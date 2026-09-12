@@ -20,7 +20,17 @@ non-canon; a decision record is now authored only when a real principle-level
 decision needs one, never as a backfill) — every check below holds vacuously true
 over an empty inventory.
 
-No CLI verb and no ``specs doctor`` rule are introduced by this file (item 4's own
+The record SHAPE is no longer hand-rolled here (0.4.7 FR6, T-047-03): the
+``find_field_violations``/``_record_violations`` copy of the required-field, status-enum
+and acceptance-law checks is DELETED and every shape assertion now runs
+``decision-record-v1.schema.json`` — the same schema the ``ledgers`` section of
+``dadaia doctor`` runs over the committed file, so a schema change can no longer pass
+here and fail there (the exact drift that let six pre-Wave-0 records violate their own
+schema while every check was green). ``find_numbering_violations`` stays: monotonic
+gap-free numbering is a property of the SET of records, which no per-record schema can
+express.
+
+No CLI verb and no doctor rule beyond that section is introduced by this file (item 4's own
 scope) — a pytest-only contract over the files already on disk plus in-memory
 fixtures. Supersedes the pre-v0.5.0-specs-canon-closure markdown-ADR contract
 (``NNNN-<slug>.md``, one file per decision) entirely — that machinery is deleted with
@@ -34,26 +44,14 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.features.specs.schemas import schema_errors
+
 pytestmark = pytest.mark.contract
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _ADR_DIR = _REPO_ROOT / "specs" / "ADRs"
 _DECISIONS_PATH = _ADR_DIR / "decisions.jsonl"
 _SUPERSEDED_PATH = _ADR_DIR / "_superseded" / "superseded.jsonl"
-
-_STATUS_ENUM: frozenset[str] = frozenset({"proposed", "accepted", "rejected", "superseded"})
-_REQUIRED_FIELDS: tuple[str, ...] = (
-    "id",
-    "ts",
-    "title",
-    "status",
-    "context",
-    "decision",
-    "consequences",
-    "measured_by",
-    "supersedes",
-    "amends",
-)
 
 
 def _read_jsonl_records(path: Path) -> list[dict[str, object]]:
@@ -73,27 +71,9 @@ def _read_jsonl_records(path: Path) -> list[dict[str, object]]:
 
 
 def find_field_violations(record: dict[str, object]) -> list[str]:
-    """Pure validator: every required-field/status/acceptance-law check for one
-    record, as violation strings. Shared by the real-file assertion below and every
-    in-memory mutation fixture."""
-    violations: list[str] = []
-    record_id = record.get("id", "<missing id>")
-
-    for field in _REQUIRED_FIELDS:
-        if field not in record:
-            violations.append(f"{record_id}: missing required field {field!r}")
-
-    status = record.get("status")
-    if status is not None and status not in _STATUS_ENUM:
-        violations.append(f"{record_id}: status {status!r} is not in {sorted(_STATUS_ENUM)}")
-
-    if status == "accepted" and not record.get("measured_by"):
-        violations.append(
-            f"{record_id}: status 'accepted' requires a non-null 'measured_by' — a "
-            "decision nobody can measure is not a principle, it is prose"
-        )
-
-    return violations
+    """Every ``decision-record-v1`` violation for one record, as messages — the ONE
+    validator, shared by the committed-file assertion and every mutation fixture."""
+    return schema_errors(record, "ADRs/decision-record-v1")
 
 
 def find_numbering_violations(ids: list[str]) -> list[str]:
@@ -183,13 +163,13 @@ def test_missing_required_field_is_red(field_name: str) -> None:
 def test_invalid_status_value_is_red() -> None:
     mutated = {**_VALID_RECORD, "status": "in-review"}
     violations = find_field_violations(mutated)
-    assert any("status" in v for v in violations), violations
+    assert any("'in-review' is not one of" in v for v in violations), violations
 
 
 def test_accepted_status_without_measured_by_is_red() -> None:
     mutated = {**_VALID_RECORD, "status": "accepted"}
     violations = find_field_violations(mutated)
-    assert any("measured_by" in v for v in violations), violations
+    assert any("None is not of type 'string'" in v for v in violations), violations
 
 
 def test_accepted_status_with_measured_by_is_green() -> None:
@@ -223,3 +203,12 @@ def test_non_4_digit_id_is_red() -> None:
 
 def test_empty_id_list_is_valid() -> None:
     assert find_numbering_violations([]) == []
+
+
+def test_the_pre_wave0_record_shape_is_red() -> None:
+    """The six records the 2026-09-12 audit found violating their own schema carried
+    `"supersedes": []` (`git show f915b3db^:specs/ADRs/decisions.jsonl`). The hand-rolled
+    validator this file used to carry checked presence only, so it called them clean —
+    the schema does not."""
+    violations = find_field_violations({**_VALID_RECORD, "supersedes": []})
+    assert any("[] is not of type" in v for v in violations), violations

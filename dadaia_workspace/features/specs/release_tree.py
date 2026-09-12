@@ -26,13 +26,14 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from jsonschema import Draft202012Validator
 
 from dadaia_workspace.core.release_state import parse_release_state, release_state_file
 from dadaia_workspace.features.specs.doctor_common import RELEASE_ARTIFACTS
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
+from dadaia_workspace.features.specs.schemas import validator_for
 
 __all__ = [
     "RELEASE_TREE_PHASES",
@@ -47,8 +48,7 @@ __all__ = [
 RELEASE_TREE_PHASES: tuple[str, ...] = ("DEFINITION", "IMPLEMENTATION", "CLOSURE", "ARCHIVED")
 
 _SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
-_PACKAGE_ROOT = Path(__file__).resolve().parents[2]  # dadaia_workspace/
-_SCHEMA_PATH = _PACKAGE_ROOT / "public" / "schemas" / "releases" / "release-state-v1.schema.json"
+_SCHEMA_NAME = "releases/release-state-v1"
 
 
 @dataclass(frozen=True)
@@ -61,10 +61,6 @@ class ReleaseTreeIssue:
     path: str
     code: str
     message: str
-
-
-def _schema() -> dict[str, Any]:
-    return cast(dict[str, Any], json.loads(_SCHEMA_PATH.read_text(encoding="utf-8")))
 
 
 def _release_dirs(releases_root: Path) -> list[tuple[Path, bool]]:
@@ -142,7 +138,7 @@ def validate_release_tree(specs_dir: Path) -> list[ReleaseTreeIssue]:
     its SPEC/PLAN/TASKS trio.
     """
     issues: list[ReleaseTreeIssue] = []
-    validator = Draft202012Validator(_schema())
+    validator = validator_for(_SCHEMA_NAME)
     for release_dir, archived in _release_dirs(specs_dir / "releases"):
         dir_rel = release_dir.relative_to(specs_dir).as_posix()
         if not archived:

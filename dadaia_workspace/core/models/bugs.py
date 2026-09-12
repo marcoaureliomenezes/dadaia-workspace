@@ -38,6 +38,7 @@ from dataclasses import fields as dc_fields
 from enum import StrEnum
 from typing import Any
 
+from dadaia_workspace.core.models.histo import BUGS_DISPOSITIONS
 from dadaia_workspace.core.redaction import PatternLike, first_privacy_hit, redact_text
 
 __all__ = [
@@ -75,14 +76,10 @@ class BugEventKind(StrEnum):
 #: (archive eligibility) and ``features.specs.doctor_governance`` (the archive-overdue
 #: WARN) import it from here, since neither may import the other
 #: (`features-no-cross-feature`).
-TERMINAL_EVENTS: frozenset[str] = frozenset(
-    {
-        BugEventKind.RESOLVED.value,
-        BugEventKind.SUPERSEDED.value,
-        BugEventKind.DEFERRED.value,
-        BugEventKind.REJECTED.value,
-    }
-)
+#: 0.4.7 FR7: the four words themselves now come from the ONE terminal vocabulary
+#: (``core.models.histo.BUGS_DISPOSITIONS``) rather than being restated here — one
+#: constant per vocabulary, across every ledger.
+TERMINAL_EVENTS: frozenset[str] = frozenset(BUGS_DISPOSITIONS)
 
 #: v0.5.0 FR2/A2.8 — the default age (days) at which a terminal ``BugRecord`` becomes
 #: eligible for ``dadaia bugs archive`` and, if still live past it, trips the doctor's

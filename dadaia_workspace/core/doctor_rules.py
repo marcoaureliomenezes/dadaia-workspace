@@ -26,7 +26,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-__all__ = ["Rule", "SectionFinding", "SectionReport", "run_section", "total_line"]
+__all__ = ["Rule", "SectionFinding", "SectionReport", "merge_sections", "run_section", "total_line"]
 
 
 @dataclass(frozen=True)
@@ -136,3 +136,22 @@ def total_line(reports: Sequence[SectionReport]) -> str:
     total = sum(r.total for r in reports)
     percent = (100 * canonical) // total if total else 100
     return f"compliance(total): {canonical}/{total} checks canonical ({percent}%)"
+
+
+def merge_sections(reports: Sequence[SectionReport]) -> SectionReport:
+    """Fold the parts of ONE section contributed by different features into one report.
+
+    A section is not a feature: `ledgers` is scored over the backlog document's records
+    AND every other committed governance record, contributed by two features that may
+    not import each other. Merging their reports at the composition root keeps one
+    section, one grammar and one score line without any cross-feature reach-in — the
+    numerators and denominators simply add, exactly as :func:`total_line` adds sections.
+    """
+    first = reports[0]
+    return SectionReport(
+        name=first.name,
+        unit=first.unit,
+        findings=tuple(f for report in reports for f in report.findings),
+        canonical=sum(report.canonical for report in reports),
+        total=sum(report.total for report in reports),
+    )

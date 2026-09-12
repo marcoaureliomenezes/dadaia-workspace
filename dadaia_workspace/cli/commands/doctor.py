@@ -34,6 +34,7 @@ from dadaia_workspace.core.doctor_rules import (
     Rule,
     SectionFinding,
     SectionReport,
+    merge_sections,
     run_section,
     total_line,
 )
@@ -42,6 +43,7 @@ from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.backlog import doctor as backlog_doctor
 from dadaia_workspace.features.spec_context.doctor import DoctorService, workspace_rules
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
+from dadaia_workspace.features.specs import ledgers as specs_ledgers
 from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
 from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 from dadaia_workspace.features.specs.rules import render_fix_help
@@ -163,9 +165,29 @@ def _ledgers_render(
     )
 
 
+def _ledger_schema_render(
+    _rule: Rule[specs_ledgers.LedgersContext, specs_ledgers.LedgerIssue],
+    issue: specs_ledgers.LedgerIssue,
+) -> SectionFinding:
+    """The compliance unit of a schema-validated ledger is the RECORD, located
+    `path:line` — the same unit the backlog rules score, so the two rule groups add
+    into one score line."""
+    return SectionFinding(
+        code=issue.code,
+        verdict=Severity.ERROR.value,
+        message=f"{issue.unit} {issue.message}",
+        canonical=False,
+        error=True,
+        unit=issue.unit,
+    )
+
+
 def _ledgers_section(
     specs_dir: Path | None, source_root: str | None, alias_map: str | None
 ) -> SectionReport:
+    """The `ledgers` section: the backlog document's BL-* rules plus one schema rule per
+    committed governance ledger (0.4.7 FR6). Two features contribute, neither imports
+    the other, and the two reports merge into one section here — the composition root."""
     from dadaia_workspace.cli.anchors import derive_cli_anchors
     from dadaia_workspace.core.models.backlog import BacklogHistoRecord, ConsumedBacklogHistoRecord
     from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
@@ -191,13 +213,26 @@ def _ledgers_section(
             from_dict=ConsumedBacklogHistoRecord.from_dict,
         ),
     )
-    return run_section(
-        "ledgers",
-        "records",
-        backlog_doctor.RULES,
-        context,
-        _ledgers_render,
-        total_units=len(context.items),
+    ledgers_context = specs_ledgers.build_ledgers_context(specs_dir)
+    return merge_sections(
+        [
+            run_section(
+                "ledgers",
+                "records",
+                backlog_doctor.RULES,
+                context,
+                _ledgers_render,
+                total_units=len(context.items),
+            ),
+            run_section(
+                "ledgers",
+                "records",
+                specs_ledgers.RULES,
+                ledgers_context,
+                _ledger_schema_render,
+                total_units=ledgers_context.total_records,
+            ),
+        ]
     )
 
 

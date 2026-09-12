@@ -21,16 +21,16 @@ headings, and wikilink resolution.
 from __future__ import annotations
 
 import argparse
-import json
 import re
 import sys
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from jsonschema import Draft202012Validator
 
 from dadaia_workspace.core import frontmatter as _fm
 from dadaia_workspace.features.specs import memory_canon
+from dadaia_workspace.features.specs.schemas import load_schema
 
 __all__ = [
     "AtomResult",
@@ -48,19 +48,12 @@ __all__ = [
 # inversion was the LOGIC living only in the projected copy, requiring a subprocess).
 # ---------------------------------------------------------------------------
 
-_PACKAGE_ROOT = Path(__file__).resolve().parents[2]  # dadaia_workspace/
-_SCHEMA_REL = Path("public") / "schemas" / "memory" / "memory-frontmatter-v1.schema.json"
-
 
 def load_frontmatter_schema() -> dict[str, Any]:
-    """Load the packaged frontmatter JSON schema."""
-    schema_path = _PACKAGE_ROOT / _SCHEMA_REL
-    if not schema_path.exists():
-        raise FileNotFoundError(
-            f"memory-frontmatter-v1.schema.json not found at {schema_path} "
-            "— the installed dadaia-workspace package is incomplete."
-        )
-    return cast(dict[str, Any], json.loads(schema_path.read_text(encoding="utf-8")))
+    """Load the packaged frontmatter JSON schema — the memory feature's named entry
+    point (its own tests, ``doctor_memory`` and the lint below call it by name),
+    resolved through the ONE packaged-schema loader (0.4.7 T-047-03)."""
+    return load_schema("memory/memory-frontmatter-v1")
 
 
 # ---------------------------------------------------------------------------

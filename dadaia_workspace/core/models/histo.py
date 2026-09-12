@@ -1,0 +1,133 @@
+"""The ONE history-record shape and the ONE terminal vocabulary (0.4.7 FR7, T-047-03).
+
+Three ``_histo.jsonl`` files carry the terminal record of everything that leaves a
+live governance document — ``backlog/_archive/backlog_histo.jsonl``,
+``audits/_archive/audits_histo.jsonl``, ``releases/_archive/releases_histo.jsonl`` —
+and each was written by its own writer, in its own shape, with no schema and no
+reader: two of them are event streams wrapping a free-form ``data`` object, the third
+is a record with two snapshot fields nothing ever read. That is the structural cause
+the 2026-09-12 lifecycle audit named: schemas existed for live documents only.
+
+:class:`HistoRecord` is that one shape — seven fields, the same seven for all three
+files — and :data:`TERMINAL_DISPOSITIONS` is the one lowercase vocabulary every
+ledger's subset is drawn from. A subset is a validator PARAMETER (which words this
+ledger may use), never a second schema file.
+
+Pure domain module: stdlib only, no I/O — ``core`` reads no schema file itself
+(``tests/contract/test_core_file_io_purity.py``).
+"""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import Any
+
+__all__ = [
+    "AUDITS_HISTO_DISPOSITIONS",
+    "BACKLOG_HISTO_DISPOSITIONS",
+    "BUGS_DISPOSITIONS",
+    "FINDINGS_DISPOSITIONS",
+    "RELEASES_HISTO_DISPOSITIONS",
+    "TERMINAL_DISPOSITIONS",
+    "HistoRecord",
+]
+
+#: The one terminal vocabulary (SPEC 0.4.7 FR7), lowercase. Every per-ledger subset
+#: below is a slice of THIS tuple, in this order.
+TERMINAL_DISPOSITIONS: tuple[str, ...] = (
+    "delivered",
+    "resolved",
+    "superseded",
+    "deferred",
+    "rejected",
+)
+
+#: A backlog item is delivered, superseded or rejected — it is never "resolved" (that
+#: is a bug's word) and a deferred item returns to ``active[]`` rather than exiting.
+BACKLOG_HISTO_DISPOSITIONS: tuple[str, ...] = ("delivered", "superseded", "rejected")
+
+#: A bug's four terminal statuses — the same four words
+#: ``core.models.bugs.TERMINAL_EVENTS`` is built from, so there is one constant, not two.
+BUGS_DISPOSITIONS: tuple[str, ...] = ("resolved", "superseded", "deferred", "rejected")
+
+#: An audit finding's terminal dispositions. NOTE: the live
+#: ``finding-record-v1.schema.json`` ``disposition`` enum keeps its own historical
+#: ``open|fixed|superseded|deferred|rejected`` words — renaming ``fixed`` to
+#: ``resolved`` is a data migration of every committed FINDINGS.jsonl and is NOT in
+#: T-047-03's scope. This subset is the vocabulary of an audit's ``_histo`` record,
+#: which is written by this shape only.
+FINDINGS_DISPOSITIONS: tuple[str, ...] = ("resolved", "superseded", "deferred", "rejected")
+
+#: An archived audit's histo record uses the findings subset.
+AUDITS_HISTO_DISPOSITIONS: tuple[str, ...] = FINDINGS_DISPOSITIONS
+
+#: A release exits exactly once, by being shipped.
+RELEASES_HISTO_DISPOSITIONS: tuple[str, ...] = ("delivered",)
+
+
+def _require_str(raw: Mapping[str, Any], key: str) -> str:
+    value = raw.get(key)
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"histo record field {key!r} must be a non-empty string, got {value!r}")
+    return value
+
+
+def _optional_str(raw: Mapping[str, Any], key: str) -> str | None:
+    if key not in raw:
+        raise ValueError(f"histo record is missing required field {key!r}")
+    value = raw[key]
+    if value is None or isinstance(value, str):
+        return value
+    raise ValueError(f"histo record field {key!r} must be a string or null, got {value!r}")
+
+
+@dataclass(frozen=True)
+class HistoRecord:
+    """One terminal record of one exit, in any ``_histo.jsonl``.
+
+    ``id``/``ts``/``disposition`` are the immutable core (the record's identity and
+    its terminal verdict); ``release``/``reason``/``summary`` are nullable free text;
+    ``entry`` is the removed object itself (a backlog entry, an audit's counts) or
+    ``None`` when the exit had nothing to snapshot.
+    """
+
+    id: str
+    ts: str
+    disposition: str
+    release: str | None
+    reason: str | None
+    summary: str | None
+    entry: dict[str, Any] | None
+
+    def to_dict(self) -> dict[str, object]:
+        """Serialize to the JSONL object shape (``"id"`` present so the generic
+        ``JsonlRecordStore.update`` seam can locate this record)."""
+        return {
+            "id": self.id,
+            "ts": self.ts,
+            "disposition": self.disposition,
+            "release": self.release,
+            "reason": self.reason,
+            "summary": self.summary,
+            "entry": self.entry,
+        }
+
+    @classmethod
+    def from_dict(cls, raw: Mapping[str, object]) -> HistoRecord:
+        """Parse one JSONL object. Raises ``ValueError`` on a malformed record, so a
+        tolerant reader can skip it (mirrors ``BugRecord``/``BacklogHistoRecord``)."""
+        if "entry" not in raw:
+            raise ValueError("histo record is missing required field 'entry'")
+        entry = raw["entry"]
+        if entry is not None and not isinstance(entry, dict):
+            raise ValueError(f"histo record field 'entry' must be an object or null, got {entry!r}")
+        return cls(
+            id=_require_str(raw, "id"),
+            ts=_require_str(raw, "ts"),
+            disposition=_require_str(raw, "disposition"),
+            release=_optional_str(raw, "release"),
+            reason=_optional_str(raw, "reason"),
+            summary=_optional_str(raw, "summary"),
+            entry=entry,
+        )
