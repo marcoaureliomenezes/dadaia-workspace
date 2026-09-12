@@ -71,7 +71,7 @@
   `dadaia_workspace/features/specs/candidate.py`, `dadaia_workspace/cli/commands/
   newartifacts.py`, `tests/**`. Blocked by: T-047-07, T-047-08. Delivers: the
   promote lane is one verb, refused with `fix:` on an open task.
-- [ ] T-047-10 — FR8: `_superseded/` lane deleted from canon/law/test; status
+- [-] T-047-10 — FR8: `_superseded/` lane deleted from canon/law/test; status
   superseded in place; `measured_by` resolvable pattern in schema + test; rulings
   born accepted (law text); DADAIA §6.5 reworded; P-02 → `ADR: none`; ADR
   0005–0009 `measured_by` rewritten to `WS-`/`SPEC-DOC`/pytest refs; 0004/0010
