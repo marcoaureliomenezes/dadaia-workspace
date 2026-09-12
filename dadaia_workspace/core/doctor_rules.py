@@ -77,7 +77,7 @@ class SectionReport:
 
     @property
     def percent(self) -> int:
-        return round(100 * self.canonical / self.total) if self.total else 100
+        return (100 * self.canonical) // self.total if self.total else 100
 
     @property
     def printable(self) -> tuple[SectionFinding, ...]:
@@ -134,5 +134,5 @@ def total_line(reports: Sequence[SectionReport]) -> str:
     """The run's final line: the three sections' numerators and denominators summed."""
     canonical = sum(r.canonical for r in reports)
     total = sum(r.total for r in reports)
-    percent = round(100 * canonical / total) if total else 100
+    percent = (100 * canonical) // total if total else 100
     return f"compliance(total): {canonical}/{total} checks canonical ({percent}%)"
