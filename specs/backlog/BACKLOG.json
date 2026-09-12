@@ -19,8 +19,7 @@
         {
           "subject": {
             "kind": "cli",
-            "ref": "release archive",
-            "surface": "new"
+            "ref": "release archive"
           },
           "change": "new verb: validated promote lane + histo record + next-release birth in one transaction"
         },
