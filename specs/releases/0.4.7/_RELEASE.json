@@ -3,7 +3,10 @@
   "release": "0.4.7",
   "phase": "DEFINITION",
   "rc": null,
-  "defined": null,
+  "defined": {
+    "sha": "97375d8a",
+    "ts": "2026-09-12T21:21:22Z"
+  },
   "implemented": null,
   "shipped": null,
   "audited": null,
@@ -13,6 +16,12 @@
       "agent": "project-manager",
       "kind": "note",
       "text": "Release 0.4.7 born (version minted at birth in 91cb34c4: pyproject 0.4.7, CHANGELOG [0.4.7]); open scope; candidate 1 = 'records tell the truth' (release-lifecycle-verbs, one-doctor-one-rule-registry, adr-ledger-hygiene, memory-hygiene) from the 2026-09-12 SDD lifecycle audit + grill (handoff 2026-09-12T181306Z). Born six days after the branch because dadaia release new writes only SPEC.md and no verb creates this file (bug release-new-writes-spec-only-never-creates-release-state, fixed in candidate 1)."
+    },
+    {
+      "ts": "2026-09-12T21:21:22Z",
+      "agent": "product-engineer",
+      "kind": "note",
+      "text": "Candidate 1 defined: trio SPEC/PLAN/TASKS Aprovado at 97375d8a (operator directive 2026-09-12: implement and close every registered release and backlog item, one deploy at the end). Operator decision on ADR 0004/0010 taken by the same directive on the PM's recommendation: 0004 accepted as written; 0010 rewritten to name existing principles before acceptance (T-047-10)."
     }
   ]
 }

@@ -1,6 +1,6 @@
 # PLAN — Release: 0.4.7
 
-**Status:** Draft
+**Status:** Aprovado
 **Release ID:** 0.4.7
 **Owner:** product-engineer
 
