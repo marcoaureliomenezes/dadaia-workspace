@@ -1,0 +1,18 @@
+{
+  "schema": "release-state-v1",
+  "release": "0.4.7",
+  "phase": "DEFINITION",
+  "rc": null,
+  "defined": null,
+  "implemented": null,
+  "shipped": null,
+  "audited": null,
+  "log": [
+    {
+      "ts": "2026-09-12T18:28:07Z",
+      "agent": "project-manager",
+      "kind": "note",
+      "text": "Release 0.4.7 born (version minted at birth in 91cb34c4: pyproject 0.4.7, CHANGELOG [0.4.7]); open scope; candidate 1 = 'records tell the truth' (release-lifecycle-verbs, one-doctor-one-rule-registry, adr-ledger-hygiene, memory-hygiene) from the 2026-09-12 SDD lifecycle audit + grill (handoff 2026-09-12T181306Z). Born six days after the branch because dadaia release new writes only SPEC.md and no verb creates this file (bug release-new-writes-spec-only-never-creates-release-state, fixed in candidate 1)."
+    }
+  ]
+}
