@@ -58,24 +58,9 @@
         {
           "subject": {
             "kind": "cli",
-            "ref": "doctor",
-            "surface": "new"
+            "ref": "doctor"
           },
-          "change": "the unified compliance entry (the registry lacks the workspace-level doctor anchor today): sections workspace/specs/ledgers, score per section and total"
-        },
-        {
-          "subject": {
-            "kind": "cli",
-            "ref": "specs doctor"
-          },
-          "change": "folds into dadaia doctor as the specs section"
-        },
-        {
-          "subject": {
-            "kind": "cli",
-            "ref": "backlog doctor"
-          },
-          "change": "folds into dadaia doctor as the ledgers section"
+          "change": "the one compliance entry: sections workspace/specs/ledgers, one rule registry, score per section and total; specs doctor and backlog doctor folded in and deleted"
         },
         {
           "subject": {
