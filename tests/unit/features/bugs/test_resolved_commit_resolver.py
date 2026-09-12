@@ -27,7 +27,13 @@ from ._bug_record_helpers import bug_record_store
 _TS = "2026-08-26T10:00:00Z"
 
 
-def _record(bug_id: str, *, status: str = "open", resolved_commit: str | None = None) -> BugRecord:
+def _record(
+    bug_id: str,
+    *,
+    status: str = "open",
+    closed_at: str | None = None,
+    resolved_commit: str | None = None,
+) -> BugRecord:
     return BugRecord(
         id=bug_id,
         ts=_TS,
@@ -41,6 +47,7 @@ def _record(bug_id: str, *, status: str = "open", resolved_commit: str | None = 
         repro="r",
         expected="e",
         status=status,
+        closed_at=closed_at,
         resolved_commit=resolved_commit,
     )
 
@@ -74,7 +81,9 @@ def test_resolved_commit_returns_stored_value_without_consulting_history(tmp_pat
         history_reader=_RaisingHistoryReader(),
         repo_root=tmp_path,
     )
-    record = _record("bug-alpha", status="resolved", resolved_commit="c-stored")
+    record = _record(
+        "bug-alpha", status="resolved", closed_at="2026-09-01T00:00:00Z", resolved_commit="c-stored"
+    )
 
     assert service.resolved_commit(record) == "c-stored"
 
@@ -212,7 +221,9 @@ def test_resolved_commit_uses_replace_to_force_derivation_on_an_already_stored_r
     reader = _FakeHistoryReader(commits)
     repo = tmp_path / "repo"
     service = BugService(bug_record_store(tmp_path), history_reader=reader, repo_root=repo)
-    stored = _record("bug-epsilon", status="resolved", resolved_commit="c2")
+    stored = _record(
+        "bug-epsilon", status="resolved", closed_at="2026-09-01T00:00:00Z", resolved_commit="c2"
+    )
 
     forced = replace(stored, resolved_commit=None)
     derived = service.resolved_commit(forced)

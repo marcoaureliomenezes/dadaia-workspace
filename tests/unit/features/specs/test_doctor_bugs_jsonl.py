@@ -55,6 +55,7 @@ def _record(bug_id: str, **overrides: object) -> dict[str, Any]:
         "resolution_granularity": None,
         "resolved_release": None,
         "audited": None,
+        "closed_at": None,
     }
     base.update(overrides)
     return base
@@ -196,7 +197,10 @@ def test_resolved_without_governance_fields_is_doctor_clean(tmp_path: Path) -> N
     (the "488 live warnings nobody acts on" the K5 card names) is silent now — the
     doctor never re-diagnoses governance completeness against history."""
     specs = tmp_path / "specs"
-    _write_ledger(_bugs_dir(specs), [_record("incomplete-resolve", status="resolved")])
+    _write_ledger(
+        _bugs_dir(specs),
+        [_record("incomplete-resolve", status="resolved", closed_at="2026-09-01T00:00:00Z")],
+    )
     assert _doc033(specs) == []
 
 
@@ -208,6 +212,7 @@ def test_resolved_with_all_governance_fields_is_clean(tmp_path: Path) -> None:
             _record(
                 "complete-resolve",
                 status="resolved",
+                closed_at="2026-09-01T00:00:00Z",
                 cause="a stale seam",
                 caused_by="prior-bug",
                 resolved_release="0.5.0",
@@ -220,7 +225,10 @@ def test_resolved_with_all_governance_fields_is_clean(tmp_path: Path) -> None:
 
 def test_superseded_without_superseded_by_is_doctor_clean(tmp_path: Path) -> None:
     specs = tmp_path / "specs"
-    _write_ledger(_bugs_dir(specs), [_record("superseded-bug", status="superseded")])
+    _write_ledger(
+        _bugs_dir(specs),
+        [_record("superseded-bug", status="superseded", closed_at="2026-09-01T00:00:00Z")],
+    )
     assert _doc033(specs) == []
 
 
@@ -236,7 +244,15 @@ def test_archive_overdue_warns_past_the_threshold(tmp_path: Path) -> None:
     bugs = _bugs_dir(specs)
     _write_ledger(
         bugs,
-        [_record("old-terminal", status="resolved", ts="2026-01-01T00:00:00Z")],
+        [
+            _record(
+                "old-terminal",
+                status="resolved",
+                # 0.4.7 FR4: SPEC-DOC-041 ages by closed_at, not by the filing date.
+                closed_at="2026-02-01T00:00:00Z",
+                ts="2026-01-01T00:00:00Z",
+            )
+        ],
     )
     validator = GovernanceValidator(specs, bug_store_factory=container.build_bug_record_store)
 
@@ -255,7 +271,14 @@ def test_archive_overdue_is_silent_for_a_recent_terminal_record(tmp_path: Path) 
     bugs = _bugs_dir(specs)
     _write_ledger(
         bugs,
-        [_record("recent-terminal", status="resolved", ts="2026-08-20T00:00:00Z")],
+        [
+            _record(
+                "recent-terminal",
+                status="resolved",
+                closed_at="2026-09-01T00:00:00Z",
+                ts="2026-08-20T00:00:00Z",
+            )
+        ],
     )
     validator = GovernanceValidator(specs, bug_store_factory=container.build_bug_record_store)
 

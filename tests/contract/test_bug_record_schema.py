@@ -54,6 +54,7 @@ _AS_APPENDED: dict[str, Any] = {
     "resolution_granularity": None,
     "resolved_release": None,
     "audited": None,
+    "closed_at": None,
 }
 
 
@@ -95,6 +96,7 @@ def test_bug_record_schema_example_validates_as_appended_and_after_resolution() 
     after_resolution = {
         **_AS_APPENDED,
         "status": "resolved",
+        "closed_at": "2026-09-01T00:00:00Z",
         "cause": "root cause narrative",
         "resolved_release": "0.5.0",
         "root_cause": "root cause narrative",
@@ -103,7 +105,6 @@ def test_bug_record_schema_example_validates_as_appended_and_after_resolution() 
         "evidence_seam": "tests/contract/test_bug_record_schema.py::"
         "test_bug_record_schema_example_validates_as_appended_and_after_resolution",
         "evidence_diff": "net-neutral: relocated schema-dependent assertions to the contract tier",
-        "diff_direction": "net-neutral",
     }
     assert list(validator.iter_errors(after_resolution)) == []
 

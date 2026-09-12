@@ -32,7 +32,6 @@ from pathlib import Path
 
 from dadaia_workspace.core.models.bugs import (
     BUG_ARCHIVE_THRESHOLD_DAYS,
-    TERMINAL_EVENTS,
     BugRecord,
 )
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
@@ -123,7 +122,8 @@ class GovernanceValidator:
         return issues
 
     def check_bug_archive_overdue(self, *, now: datetime | None = None) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-041 — WARN when a terminal :class:`BugRecord` is older than
+        """SPEC-DOC-041 — WARN when a terminal :class:`BugRecord` CLOSED (``closed_at``,
+        0.4.7 FR4 — never ``ts``, the filing date) longer ago than
         :data:`~dadaia_workspace.core.models.bugs.BUG_ARCHIVE_THRESHOLD_DAYS` and is
         still live (not yet moved by ``dadaia bugs archive``). Never a block; the
         exit code is unchanged. Absent ``bugs/`` dir -> no-op.
@@ -134,17 +134,17 @@ class GovernanceValidator:
         cutoff = (now or datetime.now(tz=UTC)) - timedelta(days=BUG_ARCHIVE_THRESHOLD_DAYS)
         issues: list[SpecsDoctorIssue] = []
         for record in self._bug_store().iter_records():
-            if record.status not in TERMINAL_EVENTS:
+            if record.closed_at is None:
                 continue
-            record_ts = _parse_bug_record_ts(record.ts)
-            if record_ts is not None and record_ts < cutoff:
+            closed_at = _parse_bug_record_ts(record.closed_at)
+            if closed_at is not None and closed_at < cutoff:
                 issues.append(
                     SpecsDoctorIssue(
                         code="SPEC-DOC-041",
                         severity=Severity.WARNING,
                         description=(
                             f"bugs/BUGS.jsonl record {record.id!r} has been terminal "
-                            f"({record.status!r}) since {record.ts} — past the "
+                            f"({record.status!r}) since {record.closed_at} — past the "
                             f"{BUG_ARCHIVE_THRESHOLD_DAYS}-day archive threshold; run "
                             "'dadaia bugs archive' (SPEC-DOC-041, WARNING — never a "
                             "block, D15)."

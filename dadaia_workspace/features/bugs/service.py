@@ -35,7 +35,6 @@ from jsonschema.exceptions import ValidationError
 from dadaia_workspace.core.bug_provenance import classify_ledger_line, derive_commit_provenance
 from dadaia_workspace.core.models.bugs import (
     BUG_ARCHIVE_THRESHOLD_DAYS,
-    TERMINAL_EVENTS,
     BugRecord,
 )
 from dadaia_workspace.core.redaction import PatternLike
@@ -208,6 +207,7 @@ class BugService:
             "resolution_granularity": None,
             "resolved_release": None,
             "audited": None,
+            "closed_at": None,
         }
         if self._validate is not None:
             try:
@@ -256,8 +256,11 @@ class BugService:
     def archive(
         self, *, now: datetime | None = None, threshold_days: int = BUG_ARCHIVE_THRESHOLD_DAYS
     ) -> BugArchiveResult:
-        """A2.8 — move every terminal record older than *threshold_days* from the live
-        ledger to the archive store, through
+        """A2.8 — move every record CLOSED more than *threshold_days* ago from the
+        live ledger to the archive store. Ageing is by ``closed_at`` (0.4.7 FR4):
+        ``ts`` is the FILING date, so a bug filed long ago and closed yesterday used
+        to be archivable the day it closed. ``closed_at`` is non-null iff the status
+        is terminal, so the status test IS the closed_at test — one condition, not two, through
         :meth:`~dadaia_workspace.infrastructure.jsonl_record_store.JsonlRecordStore.remove`
         (v0.5.0 S1 FR23 firing, A1) — the SAME refuse-stale seam :meth:`apply_update`
         already uses, never a second, unsealed raw-file rewrite. Idempotent: a second
@@ -271,7 +274,7 @@ class BugService:
         eligible_ids = {
             record.id
             for record in all_records
-            if record.status in TERMINAL_EVENTS and _parse_ts(record.ts) < cutoff
+            if record.closed_at is not None and _parse_ts(record.closed_at) < cutoff
         }
         if not eligible_ids:
             return BugArchiveResult(archived=0, kept=len(all_records))

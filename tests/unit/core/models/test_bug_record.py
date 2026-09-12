@@ -283,7 +283,6 @@ _RESOLVE_KWARGS: dict[str, str] = {
     "evidence_loop": "pytest -k the_red_loop",
     "evidence_seam": "tests/unit/x.py::test_seam",
     "evidence_diff": "net-negative: deleted more than added",
-    "diff_direction": "net-negative",
 }
 
 
@@ -345,15 +344,36 @@ def test_resolve_refuses_a_malformed_evidence_diff_pattern(bad_evidence_diff: st
     assert "evidence_diff" in str(excinfo.value)
 
 
-def test_resolve_refuses_a_diff_direction_outside_the_closed_enum() -> None:
-    record = _sample_record()
+def test_resolve_derives_diff_direction_from_the_evidence_diff_prefix() -> None:
+    """0.4.7 FR4 (T-047-08): `diff_direction` is NOT an input — two inputs for one
+    word can disagree, and a record whose narrative says 'net-negative: …' while its
+    direction says 'net-positive' states a governance fact that is false. RED before
+    the change: `resolve()` required the keyword and accepted a contradicting value.
+    Intent: CONTRACT — T-047-08; size: SMALL."""
     kwargs = dict(_RESOLVE_KWARGS)
-    kwargs["diff_direction"] = "sideways"
+    kwargs["evidence_diff"] = "net-positive: one helper added, justified"
+    resolved = _sample_record().resolve(**kwargs)
+    assert resolved.diff_direction == "net-positive"
+    assert resolved.evidence_diff == "net-positive: one helper added, justified"
 
-    with pytest.raises(IncompleteTransitionError) as excinfo:
-        record.resolve(**kwargs)
 
-    assert "diff_direction" in str(excinfo.value)
+def test_resolve_stamps_closed_at_on_every_terminal_verb() -> None:
+    """0.4.7 FR4 (T-047-08): all four terminal transitions go through the ONE seam
+    (`_reach_terminal`), so none can reach a terminal status unstamped.
+    Intent: CONTRACT — T-047-08; size: SMALL."""
+    record = _sample_record()
+    assert record.resolve(**_RESOLVE_KWARGS).closed_at is not None
+    assert record.supersede(by="other-bug").closed_at is not None
+    assert record.defer(reason="later").closed_at is not None
+    assert record.reject(reason="not a bug").closed_at is not None
+
+
+def test_apply_governance_update_refuses_closed_at() -> None:
+    """0.4.7 FR4 (T-047-08): `closed_at` is transition-owned, exactly like `status` —
+    a bare governance write can never forge the instant a bug closed.
+    Intent: CONTRACT — T-047-08; size: SMALL."""
+    with pytest.raises(ValueError, match="closed_at"):
+        _sample_record().apply_governance_update({"closed_at": "2026-09-01T00:00:00Z"})
 
 
 @pytest.mark.parametrize(
@@ -443,4 +463,37 @@ def test_from_dict_round_trips_every_terminal_status() -> None:
     for status in ("open", "resolved", "superseded", "deferred", "rejected"):
         payload = _sample_record().to_dict()
         payload["status"] = status
+        # 0.4.7 FR4: closed_at is non-null if and only if the status is terminal —
+        # the record's own cross-field invariant, checked on every construction path.
+        payload["closed_at"] = None if status == "open" else "2026-09-01T00:00:00Z"
         assert BugRecord.from_dict(payload).status == status
+
+
+def test_from_dict_refuses_a_terminal_status_without_closed_at() -> None:
+    """0.4.7 FR4 (T-047-08), RED before the change: a terminal record carrying no
+    closure instant was accepted, and `bugs archive` then aged it by its FILING date.
+    Intent: CONTRACT — T-047-08; size: SMALL."""
+    payload = _sample_record().to_dict()
+    payload["status"] = "resolved"
+    payload["closed_at"] = None
+    with pytest.raises(ValueError, match="carries no 'closed_at'"):
+        BugRecord.from_dict(payload)
+
+
+def test_from_dict_refuses_a_closed_at_preceding_the_filing_date() -> None:
+    """0.4.7 FR4 (T-047-08): a bug cannot close before it was filed.
+    Intent: CONTRACT — T-047-08; size: SMALL."""
+    payload = _sample_record().to_dict()
+    payload["status"] = "resolved"
+    payload["closed_at"] = "2000-01-01T00:00:00Z"
+    with pytest.raises(ValueError, match="precedes its filing date"):
+        BugRecord.from_dict(payload)
+
+
+def test_from_dict_refuses_an_open_record_carrying_closed_at() -> None:
+    """0.4.7 FR4 (T-047-08): closed_at is stamped only by a terminal transition.
+    Intent: CONTRACT — T-047-08; size: SMALL."""
+    payload = _sample_record().to_dict()
+    payload["closed_at"] = "2026-09-01T00:00:00Z"
+    with pytest.raises(ValueError, match="is open but carries closed_at"):
+        BugRecord.from_dict(payload)

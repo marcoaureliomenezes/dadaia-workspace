@@ -198,6 +198,7 @@ def test_bug_record_redact_scrubs_every_non_identity_field() -> None:
         repro=f"leaked {term} here",
         expected=f"leaked {term} here",
         status="resolved",
+        closed_at="2026-09-01T00:00:00Z",
         cause=f"leaked {term} here",
         caused_by=None,
         lineage_source=None,

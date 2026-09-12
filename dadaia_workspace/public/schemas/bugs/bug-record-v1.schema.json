@@ -26,7 +26,8 @@
     "resolved_commit",
     "resolution_granularity",
     "resolved_release",
-    "audited"
+    "audited",
+    "closed_at"
   ],
   "properties": {
     "id": {
@@ -58,7 +59,12 @@
     },
     "severity": {
       "type": "string",
-      "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"],
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        "CRITICAL"
+      ],
       "x-mutability": "immutable-core",
       "description": "Severity level, set at registration."
     },
@@ -125,56 +131,108 @@
     },
     "status": {
       "type": "string",
-      "enum": ["open", "resolved", "superseded", "deferred", "rejected"],
+      "enum": [
+        "open",
+        "resolved",
+        "superseded",
+        "deferred",
+        "rejected"
+      ],
       "x-mutability": "mutable-governance",
       "description": "Governance state. NO `picked` value (v0.5.0 FR2) — the pick is the bundled definition commit, not a status."
     },
     "cause": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "x-mutability": "mutable-governance",
       "description": "The one generic mutable-governance narrative field, reused across transitions rather than a second field per verb: the fix's statement of what caused the bug when resolved, or the reason narrative when deferred/rejected."
     },
     "caused_by": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "x-mutability": "mutable-governance",
       "description": "The prior bug id this one was caused by, when this record is itself a reopen (a new id declaring `caused_by`)."
     },
     "lineage_source": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "x-mutability": "mutable-governance",
       "description": "How `caused_by` was established — e.g. `declared` (the fixer named it) or `text-reference` (inferred from prose, FR3 migration)."
     },
     "registration_commit": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "x-mutability": "mutable-governance",
       "description": "The 40-hex commit sha that first added this record's line, derived from git history (FR3) — never hand-written (D2)."
     },
     "registration_granularity": {
-      "type": ["string", "null"],
-      "enum": ["exact", "release-squash", "ledger-only", null],
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "exact",
+        "release-squash",
+        "ledger-only",
+        null
+      ],
       "x-mutability": "mutable-governance",
       "description": "How precisely `registration_commit` identifies the adding commit."
     },
     "resolved_commit": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "x-mutability": "mutable-governance",
       "description": "The 40-hex commit sha that fixed this bug, derived from git history (FR3) — null until an audit fills it (a commit cannot contain its own sha, AS-1)."
     },
     "resolution_granularity": {
-      "type": ["string", "null"],
-      "enum": ["exact", "release-squash", "ledger-only", null],
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "exact",
+        "release-squash",
+        "ledger-only",
+        null
+      ],
       "x-mutability": "mutable-governance",
       "description": "How precisely `resolved_commit` identifies the fixing commit."
     },
     "resolved_release": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "x-mutability": "mutable-governance",
       "description": "The release id that shipped the fix."
     },
     "audited": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "x-mutability": "mutable-governance",
       "description": "The audit window id that reviewed this resolution — the one place `resolved_commit`/`resolution_granularity`/`audited` are ever written together, in a single atomic rewrite (FR14 pillar 1)."
+    },
+    "closed_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}:\\d{2}Z)?$",
+      "description": "ISO-8601 UTC instant this record reached a terminal status; null while status is 'open' (0.4.7 FR4). Stamped by the four terminal transitions and by nothing else (core/models/bugs.py::BugRecord._reach_terminal), unreachable through apply_governance_update for the same reason 'status' is. `dadaia bugs archive` and SPEC-DOC-041 age by THIS field, never by `ts` — `ts` is the FILING date, so a bug filed long ago and closed yesterday used to be archivable the day it closed. Never earlier than `ts` (LEDGER-BUGS-SCHEMA refuses closed_at < ts), and non-null if and only if `status` is terminal.",
+      "x-mutability": "mutable-governance"
     },
     "root_cause": {
       "type": "string",
@@ -208,7 +266,11 @@
     },
     "diff_direction": {
       "type": "string",
-      "enum": ["net-negative", "net-neutral", "net-positive"],
+      "enum": [
+        "net-negative",
+        "net-neutral",
+        "net-positive"
+      ],
       "x-mutability": "write-once",
       "description": "The closed-enum token `evidence_diff` already carries as free text — the fix-shape metric reads this field, not a parse of `evidence_diff` (FR14 metric 3)."
     },

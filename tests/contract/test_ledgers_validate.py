@@ -69,6 +69,7 @@ _VALID_BUG = {
     "resolution_granularity": None,
     "resolved_release": None,
     "audited": None,
+    "closed_at": None,
 }
 _VALID_FINDING = {
     "id": "fixture-F001",
@@ -183,28 +184,18 @@ def test_a_histo_disposition_outside_the_ledgers_subset_is_an_error(tmp_path: Pa
 
 
 def test_the_real_tree_has_no_invalid_governance_record() -> None:
-    """(c) this repo's own specs/: the ADR, backlog and audit-finding ledgers validate
-    today (Wave 0 repaired those records).
+    """(c) this repo's own specs/: EVERY committed governance record validates.
 
-    The three `_histo.jsonl` histories are included since T-047-04 migrated them to
-    `histo-record-v1` (136/23/103 records). One code family is EXCLUDED, with its own
-    repair task:
-
-    * `LEDGER-BUGS-SCHEMA` — this reader's FIRST pass over the committed bug ledger
-      found 15 records that never validated `bug-record-v1`: four `surface` values
-      outside the enum (`reports`, `tmp_gc`, `spec_artifacts`) and eleven
-      `evidence_diff` strings written without the `net-negative|net-neutral|
-      net-positive:` prefix the schema requires. They are DATA, not a rule defect
-      (nothing had ever read them), and their repair rides T-047-08, which already
-      owns `specs/bugs/BUGS.jsonl` and the bug schema. The count below is a ratchet:
-      it may only go down.
+    The three `_histo.jsonl` histories joined at T-047-04 (`histo-record-v1`), and
+    T-047-08 closed the last exclusion: `LEDGER-BUGS-SCHEMA` carried a 15-record
+    ratchet (7 `surface` values outside the enum, 8 `evidence_diff` strings without
+    the `net-*:` prefix) while the repair rode that task. The ratchet is DELETED
+    rather than lowered — there is no remaining code family this reader tolerates, so
+    one assertion over every issue is the whole contract.
     """
     issues = ledger_issues(_REPO_ROOT / "specs")
-    bugs = [i for i in issues if i.code == "LEDGER-BUGS-SCHEMA"]
-    others = [i for i in issues if i.code != "LEDGER-BUGS-SCHEMA"]
 
-    assert others == [], [f"{i.code} {i.unit} {i.message}" for i in others]
-    assert len(bugs) <= 15, [f"{i.unit} {i.message}" for i in bugs]
+    assert issues == [], [f"{i.code} {i.unit} {i.message}" for i in issues]
 
 
 def test_the_doctor_ledgers_section_carries_the_schema_findings(tmp_path: Path) -> None:

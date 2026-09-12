@@ -324,10 +324,10 @@ def bugs_resolve_cmd(
     evidence_diff: str | None = typer.Option(
         None,
         "--evidence-diff",
-        help="'net-negative|net-positive|net-neutral: <rationale>'.",
-    ),
-    diff_direction: str | None = typer.Option(
-        None, "--diff-direction", help="net-negative|net-neutral|net-positive."
+        help=(
+            "'net-negative|net-positive|net-neutral: <rationale>' — the record's "
+            "diff_direction is derived from this prefix; there is no separate flag."
+        ),
     ),
     specs_dir: str | None = typer.Option(
         None, "--specs-dir", help="Path to specs/ directory. Default: bound context session."
@@ -351,7 +351,6 @@ def bugs_resolve_cmd(
             "evidence_loop": evidence_loop,
             "evidence_seam": evidence_seam,
             "evidence_diff": evidence_diff,
-            "diff_direction": diff_direction,
         },
     )
 

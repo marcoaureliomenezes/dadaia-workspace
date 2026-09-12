@@ -31,6 +31,7 @@ seam existed is never re-diagnosed: completeness is prospective, not retroactive
 
 from __future__ import annotations
 
+import datetime as _dt
 import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
@@ -201,6 +202,12 @@ _DIFF_DIRECTIONS: frozenset[str] = frozenset({"net-negative", "net-neutral", "ne
 #: without constructing a throwaway ``BugEventKind`` mapping) — pinned the same way.
 _STATUS_VALUES: frozenset[str] = frozenset({"open", *TERMINAL_EVENTS})
 
+#: The two fields the status transition owns — unreachable through
+#: :meth:`BugRecord.apply_governance_update`, stamped together by
+#: :meth:`BugRecord._reach_terminal`. One list, so a third transition-owned field
+#: cannot be added to one guard and forgotten in the other.
+_TRANSITION_OWNED_FIELDS: frozenset[str] = frozenset({"status", "closed_at"})
+
 
 def _require_record_str(raw: Mapping[str, object], key: str) -> str:
     value = raw.get(key)
@@ -263,6 +270,14 @@ class BugRecord:
     )
     resolved_release: str | None = field(default=None, metadata={"category": "mutable-governance"})
     audited: str | None = field(default=None, metadata={"category": "mutable-governance"})
+    #: ISO-8601 UTC instant this record reached a terminal status; ``null`` while open
+    #: (0.4.7 FR4, T-047-08). Emitted always, like every governance field, but
+    #: UNREACHABLE through :meth:`apply_governance_update` for the same reason
+    #: ``status`` is: it is the transition's OWN field, stamped by
+    #: :meth:`_reach_terminal` and by nothing else. Before it, "when did this bug
+    #: close" had to be inferred from ``ts`` — the FILING date — so a bug filed long
+    #: ago and closed yesterday was archivable the day it closed.
+    closed_at: str | None = field(default=None, metadata={"category": "mutable-governance"})
     # -- Write-once, absent until set (A2.2b / A2.11 — the FR23 evidence triple restored).
     root_cause: str | None = field(default=None, metadata={"category": "write-once"})
     solution: str | None = field(default=None, metadata={"category": "write-once"})
@@ -285,11 +300,12 @@ class BugRecord:
         field's value — re-asserting its current value is a harmless no-op (A2.2a).
         Refuses (:class:`BugRecordWriteOnceFieldSetError`) a second, DIFFERING write to
         a write-once field that is already set; setting it from absent (``None``)
-        always succeeds (A2.2b). Refuses (``ValueError``) the key ``"status"`` outright
-        — status changes only through :meth:`resolve`/:meth:`supersede`/:meth:`defer`/
-        :meth:`reject`, each unreachable without its own required fields; a bare
-        governance write can never reach a terminal status. Any OTHER governance field
-        may be set freely.
+        always succeeds (A2.2b). Refuses (``ValueError``) the transition-owned keys
+        ``"status"`` and ``"closed_at"`` outright — both change only through
+        :meth:`resolve`/:meth:`supersede`/:meth:`defer`/:meth:`reject`, each
+        unreachable without its own required fields; a bare governance write can never
+        reach a terminal status, nor forge the instant one was reached. Any OTHER
+        governance field may be set freely.
 
         A2.7's own limit, stated here per A2.2's docstring requirement: this is
         SEAM-LEVEL enforcement only — any agent's file tool can still rewrite any
@@ -298,12 +314,12 @@ class BugRecord:
         """
         updates: dict[str, Any] = {}
         for key, value in changes.items():
-            if key == "status":
+            if key in _TRANSITION_OWNED_FIELDS:
                 raise ValueError(
-                    "bug-record field 'status' is unreachable through "
-                    "apply_governance_update — use the matching transition instead: "
-                    "resolve|supersede|defer|reject (status is unreachable without "
-                    "its own required fields)"
+                    f"bug-record field {key!r} is unreachable through "
+                    "apply_governance_update — it belongs to the status transition "
+                    "itself: resolve|supersede|defer|reject (each unreachable without "
+                    "its own required fields, each stamping closed_at)"
                 )
             if key in _BUG_RECORD_IMMUTABLE_CORE_FIELDS:
                 if value != getattr(self, key):
@@ -323,6 +339,38 @@ class BugRecord:
             return self
         return replace(self, **updates)
 
+    def __post_init__(self) -> None:
+        """``closed_at`` is non-null if and only if ``status`` is terminal, and never
+        earlier than ``ts``. The record owns its own cross-field invariant, so every
+        construction path — the constructor, :meth:`from_dict`, ``dataclasses.replace``
+        — is covered by ONE check instead of a validator per reader."""
+        terminal = self.status in TERMINAL_EVENTS
+        if terminal and self.closed_at is None:
+            raise ValueError(
+                f"bug record {self.id!r} is terminal ({self.status!r}) but carries no 'closed_at'"
+            )
+        if not terminal and self.closed_at is not None:
+            raise ValueError(
+                f"bug record {self.id!r} is open but carries closed_at="
+                f"{self.closed_at!r} — closed_at is stamped only by a terminal transition"
+            )
+        if self.closed_at is not None and self.closed_at < self.ts:
+            raise ValueError(
+                f"bug record {self.id!r} closed_at={self.closed_at!r} precedes its "
+                f"filing date ts={self.ts!r}"
+            )
+
+    def _reach_terminal(self, updated: BugRecord, status: str) -> BugRecord:
+        """The ONE place a record's ``status`` becomes terminal — every terminal verb
+        below ends here, so ``closed_at`` cannot be stamped by three of four verbs.
+        ``closed_at`` is write-once: a record that already carries one keeps it (a
+        correcting re-transition is not a second closure)."""
+        return replace(
+            updated,
+            status=status,
+            closed_at=self.closed_at or _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        )
+
     def resolve(
         self,
         *,
@@ -333,11 +381,14 @@ class BugRecord:
         evidence_loop: str | None = None,
         evidence_seam: str | None = None,
         evidence_diff: str | None = None,
-        diff_direction: str | None = None,
         privacy_patterns: Sequence[PatternLike] = (),
     ) -> BugRecord:
         """The ONE way a record reaches ``status="resolved"``. Every keyword is
-        REQUIRED (every problem is collected, not just the first); ``caused_by``
+        REQUIRED (every problem is collected, not just the first). ``diff_direction``
+        is NOT a keyword: it is derived from ``evidence_diff``'s own
+        ``net-*:`` prefix (0.4.7 FR4), so the record's two diff fields are consistent
+        by construction rather than by the caller passing the same word twice.
+        ``caused_by``
         must be an explicit string — the literal ``"none"`` declares "no known
         predecessor". ``evidence_loop``/``evidence_seam``/``evidence_diff`` are each
         checked against *privacy_patterns* (the operator's own baseline privacy
@@ -360,7 +411,6 @@ class BugRecord:
             ("evidence_loop", evidence_loop),
             ("evidence_seam", evidence_seam),
             ("evidence_diff", evidence_diff),
-            ("diff_direction", diff_direction),
         ):
             if value is None or not value.strip():
                 problems.append(f"{name!r} is required")
@@ -374,11 +424,6 @@ class BugRecord:
                 "'evidence_diff' must match "
                 "'^(net-negative|net-positive|net-neutral): <rationale>' "
                 "(bug-record-v1.schema.json)"
-            )
-        if "diff_direction" in values and values["diff_direction"] not in _DIFF_DIRECTIONS:
-            problems.append(
-                f"'diff_direction' must be one of {sorted(_DIFF_DIRECTIONS)}, got "
-                f"{values['diff_direction']!r}"
             )
         for evidence_field in ("evidence_loop", "evidence_seam", "evidence_diff"):
             evidence_value = values.get(evidence_field)
@@ -400,10 +445,15 @@ class BugRecord:
                 "evidence_loop": values["evidence_loop"],
                 "evidence_seam": values["evidence_seam"],
                 "evidence_diff": values["evidence_diff"],
-                "diff_direction": values["diff_direction"],
+                # DERIVED, never a second input: `diff_direction` IS `evidence_diff`'s
+                # own prefix, already validated by the pattern above. Two inputs for
+                # one word could disagree — and a record whose narrative says
+                # "net-negative: …" while its direction says "net-positive" is a
+                # governance fact that is simply false.
+                "diff_direction": values["evidence_diff"].split(":", 1)[0],
             }
         )
-        return replace(updated, status="resolved")
+        return self._reach_terminal(updated, "resolved")
 
     def supersede(
         self, *, by: str | None = None, privacy_patterns: Sequence[PatternLike] = ()
@@ -417,7 +467,7 @@ class BugRecord:
         if hit is not None:
             raise IncompleteTransitionError("supersede", [f"'by' must not contain {hit}"])
         updated = self.apply_governance_update({"superseded_by": by})
-        return replace(updated, status="superseded")
+        return self._reach_terminal(updated, "superseded")
 
     def defer(
         self, *, reason: str | None = None, privacy_patterns: Sequence[PatternLike] = ()
@@ -432,7 +482,7 @@ class BugRecord:
         if hit is not None:
             raise IncompleteTransitionError("defer", [f"'reason' must not contain {hit}"])
         updated = self.apply_governance_update({"cause": reason})
-        return replace(updated, status="deferred")
+        return self._reach_terminal(updated, "deferred")
 
     def reject(
         self, *, reason: str | None = None, privacy_patterns: Sequence[PatternLike] = ()
@@ -445,7 +495,7 @@ class BugRecord:
         if hit is not None:
             raise IncompleteTransitionError("reject", [f"'reason' must not contain {hit}"])
         updated = self.apply_governance_update({"cause": reason})
-        return replace(updated, status="rejected")
+        return self._reach_terminal(updated, "rejected")
 
     def redact(self, denylist_terms: Sequence[tuple[str, str]] = ()) -> BugRecord:
         """Return a copy with every free-text field scrubbed via :func:`redact_text`.
@@ -522,6 +572,7 @@ class BugRecord:
             resolution_granularity=_opt_record_str(raw, "resolution_granularity"),
             resolved_release=_opt_record_str(raw, "resolved_release"),
             audited=_opt_record_str(raw, "audited"),
+            closed_at=_opt_record_str(raw, "closed_at"),
             root_cause=_opt_record_str(raw, "root_cause"),
             solution=_opt_record_str(raw, "solution"),
             evidence_loop=_opt_record_str(raw, "evidence_loop"),
