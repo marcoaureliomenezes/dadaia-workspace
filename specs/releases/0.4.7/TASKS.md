@@ -81,7 +81,7 @@
   `specs/memory/ARCHITECTURE.md`, `tests/contract/test_adr_canon.py`.
   Blocked by: T-047-03. Delivers: an ADR with prose `measured_by` cannot be
   accepted.
-- [ ] T-047-11 — FR9: delete the wikilink alias table and rewrite the 15 links;
+- [-] T-047-11 — FR9: delete the wikilink alias table and rewrite the 15 links;
   delete `_TLDR_INJECTED_CATEGORIES`, catalog carries `tldr`; `category` leaves
   the frontmatter schema and the 23 atoms; closure memory log entry `kind: memory`;
   the two stale facts corrected; index heading English. Write set:
