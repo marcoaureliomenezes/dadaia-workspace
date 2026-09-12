@@ -44,8 +44,7 @@ The canon (operator, 2026-08-28) — the ONLY members permitted under ``specs/``
               <M.m.p>/{_RELEASE.json, SPEC.md, PLAN.md, TASKS.md, rc-N/{SPEC,PLAN,TASKS}.md,
                        verdicts/<40hex>.handoff.json,
                        <alpha|rc>-N/{SPEC.md, PLAN.md, TASKS.md}}}
-    backlog/{AGENTS.md, BACKLOG.json,
-             _archive/{backlog_histo.jsonl, consumed_backlog_histo.jsonl}}
+    backlog/{AGENTS.md, BACKLOG.json, _archive/backlog_histo.jsonl}
     bugs/{AGENTS.md, BUGS.jsonl, _archive/bugs_histo.jsonl}
     audits/{AGENTS.md, _archive/audits_histo.jsonl,
             <YYYYMMDD-slug>/{AUDIT.md, FINDINGS.jsonl}}
@@ -383,14 +382,6 @@ CANON: tuple[CanonEntry, ...] = (
         "backlog",
         "backlog/_archive/backlog_histo.jsonl",
     ),
-    CanonEntry(
-        re.compile(r"^backlog/_archive/consumed_backlog_histo\.jsonl$"),
-        "static",
-        False,
-        None,
-        "backlog",
-    ),
-    # -- bugs/ ---------------------------------------------------------------------
     CanonEntry(
         re.compile(r"^bugs/AGENTS\.md$"),
         "copy",

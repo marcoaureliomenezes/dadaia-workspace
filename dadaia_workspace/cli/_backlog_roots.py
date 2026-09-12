@@ -24,12 +24,6 @@ def resolve_backlog_roots(
     derived REPO-ROOT-relative (e.g. ``dadaia_workspace/core/...#Sym``) — matching the way
     committed ``code`` refs are authored. The alias map defaults to the workspace-level
     ``.dadaia/states/backlog_subject_aliases.txt`` resolved up from ``specs_dir``.
-
-    No longer returns an ``archive_root`` (v0.5.0 T-050-13A): the doctor's BL-STALE
-    condition (a) reads the relocated ``consumed_backlog_histo.jsonl`` store through a
-    ``JsonlRecordStore`` this module builds directly (ADR-0001: single consumer, no
-    container seam), wired at the call site below — the pre-relocation directory-glob
-    root has no reader left to inject it into.
     """
     src = Path(source_root).resolve() if source_root else specs_dir.parent.resolve()
     catalog_path = specs_dir / "memory" / "product" / "catalog.json"

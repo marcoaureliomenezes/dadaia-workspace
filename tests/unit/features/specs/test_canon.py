@@ -38,7 +38,6 @@ _CANON_PATHS: tuple[str, ...] = (
     "backlog/AGENTS.md",
     "backlog/BACKLOG.json",
     "backlog/_archive/backlog_histo.jsonl",
-    "backlog/_archive/consumed_backlog_histo.jsonl",
     "bugs/AGENTS.md",
     "bugs/BUGS.jsonl",
     "bugs/_archive/bugs_histo.jsonl",

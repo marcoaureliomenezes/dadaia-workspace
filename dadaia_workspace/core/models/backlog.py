@@ -47,12 +47,10 @@ __all__ = [
     "INTENTS_EXEMPT_STATUS",
     "TERMINAL_DISPOSITION_TOKENS",
     "BacklogHistoRecord",
-    "ConsumedBacklogHistoRecord",
     "Intent",
     "Subject",
     "SubjectKind",
     "is_intents_exempt",
-    "is_nonterminal_active_status",
     "is_terminal_disposition",
     "parse_intents",
     "serialize_intents",
@@ -61,7 +59,7 @@ __all__ = [
 #: The one backlog stage exempt from the resolvable-typed-intents requirement.
 INTENTS_EXEMPT_STATUS = "idea"
 
-#: The six canonical LEDGER disposition tokens (SPEC v0.12.0 FR1/FR2,
+#: The five canonical LEDGER disposition tokens (SPEC v0.12.0 FR1/FR2,
 #: ``dd-backlog-definition`` §2 — the single canonical home for this vocabulary;
 #: defined once here so the document parser (LEDGER-line grammar, A1.5) and the doctor
 #: (BL-STALE's "own Status is terminal" condition, ADR D8) share one source of truth.
@@ -69,7 +67,6 @@ TERMINAL_DISPOSITION_TOKENS: tuple[str, ...] = (
     "DELIVERED",
     "SUPERSEDED",
     "RESOLVED",
-    "CONSUMED",
     "DEFERRED",
     "REJECTED",
 )
@@ -77,34 +74,11 @@ _TERMINAL_DISPOSITION_TOKEN_SET = frozenset(TERMINAL_DISPOSITION_TOKENS)
 
 
 def is_terminal_disposition(token: str | None) -> bool:
-    """True iff *token* is (case-insensitively) one of the six canonical terminal
-    LEDGER disposition tokens: ``DELIVERED``, ``SUPERSEDED``, ``RESOLVED``, ``CONSUMED``,
+    """True iff *token* is (case-insensitively) one of the five canonical terminal
+    LEDGER disposition tokens: ``DELIVERED``, ``SUPERSEDED``, ``RESOLVED``,
     ``DEFERRED``, ``REJECTED`` (``dd-backlog-definition`` §2).
     """
     return token is not None and token.strip().upper() in _TERMINAL_DISPOSITION_TOKEN_SET
-
-
-#: v0.5.1 K5 ("same shape applies to backlog"): the ``active[]`` entry's own
-#: informal, lowercase live-stage prefixes SPEC-DOC-031 treats as "not yet
-#: dispositioned" — relocated here, UNCHANGED, from
-#: ``features.specs.doctor_governance``'s private ``_BACKLOG_NONTERMINAL_PREFIXES``
-#: tuple, so it is the ONE source both that check and (in a future pass)
-#: ``features.backlog.doctor`` read, rather than each keeping its own copy.
-_NONTERMINAL_ACTIVE_STATUS_PREFIXES: tuple[str, ...] = ("open", "picked", "candidate")
-
-
-def is_nonterminal_active_status(status: str | None) -> bool:
-    """True iff *status* (case-insensitively, prefix-matched) is one of an
-    ``active[]`` entry's informal non-terminal live stages: ``open``, ``picked``,
-    ``candidate`` (v0.5.1 K5). This is NOT :func:`is_terminal_disposition`'s inverse
-    — the two vocabularies classify different things (the six canonical LEDGER exit
-    tokens vs. the informal live-stage prefixes ``BACKLOG.json``'s own ``status``
-    field carries) and are kept as two named predicates rather than folded into one,
-    to avoid silently conflating them.
-    """
-    return status is not None and status.strip().lower().startswith(
-        _NONTERMINAL_ACTIVE_STATUS_PREFIXES
-    )
 
 
 def is_intents_exempt(status: str | None) -> bool:
@@ -328,11 +302,10 @@ class BacklogHistoRecord:
 
     ``id`` IS the backlog slug — the record's identity and the
     :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` key. With one
-    line per slug, ever, a duplicate exit is structurally impossible (A5.2): the
-    ``disposition``/``reason``/``release`` fields are rewritten IN PLACE through
-    :meth:`~dadaia_workspace.core.protocols.record_store.RecordStore.update` when a
-    provisional ``CONSUMED`` matures to its terminal token at closure (DADAIA.md §6) —
-    never a second record for the same slug.
+    line per slug, ever, a duplicate exit is structurally impossible (A5.2): an item
+    stays ``picked`` in ``active[]`` until closure and exits ONCE, with its terminal
+    disposition already known (0.4.7 FR7, T-047-05) — never a provisional record
+    awaiting a finalizer that was never written.
 
     ``id``/``ts``/``by`` are marked ``metadata={"identity": True}`` — the record's
     stable identity/attribution fields, mirroring ``BugRecord``'s own
@@ -407,63 +380,3 @@ class BacklogHistoRecord:
 _BACKLOG_HISTO_RECORD_REDACTABLE_FIELDS: tuple[str, ...] = _dataclass_field_names(
     BacklogHistoRecord, lambda metadata: not metadata.get("identity")
 )
-
-
-def _require_histo_consumed_list(raw: Mapping[str, object], key: str) -> list[dict[str, object]]:
-    """Validate :class:`ConsumedBacklogHistoRecord`'s ``consumed`` field: a list of
-    mapping entries, each carrying at least a non-empty ``slug`` string. Every other
-    key (``shipped_anchors``, ``note``, ...) passes through opaque and untouched — the
-    relocation this record backs is byte-lossless, not a narrower reshape."""
-    value = raw.get(key)
-    if not isinstance(value, list):
-        raise ValueError(f"consumed-backlog histo record field {key!r} must be a list: {raw!r}")
-    entries: list[dict[str, object]] = []
-    for entry in value:
-        if not isinstance(entry, dict):
-            raise ValueError(f"consumed-backlog histo record entry must be a mapping: {entry!r}")
-        slug = entry.get("slug")
-        if not isinstance(slug, str) or not slug:
-            raise ValueError(
-                f"consumed-backlog histo record entry missing a non-empty 'slug': {entry!r}"
-            )
-        entries.append(dict(entry))
-    return entries
-
-
-@dataclass(frozen=True)
-class ConsumedBacklogHistoRecord:
-    """One record per archived release's ``consumed_backlog.json`` sidecar (v0.5.0
-    T-050-13A, SPEC A5.5) — the relocation target for the 18 per-release
-    ``specs/_archive/<release-id>/consumed_backlog.json`` files FR6 (T-050-14) would
-    otherwise delete out from under BL-STALE's condition (a) with no failure signal
-    (FR13's "documented convention with no data behind it" shape).
-
-    Appended once per release to ``specs/backlog/_archive/consumed_backlog_histo.jsonl``
-    through the SAME generic
-    :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` seam
-    :class:`BacklogHistoRecord` uses (``infrastructure.jsonl_record_store.
-    JsonlRecordStore``, composed at ``container.build_consumed_backlog_histo_store``).
-    ``id`` is the release id the original sidecar's directory named (e.g.
-    ``"v0.1.47"``) — the record's identity and the
-    :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` key. ``consumed``
-    is that sidecar's original ``consumed`` entry list (``{slug, shipped_anchors[],
-    ...}``), preserved verbatim — a byte-lossless relocation, not a reshape.
-    """
-
-    id: str
-    consumed: list[dict[str, object]]
-
-    def to_dict(self) -> dict[str, object]:
-        """Serialize to the JSONL object shape (``"id"`` present so the generic
-        ``JsonlRecordStore`` seam can locate this record by release id)."""
-        return {"id": self.id, "consumed": self.consumed}
-
-    @classmethod
-    def from_dict(cls, raw: Mapping[str, object]) -> ConsumedBacklogHistoRecord:
-        """Parse a JSONL object into a :class:`ConsumedBacklogHistoRecord`. Raises
-        ``ValueError`` on a malformed record so the generic ``JsonlRecordStore`` skips
-        it (WARN-logged) rather than crashing the whole read."""
-        return cls(
-            id=_require_histo_str(raw, "id"),
-            consumed=_require_histo_consumed_list(raw, "consumed"),
-        )

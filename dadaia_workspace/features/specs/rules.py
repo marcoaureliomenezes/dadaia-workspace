@@ -103,7 +103,6 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(("SPEC-DOC-027",), lambda d: d._release.check_release_naming_canon()),
     _rule(("SPEC-DOC-028",), lambda d: d._coherence.check_constitution_file_refs()),
     _rule(("SPEC-DOC-030",), lambda d: d._closure_audit.check_audits_naming_canon()),
-    _rule(("SPEC-DOC-031",), lambda d: d._governance.check_consumed_backlog_disposition()),
     _rule(("SPEC-DOC-033",), lambda d: d._governance.check_bugs_jsonl_invariant()),
     _rule(
         ("SPEC-DOC-034",),

@@ -46,7 +46,7 @@ def test_generic_intents_error_fires_at_idea_status_document_model() -> None:
         intents=(),
         intents_error="malformed intents[] frontmatter: intents must be a list, got str",
     )
-    ctx = DoctorContext(items=[item], registry=None, consumed={})  # type: ignore[arg-type]
+    ctx = DoctorContext(items=[item], registry=None)  # type: ignore[arg-type]
     ctx.bound[item.slug] = ({}, [])
     findings = _check_schema(ctx)
     messages = [f.message for f in findings]

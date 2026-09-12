@@ -77,12 +77,6 @@ _SETUP_CFG = _REPO_ROOT / "setup.cfg"
 # panel->workflows x1, workflows->lifecycle x1, lifecycle->reports x1,
 # lifecycle->backlog x5, cli.lifecycle->fake_runtime x1). Cap ratcheted 29 -> 16.
 #
-# v0.12.0 T-120-08 NOTE: `features.specs.doctor_governance -> features.backlog.document`
-# added (SPEC PLAN §6) — the governance validator's SPEC-DOC-031/035 re-target reads the
-# single-source `BACKLOG.md` through the pure `document.py` parser (leaf -> leaf) instead
-# of duplicating a second parser inside `features/specs/`. Cap raised 15 -> 16
-# (+1 features-no-cross-feature).
-#
 # v0.4.3 T-043-20/FR16 NOTE: `doctor_memory -> subprocess_runner` REMOVED from BOTH
 # `features-no-infrastructure` and `features-no-subprocess` — LINT-1 no longer shells
 # out at all (imports `features.specs.memory_lint` directly instead of subprocess-ing
@@ -167,12 +161,17 @@ _SETUP_CFG = _REPO_ROOT / "setup.cfg"
 # REMOVED — the legacy-dir quarantine module is deleted (its set is "not in the
 # registry", which `dadaia doctor` now reports as WS-dadaia-slop), so the reconcile
 # step and its ignored edge die together. Cap lowered 4 -> 3 (-1 features-no-cross-feature).
-_RECORDED_IGNORE_EDGE_CAP = 3
+#
+# 0.4.7 T-047-05 NOTE (FR7): `specs.doctor_governance -> backlog.document` REMOVED —
+# the one governance rule reading the backlog document inside features/specs/ died with
+# the pick-time exit lane it policed (a picked item now stays picked in active[] and
+# exits once, at closure). Cap lowered 3 -> 2 (-1 features-no-cross-feature).
+_RECORDED_IGNORE_EDGE_CAP = 2
 
 # Per-family recorded breakdown, pinned per contract section so a wrong edge-count set
 # (or a silent shift between families) fails loudly, not just the grand total.
 _RECORDED_PER_FAMILY_CAP: dict[str, int] = {
-    "features-no-cross-feature": 3,
+    "features-no-cross-feature": 2,
 }
 
 # A18.1 (V13): the total count of `[importlinter:contract:*]` sections in setup.cfg,

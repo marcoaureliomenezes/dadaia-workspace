@@ -88,8 +88,8 @@ def test_git_mv_into_archive_produces_no_new_blob_and_a_clean_scan(tmp_path: Pat
     scan is clean by construction. The gate's blob-reuse logic itself is
     directory-name agnostic; this fixture uses a real canon archive path on
     principle. ``releases/_archive/<M.m.p>/**`` (wide open, any nested path) is used
-    rather than ``backlog/_archive/`` (a CLOSED shape — only ``backlog_histo.jsonl``/
-    ``consumed_backlog_histo.jsonl`` — since the v0.5.0 specs-canon closure's
+    rather than ``backlog/_archive/`` (a CLOSED shape — only ``backlog_histo.jsonl``
+    — since the v0.5.0 specs-canon closure's
     pre-push canon scan now ALSO runs on this same push and would otherwise refuse
     an arbitrary ``notes.md`` under the closed-shape area)."""
     repo = tmp_path / "repo"

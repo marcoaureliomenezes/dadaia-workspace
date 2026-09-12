@@ -38,7 +38,7 @@ def test_subject_kind_members_valid_construction_and_intent_is_frozen() -> None:
         (SubjectKind.CODE, "dadaia_workspace/core/models/lifecycle.py#AgentRuntimeKind"),
         (SubjectKind.CLI, "backlog doctor"),
         (SubjectKind.CATALOG, "panel"),
-        (SubjectKind.DOC, "SPEC-DOC-031"),
+        (SubjectKind.DOC, "SPEC-DOC-033"),
         (SubjectKind.INVARIANT, "INV-no-claude-at-L2"),
         (SubjectKind.PANEL, "panel:/api/workflow-catalog"),
         (SubjectKind.API, "api:/api/kanban"),
@@ -124,7 +124,7 @@ def test_parse_intents_round_trip_and_none_is_empty() -> None:
             "change": "remove OPENCODE_RUN",
         },
         {
-            "subject": {"kind": "doc", "ref": "SPEC-DOC-031"},
+            "subject": {"kind": "doc", "ref": "SPEC-DOC-033"},
             "change": "supersede prose heuristic",
         },
     ]
@@ -151,7 +151,7 @@ def test_subject_surface_new_round_trip_and_default() -> None:
             "change": "add a hello command printing a greeting",
         },
         {
-            "subject": {"kind": "doc", "ref": "SPEC-DOC-031"},
+            "subject": {"kind": "doc", "ref": "SPEC-DOC-033"},
             "change": "document it",
         },
     ]
@@ -197,7 +197,7 @@ def _histo_record(**overrides: object) -> BacklogHistoRecord:
     fields: dict[str, object] = {
         "id": "some-slug",
         "ts": "2026-08-27",
-        "disposition": "CONSUMED",
+        "disposition": "DELIVERED",
         "reason": "a reason",
         "release": "v0.5.0",
         "by": "project-manager",
@@ -238,7 +238,7 @@ def test_backlog_histo_record_redact_scrubs_every_non_identity_field() -> None:
     free-text field carries the term through unless explicitly marked identity."""
     term = "acme-corp"
     record = _histo_record(
-        disposition=f"CONSUMED — {term}",
+        disposition=f"DELIVERED — {term}",
         reason=f"leaked {term} here",
         release=f"leaked {term} here",
         entry_md=f"leaked {term} here",

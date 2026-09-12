@@ -13,14 +13,9 @@ fan-out): each check is a ``BacklogCheck`` (a code + a callable over the shared
 * **BL-CONFLICT** — two items share an anchor with incompatible change → ERROR (the divergent
   twin, caught even when hand-written; classifier ``DIVERGENT_CONFLICT``).
 * **BL-STALE** (re-defined, ADR D8; v0.5.0 A5.2) — an ACTIVE item already
-  consumed/dispositioned: its slug is recorded in the relocated consumed-backlog histo
-  ledger (``ledger.read_consumed``, T-050-13A/A5.5 — reads
-  ``consumed_backlog_histo.jsonl`` through an injected
-  ``JsonlRecordStore[ConsumedBacklogHistoRecord]``, the relocation target for the 18
-  per-release ``consumed_backlog.json`` sidecars FR6 deletes), OR it already has an
-  exit record in ``backlog_histo.jsonl`` (the retired in-document ``## LEDGER``
-  condition's replacement — v0.5.0 FR5), OR its own ``Status`` is one of the six
-  canonical terminal disposition tokens.
+  dispositioned: it already has an exit record in ``backlog_histo.jsonl`` (the retired
+  in-document ``## LEDGER`` condition's replacement — v0.5.0 FR5), OR its own
+  ``Status`` is one of the five canonical terminal disposition tokens.
 
 **BL-DUP is DELETED, not disabled (v0.5.0 A5.2) — still true under the JSON document.**
 With ``BACKLOG.json`` holding only the live ``active[]`` array and every exit landing as
@@ -36,8 +31,7 @@ dual-section document's duplicate-closure failure mode this task's SPEC (FR5) na
 its bug-history evidence, not an independent invariant.
 
 Pure module: all roots are **injected** (SPEC §3.8 #6); no I/O outside the supplied paths and
-no subprocess — ``histo_store``/``consumed_histo_store``, when supplied, are each an
-already-built
+no subprocess — ``histo_store``, when supplied, is an already-built
 :class:`~dadaia_workspace.infrastructure.jsonl_record_store.JsonlRecordStore` (DI: the
 CLI composition boundary builds it, this module only ever calls the instance it is
 handed, never constructs one itself — ADR-0001 retired the single-adapter
@@ -60,13 +54,11 @@ from dadaia_workspace.core.doctor_rules import Rule
 from dadaia_workspace.core.models.backlog import (
     INTENTS_EXEMPT_STATUS,
     BacklogHistoRecord,
-    ConsumedBacklogHistoRecord,
     is_intents_exempt,
     is_terminal_disposition,
 )
 from dadaia_workspace.features.backlog.classifier import BoundItem, Verdict, classify
 from dadaia_workspace.features.backlog.document import ActiveItem, DocumentError, load_document
-from dadaia_workspace.features.backlog.ledger import read_consumed
 from dadaia_workspace.features.backlog.preview import bound_anchor_changes
 from dadaia_workspace.features.backlog.subject_registry import Registry, build_registry
 from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
@@ -151,7 +143,6 @@ class DoctorContext:
 
     items: Sequence[ActiveItem]
     registry: Registry
-    consumed: dict[str, set[str]]
     #: Slugs already carrying an exit record in ``backlog_histo.jsonl`` (v0.5.0 FR5) —
     #: ADR D8's BL-STALE condition (b)'s replacement for the retired in-document
     #: ``## LEDGER`` check. Empty when no ``histo_store`` was supplied (A2.8-style
@@ -271,19 +262,18 @@ def _check_conflict(ctx: DoctorContext) -> list[Finding]:
 
 def _check_stale(ctx: DoctorContext) -> list[Finding]:
     """BL-STALE, re-defined over the single-section document (ADR D8; v0.5.0 A5.2): an
-    ACTIVE item already consumed/dispositioned fires on ANY of three ORed conditions —
-    (a) its slug is recorded in the relocated consumed-backlog histo ledger
-    (``ledger.read_consumed``, T-050-13A/A5.5 — empty/no-op when no
-    ``consumed_histo_store`` was supplied), (b) it already has an exit record
-    in ``backlog_histo.jsonl`` (the retired in-document ``## LEDGER`` condition's
-    replacement — ``ctx.histo_slugs``, empty/no-op when no ``histo_store`` was
-    supplied), or (c) its own ``Status`` is itself one of the six canonical terminal
-    disposition tokens."""
+    ACTIVE item already dispositioned fires on either ORed condition — (a) it already
+    has an exit record in ``backlog_histo.jsonl`` (the retired in-document ``## LEDGER``
+    condition's replacement — ``ctx.histo_slugs``, empty/no-op when no ``histo_store``
+    was supplied), or (b) its own ``Status`` is itself one of the five canonical
+    terminal disposition tokens.
+
+    A picked item stays ``picked`` in ``active[]`` and exits ONCE, at closure (0.4.7
+    FR7, T-047-05): the pick-time provisional exit this check's deleted third condition
+    policed no longer exists."""
     findings: list[Finding] = []
     for item in ctx.items:
         reasons: list[str] = []
-        if item.slug in ctx.consumed:
-            reasons.append("recorded as consumed in an archived release's consumed_backlog ledger")
         if item.slug in ctx.histo_slugs:
             reasons.append("already has an exit record in backlog_histo.jsonl")
         if item.status is not None and is_terminal_disposition(item.status):
@@ -293,7 +283,7 @@ def _check_stale(ctx: DoctorContext) -> list[Finding]:
                 Finding(
                     BacklogDoctorCode.BL_STALE,
                     Severity.ERROR,
-                    "ACTIVE item is already consumed/dispositioned (" + "; ".join(reasons) + ") "
+                    "ACTIVE item is already dispositioned (" + "; ".join(reasons) + ") "
                     "— it should have exited to backlog_histo.jsonl, not stayed an ACTIVE "
                     "subsection",
                     slug=item.slug,
@@ -339,7 +329,6 @@ def build_context(
     alias_map_path: Path,
     cli_anchors: frozenset[str],
     histo_store: JsonlRecordStore[BacklogHistoRecord] | None = None,
-    consumed_histo_store: JsonlRecordStore[ConsumedBacklogHistoRecord] | None = None,
 ) -> DoctorContext:
     """Build the shared :class:`DoctorContext` over the single-source ``BACKLOG.json``.
 
@@ -347,20 +336,15 @@ def build_context(
     ``cli``-kind anchor set threaded in from the CLI composition boundary (FR1b), so this
     feature never imports ``cli.main``. The registry is recomputed from live truth.
 
-    ``histo_store`` (v0.5.0 FR5/A13.4) and ``consumed_histo_store`` (v0.5.0 T-050-13A/
-    A5.5) are each an already-built
+    ``histo_store`` (v0.5.0 FR5/A13.4) is an already-built
     :class:`~dadaia_workspace.infrastructure.jsonl_record_store.JsonlRecordStore` — DI
     (built directly by the one real CLI callsite, ``cli.commands.newartifacts``'s
     ``backlog_doctor_cmd``, per ADR-0001: a single-consumer store builder has no reason
     to be a container seam), never constructed by this pure module. ``None`` (the
-    default for both) is a no-op for the corresponding BL-STALE condition, never a
-    false ERROR — this is the seam :func:`run_backlog_doctor` resolves the generic
-    backlog-histo stores through: ``histo_store``'s second real caller is
-    :func:`~dadaia_workspace.features.backlog.document.backlog_exit`;
-    ``consumed_histo_store`` replaces the pre-relocation ``archive_root``
-    directory-glob parameter (T-050-13A relocated the 18 per-release
-    ``consumed_backlog.json`` sidecars into one ``consumed_histo_store``-backed file
-    before FR6/T-050-14 deletes the tree they lived under).
+    default) is a no-op for BL-STALE condition (a), never a false ERROR — this is the
+    seam :func:`run_backlog_doctor` resolves the generic backlog-histo store through;
+    ``histo_store``'s second real caller is
+    :func:`~dadaia_workspace.features.backlog.document.backlog_exit`.
 
     Reads ``specs/backlog/BACKLOG.json`` through
     :func:`~dadaia_workspace.features.backlog.document.load_document` (SPEC v0.12.0 FR1/FR2,
@@ -377,7 +361,6 @@ def build_context(
         cli_anchors=cli_anchors,
     )
     document = load_document(specs_dir / "backlog")
-    consumed = read_consumed(consumed_histo_store)
     histo_slugs: frozenset[str] = (
         frozenset(record.id for record in histo_store.iter_records())
         if histo_store is not None
@@ -387,7 +370,6 @@ def build_context(
     ctx = DoctorContext(
         items=list(document.active),
         registry=registry,
-        consumed=consumed,
         histo_slugs=histo_slugs,
         document_errors=document.errors,
     )
@@ -405,7 +387,6 @@ def run_backlog_doctor(
     alias_map_path: Path,
     cli_anchors: frozenset[str],
     histo_store: JsonlRecordStore[BacklogHistoRecord] | None = None,
-    consumed_histo_store: JsonlRecordStore[ConsumedBacklogHistoRecord] | None = None,
 ) -> list[Finding]:
     """Build the context and run every `ledgers` rule over it — the one-shot path."""
     return run_checks(
@@ -416,6 +397,5 @@ def run_backlog_doctor(
             alias_map_path=alias_map_path,
             cli_anchors=cli_anchors,
             histo_store=histo_store,
-            consumed_histo_store=consumed_histo_store,
         )
     )

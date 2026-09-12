@@ -30,8 +30,8 @@ entry to blame).
 
 Pure module: the only root is the injected ``backlog_dir`` (SPEC §3.8 #6); no cwd reads,
 no subprocess. The single reading path: ``features.backlog.doctor.run_backlog_doctor``
-(the CLI-facing live entry point) and ``features.specs.doctor_governance``'s
-SPEC-DOC-031 check both call :func:`load_document` — there is no per-entry fallback.
+(the CLI-facing live entry point) calls :func:`load_document` — there is no per-entry
+fallback.
 
 ``backlog_new`` (SPEC v0.4.2 FR1, GRILL D1) lives here too: one feature owns the grammar
 for BOTH reading and writing — a fresh entry is appended at the end of the ``active``
