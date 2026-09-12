@@ -24,6 +24,7 @@ from functools import partial
 from pathlib import Path, PurePosixPath
 
 from dadaia_workspace.core import session_store, workspace_layout
+from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES, PROJECTION_TARGETS
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
@@ -607,3 +608,63 @@ class DoctorService:
         else:
             return None
         return f"deleted '{finding.path}'"
+
+
+# ── the `workspace` section of the one doctor (0.4.7 FR5, T-047-02) ──────────────
+
+SECTION = "workspace"
+
+#: The verdicts that make a run exit 1 — the pre-0.4.7 `dadaia doctor` rule, unchanged.
+ERROR_VERDICTS = frozenset({FindingVerdict.SLOP, FindingVerdict.EXPIRED, FindingVerdict.MISSING})
+
+
+def workspace_rules(
+    *, expired_only: bool = False
+) -> tuple[Rule[DoctorService, SectionFinding], ...]:
+    """This section's contribution to the ONE rule registry.
+
+    Two rules, the service's two existing reads: the context invariants (`check()`,
+    always error-class, outside the scored entry set) and the instance walk (`scan()`,
+    one finding per entry, carrying its own `canon|operator|slop|expired|missing`
+    verdict word — this section never translates into the specs/ledgers
+    `error|warning|info` vocabulary, and neither does any renderer).
+
+    ``expired_only`` SCOPES the section to the TTL lane: the invariants are skipped and
+    only expired entries are scanned, so the score line reports that lane rather than
+    the whole instance.
+    """
+
+    def invariants(service: DoctorService) -> list[SectionFinding]:
+        if expired_only:
+            return []
+        return [
+            SectionFinding(
+                code=issue.code,
+                verdict="error",
+                message=issue.description,
+                canonical=False,
+                error=True,
+            )
+            for issue in service.check()
+        ]
+
+    def entries(service: DoctorService) -> list[SectionFinding]:
+        findings = service.scan()
+        if expired_only:
+            findings = tuple(f for f in findings if f.verdict is FindingVerdict.EXPIRED)
+        return [
+            SectionFinding(
+                code=finding.code,
+                verdict=finding.verdict.value,
+                message=f"{finding.path}  {finding.detail}",
+                canonical=finding.canonical,
+                error=finding.verdict in ERROR_VERDICTS,
+                unit=finding.path,
+            )
+            for finding in findings
+        ]
+
+    return (
+        Rule(("WS-INVARIANT",), SECTION, invariants),
+        Rule(("WS-ENTRY",), SECTION, entries),
+    )

@@ -51,11 +51,12 @@ operator ruling 2026-08-28) — there is no per-entry fallback and no Markdown d
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
+from dadaia_workspace.core.doctor_rules import Rule
 from dadaia_workspace.core.models.backlog import (
     INTENTS_EXEMPT_STATUS,
     BacklogHistoRecord,
@@ -71,9 +72,12 @@ from dadaia_workspace.features.backlog.subject_registry import Registry, build_r
 from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 __all__ = [
+    "RULES",
     "BacklogDoctorCode",
     "Finding",
+    "LedgerRule",
     "Severity",
+    "build_context",
     "run_backlog_doctor",
 ]
 
@@ -298,34 +302,36 @@ def _check_stale(ctx: DoctorContext) -> list[Finding]:
     return findings
 
 
-#: A single parameterized registry of checks (SPEC §3.8 #8 — no copy-paste fan-out).
-@dataclass(frozen=True)
-class _BacklogCheck:
-    code: BacklogDoctorCode
-    run: Callable[[DoctorContext], list[Finding]]
+#: This section's binding of the ONE doctor rule record (0.4.7 FR5): the `ledgers`
+#: section's rules run over the shared :class:`DoctorContext` and emit :class:`Finding`.
+type LedgerRule = Rule[DoctorContext, Finding]
 
+SECTION = "ledgers"
 
-_CHECKS: tuple[_BacklogCheck, ...] = (
-    _BacklogCheck(BacklogDoctorCode.BL_SCHEMA, _check_schema),
-    _BacklogCheck(BacklogDoctorCode.BL_CONFLICT, _check_conflict),
-    _BacklogCheck(BacklogDoctorCode.BL_STALE, _check_stale),
+#: The `ledgers` section's rules — the same record `features/specs/rules.py` fills, so
+#: `dadaia doctor` collects, renders and scores all three sections through one engine
+#: (T-047-03 widens this tuple to every ledger without touching the collector).
+RULES: tuple[LedgerRule, ...] = (
+    Rule((BacklogDoctorCode.BL_SCHEMA.value,), SECTION, _check_schema),
+    Rule((BacklogDoctorCode.BL_CONFLICT.value,), SECTION, _check_conflict),
+    Rule((BacklogDoctorCode.BL_STALE.value,), SECTION, _check_stale),
 )
 
 
 def run_checks(ctx: DoctorContext) -> list[Finding]:
-    """Run the four parameterized checks over an already-built :class:`DoctorContext`.
+    """Run every rule of the `ledgers` section over an already-built context.
 
     The shared engine both :func:`run_backlog_doctor` (the live CLI-facing path) and the
     document-model fixture tests drive — never copy-pasted, never duplicated. Findings
     are returned in check order then item order; an empty list ⇒ clean.
     """
     findings: list[Finding] = []
-    for check in _CHECKS:
-        findings.extend(check.run(ctx))
+    for rule in RULES:
+        findings.extend(rule.run(ctx))
     return findings
 
 
-def run_backlog_doctor(
+def build_context(
     *,
     specs_dir: Path,
     source_root: Path,
@@ -334,9 +340,8 @@ def run_backlog_doctor(
     cli_anchors: frozenset[str],
     histo_store: JsonlRecordStore[BacklogHistoRecord] | None = None,
     consumed_histo_store: JsonlRecordStore[ConsumedBacklogHistoRecord] | None = None,
-) -> list[Finding]:
-    """Run BL-SCHEMA/CONFLICT/STALE over the single-source ``BACKLOG.json`` and return
-    all findings.
+) -> DoctorContext:
+    """Build the shared :class:`DoctorContext` over the single-source ``BACKLOG.json``.
 
     All roots are injected (SPEC §3.8 #6), including ``cli_anchors`` — the pre-derived
     ``cli``-kind anchor set threaded in from the CLI composition boundary (FR1b), so this
@@ -389,4 +394,28 @@ def run_backlog_doctor(
     for item in document.active:
         ctx.bound[item.slug] = bound_anchor_changes(item, registry)
 
-    return run_checks(ctx)
+    return ctx
+
+
+def run_backlog_doctor(
+    *,
+    specs_dir: Path,
+    source_root: Path,
+    catalog_path: Path,
+    alias_map_path: Path,
+    cli_anchors: frozenset[str],
+    histo_store: JsonlRecordStore[BacklogHistoRecord] | None = None,
+    consumed_histo_store: JsonlRecordStore[ConsumedBacklogHistoRecord] | None = None,
+) -> list[Finding]:
+    """Build the context and run every `ledgers` rule over it — the one-shot path."""
+    return run_checks(
+        build_context(
+            specs_dir=specs_dir,
+            source_root=source_root,
+            catalog_path=catalog_path,
+            alias_map_path=alias_map_path,
+            cli_anchors=cli_anchors,
+            histo_store=histo_store,
+            consumed_histo_store=consumed_histo_store,
+        )
+    )

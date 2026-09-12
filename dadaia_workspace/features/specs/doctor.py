@@ -90,7 +90,7 @@ class SpecsDoctor:
         bug_store_factory: Callable[[Path], JsonlRecordStore[BugRecord]] | None = None,
         live_shas: Collection[str] | None = None,
     ) -> None:
-        self.specs_dir = Path(specs_dir)
+        self.specs_dir: Path = Path(specs_dir)
         self.public_dir: Path | None = Path(public_dir) if public_dir is not None else None
         # repo_root: when supplied, the constitution file-ref invariant (SPEC-DOC-028)
         # resolves path-like references against it, and the pyproject-version-vs-
@@ -147,7 +147,7 @@ class SpecsDoctor:
         self._release.tree = tree
         issues: list[SpecsDoctorIssue] = []
         for rule in RULES:
-            issues.extend(rule.run(self, tree))
+            issues.extend(rule.run(self))
         return issues
 
     def fix(self, issues: list[SpecsDoctorIssue] | None = None) -> list[SpecsDoctorIssue]:

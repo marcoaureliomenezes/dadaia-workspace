@@ -67,7 +67,7 @@ def test_fix_dispatch_and_help_derive_from_the_registry() -> None:
 
 
 def test_cli_fix_help_is_the_derived_text() -> None:
-    src = Path("dadaia_workspace/cli/commands/specs.py").read_text(encoding="utf-8")
+    src = Path("dadaia_workspace/cli/commands/doctor.py").read_text(encoding="utf-8")
     assert "render_fix_help()" in src
     assert "TREE-3: render missing memory HTML" not in src
 

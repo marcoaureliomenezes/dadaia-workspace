@@ -20,6 +20,7 @@ from pathlib import Path
 
 import typer
 
+from dadaia_workspace.cli._backlog_roots import resolve_backlog_roots
 from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.core.atomic_write import ConcurrentModificationError
 from dadaia_workspace.core.models.backlog import SubjectKind
@@ -29,40 +30,6 @@ from dadaia_workspace.features.specs.candidate import (
     archive_candidate,
 )
 from dadaia_workspace.features.specs.canon import release_new
-
-
-def _resolve_backlog_roots(
-    specs_dir: Path, source_root: str | None, alias_map: str | None
-) -> tuple[Path, Path, Path]:
-    """Resolve the injected roots the registry/doctor need (SPEC §3.8 #6 — never cwd).
-
-    Returns ``(source_root, catalog_path, alias_map_path)``. ``source_root`` defaults to
-    the repo root that owns ``specs_dir`` (``specs_dir.parent``) so code anchors are
-    derived REPO-ROOT-relative (e.g. ``dadaia_workspace/core/...#Sym``) — matching the way
-    committed ``code`` refs are authored. The alias map defaults to the workspace-level
-    ``.dadaia/states/backlog_subject_aliases.txt`` resolved up from ``specs_dir``.
-
-    No longer returns an ``archive_root`` (v0.5.0 T-050-13A): the doctor's BL-STALE
-    condition (a) reads the relocated ``consumed_backlog_histo.jsonl`` store through a
-    ``JsonlRecordStore`` this module builds directly (ADR-0001: single consumer, no
-    container seam), wired at the call site below — the pre-relocation directory-glob
-    root has no reader left to inject it into.
-    """
-    src = Path(source_root).resolve() if source_root else specs_dir.parent.resolve()
-    catalog_path = specs_dir / "memory" / "product" / "catalog.json"
-    alias_map_path = Path(alias_map).resolve() if alias_map else _default_alias_map_path(specs_dir)
-    return src, catalog_path, alias_map_path
-
-
-def _default_alias_map_path(specs_dir: Path) -> Path:
-    """Walk up from ``specs_dir`` to the workspace root and target the alias-map file."""
-    here = specs_dir.resolve()
-    for parent in (here, *here.parents):
-        if (parent / ".dadaia").is_dir():
-            return parent / ".dadaia" / "states" / "backlog_subject_aliases.txt"
-    # No workspace found above specs_dir: fall back to a sibling of specs_dir (still injected).
-    return specs_dir.parent / ".dadaia" / "states" / "backlog_subject_aliases.txt"
-
 
 # ── shared typer apps ─────────────────────────────────────────────────────────
 
@@ -246,7 +213,7 @@ def backlog_subjects_cmd(
     if not target.is_dir():
         typer.echo(f"[error] specs_dir not found: {target}", err=True)
         sys.exit(1)
-    src, catalog_path, alias_map_path = _resolve_backlog_roots(target, source_root, alias_map)
+    src, catalog_path, alias_map_path = resolve_backlog_roots(target, source_root, alias_map)
     registry = build_registry(
         source_root=src,
         catalog_path=catalog_path,
@@ -277,104 +244,3 @@ def backlog_subjects_cmd(
 
 
 # ── dadaia backlog doctor (the ENFORCED backstop — v0.1.25 R1) ──────────────────
-
-
-@backlog_app.command("doctor")
-def backlog_doctor_cmd(
-    specs_dir: str | None = typer.Option(
-        None, "--specs-dir", help="Path to specs/ directory. Default: bound context session."
-    ),
-    source_root: str | None = typer.Option(
-        None, "--source-root", help="Source root for code-anchor derivation. Default: library."
-    ),
-    alias_map: str | None = typer.Option(
-        None, "--alias-map", help="Alias-map path. Default: workspace .dadaia/states/."
-    ),
-    explain: bool = typer.Option(
-        False, "--explain", help="Print the per-item bound-anchor resolution alongside findings."
-    ),
-) -> None:
-    """Run BL-SCHEMA/CONFLICT/STALE over the live backlog; exit non-zero on any ERROR.
-
-    This is the ENFORCED backstop (ADR-D): wired into the pre-commit chokepoint + CI, it
-    rejects a hand-written divergent twin even though ``specs/backlog/`` is ADDITIVE —
-    ``BACKLOG.json`` (the single source, SPEC v0.12.0 FR1/ADR #14; operator ruling
-    2026-08-28) is committed repository truth. ``--explain`` additionally prints how
-    each item's subjects resolved.
-    """
-    from dadaia_workspace.cli.anchors import derive_cli_anchors
-    from dadaia_workspace.core.models.backlog import BacklogHistoRecord, ConsumedBacklogHistoRecord
-    from dadaia_workspace.features.backlog.doctor import Severity, run_backlog_doctor
-    from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
-
-    target = _resolve_specs_dir(specs_dir)
-    if not target.is_dir():
-        typer.echo(f"[error] specs_dir not found: {target}", err=True)
-        sys.exit(1)
-    src, catalog_path, alias_map_path = _resolve_backlog_roots(target, source_root, alias_map)
-
-    if explain:
-        _explain_backlog(target, src, catalog_path, alias_map_path)
-
-    # ADR-0001: both stores had exactly one production consumer (this command) — the
-    # single consumer builds each JsonlRecordStore directly instead of a container
-    # seam, so BL-STALE's histo conditions stay live from the real CLI callsite.
-    findings = run_backlog_doctor(
-        specs_dir=target,
-        source_root=src,
-        catalog_path=catalog_path,
-        alias_map_path=alias_map_path,
-        cli_anchors=derive_cli_anchors(),
-        histo_store=JsonlRecordStore(
-            target / "backlog" / "_archive" / "backlog_histo.jsonl",
-            to_dict=BacklogHistoRecord.to_dict,
-            from_dict=BacklogHistoRecord.from_dict,
-        ),
-        consumed_histo_store=JsonlRecordStore(
-            target / "backlog" / "_archive" / "consumed_backlog_histo.jsonl",
-            to_dict=ConsumedBacklogHistoRecord.to_dict,
-            from_dict=ConsumedBacklogHistoRecord.from_dict,
-        ),
-    )
-
-    errors = [f for f in findings if f.severity is Severity.ERROR]
-    for finding in findings:
-        marker = finding.severity.value.upper()
-        slug = f" [{finding.slug}]" if finding.slug else ""
-        typer.echo(f"[{marker}] {finding.code.value}{slug} {finding.message}", err=True)
-
-    if errors:
-        typer.secho(
-            f"\nbacklog doctor FAILED: {len(errors)} error(s).", fg=typer.colors.RED, err=True
-        )
-        sys.exit(1)
-    typer.secho("backlog doctor: clean.", fg=typer.colors.GREEN)
-
-
-def _explain_backlog(specs_dir: Path, src: Path, catalog_path: Path, alias_map_path: Path) -> None:
-    """Print how each ACTIVE backlog item's subjects bind to canonical anchors (read-only).
-
-    Reads the single source ``specs/backlog/BACKLOG.json`` through
-    :func:`~dadaia_workspace.features.backlog.document.load_document` (SPEC v0.12.0
-    FR1/FR2, ADR #14; operator ruling 2026-08-28).
-    """
-    from dadaia_workspace.cli.anchors import derive_cli_anchors
-    from dadaia_workspace.features.backlog.document import load_document
-    from dadaia_workspace.features.backlog.preview import bound_anchor_changes
-    from dadaia_workspace.features.backlog.subject_registry import build_registry
-
-    registry = build_registry(
-        source_root=src,
-        catalog_path=catalog_path,
-        alias_map_path=alias_map_path,
-        specs_dir=specs_dir,
-        cli_anchors=derive_cli_anchors(),
-    )
-    document = load_document(specs_dir / "backlog")
-    for item in document.active:
-        anchor_changes, unresolved = bound_anchor_changes(item, registry)
-        typer.echo(f"# {item.slug}")
-        for anchor_id, change in sorted(anchor_changes.items()):
-            typer.echo(f"  RESOLVED  {anchor_id}  ->  {change}")
-        for message in unresolved:
-            typer.echo(f"  UNRESOLVED  {message}")

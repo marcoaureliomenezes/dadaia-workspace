@@ -13,125 +13,143 @@ The order is the pre-decomposition interleaved order 1:1 — the golden lock
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from dadaia_workspace.core.doctor_rules import Rule
 from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
+from dadaia_workspace.features.specs.release_tree import release_tree_issues
 
 if TYPE_CHECKING:
     from dadaia_workspace.features.specs.doctor import SpecsDoctor
-    from dadaia_workspace.features.specs.specs_tree import SpecsTree
 
-__all__ = ["FIX_BY_CODE", "RULES", "Rule", "render_fix_help"]
+__all__ = ["FIX_BY_CODE", "RULES", "SpecsRule", "render_fix_help"]
 
+#: This section's binding of the one record: rules run over the ``SpecsDoctor``
+#: coordinator and emit ``SpecsDoctorIssue``.
+type SpecsRule = Rule[SpecsDoctor, SpecsDoctorIssue]
 
-@dataclass(frozen=True)
-class Rule:
-    """One doctor rule family: which codes it emits, how to run it, how to fix one."""
-
-    codes: tuple[str, ...]
-    run: Callable[[SpecsDoctor, SpecsTree], list[SpecsDoctorIssue]]
-    fix: Callable[[SpecsDoctor, SpecsDoctorIssue], None] | None = None
-    fix_help: str | None = None
+SECTION = "specs"
 
 
-RULES: tuple[Rule, ...] = (
-    Rule(("SPEC-DOC-001",), lambda d, t: d._coherence.check_constitution()),
-    Rule(
+def _rule(
+    codes: tuple[str, ...],
+    run: Callable[[SpecsDoctor], list[SpecsDoctorIssue]],
+    fix: Callable[[SpecsDoctor, SpecsDoctorIssue], None] | None = None,
+    fix_help: str | None = None,
+) -> SpecsRule:
+    """Bind ``section="specs"`` once instead of on all 41 rows."""
+    return Rule(codes, SECTION, run, fix, fix_help)
+
+
+RULES: tuple[SpecsRule, ...] = (
+    _rule(("SPEC-DOC-001",), lambda d: d._coherence.check_constitution()),
+    _rule(
         ("SPEC-DOC-002", "SPEC-DOC-002L", "SPEC-DOC-008"),
-        lambda d, t: d._memory.check_memory_files(),
+        lambda d: d._memory.check_memory_files(),
     ),
-    Rule(
+    _rule(
         ("MEM-PLACEHOLDER-1",),
-        lambda d, t: d._memory.check_placeholder_atoms(),
+        lambda d: d._memory.check_placeholder_atoms(),
         fix=lambda d, i: d._memory.fix_placeholder_atom(i),
         fix_help="remove unfilled placeholder atoms from old scaffolds",
     ),
-    Rule(("AGENTS-PLACEHOLDER-1",), lambda d, t: d._memory.check_tests_agents_placeholder()),
-    Rule(("SPEC-DOC-003", "SPEC-DOC-009"), lambda d, t: d._release.check_active_md()),
-    Rule(("SPEC-DOC-004",), lambda d, t: d._release.check_active_release_artifacts()),
-    Rule(("SPEC-DOC-005",), lambda d, t: d._release.check_plan_line_limit()),
-    Rule(("SPEC-DOC-007",), lambda d, t: d._closure_audit.check_no_orphan_specs()),
-    Rule(("SPEC-DOC-010",), lambda d, t: d._memory.check_memory_atomicity()),
-    Rule(("TREE-1",), lambda d, t: d._structural.check_tree1_foundation()),
-    Rule(
+    _rule(("AGENTS-PLACEHOLDER-1",), lambda d: d._memory.check_tests_agents_placeholder()),
+    _rule(("SPEC-DOC-003", "SPEC-DOC-009"), lambda d: d._release.check_active_md()),
+    _rule(("SPEC-DOC-004",), lambda d: d._release.check_active_release_artifacts()),
+    _rule(("SPEC-DOC-005",), lambda d: d._release.check_plan_line_limit()),
+    _rule(("SPEC-DOC-007",), lambda d: d._closure_audit.check_no_orphan_specs()),
+    _rule(("SPEC-DOC-010",), lambda d: d._memory.check_memory_atomicity()),
+    _rule(("TREE-1",), lambda d: d._structural.check_tree1_foundation()),
+    _rule(
         ("REPO-DADAIA-1",),
-        lambda d, t: d._structural.check_repo_dadaia1(),
+        lambda d: d._structural.check_repo_dadaia1(),
         fix=lambda d, i: d._structural.fix_repo_dadaia1(i),
         fix_help="quarantine an in-repo .dadaia/ directory",
     ),
-    Rule(("TREE-2",), lambda d, t: d._structural.check_tree2_root_spec_md()),
-    Rule(("TREE-3",), lambda d, t: d._structural.check_tree3_memory_md()),
-    Rule(
+    _rule(("TREE-2",), lambda d: d._structural.check_tree2_root_spec_md()),
+    _rule(("TREE-3",), lambda d: d._structural.check_tree3_memory_md()),
+    _rule(
         ("TREE-4",),
-        lambda d, t: d._structural.check_tree4_required_dirs(),
+        lambda d: d._structural.check_tree4_required_dirs(),
         fix=lambda d, i: d._structural.fix_tree4(i),
         fix_help="create missing required dirs with their AGENTS.md",
     ),
-    Rule(
+    _rule(
         ("TREE-5",),
-        lambda d, t: d._structural.check_tree5_agents_md(),
+        lambda d: d._structural.check_tree5_agents_md(),
         fix=lambda d, i: d._structural.fix_tree5(i),
         fix_help="refresh a superseded, uncustomised law projection",
     ),
-    Rule(("TREE-5M",), lambda d, t: d._structural.check_memory_agents_md()),
-    Rule(("TREE-7",), lambda d, t: d._structural.check_tree7_bug_session_id()),
-    Rule(
+    _rule(("TREE-5M",), lambda d: d._structural.check_memory_agents_md()),
+    _rule(("TREE-7",), lambda d: d._structural.check_tree7_bug_session_id()),
+    _rule(
         ("TREE-8",),
-        lambda d, t: d._structural.check_tree8_canon_root(),
+        lambda d: d._structural.check_tree8_canon_root(),
         fix=lambda d, i: d._structural.fix_tree8(i),
         fix_help="remove a stray non-canon root entry or dotfile",
     ),
-    Rule(("CAT-1",), lambda d, t: d._memory.check_cat1_catalog_sync()),
-    Rule(("LINT-1",), lambda d, t: d._memory.check_lint1_memory_atoms()),
-    Rule(("MEM-DRIFT-1",), lambda d, t: d._memory.check_mem_drift1_features_package_map()),
-    Rule(
+    _rule(("CAT-1",), lambda d: d._memory.check_cat1_catalog_sync()),
+    _rule(("LINT-1",), lambda d: d._memory.check_lint1_memory_atoms()),
+    _rule(("MEM-DRIFT-1",), lambda d: d._memory.check_mem_drift1_features_package_map()),
+    _rule(
         ("FIXED-1", "FIXED-2"),
-        lambda d, t: d._memory.check_fixed_sections(d.public_dir),
+        lambda d: d._memory.check_fixed_sections(d.public_dir),
         fix=lambda d, i: d._memory.fix_fixed_section(i, d.public_dir),
         fix_help="insert or refresh the workspace's fixed law sections",
     ),
-    Rule(("SPECS-VERSION",), lambda d, t: d._coherence.check_specs_pattern_version()),
-    Rule(("SPEC-DOC-024",), lambda d, t: d._release.check_phase_markers_coherence()),
-    Rule(("SPEC-DOC-026",), lambda d, t: d._release.check_unique_release_ids()),
-    Rule(("SPEC-DOC-027",), lambda d, t: d._release.check_release_naming_canon()),
-    Rule(("SPEC-DOC-028",), lambda d, t: d._coherence.check_constitution_file_refs()),
-    Rule(("SPEC-DOC-030",), lambda d, t: d._closure_audit.check_audits_naming_canon()),
-    Rule(("SPEC-DOC-031",), lambda d, t: d._governance.check_consumed_backlog_disposition()),
-    Rule(("SPEC-DOC-033",), lambda d, t: d._governance.check_bugs_jsonl_invariant()),
-    Rule(
+    _rule(("SPECS-VERSION",), lambda d: d._coherence.check_specs_pattern_version()),
+    _rule(("SPEC-DOC-024",), lambda d: d._release.check_phase_markers_coherence()),
+    _rule(("SPEC-DOC-026",), lambda d: d._release.check_unique_release_ids()),
+    _rule(("SPEC-DOC-027",), lambda d: d._release.check_release_naming_canon()),
+    _rule(("SPEC-DOC-028",), lambda d: d._coherence.check_constitution_file_refs()),
+    _rule(("SPEC-DOC-030",), lambda d: d._closure_audit.check_audits_naming_canon()),
+    _rule(("SPEC-DOC-031",), lambda d: d._governance.check_consumed_backlog_disposition()),
+    _rule(("SPEC-DOC-033",), lambda d: d._governance.check_bugs_jsonl_invariant()),
+    _rule(
         ("SPEC-DOC-034",),
-        lambda d, t: d._closure_audit.check_archive_dirs_exist(),
+        lambda d: d._closure_audit.check_archive_dirs_exist(),
         fix=lambda d, i: d._closure_audit.fix_archive_dir(i),
         fix_help="create a missing _archive directory",
     ),
-    Rule(("SPEC-DOC-035",), lambda d, t: d._governance.check_unarchived_terminal_backlog()),
-    Rule(("SPEC-DOC-036",), lambda d, t: d._closure_audit.check_audit_disposition()),
-    Rule(("SPEC-DOC-037",), lambda d, t: d._coherence.check_constitution_no_runtime_enum()),
-    Rule(("SPEC-DOC-038",), lambda d, t: d._closure_audit.check_loose_undisposed_audits()),
-    Rule(("SPEC-DOC-039",), lambda d, t: d._release.check_partial_archived_release_dirs()),
-    Rule(("SPEC-DOC-041",), lambda d, t: d._governance.check_bug_archive_overdue()),
-    Rule(
+    _rule(("SPEC-DOC-035",), lambda d: d._governance.check_unarchived_terminal_backlog()),
+    _rule(("SPEC-DOC-036",), lambda d: d._closure_audit.check_audit_disposition()),
+    _rule(("SPEC-DOC-037",), lambda d: d._coherence.check_constitution_no_runtime_enum()),
+    _rule(("SPEC-DOC-038",), lambda d: d._closure_audit.check_loose_undisposed_audits()),
+    _rule(("SPEC-DOC-039",), lambda d: d._release.check_partial_archived_release_dirs()),
+    _rule(("SPEC-DOC-041",), lambda d: d._governance.check_bug_archive_overdue()),
+    _rule(
         ("SPEC-DOC-044",),
-        lambda d, t: d._release.check_stale_verdicts(live_shas=d.live_shas),
+        lambda d: d._release.check_stale_verdicts(live_shas=d.live_shas),
         fix=lambda d, i: d._release.fix_stale_verdict(i),
         fix_help="delete a stale security verdict (names no live sha: head, first parent, develop tip)",
     ),
-    Rule(
+    _rule(
         ("SPEC-DOC-045",),
-        lambda d, t: d._release.check_pyproject_version_matches_release(d.repo_root),
+        lambda d: d._release.check_pyproject_version_matches_release(d.repo_root),
     ),
-    Rule(("SPEC-DOC-047",), lambda d, t: d._release.check_no_memory_task()),
-    Rule(
+    _rule(("SPEC-DOC-047",), lambda d: d._release.check_no_memory_task()),
+    _rule(
+        (
+            "RELEASE-TREE-SCHEMA",
+            "RELEASE-TREE-PARSE",
+            "RELEASE-TREE-TS-ORDER",
+            "RELEASE-TREE-PHASE",
+            "RELEASE-TREE-ARCHIVED",
+            "RELEASE-TREE-TRIO",
+            "RELEASE-TREE-MISSING",
+        ),
+        lambda d: release_tree_issues(d.specs_dir),
+    ),
+    _rule(
         ("SPEC-DOC-046",),
-        lambda d, t: d._release.check_release_state_filename(),
+        lambda d: d._release.check_release_state_filename(),
         fix=lambda d, i: d._release.fix_release_state_filename(i),
         fix_help="rename a legacy RELEASE.json to the canonical _RELEASE.json",
     ),
 )
 
 #: code -> Rule, for every rule that carries a fix — the ONE fix dispatch table.
-FIX_BY_CODE: dict[str, Rule] = {
+FIX_BY_CODE: dict[str, SpecsRule] = {
     code: rule for rule in RULES if rule.fix is not None for code in rule.codes
 }
 

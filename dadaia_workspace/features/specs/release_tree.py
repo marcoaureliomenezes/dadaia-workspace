@@ -32,8 +32,14 @@ from jsonschema import Draft202012Validator
 
 from dadaia_workspace.core.release_state import parse_release_state, release_state_file
 from dadaia_workspace.features.specs.doctor_common import RELEASE_ARTIFACTS
+from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 
-__all__ = ["RELEASE_TREE_PHASES", "ReleaseTreeIssue", "validate_release_tree"]
+__all__ = [
+    "RELEASE_TREE_PHASES",
+    "ReleaseTreeIssue",
+    "release_tree_issues",
+    "validate_release_tree",
+]
 
 #: The four lifecycle phases a committed release state may carry (FR1). Stricter than
 #: ``core.release_state.PHASES``, which still carries the pre-0.4.7 vocabulary
@@ -164,3 +170,16 @@ def validate_release_tree(specs_dir: Path) -> list[ReleaseTreeIssue]:
             continue
         issues.extend(_document_issues(doc, text, rel, archived=archived, validator=validator))
     return issues
+
+
+def release_tree_issues(specs_dir: Path) -> list[SpecsDoctorIssue]:
+    """The validator rendered as doctor issues — the `specs` section's RELEASE-TREE rule.
+
+    Every conformance failure is an ERROR: a committed governance record is either valid
+    or it is not. Lives here, next to the validator it renders, so the rule registry
+    stays a table of one-line rows and no validator module grows for it.
+    """
+    return [
+        SpecsDoctorIssue(issue.code, Severity.ERROR, issue.message, issue.path)
+        for issue in validate_release_tree(specs_dir)
+    ]

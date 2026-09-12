@@ -3,9 +3,14 @@ exit code, `--json`, `--fix --expired-only --quiet`); size: SMALL.
 
 The CLI renders what ``DoctorService.scan()``/``fix()`` return — nothing here re-tests the
 walk (``tests/unit/test_spec_context_doctor_root.py``); it pins the shapes SPEC §3 names:
-one ``WS-<zone>-<verdict>  <path>  (<detail>)`` line per non-canonical entry, the score line
-last, exit 1 on any slop/expired/missing, the three ``--json`` keys, and a quiet lane that
-speaks only when it deleted something.
+one ``WS-<zone>-<verdict> <path>  (<detail>)`` line per non-canonical entry, the section
+score line, exit 1 on any slop/expired/missing, the `--json` section shape, and a quiet lane
+that speaks only when it deleted something.
+
+0.4.7 T-047-02 folded the three doctors into one: the same findings now render inside the
+`workspace` SECTION of ``dadaia doctor`` (`<CODE> <verdict> <message>`, then
+``compliance(workspace): …``), and `--json` nests them under ``sections.workspace``. The
+walk, the verdict vocabulary and the exit rule are unchanged.
 """
 
 from __future__ import annotations
@@ -31,8 +36,10 @@ pytestmark = pytest.mark.contract
 
 _TTL_ZONE = zones_with_ttl()[0]
 _EXPIRED_CODE = f"WS-{_TTL_ZONE.name.lstrip('.')}-expired"
-_FINDING_LINE = re.compile(r"^WS-[a-z.-]+-(slop|expired|missing)  \S+  \(.+\)$")
-_SCORE_LINE = re.compile(r"^compliance: [0-9]+/[0-9]+ entries canonical \([0-9]+%\)$")
+_FINDING_LINE = re.compile(
+    r"^WS-[a-z.-]+-(slop|expired|missing) (slop|expired|missing) \S+  \(.+\)$"
+)
+_SCORE_LINE = re.compile(r"^compliance\(workspace\): [0-9]+/[0-9]+ entries canonical \([0-9]+%\)$")
 
 
 @pytest.fixture
@@ -89,7 +96,8 @@ def test_lists_findings_then_the_score_line_and_exits_1(workspace: Path) -> None
     finding_lines = [ln for ln in lines if ln.startswith("WS-")]
     assert len(finding_lines) == 2
     assert all(_FINDING_LINE.match(ln) for ln in finding_lines), finding_lines
-    assert _SCORE_LINE.match(lines[-1]), lines[-1]
+    score_lines = [ln for ln in lines if _SCORE_LINE.match(ln)]
+    assert len(score_lines) == 1, lines
 
 
 def test_healthy_workspace_exits_0_with_a_full_score(workspace: Path) -> None:
@@ -97,7 +105,7 @@ def test_healthy_workspace_exits_0_with_a_full_score(workspace: Path) -> None:
     lines = result.output.splitlines()
 
     assert result.exit_code == 0, result.output
-    assert lines[-1].endswith("(100%)")
+    assert [ln for ln in lines if _SCORE_LINE.match(ln)][0].endswith("(100%)")
     assert not any(ln.startswith("WS-") for ln in lines)
 
 
@@ -108,16 +116,16 @@ def test_json_carries_findings_compliance_and_fixed(workspace: Path) -> None:
     payload = json.loads(result.output)
 
     assert result.exit_code == 1
-    assert {"findings", "compliance", "fixed"} <= set(payload)
-    assert payload["findings"] == [
+    assert {"sections", "compliance", "fixed"} <= set(payload)
+    workspace_section = payload["sections"]["workspace"]
+    assert workspace_section["findings"] == [
         {
             "code": "WS-root-slop",
-            "path": "junk.txt",
             "verdict": "slop",
-            "fixable": True,
-            "detail": "(not in the root law or the exceptions)",
+            "message": "junk.txt  (not in the root law or the exceptions)",
         }
     ]
+    assert set(workspace_section["compliance"]) == {"canonical", "total", "percent"}
     assert set(payload["compliance"]) == {"canonical", "total", "percent"}
     assert payload["fixed"] == []
 

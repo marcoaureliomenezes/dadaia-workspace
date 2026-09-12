@@ -15,7 +15,7 @@
   `dadaia_workspace/core/release_state.py`, `tests/**`.
   Blocked by: none. Delivers: the operator runs the test and sees the archived
   state validated for the first time.
-- [-] T-047-02 — FR5: generalize `features/specs/rules.py` to `Rule(code, section,
+- [x] T-047-02 — FR5: generalize `features/specs/rules.py` to `Rule(code, section,
   check, fix)`; `features/spec_context/doctor.py` and `features/backlog/doctor.py`
   contribute their rules; `cli/commands/doctor.py` collects, runs, renders
   `<CODE> <verdict> <message>`, `compliance(<section>)` lines, total, `--json`,

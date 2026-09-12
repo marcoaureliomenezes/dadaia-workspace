@@ -12,7 +12,7 @@ resolution seam every resolver-driven verb shares.
 
 This file pins the decision — refuse, uniformly, once, at that seam — through BOTH
 entry points the bug named, proving the fix is not duplicated per write site (the
-puxadinho this bug forbids): ``specs upgrade`` and ``specs doctor --fix``.
+puxadinho this bug forbids): ``specs upgrade`` and ``dadaia doctor --fix``.
 
 Intent: CONTRACT (bug ``symlinked-specs-root-is-followed-by-migration-and-repair``,
 T-044-40).
@@ -66,7 +66,7 @@ def test_cli_specs_doctor_fix_refuses_a_symlinked_root(tmp_path: Path) -> None:
     real, linked = _symlinked_specs_root(tmp_path)
     before = (real / "memory" / "atom.md").read_text(encoding="utf-8")
 
-    result = _runner.invoke(app, ["specs", "doctor", "--specs-dir", str(linked), "--fix"])
+    result = _runner.invoke(app, ["doctor", "--specs-dir", str(linked), "--fix"])
 
     assert result.exit_code != 0, result.output
     assert "symlink" in result.output.lower(), result.output
