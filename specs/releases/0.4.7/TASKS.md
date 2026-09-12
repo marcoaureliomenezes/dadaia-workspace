@@ -44,7 +44,7 @@
   canon rows updated. Write set: `dadaia_workspace/**`, `specs/backlog/**`,
   `tests/**`. Blocked by: T-047-04. Delivers: a picked item stays `picked` and
   exits once at closure; no code path writes `CONSUMED`.
-- [ ] T-047-06 — FR2: `release new` writes SPEC stub + `_RELEASE.json` in one
+- [-] T-047-06 — FR2: `release new` writes SPEC stub + `_RELEASE.json` in one
   transaction; refuses a second live release with `fix:`. Write set:
   `dadaia_workspace/features/specs/canon.py`, `dadaia_workspace/cli/commands/
   newartifacts.py`, `tests/**`. Blocked by: T-047-01. Delivers: after `release
