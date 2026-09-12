@@ -34,7 +34,7 @@
   `dadaia_workspace/features/specs/**`, `dadaia_workspace/features/backlog/**`,
   `dadaia_workspace/features/bugs/**`, `tests/**`. Blocked by: T-047-02.
   Delivers: an invalid committed record of any ledger fails `dadaia doctor`.
-- [ ] T-047-04 — FR7 migrations, one commit per file with counts:
+- [-] T-047-04 — FR7 migrations, one commit per file with counts:
   `backlog_histo.jsonl` (136), `audits_histo.jsonl` (23), `releases_histo.jsonl`
   (179 events → one record per release). Write set: `specs/**/_archive/*.jsonl`.
   Blocked by: T-047-03. Delivers: `dadaia doctor` ledgers 100 % on the real tree.
