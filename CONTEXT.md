@@ -54,6 +54,10 @@ _Avoid_: approval, decision (the gate's boolean), review
 The category a written path belongs to — ADDITIVE, MEMORY, MUTATING, PROTECTED — and the only thing the gate classifies.
 _Avoid_: lane, zone
 
+**Stall**:
+The flow cannot advance because an enforcement point (gate, chokepoint, doctor exit, CLI refusal) refuses the next action the law itself requires; every BLOCK carries one executable `fix:` line, and a BLOCK whose fix is itself blocked is a CRITICAL bug by definition (operator ruling 2026-09-12).
+_Avoid_: lock (a concurrency lock — the NO-LOCKS doctrine), block (one gate verdict; a stall is its consequence on the flow)
+
 ## Projection
 
 **Asset**:
