@@ -63,12 +63,19 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 from collections.abc import Collection, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
+from dadaia_workspace.core.release_state import (
+    RELEASE_STATE_FILENAME,
+    ReleaseState,
+    parse_release_state,
+    serialize_release_state,
+)
 from dadaia_workspace.core.specs_version import (
     CANONICAL_SPECS_VERSION,
     RELEASE_ID_FRAGMENT,
@@ -682,6 +689,38 @@ _RELEASE_ARTIFACT_NAMES: tuple[str, ...] = (
 )
 
 
+#: The ONE birth state document (0.4.7 FR2, T-047-06): phase DEFINITION, no candidate
+#: number yet, every milestone unreached, and one `note` entry recording the birth.
+#: Bug `release-new-writes-spec-only-never-creates-release-state`: the gate's MEMORY
+#: class, `dadaia context show`, dd-spec-navigator, V34 and `rc-archive` all resolve the
+#: live release by this file's presence — without it a minted release exists for nobody.
+def _birth_release_state_text(release_id: str) -> str:
+    """Serialize the birth ``release-state-v1`` document for *release_id*.
+
+    One serializer, ``core.release_state.serialize_release_state`` — never a second
+    hand-rolled JSON shape for the same schema."""
+    return serialize_release_state(
+        ReleaseState(
+            schema="release-state-v1",
+            release=release_id,
+            phase="DEFINITION",
+            rc=None,
+            defined=None,
+            implemented=None,
+            shipped=None,
+            audited=None,
+            log=(
+                {
+                    "ts": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "agent": "dadaia release new",
+                    "kind": "note",
+                    "text": f"Release {release_id} born",
+                },
+            ),
+        )
+    )
+
+
 def release_new(specs_dir: Path, release_id: str) -> Path:
     """Create ``specs/releases/<release_id>/SPEC.md`` with a canonical stub — the
     ``dadaia release new`` implementation (moved here from the retired
@@ -733,10 +772,13 @@ def release_new(specs_dir: Path, release_id: str) -> Path:
             if d.is_dir() and d.name not in ("_archive", "_ideas") and d.name != release_id
         )
         if others:
+            live = others[0]
             raise FileExistsError(
                 f"a live release already exists ({', '.join(others)}) — the "
-                "release-candidates model allows exactly one; stack the work as a new "
-                "candidate (dadaia release rc-archive) or ship first."
+                "release-candidates model allows exactly one (ADR 0005).\n"
+                f"fix: stack the work as a new candidate — dadaia release rc-archive\n"
+                f"fix: or ship it first — dadaia release archive {live} "
+                "--shipped <sha> --pr <n> --next " + release_id
             )
     if releases_root.is_symlink() or release_dir.is_symlink():
         raise FileExistsError(
@@ -750,14 +792,31 @@ def release_new(specs_dir: Path, release_id: str) -> Path:
                 f"{artifact} already exists — refusing to overwrite a minted release artifact."
             )
 
-    if is_release_semver(release_id):
-        return scaffold_entry(specs_dir, f"releases/{release_id}/SPEC.md", release_id=release_id)
+    # Build and PROVE the state document before anything touches disk (0.4.7 FR2): a
+    # text that does not round-trip through parse_release_state is never written.
+    state_text = _birth_release_state_text(release_id)
+    parse_release_state(state_text)
 
-    # Legacy slug: no CANON entry matches it, so it is rendered directly from the same
-    # stub template scaffold_entry would otherwise use.
-    release_dir.mkdir(parents=True, exist_ok=True)
-    spec_path = release_dir / "SPEC.md"
-    spec_path.write_text(
-        _RELEASE_SPEC_STUB.format(release_id=release_id, today=_today()), encoding="utf-8"
-    )
+    created_dir = not release_dir.exists()
+    try:
+        if is_release_semver(release_id):
+            spec_path = scaffold_entry(
+                specs_dir, f"releases/{release_id}/SPEC.md", release_id=release_id
+            )
+        else:
+            # Legacy slug: no CANON entry matches it, so it is rendered directly from
+            # the same stub template scaffold_entry would otherwise use.
+            release_dir.mkdir(parents=True, exist_ok=True)
+            spec_path = release_dir / "SPEC.md"
+            spec_path.write_text(
+                _RELEASE_SPEC_STUB.format(release_id=release_id, today=_today()),
+                encoding="utf-8",
+            )
+        (release_dir / RELEASE_STATE_FILENAME).write_text(state_text, encoding="utf-8")
+    except BaseException:
+        # All-or-nothing: the directory-level no-clobber above guarantees this tree did
+        # not exist before, so removing it restores the pre-birth state exactly.
+        if created_dir:
+            shutil.rmtree(release_dir, ignore_errors=True)
+        raise
     return spec_path

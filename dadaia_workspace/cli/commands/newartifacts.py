@@ -24,6 +24,7 @@ from dadaia_workspace.cli._backlog_roots import resolve_backlog_roots
 from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.core.atomic_write import ConcurrentModificationError
 from dadaia_workspace.core.models.backlog import SubjectKind
+from dadaia_workspace.core.release_state import RELEASE_STATE_FILENAME
 from dadaia_workspace.features.backlog.document import backlog_new
 from dadaia_workspace.features.specs.candidate import (
     CandidateArchiveError,
@@ -64,10 +65,13 @@ def release_new_cmd(
         help="Path to specs/ directory. Default: resolve from bound context session.",
     ),
 ) -> None:
-    """Create specs/releases/<id>/SPEC.md with canonical Draft frontmatter.
+    """Create specs/releases/<id>/ with its SPEC.md stub and _RELEASE.json state.
 
-    Exits non-zero if the release's SPEC.md already exists (no-clobber) or if
-    the release ID does not match the required slug pattern.
+    The ONE birth act (0.4.7 FR2): both files are written in one transaction, so the
+    gate's MEMORY class, `dadaia context show` and `dd-spec-navigator` resolve the new
+    release immediately. Exits non-zero — writing nothing — if a live release already
+    exists, if any release artifact already exists (no-clobber), or if the release ID
+    does not match the required pattern.
     """
     target = _resolve_specs_dir(specs_dir)
 
@@ -85,6 +89,7 @@ def release_new_cmd(
         sys.exit(1)
 
     typer.echo(f"[ok] created: {spec_path}")
+    typer.echo(f"[ok] created: {spec_path.parent / RELEASE_STATE_FILENAME}")
 
 
 # ── dadaia release rc-archive ─────────────────────────────────────────────────
