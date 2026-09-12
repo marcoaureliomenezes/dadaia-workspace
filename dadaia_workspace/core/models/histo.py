@@ -19,9 +19,12 @@ Pure domain module: stdlib only, no I/O — ``core`` reads no schema file itself
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field, replace
+from dataclasses import fields as dc_fields
 from typing import Any
+
+from dadaia_workspace.core.redaction import redact_text
 
 __all__ = [
     "AUDITS_HISTO_DISPOSITIONS",
@@ -31,6 +34,7 @@ __all__ = [
     "RELEASES_HISTO_DISPOSITIONS",
     "TERMINAL_DISPOSITIONS",
     "HistoRecord",
+    "is_terminal_disposition",
 ]
 
 #: The one terminal vocabulary (SPEC 0.4.7 FR7), lowercase. Every per-ledger subset
@@ -65,6 +69,34 @@ AUDITS_HISTO_DISPOSITIONS: tuple[str, ...] = FINDINGS_DISPOSITIONS
 #: A release exits exactly once, by being shipped.
 RELEASES_HISTO_DISPOSITIONS: tuple[str, ...] = ("delivered",)
 
+_TERMINAL_DISPOSITION_SET = frozenset(TERMINAL_DISPOSITIONS)
+
+
+def is_terminal_disposition(token: str | None) -> bool:
+    """True iff *token* is (case-insensitively) one of :data:`TERMINAL_DISPOSITIONS`.
+
+    The backlog doctor's BL-STALE condition (b) — "this live ``active[]`` entry's own
+    status is already a terminal verdict" — is the one caller; it asks the SAME
+    vocabulary every ``_histo.jsonl`` record is validated against, so the words live
+    here and nowhere else.
+    """
+    return token is not None and token.strip().lower() in _TERMINAL_DISPOSITION_SET
+
+
+def _scrub(value: Any, denylist_terms: Sequence[tuple[str, str]]) -> Any:
+    """Mask every string reachable from *value* — ``entry`` is an arbitrary JSON tree,
+    so the walk recurses through dicts and lists; keys are masked too, since a
+    denylisted term can name a field as easily as fill one."""
+    if isinstance(value, str):
+        return redact_text(value, denylist_terms)
+    if isinstance(value, dict):
+        return {
+            _scrub(key, denylist_terms): _scrub(item, denylist_terms) for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_scrub(item, denylist_terms) for item in value]
+    return value
+
 
 def _require_str(raw: Mapping[str, Any], key: str) -> str:
     value = raw.get(key)
@@ -90,15 +122,37 @@ class HistoRecord:
     its terminal verdict); ``release``/``reason``/``summary`` are nullable free text;
     ``entry`` is the removed object itself (a backlog entry, an audit's counts) or
     ``None`` when the exit had nothing to snapshot.
+
+    ``id``/``ts``/``disposition`` carry ``metadata={"identity": True}`` — the
+    record's identity and its controlled terminal verdict, the only fields
+    :meth:`redact` never scrubs. Every other field is free text (or, for ``entry``,
+    a free-text tree) a committed exit snapshot must never carry a denylisted term
+    in (bug ``backlog-histo-writer-skips-write-time-denylist-redaction``).
     """
 
-    id: str
-    ts: str
-    disposition: str
+    id: str = field(metadata={"identity": True})
+    ts: str = field(metadata={"identity": True})
+    disposition: str = field(metadata={"identity": True})
     release: str | None
     reason: str | None
     summary: str | None
     entry: dict[str, Any] | None
+
+    def redact(self, denylist_terms: Sequence[tuple[str, str]] = ()) -> HistoRecord:
+        """Return a copy with every free-text field — including every string nested
+        anywhere inside ``entry`` — scrubbed via
+        :func:`~dadaia_workspace.core.redaction.redact_text`, the SAME primitive
+        :meth:`~dadaia_workspace.core.models.bugs.BugRecord.redact` calls.
+
+        The field set is derived from THIS dataclass's own ``metadata`` (A2.10),
+        never a hand-kept name list: a field added below is redacted by default with
+        no code edited here.
+        """
+        updates: dict[str, Any] = {
+            name: _scrub(getattr(self, name), denylist_terms)
+            for name in _HISTO_RECORD_REDACTABLE_FIELDS
+        }
+        return replace(self, **updates)
 
     def to_dict(self) -> dict[str, object]:
         """Serialize to the JSONL object shape (``"id"`` present so the generic
@@ -116,7 +170,7 @@ class HistoRecord:
     @classmethod
     def from_dict(cls, raw: Mapping[str, object]) -> HistoRecord:
         """Parse one JSONL object. Raises ``ValueError`` on a malformed record, so a
-        tolerant reader can skip it (mirrors ``BugRecord``/``BacklogHistoRecord``)."""
+        tolerant reader can skip it (mirrors ``BugRecord``)."""
         if "entry" not in raw:
             raise ValueError("histo record is missing required field 'entry'")
         entry = raw["entry"]
@@ -131,3 +185,10 @@ class HistoRecord:
             summary=_optional_str(raw, "summary"),
             entry=entry,
         )
+
+
+#: Derived (A2.10) — never hand-kept — from :class:`HistoRecord`'s own field metadata:
+#: every field except the three identity fields (``id``/``ts``/``disposition``).
+_HISTO_RECORD_REDACTABLE_FIELDS: tuple[str, ...] = tuple(
+    f.name for f in dc_fields(HistoRecord) if not f.metadata.get("identity")
+)

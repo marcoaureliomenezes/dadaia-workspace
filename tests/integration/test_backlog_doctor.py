@@ -38,7 +38,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.models.backlog import BacklogHistoRecord
+from dadaia_workspace.core.models.histo import HistoRecord
 from dadaia_workspace.features.backlog.doctor import (
     BacklogDoctorCode,
     DoctorContext,
@@ -82,38 +82,35 @@ def _active_entry(
 class _FakeHistoStore:
     """A minimal in-memory double satisfying
     :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` for
-    :class:`BacklogHistoRecord` — a fake, not a mock, per this workspace's own
+    :class:`HistoRecord` — a fake, not a mock, per this workspace's own
     test-authoring convention (internal Protocol dependency)."""
 
-    def __init__(self, records: list[BacklogHistoRecord] | None = None) -> None:
+    def __init__(self, records: list[HistoRecord] | None = None) -> None:
         self._records = list(records or [])
 
     @property
     def path(self) -> Path:
         return Path("fake-backlog-histo.jsonl")
 
-    def append(self, record: BacklogHistoRecord) -> None:
+    def append(self, record: HistoRecord) -> None:
         self._records.append(record)
 
-    def iter_records(self) -> Iterator[BacklogHistoRecord]:
+    def iter_records(self) -> Iterator[HistoRecord]:
         return iter(self._records)
 
-    def update(
-        self, record_id: str, mutate: Callable[[BacklogHistoRecord], BacklogHistoRecord]
-    ) -> BacklogHistoRecord:
+    def update(self, record_id: str, mutate: Callable[[HistoRecord], HistoRecord]) -> HistoRecord:
         raise NotImplementedError
 
 
-def _histo_record(slug: str, *, disposition: str = "DELIVERED") -> BacklogHistoRecord:
-    return BacklogHistoRecord(
+def _histo_record(slug: str, *, disposition: str = "delivered") -> HistoRecord:
+    return HistoRecord(
         id=slug,
         ts="2026-08-01",
         disposition=disposition,
-        reason=None,
         release="v0.11.0",
-        by="test-suite",
-        entry_md=None,
-        entry_md_source=None,
+        reason=None,
+        summary=None,
+        entry=None,
     )
 
 
@@ -341,8 +338,8 @@ def test_active_item_with_own_terminal_status_fires_bl_stale(tmp_path: Path) -> 
 def test_deferred_active_status_fires_bl_stale(tmp_path: Path) -> None:
     """Bug ``backlog-doctor-rejects-deferred-status-documented-by-skill`` (T-044-34) —
     the literal repro from the report: an ACTIVE entry with ``Status: deferred``.
-    ``deferred`` IS one of the six canonical terminal disposition tokens
-    (``core.models.backlog.TERMINAL_DISPOSITION_TOKENS``), so BL-STALE firing here is the
+    ``deferred`` IS one of the canonical terminal dispositions
+    (``core.models.histo.TERMINAL_DISPOSITIONS``), so BL-STALE firing here is the
     correct, decided behaviour."""
     specs, src = _build_roots(tmp_path)
     active = [

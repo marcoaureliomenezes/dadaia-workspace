@@ -33,7 +33,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.models.backlog import BacklogHistoRecord
+from dadaia_workspace.core.models.histo import HistoRecord
 from dadaia_workspace.features.backlog.document import (
     ActiveItem,
     BacklogDocument,
@@ -573,26 +573,24 @@ from dadaia_workspace.features.backlog.document import (  # noqa: E402
 class _FakeHistoStore:
     """A minimal in-memory double satisfying
     :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` for
-    :class:`BacklogHistoRecord` — a fake, not a mock (internal Protocol dependency),
+    :class:`HistoRecord` — a fake, not a mock (internal Protocol dependency),
     per this workspace's own test-authoring convention."""
 
     def __init__(self) -> None:
-        self._records: dict[str, BacklogHistoRecord] = {}
+        self._records: dict[str, HistoRecord] = {}
 
     @property
     def path(self) -> Path:
         return Path("fake-backlog-histo.jsonl")
 
-    def append(self, record: BacklogHistoRecord) -> None:
+    def append(self, record: HistoRecord) -> None:
         assert record.id not in self._records, f"duplicate append for {record.id!r}"
         self._records[record.id] = record
 
-    def iter_records(self) -> Iterator[BacklogHistoRecord]:
+    def iter_records(self) -> Iterator[HistoRecord]:
         return iter(self._records.values())
 
-    def update(
-        self, record_id: str, mutate: Callable[[BacklogHistoRecord], BacklogHistoRecord]
-    ) -> BacklogHistoRecord:
+    def update(self, record_id: str, mutate: Callable[[HistoRecord], HistoRecord]) -> HistoRecord:
         current = self._records[record_id]
         updated = mutate(current)
         self._records[record_id] = updated
@@ -624,7 +622,7 @@ _TWO_ACTIVE_ITEMS = _doc(
 )
 
 
-def test_remove_active_subsection_removes_exactly_one_and_returns_its_source(
+def test_remove_active_subsection_removes_exactly_one_and_returns_the_removed_object(
     tmp_path: Path,
 ) -> None:
     specs = tmp_path / "specs"
@@ -633,8 +631,8 @@ def test_remove_active_subsection_removes_exactly_one_and_returns_its_source(
 
     removed = remove_active_subsection(specs, "going-away")
 
-    assert '"id": "going-away"' in removed
-    assert "retire Widget" in removed
+    assert removed["id"] == "going-away"
+    assert "retire Widget" in repr(removed)
 
     doc = load_document(specs / "backlog")
     assert doc.errors == ()
@@ -666,18 +664,17 @@ def test_backlog_exit_removes_active_and_appends_exactly_one_histo_record(
         specs,
         "going-away",
         histo_store=store,
-        disposition="DELIVERED",
+        disposition="delivered",
         reason=None,
         release="v9.9.9",
-        by="test-suite",
         denylist_terms=(),
         ts="2026-08-27",
     )
 
     assert record.id == "going-away"
-    assert record.disposition == "DELIVERED"
+    assert record.disposition == "delivered"
     assert record.release == "v9.9.9"
-    assert record.entry_md is not None and '"id": "going-away"' in record.entry_md
+    assert record.entry is not None and record.entry["id"] == "going-away"
 
     stored = list(store.iter_records())
     assert len(stored) == 1
@@ -702,10 +699,9 @@ def test_backlog_exit_twice_for_the_same_slug_is_structurally_impossible(
         specs,
         "going-away",
         histo_store=store,
-        disposition="DELIVERED",
+        disposition="delivered",
         reason=None,
         release="v9.9.9",
-        by="test-suite",
         denylist_terms=(),
     )
 
@@ -714,10 +710,9 @@ def test_backlog_exit_twice_for_the_same_slug_is_structurally_impossible(
             specs,
             "going-away",
             histo_store=store,
-            disposition="DELIVERED",
+            disposition="delivered",
             reason=None,
             release="v9.9.9",
-            by="test-suite",
             denylist_terms=(),
         )
 
@@ -726,9 +721,9 @@ def test_backlog_exit_twice_for_the_same_slug_is_structurally_impossible(
 
 # ═════════════════════════════════════════════════════════════════════════════════
 # bug backlog-histo-writer-skips-write-time-denylist-redaction — backlog_exit must
-# thread an injected operator denylist through BacklogHistoRecord.redact() BEFORE
+# thread an injected operator denylist through HistoRecord.redact() BEFORE
 # appending, exactly as BugService.register/apply_update already do (SPEC v0.4.5
-# FR6/T-045-19). Before the fix: an entry_md snapshot carrying a denylisted term is
+# FR6/T-045-19). Before the fix: an entry snapshot carrying a denylisted term is
 # appended RAW, caught only later at the push gate.
 # ═════════════════════════════════════════════════════════════════════════════════
 
@@ -746,12 +741,12 @@ _ACTIVE_ITEM_WITH_DENYLISTED_TERM = _doc(
 )
 
 
-def test_backlog_exit_masks_a_denylisted_term_in_entry_md_before_append(
+def test_backlog_exit_masks_a_denylisted_term_in_the_entry_before_append(
     tmp_path: Path,
 ) -> None:
     """The RED test (bug backlog-histo-writer-skips-write-time-denylist-redaction):
     ``backlog_exit`` threads its ``denylist_terms`` parameter through
-    ``BacklogHistoRecord.redact()`` before the record ever reaches the injected
+    ``HistoRecord.redact()`` before the record ever reaches the injected
     store — the SAME write-time seam ``BugService.register`` already enforces."""
     specs = tmp_path / "specs"
     (specs / "backlog").mkdir(parents=True)
@@ -764,21 +759,20 @@ def test_backlog_exit_masks_a_denylisted_term_in_entry_md_before_append(
         specs,
         "leaky-exit",
         histo_store=store,
-        disposition="DELIVERED",
+        disposition="delivered",
         reason=None,
         release="v9.9.9",
-        by="test-suite",
         ts="2026-08-27",
         denylist_terms=(("acme-corp", "private project/person identifier"),),
     )
 
-    assert record.entry_md is not None
-    assert "acme-corp" not in record.entry_md.lower()
-    assert "[REDACTED-TERM]" in record.entry_md
+    assert record.entry is not None
+    assert "acme-corp" not in repr(record.entry).lower()
+    assert "[REDACTED-TERM]" in repr(record.entry)
 
     persisted = list(store.iter_records())[0]
-    assert persisted.entry_md is not None
-    assert "acme-corp" not in persisted.entry_md.lower()
+    assert persisted.entry is not None
+    assert "acme-corp" not in repr(persisted.entry).lower()
 
 
 def test_backlog_exit_with_empty_denylist_terms_stays_byte_identical_to_pre_fix(
@@ -786,8 +780,8 @@ def test_backlog_exit_with_empty_denylist_terms_stays_byte_identical_to_pre_fix(
 ) -> None:
     """A6.3-class sibling guarantee: ``backlog_exit`` called with an explicit empty
     ``denylist_terms=()`` (F-13, T-050-36 security review: the parameter is REQUIRED,
-    no default) behaves exactly as before the fix — the removed entry's snapshot is
-    appended verbatim, byte-identical."""
+    no default) behaves exactly as before the fix — the removed entry is appended
+    verbatim, byte-identical."""
     specs = tmp_path / "specs"
     (specs / "backlog").mkdir(parents=True)
     (specs / "backlog" / "BACKLOG.json").write_text(
@@ -799,13 +793,12 @@ def test_backlog_exit_with_empty_denylist_terms_stays_byte_identical_to_pre_fix(
         specs,
         "leaky-exit",
         histo_store=store,
-        disposition="DELIVERED",
+        disposition="delivered",
         reason=None,
         release="v9.9.9",
-        by="test-suite",
         denylist_terms=(),
         ts="2026-08-27",
     )
 
-    assert record.entry_md is not None
-    assert "acme-corp-games" in record.entry_md
+    assert record.entry is not None
+    assert "acme-corp-games" in repr(record.entry)

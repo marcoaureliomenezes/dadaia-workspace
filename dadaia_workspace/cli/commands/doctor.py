@@ -189,7 +189,7 @@ def _ledgers_section(
     committed governance ledger (0.4.7 FR6). Two features contribute, neither imports
     the other, and the two reports merge into one section here — the composition root."""
     from dadaia_workspace.cli.anchors import derive_cli_anchors
-    from dadaia_workspace.core.models.backlog import BacklogHistoRecord
+    from dadaia_workspace.core.models.histo import HistoRecord
     from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
     if specs_dir is None:
@@ -204,8 +204,8 @@ def _ledgers_section(
         cli_anchors=derive_cli_anchors(),
         histo_store=JsonlRecordStore(
             specs_dir / "backlog" / "_archive" / "backlog_histo.jsonl",
-            to_dict=BacklogHistoRecord.to_dict,
-            from_dict=BacklogHistoRecord.from_dict,
+            to_dict=HistoRecord.to_dict,
+            from_dict=HistoRecord.from_dict,
         ),
     )
     ledgers_context = specs_ledgers.build_ledgers_context(specs_dir)

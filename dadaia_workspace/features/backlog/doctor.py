@@ -53,10 +53,9 @@ from pathlib import Path
 from dadaia_workspace.core.doctor_rules import Rule
 from dadaia_workspace.core.models.backlog import (
     INTENTS_EXEMPT_STATUS,
-    BacklogHistoRecord,
     is_intents_exempt,
-    is_terminal_disposition,
 )
+from dadaia_workspace.core.models.histo import HistoRecord, is_terminal_disposition
 from dadaia_workspace.features.backlog.classifier import BoundItem, Verdict, classify
 from dadaia_workspace.features.backlog.document import ActiveItem, DocumentError, load_document
 from dadaia_workspace.features.backlog.preview import bound_anchor_changes
@@ -265,8 +264,8 @@ def _check_stale(ctx: DoctorContext) -> list[Finding]:
     ACTIVE item already dispositioned fires on either ORed condition — (a) it already
     has an exit record in ``backlog_histo.jsonl`` (the retired in-document ``## LEDGER``
     condition's replacement — ``ctx.histo_slugs``, empty/no-op when no ``histo_store``
-    was supplied), or (b) its own ``Status`` is itself one of the five canonical
-    terminal disposition tokens.
+    was supplied), or (b) its own ``Status`` is itself one of the canonical terminal
+    dispositions (``core.models.histo.TERMINAL_DISPOSITIONS``).
 
     A picked item stays ``picked`` in ``active[]`` and exits ONCE, at closure (0.4.7
     FR7, T-047-05): the pick-time provisional exit this check's deleted third condition
@@ -328,7 +327,7 @@ def build_context(
     catalog_path: Path,
     alias_map_path: Path,
     cli_anchors: frozenset[str],
-    histo_store: JsonlRecordStore[BacklogHistoRecord] | None = None,
+    histo_store: JsonlRecordStore[HistoRecord] | None = None,
 ) -> DoctorContext:
     """Build the shared :class:`DoctorContext` over the single-source ``BACKLOG.json``.
 
@@ -386,7 +385,7 @@ def run_backlog_doctor(
     catalog_path: Path,
     alias_map_path: Path,
     cli_anchors: frozenset[str],
-    histo_store: JsonlRecordStore[BacklogHistoRecord] | None = None,
+    histo_store: JsonlRecordStore[HistoRecord] | None = None,
 ) -> list[Finding]:
     """Build the context and run every `ledgers` rule over it — the one-shot path."""
     return run_checks(

@@ -1,8 +1,8 @@
 """Bug ``backlog-doctor-rejects-deferred-status-documented-by-skill`` (T-044-34).
 
-Intent: CONTRACT — pins the single-owner resolution of the contradiction: the six
-canonical terminal LEDGER disposition tokens (``core.models.backlog.
-TERMINAL_DISPOSITION_TOKENS``, which includes ``DEFERRED``) are the ONE canonical
+Intent: CONTRACT — pins the single-owner resolution of the contradiction: the five
+canonical terminal dispositions (``core.models.histo.
+TERMINAL_DISPOSITIONS``, which includes ``deferred``) are the ONE canonical
 vocabulary for "this item left ACTIVE"; a status an ACTIVE item may still legitimately
 carry is a disjoint set. ``dd-backlog-definition`` SKILL.md's own §2 "Terminal
 disposition tokens" table already lists ``DEFERRED`` as terminal (LEDGER-only) — its
@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 
 import dadaia_workspace
-from dadaia_workspace.core.models.backlog import TERMINAL_DISPOSITION_TOKENS
+from dadaia_workspace.core.models.histo import TERMINAL_DISPOSITIONS
 
 pytestmark = pytest.mark.contract
 
@@ -45,12 +45,12 @@ def test_skill_active_status_enumeration_excludes_terminal_disposition_tokens() 
         "enumeration line in §2"
     )
     documented = {value.strip().upper() for value in match.group("values").split("|")}
-    terminal = frozenset(TERMINAL_DISPOSITION_TOKENS)
+    terminal = frozenset(word.upper() for word in TERMINAL_DISPOSITIONS)
     overlap = documented & terminal
     assert not overlap, (
         "dd-backlog-definition SKILL.md's ACTIVE '- **Status:**' enumeration lists a "
         f"terminal LEDGER disposition token as a live ACTIVE status: {sorted(overlap)!r} "
-        "— a terminal token (core.models.backlog.TERMINAL_DISPOSITION_TOKENS) belongs "
+        "— a terminal token (core.models.histo.TERMINAL_DISPOSITIONS) belongs "
         "only in a '## LEDGER' line (the skill's own Terminal disposition tokens table), "
         "never as a status an ACTIVE item may carry; the doctor's BL-STALE check "
         "correctly refuses it "

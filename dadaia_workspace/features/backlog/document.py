@@ -60,7 +60,8 @@ from pathlib import Path
 from typing import Any
 
 from dadaia_workspace.core.atomic_write import atomic_write
-from dadaia_workspace.core.models.backlog import BacklogHistoRecord, Intent, parse_intents
+from dadaia_workspace.core.models.backlog import Intent, parse_intents
+from dadaia_workspace.core.models.histo import HistoRecord
 from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 __all__ = [
@@ -455,11 +456,11 @@ def backlog_new(specs_dir: Path, slug: str) -> BacklogNewResult:
 # ═════════════════════════════════════════════════════════════════════════════════
 
 
-def remove_active_subsection(specs_dir: Path, slug: str) -> str:
+def remove_active_subsection(specs_dir: Path, slug: str) -> dict[str, Any]:
     """Remove exactly one ``active[]`` entry named *slug* from
-    ``specs/backlog/BACKLOG.json`` and return its removed source as pretty-printed JSON
-    text (``entry_md``, A5.1 — name unchanged, ``core/models/backlog.py`` is out of this
-    module's write set) — every other entry survives unchanged.
+    ``specs/backlog/BACKLOG.json`` and return the removed object itself — every other
+    entry survives unchanged. The object IS what the exit record's ``entry`` field
+    carries (0.4.7 FR7); nothing re-serializes it to a text snapshot.
 
     Raises:
         KeyError: If *slug* does not name a live ``active[]`` entry.
@@ -479,11 +480,12 @@ def remove_active_subsection(specs_dir: Path, slug: str) -> str:
     for i, entry in enumerate(active_list):
         if not isinstance(entry, dict) or entry.get("id") != slug:
             continue
-        removed = active_list.pop(i)
+        removed: dict[str, Any] = entry
+        active_list.pop(i)
         atomic_write(
             target, _dump_document(active_list), expected_previous=previous_text, ensure_parent=True
         )
-        return json.dumps(removed, indent=2, ensure_ascii=False)
+        return removed
 
     raise KeyError(f"backlog slug {slug!r} does not name a live active[] entry in {target}")
 
@@ -492,14 +494,13 @@ def backlog_exit(
     specs_dir: Path,
     slug: str,
     *,
-    histo_store: JsonlRecordStore[BacklogHistoRecord],
+    histo_store: JsonlRecordStore[HistoRecord],
     disposition: str,
     reason: str | None,
     release: str | None,
-    by: str,
     denylist_terms: list[tuple[str, str]] | tuple[tuple[str, str], ...],
     ts: str | None = None,
-) -> BacklogHistoRecord:
+) -> HistoRecord:
     """Retire *slug* out of ``active[]`` and append its one histo record (v0.5.0 FR5,
     A5.3) — the atomic pair :func:`remove_active_subsection` (the removal) and
     ``histo_store.append`` (the record) — through an INJECTED
@@ -507,11 +508,13 @@ def backlog_exit(
     the caller builds the store; this module only ever calls the instance it is
     handed).
 
-    ``entry_md`` is the exact removed entry's pretty-printed JSON text; there is
-    nothing to "recover" for a live exit (only the historical migration reaches for an
-    archived snapshot).
+    The record is the ONE :class:`~dadaia_workspace.core.models.histo.HistoRecord`
+    shape every ``_histo.jsonl`` carries (0.4.7 FR7): ``entry`` IS the removed
+    ``active[]`` object, not a re-serialized Markdown snapshot of it, and
+    ``disposition`` is drawn from
+    :data:`~dadaia_workspace.core.models.histo.BACKLOG_HISTO_DISPOSITIONS`.
 
-    ``denylist_terms`` is redacted through :meth:`BacklogHistoRecord.redact` BEFORE the
+    ``denylist_terms`` is redacted through :meth:`HistoRecord.redact` BEFORE the
     record is appended (bug ``backlog-histo-writer-skips-write-time-denylist-redaction``)
     — the SAME write-time seam ``BugService.register``/``apply_update`` already enforce
     for ``BugRecord`` (SPEC v0.4.5 FR6/T-045-19). REQUIRED, no default (F-13, T-050-36
@@ -523,16 +526,15 @@ def backlog_exit(
     wires the real operator denylist in via ``container.load_denylist_terms()``,
     mirroring how ``cli/commands/bugs.py`` wires ``BugService`` today.
     """
-    entry_md = remove_active_subsection(specs_dir, slug)
-    record = BacklogHistoRecord(
+    entry = remove_active_subsection(specs_dir, slug)
+    record = HistoRecord(
         id=slug,
         ts=ts if ts is not None else _today(),
         disposition=disposition,
-        reason=reason,
         release=release,
-        by=by,
-        entry_md=entry_md,
-        entry_md_source="live exit (backlog_exit) — exact removed active[] entry, as pretty-printed JSON",
+        reason=reason,
+        summary=None,
+        entry=entry,
     ).redact(denylist_terms)
     histo_store.append(record)
     return record
