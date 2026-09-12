@@ -20,16 +20,16 @@
   "audited": null,
   "log": [
     {
-      "ts": "2026-08-28T20:30:00Z",
-      "agent": "product-engineer",
-      "kind": "phase",
-      "text": "Definition authored from the 2026-08-28 deepening audit; SPEC/PLAN/TASKS Aprovado by operator order; phase IMPLEMENTATION."
-    },
-    {
       "ts": "2026-08-28T20:05:53Z",
       "agent": "product-engineer",
       "kind": "defined",
       "text": "Definition promotion commit 61a689a7; grill handoff claude-code-0.5.1-grill; backlog entry consumed in the same commit."
+    },
+    {
+      "ts": "2026-08-28T20:30:00Z",
+      "agent": "product-engineer",
+      "kind": "phase",
+      "text": "Definition authored from the 2026-08-28 deepening audit; SPEC/PLAN/TASKS Aprovado by operator order; phase IMPLEMENTATION."
     },
     {
       "ts": "2026-08-29T19:06:25Z",
@@ -80,6 +80,18 @@
       "text": "CLOSURE: rc-1 PR #226 open on the trio-approved commit; memory update T-051-25 and closure narrative T-051-26 begin (local until the PR merges)."
     },
     {
+      "ts": "2026-08-29T20:47:51Z",
+      "agent": "project-manager",
+      "kind": "phase",
+      "text": "ARCHIVED: rc-1 PR #226 merged into develop 46a2145e (no rc-2 round needed); consumed verdict deleted; T-051-23..27 closed; directory moves to specs/releases/_archive/0.5.1/ in this commit; T-051-28 (ship) follows on develop -> main."
+    },
+    {
+      "ts": "2026-08-29T21:17:58Z",
+      "agent": "project-manager",
+      "kind": "shipped",
+      "text": "Squash-merged develop a3111dab into main 0fee8cdd by PR #228 (tree identity develop==main). Publication withheld: no tag, PyPI stays 0.4.4, release approve untouched. Consumed verdicts (46a2145e, 748524c5) deleted in this commit."
+    },
+    {
       "ts": "2026-08-29T23:10:00Z",
       "agent": "product-engineer",
       "kind": "closure-summary",
@@ -108,18 +120,6 @@
       "agent": "product-engineer",
       "kind": "closure-artifact-gc",
       "text": "Fifteen handoffs under .dadaia/handoff/dadaia-workspace/ carry 2026-08-28/29 timestamps; this release owns thirteen of them. KEEP as evidence: 2026-08-28T183644Z-software-architect-deepening-audit (the only one carrying artifact.path, pointing at the multi-file report the SPEC's source-audit line cites - artifact-bearing handoffs follow their report's retention and are never ack-deleted); 2026-08-28T195443Z-claude-code-0.5.1-grill (named by the surviving defined log entry); 2026-08-28T180500Z-software-architect-0.5.1-k9-k11-rulings (the provenance of ADR 0001 and 0002, both still proposed); 2026-08-29T120000Z-software-architect-0.5.1-k5-net-positive-review (named verbatim in two surviving qa-close entries, and the record of the REJECTED-then-closed net-positive route); 2026-08-29T212000Z-qa-engineer-0.5.1-diagram-test-deletion-verdict (the stewardship verdict authorising the contract-test deletion and MEM-DRIFT-1's relocation); 2026-08-29T190625Z-qa-engineer-0.5.1-alpha-1-3-close and 2026-08-29T194915Z-qa-engineer-0.5.1-alpha-2-4-close (the per-segment stewardship verdicts A-0.6 requires, carrying the file:line superseding-coverage maps); 2026-08-29T203220Z-qa-engineer-0.5.1-rc1-final-14388175 (the implemented milestone's own verdict); 2026-08-29T224500Z-code-reviewer-0.5.1-rc1-six-axis-reverdict and 2026-08-29T210000Z-security-reviewer-0.5.1-rc1-pr-verdict-90e00e9c plus specs/releases/0.5.1/verdicts/14388175215c322f1003362462402d53be1b2e32.handoff.json (live PR verdicts, consumed once by the merge and deleted only after it - a survivor past merge is slop, DADAIA.md 4.2). DELETE as consumed coordination, their content already transcribed into this log or superseded by a later verdict on the same subject: 2026-08-29T195915Z-qa-engineer-0.5.1-rc1-final (superseded by the 203220Z correction, as its own implemented entry states), 2026-08-29T203000Z-code-reviewer-0.5.1-rc1-six-axis (superseded by the 224500Z reverdict), and 2026-08-28T202957Z-security-reviewer-0.5.1-pr-verdict-c807e0cd (the definition-PR head verdict, already consumed by that merge). OUT OF SCOPE, left untouched and referred to their owning release: 2026-08-28T183600Z-qa-engineer-rc1-050-qa-close and 2026-08-28T013036Z-qa-engineer-T-045-36-rc1-exercise. Every path above sits inside .dadaia/ or specs/releases/, none is reached through a symlinked directory, and no directory sweep is proposed; product-engineer has no shell, so the three deletions are handed to project-manager or software-engineer to execute file by file."
-    },
-    {
-      "ts": "2026-08-29T20:47:51Z",
-      "agent": "project-manager",
-      "kind": "phase",
-      "text": "ARCHIVED: rc-1 PR #226 merged into develop 46a2145e (no rc-2 round needed); consumed verdict deleted; T-051-23..27 closed; directory moves to specs/releases/_archive/0.5.1/ in this commit; T-051-28 (ship) follows on develop -> main."
-    },
-    {
-      "ts": "2026-08-29T21:17:58Z",
-      "agent": "project-manager",
-      "kind": "shipped",
-      "text": "Squash-merged develop a3111dab into main 0fee8cdd by PR #228 (tree identity develop==main). Publication withheld: no tag, PyPI stays 0.4.4, release approve untouched. Consumed verdicts (46a2145e, 748524c5) deleted in this commit."
     },
     {
       "ts": "2026-08-30T02:40:00Z",
