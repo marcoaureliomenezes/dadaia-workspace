@@ -25,7 +25,7 @@
   doctor.py`, `dadaia_workspace/features/backlog/doctor.py`, `tests/**`.
   Blocked by: T-047-01. Delivers: `dadaia doctor` reports workspace, specs and
   ledgers with three scores and one total.
-- [ ] T-047-03 — FR7: `core/models/histo.py` (`HistoRecord`, terminal vocabulary
+- [-] T-047-03 — FR7: `core/models/histo.py` (`HistoRecord`, terminal vocabulary
   constant), `public/schemas/histo-record-v1.schema.json`; per-ledger schema
   subsets; `ledgers` section validates `decisions.jsonl`, `BACKLOG.json`,
   `BUGS.jsonl`, `_RELEASE.json` (T-047-01) and the three histories (FR6);
