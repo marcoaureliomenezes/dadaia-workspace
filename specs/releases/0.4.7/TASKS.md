@@ -8,7 +8,7 @@
 
 ## Candidate 1 — records tell the truth
 
-- [ ] T-047-01 — FR1: `validate_release_tree` in `features/specs` over
+- [-] T-047-01 — FR1: `validate_release_tree` in `features/specs` over
   `core/release_state`; contract test `tests/contract/test_release_tree_canon.py`
   runs it on the real `specs/` tree and on a fixture reproducing the pre-Wave-0
   0.4.6 document (RED first). Write set: `dadaia_workspace/features/specs/**`,
