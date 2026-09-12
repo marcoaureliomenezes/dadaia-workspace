@@ -85,7 +85,6 @@ class Ledger:
 #: section, and one record validated twice is one finding printed twice.
 LEDGERS: tuple[Ledger, ...] = (
     Ledger("ADR", "ADRs/decisions.jsonl", "ADRs/decision-record-v1"),
-    Ledger("ADR", "ADRs/_superseded/superseded.jsonl", "ADRs/decision-record-v1"),
     Ledger("BACKLOG", "backlog/BACKLOG.json", "backlog/backlog-v1", jsonl=False),
     Ledger("BUGS", "bugs/BUGS.jsonl", "bugs/bug-record-v1"),
     Ledger("FINDINGS", "audits/*/FINDINGS.jsonl", "audits/finding-record-v1"),

@@ -27,6 +27,12 @@
       "agent": "software-engineer",
       "kind": "note",
       "text": "Candidate 1 in IMPLEMENTATION since T-047-01 (6e2d88af); phase advanced late — the doctor (SPEC-DOC-024) caught the lag once the one-doctor grammar landed."
+    },
+    {
+      "ts": "2026-09-12T23:59:00Z",
+      "agent": "software-engineer",
+      "kind": "note",
+      "text": "ADR 0004 accepted; ADR 0010 rewritten and accepted (operator decision 2026-09-12, recorded T-047-10)"
     }
   ]
 }

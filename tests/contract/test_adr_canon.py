@@ -5,15 +5,15 @@ Intent: CONTRACT — v0.5.0 specs-canon closure
 
 Validates the specs/ADRs/ decision-record canon this task introduces: JSONL, one
 record per line (dadaia_workspace.core.models.adr.AdrRecord), monotonic gap-free ids
-across BOTH ``specs/ADRs/decisions.jsonl`` AND
-``specs/ADRs/_superseded/superseded.jsonl`` together (a superseded decision MOVES,
-never copies — its id is never reused, never re-numbered), the status enum
-{proposed, accepted, rejected, superseded}, and the operator-only acceptance law
-(``accepted`` requires a non-null ``measured_by`` — a decision nobody can measure is
-not a principle, it is prose).
+over ``specs/ADRs/decisions.jsonl`` (0.4.7 FR8 retired the ``_superseded/`` lane: a
+superseded decision is retired IN PLACE with ``status: superseded``, named by its
+successor's ``supersedes`` — the second file shipped empty for the whole life of the
+canon and split one inventory in two), the status enum {proposed, accepted, rejected,
+superseded}, and the operator-only acceptance law (``accepted`` requires a RESOLVABLE
+``measured_by`` — a decision nobody can run is not a principle, it is prose).
 
 Every RED condition below is proven on an in-memory mutation fixture, never a real
-file on disk. Both committed files may legitimately be EMPTY (no real principle-level
+file on disk. The committed file may legitimately be EMPTY (no real principle-level
 decision has been authored yet under the JSONL canon — the 28 mechanical, auto-
 generated markdown ADRs this repository shipped at authoring time were deleted as
 non-canon; a decision record is now authored only when a real principle-level
@@ -51,7 +51,6 @@ pytestmark = pytest.mark.contract
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _ADR_DIR = _REPO_ROOT / "specs" / "ADRs"
 _DECISIONS_PATH = _ADR_DIR / "decisions.jsonl"
-_SUPERSEDED_PATH = _ADR_DIR / "_superseded" / "superseded.jsonl"
 
 
 def _read_jsonl_records(path: Path) -> list[dict[str, object]]:
@@ -77,8 +76,8 @@ def find_field_violations(record: dict[str, object]) -> list[str]:
 
 
 def find_numbering_violations(ids: list[str]) -> list[str]:
-    """Pure validator over a *list of id strings only* (across BOTH files, combined
-    by the caller) — numbering never needs the full record body."""
+    """Pure validator over a *list of id strings only* — numbering never needs the
+    full record body."""
     violations: list[str] = []
     if not ids:
         return violations
@@ -103,7 +102,7 @@ def find_numbering_violations(ids: list[str]) -> list[str]:
 
 
 # ---------------------------------------------------------------------------------------
-# The real, committed inventory — decisions.jsonl + _superseded/superseded.jsonl.
+# The real, committed inventory — decisions.jsonl.
 # ---------------------------------------------------------------------------------------
 
 
@@ -111,22 +110,18 @@ def test_committed_inventory_may_be_legitimately_empty() -> None:
     """Discovery itself must never raise regardless of population; every other check
     in this module holds vacuously true when the discovered set is empty."""
     assert isinstance(_read_jsonl_records(_DECISIONS_PATH), list)
-    assert isinstance(_read_jsonl_records(_SUPERSEDED_PATH), list)
 
 
 def test_every_committed_record_carries_every_required_field_and_a_valid_status() -> None:
-    all_records = _read_jsonl_records(_DECISIONS_PATH) + _read_jsonl_records(_SUPERSEDED_PATH)
-    for record in all_records:
+    for record in _read_jsonl_records(_DECISIONS_PATH):
         violations = find_field_violations(record)
         assert violations == [], violations
 
 
-def test_committed_ids_are_monotonic_gap_free_and_duplicate_free_across_both_files() -> None:
-    """The union of decisions.jsonl + _superseded/superseded.jsonl ids must be
-    1..N gap-free — a moved (superseded) record's id is never reused, never
-    re-numbered, so the two files' ids never overlap and always fill one sequence."""
-    all_records = _read_jsonl_records(_DECISIONS_PATH) + _read_jsonl_records(_SUPERSEDED_PATH)
-    ids = [str(record.get("id")) for record in all_records]
+def test_committed_ids_are_monotonic_gap_free_and_duplicate_free() -> None:
+    """decisions.jsonl's ids must be 1..N gap-free — a superseded record is retired in
+    place, so the one file always holds one unbroken sequence."""
+    ids = [str(record.get("id")) for record in _read_jsonl_records(_DECISIONS_PATH)]
     violations = find_numbering_violations(ids)
     assert violations == [], violations
 
@@ -176,8 +171,56 @@ def test_accepted_status_with_measured_by_is_green() -> None:
     mutated = {
         **_VALID_RECORD,
         "status": "accepted",
-        "measured_by": "tests/contract/test_x.py",
+        "measured_by": "pytest tests/contract/test_x.py",
     }
+    assert find_field_violations(mutated) == []
+
+
+@pytest.mark.parametrize(
+    "measured_by",
+    [
+        "pytest tests/contract/test_x.py",
+        "pytest tests/unit/a.py tests/unit/b.py",
+        "pytest tests/contract/test_test_suite_ratchets.py -k v31",
+        "lint-imports --config setup.cfg --no-cache",
+        "lint-imports --config setup.cfg --no-cache \u2014 contract features-no-subprocess",
+        "lint-imports --config setup.cfg --no-cache \u2014 contracts core-no-upper-layers, x",
+        "SPEC-DOC-045",
+        "SPEC-DOC-046 \u2014 the live release's state document is named _RELEASE.json",
+        "WS-dadaia-slop",
+        "BL-SHAPE over BACKLOG.json",
+        "RELEASE-TREE-PHASE over every committed release-state document",
+        "LEDGER-ADR-SCHEMA over specs/ADRs/decisions.jsonl",
+        "dadaia doctor \u2014 the ledgers section is 100 %",
+        "dadaia bugs status \u2014 both records terminal `deferred`",
+    ],
+)
+def test_resolvable_measured_by_is_green(measured_by: str) -> None:
+    """Intent: CONTRACT — 0.4.7 FR8. Every form a real accepted record uses today
+    resolves to a command, a doctor code or a ledger code someone can run."""
+    mutated = {**_VALID_RECORD, "status": "accepted", "measured_by": measured_by}
+    assert find_field_violations(mutated) == [], (measured_by, find_field_violations(mutated))
+
+
+def test_accepted_status_with_prose_measured_by_is_red() -> None:
+    """Intent: CONTRACT — 0.4.7 FR8. ADR 0005-0009 shipped `accepted` naming a
+    sentence ('specs doctor release rules + dd-gitflow-default conformance in
+    audits') that resolved to no runnable check; the acceptance law required only
+    non-emptiness, so prose passed. `measured_by` now matches a resolvable pattern
+    or the record is not acceptable."""
+    mutated = {
+        **_VALID_RECORD,
+        "status": "accepted",
+        "measured_by": "specs doctor release rules + dd-gitflow-default conformance in audits",
+    }
+    violations = find_field_violations(mutated)
+    assert any("does not match" in v for v in violations), violations
+
+
+def test_prose_measured_by_on_a_proposed_record_is_green() -> None:
+    """Intent: CONTRACT — 0.4.7 FR8. The pattern is part of the ACCEPTANCE law: a
+    `proposed` record is still a draft and may name its check in prose."""
+    mutated = {**_VALID_RECORD, "measured_by": "some prose nobody can run"}
     assert find_field_violations(mutated) == []
 
 

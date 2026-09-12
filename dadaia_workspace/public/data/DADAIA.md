@@ -174,7 +174,7 @@
 | `backlog/` | `AGENTS.md BACKLOG.json`, `_archive/backlog_histo.jsonl` |
 | `bugs/` | `AGENTS.md BUGS.jsonl`, `_archive/bugs_histo.jsonl` |
 | `audits/` | `AGENTS.md`, `_archive/audits_histo.jsonl`, `<YYYYMMDD-slug>/` |
-| `ADRs/` | `AGENTS.md decisions.jsonl`, `_superseded/superseded.jsonl` |
+| `ADRs/` | `AGENTS.md decisions.jsonl` |
 | `memory/` | `AGENTS.md ARCHITECTURE.md QUALITY.md TECHSTACK.md product/**` |
 
 - No stray root archive directory or dotfile; `specs doctor` flags anything else.
@@ -200,9 +200,10 @@
 
 <!-- behavior: adrs -->
 
-- `ADRs/decisions.jsonl` (+ `_superseded/superseded.jsonl`) records a decision; shape: `specs/ADRs/AGENTS.md`.
+- `ADRs/decisions.jsonl` records every decision, superseded in place; shape: `specs/ADRs/AGENTS.md`.
 - Any agent proposes; only the operator flips a decision to `accepted`.
-- One decision per Part-1 principle created or changed — never one per principle that merely exists.
+- One decision per change set, naming every Part-1 principle it creates or changes — never one per principle that merely exists.
+- A record born from an operator grill ruling is `accepted` at append, the ruling date in `context`.
 - The commit touching a Part-1 principle carries its accepted decision; a pre-canon principle carries `ADR: none` until next touched.
 
 ### 6.6 Backlog

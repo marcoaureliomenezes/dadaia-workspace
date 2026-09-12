@@ -47,7 +47,6 @@ _CANON_PATHS: tuple[str, ...] = (
     "audits/20260827-canon-v6-first-audit/FINDINGS.jsonl",
     "ADRs/AGENTS.md",
     "ADRs/decisions.jsonl",
-    "ADRs/_superseded/superseded.jsonl",
 )
 
 # Real-shape drift this task's canon explicitly excludes — one per class of violation

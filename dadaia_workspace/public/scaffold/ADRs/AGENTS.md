@@ -8,13 +8,14 @@ Scope: this file governs only `specs/ADRs/`.
 - Fields: `id` (NNNN, zero-padded, monotonic, gap-free, never reused), `ts`, `title`, `status`.
 - Fields (continued): `context`, `decision`, `consequences`, `measured_by`, `supersedes`, `amends`.
 - `status` values: `proposed` | `accepted` | `rejected` | `superseded`.
-- `accepted` requires a non-null `measured_by` — an unmeasurable decision is not a principle.
+- `accepted` requires a resolvable `measured_by` — a `pytest`/`lint-imports` invocation or a grep-able code (`SPEC-DOC-nnn`, `WS-*`, `BL-*`, `RELEASE-TREE-*`, `LEDGER-*`), never prose.
 - Schema: `public/schemas/ADRs/decision-record-v1.schema.json`.
 
 ## 2. Acceptance law (operator-only)
 
 - Any agent may append a record with `status: "proposed"`.
 - Only the operator flips `status` to `accepted` (in-place edit, `measured_by` set to a real check).
+- A record born from an operator grill ruling is `accepted` at append, the ruling date in `context`.
 - An agent that writes `status: "accepted"` has violated this law.
 - `accepted` is then immutable: `context`/`decision`/`consequences` never rewritten again.
 - A reversal is always a new record (`supersedes`/`amends` naming the earlier `id`), never an edit.
@@ -27,14 +28,14 @@ Scope: this file governs only `specs/ADRs/`.
 | Accept | `docs(adr): accept <slug>` | the record's `status`/`measured_by` flip + the paired Part-1 memory hunk, same commit |
 
 - Never a third shape: rejecting is a `status: "rejected"` edit by the operator, staged alone.
-- Superseding is a new record proposal, plus (once accepted) the superseded record's line moved to `_superseded/superseded.jsonl`.
-- A superseded record's `id` is never reused, never re-numbered — moved in the accept commit of the new one.
+- Superseding is a new record proposal; once accepted, the superseded record stays in `decisions.jsonl` with `status: superseded` and the successor's `supersedes` naming it.
+- A superseded record's `id` is never reused, never re-numbered, and its line never moves.
 
 ## 4. Discovery
 
-- `decisions.jsonl` + `_superseded/superseded.jsonl` together are the complete, authored inventory.
+- `decisions.jsonl` is the complete, authored inventory — proposed, accepted, rejected and superseded alike.
 - No hand-kept index table — `tests/contract/test_adr_canon.py` enforces monotonic, gap-free, duplicate-free numbering.
-- Either file may be legitimately empty.
+- The file may be legitimately empty.
 
 ## 5. Relationship to memory and audits
 

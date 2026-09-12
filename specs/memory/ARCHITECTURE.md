@@ -16,7 +16,7 @@ Rationale: the ledger shows zero adapter substitutions ever fixed a bug; the por
 
 ### P-02 · We never spawn a subprocess from a feature; process execution goes through the one infrastructure adapter, `infrastructure/subprocess_runner.py`.
 Measured by: `lint-imports --config setup.cfg --no-cache` — contract `features-no-subprocess` (direct imports only, zero ignored edges).
-ADR: 0001 (accepted)
+ADR: none
 Rationale: one process seam keeps execution observable, fakeable and bounded.
 
 ### P-03 · We keep `core` free of OS primitives (`fcntl`, `signal`, `subprocess`, `msvcrt`); `core/platform.py` is the sole platform seam.

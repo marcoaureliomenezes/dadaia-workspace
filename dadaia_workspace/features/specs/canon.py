@@ -48,7 +48,7 @@ The canon (operator, 2026-08-28) — the ONLY members permitted under ``specs/``
     bugs/{AGENTS.md, BUGS.jsonl, _archive/bugs_histo.jsonl}
     audits/{AGENTS.md, _archive/audits_histo.jsonl,
             <YYYYMMDD-slug>/{AUDIT.md, FINDINGS.jsonl}}
-    ADRs/{AGENTS.md, decisions.jsonl, _superseded/superseded.jsonl}
+    ADRs/{AGENTS.md, decisions.jsonl}
     memory/{AGENTS.md, ARCHITECTURE.md, QUALITY.md, TECHSTACK.md,
             product/index.md, product/catalog.json, product/<area>/<slug>.md}
 
@@ -440,14 +440,6 @@ CANON: tuple[CanonEntry, ...] = (
     ),
     CanonEntry(
         re.compile(r"^ADRs/decisions\.jsonl$"), "static", True, "", "ADRs", "ADRs/decisions.jsonl"
-    ),
-    CanonEntry(
-        re.compile(r"^ADRs/_superseded/superseded\.jsonl$"),
-        "static",
-        True,
-        "",
-        "ADRs",
-        "ADRs/_superseded/superseded.jsonl",
     ),
 )
 

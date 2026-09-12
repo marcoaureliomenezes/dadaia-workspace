@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "decision-record-v1",
   "title": "ADR Decision Record v1",
-  "description": "One record per architecture decision, appended once to specs/ADRs/decisions.jsonl (v0.5.0 specs-canon closure, operator ruling 2026-08-28). A decision moves — the whole record relocates, never copies — to specs/ADRs/_superseded/superseded.jsonl the moment it is superseded; its id is never reused. `id` is monotonic and gap-free across BOTH files together. Any agent may append a `status: proposed` record; ONLY the operator flips `status` to `accepted` (specs/ADRs/AGENTS.md's operator-only acceptance law) — `accepted` requires a non-null `measured_by` (a decision nobody can measure is not a principle, it is prose).",
+  "description": "One record per architecture decision, appended once to specs/ADRs/decisions.jsonl (v0.5.0 specs-canon closure, operator ruling 2026-08-28). A superseded decision stays in decisions.jsonl with `status: superseded`, named by its successor's `supersedes`; its id is never reused (0.4.7 FR8 retired the `_superseded/` lane — a second file the record had to be MOVED to, which shipped empty and split one inventory in two). `id` is monotonic and gap-free over the one file. Any agent may append a `status: proposed` record; ONLY the operator flips `status` to `accepted` (specs/ADRs/AGENTS.md's operator-only acceptance law) — `accepted` requires a RESOLVABLE `measured_by` (a decision nobody can run is not a principle, it is prose).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -21,12 +21,12 @@
     "id": {
       "type": "string",
       "pattern": "^\\d{4}$",
-      "description": "Zero-padded 4-digit sequence number, monotonic and gap-free across decisions.jsonl + _superseded/superseded.jsonl together — never reused, never re-numbered."
+      "description": "Zero-padded 4-digit sequence number, monotonic and gap-free over decisions.jsonl — never reused, never re-numbered."
     },
     "ts": {
       "type": "string",
       "format": "date-time",
-      "description": "ISO-8601 UTC timestamp this record was appended (or last moved, for a superseded record)."
+      "description": "ISO-8601 UTC timestamp this record was appended."
     },
     "title": {
       "type": "string",
@@ -41,7 +41,7 @@
         "rejected",
         "superseded"
       ],
-      "description": "proposed: any agent may author. accepted: operator-only, requires measured_by. rejected: operator decision, no consequence elsewhere. superseded: the record has moved to _superseded/superseded.jsonl."
+      "description": "proposed: any agent may author, EXCEPT a record born from an operator grill ruling, which is appended `accepted` with the ruling date in `context`. accepted: operator-only, requires a resolvable measured_by. rejected: operator decision, no consequence elsewhere. superseded: retired in place by the successor named in that successor's `supersedes`."
     },
     "context": {
       "type": "string",
@@ -63,7 +63,7 @@
         "string",
         "null"
       ],
-      "description": "The existing mechanical check that proves this decision holds (an import-linter contract, a contract test node id, a doctor check code, a ratchet script). Required (non-null) when status is accepted."
+      "description": "The existing mechanical check that proves this decision holds. Free text while `proposed`; once `accepted` it must match the resolvable pattern in this schema's allOf — a pytest invocation, a lint-imports invocation, or a code a reader greps for (SPEC-DOC-nnn, WS-*, BL-*, RELEASE-TREE-*, LEDGER-*), or `dadaia doctor`/`dadaia bugs status`."
     },
     "supersedes": {
       "type": [
@@ -84,7 +84,7 @@
   },
   "allOf": [
     {
-      "description": "The operator-only acceptance law, expressed MECHANICALLY (0.4.7 FR6): an 'accepted' record must carry a non-empty 'measured_by' — a decision nobody can measure is not a principle, it is prose. Stated in this schema rather than in a test's hand-rolled copy, so the one validator the ledgers doctor runs and the one the contract test runs are the same validator.",
+      "description": "The operator-only acceptance law, expressed MECHANICALLY (0.4.7 FR6): an 'accepted' record must carry a non-empty 'measured_by' — a decision nobody can measure is not a principle, it is prose. Stated in this schema rather than in a test's hand-rolled copy, so the one validator the ledgers doctor runs and the one the contract test runs are the same validator. 0.4.7 FR8 tightened non-empty to RESOLVABLE: five of the ten committed records were accepted naming the sentence 'specs doctor release rules + dd-gitflow-default conformance in audits', which resolved to nothing runnable — minLength alone cannot tell a check from a wish.",
       "if": {
         "properties": {
           "status": {
@@ -99,7 +99,7 @@
         "properties": {
           "measured_by": {
             "type": "string",
-            "minLength": 1
+            "pattern": "^(pytest \\S+( \\S+)*( -k \\S+)?|lint-imports( --config \\S+)?( --no-cache)?( \u2014 contracts? \\S+.*)?|SPEC-DOC-\\d{3}\\b.*|WS-[A-Za-z]+-[a-z]+\\b.*|BL-[A-Z]+\\b.*|RELEASE-TREE-[A-Z-]+\\b.*|LEDGER-[A-Z-]+\\b.*|dadaia (doctor|bugs status)\\b.*)$"
           }
         }
       }
