@@ -63,7 +63,7 @@
   `dadaia_workspace/features/bugs/**`, `dadaia_workspace/public/schemas/bugs/**`,
   `specs/bugs/BUGS.jsonl`, `tests/**`. Blocked by: T-047-03. Delivers: no record
   is archivable by filing date.
-- [ ] T-047-09 — FR3: `dadaia release archive <id> --shipped --pr --next`:
+- [-] T-047-09 — FR3: `dadaia release archive <id> --shipped --pr --next`:
   validate (T-047-01 + all `[x]`, CLOSURE, `implemented`), set `shipped` +
   ARCHIVED, move to `_archive/<id>/`, append histo record (T-047-03 shape), birth
   `<next>` (T-047-06), `bugs archive` (T-047-08), all-or-nothing, print `next:`
