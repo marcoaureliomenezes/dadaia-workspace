@@ -38,7 +38,7 @@
   `backlog_histo.jsonl` (136), `audits_histo.jsonl` (23), `releases_histo.jsonl`
   (179 events → one record per release). Write set: `specs/**/_archive/*.jsonl`.
   Blocked by: T-047-03. Delivers: `dadaia doctor` ledgers 100 % on the real tree.
-- [ ] T-047-05 — FR7 contract: delete `consumed_backlog_histo.jsonl`,
+- [-] T-047-05 — FR7 contract: delete `consumed_backlog_histo.jsonl`,
   `features/backlog/ledger.py`, `ConsumedBacklogHistoRecord`, its store builder,
   BL-STALE (a), SPEC-DOC-031, the provisional `CONSUMED` token and their tests;
   canon rows updated. Write set: `dadaia_workspace/**`, `specs/backlog/**`,
