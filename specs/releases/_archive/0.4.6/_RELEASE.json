@@ -14,7 +14,8 @@
   },
   "shipped": {
     "sha": "6cef01f854ee4e3c1178791270c9813fa9947730",
-    "ts": "2026-09-06T15:05:36Z"
+    "ts": "2026-09-06T15:05:36Z",
+    "pr": 249
   },
   "audited": null,
   "log": [
@@ -245,6 +246,12 @@
       "agent": "project-manager",
       "kind": "merge",
       "text": "SHIPPED + PUBLISHED: PR #248 feature/0.4.6 -> develop merged e1b44248 (37 checks green); PR #249 develop -> main squash 6cef01f8 (36 checks green, verdict gate via first parent 7a8c0e01); Release run 34040877135 green end to end: release-gate approved on operator order, PyPI 0.4.6 published (OIDC), tag v0.4.6, install-from-PyPI smoke run green. First attempt run 33990917232 rejected. Ledger 0 open bugs, backlog 0 at publication. Whole release folder archived (final trio at root, rc-1..rc-3 inside, ADR 0009); feature/0.4.7 cut from main with the develop reconciliation as its first commit."
+    },
+    {
+      "ts": "2026-09-12T18:28:07Z",
+      "agent": "project-manager",
+      "kind": "note",
+      "text": "Data repair (audit RL-1, 2026-09-12): shipped.pr = 249 added; the document failed release-state-v1 and parse_release_state raised on it while specs doctor reported 0 errors."
     }
   ]
 }
