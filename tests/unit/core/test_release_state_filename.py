@@ -24,7 +24,6 @@ def _state_doc(release: str) -> str:
             "defined": None,
             "implemented": None,
             "shipped": None,
-            "audited": None,
             "log": [],
         }
     )

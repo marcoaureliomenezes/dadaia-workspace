@@ -34,7 +34,6 @@ def _doc(**overrides: object) -> dict[str, object]:
         "defined": {"sha": "a" * 40, "ts": "2026-08-27T10:31:16Z"},
         "implemented": None,
         "shipped": None,
-        "audited": None,
         "log": [
             {
                 "ts": "2026-08-27T12:25:47Z",
@@ -58,7 +57,6 @@ def test_parse_release_state_reads_every_field() -> None:
     assert state.defined == {"sha": "a" * 40, "ts": "2026-08-27T10:31:16Z"}
     assert state.implemented is None
     assert state.shipped is None
-    assert state.audited is None
     assert len(state.log) == 1
     assert state.log[0]["kind"] == "note"
 
@@ -125,7 +123,6 @@ def test_release_state_is_a_frozen_dataclass_value_object() -> None:
         defined=None,
         implemented=None,
         shipped=None,
-        audited=None,
     )
     with pytest.raises(AttributeError):
         state.phase = "SPEC"  # type: ignore[misc]
@@ -143,8 +140,12 @@ def test_phase_vocabulary_single_home() -> None:
     """
     from dadaia_workspace.core import release_state
     from dadaia_workspace.features.spec_context import gate_policy
-    from dadaia_workspace.features.specs import doctor_release
+    from dadaia_workspace.features.specs import doctor_release, release_tree
 
     assert doctor_release.CANONICAL_PHASES is release_state.PHASES
     assert gate_policy._MEMORY_WRITE_PHASES is release_state.MEMORY_WRITE_PHASES
-    assert release_state.MEMORY_WRITE_PHASES < release_state.PHASES
+    assert frozenset(release_state.PHASES) > release_state.MEMORY_WRITE_PHASES
+    # 0.4.7 FR4: exactly four phases, in lifecycle order, and release_tree re-exports
+    # the same object rather than re-listing it.
+    assert release_state.PHASES == ("DEFINITION", "IMPLEMENTATION", "CLOSURE", "ARCHIVED")
+    assert release_tree.RELEASE_TREE_PHASES is release_state.PHASES

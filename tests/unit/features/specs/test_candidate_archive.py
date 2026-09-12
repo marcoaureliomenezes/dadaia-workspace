@@ -38,7 +38,6 @@ def _live_release(
         "defined": None,
         "implemented": None,
         "shipped": None,
-        "audited": None,
         "log": [],
     }
     name = "RELEASE.json" if legacy_name else "_RELEASE.json"
@@ -55,7 +54,7 @@ def test_archive_moves_trio_to_rc1_and_bumps_counter(tmp_path: Path) -> None:
     assert (rdir / "rc-1" / "TASKS.md").is_file()
     assert not (rdir / "SPEC.md").exists()
     state = json.loads((rdir / "_RELEASE.json").read_text(encoding="utf-8"))
-    assert state["rc"] == 1 and state["phase"] == "DISCOVERY"
+    assert state["rc"] == 1 and state["phase"] == "DEFINITION"
     assert any("rc-1" in e.get("text", "") for e in state["log"])
 
 
@@ -99,10 +98,12 @@ def test_archive_refuses_without_live_release(tmp_path: Path) -> None:
         archive_candidate(tmp_path)
 
 
-def test_doctor_accepts_the_between_candidates_discovery_state(tmp_path: Path) -> None:
-    """Bug rc-archive-discovery-state-rejected-by-doctor: the state ``rc-archive``
-    legally produces (trio in ``rc-N/``, root empty, phase DISCOVERY) must be
-    doctor-clean — the verb and the doctor may never disagree about it."""
+def test_doctor_accepts_the_between_candidates_state(tmp_path: Path) -> None:
+    """Bug rc-archive-discovery-state-rejected-by-doctor, re-pinned for 0.4.7 FR4: the
+    state ``rc-archive`` legally produces (trio in ``rc-N/``, root empty, phase
+    DEFINITION — the phase the next candidate's trio is authored in, now that
+    DISCOVERY is deleted) must not draw a SPEC-DOC-004 status finding. The verb and
+    the doctor may never disagree about it."""
     from dadaia_workspace.features.specs.doctor import SpecsDoctor
 
     specs = tmp_path
@@ -113,3 +114,26 @@ def test_doctor_accepts_the_between_candidates_discovery_state(tmp_path: Path) -
 
     issues = [i for i in SpecsDoctor(specs).check() if i.code == "SPEC-DOC-004"]
     assert issues == [], [i.description for i in issues]
+
+
+def test_archive_refuses_when_the_release_tree_is_invalid(tmp_path: Path) -> None:
+    """0.4.7 FR4 (T-047-07): nothing moves until the SHARED validator passes. RED
+    before the change — ``archive_candidate`` read only its own release's ``phase``
+    and would happily mint a second invalid document under ``rc-N/``. Intent:
+    CONTRACT — T-047-07; size: SMALL."""
+    specs = tmp_path
+    _live_release(specs)
+    state_path = specs / "releases" / "1.0.0" / "_RELEASE.json"
+    doc = json.loads(state_path.read_text(encoding="utf-8"))
+    doc["log"] = [
+        {"ts": "2026-01-01T00:00:00Z", "agent": "x", "kind": "closure-summary", "text": "t"}
+    ]
+    state_path.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
+
+    with pytest.raises(CandidateArchiveError) as excinfo:
+        archive_candidate(specs)
+
+    assert "RELEASE-TREE-SCHEMA" in str(excinfo.value)
+    assert "fix:" in str(excinfo.value)
+    assert not (specs / "releases" / "1.0.0" / "rc-1").exists(), "nothing moves on refusal"
+    assert (specs / "releases" / "1.0.0" / "SPEC.md").is_file()

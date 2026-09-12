@@ -11,7 +11,7 @@ never blocks a human); this module is only the mechanics.
 
 One deep verb, zero options: everything a caller must know is "archive the live
 candidate"; validation (trio present, every task ``[x]``, phase CLOSURE), numbering,
-the move, the counter bump, the DISCOVERY reset and the canonical
+the move, the counter bump, the DEFINITION reset and the canonical
 :data:`~dadaia_workspace.core.release_state.RELEASE_STATE_FILENAME` write all live
 behind it.
 """
@@ -26,6 +26,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.release_state import RELEASE_STATE_FILENAME, release_state_file
 from dadaia_workspace.features.specs.doctor_common import resolve_live_release_id
+from dadaia_workspace.features.specs.release_tree import validate_release_tree
 
 __all__ = ["CandidateArchive", "CandidateArchiveError", "archive_candidate"]
 
@@ -63,10 +64,27 @@ def archive_candidate(specs_dir: Path) -> CandidateArchive:
     trio is present at the release root, its TASKS carry no open ``[ ]`` or reserved
     ``[-]`` marker, and its phase is ``CLOSURE``. On success the trio moves to
     ``rc-N/`` (N = highest existing + 1), the state document records ``rc = N`` with a
-    log entry, phase resets to ``DISCOVERY`` (between candidates), and the document is
-    always written under the canonical filename — a legacy ``RELEASE.json`` is renamed
-    in the same act.
+    log entry, phase resets to ``DEFINITION`` (the next candidate's trio is authored
+    there — 0.4.7 FR4 deleted the ``DISCOVERY`` phase this used to park in), and the
+    document is always written under the canonical filename — a legacy
+    ``RELEASE.json`` is renamed in the same act.
+
+    Nothing moves until :func:`~dadaia_workspace.features.specs.release_tree
+    .validate_release_tree` passes on the whole tree: archiving a candidate whose own
+    state document is invalid mints a second invalid document under ``rc-N/`` and
+    makes the damage harder to see, which is exactly how the pre-Wave-0 0.4.6
+    document survived unnoticed. One validator, shared with ``dadaia doctor`` — never
+    a second opinion here.
     """
+    tree_issues = validate_release_tree(specs_dir)
+    if tree_issues:
+        listed = "\n".join(f"  {i.path}: {i.code} — {i.message}" for i in tree_issues)
+        raise CandidateArchiveError(
+            f"the release tree carries {len(tree_issues)} issue(s); a candidate archives "
+            f"only from a valid tree:\n{listed}\n"
+            "fix: run `dadaia doctor --context <ctx>` and repair every release-tree "
+            "finding, then re-run `dadaia release rc-archive`."
+        )
     release_id, err = resolve_live_release_id(specs_dir)
     if err:
         raise CandidateArchiveError(err)
@@ -115,7 +133,7 @@ def archive_candidate(specs_dir: Path) -> CandidateArchive:
         (release_dir / name).rename(rc_dir / name)
 
     state["rc"] = rc
-    state["phase"] = "DISCOVERY"
+    state["phase"] = "DEFINITION"
     state.setdefault("log", []).append(
         {
             "ts": _utc_now(),

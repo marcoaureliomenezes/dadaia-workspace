@@ -103,7 +103,6 @@ def _fresh_release(tmp_path: Path) -> Path:
                 "defined": {"sha": "0" * 40, "ts": "2026-09-12T00:00:00Z"},
                 "implemented": None,
                 "shipped": None,
-                "audited": None,
                 "log": [
                     {
                         "ts": "2026-09-12T00:00:00Z",

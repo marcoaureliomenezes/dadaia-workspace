@@ -199,12 +199,7 @@ def test_release_new_writes_the_release_state_document(tmp_path: Path) -> None:
     assert state.release == "0.4.9"
     assert state.phase == "DEFINITION"
     assert state.rc is None
-    assert (state.defined, state.implemented, state.shipped, state.audited) == (
-        None,
-        None,
-        None,
-        None,
-    )
+    assert (state.defined, state.implemented, state.shipped) == (None, None, None)
     assert len(state.log) == 1
     entry = state.log[0]
     assert entry["agent"] == "dadaia release new"

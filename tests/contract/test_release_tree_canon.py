@@ -40,7 +40,6 @@ def _valid_document(**overrides: Any) -> dict[str, Any]:
         "defined": {"sha": "a" * 40, "ts": "2026-09-01T00:00:00Z"},
         "implemented": None,
         "shipped": None,
-        "audited": None,
         "log": [
             {
                 "ts": "2026-09-01T00:00:00Z",
@@ -109,7 +108,10 @@ def test_phase_outside_the_four_is_refused(tmp_path: Path) -> None:
     _write_release(tmp_path, "9.9.9", _valid_document(phase="DISCOVERY"))
 
     issues = validate_release_tree(tmp_path)
-    assert _codes(issues) == ["RELEASE-TREE-PHASE"]
+    assert _codes(issues) == ["RELEASE-TREE-SCHEMA", "RELEASE-TREE-PHASE"], (
+        "0.4.7 FR4 closed the phase enum in the schema too: a non-canonical phase is "
+        "now refused by BOTH the schema and the parsed-state rule"
+    )
     assert "DISCOVERY" in issues[0].message
 
 

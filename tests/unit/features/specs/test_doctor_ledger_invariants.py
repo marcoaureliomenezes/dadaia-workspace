@@ -148,7 +148,6 @@ def _set_active(specs: Path, release_id: str, phase: str) -> None:
         "defined": None,
         "implemented": None,
         "shipped": None,
-        "audited": None,
         "log": [],
     }
     (rdir / "RELEASE.json").write_text(_json.dumps(state) + "\n", encoding="utf-8")

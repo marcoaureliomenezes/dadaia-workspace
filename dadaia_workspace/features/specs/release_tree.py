@@ -30,7 +30,7 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
-from dadaia_workspace.core.release_state import parse_release_state, release_state_file
+from dadaia_workspace.core.release_state import PHASES, parse_release_state, release_state_file
 from dadaia_workspace.features.specs.doctor_common import RELEASE_ARTIFACTS
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 from dadaia_workspace.features.specs.schemas import validator_for
@@ -42,10 +42,12 @@ __all__ = [
     "validate_release_tree",
 ]
 
-#: The four lifecycle phases a committed release state may carry (FR1). Stricter than
-#: ``core.release_state.PHASES``, which still carries the pre-0.4.7 vocabulary
-#: (DISCOVERY/SPEC/PLAN/TASKS) until T-047-07 shrinks it with its migration.
-RELEASE_TREE_PHASES: tuple[str, ...] = ("DEFINITION", "IMPLEMENTATION", "CLOSURE", "ARCHIVED")
+#: The lifecycle phases a committed release state may carry — ONE home
+#: (``core.release_state.PHASES``), re-exported here under this module's own name for
+#: the readers that speak of the release TREE. Aliased, never re-listed: T-047-07
+#: shrank the canonical vocabulary to exactly these four, so a second literal tuple
+#: here would be a copy that can drift.
+RELEASE_TREE_PHASES: tuple[str, ...] = PHASES
 
 _SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 _SCHEMA_NAME = "releases/release-state-v1"

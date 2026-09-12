@@ -49,7 +49,7 @@
   `dadaia_workspace/features/specs/canon.py`, `dadaia_workspace/cli/commands/
   newartifacts.py`, `tests/**`. Blocked by: T-047-01. Delivers: after `release
   new` the gate and `context show` resolve the release.
-- [-] T-047-07 — FR4: `release-state-v1` drops `segment`/`audited`, enumerates
+- [x] T-047-07 — FR4: `release-state-v1` drops `segment`/`audited`, enumerates
   `log.kind`; `PHASES` = four; `rc-archive` parks in DEFINITION and calls the
   shared validator; archived documents carrying `audited`/`segment` migrated
   (one commit). Write set: `dadaia_workspace/public/schemas/releases/**`,

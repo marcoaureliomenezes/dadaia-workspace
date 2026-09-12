@@ -91,7 +91,6 @@ def _pre_wave0_046_document() -> dict[str, Any]:
         "defined": {"sha": "a" * 40, "ts": "2026-09-01T00:00:00Z"},
         "implemented": {"sha": "b" * 40, "rc": 3, "ts": "2026-09-05T00:00:00Z"},
         "shipped": {"sha": "c" * 40, "ts": "2026-09-06T15:05:36Z"},
-        "audited": None,
         "log": [
             {
                 "ts": "2026-09-01T00:00:00Z",

@@ -108,7 +108,7 @@ def release_rc_archive_cmd(
     The "continue" mechanics of the promote-or-continue gate (release-candidates
     model, ADR 0008): validates candidate closure (trio at root, every task [x],
     phase CLOSURE), moves SPEC/PLAN/TASKS into rc-N/, bumps the candidate counter
-    and resets phase to DISCOVERY so the next candidate's trio can be born at root.
+    and resets phase to DEFINITION so the next candidate's trio can be born at root.
     The version never increments here — that happens only at operator-approved
     deploy.
     """

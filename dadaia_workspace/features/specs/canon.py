@@ -708,7 +708,6 @@ def _birth_release_state_text(release_id: str) -> str:
             defined=None,
             implemented=None,
             shipped=None,
-            audited=None,
             log=(
                 {
                     "ts": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),

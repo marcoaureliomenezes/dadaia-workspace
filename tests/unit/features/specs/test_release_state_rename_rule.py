@@ -33,7 +33,6 @@ def _specs_with_release(tmp_path: Path, *, legacy_name: bool) -> Path:
         "defined": None,
         "implemented": None,
         "shipped": None,
-        "audited": None,
         "log": [],
     }
     name = "RELEASE.json" if legacy_name else "_RELEASE.json"

@@ -26,7 +26,7 @@ __all__ = ["ActiveRelease", "SpecsTree"]
 class ActiveRelease:
     """The one shared answer to "which release is live, in which phase"."""
 
-    release: str
+    release: str | None
     phase: str | None
     error: str | None
 

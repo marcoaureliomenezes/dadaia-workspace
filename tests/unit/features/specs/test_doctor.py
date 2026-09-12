@@ -123,7 +123,6 @@ def _write_release_jsonl(specs: Path, release_id: str, phase: str) -> None:
         "defined": None,
         "implemented": None,
         "shipped": None,
-        "audited": None,
         "log": [],
     }
     (rdir / "RELEASE.json").write_text(_json.dumps(state) + "\n", encoding="utf-8")
@@ -353,7 +352,7 @@ def test_scaffold_copytree_source_tree_carries_agents_md_per_area(tmp_path: Path
             lambda specs: (specs / "releases" / "1.2.3" / "RELEASE.json").write_text(
                 '{"schema":"release-state-v1","release":"1.2.3","phase":"",'
                 '"rc":null,"defined":null,"implemented":null,"shipped":null,'
-                '"audited":null,"log":[]}\n',
+                '"log":[]}\n',
                 encoding="utf-8",
             ),
             "SPEC-DOC-003",
@@ -362,8 +361,8 @@ def test_scaffold_copytree_source_tree_carries_agents_md_per_area(tmp_path: Path
         pytest.param(
             "missing-plan-in-active-release",
             lambda specs: (specs / "releases" / "1.2.3" / "PLAN.md").unlink(),
-            "SPEC-DOC-004",
-            id="doc004-missing-plan",
+            "RELEASE-TREE-TRIO",
+            id="trio-missing-plan",
         ),
         pytest.param(
             "non-canonical-status",
@@ -602,7 +601,7 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
     assert tree5m_present == []
 
     # TREE-6 retired (0.5.3 T-053-04, F005): missing-artifact coverage lives in
-    # SPEC-DOC-004 — see test_one_defect_one_code_missing_active_artifact.
+    # RELEASE-TREE-TRIO — see test_one_defect_one_code_missing_active_artifact.
 
     # TREE-7: bug missing session_id is never auto-repaired; session_id: null passes.
     specs7 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree7"))
@@ -831,16 +830,21 @@ def test_doc016_and_doc027_remedies_name_the_mintable_bare_axis(tmp_path: Path) 
 def test_one_defect_one_code_missing_active_artifact(tmp_path: Path) -> None:
     """F005 (20260830 audit): TREE-6 and SPEC-DOC-004 were ONE rule kept as two
     implementations (the segment-router-silent-skip bug had to be fixed twice, one
-    ~20-line block per file). One defect now yields ONE code: SPEC-DOC-004.
-    Intent: contract; size: unit."""
+    ~20-line block per file). 0.4.7 T-047-07 found the SAME duplication a third time —
+    SPEC-DOC-004 re-reported the trio presence RELEASE-TREE-TRIO already owns, and that
+    duplicate is what forced the between-candidates phase carve-out the doctor carried.
+    One defect now yields ONE code: RELEASE-TREE-TRIO. Intent: contract; size: unit."""
     specs = _make_clean_specs_tree(tmp_path)
     plan = specs / "releases" / "1.2.3" / "PLAN.md"
     plan.unlink()
     doctor = SpecsDoctor(specs, templates_dir=_TEMPLATES_DIR)
     issues = doctor.check()
-    doc004 = [i for i in issues if i.code == "SPEC-DOC-004" and "PLAN.md" in i.description]
-    assert doc004 and doc004[0].severity == Severity.ERROR
+    trio = [i for i in issues if i.code == "RELEASE-TREE-TRIO" and "PLAN.md" in i.description]
+    assert trio and trio[0].severity == Severity.ERROR
     assert "TREE-6" not in _codes(issues)
+    assert not [i for i in issues if i.code == "SPEC-DOC-004"], (
+        "trio presence has ONE home; SPEC-DOC-004 judges the `**Status:**` line only"
+    )
     doctor.fix(issues)
     assert not plan.exists(), "a missing SDD artifact must never be auto-created"
 

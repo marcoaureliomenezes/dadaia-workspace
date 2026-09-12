@@ -110,7 +110,6 @@ def _write_release(specs_dir: Path, release_id: str, phase: str) -> None:
                 "defined": None,
                 "implemented": None,
                 "shipped": None,
-                "audited": None,
                 "log": [],
             }
         ),
