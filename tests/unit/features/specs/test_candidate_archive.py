@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.specs.candidate import CandidateArchiveError, archive_candidate
+from dadaia_workspace.features.specs.candidate import ArchiveError, archive_candidate
 
 
 def _live_release(
@@ -76,25 +76,25 @@ def test_archive_renames_legacy_state_file_on_write(tmp_path: Path) -> None:
 
 def test_archive_refuses_open_tasks(tmp_path: Path) -> None:
     _live_release(tmp_path, tasks="- [x] T-1 done\n- [ ] T-2 open\n")
-    with pytest.raises(CandidateArchiveError, match=r"\[ \]|open"):
+    with pytest.raises(ArchiveError, match=r"\[ \]|open"):
         archive_candidate(tmp_path)
 
 
 def test_archive_refuses_in_progress_tasks(tmp_path: Path) -> None:
     _live_release(tmp_path, tasks="- [-] T-1 reserved\n")
-    with pytest.raises(CandidateArchiveError):
+    with pytest.raises(ArchiveError):
         archive_candidate(tmp_path)
 
 
 def test_archive_refuses_wrong_phase(tmp_path: Path) -> None:
     _live_release(tmp_path, phase="IMPLEMENTATION")
-    with pytest.raises(CandidateArchiveError, match="CLOSURE"):
+    with pytest.raises(ArchiveError, match="CLOSURE"):
         archive_candidate(tmp_path)
 
 
 def test_archive_refuses_without_live_release(tmp_path: Path) -> None:
     (tmp_path / "releases").mkdir()
-    with pytest.raises(CandidateArchiveError, match="live release"):
+    with pytest.raises(ArchiveError, match="live release"):
         archive_candidate(tmp_path)
 
 
@@ -130,10 +130,25 @@ def test_archive_refuses_when_the_release_tree_is_invalid(tmp_path: Path) -> Non
     ]
     state_path.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
 
-    with pytest.raises(CandidateArchiveError) as excinfo:
+    with pytest.raises(ArchiveError) as excinfo:
         archive_candidate(specs)
 
     assert "RELEASE-TREE-SCHEMA" in str(excinfo.value)
     assert "fix:" in str(excinfo.value)
     assert not (specs / "releases" / "1.0.0" / "rc-1").exists(), "nothing moves on refusal"
     assert (specs / "releases" / "1.0.0" / "SPEC.md").is_file()
+
+
+def test_the_post_archive_tree_passes_the_shared_validator(tmp_path: Path) -> None:
+    """T-047-09: ``rc-archive`` and ``release archive`` share one preamble
+    (``_load_live_release``), which validates the WHOLE tree first — so the state
+    ``rc-archive`` itself leaves (DEFINITION, no trio at root) must be valid to that
+    same validator, or the second candidate could never be archived. The trio rule is
+    phase-scoped in its one home for exactly this. Intent: CONTRACT — T-047-09;
+    size: SMALL."""
+    from dadaia_workspace.features.specs.release_tree import validate_release_tree
+
+    _live_release(tmp_path)
+    archive_candidate(tmp_path)
+
+    assert validate_release_tree(tmp_path) == []

@@ -103,7 +103,7 @@ def _now_iso() -> str:
     return datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _service(target: Path, *, with_archive: bool = False) -> BugService:
+def build_bug_service(target: Path, *, with_archive: bool = False) -> BugService:
     # ADR-0001: build_bug_archive_store had exactly one consumer (this module's
     # `dadaia bugs archive`) — the single consumer builds it directly instead of a
     # container seam. build_bug_record_store stays a container seam because
@@ -173,7 +173,7 @@ def bugs_append_cmd(
         raise typer.Exit(code=1)
 
     resolved_ts = ts or _now_iso()
-    service = _service(target)
+    service = build_bug_service(target)
     try:
         service.register(
             bug_id=bug_id,
@@ -205,7 +205,7 @@ def bugs_status_cmd(
 ) -> None:
     """List folded bug records (open by default), one ``id`` per line."""
     target = _target(specs_dir)
-    service = _service(target)
+    service = build_bug_service(target)
     records = service.status(include_closed=include_closed)
     for record in records:
         severity = record.severity or "-"
@@ -222,7 +222,7 @@ def bugs_stats_cmd(
 ) -> None:
     """Print aggregate bug counts by status and by severity."""
     target = _target(specs_dir)
-    service = _service(target)
+    service = build_bug_service(target)
     stats = service.stats()
     typer.echo(f"total\t{stats.total}")
     for status, count in sorted(stats.by_status.items()):
@@ -270,7 +270,7 @@ def bugs_update_cmd(
     (``dadaia bugs resolve|supersede|defer|reject``)."""
     target = _target(specs_dir)
     changes: Mapping[str, str] = _parse_set_options(set_)
-    service = _service(target)
+    service = build_bug_service(target)
     try:
         updated = service.apply_update(bug_id, changes)
     except (
@@ -292,7 +292,7 @@ def _run_transition(
     the caller (D7/D8, never a second verb->method mapping). Every option is threaded
     through as-is (``None`` when the operator omitted it), so the model's own
     transition method is the ONE place "what's required" is decided."""
-    service = _service(target)
+    service = build_bug_service(target)
     present = {key: value for key, value in fields.items() if value is not None}
     try:
         updated = service.transition(bug_id, method, **present)
@@ -417,6 +417,6 @@ def bugs_archive_cmd(
     Idempotent: a second run with nothing newly eligible is a byte-identical no-op."""
     target = _target(specs_dir)
     parsed_now = datetime.fromisoformat(now.replace("Z", "+00:00")) if now else None
-    service = _service(target, with_archive=True)
+    service = build_bug_service(target, with_archive=True)
     result = service.archive(now=parsed_now, threshold_days=threshold_days)
     typer.echo(f"[ok] archived {result.archived} record(s), {result.kept} kept.")

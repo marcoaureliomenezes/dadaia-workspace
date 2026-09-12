@@ -130,12 +130,39 @@ def test_live_dir_in_archived_phase_is_refused(tmp_path: Path) -> None:
 
 
 def test_live_release_missing_plan_is_refused(tmp_path: Path) -> None:
-    d = _write_release(tmp_path, "9.9.9", _valid_document())
+    """IMPLEMENTATION: the candidate is under way, so all three are required."""
+    d = _write_release(tmp_path, "9.9.9", _valid_document(phase="IMPLEMENTATION"))
     (d / "PLAN.md").unlink()
 
     issues = validate_release_tree(tmp_path)
     assert _codes(issues) == ["RELEASE-TREE-TRIO"]
     assert "PLAN.md" in issues[0].message
+
+
+def test_closure_release_missing_tasks_is_refused(tmp_path: Path) -> None:
+    d = _write_release(tmp_path, "9.9.9", _valid_document(phase="CLOSURE"))
+    (d / "TASKS.md").unlink()
+
+    assert _codes(validate_release_tree(tmp_path)) == ["RELEASE-TREE-TRIO"]
+
+
+def test_definition_release_with_spec_only_is_clean(tmp_path: Path) -> None:
+    """The state `release new` leaves (SPEC + _RELEASE.json, no PLAN/TASKS yet) and the
+    state `rc-archive` leaves (no trio at all, DEFINITION) are both legitimate: the next
+    candidate's trio is authored during DEFINITION. The trio rule is phase-scoped in its
+    ONE home rather than each verb growing an exemption — the same structural mistake
+    bug ``rc-archive-discovery-state-rejected-by-doctor`` already cost once."""
+    d = _write_release(tmp_path, "9.9.9", _valid_document(phase="DEFINITION"))
+    (d / "PLAN.md").unlink()
+    (d / "TASKS.md").unlink()
+
+    assert validate_release_tree(tmp_path) == []
+
+
+def test_definition_release_without_any_trio_artifact_is_clean(tmp_path: Path) -> None:
+    _write_release(tmp_path, "9.9.9", _valid_document(phase="DEFINITION"), trio=False)
+
+    assert validate_release_tree(tmp_path) == []
 
 
 def test_release_dir_without_state_document_is_refused(tmp_path: Path) -> None:

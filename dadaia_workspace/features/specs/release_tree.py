@@ -128,6 +128,38 @@ def _document_issues(
     return issues
 
 
+#: The phases in which the candidate trio is REQUIRED at the release root. A release in
+#: DEFINITION is between candidates: ``release new`` leaves SPEC.md alone and
+#: ``rc-archive`` leaves the root with no trio at all, both by design — the next
+#: candidate's PLAN/TASKS are authored during DEFINITION. Scoping the rule by phase in
+#: its ONE home is the whole fix: the alternative (each verb teaching the validator an
+#: exemption) is the shape that produced bug
+#: ``rc-archive-discovery-state-rejected-by-doctor``, where a verb's own legitimate
+#: output was refused by the checker it shares.
+_TRIO_REQUIRED_PHASES: frozenset[str] = frozenset({"IMPLEMENTATION", "CLOSURE"})
+
+
+def _trio_issues(
+    release_dir: Path, dir_rel: str, doc: Any, *, archived: bool
+) -> list[ReleaseTreeIssue]:
+    """The RELEASE-TREE-TRIO rule, phase-scoped. An archived release keeps its final
+    trio at root (ADR 0009) but is never re-checked here: it is history, not a live
+    candidate."""
+    phase = doc.get("phase") if isinstance(doc, dict) else None
+    if archived or phase not in _TRIO_REQUIRED_PHASES:
+        return []
+    missing = [a for a in RELEASE_ARTIFACTS if not (release_dir / a).is_file()]
+    if not missing:
+        return []
+    return [
+        ReleaseTreeIssue(
+            dir_rel,
+            "RELEASE-TREE-TRIO",
+            f"release in phase {phase} is missing {', '.join(missing)}",
+        )
+    ]
+
+
 def validate_release_tree(specs_dir: Path) -> list[ReleaseTreeIssue]:
     """Validate every release directory under ``specs_dir/releases/``.
 
@@ -136,23 +168,14 @@ def validate_release_tree(specs_dir: Path) -> list[ReleaseTreeIssue]:
     exists; it validates ``release-state-v1``; it parses with
     :func:`~dadaia_workspace.core.release_state.parse_release_state`; its ``log[].ts``
     values are non-decreasing; its ``phase`` is one of :data:`RELEASE_TREE_PHASES`;
-    ``ARCHIVED`` iff the directory sits under ``_archive/``; a live release carries
-    its SPEC/PLAN/TASKS trio.
+    ``ARCHIVED`` iff the directory sits under ``_archive/``; a live release in
+    IMPLEMENTATION or CLOSURE carries its SPEC/PLAN/TASKS trio
+    (:data:`_TRIO_REQUIRED_PHASES`).
     """
     issues: list[ReleaseTreeIssue] = []
     validator = validator_for(_SCHEMA_NAME)
     for release_dir, archived in _release_dirs(specs_dir / "releases"):
         dir_rel = release_dir.relative_to(specs_dir).as_posix()
-        if not archived:
-            missing = [a for a in RELEASE_ARTIFACTS if not (release_dir / a).is_file()]
-            if missing:
-                issues.append(
-                    ReleaseTreeIssue(
-                        dir_rel,
-                        "RELEASE-TREE-TRIO",
-                        f"live release is missing {', '.join(missing)}",
-                    )
-                )
         state_path = release_state_file(release_dir)
         if state_path is None:
             issues.append(
@@ -166,6 +189,7 @@ def validate_release_tree(specs_dir: Path) -> list[ReleaseTreeIssue]:
         except json.JSONDecodeError as exc:
             issues.append(ReleaseTreeIssue(rel, "RELEASE-TREE-PARSE", f"not valid JSON: {exc}"))
             continue
+        issues.extend(_trio_issues(release_dir, dir_rel, doc, archived=archived))
         issues.extend(_document_issues(doc, text, rel, archived=archived, validator=validator))
     return issues
 
