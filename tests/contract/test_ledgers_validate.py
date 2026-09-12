@@ -182,15 +182,14 @@ def test_a_histo_disposition_outside_the_ledgers_subset_is_an_error(tmp_path: Pa
     assert codes == ["LEDGER-RELEASES-HISTO-SCHEMA"], codes
 
 
-def test_the_real_tree_has_no_invalid_adr_backlog_or_finding_record() -> None:
+def test_the_real_tree_has_no_invalid_governance_record() -> None:
     """(c) this repo's own specs/: the ADR, backlog and audit-finding ledgers validate
     today (Wave 0 repaired those records).
 
-    Two code families are EXCLUDED here, each with its own repair task:
+    The three `_histo.jsonl` histories are included since T-047-04 migrated them to
+    `histo-record-v1` (136/23/103 records). One code family is EXCLUDED, with its own
+    repair task:
 
-    * the three `_histo.jsonl` histories — T-047-04 migrates them; until it lands
-      `dadaia doctor` is intentionally RED on the `ledgers` section for exactly those
-      three files, and T-047-04 tightens this test to include their codes;
     * `LEDGER-BUGS-SCHEMA` — this reader's FIRST pass over the committed bug ledger
       found 15 records that never validated `bug-record-v1`: four `surface` values
       outside the enum (`reports`, `tmp_gc`, `spec_artifacts`) and eleven
@@ -200,12 +199,7 @@ def test_the_real_tree_has_no_invalid_adr_backlog_or_finding_record() -> None:
       owns `specs/bugs/BUGS.jsonl` and the bug schema. The count below is a ratchet:
       it may only go down.
     """
-    excluded = {
-        "LEDGER-BACKLOG-HISTO-SCHEMA",
-        "LEDGER-AUDITS-HISTO-SCHEMA",
-        "LEDGER-RELEASES-HISTO-SCHEMA",
-    }
-    issues = [i for i in ledger_issues(_REPO_ROOT / "specs") if i.code not in excluded]
+    issues = ledger_issues(_REPO_ROOT / "specs")
     bugs = [i for i in issues if i.code == "LEDGER-BUGS-SCHEMA"]
     others = [i for i in issues if i.code != "LEDGER-BUGS-SCHEMA"]
 
