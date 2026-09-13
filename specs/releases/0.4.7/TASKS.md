@@ -72,7 +72,7 @@
   behavior-map.json`, the instance projections via the CLI. Blocked by: T-047-36.
   Delivers: every future closure re-derives the docs whose atom it changed, by
   protocol.
-- [ ] T-047-40 — FR6 closure (`product-engineer`): `CHANGELOG.md [0.4.7]` candidate 4;
+- [x] T-047-40 — FR6 closure (`product-engineer`): `CHANGELOG.md [0.4.7]` candidate 4;
   preflight; `dadaia release phase CLOSURE --sha`; `dadaia backlog exit
   docs-derived-from-memory-and-distribution --disposition delivered --release 0.4.7`;
   the `log` entries (`memory` citing the report path and the unchanged/corrected
