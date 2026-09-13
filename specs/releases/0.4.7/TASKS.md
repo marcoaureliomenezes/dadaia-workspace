@@ -63,7 +63,7 @@
   Write set: `pyproject.toml`, `docs/distribution.md`, `tests/contract/
   test_docs_derived_from_memory.py`. Blocked by: T-047-36. Delivers: PyPI shows the
   tagline and five links; the channel list and each channel's state are one page.
-- [-] T-047-39 — FR5 (`ai-engineer`): `dd-release-implementation/MEMORY-UPDATE.md`
+- [x] T-047-39 — FR5 (`ai-engineer`): `dd-release-implementation/MEMORY-UPDATE.md`
   gains the re-derive step (run the derived-docs test; re-read, re-derive, re-record
   in the atom's commit); `RC-FLOW.md` step 5 Done-when adds the green test;
   `behavior-map.json` hash re-recorded; `public stage` → `install --target all` →
