@@ -21,14 +21,6 @@ def test_ci_first_parent_delegates_to_the_one_reader() -> None:
     assert "first_parent" in src
 
 
-def test_read_modes_contains_only_tokens_a_writer_mints() -> None:
-    from dadaia_workspace.features.spec_context import gate_policy
-
-    # The bind CLI persists READ bare and BOUND_<mutating> for mutating modes;
-    # BOUND_READ never existed on any write path.
-    assert frozenset({"READ"}) == gate_policy._READ_MODES
-
-
 def test_python_env_narrates_a_failed_repack_install_honestly() -> None:
     from dadaia_workspace.infrastructure import python_env
 

@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.workspace_layout import LAW_BASENAMES, additive_prefixes
+from dadaia_workspace.core.invocation import Bind
+from dadaia_workspace.core.workspace_layout import LAW_BASENAMES
 from dadaia_workspace.features.spec_context.gate_policy import (
     Decision,
     PathClass,
@@ -31,17 +31,16 @@ _SPEC_RELATIVE_CASES: tuple[tuple[str, str, PathClass], ...] = (
     ("additive_bugs", "specs/bugs/concurrency-warning.md", PathClass.ADDITIVE),
     ("additive_backlog", "specs/backlog/epic.md", PathClass.ADDITIVE),
     ("additive_audits", "specs/audits/2026-01-01T000000Z-abc12345/index.md", PathClass.ADDITIVE),
-    ("memory_atom", "specs/memory/architecture.md", PathClass.MEMORY),
-    ("memory_product", "specs/memory/product/catalog.md", PathClass.MEMORY),
+    ("memory_atom", "specs/memory/architecture.md", PathClass.MUTATING),
+    ("memory_product", "specs/memory/product/catalog.md", PathClass.MUTATING),
     ("archived_release", "specs/releases/_archive/v0.1.9/SPEC.md", PathClass.MUTATING),
     ("mutating_release", "specs/releases/v0.1.10/SPEC.md", PathClass.MUTATING),
     ("mutating_constitution", "specs/constitution.md", PathClass.MUTATING),
 )
 
-# Workspace-root verdict for each spec-relative suffix (UNGATED where no root rule matches).
-_ROOT_VERDICT_OVERRIDES: dict[str, PathClass] = {
-    "mutating_constitution": PathClass.UNGATED,
-}
+# Workspace-root verdict overrides — none: the three-class taxonomy (0.4.7 FR1) gives a
+# root path the SAME verdict as its context-relative twin, with no UNGATED tail.
+_ROOT_VERDICT_OVERRIDES: dict[str, PathClass] = {}
 
 # In-repo production source — the canonical no-class-match ⇒ MUTATING case (FR-R1-04).
 _IN_REPO_PRODUCTION_CASES: tuple[tuple[str, str], ...] = (
@@ -103,9 +102,9 @@ _IN_REPO_PRODUCTION_CASES: tuple[tuple[str, str], ...] = (
             PathClass.PROTECTED,
             id="root-protected",
         ),
-        pytest.param("root-path", "README.md", PathClass.UNGATED, id="root-readme-ungated"),
+        pytest.param("root-path", "README.md", PathClass.MUTATING, id="root-readme-mutating"),
         pytest.param(
-            "root-path", "some/loose/path.txt", PathClass.UNGATED, id="root-loose-ungated"
+            "root-path", "some/loose/path.txt", PathClass.MUTATING, id="root-loose-mutating"
         ),
         # Leading slash stripped; bare repo prefix.
         pytest.param(
@@ -113,9 +112,9 @@ _IN_REPO_PRODUCTION_CASES: tuple[tuple[str, str], ...] = (
         ),
         pytest.param(
             "root-path",
-            "/repos/foo/specs/memory/a.md",
-            PathClass.MEMORY,
-            id="leading-slash-in-repo-memory",
+            "/repos/foo/specs/bugs/a.md",
+            PathClass.ADDITIVE,
+            id="leading-slash-in-repo-additive",
         ),
         pytest.param("root-path", "repos/foo", PathClass.MUTATING, id="bare-repo-no-remainder"),
         pytest.param("root-path", "repos/foo/", PathClass.MUTATING, id="bare-repo-trailing-slash"),
@@ -137,15 +136,14 @@ def test_classification_matrix(case: str, path_or_row, expected) -> None:  # typ
         assert classify_path(with_slash) == classify_path(without_slash)
 
 
-def test_in_repo_unmatched_never_ungated() -> None:
-    """The core invariant: a ctx_rel matching no class NEVER falls through to UNGATED."""
+def test_in_repo_unmatched_is_mutating() -> None:
+    """The core invariant: a ctx_rel matching no ADDITIVE prefix is MUTATING."""
     for path in (
         _in_repo(_DEFAULT_SLUG, "specs/constitution.md"),
         _in_repo(_DEFAULT_SLUG, "dadaia_workspace/__init__.py"),
         _in_repo(_NONDEFAULT_SLUG, "specs/some-loose-file.md"),
         _in_repo(_NONDEFAULT_SLUG, "Makefile"),
     ):
-        assert classify_path(path) != PathClass.UNGATED, path
         assert classify_path(path) == PathClass.MUTATING, path
 
 
@@ -178,10 +176,7 @@ def test_evaluate_area_histo_and_live_bugs_allow(
         tmp_path,
         rel_path,
         ctx="dadaia-workspace",
-        phase="IMPLEMENTATION",
         session_id="sess-1",
-        release="v0.1.46",
-        mode="IMPLEMENTATION",
     )
     assert decision == expected_decision
     if message_contains is not None:
@@ -198,10 +193,7 @@ def test_evaluate_mutating_write_upserts_presence(tmp_path: Path) -> None:
         tmp_path,
         "repos/dadaia-workspace/specs/releases/v0.1.46/TASKS.md",
         ctx="dadaia-workspace",
-        phase="IMPLEMENTATION",
         session_id="sess-solo",
-        release="v0.1.46",
-        mode="IMPLEMENTATION",
         runtime="claude",
         pid=1234,
     )
@@ -219,10 +211,7 @@ def test_evaluate_peer_presence_warns_but_allows(tmp_path: Path) -> None:
         tmp_path,
         "repos/dadaia-workspace/specs/releases/v0.1.46/PLAN.md",
         ctx="dadaia-workspace",
-        phase="IMPLEMENTATION",
         session_id="intruder",
-        release="v0.1.46",
-        mode="IMPLEMENTATION",
         runtime="codex",
         pid=5678,
     )
@@ -235,127 +224,11 @@ def test_evaluate_anon_session_emits_no_presence_events(tmp_path: Path) -> None:
         tmp_path,
         "repos/dadaia-workspace/specs/releases/v0.1.46/TASKS.md",
         ctx="dadaia-workspace",
-        phase="IMPLEMENTATION",
         session_id="anon-session",
-        release="v0.1.46",
-        mode="IMPLEMENTATION",
     )
     assert decision == Decision.ALLOW
     presence_dir = tmp_path / ".dadaia" / "states" / "presence" / "dadaia-workspace"
     assert not presence_dir.exists()
-
-
-# ═════════════════════════════════════════════════════════════════════════════════
-# v0.4.3 T-043-17/FR13 — the MEMORY path class covers dotfiles, by decision.
-#
-# Size: SMALL — pure classify_path/evaluate calls, tmp_path-scoped. Intent: SENTINEL —
-# v0.4.3 A13.2 (memory-dotfile phase-gate parity). The software-architect ruling
-# (handoff 2026-08-17T161500Z-software-architect-v0.4.3-fr13-fr14, HIGH finding #1) is
-# ZERO-behavioral-change by design: gate_policy.py's bare-prefix match at
-# ``_MEMORY_PREFIX``/``classify_path`` ALREADY classifies every path under
-# ``specs/memory/`` — dotfiles included — as MEMORY; no carve-out exists and none is
-# added (see the module docstring and the ``_MEMORY_PREFIX`` comment for the stated
-# rule this ruling ratifies). These fixtures PIN that decision against future
-# regression — they are not fixing a defect, they are formalizing doctrine that
-# already held in code.
-# ═════════════════════════════════════════════════════════════════════════════════
-
-_MEMORY_DOTFILE_PATHS: tuple[str, ...] = (
-    "specs/memory/.editor-scratch",
-    f"repos/{_DEFAULT_SLUG}/specs/memory/.editor-scratch",
-)
-#: A non-dot sibling atom, in BOTH root and in-repo form, pinned for parity (the
-#: ruling's fixture requirement) — same MEMORY class, same phase gate, no distinction.
-_MEMORY_SIBLING_ATOM_PATHS: tuple[str, ...] = (
-    "specs/memory/architecture.md",
-    f"repos/{_DEFAULT_SLUG}/specs/memory/architecture.md",
-)
-_MEMORY_PHASES_ALLOWED: tuple[str, ...] = ("DEFINITION", "CLOSURE")
-_MEMORY_PHASES_BLOCKED: tuple[str, ...] = (
-    "IMPLEMENTATION",
-    "DISCOVERY",
-    "SPEC",
-    "PLAN",
-    "TASKS",
-    "ARCHIVED",
-)
-
-
-@pytest.mark.parametrize("rel_path", _MEMORY_DOTFILE_PATHS)
-def test_memory_dotfile_classifies_as_memory(rel_path: str) -> None:
-    """A13.2: both the root and in-repo dotfile form classify MEMORY — no dotfile
-    carve-out, bare-prefix match by decision."""
-    assert classify_path(rel_path) == PathClass.MEMORY
-
-
-@pytest.mark.parametrize("rel_path", _MEMORY_DOTFILE_PATHS)
-@pytest.mark.parametrize("phase", _MEMORY_PHASES_ALLOWED)
-def test_memory_dotfile_evaluate_allows_in_definition_and_closure(
-    tmp_path: Path, rel_path: str, phase: str
-) -> None:
-    decision, _ = evaluate(
-        tmp_path,
-        rel_path,
-        ctx="dadaia-workspace",
-        phase=phase,
-        session_id="sess-fr13",
-        release="v0.4.3",
-        mode="IMPLEMENTATION",
-    )
-    assert decision == Decision.ALLOW
-
-
-@pytest.mark.parametrize("rel_path", _MEMORY_DOTFILE_PATHS)
-@pytest.mark.parametrize("phase", _MEMORY_PHASES_BLOCKED)
-def test_memory_dotfile_evaluate_blocks_rule_a_outside_definition_and_closure(
-    tmp_path: Path, rel_path: str, phase: str
-) -> None:
-    """A13.2: IMPLEMENTATION and every other non-DEFINITION/CLOSURE phase — including
-    the doctrine question the ruling's finding 1(b) answers ('no SPEC override of the
-    phase rule', RULE A keeps blocking unconditionally by phase) — BLOCK [RULE A]."""
-    decision, message = evaluate(
-        tmp_path,
-        rel_path,
-        ctx="dadaia-workspace",
-        phase=phase,
-        session_id="sess-fr13",
-        release="v0.4.3",
-        mode="IMPLEMENTATION",
-    )
-    assert decision == Decision.BLOCK
-    assert "[RULE A]" in message
-
-
-def test_memory_dotfile_evaluate_matches_a_non_dot_sibling_atom_across_every_phase(
-    tmp_path: Path,
-) -> None:
-    """A13.2 parity fixture: the dotfile and a normal (non-dot) sibling atom, root and
-    in-repo, get an IDENTICAL decision at every phase in this matrix — no special-
-    casing distinguishes a dotfile from an ordinary memory atom."""
-    for dotfile, sibling in zip(_MEMORY_DOTFILE_PATHS, _MEMORY_SIBLING_ATOM_PATHS, strict=True):
-        assert classify_path(dotfile) == classify_path(sibling)
-        for phase in (*_MEMORY_PHASES_ALLOWED, *_MEMORY_PHASES_BLOCKED):
-            dot_decision, _ = evaluate(
-                tmp_path,
-                dotfile,
-                ctx="dadaia-workspace",
-                phase=phase,
-                session_id="sess-fr13-dot",
-                release="v0.4.3",
-                mode="IMPLEMENTATION",
-            )
-            sibling_decision, _ = evaluate(
-                tmp_path,
-                sibling,
-                ctx="dadaia-workspace",
-                phase=phase,
-                session_id="sess-fr13-sibling",
-                release="v0.4.3",
-                mode="IMPLEMENTATION",
-            )
-            assert dot_decision == sibling_decision, (
-                f"phase={phase}: dotfile and sibling atom must get the SAME decision"
-            )
 
 
 # ═════════════════════════════════════════════════════════════════════════════════
@@ -375,7 +248,7 @@ def test_fresh_repo_agents_md_classifies_mutating_not_law() -> None:
 
     A brand-new repo with no prior projection, no manifest entry, nothing on disk
     yet: repos/<fresh-slug>/AGENTS.md must classify MUTATING, never LAW. Before the
-    fix this asserted PathClass.LAW and failed (the false positive
+    fix this asserted PathClass.PROTECTED and failed (the false positive
     `sdd-gate-blocks-fresh-repo-root-agents-md` reports).
     """
     fresh_slug = "brand-new-repo-never-scaffolded-yet"
@@ -390,10 +263,7 @@ def test_fresh_repo_agents_md_write_is_allowed_on_the_executed_path(tmp_path: Pa
         tmp_path,
         _in_repo(fresh_slug, "AGENTS.md"),
         ctx=fresh_slug,
-        phase="IMPLEMENTATION",
         session_id="anon-session",
-        release="none",
-        mode="IMPLEMENTATION",
     )
     assert decision == Decision.ALLOW
     assert "[GATE]" not in message
@@ -422,10 +292,7 @@ def test_existing_nonmanifest_repo_agents_md_edit_is_allowed(tmp_path: Path) -> 
         tmp_path,
         _in_repo(slug, "AGENTS.md"),
         ctx=slug,
-        phase="IMPLEMENTATION",
         session_id="anon-session",
-        release="none",
-        mode="IMPLEMENTATION",
     )
     assert decision == Decision.ALLOW
     assert "[GATE]" not in message
@@ -484,7 +351,7 @@ def test_manifest_tracked_law_projections_stay_law() -> None:
             # asserted MUTATING by A1.1/A1.2 above, never LAW.
             continue
         for target in targets:
-            assert classify_path(target) == PathClass.LAW, target
+            assert classify_path(target) == PathClass.PROTECTED, target
             checked_any = True
     assert checked_any, "fixture manifest carried no known floor-mapped LAW asset"
 
@@ -516,34 +383,82 @@ def test_manifest_removal_never_demotes_a_statically_floored_law_path(tmp_path: 
         ".claude/rules/AGENTS.md",
     )
     for floor_path in floor_paths:
-        assert classify_path(floor_path) == PathClass.LAW, floor_path
+        assert classify_path(floor_path) == PathClass.PROTECTED, floor_path
 
     manifest_path.unlink()
     assert not manifest_path.exists()
     for floor_path in floor_paths:
-        assert classify_path(floor_path) == PathClass.LAW, floor_path
+        assert classify_path(floor_path) == PathClass.PROTECTED, floor_path
 
 
-# ---------------------------------------------------------------------------
-# The READ-mode block message advertises exactly the ADDITIVE set the gate honours.
-# ---------------------------------------------------------------------------
+# ═════════════════════════════════════════════════════════════════════════════════
+# 0.4.7 FR1 — the Bind's SCOPE is the third and last gate block.
+# ═════════════════════════════════════════════════════════════════════════════════
+
+_BIND_A = Bind(context_name="ctx-a", repos=frozenset({"ctx-a", "ctx-a-infra"}))
 
 
-def test_read_block_message_names_only_the_live_additive_set(tmp_path: Path) -> None:
-    """A retired ``.dadaia/`` zone (``reports`` after 0.4.6 candidate 4) must never be
-    offered as writable: the message is derived from the same prefixes ``classify_path``
-    honours, so the two cannot drift apart again."""
-    decision, message = evaluate(
-        tmp_path,
-        "repos/dadaia-workspace/specs/releases/v0.1.46/TASKS.md",
-        ctx="dadaia-workspace",
-        phase="IMPLEMENTATION",
-        session_id="sess-1",
-        release="v0.1.46",
-        mode="READ",
+def _evaluate_scope(tmp_path: Path, rel_path: str, **kwargs: object) -> tuple[Decision, str]:
+    return evaluate(tmp_path, rel_path, ctx="ctx-b", session_id="anon-session", **kwargs)  # type: ignore[arg-type]
+
+
+def test_write_into_a_repo_outside_the_bind_scope_is_blocked_with_a_runnable_fix(
+    tmp_path: Path,
+) -> None:
+    """AC: bound to A, a write into repos/B/src/x.py is refused and names the bind that
+    clears it."""
+    decision, message = _evaluate_scope(
+        tmp_path, "repos/ctx-b/src/x.py", bind=_BIND_A, target_slug="ctx-b", target_owner="ctx-b"
     )
-    assert decision is Decision.BLOCK
-    advertised = re.search(r"Additive paths \(([^)]*)\) remain writable", message)
-    assert advertised is not None
-    live = ("specs/backlog/", "specs/bugs/", "specs/audits/", *additive_prefixes())
-    assert set(advertised.group(1).split(", ")) == {prefix.rstrip("/") for prefix in live}
+    assert decision == Decision.BLOCK
+    assert "fix: .dadaia/.venv/bin/dadaia context bind ctx-b" in message
+
+
+def test_an_associated_repo_of_the_bound_context_is_in_scope(tmp_path: Path) -> None:
+    decision, _ = _evaluate_scope(
+        tmp_path,
+        "repos/ctx-a-infra/main.tf",
+        bind=_BIND_A,
+        target_slug="ctx-a-infra",
+        target_owner="ctx-a",
+    )
+    assert decision == Decision.ALLOW
+
+
+def test_an_unbound_session_is_never_scope_blocked(tmp_path: Path) -> None:
+    decision, _ = _evaluate_scope(
+        tmp_path, "repos/ctx-b/src/x.py", target_slug="ctx-b", target_owner="ctx-b"
+    )
+    assert decision == Decision.ALLOW
+
+
+def test_a_slug_no_context_registers_is_never_scope_blocked(tmp_path: Path) -> None:
+    """Fail-open: the gate cannot attribute a repo nothing claims."""
+    decision, _ = _evaluate_scope(
+        tmp_path, "repos/stranger/src/x.py", bind=_BIND_A, target_slug="stranger"
+    )
+    assert decision == Decision.ALLOW
+
+
+def test_an_additive_path_in_a_foreign_repo_stays_writable(tmp_path: Path) -> None:
+    decision, _ = _evaluate_scope(
+        tmp_path,
+        "repos/ctx-b/specs/bugs/BUGS.jsonl",
+        bind=_BIND_A,
+        target_slug="ctx-b",
+        target_owner="ctx-b",
+    )
+    assert decision == Decision.ALLOW
+
+
+@pytest.mark.parametrize(
+    "rel_path",
+    ["specs/memory/ARCHITECTURE.md", "repos/ctx-a/specs/memory/product/catalog.json"],
+)
+def test_a_memory_write_is_allowed_in_every_phase(tmp_path: Path, rel_path: str) -> None:
+    """The MEMORY class is deleted: memory authorship is constitution discipline,
+    audited by the drift pillar, never gated (0.4.7 FR1)."""
+    decision, _ = _evaluate_scope(
+        tmp_path, rel_path, bind=_BIND_A, target_slug="ctx-a", target_owner="ctx-a"
+    )
+    assert decision == Decision.ALLOW

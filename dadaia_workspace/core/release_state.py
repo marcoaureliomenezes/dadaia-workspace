@@ -29,7 +29,6 @@ from pathlib import Path
 from typing import Any
 
 __all__ = [
-    "MEMORY_WRITE_PHASES",
     "PHASES",
     "SCHEMA",
     "ReleaseState",
@@ -77,8 +76,6 @@ def release_state_file(release_dir: Path) -> Path | None:
 #: live release" is the ABSENCE of a document, never a value inside one).
 PHASES: tuple[str, ...] = ("DEFINITION", "IMPLEMENTATION", "CLOSURE", "ARCHIVED")
 
-#: Phases in which product-engineer may write memory atoms (constitution §13 / FR-P1-13).
-MEMORY_WRITE_PHASES: frozenset[str] = frozenset({"DEFINITION", "CLOSURE"})
 
 #: Per-milestone-kind required inner keys (light structural validation only -- the
 #: schema file is the shape authority; this is a parse-time sanity check, not a second

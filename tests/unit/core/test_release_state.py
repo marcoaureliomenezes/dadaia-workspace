@@ -143,8 +143,9 @@ def test_phase_vocabulary_single_home() -> None:
     from dadaia_workspace.features.specs import doctor_release, release_tree
 
     assert doctor_release.CANONICAL_PHASES is release_state.PHASES
-    assert gate_policy._MEMORY_WRITE_PHASES is release_state.MEMORY_WRITE_PHASES
-    assert frozenset(release_state.PHASES) > release_state.MEMORY_WRITE_PHASES
+    # 0.4.7 FR1: no phase subset survives — the gate reads no phase at all.
+    assert not hasattr(release_state, "MEMORY_WRITE_PHASES")
+    assert not hasattr(gate_policy, "_MEMORY_WRITE_PHASES")
     # 0.4.7 FR4: exactly four phases, in lifecycle order, and release_tree re-exports
     # the same object rather than re-listing it.
     assert release_state.PHASES == ("DEFINITION", "IMPLEMENTATION", "CLOSURE", "ARCHIVED")

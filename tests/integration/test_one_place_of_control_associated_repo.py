@@ -223,30 +223,6 @@ def _run_gate(
     return result.block_envelope()
 
 
-def test_gate_memory_write_inside_associated_repo_is_governed_by_the_main_repos_phase(
-    workspace: Path,
-) -> None:
-    """The associated repo's own ``specs/releases/<id>/RELEASE.json`` claims phase
-    DEFINITION (which would ALLOW a memory write); the MAIN repo's real phase is
-    IMPLEMENTATION (which BLOCKs one). A write physically inside
-    ``repos/assoc-repo/specs/memory/`` must be BLOCKed on the MAIN's phase — proving
-    the gate never reads the associated repo's own RELEASE.json."""
-    target = workspace / "repos" / _ASSOC_SLUG / "specs" / "memory" / "leak-probe.md"
-    target.parent.mkdir(parents=True, exist_ok=True)
-
-    block = _run_gate(workspace, {"tool_name": "Write", "tool_input": {"file_path": str(target)}})
-
-    assert block is not None, (
-        "expected RULE A to block — the assoc repo's own DEFINITION phase must never leak in"
-    )
-    assert "RULE A" in block["reason"]
-    assert f"current phase={_MAIN_PHASE}" in block["reason"]
-    # The RULE A message text always NAMES "DEFINITION" (the phases memory writes ARE
-    # allowed in) — the leak this test guards against is the *observed* phase, not that
-    # substring, hence the exact "current phase=<value>" check above and this one.
-    assert f"current phase={_ASSOC_PHASE}" not in block["reason"]
-
-
 def test_gate_mutating_write_inside_associated_repo_attributes_presence_to_the_owning_context(
     workspace: Path,
 ) -> None:

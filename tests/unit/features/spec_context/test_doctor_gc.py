@@ -258,7 +258,7 @@ def test_renewed_bind_survives_gc_and_gate_still_resolves_read(tmp_path: Path) -
     to refresh its last_seen_at, then sweep — the renewed record must NOT be collected,
     and the gate's mode resolution must still see READ for that session.
     """
-    from dadaia_workspace.hooks.sdd_gate import _resolve_mode
+    from dadaia_workspace.core.session_store import live_session
 
     ws = _make_workspace(tmp_path)
     sess_id = "sess_live01"
@@ -278,8 +278,9 @@ def test_renewed_bind_survives_gc_and_gate_still_resolves_read(tmp_path: Path) -
     assert not any("GRAVEYARD-GC" in a and sess_id in a for a in actions), (
         f"Renewed bind must NOT be graveyard-collected: {actions}"
     )
-    # The gate still resolves READ for this sid via the session record.
-    assert _resolve_mode(ws, sess_id, "myctx") == "READ"
+    # The record the gate's Bind resolution reads is still LIVE for this sid.
+    record = live_session(ws, sess_id)
+    assert record is not None and record.get("context") == "myctx"
 
 
 def test_stale_unrenewed_bind_is_collected(tmp_path: Path) -> None:

@@ -6,8 +6,8 @@ it delegates classification + decision to :func:`gate_policy.classify_path` and
 :func:`gate_policy.evaluate`, which is the single source of truth (avoids a third
 drifting copy alongside the bash gate).
 
-1. **One Invocation per target.** Session, context, root, mode, release and phase are
-   resolved in ONE call to :func:`dadaia_workspace.core.invocation.resolve`, called
+1. **One Invocation per target.** Session, context, root, mode and the session's own
+   Bind are resolved in ONE call to :func:`dadaia_workspace.core.invocation.resolve`, called
    with ``target_path=fpath`` so the write-target path (``repos/<slug>/...``) wins
    ahead of every other rung — a write under ``repos/B/...`` therefore never touches
    ``repos/A``'s presence, even while ``DADAIA_CONTEXT`` names a different context.
@@ -17,11 +17,12 @@ drifting copy alongside the bash gate).
    current working directory — before resolving unattributed, and the root every rung
    agrees on is never a different one than the root the write target actually lives
    under.
-2. **PROTECTED is the sole fail-CLOSED path.** ``.dadaia/sessions/`` writes are blocked
-   unconditionally (SEC-01); every other class fails OPEN.
-3. **Fail-open posture.** No non-PROTECTED, non-self-READ write blocks because of
-   another session. Mode is strictly self-scoped: ``DADAIA_MODE`` → this session's
-   own record → IMPLEMENTATION. Mutating writes upsert advisory presence.
+2. **PROTECTED is the sole fail-CLOSED path.** ``.dadaia/sessions/`` and projected law
+   writes are blocked unconditionally (SEC-01).
+3. **Scope, not phase (0.4.7 FR1).** The only other block is a MUTATING write into a
+   ``repos/<slug>/`` some OTHER context owns while this session is bound. The gate
+   reads no ``_RELEASE.json`` and knows no phase; mutating writes upsert advisory
+   presence.
 """
 
 from __future__ import annotations
@@ -70,12 +71,13 @@ def _resolve_holder_pid(payload: dict[str, object]) -> int:
     return os.getppid()
 
 
-def _resolve_mode(workspace: Path, session_id: str, ctx: str = "") -> str:
-    """Resolve the session's bind mode — a thin call onto the single mode-resolution
-    rule (:func:`dadaia_workspace.core.invocation.resolve_mode`). ``ctx`` is accepted
-    for call-site compatibility but is not consulted (mode is strictly self-scoped)."""
-    del ctx
-    return invocation.resolve_mode(workspace, session_id, os.environ)
+def _target_slug(workspace: Path, fpath: Path) -> str | None:
+    """The ``repos/<slug>`` the write target lands in, or ``None`` for a root path."""
+    try:
+        rel = fpath.resolve().relative_to((workspace / "repos").resolve())
+    except (ValueError, OSError):
+        return None
+    return rel.parts[0] if rel.parts else None
 
 
 def _evaluate_target(
@@ -84,7 +86,7 @@ def _evaluate_target(
     """Evaluate ONE write-target path through the gate policy.
 
     Builds exactly ONE :class:`~dadaia_workspace.core.invocation.Invocation` for
-    *raw_path* (session, context, root, mode, release, phase — resolved once) and
+    *raw_path* (session, context, root, mode, Bind — resolved once) and
     reads every field the policy needs off it. Returns ``(ALLOW, "")`` for any allow
     path and ``(BLOCK, reason)`` for a blocked one. Fail-open: an unresolvable/
     unattributable MUTATING write yields ALLOW. The caller (``main``) iterates every
@@ -111,17 +113,9 @@ def _evaluate_target(
 
     cls = gate_policy.classify_path(rel_path)
 
-    # PROTECTED short-circuit (sole fail-CLOSED path): no context/lease work needed.
+    # PROTECTED short-circuit (sole fail-CLOSED path): no context work needed.
     if cls == gate_policy.PathClass.PROTECTED:
-        return gate_policy.evaluate(
-            effective_workspace,
-            rel_path,
-            ctx="",
-            phase="",
-            session_id="",
-            release="",
-            mode="",
-        )
+        return gate_policy.evaluate(effective_workspace, rel_path, ctx="", session_id="")
 
     ctx = inv.context_name or ""
     # FR5: an anonymous identity (no harness-native id, no payload session_id) never
@@ -137,14 +131,21 @@ def _evaluate_target(
         return gate_policy.Decision.ALLOW, ""
 
     runtime = os.environ.get("DADAIA_RUNTIME", "unknown")
+    # SCOPE inputs (FR1): the repo the write lands in, and the context that OWNS it.
+    # Ownership is proved the same way the Bind's own scope is — ``all_repos`` over the
+    # registry — so an unregistered slug yields no owner and the policy fails open on
+    # it, exactly as the SPEC requires (the gate cannot attribute what nothing claims).
+    target_slug = _target_slug(effective_workspace, fpath)
+    owner_repos = invocation.all_repos(effective_workspace, ctx) if target_slug else frozenset()
+    target_owner = ctx if target_slug in owner_repos else None
     return gate_policy.evaluate(
         effective_workspace,
         rel_path,
         ctx=ctx,
-        phase=inv.phase,
         session_id=session_id,
-        release=inv.release,
-        mode=inv.mode,
+        bind=inv.bind,
+        target_slug=target_slug,
+        target_owner=target_owner,
         runtime=runtime,
         # NF-1: record a LONG-LIVED pid (the harness, via getppid / payload), never this
         # ephemeral hook child's own — a presence record naming a dead pid is misleading.
