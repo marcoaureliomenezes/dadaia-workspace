@@ -42,7 +42,7 @@ its content hash.
 <!-- derived-from: pypi-distribution sha256:80d67bd879ea -->
 <!-- derived-from: workspace-init sha256:5b20a0d9dc80 -->
 <!-- derived-from: context-management sha256:a66534def71e -->
-<!-- derived-from: workspace-doctor sha256:a78256c47540 -->
+<!-- derived-from: workspace-doctor sha256:d487df63fe2b -->
 <!-- derived-from: panel sha256:c55db1d0ad51 -->
 
 ```bash

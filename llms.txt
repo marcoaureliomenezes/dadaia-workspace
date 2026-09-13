@@ -27,7 +27,7 @@
 ## Reference
 
 <!-- derived-from: context-management sha256:a66534def71e -->
-<!-- derived-from: workspace-doctor sha256:a78256c47540 -->
+<!-- derived-from: workspace-doctor sha256:d487df63fe2b -->
 
 - [CLI reference](docs/cli.md): the committed output of `dadaia help tree`.
 - [Memory catalog](specs/memory/product/index.md): every product atom, its `tldr` and its path.

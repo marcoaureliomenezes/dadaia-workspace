@@ -72,7 +72,7 @@ the context's main repo plus its associated repos, and it constrains nothing els
 
 ## Check compliance — `dadaia doctor`
 
-<!-- derived-from: workspace-doctor sha256:a78256c47540 -->
+<!-- derived-from: workspace-doctor sha256:d487df63fe2b -->
 
 ```bash
 dadaia doctor --context <ctx> [--json] [--fix] [--redact]
@@ -82,6 +82,10 @@ dadaia doctor --context <ctx> [--json] [--fix] [--redact]
 (the root, the harness dirs, the `.dadaia/` zones, every ALIVE repo tree, the
 installed git hooks), `specs` (the rules over one `specs/` tree) and `ledgers`
 (`BACKLOG.json` plus schema validation of every committed governance record).
+
+With no instance around the run — CI over a bare checkout — `dadaia doctor
+--specs-dir specs` still reads the tree: the `workspace` section is empty and the
+other two run; only a run with nothing to read refuses and points at `dadaia init`.
 
 Every finding prints as one `<CODE> <verdict> <message>` line, and every error-class
 rule carries a mandatory `fix: <command>` under each of its findings — so an exit-1

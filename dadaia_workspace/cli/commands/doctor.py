@@ -106,10 +106,13 @@ def _build_redactor(workspace_root: Path) -> ContextRedactor:
 # ── the three sections ──────────────────────────────────────────────────────────
 
 
-def _workspace_section(service: DoctorService, *, expired_only: bool) -> SectionReport:
+def _workspace_section(service: DoctorService | None, *, expired_only: bool) -> SectionReport:
     """`workspace`: the instance walk. Its findings already ARE the normalized record —
     the feature owns the translation of its own verdict vocabulary, so the adapter here
-    is the identity and no mapping table exists anywhere."""
+    is the identity and no mapping table exists anywhere. No instance around the run
+    (CI over a bare checkout), nothing to walk: an empty section, never a refusal."""
+    if service is None:
+        return _empty_section("workspace", "entries")
     return run_section(
         "workspace",
         "entries",
@@ -337,6 +340,36 @@ def _resolve_live_shas(specs_dir: Path) -> tuple[str, ...] | None:
         return None
 
 
+def _resolve_run(
+    specs_dir: str | None, context: str | None
+) -> tuple[Path | None, DoctorService | None, Path | None]:
+    """What this run reads: ``(workspace_root, service, specs_dir)``. No instance around
+    the run (CI over a bare checkout, no ``.dadaia/states/`` above its cwd) leaves the
+    first two ``None`` — an explicit ``--specs-dir`` still gets its `specs` and `ledgers`
+    sections. Nothing to read at all is the one refusal."""
+    workspace_root: Path | None = None
+    service: DoctorService | None = None
+    target: Path | None = None
+    try:
+        workspace_root = resolve_workspace_root()
+        service = container.build_doctor_service(workspace_root)
+        target = _resolve_specs_dir(specs_dir, context)
+    except WorkspaceNotInitializedError:
+        target = _resolve_specs_dir(specs_dir, None) if context is None else None
+    if service is None and target is None:
+        typer.echo("Error: Workspace not initialized. Run 'dadaia init' first.", err=True)
+        raise typer.Exit(1)
+    return workspace_root, service, target
+
+
+def _render_for(workspace_root: Path | None, *, redact: bool) -> Callable[[str], str]:
+    """The render boundary: the redactor over the instance's known names, or the
+    identity — no instance holds no names to mask."""
+    if redact and workspace_root is not None:
+        return _build_redactor(workspace_root).text
+    return _identity
+
+
 def _resolve_specs_dir(specs_dir: str | None, context: str | None) -> Path | None:
     """The tree the `specs`/`ledgers` sections read, or ``None`` when this workspace has
     none to read — an unbound session in a workspace with no specs tree still gets its
@@ -412,13 +445,7 @@ def doctor(
     ),
 ) -> None:
     """Report workspace, specs and ledger compliance; optionally repair."""
-    workspace_root = resolve_workspace_root()
-    try:
-        service = container.build_doctor_service(workspace_root)
-    except WorkspaceNotInitializedError:
-        typer.echo("Error: Workspace not initialized. Run 'dadaia init' first.", err=True)
-        raise typer.Exit(1) from None
-    target = _resolve_specs_dir(specs_dir, context)
+    workspace_root, service, target = _resolve_run(specs_dir, context)
     governance = _resolve_governance(target)
     specs_doctor = _build_specs_doctor(target, public_dir, governance)
 
@@ -432,7 +459,7 @@ def doctor(
     ]
     # Render boundary ONLY: no doctor ever sees the redactor; every finding and fix action
     # keeps carrying true names inside the sections themselves.
-    render = _build_redactor(workspace_root).text if redact else _identity
+    render = _render_for(workspace_root, redact=redact)
 
     if json_out:
         typer.echo(_json_payload(reports, fixed, render, target))
@@ -451,7 +478,7 @@ def _identity(text: str) -> str:
 
 
 def _apply_fixes(
-    service: DoctorService,
+    service: DoctorService | None,
     specs_doctor: SpecsDoctor | None,
     specs_dir: Path | None,
     source_root: str | None,
@@ -470,7 +497,7 @@ def _apply_fixes(
     the SessionStart lane off the specs tree."""
     if not fix:
         return []
-    fixed = list(service.fix())
+    fixed = list(service.fix()) if service is not None else []
     if not expired_only and specs_doctor is not None:
         fixed.extend(f"[specs] {issue.code}: {issue.path}" for issue in specs_doctor.fix())
     if not expired_only:
