@@ -1,4 +1,4 @@
-"""Structural validator (v0.1.55 FR1): TREE-1..7 spec-tree invariants + TREE-4/TREE-5M.
+"""Structural validator (v0.1.55 FR1): TREE-1..8 spec-tree invariants.
 
 Single-responsibility sibling of the SpecsDoctor coordinator. Owns the ``spec-context-tree-v2``
 structural invariants (foundation/root-spec deprecation, required memory atoms, required dirs,
@@ -29,10 +29,13 @@ from dadaia_workspace.features.specs.template_history import was_shipped
 _TREE3_MEMORY_FILES: tuple[str, ...] = memory_canon.MEMORY_REQUIRED_FILES
 
 # TREE-5 scoped-law coverage (T-053-15, bug
-# releases-agents-projection-stale-vs-scaffold-source): the scaffold AGENTS.md files a
-# projection freezes at scaffold time. memory/ is EXCLUDED — single-ownership law
-# (install never updates specs/memory/AGENTS.md; TREE-5M owns its presence).
+# releases-agents-projection-stale-vs-scaffold-source; 0.4.7 FR6, bug
+# scoped-memory-agents-md-prose-rewrite-undetected-by-doctor): the scaffold AGENTS.md
+# files a projection freezes at scaffold time. memory/ is IN — single-ownership decides
+# WHO may rewrite the file, never whether the doctor may notice that someone did; its
+# presence check (the retired TREE-5M) is the same comparator's missing-file branch.
 _TREE5_SCOPED_LAW_AREAS: tuple[str, ...] = (
+    "memory",
     "releases",
     "releases/_ideas",
     "backlog",
@@ -74,7 +77,7 @@ _TREE_MIGRATION_HINT = (
 
 
 class StructuralValidator:
-    """TREE-1..7 + TREE-5M structural invariants for the spec tree."""
+    """TREE-1..8 structural invariants for the spec tree."""
 
     def __init__(
         self,
@@ -312,8 +315,11 @@ class StructuralValidator:
         for area in _TREE5_SCOPED_LAW_AREAS:
             dst = self.specs_dir / area / "AGENTS.md"
             canonical_path = self._scaffold_dir / area / "AGENTS.md"
-            if not dst.exists() or not canonical_path.exists():
-                continue  # presence is the scaffold/TREE-8 lane's business
+            if not canonical_path.exists():
+                continue
+            if not dst.exists():
+                issues.append(self._tree5_missing(dst=dst, area=area))
+                continue
             issues.extend(
                 self._tree5_compare(
                     dst=dst,
@@ -323,6 +329,27 @@ class StructuralValidator:
                 )
             )
         return issues
+
+    def _tree5_missing(self, *, dst: Path, area: str) -> SpecsDoctorIssue:
+        """A scaffolded law file that is not there at all — the check TREE-5M owned for
+        ``memory/`` alone, now the one comparator's missing-file branch for every area.
+
+        WARNING, never fixable: `dadaia public install` scaffolds this file when it is
+        missing and never updates an existing copy, so the repair is the operator
+        copying the source in deliberately.
+        """
+        return SpecsDoctorIssue(
+            code="TREE-5",
+            severity=Severity.WARNING,
+            description=(
+                f"specs/{area}/AGENTS.md is missing — expected the scaffolded law "
+                f"contract for specs/{area}/. Restore it by copying the canonical "
+                f"source dadaia_workspace/public/scaffold/{area}/AGENTS.md into "
+                f"specs/{area}/AGENTS.md."
+            ),
+            path=str(dst),
+            fixable=False,
+        )
 
     def _tree5_compare(
         self, *, dst: Path, canonical_path: Path, asset_name: str, label: str
@@ -362,7 +389,8 @@ class StructuralValidator:
                 code="TREE-5",
                 severity=Severity.WARNING,
                 description=(
-                    f"{label} has drifted from its canonical source "
+                    f"copy-drift: {label} matches neither its canonical source nor any "
+                    "version this project shipped "
                     f"(current sha256:{current_hash[:12]}… vs "
                     f"canonical sha256:{canonical_hash[:12]}…). "
                     "Review the diff and merge any upstream changes manually — "
@@ -412,37 +440,6 @@ class StructuralValidator:
                 continue
             atomic_write(dst, canonical_path.read_text(encoding="utf-8"), preserve_mode=True)
             return
-
-    def check_memory_agents_md(self) -> list[SpecsDoctorIssue]:
-        """Check: specs/memory/AGENTS.md must exist (WARNING only).
-
-        The specs-tree copy is NOT a projection target: `dadaia public install`
-        only scaffolds it when the file is missing and never updates an existing
-        copy (bug specs-doctor-tree5m-remediation-wrong). The real repair is to
-        create/edit specs/memory/AGENTS.md directly, restoring content from the
-        canonical source dadaia_workspace/public/scaffold/memory/AGENTS.md. Absence is expected
-        on fresh scaffolds and early in the lifecycle, so it is flagged as WARN
-        (never ERROR) and does NOT cause doctor to exit non-zero.
-        """
-        memory_agents_md = self.specs_dir / "memory" / "AGENTS.md"
-        if memory_agents_md.exists():
-            return []
-        return [
-            SpecsDoctorIssue(
-                code="TREE-5M",
-                severity=Severity.WARNING,
-                description=(
-                    "specs/memory/AGENTS.md is missing — expected memory ownership contract. "
-                    "Restore it by copying the canonical source "
-                    "dadaia_workspace/public/scaffold/memory/AGENTS.md into specs/memory/AGENTS.md "
-                    "(edit the specs-tree copy directly). "
-                    "Note: `dadaia public install` does NOT project this file; it only "
-                    "scaffolds it when missing and never updates an existing copy."
-                ),
-                path=str(memory_agents_md),
-                fixable=False,
-            )
-        ]
 
     def check_tree7_bug_session_id(self) -> list[SpecsDoctorIssue]:
         """TREE-7: every bugs/<slug>.md must have a session_id frontmatter field.

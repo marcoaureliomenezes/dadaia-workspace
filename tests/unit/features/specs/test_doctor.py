@@ -571,29 +571,17 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
     tree5_ok = [i for i in doctor_ok.check() if i.code == "TREE-5"]
     assert tree5_ok == []
 
-    # TREE-5M: absence emits WARNING (never ERROR) with the real-repair remediation
-    # text; presence suppresses it entirely.
-    specs_5m_absent = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree5m-absent"))
-    memory_agents = specs_5m_absent / "memory" / "AGENTS.md"
+    # TREE-5, memory area (0.4.7 FR6): absence emits WARNING (never ERROR) naming the
+    # scaffold source to copy in — the check TREE-5M owned before the fold.
+    specs_mem_absent = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-mem-absent"))
+    memory_agents = specs_mem_absent / "memory" / "AGENTS.md"
     if memory_agents.exists():
         memory_agents.unlink()
-    issues_5m = SpecsDoctor(specs_5m_absent).check()
-    tree5m = [i for i in issues_5m if i.code == "TREE-5M"]
-    assert tree5m and tree5m[0].severity == Severity.WARNING and not tree5m[0].fixable
-    description = tree5m[0].description
-    assert "public/scaffold/memory/AGENTS.md" in description
-    assert "does NOT project" in description
-    assert "Project it by running" not in description
-    errors_5m = [i for i in issues_5m if i.severity == Severity.ERROR]
-    assert errors_5m == []
-
-    specs_5m_present = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree5m-present"))
-    (specs_5m_present / "memory" / "AGENTS.md").write_text(
-        "# Memory Ownership Contract\n\nWrite-locked to product-engineer during CLOSURE.\n",
-        encoding="utf-8",
-    )
-    tree5m_present = [i for i in SpecsDoctor(specs_5m_present).check() if i.code == "TREE-5M"]
-    assert tree5m_present == []
+    issues_mem = SpecsDoctor(specs_mem_absent, public_dir=_PUBLIC_DIR).check()
+    tree5_mem = [i for i in issues_mem if i.code == "TREE-5" and "memory" in (i.path or "")]
+    assert tree5_mem and tree5_mem[0].severity == Severity.WARNING and not tree5_mem[0].fixable
+    assert "public/scaffold/memory/AGENTS.md" in tree5_mem[0].description
+    assert [i for i in issues_mem if i.severity == Severity.ERROR] == []
 
     # TREE-6 retired (0.5.3 T-053-04, F005): missing-artifact coverage lives in
     # RELEASE-TREE-TRIO — see test_one_defect_one_code_missing_active_artifact.

@@ -80,7 +80,6 @@ RULES: tuple[SpecsRule, ...] = (
         fix=lambda d, i: d._structural.fix_tree5(i),
         fix_help="refresh a superseded, uncustomised law projection",
     ),
-    _rule(("TREE-5M",), lambda d: d._structural.check_memory_agents_md()),
     _rule(("TREE-7",), lambda d: d._structural.check_tree7_bug_session_id()),
     _rule(
         ("TREE-8",),
