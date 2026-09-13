@@ -1,8 +1,8 @@
 """Path classifier and decision policy for the merged SDD PreToolUse gate.
 
-Races between sessions are surfaced through advisory presence and never prevented.
-The only mutating-mode denial is the caller's own explicit READ mode. Protected CLI
-session records remain fail-closed against file-tool writes.
+Races between sessions are surfaced through advisory presence and never prevented;
+there is no session mode. Protected CLI session records remain fail-closed against
+file-tool writes.
 
 **The gate blocks three things (0.4.7 FR1).** A PROTECTED write (CLI-owned session
 records and projected law files); a MUTATING write into a repo the session's bind does
