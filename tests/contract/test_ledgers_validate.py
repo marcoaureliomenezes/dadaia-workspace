@@ -216,3 +216,27 @@ def test_the_doctor_ledgers_section_carries_the_schema_findings(tmp_path: Path) 
     assert set(_EXPECTED_CODES) <= codes, sorted(codes)
     assert section["compliance"]["percent"] < 100
     assert result.exit_code == 1
+
+
+def test_a_terminal_bug_record_with_no_closed_at_is_a_located_ledger_issue(tmp_path: Path) -> None:
+    """Bug `bugs-update-cannot-heal-terminal-record-missing-closed-at`: 0.4.7 candidate 1
+    made `closed_at` non-null iff terminal, enforced in `BugRecord.__post_init__` — but
+    `bug-record-v1.schema.json` alone cannot express it, so a ledger whose terminal
+    records were never back-filled validated CLEAN here while every write path refused to
+    load it. The model's own refusal is the record's shape too: it surfaces as this
+    ledger's ONE code, located like every other invalid record.
+
+    Intent: CONTRACT — bugs-update-cannot-heal-terminal-record-missing-closed-at
+    Size: SMALL — one fixture tree under tmp_path, no subprocess, no network.
+    """
+    specs = _build_tree(tmp_path, valid=True)
+    _write(
+        specs / "bugs" / "BUGS.jsonl",
+        [{**_VALID_BUG, "status": "resolved", "cause": "fixture", "closed_at": None}],
+    )
+
+    issues = [i for i in ledger_issues(specs) if i.code == "LEDGER-BUGS-SCHEMA"]
+
+    assert len(issues) == 1, issues
+    assert "closed_at" in issues[0].message
+    assert issues[0].unit == "bugs/BUGS.jsonl:1"

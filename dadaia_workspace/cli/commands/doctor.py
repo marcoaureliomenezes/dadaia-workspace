@@ -191,6 +191,7 @@ def _ledgers_section(
     committed governance ledger (0.4.7 FR6). Two features contribute, neither imports
     the other, and the two reports merge into one section here — the composition root."""
     from dadaia_workspace.cli.anchors import derive_cli_anchors
+    from dadaia_workspace.cli.commands.bugs import build_bug_service
     from dadaia_workspace.core.models.histo import HistoRecord
     from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
@@ -210,7 +211,11 @@ def _ledgers_section(
             from_dict=HistoRecord.from_dict,
         ),
     )
-    ledgers_context = specs_ledgers.build_ledgers_context(specs_dir)
+    # The `ledgers` section's ONE repair, injected here exactly as `bug_store_factory`
+    # is injected into the specs doctor: `features.specs` never imports `features.bugs`.
+    ledgers_context = specs_ledgers.build_ledgers_context(
+        specs_dir, heal_bug_closed_at=build_bug_service(specs_dir).heal_closed_at
+    )
     return merge_sections(
         [
             run_section(
@@ -363,7 +368,9 @@ def doctor(
     target = _resolve_specs_dir(specs_dir, context)
     specs_doctor = _build_specs_doctor(target, public_dir)
 
-    fixed = _apply_fixes(service, specs_doctor, fix=fix, expired_only=expired_only)
+    fixed = _apply_fixes(
+        service, specs_doctor, target, source_root, alias_map, fix=fix, expired_only=expired_only
+    )
     reports = [
         _workspace_section(service, expired_only=expired_only),
         _specs_section(specs_doctor),
@@ -390,21 +397,56 @@ def _identity(text: str) -> str:
 
 
 def _apply_fixes(
-    service: DoctorService, specs_doctor: SpecsDoctor | None, *, fix: bool, expired_only: bool
+    service: DoctorService,
+    specs_doctor: SpecsDoctor | None,
+    specs_dir: Path | None,
+    source_root: str | None,
+    alias_map: str | None,
+    *,
+    fix: bool,
+    expired_only: bool,
 ) -> list[str]:
-    """The `--fix` scope, unchanged by the fold: the workspace repairs plus the specs
-    rules' own `FIX_BY_CODE` fixes. The `ledgers` section has no fix.
+    """The `--fix` scope: the workspace repairs, the specs rules' own `FIX_BY_CODE`
+    fixes, and the `ledgers` rules that carry one. Fixes run BEFORE the sections are
+    built, so what the run then reports is the post-repair truth.
 
     `--expired-only` is a SCOPE, never a second reaper: `service.fix()` is the one lane
     and runs whole either way (T-047-20 deleted the early stop it used to buy). All the
-    flag still does on the write path is skip the specs repairs, which keeps the
-    SessionStart lane off the specs tree."""
+    flag still does on the write path is skip the specs and ledgers repairs, which keeps
+    the SessionStart lane off the specs tree."""
     if not fix:
         return []
     fixed = list(service.fix())
     if not expired_only and specs_doctor is not None:
         fixed.extend(f"[specs] {issue.code}: {issue.path}" for issue in specs_doctor.fix())
+    if not expired_only:
+        fixed.extend(_ledger_fixes(specs_dir, source_root, alias_map))
     return fixed
+
+
+def _ledger_fixes(
+    specs_dir: Path | None, source_root: str | None, alias_map: str | None
+) -> list[str]:
+    """Apply every `ledgers` rule that carries a fix, over ONE freshly-read context.
+
+    Only the rules whose issues name their own remediation repair anything (a hand-edited
+    schema violation is never guessed at) — that decision lives in the feature's own
+    `fix` callable, not in a branch here."""
+    if specs_dir is None:
+        return []
+    from dadaia_workspace.cli.commands.bugs import build_bug_service
+
+    context = specs_ledgers.build_ledgers_context(
+        specs_dir, heal_bug_closed_at=build_bug_service(specs_dir).heal_closed_at
+    )
+    actions: list[str] = []
+    for rule in specs_ledgers.RULES:
+        if rule.fix is None:
+            continue
+        for issue in rule.run(context):
+            rule.fix(context, issue)
+            actions.append(f"[ledgers] {issue.code}: {issue.unit}")
+    return actions
 
 
 def _json_payload(

@@ -22,6 +22,7 @@ optional — most construction sites never need a git walk and the seam degrades
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from collections import Counter
@@ -32,14 +33,20 @@ from pathlib import Path
 
 from jsonschema.exceptions import ValidationError
 
+from dadaia_workspace.core.atomic_write import ConcurrentModificationError, atomic_write
 from dadaia_workspace.core.bug_provenance import classify_ledger_line, derive_commit_provenance
 from dadaia_workspace.core.models.bugs import (
     BUG_ARCHIVE_THRESHOLD_DAYS,
+    TERMINAL_EVENTS,
     BugRecord,
 )
+from dadaia_workspace.core.models.git_history import GitHistoryReadError
 from dadaia_workspace.core.redaction import PatternLike
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
-from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
+from dadaia_workspace.infrastructure.jsonl_record_store import (
+    JsonlRecordStore,
+    StaleRecordWriteError,
+)
 
 __all__ = [
     "BugArchiveResult",
@@ -284,6 +291,78 @@ class BugService:
             self._archive_store.append(record)
         return BugArchiveResult(archived=len(removed), kept=len(all_records) - len(removed))
 
+    def heal_closed_at(self) -> int:
+        """Back-fill ``closed_at`` on every terminal ledger record that carries none,
+        returning how many were stamped. The migration 0.4.7 candidate 1's invariant
+        shipped without (bug ``bugs-update-cannot-heal-terminal-record-missing-closed-at``).
+
+        ``closed_at`` became non-null-iff-terminal in :meth:`BugRecord.__post_init__`,
+        repaired ONCE by a throwaway script over this repo's own ledger (T-047-08). Every
+        other ledger kept ``closed_at: null`` on records the model now refuses to
+        construct — so ``update``/``remove``, which build a record before rewriting its
+        line, could not load the very records needing repair. This runs on RAW ledger
+        lines for exactly that reason: an unconstructible record is what it is here to fix.
+
+        The stamp is the date of the FIRST commit whose ``specs/bugs/`` version carried
+        the record terminal — the SAME first-add-wins winner
+        :meth:`resolved_commit` reads, now carrying its date
+        (``DerivedBugProvenance.resolved_at``), so this is one more field off one existing
+        walk, never a second history pass. When no history is available (no
+        ``history_reader``/``repo_root``, a shallow or absent repository, or a bug id the
+        walk never saw) the record's own filing date ``ts`` is the fallback: the honest
+        floor, never a date later than the truth. ``ts`` is also the clamp — the model
+        refuses a ``closed_at`` preceding it.
+
+        Costs nothing when there is nothing to do: with no terminal record missing the
+        field, it never walks history and never writes. That is load-bearing — the doctor
+        calls a fixer once per reported issue.
+        """
+        path = self._record_store.path
+        if not path.is_file():
+            return 0
+        before = path.read_text(encoding="utf-8")
+        lines = before.split("\n")
+        pending = {
+            index: raw
+            for index, line in enumerate(lines)
+            if (raw := _terminal_without_closed_at(line)) is not None
+        }
+        if not pending:
+            return 0
+
+        closed_at_of = self._derived_closed_at()
+        for index, raw in pending.items():
+            ts = str(raw["ts"])
+            derived = closed_at_of.get(str(raw["id"]))
+            raw["closed_at"] = derived if derived is not None and derived >= ts else ts
+            lines[index] = json.dumps(raw, sort_keys=True, ensure_ascii=False)
+        try:
+            atomic_write(path, "\n".join(lines), newline="", expected_previous=before)
+        except ConcurrentModificationError as exc:
+            raise StaleRecordWriteError(str(next(iter(pending.values()))["id"])) from exc
+        return len(pending)
+
+    def _derived_closed_at(self) -> dict[str, str]:
+        """``bug_id -> closed_at`` from the ledger's own git history, empty when no walk
+        is available or the walk fails — the caller's ``ts`` fallback covers both."""
+        if self._history_reader is None or self._repo_root is None:
+            return {}
+        try:
+            provenance = derive_commit_provenance(
+                self._history_reader.log_added_lines(self._repo_root, "specs/bugs/"),
+                classify_ledger_line,
+            )
+        except GitHistoryReadError:
+            _LOG.warning(
+                "closed_at back-fill: history unavailable, falling back to each record's ts"
+            )
+            return {}
+        return {
+            bug_id: _normalize_instant(derived.resolved_at)
+            for bug_id, derived in provenance.items()
+            if derived.resolved_at is not None
+        }
+
     # -- reads -------------------------------------------------------------------------
 
     def resolved_commit(self, record: BugRecord) -> str | None:
@@ -348,3 +427,37 @@ def _parse_ts(value: str) -> datetime:
     except ValueError:
         return datetime.fromtimestamp(0, tz=UTC)
     return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+
+def _terminal_without_closed_at(line: str) -> dict[str, object] | None:
+    """The raw record *line* holds, when it is a terminal record carrying no
+    ``closed_at`` — the ONE class :meth:`BugService.heal_closed_at` repairs. ``None`` for
+    every other line, malformed ones included: a line this migration cannot read is
+    preserved verbatim rather than dropped."""
+    stripped = line.strip()
+    if not stripped:
+        return None
+    try:
+        raw = json.loads(stripped)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(raw, dict):
+        return None
+    if raw.get("status") not in TERMINAL_EVENTS or raw.get("closed_at") is not None:
+        return None
+    if not isinstance(raw.get("id"), str) or not isinstance(raw.get("ts"), str):
+        return None
+    return raw
+
+
+def _normalize_instant(value: str) -> str:
+    """A git ``%aI`` date rendered in the ledger's own ``%Y-%m-%dT%H:%M:%SZ`` form (UTC).
+    Unparseable input is returned unchanged — the caller's ``>= ts`` guard then rejects
+    it and the record keeps its ``ts``, so a bad date can never become a stamp."""
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return value
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")

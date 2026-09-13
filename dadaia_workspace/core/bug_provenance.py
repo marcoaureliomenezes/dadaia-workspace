@@ -119,6 +119,10 @@ class DerivedBugProvenance:
     registration_granularity: Granularity | None
     resolved_commit: str | None
     resolution_granularity: Granularity | None
+    #: The winning terminal commit's ``HistoryCommit.date`` — "when did this bug close",
+    #: read off the SAME first-add-wins winner as :attr:`resolved_commit` rather than by a
+    #: second pass. ``None`` exactly when :attr:`resolved_commit` is.
+    resolved_at: str | None = None
     migration_note: str | None = None
 
 
@@ -157,6 +161,7 @@ def derive_commit_provenance(
     registration_commit_of: dict[str, str] = {}
     registration_granularity_of: dict[str, Granularity] = {}
     resolved_commit_of: dict[str, str] = {}
+    resolved_at_of: dict[str, str] = {}
     resolution_granularity_of: dict[str, Granularity] = {}
     known_bug_ids: set[str] = set()
 
@@ -195,6 +200,7 @@ def derive_commit_provenance(
                 if bug_id in resolved_commit_of:
                     continue
                 resolved_commit_of[bug_id] = commit.sha
+                resolved_at_of[bug_id] = commit.date
                 resolution_granularity_of[bug_id] = marker
 
     return {
@@ -204,6 +210,7 @@ def derive_commit_provenance(
             registration_granularity=registration_granularity_of.get(bug_id),
             resolved_commit=resolved_commit_of.get(bug_id),
             resolution_granularity=resolution_granularity_of.get(bug_id),
+            resolved_at=resolved_at_of.get(bug_id),
             migration_note=(
                 None
                 if bug_id in registration_commit_of

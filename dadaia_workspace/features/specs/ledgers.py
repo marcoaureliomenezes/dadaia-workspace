@@ -22,10 +22,12 @@ composition root is the only place the two rule groups meet — no cross-feature
 from __future__ import annotations
 
 import json
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from dadaia_workspace.core.doctor_rules import Rule
+from dadaia_workspace.core.models.bugs import BugRecord
 from dadaia_workspace.core.models.histo import (
     AUDITS_HISTO_DISPOSITIONS,
     BACKLOG_HISTO_DISPOSITIONS,
@@ -56,6 +58,12 @@ class LedgerIssue:
     path: str
     line: int
     message: str
+    #: This issue's OWN executable remediation, when the rule's generic ``fix_help``
+    #: would not repair it. Empty = the rule's ``fix_help`` stands. A hand-editable
+    #: schema violation and a model invariant with a shipped migration are the same code
+    #: and a different fix; printing one command for both is a Stall for whichever it
+    #: does not fix.
+    fix: str = ""
 
     @property
     def unit(self) -> str:
@@ -74,10 +82,29 @@ class Ledger:
     schema: str
     jsonl: bool = True
     dispositions: tuple[str, ...] | None = None
+    #: The record-shape rules this ledger's JSON Schema cannot express, as the model's
+    #: own refusal message (``None`` = the record is fine). A schema states field types
+    #: and enums; it cannot state "``closed_at`` is non-null IF AND ONLY IF ``status`` is
+    #: terminal", which is why a ledger that every write path refused to load used to
+    #: validate clean here (bug
+    #: ``bugs-update-cannot-heal-terminal-record-missing-closed-at``). One column, one
+    #: authority: the model that already enforces the rule reports it.
+    record_invariant: Callable[[Mapping[str, object]], str | None] | None = None
 
     @property
     def code(self) -> str:
         return f"LEDGER-{self.name}-SCHEMA"
+
+
+def _bug_invariant(record: Mapping[str, object]) -> str | None:
+    """``BugRecord``'s own construction refusal, as a ledger message — never a second
+    copy of the rule. ``BugRecord.__post_init__`` is the one authority on
+    non-null-iff-terminal ``closed_at``; this simply asks it."""
+    try:
+        BugRecord.from_dict(record)
+    except (TypeError, ValueError) as exc:
+        return str(exc)
+    return None
 
 
 #: The seven committed governance ledgers. Every ``_RELEASE.json`` is deliberately
@@ -86,7 +113,7 @@ class Ledger:
 LEDGERS: tuple[Ledger, ...] = (
     Ledger("ADR", "ADRs/decisions.jsonl", "ADRs/decision-record-v1"),
     Ledger("BACKLOG", "backlog/BACKLOG.json", "backlog/backlog-v1", jsonl=False),
-    Ledger("BUGS", "bugs/BUGS.jsonl", "bugs/bug-record-v1"),
+    Ledger("BUGS", "bugs/BUGS.jsonl", "bugs/bug-record-v1", record_invariant=_bug_invariant),
     Ledger("FINDINGS", "audits/*/FINDINGS.jsonl", "audits/finding-record-v1"),
     Ledger(
         "BACKLOG-HISTO",
@@ -128,6 +155,10 @@ class LedgersContext:
 
     specs_dir: Path
     records: dict[str, tuple[_Located, ...]] = field(default_factory=dict)
+    #: Injected at the CLI composition root (``cli/commands/doctor.py``), exactly as
+    #: ``bug_store_factory`` is injected into the specs doctor — this feature never
+    #: imports ``features.bugs``. ``None`` = no repair is wired and the rule reports only.
+    heal_bug_closed_at: Callable[[], int] | None = field(default=None, compare=False)
 
     @property
     def total_records(self) -> int:
@@ -154,7 +185,9 @@ def _read_json(path: Path, rel: str) -> list[_Located]:
         return [_Located(rel, 1, None, f"document is not valid JSON: {exc.msg}")]
 
 
-def build_ledgers_context(specs_dir: Path) -> LedgersContext:
+def build_ledgers_context(
+    specs_dir: Path, *, heal_bug_closed_at: Callable[[], int] | None = None
+) -> LedgersContext:
     """Read every committed record of every ledger once. An absent ledger file is an
     empty list, never an issue: a young specs tree has no audits and no history yet."""
     records: dict[str, tuple[_Located, ...]] = {}
@@ -166,7 +199,9 @@ def build_ledgers_context(specs_dir: Path) -> LedgersContext:
             rel = path.relative_to(specs_dir).as_posix()
             located.extend(_read_jsonl(path, rel) if ledger.jsonl else _read_json(path, rel))
         records[ledger.glob] = tuple(located)
-    return LedgersContext(specs_dir=specs_dir, records=records)
+    return LedgersContext(
+        specs_dir=specs_dir, records=records, heal_bug_closed_at=heal_bug_closed_at
+    )
 
 
 def _validate(ledger: Ledger, ctx: LedgersContext) -> list[LedgerIssue]:
@@ -175,8 +210,18 @@ def _validate(ledger: Ledger, ctx: LedgersContext) -> list[LedgerIssue]:
         if located.parse_error is not None:
             issues.append(LedgerIssue(ledger.code, located.path, located.line, located.parse_error))
             continue
-        for message in schema_errors(located.record, ledger.schema):
+        schema_messages = list(schema_errors(located.record, ledger.schema))
+        for message in schema_messages:
             issues.append(LedgerIssue(ledger.code, located.path, located.line, message))
+        if (
+            not schema_messages
+            and ledger.record_invariant is not None
+            and isinstance(located.record, dict)
+            and (refusal := ledger.record_invariant(located.record)) is not None
+        ):
+            issues.append(
+                LedgerIssue(ledger.code, located.path, located.line, refusal, fix=_FIX_COMMAND)
+            )
         if ledger.dispositions is None:
             continue
         disposition = (
@@ -201,12 +246,27 @@ type LedgerRule = Rule[LedgersContext, LedgerIssue]
 
 SECTION = "ledgers"
 
-#: One rule per ledger — the codes a reader greps for.
+#: The ONE executable remediation for a model-invariant issue that ships a migration.
+_FIX_COMMAND = ".dadaia/.venv/bin/dadaia doctor --fix"
+
+
+def _fix_record_invariant(ctx: LedgersContext, issue: LedgerIssue) -> None:
+    """Run the injected migration for a model-invariant issue. A schema violation
+    (``issue.fix`` empty) is hand-edited, never auto-repaired: this reader cannot know
+    what a mistyped field was MEANT to say, and guessing would corrupt a record."""
+    if issue.fix != _FIX_COMMAND or ctx.heal_bug_closed_at is None:
+        return
+    ctx.heal_bug_closed_at()
+
+
+#: One rule per ledger — the codes a reader greps for. Only the ledger whose model
+#: invariant ships a migration carries a fixer; the rest are hand-edited.
 RULES: tuple[LedgerRule, ...] = tuple(
     Rule(
         (ledger.code,),
         SECTION,
         (lambda bound: lambda ctx: _validate(bound, ctx))(ledger),
+        fix=_fix_record_invariant if ledger.record_invariant is not None else None,
         fix_help=(f"sed -i '<line>s|.*|<the corrected record>|' specs/{ledger.glob}"),
     )
     for ledger in LEDGERS

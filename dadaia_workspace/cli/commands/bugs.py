@@ -35,6 +35,7 @@ from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.models.bugs import BUG_ARCHIVE_THRESHOLD_DAYS, BugRecord
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.bugs.service import BugService
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.jsonl_record_store import (
     JsonlRecordStore,
     RecordNotFoundError,
@@ -121,6 +122,10 @@ def build_bug_service(target: Path, *, with_archive: bool = False) -> BugService
         denylist_terms=container.load_denylist_terms(),
         baseline_patterns=container.load_denylist_baseline_patterns(),
         validate=container.build_bug_record_validator(),
+        # The git-facing DI FR8/AS-1 declared and no construction site ever wired: the
+        # `resolved_commit` resolver and the `closed_at` back-fill both degrade silently
+        # to "no history" without it. One adapter, built at the composition root.
+        history_reader=GitSubprocessClient(),
         # F017: the component normalizer probes the containing repo for the on-disk
         # spelling; specs/ always sits at the repo root.
         repo_root=target.parent,
