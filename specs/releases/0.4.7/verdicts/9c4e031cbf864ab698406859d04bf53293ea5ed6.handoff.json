@@ -1,0 +1,75 @@
+{
+  "schema_version": "handoff-v1.2",
+  "self_pull": {
+    "refs": [
+      "specs/releases/0.4.7/_RELEASE.json",
+      "specs/releases/0.4.7/SPEC.md",
+      "specs/releases/0.4.7/TASKS.md"
+    ]
+  },
+  "agent": "security-reviewer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-09-13T06:07:29Z",
+  "release_id": "0.4.7",
+  "artifact": {
+    "type": "other"
+  },
+  "scope": "PR-gate DELTA verdict for feature/0.4.7 -> develop, candidate 2, full review range 6cef01f854ee4e3c1178791270c9813fa9947730..9c4e031cbf864ab698406859d04bf53293ea5ed6 (1461 commits). This delta re-review covers only what moved since the prior APPROVED verdict at 56ae76854ad9f56936c5c96d4dde89715ab71893: 56ae7685..9c4e031c, 19 commits, 51 files, +1083/-470. Reviewed by group: G1/G2 qa-engineer fixes (aa8ae18a..a828ea90 \u2014 reaped listing always shown regardless of score, certify/heartbeat resolve on one verb, no --mode/--release anywhere); F1-F6 code-reviewer fixes (a828ea90..ddae7de4 \u2014 prune-before-classify ordering, no runtime raise replaced by a contract-test-proven fix_help, one grammar for every fix line, the root-whitelist BLOCK states its exceptions remedy once, the last path-scoped privacy exclude_regex carve-out deleted with its two synthetic-literal tests); backlog disposition sweep (129afeec); memory pass (baa6b287); CLOSURE (8239d750); two implemented-milestone notes (81353d59, 9c4e031c); the honest-fix-lines rework (ec27c4b1 \u2014 nine doctor remedies rewritten so the fix line cannot destroy the record its own finding protects, four judgment-only rules demoted to WARNING so they can never stall a push, new seam tests/integration/test_doctor_fix_lines_clear_their_finding.py which EXECUTES each fix line via bash -c against a git-backed tmp fixture); a handoff-check wording fix (6e820623) plus its own positional-arity test (825290d6); a doctor-parameters doc note (f02aa77f); and the SPEC-DOC-039 fix-line/PLAN-limit closeout (99ac4bf8). Lenses applied: OWASP A01/A03/A05/A08 on every rewritten fix line and on the new subprocess-executing test seam; secret-pattern and private-key-header grep over the full delta diff; dependency/lockfile and CI-workflow/IaC diff check across the whole 6cef01f8..HEAD range; git-history literal-leak re-verification (-S search) over specs/releases/0.4.7/; push-gate simulation over the full range.",
+  "verdict": "APPROVED",
+  "verdict_reason": "Explicitly requested seam reviewed: tests/integration/test_doctor_fix_lines_clear_their_finding.py executes production doctor fix lines via `subprocess.run([\"bash\", \"-c\", command], cwd=root, ...)`. Traced every substitution: the `Plant.substitutions` dicts that fill each fix line's `<placeholder>` tokens are dataclass literals hardcoded in the test module itself (fixed strings such as a release id, a document name, an audit slug chosen by the test author) \u2014 none is read from file content, external input, or anything an untrusted contributor could shape at review time; `_resolve()` asserts no `<` survives substitution, so a silently-unresolved placeholder cannot reach the shell. Every `subprocess.run` and the shared `_git()` helper pin `cwd=root`, where `root` is pytest's own `tmp_path` fixture (a fresh, isolated directory created and torn down per test) \u2014 no command in this module runs outside that fixture tree. The `_git()` helper additionally pins `env={\"HOME\": str(root), \"PATH\": \"/usr/bin:/bin\", \"GIT_CONFIG_GLOBAL\": \"/dev/null\"}`, so git commands cannot read the invoking user's global config. Cross-checked against production: `dadaia_workspace/features/specs/rules.py`'s `fix_help` strings are consumed exactly once at runtime, by `render_fix_help()` in `dadaia_workspace/cli/commands/doctor.py`, which only feeds `typer.Option(..., help=...)` for display \u2014 production code never subprocess-executes a fix line; only this test does, under the confinement above. No injection path found: no untrusted-content substitution, no execution outside the fixture cwd. Root-cause history verified clean: `git log --all -p -S<the operator's home-directory literal> -- specs/releases/0.4.7/` and the equivalent `-S` search for a synthetic email literal both return zero commits \u2014 no operator-local path or synthetic email literal is reachable from any ref under that tree. Push-gate replay over the full candidate range (`refs/heads/feature/0.4.7 9c4e031c... refs/heads/feature/0.4.7 6cef01f8...` piped to `dadaia ci push-gate-check`) exits 0, denylist-scan banner only, no BLOCKED line. `tests/integration/test_repo_self_scan.py` is green (4 passed) \u2014 this run is materially stronger than the prior verdict's baseline: T-047-22 (fix commit e743098d, reviewed as part of this delta's F1-F6 group) deleted the privacy scan's last path-scoped `exclude_regex` carve-out and its `_TESTS_SCOPE_BASELINE` tolerated-pairs list entirely, widening the self-scan to a plain zero-tolerance check over the whole tracked tree (`.github/`, `docs/`, `README.md`, `CHANGELOG.md` included) with one real operator username removed from fixtures in the same commit \u2014 a net reduction in privacy-scan bug surface, not a new risk. No dependency file (`pyproject.toml` dependencies/groups, `poetry.lock`) changed in either the delta or the full 6cef01f8..HEAD range \u2014 `pyproject.toml`'s only edits are the version bump to 0.4.7 (already reviewed) and moving the ruff/mypy cache directories to a relative, in-tree-adjacent path (config, not a dependency). No CI workflow, Dockerfile, compose, or Terraform file changed in the delta. `git diff -U0` over the delta against the secret-pattern regex and a private-key-header grep: 0 matches. `dadaia doctor --json`: 12975/12975 canonical, 100%, 0 findings. `candidate.py`'s three `ArchiveError` messages and one `already exists` message changed to the one-fix-line-per-refusal grammar (T-047-14) \u2014 wording only, confirmed by diff: still zero `symlink`/`resolve(` occurrences in the file, so the carried-forward LOW finding from the prior verdict is unchanged, not worsened. `schemas.py` is byte-identical across the whole delta. No new HIGH/CRITICAL surface found; nothing in this delta touches an authenticated production endpoint or a live credential. Snapshot, not a guarantee of \"secure\" (DADAIA.md 7.5) \u2014 the operator owns the ship decision.",
+  "findings": [
+    {
+      "severity": "INFO",
+      "message": "New test seam reviewed for injection: tests/integration/test_doctor_fix_lines_clear_their_finding.py executes real doctor fix lines via bash -c \u2014 confirmed safe by construction",
+      "detail_md": "Every `<placeholder>` substitution value comes from a hardcoded `Plant.substitutions` literal in the test module (no file content, no external input); `_resolve()` asserts no unresolved `<` token survives. Every executed command runs with `cwd=root`, pytest's own `tmp_path` fixture; the shared `_git()` helper additionally restricts `HOME`/`PATH`/`GIT_CONFIG_GLOBAL`. Production code (`dadaia_workspace/cli/commands/doctor.py`'s `render_fix_help()`) only ever displays a `fix_help` string via `typer.Option(help=...)` and never subprocess-executes it \u2014 execution of a fix line happens only inside this test, inside the confinement above. No injection path.",
+      "fix_recommendation": "None required."
+    },
+    {
+      "severity": "INFO",
+      "message": "T-047-22 removal of the privacy baseline's last path-scoped exclude_regex carve-out (commit e743098d) reduces scan surface, reviewed clean",
+      "detail_md": "The carve-out existed only to exempt two synthetic fixture literals that had leaked into an unamendable, already-published main squash-commit body. This delta deletes the carve-out, its two dedicated tests, and the entire 23-row `_TESTS_SCOPE_BASELINE` tolerated-pairs list, replacing every incidental test fixture literal with values the baseline already excludes by design (the generic placeholder home path, RFC 5737 `192.0.2.0/24`, `@example.invalid`) or with run-time-composed non-tracked literals (`tests/helpers/privacy_fixtures.py`). `tests/integration/test_repo_self_scan.py` now asserts a plain zero over the whole tracked tree, widened to include `.github/`, `docs/`, `README.md`, `CHANGELOG.md`. Verified green (4 passed) on this head. One real operator username was removed from fixtures in the same commit. Net effect: strictly less privacy-scan bug surface than the prior verdict's baseline.",
+      "fix_recommendation": "None required."
+    },
+    {
+      "severity": "LOW",
+      "message": "CARRIED FORWARD, unchanged in this delta, non-blocking: dadaia_workspace/features/specs/candidate.py has no symlink handling around its release-tree file operations",
+      "detail_md": "Re-verified on this head: `grep -n 'symlink\\|resolve(' dadaia_workspace/features/specs/candidate.py` returns zero matches. The delta's only edits to this file (T-047-14) rewrite three `ArchiveError` messages and one `already exists` message to the one-fix-line grammar \u2014 wording only, no path/symlink logic touched. Judged non-blocking, as in the prior verdict: this file operates on the operator-controlled specs/releases/ tree during release archival, not on attacker-reachable input, with no authentication boundary crossed.",
+      "fix_recommendation": "No fix required for this release. If this surface is ever exposed to untrusted input, add an is_symlink() guard before any move/copy, matching the pattern already used in doctor_structural.py::fix_tree5."
+    }
+  ],
+  "metrics": {
+    "commit_sha": "9c4e031cbf864ab698406859d04bf53293ea5ed6",
+    "review_range": "6cef01f854ee4e3c1178791270c9813fa9947730..9c4e031cbf864ab698406859d04bf53293ea5ed6",
+    "review_range_commits": 1461,
+    "delta_range_reviewed": "56ae76854ad9f56936c5c96d4dde89715ab71893..9c4e031cbf864ab698406859d04bf53293ea5ed6",
+    "delta_commits": 19,
+    "delta_files_changed": 51,
+    "delta_added_lines": 1083,
+    "delta_removed_lines": 470,
+    "history_leak_scan_home_path": "0 matches (-S over specs/releases/0.4.7/, branch and --all)",
+    "history_leak_scan_synthetic_email": "0 matches (-S over specs/releases/0.4.7/, branch and --all)",
+    "push_gate_check_full_range": "exit 0, denylist scan banner only, no BLOCKED line",
+    "secret_scan_delta_matches": 0,
+    "private_key_header_delta_matches": 0,
+    "dependency_lockfile_touched_in_range": false,
+    "ci_workflow_touched_in_delta": false,
+    "iac_touched_in_delta": false,
+    "repo_self_scan_test": "4 passed",
+    "dadaia_doctor_json": "12975/12975 canonical, 100%, 0 findings",
+    "findings_critical": 0,
+    "findings_high": 0,
+    "findings_medium": 0,
+    "findings_low": 1,
+    "findings_info": 2,
+    "findings_new_in_delta": 0,
+    "pr_edge": "feature/0.4.7 -> develop"
+  },
+  "decisions_required": [
+    "Operator: LOW (candidate.py symlink gap) remains record-only, carried unchanged from the round-1 and candidate-1 verdicts \u2014 confirm it stays backlog-eligible rather than blocking."
+  ],
+  "next_handoff": {
+    "agent": "project-manager",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "other"
+  }
+}
