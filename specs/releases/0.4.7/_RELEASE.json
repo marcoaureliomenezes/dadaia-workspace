@@ -325,6 +325,12 @@
       "agent": "release-candidates",
       "kind": "note",
       "text": "Candidate 4 implemented at c746592a; phase CLOSURE."
+    },
+    {
+      "ts": "2026-09-13T10:58:24Z",
+      "agent": "project-manager",
+      "kind": "reviews",
+      "text": "Candidate 4 trio review @ e214a463: code-reviewer APPROVED (MEDIUM-1 SPEC FR3 hex64 sentence corrected to the shipped 12-hex width in this commit; MEDIUM-2 GitHub topics re-set to exactly the nine pyproject keywords; LOW-3/4 pre-heading intros and markdown links unguarded — recorded, candidate for a later ratchet); security-reviewer APPROVED (verdict 148a5059; one LOW CWE-22 in citations.py fixed in the following commit); qa-engineer verdict pending at the time of this entry, appended when received."
     }
   ]
 }

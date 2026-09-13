@@ -101,7 +101,7 @@ steps recorded, never delegated to a task.
 - FR3 — **Documents derived from memory, under one contract test.** The derived set is
   `README.md`, `llms.txt` and every `docs/*.md` — a glob, never a list. Every `## `
   heading is followed by one or more markers `<!-- derived-from: <slug>
-  sha256:<hex64> -->`; `<slug>` resolves by stem to exactly one file under
+  sha256:<12 hex of the atom file> -->`; `<slug>` resolves by stem to exactly one file under
   `specs/memory/` (a product atom or `ARCHITECTURE`/`QUALITY`/`TECHSTACK`), the hash
   is that file's current sha256 (whole file, as `behavior-map.json`'s `hash_tuple`),
   and there is no `derived-from: none` — a section that can name no atom is slop or
