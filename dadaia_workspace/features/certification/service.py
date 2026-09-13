@@ -370,7 +370,7 @@ def certify(
             encoding="utf-8",
         )
         cli("reports", "validate", str(path), "--json")
-        return "handoff-v1.2 strict validation"
+        return "reports validate accepted a handoff-v1.2 record"
 
     check("reports-handoff-validation", handoff_validation)
 
