@@ -1,0 +1,72 @@
+{
+  "schema_version": "handoff-v1.2",
+  "self_pull": {
+    "refs": [
+      "specs/releases/0.4.7/_RELEASE.json",
+      "specs/releases/0.4.7/SPEC.md",
+      "specs/releases/0.4.7/TASKS.md"
+    ]
+  },
+  "agent": "security-reviewer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-09-13T09:28:25Z",
+  "release_id": "0.4.7",
+  "artifact": {
+    "type": "other"
+  },
+  "scope": "PR-gate DELTA verdict for feature/0.4.7 -> develop, candidate 3, full review range 6cef01f854ee4e3c1178791270c9813fa9947730..92e934787380fca470887bc719e666a60874e243 (1502 commits). This is the PR-gate verdict for the eventual feature/0.4.7 -> develop PR carrying candidates 2-3, opened once PR #253 (candidate 2) merges. This delta re-review covers only what moved since the prior APPROVED verdict at 27e5e78753010108e065c73c8b90bb9e9bc75bb7 (one MEDIUM open, CWE-22 audit-directory confinement): 1a9aae4c..HEAD, 13 commits, 58 files, +1121/-350. Reviewed by group: T-047-32 fixes (b65aaaf5, 954fb7d2, f23ac81f -- the bugs-update lineage arm collapses to one writer/one validation site, one context decider serves the governance-event writer and reader alike with no env read, a retired bug-record key gains its one public-law citation); the CWE-22 fix (630b02a6, T-047-28) -- verified below; a backlog-exit evidence fix (9a3ca89e, T-047-27, CR MEDIUM-4); a governance-baseline perf/ratchet change (a88b2e2e, T-047-26, no security surface); a dedupe refactor (f6fa59a8, T-047-27) -- verified below; the 0.4.7 candidate 3 memory pass with ADR 0011 (9cd87a7f); the closure narrative (e0d096d6); three `dadaia backlog exit` verb runs recorded as a disposition sweep (b7fb1efe); one `dadaia release phase CLOSURE` verb run (7db3dcc3); and one log re-timing commit (92e93478). Lenses applied: OWASP A01/A03/A05/A08 on the CWE-22 fix and every rewritten fix-line string; secret-pattern and private-key-header grep over the full 1a9aae4c..HEAD diff; dependency/lockfile diff and CI-workflow/IaC diff across both the delta and the full 6cef01f8..HEAD range; git-history literal-leak re-verification (-S search for the operator's home-directory path literal) restricted to commits new in this range; push-gate simulation over the full 6cef01f8..HEAD range; confirmation that specs/bugs/BUGS.jsonl carries no staged or committed change anywhere in the delta.",
+  "verdict": "APPROVED",
+  "verdict_reason": "CWE-22 fix (630b02a6) verified as the root-cause close of the MEDIUM opened at the prior verdict (27e5e787), not a workaround: `_audit_dir` in dadaia_workspace/features/specs/audit.py now resolves both `specs/audits` and the joined `specs/audits/<audit>` target with `Path.resolve()` (following symlinks) and requires `target != audits and target.is_relative_to(audits)` before the directory is treated as live -- one containment rule covers `..` traversal, an absolute-path argument, and a symlink escaping the tree, so there is no per-shape check to drift out of step. Read the whole diff of dadaia_workspace/core/models/histo.py and dadaia_workspace/features/specs/audit.py: no other behavior changed except the caller-supplied `fix:` line (LOW-9) and the AUDIT_PILLARS vocabulary (QA minor), both non-security. Ran the regression seam named in the task, tests/integration/cli/test_audit_verbs.py: 15 passed, including the three new parametrized traversal/absolute/nested-traversal cases that assert the outside directory's `keep-me.txt` survives and the live audit's FINDINGS.jsonl is untouched, plus the fix-line-naming and zero-pillar cases. f6fa59a8 (DADAIA_BIN dedupe) verified line-by-line: `DADAIA_BIN` is a single string constant in core/kernel_tunables.py equal to `.dadaia/.venv/bin/dadaia` -- byte-identical to every literal it replaced across the ~35 substituted fix-line f-strings in ci.py, context.py, backlog/doctor.py, backlog/document.py, spec_context/doctor.py, spec_context/gate_policy.py, specs/audit.py, specs/candidate.py, specs/canon.py, specs/ledgers.py and specs/rules.py -- confirmed by `grep -rn DADAIA_BIN` and a diff read of every touched call site: no path other than the constant's own value is ever rendered, and the surviving raw `.dadaia/.venv/bin/dadaia` occurrences are all in shell scripts, docs and codex-asset generator literals outside the fix-line surface the commit targeted. The root-specs context decider `core/invocation.py::_self_hosting_context_name` reads only the workspace's context registry (`_registry_contexts`) and each candidate's own `repos/<slug>/specs` directory presence -- confirmed by reading the full function body: no `os.environ` access, matching the commit's claim that the `$DADAIA_CONTEXT` rung was deleted rather than reordered. Targeted regression run (44 tests: test_required_evidence_has_one_home.py, test_event_context_decider.py, test_root_specs_event_context.py, test_bugs_governance_events.py, test_document.py, test_lineage_single_writer.py, test_slop_ratchets.py) all passed. Read the memory pass (9cd87a7f) and ADR 0011: the deleted P-16 provenance fields and the new decisions.jsonl entry carry no secret, credential or local path. Read the closure narrative (e0d096d6), the three backlog-exit histo entries appended by verb in b7fb1efe, the `dadaia release phase CLOSURE` run in 7db3dcc3, and the log re-timing in 92e93478: all are verb-written JSON/JSONL records with the expected shape, no hand-authored governance fields, no secret material. `git diff --stat 1a9aae4c^..HEAD -- specs/bugs/BUGS.jsonl` is empty -- the file was neither staged nor committed anywhere in this delta, satisfying the standing instruction never to touch it. Secret-pattern grep (password|passwd|secret|token|api_key|apikey|private_key literal assignment) and a private-key-header grep over the full delta diff: 0 matches. `git log 6cef01f8..HEAD -p -S<the operator's home-directory path literal> -- specs/ dadaia_workspace/public`: 0 commits (the one historical hit under an unrestricted `git log --all` predates 6cef01f8, already covered by the candidate-2 and earlier verdicts). A broader diff-wide grep for an absolute local-home path pattern over the whole delta also returns 0 matches -- no new absolute local path anywhere in the reviewed commits. `pyproject.toml` is the only dependency-adjacent file touched in the full 6cef01f8..HEAD range; its diff is the version bump to 0.4.7 (already reviewed under the candidate-2 verdict) plus moving the ruff/mypy cache directories to a relative, in-tree-adjacent path -- configuration, not a dependency, and no `poetry.lock` or `[tool.poetry.dependencies]`/`[tool.poetry.group.*.dependencies]` entry changed anywhere in range. No CI workflow, Dockerfile, compose, or Terraform file changed in the delta. Push-gate replay over the full candidate range (`refs/heads/feature/0.4.7 92e93478... refs/heads/feature/0.4.7 6cef01f8...` piped to `dadaia ci push-gate-check`) exits 0, denylist-scan banner only, no BLOCKED line. `tests/integration/test_repo_self_scan.py`: 4 passed. `dadaia doctor --json`: 13071/13071 canonical, 100%, 0 fixed. No new HIGH/CRITICAL surface found; nothing in this delta touches an authenticated production endpoint or a live credential. Snapshot, not a guarantee of \"secure\" (DADAIA.md 7.5) -- the operator owns the ship decision.",
+  "findings": [
+    {
+      "severity": "INFO",
+      "message": "CWE-22 MEDIUM opened at the prior verdict (27e5e787) is CLOSED at root cause in 630b02a6, verified with a passing regression seam",
+      "detail_md": "`_audit_dir(specs_dir, audit, *, fix)` in dadaia_workspace/features/specs/audit.py now resolves both `specs/audits` and the joined target with `Path.resolve()` and requires `target != audits and target.is_relative_to(audits)` before treating the target as a live audit directory. One rule confines `..` traversal, an absolute-path argument, and a symlink escape alike -- no per-shape check to drift. tests/integration/cli/test_audit_verbs.py adds three parametrized cases (`traversal`, `absolute`, `nested-traversal`) that plant a valid, fully-dispositioned audit OUTSIDE `specs/audits/` (so `close` would otherwise both archive and delete it) and assert the outside tree's `keep-me.txt` survives and the live audit's FINDINGS.jsonl is untouched after the refusal. Ran locally: 15/15 passed.",
+      "fix_recommendation": "None required."
+    },
+    {
+      "severity": "LOW",
+      "message": "CARRIED FORWARD, unchanged in this delta, non-blocking: dadaia_workspace/features/specs/candidate.py has no symlink handling around its release-tree file operations",
+      "detail_md": "Re-verified on this head: `grep -n 'symlink\\|resolve(' dadaia_workspace/features/specs/candidate.py` returns zero matches. No commit in the reviewed delta touches this file's path/symlink logic. Judged non-blocking, as in the prior two verdicts: this file operates on the operator-controlled specs/releases/ tree during release archival, not on attacker-reachable input, with no authentication boundary crossed.",
+      "fix_recommendation": "No fix required for this release. If this surface is ever exposed to untrusted input, add an is_symlink() guard before any move/copy, matching the pattern already used in doctor_structural.py::fix_tree5."
+    }
+  ],
+  "metrics": {
+    "commit_sha": "92e934787380fca470887bc719e666a60874e243",
+    "review_range": "6cef01f854ee4e3c1178791270c9813fa9947730..92e934787380fca470887bc719e666a60874e243",
+    "review_range_commits": 1502,
+    "delta_range_reviewed": "27e5e78753010108e065c73c8b90bb9e9bc75bb7..92e934787380fca470887bc719e666a60874e243",
+    "delta_commits": 13,
+    "delta_files_changed": 58,
+    "delta_added_lines": 1121,
+    "delta_removed_lines": 350,
+    "history_leak_scan_home_path": "0 matches in-range (git log 6cef01f8..HEAD -S<home-path literal> over specs/ and dadaia_workspace/public)",
+    "absolute_local_path_scan_delta": "0 matches (diff-wide grep for an absolute local-home path pattern over 1a9aae4c^..HEAD)",
+    "push_gate_check_full_range": "exit 0, denylist scan banner only, no BLOCKED line",
+    "secret_scan_delta_matches": 0,
+    "private_key_header_delta_matches": 0,
+    "dependency_lockfile_touched_in_range": false,
+    "ci_workflow_touched_in_delta": false,
+    "iac_touched_in_delta": false,
+    "repo_self_scan_test": "4 passed",
+    "audit_verbs_regression_test": "15 passed (tests/integration/cli/test_audit_verbs.py)",
+    "targeted_delta_regression_tests": "44 passed",
+    "dadaia_doctor_json": "13071/13071 canonical, 100%, 0 fixed",
+    "bugs_jsonl_touched_in_delta": false,
+    "findings_critical": 0,
+    "findings_high": 0,
+    "findings_medium": 0,
+    "findings_low": 1,
+    "findings_info": 1,
+    "findings_new_in_delta": 0,
+    "pr_edge": "feature/0.4.7 -> develop"
+  },
+  "decisions_required": [
+    "Operator: LOW (candidate.py symlink gap) remains record-only, carried unchanged from the candidate-1/2/3 verdicts -- confirm it stays backlog-eligible rather than blocking."
+  ],
+  "next_handoff": {
+    "agent": "project-manager",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "other"
+  }
+}
