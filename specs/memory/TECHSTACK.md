@@ -13,13 +13,14 @@ Rationale: a marker known to one file and unknown to the other is a silent exclu
 ## Part 2 — Implementation
 ### Snapshot
 - Python `^3.12`, Poetry Core build, console entrypoint `dadaia`; the version lives in `pyproject.toml` alone ([[pypi-distribution]]).
-- Deps are Typer, Rich, PyYAML, Jinja2, jsonschema, Mistune and openpyxl plus an optional `claude-sdk` extra; everything else is stdlib, and SQLite backs local telemetry.
+- Deps are Typer, Rich, PyYAML, Jinja2, jsonschema, Mistune and openpyxl plus an optional `claude-sdk` extra; everything else is stdlib, and SQLite backs local telemetry and the governance-event table (`TelemetryStore` schema version 7, [[agent-monitoring]]).
 - Codex and Kimi Code are operator-installed external CLIs, never Python deps, and the workspace runs no agent-execution runtime.
 - Entry harnesses are single-sourced as `L1_ENTRY_HARNESSES` in `core/harness_registry.py` — Claude Code, Codex, Kimi Code — each with its own projection plus the shared `.agents/` root.
 - Layer-1 agent bodies are model-agnostic in source and receive `(model, effort)` at `public install`; Codex projections carry registry-derived Codex-native tier identity.
 - Quality tooling is pytest with `pytest-cov`, `pytest-xdist`, `pytest-randomly` and `pytest-timeout`, Ruff, mypy `--strict`, import-linter, Hypothesis, Playwright and gitleaks; every cache is redirected by `pyproject.toml` (`addopts -p no:cacheprovider`, `[tool.ruff] cache-dir`, `[tool.mypy] cache_dir` → `../../.dadaia/tmp/<tool>-cache`), so the bare commands are the canonical ones and no per-command flag exists.
 - The closed marker set is eight — unit, contract, integration, e2e, slow, tmp, flaky, quarantine (P-28).
 - Mutation testing is `mutmut==3.7.0` in an optional Poetry group, absent from every push-path selector ([[QUALITY]]).
+- CI checks out at the default depth; `fetch-depth: 0` survives on the `security-verdict-gate` job alone (`ci verdict-check` walks the PR head's first parent) — no job fetches history for a bug record's sake ([[QUALITY]]).
 - Caches and artifacts live outside repos by configuration; the venv guard's one rule is venv-rooting, and a cache that still appears in a repo tree is moved to `.dadaia/reaped/` by the doctor's reaper ([[sdd-gate-v3]], [[workspace-doctor]]).
 
 ### Canonical commands
@@ -41,4 +42,4 @@ Rationale: a marker known to one file and unknown to the other is a silent exclu
 
 ### Dependencies
 
-[[ARCHITECTURE]], [[QUALITY]], [[harness-claude-code]], [[harness-codex]], [[harness-kimi-code]].
+[[ARCHITECTURE]], [[QUALITY]], [[harness-claude-code]], [[harness-codex]], [[harness-kimi-code]], [[agent-monitoring]].

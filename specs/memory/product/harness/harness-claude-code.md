@@ -10,7 +10,7 @@ tags: [harness, claude-code, projection, dispatch]
 
 - Claude Code is the only harness with native sub-agent dispatch (the Agent tool), and the nine-agent roster runs inside it as sub-agents.
 - `CLAUDE.md` imports `AGENTS.md`, which imports `DADAIA.md`; that chain is the single load path, so the law is in context exactly once per session and this harness receives no rules-directory mirror.
-- `dadaia context bind <ctx>` arms ctx-inject (`UserPromptSubmit`), which injects the bound context's tech-stack digest and feature catalog once per session.
+- `dadaia context bind <ctx>` arms ctx-inject (`UserPromptSubmit`), which injects the bound context's tech-stack digest and feature catalog once per session — and never the fixed law blocks, which the law chain already loads.
 - Claude Code exposes a native session id, so the bind record is this session's own at rung 2 and a concurrent session's bind never reaches it ([[context-management]]).
 - `.claude/settings.json` registers `SessionStart` matchers `compact`, `clear`, `startup` and `resume` — the bootstrap re-emits after a compact or `/clear`, and a NEW session receives it at the event itself instead of waiting for its first prompt.
 - Writes pass PreToolUse `pre_gate` (matcher `Edit|Write|MultiEdit|NotebookEdit|Bash`), a match-all PostToolUse heartbeat/reconciler, and the git chokepoints ([[sdd-gate-v3]]).

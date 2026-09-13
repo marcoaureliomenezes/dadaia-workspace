@@ -11,7 +11,7 @@
 | slug | title | tldr |
 |------|-------|------|
 | `agent-comms` | agent-comms | The handoff-v1 JSON contract agents emit, its stdlib validator behind `dadaia reports`, and ack-on-consume deletion. |
-| `agent-monitoring` | agent-monitoring | Stdlib-only local agent telemetry behind an allowlist gate, plus where each runtime artifact under .dadaia/ lives and expires. |
+| `agent-monitoring` | agent-monitoring | Stdlib-only local agent telemetry and the governance-event table in one SQLite store, plus where each runtime artifact under .dadaia/ lives and expires. |
 | `agent-orchestration` | agent-orchestration | Nine core Layer-1 roles, two dispatchers, document-governed ordered work, and advisory-only concurrency. |
 | `agentic-entities` | agentic-entities | Abstract-entity registry — Personas, Behaviors, Rules — plus the behavior map binding every skill and scoped rule file to one law section. |
 
@@ -59,7 +59,7 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `audits-canon` | audits-canon | Audits are committed spec artifacts — three pillars over a sha window read from audits_histo.jsonl, JSONL findings, one remediation release dispositions them. |
-| `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | One bug record with closed_at at the terminal transition, a backlog exiting once at closure as one histo record, the release state document and its three verbs. |
+| `audits-canon` | audits-canon | Audits are committed spec artifacts — three pillars over a sha window, JSONL findings moved by dadaia audit disposition, archived by dadaia audit close. |
+| `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | One bug record shape with no derived cache, one verb per governance record change writing one governance event, and a hand edit measured as a WARNING. |
 | `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write), one fix line per BLOCK, chokepoints at the push. |
 

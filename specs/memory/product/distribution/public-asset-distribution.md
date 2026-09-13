@@ -31,6 +31,7 @@ tags: [public, assets, distribution, projection, privacy]
 ## Scaffold and consumer fan-out
 
 - The scaffolded `specs/` tree is the v6 canon — `backlog/`, `bugs/`, `memory/`, `releases/`, `audits/`, `ADRs/`, `constitution.md`, `AGENTS.md` — stamped `specs_pattern_version: 6`.
+- The scaffolded `specs/AGENTS.md` (`templates/specs-AGENTS.md`) is a statement list — load order pointing at `dd-spec-navigator`, the authority table, escalation — with no gate claim and no root `_archive/`; every scoped scaffold `AGENTS.md` states scope and read rules only and cites the skill or the law section that owns the rule, and `TREE-5` heals each by shipped hash ([[workspace-doctor]]).
 - Each scoped `AGENTS.md` is hash-projected and doctor-compared; operator-owned domain-scoped files are never overwritten.
 - Repo templates land at `alive()`, not at install: `repo-AGENTS.md` to the repo root, `tests-AGENTS.md` only when `tests/` is a real directory holding no such file.
 - Templates ship parameterized, so an installed file still carrying `<ANGLE-BRACKET>` placeholders is the drift `dadaia doctor`'s `specs` section reports (`AGENTS-PLACEHOLDER-1`, `MEM-PLACEHOLDER-1`; [[workspace-doctor]]).

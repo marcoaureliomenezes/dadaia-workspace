@@ -1,15 +1,17 @@
 ---
 slug: agent-monitoring
 title: agent-monitoring
-tldr: Stdlib-only local agent telemetry behind an allowlist gate, plus where each runtime artifact under .dadaia/ lives and expires.
-summary: Telemetry ingests Claude Code, Codex and Kimi Code session metadata into a local SQLite store behind an allowlist gate; runtime artifacts live in registry zones and expire through dadaia doctor.
+tldr: Stdlib-only local agent telemetry and the governance-event table in one SQLite store, plus where each runtime artifact under .dadaia/ lives and expires.
+summary: Telemetry ingests Claude Code, Codex and Kimi Code session metadata into a local SQLite store behind an allowlist gate; the same store holds one governance event per record-changing verb; runtime artifacts live in registry zones and expire through dadaia doctor.
 tags: [monitoring, telemetry, sessions, lifecycle]
 ---
 
 ## Telemetry
 
 - Local agent telemetry reads only the operator's own files — no remote API, no Node dependency.
-- `features/telemetry/store.py`'s `TelemetryStore` owns the SQLite file at `~/.dadaia/state/telemetry/telemetry.sqlite` — open, migrate, `integrity_check`, `quarantine` — and no caller reaches a connection past it.
+- `features/telemetry/store.py`'s `TelemetryStore` owns the SQLite file at `~/.dadaia/state/telemetry/telemetry.sqlite` — open, migrate (`SCHEMA_VERSION` 7), `integrity_check`, `quarantine` — and no caller reaches a connection past it; `container.build_telemetry_store()` is the one builder, shared by the panel composition, the governance verbs and the doctor.
+- Migration 7 adds `governance_events` (index `(ledger, record_id, ts)`) with `insert_governance_event` (idempotent by `event_id`) and `latest_governance_events()` (one row per `(ledger, record_id)`): one `GovernanceEvent` per governance verb, content-free, keyed by the record's hash — the store is the observability of every record change and the baseline the doctor's hand-edit rules read ([[sdd-bug-backlog-governance]], [[workspace-doctor]]).
+- One machine has one store, so two workspaces share the file and the event's `context` keeps them apart; CI has none.
 - `TelemetryService(store, readers, clock)` exposes refresh and the session/agent aggregations the panel's sessions, agents and agent-prompt routes read ([[panel]]).
 - Runtimes are `claude`, `codex` and `kimi-code`, each with its own reader and aggregator; Kimi has no per-event pricing, so its cost is reported unknown, never faked.
 - `reader/allowlist.py` is a hardcoded key allowlist every event passes before reaching SQLite; no column and no endpoint carries message content.
@@ -28,4 +30,4 @@ tags: [monitoring, telemetry, sessions, lifecycle]
 
 ## Dependencies
 
-[[panel]], [[context-management]], [[brand-identity]], [[workspace-doctor]].
+[[panel]], [[context-management]], [[brand-identity]], [[workspace-doctor]], [[sdd-bug-backlog-governance]].

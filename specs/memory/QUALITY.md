@@ -89,16 +89,18 @@ Rationale: a reported number promoted as if it gated is fabricated detection.
 - Caches redirect by configuration, never by a remembered flag: `[tool.pytest.ini_options] addopts` (`-p no:cacheprovider`), `[tool.ruff] cache-dir` and `[tool.mypy] cache_dir` (`../../.dadaia/tmp/<tool>-cache`, relative on every OS), hypothesis `database = None`; a bare `pytest`, `ruff check`, `ruff format --check`, `mypy --strict` from the repo root leaves the tree clean (`tests/unit/features/ci_preflight/test_no_pollution.py`), so `dadaia ci preflight` runs exactly the bare commands.
 - The forbidden repo-local set is `core/workspace_layout.REPO_TREE_EXCLUDED`, measured by `tests/contract/test_source_repo_hygiene.py` and swept at every ALIVE repo by `dadaia doctor` ([[workspace-doctor]]).
 - Memory-vs-code drift is a `dadaia doctor` `specs`-section WARNING (`MEM-DRIFT-1`), never a push-gated test: a package added mid-implementation is drift to fix at the next closure, not a red build ([[workspace-doctor]]).
+- A hand edit of a verb-owned governance record is likewise a WARNING (`LEDGER-*-HANDEDIT`, `RELEASE-TREE-HANDEDIT`), exit 0, measured only where a governance-event store exists — CI has none, so no build turns red on it ([[sdd-bug-backlog-governance]]).
+- A doctor fix is proven on the executed path: `tests/contract/test_ledgers_validate.py` and `tests/unit/features/bugs/test_heal_closed_at.py` run `--fix` over a committed-shaped ledger and assert the re-serialized line, never the fixer's return value; a schema drop ships with its repair and its test in the same change.
 
 ### Slop measurement
 
-- Four repo-pure ratchets pin slop counts and move only downward: V31 (Intent-less test files per tier) in `tests/contract/test_test_suite_ratchets.py`; V32 (governance ids in production comments and docstrings), V33 (`PREFIX-NN` families without a mechanical reader) and V34 (live SPEC/TASKS byte ceiling) in `tests/contract/test_slop_ratchets.py`.
+- Five repo-pure ratchets pin slop counts and move only downward: V31 (Intent-less test files per tier) in `tests/contract/test_test_suite_ratchets.py`; V32 (governance ids in production comments and docstrings), V33 (`PREFIX-NN` families without a mechanical reader), V34 (live SPEC/TASKS byte ceiling) and V35 (skill directories ≤ 18 and total `public/skills/**/*.md` lines, pinned at the measured value and re-pinned at every corpus-touching closure) in `tests/contract/test_slop_ratchets.py`; `PLAN.md` has no byte ratchet (`SPEC-DOC-005` is advisory).
 - Stale handoffs and scratch are a closure readout, never a ratchet: `dd-release-implementation` RC-FLOW step 8 runs `dadaia doctor` dry, then `dadaia doctor --fix` (slop moved to `reaped/`, expired entries deleted), and the `kind: artifact-gc` log entry records the `compliance(total)` line and what the reaper holds ([[workspace-doctor]]).
 - `dd-audit-project` pillar 2 re-measures the ratchets over the audit window and applies `dd-code-review` SLOP.md S1–S10 to a commit sample; the fixed law sections are kept byte-exact by `dadaia doctor` FIXED-1/2.
 
 ### Dependencies
 
-[[TECHSTACK]], [[ARCHITECTURE]], [[panel]], [[consumer-agent-support]], [[sdd-gate-v3]].
+[[TECHSTACK]], [[ARCHITECTURE]], [[panel]], [[consumer-agent-support]], [[sdd-gate-v3]], [[sdd-bug-backlog-governance]], [[workspace-doctor]].
 
 <!-- dadaia:fixed slop-tests -->
 ### Slop — tests (fixed)

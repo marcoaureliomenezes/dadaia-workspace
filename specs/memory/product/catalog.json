@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-13T05:22:44Z",
+  "generated_at": "2026-09-13T09:23:13Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -26,8 +26,8 @@
       "slug": "agent-monitoring",
       "title": "agent-monitoring",
       "area": "agents",
-      "tldr": "Stdlib-only local agent telemetry behind an allowlist gate, plus where each runtime artifact under .dadaia/ lives and expires.",
-      "summary": "Telemetry ingests Claude Code, Codex and Kimi Code session metadata into a local SQLite store behind an allowlist gate; runtime artifacts live in registry zones and expire through dadaia doctor.",
+      "tldr": "Stdlib-only local agent telemetry and the governance-event table in one SQLite store, plus where each runtime artifact under .dadaia/ lives and expires.",
+      "summary": "Telemetry ingests Claude Code, Codex and Kimi Code session metadata into a local SQLite store behind an allowlist gate; the same store holds one governance event per record-changing verb; runtime artifacts live in registry zones and expire through dadaia doctor.",
       "path": "specs/memory/product/agents/agent-monitoring.md",
       "tags": [
         "monitoring",
@@ -35,10 +35,11 @@
         "sessions",
         "lifecycle"
       ],
-      "token_estimate": 497,
+      "token_estimate": 622,
       "depends_on": [
-        "panel",
+        "sdd-bug-backlog-governance",
         "workspace-doctor",
+        "panel",
         "context-management",
         "brand-identity"
       ]
@@ -57,11 +58,12 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 404,
+      "token_estimate": 513,
       "depends_on": [
         "ARCHITECTURE",
         "TECHSTACK",
         "agentic-entities",
+        "sdd-bug-backlog-governance",
         "sdd-gate-v3",
         "QUALITY",
         "agent-comms",
@@ -84,8 +86,9 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 593,
+      "token_estimate": 749,
       "depends_on": [
+        "QUALITY",
         "ARCHITECTURE",
         "agent-orchestration",
         "panel",
@@ -108,7 +111,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 863,
+      "token_estimate": 941,
       "depends_on": [
         "agentic-entities",
         "workspace-doctor",
@@ -151,7 +154,7 @@
         "projection",
         "dispatch"
       ],
-      "token_estimate": 309,
+      "token_estimate": 327,
       "depends_on": [
         "context-management",
         "sdd-gate-v3",
@@ -404,10 +407,11 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 2507,
+      "token_estimate": 2773,
       "depends_on": [
         "sdd-gate-v3",
         "context-management",
+        "agent-monitoring",
         "QUALITY",
         "ARCHITECTURE",
         "sdd-bug-backlog-governance",
@@ -442,8 +446,8 @@
       "slug": "audits-canon",
       "title": "audits-canon",
       "area": "sdd",
-      "tldr": "Audits are committed spec artifacts — three pillars over a sha window read from audits_histo.jsonl, JSONL findings, one remediation release dispositions them.",
-      "summary": "An audit is a committed folder holding AUDIT.md and FINDINGS.jsonl; three pillars always run together over the window since the newest archived audit, and the archive is one histo-record-v1 line.",
+      "tldr": "Audits are committed spec artifacts — three pillars over a sha window, JSONL findings moved by dadaia audit disposition, archived by dadaia audit close.",
+      "summary": "An audit is a committed folder holding AUDIT.md and FINDINGS.jsonl; three pillars always run together over the window since the newest archived audit; a finding's disposition and the archive are two CLI verbs, each all-or-nothing and each leaving one governance event.",
       "path": "specs/memory/product/sdd/audits-canon.md",
       "tags": [
         "sdd",
@@ -452,7 +456,7 @@
         "governance",
         "evidence"
       ],
-      "token_estimate": 722,
+      "token_estimate": 811,
       "depends_on": [
         "sdd-bug-backlog-governance",
         "workspace-doctor",
@@ -465,8 +469,8 @@
       "slug": "sdd-bug-backlog-governance",
       "title": "sdd-bug-backlog-governance",
       "area": "sdd",
-      "tldr": "One bug record with closed_at at the terminal transition, a backlog exiting once at closure as one histo record, the release state document and its three verbs.",
-      "summary": "The bug ledger, the backlog live photo, the release state document and the ADR ledger — one record per bug, one write seam, one histo-record-v1 shape for every exit, one mutable _RELEASE.json per release born and archived by one verb each, every committed record schema-validated by dadaia doctor.",
+      "tldr": "One bug record shape with no derived cache, one verb per governance record change writing one governance event, and a hand edit measured as a WARNING.",
+      "summary": "The bug ledger, the backlog live photo, the release state document and the ADR ledger — one record per bug with no git-derived cache, one histo-record-v1 shape for every exit, every record change a CLI verb that leaves one governance event in the telemetry store, every committed record schema-validated and every hand edit measured by dadaia doctor.",
       "path": "specs/memory/product/sdd/sdd-bug-backlog-governance.md",
       "tags": [
         "sdd",
@@ -475,14 +479,16 @@
         "backlog",
         "bugs",
         "adrs",
-        "gitflow"
+        "gitflow",
+        "events"
       ],
-      "token_estimate": 1652,
+      "token_estimate": 2527,
       "depends_on": [
         "workspace-doctor",
         "sdd-gate-v3",
-        "audits-canon",
-        "agent-comms"
+        "agent-comms",
+        "agent-monitoring",
+        "audits-canon"
       ]
     },
     {

@@ -1,7 +1,7 @@
 ---
 slug: ARCHITECTURE
 title: Architecture Memory
-tldr: 17 measured architecture principles, then the one-decider module table and the diagrams of doctor classes, feature packages and panel view modules.
+tldr: 16 measured architecture principles, then the one-decider module table and the diagrams of doctor classes, feature packages and panel view modules.
 summary: Part 1 carries the ADR-gated architecture principles and the check measuring each; Part 2 names the module deciding each cross-cutting fact and carries the three diagrams.
 tags: [architecture, layers, dependency-rules, agents, sdd]
 ---
@@ -83,11 +83,6 @@ Measured by: `pytest tests/contract/test_release_state_schema.py`.
 ADR: 0004 (accepted)
 Rationale: an open envelope accumulates fields until no consumer can fold it.
 
-### P-16 · We store no provenance a resolver cannot re-derive: a stored `resolved_commit` equals the value derived from git history.
-Measured by: `pytest tests/contract/test_resolved_commit_stored_equals_derived.py` (marked `slow`; runs in the `contract-coverage` job and the local preflight).
-ADR: none
-Rationale: git is the authority for git facts; this test keeps the cache a cache.
-
 ### P-17 · We map every core skill and every scoped `AGENTS.md` source to exactly one `DADAIA.md` section, every section to at least one owner, with content hashes re-recorded only by review.
 Measured by: `pytest tests/contract/test_behavior_map.py` (bijection, hash tuples, citation check, invocation grants).
 ADR: none
@@ -108,8 +103,15 @@ Rationale: law that no asset owns is law nobody applies.
 | what a `specs/` tree may contain | `core/workspace_layout.SPECS_CANON` rows; `features/specs/canon.py` is the renderer (`scaffold`, `release_new`) and checker (`check_tree`) over them |
 | whether a projection is current | `infrastructure/projection.py`'s `ProjectionRule` plus `projection_rules()`; install writes and doctor compares the same table |
 | which harness a projection targets | `HarnessProjection` in `infrastructure/projection_rules.py`, with three production adapters — Claude Code, Codex, Kimi Code |
-| a bug record's status and `closed_at` | `core/models/bugs.py` transition methods, every terminal one ending in `_reach_terminal` (stamps `closed_at` once); `infrastructure/jsonl_record_store.py::JsonlRecordStore.scan()` is the one ledger parser, yielding `MalformedLine` for a bad row |
-| the histo record shape and the terminal vocabulary | `core/models/histo.py` — `HistoRecord`, `TERMINAL_DISPOSITIONS` and the per-ledger subsets; `features/specs/ledgers.py::LEDGERS` is the one table of validated ledgers |
+| a bug record's status, `closed_at`, lineage and shape | `core/models/bugs.py` transition methods, every terminal one ending in `_reach_terminal` (stamps `closed_at` once); `resolve` is the one `caused_by` writer; `from_dict`/`to_dict` are the one authority on which keys a record has (the seven git-derived provenance keys are retired — no stored fact a resolver re-derives, ADR 0011); `infrastructure/jsonl_record_store.py::JsonlRecordStore.scan()` is the one ledger parser, yielding `MalformedLine` for a bad row |
+| the `surface` enum's feature arm | `features/specs/schemas.py` appends the `features/<name>/` packages on disk at load (`x-enum-append: feature-packages`); the schema lists only the six non-feature layers and `unknown` |
+| the histo record shape, the terminal vocabulary, which disposition needs which evidence | `core/models/histo.py` — `HistoRecord`, `TERMINAL_DISPOSITIONS`, the per-ledger subsets (`FINDINGS_DISPOSITIONS` serves findings and the audits histo) and `REQUIRED_EVIDENCE` (`release` vs `reason` per disposition), read by `backlog exit`, `audit disposition` and the doctor alike; `features/specs/ledgers.py::LEDGERS` is the one table of validated ledgers, each row naming its `events_ledger` or none |
+| a governance event and its record hash | `core/models/telemetry.py` — `GovernanceEvent {event_id, ts, session_id, context, verb, ledger, record_id, record_hash}` and `record_hash()` (sha256 of the canonical JSONL line), beside each other so writer and reader hash identically; `cli/_governance_event.py::record_governance_event` is the one writer every verb calls after its record write, swallowing a store that cannot open; `features/telemetry/store.py` migration 7 holds the table |
+| the context a governance event is stamped with | `cli/_specs_resolution.py::resolve_event_context_for_cli` — from the `specs/` tree the verb resolved, never the session's env binding; the doctor filters its baseline with the same function, so a verb-written record is never reported as a hand edit by the tree that owns it |
+| whether a verb-owned record was hand-edited | `features/specs/ledgers.py` (`LEDGER-<NAME>-HANDEDIT`, latest event hash vs committed record, baseline = the store's first event) and `features/specs/release_tree.py` (`RELEASE-TREE-HANDEDIT`, live phase/milestones vs the latest `release` event); `cli/commands/doctor.py` reads `latest_governance_events()` once and passes plain data — neither feature imports `features/telemetry` |
+| an audit finding's disposition and the audit archive | `features/specs/audit.py` — `disposition_finding` (the first caller of `FindingRecord.apply_governance_update`) and `close_audit` (all-or-nothing, histo append last); `_audit_dir` confines every `<dir>` argument to `specs/audits/` |
+| the release phase transition and its milestone | `features/specs/candidate.py` — `release phase IMPLEMENTATION` stamps `defined`, `release phase CLOSURE` stamps `implemented {sha, rc + 1, ts}`; `archive` validates `CLOSURE` only, so no milestone can be set by hand for it to hang on |
+| the venv `dadaia` spelling in every `fix:` line | `core/kernel_tunables.DADAIA_BIN` — one literal, imported by every verb and rule that renders a fix |
 | a packaged JSON schema | `features/specs/schemas.py::validator_for` — one loader, one cache, addressed as `<dir>/<id>` under `public/schemas/` |
 | a handoff's version, artifact and validity | `core/handoff_index.py` — `HandoffIndex`/`Handoff`, the stdlib schema walker internal to it |
 | the git publication boundary | `features/chokepoints/{branch_policy,denylist_scan,pre_commit,push_gate,verdict}.py`; `covering_verdict()` is the single verdict reader, `live_verdict_shas()` the one stale-verdict rule |
