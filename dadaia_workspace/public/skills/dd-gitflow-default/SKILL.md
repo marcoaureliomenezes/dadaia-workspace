@@ -15,7 +15,7 @@ description: >
 
 - Start of any session touching git.
 - Branching, committing, opening a PR, starting a task, or minting a version.
-- Any bug fix (fixed on the live feature branch, in any phase, no ceremony).
+- Any bug fix (`dd-bug-resolution`).
 
 ## 2. Steps
 
@@ -23,16 +23,14 @@ description: >
 2. Diff `main` against `develop` — a nonzero diff means `develop` carries undeployed work.
 3. Identify the one live `feature/{M.m.p}` branch.
 4. Surface a `feature/{v}` predating `develop`'s last move to the operator first — it is stale.
-5. Refuse to create a second `feature/*` branch while one is already live.
-6. Cut `feature/{next-version}` from `main` only, once `{version}` is deployed on `main`.
-7. Name the new branch exactly `M.m.p` — no `v` prefix, no suffix.
-8. Definition stage: author the candidate's SPEC/PLAN/TASKS at the release root on `feature/{M.m.p}`.
-9. Implementation stage: one commit per completed task group, shaped per §3a.
-10. Candidate closure (memory → CLOSURE): open one `feature/{M.m.p}` → `develop` PR and merge it green.
-11. After the merge, ask the operator: **promote or continue?** Continue = `dadaia release rc-archive` (validates the tree, trio → `rc-N/`, release parked in `DEFINITION`, `bugs archive`; same version, same branch); promote = step 12.
-12. Promote: open the PR `develop` → `main` (ship verdict pre-staged naming develop's tip, §3b).
-13. The moment it merges, run `dadaia release archive <v> --shipped <sha> --pr <n> --next <M.m.p>` — it ships, archives, appends the histo record and births the next release, then PRINTS the git `next:` lines: delete `feature/{M.m.p}`, cut `feature/{next}` (step 6), reconcile — run them in that order.
-14. Tag `archive/<name>` then delete a branch the moment its work lands elsewhere.
+5. Branch count, cut point and name follow `DADAIA.md` §4.2 — never restated here.
+6. Definition stage: author the candidate's SPEC/PLAN/TASKS at the release root on `feature/{M.m.p}`.
+7. Implementation stage: one commit per completed task group, shaped per §3a.
+8. Candidate closure: open one `feature/{M.m.p}` → `develop` PR and merge it green.
+9. After the merge, ask the operator: **promote or continue?** Continue = `dadaia release rc-archive`; promote = step 10.
+10. Promote: open the PR `develop` → `main` (ship verdict pre-staged naming develop's tip, §3b).
+11. The moment it merges, run `dadaia release archive <v> --shipped <sha> --pr <n> --next <M.m.p>` — it ships, archives, appends the histo record and births the next release, then PRINTS the git `next:` lines: delete `feature/{M.m.p}`, cut `feature/{next}` from `main`, then `git merge -s ours origin/develop` — run them in that order.
+12. Tag `archive/<name>` then delete a branch the moment its work lands elsewhere.
 
 ## 3a. Commit shapes — each write alone, in its own shape
 
@@ -62,12 +60,10 @@ description: >
 
 ## 4. Done when
 
-- Exactly one live `feature/*` branch exists at all times, named for the next version
-  immediately after each deploy.
 - Every commit for a release traces to a candidate's definition, implementation,
   closure merge, or a bug fix — each write alone in its §3a shape, verifiable by
   `git log`.
-- Only `feature/*` is pushable directly; `develop`/`main` advance by PR only.
+- Every staged verdict names a sha the merge will consume; no survivor on disk.
 
 ## 5. References
 

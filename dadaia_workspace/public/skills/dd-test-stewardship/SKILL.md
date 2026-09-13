@@ -89,6 +89,5 @@ description: >
 
 - [`PARAMETERS.md`](PARAMETERS.md) — LARGE cap, flake ceiling, quarantine
   cap/escalation, timeouts, wall-clock budget, mutation cadence.
-- `dd-task-manager` — reservation discipline for a curation-verdict commit.
 - `dd-audit-project` — detection-quality scoring for drift audits.
 - `DADAIA.md` §5 — artifact retention and repo cleanliness; §7 — the five-point law.

@@ -15,7 +15,6 @@ tools:
 skills:
   - dd-cli-library
   - dd-handoff-emitter
-  - dd-task-manager
   - dd-spec-navigator
   - dd-ai-eng-knowhow
   - dd-release-implementation
@@ -120,7 +119,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 
 1. Resolve the active release by reading `_RELEASE.json`'s `phase` field directly (no fold, no `ACTIVE.md`).
 2. Read the resolved release's `SPEC/PLAN/TASKS.md` — the SDD gate blocks AI-entity authoring without an approved task.
-3. Reserve the task via `dd-task-manager`: `[ ]` -> `[-]` + commit before editing.
+3. Reserve the task (`dd-release-implementation` RC-FLOW step 1): `[ ]` -> `[-]` + commit before editing.
 4. Read the persona brief (`product-engineer`, or the release's SPEC.md/TASKS.md).
 5. Apply the instruction-hierarchy ordering and persona-consistency invariants (`CONTEXT-ENGINEERING.md`).
 6. Validate frontmatter via the workspace parser (`tests/unit/features/agents/test_reader.py`).

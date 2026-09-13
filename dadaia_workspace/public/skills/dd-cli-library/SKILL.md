@@ -14,30 +14,25 @@ line here and `--help` disagree, `--help` wins.
 
 ## Core idioms
 
-1. Call the venv binary always: `.dadaia/.venv/bin/dadaia` (absolute path) — never
-   system Python/pip.
-2. `dadaia --help` lists the groups; `dadaia <group> --help` the subcommands; add
+1. `dadaia --help` lists the groups; `dadaia <group> --help` the subcommands; add
    `--json` to read commands for machine-readable output.
-3. Run `dadaia capabilities --json` first in any new or upgraded session.
-4. Bind the session: `dadaia context bind <ctx>` — one verb, no mode, no release, no
-   force; `--print-env` emits `DADAIA_CONTEXT`/`DADAIA_SESSION_ID` for `eval $(…)`.
-   A plain shell (or kimi-code) exports `DADAIA_CONTEXT=<ctx>` instead — the env var
-   IS the binding there. ADDITIVE work (bugs/backlog/audits/reports) needs no bind.
-   The bind also sets the write scope: the context's main repo plus its associated
-   repos (`DADAIA.md` §3.3).
-5. Before implementing: `dadaia doctor --context <ctx> --json` clean (sections
-   `workspace`/`specs`/`ledgers`), then reserve the task (`dd-task-manager`).
-   `--fix` MOVES slop to `.dadaia/reaped/` (7-day hold); nothing is deleted before
-   its own TTL.
-6. Pass explicit `--context`/`--release-id` on every command.
-7. Converge a runtime: resolve `provider.distribution_version` from
+2. Run `dadaia capabilities --json` first in any new or upgraded session.
+3. Bind the session: `dadaia context bind <ctx>` — `--print-env` emits
+   `DADAIA_CONTEXT`/`DADAIA_SESSION_ID` for `eval $(…)`; the bind sets the write
+   scope to the context's main repo plus its associated repos (`DADAIA.md` §3.3).
+4. Workspace compliance: `dadaia doctor --context <ctx> [--json]` — clean before any
+   implementation write; `--fix` MOVES slop to `.dadaia/reaped/` (7-day hold) and
+   nothing is deleted before its own TTL; `--fix --expired-only` reaps without
+   touching slop (`DADAIA.md` §8.5).
+5. Pass explicit `--context`/`--release-id` on every command.
+6. Converge a runtime: resolve `provider.distribution_version` from
    `dadaia capabilities --json`, then `dadaia reconcile --expect-version "$v"
    --json`, then `dadaia certify --json` — a failed certify check is a release
    blocker.
-8. On a failing command: preserve the evidence trail (command, exit code, output);
+7. On a failing command: preserve the evidence trail (command, exit code, output);
    classify and register a genuine bug (`dd-bug-registration`) before any
    workaround.
-9. `dadaia panel` (default port 4999) is the human view.
+8. `dadaia panel` (default port 4999) is the human view.
 
 ## Workspace state is CLI-owned
 
@@ -49,8 +44,6 @@ line here and `--help` disagree, `--help` wins.
 - Portability: `dadaia export` writes `.dadaia/dist/spec-contexts.json` (overwritten
   each run); on the destination `dadaia import <file>` registers each unknown context
   DEAD, then `dadaia context alive <slug>` clones it; verify with `dadaia context list`.
-- NO-LOCKS: binds acquire nothing; MUTATING writes leave advisory presence; a live
-  foreign presence is one throttled warning, never a block.
 
 ## Dev-server law
 
@@ -61,13 +54,6 @@ line here and `--help` disagree, `--help` wins.
   (`dadaia server release --port N`); on `PortConflictError`: `server list`,
   `server clean` if stale, `server next` again.
 
-## Reachability
-
-Granted to every persona whose `tools:` include `Bash`; the shell-less roles
-(`product-engineer`, `software-architect`) are ungranted and receive CLI work by
-dispatch. The table is derived at projection time by
-`dadaia_workspace/public/scripts/lint-dadaia-cli-reachability.py`.
-
 ## Done when
 
 - The command run matches live `--help`, not a remembered table.
@@ -76,6 +62,6 @@ dispatch. The table is derived at projection time by
 
 ## References
 
-- `dd-bug-registration` — classify-first, redaction, `dadaia bugs append`.
+- `dd-bug-registration` — the ask-first proposal a genuine bug takes before `dadaia bugs append`.
 - `dd-handoff-emitter` — emit/validate the final handoff.
 - `DADAIA.md` §2 — SDD stages are agent-dispatched, not a CLI verb group.

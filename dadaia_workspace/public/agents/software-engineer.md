@@ -16,7 +16,6 @@ skills:
   - dd-codebase-design
   - dd-cli-library
   - dd-handoff-emitter
-  - dd-task-manager
   - dd-spec-navigator
   - dd-ai-eng-knowhow
   - dd-release-implementation
@@ -121,7 +120,7 @@ E2E tests -> qa-engineer.
 Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then:
 
 1. Read the approved SPEC.md and TASKS.md for the current task.
-2. Reserve via `dd-task-manager`: flip `[ ]`->`[-]` and commit `chore(tasks): start <task-id>` before editing production.
+2. Reserve (`dd-release-implementation` RC-FLOW step 1): flip `[ ]`->`[-]` and commit `chore(tasks): start <task-id>` before editing production.
 3. Write the failing test(s) first — red before any production code.
 4. Implement the minimum code to go green.
 5. Refactor with tests still green.

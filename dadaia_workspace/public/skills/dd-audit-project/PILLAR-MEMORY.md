@@ -24,7 +24,7 @@ git log -p --since="<window start>" -- specs/memory/ARCHITECTURE.md specs/memory
 
 ## 3 — Product atoms and Part-2 implementation vs code
 
-Reused, unscored, from the retired six-dimension audit — evidence-gathering technique, never a weighted score.
+Unscored — an evidence-gathering technique, never a weighted score.
 
 1. Layer sample walk: for each layer `ARCHITECTURE.md`'s Part 2 declares, list its module paths, sample 3-5 files.
 2. Layer sample walk: compare structure to the declared responsibility; record a mismatch as `spec:line` vs `code:line`.
@@ -34,7 +34,7 @@ Reused, unscored, from the retired six-dimension audit — evidence-gathering te
 6. Tech-stack cross-reference: for each dependency `TECHSTACK.md`'s Part 2 declares, confirm it and its pinned version in the manifest.
 7. Tech-stack cross-reference: check the lockfile for an undeclared dependency the memory atom is silent on.
 
-## 4 — Dead-code detection (folded from the retired `TOOLING.md`)
+## 4 — Dead-code detection
 
 Supports the Part-2/product-atom walk — a module claimed live in memory but actually unreachable is drift.
 Every install pins an exact version/hash, never `latest`.

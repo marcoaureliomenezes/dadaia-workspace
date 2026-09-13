@@ -19,7 +19,6 @@ skills:
   - dd-release-definition
   - dd-bug-registration
   - dd-grill-me
-  - dd-task-manager
   - dd-spec-navigator
   - dd-ai-eng-knowhow
   - dd-gitflow-default
@@ -149,7 +148,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap).
 6. Move long guides to auxiliary docs; set `phase: PLAN`; wait for approval.
 7. TASKS.md (after PLAN approval): stable id, description, owner, target files/subsystem, preconditions, done criterion, parallelism note.
 8. Use markers `[ ]`->`[-]`->`[x]`; one `[-]` at a time unless TASKS declares disjoint write sets; wait for approval.
-9. Set `phase: IMPLEMENTATION`; the implementer follows `dd-task-manager` (reserve, commit, work, close, commit).
+9. `dadaia release phase IMPLEMENTATION --sha <sha>`; the implementer follows `dd-release-implementation` (reserve, work, close, commit).
 10. Answer questions and update specs only if the operator approves a change, during implementation.
 11. At closure (after all tasks `[x]`): set `phase: CLOSURE`; update memory Markdown (`MEMORY-UPDATE.md`).
 12. Record the closure narrative as `_RELEASE.json` `log` entries (`RELEASE-EVENTS.md`'s conventions) — never write a `CLOSURE.md`.

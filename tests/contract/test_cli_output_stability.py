@@ -133,10 +133,10 @@ def test_doctor_default_output_healthy_workspace_unchanged(workspace: Path) -> N
     result = _runner.invoke(app, ["doctor"])
     assert result.exit_code == 0, result.output
     assert result.output == (
-        "compliance(workspace): 134/134 entries canonical (100%)\n"
+        "compliance(workspace): 128/128 entries canonical (100%)\n"
         "compliance(specs): 0/0 rules canonical (100%)\n"
         "compliance(ledgers): 0/0 records canonical (100%)\n"
-        "compliance(total): 134/134 checks canonical (100%)\n"
+        "compliance(total): 128/128 checks canonical (100%)\n"
     )
 
 
@@ -147,10 +147,10 @@ def test_doctor_default_output_with_issue_unchanged(workspace: Path) -> None:
     assert result.output == (
         "INV-5 error Context 'stale-ctx' is dead but repo 'stale-ctx' is on disk\n"
         "fix: .dadaia/.venv/bin/dadaia doctor --fix\n"
-        "compliance(workspace): 135/135 entries canonical (100%)\n"
+        "compliance(workspace): 129/129 entries canonical (100%)\n"
         "compliance(specs): 0/0 rules canonical (100%)\n"
         "compliance(ledgers): 0/0 records canonical (100%)\n"
-        "compliance(total): 135/135 checks canonical (100%)\n"
+        "compliance(total): 129/129 checks canonical (100%)\n"
     )
 
 
@@ -161,13 +161,13 @@ def test_doctor_default_fix_output_unchanged(workspace: Path) -> None:
     # 136, not 135: the reaper's own zone directory now exists and is canonical.
     day = datetime.now(tz=UTC).strftime("%Y%m%d")
     assert result.output == (
-        "compliance(workspace): 136/136 entries canonical (100%)\n"
+        "compliance(workspace): 130/130 entries canonical (100%)\n"
         "compliance(specs): 0/0 rules canonical (100%)\n"
         "compliance(ledgers): 0/0 records canonical (100%)\n"
         "\nApplied 1 repair(s):\n"
         "  - INV-5: moved 'repos/stale-ctx' (context stale-ctx) -> "
         f"'.dadaia/reaped/{day}/repos/stale-ctx'\n"
-        "compliance(total): 136/136 checks canonical (100%)\n"
+        "compliance(total): 130/130 checks canonical (100%)\n"
     )
 
 

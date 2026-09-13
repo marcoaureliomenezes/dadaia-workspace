@@ -1,22 +1,14 @@
-# MEMORY-UPDATE — dd-release-implementation (final-rc step 8 detail)
+# MEMORY-UPDATE — dd-release-implementation (RC-FLOW step 5 detail)
 
-Disclosed reference reached at `SKILL.md` step 8 — `product-engineer` reads this before touching any `specs/memory/**` atom at closure.
-The closure memory protocol.
+Disclosed reference reached at `SKILL.md` step 6 — `product-engineer` reads this before touching any `specs/memory/**` atom at closure.
 
 ## Protocol
 
-1. Verify gate phase: confirm the live release is in `CLOSURE` phase before writing `specs/memory/**` (also writable in `DEFINITION`).
-2. Set `phase` in `_RELEASE.json` (`RELEASE-EVENTS.md`; there is no mirror document to keep in sync).
-3. Otherwise the gate blocks the write.
-4. Do not author legacy HTML memory — if it exists, treat it as read-only migration input; new memory writes are Markdown.
-5. Update Markdown atoms: apply the release's deltas to the corresponding `specs/memory/*.md` / `specs/memory/product/*.md` files.
-6. Memory describes the product as it is now, not what changed — change history lives in this release's `_RELEASE.json` `log` and git.
-7. Diagrams: use fenced Mermaid blocks; memory Markdown carries no external image references.
-8. `ARCHITECTURE.md`'s own `## Architecture Diagrams` section is the pattern to follow.
-9. Forbidden in memory Markdown: `<h2>Changelog</h2>`, `<h2>History</h2>`, `<h2>Histórico</h2>`, `<h2>Versions</h2>`.
-10. Forbidden (continued): `<section class="changelog">` and similar; narrative of past versions ("we used to use X, now Y").
-11. Point the operator to this release's `_RELEASE.json` `log` or git if they ask for history.
-12. Validate with `dadaia doctor` before moving to archive — its `specs` section checks atomicity and Mermaid script presence.
+1. The live release is in `CLOSURE` phase (`dadaia release phase CLOSURE --sha <sha>`) before any `specs/memory/**` write; the gate blocks it otherwise.
+2. Apply the candidate's deltas to the corresponding `specs/memory/*.md` and `specs/memory/product/**` atoms.
+3. Heading rule, forbidden history sections and the atom's shape: `specs/memory/AGENTS.md`.
+4. Point the operator to this release's `_RELEASE.json` `log` or git if they ask for history.
+5. Validate with `dadaia doctor` — its `specs` section checks atomicity and Mermaid script presence.
 
 ## Product memory is a folder catalog
 
@@ -34,4 +26,3 @@ The closure memory protocol.
 - A deprecated feature's link and its atom are deleted outright — memory carries no archive of its own (history lives in git).
 
 *Done when:* every affected atom reflects current product truth, `dadaia doctor` reports the memory atoms clean, and one `kind: memory` log entry records atoms reviewed-unchanged vs changed.
-*Done when* (continued): `_RELEASE.json`'s `phase` field reads `CLOSURE`.

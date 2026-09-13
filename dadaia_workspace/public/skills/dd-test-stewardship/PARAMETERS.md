@@ -6,7 +6,7 @@ A consumer workspace re-parameterizes without forking the doctrine in `SKILL.md`
 
 | Parameter | This repo's value | Abstract default |
 |---|---|---|
-| LARGE (E2E) cap | 30 (current ~84 — companion-release remediation target) | 12-15 per module |
+| LARGE (E2E) cap | 30 | 12-15 per module |
 | Flake rate | target < 0.5% of runs | hard ceiling 1% |
 | Quarantine cap | max 8 tests | — |
 | Quarantine escalation | 30d unresolved -> `disabled`; 30 clean days -> restored | — |

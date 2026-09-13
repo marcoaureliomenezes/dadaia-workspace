@@ -1165,3 +1165,79 @@ def test_posix_relpath_is_separator_agnostic_under_windows_path_semantics() -> N
 
     assert rel == "dadaia_workspace/public/skills/fixture-skill/SKILL.md"
     assert "\\" not in rel
+
+
+# --------------------------------------------------------------------------- #
+# Body pointers — every `dd-*`, `dd-* §N` and `*-AGENTS.md` token in a skill body
+# resolves to a skill dir, a numbered section, or a public asset on disk.
+# --------------------------------------------------------------------------- #
+
+_DD_SKILL_TOKEN_RE = re.compile(r"^dd-[a-z0-9-]+$")
+_DD_SECTION_PAIR_RE = re.compile(r"`(dd-[a-z0-9-]+)`[^`§\n]{0,40}§(\d+)")
+_SCOPED_AGENTS_TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*-AGENTS\.md$")
+
+
+def _numbered_headings(skill_md: Path) -> set[str]:
+    """The `N` of every `## N.`/`## Na.` heading of *skill_md* — `## 3a.` answers §3."""
+    return {
+        m.group(1)
+        for m in re.finditer(r"^## (\d+)[a-z]?\.", skill_md.read_text(encoding="utf-8"), re.M)
+    }
+
+
+def _find_dead_body_pointers(
+    roots: tuple[Path, ...], public_dir: Path, repo_root: Path
+) -> list[str]:
+    """Every backticked `dd-<name>` token names a skill directory; every `` `dd-x` §N ``
+    pair names a `## N.` section of that skill's `SKILL.md`; every backticked
+    `*-AGENTS.md` filename resolves to an asset under ``public_dir``. Returns
+    ``file:line: …`` strings naming what to re-read."""
+    skills = {d.name for d in public_dir.joinpath("skills").iterdir() if d.is_dir()}
+    violations: list[str] = []
+    for root in roots:
+        for md_path in sorted(root.glob("**/*.md")):
+            rel = _posix_relpath(md_path, repo_root)
+            for idx, line in enumerate(md_path.read_text(encoding="utf-8").splitlines()):
+                for m in _CITATION_BACKTICK_RE.finditer(line):
+                    token = m.group(1).strip()
+                    if _DD_SKILL_TOKEN_RE.match(token) and token not in skills:
+                        violations.append(f"{rel}:{idx + 1}: dead skill pointer `{token}`")
+                    elif _SCOPED_AGENTS_TOKEN_RE.match(token) and not any(
+                        public_dir.glob(f"**/{token}")
+                    ):
+                        violations.append(f"{rel}:{idx + 1}: dead scoped-rule pointer `{token}`")
+                for m in _DD_SECTION_PAIR_RE.finditer(line):
+                    skill, number = m.group(1), m.group(2)
+                    target = public_dir / "skills" / skill / "SKILL.md"
+                    if not target.exists() or number not in _numbered_headings(target):
+                        violations.append(
+                            f"{rel}:{idx + 1}: dead section pointer `{skill}` §{number} "
+                            f"— re-read {skill}/SKILL.md's numbered headings"
+                        )
+    return violations
+
+
+def test_every_skill_body_pointer_resolves() -> None:
+    violations = _find_dead_body_pointers((_SKILLS_DIR,), _PUBLIC, _REPO_ROOT)
+    assert violations == [], "dead body pointer(s):\n" + "\n".join(violations)
+
+
+def test_mutation_fixture_12_dead_body_pointer_turns_red(tmp_path: Path) -> None:
+    """A skill body naming a skill that is not on disk, a section its target does not
+    carry, or a scoped rule file that does not exist must be flagged — three fixtures,
+    one finder, never touching a real repo file."""
+    repo = tmp_path / "fixture-repo"
+    public = repo / "dadaia_workspace" / "public"
+    (public / "skills" / "dd-real").mkdir(parents=True)
+    (public / "skills" / "dd-real" / "SKILL.md").write_text("## 1. When\n", encoding="utf-8")
+    body = public / "skills" / "dd-real" / "NOTES.md"
+    body.write_text(
+        "See `dd-gone`.\nSee `dd-real` §9.\nSee `nowhere-AGENTS.md`.\nSee `dd-real` §1.\n",
+        encoding="utf-8",
+    )
+
+    violations = _find_dead_body_pointers((public / "skills",), public, repo)
+    assert len(violations) == 3, violations
+    assert "dead skill pointer `dd-gone`" in violations[0]
+    assert "dead section pointer `dd-real` §9" in violations[1]
+    assert "dead scoped-rule pointer `nowhere-AGENTS.md`" in violations[2]

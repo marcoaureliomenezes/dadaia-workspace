@@ -1,8 +1,7 @@
 # CONTEXT.md Format
 
 Disclosed reference of [`SKILL.md`](SKILL.md): the bounded-context glossary file's
-structure. Adapted from the reference corpus (`mattpocock/skills`,
-`engineering/domain-modeling`).
+structure.
 
 ## Structure
 

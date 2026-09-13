@@ -2,8 +2,8 @@
 name: dd-release-definition
 description: >
   Turn bugs and backlog items into the live release's next closed-scope candidate:
-  pick the set, enforce bug-always-solved, run the mandatory grill, author the trio.
-  Use at the start of each candidate's definition.
+  pick the set, run the mandatory grill, author the trio. Use at the start of each
+  candidate's definition.
 ---
 
 # dd-release-definition
@@ -17,13 +17,9 @@ description: >
 1. Inspect `specs/bugs/BUGS.jsonl` via `dadaia bugs status`/`stats`.
 2. Read `specs/backlog/BACKLOG.json`'s `active[]` — already sanitized by
    `dd-backlog-definition`, consumed with no further triage.
-3. Open bugs and undispositioned audits outrank fresh backlog (`DADAIA.md` §6);
-   keep picking scoped to `specs/bugs/` + `specs/backlog/` discovery.
-4. Solve every picked bug in the candidate, with exactly one exception —
-   subsumption by a picked backlog item: run
-   `dadaia bugs supersede <slug> --by <backlog-slug>`, note it in the SPEC, and
-   ensure the backlog item's TASKS cover the bug's acceptance criteria. A bug
-   neither fixed nor subsumed stays `open` — never silently dropped.
+3. Read `specs/audits/**` for undispositioned findings; each enters the SPEC with the
+   disposition it will take (`dadaia audit disposition`).
+4. Keep picking scoped to `specs/bugs/` + `specs/backlog/` + `specs/audits/` discovery.
 
 **Done when** the picked set is recorded; it becomes the SPEC's scope.
 
@@ -70,16 +66,17 @@ a fuzzy term in the demand becomes a canonical term before it reaches the SPEC.
 - Declare a slug only when fully consumed (all its bound anchors shipped); abort on
   an unknown slug — fix it before it lands in the SPEC.
 - A picked entry stays in `active[]` as `status: picked`; it exits once, at closure,
-  when `dd-release-implementation`'s disposition sweep writes its one histo record.
+  by `dadaia backlog exit` (`dd-release-implementation` RC-FLOW step 7).
 - Mechanical backstop: `dadaia doctor`'s `ledgers` section schema-validates
   `BACKLOG.json` and `backlog_histo.jsonl` on every run.
 
 ## 6. Done when
 
-- Picked set recorded; every picked bug fixed-in-candidate OR `superseded_by` a
-  picked backlog item.
-- The `dd-grill-me` session completed and emitted.
+- Picked set recorded; the `dd-grill-me` session completed and emitted.
 - SPEC authored from the refined set; `**Consumes:**` declared or omitted.
+- Traceability: every approved requirement maps into PLAN strategy and >=1 TASKS entry.
+- Every unresolved gap routed to the PM's operator-gated intake report — never a
+  direct backlog append.
 
 ## 7. References
 

@@ -69,7 +69,7 @@
   Write set: `dadaia_workspace/cli/commands/doctor.py`, `dadaia_workspace/features/
   specs/{ledgers.py,release_tree.py,rules.py}`, `tests/**`. Blocked by: T-047-28,
   T-047-29. Delivers: a hand edit of a verb-owned record is one WARNING line, exit 0.
-- [-] T-047-31 — FR7a (`ai-engineer`): delete `dd-workspace-doctor/`, `dd-task-manager/`,
+- [x] T-047-31 — FR7a (`ai-engineer`): delete `dd-workspace-doctor/`, `dd-task-manager/`,
   `dd-audit-project/SPEC-REVIEW.md`; RC-FLOW ends at step 9 (+ pointer, Recovery lines
   in step 1, step 3 names `software-architect`, step 7 names `backlog exit`/`audit
   close`, step 5 names `release phase`); gitflow §2 steps 5–7 → §4.2 citation;

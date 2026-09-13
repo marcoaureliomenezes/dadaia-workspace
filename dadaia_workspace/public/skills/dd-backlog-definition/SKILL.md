@@ -13,24 +13,10 @@ description: >
 
 ## The document
 
-- `specs/backlog/BACKLOG.json` is the single source: `{schema: "backlog-v1",
-  active: [...]}` — no per-entry files; schema:
-  `dadaia_workspace/public/schemas/backlog/backlog-v1.schema.json`.
-- Append via `dadaia backlog new <slug>`; validate via `dadaia doctor`
-  (`ledgers` section, BL-SCHEMA/CONFLICT/STALE).
-- Required fields per entry: `id`, `title`, `opened`, `status`, `description`,
-  `provenance`.
-- **Status:** idea | candidate | picked — live (non-terminal) tokens only; a
-  terminal disposition token belongs to a `backlog_histo.jsonl` record instead.
-- `intents[]` is optional at `idea`, required from `candidate` on — every subject
-  bound to a canonical anchor (`dadaia backlog subjects`).
-- A closed item exits `active[]` into one append-only
-  `specs/backlog/_archive/backlog_histo.jsonl` record (`histo-record-v1`:
-  `{id, ts, disposition, release, reason, summary, entry}`) — never deleted, never two
-  records for one slug.
-- Terminal dispositions, lowercase: `delivered`, `superseded`, `rejected`; a `deferred`
-  item returns to `active[]` instead of exiting (a live status token never appears in
-  the histo, a terminal disposition never in `active[]`).
+- `specs/backlog/BACKLOG.json` shape, required fields, live status tokens, the histo
+  record and the terminal dispositions: `specs/backlog/AGENTS.md`.
+- Append via `dadaia backlog new <slug>`; validate via `dadaia doctor` (`ledgers`
+  section).
 
 ## Continuous curation
 
@@ -59,8 +45,9 @@ description: >
 
 - A picked entry stays in `active[]` with `status: picked` (`DADAIA.md` §6.6) —
   nothing is purged at pick time.
-- It exits exactly once, at closure, when `dd-release-implementation`'s disposition
-  sweep writes its single histo record.
+- It exits exactly once, at closure, by `dadaia backlog exit <slug> --disposition
+  delivered|superseded|rejected [--release <id>] [--reason <text>]` — one histo
+  record, refused on a second exit (`dd-release-implementation` RC-FLOW step 7).
 - `dd-release-definition` consumes the picked set with no further triage — the
   backlog it reads is already sanitized.
 
@@ -75,6 +62,5 @@ description: >
 
 - `DADAIA.md` §6.6 — the backlog law this skill operates.
 - `dd-release-definition` — the picked-set consumer.
-- CLI: `dadaia backlog new`, `dadaia backlog subjects`, `dadaia doctor`; exiting an
-  item has no CLI verb yet (`features/backlog/document.py::backlog_exit`) — use file
-  tools directly (ADDITIVE path).
+- CLI: `dadaia backlog new`, `dadaia backlog exit`, `dadaia backlog subjects`,
+  `dadaia doctor`.

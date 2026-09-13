@@ -16,7 +16,6 @@ skills:
   - dd-codebase-design
   - dd-grill-me
   - dd-handoff-emitter
-  - dd-task-manager
   - dd-spec-navigator
   - dd-ai-eng-knowhow
   - dd-bug-registration

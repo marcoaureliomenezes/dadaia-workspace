@@ -17,7 +17,6 @@ skills:
   - dd-cli-library
   - dd-handoff-emitter
   - dd-spec-navigator
-  - dd-task-manager
   - dd-ai-eng-knowhow
   - dd-release-implementation
   - dd-bug-registration

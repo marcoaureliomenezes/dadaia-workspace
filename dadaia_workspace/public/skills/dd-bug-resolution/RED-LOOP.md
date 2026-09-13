@@ -1,7 +1,6 @@
 # RED-LOOP.md — building the feedback loop (Phase 1)
 
-Disclosed reference of [`SKILL.md`](SKILL.md) Phase 1. Adapted from the reference
-corpus (`mattpocock/skills`, `engineering/diagnosing-bugs`). Spend disproportionate
+Disclosed reference of [`SKILL.md`](SKILL.md) Phase 1. Spend disproportionate
 effort here: with a tight loop the cause falls out; without one no amount of staring
 at code will save you.
 
