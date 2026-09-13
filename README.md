@@ -242,7 +242,7 @@ store — not prose:
   (`resolved`/`superseded`/`deferred`/`rejected`). `dadaia bugs status` lists open
   bugs; `dadaia bugs stats` aggregates. Bugs are never silently dropped.
 - **Backlog — typed intents.** Every entry declares `(subject{kind,ref} → change)`
-  intents bound against an auto-derived anchor registry; `dadaia backlog doctor`
+  intents bound against an auto-derived anchor registry; `dadaia doctor --context <ctx>`
   fail-closed checks (BL-*) run in pre-commit and CI.
 - **Memory — current product truth.** Curated Markdown atoms under `specs/memory/`
   with a generated feature catalog (`dadaia memory catalog generate`). Memory is
@@ -265,9 +265,9 @@ dadaia [COMMAND] --help   # always works at every level
 | `dadaia context` | Manage Spec Context Projects (list, bind, show, …) |
 | `dadaia ci` | Local CI-equivalent preflight gate + git-hook chokepoints |
 | `dadaia public` | Stage, install (profile-aware), and doctor agentic assets |
-| `dadaia specs` | SDD release-lifecycle structural checks (`specs doctor`) |
+| `dadaia specs` | SDD spec-tree scaffolding and upgrade (`init`, `upgrade`) |
 | `dadaia bugs` | Event-sourced JSONL bug telemetry (append/status/stats) |
-| `dadaia backlog` | Backlog entries + fail-closed consistency doctor |
+| `dadaia backlog` | Backlog entries (the consistency checks run in `dadaia doctor`) |
 | `dadaia release` | Release management commands |
 | `dadaia memory` | Memory catalog management |
 | `dadaia reports` | Validate handoffs; efficiency-audit marker (`mark-efficiency-audit`) |

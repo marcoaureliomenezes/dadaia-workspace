@@ -38,7 +38,7 @@ Definitions are pointers, not rules — each term is defined once, in the atom n
 
 **Law.** The harness roster is enumerated in exactly one memory atom, set-equal to
 `dadaia_workspace/core/harness_registry.py`; this constitution never enumerates it
-(**C-01** — measured today by `dadaia specs doctor` SPEC-DOC-037).
+(**C-01** — measured today by `dadaia doctor` SPEC-DOC-037).
 
 ## 1. SDD Is Binding
 
@@ -178,7 +178,7 @@ by `ARCHITECTURE.md` P-17 (ADR 0017 proposed) (**C-18**).
 This constitution is versioned (`constitution_version`, semver): MAJOR for a changed or
 removed article, MINOR for a new article or substantive clarification, PATCH for wording. An
 amendment lands with the ADR that decided it (§13); amendment history lives in the amending
-release's `RELEASE.json` notes and in `_archive/`, never inline. `dadaia specs doctor` holds
+release's `RELEASE.json` notes and in `_archive/`, never inline. `dadaia doctor` holds
 this law consistent with code and memory (**C-19**).
 
 ## 16. Rules Map to Skills
