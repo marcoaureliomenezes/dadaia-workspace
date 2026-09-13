@@ -10,7 +10,7 @@ tags: [panel, ui, http, dashboard]
 
 - The server binds only to `127.0.0.1`, a Host allowlist rejects DNS-rebinding, and no token, cookie or credential store exists.
 - The stdlib HTTP server applies strict CSP and `nosniff` to reads and mutations alike.
-- One `(method, pattern, view_name, params)` table in `features/panel/handler.py` dispatches every route; a route absent from it cannot exist, and there is no silent-public fallback.
+- One `_Route(method, pattern, view_name, requires_telemetry, mutation)` table of 15 rows in `features/panel/handler.py` dispatches every route; a route absent from it cannot exist, and there is no silent-public fallback.
 - Each view lives in its own module, receives the panel service from the container and imports nothing but that service and `core.models`; telemetry reaches them only through `TelemetryStore`'s service ([[agent-monitoring]]).
 - Operator-controlled strings are escaped, mutating routes validate payloads before atomic writes, and assets are served from packaged source with no CDN.
 - The four tabs are Projects (contexts and their memory, each card listing main and associated repos, [[context-management]]), Agents (persona cards, model templates and overrides, plus the Sessions telemetry dashboard), Agentic Entities (the registry rendered server-side, [[agentic-entities]]) and Servers ([[server-registry]]).

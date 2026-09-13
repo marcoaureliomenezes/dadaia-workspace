@@ -18,19 +18,19 @@ tags: [agents, entities, derivation, governance]
 ## The behavior map
 
 - `public/entities/behavior-map.json` is the single declaration of which skill and which scoped rule file operate which section of the law.
-- A row is `{section, behavior, skill, scoped_agents_md[], hash_tuple, recorded_by, recorded_at}`, keyed by the law's section heading.
+- A row is `{section, anchor, skill, scoped_agents_md[], hash_tuple, recorded_by, recorded_at}`, keyed by the law's section heading.
 - Every skill and every scoped `AGENTS.md` source on disk has exactly one row, every law section has at least one owner, and several skills may own one section.
 - The map also carries `declared_overlaps`, the canonical home of an intended skill-activation overlap, and the `SKILL.md` line ceiling; no CLI verb and no hook reads it.
 - The corpus is 18 `dd-*` skill directories; `tests/contract/test_slop_ratchets.py` V35 pins the directory count and the total `public/skills/**/*.md` line count at their measured post-closure values, down only, re-pinned at every corpus-touching closure ([[QUALITY]]).
 - `tests/contract/test_agentic_entities_derivation.py` pins the bijection, wired-hook coverage, harness coverage and the universal surface at source.
 - `public doctor`'s `entities-derivation` check (`ENT-DERIVE-1`, blocking) attests the installed package at behavioral-fidelity depth, a stub body, an identity swap and a broken reference each its own drift class.
 - `tests/contract/test_behavior_map.py` is the single map enforcer, red on a member with no row, a section with no owner, a row naming a missing member, a member changed without its hash tuple, or an undeclared overlap.
-- It also carries the citation check (every path and `dadaia` verb a public asset cites must resolve), the body-pointer finder (every backticked `dd-*` token and every `` `dd-x` §N `` pair in `public/agents/*.md` and `public/skills/**/*.md` resolves to a skill directory and a `## N.` heading) and invocation-model equivalence (a skill no persona grants carries `disable-model-invocation: true`).
+- It also runs the citation check through `features/specs/citations.py::dead_citations` (every path and `dadaia` verb a public asset cites must resolve — the one finder `MEM-DRIFT-2` and the derived-docs test share), the body-pointer finder (every backticked `dd-*` token and every `` `dd-x` §N `` pair in `public/agents/*.md` and `public/skills/**/*.md` resolves to a skill directory and a `## N.` heading) and invocation-model equivalence (a skill no persona grants carries `disable-model-invocation: true`).
 - Overlap is checked only where it can mean something: universal skills claiming `**` are out of scope, and stage skills resolve by most-specific glob.
 
 ## Always-on budget
 
-- The always-on load — law chain, nine persona bodies, listed skill descriptions — is measured every release against a stated ceiling by a `words × 1.33` estimator with per-section attribution.
+- The always-on load — law chain, nine persona bodies, listed skill descriptions — is measured every release against a stated ceiling by the `words × 1.33` estimator `dd-ai-eng-knowhow`'s `CONTEXT-ENGINEERING.md` defines, with per-section attribution — a closure readout, not a ratchet.
 - A release measuring above its declared ceiling cuts text; the number is never re-measured, averaged or renegotiated to fit.
 - Nine personas; a persona states a rule once and points at the skill that operates it — no playbook table, no restated handoff-schema bullet ([[ARCHITECTURE]]).
 

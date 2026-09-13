@@ -4,13 +4,13 @@
 
 ## What it is
 
-<!-- derived-from: product-vision sha256:1c23dfac0886 -->
+<!-- derived-from: product-vision sha256:ec1cebce031b -->
 
-- [README](README.md): the unit is the Spec Context Project; documents are the lifecycle; boundaries are mechanical; concurrency is visible, never locked.
+- [README](README.md): the unit is the context (a Spec Context Project); documents are the lifecycle; boundaries are mechanical; concurrency is visible, never locked.
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:8c7a137f41da -->
+<!-- derived-from: pypi-distribution sha256:80d67bd879ea -->
 <!-- derived-from: workspace-init sha256:5b20a0d9dc80 -->
 
 - [PyPI project](https://pypi.org/project/dadaia-workspace/): `pip install dadaia-workspace`, then `dadaia init`.
@@ -18,16 +18,16 @@
 
 ## The law
 
-<!-- derived-from: agentic-entities sha256:41908057d8df -->
-<!-- derived-from: sdd-gate-v3 sha256:8346312b6aee -->
+<!-- derived-from: agentic-entities sha256:762aef59899f -->
+<!-- derived-from: sdd-gate-v3 sha256:6206bc904484 -->
 
 - [DADAIA.md](dadaia_workspace/public/data/DADAIA.md): the always-on law, projected to the workspace root and to each harness runtime root.
 - [Constitution](specs/constitution.md): the derivation law for personas, behaviors, rules and skills.
 
 ## Reference
 
-<!-- derived-from: context-management sha256:701506d2775c -->
-<!-- derived-from: workspace-doctor sha256:beb6a92acc5f -->
+<!-- derived-from: context-management sha256:a66534def71e -->
+<!-- derived-from: workspace-doctor sha256:a78256c47540 -->
 
 - [CLI reference](docs/cli.md): the committed output of `dadaia help tree`.
 - [Memory catalog](specs/memory/product/index.md): every product atom, its `tldr` and its path.

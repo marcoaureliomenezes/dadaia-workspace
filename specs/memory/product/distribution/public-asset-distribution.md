@@ -10,7 +10,7 @@ tags: [public, assets, distribution, projection, privacy]
 
 - `dadaia public stage` copies `dadaia_workspace/public/` into `.dadaia/agentic/<type>/` with a SHA256 manifest.
 - `dadaia public install` projects staged assets into `.claude/`, `.codex/`, `.kimi-code/`, `.agents/`, the root law pair, scoped rule files and the Codex hook wrappers under `.dadaia/hooks/`.
-- `projection_rules(plan)` builds one `ProjectionRule(label, dst, render, compare, ownership)` table; `install` writes it, `doctor` compares it and the install ledger is its destination list — no second derivation of the managed set.
+- `projection_rules(plan, harnesses)` builds one `ProjectionRule(label, harness, dst, render, compare, mode)` table; `install` writes it, `doctor` compares it and the install ledger is its destination list — no second derivation of the managed set.
 - `HarnessProjection` has three production adapters — Claude Code, Codex, Kimi Code — each contributing its own rules plus the doctor lines a byte-compare cannot express.
 - The renderer is the only verifier: a rule's `render` maps the bytes on disk to the bytes that belong there, so a `bytes` rule is a plain compare while an `owned-slice` or `managed-block` rule is a fixed point that leaves an operator's own keys alone.
 - There is no `public/hooks/`: governance hooks are the Python package `dadaia_workspace/hooks/`.
@@ -34,7 +34,7 @@ tags: [public, assets, distribution, projection, privacy]
 - The scaffolded `specs/AGENTS.md` (`templates/specs-AGENTS.md`) is a statement list — load order pointing at `dd-spec-navigator`, the authority table, escalation — with no gate claim and no root `_archive/`; every scoped scaffold `AGENTS.md` states scope and read rules only and cites the skill or the law section that owns the rule, and `TREE-5` heals each by shipped hash ([[workspace-doctor]]).
 - Each scoped `AGENTS.md` is hash-projected and doctor-compared; operator-owned domain-scoped files are never overwritten.
 - Repo templates land at `alive()`, not at install: `repo-AGENTS.md` to the repo root, `tests-AGENTS.md` only when `tests/` is a real directory holding no such file.
-- Templates ship parameterized, so an installed file still carrying `<ANGLE-BRACKET>` placeholders is the drift `dadaia doctor`'s `specs` section reports (`AGENTS-PLACEHOLDER-1`, `MEM-PLACEHOLDER-1`; [[workspace-doctor]]).
+- Templates ship parameterized, so an installed file still carrying `<ANGLE-BRACKET>` placeholders is the finding `dadaia doctor`'s `specs` section reports (`AGENTS-PLACEHOLDER-1`, `MEM-PLACEHOLDER-1`; [[workspace-doctor]]).
 - Consumer-repo `AGENTS.md` fan-out is provenance-gated by the canonical banner: absent creates, a stale banner is restored as `[updated]`, a bannerless file is `[foreign]` and never overwritten.
 - A registry `repo_slug` is accepted only as a single, relative, non-dot path component validated lexically, so a symlinked `repos/<slug>` directory is allowed while a symlinked destination file is `[foreign]`.
 - `public install` refuses the `dadaia-workspace` source repo root unless `DADAIA_ALLOW_SOURCE_ROOT_PUBLIC_INSTALL=1` is set.

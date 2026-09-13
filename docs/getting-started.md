@@ -5,7 +5,7 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:8c7a137f41da -->
+<!-- derived-from: pypi-distribution sha256:80d67bd879ea -->
 <!-- derived-from: workspace-init sha256:5b20a0d9dc80 -->
 
 ```bash
@@ -50,11 +50,11 @@ with `dadaia ci install-hook`.
 ## Bind a context — `dadaia context bind`
 
 <!-- derived-from: spec-context-project sha256:a80fd443036b -->
-<!-- derived-from: context-management sha256:701506d2775c -->
+<!-- derived-from: context-management sha256:a66534def71e -->
 
-A Spec Context Project is the unit of work: one canonical `specs/` tree owned by one
-main repository, optionally spanning associated repositories that live and die with
-it. Specs, bind, memory, releases and backlog resolve only from the main repo.
+A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
+owned by one main repository, optionally spanning associated repositories that live and
+die with it. Specs, bind, memory, releases and backlog resolve only from the main repo.
 
 ```bash
 dadaia context create <ctx> --repo-url <url>   # registers it DEAD in the registry
@@ -72,7 +72,7 @@ the context's main repo plus its associated repos, and it constrains nothing els
 
 ## Check compliance — `dadaia doctor`
 
-<!-- derived-from: workspace-doctor sha256:beb6a92acc5f -->
+<!-- derived-from: workspace-doctor sha256:a78256c47540 -->
 
 ```bash
 dadaia doctor --context <ctx> [--json] [--fix] [--redact]
@@ -93,7 +93,7 @@ its own TTL expired.
 
 ## Look at it — `dadaia panel`
 
-<!-- derived-from: panel sha256:71b641681bbb -->
+<!-- derived-from: panel sha256:c55db1d0ad51 -->
 
 ```bash
 dadaia panel
@@ -110,7 +110,7 @@ atomically.
 
 ## Run the first candidate
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:15ab5ec5a818 -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:bc20d301cfe8 -->
 
 A candidate is one closed-scope SDD cycle inside the live release. Nothing drives it:
 the documents are the state, the verbs move the state document, and the markers in

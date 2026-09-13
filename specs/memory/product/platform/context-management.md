@@ -2,7 +2,7 @@
 slug: context-management
 title: context-management
 tldr: ALIVE/DEAD registry of one main repo plus N associated repos, one Invocation per process, a Bind carrying scope, bind-driven injection, advisory presence.
-summary: Spec Context Projects and their repositories through a v3 registry, one resolution authority whose Bind carries the session's scope, one repo accessor, bind-driven injection and expiring presence records.
+summary: Contexts (Spec Context Projects) and their repositories through a v3 registry, one resolution authority whose Bind carries the session's scope, one repo accessor, bind-driven injection and expiring presence records.
 tags: [context, lifecycle, session, no-locks, privacy]
 ---
 
@@ -35,14 +35,14 @@ tags: [context, lifecycle, session, no-locks, privacy]
 - That record is reachable at rung 2 only when keyed by the session's own harness-native id; lacking one, `bind` warns that the `DADAIA_CONTEXT` export is the binding.
 - The injection carries state, never law: the tech-stack digest plus the product catalog digest, the ALIVE-context list going only to an unbound session.
 - Every emission also attaches the derived CLI help digest (`.dadaia/agentic/help-digest.md`, built by `public install`/`reconcile`/`dadaia help tree --digest`) bind-independent; the hook only reads the file, never builds it.
-- The catalog generator persists `slug`, `title`, `tldr` and `path` for every atom, and the injected digest carries exactly those four per atom — `summary` stays behind.
+- The catalog persists ten keys per atom (`slug title tldr summary path area tags depends_on rank token_estimate`); the injected digest keeps exactly `slug`, `title`, `tldr` and `path` (`hooks/ctx_inject.py::_DIGEST_FIELDS`) — `summary` stays behind.
 - Specs, bind, memory, releases and backlog resolve only from the main repo, so each doctor and the gate see exactly one `specs/` tree per context.
 - The bind's scope is the only thing it constrains: a bound session's MUTATING write under a `repos/<slug>/` another context owns is refused with `fix: … context bind <owner>`; ADDITIVE paths, workspace-root paths, unregistered slugs and an unbound session are never scope-judged ([[sdd-gate-v3]]).
 
 ## Presence, redaction, export
 
 - Mutating file-tool activity best-effort records advisory presence; a live peer warns, never denies, and records expire by heartbeat age.
-- `presence.gc()` is the only reaper of presence records, throttle and sentinel markers and the directories they empty; the workspace reaper runs it — `doctor --fix` and, on one throttle, the PostToolUse hook through `doctor.reap(own_session_id=…)` — so a live session's own record is never touched ([[workspace-doctor]]).
+- `presence.gc()` is the only reaper of presence records, throttle markers, the injection sentinel and the directories they empty; the workspace reaper runs it — `doctor --fix` and, on one throttle, the PostToolUse hook through `doctor.reap(own_session_id=…)` — so a live session's own record is never touched ([[workspace-doctor]]).
 - `context list`, `context show` and `dadaia doctor` accept `--redact`, presence block included, turning every foreign context name and repo slug into a stable `[REDACTED-CONTEXT-<n>]` placeholder at the render boundary.
 - `dadaia export` refreshes each ALIVE repo's checked-out branch, then writes one file, `.dadaia/dist/spec-contexts.json` (`spec-contexts-export-v1`: per context slug, name, state, repo URL, branch, associated repos, last sync); anything else in `dist/` is `WS-dist-slop` ([[workspace-doctor]]).
 - `dadaia import <file>` accepts only that schema version, registers each unknown name DEAD with its branch and associated repos, prints `skipped (exists)` for a known name and names `dadaia context alive <name>` as the restore step.

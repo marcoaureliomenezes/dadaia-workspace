@@ -8,7 +8,7 @@ is `dadaia_workspace/public/data/DADAIA.md`, and the walkthrough is
 ## Context
 
 <!-- derived-from: spec-context-project sha256:a80fd443036b -->
-<!-- derived-from: context-management sha256:701506d2775c -->
+<!-- derived-from: context-management sha256:a66534def71e -->
 
 A *context* — a Spec Context Project — is one canonical `specs/` tree owned by one
 main repository, the unit for memory, backlog, bugs, releases, reports and handoffs.
@@ -22,7 +22,7 @@ is not a binding.
 
 ## Release and candidate
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:15ab5ec5a818 -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:bc20d301cfe8 -->
 
 Exactly one *release* is live at a time, named last-published-PyPI + 1 patch, with
 OPEN scope; it grows by *candidates*, each a closed-scope SDD cycle whose SPEC, PLAN
@@ -35,7 +35,7 @@ deploy.
 
 ## The flow
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:15ab5ec5a818 -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:bc20d301cfe8 -->
 <!-- derived-from: audits-canon sha256:a96df64d264c -->
 
 Every demand takes one of two arms. **Arm A**, a feature, enters through the backlog
@@ -49,7 +49,7 @@ the verbs move the records.
 
 ## The gate
 
-<!-- derived-from: sdd-gate-v3 sha256:8346312b6aee -->
+<!-- derived-from: sdd-gate-v3 sha256:6206bc904484 -->
 
 The *gate* is a PreToolUse chain of three policies evaluated in fixed order — root
 whitelist, venv guard, SDD gate — first block wins, and a policy that raises is ALLOW.
@@ -66,22 +66,23 @@ feeding each fix back through the gate.
 
 ## Memory
 
-<!-- derived-from: context-management sha256:701506d2775c -->
-<!-- derived-from: workspace-doctor sha256:beb6a92acc5f -->
+<!-- derived-from: context-management sha256:a66534def71e -->
+<!-- derived-from: workspace-doctor sha256:a78256c47540 -->
 
 *Memory* is current product truth, never history: one Markdown atom per subject under
 `specs/memory/product/**`, plus `ARCHITECTURE.md`, `QUALITY.md` and `TECHSTACK.md`,
 each of the three split into an ADR-gated Part 1 of principles (every one carrying a
-`Measured by:` command) and a Part 2 of implementation. Frontmatter carries six fields,
-`tldr` among them, and the catalog persists ten keys per atom while the digest
-injected at bind keeps exactly `slug`, `title`, `tldr` and `path` — `summary` stays
-behind. `dadaia doctor`'s `specs` section polices it: atoms present and Markdown,
-catalog slugs equal to the atom files, frontmatter and wikilinks linted, and memory
-drifting from the code it describes reported as a warning.
+`Measured by:` command) and a Part 2 of implementation. Frontmatter carries five
+fields (`slug`, `title`, `tldr`, `summary`, `tags`), the catalog persists ten keys per
+atom, and the digest injected at bind keeps exactly `slug`, `title`, `tldr` and `path`
+— `summary` stays behind. `dadaia doctor`'s `specs` section polices it: atoms present
+and Markdown, catalog slugs equal to the atom files, frontmatter and wikilinks linted,
+and memory drift — the features package map against the live tree, a `dadaia <verb>`
+or path an atom cites that no longer exists — reported as a warning, never a red build.
 
 ## Bugs and backlog
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:15ab5ec5a818 -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:bc20d301cfe8 -->
 
 Both are records with one shape and one owning verb. `specs/bugs/BUGS.jsonl` holds one
 record per bug, appended once and keyed by `id`, with no git-derived cache — git is the

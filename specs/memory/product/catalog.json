@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-13T09:23:13Z",
+  "generated_at": "2026-09-13T10:43:12Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -15,7 +15,7 @@
         "handoff",
         "schema"
       ],
-      "token_estimate": 378,
+      "token_estimate": 389,
       "depends_on": [
         "workspace-doctor",
         "public-asset-distribution"
@@ -35,7 +35,7 @@
         "sessions",
         "lifecycle"
       ],
-      "token_estimate": 622,
+      "token_estimate": 624,
       "depends_on": [
         "sdd-bug-backlog-governance",
         "workspace-doctor",
@@ -58,7 +58,7 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 513,
+      "token_estimate": 518,
       "depends_on": [
         "ARCHITECTURE",
         "TECHSTACK",
@@ -86,7 +86,7 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 749,
+      "token_estimate": 779,
       "depends_on": [
         "QUALITY",
         "ARCHITECTURE",
@@ -111,7 +111,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 941,
+      "token_estimate": 944,
       "depends_on": [
         "agentic-entities",
         "workspace-doctor",
@@ -132,7 +132,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 375,
+      "token_estimate": 667,
       "depends_on": [
         "public-asset-distribution",
         "consumer-agent-support",
@@ -154,7 +154,7 @@
         "projection",
         "dispatch"
       ],
-      "token_estimate": 327,
+      "token_estimate": 352,
       "depends_on": [
         "context-management",
         "sdd-gate-v3",
@@ -192,7 +192,7 @@
       "title": "Harness — Kimi Code",
       "area": "harness",
       "tldr": "Layer-1 harness — inert `.kimi-code/` projection plus user-level TOML hook shims; binds through `DADAIA_CONTEXT` exported at launch.",
-      "summary": "Kimi Code is a Layer-1 entry harness whose live wiring is four POSIX shims registered in a managed block of the user-level Kimi config; it binds through DADAIA_CONTEXT.",
+      "summary": "Kimi Code is a Layer-1 entry harness whose live wiring is five POSIX shims registered in a managed block of the user-level Kimi config; it binds through DADAIA_CONTEXT.",
       "path": "specs/memory/product/harness/harness-kimi-code.md",
       "tags": [
         "harness",
@@ -201,7 +201,7 @@
         "projection",
         "binding"
       ],
-      "token_estimate": 310,
+      "token_estimate": 335,
       "depends_on": [
         "public-asset-distribution",
         "context-management",
@@ -225,7 +225,7 @@
         "css",
         "tokens"
       ],
-      "token_estimate": 153,
+      "token_estimate": 148,
       "depends_on": [
         "panel"
       ]
@@ -244,7 +244,7 @@
         "http",
         "dashboard"
       ],
-      "token_estimate": 277,
+      "token_estimate": 282,
       "depends_on": [
         "agent-monitoring",
         "context-management",
@@ -259,7 +259,7 @@
       "slug": "product-vision",
       "title": "product-vision",
       "area": "philosophy",
-      "tldr": "A local-first, strictly bounded SDD workspace giving agents current context, a document-governed lifecycle, visible concurrency and anti-slop boundaries.",
+      "tldr": "A local-first, spec-driven workspace that gives AI agents current context, a document-governed lifecycle, visible concurrency and anti-slop boundaries.",
       "summary": "dadaia-workspace is a local-first environment for context-bound agent work — canonical specs and memory, deterministic gates, a document-governed lifecycle and auditable evidence.",
       "path": "specs/memory/product/philosophy/product-vision.md",
       "tags": [
@@ -269,11 +269,17 @@
         "lifecycle",
         "anti-slop"
       ],
-      "token_estimate": 289,
+      "token_estimate": 479,
       "depends_on": [
         "spec-context-project",
         "sdd-gate-v3",
         "public-asset-distribution",
+        "pypi-distribution",
+        "workspace-init",
+        "workspace-doctor",
+        "panel",
+        "agent-comms",
+        "QUALITY",
         "ARCHITECTURE"
       ]
     },
@@ -303,7 +309,7 @@
       "slug": "consumer-agent-support",
       "title": "Consumer validation gate",
       "area": "platform",
-      "tldr": "A consumer-side validation agent running the shipped recipe on a real workspace is the release gate; no wheel publishes without its CERTIFIED_100 verdict.",
+      "tldr": "A consumer-side validation agent running the shipped recipe on a real workspace is the release gate; no wheel publishes until every statement reports PASS.",
       "summary": "The canonical release gate is a consumer-side validation agent running the shipped recipe on a real workspace; a deterministic internal gate never approves a release by itself.",
       "path": "specs/memory/product/platform/consumer-agent-support.md",
       "tags": [
@@ -311,7 +317,7 @@
         "release-gate",
         "sdd"
       ],
-      "token_estimate": 288,
+      "token_estimate": 347,
       "depends_on": [
         "workspace-init",
         "TECHSTACK",
@@ -326,7 +332,7 @@
       "title": "context-management",
       "area": "platform",
       "tldr": "ALIVE/DEAD registry of one main repo plus N associated repos, one Invocation per process, a Bind carrying scope, bind-driven injection, advisory presence.",
-      "summary": "Spec Context Projects and their repositories through a v3 registry, one resolution authority whose Bind carries the session's scope, one repo accessor, bind-driven injection and expiring presence records.",
+      "summary": "Contexts (Spec Context Projects) and their repositories through a v3 registry, one resolution authority whose Bind carries the session's scope, one repo accessor, bind-driven injection and expiring presence records.",
       "path": "specs/memory/product/platform/context-management.md",
       "tags": [
         "context",
@@ -335,7 +341,7 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 1173,
+      "token_estimate": 1183,
       "depends_on": [
         "workspace-doctor",
         "sdd-gate-v3",
@@ -360,7 +366,7 @@
         "macos",
         "linux"
       ],
-      "token_estimate": 208,
+      "token_estimate": 231,
       "depends_on": [
         "sdd-gate-v3",
         "workspace-init",
@@ -407,7 +413,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 2773,
+      "token_estimate": 2846,
       "depends_on": [
         "sdd-gate-v3",
         "context-management",
@@ -470,7 +476,7 @@
       "title": "sdd-bug-backlog-governance",
       "area": "sdd",
       "tldr": "One bug record shape with no derived cache, one verb per governance record change writing one governance event, and a hand edit measured as a WARNING.",
-      "summary": "The bug ledger, the backlog live photo, the release state document and the ADR ledger — one record per bug with no git-derived cache, one histo-record-v1 shape for every exit, every record change a CLI verb that leaves one governance event in the telemetry store, every committed record schema-validated and every hand edit measured by dadaia doctor.",
+      "summary": "The bug record store, the backlog live photo, the release state document and the decision record store — one record per bug with no git-derived cache, one histo-record-v1 shape for every exit, every record change a CLI verb that leaves one governance event in the telemetry store, every committed record schema-validated and every hand edit measured by dadaia doctor.",
       "path": "specs/memory/product/sdd/sdd-bug-backlog-governance.md",
       "tags": [
         "sdd",
@@ -482,7 +488,7 @@
         "gitflow",
         "events"
       ],
-      "token_estimate": 2527,
+      "token_estimate": 2530,
       "depends_on": [
         "workspace-doctor",
         "sdd-gate-v3",
@@ -507,7 +513,7 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 1420,
+      "token_estimate": 1428,
       "depends_on": [
         "workspace-doctor",
         "context-management",

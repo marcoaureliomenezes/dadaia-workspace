@@ -96,14 +96,14 @@ Rationale: law that no asset owns is law nobody applies.
 |---|---|
 | workspace root, session, context, the session's Bind | `core/invocation.py` — `resolve() -> Invocation`, over rungs 0 (explicit/`target_path`) … 3 (repo of the cwd); `Bind(context_name, repos)` with `all_repos()` (main + associated) is the scope, resolved from `DADAIA_CONTEXT` then the live session record, never the cwd |
 | the gate's three blocks and three path classes | `hooks/root_whitelist.py` (a new root entry), `hooks/venv_guard.py` (one rule: venv-rooting), `features/spec_context/gate_policy.py` (`classify_path` → ADDITIVE/MUTATING/PROTECTED; `evaluate` → PROTECTED or out-of-scope BLOCK, else ALLOW with presence); `hooks/sdd_gate.py` resolves the Invocation once and passes the Bind and target owner as plain data — no phase, no mode, no `_RELEASE.json` read |
-| the BLOCK envelope | one `fix: <command>` line per refusal, every enforcement point; `tests/contract/test_every_block_carries_a_fix.py` is the interface (68 refusals, each fed back through `pre_gate.evaluate_payload` as ALLOW) |
+| the BLOCK envelope | one `fix: <command>` line per refusal, every enforcement point; `tests/contract/test_every_block_carries_a_fix.py` is the interface (every refusal case, each fed back through `pre_gate.evaluate_payload` as ALLOW) |
 | session record schema, read, liveness and reaping | `core/session_store.py` — `new_binding_record`/`is_live`/`live_session`/`reap_stale`; `core/record_liveness.py` holds the raw TTL predicate |
-| presence liveness and reaping | `features/spec_context/presence.py` — `gc()` is the only reaper of records, markers, sentinels and emptied directories |
+| presence liveness and reaping | `features/spec_context/presence.py` — `gc()` is the only reaper of presence records, throttle markers, the injection sentinel and emptied directories |
 | every canonical name — the root law, `.dadaia/` zones (class, creator, TTL, canon; `reaped` at 7 days), the `states/` canon, the `specs/` canon rows, the repo-tree exclusion set, the installed git hooks | `core/workspace_layout.py` — `ROOT_ALLOWED_DIRS`/`ROOT_ALLOWED_FILES`, `INSTANCE_EXCEPTIONS`, `DADAIA_ZONES`, `STATES_CANON`, `SPECS_CANON` (`CanonEntry` shape → matcher, `CANON_ROOT_MEMBERS` derived), `REPO_TREE_EXCLUDED` (= `.dadaia` + `REPO_TREE_ARTIFACTS`), `INSTALLED_GIT_HOOKS`; init, `dadaia doctor`, the gate's ADDITIVE prefixes, the root-whitelist hook, `privacy_check`, `ci install-hook`, export and the stage renderer (`<!-- zones\|canon\|root\|repo-excluded\|specs-canon -->` into `.dadaia/AGENTS.md` and DADAIA §5.1/§5.3/§6.2) are derived views; a literal of three or more canonical names outside this module fails `tests/contract/test_zone_registry.py` |
 | what a `specs/` tree may contain | `core/workspace_layout.SPECS_CANON` rows; `features/specs/canon.py` is the renderer (`scaffold`, `release_new`) and checker (`check_tree`) over them |
-| whether a projection is current | `infrastructure/projection.py`'s `ProjectionRule` plus `projection_rules()`; install writes and doctor compares the same table |
+| whether a projection is current | `infrastructure/projection.py`'s `ProjectionRule` plus `infrastructure/projection_rules.py::projection_rules(plan, harnesses)`; install writes and doctor compares the same table |
 | which harness a projection targets | `HarnessProjection` in `infrastructure/projection_rules.py`, with three production adapters — Claude Code, Codex, Kimi Code |
-| a bug record's status, `closed_at`, lineage and shape | `core/models/bugs.py` transition methods, every terminal one ending in `_reach_terminal` (stamps `closed_at` once); `resolve` is the one `caused_by` writer; `from_dict`/`to_dict` are the one authority on which keys a record has (the seven git-derived provenance keys are retired — no stored fact a resolver re-derives, ADR 0011); `infrastructure/jsonl_record_store.py::JsonlRecordStore.scan()` is the one ledger parser, yielding `MalformedLine` for a bad row |
+| a bug record's status, `closed_at`, lineage and shape | `core/models/bugs.py` transition methods, every terminal one ending in `_reach_terminal` (stamps `closed_at` once); `resolve` is the one `caused_by` writer; `from_dict`/`to_dict` are the one authority on which keys a record has (the seven git-derived provenance keys are retired — no stored fact a resolver re-derives, ADR 0011); `infrastructure/jsonl_record_store.py::JsonlRecordStore.scan()` is the one parser of every JSONL record store, yielding `MalformedLine` for a bad row |
 | the `surface` enum's feature arm | `features/specs/schemas.py` appends the `features/<name>/` packages on disk at load (`x-enum-append: feature-packages`); the schema lists only the six non-feature layers and `unknown` |
 | the histo record shape, the terminal vocabulary, which disposition needs which evidence | `core/models/histo.py` — `HistoRecord`, `TERMINAL_DISPOSITIONS`, the per-ledger subsets (`FINDINGS_DISPOSITIONS` serves findings and the audits histo) and `REQUIRED_EVIDENCE` (`release` vs `reason` per disposition), read by `backlog exit`, `audit disposition` and the doctor alike; `features/specs/ledgers.py::LEDGERS` is the one table of validated ledgers, each row naming its `events_ledger` or none |
 | a governance event and its record hash | `core/models/telemetry.py` — `GovernanceEvent {event_id, ts, session_id, context, verb, ledger, record_id, record_hash}` and `record_hash()` (sha256 of the canonical JSONL line), beside each other so writer and reader hash identically; `cli/_governance_event.py::record_governance_event` is the one writer every verb calls after its record write, swallowing a store that cannot open; `features/telemetry/store.py` migration 7 holds the table |
@@ -128,6 +128,8 @@ Rationale: law that no asset owns is law nobody applies.
 | specs-rule order, fix dispatch, --fix help | `features/specs/rules.py::RULES` — one ordered registry, three derived projections |
 | conformance of every `_RELEASE.json`, live or archived | `features/specs/release_tree.py::validate_release_tree` — the doctor, `rc-archive` and `release archive` all call it |
 | shared specs facts per doctor run | `features/specs/specs_tree.py::SpecsTree` — fresh per check(), active release parsed once |
+| a dead citation — a `dadaia <verb>` absent from the command tree, a `specs/`, `dadaia_workspace/` or `.github/` path absent from the repo | `features/specs/citations.py::dead_citations(text, *, command_paths, repo_root)` — one finder shared by `MEM-DRIFT-2`, `tests/contract/test_behavior_map.py` and `tests/contract/test_docs_derived_from_memory.py`; the command tree arrives as plain data |
+| the live command tree | `cli/help_digest.py::command_paths()` — the one Typer walk; `render_digest` (`dadaia help tree`, the injected help digest), the doctor CLI root and the two contract tests consume it, and `features` never imports `cli` |
 
 - `container.py` is composition wiring only, contract-tested so every definition keeps a production consumer (no orphaned factories); the panel's 15-route composition lives with its single consumer in `cli/commands/panel_composition.py`; a single-consumer adapter is imported directly by its feature and never passes through the container (ADR 0001).
 - `core/protocols/` holds six Protocols: three two-adapter OS seams (`FilePermissionSetter`, `ShutdownHandler`, `TelemetryRefreshLock`) and three panel cross-feature seams whose implementer lives under `features/` (`AgentsProvider`, `ContextProjectProvider`, `ServerRegistryProvider`); every other adapter is imported by its one consumer (the consumer-less `ProcessAncestry` chain was deleted at 0.5.3).
@@ -152,7 +154,7 @@ classDiagram
     SpecsDoctor --> ClosureAuditValidator : owns ORDER
     SpecsDoctor --> GovernanceValidator : owns ORDER
     SpecsDoctor --> CoherenceValidator : owns ORDER
-    note for MemoryValidator "takes the specs dir; runs the memory lint in-process; owns CAT-1, LINT-1 and MEM-DRIFT-1"
+    note for MemoryValidator "takes the specs dir; runs the memory lint in-process; owns CAT-1, LINT-1, MEM-DRIFT-1 and MEM-DRIFT-2"
     note for GovernanceValidator "sole features.backlog.document import; reads BUGS.jsonl only through the injected bug store"
     note for SpecsDoctor "iterates rules.RULES over a fresh SpecsTree per check(); fix dispatch and --fix help derive from the same registry; takes bug_store_factory; imports neither spec_context nor infrastructure"
 ```
@@ -172,7 +174,7 @@ flowchart TB
 
 ```mermaid
 classDiagram
-    container : build_panel_views()
+    panel_composition : build_panel_views()
     api_servers : render_api_servers()
     api_contexts : render_api_contexts()
     api_agents : render_api_agents_canonical()
@@ -180,9 +182,11 @@ classDiagram
     api_agents : render_api_agent_sessions()
     agent_policy : render_api_agent_model_policy()
     agent_policy : render_api_agent_model_templates()
+    agent_policy : render_put_agent_model_policy()
+    agent_policy : render_post_agent_model_policy_validate()
     api_sessions : render_api_sessions()
     api_health : render_health()
-    note "no api.py barrel — container named-imports each render_api_* from its own module; each view imports only features.panel.service and core.models; handler._ROUTES is the one (method, pattern, view_name) table and a route absent from it cannot exist"
+    note "no api.py barrel — panel_composition named-imports each view from its own module; each view imports only features.panel.service and core.models; handler._ROUTES is the one _Route(method, pattern, view_name, requires_telemetry, mutation) table and a route absent from it cannot exist"
 ```
 
 <!-- dadaia:fixed slop-code -->

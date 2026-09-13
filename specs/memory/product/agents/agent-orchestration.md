@@ -30,7 +30,7 @@ The public core roster is nine Layer-1 agents (`public/agents/*.md`). Only `proj
 - An agent resolves or binds its context, reads the constitution, [[ARCHITECTURE]], [[TECHSTACK]], the catalog, the relevant atoms and the release artifacts, reserves tasks `[ ] -> [-]`, validates, marks `[x]`, and emits a handoff ([[agentic-entities]]); a record change goes through its governance verb, never a file tool ([[sdd-bug-backlog-governance]]).
 - Concurrent sessions are allowed and presence is advisory: no agent acquires, holds, hands off, releases or steals a lock.
 - Release definition requires architectural, QA and implementability review before approval; implementation requires QA, security and code review before a task is done, a rejection returning it to implementation.
-- A merge requires an approved security handoff covering the PR head sha ([[sdd-gate-v3]]), and every verdict states the bug-surface delta from the bug ledger ([[QUALITY]]).
+- A merge requires an approved security handoff covering the PR head sha ([[sdd-gate-v3]]), and every verdict states the bug-surface delta from the bug record store (`dadaia bugs stats`, [[QUALITY]]).
 - Layer-1 agent sources are model-agnostic, receiving model and effort at `public install`.
 
 ## Dependencies

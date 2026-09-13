@@ -14,7 +14,7 @@ tags: [harness, claude-code, projection, dispatch]
 - Claude Code exposes a native session id, so the bind record is this session's own at rung 2 and a concurrent session's bind never reaches it ([[context-management]]).
 - `.claude/settings.json` registers `SessionStart` matchers `compact`, `clear`, `startup` and `resume` — the bootstrap re-emits after a compact or `/clear`, and a NEW session receives it at the event itself instead of waiting for its first prompt.
 - Writes pass PreToolUse `pre_gate` (matcher `Edit|Write|MultiEdit|NotebookEdit|Bash`), a match-all PostToolUse heartbeat/reconciler, and the git chokepoints ([[sdd-gate-v3]]).
-- The pre-gate emits a merged envelope — `hookSpecificOutput.permissionDecision` `deny`/`defer` is the operative contract, the top-level `decision`/`reason` pair riding along for the Codex hooks and the Kimi shim.
+- The pre-gate emits a merged envelope — `hookSpecificOutput.permissionDecision: deny` (with its `permissionDecisionReason`) is the operative contract, the top-level `decision: block`/`reason` pair riding along for the Codex hooks and the Kimi shim; an ALLOW carries no permission verdict at all (`defer` is print-mode only and never emitted).
 - It never answers `permissionDecision: allow`, which would bypass the permission prompts.
 - `dadaia public install --target claude` projects `.claude/agents/` (the nine personas rendered with resolved model/effort), `.claude/skills/` and `.claude/settings.json`, manifest-tracked and never hand-edited ([[public-asset-distribution]]).
 

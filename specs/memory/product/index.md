@@ -41,14 +41,14 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `product-vision` | product-vision | A local-first, strictly bounded SDD workspace giving agents current context, a document-governed lifecycle, visible concurrency and anti-slop boundaries. |
+| `product-vision` | product-vision | A local-first, spec-driven workspace that gives AI agents current context, a document-governed lifecycle, visible concurrency and anti-slop boundaries. |
 | `spec-context-project` | spec-context-project | One canonical specs tree owned by one main repository, optionally spanning associated repos, bound per session and safe for visible concurrent work. |
 
 ### platform
 
 | slug | title | tldr |
 |------|-------|------|
-| `consumer-agent-support` | Consumer validation gate | A consumer-side validation agent running the shipped recipe on a real workspace is the release gate; no wheel publishes without its CERTIFIED_100 verdict. |
+| `consumer-agent-support` | Consumer validation gate | A consumer-side validation agent running the shipped recipe on a real workspace is the release gate; no wheel publishes until every statement reports PASS. |
 | `context-management` | context-management | ALIVE/DEAD registry of one main repo plus N associated repos, one Invocation per process, a Bind carrying scope, bind-driven injection, advisory presence. |
 | `cross-platform-portability` | cross-platform-portability | Linux, macOS and Windows through one platform capability seam, injected adapters, Python hooks and hard-gated cross-OS CI legs. |
 | `server-registry` | server-registry | Port registry with TTL and PID tracking so parallel agents' dev servers never collide; the 3000-3999 range binds only `next_port`. |

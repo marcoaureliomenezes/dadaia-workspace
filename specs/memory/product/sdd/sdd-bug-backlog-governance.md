@@ -2,20 +2,20 @@
 slug: sdd-bug-backlog-governance
 title: sdd-bug-backlog-governance
 tldr: One bug record shape with no derived cache, one verb per governance record change writing one governance event, and a hand edit measured as a WARNING.
-summary: The bug ledger, the backlog live photo, the release state document and the ADR ledger — one record per bug with no git-derived cache, one histo-record-v1 shape for every exit, every record change a CLI verb that leaves one governance event in the telemetry store, every committed record schema-validated and every hand edit measured by dadaia doctor.
+summary: The bug record store, the backlog live photo, the release state document and the decision record store — one record per bug with no git-derived cache, one histo-record-v1 shape for every exit, every record change a CLI verb that leaves one governance event in the telemetry store, every committed record schema-validated and every hand edit measured by dadaia doctor.
 tags: [sdd, governance, release-lifecycle, backlog, bugs, adrs, gitflow, events]
 ---
 
 ## Bugs
 
-- `specs/bugs/BUGS.jsonl` is the single canonical ledger: one record per bug, appended once, keyed by `id`, git history being that line's change log.
+- `specs/bugs/BUGS.jsonl` is the one bug record store: one record per bug, appended once, keyed by `id`, git history being that line's change log.
 - `bug-record-v1.schema.json` names every field and marks it immutable core, write-once or mutable governance; `core/models/bugs.py` mirrors its `status` and `diff_direction` enums and `evidence_diff` pattern zero-I/O, pinned by `tests/contract/test_bug_record_schema.py`; `dadaia doctor`'s `ledgers` section validates every committed line (`LEDGER-BUGS-SCHEMA`, [[workspace-doctor]]).
 - The record carries no git-derived cache: the seven provenance keys (`lineage_source registration_commit registration_granularity resolved_commit resolution_granularity root_cause migration_note`) are retired, `from_dict` ignores exactly those seven, `to_dict` never emits them, and `dadaia doctor --fix` re-serializes any committed record that parses but fails the schema or the model's own invariant — stripping a retired key, back-filling a terminal record's missing `closed_at` (from `ts` when nothing better exists) — losslessly, ledger and histo alike; git is the only authority for git facts.
 - `status` is `open | resolved | superseded | deferred | rejected`; `resolved` requires a regression seam, a sweep closure is `superseded_by`, and a reopen is a new record declaring `caused_by`.
 - `closed_at` is stamped once by `BugRecord._reach_terminal`, the one exit every terminal transition ends in: non-null iff `status` is terminal, never earlier than `ts`, never rewritten by `update`.
 - `surface` is a closed enum with one derived arm: the schema lists the six non-feature layers and the `unknown` legacy sentinel, and the feature arm is appended at load time from the `dadaia_workspace/features/<name>/` packages on disk (`x-enum-append: feature-packages`, resolved by `features/specs/schemas.py`); `append --surface unknown` is refused with a `fix:` line while the committed `unknown` records stay valid; `component` is free-text `path#symbol`.
 - `features/bugs`'s record store is the only code path that writes a governance field, sanitizing then masking each write once through the push scan's denylist loader, and rewriting compare-then-swap with refuse-stale plus retry ([[sdd-gate-v3]]).
-- `JsonlRecordStore.scan()` is the ledger's one parser, yielding a `MalformedLine` for a row it cannot read, so every reader — the CLI, the doctor, the audit — diagnoses a bad line identically.
+- `JsonlRecordStore.scan()` is the store's one parser, yielding a `MalformedLine` for a row it cannot read, so every reader — the CLI, the doctor, the audit — diagnoses a bad line identically.
 - A terminal status is reachable only through a transition that carries its evidence: `BugRecord.resolve/supersede/defer/reject` raise `IncompleteTransitionError` on missing input, and the model itself refuses a bare `status` or `closed_at` key.
 - Nine verbs sit over that seam — `append`, `status`, `stats`, `update` (refusing an immutable core field, a second write to a write-once field, `status`/`closed_at` outright and `caused_by`), `resolve` (deriving `diff_direction` from `--evidence-diff`'s `net-*:` prefix; `--caused-by <bug-id>|none` validated against the ledger or the literal `none`, the one lineage writer), `supersede`, `defer`, `reject` and `archive`; each of the seven writing verbs leaves one governance event.
 - Registration is ask-first: the agent proposes — the contract line violated, one reproducing command, why it is not agent error, a severity from the one rubric (CRITICAL a stall or data loss; HIGH a contract broken on the default path; MEDIUM off the default path or with a documented workaround; LOW message or cosmetic) — and `dadaia bugs append` runs only after the operator confirms; with no operator present the proposal leaves the session as one handoff finding whose `message` starts `bug-proposal:` and whose `fix_recommendation` is the exact `append` line, never a record (`dd-bug-registration`, [[agent-comms]]).
@@ -62,7 +62,7 @@ tags: [sdd, governance, release-lifecycle, backlog, bugs, adrs, gitflow, events]
 
 ## Decisions
 
-- `specs/ADRs/decisions.jsonl` (`decision-record-v1`) is the ADR ledger; a superseded decision keeps its line with `status: superseded` — no `_superseded/` directory exists.
+- `specs/ADRs/decisions.jsonl` (`decision-record-v1`) is the decision record store; a superseded decision keeps its line with `status: superseded` — no `_superseded/` directory exists.
 - `measured_by` must match the resolvable pattern the schema enforces — `pytest <path>[::node] [-k …]`, `lint-imports …`, a `SPEC-DOC-nnn`, `WS-…`, `BL-…`, `RELEASE-TREE-…` or `LEDGER-…` code, `dadaia doctor`/`dadaia bugs status` — so every accepted decision names a check that runs.
 - A record born from an operator grill ruling is appended `accepted` with the ruling date in `context`; any other record is `proposed` until the operator flips it; `LEDGER-ADR-SCHEMA` validates every committed line ([[workspace-doctor]]).
 

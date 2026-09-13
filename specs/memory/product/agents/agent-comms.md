@@ -10,7 +10,7 @@ tags: [agent-comms, handoff, schema]
 
 - `handoff-v1` is the JSON contract every agent emits, written to `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json`.
 - An optional HTML report under `repos/<slug>/reports/<agent>/` is referenced by `artifact.path` plus `artifact.content_hash`.
-- The current token is `handoff-v1.2`, carrying `self_pull.refs` — the `specs/`-prefixed atoms the session read; the enum also accepts `handoff-v1.1`, the sanctioned emission for a session that read none.
+- The current token is `handoff-v1.2`, carrying `self_pull.refs` — the `specs/`-prefixed atoms the session read; the enum also accepts `handoff-v1` and `handoff-v1.1` (historical documents stay valid), `handoff-v1.1` being the sanctioned emission for a session that read none.
 - `public/schemas/handoff-v1.schema.json` is the single source of field semantics, staged to `.dadaia/agentic/schemas/` and never projected into a harness root, since only the CLI reads it.
 
 ## Validation and lifecycle

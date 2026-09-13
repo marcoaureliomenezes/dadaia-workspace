@@ -7,11 +7,11 @@ A local-first, spec-driven workspace that gives AI agents current context, a doc
 
 ## What it is and principles
 
-<!-- derived-from: product-vision sha256:1c23dfac0886 -->
+<!-- derived-from: product-vision sha256:ec1cebce031b -->
 
 dadaia-workspace is the operating environment around repositories developed with AI
-agents. Its unit is the Spec Context Project: one registered `specs/` tree and the
-repositories it owns. Nine pillars:
+agents. Its unit is the context — a Spec Context Project: one registered `specs/`
+tree and the repositories it owns. Nine pillars:
 
 - **Current context** — agents bind explicitly and receive only the relevant project,
   memory, release and task state.
@@ -33,13 +33,17 @@ repositories it owns. Nine pillars:
 - **Evidence, never prose** — success is evidenced by reviews, task markers, commands
   and artifacts.
 
+Two usage paths follow — a human drives it from a shell, an agent reads `DADAIA.md` —
+and both read one truth: every section below derives from a named memory atom under
+its content hash.
+
 ## A human installs and uses it
 
-<!-- derived-from: pypi-distribution sha256:8c7a137f41da -->
+<!-- derived-from: pypi-distribution sha256:80d67bd879ea -->
 <!-- derived-from: workspace-init sha256:5b20a0d9dc80 -->
-<!-- derived-from: context-management sha256:701506d2775c -->
-<!-- derived-from: workspace-doctor sha256:beb6a92acc5f -->
-<!-- derived-from: panel sha256:71b641681bbb -->
+<!-- derived-from: context-management sha256:a66534def71e -->
+<!-- derived-from: workspace-doctor sha256:a78256c47540 -->
+<!-- derived-from: panel sha256:c55db1d0ad51 -->
 
 ```bash
 pip install dadaia-workspace
@@ -76,13 +80,13 @@ time, **review** before the push, **close** the candidate and merge it.
 
 ## An agent reads DADAIA.md and uses it
 
-<!-- derived-from: agentic-entities sha256:41908057d8df -->
-<!-- derived-from: sdd-gate-v3 sha256:8346312b6aee -->
-<!-- derived-from: sdd-bug-backlog-governance sha256:15ab5ec5a818 -->
-<!-- derived-from: harness-claude-code sha256:2b301f8bab02 -->
+<!-- derived-from: agentic-entities sha256:762aef59899f -->
+<!-- derived-from: sdd-gate-v3 sha256:6206bc904484 -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:bc20d301cfe8 -->
+<!-- derived-from: harness-claude-code sha256:0dd461fa1f27 -->
 <!-- derived-from: harness-codex sha256:38cdff41eaea -->
-<!-- derived-from: harness-kimi-code sha256:e2d47f9d992c -->
-<!-- derived-from: agent-comms sha256:e4588714d510 -->
+<!-- derived-from: harness-kimi-code sha256:622511bee49b -->
+<!-- derived-from: agent-comms sha256:e7f9051b11a9 -->
 
 The complete always-on law is one file, `DADAIA.md`, at the workspace root and mirrored
 into the Codex and Kimi Code runtime roots; Claude Code reaches it through the import
@@ -116,7 +120,7 @@ runtime tree, validated by `dadaia reports validate`.
 
 ## Links
 
-<!-- derived-from: pypi-distribution sha256:8c7a137f41da -->
+<!-- derived-from: pypi-distribution sha256:80d67bd879ea -->
 
 - GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
 - PyPI — <https://pypi.org/project/dadaia-workspace/>

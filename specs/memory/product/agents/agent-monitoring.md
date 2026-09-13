@@ -25,7 +25,7 @@ tags: [monitoring, telemetry, sessions, lifecycle]
 ## Artifact lifecycle
 
 - Every runtime artifact under `.dadaia/` lives in a registry zone; `handoff tmp mcps .cache` expire one day after mtime and `reaped` seven days after the move, and `dadaia doctor --fix --expired-only --quiet` reaps them at every SessionStart as a CLI process, never a hook module ([[workspace-doctor]]).
-- `presence.gc()` is the one reaper of presence records, throttle and sentinel markers and the directories they empty; a live session's own record is never touched, and it runs inside the workspace reaper — `doctor --fix` and the PostToolUse hook's throttle ([[context-management]]).
+- `presence.gc()` is the one reaper of presence records, throttle markers, the injection sentinel and the directories they empty; a live session's own record is never touched, and it runs inside the workspace reaper — `doctor --fix` and the PostToolUse hook's throttle ([[context-management]]).
 - A cache is prevented by configuration, never by a command flag; one that still lands in a repo tree is moved to `.dadaia/reaped/` by the reaper, not deleted ([[workspace-doctor]]).
 
 ## Dependencies

@@ -20,7 +20,7 @@ Rationale: a marker known to one file and unknown to the other is a silent exclu
 - Quality tooling is pytest with `pytest-cov`, `pytest-xdist`, `pytest-randomly` and `pytest-timeout`, Ruff, mypy `--strict`, import-linter, Hypothesis, Playwright and gitleaks; every cache is redirected by `pyproject.toml` (`addopts -p no:cacheprovider`, `[tool.ruff] cache-dir`, `[tool.mypy] cache_dir` → `../../.dadaia/tmp/<tool>-cache`), so the bare commands are the canonical ones and no per-command flag exists.
 - The closed marker set is eight — unit, contract, integration, e2e, slow, tmp, flaky, quarantine (P-28).
 - Mutation testing is `mutmut==3.7.0` in an optional Poetry group, absent from every push-path selector ([[QUALITY]]).
-- CI checks out at the default depth; `fetch-depth: 0` survives on the `security-verdict-gate` job alone (`ci verdict-check` walks the PR head's first parent) — no job fetches history for a bug record's sake ([[QUALITY]]).
+- `ci.yml` checks out at the default depth; `fetch-depth: 0` survives on its `security-verdict-gate` job alone (`ci verdict-check` walks the PR head's first parent); `release.yml` and `secret-scan.yml` fetch full history for tag derivation and the whole-history secret scan — no job fetches history for a bug record's sake ([[QUALITY]]).
 - Caches and artifacts live outside repos by configuration; the venv guard's one rule is venv-rooting, and a cache that still appears in a repo tree is moved to `.dadaia/reaped/` by the doctor's reaper ([[sdd-gate-v3]], [[workspace-doctor]]).
 
 ### Canonical commands
@@ -37,7 +37,7 @@ Rationale: a marker known to one file and unknown to the other is a silent exclu
 
 ### Packaging
 
-- Wheels and sdists exclude bytecode, and the canonical `public/` tree ships via the package include, so a consumer install carries agents, skills, law, schemas, templates and scaffold.
+- Wheels and sdists exclude bytecode, and the canonical `public/` tree ships inside the `dadaia_workspace` package (`packages = [{include = "dadaia_workspace"}]`, no separate `include` entry), so a consumer install carries agents, skills, law, schemas, templates and scaffold.
 - The capabilities payload is `dadaia-capabilities-v2`, and `dadaia certify` runs the deterministic check list against a live workspace.
 
 ### Dependencies
