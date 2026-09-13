@@ -74,6 +74,7 @@ __all__ = [
     "Invocation",
     "all_repos",
     "context_name_for_repo_slug",
+    "context_name_for_specs_dir",
     "repo_slug_for_context",
     "resolve",
     "resolve_bind",
@@ -264,6 +265,23 @@ def _repo_slug_under_repos(workspace_root: Path, path: Path) -> str | None:
         return None
     slug = parts[0]
     return slug if CONTEXT_NAME_RE.fullmatch(slug) else None
+
+
+def context_name_for_specs_dir(specs_dir: Path) -> str:
+    """The context name a resolved ``specs/`` tree belongs to, or ``""``.
+
+    The inverse of :func:`resolve_context_specs_dir`, and the ONE way a caller that
+    already resolved WHERE it wrote names WHICH context it wrote for — instead of
+    reading ``$DADAIA_CONTEXT`` a second time, which says where the SESSION is bound,
+    not where the verb routed (``--context``/``--specs-dir`` both override the bind).
+    """
+    workspace_root = _root_from(specs_dir)
+    if workspace_root is None:
+        return ""
+    slug = _repo_slug_under_repos(workspace_root, specs_dir)
+    if slug is None:
+        return ""
+    return context_name_for_repo_slug(workspace_root, slug)
 
 
 # ---------------------------------------------------------------------------

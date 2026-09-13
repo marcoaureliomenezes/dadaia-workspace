@@ -218,7 +218,11 @@ def _record_release_event(verb: str, target: Path, release_id: str) -> None:
     except (OSError, ValueError):
         return
     record_governance_event(
-        verb=verb, ledger="releases", record_id=release_id, record=governed_state(state)
+        verb=verb,
+        ledger="releases",
+        record_id=release_id,
+        record=governed_state(state),
+        specs_dir=target,
     )
 
 
@@ -244,6 +248,7 @@ def _histo_appender(target: Path) -> Callable[[HistoRecord], None]:
             ledger="releases-histo",
             record_id=record.id,
             record=record.to_dict(),
+            specs_dir=target,
         )
 
     return append
@@ -359,7 +364,9 @@ def backlog_new_cmd(
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
 
-    record_governance_event(verb="new", ledger="backlog", record_id=slug, record=result.entry)
+    record_governance_event(
+        verb="new", ledger="backlog", record_id=slug, record=result.entry, specs_dir=target
+    )
 
     verb = "created" if result.created else "appended"
     typer.echo(
@@ -429,7 +436,11 @@ def backlog_exit_cmd(
         sys.exit(1)
 
     record_governance_event(
-        verb="exit", ledger="backlog", record_id=record.id, record=record.to_dict()
+        verb="exit",
+        ledger="backlog",
+        record_id=record.id,
+        record=record.to_dict(),
+        specs_dir=target,
     )
     typer.echo(f"[ok] exited {record.id!r} ({record.disposition}) -> {target / 'backlog'}")
 

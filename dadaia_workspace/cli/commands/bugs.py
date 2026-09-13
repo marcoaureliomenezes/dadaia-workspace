@@ -192,7 +192,7 @@ def bugs_append_cmd(
     except ValueError as exc:
         typer.echo(f"[error] {exc}", err=True)
         raise typer.Exit(code=1) from exc
-    _record_event("append", appended)
+    _record_event("append", appended, target)
     typer.echo(f"[ok] registered {bug_id} -> {target}")
 
 
@@ -284,14 +284,21 @@ def bugs_update_cmd(
     ) as exc:
         typer.echo(f"[error] {exc}", err=True)
         raise typer.Exit(code=1) from exc
-    _record_event("update", updated)
+    _record_event("update", updated, target)
     typer.echo(f"[ok] updated {', '.join(sorted(changes))} for {updated.id}")
 
 
-def _record_event(verb: str, record: BugRecord) -> None:
+def _record_event(verb: str, record: BugRecord, target: Path) -> None:
     """One verb, one governance event over the record it just wrote (0.4.7 FR2) — the
-    ONE call site shape every bugs verb uses."""
-    record_governance_event(verb=verb, ledger="bugs", record_id=record.id, record=record.to_dict())
+    ONE call site shape every bugs verb uses. *target* is the ledger tree the verb
+    resolved, the event's only source of context."""
+    record_governance_event(
+        verb=verb,
+        ledger="bugs",
+        record_id=record.id,
+        record=record.to_dict(),
+        specs_dir=target,
+    )
 
 
 def _run_transition(
@@ -314,7 +321,7 @@ def _run_transition(
     except (RecordNotFoundError, StaleRecordWriteError, ValueError) as exc:
         typer.echo(f"[error] {exc}", err=True)
         raise typer.Exit(code=1) from exc
-    _record_event(verb, updated)
+    _record_event(verb, updated, target)
     typer.echo(f"[ok] {updated.status} {updated.id}")
 
 
@@ -437,5 +444,5 @@ def bugs_archive_cmd(
     service = build_bug_service(target, with_archive=True)
     result = service.archive(now=parsed_now, threshold_days=threshold_days)
     for moved in result.records:
-        _record_event("archive", moved)
+        _record_event("archive", moved, target)
     typer.echo(f"[ok] archived {result.archived} record(s), {result.kept} kept.")

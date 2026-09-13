@@ -23,7 +23,9 @@ import sqlite3
 import uuid
 from collections.abc import Mapping
 from datetime import UTC, datetime
+from pathlib import Path
 
+from dadaia_workspace.cli._specs_resolution import resolve_event_context_for_cli
 from dadaia_workspace.core.models.telemetry import GovernanceEvent, record_hash
 
 __all__ = ["record_governance_event"]
@@ -32,16 +34,29 @@ logger = logging.getLogger(__name__)
 
 
 def record_governance_event(
-    *, verb: str, ledger: str, record_id: str, record: Mapping[str, object]
+    *,
+    verb: str,
+    ledger: str,
+    record_id: str,
+    record: Mapping[str, object],
+    specs_dir: Path,
 ) -> None:
-    """Write one event for the record *verb* just changed. Never raises."""
+    """Write one event for the record *verb* just changed. Never raises.
+
+    *specs_dir* is the tree the verb ACTUALLY wrote to; the event's ``context`` is
+    derived from it through the one decider ``resolve_event_context_for_cli``, the same
+    the doctor's reader uses. The context is never read from ``$DADAIA_CONTEXT`` here:
+    that names the session's bind, which every ``--context``/``--specs-dir`` overrides,
+    so an event stamped from the env was invisible to the doctor of the context the verb
+    had just written (and the record it wrote was then reported as a hand edit).
+    """
     from dadaia_workspace import container
 
     event = GovernanceEvent(
         event_id=str(uuid.uuid4()),
         ts=datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         session_id=os.environ.get("DADAIA_SESSION_ID", ""),
-        context=os.environ.get("DADAIA_CONTEXT", ""),
+        context=resolve_event_context_for_cli(specs_dir),
         verb=verb,
         ledger=ledger,
         record_id=record_id,

@@ -135,3 +135,32 @@ def test_a_verb_still_succeeds_when_the_event_store_cannot_be_opened(
     _append(specs, "b-degraded")
 
     assert '"id": "b-degraded"' in (specs / "bugs" / "BUGS.jsonl").read_text(encoding="utf-8")
+
+
+def test_the_event_names_the_context_the_verb_routed_to_not_the_bound_one(
+    tmp_path: Path, home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`--context B` is a ROUTING key: the record lands in B's ledger, so the event that
+    records the write must say B too. Capturing `$DADAIA_CONTEXT` instead made
+    `doctor --context B` discard the verb's own event and report the record it wrote as
+    a hand edit (code review 0.4.7 c3 HIGH-2)."""
+    workspace = tmp_path / "ws"
+    (workspace / ".dadaia" / "states").mkdir(parents=True)
+    (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        '{"version": 2, "contexts": []}', encoding="utf-8"
+    )
+    (workspace / "repos" / "ctx-b" / "specs" / "bugs").mkdir(parents=True)
+    monkeypatch.chdir(workspace)
+    monkeypatch.setenv("DADAIA_CONTEXT", "ctx-a")
+
+    _run(
+        "bugs", "append", "--bug-id", "b-routed",
+        "--title", "t", "--severity", "LOW", "--surface", "bugs",
+        "--component", "c", "--context", "ctx-b",
+        "--symptom", "s", "--repro", "r", "--expected", "e",
+    )  # fmt: skip
+
+    ledger = workspace / "repos" / "ctx-b" / "specs" / "bugs" / "BUGS.jsonl"
+    assert '"id": "b-routed"' in ledger.read_text(encoding="utf-8")
+    (row,) = [r for r in _events(home) if r["record_id"] == "b-routed"]
+    assert row["context"] == "ctx-b"

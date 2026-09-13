@@ -75,7 +75,11 @@ def audit_disposition_cmd(
         sys.exit(1)
 
     record_governance_event(
-        verb="disposition", ledger="audits", record_id=record.id, record=record.to_dict()
+        verb="disposition",
+        ledger="audits",
+        record_id=record.id,
+        record=record.to_dict(),
+        specs_dir=target,
     )
     typer.echo(f"[ok] {record.id} -> {record.disposition}")
 
@@ -107,7 +111,11 @@ def audit_close_cmd(
         sys.exit(1)
 
     record_governance_event(
-        verb="close", ledger="audits", record_id=record.id, record=record.to_dict()
+        verb="close",
+        ledger="audits",
+        record_id=record.id,
+        record=record.to_dict(),
+        specs_dir=target,
     )
     typer.echo(
         f"[ok] archived audit {record.id} ({record.summary}) -> "

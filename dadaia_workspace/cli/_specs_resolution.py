@@ -33,6 +33,7 @@ from dadaia_workspace.core.invocation import CONTEXT_NAME_RE as _CONTEXT_NAME_RE
 from dadaia_workspace.core.invocation import (
     HARNESS_SESSION_ID_ENV_VARS as _HARNESS_SESSION_ID_ENV_VARS,
 )
+from dadaia_workspace.core.invocation import context_name_for_specs_dir
 from dadaia_workspace.core.invocation import repo_slug_for_context as _core_repo_slug
 from dadaia_workspace.core.invocation import resolve as _resolve_invocation
 from dadaia_workspace.core.invocation import (
@@ -108,6 +109,25 @@ def resolve_context_specs_dir_for_cli(workspace_root: Path, context: str) -> Pat
     ``repo_slug`` mapping + self-hosting root fallback. CLI verbs import THIS, never
     ``core.invocation`` directly (bind-resolution-seam-is-a-single-home)."""
     return _core_resolve_context_specs_dir(workspace_root, context)
+
+
+def resolve_event_context_for_cli(specs_dir: Path | None) -> str:
+    """The context name a governance verb ACTED IN, derived from the ``specs/`` tree it
+    resolved — the ONE decider both the writer
+    (:func:`~dadaia_workspace.cli._governance_event.record_governance_event`) and the
+    reader (``doctor``'s governance baseline) use, so an event can never be filtered out
+    by the verb that wrote it.
+
+    ``$DADAIA_CONTEXT`` is the LAST rung, not the first: it names where the SESSION is
+    bound, and every governance verb's ``--context``/``--specs-dir`` overrides that
+    bind. Reading the env first is what made `doctor --context B` report B's own
+    verb-written records as hand edits.
+    """
+    if specs_dir is not None:
+        derived = context_name_for_specs_dir(specs_dir)
+        if derived:
+            return derived
+    return os.environ.get("DADAIA_CONTEXT", "")
 
 
 def resolve_specs_dir_for_cli(specs_dir: str | None) -> Path:

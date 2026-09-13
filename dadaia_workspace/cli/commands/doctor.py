@@ -17,7 +17,7 @@ its own adapter at the seam).
 from __future__ import annotations
 
 import json
-import os
+import sqlite3
 from collections.abc import Callable
 from pathlib import Path
 
@@ -28,6 +28,7 @@ from dadaia_workspace.cli._backlog_roots import resolve_backlog_roots
 from dadaia_workspace.cli._specs_resolution import (
     resolve_context_for_cli,
     resolve_context_specs_dir_for_cli,
+    resolve_event_context_for_cli,
     resolve_specs_dir_for_cli,
 )
 from dadaia_workspace.cli.redact import ContextRedactor
@@ -193,28 +194,31 @@ def _ledger_schema_render(
     )
 
 
-def _resolve_governance(context: str | None) -> GovernanceBaseline | None:
+def _resolve_governance(specs_dir: Path | None) -> GovernanceBaseline | None:
     """The governance events, read ONCE into plain data and handed to the rules that
     measure hand edits (0.4.7 FR6) — the same shape ``_resolve_live_shas`` has.
 
     Scoped to ONE spec context, because the store is one file per MACHINE and two
     workspaces on it are kept apart by each event's ``context`` (``container
-    .build_telemetry_store``). No context resolved, no store, an unreadable or
-    unmigrated store: ``None``, and every hand-edit rule is silent — a consumer without
-    telemetry is not a consumer with drift.
+    .build_telemetry_store``). The context comes from the ``specs/`` tree this run
+    RESOLVED, through the same one decider the writer uses — never from the env, which
+    names the session's bind and made ``doctor --context B`` discard B's own events. No
+    context resolved, no store, an unreadable or unmigrated store: ``None``, and every
+    hand-edit rule is silent — a consumer without telemetry is not a consumer with
+    drift.
     """
-    resolved = context or os.environ.get("DADAIA_CONTEXT") or ""
+    resolved = resolve_event_context_for_cli(specs_dir)
     if not resolved:
         return None
     from dadaia_workspace.features.telemetry.store import TelemetryStore
 
     try:
         connection = container.build_telemetry_store().open_read()
-    except Exception:  # noqa: BLE001 — no store, no file, no permission: silent
+    except (OSError, sqlite3.Error, ImportError):  # no store, no file, no permission
         return None
     try:
         events = TelemetryStore.from_connection(connection).latest_governance_events()
-    except Exception:  # noqa: BLE001 — corrupt or unmigrated store: silent
+    except (OSError, sqlite3.Error, ImportError):  # corrupt or unmigrated store
         return None
     finally:
         connection.close()
@@ -411,7 +415,7 @@ def doctor(
         typer.echo("Error: Workspace not initialized. Run 'dadaia init' first.", err=True)
         raise typer.Exit(1) from None
     target = _resolve_specs_dir(specs_dir, context)
-    governance = _resolve_governance(context)
+    governance = _resolve_governance(target)
     specs_doctor = _build_specs_doctor(target, public_dir, governance)
 
     fixed = _apply_fixes(
