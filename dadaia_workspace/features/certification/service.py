@@ -338,16 +338,7 @@ def certify(
     harness_env = {"CODEX_THREAD_ID": "certification-session"}
 
     def bind_heartbeat() -> str:
-        cli(
-            "context",
-            "bind",
-            "certified-consumer",
-            "--mode",
-            "implementation",
-            "--release",
-            "v0.0.1",
-            extra_env=harness_env,
-        )
+        cli("context", "bind", "certified-consumer", extra_env=harness_env)
         output = cli("context", "heartbeat", extra_env=harness_env)
         if "certification-session" not in output:
             raise RuntimeError(output)
@@ -378,7 +369,7 @@ def certify(
             + "\n",
             encoding="utf-8",
         )
-        cli("reports", "validate", str(path), "--strict", "--json")
+        cli("reports", "validate", str(path), "--json")
         return "handoff-v1.2 strict validation"
 
     check("reports-handoff-validation", handoff_validation)

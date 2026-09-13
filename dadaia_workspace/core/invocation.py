@@ -462,7 +462,7 @@ def resolve_specs_dir(specs_dir: str | None) -> Path:
 
     raise typer.BadParameter(
         "Could not resolve specs_dir. Pass --specs-dir or bind a context with "
-        "`eval $(dadaia context bind <name> --mode read)`."
+        "`eval $(dadaia context bind <name> --print-env)`."
     )
 
 

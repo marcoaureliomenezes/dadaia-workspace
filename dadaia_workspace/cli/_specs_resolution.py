@@ -97,7 +97,7 @@ def resolve_context_for_cli(explicit: str | None) -> str:
         return resolved
     raise ValueError(
         "No caller-owned Spec Context is selected. Run "
-        "'dadaia context bind <name> --mode <mode>' in this session or pass "
+        "'dadaia context bind <name>' in this session or pass "
         "'--context <name>' explicitly. Use 'dadaia context list --json' to discover "
         "available contexts."
     )
