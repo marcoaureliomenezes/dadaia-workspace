@@ -562,7 +562,19 @@ class Handoff:
             mapped = ROLE_ATOM_MAP.get(agent)
             if mapped is not None:
                 expected_ref = f"specs/{mapped}"
-                if expected_ref not in refs:
+                # The rule demands the atom exactly when the tree the handoff points at
+                # HAS it — same existence resolver the ref loop above uses, no second
+                # name table and no per-specs-pattern branch. Before this, the two rules
+                # contradicted each other in a specs pattern-5 tree (memory files are
+                # `quality-assurance.md`/`architecture.md`, so `QUALITY.md` CANNOT
+                # exist): listing the mapped atom failed existence, omitting it failed
+                # coverage, and no honest handoff-v1.2 could validate there.
+                if expected_ref not in refs and self._self_pull_ref_exists(
+                    expected_ref,
+                    context,
+                    workspace_root=workspace_root,
+                    reviewed_root=reviewed_root,
+                ):
                     errors.append(
                         HandoffValidationError(
                             "self_pull.refs",
