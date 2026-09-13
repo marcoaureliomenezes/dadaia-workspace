@@ -171,7 +171,7 @@
       "text": "security-reviewer APPROVED @ 56ae7685. qa-engineer CHANGES_REQUESTED @ 56ae7685 — G1/G2 fixed in aa8ae18a. code-reviewer CHANGES_REQUESTED @ 56ae7685 — F1..F6 fixed in a828ea90..ddae7de4. Delta verdicts from all three requested on the closure head before the candidate PR."
     },
     {
-      "ts": "2026-09-13T06:20:00Z",
+      "ts": "2026-09-13T06:05:00Z",
       "agent": "product-engineer",
       "kind": "note",
       "text": "SPEC-DOC-005 (PLAN over 300 lines) is advisory since ec27c4b1 — its only exit-1 path (`HARD_LIMIT_PLAN_CUTOFF`) was deleted with the truncating fix line; `PLAN.md` has no byte ratchet (V34 pins SPEC/TASKS). Recorded as a drift; a PLAN row in `test_slop_ratchets.py` is candidate 3 dedupe work if the operator wants it enforced."

@@ -5,7 +5,7 @@
       "id": "governance-verbs-telemetry",
       "title": "Governance verbs: backlog exit, audit close, telemetry event per verb",
       "opened": "2026-09-12",
-      "status": "candidate",
+      "status": "picked",
       "description": "Audit BL-5, SK-19, BG-11; grill Q5/Q6. Every governance record change has exactly one CLI verb; a file-tool write to a governance record is measured as drift by the doctor, never blocked. New verbs: `dadaia backlog exit <slug> --disposition --release|--reason` over the existing backlog_exit; `dadaia audit close <dir>` (rewrites dispositions to terminal, appends the histo record with window-end sha and per-pillar counts, deletes the dir). ADRs and memory atoms stay hand-written and doctor-validated. Every governance verb (bugs, backlog, release, audit) writes one event (session, agent, verb, record id, sha) to the existing telemetry store — no new store, no new hook — so audits measure who changed what without git log --all.",
       "provenance": "operator-ratified grill 2026-09-12 (SDD lifecycle audit, rulings Q1-Q17)",
       "intents": [
@@ -52,7 +52,7 @@
       "id": "bug-policy-one-model-ask-first",
       "title": "Bug policy: one model (fix now), ask before registering, lineage folded into resolve",
       "opened": "2026-09-12",
-      "status": "candidate",
+      "status": "picked",
       "description": "Audit GV-2/C2, BG-1/2/5/8/9/13; grill Q9/Q13 and the operator's registration ruling. One bug model: a bug is fixed immediately on the live branch, resolved_release is a recorded fact; 'open bugs outrank backlog at pick', the bug-always-solved pick step and specs/AGENTS.md:47 are deleted. Registration policy: the agent proposes, the operator confirms — a bug is only a reproducible violation of a tool's documented contract; the agent's own mistake, wrong usage, environment limits, designed validation, law ambiguity and missing features are not bugs (grill/backlog instead). Without an operator present the proposal (contract violated with law/--help line, one-command reproduction, why it is not agent error) goes to the handoff as bug-proposal, never to the ledger; no new CLI flag; the audit measures registrations per session. DADAIA 7.3 and dd-bug-registration rewritten. Lineage: Phase 0 folds into `bugs resolve` (--caused-by validated as bug id or none), lineage_source and root_cause deleted; provenance machinery (core/bug_provenance.py, BugEventKind, the four *_commit/*_granularity fields, fetch-depth 0 in CI) deleted; surface enum derived from features/* at validation, unknown refused for native records; severity gets a one-line rubric.",
       "provenance": "operator-ratified grill 2026-09-12 (SDD lifecycle audit, rulings Q1-Q17)",
       "intents": [
@@ -83,7 +83,7 @@
       "id": "law-and-skill-dedupe",
       "title": "Law and skills: one home per rule, dead pointers and provenance deleted",
       "opened": "2026-09-12",
-      "status": "candidate",
+      "status": "picked",
       "description": "Audit SK-01..SK-24, GV-3, GV-12/13/14/16, ADR-5, D-004/005/008/009. After DADAIA is made true (gate-context-scope-antistall), every rule lives in one home: gitflow owns merge->ship (RC-FLOW ends at the candidate PR); dd-task-manager folds into RC-FLOW step 1; dd-workspace-doctor deleted (one idiom line in dd-cli-library); dd-audit-project/SPEC-REVIEW.md deleted (two lines move to dd-release-definition); dd-manager-orchestration drops its agent/stage re-tables and the phantom pre-implementation agreement; backlog and handoff contracts in one home each; the 13 conflicting restatements (audit dir name, TTL, checkpoint model, six-vs-three axes) fixed to one value; constitution.md reduced to frontmatter + fixed block + statements that exist nowhere else; public/data/memory-AGENTS.md twin deleted; ctx_inject stops re-injecting the fixed slop blocks; PM playbook table, six dead persona pointers, ~14 provenance lines and the non-resolving ADR-* comment namespaces deleted; product-engineer either gets Bash or its nine CLI steps become dispatch; reviewer personas carry one checkpoint sentence; dd-architecture-survey granted to software-architect; a contract test resolves every dd-*/section/path token in persona bodies. Target: 71 duplicated statements -> ~15, 13 conflicts -> 0, two skill dirs fewer.",
       "provenance": "operator-ratified grill 2026-09-12 (SDD lifecycle audit, rulings Q1-Q17)",
       "intents": [
