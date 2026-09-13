@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.invocation import Bind
 from dadaia_workspace.core.workspace_layout import LAW_BASENAMES
 from dadaia_workspace.features.spec_context.gate_policy import (
     Decision,
@@ -395,7 +394,10 @@ def test_manifest_removal_never_demotes_a_statically_floored_law_path(tmp_path: 
 # 0.4.7 FR1 — the Bind's SCOPE is the third and last gate block.
 # ═════════════════════════════════════════════════════════════════════════════════
 
-_BIND_A = Bind(context_name="ctx-a", repos=frozenset({"ctx-a", "ctx-a-infra"}))
+_BOUND_A: dict[str, object] = {
+    "bound_context": "ctx-a",
+    "bound_repos": frozenset({"ctx-a", "ctx-a-infra"}),
+}
 
 
 def _evaluate_scope(tmp_path: Path, rel_path: str, **kwargs: object) -> tuple[Decision, str]:
@@ -408,7 +410,7 @@ def test_write_into_a_repo_outside_the_bind_scope_is_blocked_with_a_runnable_fix
     """AC: bound to A, a write into repos/B/src/x.py is refused and names the bind that
     clears it."""
     decision, message = _evaluate_scope(
-        tmp_path, "repos/ctx-b/src/x.py", bind=_BIND_A, target_slug="ctx-b", target_owner="ctx-b"
+        tmp_path, "repos/ctx-b/src/x.py", **_BOUND_A, target_slug="ctx-b", target_owner="ctx-b"
     )
     assert decision == Decision.BLOCK
     assert "fix: .dadaia/.venv/bin/dadaia context bind ctx-b" in message
@@ -418,7 +420,7 @@ def test_an_associated_repo_of_the_bound_context_is_in_scope(tmp_path: Path) -> 
     decision, _ = _evaluate_scope(
         tmp_path,
         "repos/ctx-a-infra/main.tf",
-        bind=_BIND_A,
+        **_BOUND_A,
         target_slug="ctx-a-infra",
         target_owner="ctx-a",
     )
@@ -435,7 +437,7 @@ def test_an_unbound_session_is_never_scope_blocked(tmp_path: Path) -> None:
 def test_a_slug_no_context_registers_is_never_scope_blocked(tmp_path: Path) -> None:
     """Fail-open: the gate cannot attribute a repo nothing claims."""
     decision, _ = _evaluate_scope(
-        tmp_path, "repos/stranger/src/x.py", bind=_BIND_A, target_slug="stranger"
+        tmp_path, "repos/stranger/src/x.py", **_BOUND_A, target_slug="stranger"
     )
     assert decision == Decision.ALLOW
 
@@ -444,7 +446,7 @@ def test_an_additive_path_in_a_foreign_repo_stays_writable(tmp_path: Path) -> No
     decision, _ = _evaluate_scope(
         tmp_path,
         "repos/ctx-b/specs/bugs/BUGS.jsonl",
-        bind=_BIND_A,
+        **_BOUND_A,
         target_slug="ctx-b",
         target_owner="ctx-b",
     )
@@ -459,6 +461,6 @@ def test_a_memory_write_is_allowed_in_every_phase(tmp_path: Path, rel_path: str)
     """The MEMORY class is deleted: memory authorship is constitution discipline,
     audited by the drift pillar, never gated (0.4.7 FR1)."""
     decision, _ = _evaluate_scope(
-        tmp_path, rel_path, bind=_BIND_A, target_slug="ctx-a", target_owner="ctx-a"
+        tmp_path, rel_path, **_BOUND_A, target_slug="ctx-a", target_owner="ctx-a"
     )
     assert decision == Decision.ALLOW

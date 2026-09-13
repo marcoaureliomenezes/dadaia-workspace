@@ -131,7 +131,10 @@ def _evaluate_target(
         return gate_policy.Decision.ALLOW, ""
 
     runtime = os.environ.get("DADAIA_RUNTIME", "unknown")
-    # SCOPE inputs (FR1): the repo the write lands in, and the context that OWNS it.
+    # SCOPE inputs (FR1): the repo the write lands in, the context that OWNS it, and the
+    # session's OWN bind flattened to plain data (name + repo slugs). The policy module
+    # stays pure — ``core.invocation`` is resolved HERE, once, and never imported by
+    # ``features/`` (P-09: the bind-resolution seam has a single home).
     # Ownership is proved the same way the Bind's own scope is — ``all_repos`` over the
     # registry — so an unregistered slug yields no owner and the policy fails open on
     # it, exactly as the SPEC requires (the gate cannot attribute what nothing claims).
@@ -143,7 +146,8 @@ def _evaluate_target(
         rel_path,
         ctx=ctx,
         session_id=session_id,
-        bind=inv.bind,
+        bound_context=inv.bind.context_name,
+        bound_repos=inv.bind.repos,
         target_slug=target_slug,
         target_owner=target_owner,
         runtime=runtime,

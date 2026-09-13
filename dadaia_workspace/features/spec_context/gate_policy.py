@@ -5,7 +5,7 @@ The only mutating-mode denial is the caller's own explicit READ mode. Protected 
 session records remain fail-closed against file-tool writes.
 
 **The gate blocks three things (0.4.7 FR1).** A PROTECTED write (CLI-owned session
-records and projected law files); a MUTATING write into a repo the session's Bind does
+records and projected law files); a MUTATING write into a repo the session's bind does
 not own; and — in ``hooks/root_whitelist`` — a new workspace-root entry. There is no
 fourth block and no path class beyond ``ADDITIVE``/``MUTATING``/``PROTECTED``.
 
@@ -28,7 +28,6 @@ from enum import Enum
 from pathlib import Path
 
 from dadaia_workspace.core import workspace_layout
-from dadaia_workspace.core.invocation import Bind
 from dadaia_workspace.features.spec_context import presence
 
 __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
@@ -207,19 +206,29 @@ def classify_path(rel_path: str) -> PathClass:
 
 
 def _scope_block(
-    rel_path: str, bind: Bind, target_slug: str | None, target_owner: str | None
+    rel_path: str,
+    bound_context: str | None,
+    bound_repos: frozenset[str],
+    target_slug: str | None,
+    target_owner: str | None,
 ) -> str | None:
-    """The scope refusal for a MUTATING write, or ``None`` when the write is in scope."""
-    if bind.context_name is None or target_slug is None or target_owner is None:
+    """The scope refusal for a MUTATING write, or ``None`` when the write is in scope.
+
+    The bind is PLAIN DATA here — the name the session bound and the repo slugs that
+    scope covers. Resolving them is the hook's job (``hooks/sdd_gate._evaluate_target``
+    already resolves the Invocation once); this module imports nothing from
+    ``core.invocation`` (P-09: the resolution seam has a single home).
+    """
+    if bound_context is None or target_slug is None or target_owner is None:
         return None
-    if target_slug in bind.repos or target_owner == bind.context_name:
+    if target_slug in bound_repos or target_owner == bound_context:
         return None
     return _SCOPE_BLOCK_MESSAGE.format(
         rel_path=rel_path,
         slug=target_slug,
         owner=target_owner,
-        bound=bind.context_name,
-        scope=", ".join(sorted(bind.repos)) or "no registered repo",
+        bound=bound_context,
+        scope=", ".join(sorted(bound_repos)) or "no registered repo",
     )
 
 
@@ -229,7 +238,8 @@ def evaluate(
     *,
     ctx: str,
     session_id: str,
-    bind: Bind = Bind(),
+    bound_context: str | None = None,
+    bound_repos: frozenset[str] = frozenset(),
     target_slug: str | None = None,
     target_owner: str | None = None,
     clock: Callable[[], datetime] = _utcnow,
@@ -239,13 +249,14 @@ def evaluate(
     """Return the gate decision for one write target — the fail-safe contract.
 
     Three blocks, in order: PROTECTED (fail-CLOSED, the projected-law message or the
-    session-record message), then — for a MUTATING write — the Bind's SCOPE. Everything
+    session-record message), then — for a MUTATING write — the bind's SCOPE, received as
+    plain data (*bound_context* / *bound_repos*), never re-resolved here. Everything
     else ALLOWS, upserting advisory presence.
 
     SCOPE (FR1, Q1): only ``repos/<slug>/`` is scope-judged. *target_slug* is the repo
     the write lands in and *target_owner* the context that registers it; the write is
     refused only when the session is BOUND, some context demonstrably owns that slug,
-    and it is not the bound context's own (``bind.repos`` = main + associated). An
+    and it is not the bound context's own (*bound_repos* = main + associated). An
     unbound session, a workspace-root path, and a slug no context registers all ALLOW —
     the gate cannot attribute them, and fail-open is the posture.
 
@@ -269,7 +280,7 @@ def evaluate(
     if cls == PathClass.ADDITIVE:
         return Decision.ALLOW, ""
 
-    scope_block = _scope_block(rel_path, bind, target_slug, target_owner)
+    scope_block = _scope_block(rel_path, bound_context, bound_repos, target_slug, target_owner)
     if scope_block is not None:
         return Decision.BLOCK, scope_block
 
