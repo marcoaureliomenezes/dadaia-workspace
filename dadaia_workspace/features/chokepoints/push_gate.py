@@ -41,7 +41,7 @@ from dadaia_workspace.features.chokepoints.denylist_scan import (
     PathMasker,
     scan_objects,
 )
-from dadaia_workspace.features.chokepoints.verdict import live_verdict_shas
+from dadaia_workspace.features.chokepoints.verdict import INTEGRATION_TIP_REF, live_verdict_shas
 
 __all__ = ["push_gate_decision"]
 
@@ -73,6 +73,8 @@ class ObjectSource(Protocol):
     def first_parent(self, repo: Path, sha: str) -> str | None: ...
 
     def resolve_ref(self, repo: Path, ref: str) -> str | None: ...
+
+    def tree_mentions(self, repo: Path, sha: str, term: str) -> bool: ...
 
 
 def _annotate_skip(
@@ -190,8 +192,14 @@ def _run_denylist_scan(
     terms: Iterable[tuple[str, str]],
     patterns: Iterable[BaselinePatternLike],
     slugs: Iterable[str],
+    specs_paths_by_ref: dict[str, list[str]] | None = None,
 ) -> tuple[Decision | None, int, tuple[OversizedNote, ...], PathMasker]:
     """Run the FR1/FR2 scan over *scan_refs* — every non-deletion ref, tags included.
+
+    *specs_paths_by_ref* (operator ruling 2026-09-13, bug
+    ``pre-push-canon-scan-not-range-scoped``): when given, every ``specs/`` path the
+    streamed range objects carry is recorded under the ref's local sha — the canon
+    scan reads the SAME single pass instead of listing the whole tree at the tip.
 
     Returns ``(refusal_or_None, skipped_binary_count, oversized_notes, path_masker)``.
     A git object-read failure refuses immediately, naming the failure (FR6 row 2) —
@@ -217,6 +225,11 @@ def _run_denylist_scan(
     path_masker = PathMasker(term_list, pattern_list, slug_list)
     if not scan_refs:
         return None, 0, (), path_masker
+    try:
+        published = _published_slugs(scan_refs, object_source, repo, slug_list)
+    except GitObjectReadError:
+        published = set()  # fail CLOSED: an unreadable baseline amnesties nothing
+    scan_slugs = [slug for slug in slug_list if slug not in published]
     seen_shas: set[str] = set()
     per_ref_hits: list[tuple[PushRef, Hit]] = []
     skipped_total = 0
@@ -224,7 +237,10 @@ def _run_denylist_scan(
     try:
         for ref in scan_refs:
             fresh = _dedup_new_objects(object_source, repo, ref, seen_shas)
-            outcome = scan_objects(fresh, term_list, pattern_list, slug_list)
+            if specs_paths_by_ref is not None:
+                sink = specs_paths_by_ref.setdefault(ref.local_sha, [])
+                fresh = _record_specs_paths(fresh, sink)
+            outcome = scan_objects(fresh, term_list, pattern_list, scan_slugs)
             skipped_total += outcome.skipped_binary_count
             oversized_all.extend(outcome.oversized_notes)
             per_ref_hits.extend((ref, hit) for hit in outcome.hits)
@@ -285,27 +301,46 @@ def _compose_specs_canon_refusal(violations: list[tuple[PushRef, str]]) -> str:
     return "\n".join(lines)
 
 
+def _record_specs_paths(
+    objects: Iterator[ScannedObject], sink: list[str]
+) -> Iterator[ScannedObject]:
+    """Stream *objects* through unchanged, recording each ``specs/`` path into *sink*.
+
+    Bug ``pre-push-canon-scan-not-range-scoped`` (operator ruling 2026-09-13): the
+    canon scan reads the SAME pushed-range objects the denylist scan streams — one
+    pass over ``new_objects``, never the whole tree at the tip. A path no commit in
+    the range touches is already published, so it never blocks a push (the principle
+    the denylist refusal text has always stated: the range scope means published
+    history never needs a rewrite).
+    """
+    for obj in objects:
+        if obj.path.startswith("specs/"):
+            sink.append(obj.path)
+        yield obj
+
+
 def _run_specs_canon_scan(
     scan_refs: list[PushRef],
+    specs_paths_by_ref: dict[str, list[str]],
     object_source: ObjectSource,
     repo: Path,
     canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
     verdict_violations_fn: Callable[[Sequence[str], Collection[str]], Sequence[str]],
 ) -> Decision | None:
-    """SPEC v0.5.0 specs-canon closure (operator ruling 2026-08-28): every pushed
-    non-deletion ref's tree is checked for a ``specs/`` path violating the v6 canon
-    (or the verdict business rule) — via the INJECTED *canon_violations_fn*/
-    *verdict_violations_fn* (v0.5.1 K7: the SAME predicates the doctor's TREE-8 check
-    uses, never a second, hand-kept member list — injected rather than imported at
-    module scope so this module carries no ``chokepoints -> specs.canon`` edge; the CLI
-    composition root wires ``features.specs.canon.canon_violations``/
-    ``verdict_violations`` straight through).
+    """SPEC v0.5.0 specs-canon closure (operator ruling 2026-08-28), range-scoped since
+    2026-09-13: every ``specs/`` path the pushed range introduces or rewrites
+    (*specs_paths_by_ref*, recorded by :func:`_record_specs_paths`) is checked against
+    the v6 canon; the verdict business rule ("at most ONE file per live sha") is a
+    property of the published TREE, so it alone keeps a tree view over the tip's
+    ``verdicts/`` paths — both via the INJECTED predicates (v0.5.1 K7: the SAME
+    predicates the doctor's TREE-8 check uses, never a second, hand-kept member list —
+    injected rather than imported at module scope so this module carries no
+    ``chokepoints -> specs.canon`` edge).
     """
     violations: list[tuple[PushRef, str]] = []
-    seen: set[tuple[str, str]] = set()
     for ref in scan_refs:
         try:
-            raw_paths = object_source.list_tree_paths(repo, ref.local_sha, "specs")
+            tree_paths = object_source.list_tree_paths(repo, ref.local_sha, "specs")
         except GitObjectReadError as exc:
             return Decision(
                 allowed=False,
@@ -318,20 +353,47 @@ def _run_specs_canon_scan(
                     "the object store first — git fsck)"
                 ),
             )
-        specs_rel = [p[len("specs/") :] for p in raw_paths if p.startswith("specs/")]
-        bad = set(canon_violations_fn(specs_rel))
+        range_rel = sorted({p[len("specs/") :] for p in specs_paths_by_ref.get(ref.local_sha, [])})
+        verdict_rel = [p[len("specs/") :] for p in tree_paths if "/verdicts/" in p]
+        bad = set(canon_violations_fn(range_rel))
         bad.update(
-            verdict_violations_fn(specs_rel, live_verdict_shas(object_source, repo, ref.local_sha))
+            verdict_violations_fn(
+                verdict_rel, live_verdict_shas(object_source, repo, ref.local_sha)
+            )
         )
-        for path in sorted(bad):
-            key = (ref.local_sha, path)
-            if key in seen:
-                continue
-            seen.add(key)
-            violations.append((ref, path))
+        violations.extend((ref, path) for path in sorted(bad))
     if not violations:
         return None
     return Decision(allowed=False, message=_compose_specs_canon_refusal(violations))
+
+
+def _published_slugs(
+    scan_refs: list[PushRef],
+    object_source: ObjectSource,
+    repo: Path,
+    slugs: Sequence[str],
+) -> set[str]:
+    """The foreign slugs the pushed refs' remote tips (or, for a brand-new ref, the
+    integration tip) already publish — a sibling repository's name this repository's
+    published history already carries is not a new disclosure (operator ruling
+    2026-09-13; extends the v0.11.0 FR1 per-path amnesty to the repository). Raises
+    :class:`GitObjectReadError` through; the caller then amnesties nothing.
+    """
+    if not slugs:
+        return set()
+    baselines: set[str] = set()
+    for ref in scan_refs:
+        if ref.remote_sha and ref.remote_sha != "0" * 40:
+            baselines.add(ref.remote_sha)
+        else:
+            tip = object_source.resolve_ref(repo, INTEGRATION_TIP_REF)
+            if tip:
+                baselines.add(tip)
+    return {
+        slug
+        for slug in slugs
+        if any(object_source.tree_mentions(repo, sha, slug) for sha in baselines)
+    }
 
 
 def push_gate_decision(
@@ -356,9 +418,11 @@ def push_gate_decision(
        ``main`` are refused outright (they advance by PR only); names outside the three
        permitted patterns are refused as invalid.
     2. **specs/ canon scan** (v0.5.0 specs-canon closure, operator ruling 2026-08-28)
-       — every non-deletion ref, tags included, is checked via *object_source* for a
-       ``specs/`` path violating the v6 canon or the verdict business rule (the
-       injected *canon_violations_fn*/*verdict_violations_fn*).
+       — every ``specs/`` path the pushed range introduces or rewrites is checked
+       against the v6 canon (range-scoped since 2026-09-13: a path no commit in the
+       range touches never blocks); the verdict business rule keeps its tree view over
+       the tip's ``verdicts/`` paths (the injected *canon_violations_fn*/
+       *verdict_violations_fn*).
     3. **Range-scoped denylist scan** (v0.9.0 FR1/FR2) — every non-deletion ref, tags
        included, is scanned via *object_source* for new objects carrying a denylisted
        term. Runs AFTER branch policy and the canon scan (both free and pure) — under
@@ -404,17 +468,37 @@ def push_gate_decision(
     # the denylist scan (step 3, A3.4).
     scan_refs = [r for r in refs if not r.is_deletion]
 
-    # v0.5.0 specs-canon closure (operator ruling 2026-08-28): step 2.
+    # One streaming pass over the pushed-range objects feeds BOTH step 2 (specs canon,
+    # range-scoped, operator ruling 2026-09-13) and step 3 (denylist); step 2's refusal
+    # still takes precedence over step 3's.
+    specs_paths_by_ref: dict[str, list[str]] = {}
+    scan_refusal, skipped_binary_count, oversized_notes, path_masker = _run_denylist_scan(
+        scan_refs,
+        object_source,
+        repo,
+        denylist_terms,
+        baseline_patterns,
+        foreign_slugs,
+        specs_paths_by_ref,
+    )
+    if scan_refusal is not None and not scan_refusal.message.startswith(
+        "[pre-push] BLOCKED: the pushed range publishes"
+    ):
+        # A git-read failure: nothing was streamed, so the canon scan has no input
+        # either — fail closed on the read error itself.
+        return _annotate_skip(scan_refusal, skipped_binary_count, oversized_notes, path_masker)
+
     canon_refusal = _run_specs_canon_scan(
-        scan_refs, object_source, repo, canon_violations_fn, verdict_violations_fn
+        scan_refs,
+        specs_paths_by_ref,
+        object_source,
+        repo,
+        canon_violations_fn,
+        verdict_violations_fn,
     )
     if canon_refusal is not None:
         return canon_refusal
 
-    # v0.9.0 FR1/FR2: step 3.
-    scan_refusal, skipped_binary_count, oversized_notes, path_masker = _run_denylist_scan(
-        scan_refs, object_source, repo, denylist_terms, baseline_patterns, foreign_slugs
-    )
     if scan_refusal is not None:
         return _annotate_skip(scan_refusal, skipped_binary_count, oversized_notes, path_masker)
 

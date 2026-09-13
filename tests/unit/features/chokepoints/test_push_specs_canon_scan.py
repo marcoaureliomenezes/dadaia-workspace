@@ -34,6 +34,9 @@ class _FakeCanonObjectSource:
     parent — no denylist content, this fixture only exercises the canon scan step."""
 
     tree_by_sha: dict[str, list[str]] = field(default_factory=dict)
+    #: The paths the pushed RANGE introduces or rewrites at a sha (bug
+    #: ``pre-push-canon-scan-not-range-scoped``: the canon scan reads these, never the tree).
+    range_by_sha: dict[str, list[str]] = field(default_factory=dict)
     parent_by_sha: dict[str, str] = field(default_factory=dict)
     sha_by_ref: dict[str, str] = field(default_factory=dict)
     tree_calls: list[tuple[str, str]] = field(default_factory=list)
@@ -41,7 +44,10 @@ class _FakeCanonObjectSource:
     ref_calls: list[str] = field(default_factory=list)
 
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
-        return ()
+        return [
+            ScannedObject(path=path, sha=f"blob{i}", text="", decodable=True)
+            for i, path in enumerate(self.range_by_sha.get(local_sha, []))
+        ]
 
     def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
         self.tree_calls.append((sha, prefix))
@@ -54,6 +60,9 @@ class _FakeCanonObjectSource:
     def resolve_ref(self, repo: Path, ref: str) -> str | None:
         self.ref_calls.append(ref)
         return self.sha_by_ref.get(ref)
+
+    def tree_mentions(self, repo: Path, sha: str, term: str) -> bool:
+        return False
 
 
 class _FailingTreeObjectSource:
@@ -68,6 +77,9 @@ class _FailingTreeObjectSource:
 
     def resolve_ref(self, repo: Path, ref: str) -> str | None:
         return None
+
+    def tree_mentions(self, repo: Path, sha: str, term: str) -> bool:
+        return False
 
 
 def _refs(*lines: str) -> list[PushRef]:
@@ -92,6 +104,7 @@ def test_a_fully_canon_conformant_tree_passes(tmp_path: Path) -> None:
 def test_a_non_canon_path_refuses_naming_the_fix_hint(tmp_path: Path) -> None:
     source = _FakeCanonObjectSource(
         tree_by_sha={_SHA_A: ["specs/AGENTS.md", "specs/backlog/loose-entry.md"]},
+        range_by_sha={_SHA_A: ["specs/backlog/loose-entry.md"]},
     )
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
@@ -105,8 +118,52 @@ def test_a_non_canon_path_refuses_naming_the_fix_hint(tmp_path: Path) -> None:
     assert "delete the path; canon: DADAIA.md §6" in decision.message
 
 
+def test_a_non_canon_path_outside_the_pushed_range_never_blocks(tmp_path: Path) -> None:
+    """Bug ``pre-push-canon-scan-not-range-scoped`` (operator ruling 2026-09-13): a
+    pre-migration tree (``specs/_archive/**``, a Markdown backlog) already published
+    must never block a push whose range touches only canon paths — the range scope
+    means published history never needs a rewrite (the denylist scan's own law)."""
+    source = _FakeCanonObjectSource(
+        tree_by_sha={
+            _SHA_A: [
+                "specs/AGENTS.md",
+                "specs/_archive/legacy/SPEC.md",
+                "specs/backlog/candidates.md",
+                "specs/memory/product/atom.md",
+            ]
+        },
+        range_by_sha={_SHA_A: ["specs/memory/product/atom.md", "README.md"]},
+    )
+    decision = push_gate_decision(
+        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_SHA_B}"),
+        object_source=source,
+        repo=tmp_path,
+        canon_violations_fn=lambda paths: [p for p in paths if p.startswith("_archive/")],
+        verdict_violations_fn=verdict_violations,
+    )
+    assert decision.allowed, decision.message
+
+
+def test_a_non_canon_path_inside_the_pushed_range_still_blocks(tmp_path: Path) -> None:
+    source = _FakeCanonObjectSource(
+        tree_by_sha={_SHA_A: ["specs/AGENTS.md", "specs/_archive/new.md"]},
+        range_by_sha={_SHA_A: ["specs/_archive/new.md"]},
+    )
+    decision = push_gate_decision(
+        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_SHA_B}"),
+        object_source=source,
+        repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
+    )
+    assert not decision.allowed
+    assert "specs/_archive/new.md" in decision.message
+
+
 def test_a_stray_dotfile_refuses(tmp_path: Path) -> None:
-    source = _FakeCanonObjectSource(tree_by_sha={_SHA_A: ["specs/.gitkeep"]})
+    source = _FakeCanonObjectSource(
+        tree_by_sha={_SHA_A: ["specs/.gitkeep"]}, range_by_sha={_SHA_A: ["specs/.gitkeep"]}
+    )
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,
@@ -205,7 +262,10 @@ def test_a_deletion_ref_is_never_scanned(tmp_path: Path) -> None:
 
 
 def test_a_tag_push_is_scanned_too(tmp_path: Path) -> None:
-    source = _FakeCanonObjectSource(tree_by_sha={_SHA_A: ["specs/backlog/loose.md"]})
+    source = _FakeCanonObjectSource(
+        tree_by_sha={_SHA_A: ["specs/backlog/loose.md"]},
+        range_by_sha={_SHA_A: ["specs/backlog/loose.md"]},
+    )
     decision = push_gate_decision(
         _refs(f"refs/tags/v9.9.9 {_SHA_A} refs/tags/v9.9.9 {_ZERO}"),
         object_source=source,
@@ -232,7 +292,9 @@ def test_a_git_read_failure_on_list_tree_paths_refuses_fail_closed(tmp_path: Pat
 def test_canon_scan_runs_before_the_denylist_scan(tmp_path: Path) -> None:
     """The canon refusal fires even with zero denylist terms configured — step 2 runs
     independently of, and before, step 3 (A3.4's later denylist step)."""
-    source = _FakeCanonObjectSource(tree_by_sha={_SHA_A: ["specs/rogue.md"]})
+    source = _FakeCanonObjectSource(
+        tree_by_sha={_SHA_A: ["specs/rogue.md"]}, range_by_sha={_SHA_A: ["specs/rogue.md"]}
+    )
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,

@@ -158,6 +158,9 @@ class _FakeObjectSource:
     def resolve_ref(self, repo: Path, ref: str) -> str | None:
         return None
 
+    def tree_mentions(self, repo: Path, sha: str, term: str) -> bool:
+        return False
+
 
 class _FailingObjectSource(_FakeObjectSource):
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
@@ -211,7 +214,11 @@ def _feature_ref() -> list[PushRef]:
 
 
 def test_push_gate_specs_canon_refusal_carries_a_runnable_fix() -> None:
-    source = _FakeObjectSource(tree_paths=["specs/not-a-canon-entry.md"])
+    stray = "specs/not-a-canon-entry.md"
+    source = _FakeObjectSource(
+        objects=[ScannedObject(path=stray, sha="blob0", text="", decodable=True)],
+        tree_paths=[stray],
+    )
     assert_block_carries_a_runnable_fix(_decide(_feature_ref(), source=source))
 
 

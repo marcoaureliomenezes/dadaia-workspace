@@ -231,6 +231,12 @@ def _foreign_repo_slugs(
     return sorted((registry_terms | dir_terms) - own_identities)
 
 
+def _no_canon_violations(paths: Iterable[str]) -> list[str]:
+    """The canon predicate for a specs/ tree stamped below the canonical pattern: the
+    v6 canon does not describe it, so no path in it is a v6 violation."""
+    return []
+
+
 @app.command("push-gate-check")
 def push_gate_check() -> None:
     """Pre-push gate: branch-name validation + the range-scoped denylist scan.
@@ -259,12 +265,31 @@ def push_gate_check() -> None:
         load_denylist_terms,
         load_registry_context_identities,
     )
+    from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, read_pattern_version
     from dadaia_workspace.features.chokepoints import context_slug_for_path, push_gate_decision
     from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
     from dadaia_workspace.features.specs.canon import canon_violations, verdict_violations
 
     repo_root = _repo_root()
     workspace = resolve_workspace_root_for_cli(repo_root)
+
+    # Bug pre-push-canon-scan-not-range-scoped (operator ruling 2026-09-13): the v6
+    # canon is a property of a v6 tree. A specs/ tree still stamped below
+    # CANONICAL_SPECS_VERSION (pattern 5: Markdown backlog, `v`-prefixed release dirs,
+    # lowercase memory files) has NOTHING for the canon scan to enforce until
+    # `dadaia specs upgrade` migrates it — the doctor already reports that drift;
+    # the push gate must not lock every specs edit behind the migration.
+    specs_version = read_pattern_version(repo_root / "specs")
+    canon_fn = canon_violations
+    if 0 < specs_version < CANONICAL_SPECS_VERSION:
+        typer.echo(
+            f"[pre-push] specs/ tree is stamped pattern {specs_version} "
+            f"(< {CANONICAL_SPECS_VERSION}): the v6 canon scan does not apply until "
+            "`dadaia specs upgrade` migrates it; the verdict rule and the denylist "
+            "scan still run.",
+            err=True,
+        )
+        canon_fn = _no_canon_violations
 
     denylist_terms = load_denylist_terms()
     baseline_patterns = load_denylist_baseline_patterns()
@@ -293,7 +318,7 @@ def push_gate_check() -> None:
         refs,
         object_source=build_git_object_reader(),
         repo=repo_root,
-        canon_violations_fn=canon_violations,
+        canon_violations_fn=canon_fn,
         verdict_violations_fn=verdict_violations,
         malformed_lines=malformed,
         denylist_terms=denylist_terms,

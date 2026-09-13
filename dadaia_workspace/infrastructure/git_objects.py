@@ -926,6 +926,22 @@ class GitSubprocessObjectReader:
         sha = _decode(result.stdout).strip()
         return sha or None
 
+    def tree_mentions(self, repo: Path, sha: str, term: str) -> bool:
+        """``git grep -q -I -i -F -e <term> <sha>`` — whether the published tree at
+        *sha* already carries *term* anywhere (operator ruling 2026-09-13: a sibling
+        repository's slug this repository's remote tip already publishes is not a new
+        disclosure). Exit 0 -> True, 1 -> False, anything else raises
+        :class:`GitObjectReadError` (the caller then amnesties nothing — fail closed).
+        """
+        if not sha or not _SHA_SHAPE_RE.match(sha) or not term:
+            return False
+        result = _run(["git", "grep", "-q", "-I", "-i", "-F", "-e", term, sha], repo)
+        if result.returncode == 0:
+            return True
+        if result.returncode == 1:
+            return False
+        raise GitObjectReadError(f"git grep failed: {_decode(result.stderr).strip()}")
+
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterator[ScannedObject]:
         if not local_sha or local_sha == ZERO_SHA:
             return

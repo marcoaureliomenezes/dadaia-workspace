@@ -55,6 +55,9 @@ class _EmptyObjectSource:
     def resolve_ref(self, repo: Path, ref: str) -> str | None:
         return None
 
+    def tree_mentions(self, repo: Path, sha: str, term: str) -> bool:
+        return False
+
 
 def _decide(refs: list[PushRef], root: Path, **kwargs: Any) -> Decision:
     """``push_gate_decision`` with a no-op object source unless a test overrides it —
