@@ -4,8 +4,8 @@
   "phase": "DEFINITION",
   "rc": 1,
   "defined": {
-    "sha": "ea2acc24",
-    "ts": "2026-09-12T21:21:22Z"
+    "sha": "6e87fec4",
+    "ts": "2026-09-13T01:46:31Z"
   },
   "implemented": {
     "sha": "8e176493",
@@ -103,6 +103,12 @@
       "agent": "project-manager",
       "kind": "note",
       "text": "Sequencing deviation: rc-archive ran before PR #253 (feature/0.4.7 -> develop, head dd1a0d26) merged — every CI job was refused at start ('account is locked due to a billing issue'); the operator unlocks billing and re-runs the checks, the merge follows. Continue was ruled in advance (one deploy at the end; rc-N per theme)."
+    },
+    {
+      "ts": "2026-09-13T01:46:31Z",
+      "agent": "product-engineer",
+      "kind": "note",
+      "text": "Candidate 2 defined: 'the gate blocks three things' — gate-context-scope-antistall, one-canon-registry, continuous-reaper-reaped-zone, privacy-selfscan-scope + bug context-bind-implementation-requires-release-id-stall-when-none-live; trio Aprovado at 6e87fec4 under the operator's 2026-09-12 directive; grill Q1–Q5 answered by the PM as recorded in SPEC section 5 (Q2 option deletion and Q3 reaped zone location flagged to the operator). SPEC-DOC-044 names the candidate-1 PR verdict as stale locally because HEAD moved past the PR head while PR #253 waits on the GitHub billing unlock; the verdict is live for the PR head and is consumed at the merge — not fixed away."
     }
   ]
 }
