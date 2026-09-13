@@ -1,8 +1,8 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.7",
-  "phase": "CLOSURE",
-  "rc": null,
+  "phase": "DEFINITION",
+  "rc": 1,
   "defined": {
     "sha": "ea2acc24",
     "ts": "2026-09-12T21:21:22Z"
@@ -91,6 +91,18 @@
       "agent": "project-manager",
       "kind": "note",
       "text": "Corrections to earlier entries (append-only, never rewritten): the reviews entry's shas predate the pre-push history redaction — the first-round commit is 19eadea4 and the review fixes are cf502dd2..525ea4f6; drifts item (5) (RELEASE-TREE-MISSING tuple, '41 rows' comment) was fixed in 6e3fdade; drifts item (4) is half: dadaia doctor --fix DOES heal a scoped law file whose bytes match a shipped digest and refuses only unknown bytes. Delta verdicts: code-reviewer APPROVED @ 8e176493, qa-engineer APPROVED @ 8e176493 (implemented set in f32f6115)."
+    },
+    {
+      "ts": "2026-09-13T01:31:45Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate 1 archived to rc-1/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
+    },
+    {
+      "ts": "2026-09-13T01:32:00Z",
+      "agent": "project-manager",
+      "kind": "note",
+      "text": "Sequencing deviation: rc-archive ran before PR #253 (feature/0.4.7 -> develop, head dd1a0d26) merged — every CI job was refused at start ('account is locked due to a billing issue'); the operator unlocks billing and re-runs the checks, the merge follows. Continue was ruled in advance (one deploy at the end; rc-N per theme)."
     }
   ]
 }
