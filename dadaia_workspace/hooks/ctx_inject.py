@@ -71,7 +71,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from dadaia_workspace.core import fixed_sections, invocation, session_store
+from dadaia_workspace.core import invocation, session_store
 from dadaia_workspace.features.spec_context import injection_policy
 from dadaia_workspace.hooks import _common
 
