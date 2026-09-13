@@ -269,7 +269,9 @@ def bugs_update_cmd(
     ``--set status=...`` is REFUSED — the model itself refuses the key ``"status"``
     (:meth:`~dadaia_workspace.core.models.bugs.BugRecord.apply_governance_update`),
     naming the matching transition command instead
-    (``dadaia bugs resolve|supersede|defer|reject``)."""
+    (``dadaia bugs resolve|supersede|defer|reject``). ``--set caused_by=...`` is
+    REFUSED too (0.4.7 FR1): lineage has ONE writer, ``dadaia bugs resolve
+    --caused-by``, which is the only place it is validated against the ledger."""
     target = _target(specs_dir)
     changes: Mapping[str, str] = _parse_set_options(set_)
     service = build_bug_service(target)

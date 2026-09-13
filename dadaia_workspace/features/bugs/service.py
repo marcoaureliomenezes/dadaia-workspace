@@ -36,6 +36,7 @@ from pathlib import Path
 from jsonschema.exceptions import ValidationError
 
 from dadaia_workspace.core.atomic_write import ConcurrentModificationError, atomic_write
+from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.models.bugs import (
     BUG_ARCHIVE_THRESHOLD_DAYS,
     TERMINAL_EVENTS,
@@ -64,6 +65,9 @@ _LEGACY_SURFACE = "unknown"
 #: The literal a fixer passes to ``--caused-by`` when this bug has no prior cause —
 #: the one word that is NOT looked up in the ledger.
 _NO_LINEAGE = "none"
+
+#: The lineage key ``dadaia bugs resolve --caused-by`` owns outright (0.4.7 FR1).
+_LINEAGE_FIELD = "caused_by"
 
 
 _DOTTED_MODULE_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)+$")
@@ -239,10 +243,18 @@ class BugService:
     def apply_update(self, record_id: str, changes: Mapping[str, object]) -> BugRecord:
         """The one governance-write seam for every governance/write-once field OTHER
         than ``status`` (refused by :meth:`~dadaia_workspace.core.models.bugs.BugRecord
-        .apply_governance_update` itself): the auditor's ``audited`` rewrite and any
-        other non-status governance write. Redacts
+        .apply_governance_update` itself) and ``caused_by`` (refused here, 0.4.7 FR1):
+        the auditor's ``audited`` rewrite and any other non-status, non-lineage
+        governance write. Redacts
         the WHOLE resulting record (A2.6) before the store's refuse-stale atomic
         rewrite (A2.9, A2.2c)."""
+        if _LINEAGE_FIELD in changes:
+            raise ValueError(
+                f"bug-record field {_LINEAGE_FIELD!r} is unreachable through "
+                "'dadaia bugs update' — lineage is declared at resolve and nowhere "
+                f"else (0.4.7 FR1); fix: {DADAIA_BIN} bugs resolve {record_id} "
+                "--caused-by <bug-id|none>"
+            )
 
         def _mutate(record: BugRecord) -> BugRecord:
             updated = record.apply_governance_update(changes)
@@ -275,10 +287,12 @@ class BugService:
         return self._record_store.update(record_id, _mutate)
 
     def _validate_caused_by(self, caused_by: str | None) -> None:
-        """Lineage is declared at ``resolve`` and nowhere else (0.4.7 FR1), so this is
-        the ONE place it is checked: ``caused_by`` names a record of this ledger (live
-        or archived) or the literal ``none``. An unvalidated free-text lineage field is
-        how a second, unreadable lineage home grew."""
+        """Lineage is declared at ``resolve`` and nowhere else (0.4.7 FR1) — the
+        ``bugs update`` arm is refused outright by :meth:`apply_update`, so ``resolve``
+        is the ONE writer and this the ONE place it is checked: ``caused_by`` names a
+        record of this ledger (live or archived) or the literal ``none``. An
+        unvalidated free-text lineage field is how a second, unreadable lineage home
+        grew."""
         if caused_by is None or caused_by == _NO_LINEAGE:
             return
         known = {record.id for record in self._record_store.iter_records()}
