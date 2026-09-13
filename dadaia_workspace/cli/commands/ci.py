@@ -367,7 +367,8 @@ def verdict_check(
         typer.secho(
             f"[verdict-check] BLOCKED: --release-id '{release_id}' does not match the "
             "canon release-id pattern — refusing to use it to narrow the search.\n"
-            "fix: pass a bare SemVer release id, e.g. --release-id 0.4.7",
+            "fix: .dadaia/.venv/bin/dadaia ci verdict-check --head <sha> "
+            "--release-id 0.4.7",
             fg=typer.colors.RED,
             err=True,
         )
@@ -386,8 +387,9 @@ def verdict_check(
             "specs/releases/<id>/verdicts/<sha>.handoff.json or "
             "specs/releases/_archive/<id>/verdicts/<sha>.handoff.json "
             f"(sha = {head} or its first parent {parent or 'none'}).\n"
-            f"fix: commit the security-reviewer APPROVED handoff at "
-            f"specs/releases/<id>/verdicts/{head}.handoff.json",
+            f"The security-reviewer APPROVED handoff belongs at "
+            f"specs/releases/<id>/verdicts/{head}.handoff.json:\n"
+            f"fix: git add specs/releases/<id>/verdicts/{head}.handoff.json",
             fg=typer.colors.RED,
             err=True,
         )

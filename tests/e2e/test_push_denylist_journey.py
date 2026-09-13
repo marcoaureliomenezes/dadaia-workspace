@@ -193,7 +193,7 @@ def test_planted_term_refused_then_clean_push_after_amend(tmp_path: Path) -> Non
     assert "fake-context-name" not in out1, out1
 
     # A5.3 — remediation names edit + rewrite-before-push, never published-history rewrite.
-    assert "edit the listed file" in out1, out1
+    assert "Remove the term from the listed file(s)" in out1, out1
     assert "already-published history" in out1 and "never needs a rewrite" in out1, out1
     assert "--no-verify" in out1, out1
 

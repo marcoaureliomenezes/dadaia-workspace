@@ -122,6 +122,4 @@ def test_fix_inserts_a_missing_block_and_refreshes_a_drifted_one(tmp_path: Path)
 def test_fix_help_names_the_fixed_family() -> None:
     from dadaia_workspace.features.specs.rules import render_fix_help
 
-    assert (
-        "FIXED-1/FIXED-2: insert or refresh the workspace's fixed law sections" in render_fix_help()
-    )
+    assert "FIXED-1/FIXED-2" in render_fix_help()

@@ -139,8 +139,9 @@ def _compose_denylist_refusal(hits: list[tuple[PushRef, Hit]], path_masker: Path
         "`git push --no-verify` (discouraged; leaves a reflog trace)."
     )
     lines.append(
-        "fix: edit the listed file(s) to remove the term, then rewrite the offending "
-        "commit(s) — git rebase -i <first-offending-sha>^ — and push again"
+        "Remove the term from the listed file(s), then rewrite the offending "
+        "commit(s) and push again:\n"
+        "fix: git rebase -i <first-offending-sha>^"
     )
     return "\n".join(lines)
 
@@ -277,8 +278,9 @@ def _compose_specs_canon_refusal(violations: list[tuple[PushRef, str]]) -> str:
         "`git push --no-verify` (discouraged; leaves a reflog trace)."
     )
     lines.append(
-        "fix: git rm the listed specs/ path(s), then rewrite the offending commit(s) — "
-        "git rebase -i <first-offending-sha>^ — and push again"
+        "git rm the listed specs/ path(s), then rewrite the offending commit(s) and "
+        "push again:\n"
+        "fix: git rebase -i <first-offending-sha>^"
     )
     return "\n".join(lines)
 

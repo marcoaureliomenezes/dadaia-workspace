@@ -46,6 +46,46 @@ def _the_fix(message: str) -> str:
     return fixes[0]
 
 
+#: The executable tokens a ``fix:`` line may open with. ``dadaia`` bare is admitted only
+#: where the venv-rooted path cannot be spelled (a message rendered outside the
+#: workspace); everything else is a real binary the operator already has.
+_EXECUTABLE_TOKENS: frozenset[str] = frozenset(
+    {
+        ".dadaia/.venv/bin/dadaia",
+        "dadaia",
+        "git",
+        "gh",
+        "rm",
+        "mv",
+        "mkdir",
+        "printf",
+        "sed",
+        "cp",
+        "bash",
+    }
+)
+
+#: Words that betray prose or a second alternative inside one fix line.
+_PROSE_MARKERS: tuple[str, ...] = (" or ", ", then ", " then ", " and then ")
+
+
+def _assert_one_command(command: str) -> None:
+    """FR2's grammar: the fix is ONE executable command, not an instruction.
+
+    A ``&&`` chain of the same tool counts as one command — it is still a single line
+    the operator pastes. Prose ("author the missing document", "fix it and then push")
+    does not: an agent cannot run it, so the BLOCK is a Stall with a friendly face.
+    """
+    head = command.split()[0]
+    assert head in _EXECUTABLE_TOKENS, (
+        f"a fix line opens with an executable, not prose — got {head!r} in:\n{command}"
+    )
+    for marker in _PROSE_MARKERS:
+        assert marker not in command, (
+            f"a fix line is ONE command — {marker!r} makes it two:\n{command}"
+        )
+
+
 def _assert_runnable(command: str) -> None:
     """The fix must itself pass the PreToolUse gate — a blocked fix is a closed loop."""
     block = pre_gate.evaluate_payload({"tool_name": "Bash", "tool_input": {"command": command}})
@@ -53,7 +93,9 @@ def _assert_runnable(command: str) -> None:
 
 
 def assert_block_carries_a_runnable_fix(message: str) -> None:
-    _assert_runnable(_the_fix(message))
+    command = _the_fix(message)
+    _assert_one_command(command)
+    _assert_runnable(command)
 
 
 # ── the PreToolUse gate ─────────────────────────────────────────────────────────

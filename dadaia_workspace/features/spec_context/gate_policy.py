@@ -82,9 +82,9 @@ _LAW_MESSAGE = (
     "[GATE] '{path}' is a projected law file (the workspace system prompt / scoped "
     "AGENTS.md). In an instantiated workspace only a human operator edits it by hand; "
     "an agent changes the law at its source and re-projects.\n"
-    "fix: edit the source under dadaia_workspace/public/ and run "
-    ".dadaia/.venv/bin/dadaia public stage && .dadaia/.venv/bin/dadaia public install "
-    "--target all"
+    "The source is dadaia_workspace/public/; this re-projects it:\n"
+    "fix: .dadaia/.venv/bin/dadaia public stage && .dadaia/.venv/bin/dadaia public "
+    "install --target all"
 )
 
 #: BLOCK message for a MUTATING write into a repo outside the Bind's scope (FR1, Q1).

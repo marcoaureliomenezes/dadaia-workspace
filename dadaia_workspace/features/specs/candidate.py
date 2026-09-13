@@ -229,18 +229,20 @@ def _refuse_bad_arguments(shipped_sha: str, pr: int, next_release: str) -> None:
     if not _SHA_RE.match(shipped_sha):
         raise ArchiveError(
             f"--shipped {shipped_sha!r} is not a commit sha (7–40 lowercase hex).\n"
-            "fix: pass the sha of the develop -> main merge commit — "
-            "`git rev-parse origin/main`."
+            "--shipped takes the sha of the develop -> main merge commit:\n"
+            "fix: git rev-parse origin/main"
         )
     if pr <= 0:
         raise ArchiveError(
             f"--pr {pr} is not a pull-request number.\n"
-            "fix: pass the ship PR's number — `gh pr list --state merged --base main --limit 1`."
+            "--pr takes the ship PR's number:\n"
+            "fix: gh pr list --state merged --base main --limit 1"
         )
     if not is_release_semver(next_release):
         raise ArchiveError(
             f"--next {next_release!r} is not bare SemVer M.m.p.\n"
-            "fix: pass the next patch of the published version, e.g. --next 1.2.4."
+            "--next takes the next patch of the published version:\n"
+            "fix: .dadaia/.venv/bin/dadaia release archive <id> --next 1.2.4"
         )
 
 
@@ -344,7 +346,8 @@ def archive_release(
         raise ArchiveError(
             f"release {next_release} already exists — --next must name an unused "
             "version.\n"
-            f"fix: pass the next unused patch, e.g. --next {_bump_patch(next_release)}."
+            f"fix: .dadaia/.venv/bin/dadaia release archive <id> --next "
+            f"{_bump_patch(next_release)}"
         )
 
     original_bytes = state_path.read_bytes()

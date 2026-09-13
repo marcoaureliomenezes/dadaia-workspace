@@ -215,9 +215,7 @@ def test_a_held_entry_is_always_listed_and_never_scored(workspace: Path) -> None
     held_lines = [ln for ln in lines if ln.startswith("WS-reaped-reaped")]
 
     assert result.exit_code == 0, result.output
-    assert held_lines == [
-        "WS-reaped-reaped reaped reaped/20260913/x  (7d left)"
-    ], lines
+    assert held_lines == ["WS-reaped-reaped reaped reaped/20260913/x  (7d left)"], lines
     assert [ln for ln in lines if _SCORE_LINE.match(ln)][0].endswith("(100%)"), lines
 
 
