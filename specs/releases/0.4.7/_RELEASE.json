@@ -1,16 +1,16 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.7",
-  "phase": "IMPLEMENTATION",
+  "phase": "CLOSURE",
   "rc": 3,
   "defined": {
     "sha": "66718f33",
     "ts": "2026-09-13T09:56:42Z"
   },
   "implemented": {
-    "sha": "b7fb1efe",
-    "rc": 3,
-    "ts": "2026-09-13T09:24:16Z"
+    "sha": "c746592a",
+    "rc": 4,
+    "ts": "2026-09-13T10:49:36Z"
   },
   "shipped": null,
   "log": [
@@ -319,6 +319,12 @@
       "agent": "product-engineer",
       "kind": "artifact-gc",
       "text": "`dadaia doctor --context dadaia-workspace` on this instance after the memory pass and the ADR append: compliance(workspace): 12232/12232 entries canonical (100%); compliance(specs): 41/41 rules canonical (100%); compliance(ledgers): 804/804 records canonical (100%); compliance(total): 13077/13077 checks canonical (100%); exit 0. Zero `MEM-DRIFT-1`/`MEM-DRIFT-2`, `LINT-1`, `CAT-1`, `LEDGER-*`, `RELEASE-TREE-*` or `*-HANDEDIT` lines. `.dadaia/reaped/20260913/` holds 74 entries — the mypy and hypothesis caches the walk took from two consumer repos' trees — listed `WS-reaped-reaped (7d left)`, never scored; nothing expired, no slop held by the operator, nothing for `--fix` to move."
+    },
+    {
+      "ts": "2026-09-13T10:49:36Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate 4 implemented at c746592a; phase CLOSURE."
     }
   ]
 }
