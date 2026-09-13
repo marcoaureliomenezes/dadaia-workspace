@@ -12,6 +12,7 @@ size: SMALL.
 from __future__ import annotations
 
 import ast
+import itertools
 from pathlib import Path
 from typing import Any
 
@@ -24,21 +25,33 @@ from dadaia_workspace.features.certification import service
 _SOURCE = Path(service.__file__)
 
 
-def _invocations() -> list[tuple[tuple[str, ...], tuple[str, ...]]]:
-    """Every ``cli(...)`` call as ``(words, flags)`` — literal arguments only."""
+#: What a non-literal argument (``str(path)``, an f-string) is called in the parsed
+#: invocation: its VALUE is unknown here, its POSITION is not.
+_COMPUTED = "<computed>"
+
+
+def _invocations() -> list[tuple[str, ...]]:
+    """Every ``cli(...)`` call as its argument words, in order.
+
+    A non-literal argument becomes :data:`_COMPUTED`: the flag check ignores it, the
+    arity check counts it — a positional the service passes is a positional whether or
+    not the test can read its value.
+    """
     tree = ast.parse(_SOURCE.read_text(encoding="utf-8"))
-    found: list[tuple[tuple[str, ...], tuple[str, ...]]] = []
+    found: list[tuple[str, ...]] = []
     for node in ast.walk(tree):
         if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)):
             continue
         if node.func.id != "cli":
             continue
+        if any(isinstance(a, ast.Starred) for a in node.args):
+            continue  # `cli(*args)` — a forwarding wrapper, not an invocation
         words = tuple(
-            a.value for a in node.args if isinstance(a, ast.Constant) and isinstance(a.value, str)
+            a.value if isinstance(a, ast.Constant) and isinstance(a.value, str) else _COMPUTED
+            for a in node.args
         )
-        flags = tuple(w for w in words if w.startswith("--"))
-        if flags:
-            found.append((words, flags))
+        if words:
+            found.append(words)
     return found
 
 
@@ -62,17 +75,48 @@ def _resolve(words: tuple[str, ...]) -> tuple[str, Any]:
 
 
 _INVOCATIONS = _invocations()
+_IDS = [" ".join(w) for w in _INVOCATIONS]
 
 
-@pytest.mark.parametrize(
-    ("words", "flags"),
-    _INVOCATIONS,
-    ids=[" ".join(w) for w, _ in _INVOCATIONS],
-)
-def test_certify_invocation_flags_exist_on_the_real_cli(
-    words: tuple[str, ...], flags: tuple[str, ...]
-) -> None:
+@pytest.mark.parametrize("words", _INVOCATIONS, ids=_IDS)
+def test_certify_invocation_flags_exist_on_the_real_cli(words: tuple[str, ...]) -> None:
     name, command = _resolve(words)
     declared = {opt for param in command.params for opt in param.opts}
-    for flag in flags:
+    for flag in (w for w in words if w.startswith("--")):
         assert flag in declared, f"`{name}` has no option {flag} — certify would exit 2"
+
+
+def _arity(command: Any) -> tuple[int, int | None]:
+    """(minimum, maximum) positional count the resolved command accepts; ``None`` = a
+    variadic argument, so there is no maximum."""
+    minimum = 0
+    maximum: int | None = 0
+    for param in command.params:
+        if param.param_type_name != "argument":
+            continue
+        if param.nargs == -1:
+            maximum = None
+            continue
+        if param.required:
+            minimum += param.nargs
+        if maximum is not None:
+            maximum += param.nargs
+    return minimum, maximum
+
+
+@pytest.mark.parametrize("words", _INVOCATIONS, ids=_IDS)
+def test_certify_invocation_positional_arity_matches_the_real_cli(words: tuple[str, ...]) -> None:
+    """A verb that gains or loses a positional breaks certify at the subprocess too —
+    the flag check alone left ``cli("context", "bind", "certified-consumer")`` asserting
+    nothing at all (0.4.7 c2 review)."""
+    name, command = _resolve(words)
+    consumed = len(name.split()) - 1  # "dadaia" is not one of the invocation's words
+    tail = words[consumed:]
+    positionals = list(itertools.takewhile(lambda w: not w.startswith("-"), tail))
+    minimum, maximum = _arity(command)
+    assert minimum <= len(positionals), (
+        f"`{name}` takes at least {minimum} positional(s); certify passes {positionals}"
+    )
+    assert maximum is None or len(positionals) <= maximum, (
+        f"`{name}` takes at most {maximum} positional(s); certify passes {positionals}"
+    )
