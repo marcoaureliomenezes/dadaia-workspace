@@ -1,17 +1,20 @@
 [tool.poetry]
 name = "dadaia-workspace"
 version = "0.4.7"
-description = "AI-native workspace management CLI for multi-agent development with Claude Code, Codex and Kimi Code"
+description = "A local-first, spec-driven workspace that gives AI agents current context, a document-governed lifecycle, visible concurrency and anti-slop boundaries."
 authors = ["Marco Menezes <marcoaureliomenezes@users.noreply.github.com>"]
 readme = "README.md"
 packages = [{include = "dadaia_workspace"}]
 # Public-source hygiene (T-011-15 / FR-W5-01): never ship compiled bytecode in the
 # sdist/wheel. poetry-core honours these globs for both artifacts.
 exclude = ["**/__pycache__", "**/*.pyc", "**/*.pyo"]
+# Every keyword names something the README says; it is also the GitHub topic set
+# (SPEC 0.4.7 FR4). "developer-tools" and "agentic" were dropped: the README claims
+# neither.
 keywords = [
     "ai-agents", "claude-code", "codex", "kimi-code",
     "workspace", "multi-agent", "sdd", "spec-driven-development",
-    "developer-tools", "cli", "agentic"
+    "cli"
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -27,6 +30,15 @@ classifiers = [
     "Operating System :: MacOS",
     "Operating System :: Microsoft :: Windows",
 ]
+
+# What PyPI renders beside the long description. Homepage is the PyPI project page:
+# no documentation site exists, and the docs entry point is the repository's own.
+[tool.poetry.urls]
+Homepage = "https://pypi.org/project/dadaia-workspace/"
+Repository = "https://github.com/marcoaureliomenezes/dadaia-workspace"
+Documentation = "https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/getting-started.md"
+Changelog = "https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/CHANGELOG.md"
+Issues = "https://github.com/marcoaureliomenezes/dadaia-workspace/issues"
 
 [tool.poetry.scripts]
 dadaia = "dadaia_workspace.cli.main:_safe_app"

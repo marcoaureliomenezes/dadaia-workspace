@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -220,3 +221,45 @@ def test_no_derived_document_cites_a_dead_verb_or_path() -> None:
     ]
 
     assert violations == [], "\n".join(violations)
+
+
+def _readme_tagline() -> str:
+    """The README's first non-badge paragraph — PyPI's summary line, in prose."""
+    for block in (_REPO_ROOT / "README.md").read_text("utf-8").split("\n\n"):
+        line = block.strip()
+        if not line or line.startswith(("#", "[![", "<!--")):
+            continue
+        return " ".join(line.split())
+    raise AssertionError("README.md carries no prose paragraph")
+
+
+def _llms_tagline() -> str:
+    for line in (_REPO_ROOT / "llms.txt").read_text("utf-8").splitlines():
+        if line.startswith("> "):
+            return " ".join(line[2:].split())
+    raise AssertionError("llms.txt carries no `> ` tagline line")
+
+
+def _pyproject_poetry() -> dict[str, object]:
+    with (_REPO_ROOT / "pyproject.toml").open("rb") as handle:
+        return tomllib.load(handle)["tool"]["poetry"]  # type: ignore[index,no-any-return]
+
+
+def test_one_tagline_across_the_readme_pyproject_and_the_agent_index() -> None:
+    """The three discovery surfaces say one thing: PyPI's `description`, the README's
+    first paragraph and `llms.txt`'s `> ` line are the same sentence (SPEC 0.4.7 FR4)."""
+    readme = _readme_tagline()
+
+    assert _pyproject_poetry()["description"] == readme
+    assert _llms_tagline() == readme
+
+
+def test_every_pypi_link_a_reader_needs_is_declared() -> None:
+    """`[tool.poetry.urls]` is what PyPI renders beside the long description: the five
+    keys are the project page, the source, the docs entry point, the changelog and the
+    issue tracker — a missing one is a dead end on the package page."""
+    urls = _pyproject_poetry()["urls"]
+
+    assert isinstance(urls, dict)
+    assert sorted(urls) == ["Changelog", "Documentation", "Homepage", "Issues", "Repository"]
+    assert all(str(value).startswith("https://") for value in urls.values())

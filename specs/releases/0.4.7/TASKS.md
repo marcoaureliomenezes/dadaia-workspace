@@ -53,7 +53,7 @@
   both marker-derived. Write set: `docs/getting-started.md`, `docs/concepts.md`.
   Blocked by: T-047-36 (disjoint from T-047-38, T-047-39). Delivers: a newcomer
   walks from `pip install` to a first candidate on derived pages only.
-- [-] T-047-38 — FR4 (`software-engineer`): `pyproject.toml` `description` = the
+- [x] T-047-38 — FR4 (`software-engineer`): `pyproject.toml` `description` = the
   tagline, `[tool.poetry.urls]` Homepage/Repository/Documentation/Changelog/Issues,
   `keywords`/`classifiers` verified against the README; the tagline equality test
   (README first non-badge paragraph == `description` == `llms.txt` `>` line) in
