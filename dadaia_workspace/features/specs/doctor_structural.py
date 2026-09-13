@@ -224,7 +224,7 @@ class StructuralValidator:
                     + (
                         "Contains states/ — resolve manually (never auto-removed)."
                         if has_states
-                        else "Stray tmp landing zone — `dadaia specs doctor --fix` removes it."
+                        else "Stray tmp landing zone — `dadaia doctor --fix` removes it."
                     )
                 ),
                 path=str(stray),
@@ -351,7 +351,7 @@ class StructuralValidator:
                         f"template (current sha256:{current_hash[:12]}… is a previously "
                         f"shipped release; canonical sha256:{canonical_hash[:12]}…). "
                         "It carries no operator customisation, so it can be refreshed "
-                        "losslessly — run `dadaia specs doctor --fix`."
+                        "losslessly — run `dadaia doctor --fix`."
                     ),
                     path=str(dst),
                     fixable=True,
