@@ -2,82 +2,6 @@
   "schema": "backlog-v1",
   "active": [
     {
-      "id": "release-lifecycle-verbs",
-      "title": "Release lifecycle: atomic birth, validated archive, one tree validator",
-      "opened": "2026-09-12",
-      "status": "picked",
-      "description": "Audit RL-1..RL-13, GV-10, grill Q5/Q14/Q17. `dadaia release new` becomes the one birth act (SPEC stub + _RELEASE.json in DEFINITION); `dadaia release archive <id> --shipped <sha> --pr <n> --next <M.m.p>` archives, appends the histo record and births the next release in one transaction (git stays with the agent: the next branch step is printed, never executed). One validate_release_tree shared by the doctor, both archive lanes (promote + rc-archive) and one contract test over every live and archived _RELEASE.json. PHASES shrink to DEFINITION/IMPLEMENTATION/CLOSURE/ARCHIVED; log.kind enumerated; `segment` and the `audited` milestone deleted from release-state-v1; `bugs archive` runs inside both archive verbs, threshold by resolution date. Data repair: 0.4.6 shipped.pr, phase vocabulary in archives.",
-      "provenance": "operator-ratified grill 2026-09-12 (SDD lifecycle audit, rulings Q1-Q17)",
-      "intents": [
-        {
-          "subject": {
-            "kind": "cli",
-            "ref": "release new"
-          },
-          "change": "writes SPEC stub and _RELEASE.json atomically"
-        },
-        {
-          "subject": {
-            "kind": "cli",
-            "ref": "release archive"
-          },
-          "change": "new verb: validated promote lane + histo record + next-release birth in one transaction"
-        },
-        {
-          "subject": {
-            "kind": "cli",
-            "ref": "release rc-archive"
-          },
-          "change": "shares the one release-tree validator"
-        },
-        {
-          "subject": {
-            "kind": "cli",
-            "ref": "bugs archive"
-          },
-          "change": "invoked by both archive verbs; ages by resolution date"
-        },
-        {
-          "subject": {
-            "kind": "catalog",
-            "ref": "pypi-distribution"
-          },
-          "change": "archived folder id vs published version stated once"
-        }
-      ]
-    },
-    {
-      "id": "one-doctor-one-rule-registry",
-      "title": "One compliance surface: dadaia doctor with sections, scores and schema-validated records",
-      "opened": "2026-09-12",
-      "status": "picked",
-      "description": "Audit cross-cutting, GV-5, BL-1, AU-1, ADR-1, RL-1; grill Q3/Q4. `dadaia doctor` is the only entry: sections workspace / specs / ledgers, each finding `<CODE> <verdict>`, a score line per section and a total, one --json. specs doctor and backlog doctor fold into the same rule registry (features/specs/rules.py::RULES generalised). Every committed governance record is validated against its schema: decisions.jsonl, BACKLOG.json, BUGS.jsonl, every _RELEASE.json, and the histories. The three _histo.jsonl files collapse to one flat record shape {id, ts, disposition, release, reason, summary} with one schema; consumed_backlog_histo.jsonl and its ledger/model/store/tests are deleted; audits_histo.jsonl is rewritten as records (no event wrapper); one lowercase terminal vocabulary shared by bugs, backlog and findings (backlog tokens 6 -> 3, provisional CONSUMED deleted). Scaffolded AGENTS.md copy-drift is a finding (memory/AGENTS.md prose rewrite today).",
-      "provenance": "operator-ratified grill 2026-09-12 (SDD lifecycle audit, rulings Q1-Q17)",
-      "intents": [
-        {
-          "subject": {
-            "kind": "cli",
-            "ref": "doctor"
-          },
-          "change": "the one compliance entry: sections workspace/specs/ledgers, one rule registry, score per section and total; specs doctor and backlog doctor folded in and deleted"
-        },
-        {
-          "subject": {
-            "kind": "catalog",
-            "ref": "specs-doctor"
-          },
-          "change": "rule registry generalised; every committed governance record schema-validated; one histo schema and terminal vocabulary"
-        },
-        {
-          "subject": {
-            "kind": "catalog",
-            "ref": "audits-canon"
-          },
-          "change": "audits_histo as flat records; audit window derived from it"
-        }
-      ]
-    },
-    {
       "id": "one-canon-registry",
       "title": "One canon registry for root, .dadaia zones and specs",
       "opened": "2026-09-12",
@@ -293,54 +217,6 @@
             "ref": "ci pre-commit-check"
           },
           "change": "bundled-ledger advisory unchanged; no self-scan of fixtures"
-        }
-      ]
-    },
-    {
-      "id": "adr-ledger-hygiene",
-      "title": "ADR ledger: schema-validated records, rulings born accepted, resolvable measured_by",
-      "opened": "2026-09-12",
-      "status": "picked",
-      "description": "Audit ADR-1..ADR-7, MEM-5, GV-18. Every committed decisions.jsonl line validates against decision-record-v1 by the one validator (hand-rolled presence checks deleted); status superseded in place, _superseded/ deleted; a record born from an operator grill ruling is accepted at append with the ruling date in context; measured_by must resolve to a test node id, a lint-imports contract or a doctor code (schema pattern) before a record can be accepted; DADAIA 6.5 reworded to one decision per change set naming every principle touched; P-02 corrected to ADR: none; 0004 and 0010 accepted or rejected by the operator; the six invalid records and four truncated titles repaired.",
-      "provenance": "operator-ratified grill 2026-09-12 (SDD lifecycle audit, rulings Q1-Q17)",
-      "intents": [
-        {
-          "subject": {
-            "kind": "doc",
-            "ref": "memory/AGENTS.md#1-write-ownership"
-          },
-          "change": "ADR acceptance law: rulings born accepted, measured_by must resolve, one decision per change set"
-        },
-        {
-          "subject": {
-            "kind": "doc",
-            "ref": "memory/AGENTS.md#2-the-two-tiers"
-          },
-          "change": "Part-1 principles cite ADR: none or a resolvable accepted ADR; P-02 corrected"
-        }
-      ]
-    },
-    {
-      "id": "memory-hygiene",
-      "title": "Memory: wikilink aliases deleted, tldr digest real, closure memory pass measured",
-      "opened": "2026-09-12",
-      "status": "picked",
-      "description": "Audit MEM-1..MEM-8, RL-8. The hidden wikilink alias table is deleted and the 15 links point at the trio files; the dead _TLDR_INJECTED_CATEGORIES filter is deleted so catalog.json carries tldr for every atom (the navigator's promise becomes true); frontmatter category (constant) dropped from memory-frontmatter-v1; the closure memory pass logs atoms reviewed-unchanged vs changed and pillar 3 measures the untouched set per ship; 'chokepoints is four modules' and the pypi-distribution digits claim corrected in their one home; generated index heading in English.",
-      "provenance": "operator-ratified grill 2026-09-12 (SDD lifecycle audit, rulings Q1-Q17)",
-      "intents": [
-        {
-          "subject": {
-            "kind": "doc",
-            "ref": "memory/AGENTS.md#3-tree-shape"
-          },
-          "change": "wikilink alias table deleted; category field dropped; index heading in English"
-        },
-        {
-          "subject": {
-            "kind": "cli",
-            "ref": "memory catalog generate"
-          },
-          "change": "catalog carries tldr for every atom"
         }
       ]
     },
