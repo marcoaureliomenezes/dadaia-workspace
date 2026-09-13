@@ -8,7 +8,7 @@
 
 ## Candidate 4 — docs derive from memory
 
-- [ ] T-047-34 — FR1 (`product-engineer`): read every `specs/memory/product/**/*.md`
+- [-] T-047-34 — FR1 (`product-engineer`): read every `specs/memory/product/**/*.md`
   (22) and `ARCHITECTURE.md`, `QUALITY.md`, `TECHSTACK.md` statement by statement
   against the code each names and against `CONTEXT.md`; run every Part-1 `Measured
   by:`; write `.dadaia/tmp/product-engineer/<YYYYMMDD>/memory-review.md` — one row
