@@ -170,6 +170,66 @@ Open-scope release (ADRs 0005–0009): version minted at birth from the PyPI lin
 #### Fixed
 - `context-bind-implementation-requires-release-id-stall-when-none-live` — by deletion of `--release`.
 
+### Candidate 3 — one verb per record change
+
+#### Added
+- `dadaia backlog exit <slug> --disposition delivered|superseded|rejected [--release] [--reason]`:
+  the one backlog exit — one `active[]` object removed, one `histo-record-v1` appended, evidence per
+  disposition from `core/models/histo.py::REQUIRED_EVIDENCE`.
+- `dadaia audit disposition <dir> <finding-id> --disposition resolved|superseded|deferred|rejected`
+  and `dadaia audit close <dir> --sha <window-end>` (`features/specs/audit.py`): all-or-nothing,
+  `<dir>` confined to `specs/audits/`, histo `entry {sha, pillars{bugs,specs,memory}, dispositions}`.
+- `dadaia release phase IMPLEMENTATION|CLOSURE --sha <sha>`: the trio-`Aprovado` and every-task-`[x]`
+  checks stamp `defined` / `implemented {sha, rc, ts}`; `phase` and milestones move only by verb.
+- `GovernanceEvent {event_id, ts, session_id, context, verb, ledger, record_id, record_hash}` in the
+  telemetry store (migration 7, `container.build_telemetry_store()`), written once per governance verb
+  by `cli/_governance_event.py`; `resolve_event_context_for_cli` is the one context decider for writer
+  and reader; a store that cannot open never fails the verb.
+- `dadaia doctor`: `LEDGER-BUGS|BACKLOG-HISTO|AUDITS-HISTO|RELEASES-HISTO-HANDEDIT` and
+  `RELEASE-TREE-HANDEDIT` (WARNING) — a verb-owned record changed with no matching event; silent
+  without a store.
+- `bug-record-v1` `surface`: the feature arm is derived from `features/*` at load
+  (`x-enum-append: feature-packages`); `bugs append --surface unknown` is refused.
+- V35 in `tests/contract/test_slop_ratchets.py` (skill directories ≤ 18, corpus lines pinned) and the
+  body-pointer finder in `test_behavior_map.py`.
+- ADR 0011: P-16 deleted — no derived provenance is stored, so nothing needs to equal a re-derivation.
+
+#### Changed
+- Bug registration is ask-first: the agent proposes (contract line, one repro, why not agent error,
+  severity rubric), the operator confirms; with no operator the proposal is a `bug-proposal:` handoff
+  finding, never a record. A bug is fixed on the live branch in any phase; §6.7's pick line is gone.
+- Lineage has one writer: `bugs resolve --caused-by <bug-id>|none` validated against the ledger;
+  `bugs update --set caused_by` is refused.
+- `finding-record-v1` disposition enum is `open resolved superseded deferred rejected`
+  (`FINDINGS_DISPOSITIONS`); SPEC-DOC-036/038 `fix:` lines name the audit verbs.
+- `dadaia doctor --fix` re-serializes any `BUGS.jsonl`/`bugs_histo.jsonl` record that parses but fails
+  the schema or the model invariant — retired keys stripped (509 + 179 records), a terminal record's
+  missing `closed_at` back-filled.
+- Skills 20 → 18 (2916 lines); RC-FLOW ends at the candidate PR; personas carry no playbook table and
+  no `--with-report`; `product-engineer` holds `Bash`; registry mandates are one sentence;
+  `constitution.md` 6.0.0 keeps identity, the operational-change lane, dispatcher purity, versioning;
+  `templates/specs-AGENTS.md` is a statement list; DADAIA §1.1/§6.6/§6.7/§6.8/§7.3/§8.5/§10.2 and
+  `CONTEXT.md` say each thing once (hand edit, governance verb, governance event, bug proposal).
+- CI checks out at default depth; `fetch-depth: 0` stays on `security-verdict-gate` only.
+
+#### Removed
+- `core/bug_provenance.py`, `core/models/git_history.py`, `GitSubprocessClient.log_added_lines`,
+  `BugEventKind`, `BugService.resolved_commit` and the seven derived bug-record keys
+  (`lineage_source registration_commit registration_granularity resolved_commit
+  resolution_granularity root_cause migration_note`); P-16 and its test.
+- `dd-workspace-doctor/`, `dd-task-manager/`, `dd-audit-project/SPEC-REVIEW.md`;
+  `doctor_closure_audit._TERMINAL_DISPOSITIONS`; `ctx_inject._fixed_law_blocks`; two
+  `_REQUIRED_EVIDENCE` copies; `release archive`'s refusal on a hand-set `implemented`.
+
+#### Fixed
+- `handoff-v12-role-atom-map-unsatisfiable-in-pattern5-tree`: the role-atom rule is skipped when the
+  mapped atom is absent from the tree.
+- `bugs-update-cannot-heal-terminal-record-missing-closed-at`: the `closed_at` invariant ships with
+  its migration — a doctor fixer back-fills from the record's own `ts`.
+- Review round (27e5e787 → a88b2e2e): audit directory confinement (CWE-22), FR3 evidence rules as
+  approved, one context decider for events, the `bugs update` lineage arm deleted, a retired key named
+  nowhere in public law, the governance baseline indexed.
+
 ## [0.4.6] — 2026-09-04
 
 Open-scope release under the release-candidates model it implements (ADRs
