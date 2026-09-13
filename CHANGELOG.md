@@ -59,6 +59,70 @@ Left exactly as written; a future task can pick this up.
 Open-scope release (ADRs 0005–0009): version minted at birth from the PyPI lineage
 (latest published `0.4.6` + 1 patch); each closed-scope candidate appends here.
 
+### Candidate 1 — records tell the truth
+
+#### Added
+- `dadaia release archive <id> --shipped <sha> --pr <n> --next <M.m.p>`: the promote lane as one
+  all-or-nothing verb — validates, sets `shipped` + `ARCHIVED`, moves to `_archive/<id>/`, appends
+  the `releases_histo.jsonl` record, births `<next>`, runs `bugs archive`, prints the git `next:` lines.
+- `features/specs/release_tree.py::validate_release_tree`: every `_RELEASE.json`, live and archived,
+  validated and parsed (`RELEASE-TREE-STATE-MISSING|SCHEMA|PARSE|TS-ORDER|PHASE|ARCHIVED|TRIO`).
+- `core/doctor_rules.py::Rule(codes, section, run, fix, fix_help)`: the one rule record and section
+  scorer; `compliance(<section>): N/M <unit> canonical (P%)` lines and `compliance(total)`.
+- `ledgers` section: `LEDGER-<NAME>-SCHEMA` over `decisions.jsonl`, `BACKLOG.json`, `BUGS.jsonl`,
+  every `FINDINGS.jsonl` and the three `_histo.jsonl` (`features/specs/ledgers.py`, `schemas.py`).
+- `histo-record-v1` `{id, ts, disposition, release, reason, summary, entry}` and the one terminal
+  vocabulary `delivered resolved superseded deferred rejected` (`core/models/histo.py`).
+- Bug `closed_at`: write-once, stamped by the four terminal transitions (`BugRecord._reach_terminal`);
+  505 records back-filled from the ledger's commit dates.
+- `TREE-5` covers `memory/AGENTS.md`: a scaffolded law file matching neither its source nor any
+  shipped version is `copy-drift`.
+- ADR `measured_by` resolvable pattern enforced by `decision-record-v1`; ADR 0004 accepted, 0010
+  rewritten and accepted, 0005–0009 re-pointed to resolvable checks; P-02 `ADR: none`.
+
+#### Changed
+- `dadaia doctor` is the one compliance surface: sections `workspace`/`specs`/`ledgers`, one line
+  `<CODE> <verdict> <message>` per finding, `--json`, exit 1 on any error-class finding;
+  `--specs-dir`/`--context`/`--public-dir` moved here; the CI hygiene job runs it.
+- `dadaia release new <id>` writes `SPEC.md` and `_RELEASE.json` (DEFINITION) in one transaction and
+  refuses a second live release with a `fix:` line.
+- `dadaia release rc-archive` validates the whole tree, parks the release in `DEFINITION`, runs
+  `bugs archive`.
+- `release-state-v1`: four phases `DEFINITION IMPLEMENTATION CLOSURE ARCHIVED`; `log.kind` enum
+  `note summary size drifts dispositions test-dispositions artifact-gc reviews merge memory`.
+- The audit window is read from `audits_histo.jsonl`; an audit is not a release milestone.
+- `bugs archive` and `SPEC-DOC-041` age by `closed_at`; `bugs resolve` derives `diff_direction` from
+  `--evidence-diff`'s `net-*:` prefix.
+- A picked backlog item stays `picked` in `active[]` and exits once, at closure, as one histo record.
+- Histories migrated in place, one commit each: `backlog_histo.jsonl` (136), `audits_histo.jsonl`
+  (23), `releases_histo.jsonl` (179 events -> one record per release).
+- Memory frontmatter is five fields (`slug title tldr summary tags`); `catalog.json` carries `tldr`
+  for every atom; the generated index heading is English.
+- DADAIA §6.2/§6.4/§6.5/§6.6/§6.7/§6.8/§8.5, the releases/backlog/ADRs/audits scaffolds,
+  `dd-release-definition`, `dd-release-implementation`, `dd-backlog-definition`, `dd-audit-project`,
+  `dd-cli-library`, `dd-workspace-doctor` and `CONTEXT.md` say one thing about doctors, histories and
+  release verbs.
+
+#### Removed
+- `dadaia specs doctor`, `dadaia backlog doctor` (deleted, not aliased).
+- `consumed_backlog_histo.jsonl`, `features/backlog/ledger.py`, `ConsumedBacklogHistoRecord`, its
+  store builder, the `CONSUMED` token, purge-on-pick, BL-STALE (a), `SPEC-DOC-031`, `TREE-5M`.
+- `specs/ADRs/_superseded/` (status `superseded` in place); `public/data/memory-AGENTS.md` (byte twin
+  of the scaffold).
+- `segment` and `audited` from `release-state-v1`; the `DISCOVERY`/`SPEC`/`PLAN`/`TASKS`/`none` phases.
+- The wikilink alias table (`memory_canon`, `memory_lint`, panel `_md_render`);
+  `_TLDR_INJECTED_CATEGORIES`; `category` from `memory-frontmatter-v1`;
+  `test_adr_canon.py::_record_violations`; `bugs resolve --diff-direction`.
+
+#### Fixed
+- `archived-release-state-invalid-and-unparseable-doctor-silent`,
+  `backlog-subject-registry-lacks-top-level-doctor-cli-anchor`,
+  `adr-records-violate-schema-and-no-test-validates-committed-file`,
+  `provisional-consumed-histo-records-never-finalized-no-writer-no-check`,
+  `release-new-writes-spec-only-never-creates-release-state`,
+  `minted-feature-branch-without-live-release-blocks-every-memory-write`,
+  `scoped-memory-agents-md-prose-rewrite-undetected-by-doctor`.
+
 ## [0.4.6] — 2026-09-04
 
 Open-scope release under the release-candidates model it implements (ADRs

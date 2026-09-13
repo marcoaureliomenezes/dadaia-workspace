@@ -99,7 +99,7 @@
   `CONTEXT.md`, the workspace-instance projections via the CLI,
   `tests/**`. Blocked by: T-047-05, T-047-09, T-047-10, T-047-11. Delivers: law,
   skills and instance say one thing about doctors, histories and release verbs.
-- [ ] T-047-13 — FR11 closure: memory atoms (`specs-doctor`, `workspace-doctor`,
+- [x] T-047-13 — FR11 closure: memory atoms (`specs-doctor`, `workspace-doctor`,
   `audits-canon`, `sdd-bug-backlog-governance`, `pypi-distribution`),
   `CHANGELOG.md [0.4.7]` candidate 1, preflight, `dadaia doctor` 100 %, `_RELEASE.json`
   CLOSURE with `summary`/`size`/`dispositions`/`memory` log entries. Write set:
