@@ -31,7 +31,7 @@
   `dadaia_workspace/features/specs/{citations.py,doctor_memory.py,rules.py}`,
   `tests/**`. Blocked by: none (disjoint from T-047-34). Delivers: `dadaia doctor`
   names every memory atom citing a dead verb or path, as a WARNING.
-- [ ] T-047-36 — FR3 core (`software-engineer`): `docs/cli.md` = `dadaia help tree`
+- [-] T-047-36 — FR3 core (`software-engineer`): `docs/cli.md` = `dadaia help tree`
   output; `llms.txt` at the repo root (link lists only); `README.md` rewritten ≤ 10 KB
   in the three blocks + Links, every `## ` followed by `<!-- derived-from: <slug>
   sha256:<hex64> -->`, content from the atoms and the T-047-34 report's corrected
