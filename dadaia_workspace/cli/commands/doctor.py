@@ -214,7 +214,8 @@ def _ledgers_section(
     # The `ledgers` section's ONE repair, injected here exactly as `bug_store_factory`
     # is injected into the specs doctor: `features.specs` never imports `features.bugs`.
     ledgers_context = specs_ledgers.build_ledgers_context(
-        specs_dir, heal_bug_closed_at=build_bug_service(specs_dir).heal_closed_at
+        specs_dir,
+        normalize_bug_records=build_bug_service(specs_dir, with_archive=True).normalize_records,
     )
     return merge_sections(
         [
@@ -437,7 +438,8 @@ def _ledger_fixes(
     from dadaia_workspace.cli.commands.bugs import build_bug_service
 
     context = specs_ledgers.build_ledgers_context(
-        specs_dir, heal_bug_closed_at=build_bug_service(specs_dir).heal_closed_at
+        specs_dir,
+        normalize_bug_records=build_bug_service(specs_dir, with_archive=True).normalize_records,
     )
     actions: list[str] = []
     for rule in specs_ledgers.RULES:

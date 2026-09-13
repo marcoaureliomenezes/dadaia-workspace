@@ -157,21 +157,17 @@ def build_bug_record_store(specs_dir: Path) -> "JsonlRecordStore[BugRecord]":
 
 
 def build_bug_record_validator() -> Callable[[Mapping[str, object]], None]:
-    """Composition-root seam for ``bug-record-v1.schema.json`` validation (D9) — the
-    ONE validation table, loaded once, reused by :meth:`~dadaia_workspace.features
-    .bugs.service.BugService.register` (relocated from ``cli/commands/bugs.py``'s own
-    schema loading, ``cli-no-infrastructure``: neither ``jsonschema``'s
-    ``Draft202012Validator`` nor the packaged schema path belongs at the CLI layer).
+    """Composition-root seam for ``bug-record-v1`` validation (D9) — the ONE validation
+    table, loaded through the ONE packaged-schema loader
+    (``features.specs.schemas.validator_for``), so the ``surface`` enum a registration
+    is checked against is the SAME derived one every committed record is checked
+    against (0.4.7 FR1). It used to read and compile the schema file a second time
+    here, which is how a registration could accept a value the doctor refused.
     Raises ``jsonschema.exceptions.ValidationError`` on the first schema violation.
     """
-    import json
+    from dadaia_workspace.features.specs.schemas import validator_for
 
-    from jsonschema import Draft202012Validator
-
-    package_root = Path(__file__).resolve().parent
-    schema_path = package_root / "public" / "schemas" / "bugs" / "bug-record-v1.schema.json"
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
-    validator = Draft202012Validator(schema)
+    validator = validator_for("bugs/bug-record-v1")
 
     def _validate(payload: Mapping[str, object]) -> None:
         validator.validate(payload)

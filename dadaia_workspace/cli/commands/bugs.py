@@ -12,7 +12,7 @@ method: status is unreachable without its own required fields, refused with ever
 missing/invalid field named at once, the record left completely untouched on refusal.
 ``update --set status=...`` is REFUSED (the model itself refuses the key ``"status"``).
 ``update`` remains the seam for every OTHER governance/write-once field (the auditor's
-``audited``/``resolved_commit`` rewrite). ``archive`` moves terminal records older
+``audited`` rewrite). ``archive`` moves terminal records older
 than 90 days to ``specs/bugs/_archive/bugs_histo.jsonl``. Writes land under an
 ADDITIVE path (never concurrency-blocked).
 """
@@ -35,7 +35,6 @@ from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.models.bugs import BUG_ARCHIVE_THRESHOLD_DAYS, BugRecord
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.bugs.service import BugService
-from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.jsonl_record_store import (
     JsonlRecordStore,
     RecordNotFoundError,
@@ -122,10 +121,6 @@ def build_bug_service(target: Path, *, with_archive: bool = False) -> BugService
         denylist_terms=container.load_denylist_terms(),
         baseline_patterns=container.load_denylist_baseline_patterns(),
         validate=container.build_bug_record_validator(),
-        # The git-facing DI FR8/AS-1 declared and no construction site ever wired: the
-        # `resolved_commit` resolver and the `closed_at` back-fill both degrade silently
-        # to "no history" without it. One adapter, built at the composition root.
-        history_reader=GitSubprocessClient(),
         # F017: the component normalizer probes the containing repo for the on-disk
         # spelling; specs/ always sits at the repo root.
         repo_root=target.parent,
@@ -263,7 +258,7 @@ def bugs_update_cmd(
     ),
 ) -> None:
     """The one governance-write seam for every governance/write-once field OTHER than
-    ``status`` — the auditor's ``audited``/``resolved_commit`` rewrite and any other
+    ``status`` — the auditor's ``audited`` rewrite and any other
     non-status governance write go through this verb. No content validation is added
     beyond the seam's own structural refusals (immutable-core changed, write-once
     field re-set with a differing value) — a refuse-stale race is reported as a

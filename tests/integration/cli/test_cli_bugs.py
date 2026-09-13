@@ -70,7 +70,7 @@ def _resolve(specs_dir: Path, bug_id: str) -> None:
             "--cause",
             "the gate reused a stale specs_dir",
             "--caused-by",
-            "none-first-fix",
+            "none",
             "--resolved-release",
             "v0.1.46",
             "--solution",
@@ -283,3 +283,76 @@ def test_supersede_defer_reject_reach_their_terminal_status(specs: Path) -> None
     missing_by = _runner.invoke(app, ["bugs", "supersede", "k", "--specs-dir", str(specs)])
     assert missing_by.exit_code == 1
     assert "'by' is required" in missing_by.output
+
+
+def test_resolve_refuses_a_caused_by_that_is_not_a_ledger_id(specs: Path) -> None:
+    """0.4.7 FR1: lineage lives at ``resolve`` alone and is VALIDATED there — a
+    ``--caused-by`` that is neither the literal ``none`` nor an id in this ledger is
+    refused, and the record is left untouched. An unvalidated free-text lineage field
+    is how a second, unreadable lineage home grew."""
+    _append_reported(specs, "a")
+
+    result = _runner.invoke(
+        app,
+        [
+            "bugs",
+            "resolve",
+            "a",
+            "--cause",
+            "c",
+            "--caused-by",
+            "not-a-bug",
+            "--resolved-release",
+            "0.4.7",
+            "--solution",
+            "s",
+            "--evidence-loop",
+            "pytest -k test_resolve_refuses_a_caused_by_that_is_not_a_ledger_id",
+            "--evidence-seam",
+            "tests/integration/cli/test_cli_bugs.py::test_resolve_refuses_a_caused_by_that_is_not_a_ledger_id",
+            "--evidence-diff",
+            "net-neutral: test only",
+            "--specs-dir",
+            str(specs),
+        ],
+    )
+
+    assert result.exit_code == 1, result.output
+    assert "not-a-bug" in result.output
+    assert '"status": "open"' in (specs / "bugs" / "BUGS.jsonl").read_text(encoding="utf-8")
+
+
+def test_append_refuses_the_unknown_surface_naming_the_fix(specs: Path) -> None:
+    """0.4.7 FR1: ``unknown`` is a legacy sentinel that stays valid on the 268 records
+    already carrying it — never a value a NEW registration may choose."""
+    result = _runner.invoke(
+        app,
+        [
+            "bugs",
+            "append",
+            "--specs-dir",
+            str(specs),
+            "--bug-id",
+            "u",
+            "--title",
+            "t",
+            "--severity",
+            "LOW",
+            "--surface",
+            "unknown",
+            "--component",
+            "c",
+            "--context",
+            "dadaia-workspace",
+            "--symptom",
+            "s",
+            "--repro",
+            "r",
+            "--expected",
+            "e",
+        ],
+    )
+
+    assert result.exit_code == 1, result.output
+    assert "fix:" in result.output
+    assert not (specs / "bugs" / "BUGS.jsonl").exists()

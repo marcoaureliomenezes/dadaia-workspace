@@ -24,6 +24,7 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from dadaia_workspace.core.models import bugs as _bugs_module
+from dadaia_workspace.features.specs.schemas import load_schema
 
 pytestmark = pytest.mark.contract
 
@@ -47,11 +48,6 @@ _AS_APPENDED: dict[str, Any] = {
     "status": "open",
     "cause": None,
     "caused_by": None,
-    "lineage_source": None,
-    "registration_commit": None,
-    "registration_granularity": None,
-    "resolved_commit": None,
-    "resolution_granularity": None,
     "resolved_release": None,
     "audited": None,
     "closed_at": None,
@@ -82,7 +78,7 @@ def test_bug_record_schema_is_valid_draft_2020_12_and_closes_the_envelope() -> N
 
 def test_bug_record_schema_example_validates_as_appended_and_after_resolution() -> None:
     """A freshly registered record (write-once fields absent entirely, not even
-    ``null`` — ``root_cause``/``solution``/the FR23 evidence triple/``diff_direction``
+    ``null`` — ``solution``/the FR23 evidence triple/``diff_direction``
     are not ``required``) validates; the SAME record after a fix resolves it (the
     write-once fields filled exactly once, ``status``/``cause``/``resolved_release``
     rewritten in place) stays valid too — proving the schema tolerates both the
@@ -99,7 +95,6 @@ def test_bug_record_schema_example_validates_as_appended_and_after_resolution() 
         "closed_at": "2026-09-01T00:00:00Z",
         "cause": "root cause narrative",
         "resolved_release": "0.5.0",
-        "root_cause": "root cause narrative",
         "solution": "the fix narrative",
         "evidence_loop": "pytest --collect-only -q tests/unit/core/models",
         "evidence_seam": "tests/contract/test_bug_record_schema.py::"
@@ -149,3 +144,49 @@ def test_bug_record_schema_rejects_an_unknown_property_and_a_bad_status() -> Non
 
     with_bad_status = {**_AS_APPENDED, "status": "picked"}
     assert list(validator.iter_errors(with_bad_status)) != []
+
+
+# --- 0.4.7 FR1 — the surface enum's feature arm is DERIVED, never restated -----------
+
+
+def test_the_packaged_schema_restates_no_feature_package_name() -> None:
+    """The 24-name list the schema used to carry was a hand-kept copy of a directory
+    listing, policed by a test that went stale the moment a package was added or
+    removed. The file now carries the six non-feature layers and the `unknown` sentinel
+    only — a list that cannot drift from the disk because it does not describe it."""
+    surface = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))["properties"]["surface"]
+
+    assert surface["enum"] == [
+        "cli",
+        "core",
+        "hooks",
+        "infrastructure",
+        "public-assets",
+        "tests",
+        "unknown",
+    ]
+    assert surface["x-enum-append"] == "feature-packages"
+
+
+def test_the_loaded_surface_enum_is_the_layers_plus_every_on_disk_feature_package() -> None:
+    """What a record is VALIDATED against (0.4.7 FR1): the derivation resolves at load
+    time, so adding a feature package is the only edit a new surface value ever needs."""
+    features_dir = _REPO_ROOT / "dadaia_workspace" / "features"
+    on_disk = {
+        child.name
+        for child in features_dir.iterdir()
+        if (child / "__init__.py").is_file() and not child.name.startswith("_")
+    }
+    assert "bugs" in on_disk and "__pycache__" not in on_disk
+
+    enum_values = set(load_schema("bugs/bug-record-v1")["properties"]["surface"]["enum"])
+
+    assert enum_values == on_disk | {
+        "cli",
+        "core",
+        "hooks",
+        "infrastructure",
+        "public-assets",
+        "tests",
+        "unknown",
+    }

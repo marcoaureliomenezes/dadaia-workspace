@@ -1,6 +1,6 @@
 """Bug domain models — :class:`BugRecord`, the one-record-per-bug model.
 
-Pure domain module — no I/O, no internal imports beyond ``dataclasses``/``enum``
+Pure domain module — no I/O, no internal imports beyond ``dataclasses``
 (stdlib only) plus ONE sibling core module, ``core.redaction`` (the shared, also-pure
 ``redact_text``/``first_privacy_hit`` primitives both this model and
 ``core.models.backlog`` import — never each other). ``core/models/bugs.py`` is NOT in
@@ -12,12 +12,16 @@ three-category split — A2.1). It derives its optional/redactable field set fro
 ``dataclasses.field(metadata=...)`` declarations (per-field, colocated, zero I/O) rather
 than a second, separately-maintained module-level tuple (A2.10).
 
-``BugEventKind``/:data:`TERMINAL_EVENTS` are the v5/v6 line-classifier's vocabulary
-(:func:`~dadaia_workspace.core.bug_provenance.classify_ledger_line`, permanent by
-necessity: git history is v5-shaped forever) and the closed set of terminal
-``BugRecord.status`` values. A surviving ``"event"``-keyed v5 line in the v6 ledger
-fails :meth:`BugRecord.from_dict` and surfaces as a single SPEC-DOC-033 ERROR, never a
-folded diagnosis.
+:data:`TERMINAL_EVENTS` is the closed set of terminal ``BugRecord.status`` values. A
+surviving ``"event"``-keyed v5 line in the v6 ledger fails :meth:`BugRecord.from_dict`
+and surfaces as a single SPEC-DOC-033 ERROR, never a folded diagnosis.
+
+0.4.7 FR1 retired the seven derived-provenance keys (``lineage_source``,
+``registration_commit``/``_granularity``, ``resolved_commit``/``resolution_granularity``,
+``root_cause``, ``migration_note``): a git-derived CACHE stored in the record, whose
+derivation needed a full-history walk every reader disagreed about.
+:meth:`BugRecord.from_dict` IGNORES them on a legacy line and :meth:`to_dict` never
+emits them, so one read-write cycle is the whole migration.
 
 **Status transitions are the interface.** :meth:`BugRecord.resolve`/:meth:`supersede`/
 :meth:`defer`/:meth:`reject` are the ONLY way a record reaches their respective terminal
@@ -36,7 +40,6 @@ import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from dataclasses import fields as dc_fields
-from enum import StrEnum
 from typing import Any
 
 from dadaia_workspace.core.models.histo import BUGS_DISPOSITIONS
@@ -44,29 +47,12 @@ from dadaia_workspace.core.redaction import PatternLike, first_privacy_hit, reda
 
 __all__ = [
     "TERMINAL_EVENTS",
-    "BugEventKind",
     "BugRecord",
     "BugRecordImmutableFieldError",
     "BugRecordWriteOnceFieldSetError",
     "IncompleteTransitionError",
     "redact_text",
 ]
-
-
-class BugEventKind(StrEnum):
-    """The seven historical v5 event kinds — the closed vocabulary
-    :func:`~dadaia_workspace.core.bug_provenance.classify_ledger_line` still decodes
-    permanently (git history is v5-shaped forever). ``reported`` opens a stream; the
-    four in :data:`TERMINAL_EVENTS` are terminal (at most one per ``bug_id``);
-    ``archived``/``picked`` are non-terminal annotations."""
-
-    REPORTED = "reported"
-    RESOLVED = "resolved"
-    SUPERSEDED = "superseded"
-    DEFERRED = "deferred"
-    REJECTED = "rejected"
-    ARCHIVED = "archived"
-    PICKED = "picked"
 
 
 #: The terminal set for event coherence. ``archived`` is deliberately NOT here — it is a
@@ -199,7 +185,7 @@ _DIFF_DIRECTIONS: frozenset[str] = frozenset({"net-negative", "net-neutral", "ne
 
 #: bug-record-v1.schema.json's ``status`` closed enum (mirrors ``TERMINAL_EVENTS`` +
 #: ``"open"`` — restated as its own set so :meth:`BugRecord.from_dict` can validate it
-#: without constructing a throwaway ``BugEventKind`` mapping) — pinned the same way.
+#: without a second mapping) — pinned the same way.
 _STATUS_VALUES: frozenset[str] = frozenset({"open", *TERMINAL_EVENTS})
 
 #: The two fields the status transition owns — unreachable through
@@ -257,17 +243,6 @@ class BugRecord:
     status: str = field(default="open", metadata={"category": "mutable-governance"})
     cause: str | None = field(default=None, metadata={"category": "mutable-governance"})
     caused_by: str | None = field(default=None, metadata={"category": "mutable-governance"})
-    lineage_source: str | None = field(default=None, metadata={"category": "mutable-governance"})
-    registration_commit: str | None = field(
-        default=None, metadata={"category": "mutable-governance"}
-    )
-    registration_granularity: str | None = field(
-        default=None, metadata={"category": "mutable-governance"}
-    )
-    resolved_commit: str | None = field(default=None, metadata={"category": "mutable-governance"})
-    resolution_granularity: str | None = field(
-        default=None, metadata={"category": "mutable-governance"}
-    )
     resolved_release: str | None = field(default=None, metadata={"category": "mutable-governance"})
     audited: str | None = field(default=None, metadata={"category": "mutable-governance"})
     #: ISO-8601 UTC instant this record reached a terminal status; ``null`` while open
@@ -279,14 +254,12 @@ class BugRecord:
     #: ago and closed yesterday was archivable the day it closed.
     closed_at: str | None = field(default=None, metadata={"category": "mutable-governance"})
     # -- Write-once, absent until set (A2.2b / A2.11 — the FR23 evidence triple restored).
-    root_cause: str | None = field(default=None, metadata={"category": "write-once"})
     solution: str | None = field(default=None, metadata={"category": "write-once"})
     evidence_loop: str | None = field(default=None, metadata={"category": "write-once"})
     evidence_seam: str | None = field(default=None, metadata={"category": "write-once"})
     evidence_diff: str | None = field(default=None, metadata={"category": "write-once"})
     diff_direction: str | None = field(default=None, metadata={"category": "write-once"})
     superseded_by: str | None = field(default=None, metadata={"category": "write-once"})
-    migration_note: str | None = field(default=None, metadata={"category": "write-once"})
 
     def apply_governance_update(self, changes: Mapping[str, object]) -> BugRecord:
         """Apply *changes*, returning a NEW record — the seam every writer of an
@@ -565,22 +538,15 @@ class BugRecord:
             status=status,
             cause=_opt_record_str(raw, "cause"),
             caused_by=_opt_record_str(raw, "caused_by"),
-            lineage_source=_opt_record_str(raw, "lineage_source"),
-            registration_commit=_opt_record_str(raw, "registration_commit"),
-            registration_granularity=_opt_record_str(raw, "registration_granularity"),
-            resolved_commit=_opt_record_str(raw, "resolved_commit"),
-            resolution_granularity=_opt_record_str(raw, "resolution_granularity"),
             resolved_release=_opt_record_str(raw, "resolved_release"),
             audited=_opt_record_str(raw, "audited"),
             closed_at=_opt_record_str(raw, "closed_at"),
-            root_cause=_opt_record_str(raw, "root_cause"),
             solution=_opt_record_str(raw, "solution"),
             evidence_loop=_opt_record_str(raw, "evidence_loop"),
             evidence_seam=_opt_record_str(raw, "evidence_seam"),
             evidence_diff=_opt_record_str(raw, "evidence_diff"),
             diff_direction=_opt_record_str(raw, "diff_direction"),
             superseded_by=_opt_record_str(raw, "superseded_by"),
-            migration_note=_opt_record_str(raw, "migration_note"),
         )
 
 

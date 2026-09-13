@@ -38,15 +38,59 @@ _CORE_MODELS_DIR = _REPO_ROOT / "dadaia_workspace" / "core" / "models"
 #: plus ``diff_direction`` (A2.11) alongside ``root_cause``/``solution``/
 #: ``superseded_by``/``migration_note``.
 _WRITE_ONCE_FIELDS = (
-    "root_cause",
     "solution",
     "evidence_loop",
     "evidence_seam",
     "evidence_diff",
     "diff_direction",
     "superseded_by",
+)
+
+#: The seven derived-provenance keys 0.4.7 FR1 retired — a git-derived CACHE stored in
+#: the record. Every committed record carries them; ``from_dict`` ignores them and
+#: ``to_dict`` never emits them, so one read-write cycle strips a legacy line.
+_RETIRED_KEYS = (
+    "lineage_source",
+    "registration_commit",
+    "registration_granularity",
+    "resolved_commit",
+    "resolution_granularity",
+    "root_cause",
     "migration_note",
 )
+
+
+def test_from_dict_ignores_the_retired_provenance_keys_and_to_dict_never_emits_them() -> None:
+    """A legacy committed line loads, and re-serializing it is the whole migration
+    (0.4.7 FR1): the cache that needed a full git walk to derive leaves the record."""
+    legacy: dict[str, object] = {
+        "id": "legacy-bug",
+        "ts": "2026-08-27T12:00:00Z",
+        "reported_by": "software-engineer",
+        "title": "legacy bug",
+        "severity": "MEDIUM",
+        "surface": "bugs",
+        "component": "c",
+        "context": "dadaia-workspace",
+        "symptom": "s",
+        "repro": "r",
+        "expected": "e",
+        "status": "resolved",
+        "closed_at": "2026-09-01T00:00:00Z",
+        "cause": "the cause",
+        "caused_by": None,
+        "resolved_release": "0.4.6",
+        "audited": None,
+        **dict.fromkeys(_RETIRED_KEYS, "x" * 40),
+    }
+
+    record = BugRecord.from_dict(legacy)
+
+    assert record.id == "legacy-bug"
+    assert record.cause == "the cause"
+    for key in _RETIRED_KEYS:
+        assert not hasattr(record, key)
+    assert set(record.to_dict()) & set(_RETIRED_KEYS) == set()
 
 
 def _schema() -> dict[str, Any]:
@@ -225,52 +269,6 @@ def test_field_categories_documented_in_schema_match_dataclass_with_no_hand_kept
         "hand-kept module-level field-name mirror(s) found (A2.10 forbids them; the "
         f"field set must be read from the schema): {offenses}"
     )
-
-
-# --- A2.12 — surface enum, one source ------------------------------------------------
-
-
-def test_surface_enum_equals_on_disk_feature_packages() -> None:
-    """A2.12: the schema ``surface`` enum's FEATURE arm equals the
-    ``dadaia_workspace/features/<name>/`` packages on disk (glob, 23 at this fold —
-    v0.5.1 K4 retired the ``spec_artifacts`` package, folding its two writers into
-    ``features.specs.canon``; the enum lost the matching ``"spec_artifacts"`` member in
-    the same commit), plus the 7 fixed non-feature members (``core``/``infrastructure``/
-    ``cli``/``hooks``/``tests``/``public-assets``/``unknown``).
-
-    Compared against the ON-DISK package list, NOT ``setup.cfg``'s
-    ``[importlinter:contract:features-no-cross-feature]`` ``modules =`` list: that list
-    is 20 entries today (``capabilities``/``certification``/``reconcile``/``tmp_gc``
-    missing) and is completed to the full 23 by T-050-29 — asserting against it here
-    would go RED for a gap this task does not own. Once T-050-29 lands, a SEPARATE
-    assertion (there, not here) equates ``setup.cfg`` to this same on-disk list.
-    """
-    schema = _schema()
-    enum_values = set(schema["properties"]["surface"]["enum"])
-
-    features_dir = _REPO_ROOT / "dadaia_workspace" / "features"
-    on_disk_packages = {
-        p.name
-        for p in features_dir.iterdir()
-        if p.is_dir() and p.name != "__pycache__" and (p / "__init__.py").is_file()
-    }
-    assert (
-        len(on_disk_packages) == 19
-    )  # 0.4.6 T-046-26 (23 -> 21), T-046-28 (21 -> 20), T-046-25 reports pkg (20 -> 19)
-
-    non_feature_members = {
-        "core",
-        "infrastructure",
-        "cli",
-        "hooks",
-        "tests",
-        "public-assets",
-        "unknown",
-    }
-    assert enum_values == on_disk_packages | non_feature_members
-    assert (
-        len(enum_values) == 26
-    )  # 0.4.6 T-046-28 academy, T-046-25 reports: each left with its package
 
 
 # --- v0.5.1 K5 — status transitions are the interface -------------------------------

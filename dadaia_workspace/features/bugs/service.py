@@ -13,11 +13,13 @@ rewrites an existing record's governance fields (never ``status`` — refused by
 :meth:`~dadaia_workspace.core.models.bugs.BugRecord.apply_governance_update` itself);
 :meth:`transition` is the ONE seam a status change goes through.
 
-**FR8's one resolver seam (AS-1).** :meth:`BugService.resolved_commit` is the SOLE
-resolver for a record's ``resolved_commit``: the stored value when present, derived
-from git history otherwise (DI'd in via ``history_reader``/``repo_root``, both
-optional — most construction sites never need a git walk and the seam degrades to
-"stored or ``None``").
+**One fixer, one canonical shape (0.4.7 FR1).** :meth:`normalize_records` rewrites
+every committed record of the ledger AND the histo into the shape
+:meth:`~dadaia_workspace.core.models.bugs.BugRecord.to_dict` emits today — that is how
+the seven retired derived-provenance keys leave 541 committed records, and how a
+terminal record that predates the ``closed_at`` invariant is stamped. No git walk is
+involved in either: the derived cache this service used to resolve from history is
+deleted, cache and walk together.
 """
 
 from __future__ import annotations
@@ -34,15 +36,12 @@ from pathlib import Path
 from jsonschema.exceptions import ValidationError
 
 from dadaia_workspace.core.atomic_write import ConcurrentModificationError, atomic_write
-from dadaia_workspace.core.bug_provenance import classify_ledger_line, derive_commit_provenance
 from dadaia_workspace.core.models.bugs import (
     BUG_ARCHIVE_THRESHOLD_DAYS,
     TERMINAL_EVENTS,
     BugRecord,
 )
-from dadaia_workspace.core.models.git_history import GitHistoryReadError
 from dadaia_workspace.core.redaction import PatternLike
-from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.jsonl_record_store import (
     JsonlRecordStore,
     StaleRecordWriteError,
@@ -57,6 +56,14 @@ __all__ = [
 ]
 
 _LOG = logging.getLogger(__name__)
+
+#: The ``surface`` value a NEW registration may never choose (0.4.7 FR1): it exists so
+#: the 268 records whose feature could not be mapped stay valid, not as an escape hatch.
+_LEGACY_SURFACE = "unknown"
+
+#: The literal a fixer passes to ``--caused-by`` when this bug has no prior cause —
+#: the one word that is NOT looked up in the ledger.
+_NO_LINEAGE = "none"
 
 
 _DOTTED_MODULE_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)+$")
@@ -139,7 +146,6 @@ class BugService:
         archive_store: JsonlRecordStore[BugRecord] | None = None,
         denylist_terms: Sequence[tuple[str, str]] = (),
         baseline_patterns: Sequence[PatternLike] = (),
-        history_reader: GitSubprocessClient | None = None,
         repo_root: Path | None = None,
         validate: Callable[[Mapping[str, object]], None] | None = None,
     ) -> None:
@@ -153,10 +159,7 @@ class BugService:
         # refuses on (container.load_denylist_baseline_patterns) — threaded through
         # every transition method's write-once free-text field(s), D5.
         self._baseline_patterns = tuple(baseline_patterns)
-        # FR8/AS-1: the resolved_commit resolver's git-facing DI — both optional
-        # (container.build_git_history_reader() wires the real adapter; most
-        # construction sites never need it, see :meth:`resolved_commit`).
-        self._history_reader = history_reader
+        # The component normalizer probes the containing repo for the on-disk spelling.
         self._repo_root = repo_root
         # bug-record-v1.schema.json's validator (container.build_bug_record_validator)
         # — optional; wired at :meth:`register` only (a freshly registered record is
@@ -189,6 +192,12 @@ class BugService:
         free-text field through the same seam the update path uses (A2.6) before
         appending.
         """
+        if surface == _LEGACY_SURFACE:
+            raise ValueError(
+                f"surface {_LEGACY_SURFACE!r} is a legacy sentinel, valid only on the records "
+                "that already carry it; fix: pass the feature package or non-feature layer "
+                "this bug lives in (dadaia bugs append --help lists them)"
+            )
         existing = {record.id for record in self._record_store.iter_records()}
         if bug_id in existing:
             raise BugDuplicateIdError(bug_id)
@@ -207,11 +216,6 @@ class BugService:
             "status": "open",
             "cause": None,
             "caused_by": None,
-            "lineage_source": None,
-            "registration_commit": None,
-            "registration_granularity": None,
-            "resolved_commit": None,
-            "resolution_granularity": None,
             "resolved_release": None,
             "audited": None,
             "closed_at": None,
@@ -227,8 +231,8 @@ class BugService:
     def apply_update(self, record_id: str, changes: Mapping[str, object]) -> BugRecord:
         """The one governance-write seam for every governance/write-once field OTHER
         than ``status`` (refused by :meth:`~dadaia_workspace.core.models.bugs.BugRecord
-        .apply_governance_update` itself): the auditor's ``audited``/
-        ``resolved_commit`` rewrite and any other non-status governance write. Redacts
+        .apply_governance_update` itself): the auditor's ``audited`` rewrite and any
+        other non-status governance write. Redacts
         the WHOLE resulting record (A2.6) before the store's refuse-stale atomic
         rewrite (A2.9, A2.2c)."""
 
@@ -254,11 +258,30 @@ class BugService:
         ever touches disk, leaving the record byte-identical on refusal.
         """
 
+        self._validate_caused_by(fields.get("caused_by"))
+
         def _mutate(record: BugRecord) -> BugRecord:
             updated = method(record, privacy_patterns=self._baseline_patterns, **fields)
             return updated.redact(self._denylist_terms)
 
         return self._record_store.update(record_id, _mutate)
+
+    def _validate_caused_by(self, caused_by: str | None) -> None:
+        """Lineage is declared at ``resolve`` and nowhere else (0.4.7 FR1), so this is
+        the ONE place it is checked: ``caused_by`` names a record of this ledger (live
+        or archived) or the literal ``none``. An unvalidated free-text lineage field is
+        how a second, unreadable lineage home grew."""
+        if caused_by is None or caused_by == _NO_LINEAGE:
+            return
+        known = {record.id for record in self._record_store.iter_records()}
+        if self._archive_store is not None:
+            known |= {record.id for record in self._archive_store.iter_records()}
+        if caused_by not in known:
+            raise ValueError(
+                f"caused_by {caused_by!r} is not a record of this bug ledger "
+                f"({self._record_store.path.name}); fix: pass an existing bug id or "
+                f"the literal '{_NO_LINEAGE}'"
+            )
 
     def archive(
         self, *, now: datetime | None = None, threshold_days: int = BUG_ARCHIVE_THRESHOLD_DAYS
@@ -291,117 +314,55 @@ class BugService:
             self._archive_store.append(record)
         return BugArchiveResult(archived=len(removed), kept=len(all_records) - len(removed))
 
-    def heal_closed_at(self) -> int:
-        """Back-fill ``closed_at`` on every terminal ledger record that carries none,
-        returning how many were stamped. The migration 0.4.7 candidate 1's invariant
-        shipped without (bug ``bugs-update-cannot-heal-terminal-record-missing-closed-at``).
+    def normalize_records(self) -> int:
+        """Rewrite every committed record of the ledger and the histo into its canonical
+        ``bug-record-v1`` shape, returning how many lines changed — the ONE fixer
+        ``LEDGER-BUGS-SCHEMA`` runs (0.4.7 FR1).
 
-        ``closed_at`` became non-null-iff-terminal in :meth:`BugRecord.__post_init__`,
-        repaired ONCE by a throwaway script over this repo's own ledger (T-047-08). Every
-        other ledger kept ``closed_at: null`` on records the model now refuses to
-        construct — so ``update``/``remove``, which build a record before rewriting its
-        line, could not load the very records needing repair. This runs on RAW ledger
-        lines for exactly that reason: an unconstructible record is what it is here to fix.
+        Two classes of drift, one pass, because both are "this line is not what
+        :meth:`BugRecord.to_dict` emits today":
 
-        The stamp is the date of the FIRST commit whose ``specs/bugs/`` version carried
-        the record terminal — the SAME first-add-wins winner
-        :meth:`resolved_commit` reads, now carrying its date
-        (``DerivedBugProvenance.resolved_at``), so this is one more field off one existing
-        walk, never a second history pass. When no history is available (no
-        ``history_reader``/``repo_root``, a shallow or absent repository, or a bug id the
-        walk never saw) the record's own filing date ``ts`` is the fallback: the honest
-        floor, never a date later than the truth. ``ts`` is also the clamp — the model
-        refuses a ``closed_at`` preceding it.
+        * the seven retired derived-provenance keys (``lineage_source``,
+          ``registration_commit``/``_granularity``, ``resolved_commit``/
+          ``resolution_granularity``, ``root_cause``, ``migration_note``) — a
+          git-derived CACHE :meth:`BugRecord.from_dict` now ignores, so re-serializing
+          strips them losslessly;
+        * a terminal record carrying no ``closed_at`` — the invariant 0.4.7 candidate 1
+          shipped without (bug
+          ``bugs-update-cannot-heal-terminal-record-missing-closed-at``). The stamp is
+          the record's OWN filing date ``ts``, and nothing else: the ledger's git
+          history is NOT consulted, the walk that used to date the terminal line having
+          been deleted with the cache. ``ts`` is the honest floor — never a date later
+          than the truth, and the one bound ``__post_init__`` enforces anyway.
 
-        Costs nothing when there is nothing to do: with no terminal record missing the
-        field, it never walks history and never writes. That is load-bearing — the doctor
-        calls a fixer once per reported issue.
+        Runs on RAW lines because an unconstructible record is exactly what it repairs;
+        a line it cannot parse is preserved verbatim rather than dropped. Costs nothing
+        when there is nothing to do — that is load-bearing, the doctor calling a fixer
+        once per reported issue.
         """
-        path = self._record_store.path
+        stores = [self._record_store]
+        if self._archive_store is not None:
+            stores.append(self._archive_store)
+        return sum(self._normalize_file(store.path) for store in stores)
+
+    def _normalize_file(self, path: Path) -> int:
         if not path.is_file():
             return 0
         before = path.read_text(encoding="utf-8")
         lines = before.split("\n")
-        pending = {
-            index: raw
-            for index, line in enumerate(lines)
-            if (raw := _terminal_without_closed_at(line)) is not None
-        }
-        if not pending:
+        changed = 0
+        for index, line in enumerate(lines):
+            canonical = _canonical_line(line)
+            if canonical is not None and canonical != line.strip():
+                lines[index] = canonical
+                changed += 1
+        if not changed:
             return 0
-
-        closed_at_of = self._derived_closed_at()
-        for index, raw in pending.items():
-            ts = str(raw["ts"])
-            derived = closed_at_of.get(str(raw["id"]))
-            raw["closed_at"] = derived if derived is not None and derived >= ts else ts
-            lines[index] = json.dumps(raw, sort_keys=True, ensure_ascii=False)
         try:
             atomic_write(path, "\n".join(lines), newline="", expected_previous=before)
         except ConcurrentModificationError as exc:
-            raise StaleRecordWriteError(str(next(iter(pending.values()))["id"])) from exc
-        return len(pending)
-
-    def _derived_closed_at(self) -> dict[str, str]:
-        """``bug_id -> closed_at`` from the ledger's own git history, empty when no walk
-        is available or the walk fails — the caller's ``ts`` fallback covers both."""
-        if self._history_reader is None or self._repo_root is None:
-            return {}
-        try:
-            provenance = derive_commit_provenance(
-                self._history_reader.log_added_lines(self._repo_root, "specs/bugs/"),
-                classify_ledger_line,
-            )
-        except GitHistoryReadError:
-            _LOG.warning(
-                "closed_at back-fill: history unavailable, falling back to each record's ts"
-            )
-            return {}
-        return {
-            bug_id: _normalize_instant(derived.resolved_at)
-            for bug_id, derived in provenance.items()
-            if derived.resolved_at is not None
-        }
-
-    # -- reads -------------------------------------------------------------------------
-
-    def resolved_commit(self, record: BugRecord) -> str | None:
-        """FR8's one resolver seam (AS-1, A8.2) — the stored value when present,
-        derived from real git history otherwise. One function, one caller-facing
-        signature: the SAME method a read-only display (a future ``bugs status``/
-        ``stats`` renderer) and this release's stored-equals-derived contract test
-        both call.
-
-        **Read-only.** Never writes ``resolved_commit`` back to the ledger — the
-        field stays a cache by construction (a commit cannot contain its own sha) and
-        its ONE writer is FR14's pillar-1 audit, in the same atomic in-place rewrite
-        that sets ``audited`` (a later task; not this seam, not a second commit).
-
-        Derivation needs a real git walk over ``specs/bugs/`` through
-        :func:`~dadaia_workspace.core.bug_provenance.derive_commit_provenance`,
-        classified through :func:`~dadaia_workspace.core.bug_provenance
-        .classify_ledger_line` (permanent, S1 FR23 firing A2 — the walked history spans
-        both shapes). It runs only when *record* has no stored value AND this service
-        was constructed with both
-        ``history_reader``/``repo_root`` — most construction sites (every ``append``,
-        a plain read with no derivation need) pass neither, and this method degrades
-        to "stored or ``None``", never raising and never a new blocking validation
-        (A8.3).
-
-        Returns ``None`` for an open bug, for a resolved bug whose commit the walked
-        history never captured (FR3 step 5 — ``null`` is correct there, not a
-        failure, A8.2), and whenever derivation is unavailable.
-        """
-        if record.resolved_commit is not None:
-            return record.resolved_commit
-        if self._history_reader is None or self._repo_root is None:
-            return None
-        provenance = derive_commit_provenance(
-            self._history_reader.log_added_lines(self._repo_root, "specs/bugs/"),
-            classify_ledger_line,
-        )
-        derived = provenance.get(record.id)
-        return derived.resolved_commit if derived is not None else None
+            raise StaleRecordWriteError(path.name) from exc
+        return changed
 
     def status(self, *, include_closed: bool = False) -> list[BugRecord]:
         """Return every ledger record, open-only by default, sorted by ``id``."""
@@ -429,11 +390,13 @@ def _parse_ts(value: str) -> datetime:
     return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
 
 
-def _terminal_without_closed_at(line: str) -> dict[str, object] | None:
-    """The raw record *line* holds, when it is a terminal record carrying no
-    ``closed_at`` — the ONE class :meth:`BugService.heal_closed_at` repairs. ``None`` for
-    every other line, malformed ones included: a line this migration cannot read is
-    preserved verbatim rather than dropped."""
+def _canonical_line(line: str) -> str | None:
+    """The canonical serialization of the record *line* holds — ``None`` when the line
+    is blank or this fixer cannot read it (preserved verbatim, never dropped).
+
+    The ``closed_at`` stamp happens on the RAW mapping, before construction, precisely
+    because the model refuses to construct a terminal record without it.
+    """
     stripped = line.strip()
     if not stripped:
         return None
@@ -443,21 +406,14 @@ def _terminal_without_closed_at(line: str) -> dict[str, object] | None:
         return None
     if not isinstance(raw, dict):
         return None
-    if raw.get("status") not in TERMINAL_EVENTS or raw.get("closed_at") is not None:
-        return None
-    if not isinstance(raw.get("id"), str) or not isinstance(raw.get("ts"), str):
-        return None
-    return raw
-
-
-def _normalize_instant(value: str) -> str:
-    """A git ``%aI`` date rendered in the ledger's own ``%Y-%m-%dT%H:%M:%SZ`` form (UTC).
-    Unparseable input is returned unchanged — the caller's ``>= ts`` guard then rejects
-    it and the record keeps its ``ts``, so a bad date can never become a stamp."""
+    if (
+        raw.get("status") in TERMINAL_EVENTS
+        and raw.get("closed_at") is None
+        and isinstance(raw.get("ts"), str)
+    ):
+        raw["closed_at"] = raw["ts"]
     try:
-        parsed = datetime.fromisoformat(value)
-    except ValueError:
-        return value
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=UTC)
-    return parsed.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        record = BugRecord.from_dict(raw)
+    except (TypeError, ValueError):
+        return None
+    return json.dumps(record.to_dict(), sort_keys=True, ensure_ascii=False)
