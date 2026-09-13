@@ -37,7 +37,7 @@ def _rule(
     fix: Callable[[SpecsDoctor, SpecsDoctorIssue], None] | None = None,
     fix_help: str | None = None,
 ) -> SpecsRule:
-    """Bind ``section="specs"`` once instead of on all 41 rows."""
+    """Bind ``section="specs"`` once instead of on every row."""
     return Rule(codes, SECTION, run, fix, fix_help)
 
 
@@ -134,7 +134,7 @@ RULES: tuple[SpecsRule, ...] = (
             "RELEASE-TREE-PHASE",
             "RELEASE-TREE-ARCHIVED",
             "RELEASE-TREE-TRIO",
-            "RELEASE-TREE-MISSING",
+            "RELEASE-TREE-STATE-MISSING",
         ),
         lambda d: release_tree_issues(d.specs_dir),
     ),
