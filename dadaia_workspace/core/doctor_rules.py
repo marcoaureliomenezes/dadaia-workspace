@@ -26,7 +26,15 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 
-__all__ = ["Rule", "SectionFinding", "SectionReport", "merge_sections", "run_section", "total_line"]
+__all__ = [
+    "Rule",
+    "SectionFinding",
+    "SectionReport",
+    "merge_sections",
+    "run_section",
+    "total_compliance",
+    "total_line",
+]
 
 
 @dataclass(frozen=True)
