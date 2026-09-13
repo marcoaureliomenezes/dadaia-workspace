@@ -230,6 +230,62 @@ Open-scope release (ADRs 0005–0009): version minted at birth from the PyPI lin
   approved, one context decider for events, the `bugs update` lineage arm deleted, a retired key named
   nowhere in public law, the governance baseline indexed.
 
+### Candidate 4 — docs derived from memory
+
+#### Added
+- `tests/contract/test_docs_derived_from_memory.py`: every `## ` section of `README.md`, `llms.txt` and
+  `docs/*.md` names its memory atom under `<!-- derived-from: <slug> sha256:<12 hex> -->` — red on a
+  stale hash, an unknown slug, a missing marker or `none`; `docs/cli.md` body-equal to `render_digest()`;
+  the 10 KB README budget; one tagline across `README.md`, `pyproject.toml` and `llms.txt`; the five
+  `[tool.poetry.urls]` keys; `dead_citations` over the whole set.
+- `MEM-DRIFT-2` (`dadaia doctor` `specs` section, WARNING, unit = atom, no fix): a memory atom citing a
+  `dadaia <verb>` absent from the live command tree or a `specs/`/`dadaia_workspace/`/`.github/` path
+  absent from the repo.
+- `features/specs/citations.py::dead_citations(text, *, command_paths, repo_root)` — the one citation
+  finder, relocated from `test_behavior_map.py`'s two test-local finders;
+  `cli/help_digest.py::command_paths()` — the one Typer walk `render_digest`, the doctor CLI root and
+  the contract tests share (`features` never imports `cli`).
+- `llms.txt` (llmstxt.org index of link lines), `docs/getting-started.md`, `docs/concepts.md`,
+  `docs/distribution.md` (channel | artifact | state | who acts), `docs/cli.md` (the committed output
+  of `dadaia help tree`).
+- `pyproject.toml`: `description` = the README tagline; `[tool.poetry.urls]`
+  Homepage/Repository/Documentation/Changelog/Issues.
+- `dd-release-implementation` `MEMORY-UPDATE.md`: the re-derive step — run the derived-docs test,
+  re-read the atom, re-derive the section, re-record the hash in the atom's own commit; RC-FLOW step 5
+  Done-when adds the green test.
+- `QUALITY.md` P-29 (ADR 0012, proposed): every human- and agent-facing document derives from a named
+  memory atom under a content hash.
+- Memory: `product-vision` gains the tagline and the two usage paths; `pypi-distribution` the metadata
+  contract and the channel list; `workspace-doctor` `MEM-DRIFT-2`; `ARCHITECTURE.md` Part 2 rows for
+  `citations.py` and `command_paths()`; `QUALITY.md` Part 2 names the derived-docs contract beside the
+  ratchets.
+
+#### Changed
+- `README.md` rewritten from memory (15 KB → 7 KB): what it is, a human installs and uses it, an agent
+  reads `DADAIA.md` and uses it, links.
+- Memory reviewed file by file against the code (T-047-34 report, 25 files): 14 atoms corrected —
+  `projection_rules(plan, harnesses)` and the `ProjectionRule` fields, the Claude Code
+  `permissionDecision: deny` envelope, five Kimi shims, the panel `_Route` table, the handoff enum, the
+  behavior-map row keys, `F-01…F-25`/`R-01…R-21`, the ten catalog keys, three OS ports, the
+  `core/models/` mutation score, the ledger fixer's executed-path test, `release.yml`/`secret-scan.yml`
+  fetch depth, the `public/` package include, the panel composition diagram node — and every unpinned
+  literal deleted (68 refusals, 25 %, baseline v8, `#3d3600`, `CERTIFIED_100`); `CONTEXT.md` senses
+  applied (finding verdict, injection sentinel, record store, candidate wheel, context).
+- GitHub repository description, homepage and topics set from the same tagline and keyword set
+  (project-manager, 7ecb02a0).
+
+#### Removed
+- `docs/01_medium_codex.md`; the README's hand-kept CLI table and its dead claims (`ACTIVE.md`,
+  `CLOSURE.md`, `dadaia academy`, `dadaia clean`, four harnesses, the TTL lease, six-axis reviews,
+  event-sourced bugs, Academy/Games tabs, memory writable in two phases, the pre-commit lease gate);
+  `test_behavior_map.py`'s `_find_dead_path_citations`, `_find_dead_verb_citations` and
+  `_derive_command_tree`.
+
+#### Fixed
+- `LEDGER-BUGS-SCHEMA`'s fixer is proven on the executed path again
+  (`tests/unit/features/specs/test_ledgers_fix_canonical_form.py`, c79f9997) after its test was deleted
+  at 717c08ae — a stewardship gap, not a product bug.
+
 ## [0.4.6] — 2026-09-04
 
 Open-scope release under the release-candidates model it implements (ADRs
