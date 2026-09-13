@@ -12,7 +12,7 @@ scan reaches every non-deletion ref (tags included), never a deletion.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -61,8 +61,8 @@ class _FakeCanonObjectSource:
         self.ref_calls.append(ref)
         return self.sha_by_ref.get(ref)
 
-    def tree_mentions(self, repo: Path, sha: str, term: str) -> bool:
-        return False
+    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]:
+        return set()
 
 
 class _FailingTreeObjectSource:
@@ -78,8 +78,8 @@ class _FailingTreeObjectSource:
     def resolve_ref(self, repo: Path, ref: str) -> str | None:
         return None
 
-    def tree_mentions(self, repo: Path, sha: str, term: str) -> bool:
-        return False
+    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]:
+        return set()
 
 
 def _refs(*lines: str) -> list[PushRef]:

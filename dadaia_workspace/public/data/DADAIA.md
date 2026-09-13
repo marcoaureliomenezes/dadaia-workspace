@@ -94,7 +94,9 @@
 - Git hooks gate the `Bash` write path, outside the gate's own parsing, independent of any harness hook.
 - pre-commit: warns and always allows.
 - pre-push: allows `feature/*` after CI preflight + valid name.
-- pre-push: refuses a direct `develop`/`main` push (§4), a non-canon `specs/` path, or a stale PR verdict.
+- pre-push: refuses a direct `develop`/`main` push (§4), a non-canon `specs/` path the pushed range introduces or rewrites, or a stale PR verdict.
+- pre-push scans the pushed range only: published history is the baseline and is never rescanned (ADR 0013).
+- pre-push applies the v6 canon only to a `specs/` tree stamped at the canonical pattern; a lower stamp is doctor drift, never a push block.
 
 ### 3.5 Enforcement posture
 
@@ -271,7 +273,8 @@
 - Every `feature/{M.m.p}` push runs the local CI preflight first — always-on, not hook-forced.
 - Preflight: `ruff format --check`, `ruff check`, `mypy --strict`, `pytest`.
 - A full scan lives only in the audit lane; the PR-gate review is diff-based; only pushes are review-blocked, commits flow freely.
-- The push IS the publication boundary: this repository is public, so pre-push runs the full denylist scan over every tracked path.
+- The push IS the publication boundary: pre-push runs the denylist scan over every object the pushed range introduces or rewrites.
+- Published history is the baseline and is never rescanned; the only amnesty is a term the baseline already publishes under the same matcher (ADR 0013).
 - No path is exempt and no tolerated-pairs list exists; a fixture needing a secret shape composes it at runtime, never as a tracked literal.
 - Watch every push/PR to green (`dd-release-implementation`).
 - A `quarantine`-marked test sits outside the gating selectors, bug-gated; unregistered pass-on-retry is a failure.
@@ -372,7 +375,7 @@
 - **path class** — the ADDITIVE/MUTATING/PROTECTED category a write path belongs to (§3.2).
 - **scope** — the repo set a bind owns: the context's main repo plus its associated repos (§3.3).
 - **stall** — a BLOCK whose own `fix:` command is itself blocked; CRITICAL (§3.1).
-- **publication boundary** — the push, where the full denylist scan runs on every tracked path (§7.4).
+- **publication boundary** — the push, where the denylist scan runs over the pushed range against the published baseline (§7.4).
 - **presence** — the advisory record a session leaves when it writes, surfaced to others.
 - **canon** — the closed set of paths a `specs/` root may contain (§6.2).
 - **histo** — an append-only JSONL history file under an area's `_archive/`; one `histo-record-v1` per exited entry.

@@ -10,7 +10,7 @@ standing rule): ``zz-``-prefixed values, never a real operator term or foreign s
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -45,8 +45,8 @@ class _FakeObjectSource:
     def resolve_ref(self, repo: Path, ref: str) -> str | None:
         return None
 
-    def tree_mentions(self, repo: Path, sha: str, term: str) -> bool:
-        return False
+    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]:
+        return set()
 
 
 class _FailingObjectSource:
@@ -62,8 +62,8 @@ class _FailingObjectSource:
     def resolve_ref(self, repo: Path, ref: str) -> str | None:
         return None
 
-    def tree_mentions(self, repo: Path, sha: str, term: str) -> bool:
-        return False
+    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]:
+        return set()
 
 
 def _refs(*lines: str) -> list[PushRef]:
@@ -614,8 +614,8 @@ class _FailingObjectSourceWithPath:
     def resolve_ref(self, repo: Path, ref: str) -> str | None:
         return None
 
-    def tree_mentions(self, repo: Path, sha: str, term: str) -> bool:
-        return False
+    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]:
+        return set()
 
 
 def test_git_object_read_failure_at_a_denylisted_path_masks_the_path(tmp_path: Path) -> None:
@@ -714,11 +714,11 @@ class _PublishedSlugObjectSource(_FakeObjectSource):
     raise_on_grep: bool = False
     grep_calls: list[tuple[str, str]] = field(default_factory=list)
 
-    def tree_mentions(self, repo: Path, sha: str, term: str) -> bool:
-        self.grep_calls.append((sha, term))
+    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]:
+        self.grep_calls.append((sha, tuple(patterns)))
         if self.raise_on_grep:
             raise GitObjectReadError("simulated git grep failure")
-        return term in self.published.get(sha, set())
+        return {text.lower() for text in self.published.get(sha, set())}
 
 
 def _sibling_ref() -> list[PushRef]:
@@ -739,7 +739,11 @@ def test_a_foreign_slug_already_published_in_the_remote_tip_passes(tmp_path: Pat
         foreign_slugs=("zz-sibling-repo",),
     )
     assert decision.allowed, decision.message
-    assert (_SHA_B, "zz-sibling-repo") in source.grep_calls
+    assert source.grep_calls and source.grep_calls[0][0] == _SHA_B
+    # The baseline is searched with the detector's own whole-token pattern, never a bare term.
+    assert any(
+        "zz\\-sibling\\-repo" in p or "zz-sibling-repo" in p for p in source.grep_calls[0][1]
+    )
 
 
 def test_a_foreign_slug_not_yet_published_still_refuses(tmp_path: Path) -> None:

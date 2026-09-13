@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -158,8 +158,8 @@ class _FakeObjectSource:
     def resolve_ref(self, repo: Path, ref: str) -> str | None:
         return None
 
-    def tree_mentions(self, repo: Path, sha: str, term: str) -> bool:
-        return False
+    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]:
+        return set()
 
 
 class _FailingObjectSource(_FakeObjectSource):

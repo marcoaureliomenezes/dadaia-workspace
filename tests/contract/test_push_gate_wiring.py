@@ -13,7 +13,7 @@ Pins two composition-root guarantees:
 from __future__ import annotations
 
 import subprocess
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -50,8 +50,8 @@ class _SpyObjectSource:
     def resolve_ref(self, repo: Path, ref: str) -> str | None:
         return None
 
-    def tree_mentions(self, repo: Path, sha: str, term: str) -> bool:
-        return False
+    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]:
+        return set()
 
 
 def _init_repo(path: Path) -> str:

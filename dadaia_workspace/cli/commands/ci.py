@@ -279,9 +279,11 @@ def push_gate_check() -> None:
     # lowercase memory files) has NOTHING for the canon scan to enforce until
     # `dadaia specs upgrade` migrates it — the doctor already reports that drift;
     # the push gate must not lock every specs edit behind the migration.
-    specs_version = read_pattern_version(repo_root / "specs")
+    specs_dir = repo_root / "specs"
+    specs_version = read_pattern_version(specs_dir)
     canon_fn = canon_violations
-    if 0 < specs_version < CANONICAL_SPECS_VERSION:
+    if specs_dir.is_dir() and specs_version < CANONICAL_SPECS_VERSION:
+        # An unstamped (pre-framework) tree counts as below the canon too — ADR 0013.
         typer.echo(
             f"[pre-push] specs/ tree is stamped pattern {specs_version} "
             f"(< {CANONICAL_SPECS_VERSION}): the v6 canon scan does not apply until "

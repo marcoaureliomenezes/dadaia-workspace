@@ -506,3 +506,34 @@ def test_foreign_slugs_cover_associated_repos_not_just_the_main_slug(
     assert "zz-private-associated-repo" in foreign_slugs
     assert "other-main-slug" in foreign_slugs
     assert "pushing-repo" not in foreign_slugs
+
+
+def test_published_slug_amnesty_is_never_broader_than_detection(tmp_path: Path) -> None:
+    """Operator ruling 2026-09-13 / ADR 0013 — the REAL adapter searches the baseline
+    with the detector's own whole-token pattern, so a slug glued into a longer
+    identifier (``zz-sibling-repo-x``, ``ZZ-SIBLING-REPO.md``) never amnesties the bare
+    slug — the 2026-08-27 substring bug must not recur on the fail-open side. A bare,
+    case-different occurrence does amnesty."""
+    from dadaia_workspace.features.chokepoints.denylist_scan import compile_slug_patterns
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(["init", "-q"], repo)
+    _git(["config", "user.email", "t@example.com"], repo)
+    _git(["config", "user.name", "T"], repo)
+    (repo / "notes.md").write_text(
+        "assets: zz-sibling-repo-x and ZZ-SIBLING-REPO.md and pkg.zz-sibling-repo\n",
+        encoding="utf-8",
+    )
+    _git(["add", "-A"], repo)
+    _git(["commit", "-q", "-m", "substrings only"], repo)
+    substrings_sha = _git(["rev-parse", "HEAD"], repo).stdout.strip()
+    (repo / "notes.md").write_text("see the ZZ-Sibling-Repo repository\n", encoding="utf-8")
+    _git(["add", "-A"], repo)
+    _git(["commit", "-q", "-m", "whole token"], repo)
+    whole_sha = _git(["rev-parse", "HEAD"], repo).stdout.strip()
+
+    reader = GitSubprocessObjectReader()
+    patterns = [regex.pattern for _slug, regex in compile_slug_patterns(["zz-sibling-repo"])]
+    assert reader.tree_matches(repo, substrings_sha, patterns) == set()
+    assert reader.tree_matches(repo, whole_sha, patterns) == {"ZZ-Sibling-Repo"}
