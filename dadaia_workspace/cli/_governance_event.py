@@ -17,8 +17,6 @@ swallowed: observability is not a gate.
 
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
 import os
 import sqlite3
@@ -26,19 +24,11 @@ import uuid
 from collections.abc import Mapping
 from datetime import UTC, datetime
 
-from dadaia_workspace.core.models.telemetry import GovernanceEvent
+from dadaia_workspace.core.models.telemetry import GovernanceEvent, record_hash
 
 __all__ = ["record_governance_event"]
 
 logger = logging.getLogger(__name__)
-
-
-def record_hash(record: Mapping[str, object]) -> str:
-    """The sha256 of the record's canonical JSON — byte-for-byte the line a JSONL
-    ledger writes (``json.dumps(..., sort_keys=True, ensure_ascii=False)``), so the
-    hash can be recomputed from the committed file alone."""
-    canonical = json.dumps(record, sort_keys=True, ensure_ascii=False)
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def record_governance_event(

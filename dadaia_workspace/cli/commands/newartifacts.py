@@ -46,6 +46,7 @@ from dadaia_workspace.features.specs.candidate import (
     set_phase,
 )
 from dadaia_workspace.features.specs.canon import release_new
+from dadaia_workspace.features.specs.release_tree import governed_state
 from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 # ── shared typer apps ─────────────────────────────────────────────────────────
@@ -200,7 +201,14 @@ def _archive_bugs(target: Path) -> int:
 
 def _record_release_event(verb: str, target: Path, release_id: str) -> None:
     """One verb, one governance event (0.4.7 FR2) over the state document the verb just
-    wrote — the record whose hash `dadaia doctor` compares a hand edit against."""
+    wrote — the record whose hash `dadaia doctor` compares a hand edit against.
+
+    The hashed shape is ``release_tree.governed_state`` — ``phase``/``defined``/
+    ``implemented`` and nothing else — imported from the rule that recomputes it so the
+    two can never disagree. The rest of the document is hand-written by design (SPEC
+    0.4.7 Q3): hashing the whole state would read every closure paragraph appended to
+    `log` as a hand edit of a phase nobody touched.
+    """
     state_path = target / "releases" / release_id / RELEASE_STATE_FILENAME
     if not state_path.is_file():
         # `archive` moved the document into _archive/<id>/ as part of the same act.
@@ -209,18 +217,36 @@ def _record_release_event(verb: str, target: Path, release_id: str) -> None:
         state = json.loads(state_path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return
-    record_governance_event(verb=verb, ledger="releases", record_id=release_id, record=state)
+    record_governance_event(
+        verb=verb, ledger="releases", record_id=release_id, record=governed_state(state)
+    )
 
 
 def _histo_appender(target: Path) -> Callable[[HistoRecord], None]:
     """The ``releases_histo.jsonl`` sink, built the way every other ledger store is
-    built at the composition root — one record shape, one store, no second writer."""
+    built at the composition root — one record shape, one store, no second writer.
+
+    The append carries its own governance event, under its own namespace: a histo
+    record and the ``_RELEASE.json`` of the same release share an id and are two
+    different records, so one namespace for both would compare each against the
+    other's hash forever.
+    """
     store: JsonlRecordStore[HistoRecord] = JsonlRecordStore(
         target / "releases" / "_archive" / "releases_histo.jsonl",
         to_dict=HistoRecord.to_dict,
         from_dict=HistoRecord.from_dict,
     )
-    return store.append
+
+    def append(record: HistoRecord) -> None:
+        store.append(record)
+        record_governance_event(
+            verb="archive",
+            ledger="releases-histo",
+            record_id=record.id,
+            record=record.to_dict(),
+        )
+
+    return append
 
 
 # ── dadaia release archive ────────────────────────────────────────────────────

@@ -17,6 +17,7 @@ its own adapter at the seam).
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Callable
 from pathlib import Path
 
@@ -41,6 +42,7 @@ from dadaia_workspace.core.doctor_rules import (
     total_line,
 )
 from dadaia_workspace.core.exceptions import SchemaVersionError, WorkspaceNotInitializedError
+from dadaia_workspace.core.models.telemetry import GovernanceBaseline
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.backlog import doctor as backlog_doctor
 from dadaia_workspace.features.spec_context.doctor import DoctorService, workspace_rules
@@ -173,19 +175,57 @@ def _ledger_schema_render(
 ) -> SectionFinding:
     """The compliance unit of a schema-validated ledger is the RECORD, located
     `path:line` — the same unit the backlog rules score, so the two rule groups add
-    into one score line."""
+    into one score line.
+
+    A warning-class issue scores NOTHING (``unit=None``): the only one is
+    LEDGER-*-HANDEDIT (0.4.7 FR6), and the record it names is valid — what it reports
+    is provenance. Disqualifying a valid record would make compliance answer a question
+    it is not asking.
+    """
+    error = issue.verdict == Severity.ERROR.value
     return SectionFinding(
         code=issue.code,
-        verdict=Severity.ERROR.value,
+        verdict=issue.verdict,
         message=f"{issue.unit} {issue.message}",
         canonical=False,
-        error=True,
-        unit=issue.unit,
+        error=error,
+        unit=issue.unit if error else None,
     )
 
 
+def _resolve_governance(context: str | None) -> GovernanceBaseline | None:
+    """The governance events, read ONCE into plain data and handed to the rules that
+    measure hand edits (0.4.7 FR6) — the same shape ``_resolve_live_shas`` has.
+
+    Scoped to ONE spec context, because the store is one file per MACHINE and two
+    workspaces on it are kept apart by each event's ``context`` (``container
+    .build_telemetry_store``). No context resolved, no store, an unreadable or
+    unmigrated store: ``None``, and every hand-edit rule is silent — a consumer without
+    telemetry is not a consumer with drift.
+    """
+    resolved = context or os.environ.get("DADAIA_CONTEXT") or ""
+    if not resolved:
+        return None
+    from dadaia_workspace.features.telemetry.store import TelemetryStore
+
+    try:
+        connection = container.build_telemetry_store().open_read()
+    except Exception:  # noqa: BLE001 — no store, no file, no permission: silent
+        return None
+    try:
+        events = TelemetryStore.from_connection(connection).latest_governance_events()
+    except Exception:  # noqa: BLE001 — corrupt or unmigrated store: silent
+        return None
+    finally:
+        connection.close()
+    return GovernanceBaseline(tuple(e for e in events if e.context == resolved))
+
+
 def _ledgers_section(
-    specs_dir: Path | None, source_root: str | None, alias_map: str | None
+    specs_dir: Path | None,
+    source_root: str | None,
+    alias_map: str | None,
+    governance: GovernanceBaseline | None,
 ) -> SectionReport:
     """The `ledgers` section: the backlog document's BL-* rules plus one schema rule per
     committed governance ledger (0.4.7 FR6). Two features contribute, neither imports
@@ -216,6 +256,7 @@ def _ledgers_section(
     ledgers_context = specs_ledgers.build_ledgers_context(
         specs_dir,
         normalize_bug_records=build_bug_service(specs_dir, with_archive=True).normalize_records,
+        governance=governance,
     )
     return merge_sections(
         [
@@ -242,7 +283,9 @@ def _ledgers_section(
 # ── composition ─────────────────────────────────────────────────────────────────
 
 
-def _build_specs_doctor(specs_dir: Path | None, public_dir: str | None) -> SpecsDoctor | None:
+def _build_specs_doctor(
+    specs_dir: Path | None, public_dir: str | None, governance: GovernanceBaseline | None = None
+) -> SpecsDoctor | None:
     """``None`` in, ``None`` out: a workspace with no specs tree has no specs doctor."""
     if specs_dir is None:
         return None
@@ -255,6 +298,7 @@ def _build_specs_doctor(specs_dir: Path | None, public_dir: str | None) -> Specs
         # _resolve_live_shas documents; feeds SPEC-DOC-028 and SPEC-DOC-045.
         repo_root=specs_dir.parent,
         live_shas=_resolve_live_shas(specs_dir),
+        governance=governance,
         bug_store_factory=container.build_bug_record_store,
     )
 
@@ -367,7 +411,8 @@ def doctor(
         typer.echo("Error: Workspace not initialized. Run 'dadaia init' first.", err=True)
         raise typer.Exit(1) from None
     target = _resolve_specs_dir(specs_dir, context)
-    specs_doctor = _build_specs_doctor(target, public_dir)
+    governance = _resolve_governance(context)
+    specs_doctor = _build_specs_doctor(target, public_dir, governance)
 
     fixed = _apply_fixes(
         service, specs_doctor, target, source_root, alias_map, fix=fix, expired_only=expired_only
@@ -375,7 +420,7 @@ def doctor(
     reports = [
         _workspace_section(service, expired_only=expired_only),
         _specs_section(specs_doctor),
-        _ledgers_section(target, source_root, alias_map),
+        _ledgers_section(target, source_root, alias_map, governance),
     ]
     # Render boundary ONLY: no doctor ever sees the redactor; every finding and fix action
     # keeps carrying true names inside the sections themselves.
@@ -437,6 +482,8 @@ def _ledger_fixes(
         return []
     from dadaia_workspace.cli.commands.bugs import build_bug_service
 
+    # No governance baseline on the fix path: no hand-edit rule carries a fixer (the
+    # answer is the operator's judgment), so reading the store here would buy nothing.
     context = specs_ledgers.build_ledgers_context(
         specs_dir,
         normalize_bug_records=build_bug_service(specs_dir, with_archive=True).normalize_records,

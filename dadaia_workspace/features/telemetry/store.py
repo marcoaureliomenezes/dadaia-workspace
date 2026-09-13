@@ -538,14 +538,20 @@ class TelemetryStore:
 
     def latest_governance_events(self) -> list[GovernanceEvent]:
         """The most recent event for each ``(ledger, record_id)`` — the whole state a
-        hand-edit reader needs, read once into plain data."""
+        hand-edit reader needs, read once into plain data.
+
+        "Most recent" is the LAST INSERTED (``MAX(rowid)``), not ``MAX(ts)``: ``ts`` is
+        stamped at insert so the two orders agree, but two verbs on one record inside
+        the same second share a ``ts`` and a ``GROUP BY``'s bare columns would then
+        pick a row arbitrarily — which reads as a hand edit of a record a verb had just
+        written.
+        """
         conn = self._require_conn()
         rows = conn.execute(
             """
-            SELECT event_id, MAX(ts) AS ts, session_id, context, verb,
-                   ledger, record_id, record_hash
+            SELECT event_id, ts, session_id, context, verb, ledger, record_id, record_hash
             FROM governance_events
-            GROUP BY ledger, record_id
+            WHERE rowid IN (SELECT MAX(rowid) FROM governance_events GROUP BY ledger, record_id)
             ORDER BY ledger, record_id
             """
         ).fetchall()

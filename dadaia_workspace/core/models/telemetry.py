@@ -13,6 +13,9 @@ every name here for backward compatibility.
 
 from __future__ import annotations
 
+import hashlib
+import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
@@ -210,3 +213,79 @@ class GovernanceEvent:
     ledger: str
     record_id: str
     record_hash: str
+
+
+def record_hash(record: Mapping[str, object]) -> str:
+    """The sha256 of a governance record's canonical JSON — byte-for-byte the line a
+    JSONL ledger writes (``json.dumps(..., sort_keys=True, ensure_ascii=False)``), so
+    the hash can be recomputed from the committed file alone.
+
+    Lives HERE, beside :class:`GovernanceEvent`, because the verb that writes the hash
+    (``cli/_governance_event.py``) and the doctor rule that recomputes it
+    (``features/specs/{ledgers,release_tree}.py``) must agree byte-for-byte. Two homes
+    would be two hash functions, and the mismatch would read as a hand edit forever.
+    """
+    return hashlib.sha256(
+        json.dumps(record, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+
+
+@dataclass(frozen=True)
+class GovernanceBaseline:
+    """The governance-event state a doctor rule needs, read ONCE into plain data.
+
+    The whole hand-edit judgment lives here — the ledger rules and the release-tree
+    rule ask :meth:`hand_edit` and render its answer, so "what is a hand edit" is
+    decided in one place and ``features/specs`` never imports ``features/telemetry``
+    (the CLI composition root reads the store and passes this record in, exactly as
+    ``live_shas`` travels).
+
+    ``events`` is the LATEST event per ``(ledger, record_id)``, already scoped to one
+    spec context. Absent store, unreadable store, or a session with no context = no
+    baseline at all (``None`` at the call site), and every rule is silent: a consumer
+    without telemetry is not a consumer with drift.
+    """
+
+    events: tuple[GovernanceEvent, ...]
+
+    @property
+    def first_ts(self) -> str:
+        """The oldest event this baseline holds — the measurement horizon. A record
+        older than it predates the verbs and is never a hand edit (SPEC 0.4.7 §5):
+        the 564 existing bug records enter measurement only when a verb touches them.
+        """
+        return min(event.ts for event in self.events)
+
+    def hand_edit(
+        self,
+        *,
+        ledger: str,
+        record_id: str,
+        record: Mapping[str, object],
+        record_ts: str | None = None,
+    ) -> str | None:
+        """The message for a record no verb wrote, or ``None`` when the record and the
+        events agree.
+
+        Two shapes, one question — "did a verb write THIS?":
+        a matching event whose ``record_hash`` differs (the record changed after the
+        verb), or no event at all for a record newer than :attr:`first_ts` (the record
+        appeared without a verb). ``record_ts=None`` opts out of the second shape for a
+        record class that carries no timestamp of its own (``_RELEASE.json``).
+        """
+        if not self.events:
+            return None
+        for event in self.events:
+            if event.ledger == ledger and event.record_id == record_id:
+                if event.record_hash == record_hash(record):
+                    return None
+                return (
+                    f"record changed after `{event.verb}` ({event.ts}) wrote it — "
+                    "hand edit, not a verb"
+                )
+        if record_ts is not None and record_ts > self.first_ts:
+            return (
+                f"no governance verb ever wrote this record, and it is newer than the "
+                f"first governance event ({self.first_ts}) — hand edit, not a verb"
+            )
+        return None

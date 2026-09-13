@@ -33,6 +33,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.models.bugs import BugRecord
 from dadaia_workspace.core.models.findings import FindingRecord
+from dadaia_workspace.core.models.telemetry import GovernanceBaseline
 from dadaia_workspace.features.specs.doctor_closure_audit import ClosureAuditValidator
 from dadaia_workspace.features.specs.doctor_coherence import CoherenceValidator
 from dadaia_workspace.features.specs.doctor_governance import GovernanceValidator
@@ -78,6 +79,11 @@ class SpecsDoctor:
             CLI composition root and passed in as plain data — feeds SPEC-DOC-044
             (stale verdicts). ``None`` (default) keeps that check a silent no-op; this
             coordinator never resolves git state itself.
+        governance: Optional governance-event baseline
+            (``core.models.telemetry.GovernanceBaseline``), read ONCE by the CLI
+            composition root and passed in as plain data exactly as ``live_shas`` is —
+            feeds RELEASE-TREE-HANDEDIT (0.4.7 FR6). ``None`` (default, and the only
+            value on a machine with no telemetry store) keeps that check silent.
     """
 
     def __init__(
@@ -89,6 +95,7 @@ class SpecsDoctor:
         findings_store_factory: Callable[[Path], JsonlRecordStore[FindingRecord]] | None = None,
         bug_store_factory: Callable[[Path], JsonlRecordStore[BugRecord]] | None = None,
         live_shas: Collection[str] | None = None,
+        governance: GovernanceBaseline | None = None,
     ) -> None:
         self.specs_dir: Path = Path(specs_dir)
         self.public_dir: Path | None = Path(public_dir) if public_dir is not None else None
@@ -100,6 +107,9 @@ class SpecsDoctor:
         # live_shas (v0.5.0 specs-canon closure): SPEC-DOC-044's plain-data input,
         # resolved once by the CLI. None -> that check is a no-op.
         self.live_shas: Collection[str] | None = live_shas
+        # governance (0.4.7 FR6): RELEASE-TREE-HANDEDIT's plain-data input, read once by
+        # the CLI. None -> that check is a no-op, as it is wherever no store exists.
+        self.governance: GovernanceBaseline | None = governance
         # templates_dir is resolved from public_dir if not explicitly supplied.
         if templates_dir is not None:
             self._templates_dir: Path | None = Path(templates_dir)

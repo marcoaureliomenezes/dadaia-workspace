@@ -33,6 +33,8 @@ from dadaia_workspace.core.models.histo import (
     BACKLOG_HISTO_DISPOSITIONS,
     RELEASES_HISTO_DISPOSITIONS,
 )
+from dadaia_workspace.core.models.telemetry import GovernanceBaseline
+from dadaia_workspace.features.specs.doctor_types import Severity
 from dadaia_workspace.features.specs.schemas import schema_errors
 
 __all__ = [
@@ -58,6 +60,10 @@ class LedgerIssue:
     path: str
     line: int
     message: str
+    #: This issue's OWN word (``error``/``warning``) — a record is either invalid (an
+    #: error: the shape is wrong) or merely unexplained (a warning: the shape is right
+    #: and no verb claims it). One field, no mapping table at the render seam.
+    verdict: str = Severity.ERROR.value
     #: This issue's OWN executable remediation, when the rule's generic ``fix_help``
     #: would not repair it. Empty = the rule's ``fix_help`` stands. A hand-editable
     #: schema violation and a model invariant with a shipped migration are the same code
@@ -92,9 +98,21 @@ class Ledger:
     #: The model that owns the shape reports it; nothing here restates a rule.
     canonical_issue: Callable[[Mapping[str, object]], str | None] | None = None
 
+    #: The governance-event namespace whose events are written OVER this ledger's
+    #: records (``GovernanceEvent.ledger``) — the join key of the hand-edit rule
+    #: (0.4.7 FR6). ``None`` = no verb owns this ledger's records, so a hand edit of
+    #: them is not measurable and the rule does not exist for it: ``BACKLOG.json``
+    #: maturation and `audits/*/FINDINGS.jsonl` stay hand-written by design (SPEC Q3),
+    #: and ADRs are flipped by the operator alone.
+    events_ledger: str | None = None
+
     @property
     def code(self) -> str:
         return f"LEDGER-{self.name}-SCHEMA"
+
+    @property
+    def hand_edit_code(self) -> str:
+        return f"LEDGER-{self.name}-HANDEDIT"
 
 
 def _bug_canonical_issue(record: Mapping[str, object]) -> str | None:
@@ -118,25 +136,34 @@ def _bug_canonical_issue(record: Mapping[str, object]) -> str | None:
 LEDGERS: tuple[Ledger, ...] = (
     Ledger("ADR", "ADRs/decisions.jsonl", "ADRs/decision-record-v1"),
     Ledger("BACKLOG", "backlog/BACKLOG.json", "backlog/backlog-v1", jsonl=False),
-    Ledger("BUGS", "bugs/BUGS.jsonl", "bugs/bug-record-v1", canonical_issue=_bug_canonical_issue),
+    Ledger(
+        "BUGS",
+        "bugs/BUGS.jsonl",
+        "bugs/bug-record-v1",
+        canonical_issue=_bug_canonical_issue,
+        events_ledger="bugs",
+    ),
     Ledger("FINDINGS", "audits/*/FINDINGS.jsonl", "audits/finding-record-v1"),
     Ledger(
         "BACKLOG-HISTO",
         "backlog/_archive/backlog_histo.jsonl",
         "histo/histo-record-v1",
         dispositions=BACKLOG_HISTO_DISPOSITIONS,
+        events_ledger="backlog",
     ),
     Ledger(
         "AUDITS-HISTO",
         "audits/_archive/audits_histo.jsonl",
         "histo/histo-record-v1",
         dispositions=AUDITS_HISTO_DISPOSITIONS,
+        events_ledger="audits",
     ),
     Ledger(
         "RELEASES-HISTO",
         "releases/_archive/releases_histo.jsonl",
         "histo/histo-record-v1",
         dispositions=RELEASES_HISTO_DISPOSITIONS,
+        events_ledger="releases-histo",
     ),
 )
 
@@ -164,6 +191,12 @@ class LedgersContext:
     #: ``bug_store_factory`` is injected into the specs doctor — this feature never
     #: imports ``features.bugs``. ``None`` = no repair is wired and the rule reports only.
     normalize_bug_records: Callable[[], int] | None = field(default=None, compare=False)
+    #: The governance events, read ONCE at the CLI composition root and passed in as
+    #: plain data (0.4.7 FR6) — exactly as ``live_shas`` travels into the specs doctor,
+    #: so ``features/specs`` never imports ``features/telemetry``. ``None`` = no store
+    #: (a consumer without telemetry, CI, a fresh machine) and every hand-edit rule is
+    #: silent.
+    governance: GovernanceBaseline | None = None
 
     @property
     def total_records(self) -> int:
@@ -191,7 +224,10 @@ def _read_json(path: Path, rel: str) -> list[_Located]:
 
 
 def build_ledgers_context(
-    specs_dir: Path, *, normalize_bug_records: Callable[[], int] | None = None
+    specs_dir: Path,
+    *,
+    normalize_bug_records: Callable[[], int] | None = None,
+    governance: GovernanceBaseline | None = None,
 ) -> LedgersContext:
     """Read every committed record of every ledger once. An absent ledger file is an
     empty list, never an issue: a young specs tree has no audits and no history yet."""
@@ -205,7 +241,10 @@ def build_ledgers_context(
             located.extend(_read_jsonl(path, rel) if ledger.jsonl else _read_json(path, rel))
         records[ledger.glob] = tuple(located)
     return LedgersContext(
-        specs_dir=specs_dir, records=records, normalize_bug_records=normalize_bug_records
+        specs_dir=specs_dir,
+        records=records,
+        normalize_bug_records=normalize_bug_records,
+        governance=governance,
     )
 
 
@@ -250,6 +289,50 @@ def _validate(ledger: Ledger, ctx: LedgersContext) -> list[LedgerIssue]:
     return issues
 
 
+def _hand_edits(ledger: Ledger, ctx: LedgersContext) -> list[LedgerIssue]:
+    """Every record of *ledger* no governance verb wrote (0.4.7 FR6).
+
+    The judgment itself lives in ``core.models.telemetry.GovernanceBaseline.hand_edit``
+    — the ONE definition of "a hand edit", shared with the release-tree rule. This
+    function only supplies the join key (``events_ledger`` + the record's own id) and
+    the record's own timestamp, which is what makes the rule a table row rather than a
+    fourth code path.
+
+    WARNING, never an error, and it disqualifies no compliance unit: the record is
+    VALID (the schema rules score that) — what is unexplained is its provenance, and
+    whether to re-run the verb or accept the edit is the operator's judgment, not a
+    failure. Measured, never blocked (SPEC 0.4.7 FR6).
+    """
+    if ctx.governance is None or ledger.events_ledger is None:
+        return []
+    issues: list[LedgerIssue] = []
+    for located in ctx.records.get(ledger.glob, ()):
+        record = located.record
+        if not isinstance(record, dict):
+            continue
+        record_id = record.get("id")
+        if not isinstance(record_id, str):
+            continue
+        ts = record.get("ts")
+        message = ctx.governance.hand_edit(
+            ledger=ledger.events_ledger,
+            record_id=record_id,
+            record=record,
+            record_ts=ts if isinstance(ts, str) else None,
+        )
+        if message is not None:
+            issues.append(
+                LedgerIssue(
+                    ledger.hand_edit_code,
+                    located.path,
+                    located.line,
+                    message,
+                    verdict=Severity.WARNING.value,
+                )
+            )
+    return issues
+
+
 #: This feature's binding of the ONE doctor rule record: the `ledgers` section's
 #: schema rules run over :class:`LedgersContext` and emit :class:`LedgerIssue`.
 type LedgerRule = Rule[LedgersContext, LedgerIssue]
@@ -281,6 +364,17 @@ RULES: tuple[LedgerRule, ...] = tuple(
         fix_help=(f"sed -i '<line>s|.*|<the corrected record>|' specs/{ledger.glob}"),
     )
     for ledger in LEDGERS
+) + tuple(
+    Rule(
+        (ledger.hand_edit_code,),
+        SECTION,
+        (lambda bound: lambda ctx: _hand_edits(bound, ctx))(ledger),
+        # No fix line: re-running the verb and accepting the edit are both correct
+        # answers, and printing one of them would be a guess. WARNING-only, so the run
+        # never exits 1 on it and no `fix:` is owed.
+    )
+    for ledger in LEDGERS
+    if ledger.events_ledger is not None
 )
 
 

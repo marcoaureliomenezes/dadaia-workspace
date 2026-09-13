@@ -61,7 +61,7 @@
   `dadaia_workspace/cli/commands/newartifacts.py`, `tests/**`. Blocked by: T-047-27.
   Delivers: `_RELEASE.json`'s phase and milestones move only by verb; `archive` cannot
   hang on a hand-set milestone.
-- [-] T-047-30 — FR6: the doctor CLI reads `latest_governance_events()` once into
+- [x] T-047-30 — FR6: the doctor CLI reads `latest_governance_events()` once into
   plain data; `LEDGER-<NAME>-HANDEDIT` (BUGS + three histos, WARNING, hash mismatch or
   no event newer than the store's first) in `ledgers.py`; `RELEASE-TREE-HANDEDIT` in
   `release_tree.py` for `phase`/`defined`/`implemented`; silent with no store (RED: a

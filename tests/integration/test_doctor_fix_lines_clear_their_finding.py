@@ -168,6 +168,9 @@ _UNEXERCISED: dict[str, str] = {
     "own call, not a fixture assertion",
     "TREE-1": "the fix is `specs upgrade`, a full scaffold run exercised by the specs "
     "upgrade integration suite",
+    "RELEASE-TREE-HANDEDIT": "carries no fix line by design (0.4.7 FR6: re-running the "
+    "verb and accepting the edit are both correct); the rule is exercised end to end by "
+    "tests/integration/cli/test_doctor_hand_edit.py",
     "TREE-4": "auto-fixed rule (`fix_tree4`), covered by the structural doctor unit tests",
     "TREE-5": "auto-fixed rule (`fix_tree5`), covered by the structural doctor unit tests",
     "TREE-7": "the fix redacts a session id inside BUGS.jsonl; the value is per-record "
