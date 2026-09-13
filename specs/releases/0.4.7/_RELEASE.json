@@ -4,7 +4,7 @@
   "phase": "IMPLEMENTATION",
   "rc": null,
   "defined": {
-    "sha": "97375d8a",
+    "sha": "ea2acc24",
     "ts": "2026-09-12T21:21:22Z"
   },
   "implemented": null,
@@ -20,13 +20,13 @@
       "ts": "2026-09-12T21:21:22Z",
       "agent": "product-engineer",
       "kind": "note",
-      "text": "Candidate 1 defined: trio SPEC/PLAN/TASKS Aprovado at 97375d8a (operator directive 2026-09-12: implement and close every registered release and backlog item, one deploy at the end). Operator decision on ADR 0004/0010 taken by the same directive on the PM's recommendation: 0004 accepted as written; 0010 rewritten to name existing principles before acceptance (T-047-10)."
+      "text": "Candidate 1 defined: trio SPEC/PLAN/TASKS Aprovado at ea2acc24 (operator directive 2026-09-12: implement and close every registered release and backlog item, one deploy at the end). Operator decision on ADR 0004/0010 taken by the same directive on the PM's recommendation: 0004 accepted as written; 0010 rewritten to name existing principles before acceptance (T-047-10)."
     },
     {
       "ts": "2026-09-12T23:29:14Z",
       "agent": "software-engineer",
       "kind": "note",
-      "text": "Candidate 1 in IMPLEMENTATION since T-047-01 (6e2d88af); phase advanced late — the doctor (SPEC-DOC-024) caught the lag once the one-doctor grammar landed."
+      "text": "Candidate 1 in IMPLEMENTATION since T-047-01 (36dc8b8a); phase advanced late — the doctor (SPEC-DOC-024) caught the lag once the one-doctor grammar landed."
     },
     {
       "ts": "2026-09-12T23:59:00Z",
