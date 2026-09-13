@@ -136,7 +136,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 - Write an HTML report to `repos/<context>/reports/ai-engineer/<UTC>-<task-slug>.html` only on operator request or a human-facing next hop.
 - Required sections: Summary, Files authored/refactored (path + diff summary), Instruction-hierarchy compliance.
 - Required sections (continued): Persona-consistency invariants, Cost-impact estimate (when relevant), Topology-guard run, Operator-facing rationale.
-- Emit the handoff via `dd-handoff-emitter` — schema `handoff-v1.2`, `self_pull.refs` lists only atoms this session actually read.
+- Emit the handoff via `dd-handoff-emitter`.
 - Treat a completed AI-entity implementation as a handoff, not task completion — hold `[x]`/push/PR/merge/deploy/close per `dd-release-implementation`.
 - Include evidence paths for changed public assets, projection/doctor commands run, and privacy/security checks performed.
 

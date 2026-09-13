@@ -1218,7 +1218,7 @@ def _find_dead_body_pointers(
 
 
 def test_every_skill_body_pointer_resolves() -> None:
-    violations = _find_dead_body_pointers((_SKILLS_DIR,), _PUBLIC, _REPO_ROOT)
+    violations = _find_dead_body_pointers((_SKILLS_DIR, _PUBLIC / "agents"), _PUBLIC, _REPO_ROOT)
     assert violations == [], "dead body pointer(s):\n" + "\n".join(violations)
 
 

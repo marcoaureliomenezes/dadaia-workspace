@@ -16,11 +16,11 @@
     },
     {
       "id": "qa-engineer",
-      "mandate": "E2E and test-pyramid owner; validates deploys; the pre-commit review checkpoint."
+      "mandate": "E2E and test-pyramid owner; validates deploys; validates at candidate close (RC-FLOW step 4)."
     },
     {
       "id": "code-reviewer",
-      "mandate": "Six-axis review before a PR (architecture/patterns/tests/security/perf/dead code). Never edits code."
+      "mandate": "Three-axis review (standards, spec, bug surface) at candidate close, before the PR. Never edits code."
     },
     {
       "id": "security-reviewer",

@@ -4,7 +4,7 @@ Scope: this file governs only `specs/ADRs/`.
 
 ## 1. Shape
 
-- JSONL, one record per line, `decisions.jsonl`, `decision-record-v1` (v0.5.0 specs-canon).
+- JSONL, one record per line, `decisions.jsonl`, `decision-record-v1`.
 - Fields: `id` (NNNN, zero-padded, monotonic, gap-free, never reused), `ts`, `title`, `status`.
 - Fields (continued): `context`, `decision`, `consequences`, `measured_by`, `supersedes`, `amends`.
 - `status` values: `proposed` | `accepted` | `rejected` | `superseded`.

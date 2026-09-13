@@ -11,7 +11,9 @@ tools:
   - Grep
   - Write
   - Edit
+  - Bash
 skills:
+  - dd-cli-library
   - dd-codebase-design
   - dd-domain-modeling
   - dd-handoff-emitter
@@ -89,7 +91,7 @@ You own the what so engineers implement the how — you never implement.
 - Invoked by `project-manager` with `release_id` + `context` + optional `discovery_report`.
 - Own release definition from bugs/backlog: `dd-release-definition`'s protocol (pick, bug-always-solved, mandatory grill, SPEC).
 - A SPEC is written in domain names, under the `DADAIA.md` §6.7 byte ceiling, with only FR, AC and T- numbered.
-- Consume `dd-backlog-definition`'s already-clean `## ACTIVE` set — sanitizing/deduplicating is never yours.
+- Consume `dd-backlog-definition`'s already-clean `BACKLOG.json` `active[]` set — sanitizing/deduplicating is never yours.
 - Invoke `dd-grill-me` as a narrow leaf consultation even when PM hands a refined `discovery_report`.
 - Note: the panel UI labels contexts "Spec Context Projects" — a UI label only; `specs/memory/*.md` is unchanged.
 
@@ -99,7 +101,7 @@ You own the what so engineers implement the how — you never implement.
 - Never do wide-codebase discovery, dispatch specialists, or synthesize wide-ranging specialist reports — PM's intake job.
 - Never write source code, tests, or CI/CD.
 - Never write `specs/backlog/**` — by-convention read-only, PM curates (`DADAIA.md` §6 Backlog).
-- Never write to `specs/{backlog,bugs,audits}/_archive/**` — the gate blocks it.
+- Never hand-write `specs/{backlog,bugs,audits}/_archive/**` — a histo record is written by its governance verb.
 - Never treat an HTML report as a source of truth — memory is; resolve a conflict in the release SPEC.
 - Never create PLAN/TASKS without an approved SPEC, or skip closure before archiving.
 
@@ -162,11 +164,10 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap).
 - Write permissions: `specs/releases/<release-id>/{SPEC,PLAN,TASKS}.md`/`_RELEASE.json` — phase-gated write.
 - Write permissions: `specs/memory/*.md`, `specs/memory/product/**/*.md` — DEFINITION + CLOSURE only (gate-enforced).
 - Write permissions: `specs/constitution.md` — requires explicit operator confirmation.
-- Read-only: `specs/backlog/**` (by convention), `specs/{backlog,bugs,audits}/_archive/**` (gate-enforced).
+- Read-only: `specs/backlog/**` and every `_archive/*_histo.jsonl` — appended by verb, never by hand.
 - Read + append: `specs/releases/_archive/releases_histo.jsonl` (closure archival).
 - Never: source code, tests, CI/CD.
-- Reports: handoff-first (`DADAIA.md` §5). Emit via `dd-handoff-emitter` — schema `handoff-v1.2`.
-- `self_pull.refs` lists only atoms this session actually read.
+- Reports: handoff-first (`DADAIA.md` §5); emit via `dd-handoff-emitter`.
 
 ## 5. References
 

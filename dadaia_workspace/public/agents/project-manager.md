@@ -108,7 +108,7 @@ Browser frontend and CI YAML -> software-engineer (generic implementer).
 
 1. Resolve context: `dadaia context show --json`; read the live release's `_RELEASE.json` `phase` field directly, no fold.
 2. Grill: run `dd-grill-me` to resolve ambiguity before any dispatch.
-3. Classify + dispatch: map the resolved demand to a playbook (router table below).
+3. Classify + dispatch: resolve the owning agent (`DADAIA.md` §2.1) and the stage (§1.1).
 4. Auto-reserve task_ids in TASKS.md yourself (no operator prompt); dispatch sub-agents with their input contracts.
 5. Enforce the review checkpoint: route implementation handoffs through qa -> security -> code-review.
 6. Block every transition until the trio approves.
@@ -116,28 +116,14 @@ Browser frontend and CI YAML -> software-engineer (generic implementer).
 8. On disagreement between two agents: request each to document its position.
 9. Apply the Decision Authority Matrix (`dd-manager-orchestration`); propose resolution.
 10. Escalate to the operator via `dd-grill-me` if unresolved — domain authority wins within its domain, cross-domain goes to the operator.
-11. Escalate to the operator on 3+ unresolved conflicts, or a demand outside any known playbook.
+11. Escalate to the operator on 3+ unresolved conflicts, or a demand no owner in `DADAIA.md` §2.1 covers.
 
 ## 4. Outputs
 
-- Reports: handoff-first (`DADAIA.md` §5); HTML only on `--with-report` or `next_handoff.agent == "human"`.
-- Schema `handoff-v1.2`; `self_pull.refs` lists only memory atoms this session actually self-pulled/read (`specs/`-prefixed, context-relative).
+- Reports: handoff-first (`DADAIA.md` §5); emit via `dd-handoff-emitter`.
 - Reports land in `repos/<ctx>/reports/project-manager/`.
 
 ## 5. References
-
-Playbook routers (entry agent in the demand cell):
-
-| Demand pattern -> entry agent | Playbook |
-|---|---|
-| ADR / boundaries / migration -> `software-architect` | `architecture-review` |
-| Non-trivial feature logic -> surface implementer | `tdd-cycle` |
-| Reproducible defect, narrow blast radius -> surface implementer | `bug-fix-fastlane` |
-| New release from bugs + backlog -> `product-engineer` | `release-definition` |
-| Vulnerability / CVE -> `security-reviewer` | `security-patch` |
-| Post-deploy smoke / evidence only -> `qa-engineer` | `deploy-validation-only` |
-| Public agents / skills / rules / hooks -> `ai-engineer` | `ai-entity-refinement` |
-| First restricted self-edit of AI entities -> `ai-engineer` | `ai-engineer-recursive-bootstrap` |
 
 - Compliance audit / drift routes to `project-auditor` (peer, operator-triggered).
 - Browser frontend, UX/UI design, and CI/CD demands route to `software-engineer` (the generic implementer).

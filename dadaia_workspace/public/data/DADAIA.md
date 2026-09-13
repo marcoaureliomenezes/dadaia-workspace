@@ -16,9 +16,9 @@
 - Classify every demand: Arm A (feature) or Arm B (bug); state the arm before acting.
 - Deviation needs an explicit, confirmed operator request; default to the flow.
 - Arm A: `demand -> backlog-definition -> release-definition -> implementation+reviews -> audit`.
-- Arm B: `register -> reproduce -> RED test -> root-cause fix -> GREEN -> resolved -> commit`.
+- Arm B: `propose -> operator confirms -> register -> RED test -> root-cause fix -> GREEN -> resolved`.
 - Test: does the tool break its own contract? Yes -> Arm B, fixed now. No -> Arm A, via a release.
-- A feature enters only through the backlog; a bug is fixed immediately, outside release material.
+- A feature enters only through the backlog; a confirmed bug is fixed immediately, outside release material.
 
 ### 1.2 Dispatch
 
@@ -210,8 +210,7 @@
 - The operator's demand queue: only the operator creates demand; `project-manager` curates `specs/backlog/BACKLOG.json`'s `active[]`.
 - A closed item's terminal record lives in `backlog/_archive/backlog_histo.jsonl`; everyone reads both freely.
 - An entry materializes only via the PM's operator-facing intake report; an operator-ratified in-release deferral already counts as intake.
-- Every item is retained: leaves `active[]` only via a histo disposition record.
-- A picked item stays `picked` in `active[]` and exits once, at closure, into `backlog_histo.jsonl`.
+- Every item is retained: it leaves `active[]` only by `dadaia backlog exit <slug> --disposition …`, once, at closure.
 - Covers bugs and backlog only — tests are prunable under stewardship criteria (§7.2). Protocol: `dd-backlog-definition`.
 
 ### 6.7 Releases
@@ -221,8 +220,8 @@
 - A release is `major.minor.patch` with OPEN scope, born by `dadaia release new <id>` (SPEC.md + `_RELEASE.json`, DEFINITION, one transaction).
 - It grows by stacked closed-scope candidates; exactly one live release ever, a second is refused (ADR 0005).
 - A candidate is one full SDD cycle: grill -> SPEC/PLAN/TASKS `Aprovado` at the release root -> implementation -> memory -> CLOSURE -> `feature -> develop` merge.
+- `phase` and the `defined`/`implemented` milestones move only by `dadaia release phase IMPLEMENTATION|CLOSURE --sha <sha>`; `shipped` only by `release archive`.
 - A `dd-grill-me` session on the picked set precedes each candidate's SPEC.
-- At pick time, open bugs and undispositioned audits outrank fresh backlog.
 - After each merge, the promote-or-continue gate (§4.2): continue = `dadaia release rc-archive` moves the trio to `rc-N/` and a fresh trio is born at root; promote = the ship lane, then `dadaia release archive <id> --shipped --pr --next` (final trio stays at root, ADR 0009).
 - Candidate finalization order: memory update -> CLOSURE -> gate; a completed task group is one commit.
 - A candidate's SPEC.md fits 24 KB and TASKS.md 12 KB — measured by V34 (`tests/contract/test_slop_ratchets.py`).
@@ -234,8 +233,8 @@
 - `specs/audits/<YYYYMMDD>-<slug>/AUDIT.md` + `FINDINGS.jsonl` hold three pillars: bug history, spec compliance, memory drift.
 - The three pillars run together, over the window read from `audits/_archive/audits_histo.jsonl`.
 - Suggested every 5 releases, never mandatory.
-- Generates exactly one remediation release; every finding gets a disposition: `fixed`, `superseded`, or `deferred`/`rejected` to backlog.
-- Fully dispositioned: summary lands in `audits/_archive/audits_histo.jsonl`, the audit directory is deleted.
+- Generates exactly one remediation release; every finding moves by `dadaia audit disposition <dir> <finding> --disposition resolved|superseded|deferred|rejected`.
+- With none `open`, `dadaia audit close <dir> --sha <window-end>` appends the `audits_histo.jsonl` summary and deletes the directory.
 
 ---
 
@@ -257,11 +256,12 @@
 
 <!-- behavior: bugs -->
 
-- Register every bug you hit while operating this tooling — any behavior that breaks its own contract.
-- Classify first: environment limits, invalid input, wrong usage, and a designed validation are not bugs.
-- Append `reported` before the turn ends; bug paths are ADDITIVE, so registration is always possible.
+- A bug is a reproducible violation of a contract the tool documents — `--help`, this law, a schema.
+- Not a bug: your own mistake, wrong usage, an environment limit, a designed validation, a law ambiguity, a missing feature.
+- The agent proposes, the operator confirms: name the contract line violated, one reproducing command, why it is not agent error.
+- `dadaia bugs append` runs only after that confirmation; with no operator, the proposal is a handoff finding whose `message` starts `bug-proposal:` — never a record.
 - Redact local paths, IPs, hostnames, private names, secrets from every field. Protocol: `dd-bug-registration`.
-- Close in the same session as the fix: append `resolved` with the red-loop command, the regression-test seam, the diff direction.
+- Close in the same session as the fix: `dadaia bugs resolve` with the red-loop command, the regression-test seam, the diff direction.
 - Commit exactly what the fix touched, never a blanket `-A`; a net-positive diff routes to `software-architect` first.
 - Check prior resolutions on the same component first; declare `caused_by: <bug_id>|none` — protocol: `dd-bug-resolution`.
 - Commit shapes: `dd-gitflow-default` §3a — measured by audits via `git log`, never a hook.
@@ -328,6 +328,7 @@
 - Nothing is deleted directly: deletion happens only when a TTL zone's entry expires, `reaped/` included.
 - `--fix` runs that reaper then the specs fixes; `--expired-only` scopes the report to the TTL lane, never the deletion.
 - SessionStart runs `dadaia doctor --fix --expired-only --quiet`; the PostToolUse throttle runs the same reaper, which also owns presence GC.
+- `LEDGER-<NAME>-HANDEDIT` and `RELEASE-TREE-HANDEDIT` (WARNING, never a block): a governance record changed with no matching governance event; silent where no telemetry store exists.
 - `HOOKS-DRIFT-1`: an ALIVE repo's installed `.git/hooks/{pre-commit,pre-push}` byte-differing from the shipped script; `fix: .dadaia/.venv/bin/dadaia ci install-hook --force`.
 
 ---
@@ -391,6 +392,10 @@
 - **instance exceptions** — `.dadaia/states/instance_exceptions.txt`, one glob per line, honoured at the root and inside the harness dirs (§5.1).
 - **operator** — the human who owns the workspace and approves ADRs, deferrals, releases.
 - **dispatcher** — an agent authorized to invoke another agent via subagent dispatch.
+- **governance verb** — the one CLI command authorized to change a governance record (§6.6, §6.7, §6.8, §7.3).
+- **governance event** — the row a governance verb writes into the telemetry store, naming the record and its post-write hash.
+- **hand edit** — a governance record change with no matching governance event; measured as a WARNING, never blocked (§8.5).
+- **bug proposal** — the operator-facing case for a bug before any record exists; `bug-proposal:` in a handoff finding when no operator is present (§7.3).
 - **slop** — what passes the deletion test without loss (§7.6).
 - **ratchet** — a contract test pinning a measured count that moves down only (§7.6).
 - **fixed section** — a marker-bounded law block in a scaffolded spec, kept byte-equal to its fragment by `dadaia doctor` (§7.6).

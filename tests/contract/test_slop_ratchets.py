@@ -237,8 +237,8 @@ def test_v34_live_candidate_trio_bytes_under_the_fixed_ceiling() -> None:
 # ---------------------------------------------------------------------------
 
 # RECORDED PINS (ratchet DOWN ONLY) — measured on the post-candidate corpus: every
-# tracked `*.md` under dadaia_workspace/public/skills/. Lower them in the commit that
-# deletes the lines; raising either is never a ratchet move.
+# tracked `*.md` under dadaia_workspace/public/skills/. Re-pinned at every closure that
+# touches the corpus, downward only; raising either is never a ratchet move.
 _V35_DIR_CEILING = 18
 _V35_LINE_CEILING = 2917
 

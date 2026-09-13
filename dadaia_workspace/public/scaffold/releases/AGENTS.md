@@ -1,6 +1,6 @@
 # specs/releases/ — Release Rules
 
-Scope: this file governs only `specs/releases/`. Replaces the retired `releases/README.md` (v6 canon, FR1).
+Scope: this file governs only `specs/releases/`.
 
 - Exactly ONE live release directory, ever (release-candidates model, ADR 0005): a bare
   SemVer id = last published PyPI + 1 patch, created only by `dadaia release new <id>` — which
@@ -36,7 +36,7 @@ Scope: this file governs only `specs/releases/`. Replaces the retired `releases/
 
 - The active release's phase is its `phase` field — read directly, no fold, no event-stream replay.
 - Who sets which milestone, and the exact shape per field: `dd-release-implementation`'s `RELEASE-EVENTS.md`.
-- No dual-write, no mirror file (v0.5.0 FR4/T-050-21A, A4.1).
+- No dual-write, no mirror file.
 - The SDD gate resolves the active release directly: the ONE non-archived, non-`_ideas` directory with a `_RELEASE.json`.
 - No such directory: no active release — honest absence, no placeholder file.
 
