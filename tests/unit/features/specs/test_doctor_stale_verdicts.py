@@ -149,8 +149,8 @@ def test_cli_resolver_is_silent_when_the_integration_tip_is_unresolvable(
         def resolve_ref(self, repo: Path, ref: str) -> str | None:
             return self._refs.get(ref)
 
-        def first_parent(self, repo: Path, sha: str) -> str | None:
-            return _PARENT
+        def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
+            return (_PARENT,) if sha == _HEAD else ()
 
     monkeypatch.setattr(container, "build_git_object_reader", lambda: _Reader({"HEAD": _HEAD}))
     assert doctor_cli._resolve_live_shas(tmp_path / "specs") is None

@@ -53,9 +53,10 @@ class _FakeCanonObjectSource:
         self.tree_calls.append((sha, prefix))
         return self.tree_by_sha.get(sha, [])
 
-    def first_parent(self, repo: Path, sha: str) -> str | None:
+    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
         self.parent_calls.append(sha)
-        return self.parent_by_sha.get(sha)
+        parent = self.parent_by_sha.get(sha)
+        return (parent,) if parent else ()
 
     def resolve_ref(self, repo: Path, ref: str) -> str | None:
         self.ref_calls.append(ref)
@@ -72,8 +73,8 @@ class _FailingTreeObjectSource:
     def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
         raise GitObjectReadError("simulated git ls-tree failure")
 
-    def first_parent(self, repo: Path, sha: str) -> str | None:
-        return None
+    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
+        return ()
 
     def resolve_ref(self, repo: Path, ref: str) -> str | None:
         return None

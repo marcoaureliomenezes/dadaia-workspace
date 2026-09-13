@@ -44,8 +44,8 @@ class _SpyObjectSource:
     def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
         return []
 
-    def first_parent(self, repo: Path, sha: str) -> str | None:
-        return None
+    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
+        return ()
 
     def resolve_ref(self, repo: Path, ref: str) -> str | None:
         return None

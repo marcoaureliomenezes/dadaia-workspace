@@ -342,14 +342,14 @@ def _first_parent_sha(repo_root: Path, sha: str) -> str | None:
     """The first-parent sha of *sha* in *repo_root*, or ``None`` (root commit, or git
     cannot resolve it — e.g. a shallow clone; the caller's CI job fetches full history).
 
-    Delegates to the ONE first-parent implementation (F015, 20260830 audit) —
-    ``git_objects.GitSubprocessObjectReader.first_parent`` — never a second raw
-    subprocess with its own error modes.
+    Delegates to the ONE parents implementation (F015, 20260830 audit) —
+    ``git_objects.GitSubprocessObjectReader.parents`` — never a second raw subprocess
+    with its own error modes.
     """
     from dadaia_workspace.container import build_git_object_reader
 
-    parent: str | None = build_git_object_reader().first_parent(repo_root, sha)
-    return parent
+    parents = build_git_object_reader().parents(repo_root, sha)
+    return parents[0] if parents else None
 
 
 @app.command("verdict-check")
