@@ -40,7 +40,7 @@
   event. Write set: `dadaia_workspace/cli/commands/newartifacts.py`,
   `dadaia_workspace/features/backlog/document.py`, `tests/**`. Blocked by: T-047-26.
   Delivers: a backlog item exits by one verb, one histo record, one event.
-- [ ] T-047-28 — FR4: `features/specs/audit.py` (`disposition_finding`, `close_audit`,
+- [-] T-047-28 — FR4: `features/specs/audit.py` (`disposition_finding`, `close_audit`,
   all-or-nothing, histo append last); `cli/commands/audit.py` group `dadaia audit
   disposition|close` registered in `cli/main.py`, each writing an event;
   `finding-record-v1` enum `open resolved superseded deferred rejected`;
