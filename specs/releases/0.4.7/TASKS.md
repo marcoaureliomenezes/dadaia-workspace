@@ -15,7 +15,7 @@
   `pre_gate.evaluate_payload` as Bash and assert ALLOW. RED on today's tree. Write
   set: `tests/**`. Blocked by: none. Delivers: the operator reads the list of BLOCKs
   that stall today.
-- [ ] T-047-15 — FR1: `PathClass` = ADDITIVE/MUTATING/PROTECTED; delete MEMORY,
+- [-] T-047-15 — FR1: `PathClass` = ADDITIVE/MUTATING/PROTECTED; delete MEMORY,
   LAW, UNGATED, `_MEMORY_WRITE_PHASES`, `release_state.MEMORY_WRITE_PHASES`, the
   READ block; `evaluate(rel_path, bind, target_slug, …)`; `core.invocation` resolves
   `Bind` (name + `all_repos()` slugs) and drops `release`/`phase`/`resolve_mode`
