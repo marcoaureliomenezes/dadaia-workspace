@@ -214,3 +214,79 @@ def test_an_unknown_audit_dir_names_specs_audits(home: Path, specs: Path) -> Non
     output = _refuse("audit", "close", "20260101-nope", "--sha", _SHA, "--specs-dir", str(specs))
     assert "specs/audits/" in output
     assert_block_carries_a_runnable_fix(output)
+
+
+@pytest.mark.parametrize("shape", ["traversal", "absolute", "nested-traversal"])
+def test_an_audit_name_outside_specs_audits_is_refused_and_touches_nothing(
+    tmp_path: Path, home: Path, specs: Path, shape: str
+) -> None:
+    """CWE-22: `audit close` DELETES the directory it resolves, so an `<audit>` argument
+    that escapes `specs/audits/` would delete an operator tree. The name is confined to
+    the audits directory before anything is read, resolved or removed."""
+    # A VALID, fully dispositioned audit: `close` would succeed and DELETE it, so only
+    # the confinement rule can save the operator's tree.
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "AUDIT.md").write_text("# Audit\n", encoding="utf-8")
+    closed = dict(_finding("20260101-lifecycle-F001", "bugs"), disposition="resolved")
+    closed["release"] = "0.4.7"
+    (outside / "FINDINGS.jsonl").write_text(json.dumps(closed) + "\n", encoding="utf-8")
+    (outside / "keep-me.txt").write_text("operator data", encoding="utf-8")
+
+    names = {
+        "traversal": "../../outside",
+        "absolute": str(outside),
+        "nested-traversal": f"{_AUDIT}/../../../outside",
+    }
+    output = _refuse("audit", "close", names[shape], "--sha", _SHA, "--specs-dir", str(specs))
+
+    assert "specs/audits/" in output
+    assert_block_carries_a_runnable_fix(output)
+    assert (outside / "keep-me.txt").is_file()
+    assert (specs / "audits" / _AUDIT / "FINDINGS.jsonl").is_file()
+
+
+def test_the_refusal_names_the_verb_the_caller_actually_ran(home: Path, specs: Path) -> None:
+    """`audit disposition` refusing an unknown directory must not hand back a
+    `audit close` remedy — the fix line names the verb that failed."""
+    output = _refuse(
+        "audit", "disposition", "20260101-nope", f"{_AUDIT}-F001",
+        "--disposition", "resolved", "--release", "0.4.7", "--specs-dir", str(specs),
+    )  # fmt: skip
+
+    assert "dadaia audit disposition" in output
+    assert "dadaia audit close" not in output
+
+
+def test_the_archived_record_counts_all_three_pillars_including_the_empty_ones(
+    home: Path, specs: Path
+) -> None:
+    """One record shape whatever the window held: a pillar that found nothing is `0`,
+    not absent, so a reader never has to distinguish "no findings" from "old record"."""
+    for index, disposition_args in enumerate(
+        (["--disposition", "resolved", "--release", "0.4.7"],) * 3
+    ):
+        _run(
+            "audit", "disposition", _AUDIT, f"{_AUDIT}-F00{index + 1}",
+            *disposition_args, "--specs-dir", str(specs),
+        )  # fmt: skip
+    _run("audit", "close", _AUDIT, "--sha", _SHA, "--specs-dir", str(specs))
+
+    line = (specs / "audits" / "_archive" / "audits_histo.jsonl").read_text(encoding="utf-8")
+    entry = json.loads(line.strip())["entry"]
+    assert entry["pillars"] == {"bugs": 1, "specs": 1, "memory": 1}
+
+
+def test_a_pillar_with_no_findings_is_reported_as_zero(
+    tmp_path: Path, home: Path, specs: Path
+) -> None:
+    findings = specs / "audits" / _AUDIT / "FINDINGS.jsonl"
+    only_bugs = dict(_finding(f"{_AUDIT}-F001", "bugs"), disposition="resolved")
+    only_bugs["release"] = "0.4.7"
+    findings.write_text(json.dumps(only_bugs) + "\n", encoding="utf-8")
+
+    _run("audit", "close", _AUDIT, "--sha", _SHA, "--specs-dir", str(specs))
+
+    line = (specs / "audits" / "_archive" / "audits_histo.jsonl").read_text(encoding="utf-8")
+    entry = json.loads(line.strip())["entry"]
+    assert entry["pillars"] == {"bugs": 1, "specs": 0, "memory": 0}

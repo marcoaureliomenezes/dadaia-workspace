@@ -24,13 +24,16 @@ from datetime import UTC, datetime
 from pathlib import Path
 from shutil import rmtree
 
+from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.models.findings import FindingRecord
-from dadaia_workspace.core.models.histo import FINDINGS_DISPOSITIONS, HistoRecord
+from dadaia_workspace.core.models.histo import (
+    AUDIT_PILLARS,
+    FINDINGS_DISPOSITIONS,
+    HistoRecord,
+)
 from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 __all__ = ["AuditError", "close_audit", "disposition_finding"]
-
-_DADAIA = ".dadaia/.venv/bin/dadaia"
 
 #: The evidence each disposition must carry — one table, no per-word branch. A
 #: ``resolved``/``superseded`` finding names the remediation release that closed it; a
@@ -55,11 +58,20 @@ def _findings_store(audit_dir: Path) -> JsonlRecordStore[FindingRecord]:
     )
 
 
-def _audit_dir(specs_dir: Path, audit: str) -> Path:
-    """Resolve one live audit directory, or refuse naming the ones that exist."""
-    audits = specs_dir / "audits"
-    target = audits / audit
-    if (target / "FINDINGS.jsonl").is_file():
+def _audit_dir(specs_dir: Path, audit: str, *, fix: str) -> Path:
+    """Resolve one live audit directory, or refuse naming the ones that exist and the
+    *fix* line of the verb that asked.
+
+    *audit* is operator input naming a directory :func:`close_audit` DELETES, so it is
+    CONFINED before it is read: the fully resolved target must sit strictly inside the
+    resolved ``specs/audits/``. One containment rule covers every escape shape —
+    ``..`` traversal, an absolute path, and a symlink out of the tree (CWE-22/CWE-59) —
+    so there is no second, per-shape check to keep in step with it.
+    """
+    audits = (specs_dir / "audits").resolve()
+    target = (audits / audit).resolve()
+    confined = target != audits and target.is_relative_to(audits)
+    if confined and (target / "FINDINGS.jsonl").is_file():
         return target
     live = sorted(
         child.name
@@ -69,7 +81,7 @@ def _audit_dir(specs_dir: Path, audit: str) -> Path:
     raise AuditError(
         f"{audit!r} does not name a live audit with a FINDINGS.jsonl under "
         f"specs/audits/. Live audits: {', '.join(live) or '(none)'}.\n"
-        f"fix: .dadaia/.venv/bin/dadaia audit close <audit-dir> --sha <window-end-sha>"
+        f"fix: {fix}"
     )
 
 
@@ -105,14 +117,19 @@ def disposition_finding(
     Refuses — writing nothing — an unknown audit, an unknown finding id, a word outside
     the one finding vocabulary, or a disposition missing the evidence it requires.
     """
-    audit_dir = _audit_dir(specs_dir, audit)
+    audit_dir = _audit_dir(
+        specs_dir,
+        audit,
+        fix=f"{DADAIA_BIN} audit disposition <audit-dir> <finding-id> "
+        "--disposition resolved --release <release-id>",
+    )
 
     if disposition not in FINDINGS_DISPOSITIONS:
         raise AuditError(
             f"unknown disposition {disposition!r}: a finding is dispositioned as one of "
             f"{'|'.join(FINDINGS_DISPOSITIONS)} (the word 'fixed' was retired — one "
             "finding vocabulary, 0.4.7 FR4).\n"
-            f"fix: {_DADAIA} audit disposition {audit} {finding_id} --disposition resolved "
+            f"fix: {DADAIA_BIN} audit disposition {audit} {finding_id} --disposition resolved "
             "--release <release-id>"
         )
 
@@ -127,7 +144,7 @@ def disposition_finding(
         raise AuditError(
             f"disposition {disposition!r} requires --{required}: the finding's governance "
             "triple is the only surviving record of how it was closed.\n"
-            f"fix: {_DADAIA} audit disposition {audit} {finding_id} "
+            f"fix: {DADAIA_BIN} audit disposition {audit} {finding_id} "
             f"--disposition {disposition} {example}"
         )
 
@@ -168,7 +185,9 @@ def close_audit(
     must be one release — otherwise nothing is written and nothing is deleted. The histo
     record is appended LAST, so the directory is never gone without its record.
     """
-    audit_dir = _audit_dir(specs_dir, audit)
+    audit_dir = _audit_dir(
+        specs_dir, audit, fix=f"{DADAIA_BIN} audit close <audit-dir> --sha <window-end-sha>"
+    )
     records = _read_findings(audit_dir)
     if not records:
         raise AuditError(
@@ -183,7 +202,7 @@ def close_audit(
             f"audit {audit!r} still carries {len(open_ids)} undispositioned finding(s): "
             f"{', '.join(open_ids)}. Every finding gets a disposition before the audit "
             "closes.\n"
-            f"fix: {_DADAIA} audit disposition {audit} {open_ids[0]} --disposition resolved "
+            f"fix: {DADAIA_BIN} audit disposition {audit} {open_ids[0]} --disposition resolved "
             "--release <release-id>"
         )
 
@@ -192,7 +211,7 @@ def close_audit(
         raise AuditError(
             f"audit {audit!r} names {len(releases)} remediation releases "
             f"({', '.join(releases)}); an audit generates exactly one.\n"
-            f"fix: {_DADAIA} audit disposition {audit} <finding-id> --disposition resolved "
+            f"fix: {DADAIA_BIN} audit disposition {audit} <finding-id> --disposition resolved "
             f"--release {releases[0]}"
         )
 
@@ -204,8 +223,12 @@ def close_audit(
         disposition="resolved",
         release=releases[0] if releases else None,
         reason=None,
-        summary=", ".join(f"{pillar} {pillars[pillar]}" for pillar in ("bugs", "specs", "memory")),
-        entry={"sha": sha, "pillars": dict(pillars), "dispositions": dict(dispositions)},
+        summary=", ".join(f"{pillar} {pillars[pillar]}" for pillar in AUDIT_PILLARS),
+        entry={
+            "sha": sha,
+            "pillars": {pillar: pillars[pillar] for pillar in AUDIT_PILLARS},
+            "dispositions": dict(dispositions),
+        },
     ).redact(denylist_terms)
     histo_append(record)
     rmtree(audit_dir)
