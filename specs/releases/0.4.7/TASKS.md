@@ -100,7 +100,7 @@
   ctx_inject.py`, `CONTEXT.md`, `specs/constitution.md`, the instance projections via
   the CLI, `tests/**`. Blocked by: T-047-31. Delivers: law, personas, scaffolds and the
   glossary say one thing about bugs, verbs, hand edits and the corpus.
-- [ ] T-047-33 — FR8 closure: `CHANGELOG.md [0.4.7]` candidate 3; preflight; `dadaia
+- [x] T-047-33 — FR8 closure: `CHANGELOG.md [0.4.7]` candidate 3; preflight; `dadaia
   doctor` 100 %; `dadaia release phase CLOSURE --sha`; the three `backlog exit`
   records; `_RELEASE.json` `summary`/`size`/`drifts`/`test-dispositions`/
   `dispositions`/`artifact-gc`/`reviews` entries; the memory pass (the eight atoms,
