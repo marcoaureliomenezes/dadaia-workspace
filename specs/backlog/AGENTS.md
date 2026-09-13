@@ -1,6 +1,6 @@
 # specs/backlog/ — Backlog Rules
 
-Scope: this file governs only `specs/backlog/`. Replaces the retired `backlog/README.md` (v6 canon, FR1).
+Scope: this file governs only `specs/backlog/`.
 
 - The backlog is a single JSON document: `specs/backlog/BACKLOG.json`, `{schema: "backlog-v1", active: [...]}`.
 - No per-entry file per backlog item — every live candidate/idea is one `active[]` object (ADR #14).
@@ -11,7 +11,7 @@ Scope: this file governs only `specs/backlog/`. Replaces the retired `backlog/RE
 
 - `active[]` (in `BACKLOG.json`) — one object per live candidate or idea, the document's only array.
 - `backlog_histo.jsonl` (in `_archive/`) — one append-only record per closed item.
-- Fields: `{id, ts, disposition, reason, release, by, entry_md, entry_md_source}`.
+- Fields: `{id, ts, disposition, release, reason, summary, entry}`.
 - An item's whole life is `active[]` -> one histo record; it never lives in both places at once.
 - One record per slug, ever — a duplicate exit is structurally impossible.
 
@@ -24,7 +24,7 @@ Scope: this file governs only `specs/backlog/`. Replaces the retired `backlog/RE
 - Plus one optional field: `intents` (see §4).
 - Backlog entries are not specs — they do not authorize implementation on their own.
 - An entry must be picked into a release (`dadaia release new`, naming the slug under `**Consumes:**`) to enter SDD.
-- Never delete an entry — a closed item's `active[]` object is removed and one histo record appended, same act.
+- Never delete an entry — `dadaia backlog exit <slug> --disposition …` removes the `active[]` object and appends its one histo record.
 
 ## 3. Terminal disposition tokens
 

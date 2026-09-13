@@ -16,7 +16,7 @@ History lives in each release's `_RELEASE.json` `log` entries and under `_archiv
 
 - The SDD gate enforces neither half: `specs/memory/**` is MUTATING, writable in every phase.
 - Both halves — the phase and `product-engineer` as sole author — are agent discipline, measured by the audit's memory pillar.
-- See `constitution.md §13` for the discipline statement.
+- Discipline statement: `DADAIA.md` §6.4.
 - Stale memory found mid-implementation becomes a bug or a closure note — never patch it in place outside the allowed phases.
 
 ## 2. The two tiers
@@ -83,7 +83,7 @@ dadaia memory catalog generate
 
 - YAML frontmatter validated against `memory-frontmatter-v1`; all 5 fields required: `slug`, `title`, `tldr`, `summary`, `tags`.
 - `additionalProperties: false` makes any stray field a hard error.
-- `agent_tier` is rejected by the schema (deprecated v0.1.53, schema-dropped v0.1.61) — do not include it.
+- `agent_tier` is rejected by the schema — do not include it.
 - The catalog computes atom size from its body — no stored size field belongs in frontmatter.
 - Body uses curated headings only — the `lint-memory-atoms` allowlist governs which h2 sections are valid.
 - In the trio those are exactly the two Part headings; every former section lives on as an `###` subsection.
