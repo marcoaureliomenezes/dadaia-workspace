@@ -34,7 +34,7 @@
   `dadaia_workspace/cli/_governance_event.py`, `dadaia_workspace/cli/commands/
   {bugs,panel_composition}.py`, `tests/**`. Blocked by: T-047-25. Delivers: `dadaia
   bugs append` leaves one governance event the panel's store can be queried for.
-- [-] T-047-27 — FR3: `dadaia backlog exit <slug> --disposition delivered|superseded|
+- [x] T-047-27 — FR3: `dadaia backlog exit <slug> --disposition delivered|superseded|
   rejected [--release] [--reason]` over `backlog_exit` (rules per disposition, `fix:` on
   every refusal, denylist from the container) + its event; `backlog new` writes an
   event. Write set: `dadaia_workspace/cli/commands/newartifacts.py`,

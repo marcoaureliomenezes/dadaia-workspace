@@ -54,19 +54,20 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.models.backlog import Intent, parse_intents
-from dadaia_workspace.core.models.histo import HistoRecord
+from dadaia_workspace.core.models.histo import BACKLOG_HISTO_DISPOSITIONS, HistoRecord
 from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 __all__ = [
     "ActiveItem",
     "BacklogDocument",
+    "BacklogExitError",
     "BacklogNewResult",
     "DocumentError",
     "backlog_exit",
@@ -350,6 +351,10 @@ class BacklogNewResult:
     created."""
 
     path: Path
+    #: The ``active[]`` object this call appended — what the CLI hashes into the one
+    #: governance event for ``backlog new`` (0.4.7 FR2): the writer already holds the
+    #: object, so nothing re-reads the document to recover it.
+    entry: dict[str, Any] = field(default_factory=dict)
     #: True only when this call created BACKLOG.json itself; False for an append to an
     #: existing document (bug backlog-new-append-reported-as-created: the CLI printed
     #: "[ok] created:" for every append because this was hardcoded True).
@@ -425,16 +430,15 @@ def backlog_new(specs_dir: Path, slug: str) -> BacklogNewResult:
 
     previous_text, raw = _read_raw_document(target)
     active_list = list(raw["active"])
-    active_list.append(
-        {
-            "id": slug,
-            "title": slug,
-            "opened": _today(),
-            "status": "idea",
-            "description": "(one-line description of the need)",
-            "provenance": "operator request",
-        }
-    )
+    entry: dict[str, Any] = {
+        "id": slug,
+        "title": slug,
+        "opened": _today(),
+        "status": "idea",
+        "description": "(one-line description of the need)",
+        "provenance": "operator request",
+    }
+    active_list.append(entry)
     atomic_write(
         target, _dump_document(active_list), expected_previous=previous_text, ensure_parent=True
     )
@@ -448,7 +452,7 @@ def backlog_new(specs_dir: Path, slug: str) -> BacklogNewResult:
             f"show slug {slug!r} in active — refusing to report success"
         )
 
-    return BacklogNewResult(path=target, created=not document_existed)
+    return BacklogNewResult(path=target, entry=entry, created=not document_existed)
 
 
 # ═════════════════════════════════════════════════════════════════════════════════
@@ -490,6 +494,82 @@ def remove_active_subsection(specs_dir: Path, slug: str) -> dict[str, Any]:
     raise KeyError(f"backlog slug {slug!r} does not name a live active[] entry in {target}")
 
 
+class BacklogExitError(ValueError):
+    """One refusal of :func:`backlog_exit`, message carrying exactly one ``fix:`` line.
+
+    An exit is the ONE act that takes an item out of ``active[]`` (0.4.7 FR3), so its
+    evidence is checked before anything is written: an item is never removed by a call
+    that then fails to record why it left.
+    """
+
+
+#: The evidence each disposition must carry. ``delivered`` names the release that
+#: shipped the item (validated against ``specs/releases/`` — live or archived, since a
+#: closure sweep may run after the ship); ``superseded``/``rejected`` name the reason
+#: (the superseder, or why it was refused). One table, no per-disposition branch.
+_REQUIRED_EVIDENCE: dict[str, str] = {
+    "delivered": "release",
+    "superseded": "reason",
+    "rejected": "reason",
+}
+
+
+def _known_release(specs_dir: Path, release: str) -> bool:
+    releases = specs_dir / "releases"
+    return (releases / release).is_dir() or (releases / "_archive" / release).is_dir()
+
+
+def _check_exit_evidence(
+    specs_dir: Path, slug: str, disposition: str, reason: str | None, release: str | None
+) -> None:
+    """Refuse, before any write, an exit whose evidence does not match its disposition."""
+    if disposition not in BACKLOG_HISTO_DISPOSITIONS:
+        raise BacklogExitError(
+            f"unknown disposition {disposition!r}: a backlog item exits as one of "
+            f"{'|'.join(BACKLOG_HISTO_DISPOSITIONS)}.\n"
+            f"fix: .dadaia/.venv/bin/dadaia backlog exit {slug} --disposition rejected "
+            f"--reason '<why it was refused>'"
+        )
+
+    required = _REQUIRED_EVIDENCE[disposition]
+    supplied = {"release": release, "reason": reason}[required]
+    if not (supplied or "").strip():
+        example = (
+            "--release <release-id>" if required == "release" else "--reason '<naming the record>'"
+        )
+        raise BacklogExitError(
+            f"disposition {disposition!r} requires --{required}: the histo record is the "
+            f"only surviving trace of why {slug!r} left active[].\n"
+            f"fix: .dadaia/.venv/bin/dadaia backlog exit {slug} --disposition {disposition} "
+            f"{example}"
+        )
+
+    if (
+        disposition == "delivered"
+        and release is not None
+        and not _known_release(specs_dir, release)
+    ):
+        raise BacklogExitError(
+            f"release {release!r} names neither a live nor an archived release under "
+            f"specs/releases/ — a delivered item names the release that shipped it.\n"
+            f"fix: .dadaia/.venv/bin/dadaia release archive --help"
+        )
+
+
+def _live_slug_or_refuse(specs_dir: Path, slug: str) -> None:
+    """Refuse a slug that does not name a live ``active[]`` entry — it either already
+    exited (the histo carries its terminal record) or never existed."""
+    live = [item.slug for item in load_document(specs_dir / "backlog").active if item.slug]
+    if slug in live:
+        return
+    raise BacklogExitError(
+        f"{slug!r} does not name a live active[] entry. Live slugs: "
+        f"{', '.join(sorted(live)) or '(none)'}. An item is retained forever, so a slug "
+        f"missing from active[] has already exited.\n"
+        f"fix: grep {slug} specs/backlog/_archive/backlog_histo.jsonl"
+    )
+
+
 def backlog_exit(
     specs_dir: Path,
     slug: str,
@@ -526,6 +606,8 @@ def backlog_exit(
     wires the real operator denylist in via ``container.load_denylist_terms()``,
     mirroring how ``cli/commands/bugs.py`` wires ``BugService`` today.
     """
+    _check_exit_evidence(specs_dir, slug, disposition, reason, release)
+    _live_slug_or_refuse(specs_dir, slug)
     entry = remove_active_subsection(specs_dir, slug)
     record = HistoRecord(
         id=slug,

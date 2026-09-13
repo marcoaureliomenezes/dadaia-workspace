@@ -5,6 +5,7 @@ Implements:
 - dadaia release rc-archive  → the completed candidate trio into rc-N/
 - dadaia release archive <id> → the promote lane: ship, move to _archive/, birth <next>
 - dadaia backlog new <slug>  → appends one active[] entry to specs/backlog/BACKLOG.json
+- dadaia backlog exit <slug> → the ONE path out of active[]: one histo record, one event
 - dadaia backlog subjects    → read-only resolve/preview of canonical subjects (v0.1.25 R1)
 - dadaia backlog doctor      → BL-SCHEMA/CONFLICT/STALE backlog-consistency check (BL-DUP
   deleted, not disabled, v0.5.0 A5.2)
@@ -23,13 +24,19 @@ from pathlib import Path
 
 import typer
 
+from dadaia_workspace import container
 from dadaia_workspace.cli._backlog_roots import resolve_backlog_roots
+from dadaia_workspace.cli._governance_event import record_governance_event
 from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.core.atomic_write import ConcurrentModificationError
 from dadaia_workspace.core.models.backlog import SubjectKind
 from dadaia_workspace.core.models.histo import HistoRecord
 from dadaia_workspace.core.release_state import RELEASE_STATE_FILENAME
-from dadaia_workspace.features.backlog.document import backlog_new
+from dadaia_workspace.features.backlog.document import (
+    BacklogExitError,
+    backlog_exit,
+    backlog_new,
+)
 from dadaia_workspace.features.specs.candidate import (
     ArchiveError,
     archive_candidate,
@@ -272,12 +279,79 @@ def backlog_new_cmd(
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
 
+    record_governance_event(verb="new", ledger="backlog", record_id=slug, record=result.entry)
+
     verb = "created" if result.created else "appended"
     typer.echo(
         f"[ok] {verb} {slug!r} -> {result.path}"
         if not result.created
         else f"[ok] created: {result.path}"
     )
+
+
+# ── dadaia backlog exit ───────────────────────────────────────────────────────
+
+
+def _backlog_histo_store(target: Path) -> JsonlRecordStore[HistoRecord]:
+    """The ``backlog_histo.jsonl`` sink, built at the composition root — the same one
+    record shape, one store shape every other ledger uses."""
+    return JsonlRecordStore(
+        target / "backlog" / "_archive" / "backlog_histo.jsonl",
+        to_dict=HistoRecord.to_dict,
+        from_dict=HistoRecord.from_dict,
+    )
+
+
+@backlog_app.command("exit")
+def backlog_exit_cmd(
+    slug: str = typer.Argument(..., help="The live active[] entry leaving the backlog."),
+    disposition: str = typer.Option(
+        ...,
+        "--disposition",
+        help="delivered (needs --release) | superseded (needs --reason) | rejected (needs --reason).",
+    ),
+    release: str | None = typer.Option(
+        None, "--release", help="The release that delivered the item (live or archived)."
+    ),
+    reason: str | None = typer.Option(
+        None, "--reason", help="Why it left: the superseding record, or why it was refused."
+    ),
+    specs_dir: str | None = typer.Option(
+        None,
+        "--specs-dir",
+        help="Path to specs/ directory. Default: resolve from bound context session.",
+    ),
+) -> None:
+    """Retire <slug> out of active[] and append its one backlog_histo record.
+
+    The ONE path out of ``active[]`` (0.4.7 FR3): the hand-edit lane the closure sweeps
+    used ("use file tools directly") is retired, so an item never leaves without the
+    terminal record that says why. Every refusal writes nothing and hands back one
+    ``fix:`` line.
+    """
+    target = _resolve_specs_dir(specs_dir)
+    if not target.is_dir():
+        typer.echo(f"[error] specs_dir not found: {target}", err=True)
+        sys.exit(1)
+
+    try:
+        record = backlog_exit(
+            target,
+            slug,
+            histo_store=_backlog_histo_store(target),
+            disposition=disposition,
+            reason=reason,
+            release=release,
+            denylist_terms=container.load_denylist_terms(),
+        )
+    except (BacklogExitError, KeyError, ConcurrentModificationError) as exc:
+        typer.echo(f"[error] {exc}", err=True)
+        sys.exit(1)
+
+    record_governance_event(
+        verb="exit", ledger="backlog", record_id=record.id, record=record.to_dict()
+    )
+    typer.echo(f"[ok] exited {record.id!r} ({record.disposition}) -> {target / 'backlog'}")
 
 
 # ── dadaia backlog subjects (read-only resolve/preview surface — v0.1.25 R1) ────

@@ -59,6 +59,7 @@ _EXECUTABLE_TOKENS: frozenset[str] = frozenset(
         "mv",
         "mkdir",
         "printf",
+        "grep",
         "sed",
         "cp",
         "bash",

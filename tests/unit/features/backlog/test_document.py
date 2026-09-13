@@ -565,6 +565,7 @@ def test_backlog_document_1000_items_parses_well_under_one_second(tmp_path: Path
 # ═════════════════════════════════════════════════════════════════════════════════
 
 from dadaia_workspace.features.backlog.document import (  # noqa: E402
+    BacklogExitError,
     backlog_exit,
     remove_active_subsection,
 )
@@ -658,6 +659,7 @@ def test_backlog_exit_removes_active_and_appends_exactly_one_histo_record(
     specs = tmp_path / "specs"
     (specs / "backlog").mkdir(parents=True)
     (specs / "backlog" / "BACKLOG.json").write_text(json.dumps(_TWO_ACTIVE_ITEMS), encoding="utf-8")
+    (specs / "releases" / "9.9.9").mkdir(parents=True)
 
     store = _FakeHistoStore()
     record = backlog_exit(
@@ -666,14 +668,14 @@ def test_backlog_exit_removes_active_and_appends_exactly_one_histo_record(
         histo_store=store,
         disposition="delivered",
         reason=None,
-        release="v9.9.9",
+        release="9.9.9",
         denylist_terms=(),
         ts="2026-08-27",
     )
 
     assert record.id == "going-away"
     assert record.disposition == "delivered"
-    assert record.release == "v9.9.9"
+    assert record.release == "9.9.9"
     assert record.entry is not None and record.entry["id"] == "going-away"
 
     stored = list(store.iter_records())
@@ -693,6 +695,7 @@ def test_backlog_exit_twice_for_the_same_slug_is_structurally_impossible(
     specs = tmp_path / "specs"
     (specs / "backlog").mkdir(parents=True)
     (specs / "backlog" / "BACKLOG.json").write_text(json.dumps(_TWO_ACTIVE_ITEMS), encoding="utf-8")
+    (specs / "releases" / "9.9.9").mkdir(parents=True)
 
     store = _FakeHistoStore()
     backlog_exit(
@@ -701,18 +704,18 @@ def test_backlog_exit_twice_for_the_same_slug_is_structurally_impossible(
         histo_store=store,
         disposition="delivered",
         reason=None,
-        release="v9.9.9",
+        release="9.9.9",
         denylist_terms=(),
     )
 
-    with pytest.raises(KeyError):
+    with pytest.raises(BacklogExitError, match="does not name a live"):
         backlog_exit(
             specs,
             "going-away",
             histo_store=store,
             disposition="delivered",
             reason=None,
-            release="v9.9.9",
+            release="9.9.9",
             denylist_terms=(),
         )
 
@@ -750,6 +753,7 @@ def test_backlog_exit_masks_a_denylisted_term_in_the_entry_before_append(
     store — the SAME write-time seam ``BugService.register`` already enforces."""
     specs = tmp_path / "specs"
     (specs / "backlog").mkdir(parents=True)
+    (specs / "releases" / "9.9.9").mkdir(parents=True)
     (specs / "backlog" / "BACKLOG.json").write_text(
         json.dumps(_ACTIVE_ITEM_WITH_DENYLISTED_TERM), encoding="utf-8"
     )
@@ -761,7 +765,7 @@ def test_backlog_exit_masks_a_denylisted_term_in_the_entry_before_append(
         histo_store=store,
         disposition="delivered",
         reason=None,
-        release="v9.9.9",
+        release="9.9.9",
         ts="2026-08-27",
         denylist_terms=(("acme-corp", "private project/person identifier"),),
     )
@@ -784,6 +788,7 @@ def test_backlog_exit_with_empty_denylist_terms_stays_byte_identical_to_pre_fix(
     verbatim, byte-identical."""
     specs = tmp_path / "specs"
     (specs / "backlog").mkdir(parents=True)
+    (specs / "releases" / "9.9.9").mkdir(parents=True)
     (specs / "backlog" / "BACKLOG.json").write_text(
         json.dumps(_ACTIVE_ITEM_WITH_DENYLISTED_TERM), encoding="utf-8"
     )
@@ -795,7 +800,7 @@ def test_backlog_exit_with_empty_denylist_terms_stays_byte_identical_to_pre_fix(
         histo_store=store,
         disposition="delivered",
         reason=None,
-        release="v9.9.9",
+        release="9.9.9",
         denylist_terms=(),
         ts="2026-08-27",
     )
