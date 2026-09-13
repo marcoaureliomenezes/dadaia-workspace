@@ -213,7 +213,7 @@ def _resolve_governance(specs_dir: Path | None) -> GovernanceBaseline | None:
     from dadaia_workspace.features.telemetry.store import TelemetryStore
 
     try:
-        connection = container.build_telemetry_store().open_read()
+        connection = container.build_telemetry_store(container.telemetry_state_dir()).open_read()
     except (OSError, sqlite3.Error, ImportError):  # no store, no file, no permission
         return None
     try:

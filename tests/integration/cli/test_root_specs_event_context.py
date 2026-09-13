@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from dadaia_workspace import container
 from dadaia_workspace.cli.main import app
 
 _runner = CliRunner()
@@ -48,7 +49,7 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def _contexts(home: Path) -> list[str]:
-    db = home / ".dadaia" / "state" / "telemetry" / "telemetry.sqlite"
+    db = container.telemetry_state_dir() / "telemetry.sqlite"
     conn = sqlite3.connect(db)
     try:
         return [row[0] for row in conn.execute("SELECT context FROM governance_events")]

@@ -18,6 +18,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from dadaia_workspace import container
 from dadaia_workspace.cli.main import app
 
 _runner = CliRunner()
@@ -199,7 +200,7 @@ def test_a_workspace_with_no_telemetry_store_carries_no_handedit_finding(
         + "\n",
         encoding="utf-8",
     )
-    assert not (home / ".dadaia" / "state" / "telemetry" / "telemetry.sqlite").exists()
+    assert not (container.telemetry_state_dir() / "telemetry.sqlite").exists()
 
     _exit_code, payload = _doctor(specs)
     assert [code for code in _codes(payload) if code.endswith("HANDEDIT")] == []

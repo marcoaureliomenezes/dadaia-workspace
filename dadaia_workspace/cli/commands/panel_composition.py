@@ -70,7 +70,7 @@ def build_telemetry_service(workspace_root: Path) -> object | None:
     try:
         # The ONE store location and migration set (0.4.7 FR2): the panel and every
         # governance verb open the same file through the same builder.
-        store = container.build_telemetry_store()
+        store = container.build_telemetry_store(container.telemetry_state_dir())
         state_dir = store.db_path.parent
         # Materialise + migrate the store once at boot so the per-request
         # read-only factory always has a database to open (mode=ro cannot

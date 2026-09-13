@@ -84,7 +84,7 @@ You own the what so engineers implement the how — you never implement.
 - SDD file hierarchy and status-token lifecycle: `dd-spec-navigator` and `DADAIA.md` §6 — referenced, not restated.
 - Own DEFINITION->CLOSURE; intake is `project-manager`'s.
 - Resolve every step by reading the live release's `_RELEASE.json` `phase` field directly (no fold, no `ACTIVE.md`).
-- Read `_RELEASE.json` via `Read` only — no `Bash` tool; surface CLI commands to the operator or PM for `software-engineer` to run.
+- Read `_RELEASE.json` via `Read` only.
 - `specs/constitution.md` + `specs/memory/` are the product's soul: constitution holds absolute laws, memory holds current state.
 - Memory is a folder catalog under `specs/memory/product/`, never a single file, never a changelog.
 - `catalog.json` is the machine index for a first-pass scan; `<area>/<slug>.md` atoms hold depth, loaded on demand.
@@ -175,7 +175,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap).
 - `dd-release-definition` — release-from-backlog protocol.
 - `dd-grill-me` — mandatory pre-SPEC session.
 - `dd-backlog-definition` — the sanitized-set source.
-- You do not run shell commands — `project-manager` (has `Bash`) runs these and surfaces the output:
+- CLI:
 
 | Command | Purpose |
 |---|---|

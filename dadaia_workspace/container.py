@@ -157,18 +157,31 @@ def build_bug_record_store(specs_dir: Path) -> "JsonlRecordStore[BugRecord]":
     )
 
 
-def build_telemetry_store() -> "TelemetryStore":
-    """The ONE telemetry store: ``~/.dadaia/state/telemetry/telemetry.sqlite``, one per
-    machine (0.4.7 FR2). The panel's boot and every governance verb build it here, so
-    the path and the migration set are stated once; two workspaces on one machine share
-    the file and are kept apart by each event's ``context``.
+def telemetry_state_dir() -> Path:
+    """The ONE resolver for the machine-level telemetry state directory,
+    ``~/.dadaia/state/telemetry`` (0.4.7 FR2, SPEC line 221: one store per MACHINE, two
+    workspaces on it kept apart by each event's ``context``).
 
-    Returns an UNOPENED store — the caller decides whether it opens for write (and how
-    it degrades when it cannot).
+    It is a seam, not a convenience: the literal used to sit inside
+    ``build_telemetry_store`` with nothing to intercept, so the suite's governance-event
+    tests wrote synthetic events into the OPERATOR'S real store. ``tests/conftest.py``
+    routes this one function at ``tmp_path`` for every test (backstop proved by
+    ``tests/contract/test_telemetry_store_backstop.py``). No env var is read — the
+    directory is machine-level by law, overridden only through this seam.
+    """
+    return Path.home() / ".dadaia" / "state" / "telemetry"
+
+
+def build_telemetry_store(state_dir: Path) -> "TelemetryStore":
+    """The ONE telemetry store: ``<state_dir>/telemetry.sqlite``. The panel's boot and
+    every governance verb build it here, so the migration set is stated once.
+
+    *state_dir* comes from the caller — ``telemetry_state_dir()`` in production, a
+    ``tmp_path`` in tests. Returns an UNOPENED store: the caller decides whether it
+    opens for write (and how it degrades when it cannot).
     """
     from dadaia_workspace.features.telemetry.store import TelemetryStore
 
-    state_dir = Path("~/.dadaia/state/telemetry").expanduser()
     state_dir.mkdir(parents=True, exist_ok=True)
     return TelemetryStore(state_dir / "telemetry.sqlite")
 

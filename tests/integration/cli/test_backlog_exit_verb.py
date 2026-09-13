@@ -19,6 +19,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from dadaia_workspace import container
 from dadaia_workspace.cli.main import app
 
 _runner = CliRunner()
@@ -73,7 +74,7 @@ def _histo_lines(specs_dir: Path) -> list[str]:
 
 
 def _events(home_dir: Path) -> list[sqlite3.Row]:
-    db = home_dir / ".dadaia" / "state" / "telemetry" / "telemetry.sqlite"
+    db = container.telemetry_state_dir() / "telemetry.sqlite"
     conn = sqlite3.connect(db)
     conn.row_factory = sqlite3.Row
     try:

@@ -64,7 +64,7 @@ def record_governance_event(
     )
     store = None
     try:
-        store = container.build_telemetry_store()
+        store = container.build_telemetry_store(container.telemetry_state_dir())
         store.open_write().migrate()
         store.insert_governance_event(event)
     except (OSError, sqlite3.Error, ImportError) as exc:

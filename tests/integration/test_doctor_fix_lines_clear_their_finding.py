@@ -24,6 +24,7 @@ size: MEDIUM.
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -38,6 +39,7 @@ from dadaia_workspace.core.doctor_rules import Rule
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
+from tests.fixtures.harness_env import session_home
 
 from ..unit.features.specs.test_doctor import _make_clean_specs_tree
 
@@ -274,7 +276,12 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
 
     command = _resolve(rule.fix_help, plant).replace(_VENV_DADAIA, _THIS_VENV_DADAIA)
     done = subprocess.run(
-        ["bash", "-c", command], cwd=root, capture_output=True, text=True, check=False
+        ["bash", "-c", command],
+        cwd=root,
+        env={**os.environ, "HOME": str(session_home())},
+        capture_output=True,
+        text=True,
+        check=False,
     )
     assert done.returncode == 0, f"{code}: the fix line failed:\n{command}\n{done.stderr}"
     after = _run_rule(root, rule)
@@ -301,7 +308,12 @@ def test_spec_doc_039_relocates_the_residue_instead_of_destroying_it(tmp_path: P
 
     command = _resolve(rule.fix_help, plant).replace(_VENV_DADAIA, _THIS_VENV_DADAIA)
     done = subprocess.run(
-        ["bash", "-c", command], cwd=root, capture_output=True, text=True, check=False
+        ["bash", "-c", command],
+        cwd=root,
+        env={**os.environ, "HOME": str(session_home())},
+        capture_output=True,
+        text=True,
+        check=False,
     )
     assert done.returncode == 0, f"{command}\n{done.stderr}"
 
