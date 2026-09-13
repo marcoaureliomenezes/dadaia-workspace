@@ -33,7 +33,7 @@ tags: [public, assets, distribution, projection, privacy]
 - The scaffolded `specs/` tree is the v6 canon — `backlog/`, `bugs/`, `memory/`, `releases/`, `audits/`, `ADRs/`, `constitution.md`, `AGENTS.md` — stamped `specs_pattern_version: 6`.
 - Each scoped `AGENTS.md` is hash-projected and doctor-compared; operator-owned domain-scoped files are never overwritten.
 - Repo templates land at `alive()`, not at install: `repo-AGENTS.md` to the repo root, `tests-AGENTS.md` only when `tests/` is a real directory holding no such file.
-- Templates ship parameterized, so an installed file still carrying `<ANGLE-BRACKET>` placeholders is the drift `specs doctor` reports ([[specs-doctor]]).
+- Templates ship parameterized, so an installed file still carrying `<ANGLE-BRACKET>` placeholders is the drift `dadaia doctor`'s `specs` section reports (`AGENTS-PLACEHOLDER-1`, `MEM-PLACEHOLDER-1`; [[workspace-doctor]]).
 - Consumer-repo `AGENTS.md` fan-out is provenance-gated by the canonical banner: absent creates, a stale banner is restored as `[updated]`, a bannerless file is `[foreign]` and never overwritten.
 - A registry `repo_slug` is accepted only as a single, relative, non-dot path component validated lexically, so a symlinked `repos/<slug>` directory is allowed while a symlinked destination file is `[foreign]`.
 - `public install` refuses the `dadaia-workspace` source repo root unless `DADAIA_ALLOW_SOURCE_ROOT_PUBLIC_INSTALL=1` is set.

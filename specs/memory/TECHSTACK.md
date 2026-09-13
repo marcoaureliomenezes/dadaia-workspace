@@ -28,7 +28,6 @@ Rationale: a marker known to one file and unknown to the other is a silent exclu
 .dadaia/.venv/bin/dadaia --version
 PYTHONDONTWRITEBYTECODE=1 .dadaia/.venv/bin/python -m pytest -p no:cacheprovider
 .dadaia/.venv/bin/dadaia doctor
-.dadaia/.venv/bin/dadaia specs doctor
 .dadaia/.venv/bin/dadaia public doctor
 .dadaia/.venv/bin/dadaia certify --json
 .dadaia/.venv/bin/dadaia panel --no-open

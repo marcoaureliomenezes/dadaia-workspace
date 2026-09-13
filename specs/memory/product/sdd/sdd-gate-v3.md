@@ -36,8 +36,8 @@ tags: [sdd, gate, hooks, enforcement, no-locks, privacy]
 - A refspec aiming a local ref at a different remote ref is refused; an unparseable stdin line refuses the push naming `git push --no-verify` as the one bypass, empty stdin being the nothing-to-gate allow.
 - The security verdict is a pull-request gate: a CI job on both edges requires an APPROVED `security-reviewer` handoff whose `metrics.commit_sha` is the PR head sha, or an ancestor whose only intervening diff is the verdict evidence at `specs/releases/<release-id>/verdicts/<sha>.handoff.json`.
 - The dual qa-plus-security closure gate is the only mechanical check of the qa-engineer verdict.
-- `features/chokepoints` is five modules — `branch_policy`, `denylist_scan`, `pre_commit`, `push_gate`, `verdict` — and `verdict.covering_verdict(paths, head_sha)` is the single verdict reader the push gate, `specs doctor` and the PR check all call.
-- A consumed verdict is deleted by hand after the merge; no GC verb exists.
+- `features/chokepoints` is five modules — `branch_policy`, `denylist_scan`, `pre_commit`, `push_gate`, `verdict` — and `verdict.covering_verdict(paths, head_sha)` is the single verdict reader the push gate, `dadaia doctor` and the PR check all call.
+- A consumed verdict is deleted by hand after the merge; one naming none of the live shas (head, first parent, develop tip — `verdict.live_verdict_shas`) is `SPEC-DOC-044`, refused by the pre-push gate and deleted by `dadaia doctor --fix` ([[workspace-doctor]]).
 - `secret-scan.yml` (gitleaks) runs once per release on the ship PR; earlier material is covered only by the denylist scan, an accepted gap.
 
 ### Push-range denylist scan

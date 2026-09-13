@@ -69,18 +69,18 @@ ADR: none
 Rationale: the composition graph costs seconds of import time per gated tool call.
 
 ### P-13 · We keep the architecture diagrams derived from live code: every diagrammed class, view module and feature package is introspected against the live tree.
-Measured by: `dadaia specs doctor` — rule `MEM-DRIFT-1` (`features/specs/doctor_memory.py`), one WARNING per package the map and the live tree disagree on.
+Measured by: `dadaia doctor` — `specs`-section rule `MEM-DRIFT-1` (`features/specs/doctor_memory.py`), one WARNING per package the map and the live tree disagree on.
 ADR: none
 Rationale: a diagram nobody checks is the first artifact to lie.
 
 ### P-14 · We keep the release-state reader pure: `core/release_state.py` parses and serializes already-read text and performs no file I/O.
 Measured by: `pytest tests/contract/test_release_state_read_only.py`.
-ADR: 0004 (proposed)
+ADR: 0004 (accepted)
 Rationale: a reader that can write is a reader that can rewrite history.
 
 ### P-15 · We close the release-state envelope: `release-state-v1` carries `additionalProperties: false` at every level, a closed log-entry shape, and no harness `session_id`.
 Measured by: `pytest tests/contract/test_release_state_schema.py`.
-ADR: 0004 (proposed)
+ADR: 0004 (accepted)
 Rationale: an open envelope accumulates fields until no consumer can fold it.
 
 ### P-16 · We store no provenance a resolver cannot re-derive: a stored `resolved_commit` equals the value derived from git history.
@@ -106,23 +106,27 @@ Rationale: law that no asset owns is law nobody applies.
 | what a `specs/` tree may contain | `features/specs/canon.py`'s `CANON` table — scaffold renders it, doctor checks it |
 | whether a projection is current | `infrastructure/projection.py`'s `ProjectionRule` plus `projection_rules()`; install writes and doctor compares the same table |
 | which harness a projection targets | `HarnessProjection` in `infrastructure/projection_rules.py`, with three production adapters — Claude Code, Codex, Kimi Code |
-| a bug record's status | `core/models/bugs.py` transition methods; `infrastructure/jsonl_record_store.py::JsonlRecordStore.scan()` is the one ledger parser, yielding `MalformedLine` for a bad row |
+| a bug record's status and `closed_at` | `core/models/bugs.py` transition methods, every terminal one ending in `_reach_terminal` (stamps `closed_at` once); `infrastructure/jsonl_record_store.py::JsonlRecordStore.scan()` is the one ledger parser, yielding `MalformedLine` for a bad row |
+| the histo record shape and the terminal vocabulary | `core/models/histo.py` — `HistoRecord`, `TERMINAL_DISPOSITIONS` and the per-ledger subsets; `features/specs/ledgers.py::LEDGERS` is the one table of validated ledgers |
+| a packaged JSON schema | `features/specs/schemas.py::validator_for` — one loader, one cache, addressed as `<dir>/<id>` under `public/schemas/` |
 | a handoff's version, artifact and validity | `core/handoff_index.py` — `HandoffIndex`/`Handoff`, the stdlib schema walker internal to it |
-| the git publication boundary | `features/chokepoints/{branch_policy,pre_commit,push_gate,verdict}.py`; `covering_verdict()` is the single verdict reader |
+| the git publication boundary | `features/chokepoints/{branch_policy,denylist_scan,pre_commit,push_gate,verdict}.py`; `covering_verdict()` is the single verdict reader, `live_verdict_shas()` the one stale-verdict rule |
 | the telemetry database connection | `features/telemetry/store.py`'s `TelemetryStore`, owning open/migrate/`integrity_check`/`quarantine` |
 | a YAML frontmatter block | `core/frontmatter.py` |
 | the release phase vocabulary | `core/release_state.py` — `PHASES` + `MEMORY_WRITE_PHASES`; doctor and gate import, never re-type |
 | the release-id shape | `core/specs_version.py` — `RELEASE_SEMVER_RE` with `RELEASE_ID_FRAGMENT` derived for path regexes; `is_release_semver` is the mint predicate |
-| memory-canon shape facts | `features/specs/memory_canon.py` — slug→file table, forbidden-heading matcher, wikilink grammar |
+| memory-canon shape facts | `features/specs/memory_canon.py` — the top-level file tuple (a slug is its filename stem, no alias table), forbidden-heading matcher, wikilink grammar, fixed-section lookup |
 | fail-soft registry reads | `core/invocation.py` — `alive_context_slugs` + the name↔slug maps; `JsonContextStore` stays the schema-gated CRUD |
 | first parent of a sha | `infrastructure/git_objects.py::GitSubprocessObjectReader.first_parent` |
 | the ctx-inject decision | `features/spec_context/injection_policy.py::decide_injection` — pure over plain values; the hook is transport |
-| doctor order, fix dispatch, --fix help | `features/specs/rules.py::RULES` — one ordered registry, three derived projections |
+| the doctor rule record, section scoring, the total line | `core/doctor_rules.py` — `Rule`, `SectionFinding`, `run_section`, `merge_sections`, `total_line`; `cli/commands/doctor.py` is the one composition point of the `workspace`/`specs`/`ledgers` sections |
+| specs-rule order, fix dispatch, --fix help | `features/specs/rules.py::RULES` — one ordered registry, three derived projections |
+| conformance of every `_RELEASE.json`, live or archived | `features/specs/release_tree.py::validate_release_tree` — the doctor, `rc-archive` and `release archive` all call it |
 | shared specs facts per doctor run | `features/specs/specs_tree.py::SpecsTree` — fresh per check(), active release parsed once |
 
 - `container.py` is composition wiring only, contract-tested so every definition keeps a production consumer (no orphaned factories); the panel's 15-route composition lives with its single consumer in `cli/commands/panel_composition.py`; a single-consumer adapter is imported directly by its feature and never passes through the container (ADR 0001).
 - `core/protocols/` holds six Protocols: three two-adapter OS seams (`FilePermissionSetter`, `ShutdownHandler`, `TelemetryRefreshLock`) and three panel cross-feature seams whose implementer lives under `features/` (`AgentsProvider`, `ContextProjectProvider`, `ServerRegistryProvider`); every other adapter is imported by its one consumer (the consumer-less `ProcessAncestry` chain was deleted at 0.5.3).
-- `setup.cfg` carries seven import-linter contracts; `features-no-infrastructure` and `cli-no-infrastructure` were deleted by ADR 0001, `features-no-subprocess` is direct-imports-only with no suppressed edge, and the three surviving suppressed edges all sit under `features-no-cross-feature`.
+- `setup.cfg` carries seven import-linter contracts; `features-no-infrastructure` and `cli-no-infrastructure` were deleted by ADR 0001, `features-no-subprocess` is direct-imports-only with no suppressed edge, and the two surviving suppressed edges (`reconcile.service` -> `capabilities`, `reconcile.service` -> `migrate.state_v2`) both sit under `features-no-cross-feature`.
 - `features/migrate` stamps `specs_pattern_version: 6` or refuses, instructing a tree below v6 to upgrade to 0.4.x first — no in-wheel pre-v6 lineage.
 - Hooks import `core.invocation` directly and build the `Invocation` once per process; they never import `container` (P-12); the PostToolUse hook `sdd_post_gate` renews presence, touches `last_seen_at` and runs `presence.gc` on one throttle — it writes nothing else.
 

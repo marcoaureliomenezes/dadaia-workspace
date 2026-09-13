@@ -18,8 +18,8 @@ Measured by: `ruff check --no-cache dadaia_workspace/` (`C901`, `PLR1702`; ceili
 ADR: none
 Rationale: a ceiling measured first and pinned second is red only on growth.
 
-### P-20 · We do not grow `specs upgrade` / `specs doctor`: their complexity is pinned and the migration module changes only with a same-commit justification.
-Measured by: `pytest tests/contract/test_specs_cli_complexity_ratchet.py` (radon complexity plus a pinned hash of `features/migrate/upgrade.py`).
+### P-20 · We do not grow `specs upgrade` / `dadaia doctor`: their complexity is pinned and the migration module changes only with a same-commit justification.
+Measured by: `pytest tests/contract/test_specs_cli_complexity_ratchet.py` (radon complexity of `cli/commands/specs.py#upgrade` and `cli/commands/doctor.py#doctor` plus a pinned hash of `features/migrate/upgrade.py`).
 ADR: none
 Rationale: these two surfaces absorbed every migration this product shipped.
 
@@ -39,7 +39,7 @@ ADR: none
 Rationale: a test reaching into a private symbol turns a safe refactor red.
 
 ### P-24 · We declare intent at birth: the count of test files whose module docstring carries `Intent: <KIND> — <ref>` ratchets upward only.
-Measured by: `pytest tests/contract/test_test_suite_ratchets.py -k v27` (the test module is the floor's numeric home).
+Measured by: `pytest tests/contract/test_test_suite_ratchets.py -k v31` (the test module is the ceiling's numeric home, per tier).
 ADR: none
 Rationale: an undeclared test is SCAFFOLD by default.
 
@@ -81,19 +81,19 @@ Rationale: a reported number promoted as if it gated is fabricated detection.
 
 ### CI gates
 
-- CI runs the preflight ladder plus cross-OS subsets, integration, Python and panel E2E, repo hygiene, backlog doctor, PR governance, the security-verdict gate and gitleaks.
+- CI runs the preflight ladder plus cross-OS subsets, integration, Python and panel E2E, repo hygiene, `dadaia doctor` over the checked-out tree, PR governance, the security-verdict gate and gitleaks.
 - Push triggers are `main`, `develop` and `feature/**`; PRs to `develop` or `main` run the same matrix as the local preflight.
 - `pr-source-guard` is fail-closed, and the security-verdict gate needs an APPROVED handoff covering the PR head sha from `specs/releases/<id>/verdicts/` ([[sdd-gate-v3]]).
 - Every review verdict states the bug-surface delta from `dadaia bugs stats`, and no deploy is approved without the consumer-side matrix ([[consumer-agent-support]]).
 - Ruff `C901` and `PLR1702` are scoped to `dadaia_workspace/` with ceilings pinned in `pyproject.toml` against the enforcing tool; `radon cc` reports and never gates.
 - Caches and artifacts are redirected outside the repository, and the forbidden repo-local set is measured by `tests/contract/test_source_repo_hygiene.py`.
-- Memory-vs-code drift is a `specs doctor` WARNING, never a push-gated test: a package added mid-implementation is drift to fix at the next closure, not a red build ([[specs-doctor]]).
+- Memory-vs-code drift is a `dadaia doctor` `specs`-section WARNING (`MEM-DRIFT-1`), never a push-gated test: a package added mid-implementation is drift to fix at the next closure, not a red build ([[workspace-doctor]]).
 
 ### Slop measurement
 
 - Four repo-pure ratchets pin slop counts and move only downward: V31 (Intent-less test files per tier) in `tests/contract/test_test_suite_ratchets.py`; V32 (governance ids in production comments and docstrings), V33 (`PREFIX-NN` families without a mechanical reader) and V34 (live SPEC/TASKS byte ceiling) in `tests/contract/test_slop_ratchets.py`.
-- Stale handoffs and scratch are a closure readout, never a ratchet: `dd-release-implementation` RC-FLOW step 8 runs `dadaia doctor` dry, then `dadaia doctor --fix --expired-only`, and the `closure-artifact-gc` log entry records the counts ([[workspace-doctor]]).
-- `dd-audit-project` pillar 2 re-measures the ratchets over the audit window and applies `dd-code-review` SLOP.md S1–S10 to a commit sample; the fixed law sections are kept byte-exact by `specs doctor` FIXED-1/2.
+- Stale handoffs and scratch are a closure readout, never a ratchet: `dd-release-implementation` RC-FLOW step 8 runs `dadaia doctor` dry, then `dadaia doctor --fix --expired-only`, and the `kind: artifact-gc` log entry records the `compliance(total)` line ([[workspace-doctor]]).
+- `dd-audit-project` pillar 2 re-measures the ratchets over the audit window and applies `dd-code-review` SLOP.md S1–S10 to a commit sample; the fixed law sections are kept byte-exact by `dadaia doctor` FIXED-1/2.
 
 ### Dependencies
 

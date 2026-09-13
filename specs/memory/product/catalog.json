@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-12T23:53:33Z",
+  "generated_at": "2026-09-13T01:12:40Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -85,7 +85,7 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 606,
+      "token_estimate": 593,
       "depends_on": [
         "ARCHITECTURE",
         "agent-orchestration",
@@ -109,12 +109,11 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 824,
+      "token_estimate": 829,
       "depends_on": [
         "agentic-entities",
         "workspace-doctor",
-        "workspace-init",
-        "specs-doctor"
+        "workspace-init"
       ]
     },
     {
@@ -334,7 +333,7 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 1021,
+      "token_estimate": 1025,
       "depends_on": [
         "workspace-doctor",
         "spec-context-project",
@@ -392,8 +391,8 @@
       "slug": "workspace-doctor",
       "title": "workspace-doctor",
       "area": "platform",
-      "tldr": "The one scan and reaper of the workspace instance — WS-<zone>-<verdict> findings against the zone registry, a compliance score, --fix deleting expired and slop.",
-      "summary": "dadaia doctor classifies every entry of the root, the harness dirs, .dadaia/ and states/ with one finding verdict derived from the zone registry, reports the context invariants, and is the only cleanup engine.",
+      "tldr": "The one compliance surface — dadaia doctor scores workspace, specs and ledgers from one rule record, one grammar, one exit rule; --fix is the one reaper.",
+      "summary": "dadaia doctor runs the workspace walk, the specs rules and the ledger schema rules from one rule record, prints one line per finding and one compliance score per section plus a total, exits 1 on any error-class finding, and is the only cleanup engine of the instance.",
       "path": "specs/memory/product/platform/workspace-doctor.md",
       "tags": [
         "workspace",
@@ -401,14 +400,21 @@
         "health",
         "repair",
         "zones",
+        "specs",
+        "ledgers",
+        "compliance",
         "privacy"
       ],
-      "token_estimate": 741,
+      "token_estimate": 2063,
       "depends_on": [
-        "sdd-gate-v3",
         "context-management",
+        "QUALITY",
+        "ARCHITECTURE",
+        "sdd-gate-v3",
+        "sdd-bug-backlog-governance",
         "public-asset-distribution",
-        "workspace-init"
+        "workspace-init",
+        "audits-canon"
       ]
     },
     {
@@ -437,8 +443,8 @@
       "slug": "audits-canon",
       "title": "audits-canon",
       "area": "sdd",
-      "tldr": "Audits are committed spec artifacts — three pillars over a sha window, findings as JSONL records, dispositioned by exactly one remediation release.",
-      "summary": "An audit is a committed folder holding AUDIT.md and FINDINGS.jsonl; three pillars always run together over the window since the last audited milestone.",
+      "tldr": "Audits are committed spec artifacts — three pillars over a sha window read from audits_histo.jsonl, JSONL findings, one remediation release dispositions them.",
+      "summary": "An audit is a committed folder holding AUDIT.md and FINDINGS.jsonl; three pillars always run together over the window since the newest archived audit, and the archive is one histo-record-v1 line.",
       "path": "specs/memory/product/sdd/audits-canon.md",
       "tags": [
         "sdd",
@@ -447,10 +453,10 @@
         "governance",
         "evidence"
       ],
-      "token_estimate": 621,
+      "token_estimate": 722,
       "depends_on": [
         "sdd-bug-backlog-governance",
-        "specs-doctor",
+        "workspace-doctor",
         "sdd-gate-v3",
         "agent-comms"
       ]
@@ -460,8 +466,8 @@
       "slug": "sdd-bug-backlog-governance",
       "title": "sdd-bug-backlog-governance",
       "area": "sdd",
-      "tldr": "One record per bug through one write seam, a live-photo backlog with histo exits, and the _RELEASE.json state document.",
-      "summary": "The bug ledger, the backlog live photo and the release state document — one record per bug, one write seam, one exit record per backlog slug, one mutable _RELEASE.json per release.",
+      "tldr": "One bug record with closed_at at the terminal transition, a backlog exiting once at closure as one histo record, the release state document and its three verbs.",
+      "summary": "The bug ledger, the backlog live photo, the release state document and the ADR ledger — one record per bug, one write seam, one histo-record-v1 shape for every exit, one mutable _RELEASE.json per release born and archived by one verb each, every committed record schema-validated by dadaia doctor.",
       "path": "specs/memory/product/sdd/sdd-bug-backlog-governance.md",
       "tags": [
         "sdd",
@@ -469,13 +475,14 @@
         "release-lifecycle",
         "backlog",
         "bugs",
+        "adrs",
         "gitflow"
       ],
-      "token_estimate": 1149,
+      "token_estimate": 1644,
       "depends_on": [
+        "workspace-doctor",
         "sdd-gate-v3",
         "audits-canon",
-        "specs-doctor",
         "agent-comms"
       ]
     },
@@ -495,35 +502,12 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 1041,
+      "token_estimate": 1073,
       "depends_on": [
         "workspace-doctor",
         "context-management",
         "ARCHITECTURE",
         "agent-monitoring"
-      ]
-    },
-    {
-      "rank": 23,
-      "slug": "specs-doctor",
-      "title": "specs-doctor",
-      "area": "sdd",
-      "tldr": "Validates the v6 canon tree, memory drift and catalog integrity, _RELEASE.json, bug and backlog governance, and audit findings folded from JSONL.",
-      "summary": "dadaia specs doctor coordinates structural, memory, release, closure/audit, governance and coherence validators over the v6 canon; it reports, never blocks, and fixes only deterministic state.",
-      "path": "specs/memory/product/sdd/specs-doctor.md",
-      "tags": [
-        "specs",
-        "doctor",
-        "validation",
-        "sdd"
-      ],
-      "token_estimate": 894,
-      "depends_on": [
-        "sdd-gate-v3",
-        "context-management",
-        "workspace-doctor",
-        "sdd-bug-backlog-governance",
-        "audits-canon"
       ]
     }
   ]
