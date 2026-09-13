@@ -1,8 +1,8 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.7",
-  "phase": "CLOSURE",
-  "rc": 2,
+  "phase": "DEFINITION",
+  "rc": 3,
   "defined": {
     "sha": "10fb7de6",
     "ts": "2026-09-13T07:38:20Z"
@@ -253,6 +253,18 @@
       "agent": "release-candidates",
       "kind": "note",
       "text": "Candidate 3 implemented at b7fb1efe; phase CLOSURE."
+    },
+    {
+      "ts": "2026-09-13T09:56:13Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate 3 archived to rc-3/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
+    },
+    {
+      "ts": "2026-09-13T09:56:14Z",
+      "agent": "project-manager",
+      "kind": "note",
+      "text": "Sequencing deviation (same cause as rc-1/rc-2): rc-archive ran before candidate 3 merged — PR #253 still cannot run CI (GitHub billing lock); candidates 2–4 ride one later PR with a fresh security verdict on its head. Candidate 3 verdict 8ed31df4 (covering 05650181) is consumed by SPEC-DOC-044 as the head moves."
     }
   ]
 }
