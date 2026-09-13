@@ -11,6 +11,7 @@ explicit tree) the run still refuses with the one initialization message.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -61,4 +62,8 @@ def test_two_trees_is_a_usage_error_before_any_resolution(no_instance: Path) -> 
     run = _runner.invoke(app, ["doctor", "--context", "ctx", "--specs-dir", str(no_instance)])
 
     assert run.exit_code == 2, run.output
-    assert "--context" in run.output and "--specs-dir" in run.output
+    # Rich box-wraps the usage error at the runner's width and may split a token across
+    # lines: strip ANSI codes and box glyphs before asserting the tokens are named.
+    clean = re.sub(r"\x1b\[[0-9;]*m", "", run.output)
+    clean = re.sub(r"[\u2500-\u257f\n ]", "", clean)
+    assert "--context" in clean and "--specs-dir" in clean, run.output

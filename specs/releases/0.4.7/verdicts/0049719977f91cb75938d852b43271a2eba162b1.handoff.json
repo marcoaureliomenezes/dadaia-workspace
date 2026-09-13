@@ -1,0 +1,61 @@
+{
+  "schema_version": "handoff-v1.2",
+  "self_pull": {
+    "refs": [
+      "specs/releases/0.4.7/_RELEASE.json",
+      "specs/releases/0.4.7/SPEC.md",
+      "specs/releases/0.4.7/TASKS.md"
+    ]
+  },
+  "agent": "security-reviewer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-09-13T16:50:03Z",
+  "release_id": "0.4.7",
+  "artifact": {
+    "type": "other"
+  },
+  "scope": "Delta re-verdict superseding 448d365efc57fc8f4e0ba37e58f2156f7cb258a2 (APPROVED, deleted from the working tree by this same delta -- consumed). PR-gate verdict for feature/0.4.7 -> develop, PR #253, full review range 6cef01f854ee4e3c1178791270c9813fa9947730..0049719977f91cb75938d852b43271a2eba162b1, delta review range 448d365efc57fc8f4e0ba37e58f2156f7cb258a2..0049719977f91cb75938d852b43271a2eba162b1. Note on the superseded sha: 448d365e was the rewritten (post tree-filter) form of the commit the prior verdict actually reviewed -- the range was rewritten once while unpushed to redact sibling-repository names from specs/bugs/BUGS.jsonl and specs/ADRs/decisions.jsonl; the redaction is re-verified below over the current tree, not re-litigated as new. 2 commits reviewed individually: 10f7f934 (docs-only -- adds the 448d365e verdict file, deletes the superseded 62369eb9 verdict file, adds an Intent docstring line to tests/contract/test_doctor_without_an_instance.py, re-records 5 section hashes in dadaia_workspace/public/entities/behavior-map.json following an unrelated law-text edit under ADR 0013 -- no executable surface), 0049719977 (fix(doctor): moves the pre-existing `--context`/`--specs-dir` mutual-exclusion `typer.BadParameter` check from inside `_resolve_specs_dir` to the top of `_resolve_run`, verbatim condition `specs_dir is not None and context is not None`, no new branch value and no new I/O; test-only CRLF-normalization of `_atom_hash` in test_docs_derived_from_memory.py; one new regression test `test_two_trees_is_a_usage_error_before_any_resolution` in test_doctor_without_an_instance.py).",
+  "verdict": "APPROVED",
+  "verdict_reason": "Read `git diff 448d365e..HEAD` line by line: dadaia_workspace/cli/commands/doctor.py's only change is `_resolve_run` gaining `if specs_dir is not None and context is not None: raise typer.BadParameter(...)` as its first statement, and `_resolve_specs_dir` losing the identical check it used to run later -- the same guard condition, same exception type, same message, relocated earlier so the no-instance path (which previously skipped straight past `_resolve_specs_dir`'s check for `--context`, per the docstring: 'No instance around the run ... leaves the first two None') now hits it too. No new parameter, no new subprocess, no new filesystem read, no new network call -- purely a control-flow reorder of an existing validation, confirmed by reading the full `_resolve_run`/`_resolve_specs_dir` bodies (lines 330-390), not just the diff hunk. tests/contract/test_docs_derived_from_memory.py: `_atom_hash` now hashes `path.read_bytes().replace(b'\\r\\n', b'\\n')` instead of the raw bytes -- test-only code, no production path touches this function; CRLF normalization narrows what counts as a hash match, it cannot admit new content, so no security regression. tests/contract/test_doctor_without_an_instance.py: one added regression test invoking the CLI runner with `['doctor', '--context', 'ctx', '--specs-dir', str(no_instance)]`, asserting exit code 2 and both flag names in the output -- exercises exactly the moved guard, no new fixture, no new external input. dadaia_workspace/public/entities/behavior-map.json: five `hash_tuple.section` values re-recorded (sha256 digests only, no path, no content) following an unrelated law-text edit already reviewed under the prior (448d365e) verdict's ADR-0013 closure -- pure metadata, not re-opened here. specs/releases/0.4.7/verdicts/448d365efc57fc8f4e0ba37e58f2156f7cb258a2.handoff.json and .../62369eb9....handoff.json: added-then-deleted verdict prose, itself audited below by the leak greps rather than trusted. Leak scan: a grep over the delta diff for home-directory paths, IPv4 literals and the sibling family name -> 2 hits total, both on the two long verdict-prose lines added by 10f7f934 (line 99: the literal string `<sibling-family>` appearing only inside a quoted, already-executed grep pattern `'<sibling-family>|chain-(capture|explorer)'` that the prior verdict ran to PROVE zero matches in specs/bugs/BUGS.jsonl and specs/ADRs/decisions.jsonl; line 176: the placeholder `<home-dir>` -- already redacted, not a real path) -- read both lines in full: neither introduces a live sibling-repo name, IP, or absolute local path; both are descriptive prose about a scan already run and closed, matching the task's stated non-finding carve-out. No unredacted absolute path, IP, or sibling-repo slug found anywhere else in the delta. Secret-pattern grep `(password|passwd|secret|token|api_key|apikey|private_key)\\s*=\\s*[\"'][^\"']{6,}` over the same delta diff: 0 matches (exit 1). `BEGIN...PRIVATE KEY` grep over the same delta diff: 0 matches (exit 1) -- the prior verdict's own text mentioning historical PRIVATE KEY fixture hits was itself deleted by 10f7f934 (the 62369eb9 file removal), so this delta carries strictly fewer such mentions than its predecessor, not more. specs/bugs/BUGS.jsonl and specs/ADRs/decisions.jsonl: untouched by this delta (`git diff --stat 448d365e..HEAD` names neither file) -- the redaction landed in the range this delta supersedes and is not re-opened. No dependency, lockfile, CI workflow, or IaC file touched. Targeted tests: `pytest tests/contract/test_doctor_without_an_instance.py tests/contract/test_docs_derived_from_memory.py tests/integration/cli/test_diagnostic_context_option.py -q -p no:cacheprovider` -> 16 passed, 0 failed, covering the moved BadParameter guard end-to-end through the real Typer CLI runner (not a unit stub) plus the existing `--context`/`--specs-dir` diagnostic-option suite for regression. No CRITICAL/HIGH/MEDIUM finding. Nothing in this delta touches an authenticated production endpoint, a live credential, adds a subprocess/network call, or changes a dependency version. Snapshot, not a guarantee of 'secure' (DADAIA.md 7.5) -- the operator owns the ship decision.",
+  "findings": [],
+  "metrics": {
+    "commit_sha": "0049719977f91cb75938d852b43271a2eba162b1",
+    "review_range": "6cef01f854ee4e3c1178791270c9813fa9947730..0049719977f91cb75938d852b43271a2eba162b1",
+    "delta_review_range": "448d365efc57fc8f4e0ba37e58f2156f7cb258a2..0049719977f91cb75938d852b43271a2eba162b1",
+    "delta_commits_reviewed": 2,
+    "delta_files_changed": 6,
+    "prior_verdict_superseded": "448d365efc57fc8f4e0ba37e58f2156f7cb258a2 (APPROVED, 0 findings) -- consumed, file removed from the working tree by this delta",
+    "prior_verdict_sha_note": "448d365e is the rewritten (tree-filtered) form of the commit the superseded verdict originally reviewed; the redaction it performed (specs/bugs/BUGS.jsonl, specs/ADRs/decisions.jsonl) is untouched by this delta, not re-opened",
+    "new_production_code_paths": 0,
+    "control_flow_only_changes": 1,
+    "test_only_changes": 2,
+    "metadata_only_changes": 1,
+    "docs_only_commits": 1,
+    "absolute_path_ip_dd_chain_grep_hits": 2,
+    "absolute_path_ip_dd_chain_grep_hits_all_inside_verdict_prose_non_finding": true,
+    "secret_pattern_scan_delta_matches": 0,
+    "private_key_header_matches_in_delta": 0,
+    "bugs_jsonl_touched_in_delta": false,
+    "adrs_decisions_touched_in_delta": false,
+    "dependency_lockfile_touched_in_delta": false,
+    "ci_workflow_touched_in_delta": false,
+    "iac_touched_in_delta": false,
+    "targeted_tests_run": "pytest tests/contract/test_doctor_without_an_instance.py tests/contract/test_docs_derived_from_memory.py tests/integration/cli/test_diagnostic_context_option.py -q -p no:cacheprovider",
+    "targeted_tests_passed": 16,
+    "targeted_tests_failed": 0,
+    "findings_critical": 0,
+    "findings_high": 0,
+    "findings_medium": 0,
+    "findings_low": 0,
+    "findings_info": 0,
+    "findings_new_in_this_review": 0,
+    "pr_edge": "feature/0.4.7 -> develop",
+    "pr_number": 253
+  },
+  "decisions_required": [],
+  "next_handoff": {
+    "agent": "project-manager",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "other"
+  }
+}

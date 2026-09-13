@@ -30,6 +30,9 @@ def test_conftest_backstop_routes_the_resolver_away_from_the_operator_store() ->
     resolved = container.telemetry_state_dir()
     real = Path("~/.dadaia/state/telemetry").expanduser()
     assert resolved != real, "conftest backstop is not routing telemetry_state_dir()"
-    assert Path.home() not in resolved.parents, (
-        f"telemetry state dir {resolved} still resolves under the operator's home"
+    # The operator's store root, not the home directory: a Windows tmp_path lives under
+    # the home directory (`%LOCALAPPDATA%\\Temp`) and is still routed away.
+    operator_root = Path.home() / ".dadaia"
+    assert operator_root not in resolved.parents, (
+        f"telemetry state dir {resolved} still resolves under the operator's store root"
     )

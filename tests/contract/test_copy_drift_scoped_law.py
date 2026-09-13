@@ -60,7 +60,7 @@ def _memory_issues(tmp_path: Path, content: str | None) -> list[str]:
     return [
         f"{i.code} {i.severity.value} {i.description}"
         for i in doctor.check()
-        if i.path.endswith("memory/AGENTS.md")
+        if Path(i.path).as_posix().endswith("memory/AGENTS.md")
     ]
 
 
