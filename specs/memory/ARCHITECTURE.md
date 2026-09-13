@@ -48,7 +48,7 @@ Measured by: `pytest tests/contract/test_protocols_have_two_adapters.py`.
 ADR: 0001 (accepted)
 Rationale: a Protocol with one implementer is interface text that hides a direct dependency.
 
-### P-09 · We resolve the whole Invocation — workspace root, session, context, specs dir, mode, release, phase — once per process in `core.invocation.resolve`, imported directly only by `cli._specs_resolution`, `container` and `hooks`.
+### P-09 · We resolve the whole Invocation — workspace root, session, context, specs dir, the session's Bind — once per process in `core.invocation.resolve`, imported directly only by `cli._specs_resolution`, `container` and `hooks`.
 Measured by: `lint-imports --config setup.cfg --no-cache` — contract `bind-resolution-seam-is-a-single-home` (zero ignored imports, none ever accepted); `pytest tests/unit/core/test_invocation.py`.
 ADR: 0003 (accepted)
 Rationale: every context bug came from a second resolution path answering differently.
@@ -99,11 +99,13 @@ Rationale: law that no asset owns is law nobody applies.
 
 | Fact | The module that decides it |
 |---|---|
-| workspace root, session, context, mode, release, phase | `core/invocation.py` — `resolve() -> Invocation`, over rungs 0 (explicit/`target_path`) … 3 (repo of the cwd) |
+| workspace root, session, context, the session's Bind | `core/invocation.py` — `resolve() -> Invocation`, over rungs 0 (explicit/`target_path`) … 3 (repo of the cwd); `Bind(context_name, repos)` with `all_repos()` (main + associated) is the scope, resolved from `DADAIA_CONTEXT` then the live session record, never the cwd |
+| the gate's three blocks and three path classes | `hooks/root_whitelist.py` (a new root entry), `hooks/venv_guard.py` (one rule: venv-rooting), `features/spec_context/gate_policy.py` (`classify_path` → ADDITIVE/MUTATING/PROTECTED; `evaluate` → PROTECTED or out-of-scope BLOCK, else ALLOW with presence); `hooks/sdd_gate.py` resolves the Invocation once and passes the Bind and target owner as plain data — no phase, no mode, no `_RELEASE.json` read |
+| the BLOCK envelope | one `fix: <command>` line per refusal, every enforcement point; `tests/contract/test_every_block_carries_a_fix.py` is the interface (68 refusals, each fed back through `pre_gate.evaluate_payload` as ALLOW) |
 | session record schema, read, liveness and reaping | `core/session_store.py` — `new_binding_record`/`is_live`/`live_session`/`reap_stale`; `core/record_liveness.py` holds the raw TTL predicate |
 | presence liveness and reaping | `features/spec_context/presence.py` — `gc()` is the only reaper of records, markers, sentinels and emptied directories |
-| what `.dadaia/` may contain — zones with class, creator, TTL and canon, the `states/` canon, the root law sets, the exceptions file | `core/workspace_layout.py` — `DADAIA_ZONES`, `STATES_CANON`, `ROOT_ALLOWED_DIRS`/`ROOT_ALLOWED_FILES`, `INSTANCE_EXCEPTIONS`; init, `dadaia doctor`, the gate's ADDITIVE prefixes, the root-whitelist hook, the stage renderer and export are derived views, pinned by `tests/contract/test_zone_registry.py` |
-| what a `specs/` tree may contain | `features/specs/canon.py`'s `CANON` table — scaffold renders it, doctor checks it |
+| every canonical name — the root law, `.dadaia/` zones (class, creator, TTL, canon; `reaped` at 7 days), the `states/` canon, the `specs/` canon rows, the repo-tree exclusion set, the installed git hooks | `core/workspace_layout.py` — `ROOT_ALLOWED_DIRS`/`ROOT_ALLOWED_FILES`, `INSTANCE_EXCEPTIONS`, `DADAIA_ZONES`, `STATES_CANON`, `SPECS_CANON` (`CanonEntry` shape → matcher, `CANON_ROOT_MEMBERS` derived), `REPO_TREE_EXCLUDED` (= `.dadaia` + `REPO_TREE_ARTIFACTS`), `INSTALLED_GIT_HOOKS`; init, `dadaia doctor`, the gate's ADDITIVE prefixes, the root-whitelist hook, `privacy_check`, `ci install-hook`, export and the stage renderer (`<!-- zones\|canon\|root\|repo-excluded\|specs-canon -->` into `.dadaia/AGENTS.md` and DADAIA §5.1/§5.3/§6.2) are derived views; a literal of three or more canonical names outside this module fails `tests/contract/test_zone_registry.py` |
+| what a `specs/` tree may contain | `core/workspace_layout.SPECS_CANON` rows; `features/specs/canon.py` is the renderer (`scaffold`, `release_new`) and checker (`check_tree`) over them |
 | whether a projection is current | `infrastructure/projection.py`'s `ProjectionRule` plus `projection_rules()`; install writes and doctor compares the same table |
 | which harness a projection targets | `HarnessProjection` in `infrastructure/projection_rules.py`, with three production adapters — Claude Code, Codex, Kimi Code |
 | a bug record's status and `closed_at` | `core/models/bugs.py` transition methods, every terminal one ending in `_reach_terminal` (stamps `closed_at` once); `infrastructure/jsonl_record_store.py::JsonlRecordStore.scan()` is the one ledger parser, yielding `MalformedLine` for a bad row |
@@ -113,7 +115,8 @@ Rationale: law that no asset owns is law nobody applies.
 | the git publication boundary | `features/chokepoints/{branch_policy,denylist_scan,pre_commit,push_gate,verdict}.py`; `covering_verdict()` is the single verdict reader, `live_verdict_shas()` the one stale-verdict rule |
 | the telemetry database connection | `features/telemetry/store.py`'s `TelemetryStore`, owning open/migrate/`integrity_check`/`quarantine` |
 | a YAML frontmatter block | `core/frontmatter.py` |
-| the release phase vocabulary | `core/release_state.py` — `PHASES` + `MEMORY_WRITE_PHASES`; doctor and gate import, never re-type |
+| the release phase vocabulary | `core/release_state.py` — `PHASES`; the schema enum, the doctor and the release verbs import it, the gate reads none |
+| the reaper's filesystem acts — walk, mtime, move, remove | `features/spec_context/sweep.py` — one primitive, one guard (symlink never followed, vanished = absent, outside the workspace = skipped, `OSError` = one `skipped` action, cross-device move = copy + remove); `DoctorService` classifies over `walk()` and dispatches `move()`/`remove()`; `doctor.reap()` is the container-free lane the PostToolUse throttle and SessionStart run |
 | the release-id shape | `core/specs_version.py` — `RELEASE_SEMVER_RE` with `RELEASE_ID_FRAGMENT` derived for path regexes; `is_release_semver` is the mint predicate |
 | memory-canon shape facts | `features/specs/memory_canon.py` — the top-level file tuple (a slug is its filename stem, no alias table), forbidden-heading matcher, wikilink grammar, fixed-section lookup |
 | fail-soft registry reads | `core/invocation.py` — `alive_context_slugs` + the name↔slug maps; `JsonContextStore` stays the schema-gated CRUD |
@@ -128,7 +131,7 @@ Rationale: law that no asset owns is law nobody applies.
 - `core/protocols/` holds six Protocols: three two-adapter OS seams (`FilePermissionSetter`, `ShutdownHandler`, `TelemetryRefreshLock`) and three panel cross-feature seams whose implementer lives under `features/` (`AgentsProvider`, `ContextProjectProvider`, `ServerRegistryProvider`); every other adapter is imported by its one consumer (the consumer-less `ProcessAncestry` chain was deleted at 0.5.3).
 - `setup.cfg` carries seven import-linter contracts; `features-no-infrastructure` and `cli-no-infrastructure` were deleted by ADR 0001, `features-no-subprocess` is direct-imports-only with no suppressed edge, and the two surviving suppressed edges (`reconcile.service` -> `capabilities`, `reconcile.service` -> `migrate.state_v2`) both sit under `features-no-cross-feature`.
 - `features/migrate` stamps `specs_pattern_version: 6` or refuses, instructing a tree below v6 to upgrade to 0.4.x first — no in-wheel pre-v6 lineage.
-- Hooks import `core.invocation` directly and build the `Invocation` once per process; they never import `container` (P-12); the PostToolUse hook `sdd_post_gate` renews presence, touches `last_seen_at` and runs `presence.gc` on one throttle — it writes nothing else.
+- Hooks import `core.invocation` directly and build the `Invocation` once per process; they never import `container` (P-12); the PostToolUse hook `sdd_post_gate` renews presence, touches `last_seen_at` and runs `doctor.reap(own_session_id=…)` on one throttle (the reaper owns `presence.gc`) — it writes nothing else.
 
 ### `features/specs/doctor` — SpecsDoctor coordinator + validator siblings
 

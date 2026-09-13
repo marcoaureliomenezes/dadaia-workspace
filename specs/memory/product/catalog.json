@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-13T01:12:40Z",
+  "generated_at": "2026-09-13T05:22:44Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -35,12 +35,11 @@
         "sessions",
         "lifecycle"
       ],
-      "token_estimate": 473,
+      "token_estimate": 497,
       "depends_on": [
         "panel",
         "workspace-doctor",
         "context-management",
-        "sdd-gate-v3",
         "brand-identity"
       ]
     },
@@ -109,7 +108,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 829,
+      "token_estimate": 863,
       "depends_on": [
         "agentic-entities",
         "workspace-doctor",
@@ -199,7 +198,7 @@
         "projection",
         "binding"
       ],
-      "token_estimate": 309,
+      "token_estimate": 310,
       "depends_on": [
         "public-asset-distribution",
         "context-management",
@@ -267,7 +266,7 @@
         "lifecycle",
         "anti-slop"
       ],
-      "token_estimate": 278,
+      "token_estimate": 289,
       "depends_on": [
         "spec-context-project",
         "sdd-gate-v3",
@@ -289,7 +288,7 @@
         "lifecycle",
         "concurrency"
       ],
-      "token_estimate": 234,
+      "token_estimate": 319,
       "depends_on": [
         "context-management",
         "sdd-gate-v3",
@@ -323,8 +322,8 @@
       "slug": "context-management",
       "title": "context-management",
       "area": "platform",
-      "tldr": "ALIVE/DEAD registry of one main repo plus N associated repos, one Invocation resolved per process, bind-driven injection, advisory presence, redactable output.",
-      "summary": "Spec Context Projects and their repositories through a v3 registry, one resolution authority, one repo accessor, bind-driven injection and expiring presence records.",
+      "tldr": "ALIVE/DEAD registry of one main repo plus N associated repos, one Invocation per process, a Bind carrying scope, bind-driven injection, advisory presence.",
+      "summary": "Spec Context Projects and their repositories through a v3 registry, one resolution authority whose Bind carries the session's scope, one repo accessor, bind-driven injection and expiring presence records.",
       "path": "specs/memory/product/platform/context-management.md",
       "tags": [
         "context",
@@ -333,11 +332,11 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 1025,
+      "token_estimate": 1173,
       "depends_on": [
         "workspace-doctor",
-        "spec-context-project",
         "sdd-gate-v3",
+        "spec-context-project",
         "workspace-init",
         "QUALITY"
       ]
@@ -391,8 +390,8 @@
       "slug": "workspace-doctor",
       "title": "workspace-doctor",
       "area": "platform",
-      "tldr": "The one compliance surface — dadaia doctor scores workspace, specs and ledgers from one rule record, one grammar, one exit rule; --fix is the one reaper.",
-      "summary": "dadaia doctor runs the workspace walk, the specs rules and the ledger schema rules from one rule record, prints one line per finding and one compliance score per section plus a total, exits 1 on any error-class finding, and is the only cleanup engine of the instance.",
+      "tldr": "The one compliance surface — dadaia doctor scores workspace, specs and ledgers from one rule record; --fix is the reaper, moving slop, deleting only by TTL.",
+      "summary": "dadaia doctor runs the workspace walk, the specs rules and the ledger schema rules from one rule record, prints one line per finding and one compliance score per section plus a total, exits 1 on any error-class finding with a runnable fix line, and its reaper moves slop into a held zone and deletes only what a TTL expired.",
       "path": "specs/memory/product/platform/workspace-doctor.md",
       "tags": [
         "workspace",
@@ -405,12 +404,12 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 2063,
+      "token_estimate": 2507,
       "depends_on": [
+        "sdd-gate-v3",
         "context-management",
         "QUALITY",
         "ARCHITECTURE",
-        "sdd-gate-v3",
         "sdd-bug-backlog-governance",
         "public-asset-distribution",
         "workspace-init",
@@ -431,7 +430,7 @@
         "setup",
         "idempotent"
       ],
-      "token_estimate": 247,
+      "token_estimate": 327,
       "depends_on": [
         "workspace-doctor",
         "public-asset-distribution",
@@ -478,7 +477,7 @@
         "adrs",
         "gitflow"
       ],
-      "token_estimate": 1644,
+      "token_estimate": 1652,
       "depends_on": [
         "workspace-doctor",
         "sdd-gate-v3",
@@ -491,8 +490,8 @@
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "area": "sdd",
-      "tldr": "No-lock enforcement — origin-classified LAW, path/phase/mode gates, phase read from _RELEASE.json, git hooks pared to the publication boundary.",
-      "summary": "The merged PreToolUse gate enforces root whitelist, venv and cache posture, path class, phase and caller mode; the git chokepoints enforce the publication boundary and the denylist scan.",
+      "tldr": "No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write), one fix line per BLOCK, chokepoints at the push.",
+      "summary": "The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one executable fix line; the git chokepoints enforce the publication boundary and the full denylist scan over every pushed path.",
       "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
         "sdd",
@@ -502,7 +501,7 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 1073,
+      "token_estimate": 1420,
       "depends_on": [
         "workspace-doctor",
         "context-management",

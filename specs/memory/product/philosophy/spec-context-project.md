@@ -12,9 +12,10 @@ tags: [spec-context, sdd, lifecycle, concurrency]
 - A product spanning several repositories is still one project: the context may carry associated repositories, which live and die with it.
 - Specs, bind, memory, releases and backlog resolve only from the main repo, an associated repo's own `specs/` never being read.
 - The main repository owns production source and `specs/`; an associated repository owns production source only.
-- Bind selects a context and mode, changing only the caller's own session record; a session without a harness-native id carries the binding in `DADAIA_CONTEXT` instead.
+- Bind selects a context and nothing else, changing only the caller's own session record; a session without a harness-native id carries the binding in `DADAIA_CONTEXT` instead.
+- A bind carries a scope — the context's main repo plus its associated repos — and a bound session's MUTATING write into a repo another context owns is refused with the bind that would allow it; an unbound session is never scope-judged.
 - Injection fires when that record's `bound_at` is newer than this session's injection sentinel.
-- Enforcement is the path/phase/mode gate plus the git chokepoints, and concurrent work surfaces overlap through presence warnings without blocking.
+- Enforcement is the three-block gate (a new root entry, a non-venv command, a PROTECTED or out-of-scope write) plus the git chokepoints; no phase and no mode is enforced, and concurrent work surfaces overlap through presence warnings without blocking.
 
 ## Runtime state
 

@@ -16,7 +16,7 @@ tags: [harness, kimi-code, layer-1, projection, binding]
 - They fail open outside dadaia workspaces and are the only dadaia assets installed outside the workspace tree.
 - `dadaia public doctor` verifies the projection, the shims and the block ([[public-asset-distribution]]).
 - Kimi Code exposes no session-id variable, so its binding is `DADAIA_CONTEXT` exported into the launching environment — rung 1 ([[context-management]]).
-- With it set, the injection shim delivers the bound memory, the pre-gate resolves mode and attributes the write, and the heartbeat carries the context.
+- With it set, the injection shim delivers the bound memory, the pre-gate attributes the write and judges its scope, and the heartbeat carries the context.
 - `dadaia context bind` inside a kimi shell writes a record the session cannot key back to, so it warns and names the export to add.
 
 ## Dependencies

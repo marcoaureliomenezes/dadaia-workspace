@@ -17,16 +17,17 @@ Rationale: a marker known to one file and unknown to the other is a silent exclu
 - Codex and Kimi Code are operator-installed external CLIs, never Python deps, and the workspace runs no agent-execution runtime.
 - Entry harnesses are single-sourced as `L1_ENTRY_HARNESSES` in `core/harness_registry.py` — Claude Code, Codex, Kimi Code — each with its own projection plus the shared `.agents/` root.
 - Layer-1 agent bodies are model-agnostic in source and receive `(model, effort)` at `public install`; Codex projections carry registry-derived Codex-native tier identity.
-- Quality tooling is pytest with `pytest-cov`, `pytest-xdist`, `pytest-randomly` and `pytest-timeout`, Ruff, mypy `--strict`, import-linter, Hypothesis, Playwright and gitleaks, with `-p no:cacheprovider` in addopts.
+- Quality tooling is pytest with `pytest-cov`, `pytest-xdist`, `pytest-randomly` and `pytest-timeout`, Ruff, mypy `--strict`, import-linter, Hypothesis, Playwright and gitleaks; every cache is redirected by `pyproject.toml` (`addopts -p no:cacheprovider`, `[tool.ruff] cache-dir`, `[tool.mypy] cache_dir` → `../../.dadaia/tmp/<tool>-cache`), so the bare commands are the canonical ones and no per-command flag exists.
 - The closed marker set is eight — unit, contract, integration, e2e, slow, tmp, flaky, quarantine (P-28).
 - Mutation testing is `mutmut==3.7.0` in an optional Poetry group, absent from every push-path selector ([[QUALITY]]).
-- Caches and artifacts live outside repos, and the venv guard refuses an invocation that would write one in-tree ([[sdd-gate-v3]]).
+- Caches and artifacts live outside repos by configuration; the venv guard's one rule is venv-rooting, and a cache that still appears in a repo tree is moved to `.dadaia/reaped/` by the doctor's reaper ([[sdd-gate-v3]], [[workspace-doctor]]).
 
 ### Canonical commands
 
 ```bash
 .dadaia/.venv/bin/dadaia --version
-PYTHONDONTWRITEBYTECODE=1 .dadaia/.venv/bin/python -m pytest -p no:cacheprovider
+.dadaia/.venv/bin/python -m pytest
+.dadaia/.venv/bin/dadaia ci preflight
 .dadaia/.venv/bin/dadaia doctor
 .dadaia/.venv/bin/dadaia public doctor
 .dadaia/.venv/bin/dadaia certify --json

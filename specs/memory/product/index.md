@@ -49,10 +49,10 @@
 | slug | title | tldr |
 |------|-------|------|
 | `consumer-agent-support` | Consumer validation gate | A consumer-side validation agent running the shipped recipe on a real workspace is the release gate; no wheel publishes without its CERTIFIED_100 verdict. |
-| `context-management` | context-management | ALIVE/DEAD registry of one main repo plus N associated repos, one Invocation resolved per process, bind-driven injection, advisory presence, redactable output. |
+| `context-management` | context-management | ALIVE/DEAD registry of one main repo plus N associated repos, one Invocation per process, a Bind carrying scope, bind-driven injection, advisory presence. |
 | `cross-platform-portability` | cross-platform-portability | Linux, macOS and Windows through one platform capability seam, injected adapters, Python hooks and hard-gated cross-OS CI legs. |
 | `server-registry` | server-registry | Port registry with TTL and PID tracking so parallel agents' dev servers never collide; the 3000-3999 range binds only `next_port`. |
-| `workspace-doctor` | workspace-doctor | The one compliance surface — dadaia doctor scores workspace, specs and ledgers from one rule record, one grammar, one exit rule; --fix is the one reaper. |
+| `workspace-doctor` | workspace-doctor | The one compliance surface — dadaia doctor scores workspace, specs and ledgers from one rule record; --fix is the reaper, moving slop, deleting only by TTL. |
 | `workspace-init` | workspace-init | Idempotent bootstrap of workspace state, the Python venv, the selected harness projections and the governance hooks. |
 
 ### sdd
@@ -61,5 +61,5 @@
 |------|-------|------|
 | `audits-canon` | audits-canon | Audits are committed spec artifacts — three pillars over a sha window read from audits_histo.jsonl, JSONL findings, one remediation release dispositions them. |
 | `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | One bug record with closed_at at the terminal transition, a backlog exiting once at closure as one histo record, the release state document and its three verbs. |
-| `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement — origin-classified LAW, path/phase/mode gates, phase read from _RELEASE.json, git hooks pared to the publication boundary. |
+| `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write), one fix line per BLOCK, chokepoints at the push. |
 

@@ -18,7 +18,7 @@ tags: [public, assets, distribution, projection, privacy]
 - The nine `agents/*.md` bodies stage generic and render at install as `render(staged body + resolved (model, effort))`, precedence override > template > `balanced` over `.dadaia/states/agent_model_policy.json`.
 - Codex render fails closed without a model, and the manifest keeps hashing the policy-free staged bytes.
 - A skill is a folder and every file in it is projected, to `.agents/skills/<name>/` plus `.claude/skills/<name>/`; Codex and Kimi Code read the shared root natively, with no per-harness copy ([[agentic-entities]]).
-- `stage` fills the `<!-- zones -->` and `<!-- canon -->` placeholders of the `.dadaia/AGENTS.md` and `.dadaia/states/AGENTS.md` fragments from the zone registry, so the projected tables are the registry ([[workspace-doctor]]); scripts are staged under `agentic/scripts` and never projected — git hooks and CI execute the package copy, and the memory-atom lint lives in `features/specs/memory_lint.py`.
+- `stage` renders five placeholders from `core/workspace_layout.py` through `render_registry_tables` — `<!-- zones -->` and `<!-- canon -->` in the `.dadaia/AGENTS.md` and `.dadaia/states/AGENTS.md` fragments, `<!-- root -->`, `<!-- repo-excluded -->` and `<!-- specs-canon -->` in `DADAIA.md` §5.1/§5.3/§6.2 — so every canon table in the projected law is the registry, pinned row for row by `tests/contract/test_zone_registry.py` ([[workspace-doctor]]); scripts are staged under `agentic/scripts` and never projected — git hooks and CI execute the package copy, and the memory-atom lint lives in `features/specs/memory_lint.py`.
 
 ## Doctor
 
