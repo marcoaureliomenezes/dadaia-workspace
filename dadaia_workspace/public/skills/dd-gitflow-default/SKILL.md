@@ -29,9 +29,9 @@ description: >
 8. Definition stage: author the candidate's SPEC/PLAN/TASKS at the release root on `feature/{M.m.p}`.
 9. Implementation stage: one commit per completed task group, shaped per §3a.
 10. Candidate closure (memory → CLOSURE): open one `feature/{M.m.p}` → `develop` PR and merge it green.
-11. After the merge, ask the operator: **promote or continue?** Continue = `dadaia release rc-archive` (trio → `rc-N/`, fresh trio at root, same version, same branch); promote = step 12.
+11. After the merge, ask the operator: **promote or continue?** Continue = `dadaia release rc-archive` (validates the tree, trio → `rc-N/`, release parked in `DEFINITION`, `bugs archive`; same version, same branch); promote = step 12.
 12. Promote: open the PR `develop` → `main` (ship verdict pre-staged naming develop's tip, §3b).
-13. The moment it merges, delete `feature/{M.m.p}` and cut `feature/{next}` (step 6) in the same step.
+13. The moment it merges, run `dadaia release archive <v> --shipped <sha> --pr <n> --next <M.m.p>` — it ships, archives, appends the histo record and births the next release, then PRINTS the git `next:` lines: delete `feature/{M.m.p}`, cut `feature/{next}` (step 6), reconcile — run them in that order.
 14. Tag `archive/<name>` then delete a branch the moment its work lands elsewhere.
 
 ## 3a. Commit shapes — each write alone, in its own shape
@@ -42,7 +42,7 @@ description: >
 | 2 | Backlog / ADR | `BACKLOG.json` alone, or `ADRs/decisions.jsonl` alone | `chore(backlog): …` / `chore(adrs): …` |
 | 3 | Bug fix | code + regression test + the `BUGS.jsonl` line, together | `fix(bugs): <id> — <cause>` |
 | 4 | Resolve record | commits only; a push happens when asked, `dadaia ci preflight` first | — |
-| 5 | Release definition | SPEC + PLAN + TASKS + purge-on-pick + picked bugs, one commit | `feat(specs): define candidate …` |
+| 5 | Release definition | SPEC + PLAN + TASKS + the picked entries flipped to `status: picked` + picked bugs, one commit | `feat(specs): define candidate …` |
 | 6 | Task implementation | the task's declared write set | `conventional-commit(task-id): description` — the auditable trace |
 
 ## 3b. The ship-PR verdict
@@ -55,7 +55,7 @@ description: >
   (`features/chokepoints/verdict.py::covering_verdict`).
 - On disk a verdict is live while it names the head, the head's first parent, or
   `origin/develop`'s tip — one file per sha; anything else is stale, refused by the
-  pre-push gate and deleted by `specs doctor --fix` (SPEC-DOC-044, one rule:
+  pre-push gate and deleted by `dadaia doctor --fix` (SPEC-DOC-044, one rule:
   `features/chokepoints/verdict.py::live_verdict_shas`).
 - The ship PR's verdict is consumed and deleted after the `main` merge, like any
   other.

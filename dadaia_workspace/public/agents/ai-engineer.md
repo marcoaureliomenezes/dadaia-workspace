@@ -151,8 +151,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 - CLI:
   ```bash
   dadaia context show --json    # discover active context and specs_dir
-  dadaia doctor                 # workspace health check
-  dadaia specs doctor           # SDD-specific health check
+  dadaia doctor                 # workspace, specs and ledgers health check
   dadaia public stage           # stage canonical assets for propagation
   dadaia public doctor          # verify projection consistency
   ```

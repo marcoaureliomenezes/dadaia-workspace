@@ -2,7 +2,7 @@
 name: dd-audit-project
 description: >
   project-auditor's audit protocols: the three-pillar drift audit (bug history, spec
-  compliance, memory drift) over the sha window since the last audited milestone, and
+  compliance, memory drift) over the sha window read from audits_histo.jsonl, and
   the pre-implementation spec-set review. Use when dispatched to audit, or to review
   a spec set before implementation.
 ---
@@ -14,10 +14,10 @@ description: >
 
 ## 1. The window — computed once per audit
 
-1. Read the live release's `_RELEASE.json` `audited` field plus every archived
-   release's `audited` fact in `releases_histo.jsonl`.
-2. Set the window to `[newest audited sha, HEAD]` — the whole history when no
-   `audited` milestone exists yet. Never scan `specs/releases/_ideas/**`.
+1. Read `specs/audits/_archive/audits_histo.jsonl` — an audit is not a release
+   milestone, so `_RELEASE.json` carries no `audited` field.
+2. Set the window to `[newest archived audit's sha, HEAD]` — the whole history when
+   the histo is empty. Never scan `specs/releases/_ideas/**`.
 3. Record the resulting `[from-sha, HEAD]` in `AUDIT.md`'s scope. Window mechanics:
    `dd-bug-resolution`'s `LINEAGE.md`, cited not restated.
 
@@ -61,4 +61,4 @@ instead of a sha window).
 - [`SPEC-REVIEW.md`](SPEC-REVIEW.md) — the spec-set review dimension.
 - `DADAIA.md` §6.8 — lifecycle: one audit binds to one remediation release,
   archives once dispositioned.
-- `dadaia specs doctor --json` / `dd-cli-library` — command reference.
+- `dadaia doctor --json` / `dd-cli-library` — command reference.

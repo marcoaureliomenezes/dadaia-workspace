@@ -94,11 +94,11 @@ dadaia memory catalog generate
 ## 5. Validation
 
 ```bash
-dadaia specs doctor
+dadaia doctor --context <ctx>
 ```
 
-- Doctor checks atom presence, the top-level trio, and catalog consistency.
+- The `specs` section checks atom presence, the top-level trio, and catalog consistency.
 - Fix findings at the source atom — never hand-edit `catalog.json` to silence a check, regenerate it instead.
 
-Generated from `dadaia_workspace/public/data/memory-AGENTS.md`.
-Project teams may customize this file; `dadaia specs doctor` reports drift instead of overwriting it.
+Generated from `dadaia_workspace/public/scaffold/memory/AGENTS.md`.
+Project teams may customize this file; `dadaia doctor` reports drift instead of overwriting it.

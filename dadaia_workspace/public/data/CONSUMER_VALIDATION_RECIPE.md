@@ -80,12 +80,13 @@ an initialized workspace, create it:
 ### F-04 — Doctors
 - Run in an initialized workspace: `$D doctor`; `$D public doctor`; and a specs tree
   INSIDE a repo: `mkdir -p repos/valproj && $D specs init --specs-dir
-  repos/valproj/specs && $D specs doctor --specs-dir repos/valproj/specs`.
+  repos/valproj/specs && $D doctor --specs-dir repos/valproj/specs`.
 - Also assert coherence: bare `$D specs init` AT the workspace root must REFUSE
   (Root Law — init must not create what doctor refuses), exit non-zero, no `specs/`
   created.
-- **PASS if:** doctor/public-doctor/specs-doctor exit 0 on the clean tree and the root
-  `specs init` refusal holds (the slop probe is F-02).
+- **PASS if:** `doctor` (sections `workspace`/`specs`/`ledgers`, each scored) and
+  `public doctor` exit 0 on the clean tree and the root `specs init` refusal holds (the
+  slop probe is F-02).
 
 ### F-05 — Projections
 - Run: `$D public stage`; `$D public install --target all`; `$D public doctor`.
@@ -100,7 +101,7 @@ an initialized workspace, create it:
 - **PASS if:** create→list shows alpha `state:"dead"`; `alive` clones, scaffolds AND
   commits its own scaffold (repo left clean — `git status --porcelain` empty of
   tool-created files); the freshly-scaffolded context is doctor-clean —
-  `$D specs doctor --context alpha` reports **0 errors AND 0 warnings** (a supported
+  `$D doctor --context alpha` reports **0 errors AND 0 warnings** (a supported
   init path must reach a fully clean tree — catalog present, no raw placeholder atom,
   no live release directory at all (the honest absence, `ACTIVE.md` retired at
   T-050-21A) — a fresh context that doctor rejects is a FAIL); `dead` flips back
@@ -166,18 +167,16 @@ an initialized workspace, create it:
   repos/vp/specs`; the incomplete one exits non-zero and writes nothing.
 
 ### F-10 — Backlog governance
-- Run against the IN-REPO specs tree from F-04: `$D specs doctor --json --specs-dir
+- Run against the IN-REPO specs tree from F-04: `$D doctor --json --specs-dir
   repos/valproj/specs` (must be valid JSON); plant the malformed item as an `active[]`
   entry directly in `repos/valproj/specs/backlog/BACKLOG.json` (the single source —
   `dadaia backlog new <slug> --specs-dir repos/valproj/specs` creates the document if it
   does not exist yet; then edit the new entry's `status` to `candidate` and leave it
-  with no `intents[]` array), then run the backlog-specific doctor — `$D backlog doctor
-  --specs-dir repos/valproj/specs` (NOT `specs doctor`, which validates the
-  single-source loose-file/consumption invariants SPEC-DOC-031/035, not the `active[]`
-  entry schema; BL-SCHEMA is the `backlog doctor` path). Assert its exit code directly,
-  not through a pipe.
-- **PASS if:** `specs doctor --json` emits parseable JSON exit 0; and `backlog doctor`
-  flags the malformed item `[ERROR] BL-SCHEMA` and exits non-zero.
+  with no `intents[]` array), then re-run `$D doctor --specs-dir repos/valproj/specs`:
+  the `ledgers` section carries BL-SCHEMA. Assert its exit code directly, not through a
+  pipe.
+- **PASS if:** `doctor --json` emits parseable JSON exit 0 on the clean tree; and on the
+  planted tree it flags the malformed item `BL-SCHEMA` and exits non-zero.
 
 ### F-12 — Reports & handoffs
 - Setup: run inside an INITIALIZED workspace (`reports validate` resolves workspace state);
@@ -219,12 +218,12 @@ an initialized workspace, create it:
 
 ### F-15 — Memory & injection
 - Setup: an in-repo scaffolded specs tree `S` (`S=repos/vp/specs`; `mkdir -p repos/vp &&
-  $D specs init --specs-dir S`) that is doctor-clean — confirm `$D specs doctor
+  $D specs init --specs-dir S`) that is doctor-clean — confirm `$D doctor
   --specs-dir S` reports **0 errors AND 0 warnings**.
 - Run: `$D memory product add <slug> --area <area> --specs-dir S`;
-  `$D memory catalog generate --specs-dir S`; then `$D specs doctor --specs-dir S` again.
+  `$D memory catalog generate --specs-dir S`; then `$D doctor --specs-dir S` again.
 - **PASS if:** the verbs exist and exit 0; the atom is registered in the catalog; and the
-  supported "add a feature" path leaves `specs doctor` at **0 errors AND 0 warnings** —
+  supported "add a feature" path leaves `dadaia doctor` at **0 errors AND 0 warnings** —
   the atom emitted by `memory product add` must lint clean out of the box (its template
   headings are allowlisted). A LINT-1 unknown-heading warning on a freshly added atom is a
   FAIL: the tool's own template must not violate its own linter.
@@ -241,9 +240,9 @@ an initialized workspace, create it:
 ### F-17 — Migrations
 - Setup: seed an older specs tree (lower pattern version) in a throwaway dir.
 - Run: `$D migrate --help` then the relevant migrate verb (`migrate tree-v2 -y`);
-  `$D specs doctor` after.
+  `$D doctor` after.
 - **PASS if:** the migrate verb upgrades losslessly (legacy content relocated under
-  `releases/legacy/`, nothing dropped) and `specs doctor` exits 0 with **0 errors**
+  `releases/legacy/`, nothing dropped) and `dadaia doctor` exits 0 with **0 errors**
   afterwards; re-running the migrate verb is a no-op. A SPEC-DOC-027 **WARNING** on the
   sanctioned `releases/legacy/` holding dir is EXPECTED, not a FAIL — it is the migration's
   own destination, preserved-until-renamed by design (doctor exits 0 on warnings). Judge
@@ -338,21 +337,21 @@ never exercised the live backlog path was false confidence).
   --specs-dir <ctx>/specs`.
 - **PASS if:** every emitted `intents[].ref` resolves against the live registry (no
   unresolved subjects) AND a release SPEC naming the item under `**Consumes:**` is
-  accepted by `specs doctor`, with the declared slug resolving to an `active[]` entry
+  accepted by `dadaia doctor`, with the declared slug resolving to an `active[]` entry
   in `specs/backlog/BACKLOG.json`.
 
 ### R-03 — Fresh specs tree is doctor-clean with no manual edits
 
-- Run `$D specs init --specs-dir /tmp/r03/specs`; then `$D specs doctor --specs-dir
+- Run `$D specs init --specs-dir /tmp/r03/specs`; then `$D doctor --specs-dir
   /tmp/r03/specs`.
 - **PASS if:** doctor reports 0 errors AND 0 warnings out of the box (no
   placeholder atom requiring manual repair — the scaffold emits only valid atoms).
 
-### R-04 — Old tree with a placeholder atom is repaired by BOTH verbs
+### R-04 — Old tree with a placeholder atom is repaired by doctor and upgrade
 
 - Seed `/tmp/r04/specs` (fresh init) + a raw `memory/product/feature.md` carrying
   `SLUG_PLACEHOLDER`/`TITLE_PLACEHOLDER`/`RELEASE_PLACEHOLDER`.
-- Run `$D specs doctor --fix --specs-dir /tmp/r04/specs`; then re-seed and run `$D
+- Run `$D doctor --fix --specs-dir /tmp/r04/specs`; then re-seed and run `$D
   specs upgrade --specs-dir /tmp/r04/specs -y`; also `$D specs upgrade --dry-run`.
 - **PASS if:** `doctor --fix` removes the atom and leaves doctor 0/0; `upgrade`
   repairs even an already-current tree (dry-run reports without deleting);
@@ -384,21 +383,21 @@ never exercised the live backlog path was false confidence).
 
 ### R-13 — Producers pass their own validators (scaffold / backlog / baseline)
 
-- Hand-write a release scaffold — `mkdir -p specs/releases/v0.1.0`, a Draft `SPEC.md`
-  stub, and a `_RELEASE.json` with `phase: "SPEC"` (shape: `release-state-v1`,
-  `dd-release-implementation`'s `RELEASE-EVENTS.md` — `specs release open`/`specs segment
-  open` retired at T-050-21A, no CLI verb replaces them) — then `specs doctor`;
-  `backlog new <slug>` then `backlog doctor`; fresh context: `context create` → `alive` → `specs
+- Create a release — `$D release new 0.1.0` writes the Draft `SPEC.md` stub and a
+  `_RELEASE.json` with `phase: "DEFINITION"` (shape: `release-state-v1`,
+  `dd-release-implementation`'s `RELEASE-EVENTS.md`) in one transaction, and refuses a
+  second live release — then `dadaia doctor`;
+  `backlog new <slug>` then `dadaia doctor`; fresh context: `context create` → `alive` → `specs
   init` → `context baseline`.
-- **PASS if ALL of:** both doctors report 0 errors AND 0 warnings on the fresh
-  scaffold (Draft + phase SPEC is the legitimate authoring state — bug
+- **PASS if ALL of:** doctor reports 0 errors AND 0 warnings on the fresh
+  scaffold (Draft + phase DEFINITION is the legitimate authoring state — bug
   fresh-release-scaffold-emits-spec-doctor-warnings-042); the freshly-created `active[]`
   entry in `specs/backlog/BACKLOG.json` (the single source, SPEC v0.12.0 FR3, ADR #14)
   is BL-SCHEMA-valid out of the box; and baseline COMPLETES after the official
   scaffold follow-up while still refusing a tree carrying operator files (bug
   context-baseline-rejects-official-scaffold-followup).
 - **A GATE is a validator too** (bug r4g-backlog-surface-new-existing-accepted): take
-  what `backlog doctor` ACCEPTED and run `specs doctor` over the same tree. A tree that
+  what `backlog new` ACCEPTED and run `dadaia doctor` over the same tree. A tree that
   passes one while the other rejects it is a FAIL — the two must never hold two
   opinions. Probe the degenerate inputs specifically: an item with NO `intents[]` at
   `candidate` status (must block; `idea` stays exempt), and an empty/absent field where

@@ -5,10 +5,10 @@ The audit's pillar 1 cites this section, never restates it — if the two disagr
 
 ## The window (stated once)
 
-- The window runs from the last `audited` milestone to `HEAD`.
-- Read the live release's `_RELEASE.json` `audited` field, plus every archived release's own `audited` fact.
+- The window runs from the newest archived audit to `HEAD`.
+- Read `specs/audits/_archive/audits_histo.jsonl` — an audit is not a release milestone.
 - Archived facts live in `releases/_archive/releases_histo.jsonl` (no per-release `_RELEASE.json` survives archiving).
-- The window is `[newest audited milestone's sha, HEAD]`; the whole file when no `audited` milestone exists yet.
+- The window is `[newest archived audit's sha, HEAD]`; the whole file when that histo is empty.
 - Never scan `specs/releases/_ideas/**` — a Draft carries no `_RELEASE.json`, so it carries no milestone.
 
 ## The filter

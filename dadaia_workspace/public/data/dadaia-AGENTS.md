@@ -43,7 +43,6 @@ dadaia public doctor
 ```bash
 dadaia doctor
 dadaia public doctor
-dadaia specs doctor
 ```
 
 - On drift or a `WS-*-slop` finding: fix the public source or the state owner; `dadaia doctor --fix` deletes only what its dry run listed.

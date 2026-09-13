@@ -8,29 +8,30 @@ Disclosed reference reached from `SKILL.md`/`RC-FLOW.md` wherever the arc says "
 
 ## Shape
 
-- Fields: `{schema, release, phase, rc, defined, implemented, shipped, audited, log[]}` (`segment` retired at 0.4.6, ADR 0006; `rc` = archived-candidate count).
+- Fields, all seven required: `{schema, release, phase, rc, defined, implemented, shipped, log[]}` (`rc` = archived-candidate count).
+- `segment` and `audited` are retired — an audit is not a release milestone; the audit window is read from `audits/_archive/audits_histo.jsonl`.
+- `phase` is one of `DEFINITION IMPLEMENTATION CLOSURE ARCHIVED` — nothing else validates.
 - `phase` and `rc` are rewritten in place on every transition — no history of prior values survives in the field.
 - A transition worth remembering becomes a `log` entry.
-- `defined`/`implemented`/`shipped`/`audited` are the four sha-bearing milestone facts.
+- `defined`/`implemented`/`shipped` are the three sha-bearing milestone facts.
 - Each milestone is set at most once meaningfully (a later legitimate rewrite is a correction, not a duplicate), or `null` before that point.
-- `log` is the one append-only array inside the document — oldest first, never rewritten once appended.
+- `log` is the one append-only array inside the document — oldest first, never rewritten once appended; each entry is `{ts, agent, kind, text}`.
+- `kind` is one of `note summary size drifts dispositions test-dispositions artifact-gc reviews merge memory`.
 
 ## Who sets which milestone
 
 | Milestone | Set by | Shape |
 |---|---|---|
-| `phase` | whoever drives the transition (`product-engineer` at DEFINITION/CLOSURE, first implementer at IMPLEMENTATION) | phase string |
+| `phase` | whoever drives the transition (`product-engineer` at DEFINITION/CLOSURE, first implementer at IMPLEMENTATION, `dadaia release archive` at ARCHIVED) | phase string |
 | `defined` | `product-engineer`, at the definition promotion commit | `{sha, ts}` |
 | `implemented` | `qa-engineer`, at final-`rc` QA close, on the closed commit's sha, not the merge commit | `{sha, rc, ts}` |
-| `shipped` | `project-manager` (or whoever merges the ship PR) | `{sha, pr, ts}` |
-| `audited` | `project-auditor`, the same atomic rewrite that sets a bug's `resolved_commit`/`audited` | `{sha, ts, audit}` |
+| `shipped` | `dadaia release archive <id> --shipped <sha> --pr <n>`, after the ship PR merges | `{sha, pr, ts}` |
 
 ## `log` — the retired `CLOSURE.md` narrative's home
 
-- Every closure-narrative class (summary, size accounting, drifts, artifact-GC, test dispositions) lands as one `log` entry.
-- The entry's `kind` field names the class.
-- Already-native classes need no entry: dispositions (`backlog_histo.jsonl`/`BUGS.jsonl`'s `resolved_release`).
-- Already-native classes (continued): tasks completed (`TASKS.md` `[x]` + sha), validations (trio `APPROVED` handoffs), memory updates (atom diffs).
+- Every closure-narrative class lands as one `log` entry whose `kind` names it — `summary`, `size`, `drifts`, `artifact-gc`, `test-dispositions`, `dispositions`, `memory`, `reviews`, `merge`.
+- The `memory` entry records atoms reviewed-unchanged vs changed; `dispositions` records the sweep.
+- Already-native facts need no entry: tasks completed (`TASKS.md` `[x]` + sha) and the trio `APPROVED` handoffs.
 
 ## Write seam
 

@@ -73,10 +73,11 @@ record:
 
 ```
 dadaia bugs resolve <bug-id> --cause … --caused-by … --resolved-release …
-  --solution … --evidence-loop … --evidence-seam … --evidence-diff …
-  --diff-direction …
+  --solution … --evidence-loop … --evidence-seam … --evidence-diff net-negative:…
 ```
 
+- `diff_direction` is derived from `--evidence-diff`'s `net-*:` prefix — there is no `--diff-direction` flag.
+- `closed_at` is stamped by the terminal transition; `dadaia bugs archive` ages by it, never by the filing date `ts`.
 - `resolved_commit` stays `null` at resolve time — a commit cannot contain its own sha.
 - `caused_by`/`lineage_source` were set in Phase 0; leave them untouched.
 - Stage code + regression test + the `BUGS.jsonl` line together — ONE commit, shape 3
@@ -90,7 +91,7 @@ dadaia bugs resolve <bug-id> --cause … --caused-by … --resolved-release …
 - The surviving hypothesis was confirmed by instrumentation.
 - The regression test sits at the correct seam, or the seam gap was registered first.
 - Probes are gone; the diff is smaller or equal; the resolve record carries the
-  evidence triple + `diff_direction` + `resolved_release`; one isolated commit;
+  evidence triple + the derived `diff_direction` + `resolved_release` + `closed_at`; one isolated commit;
   worktree clean.
 
 ## 4. References

@@ -67,10 +67,10 @@ Implementation is allowed only when:
 ## 6. Doctor
 
 ```bash
-dadaia specs doctor
+dadaia doctor --context <ctx>
 ```
 
-- `dadaia specs doctor --fix` may repair scaffoldable tree issues.
+- `dadaia doctor --fix` may repair scaffoldable tree issues.
 - Never use it to bypass missing approval, unclear scope, or task ownership.
 
 ## 7. Escalation
@@ -85,4 +85,4 @@ Needed decision: <one concrete question or action>
 ```
 
 Generated from `dadaia_workspace/public/templates/specs-AGENTS.md`.
-Project teams may customize this file; `dadaia specs doctor` reports drift instead of overwriting it.
+Project teams may customize this file; `dadaia doctor` reports drift instead of overwriting it.

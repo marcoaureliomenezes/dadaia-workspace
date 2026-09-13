@@ -89,7 +89,7 @@
   catalog.py`, `dadaia_workspace/hooks/ctx_inject.py`, `dadaia_workspace/public/
   schemas/memory/**`, `specs/memory/**`, `tests/**`. Blocked by: T-047-02.
   Delivers: the injected digest shows a `tldr` per atom.
-- [-] T-047-12 — FR10: DADAIA §6.2/§6.4/§6.5/§6.6/§6.7/§6.8/§8.5; scaffolds for
+- [x] T-047-12 — FR10: DADAIA §6.2/§6.4/§6.5/§6.6/§6.7/§6.8/§8.5; scaffolds for
   releases/backlog/ADRs/audits; `dd-release-definition`, `dd-release-implementation`
   (RC-FLOW 9–12, RELEASE-EVENTS), `dd-backlog-definition`, `dd-audit-project`,
   `dd-cli-library`, `dd-workspace-doctor`; behavior-map hashes; `CONTEXT.md`

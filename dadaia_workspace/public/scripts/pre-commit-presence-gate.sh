@@ -7,7 +7,7 @@
 # context (NO-LOCKS DOCTRINE, v0.1.76) and it still WARNS (never blocks) when the
 # dadaia runner cannot be located.
 #
-# The `backlog doctor` BLOCK and the fail-closed runner resolution that used to live
+# The backlog-doctor BLOCK and the fail-closed runner resolution that used to live
 # here are DELETED, in this script only (`pre-push-ci-gate.sh` keeps its fail-closed
 # runner — it is the publication boundary, not this one). CI's `backlog-doctor` job
 # already runs the unscoped sweep over the whole tree, so blocking commits here only

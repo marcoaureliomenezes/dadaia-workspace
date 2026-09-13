@@ -169,7 +169,7 @@
 | Area | Members |
 |---|---|
 | root | `AGENTS.md constitution.md memory/ releases/ backlog/ bugs/ audits/ ADRs/` |
-| `releases/` | `AGENTS.md`, `_ideas/` (own `AGENTS.md`), `_archive/<release-id>/` |
+| `releases/` | `AGENTS.md`, `_ideas/` (own `AGENTS.md`), `_archive/releases_histo.jsonl`, `_archive/<release-id>/` |
 | `releases/<M.m.p>/` | `_RELEASE.json SPEC.md PLAN.md TASKS.md rc-N/ verdicts/` |
 | `backlog/` | `AGENTS.md BACKLOG.json`, `_archive/backlog_histo.jsonl` |
 | `bugs/` | `AGENTS.md BUGS.jsonl`, `_archive/bugs_histo.jsonl` |
@@ -177,7 +177,7 @@
 | `ADRs/` | `AGENTS.md decisions.jsonl` |
 | `memory/` | `AGENTS.md ARCHITECTURE.md QUALITY.md TECHSTACK.md product/**` |
 
-- No stray root archive directory or dotfile; `specs doctor` flags anything else.
+- No stray root archive directory or dotfile; `dadaia doctor` flags anything else.
 
 ### 6.3 Tasks
 
@@ -214,18 +214,19 @@
 - A closed item's terminal record lives in `backlog/_archive/backlog_histo.jsonl`; everyone reads both freely.
 - An entry materializes only via the PM's operator-facing intake report; an operator-ratified in-release deferral already counts as intake.
 - Every item is retained: leaves `active[]` only via a histo disposition record.
-- A picked item leaves `active[]` in the same commit that creates the release SPEC.
+- A picked item stays `picked` in `active[]` and exits once, at closure, into `backlog_histo.jsonl`.
 - Covers bugs and backlog only — tests are prunable under stewardship criteria (§7.2). Protocol: `dd-backlog-definition`.
 
 ### 6.7 Releases
 
 <!-- behavior: releases -->
 
-- A release is `major.minor.patch` with OPEN scope: it grows by stacked closed-scope candidates, one live release ever (ADR 0005).
+- A release is `major.minor.patch` with OPEN scope, born by `dadaia release new <id>` (SPEC.md + `_RELEASE.json`, DEFINITION, one transaction).
+- It grows by stacked closed-scope candidates; exactly one live release ever, a second is refused (ADR 0005).
 - A candidate is one full SDD cycle: grill -> SPEC/PLAN/TASKS `Aprovado` at the release root -> implementation -> memory -> CLOSURE -> `feature -> develop` merge.
 - A `dd-grill-me` session on the picked set precedes each candidate's SPEC.
 - At pick time, open bugs and undispositioned audits outrank fresh backlog.
-- After each merge, the promote-or-continue gate (§4.2): continue = `dadaia release rc-archive` moves the trio to `rc-N/` and a fresh trio is born at root; promote = the ship lane, then archive the whole release folder (final trio stays at root, ADR 0009).
+- After each merge, the promote-or-continue gate (§4.2): continue = `dadaia release rc-archive` moves the trio to `rc-N/` and a fresh trio is born at root; promote = the ship lane, then `dadaia release archive <id> --shipped --pr --next` (final trio stays at root, ADR 0009).
 - Candidate finalization order: memory update -> CLOSURE -> gate; a completed task group is one commit.
 - A candidate's SPEC.md fits 24 KB and TASKS.md 12 KB — measured by V34 (`tests/contract/test_slop_ratchets.py`).
 
@@ -234,7 +235,7 @@
 <!-- behavior: audits -->
 
 - `specs/audits/<YYYYMMDD>-<slug>/AUDIT.md` + `FINDINGS.jsonl` hold three pillars: bug history, spec compliance, memory drift.
-- The three pillars run together, over the window since the last audited release.
+- The three pillars run together, over the window read from `audits/_archive/audits_histo.jsonl`.
 - Suggested every 5 releases, never mandatory.
 - Generates exactly one remediation release; every finding gets a disposition: `fixed`, `superseded`, or `deferred`/`rejected` to backlog.
 - Fully dispositioned: summary lands in `audits/_archive/audits_histo.jsonl`, the audit directory is deleted.
@@ -288,7 +289,7 @@
 - Slop dies in the change that finds it; it is never commented out, marked, archived or deferred.
 - The writer proves the artifact fails the deletion test; the reviewer applies the test; the auditor measures the balance.
 - A rule lives in one home; the second copy is deleted; a consumed handoff is deleted in the same turn.
-- Artifact rules live by class: constitution `Slop`, memory `ARCHITECTURE`/`QUALITY` fixed sections; `specs doctor` keeps them byte-exact.
+- Artifact rules live by class: constitution `Slop`, memory `ARCHITECTURE`/`QUALITY` fixed sections; `dadaia doctor` keeps them byte-exact.
 - Detection and ratchets: `dd-code-review` SLOP.md; measured by `tests/contract/test_slop_ratchets.py` and audit pillar 2.
 
 ---
@@ -319,7 +320,9 @@
 
 ### 8.5 Instance compliance
 
-- `dadaia doctor` is the one workspace scan and reaper: one `WS-<zone>-<verdict>` finding per line, a final `compliance: N/M entries canonical (P%)` line, `--json` mirror, exit 1 on any slop or expired entry.
+- `dadaia doctor` is the one scan and reaper — sections `workspace`, `specs`, `ledgers`; `--fix`, `--specs-dir`, `--context`, `--public-dir`, `--json`; exit 1 on any error-class finding.
+- One finding per line, `<CODE> <verdict> <message>`; codes `WS-<zone>-<verdict>`, `SPEC-DOC-*`, `TREE-*`, `RELEASE-TREE-*`, `BL-SCHEMA|CONFLICT|STALE`, `LEDGER-<NAME>-SCHEMA`; scored `compliance(<section>): N/M <unit> canonical (P%)` plus `compliance(total)`.
+- `ledgers` schema-validates every committed governance record: `decisions.jsonl`, `BACKLOG.json`, `BUGS.jsonl`, `FINDINGS.jsonl`, every `_RELEASE.json`, the three `_histo.jsonl`.
 - `.dadaia/` zones and the `states/` canon are one registry (`core/workspace_layout.DADAIA_ZONES`), rendered into `.dadaia/AGENTS.md` at `public stage`; outside manifest, registry and exceptions (§5.1) = slop.
 - SessionStart runs `dadaia doctor --fix --expired-only`; slop dies only by an explicit operator `dadaia doctor --fix`.
 
@@ -342,7 +345,7 @@
 |---|---|
 | Scoped law | `specs/AGENTS.md`, `.dadaia/AGENTS.md`, `.dadaia/handoff/AGENTS.md`, `repos/<slug>/AGENTS.md`, any nested `AGENTS.md` |
 | Skills | `.claude/skills/`, `.agents/skills/` — skill-to-rule mapping declared once in `public/entities/behavior-map.json` |
-| State | `dadaia context show --json`, `dadaia doctor`, `dadaia specs doctor`, `dadaia public doctor`, `dadaia server list`, `dadaia bugs status`, `dadaia panel` |
+| State | `dadaia context show --json`, `dadaia doctor`, `dadaia public doctor`, `dadaia server list`, `dadaia bugs status`, `dadaia panel` |
 
 - Language: operator preference, default English. Tone: direct, concise, operational.
 
@@ -364,12 +367,12 @@
 - **path class** — the ADDITIVE/MEMORY/MUTATING/PROTECTED category a write path belongs to (§3.2).
 - **presence** — the advisory record a session leaves when it writes, surfaced to others.
 - **canon** — the closed set of paths a `specs/` root may contain (§6.2).
-- **histo** — an append-only JSONL history file under an area's `_archive/`.
+- **histo** — an append-only JSONL history file under an area's `_archive/`; one `histo-record-v1` per exited entry.
 - **memory atom** — one Markdown file under `specs/memory/product/**` carrying current truth.
 - **Part 1/Part 2** — a memory doc's ADR-gated Principles section vs its Implementation section.
 - **ADR** — an accepted decision record in `ADRs/decisions.jsonl`.
 - **backlog entry** — a candidate item in `backlog/BACKLOG.json`'s `active[]`.
-- **disposition** — the terminal verdict closing a bug, backlog entry, or audit finding.
+- **disposition** — the terminal verdict closing a bug, backlog entry, audit or release: `delivered resolved superseded deferred rejected`.
 - **audit** — a periodic three-pillar review producing one remediation release.
 - **finding** — one recorded audit observation in `FINDINGS.jsonl`.
 - **denylist** — the pattern list the pre-push scan refuses to let through.
@@ -382,4 +385,4 @@
 - **dispatcher** — an agent authorized to invoke another agent via subagent dispatch.
 - **slop** — what passes the deletion test without loss (§7.6).
 - **ratchet** — a contract test pinning a measured count that moves down only (§7.6).
-- **fixed section** — a marker-bounded law block in a scaffolded spec, kept byte-equal to its fragment by `specs doctor` (§7.6).
+- **fixed section** — a marker-bounded law block in a scaffolded spec, kept byte-equal to its fragment by `dadaia doctor` (§7.6).

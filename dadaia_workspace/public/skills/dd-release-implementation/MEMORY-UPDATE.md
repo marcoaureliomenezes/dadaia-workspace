@@ -16,7 +16,7 @@ The closure memory protocol.
 9. Forbidden in memory Markdown: `<h2>Changelog</h2>`, `<h2>History</h2>`, `<h2>Histórico</h2>`, `<h2>Versions</h2>`.
 10. Forbidden (continued): `<section class="changelog">` and similar; narrative of past versions ("we used to use X, now Y").
 11. Point the operator to this release's `_RELEASE.json` `log` or git if they ask for history.
-12. Validate with `dadaia specs doctor` before moving to archive — it checks atomicity and Mermaid script presence.
+12. Validate with `dadaia doctor` before moving to archive — its `specs` section checks atomicity and Mermaid script presence.
 
 ## Product memory is a folder catalog
 
@@ -33,5 +33,5 @@ The closure memory protocol.
 - A new feature gets its atom created and linked from `index.md`.
 - A deprecated feature's link and its atom are deleted outright — memory carries no archive of its own (history lives in git).
 
-*Done when:* every affected atom reflects current product truth, and `dadaia specs doctor` reports the memory atoms clean.
+*Done when:* every affected atom reflects current product truth, `dadaia doctor` reports the memory atoms clean, and one `kind: memory` log entry records atoms reviewed-unchanged vs changed.
 *Done when* (continued): `_RELEASE.json`'s `phase` field reads `CLOSURE`.

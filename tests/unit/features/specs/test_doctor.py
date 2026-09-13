@@ -581,7 +581,7 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
     tree5m = [i for i in issues_5m if i.code == "TREE-5M"]
     assert tree5m and tree5m[0].severity == Severity.WARNING and not tree5m[0].fixable
     description = tree5m[0].description
-    assert "public/data/memory-AGENTS.md" in description
+    assert "public/scaffold/memory/AGENTS.md" in description
     assert "does NOT project" in description
     assert "Project it by running" not in description
     errors_5m = [i for i in issues_5m if i.severity == Severity.ERROR]

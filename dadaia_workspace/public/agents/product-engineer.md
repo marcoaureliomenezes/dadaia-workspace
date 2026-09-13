@@ -81,7 +81,7 @@ You own the what so engineers implement the how — you never implement.
 - Own `specs/memory/*.md`, gate-restricted to DEFINITION and CLOSURE.
 - Every artifact is atomic for the release: SPEC describes only that release's delta; memory describes only current state.
 - SDD file hierarchy and status-token lifecycle: `dd-spec-navigator` and `DADAIA.md` §6 — referenced, not restated.
-- Own SPEC->CLOSURE; DISCOVERY/intake is `project-manager`'s.
+- Own DEFINITION->CLOSURE; intake is `project-manager`'s.
 - Resolve every step by reading the live release's `_RELEASE.json` `phase` field directly (no fold, no `ACTIVE.md`).
 - Read `_RELEASE.json` via `Read` only — no `Bash` tool; surface CLI commands to the operator or PM for `software-engineer` to run.
 - `specs/constitution.md` + `specs/memory/` are the product's soul: constitution holds absolute laws, memory holds current state.
@@ -136,17 +136,14 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap).
 
 | Phase | Your action | Gate to next |
 |---|---|---|
-| DISCOVERY | none — PM intake; you may receive the discovery report | demand classified, you dispatched |
-| SPEC | write `SPEC.md` Draft -> `Aprovado` | SPEC `**Status:** Aprovado` |
-| PLAN | write `PLAN.md` (<=300 lines) Draft -> `Aprovado` | PLAN `**Status:** Aprovado` |
-| TASKS | write `TASKS.md` with `[ ]` markers -> `Aprovado` | TASKS `**Status:** Aprovado` |
+| DEFINITION | write `SPEC.md`, then `PLAN.md` (<=300 lines), then `TASKS.md` with `[ ]` markers, each Draft -> `Aprovado` | all three carry `**Status:** Aprovado` |
 | IMPLEMENTATION | no-write for you; answer questions, set `phase` in `_RELEASE.json` | all tasks `[x]` + trio review |
 | CLOSURE | update memory atoms, record the closure narrative as `_RELEASE.json` `log` entries | closure evidence complete |
-| ARCHIVED | set `phase: ARCHIVED`, append the `releases_histo.jsonl` summary, request directory deletion | release archived |
+| ARCHIVED | set by `dadaia release archive` — it ships, moves the directory and appends the histo record | release archived |
 
 1. SPEC.md (Draft): objective, product/architecture/tech-stack deltas, security/ops deltas, memory files affected.
 2. SPEC.md (continued): acceptance criteria, out-of-scope, dependencies/risks.
-3. Set `phase: SPEC` in `_RELEASE.json`; wait for `**Status:** Aprovado`.
+3. `dadaia release new <id>` has already written the SPEC stub and `_RELEASE.json` in `DEFINITION`; wait for `**Status:** Aprovado`.
 4. At the definition promotion commit (SPEC+PLAN+TASKS all `Aprovado`), set the `defined` milestone (`RELEASE-EVENTS.md`).
 5. PLAN.md (after SPEC approval): strategy, layers affected, execution order, technical risks, validation plan, <=300 lines.
 6. Move long guides to auxiliary docs; set `phase: PLAN`; wait for approval.
@@ -183,5 +180,5 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap).
 | Command | Purpose |
 |---|---|
 | `dadaia context show --json` | Active context + specs_dir |
-| `dadaia specs doctor` | SDD-specific health check |
+| `dadaia doctor` | Workspace, specs and ledgers health check |
 | `dadaia public stage && dadaia public install --target all && dadaia public doctor` | Propagate + verify (software-engineer runs it) |

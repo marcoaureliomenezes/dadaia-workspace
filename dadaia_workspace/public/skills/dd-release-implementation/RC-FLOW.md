@@ -40,24 +40,24 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 **Step 5 — Memory update (`product-engineer`).**
 - Set `phase: CLOSURE` in `_RELEASE.json` — after the last task is `[x]`, never before.
 - Memory is closure procedure, never a task: a TASKS.md task whose write set names
-  `specs/memory` is refused by `specs doctor` (SPEC-DOC-047).
+  `specs/memory` is refused by `dadaia doctor` (SPEC-DOC-047).
 - Update `specs/memory/**` atoms to the product's current state — protocol detail: `MEMORY-UPDATE.md`.
-- Done when: `dadaia specs doctor` reports the memory atoms clean.
+- Done when: `dadaia doctor`'s `specs` section reports the memory atoms clean and one `kind: memory` log entry records atoms reviewed-unchanged vs changed.
 
 **Step 6 — Record the candidate's closure narrative.**
-- Append the `log` entries `RELEASE-EVENTS.md` describes (summary, size, drifts, GC, dispositions).
+- Append the `log` entries `RELEASE-EVENTS.md` describes, each with its `kind`: `summary`, `size`, `drifts`, `artifact-gc`, `test-dispositions`, `dispositions`.
 - Done when: every narrative class has a `log` entry or its named native home.
 
 **Step 7 — Disposition sweep.**
 - Flip every bug/backlog item picked into (or superseded by) this candidate to a terminal token.
-- CONSUMED -> terminal token is an update, never a second histo record.
+- A picked backlog entry exits `active[]` here, once, into `backlog_histo.jsonl` as one `histo-record-v1` — never a second record for the same slug.
 - A bug is never silently dropped — `dadaia bugs update` already closed it, or a superseder covers it.
-- Done when: `dadaia bugs stats` and `dadaia backlog doctor` show zero non-terminal picked items.
+- Done when: `dadaia bugs stats` and `dadaia doctor`'s `ledgers` section show zero non-terminal picked items.
 
 **Step 8 — Artifact GC sweep.**
 - `dadaia doctor` dry: read every `WS-<zone>-<verdict>` line and the `compliance:` score line.
 - `dadaia doctor --fix --expired-only` reaps the TTL-expired entries; list the remaining slop for the operator — structural slop dies only by an explicit operator `--fix`.
-- Done when: the `closure-artifact-gc` log entry records the score line and it reads 100%, or names the slop the operator holds.
+- Done when: the `kind: artifact-gc` log entry records the `compliance(total)` line and it reads 100%, or names the slop the operator holds.
 
 **Step 9 — Candidate PR.**
 - Open the `feature/{M.m.p}` -> `develop` PR (security verdict covering the head, `DADAIA.md` §4.2); watch CI to green; merge.
@@ -65,7 +65,7 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 
 **Step 10 — The promote-or-continue gate.**
 - Ask the operator: **promote (deploy) or continue?** Never assume; never a hook.
-- **Continue**: run `dadaia release rc-archive` — the trio moves to `rc-N/`, phase resets to DISCOVERY, and the next candidate starts at `dd-release-definition`. Same version, same branch.
+- **Continue**: run `dadaia release rc-archive` — it validates the whole tree, moves the trio to `rc-N/` and parks the release in `DEFINITION` (trio absent or SPEC-only is legal there), then runs `bugs archive`. The next candidate starts at `dd-release-definition`, same version, same branch.
 - **Promote**: proceed to step 11.
 
 **Step 11 — Ship (promote only).**
@@ -73,15 +73,15 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 - Done when: it merges and the Release workflow is green end to end.
 
 **Step 12 — Archive + branch cut (promote only).**
-- `git mv specs/releases/<v>/ specs/releases/_archive/<v>/` — whole directory: the final trio stays at root, `rc-N/` folders inside (ADR 0009); set `phase: ARCHIVED`; append the histo record, same commit.
-- Delete `feature/{v}`; cut `feature/{next patch}` from `main` in the same step; the new release is born with its version minted (pyproject + CHANGELOG top section).
-- Reconcile first: the new branch's first commit is `git merge -s ours origin/develop` — the squash kept `main`'s tree, not `develop`'s history, and without this every later `feature -> develop` PR is DIRTY (bug `squash-to-main-leaves-develop-history-divergent-…`).
+- `dadaia release archive <v> --shipped <sha> --pr <n> --next <M.m.p>` is the whole lane, all-or-nothing: it validates (tree, every task `[x]`, CLOSURE, `implemented`), sets `shipped` + `phase: ARCHIVED`, moves the directory to `_archive/<v>/` (final trio at root, `rc-N/` folders inside, ADR 0009), appends the histo record, births `<next>`, runs `bugs archive`.
+- It never runs git: it PRINTS the `next:` lines — delete `feature/{v}`, cut `feature/{next}` from `main`, then `git merge -s ours origin/develop` as the new branch's first commit (the squash kept `main`'s tree, not `develop`'s history; without it every later `feature -> develop` PR is DIRTY, bug `squash-to-main-leaves-develop-history-divergent-…`). Run them in that order.
+- Mint the new release's version in `pyproject` + the CHANGELOG top section.
 - Done when: exactly one `feature/*` branch exists, named for the next version.
 
 ## Test-stewardship touchpoints (reference)
 
 - Declare test intent at birth; pass the admission filter (`dd-test-stewardship`, intent and admission) before a test enters the suite.
-- Demotion and quarantine/SCAFFOLD expiry are candidate-closure work (step 6's `closure-test-dispositions` log entry).
+- Demotion and quarantine/SCAFFOLD expiry are candidate-closure work (step 6's `kind: test-dispositions` log entry).
 
 ## Out of scope for closure
 

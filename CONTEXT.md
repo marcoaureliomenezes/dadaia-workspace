@@ -90,8 +90,12 @@ _Avoid_: event, entry, row
 An append-only archive JSONL under an area's `_archive/`, one record per exit.
 _Avoid_: archive file, ledger, log
 
+**Histo record**:
+The one shape every histo line carries — `histo-record-v1`: `{id, ts, disposition, release, reason, summary, entry}`, where `entry` is the removed live object. Each area's `disposition` is a subset of the one lowercase vocabulary `delivered resolved superseded deferred rejected`.
+_Avoid_: exit record, summary record, archive event, CONSUMED (retired)
+
 **Terminal**:
-A record's final status — `resolved`, `superseded`, `deferred`, `rejected` — reached only through a transition that carries its evidence.
+A record's final status — `delivered`, `resolved`, `superseded`, `deferred`, `rejected` — reached only through a transition that carries its evidence and stamps `closed_at`.
 _Avoid_: closed, dispositioned, done
 
 **Transition**:
@@ -123,8 +127,12 @@ The HTML rendering of a handoff, written only for a human hop.
 _Avoid_: artifact (bare), page
 
 **Doctor**:
-A validator for one area — specs, backlog, public, workspace — that reports and, with `--fix`, repairs. Always qualified by its area.
-_Avoid_: checker, linter (for doctors), audit (for doctors)
+`dadaia doctor` — the one validator over three Compliance sections (`workspace`, `specs`, `ledgers`), reporting one finding per line as `<CODE> <verdict> <message>` and repairing the fixable ones with `--fix`; exit 1 on any error-class finding. `dadaia public doctor` (lib-vs-projection) is the only other one, always qualified.
+_Avoid_: specs doctor, backlog doctor (both retired, not aliased), checker, linter (for doctors), audit (for doctors)
+
+**Compliance section**:
+One scored half-open group of doctor rules — `workspace` (zones, root and harness-dir entries), `specs` (canon tree, releases, fixed law, memory) or `ledgers` (schema validation of every committed governance record). Each prints `compliance(<section>): N/M <unit> canonical (P%)`, then `compliance(total)` last.
+_Avoid_: doctor area, lane, pass (for a section)
 
 **Store**:
 The module that owns one record file's reads and writes; the only parser of that file.
@@ -167,7 +175,7 @@ The doctor's classification of one scanned entry — `canon | operator | slop | 
 _Avoid_: verdict (bare — the PR approval record above), status, class
 
 **Finding code**:
-`WS-<zone>-<verdict>` — `<zone>` is `root`, a harness dir (`claude codex kimi-code agents`), `dadaia` (the `.dadaia/` top level) or a zone name with its leading dot stripped (`cache`); one finding line each, then the score line `compliance: N/M entries canonical (P%)`.
+`WS-<zone>-<verdict>` — `<zone>` is `root`, a harness dir (`claude codex kimi-code agents`), `dadaia` (the `.dadaia/` top level) or a zone name with its leading dot stripped (`cache`); the `workspace` section's code family, beside `SPEC-DOC-*`, `TREE-*`, `RELEASE-TREE-*` (specs) and `BL-SCHEMA|CONFLICT|STALE`, `LEDGER-<NAME>-SCHEMA` (ledgers).
 _Avoid_: ROOT-n, EFF-n, issue code
 
 **Instance exceptions**:

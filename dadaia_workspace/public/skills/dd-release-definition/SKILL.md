@@ -40,8 +40,8 @@ a fuzzy term in the demand becomes a canonical term before it reaches the SPEC.
 2. Definition runs on `feature/{M.m.p}`; the trio lives at the RELEASE ROOT
    (`specs/releases/<v>/`) — after a prior candidate, `dadaia release rc-archive`
    has already cleared it.
-3. Commit shape 5 (`dd-gitflow-default` §3a): SPEC + PLAN + TASKS + purge-on-pick +
-   picked bugs, one commit; append the `defined` note in `_RELEASE.json`
+3. Commit shape 5 (`dd-gitflow-default` §3a): SPEC + PLAN + TASKS + the picked entries
+   flipped to `status: picked` + picked bugs, one commit; set the `defined` milestone in `_RELEASE.json`
    (`dd-release-implementation`'s `RELEASE-EVENTS.md`).
 4. PLAN names the seams the work will cut — speak `dd-codebase-design`
    (module, seam, deletion test) when declaring what each FR grows or deletes.
@@ -69,11 +69,10 @@ a fuzzy term in the demand becomes a canonical term before it reaches the SPEC.
 - `**Consumes:**` is SPEC provenance only — no library/CLI verb reads it.
 - Declare a slug only when fully consumed (all its bound anchors shipped); abort on
   an unknown slug — fix it before it lands in the SPEC.
-- Purge-on-pick executes consumption at definition (same commit as the SPEC);
-  `dd-release-implementation`'s disposition sweep rewrites the histo record to its
-  terminal token at closure.
-- Mechanical backstops for a fallen-through slug: `backlog doctor`'s BL-STALE and
-  `specs doctor`'s SPEC-DOC-031.
+- A picked entry stays in `active[]` as `status: picked`; it exits once, at closure,
+  when `dd-release-implementation`'s disposition sweep writes its one histo record.
+- Mechanical backstop: `dadaia doctor`'s `ledgers` section schema-validates
+  `BACKLOG.json` and `backlog_histo.jsonl` on every run.
 
 ## 6. Done when
 

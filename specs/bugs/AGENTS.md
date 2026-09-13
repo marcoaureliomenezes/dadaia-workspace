@@ -15,8 +15,8 @@ Scope: this file governs only `specs/bugs/`. Replaces the retired `bugs/README.m
 | `mutable-governance` | Rewritten in place, atomic refuse-stale |
 
 - `immutable-core` fields: `id`, `ts`, `title`, `severity`, `surface`, `component`, `symptom`, `repro`, `expected`.
-- `write-once` fields: `root_cause`, `solution`, `evidence_loop`, `evidence_seam`, `evidence_diff`, `diff_direction`.
-- `mutable-governance` fields: `status`, `cause`, `caused_by`, `lineage_source`, `registration_commit`.
+- `write-once` fields: `root_cause`, `solution`, `evidence_loop`, `evidence_seam`, `evidence_diff`, `diff_direction` (derived from `evidence_diff`'s `net-*:` prefix).
+- `mutable-governance` fields: `status`, `closed_at`, `cause`, `caused_by`, `lineage_source`, `registration_commit`.
 - `mutable-governance` fields (continued): `resolved_commit`, `resolution_granularity`, `resolved_release`, `audited`.
 
 ## 2. Authoring rules
@@ -26,6 +26,7 @@ Scope: this file governs only `specs/bugs/`. Replaces the retired `bugs/README.m
 - Never hand-edit `BUGS.jsonl` to keep every entry schema-valid.
 - Change a governance/write-once field with `dadaia bugs update <id> --set <field>=<value>` — the one governance-write seam (AS-16).
 - That seam is atomic, refuse-stale, redacted, and refuses any `immutable-core` field or a differing re-set of a `write-once` field.
+- `status` and `closed_at` change only through the four terminal transitions, never through `--set`; `dadaia bugs archive` ages by `closed_at`.
 - `status` has no `picked` value — a pick is the bundled release-definition commit, never a ledger write.
 - Bug reports are not specs — they do not authorize implementation changes on their own.
 - Never hand-delete a record once appended — `dadaia bugs archive` is the only retiring path, and it is idempotent.

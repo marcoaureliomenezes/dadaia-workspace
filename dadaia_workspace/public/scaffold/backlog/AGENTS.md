@@ -24,18 +24,18 @@ Scope: this file governs only `specs/backlog/`. Replaces the retired `backlog/RE
 - Plus one optional field: `intents` (see §4).
 - Backlog entries are not specs — they do not authorize implementation on their own.
 - An entry must be picked into a release (`dadaia release new`, naming the slug under `**Consumes:**`) to enter SDD.
-- Never delete an entry — a closed item's `active[]` object is removed, one terminal-disposition record is appended, same act.
+- Never delete an entry — a closed item's `active[]` object is removed and one histo record appended, same act.
 
 ## 3. Terminal disposition tokens
 
-- Canonical home: `dd-backlog-definition` (The document) — six tokens: `DELIVERED`, `SUPERSEDED`, `RESOLVED`, `CONSUMED`, `DEFERRED`, `REJECTED`.
-- `DELIVERED`/`SUPERSEDED`/`RESOLVED`/`CONSUMED` carry the release id in `release`.
-- `DEFERRED`/`REJECTED` carry a one-line reason in `reason` instead.
-- A provisional `CONSUMED` is rewritten in place to its terminal token at closure — never a second record for the same slug.
+- One lowercase vocabulary across every histo (`core/models/histo.py`); a backlog entry exits as `delivered`, `superseded` or `rejected`.
+- `delivered`/`superseded` carry the release id in `release`; `rejected` carries a one-line `reason`.
+- A `deferred` item returns to `active[]` — it never exits.
+- Record shape is `histo-record-v1`: `{id, ts, disposition, release, reason, summary, entry}`; `entry` IS the removed `active[]` object.
 
 ## 4. Idea-stage freedom vs bound intents
 
-- `idea` — an unbound brainstorm; no `intents` array required; `backlog doctor`-clean with no further edits.
+- `idea` — an unbound brainstorm; no `intents` array required; `dadaia doctor`-clean with no further edits.
 - `candidate` and beyond — the entry must carry a typed `intents[]` array; every subject must resolve to a canonical anchor.
 - A malformed `intents[]` or an invalid `status` is always `BL-SCHEMA`, at any status.
 
@@ -68,5 +68,5 @@ dadaia backlog subjects --resolve <ref> --kind <kind>   # preview how one subjec
 ## 5. Relationship to releases
 
 - A release SPEC names a picked entry's slug under `**Consumes:**`.
-- Purge-on-pick (`DADAIA.md` §6.6): the entry exits `active[]` in the same commit that creates the release SPEC, leaving a provisional `CONSUMED` histo record.
-- At closure, the disposition sweep rewrites that record in place to its terminal token.
+- A picked entry stays in `active[]` with `status: picked` (`DADAIA.md` §6.6) — nothing is purged at pick time.
+- It exits once, at closure's disposition sweep, into `_archive/backlog_histo.jsonl`.

@@ -420,8 +420,7 @@ class StructuralValidator:
         only scaffolds it when the file is missing and never updates an existing
         copy (bug specs-doctor-tree5m-remediation-wrong). The real repair is to
         create/edit specs/memory/AGENTS.md directly, restoring content from the
-        canonical source dadaia_workspace/public/data/memory-AGENTS.md and
-        keeping the data/ + scaffold/ source copies in sync. Absence is expected
+        canonical source dadaia_workspace/public/scaffold/memory/AGENTS.md. Absence is expected
         on fresh scaffolds and early in the lifecycle, so it is flagged as WARN
         (never ERROR) and does NOT cause doctor to exit non-zero.
         """
@@ -435,9 +434,8 @@ class StructuralValidator:
                 description=(
                     "specs/memory/AGENTS.md is missing — expected memory ownership contract. "
                     "Restore it by copying the canonical source "
-                    "dadaia_workspace/public/data/memory-AGENTS.md into specs/memory/AGENTS.md "
-                    "(edit the specs-tree copy directly and keep both source copies — "
-                    "public/data/ and public/scaffold/memory/ — in sync). "
+                    "dadaia_workspace/public/scaffold/memory/AGENTS.md into specs/memory/AGENTS.md "
+                    "(edit the specs-tree copy directly). "
                     "Note: `dadaia public install` does NOT project this file; it only "
                     "scaffolds it when missing and never updates an existing copy."
                 ),

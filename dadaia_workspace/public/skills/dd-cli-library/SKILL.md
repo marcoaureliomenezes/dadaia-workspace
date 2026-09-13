@@ -23,8 +23,8 @@ line here and `--help` disagree, `--help` wins.
    <id>`; a plain shell (or kimi-code) exports `DADAIA_CONTEXT=<ctx>` instead — the
    env var IS the binding there. ADDITIVE work (bugs/backlog/audits/reports) needs
    no bind.
-5. Before implementing: `dadaia specs doctor --context <ctx> --json` clean, then
-   reserve the task (`dd-task-manager`).
+5. Before implementing: `dadaia doctor --context <ctx> --json` clean (sections
+   `workspace`/`specs`/`ledgers`), then reserve the task (`dd-task-manager`).
 6. Pass explicit `--context`/`--release-id` on every command.
 7. Converge a runtime: resolve `provider.distribution_version` from
    `dadaia capabilities --json`, then `dadaia reconcile --expect-version "$v"
@@ -67,7 +67,7 @@ dispatch. The table is derived at projection time by
 ## Done when
 
 - The command run matches live `--help`, not a remembered table.
-- `specs doctor` clean before any implementation write; `certify --json` green
+- `dadaia doctor` clean before any implementation write; `certify --json` green
   before promoting a runtime; every dev server started is registered.
 
 ## References

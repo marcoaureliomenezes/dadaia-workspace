@@ -68,7 +68,7 @@
     },
     {
       "code": "TREE-5M",
-      "description": "specs/memory/AGENTS.md is missing — expected memory ownership contract. Restore it by copying the canonical source dadaia_workspace/public/data/memory-AGENTS.md into specs/memory/AGENTS.md (edit the specs-tree copy directly and keep both source copies — public/data/ and public/scaffold/memory/ — in sync). Note: `dadaia public install` does NOT project this file; it only scaffolds it when missing and never updates an existing copy.",
+      "description": "specs/memory/AGENTS.md is missing — expected memory ownership contract. Restore it by copying the canonical source dadaia_workspace/public/scaffold/memory/AGENTS.md into specs/memory/AGENTS.md (edit the specs-tree copy directly). Note: `dadaia public install` does NOT project this file; it only scaffolds it when missing and never updates an existing copy.",
       "path": "<SPECS>/memory/AGENTS.md",
       "severity": "warning"
     },
