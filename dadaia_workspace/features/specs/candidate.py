@@ -323,8 +323,8 @@ def archive_release(
         raise ArchiveError(
             f"release {release_id} carries no `implemented` milestone — it was never "
             "recorded as implemented.\n"
-            f"fix: set phase CLOSURE and implemented {{sha, rc, ts}} in "
-            f"specs/releases/{release_id}/_RELEASE.json"
+            f'fix: qa-engineer sets implemented = {{"sha": …, "rc": …, "ts": …}} in '
+            f"specs/releases/{release_id}/_RELEASE.json at the final-rc QA close"
         )
 
     archive_root = specs_dir / "releases" / "_archive"
