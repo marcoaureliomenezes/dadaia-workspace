@@ -46,8 +46,6 @@ from dadaia_workspace.features.telemetry.store import TelemetryStore
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_STATE_DIR = pathlib.Path("~/.dadaia/state/telemetry").expanduser()
-
 
 class _Aggregator(Protocol):
     """The read-side surface TelemetryService delegates its query methods to."""
@@ -152,7 +150,7 @@ class TelemetryService:
         aggregator: _Aggregator,
         pricing_module: _PricingModule,
         workspace_root: pathlib.Path,
-        state_dir: pathlib.Path = _DEFAULT_STATE_DIR,
+        state_dir: pathlib.Path,
         spec_context_service: Any = None,
         refresh_lock: TelemetryRefreshLock | None = None,
         permission_setter: FilePermissionSetter | None = None,
