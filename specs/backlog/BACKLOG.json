@@ -307,14 +307,14 @@
         {
           "subject": {
             "kind": "doc",
-            "ref": "memory/AGENTS.md#write-ownership"
+            "ref": "memory/AGENTS.md#1-write-ownership"
           },
           "change": "ADR acceptance law: rulings born accepted, measured_by must resolve, one decision per change set"
         },
         {
           "subject": {
             "kind": "doc",
-            "ref": "memory/AGENTS.md#the-two-tiers"
+            "ref": "memory/AGENTS.md#2-the-two-tiers"
           },
           "change": "Part-1 principles cite ADR: none or a resolvable accepted ADR; P-02 corrected"
         }
@@ -331,7 +331,7 @@
         {
           "subject": {
             "kind": "doc",
-            "ref": "memory/AGENTS.md#tree-shape-and-atom-format"
+            "ref": "memory/AGENTS.md#3-tree-shape"
           },
           "change": "wikilink alias table deleted; category field dropped; index heading in English"
         },
