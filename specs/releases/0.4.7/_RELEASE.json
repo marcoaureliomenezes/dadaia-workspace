@@ -1,11 +1,11 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.7",
-  "phase": "DEFINITION",
+  "phase": "IMPLEMENTATION",
   "rc": 3,
   "defined": {
-    "sha": "10fb7de6",
-    "ts": "2026-09-13T07:38:20Z"
+    "sha": "66718f33",
+    "ts": "2026-09-13T09:56:42Z"
   },
   "implemented": {
     "sha": "b7fb1efe",
@@ -265,6 +265,12 @@
       "agent": "project-manager",
       "kind": "note",
       "text": "Sequencing deviation (same cause as rc-1/rc-2): rc-archive ran before candidate 3 merged — PR #253 still cannot run CI (GitHub billing lock); candidates 2–4 ride one later PR with a fresh security verdict on its head. Candidate 3 verdict 8ed31df4 (covering 05650181) is consumed by SPEC-DOC-044 as the head moves."
+    },
+    {
+      "ts": "2026-09-13T09:56:42Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate defined at 66718f33; phase IMPLEMENTATION."
     }
   ]
 }
