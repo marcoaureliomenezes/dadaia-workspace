@@ -355,8 +355,12 @@ class DoctorService:
         working tree carries source and its own artifacts, and an untracked source entry
         is never the doctor's to judge — so only the excluded names are reported, at the
         top AND at any depth, plus a nested ``.dadaia/`` (which corrupts context
-        resolution for every tree-walking tool). The walk prunes at ``.git``, ``.venv``
-        and ``node_modules``, which is what bounds its cost.
+        resolution for every tree-walking tool).
+
+        ``_REPO_WALK_PRUNED`` is consulted FIRST: ``.git``, ``.venv`` and
+        ``node_modules`` end the walk and are therefore never candidates (FR6). A
+        virtualenv dies the moment it is moved — its interpreter paths are absolute —
+        and this pass runs unattended.
         """
         excluded = frozenset(workspace_layout.REPO_TREE_EXCLUDED)
         out: list[Finding] = []
@@ -364,6 +368,8 @@ class DoctorService:
             pending = [top]
             while pending:
                 for entry in sweep.walk(pending.pop()):
+                    if entry.name in _REPO_WALK_PRUNED:
+                        continue
                     if entry.name in excluded:
                         out.append(
                             self._finding(
@@ -374,8 +380,6 @@ class DoctorService:
                                 "(a repo working tree carries source only — DADAIA.md 5.3)",
                             )
                         )
-                        continue
-                    if entry.name in _REPO_WALK_PRUNED:
                         continue
                     if entry.is_dir() and not entry.is_symlink():
                         pending.append(entry)
@@ -575,8 +579,7 @@ class DoctorService:
                 # Days ROUNDED UP: a hold taken a minute ago has its whole window left,
                 # and the last day reads "1d left", never "0d left" on a live entry.
                 left = -(-int(zone.ttl_seconds - age) // 86_400)
-                origin = entry.relative_to(self._dadaia / zone.name).as_posix()
-                detail = f"(reaped from {origin}, {left}d left)"
+                detail = f"({left}d left)"
             else:
                 verdict, detail = FindingVerdict.CANON, ""
             if verdict is not FindingVerdict.EXPIRED:

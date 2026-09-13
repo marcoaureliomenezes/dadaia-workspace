@@ -216,7 +216,7 @@ def test_a_held_entry_is_always_listed_and_never_scored(workspace: Path) -> None
 
     assert result.exit_code == 0, result.output
     assert held_lines == [
-        "WS-reaped-reaped reaped reaped/20260913/x  (reaped from 20260913/x, 7d left)"
+        "WS-reaped-reaped reaped reaped/20260913/x  (7d left)"
     ], lines
     assert [ln for ln in lines if _SCORE_LINE.match(ln)][0].endswith("(100%)"), lines
 
@@ -233,7 +233,7 @@ def test_json_lists_a_held_entry_and_keeps_the_score_whole(workspace: Path) -> N
     assert result.exit_code == 0, result.output
     (held,) = section["findings"]
     assert (held["code"], held["verdict"]) == ("WS-reaped-reaped", "reaped")
-    assert held["message"] == "reaped/20260913/x  (reaped from 20260913/x, 7d left)"
+    assert held["message"] == "reaped/20260913/x  (7d left)"
     assert section["compliance"]["percent"] == 100
     # The hold is outside the scored set entirely — it neither helps nor hurts the count.
     assert section["compliance"]["total"] == healthy["sections"]["workspace"]["compliance"]["total"]
