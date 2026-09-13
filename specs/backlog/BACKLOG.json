@@ -69,7 +69,7 @@
       "id": "docs-derived-from-memory-and-distribution",
       "title": "Documentation derived from memory; memory reviewed file by file; distribution metadata and channels",
       "opened": "2026-09-12",
-      "status": "candidate",
+      "status": "picked",
       "description": "Operator demand 2026-09-12, before the 0.4.7 deploy: (1) memory review file by file — every atom under specs/memory/product/** and ARCHITECTURE.md/QUALITY.md/TECHSTACK.md read against the code and corrected in place, so memory has zero drift and no ambiguity (the review is recorded in the candidate's _RELEASE.json log with atoms unchanged vs changed); (2) human+agent documentation derived FROM memory, not written beside it: README.md (what it is, principles, how a human installs and uses it, how an agent uses it), a short docs/ set (getting started, concepts, CLI reference generated from the command tree), each section naming the memory atom it derives from; (3) distribution: pyproject description/keywords/classifiers/urls, README as the PyPI long description, GitHub repository description + topics + homepage, and a ruled list of discovery channels for agents (PyPI, GitHub topics, awesome-lists, skill/plugin registries) — the strategy grilled with the operator before the SPEC.",
       "provenance": "operator demand 2026-09-12 (intake by project-manager during 0.4.7 candidate 1)",
       "intents": [
