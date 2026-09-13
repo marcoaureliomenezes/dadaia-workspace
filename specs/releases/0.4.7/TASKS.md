@@ -85,7 +85,7 @@
   features/chokepoints/**`, `.github/workflows/ci.yml`. Blocked by: T-047-14.
   Delivers: a synthetic fixture needs no row; a private hostname in `specs/**` or
   `tests/**` is refused at push like anywhere else.
-- [ ] T-047-23 — FR8: DADAIA §3.1–§3.5/§5.1/§5.3/§6.2/§7.4/§8.2/§8.5/§10.2;
+- [-] T-047-23 — FR8: DADAIA §3.1–§3.5/§5.1/§5.3/§6.2/§7.4/§8.2/§8.5/§10.2;
   `.dadaia/AGENTS.md`; `scaffold/memory/AGENTS.md`; `entities/registry.json`; skills
   `dd-ai-eng-knowhow`, `dd-task-manager`, `dd-cli-library`, `dd-spec-navigator`,
   `dd-workspace-doctor`, `dd-bug-registration`; `CONSUMER_VALIDATION_RECIPE.md`;
