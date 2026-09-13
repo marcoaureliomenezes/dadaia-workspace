@@ -28,7 +28,7 @@ from dadaia_workspace.core.models.agent_model_policy import (
 )
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus, attest
 from dadaia_workspace.core.models.install_ledger import InstallLedger, LedgerEntry
-from dadaia_workspace.core.workspace_layout import STATES_CANON, zone_table_rows
+from dadaia_workspace.core.workspace_layout import HARNESS_DIRS, STATES_CANON, zone_table_rows
 from dadaia_workspace.infrastructure.codex_doctor import check_codex_rule_corpus_reachable
 from dadaia_workspace.infrastructure.entity_doctor import (
     check_agent_skill_refs,
@@ -591,7 +591,7 @@ class FileSystemPublicAssetManager:
         except subprocess.TimeoutExpired:
             reports.append(DoctorLine(DoctorStatus.WARN, "git-dirty check timed out"))
 
-        for harness_dir in (".agents", ".claude", ".codex", ".kimi-code"):
+        for harness_dir in sorted(HARNESS_DIRS):
             legacy_dir = workspace_root / harness_dir / "workflows"
             for legacy in sorted(legacy_dir.glob("*.workflow.md")):
                 reports.append(

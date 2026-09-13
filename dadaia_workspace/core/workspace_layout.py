@@ -21,24 +21,42 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from enum import StrEnum
+from functools import cached_property
+from typing import Literal
+
+from dadaia_workspace.core.specs_version import RELEASE_ID_FRAGMENT
 
 __all__ = [
     "AUDIT_DIR_NAME_PATTERN",
     "AUDIT_DIR_NAME_RE",
+    "CANON_ROOT_MEMBERS",
     "DADAIA_MD_HARNESS_TARGETS",
     "DADAIA_ROOT_FILES",
     "DADAIA_ZONES",
+    "HARNESS_DIRS",
     "INSTANCE_EXCEPTIONS",
     "LAW_BASENAMES",
     "LAW_HARNESS_DIRS",
+    "MEMORY_TOPLEVEL_FILES",
+    "REPO_TREE_ARTIFACTS",
+    "REPO_TREE_EXCLUDED",
+    "REQUIRED_ROOT_DIRS",
     "ROOT_ALLOWED_DIRS",
     "ROOT_ALLOWED_FILES",
+    "SCOPED_LAW_AREAS",
+    "SHAPE_FRAGMENTS",
+    "SPECS_CANON",
     "STATES_CANON",
+    "CanonEntry",
     "Creator",
+    "SpecsArea",
     "Zone",
     "ZoneClass",
     "additive_prefixes",
     "parse_exception_globs",
+    "repo_excluded_display",
+    "root_entries_display",
+    "specs_canon_table_rows",
     "walked_zones",
     "zone_names",
     "zone_table_rows",
@@ -264,9 +282,254 @@ LAW_BASENAMES: frozenset[str] = frozenset({"DADAIA.md", "AGENTS.md", "CLAUDE.md"
 #: ``DADAIA.md`` into the subset in :data:`DADAIA_MD_HARNESS_TARGETS`.
 LAW_HARNESS_DIRS: frozenset[str] = frozenset({".claude/rules", ".codex", ".kimi-code", ".agents"})
 
+#: The harness directories themselves (the top segment of each of the above) — the one
+#: home of "which root directories a harness owns", derived, never respelled.
+HARNESS_DIRS: frozenset[str] = frozenset(path.split("/")[0] for path in LAW_HARNESS_DIRS)
+
 #: Where the law is projected per harness whose root-import chain does not already
 #: deliver it — Claude Code's does, so no entry here (bug FR31, see workspace-law rule).
 DADAIA_MD_HARNESS_TARGETS: dict[str, str] = {
     "codex": ".codex/DADAIA.md",
     "kimi-code": ".kimi-code/DADAIA.md",
 }
+
+# ---------------------------------------------------------------------------------
+# The repo working tree (DADAIA.md §5.3) and the ``specs/`` canon (§6.2) — the same
+# registry regime as the root law and the zone table above. 0.4.7 FR5: these names
+# lived in three homes (the law's hand-typed bullets, ``features/specs/canon.py``'s
+# rows, ``infrastructure/privacy_check.py``'s literal) and the ledger counted seven
+# bugs born of one home drifting from another.
+# ---------------------------------------------------------------------------------
+
+#: Tool artifacts a repo working tree may carry but that are never source: caches,
+#: build output, coverage data. Bare names — the display form (trailing ``/`` for the
+#: directories) is :func:`repo_excluded_display`.
+REPO_TREE_ARTIFACTS: tuple[str, ...] = (
+    ".venv",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".hypothesis",
+    ".ruff_cache",
+    "test-results",
+    "playwright-report",
+    "coverage",
+    ".coverage",
+)
+
+#: Everything a repo working tree must NOT carry (DADAIA.md §5.3): the tool artifacts
+#: above plus ``.dadaia`` — a nested workspace control directory, excluded for its own
+#: reason (it corrupts context resolution for every tree-walking tool), which is why a
+#: consumer walking artifacts only (the public-asset walk, which lives UNDER
+#: ``.dadaia/``) reads :data:`REPO_TREE_ARTIFACTS` instead.
+REPO_TREE_EXCLUDED: tuple[str, ...] = (".dadaia", *REPO_TREE_ARTIFACTS)
+
+#: The one entry of :data:`REPO_TREE_ARTIFACTS` that is a file, not a directory — the
+#: only fact the rendered law line needs beyond the names themselves.
+_REPO_TREE_EXCLUDED_FILES: frozenset[str] = frozenset({".coverage"})
+
+#: Top-level ``specs/memory/`` files (v6 canon). Named here, with every other canonical
+#: name; ``features.specs.memory_canon`` re-exports it for its own consumers.
+MEMORY_TOPLEVEL_FILES: tuple[str, ...] = ("ARCHITECTURE.md", "TECHSTACK.md", "QUALITY.md")
+
+#: The root member a :class:`CanonEntry` lives under. Distinct from a filesystem "area"
+#: only for the two bare root files (``AGENTS.md``, ``constitution.md``), each its own
+#: singleton member — every other value names the directory area it governs. Deriving
+#: :data:`CANON_ROOT_MEMBERS` as ``{e.area for e in SPECS_CANON}`` then needs zero
+#: special casing — the whole reason this carries 8 values, not 6.
+SpecsArea = Literal[
+    "AGENTS.md", "constitution.md", "memory", "releases", "backlog", "bugs", "audits", "ADRs"
+]
+
+#: The variable segments a canon path shape may carry: the law's own notation on the
+#: left, the regex fragment it compiles to on the right. A shape is written ONCE, in
+#: the law's notation; :attr:`CanonEntry.pattern` derives the matcher and
+#: :func:`specs_canon_table_rows` derives the rendered table from the same string —
+#: never a hand-kept regex beside a hand-kept prose spelling of the same path.
+_SHAPE_TOKENS: tuple[tuple[str, str], ...] = (
+    ("<M.m.p>", RELEASE_ID_FRAGMENT),
+    ("<40hex>", r"[0-9a-f]{40}"),
+    ("<YYYYMMDD-slug>", AUDIT_DIR_NAME_PATTERN),
+    ("<area>", r"[a-z][a-z0-9_-]*"),
+    ("<slug>", r"[a-z][a-z0-9_-]*"),
+    ("rc-N", r"rc-\d+"),
+    ("**", r".+"),
+)
+
+#: The shape tokens as a lookup — a consumer needing one fragment (the verdict-sha
+#: capture in ``features.specs.canon``) reads it here instead of respelling it.
+SHAPE_FRAGMENTS: dict[str, str] = dict(_SHAPE_TOKENS)
+
+_SHAPE_TOKEN_RE = re.compile("|".join(f"({re.escape(token)})" for token, _ in _SHAPE_TOKENS))
+
+
+def _shape_regex(shape: str) -> str:
+    """*shape* with every token replaced by its fragment and every literal part escaped."""
+    fragments = dict(_SHAPE_TOKENS)
+    return "".join(
+        fragments[part] if part in fragments else re.escape(part)
+        for part in _SHAPE_TOKEN_RE.split(shape)
+        if part
+    )
+
+
+@dataclass(frozen=True)
+class CanonEntry:
+    """One row of the ``specs/`` canon: a path SHAPE, its root member, and whether a
+    fresh tree must carry it at birth.
+
+    :attr:`shape` is the law's notation (``releases/<M.m.p>/SPEC.md``). A shape with no
+    variable token IS a concrete ``specs/``-relative destination (:attr:`dest`); a shape
+    with one is matched, never scaffolded at birth. Rendering — which template produces
+    the content — is the SCAFFOLDER's concern and lives in ``features.specs.canon``,
+    keyed by :attr:`shape`: ``core`` holds the names, never the file contents.
+    """
+
+    shape: str
+    area: SpecsArea
+    required_at_birth: bool = False
+
+    @property
+    def dest(self) -> str | None:
+        """The concrete ``specs/``-relative path, or ``None`` for a variable shape."""
+        return None if _SHAPE_TOKEN_RE.search(self.shape) else self.shape
+
+    @cached_property
+    def pattern(self) -> re.Pattern[str]:
+        """The anchored matcher derived from :attr:`shape` — never hand-written."""
+        return re.compile(f"^{_shape_regex(self.shape)}$")
+
+
+#: THE CANON TABLE — one row per canon-conformant path shape, in rendered-table order
+#: (root, memory, releases, backlog, bugs, audits, ADRs; required-at-birth first within
+#: an area).
+SPECS_CANON: tuple[CanonEntry, ...] = (
+    CanonEntry("AGENTS.md", "AGENTS.md", True),
+    CanonEntry("constitution.md", "constitution.md", True),
+    CanonEntry("memory/AGENTS.md", "memory", True),
+    *(CanonEntry(f"memory/{name}", "memory", True) for name in MEMORY_TOPLEVEL_FILES),
+    CanonEntry("memory/product/index.md", "memory", True),
+    CanonEntry("memory/product/catalog.json", "memory", True),
+    CanonEntry("memory/product/<area>/<slug>.md", "memory"),
+    CanonEntry("releases/AGENTS.md", "releases", True),
+    CanonEntry("releases/_ideas/AGENTS.md", "releases", True),
+    CanonEntry("releases/_archive/releases_histo.jsonl", "releases", True),
+    CanonEntry("releases/_ideas/<M.m.p>/SPEC.md", "releases"),
+    CanonEntry("releases/_archive/<M.m.p>/**", "releases"),
+    CanonEntry("releases/<M.m.p>/_RELEASE.json", "releases"),
+    # Legacy state-file name (pre-0.4.6) — admitted ONLY as the rename-lane input:
+    # SPEC-DOC-046 offers the doctor-fixable rename to _RELEASE.json (ADR 0007).
+    CanonEntry("releases/<M.m.p>/RELEASE.json", "releases"),
+    CanonEntry("releases/<M.m.p>/SPEC.md", "releases"),
+    CanonEntry("releases/<M.m.p>/PLAN.md", "releases"),
+    CanonEntry("releases/<M.m.p>/TASKS.md", "releases"),
+    CanonEntry("releases/<M.m.p>/verdicts/<40hex>.handoff.json", "releases"),
+    # An archived candidate's trio (ADR 0006): rc-N is ONLY an archive, opened on
+    # demand by ``dadaia release rc-archive``, never required at birth.
+    CanonEntry("releases/<M.m.p>/rc-N/SPEC.md", "releases"),
+    CanonEntry("releases/<M.m.p>/rc-N/PLAN.md", "releases"),
+    CanonEntry("releases/<M.m.p>/rc-N/TASKS.md", "releases"),
+    CanonEntry("backlog/AGENTS.md", "backlog", True),
+    CanonEntry("backlog/BACKLOG.json", "backlog", True),
+    CanonEntry("backlog/_archive/backlog_histo.jsonl", "backlog", True),
+    CanonEntry("bugs/AGENTS.md", "bugs", True),
+    CanonEntry("bugs/BUGS.jsonl", "bugs"),
+    CanonEntry("bugs/_archive/bugs_histo.jsonl", "bugs", True),
+    CanonEntry("audits/AGENTS.md", "audits", True),
+    CanonEntry("audits/_archive/audits_histo.jsonl", "audits", True),
+    CanonEntry("audits/<YYYYMMDD-slug>/AUDIT.md", "audits"),
+    CanonEntry("audits/<YYYYMMDD-slug>/FINDINGS.jsonl", "audits"),
+    CanonEntry("ADRs/AGENTS.md", "ADRs", True),
+    CanonEntry("ADRs/decisions.jsonl", "ADRs", True),
+)
+
+#: The v6 canon ROOT member names — every entry permitted directly under ``specs/``.
+#: Derived from :data:`SPECS_CANON` itself (zero special-casing: :data:`SpecsArea`
+#: already carries one value per root member, including the two bare root files).
+CANON_ROOT_MEMBERS: frozenset[str] = frozenset(entry.area for entry in SPECS_CANON)
+
+#: TREE-4's required directories, derived (not hand-kept): every area that pre-creates
+#: its own ``_archive/<area>_histo.jsonl`` at birth also needs its directory to exist —
+#: exactly {audits, backlog, bugs, releases} today, self-updating if a future area gains
+#: a birth-time histo entry.
+REQUIRED_ROOT_DIRS: tuple[str, ...] = tuple(
+    sorted(
+        {
+            entry.area
+            for entry in SPECS_CANON
+            if entry.required_at_birth
+            and entry.dest
+            and entry.dest.startswith(f"{entry.area}/_archive/")
+        }
+    )
+)
+
+#: The areas whose scaffolded ``AGENTS.md`` a projection freezes (the doctor's TREE-5
+#: scoped-law coverage), derived from the rows that declare one.
+SCOPED_LAW_AREAS: tuple[str, ...] = tuple(
+    entry.dest.removesuffix("/AGENTS.md")
+    for entry in SPECS_CANON
+    if entry.dest and entry.dest.endswith("/AGENTS.md")
+)
+
+
+# Derived views — the rendered law tables (DADAIA.md §5.1, §5.3, §6.2).
+
+
+def root_entries_display() -> str:
+    """§5.1's one line: every root directory (trailing ``/``) then every root file."""
+    return " ".join(
+        [*(f"{name}/" for name in sorted(ROOT_ALLOWED_DIRS)), *sorted(ROOT_ALLOWED_FILES)]
+    )
+
+
+def repo_excluded_display() -> str:
+    """§5.3's one line: the excluded names in registry order, directories slashed."""
+    return " ".join(
+        name if name in _REPO_TREE_EXCLUDED_FILES else f"{name}/" for name in REPO_TREE_ARTIFACTS
+    )
+
+
+def specs_canon_table_rows() -> tuple[tuple[str, str], ...]:
+    """``(parent, members)`` per rendered §6.2 row: one row per directory that holds two
+    or more canon members (``""`` = the ``specs/`` root), members in table order.
+
+    A directory holding exactly one member is path-compressed into its parent's cell
+    (``verdicts/<40hex>.handoff.json``) instead of earning a row of its own — nothing is
+    elided and nothing is spelled twice: the rows ARE :data:`SPECS_CANON` read one path
+    segment at a time.
+    """
+    children: dict[str, list[str]] = {}
+    for entry in SPECS_CANON:
+        segments = entry.shape.split("/")
+        for depth, segment in enumerate(segments):
+            bucket = children.setdefault("/".join(segments[:depth]), [])
+            if segment not in bucket:
+                bucket.append(segment)
+
+    def compress(node: str) -> tuple[str, str | None]:
+        """The cell text for the member at *node*, and the row it opens (or ``None``)."""
+        parts = [node.rsplit("/", 1)[-1]]
+        while len(children.get(node, ())) == 1:
+            node = f"{node}/{children[node][0]}"
+            parts.append(node.rsplit("/", 1)[-1])
+        return (
+            "/".join(parts) + ("/" if node in children else ""),
+            node if node in children else None,
+        )
+
+    rows: list[tuple[str, str]] = []
+
+    def emit(parent: str) -> None:
+        cells: list[str] = []
+        opened: list[str] = []
+        for segment in children[parent]:
+            cell, row = compress(f"{parent}/{segment}" if parent else segment)
+            cells.append(cell)
+            if row is not None:
+                opened.append(row)
+        rows.append((parent, " ".join(cells)))
+        for row in opened:
+            emit(row)
+
+    emit("")
+    return tuple(rows)

@@ -18,11 +18,14 @@ from dadaia_workspace.core.fixed_sections import (
     extract_fixed_section,
     render_fixed_section,
 )
+from dadaia_workspace.core.workspace_layout import (
+    MEMORY_TOPLEVEL_FILES as _MEMORY_TOPLEVEL_FILES,
+)
 
 #: Top-level memory files (.md canonical source; v6 canon FR1/A1.5/A1.6, T-050-06).
-#: 0.4.7 FR9 deleted the slug->filename alias table this tuple used to be derived from:
-#: a slug IS its filename stem everywhere, so these three need no translation.
-MEMORY_TOPLEVEL_FILES: tuple[str, ...] = ("ARCHITECTURE.md", "TECHSTACK.md", "QUALITY.md")
+#: Re-exported from the one canonical-name registry (0.4.7 FR5) — the canon rows that
+#: admit these three files are built from the SAME tuple.
+MEMORY_TOPLEVEL_FILES = _MEMORY_TOPLEVEL_FILES
 
 #: Memory files that must exist (TREE-3): the top-level trio plus the product index.
 MEMORY_REQUIRED_FILES: tuple[str, ...] = (*MEMORY_TOPLEVEL_FILES, "product/index.md")

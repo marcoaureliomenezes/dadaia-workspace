@@ -14,6 +14,7 @@ import shutil
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.workspace_layout import SCOPED_LAW_AREAS
 from dadaia_workspace.features.specs import memory_canon
 from dadaia_workspace.features.specs.canon import (
     CANON_ROOT_MEMBERS,
@@ -34,15 +35,7 @@ _TREE3_MEMORY_FILES: tuple[str, ...] = memory_canon.MEMORY_REQUIRED_FILES
 # files a projection freezes at scaffold time. memory/ is IN — single-ownership decides
 # WHO may rewrite the file, never whether the doctor may notice that someone did; its
 # presence check (the retired TREE-5M) is the same comparator's missing-file branch.
-_TREE5_SCOPED_LAW_AREAS: tuple[str, ...] = (
-    "memory",
-    "releases",
-    "releases/_ideas",
-    "backlog",
-    "bugs",
-    "audits",
-    "ADRs",
-)
+_TREE5_SCOPED_LAW_AREAS: tuple[str, ...] = SCOPED_LAW_AREAS
 
 # TREE-4: directories that must exist — folded over the canon table (v0.5.1 K4): every
 # area whose ``_archive/<area>_histo.jsonl`` is required_at_birth also needs its own
