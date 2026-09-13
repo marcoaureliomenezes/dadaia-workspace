@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Literal
 
@@ -28,7 +28,14 @@ from dadaia_workspace.core.models.agent_model_policy import (
 )
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus, attest
 from dadaia_workspace.core.models.install_ledger import InstallLedger, LedgerEntry
-from dadaia_workspace.core.workspace_layout import HARNESS_DIRS, STATES_CANON, zone_table_rows
+from dadaia_workspace.core.workspace_layout import (
+    HARNESS_DIRS,
+    STATES_CANON,
+    repo_excluded_display,
+    root_entries_display,
+    specs_canon_table_rows,
+    zone_table_rows,
+)
 from dadaia_workspace.infrastructure.codex_doctor import check_codex_rule_corpus_reachable
 from dadaia_workspace.infrastructure.entity_doctor import (
     check_agent_skill_refs,
@@ -94,13 +101,33 @@ def _states_canon_table() -> str:
     return "\n".join(["| Entry |", "|---|", *(f"| `{entry}` |" for entry in sorted(STATES_CANON))])
 
 
+def _specs_canon_table() -> str:
+    rows = ["| Area | Members |", "|---|---|"]
+    rows += [
+        f"| {'root' if parent == '' else f'`{parent}/`'} | `{members}` |"
+        for parent, members in specs_canon_table_rows()
+    ]
+    return "\n".join(rows)
+
+
+#: Law-fragment placeholder -> the registry view that fills it. The projected law's
+#: canonical-name tables ARE ``core.workspace_layout`` (0.4.6 FR14/D14 for the zone and
+#: states tables; 0.4.7 FR5b for DADAIA.md §5.1, §5.3 and §6.2) — never a hand-kept copy
+#: that the next fix edits in one home and forgets in the other.
+_PLACEHOLDERS: dict[str, Callable[[], str]] = {
+    "<!-- zones -->": _zone_table,
+    "<!-- canon -->": _states_canon_table,
+    "<!-- root -->": root_entries_display,
+    "<!-- repo-excluded -->": repo_excluded_display,
+    "<!-- specs-canon -->": _specs_canon_table,
+}
+
+
 def render_registry_tables(text: str) -> str:
-    """Fill a law fragment's ``<!-- zones -->`` / ``<!-- canon -->`` placeholders from
-    ``core.workspace_layout`` — the projected ``.dadaia/AGENTS.md`` table IS the registry
-    (0.4.6 FR14/D14), never a hand-kept copy of it."""
-    return text.replace("<!-- zones -->", _zone_table()).replace(
-        "<!-- canon -->", _states_canon_table()
-    )
+    """Fill every registry placeholder in a law fragment from ``core.workspace_layout``."""
+    for placeholder, render in _PLACEHOLDERS.items():
+        text = text.replace(placeholder, render())
+    return text
 
 
 def _staged_bytes(src: Path, public_dir: Path) -> bytes:

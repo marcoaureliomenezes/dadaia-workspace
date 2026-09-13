@@ -127,7 +127,7 @@
 
 ### 5.1 Workspace root
 
-- Root holds only: `.agents/ .claude/ .codex/ .dadaia/ .git/ .kimi-code/ repos/ .env .gitignore AGENTS.md CLAUDE.md DADAIA.md prompt.md`.
+- Root holds only: `<!-- root -->`.
 - Anything the operator created by hand stays, permanently.
 - A tool needing another root or harness-dir entry gets a documented glob in `.dadaia/states/instance_exceptions.txt`.
 
@@ -144,7 +144,7 @@
 
 - A repo working tree carries source and its own artifacts only — never `.dadaia/`.
 - A nested `.dadaia/` corrupts context resolution for every tree-walking tool.
-- Excluded: `.venv/ .pytest_cache/ .mypy_cache/ .hypothesis/ .ruff_cache/ test-results/ playwright-report/ coverage/ .coverage`.
+- Excluded: `<!-- repo-excluded -->`.
 - Redirect caches: pytest `-p no:cacheprovider`, mypy `incremental = false`, hypothesis `database = None`, ruff `--no-cache`.
 - Redirect Playwright's `outputDir` into `.dadaia/tmp/`.
 - Gitignore is defence in depth, not permission to create them.
@@ -166,16 +166,7 @@
 
 ### 6.2 Canon
 
-| Area | Members |
-|---|---|
-| root | `AGENTS.md constitution.md memory/ releases/ backlog/ bugs/ audits/ ADRs/` |
-| `releases/` | `AGENTS.md`, `_ideas/` (own `AGENTS.md`), `_archive/releases_histo.jsonl`, `_archive/<release-id>/` |
-| `releases/<M.m.p>/` | `_RELEASE.json SPEC.md PLAN.md TASKS.md rc-N/ verdicts/` |
-| `backlog/` | `AGENTS.md BACKLOG.json`, `_archive/backlog_histo.jsonl` |
-| `bugs/` | `AGENTS.md BUGS.jsonl`, `_archive/bugs_histo.jsonl` |
-| `audits/` | `AGENTS.md`, `_archive/audits_histo.jsonl`, `<YYYYMMDD-slug>/` |
-| `ADRs/` | `AGENTS.md decisions.jsonl` |
-| `memory/` | `AGENTS.md ARCHITECTURE.md QUALITY.md TECHSTACK.md product/**` |
+<!-- specs-canon -->
 
 - No stray root archive directory or dotfile; `dadaia doctor` flags anything else.
 

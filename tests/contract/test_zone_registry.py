@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import ast
 import importlib
+import re
 from pathlib import Path
 
 import pytest
@@ -34,6 +35,9 @@ from dadaia_workspace.core.workspace_layout import (
     ROOT_ALLOWED_FILES,
     STATES_CANON,
     Creator,
+    repo_excluded_display,
+    root_entries_display,
+    specs_canon_table_rows,
     zone_names,
 )
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
@@ -110,6 +114,19 @@ def _second_list_hits(tree: ast.AST, names: frozenset[str]) -> list[str]:
             and node.value.rstrip("/") in retired_paths
         ):
             hits.append(f"{node.lineno}: retired zone path {node.value!r}")
+    return hits
+
+
+def _restated_law_lines(text: str) -> list[str]:
+    """``line:<detail>`` for every law line naming HALF OR MORE of one canonical set —
+    a line that restates a set instead of referring to some of its members."""
+    hits: list[str] = []
+    for number, line in enumerate(text.splitlines(), start=1):
+        tokens = set(re.findall(r"[A-Za-z0-9_.\-]+", line))
+        for label, canonical in _CANONICAL_SETS.items():
+            found = sorted(tokens & canonical)
+            if len(found) * 2 >= len(canonical):
+                hits.append(f"{number}: line restates the {label} set {found}")
     return hits
 
 
@@ -197,6 +214,38 @@ def test_zone_registry_is_the_only_dadaia_name_list() -> None:
         "a second .dadaia zone list was born outside core.workspace_layout — derive a view "
         f"from DADAIA_ZONES instead: {violations}"
     )
+
+
+def test_the_law_source_never_restates_a_canonical_set() -> None:
+    """No line of the law SOURCE spells out a canonical set: §5.1 (root), §5.3 (repo
+    exclusions) and §6.2 (specs canon) carry placeholders ``public stage`` fills from the
+    registry, so the projected law cannot drift from ``core``."""
+    law = _PACKAGE / "public" / "data" / "DADAIA.md"
+    hits = _restated_law_lines(law.read_text("utf-8"))
+    assert not hits, (
+        "the law restates a registry set instead of rendering it — replace the lines with "
+        f"the <!-- root -->/<!-- repo-excluded -->/<!-- specs-canon --> markers: {hits}"
+    )
+
+
+def test_staged_law_canon_tables_equal_the_registry(staged_data: Path) -> None:
+    """The staged ``DADAIA.md``'s §6.2 table IS ``specs_canon_table_rows()``, row for row,
+    and its §5.1/§5.3 lines ARE the rendered root and repo-exclusion lists — documented ==
+    allowed, for the law exactly as for ``.dadaia/AGENTS.md``."""
+    text = (staged_data / "DADAIA.md").read_text("utf-8")
+    canon_tables = [t for t in _markdown_tables(text) if t and {"area", "members"} <= set(t[0])]
+    assert len(canon_tables) == 1, "exactly one rendered specs-canon table"
+    rendered = [(_bare(row["area"]), row["members"].strip("`")) for row in canon_tables[0]]
+    expected = [
+        ("root" if parent == "" else parent, members)
+        for parent, members in specs_canon_table_rows()
+    ]
+    assert rendered == expected
+
+    assert f"- Root holds only: `{root_entries_display()}`." in text
+    assert f"- Excluded: `{repo_excluded_display()}`." in text
+    for placeholder in ("<!-- root -->", "<!-- repo-excluded -->", "<!-- specs-canon -->"):
+        assert placeholder not in text, f"{placeholder} was left unrendered"
 
 
 def test_every_zone_creator_exists() -> None:
