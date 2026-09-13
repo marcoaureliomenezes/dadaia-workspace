@@ -180,21 +180,15 @@ def total_line(reports: Sequence[SectionReport]) -> str:
 
 
 def _with_fix[C, I](finding: SectionFinding, rule: Rule[C, I]) -> SectionFinding:
-    """Stamp the emitting rule's ``fix_help`` onto *finding*; refuse an unfixable error.
+    """Stamp the emitting rule's ``fix_help`` onto *finding*.
 
-    0.4.7 FR2 — every BLOCK carries one executable fix. A doctor run exits 1 on an
-    error-class finding, so an error-class rule with no ``fix_help`` would stop the
-    operator with nothing to run. That is a rule-authoring defect, caught here at the
-    one seam every finding passes through rather than by review.
+    0.4.7 FR2 — every BLOCK carries one executable fix. That every error-class rule
+    carries a ``fix_help`` is proven statically, before the operator ever runs the
+    doctor, by ``tests/contract/test_every_block_carries_a_fix.py``; raising here would
+    turn a rule-authoring defect into a traceback, which is a refusal with no message
+    at all.
     """
-    fix = finding.fix or rule.fix_help or ""
-    if finding.error and not fix:
-        raise ValueError(
-            f"doctor rule {'/'.join(rule.codes)} emits an error-class finding "
-            f"({finding.code}) with no fix_help — an exit-1 finding must name one "
-            "executable remediation (0.4.7 FR2)."
-        )
-    return replace(finding, fix=fix)
+    return replace(finding, fix=finding.fix or rule.fix_help or "")
 
 
 def render_finding(finding: SectionFinding) -> str:
