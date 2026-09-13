@@ -36,6 +36,7 @@ from dadaia_workspace.core.doctor_rules import (
     SectionReport,
     merge_sections,
     run_section,
+    total_compliance,
     total_line,
 )
 from dadaia_workspace.core.exceptions import SchemaVersionError, WorkspaceNotInitializedError
@@ -418,15 +419,11 @@ def _json_payload(
                         {"code": f.code, "verdict": f.verdict, "message": render(f.message)}
                         for f in report.printable
                     ],
-                    "compliance": {
-                        "canonical": report.canonical,
-                        "total": report.total,
-                        "percent": report.percent,
-                    },
+                    "compliance": _compliance(report),
                 }
                 for report in reports
             },
-            "compliance": _total_compliance(reports),
+            "compliance": _compliance(total_compliance(reports)),
             "fixed": [render(action) for action in fixed],
         },
         indent=2,
@@ -449,11 +446,6 @@ def _emit_human(
     typer.echo(total_line(reports))
 
 
-def _total_compliance(reports: list[SectionReport]) -> dict[str, int]:
-    canonical = sum(r.canonical for r in reports)
-    total = sum(r.total for r in reports)
-    return {
-        "canonical": canonical,
-        "total": total,
-        "percent": round(100 * canonical / total) if total else 100,
-    }
+def _compliance(report: SectionReport) -> dict[str, int]:
+    """One score, rendered once — sections and the total alike."""
+    return {"canonical": report.canonical, "total": report.total, "percent": report.percent}

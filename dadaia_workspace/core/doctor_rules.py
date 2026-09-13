@@ -24,7 +24,7 @@ Pure module — no I/O, no dependencies outside the stdlib.
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 __all__ = ["Rule", "SectionFinding", "SectionReport", "merge_sections", "run_section", "total_line"]
 
@@ -105,7 +105,7 @@ def run_section[C, I](
     """Run every rule of one section over its context and score it.
 
     ``render`` is the section's adapter at the seam: it translates the feature's own
-    issue type into a :class:`SectionFinding` and names the compliance unit. The
+    issue type into a :class:`SectionFinding` and names the compliance unit.
     A section that KNOWS its denominator (rules run, records read) passes
     ``total_units``; its numerator is that count minus the units a non-canonical
     finding disqualified. A section that CLASSIFIES every unit as it goes (the
@@ -130,14 +130,6 @@ def run_section[C, I](
     )
 
 
-def total_line(reports: Sequence[SectionReport]) -> str:
-    """The run's final line: the three sections' numerators and denominators summed."""
-    canonical = sum(r.canonical for r in reports)
-    total = sum(r.total for r in reports)
-    percent = (100 * canonical) // total if total else 100
-    return f"compliance(total): {canonical}/{total} checks canonical ({percent}%)"
-
-
 def merge_sections(reports: Sequence[SectionReport]) -> SectionReport:
     """Fold the parts of ONE section contributed by different features into one report.
 
@@ -155,3 +147,19 @@ def merge_sections(reports: Sequence[SectionReport]) -> SectionReport:
         canonical=sum(report.canonical for report in reports),
         total=sum(report.total for report in reports),
     )
+
+
+def total_compliance(reports: Sequence[SectionReport]) -> SectionReport:
+    """The run's total, as ONE report: the sections' numbers summed and scored by the
+    same :attr:`SectionReport.percent` every section line uses.
+
+    The human `compliance(total)` line and the `--json` total payload are two renderings
+    of this one object. A second formula on either side is exactly how they came to
+    disagree at a denominator that rounds up (1055/1056: floor 99, round 100).
+    """
+    return replace(merge_sections(reports), name="total", unit="checks")
+
+
+def total_line(reports: Sequence[SectionReport]) -> str:
+    """The run's final line."""
+    return total_compliance(reports).score_line()

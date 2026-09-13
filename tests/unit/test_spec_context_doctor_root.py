@@ -37,7 +37,6 @@ from dadaia_workspace.features.spec_context.doctor import (
     DoctorService,
     Finding,
     FindingVerdict,
-    compliance,
 )
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from tests.fakes import FakeContextStore, FakeGitClient
@@ -530,24 +529,8 @@ def test_operator_and_managed_zones_are_never_walked(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# The score, the reaper order, --expired-only
+# The reaper order, --expired-only
 # ---------------------------------------------------------------------------
-
-
-def test_compliance_counts_canon_and_operator_over_every_entry(tmp_path: Path) -> None:
-    _init_workspace(tmp_path)
-    (tmp_path / "junk").mkdir()
-    (tmp_path / "shot.png").write_bytes(b"")
-    (tmp_path / INSTANCE_EXCEPTIONS).write_text("*.png\n", encoding="utf-8")
-
-    findings = _make_doctor(tmp_path).scan()
-    score = compliance(findings)
-
-    non_canonical = [f for f in findings if f.verdict is FindingVerdict.SLOP]
-    assert [f.path for f in non_canonical] == ["junk"]
-    assert score.total == len(findings)
-    assert score.canonical == len(findings) - 1
-    assert score.percent == round(100 * score.canonical / score.total)
 
 
 def test_fix_expired_only_stops_before_slop(tmp_path: Path) -> None:
@@ -707,4 +690,4 @@ def test_fix_removes_state_and_session_slop_recursively(tmp_path: Path) -> None:
 
     assert not locks.exists()
     assert not pointer.exists()
-    assert compliance(_make_doctor(tmp_path).scan()).percent == 100
+    assert all(f.canonical for f in _make_doctor(tmp_path).scan())

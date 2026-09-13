@@ -68,20 +68,6 @@ class Finding:
 
 
 @dataclass(frozen=True)
-class Compliance:
-    canonical: int
-    total: int
-    percent: int
-
-
-def compliance(findings: tuple[Finding, ...]) -> Compliance:
-    """The score line's numbers: canon + operator over every classified entry."""
-    total = len(findings)
-    canonical = sum(1 for f in findings if f.canonical)
-    return Compliance(canonical, total, round(100 * canonical / total) if total else 100)
-
-
-@dataclass(frozen=True)
 class DoctorIssue:
     code: str
     description: str
