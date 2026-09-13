@@ -14,8 +14,8 @@ History lives in each release's `_RELEASE.json` `log` entries and under `_archiv
 | Write/edit any atom | `product-engineer` only, in `DEFINITION` or `CLOSURE` phase |
 | Edit by any other agent | never, in any phase |
 
-- The SDD gate deterministically enforces only the phase half (`specs/memory/**` = MEMORY path class).
-- The who half — `product-engineer` as sole author — is agent discipline, not gate-enforced.
+- The SDD gate enforces neither half: `specs/memory/**` is MUTATING, writable in every phase.
+- Both halves — the phase and `product-engineer` as sole author — are agent discipline, measured by the audit's memory pillar.
 - See `constitution.md §13` for the discipline statement.
 - Stale memory found mid-implementation becomes a bug or a closure note — never patch it in place outside the allowed phases.
 

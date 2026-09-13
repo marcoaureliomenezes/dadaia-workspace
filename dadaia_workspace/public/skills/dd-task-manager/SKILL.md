@@ -43,8 +43,8 @@ description: >
   yourself.
 - A foreign `[-]` from another session: read `git log` first, then report it to the
   operator before any transition.
-- A gate block: read which stage fired (`DADAIA.md` §3); rebind mode only if your own
-  session resolved READ (`dadaia context bind <ctx> --mode implementation`).
+- A gate block: read which stage fired (`DADAIA.md` §3) and run the block's own one
+  `fix:` line — a BLOCK whose fix is itself blocked is a Stall, reported at once.
 
 ## Done when
 

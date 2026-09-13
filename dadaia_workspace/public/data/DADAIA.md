@@ -56,31 +56,36 @@
 ### 3.1 The gate
 
 - One PreToolUse entrypoint (`pre_gate`), fixed order, first block wins: root whitelist -> venv guard -> SDD gate.
-- Root whitelist blocks a new top-level workspace-root entry (§5.1).
-- Venv guard (`Bash` only) blocks `dadaia`/`pip`/`python -m dadaia_workspace` run outside `.dadaia/.venv/bin/`; message carries the fix.
-- SDD gate: path class × presence × phase × mode — context-relative, root and every `repos/<slug>/` alike.
+- The gate blocks exactly three things; there is no fourth.
+- Root whitelist blocks a new top-level workspace-root entry (§5.1) — block one.
+- Venv guard (`Bash` only) blocks `dadaia`/`pip`/`python -m dadaia_workspace` run outside `.dadaia/.venv/bin/` — block two, its only rule.
+- SDD gate blocks a PROTECTED write, and a bound session's MUTATING write under a `repos/<slug>/` outside its scope (§3.3) — block three.
+- Every BLOCK, from every enforcement point, carries exactly one `fix: <command>` line naming one executable command.
+- A BLOCK whose own fix is itself blocked is a Stall: CRITICAL, and unrepresentable by contract test.
 
 ### 3.2 Path classes
 
 | Class | Paths | Verdict |
 |---|---|---|
-| ADDITIVE | `specs/bugs\|backlog\|audits/`, each area's `_archive/*_histo.jsonl`, `.dadaia/{handoff,tmp,mcps,.cache}/` | Always writable |
-| MEMORY | `specs/memory/` | Writable in `DEFINITION` and `CLOSURE` phase |
-| MUTATING | everything else in-repo | Writable; records advisory presence |
+| ADDITIVE | `specs/bugs\|backlog\|audits/`, each area's `_archive/*_histo.jsonl`, `.dadaia/{handoff,tmp,reaped,mcps,.cache}/` | Always writable |
+| MUTATING | everything else in-repo | Writable, scope-judged under `repos/<slug>/`; records advisory presence |
 | PROTECTED | `.dadaia/sessions/`, projected law files (§8.2) | Blocked |
 
+- Three classes, no fourth: a workspace-root path matching no ADDITIVE or PROTECTED prefix is MUTATING.
+- `specs/memory/` is MUTATING, writable in every phase; memory discipline (§6.4, §6.7) is procedure, audited, never gated.
 - ADDITIVE's record contract (immutable core, write-once, mutable governance) is audited, not gated.
 - No FROZEN class: no root `_archive/` under `specs/`; archiving is histo-only under ADDITIVE, backstopped by pre-push (§3.4).
 
-### 3.3 Races, mode, context
+### 3.3 Races, context, scope
 
 - Races surface, never block — no locks, leases, ownership blocks.
 - A MUTATING write records advisory presence and proceeds; one throttled warning names a colliding session.
 - Presence I/O errors are swallowed; the write proceeds.
-- Mode: env -> session record -> IMPLEMENTATION default; READ blocks only your own MUTATING writes.
 - Context: `DADAIA_CONTEXT` -> session binding -> repo of the cwd; inspect via `dadaia context show --json`.
-- `dadaia context bind` refreshes the session; it is the sole context-memory-injection trigger.
+- `dadaia context bind <ctx> [--print-env]` is one verb: no mode, no release, no session state beyond the context — it refreshes the session and is the sole context-memory-injection trigger.
 - A plain shell's exported `DADAIA_CONTEXT` env var IS the binding.
+- Scope = the bound context's main repo plus its associated repos; only `repos/<slug>/` is scope-judged.
+- Out-of-scope write: BLOCKed with `fix: dadaia context bind <owner>`; an unbound session, an unregistered slug and a workspace-root path are never scope-blocked.
 - Bind is optional; ADDITIVE needs none; alert the operator only at zero ALIVE contexts.
 - One harness session per checked-out tree (ADR 0002); a parallel session's worktree is created before launch; staging discipline: §7.3.
 
@@ -145,7 +150,8 @@
 - A repo working tree carries source and its own artifacts only — never `.dadaia/`.
 - A nested `.dadaia/` corrupts context resolution for every tree-walking tool.
 - Excluded: `<!-- repo-excluded -->`.
-- Redirect caches: pytest `-p no:cacheprovider`, mypy `incremental = false`, hypothesis `database = None`, ruff `--no-cache`.
+- Caches redirect by configuration, never by a remembered command flag: `[tool.pytest.ini_options] addopts`, `[tool.ruff] cache-dir`, `[tool.mypy] cache_dir`, hypothesis `database = None`.
+- A bare `pytest`/`ruff check`/`mypy --strict` from the repo root leaves the tree clean; the excluded set is rendered from the one registry (§8.5).
 - Redirect Playwright's `outputDir` into `.dadaia/tmp/`.
 - Gitignore is defence in depth, not permission to create them.
 
@@ -265,6 +271,8 @@
 - Every `feature/{M.m.p}` push runs the local CI preflight first — always-on, not hook-forced.
 - Preflight: `ruff format --check`, `ruff check`, `mypy --strict`, `pytest`.
 - A full scan lives only in the audit lane; the PR-gate review is diff-based; only pushes are review-blocked, commits flow freely.
+- The push IS the publication boundary: this repository is public, so pre-push runs the full denylist scan over every tracked path.
+- No path is exempt and no tolerated-pairs list exists; a fixture needing a secret shape composes it at runtime, never as a tracked literal.
 - Watch every push/PR to green (`dd-release-implementation`).
 - A `quarantine`-marked test sits outside the gating selectors, bug-gated; unregistered pass-on-retry is a failure.
 
@@ -315,7 +323,12 @@
 - One finding per line, `<CODE> <verdict> <message>`; codes `WS-<zone>-<verdict>`, `SPEC-DOC-*`, `TREE-*`, `RELEASE-TREE-*`, `BL-SCHEMA|CONFLICT|STALE`, `LEDGER-<NAME>-SCHEMA`; scored `compliance(<section>): N/M <unit> canonical (P%)` plus `compliance(total)`.
 - `ledgers` schema-validates every committed governance record: `decisions.jsonl`, `BACKLOG.json`, `BUGS.jsonl`, `FINDINGS.jsonl`, every `_RELEASE.json`, the three `_histo.jsonl`.
 - `.dadaia/` zones and the `states/` canon are one registry (`core/workspace_layout.DADAIA_ZONES`), rendered into `.dadaia/AGENTS.md` at `public stage`; outside manifest, registry and exceptions (§5.1) = slop.
-- SessionStart runs `dadaia doctor --fix --expired-only`; slop dies only by an explicit operator `dadaia doctor --fix`.
+- The workspace section scans the root, the harness dirs, the `.dadaia/` zones and the top of every ALIVE registered repo — plus, at any depth in a repo, an excluded name or a nested `.dadaia/`.
+- Slop and dead-repo leftovers are MOVED to `.dadaia/reaped/<YYYYMMDD>/<workspace-relative-path>` (a zone, 7-day TTL from the move, one hold per origin per day) and listed `WS-reaped-reaped`.
+- Nothing is deleted directly: deletion happens only when a TTL zone's entry expires, `reaped/` included.
+- `--fix` runs that reaper then the specs fixes; `--expired-only` scopes the report to the TTL lane, never the deletion.
+- SessionStart runs `dadaia doctor --fix --expired-only --quiet`; the PostToolUse throttle runs the same reaper, which also owns presence GC.
+- `HOOKS-DRIFT-1`: an ALIVE repo's installed `.git/hooks/{pre-commit,pre-push}` byte-differing from the shipped script; `fix: .dadaia/.venv/bin/dadaia ci install-hook --force`.
 
 ---
 
@@ -355,7 +368,10 @@
 - **verdict** — a PR-head-scoped approval record, consumed once, deleted after merge.
 - **chokepoint** — a git hook that gates the write path outside the harness hook.
 - **gate** — the deterministic PreToolUse enforcement chain (§3.1).
-- **path class** — the ADDITIVE/MEMORY/MUTATING/PROTECTED category a write path belongs to (§3.2).
+- **path class** — the ADDITIVE/MUTATING/PROTECTED category a write path belongs to (§3.2).
+- **scope** — the repo set a bind owns: the context's main repo plus its associated repos (§3.3).
+- **stall** — a BLOCK whose own `fix:` command is itself blocked; CRITICAL (§3.1).
+- **publication boundary** — the push, where the full denylist scan runs on every tracked path (§7.4).
 - **presence** — the advisory record a session leaves when it writes, surfaced to others.
 - **canon** — the closed set of paths a `specs/` root may contain (§6.2).
 - **histo** — an append-only JSONL history file under an area's `_archive/`; one `histo-record-v1` per exited entry.
@@ -369,7 +385,8 @@
 - **denylist** — the pattern list the pre-push scan refuses to let through.
 - **projection** — a lib-originated copy of a `public/` asset installed into a runtime tree.
 - **zone** — one top-level `.dadaia/` directory with a registry record: class, creator, TTL, canon, purpose (§8.5).
-- **finding verdict** — `dadaia doctor`'s class for one scanned entry: `canon | operator | slop | expired | missing`; `canon` + `operator` count as canonical.
+- **finding verdict** — `dadaia doctor`'s class for one scanned entry: `canon | operator | reaped | slop | expired | missing`; `canon`, `operator` and `reaped` count as canonical.
+- **reaped** — an entry held in `.dadaia/reaped/` after the reaper moved it, awaiting its own TTL (§8.5).
 - **finding code** — `WS-<zone>-<verdict>`, `<zone>` = `root`, a harness dir, `dadaia`, or a zone name without its leading dot.
 - **instance exceptions** — `.dadaia/states/instance_exceptions.txt`, one glob per line, honoured at the root and inside the harness dirs (§5.1).
 - **operator** — the human who owns the workspace and approves ADRs, deferrals, releases.

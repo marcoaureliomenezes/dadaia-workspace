@@ -36,7 +36,8 @@ dadaia public doctor
 ## 4. Hygiene
 
 - `dadaia doctor` is the one scan and reaper: a loose file or unknown directory at the `.dadaia/` root is a `WS-dadaia-slop` finding — route it into the zone that owns it.
-- SessionStart reaps only expired entries; slop dies only by an explicit operator `dadaia doctor --fix`.
+- The reaper MOVES slop into `reaped/<YYYYMMDD>/<workspace-relative-path>`; it never deletes directly — a held entry dies at its own 7-day TTL.
+- It runs at SessionStart, on the PostToolUse throttle, and on `dadaia doctor --fix`; recover a mistakenly held entry by moving it back before its TTL.
 
 ## 5. Validation
 
@@ -45,5 +46,5 @@ dadaia doctor
 dadaia public doctor
 ```
 
-- On drift or a `WS-*-slop` finding: fix the public source or the state owner; `dadaia doctor --fix` deletes only what its dry run listed.
+- On drift or a `WS-*-slop` finding: fix the public source or the state owner; `dadaia doctor --fix` acts only on what its dry run listed.
 - Never patch the projection in place; never rubber-stamp a new folder into the canonical set to silence the check.

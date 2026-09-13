@@ -56,7 +56,7 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 
 **Step 8 — Artifact GC sweep.**
 - `dadaia doctor` dry: read every `WS-<zone>-<verdict>` line and the `compliance:` score line.
-- `dadaia doctor --fix --expired-only` reaps the TTL-expired entries; list the remaining slop for the operator — structural slop dies only by an explicit operator `--fix`.
+- `dadaia doctor --fix` runs the reaper (slop MOVED to `.dadaia/reaped/`, 7-day hold) then the specs repairs; list what it held for the operator.
 - Done when: the `kind: artifact-gc` log entry records the `compliance(total)` line and it reads 100%, or names the slop the operator holds.
 
 **Step 9 — Candidate PR.**

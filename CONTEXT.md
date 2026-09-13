@@ -21,21 +21,21 @@ One harness process, identified by exactly one `session_id` — the harness's ow
 _Avoid_: sid ladder, CLI-minted session, thread id
 
 **Bind**:
-The session record that names the context a session works in. A context with at least one live bind is alive.
-_Avoid_: alive flag, lease, lock
+The session record that names the context a session works in, and nothing else — `dadaia context bind <ctx> [--print-env]` is one verb with no mode, release, force or reason. A context with at least one live bind is alive; a bind carries a Scope.
+_Avoid_: alive flag, lease, lock, bind mode, bind release
 
 **Presence**:
-The advisory record a session leaves when it writes, surfaced to other sessions and reaped only by the presence module.
+The advisory record a session leaves when it writes, surfaced to other sessions and collected by the one reaper, which never touches the writing session's own record.
 _Avoid_: heartbeat, marker, sentinel
 
 **Invocation**:
-The facts resolved once per process from environment, cwd and payload: workspace, session, context, repo, specs_dir, mode, release and phase. Every policy receives an Invocation; none re-derives it.
+The facts resolved once per process from environment, cwd and payload: workspace, session, context, repo, specs_dir and bind. Every policy receives an Invocation; none re-derives it, and none carries a release or a phase — the gate reads no SDD artifact.
 _Avoid_: resolution ladder, rung, resolve_context
 
 ## Enforcement
 
 **Gate**:
-The one PreToolUse chain (root whitelist, venv guard, SDD classifier) that decides whether a harness write proceeds.
+The one PreToolUse chain (root whitelist, venv guard, SDD classifier) that decides whether a harness write proceeds. It blocks exactly three things — a new workspace-root entry, a non-venv `dadaia`/`pip`/`python -m dadaia_workspace`, and a PROTECTED or out-of-Scope write — each with one `fix:` line.
 _Avoid_: hook (for the chain), guard (for the chain)
 
 **Hook**:
@@ -43,16 +43,24 @@ A harness-invoked script (PreToolUse, PostToolUse, SessionStart) — the transpo
 _Avoid_: gate, chokepoint
 
 **Chokepoint**:
-A git hook (pre-commit, pre-push) or CI job that validates at the publication boundary.
+A git hook (pre-commit, pre-push) or CI job that validates at the Publication boundary. An installed copy byte-differing from the shipped script is `HOOKS-DRIFT-1`.
 _Avoid_: hook, guard
+
+**Publication boundary**:
+The push — where a blob becomes public. This repository is public, so the full denylist scan applies to every tracked path, with no tolerated-pairs list and no path exemption; a fixture needing a secret shape composes it at runtime.
+_Avoid_: release boundary, publish step, baseline (for a tolerated literal)
 
 **Verdict**:
 A security-reviewer APPROVED handoff bound to one commit sha, committed under `releases/<id>/verdicts/`, consumed once by the PR gate and deleted after merge.
 _Avoid_: approval, decision (the gate's boolean), review
 
 **Path class**:
-The category a written path belongs to — ADDITIVE, MEMORY, MUTATING, PROTECTED — and the only thing the gate classifies.
-_Avoid_: lane, zone
+The category a written path belongs to — ADDITIVE, MUTATING, PROTECTED, three and no fourth — and the only thing the gate classifies. `specs/memory/` is MUTATING in every phase.
+_Avoid_: lane, zone, MEMORY, LAW, UNGATED, FROZEN (retired classes)
+
+**Scope**:
+The repo set one Bind owns — its context's main repo plus its associated repos. A bound session's MUTATING write under a `repos/<slug>/` outside it is the gate's one non-PROTECTED block; an unbound session, an unregistered slug and a workspace-root path are never scope-judged.
+_Avoid_: ownership, lease, territory, allowlist (for the repo set)
 
 **Stall**:
 The flow cannot advance because an enforcement point (gate, chokepoint, doctor exit, CLI refusal) refuses the next action the law itself requires; every BLOCK carries one executable `fix:` line, and a BLOCK whose fix is itself blocked is a CRITICAL bug by definition (operator ruling 2026-09-12).
@@ -127,11 +135,11 @@ The HTML rendering of a handoff, written only for a human hop.
 _Avoid_: artifact (bare), page
 
 **Doctor**:
-`dadaia doctor` — the one validator over three Compliance sections (`workspace`, `specs`, `ledgers`), reporting one finding per line as `<CODE> <verdict> <message>` and repairing the fixable ones with `--fix`; exit 1 on any error-class finding. `dadaia public doctor` (lib-vs-projection) is the only other one, always qualified.
+`dadaia doctor` — the one validator and reaper over three Compliance sections (`workspace`, `specs`, `ledgers`), reporting one finding per line as `<CODE> <verdict> <message>`; `--fix` runs the reaper then the specs repairs, `--expired-only` scopes the report to the TTL lane; exit 1 on any error-class finding, each carrying one `fix:` line. `dadaia public doctor` (lib-vs-projection) is the only other one, always qualified.
 _Avoid_: specs doctor, backlog doctor (both retired, not aliased), checker, linter (for doctors), audit (for doctors)
 
 **Compliance section**:
-One scored half-open group of doctor rules — `workspace` (zones, root and harness-dir entries), `specs` (canon tree, releases, fixed law, memory) or `ledgers` (schema validation of every committed governance record). Each prints `compliance(<section>): N/M <unit> canonical (P%)`, then `compliance(total)` last.
+One scored half-open group of doctor rules — `workspace` (zones, root and harness-dir entries, every ALIVE repo's top, held reaped entries, installed hook drift), `specs` (canon tree, releases, fixed law, memory) or `ledgers` (schema validation of every committed governance record). Each prints `compliance(<section>): N/M <unit> canonical (P%)`, then `compliance(total)` last.
 _Avoid_: doctor area, lane, pass (for a section)
 
 **Store**:
@@ -167,12 +175,20 @@ _Avoid_: sub-AGENTS, area rules file
 ## Workspace zones (0.4.6)
 
 **Zone**:
-One top-level `.dadaia/` directory with a `Zone(name, cls, creator, ttl_seconds, canon, purpose)` record in `core/workspace_layout.DADAIA_ZONES`; classes `projection state protected operator output ephemeral managed`, creators `init install runtime operator`. Every other list of zone names is a view of the registry.
+One top-level `.dadaia/` directory with a `Zone(name, cls, creator, ttl_seconds, canon, purpose)` record in `core/workspace_layout.DADAIA_ZONES` — the one registry that also holds the root law, the states canon, the `specs/` canon rows and `REPO_TREE_EXCLUDED`; classes `projection state protected operator output ephemeral managed`, creators `init install runtime operator`. Every other list of canonical names is a view of it.
 _Avoid_: folder, lane, path class (the gate's category — a zone is a directory record)
 
 **Finding verdict**:
-The doctor's classification of one scanned entry — `canon | operator | slop | expired | missing`; `canon` + `operator` count as canonical. Always written qualified.
+The doctor's classification of one scanned entry — `canon | operator | reaped | slop | expired | missing`; `canon`, `operator` and `reaped` count as canonical. Always written qualified.
 _Avoid_: verdict (bare — the PR approval record above), status, class
+
+**Reaped**:
+An entry the reaper MOVED out of the working tree into the `reaped` zone (`.dadaia/reaped/<YYYYMMDD>/<workspace-relative-path>`), held 7 days from the move, one hold per origin per day. Slop is never deleted directly — deletion happens only when a TTL zone's entry expires.
+_Avoid_: deleted, purged, quarantined (the pytest mark), trash
+
+**Sweep**:
+`features/spec_context/sweep.py` — the one traversal primitive (`walk`, `mtime`, `move`, `remove`) behind every doctor walk, under one guard: a symlink is never followed, a vanished entry is absent, a location outside the workspace is skipped, every OSError is one `skipped` action.
+_Avoid_: reaper walk, gc, cleanup pass, per-call-site guard
 
 **Finding code**:
 `WS-<zone>-<verdict>` — `<zone>` is `root`, a harness dir (`claude codex kimi-code agents`), `dadaia` (the `.dadaia/` top level) or a zone name with its leading dot stripped (`cache`); the `workspace` section's code family, beside `SPEC-DOC-*`, `TREE-*`, `RELEASE-TREE-*` (specs) and `BL-SCHEMA|CONFLICT|STALE`, `LEDGER-<NAME>-SCHEMA` (ledgers).

@@ -60,12 +60,16 @@ an initialized workspace, create it:
 - Setup: an initialized workspace; seed `mkdir .dadaia/nonsense` and one file under
   `.dadaia/tmp/` with an mtime older than one day (`touch -d '2 days ago'`).
 - Run: `$D doctor` (exit code asserted directly, never through a pipe), then
-  `$D doctor --fix --expired-only`, then `$D doctor --fix`, then `$D doctor`.
+  `$D doctor --fix`, then `$D doctor`.
 - **PASS if:** the dry run exits non-zero with one `WS-dadaia-slop` line for `nonsense`,
   one `WS-tmp-expired` line and a final `compliance: N/M entries canonical (P%)` line;
-  `--expired-only` deletes only the tmp file; the plain `--fix` deletes `nonsense`; the
-  last run exits 0 at 100%. Run the seed and the doctor from the SAME cwd — a doctor run
-  from another cwd resolves a different workspace and proves nothing.
+  `--fix` DELETES the expired tmp file and MOVES `nonsense` to
+  `.dadaia/reaped/<YYYYMMDD>/.dadaia/nonsense` (present on disk, reported
+  `WS-reaped-reaped`, never deleted); the last run exits 0 at 100%. Run the seed and the
+  doctor from the SAME cwd — a doctor run from another cwd resolves a different
+  workspace and proves nothing.
+- `--expired-only` scopes the REPORT to the TTL lane only; it is not a second, gentler
+  fix — asserting that it leaves slop in place is a FAIL of the recipe, not of the tool.
 
 ### F-03 — Certify agrees with reconcile
 - Run: `$D certify --json`.
@@ -112,9 +116,8 @@ an initialized workspace, create it:
 ### F-07 — Bind & session identity
 - Setup: initialized workspace with one alive context `beta`; export a STABLE id:
   `export DADAIA_SESSION_ID=f07-fixed`.
-- Run: `$D context show --json` (no bind yet); `$D context bind beta --mode
-  implementation --release r1`; `$D context bind beta --mode implementation --release
-  r1` (again); `ls .dadaia/sessions/*.json | wc -l`.
+- Run: `$D context show --json` (no bind yet); `$D context bind beta`; `$D context bind
+  beta` (again); `ls .dadaia/sessions/*.json | wc -l`.
 - **PASS if:** the unbound `show --json` prints `{"context": null}` exit 0 (no
   traceback); both binds print the SAME session id (`f07-fixed`); and exactly ONE
   session record exists after the two binds.
@@ -126,11 +129,13 @@ an initialized workspace, create it:
   separate, correct decision, asserted on its own):
   - `repos/valproj/specs/bugs/x.md` (ADDITIVE) → expect `allow`;
   - `repos/valproj/specs/bugs/_archive/bugs_histo.jsonl` (ADDITIVE histo) → expect `allow`;
+  - `repos/valproj/specs/memory/product/catalog.json` (MUTATING, no phase) → expect `allow`;
   - `.dadaia/sessions/x` (PROTECTED) → expect `block`;
   - `newdir/x.md` (new top-level root entry) → expect `block` naming the root
     whitelist.
-- **PASS if:** all four decisions match. (Each is one deterministic hook invocation —
-  that IS the demonstration.)
+- **PASS if:** all five decisions match, and every `block` reason carries exactly one
+  `fix: ` line whose command, replayed as a Bash payload, is itself ALLOWed. (Each is
+  one deterministic hook invocation — that IS the demonstration.)
 - **Envelope contract (bugs claude-pre-gate-envelope-contract +
   pre-gate-allow-envelope-fails-claude-schema):** each verdict must be a single JSON
   envelope that validates against the Claude Code PreToolUse output schema (top-level

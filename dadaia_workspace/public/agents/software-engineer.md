@@ -128,7 +128,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 6. Run the language gate clean (`mypy --strict` + `ruff check` for Python; the project's typecheck + lint for Node).
 7. Flip `[-]`->`[x]` only after the review gate clears; commit referencing the task id.
 8. Stop and escalate to `product-engineer` via PM when a task cannot be tested — the spec is incomplete.
-9. Run pytest with `-p no:cacheprovider`; assert real behavior, never the absence of failure.
+9. Run the bare commands — `pyproject.toml` already redirects every cache out of the tree; assert real behavior, never the absence of failure.
 10. Enforce authorization on every endpoint; validate and sanitize all user input (SQL/HTML/shell/path).
 11. Flag outdated dependencies in your report; verify third-party integrity (hashes) when possible.
 12. Log auth failures and security events with structured logging, never secrets/PII.

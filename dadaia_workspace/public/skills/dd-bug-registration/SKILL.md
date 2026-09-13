@@ -8,7 +8,7 @@ description: >
 
 # dd-bug-registration
 
-> ADDITIVE paths (`specs/bugs/**`) are always writable, in any mode — registration is
+> ADDITIVE paths (`specs/bugs/**`) are always writable, bound or not — registration is
 > never blocked and never waits. Any agent runs this.
 
 ## 1. When

@@ -51,7 +51,7 @@
     },
     {
       "id": "venv-guard",
-      "mandate": "dadaia/pip/python -m dadaia_workspace run only from the workspace venv; the block message carries the corrected command.",
+      "mandate": "One rule: dadaia/pip/python -m dadaia_workspace run only from the workspace venv; the block carries one fix: line with the corrected command. Caches redirect by configuration, never by a guard.",
       "implementations": {
         "claude": "PreToolUse hook (Bash payloads) via dadaia_workspace.hooks.pre_gate",
         "codex": ".codex/hooks.json wrapper → the same Python gate",
@@ -60,9 +60,9 @@
     },
     {
       "id": "sdd-gate",
-      "mandate": "Path class × presence × phase × mode on every write: ADDITIVE always writable, MEMORY phase-gated, FROZEN/PROTECTED/LAW blocked; races surfaced, never prevented.",
+      "mandate": "Three path classes on every write: ADDITIVE always writable, PROTECTED blocked, MUTATING writable but scope-judged under repos/<slug>/ when the session is bound; no phase, no mode; every block carries one fix: line; races surfaced, never prevented.",
       "implementations": {
-        "claude": "PreToolUse hook via dadaia_workspace.hooks.pre_gate (single merged entrypoint) + PostToolUse advisory presence via dadaia_workspace.hooks.sdd_post_gate",
+        "claude": "PreToolUse hook via dadaia_workspace.hooks.pre_gate (single merged entrypoint) + PostToolUse advisory presence and the throttled workspace reaper via dadaia_workspace.hooks.sdd_post_gate",
         "codex": ".codex/hooks.json wrapper → the same Python gate (pre + post)",
         "kimi-code": "managed hook block → the same Python gate (pre + post)"
       }
@@ -71,7 +71,7 @@
       "id": "context-memory-injection",
       "mandate": "The session's own bind selects which product memory is injected at prompt time; never another session's bind.",
       "implementations": {
-        "claude": "UserPromptSubmit + SessionStart hooks via dadaia_workspace.hooks.ctx_inject",
+        "claude": "UserPromptSubmit + SessionStart hooks via dadaia_workspace.hooks.ctx_inject; SessionStart also runs dadaia doctor --fix --expired-only --quiet (the reaper lane)",
         "codex": "session bootstrap via the projected wrapper (headless sessions read AGENTS.md natively)",
         "kimi-code": "managed hook block → the same ctx_inject module"
       }

@@ -19,12 +19,16 @@ line here and `--help` disagree, `--help` wins.
 2. `dadaia --help` lists the groups; `dadaia <group> --help` the subcommands; add
    `--json` to read commands for machine-readable output.
 3. Run `dadaia capabilities --json` first in any new or upgraded session.
-4. Bind the session: `dadaia context bind <ctx> --mode implementation --release
-   <id>`; a plain shell (or kimi-code) exports `DADAIA_CONTEXT=<ctx>` instead — the
-   env var IS the binding there. ADDITIVE work (bugs/backlog/audits/reports) needs
-   no bind.
+4. Bind the session: `dadaia context bind <ctx>` — one verb, no mode, no release, no
+   force; `--print-env` emits `DADAIA_CONTEXT`/`DADAIA_SESSION_ID` for `eval $(…)`.
+   A plain shell (or kimi-code) exports `DADAIA_CONTEXT=<ctx>` instead — the env var
+   IS the binding there. ADDITIVE work (bugs/backlog/audits/reports) needs no bind.
+   The bind also sets the write scope: the context's main repo plus its associated
+   repos (`DADAIA.md` §3.3).
 5. Before implementing: `dadaia doctor --context <ctx> --json` clean (sections
    `workspace`/`specs`/`ledgers`), then reserve the task (`dd-task-manager`).
+   `--fix` MOVES slop to `.dadaia/reaped/` (7-day hold); nothing is deleted before
+   its own TTL.
 6. Pass explicit `--context`/`--release-id` on every command.
 7. Converge a runtime: resolve `provider.distribution_version` from
    `dadaia capabilities --json`, then `dadaia reconcile --expect-version "$v"
