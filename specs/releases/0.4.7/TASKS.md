@@ -26,7 +26,7 @@
   session_store}.py`, `dadaia_workspace/features/specs/specs_tree.py`, `tests/**`.
   Blocked by: T-047-14. Delivers: bound to A, a write into `repos/B/` is refused with a
   runnable fix; a memory atom is writable in every phase.
-- [ ] T-047-16 — FR3 + FR4 (bug `context-bind-implementation-requires-release-id-
+- [-] T-047-16 — FR3 + FR4 (bug `context-bind-implementation-requires-release-id-
   stall-when-none-live`): delete `_cache_guard_reason` + helpers and their tests;
   `[tool.ruff] cache-dir`, `[tool.mypy] cache_dir` in `pyproject.toml`; preflight
   drops the per-command flags and `resolve_mypy_cache_dir`; `context bind <ctx>
