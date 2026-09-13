@@ -60,6 +60,7 @@ from pathlib import Path
 from typing import Any
 
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.models.backlog import Intent, parse_intents
 from dadaia_workspace.core.models.histo import BACKLOG_HISTO_DISPOSITIONS, HistoRecord
 from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
@@ -503,15 +504,22 @@ class BacklogExitError(ValueError):
     """
 
 
-#: The evidence each disposition must carry. ``delivered`` names the release that
-#: shipped the item (validated against ``specs/releases/`` — live or archived, since a
-#: closure sweep may run after the ship); ``superseded``/``rejected`` name the reason
-#: (the superseder, or why it was refused). One table, no per-disposition branch.
+#: The evidence each disposition must carry (0.4.7 FR3). ``delivered`` and
+#: ``superseded`` are the two RELEASE lanes: both name the release that closed the item
+#: (validated against ``specs/releases/`` — live or archived, since a closure sweep may
+#: run after the ship) and both exit an entry that was actually ``picked`` into one.
+#: ``rejected`` is the lane for an item no release ever took: it names the reason and
+#: exits from any live status. One table, no per-disposition branch.
 _REQUIRED_EVIDENCE: dict[str, str] = {
     "delivered": "release",
-    "superseded": "reason",
+    "superseded": "release",
     "rejected": "reason",
 }
+
+#: The entry status the two release lanes require — an item a release closed is an item
+#: a release picked. Exiting an ``idea`` as ``delivered`` launders unworked scope into
+#: the histo as shipped work.
+_PICKED_STATUS = "picked"
 
 
 def _known_release(specs_dir: Path, release: str) -> bool:
@@ -544,16 +552,34 @@ def _check_exit_evidence(
             f"{example}"
         )
 
-    if (
-        disposition == "delivered"
-        and release is not None
-        and not _known_release(specs_dir, release)
-    ):
+    if required != "release":
+        return
+
+    if release is not None and not _known_release(specs_dir, release):
         raise BacklogExitError(
             f"release {release!r} names neither a live nor an archived release under "
-            f"specs/releases/ — a delivered item names the release that shipped it.\n"
-            f"fix: .dadaia/.venv/bin/dadaia release archive --help"
+            f"specs/releases/ — a {disposition} item names the release that closed it.\n"
+            f"fix: {DADAIA_BIN} release archive --help"
         )
+
+    status = _status_of(specs_dir, slug)
+    if status != _PICKED_STATUS:
+        raise BacklogExitError(
+            f"{slug!r} is {status!r}, not {_PICKED_STATUS!r}: only an entry a release "
+            f"picked can exit as {disposition!r}. An item no release took exits as "
+            f"'rejected', with the reason.\n"
+            f"fix: {DADAIA_BIN} backlog exit {slug} --disposition rejected "
+            f"--reason '<why no release took it>'"
+        )
+
+
+def _status_of(specs_dir: Path, slug: str) -> str | None:
+    """The live ``active[]`` status of *slug*, or ``None`` — read from the document the
+    exit is about to rewrite, never from a second cache."""
+    for item in load_document(specs_dir / "backlog").active:
+        if item.slug == slug:
+            return item.status
+    return None
 
 
 def _live_slug_or_refuse(specs_dir: Path, slug: str) -> None:
@@ -606,8 +632,10 @@ def backlog_exit(
     wires the real operator denylist in via ``container.load_denylist_terms()``,
     mirroring how ``cli/commands/bugs.py`` wires ``BugService`` today.
     """
-    _check_exit_evidence(specs_dir, slug, disposition, reason, release)
+    # Liveness first: it is the precondition for every other question. A slug that
+    # already exited must be told so, not diagnosed for the status it no longer has.
     _live_slug_or_refuse(specs_dir, slug)
+    _check_exit_evidence(specs_dir, slug, disposition, reason, release)
     entry = remove_active_subsection(specs_dir, slug)
     record = HistoRecord(
         id=slug,

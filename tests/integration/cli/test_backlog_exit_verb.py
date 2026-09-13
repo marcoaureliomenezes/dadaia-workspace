@@ -56,6 +56,17 @@ def _new(specs_dir: Path, slug: str) -> None:
     _run("backlog", "new", slug, "--specs-dir", str(specs_dir))
 
 
+def _pick(specs_dir: Path, slug: str) -> None:
+    """Flip an entry to `picked` the way the release-definition commit does — the
+    status FR3 requires before a `delivered`/`superseded` exit."""
+    path = specs_dir / "backlog" / "BACKLOG.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    for item in document["active"]:
+        if item["id"] == slug:
+            item["status"] = "picked"
+    path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+
+
 def _histo_lines(specs_dir: Path) -> list[str]:
     path = specs_dir / "backlog" / "_archive" / "backlog_histo.jsonl"
     return [line for line in path.read_text(encoding="utf-8").split("\n") if line.strip()]
@@ -78,6 +89,7 @@ def test_exit_removes_one_entry_appends_one_histo_record_and_one_event(
     `entry`, and the event's `record_hash` is the sha256 of that exact line."""
     _new(specs, "a-thing")
     _new(specs, "another-thing")
+    _pick(specs, "a-thing")
 
     _run(
         "backlog", "exit", "a-thing", "--disposition", "delivered",
@@ -109,6 +121,7 @@ def test_an_archived_release_is_a_valid_delivered_target(home: Path, specs: Path
     """`--release` accepts a live OR an archived release id — a closure sweep run after
     the ship must still name the release that delivered the item."""
     _new(specs, "old-thing")
+    _pick(specs, "old-thing")
     _run(
         "backlog", "exit", "old-thing", "--disposition", "delivered",
         "--release", "0.4.6", "--specs-dir", str(specs),
@@ -121,7 +134,8 @@ def test_an_archived_release_is_a_valid_delivered_target(home: Path, specs: Path
     [
         ("delivered-without-release", ["--disposition", "delivered"]),
         ("delivered-unknown-release", ["--disposition", "delivered", "--release", "9.9.9"]),
-        ("superseded-without-reason", ["--disposition", "superseded"]),
+        ("superseded-without-release", ["--disposition", "superseded"]),
+        ("superseded-unknown-release", ["--disposition", "superseded", "--release", "9.9.9"]),
         ("rejected-without-reason", ["--disposition", "rejected"]),
     ],
 )
@@ -161,3 +175,57 @@ def test_a_second_exit_of_the_same_slug_refuses_and_points_at_the_histo(
     assert "another-thing" in output
     assert_block_carries_a_runnable_fix(output)
     assert len(_histo_lines(specs)) == 1
+
+
+@pytest.mark.parametrize("disposition", ["delivered", "superseded"])
+def test_a_release_exit_refuses_an_entry_that_was_never_picked(
+    home: Path, specs: Path, disposition: str
+) -> None:
+    """FR3: `delivered`/`superseded` exit a PICKED entry. An `idea` that never entered a
+    release cannot have been delivered or superseded by one — exiting it that way
+    launders an unworked item into the histo as shipped work."""
+    from tests.contract.test_every_block_carries_a_fix import assert_block_carries_a_runnable_fix
+
+    _new(specs, "an-idea")
+
+    output = _refuse(
+        "backlog", "exit", "an-idea", "--disposition", disposition,
+        "--release", "0.4.7", "--specs-dir", str(specs),
+    )  # fmt: skip
+    assert "picked" in output
+    assert_block_carries_a_runnable_fix(output)
+
+    document = json.loads((specs / "backlog" / "BACKLOG.json").read_text(encoding="utf-8"))
+    assert [item["id"] for item in document["active"]] == ["an-idea"]
+    assert not (specs / "backlog" / "_archive").exists()
+
+
+def test_rejected_exits_from_any_live_status_and_needs_only_a_reason(
+    home: Path, specs: Path
+) -> None:
+    """FR3: `rejected` is the lane for an item that never got picked — it carries a
+    reason, names no release, and needs no status."""
+    _new(specs, "an-idea")
+
+    _run(
+        "backlog", "exit", "an-idea", "--disposition", "rejected",
+        "--reason", "out of scope", "--specs-dir", str(specs),
+    )  # fmt: skip
+
+    record = json.loads(_histo_lines(specs)[0])
+    assert record["disposition"] == "rejected"
+    assert record["reason"] == "out of scope"
+
+
+def test_superseded_records_the_release_that_superseded_it(home: Path, specs: Path) -> None:
+    """FR3: `superseded` names the release, exactly like `delivered` — one evidence rule
+    for both release lanes instead of two."""
+    _new(specs, "a-thing")
+    _pick(specs, "a-thing")
+
+    _run(
+        "backlog", "exit", "a-thing", "--disposition", "superseded",
+        "--release", "0.4.7", "--specs-dir", str(specs),
+    )  # fmt: skip
+
+    assert json.loads(_histo_lines(specs)[0])["release"] == "0.4.7"

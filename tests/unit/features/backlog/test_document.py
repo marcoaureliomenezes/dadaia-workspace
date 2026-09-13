@@ -604,7 +604,7 @@ _TWO_ACTIVE_ITEMS = _doc(
             "id": "going-away",
             "title": "Going away",
             "opened": "2026-08-10",
-            "status": "candidate",
+            "status": "picked",
             "description": "About to exit.",
             "provenance": "operator request",
             "intents": [
@@ -736,7 +736,7 @@ _ACTIVE_ITEM_WITH_DENYLISTED_TERM = _doc(
             "id": "leaky-exit",
             "title": "Leaky exit",
             "opened": "2026-08-10",
-            "status": "candidate",
+            "status": "picked",
             "description": "See .dadaia/reports/acme-corp-games/qa-engineer/report.html for detail.",
             "provenance": "operator request",
         }
