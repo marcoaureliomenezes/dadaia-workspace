@@ -46,7 +46,7 @@
   `llms.txt`, `docs/**`, `tests/**`. Blocked by: T-047-34. Delivers: the PyPI long
   description is true, every section names its atom, and one changed atom byte is a
   red test.
-- [ ] T-047-37 — FR3 rest (`software-engineer`): `docs/getting-started.md` (install →
+- [-] T-047-37 — FR3 rest (`software-engineer`): `docs/getting-started.md` (install →
   `dadaia init` → `context bind` → `doctor` → `panel` → first candidate, what each
   step creates) and `docs/concepts.md` (context, release/candidate, the flow, the
   gate, memory, bugs/backlog, audits — one paragraph each, `CONTEXT.md` for terms),
