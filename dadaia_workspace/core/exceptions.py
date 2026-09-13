@@ -214,7 +214,7 @@ class ScopeNotConsumedError(DadaiaError):
 
     The run injects an authoritative scope directive naming the items the definition MUST
     pick; nothing verified the produced SPEC against it, so a definition that dropped every
-    item still reported success with an empty consumed_backlog ledger
+    item still reported success while picking nothing
     (bug release-definition-consumes-nothing-while-scope-declares-items). Raised by the
     producer post-step and surfaced as ``post_step_error`` — never a silent skip.
     """

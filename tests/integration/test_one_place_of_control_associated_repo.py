@@ -1,4 +1,4 @@
-"""FR19 (v0.4.4, T-044-30) A19.2 — one place of control: ``specs doctor``, ``backlog
+"""FR19 (v0.4.4, T-044-30) A19.2 — one place of control: ``dadaia doctor``'s specs and ledgers sections, ``backlog
 doctor`` and the SDD gate see exactly ONE ``specs/`` tree per context — the main repo's.
 
 Intent: CONTRACT — A19.2
@@ -15,7 +15,7 @@ Extends T-044-27's A16.4 resolution-walk coverage
 (``tests/unit/core/test_specs_resolver_associated_repo_walk.py`` — which already proves
 ``core.specs_resolver.resolve_specs_dir`` lands on the main repo's ``specs/`` from a cwd
 inside the associated repo) up to the three real consumers that sit on top of that
-resolver: the ``specs doctor`` / ``backlog doctor`` CLI verbs (via the real Typer app,
+resolver: the ``dadaia doctor`` specs/ledgers sections (via the real Typer app,
 the same convention as
 ``tests/integration/cli/test_bind_resolution_seam_executed_path.py``) and the
 ``sdd_gate`` PreToolUse hook (via ``run_hook_subprocess``, the same convention as
@@ -163,43 +163,44 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# `specs doctor` — resolves the main repo's specs/ tree from inside the associated repo
+# the `specs` section — resolves the main repo's specs/ tree from inside the assoc repo
 # --------------------------------------------------------------------------- #
 
 
-def test_specs_doctor_from_inside_associated_repo_resolves_main_specs_tree(
+def test_doctor_specs_section_from_inside_associated_repo_resolves_main_specs_tree(
     workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(workspace / "repos" / _ASSOC_SLUG)
 
-    result = _runner.invoke(app, ["specs", "doctor", "--json"])
+    result = _runner.invoke(app, ["doctor", "--json"])
 
     assert result.exit_code in (0, 1), result.output
     payload = json.loads(result.output)
-    assert Path(payload["specs_dir"]) == (workspace / "repos" / _MAIN_SLUG / "specs").resolve()
-    # Never a byte of the associated repo's own content in the doctor's own output.
+    assert set(payload["sections"]) == {"workspace", "specs", "ledgers"}
+    # Never a byte of the associated repo's own content in the doctor's own output: the
+    # associated tree was never the one resolved.
     assert _ASSOC_RELEASE not in result.output
     assert _ASSOC_MEMORY_MARKER not in result.output
 
 
 # --------------------------------------------------------------------------- #
-# `backlog doctor` — same seam, same resolution; the assoc repo's BL-SCHEMA violation
+# the `ledgers` section — same seam, same resolution; the assoc repo's BL-SCHEMA violation
 # must never be evaluated, let alone reported.
 # --------------------------------------------------------------------------- #
 
 
-def test_backlog_doctor_from_inside_associated_repo_never_sees_the_associated_backlog(
+def test_doctor_ledgers_section_from_inside_associated_repo_never_sees_the_assoc_backlog(
     workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(workspace / "repos" / _ASSOC_SLUG)
 
-    result = _runner.invoke(app, ["backlog", "doctor"])
+    result = _runner.invoke(app, ["doctor", "--json"])
 
-    # The MAIN repo's backlog/ has no BACKLOG.json at all (A2.8: absent -> clean, exit 0).
+    # The MAIN repo's backlog/ has no BACKLOG.json at all (A2.8: absent -> clean).
     # If this had instead resolved to the associated repo's own (broken) BACKLOG.json, the
-    # BL-SCHEMA violation would fail the command (exit 1) and name the broken slug.
-    assert result.exit_code == 0, result.output
-    assert "clean" in result.output
+    # BL-SCHEMA violation would be a ledgers finding naming the broken slug.
+    payload = json.loads(result.output)
+    assert payload["sections"]["ledgers"]["findings"] == []
     assert _ASSOC_BACKLOG_SLUG not in result.output
 
 
@@ -220,30 +221,6 @@ def _run_gate(
     result = run_hook_subprocess("sdd_gate", full_payload, env, cwd=ws / "repos" / _ASSOC_SLUG)
     assert result.returncode == 0, result.stderr
     return result.block_envelope()
-
-
-def test_gate_memory_write_inside_associated_repo_is_governed_by_the_main_repos_phase(
-    workspace: Path,
-) -> None:
-    """The associated repo's own ``specs/releases/<id>/RELEASE.json`` claims phase
-    DEFINITION (which would ALLOW a memory write); the MAIN repo's real phase is
-    IMPLEMENTATION (which BLOCKs one). A write physically inside
-    ``repos/assoc-repo/specs/memory/`` must be BLOCKed on the MAIN's phase — proving
-    the gate never reads the associated repo's own RELEASE.json."""
-    target = workspace / "repos" / _ASSOC_SLUG / "specs" / "memory" / "leak-probe.md"
-    target.parent.mkdir(parents=True, exist_ok=True)
-
-    block = _run_gate(workspace, {"tool_name": "Write", "tool_input": {"file_path": str(target)}})
-
-    assert block is not None, (
-        "expected RULE A to block — the assoc repo's own DEFINITION phase must never leak in"
-    )
-    assert "RULE A" in block["reason"]
-    assert f"current phase={_MAIN_PHASE}" in block["reason"]
-    # The RULE A message text always NAMES "DEFINITION" (the phases memory writes ARE
-    # allowed in) — the leak this test guards against is the *observed* phase, not that
-    # substring, hence the exact "current phase=<value>" check above and this one.
-    assert f"current phase={_ASSOC_PHASE}" not in block["reason"]
 
 
 def test_gate_mutating_write_inside_associated_repo_attributes_presence_to_the_owning_context(

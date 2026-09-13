@@ -1,8 +1,7 @@
 ---
-slug: quality-assurance
+slug: QUALITY
 title: quality-assurance
-category: core
-tldr: 10 measured quality principles, then test layers, intent taxonomy, flake and quarantine policy, CI gates and slop measurement.
+tldr: 11 measured quality principles, then test layers, intent taxonomy, flake and quarantine policy, CI gates and slop measurement.
 summary: Part 1 carries the ADR-gated quality principles and the check measuring each; Part 2 records test layers, intent taxonomy, flake handling, the CI gate set and how slop is measured.
 tags: [testing, pytest, ci, quality, test-architecture, flake, quarantine, privacy]
 ---
@@ -15,12 +14,12 @@ ADR: none
 Rationale: split modules grow back one helper at a time unless a number refuses it.
 
 ### P-19 · We pin cyclomatic complexity and nesting at their measured maxima and move them only downward, with the justification in the reducing release's closure record.
-Measured by: `ruff check --no-cache dadaia_workspace/` (`C901`, `PLR1702`; ceilings pinned in `pyproject.toml`), run by `dadaia ci preflight` and the CI lint job.
+Measured by: `ruff check dadaia_workspace/` (`C901`, `PLR1702`; ceilings pinned in `pyproject.toml`), run by `dadaia ci preflight` and the CI lint job.
 ADR: none
 Rationale: a ceiling measured first and pinned second is red only on growth.
 
-### P-20 · We do not grow `specs upgrade` / `specs doctor`: their complexity is pinned and the migration module changes only with a same-commit justification.
-Measured by: `pytest tests/contract/test_specs_cli_complexity_ratchet.py` (radon complexity plus a pinned hash of `features/migrate/upgrade.py`).
+### P-20 · We do not grow `specs upgrade` / `dadaia doctor`: their complexity is pinned and the migration module changes only with a same-commit justification.
+Measured by: `pytest tests/contract/test_specs_cli_complexity_ratchet.py` (radon complexity of `cli/commands/specs.py#upgrade` and `cli/commands/doctor.py#doctor` plus a pinned hash of `features/migrate/upgrade.py`).
 ADR: none
 Rationale: these two surfaces absorbed every migration this product shipped.
 
@@ -40,7 +39,7 @@ ADR: none
 Rationale: a test reaching into a private symbol turns a safe refactor red.
 
 ### P-24 · We declare intent at birth: the count of test files whose module docstring carries `Intent: <KIND> — <ref>` ratchets upward only.
-Measured by: `pytest tests/contract/test_test_suite_ratchets.py -k v27` (the test module is the floor's numeric home).
+Measured by: `pytest tests/contract/test_test_suite_ratchets.py -k v31` (the test module is the ceiling's numeric home, per tier).
 ADR: none
 Rationale: an undeclared test is SCAFFOLD by default.
 
@@ -59,6 +58,11 @@ Measured by: `pytest -s tests/contract/test_test_suite_ratchets.py -k v30` (prin
 ADR: none
 Rationale: a reported number promoted as if it gated is fabricated detection.
 
+### P-29 · We derive every human- and agent-facing document from a named memory atom under a content hash: each `## ` section of `README.md`, `llms.txt` and every `docs/*.md` names its atom and the atom's current sha256, and `docs/cli.md` is the committed output of `dadaia help tree`.
+Measured by: `pytest tests/contract/test_docs_derived_from_memory.py`.
+ADR: 0012 (proposed)
+Rationale: a document written beside memory rots; one that names its source is red the moment the source moves.
+
 ## Part 2 — Implementation
 
 ### Layers and intent
@@ -75,30 +79,34 @@ Rationale: a reported number promoted as if it gated is fabricated detection.
 - `flaky` marks a pass-and-fail on identical code; `quarantine` leaves every gating selector, is bug-gated by P-22, and the lane is empty.
 - Quarantine cap, escalation clock, diagnostic reruns, flake-rate target and the LARGE cap have one home each in `dd-test-stewardship`'s `PARAMETERS.md`.
 - A fail-closed step on the retrying panel E2E job turns an unregistered pass-on-retry red.
-- The structural audit fires on a trigger: wall-clock growth over 25 %, flake rate above ceiling, LARGE count above cap, or quarantine at cap.
-- Every `tests/e2e/**` file names an owner; every LARGE test carries a demotion, supersession or keep-justification, and the tree misses the LARGE cap.
+- The structural audit fires when a `PARAMETERS.md` ceiling is crossed — flake rate, LARGE count, quarantine cap; wall-clock growth is a closure readout with no pinned number.
+- Every LARGE test carries a demotion, supersession or keep-justification, and the tree misses the LARGE cap.
 - Curation is a `qa-engineer` verdict; `software-engineer` executes.
-- Mutation testing runs once per release off the push path (`mutmut==3.7.0`); its score is evidence, never a gate, and `core/` ratchets upward only.
+- Mutation testing runs once per release off the push path (`mutmut==3.7.0`); its score is evidence, never a gate, and the `core/models/` score ratchets upward only.
 
 ### CI gates
 
-- CI runs the preflight ladder plus cross-OS subsets, integration, Python and panel E2E, repo hygiene, backlog doctor, PR governance, the security-verdict gate and gitleaks.
+- CI runs the preflight ladder plus cross-OS subsets, integration, Python and panel E2E, repo hygiene, `dadaia doctor` over the checked-out tree, PR governance, the security-verdict gate and gitleaks — every one of the eighteen a required status check on `develop`, gitleaks included.
 - Push triggers are `main`, `develop` and `feature/**`; PRs to `develop` or `main` run the same matrix as the local preflight.
 - `pr-source-guard` is fail-closed, and the security-verdict gate needs an APPROVED handoff covering the PR head sha from `specs/releases/<id>/verdicts/` ([[sdd-gate-v3]]).
 - Every review verdict states the bug-surface delta from `dadaia bugs stats`, and no deploy is approved without the consumer-side matrix ([[consumer-agent-support]]).
 - Ruff `C901` and `PLR1702` are scoped to `dadaia_workspace/` with ceilings pinned in `pyproject.toml` against the enforcing tool; `radon cc` reports and never gates.
-- Caches and artifacts are redirected outside the repository, and the forbidden repo-local set is measured by `tests/contract/test_source_repo_hygiene.py`.
-- Memory-vs-code drift is a `specs doctor` WARNING, never a push-gated test: a package added mid-implementation is drift to fix at the next closure, not a red build ([[specs-doctor]]).
+- Caches redirect by configuration, never by a remembered flag: `[tool.pytest.ini_options] addopts` (`-p no:cacheprovider`), `[tool.ruff] cache-dir` and `[tool.mypy] cache_dir` (`../../.dadaia/tmp/<tool>-cache`, relative on every OS), hypothesis `database = None`; a bare `pytest`, `ruff check`, `ruff format --check`, `mypy --strict` from the repo root leaves the tree clean (`tests/unit/features/ci_preflight/test_no_pollution.py`), so `dadaia ci preflight` runs exactly the bare commands.
+- The forbidden repo-local set is `core/workspace_layout.REPO_TREE_EXCLUDED`, measured by `tests/contract/test_source_repo_hygiene.py` and swept at every ALIVE repo by `dadaia doctor` ([[workspace-doctor]]).
+- Memory-vs-code drift is a `dadaia doctor` `specs`-section WARNING (`MEM-DRIFT-1` for the features package map, `MEM-DRIFT-2` for a dead `dadaia <verb>` or path an atom cites), never a push-gated test: a package added or a verb deleted mid-implementation is memory drift to fix at the next closure, not a red build ([[workspace-doctor]]).
+- A hand edit of a verb-owned governance record is likewise a WARNING (`LEDGER-*-HANDEDIT`, `RELEASE-TREE-HANDEDIT`), exit 0, measured only where a governance-event store exists — CI has none, so no build turns red on it ([[sdd-bug-backlog-governance]]).
+- A doctor fix is proven on the executed path: `tests/contract/test_ledgers_validate.py` locates the issue and `tests/unit/features/specs/test_ledgers_fix_canonical_form.py` runs `--fix` over a committed-shaped record file and asserts the re-serialized line, never the fixer's return value; a schema drop ships with its repair and its test in the same change.
 
 ### Slop measurement
 
-- Four repo-pure ratchets pin slop counts and move only downward: V31 (Intent-less test files per tier) in `tests/contract/test_test_suite_ratchets.py`; V32 (governance ids in production comments and docstrings), V33 (`PREFIX-NN` families without a mechanical reader) and V34 (live SPEC/TASKS byte ceiling) in `tests/contract/test_slop_ratchets.py`.
-- Stale handoffs and scratch are a closure readout, never a ratchet: `dd-release-implementation` RC-FLOW step 8 runs `dadaia doctor` dry, then `dadaia doctor --fix --expired-only`, and the `closure-artifact-gc` log entry records the counts ([[workspace-doctor]]).
-- `dd-audit-project` pillar 2 re-measures the ratchets over the audit window and applies `dd-code-review` SLOP.md S1–S10 to a commit sample; the fixed law sections are kept byte-exact by `specs doctor` FIXED-1/2.
+- Five repo-pure ratchets pin slop counts and move only downward: V31 (Intent-less test files per tier) in `tests/contract/test_test_suite_ratchets.py`; V32 (governance ids in production comments and docstrings), V33 (`PREFIX-NN` families without a mechanical reader), V34 (live SPEC/TASKS byte ceiling) and V35 (skill directories ≤ 18 and total `public/skills/**/*.md` lines, pinned at the measured value and re-pinned at every corpus-touching closure) in `tests/contract/test_slop_ratchets.py`; `PLAN.md` has no byte ratchet (`SPEC-DOC-005` is advisory).
+- The derived-docs contract sits beside the ratchets: `tests/contract/test_docs_derived_from_memory.py` (P-29) checks every `<!-- derived-from: <slug> sha256:<12 hex> -->` marker's slug and hash over `README.md`, `llms.txt` and `docs/*.md`, the `docs/cli.md` body against `render_digest()`, the 10 KB README budget, the one tagline across `README.md`, `pyproject.toml` and `llms.txt`, the five `[tool.poetry.urls]` keys, and runs `dead_citations` over the same set; a red row is closure work — re-read the atom, re-derive the section, re-record the hash in the atom's own commit (`dd-release-implementation` MEMORY-UPDATE).
+- Stale handoffs and scratch are a closure readout, never a ratchet: `dd-release-implementation` RC-FLOW step 8 runs `dadaia doctor` dry, then `dadaia doctor --fix` (slop moved to `reaped/`, expired entries deleted), and the `kind: artifact-gc` log entry records the `compliance(total)` line and what the reaper holds ([[workspace-doctor]]).
+- `dd-audit-project` pillar 2 re-measures the ratchets over the audit window and applies `dd-code-review` SLOP.md S1–S10 to a commit sample; the fixed law sections are kept byte-exact by `dadaia doctor` FIXED-1/2.
 
 ### Dependencies
 
-[[tech-stack]], [[architecture]], [[panel]], [[consumer-agent-support]], [[sdd-gate-v3]].
+[[TECHSTACK]], [[ARCHITECTURE]], [[panel]], [[consumer-agent-support]], [[sdd-gate-v3]], [[sdd-bug-backlog-governance]], [[workspace-doctor]].
 
 <!-- dadaia:fixed slop-tests -->
 ### Slop — tests (fixed)

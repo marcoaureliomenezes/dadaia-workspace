@@ -50,7 +50,7 @@ def _make_codex_db(tmp_path: pathlib.Path, rows: list[dict[str, object]]) -> pat
                 "tokens_used": row.get("tokens_used", 0),
                 "created_at": row.get("created_at", 1716000000),
                 "updated_at": row.get("updated_at", 1716003600),
-                "cwd": row.get("cwd", "/home/op/workspace"),
+                "cwd": row.get("cwd", "/home/user/workspace"),
                 "title": row.get("title", "Test thread"),
                 "model": row.get("model", "o3"),
                 "model_provider": row.get("model_provider", "openai"),

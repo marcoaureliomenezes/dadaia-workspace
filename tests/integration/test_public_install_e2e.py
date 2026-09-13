@@ -214,7 +214,7 @@ def test_installed_dadaia_agents_md_carries_the_rendered_zone_table(tmp_path: Pa
     zones = (ws / ".dadaia" / "AGENTS.md").read_text(encoding="utf-8")
     assert "<!-- zones -->" not in zones
     rows = _table_rows(zones)
-    assert len(rows) == len(DADAIA_ZONES) == 11
+    assert len(rows) == len(DADAIA_ZONES) == 12
     assert [row.split("|")[1].strip().strip("`").rstrip("/") for row in rows] == [
         zone.name for zone in DADAIA_ZONES
     ]

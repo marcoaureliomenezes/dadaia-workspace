@@ -19,7 +19,6 @@ from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
 _VALID_FRONTMATTER = """---
 slug: {slug}
 title: "Fixture atom"
-category: core
 tldr: "a valid atom for LINT-1 fixture purposes"
 summary: "a valid atom for LINT-1 fixture purposes, used across doctor_memory tests"
 tags: ["fixture"]

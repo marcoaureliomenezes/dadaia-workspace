@@ -89,7 +89,7 @@ def test_codex_thread_id_bind_persists_resolver_attributes_and_negative_control(
 
     result = _runner.invoke(
         app,
-        ["context", "bind", _CTX, "--mode", "read"],
+        ["context", "bind", _CTX],
     )
     assert result.exit_code == 0, result.output
 

@@ -13,7 +13,6 @@ from __future__ import annotations
 import pytest
 
 from dadaia_workspace.core.models.backlog import (
-    BacklogHistoRecord,
     Intent,
     Subject,
     SubjectKind,
@@ -38,7 +37,7 @@ def test_subject_kind_members_valid_construction_and_intent_is_frozen() -> None:
         (SubjectKind.CODE, "dadaia_workspace/core/models/lifecycle.py#AgentRuntimeKind"),
         (SubjectKind.CLI, "backlog doctor"),
         (SubjectKind.CATALOG, "panel"),
-        (SubjectKind.DOC, "SPEC-DOC-031"),
+        (SubjectKind.DOC, "SPEC-DOC-033"),
         (SubjectKind.INVARIANT, "INV-no-claude-at-L2"),
         (SubjectKind.PANEL, "panel:/api/workflow-catalog"),
         (SubjectKind.API, "api:/api/kanban"),
@@ -63,7 +62,7 @@ def test_subject_kind_members_valid_construction_and_intent_is_frozen() -> None:
             # PRIVACY: an absolute operator-local path must never bind as a code ref.
             "rejects_absolute_path",
             SubjectKind.CODE,
-            "/home/marco/workspace/foo.py#Bar",
+            "/home/user/workspace/foo.py#Bar",
             "module-relative|absolute",
         ),
         (
@@ -124,7 +123,7 @@ def test_parse_intents_round_trip_and_none_is_empty() -> None:
             "change": "remove OPENCODE_RUN",
         },
         {
-            "subject": {"kind": "doc", "ref": "SPEC-DOC-031"},
+            "subject": {"kind": "doc", "ref": "SPEC-DOC-033"},
             "change": "supersede prose heuristic",
         },
     ]
@@ -151,7 +150,7 @@ def test_subject_surface_new_round_trip_and_default() -> None:
             "change": "add a hello command printing a greeting",
         },
         {
-            "subject": {"kind": "doc", "ref": "SPEC-DOC-031"},
+            "subject": {"kind": "doc", "ref": "SPEC-DOC-033"},
             "change": "document it",
         },
     ]
@@ -181,91 +180,3 @@ def test_subject_surface_new_round_trip_and_default() -> None:
 def test_parse_intents_reject_table(name: str, payload: object, match: str) -> None:
     with pytest.raises(ValueError, match=match):
         parse_intents(payload)  # type: ignore[arg-type]
-
-
-# ═════════════════════════════════════════════════════════════════════════════════
-# BacklogHistoRecord.redact() — write-time denylist redaction (bug
-# backlog-histo-writer-skips-write-time-denylist-redaction). The SAME defect class
-# BugRecord already had fixed twice (T-043-23 -> T-044-62 -> T-045-19, SPEC v0.4.5
-# FR6): a committed histo snapshot's free-text fields (``entry_md`` above all) must be
-# masked through the SAME ``redact_text`` seam BEFORE the record is appended, never
-# written raw and caught later only at the push gate.
-# ═════════════════════════════════════════════════════════════════════════════════
-
-
-def _histo_record(**overrides: object) -> BacklogHistoRecord:
-    fields: dict[str, object] = {
-        "id": "some-slug",
-        "ts": "2026-08-27",
-        "disposition": "CONSUMED",
-        "reason": "a reason",
-        "release": "v0.5.0",
-        "by": "project-manager",
-        "entry_md": "### some-slug\nsome body",
-        "entry_md_source": "live exit",
-    }
-    fields.update(overrides)
-    return BacklogHistoRecord(**fields)  # type: ignore[arg-type]
-
-
-def test_backlog_histo_record_redact_masks_denylisted_term_in_entry_md() -> None:
-    """A5.1/A2.6-class fix: a denylisted term embedded in ``entry_md`` (the free-text
-    exit snapshot) is masked by :meth:`BacklogHistoRecord.redact`, mirroring
-    ``BugRecord.redact`` exactly — same ``(term, reason)`` shape, same
-    ``[REDACTED-TERM]`` placeholder."""
-    record = _histo_record(
-        entry_md="See .dadaia/reports/acme-corp-games/qa-engineer/report.html for detail."
-    )
-
-    redacted = record.redact(denylist_terms=(("acme-corp", "private project/person identifier"),))
-
-    assert redacted.entry_md is not None
-    assert "acme-corp" not in redacted.entry_md.lower()
-    assert "[REDACTED-TERM]" in redacted.entry_md
-
-
-def test_backlog_histo_record_redact_with_no_terms_is_byte_identical() -> None:
-    """No-op default: a record redacted with no denylist terms is unchanged (mirrors
-    ``BugRecord.redact()``'s own no-op default)."""
-    record = _histo_record(entry_md="nothing sensitive here")
-
-    assert record.redact() == record
-
-
-def test_backlog_histo_record_redact_scrubs_every_non_identity_field() -> None:
-    """A2.10-class regression guard: the redactable field set is DERIVED from
-    ``BacklogHistoRecord``'s own dataclass metadata, never a hand-kept list — every
-    free-text field carries the term through unless explicitly marked identity."""
-    term = "acme-corp"
-    record = _histo_record(
-        disposition=f"CONSUMED — {term}",
-        reason=f"leaked {term} here",
-        release=f"leaked {term} here",
-        entry_md=f"leaked {term} here",
-        entry_md_source=f"leaked {term} here",
-    )
-
-    redacted = record.redact(denylist_terms=((term, "private client name"),))
-
-    for name in ("disposition", "reason", "release", "entry_md", "entry_md_source"):
-        value = getattr(redacted, name)
-        assert value is not None
-        assert term not in value, f"field {name!r} was not scrubbed"
-    # Identity fields (id/ts/by) are never touched by denylist masking.
-    assert redacted.id == "some-slug"
-    assert redacted.ts == "2026-08-27"
-    assert redacted.by == "project-manager"
-
-
-def test_backlog_histo_record_redact_leaves_none_fields_none() -> None:
-    """``reason``/``release``/``entry_md``/``entry_md_source`` are all optional — a
-    ``None`` free-text field stays ``None`` through redaction, never coerced to a
-    string."""
-    record = _histo_record(reason=None, release=None, entry_md=None, entry_md_source=None)
-
-    redacted = record.redact(denylist_terms=(("acme-corp", "private client name"),))
-
-    assert redacted.reason is None
-    assert redacted.release is None
-    assert redacted.entry_md is None
-    assert redacted.entry_md_source is None

@@ -76,7 +76,7 @@ def test_migration_idempotent_and_reaches_schema_version(tmp_path: pathlib.Path)
     store.migrate()
     store.migrate()  # idempotent — re-applying raises nothing
     version = store._conn.execute("PRAGMA user_version").fetchone()[0]  # noqa: SLF001
-    assert version == SCHEMA_VERSION == 6
+    assert version == SCHEMA_VERSION == 7
     store.close()
 
 

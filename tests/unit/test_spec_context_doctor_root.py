@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import os
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -33,11 +34,11 @@ from dadaia_workspace.core.workspace_layout import (
     zones_with_canon,
     zones_with_ttl,
 )
+from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.features.spec_context.doctor import (
     DoctorService,
     Finding,
     FindingVerdict,
-    compliance,
 )
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from tests.fakes import FakeContextStore, FakeGitClient
@@ -51,6 +52,12 @@ _TWO_DAYS_AGO = time.time() - 2 * 86_400
 
 def _make_doctor(root: Path) -> DoctorService:
     return DoctorService(FakeContextStore(), FakeGitClient(), root)
+
+
+def _reaped(root: Path, rel: str) -> Path:
+    """Where the reaper holds *rel*: ``.dadaia/reaped/<YYYYMMDD>/<workspace-relative>``."""
+    day = datetime.now(tz=UTC).strftime("%Y%m%d")
+    return root / ".dadaia" / "reaped" / day / rel
 
 
 def _init_workspace(root: Path) -> None:
@@ -149,7 +156,7 @@ def test_fix_migrates_root_exceptions_into_instance_exceptions(tmp_path: Path) -
     assert before["shot.png"].verdict is FindingVerdict.SLOP
     assert before[f"{_STATE_ZONE.name}/root_exceptions.txt"].code == f"WS-{_STATE_ZONE.name}-slop"
 
-    actions = _make_doctor(tmp_path).fix(expired_only=True)
+    actions = _make_doctor(tmp_path).fix()
 
     assert not legacy.exists()
     assert new.read_text(encoding="utf-8") == "*.png\n.mcp.json\nz_img\n"
@@ -376,7 +383,7 @@ def test_absent_harness_profile_is_missing_and_fix_seeds_it_from_present_dirs(
         (f"WS-{_STATE_ZONE.name}-missing", f"{_STATE_ZONE.name}/harness_profile.json", True)
     ]
 
-    actions = _make_doctor(tmp_path).fix(expired_only=True)
+    actions = _make_doctor(tmp_path).fix()
 
     assert actions == [
         f"WS-{_STATE_ZONE.name}-missing: created '{_STATE_ZONE.name}/harness_profile.json'"
@@ -422,7 +429,8 @@ def test_every_ttl_zone_uses_its_own_code_and_ttl(tmp_path: Path) -> None:
         zone_dir.mkdir(exist_ok=True)
         stale = zone_dir / "stale"
         stale.write_text("", encoding="utf-8")
-        _age(stale)
+        # Age past THIS zone's own TTL — the rows no longer share one day (reaped = 7).
+        _age(stale, time.time() - (zone.ttl_seconds or 0) - 60)
 
     codes = _codes(_make_doctor(tmp_path).scan())
 
@@ -442,7 +450,7 @@ def test_zone_agents_md_is_never_a_ttl_candidate(tmp_path: Path) -> None:
     found = _by_path(_make_doctor(tmp_path).scan())
 
     assert found[f"{_TTL_ZONE.name}/AGENTS.md"].verdict is FindingVerdict.CANON
-    assert not _make_doctor(tmp_path).fix(expired_only=True)
+    assert not _make_doctor(tmp_path).fix()
     assert law.exists()
 
 
@@ -471,7 +479,7 @@ def test_symlinks_are_never_followed_and_only_the_link_is_deleted(tmp_path: Path
     assert f"{_TTL_ZONE.name}/link" in paths
     assert not any("keep.txt" in p for p in paths)
 
-    _make_doctor(ws).fix(expired_only=True)
+    _make_doctor(ws).fix()
 
     assert not link.exists() and not link.is_symlink()
     assert victim.read_text(encoding="utf-8") == "keep"
@@ -492,17 +500,17 @@ def test_ttl_walk_treats_an_entry_that_vanishes_mid_walk_as_absent(
     gone_dir = zone_dir / "gone_dir"
     gone_dir.mkdir()
     (zone_dir / "kept.txt").write_text("", encoding="utf-8")
-    real_entries = DoctorService._entries
+    real_walk = sweep.walk
 
-    def racing_entries(directory: Path) -> list[Path]:
-        entries = real_entries(directory)
+    def racing_walk(directory: Path) -> list[Path]:
+        entries = real_walk(directory)
         if directory == zone_dir:
             gone_file.unlink()
         elif directory == gone_dir:
             gone_dir.rmdir()
         return entries
 
-    monkeypatch.setattr(DoctorService, "_entries", staticmethod(racing_entries))
+    monkeypatch.setattr(sweep, "walk", racing_walk)
 
     found = _by_path(_make_doctor(tmp_path).scan())
 
@@ -530,27 +538,13 @@ def test_operator_and_managed_zones_are_never_walked(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# The score, the reaper order, --expired-only
+# The reaper order, --expired-only
 # ---------------------------------------------------------------------------
 
 
-def test_compliance_counts_canon_and_operator_over_every_entry(tmp_path: Path) -> None:
-    _init_workspace(tmp_path)
-    (tmp_path / "junk").mkdir()
-    (tmp_path / "shot.png").write_bytes(b"")
-    (tmp_path / INSTANCE_EXCEPTIONS).write_text("*.png\n", encoding="utf-8")
-
-    findings = _make_doctor(tmp_path).scan()
-    score = compliance(findings)
-
-    non_canonical = [f for f in findings if f.verdict is FindingVerdict.SLOP]
-    assert [f.path for f in non_canonical] == ["junk"]
-    assert score.total == len(findings)
-    assert score.canonical == len(findings) - 1
-    assert score.percent == round(100 * score.canonical / score.total)
-
-
-def test_fix_expired_only_stops_before_slop(tmp_path: Path) -> None:
+def test_the_reaper_lane_seeds_moves_slop_and_deletes_only_what_expired(tmp_path: Path) -> None:
+    """0.4.7 FR6b: there is no second, smaller lane. One ``fix()`` seeds what is missing,
+    MOVES slop into ``reaped/`` (never deletes it) and deletes only TTL-expired entries."""
     _init_workspace(tmp_path)
     (tmp_path / ".dadaia" / _INSTALL_ZONE.name).rmdir()
     junk = tmp_path / "junk.txt"
@@ -561,20 +555,21 @@ def test_fix_expired_only_stops_before_slop(tmp_path: Path) -> None:
     stale.write_text("", encoding="utf-8")
     _age(stale)
 
-    actions = _make_doctor(tmp_path).fix(expired_only=True)
+    actions = _make_doctor(tmp_path).fix()
 
     assert not stale.exists()
-    assert junk.exists()
+    assert not junk.exists(), "slop is moved, not left in place"
+    assert _reaped(tmp_path, "junk.txt").exists(), "slop is held in reaped/, never deleted"
     assert (tmp_path / ".dadaia" / _INSTALL_ZONE.name).is_dir()
     assert [a.split(":")[0] for a in actions] == [
         f"WS-{_INSTALL_ZONE.name}-missing",
+        "WS-root-slop",
         f"WS-{_TTL_ZONE.name.lstrip('.')}-expired",
     ]
 
-    actions = _make_doctor(tmp_path).fix()
-
-    assert not junk.exists()
-    assert actions == ["WS-root-slop: deleted 'junk.txt'"]
+    # A second pass has nothing left to take: the held entry is canonical where it sits.
+    assert _make_doctor(tmp_path).fix() == []
+    assert _reaped(tmp_path, "junk.txt").exists()
 
 
 @pytest.mark.skipif(
@@ -640,20 +635,25 @@ def test_fix_skips_and_reports_a_failing_migration_or_seed_and_still_deletes_exp
     monkeypatch.setattr(Path, "write_text", denied)
     monkeypatch.setattr(JsonHarnessProfileStore, "write", denied)
 
-    actions = _make_doctor(tmp_path).fix(expired_only=True)
+    actions = _make_doctor(tmp_path).fix()
 
-    assert legacy.exists()
+    # The migration was refused, so the legacy file is still what it always was —
+    # closed-canon slop — and the reaper HOLDS it rather than deleting it.
+    assert not legacy.exists()
+    assert _reaped(tmp_path, f".dadaia/{_STATE_ZONE.name}/root_exceptions.txt").exists()
     assert not (tmp_path / INSTANCE_EXCEPTIONS).exists()
     assert not _profile(tmp_path).exists()
     assert not stale.exists()
     assert [a.split(": ", 1)[1].split(" (")[0] for a in actions] == [
         "skipped 'root_exceptions.txt'",
         f"skipped '{_STATE_ZONE.name}/harness_profile.json'",
+        f"moved '{_STATE_ZONE.name}/root_exceptions.txt' -> "
+        f"'{_reaped(tmp_path, f'.dadaia/{_STATE_ZONE.name}/root_exceptions.txt').relative_to(tmp_path).as_posix()}'",
         f"deleted '{_TTL_ZONE.name}/stale'",
     ]
     assert all("(errno 13: Permission denied)" in a for a in actions[:2]), actions
     assert actions[1].startswith(f"WS-{_STATE_ZONE.name}-missing: ")
-    assert actions[2] == f"WS-{_TTL_ZONE.name}-expired: deleted '{_TTL_ZONE.name}/stale'"
+    assert actions[3] == f"WS-{_TTL_ZONE.name}-expired: deleted '{_TTL_ZONE.name}/stale'"
 
 
 @pytest.mark.parametrize("target_inside_workspace", [True, False])
@@ -682,7 +682,7 @@ def test_a_symlinked_zone_root_is_never_walked(
     zone_dir.symlink_to(target, target_is_directory=True)
 
     findings = _make_doctor(ws).scan()
-    actions = _make_doctor(ws).fix(expired_only=True)
+    actions = _make_doctor(ws).fix()
 
     assert not any("old.txt" in f.path for f in findings), [f.path for f in findings]
     assert victim.read_text(encoding="utf-8") == "keep"
@@ -707,4 +707,4 @@ def test_fix_removes_state_and_session_slop_recursively(tmp_path: Path) -> None:
 
     assert not locks.exists()
     assert not pointer.exists()
-    assert compliance(_make_doctor(tmp_path).scan()).percent == 100
+    assert all(f.canonical for f in _make_doctor(tmp_path).scan())

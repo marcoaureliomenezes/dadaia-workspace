@@ -44,12 +44,11 @@ The canon (operator, 2026-08-28) — the ONLY members permitted under ``specs/``
               <M.m.p>/{_RELEASE.json, SPEC.md, PLAN.md, TASKS.md, rc-N/{SPEC,PLAN,TASKS}.md,
                        verdicts/<40hex>.handoff.json,
                        <alpha|rc>-N/{SPEC.md, PLAN.md, TASKS.md}}}
-    backlog/{AGENTS.md, BACKLOG.json,
-             _archive/{backlog_histo.jsonl, consumed_backlog_histo.jsonl}}
+    backlog/{AGENTS.md, BACKLOG.json, _archive/backlog_histo.jsonl}
     bugs/{AGENTS.md, BUGS.jsonl, _archive/bugs_histo.jsonl}
     audits/{AGENTS.md, _archive/audits_histo.jsonl,
             <YYYYMMDD-slug>/{AUDIT.md, FINDINGS.jsonl}}
-    ADRs/{AGENTS.md, decisions.jsonl, _superseded/superseded.jsonl}
+    ADRs/{AGENTS.md, decisions.jsonl}
     memory/{AGENTS.md, ARCHITECTURE.md, QUALITY.md, TECHSTACK.md,
             product/index.md, product/catalog.json, product/<area>/<slug>.md}
 
@@ -64,29 +63,48 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 from collections.abc import Collection, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
+from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
+from dadaia_workspace.core.release_state import (
+    RELEASE_STATE_FILENAME,
+    ReleaseState,
+    parse_release_state,
+    serialize_release_state,
+)
 from dadaia_workspace.core.specs_version import (
     CANONICAL_SPECS_VERSION,
-    RELEASE_ID_FRAGMENT,
     is_release_semver,
 )
-from dadaia_workspace.core.workspace_layout import AUDIT_DIR_NAME_PATTERN
+from dadaia_workspace.core.workspace_layout import (
+    CANON_ROOT_MEMBERS,
+    MEMORY_TOPLEVEL_FILES,
+    REQUIRED_ROOT_DIRS,
+    SHAPE_FRAGMENTS,
+    SPECS_CANON,
+    CanonEntry,
+)
 from dadaia_workspace.features.specs.memory_canon import (
     FIXED_SECTION_BY_PATH,
-    MEMORY_TOPLEVEL_FILES,
     read_fixed_fragment,
     render_fixed_section,
 )
+
+#: The canon rows live in ``core.workspace_layout`` (0.4.7 FR5: ONE registry of
+#: canonical names, shared with the root law, the zone table and the projected
+#: ``DADAIA.md`` §6.2 table). This module is their renderer and checker.
+CANON: tuple[CanonEntry, ...] = SPECS_CANON
 
 __all__ = [
     "CANON",
     "CANON_ROOT_MEMBERS",
     "REQUIRED_ROOT_DIRS",
+    "TEMPLATES",
     "CanonEntry",
     "Violation",
     "canon_violations",
@@ -97,64 +115,6 @@ __all__ = [
     "scaffold_entry",
     "verdict_violations",
 ]
-
-_SEMVER = RELEASE_ID_FRAGMENT
-_SHA40 = r"[0-9a-f]{40}"
-#: One fact, one place (core.workspace_layout, SPEC-DOC-030's own single home) — never
-#: a second, independently hand-kept copy of the audit-dir date-slug shape.
-_YYYYMMDD_SLUG = AUDIT_DIR_NAME_PATTERN
-#: An archived-candidate folder under the live release (release 0.4.6 FR2, ADR 0006):
-#: ``rc-N`` holds the SPEC/PLAN/TASKS trio of the N-th completed-but-not-shipped
-#: candidate, moved there by ``dadaia release rc-archive``. The scaffolded segment
-#: lane (``alpha-N``, docs planned ahead) is retired — rc-N is ONLY an archive.
-_RC = r"rc-\d+"
-_AREA = r"[a-z][a-z0-9_-]*"
-_SLUG = r"[a-z][a-z0-9_-]*"
-
-#: The root member a :class:`CanonEntry` lives under. Distinct from a filesystem "area"
-#: only for the two bare root files (``AGENTS.md``, ``constitution.md``), each its own
-#: singleton member — every other value names the directory area it governs. Deriving
-#: :data:`CANON_ROOT_MEMBERS` as ``{e.area for e in CANON}`` then needs zero special
-#: casing (see below) — the whole reason this field carries 8 values, not 6.
-Area = Literal[
-    "AGENTS.md", "constitution.md", "memory", "releases", "backlog", "bugs", "audits", "ADRs"
-]
-
-#: How a required-at-birth (or on-demand, via :func:`scaffold_entry`) entry's content is
-#: produced:
-#:
-#: * ``"copy"``       — read ``public_dir / template`` verbatim, write byte-identical.
-#: * ``"static"``      — ``template`` IS the literal content (never ``.format()``-ed —
-#:                        several static templates hold literal JSON braces).
-#: * ``"format"``      — ``template.format(**context)``; used only where every brace in
-#:                        the template is a deliberate placeholder (constitution.md, the
-#:                        release SPEC.md stub).
-#: * ``"json_catalog"`` — one dedicated renderer (``json.dumps``, correctly escaped) —
-#:                        the ONE entry needing computed, safely-escaped JSON content;
-#:                        folding it into ``"format"`` would risk JSON injection from an
-#:                        arbitrary ``project_name``.
-Kind = Literal["copy", "static", "format", "json_catalog"]
-
-
-@dataclass(frozen=True)
-class CanonEntry:
-    """One row of the canon table: a path SHAPE plus (optionally) how to render it.
-
-    ``dest`` is the concrete ``specs/``-relative path for an entry with no variable
-    path segment (every ``required_at_birth`` entry today has none) — :func:`scaffold`
-    folds over these directly, with no regex-to-literal-path reverse engineering.
-    ``dest`` is ``None`` for a variable-shaped entry (a release id, a sha, a slug); such
-    an entry is never ``required_at_birth`` and is rendered, if at all, through
-    :func:`scaffold_entry` instead.
-    """
-
-    pattern: re.Pattern[str]
-    kind: Kind
-    required_at_birth: bool
-    template: str | None
-    area: Area
-    dest: str | None = None
-
 
 _CONSTITUTION_STUB = """\
 ---
@@ -219,267 +179,55 @@ _RELEASE_SPEC_STUB = """\
 _BACKLOG_STUB = '{"schema": "backlog-v1", "active": []}\n'
 
 
-def _copy(rel: str) -> str:
-    """A ``"copy"`` entry's ``template`` — a ``public_dir``-relative source path."""
-    return rel
-
-
 # ---------------------------------------------------------------------------------
-# THE CANON TABLE — one row per canon-conformant path shape. Order mirrors the
-# root-member order in the module docstring (root, memory, releases, backlog, bugs,
-# audits, ADRs); within an area, required-at-birth rows come first.
+# THE RENDERER MAP — how a canon row's content is produced. Keyed by
+# ``CanonEntry.shape``: ``core`` holds the NAMES (the rows), this module holds the
+# CONTENT (the templates). A shape absent here is checked but never scaffolded.
+#
+# * ``"copy"``        — read ``public_dir / template`` verbatim, write byte-identical.
+# * ``"static"``      — ``template`` IS the literal content (never ``.format()``-ed —
+#                       several static templates hold literal JSON braces).
+# * ``"format"``      — ``template.format(**context)``; used only where every brace in
+#                       the template is a deliberate placeholder.
+# * ``"json_catalog"`` — one dedicated renderer (``json.dumps``, correctly escaped) —
+#                       the ONE entry needing computed, safely-escaped JSON content;
+#                       folding it into ``"format"`` would risk JSON injection from an
+#                       arbitrary ``project_name``.
 # ---------------------------------------------------------------------------------
-CANON: tuple[CanonEntry, ...] = (
-    # -- root --------------------------------------------------------------------
-    CanonEntry(
-        re.compile(r"^AGENTS\.md$"),
-        "copy",
-        True,
-        _copy("templates/specs-AGENTS.md"),
-        "AGENTS.md",
-        "AGENTS.md",
-    ),
-    CanonEntry(
-        re.compile(r"^constitution\.md$"),
-        "format",
-        True,
-        _CONSTITUTION_STUB,
-        "constitution.md",
-        "constitution.md",
-    ),
-    # -- memory/ -------------------------------------------------------------------
-    CanonEntry(
-        re.compile(r"^memory/AGENTS\.md$"),
-        "copy",
-        True,
-        _copy("scaffold/memory/AGENTS.md"),
-        "memory",
-        "memory/AGENTS.md",
-    ),
-    # The top-level memory trio — folded over the ONE memory-canon table (F011):
-    # never a second, hand-kept row per file.
-    *(
-        CanonEntry(
-            re.compile(rf"^memory/{re.escape(name)}$"),
-            "copy",
-            True,
-            _copy(f"scaffold/memory/{name}"),
-            "memory",
-            f"memory/{name}",
-        )
-        for name in MEMORY_TOPLEVEL_FILES
-    ),
-    CanonEntry(
-        re.compile(r"^memory/product/index\.md$"),
-        "copy",
-        True,
-        _copy("scaffold/memory/product/index.md"),
-        "memory",
-        "memory/product/index.md",
-    ),
-    CanonEntry(
-        re.compile(r"^memory/product/catalog\.json$"),
-        "json_catalog",
-        True,
-        None,
-        "memory",
-        "memory/product/catalog.json",
-    ),
-    CanonEntry(
-        re.compile(rf"^memory/product/{_AREA}/{_SLUG}\.md$"),
-        "copy",
-        False,
-        None,
-        "memory",
-    ),
-    # -- releases/ -----------------------------------------------------------------
-    CanonEntry(
-        re.compile(r"^releases/AGENTS\.md$"),
-        "copy",
-        True,
-        _copy("scaffold/releases/AGENTS.md"),
-        "releases",
-        "releases/AGENTS.md",
-    ),
-    CanonEntry(
-        re.compile(r"^releases/_ideas/AGENTS\.md$"),
-        "copy",
-        True,
-        _copy("scaffold/releases/_ideas/AGENTS.md"),
-        "releases",
-        "releases/_ideas/AGENTS.md",
-    ),
-    CanonEntry(
-        re.compile(r"^releases/_archive/releases_histo\.jsonl$"),
-        "static",
-        True,
-        "",
-        "releases",
-        "releases/_archive/releases_histo.jsonl",
-    ),
-    CanonEntry(
-        re.compile(rf"^releases/_ideas/{_SEMVER}/SPEC\.md$"), "format", False, None, "releases"
-    ),
-    CanonEntry(re.compile(rf"^releases/_archive/{_SEMVER}/.+$"), "static", False, None, "releases"),
-    CanonEntry(
-        re.compile(rf"^releases/{_SEMVER}/_RELEASE\.json$"), "static", False, None, "releases"
-    ),
-    # Legacy state-file name (pre-0.4.6) — admitted ONLY as the rename-lane input:
-    # SPEC-DOC-046 offers the doctor-fixable rename to _RELEASE.json (ADR 0007).
-    CanonEntry(
-        re.compile(rf"^releases/{_SEMVER}/RELEASE\.json$"), "static", False, None, "releases"
-    ),
-    CanonEntry(
-        re.compile(rf"^releases/(?P<release_id>{_SEMVER})/SPEC\.md$"),
-        "format",
-        False,
-        _RELEASE_SPEC_STUB,
-        "releases",
-    ),
-    CanonEntry(re.compile(rf"^releases/{_SEMVER}/PLAN\.md$"), "static", False, None, "releases"),
-    CanonEntry(re.compile(rf"^releases/{_SEMVER}/TASKS\.md$"), "static", False, None, "releases"),
-    CanonEntry(
-        re.compile(rf"^releases/{_SEMVER}/verdicts/{_SHA40}\.handoff\.json$"),
-        "static",
-        False,
-        None,
-        "releases",
-    ),
-    # A segmented release's SPEC/PLAN/TASKS live one directory deeper
-    # (``releases/<M.m.p>/<alpha|rc>-N/{SPEC,PLAN,TASKS}.md`` —
-    # ``scaffolder.scaffold_release_segment``, ``dd-release-implementation`` §2/§4). Never
-    # required_at_birth: a segment is opened on demand, well after the release itself.
-    CanonEntry(
-        re.compile(rf"^releases/{_SEMVER}/{_RC}/SPEC\.md$"), "static", False, None, "releases"
-    ),
-    CanonEntry(
-        re.compile(rf"^releases/{_SEMVER}/{_RC}/PLAN\.md$"), "static", False, None, "releases"
-    ),
-    CanonEntry(
-        re.compile(rf"^releases/{_SEMVER}/{_RC}/TASKS\.md$"), "static", False, None, "releases"
-    ),
-    # -- backlog/ ------------------------------------------------------------------
-    CanonEntry(
-        re.compile(r"^backlog/AGENTS\.md$"),
-        "copy",
-        True,
-        _copy("scaffold/backlog/AGENTS.md"),
-        "backlog",
-        "backlog/AGENTS.md",
-    ),
-    CanonEntry(
-        re.compile(r"^backlog/BACKLOG\.json$"),
-        "static",
-        True,
-        _BACKLOG_STUB,
-        "backlog",
-        "backlog/BACKLOG.json",
-    ),
-    CanonEntry(
-        re.compile(r"^backlog/_archive/backlog_histo\.jsonl$"),
-        "static",
-        True,
-        "",
-        "backlog",
-        "backlog/_archive/backlog_histo.jsonl",
-    ),
-    CanonEntry(
-        re.compile(r"^backlog/_archive/consumed_backlog_histo\.jsonl$"),
-        "static",
-        False,
-        None,
-        "backlog",
-    ),
-    # -- bugs/ ---------------------------------------------------------------------
-    CanonEntry(
-        re.compile(r"^bugs/AGENTS\.md$"),
-        "copy",
-        True,
-        _copy("scaffold/bugs/AGENTS.md"),
-        "bugs",
-        "bugs/AGENTS.md",
-    ),
-    CanonEntry(re.compile(r"^bugs/BUGS\.jsonl$"), "static", False, None, "bugs"),
-    CanonEntry(
-        re.compile(r"^bugs/_archive/bugs_histo\.jsonl$"),
-        "static",
-        True,
-        "",
-        "bugs",
-        "bugs/_archive/bugs_histo.jsonl",
-    ),
-    # -- audits/ -------------------------------------------------------------------
-    CanonEntry(
-        re.compile(r"^audits/AGENTS\.md$"),
-        "copy",
-        True,
-        _copy("scaffold/audits/AGENTS.md"),
-        "audits",
-        "audits/AGENTS.md",
-    ),
-    CanonEntry(
-        re.compile(r"^audits/_archive/audits_histo\.jsonl$"),
-        "static",
-        True,
-        "",
-        "audits",
-        "audits/_archive/audits_histo.jsonl",
-    ),
-    CanonEntry(
-        re.compile(rf"^audits/{_YYYYMMDD_SLUG}/AUDIT\.md$"), "static", False, None, "audits"
-    ),
-    CanonEntry(
-        re.compile(rf"^audits/{_YYYYMMDD_SLUG}/FINDINGS\.jsonl$"), "static", False, None, "audits"
-    ),
-    # -- ADRs/ ---------------------------------------------------------------------
-    CanonEntry(
-        re.compile(r"^ADRs/AGENTS\.md$"),
-        "copy",
-        True,
-        _copy("scaffold/ADRs/AGENTS.md"),
-        "ADRs",
-        "ADRs/AGENTS.md",
-    ),
-    CanonEntry(
-        re.compile(r"^ADRs/decisions\.jsonl$"), "static", True, "", "ADRs", "ADRs/decisions.jsonl"
-    ),
-    CanonEntry(
-        re.compile(r"^ADRs/_superseded/superseded\.jsonl$"),
-        "static",
-        True,
-        "",
-        "ADRs",
-        "ADRs/_superseded/superseded.jsonl",
-    ),
+Kind = Literal["copy", "static", "format", "json_catalog"]
+
+TEMPLATES: dict[str, tuple[Kind, str]] = {
+    "AGENTS.md": ("copy", "templates/specs-AGENTS.md"),
+    "constitution.md": ("format", _CONSTITUTION_STUB),
+    "memory/AGENTS.md": ("copy", "scaffold/memory/AGENTS.md"),
+    **{f"memory/{name}": ("copy", f"scaffold/memory/{name}") for name in MEMORY_TOPLEVEL_FILES},
+    "memory/product/index.md": ("copy", "scaffold/memory/product/index.md"),
+    "memory/product/catalog.json": ("json_catalog", ""),
+    "releases/AGENTS.md": ("copy", "scaffold/releases/AGENTS.md"),
+    "releases/_ideas/AGENTS.md": ("copy", "scaffold/releases/_ideas/AGENTS.md"),
+    "releases/_archive/releases_histo.jsonl": ("static", ""),
+    "releases/<M.m.p>/SPEC.md": ("format", _RELEASE_SPEC_STUB),
+    "backlog/AGENTS.md": ("copy", "scaffold/backlog/AGENTS.md"),
+    "backlog/BACKLOG.json": ("static", _BACKLOG_STUB),
+    "backlog/_archive/backlog_histo.jsonl": ("static", ""),
+    "bugs/AGENTS.md": ("copy", "scaffold/bugs/AGENTS.md"),
+    "bugs/_archive/bugs_histo.jsonl": ("static", ""),
+    "audits/AGENTS.md": ("copy", "scaffold/audits/AGENTS.md"),
+    "audits/_archive/audits_histo.jsonl": ("static", ""),
+    "ADRs/AGENTS.md": ("copy", "scaffold/ADRs/AGENTS.md"),
+    "ADRs/decisions.jsonl": ("static", ""),
+}
+
+#: The verdict-filename shape with its sha CAPTURED — the SAME canon row
+#: ``releases/<M.m.p>/verdicts/<40hex>.handoff.json`` every other consumer matches, with
+#: the sha fragment wrapped in a group so :func:`verdict_violations` can read the sha
+#: out of an otherwise-canon-conformant verdict path. Never a second hand-written regex.
+_SHA40 = SHAPE_FRAGMENTS["<40hex>"]
+_VERDICT_RE = re.compile(
+    next(
+        e for e in CANON if e.shape.endswith("verdicts/<40hex>.handoff.json")
+    ).pattern.pattern.replace(_SHA40, f"({_SHA40})")
 )
-
-#: The v6 canon ROOT member names — every entry permitted directly under ``specs/``.
-#: Derived from :data:`CANON` itself (zero special-casing: :data:`Area` already carries
-#: one value per root member, including the two bare root files) — the doctor's TREE-8
-#: root-membership tier is the one consumer of this frozenset.
-CANON_ROOT_MEMBERS: frozenset[str] = frozenset(entry.area for entry in CANON)
-
-#: TREE-4's required directories, derived (not hand-kept): every area that pre-creates
-#: its own ``_archive/<area>_histo.jsonl`` at birth also needs its directory to exist —
-#: exactly {audits, backlog, bugs, releases} today, self-updating if a future area gains
-#: a birth-time histo entry.
-REQUIRED_ROOT_DIRS: tuple[str, ...] = tuple(
-    sorted(
-        {
-            entry.area
-            for entry in CANON
-            if entry.required_at_birth
-            and entry.dest
-            and entry.dest.startswith(f"{entry.area}/_archive/")
-        }
-    )
-)
-
-#: The verdict-filename shape, isolated (matches the trailing component
-#: ``releases/<M.m.p>/verdicts/<40hex>.handoff.json`` already admitted by the CANON
-#: table above), used by :func:`verdict_violations` to pick the sha out of an
-#: otherwise-canon-conformant verdict path.
-_VERDICT_RE = re.compile(rf"^releases/{_SEMVER}/verdicts/({_SHA40})\.handoff\.json$")
 
 #: The legacy release-id slug form new releases may still mint (pre-canon-v6 repos);
 #: bare SemVer (:func:`~dadaia_workspace.core.specs_version.is_release_semver`) is the
@@ -578,16 +326,14 @@ def _today() -> str:
 
 
 def _render(entry: CanonEntry, *, public_dir: Path, context: dict[str, str]) -> str:
-    if entry.kind == "copy":
-        assert entry.template is not None
-        text = (public_dir / entry.template).read_text(encoding="utf-8")
-    elif entry.kind == "static":
-        assert entry.template is not None
-        text = entry.template
-    elif entry.kind == "format":
-        assert entry.template is not None
-        text = entry.template.format(**context)
-    elif entry.kind == "json_catalog":
+    kind, template = TEMPLATES[entry.shape]
+    if kind == "copy":
+        text = (public_dir / template).read_text(encoding="utf-8")
+    elif kind == "static":
+        text = template
+    elif kind == "format":
+        text = template.format(**context)
+    else:
         text = (
             json.dumps(
                 {
@@ -599,8 +345,6 @@ def _render(entry: CanonEntry, *, public_dir: Path, context: dict[str, str]) -> 
             )
             + "\n"
         )
-    else:
-        raise AssertionError(f"unknown CanonEntry.kind: {entry.kind!r}")  # pragma: no cover
     section_id = FIXED_SECTION_BY_PATH.get(entry.dest or "")
     if section_id is None:
         return text
@@ -630,12 +374,10 @@ def scaffold(
     }
     created: list[Path] = []
     for entry in CANON:
-        # NOTE: entry.template is None is a VALID, required state for kind=="json_catalog"
-        # (memory/product/catalog.json) — its content is computed by _render, not read
-        # from a template. Do not skip on entry.template is None here; a prior version of
-        # this guard did, silently dropping the one required_at_birth json_catalog entry
-        # from every fresh scaffold (fresh-specs-scaffold-fails-specs-doctor's own class
-        # of bug, reproduced structurally). Only "no destination" disqualifies an entry.
+        # Only "no destination" disqualifies an entry: a required_at_birth row always
+        # has a renderer (``memory/product/catalog.json``'s is computed, not a template —
+        # a prior guard skipped it for having no template string and silently dropped it
+        # from every fresh scaffold: fresh-specs-scaffold-fails-specs-doctor's own class).
         if not entry.required_at_birth or entry.dest is None:
             continue
         target = specs_dir / entry.dest
@@ -662,7 +404,7 @@ def scaffold_entry(specs_dir: Path, rel_path: str, /, **context: str) -> Path:
     entry = next((e for e in CANON if e.pattern.match(rel_path)), None)
     if entry is None:
         raise ValueError(f"{rel_path!r} is not a v6-canon-conformant path — nothing to scaffold.")
-    if entry.template is None:
+    if entry.shape not in TEMPLATES:
         raise ValueError(f"{rel_path!r} (area={entry.area}) has no scaffold template.")
     target = specs_dir / rel_path
     if target.exists():
@@ -677,18 +419,47 @@ def scaffold_entry(specs_dir: Path, rel_path: str, /, **context: str) -> Path:
     return target
 
 
-#: Every artifact ``release_new`` refuses to mint over (CWE-73/CWE-59 hardening,
-#: carried over from the retired ``features.spec_artifacts.new_artifacts``): a release
-#: directory a caller can already write RELEASE.json/PLAN.md/TASKS.md into ahead of
-#: ``release new`` (e.g. `dadaia release new` racing a segment scaffold) must never
-#: have any of its four canonical artifacts silently overwritten.
-_RELEASE_ARTIFACT_NAMES: tuple[str, ...] = (
-    "SPEC.md",
-    "PLAN.md",
-    "TASKS.md",
-    "_RELEASE.json",
-    "RELEASE.json",
+#: Every artifact ``release_new`` refuses to mint over (CWE-73/CWE-59 hardening): a
+#: release directory a caller can already write artifacts into ahead of ``release new``
+#: must never have any of its canonical artifacts silently overwritten. Derived from the
+#: canon rows themselves (0.4.7 FR5) — never a second hand-kept list of the same names.
+_RELEASE_ARTIFACT_NAMES: tuple[str, ...] = tuple(
+    entry.shape.removeprefix("releases/<M.m.p>/")
+    for entry in CANON
+    if entry.shape.startswith("releases/<M.m.p>/")
+    and "/" not in entry.shape.removeprefix("releases/<M.m.p>/")
 )
+
+
+#: The ONE birth state document (0.4.7 FR2, T-047-06): phase DEFINITION, no candidate
+#: number yet, every milestone unreached, and one `note` entry recording the birth.
+#: Bug `release-new-writes-spec-only-never-creates-release-state`: the gate's MEMORY
+#: class, `dadaia context show`, dd-spec-navigator, V34 and `rc-archive` all resolve the
+#: live release by this file's presence — without it a minted release exists for nobody.
+def _birth_release_state_text(release_id: str) -> str:
+    """Serialize the birth ``release-state-v1`` document for *release_id*.
+
+    One serializer, ``core.release_state.serialize_release_state`` — never a second
+    hand-rolled JSON shape for the same schema."""
+    return serialize_release_state(
+        ReleaseState(
+            schema="release-state-v1",
+            release=release_id,
+            phase="DEFINITION",
+            rc=None,
+            defined=None,
+            implemented=None,
+            shipped=None,
+            log=(
+                {
+                    "ts": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "agent": "dadaia release new",
+                    "kind": "note",
+                    "text": f"Release {release_id} born",
+                },
+            ),
+        )
+    )
 
 
 def release_new(specs_dir: Path, release_id: str) -> Path:
@@ -742,10 +513,14 @@ def release_new(specs_dir: Path, release_id: str) -> Path:
             if d.is_dir() and d.name not in ("_archive", "_ideas") and d.name != release_id
         )
         if others:
+            live = others[0]
             raise FileExistsError(
                 f"a live release already exists ({', '.join(others)}) — the "
-                "release-candidates model allows exactly one; stack the work as a new "
-                "candidate (dadaia release rc-archive) or ship first."
+                f"release-candidates model allows exactly one (ADR 0005) — stack the "
+                f"work as a candidate, or ship {live} first "
+                f"({DADAIA_BIN} release archive {live} --shipped <sha> "
+                f"--pr <n> --next {release_id}).\n"
+                f"fix: {DADAIA_BIN} release rc-archive"
             )
     if releases_root.is_symlink() or release_dir.is_symlink():
         raise FileExistsError(
@@ -759,14 +534,31 @@ def release_new(specs_dir: Path, release_id: str) -> Path:
                 f"{artifact} already exists — refusing to overwrite a minted release artifact."
             )
 
-    if is_release_semver(release_id):
-        return scaffold_entry(specs_dir, f"releases/{release_id}/SPEC.md", release_id=release_id)
+    # Build and PROVE the state document before anything touches disk (0.4.7 FR2): a
+    # text that does not round-trip through parse_release_state is never written.
+    state_text = _birth_release_state_text(release_id)
+    parse_release_state(state_text)
 
-    # Legacy slug: no CANON entry matches it, so it is rendered directly from the same
-    # stub template scaffold_entry would otherwise use.
-    release_dir.mkdir(parents=True, exist_ok=True)
-    spec_path = release_dir / "SPEC.md"
-    spec_path.write_text(
-        _RELEASE_SPEC_STUB.format(release_id=release_id, today=_today()), encoding="utf-8"
-    )
+    created_dir = not release_dir.exists()
+    try:
+        if is_release_semver(release_id):
+            spec_path = scaffold_entry(
+                specs_dir, f"releases/{release_id}/SPEC.md", release_id=release_id
+            )
+        else:
+            # Legacy slug: no CANON entry matches it, so it is rendered directly from
+            # the same stub template scaffold_entry would otherwise use.
+            release_dir.mkdir(parents=True, exist_ok=True)
+            spec_path = release_dir / "SPEC.md"
+            spec_path.write_text(
+                _RELEASE_SPEC_STUB.format(release_id=release_id, today=_today()),
+                encoding="utf-8",
+            )
+        (release_dir / RELEASE_STATE_FILENAME).write_text(state_text, encoding="utf-8")
+    except BaseException:
+        # All-or-nothing: the directory-level no-clobber above guarantees this tree did
+        # not exist before, so removing it restores the pre-birth state exactly.
+        if created_dir:
+            shutil.rmtree(release_dir, ignore_errors=True)
+        raise
     return spec_path

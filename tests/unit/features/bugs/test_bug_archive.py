@@ -22,7 +22,9 @@ _TS_RECENT = "2026-08-20T00:00:00Z"
 _NOW = datetime(2026, 8, 27, tzinfo=UTC)
 
 
-def _record(bug_id: str, *, status: str = "open", ts: str = _TS_OLD) -> BugRecord:
+def _record(
+    bug_id: str, *, status: str = "open", ts: str = _TS_OLD, closed_at: str | None = None
+) -> BugRecord:
     return BugRecord(
         id=bug_id,
         ts=ts,
@@ -36,6 +38,9 @@ def _record(bug_id: str, *, status: str = "open", ts: str = _TS_OLD) -> BugRecor
         repro="r",
         expected="e",
         status=status,
+        # 0.4.7 FR4: ageing is by closed_at, so a terminal fixture closes on its own
+        # filing date unless the test says otherwise.
+        closed_at=closed_at or (ts if status != "open" else None),
     )
 
 

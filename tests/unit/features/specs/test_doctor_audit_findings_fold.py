@@ -8,7 +8,7 @@ FR15 deletes ``check_audit_disposition``'s former disposition-marker regex outri
 
 * an ``open`` record inside an archived audit (``specs/audits/_archive/**``) is an
   ERROR (SPEC-DOC-036);
-* a live audit whose records are ALL terminal (``fixed|superseded|deferred|rejected``)
+* a live audit whose records are ALL terminal (``resolved|superseded|deferred|rejected``)
   and each names a disposing ``release`` is an archive-due WARN (SPEC-DOC-038);
 * an archived audit with no ``FINDINGS.jsonl`` at all predates the ``audit-canon-v1``
   schema (D5) and is folded into a single aggregate WARNING, never an ERROR.
@@ -64,7 +64,7 @@ def test_archived_audit_with_open_record_errors(tmp_path: Path) -> None:
     _write_findings(
         audit_dir / "FINDINGS.jsonl",
         [
-            _finding("20261020-five-release-window-F001", disposition="fixed", release="0.5.0"),
+            _finding("20261020-five-release-window-F001", disposition="resolved", release="0.5.0"),
             _finding("20261020-five-release-window-F002", disposition="open"),
         ],
     )
@@ -83,7 +83,7 @@ def test_archived_audit_fully_terminal_is_clean(tmp_path: Path) -> None:
     _write_findings(
         audit_dir / "FINDINGS.jsonl",
         [
-            _finding("20261020-fully-closed-F001", disposition="fixed", release="0.5.0"),
+            _finding("20261020-fully-closed-F001", disposition="resolved", release="0.5.0"),
             _finding("20261020-fully-closed-F002", disposition="rejected", release="0.5.0"),
         ],
     )
@@ -102,7 +102,7 @@ def test_live_fully_terminal_audit_warns_archive_due(tmp_path: Path) -> None:
     _write_findings(
         audit_dir / "FINDINGS.jsonl",
         [
-            _finding("20261020-five-release-window-F001", disposition="fixed", release="0.5.0"),
+            _finding("20261020-five-release-window-F001", disposition="resolved", release="0.5.0"),
             _finding(
                 "20261020-five-release-window-F002", disposition="superseded", release="0.5.0"
             ),
@@ -123,7 +123,7 @@ def test_live_audit_with_open_record_is_silent(tmp_path: Path) -> None:
     _write_findings(
         audit_dir / "FINDINGS.jsonl",
         [
-            _finding("20261020-still-open-F001", disposition="fixed", release="0.5.0"),
+            _finding("20261020-still-open-F001", disposition="resolved", release="0.5.0"),
             _finding("20261020-still-open-F002", disposition="open"),
         ],
     )
@@ -137,7 +137,7 @@ def test_live_audit_terminal_without_named_release_is_silent(tmp_path: Path) -> 
     audit_dir = specs / "audits" / "20261020-terminal-no-release"
     _write_findings(
         audit_dir / "FINDINGS.jsonl",
-        [_finding("20261020-terminal-no-release-F001", disposition="fixed", release=None)],
+        [_finding("20261020-terminal-no-release-F001", disposition="resolved", release=None)],
     )
 
     assert _codes(specs, "SPEC-DOC-038") == []

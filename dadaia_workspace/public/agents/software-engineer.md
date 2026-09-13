@@ -16,7 +16,6 @@ skills:
   - dd-codebase-design
   - dd-cli-library
   - dd-handoff-emitter
-  - dd-task-manager
   - dd-spec-navigator
   - dd-ai-eng-knowhow
   - dd-release-implementation
@@ -121,14 +120,14 @@ E2E tests -> qa-engineer.
 Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then:
 
 1. Read the approved SPEC.md and TASKS.md for the current task.
-2. Reserve via `dd-task-manager`: flip `[ ]`->`[-]` and commit `chore(tasks): start <task-id>` before editing production.
+2. Reserve (`dd-release-implementation` RC-FLOW step 1): flip `[ ]`->`[-]` and commit `chore(tasks): start <task-id>` before editing production.
 3. Write the failing test(s) first — red before any production code.
 4. Implement the minimum code to go green.
 5. Refactor with tests still green.
 6. Run the language gate clean (`mypy --strict` + `ruff check` for Python; the project's typecheck + lint for Node).
 7. Flip `[-]`->`[x]` only after the review gate clears; commit referencing the task id.
 8. Stop and escalate to `product-engineer` via PM when a task cannot be tested — the spec is incomplete.
-9. Run pytest with `-p no:cacheprovider`; assert real behavior, never the absence of failure.
+9. Run the bare commands — `pyproject.toml` already redirects every cache out of the tree; assert real behavior, never the absence of failure.
 10. Enforce authorization on every endpoint; validate and sanitize all user input (SQL/HTML/shell/path).
 11. Flag outdated dependencies in your report; verify third-party integrity (hashes) when possible.
 12. Log auth failures and security events with structured logging, never secrets/PII.
@@ -145,7 +144,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 - Never write: lib-originated projections (`.claude/`, `.agents/`, `.codex/`, `.kimi-code/`).
 - Write an HTML report to `repos/<context>/reports/software-engineer/<UTC>-<task-slug>.html` only on operator request or human next hop.
 - Required sections: Summary, Tests written (`file:line`), Security checklist (OWASP items touched), Commit/branch, Review status.
-- Emit via `dd-handoff-emitter` — schema `handoff-v1.2`, `self_pull.refs` lists only atoms this session actually read.
+- Emit via `dd-handoff-emitter`.
 - Treat a completed implementation as a handoff, not task completion — hold `[x]`/push/PR/merge/deploy/close per `dd-release-implementation`.
 - Include evidence paths for changed files, unit/integration commands run, and security/privacy checks performed.
 
@@ -158,6 +157,5 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 - CLI:
   ```bash
   dadaia context show --json    # discover active context and specs_dir
-  dadaia doctor                 # workspace health check
-  dadaia specs doctor           # SDD-specific health check
+  dadaia doctor                 # workspace, specs and ledgers health check
   ```

@@ -17,7 +17,7 @@ labelled judgement call with the command that makes it verifiable in the diff.
 | S7 | Acronym or generic name | a term outside the repo's `CONTEXT.md`; `Manager\|Helper\|Utils\|data\|result\|temp` in a new name | LOW | A domain name |
 | S8 | File outside the canon | `git diff --name-status \| grep '^A'` against the root whitelist, the specs canon, the `.dadaia/` canon; `*.bak`, `SUMMARY.md`, `NOTES.md` | HIGH | Delete, or move to its home |
 | S9 | Commit outside the six shapes; surviving branch | `git log --stat` against `dd-gitflow-default` §3a; `git branch -r --merged` | MEDIUM | Rewrite the series before the push; tag and delete |
-| S10 | Duplicated rule; surviving handoff; provenance in a skill | an identical paragraph in two files (read — the behavior-map hashes, it never reads prose); `find .dadaia/handoff -mtime +30`; "renamed from", "formerly", `v0.` in a `SKILL.md` | MEDIUM | One home; delete |
+| S10 | Duplicated rule; surviving handoff; provenance in a skill | an identical paragraph in two files (read — the behavior-map hashes, it never reads prose); `find .dadaia/handoff -mtime +1`; "renamed from", "formerly", `v0.` in a `SKILL.md` | MEDIUM | One home; delete |
 
 ## Tests (S3)
 

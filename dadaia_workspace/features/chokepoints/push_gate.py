@@ -25,6 +25,7 @@ CLI defect, never a bypass).
 from __future__ import annotations
 
 from collections.abc import Callable, Collection, Iterable, Iterator, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
@@ -39,9 +40,10 @@ from dadaia_workspace.features.chokepoints.denylist_scan import (
     Hit,
     OversizedNote,
     PathMasker,
+    compile_slug_patterns,
     scan_objects,
 )
-from dadaia_workspace.features.chokepoints.verdict import live_verdict_shas
+from dadaia_workspace.features.chokepoints.verdict import INTEGRATION_TIP_REF, live_verdict_shas
 
 __all__ = ["push_gate_decision"]
 
@@ -73,6 +75,8 @@ class ObjectSource(Protocol):
     def first_parent(self, repo: Path, sha: str) -> str | None: ...
 
     def resolve_ref(self, repo: Path, ref: str) -> str | None: ...
+
+    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]: ...
 
 
 def _annotate_skip(
@@ -134,14 +138,14 @@ def _compose_denylist_refusal(hits: list[tuple[PushRef, Hit]], path_masker: Path
     if remainder > 0:
         lines.append(f"  ... and {remainder} more offending object(s).")
     lines.append(
-        "  Fix: edit the file(s) to remove the term, then rewrite the offending "
-        "commit(s) (--amend / interactive rebase / cherry-pick) so no pushed object "
-        "carries it, and push again — the range scope means already-published history "
-        "never needs a rewrite."
+        "  The range scope means already-published history never needs a rewrite. If "
+        "this push is a genuine emergency, git's sanctioned, traceable bypass is "
+        "`git push --no-verify` (discouraged; leaves a reflog trace)."
     )
     lines.append(
-        "  If this push is a genuine emergency, git's sanctioned, traceable bypass is "
-        "`git push --no-verify` (discouraged; leaves a reflog trace)."
+        "Remove the term from the listed file(s), then rewrite the offending "
+        "commit(s) and push again:\n"
+        "fix: git rebase -i <first-offending-sha>^"
     )
     return "\n".join(lines)
 
@@ -183,6 +187,27 @@ def _dedup_new_objects(
         yield obj
 
 
+@dataclass(frozen=True)
+class _RangeScan:
+    """The outcome of the ONE streaming pass over the pushed-range objects.
+
+    ``read_failed`` is the typed discriminator the decision keys on (never the refusal
+    prose): True means git could not be read and ``refusal`` names that failure; False
+    with a ``refusal`` means denylist hits; False without one means clean.
+    ``specs_paths_by_ref`` (operator ruling 2026-09-13, bug
+    ``pre-push-canon-scan-not-range-scoped``) is every ``specs/`` path the range
+    introduces or rewrites, per local sha — the canon scan's input, recorded from the
+    SAME pass instead of a second whole-tree listing.
+    """
+
+    refusal: Decision | None
+    read_failed: bool
+    skipped_binary_count: int
+    oversized_notes: tuple[OversizedNote, ...]
+    path_masker: PathMasker
+    specs_paths_by_ref: dict[str, list[str]]
+
+
 def _run_denylist_scan(
     scan_refs: list[PushRef],
     object_source: ObjectSource,
@@ -190,10 +215,9 @@ def _run_denylist_scan(
     terms: Iterable[tuple[str, str]],
     patterns: Iterable[BaselinePatternLike],
     slugs: Iterable[str],
-) -> tuple[Decision | None, int, tuple[OversizedNote, ...], PathMasker]:
+) -> _RangeScan:
     """Run the FR1/FR2 scan over *scan_refs* — every non-deletion ref, tags included.
 
-    Returns ``(refusal_or_None, skipped_binary_count, oversized_notes, path_masker)``.
     A git object-read failure refuses immediately, naming the failure (FR6 row 2) —
     never a silent empty scan. ``oversized_notes`` is deduplicated for free — it is
     built from ``scan_objects`` runs over :func:`_dedup_new_objects`, which shares
@@ -215,44 +239,56 @@ def _run_denylist_scan(
     pattern_list = list(patterns)
     slug_list = list(slugs)
     path_masker = PathMasker(term_list, pattern_list, slug_list)
+    specs_paths_by_ref: dict[str, list[str]] = {}
     if not scan_refs:
-        return None, 0, (), path_masker
+        return _RangeScan(None, False, 0, (), path_masker, specs_paths_by_ref)
+    try:
+        published = _published_slugs(scan_refs, object_source, repo, slug_list)
+    except GitObjectReadError:
+        published = set()  # fail CLOSED: an unreadable baseline amnesties nothing
+    scan_slugs = [slug for slug in slug_list if slug not in published]
     seen_shas: set[str] = set()
     per_ref_hits: list[tuple[PushRef, Hit]] = []
     skipped_total = 0
     oversized_all: list[OversizedNote] = []
     try:
         for ref in scan_refs:
-            fresh = _dedup_new_objects(object_source, repo, ref, seen_shas)
-            outcome = scan_objects(fresh, term_list, pattern_list, slug_list)
+            fresh = _record_specs_paths(
+                _dedup_new_objects(object_source, repo, ref, seen_shas),
+                specs_paths_by_ref.setdefault(ref.local_sha, []),
+            )
+            outcome = scan_objects(fresh, term_list, pattern_list, scan_slugs)
             skipped_total += outcome.skipped_binary_count
             oversized_all.extend(outcome.oversized_notes)
             per_ref_hits.extend((ref, hit) for hit in outcome.hits)
     except GitObjectReadError as exc:
-        return (
+        return _RangeScan(
             Decision(
                 allowed=False,
                 message=(
                     f"[pre-push] BLOCKED: reading the pushed-range git objects failed "
                     f"({_render_git_read_error(exc, path_masker)}) — a policy gate never "
-                    "skips what it cannot evaluate (fail closed).\n"
-                    "  If this push is a genuine emergency, git's sanctioned, traceable "
-                    "bypass is `git push --no-verify` (discouraged; leaves a reflog "
-                    "trace)."
+                    "skips what it cannot evaluate (fail closed). The sanctioned, "
+                    "traceable emergency bypass is `git push --no-verify` "
+                    "(discouraged; leaves a reflog trace).\n"
+                    "fix: git fetch origin && git push origin feature/<M.m.p> (repair "
+                    "the object store first — git fsck)"
                 ),
             ),
+            True,
             0,
             (),
             path_masker,
+            specs_paths_by_ref,
         )
     oversized_notes = tuple(oversized_all)
-    if not per_ref_hits:
-        return None, skipped_total, oversized_notes, path_masker
-    return (
-        Decision(allowed=False, message=_compose_denylist_refusal(per_ref_hits, path_masker)),
-        skipped_total,
-        oversized_notes,
-        path_masker,
+    refusal = (
+        Decision(allowed=False, message=_compose_denylist_refusal(per_ref_hits, path_masker))
+        if per_ref_hits
+        else None
+    )
+    return _RangeScan(
+        refusal, False, skipped_total, oversized_notes, path_masker, specs_paths_by_ref
     )
 
 
@@ -276,56 +312,114 @@ def _compose_specs_canon_refusal(violations: list[tuple[PushRef, str]]) -> str:
         "  If this push is a genuine emergency, git's sanctioned, traceable bypass is "
         "`git push --no-verify` (discouraged; leaves a reflog trace)."
     )
+    lines.append(
+        "git rm the listed specs/ path(s), then rewrite the offending commit(s) and "
+        "push again:\n"
+        "fix: git rebase -i <first-offending-sha>^"
+    )
     return "\n".join(lines)
+
+
+def _record_specs_paths(
+    objects: Iterator[ScannedObject], sink: list[str]
+) -> Iterator[ScannedObject]:
+    """Stream *objects* through unchanged, recording each ``specs/`` path into *sink*.
+
+    Bug ``pre-push-canon-scan-not-range-scoped`` (operator ruling 2026-09-13): the
+    canon scan reads the SAME pushed-range objects the denylist scan streams — one
+    pass over ``new_objects``, never the whole tree at the tip. A path no commit in
+    the range touches is already published, so it never blocks a push (the principle
+    the denylist refusal text has always stated: the range scope means published
+    history never needs a rewrite).
+    """
+    for obj in objects:
+        if obj.path.startswith("specs/"):
+            sink.append(obj.path)
+        yield obj
 
 
 def _run_specs_canon_scan(
     scan_refs: list[PushRef],
+    specs_paths_by_ref: dict[str, list[str]],
     object_source: ObjectSource,
     repo: Path,
     canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
     verdict_violations_fn: Callable[[Sequence[str], Collection[str]], Sequence[str]],
 ) -> Decision | None:
-    """SPEC v0.5.0 specs-canon closure (operator ruling 2026-08-28): every pushed
-    non-deletion ref's tree is checked for a ``specs/`` path violating the v6 canon
-    (or the verdict business rule) — via the INJECTED *canon_violations_fn*/
-    *verdict_violations_fn* (v0.5.1 K7: the SAME predicates the doctor's TREE-8 check
-    uses, never a second, hand-kept member list — injected rather than imported at
-    module scope so this module carries no ``chokepoints -> specs.canon`` edge; the CLI
-    composition root wires ``features.specs.canon.canon_violations``/
-    ``verdict_violations`` straight through).
+    """SPEC v0.5.0 specs-canon closure (operator ruling 2026-08-28), range-scoped since
+    2026-09-13: every ``specs/`` path the pushed range introduces or rewrites
+    (*specs_paths_by_ref*, recorded by :func:`_record_specs_paths`) is checked against
+    the v6 canon; the verdict business rule ("at most ONE file per live sha") is a
+    property of the published TREE, so it alone keeps a tree view over the tip's
+    ``verdicts/`` paths — both via the INJECTED predicates (v0.5.1 K7: the SAME
+    predicates the doctor's TREE-8 check uses, never a second, hand-kept member list —
+    injected rather than imported at module scope so this module carries no
+    ``chokepoints -> specs.canon`` edge).
     """
     violations: list[tuple[PushRef, str]] = []
-    seen: set[tuple[str, str]] = set()
     for ref in scan_refs:
         try:
-            raw_paths = object_source.list_tree_paths(repo, ref.local_sha, "specs")
+            tree_paths = object_source.list_tree_paths(repo, ref.local_sha, "specs")
         except GitObjectReadError as exc:
             return Decision(
                 allowed=False,
                 message=(
                     f"[pre-push] BLOCKED: reading the pushed specs/ tree failed ({exc}) "
                     "— a policy gate never skips what it cannot evaluate (fail "
-                    "closed).\n"
-                    "  If this push is a genuine emergency, git's sanctioned, "
-                    "traceable bypass is `git push --no-verify` (discouraged; "
-                    "leaves a reflog trace)."
+                    "closed). The sanctioned, traceable emergency bypass is "
+                    "`git push --no-verify` (discouraged; leaves a reflog trace).\n"
+                    "fix: git fetch origin && git push origin feature/<M.m.p> (repair "
+                    "the object store first — git fsck)"
                 ),
             )
-        specs_rel = [p[len("specs/") :] for p in raw_paths if p.startswith("specs/")]
-        bad = set(canon_violations_fn(specs_rel))
+        range_rel = sorted({p[len("specs/") :] for p in specs_paths_by_ref.get(ref.local_sha, [])})
+        verdict_rel = [p[len("specs/") :] for p in tree_paths if "/verdicts/" in p]
+        bad = set(canon_violations_fn(range_rel))
         bad.update(
-            verdict_violations_fn(specs_rel, live_verdict_shas(object_source, repo, ref.local_sha))
+            verdict_violations_fn(
+                verdict_rel, live_verdict_shas(object_source, repo, ref.local_sha)
+            )
         )
-        for path in sorted(bad):
-            key = (ref.local_sha, path)
-            if key in seen:
-                continue
-            seen.add(key)
-            violations.append((ref, path))
+        violations.extend((ref, path) for path in sorted(bad))
     if not violations:
         return None
     return Decision(allowed=False, message=_compose_specs_canon_refusal(violations))
+
+
+def _published_slugs(
+    scan_refs: list[PushRef],
+    object_source: ObjectSource,
+    repo: Path,
+    slugs: Sequence[str],
+) -> set[str]:
+    """The foreign slugs the pushed refs' remote tips (or, for a brand-new ref, the
+    integration tip) already publish — a sibling repository's name this repository's
+    published history already carries is not a new disclosure (operator ruling
+    2026-09-13; extends the v0.11.0 FR1 per-path amnesty to the repository).
+
+    Amnesty is a SUBSET of detection by construction: the baseline is searched with
+    the very :func:`compile_slug_patterns` regexes the scan matches with (whole-token,
+    case-insensitive), one ``git grep`` per baseline carrying every pattern — never a
+    substring test (the 2026-08-27 substring bug on this layer must not recur on the
+    fail-open side). Raises :class:`GitObjectReadError` through; the caller then
+    amnesties nothing.
+    """
+    compiled = compile_slug_patterns(slugs)
+    if not compiled:
+        return set()
+    baselines: set[str] = set()
+    for ref in scan_refs:
+        if ref.remote_sha and ref.remote_sha != "0" * 40:
+            baselines.add(ref.remote_sha)
+        else:
+            tip = object_source.resolve_ref(repo, INTEGRATION_TIP_REF)
+            if tip:
+                baselines.add(tip)
+    regexes = [regex.pattern for _slug, regex in compiled]
+    matched: set[str] = set()
+    for sha in baselines:
+        matched |= {m.lower() for m in object_source.tree_matches(repo, sha, regexes)}
+    return {slug for slug, _regex in compiled if slug.lower() in matched}
 
 
 def push_gate_decision(
@@ -350,13 +444,16 @@ def push_gate_decision(
        ``main`` are refused outright (they advance by PR only); names outside the three
        permitted patterns are refused as invalid.
     2. **specs/ canon scan** (v0.5.0 specs-canon closure, operator ruling 2026-08-28)
-       — every non-deletion ref, tags included, is checked via *object_source* for a
-       ``specs/`` path violating the v6 canon or the verdict business rule (the
-       injected *canon_violations_fn*/*verdict_violations_fn*).
+       — every ``specs/`` path the pushed range introduces or rewrites is checked
+       against the v6 canon (range-scoped since 2026-09-13: a path no commit in the
+       range touches never blocks); the verdict business rule keeps its tree view over
+       the tip's ``verdicts/`` paths (the injected *canon_violations_fn*/
+       *verdict_violations_fn*).
     3. **Range-scoped denylist scan** (v0.9.0 FR1/FR2) — every non-deletion ref, tags
        included, is scanned via *object_source* for new objects carrying a denylisted
-       term. Runs AFTER branch policy and the canon scan (both free and pure) — under
-       v2 this feature push is the first publication to ``origin`` (A3.3).
+       term. Steps 2 and 3 share ONE object walk (the walk runs once, after branch
+       policy; step 2's refusal is decided first) — under v2 this feature push is the
+       first publication to ``origin`` (A3.3).
 
     There is no fourth step: the former diff-based security-verdict check is DELETED
     from this path (v0.4.4 A3.4) — it relocates to a PR gate covering
@@ -381,9 +478,9 @@ def push_gate_decision(
             message=(
                 f"[pre-push] BLOCKED: {malformed_lines} unparseable pre-push stdin "
                 "line(s) — a policy gate never skips what it cannot parse (fail "
-                "closed).\n"
-                "  If this push is a genuine emergency, git's sanctioned, traceable "
-                "bypass is `git push --no-verify` (discouraged; leaves a reflog trace)."
+                "closed). The sanctioned, traceable emergency bypass is "
+                "`git push --no-verify` (discouraged; leaves a reflog trace).\n"
+                "fix: git push origin feature/<M.m.p> (one explicit refspec)"
             ),
         )
 
@@ -398,26 +495,43 @@ def push_gate_decision(
     # the denylist scan (step 3, A3.4).
     scan_refs = [r for r in refs if not r.is_deletion]
 
-    # v0.5.0 specs-canon closure (operator ruling 2026-08-28): step 2.
-    canon_refusal = _run_specs_canon_scan(
-        scan_refs, object_source, repo, canon_violations_fn, verdict_violations_fn
-    )
-    if canon_refusal is not None:
-        return canon_refusal
-
-    # v0.9.0 FR1/FR2: step 3.
-    scan_refusal, skipped_binary_count, oversized_notes, path_masker = _run_denylist_scan(
+    # One streaming pass over the pushed-range objects feeds BOTH step 2 (specs canon,
+    # range-scoped, operator ruling 2026-09-13) and step 3 (denylist); step 2's refusal
+    # still takes precedence over step 3's.
+    scan = _run_denylist_scan(
         scan_refs, object_source, repo, denylist_terms, baseline_patterns, foreign_slugs
     )
-    if scan_refusal is not None:
-        return _annotate_skip(scan_refusal, skipped_binary_count, oversized_notes, path_masker)
+    if scan.read_failed and scan.refusal is not None:
+        # Nothing was streamed, so the canon scan has no input either — fail closed
+        # on the read error itself.
+        return _annotate_skip(
+            scan.refusal, scan.skipped_binary_count, scan.oversized_notes, scan.path_masker
+        )
+
+    canon_refusal = _run_specs_canon_scan(
+        scan_refs,
+        scan.specs_paths_by_ref,
+        object_source,
+        repo,
+        canon_violations_fn,
+        verdict_violations_fn,
+    )
+    if canon_refusal is not None:
+        return _annotate_skip(
+            canon_refusal, scan.skipped_binary_count, scan.oversized_notes, scan.path_masker
+        )
+
+    if scan.refusal is not None:
+        return _annotate_skip(
+            scan.refusal, scan.skipped_binary_count, scan.oversized_notes, scan.path_masker
+        )
 
     return _annotate_skip(
         Decision(
             allowed=True,
             message="[pre-push] branch policy + specs-canon scan + denylist scan passed; allow.",
         ),
-        skipped_binary_count,
-        oversized_notes,
-        path_masker,
+        scan.skipped_binary_count,
+        scan.oversized_notes,
+        scan.path_masker,
     )

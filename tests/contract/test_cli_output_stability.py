@@ -9,6 +9,11 @@ was captured from the verb's actual output before the ``--redact`` flag existed,
 byte-for-byte regression here means the new flag's plumbing leaked into the default
 path — not a decision this task is free to re-litigate.
 
+The three `dadaia doctor` goldens were RE-PINNED ONCE at 0.4.7 T-047-02, when the three
+doctors became one: the render is now `<CODE> <verdict> <message>` lines plus one
+`compliance(<section>)` line per section and a `compliance(total)` line. `--redact`'s
+default-path neutrality — the property this module exists for — is unchanged.
+
 Byte-for-byte golden literals are inherently platform-specific wherever they embed a
 ``rich.table.Table`` rendering: Rich substitutes its default HEAVY_HEAD box-drawing
 characters for the ASCII-safe SQUARE box whenever ``Console.legacy_windows`` resolves
@@ -28,6 +33,7 @@ from __future__ import annotations
 
 import json
 import platform
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -127,7 +133,10 @@ def test_doctor_default_output_healthy_workspace_unchanged(workspace: Path) -> N
     result = _runner.invoke(app, ["doctor"])
     assert result.exit_code == 0, result.output
     assert result.output == (
-        "All invariants OK — workspace is healthy.\ncompliance: 134/134 entries canonical (100%)\n"
+        "compliance(workspace): 128/128 entries canonical (100%)\n"
+        "compliance(specs): 0/0 rules canonical (100%)\n"
+        "compliance(ledgers): 0/0 records canonical (100%)\n"
+        "compliance(total): 128/128 checks canonical (100%)\n"
     )
 
 
@@ -136,11 +145,12 @@ def test_doctor_default_output_with_issue_unchanged(workspace: Path) -> None:
     result = _runner.invoke(app, ["doctor"])
     assert result.exit_code == 1, result.output
     assert result.output == (
-        "Found 1 issue(s):\n"
-        "  INV-5 [fixable] — Context 'stale-ctx' is dead but repo 'stale-ctx' is on disk\n"
-        "\n"
-        "Run 'dadaia doctor --fix' to apply automatic repairs.\n"
-        "compliance: 135/135 entries canonical (100%)\n"
+        "INV-5 error Context 'stale-ctx' is dead but repo 'stale-ctx' is on disk\n"
+        "fix: .dadaia/.venv/bin/dadaia doctor --fix\n"
+        "compliance(workspace): 129/129 entries canonical (100%)\n"
+        "compliance(specs): 0/0 rules canonical (100%)\n"
+        "compliance(ledgers): 0/0 records canonical (100%)\n"
+        "compliance(total): 129/129 checks canonical (100%)\n"
     )
 
 
@@ -148,13 +158,16 @@ def test_doctor_default_fix_output_unchanged(workspace: Path) -> None:
     _register_dead_ctx_with_repo_on_disk(workspace)
     result = _runner.invoke(app, ["doctor", "--fix"])
     assert result.exit_code == 0, result.output
+    # 136, not 135: the reaper's own zone directory now exists and is canonical.
+    day = datetime.now(tz=UTC).strftime("%Y%m%d")
     assert result.output == (
-        "Found 1 issue(s):\n"
-        "  INV-5 [fixable] — Context 'stale-ctx' is dead but repo 'stale-ctx' is on disk\n"
-        "\n"
-        "Applied 1 repair(s):\n"
-        "  - INV-5: removed stale repo 'stale-ctx' for dead context 'stale-ctx'\n"
-        "compliance: 135/135 entries canonical (100%)\n"
+        "compliance(workspace): 130/130 entries canonical (100%)\n"
+        "compliance(specs): 0/0 rules canonical (100%)\n"
+        "compliance(ledgers): 0/0 records canonical (100%)\n"
+        "\nApplied 1 repair(s):\n"
+        "  - INV-5: moved 'repos/stale-ctx' (context stale-ctx) -> "
+        f"'.dadaia/reaped/{day}/repos/stale-ctx'\n"
+        "compliance(total): 130/130 checks canonical (100%)\n"
     )
 
 

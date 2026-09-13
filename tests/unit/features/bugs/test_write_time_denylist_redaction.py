@@ -198,16 +198,11 @@ def test_bug_record_redact_scrubs_every_non_identity_field() -> None:
         repro=f"leaked {term} here",
         expected=f"leaked {term} here",
         status="resolved",
+        closed_at="2026-09-01T00:00:00Z",
         cause=f"leaked {term} here",
         caused_by=None,
-        lineage_source=None,
-        registration_commit=None,
-        registration_granularity=None,
-        resolved_commit=None,
-        resolution_granularity=None,
         resolved_release=f"leaked {term} here",
         audited=None,
-        root_cause=f"leaked {term} here",
         solution=f"leaked {term} here",
     )
 
@@ -222,7 +217,6 @@ def test_bug_record_redact_scrubs_every_non_identity_field() -> None:
         "expected",
         "cause",
         "resolved_release",
-        "root_cause",
         "solution",
     ):
         value = getattr(redacted, name)

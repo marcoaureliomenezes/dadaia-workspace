@@ -3,7 +3,6 @@ name: dd-architecture-survey
 description: >
   Survey a codebase for deepening opportunities, oriented by the measured bug history.
   Produces architecture cards plus exactly ONE top candidate routed to dd-grill-me.
-disable-model-invocation: true
 ---
 
 # dd-architecture-survey

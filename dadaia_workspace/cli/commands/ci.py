@@ -16,7 +16,9 @@ from dadaia_workspace.cli._specs_resolution import (
     resolve_workspace_root_for_cli,
 )
 from dadaia_workspace.container import is_source_repo_root as _is_source_repo_root
+from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.exceptions import CiPreflightScopeError
+from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.features.ci_preflight import (
     all_passed,
     checks_for,
@@ -28,9 +30,15 @@ from dadaia_workspace.features.ci_preflight import (
 app = typer.Typer(help="Local CI-equivalent preflight gate + git-hook chokepoints.")
 
 # .../dadaia_workspace/cli/commands/ci.py -> parents[2] == .../dadaia_workspace
-_SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "public" / "scripts"
-_HOOK_SOURCE = _SCRIPTS_DIR / "pre-push-ci-gate.sh"
-_PRE_COMMIT_HOOK_SOURCE = _SCRIPTS_DIR / "pre-commit-presence-gate.sh"
+_SCRIPTS_DIR = workspace_layout.public_scripts_dir()
+#: Derived from the ONE registry of which chokepoints exist and what they are made of
+#: (``workspace_layout.INSTALLED_GIT_HOOKS``) — the same rows the workspace doctor
+#: compares the installed copies against (HOOKS-DRIFT-1). Never a second literal.
+_HOOK_SOURCES: dict[str, Path] = {
+    target: _SCRIPTS_DIR / source for target, source in workspace_layout.INSTALLED_GIT_HOOKS
+}
+_HOOK_SOURCE = _HOOK_SOURCES["pre-push"]
+_PRE_COMMIT_HOOK_SOURCE = _HOOK_SOURCES["pre-commit"]
 
 
 def _repo_root() -> Path:
@@ -223,6 +231,12 @@ def _foreign_repo_slugs(
     return sorted((registry_terms | dir_terms) - own_identities)
 
 
+def _no_canon_violations(paths: Iterable[str]) -> list[str]:
+    """The canon predicate for a specs/ tree stamped below the canonical pattern: the
+    v6 canon does not describe it, so no path in it is a v6 violation."""
+    return []
+
+
 @app.command("push-gate-check")
 def push_gate_check() -> None:
     """Pre-push gate: branch-name validation + the range-scoped denylist scan.
@@ -251,12 +265,33 @@ def push_gate_check() -> None:
         load_denylist_terms,
         load_registry_context_identities,
     )
+    from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, read_pattern_version
     from dadaia_workspace.features.chokepoints import context_slug_for_path, push_gate_decision
     from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
     from dadaia_workspace.features.specs.canon import canon_violations, verdict_violations
 
     repo_root = _repo_root()
     workspace = resolve_workspace_root_for_cli(repo_root)
+
+    # Bug pre-push-canon-scan-not-range-scoped (operator ruling 2026-09-13): the v6
+    # canon is a property of a v6 tree. A specs/ tree still stamped below
+    # CANONICAL_SPECS_VERSION (pattern 5: Markdown backlog, `v`-prefixed release dirs,
+    # lowercase memory files) has NOTHING for the canon scan to enforce until
+    # `dadaia specs upgrade` migrates it — the doctor already reports that drift;
+    # the push gate must not lock every specs edit behind the migration.
+    specs_dir = repo_root / "specs"
+    specs_version = read_pattern_version(specs_dir)
+    canon_fn = canon_violations
+    if specs_dir.is_dir() and specs_version < CANONICAL_SPECS_VERSION:
+        # An unstamped (pre-framework) tree counts as below the canon too — ADR 0013.
+        typer.echo(
+            f"[pre-push] specs/ tree is stamped pattern {specs_version} "
+            f"(< {CANONICAL_SPECS_VERSION}): the v6 canon scan does not apply until "
+            "`dadaia specs upgrade` migrates it; the verdict rule and the denylist "
+            "scan still run.",
+            err=True,
+        )
+        canon_fn = _no_canon_violations
 
     denylist_terms = load_denylist_terms()
     baseline_patterns = load_denylist_baseline_patterns()
@@ -285,7 +320,7 @@ def push_gate_check() -> None:
         refs,
         object_source=build_git_object_reader(),
         repo=repo_root,
-        canon_violations_fn=canon_violations,
+        canon_violations_fn=canon_fn,
         verdict_violations_fn=verdict_violations,
         malformed_lines=malformed,
         denylist_terms=denylist_terms,
@@ -349,7 +384,8 @@ def verdict_check(
     if not _SHA40_RE.match(head):
         typer.secho(
             f"[verdict-check] BLOCKED: --head '{head}' is not a 40-hex sha — refusing "
-            "to use it as a git argument or coverage anchor.",
+            "to use it as a git argument or coverage anchor.\n"
+            "fix: git rev-parse HEAD",
             fg=typer.colors.RED,
             err=True,
         )
@@ -358,7 +394,9 @@ def verdict_check(
     if release_id and release_id != "none" and not RELEASE_SEMVER_RE.match(release_id):
         typer.secho(
             f"[verdict-check] BLOCKED: --release-id '{release_id}' does not match the "
-            "canon release-id pattern — refusing to use it to narrow the search.",
+            "canon release-id pattern — refusing to use it to narrow the search.\n"
+            f"fix: {DADAIA_BIN} ci verdict-check --head <sha> "
+            "--release-id 0.4.7",
             fg=typer.colors.RED,
             err=True,
         )
@@ -376,7 +414,10 @@ def verdict_check(
             f"head {head} — expected one at "
             "specs/releases/<id>/verdicts/<sha>.handoff.json or "
             "specs/releases/_archive/<id>/verdicts/<sha>.handoff.json "
-            f"(sha = {head} or its first parent {parent or 'none'}).",
+            f"(sha = {head} or its first parent {parent or 'none'}).\n"
+            f"The security-reviewer APPROVED handoff belongs at "
+            f"specs/releases/<id>/verdicts/{head}.handoff.json:\n"
+            f"fix: git add specs/releases/<id>/verdicts/{head}.handoff.json",
             fg=typer.colors.RED,
             err=True,
         )

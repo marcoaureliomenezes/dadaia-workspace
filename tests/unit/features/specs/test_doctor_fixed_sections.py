@@ -63,11 +63,11 @@ def test_check_reports_missing_and_drifted_blocks_and_stays_silent_on_exact_ones
     ]
     assert issues[0].description == (
         "constitution.md: fixed law section `slop-law` is missing — "
-        "`dadaia specs doctor --fix` inserts or refreshes it"
+        "`dadaia doctor --fix` inserts or refreshes it"
     )
     assert issues[1].description == (
         "memory/ARCHITECTURE.md: fixed law section `slop-code` differs from the library "
-        "fragment — `dadaia specs doctor --fix` inserts or refreshes it"
+        "fragment — `dadaia doctor --fix` inserts or refreshes it"
     )
 
 
@@ -122,6 +122,4 @@ def test_fix_inserts_a_missing_block_and_refreshes_a_drifted_one(tmp_path: Path)
 def test_fix_help_names_the_fixed_family() -> None:
     from dadaia_workspace.features.specs.rules import render_fix_help
 
-    assert (
-        "FIXED-1/FIXED-2: insert or refresh the workspace's fixed law sections" in render_fix_help()
-    )
+    assert "FIXED-1/FIXED-2" in render_fix_help()

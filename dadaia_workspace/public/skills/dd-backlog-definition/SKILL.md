@@ -13,22 +13,10 @@ description: >
 
 ## The document
 
-- `specs/backlog/BACKLOG.json` is the single source: `{schema: "backlog-v1",
-  active: [...]}` — no per-entry files; schema:
-  `dadaia_workspace/public/schemas/backlog/backlog-v1.schema.json`.
-- Append via `dadaia backlog new <slug>`; validate via `dadaia backlog doctor`
-  (BL-SCHEMA/CONFLICT/STALE).
-- Required fields per entry: `id`, `title`, `opened`, `status`, `description`,
-  `provenance`.
-- **Status:** idea | candidate | picked — live (non-terminal) tokens only; a
-  terminal disposition token belongs to a `backlog_histo.jsonl` record instead.
-- `intents[]` is optional at `idea`, required from `candidate` on — every subject
-  bound to a canonical anchor (`dadaia backlog subjects`).
-- A closed item exits `active[]` into one append-only
-  `specs/backlog/_archive/backlog_histo.jsonl` record — never deleted, never two
-  records for one slug. Terminal tokens: `DELIVERED`, `SUPERSEDED`, `RESOLVED`,
-  `CONSUMED`, `DEFERRED`, `REJECTED` (a live status token never appears in the
-  histo, a terminal token never in `active[]`).
+- `specs/backlog/BACKLOG.json` shape, required fields, live status tokens, the histo
+  record and the terminal dispositions: `specs/backlog/AGENTS.md`.
+- Append via `dadaia backlog new <slug>`; validate via `dadaia doctor` (`ledgers`
+  section).
 
 ## Continuous curation
 
@@ -38,8 +26,8 @@ description: >
   same subject — by domain concept (`dd-domain-modeling`), not by the request's
   wording; merge a near-duplicate into the existing entry.
 - Staleness: an ACTIVE item with no reads/updates past a reasonable window is a
-  sanitize candidate; disposition a confirmed-stale/invalid item to
-  `DEFERRED`/`REJECTED` with a one-line reason.
+  sanitize candidate; a confirmed-invalid item exits as `rejected` with a one-line
+  `reason`; a merely-postponed one stays `active[]`.
 
 ## The intake gate — the only path to a new entry
 
@@ -55,10 +43,11 @@ description: >
 
 ## Pick and dispositions
 
-- A picked entry exits `active[]` in the same commit that creates the release SPEC
-  (purge-on-pick, `DADAIA.md` §6.6), leaving a provisional `CONSUMED` histo record.
-- At closure, `dd-release-implementation`'s disposition sweep rewrites that record in
-  place to its terminal token.
+- A picked entry stays in `active[]` with `status: picked` (`DADAIA.md` §6.6) —
+  nothing is purged at pick time.
+- It exits exactly once, at closure, by `dadaia backlog exit <slug> --disposition
+  delivered|superseded|rejected [--release <id>] [--reason <text>]` — one histo
+  record, refused on a second exit (`dd-release-implementation` RC-FLOW step 7).
 - `dd-release-definition` consumes the picked set with no further triage — the
   backlog it reads is already sanitized.
 
@@ -67,11 +56,11 @@ description: >
 - Every live candidate is in `active[]` with a live token; every closed one has
   exactly one histo record.
 - No entry was created outside the operator-gated intake path.
-- A picked entry's SPEC exists in the same commit its `active[]` entry was purged.
+- A picked entry's SPEC exists in the same commit its `active[]` entry turned `picked`.
 
 ## References
 
 - `DADAIA.md` §6.6 — the backlog law this skill operates.
 - `dd-release-definition` — the picked-set consumer.
-- CLI: `dadaia backlog new`, `dadaia backlog doctor`, `dadaia backlog subjects`;
-  exiting an item has no CLI verb — use file tools directly (ADDITIVE path).
+- CLI: `dadaia backlog new`, `dadaia backlog exit`, `dadaia backlog subjects`,
+  `dadaia doctor`.

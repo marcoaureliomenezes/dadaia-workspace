@@ -13,6 +13,7 @@ presence only; no tunable in this module can make a workspace operation wait or 
 from __future__ import annotations
 
 __all__ = [
+    "DADAIA_BIN",
     "PRESENCE_TTL_SECONDS",
     "RECONCILER_THROTTLE_TTL_SECONDS",
     "SENTINEL_GC_TTL_SECONDS",
@@ -39,3 +40,8 @@ SESSION_GC_TTL_SECONDS: int = 300
 #: the same cadence, gates the ONE GC reaper's call (release 0.5.1 K2:
 #: ``features.spec_context.presence.gc``).
 RECONCILER_THROTTLE_TTL_SECONDS: int = 30
+
+#: The one spelling of the workspace CLI every ``fix:`` line names — the venv-rooted
+#: relative path the venv guard accepts (``hooks/venv_guard``). One home, so a refusal
+#: can never teach an agent a command the guard will block.
+DADAIA_BIN: str = ".dadaia/.venv/bin/dadaia"

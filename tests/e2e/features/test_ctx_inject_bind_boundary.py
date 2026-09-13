@@ -101,8 +101,6 @@ def _real_bind(
             "context",
             "bind",
             ctx,
-            "--mode",
-            "read",
         ],
         cwd=str(workspace),
         env=env,

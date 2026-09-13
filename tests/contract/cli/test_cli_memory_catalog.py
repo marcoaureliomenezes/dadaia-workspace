@@ -26,7 +26,6 @@ _FEATURE_MD_TEMPLATE = """\
 ---
 slug: {slug}
 title: {slug}
-category: product
 tldr: '{tldr}'
 summary: '{summary}'
 tags: []
@@ -126,7 +125,6 @@ def test_catalog_generate_computes_token_estimate_ignoring_wrong_frontmatter(
         "---\n"
         "slug: computed-not-stored\n"
         "title: computed-not-stored\n"
-        "category: product\n"
         "tldr: 'proves token_estimate is computed.'\n"
         "summary: 'proves token_estimate is computed.'\n"
         "tags: []\n"

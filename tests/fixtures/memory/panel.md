@@ -1,7 +1,6 @@
 ---
 slug: panel
 title: Panel
-category: product
 tldr: Painel web de controle do dadaia-workspace.
 summary: HTTP server Python puro (no frameworks) que serve a UI do workspace com rotas para agentes, specs, memória e Kanban.
 tags: [panel, http, ui]

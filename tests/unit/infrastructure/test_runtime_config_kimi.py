@@ -232,13 +232,13 @@ def test_pre_gate_shim_fails_open_outside_dadaia_workspaces(tmp_path: Path) -> N
 
 _LEGACY_UNMARKED_RULES = (
     '[[hooks]]\nevent = "PreToolUse"\nmatcher = "^(Edit|Write|Bash)$"\n'
-    'command = "/home/u/.kimi-code/hooks/dadaia-kimi-pre-gate.sh"\ntimeout = 10\n\n'
+    'command = "/home/user/.kimi-code/hooks/dadaia-kimi-pre-gate.sh"\ntimeout = 10\n\n'
     '[[hooks]]\nevent = "PostToolUse"\n'
-    'command = "/home/u/.kimi-code/hooks/dadaia-kimi-post-gate.sh"\ntimeout = 10\n\n'
+    'command = "/home/user/.kimi-code/hooks/dadaia-kimi-post-gate.sh"\ntimeout = 10\n\n'
     '[[hooks]]\nevent = "UserPromptSubmit"\n'
-    'command = "/home/u/.kimi-code/hooks/dadaia-kimi-ctx-inject.sh"\ntimeout = 10\n\n'
+    'command = "/home/user/.kimi-code/hooks/dadaia-kimi-ctx-inject.sh"\ntimeout = 10\n\n'
     '[[hooks]]\nevent = "PostCompact"\nmatcher = "manual|auto"\n'
-    'command = "/home/u/.kimi-code/hooks/dadaia-kimi-post-compact.sh"\ntimeout = 10\n'
+    'command = "/home/user/.kimi-code/hooks/dadaia-kimi-post-compact.sh"\ntimeout = 10\n'
 )
 
 

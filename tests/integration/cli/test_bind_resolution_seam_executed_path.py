@@ -14,7 +14,7 @@ hardcoded/no-op fallback.
 Probed resolver-driven verbs:
   - ``context show`` (no positional name) — context.py
   - ``bugs status`` (no ``--specs-dir``) — bugs.py
-  - ``specs doctor --json`` (no ``--specs-dir``/``--context``) — specs.py
+  - ``doctor --json`` (no ``--specs-dir``/``--context``) — doctor.py
 
 Reports commands accept optional run filters, not bound-context resolution inputs, so
 they are intentionally covered by the structural classifier rather than this executed
@@ -136,7 +136,7 @@ def two_ctx_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.chdir(ws)
     bind_result = _runner.invoke(
         app,
-        ["context", "bind", _CTX_B, "--mode", "implementation", "--release", "v0.9.9"],
+        ["context", "bind", _CTX_B],
     )
     assert bind_result.exit_code == 0, bind_result.output
     monkeypatch.setenv("DADAIA_CONTEXT", _CTX_B)
@@ -195,7 +195,7 @@ def test_bugs_status_resolves_bound_context(two_ctx_workspace: Path) -> None:
 
 
 def test_specs_doctor_resolves_bound_context(two_ctx_workspace: Path) -> None:
-    result = _runner.invoke(app, ["specs", "doctor", "--json"])
+    result = _runner.invoke(app, ["doctor", "--json"])
     assert result.exit_code in (0, 1), result.output
     payload = json.loads(result.output)
     resolved = Path(payload["specs_dir"])

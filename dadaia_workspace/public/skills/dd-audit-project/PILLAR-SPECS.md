@@ -1,7 +1,7 @@
 # PILLAR-SPECS — spec compliance
 
 Disclosed sibling of `SKILL.md`, pillar 2. Input: `git log` over every commit in the audit window.
-Also input: `dadaia specs doctor` against every release the window touches.
+Also input: `dadaia doctor` against every release the window touches.
 
 ## Commit-shape conformance
 
@@ -16,14 +16,13 @@ Also input: `dadaia specs doctor` against every release the window touches.
 ## Canon-v6 pattern compliance
 
 ```bash
-dadaia specs doctor --context <ctx> --json
-dadaia specs doctor --context <ctx> --recipe
+dadaia doctor --context <ctx> --json
 ```
 
-1. `--json` gives the structured issue list (path, code, severity).
-2. `--recipe` gives the ordered, copy-pasteable remediation steps for each.
+1. `--json` gives the structured sections, findings and `compliance(...)` scores.
+2. Each finding reads `<CODE> <verdict> <message>`; the message carries its own remediation.
 3. Every non-zero-severity issue inside the window becomes a `FINDINGS-FORMAT.md` record with `pillar: "specs"`.
-4. Record a WARN that `--recipe` can fix mechanically as a finding too — this pillar measures, it never fixes.
+4. Record a WARN that `--fix` can repair mechanically as a finding too — this pillar measures, it never fixes.
 5. Treat an absent `specs/releases/**/verdicts/**` file on a merged PR as expected — the gate deletes a verdict once consumed.
 6. Treat an archived release carrying no directory (only its `releases_histo.jsonl` summary) as the canon shape, not drift.
 
@@ -35,12 +34,12 @@ dadaia specs doctor --context <ctx> --recipe
 4. Flag a release with a `shipped` milestone but no `defined`/`implemented` milestone — the chain has a gap.
 5. For an archived release, check the same via its `releases_histo.jsonl` summary.
 
-## SPEC provenance and purge-on-pick
+## SPEC provenance and the one exit
 
 1. For each release's SPEC in the window, confirm `**Consumes:**` names the backlog entry/entries it picked.
-2. Confirm the release-definition commit (shape 5) actually removed those entries from `BACKLOG.json`'s `active` array.
-3. Confirm the removal happened in the same commit as the SPEC.
-4. Flag a SPEC that consumes an entry still present in `active` after the definition commit — purge-on-pick unmet.
+2. Confirm the release-definition commit (shape 5) flipped those entries to `status: picked` in `BACKLOG.json`.
+3. Confirm each picked entry left `active[]` exactly once, at that release's closure, as one `backlog_histo.jsonl` record.
+4. Flag a consumed entry with no histo record, or with two — the one-exit contract is unmet.
 
 ## Slop readout
 

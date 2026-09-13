@@ -116,8 +116,8 @@ def test_shipped_history_records_the_current_canonical_template() -> None:
 # ---------------------------------------------------------------------------
 # T-053-15 (bug releases-agents-projection-stale-vs-scaffold-source, F006 lane):
 # the shipped-history mechanism covers every SCOPED scaffold law file too —
-# specs/<area>/AGENTS.md vs public/scaffold/<area>/AGENTS.md. memory/AGENTS.md is
-# excluded by the single-ownership law (install never updates it; TREE-5M owns it).
+# specs/<area>/AGENTS.md vs public/scaffold/<area>/AGENTS.md — memory/ included since
+# 0.4.7 FR6 (bug scoped-memory-agents-md-prose-rewrite-undetected-by-doctor).
 # ---------------------------------------------------------------------------
 
 _SCOPED_STALE = "# specs/releases/ — old era\n\nRELEASE.jsonl append-only event log.\n"
@@ -175,25 +175,9 @@ def test_customised_scoped_law_is_never_overwritten(tmp_path: Path) -> None:
     assert (specs / "releases" / "AGENTS.md").read_text(encoding="utf-8") == customised
 
 
-def test_memory_agents_is_excluded_from_scoped_law_refresh(tmp_path: Path) -> None:
-    """specs/memory/AGENTS.md is single-ownership (install never updates it) — the
-    scoped TREE-5 loop must not touch it even when its bytes match shipped history."""
-    public = _public_dir_with_scoped(tmp_path)
-    scaffold_mem = public / "scaffold" / "memory"
-    scaffold_mem.mkdir(parents=True)
-    (scaffold_mem / "AGENTS.md").write_text("# Memory law v2\n", encoding="utf-8")
-    specs = _specs_tree(tmp_path / "scoped-mem", _CANONICAL_TEXT)
-    (specs / "memory" / "AGENTS.md").write_text("# Memory law v1\n", encoding="utf-8")
-
-    doctor = SpecsDoctor(specs, public_dir=public)
-    issues = [i for i in doctor.check() if i.code == "TREE-5"]
-    assert not [i for i in issues if "memory" in (i.path or "")]
-
-
 def test_shipped_history_records_every_current_scaffold_law() -> None:
-    """Anti-rot, scoped half: every scaffold AGENTS.md edit must append its new hash
-    (memory excluded — single-ownership, never refreshed by TREE-5)."""
+    """Anti-rot, scoped half: every scaffold AGENTS.md edit must append its new hash."""
     scaffold_root = _REPO_ROOT / "dadaia_workspace" / "public" / "scaffold"
-    for area in ("releases", "releases/_ideas", "backlog", "bugs", "audits", "ADRs"):
+    for area in ("memory", "releases", "releases/_ideas", "backlog", "bugs", "audits", "ADRs"):
         text = (scaffold_root / area / "AGENTS.md").read_text(encoding="utf-8")
         assert was_shipped(text, f"scaffold/{area}/AGENTS.md", _REAL_TEMPLATES_DIR), area

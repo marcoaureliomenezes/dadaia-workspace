@@ -1,7 +1,6 @@
 ---
-slug: quality-assurance
+slug: QUALITY
 title: Quality Assurance
-category: core
 tldr: QA standards, anti-slop rules, and test discipline for this workspace.
 summary: Documents QA standards, anti-slop laws, test discipline (TDD, no fabricated tests), and the pre-commit/pre-push gate sequence.
 tags:
@@ -16,7 +15,7 @@ tags:
 
 - TDD: todo comportamento novo nasce com um teste que falha primeiro; correção de bug
   reproduz o defeito em teste antes do fix.
-- Testes rodam com `pytest -p no:cacheprovider` (nenhum cache dentro do repo) e devem
+- Testes rodam com o comando nu — o `pyproject.toml` redireciona todo cache para fora do repo — e devem
   passar verdes antes de qualquer commit de fechamento de task.
 - Revisões julgam o artefato apresentado pelos critérios acima; num contexto novo, a
   ausência de histórico não é motivo de rejeição — o SPEC vigente define a base.

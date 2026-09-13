@@ -1,17 +1,20 @@
 [tool.poetry]
 name = "dadaia-workspace"
-version = "0.4.6"
-description = "AI-native workspace management CLI for multi-agent development with Claude Code, Codex and Kimi Code"
+version = "0.4.7"
+description = "A local-first, spec-driven workspace that gives AI agents current context, a document-governed lifecycle, visible concurrency and anti-slop boundaries."
 authors = ["Marco Menezes <marcoaureliomenezes@users.noreply.github.com>"]
 readme = "README.md"
 packages = [{include = "dadaia_workspace"}]
 # Public-source hygiene (T-011-15 / FR-W5-01): never ship compiled bytecode in the
 # sdist/wheel. poetry-core honours these globs for both artifacts.
 exclude = ["**/__pycache__", "**/*.pyc", "**/*.pyo"]
+# Every keyword names something the README says; it is also the GitHub topic set
+# (SPEC 0.4.7 FR4). "developer-tools" and "agentic" were dropped: the README claims
+# neither.
 keywords = [
     "ai-agents", "claude-code", "codex", "kimi-code",
     "workspace", "multi-agent", "sdd", "spec-driven-development",
-    "developer-tools", "cli", "agentic"
+    "cli"
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -27,6 +30,15 @@ classifiers = [
     "Operating System :: MacOS",
     "Operating System :: Microsoft :: Windows",
 ]
+
+# What PyPI renders beside the long description. Homepage is the PyPI project page:
+# no documentation site exists, and the docs entry point is the repository's own.
+[tool.poetry.urls]
+Homepage = "https://pypi.org/project/dadaia-workspace/"
+Repository = "https://github.com/marcoaureliomenezes/dadaia-workspace"
+Documentation = "https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/getting-started.md"
+Changelog = "https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/CHANGELOG.md"
+Issues = "https://github.com/marcoaureliomenezes/dadaia-workspace/issues"
 
 [tool.poetry.scripts]
 dadaia = "dadaia_workspace.cli.main:_safe_app"
@@ -106,6 +118,12 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
 line-length = 100
+# 0.4.7 FR3: the cache is redirected by CONFIGURATION, not by a flag on every command
+# (the venv guard's cache rule is deleted). The path is RELATIVE — resolved the same way
+# on every OS, and from a `repos/<slug>/` checkout it lands in the workspace's own
+# `.dadaia/tmp/` zone. From a standalone CI checkout it lands in the checkout's
+# grandparent, which is writable on every runner. Either way the repo tree stays clean.
+cache-dir = "../../.dadaia/tmp/ruff-cache"
 target-version = "py312"
 
 # Complexity/size governance (FR21a, T-043-29, R8): a MEASURED RATCHET, never an
@@ -213,18 +231,12 @@ python_version = "3.12"
 strict = true
 ignore_missing_imports = true
 incremental = false
-# No cache_dir here (bug mypy-strict-cache-dir-created-without-cache-dir-env-override):
-# mypy 2.x writes .mypy_cache/ (CACHEDIR.TAG + a version dir) at cache_dir's default
-# regardless of `incremental = false` -- that claim was false. There is no cache_dir
-# value that is BOTH portable (no hardcoded absolute path; `$MYPY_CONFIG_FILE_DIR/..`
-# assumes this checkout's depth under a workspace root, and an unwritable resolved
-# target crashes mypy with an INTERNAL ERROR -- verified, not merely feared) AND
-# guaranteed outside the repo tree, so redirect via the MYPY_CACHE_DIR env var instead
-# (mypy's own supported override) -- exactly what CI does (ci.yml) and what
-# `dadaia ci preflight` does automatically (--cache-dir, see
-# features/ci_preflight/service.py:resolve_mypy_cache_dir). A bare local
-# `mypy --strict dadaia_workspace/` with no redirect WILL create .mypy_cache/ here;
-# run `dadaia ci preflight` instead, or set MYPY_CACHE_DIR yourself.
+# 0.4.7 FR3: same relative redirect as `[tool.ruff] cache-dir` — one rule, both tools,
+# every OS. mypy writes `.mypy_cache/` even with `incremental = false` (bug
+# mypy-strict-cache-dir-created-without-cache-dir-env-override), so the destination must
+# be named; a relative path is the only portable value (an absolute one is
+# machine-specific and `/dev/null` is POSIX-only — ruff cannot even open it).
+cache_dir = "../../.dadaia/tmp/mypy-cache"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

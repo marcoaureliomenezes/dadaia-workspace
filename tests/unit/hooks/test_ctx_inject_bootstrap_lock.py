@@ -1,9 +1,8 @@
 """Intent: CONTRACT — 0.4.6 AC11 (Layer-1 bootstrap byte-identical lock).
 
-Size: SMALL. ``_build_memory`` emits exactly: the tech-stack digest, the fixed law
-blocks of ``memory/ARCHITECTURE.md`` and ``memory/QUALITY.md`` (the marked body only,
-never the rest of the atom), and the lean catalog digest. The constitution and every
-unmarked memory body stay self-pull. The golden is the mutation check: any growth, a
+Size: SMALL. ``_build_memory`` emits exactly the tech-stack digest and the lean catalog
+digest. The constitution, the fixed law blocks and every memory body stay self-pull — the
+law chain already loads the law. The golden is the mutation check: any growth, a
 header change or a join change fails the byte equality. The output carries no host
 path, so the golden is identical on every platform.
 """
@@ -35,7 +34,6 @@ _CATALOG: dict[str, object] = {
             "rank": 1,
             "slug": "agent-comms",
             "title": "agent-comms — Handoff Contract v1",
-            "category": "product",
             "tldr": "handoff-v1.1 separates HTML reports from JSON handoffs.",
             "summary": _HEAVY_SUMMARY,
             "tags": ["agent-comms", "handoff", "schema"],
@@ -48,7 +46,6 @@ _CATALOG: dict[str, object] = {
             "rank": 2,
             "slug": "context-injection",
             "title": "context-injection — Layer-1 self-pull bootstrap",
-            "category": "platform",
             "tldr": (
                 "ctx_inject injects a lean tech + catalog digest; deeper atoms are self-pulled."
             ),
@@ -99,11 +96,6 @@ _EXPECTED_BOOTSTRAP = (
     "\n"
     "Python 3.12 + poetry\n"
     "pytest + mypy --strict + ruff\n"
-    "=== workspace law (fixed) ===\n"
-    "### Slop — code (fixed)\n"
-    "- LAW_CODE_BULLET\n"
-    "### Slop — tests (fixed)\n"
-    "- LAW_TESTS_BULLET\n"
     "{\n"
     '  "features": [\n'
     "    {\n"

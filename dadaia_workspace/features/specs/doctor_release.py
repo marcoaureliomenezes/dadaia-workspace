@@ -46,7 +46,6 @@ from dadaia_workspace.features.specs.specs_tree import SpecsTree
 # because doctor_release has been the documented import site for both.
 CANONICAL_STATUS = _CANONICAL_STATUS
 CANONICAL_PHASES = _PHASES
-HARD_LIMIT_PLAN_CUTOFF = date(2026, 5, 17)
 PLAN_MAX_LINES = 300
 
 # Release-id canon cutoff (D3): a live release whose SPEC.md Created: is on/after
@@ -175,6 +174,10 @@ class ReleaseValidator:
                 )
             )
             return issues
+        if release is None:
+            # No live release: there is no phase to judge. The retired "none" phase
+            # sentinel used to make this case indistinguishable from a real phase.
+            return issues
         if phase not in CANONICAL_PHASES:
             issues.append(
                 SpecsDoctorIssue(
@@ -187,7 +190,7 @@ class ReleaseValidator:
                     path=str(path),
                 )
             )
-        if release and release != "none":
+        if release:
             release_dir = self.specs_dir / "releases" / release
             if not release_dir.exists():
                 issues.append(
@@ -206,13 +209,7 @@ class ReleaseValidator:
         issues: list[SpecsDoctorIssue] = []
         active = self.tree.active_release
         release, phase, err = (active.release, active.phase, active.error)
-        if err or not release or release == "none":
-            return issues
-        # Between candidates (bug rc-archive-discovery-state-rejected-by-doctor):
-        # DISCOVERY is the state `release rc-archive` legally produces — trio archived
-        # to rc-N/, root empty until the next candidate's definition. The trio
-        # requirement applies only to phases where a candidate exists.
-        if phase == "DISCOVERY":
+        if err or not release:
             return issues
         # Segment routing retired (release 0.4.6, ADR 0006): the live candidate trio
         # always sits flat at the release root; rc-N/ subfolders are archives owned by
@@ -221,14 +218,11 @@ class ReleaseValidator:
         for fname in ("SPEC.md", "PLAN.md", "TASKS.md"):
             fpath = rdir / fname
             if not fpath.exists():
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="SPEC-DOC-004",
-                        severity=Severity.ERROR,
-                        description=f"Active release missing {fname}",
-                        path=str(fpath),
-                    )
-                )
+                # Presence is RELEASE-TREE-TRIO's rule, in ONE home
+                # (features/specs/release_tree.py). This rule judges the `**Status:**`
+                # line of the trio documents that exist — a second "missing" finding
+                # here was the same fact reported twice, and it was what forced the
+                # deleted between-candidates DISCOVERY carve-out.
                 continue
             status = _extract_status(fpath)
             if status is None:
@@ -254,9 +248,9 @@ class ReleaseValidator:
                 )
             elif status != APPROVED and phase in ("IMPLEMENTATION", "CLOSURE"):
                 # Bug fresh-release-scaffold-emits-spec-doctor-warnings-042: Draft/Em
-                # revisão IS the legitimate state of an authoring-phase release
-                # (DISCOVERY/DEFINITION/SPEC/PLAN/TASKS) — the scaffolder emits exactly
-                # that. Only implementation-bound phases expect Aprovado artifacts.
+                # revisão IS the legitimate state of a DEFINITION-phase release — the
+                # scaffolder emits exactly that. Only implementation-bound phases
+                # expect Aprovado artifacts.
                 issues.append(
                     SpecsDoctorIssue(
                         code="SPEC-DOC-004",
@@ -277,21 +271,14 @@ class ReleaseValidator:
             n_lines = sum(1 for _ in plan.read_text(encoding="utf-8").splitlines())
             if n_lines <= PLAN_MAX_LINES:
                 continue
-            spec = plan.with_name("SPEC.md")
-            created = _extract_created_date(spec) if spec.exists() else None
-            severity = (
-                Severity.ERROR
-                if (created is not None and created >= HARD_LIMIT_PLAN_CUTOFF)
-                else Severity.WARNING
-            )
             issues.append(
                 SpecsDoctorIssue(
                     code="SPEC-DOC-005",
-                    severity=severity,
-                    description=(
-                        f"PLAN.md has {n_lines} lines > {PLAN_MAX_LINES} "
-                        f"(created={created or 'unknown'})"
-                    ),
+                    # WARNING, always: the remedy is splitting the PLAN — judgment, with
+                    # no command to hand back. An exit-1 whose only runnable "fix" was
+                    # `sed -i '<limit>,$d'` deleted the plan's tail (0.4.7 c2 review).
+                    severity=Severity.WARNING,
+                    description=f"PLAN.md has {n_lines} lines > {PLAN_MAX_LINES}",
                     path=str(plan),
                 )
             )
@@ -317,7 +304,7 @@ class ReleaseValidator:
         the contradiction is refused at definition, where it is born.
         """
         active = self.tree.active_release
-        if active.error or not active.release or active.release == "none":
+        if active.error or not active.release:
             return []
         tasks = self.specs_dir / "releases" / active.release / "TASKS.md"
         if not tasks.exists():
@@ -361,7 +348,7 @@ class ReleaseValidator:
         active_path = self.specs_dir / "releases"
         active = self.tree.active_release
         release, phase, err = (active.release, active.phase, active.error)
-        if err or not release or release == "none" or phase is None:
+        if err or not release or phase is None:
             return issues
         rdir = self.specs_dir / "releases" / release
         if not rdir.exists():
@@ -668,7 +655,7 @@ class ReleaseValidator:
             return []
         active = self.tree.active_release
         release, phase, err = active.release, active.phase, active.error
-        if err or not release or release == "none" or phase not in {"CLOSURE", "ARCHIVED"}:
+        if err or not release or phase not in {"CLOSURE", "ARCHIVED"}:
             return []
         try:
             data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))

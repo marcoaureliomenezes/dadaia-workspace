@@ -59,21 +59,19 @@ def build_telemetry_service(workspace_root: Path) -> object | None:
     to 503 when this returns ``None``.
     """
     import sqlite3
-    from pathlib import Path as _Path
 
+    from dadaia_workspace import container
     from dadaia_workspace.core.exceptions import PlatformSecurityError
     from dadaia_workspace.features.telemetry import pricing as _pricing
     from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
     from dadaia_workspace.features.telemetry.reader.adapters import DEFAULT_READERS
     from dadaia_workspace.features.telemetry.service import TelemetryService
-    from dadaia_workspace.features.telemetry.store import TelemetryStore
-
-    state_dir = _Path("~/.dadaia/state/telemetry").expanduser()
-    db_path = state_dir / "telemetry.sqlite"
-    store = TelemetryStore(db_path)
 
     try:
-        state_dir.mkdir(parents=True, exist_ok=True)
+        # The ONE store location and migration set (0.4.7 FR2): the panel and every
+        # governance verb open the same file through the same builder.
+        store = container.build_telemetry_store(container.telemetry_state_dir())
+        state_dir = store.db_path.parent
         # Materialise + migrate the store once at boot so the per-request
         # read-only factory always has a database to open (mode=ro cannot
         # create a file); this store instance is also what the service ingests

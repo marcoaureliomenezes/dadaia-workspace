@@ -1,8 +1,12 @@
 """CLI command groups: ``dadaia release``, ``dadaia backlog``.
 
 Implements:
-- dadaia release new <id>    → specs/releases/<id>/SPEC.md stub
+- dadaia release new <id>    → specs/releases/<id>/SPEC.md stub + _RELEASE.json
+- dadaia release phase <P>   → the ONE writer of phase/defined/implemented
+- dadaia release rc-archive  → the completed candidate trio into rc-N/
+- dadaia release archive <id> → the promote lane: ship, move to _archive/, birth <next>
 - dadaia backlog new <slug>  → appends one active[] entry to specs/backlog/BACKLOG.json
+- dadaia backlog exit <slug> → the ONE path out of active[]: one histo record, one event
 - dadaia backlog subjects    → read-only resolve/preview of canonical subjects (v0.1.25 R1)
 - dadaia backlog doctor      → BL-SCHEMA/CONFLICT/STALE backlog-consistency check (BL-DUP
   deleted, not disabled, v0.5.0 A5.2)
@@ -15,54 +19,35 @@ is retired outright (operator ruling 2026-08-28) — the single source is
 
 from __future__ import annotations
 
+import json
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 import typer
 
+from dadaia_workspace import container
+from dadaia_workspace.cli._backlog_roots import resolve_backlog_roots
+from dadaia_workspace.cli._governance_event import record_governance_event
 from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.core.atomic_write import ConcurrentModificationError
 from dadaia_workspace.core.models.backlog import SubjectKind
-from dadaia_workspace.features.backlog.document import backlog_new
+from dadaia_workspace.core.models.histo import HistoRecord
+from dadaia_workspace.core.release_state import RELEASE_STATE_FILENAME
+from dadaia_workspace.features.backlog.document import (
+    BacklogExitError,
+    backlog_exit,
+    backlog_new,
+)
 from dadaia_workspace.features.specs.candidate import (
-    CandidateArchiveError,
+    ArchiveError,
     archive_candidate,
+    archive_release,
+    set_phase,
 )
 from dadaia_workspace.features.specs.canon import release_new
-
-
-def _resolve_backlog_roots(
-    specs_dir: Path, source_root: str | None, alias_map: str | None
-) -> tuple[Path, Path, Path]:
-    """Resolve the injected roots the registry/doctor need (SPEC §3.8 #6 — never cwd).
-
-    Returns ``(source_root, catalog_path, alias_map_path)``. ``source_root`` defaults to
-    the repo root that owns ``specs_dir`` (``specs_dir.parent``) so code anchors are
-    derived REPO-ROOT-relative (e.g. ``dadaia_workspace/core/...#Sym``) — matching the way
-    committed ``code`` refs are authored. The alias map defaults to the workspace-level
-    ``.dadaia/states/backlog_subject_aliases.txt`` resolved up from ``specs_dir``.
-
-    No longer returns an ``archive_root`` (v0.5.0 T-050-13A): the doctor's BL-STALE
-    condition (a) reads the relocated ``consumed_backlog_histo.jsonl`` store through a
-    ``JsonlRecordStore`` this module builds directly (ADR-0001: single consumer, no
-    container seam), wired at the call site below — the pre-relocation directory-glob
-    root has no reader left to inject it into.
-    """
-    src = Path(source_root).resolve() if source_root else specs_dir.parent.resolve()
-    catalog_path = specs_dir / "memory" / "product" / "catalog.json"
-    alias_map_path = Path(alias_map).resolve() if alias_map else _default_alias_map_path(specs_dir)
-    return src, catalog_path, alias_map_path
-
-
-def _default_alias_map_path(specs_dir: Path) -> Path:
-    """Walk up from ``specs_dir`` to the workspace root and target the alias-map file."""
-    here = specs_dir.resolve()
-    for parent in (here, *here.parents):
-        if (parent / ".dadaia").is_dir():
-            return parent / ".dadaia" / "states" / "backlog_subject_aliases.txt"
-    # No workspace found above specs_dir: fall back to a sibling of specs_dir (still injected).
-    return specs_dir.parent / ".dadaia" / "states" / "backlog_subject_aliases.txt"
-
+from dadaia_workspace.features.specs.release_tree import governed_state
+from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 # ── shared typer apps ─────────────────────────────────────────────────────────
 
@@ -97,10 +82,13 @@ def release_new_cmd(
         help="Path to specs/ directory. Default: resolve from bound context session.",
     ),
 ) -> None:
-    """Create specs/releases/<id>/SPEC.md with canonical Draft frontmatter.
+    """Create specs/releases/<id>/ with its SPEC.md stub and _RELEASE.json state.
 
-    Exits non-zero if the release's SPEC.md already exists (no-clobber) or if
-    the release ID does not match the required slug pattern.
+    The ONE birth act (0.4.7 FR2): both files are written in one transaction, so the
+    gate's MEMORY class, `dadaia context show` and `dd-spec-navigator` resolve the new
+    release immediately. Exits non-zero — writing nothing — if a live release already
+    exists, if any release artifact already exists (no-clobber), or if the release ID
+    does not match the required pattern.
     """
     target = _resolve_specs_dir(specs_dir)
 
@@ -117,7 +105,43 @@ def release_new_cmd(
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
 
+    _record_release_event("new", target, release_id)
     typer.echo(f"[ok] created: {spec_path}")
+    typer.echo(f"[ok] created: {spec_path.parent / RELEASE_STATE_FILENAME}")
+
+
+# ── dadaia release phase ──────────────────────────────────────────────────────
+
+
+@release_app.command("phase")
+def release_phase_cmd(
+    phase: str = typer.Argument(..., help="IMPLEMENTATION or CLOSURE."),
+    sha: str = typer.Option(..., "--sha", help="The commit the milestone names (7-40 hex)."),
+    specs_dir: str | None = typer.Option(
+        None,
+        "--specs-dir",
+        help="Path to specs/ directory. Default: resolve from bound context session.",
+    ),
+) -> None:
+    """Move the live release to IMPLEMENTATION or CLOSURE, stamping its milestone.
+
+    The ONE writer of `phase`, `defined` and `implemented` (0.4.7 FR5): those fields
+    were Read-then-Edit, which is how `release archive` came to refuse on a hand-set
+    `implemented` it validated itself. The phase and the milestone now move in one act,
+    so they cannot disagree.
+    """
+    target = _resolve_specs_dir(specs_dir)
+    if not target.is_dir():
+        typer.echo(f"[error] specs_dir not found: {target}", err=True)
+        sys.exit(1)
+    try:
+        change = set_phase(target, phase.upper(), sha=sha)
+    except ArchiveError as exc:
+        typer.echo(f"[error] {exc}", err=True)
+        sys.exit(1)
+
+    _record_release_event("phase", target, change.release)
+    typer.echo(f"[ok] release {change.release} -> phase {change.phase} ({change.ts})")
 
 
 # ── dadaia release rc-archive ─────────────────────────────────────────────────
@@ -136,7 +160,7 @@ def release_rc_archive_cmd(
     The "continue" mechanics of the promote-or-continue gate (release-candidates
     model, ADR 0008): validates candidate closure (trio at root, every task [x],
     phase CLOSURE), moves SPEC/PLAN/TASKS into rc-N/, bumps the candidate counter
-    and resets phase to DISCOVERY so the next candidate's trio can be born at root.
+    and resets phase to DEFINITION so the next candidate's trio can be born at root.
     The version never increments here — that happens only at operator-approved
     deploy.
     """
@@ -146,12 +170,149 @@ def release_rc_archive_cmd(
         sys.exit(1)
     try:
         result = archive_candidate(target)
-    except CandidateArchiveError as exc:
+    except ArchiveError as exc:
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
+    _record_release_event("rc-archive", target, result.release)
+    archived_bugs = _archive_bugs(target)
     typer.echo(
         f"[ok] candidate {result.rc} of release {result.release} archived -> "
         f"{result.rc_dir} — root is ready for the next candidate's SPEC/PLAN/TASKS."
+    )
+    typer.echo(f"[ok] bugs archived: {archived_bugs}")
+
+
+# ── helper: the bugs-archive sweep both archive verbs run ─────────────────────
+
+
+def _archive_bugs(target: Path) -> int:
+    """Run ``bugs archive`` inside an archive verb and return how many records moved.
+
+    Composed HERE, at the CLI — ``features/specs`` must not import ``features/bugs``
+    (P-07: features compose through the container or the CLI). Archiving a candidate
+    or a release is exactly the moment the ledger's terminal records stop being live
+    history, so the sweep rides the same verb instead of being a step an agent
+    remembers (RC-FLOW's hand-driven lane is what 0.4.7 FR3 deletes).
+    """
+    from dadaia_workspace.cli.commands.bugs import build_bug_service
+
+    return build_bug_service(target, with_archive=True).archive().archived
+
+
+def _record_release_event(verb: str, target: Path, release_id: str) -> None:
+    """One verb, one governance event (0.4.7 FR2) over the state document the verb just
+    wrote — the record whose hash `dadaia doctor` compares a hand edit against.
+
+    The hashed shape is ``release_tree.governed_state`` — ``phase``/``defined``/
+    ``implemented`` and nothing else — imported from the rule that recomputes it so the
+    two can never disagree. The rest of the document is hand-written by design (SPEC
+    0.4.7 Q3): hashing the whole state would read every closure paragraph appended to
+    `log` as a hand edit of a phase nobody touched.
+    """
+    state_path = target / "releases" / release_id / RELEASE_STATE_FILENAME
+    if not state_path.is_file():
+        # `archive` moved the document into _archive/<id>/ as part of the same act.
+        state_path = target / "releases" / "_archive" / release_id / RELEASE_STATE_FILENAME
+    try:
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    record_governance_event(
+        verb=verb,
+        ledger="releases",
+        record_id=release_id,
+        record=governed_state(state),
+        specs_dir=target,
+    )
+
+
+def _histo_appender(target: Path) -> Callable[[HistoRecord], None]:
+    """The ``releases_histo.jsonl`` sink, built the way every other ledger store is
+    built at the composition root — one record shape, one store, no second writer.
+
+    The append carries its own governance event, under its own namespace: a histo
+    record and the ``_RELEASE.json`` of the same release share an id and are two
+    different records, so one namespace for both would compare each against the
+    other's hash forever.
+    """
+    store: JsonlRecordStore[HistoRecord] = JsonlRecordStore(
+        target / "releases" / "_archive" / "releases_histo.jsonl",
+        to_dict=HistoRecord.to_dict,
+        from_dict=HistoRecord.from_dict,
+    )
+
+    def append(record: HistoRecord) -> None:
+        store.append(record)
+        record_governance_event(
+            verb="archive",
+            ledger="releases-histo",
+            record_id=record.id,
+            record=record.to_dict(),
+            specs_dir=target,
+        )
+
+    return append
+
+
+# ── dadaia release archive ────────────────────────────────────────────────────
+
+
+@release_app.command("archive")
+def release_archive_cmd(
+    release_id: str = typer.Argument(..., help="The live release being shipped, e.g. 0.4.7."),
+    shipped: str = typer.Option(
+        ..., "--shipped", help="The develop -> main merge commit sha (7-40 hex)."
+    ),
+    pr: int = typer.Option(..., "--pr", help="The ship PR's number."),
+    next_release: str = typer.Option(
+        ..., "--next", help="The next release version, bare SemVer M.m.p."
+    ),
+    specs_dir: str | None = typer.Option(
+        None,
+        "--specs-dir",
+        help="Path to specs/ directory. Default: resolve from bound context session.",
+    ),
+) -> None:
+    """Ship the live release: one transactional promote verb (0.4.7 FR3).
+
+    Validates (release tree, every task [x], phase CLOSURE, `implemented` set), then
+    writes `shipped` + ARCHIVED, moves specs/releases/<id>/ to _archive/<id>/, births
+    <next>, appends the one releases_histo record and sweeps `bugs archive` — all or
+    nothing. Prints the git commands the operator runs next and NEVER runs git itself.
+    """
+    target = _resolve_specs_dir(specs_dir)
+    if not target.is_dir():
+        typer.echo(f"[error] specs_dir not found: {target}", err=True)
+        sys.exit(1)
+    try:
+        result = archive_release(
+            target,
+            release_id,
+            shipped_sha=shipped,
+            pr=pr,
+            next_release=next_release,
+            histo_append=_histo_appender(target),
+        )
+    except ArchiveError as exc:
+        typer.echo(f"[error] {exc}", err=True)
+        sys.exit(1)
+
+    _record_release_event("archive", target, result.release)
+    archived_bugs = _archive_bugs(target)
+    typer.echo(f"[ok] archived: {result.archived_dir}")
+    typer.echo(f"[ok] created: {result.next_spec}")
+    typer.echo(f"[ok] created: {result.next_spec.parent / RELEASE_STATE_FILENAME}")
+    typer.echo(f"[ok] histo record: {result.histo_id} (delivered)")
+    typer.echo(f"[ok] bugs archived: {archived_bugs}")
+    typer.echo(
+        "next: git add -A specs/releases specs/bugs && git commit -m "
+        f'"chore(specs): archive release {result.release} — shipped {shipped} '
+        f'(PR #{pr}); {result.next_release} born"'
+    )
+    typer.echo(f"next: git push origin --delete feature/{result.release}")
+    typer.echo(
+        f"next: git checkout -b feature/{result.next_release} main "
+        "&& git merge -s ours origin/develop"
     )
 
 
@@ -203,12 +364,85 @@ def backlog_new_cmd(
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
 
+    record_governance_event(
+        verb="new", ledger="backlog", record_id=slug, record=result.entry, specs_dir=target
+    )
+
     verb = "created" if result.created else "appended"
     typer.echo(
         f"[ok] {verb} {slug!r} -> {result.path}"
         if not result.created
         else f"[ok] created: {result.path}"
     )
+
+
+# ── dadaia backlog exit ───────────────────────────────────────────────────────
+
+
+def _backlog_histo_store(target: Path) -> JsonlRecordStore[HistoRecord]:
+    """The ``backlog_histo.jsonl`` sink, built at the composition root — the same one
+    record shape, one store shape every other ledger uses."""
+    return JsonlRecordStore(
+        target / "backlog" / "_archive" / "backlog_histo.jsonl",
+        to_dict=HistoRecord.to_dict,
+        from_dict=HistoRecord.from_dict,
+    )
+
+
+@backlog_app.command("exit")
+def backlog_exit_cmd(
+    slug: str = typer.Argument(..., help="The live active[] entry leaving the backlog."),
+    disposition: str = typer.Option(
+        ...,
+        "--disposition",
+        help="delivered (needs --release) | superseded (needs --reason) | rejected (needs --reason).",
+    ),
+    release: str | None = typer.Option(
+        None, "--release", help="The release that delivered the item (live or archived)."
+    ),
+    reason: str | None = typer.Option(
+        None, "--reason", help="Why it left: the superseding record, or why it was refused."
+    ),
+    specs_dir: str | None = typer.Option(
+        None,
+        "--specs-dir",
+        help="Path to specs/ directory. Default: resolve from bound context session.",
+    ),
+) -> None:
+    """Retire <slug> out of active[] and append its one backlog_histo record.
+
+    The ONE path out of ``active[]`` (0.4.7 FR3): the hand-edit lane the closure sweeps
+    used ("use file tools directly") is retired, so an item never leaves without the
+    terminal record that says why. Every refusal writes nothing and hands back one
+    ``fix:`` line.
+    """
+    target = _resolve_specs_dir(specs_dir)
+    if not target.is_dir():
+        typer.echo(f"[error] specs_dir not found: {target}", err=True)
+        sys.exit(1)
+
+    try:
+        record = backlog_exit(
+            target,
+            slug,
+            histo_store=_backlog_histo_store(target),
+            disposition=disposition,
+            reason=reason,
+            release=release,
+            denylist_terms=container.load_denylist_terms(),
+        )
+    except (BacklogExitError, KeyError, ConcurrentModificationError) as exc:
+        typer.echo(f"[error] {exc}", err=True)
+        sys.exit(1)
+
+    record_governance_event(
+        verb="exit",
+        ledger="backlog",
+        record_id=record.id,
+        record=record.to_dict(),
+        specs_dir=target,
+    )
+    typer.echo(f"[ok] exited {record.id!r} ({record.disposition}) -> {target / 'backlog'}")
 
 
 # ── dadaia backlog subjects (read-only resolve/preview surface — v0.1.25 R1) ────
@@ -246,7 +480,7 @@ def backlog_subjects_cmd(
     if not target.is_dir():
         typer.echo(f"[error] specs_dir not found: {target}", err=True)
         sys.exit(1)
-    src, catalog_path, alias_map_path = _resolve_backlog_roots(target, source_root, alias_map)
+    src, catalog_path, alias_map_path = resolve_backlog_roots(target, source_root, alias_map)
     registry = build_registry(
         source_root=src,
         catalog_path=catalog_path,
@@ -277,104 +511,3 @@ def backlog_subjects_cmd(
 
 
 # ── dadaia backlog doctor (the ENFORCED backstop — v0.1.25 R1) ──────────────────
-
-
-@backlog_app.command("doctor")
-def backlog_doctor_cmd(
-    specs_dir: str | None = typer.Option(
-        None, "--specs-dir", help="Path to specs/ directory. Default: bound context session."
-    ),
-    source_root: str | None = typer.Option(
-        None, "--source-root", help="Source root for code-anchor derivation. Default: library."
-    ),
-    alias_map: str | None = typer.Option(
-        None, "--alias-map", help="Alias-map path. Default: workspace .dadaia/states/."
-    ),
-    explain: bool = typer.Option(
-        False, "--explain", help="Print the per-item bound-anchor resolution alongside findings."
-    ),
-) -> None:
-    """Run BL-SCHEMA/CONFLICT/STALE over the live backlog; exit non-zero on any ERROR.
-
-    This is the ENFORCED backstop (ADR-D): wired into the pre-commit chokepoint + CI, it
-    rejects a hand-written divergent twin even though ``specs/backlog/`` is ADDITIVE —
-    ``BACKLOG.json`` (the single source, SPEC v0.12.0 FR1/ADR #14; operator ruling
-    2026-08-28) is committed repository truth. ``--explain`` additionally prints how
-    each item's subjects resolved.
-    """
-    from dadaia_workspace.cli.anchors import derive_cli_anchors
-    from dadaia_workspace.core.models.backlog import BacklogHistoRecord, ConsumedBacklogHistoRecord
-    from dadaia_workspace.features.backlog.doctor import Severity, run_backlog_doctor
-    from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
-
-    target = _resolve_specs_dir(specs_dir)
-    if not target.is_dir():
-        typer.echo(f"[error] specs_dir not found: {target}", err=True)
-        sys.exit(1)
-    src, catalog_path, alias_map_path = _resolve_backlog_roots(target, source_root, alias_map)
-
-    if explain:
-        _explain_backlog(target, src, catalog_path, alias_map_path)
-
-    # ADR-0001: both stores had exactly one production consumer (this command) — the
-    # single consumer builds each JsonlRecordStore directly instead of a container
-    # seam, so BL-STALE's histo conditions stay live from the real CLI callsite.
-    findings = run_backlog_doctor(
-        specs_dir=target,
-        source_root=src,
-        catalog_path=catalog_path,
-        alias_map_path=alias_map_path,
-        cli_anchors=derive_cli_anchors(),
-        histo_store=JsonlRecordStore(
-            target / "backlog" / "_archive" / "backlog_histo.jsonl",
-            to_dict=BacklogHistoRecord.to_dict,
-            from_dict=BacklogHistoRecord.from_dict,
-        ),
-        consumed_histo_store=JsonlRecordStore(
-            target / "backlog" / "_archive" / "consumed_backlog_histo.jsonl",
-            to_dict=ConsumedBacklogHistoRecord.to_dict,
-            from_dict=ConsumedBacklogHistoRecord.from_dict,
-        ),
-    )
-
-    errors = [f for f in findings if f.severity is Severity.ERROR]
-    for finding in findings:
-        marker = finding.severity.value.upper()
-        slug = f" [{finding.slug}]" if finding.slug else ""
-        typer.echo(f"[{marker}] {finding.code.value}{slug} {finding.message}", err=True)
-
-    if errors:
-        typer.secho(
-            f"\nbacklog doctor FAILED: {len(errors)} error(s).", fg=typer.colors.RED, err=True
-        )
-        sys.exit(1)
-    typer.secho("backlog doctor: clean.", fg=typer.colors.GREEN)
-
-
-def _explain_backlog(specs_dir: Path, src: Path, catalog_path: Path, alias_map_path: Path) -> None:
-    """Print how each ACTIVE backlog item's subjects bind to canonical anchors (read-only).
-
-    Reads the single source ``specs/backlog/BACKLOG.json`` through
-    :func:`~dadaia_workspace.features.backlog.document.load_document` (SPEC v0.12.0
-    FR1/FR2, ADR #14; operator ruling 2026-08-28).
-    """
-    from dadaia_workspace.cli.anchors import derive_cli_anchors
-    from dadaia_workspace.features.backlog.document import load_document
-    from dadaia_workspace.features.backlog.preview import bound_anchor_changes
-    from dadaia_workspace.features.backlog.subject_registry import build_registry
-
-    registry = build_registry(
-        source_root=src,
-        catalog_path=catalog_path,
-        alias_map_path=alias_map_path,
-        specs_dir=specs_dir,
-        cli_anchors=derive_cli_anchors(),
-    )
-    document = load_document(specs_dir / "backlog")
-    for item in document.active:
-        anchor_changes, unresolved = bound_anchor_changes(item, registry)
-        typer.echo(f"# {item.slug}")
-        for anchor_id, change in sorted(anchor_changes.items()):
-            typer.echo(f"  RESOLVED  {anchor_id}  ->  {change}")
-        for message in unresolved:
-            typer.echo(f"  UNRESOLVED  {message}")

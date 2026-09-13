@@ -3,21 +3,24 @@
   "skill_md_line_ceiling": 500,
   "declared_overlaps": [
     [
-      "dd-release-implementation",
-      "dd-task-manager"
-    ],
-    [
-      "dd-audit-project",
-      "dd-workspace-doctor"
+      "dd-gitflow-default",
+      "dd-release-implementation"
     ],
     [
       "dd-bug-registration",
       "dd-bug-resolution"
     ],
     [
-      "dd-handoff-emitter",
-      "dd-manager-orchestration",
-      "dd-workspace-doctor"
+      "dd-backlog-definition",
+      "dd-release-definition"
+    ],
+    [
+      "dd-audit-project",
+      "dd-bug-resolution"
+    ],
+    [
+      "dd-spec-navigator",
+      "dd-cli-library"
     ]
   ],
   "rows": [
@@ -27,12 +30,12 @@
       "skill": "dd-manager-orchestration",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:6b73fe234171bca96b842a11500e70307c480db89a8d0c191e424c73f4935ce5",
-        "skill": "sha256:ff93afb4e1fdc317d4a695f027b965824bf3c667499323b0a91777540b290eef",
+        "section": "sha256:69aceac08e8c30f197f5970cdc87b658b7ca8656865bda133e695316d1689981",
+        "skill": "sha256:851e1117ee2f163d022707006cf63c9faabb6815afbbfb4cd29a1d2f2529a85a",
         "scoped": []
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§2 Who does what",
@@ -44,8 +47,8 @@
         "skill": "sha256:82c04f5759661c238ed1fb934638cf72353861bd20b67afc42f2a2910acb2766",
         "scoped": []
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§2 Who does what",
@@ -54,11 +57,11 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:4ff73734813e198c0717caf61020c9c81de1fedf182240a22bdce7b32ffe17fe",
-        "skill": "sha256:227693607add8a6ab4f9d3a14a0b284cf45227185210c426d2cabbe1dbaa4fb2",
+        "skill": "sha256:1a3995ae77de18dd8804372ee6e52574ef037303c35a2fc346a004d0277edac2",
         "scoped": []
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§4 Gitflow — the branch contract",
@@ -67,11 +70,11 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:84f81b26ae4f3629ccd5040fc183b92739061c1624785ee30d6c943a7bf33bac",
-        "skill": "sha256:a41bdef56d38ee33c7950f41259a75ebc7c6552ed1981269f9b06dc01abcbf84",
+        "skill": "sha256:1b13828ad71eb730366c78f3cb229ced3f0765009d79598065563df08cd2cc9a",
         "scoped": []
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§5 Where things are written",
@@ -81,14 +84,14 @@
         "dadaia_workspace/public/data/handoff-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:72afd5d58b21dcfa4f887e8f1a0bf30d564d545cf3db1f332b776e7071f0dfc6",
-        "skill": "sha256:721f63f154573d93b4f2eb45e1788dc6905bc3ef6afd98b822d38b13b1fed652",
+        "section": "sha256:dafe70bf2bdb1d247d99b80c09d7fb95ee7cd607004ca2778d59aed52808f6ac",
+        "skill": "sha256:a2209b744ef208837a007818638f80ef8e1ebb747657f56e768fde2210a43211",
         "scoped": [
-          "sha256:1b00807565d4934626195cb2e05983dbe3eb5890ba3ee95ee60774d98e75e70f"
+          "sha256:7bb0a1e9e1c5b48b99796927065475e9e5497205c07b78bc5de644739545587a"
         ]
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§5 Where things are written",
@@ -98,14 +101,14 @@
         "dadaia_workspace/public/data/dadaia-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:72afd5d58b21dcfa4f887e8f1a0bf30d564d545cf3db1f332b776e7071f0dfc6",
+        "section": "sha256:dafe70bf2bdb1d247d99b80c09d7fb95ee7cd607004ca2778d59aed52808f6ac",
         "skill": null,
         "scoped": [
-          "sha256:596b84ae24ea67395d34afd050941b37e11c31e1441c44103e030d7e6fb25456"
+          "sha256:9b7bbb521ec415b28c86713605cc2e552a08e014d46d89dcb2efd006c955df66"
         ]
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§5 Where things are written",
@@ -115,27 +118,14 @@
         "dadaia_workspace/public/data/tmp-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:72afd5d58b21dcfa4f887e8f1a0bf30d564d545cf3db1f332b776e7071f0dfc6",
+        "section": "sha256:dafe70bf2bdb1d247d99b80c09d7fb95ee7cd607004ca2778d59aed52808f6ac",
         "skill": null,
         "scoped": [
           "sha256:f26363f7086defe1337610925040a2f4477d26f34fdae6ee2bc5a84ac0b129d3"
         ]
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
-    },
-    {
-      "section": "§6 Specs, tasks and memory",
-      "anchor": null,
-      "skill": "dd-task-manager",
-      "scoped_agents_md": [],
-      "hash_tuple": {
-        "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
-        "skill": "sha256:c1eb56a5344104cc544e79d2275e2cafa3d0a0599f17286ddc7fe37b543feed8",
-        "scoped": []
-      },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§6 Specs, tasks and memory",
@@ -145,14 +135,14 @@
         "dadaia_workspace/public/scaffold/backlog/AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
-        "skill": "sha256:5ecf13f2c9f52f7ec2f6b27ee6c043a72043e328b41cf8185e2b39cd2512ae06",
+        "section": "sha256:2ef9f074230f35dd0095eb76df6c129cc085a28bb54a1764381ef995f1d5ad46",
+        "skill": "sha256:505b52383f10f19ea23890948b1c575b3ba95cf011717f68b81c33e02e14112b",
         "scoped": [
-          "sha256:4e0b67a3c7affffe2dbde34ee2e265dd480c36366de04fd977a667eb56e8b405"
+          "sha256:4753d08d404a5fcd5b948a92c85f8270a522a684c795ffa72c674e33c013cf91"
         ]
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§6 Specs, tasks and memory",
@@ -160,12 +150,12 @@
       "skill": "dd-release-definition",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
-        "skill": "sha256:fa6ffad1cc5b41ac78b8bdd8660b2033d91863a14374314d5c87fccf5aae420e",
+        "section": "sha256:2ef9f074230f35dd0095eb76df6c129cc085a28bb54a1764381ef995f1d5ad46",
+        "skill": "sha256:73705c1b89876b3e1b6772e23cd16c44a912ffe94cf51fb06792bf53d7a5ff06",
         "scoped": []
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§6 Specs, tasks and memory",
@@ -175,14 +165,14 @@
         "dadaia_workspace/public/scaffold/releases/AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
-        "skill": "sha256:f5cb4848dbf2c819ce9e812caa31ae455fc933c7883678c020f0dbcc1d13902a",
+        "section": "sha256:2ef9f074230f35dd0095eb76df6c129cc085a28bb54a1764381ef995f1d5ad46",
+        "skill": "sha256:f5fc2ad0cd07a8f3896905080ab2c16a0abb5b087d448a44aeef73bee9e88a01",
         "scoped": [
-          "sha256:1cc9b81a086fdcfd13a7d0005192c2ed5ab9d21adf390a0b00b4da16c8ddc026"
+          "sha256:fa6807beb5f94e5aba949c2708dce49428453382d2aa26ebb06552b4283225e7"
         ]
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§6 Specs, tasks and memory",
@@ -192,14 +182,14 @@
         "dadaia_workspace/public/scaffold/audits/AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
-        "skill": "sha256:3a66547699b5ffb8d38a2dd081140499f95768202dbc31f03baaeccb8501f353",
+        "section": "sha256:2ef9f074230f35dd0095eb76df6c129cc085a28bb54a1764381ef995f1d5ad46",
+        "skill": "sha256:83d82412f72df3fc0bd67b7b5c628ec811efb332a00b38f078f032df48c6ee41",
         "scoped": [
-          "sha256:8d496146c5a9efdd2a4829d8a489e9365dcb0d8bc8752700897e4e7bbc60b8ea"
+          "sha256:520406598255cf3b2435fce5fadc8eaf074ed3a6700082738fefcc8123aa97e3"
         ]
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§6 Specs, tasks and memory",
@@ -209,14 +199,14 @@
         "dadaia_workspace/public/scaffold/ADRs/AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
+        "section": "sha256:2ef9f074230f35dd0095eb76df6c129cc085a28bb54a1764381ef995f1d5ad46",
         "skill": null,
         "scoped": [
-          "sha256:17919aa759d9bef6524385d57ddd200de00ffb0146c0052550141860cc655ef6"
+          "sha256:0a239e41c9432c1c4bf7787032682f785878b749ff741ebd6258df3ecaf050ed"
         ]
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§6 Specs, tasks and memory",
@@ -224,31 +214,29 @@
       "skill": "dd-grill-me",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
+        "section": "sha256:2ef9f074230f35dd0095eb76df6c129cc085a28bb54a1764381ef995f1d5ad46",
         "skill": "sha256:555d4b8fff0353ae0660bda4e639e98e7dbf4d789cef440edb019b0a24a5d7cf",
         "scoped": []
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§6 Specs, tasks and memory",
       "anchor": null,
       "skill": "dd-spec-navigator",
       "scoped_agents_md": [
-        "dadaia_workspace/public/data/memory-AGENTS.md",
         "dadaia_workspace/public/scaffold/memory/AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
-        "skill": "sha256:b723649f7d392c87353f6c947ff3918952b10caf934d6a8946ac5f1999b9fcd7",
+        "section": "sha256:2ef9f074230f35dd0095eb76df6c129cc085a28bb54a1764381ef995f1d5ad46",
+        "skill": "sha256:a1c148f0d13278fed078a516810119de8c982fdd4d0ca688c454b65cfd1f8428",
         "scoped": [
-          "sha256:7bb5178387b97e21093334df304c35a6f26b02de960bdde4c554e3ea10157dbb",
-          "sha256:7bb5178387b97e21093334df304c35a6f26b02de960bdde4c554e3ea10157dbb"
+          "sha256:146db1451baf4e2373a78169d6447aafd1ffa340a3cdaea0a79a5c5cbc6f8f5b"
         ]
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§7 Quality",
@@ -256,12 +244,12 @@
       "skill": "dd-bug-resolution",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:97a73434b788824c557c31bc30dfffa2a58033969a812746ce525974407eddb6",
-        "skill": "sha256:797404a4415ae8d1a0f854bc0c108325795e43497d0d070813ab5035c0f7c5fc",
+        "section": "sha256:39b4ebb23f6e1142afba6f77b3a089221716600e857445604883be6ea7f1651f",
+        "skill": "sha256:87d300c5f7566d62d40b3a192e4cd2b5d8e7d396b8b0c81978c4555d6d229bab",
         "scoped": []
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§7 Quality",
@@ -271,14 +259,14 @@
         "dadaia_workspace/public/scaffold/bugs/AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:97a73434b788824c557c31bc30dfffa2a58033969a812746ce525974407eddb6",
-        "skill": "sha256:be8fa0c376069fbdfaaa3fdc16c7797b8b3d355af0595ccc863ba1b73e6f89a9",
+        "section": "sha256:39b4ebb23f6e1142afba6f77b3a089221716600e857445604883be6ea7f1651f",
+        "skill": "sha256:9cd358d50d1be5f9e89a0b5f6d587e577ed011ecf7ff6979aa8d5f19dd56f14f",
         "scoped": [
-          "sha256:c7535992c4dfdfe6d54e5bc9fa543f41d4146f3ebc17c93ebb185b82a00520bd"
+          "sha256:390ab05209a733a1c3adf22a9286bd6bb1c9704cbb0587bf05534ca30be16dff"
         ]
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§7 Quality",
@@ -288,31 +276,31 @@
         "dadaia_workspace/public/templates/tests-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:97a73434b788824c557c31bc30dfffa2a58033969a812746ce525974407eddb6",
-        "skill": "sha256:0a82b65d3139439073d586ff3bb25d0292c23e19f7caf0e6a5b42d93081cf6ab",
+        "section": "sha256:39b4ebb23f6e1142afba6f77b3a089221716600e857445604883be6ea7f1651f",
+        "skill": "sha256:b989e824bc81fa6f7d97f531f3b1a1f154bef30b86d29def17cfba47becb34b7",
         "scoped": [
           "sha256:7acc3f692324f37471b27eb97d5d8405c905700c979601c620d64ff385fe0bd3"
         ]
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§3 What is enforced deterministically",
       "anchor": null,
-      "skill": "dd-workspace-doctor",
+      "skill": null,
       "scoped_agents_md": [
         "dadaia_workspace/public/data/states-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:a33ad4a7f1a281aa351f7b354e3536bad30df9c202ff3eddbae4ebccfb9bab5f",
-        "skill": "sha256:3b32d25f56db1c42757324aae6e5e81cc70c87385265b30698b3a8f86dee3424",
+        "section": "sha256:11b2b74ab6f8ec8cbc6eaeebd14dd705a191c6ff16d49f9e987728d6419f54c4",
+        "skill": null,
         "scoped": [
           "sha256:3b624dcf425012cd3711b7d30e4425b0ab65a3697ffd2c7dea6a27c7e2b5b7c1"
         ]
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§8 The library surface",
@@ -320,12 +308,12 @@
       "skill": "dd-cli-library",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:35f1476c4c8e010fee0455ee3dc4a55496fbfcdf3b8a1eb36456a178ef822fb3",
-        "skill": "sha256:8ebd32d580a48dcf8667add58071757e03432795b7667c198a96f0dd8bc81fc0",
+        "section": "sha256:a4bddeb9839ec1cf286d89b903da0b1639a8cc6285617966d99b247b8d59e88d",
+        "skill": "sha256:638adda40c9cf606586cb1ebf8121b4f9fdf20c6a24469e90d80095a593d4e12",
         "scoped": []
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§9 Credentials",
@@ -341,8 +329,8 @@
           "sha256:af2bd3ffbeb24938532924ba6a0833111b9ed5bed90eabf3956885f2b8dd8ad5"
         ]
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§10 Where to look next",
@@ -352,14 +340,14 @@
         "dadaia_workspace/public/templates/specs-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:c59a4b5044b85a396e3f68485d24b2fca696c7ffaf4f005d64c2dc0fc7de0dea",
+        "section": "sha256:0d59dea4e4cb9082501f9eab60443a4b4a7aed496ae93bc263844809b60b3a2f",
         "skill": null,
         "scoped": [
-          "sha256:91576585aa8de972e7c3560acc88cf6f9be8f25442a701c75d7af35c6639900a"
+          "sha256:31fe0e6f92c0627356d0015233a94f67d4346ac40ab5a29cd98ba602c031f01f"
         ]
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§6 Specs, tasks and memory",
@@ -369,14 +357,14 @@
         "dadaia_workspace/public/scaffold/releases/_ideas/AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
+        "section": "sha256:2ef9f074230f35dd0095eb76df6c129cc085a28bb54a1764381ef995f1d5ad46",
         "skill": null,
         "scoped": [
-          "sha256:0517671f6ae5f0de8f37322dc4b5be56f96e8615431c451749c3ccfee22558b0"
+          "sha256:2693aba75a576d810bd903fcaa9801cada133918310fca0c157d2deaa3c344bc"
         ]
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§6 Specs, tasks and memory",
@@ -384,12 +372,12 @@
       "skill": "dd-architecture-survey",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
-        "skill": "sha256:a6d8b1c1602fd5e32fa87b0e78f67c0853c2634f0297a7b858d287d8ff0775a6",
+        "section": "sha256:2ef9f074230f35dd0095eb76df6c129cc085a28bb54a1764381ef995f1d5ad46",
+        "skill": "sha256:29561c77caef30a78e5e903f8343b5503de540078ba4f87f6e1d500ce6e81928",
         "scoped": []
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§2 Who does what",
@@ -398,11 +386,11 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:4ff73734813e198c0717caf61020c9c81de1fedf182240a22bdce7b32ffe17fe",
-        "skill": "sha256:f4249e02240c87ecf67278a005f4c5c35d326f492a6d2fc6f74741c3d3992cf0",
+        "skill": "sha256:adc1f87767feee4a1487b6fb44023d9ed75eadafe3a5e36ef14d022dd83b1bdc",
         "scoped": []
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§6 Specs, tasks and memory",
@@ -410,12 +398,12 @@
       "skill": "dd-domain-modeling",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
+        "section": "sha256:2ef9f074230f35dd0095eb76df6c129cc085a28bb54a1764381ef995f1d5ad46",
         "skill": "sha256:1da471ae4df6ed1704f36db42ffab5876a0ee3bd607eedef9464540a97c2a5aa",
         "scoped": []
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     }
   ]
 }

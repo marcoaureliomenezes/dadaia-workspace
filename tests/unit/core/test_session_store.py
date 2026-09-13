@@ -124,8 +124,6 @@ def test_new_binding_record_authors_the_schema() -> None:
     record = session_store.new_binding_record(
         session_id="sess-1",
         context="alpha",
-        mode="BOUND_IMPLEMENTATION",
-        release="0.5.3",
         runtime="claude-code",
         pid=1234,
         now="2026-08-31T12:00:00+00:00",
@@ -133,8 +131,6 @@ def test_new_binding_record_authors_the_schema() -> None:
     assert record == {
         "session_id": "sess-1",
         "context": "alpha",
-        "mode": "BOUND_IMPLEMENTATION",
-        "release": "0.5.3",
         "runtime": "claude-code",
         "pid": 1234,
         "bound_at": "2026-08-31T12:00:00+00:00",
@@ -146,13 +142,29 @@ def test_new_binding_record_authors_the_schema() -> None:
     assert "is_stale" not in record
 
 
+def test_a_record_carrying_the_retired_mode_and_release_keys_still_parses() -> None:
+    """0.4.7 FR4: readers reach for named keys, never validate the key set — an OLD
+    session record keeps working with no migration and no compatibility branch."""
+    legacy = {
+        **session_store.new_binding_record(
+            session_id="sess-old",
+            context="alpha",
+            runtime="claude-code",
+            pid=1234,
+            now=datetime.now(tz=UTC).isoformat(),
+        ),
+        "mode": "BOUND_IMPLEMENTATION",
+        "release": "0.5.3",
+    }
+    assert session_store.is_live(legacy)
+    assert legacy["context"] == "alpha"
+
+
 def test_is_live_and_live_session(tmp_path: Path) -> None:
     now = datetime.now(tz=UTC)
     fresh = session_store.new_binding_record(
         session_id="sess-2",
         context="alpha",
-        mode="READ",
-        release=None,
         runtime="unknown",
         pid=1,
         now=now.isoformat(),
@@ -175,8 +187,6 @@ def test_reap_stale_deletes_only_expired_records(tmp_path: Path) -> None:
     live = session_store.new_binding_record(
         session_id="live-1",
         context="a",
-        mode="READ",
-        release=None,
         runtime="unknown",
         pid=1,
         now=now.isoformat(),

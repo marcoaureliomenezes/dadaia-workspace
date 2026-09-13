@@ -12,7 +12,7 @@ vocabulary in `SKILL.md`: module, interface, seam, adapter.
 
 ## Seam discipline
 
-- One adapter = a hypothetical seam; two = a real one. A single-adapter port is indirection (this repo's ADR 0001 retired exactly that class).
+- One adapter = a hypothetical seam; two = a real one. A single-adapter port is indirection.
 - Internal seams stay private to the implementation and its tests — never exposed through the interface because a test happens to use them.
 
 ## Testing: replace, don't layer

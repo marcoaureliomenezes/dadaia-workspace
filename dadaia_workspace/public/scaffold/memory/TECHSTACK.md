@@ -1,7 +1,6 @@
 ---
-slug: tech-stack
+slug: TECHSTACK
 title: Tech Stack
-category: core
 tldr: Linguagens, runtimes, dependências aprovadas e restrições do stack tecnológico.
 summary: Cataloga todas as linguagens, runtimes e dependências em uso, além dos comandos canônicos e das restrições explícitas do stack. Referência obrigatória antes de propor novas dependências.
 tags:

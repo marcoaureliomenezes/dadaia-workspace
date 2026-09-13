@@ -107,13 +107,19 @@ import re
 import tempfile
 from collections import Counter
 from itertools import combinations
-from pathlib import Path, PurePath, PureWindowsPath
+from pathlib import Path, PureWindowsPath
 from typing import Any
 
 import jsonschema
 import pytest
-from typer.main import get_command
 
+from dadaia_workspace.cli.help_digest import command_paths
+from dadaia_workspace.features.specs.citations import (
+    dead_body_pointers_in_tree,
+    dead_path_citations_in_tree,
+    dead_verb_citations_in_tree,
+    posix_relpath,
+)
 from tests.helpers.scan_population import assert_populated
 
 pytestmark = pytest.mark.contract
@@ -873,35 +879,6 @@ def test_mutation_fixture_8_flagged_skill_still_granted_turns_red() -> None:
 # --------------------------------------------------------------------------- #
 
 
-@functools.lru_cache(maxsize=1)
-def _derive_command_tree() -> frozenset[tuple[str, ...]]:
-    """Walk the REAL Typer app (never a subprocess ``--help`` parse — see module
-    docstring for the hermetic/fast/always-in-sync justification), once per run.
-
-    Walked by duck-typing (``hasattr(cmd, "commands")``), never
-    ``isinstance(cmd, click.Group)``: the installed ``typer`` (``>=0.27.1``) vendors its
-    own click-compatible core (``typer._click.core``), so ``typer.core.TyperGroup`` does
-    NOT subclass the external ``click.Group`` — an ``isinstance`` check silently walks
-    zero children. Duck-typing is the version-robust choice across typer/click pairings.
-    """
-    from dadaia_workspace.cli.main import app as _app
-
-    root = get_command(_app)
-    paths: set[tuple[str, ...]] = {()}
-
-    def _walk(cmd: object, prefix: tuple[str, ...]) -> None:
-        commands = getattr(cmd, "commands", None)
-        if not isinstance(commands, dict):
-            return
-        for name, sub in commands.items():
-            child = prefix + (name,)
-            paths.add(child)
-            _walk(sub, child)
-
-    _walk(root, ())
-    return frozenset(paths)
-
-
 # Pinned, derived-with-a-pin (module docstring's fix note): the ONE specs_dir-relative
 # path this corpus cites that is a projected INSTANCE reality, never a checkout reality
 # (bug citation-enforcer-resolves-projected-instance-paths-against-the-checkout). The
@@ -950,101 +927,20 @@ def _projected_specs_agents_relpath(repo_root: Path) -> str | None:
     return _PROJECTED_SPECS_TARGET_RELPATH
 
 
-def _is_placeholder_or_ellipsis(token: str) -> bool:
-    if any(ch in _PLACEHOLDER_CHARS for ch in token):
-        return True
-    return any(marker in token for marker in _ELLIPSIS_MARKERS)
+def _exempt_projected(repo_root: Path) -> frozenset[str]:
+    """The one projected-INSTANCE path this corpus cites, as plain data for the
+    relocated finder (`features.specs.citations`) — proven by
+    `_projected_specs_agents_relpath`, never a hand-kept allowlist inside production."""
+    rel = _projected_specs_agents_relpath(repo_root)
+    return frozenset() if rel is None else frozenset({f"specs/{rel}"})
 
 
-def _sibling_marked(same_line_remainder: str, next_line: str) -> bool:
-    """True if the ``(sibling)``/``sibling`` annotation follows the citation, either on
-    the same line or on the very next line — a blockquote continuation, whose leading
-    ``>`` marker is stripped first."""
-    if _SIBLING_MARKER_RE.match(same_line_remainder.lstrip()):
-        return True
-    stripped_next = _BLOCKQUOTE_PREFIX_RE.sub("", next_line).lstrip()
-    return bool(_SIBLING_MARKER_RE.match(stripped_next))
-
-
-def _posix_relpath(path: PurePath, root: PurePath) -> str:
-    """Render ``path`` relative to ``root`` in POSIX form — separator-agnostic, so a
-    violation's ``file:line`` citation is byte-identical whether the check runs on
-    Windows or POSIX (bug ``citation-mutation-fixtures-never-turn-red-on-windows``).
-    ``relative_to``/``as_posix`` are pure path arithmetic (no I/O), so this seam takes
-    any ``PurePath`` — including a ``PureWindowsPath`` on a non-Windows host, which is
-    exactly how the regression test below drives it without needing Windows CI."""
-    return path.relative_to(root).as_posix()
-
-
-def _find_dead_path_citations(public_dir: Path, repo_root: Path) -> list[str]:
-    """Failure mode (a) — every ``specs/``/``dadaia_workspace/``/``.github/``-prefixed
-    or ``(sibling)``-annotated bare-filename citation in every ``*.md`` under
-    ``public_dir`` must resolve on disk. Returns ``file:line: dead ... `token` `` strings
-    (A27.20 — fails naming the file:line and the dead path)."""
-    violations: list[str] = []
-    for md_path in sorted(public_dir.glob("**/*.md")):
-        lines = md_path.read_text(encoding="utf-8").splitlines()
-        rel = _posix_relpath(md_path, repo_root)
-        for idx, line in enumerate(lines):
-            for m in _CITATION_BACKTICK_RE.finditer(line):
-                token = m.group(1).strip()
-                if not token or _is_placeholder_or_ellipsis(token):
-                    continue
-                if token.startswith(_WORKSPACE_RUNTIME_PREFIX):
-                    continue
-                if token.startswith(_CITABLE_PATH_PREFIXES):
-                    projected_relpath = _projected_specs_agents_relpath(repo_root)
-                    if projected_relpath is not None and token == f"specs/{projected_relpath}":
-                        continue
-                    if not (repo_root / token).exists():
-                        violations.append(f"{rel}:{idx + 1}: dead path `{token}`")
-                    continue
-                if "/" in token or not _SIBLING_FILENAME_RE.match(token):
-                    continue
-                next_line = lines[idx + 1] if idx + 1 < len(lines) else ""
-                if not _sibling_marked(line[m.end() :], next_line):
-                    continue
-                if (md_path.parent / token).exists():
-                    continue
-                if any(public_dir.glob(f"**/{token}")):
-                    continue
-                violations.append(f"{rel}:{idx + 1}: dead sibling citation `{token}`")
-    return violations
-
-
-def _find_dead_verb_citations(
-    public_dir: Path, repo_root: Path, tree: frozenset[tuple[str, ...]]
-) -> list[str]:
-    """Failure mode (b) — every ``dadaia <verb> [<sub>]`` citation in every ``*.md``
-    under ``public_dir`` must resolve in the live command tree. Returns
-    ``file:line: dead verb ... `` strings (A27.20 — fails naming the file:line and the
-    dead verb)."""
-    violations: list[str] = []
-    for md_path in sorted(public_dir.glob("**/*.md")):
-        lines = md_path.read_text(encoding="utf-8").splitlines()
-        rel = _posix_relpath(md_path, repo_root)
-        for idx, line in enumerate(lines):
-            for m in _CITATION_BACKTICK_RE.finditer(line):
-                token = m.group(1)
-                for cm in _DADAIA_VERB_RE.finditer(token):
-                    v1, v2 = cm.group(1), cm.group(2)
-                    if v1 is None:
-                        verb_path: tuple[str, ...] = ()
-                    elif v2 is None:
-                        verb_path = (v1,)
-                    else:
-                        verb_path = (v1, v2)
-                    if not verb_path or verb_path in tree:
-                        continue
-                    violations.append(
-                        f"{rel}:{idx + 1}: dead verb `dadaia {' '.join(verb_path)}` "
-                        f"(cited as `{token.strip()}`)"
-                    )
-    return violations
+def _real_dead_path_citations(repo_root: Path = _REPO_ROOT) -> list[str]:
+    return dead_path_citations_in_tree(_PUBLIC, repo_root, exempt=_exempt_projected(repo_root))
 
 
 def test_every_cited_path_exists() -> None:
-    violations = _find_dead_path_citations(_PUBLIC, _REPO_ROOT)
+    violations = _real_dead_path_citations()
     assert violations == [], "dead path citation(s):\n" + "\n".join(violations)
 
 
@@ -1070,7 +966,7 @@ def test_projected_specs_agents_md_citation_survives_bare_checkout() -> None:
         assert not (_REPO_ROOT / "specs" / "AGENTS.md").exists(), (
             "fixture precondition: specs/AGENTS.md must be absent to simulate a bare checkout"
         )
-        violations = _find_dead_path_citations(_PUBLIC, _REPO_ROOT)
+        violations = _real_dead_path_citations()
     finally:
         if moved:
             hidden_path.rename(real_path)
@@ -1082,8 +978,7 @@ def test_projected_specs_agents_md_citation_survives_bare_checkout() -> None:
 
 
 def test_every_cited_dadaia_verb_exists() -> None:
-    tree = _derive_command_tree()
-    violations = _find_dead_verb_citations(_PUBLIC, _REPO_ROOT, tree)
+    violations = dead_verb_citations_in_tree(_PUBLIC, _REPO_ROOT, command_paths())
     assert violations == [], "dead dadaia verb citation(s):\n" + "\n".join(violations)
 
 
@@ -1098,7 +993,7 @@ def test_mutation_fixture_9_dead_path_citation_turns_red(tmp_path: Path) -> None
         "See `specs/this-path-does-not-exist-fixture.md` for detail.\n", encoding="utf-8"
     )
 
-    violations = _find_dead_path_citations(
+    violations = dead_path_citations_in_tree(
         fixture_repo_root / "dadaia_workspace" / "public", fixture_repo_root
     )
     assert len(violations) == 1
@@ -1120,7 +1015,7 @@ def test_mutation_fixture_11_lookalike_projected_path_still_turns_red(tmp_path: 
         "See `specs/nested/AGENTS.md` for detail.\n", encoding="utf-8"
     )
 
-    violations = _find_dead_path_citations(
+    violations = dead_path_citations_in_tree(
         fixture_repo_root / "dadaia_workspace" / "public", fixture_repo_root
     )
     assert len(violations) == 1
@@ -1138,9 +1033,8 @@ def test_mutation_fixture_10_dead_verb_citation_turns_red(tmp_path: Path) -> Non
         "Run `dadaia fixture-nonexistent-verb now`.\n", encoding="utf-8"
     )
 
-    tree = _derive_command_tree()
-    violations = _find_dead_verb_citations(
-        fixture_repo_root / "dadaia_workspace" / "public", fixture_repo_root, tree
+    violations = dead_verb_citations_in_tree(
+        fixture_repo_root / "dadaia_workspace" / "public", fixture_repo_root, command_paths()
     )
     assert len(violations) == 1
     assert "dadaia fixture-nonexistent-verb now" in violations[0]
@@ -1149,7 +1043,7 @@ def test_mutation_fixture_10_dead_verb_citation_turns_red(tmp_path: Path) -> Non
 
 def test_posix_relpath_is_separator_agnostic_under_windows_path_semantics() -> None:
     """Regression — bug `citation-mutation-fixtures-never-turn-red-on-windows` (HIGH).
-    On windows-latest CI, `_find_dead_path_citations`/`_find_dead_verb_citations`
+    On windows-latest CI, `dead_path_citations`/`dead_verb_citations`
     correctly DETECTED the planted violation (`len(violations) == 1`, correct token) —
     the bug was never a vacuous no-op. It was the violation's `file:line` prefix
     rendering with the OS-native separator (backslash on Windows) instead of the
@@ -1161,7 +1055,43 @@ def test_posix_relpath_is_separator_agnostic_under_windows_path_semantics() -> N
         windows_root / "dadaia_workspace" / "public" / "skills" / "fixture-skill" / "SKILL.md"
     )
 
-    rel = _posix_relpath(windows_md_path, windows_root)
+    rel = posix_relpath(windows_md_path, windows_root)
 
     assert rel == "dadaia_workspace/public/skills/fixture-skill/SKILL.md"
     assert "\\" not in rel
+
+
+# --------------------------------------------------------------------------- #
+# Body pointers — every `dd-*`, `dd-* §N` and `*-AGENTS.md` token in a skill body
+# resolves to a skill dir, a numbered section, or a public asset on disk.
+# --------------------------------------------------------------------------- #
+
+_DD_SKILL_TOKEN_RE = re.compile(r"^dd-[a-z0-9-]+$")
+_DD_SECTION_PAIR_RE = re.compile(r"`(dd-[a-z0-9-]+)`[^`§\n]{0,40}§(\d+)")
+_SCOPED_AGENTS_TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*-AGENTS\.md$")
+
+
+def test_every_skill_body_pointer_resolves() -> None:
+    violations = dead_body_pointers_in_tree((_SKILLS_DIR, _PUBLIC / "agents"), _PUBLIC, _REPO_ROOT)
+    assert violations == [], "dead body pointer(s):\n" + "\n".join(violations)
+
+
+def test_mutation_fixture_12_dead_body_pointer_turns_red(tmp_path: Path) -> None:
+    """A skill body naming a skill that is not on disk, a section its target does not
+    carry, or a scoped rule file that does not exist must be flagged — three fixtures,
+    one finder, never touching a real repo file."""
+    repo = tmp_path / "fixture-repo"
+    public = repo / "dadaia_workspace" / "public"
+    (public / "skills" / "dd-real").mkdir(parents=True)
+    (public / "skills" / "dd-real" / "SKILL.md").write_text("## 1. When\n", encoding="utf-8")
+    body = public / "skills" / "dd-real" / "NOTES.md"
+    body.write_text(
+        "See `dd-gone`.\nSee `dd-real` §9.\nSee `nowhere-AGENTS.md`.\nSee `dd-real` §1.\n",
+        encoding="utf-8",
+    )
+
+    violations = dead_body_pointers_in_tree((public / "skills",), public, repo)
+    assert len(violations) == 3, violations
+    assert "dead skill pointer `dd-gone`" in violations[0]
+    assert "dead section pointer `dd-real` §9" in violations[1]
+    assert "dead scoped-rule pointer `nowhere-AGENTS.md`" in violations[2]

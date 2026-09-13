@@ -16,12 +16,9 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.specs_repair import is_placeholder_atom, remove_placeholder_atoms
 from dadaia_workspace.features.migrate import upgrade as upgrade_feat
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
-from dadaia_workspace.features.specs.doctor_memory import (
-    is_placeholder_atom,
-    remove_placeholder_atoms,
-)
 from dadaia_workspace.features.specs.scaffolder import scaffold
 
 pytestmark = pytest.mark.unit
@@ -32,7 +29,6 @@ _TESTS_AGENTS_TEMPLATE = _TEMPLATES_DIR / "tests-AGENTS.md"
 _PLACEHOLDER_ATOM = """---
 slug: SLUG_PLACEHOLDER
 title: TITLE_PLACEHOLDER
-category: product
 tldr: Uma frase descrevendo o que esta feature faz.
 summary: Uma a duas frases expandindo o tldr.
 tags:
@@ -106,7 +102,6 @@ def test_filled_atom_is_never_flagged_or_removed(tmp_path: Path) -> None:
         "---\n"
         "slug: feature\n"
         "title: Real Feature\n"
-        "category: product\n"
         "tldr: A real feature with real content.\n"
         "summary: This placeholder text in prose is NOT a template marker.\n"
         "tags: [feature]\n"

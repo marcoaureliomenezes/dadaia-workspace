@@ -1,4 +1,4 @@
-"""``core.invocation`` — the single session/context/root/mode resolution authority.
+"""``core.invocation`` — the single session/context/root/Bind resolution authority.
 
 Intent: CONTRACT — release 0.5.1 candidate K1 ("One Invocation"). Replaces, at the new
 deepened interface, the eight deciders / three sid ladders / four staleness rules the
@@ -91,27 +91,6 @@ def _write_session(
                 "mode": mode,
                 "last_seen_at": last_seen,
                 "ttl_seconds": ttl,
-            }
-        ),
-        encoding="utf-8",
-    )
-
-
-def _write_release(specs_dir: Path, release_id: str, phase: str) -> None:
-    release_dir = specs_dir / "releases" / release_id
-    release_dir.mkdir(parents=True, exist_ok=True)
-    (release_dir / "RELEASE.json").write_text(
-        json.dumps(
-            {
-                "schema": "release-state-v1",
-                "release": release_id,
-                "phase": phase,
-                "rc": 1,
-                "defined": None,
-                "implemented": None,
-                "shipped": None,
-                "audited": None,
-                "log": [],
             }
         ),
         encoding="utf-8",
@@ -235,43 +214,13 @@ def _open_bug_linked_worktree_outside_repos(tmp_path: Path) -> dict[str, object]
     return {"target_path": target, "env": {}, "cwd": nested}
 
 
-def _read_mode_from_session_record(tmp_path: Path) -> dict[str, object]:
+def _bind_from_env(tmp_path: Path) -> dict[str, object]:
     ws = _mk_ws(tmp_path, slug="proj")
-    sid = "sess-read-mode"
-    _write_session(ws, sid, "proj", mode="READ")
-    return {"env": {"CLAUDE_CODE_SESSION_ID": sid}, "cwd": ws / "repos" / "proj"}
+    _register_context(ws, slug="other", associated=["other-infra"])
+    return {"env": {"DADAIA_CONTEXT": "other"}, "cwd": ws / "repos" / "proj"}
 
 
-def _dadaia_mode_env_overrides_session_record(tmp_path: Path) -> dict[str, object]:
-    ws = _mk_ws(tmp_path, slug="proj")
-    sid = "sess-mode-override"
-    _write_session(ws, sid, "proj", mode="IMPLEMENTATION")
-    return {
-        "env": {"CLAUDE_CODE_SESSION_ID": sid, "DADAIA_MODE": "READ"},
-        "cwd": ws / "repos" / "proj",
-    }
-
-
-def _missing_mode_defaults_implementation(tmp_path: Path) -> dict[str, object]:
-    ws = _mk_ws(tmp_path, slug="proj")
-    return {"env": {}, "cwd": ws / "repos" / "proj"}
-
-
-def _release_phase_resolved(tmp_path: Path) -> dict[str, object]:
-    ws = _mk_ws(tmp_path, slug="proj")
-    _write_release(ws / "repos" / "proj" / "specs", "0.5.1", "IMPLEMENTATION")
-    return {"env": {}, "cwd": ws / "repos" / "proj"}
-
-
-def _release_phase_none_when_ambiguous(tmp_path: Path) -> dict[str, object]:
-    ws = _mk_ws(tmp_path, slug="proj")
-    specs_dir = ws / "repos" / "proj" / "specs"
-    _write_release(specs_dir, "0.5.0", "CLOSURE")
-    _write_release(specs_dir, "0.5.1", "DEFINITION")
-    return {"env": {}, "cwd": ws / "repos" / "proj"}
-
-
-def _release_phase_none_when_no_releases_dir(tmp_path: Path) -> dict[str, object]:
+def _bind_unbound(tmp_path: Path) -> dict[str, object]:
     ws = _mk_ws(tmp_path, slug="proj")
     return {"env": {}, "cwd": ws / "repos" / "proj"}
 
@@ -345,9 +294,7 @@ SCENARIOS: tuple[Scenario, ...] = (
             and inv.context_name is None
             and inv.repo_slug is None
             and inv.specs_dir is None
-            and inv.mode == "IMPLEMENTATION"
-            and inv.release == "none"
-            and inv.phase == ""
+            and inv.bind.context_name is None
             and inv.rung == "none"
         ),
     ),
@@ -363,34 +310,17 @@ SCENARIOS: tuple[Scenario, ...] = (
         ),
     ),
     Scenario(
-        "mode_read_from_session_record",
-        _read_mode_from_session_record,
-        lambda inv: inv.mode == "READ",
+        "bind_carries_the_context_scope_main_plus_associated",
+        _bind_from_env,
+        lambda inv: (
+            inv.bind.context_name == "other"
+            and inv.bind.repos == frozenset({"other", "other-infra"})
+        ),
     ),
     Scenario(
-        "mode_dadaia_mode_env_overrides_session_record",
-        _dadaia_mode_env_overrides_session_record,
-        lambda inv: inv.mode == "READ",
-    ),
-    Scenario(
-        "mode_missing_defaults_to_implementation",
-        _missing_mode_defaults_implementation,
-        lambda inv: inv.mode == "IMPLEMENTATION",
-    ),
-    Scenario(
-        "release_phase_resolved_from_release_json",
-        _release_phase_resolved,
-        lambda inv: inv.release == "0.5.1" and inv.phase == "IMPLEMENTATION",
-    ),
-    Scenario(
-        "release_phase_none_when_two_release_dirs_are_ambiguous",
-        _release_phase_none_when_ambiguous,
-        lambda inv: inv.release == "none" and inv.phase == "",
-    ),
-    Scenario(
-        "release_phase_none_when_no_releases_dir",
-        _release_phase_none_when_no_releases_dir,
-        lambda inv: inv.release == "none" and inv.phase == "",
+        "bind_is_empty_when_the_session_never_bound_even_inside_a_repo",
+        _bind_unbound,
+        lambda inv: inv.bind.context_name is None and inv.bind.repos == frozenset(),
     ),
 )
 

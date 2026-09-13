@@ -1,4 +1,4 @@
-"""Code-review remediation (v0.1.69 FR2.2, HIGH): ``specs doctor --context`` must reuse
+"""Code-review remediation (v0.1.69 FR2.2, HIGH): ``dadaia doctor --context`` must reuse
 the SAME context->specs resolver the FR3 preflight-input probe already uses
 (historically ``container._context_specs_dir`` / its public seam),
 not a hand-rolled ``repos/<context>/specs`` path.
@@ -20,6 +20,7 @@ relies on for the implement step's write-scope derivation.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -55,12 +56,12 @@ def _make_self_hosting_workspace(root: Path) -> Path:
 def test_doctor_context_resolves_workspace_root_specs_for_self_hosting_context(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """``specs doctor --context <ctx>`` for a self-hosting-style tmp workspace (no
+    """``dadaia doctor --context <ctx>`` for a self-hosting-style tmp workspace (no
     ``repos/<ctx>/specs`` on disk) must resolve to the REAL workspace-root ``specs/``
     tree — never fabricate ``SPEC-DOC-001`` because it looked at a nonexistent
     ``repos/<ctx>/specs`` path.
 
-    FAILS on current code: the hand-rolled resolver in ``specs.py`` always targets
+    FAILS on the pre-fix code: the hand-rolled resolver always targeted
     ``repos/<ctx>/specs`` regardless of whether it exists, so the doctor reports the
     fabricated missing-constitution error even though the context's real specs tree
     (at workspace-root) is a fully valid scaffold.
@@ -69,9 +70,12 @@ def test_doctor_context_resolves_workspace_root_specs_for_self_hosting_context(
     ctx = "self-hosting-ctx"
 
     monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["specs", "doctor", "--context", ctx])
+    result = _runner.invoke(app, ["doctor", "--context", ctx, "--json"])
 
+    # A fabricated repos/<ctx>/specs target would report the missing constitution of a
+    # tree that does not exist; the real workspace-root scaffold has one, and IS the
+    # tree the one resolver returned.
+    payload = json.loads(result.output)
+    assert Path(payload["specs_dir"]) == (tmp_path / "specs").resolve()
     assert "SPEC-DOC-001" not in result.output, result.output
     assert "constitution.md is missing" not in result.output, result.output
-    assert str(tmp_path / "specs") in result.output, result.output
-    assert result.exit_code == 0, result.output

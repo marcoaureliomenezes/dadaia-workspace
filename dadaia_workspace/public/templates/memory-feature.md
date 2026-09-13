@@ -1,7 +1,6 @@
 ---
 slug: SLUG_PLACEHOLDER
 title: TITLE_PLACEHOLDER
-category: product
 tldr: Document the user-visible purpose of TITLE_PLACEHOLDER.
 summary: Describe the current behavior, boundaries, and operational contract.
 tags:

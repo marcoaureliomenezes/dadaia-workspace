@@ -15,7 +15,7 @@ description: >
 
 - Start of any session touching git.
 - Branching, committing, opening a PR, starting a task, or minting a version.
-- Any bug fix (fixed on the live feature branch, in any phase, no ceremony).
+- Any bug fix (`dd-bug-resolution`).
 
 ## 2. Steps
 
@@ -23,16 +23,14 @@ description: >
 2. Diff `main` against `develop` — a nonzero diff means `develop` carries undeployed work.
 3. Identify the one live `feature/{M.m.p}` branch.
 4. Surface a `feature/{v}` predating `develop`'s last move to the operator first — it is stale.
-5. Refuse to create a second `feature/*` branch while one is already live.
-6. Cut `feature/{next-version}` from `main` only, once `{version}` is deployed on `main`.
-7. Name the new branch exactly `M.m.p` — no `v` prefix, no suffix.
-8. Definition stage: author the candidate's SPEC/PLAN/TASKS at the release root on `feature/{M.m.p}`.
-9. Implementation stage: one commit per completed task group, shaped per §3a.
-10. Candidate closure (memory → CLOSURE): open one `feature/{M.m.p}` → `develop` PR and merge it green.
-11. After the merge, ask the operator: **promote or continue?** Continue = `dadaia release rc-archive` (trio → `rc-N/`, fresh trio at root, same version, same branch); promote = step 12.
-12. Promote: open the PR `develop` → `main` (ship verdict pre-staged naming develop's tip, §3b).
-13. The moment it merges, delete `feature/{M.m.p}` and cut `feature/{next}` (step 6) in the same step.
-14. Tag `archive/<name>` then delete a branch the moment its work lands elsewhere.
+5. Branch count, cut point and name follow `DADAIA.md` §4.2 — never restated here.
+6. Definition stage: author the candidate's SPEC/PLAN/TASKS at the release root on `feature/{M.m.p}`.
+7. Implementation stage: one commit per completed task group, shaped per §3a.
+8. Candidate closure: open one `feature/{M.m.p}` → `develop` PR and merge it green.
+9. After the merge, ask the operator: **promote or continue?** Continue = `dadaia release rc-archive`; promote = step 10.
+10. Promote: open the PR `develop` → `main` (ship verdict pre-staged naming develop's tip, §3b).
+11. The moment it merges, run `dadaia release archive <v> --shipped <sha> --pr <n> --next <M.m.p>` — it ships, archives, appends the histo record and births the next release, then PRINTS the git `next:` lines: delete `feature/{M.m.p}`, cut `feature/{next}` from `main`, then `git merge -s ours origin/develop` — run them in that order.
+12. Tag `archive/<name>` then delete a branch the moment its work lands elsewhere.
 
 ## 3a. Commit shapes — each write alone, in its own shape
 
@@ -42,7 +40,7 @@ description: >
 | 2 | Backlog / ADR | `BACKLOG.json` alone, or `ADRs/decisions.jsonl` alone | `chore(backlog): …` / `chore(adrs): …` |
 | 3 | Bug fix | code + regression test + the `BUGS.jsonl` line, together | `fix(bugs): <id> — <cause>` |
 | 4 | Resolve record | commits only; a push happens when asked, `dadaia ci preflight` first | — |
-| 5 | Release definition | SPEC + PLAN + TASKS + purge-on-pick + picked bugs, one commit | `feat(specs): define candidate …` |
+| 5 | Release definition | SPEC + PLAN + TASKS + the picked entries flipped to `status: picked` + picked bugs, one commit | `feat(specs): define candidate …` |
 | 6 | Task implementation | the task's declared write set | `conventional-commit(task-id): description` — the auditable trace |
 
 ## 3b. The ship-PR verdict
@@ -55,19 +53,17 @@ description: >
   (`features/chokepoints/verdict.py::covering_verdict`).
 - On disk a verdict is live while it names the head, the head's first parent, or
   `origin/develop`'s tip — one file per sha; anything else is stale, refused by the
-  pre-push gate and deleted by `specs doctor --fix` (SPEC-DOC-044, one rule:
+  pre-push gate and deleted by `dadaia doctor --fix` (SPEC-DOC-044, one rule:
   `features/chokepoints/verdict.py::live_verdict_shas`).
 - The ship PR's verdict is consumed and deleted after the `main` merge, like any
   other.
 
 ## 4. Done when
 
-- Exactly one live `feature/*` branch exists at all times, named for the next version
-  immediately after each deploy.
 - Every commit for a release traces to a candidate's definition, implementation,
   closure merge, or a bug fix — each write alone in its §3a shape, verifiable by
   `git log`.
-- Only `feature/*` is pushable directly; `develop`/`main` advance by PR only.
+- Every staged verdict names a sha the merge will consume; no survivor on disk.
 
 ## 5. References
 

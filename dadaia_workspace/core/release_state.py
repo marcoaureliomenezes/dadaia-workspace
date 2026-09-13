@@ -29,7 +29,6 @@ from pathlib import Path
 from typing import Any
 
 __all__ = [
-    "MEMORY_WRITE_PHASES",
     "PHASES",
     "SCHEMA",
     "ReleaseState",
@@ -64,25 +63,19 @@ def release_state_file(release_dir: Path) -> Path | None:
     return None
 
 
-#: Canonical release lifecycle phase vocabulary (constitution §7; the ``phase`` field
-#: of release-state-v1). ONE home (F007, 20260830 audit) — every consumer imports this
-#: set; ``"none"`` is the scaffold default meaning "no active release".
-PHASES: frozenset[str] = frozenset(
-    {
-        "DISCOVERY",
-        "DEFINITION",
-        "SPEC",
-        "PLAN",
-        "TASKS",
-        "IMPLEMENTATION",
-        "CLOSURE",
-        "ARCHIVED",
-        "none",
-    }
-)
+#: Canonical release lifecycle phase vocabulary (0.4.7 FR4; the ``phase`` field of
+#: release-state-v1). ONE home (F007, 20260830 audit) — every consumer imports this
+#: tuple, and ``release-state-v1.schema.json``'s ``phase`` enum is pinned equal to it
+#: by ``tests/contract/test_release_state_schema.py``.
+#:
+#: Four phases, in lifecycle order. The pre-0.4.7 vocabulary carried five more —
+#: ``DISCOVERY`` (intake, which happens in the backlog, before a release exists),
+#: ``SPEC``/``PLAN``/``TASKS`` (an authoring sub-phase per trio document, which the
+#: candidate model replaced: the trio is authored as one act, in DEFINITION) and the
+#: scaffold default ``"none"`` (a release id sentinel wearing a phase's clothes: "no
+#: live release" is the ABSENCE of a document, never a value inside one).
+PHASES: tuple[str, ...] = ("DEFINITION", "IMPLEMENTATION", "CLOSURE", "ARCHIVED")
 
-#: Phases in which product-engineer may write memory atoms (constitution §13 / FR-P1-13).
-MEMORY_WRITE_PHASES: frozenset[str] = frozenset({"DEFINITION", "CLOSURE"})
 
 #: Per-milestone-kind required inner keys (light structural validation only -- the
 #: schema file is the shape authority; this is a parse-time sanity check, not a second
@@ -91,11 +84,10 @@ _MILESTONE_REQUIRED: dict[str, frozenset[str]] = {
     "defined": frozenset({"sha", "ts"}),
     "implemented": frozenset({"sha", "rc", "ts"}),
     "shipped": frozenset({"sha", "pr", "ts"}),
-    "audited": frozenset({"sha", "ts", "audit"}),
 }
 
 _TOP_LEVEL_REQUIRED: frozenset[str] = frozenset(
-    {"schema", "release", "phase", "rc", "defined", "implemented", "shipped", "audited", "log"}
+    {"schema", "release", "phase", "rc", "defined", "implemented", "shipped", "log"}
 )
 
 _NOTE_REQUIRED: frozenset[str] = frozenset({"ts", "agent", "kind", "text"})
@@ -105,7 +97,7 @@ _NOTE_REQUIRED: frozenset[str] = frozenset({"ts", "agent", "kind", "text"})
 class ReleaseState:
     """One release's complete mutable state -- the whole ``RELEASE.json`` document.
 
-    ``defined``/``implemented``/``shipped``/``audited`` are ``dict | None`` rather than
+    ``defined``/``implemented``/``shipped`` are ``dict | None`` rather than
     four near-identical dataclasses -- each already carries its own shape via
     :data:`_MILESTONE_REQUIRED` and gains nothing from a bespoke type per kind. ``log``
     is the append-only narrative array living INSIDE this otherwise-mutable document
@@ -121,7 +113,6 @@ class ReleaseState:
     defined: dict[str, Any] | None
     implemented: dict[str, Any] | None
     shipped: dict[str, Any] | None
-    audited: dict[str, Any] | None
     log: tuple[dict[str, Any], ...] = field(default_factory=tuple)
 
     def to_dict(self) -> dict[str, Any]:
@@ -135,7 +126,6 @@ class ReleaseState:
             "defined": self.defined,
             "implemented": self.implemented,
             "shipped": self.shipped,
-            "audited": self.audited,
         }
         out["log"] = [dict(n) for n in self.log]
         return out
@@ -204,7 +194,6 @@ def parse_release_state(text: str) -> ReleaseState:
         defined=_validate_milestone("defined", obj["defined"]),
         implemented=_validate_milestone("implemented", obj["implemented"]),
         shipped=_validate_milestone("shipped", obj["shipped"]),
-        audited=_validate_milestone("audited", obj["audited"]),
         log=_validate_notes(obj["log"]),
     )
 

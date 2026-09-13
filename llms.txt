@@ -1,0 +1,34 @@
+# dadaia-workspace
+
+> A local-first, spec-driven workspace that gives AI agents current context, a document-governed lifecycle, visible concurrency and anti-slop boundaries.
+
+## What it is
+
+<!-- derived-from: product-vision sha256:ec1cebce031b -->
+
+- [README](README.md): the unit is the context (a Spec Context Project); documents are the lifecycle; boundaries are mechanical; concurrency is visible, never locked.
+
+## Install
+
+<!-- derived-from: pypi-distribution sha256:80d67bd879ea -->
+<!-- derived-from: workspace-init sha256:5b20a0d9dc80 -->
+
+- [PyPI project](https://pypi.org/project/dadaia-workspace/): `pip install dadaia-workspace`, then `dadaia init`.
+- [Changelog](CHANGELOG.md): one section per published version.
+
+## The law
+
+<!-- derived-from: agentic-entities sha256:762aef59899f -->
+<!-- derived-from: sdd-gate-v3 sha256:6206bc904484 -->
+
+- [DADAIA.md](dadaia_workspace/public/data/DADAIA.md): the always-on law, projected to the workspace root and to each harness runtime root.
+- [Constitution](specs/constitution.md): the derivation law for personas, behaviors, rules and skills.
+
+## Reference
+
+<!-- derived-from: context-management sha256:a66534def71e -->
+<!-- derived-from: workspace-doctor sha256:d487df63fe2b -->
+
+- [CLI reference](docs/cli.md): the committed output of `dadaia help tree`.
+- [Memory catalog](specs/memory/product/index.md): every product atom, its `tldr` and its path.
+- [Source repository](https://github.com/marcoaureliomenezes/dadaia-workspace): issues, releases and the full specs tree.

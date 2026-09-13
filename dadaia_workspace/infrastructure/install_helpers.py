@@ -18,6 +18,7 @@ from dadaia_workspace.core.models.agent_model_policy import (
     ResolvedAgentModel,
     codex_effort_for_claude_effort,
 )
+from dadaia_workspace.core.workspace_layout import HARNESS_DIRS
 from dadaia_workspace.infrastructure.public_assets_common import (
     _SCHEMA_VERSION,
     _package_version,
@@ -67,7 +68,7 @@ def remove_legacy_workflow_projections(
     installed: list[str],
 ) -> None:
     """Remove retired Markdown workflow projections without touching operator files."""
-    for harness_dir in (".agents", ".claude", ".codex", ".kimi-code"):
+    for harness_dir in sorted(HARNESS_DIRS):
         legacy_dir = workspace_root / harness_dir / "workflows"
         if not legacy_dir.is_dir():
             continue

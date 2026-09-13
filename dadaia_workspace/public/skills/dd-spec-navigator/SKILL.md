@@ -36,7 +36,8 @@ read or any output written.
    dependency rules, agent topology or schema contracts; a task self-contained in one
    well-understood component skips that re-read.
 5. Memory is read-only here: atoms are written only by `product-engineer` in
-   DEFINITION/CLOSURE phase (`DADAIA.md` §6).
+   DEFINITION/CLOSURE phase (`DADAIA.md` §6) — discipline the audit measures, never a
+   gate block.
 
 ## Phase 3 — resolve the live release and its trio
 

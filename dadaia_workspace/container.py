@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from dadaia_workspace.core.models.bugs import BugRecord
     from dadaia_workspace.features.certification import CertificationResult
+    from dadaia_workspace.features.telemetry.store import TelemetryStore
     from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 from dadaia_workspace.core.exceptions import (
@@ -156,22 +157,47 @@ def build_bug_record_store(specs_dir: Path) -> "JsonlRecordStore[BugRecord]":
     )
 
 
+def telemetry_state_dir() -> Path:
+    """The ONE resolver for the machine-level telemetry state directory,
+    ``~/.dadaia/state/telemetry`` (0.4.7 FR2, SPEC line 221: one store per MACHINE, two
+    workspaces on it kept apart by each event's ``context``).
+
+    It is a seam, not a convenience: the literal used to sit inside
+    ``build_telemetry_store`` with nothing to intercept, so the suite's governance-event
+    tests wrote synthetic events into the OPERATOR'S real store. ``tests/conftest.py``
+    routes this one function at ``tmp_path`` for every test (backstop proved by
+    ``tests/contract/test_telemetry_store_backstop.py``). No env var is read — the
+    directory is machine-level by law, overridden only through this seam.
+    """
+    return Path.home() / ".dadaia" / "state" / "telemetry"
+
+
+def build_telemetry_store(state_dir: Path) -> "TelemetryStore":
+    """The ONE telemetry store: ``<state_dir>/telemetry.sqlite``. The panel's boot and
+    every governance verb build it here, so the migration set is stated once.
+
+    *state_dir* comes from the caller — ``telemetry_state_dir()`` in production, a
+    ``tmp_path`` in tests. Returns an UNOPENED store: the caller decides whether it
+    opens for write (and how it degrades when it cannot).
+    """
+    from dadaia_workspace.features.telemetry.store import TelemetryStore
+
+    state_dir.mkdir(parents=True, exist_ok=True)
+    return TelemetryStore(state_dir / "telemetry.sqlite")
+
+
 def build_bug_record_validator() -> Callable[[Mapping[str, object]], None]:
-    """Composition-root seam for ``bug-record-v1.schema.json`` validation (D9) — the
-    ONE validation table, loaded once, reused by :meth:`~dadaia_workspace.features
-    .bugs.service.BugService.register` (relocated from ``cli/commands/bugs.py``'s own
-    schema loading, ``cli-no-infrastructure``: neither ``jsonschema``'s
-    ``Draft202012Validator`` nor the packaged schema path belongs at the CLI layer).
+    """Composition-root seam for ``bug-record-v1`` validation (D9) — the ONE validation
+    table, loaded through the ONE packaged-schema loader
+    (``features.specs.schemas.validator_for``), so the ``surface`` enum a registration
+    is checked against is the SAME derived one every committed record is checked
+    against (0.4.7 FR1). It used to read and compile the schema file a second time
+    here, which is how a registration could accept a value the doctor refused.
     Raises ``jsonschema.exceptions.ValidationError`` on the first schema violation.
     """
-    import json
+    from dadaia_workspace.features.specs.schemas import validator_for
 
-    from jsonschema import Draft202012Validator
-
-    package_root = Path(__file__).resolve().parent
-    schema_path = package_root / "public" / "schemas" / "bugs" / "bug-record-v1.schema.json"
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
-    validator = Draft202012Validator(schema)
+    validator = validator_for("bugs/bug-record-v1")
 
     def _validate(payload: Mapping[str, object]) -> None:
         validator.validate(payload)

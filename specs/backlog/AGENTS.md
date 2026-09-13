@@ -1,6 +1,6 @@
 # specs/backlog/ — Backlog Rules
 
-Scope: this file governs only `specs/backlog/`. Replaces the retired `backlog/README.md` (v6 canon, FR1).
+Scope: this file governs only `specs/backlog/`.
 
 - The backlog is a single JSON document: `specs/backlog/BACKLOG.json`, `{schema: "backlog-v1", active: [...]}`.
 - No per-entry file per backlog item — every live candidate/idea is one `active[]` object (ADR #14).
@@ -11,7 +11,7 @@ Scope: this file governs only `specs/backlog/`. Replaces the retired `backlog/RE
 
 - `active[]` (in `BACKLOG.json`) — one object per live candidate or idea, the document's only array.
 - `backlog_histo.jsonl` (in `_archive/`) — one append-only record per closed item.
-- Fields: `{id, ts, disposition, reason, release, by, entry_md, entry_md_source}`.
+- Fields: `{id, ts, disposition, release, reason, summary, entry}`.
 - An item's whole life is `active[]` -> one histo record; it never lives in both places at once.
 - One record per slug, ever — a duplicate exit is structurally impossible.
 
@@ -24,18 +24,18 @@ Scope: this file governs only `specs/backlog/`. Replaces the retired `backlog/RE
 - Plus one optional field: `intents` (see §4).
 - Backlog entries are not specs — they do not authorize implementation on their own.
 - An entry must be picked into a release (`dadaia release new`, naming the slug under `**Consumes:**`) to enter SDD.
-- Never delete an entry — a closed item's `active[]` object is removed, one terminal-disposition record is appended, same act.
+- Never delete an entry — `dadaia backlog exit <slug> --disposition …` removes the `active[]` object and appends its one histo record.
 
 ## 3. Terminal disposition tokens
 
-- Canonical home: `dd-backlog-definition` (The document) — six tokens: `DELIVERED`, `SUPERSEDED`, `RESOLVED`, `CONSUMED`, `DEFERRED`, `REJECTED`.
-- `DELIVERED`/`SUPERSEDED`/`RESOLVED`/`CONSUMED` carry the release id in `release`.
-- `DEFERRED`/`REJECTED` carry a one-line reason in `reason` instead.
-- A provisional `CONSUMED` is rewritten in place to its terminal token at closure — never a second record for the same slug.
+- One lowercase vocabulary across every histo (`core/models/histo.py`); a backlog entry exits as `delivered`, `superseded` or `rejected`.
+- `delivered`/`superseded` carry the release id in `release`; `rejected` carries a one-line `reason`.
+- A `deferred` item returns to `active[]` — it never exits.
+- Record shape is `histo-record-v1`: `{id, ts, disposition, release, reason, summary, entry}`; `entry` IS the removed `active[]` object.
 
 ## 4. Idea-stage freedom vs bound intents
 
-- `idea` — an unbound brainstorm; no `intents` array required; `backlog doctor`-clean with no further edits.
+- `idea` — an unbound brainstorm; no `intents` array required; `dadaia doctor`-clean with no further edits.
 - `candidate` and beyond — the entry must carry a typed `intents[]` array; every subject must resolve to a canonical anchor.
 - A malformed `intents[]` or an invalid `status` is always `BL-SCHEMA`, at any status.
 
@@ -68,5 +68,5 @@ dadaia backlog subjects --resolve <ref> --kind <kind>   # preview how one subjec
 ## 5. Relationship to releases
 
 - A release SPEC names a picked entry's slug under `**Consumes:**`.
-- Purge-on-pick (`DADAIA.md` §6.6): the entry exits `active[]` in the same commit that creates the release SPEC, leaving a provisional `CONSUMED` histo record.
-- At closure, the disposition sweep rewrites that record in place to its terminal token.
+- A picked entry stays in `active[]` with `status: picked` (`DADAIA.md` §6.6) — nothing is purged at pick time.
+- It exits once, at closure's disposition sweep, into `_archive/backlog_histo.jsonl`.

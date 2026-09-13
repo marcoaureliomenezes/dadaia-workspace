@@ -139,7 +139,7 @@ def test_cli_resolver_is_silent_when_the_integration_tip_is_unresolvable(
     hands SpecsDoctor ``None`` (silent) instead of a partial set whose ``--fix`` would
     delete staged ship evidence. The pre-push gate keeps failing closed on its own."""
     from dadaia_workspace import container
-    from dadaia_workspace.cli.commands import specs as specs_cli
+    from dadaia_workspace.cli.commands import doctor as doctor_cli
     from dadaia_workspace.features.chokepoints.verdict import INTEGRATION_TIP_REF
 
     class _Reader:
@@ -153,8 +153,8 @@ def test_cli_resolver_is_silent_when_the_integration_tip_is_unresolvable(
             return _PARENT
 
     monkeypatch.setattr(container, "build_git_object_reader", lambda: _Reader({"HEAD": _HEAD}))
-    assert specs_cli._resolve_live_shas(tmp_path / "specs") is None
+    assert doctor_cli._resolve_live_shas(tmp_path / "specs") is None
 
     full = _Reader({"HEAD": _HEAD, INTEGRATION_TIP_REF: _DEVELOP_TIP})
     monkeypatch.setattr(container, "build_git_object_reader", lambda: full)
-    assert specs_cli._resolve_live_shas(tmp_path / "specs") == _LIVE
+    assert doctor_cli._resolve_live_shas(tmp_path / "specs") == _LIVE

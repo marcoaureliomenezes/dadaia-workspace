@@ -16,9 +16,9 @@
 - Classify every demand: Arm A (feature) or Arm B (bug); state the arm before acting.
 - Deviation needs an explicit, confirmed operator request; default to the flow.
 - Arm A: `demand -> backlog-definition -> release-definition -> implementation+reviews -> audit`.
-- Arm B: `register -> reproduce -> RED test -> root-cause fix -> GREEN -> resolved -> commit`.
+- Arm B: `propose -> operator confirms -> register -> RED test -> root-cause fix -> GREEN -> resolved`.
 - Test: does the tool break its own contract? Yes -> Arm B, fixed now. No -> Arm A, via a release.
-- A feature enters only through the backlog; a bug is fixed immediately, outside release material.
+- A feature enters only through the backlog; a confirmed bug is fixed immediately, outside release material.
 
 ### 1.2 Dispatch
 
@@ -56,31 +56,36 @@
 ### 3.1 The gate
 
 - One PreToolUse entrypoint (`pre_gate`), fixed order, first block wins: root whitelist -> venv guard -> SDD gate.
-- Root whitelist blocks a new top-level workspace-root entry (§5.1).
-- Venv guard (`Bash` only) blocks `dadaia`/`pip`/`python -m dadaia_workspace` run outside `.dadaia/.venv/bin/`; message carries the fix.
-- SDD gate: path class × presence × phase × mode — context-relative, root and every `repos/<slug>/` alike.
+- The gate blocks exactly three things; there is no fourth.
+- Root whitelist blocks a new top-level workspace-root entry (§5.1) — block one.
+- Venv guard (`Bash` only) blocks `dadaia`/`pip`/`python -m dadaia_workspace` run outside `.dadaia/.venv/bin/` — block two, its only rule.
+- SDD gate blocks a PROTECTED write, and a bound session's MUTATING write under a `repos/<slug>/` outside its scope (§3.3) — block three.
+- Every BLOCK, from every enforcement point, carries exactly one `fix: <command>` line naming one executable command.
+- A BLOCK whose own fix is itself blocked is a Stall: CRITICAL, and unrepresentable by contract test.
 
 ### 3.2 Path classes
 
 | Class | Paths | Verdict |
 |---|---|---|
-| ADDITIVE | `specs/bugs\|backlog\|audits/`, each area's `_archive/*_histo.jsonl`, `.dadaia/{handoff,tmp,mcps,.cache}/` | Always writable |
-| MEMORY | `specs/memory/` | Writable in `DEFINITION` and `CLOSURE` phase |
-| MUTATING | everything else in-repo | Writable; records advisory presence |
+| ADDITIVE | `specs/bugs\|backlog\|audits/`, each area's `_archive/*_histo.jsonl`, `.dadaia/{handoff,tmp,reaped,mcps,.cache}/` | Always writable |
+| MUTATING | everything else in-repo | Writable, scope-judged under `repos/<slug>/`; records advisory presence |
 | PROTECTED | `.dadaia/sessions/`, projected law files (§8.2) | Blocked |
 
+- Three classes, no fourth: a workspace-root path matching no ADDITIVE or PROTECTED prefix is MUTATING.
+- `specs/memory/` is MUTATING, writable in every phase; memory discipline (§6.4, §6.7) is procedure, audited, never gated.
 - ADDITIVE's record contract (immutable core, write-once, mutable governance) is audited, not gated.
 - No FROZEN class: no root `_archive/` under `specs/`; archiving is histo-only under ADDITIVE, backstopped by pre-push (§3.4).
 
-### 3.3 Races, mode, context
+### 3.3 Races, context, scope
 
 - Races surface, never block — no locks, leases, ownership blocks.
 - A MUTATING write records advisory presence and proceeds; one throttled warning names a colliding session.
 - Presence I/O errors are swallowed; the write proceeds.
-- Mode: env -> session record -> IMPLEMENTATION default; READ blocks only your own MUTATING writes.
 - Context: `DADAIA_CONTEXT` -> session binding -> repo of the cwd; inspect via `dadaia context show --json`.
-- `dadaia context bind` refreshes the session; it is the sole context-memory-injection trigger.
+- `dadaia context bind <ctx> [--print-env]` is one verb: no mode, no release, no session state beyond the context — it refreshes the session and is the sole context-memory-injection trigger.
 - A plain shell's exported `DADAIA_CONTEXT` env var IS the binding.
+- Scope = the bound context's main repo plus its associated repos; only `repos/<slug>/` is scope-judged.
+- Out-of-scope write: BLOCKed with `fix: dadaia context bind <owner>`; an unbound session, an unregistered slug and a workspace-root path are never scope-blocked.
 - Bind is optional; ADDITIVE needs none; alert the operator only at zero ALIVE contexts.
 - One harness session per checked-out tree (ADR 0002); a parallel session's worktree is created before launch; staging discipline: §7.3.
 
@@ -89,7 +94,9 @@
 - Git hooks gate the `Bash` write path, outside the gate's own parsing, independent of any harness hook.
 - pre-commit: warns and always allows.
 - pre-push: allows `feature/*` after CI preflight + valid name.
-- pre-push: refuses a direct `develop`/`main` push (§4), a non-canon `specs/` path, or a stale PR verdict.
+- pre-push: refuses a direct `develop`/`main` push (§4), a non-canon `specs/` path the pushed range introduces or rewrites, or a stale PR verdict.
+- pre-push scans the pushed range only: published history is the baseline and is never rescanned (ADR 0013).
+- pre-push applies the v6 canon only to a `specs/` tree stamped at the canonical pattern; a lower stamp is doctor drift, never a push block.
 
 ### 3.5 Enforcement posture
 
@@ -127,7 +134,7 @@
 
 ### 5.1 Workspace root
 
-- Root holds only: `.agents/ .claude/ .codex/ .dadaia/ .git/ .kimi-code/ repos/ .env .gitignore AGENTS.md CLAUDE.md DADAIA.md prompt.md`.
+- Root holds only: `<!-- root -->`.
 - Anything the operator created by hand stays, permanently.
 - A tool needing another root or harness-dir entry gets a documented glob in `.dadaia/states/instance_exceptions.txt`.
 
@@ -144,8 +151,9 @@
 
 - A repo working tree carries source and its own artifacts only — never `.dadaia/`.
 - A nested `.dadaia/` corrupts context resolution for every tree-walking tool.
-- Excluded: `.venv/ .pytest_cache/ .mypy_cache/ .hypothesis/ .ruff_cache/ test-results/ playwright-report/ coverage/ .coverage`.
-- Redirect caches: pytest `-p no:cacheprovider`, mypy `incremental = false`, hypothesis `database = None`, ruff `--no-cache`.
+- Excluded: `<!-- repo-excluded -->`.
+- Caches redirect by configuration, never by a remembered command flag: `[tool.pytest.ini_options] addopts`, `[tool.ruff] cache-dir`, `[tool.mypy] cache_dir`, hypothesis `database = None`.
+- A bare `pytest`/`ruff check`/`mypy --strict` from the repo root leaves the tree clean; the excluded set is rendered from the one registry (§8.5).
 - Redirect Playwright's `outputDir` into `.dadaia/tmp/`.
 - Gitignore is defence in depth, not permission to create them.
 
@@ -166,18 +174,9 @@
 
 ### 6.2 Canon
 
-| Area | Members |
-|---|---|
-| root | `AGENTS.md constitution.md memory/ releases/ backlog/ bugs/ audits/ ADRs/` |
-| `releases/` | `AGENTS.md`, `_ideas/` (own `AGENTS.md`), `_archive/<release-id>/` |
-| `releases/<M.m.p>/` | `_RELEASE.json SPEC.md PLAN.md TASKS.md rc-N/ verdicts/` |
-| `backlog/` | `AGENTS.md BACKLOG.json`, `_archive/backlog_histo.jsonl` |
-| `bugs/` | `AGENTS.md BUGS.jsonl`, `_archive/bugs_histo.jsonl` |
-| `audits/` | `AGENTS.md`, `_archive/audits_histo.jsonl`, `<YYYYMMDD-slug>/` |
-| `ADRs/` | `AGENTS.md decisions.jsonl`, `_superseded/superseded.jsonl` |
-| `memory/` | `AGENTS.md ARCHITECTURE.md QUALITY.md TECHSTACK.md product/**` |
+<!-- specs-canon -->
 
-- No stray root archive directory or dotfile; `specs doctor` flags anything else.
+- No stray root archive directory or dotfile; `dadaia doctor` flags anything else.
 
 ### 6.3 Tasks
 
@@ -193,16 +192,17 @@
 - Current product truth, not history — read it before changing production behavior.
 - `product-engineer` writes `specs/memory/**` only in `DEFINITION`/`CLOSURE` phases; every other agent reads it.
 - Changelog and history live in each release's `_RELEASE.json` `log` and in git.
-- Atom frontmatter carries exactly 6 fields: `slug title category tldr summary tags`.
+- Atom frontmatter carries exactly 5 fields: `slug title tldr summary tags`.
 - `ARCHITECTURE.md QUALITY.md TECHSTACK.md` split into ADR-gated Part 1 Principles (each `Measured by:`) and Part 2 Implementation.
 
 ### 6.5 ADRs
 
 <!-- behavior: adrs -->
 
-- `ADRs/decisions.jsonl` (+ `_superseded/superseded.jsonl`) records a decision; shape: `specs/ADRs/AGENTS.md`.
+- `ADRs/decisions.jsonl` records every decision, superseded in place; shape: `specs/ADRs/AGENTS.md`.
 - Any agent proposes; only the operator flips a decision to `accepted`.
-- One decision per Part-1 principle created or changed — never one per principle that merely exists.
+- One decision per change set, naming every Part-1 principle it creates or changes — never one per principle that merely exists.
+- A record born from an operator grill ruling is `accepted` at append, the ruling date in `context`.
 - The commit touching a Part-1 principle carries its accepted decision; a pre-canon principle carries `ADR: none` until next touched.
 
 ### 6.6 Backlog
@@ -212,19 +212,19 @@
 - The operator's demand queue: only the operator creates demand; `project-manager` curates `specs/backlog/BACKLOG.json`'s `active[]`.
 - A closed item's terminal record lives in `backlog/_archive/backlog_histo.jsonl`; everyone reads both freely.
 - An entry materializes only via the PM's operator-facing intake report; an operator-ratified in-release deferral already counts as intake.
-- Every item is retained: leaves `active[]` only via a histo disposition record.
-- A picked item leaves `active[]` in the same commit that creates the release SPEC.
+- Every item is retained: it leaves `active[]` only by `dadaia backlog exit <slug> --disposition …`, once, at closure.
 - Covers bugs and backlog only — tests are prunable under stewardship criteria (§7.2). Protocol: `dd-backlog-definition`.
 
 ### 6.7 Releases
 
 <!-- behavior: releases -->
 
-- A release is `major.minor.patch` with OPEN scope: it grows by stacked closed-scope candidates, one live release ever (ADR 0005).
+- A release is `major.minor.patch` with OPEN scope, born by `dadaia release new <id>` (SPEC.md + `_RELEASE.json`, DEFINITION, one transaction).
+- It grows by stacked closed-scope candidates; exactly one live release ever, a second is refused (ADR 0005).
 - A candidate is one full SDD cycle: grill -> SPEC/PLAN/TASKS `Aprovado` at the release root -> implementation -> memory -> CLOSURE -> `feature -> develop` merge.
+- `phase` and the `defined`/`implemented` milestones move only by `dadaia release phase IMPLEMENTATION|CLOSURE --sha <sha>`; `shipped` only by `release archive`.
 - A `dd-grill-me` session on the picked set precedes each candidate's SPEC.
-- At pick time, open bugs and undispositioned audits outrank fresh backlog.
-- After each merge, the promote-or-continue gate (§4.2): continue = `dadaia release rc-archive` moves the trio to `rc-N/` and a fresh trio is born at root; promote = the ship lane, then archive the whole release folder (final trio stays at root, ADR 0009).
+- After each merge, the promote-or-continue gate (§4.2): continue = `dadaia release rc-archive` moves the trio to `rc-N/` and a fresh trio is born at root; promote = the ship lane, then `dadaia release archive <id> --shipped --pr --next` (final trio stays at root, ADR 0009).
 - Candidate finalization order: memory update -> CLOSURE -> gate; a completed task group is one commit.
 - A candidate's SPEC.md fits 24 KB and TASKS.md 12 KB — measured by V34 (`tests/contract/test_slop_ratchets.py`).
 
@@ -233,10 +233,10 @@
 <!-- behavior: audits -->
 
 - `specs/audits/<YYYYMMDD>-<slug>/AUDIT.md` + `FINDINGS.jsonl` hold three pillars: bug history, spec compliance, memory drift.
-- The three pillars run together, over the window since the last audited release.
+- The three pillars run together, over the window read from `audits/_archive/audits_histo.jsonl`.
 - Suggested every 5 releases, never mandatory.
-- Generates exactly one remediation release; every finding gets a disposition: `fixed`, `superseded`, or `deferred`/`rejected` to backlog.
-- Fully dispositioned: summary lands in `audits/_archive/audits_histo.jsonl`, the audit directory is deleted.
+- Generates exactly one remediation release; every finding moves by `dadaia audit disposition <dir> <finding> --disposition resolved|superseded|deferred|rejected`.
+- With none `open`, `dadaia audit close <dir> --sha <window-end>` appends the `audits_histo.jsonl` summary and deletes the directory.
 
 ---
 
@@ -258,11 +258,12 @@
 
 <!-- behavior: bugs -->
 
-- Register every bug you hit while operating this tooling — any behavior that breaks its own contract.
-- Classify first: environment limits, invalid input, wrong usage, and a designed validation are not bugs.
-- Append `reported` before the turn ends; bug paths are ADDITIVE, so registration is always possible.
+- A bug is a reproducible violation of a contract the tool documents — `--help`, this law, a schema.
+- Not a bug: your own mistake, wrong usage, an environment limit, a designed validation, a law ambiguity, a missing feature.
+- The agent proposes, the operator confirms: name the contract line violated, one reproducing command, why it is not agent error.
+- `dadaia bugs append` runs only after that confirmation; with no operator, the proposal is a handoff finding whose `message` starts `bug-proposal:` — never a record.
 - Redact local paths, IPs, hostnames, private names, secrets from every field. Protocol: `dd-bug-registration`.
-- Close in the same session as the fix: append `resolved` with the red-loop command, the regression-test seam, the diff direction.
+- Close in the same session as the fix: `dadaia bugs resolve` with the red-loop command, the regression-test seam, the diff direction.
 - Commit exactly what the fix touched, never a blanket `-A`; a net-positive diff routes to `software-architect` first.
 - Check prior resolutions on the same component first; declare `caused_by: <bug_id>|none` — protocol: `dd-bug-resolution`.
 - Commit shapes: `dd-gitflow-default` §3a — measured by audits via `git log`, never a hook.
@@ -272,6 +273,9 @@
 - Every `feature/{M.m.p}` push runs the local CI preflight first — always-on, not hook-forced.
 - Preflight: `ruff format --check`, `ruff check`, `mypy --strict`, `pytest`.
 - A full scan lives only in the audit lane; the PR-gate review is diff-based; only pushes are review-blocked, commits flow freely.
+- The push IS the publication boundary: pre-push runs the denylist scan over every object the pushed range introduces or rewrites.
+- Published history is the baseline and is never rescanned; the only amnesty is a term the baseline already publishes under the same matcher (ADR 0013).
+- No path is exempt and no tolerated-pairs list exists; a fixture needing a secret shape composes it at runtime, never as a tracked literal.
 - Watch every push/PR to green (`dd-release-implementation`).
 - A `quarantine`-marked test sits outside the gating selectors, bug-gated; unregistered pass-on-retry is a failure.
 
@@ -287,7 +291,7 @@
 - Slop dies in the change that finds it; it is never commented out, marked, archived or deferred.
 - The writer proves the artifact fails the deletion test; the reviewer applies the test; the auditor measures the balance.
 - A rule lives in one home; the second copy is deleted; a consumed handoff is deleted in the same turn.
-- Artifact rules live by class: constitution `Slop`, memory `ARCHITECTURE`/`QUALITY` fixed sections; `specs doctor` keeps them byte-exact.
+- Artifact rules live by class: constitution `Slop`, memory `ARCHITECTURE`/`QUALITY` fixed sections; `dadaia doctor` keeps them byte-exact.
 - Detection and ratchets: `dd-code-review` SLOP.md; measured by `tests/contract/test_slop_ratchets.py` and audit pillar 2.
 
 ---
@@ -318,9 +322,17 @@
 
 ### 8.5 Instance compliance
 
-- `dadaia doctor` is the one workspace scan and reaper: one `WS-<zone>-<verdict>` finding per line, a final `compliance: N/M entries canonical (P%)` line, `--json` mirror, exit 1 on any slop or expired entry.
+- `dadaia doctor` is the one scan and reaper — sections `workspace`, `specs`, `ledgers`; `--fix`, `--specs-dir`, `--context`, `--public-dir`, `--json`; exit 1 on any error-class finding.
+- One finding per line, `<CODE> <verdict> <message>`; codes `WS-<zone>-<verdict>`, `SPEC-DOC-*`, `TREE-*`, `RELEASE-TREE-*`, `BL-SCHEMA|CONFLICT|STALE`, `LEDGER-<NAME>-SCHEMA`; scored `compliance(<section>): N/M <unit> canonical (P%)` plus `compliance(total)`.
+- `ledgers` schema-validates every committed governance record: `decisions.jsonl`, `BACKLOG.json`, `BUGS.jsonl`, `FINDINGS.jsonl`, every `_RELEASE.json`, the three `_histo.jsonl`.
 - `.dadaia/` zones and the `states/` canon are one registry (`core/workspace_layout.DADAIA_ZONES`), rendered into `.dadaia/AGENTS.md` at `public stage`; outside manifest, registry and exceptions (§5.1) = slop.
-- SessionStart runs `dadaia doctor --fix --expired-only`; slop dies only by an explicit operator `dadaia doctor --fix`.
+- The workspace section scans the root, the harness dirs, the `.dadaia/` zones and the top of every ALIVE registered repo — plus, at any depth in a repo, an excluded name or a nested `.dadaia/`.
+- Slop and dead-repo leftovers are MOVED to `.dadaia/reaped/<YYYYMMDD>/<workspace-relative-path>` (a zone, 7-day TTL from the move, one hold per origin per day) and listed `WS-reaped-reaped`.
+- Nothing is deleted directly: deletion happens only when a TTL zone's entry expires, `reaped/` included.
+- `--fix` runs that reaper then the specs fixes; `--expired-only` scopes the report to the TTL lane, never the deletion.
+- SessionStart runs `dadaia doctor --fix --expired-only --quiet`; the PostToolUse throttle runs the same reaper, which also owns presence GC.
+- `LEDGER-<NAME>-HANDEDIT` and `RELEASE-TREE-HANDEDIT` (WARNING, never a block): a governance record changed with no matching governance event; silent where no telemetry store exists.
+- `HOOKS-DRIFT-1`: an ALIVE repo's installed `.git/hooks/{pre-commit,pre-push}` byte-differing from the shipped script; `fix: .dadaia/.venv/bin/dadaia ci install-hook --force`.
 
 ---
 
@@ -341,7 +353,7 @@
 |---|---|
 | Scoped law | `specs/AGENTS.md`, `.dadaia/AGENTS.md`, `.dadaia/handoff/AGENTS.md`, `repos/<slug>/AGENTS.md`, any nested `AGENTS.md` |
 | Skills | `.claude/skills/`, `.agents/skills/` — skill-to-rule mapping declared once in `public/entities/behavior-map.json` |
-| State | `dadaia context show --json`, `dadaia doctor`, `dadaia specs doctor`, `dadaia public doctor`, `dadaia server list`, `dadaia bugs status`, `dadaia panel` |
+| State | `dadaia context show --json`, `dadaia doctor`, `dadaia public doctor`, `dadaia server list`, `dadaia bugs status`, `dadaia panel` |
 
 - Language: operator preference, default English. Tone: direct, concise, operational.
 
@@ -360,25 +372,33 @@
 - **verdict** — a PR-head-scoped approval record, consumed once, deleted after merge.
 - **chokepoint** — a git hook that gates the write path outside the harness hook.
 - **gate** — the deterministic PreToolUse enforcement chain (§3.1).
-- **path class** — the ADDITIVE/MEMORY/MUTATING/PROTECTED category a write path belongs to (§3.2).
+- **path class** — the ADDITIVE/MUTATING/PROTECTED category a write path belongs to (§3.2).
+- **scope** — the repo set a bind owns: the context's main repo plus its associated repos (§3.3).
+- **stall** — a BLOCK whose own `fix:` command is itself blocked; CRITICAL (§3.1).
+- **publication boundary** — the push, where the denylist scan runs over the pushed range against the published baseline (§7.4).
 - **presence** — the advisory record a session leaves when it writes, surfaced to others.
 - **canon** — the closed set of paths a `specs/` root may contain (§6.2).
-- **histo** — an append-only JSONL history file under an area's `_archive/`.
+- **histo** — an append-only JSONL history file under an area's `_archive/`; one `histo-record-v1` per exited entry.
 - **memory atom** — one Markdown file under `specs/memory/product/**` carrying current truth.
 - **Part 1/Part 2** — a memory doc's ADR-gated Principles section vs its Implementation section.
 - **ADR** — an accepted decision record in `ADRs/decisions.jsonl`.
 - **backlog entry** — a candidate item in `backlog/BACKLOG.json`'s `active[]`.
-- **disposition** — the terminal verdict closing a bug, backlog entry, or audit finding.
+- **disposition** — the terminal verdict closing a bug, backlog entry, audit or release: `delivered resolved superseded deferred rejected`.
 - **audit** — a periodic three-pillar review producing one remediation release.
 - **finding** — one recorded audit observation in `FINDINGS.jsonl`.
 - **denylist** — the pattern list the pre-push scan refuses to let through.
 - **projection** — a lib-originated copy of a `public/` asset installed into a runtime tree.
 - **zone** — one top-level `.dadaia/` directory with a registry record: class, creator, TTL, canon, purpose (§8.5).
-- **finding verdict** — `dadaia doctor`'s class for one scanned entry: `canon | operator | slop | expired | missing`; `canon` + `operator` count as canonical.
+- **finding verdict** — `dadaia doctor`'s class for one scanned entry: `canon | operator | reaped | slop | expired | missing`; `canon`, `operator` and `reaped` count as canonical.
+- **reaped** — an entry held in `.dadaia/reaped/` after the reaper moved it, awaiting its own TTL (§8.5).
 - **finding code** — `WS-<zone>-<verdict>`, `<zone>` = `root`, a harness dir, `dadaia`, or a zone name without its leading dot.
 - **instance exceptions** — `.dadaia/states/instance_exceptions.txt`, one glob per line, honoured at the root and inside the harness dirs (§5.1).
 - **operator** — the human who owns the workspace and approves ADRs, deferrals, releases.
 - **dispatcher** — an agent authorized to invoke another agent via subagent dispatch.
+- **governance verb** — the one CLI command authorized to change a governance record (§6.6, §6.7, §6.8, §7.3).
+- **governance event** — the row a governance verb writes into the telemetry store, naming the record and its post-write hash.
+- **hand edit** — a governance record change with no matching governance event; measured as a WARNING, never blocked (§8.5).
+- **bug proposal** — the operator-facing case for a bug before any record exists; `bug-proposal:` in a handoff finding when no operator is present (§7.3).
 - **slop** — what passes the deletion test without loss (§7.6).
 - **ratchet** — a contract test pinning a measured count that moves down only (§7.6).
-- **fixed section** — a marker-bounded law block in a scaffolded spec, kept byte-equal to its fragment by `specs doctor` (§7.6).
+- **fixed section** — a marker-bounded law block in a scaffolded spec, kept byte-equal to its fragment by `dadaia doctor` (§7.6).

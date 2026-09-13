@@ -406,13 +406,10 @@ def test_amnesty_applies_to_the_foreign_slug_layer_too() -> None:
 # amnesty an unrelated new value that happens to be one of its substrings.
 # ---------------------------------------------------------------------------
 
-#: Bug reconciliation-merge-body-scan-unamendable-main-squash (HIGH): these two
-#: literals were originally "synthxabcd"/"synthxa" (still quoted verbatim, unamendable,
-#: in main's already-published v0.11.0 squash-merge commit body, which is WHY those two
-#: exact strings are now carved out of the home-abs-path baseline exclude_regex).
-#: Renamed here to a fresh synthetic pair that the carve-out does NOT cover, so this
-#: regression test keeps exercising a hit that actually fires (the carve-out would
-#: otherwise silently suppress it before the amnesty predicate is ever reached).
+#: Synthetic ``/home/<name>`` fixture values, composed at run time so this module's own
+#: tracked source never carries a contiguous home path. The baseline excludes generic
+#: placeholder users only, so these fire — which is the point: the pair exercises the
+#: substring-amnesty predicate on a hit that actually reaches it.
 _POSITIVE_HOME_PATH_SUPERSTRING = "/hom" + "e/synthzqwxyz"  # a DIFFERENT prior value
 _POSITIVE_HOME_PATH_SUBSTRING = "/hom" + "e/synthzq"  # substring of the value above
 _SYNTHETIC_SLUG_SUPERSTRING_PRIOR = "the zz-fake-context-namecorp bundle"  # no \b match
@@ -523,6 +520,19 @@ def test_no_allowlist_or_sanctioned_terms_constant_in_matcher_source() -> None:
         r"(?im)^\s*_?[A-Za-z_]*\b(ALLOWLIST|SANCTIONED|AMNESTY|EXEMPT)\w*\s*[:=]"
     )
     assert not forbidden.search(source), "denylist_scan.py must carry no amnesty list (FR4/A4.1)"
+
+    # v0.4.7 FR7: the same construct is forbidden in the repo self-scan SENTINEL, the
+    # one place it ever actually grew one — `_TESTS_SCOPE_BASELINE`, 23 hand-kept
+    # (path, pattern) rows that were a SECOND scope decision and the measured cause of
+    # the privacy-scan bug loop. Its own vocabulary (TOLERATED/SCOPE_BASELINE) is added
+    # so reintroducing the list under its historical name fails here.
+    sentinel = Path(__file__).resolve().parents[3] / "integration" / "test_repo_self_scan.py"
+    forbidden_rows = re.compile(
+        r"(?im)^\s*_?[A-Za-z_]*\b(ALLOWLIST|SANCTIONED|AMNESTY|EXEMPT|TOLERATED|SCOPE_BASELINE)\w*\s*[:=]"
+    )
+    assert not forbidden_rows.search(sentinel.read_text(encoding="utf-8")), (
+        "test_repo_self_scan.py must carry no tolerated-pairs baseline (v0.4.7 FR7)"
+    )
 
 
 # ---------------------------------------------------------------------------

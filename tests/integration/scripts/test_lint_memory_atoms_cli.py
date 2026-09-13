@@ -23,7 +23,6 @@ def _valid_frontmatter(slug: str = "test-atom") -> str:
     fields: dict[str, Any] = {
         "slug": slug,
         "title": "Test Atom",
-        "category": "product",
         "tldr": "A short description.",
         "summary": "One to two sentence summary.",
         "tags": ["test"],

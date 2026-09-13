@@ -7,8 +7,9 @@ without ever changing their shape; each list disagreed with the next. These ratc
 the recurrence unrepresentable:
 
 1. the rendered ``.dadaia/AGENTS.md`` table IS the registry (documented == allowed);
-2. no other literal in the package holds three or more zone names, and no string literal
-   names a retired zone — a second list cannot be born;
+2. no other literal in the package holds three or more names of ANY canonical set (zones,
+   root entries, specs canon members, repo-tree exclusions), and no string literal names a
+   retired zone — a second list cannot be born;
 3. every ``Creator`` maps to a live module — retiring a feature without deleting its row
    fails the build (the ``test_core_file_io_purity`` "every authorized stem exists" shape).
 
@@ -21,14 +22,22 @@ from __future__ import annotations
 
 import ast
 import importlib
+import re
 from pathlib import Path
 
 import pytest
 
 from dadaia_workspace.core.workspace_layout import (
+    CANON_ROOT_MEMBERS,
     DADAIA_ZONES,
+    REPO_TREE_EXCLUDED,
+    ROOT_ALLOWED_DIRS,
+    ROOT_ALLOWED_FILES,
     STATES_CANON,
     Creator,
+    repo_excluded_display,
+    root_entries_display,
+    specs_canon_table_rows,
     zone_names,
 )
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
@@ -62,24 +71,62 @@ def _package_sources() -> list[Path]:
     return files
 
 
+#: Every closed set of canonical names the registry owns (0.4.7 FR5 widened ratchet 2
+#: from the zone names to all four): a literal holding three or more names of ONE set,
+#: outside ``core/workspace_layout.py``, is a second list of that set.
+_CANONICAL_SETS: dict[str, frozenset[str]] = {
+    "zone": zone_names(),
+    "root": ROOT_ALLOWED_DIRS | ROOT_ALLOWED_FILES,
+    "specs-canon": CANON_ROOT_MEMBERS,
+    "repo-excluded": frozenset(REPO_TREE_EXCLUDED),
+}
+
+#: Literals whose names coincide with a canonical set by accident, not by restatement,
+#: each with the evidence that it is not a canon list. An entry whose file no longer
+#: holds such a literal is stale and fails the test.
+_NOT_A_NAME_LIST: dict[str, str] = {
+    "dadaia_workspace/features/capabilities/service.py": (
+        "`capabilities` surface groups: CLI verb-group labels that happen to read like "
+        "specs area names, never a specs canon member list"
+    ),
+}
+
+
 def _second_list_hits(tree: ast.AST, names: frozenset[str]) -> list[str]:
     """``line:<detail>`` for every literal holding >= 3 zone names or a retired-zone path."""
     retired_paths = {f".dadaia/{name}" for name in _RETIRED_ZONES}
     hits: list[str] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Set | ast.Tuple | ast.List):
-            found = [
-                elt.value
-                for elt in node.elts
-                if isinstance(elt, ast.Constant)
-                and isinstance(elt.value, str)
-                and elt.value in names
-            ]
-            if len(found) >= 3:
-                hits.append(f"{node.lineno}: literal holds zone names {found}")
-        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
-            if node.value.rstrip("/") in retired_paths:
-                hits.append(f"{node.lineno}: retired zone path {node.value!r}")
+            for label, canonical in _CANONICAL_SETS.items():
+                found = [
+                    elt.value
+                    for elt in node.elts
+                    if isinstance(elt, ast.Constant)
+                    and isinstance(elt.value, str)
+                    and elt.value.rstrip("/") in canonical
+                ]
+                if len(found) >= 3:
+                    hits.append(f"{node.lineno}: literal holds {label} names {found}")
+        elif (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and node.value.rstrip("/") in retired_paths
+        ):
+            hits.append(f"{node.lineno}: retired zone path {node.value!r}")
+    return hits
+
+
+def _restated_law_lines(text: str) -> list[str]:
+    """``line:<detail>`` for every law line naming HALF OR MORE of one canonical set —
+    a line that restates a set instead of referring to some of its members."""
+    hits: list[str] = []
+    for number, line in enumerate(text.splitlines(), start=1):
+        tokens = set(re.findall(r"[A-Za-z0-9_.\-]+", line))
+        for label, canonical in _CANONICAL_SETS.items():
+            found = sorted(tokens & canonical)
+            if len(found) * 2 >= len(canonical):
+                hits.append(f"{number}: line restates the {label} set {found}")
     return hits
 
 
@@ -154,14 +201,51 @@ def test_zone_registry_is_the_only_dadaia_name_list() -> None:
     names = zone_names()
     violations: dict[str, list[str]] = {}
     for path in _package_sources():
+        rel = path.relative_to(_REPO_ROOT).as_posix()
+        if rel.endswith("core/workspace_layout.py"):
+            continue
         hits = _second_list_hits(ast.parse(path.read_text("utf-8")), names)
-        if hits:
-            violations[path.relative_to(_REPO_ROOT).as_posix()] = hits
+        if hits and rel not in _NOT_A_NAME_LIST:
+            violations[rel] = hits
+        elif not hits and rel in _NOT_A_NAME_LIST:
+            violations[rel] = ["stale _NOT_A_NAME_LIST entry: no canonical-name literal left"]
 
     assert not violations, (
         "a second .dadaia zone list was born outside core.workspace_layout — derive a view "
         f"from DADAIA_ZONES instead: {violations}"
     )
+
+
+def test_the_law_source_never_restates_a_canonical_set() -> None:
+    """No line of the law SOURCE spells out a canonical set: §5.1 (root), §5.3 (repo
+    exclusions) and §6.2 (specs canon) carry placeholders ``public stage`` fills from the
+    registry, so the projected law cannot drift from ``core``."""
+    law = _PACKAGE / "public" / "data" / "DADAIA.md"
+    hits = _restated_law_lines(law.read_text("utf-8"))
+    assert not hits, (
+        "the law restates a registry set instead of rendering it — replace the lines with "
+        f"the <!-- root -->/<!-- repo-excluded -->/<!-- specs-canon --> markers: {hits}"
+    )
+
+
+def test_staged_law_canon_tables_equal_the_registry(staged_data: Path) -> None:
+    """The staged ``DADAIA.md``'s §6.2 table IS ``specs_canon_table_rows()``, row for row,
+    and its §5.1/§5.3 lines ARE the rendered root and repo-exclusion lists — documented ==
+    allowed, for the law exactly as for ``.dadaia/AGENTS.md``."""
+    text = (staged_data / "DADAIA.md").read_text("utf-8")
+    canon_tables = [t for t in _markdown_tables(text) if t and {"area", "members"} <= set(t[0])]
+    assert len(canon_tables) == 1, "exactly one rendered specs-canon table"
+    rendered = [(_bare(row["area"]), row["members"].strip("`")) for row in canon_tables[0]]
+    expected = [
+        ("root" if parent == "" else parent, members)
+        for parent, members in specs_canon_table_rows()
+    ]
+    assert rendered == expected
+
+    assert f"- Root holds only: `{root_entries_display()}`." in text
+    assert f"- Excluded: `{repo_excluded_display()}`." in text
+    for placeholder in ("<!-- root -->", "<!-- repo-excluded -->", "<!-- specs-canon -->"):
+        assert placeholder not in text, f"{placeholder} was left unrendered"
 
 
 def test_every_zone_creator_exists() -> None:

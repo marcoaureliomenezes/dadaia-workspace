@@ -14,7 +14,6 @@ from __future__ import annotations
 import os
 import shutil
 import sys
-import tempfile
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -66,29 +65,6 @@ _REQUIRED_TOOL_HINT: dict[str, str] = {
         "job and in `dadaia ci preflight`. Install it with: poetry install --with dev"
     ),
 }
-
-
-def resolve_mypy_cache_dir(start: Path | None = None) -> Path:
-    """Resolve a writable mypy cache dir OUTSIDE any repo working tree.
-
-    Self-pollution fix (T-010-25 / bug ``ci-preflight-self-pollution-…``): mypy
-    creates ``.mypy_cache/`` even with ``incremental = false``. Redirecting it
-    away from the repo root stops the preflight gate from creating the pollution
-    that its own final pytest check rejects.
-
-    Resolution walks up from ``start`` (default: this module's location) looking
-    for a workspace root — a directory containing a ``.dadaia/`` folder — and
-    targets ``<ws>/.dadaia/tmp/ci-preflight/mypy-cache``. When no workspace is
-    found (e.g. the package is installed standalone), it falls back to a path
-    under the system temp dir, which is always outside any repo.
-    """
-    here = (start or Path(__file__)).resolve()
-    for parent in (here, *here.parents):
-        candidate = parent / ".dadaia"
-        if candidate.is_dir():
-            return candidate / "tmp" / "ci-preflight" / "mypy-cache"
-    # No workspace above ``start`` — fall back to a stable system-tmp location.
-    return Path(tempfile.gettempdir()) / "dadaia-ci-preflight" / "mypy-cache"
 
 
 def _is_executable_file(path: Path) -> bool:
@@ -180,26 +156,25 @@ def _lint_type_checks(
     python_executable: str | None = None,
     dadaia_bin: str | None = None,
 ) -> tuple[Check, ...]:
-    """Build the lint/type checks with cache redirection baked into the argv.
+    """Build the lint/type checks — bare commands, no cache flags.
 
-    Ruff runs with ``--no-cache`` (no ``.ruff_cache/`` at root); mypy gets an
-    explicit ``--cache-dir`` outside the repo (no ``.mypy_cache/`` at root).
+    0.4.7 FR3: cache redirection is `pyproject.toml`'s job (`[tool.ruff] cache-dir`,
+    `[tool.mypy] cache_dir`), so preflight runs exactly what an agent types by hand.
     Ordered cheapest → most expensive so fail-fast surfaces quick problems first.
     Each tool prefix is resolved via ``_resolve_tool`` (runner-derived, not
     ``poetry``-hardcoded — bug B2).
     """
-    mypy_cache = resolve_mypy_cache_dir()
     ruff = _resolve_tool("ruff", python_executable=python_executable, dadaia_bin=dadaia_bin)
     mypy = _resolve_tool("mypy", python_executable=python_executable, dadaia_bin=dadaia_bin)
     return (
         Check(
             "ruff format --check",
-            (*ruff, "format", "--check", "--no-cache", *_RUFF_PATHS),
+            (*ruff, "format", "--check", *_RUFF_PATHS),
         ),
-        Check("ruff check", (*ruff, "check", "--no-cache", *_RUFF_PATHS)),
+        Check("ruff check", (*ruff, "check", *_RUFF_PATHS)),
         Check(
             "mypy --strict",
-            (*mypy, "--strict", "--cache-dir", str(mypy_cache), *_MYPY_PATHS),
+            (*mypy, "--strict", *_MYPY_PATHS),
         ),
     )
 

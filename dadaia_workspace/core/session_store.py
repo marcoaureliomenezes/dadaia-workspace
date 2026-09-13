@@ -200,22 +200,22 @@ def new_binding_record(
     *,
     session_id: str,
     context: str,
-    mode: str,
-    release: str | None,
     runtime: str,
     pid: int,
     now: str,
 ) -> dict[str, object]:
     """Author one session-binding record — the ONE schema author (F002).
 
-    ``mode`` is the PERSISTED token (the bind CLI maps its aliases before calling).
-    The old inline author's dead ``is_stale: False`` field (read by nothing) is gone.
+    0.4.7 FR4: ``mode`` and ``release`` are gone — nothing reads them since the gate's
+    READ block and phase rule died. Readers stay TOLERANT by construction: every reader
+    in the codebase (``live_session``, ``is_live``, the Bind resolution, the panel)
+    reaches for named keys with ``.get``, never iterates or validates the key set, so an
+    OLD record still carrying ``mode``/``release`` parses exactly as before and its extra
+    keys are simply never read. No migration, no version bump, no compatibility branch.
     """
     return {
         "session_id": session_id,
         "context": context,
-        "mode": mode,
-        "release": release,
         "runtime": runtime,
         "pid": pid,
         "bound_at": now,

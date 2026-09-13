@@ -1,7 +1,6 @@
 ---
-slug: architecture
+slug: ARCHITECTURE
 title: Arquitetura
-category: core
 tldr: Visão geral das camadas, dependências e fluxos de dados do sistema.
 summary: Documenta as camadas de responsabilidade, regras de dependência e os principais fluxos de dados. Referência estrutural para decisões de design e integração.
 tags:

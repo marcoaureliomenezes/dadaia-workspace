@@ -64,20 +64,21 @@ from pathlib import Path
 
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
-from dadaia_workspace.core.release_state import parse_release_state, release_state_file
-from dadaia_workspace.core.session_store import live_session, read_session
+from dadaia_workspace.core.session_store import live_session
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
 __all__ = [
     "CONTEXT_NAME_RE",
     "HARNESS_SESSION_ID_ENV_VARS",
+    "Bind",
     "Invocation",
+    "all_repos",
     "context_name_for_repo_slug",
+    "context_name_for_specs_dir",
     "repo_slug_for_context",
     "resolve",
-    "resolve_active_release",
+    "resolve_bind",
     "resolve_context_specs_dir",
-    "resolve_mode",
     "resolve_specs_dir",
     "resolve_session_id",
     "sanitize_session_id",
@@ -95,13 +96,18 @@ HARNESS_SESSION_ID_ENV_VARS: tuple[str, ...] = (
 
 _SESSION_ID_STRIP = re.compile(r"[^A-Za-z0-9_-]")
 
-#: Default mode when neither the env override nor a session record resolves one.
-#: Missing-mode sessions stay IMPLEMENTATION-capable (Decision D-3 / FR-R4-04).
-_DEFAULT_MODE = "IMPLEMENTATION"
 
-#: Phases in which product-engineer may write memory atoms (FR-P1-13) — unused here
-#: directly, but ``phase`` is resolved for the gate's own MEMORY-phase check.
-_RELEASE_DIRS_EXCLUDED = frozenset({"_archive", "_ideas"})
+@dataclass(frozen=True)
+class Bind:
+    """The SESSION's own binding: the context it named, and every repo slug that
+    context owns (its main repo plus its associated repos — ``all_repos()``).
+
+    Unbound is ``context_name=None`` with an empty ``repos``: an unbound session is
+    never scope-blocked, because the gate cannot attribute its writes to any context.
+    """
+
+    context_name: str | None = None
+    repos: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -111,9 +117,10 @@ class Invocation:
     ``workspace_root``/``context_name``/``specs_dir`` are ``None`` when unresolvable
     (every rung fails soft — matches the prior ladders' contract). ``repo_slug`` is the
     ``repos/<slug>`` on-disk directory for ``context_name`` (identical to
-    ``context_name`` unless the registry names a different one). ``mode``/``release``/
-    ``phase`` default to ``"IMPLEMENTATION"``/``"none"``/``""`` when unresolvable — the
-    gate's existing fail-toward-blocking-MEMORY posture. ``rung`` names which rung
+    ``context_name`` unless the registry names a different one). ``bind`` is the
+    SESSION's OWN binding — a
+    different question from ``context_name``, which the write TARGET may decide: the
+    gate's scope rule compares the two. ``rung`` names which rung
     supplied ``context_name`` (``"explicit"``, ``"target_path"``, ``"env"``,
     ``"session"``, ``"cwd"``, or ``"none"``) — diagnostic, never consulted for policy.
     """
@@ -123,9 +130,7 @@ class Invocation:
     context_name: str | None
     repo_slug: str | None
     specs_dir: Path | None
-    mode: str
-    release: str
-    phase: str
+    bind: Bind
     rung: str
 
 
@@ -262,6 +267,45 @@ def _repo_slug_under_repos(workspace_root: Path, path: Path) -> str | None:
     return slug if CONTEXT_NAME_RE.fullmatch(slug) else None
 
 
+def context_name_for_specs_dir(specs_dir: Path) -> str:
+    """The context name a resolved ``specs/`` tree belongs to, or ``""``.
+
+    The inverse of :func:`resolve_context_specs_dir`, and the ONE way a caller that
+    already resolved WHERE it wrote names WHICH context it wrote for — instead of
+    reading ``$DADAIA_CONTEXT`` a second time, which says where the SESSION is bound,
+    not where the verb routed (``--context``/``--specs-dir`` both override the bind).
+    """
+    workspace_root = _root_from(specs_dir)
+    if workspace_root is None:
+        return ""
+    slug = _repo_slug_under_repos(workspace_root, specs_dir)
+    if slug is not None:
+        return context_name_for_repo_slug(workspace_root, slug)
+    if specs_dir.resolve() == (workspace_root / "specs").resolve():
+        return _self_hosting_context_name(workspace_root)
+    return ""
+
+
+def _self_hosting_context_name(workspace_root: Path) -> str:
+    """The one ALIVE context :func:`resolve_context_specs_dir` sends to the workspace-root
+    ``specs/`` tree — the inverse of its fallback rung, so the self-hosting library repo
+    names itself instead of leaving the caller to read ``$DADAIA_CONTEXT``.
+
+    The forward rule falls back whenever ``repos/<slug>/specs`` is absent, so the inverse
+    is the ALIVE context whose repo carries no ``specs/`` of its own. Two of those would
+    resolve to the SAME tree — an ambiguity no name can settle — so that returns ``""``,
+    the same silence a tree belonging to no context gets.
+    """
+    candidates = [
+        name
+        for entry in _registry_contexts(workspace_root)
+        if str(entry.get("state", "")).lower() == "alive"
+        and (name := str(entry.get("name") or entry.get("repo_slug") or ""))
+        and not (workspace_root / "repos" / str(entry.get("repo_slug") or name) / "specs").is_dir()
+    ]
+    return candidates[0] if len(candidates) == 1 else ""
+
+
 # ---------------------------------------------------------------------------
 # Workspace root — ONE resolver, target-path-first (the open-bug fix).
 # ---------------------------------------------------------------------------
@@ -313,74 +357,40 @@ def _live_session_context(workspace_root: Path, session_id: str | None) -> str |
     return context
 
 
-# ---------------------------------------------------------------------------
-# Mode — self-scoped: DADAIA_MODE env override -> this session's own record -> default.
-# ---------------------------------------------------------------------------
+def all_repos(workspace_root: Path, context_name: str) -> frozenset[str]:
+    """Every repo slug *context_name* owns: its main repo plus its associated repos.
 
-
-def resolve_mode(
-    workspace_root: Path | None, session_id: str | None, env: Mapping[str, str]
-) -> str:
-    """Resolve the caller's bind mode. First hit wins: ``DADAIA_MODE`` env override (an
-    operator-shell escape) -> this session's OWN record's ``mode`` field -> the default
-    (``IMPLEMENTATION`` — missing-mode sessions stay write-capable, Decision D-3 /
-    FR-R4-04). Strictly self-scoped: a foreign session's bind can never change this
-    result — *session_id* names only the CALLER's own identity."""
-    env_mode = env.get("DADAIA_MODE")
-    if env_mode:
-        return env_mode
-    if workspace_root is not None and session_id:
-        record = read_session(workspace_root, session_id)
-        if record is not None:
-            raw = record.get("mode")
-            if raw:
-                return str(raw)
-    return _DEFAULT_MODE
-
-
-# ---------------------------------------------------------------------------
-# Release/phase — the RELEASE.json state document is the sole phase authority.
-# ---------------------------------------------------------------------------
-
-
-def resolve_active_release(specs_dir: Path | None) -> tuple[str, str]:
-    """Resolve ``(release_id, phase)`` from the live release's ``RELEASE.json``.
-
-    Returns ``("none", "")`` when *specs_dir* is ``None``, no live release directory
-    exists, more than one does (ambiguous), or its ``RELEASE.json`` cannot be read or
-    fails to parse — callers treat this the same as "no active release" (fail toward
-    blocking a MEMORY write rather than guessing a phase that grants one).
+    The Bind's SCOPE. An unknown context owns nothing; an unreadable registry owns
+    nothing either — and an empty scope never blocks, because the scope rule only
+    fires for a slug some OTHER context demonstrably owns.
     """
-    if specs_dir is None:
-        return "none", ""
-    releases_root = specs_dir / "releases"
-    if not releases_root.is_dir():
-        return "none", ""
-    try:
-        candidates = sorted(
-            d.name
-            for d in releases_root.iterdir()
-            if d.is_dir()
-            and d.name not in _RELEASE_DIRS_EXCLUDED
-            and release_state_file(d) is not None
-        )
-    except OSError:
-        return "none", ""
-    if len(candidates) != 1:
-        return "none", ""
-    release_id = candidates[0]
-    try:
-        state_path = release_state_file(releases_root / release_id)
-        if state_path is None:
-            return release_id, ""
-        text = state_path.read_text(encoding="utf-8")
-    except OSError:
-        return release_id, ""
-    try:
-        state = parse_release_state(text)
-    except ValueError:
-        return release_id, ""
-    return release_id, state.phase
+    for entry in _registry_contexts(workspace_root):
+        if entry.get("name") != context_name:
+            continue
+        slugs = {entry.get("repo_slug") or entry.get("repo") or context_name}
+        associated = entry.get("associated_repos")
+        if isinstance(associated, list):
+            slugs |= {
+                assoc["slug"]
+                for assoc in associated
+                if isinstance(assoc, dict) and isinstance(assoc.get("slug"), str)
+            }
+        return frozenset(s for s in slugs if isinstance(s, str) and s)
+    return frozenset()
+
+
+def resolve_bind(
+    workspace_root: Path | None, session_id: str | None, env: Mapping[str, str]
+) -> Bind:
+    """Resolve the SESSION's own binding — ``DADAIA_CONTEXT`` then this session's live
+    record, and nothing else. Deliberately NOT cwd-derived: sitting inside a repo is
+    not a bind, and a session that never bound must never be scope-blocked."""
+    name = env.get("DADAIA_CONTEXT") or None
+    if name is None and workspace_root is not None:
+        name = _live_session_context(workspace_root, session_id)
+    if not name or workspace_root is None:
+        return Bind()
+    return Bind(context_name=name, repos=all_repos(workspace_root, name))
 
 
 # ---------------------------------------------------------------------------
@@ -397,7 +407,7 @@ def resolve(
     cwd: Path,
     clock: Callable[[], float] | None = None,
 ) -> Invocation:
-    """Resolve session, context, root and mode ONCE — the single decider.
+    """Resolve session, context, root and Bind ONCE — the single decider.
 
     *explicit*/*target_path* are rung 0 (a caller-supplied context name, or the context
     implied by an explicit write TARGET under ``repos/<slug>/`` — a repo write IS
@@ -446,18 +456,13 @@ def resolve(
         repo_slug = repo_slug_for_context(workspace_root, context_name)
         specs_dir = (workspace_root / "repos" / repo_slug / "specs").resolve()
 
-    mode = resolve_mode(workspace_root, session_id, env)
-    release, phase = resolve_active_release(specs_dir)
-
     return Invocation(
         workspace_root=workspace_root,
         session_id=session_id,
         context_name=context_name,
         repo_slug=repo_slug,
         specs_dir=specs_dir,
-        mode=mode,
-        release=release,
-        phase=phase,
+        bind=resolve_bind(workspace_root, session_id, env),
         rung=rung,
     )
 
@@ -497,7 +502,7 @@ def resolve_specs_dir(specs_dir: str | None) -> Path:
 
     raise typer.BadParameter(
         "Could not resolve specs_dir. Pass --specs-dir or bind a context with "
-        "`eval $(dadaia context bind <name> --mode read)`."
+        "`eval $(dadaia context bind <name> --print-env)`."
     )
 
 
