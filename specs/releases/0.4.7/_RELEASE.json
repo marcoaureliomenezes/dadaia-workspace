@@ -85,6 +85,12 @@
       "agent": "product-engineer",
       "kind": "reviews",
       "text": "qa-engineer APPROVED @ f23466d0. code-reviewer CHANGES_REQUESTED @ f23466d0 — F1/F2/F3/F4/F5 fixed in cb18cab0..18c80d74. security-reviewer CHANGES_REQUESTED @ f23466d0 — history redaction of 4 blobs (F1) done; delta verdicts from code-reviewer and security-reviewer requested on the closure head before the candidate PR."
+    },
+    {
+      "ts": "2026-09-13T01:20:56Z",
+      "agent": "project-manager",
+      "kind": "note",
+      "text": "Corrections to earlier entries (append-only, never rewritten): the reviews entry's shas predate the pre-push history redaction — the first-round commit is 19eadea4 and the review fixes are cf502dd2..525ea4f6; drifts item (5) (RELEASE-TREE-MISSING tuple, '41 rows' comment) was fixed in 6e3fdade; drifts item (4) is half: dadaia doctor --fix DOES heal a scoped law file whose bytes match a shipped digest and refuses only unknown bytes. Delta verdicts: code-reviewer APPROVED @ 8e176493, qa-engineer APPROVED @ 8e176493 (implemented set in f32f6115)."
     }
   ]
 }
