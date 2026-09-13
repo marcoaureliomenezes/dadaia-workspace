@@ -8,7 +8,7 @@
 
 ## Candidate 2 — the gate blocks three things
 
-- [ ] T-047-14 — FR2: `tests/contract/test_every_block_carries_a_fix.py` — enumerate
+- [-] T-047-14 — FR2: `tests/contract/test_every_block_carries_a_fix.py` — enumerate
   every BLOCK path by public seam (root whitelist, venv guard, PROTECTED sessions/law,
   scope, `push_gate_decision` refusals, `ci verdict-check`, `release new`/`archive`/
   `rc-archive`, Doctor error-class rules), assert one `fix:` line, feed it through
