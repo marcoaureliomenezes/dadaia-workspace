@@ -1,7 +1,7 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.7",
-  "phase": "DEFINITION",
+  "phase": "IMPLEMENTATION",
   "rc": 1,
   "defined": {
     "sha": "6e87fec4",
@@ -109,6 +109,12 @@
       "agent": "product-engineer",
       "kind": "note",
       "text": "Candidate 2 defined: 'the gate blocks three things' — gate-context-scope-antistall, one-canon-registry, continuous-reaper-reaped-zone, privacy-selfscan-scope + bug context-bind-implementation-requires-release-id-stall-when-none-live; trio Aprovado at 6e87fec4 under the operator's 2026-09-12 directive; grill Q1–Q5 answered by the PM as recorded in SPEC section 5 (Q2 option deletion and Q3 reaped zone location flagged to the operator). SPEC-DOC-044 names the candidate-1 PR verdict as stale locally because HEAD moved past the PR head while PR #253 waits on the GitHub billing unlock; the verdict is live for the PR head and is consumed at the merge — not fixed away."
+    },
+    {
+      "ts": "2026-09-13T03:52:16Z",
+      "agent": "software-engineer",
+      "kind": "note",
+      "text": "Candidate 2 in IMPLEMENTATION since T-047-14 (794bafec); phase advanced late again (SPEC-DOC-024) — candidate 3 gives this transition a verb."
     }
   ]
 }
