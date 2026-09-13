@@ -279,9 +279,31 @@ def context_name_for_specs_dir(specs_dir: Path) -> str:
     if workspace_root is None:
         return ""
     slug = _repo_slug_under_repos(workspace_root, specs_dir)
-    if slug is None:
-        return ""
-    return context_name_for_repo_slug(workspace_root, slug)
+    if slug is not None:
+        return context_name_for_repo_slug(workspace_root, slug)
+    if specs_dir.resolve() == (workspace_root / "specs").resolve():
+        return _self_hosting_context_name(workspace_root)
+    return ""
+
+
+def _self_hosting_context_name(workspace_root: Path) -> str:
+    """The one ALIVE context :func:`resolve_context_specs_dir` sends to the workspace-root
+    ``specs/`` tree — the inverse of its fallback rung, so the self-hosting library repo
+    names itself instead of leaving the caller to read ``$DADAIA_CONTEXT``.
+
+    The forward rule falls back whenever ``repos/<slug>/specs`` is absent, so the inverse
+    is the ALIVE context whose repo carries no ``specs/`` of its own. Two of those would
+    resolve to the SAME tree — an ambiguity no name can settle — so that returns ``""``,
+    the same silence a tree belonging to no context gets.
+    """
+    candidates = [
+        name
+        for entry in _registry_contexts(workspace_root)
+        if str(entry.get("state", "")).lower() == "alive"
+        and (name := str(entry.get("name") or entry.get("repo_slug") or ""))
+        and not (workspace_root / "repos" / str(entry.get("repo_slug") or name) / "specs").is_dir()
+    ]
+    return candidates[0] if len(candidates) == 1 else ""
 
 
 # ---------------------------------------------------------------------------

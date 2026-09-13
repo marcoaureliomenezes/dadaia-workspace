@@ -25,6 +25,7 @@ from pathlib import Path, PurePosixPath
 from dadaia_workspace.core import session_store, workspace_layout
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES, PROJECTION_TARGETS
+from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.platform import PLATFORM
@@ -824,18 +825,18 @@ def workspace_rules(
             ("WS-INVARIANT",),
             SECTION,
             invariants,
-            fix_help=".dadaia/.venv/bin/dadaia doctor --fix",
+            fix_help=f"{DADAIA_BIN} doctor --fix",
         ),
         Rule(
             ("HOOKS-DRIFT-1",),
             SECTION,
             installed_hooks,
-            fix_help=".dadaia/.venv/bin/dadaia ci install-hook --force",
+            fix_help=f"{DADAIA_BIN} ci install-hook --force",
         ),
         Rule(
             ("WS-ENTRY",),
             SECTION,
             entries,
-            fix_help=".dadaia/.venv/bin/dadaia doctor --fix",
+            fix_help=f"{DADAIA_BIN} doctor --fix",
         ),
     )

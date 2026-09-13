@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from dadaia_workspace.core.doctor_rules import Rule
+from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.models.bugs import BugRecord
 from dadaia_workspace.core.models.histo import (
     AUDITS_HISTO_DISPOSITIONS,
@@ -340,7 +341,7 @@ type LedgerRule = Rule[LedgersContext, LedgerIssue]
 SECTION = "ledgers"
 
 #: The ONE executable remediation for a model-invariant issue that ships a migration.
-_FIX_COMMAND = ".dadaia/.venv/bin/dadaia doctor --fix"
+_FIX_COMMAND = f"{DADAIA_BIN} doctor --fix"
 
 
 def _fix_canonical_form(ctx: LedgersContext, issue: LedgerIssue) -> None:

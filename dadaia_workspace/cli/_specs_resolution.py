@@ -118,16 +118,14 @@ def resolve_event_context_for_cli(specs_dir: Path | None) -> str:
     reader (``doctor``'s governance baseline) use, so an event can never be filtered out
     by the verb that wrote it.
 
-    ``$DADAIA_CONTEXT`` is the LAST rung, not the first: it names where the SESSION is
-    bound, and every governance verb's ``--context``/``--specs-dir`` overrides that
-    bind. Reading the env first is what made `doctor --context B` report B's own
-    verb-written records as hand edits.
+    ``$DADAIA_CONTEXT`` is not a rung at all: it names where the SESSION is bound, and
+    every governance verb's ``--context``/``--specs-dir`` overrides that bind, so reading
+    it made `doctor --context B` report B's own verb-written records as hand edits. The
+    tree is the ONE source — including the self-hosting workspace-root ``specs/``, whose
+    context ``context_name_for_specs_dir`` names directly. A tree belonging to no context
+    resolves to ``""``: silence, never a name the verb did not write for.
     """
-    if specs_dir is not None:
-        derived = context_name_for_specs_dir(specs_dir)
-        if derived:
-            return derived
-    return os.environ.get("DADAIA_CONTEXT", "")
+    return context_name_for_specs_dir(specs_dir) if specs_dir is not None else ""
 
 
 def resolve_specs_dir_for_cli(specs_dir: str | None) -> Path:

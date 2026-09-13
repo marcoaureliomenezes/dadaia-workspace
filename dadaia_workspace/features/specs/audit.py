@@ -29,21 +29,12 @@ from dadaia_workspace.core.models.findings import FindingRecord
 from dadaia_workspace.core.models.histo import (
     AUDIT_PILLARS,
     FINDINGS_DISPOSITIONS,
+    REQUIRED_EVIDENCE,
     HistoRecord,
 )
 from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 __all__ = ["AuditError", "close_audit", "disposition_finding"]
-
-#: The evidence each disposition must carry — one table, no per-word branch. A
-#: ``resolved``/``superseded`` finding names the remediation release that closed it; a
-#: ``deferred``/``rejected`` one names why, because nothing else records the decision.
-_REQUIRED_EVIDENCE: dict[str, str] = {
-    "resolved": "release",
-    "superseded": "release",
-    "deferred": "reason",
-    "rejected": "reason",
-}
 
 
 class AuditError(ValueError):
@@ -133,7 +124,7 @@ def disposition_finding(
             "--release <release-id>"
         )
 
-    required = _REQUIRED_EVIDENCE[disposition]
+    required = REQUIRED_EVIDENCE[disposition]
     supplied = {"release": release, "reason": reason}[required]
     if not (supplied or "").strip():
         example = (

@@ -16,6 +16,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from dadaia_workspace.core.doctor_rules import Rule
+from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
 from dadaia_workspace.features.specs.release_tree import release_tree_issues
 
@@ -60,7 +61,7 @@ RULES: tuple[SpecsRule, ...] = (
         ("MEM-PLACEHOLDER-1",),
         lambda d: d._memory.check_placeholder_atoms(),
         fix=lambda d, i: d._memory.fix_placeholder_atom(i),
-        fix_help=".dadaia/.venv/bin/dadaia doctor --fix",
+        fix_help=f"{DADAIA_BIN} doctor --fix",
     ),
     _rule(
         ("AGENTS-PLACEHOLDER-1",),
@@ -106,7 +107,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("TREE-1",),
         lambda d: d._structural.check_tree1_foundation(),
-        fix_help=".dadaia/.venv/bin/dadaia specs upgrade --specs-dir <specs>",
+        fix_help=f"{DADAIA_BIN} specs upgrade --specs-dir <specs>",
     ),
     _rule(
         ("TREE-2",),
@@ -123,13 +124,13 @@ RULES: tuple[SpecsRule, ...] = (
         ("TREE-4",),
         lambda d: d._structural.check_tree4_required_dirs(),
         fix=lambda d, i: d._structural.fix_tree4(i),
-        fix_help=".dadaia/.venv/bin/dadaia doctor --fix",
+        fix_help=f"{DADAIA_BIN} doctor --fix",
     ),
     _rule(
         ("TREE-5",),
         lambda d: d._structural.check_tree5_agents_md(),
         fix=lambda d, i: d._structural.fix_tree5(i),
-        fix_help=".dadaia/.venv/bin/dadaia doctor --fix",
+        fix_help=f"{DADAIA_BIN} doctor --fix",
     ),
     _rule(
         ("TREE-7",),
@@ -140,12 +141,12 @@ RULES: tuple[SpecsRule, ...] = (
         ("TREE-8",),
         lambda d: d._structural.check_tree8_canon_root(),
         fix=lambda d, i: d._structural.fix_tree8(i),
-        fix_help=".dadaia/.venv/bin/dadaia doctor --fix",
+        fix_help=f"{DADAIA_BIN} doctor --fix",
     ),
     _rule(
         ("CAT-1",),
         lambda d: d._memory.check_cat1_catalog_sync(),
-        fix_help=".dadaia/.venv/bin/dadaia memory catalog generate --specs-dir <specs>",
+        fix_help=f"{DADAIA_BIN} memory catalog generate --specs-dir <specs>",
     ),
     _rule(
         ("LINT-1",),
@@ -161,12 +162,12 @@ RULES: tuple[SpecsRule, ...] = (
         ("FIXED-1", "FIXED-2"),
         lambda d: d._memory.check_fixed_sections(d.public_dir),
         fix=lambda d, i: d._memory.fix_fixed_section(i, d.public_dir),
-        fix_help=".dadaia/.venv/bin/dadaia doctor --fix",
+        fix_help=f"{DADAIA_BIN} doctor --fix",
     ),
     _rule(
         ("SPECS-VERSION",),
         lambda d: d._coherence.check_specs_pattern_version(),
-        fix_help=".dadaia/.venv/bin/dadaia specs upgrade --specs-dir <specs>",
+        fix_help=f"{DADAIA_BIN} specs upgrade --specs-dir <specs>",
     ),
     _rule(
         ("SPEC-DOC-024",),
@@ -196,24 +197,24 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-033",),
         lambda d: d._governance.check_bugs_jsonl_invariant(),
-        fix_help=".dadaia/.venv/bin/dadaia bugs update <bug-id> --<field> <value>",
+        fix_help=f"{DADAIA_BIN} bugs update <bug-id> --<field> <value>",
     ),
     _rule(
         ("SPEC-DOC-034",),
         lambda d: d._closure_audit.check_archive_dirs_exist(),
         fix=lambda d, i: d._closure_audit.fix_archive_dir(i),
-        fix_help=".dadaia/.venv/bin/dadaia doctor --fix",
+        fix_help=f"{DADAIA_BIN} doctor --fix",
     ),
     _rule(
         ("SPEC-DOC-035",),
         lambda d: d._governance.check_unarchived_terminal_backlog(),
-        fix_help=".dadaia/.venv/bin/dadaia backlog archive",
+        fix_help=f"{DADAIA_BIN} backlog archive",
     ),
     _rule(
         ("SPEC-DOC-036",),
         lambda d: d._closure_audit.check_audit_disposition(),
         fix_help=(
-            ".dadaia/.venv/bin/dadaia audit disposition <audit> <finding-id> "
+            f"{DADAIA_BIN} audit disposition <audit> <finding-id> "
             "--disposition resolved --release <release>"
         ),
     ),
@@ -225,7 +226,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-038",),
         lambda d: d._closure_audit.check_loose_undisposed_audits(),
-        fix_help=".dadaia/.venv/bin/dadaia audit close <audit> --sha <sha>",
+        fix_help=f"{DADAIA_BIN} audit close <audit> --sha <sha>",
     ),
     _rule(
         ("SPEC-DOC-039",),
@@ -241,13 +242,13 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-041",),
         lambda d: d._governance.check_bug_archive_overdue(),
-        fix_help=".dadaia/.venv/bin/dadaia bugs archive",
+        fix_help=f"{DADAIA_BIN} bugs archive",
     ),
     _rule(
         ("SPEC-DOC-044",),
         lambda d: d._release.check_stale_verdicts(live_shas=d.live_shas),
         fix=lambda d, i: d._release.fix_stale_verdict(i),
-        fix_help=".dadaia/.venv/bin/dadaia doctor --fix",
+        fix_help=f"{DADAIA_BIN} doctor --fix",
     ),
     _rule(
         ("SPEC-DOC-045",),
@@ -287,7 +288,7 @@ RULES: tuple[SpecsRule, ...] = (
         ("SPEC-DOC-046",),
         lambda d: d._release.check_release_state_filename(),
         fix=lambda d, i: d._release.fix_release_state_filename(i),
-        fix_help=".dadaia/.venv/bin/dadaia doctor --fix",
+        fix_help=f"{DADAIA_BIN} doctor --fix",
     ),
 )
 

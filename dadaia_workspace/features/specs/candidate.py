@@ -36,6 +36,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.models.histo import RELEASES_HISTO_DISPOSITIONS, HistoRecord
 from dadaia_workspace.core.release_state import RELEASE_STATE_FILENAME, release_state_file
 from dadaia_workspace.core.spec_status import extract_status
@@ -63,10 +64,6 @@ _RC_DIR_RE = re.compile(r"^rc-(\d+)$")
 
 #: Task markers that mean the candidate is NOT closed: open ``[ ]`` or reserved ``[-]``.
 _UNFINISHED_MARKER_RE = re.compile(r"^\s*-\s\[( |-)\]\s.*$", re.MULTILINE)
-
-
-#: The venv-rooted binary every refusal's ``fix:`` line names.
-_DADAIA = ".dadaia/.venv/bin/dadaia"
 
 
 class ArchiveError(Exception):
@@ -121,8 +118,8 @@ def _load_live_release(specs_dir: Path, verb: str) -> _LiveRelease:
         raise ArchiveError(
             f"the release tree carries {len(tree_issues)} issue(s); a release archives "
             f"only from a valid tree:\n{listed}\n"
-            f"fix: .dadaia/.venv/bin/dadaia doctor --fix (then re-run "
-            f".dadaia/.venv/bin/dadaia release {verb})"
+            f"fix: {DADAIA_BIN} doctor --fix (then re-run "
+            f"{DADAIA_BIN} release {verb})"
         )
     release_id, err = resolve_live_release_id(specs_dir)
     if err:
@@ -130,7 +127,7 @@ def _load_live_release(specs_dir: Path, verb: str) -> _LiveRelease:
     if release_id is None:
         raise ArchiveError(
             "no live release under specs/releases/ — nothing to archive.\n"
-            "fix: .dadaia/.venv/bin/dadaia release new <M.m.p>"
+            f"fix: {DADAIA_BIN} release new <M.m.p>"
         )
     release_dir = specs_dir / "releases" / release_id
     state_path = release_state_file(release_dir)
@@ -267,7 +264,7 @@ def _refuse_unapproved_trio(release_dir: Path, release_id: str) -> None:
             raise ArchiveError(
                 f"release {release_id} has no {name} at root — a candidate is defined by "
                 "its trio.\n"
-                f"fix: {_DADAIA} release new {release_id}"
+                f"fix: {DADAIA_BIN} release new {release_id}"
             )
         status = extract_status(document.read_text(encoding="utf-8"))
         if status != "Aprovado":
@@ -301,13 +298,13 @@ def set_phase(specs_dir: Path, phase: str, *, sha: str) -> PhaseChange:
     if not _SHA_RE.match(sha):
         raise ArchiveError(
             f"--sha {sha!r} is not a 7-40 character hex commit sha.\n"
-            f"fix: {_DADAIA} release phase {phase} --sha $(git rev-parse --short HEAD)"
+            f"fix: {DADAIA_BIN} release phase {phase} --sha $(git rev-parse --short HEAD)"
         )
     if phase not in _PHASE_PREDECESSOR:
         raise ArchiveError(
             f"{phase!r} is not a phase this verb writes: DEFINITION is written by "
             "`release new`/`release rc-archive` and ARCHIVED by `release archive`.\n"
-            f"fix: {_DADAIA} release phase IMPLEMENTATION --sha {sha}"
+            f"fix: {DADAIA_BIN} release phase IMPLEMENTATION --sha {sha}"
         )
 
     live = _load_live_release(specs_dir, f"phase {phase}")
@@ -317,12 +314,12 @@ def set_phase(specs_dir: Path, phase: str, *, sha: str) -> PhaseChange:
         raise ArchiveError(
             f"release {live.release_id} is in phase {current!r} — {phase} follows "
             f"{expected} exactly once.\n"
-            f"fix: {_DADAIA} release phase {expected} --sha {sha}"
+            f"fix: {DADAIA_BIN} release phase {expected} --sha {sha}"
             if current != phase
             else (
                 f"release {live.release_id} is already in phase {phase!r} — a transition "
                 "happens once per candidate.\n"
-                f"fix: {_DADAIA} release rc-archive"
+                f"fix: {DADAIA_BIN} release rc-archive"
             )
         )
 
@@ -374,7 +371,7 @@ def _refuse_bad_arguments(shipped_sha: str, pr: int, next_release: str) -> None:
         raise ArchiveError(
             f"--next {next_release!r} is not bare SemVer M.m.p.\n"
             "--next takes the next patch of the published version:\n"
-            "fix: .dadaia/.venv/bin/dadaia release archive <id> --next 1.2.4"
+            f"fix: {DADAIA_BIN} release archive <id> --next 1.2.4"
         )
 
 
@@ -437,7 +434,7 @@ def archive_release(
     if live.release_id != release_id:
         raise ArchiveError(
             f"{release_id} is not the live release ({live.release_id} is).\n"
-            f"fix: .dadaia/.venv/bin/dadaia release archive {live.release_id} "
+            f"fix: {DADAIA_BIN} release archive {live.release_id} "
             f"--shipped {shipped_sha} "
             f"--pr {pr} --next {next_release}"
         )
@@ -459,7 +456,7 @@ def archive_release(
         raise ArchiveError(
             f"release {release_id} is in phase {state.get('phase')!r} — a release "
             "archives only from CLOSURE.\n"
-            f"fix: {_DADAIA} release phase CLOSURE --sha <implementation-tip-sha>"
+            f"fix: {DADAIA_BIN} release phase CLOSURE --sha <implementation-tip-sha>"
         )
 
     archive_root = specs_dir / "releases" / "_archive"
@@ -475,7 +472,7 @@ def archive_release(
         raise ArchiveError(
             f"release {next_release} already exists — --next must name an unused "
             "version.\n"
-            f"fix: .dadaia/.venv/bin/dadaia release archive <id> --next "
+            f"fix: {DADAIA_BIN} release archive <id> --next "
             f"{_bump_patch(next_release)}"
         )
 

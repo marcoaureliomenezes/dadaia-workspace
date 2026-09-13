@@ -54,6 +54,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -62,7 +63,11 @@ from typing import Any
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.models.backlog import Intent, parse_intents
-from dadaia_workspace.core.models.histo import BACKLOG_HISTO_DISPOSITIONS, HistoRecord
+from dadaia_workspace.core.models.histo import (
+    BACKLOG_HISTO_DISPOSITIONS,
+    REQUIRED_EVIDENCE,
+    HistoRecord,
+)
 from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 __all__ = [
@@ -504,17 +509,12 @@ class BacklogExitError(ValueError):
     """
 
 
-#: The evidence each disposition must carry (0.4.7 FR3). ``delivered`` and
-#: ``superseded`` are the two RELEASE lanes: both name the release that closed the item
-#: (validated against ``specs/releases/`` — live or archived, since a closure sweep may
-#: run after the ship) and both exit an entry that was actually ``picked`` into one.
+#: The two RELEASE lanes of ``BACKLOG_HISTO_DISPOSITIONS`` (0.4.7 FR3) — ``delivered``
+#: and ``superseded``, per the one ``REQUIRED_EVIDENCE`` table — additionally validate
+#: the named release against ``specs/releases/`` (live or archived, since a closure
+#: sweep may run after the ship) and require an entry a release actually ``picked``.
 #: ``rejected`` is the lane for an item no release ever took: it names the reason and
-#: exits from any live status. One table, no per-disposition branch.
-_REQUIRED_EVIDENCE: dict[str, str] = {
-    "delivered": "release",
-    "superseded": "release",
-    "rejected": "reason",
-}
+#: exits from any live status.
 
 #: The entry status the two release lanes require — an item a release closed is an item
 #: a release picked. Exiting an ``idea`` as ``delivered`` launders unworked scope into
@@ -528,18 +528,27 @@ def _known_release(specs_dir: Path, release: str) -> bool:
 
 
 def _check_exit_evidence(
-    specs_dir: Path, slug: str, disposition: str, reason: str | None, release: str | None
+    specs_dir: Path,
+    active: Sequence[ActiveItem],
+    slug: str,
+    disposition: str,
+    reason: str | None,
+    release: str | None,
 ) -> None:
-    """Refuse, before any write, an exit whose evidence does not match its disposition."""
+    """Refuse, before any write, an exit whose evidence does not match its disposition.
+
+    *active* is the document ``backlog_exit`` already loaded — the one parse every
+    precondition reads, so two refusals can never disagree about the same file.
+    """
     if disposition not in BACKLOG_HISTO_DISPOSITIONS:
         raise BacklogExitError(
             f"unknown disposition {disposition!r}: a backlog item exits as one of "
             f"{'|'.join(BACKLOG_HISTO_DISPOSITIONS)}.\n"
-            f"fix: .dadaia/.venv/bin/dadaia backlog exit {slug} --disposition rejected "
+            f"fix: {DADAIA_BIN} backlog exit {slug} --disposition rejected "
             f"--reason '<why it was refused>'"
         )
 
-    required = _REQUIRED_EVIDENCE[disposition]
+    required = REQUIRED_EVIDENCE[disposition]
     supplied = {"release": release, "reason": reason}[required]
     if not (supplied or "").strip():
         example = (
@@ -548,7 +557,7 @@ def _check_exit_evidence(
         raise BacklogExitError(
             f"disposition {disposition!r} requires --{required}: the histo record is the "
             f"only surviving trace of why {slug!r} left active[].\n"
-            f"fix: .dadaia/.venv/bin/dadaia backlog exit {slug} --disposition {disposition} "
+            f"fix: {DADAIA_BIN} backlog exit {slug} --disposition {disposition} "
             f"{example}"
         )
 
@@ -562,7 +571,7 @@ def _check_exit_evidence(
             f"fix: {DADAIA_BIN} release archive --help"
         )
 
-    status = _status_of(specs_dir, slug)
+    status = next((item.status for item in active if item.slug == slug), None)
     if status != _PICKED_STATUS:
         raise BacklogExitError(
             f"{slug!r} is {status!r}, not {_PICKED_STATUS!r}: only an entry a release "
@@ -573,19 +582,10 @@ def _check_exit_evidence(
         )
 
 
-def _status_of(specs_dir: Path, slug: str) -> str | None:
-    """The live ``active[]`` status of *slug*, or ``None`` — read from the document the
-    exit is about to rewrite, never from a second cache."""
-    for item in load_document(specs_dir / "backlog").active:
-        if item.slug == slug:
-            return item.status
-    return None
-
-
-def _live_slug_or_refuse(specs_dir: Path, slug: str) -> None:
+def _live_slug_or_refuse(active: Sequence[ActiveItem], slug: str) -> None:
     """Refuse a slug that does not name a live ``active[]`` entry — it either already
     exited (the histo carries its terminal record) or never existed."""
-    live = [item.slug for item in load_document(specs_dir / "backlog").active if item.slug]
+    live = [item.slug for item in active if item.slug]
     if slug in live:
         return
     raise BacklogExitError(
@@ -634,8 +634,9 @@ def backlog_exit(
     """
     # Liveness first: it is the precondition for every other question. A slug that
     # already exited must be told so, not diagnosed for the status it no longer has.
-    _live_slug_or_refuse(specs_dir, slug)
-    _check_exit_evidence(specs_dir, slug, disposition, reason, release)
+    active = load_document(specs_dir / "backlog").active
+    _live_slug_or_refuse(active, slug)
+    _check_exit_evidence(specs_dir, active, slug, disposition, reason, release)
     entry = remove_active_subsection(specs_dir, slug)
     record = HistoRecord(
         id=slug,

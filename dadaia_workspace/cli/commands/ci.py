@@ -18,6 +18,7 @@ from dadaia_workspace.cli._specs_resolution import (
 from dadaia_workspace.container import is_source_repo_root as _is_source_repo_root
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.exceptions import CiPreflightScopeError
+from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.features.ci_preflight import (
     all_passed,
     checks_for,
@@ -367,7 +368,7 @@ def verdict_check(
         typer.secho(
             f"[verdict-check] BLOCKED: --release-id '{release_id}' does not match the "
             "canon release-id pattern — refusing to use it to narrow the search.\n"
-            "fix: .dadaia/.venv/bin/dadaia ci verdict-check --head <sha> "
+            f"fix: {DADAIA_BIN} ci verdict-check --head <sha> "
             "--release-id 0.4.7",
             fg=typer.colors.RED,
             err=True,

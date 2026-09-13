@@ -39,13 +39,26 @@ _EVIDENCE = [
 @pytest.fixture()
 def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
-    monkeypatch.setenv("DADAIA_CONTEXT", "dadaia-workspace")
+    monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
     monkeypatch.setenv("DADAIA_SESSION_ID", "session-under-test")
     return tmp_path / "home"
 
 
 @pytest.fixture()
 def specs(tmp_path: Path) -> Path:
+    """The self-hosting root ``specs/`` of a workspace whose one ALIVE context is
+    ``lib-ws`` — the event's context is derived from THIS tree, never from a bind."""
+    states = tmp_path / ".dadaia" / "states"
+    states.mkdir(parents=True, exist_ok=True)
+    (states / "spec_contexts.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "2",
+                "contexts": [{"name": "lib-ws", "repo_slug": "lib-ws", "state": "alive"}],
+            }
+        ),
+        encoding="utf-8",
+    )
     target = tmp_path / "specs"
     (target / "bugs").mkdir(parents=True)
     return target
@@ -60,7 +73,7 @@ def _append(specs_dir: Path, bug_id: str) -> None:
     _run(
         "bugs", "append", "--specs-dir", str(specs_dir), "--bug-id", bug_id,
         "--title", bug_id, "--severity", "LOW", "--surface", "bugs",
-        "--component", "c", "--context", "dadaia-workspace",
+        "--component", "c", "--context", "lib-ws",
         "--symptom", "s", "--repro", "r", "--expected", "e",
     )  # fmt: skip
 
@@ -113,7 +126,7 @@ def test_the_seven_bugs_verbs_leave_seven_events_hashing_the_committed_record(
     for verb in ("update", "resolve", "supersede", "defer", "reject", "archive"):
         assert verbs.count(verb) >= 1, verbs
     assert {row["ledger"] for row in rows} == {"bugs"}
-    assert {row["context"] for row in rows} == {"dadaia-workspace"}
+    assert {row["context"] for row in rows} == {"lib-ws"}
     assert {row["session_id"] for row in rows} == {"session-under-test"}
 
     by_verb = {row["verb"]: row for row in rows}
@@ -147,7 +160,7 @@ def test_the_event_names_the_context_the_verb_routed_to_not_the_bound_one(
     workspace = tmp_path / "ws"
     (workspace / ".dadaia" / "states").mkdir(parents=True)
     (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        '{"version": 2, "contexts": []}', encoding="utf-8"
+        '{"schema_version": "2", "contexts": []}', encoding="utf-8"
     )
     (workspace / "repos" / "ctx-b" / "specs" / "bugs").mkdir(parents=True)
     monkeypatch.chdir(workspace)

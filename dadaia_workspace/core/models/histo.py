@@ -33,6 +33,7 @@ __all__ = [
     "BUGS_DISPOSITIONS",
     "FINDINGS_DISPOSITIONS",
     "RELEASES_HISTO_DISPOSITIONS",
+    "REQUIRED_EVIDENCE",
     "TERMINAL_DISPOSITIONS",
     "HistoRecord",
     "is_terminal_disposition",
@@ -73,6 +74,24 @@ AUDIT_PILLARS: tuple[str, ...] = ("bugs", "specs", "memory")
 
 #: A release exits exactly once, by being shipped.
 RELEASES_HISTO_DISPOSITIONS: tuple[str, ...] = ("delivered",)
+
+#: The evidence each terminal disposition must carry, for EVERY ledger — one table
+#: beside the vocabulary it is keyed by, not one copy per feature. The two features that
+#: validate an exit (``features/specs/audit.py``, ``features/backlog/document.py``) read
+#: THIS mapping; each first refuses a word outside its own subset above, so a ledger
+#: never sees a key it does not use and the table needs no ledger axis. The two
+#: pre-existing copies agreed on every word they shared (``superseded`` -> release,
+#: ``rejected`` -> reason); this is their union, keyed by disposition alone.
+#:
+#: A release lane names the release that closed the item — nothing else records which
+#: one; a reason lane names why, because no release ever took it.
+REQUIRED_EVIDENCE: Mapping[str, str] = {
+    "delivered": "release",
+    "resolved": "release",
+    "superseded": "release",
+    "deferred": "reason",
+    "rejected": "reason",
+}
 
 _TERMINAL_DISPOSITION_SET = frozenset(TERMINAL_DISPOSITIONS)
 

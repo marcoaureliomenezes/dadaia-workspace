@@ -26,7 +26,7 @@ _runner = CliRunner()
 @pytest.fixture()
 def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
-    monkeypatch.setenv("DADAIA_CONTEXT", "dadaia-workspace")
+    monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
     monkeypatch.setenv("DADAIA_SESSION_ID", "session-under-test")
     return tmp_path / "home"
 
@@ -53,6 +53,26 @@ def specs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     entry = venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}"
     entry.write_text("#!/bin/sh\n")
     entry.chmod(0o755)
+
+    # The tree is the SELF-HOSTING root ``specs/`` of one registered context, so writer
+    # and reader derive the same name from the tree itself — no $DADAIA_CONTEXT, which
+    # names a session bind the --specs-dir under test overrides anyway.
+    registry = tmp_path / ".dadaia" / "states" / "spec_contexts.json"
+    document = json.loads(registry.read_text(encoding="utf-8"))
+    document["contexts"] = [
+        {
+            "name": "lib-ws",
+            "state": "alive",
+            "repo_slug": "lib-ws",
+            "repo_url": "https://example.invalid/lib-ws.git",
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "alive_since": "2026-01-01T00:00:00+00:00",
+            "dead_since": None,
+            "current_branch": "main",
+            "associated_repos": [],
+        }
+    ]
+    registry.write_text(json.dumps(document), encoding="utf-8")
 
     target = tmp_path / "specs"
     (target / "bugs").mkdir(parents=True)

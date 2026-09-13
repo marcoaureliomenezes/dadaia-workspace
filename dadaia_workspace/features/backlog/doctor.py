@@ -51,6 +51,7 @@ from enum import StrEnum
 from pathlib import Path
 
 from dadaia_workspace.core.doctor_rules import Rule
+from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.models.backlog import (
     INTENTS_EXEMPT_STATUS,
     is_intents_exempt,
@@ -305,19 +306,19 @@ RULES: tuple[LedgerRule, ...] = (
         (BacklogDoctorCode.BL_SCHEMA.value,),
         SECTION,
         _check_schema,
-        fix_help=".dadaia/.venv/bin/dadaia backlog update <slug> --<field> <value>",
+        fix_help=f"{DADAIA_BIN} backlog update <slug> --<field> <value>",
     ),
     Rule(
         (BacklogDoctorCode.BL_CONFLICT.value,),
         SECTION,
         _check_conflict,
-        fix_help=".dadaia/.venv/bin/dadaia backlog update <slug> --status rejected",
+        fix_help=f"{DADAIA_BIN} backlog update <slug> --status rejected",
     ),
     Rule(
         (BacklogDoctorCode.BL_STALE.value,),
         SECTION,
         _check_stale,
-        fix_help=".dadaia/.venv/bin/dadaia backlog update <slug> --status <disposition>",
+        fix_help=f"{DADAIA_BIN} backlog update <slug> --status <disposition>",
     ),
 )
 

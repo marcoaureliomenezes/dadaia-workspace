@@ -28,6 +28,7 @@ from enum import Enum
 from pathlib import Path
 
 from dadaia_workspace.core import workspace_layout
+from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.features.spec_context import presence
 
 __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
@@ -67,7 +68,7 @@ _PROTECTED_MESSAGE = (
     "[GATE] .dadaia/sessions/ is protected CLI-owned bind state. Agents must not write "
     "here via file tools. Blocked to preserve caller session identity integrity "
     "(SEC-01 / CWE-284).\n"
-    "fix: .dadaia/.venv/bin/dadaia context bind <ctx>"
+    f"fix: {DADAIA_BIN} context bind <ctx>"
 )
 #: Projected LAW files. ``DADAIA.md`` is the workspace system prompt and the sole
 #: always-on rule file the library ships; the ``AGENTS.md``/``CLAUDE.md`` pair is its
@@ -83,7 +84,7 @@ _LAW_MESSAGE = (
     "AGENTS.md). In an instantiated workspace only a human operator edits it by hand; "
     "an agent changes the law at its source and re-projects.\n"
     "The source is dadaia_workspace/public/; this re-projects it:\n"
-    "fix: .dadaia/.venv/bin/dadaia public stage && .dadaia/.venv/bin/dadaia public "
+    f"fix: {DADAIA_BIN} public stage && {DADAIA_BIN} public "
     "install --target all"
 )
 
@@ -93,7 +94,7 @@ _LAW_MESSAGE = (
 _SCOPE_BLOCK_MESSAGE = (
     "[GATE] '{rel_path}' writes into repo '{slug}', owned by context '{owner}' — this "
     "session is bound to '{bound}', whose scope is: {scope}.\n"
-    "fix: .dadaia/.venv/bin/dadaia context bind {owner}"
+    "fix: " + DADAIA_BIN + " context bind {owner}"
 )
 
 #: The default session id when no harness-native id resolves (``hooks/sdd_gate.py``'s

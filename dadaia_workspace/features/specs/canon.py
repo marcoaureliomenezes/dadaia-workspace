@@ -70,6 +70,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
+from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.release_state import (
     RELEASE_STATE_FILENAME,
     ReleaseState,
@@ -517,9 +518,9 @@ def release_new(specs_dir: Path, release_id: str) -> Path:
                 f"a live release already exists ({', '.join(others)}) — the "
                 f"release-candidates model allows exactly one (ADR 0005) — stack the "
                 f"work as a candidate, or ship {live} first "
-                f"(.dadaia/.venv/bin/dadaia release archive {live} --shipped <sha> "
+                f"({DADAIA_BIN} release archive {live} --shipped <sha> "
                 f"--pr <n> --next {release_id}).\n"
-                "fix: .dadaia/.venv/bin/dadaia release rc-archive"
+                f"fix: {DADAIA_BIN} release rc-archive"
             )
     if releases_root.is_symlink() or release_dir.is_symlink():
         raise FileExistsError(

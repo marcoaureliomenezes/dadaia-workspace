@@ -35,6 +35,7 @@ from dadaia_workspace.core.exceptions import (
     SchemaVersionError,
     WorkspaceNotInitializedError,
 )
+from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.models.spec_context import (
     AssociatedRepo,
     ContextState,
@@ -707,7 +708,7 @@ def heartbeat() -> None:
             "first (in a plain shell, wrap the bind in "
             "'eval $(... --print-env)' so the id reaches this process)."
         )
-        err_console.print("fix: .dadaia/.venv/bin/dadaia context bind <name>")
+        err_console.print(f"fix: {DADAIA_BIN} context bind <name>")
         raise typer.Exit(1) from None
 
     workspace_root = resolve_workspace_root()
