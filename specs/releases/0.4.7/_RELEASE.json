@@ -271,6 +271,12 @@
       "agent": "release-candidates",
       "kind": "note",
       "text": "Candidate defined at 66718f33; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-09-13T10:28:52Z",
+      "agent": "project-manager",
+      "kind": "note",
+      "text": "Candidate 4 FR4 external step run by the PM: gh repo edit — description = the README tagline ('A local-first, spec-driven workspace that gives AI agents current context, a document-governed lifecycle, visible concurrency and anti-slop boundaries.'), homepage = the PyPI project page, topics = agentic ai-agents claude-code cli codex developer-tools kimi-code multi-agent python spec-driven-development (verified by gh repo view). Remaining channels (awesome-lists, skills registry) are operator steps listed in docs/distribution.md."
     }
   ]
 }
