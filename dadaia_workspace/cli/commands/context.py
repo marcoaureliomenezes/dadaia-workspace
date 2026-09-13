@@ -560,89 +560,40 @@ def dead(
         raise typer.Exit(1) from None
 
 
-# Bind mode resolution. READ is self-protecting; IMPLEMENTATION and REVIEW are mutating.
-# `spec` remains a legacy alias of READ. Mutating modes carry the BOUND_ prefix.
-_BIND_MODE_ALIASES: dict[str, str] = {
-    "READ": "READ",
-    "SPEC": "READ",
-    "IMPLEMENTATION": "IMPLEMENTATION",
-    "REVIEW": "REVIEW",
-}
-_MUTATING_MODES = ("IMPLEMENTATION", "REVIEW")
-
-
 @app.command(
-    epilog="Examples: eval $(dadaia context bind my-ctx --mode implementation --release 1.2.3 --print-env) | dadaia context bind my-ctx --mode read"
+    epilog="Examples: dadaia context bind my-ctx | eval $(dadaia context bind my-ctx --print-env)"
 )
 def bind(
     name: str = typer.Argument(..., help="Context name to bind to"),
-    mode: str = typer.Option(
-        "read",
-        "--mode",
-        help=(
-            "Binding mode (optional; default 'read'): read | implementation | review. "
-            "Legacy alias: 'spec' maps to read."
-        ),
-    ),
-    release: str | None = typer.Option(
-        None, "--release", help="Release ID (required for implementation and review modes)"
-    ),
     print_env: bool = typer.Option(
         False,
         "--print-env",
         help=(
-            "Back-compat: also emit eval-compatible 'export DADAIA_*' lines for operators "
-            "who still run 'eval $(dadaia context bind ...)'. Default off — bind persists "
-            "the mode in the session record instead."
+            "Emit eval-compatible 'export DADAIA_CONTEXT/DADAIA_SESSION_ID' lines for "
+            "`eval $(dadaia context bind ... --print-env)`. Default off — the binding is "
+            "persisted in the session record either way."
         ),
     ),
-    force: bool = typer.Option(False, "--force", help="Deprecated compatibility flag (no-op)"),
-    reason: str = typer.Option("", "--reason", help="Reason note (informational only)"),
 ) -> None:
     """Bind this shell session to a context.
 
-    Run: dadaia context bind <name> [--mode <mode>] [--release <id>]
+    Run: dadaia context bind <name> [--print-env]
 
-    With no --mode, binds normally in 'read' (observe) mode — never lock-blocked. The
-    bound context, mode, and session id are persisted in the session record (consumed by
-    the SDD gate); a human confirmation line is printed. Pass --print-env to additionally
-    emit the legacy 'export DADAIA_*' lines for `eval $(...)` workflows.
+    ONE verb, one argument (0.4.7 FR4). `--mode` is gone with the gate's READ block and
+    its phase rule; `--release` is gone because the release is a fact of `_RELEASE.json`,
+    never of a session record — requiring it here is what made
+    `context-bind-implementation-requires-release-id-stall-when-none-live` a Stall.
+    `--force` was a documented no-op and `--reason` was never read.
     """
-    mode_upper = mode.upper()
-    if mode_upper not in _BIND_MODE_ALIASES:
-        err_console.print(
-            f"[red]Error:[/red] Invalid mode '{mode}'. Must be one of: "
-            "read, spec, implementation, review"
-        )
-        raise typer.Exit(1) from None
-
-    resolved_mode = _BIND_MODE_ALIASES[mode_upper]
-
-    # Mutating bindings identify the release whose work they intend to change.
-    if resolved_mode in _MUTATING_MODES and not release:
-        err_console.print(f"[red]Error:[/red] --release <id> is required for --mode {mode.lower()}")
-        raise typer.Exit(1) from None
-
     workspace_root = resolve_workspace_root()
     sessions_dir = _sessions_dir(workspace_root)
-
-    # Ensure directories exist
     sessions_dir.mkdir(parents=True, exist_ok=True)
 
-    # Verify context exists and is ALIVE (AC-T11-5)
     svc = _ctx_service()
     try:
-        ctx = svc.show(name)
+        svc.show(name)
     except ContextNotFoundError as e:
         err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
-
-    # Mutating modes require a checked-out ALIVE context.
-    if resolved_mode in _MUTATING_MODES and ctx.state != ContextState.ALIVE:
-        err_console.print(
-            f"[red]Error:[/red] Context '{name}' is not ALIVE (state={ctx.state.value}). "
-            "Run 'dadaia context alive <name>' first."
-        )
         raise typer.Exit(1) from None
 
     # Stable session identity (bug bind-session-id-divergence, 2026-07-15): reuse the
@@ -651,41 +602,22 @@ def bind(
     session_id = _resolve_own_session_id(mint=True)
     if session_id is None:  # pragma: no cover — mint=True always yields one
         raise RuntimeError("session-id resolution returned None despite mint=True")
-    now = _now_iso()
-    runtime = os.environ.get("DADAIA_RUNTIME", "unknown")
-    pid = os.getpid()
 
-    # The persisted mode the gate reads: mutating modes carry BOUND_; READ stays bare.
-    persisted_mode = f"BOUND_{resolved_mode}" if resolved_mode in _MUTATING_MODES else resolved_mode
-
-    session_data = session_store.new_binding_record(
-        session_id=session_id,
-        context=name,
-        mode=persisted_mode,
-        release=release,
-        runtime=runtime,
-        pid=pid,
-        now=now,
+    session_store.write_session(
+        workspace_root,
+        session_id,
+        session_store.new_binding_record(
+            session_id=session_id,
+            context=name,
+            runtime=os.environ.get("DADAIA_RUNTIME", "unknown"),
+            pid=os.getpid(),
+            now=_now_iso(),
+        ),
     )
 
-    # Persist the CLI session and, when available, the harness-native session record. There
-    # is deliberately no context-global "incumbent" pointer: binding is caller-scoped.
-    # Exactly ONE record per session, keyed by the resolved identity. The former
-    # harness-alias dual-write (env id != harness id -> second record) recreated the
-    # identity divergence this resolution order exists to prevent (consumer validation
-    # F-07, 2026-07-15): hooks resolve DADAIA_SESSION_ID first too, so the alias never
-    # carried information the primary record does not.
-    session_store.write_session(workspace_root, session_id, session_data)
-
-    # T-50-05 (SPEC v0.5.0 FR1, the one addition in an otherwise subtractive lane):
-    # T-50-04 deleted `_adopt_attributed_bind`, the ancestry-marker path that used to make
-    # THIS exact binding reachable for a caller with no harness-native id and no
-    # DADAIA_CONTEXT. Without this loud warning, that deletion turns a working flow into a
-    # silent no-op — printed to stderr (never stdout) so it never corrupts
-    # `eval $(dadaia context bind ... --print-env)`.
-    # F-06 (v0.5.0 review): an exported DADAIA_SESSION_ID keys a reachable record (the
-    # hooks' identity channel), and a `--print-env` caller is mid `eval $(...)` — both
-    # flows produce a working binding, so warning there is noise, not signal.
+    # T-50-05 (SPEC v0.5.0 FR1): without this loud warning, a caller with no
+    # harness-native id and no DADAIA_CONTEXT gets a silent no-op. stderr only, so it
+    # never corrupts `eval $(dadaia context bind ... --print-env)`.
     if (
         not _harness_session_id()
         and not os.environ.get("DADAIA_CONTEXT")
@@ -696,22 +628,15 @@ def bind(
             f"[yellow]![/yellow] No harness-native session id and DADAIA_CONTEXT is "
             f"unset in this shell — this binding is reachable only if DADAIA_CONTEXT="
             f"{name} is exported here (e.g. `eval $(dadaia context bind {name} "
-            "--mode read --print-env)`)."
+            "--print-env)`)."
         )
 
-    # Back-compat escape: emit ONLY the legacy export lines when requested, so the output
-    # stays eval-safe for operators still running `eval $(dadaia context bind ... --print-env)`.
     if print_env:
         print(f"export DADAIA_CONTEXT={name}")
         print(f"export DADAIA_SESSION_ID={session_id}")
-        print(f"export DADAIA_MODE={resolved_mode}")
         return
 
-    # Human confirmation (NOT shell-export syntax): context, mode, session id.
-    console.print(
-        f"[green]✓[/green] Bound to '[bold]{name}[/bold]' "
-        f"(mode: {resolved_mode.lower()}, session id: {session_id})"
-    )
+    console.print(f"[green]✓[/green] Bound to '[bold]{name}[/bold]' (session id: {session_id})")
 
 
 @app.command(name="release")

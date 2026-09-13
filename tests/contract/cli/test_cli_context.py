@@ -161,15 +161,6 @@ def test_context_list_json_empty_is_stable_array(workspace: Path) -> None:
         pytest.param(["context", "delete", "ghost"], id="delete-nonexistent"),
         pytest.param(["context", "alive", "ghost"], id="alive-requires-existing"),
         pytest.param(["context", "dead", "ghost"], id="dead-requires-existing"),
-        pytest.param(["context", "bind", "myctx", "--mode", "turbo"], id="bind-invalid-mode"),
-        pytest.param(
-            ["context", "bind", "myctx", "--mode", "implementation"],
-            id="bind-implementation-requires-release",
-        ),
-        pytest.param(
-            ["context", "bind", "myctx", "--mode", "review"],
-            id="bind-review-requires-release",
-        ),
     ],
 )
 def test_context_error_matrix(workspace: Path, invoke_args: list[str]) -> None:
@@ -229,56 +220,37 @@ def test_context_uninitialized_workspace_and_v1_workspace_exit_nonzero(
 # ---------------------------------------------------------------------------
 
 
-def test_context_bind_read_persistence_variants(workspace: Path) -> None:
-    """FR-R4-01/02: bind with NO --mode exits 0, defaults to read, persists READ, and
-    prints a human confirmation (context/mode/session id) — never a shell export line.
-    Explicit --mode read persists READ; legacy --mode spec alias maps and persists as
-    READ too."""
+def test_context_bind_is_one_verb_with_one_argument(workspace: Path) -> None:
+    """0.4.7 FR4: `bind <ctx>` exits 0, persists the record, prints a human
+    confirmation — never a shell export line. No --mode, no --release, no --force,
+    no --reason; the record carries neither `mode` nor `release`."""
     _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "bind", "myctx"])
     assert result.exit_code == 0, result.output
-    # Confirmation line, NOT a shell export line
     assert "export DADAIA_CONTEXT" not in result.output
-    out = result.output.lower()
     assert "myctx" in result.output
-    assert "read" in out
     assert "sess_" in result.output
     record = _session_record_for(workspace, result.output)
-    assert record["mode"] == "READ"
     assert record["context"] == "myctx"
+    assert "mode" not in record
+    assert "release" not in record
 
-    result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "read"])
-    assert result.exit_code == 0, result.output
-    record = _session_record_for(workspace, result.output)
-    assert record["mode"] == "READ"
-
-    result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "spec"])
-    assert result.exit_code == 0, result.output
-    record = _session_record_for(workspace, result.output)
-    assert record["mode"] == "READ"
+    for flag in ("--mode", "--release", "--force", "--reason"):
+        refused = _runner.invoke(app, ["context", "bind", "myctx", flag, "x"])
+        assert refused.exit_code != 0, f"{flag} must not exist any more"
 
 
 def test_context_bind_print_env_read_and_implementation_shapes(workspace: Path) -> None:
-    """Back-compat: --print-env emits eval-compatible export lines for both the
-    default READ bind and an implementation bind, and the session record still
-    persists under --print-env in both cases."""
+    """--print-env emits exactly two eval-compatible export lines (DADAIA_CONTEXT and
+    DADAIA_SESSION_ID) and still persists the session record."""
     _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "bind", "myctx", "--print-env"])
     assert result.exit_code == 0, result.output
     assert "export DADAIA_CONTEXT=myctx" in result.output
     assert "export DADAIA_SESSION_ID=" in result.output
-    assert "export DADAIA_MODE=READ" in result.output
+    assert "export DADAIA_MODE" not in result.output, "0.4.7 FR4: two variables, no mode"
     record = _session_record_for(workspace, result.output)
-    assert record["mode"] == "READ"
-
-    result = _runner.invoke(
-        app,
-        ["context", "bind", "myctx", "--mode", "implementation", "--release", "v1", "--print-env"],
-    )
-    assert result.exit_code == 0, result.output
-    assert "export DADAIA_MODE=IMPLEMENTATION" in result.output
-    record = _session_record_for(workspace, result.output)
-    assert record["mode"] == "BOUND_IMPLEMENTATION"
+    assert record["context"] == "myctx"
 
 
 # --- caller-scoped harness binding -----------------------------------------
@@ -287,56 +259,28 @@ def test_context_bind_print_env_read_and_implementation_shapes(workspace: Path) 
 def test_context_bind_persists_harness_owned_record(
     workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Bind persists the mode under the current harness id without a global pointer."""
+    """Bind persists the record under the current harness id without a global pointer."""
     from dadaia_workspace.core import session_store as session_identity
 
     monkeypatch.setenv("CODEX_THREAD_ID", "harness-session")
     _register_alive_ctx(workspace)
-    result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "read"])
+    result = _runner.invoke(app, ["context", "bind", "myctx"])
     assert result.exit_code == 0, result.output
     record = session_identity.read_session(workspace, "harness-session")
     assert record is not None
     assert record["context"] == "myctx"
-    assert record["mode"] == "READ"
     assert not (workspace / ".dadaia" / "sessions" / "runtime").exists()
 
 
 # --- FR-R4-02: implementation / review bind persistence --------------------
 
 
-@pytest.mark.parametrize(
-    ("mode", "expected_record_mode"),
-    [
-        pytest.param("implementation", "BOUND_IMPLEMENTATION", id="implementation"),
-        pytest.param("review", "BOUND_REVIEW", id="review"),
-    ],
-)
-def test_context_bind_implementation_and_review_persist_mode(
-    workspace: Path, mode: str, expected_record_mode: str
-) -> None:
-    """FR-R4-02: implementation/review binds persist BOUND_* mode and a session."""
-    _register_alive_ctx(workspace)
-    result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", mode, "--release", "v1"])
-    assert result.exit_code == 0, result.output
-    record = _session_record_for(workspace, result.output)
-    assert record["mode"] == expected_record_mode
-
-    if mode == "implementation":
-        session_id = record["session_id"]
-        session_file = workspace / ".dadaia" / "sessions" / f"{session_id}.json"
-        assert session_file.exists(), "Session file must be created"
-
-
 def test_context_bind_second_implementation_does_not_block(workspace: Path) -> None:
     """Independent implementation binds both succeed; peer presence is advisory."""
     _register_alive_ctx(workspace)
-    result1 = _runner.invoke(
-        app, ["context", "bind", "myctx", "--mode", "implementation", "--release", "v1"]
-    )
+    result1 = _runner.invoke(app, ["context", "bind", "myctx"])
     assert result1.exit_code == 0, result1.output
-    result2 = _runner.invoke(
-        app, ["context", "bind", "myctx", "--mode", "implementation", "--release", "v1"]
-    )
+    result2 = _runner.invoke(app, ["context", "bind", "myctx"])
     assert result2.exit_code == 0, result2.output
 
 
@@ -410,7 +354,7 @@ def test_context_heartbeat_resolves_harness_native_persisted_bind(
     monkeypatch.delenv("DADAIA_SESSION_ID", raising=False)
     monkeypatch.setenv("CODEX_THREAD_ID", "codex-heartbeat-session")
 
-    bind_result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "read"])
+    bind_result = _runner.invoke(app, ["context", "bind", "myctx"])
     assert bind_result.exit_code == 0, bind_result.output
 
     heartbeat_result = _runner.invoke(app, ["context", "heartbeat"])
@@ -445,7 +389,7 @@ def test_context_release_deletes_session_and_without_session_exits_nonzero(
     _register_alive_ctx(workspace)
     bind_result = _runner.invoke(
         app,
-        ["context", "bind", "myctx", "--mode", "implementation", "--release", "v1", "--print-env"],
+        ["context", "bind", "myctx", "--print-env"],
     )
     assert bind_result.exit_code == 0, bind_result.output
 
@@ -489,7 +433,7 @@ def test_context_show_json_session_null_then_populated_when_bound(workspace: Pat
     assert "session" in data
     assert data["session"] is None
 
-    bind_result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "spec", "--print-env"])
+    bind_result = _runner.invoke(app, ["context", "bind", "myctx", "--print-env"])
     assert bind_result.exit_code == 0, bind_result.output
     lines = bind_result.output.strip().split("\n")
     session_line = next(line for line in lines if "DADAIA_SESSION_ID" in line)
@@ -646,9 +590,7 @@ def test_bind_reuses_harness_native_session_identity(workspace: Path, monkeypatc
     assert first.exit_code == 0, first.output
     assert "claude-stable-abc123" in first.output
 
-    second = _runner.invoke(
-        app, ["context", "bind", "myctx", "--mode", "implementation", "--release", "v1"]
-    )
+    second = _runner.invoke(app, ["context", "bind", "myctx"])
     assert second.exit_code == 0, second.output
     assert "claude-stable-abc123" in second.output
     assert "sess_" not in second.output, "must not mint a divergent sess_* id"
@@ -656,8 +598,6 @@ def test_bind_reuses_harness_native_session_identity(workspace: Path, monkeypatc
     record = session_identity.read_session(workspace, "claude-stable-abc123")
     assert record is not None
     assert record["session_id"] == "claude-stable-abc123"
-    assert record["mode"] == "BOUND_IMPLEMENTATION"
-    assert record["release"] == "v1"
 
     sessions_dir = workspace / ".dadaia" / "sessions"
     strays = [p.name for p in sessions_dir.glob("sess_*")]
@@ -726,3 +666,32 @@ def test_bind_env_id_with_harness_id_yields_single_record(workspace: Path, monke
     assert records == ["sess_envfixed.json"], f"expected ONE record, got: {records}"
     rec = session_identity.read_session(workspace, "sess_envfixed")
     assert rec is not None and rec["session_id"] == "sess_envfixed"
+
+
+def test_bind_with_no_live_release_exits_zero_and_the_next_write_is_allowed(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bug ``context-bind-implementation-requires-release-id-stall-when-none-live``.
+
+    The repro: a workspace with no ``specs/releases/<id>/`` on disk. Bind used to refuse
+    (``--release <id> is required``) and the only way to create the release was a
+    MUTATING write the refused bind would not grant — a closed loop. `bind` no longer
+    knows what a release is, so it exits 0 and the next in-scope MUTATING write ALLOWs.
+    """
+    from dadaia_workspace.hooks import pre_gate
+
+    _register_alive_ctx(workspace)
+    assert not (workspace / "repos" / "myctx" / "specs" / "releases").exists()
+
+    result = _runner.invoke(app, ["context", "bind", "myctx"])
+    assert result.exit_code == 0, result.output
+
+    record = _session_record_for(workspace, result.output)
+    monkeypatch.setenv("WORKSPACE_ROOT", str(workspace))
+    monkeypatch.setenv("DADAIA_SESSION_ID", str(record["session_id"]))
+    monkeypatch.setenv("DADAIA_CONTEXT", "myctx")
+    target = workspace / "repos" / "myctx" / "specs" / "releases" / "0.0.1" / "SPEC.md"
+    block = pre_gate.evaluate_payload(
+        {"tool_name": "Write", "tool_input": {"file_path": str(target)}}
+    )
+    assert block is None, block

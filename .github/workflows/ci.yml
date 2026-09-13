@@ -126,7 +126,8 @@ jobs:
         run: poetry install --no-interaction --no-ansi --with dev
       - name: mypy --strict
         # Redirect mypy's cache outside the checkout (pyproject cache_dir removed in T-018-07).
-        run: MYPY_CACHE_DIR="$RUNNER_TEMP/mypy" poetry run mypy --strict dadaia_workspace/
+        # 0.4.7 FR3: the cache is redirected by [tool.mypy] cache_dir in pyproject.toml.
+        run: poetry run mypy --strict dadaia_workspace/
 
   unit-fast:
     name: Unit fast (pytest)

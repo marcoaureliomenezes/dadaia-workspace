@@ -64,7 +64,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
-from dadaia_workspace.core.session_store import live_session, read_session
+from dadaia_workspace.core.session_store import live_session
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
 __all__ = [
@@ -78,7 +78,6 @@ __all__ = [
     "resolve",
     "resolve_bind",
     "resolve_context_specs_dir",
-    "resolve_mode",
     "resolve_specs_dir",
     "resolve_session_id",
     "sanitize_session_id",
@@ -95,10 +94,6 @@ HARNESS_SESSION_ID_ENV_VARS: tuple[str, ...] = (
 )
 
 _SESSION_ID_STRIP = re.compile(r"[^A-Za-z0-9_-]")
-
-#: Default mode when neither the env override nor a session record resolves one.
-#: Missing-mode sessions stay IMPLEMENTATION-capable (Decision D-3 / FR-R4-04).
-_DEFAULT_MODE = "IMPLEMENTATION"
 
 
 @dataclass(frozen=True)
@@ -121,8 +116,8 @@ class Invocation:
     ``workspace_root``/``context_name``/``specs_dir`` are ``None`` when unresolvable
     (every rung fails soft — matches the prior ladders' contract). ``repo_slug`` is the
     ``repos/<slug>`` on-disk directory for ``context_name`` (identical to
-    ``context_name`` unless the registry names a different one). ``mode`` defaults to
-    ``"IMPLEMENTATION"`` when unresolvable. ``bind`` is the SESSION's OWN binding — a
+    ``context_name`` unless the registry names a different one). ``bind`` is the
+    SESSION's OWN binding — a
     different question from ``context_name``, which the write TARGET may decide: the
     gate's scope rule compares the two. ``rung`` names which rung
     supplied ``context_name`` (``"explicit"``, ``"target_path"``, ``"env"``,
@@ -134,7 +129,6 @@ class Invocation:
     context_name: str | None
     repo_slug: str | None
     specs_dir: Path | None
-    mode: str
     bind: Bind
     rung: str
 
@@ -360,31 +354,6 @@ def resolve_bind(
 
 
 # ---------------------------------------------------------------------------
-# Mode — self-scoped: DADAIA_MODE env override -> this session's own record -> default.
-# ---------------------------------------------------------------------------
-
-
-def resolve_mode(
-    workspace_root: Path | None, session_id: str | None, env: Mapping[str, str]
-) -> str:
-    """Resolve the caller's bind mode. First hit wins: ``DADAIA_MODE`` env override (an
-    operator-shell escape) -> this session's OWN record's ``mode`` field -> the default
-    (``IMPLEMENTATION`` — missing-mode sessions stay write-capable, Decision D-3 /
-    FR-R4-04). Strictly self-scoped: a foreign session's bind can never change this
-    result — *session_id* names only the CALLER's own identity."""
-    env_mode = env.get("DADAIA_MODE")
-    if env_mode:
-        return env_mode
-    if workspace_root is not None and session_id:
-        record = read_session(workspace_root, session_id)
-        if record is not None:
-            raw = record.get("mode")
-            if raw:
-                return str(raw)
-    return _DEFAULT_MODE
-
-
-# ---------------------------------------------------------------------------
 # The one entry point.
 # ---------------------------------------------------------------------------
 
@@ -398,7 +367,7 @@ def resolve(
     cwd: Path,
     clock: Callable[[], float] | None = None,
 ) -> Invocation:
-    """Resolve session, context, root and mode ONCE — the single decider.
+    """Resolve session, context, root and Bind ONCE — the single decider.
 
     *explicit*/*target_path* are rung 0 (a caller-supplied context name, or the context
     implied by an explicit write TARGET under ``repos/<slug>/`` — a repo write IS
@@ -447,15 +416,12 @@ def resolve(
         repo_slug = repo_slug_for_context(workspace_root, context_name)
         specs_dir = (workspace_root / "repos" / repo_slug / "specs").resolve()
 
-    mode = resolve_mode(workspace_root, session_id, env)
-
     return Invocation(
         workspace_root=workspace_root,
         session_id=session_id,
         context_name=context_name,
         repo_slug=repo_slug,
         specs_dir=specs_dir,
-        mode=mode,
         bind=resolve_bind(workspace_root, session_id, env),
         rung=rung,
     )

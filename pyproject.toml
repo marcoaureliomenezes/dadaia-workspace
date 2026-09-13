@@ -106,6 +106,12 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
 line-length = 100
+# 0.4.7 FR3: the cache is redirected by CONFIGURATION, not by a flag on every command
+# (the venv guard's cache rule is deleted). The path is RELATIVE — resolved the same way
+# on every OS, and from a `repos/<slug>/` checkout it lands in the workspace's own
+# `.dadaia/tmp/` zone. From a standalone CI checkout it lands in the checkout's
+# grandparent, which is writable on every runner. Either way the repo tree stays clean.
+cache-dir = "../../.dadaia/tmp/ruff-cache"
 target-version = "py312"
 
 # Complexity/size governance (FR21a, T-043-29, R8): a MEASURED RATCHET, never an
@@ -213,18 +219,12 @@ python_version = "3.12"
 strict = true
 ignore_missing_imports = true
 incremental = false
-# No cache_dir here (bug mypy-strict-cache-dir-created-without-cache-dir-env-override):
-# mypy 2.x writes .mypy_cache/ (CACHEDIR.TAG + a version dir) at cache_dir's default
-# regardless of `incremental = false` -- that claim was false. There is no cache_dir
-# value that is BOTH portable (no hardcoded absolute path; `$MYPY_CONFIG_FILE_DIR/..`
-# assumes this checkout's depth under a workspace root, and an unwritable resolved
-# target crashes mypy with an INTERNAL ERROR -- verified, not merely feared) AND
-# guaranteed outside the repo tree, so redirect via the MYPY_CACHE_DIR env var instead
-# (mypy's own supported override) -- exactly what CI does (ci.yml) and what
-# `dadaia ci preflight` does automatically (--cache-dir, see
-# features/ci_preflight/service.py:resolve_mypy_cache_dir). A bare local
-# `mypy --strict dadaia_workspace/` with no redirect WILL create .mypy_cache/ here;
-# run `dadaia ci preflight` instead, or set MYPY_CACHE_DIR yourself.
+# 0.4.7 FR3: same relative redirect as `[tool.ruff] cache-dir` — one rule, both tools,
+# every OS. mypy writes `.mypy_cache/` even with `incremental = false` (bug
+# mypy-strict-cache-dir-created-without-cache-dir-env-override), so the destination must
+# be named; a relative path is the only portable value (an absolute one is
+# machine-specific and `/dev/null` is POSIX-only — ruff cannot even open it).
+cache_dir = "../../.dadaia/tmp/mypy-cache"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

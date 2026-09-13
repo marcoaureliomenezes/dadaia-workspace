@@ -136,7 +136,7 @@ def two_ctx_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.chdir(ws)
     bind_result = _runner.invoke(
         app,
-        ["context", "bind", _CTX_B, "--mode", "implementation", "--release", "v0.9.9"],
+        ["context", "bind", _CTX_B],
     )
     assert bind_result.exit_code == 0, bind_result.output
     monkeypatch.setenv("DADAIA_CONTEXT", _CTX_B)
