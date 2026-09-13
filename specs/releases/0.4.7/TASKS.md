@@ -44,7 +44,7 @@
   workspace_layout.py`, `dadaia_workspace/features/specs/canon.py`, `dadaia_workspace/
   infrastructure/privacy_check.py`, `tests/**`. Blocked by: none. Delivers: one module
   answers "what may exist" for root, `.dadaia/`, `specs/` and a repo tree.
-- [ ] T-047-18 — FR5b: `render_registry_tables` fills `<!-- root -->`,
+- [-] T-047-18 — FR5b: `render_registry_tables` fills `<!-- root -->`,
   `<!-- repo-excluded -->`, `<!-- specs-canon -->` in `public/data/DADAIA.md`
   §5.1/§5.3/§6.2 at `public stage`; contract test: staged §6.2 table == registry rows.
   Write set: `dadaia_workspace/infrastructure/public_assets.py`, `dadaia_workspace/
