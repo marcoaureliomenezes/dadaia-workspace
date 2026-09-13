@@ -45,7 +45,8 @@ class FindingVerdict(StrEnum):
     EXPIRED = "expired"
     MISSING = "missing"
     #: Held in ``.dadaia/reaped/`` — already off the working tree, awaiting TTL expiry.
-    #: Canonical: the reaper did its job, and nothing is left for the operator to do.
+    #: Canonical (the reaper has nothing left to take), but NOT scored and always
+    #: printed: the operator has to see what was moved while the window is open.
     REAPED = "reaped"
 
 
@@ -76,6 +77,18 @@ class Finding:
     @property
     def canonical(self) -> bool:
         return self.verdict in _CANONICAL
+
+    @property
+    def scored(self) -> bool:
+        """Whether this entry is one of the entries compliance is measured over.
+
+        A held entry already LEFT the working tree, so it is not part of what the scan
+        scores — it is reported (FR6: the operator sees what was moved and how long is
+        left to take it back) and counted nowhere. That is the whole rule: a hold is
+        neither compliance nor failure, so it drops out of the fraction instead of
+        needing a branch in the renderer, the exit rule or the score.
+        """
+        return self.verdict is not FindingVerdict.REAPED
 
 
 @dataclass(frozen=True)
@@ -559,7 +572,9 @@ class DoctorService:
                 # Held, not slop and not expired: report where it came from and how long
                 # the operator still has to take it back.
                 verdict = FindingVerdict.REAPED
-                left = timedelta(seconds=zone.ttl_seconds - age).days
+                # Days ROUNDED UP: a hold taken a minute ago has its whole window left,
+                # and the last day reads "1d left", never "0d left" on a live entry.
+                left = -(-int(zone.ttl_seconds - age) // 86_400)
                 origin = entry.relative_to(self._dadaia / zone.name).as_posix()
                 detail = f"(reaped from {origin}, {left}d left)"
             else:
@@ -794,9 +809,9 @@ def workspace_rules(
                 code=finding.code,
                 verdict=finding.verdict.value,
                 message=f"{finding.path}  {finding.detail}",
-                canonical=finding.canonical,
+                canonical=finding.canonical and finding.scored,
                 error=finding.verdict in ERROR_VERDICTS,
-                unit=finding.path,
+                unit=finding.path if finding.scored else None,
             )
             for finding in findings
         ]

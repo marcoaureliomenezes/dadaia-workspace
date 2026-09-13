@@ -191,3 +191,49 @@ def test_fix_moves_slop_to_reaped_and_reports_the_post_fix_score(workspace: Path
     assert "WS-root-slop: moved 'junk.txt' -> '.dadaia/reaped/" in result.output
     assert lines[-1].endswith("(100%)")
     assert not (workspace / "junk.txt").exists()
+
+
+def _plant_hold(workspace: Path) -> Path:
+    """One entry HELD in ``reaped/``: off the working tree, inside its 7-day window."""
+    held = workspace / ".dadaia" / "reaped" / "20260913" / "x"
+    held.parent.mkdir(parents=True, exist_ok=True)
+    held.write_text("", encoding="utf-8")
+    return held
+
+
+def test_a_held_entry_is_always_listed_and_never_scored(workspace: Path) -> None:
+    """Intent: CONTRACT — 0.4.7 FR6 AC (`dadaia doctor` LISTS what the reaper holds); size: SMALL.
+
+    A hold is the one finding that is neither compliance nor failure: the operator must SEE
+    what was moved and how long is left to take it back, while the score stays whole — the
+    entry already left the working tree, so it is no longer one of the entries being scored.
+    """
+    _plant_hold(workspace)
+
+    result = CliRunner().invoke(app, ["doctor"])
+    lines = result.output.splitlines()
+    held_lines = [ln for ln in lines if ln.startswith("WS-reaped-reaped")]
+
+    assert result.exit_code == 0, result.output
+    assert held_lines == [
+        "WS-reaped-reaped reaped reaped/20260913/x  (reaped from 20260913/x, 7d left)"
+    ], lines
+    assert [ln for ln in lines if _SCORE_LINE.match(ln)][0].endswith("(100%)"), lines
+
+
+def test_json_lists_a_held_entry_and_keeps_the_score_whole(workspace: Path) -> None:
+    """Intent: CONTRACT — 0.4.7 FR6 AC (the `--json` mirror of the held-entry listing); size: SMALL."""
+    _plant_hold(workspace)
+    healthy = json.loads(CliRunner().invoke(app, ["doctor", "--json"]).output)
+
+    result = CliRunner().invoke(app, ["doctor", "--json"])
+    payload = json.loads(result.output)
+    section = payload["sections"]["workspace"]
+
+    assert result.exit_code == 0, result.output
+    (held,) = section["findings"]
+    assert (held["code"], held["verdict"]) == ("WS-reaped-reaped", "reaped")
+    assert held["message"] == "reaped/20260913/x  (reaped from 20260913/x, 7d left)"
+    assert section["compliance"]["percent"] == 100
+    # The hold is outside the scored set entirely — it neither helps nor hurts the count.
+    assert section["compliance"]["total"] == healthy["sections"]["workspace"]["compliance"]["total"]

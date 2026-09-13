@@ -333,8 +333,9 @@ def doctor(
         False,
         "--expired-only",
         help=(
-            "Scope the run to TTL-expired entries: the workspace section reports that "
-            "lane only and --fix stops after deleting them."
+            "Scope the run to the workspace TTL lane: the workspace section reports "
+            "only expired entries and --fix skips the specs repairs. The reaper lane "
+            "itself is one lane and runs whole either way."
         ),
     ),
     json_out: bool = typer.Option(
@@ -392,8 +393,12 @@ def _apply_fixes(
     service: DoctorService, specs_doctor: SpecsDoctor | None, *, fix: bool, expired_only: bool
 ) -> list[str]:
     """The `--fix` scope, unchanged by the fold: the workspace repairs plus the specs
-    rules' own `FIX_BY_CODE` fixes; `--expired-only` stops after the TTL deletions. The
-    `ledgers` section has no fix."""
+    rules' own `FIX_BY_CODE` fixes. The `ledgers` section has no fix.
+
+    `--expired-only` is a SCOPE, never a second reaper: `service.fix()` is the one lane
+    and runs whole either way (T-047-20 deleted the early stop it used to buy). All the
+    flag still does on the write path is skip the specs repairs, which keeps the
+    SessionStart lane off the specs tree."""
     if not fix:
         return []
     fixed = list(service.fix())
