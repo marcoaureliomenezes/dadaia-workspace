@@ -346,7 +346,10 @@ def _resolve_run(
     """What this run reads: ``(workspace_root, service, specs_dir)``. No instance around
     the run (CI over a bare checkout, no ``.dadaia/states/`` above its cwd) leaves the
     first two ``None`` — an explicit ``--specs-dir`` still gets its `specs` and `ledgers`
-    sections. Nothing to read at all is the one refusal."""
+    sections. Nothing to read at all is the one refusal; naming two trees is a usage
+    error, judged before any resolution."""
+    if specs_dir is not None and context is not None:
+        raise typer.BadParameter("Pass either --context or --specs-dir, not both.")
     workspace_root: Path | None = None
     service: DoctorService | None = None
     target: Path | None = None
@@ -377,8 +380,6 @@ def _resolve_specs_dir(specs_dir: str | None, context: str | None) -> Path | Non
     ``--specs-dir``/``--context`` that cannot be resolved still refuses: naming a tree
     that is not there is an operator error, not an absent tree.
     """
-    if specs_dir is not None and context is not None:
-        raise typer.BadParameter("Pass either --context or --specs-dir, not both.")
     if context is not None:
         return resolve_context_specs_dir_for_cli(resolve_workspace_root(), context)
     if specs_dir is not None:

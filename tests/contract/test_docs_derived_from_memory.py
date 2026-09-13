@@ -41,7 +41,9 @@ _HASH_CHARS = 12
 
 
 def _atom_hash(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()[:_HASH_CHARS]
+    """The atom's content hash — over LF bytes, so a CRLF checkout (Windows autocrlf)
+    pins the same twelve characters as the LF checkout that recorded them."""
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()[:_HASH_CHARS]
 
 
 def _atoms() -> dict[str, Path]:

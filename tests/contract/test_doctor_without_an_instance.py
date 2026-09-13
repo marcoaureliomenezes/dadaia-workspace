@@ -55,3 +55,10 @@ def test_nothing_to_read_refuses_with_the_init_message(no_instance: Path) -> Non
 
     assert run.exit_code == 1
     assert "dadaia init" in run.output
+
+
+def test_two_trees_is_a_usage_error_before_any_resolution(no_instance: Path) -> None:
+    run = _runner.invoke(app, ["doctor", "--context", "ctx", "--specs-dir", str(no_instance)])
+
+    assert run.exit_code == 2, run.output
+    assert "--context" in run.output and "--specs-dir" in run.output
