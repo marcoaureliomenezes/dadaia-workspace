@@ -99,4 +99,3 @@
 ## dadaia specs — SDD release-lifecycle structural checks and helpers.
 - specs init — Bootstrap a SDD release-lifecycle specs/ directory structure.
 - specs upgrade — Upgrade a specs/ tree to the canonical pattern version.
-

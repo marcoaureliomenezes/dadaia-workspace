@@ -180,16 +180,11 @@ def test_a_current_marker_is_green_on_a_fixture() -> None:
 
 
 def test_the_cli_reference_is_the_committed_output_of_the_generator() -> None:
-    """`docs/cli.md` carries no atom marker — it is generated. Its body, after the
-    generator header and the digest's version-stamp line, is `render_digest()`'s own;
-    regenerate with `dadaia help tree > docs/cli.md`."""
+    """`docs/cli.md` carries no atom marker — it IS `render_digest()`'s output, header
+    line included; regenerate with `dadaia help tree > docs/cli.md`."""
     committed = (_DOCS_DIR / "cli.md").read_text("utf-8")
 
-    assert committed.splitlines()[0].startswith("<!-- derived-from: dadaia help tree")
-    # The redirect `dadaia help tree > docs/cli.md` terminates the file with the
-    # newline `render_digest()`'s last line lacks — the one tolerated difference.
-    body = committed.split("\n# dadaia CLI digest", 1)[1].split("\n", 1)[1].rstrip("\n")
-    assert body == render_digest().split("\n", 1)[1].rstrip("\n"), (
+    assert committed == render_digest(), (
         "docs/cli.md drifted from the live command tree — "
         "regenerate: dadaia help tree > docs/cli.md"
     )

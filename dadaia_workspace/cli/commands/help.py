@@ -36,4 +36,4 @@ def tree(
             typer.echo("[error] digest could not be written", err=True)
             raise typer.Exit(1)
         typer.echo(f"[ok] digest written: {path}")
-    typer.echo(render_digest())
+    typer.echo(render_digest(), nl=False)
