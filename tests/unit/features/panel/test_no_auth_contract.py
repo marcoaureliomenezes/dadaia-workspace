@@ -226,7 +226,7 @@ def test_loopback_and_missing_host_pass_and_predicate_table(host: str | None) ->
     assert allowed("") is True
     assert allowed("evil.example.com") is False
     assert allowed("evil.example.com:3742") is False
-    assert allowed("10.0.0.5") is False
+    assert allowed("192.0.2.5") is False
     assert allowed("[::1") is False  # malformed IPv6 literal
 
 

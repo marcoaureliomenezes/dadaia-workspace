@@ -104,7 +104,7 @@ def test_malformed_lines_are_skipped_valid_lines_still_ingest(tmp_path: pathlib.
             {
                 "sessionId": "kimi-session-good",
                 "sessionDir": str(session_dir),
-                "workDir": "/home/operator/workspace",
+                "workDir": "/home/user/workspace",
             }
         ),
     ]
@@ -120,7 +120,7 @@ def test_malformed_lines_are_skipped_valid_lines_still_ingest(tmp_path: pathlib.
 
     row = _get_session(dao, "kimi-session-good")
     assert row is not None
-    assert row["cwd"] == "/home/operator/workspace"
+    assert row["cwd"] == "/home/user/workspace"
 
 
 # ---------------------------------------------------------------------------
@@ -141,7 +141,7 @@ def test_basic_ingest_event_id_and_idempotent_reread(tmp_path: pathlib.Path) -> 
                 {
                     "sessionId": "session_aaa",
                     "sessionDir": str(session_dir),
-                    "workDir": "/home/operator/repo",
+                    "workDir": "/home/user/repo",
                 }
             )
         ],

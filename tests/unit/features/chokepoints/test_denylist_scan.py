@@ -524,6 +524,19 @@ def test_no_allowlist_or_sanctioned_terms_constant_in_matcher_source() -> None:
     )
     assert not forbidden.search(source), "denylist_scan.py must carry no amnesty list (FR4/A4.1)"
 
+    # v0.4.7 FR7: the same construct is forbidden in the repo self-scan SENTINEL, the
+    # one place it ever actually grew one — `_TESTS_SCOPE_BASELINE`, 23 hand-kept
+    # (path, pattern) rows that were a SECOND scope decision and the measured cause of
+    # the privacy-scan bug loop. Its own vocabulary (TOLERATED/SCOPE_BASELINE) is added
+    # so reintroducing the list under its historical name fails here.
+    sentinel = Path(__file__).resolve().parents[3] / "integration" / "test_repo_self_scan.py"
+    forbidden_rows = re.compile(
+        r"(?im)^\s*_?[A-Za-z_]*\b(ALLOWLIST|SANCTIONED|AMNESTY|EXEMPT|TOLERATED|SCOPE_BASELINE)\w*\s*[:=]"
+    )
+    assert not forbidden_rows.search(sentinel.read_text(encoding="utf-8")), (
+        "test_repo_self_scan.py must carry no tolerated-pairs baseline (v0.4.7 FR7)"
+    )
+
 
 # ---------------------------------------------------------------------------
 # LOW performance finding — the matcher short-circuits at the first hit LINE; it never

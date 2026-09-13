@@ -34,6 +34,7 @@ from dadaia_workspace.core.model_registry import is_fable_model
 from dadaia_workspace.infrastructure.privacy_check import _PRIVACY_DENYLIST_ENV
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from tests.helpers import public_asset_roster
+from tests.helpers.privacy_fixtures import private_ip
 from tests.helpers.scan_population import assert_populated
 from tests.helpers.skill_inventory_oracle import skill_names
 
@@ -189,7 +190,7 @@ def test_install_refuses_source_root_overwrite_skip_force_and_doctor_drift_track
 # Public-privacy gate (CRITICAL — public-boundary)
 # ---------------------------------------------------------------------------
 
-_PRIVACY_TEST_TERM = "10.99.99.99"
+_PRIVACY_TEST_TERM = private_ip()
 
 
 def _seed_denylist_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

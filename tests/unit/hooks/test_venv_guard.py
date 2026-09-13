@@ -70,8 +70,8 @@ def test_blocks_bare_workspace_invocation(command: str, expected_correction: str
         ".dadaia/.venv/bin/pip install foo",
         ".dadaia/.venv/bin/python -m dadaia_workspace",
         # Workspace-absolute venv equivalent.
-        "/home/op/ws/.dadaia/.venv/bin/dadaia doctor",
-        "/home/op/ws/.dadaia/.venv/bin/pip install foo",
+        "/home/user/ws/.dadaia/.venv/bin/dadaia doctor",
+        "/home/user/ws/.dadaia/.venv/bin/pip install foo",
         # $DADAIA_BIN override.
         "$DADAIA_BIN doctor",
         "${DADAIA_BIN} doctor",

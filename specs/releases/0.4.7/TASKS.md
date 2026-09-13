@@ -75,7 +75,7 @@
   install-hook --force`; rendered in the workspace section. Write set:
   `dadaia_workspace/features/spec_context/doctor.py`, `tests/**`. Blocked by:
   T-047-20. Delivers: a stale installed hook is a finding with a runnable fix.
-- [-] T-047-22 — FR7: rewrite every fixture literal that `_TESTS_SCOPE_BASELINE` (23
+- [x] T-047-22 — FR7: rewrite every fixture literal that `_TESTS_SCOPE_BASELINE` (23
   rows) and the path-scoped `privacy_baseline.json` `exclude_regex` rows tolerate to a
   synthetic value matching no pattern (or build it at runtime from parts); delete
   `_TESTS_SCOPE_BASELINE` and those rows; `test_repo_self_scan.py` asserts zero hits

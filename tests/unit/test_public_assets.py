@@ -26,8 +26,14 @@ from dadaia_workspace.infrastructure.privacy_check import (
 from dadaia_workspace.infrastructure.public_assets import (
     FileSystemPublicAssetManager,
 )
+from tests.helpers.privacy_fixtures import (
+    internal_host,
+    macos_home_path,
+    private_ip,
+    windows_home_path,
+)
 
-_TEST_TERM = "10.99.99.99"
+_TEST_TERM = private_ip()
 
 
 def _seed_denylist_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -78,22 +84,10 @@ def _manager(public_dir: Path) -> FileSystemPublicAssetManager:
 #: object, so a literal inlined here could be masked by the pre-existing
 #: ipv4-literal hit from _TEST_TERM above) — a runtime-composed literal never
 #: reaches the tracked blob at all, so there is nothing left to mask or to hit.
-def _macos_home_literal() -> str:
-    """The bare ``users-abs-path`` positive literal, composed at runtime (never
-    contiguous in this module's own tracked source)."""
-    return "/Users/" + "zz-fixture-user"
-
-
-def _windows_home_literal() -> str:
-    """The bare ``windows-users-path`` positive literal, composed at runtime (never
-    contiguous in this module's own tracked source)."""
-    return "C:\\Users\\" + "zz-fixture-user"
-
-
 def _macos_home_path_fixture() -> str:
     """Synthetic positive fixture for the ``users-abs-path`` baseline pattern
     (macOS) — content identical to the retired ``macos_home_path.txt`` fixture."""
-    home = _macos_home_literal()
+    home = macos_home_path()
     return (
         "SPEC v0.4.2 FR10/GRILL P15/D9 -- synthetic positive fixture for the users-abs-path\n"
         "baseline pattern (macOS). The name below is synthetic and non-identifying.\n"
@@ -107,7 +101,7 @@ def _windows_home_path_fixture() -> str:
     including the CR-2 mid-sentence prose form (a hit not only at a trailing path
     separator/end-of-line, proven again in isolation by
     :func:`test_windows_users_path_pattern_fires_in_prose_form_parity_with_posix_patterns`)."""
-    home = _windows_home_literal()
+    home = windows_home_path()
     return (
         "SPEC v0.4.2 FR10/GRILL P15/D9 -- synthetic positive fixture for the windows-users-path\n"
         "baseline pattern (Windows). The name below is synthetic and non-identifying.\n"
@@ -121,17 +115,17 @@ def _windows_home_path_fixture() -> str:
 @pytest.mark.parametrize(
     ("name", "content", "expect_fragment"),
     [
-        ("planted_ip", "Endpoint: 10.99.99.99\n", "10.99.99.99"),
-        ("internal_hostname", "host: bastion.internal\n", "bastion.internal"),
+        ("planted_ip", f"Endpoint: {private_ip()}\n", private_ip()),
+        ("internal_hostname", f"host: {internal_host('bastion')}\n", internal_host("bastion")),
         (
             "macos_users_path",
             _macos_home_path_fixture(),
-            _macos_home_literal(),
+            macos_home_path(),
         ),
         (
             "windows_users_path",
             _windows_home_path_fixture(),
-            _windows_home_literal(),
+            windows_home_path(),
         ),
     ],
 )
@@ -280,16 +274,18 @@ def test_operator_denylist_merges_additive_over_baseline(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Operator terms are ADDITIVE: both an operator term and a baseline pattern fire."""
-    _seed_denylist_env(monkeypatch, tmp_path)  # operator term = "10.99.99.99"
+    _seed_denylist_env(monkeypatch, tmp_path)  # operator term = the private_ip() shape
     public_dir = tmp_path / "public"
     data_dir = public_dir / "data"
     data_dir.mkdir(parents=True)
     # operator term + a baseline-only hit (internal hostname)
-    (data_dir / "AGENTS.md").write_text(f"ip {_TEST_TERM}\nhost db.internal\n", encoding="utf-8")
+    (data_dir / "AGENTS.md").write_text(
+        f"ip {_TEST_TERM}\nhost {internal_host('db')}\n", encoding="utf-8"
+    )
 
     report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
     assert any(_TEST_TERM in line for line in report)
-    assert any("db.internal" in line for line in report)
+    assert any(internal_host("db") in line for line in report)
 
 
 # ---------------------------------------------------------------------------

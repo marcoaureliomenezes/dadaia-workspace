@@ -62,7 +62,7 @@ def test_subject_kind_members_valid_construction_and_intent_is_frozen() -> None:
             # PRIVACY: an absolute operator-local path must never bind as a code ref.
             "rejects_absolute_path",
             SubjectKind.CODE,
-            "/home/marco/workspace/foo.py#Bar",
+            "/home/user/workspace/foo.py#Bar",
             "module-relative|absolute",
         ),
         (

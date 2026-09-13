@@ -36,6 +36,7 @@ from dadaia_workspace.features.spec_context.service import (  # noqa: E402
 from dadaia_workspace.features.specs.canon import scaffold as canon_scaffold  # noqa: E402
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
 from tests.fakes import FakeContextStore  # noqa: E402
+from tests.helpers.privacy_fixtures import aws_key_shape  # noqa: E402
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
@@ -53,7 +54,7 @@ def _bare_remote(tmp_path: Path) -> Path:
 
 def _clone_with_initial_commit(remote: Path, dest: Path) -> None:
     _run(["git", "clone", str(remote), str(dest)])
-    _run(["git", "config", "user.email", "test@test.com"], cwd=dest)
+    _run(["git", "config", "user.email", "test@example.invalid"], cwd=dest)
     _run(["git", "config", "user.name", "Test"], cwd=dest)
     (dest / "README.md").write_text("init\n")
     _run(["git", "add", "-A"], cwd=dest)
@@ -161,7 +162,7 @@ def test_dead_refuses_untracked_then_commit_secret_free_pushes_and_planted_secre
     remote3 = _bare_remote(secret_remote_root)
     repo3 = workspace_root / "repos" / "proj-repo-secret"
     _clone_with_initial_commit(remote3, repo3)
-    secret = "AKIAIOSFODNN7EXAMPLE"
+    secret = aws_key_shape()
     (repo3 / "creds.env").write_text(f"AWS_ACCESS_KEY_ID={secret}\n")
 
     service3, store3 = _make_service(workspace_root)
@@ -197,7 +198,7 @@ def test_dead_proceeds_gitignored_clean_tree_and_readonly_objects_real_git(
     (repo1 / ".gitignore").write_text("ignored.txt\n")
     _run(["git", "add", ".gitignore"], cwd=repo1)
     _run(["git", "commit", "-m", "add gitignore"], cwd=repo1)
-    (repo1 / "ignored.txt").write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
+    (repo1 / "ignored.txt").write_text(f"AWS_ACCESS_KEY_ID={aws_key_shape()}\n")
 
     service1, store1 = _make_service(workspace_root)
     _alive_ctx(store1, "proj-repo-gitignored")
