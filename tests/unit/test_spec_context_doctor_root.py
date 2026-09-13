@@ -33,6 +33,7 @@ from dadaia_workspace.core.workspace_layout import (
     zones_with_canon,
     zones_with_ttl,
 )
+from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.features.spec_context.doctor import (
     DoctorService,
     Finding,
@@ -491,17 +492,17 @@ def test_ttl_walk_treats_an_entry_that_vanishes_mid_walk_as_absent(
     gone_dir = zone_dir / "gone_dir"
     gone_dir.mkdir()
     (zone_dir / "kept.txt").write_text("", encoding="utf-8")
-    real_entries = DoctorService._entries
+    real_walk = sweep.walk
 
-    def racing_entries(directory: Path) -> list[Path]:
-        entries = real_entries(directory)
+    def racing_walk(directory: Path) -> list[Path]:
+        entries = real_walk(directory)
         if directory == zone_dir:
             gone_file.unlink()
         elif directory == gone_dir:
             gone_dir.rmdir()
         return entries
 
-    monkeypatch.setattr(DoctorService, "_entries", staticmethod(racing_entries))
+    monkeypatch.setattr(sweep, "walk", racing_walk)
 
     found = _by_path(_make_doctor(tmp_path).scan())
 

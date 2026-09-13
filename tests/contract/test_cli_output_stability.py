@@ -162,7 +162,7 @@ def test_doctor_default_fix_output_unchanged(workspace: Path) -> None:
         "compliance(specs): 0/0 rules canonical (100%)\n"
         "compliance(ledgers): 0/0 records canonical (100%)\n"
         "\nApplied 1 repair(s):\n"
-        "  - INV-5: removed stale repo 'stale-ctx' for dead context 'stale-ctx'\n"
+        "  - INV-5: deleted 'repos/stale-ctx'\n"
         "compliance(total): 135/135 checks canonical (100%)\n"
     )
 

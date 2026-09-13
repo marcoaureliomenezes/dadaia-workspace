@@ -1,7 +1,8 @@
 """DoctorService — the one scan and reaper of the workspace instance (0.4.6 FR3/FR4).
 
 ``check()`` reports the context invariants (INV-4/5/6, CTX-URL-1, VENV-1, PRESENCE-GC).
-``scan()`` is the ONE walk over the instance, driven by the zone registry
+``scan()`` is the ONE walk over the instance — one traversal primitive
+(``features.spec_context.sweep``) serves both it and ``fix()``, driven by the zone registry
 (``core.workspace_layout.DADAIA_ZONES``): root, harness dirs, the ``.dadaia/`` top level,
 the closed-canon zones, the TTL zones — every entry gets one finding verdict and one
 ``WS-<zone>-<verdict>`` code. ``fix()`` consumes the same findings in the fixed order.
@@ -14,9 +15,7 @@ allow set, TTL and canon is a view of the registry.
 
 import fnmatch
 import os
-import shutil
 import time
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
@@ -30,7 +29,7 @@ from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.workspace_layout import Creator, Zone
-from dadaia_workspace.features.spec_context import presence
+from dadaia_workspace.features.spec_context import presence, sweep
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
@@ -288,21 +287,9 @@ class DoctorService:
             target=target,
         )
 
-    @staticmethod
-    def _entries(directory: Path) -> list[Path]:
-        """A root that is itself a symlink is never walked — the read side of ``_remove``'s
-        "a symlink is unlinked, never followed"; ``iterdir`` would follow it and every entry of
-        the target would pass the per-entry guard, its parent being inside the workspace."""
-        if directory.is_symlink():
-            return []
-        try:
-            return sorted(directory.iterdir())
-        except OSError:
-            return []
-
     def _scan_root(self, globs: tuple[str, ...]) -> list[Finding]:
         out: list[Finding] = []
-        for entry in self._entries(self._workspace_root):
+        for entry in sweep.walk(self._workspace_root):
             allowed = (
                 workspace_layout.ROOT_ALLOWED_DIRS
                 if entry.is_dir()
@@ -355,7 +342,7 @@ class DoctorService:
             pending = [root]
             while pending:
                 directory = pending.pop()
-                for entry in self._entries(directory):
+                for entry in sweep.walk(directory):
                     rel = entry.relative_to(self._workspace_root).as_posix()
                     if rel in targets:
                         verdict, detail = FindingVerdict.CANON, ""
@@ -373,7 +360,7 @@ class DoctorService:
     def _scan_dadaia_top(self) -> list[Finding]:
         out: list[Finding] = []
         present: set[str] = set()
-        for entry in self._entries(self._dadaia):
+        for entry in sweep.walk(self._dadaia):
             if entry.is_dir() and entry.name in workspace_layout.zone_names():
                 present.add(entry.name)
                 verdict, detail = FindingVerdict.CANON, ""
@@ -398,7 +385,7 @@ class DoctorService:
     def _scan_canon_zone(self, zone: Zone) -> list[Finding]:
         assert zone.canon is not None
         out: list[Finding] = []
-        for entry in self._entries(self._dadaia / zone.name):
+        for entry in sweep.walk(self._dadaia / zone.name):
             if any(fnmatch.fnmatch(entry.name, g) for g in zone.canon):
                 verdict, detail = FindingVerdict.CANON, ""
             else:
@@ -423,9 +410,9 @@ class DoctorService:
         """Append one finding per file (by lstat mtime, symlinks never followed) and per
         directory emptied by expiry; return whether *directory* is entirely expired."""
         assert zone.ttl_seconds is not None
-        entries = self._entries(directory)
+        entries = sweep.walk(directory)
         if not entries:
-            mtime = self._mtime(directory)
+            mtime = sweep.mtime(directory)
             return not is_zone_root and mtime is not None and now - mtime > zone.ttl_seconds
         all_expired = True
         for entry in entries:
@@ -443,7 +430,7 @@ class DoctorService:
                 else:
                     all_expired = False
                 continue
-            mtime = self._mtime(entry)
+            mtime = sweep.mtime(entry)
             if mtime is None:
                 continue
             age = now - mtime
@@ -462,16 +449,6 @@ class DoctorService:
             out.append(self._finding(zone.name, self._dadaia, entry, verdict, detail))
         return all_expired
 
-    @staticmethod
-    def _mtime(path: Path) -> float | None:
-        """``lstat`` mtime, or ``None`` for an entry that vanished between ``iterdir`` and
-        ``lstat`` — absent, never an exception (bug
-        doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk)."""
-        try:
-            return path.lstat().st_mtime
-        except OSError:
-            return None
-
     # ------------------------------------------------------------------
     # fix() — the one reaper, in the fixed FR4 order
     # ------------------------------------------------------------------
@@ -479,7 +456,8 @@ class DoctorService:
     def fix(self, *, expired_only: bool = False) -> list[str]:
         """presence.gc -> session reap -> migrate -> seed missing -> delete expired -> [stop]
         -> delete slop -> remove dead contexts' repos (INV-5). Every step on an entry runs
-        through ``_guarded``: it reports what it did or that it skipped, never aborts."""
+        through the ONE sweep guard: it reports what it did or that it skipped, never
+        aborts, and never touches a location outside the workspace."""
         actions: list[str] = []
 
         # presence.gc() is the ONE reaper of stale presence records, throttle/sentinel
@@ -502,7 +480,7 @@ class DoctorService:
         for finding in findings:
             if finding.verdict is FindingVerdict.MISSING and finding.fixable:
                 actions.extend(
-                    self._guarded(finding.code, finding.path, partial(self._seed, finding))
+                    sweep.guarded(finding.code, finding.path, partial(self._seed, finding))
                 )
         actions.extend(self._delete(findings, FindingVerdict.EXPIRED))
         if expired_only:
@@ -512,33 +490,23 @@ class DoctorService:
         for ctx in self._store.list_all():
             repo_path = self._repos_dir() / ctx.repo_slug
             if ctx.state is ContextState.DEAD and repo_path.exists():
-                step = partial(self._remove_dead_repo, ctx, repo_path)
-                actions.extend(self._guarded("INV-5", f"repos/{ctx.repo_slug}", step))
+                actions.extend(self._reap_dead_repo(ctx, repo_path))
         return actions
 
-    def _remove_dead_repo(self, ctx: SpecContextProject, repo_path: Path) -> str | None:
-        """INV-5: rmtree ``repos/<slug>`` only when it resolves to a direct child of ``repos/``
-        — a slug like ``..`` or a symlinked checkout resolves elsewhere and is refused (bug
-        import-registers-unvalidated-slugs-that-doctor-fix-inv5-rmtrees) — and the context
-        is still DEAD at the moment of deletion."""
+    def _reap_dead_repo(self, ctx: SpecContextProject, repo_path: Path) -> list[str]:
+        """INV-5: reap ``repos/<slug>`` only when it resolves to a DIRECT child of
+        ``repos/`` — a slug like ``..`` or a symlinked checkout resolves elsewhere and is
+        refused (bug import-registers-unvalidated-slugs-that-doctor-fix-inv5-rmtrees) —
+        and the context is still DEAD at the moment of the reap. The two liveness
+        questions are policy and live here; the filesystem act is the primitive's."""
+        label = f"repos/{ctx.repo_slug}"
         if repo_path.resolve().parent != self._repos_dir().resolve():
-            return f"skipped 'repos/{ctx.repo_slug}' (outside repos/)"
+            return [f"INV-5: skipped '{label}' (outside repos/)"]
         current = self._store.get(ctx.name)
         if current is None or current.state is not ContextState.DEAD:
-            return None
-        shutil.rmtree(repo_path)
-        return f"removed stale repo '{ctx.repo_slug}' for dead context '{ctx.name}'"
-
-    @staticmethod
-    def _guarded(code: str, path: str, step: Callable[[], str | None]) -> list[str]:
-        """One action line per step — what the step reports, or ``skipped`` with the errno
-        when the process cannot perform it; the pass never aborts (bug
-        doctor-fix-aborts-whole-pass-on-first-undeletable-entry, every fix step alike)."""
-        try:
-            done = step()
-        except OSError as exc:
-            return [f"{code}: skipped '{path}' (errno {exc.errno}: {exc.strerror})"]
-        return [] if done is None else [f"{code}: {done}"]
+            return []
+        step = partial(sweep.remove, self._workspace_root, repo_path, label)
+        return sweep.guarded("INV-5", label, step)
 
     def _migrate_exceptions(self) -> list[str]:
         """FR6: ``root_exceptions.txt`` -> ``INSTANCE_EXCEPTIONS`` through the one parser;
@@ -554,7 +522,7 @@ class DoctorService:
             old.unlink()
             return f"migrated '{old.name}' -> '{new.name}' ({len(globs)} globs)"
 
-        return self._guarded("EXCEPTIONS-MIGRATION", old.name, migrate)
+        return sweep.guarded("EXCEPTIONS-MIGRATION", old.name, migrate)
 
     def _seed(self, finding: Finding) -> str:
         """A missing zone is a directory; the missing profile is written by the one store
@@ -573,27 +541,13 @@ class DoctorService:
         for finding in findings:
             if finding.verdict is verdict:
                 actions.extend(
-                    self._guarded(finding.code, finding.path, partial(self._remove, finding))
+                    sweep.guarded(
+                        finding.code,
+                        finding.path,
+                        partial(sweep.remove, self._workspace_root, finding.target, finding.path),
+                    )
                 )
         return actions
-
-    def _remove(self, finding: Finding) -> str | None:
-        """Delete the entry iff its own location (never a symlink's destination) resolves
-        inside the workspace; a symlink is unlinked, never followed; an entry already gone
-        is nothing to report."""
-        target = finding.target
-        location = target.parent.resolve() / target.name
-        try:
-            location.relative_to(self._workspace_root.resolve())
-        except ValueError:
-            return f"skipped '{finding.path}' (outside the workspace)"
-        if target.is_symlink() or target.is_file():
-            target.unlink()
-        elif target.is_dir():
-            shutil.rmtree(target)
-        else:
-            return None
-        return f"deleted '{finding.path}'"
 
 
 # ── the `workspace` section of the one doctor (0.4.7 FR5, T-047-02) ──────────────
