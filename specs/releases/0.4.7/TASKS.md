@@ -75,17 +75,16 @@
   install-hook --force`; rendered in the workspace section. Write set:
   `dadaia_workspace/features/spec_context/doctor.py`, `tests/**`. Blocked by:
   T-047-20. Delivers: a stale installed hook is a finding with a runnable fix.
-- [ ] T-047-22 — FR7: `core/scan_scope.py::layers_for` (full tier: `dadaia_workspace/**`,
-  `pyproject.toml`, `README.md`; secret-shaped elsewhere — Q4); `push_gate`/
-  `denylist_scan`, `check_public_privacy`, `BugRecord` evidence guard consume it;
-  `_TESTS_SCOPE_BASELINE` deleted and `test_repo_self_scan.py` asserts the two tiers;
-  out-of-tier `exclude_regex` carve-outs deleted; `secret-scan.yml` untouched. Write
-  set: `dadaia_workspace/core/scan_scope.py`, `dadaia_workspace/core/models/bugs.py`,
-  `dadaia_workspace/features/chokepoints/**`, `dadaia_workspace/infrastructure/
-  privacy_check.py`, `dadaia_workspace/infrastructure/data/privacy_baseline.json`,
-  `dadaia_workspace/cli/commands/ci.py`, `tests/**`. Blocked by: T-047-14. Delivers:
-  a synthetic fixture email under `tests/**` needs no row; a token shape in `specs/**`
-  is still refused.
+- [ ] T-047-22 — FR7: rewrite every fixture literal that `_TESTS_SCOPE_BASELINE` (23
+  rows) and the path-scoped `privacy_baseline.json` `exclude_regex` rows tolerate to a
+  synthetic value matching no pattern (or build it at runtime from parts); delete
+  `_TESTS_SCOPE_BASELINE` and those rows; `test_repo_self_scan.py` asserts zero hits
+  over the tracked tree with no tolerated-pairs list; the scan layers stay full on
+  every path; gitleaks required on `develop` (recorded). Write set: `tests/**`,
+  `dadaia_workspace/infrastructure/data/privacy_baseline.json`, `dadaia_workspace/
+  features/chokepoints/**`, `.github/workflows/ci.yml`. Blocked by: T-047-14.
+  Delivers: a synthetic fixture needs no row; a private hostname in `specs/**` or
+  `tests/**` is refused at push like anywhere else.
 - [ ] T-047-23 — FR8: DADAIA §3.1–§3.5/§5.1/§5.3/§6.2/§7.4/§8.2/§8.5/§10.2;
   `.dadaia/AGENTS.md`; `scaffold/memory/AGENTS.md`; `entities/registry.json`; skills
   `dd-ai-eng-knowhow`, `dd-task-manager`, `dd-cli-library`, `dd-spec-navigator`,

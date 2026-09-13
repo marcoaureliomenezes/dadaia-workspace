@@ -165,25 +165,26 @@ published — measured by contract tests that make each recurrence unrepresentab
   `.pytest_cache/` at `repos/<slug>/tests/` is moved at the next throttled
   PostToolUse and expires 7 days later; nothing under `repos/<slug>/` outside the set
   is ever moved; `scan()` and `fix()` share one walk (no second `iterdir`).
-- FR7 — **Privacy scan scoped to the publication boundary.** One pure predicate,
-  `core/scan_scope.py::layers_for(path) -> ScanLayers`, decides which layers a blob
-  gets: the **full** set (operator denylist, structural baseline, foreign slugs) for
-  the published tree — `dadaia_workspace/**` (the wheel), `pyproject.toml`, `README.md`
-  (the PyPI page) — and the **secret-shaped** set only (private-key block, AWS key,
-  GitHub/Slack token, generic secret assignment — the rules `_SECRET_SCAN_RULES`
-  already holds) for everything else (`specs/**`, `tests/**`, `.github/**`, `CHANGELOG`).
-  `push_gate`/`denylist_scan` (`ci push-gate-check`), `check_public_privacy` (`public
-  doctor`) and `BugRecord`'s evidence guard consume the predicate; `tests/integration/
-  test_repo_self_scan.py` asserts the two tiers over the tracked tree and
-  `_TESTS_SCOPE_BASELINE` (23 hand-kept rows) is deleted; every `privacy_baseline.json`
-  `exclude_regex` whose rationale names a path outside the full tier is deleted; the
-  prior-published amnesty stays. gitleaks (`secret-scan.yml`, already triggered on PRs
-  to `main` and `develop`) becomes a required status check on `develop` (branch
-  protection, whole required-checks list re-supplied — recorded in the `_RELEASE.json`
-  log). AC: a synthetic email-shaped fixture under `tests/**` is not a hit and needs no
-  row; a private hostname in `dadaia_workspace/public/**` is; an AWS key shape in
-  `specs/**` is; `test_no_allowlist_or_sanctioned_terms_constant_in_matcher_source`
-  stays green; no list of tolerated `(path, pattern)` pairs exists anywhere.
+- FR7 — **Privacy scan at the publication boundary — which is the push.** This
+  repository is public (README: MIT, GitHub link), so every pushed blob is published:
+  the full layer set (operator denylist, structural baseline, foreign slugs, secret
+  shapes) applies to every tracked path, unchanged. The 26-bug loop (every fix a
+  literal/baseline/regex edit) ends at its root instead: the 23 hand-kept rows of
+  `_TESTS_SCOPE_BASELINE` (`tests/integration/test_repo_self_scan.py`) are deleted
+  after each fixture literal they tolerate is rewritten to a synthetic value that
+  matches no pattern (`example.invalid` hosts, RFC 5737 addresses, `AKIAEXAMPLE`-free
+  key shapes, no `@` in fake mail); every `privacy_baseline.json` `exclude_regex`
+  whose rationale names a test or spec path is deleted the same way (fix the literal,
+  delete the row); the prior-published amnesty stays. A test fixture that needs a
+  realistic secret shape builds it at runtime from parts, never as a literal.
+  gitleaks (`secret-scan.yml`, already triggered on PRs to `main` and `develop`) becomes
+  a required status check on `develop` (branch protection, whole required-checks list
+  re-supplied — recorded in the `_RELEASE.json` log). AC: `_TESTS_SCOPE_BASELINE` and
+  every path-scoped `exclude_regex` are gone; `test_repo_self_scan.py` asserts zero
+  hits over the tracked tree with no tolerated-pairs list anywhere;
+  `test_no_allowlist_or_sanctioned_terms_constant_in_matcher_source` stays green; a
+  private hostname under `specs/**` or `tests/**` is refused at push exactly as under
+  `dadaia_workspace/**`.
 - FR8 — **Law, skills, entities, glossary — only where behavior changed.** DADAIA
   §3.1–§3.5 (three blocks, three classes, no phase, Bind = scope, `fix:` on every
   BLOCK), §5.1/§5.3/§6.2 rendered, §7.4 (config not flags), §8.2, §8.5 (move not
@@ -201,7 +202,7 @@ published — measured by contract tests that make each recurrence unrepresentab
 - FR9 — **Closure.** Memory atoms `sdd-gate-v3`, `context-management`,
   `workspace-doctor`, `workspace-init`, `spec-context-project`,
   `public-asset-distribution`, `ARCHITECTURE` Part 2 (one-decider rows: release phase
-  vocabulary, `workspace_layout`, chokepoints, new `scan_scope`/`sweep` rows),
+  vocabulary, `workspace_layout`, chokepoints, new `sweep` row),
   `QUALITY`/`TECHSTACK` where they name the cache flags; `CHANGELOG.md [0.4.7]`
   candidate 2; full preflight; `dadaia doctor` 100 % on this instance; the gitleaks
   required-check action recorded; candidate CLOSURE.
@@ -225,8 +226,8 @@ published — measured by contract tests that make each recurrence unrepresentab
   `repos/<slug>/` is scope-judged, root non-repo paths are in scope under a bind; Q2
   `--mode`/`--release`/`--force`/`--reason` deleted — bind is one verb, READ's block
   dies with the three-block rule; Q3 `.dadaia/reaped/` is its own zone row (7 d), not a
-  TTL override inside `tmp`; Q4 full scan tier = `dadaia_workspace/**` + `pyproject.toml`
-  + `README.md`, five secret-shaped rules anywhere; Q5 canonical at a repo top =
+  TTL override inside `tmp`; Q4 superseded — the repository is public, so the full tier is every pushed path
+  (FR7); Q5 canonical at a repo top =
   anything not in `REPO_TREE_EXCLUDED`, an untracked source entry is never moved.
 - FR3 mypy: `cache_dir = /dev/null` is honoured through `os.devnull` on POSIX only; the
   implementer proves the Windows leg (CI typecheck runs on ubuntu) or keeps the env
@@ -236,10 +237,9 @@ published — measured by contract tests that make each recurrence unrepresentab
   walk's wall time on this instance (target under 200 ms) in the closure `size` entry.
 - FR6 moves across filesystems fall back to copy+remove inside the primitive — one
   place; a failed move is one `skipped` action, never a partial delete.
-- FR7 narrows the push-time scan for `specs/**`/`tests/**`; the accepted trade-off is
-  that an operator-private name typed into spec prose is caught only by the operator
-  denylist at publication of the wheel, never at push of a private repo — this repo
-  is private (memory `go-open-source-release`), and gitleaks stays on both PRs.
+- FR7 keeps the full scan everywhere because the repository is public (the earlier
+  draft assumed private); the deletion target is the tolerated-pairs baseline, reached
+  by fixing fixture literals at their root, never by narrowing what a push publishes.
 - FR5 moves ~200 lines of rows into `core`; `test_core_file_io_purity` is unaffected
   (pure data), `lint-imports` contracts unchanged (features → core edge exists).
 - Net: deletions (MEMORY/LAW/UNGATED classes, phase read, READ block, cache guard +
@@ -247,5 +247,5 @@ published — measured by contract tests that make each recurrence unrepresentab
   five per-site guards, INV-5 rmtree, `REPO-DADAIA-1`, `_TESTS_SCOPE_BASELINE`, prose
   carve-outs, preflight flags, `resolve_mypy_cache_dir`, `_PUBLIC_ASSET_IGNORED_DIRS`)
   against additions (scope rule, `fix:` grammar + one contract test, `sweep.py`,
-  `reaped` row, `scan_scope.py`, three placeholders). Production net is expected
+  `reaped` row, three placeholders). Production net is expected
   negative; the closure `summary` entry applies the deletion test to every addition.

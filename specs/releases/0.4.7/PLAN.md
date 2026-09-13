@@ -49,12 +49,11 @@ cuts, what it deletes, and the deletion-test outcome of the one thing it adds.
   liveness; session records and presence keep their own reapers. Moving instead of
   deleting removes the reason `--expired-only` existed (deletion was destructive), so
   the SessionStart lane simply becomes "the reaper" and `--fix` = reaper + specs fixes.
-- **Seam 5 — `core.scan_scope.layers_for`** (FR7). The three detectors (`push_gate`,
-  `check_public_privacy`, `BugRecord` evidence guard) and the self-scan test each
-  decide scope by their own path lists today; one pure predicate replaces four
-  decisions, and the hand-kept baseline of 23 tolerated pairs fails the deletion test
-  the moment fixtures leave the full tier. The structural cause named in the SPEC —
-  scope, not literals — is answered where the scope is decided, once.
+- **Seam 5 — the fixture, not the scope** (FR7). The repository is public, so every
+  push publishes; the scan layers stay full on every path. The hand-kept baseline of
+  23 tolerated pairs fails the deletion test once each fixture literal it tolerates
+  is synthetic (matches no pattern) — the loop of literal/baseline/regex edits ends
+  because nothing tolerated remains; no predicate, no second scope decision.
 
 ## Order of work (tracer bullets)
 
