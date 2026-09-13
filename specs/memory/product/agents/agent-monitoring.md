@@ -1,7 +1,6 @@
 ---
 slug: agent-monitoring
 title: agent-monitoring
-category: product
 tldr: Stdlib-only local agent telemetry behind an allowlist gate, plus where each runtime artifact under .dadaia/ lives and expires.
 summary: Telemetry ingests Claude Code, Codex and Kimi Code session metadata into a local SQLite store behind an allowlist gate; runtime artifacts live in registry zones and expire through dadaia doctor.
 tags: [monitoring, telemetry, sessions, lifecycle]

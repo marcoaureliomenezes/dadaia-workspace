@@ -1,7 +1,6 @@
 ---
 slug: agent-comms
 title: agent-comms
-category: product
 tldr: The handoff-v1 JSON contract agents emit, its stdlib validator behind `dadaia reports`, and ack-on-consume deletion.
 summary: Agent-to-agent coordination is a JSON handoff under the workspace handoff tree, validated against the packaged handoff-v1 schema, with HTML reports as optional evidence.
 tags: [agent-comms, handoff, schema]

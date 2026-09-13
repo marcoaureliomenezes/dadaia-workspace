@@ -1,7 +1,6 @@
 ---
 slug: spec-context-project
 title: spec-context-project
-category: product
 tldr: One canonical specs tree owned by one main repository, optionally spanning associated repos, bound per session and safe for visible concurrent work.
 summary: The central unit of dadaia-workspace — one main repository is the sole source of specs, bind, memory, releases and backlog, and associated repositories extend it without a second specs tree.
 tags: [spec-context, sdd, lifecycle, concurrency]
@@ -23,4 +22,4 @@ tags: [spec-context, sdd, lifecycle, concurrency]
 
 ## Dependencies
 
-[[context-management]], [[sdd-gate-v3]], [[architecture]].
+[[context-management]], [[sdd-gate-v3]], [[ARCHITECTURE]].

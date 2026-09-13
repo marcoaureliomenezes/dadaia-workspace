@@ -35,7 +35,6 @@ _CATALOG: dict[str, object] = {
             "rank": 1,
             "slug": "agent-comms",
             "title": "agent-comms — Handoff Contract v1",
-            "category": "product",
             "tldr": "handoff-v1.1 separates HTML reports from JSON handoffs.",
             "summary": _HEAVY_SUMMARY,
             "tags": ["agent-comms", "handoff", "schema"],
@@ -48,7 +47,6 @@ _CATALOG: dict[str, object] = {
             "rank": 2,
             "slug": "context-injection",
             "title": "context-injection — Layer-1 self-pull bootstrap",
-            "category": "platform",
             "tldr": (
                 "ctx_inject injects a lean tech + catalog digest; deeper atoms are self-pulled."
             ),

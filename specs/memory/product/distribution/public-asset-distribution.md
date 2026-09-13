@@ -1,7 +1,6 @@
 ---
 slug: public-asset-distribution
 title: public-asset-distribution
-category: product
 tldr: Canonical public assets staged to .dadaia/agentic and projected to the Claude Code, Codex, Kimi Code and .agents roots, hash-compared by doctor.
 summary: The stage, install and doctor chain distributing the agentic surface into runtime roots, with hash-compare overwrite, rendered agents, whole-folder skills and a privacy gate.
 tags: [public, assets, distribution, projection, privacy]

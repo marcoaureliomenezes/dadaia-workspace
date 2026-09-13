@@ -22,7 +22,6 @@ _FRONTMATTER_TEMPLATE = """\
 ---
 slug: {slug}
 title: {title}
-category: product
 tldr: '{tldr}'
 summary: '{summary}'
 tags: {tags}
@@ -119,7 +118,6 @@ def test_entry_parsing_and_slug_path_consistency(tmp_path: Path) -> None:
         "rank",
         "slug",
         "title",
-        "category",
         "area",
         "tldr",
         "summary",
@@ -176,14 +174,14 @@ def test_subdirectory_discovery_and_area_derivation(tmp_path: Path) -> None:
 
     # index.md at root AND at a subdirectory depth must be excluded at every depth.
     (product_dir / "index.md").write_text(
-        "---\nslug: index\ntitle: index\ncategory: core\ntldr: t\nsummary: s\n"
+        "---\nslug: index\ntitle: index\ntldr: t\nsummary: s\n"
         "tags: []\nagent_tier: inject\ntoken_estimate: 0\n---\n\n## Index\n",
         encoding="utf-8",
     )
     subdir = product_dir / "philosophy"
     subdir.mkdir()
     (subdir / "index.md").write_text(
-        "---\nslug: index\ntitle: index\ncategory: core\ntldr: t\nsummary: s\n"
+        "---\nslug: index\ntitle: index\ntldr: t\nsummary: s\n"
         "tags: []\nagent_tier: inject\ntoken_estimate: 0\n---\n\n## Subdir index\n",
         encoding="utf-8",
     )
@@ -226,12 +224,13 @@ def test_subdirectory_discovery_and_area_derivation(tmp_path: Path) -> None:
         == "specs/memory/product/philosophy/spec-context-project.md"
     )
 
-    # area derivation: root atom's area is "product"; subdir atoms use the parent dir name;
-    # area is a separate field and does not override category.
+    # area derivation: root atom's area is "product"; subdir atoms use the parent dir name.
+    # 0.4.7 FR9: `area` is the ONE grouping, derived from the path — the hand-typed
+    # `category` frontmatter field it shadowed is gone.
     assert by_slug["workspace-init"]["area"] == "product"
     assert by_slug["specs-doctor"]["area"] == "sdd"
     assert by_slug["spec-context-project"]["area"] == "philosophy"
-    assert by_slug["specs-doctor"]["category"] == "product"
+    assert "category" not in by_slug["specs-doctor"]
 
     # index.md groups by area, not a single "product" bucket.
     index_md = render_index_md(catalog)
@@ -286,9 +285,8 @@ def test_cli_generate_emits_both_catalog_and_index(tmp_path: Path) -> None:
     This is the regression the bug describes: the CLI used to write only
     catalog.json, letting index.md silently drift. Both must now be emitted from
     the same atom-frontmatter source. index.md is rendered from the FULL,
-    uncurated catalog (FR12/A12.3 — every atom's tldr survives at least this one
-    lookup step) even though catalog.json itself may curate ``tldr`` per-category
-    (FR12 T-045-26) — slug/title/path stay in sync either way.
+    uncurated catalog: 0.4.7 FR9 deleted the per-category curation step, so
+    catalog.json and index.md now carry the same `tldr` for every atom.
     """
     from typer.testing import CliRunner
 
@@ -314,12 +312,8 @@ def test_cli_generate_emits_both_catalog_and_index(tmp_path: Path) -> None:
             f"index.md is out of sync with the atom source for {feature['slug']}"
         )
     for feature in catalog["features"]:
-        # All fixture atoms are category=product (outside the default tier-1 set) —
-        # FR12 curation drops their tldr from the PERSISTED catalog.json.
-        assert "tldr" not in feature, (
-            f"{feature['slug']}: FR12 curation should have dropped tldr from the "
-            "persisted catalog.json for a non-tier-1 category"
-        )
+        # 0.4.7 FR9: every persisted atom carries its tldr — no per-category drop.
+        assert feature["tldr"], f"{feature['slug']}: persisted catalog.json must carry tldr"
         assert feature["slug"] in index_text
         assert feature["path"] in {f["path"] for f in full_catalog["features"]}
 
@@ -335,7 +329,7 @@ def test_cli_generate_emits_both_catalog_and_index(tmp_path: Path) -> None:
 
 def _scaffold_index(specs_dir) -> str:
     text = (
-        "---\nslug: index\ntitle: Catálogo de Produtos\ncategory: product\n---\n\n"
+        "---\nslug: index\ntitle: Catálogo de Produtos\n---\n\n"
         "## Visão atômica\n\nVisão do produto.\n\n"
         "## Usuários\n\n| Usuário | Descrição |\n|---|---|\n| dev | usa |\n\n"
         "## Catálogo de features\n\n"
@@ -400,19 +394,20 @@ def test_write_index_fresh_file_carries_canonical_catalog_heading(tmp_path) -> N
 # ---------------------------------------------------------------------------
 
 
-def test_persisted_catalog_tldr_curation_shrinks_ctx_inject_digest(tmp_path: Path) -> None:
-    """A12.1-A12.4: the persisted catalog.json — and therefore ctx_inject's
-    byte-unchanged ``_digest_catalog`` reading it — is measurably smaller once tldr is
-    curated to tier-1 categories only, while every atom stays reachable: `path` is kept
-    on every persisted entry (one self-pull step) and `index.md` (rendered from the
-    FULL, uncurated dict) still carries every atom's tldr (one lookup step)."""
+def test_ctx_inject_digest_carries_a_tldr_for_every_persisted_atom(tmp_path: Path) -> None:
+    """Intent: CONTRACT — 0.4.7 FR9 AC. The persisted catalog.json, and therefore
+    ctx_inject's byte-unchanged ``_digest_catalog`` reading it, names a `tldr` for
+    EVERY atom. The retired per-category curation dropped `tldr` outside `core`, so
+    the once-per-session first-pass scan saw a bare slug for most of the corpus — the
+    field exists to be that scan's filter, and a filter absent from 20 of 23 entries
+    is not a filter."""
     from dadaia_workspace.hooks.ctx_inject import _digest_catalog
 
     atoms = [
         {
             "slug": f"atom-{i}",
             "title": f"atom-{i}",
-            "tldr": "a fairly long tldr sentence meant to simulate real catalog entries here",
+            "tldr": f"the one-line abstract of atom-{i}",
             "summary": f"atom-{i} summary.",
             "tags": "[]",
             "purpose": f"Body of atom-{i}.",
@@ -422,40 +417,21 @@ def test_persisted_catalog_tldr_curation_shrinks_ctx_inject_digest(tmp_path: Pat
     specs = _make_specs_dir(tmp_path, atoms)
     catalog = generate_catalog(specs)
 
-    # Ground truth: every atom's tldr is intact in the FULL in-memory catalog and in
-    # index.md — curation never destroys a fact, only what gets persisted/injected.
-    for feature in catalog["features"]:
-        assert feature["tldr"]
     index_md = render_index_md(catalog)
     for feature in catalog["features"]:
         assert feature["tldr"] in index_md
 
     write_catalog(specs, catalog)
     persisted_text = (specs / "memory" / "product" / "catalog.json").read_text(encoding="utf-8")
-
-    # Every persisted entry keeps its self-pull path — A12.3, one step to the atom.
     persisted = json.loads(persisted_text)
+
+    # Every persisted entry keeps its self-pull path AND its tldr — one step to the atom.
     for feature in persisted["features"]:
-        assert feature["path"], f"{feature.get('slug')}: path must survive curation"
-        assert "tldr" not in feature  # all fixture atoms are category=product, tier-2
+        assert feature["path"], f"{feature.get('slug')}: path must survive persistence"
+        assert feature["tldr"], f"{feature.get('slug')}: tldr must survive persistence"
 
-    # A12.2: ctx_inject's digest function is exercised unmodified against the curated
-    # file text — it degrades gracefully when `tldr` is simply absent per entry.
-    curated_digest = json.loads(_digest_catalog(persisted_text))
-    for feat in curated_digest["features"]:
-        assert set(feat.keys()) <= {"slug", "title", "tldr", "path"}
-        assert "tldr" not in feat
-
-    # The uncurated baseline (what ctx_inject would have injected pre-FR12): same
-    # entries, tldr present on every one.
-    uncurated_text = json.dumps(catalog, ensure_ascii=False, indent=2)
-    baseline_digest = json.loads(_digest_catalog(uncurated_text))
-    baseline_words = len(json.dumps(baseline_digest, ensure_ascii=False, indent=2).split())
-    curated_words = len(json.dumps(curated_digest, ensure_ascii=False, indent=2).split())
-
-    assert curated_words < baseline_words, (
-        f"curated digest ({curated_words} words) must be smaller than the "
-        f"pre-FR12 baseline ({baseline_words} words)"
-    )
-    # Real savings, not noise: tier-2 tldr text is gone from every one of the 10 atoms.
-    assert curated_words <= baseline_words * 0.6
+    digest = json.loads(_digest_catalog(persisted_text))
+    assert len(digest["features"]) == 10
+    for feat in digest["features"]:
+        assert set(feat.keys()) == {"slug", "title", "tldr", "path"}
+        assert feat["tldr"] == f"the one-line abstract of {feat['slug']}"

@@ -1,7 +1,6 @@
 ---
 slug: audits-canon
 title: audits-canon
-category: product
 tldr: Audits are committed spec artifacts — three pillars over a sha window, findings as JSONL records, dispositioned by exactly one remediation release.
 summary: An audit is a committed folder holding AUDIT.md and FINDINGS.jsonl; three pillars always run together over the window since the last audited milestone.
 tags: [sdd, audits, findings, governance, evidence]

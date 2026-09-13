@@ -19,11 +19,10 @@ import pytest
 
 from dadaia_workspace.core.frontmatter import Frontmatter, FrontmatterError, missing_fields, parse
 
-#: The memory-atom 6-field contract (DADAIA.md §6.4).
+#: The memory-atom 5-field contract (DADAIA.md §6.4).
 _MEMORY_REQUIRED_FIELDS: tuple[str, ...] = (
     "slug",
     "title",
-    "category",
     "tldr",
     "summary",
     "tags",
@@ -85,18 +84,17 @@ def test_non_mapping_frontmatter_is_named_not_a_mapping() -> None:
 
 def test_missing_fields_reports_every_absent_field_not_just_the_first() -> None:
     """Checker half of bug memory-trio-missing-required-frontmatter-fields."""
-    data = {"category": "core"}
+    data = {"unrelated": "value"}
 
     absent = missing_fields(data, _MEMORY_REQUIRED_FIELDS)
 
     assert absent == ["slug", "title", "tldr", "summary", "tags"]
 
 
-def test_missing_fields_is_empty_when_the_six_field_contract_is_satisfied() -> None:
+def test_missing_fields_is_empty_when_the_five_field_contract_is_satisfied() -> None:
     data = {
         "slug": "x",
         "title": "X",
-        "category": "core",
         "tldr": "t",
         "summary": "s",
         "tags": [],

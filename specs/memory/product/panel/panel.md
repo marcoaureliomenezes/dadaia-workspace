@@ -1,7 +1,6 @@
 ---
 slug: panel
 title: panel
-category: product
 tldr: Local loopback-only four-tab workspace UI — Projects, Agents, Agentic Entities, Servers.
 summary: The panel serves a loopback-only, no-auth, Host-guarded, CSP-constrained four-tab UI over local workspace state; the Agents tab is its only governance editor.
 tags: [panel, ui, http, dashboard]

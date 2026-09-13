@@ -1,7 +1,6 @@
 ---
 slug: specs-doctor
 title: specs-doctor
-category: product
 tldr: Validates the v6 canon tree, memory drift and catalog integrity, _RELEASE.json, bug and backlog governance, and audit findings folded from JSONL.
 summary: dadaia specs doctor coordinates structural, memory, release, closure/audit, governance and coherence validators over the v6 canon; it reports, never blocks, and fixes only deterministic state.
 tags: [specs, doctor, validation, sdd]

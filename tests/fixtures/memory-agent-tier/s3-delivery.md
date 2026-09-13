@@ -1,7 +1,6 @@
 ---
 slug: s3-delivery
 title: Entrega S3 via Kafka Connect
-category: product
 tldr: Tres S3 Sink connectors gravam topicos mainnet-* como NDJSON particionado (Wallclock) em raw/mainnet-*; fluent-bit envia logs redigidos a raw/app_logs/.
 summary: A entrega S3 é a fronteira única de integração do produto. O Kafka Connect roda três S3 Sink connectors que escrevem NDJSON particionado por Wallclock em `raw/mainnet-*`; fluent-bit envia logs com redação por valor a `raw/app_logs/`. Consumidores downstream leem exclusivamente `raw/*`.
 tags:

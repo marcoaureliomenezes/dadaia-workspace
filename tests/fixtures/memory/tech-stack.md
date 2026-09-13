@@ -1,7 +1,6 @@
 ---
 slug: tech-stack
 title: Tech Stack
-category: core
 tldr: Linguagens, runtimes e dependências do workspace.
 summary: Documenta Python 3.12, Poetry, mistune, e demais dependências de runtime e dev.
 tags: [tech-stack, python, dependencies]

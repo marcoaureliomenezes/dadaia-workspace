@@ -1,7 +1,6 @@
 ---
 slug: architecture
 title: Arquitetura
-category: core
 tldr: Visão geral das camadas e contratos do dadaia-workspace.
 summary: Define as camadas (features, infrastructure, CLI), regras de dependência e contratos entre componentes.
 tags: [architecture, layers, contracts]

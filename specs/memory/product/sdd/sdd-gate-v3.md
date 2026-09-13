@@ -1,7 +1,6 @@
 ---
 slug: sdd-gate-v3
 title: sdd-gate-v3
-category: product
 tldr: No-lock enforcement — origin-classified LAW, path/phase/mode gates, phase read from _RELEASE.json, git hooks pared to the publication boundary.
 summary: The merged PreToolUse gate enforces root whitelist, venv and cache posture, path class, phase and caller mode; the git chokepoints enforce the publication boundary and the denylist scan.
 tags: [sdd, gate, hooks, enforcement, no-locks, privacy]
@@ -37,7 +36,7 @@ tags: [sdd, gate, hooks, enforcement, no-locks, privacy]
 - A refspec aiming a local ref at a different remote ref is refused; an unparseable stdin line refuses the push naming `git push --no-verify` as the one bypass, empty stdin being the nothing-to-gate allow.
 - The security verdict is a pull-request gate: a CI job on both edges requires an APPROVED `security-reviewer` handoff whose `metrics.commit_sha` is the PR head sha, or an ancestor whose only intervening diff is the verdict evidence at `specs/releases/<release-id>/verdicts/<sha>.handoff.json`.
 - The dual qa-plus-security closure gate is the only mechanical check of the qa-engineer verdict.
-- `features/chokepoints` is four modules — `branch_policy`, `pre_commit`, `push_gate`, `verdict` — and `verdict.covering_verdict(paths, head_sha)` is the single verdict reader the push gate, `specs doctor` and the PR check all call.
+- `features/chokepoints` is five modules — `branch_policy`, `denylist_scan`, `pre_commit`, `push_gate`, `verdict` — and `verdict.covering_verdict(paths, head_sha)` is the single verdict reader the push gate, `specs doctor` and the PR check all call.
 - A consumed verdict is deleted by hand after the merge; no GC verb exists.
 - `secret-scan.yml` (gitleaks) runs once per release on the ship PR; earlier material is covered only by the denylist scan, an accepted gap.
 
@@ -52,4 +51,4 @@ tags: [sdd, gate, hooks, enforcement, no-locks, privacy]
 
 ## Dependencies
 
-[[context-management]], [[workspace-doctor]], [[architecture]], [[agent-monitoring]].
+[[context-management]], [[workspace-doctor]], [[ARCHITECTURE]], [[agent-monitoring]].

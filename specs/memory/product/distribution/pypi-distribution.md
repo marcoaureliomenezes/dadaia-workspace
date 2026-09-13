@@ -1,7 +1,6 @@
 ---
 slug: pypi-distribution
 title: pypi-distribution
-category: product
 tldr: The published PyPI package on one version axis, the OIDC publish pipeline, and the wheel content contract.
 summary: dadaia-workspace publishes to PyPI from the release workflow under OIDC trusted publishing; pyproject version is the single source of the number, and minting is separate from publishing.
 tags: [distribution, pypi, release, packaging]
@@ -29,4 +28,4 @@ tags: [distribution, pypi, release, packaging]
 
 ## Dependencies
 
-[[quality-assurance]], [[public-asset-distribution]], [[cross-platform-portability]].
+[[QUALITY]], [[public-asset-distribution]], [[cross-platform-portability]].

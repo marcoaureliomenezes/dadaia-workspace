@@ -1,7 +1,6 @@
 ---
 slug: agentic-entities
 title: agentic-entities
-category: product
 tldr: Abstract-entity registry — Personas, Behaviors, Rules — plus the behavior map binding every skill and scoped rule file to one law section.
 summary: The entity registry defines the workspace method abstractly and every scaffolded sub-agent, hook and rule file derives from it; the behavior map binds each skill and scoped rule file to one law section.
 tags: [agents, entities, derivation, governance]
@@ -32,8 +31,8 @@ tags: [agents, entities, derivation, governance]
 
 - The always-on load — law chain, nine persona bodies, listed skill descriptions — is measured every release against a stated ceiling by a `words × 1.33` estimator with per-section attribution.
 - A release measuring above its declared ceiling cuts text; the number is never re-measured, averaged or renegotiated to fit.
-- Nine personas, four inside the 120-220 line ceiling and five above it, each overflow carrying the reason its content has no other home ([[architecture]]).
+- Nine personas, four inside the 120-220 line ceiling and five above it, each overflow carrying the reason its content has no other home ([[ARCHITECTURE]]).
 
 ## Dependencies
 
-[[agent-orchestration]], [[panel]], [[public-asset-distribution]], [[tech-stack]].
+[[agent-orchestration]], [[panel]], [[public-asset-distribution]], [[TECHSTACK]].

@@ -1,7 +1,6 @@
 ---
 slug: product-vision
 title: product-vision
-category: product
 tldr: A local-first, strictly bounded SDD workspace giving agents current context, a document-governed lifecycle, visible concurrency and anti-slop boundaries.
 summary: dadaia-workspace is a local-first environment for context-bound agent work — canonical specs and memory, deterministic gates, a document-governed lifecycle and auditable evidence.
 tags: [vision, philosophy, identity, lifecycle, anti-slop]
@@ -21,4 +20,4 @@ tags: [vision, philosophy, identity, lifecycle, anti-slop]
 
 ## Dependencies
 
-[[spec-context-project]], [[sdd-gate-v3]], [[architecture]], [[public-asset-distribution]].
+[[spec-context-project]], [[sdd-gate-v3]], [[ARCHITECTURE]], [[public-asset-distribution]].

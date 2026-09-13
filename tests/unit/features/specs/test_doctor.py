@@ -30,7 +30,6 @@ MINIMAL_MEMORY_PRODUCT_INDEX_MD = """\
 ---
 slug: index
 title: Product Index
-category: product
 tldr: 'Product catalog entry point.'
 summary: 'Product catalog entry point.'
 tags: []
@@ -47,7 +46,6 @@ MINIMAL_MEMORY_PRODUCT_FEATURE_MD = """\
 ---
 slug: feature-a
 title: Feature A
-category: product
 tldr: 'Does A.'
 summary: 'Does A.'
 tags: []
@@ -64,7 +62,6 @@ MINIMAL_MEMORY_ARCHITECTURE_MD = """\
 ---
 slug: architecture
 title: Architecture Memory
-category: core
 tldr: 'System architecture layers.'
 summary: 'System architecture layers and dependency contracts.'
 tags: []
@@ -81,7 +78,6 @@ MINIMAL_MEMORY_TECH_STACK_MD = """\
 ---
 slug: tech-stack
 title: Tech Stack Memory
-category: core
 tldr: 'Technology stack.'
 summary: 'Technology stack and approved dependencies.'
 tags: []
@@ -149,7 +145,7 @@ def _make_clean_specs_tree(root: Path, release_id: str = "1.2.3") -> Path:
     )
     (specs / "memory" / "TECHSTACK.md").write_text(MINIMAL_MEMORY_TECH_STACK_MD, encoding="utf-8")
     (specs / "memory" / "QUALITY.md").write_text(
-        "---\nslug: quality-assurance\ntitle: Quality Assurance\ncategory: core\n"
+        "---\nslug: quality-assurance\ntitle: Quality Assurance\n"
         "tldr: 'QA standards.'\nsummary: 'QA standards and anti-slop rules.'\n"
         "tags: []\nagent_tier: self-pull\ntoken_estimate: 20\n"
         "---\n\n## Standards\n\nQA standards.\n",
@@ -206,7 +202,6 @@ def _write_feature_md(product_dir: Path, slug: str) -> None:
 ---
 slug: {slug}
 title: {slug}
-category: product
 tldr: 'Does {slug}.'
 summary: 'Does {slug}.'
 tags: []
@@ -447,7 +442,7 @@ def test_sad_matrix(tmp_path: Path, case: str, mutate, expected_code: str) -> No
             lambda specs: (
                 (specs / "memory" / "product" / "sdd").mkdir(parents=True, exist_ok=True),
                 (specs / "memory" / "product" / "sdd" / "specs-doctor.md").write_text(
-                    "---\nslug: specs-doctor\ntitle: Specs Doctor\ncategory: product\n"
+                    "---\nslug: specs-doctor\ntitle: Specs Doctor\n"
                     "tldr: 'Doctor checks.'\nsummary: 'Doctor structural checks.'\ntags: []\n"
                     "agent_tier: self-pull\ntoken_estimate: 100\n"
                     "---\n\n## Propósito\n\nValidates specs.\n",
@@ -797,7 +792,7 @@ def test_cat1_sync_matrix(tmp_path: Path) -> None:
     subdir_g = product_dir_g / "philosophy"
     subdir_g.mkdir(parents=True, exist_ok=True)
     (subdir_g / "product-vision.md").write_text(
-        "---\nslug: product-vision\ntitle: Product Vision\ncategory: product\n"
+        "---\nslug: product-vision\ntitle: Product Vision\n"
         "tldr: 'Vision.'\nsummary: 'Vision summary.'\ntags: []\nagent_tier: self-pull\n"
         "token_estimate: 100\n---\n\n"
         "## Vision\n\nThe vision.\n",

@@ -1,7 +1,6 @@
 ---
 slug: brand-identity
 title: brand-identity
-category: product
 tldr: The panel's canonical five-colour palette and its CSS token mapping, sourced only from `views/assets/css/tokens.py`.
 summary: The panel's canonical palette and CSS tokens, homed in one module and extended per theme.
 tags: [brand, design, css, tokens]

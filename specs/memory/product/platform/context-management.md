@@ -1,7 +1,6 @@
 ---
 slug: context-management
 title: context-management
-category: product
 tldr: ALIVE/DEAD registry of one main repo plus N associated repos, one Invocation resolved per process, bind-driven injection, advisory presence, redactable output.
 summary: Spec Context Projects and their repositories through a v3 registry, one resolution authority, one repo accessor, bind-driven injection and expiring presence records.
 tags: [context, lifecycle, session, no-locks, privacy]
@@ -53,4 +52,4 @@ tags: [context, lifecycle, session, no-locks, privacy]
 
 ## Dependencies
 
-[[spec-context-project]], [[sdd-gate-v3]], [[workspace-doctor]], [[workspace-init]], [[quality-assurance]].
+[[spec-context-project]], [[sdd-gate-v3]], [[workspace-doctor]], [[workspace-init]], [[QUALITY]].

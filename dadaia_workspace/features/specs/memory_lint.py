@@ -63,15 +63,6 @@ def load_frontmatter_schema() -> dict[str, Any]:
 _H2_RE = re.compile(r"^##\s+(.+)$", re.MULTILINE)
 _WIKILINK_RE = memory_canon.WIKILINK_RE
 
-# v6 canon top-level singles (FR1/A1.5/A1.6, T-050-06): these three atoms' on-disk
-# filenames were renamed (ARCHITECTURE.md, TECHSTACK.md, QUALITY.md) while their
-# frontmatter `slug:` — the stable identity every `[[wikilink]]` across the memory
-# corpus already references — stays unchanged (architecture / tech-stack /
-# quality-assurance). This is the ONE named exception to "slug == filename stem" and
-# to "wikilink target == <slug>.md": both checks below consult it instead of adding a
-# second slug-resolution mechanism.
-_CANON_SINGLE_FILENAMES: dict[str, str] = memory_canon.MEMORY_SINGLE_FILE_SLUGS
-
 
 def _extract_h2_headings(body: str) -> list[str]:
     """Return list of ## heading texts in order of appearance."""
@@ -151,11 +142,7 @@ def lint_atom(
 
     slug = fm.get("slug")
     if isinstance(slug, str) and slug != stem:
-        canon_name = _CANON_SINGLE_FILENAMES.get(slug)
-        if canon_name is None or f"{stem}.md" != canon_name:
-            result.error(
-                f"'slug' frontmatter value '{slug}' does not match filename stem '{stem}'."
-            )
+        result.error(f"'slug' frontmatter value '{slug}' does not match filename stem '{stem}'.")
 
     headings = _extract_h2_headings(body)
     seen: set[str] = set()
@@ -175,7 +162,7 @@ def lint_atom(
 
     wikilinks = _extract_wikilinks(body)
     for wikilink_slug in wikilinks:
-        target_name = _CANON_SINGLE_FILENAMES.get(wikilink_slug, f"{wikilink_slug}.md")
+        target_name = f"{wikilink_slug}.md"
         if not any(memory_dir.rglob(target_name)):
             result.error(
                 f"Wikilink [[{wikilink_slug}]] does not resolve to any .md file under {memory_dir}."

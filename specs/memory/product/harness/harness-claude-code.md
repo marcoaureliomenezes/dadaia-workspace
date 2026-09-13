@@ -1,7 +1,6 @@
 ---
 slug: harness-claude-code
 title: Harness — Claude Code
-category: product
 tldr: Entry harness with native sub-agent dispatch; its scaffold is the CLAUDE.md bridge plus the .claude/ projection.
 summary: Claude Code is the only harness with native sub-agent dispatch, loading the law through the CLAUDE.md import chain and running the nine-agent roster under the Python hooks.
 tags: [harness, claude-code, projection, dispatch]
@@ -21,4 +20,4 @@ tags: [harness, claude-code, projection, dispatch]
 
 ## Dependencies
 
-[[tech-stack]], [[sdd-gate-v3]], [[public-asset-distribution]], [[agent-orchestration]].
+[[TECHSTACK]], [[sdd-gate-v3]], [[public-asset-distribution]], [[agent-orchestration]].

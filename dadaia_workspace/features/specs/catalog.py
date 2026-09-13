@@ -26,7 +26,6 @@ Schema of the returned dict
       "rank": 1,
       "slug": "workspace-init",
       "title": "workspace-init",
-      "category": "product",
       "area": "platform",
       "tldr": "...",
       "summary": "...",
@@ -85,7 +84,6 @@ _WIKILINK_RE = memory_canon.WIKILINK_RE
 _REQUIRED_FIELDS: tuple[str, ...] = (
     "slug",
     "title",
-    "category",
     "tldr",
     "summary",
     "tags",
@@ -217,7 +215,6 @@ def generate_catalog(specs_dir: Path) -> dict[str, Any]:
                 "rank": rank,
                 "slug": slug,
                 "title": str(fm.get("title", slug)),
-                "category": str(fm.get("category", "product")),
                 "area": area,
                 "tldr": str(fm.get("tldr", "")),
                 "summary": str(fm.get("summary", "")),
@@ -251,36 +248,16 @@ def generate_catalog(specs_dir: Path) -> dict[str, Any]:
     return catalog
 
 
-# FR12 (T-045-26): the persisted catalog.json drops ``tldr`` outside
-# ``_TLDR_INJECTED_CATEGORIES`` (category, not rank — F-77) to shrink ctx_inject's
-# digest; index.md and the in-memory dict stay full (A12.3). Default pending PE
-# ratification (DADAIA.md §2).
-_TLDR_INJECTED_CATEGORIES: frozenset[str] = frozenset({"core"})
-
-
-def curate_catalog_for_persistence(catalog: dict[str, Any]) -> dict[str, Any]:
-    """Return a copy of *catalog* with ``tldr`` dropped for non-tier-1 features.
-
-    Shared by both catalog writers (this module's :func:`write_catalog` and the
-    importless-fallback twin ``public/scripts/generate-memory-catalog.py``, which
-    imports this function directly) so the persisted output never diverges (FR23
-    Firing 3). Never mutates *catalog* or its feature dicts.
-    """
-    curated_features = [
-        dict(feat)
-        if str(feat.get("category", "")) in _TLDR_INJECTED_CATEGORIES
-        else {k: v for k, v in feat.items() if k != "tldr"}
-        for feat in catalog.get("features", [])
-    ]
-    return {**catalog, "features": curated_features}
-
-
 def write_catalog(specs_dir: Path, catalog: dict[str, Any]) -> Path:
-    """Serialise the FR12-curated ``catalog`` to ``specs_dir/memory/product/catalog.json``."""
+    """Serialise ``catalog`` to ``specs_dir/memory/product/catalog.json``.
+
+    Every atom keeps its ``tldr``: 0.4.7 FR9 deleted the per-category curation step
+    that dropped it outside ``core``, so the ctx-inject digest names a one-line
+    abstract for every atom instead of a bare slug for most of them.
+    """
     out_path = Path(specs_dir) / "memory" / "product" / "catalog.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    persisted = curate_catalog_for_persistence(catalog)
-    json_text = json.dumps(persisted, ensure_ascii=False, indent=2) + "\n"
+    json_text = json.dumps(catalog, ensure_ascii=False, indent=2) + "\n"
     out_path.write_text(json_text, encoding="utf-8")
     return out_path
 

@@ -1,7 +1,6 @@
 ---
-slug: quality-assurance
+slug: QUALITY
 title: Quality Assurance
-category: core
 tldr: QA standards, anti-slop rules, and test discipline for this workspace.
 summary: Documents QA standards, anti-slop laws, test discipline (TDD, no fabricated tests), and the pre-commit/pre-push gate sequence.
 tags:

@@ -1,7 +1,6 @@
 ---
 slug: sdd-bug-backlog-governance
 title: sdd-bug-backlog-governance
-category: product
 tldr: One record per bug through one write seam, a live-photo backlog with histo exits, and the _RELEASE.json state document.
 summary: The bug ledger, the backlog live photo and the release state document — one record per bug, one write seam, one exit record per backlog slug, one mutable _RELEASE.json per release.
 tags: [sdd, governance, release-lifecycle, backlog, bugs, gitflow]

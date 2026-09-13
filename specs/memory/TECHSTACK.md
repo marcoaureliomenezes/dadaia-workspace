@@ -1,7 +1,6 @@
 ---
-slug: tech-stack
+slug: TECHSTACK
 title: Tech Stack Memory
-category: core
 tldr: Python 3.12 Typer CLI; stdlib services; three entry harnesses (Claude Code, Codex, Kimi Code); one closed marker set; strict quality gates.
 summary: Part 1 carries the measured marker-set principle; Part 2 is the current language, dependency, runtime, model, testing, packaging and command contract.
 tags: [tech-stack, dependencies, toolchain, constraints]
@@ -20,7 +19,7 @@ Rationale: a marker known to one file and unknown to the other is a silent exclu
 - Layer-1 agent bodies are model-agnostic in source and receive `(model, effort)` at `public install`; Codex projections carry registry-derived Codex-native tier identity.
 - Quality tooling is pytest with `pytest-cov`, `pytest-xdist`, `pytest-randomly` and `pytest-timeout`, Ruff, mypy `--strict`, import-linter, Hypothesis, Playwright and gitleaks, with `-p no:cacheprovider` in addopts.
 - The closed marker set is eight — unit, contract, integration, e2e, slow, tmp, flaky, quarantine (P-28).
-- Mutation testing is `mutmut==3.7.0` in an optional Poetry group, absent from every push-path selector ([[quality-assurance]]).
+- Mutation testing is `mutmut==3.7.0` in an optional Poetry group, absent from every push-path selector ([[QUALITY]]).
 - Caches and artifacts live outside repos, and the venv guard refuses an invocation that would write one in-tree ([[sdd-gate-v3]]).
 
 ### Canonical commands
@@ -42,4 +41,4 @@ PYTHONDONTWRITEBYTECODE=1 .dadaia/.venv/bin/python -m pytest -p no:cacheprovider
 
 ### Dependencies
 
-[[architecture]], [[quality-assurance]], [[harness-claude-code]], [[harness-codex]], [[harness-kimi-code]].
+[[ARCHITECTURE]], [[QUALITY]], [[harness-claude-code]], [[harness-codex]], [[harness-kimi-code]].

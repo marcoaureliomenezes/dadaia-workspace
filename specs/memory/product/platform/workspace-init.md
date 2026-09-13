@@ -1,7 +1,6 @@
 ---
 slug: workspace-init
 title: workspace-init
-category: product
 tldr: Idempotent bootstrap of workspace state, the Python venv, the selected harness projections and the governance hooks.
 summary: dadaia init provisions the venv, creates the registry's init zones and the selected harness roots, seeds the state files and the harness profile, then stages and installs public assets.
 tags: [workspace, init, setup, idempotent]

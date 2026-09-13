@@ -1,7 +1,6 @@
 ---
 slug: cross-platform-portability
 title: cross-platform-portability
-category: product
 tldr: Linux, macOS and Windows through one platform capability seam, injected adapters, Python hooks and hard-gated cross-OS CI legs.
 summary: core/platform.py is the single capability seam and the container selects adapters; security failures are loud, non-security features degrade explicitly, unsupported capabilities fail at construction.
 tags: [platform, cross-platform, portability, windows, macos, linux]
@@ -18,4 +17,4 @@ tags: [platform, cross-platform, portability, windows, macos, linux]
 
 ## Dependencies
 
-[[workspace-init]], [[sdd-gate-v3]], [[architecture]], [[public-asset-distribution]].
+[[workspace-init]], [[sdd-gate-v3]], [[ARCHITECTURE]], [[public-asset-distribution]].

@@ -52,11 +52,11 @@ the top of its Part 2, because `hooks/ctx_inject.py` injects only that atom's le
 Regenerate the machine index after any atom path change with `dadaia memory catalog generate`.
 
 - YAML frontmatter validated against `memory-frontmatter-v1`, carrying exactly `slug`, `title`,
-  `category`, `tldr`, `summary`, `tags`; `additionalProperties: false` makes any stray field a hard
+  `tldr`, `summary`, `tags`; `additionalProperties: false` makes any stray field a hard
   error, and `tldr` stays at or below 160 characters.
 - One `##` heading per section, no duplicates; `Changelog`, `History` and version-log sections are
   refused. In the trio the only `##` headings are the two Part headings.
-- `[[slug]]` wikilinks resolve by slug at any depth; never hardcode a path.
+- `[[slug]]` resolves iff `<slug>.md` exists under `memory/` at any depth; a slug IS its filename stem, the top-level trio included; never hardcode a path.
 
 Run `dadaia specs doctor` before closing spec work: it checks atom presence, the top-level trio and
 catalog consistency. Fix findings at the source atom; never hand-edit `catalog.json` to silence a

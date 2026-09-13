@@ -193,7 +193,7 @@
 - Current product truth, not history — read it before changing production behavior.
 - `product-engineer` writes `specs/memory/**` only in `DEFINITION`/`CLOSURE` phases; every other agent reads it.
 - Changelog and history live in each release's `_RELEASE.json` `log` and in git.
-- Atom frontmatter carries exactly 6 fields: `slug title category tldr summary tags`.
+- Atom frontmatter carries exactly 5 fields: `slug title tldr summary tags`.
 - `ARCHITECTURE.md QUALITY.md TECHSTACK.md` split into ADR-gated Part 1 Principles (each `Measured by:`) and Part 2 Implementation.
 
 ### 6.5 ADRs

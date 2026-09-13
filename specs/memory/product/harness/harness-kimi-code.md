@@ -1,7 +1,6 @@
 ---
 slug: harness-kimi-code
 title: Harness — Kimi Code
-category: product
 tldr: Layer-1 harness — inert `.kimi-code/` projection plus user-level TOML hook shims; binds through `DADAIA_CONTEXT` exported at launch.
 summary: Kimi Code is a Layer-1 entry harness whose live wiring is four POSIX shims registered in a managed block of the user-level Kimi config; it binds through DADAIA_CONTEXT.
 tags: [harness, kimi-code, layer-1, projection, binding]
@@ -22,4 +21,4 @@ tags: [harness, kimi-code, layer-1, projection, binding]
 
 ## Dependencies
 
-[[workspace-init]], [[tech-stack]], [[sdd-gate-v3]], [[harness-claude-code]].
+[[workspace-init]], [[TECHSTACK]], [[sdd-gate-v3]], [[harness-claude-code]].

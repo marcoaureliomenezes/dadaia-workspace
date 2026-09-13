@@ -1,7 +1,6 @@
 ---
-slug: architecture
+slug: ARCHITECTURE
 title: Architecture Memory
-category: core
 tldr: 17 measured architecture principles, then the one-decider module table and the diagrams of doctor classes, feature packages and panel view modules.
 summary: Part 1 carries the ADR-gated architecture principles and the check measuring each; Part 2 names the module deciding each cross-cutting fact and carries the three diagrams.
 tags: [architecture, layers, dependency-rules, agents, sdd]

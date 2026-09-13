@@ -104,17 +104,18 @@ def test_wikilink_renderer_slug_parameterisation_default_and_cache() -> None:
     # A non-default slug renders with the given slug's href, never hardcoded
     # 'dadaia-workspace', and always with a .md extension.
     md = build_renderer("my-project")
-    result: str = md("[[architecture]]")  # type: ignore[assignment]
-    # v6 canon single (FR1/A1.5/A1.6, T-050-06): [[architecture]] resolves to the
-    # RENAMED file, not the generic "<slug>.md" guess.
+    result: str = md("[[ARCHITECTURE]]")  # type: ignore[assignment]
+    # 0.4.7 FR9: `[[x]]` is `x.md`, always — the renderer's copy of the slug->filename
+    # alias table (the third copy; the second caused `panel-wikilink-slug-hardcoded`)
+    # is deleted, so the trio is linked by its stem like every other atom.
     assert "/memory-view/my-project/ARCHITECTURE.md" in result
 
     md_default = build_renderer()
-    result_default: str = md_default("[[tech-stack]]")  # type: ignore[assignment]
+    result_default: str = md_default("[[TECHSTACK]]")  # type: ignore[assignment]
     assert "/memory-view/dadaia-workspace/TECHSTACK.md" in result_default
 
     md_other = build_renderer("other-project")
-    result_other: str = md_other("[[architecture]]")  # type: ignore[assignment]
+    result_other: str = md_other("[[ARCHITECTURE]]")  # type: ignore[assignment]
     assert "dadaia-workspace" not in result_other
     assert "/memory-view/other-project/ARCHITECTURE.md" in result_other
 

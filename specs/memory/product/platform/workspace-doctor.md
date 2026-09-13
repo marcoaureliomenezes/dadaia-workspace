@@ -1,7 +1,6 @@
 ---
 slug: workspace-doctor
 title: workspace-doctor
-category: product
 tldr: The one scan and reaper of the workspace instance — WS-<zone>-<verdict> findings against the zone registry, a compliance score, --fix deleting expired and slop.
 summary: dadaia doctor classifies every entry of the root, the harness dirs, .dadaia/ and states/ with one finding verdict derived from the zone registry, reports the context invariants, and is the only cleanup engine.
 tags: [workspace, doctor, health, repair, zones, privacy]

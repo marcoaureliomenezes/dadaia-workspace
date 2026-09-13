@@ -1,7 +1,6 @@
 ---
-slug: quality-assurance
+slug: QUALITY
 title: quality-assurance
-category: core
 tldr: 10 measured quality principles, then test layers, intent taxonomy, flake and quarantine policy, CI gates and slop measurement.
 summary: Part 1 carries the ADR-gated quality principles and the check measuring each; Part 2 records test layers, intent taxonomy, flake handling, the CI gate set and how slop is measured.
 tags: [testing, pytest, ci, quality, test-architecture, flake, quarantine, privacy]
@@ -98,7 +97,7 @@ Rationale: a reported number promoted as if it gated is fabricated detection.
 
 ### Dependencies
 
-[[tech-stack]], [[architecture]], [[panel]], [[consumer-agent-support]], [[sdd-gate-v3]].
+[[TECHSTACK]], [[ARCHITECTURE]], [[panel]], [[consumer-agent-support]], [[sdd-gate-v3]].
 
 <!-- dadaia:fixed slop-tests -->
 ### Slop — tests (fixed)

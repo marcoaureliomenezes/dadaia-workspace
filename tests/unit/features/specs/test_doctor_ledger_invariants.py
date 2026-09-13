@@ -33,7 +33,6 @@ MINIMAL_MEMORY_PRODUCT_INDEX_MD = """\
 ---
 slug: index
 title: Product Index
-category: product
 tldr: 'Product catalog entry point.'
 summary: 'Product catalog entry point.'
 tags: []
@@ -50,7 +49,6 @@ MINIMAL_MEMORY_ATOM_MD = """\
 ---
 slug: {slug}
 title: {title}
-category: core
 tldr: 'tldr.'
 summary: 'summary.'
 tags: []

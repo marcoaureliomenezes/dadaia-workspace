@@ -1,7 +1,6 @@
 ---
 slug: consumer-agent-support
 title: Consumer validation gate
-category: product
 tldr: A consumer-side validation agent running the shipped recipe on a real workspace is the release gate; no wheel publishes without its CERTIFIED_100 verdict.
 summary: The canonical release gate is a consumer-side validation agent running the shipped recipe on a real workspace; a deterministic internal gate never approves a release by itself.
 tags: [consumer-validation, release-gate, sdd]
@@ -20,4 +19,4 @@ tags: [consumer-validation, release-gate, sdd]
 
 ## Dependencies
 
-[[workspace-init]], [[tech-stack]], [[spec-context-project]], [[sdd-gate-v3]], [[workspace-doctor]].
+[[workspace-init]], [[TECHSTACK]], [[spec-context-project]], [[sdd-gate-v3]], [[workspace-doctor]].
