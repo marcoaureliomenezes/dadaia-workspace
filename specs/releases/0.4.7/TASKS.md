@@ -8,7 +8,7 @@
 
 ## Candidate 3 — one model, one verb, one home
 
-- [ ] T-047-25 — FR1: delete `core/bug_provenance.py`, `core/models/git_history.py`,
+- [-] T-047-25 — FR1: delete `core/bug_provenance.py`, `core/models/git_history.py`,
   `GitSubprocessClient.log_added_lines`, `BugEventKind`, `BugService.resolved_commit`
   and the seven schema keys; `from_dict` ignores the retired keys, `to_dict` never
   emits them; `LEDGER-BUGS-SCHEMA` fix re-serializes a parseable record (`--fix` strips
