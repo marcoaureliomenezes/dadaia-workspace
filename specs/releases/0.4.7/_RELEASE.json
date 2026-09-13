@@ -1,11 +1,11 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.7",
-  "phase": "DEFINITION",
+  "phase": "IMPLEMENTATION",
   "rc": 2,
   "defined": {
     "sha": "10fb7de6",
-    "ts": "2026-09-13T06:11:57Z"
+    "ts": "2026-09-13T07:38:20Z"
   },
   "implemented": {
     "sha": "99ac4bf8",
@@ -193,6 +193,12 @@
       "agent": "product-engineer",
       "kind": "note",
       "text": "Candidate 3 defined: 'one verb per record change' — bug-policy-one-model-ask-first, governance-verbs-telemetry, law-and-skill-dedupe; trio Aprovado at 10fb7de6 under the operator's 2026-09-12 directive; grill Q1–Q6 answered by the PM as recorded in SPEC section 5 (Q4 product-engineer gains Bash and Q5 constitution 6.0.0 flagged to the operator). Two Arm B bugs registered by another session (handoff-v12 role-atom map; closed_at healing) are being fixed on the branch before candidate 3's tasks start."
+    },
+    {
+      "ts": "2026-09-13T07:38:20Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate defined at 10fb7de6; phase IMPLEMENTATION."
     }
   ]
 }
