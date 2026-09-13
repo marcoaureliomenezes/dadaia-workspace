@@ -1,0 +1,53 @@
+{
+  "schema_version": "handoff-v1.2",
+  "self_pull": {
+    "refs": [
+      "specs/releases/0.4.7/_RELEASE.json",
+      "specs/releases/0.4.7/SPEC.md",
+      "specs/releases/0.4.7/TASKS.md"
+    ]
+  },
+  "agent": "security-reviewer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-09-13T11:15:00Z",
+  "release_id": "0.4.7",
+  "artifact": {
+    "type": "other"
+  },
+  "scope": "Delta re-verdict superseding e214a4632ee6c0c9e9985a2e4f645dd452185f1c (candidate 4, APPROVED with one LOW). PR-gate verdict for feature/0.4.7 -> develop, candidates 2-4, full review range 6cef01f854ee4e3c1178791270c9813fa9947730..62369eb9d163228649b87951514a38970f9958b6. Four new commits reviewed individually since the superseded verdict: 2253a793 (SPEC.md FR3 marker-width sentence corrected to the shipped 12-hex form; a `reviews` log entry appended to _RELEASE.json -- docs only, no production surface), f874561f (T-047-35, the fix for the superseded verdict's one LOW/CWE-22 finding: dadaia_workspace/features/specs/citations.py adds `_resolves_inside(repo_root, token)` -- rejects a symlinked candidate outright, then requires `candidate.resolve().is_relative_to(repo_root.resolve())` and `.exists()`, OSError treated as dead; `_markdown_files()` now filters `p.is_symlink()` out of the `**/*.md` walk; 3 new regression tests in tests/unit/features/specs/test_doctor_memory_citations.py cover a `../../` traversal token naming a real file outside the repo, a same-repo symlink pointing outside, and a symlinked memory atom skipped by the walk), 7fceafe3 (T-047-36, unrelated CLI-docs fix: `dadaia help tree` now emits its own `<!-- derived-from -->` header via `typer.echo(render_digest(), nl=False)` instead of a second, drifted header, so `docs/cli.md` is byte-for-byte the generator's own output; docs/cli.md regenerated; test_docs_derived_from_memory.py's parity assertion simplified to a direct `==`; no security surface), 62369eb9 (log-only: _RELEASE.json `reviews`/`note` entries recording the qa-engineer CHANGES_REQUESTED-then-fixed cycle and this fix -- no production or spec code).",
+  "verdict": "APPROVED",
+  "verdict_reason": "The superseded verdict's sole LOW finding (CWE-22, missing repo-root containment in features/specs/citations.py) is fixed by f874561f exactly as its own fix_recommendation prescribed: a single shared `_resolves_inside()` guard added at the one point citations.py joins repo_root with a token, applied to `dead_path_citations`; `.is_symlink()` is checked before `.resolve()` (a same-repo symlink is rejected outright, not merely one whose target escapes), then `resolved.is_relative_to(repo_root.resolve())` and `resolved.exists()` are both required, and `OSError` (e.g. a resolution loop) is treated as dead rather than raised. `_markdown_files()` now excludes `p.is_symlink()` from its `root.glob('**/*.md')` walk, closing the companion gap the same finding named. Read all three new tests line by line: `test_a_citation_escaping_the_repo_is_dead_even_when_the_target_exists` (a `specs/../../outside/x.md` traversal token naming a real file outside repo_root is reported dead), `test_a_symlinked_citation_target_is_dead` (an in-repo symlink to an outside file is reported dead), `test_the_markdown_walk_skips_symlinks` (a symlinked memory atom is never read by `memory_citation_violations`) -- all three exercise the exact CWE-22 shape from the prior finding and would fail against the pre-fix code (`(repo_root / token).exists()` with no resolve/containment check). No new regex, no new external input, no new dependency in this delta. 7fceafe3 touches only CLI-help rendering and a generated docs file; read cli/help_digest.py's diff line by line -- no new I/O, subprocess, or network call, `nl=False` only changes whether an extra newline is printed. 2253a793 and 62369eb9 are prose-only changes to SPEC.md and _RELEASE.json's append-only `log`/`reviews` array. Secret-pattern grep (`(password|passwd|secret|token|api_key|apikey|private_key)\\s*=\\s*[\"'][^\"']{6,}`) and a `BEGIN...PRIVATE KEY` grep over `git diff e214a463..HEAD` for all four commits: 0 matches in the diff body outside the superseded verdict file itself (which quotes the pattern as descriptive text, not a live secret, and is deleted by this same commit). Grep for `/home/<user>`-shaped absolute paths, hostnames, IPs and the operator's real name/email over the same delta: 0 matches -- the log entries name only commit shas, task IDs, agent names and file:line references. `git diff --stat` confirms specs/bugs/BUGS.jsonl carries no change anywhere between e214a463 and this head; this reviewer staged no edit to it. No dependency, lockfile, CI workflow, or IaC file touched in this delta. No CRITICAL/HIGH finding; nothing in this delta touches an authenticated production endpoint, a live credential, or a dependency version. Snapshot, not a guarantee of \"secure\" (DADAIA.md 7.5) -- the operator owns the ship decision.",
+  "findings": [],
+  "metrics": {
+    "commit_sha": "62369eb9d163228649b87951514a38970f9958b6",
+    "review_range": "6cef01f854ee4e3c1178791270c9813fa9947730..62369eb9d163228649b87951514a38970f9958b6",
+    "delta_review_range": "e214a4632ee6c0c9e9985a2e4f645dd452185f1c..62369eb9d163228649b87951514a38970f9958b6",
+    "delta_commits_reviewed": 4,
+    "delta_files_changed": 6,
+    "regex_patterns_audited_in_delta": 0,
+    "redos_patterns_found": 0,
+    "secret_scan_delta_matches": 0,
+    "secret_scan_full_range_matches": 0,
+    "private_key_header_matches_in_delta": 0,
+    "dependency_lockfile_touched_in_delta": false,
+    "ci_workflow_touched_in_delta": false,
+    "iac_touched_in_delta": false,
+    "bugs_jsonl_touched_in_delta": false,
+    "regression_tests_added_in_delta": 3,
+    "prior_low_finding_status": "fixed (f874561f4d8940210e06867cdb776e3b5721fe1e) -- CWE-22 containment guard added, symlink walk closed",
+    "prior_verdict_superseded": "e214a4632ee6c0c9e9985a2e4f645dd452185f1c (candidate 4, APPROVED, 1 LOW) -- consumed and deleted in this same commit",
+    "findings_critical": 0,
+    "findings_high": 0,
+    "findings_medium": 0,
+    "findings_low": 0,
+    "findings_info": 0,
+    "findings_new_in_this_review": 0,
+    "pr_edge": "feature/0.4.7 -> develop"
+  },
+  "decisions_required": [],
+  "next_handoff": {
+    "agent": "project-manager",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "other"
+  }
+}
