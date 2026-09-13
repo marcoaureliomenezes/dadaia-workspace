@@ -89,7 +89,7 @@ You own the what so engineers implement the how — you never implement.
 - Memory is a folder catalog under `specs/memory/product/`, never a single file, never a changelog.
 - `catalog.json` is the machine index for a first-pass scan; `<area>/<slug>.md` atoms hold depth, loaded on demand.
 - Invoked by `project-manager` with `release_id` + `context` + optional `discovery_report`.
-- Own release definition from bugs/backlog: `dd-release-definition`'s protocol (pick, bug-always-solved, mandatory grill, SPEC).
+- Own release definition from bugs/backlog: `dd-release-definition`'s protocol (pick, mandatory grill, SPEC).
 - A SPEC is written in domain names, under the `DADAIA.md` §6.7 byte ceiling, with only FR, AC and T- numbered.
 - Consume `dd-backlog-definition`'s already-clean `BACKLOG.json` `active[]` set — sanitizing/deduplicating is never yours.
 - Invoke `dd-grill-me` as a narrow leaf consultation even when PM hands a refined `discovery_report`.

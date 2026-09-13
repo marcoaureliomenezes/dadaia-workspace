@@ -212,29 +212,15 @@ def _digest_tech_stack(raw: str) -> str:
     )
 
 
-def _fixed_law_blocks(specs_dir: Path) -> list[str]:
-    """The fixed law bodies the memory files carry, in table order; an absent one is skipped."""
-    blocks: list[str] = []
-    for rel, section_id in fixed_sections.FIXED_SECTIONS:
-        if not rel.startswith("memory/"):
-            continue
-        with contextlib.suppress(OSError):
-            text = (specs_dir / rel).read_text(encoding="utf-8")
-            body = fixed_sections.extract_fixed_section(text, section_id)
-            if body:
-                blocks.append(body.rstrip("\n"))
-    return blocks
-
-
 def _build_memory(specs_dir: Path) -> str:
-    """Build the once-per-session LEAN memory bootstrap: tech digest + fixed law + catalog digest.
+    """Build the once-per-session LEAN memory bootstrap: tech digest + catalog digest.
 
     WS-C (v0.1.30 / T-30-E-05): this is a session-orientation bootstrap for an interactive
     agent session — a lightweight orientation aid, not the full memory tree. The agent
     self-pulls deeper atoms (e.g. ``ARCHITECTURE.md``, a specific product atom) directly when
     a decision needs them, per the ``dd-spec-navigator`` skill (memory-bootstrap phase). So the bootstrap
     stays lean — a bounded tech-stack digest + the lean catalog tldr-digest, never the full
-    memory tree.
+    memory tree, and never the fixed law blocks the law chain already loads.
     """
     memory_dir = specs_dir / "memory"
     if not memory_dir.is_dir():
@@ -244,10 +230,6 @@ def _build_memory(specs_dir: Path) -> str:
     if tech.is_file():
         with contextlib.suppress(OSError):
             parts.append(_digest_tech_stack(tech.read_text(encoding="utf-8")))
-    law = _fixed_law_blocks(specs_dir)
-    if law:
-        parts.append("=== workspace law (fixed) ===")
-        parts.extend(law)
     catalog = memory_dir / "product" / "catalog.json"
     index = memory_dir / "product" / "index.md"
     if catalog.is_file():

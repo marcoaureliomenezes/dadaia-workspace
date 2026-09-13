@@ -47,8 +47,8 @@
         "skill": "sha256:82c04f5759661c238ed1fb934638cf72353861bd20b67afc42f2a2910acb2766",
         "scoped": []
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§2 Who does what",
@@ -60,8 +60,8 @@
         "skill": "sha256:1a3995ae77de18dd8804372ee6e52574ef037303c35a2fc346a004d0277edac2",
         "scoped": []
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§4 Gitflow — the branch contract",
@@ -124,8 +124,8 @@
           "sha256:f26363f7086defe1337610925040a2f4477d26f34fdae6ee2bc5a84ac0b129d3"
         ]
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§6 Specs, tasks and memory",
@@ -329,8 +329,8 @@
           "sha256:af2bd3ffbeb24938532924ba6a0833111b9ed5bed90eabf3956885f2b8dd8ad5"
         ]
       },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-09-13"
     },
     {
       "section": "§10 Where to look next",
@@ -343,7 +343,7 @@
         "section": "sha256:fc4ea51462648bc6b32436a96eda30ab7cebecf355fdb83e5638f402560834dc",
         "skill": null,
         "scoped": [
-          "sha256:9dec07965240007cf363634cd2b0a7ae8f8ac27bc221e2f890442c8a0f3cdbea"
+          "sha256:31fe0e6f92c0627356d0015233a94f67d4346ac40ab5a29cd98ba602c031f01f"
         ]
       },
       "recorded_by": "ai-engineer",

@@ -124,6 +124,24 @@ _Avoid_: version (for the unit), sprint
 The current product truth under `specs/memory/`; never history.
 _Avoid_: docs, notes
 
+## Governance verbs and hand edits
+
+**Governance verb**:
+The one CLI command authorized to change a governance record — `dadaia bugs append|update|resolve|supersede|defer|reject|archive`, `backlog new|exit`, `release new|phase|rc-archive|archive`, `audit disposition|close`.
+_Avoid_: CLI command (generic), mutation, setter
+
+**Governance event**:
+The row a governance verb writes into the telemetry store after its record write — `{event_id, ts, session_id, context, verb, ledger, record_id, record_hash}`. Observability, never a gate.
+_Avoid_: record, audit trail, log entry
+
+**Hand edit**:
+A governance record change with no matching governance event. Measured as a WARNING (`LEDGER-*-HANDEDIT`, `RELEASE-TREE-HANDEDIT`), never blocked.
+_Avoid_: drift (a projection differing from its render), manual write, tampering
+
+**Bug proposal**:
+The operator-facing case for a bug before any record exists: the contract line violated, one reproducing command, why it is not agent error. With no operator present it leaves the session as a handoff finding whose `message` starts `bug-proposal:`.
+_Avoid_: bug report, registration, ticket
+
 ## Output
 
 **Handoff**:

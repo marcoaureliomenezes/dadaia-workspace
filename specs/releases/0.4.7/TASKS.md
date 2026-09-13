@@ -86,7 +86,7 @@
   skills/**`, `dadaia_workspace/public/entities/behavior-map.json`, `tests/**`. Blocked
   by: T-047-29. Delivers: 18 skills, every skill pointer resolves, the corpus ratchet
   is pinned.
-- [-] T-047-32 — FR7b (`ai-engineer`): personas (playbook table, `--with-report`, dead
+- [x] T-047-32 — FR7b (`ai-engineer`): personas (playbook table, `--with-report`, dead
   pointers, checkpoint sentences, `handoff-v1.2` bullets, `product-engineer` `Bash` +
   grants, `software-architect` grant, `dd-task-manager`/`dd-workspace-doctor` grants
   removed); `registry.json` mandates (three-axis, candidate close); `DADAIA.md` §6.6–6.8,

@@ -5,75 +5,37 @@ Root workspace behavior is in the workspace `AGENTS.md`; production-source behav
 
 ## 1. Load order
 
-Before writing or reviewing SDD artifacts, read:
+- Ground the session with `dd-spec-navigator` — context, memory bootstrap, live release and its trio, in that order.
+- `_archive/` and `backlog/` are history and intake; neither is an approval.
 
-```text
-constitution.md
-memory/ARCHITECTURE.md
-memory/TECHSTACK.md
-memory/product/index.md
-releases/<release-id>/_RELEASE.json    (phase field read directly, no fold)
-releases/<release-id>/SPEC.md
-releases/<release-id>/PLAN.md
-releases/<release-id>/TASKS.md
-```
+## 2. Before implementing
 
-- Use `_archive/` only for history.
-- Use `backlog/` and `bugs/` for intake and triage; they are not approval gates.
-- Run ordered work by dispatching the owning agent for each stage — no workflow engine executes stages.
-- Concurrent sessions are allowed and surfaced through advisory presence; never wait for a concurrency lock.
-
-## 2. Release gate
-
-Implementation is allowed only when:
-
-- The live release's `_RELEASE.json` `phase` field reads `IMPLEMENTATION`.
-- `SPEC.md`, `PLAN.md`, and `TASKS.md` contain `**Status:** Aprovado`.
-- The active task is changed from `[ ]` to `[-]` before production edits.
-- The task's declared write set contains every production file to be edited.
-- If any item is missing: stop, draft or repair the SDD artifact instead of editing production.
+- The live release's `_RELEASE.json` `phase` reads `IMPLEMENTATION`, and `SPEC.md`/`PLAN.md`/`TASKS.md` all carry `**Status:** Aprovado`.
+- The task is flipped `[ ]` -> `[-]` before any production edit, and its declared write set names every file touched.
+- Any item missing: stop and repair the SDD artifact instead of editing production.
 
 ## 3. Artifact authority
 
 | Path | Writer |
 |---|---|
-| `constitution.md` | operator or `product-engineer` during approved governance work |
-| `releases/<id>/_RELEASE.json` | agents with file tools, per field (`dd-release-implementation`'s `RELEASE-EVENTS.md`) |
-| `releases/<id>/SPEC.md` | `product-engineer` |
-| `releases/<id>/PLAN.md` | `product-engineer` |
-| `releases/<id>/TASKS.md` | `product-engineer`; implementers may change only their task marker |
-| `memory/**` | `product-engineer` in `DEFINITION` and `CLOSURE` phase |
-| `backlog/**` | `project-manager` only (sole backlog author) |
-| `bugs/**` | any agent may file; `product-engineer` resolves into release work |
+| `constitution.md` | operator, or `product-engineer` under approved governance work |
+| `releases/<id>/_RELEASE.json` | `dadaia release phase|new|rc-archive|archive`; `log` entries by the narrating agent |
+| `releases/<id>/{SPEC,PLAN,TASKS}.md` | `product-engineer`; implementers change only their own task marker |
+| `memory/**` | `product-engineer`, in `DEFINITION` and `CLOSURE` phase |
+| `backlog/**` | `project-manager`; entries exit by `dadaia backlog exit` |
+| `bugs/**` | any agent, after the operator confirms the proposal; verbs only |
+| `audits/**` | `project-auditor`; findings move by `dadaia audit disposition|close` |
 
-## 4. Task markers
+## 4. Memory
 
-```text
-[ ] OPEN
-[-] IN PROGRESS
-[x] DONE
-```
+- Memory describes the product as it is now; no changelog, history or version sections.
+- Stale memory found during implementation becomes a bug proposal or a closure note — never patched mid-implementation.
 
-- Do not take a task already marked `[-]`.
-- Do not mark `[x]` without validation evidence in the implementing report.
+## 5. Bugs
 
-## 5. Memory
+- A bug is fixed on the live `feature/{M.m.p}` branch, in any phase, with no release ceremony.
 
-- Memory describes the product as it is now.
-- No changelog/history/version sections in `memory/**`.
-- The v6 canon root carries no `assets/` member — a diagram is an in-doc fenced Mermaid block.
-- Stale memory found during implementation becomes a bug or closure note — never patch memory mid-implementation.
-
-## 6. Doctor
-
-```bash
-dadaia doctor --context <ctx>
-```
-
-- `dadaia doctor --fix` may repair scaffoldable tree issues.
-- Never use it to bypass missing approval, unclear scope, or task ownership.
-
-## 7. Escalation
+## 6. Escalation
 
 ```text
 [SDD BLOCKED]
