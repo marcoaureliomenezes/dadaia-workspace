@@ -396,7 +396,7 @@ def _apply_fixes(
     `ledgers` section has no fix."""
     if not fix:
         return []
-    fixed = list(service.fix(expired_only=expired_only))
+    fixed = list(service.fix())
     if not expired_only and specs_doctor is not None:
         fixed.extend(f"[specs] {issue.code}: {issue.path}" for issue in specs_doctor.fix())
     return fixed

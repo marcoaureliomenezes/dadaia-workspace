@@ -97,12 +97,6 @@ RULES: tuple[SpecsRule, ...] = (
         fix_help=".dadaia/.venv/bin/dadaia specs upgrade --context <ctx>",
     ),
     _rule(
-        ("REPO-DADAIA-1",),
-        lambda d: d._structural.check_repo_dadaia1(),
-        fix=lambda d, i: d._structural.fix_repo_dadaia1(i),
-        fix_help="quarantine an in-repo .dadaia/ directory",
-    ),
-    _rule(
         ("TREE-2",),
         lambda d: d._structural.check_tree2_root_spec_md(),
         fix_help="author the root spec document the canon declares",

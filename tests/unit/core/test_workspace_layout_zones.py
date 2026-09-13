@@ -20,6 +20,7 @@ _SPEC_ZONE_ORDER = [
     "sessions",
     "handoff",
     "tmp",
+    "reaped",
     "mcps",
     ".cache",
     "dist",
@@ -46,7 +47,7 @@ def _zone(name: str) -> wl.Zone:
     return next(z for z in wl.DADAIA_ZONES if z.name == name)
 
 
-def test_registry_holds_the_eleven_spec_zones_in_order() -> None:
+def test_registry_holds_the_twelve_spec_zones_in_order() -> None:
     assert [z.name for z in wl.DADAIA_ZONES] == _SPEC_ZONE_ORDER
     assert wl.zone_names() == frozenset(_SPEC_ZONE_ORDER)
 
@@ -56,9 +57,17 @@ def test_zone_record_is_frozen() -> None:
         _zone("tmp").ttl_seconds = 1  # type: ignore[misc]
 
 
-def test_ttl_zones_are_the_four_fr5_zones_at_one_day() -> None:
+def test_ttl_zones_are_the_four_fr5_zones_at_one_day_plus_the_reaper_hold_at_seven() -> None:
+    """0.4.7 FR6b (Q3): ``reaped/`` is its own zone row at 7 days, never a TTL override
+    inside ``tmp`` — an entry the reaper took off the working tree is held a week."""
     ttl = {z.name: z.ttl_seconds for z in wl.zones_with_ttl()}
-    assert ttl == {"handoff": 86_400, "tmp": 86_400, "mcps": 86_400, ".cache": 86_400}
+    assert ttl == {
+        "handoff": 86_400,
+        "tmp": 86_400,
+        "reaped": 604_800,
+        "mcps": 86_400,
+        ".cache": 86_400,
+    }
     assert all(z.ttl_seconds is None for z in wl.DADAIA_ZONES if z.name not in ttl)
 
 
@@ -81,6 +90,7 @@ def test_zone_classes_match_architect_table() -> None:
         "sessions": wl.ZoneClass.PROTECTED,
         "handoff": wl.ZoneClass.OUTPUT,
         "tmp": wl.ZoneClass.EPHEMERAL,
+        "reaped": wl.ZoneClass.EPHEMERAL,
         "mcps": wl.ZoneClass.EPHEMERAL,
         ".cache": wl.ZoneClass.EPHEMERAL,
         "dist": wl.ZoneClass.STATE,
@@ -94,19 +104,20 @@ def test_creator_views_partition_the_registry() -> None:
     assert by_creator == {
         wl.Creator.INIT: ["states", ".venv"],
         wl.Creator.INSTALL: ["agentic", "hooks"],
-        wl.Creator.RUNTIME: ["sessions", "handoff", "tmp", "mcps", ".cache", "dist"],
+        wl.Creator.RUNTIME: ["sessions", "handoff", "tmp", "reaped", "mcps", ".cache", "dist"],
         wl.Creator.OPERATOR: ["references"],
     }
 
 
 def test_walked_zones_exclude_operator_and_managed() -> None:
-    assert [z.name for z in wl.walked_zones()] == _SPEC_ZONE_ORDER[:9]
+    assert [z.name for z in wl.walked_zones()] == _SPEC_ZONE_ORDER[:10]
 
 
 def test_additive_prefixes_are_output_and_ephemeral_zones_in_registry_order() -> None:
     assert wl.additive_prefixes() == (
         ".dadaia/handoff/",
         ".dadaia/tmp/",
+        ".dadaia/reaped/",
         ".dadaia/mcps/",
         ".dadaia/.cache/",
     )

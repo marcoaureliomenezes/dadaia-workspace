@@ -94,14 +94,20 @@ def remove(workspace_root: Path, target: Path, label: str) -> str | None:
     return f"deleted '{label}'"
 
 
-def move(workspace_root: Path, target: Path, destination: Path, label: str) -> str | None:
+def move(
+    workspace_root: Path, target: Path, destination: Path, label: str, *, note: str = ""
+) -> str | None:
     """Relocate *target* to *destination*, creating its parents. Both ends must sit
     inside the workspace. The moved entry's mtime is stamped at the move, so a TTL zone
     clocks a held entry from when it was reaped, never from the origin's own age.
 
     A cross-device ``os.replace`` (EXDEV) falls back to copy + remove here — the one
     place — and the copy lands before the origin is unlinked, so a failure leaves the
-    origin intact rather than a partial delete."""
+    origin intact rather than a partial delete.
+
+    ONE message shape for every mover: ``moved '<label>'<note> -> '<destination>'``.
+    *note* is the one extra field a caller may add when the label alone does not say
+    whose entry it was (INV-5 names the context that owned the repo)."""
     if not _exists(target):
         return None
     if not _inside(workspace_root, target) or not _inside(workspace_root, destination):
@@ -121,4 +127,8 @@ def move(workspace_root: Path, target: Path, destination: Path, label: str) -> s
         remove(workspace_root, target, label)
     if not destination.is_symlink():
         os.utime(destination)
-    return f"moved '{label}'"
+    try:
+        shown = destination.relative_to(workspace_root).as_posix()
+    except ValueError:  # pragma: no cover — _inside already proved it is under the root
+        shown = destination.as_posix()
+    return f"moved '{label}'{note} -> '{shown}'"

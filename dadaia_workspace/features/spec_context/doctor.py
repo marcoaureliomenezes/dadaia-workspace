@@ -44,9 +44,21 @@ class FindingVerdict(StrEnum):
     SLOP = "slop"
     EXPIRED = "expired"
     MISSING = "missing"
+    #: Held in ``.dadaia/reaped/`` — already off the working tree, awaiting TTL expiry.
+    #: Canonical: the reaper did its job, and nothing is left for the operator to do.
+    REAPED = "reaped"
 
 
-_CANONICAL = frozenset({FindingVerdict.CANON, FindingVerdict.OPERATOR})
+_CANONICAL = frozenset({FindingVerdict.CANON, FindingVerdict.OPERATOR, FindingVerdict.REAPED})
+
+#: The zone the reaper HOLDS what it takes off the working tree. Deletion is reserved to
+#: TTL expiry of this zone, so no scan verdict ever deletes anything directly — the shape
+#: behind the CRITICAL doctor-ptr-gc-deletes-valid-lock-free-bind.
+REAPED_ZONE = "reaped"
+
+#: Directory names that end the repo-tree walk: a nested VCS/venv/dependency tree is
+#: never ours to classify and is where the walk's cost would otherwise live.
+_REPO_WALK_PRUNED: frozenset[str] = frozenset({".git", ".venv", "node_modules"})
 
 
 @dataclass(frozen=True)
@@ -248,12 +260,75 @@ class DoctorService:
         findings.extend(self._scan_root(globs))
         findings.extend(self._scan_harness_dirs(globs))
         findings.extend(self._scan_dadaia_top())
+        findings.extend(self._scan_repo_trees())
         for zone in workspace_layout.zones_with_canon():
             findings.extend(self._scan_canon_zone(zone))
         now = time.time()
         for zone in workspace_layout.zones_with_ttl():
             findings.extend(self._scan_ttl_zone(zone, now))
         return tuple(findings)
+
+    def _contexts(self) -> list[SpecContextProject]:
+        """The registered contexts, or NOTHING when the registry cannot be read.
+
+        The store's contract — degrade to inaction, never to deletion — applied at the one
+        place both readers share. It matters more now than it did: the reaper runs on
+        ``sdd_post_gate``'s throttle, so an unreadable or older-shaped registry must make
+        the pass do less, never raise on the write hot path (and never let the INV-5 lane
+        act on a half-parsed registry)."""
+        try:
+            return list(self._store.list_all())
+        except (KeyError, OSError, TypeError, ValueError):
+            return []
+
+    def _alive_repo_tops(self) -> list[Path]:
+        """Every ALIVE registered repo's top — main plus associated — that exists on disk.
+        A DEAD context's repo is INV-5's business, not the tree walk's.
+
+        Reads the registry through :meth:`_contexts`, which degrades to inaction."""
+        tops: list[Path] = []
+        for ctx in self._contexts():
+            if ctx.state is not ContextState.ALIVE:
+                continue
+            slugs = (ctx.repo_slug, *(repo.slug for repo in ctx.associated_repos))
+            for slug in slugs:
+                path = self._repos_dir() / slug
+                if path.is_dir() and path not in tops:
+                    tops.append(path)
+        return tops
+
+    def _scan_repo_trees(self) -> list[Finding]:
+        """The repo-cleanliness walk (DADAIA.md 5.3), one finding per excluded entry.
+
+        Canonical at a repo top is EVERYTHING not on ``REPO_TREE_EXCLUDED`` (Q5): a repo
+        working tree carries source and its own artifacts, and an untracked source entry
+        is never the doctor's to judge — so only the excluded names are reported, at the
+        top AND at any depth, plus a nested ``.dadaia/`` (which corrupts context
+        resolution for every tree-walking tool). The walk prunes at ``.git``, ``.venv``
+        and ``node_modules``, which is what bounds its cost.
+        """
+        excluded = frozenset(workspace_layout.REPO_TREE_EXCLUDED)
+        out: list[Finding] = []
+        for top in self._alive_repo_tops():
+            pending = [top]
+            while pending:
+                for entry in sweep.walk(pending.pop()):
+                    if entry.name in excluded:
+                        out.append(
+                            self._finding(
+                                "repos",
+                                self._workspace_root,
+                                entry,
+                                FindingVerdict.SLOP,
+                                "(a repo working tree carries source only — DADAIA.md 5.3)",
+                            )
+                        )
+                        continue
+                    if entry.name in _REPO_WALK_PRUNED:
+                        continue
+                    if entry.is_dir() and not entry.is_symlink():
+                        pending.append(entry)
+        return out
 
     def _exception_globs(self) -> tuple[str, ...]:
         try:
@@ -442,6 +517,13 @@ class DoctorService:
                 verdict = FindingVerdict.EXPIRED
                 days = timedelta(seconds=age).days
                 detail = f"(mtime {days}d > ttl {timedelta(seconds=zone.ttl_seconds).days}d)"
+            elif zone.name == REAPED_ZONE:
+                # Held, not slop and not expired: report where it came from and how long
+                # the operator still has to take it back.
+                verdict = FindingVerdict.REAPED
+                left = timedelta(seconds=zone.ttl_seconds - age).days
+                origin = entry.relative_to(self._dadaia / zone.name).as_posix()
+                detail = f"(reaped from {origin}, {left}d left)"
             else:
                 verdict, detail = FindingVerdict.CANON, ""
             if verdict is not FindingVerdict.EXPIRED:
@@ -453,16 +535,35 @@ class DoctorService:
     # fix() — the one reaper, in the fixed FR4 order
     # ------------------------------------------------------------------
 
-    def fix(self, *, expired_only: bool = False) -> list[str]:
-        """presence.gc -> session reap -> migrate -> seed missing -> delete expired -> [stop]
-        -> delete slop -> remove dead contexts' repos (INV-5). Every step on an entry runs
+    def fix(self, *, own_session_id: str = "") -> list[str]:
+        """The ONE reaper lane: presence.gc -> session reap -> migrate -> seed missing ->
+        MOVE slop to ``reaped/`` -> reap dead contexts' repos (INV-5) -> delete expired.
+
+        There is no second, smaller lane. ``--expired-only`` used to buy one by stopping
+        this method early; now that slop is HELD rather than deleted, the cheap lane and
+        the full lane are the same acts, so the parameter is deleted and the CLI flag
+        means only what it always should have: which findings the REPORT shows. The
+        SessionStart lane and ``sdd_post_gate``'s throttle run exactly this.
+
+        *own_session_id* is the caller's OWN session: ``presence.gc`` never reaps that
+        record. The CLI passes nothing (it is not a session); ``sdd_post_gate`` passes its
+        own id, which is why the hook no longer calls ``presence.gc`` itself — one cadence,
+        one reaper, and a live session can never reap its own presence.
+
+        Nothing here deletes a live entry. Slop is MOVED and holds its 7 days in
+        ``.dadaia/reaped/<YYYYMMDD>/<workspace-relative-path>``, the clock starting at the
+        move; direct deletion is reserved to TTL expiry. That is the structural answer to
+        the CRITICAL ``doctor-ptr-gc-deletes-valid-lock-free-bind``: a misclassification
+        now costs a week of holding, not the operator's state. Every step on an entry runs
         through the ONE sweep guard: it reports what it did or that it skipped, never
         aborts, and never touches a location outside the workspace."""
         actions: list[str] = []
 
         # presence.gc() is the ONE reaper of stale presence records, throttle/sentinel
         # markers and now-empty presence context dirs (release 0.5.1 K2).
-        gc_report = presence.gc(self._workspace_root, now=datetime.now(tz=UTC), own_session_id="")
+        gc_report = presence.gc(
+            self._workspace_root, now=datetime.now(tz=UTC), own_session_id=own_session_id
+        )
         for key in gc_report.presence:
             actions.append(f"PRESENCE-GC: deleted stale presence record '{key}'")
         for name in gc_report.markers:
@@ -482,15 +583,35 @@ class DoctorService:
                 actions.extend(
                     sweep.guarded(finding.code, finding.path, partial(self._seed, finding))
                 )
-        actions.extend(self._delete(findings, FindingVerdict.EXPIRED))
-        if expired_only:
-            return actions
-        actions.extend(self._delete(findings, FindingVerdict.SLOP))
-
-        for ctx in self._store.list_all():
+        actions.extend(self._reap(findings))
+        for ctx in self._contexts():
             repo_path = self._repos_dir() / ctx.repo_slug
             if ctx.state is ContextState.DEAD and repo_path.exists():
                 actions.extend(self._reap_dead_repo(ctx, repo_path))
+        actions.extend(self._delete(findings, FindingVerdict.EXPIRED))
+        return actions
+
+    def _reaped_destination(self, target: Path) -> Path:
+        """``.dadaia/reaped/<YYYYMMDD>/<workspace-relative-path>`` — the origin path is the
+        record of where the entry came from, so nothing else has to be written down."""
+        day = datetime.now(tz=UTC).strftime("%Y%m%d")
+        rel = target.relative_to(self._workspace_root)
+        return self._dadaia / REAPED_ZONE / day / rel
+
+    def _reap(self, findings: tuple[Finding, ...]) -> list[str]:
+        """MOVE every slop entry into the reaped zone. Never deletes."""
+        actions: list[str] = []
+        for finding in findings:
+            if finding.verdict is not FindingVerdict.SLOP:
+                continue
+            step = partial(
+                sweep.move,
+                self._workspace_root,
+                finding.target,
+                self._reaped_destination(finding.target),
+                finding.path,
+            )
+            actions.extend(sweep.guarded(finding.code, finding.path, step))
         return actions
 
     def _reap_dead_repo(self, ctx: SpecContextProject, repo_path: Path) -> list[str]:
@@ -498,14 +619,24 @@ class DoctorService:
         ``repos/`` — a slug like ``..`` or a symlinked checkout resolves elsewhere and is
         refused (bug import-registers-unvalidated-slugs-that-doctor-fix-inv5-rmtrees) —
         and the context is still DEAD at the moment of the reap. The two liveness
-        questions are policy and live here; the filesystem act is the primitive's."""
+        questions are policy and live here; the filesystem act is the primitive's.
+
+        The leftover is MOVED, like every other reaped entry: a DEAD context whose repo is
+        still on disk is exactly the case where an rmtree used to be irreversible."""
         label = f"repos/{ctx.repo_slug}"
         if repo_path.resolve().parent != self._repos_dir().resolve():
             return [f"INV-5: skipped '{label}' (outside repos/)"]
         current = self._store.get(ctx.name)
         if current is None or current.state is not ContextState.DEAD:
             return []
-        step = partial(sweep.remove, self._workspace_root, repo_path, label)
+        step = partial(
+            sweep.move,
+            self._workspace_root,
+            repo_path,
+            self._reaped_destination(repo_path),
+            label,
+            note=f" (context {ctx.name})",
+        )
         return sweep.guarded("INV-5", label, step)
 
     def _migrate_exceptions(self) -> list[str]:
@@ -548,6 +679,19 @@ class DoctorService:
                     )
                 )
         return actions
+
+
+def reap(workspace_root: Path, *, own_session_id: str = "") -> list[str]:
+    """The reaper lane, composed without the container (P-12).
+
+    ``sdd_post_gate``'s throttle and the SessionStart lane call this: seed what is
+    missing, move slop into ``reaped/``, delete what TTL expired. Hooks are sanctioned
+    direct importers of a feature and its stores; the composition root is not on the
+    write hot path.
+    """
+    states = workspace_root / ".dadaia" / "states"
+    service = DoctorService(JsonContextStore(states), GitSubprocessClient(), workspace_root)
+    return service.fix(own_session_id=own_session_id)
 
 
 # ── the `workspace` section of the one doctor (0.4.7 FR5, T-047-02) ──────────────

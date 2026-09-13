@@ -51,7 +51,6 @@ def test_fix_dispatch_and_help_derive_from_the_registry() -> None:
     assert fixable == {
         "TREE-4",
         "TREE-5",
-        "REPO-DADAIA-1",
         "TREE-8",
         "SPEC-DOC-034",
         "SPEC-DOC-044",

@@ -160,29 +160,34 @@ def test_fix_reports_an_undeletable_entry_exits_1_and_never_raises(workspace: Pa
     assert f"{_EXPIRED_CODE}: skipped '{_TTL_ZONE.name}/locked/a.js' (errno 13" in result.output
 
 
-def test_fix_expired_only_quiet_prints_only_what_it_deleted(workspace: Path) -> None:
+def test_fix_expired_only_quiet_is_the_reaper_lane(workspace: Path) -> None:
+    """0.4.7 FR6b: ``--expired-only`` scopes what the REPORT shows, not what the reaper
+    does — there is one lane (seed, move slop, expire). The SessionStart hook runs this
+    exact command, so slop leaves the working tree there too; it is HELD in ``reaped/``,
+    never deleted, and a second run has nothing left to take."""
     (workspace / "junk.txt").write_text("", encoding="utf-8")
     stale = _plant_expired(workspace)
 
     result = CliRunner().invoke(app, ["doctor", "--fix", "--expired-only", "--quiet"])
 
     assert result.exit_code == 0, result.output
-    assert result.output.splitlines() == [f"{_EXPIRED_CODE}: deleted '{_TTL_ZONE.name}/stale'"]
+    assert f"{_EXPIRED_CODE}: deleted '{_TTL_ZONE.name}/stale'" in result.output.splitlines()
     assert not stale.exists()
-    assert (workspace / "junk.txt").exists()
+    assert not (workspace / "junk.txt").exists()
+    assert any(p.name == "junk.txt" for p in (workspace / ".dadaia" / "reaped").rglob("junk.txt"))
 
     again = CliRunner().invoke(app, ["doctor", "--fix", "--expired-only", "--quiet"])
     assert again.exit_code == 0
     assert again.output == ""
 
 
-def test_fix_deletes_slop_and_reports_the_post_fix_score(workspace: Path) -> None:
+def test_fix_moves_slop_to_reaped_and_reports_the_post_fix_score(workspace: Path) -> None:
     (workspace / "junk.txt").write_text("", encoding="utf-8")
 
     result = CliRunner().invoke(app, ["doctor", "--fix"])
     lines = result.output.splitlines()
 
     assert result.exit_code == 0, result.output
-    assert "WS-root-slop: deleted 'junk.txt'" in result.output
+    assert "WS-root-slop: moved 'junk.txt' -> '.dadaia/reaped/" in result.output
     assert lines[-1].endswith("(100%)")
     assert not (workspace / "junk.txt").exists()

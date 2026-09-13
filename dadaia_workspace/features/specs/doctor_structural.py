@@ -197,46 +197,6 @@ class StructuralValidator:
             )
         return issues
 
-    def check_repo_dadaia1(self) -> list[SpecsDoctorIssue]:
-        """REPO-DADAIA-1: a ``.dadaia/`` directory INSIDE the context repo (v0.1.73 FR6,
-        bug ``stray-dadaia-tmp-inside-repo``).
-
-        ``.dadaia/`` is workspace-level ONLY — an in-repo copy corrupts workspace-vs-repo
-        boundary detection (root AGENTS.md repo-cleanliness law). Fixable (removed by
-        ``--fix``) only when it carries NO ``states/`` — a stray tmp landing zone; a
-        ``.dadaia/`` WITH ``states/`` demands operator judgment and is never auto-removed.
-        """
-        stray = self.specs_dir.parent / ".dadaia"
-        if not stray.is_dir():
-            return []
-        has_states = (stray / "states").exists()
-        return [
-            SpecsDoctorIssue(
-                code="REPO-DADAIA-1",
-                severity=Severity.WARNING,
-                description=(
-                    ".dadaia/ exists INSIDE the repo — it is workspace-level only "
-                    "(corrupts workspace-vs-repo boundary detection). "
-                    + (
-                        "Contains states/ — resolve manually (never auto-removed)."
-                        if has_states
-                        else "Stray tmp landing zone — `dadaia doctor --fix` removes it."
-                    )
-                ),
-                path=str(stray),
-                fixable=not has_states,
-            )
-        ]
-
-    def fix_repo_dadaia1(self, issue: SpecsDoctorIssue) -> None:
-        """Remove a stray in-repo ``.dadaia/`` (only ever called for fixable issues —
-        the check marks a states/-bearing dir non-fixable)."""
-        assert issue.code == "REPO-DADAIA-1"
-        stray = Path(issue.path)  # type: ignore[arg-type]
-        if (stray / "states").exists():  # belt-and-suspenders: never remove state
-            return
-        shutil.rmtree(stray, ignore_errors=True)
-
     def fix_tree4(self, issue: SpecsDoctorIssue) -> None:
         """Create the missing directory with AGENTS.md — a directory is kept by its
         AGENTS.md, no separate .gitkeep placeholder."""

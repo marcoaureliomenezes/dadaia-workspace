@@ -215,7 +215,7 @@ class MemoryValidator:
         Reuses the MEM-PLACEHOLDER-1 validator shape (same family, WARN not ERROR since
         no verb can auto-fill project-specific numbers). Runs ONLY against the
         **installed** consumer copy at ``<repo-root>/tests/AGENTS.md`` —
-        ``specs_dir.parent`` is the repo-root idiom this module's ``REPO-DADAIA-1``
+        ``specs_dir.parent`` is the repo-root idiom the workspace section's repo-tree walk
         sibling already uses — never against the canonical template
         (``dadaia_workspace/public/templates/tests-AGENTS.md``), which legitimately
         ships placeholders for the operator to fill in. Silent when the file is absent

@@ -148,6 +148,9 @@ STATES_CANON: frozenset[str] = frozenset(
 
 _ONE_DAY = 86_400
 
+#: The reaper's hold window: a moved entry is deleted only after this elapses (Q3).
+_SEVEN_DAYS: int = 7 * _ONE_DAY
+
 #: The one record of what may live in ``.dadaia/``. Row order is the
 #: rendered table order; every other list of zone names in the package is a view of this.
 DADAIA_ZONES: tuple[Zone, ...] = (
@@ -178,6 +181,14 @@ DADAIA_ZONES: tuple[Zone, ...] = (
         "agent handoffs, ack-on-consume",
     ),
     Zone("tmp", ZoneClass.EPHEMERAL, Creator.RUNTIME, _ONE_DAY, None, "scratch + evidence"),
+    Zone(
+        "reaped",
+        ZoneClass.EPHEMERAL,
+        Creator.RUNTIME,
+        _SEVEN_DAYS,
+        None,
+        "slop held by the reaper; deleted only by TTL expiry",
+    ),
     Zone("mcps", ZoneClass.EPHEMERAL, Creator.RUNTIME, _ONE_DAY, None, "MCP working dirs"),
     Zone(
         ".cache",

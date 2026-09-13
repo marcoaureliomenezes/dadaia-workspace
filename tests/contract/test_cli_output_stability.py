@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import json
 import platform
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -157,13 +158,16 @@ def test_doctor_default_fix_output_unchanged(workspace: Path) -> None:
     _register_dead_ctx_with_repo_on_disk(workspace)
     result = _runner.invoke(app, ["doctor", "--fix"])
     assert result.exit_code == 0, result.output
+    # 136, not 135: the reaper's own zone directory now exists and is canonical.
+    day = datetime.now(tz=UTC).strftime("%Y%m%d")
     assert result.output == (
-        "compliance(workspace): 135/135 entries canonical (100%)\n"
+        "compliance(workspace): 136/136 entries canonical (100%)\n"
         "compliance(specs): 0/0 rules canonical (100%)\n"
         "compliance(ledgers): 0/0 records canonical (100%)\n"
         "\nApplied 1 repair(s):\n"
-        "  - INV-5: deleted 'repos/stale-ctx'\n"
-        "compliance(total): 135/135 checks canonical (100%)\n"
+        "  - INV-5: moved 'repos/stale-ctx' (context stale-ctx) -> "
+        f"'.dadaia/reaped/{day}/repos/stale-ctx'\n"
+        "compliance(total): 136/136 checks canonical (100%)\n"
     )
 
 

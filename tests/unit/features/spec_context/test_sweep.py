@@ -118,8 +118,9 @@ def test_move_relocates_an_entry_and_creates_the_destination_parents(tmp_path: P
     (src / "v").write_text("x")
     dest = tmp_path / ".dadaia" / "reaped" / "20260913" / "repos" / "x" / ".pytest_cache"
     message = sweep.move(tmp_path, src, dest, "repos/x/.pytest_cache")
-    assert message is not None
-    assert "repos/x/.pytest_cache" in message
+    assert message == (
+        "moved 'repos/x/.pytest_cache' -> '.dadaia/reaped/20260913/repos/x/.pytest_cache'"
+    )
     assert not src.exists()
     assert (dest / "v").read_text() == "x"
 
@@ -134,6 +135,17 @@ def test_move_resets_the_ttl_clock_at_the_move(tmp_path: Path) -> None:
     moved = sweep.mtime(dest)
     assert moved is not None
     assert moved > 1_000_000_000
+
+
+def test_move_carries_one_optional_note_naming_whose_entry_it_was(tmp_path: Path) -> None:
+    """ONE message shape; the note is the single extra field (INV-5 names the context)."""
+    src = tmp_path / "repos" / "stale"
+    src.mkdir(parents=True)
+    dest = tmp_path / ".dadaia" / "reaped" / "20260913" / "repos" / "stale"
+    message = sweep.move(tmp_path, src, dest, "repos/stale", note=" (context stale-ctx)")
+    assert message == (
+        "moved 'repos/stale' (context stale-ctx) -> '.dadaia/reaped/20260913/repos/stale'"
+    )
 
 
 def test_move_skips_a_source_outside_the_workspace(tmp_path: Path) -> None:

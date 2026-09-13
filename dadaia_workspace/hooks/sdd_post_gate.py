@@ -15,7 +15,8 @@ sits first in ``resolve_session_id``'s order).
 - Fail-open: any exception ⇒ exit 0. The hook must never break the harness.
 
 GC (release 0.5.1 K2): this hook no longer reaps anything itself. On its own throttle
-cadence (never on every single tool call) it calls the ONE reaper, :func:`presence.gc`,
+cadence (never on every single tool call) it calls the ONE presence reaper,
+:func:`presence.gc`, and the ONE workspace reaper, :func:`doctor.reap` (0.4.7 FR6b) —
 for presence records,
 throttle/sentinel markers and now-empty presence context dirs. Session-record graveyard
 GC stays exclusively owned by ``DoctorService.fix()`` — this hook used to duplicate it at
@@ -81,7 +82,15 @@ def _throttled_gc(workspace: Path, sess_id: str) -> None:
     ):
         return
     presence.stamp_throttle(workspace, marker)
-    presence.gc(workspace, now=datetime.now(tz=UTC), own_session_id=sess_id)
+    # ONE cadence, ONE reaper (0.4.7 FR6b): ``doctor.reap`` seeds what is missing, moves
+    # slop into ``.dadaia/reaped/``, deletes what TTL expired — and runs ``presence.gc``
+    # itself, with THIS session id, so the hook no longer calls it separately and a live
+    # session can never reap its own presence record. Imported HERE, not at module scope,
+    # so the throttled-out path — the overwhelmingly common one — pays none of the
+    # reaper's import cost; never through the container (P-12).
+    from dadaia_workspace.features.spec_context import doctor
+
+    doctor.reap(workspace, own_session_id=sess_id)
 
 
 def main() -> int:

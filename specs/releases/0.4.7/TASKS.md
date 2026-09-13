@@ -58,7 +58,7 @@
   Write set: `dadaia_workspace/features/spec_context/{doctor,sweep}.py`, `tests/**`.
   Blocked by: T-047-17. Delivers: one walk serves scan and fix; the CRIT repro (bind,
   `doctor --fix`, `context show`) keeps the bind.
-- [-] T-047-20 — FR6b: `reaped` zone row (7 d, Q3 path); slop and INV-5 leftovers
+- [x] T-047-20 — FR6b: `reaped` zone row (7 d, Q3 path); slop and INV-5 leftovers
   moved to `reaped/<YYYYMMDD>/<rel-path>` with the clock at the move; deletion only by
   TTL; repo-top + `REPO_TREE_EXCLUDED`-at-depth + nested `.dadaia/` walk over every
   ALIVE repo set (pruned at `.git`, `.venv`, `node_modules`); `WS-reaped-reaped`
