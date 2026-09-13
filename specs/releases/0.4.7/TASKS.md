@@ -24,7 +24,7 @@
   schemas/bugs/bug-record-v1.schema.json`, `.github/workflows/ci.yml`, `specs/bugs/**`,
   `tests/**`. Blocked by: none. Delivers: one bug record shape with no derivable cache;
   `doctor --fix` heals every committed record; CI checks out shallow.
-- [ ] T-047-26 — FR2: `GovernanceEvent` in `core/models/telemetry.py`; migration 7 +
+- [-] T-047-26 — FR2: `GovernanceEvent` in `core/models/telemetry.py`; migration 7 +
   `insert_governance_event` + `latest_governance_events()` in `features/telemetry/
   store.py`; `container.build_telemetry_store()` shared with `panel_composition`;
   `cli/_governance_event.py` (build, hash, insert, swallow OSError); the seven `bugs`
