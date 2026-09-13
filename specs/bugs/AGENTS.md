@@ -15,7 +15,7 @@ Scope: this file governs only `specs/bugs/`.
 | `mutable-governance` | Rewritten in place, atomic refuse-stale |
 
 - `immutable-core` fields: `id`, `ts`, `title`, `severity`, `surface`, `component`, `symptom`, `repro`, `expected`.
-- `write-once` fields: `root_cause`, `solution`, `evidence_loop`, `evidence_seam`, `evidence_diff`, `diff_direction` (derived from `evidence_diff`'s `net-*:` prefix).
+- `write-once` fields: `solution`, `evidence_loop`, `evidence_seam`, `evidence_diff`, `diff_direction` (derived from `evidence_diff`'s `net-*:` prefix).
 - `mutable-governance` fields: `status`, `closed_at`, `cause`, `caused_by`, `resolved_release`, `audited`.
 
 ## 2. Authoring rules

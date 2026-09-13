@@ -148,7 +148,7 @@
         "null"
       ],
       "x-mutability": "mutable-governance",
-      "description": "The audit window id that reviewed this resolution — the one place `resolved_commit`/`resolution_granularity`/`audited` are ever written together, in a single atomic rewrite (FR14 pillar 1)."
+      "description": "The audit window id that reviewed this resolution — written by the auditor through the one governance-update seam, in a single atomic rewrite (FR14 pillar 1)."
     },
     "closed_at": {
       "type": [
