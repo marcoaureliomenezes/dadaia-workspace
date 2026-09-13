@@ -248,6 +248,31 @@ def test_live_shas_cover_the_verdict_a_merge_commit_just_consumed(tmp_path: Path
     assert live_verdict_shas(source, tmp_path, merge) == (merge, old_tip, feature_head, reviewed)
 
 
+def test_live_shas_follow_the_merged_line_along_both_gitflow_edges(tmp_path: Path) -> None:
+    """main right after the ship merge (and the ship PR's synthetic merge ref): the
+    merged line is develop's tip, itself the merge of the last feature PR. Both the
+    ship verdict (develop's pre-merge tip = the merged line's first parent) and the
+    PR-gate verdict that last feature merge consumed (one merged line deeper) are live;
+    a third edge does not exist, so nothing deeper is."""
+    ship, old_main, dev_tip, dev_prev, feat, reviewed, deeper = (c * 40 for c in "somdfrx")
+    source = _FakeShaSource(
+        refs={INTEGRATION_TIP_REF: dev_tip},
+        parents_by_sha={
+            ship: (old_main, dev_tip),
+            dev_tip: (dev_prev, feat),
+            feat: (reviewed,),
+            reviewed: (deeper,),
+        },
+    )
+    assert live_verdict_shas(source, tmp_path, ship) == (
+        ship,
+        old_main,
+        dev_tip,
+        dev_prev,
+        reviewed,
+    )
+
+
 def test_live_shas_dedupe_when_the_integration_tip_is_the_parent(tmp_path: Path) -> None:
     source = _FakeShaSource(parent=_SHA_PARENT, refs={INTEGRATION_TIP_REF: _SHA_PARENT})
     assert live_verdict_shas(source, tmp_path, _SHA_HEAD) == (_SHA_HEAD, _SHA_PARENT)

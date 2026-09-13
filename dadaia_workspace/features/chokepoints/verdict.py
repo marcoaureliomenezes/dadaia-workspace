@@ -79,30 +79,43 @@ class ShaSource(Protocol):
     def resolve_ref(self, repo: Path, ref: str) -> str | None: ...
 
 
+#: The gitflow edges a merged line is followed along — feature -> develop -> main
+#: (DADAIA.md §4.1): every verdict a merge on either edge consumed stays live one edge
+#: deeper, never further.
+GITFLOW_EDGES = 2
+
+
 def live_verdict_shas(source: ShaSource, repo: Path, head_sha: str) -> tuple[str, ...]:
     """The ONE on-disk liveness set: the shas a committed verdict under
     ``specs/releases/<id>/verdicts/`` may name and not be stale.
 
     ``head_sha`` itself; every parent of it (the committed-verdict shape — the verdict
     file lands in the commit right after the reviewed sha, so on a linear branch the
-    first parent is the reviewed sha); for a merge commit, the first parent of each
-    MERGED line (the second parent onward) — the PR-gate verdict a feature -> develop
-    merge just consumed names the feature head's first parent, and the ship verdict a
-    develop -> main merge consumed names develop's pre-merge tip, which is the merged
-    line's first parent; and the integration branch tip (:data:`INTEGRATION_TIP_REF` —
-    the ship-PR verdict DADAIA.md §4.2 stages on the feature branch names develop's tip
+    first parent is the reviewed sha); the first parent of each MERGED line, followed
+    along gitflow's two edges (:data:`GITFLOW_EDGES`): a feature -> develop merge
+    consumed the PR-gate verdict naming the feature head's first parent, and a develop
+    -> main merge consumed the ship verdict naming develop's pre-merge tip while develop
+    still carries the PR-gate verdict ITS last feature merge consumed (the ship PR's
+    own head cannot delete it — it gates that PR), so from main both are one merged
+    line deeper; and the integration branch tip (:data:`INTEGRATION_TIP_REF` — the
+    ship-PR verdict DADAIA.md §4.2 stages on the feature branch names develop's tip
     before that merge exists). Anything unresolvable is simply absent; duplicates
-    collapse; order is head, parents, merged lines' first parents, tip.
-    ``features.specs.canon.verdict_violations`` (the doctor's SPEC-DOC-044 and the
+    collapse; order is head, parents, merged lines' first parents (nearest edge first),
+    tip. ``features.specs.canon.verdict_violations`` (the doctor's SPEC-DOC-044 and the
     pre-push specs-canon scan) consumes exactly this set — the rule has one home, so the
     shape the law mandates is never refused by one gate and accepted by another, and
-    the integration branch is never red on the verdict it just consumed.
+    no integration branch is ever red on the evidence its own merges just consumed.
     """
     parents = source.parents(repo, head_sha)
-    merged_lines = [source.parents(repo, merged)[:1] for merged in parents[1:]]
     candidates: list[str | None] = [head_sha, *parents]
-    for line in merged_lines:
-        candidates.extend(line)
+    merged = list(parents[1:])
+    for _edge in range(GITFLOW_EDGES):
+        next_merged: list[str] = []
+        for merged_sha in merged:
+            line = source.parents(repo, merged_sha)
+            candidates.extend(line[:1])
+            next_merged.extend(line[1:])
+        merged = next_merged
     candidates.append(source.resolve_ref(repo, INTEGRATION_TIP_REF))
     shas: list[str] = []
     for sha in candidates:
