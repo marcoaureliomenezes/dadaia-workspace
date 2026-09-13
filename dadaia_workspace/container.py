@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from dadaia_workspace.core.models.bugs import BugRecord
     from dadaia_workspace.features.certification import CertificationResult
+    from dadaia_workspace.features.telemetry.store import TelemetryStore
     from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 from dadaia_workspace.core.exceptions import (
@@ -154,6 +155,22 @@ def build_bug_record_store(specs_dir: Path) -> "JsonlRecordStore[BugRecord]":
         to_dict=BugRecord.to_dict,
         from_dict=BugRecord.from_dict,
     )
+
+
+def build_telemetry_store() -> "TelemetryStore":
+    """The ONE telemetry store: ``~/.dadaia/state/telemetry/telemetry.sqlite``, one per
+    machine (0.4.7 FR2). The panel's boot and every governance verb build it here, so
+    the path and the migration set are stated once; two workspaces on one machine share
+    the file and are kept apart by each event's ``context``.
+
+    Returns an UNOPENED store — the caller decides whether it opens for write (and how
+    it degrades when it cannot).
+    """
+    from dadaia_workspace.features.telemetry.store import TelemetryStore
+
+    state_dir = Path("~/.dadaia/state/telemetry").expanduser()
+    state_dir.mkdir(parents=True, exist_ok=True)
+    return TelemetryStore(state_dir / "telemetry.sqlite")
 
 
 def build_bug_record_validator() -> Callable[[Mapping[str, object]], None]:

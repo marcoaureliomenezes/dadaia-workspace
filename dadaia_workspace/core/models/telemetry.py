@@ -189,3 +189,24 @@ class SessionAggregate:
     total_messages: int
     top_agent: TopAgent | None
     generated_at: str  # ISO UTC timestamp
+
+
+@dataclass(frozen=True)
+class GovernanceEvent:
+    """One governance record change, as observed by the verb that made it (0.4.7 FR2).
+
+    Carries NO content — only the hash of the record the verb left on disk, so a hand
+    edit is measurable (the committed record no longer hashes to the latest event)
+    without the store ever holding a second copy of the ledger. There is no ``agent``
+    field: ``sessions.agent_name`` joins on ``session_id``. There is no commit sha: a
+    governance verb never runs git.
+    """
+
+    event_id: str
+    ts: str
+    session_id: str
+    context: str
+    verb: str
+    ledger: str
+    record_id: str
+    record_hash: str

@@ -30,9 +30,11 @@ import pathlib
 import sqlite3
 from dataclasses import dataclass
 
+from dadaia_workspace.core.models.telemetry import GovernanceEvent
+
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION: int = 6
+SCHEMA_VERSION: int = 7
 
 
 # ---------------------------------------------------------------------------
@@ -213,6 +215,21 @@ _MIGRATION_6 = (
     "DROP TABLE IF EXISTS workflow_agents;\nDROP TABLE IF EXISTS workflows;\n"
 )
 
+_MIGRATION_7 = """
+CREATE TABLE IF NOT EXISTS governance_events (
+    event_id    TEXT PRIMARY KEY,
+    ts          TEXT NOT NULL,
+    session_id  TEXT NOT NULL,
+    context     TEXT NOT NULL,
+    verb        TEXT NOT NULL,
+    ledger      TEXT NOT NULL,
+    record_id   TEXT NOT NULL,
+    record_hash TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_governance_events_record
+    ON governance_events(ledger, record_id, ts);
+"""
+
 _MIGRATIONS: list[str] = [
     _MIGRATION_1,
     _MIGRATION_2,
@@ -220,6 +237,7 @@ _MIGRATIONS: list[str] = [
     _MIGRATION_4,
     _MIGRATION_5,
     _MIGRATION_6,
+    _MIGRATION_7,
 ]
 
 # Milliseconds a connection waits on a locked table before raising
@@ -490,6 +508,60 @@ class TelemetryStore:
             ),
         )
         conn.commit()
+
+    def insert_governance_event(self, event: GovernanceEvent) -> None:
+        """Insert one governance event; a repeated ``event_id`` is ignored (idempotent).
+
+        Deliberately NO foreign key to ``sessions``: a CLI verb's session is a shell,
+        not a harness transcript the telemetry reader ever ingested, and an event that
+        refused to insert because its session is unknown would be an event that gates.
+        """
+        conn = self._require_conn()
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO governance_events
+                (event_id, ts, session_id, context, verb, ledger, record_id, record_hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                event.event_id,
+                event.ts,
+                event.session_id,
+                event.context,
+                event.verb,
+                event.ledger,
+                event.record_id,
+                event.record_hash,
+            ),
+        )
+        conn.commit()
+
+    def latest_governance_events(self) -> list[GovernanceEvent]:
+        """The most recent event for each ``(ledger, record_id)`` — the whole state a
+        hand-edit reader needs, read once into plain data."""
+        conn = self._require_conn()
+        rows = conn.execute(
+            """
+            SELECT event_id, MAX(ts) AS ts, session_id, context, verb,
+                   ledger, record_id, record_hash
+            FROM governance_events
+            GROUP BY ledger, record_id
+            ORDER BY ledger, record_id
+            """
+        ).fetchall()
+        return [
+            GovernanceEvent(
+                event_id=r["event_id"],
+                ts=r["ts"],
+                session_id=r["session_id"],
+                context=r["context"],
+                verb=r["verb"],
+                ledger=r["ledger"],
+                record_id=r["record_id"],
+                record_hash=r["record_hash"],
+            )
+            for r in rows
+        ]
 
     def iter_events_missing_cost(self) -> list[EventCostRow]:
         """Return every event whose cost is not yet backfilled."""

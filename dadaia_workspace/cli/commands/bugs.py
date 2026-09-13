@@ -26,6 +26,7 @@ from pathlib import Path
 import typer
 
 from dadaia_workspace import container
+from dadaia_workspace.cli._governance_event import record_governance_event
 from dadaia_workspace.cli._specs_resolution import (
     repo_slug_for_context,
     resolve_context_for_cli,
@@ -175,7 +176,7 @@ def bugs_append_cmd(
     resolved_ts = ts or _now_iso()
     service = build_bug_service(target)
     try:
-        service.register(
+        appended = service.register(
             bug_id=bug_id,
             ts=resolved_ts,
             reported_by=reported_by,
@@ -191,6 +192,7 @@ def bugs_append_cmd(
     except ValueError as exc:
         typer.echo(f"[error] {exc}", err=True)
         raise typer.Exit(code=1) from exc
+    _record_event("append", appended)
     typer.echo(f"[ok] registered {bug_id} -> {target}")
 
 
@@ -280,11 +282,22 @@ def bugs_update_cmd(
     ) as exc:
         typer.echo(f"[error] {exc}", err=True)
         raise typer.Exit(code=1) from exc
+    _record_event("update", updated)
     typer.echo(f"[ok] updated {', '.join(sorted(changes))} for {updated.id}")
 
 
+def _record_event(verb: str, record: BugRecord) -> None:
+    """One verb, one governance event over the record it just wrote (0.4.7 FR2) — the
+    ONE call site shape every bugs verb uses."""
+    record_governance_event(verb=verb, ledger="bugs", record_id=record.id, record=record.to_dict())
+
+
 def _run_transition(
-    target: Path, bug_id: str, method: Callable[..., BugRecord], fields: Mapping[str, str | None]
+    target: Path,
+    bug_id: str,
+    verb: str,
+    method: Callable[..., BugRecord],
+    fields: Mapping[str, str | None],
 ) -> None:
     """Shared body for the four transition commands below — *method* is the unbound
     :class:`~dadaia_workspace.core.models.bugs.BugRecord` transition method
@@ -299,6 +312,7 @@ def _run_transition(
     except (RecordNotFoundError, StaleRecordWriteError, ValueError) as exc:
         typer.echo(f"[error] {exc}", err=True)
         raise typer.Exit(code=1) from exc
+    _record_event(verb, updated)
     typer.echo(f"[ok] {updated.status} {updated.id}")
 
 
@@ -342,6 +356,7 @@ def bugs_resolve_cmd(
     _run_transition(
         target,
         bug_id,
+        "resolve",
         BugRecord.resolve,
         {
             "cause": cause,
@@ -367,7 +382,7 @@ def bugs_supersede_cmd(
 ) -> None:
     """The ONE way a record reaches ``status="superseded"`` — ``--by`` is REQUIRED."""
     target = _target(specs_dir)
-    _run_transition(target, bug_id, BugRecord.supersede, {"by": by})
+    _run_transition(target, bug_id, "supersede", BugRecord.supersede, {"by": by})
 
 
 @bugs_app.command("defer")
@@ -381,7 +396,7 @@ def bugs_defer_cmd(
     """The ONE way a record reaches ``status="deferred"`` — ``--reason`` is
     REQUIRED."""
     target = _target(specs_dir)
-    _run_transition(target, bug_id, BugRecord.defer, {"reason": reason})
+    _run_transition(target, bug_id, "defer", BugRecord.defer, {"reason": reason})
 
 
 @bugs_app.command("reject")
@@ -395,7 +410,7 @@ def bugs_reject_cmd(
     """The ONE way a record reaches ``status="rejected"`` — ``--reason`` is
     REQUIRED."""
     target = _target(specs_dir)
-    _run_transition(target, bug_id, BugRecord.reject, {"reason": reason})
+    _run_transition(target, bug_id, "reject", BugRecord.reject, {"reason": reason})
 
 
 @bugs_app.command("archive")
@@ -419,4 +434,6 @@ def bugs_archive_cmd(
     parsed_now = datetime.fromisoformat(now.replace("Z", "+00:00")) if now else None
     service = build_bug_service(target, with_archive=True)
     result = service.archive(now=parsed_now, threshold_days=threshold_days)
+    for moved in result.records:
+        _record_event("archive", moved)
     typer.echo(f"[ok] archived {result.archived} record(s), {result.kept} kept.")

@@ -130,10 +130,16 @@ class BugStats:
 
 @dataclass(frozen=True)
 class BugArchiveResult:
-    """A2.8 — the outcome of one ``dadaia bugs archive`` run."""
+    """A2.8 — the outcome of one ``dadaia bugs archive`` run. Carries the records it
+    MOVED, not just how many: the caller writes one governance event per moved record
+    (0.4.7 FR2), and the count is derived from them rather than reported beside them."""
 
-    archived: int
-    kept: int
+    records: tuple[BugRecord, ...] = ()
+    kept: int = 0
+
+    @property
+    def archived(self) -> int:
+        return len(self.records)
 
 
 class BugService:
@@ -182,11 +188,12 @@ class BugService:
         symptom: str | None,
         repro: str | None,
         expected: str | None,
-    ) -> None:
+    ) -> BugRecord:
         """Append one NEW, freshly-registered :class:`BugRecord` (``status="open"``).
 
         Refuses (:class:`BugDuplicateIdError`) a *bug_id* already present anywhere in
         the ledger. When a ``validate`` callable was injected (the schema, D9), the
+        Returns the appended record (the caller's governance event hashes it). The
         raw payload is validated FIRST — a missing/mistyped/out-of-enum field raises
         ``ValueError`` before any :class:`BugRecord` is constructed. Redacts every
         free-text field through the same seam the update path uses (A2.6) before
@@ -227,6 +234,7 @@ class BugService:
                 raise ValueError(str(exc.message)) from exc
         record = BugRecord.from_dict(payload).redact(self._denylist_terms)
         self._record_store.append(record)
+        return record
 
     def apply_update(self, record_id: str, changes: Mapping[str, object]) -> BugRecord:
         """The one governance-write seam for every governance/write-once field OTHER
@@ -307,12 +315,12 @@ class BugService:
             if record.closed_at is not None and _parse_ts(record.closed_at) < cutoff
         }
         if not eligible_ids:
-            return BugArchiveResult(archived=0, kept=len(all_records))
+            return BugArchiveResult(kept=len(all_records))
 
         removed = self._record_store.remove(eligible_ids)
         for record in removed:
             self._archive_store.append(record)
-        return BugArchiveResult(archived=len(removed), kept=len(all_records) - len(removed))
+        return BugArchiveResult(records=tuple(removed), kept=len(all_records) - len(removed))
 
     def normalize_records(self) -> int:
         """Rewrite every committed record of the ledger and the histo into its canonical
