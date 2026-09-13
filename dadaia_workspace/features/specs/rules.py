@@ -229,7 +229,13 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-039",),
         lambda d: d._release.check_partial_archived_release_dirs(),
-        fix_help="git rm -r specs/_archive/releases/<release-id>",
+        fix_help=(
+            "mkdir -p specs/_archive/wip-abandoned && "
+            "git mv specs/_archive/releases/<release-id> "
+            "specs/_archive/wip-abandoned/<release-id> && "
+            "printf '%s\\n' '<why abandoned>' "
+            ">> specs/_archive/wip-abandoned/<release-id>/README.md"
+        ),
     ),
     _rule(
         ("SPEC-DOC-041",),

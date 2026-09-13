@@ -24,6 +24,7 @@ size: MEDIUM.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -146,7 +147,10 @@ PLANTS: dict[str, Plant] = {
             "<summary>": "three pillars closed",
         },
     ),
-    "SPEC-DOC-039": Plant(_plant_archived_release_residue, {"<release-id>": "0.0.9"}),
+    "SPEC-DOC-039": Plant(
+        _plant_archived_release_residue,
+        {"<release-id>": "0.0.9", "<why abandoned>": "abandoned: superseded by 0.1.0"},
+    ),
 }
 
 _UNEXERCISED: dict[str, str] = {
@@ -272,6 +276,33 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
     )
 
 
+def test_spec_doc_039_relocates_the_residue_instead_of_destroying_it(tmp_path: Path) -> None:
+    """The remedy the finding NAMES is the remedy its fix line RUNS.
+
+    ``doctor_release.check_partial_archived_release_dirs`` tells the operator to
+    relocate the residue to ``specs/_archive/wip-abandoned/<name>/`` with a README
+    breadcrumb. A fix line that removes the directory answers a different question.
+    """
+    root = _repo(tmp_path)
+    plant = PLANTS["SPEC-DOC-039"]
+    plant.plant(root)
+    _git(root, "add", "-A")
+    _git(root, "commit", "-qm", "fixture")
+    rule = next(r for r in SPECS_RULES if "SPEC-DOC-039" in r.codes)
+    assert rule.fix_help is not None
+
+    command = _resolve(rule.fix_help, plant).replace(_VENV_DADAIA, "dadaia")
+    done = subprocess.run(
+        ["bash", "-c", command], cwd=root, capture_output=True, text=True, check=False
+    )
+    assert done.returncode == 0, f"{command}\n{done.stderr}"
+
+    relocated = root / "specs" / "_archive" / "wip-abandoned" / "0.0.9"
+    assert (relocated / "GRILL.md").read_text(encoding="utf-8") == "# Grill notes\n"
+    assert "abandoned" in (relocated / "README.md").read_text(encoding="utf-8")
+    assert not (root / "specs" / "_archive" / "releases" / "0.0.9").exists()
+
+
 def test_every_specs_rule_is_either_exercised_or_listed_with_a_reason() -> None:
     """The census: no rule falls out of this module silently."""
     accounted: set[str] = set()
@@ -294,14 +325,25 @@ def _iter_fix_helps() -> list[tuple[str, Any]]:
     return [("/".join(r.codes), r.fix_help) for r in SPECS_RULES]
 
 
+#: a bare ``rm`` invocation with a recursive flag, at the head of the line or of any
+#: segment of a chain. ``git rm -r`` is deliberately NOT matched: it stages a removal
+#: that git history still holds, which is why SPEC-DOC-038 may end with one.
+_BARE_RECURSIVE_RM = re.compile(r"(?:^|&&|;|\|)\s*rm\s+-[a-zA-Z]*r")
+
+
 @pytest.mark.parametrize(("codes", "fix"), _iter_fix_helps(), ids=[c for c, _ in _iter_fix_helps()])
 def test_no_fix_line_deletes_a_record_without_recording_it(codes: str, fix: str | None) -> None:
-    """A bare ``rm -rf`` is never a fix: what the finding protects would go with it."""
+    """A bare recursive ``rm`` is never a fix: what the finding protects goes with it.
+
+    The class, not the one line that was found: any ``rm -r``/``rm -rf``/``rm -fr``
+    anywhere in the chain, not only as its opening token.
+    """
     if fix is None:
         return
-    assert not fix.startswith("rm -rf"), (
-        f"{codes}: `rm -rf` destroys the subject instead of dispositioning it — "
-        "chain the record step ahead of the removal, or drop the fix line"
+    assert not _BARE_RECURSIVE_RM.search(fix), (
+        f"{codes}: a bare recursive `rm` destroys the subject instead of "
+        "dispositioning it — chain the record step ahead of the removal, "
+        "relocate instead of deleting, or drop the fix line"
     )
 
 
