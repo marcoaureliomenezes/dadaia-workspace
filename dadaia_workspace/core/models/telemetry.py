@@ -17,6 +17,7 @@ import hashlib
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
+from dataclasses import field as dc_field
 from typing import Literal
 
 
@@ -248,6 +249,17 @@ class GovernanceBaseline:
 
     events: tuple[GovernanceEvent, ...]
 
+    #: ``events`` keyed by the pair every lookup asks for, built ONCE per baseline
+    #: instead of scanned per record: `hand_edit` is called once per committed record
+    #: (509 bug records today) and used to be a linear walk of every event each time.
+    _by_record: dict[tuple[str, str], GovernanceEvent] = dc_field(
+        init=False, repr=False, compare=False, default_factory=dict
+    )
+
+    def __post_init__(self) -> None:
+        for event in self.events:
+            self._by_record[(event.ledger, event.record_id)] = event
+
     @property
     def first_ts(self) -> str:
         """The oldest event this baseline holds — the measurement horizon. A record
@@ -275,14 +287,13 @@ class GovernanceBaseline:
         """
         if not self.events:
             return None
-        for event in self.events:
-            if event.ledger == ledger and event.record_id == record_id:
-                if event.record_hash == record_hash(record):
-                    return None
-                return (
-                    f"record changed after `{event.verb}` ({event.ts}) wrote it — "
-                    "hand edit, not a verb"
-                )
+        event = self._by_record.get((ledger, record_id))
+        if event is not None:
+            if event.record_hash == record_hash(record):
+                return None
+            return (
+                f"record changed after `{event.verb}` ({event.ts}) wrote it — hand edit, not a verb"
+            )
         if record_ts is not None and record_ts > self.first_ts:
             return (
                 f"no governance verb ever wrote this record, and it is newer than the "
