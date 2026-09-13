@@ -208,7 +208,10 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-036",),
         lambda d: d._closure_audit.check_audit_disposition(),
-        fix_help='sed -i \'s/"disposition": null/"disposition": "<fixed|superseded|deferred|rejected>"/\' specs/audits/<audit>/FINDINGS.jsonl',
+        fix_help=(
+            ".dadaia/.venv/bin/dadaia audit disposition <audit> <finding-id> "
+            "--disposition resolved --release <release>"
+        ),
     ),
     _rule(
         ("SPEC-DOC-037",),
@@ -218,13 +221,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-038",),
         lambda d: d._closure_audit.check_loose_undisposed_audits(),
-        fix_help=(
-            'printf \'%s\\n\' \'{"id":"<audit>","ts":"<ts>",'
-            '"disposition":"resolved","release":"<release>","reason":null,'
-            '"summary":"<summary>","entry":null}\' '
-            ">> specs/audits/_archive/audits_histo.jsonl && "
-            "git rm -r specs/audits/<audit>"
-        ),
+        fix_help=".dadaia/.venv/bin/dadaia audit close <audit> --sha <sha>",
     ),
     _rule(
         ("SPEC-DOC-039",),

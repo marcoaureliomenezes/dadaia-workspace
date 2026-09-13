@@ -24,6 +24,7 @@ from dadaia_workspace.cli.commands import (
 from dadaia_workspace.cli.commands import (
     help as help_cmd,
 )
+from dadaia_workspace.cli.commands.audit import audit_app
 from dadaia_workspace.cli.commands.bugs import bugs_app
 from dadaia_workspace.cli.commands.export import export
 from dadaia_workspace.cli.commands.import_ import import_workspace
@@ -99,6 +100,7 @@ app.add_typer(panel.app, name="panel", rich_help_panel="Common")
 app.add_typer(memory_app, name="memory", rich_help_panel="Management")
 app.add_typer(release_app, name="release", rich_help_panel="Common")
 app.add_typer(backlog_app, name="backlog", rich_help_panel="Common")
+app.add_typer(audit_app, name="audit", rich_help_panel="Common")
 app.add_typer(bugs_app, name="bugs", rich_help_panel="Common")
 app.add_typer(help_cmd.app, name="help", rich_help_panel="Common")
 

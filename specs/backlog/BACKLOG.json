@@ -19,8 +19,7 @@
         {
           "subject": {
             "kind": "cli",
-            "ref": "audit close",
-            "surface": "new"
+            "ref": "audit close"
           },
           "change": "new verb: dispositions, histo record, dir removal"
         },

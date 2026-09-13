@@ -26,6 +26,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -42,6 +43,9 @@ from ..unit.features.specs.test_doctor import _make_clean_specs_tree
 
 _RELEASE = "1.2.3"
 _VENV_DADAIA = ".dadaia/.venv/bin/dadaia"
+#: The fix line names the venv binary by its workspace-relative path; the fixture tree is
+#: not a workspace, so it is resolved to the venv running this suite — the SAME binary.
+_THIS_VENV_DADAIA = str(Path(sys.executable).parent / "dadaia")
 
 
 @dataclass(frozen=True)
@@ -95,13 +99,13 @@ def _plant_dispositioned_audit(root: Path) -> None:
     (audit / "FINDINGS.jsonl").write_text(
         json.dumps(
             {
-                "id": "F1",
-                "pillar": "spec-compliance",
+                "id": "20260101-lifecycle-F001",
+                "pillar": "specs",
                 "severity": "LOW",
                 "refs": ["specs/constitution.md"],
                 "claim": "a claim",
                 "evidence": "an evidence line",
-                "disposition": "fixed",
+                "disposition": "resolved",
                 "release": _RELEASE,
                 "reason": None,
             }
@@ -142,9 +146,9 @@ PLANTS: dict[str, Plant] = {
         _plant_dispositioned_audit,
         {
             "<audit>": "20260101-lifecycle",
-            "<ts>": "2026-01-01",
-            "<release>": _RELEASE,
-            "<summary>": "three pillars closed",
+            # The fixture tree is not a bound workspace, so the verb is told which
+            # specs/ it acts on — the one argument a real invocation resolves itself.
+            "<sha>": "abc1234 --specs-dir specs",
         },
     ),
     "SPEC-DOC-039": Plant(
@@ -189,8 +193,9 @@ _UNEXERCISED: dict[str, str] = {
     "SPEC-DOC-034": "auto-fixed rule (`fix_archive_dir`), covered by the closure-audit "
     "doctor unit tests",
     "SPEC-DOC-035": "the fix is `backlog archive`, exercised by the backlog CLI suite",
-    "SPEC-DOC-036": "the fix writes one disposition word into FINDINGS.jsonl; which word "
-    "is the auditor's verdict",
+    "SPEC-DOC-036": "the fix dispositions a finding inside an ARCHIVED audit dir; "
+    "`dadaia audit disposition` acts on live audits only, and `dadaia audit close` is "
+    "what stops an audit reaching _archive/ with an open finding at all",
     "SPEC-DOC-037": "the fix deletes a runtime-enum line from the constitution; the line "
     "is operator content",
     "SPEC-DOC-041": "the fix is `bugs archive`, exercised by the bugs CLI suite",
@@ -264,7 +269,7 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
         )
         return
 
-    command = _resolve(rule.fix_help, plant).replace(_VENV_DADAIA, "dadaia")
+    command = _resolve(rule.fix_help, plant).replace(_VENV_DADAIA, _THIS_VENV_DADAIA)
     done = subprocess.run(
         ["bash", "-c", command], cwd=root, capture_output=True, text=True, check=False
     )
@@ -291,7 +296,7 @@ def test_spec_doc_039_relocates_the_residue_instead_of_destroying_it(tmp_path: P
     rule = next(r for r in SPECS_RULES if "SPEC-DOC-039" in r.codes)
     assert rule.fix_help is not None
 
-    command = _resolve(rule.fix_help, plant).replace(_VENV_DADAIA, "dadaia")
+    command = _resolve(rule.fix_help, plant).replace(_VENV_DADAIA, _THIS_VENV_DADAIA)
     done = subprocess.run(
         ["bash", "-c", command], cwd=root, capture_output=True, text=True, check=False
     )

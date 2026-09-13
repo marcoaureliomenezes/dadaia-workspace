@@ -55,12 +55,11 @@ BACKLOG_HISTO_DISPOSITIONS: tuple[str, ...] = ("delivered", "superseded", "rejec
 #: ``core.models.bugs.TERMINAL_EVENTS`` is built from, so there is one constant, not two.
 BUGS_DISPOSITIONS: tuple[str, ...] = ("resolved", "superseded", "deferred", "rejected")
 
-#: An audit finding's terminal dispositions. NOTE: the live
-#: ``finding-record-v1.schema.json`` ``disposition`` enum keeps its own historical
-#: ``open|fixed|superseded|deferred|rejected`` words — renaming ``fixed`` to
-#: ``resolved`` is a data migration of every committed FINDINGS.jsonl and is NOT in
-#: T-047-03's scope. This subset is the vocabulary of an audit's ``_histo`` record,
-#: which is written by this shape only.
+#: An audit finding's terminal dispositions — the ONE finding vocabulary (0.4.7 FR4):
+#: ``finding-record-v1.schema.json``'s ``disposition`` enum is ``open`` plus exactly
+#: these words, ``features/specs/audit.py`` validates against them, and
+#: ``doctor_closure_audit`` folds them. The historical ``fixed`` was renamed
+#: ``resolved`` with zero committed ``FINDINGS.jsonl`` to migrate.
 FINDINGS_DISPOSITIONS: tuple[str, ...] = ("resolved", "superseded", "deferred", "rejected")
 
 #: An archived audit's histo record uses the findings subset.

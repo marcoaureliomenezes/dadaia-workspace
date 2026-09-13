@@ -107,7 +107,7 @@ def test_finding_record_schema_example_from_spec_validates_both_before_and_after
 
     after_remediation = {
         **as_appended,
-        "disposition": "fixed",
+        "disposition": "resolved",
         "release": "<the remediation release id>",
         "reason": "one render path; regression test at the formatter seam",
     }

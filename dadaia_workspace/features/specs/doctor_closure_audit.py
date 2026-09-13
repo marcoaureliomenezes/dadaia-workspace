@@ -34,6 +34,7 @@ from collections.abc import Callable, Iterator
 from pathlib import Path
 
 from dadaia_workspace.core.models.findings import FindingRecord
+from dadaia_workspace.core.models.histo import FINDINGS_DISPOSITIONS
 from dadaia_workspace.core.workspace_layout import AUDIT_DIR_NAME_RE
 from dadaia_workspace.features.specs.canon import REQUIRED_ROOT_DIRS
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
@@ -63,11 +64,6 @@ _AUDIT_DIR_GRANDFATHER: frozenset[str] = frozenset(
 _ARCHIVE_PARENT_DIRS: tuple[str, ...] = tuple(
     d for d in REQUIRED_ROOT_DIRS if d in ("backlog", "bugs")
 )
-
-# FR13 (D5): a finding's mutable governance triple. A record is done once its
-# ``disposition`` lands here AND names a disposing ``release`` — the only two facts
-# SPEC-DOC-036/038 need out of the finding-record shape.
-_TERMINAL_DISPOSITIONS: frozenset[str] = frozenset({"fixed", "superseded", "deferred", "rejected"})
 
 # Names never treated as a per-audit entry when walking ``audits/`` or ``audits/_archive/``.
 _AUDIT_DIR_SKIP_NAMES: frozenset[str] = frozenset({"README.md"})
@@ -293,7 +289,7 @@ class ClosureAuditValidator:
         """SPEC-DOC-038 (v0.5.0 FR15, A15.1/A15.2): fold ``FINDINGS.jsonl`` archive-due WARN.
 
         A live (non-archived) audit directory directly under ``specs/audits/`` whose
-        ``FINDINGS.jsonl`` records are ALL terminal (:data:`_TERMINAL_DISPOSITIONS`) and
+        ``FINDINGS.jsonl`` records are ALL terminal (:data:`~dadaia_workspace.core.models.histo.FINDINGS_DISPOSITIONS`) and
         each names a disposing ``release`` is due for archiving — one WARN
         (:meth:`_iter_findings`). A live audit still carrying an open record, or one
         with no ``FINDINGS.jsonl`` at all (still in flight, or pre-canon), is silent —
@@ -311,8 +307,7 @@ class ClosureAuditValidator:
             if not records:
                 continue
             if all(
-                record.disposition in _TERMINAL_DISPOSITIONS and record.release
-                for record in records
+                record.disposition in FINDINGS_DISPOSITIONS and record.release for record in records
             ):
                 issues.append(
                     SpecsDoctorIssue(
