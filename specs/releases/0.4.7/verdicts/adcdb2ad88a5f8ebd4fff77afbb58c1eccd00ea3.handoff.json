@@ -1,0 +1,82 @@
+{
+  "schema_version": "handoff-v1.2",
+  "self_pull": {
+    "refs": [
+      "specs/releases/0.4.7/_RELEASE.json",
+      "specs/releases/0.4.7/SPEC.md",
+      "specs/releases/0.4.7/TASKS.md"
+    ]
+  },
+  "agent": "security-reviewer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-09-13T01:24:16Z",
+  "release_id": "0.4.7",
+  "artifact": {
+    "type": "other"
+  },
+  "scope": "PR-gate verdict for feature/0.4.7 -> develop, candidate 1, full review range 6cef01f854ee4e3c1178791270c9813fa9947730..adcdb2ad88a5f8ebd4fff77afbb58c1eccd00ea3 (1407 commits, 228 files, +6978/-4571). This is a DELTA re-verdict superseding the first-round CHANGES_REQUESTED at f23466d07f89236ef7a3fdb2114916c09eb31301 (evidence: .dadaia/tmp/security-reviewer/20260912/scan-log.txt). New delta actually re-reviewed: f23466d0..adcdb2ad, 61 commits, 37 files, +608/-495 - candidate-1 review fixes (F1 redaction remap), FR6 copy-drift (doctor_structural.py TREE-5 comparator incl. the --fix heal path for scaffolded AGENTS.md incl. memory), the memory pass, and CLOSURE records. Lenses: OWASP A01/A03/A05/A08 on the doctor_structural.py fix_tree5 heal path, secret/private-path scan on the full delta diff, dependency/IaC surface check (none touched in the delta), and F1 history-leak re-verification with backup-ref and dangling-object cross-checks.",
+  "verdict": "APPROVED",
+  "verdict_reason": "F1 (operator-local path in historical TASKS.md blobs) is resolved: `git log -p -S'<local-path> --format=%h -- specs/releases/0.4.7/TASKS.md` returns zero commits on the branch and with --all; `refs/original/*` (filter-branch's own backup) is empty; the one stray tag `backup/pre-rewrite-0.5.0` does not even contain a specs/releases/0.4.7/TASKS.md path (0 hits via git ls-tree). The 4 blobs named in the first-round scan (0d8a0c9b67e4, 397a562cf933, 1621479c7281, 98454099c338) are confirmed present only as `git fsck --unreachable` dangling objects - not reachable from any ref, so no push transmits them. The push-gate simulation over the full candidate range exits 0: `printf 'refs/heads/feature/0.4.7 adcdb2ad... refs/heads/feature/0.4.7 6cef01f8...' | dadaia ci push-gate-check` -> denylist scan mode banner only, exit=0 (no BLOCKED line, contrast with the first-round log's BLOCKED output). New delta (f23466d0..adcdb2ad) scanned clean: 0 secret-pattern matches, 0 private-key headers, 0 '<local-path> occurrences across the entire diff; no pyproject.toml/lockfile/CI-workflow/Dockerfile/compose/Terraform touched, so no new dependency or IaC surface. The copy-drift TREE-5 heal path (doctor_structural.py::fix_tree5) is sound: repair target is resolved against a CLOSED tuple of known law-file destinations keyed by the issue's own path (CWE-73 mitigated, no arbitrary-path write), a symlinked destination is refused before any write (CWE-59/CWE-61 mitigated), and `was_shipped` is re-verified inside the fixer itself (not just the checker) so a repair can never overwrite operator-customised content - this closes cleanly, no new finding. F2 (candidate.py symlink-follow gap) and F3 (schemas.py FileNotFoundError echoes an install path) are both untouched in the delta - candidate.py's diff is exception-text wording only (no symlink/path logic changed), and schemas.py is byte-identical between f23466d0 and adcdb2ad. Re-judged: still LOW/INFO, non-blocking - internal tooling paths, no attacker-controlled input, no auth boundary, no CVSS>=9 dependency. `dadaia doctor --json`: 1032/1032 canonical, 100%, 0 findings. Snapshot, not a guarantee of 'secure' (DADAIA.md 7.5); operator owns the ship decision.",
+  "findings": [
+    {
+      "severity": "INFO",
+      "message": "F1 RESOLVED - operator-local path no longer reachable from any ref; the 4 flagged blobs are confirmed unreachable/dangling, not on the branch",
+      "detail_md": "`git log -p -S'<local-path> --format=%h -- specs/releases/0.4.7/TASKS.md` (both on feature/0.4.7 and with `--all`) returns zero commits. `git for-each-ref refs/original` is empty (filter-branch's default backup already cleaned). The lone stray ref `refs/tags/backup/pre-rewrite-0.5.0` was checked directly: `git ls-tree -r <tag> --name-only | grep -c specs/releases/0.4.7/TASKS.md` -> 0 - that tag predates 0.4.7 and carries no copy of the leaked file. `git rev-list --objects --all | grep <blob>` finds none of the 4 blobs named in the first-round scan (0d8a0c9b67e4, 397a562cf933, 1621479c7281, 98454099c338); `git fsck --unreachable --no-reflogs` DOES list all 4 as unreachable blobs - physically present in the object DB until GC, but not reachable from any ref, so `git push` never transmits them. The push-gate replay over the full range (6cef01f854ee4e3c1178791270c9813fa9947730..adcdb2ad88a5f8ebd4fff77afbb58c1eccd00ea3) exits 0 with no BLOCKED line, versus the first-round replay over 6cef01f8..f23466d0 which printed 4 BLOCKED lines naming these exact blobs.",
+      "fix_recommendation": "None required for the PR gate. Optional hygiene for the operator: `git gc --prune=now` (or wait out the default 2-week grace period) to purge the now-unreachable blobs from local object storage - cosmetic, not a security requirement, since they are unreachable and unpushable already."
+    },
+    {
+      "severity": "INFO",
+      "message": "FR6 copy-drift heal path (doctor_structural.py::fix_tree5) reviewed under OWASP A01/A05 - path-confusion and symlink-follow both closed by design",
+      "detail_md": "`_tree5_compare` classifies a scaffolded law-file drift into three outcomes: identical (no issue), `was_shipped` byte-match (WARNING, fixable=True), or copy-drift matching neither source (WARNING, fixable=False, never auto-repaired). `fix_tree5` is only ever invoked on an issue this same validator marked fixable, and even then re-derives the repair target from a closed, hand-enumerated `targets` list keyed by matching `issue.path` against `dst.resolve()` - the issue string never becomes a raw filesystem destination (CWE-73 closed). Before any write: `dst.is_symlink()` is checked and the write skipped if true (CWE-59/61 closed - a projected law file symlinked elsewhere in the tree cannot be used to redirect the heal write off-tree). `was_shipped` is re-verified inside the fixer, not just trusted from the earlier check call, so a TOCTOU window where an operator edits the file between check and fix cannot cause an overwrite of customised content. `atomic_write(..., preserve_mode=True)` is used for the actual write (no partial-write window). No finding raised; documented as reviewed-clean.",
+      "fix_recommendation": "None."
+    },
+    {
+      "severity": "LOW",
+      "message": "CARRIED FORWARD, unchanged, non-blocking: candidate.py has no symlink handling around its release-tree file operations",
+      "detail_md": "First recorded in the round-1 scan. Re-verified in this delta: `grep -n 'symlink\\|resolve(' candidate.py` returns zero matches; the only change to this file in the f23466d0..adcdb2ad delta is exception-text wording (the `implemented` refusal message), not any path/symlink logic. Judged non-blocking: candidate.py operates only on the operator-controlled `specs/releases/` tree during release archival, not on attacker-reachable input, in an internal single-operator tooling workspace with no authentication boundary crossed.",
+      "fix_recommendation": "No fix required for this release. If this surface is ever exposed to untrusted input, add an `is_symlink()` guard before any move/copy, matching the pattern already used in doctor_structural.py::fix_tree5."
+    },
+    {
+      "severity": "INFO",
+      "message": "CARRIED FORWARD, unchanged, non-blocking: schemas.py's FileNotFoundError echoes the resolved installed-package path",
+      "detail_md": "`dadaia_workspace/features/specs/schemas.py:40` - `f\"{name}.schema.json not found at {path} ...\"`. Confirmed byte-identical between f23466d0 and adcdb2ad (`git diff f23466d0..HEAD -- dadaia_workspace/features/specs/schemas.py` is empty), so this is not a new or worsened surface. The disclosed value is a local package-install filesystem path, not a secret, credential, or externally-reachable value; the error surfaces only to the local CLI operator on a missing packaged schema file.",
+      "fix_recommendation": "None required. Cosmetic improvement only: could name just the schema filename instead of the full resolved path."
+    }
+  ],
+  "metrics": {
+    "commit_sha": "adcdb2ad88a5f8ebd4fff77afbb58c1eccd00ea3",
+    "supersedes_verdict_scan": ".dadaia/tmp/security-reviewer/20260912/scan-log.txt (CHANGES_REQUESTED at f23466d07f89236ef7a3fdb2114916c09eb31301)",
+    "review_range": "6cef01f854ee4e3c1178791270c9813fa9947730..adcdb2ad88a5f8ebd4fff77afbb58c1eccd00ea3",
+    "delta_range_reviewed": "f23466d07f89236ef7a3fdb2114916c09eb31301..adcdb2ad88a5f8ebd4fff77afbb58c1eccd00ea3",
+    "review_range_commits": 1407,
+    "delta_commits": 61,
+    "delta_files_changed": 37,
+    "delta_added_lines": 608,
+    "delta_removed_lines": 495,
+    "push_gate_check_full_range": "exit 0, no BLOCKED line",
+    "push_gate_check_first_round": "exit non-zero equivalent, 4 BLOCKED lines (historical, superseded)",
+    "f1_leaked_blobs_reachable_from_any_ref": 0,
+    "f1_leaked_blobs_confirmed_dangling": 4,
+    "secret_scan_delta_matches": 0,
+    "private_path_scan_delta_matches": 0,
+    "dependency_lockfile_touched_in_delta": false,
+    "ci_workflow_touched_in_delta": false,
+    "iac_touched_in_delta": false,
+    "dadaia_doctor_json": "1032/1032 canonical, 100%, 0 findings",
+    "findings_critical": 0,
+    "findings_high": 0,
+    "findings_medium": 0,
+    "findings_low": 1,
+    "findings_info": 3,
+    "findings_new_in_delta": 0,
+    "pr_edge": "feature/0.4.7 -> develop"
+  },
+  "decisions_required": [
+    "Operator: LOW (candidate.py symlink gap) and INFO (schemas.py path in exception text) remain record-only, carried unchanged from round 1 - confirm they stay backlog-eligible rather than blocking."
+  ],
+  "next_handoff": {
+    "agent": "project-manager",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "other"
+  }
+}
