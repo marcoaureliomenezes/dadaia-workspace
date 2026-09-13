@@ -46,7 +46,6 @@ from dadaia_workspace.features.specs.specs_tree import SpecsTree
 # because doctor_release has been the documented import site for both.
 CANONICAL_STATUS = _CANONICAL_STATUS
 CANONICAL_PHASES = _PHASES
-HARD_LIMIT_PLAN_CUTOFF = date(2026, 5, 17)
 PLAN_MAX_LINES = 300
 
 # Release-id canon cutoff (D3): a live release whose SPEC.md Created: is on/after
@@ -272,21 +271,14 @@ class ReleaseValidator:
             n_lines = sum(1 for _ in plan.read_text(encoding="utf-8").splitlines())
             if n_lines <= PLAN_MAX_LINES:
                 continue
-            spec = plan.with_name("SPEC.md")
-            created = _extract_created_date(spec) if spec.exists() else None
-            severity = (
-                Severity.ERROR
-                if (created is not None and created >= HARD_LIMIT_PLAN_CUTOFF)
-                else Severity.WARNING
-            )
             issues.append(
                 SpecsDoctorIssue(
                     code="SPEC-DOC-005",
-                    severity=severity,
-                    description=(
-                        f"PLAN.md has {n_lines} lines > {PLAN_MAX_LINES} "
-                        f"(created={created or 'unknown'})"
-                    ),
+                    # WARNING, always: the remedy is splitting the PLAN — judgment, with
+                    # no command to hand back. An exit-1 whose only runnable "fix" was
+                    # `sed -i '<limit>,$d'` deleted the plan's tail (0.4.7 c2 review).
+                    severity=Severity.WARNING,
+                    description=f"PLAN.md has {n_lines} lines > {PLAN_MAX_LINES}",
                     path=str(plan),
                 )
             )

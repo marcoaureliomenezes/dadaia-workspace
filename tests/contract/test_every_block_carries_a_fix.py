@@ -330,12 +330,18 @@ def test_context_heartbeat_without_a_session_carries_a_runnable_fix(
 
 
 def _every_doctor_rule() -> list[tuple[str, doctor_rules.Rule[Any, Any]]]:
-    from dadaia_workspace.features.backlog.doctor import RULES as LEDGER_RULES
+    from dadaia_workspace.features.backlog.doctor import RULES as BACKLOG_RULES
     from dadaia_workspace.features.spec_context.doctor import workspace_rules
+    from dadaia_workspace.features.specs.ledgers import RULES as LEDGER_SCHEMA_RULES
     from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 
     rules: list[tuple[str, doctor_rules.Rule[Any, Any]]] = []
-    for rule in (*workspace_rules(expired_only=False), *SPECS_RULES, *LEDGER_RULES):
+    for rule in (
+        *workspace_rules(expired_only=False),
+        *SPECS_RULES,
+        *BACKLOG_RULES,
+        *LEDGER_SCHEMA_RULES,
+    ):
         rules.append(("/".join(rule.codes), rule))
     return rules
 
@@ -349,8 +355,15 @@ _DOCTOR_RULES = _every_doctor_rule()
 def test_every_doctor_rule_renders_a_runnable_fix(
     codes: str, rule: doctor_rules.Rule[Any, Any]
 ) -> None:
-    """An error-class doctor finding exits 1 — the operator gets one command back."""
-    assert rule.fix_help, f"doctor rule {codes} carries no fix_help — an exit-1 Stall"
+    """An error-class doctor finding exits 1 — the operator gets one command back.
+
+    A rule with NO ``fix_help`` is judgment-only: it emits WARNING findings, which never
+    exit 1, so there is nothing to hand back and nothing to prove here. That its findings
+    really are WARNING is proven by executing each rule in
+    ``tests/integration/test_doctor_fix_lines_clear_their_finding.py``.
+    """
+    if rule.fix_help is None:
+        pytest.skip(f"{codes} is judgment-only: WARNING findings, no fix line")
     finding = doctor_rules.SectionFinding(
         code=rule.codes[0],
         verdict="error",

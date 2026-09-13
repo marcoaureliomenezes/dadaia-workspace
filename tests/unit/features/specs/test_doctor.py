@@ -622,16 +622,13 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    ("created", "expected_severity"),
-    [
-        pytest.param("2026-06-01", Severity.ERROR, id="oversized-plan-after-cutoff-error"),
-        pytest.param("2026-04-01", Severity.WARNING, id="oversized-plan-before-cutoff-warning"),
-    ],
-)
-def test_doc005_plan_line_limit_cutoff_boundary(
-    tmp_path: Path, created: str, expected_severity: Severity
+@pytest.mark.parametrize("created", ["2026-06-01", "2026-04-01"])
+def test_doc005_oversized_plan_warns_whatever_the_spec_creation_date(
+    tmp_path: Path, created: str
 ) -> None:
+    """0.4.7 c2: an over-long PLAN is SPLIT — judgment, with no command to hand back, so
+    the finding can never be error-class (which would exit 1 with no fix). The date-based
+    hard-limit cutoff that used to raise it to ERROR is gone with the constant."""
     specs = _make_clean_specs_tree(tmp_path)
     big = "# Plan\n\n> **Status:** Aprovado\n\n" + "\n".join(f"- line {i}" for i in range(400))
     (specs / "releases" / "1.2.3" / "PLAN.md").write_text(big, encoding="utf-8")
@@ -640,7 +637,7 @@ def test_doc005_plan_line_limit_cutoff_boundary(
     )
     issues = SpecsDoctor(specs).check()
     doc5 = [i for i in issues if i.code == "SPEC-DOC-005"]
-    assert doc5 and doc5[0].severity == expected_severity
+    assert doc5 and doc5[0].severity is Severity.WARNING
 
 
 def test_doc012_retired_never_fires_on_a_planted_candidates_md(tmp_path: Path) -> None:

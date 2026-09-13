@@ -467,7 +467,11 @@ class MemoryValidator:
                 issues.append(
                     SpecsDoctorIssue(
                         code="SPEC-DOC-008",
-                        severity=Severity.ERROR,
+                        # WARNING: where the atom's history belongs is judgment, so this
+                        # rule hands back no command (0.4.7 c2 review). The exit-1 home
+                        # of the same invariant is LINT-1, which errors on the very same
+                        # forbidden heading over a superset of these files.
+                        severity=Severity.WARNING,
                         description=(
                             f"memory/{rel} has forbidden heading: ## {label!r} — "
                             "memory atoms must be atomic, not changelogs"

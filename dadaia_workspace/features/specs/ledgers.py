@@ -207,10 +207,7 @@ RULES: tuple[LedgerRule, ...] = tuple(
         (ledger.code,),
         SECTION,
         (lambda bound: lambda ctx: _validate(bound, ctx))(ledger),
-        fix_help=(
-            f"edit the offending record in specs/{ledger.glob} to the schema its AGENTS.md "
-            "declares (one JSON object per line)"
-        ),
+        fix_help=(f"sed -i '<line>s|.*|<the corrected record>|' specs/{ledger.glob}"),
     )
     for ledger in LEDGERS
 )

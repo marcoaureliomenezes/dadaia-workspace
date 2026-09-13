@@ -50,7 +50,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-002", "SPEC-DOC-002L", "SPEC-DOC-008"),
         lambda d: d._memory.check_memory_files(),
-        fix_help="printf '%s\\n' '# <title>' > specs/memory/<document>.md",
+        fix_help="printf '%s\\n' '# <title>' >> specs/memory/<document>.md",
     ),
     _rule(
         ("MEM-PLACEHOLDER-1",),
@@ -61,7 +61,8 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("AGENTS-PLACEHOLDER-1",),
         lambda d: d._memory.check_tests_agents_placeholder(),
-        fix_help="printf '%s\\n' '<the repo test rules>' > tests/AGENTS.md",
+        # No fix line: filling a project's own test rules is judgment, and `>` would
+        # overwrite the operator's file. WARNING-only, so the run never exits 1 on it.
     ),
     _rule(
         (
@@ -74,12 +75,17 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-004",),
         lambda d: d._release.check_active_release_artifacts(),
-        fix_help="printf '%s\\n' '**Status:** Draft' > specs/releases/<id>/<missing>.md",
+        fix_help=(
+            "sed -i '\\|\\*\\*Status:\\*\\*|d' specs/releases/<id>/<document>.md && "
+            "printf '%s\\n' '**Status:** <Aprovado|Em revisão|Draft>' "
+            ">> specs/releases/<id>/<document>.md"
+        ),
     ),
     _rule(
         ("SPEC-DOC-005",),
         lambda d: d._release.check_plan_line_limit(),
-        fix_help="sed -i '<limit>,$d' specs/releases/<id>/PLAN.md",
+        # No fix line: an over-long PLAN is split, and truncating it at the limit
+        # deletes the plan's tail. WARNING-only (see check_plan_line_limit).
     ),
     _rule(
         ("SPEC-DOC-007",),
@@ -89,7 +95,9 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-010",),
         lambda d: d._memory.check_memory_atomicity(),
-        fix_help="sed -i '<first line of the second subject>,$d' <atom>",
+        # No fix line: where an atom's history belongs is judgment, and truncating at
+        # the heading deletes it. WARNING-only here; LINT-1 still errors on the same
+        # atom, so the invariant keeps its exit-1 home.
     ),
     _rule(
         ("TREE-1",),
@@ -99,12 +107,13 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("TREE-2",),
         lambda d: d._structural.check_tree2_root_spec_md(),
-        fix_help="printf '%s\\n' '# <title>' > specs/<document>.md",
+        # No fix line: reclassifying a root SPEC.md needs operator consent (the check's
+        # own docstring). WARNING-only.
     ),
     _rule(
         ("TREE-3",),
         lambda d: d._structural.check_tree3_memory_md(),
-        fix_help="printf '%s\\n' '# <title>' > specs/memory/<document>.md",
+        fix_help="printf '%s\\n' '# <title>' >> specs/memory/<document>.md",
     ),
     _rule(
         ("TREE-4",),
@@ -209,12 +218,18 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-038",),
         lambda d: d._closure_audit.check_loose_undisposed_audits(),
-        fix_help="rm -rf specs/audits/<audit>",
+        fix_help=(
+            'printf \'%s\\n\' \'{"id":"<audit>","ts":"<ts>",'
+            '"disposition":"resolved","release":"<release>","reason":null,'
+            '"summary":"<summary>","entry":null}\' '
+            ">> specs/audits/_archive/audits_histo.jsonl && "
+            "git rm -r specs/audits/<audit>"
+        ),
     ),
     _rule(
         ("SPEC-DOC-039",),
         lambda d: d._release.check_partial_archived_release_dirs(),
-        fix_help="rm -rf specs/releases/_archive/<release-id>",
+        fix_help="git rm -r specs/_archive/releases/<release-id>",
     ),
     _rule(
         ("SPEC-DOC-041",),
