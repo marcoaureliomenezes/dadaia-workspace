@@ -902,16 +902,18 @@ class GitSubprocessObjectReader:
             )
         return [line for line in _decode(result.stdout).splitlines() if line]
 
-    def first_parent(self, repo: Path, sha: str) -> str | None:
-        """``git rev-parse <sha>^1`` (v0.5.0 specs-canon closure) — see the port's own
-        docstring for why a missing parent is ``None``, never a raise."""
+    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
+        """``git rev-list --parents -n 1 <sha>`` — the parent shas in order (first
+        parent first; two or more for a merge commit); empty for a root commit, an
+        unresolvable sha or a non-sha shape. Never raises: ``live_verdict_shas`` shrinks
+        its set instead."""
         if not sha or not _SHA_SHAPE_RE.match(sha):
-            return None
-        result = _run(["git", "rev-parse", f"{sha}^1"], repo)
+            return ()
+        result = _run(["git", "rev-list", "--parents", "-n", "1", sha], repo)
         if result.returncode != 0:
-            return None
-        parent = _decode(result.stdout).strip()
-        return parent or None
+            return ()
+        fields = _decode(result.stdout).split()
+        return tuple(fields[1:])
 
     def resolve_ref(self, repo: Path, ref: str) -> str | None:
         """``git rev-parse --verify --quiet <ref>^{commit}`` — the commit sha a ref

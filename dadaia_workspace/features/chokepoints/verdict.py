@@ -74,7 +74,7 @@ class ShaSource(Protocol):
     push gate's ``ObjectSource`` and the concrete ``GitSubprocessObjectReader`` both
     satisfy; this module still never imports ``infrastructure``."""
 
-    def first_parent(self, repo: Path, sha: str) -> str | None: ...
+    def parents(self, repo: Path, sha: str) -> tuple[str, ...]: ...
 
     def resolve_ref(self, repo: Path, ref: str) -> str | None: ...
 
@@ -83,18 +83,29 @@ def live_verdict_shas(source: ShaSource, repo: Path, head_sha: str) -> tuple[str
     """The ONE on-disk liveness set: the shas a committed verdict under
     ``specs/releases/<id>/verdicts/`` may name and not be stale.
 
-    ``head_sha`` itself; its first parent (the committed-verdict shape — the verdict
-    file lands in the commit right after the reviewed sha); and the integration branch
-    tip (:data:`INTEGRATION_TIP_REF` — the ship-PR verdict DADAIA.md §4.2 stages on the
-    feature branch names develop's tip, which becomes the merge commit's first parent
-    only after the merge). Anything unresolvable is simply absent; duplicates collapse;
-    order is head, parent, tip. ``features.specs.canon.verdict_violations`` (the doctor's
-    SPEC-DOC-044 and the pre-push specs-canon scan) consumes exactly this set — the rule
-    has one home, so the shape the law mandates is never refused by one gate and
-    accepted by another.
+    ``head_sha`` itself; every parent of it (the committed-verdict shape — the verdict
+    file lands in the commit right after the reviewed sha, so on a linear branch the
+    first parent is the reviewed sha); for a merge commit, the first parent of each
+    MERGED line (the second parent onward) — the PR-gate verdict a feature -> develop
+    merge just consumed names the feature head's first parent, and the ship verdict a
+    develop -> main merge consumed names develop's pre-merge tip, which is the merged
+    line's first parent; and the integration branch tip (:data:`INTEGRATION_TIP_REF` —
+    the ship-PR verdict DADAIA.md §4.2 stages on the feature branch names develop's tip
+    before that merge exists). Anything unresolvable is simply absent; duplicates
+    collapse; order is head, parents, merged lines' first parents, tip.
+    ``features.specs.canon.verdict_violations`` (the doctor's SPEC-DOC-044 and the
+    pre-push specs-canon scan) consumes exactly this set — the rule has one home, so the
+    shape the law mandates is never refused by one gate and accepted by another, and
+    the integration branch is never red on the verdict it just consumed.
     """
-    shas: list[str] = [head_sha]
-    for sha in (source.first_parent(repo, head_sha), source.resolve_ref(repo, INTEGRATION_TIP_REF)):
+    parents = source.parents(repo, head_sha)
+    merged_lines = [source.parents(repo, merged)[:1] for merged in parents[1:]]
+    candidates: list[str | None] = [head_sha, *parents]
+    for line in merged_lines:
+        candidates.extend(line)
+    candidates.append(source.resolve_ref(repo, INTEGRATION_TIP_REF))
+    shas: list[str] = []
+    for sha in candidates:
         if sha and sha not in shas:
             shas.append(sha)
     return tuple(shas)

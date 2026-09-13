@@ -1,0 +1,83 @@
+{
+  "schema_version": "handoff-v1.2",
+  "self_pull": {
+    "refs": [
+      "specs/releases/0.4.7/_RELEASE.json",
+      "specs/releases/0.4.7/SPEC.md",
+      "specs/releases/0.4.7/TASKS.md"
+    ]
+  },
+  "agent": "security-reviewer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-09-13T17:04:02Z",
+  "release_id": "0.4.7",
+  "artifact": {
+    "type": "other"
+  },
+  "scope": "Ship verdict: develop -> main for release 0.4.7 (candidates 1-4 plus post-closure fixes), the develop tip is the merge commit of PR #253",
+  "verdict": "APPROVED",
+  "verdict_reason": "Release-level snapshot over 6cef01f854ee4e3c1178791270c9813fa9947730..e8a0242c0107b24c392d2f643ccb7f2fa2aa01cf (main's published tip .. develop's tip, the PR #253 merge commit). (a) `git diff origin/main..origin/develop --stat` -> 407 files changed, 18817(+)/11167(-); `--dirstat` confirms the surface matches the expected shape: tests/contract, tests/unit/features/specs, dadaia_workspace/features/specs, tests/integration/cli, dadaia_workspace/cli/commands, dadaia_workspace/hooks, dadaia_workspace/core, specs/memory/product, specs/releases/0.4.7 and public/skills/agents dominate -- the four candidates' known surfaces (gate policy, doctor/ledgers consolidation, release lifecycle, memory/skills work) plus chokepoint (dd-gitflow-default verdict-store two-hop rule) and doctor (backlog-doctor -> one `dadaia doctor` job) fixes visible directly in .github/workflows/ci.yml and pyproject.toml; no unexplained surface. (b) Leak grep `<home-dir>/|<home-dir>/|IPv4` over the full diff: 134 raw hits, all inspected. Every hit is one of: (i) an already-redacted `[REDACTED]` literal inside specs/bugs ledger history migrated from _archive; (ii) a documented placeholder/exclude-list form (`<home-dir>/(user|username|youruser|<user>|runner|ci|ubuntu|synthxabcd|synthxa)`, `<home-dir>/(user|...|Shared)`) that IS the denylist scanner's own pattern definition, not a leak; (iii) synthetic test fixtures (`<home-dir>/operator`, `<home-dir>/testuser`, `<home-dir>/op`, `test-session-*` telemetry fixtures) that are the product's own test data; (iv) IPv4 hits that are either the loopback address (loopback, intentional -- panel binds loopback-only per project memory), RFC5737 TEST-NET literals (a TEST-NET literal) replacing RFC1918 literals (two RFC1918 literals) in test fixtures -- a REMEDIATION, not a regression -- or version strings (`0.4.x`) misf-matched by the digit-group regex. One noteworthy hit (tests/unit/test_backlog_models.py, a `-`/`+` pair): the diff REMOVES the literal operator username path `<home-dir>/workspace/foo.py#Bar` (a pre-existing, already-published-on-main negative-test fixture demonstrating 'an absolute operator-local path must never bind as a code ref') and replaces it with the generic placeholder `<home-dir>/user/workspace/foo.py#Bar` -- this is a remediation of a pre-existing minor privacy smell already on main's history, not a new introduction; the value never leaves the diff as a live path (it names this operator's own workstation, already a matter of published git history predating this release, not newly disclosed by this range). Zero net-new unredacted absolute path, IP, or hostname. (c) `git grep -n -i -E '<sibling-family>' origin/develop -- . ':!specs/bugs/_archive' ':!specs/releases/_archive'` -> 0 hits (the sibling family name is fully absent from the develop tree outside the excluded archive paths -- exceeds the carve-out, nothing to disposition). Secret-pattern grep `(password|passwd|secret|token|api_key|apikey|private_key)\\s*=\\s*[\"'][^\"']{6,}` over the full diff -> 1 raw hit, a `-` (removed) line: `secret = \"<secret-token>\"` in a chokepoint denylist-scan test, AWS's own documented non-functional EXAMPLE key literal, and the diff replaces it with a runtime-composed `aws_key_shape()` helper -- matches DADAIA.md 7.4 ('a fixture needing a secret shape composes it at runtime, never as a tracked literal') exactly; a remediation, not a finding. `BEGIN.*PRIVATE KEY` grep over the full diff -> 2 raw hits, both inside verdict-prose (the superseded 00497199/448d365e handoff text) quoting the grep PATTERN itself as part of a prior scan's own description -- no private-key material, confirmed by direct read. (d) Dependency/lockfile/CI: `git diff --stat -- pyproject.toml poetry.lock .github` -> poetry.lock untouched (0 dependency version changes in range); pyproject.toml gains `[tool.ruff] cache-dir` and `[tool.mypy] cache_dir` (both relative paths under `../../.dadaia/tmp/`, redirecting caches outside the repo tree per DADAIA.md 5.3 -- no absolute path, no new credential surface), a `[tool.poetry.urls]` block (public PyPI/GitHub URLs only, no secret), and version 0.4.6 -> 0.4.7; .github/workflows/ci.yml drops the blanket `fetch-depth: 0` from every checkout step (reduces exposure of full git history to CI runners -- a hardening, not a weakening) and consolidates the `backlog-doctor` job into one `dadaia doctor` job (functional rename, same invariants: BL-SCHEMA/CONFLICT/STALE plus SPEC-DOC/RELEASE-TREE, still fails the job on any error-class finding); no IaC file (Dockerfile/compose/Terraform/Pulumi) touched anywhere in the range. `pip-audit` on the dev venv: 47 known findings across 5 packages (dulwich 0.21.7, msgpack 1.1.2, pillow 12.2.0, pip 24.0, poetry 1.8.3) -- all pre-existing dev-tooling CVEs unrelated to this release's diff (poetry.lock unchanged, confirming these versions are not newly introduced), not a production dependency (the two project packages dadaia-workspace/dm-capture-utils are correctly unaudited, not on PyPI) -- carried forward as a known, non-blocking open item, not new to 0.4.7. (e) Prior verdict chain, each covering a sub-range of this same 6cef01f8..e8a0242c span, all APPROVED, 0 findings at time of issuance: e214a463 (candidate 4 PR-gate), 62369eb9 (candidates 2-4 PR-gate), 448d365e (delta re-verdict), 00497199 (delta re-verdict, superseded by this session's PR-gate verdict alongside this ship verdict) -- each individually reviewed its slice of the range with the same method (OWASP scan, secret grep, leak grep, dependency check); this ship verdict is the release-level snapshot re-confirming the union of those slices plus the small residual (CI/pyproject hardening, test-fixture remediations) visible only in the full main..develop diff and not in any single candidate's delta. No CRITICAL/HIGH/MEDIUM finding. No production dependency version changed. No IaC surface touched. No live credential, no PII, no auth/access-control regression identified anywhere in the range. Snapshot, not a guarantee of 'secure' (DADAIA.md 7.5) -- the operator owns the ship decision.",
+  "findings": [
+    {
+      "severity": "INFO",
+      "message": "tests/unit/test_backlog_models.py: pre-existing published literal operator-workstation username path removed from a negative-test fixture, replaced with a generic placeholder.",
+      "detail_md": "CWE-200. The diff removes a pre-existing (already published on main) literal operator-workstation username path used as a negative-test fixture (`<home-dir>/workspace/foo.py#Bar`) and replaces it with the generic placeholder `<home-dir>/user/workspace/foo.py#Bar`. Record-only: a remediation of pre-existing published history, not a new disclosure in this range.",
+      "fix_recommendation": "None required -- already fixed in this diff. Record only."
+    },
+    {
+      "severity": "INFO",
+      "message": "chokepoint denylist-scan test fixture: tracked AWS example-key literal replaced with a runtime-composed helper.",
+      "detail_md": "CWE-798. The diff replaces the tracked literal AWS example-key string `<secret-token>` in a denylist-scan test fixture with a runtime-composed `aws_key_shape()` helper, matching DADAIA.md 7.4's rule that a fixture needing a secret shape composes it at runtime rather than as a tracked literal. Record-only: a remediation, not a new finding.",
+      "fix_recommendation": "None required -- already fixed in this diff. Record only."
+    },
+    {
+      "severity": "LOW",
+      "message": "Pre-existing dev-tooling CVEs (dulwich, msgpack, pillow, pip, poetry) unrelated to this release's diff.",
+      "detail_md": "CWE-1104. pip-audit on the operator's dev venv reports 47 known CVEs across dulwich 0.21.7, msgpack 1.1.2, pillow 12.2.0, pip 24.0, poetry 1.8.3. poetry.lock carries zero version changes in this range (confirmed by `git diff --stat -- poetry.lock` == empty), so these are pre-existing, not introduced by 0.4.7. None are production runtime dependencies of dadaia-workspace itself (dev/build tooling only).",
+      "fix_recommendation": "Operator decision: bump dulwich>=1.2.5, msgpack>=1.2.1, pillow>=12.3.0, pip>=26.1.2, poetry>=2.3.4 in a future dependency-hygiene candidate; not a 0.4.7 blocker."
+    }
+  ],
+  "metrics": {
+    "commit_sha": "e8a0242c0107b24c392d2f643ccb7f2fa2aa01cf",
+    "review_range": "6cef01f854ee4e3c1178791270c9813fa9947730..e8a0242c0107b24c392d2f643ccb7f2fa2aa01cf",
+    "files_changed": 407,
+    "insertions": 18817,
+    "deletions": 11167,
+    "dd_chain_family_grep_hits_on_develop_tree": 0,
+    "leak_grep_raw_hits": 134,
+    "leak_grep_genuine_findings": 0,
+    "leak_grep_remediations_observed": 1,
+    "secret_pattern_scan_raw_hits": 1,
+    "secret_pattern_scan_genuine_findings": 0,
+    "secret_pattern_remediations_observed": 1,
+    "private_key_header_grep_hits": 2,
+    "private_key_header_genuine_findings": 0,
+    "dependency_lockfile_touched": false,
+    "ci_workflow_touched": true,
+    "ci_workflow_change_class": "hardening-and-consolidation",
+    "iac_touched": false,
+    "pip_audit_findings_total": 47,
+    "pip_audit_packages_affected": 5,
+    "pip_audit_all_pre_existing_dev_tooling": true,
+    "prior_verdicts_covered": [
+      "e214a463 (candidate 4 PR-gate, APPROVED, 0 findings)",
+      "62369eb9 (candidates 2-4 PR-gate, APPROVED, 0 findings)",
+      "448d365efc57fc8f4e0ba37e58f2156f7cb258a2 (delta re-verdict, APPROVED, 0 findings)",
+      "0049719977f91cb75938d852b43271a2eba162b1 (delta re-verdict, APPROVED, 0 findings, superseded by this session)"
+    ],
+    "findings_critical": 0,
+    "findings_high": 0,
+    "findings_medium": 0,
+    "findings_low": 1,
+    "findings_info": 2,
+    "findings_new_in_this_review": 3,
+    "pr_edge": "develop -> main",
+    "pr_number": null
+  },
+  "decisions_required": [],
+  "next_handoff": {
+    "agent": "project-manager",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "other"
+  }
+}
