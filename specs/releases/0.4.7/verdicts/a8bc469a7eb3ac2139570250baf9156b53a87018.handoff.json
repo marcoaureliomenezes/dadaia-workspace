@@ -1,0 +1,86 @@
+{
+  "schema_version": "handoff-v1.2",
+  "self_pull": {
+    "refs": [
+      "specs/releases/0.4.7/_RELEASE.json",
+      "specs/releases/0.4.7/SPEC.md",
+      "specs/releases/0.4.7/TASKS.md"
+    ]
+  },
+  "agent": "security-reviewer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-09-13T17:44:01Z",
+  "release_id": "0.4.7",
+  "artifact": {
+    "type": "other"
+  },
+  "scope": "Ship verdict superseding b02c0871: develop -> main for release 0.4.7 (candidates 1-4 plus post-closure fixes), develop's tip is now the merge commit of PR #256, a8bc469a7eb3ac2139570250baf9156b53a87018. Open ship PR #255 (develop -> main) head confirmed at this same sha.",
+  "verdict": "APPROVED",
+  "verdict_reason": "Release-level snapshot over 6cef01f854ee4e3c1178791270c9813fa9947730..a8bc469a7eb3ac2139570250baf9156b53a87018 (main's published tip .. develop's new tip). Growth since the superseded b02c0871 ship verdict is exactly PR #256, confirmed by `git log --oneline b02c0871..a8bc469a` -> 3 commits (6225e866: the compliance job's checkout-depth fix, already reviewed and APPROVED under its own PR-gate delta verdict, superseded in this same session by the newer 7450393442 PR-gate verdict; 4c540bdc: docs-only, swaps the superseded PR-gate/ship verdict pair for the pair this very session now supersedes again; a8bc469a: the merge commit itself) and `git diff b02c0871..a8bc469a --stat` -> 5 files, 155(+)/151(-), confined to .github/workflows/ci.yml (+6/-0, the checkout-depth fix, already read line-by-line under the 6225e866 PR-gate verdict this chain carries forward) and 4 verdict handoff files under specs/releases/0.4.7/verdicts/ (two removed: the then-superseded 18f655ca PR-gate and e8a0242c ship files; two added: the 6225e866 PR-gate and b02c0871 ship files, both themselves now consumed by this session's rewrite) -- no surface outside what the 6225e866 PR-gate verdict already reviewed commit-by-commit. Re-ran the release-level checks fresh against this new tip: (a) `git fetch -q origin main develop` then `git diff origin/main..origin/develop --stat | tail -1` -> 411 files changed, 19022(+)/11223(-) (up from 411/19019/11224 at b02c0871: net +3 insertions/-1 deletion, i.e. a net +4 line shift matching the b02c0871..a8bc469a diff's own net of 155-151=+4 exactly; the file count holds at 411 because the two removed and two added verdict files are a like-for-like swap against a main baseline that has neither version, and .github/workflows/ci.yml already differed from main before this PR, so widening it by 6 lines changes no file-count bucket -- no unexplained growth). (b) Secret-pattern grep `(password|passwd|secret|token|api_key|apikey|private_key)\\s*=\\s*[\"'][^\"']{6,}` over the full main..develop diff -> 1 raw hit, identical in location and content to every prior verdict in this chain: a REMOVED (`-`) line inside a chokepoint denylist-scan test fixture carrying an AWS-documented, non-functional example key literal, already replaced by a runtime-composed helper (DADAIA.md 7.4) -- unchanged by PR #256, which touches none of that file. (c) A private-key-header-shaped grep (an actual `BEGIN` + key-type word + `KEY` header, not just the bare words) over the same full diff -> 0 hits; a looser two-word substring pass turned up exactly one incidental occurrence, inside an unrelated, already-deleted 0.4.6-era verdict file's own prose (quoting a grep pattern as text, describing a scan that itself found nothing), confirmed by direct read to carry no key material and to be untouched by this range's own commits. (d) The sibling-family name grep, `git grep -c -i -E '<sibling-family>' origin/develop -- . ':!specs/bugs/_archive' ':!specs/releases/_archive'`, -> 0 matching files, unchanged from every prior verdict in this chain. (e) Lockfile: `git diff origin/main..origin/develop -- poetry.lock` -> 0 lines, untouched, unchanged since b02c0871. No production dependency version changed anywhere in the range. No IaC file (Dockerfile/compose/Terraform/Pulumi) touched. Prior verdict chain, each covering a sub-range of this same span, all APPROVED, cited rather than re-derived in full: e214a463 (candidate 4 PR-gate), 62369eb9 (candidates 2-4 PR-gate), 448d365e (delta re-verdict), 00497199 (delta re-verdict), e8a0242c (superseded ship verdict), 18f655ca (superseded PR-gate delta verdict), b02c0871 (superseded ship verdict, this verdict's direct predecessor), and 6225e866 (superseded PR-gate delta verdict, the compliance-job checkout-depth fix, read again in full under this session's sibling PR-gate verdict at 7450393442). No CRITICAL/HIGH/MEDIUM finding anywhere in the range. No live credential, no PII, no auth/access-control regression identified. Snapshot, not a guarantee of 'secure' (DADAIA.md 7.5) -- the operator owns the ship decision.",
+  "findings": [
+    {
+      "severity": "INFO",
+      "message": "Chokepoint denylist-scan test fixture: tracked AWS example-key literal already replaced with a runtime-composed helper (carried forward unchanged through e8a0242c, b02c0871, and this verdict).",
+      "detail_md": "CWE-798. The full main..develop diff still shows one removed line containing an AWS-documented, non-functional example key literal inside a denylist-scan test fixture, already replaced by a runtime-composed key-shape helper. This is the same remediation disclosed and record-only in every prior ship verdict in this chain; PR #256 touches none of that file, so nothing changed here.",
+      "fix_recommendation": "None required -- already fixed prior to this range. Record only."
+    },
+    {
+      "severity": "LOW",
+      "message": "Pre-existing dev-tooling CVEs (dulwich, msgpack, pillow, pip, poetry) unrelated to this release's diff; carried forward unchanged since poetry.lock has not moved across this entire chain.",
+      "detail_md": "CWE-1104. `git diff origin/main..origin/develop -- poetry.lock` returns 0 lines for this range, identical to every prior verdict's own confirmation, so the pip-audit finding recorded at e8a0242c (47 known findings across dulwich, msgpack, pillow, pip, poetry -- all dev/build tooling, not production runtime dependencies) stands unchanged and was not re-run in this session.",
+      "fix_recommendation": "Operator decision: bump the affected dev-tooling packages in a future dependency-hygiene candidate; not a 0.4.7 blocker."
+    }
+  ],
+  "metrics": {
+    "commit_sha": "a8bc469a7eb3ac2139570250baf9156b53a87018",
+    "review_range": "6cef01f854ee4e3c1178791270c9813fa9947730..a8bc469a7eb3ac2139570250baf9156b53a87018",
+    "supersedes_verdict": "b02c08712900fff1717622aac666157503ce81de",
+    "growth_since_superseded_verdict_commits": 3,
+    "growth_since_superseded_verdict_files": 5,
+    "growth_since_superseded_verdict_insertions": 155,
+    "growth_since_superseded_verdict_deletions": 151,
+    "files_changed": 411,
+    "insertions": 19022,
+    "deletions": 11223,
+    "dd_sibling_family_grep_hits_on_develop_tree": 0,
+    "secret_pattern_scan_raw_hits": 1,
+    "secret_pattern_scan_genuine_findings": 0,
+    "secret_pattern_remediations_observed": 1,
+    "private_key_header_grep_hits": 0,
+    "private_key_header_genuine_findings": 0,
+    "private_key_incidental_substring_hits": 1,
+    "dependency_lockfile_touched": false,
+    "ci_workflow_touched": true,
+    "ci_workflow_change_class": "checkout-depth-fix-already-reviewed-under-6225e866",
+    "iac_touched": false,
+    "pip_audit_findings_total": 47,
+    "pip_audit_packages_affected": 5,
+    "pip_audit_all_pre_existing_dev_tooling": true,
+    "pip_audit_rerun_this_session": false,
+    "pr_head_matches_review_sha": true,
+    "prior_verdicts_covered": [
+      "e214a463 (candidate 4 PR-gate, APPROVED, 0 findings)",
+      "62369eb9 (candidates 2-4 PR-gate, APPROVED, 0 findings)",
+      "448d365efc57fc8f4e0ba37e58f2156f7cb258a2 (delta re-verdict, APPROVED, 0 findings)",
+      "0049719977f91cb75938d852b43271a2eba162b1 (delta re-verdict, APPROVED, 0 findings)",
+      "e8a0242c0107b24c392d2f643ccb7f2fa2aa01cf (ship verdict, develop -> main, APPROVED, 3 findings, superseded)",
+      "18f655cadc10eb7734c0e375419659154d0d0825 (PR-gate delta re-verdict, APPROVED, 1 finding, consumed)",
+      "b02c08712900fff1717622aac666157503ce81de (ship verdict, develop -> main, APPROVED, 2 findings, superseded by this verdict)",
+      "6225e866804b2764f4f15254f8fd49fae24c4cb2 (PR-gate delta re-verdict, APPROVED, 0 findings, superseded by the sibling PR-gate verdict at 7450393442d49003c05666cdb10807837e871173)"
+    ],
+    "findings_critical": 0,
+    "findings_high": 0,
+    "findings_medium": 0,
+    "findings_low": 1,
+    "findings_info": 1,
+    "findings_new_in_this_review": 0,
+    "pr_edge": "develop -> main",
+    "pr_number": 255
+  },
+  "decisions_required": [],
+  "next_handoff": {
+    "agent": "project-manager",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "other"
+  }
+}

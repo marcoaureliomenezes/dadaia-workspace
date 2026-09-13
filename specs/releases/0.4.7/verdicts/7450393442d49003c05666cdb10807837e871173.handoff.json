@@ -1,0 +1,83 @@
+{
+  "schema_version": "handoff-v1.2",
+  "self_pull": {
+    "refs": [
+      "specs/releases/0.4.7/_RELEASE.json",
+      "specs/releases/0.4.7/SPEC.md",
+      "specs/releases/0.4.7/TASKS.md"
+    ]
+  },
+  "agent": "security-reviewer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-09-13T17:44:01Z",
+  "release_id": "0.4.7",
+  "artifact": {
+    "type": "other"
+  },
+  "scope": "PR-gate delta re-verdict: feature/0.4.7 -> develop, 6225e866804b2764f4f15254f8fd49fae24c4cb2..7450393442d49003c05666cdb10807837e871173 (2 commits: 4c540bdc, 74503934). Chain: e214a463, 62369eb9, 448d365e, 00497199, ship verdicts e8a0242c and b02c0871, PR-gate verdicts 18f655ca and 6225e866.",
+  "verdict": "APPROVED",
+  "verdict_reason": "Delta over 6225e866..7450393442, 2 commits, confirmed by `git log --oneline 6225e866..HEAD` and `git diff 6225e866..HEAD --stat` (6 files, 199 insertions, 163 deletions). (1) 4c540bdc: verdict files only -- removes the two superseded handoff files (18f655cadc10eb7734c0e375419659154d0d0825, e8a0242c0107b24c392d2f643ccb7f2fa2aa01cf) and adds the two this session itself supersedes (6225e866804b2764f4f15254f8fd49fae24c4cb2, b02c08712900fff1717622aac666157503ce81de). No production code, no test, no CI file. (2) 74503934: the only production-surface change, confined to dadaia_workspace/features/chokepoints/verdict.py (`git diff --numstat` 25 insertions/12 deletions) plus one pure-addition unit test in tests/unit/features/chokepoints/test_verdict.py (25 insertions/0 deletions). Read in full: `live_verdict_shas` replaces a single one-hop walk over each merged line's first parent with a named constant `GITFLOW_EDGES = 2` and a bounded double loop -- `for _edge in range(GITFLOW_EDGES): for merged_sha in merged: line = source.parents(repo, merged_sha); candidates.extend(line[:1]); next_merged.extend(line[1:])` -- iterating a fixed 2 times regardless of input, calling only the pre-existing `ShaSource.parents`/`resolve_ref` protocol methods already used before this change. No recursion, no new import, no new subprocess invocation, no new path construction: grepping the commit diff for subprocess/import-os/Path( additions returns 0 matches, and the function signature and its two call sites are unchanged. Termination is structural, not data-dependent -- `range(GITFLOW_EDGES)` bounds the outer loop at exactly 2 regardless of how deep the actual git history goes, and each inner iteration only ever inspects the previous iteration's `next_merged` list (built from `source.parents`' own already-bounded return value), so the walk cannot loop or diverge. Verified by direct trace against the two preservation cases named in the task: a linear commit has `parents = (p1,)`, so `parents[1:]` is empty, `merged` starts and stays `[]`, and both the old and the new code contribute nothing beyond `head_sha` and `p1` -- identical. A single feature -> develop merge has `parents = (p1, p2)` with `p2` (the feature head) itself linear (`source.parents(repo, p2)` has length 1) -- old code's one-shot `source.parents(repo, p2)[:1]` and new code's edge-1 `line[:1]` both add exactly `p2`'s first parent once, and edge-1's `line[1:]` is empty so `next_merged` stays empty and edge 2 is a no-op -- identical. The new three-generation case (a ship merge whose merged line, develop's tip, is itself a merge) is exactly the RED case the commit message names and the new test proves: `test_live_shas_follow_the_merged_line_along_both_gitflow_edges` constructs a synthetic ship/old_main/dev_tip/dev_prev/feat/reviewed/deeper chain and asserts the live set is exactly (ship, old_main, dev_tip, dev_prev, reviewed) -- `deeper` (a third edge) is excluded, proving the walk is bounded at exactly `GITFLOW_EDGES` and does not widen further. Ran the exact suite named: `pytest tests/unit/features/chokepoints tests/unit/features/specs/test_doctor_stale_verdicts.py tests/integration/cli/test_cli_ci_verdict_check.py -q -p no:cacheprovider` -> 152 passed, 0 failed, 0 skipped, including every pre-existing linear- and single-merge-shape test alongside the new ship-merge test, confirming behavioral equivalence for the two named cases plus correctness for the new one. Security framing: this module is itself a chokepoint (SPEC-DOC-044 / the pre-push verdict-liveness rule DADAIA.md 4.2 names by file and function), so a change that WIDENS what counts as a live, not-stale verdict deserves scrutiny for control loosening rather than a plain correctness read. The widening is bounded precisely to the shape DADAIA.md 4.1 already documents (feature -> develop -> main, two edges, no third) -- it does not accept any verdict that was not itself already a real security-reviewer APPROVED commit under specs/releases/<id>/verdicts/, it only recognizes that a verdict a feature -> develop merge already consumed necessarily still lives on develop's tree one generation deeper once a develop -> main merge happens on top of it, which is precisely the false-negative the commit message reproduces and closes. No new trust is granted; an already-approved artifact is correctly kept live one hop further, matching the law's own two-hop statement rather than exceeding it. No OWASP category implicated beyond this control-loosening review, which resolves clean: no injection surface added (pure in-memory sha-string list operations), no auth/access-control change, no new secrets or external input consumed. Secret-pattern grep `(password|passwd|secret|token|api_key|apikey|private_key)\\s*=\\s*[\"'][^\"']{6,}` over the full 2-commit diff -> 0 hits. A private-key-header-shaped grep (`BEGIN` followed by an actual key-type word and `KEY`) over the same diff -> 0 hits. No dependency file (poetry.lock, pyproject.toml) touched. No IaC file (Dockerfile/compose/Terraform/Pulumi) touched. No CRITICAL/HIGH/MEDIUM finding. Snapshot, not a guarantee of 'secure' (DADAIA.md 7.5) -- the operator owns the merge decision.",
+  "findings": [
+    {
+      "severity": "INFO",
+      "message": "The liveness-set fix widens what a stale-verdict check accepts on the merged line, bounded exactly to gitflow's two documented edges -- reviewed as a control change, not just a correctness patch, and found to grant no new trust.",
+      "detail_md": "CWE-284-adjacent (access decision, here to a doctor/pre-push CHECK rather than to a system resource). `live_verdict_shas` decides which committed verdict files SPEC-DOC-044 and the pre-push scan treat as not-stale; widening that set is a control-loosening change in principle. Read in full: the new `GITFLOW_EDGES = 2` constant and its bounded double loop only recognize one further generation on a MERGED line, matching DADAIA.md 4.1's own feature -> develop -> main shape -- no unbounded walk, no recursion, no new class of file accepted as a verdict, no relaxation of the commit-shape rule (the verdict must still be the first commit after the reviewed sha). The new unit test proves a third edge (`deeper`) is excluded. Net effect: an already-APPROVED verdict a feature -> develop merge consumed stays correctly recognized as covering the code now on develop's tree one generation further, once that same tree merges into main -- it does not let a never-reviewed sha, or a verdict reviewing different content, pass as live.",
+      "fix_recommendation": "None required. Record-only: worth an explicit note in this ledger since a future change to GITFLOW_EDGES or the loop bound should get the same control-loosening scrutiny applied here."
+    }
+  ],
+  "metrics": {
+    "commit_sha": "7450393442d49003c05666cdb10807837e871173",
+    "review_range": "6cef01f854ee4e3c1178791270c9813fa9947730..7450393442d49003c05666cdb10807837e871173",
+    "delta_review_range": "6225e866804b2764f4f15254f8fd49fae24c4cb2..7450393442d49003c05666cdb10807837e871173",
+    "files_changed": 6,
+    "insertions": 199,
+    "deletions": 163,
+    "commits_in_delta": 2,
+    "production_files_changed": 1,
+    "production_insertions": 25,
+    "production_deletions": 12,
+    "test_files_changed": 1,
+    "test_insertions": 25,
+    "test_deletions": 0,
+    "verdict_files_swapped": 4,
+    "tests_run": 152,
+    "tests_passed": 152,
+    "tests_failed": 0,
+    "tests_skipped": 0,
+    "new_subprocess_calls": 0,
+    "new_path_construction": 0,
+    "loop_bound_constant": "GITFLOW_EDGES = 2",
+    "recursion_present": false,
+    "secret_pattern_scan_raw_hits": 0,
+    "secret_pattern_scan_genuine_findings": 0,
+    "private_key_header_grep_hits": 0,
+    "private_key_header_genuine_findings": 0,
+    "dependency_lockfile_touched": false,
+    "ci_workflow_touched": false,
+    "iac_touched": false,
+    "prior_verdicts_covered": [
+      "e214a463 (candidate 4 PR-gate, APPROVED, 0 findings)",
+      "62369eb9 (candidates 2-4 PR-gate, APPROVED, 0 findings)",
+      "448d365efc57fc8f4e0ba37e58f2156f7cb258a2 (delta re-verdict, APPROVED, 0 findings)",
+      "0049719977f91cb75938d852b43271a2eba162b1 (delta re-verdict, APPROVED, 0 findings)",
+      "e8a0242c0107b24c392d2f643ccb7f2fa2aa01cf (ship verdict, develop -> main, APPROVED, 3 findings, superseded)",
+      "18f655cadc10eb7734c0e375419659154d0d0825 (PR-gate delta re-verdict, APPROVED, 1 finding, consumed)",
+      "b02c08712900fff1717622aac666157503ce81de (ship verdict, develop -> main, APPROVED, 2 findings, superseded by the sibling ship verdict at a8bc469a7eb3ac2139570250baf9156b53a87018)",
+      "6225e866804b2764f4f15254f8fd49fae24c4cb2 (PR-gate delta re-verdict, APPROVED, 0 findings, consumed by this verdict)"
+    ],
+    "findings_critical": 0,
+    "findings_high": 0,
+    "findings_medium": 0,
+    "findings_low": 0,
+    "findings_info": 1,
+    "findings_new_in_this_review": 1,
+    "pr_edge": "feature -> develop",
+    "pr_number": null
+  },
+  "decisions_required": [],
+  "next_handoff": {
+    "agent": "project-manager",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "other"
+  }
+}
