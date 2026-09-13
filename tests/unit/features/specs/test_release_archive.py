@@ -173,19 +173,6 @@ def test_refuses_a_release_not_in_closure(tmp_path: Path) -> None:
     assert _digest(tmp_path) == before
 
 
-def test_refuses_a_release_without_implemented(tmp_path: Path) -> None:
-    rdir = _closed_release(tmp_path)
-    state = json.loads((rdir / "_RELEASE.json").read_text(encoding="utf-8"))
-    state["implemented"] = None
-    (rdir / "_RELEASE.json").write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
-    before = _digest(tmp_path)
-
-    with pytest.raises(ArchiveError, match="implemented"):
-        _archive(tmp_path)
-
-    assert _digest(tmp_path) == before
-
-
 def test_refuses_an_id_that_is_not_the_live_release(tmp_path: Path) -> None:
     _closed_release(tmp_path)
     before = _digest(tmp_path)

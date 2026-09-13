@@ -2,6 +2,7 @@
 
 Implements:
 - dadaia release new <id>    → specs/releases/<id>/SPEC.md stub + _RELEASE.json
+- dadaia release phase <P>   → the ONE writer of phase/defined/implemented
 - dadaia release rc-archive  → the completed candidate trio into rc-N/
 - dadaia release archive <id> → the promote lane: ship, move to _archive/, birth <next>
 - dadaia backlog new <slug>  → appends one active[] entry to specs/backlog/BACKLOG.json
@@ -18,6 +19,7 @@ is retired outright (operator ruling 2026-08-28) — the single source is
 
 from __future__ import annotations
 
+import json
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -41,6 +43,7 @@ from dadaia_workspace.features.specs.candidate import (
     ArchiveError,
     archive_candidate,
     archive_release,
+    set_phase,
 )
 from dadaia_workspace.features.specs.canon import release_new
 from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
@@ -101,8 +104,43 @@ def release_new_cmd(
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
 
+    _record_release_event("new", target, release_id)
     typer.echo(f"[ok] created: {spec_path}")
     typer.echo(f"[ok] created: {spec_path.parent / RELEASE_STATE_FILENAME}")
+
+
+# ── dadaia release phase ──────────────────────────────────────────────────────
+
+
+@release_app.command("phase")
+def release_phase_cmd(
+    phase: str = typer.Argument(..., help="IMPLEMENTATION or CLOSURE."),
+    sha: str = typer.Option(..., "--sha", help="The commit the milestone names (7-40 hex)."),
+    specs_dir: str | None = typer.Option(
+        None,
+        "--specs-dir",
+        help="Path to specs/ directory. Default: resolve from bound context session.",
+    ),
+) -> None:
+    """Move the live release to IMPLEMENTATION or CLOSURE, stamping its milestone.
+
+    The ONE writer of `phase`, `defined` and `implemented` (0.4.7 FR5): those fields
+    were Read-then-Edit, which is how `release archive` came to refuse on a hand-set
+    `implemented` it validated itself. The phase and the milestone now move in one act,
+    so they cannot disagree.
+    """
+    target = _resolve_specs_dir(specs_dir)
+    if not target.is_dir():
+        typer.echo(f"[error] specs_dir not found: {target}", err=True)
+        sys.exit(1)
+    try:
+        change = set_phase(target, phase.upper(), sha=sha)
+    except ArchiveError as exc:
+        typer.echo(f"[error] {exc}", err=True)
+        sys.exit(1)
+
+    _record_release_event("phase", target, change.release)
+    typer.echo(f"[ok] release {change.release} -> phase {change.phase} ({change.ts})")
 
 
 # ── dadaia release rc-archive ─────────────────────────────────────────────────
@@ -134,6 +172,7 @@ def release_rc_archive_cmd(
     except ArchiveError as exc:
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
+    _record_release_event("rc-archive", target, result.release)
     archived_bugs = _archive_bugs(target)
     typer.echo(
         f"[ok] candidate {result.rc} of release {result.release} archived -> "
@@ -157,6 +196,20 @@ def _archive_bugs(target: Path) -> int:
     from dadaia_workspace.cli.commands.bugs import build_bug_service
 
     return build_bug_service(target, with_archive=True).archive().archived
+
+
+def _record_release_event(verb: str, target: Path, release_id: str) -> None:
+    """One verb, one governance event (0.4.7 FR2) over the state document the verb just
+    wrote — the record whose hash `dadaia doctor` compares a hand edit against."""
+    state_path = target / "releases" / release_id / RELEASE_STATE_FILENAME
+    if not state_path.is_file():
+        # `archive` moved the document into _archive/<id>/ as part of the same act.
+        state_path = target / "releases" / "_archive" / release_id / RELEASE_STATE_FILENAME
+    try:
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    record_governance_event(verb=verb, ledger="releases", record_id=release_id, record=state)
 
 
 def _histo_appender(target: Path) -> Callable[[HistoRecord], None]:
@@ -213,6 +266,7 @@ def release_archive_cmd(
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
 
+    _record_release_event("archive", target, result.release)
     archived_bugs = _archive_bugs(target)
     typer.echo(f"[ok] archived: {result.archived_dir}")
     typer.echo(f"[ok] created: {result.next_spec}")

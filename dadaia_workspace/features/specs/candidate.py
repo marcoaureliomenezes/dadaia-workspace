@@ -38,6 +38,7 @@ from typing import Any
 
 from dadaia_workspace.core.models.histo import RELEASES_HISTO_DISPOSITIONS, HistoRecord
 from dadaia_workspace.core.release_state import RELEASE_STATE_FILENAME, release_state_file
+from dadaia_workspace.core.spec_status import extract_status
 from dadaia_workspace.core.specs_version import is_release_semver
 from dadaia_workspace.features.specs.canon import release_new
 from dadaia_workspace.features.specs.doctor_common import resolve_live_release_id
@@ -61,7 +62,11 @@ _TRIO = ("SPEC.md", "PLAN.md", "TASKS.md")
 _RC_DIR_RE = re.compile(r"^rc-(\d+)$")
 
 #: Task markers that mean the candidate is NOT closed: open ``[ ]`` or reserved ``[-]``.
-_UNFINISHED_MARKER_RE = re.compile(r"^\s*-\s\[( |-)\]\s", re.MULTILINE)
+_UNFINISHED_MARKER_RE = re.compile(r"^\s*-\s\[( |-)\]\s.*$", re.MULTILINE)
+
+
+#: The venv-rooted binary every refusal's ``fix:`` line names.
+_DADAIA = ".dadaia/.venv/bin/dadaia"
 
 
 class ArchiveError(Exception):
@@ -138,14 +143,18 @@ def _load_live_release(specs_dir: Path, verb: str) -> _LiveRelease:
     return _LiveRelease(release_id, release_dir, state_path, state)
 
 
-def _unfinished_tasks(release_dir: Path) -> int:
-    """How many ``[ ]``/``[-]`` markers TASKS.md still carries (0 = the candidate is
-    implemented). A missing TASKS.md counts as none — its absence is the trio rule's
-    business, not this one's."""
+def _unfinished_tasks(release_dir: Path) -> list[str]:
+    """The ``[ ]``/``[-]`` task lines TASKS.md still carries (empty = the candidate is
+    implemented). A missing TASKS.md carries none — its absence is the trio rule's
+    business, not this one's. The LINES, not a count: a refusal names the task that
+    blocks it, and a count is one `len()` away."""
     tasks = release_dir / "TASKS.md"
     if not tasks.is_file():
-        return 0
-    return len(_UNFINISHED_MARKER_RE.findall(tasks.read_text(encoding="utf-8")))
+        return []
+    return [
+        match.group(0).strip()
+        for match in _UNFINISHED_MARKER_RE.finditer(tasks.read_text(encoding="utf-8"))
+    ]
 
 
 def _utc_now() -> str:
@@ -182,8 +191,9 @@ def archive_candidate(specs_dir: Path) -> CandidateArchive:
     unfinished = _unfinished_tasks(release_dir)
     if unfinished:
         raise ArchiveError(
-            f"TASKS.md still carries {unfinished} open '[ ]'/reserved '[-]' "
-            "marker(s) — a candidate archives only fully implemented ([x])."
+            f"TASKS.md still carries {len(unfinished)} open '[ ]'/reserved '[-]' "
+            f"marker(s) — a candidate archives only fully implemented ([x]): "
+            f"{unfinished[0]}"
         )
 
     phase = state.get("phase")
@@ -222,6 +232,128 @@ def archive_candidate(specs_dir: Path) -> CandidateArchive:
     if state_path.name != RELEASE_STATE_FILENAME:
         state_path.unlink()
     return CandidateArchive(release=release_id, rc=rc, rc_dir=rc_dir)
+
+
+# ═════════════════════════════════════════════════════════════════════════════════
+# ── release phase — the ONE writer of `phase`, `defined` and `implemented` ────────
+# ═════════════════════════════════════════════════════════════════════════════════
+
+
+@dataclass(frozen=True)
+class PhaseChange:
+    """The completed transition: which release moved to which phase, and when."""
+
+    release: str
+    phase: str
+    ts: str
+
+
+#: The one ordered lane a candidate walks. ``DEFINITION`` is written by ``release
+#: new``/``rc-archive`` and ``ARCHIVED`` by ``release archive`` — this verb owns the two
+#: transitions in between, each from exactly one predecessor, so an out-of-order move
+#: and a re-run are the same single check.
+_PHASE_PREDECESSOR: dict[str, str] = {
+    "IMPLEMENTATION": "DEFINITION",
+    "CLOSURE": "IMPLEMENTATION",
+}
+
+
+def _refuse_unapproved_trio(release_dir: Path, release_id: str) -> None:
+    """A candidate enters IMPLEMENTATION only with all three documents ``Aprovado`` —
+    the same status token ``dd-spec-navigator`` reads, parsed by the one extractor."""
+    for name in _TRIO:
+        document = release_dir / name
+        if not document.is_file():
+            raise ArchiveError(
+                f"release {release_id} has no {name} at root — a candidate is defined by "
+                "its trio.\n"
+                f"fix: {_DADAIA} release new {release_id}"
+            )
+        status = extract_status(document.read_text(encoding="utf-8"))
+        if status != "Aprovado":
+            raise ArchiveError(
+                f"specs/releases/{release_id}/{name} carries status {status!r} — a "
+                "candidate enters IMPLEMENTATION only once SPEC, PLAN and TASKS are all "
+                "'**Status:** Aprovado'.\n"
+                f"fix: sed -i 's/^\\*\\*Status:\\*\\* .*/**Status:** Aprovado/' "
+                f"specs/releases/{release_id}/{name}"
+            )
+
+
+def set_phase(specs_dir: Path, phase: str, *, sha: str) -> PhaseChange:
+    """Move the live release to *phase* and stamp the milestone that phase records.
+
+    The ONE writer of ``phase``, ``defined`` and ``implemented`` (0.4.7 FR5). These
+    three fields were Read-then-Edit, which is how candidate 1 reached a state where
+    ``release archive`` refused on a hand-set ``implemented`` that ``archive`` itself
+    validated: a document with two writers, one of them indistinguishable from a typo.
+
+    - ``IMPLEMENTATION`` requires the trio at root, all ``Aprovado``, and stamps
+      ``defined {sha, ts}`` (re-stamped when a later candidate is defined).
+    - ``CLOSURE`` requires every task ``[x]`` and stamps ``implemented {sha, rc, ts}``
+      where ``rc`` names the candidate being closed (the archived count + 1).
+
+    Refuses — writing nothing — an unknown target, an out-of-order or repeated
+    transition, an unapproved document, an unfinished task, or a malformed sha. One
+    ``note`` is appended per transition; the state document is always written under the
+    canonical filename.
+    """
+    if not _SHA_RE.match(sha):
+        raise ArchiveError(
+            f"--sha {sha!r} is not a 7-40 character hex commit sha.\n"
+            f"fix: {_DADAIA} release phase {phase} --sha $(git rev-parse --short HEAD)"
+        )
+    if phase not in _PHASE_PREDECESSOR:
+        raise ArchiveError(
+            f"{phase!r} is not a phase this verb writes: DEFINITION is written by "
+            "`release new`/`release rc-archive` and ARCHIVED by `release archive`.\n"
+            f"fix: {_DADAIA} release phase IMPLEMENTATION --sha {sha}"
+        )
+
+    live = _load_live_release(specs_dir, f"phase {phase}")
+    current = live.state.get("phase")
+    expected = _PHASE_PREDECESSOR[phase]
+    if current != expected:
+        raise ArchiveError(
+            f"release {live.release_id} is in phase {current!r} — {phase} follows "
+            f"{expected} exactly once.\n"
+            f"fix: {_DADAIA} release phase {expected} --sha {sha}"
+            if current != phase
+            else (
+                f"release {live.release_id} is already in phase {phase!r} — a transition "
+                "happens once per candidate.\n"
+                f"fix: {_DADAIA} release rc-archive"
+            )
+        )
+
+    ts = _utc_now()
+    state = live.state
+    if phase == "IMPLEMENTATION":
+        _refuse_unapproved_trio(live.release_dir, live.release_id)
+        state["defined"] = {"sha": sha, "ts": ts}
+        text = f"Candidate defined at {sha}; phase IMPLEMENTATION."
+    else:
+        unfinished = _unfinished_tasks(live.release_dir)
+        if unfinished:
+            raise ArchiveError(
+                f"TASKS.md still carries {len(unfinished)} open '[ ]'/reserved '[-]' "
+                f"marker(s) — a candidate closes fully implemented: {unfinished[0]}\n"
+                f"fix: sed -i 's/^- \\[-\\]/- [x]/' "
+                f"specs/releases/{live.release_id}/TASKS.md"
+            )
+        rc = int(state.get("rc") or 0) + 1
+        state["implemented"] = {"sha": sha, "rc": rc, "ts": ts}
+        text = f"Candidate {rc} implemented at {sha}; phase CLOSURE."
+
+    state["phase"] = phase
+    state.setdefault("log", []).append(
+        {"ts": ts, "agent": "release-candidates", "kind": "note", "text": text}
+    )
+    canonical = live.release_dir / RELEASE_STATE_FILENAME
+    canonical.write_text(json.dumps(state, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    if live.state_path.name != RELEASE_STATE_FILENAME:
+        live.state_path.unlink()
+    return PhaseChange(release=live.release_id, phase=phase, ts=ts)
 
 
 def _refuse_bad_arguments(shipped_sha: str, pr: int, next_release: str) -> None:
@@ -314,23 +446,20 @@ def archive_release(
     unfinished = _unfinished_tasks(release_dir)
     if unfinished:
         raise ArchiveError(
-            f"TASKS.md still carries {unfinished} open '[ ]'/reserved '[-]' marker(s) — "
+            f"TASKS.md still carries {len(unfinished)} open '[ ]'/reserved '[-]' marker(s) — "
             "a release ships only fully implemented work.\n"
             f"fix: flip the open task markers to [x] in specs/releases/{release_id}/TASKS.md"
         )
     if state.get("phase") != "CLOSURE":
+        # ONE check, not two (0.4.7 FR5): `phase` and `implemented` are written by the
+        # same act — `dadaia release phase CLOSURE` — so a release in CLOSURE always
+        # carries the milestone. The separate `implemented` refusal this verb used to
+        # raise existed only because a hand edit could set one without the other, and
+        # candidate 1's reviewer found `archive` hanging on exactly that.
         raise ArchiveError(
             f"release {release_id} is in phase {state.get('phase')!r} — a release "
             "archives only from CLOSURE.\n"
-            f"fix: set phase CLOSURE and implemented {{sha, rc, ts}} in "
-            f"specs/releases/{release_id}/_RELEASE.json"
-        )
-    if not state.get("implemented"):
-        raise ArchiveError(
-            f"release {release_id} carries no `implemented` milestone — it was never "
-            "recorded as implemented.\n"
-            f'fix: qa-engineer sets implemented = {{"sha": …, "rc": …, "ts": …}} in '
-            f"specs/releases/{release_id}/_RELEASE.json at the final-rc QA close"
+            f"fix: {_DADAIA} release phase CLOSURE --sha <implementation-tip-sha>"
         )
 
     archive_root = specs_dir / "releases" / "_archive"

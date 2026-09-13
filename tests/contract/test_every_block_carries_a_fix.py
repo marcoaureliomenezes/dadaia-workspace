@@ -16,6 +16,7 @@ size: SMALL.
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -306,6 +307,188 @@ def test_archive_verbs_refuse_without_a_live_release_with_a_runnable_fix(
             )
         else:
             candidate.archive_candidate(specs)
+    assert_block_carries_a_runnable_fix(str(exc.value))
+
+
+# ── the governance verbs (0.4.7 FR3/FR4/FR5) ───────────────────────────────────
+
+
+def _backlog_tree(tmp_path: Path) -> Path:
+    specs = _specs_tree(tmp_path)
+    (specs / "backlog").mkdir()
+    (specs / "backlog" / "BACKLOG.json").write_text(
+        '{"schema": "backlog-v1", "active": [{"id": "a-thing", "title": "t", '
+        '"opened": "2026-01-01", "status": "picked", "description": "d", '
+        '"provenance": "operator request"}]}',
+        encoding="utf-8",
+    )
+    return specs
+
+
+@pytest.mark.parametrize(
+    ("name", "kwargs"),
+    [
+        ("unknown-disposition", {"disposition": "nope", "reason": "r", "release": "0.0.1"}),
+        (
+            "delivered-without-release",
+            {"disposition": "delivered", "reason": None, "release": None},
+        ),
+        ("rejected-without-reason", {"disposition": "rejected", "reason": None, "release": None}),
+        ("unknown-release", {"disposition": "delivered", "reason": None, "release": "9.9.9"}),
+    ],
+)
+def test_backlog_exit_refusals_carry_a_runnable_fix(
+    name: str, kwargs: dict[str, Any], tmp_path: Path
+) -> None:
+    from dadaia_workspace.features.backlog import document
+
+    specs = _backlog_tree(tmp_path)
+    with pytest.raises(document.BacklogExitError) as exc:
+        document.backlog_exit(specs, "a-thing", histo_store=None, denylist_terms=(), **kwargs)
+    assert_block_carries_a_runnable_fix(str(exc.value))
+
+
+def test_backlog_exit_unknown_slug_carries_a_runnable_fix(tmp_path: Path) -> None:
+    from dadaia_workspace.features.backlog import document
+
+    specs = _backlog_tree(tmp_path)
+    with pytest.raises(document.BacklogExitError) as exc:
+        document.backlog_exit(
+            specs,
+            "never-existed",
+            histo_store=None,
+            disposition="rejected",
+            reason="r",
+            release=None,
+            denylist_terms=(),
+        )
+    assert_block_carries_a_runnable_fix(str(exc.value))
+
+
+def _audit_tree(tmp_path: Path, disposition: str = "open") -> Path:
+    specs = _specs_tree(tmp_path)
+    audit = specs / "audits" / "20260101-slug"
+    audit.mkdir(parents=True)
+    (audit / "FINDINGS.jsonl").write_text(
+        json.dumps(
+            {
+                "id": "20260101-slug-F001",
+                "pillar": "bugs",
+                "severity": "LOW",
+                "refs": ["a"],
+                "claim": "c",
+                "evidence": "e",
+                "disposition": disposition,
+                "release": "0.0.1" if disposition != "open" else None,
+                "reason": None,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return specs
+
+
+@pytest.mark.parametrize(
+    ("name", "audit", "finding", "kwargs"),
+    [
+        (
+            "unknown-audit",
+            "nope",
+            "20260101-slug-F001",
+            {"disposition": "resolved", "release": "0.0.1"},
+        ),
+        (
+            "unknown-finding",
+            "20260101-slug",
+            "F999",
+            {"disposition": "resolved", "release": "0.0.1"},
+        ),
+        ("retired-word", "20260101-slug", "20260101-slug-F001", {"disposition": "fixed"}),
+        (
+            "deferred-without-reason",
+            "20260101-slug",
+            "20260101-slug-F001",
+            {"disposition": "deferred"},
+        ),
+    ],
+)
+def test_audit_disposition_refusals_carry_a_runnable_fix(
+    name: str, audit: str, finding: str, kwargs: dict[str, Any], tmp_path: Path
+) -> None:
+    from dadaia_workspace.features.specs import audit as audit_feature
+
+    specs = _audit_tree(tmp_path)
+    with pytest.raises(audit_feature.AuditError) as exc:
+        audit_feature.disposition_finding(specs, audit, finding, **kwargs)
+    assert_block_carries_a_runnable_fix(str(exc.value))
+
+
+def test_audit_close_with_an_open_finding_carries_a_runnable_fix(tmp_path: Path) -> None:
+    from dadaia_workspace.features.specs import audit as audit_feature
+
+    specs = _audit_tree(tmp_path)
+    with pytest.raises(audit_feature.AuditError) as exc:
+        audit_feature.close_audit(
+            specs, "20260101-slug", sha="abc1234", histo_append=lambda _r: None, denylist_terms=()
+        )
+    assert_block_carries_a_runnable_fix(str(exc.value))
+
+
+def _phase_tree(tmp_path: Path, *, phase: str, status: str = "Aprovado", tasks: str) -> Path:
+    specs = _specs_tree(tmp_path)
+    rdir = specs / "releases" / "0.0.1"
+    rdir.mkdir()
+    (rdir / "SPEC.md").write_text("# S\n\n**Status:** Aprovado\n", encoding="utf-8")
+    (rdir / "PLAN.md").write_text(f"# P\n\n**Status:** {status}\n", encoding="utf-8")
+    (rdir / "TASKS.md").write_text(f"# T\n\n**Status:** Aprovado\n\n{tasks}", encoding="utf-8")
+    (rdir / "_RELEASE.json").write_text(
+        json.dumps(
+            {
+                "schema": "release-state-v1",
+                "release": "0.0.1",
+                "phase": phase,
+                "rc": None,
+                "defined": None,
+                "implemented": None,
+                "shipped": None,
+                "log": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return specs
+
+
+@pytest.mark.parametrize(
+    ("name", "tree", "target", "sha"),
+    [
+        ("bad-sha", {"phase": "DEFINITION", "tasks": "- [x] T-1\n"}, "IMPLEMENTATION", "nope"),
+        ("out-of-order", {"phase": "DEFINITION", "tasks": "- [x] T-1\n"}, "CLOSURE", _SHA_A),
+        ("re-run", {"phase": "IMPLEMENTATION", "tasks": "- [x] T-1\n"}, "IMPLEMENTATION", _SHA_A),
+        (
+            "unapproved-plan",
+            {"phase": "DEFINITION", "status": "Draft", "tasks": "- [x] T-1\n"},
+            "IMPLEMENTATION",
+            _SHA_A,
+        ),
+        (
+            "unfinished-task",
+            {"phase": "IMPLEMENTATION", "tasks": "- [-] T-1\n"},
+            "CLOSURE",
+            _SHA_A,
+        ),
+        ("unknown-phase", {"phase": "DEFINITION", "tasks": "- [x] T-1\n"}, "DEFINITION", _SHA_A),
+    ],
+)
+def test_release_phase_refusals_carry_a_runnable_fix(
+    name: str, tree: dict[str, str], target: str, sha: str, tmp_path: Path
+) -> None:
+    from dadaia_workspace.features.specs import candidate
+
+    specs = _phase_tree(tmp_path, **tree)
+    with pytest.raises(candidate.ArchiveError) as exc:
+        candidate.set_phase(specs, target, sha=sha)
     assert_block_carries_a_runnable_fix(str(exc.value))
 
 

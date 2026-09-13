@@ -52,7 +52,7 @@
   core/models/{findings,histo}.py`, `dadaia_workspace/public/schemas/audits/
   finding-record-v1.schema.json`, `tests/**`. Blocked by: T-047-26. Delivers: an audit
   is dispositioned and archived by two verbs; the finding vocabulary is one.
-- [-] T-047-29 — FR5: `dadaia release phase IMPLEMENTATION|CLOSURE --sha <sha>` in
+- [x] T-047-29 — FR5: `dadaia release phase IMPLEMENTATION|CLOSURE --sha <sha>` in
   `features/specs/candidate.py` (trio `Aprovado` check, every-task-`[x]` check, stamps
   `defined`/`implemented {sha, rc: rc+1, ts}`, one `note`, refuses order/re-run with
   `fix:`), CLI in `newartifacts.py`; `release new|rc-archive|archive` write events (RED:
