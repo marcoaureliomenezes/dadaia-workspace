@@ -159,6 +159,13 @@ RULES: tuple[SpecsRule, ...] = (
         fix_help="sed -i 's|<stale package line>|<package on disk>|' specs/memory/ARCHITECTURE.md",
     ),
     _rule(
+        ("MEM-DRIFT-2",),
+        lambda d: d._memory.check_mem_drift2_citations(
+            repo_root=d.repo_root, command_paths=d.command_paths
+        ),
+        fix_help="sed -i 's|<dead citation>|<what exists today>|' <memory atom>",
+    ),
+    _rule(
         ("FIXED-1", "FIXED-2"),
         lambda d: d._memory.check_fixed_sections(d.public_dir),
         fix=lambda d, i: d._memory.fix_fixed_section(i, d.public_dir),

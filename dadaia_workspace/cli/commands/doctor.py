@@ -31,6 +31,7 @@ from dadaia_workspace.cli._specs_resolution import (
     resolve_event_context_for_cli,
     resolve_specs_dir_for_cli,
 )
+from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.cli.redact import ContextRedactor
 from dadaia_workspace.core.doctor_rules import (
     Rule,
@@ -302,6 +303,9 @@ def _build_specs_doctor(
         # _resolve_live_shas documents; feeds SPEC-DOC-028 and SPEC-DOC-045.
         repo_root=specs_dir.parent,
         live_shas=_resolve_live_shas(specs_dir),
+        # The ONE Typer walk (0.4.7 FR2), done here and handed in as plain data — the
+        # same shape `live_shas` travels in; `features` never imports `cli`.
+        command_paths=command_paths(),
         governance=governance,
         bug_store_factory=container.build_bug_record_store,
     )

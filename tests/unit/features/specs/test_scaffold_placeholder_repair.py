@@ -16,12 +16,9 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.specs_repair import is_placeholder_atom, remove_placeholder_atoms
 from dadaia_workspace.features.migrate import upgrade as upgrade_feat
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
-from dadaia_workspace.features.specs.doctor_memory import (
-    is_placeholder_atom,
-    remove_placeholder_atoms,
-)
 from dadaia_workspace.features.specs.scaffolder import scaffold
 
 pytestmark = pytest.mark.unit

@@ -182,6 +182,10 @@ _UNEXERCISED: dict[str, str] = {
     "LINT-1": "the fix inserts one missing frontmatter field; which field is per-atom",
     "MEM-DRIFT-1": "the fix rewrites one ARCHITECTURE.md package line against the real "
     "package tree, which a tmp specs tree has none of",
+    "MEM-DRIFT-2": "the fix rewrites one dead citation inside one memory atom against "
+    "the live command tree and repo; both are the real repo's, which a tmp specs tree "
+    "has none of (the rule itself: tests/unit/features/specs/test_doctor_memory_"
+    "citations.py)",
     "FIXED-1/FIXED-2": "auto-fixed rule (`fix_fixed_section`), covered by "
     "tests/contract/test_fixed_sections_canon.py",
     "SPECS-VERSION": "the fix is `specs upgrade`, exercised by the specs upgrade suite",

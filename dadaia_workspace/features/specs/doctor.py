@@ -79,6 +79,11 @@ class SpecsDoctor:
             CLI composition root and passed in as plain data — feeds SPEC-DOC-044
             (stale verdicts). ``None`` (default) keeps that check a silent no-op; this
             coordinator never resolves git state itself.
+        command_paths: Optional live command-path set
+            (``cli.help_digest.command_paths()``), walked ONCE by the CLI composition
+            root and passed in as plain data exactly as ``live_shas`` is — feeds
+            MEM-DRIFT-2 (memory citations, 0.4.7 FR2). ``None`` (default) keeps that
+            check silent.
         governance: Optional governance-event baseline
             (``core.models.telemetry.GovernanceBaseline``), read ONCE by the CLI
             composition root and passed in as plain data exactly as ``live_shas`` is —
@@ -96,6 +101,7 @@ class SpecsDoctor:
         bug_store_factory: Callable[[Path], JsonlRecordStore[BugRecord]] | None = None,
         live_shas: Collection[str] | None = None,
         governance: GovernanceBaseline | None = None,
+        command_paths: Collection[tuple[str, ...]] | None = None,
     ) -> None:
         self.specs_dir: Path = Path(specs_dir)
         self.public_dir: Path | None = Path(public_dir) if public_dir is not None else None
@@ -110,6 +116,10 @@ class SpecsDoctor:
         # governance (0.4.7 FR6): RELEASE-TREE-HANDEDIT's plain-data input, read once by
         # the CLI. None -> that check is a no-op, as it is wherever no store exists.
         self.governance: GovernanceBaseline | None = governance
+        # command_paths (0.4.7 FR2): MEM-DRIFT-2's plain-data input — the ONE Typer walk
+        # (`cli.help_digest.command_paths`), done by the CLI. None -> that check is a
+        # no-op; `features` never imports `cli`.
+        self.command_paths: Collection[tuple[str, ...]] | None = command_paths
         # templates_dir is resolved from public_dir if not explicitly supplied.
         if templates_dir is not None:
             self._templates_dir: Path | None = Path(templates_dir)

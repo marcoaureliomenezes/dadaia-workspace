@@ -1,9 +1,9 @@
-"""Memory validator (v0.1.55 FR1): memory-atom files, atomicity, CAT-1, LINT-1, MEM-DRIFT-1.
-
+"""Memory validator: atom files, atomicity, CAT-1, LINT-1, MEM-DRIFT-1, MEM-DRIFT-2.
 Single-responsibility sibling of the SpecsDoctor coordinator. Owns the memory-markdown-source
 invariants: required atoms present with a heading (SPEC-DOC-002/002L), no changelog/history
 headings (SPEC-DOC-008), catalog↔atom sync (CAT-1), the LINT-1 memory-atom lint, and (v0.5.1
-T-051-22 rework) MEM-DRIFT-1's features-package-map-vs-live-tree WARNING. LINT-1 imports
+T-051-22 rework) MEM-DRIFT-1's features-package-map-vs-live-tree WARNING and (0.4.7 FR2)
+MEM-DRIFT-2's memory-citation WARNING (finders: ``features.specs.citations``). LINT-1 imports
 ``features.specs.memory_lint`` directly (v0.4.3 T-043-20/FR16 — no subprocess, no dependency
 on the projected ``public/scripts/lint-memory-atoms.py`` copy existing or being current).
 Leaf-only: imports the shared leaves + core, never a sibling validator.
@@ -12,16 +12,13 @@ Leaf-only: imports the shared leaves + core, never a sibling validator.
 from __future__ import annotations
 
 import re
+from collections.abc import Collection
 from pathlib import Path
 
 from dadaia_workspace.core import frontmatter as _fm
 from dadaia_workspace.core.atomic_write import atomic_write
-from dadaia_workspace.core.specs_repair import (  # noqa: F401
-    has_unfilled_angle_placeholders,
-    is_placeholder_atom,
-    remove_placeholder_atoms,
-)
-from dadaia_workspace.features.specs import memory_canon, memory_lint
+from dadaia_workspace.core.specs_repair import has_unfilled_angle_placeholders, is_placeholder_atom
+from dadaia_workspace.features.specs import citations, memory_canon, memory_lint
 from dadaia_workspace.features.specs.canon import default_public_dir
 from dadaia_workspace.features.specs.doctor_types import (
     Severity,
@@ -43,16 +40,13 @@ PRODUCT_INDEX_REL = "product/index.md"
 _MD_HEADING_RE = re.compile(r"^#{1,6}\s+\S", re.MULTILINE)
 _MD_H1_RE = re.compile(r"^#\s+(.+)$", re.MULTILINE)
 _MD_H2_RE = re.compile(r"^##\s+(.+)$", re.MULTILINE)
-_WIKILINK_RE = memory_canon.WIKILINK_RE
 
 
 def _parse_memory_md(path: Path) -> _MemoryMdSummary:
     """Extract the facts the doctor needs from a memory .md atom."""
     content = path.read_text(encoding="utf-8")
 
-    # Extract frontmatter if present — tolerant: any parse failure (no delimiter,
-    # invalid YAML, non-mapping block) degrades to "no frontmatter" rather than
-    # raising, same as the pre-consolidation behaviour.
+    # Tolerant: any frontmatter parse failure degrades to "no frontmatter", never raises.
     fm: dict | None = None  # type: ignore[type-arg]
     body = content
     parsed = _fm.parse(content)
@@ -60,14 +54,12 @@ def _parse_memory_md(path: Path) -> _MemoryMdSummary:
         fm = parsed.data
         body = parsed.body
 
-    # First H1 heading text (used for heading_text field; may be empty).
     h1_match = _MD_H1_RE.search(body)
     heading_text = h1_match.group(1).strip() if h1_match else ""
     # has_heading is True if the body contains ANY ATX heading (H1–H6), including
     # atoms that only have ## / ### level headings and no H1.
     has_heading = bool(_MD_HEADING_RE.search(body))
 
-    # Check ## headings for forbidden patterns
     forbidden_h2: list[str] = []
     for h2_match in _MD_H2_RE.finditer(body):
         text = h2_match.group(1).strip()
@@ -125,29 +117,16 @@ def _live_feature_package_names() -> set[str]:
     """The live ``dadaia_workspace/features/<pkg>`` package names.
 
     Introspects the SAME installed ``dadaia_workspace.features`` namespace this module
-    itself lives under — never a hardcoded name list (the deleted contract test's own
-    technique, preserved). ``dadaia_workspace.features`` is the package NAMESPACE, not a
-    sibling feature: the `features-no-cross-feature` independence contract's ``modules =``
-    list names only the sub-packages (``features.panel``, …, never bare ``features``
-    itself), and this module's own empty ``__init__.py`` means importing it loads no
-    sibling code — so this import carries no cross-feature edge (verified live by
-    `lint-imports --config setup.cfg --no-cache`, which this module's own contract gates).
-    Falls back to a filesystem walk from this module's own path — never a subprocess,
-    never a hardcoded list — if that ever stops holding.
+    itself lives under — never a hardcoded name list. That namespace is the package, not
+    a sibling feature: the `features-no-cross-feature` contract's ``modules =`` list names
+    only the sub-packages, and the namespace's own empty ``__init__.py`` loads no sibling
+    code — so this import carries no cross-feature edge (gated live by `lint-imports`).
     """
-    try:
-        import importlib
-        import pkgutil
+    import importlib
+    import pkgutil
 
-        pkg = importlib.import_module("dadaia_workspace.features")
-        return {name for _finder, name, ispkg in pkgutil.iter_modules(pkg.__path__) if ispkg}
-    except ImportError:
-        features_dir = Path(__file__).resolve().parents[1]
-        return {
-            child.name
-            for child in features_dir.iterdir()
-            if child.is_dir() and (child / "__init__.py").is_file()
-        }
+    pkg = importlib.import_module("dadaia_workspace.features")
+    return {name for _finder, name, ispkg in pkgutil.iter_modules(pkg.__path__) if ispkg}
 
 
 def _iter_memory_md_files(mem_dir: Path) -> list[Path]:
@@ -163,7 +142,6 @@ def _iter_memory_md_files(mem_dir: Path) -> list[Path]:
             out.append(p)
     product_dir = mem_dir / "product"
     if product_dir.is_dir():
-        # Recurse into thematic subdirs (v0.1.9 product/ tree).
         for p in sorted(product_dir.glob("**/*.md")):
             if p.name == "index.md":
                 continue
@@ -312,14 +290,11 @@ class MemoryValidator:
         issues: list[SpecsDoctorIssue] = []
         mem_dir = self.specs_dir / "memory"
 
-        # Required top-level singles
         required: list[tuple[str, Path]] = [
             (name, mem_dir / name) for name in TOPLEVEL_MEMORY_FILES
         ]
-        # Required folder catalog entry
         required.append((PRODUCT_INDEX_REL, mem_dir / PRODUCT_INDEX_REL))
 
-        # Plus any optional feature .md atoms that DO exist — they must parse too
         product_dir = mem_dir / "product"
         feature_files: list[tuple[str, Path]] = []
         if product_dir.is_dir():
@@ -384,7 +359,7 @@ class MemoryValidator:
         if mem_dir.exists():
             for stray in mem_dir.glob("*.html"):
                 if stray.name == "product.html":
-                    continue  # already reported above
+                    continue
                 issues.append(
                     SpecsDoctorIssue(
                         code="SPEC-DOC-002L",
@@ -543,6 +518,34 @@ class MemoryValidator:
                 )
             )
         return issues
+
+    def check_mem_drift2_citations(
+        self,
+        *,
+        repo_root: Path | None,
+        command_paths: Collection[tuple[str, ...]] | None,
+    ) -> list[SpecsDoctorIssue]:
+        """MEM-DRIFT-2: every ``dadaia <verb>`` and repo path a memory atom cites still
+        exists — the SAME finders (``features.specs.citations``) the ``public/**``
+        citation contract tests use, never a second rule. WARNING and unfixable, like
+        MEM-DRIFT-1: memory drift is a closure finding (QUALITY.md), so a verb retired
+        mid-implementation never reddens an unrelated task. *command_paths* is plain data
+        from the CLI root, exactly as ``live_shas`` travels.
+        """
+        return [
+            SpecsDoctorIssue(
+                code="MEM-DRIFT-2",
+                severity=Severity.WARNING,
+                description=(
+                    f"memory atom cites what no longer exists: {violation} "
+                    "(memory drift — correct the atom at closure)."
+                ),
+                path=str(path),
+            )
+            for path, violation in citations.memory_citation_violations(
+                self.specs_dir / "memory", repo_root=repo_root, command_paths=command_paths
+            )
+        ]
 
     def check_mem_drift1_features_package_map(self) -> list[SpecsDoctorIssue]:
         """MEM-DRIFT-1: the features package-map mermaid diagram matches the live tree.

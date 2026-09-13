@@ -29,7 +29,6 @@ def test_memory_file_lists_are_the_one_home() -> None:
 
 
 def test_wikilink_regex_is_compiled_once() -> None:
-    assert doctor_memory._WIKILINK_RE is memory_canon.WIKILINK_RE
     assert memory_lint._WIKILINK_RE is memory_canon.WIKILINK_RE
     assert catalog._WIKILINK_RE is memory_canon.WIKILINK_RE
 

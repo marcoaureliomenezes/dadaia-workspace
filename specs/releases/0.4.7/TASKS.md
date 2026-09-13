@@ -19,7 +19,7 @@
   `.dadaia/tmp/product-engineer/<YYYYMMDD>/memory-review.md`. Blocked by: none
   (disjoint from T-047-35). Delivers: the operator reads one table of 25 files, each
   with a verdict and its evidence.
-- [-] T-047-35 — FR2 (`software-engineer`): `cli/help_digest.py::command_paths()` (the
+- [x] T-047-35 — FR2 (`software-engineer`): `cli/help_digest.py::command_paths()` (the
   one Typer walk; `render_digest` uses it); `features/specs/citations.py::
   dead_citations(text, *, command_paths, repo_root)` relocated from
   `test_behavior_map.py`'s two finders (the test imports both, keeps every fixture,
