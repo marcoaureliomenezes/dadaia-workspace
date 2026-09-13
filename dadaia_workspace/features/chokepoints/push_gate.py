@@ -134,14 +134,13 @@ def _compose_denylist_refusal(hits: list[tuple[PushRef, Hit]], path_masker: Path
     if remainder > 0:
         lines.append(f"  ... and {remainder} more offending object(s).")
     lines.append(
-        "  Fix: edit the file(s) to remove the term, then rewrite the offending "
-        "commit(s) (--amend / interactive rebase / cherry-pick) so no pushed object "
-        "carries it, and push again — the range scope means already-published history "
-        "never needs a rewrite."
+        "  The range scope means already-published history never needs a rewrite. If "
+        "this push is a genuine emergency, git's sanctioned, traceable bypass is "
+        "`git push --no-verify` (discouraged; leaves a reflog trace)."
     )
     lines.append(
-        "  If this push is a genuine emergency, git's sanctioned, traceable bypass is "
-        "`git push --no-verify` (discouraged; leaves a reflog trace)."
+        "fix: edit the listed file(s) to remove the term, then rewrite the offending "
+        "commit(s) — git rebase -i <first-offending-sha>^ — and push again"
     )
     return "\n".join(lines)
 
@@ -235,10 +234,11 @@ def _run_denylist_scan(
                 message=(
                     f"[pre-push] BLOCKED: reading the pushed-range git objects failed "
                     f"({_render_git_read_error(exc, path_masker)}) — a policy gate never "
-                    "skips what it cannot evaluate (fail closed).\n"
-                    "  If this push is a genuine emergency, git's sanctioned, traceable "
-                    "bypass is `git push --no-verify` (discouraged; leaves a reflog "
-                    "trace)."
+                    "skips what it cannot evaluate (fail closed). The sanctioned, "
+                    "traceable emergency bypass is `git push --no-verify` "
+                    "(discouraged; leaves a reflog trace).\n"
+                    "fix: git fetch origin && git push origin feature/<M.m.p> (repair "
+                    "the object store first — git fsck)"
                 ),
             ),
             0,
@@ -276,6 +276,10 @@ def _compose_specs_canon_refusal(violations: list[tuple[PushRef, str]]) -> str:
         "  If this push is a genuine emergency, git's sanctioned, traceable bypass is "
         "`git push --no-verify` (discouraged; leaves a reflog trace)."
     )
+    lines.append(
+        "fix: git rm the listed specs/ path(s), then rewrite the offending commit(s) — "
+        "git rebase -i <first-offending-sha>^ — and push again"
+    )
     return "\n".join(lines)
 
 
@@ -306,10 +310,10 @@ def _run_specs_canon_scan(
                 message=(
                     f"[pre-push] BLOCKED: reading the pushed specs/ tree failed ({exc}) "
                     "— a policy gate never skips what it cannot evaluate (fail "
-                    "closed).\n"
-                    "  If this push is a genuine emergency, git's sanctioned, "
-                    "traceable bypass is `git push --no-verify` (discouraged; "
-                    "leaves a reflog trace)."
+                    "closed). The sanctioned, traceable emergency bypass is "
+                    "`git push --no-verify` (discouraged; leaves a reflog trace).\n"
+                    "fix: git fetch origin && git push origin feature/<M.m.p> (repair "
+                    "the object store first — git fsck)"
                 ),
             )
         specs_rel = [p[len("specs/") :] for p in raw_paths if p.startswith("specs/")]
@@ -381,9 +385,9 @@ def push_gate_decision(
             message=(
                 f"[pre-push] BLOCKED: {malformed_lines} unparseable pre-push stdin "
                 "line(s) — a policy gate never skips what it cannot parse (fail "
-                "closed).\n"
-                "  If this push is a genuine emergency, git's sanctioned, traceable "
-                "bypass is `git push --no-verify` (discouraged; leaves a reflog trace)."
+                "closed). The sanctioned, traceable emergency bypass is "
+                "`git push --no-verify` (discouraged; leaves a reflog trace).\n"
+                "fix: git push origin feature/<M.m.p> (one explicit refspec)"
             ),
         )
 

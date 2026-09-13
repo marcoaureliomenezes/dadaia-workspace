@@ -349,7 +349,8 @@ def verdict_check(
     if not _SHA40_RE.match(head):
         typer.secho(
             f"[verdict-check] BLOCKED: --head '{head}' is not a 40-hex sha — refusing "
-            "to use it as a git argument or coverage anchor.",
+            "to use it as a git argument or coverage anchor.\n"
+            "fix: git rev-parse HEAD",
             fg=typer.colors.RED,
             err=True,
         )
@@ -358,7 +359,8 @@ def verdict_check(
     if release_id and release_id != "none" and not RELEASE_SEMVER_RE.match(release_id):
         typer.secho(
             f"[verdict-check] BLOCKED: --release-id '{release_id}' does not match the "
-            "canon release-id pattern — refusing to use it to narrow the search.",
+            "canon release-id pattern — refusing to use it to narrow the search.\n"
+            "fix: pass a bare SemVer release id, e.g. --release-id 0.4.7",
             fg=typer.colors.RED,
             err=True,
         )
@@ -376,7 +378,9 @@ def verdict_check(
             f"head {head} — expected one at "
             "specs/releases/<id>/verdicts/<sha>.handoff.json or "
             "specs/releases/_archive/<id>/verdicts/<sha>.handoff.json "
-            f"(sha = {head} or its first parent {parent or 'none'}).",
+            f"(sha = {head} or its first parent {parent or 'none'}).\n"
+            f"fix: commit the security-reviewer APPROVED handoff at "
+            f"specs/releases/<id>/verdicts/{head}.handoff.json",
             fg=typer.colors.RED,
             err=True,
         )

@@ -35,6 +35,7 @@ from dadaia_workspace.core.doctor_rules import (
     SectionFinding,
     SectionReport,
     merge_sections,
+    render_finding,
     run_section,
     total_compliance,
     total_line,
@@ -416,7 +417,12 @@ def _json_payload(
             "sections": {
                 report.name: {
                     "findings": [
-                        {"code": f.code, "verdict": f.verdict, "message": render(f.message)}
+                        {
+                            "code": f.code,
+                            "verdict": f.verdict,
+                            "message": render(f.message),
+                            "fix": render(f.fix),
+                        }
                         for f in report.printable
                     ],
                     "compliance": _compliance(report),
@@ -437,7 +443,7 @@ def _emit_human(
     word — then that section's score, then the run's total."""
     for report in reports:
         for finding in report.printable:
-            typer.echo(render(f"{finding.code} {finding.verdict} {finding.message}"))
+            typer.echo(render(render_finding(finding)))
         typer.echo(report.score_line())
     if fix:
         typer.echo(f"\nApplied {len(fixed)} repair(s):")

@@ -133,6 +133,7 @@ def _root_violation(workspace: Path, raw_path: str) -> str | None:
         f"The workspace root may only contain: {_render_whitelist()}. Redirect output to "
         ".dadaia/<subdir> (temp files: .dadaia/tmp/<agent>/<date>/; tool caches: "
         ".dadaia/; MCP output: .dadaia/mcps/<server>/). If this entry is genuinely "
-        f"required at root, add a glob pattern to {workspace_layout.INSTANCE_EXCEPTIONS} "
-        "and retry. Operator-created files are exempt — add them there."
+        "required at root, the operator's instance exceptions document it.\n"
+        f"fix: move the entry under .dadaia/tmp/<agent>/<YYYYMMDD>/ or add a glob "
+        f"matching '{first}' to {workspace_layout.INSTANCE_EXCEPTIONS}"
     )

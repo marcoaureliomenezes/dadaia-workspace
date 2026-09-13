@@ -145,6 +145,7 @@ def test_doctor_default_output_with_issue_unchanged(workspace: Path) -> None:
     assert result.exit_code == 1, result.output
     assert result.output == (
         "INV-5 error Context 'stale-ctx' is dead but repo 'stale-ctx' is on disk\n"
+        "fix: .dadaia/.venv/bin/dadaia doctor --fix\n"
         "compliance(workspace): 135/135 entries canonical (100%)\n"
         "compliance(specs): 0/0 rules canonical (100%)\n"
         "compliance(ledgers): 0/0 records canonical (100%)\n"

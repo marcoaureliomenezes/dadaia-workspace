@@ -651,6 +651,16 @@ def workspace_rules(
         ]
 
     return (
-        Rule(("WS-INVARIANT",), SECTION, invariants),
-        Rule(("WS-ENTRY",), SECTION, entries),
+        Rule(
+            ("WS-INVARIANT",),
+            SECTION,
+            invariants,
+            fix_help=".dadaia/.venv/bin/dadaia doctor --fix",
+        ),
+        Rule(
+            ("WS-ENTRY",),
+            SECTION,
+            entries,
+            fix_help=".dadaia/.venv/bin/dadaia doctor --fix",
+        ),
     )

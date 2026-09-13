@@ -766,10 +766,11 @@ def release_new(specs_dir: Path, release_id: str) -> Path:
             live = others[0]
             raise FileExistsError(
                 f"a live release already exists ({', '.join(others)}) — the "
-                "release-candidates model allows exactly one (ADR 0005).\n"
-                f"fix: stack the work as a new candidate — dadaia release rc-archive\n"
-                f"fix: or ship it first — dadaia release archive {live} "
-                "--shipped <sha> --pr <n> --next " + release_id
+                f"release-candidates model allows exactly one (ADR 0005) — stack the "
+                f"work as a candidate, or ship {live} first "
+                f"(.dadaia/.venv/bin/dadaia release archive {live} --shipped <sha> "
+                f"--pr <n> --next {release_id}).\n"
+                "fix: .dadaia/.venv/bin/dadaia release rc-archive"
             )
     if releases_root.is_symlink() or release_dir.is_symlink():
         raise FileExistsError(

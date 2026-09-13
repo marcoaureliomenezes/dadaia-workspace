@@ -196,12 +196,11 @@ def test_push_gate_git_read_failure_carries_a_runnable_fix() -> None:
         ("no-verdict", ["--head", _SHA_A, "--release-id", "0.0.1"]),
     ],
 )
-def test_verdict_check_refusals_carry_a_runnable_fix(
-    name: str, args: list[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_verdict_check_refusals_carry_a_runnable_fix(name: str, args: list[str]) -> None:
+    """Driven in the real repo — ``verdict-check`` reads git, and a refusal must still
+    hand back one command."""
     from dadaia_workspace.cli.commands import ci
 
-    monkeypatch.chdir(tmp_path)
     result = CliRunner().invoke(ci.app, ["verdict-check", *args])
     assert result.exit_code == 1, result.output
     assert_block_carries_a_runnable_fix(result.output)

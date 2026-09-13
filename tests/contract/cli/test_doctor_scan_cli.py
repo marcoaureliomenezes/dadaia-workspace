@@ -123,6 +123,7 @@ def test_json_carries_findings_compliance_and_fixed(workspace: Path) -> None:
             "code": "WS-root-slop",
             "verdict": "slop",
             "message": "junk.txt  (not in the root law or the exceptions)",
+            "fix": ".dadaia/.venv/bin/dadaia doctor --fix",
         }
     ]
     assert set(workspace_section["compliance"]) == {"canonical", "total", "percent"}

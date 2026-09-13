@@ -151,8 +151,7 @@ def _refuse_branch(branch: str, local_ref: str) -> Decision:
             message=(
                 "[pre-push] BLOCKED: 'main' is never pushed directly — it advances only "
                 "via a PR from 'develop' (gitflow law, DADAIA.md §4).\n"
-                "  Fix: push your work to 'develop' (via the PR below), then open the "
-                "PR develop → main."
+                "fix: gh pr create --base main --head develop"
             ),
         )
     if branch == "develop":
@@ -161,8 +160,7 @@ def _refuse_branch(branch: str, local_ref: str) -> Decision:
             message=(
                 "[pre-push] BLOCKED: 'develop' is never pushed directly — it advances "
                 "only via a PR from 'feature/{M.m.p}' (gitflow law, DADAIA.md §4).\n"
-                "  Fix: push your work on 'feature/{M.m.p}' instead, then open the PR "
-                "feature/{M.m.p} → develop."
+                "fix: gh pr create --base develop --head feature/<M.m.p>"
             ),
         )
     return Decision(
@@ -171,9 +169,7 @@ def _refuse_branch(branch: str, local_ref: str) -> Decision:
             f"[pre-push] BLOCKED: ref '{local_ref}' is outside the three permitted "
             "branch patterns — main, develop, feature/M.m.p (gitflow law, "
             "DADAIA.md §4). Only 'feature/M.m.p' is pushable.\n"
-            "  Fix: rebuild the work on a permitted branch (git checkout -b "
-            "feature/M.m.p from main), push it, then open the PR "
-            "feature/M.m.p → develop."
+            "fix: git checkout -b feature/<M.m.p> main && git push origin feature/<M.m.p>"
         ),
     )
 
@@ -195,9 +191,7 @@ def check_branch_policy(refs: list[PushRef]) -> Decision | None:
                     f"[pre-push] BLOCKED: local ref '{ref.local_ref}' is not a branch "
                     "head — only a 'refs/heads/feature/M.m.p' branch may be pushed "
                     "(gitflow law, DADAIA.md §4).\n"
-                    "  Fix: check out your feature/M.m.p branch (git checkout "
-                    "feature/M.m.p) and push it directly instead of pushing a "
-                    "detached or symbolic ref."
+                    "fix: git checkout feature/<M.m.p> && git push origin feature/<M.m.p>"
                 ),
             )
         branch = ref.local_ref[len(HEADS_PREFIX) :]
@@ -211,9 +205,7 @@ def check_branch_policy(refs: list[PushRef]) -> Decision | None:
                     f"'{ref.remote_ref}' — only refs/heads/{branch} → "
                     f"refs/heads/{branch} is pushable (gitflow law, DADAIA.md §4; "
                     "'develop' and 'main' advance via PR only).\n"
-                    f"  Fix: push {branch} to {branch} (git push origin {branch}) "
-                    "and open the PR feature/M.m.p → develop for anything meant to "
-                    "land there."
+                    f"fix: git push origin {branch}:{branch}"
                 ),
             )
     return None

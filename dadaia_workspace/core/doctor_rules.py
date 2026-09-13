@@ -31,6 +31,7 @@ __all__ = [
     "SectionFinding",
     "SectionReport",
     "merge_sections",
+    "render_finding",
     "run_section",
     "total_compliance",
     "total_line",
@@ -59,6 +60,10 @@ class SectionFinding:
     #: slug). ``None`` = a finding outside the scored set (a workspace invariant is not
     #: an entry).
     unit: str | None = None
+    #: The ONE executable remediation (0.4.7 FR2). Mandatory on an error-class finding:
+    #: an exit-1 finding with nothing to run is a Stall. Stamped from the emitting
+    #: rule's ``fix_help`` by :func:`run_section` when the section left it empty.
+    fix: str = ""
 
 
 @dataclass(frozen=True)
@@ -122,7 +127,8 @@ def run_section[C, I](
     """
     findings: list[SectionFinding] = []
     for rule in rules:
-        findings.extend(render(rule, issue) for issue in rule.run(context))
+        for issue in rule.run(context):
+            findings.append(_with_fix(render(rule, issue), rule))
     scored = [f for f in findings if f.unit is not None]
     if total_units is None:
         canonical = sum(1 for f in scored if f.canonical)
@@ -171,3 +177,27 @@ def total_compliance(reports: Sequence[SectionReport]) -> SectionReport:
 def total_line(reports: Sequence[SectionReport]) -> str:
     """The run's final line."""
     return total_compliance(reports).score_line()
+
+
+def _with_fix[C, I](finding: SectionFinding, rule: Rule[C, I]) -> SectionFinding:
+    """Stamp the emitting rule's ``fix_help`` onto *finding*; refuse an unfixable error.
+
+    0.4.7 FR2 — every BLOCK carries one executable fix. A doctor run exits 1 on an
+    error-class finding, so an error-class rule with no ``fix_help`` would stop the
+    operator with nothing to run. That is a rule-authoring defect, caught here at the
+    one seam every finding passes through rather than by review.
+    """
+    fix = finding.fix or rule.fix_help or ""
+    if finding.error and not fix:
+        raise ValueError(
+            f"doctor rule {'/'.join(rule.codes)} emits an error-class finding "
+            f"({finding.code}) with no fix_help — an exit-1 finding must name one "
+            "executable remediation (0.4.7 FR2)."
+        )
+    return replace(finding, fix=fix)
+
+
+def render_finding(finding: SectionFinding) -> str:
+    """One finding, rendered: its line, plus the ``fix:`` line when it fails the run."""
+    line = f"{finding.code} {finding.verdict} {finding.message}"
+    return f"{line}\nfix: {finding.fix}" if finding.error and finding.fix else line

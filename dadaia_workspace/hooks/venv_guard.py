@@ -234,9 +234,8 @@ def _cache_block_message(original: str, corrected: str, note: str) -> str:
         "[CACHE GUARD] This command must not create an in-repo cache directory "
         "(DADAIA.md, Repos stay clean; FR28). Blocked:\n"
         f"  {original}\n"
-        "Use the compliant form instead:\n"
-        f"  {corrected}\n"
-        f"({note})"
+        f"({note})\n"
+        f"fix: {corrected}"
     )
 
 
@@ -308,8 +307,6 @@ def _block_message(original: str, corrected: str) -> str:
         "[VENV GUARD] This command must run from the workspace venv "
         f"({_VENV_BIN}). Blocked:\n"
         f"  {original}\n"
-        "Use the venv-rooted form instead:\n"
-        f"  {corrected}\n"
-        "(pytest/ruff/mypy are exempt from venv-rooting — see the separate cache "
-        "guard; set $DADAIA_BIN to override.)"
+        "(pytest/ruff/mypy are exempt from venv-rooting; set $DADAIA_BIN to override.)\n"
+        f"fix: {corrected}"
     )

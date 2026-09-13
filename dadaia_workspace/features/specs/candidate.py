@@ -116,14 +116,17 @@ def _load_live_release(specs_dir: Path, verb: str) -> _LiveRelease:
         raise ArchiveError(
             f"the release tree carries {len(tree_issues)} issue(s); a release archives "
             f"only from a valid tree:\n{listed}\n"
-            "fix: run `dadaia doctor --context <ctx>` and repair every release-tree "
-            f"finding, then re-run `dadaia release {verb}`."
+            f"fix: .dadaia/.venv/bin/dadaia doctor --fix (then re-run "
+            f".dadaia/.venv/bin/dadaia release {verb})"
         )
     release_id, err = resolve_live_release_id(specs_dir)
     if err:
         raise ArchiveError(err)
     if release_id is None:
-        raise ArchiveError("no live release under specs/releases/ — nothing to archive.")
+        raise ArchiveError(
+            "no live release under specs/releases/ — nothing to archive.\n"
+            "fix: .dadaia/.venv/bin/dadaia release new <M.m.p>"
+        )
     release_dir = specs_dir / "releases" / release_id
     state_path = release_state_file(release_dir)
     if state_path is None:
@@ -300,7 +303,8 @@ def archive_release(
     if live.release_id != release_id:
         raise ArchiveError(
             f"{release_id} is not the live release ({live.release_id} is).\n"
-            f"fix: dadaia release archive {live.release_id} --shipped {shipped_sha} "
+            f"fix: .dadaia/.venv/bin/dadaia release archive {live.release_id} "
+            f"--shipped {shipped_sha} "
             f"--pr {pr} --next {next_release}"
         )
     release_dir, state_path, state = live.release_dir, live.state_path, live.state

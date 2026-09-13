@@ -67,8 +67,9 @@ _PROTECTED_PREFIX = ".dadaia/sessions/"
 #: which delegates here so PROTECTED has a single message source.
 _PROTECTED_MESSAGE = (
     "[GATE] .dadaia/sessions/ is protected CLI-owned bind state. Agents must not write "
-    "here via file tools; use dadaia context commands. Blocked to preserve caller session "
-    "identity integrity (SEC-01 / CWE-284)."
+    "here via file tools. Blocked to preserve caller session identity integrity "
+    "(SEC-01 / CWE-284).\n"
+    "fix: .dadaia/.venv/bin/dadaia context bind <ctx>"
 )
 #: Projected LAW files. ``DADAIA.md`` is the workspace system prompt and the sole
 #: always-on rule file the library ships; the ``AGENTS.md``/``CLAUDE.md`` pair is its
@@ -81,9 +82,11 @@ _LAW_BASENAMES: frozenset[str] = workspace_layout.LAW_BASENAMES
 _LAW_HARNESS_DIRS: frozenset[str] = workspace_layout.LAW_HARNESS_DIRS
 _LAW_MESSAGE = (
     "[GATE] '{path}' is a projected law file (the workspace system prompt / scoped "
-    "AGENTS.md). In an instantiated workspace only a human operator edits it by hand. "
-    "To change the law, edit the source under dadaia_workspace/public/ and re-project: "
-    "`dadaia public stage && dadaia public install --target all && dadaia public doctor`."
+    "AGENTS.md). In an instantiated workspace only a human operator edits it by hand; "
+    "an agent changes the law at its source and re-projects.\n"
+    "fix: edit the source under dadaia_workspace/public/ and run "
+    ".dadaia/.venv/bin/dadaia public stage && .dadaia/.venv/bin/dadaia public install "
+    "--target all"
 )
 
 #: Phases in which product-engineer may write memory atoms (FR-P1-13).

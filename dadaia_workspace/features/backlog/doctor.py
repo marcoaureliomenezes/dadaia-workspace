@@ -301,9 +301,24 @@ SECTION = "ledgers"
 #: `dadaia doctor` collects, renders and scores all three sections through one engine
 #: (T-047-03 widens this tuple to every ledger without touching the collector).
 RULES: tuple[LedgerRule, ...] = (
-    Rule((BacklogDoctorCode.BL_SCHEMA.value,), SECTION, _check_schema),
-    Rule((BacklogDoctorCode.BL_CONFLICT.value,), SECTION, _check_conflict),
-    Rule((BacklogDoctorCode.BL_STALE.value,), SECTION, _check_stale),
+    Rule(
+        (BacklogDoctorCode.BL_SCHEMA.value,),
+        SECTION,
+        _check_schema,
+        fix_help="repair the named record in specs/backlog/BACKLOG.json against specs/backlog/AGENTS.md",
+    ),
+    Rule(
+        (BacklogDoctorCode.BL_CONFLICT.value,),
+        SECTION,
+        _check_conflict,
+        fix_help="adjudicate the conflicting entries to a single owner in specs/backlog/BACKLOG.json",
+    ),
+    Rule(
+        (BacklogDoctorCode.BL_STALE.value,),
+        SECTION,
+        _check_stale,
+        fix_help="disposition the stale entry — .dadaia/.venv/bin/dadaia backlog update <slug> --status …",
+    ),
 )
 
 
