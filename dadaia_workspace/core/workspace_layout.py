@@ -338,6 +338,9 @@ DADAIA_MD_HARNESS_TARGETS: dict[str, str] = {
 #: build output, coverage data. Bare names — the display form (trailing ``/`` for the
 #: directories) is :func:`repo_excluded_display`.
 REPO_TREE_ARTIFACTS: tuple[str, ...] = (
+    # ``.venv`` is here for the RENDERED law line only (DADAIA.md §5.3 lists `.venv/`
+    # and the rendering reads this tuple). It can never produce a finding: the repo-tree
+    # walk consults ``_REPO_WALK_PRUNED`` first, which ends the walk at ``.venv``.
     ".venv",
     ".pytest_cache",
     ".mypy_cache",
