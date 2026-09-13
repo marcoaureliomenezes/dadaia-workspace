@@ -50,7 +50,7 @@
   Write set: `dadaia_workspace/infrastructure/public_assets.py`, `dadaia_workspace/
   public/data/DADAIA.md`, `tests/**`. Blocked by: T-047-17. Delivers: the projected
   law's canon tables cannot drift from the registry.
-- [ ] T-047-19 — FR6a: `features/spec_context/sweep.py` — `walk`, `move`, `remove`
+- [-] T-047-19 — FR6a: `features/spec_context/sweep.py` — `walk`, `move`, `remove`
   behind one guard (symlink never followed, vanished = absent, outside workspace =
   skipped, OSError = one `skipped` action; cross-device move = copy+remove inside);
   `DoctorService.scan()`/`fix()` consume it; `_entries`, `_mtime`, `_remove`,
