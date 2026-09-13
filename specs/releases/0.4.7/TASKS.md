@@ -96,7 +96,7 @@
   instance projections via the CLI, `tests/**`. Blocked by: T-047-16, T-047-18,
   T-047-21, T-047-22. Delivers: law, skills, entities and instance say one thing about
   the gate, the canon, the reaper and the scan.
-- [ ] T-047-24 — FR9 closure: `CHANGELOG.md [0.4.7]` candidate 2, preflight, `dadaia doctor`
+- [x] T-047-24 — FR9 closure: `CHANGELOG.md [0.4.7]` candidate 2, preflight, `dadaia doctor`
   100 %, gitleaks required on `develop` (PM/operator `gh api`, whole list re-supplied,
   recorded), `_RELEASE.json` CLOSURE with `summary`/`size`/`drifts`/`test-dispositions`/
   `dispositions`/`artifact-gc`/`reviews` entries; the memory pass (`sdd-gate-v3`,

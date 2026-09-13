@@ -123,6 +123,53 @@ Open-scope release (ADRs 0005–0009): version minted at birth from the PyPI lin
   `minted-feature-branch-without-live-release-blocks-every-memory-write`,
   `scoped-memory-agents-md-prose-rewrite-undetected-by-doctor`.
 
+### Candidate 2 — the gate blocks three things
+
+#### Added
+- Scope rule: a bound session's MUTATING write under a `repos/<slug>/` outside its scope (main +
+  associated repos, `core/invocation.py::Bind`/`all_repos`) is BLOCKed with `fix: … context bind <owner>`.
+- `fix:` grammar: every BLOCK from every enforcement point carries exactly one executable command;
+  `tests/contract/test_every_block_carries_a_fix.py` (68 refusals) feeds each line back through the gate.
+- `core/workspace_layout.py` is the one canon registry: `SPECS_CANON` rows, `REPO_TREE_EXCLUDED`,
+  `INSTALLED_GIT_HOOKS`, `reaped` zone (7-day TTL); `public stage` renders `<!-- root -->`,
+  `<!-- repo-excluded -->`, `<!-- specs-canon -->` into DADAIA §5.1/§5.3/§6.2.
+- `features/spec_context/sweep.py`: one traversal primitive (`walk`/`mtime`/`move`/`remove`) behind one guard.
+- Reaper hold: slop and INV-5 leftovers MOVED to `.dadaia/reaped/<YYYYMMDD>/<path>`, listed
+  `WS-reaped-reaped (Nd left)`; deletion only by TTL expiry.
+- `HOOKS-DRIFT-1`: an ALIVE repo's installed `.git/hooks/{pre-commit,pre-push}` byte-differing from the
+  shipped script; `fix: … ci install-hook --force`.
+- `[tool.ruff] cache-dir`, `[tool.mypy] cache_dir` → `../../.dadaia/tmp/<tool>-cache`; bare commands leave
+  the tree clean (`test_no_pollution.py`).
+- gitleaks is a required status check on `develop` (18 contexts re-supplied, recorded in `_RELEASE.json`).
+
+#### Changed
+- Path classes are `ADDITIVE MUTATING PROTECTED`; `specs/memory/` is MUTATING in every phase; the gate
+  reads no `_RELEASE.json`.
+- `dadaia context bind <ctx> [--print-env]` is one verb; the session record carries no `mode`/`release`.
+- The workspace walk covers the top of every ALIVE repo (main + associated), excluded names at any depth
+  and a nested `.dadaia/`, pruned at `.git .venv node_modules`; `--expired-only` scopes the report only.
+- `sdd_post_gate`'s throttle runs `doctor.reap` (which owns `presence.gc`).
+- Privacy scan: full layer set on every pushed path of this public repository; fixtures synthetic
+  (`tests/helpers/privacy_fixtures.py`); `test_repo_self_scan.py` asserts zero hits with no tolerated list.
+- DADAIA §3.1–§3.5/§5.1/§5.3/§7.4/§8.5/§10.2, `.dadaia/AGENTS.md`, `scaffold/memory/AGENTS.md`,
+  `entities/registry.json`, six skills, `CONSUMER_VALIDATION_RECIPE.md`, `software-engineer.md`,
+  `CONTEXT.md` (Scope, Reaped, Publication boundary, Sweep, Stall) say one thing about the gate, the canon,
+  the reaper and the scan.
+
+#### Removed
+- Path classes `MEMORY`, `LAW`, `UNGATED`; `release_state.MEMORY_WRITE_PHASES`; `Invocation.release/.phase`;
+  `resolve_mode`; the READ-mode self-block; `DADAIA_MODE`.
+- `context bind --mode/--release/--force/--reason`.
+- Venv guard rule 2 (cache guard) and its helpers; preflight per-command cache flags; `resolve_mypy_cache_dir`.
+- Five per-site doctor guards; the INV-5 `rmtree`; `REPO-DADAIA-1`; the `Compliance` twin; the runtime
+  `_with_fix` raise.
+- `_TESTS_SCOPE_BASELINE` (23 rows) and the last path-scoped `privacy_baseline.json` `exclude_regex`.
+- Tests: `test_read_mode_non_acquiring.py`, `test_mypy_local_invocation_hygiene.py`,
+  `test_doctor_repo_dadaia.py`.
+
+#### Fixed
+- `context-bind-implementation-requires-release-id-stall-when-none-live` — by deletion of `--release`.
+
 ## [0.4.6] — 2026-09-04
 
 Open-scope release under the release-candidates model it implements (ADRs
