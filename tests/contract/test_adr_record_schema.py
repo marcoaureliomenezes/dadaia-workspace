@@ -72,7 +72,7 @@ def test_a_valid_proposed_record_validates() -> None:
 
 def test_an_accepted_record_with_measured_by_validates() -> None:
     validator = Draft202012Validator(_schema())
-    accepted = {**_BASE, "status": "accepted", "measured_by": "tests/contract/test_x.py"}
+    accepted = {**_BASE, "status": "accepted", "measured_by": "pytest tests/contract/test_x.py"}
     assert list(validator.iter_errors(accepted)) == []
 
 

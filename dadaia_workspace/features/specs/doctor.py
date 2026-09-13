@@ -6,7 +6,7 @@ single-responsibility validator siblings plus two shared leaf modules:
 
   * ``doctor_types``     — ``Severity`` / ``SpecsDoctorIssue`` / ``_MemoryMdSummary``
   * ``doctor_common``    — cross-validator pure helpers (``resolve_live_release_id`` + release-dir discovery)
-  * ``doctor_structural``   — TREE-1..8 + TREE-5M spec-tree invariants; ``fix_tree4``,
+  * ``doctor_structural``   — TREE-1..8 spec-tree invariants; ``fix_tree4``,
                               ``fix_tree8``
   * ``doctor_memory``       — memory files/atomicity, CAT-1, LINT-1
   * ``doctor_release``      — active release (RELEASE.json state document), release artifacts, SemVer + ledger invariants
@@ -33,6 +33,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.models.bugs import BugRecord
 from dadaia_workspace.core.models.findings import FindingRecord
+from dadaia_workspace.core.models.telemetry import GovernanceBaseline
 from dadaia_workspace.features.specs.doctor_closure_audit import ClosureAuditValidator
 from dadaia_workspace.features.specs.doctor_coherence import CoherenceValidator
 from dadaia_workspace.features.specs.doctor_governance import GovernanceValidator
@@ -78,6 +79,16 @@ class SpecsDoctor:
             CLI composition root and passed in as plain data — feeds SPEC-DOC-044
             (stale verdicts). ``None`` (default) keeps that check a silent no-op; this
             coordinator never resolves git state itself.
+        command_paths: Optional live command-path set
+            (``cli.help_digest.command_paths()``), walked ONCE by the CLI composition
+            root and passed in as plain data exactly as ``live_shas`` is — feeds
+            MEM-DRIFT-2 (memory citations, 0.4.7 FR2). ``None`` (default) keeps that
+            check silent.
+        governance: Optional governance-event baseline
+            (``core.models.telemetry.GovernanceBaseline``), read ONCE by the CLI
+            composition root and passed in as plain data exactly as ``live_shas`` is —
+            feeds RELEASE-TREE-HANDEDIT (0.4.7 FR6). ``None`` (default, and the only
+            value on a machine with no telemetry store) keeps that check silent.
     """
 
     def __init__(
@@ -89,8 +100,10 @@ class SpecsDoctor:
         findings_store_factory: Callable[[Path], JsonlRecordStore[FindingRecord]] | None = None,
         bug_store_factory: Callable[[Path], JsonlRecordStore[BugRecord]] | None = None,
         live_shas: Collection[str] | None = None,
+        governance: GovernanceBaseline | None = None,
+        command_paths: Collection[tuple[str, ...]] | None = None,
     ) -> None:
-        self.specs_dir = Path(specs_dir)
+        self.specs_dir: Path = Path(specs_dir)
         self.public_dir: Path | None = Path(public_dir) if public_dir is not None else None
         # repo_root: when supplied, the constitution file-ref invariant (SPEC-DOC-028)
         # resolves path-like references against it, and the pyproject-version-vs-
@@ -100,6 +113,13 @@ class SpecsDoctor:
         # live_shas (v0.5.0 specs-canon closure): SPEC-DOC-044's plain-data input,
         # resolved once by the CLI. None -> that check is a no-op.
         self.live_shas: Collection[str] | None = live_shas
+        # governance (0.4.7 FR6): RELEASE-TREE-HANDEDIT's plain-data input, read once by
+        # the CLI. None -> that check is a no-op, as it is wherever no store exists.
+        self.governance: GovernanceBaseline | None = governance
+        # command_paths (0.4.7 FR2): MEM-DRIFT-2's plain-data input — the ONE Typer walk
+        # (`cli.help_digest.command_paths`), done by the CLI. None -> that check is a
+        # no-op; `features` never imports `cli`.
+        self.command_paths: Collection[tuple[str, ...]] | None = command_paths
         # templates_dir is resolved from public_dir if not explicitly supplied.
         if templates_dir is not None:
             self._templates_dir: Path | None = Path(templates_dir)
@@ -147,7 +167,7 @@ class SpecsDoctor:
         self._release.tree = tree
         issues: list[SpecsDoctorIssue] = []
         for rule in RULES:
-            issues.extend(rule.run(self, tree))
+            issues.extend(rule.run(self))
         return issues
 
     def fix(self, issues: list[SpecsDoctorIssue] | None = None) -> list[SpecsDoctorIssue]:

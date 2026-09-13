@@ -37,13 +37,14 @@ def test_v_prefixed_axis_resolves_but_never_mints() -> None:
 
 
 def test_canon_path_fragment_is_derived_from_the_one_pattern() -> None:
-    """F004 (20260830 audit): canon.py's path-regex release-id fragment must BE the
-    core-derived fragment, not a re-typed bare ``\\d+.\\d+.\\d+`` copy. Intent:
-    contract; size: unit."""
+    """F004 (20260830 audit): the canon path shapes' release-id fragment must BE the
+    core-derived fragment, not a re-typed bare ``\\d+.\\d+.\\d+`` copy. 0.4.7 FR5 moved
+    the rows into ``core.workspace_layout``, where ``<M.m.p>`` compiles through
+    :data:`SHAPE_FRAGMENTS`. Intent: contract; size: unit."""
     from dadaia_workspace.core.specs_version import RELEASE_ID_FRAGMENT, RELEASE_SEMVER_RE
-    from dadaia_workspace.features.specs import canon
+    from dadaia_workspace.core.workspace_layout import SHAPE_FRAGMENTS
 
-    assert canon._SEMVER is RELEASE_ID_FRAGMENT
+    assert SHAPE_FRAGMENTS["<M.m.p>"] is RELEASE_ID_FRAGMENT
     # Mechanical derivation from the ONE compiled object — never a second hand copy
     # (the suffix group is neutralized to non-capturing so embedding never shifts a
     # consumer regex's group indices; bash's POSIX ERE keeps the capturing form).

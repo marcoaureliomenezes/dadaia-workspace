@@ -3,11 +3,7 @@
 Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, `ai-engineer`-only depth).
 House authoring contract for every AI-entity file `ai-engineer` writes: personas, skills, rules, hooks-facing instructions.
 
-- Derived from the public reference corpus `mattpocock/skills` (`writing-for-agents`,
-  `SKILL-MECHANICS.md`, and its promoted skills as worked examples); this file states
-  house rules in our own vocabulary, never a copy.
-
-## The 15-rule checklist (audit 2026-08-31, operator-ratified)
+## The 15-rule checklist
 
 Every library skill must satisfy all fifteen; each rule's detail lives in the section named.
 

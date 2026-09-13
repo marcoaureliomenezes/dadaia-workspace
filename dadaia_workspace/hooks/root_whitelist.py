@@ -132,7 +132,7 @@ def _root_violation(workspace: Path, raw_path: str) -> str | None:
         f"[ROOT WHITELIST GATE] Writing '{first}' at workspace root is forbidden. "
         f"The workspace root may only contain: {_render_whitelist()}. Redirect output to "
         ".dadaia/<subdir> (temp files: .dadaia/tmp/<agent>/<date>/; tool caches: "
-        ".dadaia/; MCP output: .dadaia/mcps/<server>/). If this entry is genuinely "
-        f"required at root, add a glob pattern to {workspace_layout.INSTANCE_EXCEPTIONS} "
-        "and retry. Operator-created files are exempt — add them there."
+        ".dadaia/; MCP output: .dadaia/mcps/<server>/).\n"
+        f"When it is genuinely required at root, document it:\n"
+        f"fix: printf '%s\\n' '{first}' >> {workspace_layout.INSTANCE_EXCEPTIONS}"
     )

@@ -31,7 +31,7 @@ def _init_git_repo(path: Path, initial_commit: bool = True) -> None:
     path.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "init"], cwd=path, capture_output=True, check=True)
     subprocess.run(
-        ["git", "config", "user.email", "test@test.com"],
+        ["git", "config", "user.email", "test@example.invalid"],
         cwd=path,
         capture_output=True,
     )

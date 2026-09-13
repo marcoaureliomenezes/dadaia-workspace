@@ -1,12 +1,9 @@
 # HTML Report Format
 
 Disclosed reference of [`SKILL.md`](SKILL.md), report mode only (operator asked, or
-the next hop is human). Adapted from the reference corpus (`mattpocock/skills`,
-`engineering/improve-codebase-architecture`), re-grounded on this workspace's report
-law: a report is **self-contained** — inline `<style>`, inline SVG, zero external
-scripts or stylesheets (`reports-AGENTS.md`; external assets only when committed
-beside the report). Split any report over 30 KB behind an `index.html`
-(`DADAIA.md` §5.4).
+the next hop is human). A report is **self-contained** — inline `<style>`, inline SVG,
+zero external scripts or stylesheets; an external asset only when committed beside the
+report. Split any report over 30 KB behind an `index.html` (`DADAIA.md` §5.4).
 
 ## Scaffold
 

@@ -13,7 +13,8 @@ def test_digest_derives_from_the_live_tree_within_budget() -> None:
     text = render_digest()
     assert len(text) <= _MAX_CHARS, "digest must stay within the ~4k-token budget"
     # Derived, stamped, and grounded in real groups.
-    assert text.startswith("# dadaia CLI digest (v")
+    assert text.startswith("<!-- derived-from: dadaia help tree")
+    assert text.splitlines()[2].startswith("# dadaia CLI digest (v")
     for group in ("context", "specs", "bugs", "public", "help"):
         assert f"## dadaia {group}" in text or f"- {group} " in text, group
     # The one retired phantom the old hand-written skill documented.

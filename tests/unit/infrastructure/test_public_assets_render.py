@@ -30,7 +30,7 @@ _PLACEHOLDERS = ("<!-- zones -->", "<!-- canon -->")
 def test_zones_placeholder_renders_one_row_per_zone() -> None:
     out = render_registry_tables("before\n<!-- zones -->\nafter\n")
     rows = [line for line in out.splitlines() if line.startswith("| `")]
-    assert len(rows) == len(DADAIA_ZONES) == 11
+    assert len(rows) == len(DADAIA_ZONES) == 12
     assert rows[0] == (
         "| `agentic/` | staged public assets + manifest.json | projection | never | install |"
     )

@@ -13,15 +13,18 @@ rewrites an existing record's governance fields (never ``status`` — refused by
 :meth:`~dadaia_workspace.core.models.bugs.BugRecord.apply_governance_update` itself);
 :meth:`transition` is the ONE seam a status change goes through.
 
-**FR8's one resolver seam (AS-1).** :meth:`BugService.resolved_commit` is the SOLE
-resolver for a record's ``resolved_commit``: the stored value when present, derived
-from git history otherwise (DI'd in via ``history_reader``/``repo_root``, both
-optional — most construction sites never need a git walk and the seam degrades to
-"stored or ``None``").
+**One fixer, one canonical shape (0.4.7 FR1).** :meth:`normalize_records` rewrites
+every committed record of the ledger AND the histo into the shape
+:meth:`~dadaia_workspace.core.models.bugs.BugRecord.to_dict` emits today — that is how
+the seven retired derived-provenance keys leave 541 committed records, and how a
+terminal record that predates the ``closed_at`` invariant is stamped. No git walk is
+involved in either: the derived cache this service used to resolve from history is
+deleted, cache and walk together.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from collections import Counter
@@ -32,15 +35,18 @@ from pathlib import Path
 
 from jsonschema.exceptions import ValidationError
 
-from dadaia_workspace.core.bug_provenance import classify_ledger_line, derive_commit_provenance
+from dadaia_workspace.core.atomic_write import ConcurrentModificationError, atomic_write
+from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.models.bugs import (
     BUG_ARCHIVE_THRESHOLD_DAYS,
     TERMINAL_EVENTS,
     BugRecord,
 )
 from dadaia_workspace.core.redaction import PatternLike
-from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
-from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
+from dadaia_workspace.infrastructure.jsonl_record_store import (
+    JsonlRecordStore,
+    StaleRecordWriteError,
+)
 
 __all__ = [
     "BugArchiveResult",
@@ -51,6 +57,17 @@ __all__ = [
 ]
 
 _LOG = logging.getLogger(__name__)
+
+#: The ``surface`` value a NEW registration may never choose (0.4.7 FR1): it exists so
+#: the 268 records whose feature could not be mapped stay valid, not as an escape hatch.
+_LEGACY_SURFACE = "unknown"
+
+#: The literal a fixer passes to ``--caused-by`` when this bug has no prior cause —
+#: the one word that is NOT looked up in the ledger.
+_NO_LINEAGE = "none"
+
+#: The lineage key ``dadaia bugs resolve --caused-by`` owns outright (0.4.7 FR1).
+_LINEAGE_FIELD = "caused_by"
 
 
 _DOTTED_MODULE_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)+$")
@@ -117,10 +134,16 @@ class BugStats:
 
 @dataclass(frozen=True)
 class BugArchiveResult:
-    """A2.8 — the outcome of one ``dadaia bugs archive`` run."""
+    """A2.8 — the outcome of one ``dadaia bugs archive`` run. Carries the records it
+    MOVED, not just how many: the caller writes one governance event per moved record
+    (0.4.7 FR2), and the count is derived from them rather than reported beside them."""
 
-    archived: int
-    kept: int
+    records: tuple[BugRecord, ...] = ()
+    kept: int = 0
+
+    @property
+    def archived(self) -> int:
+        return len(self.records)
 
 
 class BugService:
@@ -133,7 +156,6 @@ class BugService:
         archive_store: JsonlRecordStore[BugRecord] | None = None,
         denylist_terms: Sequence[tuple[str, str]] = (),
         baseline_patterns: Sequence[PatternLike] = (),
-        history_reader: GitSubprocessClient | None = None,
         repo_root: Path | None = None,
         validate: Callable[[Mapping[str, object]], None] | None = None,
     ) -> None:
@@ -147,10 +169,7 @@ class BugService:
         # refuses on (container.load_denylist_baseline_patterns) — threaded through
         # every transition method's write-once free-text field(s), D5.
         self._baseline_patterns = tuple(baseline_patterns)
-        # FR8/AS-1: the resolved_commit resolver's git-facing DI — both optional
-        # (container.build_git_history_reader() wires the real adapter; most
-        # construction sites never need it, see :meth:`resolved_commit`).
-        self._history_reader = history_reader
+        # The component normalizer probes the containing repo for the on-disk spelling.
         self._repo_root = repo_root
         # bug-record-v1.schema.json's validator (container.build_bug_record_validator)
         # — optional; wired at :meth:`register` only (a freshly registered record is
@@ -173,16 +192,23 @@ class BugService:
         symptom: str | None,
         repro: str | None,
         expected: str | None,
-    ) -> None:
+    ) -> BugRecord:
         """Append one NEW, freshly-registered :class:`BugRecord` (``status="open"``).
 
         Refuses (:class:`BugDuplicateIdError`) a *bug_id* already present anywhere in
         the ledger. When a ``validate`` callable was injected (the schema, D9), the
+        Returns the appended record (the caller's governance event hashes it). The
         raw payload is validated FIRST — a missing/mistyped/out-of-enum field raises
         ``ValueError`` before any :class:`BugRecord` is constructed. Redacts every
         free-text field through the same seam the update path uses (A2.6) before
         appending.
         """
+        if surface == _LEGACY_SURFACE:
+            raise ValueError(
+                f"surface {_LEGACY_SURFACE!r} is a legacy sentinel, valid only on the records "
+                "that already carry it; fix: pass the feature package or non-feature layer "
+                "this bug lives in (dadaia bugs append --help lists them)"
+            )
         existing = {record.id for record in self._record_store.iter_records()}
         if bug_id in existing:
             raise BugDuplicateIdError(bug_id)
@@ -201,13 +227,9 @@ class BugService:
             "status": "open",
             "cause": None,
             "caused_by": None,
-            "lineage_source": None,
-            "registration_commit": None,
-            "registration_granularity": None,
-            "resolved_commit": None,
-            "resolution_granularity": None,
             "resolved_release": None,
             "audited": None,
+            "closed_at": None,
         }
         if self._validate is not None:
             try:
@@ -216,14 +238,23 @@ class BugService:
                 raise ValueError(str(exc.message)) from exc
         record = BugRecord.from_dict(payload).redact(self._denylist_terms)
         self._record_store.append(record)
+        return record
 
     def apply_update(self, record_id: str, changes: Mapping[str, object]) -> BugRecord:
         """The one governance-write seam for every governance/write-once field OTHER
         than ``status`` (refused by :meth:`~dadaia_workspace.core.models.bugs.BugRecord
-        .apply_governance_update` itself): the auditor's ``audited``/
-        ``resolved_commit`` rewrite and any other non-status governance write. Redacts
+        .apply_governance_update` itself) and ``caused_by`` (refused here, 0.4.7 FR1):
+        the auditor's ``audited`` rewrite and any other non-status, non-lineage
+        governance write. Redacts
         the WHOLE resulting record (A2.6) before the store's refuse-stale atomic
         rewrite (A2.9, A2.2c)."""
+        if _LINEAGE_FIELD in changes:
+            raise ValueError(
+                f"bug-record field {_LINEAGE_FIELD!r} is unreachable through "
+                "'dadaia bugs update' — lineage is declared at resolve and nowhere "
+                f"else (0.4.7 FR1); fix: {DADAIA_BIN} bugs resolve {record_id} "
+                "--caused-by <bug-id|none>"
+            )
 
         def _mutate(record: BugRecord) -> BugRecord:
             updated = record.apply_governance_update(changes)
@@ -247,17 +278,41 @@ class BugService:
         ever touches disk, leaving the record byte-identical on refusal.
         """
 
+        self._validate_caused_by(fields.get("caused_by"))
+
         def _mutate(record: BugRecord) -> BugRecord:
             updated = method(record, privacy_patterns=self._baseline_patterns, **fields)
             return updated.redact(self._denylist_terms)
 
         return self._record_store.update(record_id, _mutate)
 
+    def _validate_caused_by(self, caused_by: str | None) -> None:
+        """Lineage is declared at ``resolve`` and nowhere else (0.4.7 FR1) — the
+        ``bugs update`` arm is refused outright by :meth:`apply_update`, so ``resolve``
+        is the ONE writer and this the ONE place it is checked: ``caused_by`` names a
+        record of this ledger (live or archived) or the literal ``none``. An
+        unvalidated free-text lineage field is how a second, unreadable lineage home
+        grew."""
+        if caused_by is None or caused_by == _NO_LINEAGE:
+            return
+        known = {record.id for record in self._record_store.iter_records()}
+        if self._archive_store is not None:
+            known |= {record.id for record in self._archive_store.iter_records()}
+        if caused_by not in known:
+            raise ValueError(
+                f"caused_by {caused_by!r} is not a record of this bug ledger "
+                f"({self._record_store.path.name}); fix: pass an existing bug id or "
+                f"the literal '{_NO_LINEAGE}'"
+            )
+
     def archive(
         self, *, now: datetime | None = None, threshold_days: int = BUG_ARCHIVE_THRESHOLD_DAYS
     ) -> BugArchiveResult:
-        """A2.8 — move every terminal record older than *threshold_days* from the live
-        ledger to the archive store, through
+        """A2.8 — move every record CLOSED more than *threshold_days* ago from the
+        live ledger to the archive store. Ageing is by ``closed_at`` (0.4.7 FR4):
+        ``ts`` is the FILING date, so a bug filed long ago and closed yesterday used
+        to be archivable the day it closed. ``closed_at`` is non-null iff the status
+        is terminal, so the status test IS the closed_at test — one condition, not two, through
         :meth:`~dadaia_workspace.infrastructure.jsonl_record_store.JsonlRecordStore.remove`
         (v0.5.0 S1 FR23 firing, A1) — the SAME refuse-stale seam :meth:`apply_update`
         already uses, never a second, unsealed raw-file rewrite. Idempotent: a second
@@ -271,55 +326,65 @@ class BugService:
         eligible_ids = {
             record.id
             for record in all_records
-            if record.status in TERMINAL_EVENTS and _parse_ts(record.ts) < cutoff
+            if record.closed_at is not None and _parse_ts(record.closed_at) < cutoff
         }
         if not eligible_ids:
-            return BugArchiveResult(archived=0, kept=len(all_records))
+            return BugArchiveResult(kept=len(all_records))
 
         removed = self._record_store.remove(eligible_ids)
         for record in removed:
             self._archive_store.append(record)
-        return BugArchiveResult(archived=len(removed), kept=len(all_records) - len(removed))
+        return BugArchiveResult(records=tuple(removed), kept=len(all_records) - len(removed))
 
-    # -- reads -------------------------------------------------------------------------
+    def normalize_records(self) -> int:
+        """Rewrite every committed record of the ledger and the histo into its canonical
+        ``bug-record-v1`` shape, returning how many lines changed — the ONE fixer
+        ``LEDGER-BUGS-SCHEMA`` runs (0.4.7 FR1).
 
-    def resolved_commit(self, record: BugRecord) -> str | None:
-        """FR8's one resolver seam (AS-1, A8.2) — the stored value when present,
-        derived from real git history otherwise. One function, one caller-facing
-        signature: the SAME method a read-only display (a future ``bugs status``/
-        ``stats`` renderer) and this release's stored-equals-derived contract test
-        both call.
+        Two classes of drift, one pass, because both are "this line is not what
+        :meth:`BugRecord.to_dict` emits today":
 
-        **Read-only.** Never writes ``resolved_commit`` back to the ledger — the
-        field stays a cache by construction (a commit cannot contain its own sha) and
-        its ONE writer is FR14's pillar-1 audit, in the same atomic in-place rewrite
-        that sets ``audited`` (a later task; not this seam, not a second commit).
+        * the seven retired derived-provenance keys (``lineage_source``,
+          ``registration_commit``/``_granularity``, ``resolved_commit``/
+          ``resolution_granularity``, ``root_cause``, ``migration_note``) — a
+          git-derived CACHE :meth:`BugRecord.from_dict` now ignores, so re-serializing
+          strips them losslessly;
+        * a terminal record carrying no ``closed_at`` — the invariant 0.4.7 candidate 1
+          shipped without (bug
+          ``bugs-update-cannot-heal-terminal-record-missing-closed-at``). The stamp is
+          the record's OWN filing date ``ts``, and nothing else: the ledger's git
+          history is NOT consulted, the walk that used to date the terminal line having
+          been deleted with the cache. ``ts`` is the honest floor — never a date later
+          than the truth, and the one bound ``__post_init__`` enforces anyway.
 
-        Derivation needs a real git walk over ``specs/bugs/`` through
-        :func:`~dadaia_workspace.core.bug_provenance.derive_commit_provenance`,
-        classified through :func:`~dadaia_workspace.core.bug_provenance
-        .classify_ledger_line` (permanent, S1 FR23 firing A2 — the walked history spans
-        both shapes). It runs only when *record* has no stored value AND this service
-        was constructed with both
-        ``history_reader``/``repo_root`` — most construction sites (every ``append``,
-        a plain read with no derivation need) pass neither, and this method degrades
-        to "stored or ``None``", never raising and never a new blocking validation
-        (A8.3).
-
-        Returns ``None`` for an open bug, for a resolved bug whose commit the walked
-        history never captured (FR3 step 5 — ``null`` is correct there, not a
-        failure, A8.2), and whenever derivation is unavailable.
+        Runs on RAW lines because an unconstructible record is exactly what it repairs;
+        a line it cannot parse is preserved verbatim rather than dropped. Costs nothing
+        when there is nothing to do — that is load-bearing, the doctor calling a fixer
+        once per reported issue.
         """
-        if record.resolved_commit is not None:
-            return record.resolved_commit
-        if self._history_reader is None or self._repo_root is None:
-            return None
-        provenance = derive_commit_provenance(
-            self._history_reader.log_added_lines(self._repo_root, "specs/bugs/"),
-            classify_ledger_line,
-        )
-        derived = provenance.get(record.id)
-        return derived.resolved_commit if derived is not None else None
+        stores = [self._record_store]
+        if self._archive_store is not None:
+            stores.append(self._archive_store)
+        return sum(self._normalize_file(store.path) for store in stores)
+
+    def _normalize_file(self, path: Path) -> int:
+        if not path.is_file():
+            return 0
+        before = path.read_text(encoding="utf-8")
+        lines = before.split("\n")
+        changed = 0
+        for index, line in enumerate(lines):
+            canonical = _canonical_line(line)
+            if canonical is not None and canonical != line.strip():
+                lines[index] = canonical
+                changed += 1
+        if not changed:
+            return 0
+        try:
+            atomic_write(path, "\n".join(lines), newline="", expected_previous=before)
+        except ConcurrentModificationError as exc:
+            raise StaleRecordWriteError(path.name) from exc
+        return changed
 
     def status(self, *, include_closed: bool = False) -> list[BugRecord]:
         """Return every ledger record, open-only by default, sorted by ``id``."""
@@ -345,3 +410,32 @@ def _parse_ts(value: str) -> datetime:
     except ValueError:
         return datetime.fromtimestamp(0, tz=UTC)
     return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+
+def _canonical_line(line: str) -> str | None:
+    """The canonical serialization of the record *line* holds — ``None`` when the line
+    is blank or this fixer cannot read it (preserved verbatim, never dropped).
+
+    The ``closed_at`` stamp happens on the RAW mapping, before construction, precisely
+    because the model refuses to construct a terminal record without it.
+    """
+    stripped = line.strip()
+    if not stripped:
+        return None
+    try:
+        raw = json.loads(stripped)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(raw, dict):
+        return None
+    if (
+        raw.get("status") in TERMINAL_EVENTS
+        and raw.get("closed_at") is None
+        and isinstance(raw.get("ts"), str)
+    ):
+        raw["closed_at"] = raw["ts"]
+    try:
+        record = BugRecord.from_dict(raw)
+    except (TypeError, ValueError):
+        return None
+    return json.dumps(record.to_dict(), sort_keys=True, ensure_ascii=False)

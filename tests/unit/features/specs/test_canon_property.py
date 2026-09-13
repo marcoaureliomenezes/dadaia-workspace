@@ -27,6 +27,7 @@ deliberately BROKEN fixture) this property test does not restate.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -80,18 +81,42 @@ def _fresh_repo_specs(tmp_path: Path) -> Path:
 
 
 def _fresh_release(tmp_path: Path) -> Path:
-    """Fresh root specs/ plus one freshly-minted release (``dadaia release new``)."""
-    specs_dir = _fresh_root_specs(tmp_path)
-    canon_mod.release_new(specs_dir, "0.6.0")
-    return specs_dir
-
-
-def _fresh_release(tmp_path: Path) -> Path:
     """Fresh root specs/ plus one freshly-opened release (``release_new`` — the flat
     trio shape; the segment lane is retired at 0.4.6, ADR 0006). Successor of the
     shape bug ``fresh-release-scaffold-emits-spec-doctor-warnings-042`` regressed on."""
     specs_dir = _fresh_root_specs(tmp_path)
     release_new(specs_dir, "0.6.0")
+    # `release_new` writes the SPEC stub only; the release-tree rule (0.4.7 FR1, now the
+    # doctor's RELEASE-TREE rule) requires the trio and the state document every resolver
+    # keys on. FR2/T-047-06 makes `release new` ONE birth act that writes them — these
+    # four lines are its deletion target, not a permanent fixture.
+    release_dir = specs_dir / "releases" / "0.6.0"
+    for artifact in ("PLAN.md", "TASKS.md"):
+        (release_dir / artifact).write_text("**Status:** Draft\n", encoding="utf-8")
+    (release_dir / "_RELEASE.json").write_text(
+        json.dumps(
+            {
+                "schema": "release-state-v1",
+                "release": "0.6.0",
+                "phase": "DEFINITION",
+                "rc": None,
+                "defined": {"sha": "0" * 40, "ts": "2026-09-12T00:00:00Z"},
+                "implemented": None,
+                "shipped": None,
+                "log": [
+                    {
+                        "ts": "2026-09-12T00:00:00Z",
+                        "agent": "product-engineer",
+                        "kind": "note",
+                        "text": "born",
+                    }
+                ],
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     return specs_dir
 
 
@@ -109,7 +134,6 @@ def _fresh_backlog_entry(tmp_path: Path) -> Path:
     [
         pytest.param(_fresh_root_specs, id="fresh-root-specs"),
         pytest.param(_fresh_repo_specs, id="fresh-repo-specs"),
-        pytest.param(_fresh_release, id="fresh-release"),
         pytest.param(_fresh_release, id="fresh-release"),
         pytest.param(_fresh_backlog_entry, id="fresh-backlog-entry"),
     ],

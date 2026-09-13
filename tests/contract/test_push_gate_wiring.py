@@ -13,7 +13,7 @@ Pins two composition-root guarantees:
 from __future__ import annotations
 
 import subprocess
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -44,11 +44,14 @@ class _SpyObjectSource:
     def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
         return []
 
-    def first_parent(self, repo: Path, sha: str) -> str | None:
-        return None
+    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
+        return ()
 
     def resolve_ref(self, repo: Path, ref: str) -> str | None:
         return None
+
+    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]:
+        return set()
 
 
 def _init_repo(path: Path) -> str:
@@ -86,6 +89,49 @@ def test_push_gate_check_always_wires_a_real_object_source(monkeypatch, tmp_path
     assert result.exit_code == 0, result.output
     assert spy.calls, "push-gate-check never reached the scan — object source unused"
     assert spy.calls[0] == (repo, tip_sha, _ZERO)
+
+
+class _StraySpecsObjectSource(_SpyObjectSource):
+    """Yields one pushed-range object at a pattern-5 specs/ path (a Markdown backlog)."""
+
+    def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
+        self.calls.append((repo, local_sha, remote_sha))
+        return [
+            ScannedObject(path="specs/backlog/candidates.md", sha="blob0", text="", decodable=True)
+        ]
+
+
+def _stamped_specs(repo: Path, version: int) -> None:
+    (repo / "specs").mkdir(exist_ok=True)
+    (repo / "specs" / "constitution.md").write_text(
+        f"---\nspecs_pattern_version: {version}\n---\n# constitution\n", encoding="utf-8"
+    )
+
+
+def test_canon_scan_does_not_apply_to_a_tree_stamped_below_the_canon(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """Bug pre-push-canon-scan-not-range-scoped (operator ruling 2026-09-13): a specs/
+    tree stamped pattern 5 has nothing for the v6 canon scan to enforce — the push
+    proceeds with one stderr note naming the migration; the same range is refused
+    once the tree is stamped 6."""
+    repo = tmp_path / "repo"
+    tip_sha = _init_repo(repo)
+    monkeypatch.setattr(ci, "_repo_root", lambda: repo)
+    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
+    monkeypatch.setattr(container, "build_git_object_reader", lambda: _StraySpecsObjectSource())
+    stdin = f"refs/heads/feature/0.0.1 {tip_sha} refs/heads/feature/0.0.1 {_ZERO}\n"
+
+    _stamped_specs(repo, 5)
+    result = _runner.invoke(app, ["ci", "push-gate-check"], input=stdin)
+    assert result.exit_code == 0, result.output
+    assert "stamped pattern 5" in result.output
+    assert "dadaia specs upgrade" in result.output
+
+    _stamped_specs(repo, 6)
+    result = _runner.invoke(app, ["ci", "push-gate-check"], input=stdin)
+    assert result.exit_code == 1
+    assert "specs/backlog/candidates.md" in result.output
 
 
 def test_mode_line_distinguishes_operator_denylist_from_baseline_only(

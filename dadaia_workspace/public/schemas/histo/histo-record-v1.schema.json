@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "histo-record-v1",
+  "title": "History Record v1",
+  "description": "One terminal record of one exit, in ANY of the three append-only history ledgers (specs/backlog/_archive/backlog_histo.jsonl, specs/audits/_archive/audits_histo.jsonl, specs/releases/_archive/releases_histo.jsonl) — release 0.4.7 FR7. Before this schema the three files had three hand-written shapes, no schema and no reader: two were event streams wrapping a free-form 'data' object, so a history record could not be validated at all. ONE shape for all three: 'id'/'ts'/'disposition' are the immutable core (identity and terminal verdict), 'release'/'reason'/'summary' are nullable free text, 'entry' is the removed object itself (the backlog entry, the audit's per-pillar counts) or null when the exit had nothing to snapshot. The per-ledger terminal vocabulary is a PARAMETER of the validator (which of the five words this ledger may use — backlog: delivered/superseded/rejected; audits: resolved/superseded/deferred/rejected; releases: delivered), never a second or third schema file.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "ts", "disposition", "release", "reason", "summary", "entry"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The exiting subject's own stable identity — the backlog slug, the audit directory name, the release id. One line per id, ever."
+    },
+    "ts": {
+      "type": "string",
+      "minLength": 1,
+      "description": "When the exit happened: an ISO-8601 date or UTC timestamp. Date-only values are accepted because migrated pre-0.4.7 records carry them."
+    },
+    "disposition": {
+      "type": "string",
+      "enum": ["delivered", "resolved", "superseded", "deferred", "rejected"],
+      "description": "The terminal verdict, from the ONE lowercase vocabulary (core.models.histo.TERMINAL_DISPOSITIONS). Each ledger is validated against its own subset of these five words."
+    },
+    "release": {
+      "type": ["string", "null"],
+      "description": "The release that dispositioned this subject, or null when none did."
+    },
+    "reason": {
+      "type": ["string", "null"],
+      "description": "Why this disposition, when the disposition alone does not say it."
+    },
+    "summary": {
+      "type": ["string", "null"],
+      "description": "One-paragraph narrative of the exit: what shipped, what the audit measured, what a note said before the event wrapper was removed."
+    },
+    "entry": {
+      "type": ["object", "null"],
+      "description": "The removed object itself — the backlog active[] entry, the audit's window-end sha and per-pillar counts — or null."
+    }
+  },
+  "examples": [
+    {
+      "id": "push-range-denylist-scan",
+      "ts": "2026-08-14",
+      "disposition": "delivered",
+      "release": "0.9.0",
+      "reason": null,
+      "summary": "Shipped as the pre-push whole-tree denylist scan.",
+      "entry": null
+    }
+  ]
+}

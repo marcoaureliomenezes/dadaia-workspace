@@ -99,7 +99,7 @@ def test_context_show_reflects_bind(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 
     bind_result = _runner.invoke(
         app,
-        ["context", "bind", _CTX, "--mode", "implementation", "--release", "v0.1.69"],
+        ["context", "bind", _CTX],
     )
     assert bind_result.exit_code == 0, bind_result.output
 
@@ -112,8 +112,7 @@ def test_context_show_reflects_bind(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     )
     named_session = named_payload["session"]
     assert named_session["context"] == _CTX
-    assert named_session["mode"].upper() == "BOUND_IMPLEMENTATION"
-    assert named_session["release"] == "v0.1.69"
+    assert named_session["session_id"]
 
     # AC4.2 — no bind at all -> named show still reports session: null.
     no_bind_ws = _make_workspace(tmp_path / "no-bind-root")
@@ -129,7 +128,7 @@ def test_context_show_reflects_bind(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 
     bind_second_result = _runner.invoke(
         app,
-        ["context", "bind", "bound-second", "--mode", "implementation", "--release", "v0.2.0"],
+        ["context", "bind", "bound-second"],
     )
     assert bind_second_result.exit_code == 0, bind_second_result.output
 
@@ -139,7 +138,6 @@ def test_context_show_reflects_bind(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert noarg_payload["name"] == "bound-second", noarg_payload
     assert noarg_payload["session"] is not None, noarg_payload
     assert noarg_payload["session"]["context"] == "bound-second"
-    assert noarg_payload["session"]["release"] == "v0.2.0"
 
     # Caller-owned selection — without a bind, no-arg show ANSWERS null (exit 0).
     # Contract changed by bug context-show-json-traceback-unbound (consumer validation

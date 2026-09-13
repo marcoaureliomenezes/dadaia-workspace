@@ -20,7 +20,9 @@ pytestmark = [pytest.mark.integration, pytest.mark.slow]
 def _init_git_repo(path: Path, initial_commit: bool = True) -> None:
     path.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "init"], cwd=path, capture_output=True, check=True)
-    subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=path, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.invalid"], cwd=path, capture_output=True
+    )
     subprocess.run(["git", "config", "user.name", "Test"], cwd=path, capture_output=True)
     if initial_commit:
         (path / "README.md").write_text("init")
@@ -43,7 +45,9 @@ def test_repo_lifecycle_clone_dirty_commit_remote_branch_checkout_and_error_path
     client.clone(str(src), dest)
     assert dest.exists()
     # CI runners have no global git identity — commits in the clone need a local one.
-    subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=dest, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.invalid"], cwd=dest, capture_output=True
+    )
     subprocess.run(["git", "config", "user.name", "Test"], cwd=dest, capture_output=True)
 
     # is_dirty: clean, then dirty after a modification.

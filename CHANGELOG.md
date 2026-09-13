@@ -54,6 +54,238 @@ for this task, so none is touched here):
 
 Left exactly as written; a future task can pick this up.
 
+## [0.4.7] — em progresso
+
+Open-scope release (ADRs 0005–0009): version minted at birth from the PyPI lineage
+(latest published `0.4.6` + 1 patch); each closed-scope candidate appends here.
+
+### Candidate 1 — records tell the truth
+
+#### Added
+- `dadaia release archive <id> --shipped <sha> --pr <n> --next <M.m.p>`: the promote lane as one
+  all-or-nothing verb — validates, sets `shipped` + `ARCHIVED`, moves to `_archive/<id>/`, appends
+  the `releases_histo.jsonl` record, births `<next>`, runs `bugs archive`, prints the git `next:` lines.
+- `features/specs/release_tree.py::validate_release_tree`: every `_RELEASE.json`, live and archived,
+  validated and parsed (`RELEASE-TREE-STATE-MISSING|SCHEMA|PARSE|TS-ORDER|PHASE|ARCHIVED|TRIO`).
+- `core/doctor_rules.py::Rule(codes, section, run, fix, fix_help)`: the one rule record and section
+  scorer; `compliance(<section>): N/M <unit> canonical (P%)` lines and `compliance(total)`.
+- `ledgers` section: `LEDGER-<NAME>-SCHEMA` over `decisions.jsonl`, `BACKLOG.json`, `BUGS.jsonl`,
+  every `FINDINGS.jsonl` and the three `_histo.jsonl` (`features/specs/ledgers.py`, `schemas.py`).
+- `histo-record-v1` `{id, ts, disposition, release, reason, summary, entry}` and the one terminal
+  vocabulary `delivered resolved superseded deferred rejected` (`core/models/histo.py`).
+- Bug `closed_at`: write-once, stamped by the four terminal transitions (`BugRecord._reach_terminal`);
+  505 records back-filled from the ledger's commit dates.
+- `TREE-5` covers `memory/AGENTS.md`: a scaffolded law file matching neither its source nor any
+  shipped version is `copy-drift`.
+- ADR `measured_by` resolvable pattern enforced by `decision-record-v1`; ADR 0004 accepted, 0010
+  rewritten and accepted, 0005–0009 re-pointed to resolvable checks; P-02 `ADR: none`.
+
+#### Changed
+- `dadaia doctor` is the one compliance surface: sections `workspace`/`specs`/`ledgers`, one line
+  `<CODE> <verdict> <message>` per finding, `--json`, exit 1 on any error-class finding;
+  `--specs-dir`/`--context`/`--public-dir` moved here; the CI hygiene job runs it.
+- `dadaia release new <id>` writes `SPEC.md` and `_RELEASE.json` (DEFINITION) in one transaction and
+  refuses a second live release with a `fix:` line.
+- `dadaia release rc-archive` validates the whole tree, parks the release in `DEFINITION`, runs
+  `bugs archive`.
+- `release-state-v1`: four phases `DEFINITION IMPLEMENTATION CLOSURE ARCHIVED`; `log.kind` enum
+  `note summary size drifts dispositions test-dispositions artifact-gc reviews merge memory`.
+- The audit window is read from `audits_histo.jsonl`; an audit is not a release milestone.
+- `bugs archive` and `SPEC-DOC-041` age by `closed_at`; `bugs resolve` derives `diff_direction` from
+  `--evidence-diff`'s `net-*:` prefix.
+- A picked backlog item stays `picked` in `active[]` and exits once, at closure, as one histo record.
+- Histories migrated in place, one commit each: `backlog_histo.jsonl` (136), `audits_histo.jsonl`
+  (23), `releases_histo.jsonl` (179 events -> one record per release).
+- Memory frontmatter is five fields (`slug title tldr summary tags`); `catalog.json` carries `tldr`
+  for every atom; the generated index heading is English.
+- DADAIA §6.2/§6.4/§6.5/§6.6/§6.7/§6.8/§8.5, the releases/backlog/ADRs/audits scaffolds,
+  `dd-release-definition`, `dd-release-implementation`, `dd-backlog-definition`, `dd-audit-project`,
+  `dd-cli-library`, `dd-workspace-doctor` and `CONTEXT.md` say one thing about doctors, histories and
+  release verbs.
+
+#### Removed
+- `dadaia specs doctor`, `dadaia backlog doctor` (deleted, not aliased).
+- `consumed_backlog_histo.jsonl`, `features/backlog/ledger.py`, `ConsumedBacklogHistoRecord`, its
+  store builder, the `CONSUMED` token, purge-on-pick, BL-STALE (a), `SPEC-DOC-031`, `TREE-5M`.
+- `specs/ADRs/_superseded/` (status `superseded` in place); `public/data/memory-AGENTS.md` (byte twin
+  of the scaffold).
+- `segment` and `audited` from `release-state-v1`; the `DISCOVERY`/`SPEC`/`PLAN`/`TASKS`/`none` phases.
+- The wikilink alias table (`memory_canon`, `memory_lint`, panel `_md_render`);
+  `_TLDR_INJECTED_CATEGORIES`; `category` from `memory-frontmatter-v1`;
+  `test_adr_canon.py::_record_violations`; `bugs resolve --diff-direction`.
+
+#### Fixed
+- `archived-release-state-invalid-and-unparseable-doctor-silent`,
+  `backlog-subject-registry-lacks-top-level-doctor-cli-anchor`,
+  `adr-records-violate-schema-and-no-test-validates-committed-file`,
+  `provisional-consumed-histo-records-never-finalized-no-writer-no-check`,
+  `release-new-writes-spec-only-never-creates-release-state`,
+  `minted-feature-branch-without-live-release-blocks-every-memory-write`,
+  `scoped-memory-agents-md-prose-rewrite-undetected-by-doctor`.
+
+### Candidate 2 — the gate blocks three things
+
+#### Added
+- Scope rule: a bound session's MUTATING write under a `repos/<slug>/` outside its scope (main +
+  associated repos, `core/invocation.py::Bind`/`all_repos`) is BLOCKed with `fix: … context bind <owner>`.
+- `fix:` grammar: every BLOCK from every enforcement point carries exactly one executable command;
+  `tests/contract/test_every_block_carries_a_fix.py` (68 refusals) feeds each line back through the gate.
+- `core/workspace_layout.py` is the one canon registry: `SPECS_CANON` rows, `REPO_TREE_EXCLUDED`,
+  `INSTALLED_GIT_HOOKS`, `reaped` zone (7-day TTL); `public stage` renders `<!-- root -->`,
+  `<!-- repo-excluded -->`, `<!-- specs-canon -->` into DADAIA §5.1/§5.3/§6.2.
+- `features/spec_context/sweep.py`: one traversal primitive (`walk`/`mtime`/`move`/`remove`) behind one guard.
+- Reaper hold: slop and INV-5 leftovers MOVED to `.dadaia/reaped/<YYYYMMDD>/<path>`, listed
+  `WS-reaped-reaped (Nd left)`; deletion only by TTL expiry.
+- `HOOKS-DRIFT-1`: an ALIVE repo's installed `.git/hooks/{pre-commit,pre-push}` byte-differing from the
+  shipped script; `fix: … ci install-hook --force`.
+- `[tool.ruff] cache-dir`, `[tool.mypy] cache_dir` → `../../.dadaia/tmp/<tool>-cache`; bare commands leave
+  the tree clean (`test_no_pollution.py`).
+- gitleaks is a required status check on `develop` (18 contexts re-supplied, recorded in `_RELEASE.json`).
+
+#### Changed
+- Path classes are `ADDITIVE MUTATING PROTECTED`; `specs/memory/` is MUTATING in every phase; the gate
+  reads no `_RELEASE.json`.
+- `dadaia context bind <ctx> [--print-env]` is one verb; the session record carries no `mode`/`release`.
+- The workspace walk covers the top of every ALIVE repo (main + associated), excluded names at any depth
+  and a nested `.dadaia/`, pruned at `.git .venv node_modules`; `--expired-only` scopes the report only.
+- `sdd_post_gate`'s throttle runs `doctor.reap` (which owns `presence.gc`).
+- Privacy scan: full layer set on every pushed path of this public repository; fixtures synthetic
+  (`tests/helpers/privacy_fixtures.py`); `test_repo_self_scan.py` asserts zero hits with no tolerated list.
+- DADAIA §3.1–§3.5/§5.1/§5.3/§7.4/§8.5/§10.2, `.dadaia/AGENTS.md`, `scaffold/memory/AGENTS.md`,
+  `entities/registry.json`, six skills, `CONSUMER_VALIDATION_RECIPE.md`, `software-engineer.md`,
+  `CONTEXT.md` (Scope, Reaped, Publication boundary, Sweep, Stall) say one thing about the gate, the canon,
+  the reaper and the scan.
+
+#### Removed
+- Path classes `MEMORY`, `LAW`, `UNGATED`; `release_state.MEMORY_WRITE_PHASES`; `Invocation.release/.phase`;
+  `resolve_mode`; the READ-mode self-block; `DADAIA_MODE`.
+- `context bind --mode/--release/--force/--reason`.
+- Venv guard rule 2 (cache guard) and its helpers; preflight per-command cache flags; `resolve_mypy_cache_dir`.
+- Five per-site doctor guards; the INV-5 `rmtree`; `REPO-DADAIA-1`; the `Compliance` twin; the runtime
+  `_with_fix` raise.
+- `_TESTS_SCOPE_BASELINE` (23 rows) and the last path-scoped `privacy_baseline.json` `exclude_regex`.
+- Tests: `test_read_mode_non_acquiring.py`, `test_mypy_local_invocation_hygiene.py`,
+  `test_doctor_repo_dadaia.py`.
+
+#### Fixed
+- `context-bind-implementation-requires-release-id-stall-when-none-live` — by deletion of `--release`.
+
+### Candidate 3 — one verb per record change
+
+#### Added
+- `dadaia backlog exit <slug> --disposition delivered|superseded|rejected [--release] [--reason]`:
+  the one backlog exit — one `active[]` object removed, one `histo-record-v1` appended, evidence per
+  disposition from `core/models/histo.py::REQUIRED_EVIDENCE`.
+- `dadaia audit disposition <dir> <finding-id> --disposition resolved|superseded|deferred|rejected`
+  and `dadaia audit close <dir> --sha <window-end>` (`features/specs/audit.py`): all-or-nothing,
+  `<dir>` confined to `specs/audits/`, histo `entry {sha, pillars{bugs,specs,memory}, dispositions}`.
+- `dadaia release phase IMPLEMENTATION|CLOSURE --sha <sha>`: the trio-`Aprovado` and every-task-`[x]`
+  checks stamp `defined` / `implemented {sha, rc, ts}`; `phase` and milestones move only by verb.
+- `GovernanceEvent {event_id, ts, session_id, context, verb, ledger, record_id, record_hash}` in the
+  telemetry store (migration 7, `container.build_telemetry_store()`), written once per governance verb
+  by `cli/_governance_event.py`; `resolve_event_context_for_cli` is the one context decider for writer
+  and reader; a store that cannot open never fails the verb.
+- `dadaia doctor`: `LEDGER-BUGS|BACKLOG-HISTO|AUDITS-HISTO|RELEASES-HISTO-HANDEDIT` and
+  `RELEASE-TREE-HANDEDIT` (WARNING) — a verb-owned record changed with no matching event; silent
+  without a store.
+- `bug-record-v1` `surface`: the feature arm is derived from `features/*` at load
+  (`x-enum-append: feature-packages`); `bugs append --surface unknown` is refused.
+- V35 in `tests/contract/test_slop_ratchets.py` (skill directories ≤ 18, corpus lines pinned) and the
+  body-pointer finder in `test_behavior_map.py`.
+- ADR 0011: P-16 deleted — no derived provenance is stored, so nothing needs to equal a re-derivation.
+
+#### Changed
+- Bug registration is ask-first: the agent proposes (contract line, one repro, why not agent error,
+  severity rubric), the operator confirms; with no operator the proposal is a `bug-proposal:` handoff
+  finding, never a record. A bug is fixed on the live branch in any phase; §6.7's pick line is gone.
+- Lineage has one writer: `bugs resolve --caused-by <bug-id>|none` validated against the ledger;
+  `bugs update --set caused_by` is refused.
+- `finding-record-v1` disposition enum is `open resolved superseded deferred rejected`
+  (`FINDINGS_DISPOSITIONS`); SPEC-DOC-036/038 `fix:` lines name the audit verbs.
+- `dadaia doctor --fix` re-serializes any `BUGS.jsonl`/`bugs_histo.jsonl` record that parses but fails
+  the schema or the model invariant — retired keys stripped (509 + 179 records), a terminal record's
+  missing `closed_at` back-filled.
+- Skills 20 → 18 (2916 lines); RC-FLOW ends at the candidate PR; personas carry no playbook table and
+  no `--with-report`; `product-engineer` holds `Bash`; registry mandates are one sentence;
+  `constitution.md` 6.0.0 keeps identity, the operational-change lane, dispatcher purity, versioning;
+  `templates/specs-AGENTS.md` is a statement list; DADAIA §1.1/§6.6/§6.7/§6.8/§7.3/§8.5/§10.2 and
+  `CONTEXT.md` say each thing once (hand edit, governance verb, governance event, bug proposal).
+- CI checks out at default depth; `fetch-depth: 0` stays on `security-verdict-gate` only.
+
+#### Removed
+- `core/bug_provenance.py`, `core/models/git_history.py`, `GitSubprocessClient.log_added_lines`,
+  `BugEventKind`, `BugService.resolved_commit` and the seven derived bug-record keys
+  (`lineage_source registration_commit registration_granularity resolved_commit
+  resolution_granularity root_cause migration_note`); P-16 and its test.
+- `dd-workspace-doctor/`, `dd-task-manager/`, `dd-audit-project/SPEC-REVIEW.md`;
+  `doctor_closure_audit._TERMINAL_DISPOSITIONS`; `ctx_inject._fixed_law_blocks`; two
+  `_REQUIRED_EVIDENCE` copies; `release archive`'s refusal on a hand-set `implemented`.
+
+#### Fixed
+- `handoff-v12-role-atom-map-unsatisfiable-in-pattern5-tree`: the role-atom rule is skipped when the
+  mapped atom is absent from the tree.
+- `bugs-update-cannot-heal-terminal-record-missing-closed-at`: the `closed_at` invariant ships with
+  its migration — a doctor fixer back-fills from the record's own `ts`.
+- Review round (27e5e787 → a88b2e2e): audit directory confinement (CWE-22), FR3 evidence rules as
+  approved, one context decider for events, the `bugs update` lineage arm deleted, a retired key named
+  nowhere in public law, the governance baseline indexed.
+
+### Candidate 4 — docs derived from memory
+
+#### Added
+- `tests/contract/test_docs_derived_from_memory.py`: every `## ` section of `README.md`, `llms.txt` and
+  `docs/*.md` names its memory atom under `<!-- derived-from: <slug> sha256:<12 hex> -->` — red on a
+  stale hash, an unknown slug, a missing marker or `none`; `docs/cli.md` body-equal to `render_digest()`;
+  the 10 KB README budget; one tagline across `README.md`, `pyproject.toml` and `llms.txt`; the five
+  `[tool.poetry.urls]` keys; `dead_citations` over the whole set.
+- `MEM-DRIFT-2` (`dadaia doctor` `specs` section, WARNING, unit = atom, no fix): a memory atom citing a
+  `dadaia <verb>` absent from the live command tree or a `specs/`/`dadaia_workspace/`/`.github/` path
+  absent from the repo.
+- `features/specs/citations.py::dead_citations(text, *, command_paths, repo_root)` — the one citation
+  finder, relocated from `test_behavior_map.py`'s two test-local finders;
+  `cli/help_digest.py::command_paths()` — the one Typer walk `render_digest`, the doctor CLI root and
+  the contract tests share (`features` never imports `cli`).
+- `llms.txt` (llmstxt.org index of link lines), `docs/getting-started.md`, `docs/concepts.md`,
+  `docs/distribution.md` (channel | artifact | state | who acts), `docs/cli.md` (the committed output
+  of `dadaia help tree`).
+- `pyproject.toml`: `description` = the README tagline; `[tool.poetry.urls]`
+  Homepage/Repository/Documentation/Changelog/Issues.
+- `dd-release-implementation` `MEMORY-UPDATE.md`: the re-derive step — run the derived-docs test,
+  re-read the atom, re-derive the section, re-record the hash in the atom's own commit; RC-FLOW step 5
+  Done-when adds the green test.
+- `QUALITY.md` P-29 (ADR 0012, proposed): every human- and agent-facing document derives from a named
+  memory atom under a content hash.
+- Memory: `product-vision` gains the tagline and the two usage paths; `pypi-distribution` the metadata
+  contract and the channel list; `workspace-doctor` `MEM-DRIFT-2`; `ARCHITECTURE.md` Part 2 rows for
+  `citations.py` and `command_paths()`; `QUALITY.md` Part 2 names the derived-docs contract beside the
+  ratchets.
+
+#### Changed
+- `README.md` rewritten from memory (15 KB → 7 KB): what it is, a human installs and uses it, an agent
+  reads `DADAIA.md` and uses it, links.
+- Memory reviewed file by file against the code (T-047-34 report, 25 files): 14 atoms corrected —
+  `projection_rules(plan, harnesses)` and the `ProjectionRule` fields, the Claude Code
+  `permissionDecision: deny` envelope, five Kimi shims, the panel `_Route` table, the handoff enum, the
+  behavior-map row keys, `F-01…F-25`/`R-01…R-21`, the ten catalog keys, three OS ports, the
+  `core/models/` mutation score, the ledger fixer's executed-path test, `release.yml`/`secret-scan.yml`
+  fetch depth, the `public/` package include, the panel composition diagram node — and every unpinned
+  literal deleted (68 refusals, 25 %, baseline v8, `#3d3600`, `CERTIFIED_100`); `CONTEXT.md` senses
+  applied (finding verdict, injection sentinel, record store, candidate wheel, context).
+- GitHub repository description, homepage and topics set from the same tagline and keyword set
+  (project-manager, 7ecb02a0).
+
+#### Removed
+- `docs/01_medium_codex.md`; the README's hand-kept CLI table and its dead claims (`ACTIVE.md`,
+  `CLOSURE.md`, `dadaia academy`, `dadaia clean`, four harnesses, the TTL lease, six-axis reviews,
+  event-sourced bugs, Academy/Games tabs, memory writable in two phases, the pre-commit lease gate);
+  `test_behavior_map.py`'s `_find_dead_path_citations`, `_find_dead_verb_citations` and
+  `_derive_command_tree`.
+
+#### Fixed
+- `LEDGER-BUGS-SCHEMA`'s fixer is proven on the executed path again
+  (`tests/unit/features/specs/test_ledgers_fix_canonical_form.py`, c79f9997) after its test was deleted
+  at 717c08ae — a stewardship gap, not a product bug.
+
 ## [0.4.6] — 2026-09-04
 
 Open-scope release under the release-candidates model it implements (ADRs

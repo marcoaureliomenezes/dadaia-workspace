@@ -33,6 +33,7 @@ from dadaia_workspace.core.invocation import CONTEXT_NAME_RE as _CONTEXT_NAME_RE
 from dadaia_workspace.core.invocation import (
     HARNESS_SESSION_ID_ENV_VARS as _HARNESS_SESSION_ID_ENV_VARS,
 )
+from dadaia_workspace.core.invocation import context_name_for_specs_dir
 from dadaia_workspace.core.invocation import repo_slug_for_context as _core_repo_slug
 from dadaia_workspace.core.invocation import resolve as _resolve_invocation
 from dadaia_workspace.core.invocation import (
@@ -97,7 +98,7 @@ def resolve_context_for_cli(explicit: str | None) -> str:
         return resolved
     raise ValueError(
         "No caller-owned Spec Context is selected. Run "
-        "'dadaia context bind <name> --mode <mode>' in this session or pass "
+        "'dadaia context bind <name>' in this session or pass "
         "'--context <name>' explicitly. Use 'dadaia context list --json' to discover "
         "available contexts."
     )
@@ -108,6 +109,23 @@ def resolve_context_specs_dir_for_cli(workspace_root: Path, context: str) -> Pat
     ``repo_slug`` mapping + self-hosting root fallback. CLI verbs import THIS, never
     ``core.invocation`` directly (bind-resolution-seam-is-a-single-home)."""
     return _core_resolve_context_specs_dir(workspace_root, context)
+
+
+def resolve_event_context_for_cli(specs_dir: Path | None) -> str:
+    """The context name a governance verb ACTED IN, derived from the ``specs/`` tree it
+    resolved — the ONE decider both the writer
+    (:func:`~dadaia_workspace.cli._governance_event.record_governance_event`) and the
+    reader (``doctor``'s governance baseline) use, so an event can never be filtered out
+    by the verb that wrote it.
+
+    ``$DADAIA_CONTEXT`` is not a rung at all: it names where the SESSION is bound, and
+    every governance verb's ``--context``/``--specs-dir`` overrides that bind, so reading
+    it made `doctor --context B` report B's own verb-written records as hand edits. The
+    tree is the ONE source — including the self-hosting workspace-root ``specs/``, whose
+    context ``context_name_for_specs_dir`` names directly. A tree belonging to no context
+    resolves to ``""``: silence, never a name the verb did not write for.
+    """
+    return context_name_for_specs_dir(specs_dir) if specs_dir is not None else ""
 
 
 def resolve_specs_dir_for_cli(specs_dir: str | None) -> Path:

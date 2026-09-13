@@ -14,23 +14,20 @@ description: >
 
 ## 1. Lifecycle frame
 
-- Work on the live `feature/{M.m.p}` branch — no separate branch, no ceremony
-  (`DADAIA.md` §4 / `dd-gitflow-default`).
-- No SPEC/PLAN/TASKS, no `specs/releases/<id>/`, no version mint — a bug fix rides
-  the live branch in any phase.
-- NO-LOCKS: races surface. Two fixers resolve by whichever `dadaia bugs resolve`
-  lands first; a losing write fails non-zero — re-read and retry.
-- Redact every secret from anything you show or record: commands, outputs, captured
-  artifacts (`dd-bug-registration`'s redaction rule applies to the whole arc).
+- A bug fix rides the live `feature/{M.m.p}` branch in any phase (`DADAIA.md` §4):
+  no separate branch, no SPEC/PLAN/TASKS, no version mint.
+- Two fixers resolve by whichever `dadaia bugs resolve` lands first; a losing write
+  fails non-zero — re-read and retry.
+- `dd-bug-registration`'s redaction rule applies to the whole arc: commands, outputs,
+  captured artifacts.
 
 ## 2. The method — seven phases, each gated
 
 **Phase 0 — Lineage.** Read the bug ledger for prior fixes to the same
-`surface`/`component` in the bounded window ([`LINEAGE.md`](LINEAGE.md)); declare
-`caused_by: <bug_id> | none` and `lineage_source: declared` via `dadaia bugs update`;
-echo the same `caused_by:`/`evidence:`/`prior diffs read:` block in the eventual fix
-commit body.
-*Done when the record carries both fields and prior diffs were actually read.*
+`surface`/`component` in the bounded window ([`LINEAGE.md`](LINEAGE.md)); carry the
+link to Phase 6, where `resolve --caused-by` is its one writer; echo the same
+`caused_by:`/`evidence:`/`prior diffs read:` block in the fix commit body.
+*Done when prior diffs were actually read and the link (or `none`) is decided.*
 
 **Phase 1 — Red loop.** This is the skill; everything after it is mechanical. Build a
 **tight** pass/fail signal that goes red on THIS bug — construction menu, tightening
@@ -73,25 +70,25 @@ record:
 
 ```
 dadaia bugs resolve <bug-id> --cause … --caused-by … --resolved-release …
-  --solution … --evidence-loop … --evidence-seam … --evidence-diff …
-  --diff-direction …
+  --solution … --evidence-loop … --evidence-seam … --evidence-diff net-negative:…
 ```
 
-- `resolved_commit` stays `null` at resolve time — a commit cannot contain its own sha.
-- `caused_by`/`lineage_source` were set in Phase 0; leave them untouched.
+- `diff_direction` is derived from `--evidence-diff`'s `net-*:` prefix — there is no `--diff-direction` flag.
+- `closed_at` is stamped by the terminal transition; `dadaia bugs archive` ages by it, never by the filing date `ts`.
+- `--caused-by` is validated against the ledger or the literal `none`; an unknown id exits 1.
 - Stage code + regression test + the `BUGS.jsonl` line together — ONE commit, shape 3
   of `dd-gitflow-default` §3a.
 
 ## 3. Done when
 
-- Phase 0 lineage declared and echoed in the fix commit body.
+- Phase 0 read the window; the link is declared at resolve and echoed in the fix commit body.
 - The red loop was captured before any hypothesis; the repro is minimised to
   load-bearing.
 - The surviving hypothesis was confirmed by instrumentation.
 - The regression test sits at the correct seam, or the seam gap was registered first.
 - Probes are gone; the diff is smaller or equal; the resolve record carries the
-  evidence triple + `diff_direction` + `resolved_release`; one isolated commit;
-  worktree clean.
+  evidence triple, `caused_by`, `resolved_release` and `closed_at`; one isolated
+  commit; worktree clean.
 
 ## 4. References
 

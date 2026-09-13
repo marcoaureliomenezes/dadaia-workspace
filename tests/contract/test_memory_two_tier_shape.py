@@ -9,9 +9,9 @@ spelled ``ADR:``, not SPEC FR17's illustrative ``Accepted by: ADR NNNN``, becaus
 promoted principle is `proposed` until the operator accepts it at T-050-31 (T-050-28
 coverage table §5 R2) and writing ``Accepted by:`` today would assert an acceptance
 nobody gave. The ``ADR:`` line is either ``ADR: NNNN (proposed|accepted...)``, mapping to
-an existing record in ``specs/ADRs/decisions.jsonl`` or
-``specs/ADRs/_superseded/superseded.jsonl`` (v0.5.0 specs-canon closure: ADRs moved to
-one JSONL record per decision), or the literal ``ADR: none`` — a pre-canon principle
+an existing record in ``specs/ADRs/decisions.jsonl`` (v0.5.0 specs-canon closure: ADRs
+moved to one JSONL record per decision; 0.4.7 FR8 retired the ``_superseded/`` lane, so
+a superseded record is retired in place), or the literal ``ADR: none`` — a pre-canon principle
 that predates the ADR mechanism entirely (the 28 mechanical, auto-generated markdown
 ADRs this trio originally pointed at were deleted as non-canon; a FUTURE change to one
 of these principles requires a real ADR, but the principle's OWN pre-existing text does
@@ -33,7 +33,6 @@ pytestmark = pytest.mark.contract
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _MEMORY_DIR = _REPO_ROOT / "specs" / "memory"
 _ADR_DECISIONS_PATH = _REPO_ROOT / "specs" / "ADRs" / "decisions.jsonl"
-_ADR_SUPERSEDED_PATH = _REPO_ROOT / "specs" / "ADRs" / "_superseded" / "superseded.jsonl"
 
 _MEMORY_FILES = ("ARCHITECTURE.md", "QUALITY.md", "TECHSTACK.md")
 
@@ -94,13 +93,13 @@ def _adr_number_of(body: str) -> str | None:
 
 
 def _adr_record_ids() -> frozenset[str]:
-    """Every ADR record id across BOTH specs/ADRs/decisions.jsonl and
-    specs/ADRs/_superseded/superseded.jsonl (v0.5.0 specs-canon closure) — the
-    union is the complete authored inventory, live + superseded. Malformed lines
-    are skipped (this contract's own test_adr_canon.py owns validating the JSONL
-    shape itself; here we only need the id set)."""
+    """Every ADR record id in specs/ADRs/decisions.jsonl — the complete authored
+    inventory, proposed/accepted/rejected/superseded alike (0.4.7 FR8: a superseded
+    record is retired in place, never moved to a second file). Malformed lines are
+    skipped (this contract's own test_adr_canon.py owns validating the JSONL shape
+    itself; here we only need the id set)."""
     ids: set[str] = set()
-    for path in (_ADR_DECISIONS_PATH, _ADR_SUPERSEDED_PATH):
+    for path in (_ADR_DECISIONS_PATH,):
         if not path.is_file():
             continue
         for line in path.read_text(encoding="utf-8").split("\n"):
@@ -242,8 +241,7 @@ def test_every_principle_maps_to_an_existing_adr_file_or_declares_adr_none() -> 
                 continue  # `ADR: none` — a pre-canon principle; nothing to map to
             assert _adr_file_exists(adr_number), (
                 f"{name} P-{pid} points at ADR {adr_number}, but no record with "
-                f"that id exists in specs/ADRs/decisions.jsonl or "
-                f"specs/ADRs/_superseded/superseded.jsonl (A17.2/A18.4)."
+                f"that id exists in specs/ADRs/decisions.jsonl (A17.2/A18.4)."
             )
 
     # Mutation fixture — RED condition: an ADR number with no backing file.

@@ -65,7 +65,6 @@ def test_transition_resolve_dispatches_to_the_matching_record_method(tmp_path: P
         evidence_loop="el sufficiently long",
         evidence_seam="es sufficiently long",
         evidence_diff="net-negative: deleted more than added",
-        diff_direction="net-negative",
     )
 
     assert updated.status == "resolved"

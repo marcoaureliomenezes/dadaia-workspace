@@ -1636,7 +1636,7 @@ def test_resolvable_remote_sha_and_new_branch_fallback_agree_on_the_same_final_s
 
 
 # ---------------------------------------------------------------------------------------
-# list_tree_paths / first_parent (v0.5.0 specs-canon closure, operator ruling 2026-08-28)
+# list_tree_paths / parents (v0.5.0 specs-canon closure, operator ruling 2026-08-28)
 # ---------------------------------------------------------------------------------------
 
 
@@ -1678,7 +1678,7 @@ def test_list_tree_paths_rejects_an_option_shaped_sha(tmp_path: Path) -> None:
         reader.list_tree_paths(repo, "--upload-pack=evil", "specs")
 
 
-def test_first_parent_of_a_child_commit_resolves_the_base(tmp_path: Path) -> None:
+def test_parents_of_a_child_commit_is_the_base(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     _init_repo(repo)
     (repo / "a.txt").write_text("first\n")
@@ -1687,37 +1687,37 @@ def test_first_parent_of_a_child_commit_resolves_the_base(tmp_path: Path) -> Non
     tip_sha = _commit(repo, "c2")
 
     reader = GitSubprocessObjectReader()
-    assert reader.first_parent(repo, tip_sha) == base_sha
+    assert reader.parents(repo, tip_sha) == (base_sha,)
 
 
-def test_first_parent_of_a_root_commit_is_none(tmp_path: Path) -> None:
+def test_parents_of_a_root_commit_is_empty(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     _init_repo(repo)
     (repo / "a.txt").write_text("first\n")
     root_sha = _commit(repo, "c1")
 
     reader = GitSubprocessObjectReader()
-    assert reader.first_parent(repo, root_sha) is None
+    assert reader.parents(repo, root_sha) == ()
 
 
-def test_first_parent_of_an_unresolvable_sha_is_none_never_raises(tmp_path: Path) -> None:
+def test_parents_of_an_unresolvable_sha_is_empty_never_raises(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     _init_repo(repo)
     (repo / "a.txt").write_text("first\n")
     _commit(repo, "seed")
 
     reader = GitSubprocessObjectReader()
-    assert reader.first_parent(repo, "a" * 40) is None
+    assert reader.parents(repo, "a" * 40) == ()
 
 
-def test_first_parent_of_an_option_shaped_sha_is_none_never_raises(tmp_path: Path) -> None:
+def test_parents_of_an_option_shaped_sha_is_empty_never_raises(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     _init_repo(repo)
     (repo / "a.txt").write_text("first\n")
     _commit(repo, "seed")
 
     reader = GitSubprocessObjectReader()
-    assert reader.first_parent(repo, "--upload-pack=evil") is None
+    assert reader.parents(repo, "--upload-pack=evil") == ()
 
 
 def test_resolve_ref_of_head_is_the_tip(tmp_path: Path) -> None:
@@ -1751,3 +1751,23 @@ def test_resolve_ref_rejects_an_option_shaped_ref(tmp_path: Path) -> None:
 
     reader = GitSubprocessObjectReader()
     assert reader.resolve_ref(repo, "--output=/tmp/x") is None
+
+
+def test_parents_of_a_merge_commit_lists_both_lines_first_parent_first(tmp_path: Path) -> None:
+    """The shape `live_verdict_shas` reads on develop right after a feature merge."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "base.txt").write_text("base\n", encoding="utf-8")
+    base_sha = _commit(repo, "base")
+    subprocess.run(["git", "checkout", "-q", "-b", "feature/x"], cwd=repo, check=True)
+    (repo / "feature.txt").write_text("feature\n", encoding="utf-8")
+    feature_sha = _commit(repo, "feature")
+    subprocess.run(["git", "checkout", "-q", "-"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "merge", "-q", "--no-ff", "-m", "merge", "feature/x"], cwd=repo, check=True
+    )
+    merge_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    reader = GitSubprocessObjectReader()
+    assert reader.parents(repo, merge_sha) == (base_sha, feature_sha)

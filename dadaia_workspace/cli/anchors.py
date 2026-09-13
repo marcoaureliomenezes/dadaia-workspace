@@ -24,7 +24,8 @@ def derive_cli_anchors(app: typer.Typer | None = None) -> frozenset[str]:
     ``app`` defaults to the live ``dadaia`` Typer app (imported lazily here so the heavy
     ``cli.main`` module is only loaded at a real composition call, never at import time);
     tests pass a small fixture app. A registered command's id is the space-joined path of
-    group names + the command name, e.g. ``backlog doctor``; a top-level command is its own
+    group names + the command name, e.g. ``backlog new``; a top-level command — including a
+    verb-less group whose callback is the command body, as ``dadaia doctor`` — is its own
     bare name.
     """
     if app is None:
@@ -46,6 +47,13 @@ def _walk_typer(app: typer.Typer, prefix: tuple[str, ...], out: set[str], *, dep
     for group in app.registered_groups:
         sub = group.typer_instance
         if sub is None or group.name is None:
+            continue
+        if not sub.registered_commands and not sub.registered_groups:
+            # A verb-less group IS the command: its `@app.callback(invoke_without_command
+            # =True)` body is what `dadaia <name>` runs (`dadaia doctor`). Without this the
+            # registry had no anchor for the one top-level command the CLI actually runs
+            # (bug `backlog-subject-registry-lacks-top-level-doctor-cli-anchor`).
+            out.add(" ".join((*prefix, group.name)))
             continue
         _walk_typer(sub, (*prefix, group.name), out, depth=depth + 1)
 

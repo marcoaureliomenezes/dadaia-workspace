@@ -13,14 +13,9 @@ fan-out): each check is a ``BacklogCheck`` (a code + a callable over the shared
 * **BL-CONFLICT** — two items share an anchor with incompatible change → ERROR (the divergent
   twin, caught even when hand-written; classifier ``DIVERGENT_CONFLICT``).
 * **BL-STALE** (re-defined, ADR D8; v0.5.0 A5.2) — an ACTIVE item already
-  consumed/dispositioned: its slug is recorded in the relocated consumed-backlog histo
-  ledger (``ledger.read_consumed``, T-050-13A/A5.5 — reads
-  ``consumed_backlog_histo.jsonl`` through an injected
-  ``JsonlRecordStore[ConsumedBacklogHistoRecord]``, the relocation target for the 18
-  per-release ``consumed_backlog.json`` sidecars FR6 deletes), OR it already has an
-  exit record in ``backlog_histo.jsonl`` (the retired in-document ``## LEDGER``
-  condition's replacement — v0.5.0 FR5), OR its own ``Status`` is one of the six
-  canonical terminal disposition tokens.
+  dispositioned: it already has an exit record in ``backlog_histo.jsonl`` (the retired
+  in-document ``## LEDGER`` condition's replacement — v0.5.0 FR5), OR its own
+  ``Status`` is one of the five canonical terminal disposition tokens.
 
 **BL-DUP is DELETED, not disabled (v0.5.0 A5.2) — still true under the JSON document.**
 With ``BACKLOG.json`` holding only the live ``active[]`` array and every exit landing as
@@ -36,8 +31,7 @@ dual-section document's duplicate-closure failure mode this task's SPEC (FR5) na
 its bug-history evidence, not an independent invariant.
 
 Pure module: all roots are **injected** (SPEC §3.8 #6); no I/O outside the supplied paths and
-no subprocess — ``histo_store``/``consumed_histo_store``, when supplied, are each an
-already-built
+no subprocess — ``histo_store``, when supplied, is an already-built
 :class:`~dadaia_workspace.infrastructure.jsonl_record_store.JsonlRecordStore` (DI: the
 CLI composition boundary builds it, this module only ever calls the instance it is
 handed, never constructs one itself — ADR-0001 retired the single-adapter
@@ -51,29 +45,31 @@ operator ruling 2026-08-28) — there is no per-entry fallback and no Markdown d
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
+from dadaia_workspace.core.doctor_rules import Rule
+from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.models.backlog import (
     INTENTS_EXEMPT_STATUS,
-    BacklogHistoRecord,
-    ConsumedBacklogHistoRecord,
     is_intents_exempt,
-    is_terminal_disposition,
 )
+from dadaia_workspace.core.models.histo import HistoRecord, is_terminal_disposition
 from dadaia_workspace.features.backlog.classifier import BoundItem, Verdict, classify
 from dadaia_workspace.features.backlog.document import ActiveItem, DocumentError, load_document
-from dadaia_workspace.features.backlog.ledger import read_consumed
 from dadaia_workspace.features.backlog.preview import bound_anchor_changes
 from dadaia_workspace.features.backlog.subject_registry import Registry, build_registry
 from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 __all__ = [
+    "RULES",
     "BacklogDoctorCode",
     "Finding",
+    "LedgerRule",
     "Severity",
+    "build_context",
     "run_backlog_doctor",
 ]
 
@@ -147,7 +143,6 @@ class DoctorContext:
 
     items: Sequence[ActiveItem]
     registry: Registry
-    consumed: dict[str, set[str]]
     #: Slugs already carrying an exit record in ``backlog_histo.jsonl`` (v0.5.0 FR5) —
     #: ADR D8's BL-STALE condition (b)'s replacement for the retired in-document
     #: ``## LEDGER`` check. Empty when no ``histo_store`` was supplied (A2.8-style
@@ -267,19 +262,18 @@ def _check_conflict(ctx: DoctorContext) -> list[Finding]:
 
 def _check_stale(ctx: DoctorContext) -> list[Finding]:
     """BL-STALE, re-defined over the single-section document (ADR D8; v0.5.0 A5.2): an
-    ACTIVE item already consumed/dispositioned fires on ANY of three ORed conditions —
-    (a) its slug is recorded in the relocated consumed-backlog histo ledger
-    (``ledger.read_consumed``, T-050-13A/A5.5 — empty/no-op when no
-    ``consumed_histo_store`` was supplied), (b) it already has an exit record
-    in ``backlog_histo.jsonl`` (the retired in-document ``## LEDGER`` condition's
-    replacement — ``ctx.histo_slugs``, empty/no-op when no ``histo_store`` was
-    supplied), or (c) its own ``Status`` is itself one of the six canonical terminal
-    disposition tokens."""
+    ACTIVE item already dispositioned fires on either ORed condition — (a) it already
+    has an exit record in ``backlog_histo.jsonl`` (the retired in-document ``## LEDGER``
+    condition's replacement — ``ctx.histo_slugs``, empty/no-op when no ``histo_store``
+    was supplied), or (b) its own ``Status`` is itself one of the canonical terminal
+    dispositions (``core.models.histo.TERMINAL_DISPOSITIONS``).
+
+    A picked item stays ``picked`` in ``active[]`` and exits ONCE, at closure (0.4.7
+    FR7, T-047-05): the pick-time provisional exit this check's deleted third condition
+    policed no longer exists."""
     findings: list[Finding] = []
     for item in ctx.items:
         reasons: list[str] = []
-        if item.slug in ctx.consumed:
-            reasons.append("recorded as consumed in an archived release's consumed_backlog ledger")
         if item.slug in ctx.histo_slugs:
             reasons.append("already has an exit record in backlog_histo.jsonl")
         if item.status is not None and is_terminal_disposition(item.status):
@@ -289,7 +283,7 @@ def _check_stale(ctx: DoctorContext) -> list[Finding]:
                 Finding(
                     BacklogDoctorCode.BL_STALE,
                     Severity.ERROR,
-                    "ACTIVE item is already consumed/dispositioned (" + "; ".join(reasons) + ") "
+                    "ACTIVE item is already dispositioned (" + "; ".join(reasons) + ") "
                     "— it should have exited to backlog_histo.jsonl, not stayed an ACTIVE "
                     "subsection",
                     slug=item.slug,
@@ -298,64 +292,74 @@ def _check_stale(ctx: DoctorContext) -> list[Finding]:
     return findings
 
 
-#: A single parameterized registry of checks (SPEC §3.8 #8 — no copy-paste fan-out).
-@dataclass(frozen=True)
-class _BacklogCheck:
-    code: BacklogDoctorCode
-    run: Callable[[DoctorContext], list[Finding]]
+#: This section's binding of the ONE doctor rule record (0.4.7 FR5): the `ledgers`
+#: section's rules run over the shared :class:`DoctorContext` and emit :class:`Finding`.
+type LedgerRule = Rule[DoctorContext, Finding]
 
+SECTION = "ledgers"
 
-_CHECKS: tuple[_BacklogCheck, ...] = (
-    _BacklogCheck(BacklogDoctorCode.BL_SCHEMA, _check_schema),
-    _BacklogCheck(BacklogDoctorCode.BL_CONFLICT, _check_conflict),
-    _BacklogCheck(BacklogDoctorCode.BL_STALE, _check_stale),
+#: The `ledgers` section's rules — the same record `features/specs/rules.py` fills, so
+#: `dadaia doctor` collects, renders and scores all three sections through one engine
+#: (T-047-03 widens this tuple to every ledger without touching the collector).
+RULES: tuple[LedgerRule, ...] = (
+    Rule(
+        (BacklogDoctorCode.BL_SCHEMA.value,),
+        SECTION,
+        _check_schema,
+        fix_help=f"{DADAIA_BIN} backlog update <slug> --<field> <value>",
+    ),
+    Rule(
+        (BacklogDoctorCode.BL_CONFLICT.value,),
+        SECTION,
+        _check_conflict,
+        fix_help=f"{DADAIA_BIN} backlog update <slug> --status rejected",
+    ),
+    Rule(
+        (BacklogDoctorCode.BL_STALE.value,),
+        SECTION,
+        _check_stale,
+        fix_help=f"{DADAIA_BIN} backlog update <slug> --status <disposition>",
+    ),
 )
 
 
 def run_checks(ctx: DoctorContext) -> list[Finding]:
-    """Run the four parameterized checks over an already-built :class:`DoctorContext`.
+    """Run every rule of the `ledgers` section over an already-built context.
 
     The shared engine both :func:`run_backlog_doctor` (the live CLI-facing path) and the
     document-model fixture tests drive — never copy-pasted, never duplicated. Findings
     are returned in check order then item order; an empty list ⇒ clean.
     """
     findings: list[Finding] = []
-    for check in _CHECKS:
-        findings.extend(check.run(ctx))
+    for rule in RULES:
+        findings.extend(rule.run(ctx))
     return findings
 
 
-def run_backlog_doctor(
+def build_context(
     *,
     specs_dir: Path,
     source_root: Path,
     catalog_path: Path,
     alias_map_path: Path,
     cli_anchors: frozenset[str],
-    histo_store: JsonlRecordStore[BacklogHistoRecord] | None = None,
-    consumed_histo_store: JsonlRecordStore[ConsumedBacklogHistoRecord] | None = None,
-) -> list[Finding]:
-    """Run BL-SCHEMA/CONFLICT/STALE over the single-source ``BACKLOG.json`` and return
-    all findings.
+    histo_store: JsonlRecordStore[HistoRecord] | None = None,
+) -> DoctorContext:
+    """Build the shared :class:`DoctorContext` over the single-source ``BACKLOG.json``.
 
     All roots are injected (SPEC §3.8 #6), including ``cli_anchors`` — the pre-derived
     ``cli``-kind anchor set threaded in from the CLI composition boundary (FR1b), so this
     feature never imports ``cli.main``. The registry is recomputed from live truth.
 
-    ``histo_store`` (v0.5.0 FR5/A13.4) and ``consumed_histo_store`` (v0.5.0 T-050-13A/
-    A5.5) are each an already-built
+    ``histo_store`` (v0.5.0 FR5/A13.4) is an already-built
     :class:`~dadaia_workspace.infrastructure.jsonl_record_store.JsonlRecordStore` — DI
     (built directly by the one real CLI callsite, ``cli.commands.newartifacts``'s
     ``backlog_doctor_cmd``, per ADR-0001: a single-consumer store builder has no reason
     to be a container seam), never constructed by this pure module. ``None`` (the
-    default for both) is a no-op for the corresponding BL-STALE condition, never a
-    false ERROR — this is the seam :func:`run_backlog_doctor` resolves the generic
-    backlog-histo stores through: ``histo_store``'s second real caller is
-    :func:`~dadaia_workspace.features.backlog.document.backlog_exit`;
-    ``consumed_histo_store`` replaces the pre-relocation ``archive_root``
-    directory-glob parameter (T-050-13A relocated the 18 per-release
-    ``consumed_backlog.json`` sidecars into one ``consumed_histo_store``-backed file
-    before FR6/T-050-14 deletes the tree they lived under).
+    default) is a no-op for BL-STALE condition (a), never a false ERROR — this is the
+    seam :func:`run_backlog_doctor` resolves the generic backlog-histo store through;
+    ``histo_store``'s second real caller is
+    :func:`~dadaia_workspace.features.backlog.document.backlog_exit`.
 
     Reads ``specs/backlog/BACKLOG.json`` through
     :func:`~dadaia_workspace.features.backlog.document.load_document` (SPEC v0.12.0 FR1/FR2,
@@ -372,7 +376,6 @@ def run_backlog_doctor(
         cli_anchors=cli_anchors,
     )
     document = load_document(specs_dir / "backlog")
-    consumed = read_consumed(consumed_histo_store)
     histo_slugs: frozenset[str] = (
         frozenset(record.id for record in histo_store.iter_records())
         if histo_store is not None
@@ -382,11 +385,32 @@ def run_backlog_doctor(
     ctx = DoctorContext(
         items=list(document.active),
         registry=registry,
-        consumed=consumed,
         histo_slugs=histo_slugs,
         document_errors=document.errors,
     )
     for item in document.active:
         ctx.bound[item.slug] = bound_anchor_changes(item, registry)
 
-    return run_checks(ctx)
+    return ctx
+
+
+def run_backlog_doctor(
+    *,
+    specs_dir: Path,
+    source_root: Path,
+    catalog_path: Path,
+    alias_map_path: Path,
+    cli_anchors: frozenset[str],
+    histo_store: JsonlRecordStore[HistoRecord] | None = None,
+) -> list[Finding]:
+    """Build the context and run every `ledgers` rule over it — the one-shot path."""
+    return run_checks(
+        build_context(
+            specs_dir=specs_dir,
+            source_root=source_root,
+            catalog_path=catalog_path,
+            alias_map_path=alias_map_path,
+            cli_anchors=cli_anchors,
+            histo_store=histo_store,
+        )
+    )

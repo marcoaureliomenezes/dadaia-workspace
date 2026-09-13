@@ -119,7 +119,7 @@ def test_bound_context_visible_to_cli_e2e(tmp_path: Path, monkeypatch: pytest.Mo
     # 1) bind — real Typer command, no DADAIA_SESSION_ID (the normal bare-bind shape).
     bind_result = _runner.invoke(
         app,
-        ["context", "bind", _CTX, "--mode", "implementation", "--release", _RELEASE],
+        ["context", "bind", _CTX],
     )
     assert bind_result.exit_code == 0, bind_result.output
 
@@ -132,7 +132,5 @@ def test_bound_context_visible_to_cli_e2e(tmp_path: Path, monkeypatch: pytest.Mo
     )
     session = show_payload["session"]
     assert session["context"] == _CTX
-    assert session["mode"].upper() == "BOUND_IMPLEMENTATION"
-    assert session["release"] == _RELEASE
     bound_sid = session["session_id"]
     assert bound_sid

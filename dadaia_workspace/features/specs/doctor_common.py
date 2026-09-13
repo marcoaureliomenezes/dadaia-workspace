@@ -115,32 +115,31 @@ def _read_and_parse_release_json(
         return None, True
 
 
-def resolve_active_release(specs_dir: Path) -> tuple[str, str | None, str | None]:
+def resolve_active_release(specs_dir: Path) -> tuple[str | None, str | None, str | None]:
     """Resolve ``(release_id, phase, error)`` straight from the live state document
     (v0.5.x reader; segment dropped at release 0.4.6 with the scaffolded segment
     lane, ADR 0006). Downstream consumers (``doctor_release``, ``doctor_structural``)
-    keep their existing branching (``if err: ...``, ``if release != "none": ...``).
+    keep their existing branching (``if err: ...``, ``if release is None: ...``).
 
     :func:`resolve_live_release_id` (above) answers "which directory" (pure stdlib);
-    this function answers the content question — phase and the optional dir-based
-    segment (ADR-1/ADR-5) the document's own ``segment`` field may carry (D-E: this
-    release itself carries none — segments are ``TASKS.md`` blocks — but the mechanism
-    stays live for any release that still scaffolds one via
-    ``features.specs.scaffolder.scaffold_release_segment``). There is no fold anymore
-    — the document already IS the current phase/segment, read straight off disk by
-    :func:`_read_and_parse_release_json`.
+    this function answers the content question — the phase, read straight off disk by
+    :func:`_read_and_parse_release_json`. There is no fold anymore: the document
+    already IS the current phase.
 
-    No live release directory: ``("none", "none", None)`` — success, not an
-    error; the honest successor of ``ACTIVE.md``'s scaffold default ``release: none``.
+    No live release directory: ``(None, None, None)`` — success, not an error. The
+    retired ``"none"`` sentinel this used to return was a release id and a phase name
+    wearing each other's clothes (0.4.7 FR4 deleted ``"none"`` from
+    :data:`~dadaia_workspace.core.release_state.PHASES`): absence is ``None``, and
+    every caller already branches on falsiness.
     Ambiguous (two+ live release dirs) or an unreadable/malformed/phase-less
     ``RELEASE.json``: ``error`` carries the reason and ``phase`` is ``None`` — the
     same "treat as UNKNOWN" contract the narrow phase reader already has.
     """
     release_id, disc_err = resolve_live_release_id(specs_dir)
     if disc_err:
-        return "none", None, disc_err
+        return None, None, disc_err
     if release_id is None:
-        return "none", "none", None
+        return None, None, None
     state, exists = _read_and_parse_release_json(specs_dir, release_id)
     if not exists or state is None:
         return release_id, None, f"state document for {release_id!r} could not be read"

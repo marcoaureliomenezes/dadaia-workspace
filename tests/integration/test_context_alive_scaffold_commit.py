@@ -54,7 +54,7 @@ def test_alive_scaffold_commit_never_sweeps_preexisting_dirty_tracked_files(
     repo.mkdir()
 
     _run(["git", "init"], repo)
-    _run(["git", "config", "user.email", "test@test.com"], repo)
+    _run(["git", "config", "user.email", "test@example.invalid"], repo)
     _run(["git", "config", "user.name", "Test"], repo)
 
     (repo / "docker-compose.yml").write_text("services:\n  app:\n    image: old\n")

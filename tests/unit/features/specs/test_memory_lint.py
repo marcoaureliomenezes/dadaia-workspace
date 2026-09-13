@@ -37,7 +37,6 @@ _REPO_ROOT = Path(__file__).resolve().parents[4]
 
 _REQUIRED_FM = {
     "title": "Fixture atom",
-    "category": "core",
     "tldr": "fixture atom for memory_lint tests",
     "summary": "fixture atom for memory_lint tests, exercising the ported package module",
     "tags": ["fixture"],
@@ -127,7 +126,6 @@ def test_missing_required_frontmatter_field_is_an_error(tmp_path: Path) -> None:
     content = (
         "---\n"
         "slug: test-atom\n"
-        "category: core\n"  # title deliberately omitted
         'tldr: "x"\n'
         'summary: "x"\n'
         "tags:\n  - fixture\n"
@@ -149,7 +147,7 @@ def test_multiple_missing_required_fields_are_all_reported(tmp_path: Path) -> No
     re-run. ``lint_atom`` now iterates every schema error, so all missing fields
     surface in one pass."""
     schema = load_frontmatter_schema()
-    content = "---\nslug: test-atom\ncategory: core\n---\n\n## Purpose\n\nBody.\n"
+    content = "---\nslug: test-atom\n---\n\n## Purpose\n\nBody.\n"
     path = tmp_path / "test-atom.md"
     path.write_text(content, encoding="utf-8")
 
@@ -214,30 +212,32 @@ def test_wikilink_resolution_valid_and_broken(tmp_path: Path) -> None:
     assert not any("[[target]]" in e for e in result.errors)
 
 
-@pytest.mark.parametrize(
-    ("slug", "canon_filename"),
-    [
-        ("architecture", "ARCHITECTURE.md"),
-        ("tech-stack", "TECHSTACK.md"),
-        ("quality-assurance", "QUALITY.md"),
-    ],
-)
-def test_v6_canon_single_slug_stem_divergence_is_not_an_error(
-    tmp_path: Path, slug: str, canon_filename: str
-) -> None:
-    """v6 canon (FR1/A1.5/A1.6, T-050-06): the three top-level singles keep their
-    lowercase ``slug`` while their on-disk filename is the renamed canon name — this
-    is the ONE named exception to "slug == filename stem", not a general relaxation."""
+@pytest.mark.parametrize("stem", ["ARCHITECTURE", "TECHSTACK", "QUALITY"])
+def test_toplevel_trio_slug_is_its_filename_stem(tmp_path: Path, stem: str) -> None:
+    """Intent: CONTRACT — 0.4.7 FR9. ONE rule, no exception table: a `slug` equals its
+    filename stem, the top-level trio included. The alias table that mapped
+    `architecture` -> `ARCHITECTURE.md` was a second slug-resolution mechanism whose
+    third copy (panel `_md_render`) already caused `panel-wikilink-slug-hardcoded`."""
     schema = load_frontmatter_schema()
-    path = _make_atom(tmp_path, slug=slug, filename=canon_filename)
+    path = _make_atom(tmp_path, slug=stem, filename=f"{stem}.md")
 
     result = lint_atom(path, tmp_path, schema)
 
     assert not any("filename stem" in e for e in result.errors), result.errors
 
 
-def test_slug_stem_mismatch_still_errors_when_not_a_v6_canon_single(tmp_path: Path) -> None:
-    """The v6 canon exception is narrow: an unrelated slug/stem mismatch still errors."""
+def test_the_retired_alias_slug_is_now_a_stem_mismatch(tmp_path: Path) -> None:
+    """Intent: CONTRACT — 0.4.7 FR9. `slug: architecture` on `ARCHITECTURE.md` was the
+    ONE named exception; with the alias table deleted it is an ordinary mismatch."""
+    schema = load_frontmatter_schema()
+    path = _make_atom(tmp_path, slug="architecture", filename="ARCHITECTURE.md")
+
+    result = lint_atom(path, tmp_path, schema)
+
+    assert any("slug" in e and "filename stem" in e for e in result.errors), result.errors
+
+
+def test_slug_stem_mismatch_errors(tmp_path: Path) -> None:
     schema = load_frontmatter_schema()
     path = _make_atom(tmp_path, slug="architecture", filename="not-the-canon-name.md")
 
@@ -246,30 +246,17 @@ def test_slug_stem_mismatch_still_errors_when_not_a_v6_canon_single(tmp_path: Pa
     assert any("slug" in e and "filename stem" in e for e in result.errors)
 
 
-@pytest.mark.parametrize(
-    ("wikilink_slug", "canon_filename"),
-    [
-        ("architecture", "ARCHITECTURE.md"),
-        ("tech-stack", "TECHSTACK.md"),
-        ("quality-assurance", "QUALITY.md"),
-    ],
-)
-def test_wikilink_resolves_to_renamed_v6_canon_single(
-    tmp_path: Path, wikilink_slug: str, canon_filename: str
-) -> None:
-    """A ``[[wikilink]]`` to one of the v6 canon singles resolves to the RENAMED file,
-    not to ``<slug>.md`` (which no longer exists on disk)."""
+@pytest.mark.parametrize("stem", ["ARCHITECTURE", "TECHSTACK", "QUALITY"])
+def test_wikilink_resolves_iff_the_named_file_exists(tmp_path: Path, stem: str) -> None:
+    """Intent: CONTRACT — 0.4.7 FR9. `[[x]]` resolves iff `x.md` exists under memory/ —
+    the trio is linkable by its stem, and by nothing else."""
     schema = load_frontmatter_schema()
-    _make_atom(tmp_path, slug=wikilink_slug, filename=canon_filename)
-    path = _make_atom(
-        tmp_path,
-        slug="source",
-        body=f"## Purpose\n\nsee [[{wikilink_slug}]]\n",
-    )
+    _make_atom(tmp_path, slug=stem, filename=f"{stem}.md")
+    path = _make_atom(tmp_path, slug="source", body=f"## Purpose\n\nsee [[{stem}]]\n")
 
     result = lint_atom(path, tmp_path, schema)
 
-    assert not any(wikilink_slug in e for e in result.errors), result.errors
+    assert not any(stem in e for e in result.errors), result.errors
 
 
 def test_lint_directory_scans_toplevel_and_product_subdir_excludes_index(

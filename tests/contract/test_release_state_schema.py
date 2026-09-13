@@ -2,7 +2,7 @@
 ``test_release_event_schema.py`` — RELEASE.jsonl -> RELEASE.json migration).
 
 Intent: CONTRACT — the schema closes the document to exactly the nine declared
-top-level properties (plus the optional ``segment`` extension), each milestone object
+top-level properties, each milestone object
 closes to its own declared shape, and the schema is internally valid Draft 2020-12.
 Size: SMALL — pure schema/document assertions, no I/O beyond reading the packaged
 schema fixture.
@@ -36,7 +36,7 @@ _SCHEMA_PATH = (
 )
 
 _REQUIRED_TOP_LEVEL = frozenset(
-    {"schema", "release", "phase", "rc", "defined", "implemented", "shipped", "audited", "log"}
+    {"schema", "release", "phase", "rc", "defined", "implemented", "shipped", "log"}
 )
 
 
@@ -53,7 +53,6 @@ def _minimal_document(**overrides: object) -> dict[str, object]:
         "defined": {"sha": "a" * 40, "ts": "2026-08-27T10:31:16Z"},
         "implemented": None,
         "shipped": None,
-        "audited": None,
         "log": [],
     }
     base.update(overrides)
@@ -79,7 +78,7 @@ def test_wrong_schema_id_is_rejected() -> None:
     assert list(validator.iter_errors(doc)) != []
 
 
-@pytest.mark.parametrize("kind", ["defined", "implemented", "shipped", "audited"])
+@pytest.mark.parametrize("kind", ["defined", "implemented", "shipped"])
 def test_each_milestone_object_closes_to_its_own_declared_shape(kind: str) -> None:
     """An unknown key on a milestone object is rejected -- the schema keeps each
     milestone's shape closed, the same discipline the envelope itself carries."""
@@ -104,11 +103,3 @@ def test_notes_entries_require_ts_agent_kind_text() -> None:
         ]
     )
     assert list(validator.iter_errors(doc_ok)) == []
-
-
-def test_segment_is_optional_and_pattern_constrained() -> None:
-    validator = Draft202012Validator(_schema())
-    assert list(validator.iter_errors(_minimal_document(segment="rc-1"))) == []
-    assert list(validator.iter_errors(_minimal_document(segment="not-a-segment"))) != []
-    # Absent entirely is valid -- `segment` is not in the required set.
-    assert "segment" not in _schema()["required"]

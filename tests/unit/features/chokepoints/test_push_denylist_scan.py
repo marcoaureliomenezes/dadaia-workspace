@@ -10,7 +10,7 @@ standing rule): ``zz-``-prefixed values, never a real operator term or foreign s
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -39,11 +39,14 @@ class _FakeObjectSource:
     def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
         return []
 
-    def first_parent(self, repo: Path, sha: str) -> str | None:
-        return None
+    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
+        return ()
 
     def resolve_ref(self, repo: Path, ref: str) -> str | None:
         return None
+
+    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]:
+        return set()
 
 
 class _FailingObjectSource:
@@ -53,11 +56,14 @@ class _FailingObjectSource:
     def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
         return []
 
-    def first_parent(self, repo: Path, sha: str) -> str | None:
-        return None
+    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
+        return ()
 
     def resolve_ref(self, repo: Path, ref: str) -> str | None:
         return None
+
+    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]:
+        return set()
 
 
 def _refs(*lines: str) -> list[PushRef]:
@@ -602,11 +608,14 @@ class _FailingObjectSourceWithPath:
     def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
         return []
 
-    def first_parent(self, repo: Path, sha: str) -> str | None:
-        return None
+    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
+        return ()
 
     def resolve_ref(self, repo: Path, ref: str) -> str | None:
         return None
+
+    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]:
+        return set()
 
 
 def test_git_object_read_failure_at_a_denylisted_path_masks_the_path(tmp_path: Path) -> None:
@@ -690,3 +699,81 @@ def test_push_with_denylisted_term_only_in_a_commit_message_body_is_refused(
     assert _SYNTHETIC_TERM not in decision.message  # never unmasked
     assert "rewrite the offending commit" in decision.message  # reword/amend healing
     assert "--no-verify" in decision.message
+
+
+# ═════════════════════════════════════════════════════════════════════════════════
+# Operator ruling 2026-09-13 — a foreign slug the remote tip already publishes is not
+# a new disclosure (repository-wide amnesty over the v0.11.0 per-path one); an
+# unreadable baseline amnesties nothing (fail closed). Intent: CONTRACT.
+# ═════════════════════════════════════════════════════════════════════════════════
+
+
+@dataclass
+class _PublishedSlugObjectSource(_FakeObjectSource):
+    published: dict[str, set[str]] = field(default_factory=dict)
+    raise_on_grep: bool = False
+    grep_calls: list[tuple[str, str]] = field(default_factory=list)
+
+    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]:
+        self.grep_calls.append((sha, tuple(patterns)))
+        if self.raise_on_grep:
+            raise GitObjectReadError("simulated git grep failure")
+        return {text.lower() for text in self.published.get(sha, set())}
+
+
+def _sibling_ref() -> list[PushRef]:
+    return _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_SHA_B}")
+
+
+def test_a_foreign_slug_already_published_in_the_remote_tip_passes(tmp_path: Path) -> None:
+    source = _PublishedSlugObjectSource(
+        by_range={(_SHA_A, _SHA_B): [_obj("docs/design.md", "see zz-sibling-repo for raw\n")]},
+        published={_SHA_B: {"zz-sibling-repo"}},
+    )
+    decision = push_gate_decision(
+        _sibling_ref(),
+        object_source=source,
+        repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
+        foreign_slugs=("zz-sibling-repo",),
+    )
+    assert decision.allowed, decision.message
+    assert source.grep_calls and source.grep_calls[0][0] == _SHA_B
+    # The baseline is searched with the detector's own whole-token pattern, never a bare term.
+    assert any(
+        "zz\\-sibling\\-repo" in p or "zz-sibling-repo" in p for p in source.grep_calls[0][1]
+    )
+
+
+def test_a_foreign_slug_not_yet_published_still_refuses(tmp_path: Path) -> None:
+    source = _PublishedSlugObjectSource(
+        by_range={(_SHA_A, _SHA_B): [_obj("docs/design.md", "see zz-sibling-repo\n")]},
+        published={_SHA_B: set()},
+    )
+    decision = push_gate_decision(
+        _sibling_ref(),
+        object_source=source,
+        repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
+        foreign_slugs=("zz-sibling-repo",),
+    )
+    assert not decision.allowed
+    assert "foreign repo slug" in decision.message
+
+
+def test_an_unreadable_baseline_amnesties_nothing(tmp_path: Path) -> None:
+    source = _PublishedSlugObjectSource(
+        by_range={(_SHA_A, _SHA_B): [_obj("docs/design.md", "see zz-sibling-repo\n")]},
+        raise_on_grep=True,
+    )
+    decision = push_gate_decision(
+        _sibling_ref(),
+        object_source=source,
+        repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
+        foreign_slugs=("zz-sibling-repo",),
+    )
+    assert not decision.allowed

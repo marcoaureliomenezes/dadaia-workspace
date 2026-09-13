@@ -2,10 +2,19 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "release-state-v1",
   "title": "Release State v1",
-  "description": "The whole content of specs/releases/<release-id>/_RELEASE.json — ONE mutable JSON object, the release's current state, never an append-only event stream (operator ruling: 'e um arquivo altamente mutavel onde acompanhamos o estado do release. Nao faz sentido ser append-only' — retires release-event-v1.schema.json and its _RELEASE.jsonl fold, core/release_events.py). `phase`, `rc`, `defined`, `implemented`, `shipped` and `audited` are rewritten IN PLACE through core/atomic_write.py's compare-and-swap seam (expected_previous, refuse-stale) whenever a code path writes this document; an agent with file tools (product-engineer, at the phase boundaries this document's history used to record as separate `phase` lines) may also Read-then-Edit it directly, the same discipline a CAS write enforces mechanically. `defined`/`implemented`/`shipped`/`audited` are the four sha-bearing milestone facts (each set at most once meaningfully — a later legitimate rewrite is a correction, not a second append, so there is no more 'duplicate milestone' finding to detect: SPEC-DOC-043 retires with the JSONL fold it existed to police). `log` is the one place free-form governance narrative survives INSIDE this otherwise-typed document — the closure narrative (summary, size accounting, drifts, dispositions, artifact GC, intake candidates, rc ledger, archive decision) that _RELEASE.jsonl's `note` records used to carry, one entry per note, oldest first, never rewritten once appended.",
+  "description": "The whole content of specs/releases/<release-id>/_RELEASE.json — ONE mutable JSON object, the release's current state, never an append-only event stream (operator ruling: 'e um arquivo altamente mutavel onde acompanhamos o estado do release. Nao faz sentido ser append-only' — retires release-event-v1.schema.json and its _RELEASE.jsonl fold, core/release_events.py). `phase`, `rc`, `defined`, `implemented` and `shipped` are rewritten IN PLACE through core/atomic_write.py's compare-and-swap seam (expected_previous, refuse-stale) whenever a code path writes this document; an agent with file tools (product-engineer, at the phase boundaries this document's history used to record as separate `phase` lines) may also Read-then-Edit it directly, the same discipline a CAS write enforces mechanically. `defined`/`implemented`/`shipped` are the three sha-bearing milestone facts (each set at most once meaningfully — a later legitimate rewrite is a correction, not a second append, so there is no more 'duplicate milestone' finding to detect: SPEC-DOC-043 retires with the JSONL fold it existed to police). An audit is NOT a release milestone: the audit window is read from audits/_archive/audits_histo.jsonl (0.4.7 FR7), so the fourth `audited` milestone is deleted rather than left as a field no code path ever wrote. `log` is the one place free-form governance narrative survives INSIDE this otherwise-typed document — the closure narrative that _RELEASE.jsonl's `note` records used to carry, one entry per note, oldest first, never rewritten once appended, each classified by the closed `kind` enum.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "release", "phase", "rc", "defined", "implemented", "shipped", "audited", "log"],
+  "required": [
+    "schema",
+    "release",
+    "phase",
+    "rc",
+    "defined",
+    "implemented",
+    "shipped",
+    "log"
+  ],
   "properties": {
     "schema": {
       "type": "string",
@@ -19,60 +28,112 @@
     },
     "phase": {
       "type": "string",
-      "description": "The release's current lifecycle phase (DISCOVERY/DEFINITION/SPEC/PLAN/TASKS/IMPLEMENTATION/CLOSURE/ARCHIVED — the canonical vocabulary lives in core/release_state.py (PHASES), not duplicated here). Overwritten in place on every phase transition — no history of prior phases survives in this field; a transition worth remembering is recorded as a `log` entry."
+      "description": "The release's current lifecycle phase. The four canonical phases are enumerated here AND in core/release_state.py (PHASES) — the two are pinned equal by tests/contract/test_release_state_schema.py, so neither can drift. Overwritten in place on every phase transition — no history of prior phases survives in this field; a transition worth remembering is recorded as a `log` entry.",
+      "enum": [
+        "DEFINITION",
+        "IMPLEMENTATION",
+        "CLOSURE",
+        "ARCHIVED"
+      ]
     },
     "rc": {
-      "type": ["integer", "null"],
+      "type": [
+        "integer",
+        "null"
+      ],
       "minimum": 1,
       "description": "The current/most recent rc round number, or null before any rc round has opened."
     },
     "defined": {
-      "type": ["object", "null"],
+      "type": [
+        "object",
+        "null"
+      ],
       "additionalProperties": false,
-      "required": ["sha", "ts"],
+      "required": [
+        "sha",
+        "ts"
+      ],
       "properties": {
-        "sha": {"type": ["string", "null"], "description": "The definition-promotion commit sha."},
-        "ts": {"type": "string", "description": "When this milestone was recorded."}
+        "sha": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The definition-promotion commit sha."
+        },
+        "ts": {
+          "type": "string",
+          "description": "When this milestone was recorded."
+        }
       },
       "description": "Set once, at the definition promotion commit (product-engineer). null before that point."
     },
     "implemented": {
-      "type": ["object", "null"],
+      "type": [
+        "object",
+        "null"
+      ],
       "additionalProperties": false,
-      "required": ["sha", "rc", "ts"],
+      "required": [
+        "sha",
+        "rc",
+        "ts"
+      ],
       "properties": {
-        "sha": {"type": ["string", "null"], "description": "The final-rc QA-close commit sha — not the merge commit (the two differ by the merge artifact)."},
-        "rc": {"type": ["integer", "null"], "description": "Which rc round closed this milestone."},
-        "ts": {"type": "string", "description": "When this milestone was recorded."}
+        "sha": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The final-rc QA-close commit sha — not the merge commit (the two differ by the merge artifact)."
+        },
+        "rc": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Which rc round closed this milestone."
+        },
+        "ts": {
+          "type": "string",
+          "description": "When this milestone was recorded."
+        }
       },
       "description": "Set once, at the final-rc QA close (qa-engineer). null before that point."
     },
     "shipped": {
-      "type": ["object", "null"],
+      "type": [
+        "object",
+        "null"
+      ],
       "additionalProperties": false,
-      "required": ["sha", "pr", "ts"],
+      "required": [
+        "sha",
+        "pr",
+        "ts"
+      ],
       "properties": {
-        "sha": {"type": ["string", "null"], "description": "The develop->main merge commit sha."},
-        "pr": {"type": ["integer", "null"], "description": "The ship PR number."},
-        "ts": {"type": "string", "description": "When this milestone was recorded."}
+        "sha": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The develop->main merge commit sha."
+        },
+        "pr": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "The ship PR number."
+        },
+        "ts": {
+          "type": "string",
+          "description": "When this milestone was recorded."
+        }
       },
       "description": "Set once, at the develop->main ship merge. null before that point."
-    },
-    "audited": {
-      "type": ["object", "null"],
-      "additionalProperties": false,
-      "required": ["sha", "ts", "audit"],
-      "properties": {
-        "sha": {"type": ["string", "null"], "description": "The sha the audit window reviewed this release at."},
-        "ts": {"type": "string", "description": "When this milestone was recorded."},
-        "audit": {"type": ["string", "null"], "description": "The audit window id (e.g. 'audits/20261020-five-release-window')."}
-      },
-      "description": "Set (and may be overwritten) each time an audit window reviews this release's resolution. null before the first audit."
-    },
-    "segment": {
-      "type": ["string", "null"],
-      "pattern": "^(alpha|rc)-\\d+$",
-      "description": "OPTIONAL: the active dir-based segment (ADR-1/ADR-5) when the release's SPEC/PLAN/TASKS live under releases/<id>/<segment>/ rather than flat. Omitted or null for a flat (unsegmented) release."
     },
     "log": {
       "type": "array",
@@ -80,7 +141,12 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["ts", "agent", "kind", "text"],
+        "required": [
+          "ts",
+          "agent",
+          "kind",
+          "text"
+        ],
         "properties": {
           "ts": {
             "type": "string",
@@ -95,7 +161,19 @@
           "kind": {
             "type": "string",
             "minLength": 1,
-            "description": "Free-text category (e.g. 'note', 'closure-summary', 'closure-drift', 'closure-dispositions') — the closure-narrative `kind` vocabulary that used to live on _RELEASE.jsonl's `note` event's `data.kind`."
+            "description": "The closure-narrative category of this log entry, from the closed enum below: 'note' (anything with no dedicated kind) plus the nine narrative kinds a candidate closure writes — summary, size, drifts, dispositions, test-dispositions, artifact-gc, reviews, merge, memory.",
+            "enum": [
+              "note",
+              "summary",
+              "size",
+              "drifts",
+              "dispositions",
+              "test-dispositions",
+              "artifact-gc",
+              "reviews",
+              "merge",
+              "memory"
+            ]
           },
           "text": {
             "type": "string",

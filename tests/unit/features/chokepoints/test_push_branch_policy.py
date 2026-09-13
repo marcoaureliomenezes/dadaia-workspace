@@ -21,7 +21,7 @@ Intent: CONTRACT — v0.4.4 A3.1, A3.2, A3.5
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -49,11 +49,14 @@ class _EmptyObjectSource:
     def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
         return []
 
-    def first_parent(self, repo: Path, sha: str) -> str | None:
-        return None
+    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
+        return ()
 
     def resolve_ref(self, repo: Path, ref: str) -> str | None:
         return None
+
+    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]:
+        return set()
 
 
 def _decide(refs: list[PushRef], root: Path, **kwargs: Any) -> Decision:

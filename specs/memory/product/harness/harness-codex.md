@@ -1,7 +1,6 @@
 ---
 slug: harness-codex
 title: Harness — Codex
-category: product
 tldr: Entry harness on the operator's Codex CLI — native AGENTS.md, Starlark command policy, version-qualified hook fire, `.codex/` projection.
 summary: Capability and scaffold truth for the Codex harness — native AGENTS.md discovery, version-qualified hook certification, Starlark command policy and the .codex/ projection.
 tags: [harness, codex, projection, enforcement]
@@ -20,4 +19,4 @@ tags: [harness, codex, projection, enforcement]
 
 ## Dependencies
 
-[[tech-stack]], [[sdd-gate-v3]], [[agentic-entities]], [[public-asset-distribution]], [[agent-orchestration]].
+[[TECHSTACK]], [[sdd-gate-v3]], [[agentic-entities]], [[public-asset-distribution]], [[agent-orchestration]].

@@ -169,3 +169,102 @@ def test_release_new_accepts_a_directory_that_holds_only_verdicts(tmp_path: Path
 
     assert path == specs / "releases" / "0.9.0" / "SPEC.md"
     assert path.is_file()
+
+
+# ── 0.4.7 FR2 (T-047-06): release new is the ONE birth act ─────────────────────
+#
+# Intent: CONTRACT — 0.4.7 FR2 / T-047-06, bugs
+# `release-new-writes-spec-only-never-creates-release-state` and
+# `minted-feature-branch-without-live-release-blocks-every-memory-write`. The gate's
+# MEMORY class, `context show`, `dd-spec-navigator`, V34 and `rc-archive` all resolve
+# the live release by the presence of `_RELEASE.json`; writing SPEC.md alone means the
+# release does not exist for any of them until a human hand-writes the state document.
+# Size: SMALL (tmp_path trees, no subprocess, no network).
+
+
+def test_release_new_writes_the_release_state_document(tmp_path: Path) -> None:
+    """FR2: birth writes SPEC.md AND `_RELEASE.json` — phase DEFINITION, `rc: null`,
+    every milestone null, exactly one `note` log entry."""
+    from dadaia_workspace.core.release_state import parse_release_state
+
+    specs = tmp_path / "specs"
+    specs.mkdir()
+
+    spec_path = release_new(specs, "0.4.9")
+
+    state_path = spec_path.parent / "_RELEASE.json"
+    assert state_path.is_file(), "release new must write the release-state document"
+    state = parse_release_state(state_path.read_text(encoding="utf-8"))
+    assert state.schema == "release-state-v1"
+    assert state.release == "0.4.9"
+    assert state.phase == "DEFINITION"
+    assert state.rc is None
+    assert (state.defined, state.implemented, state.shipped) == (None, None, None)
+    assert len(state.log) == 1
+    entry = state.log[0]
+    assert entry["agent"] == "dadaia release new"
+    assert entry["kind"] == "note"
+    assert entry["text"] == "Release 0.4.9 born"
+    assert entry["ts"]
+
+
+def test_the_born_release_is_resolvable_as_live_in_definition(tmp_path: Path) -> None:
+    """FR2 AC: after birth, the live-release resolver the gate's MEMORY class and
+    `dadaia context show` key on finds the release, in phase DEFINITION."""
+    from dadaia_workspace.features.specs.doctor_common import resolve_live_release_id
+
+    specs = tmp_path / "specs"
+    specs.mkdir()
+    release_new(specs, "0.4.9")
+
+    release_id, error = resolve_live_release_id(specs)
+    assert error is None
+    assert release_id == "0.4.9"
+
+
+def test_release_new_refuses_a_second_live_release_with_an_executable_fix(
+    tmp_path: Path,
+) -> None:
+    """FR2: exactly one live release. The refusal names the live one and carries a
+    `fix:` line the operator can execute verbatim."""
+    specs = tmp_path / "specs"
+    specs.mkdir()
+    release_new(specs, "0.4.9")
+
+    with pytest.raises(FileExistsError) as excinfo:
+        release_new(specs, "0.5.0")
+
+    message = str(excinfo.value)
+    assert "0.4.9" in message
+    assert "fix:" in message
+    assert "dadaia release rc-archive" in message
+    assert "dadaia release archive 0.4.9" in message
+
+
+def test_a_refused_birth_leaves_no_partial_release_directory(tmp_path: Path) -> None:
+    """FR2 all-or-nothing: a refused birth writes nothing — no directory, no SPEC.md,
+    no half-written state document."""
+    specs = tmp_path / "specs"
+    specs.mkdir()
+    release_new(specs, "0.4.9")
+
+    with pytest.raises(FileExistsError):
+        release_new(specs, "0.5.0")
+
+    assert not (specs / "releases" / "0.5.0").exists()
+
+
+def test_a_born_release_passes_the_release_tree_validator(tmp_path: Path) -> None:
+    """FR2 x FR1: the document birth writes is valid `release-state-v1` by the ONE
+    validator (T-047-01) — the trio issue is the only one a just-born release carries."""
+    from dadaia_workspace.features.specs.release_tree import validate_release_tree
+
+    specs = tmp_path / "specs"
+    specs.mkdir()
+    release_new(specs, "0.4.9")
+
+    codes = {issue.code for issue in validate_release_tree(specs)}
+    assert "RELEASE-STATE-MISSING" not in codes
+    assert "RELEASE-STATE-SCHEMA" not in codes
+    assert "RELEASE-STATE-PARSE" not in codes
+    assert "RELEASE-PHASE" not in codes

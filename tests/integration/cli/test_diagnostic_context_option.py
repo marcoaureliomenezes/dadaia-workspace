@@ -40,7 +40,7 @@ def test_specs_doctor_context_and_specs_dir_mutually_exclusive_ac22() -> None:
     # different width than a local TTY and can split ``--context`` across lines).
     result = _runner.invoke(
         app,
-        ["specs", "doctor", "--context", "dadaia-workspace", "--specs-dir", "/tmp/whatever"],
+        ["doctor", "--context", "dadaia-workspace", "--specs-dir", "/tmp/whatever"],
     )
     assert result.exit_code != 0, result.output
     clean = _norm(result.output)

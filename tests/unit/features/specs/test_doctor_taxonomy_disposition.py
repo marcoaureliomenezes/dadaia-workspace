@@ -131,7 +131,7 @@ def _setup_doc038_single(specs) -> None:  # type: ignore[no-untyped-def]
     _loose_audit_findings(
         specs,
         "20260701T201136Z-0bcd6c19",
-        [_finding_record("F-1", disposition="fixed", release="v0.1.47")],
+        [_finding_record("F-1", disposition="resolved", release="v0.1.47")],
     )
 
 
@@ -139,7 +139,7 @@ def _setup_doc038_multiple(specs) -> None:  # type: ignore[no-untyped-def]
     _loose_audit_findings(
         specs,
         "20260701T201136Z-0bcd6c19",
-        [_finding_record("F-1", disposition="fixed", release="v0.1.47")],
+        [_finding_record("F-1", disposition="resolved", release="v0.1.47")],
     )
     _loose_audit_findings(
         specs,
@@ -261,7 +261,7 @@ def _silent_doc036_with_disposition(specs: Path) -> None:
     _archived_audit_findings(
         specs,
         "20260701T135346Z-6145b869",
-        [_finding_record("F-1", disposition="fixed", release="v0.1.46")],
+        [_finding_record("F-1", disposition="resolved", release="v0.1.46")],
     )
 
 

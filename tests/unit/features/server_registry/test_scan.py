@@ -180,7 +180,7 @@ def test_scan_filter_and_degrade_matrix(case: str, run, assertion) -> None:  # t
         ("0.0.0.0", 9000, True),
         ("::", 9000, True),
         ("::1", 9000, False),
-        ("192.168.1.5", 9000, False),  # specific IP, not wildcard
+        ("192.0.2.5", 9000, False),  # specific IP, not wildcard
         ("0.0.0.0", 4000, True),  # from the realistic sample
         ("127.0.0.1", 8122, False),  # from the realistic sample
         ("::", 34139, True),  # IPv6 wildcard, from the realistic sample

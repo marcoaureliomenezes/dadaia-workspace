@@ -1,7 +1,6 @@
 ---
 slug: server-registry
 title: server-registry
-category: product
 tldr: Port registry with TTL and PID tracking so parallel agents' dev servers never collide; the 3000-3999 range binds only `next_port`.
 summary: An internal registry of dev-server ports with TTL and PID tracking, an expiry sweeper that distinguishes unprobable from dead PIDs, and a read-only scan against real OS listeners.
 tags: [server, registry, ports, ttl]

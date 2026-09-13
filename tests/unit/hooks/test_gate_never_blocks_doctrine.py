@@ -180,47 +180,6 @@ def test_foreign_read_bind_never_imposes_read_on_my_mutating_write(tmp_path: Pat
     _assert_never_a_lock_block(block)
 
 
-def test_my_own_read_bind_still_blocks_my_own_mutating_write(tmp_path: Path) -> None:
-    """Self-protection is kept: MY OWN session record resolving READ still blocks MY OWN
-    MUTATING write (opt-in only, never imposed by a foreign session)."""
-    ws = _mk_workspace(tmp_path, "dadaia-workspace")
-    ctx = "dadaia-workspace"
-    my_sid = "self-read-bound"
-    _write_session_record(ws, my_sid, "READ")
-
-    target = _write_target(ws, ctx, "TASKS.md")
-    block = _run(
-        ws, {"tool_name": "Write", "tool_input": {"file_path": str(target)}}, session_id=my_sid
-    )
-    assert block is not None
-    assert "read" in str(block["reason"]).lower()
-
-
-def test_foreign_implementation_bind_never_changes_my_read_mode(tmp_path: Path) -> None:
-    """Another session's implementation record cannot upgrade this caller's READ mode."""
-    ws = _mk_workspace(tmp_path, "dadaia-workspace")
-    ctx = "dadaia-workspace"
-    foreign_impl_sid = "foreign-impl-bind"
-    my_read_sid = "my-own-read-bound"
-
-    _write_session_record(ws, foreign_impl_sid, "IMPLEMENTATION")
-    _write_session_record(ws, my_read_sid, "READ")
-
-    target = _write_target(ws, ctx, "TASKS.md")
-    block = _run(
-        ws,
-        {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
-        session_id=my_read_sid,
-    )
-    assert block is not None
-    assert "read" in str(block["reason"]).lower()
-
-
-# --------------------------------------------------------------------------- #
-# anon-session guard: no session id -> write ALLOWED, but no presence record created.
-# --------------------------------------------------------------------------- #
-
-
 def test_anon_session_write_allowed_but_creates_no_presence_record(tmp_path: Path) -> None:
     ws = _mk_workspace(tmp_path, "dadaia-workspace")
     ctx = "dadaia-workspace"

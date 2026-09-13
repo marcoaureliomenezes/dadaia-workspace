@@ -12,7 +12,7 @@ method: status is unreachable without its own required fields, refused with ever
 missing/invalid field named at once, the record left completely untouched on refusal.
 ``update --set status=...`` is REFUSED (the model itself refuses the key ``"status"``).
 ``update`` remains the seam for every OTHER governance/write-once field (the auditor's
-``audited``/``resolved_commit`` rewrite). ``archive`` moves terminal records older
+``audited`` rewrite). ``archive`` moves terminal records older
 than 90 days to ``specs/bugs/_archive/bugs_histo.jsonl``. Writes land under an
 ADDITIVE path (never concurrency-blocked).
 """
@@ -26,6 +26,7 @@ from pathlib import Path
 import typer
 
 from dadaia_workspace import container
+from dadaia_workspace.cli._governance_event import record_governance_event
 from dadaia_workspace.cli._specs_resolution import (
     repo_slug_for_context,
     resolve_context_for_cli,
@@ -103,7 +104,7 @@ def _now_iso() -> str:
     return datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _service(target: Path, *, with_archive: bool = False) -> BugService:
+def build_bug_service(target: Path, *, with_archive: bool = False) -> BugService:
     # ADR-0001: build_bug_archive_store had exactly one consumer (this module's
     # `dadaia bugs archive`) — the single consumer builds it directly instead of a
     # container seam. build_bug_record_store stays a container seam because
@@ -173,9 +174,9 @@ def bugs_append_cmd(
         raise typer.Exit(code=1)
 
     resolved_ts = ts or _now_iso()
-    service = _service(target)
+    service = build_bug_service(target)
     try:
-        service.register(
+        appended = service.register(
             bug_id=bug_id,
             ts=resolved_ts,
             reported_by=reported_by,
@@ -191,6 +192,7 @@ def bugs_append_cmd(
     except ValueError as exc:
         typer.echo(f"[error] {exc}", err=True)
         raise typer.Exit(code=1) from exc
+    _record_event("append", appended, target)
     typer.echo(f"[ok] registered {bug_id} -> {target}")
 
 
@@ -205,7 +207,7 @@ def bugs_status_cmd(
 ) -> None:
     """List folded bug records (open by default), one ``id`` per line."""
     target = _target(specs_dir)
-    service = _service(target)
+    service = build_bug_service(target)
     records = service.status(include_closed=include_closed)
     for record in records:
         severity = record.severity or "-"
@@ -222,7 +224,7 @@ def bugs_stats_cmd(
 ) -> None:
     """Print aggregate bug counts by status and by severity."""
     target = _target(specs_dir)
-    service = _service(target)
+    service = build_bug_service(target)
     stats = service.stats()
     typer.echo(f"total\t{stats.total}")
     for status, count in sorted(stats.by_status.items()):
@@ -258,7 +260,7 @@ def bugs_update_cmd(
     ),
 ) -> None:
     """The one governance-write seam for every governance/write-once field OTHER than
-    ``status`` — the auditor's ``audited``/``resolved_commit`` rewrite and any other
+    ``status`` — the auditor's ``audited`` rewrite and any other
     non-status governance write go through this verb. No content validation is added
     beyond the seam's own structural refusals (immutable-core changed, write-once
     field re-set with a differing value) — a refuse-stale race is reported as a
@@ -267,10 +269,12 @@ def bugs_update_cmd(
     ``--set status=...`` is REFUSED — the model itself refuses the key ``"status"``
     (:meth:`~dadaia_workspace.core.models.bugs.BugRecord.apply_governance_update`),
     naming the matching transition command instead
-    (``dadaia bugs resolve|supersede|defer|reject``)."""
+    (``dadaia bugs resolve|supersede|defer|reject``). ``--set caused_by=...`` is
+    REFUSED too (0.4.7 FR1): lineage has ONE writer, ``dadaia bugs resolve
+    --caused-by``, which is the only place it is validated against the ledger."""
     target = _target(specs_dir)
     changes: Mapping[str, str] = _parse_set_options(set_)
-    service = _service(target)
+    service = build_bug_service(target)
     try:
         updated = service.apply_update(bug_id, changes)
     except (
@@ -280,11 +284,29 @@ def bugs_update_cmd(
     ) as exc:
         typer.echo(f"[error] {exc}", err=True)
         raise typer.Exit(code=1) from exc
+    _record_event("update", updated, target)
     typer.echo(f"[ok] updated {', '.join(sorted(changes))} for {updated.id}")
 
 
+def _record_event(verb: str, record: BugRecord, target: Path) -> None:
+    """One verb, one governance event over the record it just wrote (0.4.7 FR2) — the
+    ONE call site shape every bugs verb uses. *target* is the ledger tree the verb
+    resolved, the event's only source of context."""
+    record_governance_event(
+        verb=verb,
+        ledger="bugs",
+        record_id=record.id,
+        record=record.to_dict(),
+        specs_dir=target,
+    )
+
+
 def _run_transition(
-    target: Path, bug_id: str, method: Callable[..., BugRecord], fields: Mapping[str, str | None]
+    target: Path,
+    bug_id: str,
+    verb: str,
+    method: Callable[..., BugRecord],
+    fields: Mapping[str, str | None],
 ) -> None:
     """Shared body for the four transition commands below — *method* is the unbound
     :class:`~dadaia_workspace.core.models.bugs.BugRecord` transition method
@@ -292,13 +314,14 @@ def _run_transition(
     the caller (D7/D8, never a second verb->method mapping). Every option is threaded
     through as-is (``None`` when the operator omitted it), so the model's own
     transition method is the ONE place "what's required" is decided."""
-    service = _service(target)
+    service = build_bug_service(target)
     present = {key: value for key, value in fields.items() if value is not None}
     try:
         updated = service.transition(bug_id, method, **present)
     except (RecordNotFoundError, StaleRecordWriteError, ValueError) as exc:
         typer.echo(f"[error] {exc}", err=True)
         raise typer.Exit(code=1) from exc
+    _record_event(verb, updated, target)
     typer.echo(f"[ok] {updated.status} {updated.id}")
 
 
@@ -324,10 +347,10 @@ def bugs_resolve_cmd(
     evidence_diff: str | None = typer.Option(
         None,
         "--evidence-diff",
-        help="'net-negative|net-positive|net-neutral: <rationale>'.",
-    ),
-    diff_direction: str | None = typer.Option(
-        None, "--diff-direction", help="net-negative|net-neutral|net-positive."
+        help=(
+            "'net-negative|net-positive|net-neutral: <rationale>' — the record's "
+            "diff_direction is derived from this prefix; there is no separate flag."
+        ),
     ),
     specs_dir: str | None = typer.Option(
         None, "--specs-dir", help="Path to specs/ directory. Default: bound context session."
@@ -342,6 +365,7 @@ def bugs_resolve_cmd(
     _run_transition(
         target,
         bug_id,
+        "resolve",
         BugRecord.resolve,
         {
             "cause": cause,
@@ -351,7 +375,6 @@ def bugs_resolve_cmd(
             "evidence_loop": evidence_loop,
             "evidence_seam": evidence_seam,
             "evidence_diff": evidence_diff,
-            "diff_direction": diff_direction,
         },
     )
 
@@ -368,7 +391,7 @@ def bugs_supersede_cmd(
 ) -> None:
     """The ONE way a record reaches ``status="superseded"`` — ``--by`` is REQUIRED."""
     target = _target(specs_dir)
-    _run_transition(target, bug_id, BugRecord.supersede, {"by": by})
+    _run_transition(target, bug_id, "supersede", BugRecord.supersede, {"by": by})
 
 
 @bugs_app.command("defer")
@@ -382,7 +405,7 @@ def bugs_defer_cmd(
     """The ONE way a record reaches ``status="deferred"`` — ``--reason`` is
     REQUIRED."""
     target = _target(specs_dir)
-    _run_transition(target, bug_id, BugRecord.defer, {"reason": reason})
+    _run_transition(target, bug_id, "defer", BugRecord.defer, {"reason": reason})
 
 
 @bugs_app.command("reject")
@@ -396,7 +419,7 @@ def bugs_reject_cmd(
     """The ONE way a record reaches ``status="rejected"`` — ``--reason`` is
     REQUIRED."""
     target = _target(specs_dir)
-    _run_transition(target, bug_id, BugRecord.reject, {"reason": reason})
+    _run_transition(target, bug_id, "reject", BugRecord.reject, {"reason": reason})
 
 
 @bugs_app.command("archive")
@@ -418,6 +441,8 @@ def bugs_archive_cmd(
     Idempotent: a second run with nothing newly eligible is a byte-identical no-op."""
     target = _target(specs_dir)
     parsed_now = datetime.fromisoformat(now.replace("Z", "+00:00")) if now else None
-    service = _service(target, with_archive=True)
+    service = build_bug_service(target, with_archive=True)
     result = service.archive(now=parsed_now, threshold_days=threshold_days)
+    for moved in result.records:
+        _record_event("archive", moved, target)
     typer.echo(f"[ok] archived {result.archived} record(s), {result.kept} kept.")

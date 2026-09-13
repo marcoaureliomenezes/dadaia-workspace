@@ -20,6 +20,7 @@ from dadaia_workspace.core.models.spec_context import ContextState
 from dadaia_workspace.features.spec_context.service import SpecContextService
 from dadaia_workspace.features.specs.canon import scaffold as canon_scaffold
 from tests.fakes import FakeContextStore, FakeGitClient
+from tests.helpers.privacy_fixtures import aws_key_shape, internal_host, private_ip
 
 
 @pytest.fixture()
@@ -208,17 +209,15 @@ def test_dead_with_commit_and_clean_untracked_passes(
             # push. The value is never echoed back in the exception message.
             "planted_secret",
             "config.env",
-            lambda repo: (repo / "config.env").write_text(
-                "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n"
-            ),
-            "AKIAIOSFODNN7EXAMPLE",
+            lambda repo: (repo / "config.env").write_text(f"AWS_ACCESS_KEY_ID={aws_key_shape()}\n"),
+            aws_key_shape(),
         ),
         (
             # A planted private IP / internal hostname also blocks --commit push.
             "planted_private_ip",
             "hosts.txt",
             lambda repo: (repo / "hosts.txt").write_text(
-                "db host: 10.4.2.17 (db-primary.internal)\n"
+                f"db host: {private_ip()} ({internal_host('db-primary')})\n"
             ),
             None,
         ),

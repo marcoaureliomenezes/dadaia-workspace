@@ -14,9 +14,9 @@ History lives in each release's `_RELEASE.json` `log` entries and under `_archiv
 | Write/edit any atom | `product-engineer` only, in `DEFINITION` or `CLOSURE` phase |
 | Edit by any other agent | never, in any phase |
 
-- The SDD gate deterministically enforces only the phase half (`specs/memory/**` = MEMORY path class).
-- The who half — `product-engineer` as sole author — is agent discipline, not gate-enforced.
-- See `constitution.md §13` for the discipline statement.
+- The SDD gate enforces neither half: `specs/memory/**` is MUTATING, writable in every phase.
+- Both halves — the phase and `product-engineer` as sole author — are agent discipline, measured by the audit's memory pillar.
+- Discipline statement: `DADAIA.md` §6.4.
 - Stale memory found mid-implementation becomes a bug or a closure note — never patch it in place outside the allowed phases.
 
 ## 2. The two tiers
@@ -81,9 +81,9 @@ dadaia memory catalog generate
 
 ## 4. Atom format
 
-- YAML frontmatter validated against `memory-frontmatter-v1`; all 6 fields required: `slug`, `title`, `category`, `tldr`, `summary`, `tags`.
+- YAML frontmatter validated against `memory-frontmatter-v1`; all 5 fields required: `slug`, `title`, `tldr`, `summary`, `tags`.
 - `additionalProperties: false` makes any stray field a hard error.
-- `agent_tier` is rejected by the schema (deprecated v0.1.53, schema-dropped v0.1.61) — do not include it.
+- `agent_tier` is rejected by the schema — do not include it.
 - The catalog computes atom size from its body — no stored size field belongs in frontmatter.
 - Body uses curated headings only — the `lint-memory-atoms` allowlist governs which h2 sections are valid.
 - In the trio those are exactly the two Part headings; every former section lives on as an `###` subsection.
@@ -94,11 +94,11 @@ dadaia memory catalog generate
 ## 5. Validation
 
 ```bash
-dadaia specs doctor
+dadaia doctor --context <ctx>
 ```
 
-- Doctor checks atom presence, the top-level trio, and catalog consistency.
+- The `specs` section checks atom presence, the top-level trio, and catalog consistency.
 - Fix findings at the source atom — never hand-edit `catalog.json` to silence a check, regenerate it instead.
 
-Generated from `dadaia_workspace/public/data/memory-AGENTS.md`.
-Project teams may customize this file; `dadaia specs doctor` reports drift instead of overwriting it.
+Generated from `dadaia_workspace/public/scaffold/memory/AGENTS.md`.
+Project teams may customize this file; `dadaia doctor` reports drift instead of overwriting it.

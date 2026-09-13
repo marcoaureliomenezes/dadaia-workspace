@@ -36,7 +36,7 @@ def build_capabilities() -> dict[str, Any]:
             "status_tokens": sorted(CANONICAL_STATUS),
             "commands": [
                 "dadaia specs init",
-                "dadaia specs doctor --json",
+                "dadaia doctor --json",
                 "dadaia specs upgrade",
             ],
         },

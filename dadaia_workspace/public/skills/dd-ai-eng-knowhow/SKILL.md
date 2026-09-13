@@ -27,9 +27,10 @@ description: >
   deltas (persona serialization, constitution shape, hook firing, skill discovery,
   subagent spawn, config-layer trust) are compiled in
   [`CLAUDE-CODE.md`](CLAUDE-CODE.md) and [`CODEX.md`](CODEX.md).
-- Gate order: root-whitelist → venv-guard → SDD gate, first-block-wins; git
-  chokepoints (pre-commit WARN-only, pre-push verdict gate) run independently of any
-  harness hook.
+- Gate order: root-whitelist → venv-guard → SDD gate, first-block-wins; three blocks
+  total (a new root entry, a non-venv `dadaia`/`pip`, a PROTECTED or out-of-scope
+  write), each carrying one `fix:` line; git chokepoints (pre-commit WARN-only,
+  pre-push verdict gate) run independently of any harness hook.
 
 ## 3. Editing an AI-entity file
 

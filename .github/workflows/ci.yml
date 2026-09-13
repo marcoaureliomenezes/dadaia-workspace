@@ -55,8 +55,6 @@ jobs:
       PYTHONIOENCODING: "utf-8"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          fetch-depth: 0  # full history: provenance derivation (registration/resolved commits) needs it
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
@@ -73,8 +71,6 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          fetch-depth: 0  # full history: provenance derivation (registration/resolved commits) needs it
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
@@ -107,8 +103,6 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          fetch-depth: 0  # full history: provenance derivation (registration/resolved commits) needs it
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
@@ -126,7 +120,8 @@ jobs:
         run: poetry install --no-interaction --no-ansi --with dev
       - name: mypy --strict
         # Redirect mypy's cache outside the checkout (pyproject cache_dir removed in T-018-07).
-        run: MYPY_CACHE_DIR="$RUNNER_TEMP/mypy" poetry run mypy --strict dadaia_workspace/
+        # 0.4.7 FR3: the cache is redirected by [tool.mypy] cache_dir in pyproject.toml.
+        run: poetry run mypy --strict dadaia_workspace/
 
   unit-fast:
     name: Unit fast (pytest)
@@ -134,8 +129,6 @@ jobs:
     timeout-minutes: 2
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          fetch-depth: 0  # full history: provenance derivation (registration/resolved commits) needs it
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
@@ -160,8 +153,6 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          fetch-depth: 0  # full history: provenance derivation (registration/resolved commits) needs it
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
@@ -203,8 +194,6 @@ jobs:
       PYTHONIOENCODING: "utf-8"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          fetch-depth: 0  # full history: provenance derivation (registration/resolved commits) needs it
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
@@ -228,8 +217,6 @@ jobs:
       PYTHONIOENCODING: "utf-8"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          fetch-depth: 0  # full history: provenance derivation (registration/resolved commits) needs it
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
@@ -250,8 +237,6 @@ jobs:
     timeout-minutes: 6
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          fetch-depth: 0  # full history: provenance derivation (registration/resolved commits) needs it
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
@@ -277,8 +262,6 @@ jobs:
     timeout-minutes: 6
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          fetch-depth: 0  # full history: provenance derivation (registration/resolved commits) needs it
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
@@ -303,8 +286,6 @@ jobs:
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          fetch-depth: 0  # full history: provenance derivation (registration/resolved commits) needs it
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
@@ -417,8 +398,6 @@ jobs:
     timeout-minutes: 2
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          fetch-depth: 0  # full history: provenance derivation (registration/resolved commits) needs it
       - name: Validate PR title
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
@@ -434,31 +413,32 @@ jobs:
     timeout-minutes: 2
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          fetch-depth: 0  # full history: provenance derivation (registration/resolved commits) needs it
       - name: Fail if projection or runtime files are git-tracked
         run: bash .github/scripts/check_no_repo_local_claude.sh
 
-  backlog-doctor:
-    name: Backlog consistency (BL-SCHEMA/DUP/CONFLICT/STALE)
+  doctor:
+    name: Compliance (workspace/specs/ledgers sections)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        # Full history: SPEC-DOC-044's liveness set is the head, its parents and each
+        # merged line's first parent (features.chokepoints.verdict.live_verdict_shas);
+        # a depth-1 checkout hides a merge commit's parents and calls the verdict the
+        # merge just consumed stale — the same reason the verdict-gate job fetches depth 0.
         with:
-          fetch-depth: 0  # full history: provenance derivation (registration/resolved commits) needs it
+          fetch-depth: 0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
       - name: Install package
         run: pip install -e .
-      # Runs backlog doctor over the checked-out tree (v0.1.25 R1, ADR-D). A clean backlog
-      # exits 0; a planted BL-SCHEMA/DUP/CONFLICT/STALE violation fails the job.
-      # specs/backlog/BACKLOG.md (the single source, SPEC v0.12.0 FR1/ADR #14) is
-      # committed repository truth (.gitignore:133-142 opts *.md back in) — the check
-      # runs over the real tracked document; an absent one is trivially clean.
-      - name: dadaia backlog doctor
-        run: dadaia backlog doctor --specs-dir specs --source-root .
+      # Runs the ONE doctor over the checked-out tree (0.4.7 FR5; was `backlog doctor`,
+      # v0.1.25 R1/ADR-D). Its `ledgers` section carries BL-SCHEMA/CONFLICT/STALE and its
+      # `specs` section the SPEC-DOC + RELEASE-TREE rules over committed repository truth;
+      # any error-class finding fails the job. An absent document is trivially clean.
+      - name: dadaia doctor
+        run: dadaia doctor --specs-dir specs --source-root .
 
   pr-source-guard:
     name: PR source guard (both gitflow v2 edges, one job)
@@ -567,8 +547,6 @@ jobs:
     timeout-minutes: 2
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          fetch-depth: 0  # full history: provenance derivation (registration/resolved commits) needs it
       - name: Check qa-engineer + security-reviewer verdicts
         env:
           # Passed via workflow_dispatch inputs; empty on push/PR runs.

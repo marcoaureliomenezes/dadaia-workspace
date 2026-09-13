@@ -3,9 +3,8 @@
 Leaf module (stdlib only): the memory tree's shape facts were multiplied across
 ``canon.py`` (CanonEntry rows), ``doctor_structural.py`` (TREE-3 list),
 ``doctor_memory.py`` (top-level trio + forbidden-heading regex + wikilink regex),
-``memory_lint.py`` (already-divergent exact-match heading frozenset + slug→file map +
-wikilink regex) and ``catalog.py`` (wikilink regex). Every consumer now imports these
-objects; a re-typed copy is the duplicated-decider class the bug ledger's fix-induced
+``memory_lint.py`` (already-divergent exact-match heading frozenset + wikilink
+regex) and ``catalog.py`` (wikilink regex). Every consumer now imports these objects; a re-typed copy is the duplicated-decider class the bug ledger's fix-induced
 chains grew from.
 """
 
@@ -19,17 +18,14 @@ from dadaia_workspace.core.fixed_sections import (
     extract_fixed_section,
     render_fixed_section,
 )
-
-#: Memory slug → canonical top-level filename (the three ADR-gated Part-1/Part-2 docs).
-#: The ONE table; the file tuples below are derived views, never hand-kept copies.
-MEMORY_SINGLE_FILE_SLUGS: dict[str, str] = {
-    "architecture": "ARCHITECTURE.md",
-    "tech-stack": "TECHSTACK.md",
-    "quality-assurance": "QUALITY.md",
-}
+from dadaia_workspace.core.workspace_layout import (
+    MEMORY_TOPLEVEL_FILES as _MEMORY_TOPLEVEL_FILES,
+)
 
 #: Top-level memory files (.md canonical source; v6 canon FR1/A1.5/A1.6, T-050-06).
-MEMORY_TOPLEVEL_FILES: tuple[str, ...] = tuple(MEMORY_SINGLE_FILE_SLUGS.values())
+#: Re-exported from the one canonical-name registry (0.4.7 FR5) — the canon rows that
+#: admit these three files are built from the SAME tuple.
+MEMORY_TOPLEVEL_FILES = _MEMORY_TOPLEVEL_FILES
 
 #: Memory files that must exist (TREE-3): the top-level trio plus the product index.
 MEMORY_REQUIRED_FILES: tuple[str, ...] = (*MEMORY_TOPLEVEL_FILES, "product/index.md")
@@ -53,7 +49,6 @@ __all__ = [
     "FIXED_SECTION_BY_PATH",
     "FORBIDDEN_MEMORY_HEADING_RE",
     "MEMORY_REQUIRED_FILES",
-    "MEMORY_SINGLE_FILE_SLUGS",
     "MEMORY_TOPLEVEL_FILES",
     "WIKILINK_RE",
     "extract_fixed_section",

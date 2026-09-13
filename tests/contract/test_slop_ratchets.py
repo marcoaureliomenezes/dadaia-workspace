@@ -1,6 +1,6 @@
-"""Intent: CONTRACT — 0.4.6 AC7 (V32, V33, V34); size: SMALL (contract).
+"""Intent: CONTRACT — V32, V33, V34, V35; size: SMALL (contract).
 
-Three repo-pure slop ratchets: measured at birth, pinned, ratcheting down only; every
+Four repo-pure slop ratchets: measured at birth, pinned, ratcheting down only; every
 tree walk goes through the one tracked-files enumeration the other ratchets use.
 """
 
@@ -230,3 +230,49 @@ def test_v34_live_candidate_trio_bytes_under_the_fixed_ceiling() -> None:
     assert _byte_ceiling_violations({"SPEC.md": 24 * 1024 + 1, "TASKS.md": 12 * 1024}) == [
         "SPEC.md: 24577 B > 24576 B"
     ]
+
+
+# ---------------------------------------------------------------------------
+# V35 — the skill corpus: directories and total Markdown lines
+# ---------------------------------------------------------------------------
+
+# RECORDED PINS (ratchet DOWN ONLY) — measured on the post-candidate corpus: every
+# tracked `*.md` under dadaia_workspace/public/skills/. Re-pinned at every closure that
+# touches the corpus, downward only; raising either is never a ratchet move.
+_V35_DIR_CEILING = 18
+_V35_LINE_CEILING = 2916
+
+
+def _skill_corpus_markdown() -> list[Path]:
+    return [
+        path
+        for path in tracked_test_files(_REPO_ROOT, "*.md", tree="dadaia_workspace")
+        if "public/skills/" in path.as_posix()
+    ]
+
+
+def _skill_corpus_lines(paths: Iterable[Path]) -> int:
+    return sum(len(path.read_text(encoding="utf-8").splitlines()) for path in paths)
+
+
+def test_v35_skill_corpus_is_pinned() -> None:
+    """V35 — at most 18 skill directories and 2,917 total lines of skill Markdown.
+    A rule lives in one home: a growing corpus is a rule restated, not a rule added."""
+    corpus = _skill_corpus_markdown()
+    dirs = {
+        path.relative_to(_REPO_ROOT / "dadaia_workspace" / "public" / "skills").parts[0]
+        for path in corpus
+    }
+    assert len(dirs) <= _V35_DIR_CEILING, (
+        f"skill directories grew to {len(dirs)} (ceiling {_V35_DIR_CEILING}). A new "
+        "skill earns its dir by deleting another's material, never by restating it."
+    )
+    total = _skill_corpus_lines(corpus)
+    assert total <= _V35_LINE_CEILING, (
+        f"skill Markdown grew to {total} lines (ceiling {_V35_LINE_CEILING}). Find the "
+        "statement's other home and delete the copy — never raise the ceiling."
+    )
+
+    # Mutation fixture — the counter reads real files, and an empty set counts 0.
+    assert _skill_corpus_lines([]) == 0
+    assert _skill_corpus_lines([_THIS_FILE]) > 0

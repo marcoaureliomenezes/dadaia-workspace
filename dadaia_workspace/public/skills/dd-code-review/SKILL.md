@@ -17,7 +17,7 @@ axes are reported side by side — an axis never outranks another.
 
 ## 1. When
 
-- Reviewing a PR, branch or commit range before the pre-PR checkpoint.
+- Reviewing a PR, branch or commit range before the candidate's PR.
 - A qa-engineer or software-architect verdict needs the Bug-surface axis.
 
 ## 2. Axis 1 — Standards

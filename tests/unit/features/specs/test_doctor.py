@@ -30,7 +30,6 @@ MINIMAL_MEMORY_PRODUCT_INDEX_MD = """\
 ---
 slug: index
 title: Product Index
-category: product
 tldr: 'Product catalog entry point.'
 summary: 'Product catalog entry point.'
 tags: []
@@ -47,7 +46,6 @@ MINIMAL_MEMORY_PRODUCT_FEATURE_MD = """\
 ---
 slug: feature-a
 title: Feature A
-category: product
 tldr: 'Does A.'
 summary: 'Does A.'
 tags: []
@@ -64,7 +62,6 @@ MINIMAL_MEMORY_ARCHITECTURE_MD = """\
 ---
 slug: architecture
 title: Architecture Memory
-category: core
 tldr: 'System architecture layers.'
 summary: 'System architecture layers and dependency contracts.'
 tags: []
@@ -81,7 +78,6 @@ MINIMAL_MEMORY_TECH_STACK_MD = """\
 ---
 slug: tech-stack
 title: Tech Stack Memory
-category: core
 tldr: 'Technology stack.'
 summary: 'Technology stack and approved dependencies.'
 tags: []
@@ -123,7 +119,6 @@ def _write_release_jsonl(specs: Path, release_id: str, phase: str) -> None:
         "defined": None,
         "implemented": None,
         "shipped": None,
-        "audited": None,
         "log": [],
     }
     (rdir / "RELEASE.json").write_text(_json.dumps(state) + "\n", encoding="utf-8")
@@ -150,7 +145,7 @@ def _make_clean_specs_tree(root: Path, release_id: str = "1.2.3") -> Path:
     )
     (specs / "memory" / "TECHSTACK.md").write_text(MINIMAL_MEMORY_TECH_STACK_MD, encoding="utf-8")
     (specs / "memory" / "QUALITY.md").write_text(
-        "---\nslug: quality-assurance\ntitle: Quality Assurance\ncategory: core\n"
+        "---\nslug: quality-assurance\ntitle: Quality Assurance\n"
         "tldr: 'QA standards.'\nsummary: 'QA standards and anti-slop rules.'\n"
         "tags: []\nagent_tier: self-pull\ntoken_estimate: 20\n"
         "---\n\n## Standards\n\nQA standards.\n",
@@ -207,7 +202,6 @@ def _write_feature_md(product_dir: Path, slug: str) -> None:
 ---
 slug: {slug}
 title: {slug}
-category: product
 tldr: 'Does {slug}.'
 summary: 'Does {slug}.'
 tags: []
@@ -353,7 +347,7 @@ def test_scaffold_copytree_source_tree_carries_agents_md_per_area(tmp_path: Path
             lambda specs: (specs / "releases" / "1.2.3" / "RELEASE.json").write_text(
                 '{"schema":"release-state-v1","release":"1.2.3","phase":"",'
                 '"rc":null,"defined":null,"implemented":null,"shipped":null,'
-                '"audited":null,"log":[]}\n',
+                '"log":[]}\n',
                 encoding="utf-8",
             ),
             "SPEC-DOC-003",
@@ -362,8 +356,8 @@ def test_scaffold_copytree_source_tree_carries_agents_md_per_area(tmp_path: Path
         pytest.param(
             "missing-plan-in-active-release",
             lambda specs: (specs / "releases" / "1.2.3" / "PLAN.md").unlink(),
-            "SPEC-DOC-004",
-            id="doc004-missing-plan",
+            "RELEASE-TREE-TRIO",
+            id="trio-missing-plan",
         ),
         pytest.param(
             "non-canonical-status",
@@ -448,7 +442,7 @@ def test_sad_matrix(tmp_path: Path, case: str, mutate, expected_code: str) -> No
             lambda specs: (
                 (specs / "memory" / "product" / "sdd").mkdir(parents=True, exist_ok=True),
                 (specs / "memory" / "product" / "sdd" / "specs-doctor.md").write_text(
-                    "---\nslug: specs-doctor\ntitle: Specs Doctor\ncategory: product\n"
+                    "---\nslug: specs-doctor\ntitle: Specs Doctor\n"
                     "tldr: 'Doctor checks.'\nsummary: 'Doctor structural checks.'\ntags: []\n"
                     "agent_tier: self-pull\ntoken_estimate: 100\n"
                     "---\n\n## Propósito\n\nValidates specs.\n",
@@ -577,32 +571,20 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
     tree5_ok = [i for i in doctor_ok.check() if i.code == "TREE-5"]
     assert tree5_ok == []
 
-    # TREE-5M: absence emits WARNING (never ERROR) with the real-repair remediation
-    # text; presence suppresses it entirely.
-    specs_5m_absent = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree5m-absent"))
-    memory_agents = specs_5m_absent / "memory" / "AGENTS.md"
+    # TREE-5, memory area (0.4.7 FR6): absence emits WARNING (never ERROR) naming the
+    # scaffold source to copy in — the check TREE-5M owned before the fold.
+    specs_mem_absent = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-mem-absent"))
+    memory_agents = specs_mem_absent / "memory" / "AGENTS.md"
     if memory_agents.exists():
         memory_agents.unlink()
-    issues_5m = SpecsDoctor(specs_5m_absent).check()
-    tree5m = [i for i in issues_5m if i.code == "TREE-5M"]
-    assert tree5m and tree5m[0].severity == Severity.WARNING and not tree5m[0].fixable
-    description = tree5m[0].description
-    assert "public/data/memory-AGENTS.md" in description
-    assert "does NOT project" in description
-    assert "Project it by running" not in description
-    errors_5m = [i for i in issues_5m if i.severity == Severity.ERROR]
-    assert errors_5m == []
-
-    specs_5m_present = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree5m-present"))
-    (specs_5m_present / "memory" / "AGENTS.md").write_text(
-        "# Memory Ownership Contract\n\nWrite-locked to product-engineer during CLOSURE.\n",
-        encoding="utf-8",
-    )
-    tree5m_present = [i for i in SpecsDoctor(specs_5m_present).check() if i.code == "TREE-5M"]
-    assert tree5m_present == []
+    issues_mem = SpecsDoctor(specs_mem_absent, public_dir=_PUBLIC_DIR).check()
+    tree5_mem = [i for i in issues_mem if i.code == "TREE-5" and "memory" in (i.path or "")]
+    assert tree5_mem and tree5_mem[0].severity == Severity.WARNING and not tree5_mem[0].fixable
+    assert "public/scaffold/memory/AGENTS.md" in tree5_mem[0].description
+    assert [i for i in issues_mem if i.severity == Severity.ERROR] == []
 
     # TREE-6 retired (0.5.3 T-053-04, F005): missing-artifact coverage lives in
-    # SPEC-DOC-004 — see test_one_defect_one_code_missing_active_artifact.
+    # RELEASE-TREE-TRIO — see test_one_defect_one_code_missing_active_artifact.
 
     # TREE-7: bug missing session_id is never auto-repaired; session_id: null passes.
     specs7 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree7"))
@@ -640,16 +622,13 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    ("created", "expected_severity"),
-    [
-        pytest.param("2026-06-01", Severity.ERROR, id="oversized-plan-after-cutoff-error"),
-        pytest.param("2026-04-01", Severity.WARNING, id="oversized-plan-before-cutoff-warning"),
-    ],
-)
-def test_doc005_plan_line_limit_cutoff_boundary(
-    tmp_path: Path, created: str, expected_severity: Severity
+@pytest.mark.parametrize("created", ["2026-06-01", "2026-04-01"])
+def test_doc005_oversized_plan_warns_whatever_the_spec_creation_date(
+    tmp_path: Path, created: str
 ) -> None:
+    """0.4.7 c2: an over-long PLAN is SPLIT — judgment, with no command to hand back, so
+    the finding can never be error-class (which would exit 1 with no fix). The date-based
+    hard-limit cutoff that used to raise it to ERROR is gone with the constant."""
     specs = _make_clean_specs_tree(tmp_path)
     big = "# Plan\n\n> **Status:** Aprovado\n\n" + "\n".join(f"- line {i}" for i in range(400))
     (specs / "releases" / "1.2.3" / "PLAN.md").write_text(big, encoding="utf-8")
@@ -658,7 +637,7 @@ def test_doc005_plan_line_limit_cutoff_boundary(
     )
     issues = SpecsDoctor(specs).check()
     doc5 = [i for i in issues if i.code == "SPEC-DOC-005"]
-    assert doc5 and doc5[0].severity == expected_severity
+    assert doc5 and doc5[0].severity is Severity.WARNING
 
 
 def test_doc012_retired_never_fires_on_a_planted_candidates_md(tmp_path: Path) -> None:
@@ -798,7 +777,7 @@ def test_cat1_sync_matrix(tmp_path: Path) -> None:
     subdir_g = product_dir_g / "philosophy"
     subdir_g.mkdir(parents=True, exist_ok=True)
     (subdir_g / "product-vision.md").write_text(
-        "---\nslug: product-vision\ntitle: Product Vision\ncategory: product\n"
+        "---\nslug: product-vision\ntitle: Product Vision\n"
         "tldr: 'Vision.'\nsummary: 'Vision summary.'\ntags: []\nagent_tier: self-pull\n"
         "token_estimate: 100\n---\n\n"
         "## Vision\n\nThe vision.\n",
@@ -831,16 +810,21 @@ def test_doc016_and_doc027_remedies_name_the_mintable_bare_axis(tmp_path: Path) 
 def test_one_defect_one_code_missing_active_artifact(tmp_path: Path) -> None:
     """F005 (20260830 audit): TREE-6 and SPEC-DOC-004 were ONE rule kept as two
     implementations (the segment-router-silent-skip bug had to be fixed twice, one
-    ~20-line block per file). One defect now yields ONE code: SPEC-DOC-004.
-    Intent: contract; size: unit."""
+    ~20-line block per file). 0.4.7 T-047-07 found the SAME duplication a third time —
+    SPEC-DOC-004 re-reported the trio presence RELEASE-TREE-TRIO already owns, and that
+    duplicate is what forced the between-candidates phase carve-out the doctor carried.
+    One defect now yields ONE code: RELEASE-TREE-TRIO. Intent: contract; size: unit."""
     specs = _make_clean_specs_tree(tmp_path)
     plan = specs / "releases" / "1.2.3" / "PLAN.md"
     plan.unlink()
     doctor = SpecsDoctor(specs, templates_dir=_TEMPLATES_DIR)
     issues = doctor.check()
-    doc004 = [i for i in issues if i.code == "SPEC-DOC-004" and "PLAN.md" in i.description]
-    assert doc004 and doc004[0].severity == Severity.ERROR
+    trio = [i for i in issues if i.code == "RELEASE-TREE-TRIO" and "PLAN.md" in i.description]
+    assert trio and trio[0].severity == Severity.ERROR
     assert "TREE-6" not in _codes(issues)
+    assert not [i for i in issues if i.code == "SPEC-DOC-004"], (
+        "trio presence has ONE home; SPEC-DOC-004 judges the `**Status:**` line only"
+    )
     doctor.fix(issues)
     assert not plan.exists(), "a missing SDD artifact must never be auto-created"
 

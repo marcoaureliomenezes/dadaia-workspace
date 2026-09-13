@@ -31,6 +31,13 @@ completed agent task; the HTML report is the exception, not the rule.
 **Done when** the handoff file exists at that exact path shape, `dadaia reports
 validate` exits 0, and (report mode) `artifact.content_hash` matches the file on disk.
 
+## The bug proposal
+
+- With no operator present, a suspected bug leaves the session as one ordinary
+  finding, never a `BUGS.jsonl` record (`dd-bug-registration`).
+- `message` starts `bug-proposal:` and names the contract line violated;
+  `fix_recommendation` is the exact `dadaia bugs append …` line the operator runs.
+
 ## Consuming (ack-on-consume)
 
 After reading and acting on a coordination handoff addressed to you:

@@ -56,10 +56,12 @@ and fault-injection tests that monkeypatch a production internal without simulat
 
 from __future__ import annotations
 
+import functools
 import json
 import os
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
@@ -253,7 +255,22 @@ def _base_env() -> dict[str, str]:
     env = dict(os.environ)
     for key in _FORBIDDEN_HOOK_ENV:
         env.pop(key, None)
+    env["HOME"] = str(session_home())
     return env
+
+
+@functools.lru_cache(maxsize=1)
+def session_home() -> Path:
+    """The tmp ``HOME`` every test subprocess spawned through this module inherits.
+
+    A child process cannot see the in-process telemetry seam
+    (``container.telemetry_state_dir`` routed by ``tests/conftest.py``): it resolves
+    ``Path.home()`` itself. Inheriting the operator's ``HOME`` is how governance-verb
+    subprocesses wrote synthetic events into the operator's real
+    ``~/.dadaia/state/telemetry/telemetry.sqlite``. This is the same guard at the
+    process boundary, in the ONE env builder every test subprocess goes through.
+    """
+    return Path(tempfile.mkdtemp(prefix="dadaia-test-home-"))
 
 
 def _harness_env(

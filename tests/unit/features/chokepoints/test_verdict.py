@@ -202,13 +202,20 @@ def test_no_specs_tree_yields_no_candidates(tmp_path: Path) -> None:
 
 
 class _FakeShaSource:
-    def __init__(self, parent: str | None = None, refs: dict[str, str] | None = None) -> None:
-        self._parent = parent
+    def __init__(
+        self,
+        parent: str | None = None,
+        refs: dict[str, str] | None = None,
+        parents_by_sha: dict[str, tuple[str, ...]] | None = None,
+    ) -> None:
+        self._parents = dict(parents_by_sha or {})
+        if parent is not None:
+            self._parents.setdefault(_SHA_HEAD, (parent,))
         self._refs = refs or {}
         self.ref_calls: list[str] = []
 
-    def first_parent(self, repo: Path, sha: str) -> str | None:
-        return self._parent if sha == _SHA_HEAD else None
+    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
+        return self._parents.get(sha, ())
 
     def resolve_ref(self, repo: Path, ref: str) -> str | None:
         self.ref_calls.append(ref)
@@ -225,6 +232,45 @@ def test_live_shas_drop_what_cannot_be_resolved(tmp_path: Path) -> None:
     """A root commit with no remote-tracking develop (a fresh clone, CI's shallow
     checkout): the set shrinks to the head — never a None, never a raise."""
     assert live_verdict_shas(_FakeShaSource(), tmp_path, _SHA_HEAD) == (_SHA_HEAD,)
+
+
+def test_live_shas_cover_the_verdict_a_merge_commit_just_consumed(tmp_path: Path) -> None:
+    """develop right after a feature -> develop merge (and main right after the ship
+    merge): the head is a merge commit whose SECOND parent is the feature head, and the
+    verdict that merge consumed names the feature head's first parent. It stays live
+    until the next merge deletes it — the integration branch is never red on evidence
+    it just consumed."""
+    merge, old_tip, feature_head, reviewed = "m" * 40, "o" * 40, "f" * 40, "r" * 40
+    source = _FakeShaSource(
+        refs={INTEGRATION_TIP_REF: merge},
+        parents_by_sha={merge: (old_tip, feature_head), feature_head: (reviewed,)},
+    )
+    assert live_verdict_shas(source, tmp_path, merge) == (merge, old_tip, feature_head, reviewed)
+
+
+def test_live_shas_follow_the_merged_line_along_both_gitflow_edges(tmp_path: Path) -> None:
+    """main right after the ship merge (and the ship PR's synthetic merge ref): the
+    merged line is develop's tip, itself the merge of the last feature PR. Both the
+    ship verdict (develop's pre-merge tip = the merged line's first parent) and the
+    PR-gate verdict that last feature merge consumed (one merged line deeper) are live;
+    a third edge does not exist, so nothing deeper is."""
+    ship, old_main, dev_tip, dev_prev, feat, reviewed, deeper = (c * 40 for c in "somdfrx")
+    source = _FakeShaSource(
+        refs={INTEGRATION_TIP_REF: dev_tip},
+        parents_by_sha={
+            ship: (old_main, dev_tip),
+            dev_tip: (dev_prev, feat),
+            feat: (reviewed,),
+            reviewed: (deeper,),
+        },
+    )
+    assert live_verdict_shas(source, tmp_path, ship) == (
+        ship,
+        old_main,
+        dev_tip,
+        dev_prev,
+        reviewed,
+    )
 
 
 def test_live_shas_dedupe_when_the_integration_tip_is_the_parent(tmp_path: Path) -> None:

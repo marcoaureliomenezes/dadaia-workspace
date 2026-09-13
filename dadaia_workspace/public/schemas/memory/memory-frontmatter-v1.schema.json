@@ -2,13 +2,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "memory-frontmatter-v1",
   "title": "Memory atom frontmatter (markdown source)",
-  "description": "Validates ONLY the YAML frontmatter block of a memory .md atom. The markdown body is intentionally NOT schema-validated — body shape is enforced by the curated-heading lint. additionalProperties:false makes stray metadata a hard author-time error.",
+  "description": "Validates ONLY the YAML frontmatter block of a memory .md atom. The markdown body is intentionally NOT schema-validated — body shape is enforced by the curated-heading lint. additionalProperties:false makes stray metadata a hard author-time error. Exactly five fields (0.4.7 FR9): `category` was a hand-kept grouping whose only reader dropped `tldr` outside `core` — the catalog now carries `tldr` for every atom, and `area` (the atom\u2019s directory) is the grouping that is derived rather than typed.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "slug",
     "title",
-    "category",
     "tldr",
     "summary",
     "tags"
@@ -16,22 +15,13 @@
   "properties": {
     "slug": {
       "type": "string",
-      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
-      "description": "Machine key; must equal the filename stem."
+      "pattern": "^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$",
+      "description": "Machine key; equals the filename stem, always — the ONE rule. Product atoms are lowercase-kebab; the three top-level docs are their uppercase stems (ARCHITECTURE, TECHSTACK, QUALITY). 0.4.7 FR9 deleted the alias table that mapped a lowercase slug onto an uppercase filename: a second slug-resolution mechanism, copied into three modules."
     },
     "title": {
       "type": "string",
       "minLength": 1,
       "description": "Human-readable atom title (used in catalog + panel)."
-    },
-    "category": {
-      "type": "string",
-      "enum": [
-        "core",
-        "product",
-        "ops"
-      ],
-      "description": "Catalog grouping."
     },
     "tldr": {
       "type": "string",

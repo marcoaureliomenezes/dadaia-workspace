@@ -3,7 +3,7 @@
 Disclosed depth behind `dd-gitflow-default`'s "CI/CD automation" pointer.
 Addressed to a consumer operator wiring this contract into their own CI/CD, not to the agent running the skill.
 
-Four checks turn the v2 branch contract from a convention into a machine boundary. Each maps to one row of the skill's mechanical table.
+Four checks turn the branch contract from a convention into a machine boundary. Each maps to one row of the skill's mechanical table.
 
 | Suggested check | Where it runs | What it refuses |
 |---|---|---|

@@ -38,15 +38,59 @@ _CORE_MODELS_DIR = _REPO_ROOT / "dadaia_workspace" / "core" / "models"
 #: plus ``diff_direction`` (A2.11) alongside ``root_cause``/``solution``/
 #: ``superseded_by``/``migration_note``.
 _WRITE_ONCE_FIELDS = (
-    "root_cause",
     "solution",
     "evidence_loop",
     "evidence_seam",
     "evidence_diff",
     "diff_direction",
     "superseded_by",
+)
+
+#: The seven derived-provenance keys 0.4.7 FR1 retired — a git-derived CACHE stored in
+#: the record. Every committed record carries them; ``from_dict`` ignores them and
+#: ``to_dict`` never emits them, so one read-write cycle strips a legacy line.
+_RETIRED_KEYS = (
+    "lineage_source",
+    "registration_commit",
+    "registration_granularity",
+    "resolved_commit",
+    "resolution_granularity",
+    "root_cause",
     "migration_note",
 )
+
+
+def test_from_dict_ignores_the_retired_provenance_keys_and_to_dict_never_emits_them() -> None:
+    """A legacy committed line loads, and re-serializing it is the whole migration
+    (0.4.7 FR1): the cache that needed a full git walk to derive leaves the record."""
+    legacy: dict[str, object] = {
+        "id": "legacy-bug",
+        "ts": "2026-08-27T12:00:00Z",
+        "reported_by": "software-engineer",
+        "title": "legacy bug",
+        "severity": "MEDIUM",
+        "surface": "bugs",
+        "component": "c",
+        "context": "dadaia-workspace",
+        "symptom": "s",
+        "repro": "r",
+        "expected": "e",
+        "status": "resolved",
+        "closed_at": "2026-09-01T00:00:00Z",
+        "cause": "the cause",
+        "caused_by": None,
+        "resolved_release": "0.4.6",
+        "audited": None,
+        **dict.fromkeys(_RETIRED_KEYS, "x" * 40),
+    }
+
+    record = BugRecord.from_dict(legacy)
+
+    assert record.id == "legacy-bug"
+    assert record.cause == "the cause"
+    for key in _RETIRED_KEYS:
+        assert not hasattr(record, key)
+    assert set(record.to_dict()) & set(_RETIRED_KEYS) == set()
 
 
 def _schema() -> dict[str, Any]:
@@ -227,52 +271,6 @@ def test_field_categories_documented_in_schema_match_dataclass_with_no_hand_kept
     )
 
 
-# --- A2.12 — surface enum, one source ------------------------------------------------
-
-
-def test_surface_enum_equals_on_disk_feature_packages() -> None:
-    """A2.12: the schema ``surface`` enum's FEATURE arm equals the
-    ``dadaia_workspace/features/<name>/`` packages on disk (glob, 23 at this fold —
-    v0.5.1 K4 retired the ``spec_artifacts`` package, folding its two writers into
-    ``features.specs.canon``; the enum lost the matching ``"spec_artifacts"`` member in
-    the same commit), plus the 7 fixed non-feature members (``core``/``infrastructure``/
-    ``cli``/``hooks``/``tests``/``public-assets``/``unknown``).
-
-    Compared against the ON-DISK package list, NOT ``setup.cfg``'s
-    ``[importlinter:contract:features-no-cross-feature]`` ``modules =`` list: that list
-    is 20 entries today (``capabilities``/``certification``/``reconcile``/``tmp_gc``
-    missing) and is completed to the full 23 by T-050-29 — asserting against it here
-    would go RED for a gap this task does not own. Once T-050-29 lands, a SEPARATE
-    assertion (there, not here) equates ``setup.cfg`` to this same on-disk list.
-    """
-    schema = _schema()
-    enum_values = set(schema["properties"]["surface"]["enum"])
-
-    features_dir = _REPO_ROOT / "dadaia_workspace" / "features"
-    on_disk_packages = {
-        p.name
-        for p in features_dir.iterdir()
-        if p.is_dir() and p.name != "__pycache__" and (p / "__init__.py").is_file()
-    }
-    assert (
-        len(on_disk_packages) == 19
-    )  # 0.4.6 T-046-26 (23 -> 21), T-046-28 (21 -> 20), T-046-25 reports pkg (20 -> 19)
-
-    non_feature_members = {
-        "core",
-        "infrastructure",
-        "cli",
-        "hooks",
-        "tests",
-        "public-assets",
-        "unknown",
-    }
-    assert enum_values == on_disk_packages | non_feature_members
-    assert (
-        len(enum_values) == 26
-    )  # 0.4.6 T-046-28 academy, T-046-25 reports: each left with its package
-
-
 # --- v0.5.1 K5 — status transitions are the interface -------------------------------
 
 _RESOLVE_KWARGS: dict[str, str] = {
@@ -283,7 +281,6 @@ _RESOLVE_KWARGS: dict[str, str] = {
     "evidence_loop": "pytest -k the_red_loop",
     "evidence_seam": "tests/unit/x.py::test_seam",
     "evidence_diff": "net-negative: deleted more than added",
-    "diff_direction": "net-negative",
 }
 
 
@@ -345,15 +342,36 @@ def test_resolve_refuses_a_malformed_evidence_diff_pattern(bad_evidence_diff: st
     assert "evidence_diff" in str(excinfo.value)
 
 
-def test_resolve_refuses_a_diff_direction_outside_the_closed_enum() -> None:
-    record = _sample_record()
+def test_resolve_derives_diff_direction_from_the_evidence_diff_prefix() -> None:
+    """0.4.7 FR4 (T-047-08): `diff_direction` is NOT an input — two inputs for one
+    word can disagree, and a record whose narrative says 'net-negative: …' while its
+    direction says 'net-positive' states a governance fact that is false. RED before
+    the change: `resolve()` required the keyword and accepted a contradicting value.
+    Intent: CONTRACT — T-047-08; size: SMALL."""
     kwargs = dict(_RESOLVE_KWARGS)
-    kwargs["diff_direction"] = "sideways"
+    kwargs["evidence_diff"] = "net-positive: one helper added, justified"
+    resolved = _sample_record().resolve(**kwargs)
+    assert resolved.diff_direction == "net-positive"
+    assert resolved.evidence_diff == "net-positive: one helper added, justified"
 
-    with pytest.raises(IncompleteTransitionError) as excinfo:
-        record.resolve(**kwargs)
 
-    assert "diff_direction" in str(excinfo.value)
+def test_resolve_stamps_closed_at_on_every_terminal_verb() -> None:
+    """0.4.7 FR4 (T-047-08): all four terminal transitions go through the ONE seam
+    (`_reach_terminal`), so none can reach a terminal status unstamped.
+    Intent: CONTRACT — T-047-08; size: SMALL."""
+    record = _sample_record()
+    assert record.resolve(**_RESOLVE_KWARGS).closed_at is not None
+    assert record.supersede(by="other-bug").closed_at is not None
+    assert record.defer(reason="later").closed_at is not None
+    assert record.reject(reason="not a bug").closed_at is not None
+
+
+def test_apply_governance_update_refuses_closed_at() -> None:
+    """0.4.7 FR4 (T-047-08): `closed_at` is transition-owned, exactly like `status` —
+    a bare governance write can never forge the instant a bug closed.
+    Intent: CONTRACT — T-047-08; size: SMALL."""
+    with pytest.raises(ValueError, match="closed_at"):
+        _sample_record().apply_governance_update({"closed_at": "2026-09-01T00:00:00Z"})
 
 
 @pytest.mark.parametrize(
@@ -443,4 +461,37 @@ def test_from_dict_round_trips_every_terminal_status() -> None:
     for status in ("open", "resolved", "superseded", "deferred", "rejected"):
         payload = _sample_record().to_dict()
         payload["status"] = status
+        # 0.4.7 FR4: closed_at is non-null if and only if the status is terminal —
+        # the record's own cross-field invariant, checked on every construction path.
+        payload["closed_at"] = None if status == "open" else "2026-09-01T00:00:00Z"
         assert BugRecord.from_dict(payload).status == status
+
+
+def test_from_dict_refuses_a_terminal_status_without_closed_at() -> None:
+    """0.4.7 FR4 (T-047-08), RED before the change: a terminal record carrying no
+    closure instant was accepted, and `bugs archive` then aged it by its FILING date.
+    Intent: CONTRACT — T-047-08; size: SMALL."""
+    payload = _sample_record().to_dict()
+    payload["status"] = "resolved"
+    payload["closed_at"] = None
+    with pytest.raises(ValueError, match="carries no 'closed_at'"):
+        BugRecord.from_dict(payload)
+
+
+def test_from_dict_refuses_a_closed_at_preceding_the_filing_date() -> None:
+    """0.4.7 FR4 (T-047-08): a bug cannot close before it was filed.
+    Intent: CONTRACT — T-047-08; size: SMALL."""
+    payload = _sample_record().to_dict()
+    payload["status"] = "resolved"
+    payload["closed_at"] = "2000-01-01T00:00:00Z"
+    with pytest.raises(ValueError, match="precedes its filing date"):
+        BugRecord.from_dict(payload)
+
+
+def test_from_dict_refuses_an_open_record_carrying_closed_at() -> None:
+    """0.4.7 FR4 (T-047-08): closed_at is stamped only by a terminal transition.
+    Intent: CONTRACT — T-047-08; size: SMALL."""
+    payload = _sample_record().to_dict()
+    payload["closed_at"] = "2026-09-01T00:00:00Z"
+    with pytest.raises(ValueError, match="is open but carries closed_at"):
+        BugRecord.from_dict(payload)
