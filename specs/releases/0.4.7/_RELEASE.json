@@ -4,8 +4,8 @@
   "phase": "DEFINITION",
   "rc": 2,
   "defined": {
-    "sha": "0140296f",
-    "ts": "2026-09-13T01:46:31Z"
+    "sha": "10fb7de6",
+    "ts": "2026-09-13T06:11:57Z"
   },
   "implemented": {
     "sha": "99ac4bf8",
@@ -187,6 +187,12 @@
       "agent": "project-manager",
       "kind": "note",
       "text": "Sequencing deviation (same cause as rc-1): rc-archive ran before candidate 2 merged — PR #253 (candidate 1) still cannot run CI (GitHub account locked for billing), so candidates 2+ will ride one later PR with a fresh security verdict on its head; the candidate-2 verdict (978372e5 covering 9c4e031c) is consumed by SPEC-DOC-044 as the head moves."
+    },
+    {
+      "ts": "2026-09-13T06:11:57Z",
+      "agent": "product-engineer",
+      "kind": "note",
+      "text": "Candidate 3 defined: 'one verb per record change' — bug-policy-one-model-ask-first, governance-verbs-telemetry, law-and-skill-dedupe; trio Aprovado at 10fb7de6 under the operator's 2026-09-12 directive; grill Q1–Q6 answered by the PM as recorded in SPEC section 5 (Q4 product-engineer gains Bash and Q5 constitution 6.0.0 flagged to the operator). Two Arm B bugs registered by another session (handoff-v12 role-atom map; closed_at healing) are being fixed on the branch before candidate 3's tasks start."
     }
   ]
 }
