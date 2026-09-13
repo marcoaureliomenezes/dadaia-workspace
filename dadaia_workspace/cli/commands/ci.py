@@ -16,6 +16,7 @@ from dadaia_workspace.cli._specs_resolution import (
     resolve_workspace_root_for_cli,
 )
 from dadaia_workspace.container import is_source_repo_root as _is_source_repo_root
+from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.exceptions import CiPreflightScopeError
 from dadaia_workspace.features.ci_preflight import (
     all_passed,
@@ -28,9 +29,15 @@ from dadaia_workspace.features.ci_preflight import (
 app = typer.Typer(help="Local CI-equivalent preflight gate + git-hook chokepoints.")
 
 # .../dadaia_workspace/cli/commands/ci.py -> parents[2] == .../dadaia_workspace
-_SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "public" / "scripts"
-_HOOK_SOURCE = _SCRIPTS_DIR / "pre-push-ci-gate.sh"
-_PRE_COMMIT_HOOK_SOURCE = _SCRIPTS_DIR / "pre-commit-presence-gate.sh"
+_SCRIPTS_DIR = workspace_layout.public_scripts_dir()
+#: Derived from the ONE registry of which chokepoints exist and what they are made of
+#: (``workspace_layout.INSTALLED_GIT_HOOKS``) — the same rows the workspace doctor
+#: compares the installed copies against (HOOKS-DRIFT-1). Never a second literal.
+_HOOK_SOURCES: dict[str, Path] = {
+    target: _SCRIPTS_DIR / source for target, source in workspace_layout.INSTALLED_GIT_HOOKS
+}
+_HOOK_SOURCE = _HOOK_SOURCES["pre-push"]
+_PRE_COMMIT_HOOK_SOURCE = _HOOK_SOURCES["pre-commit"]
 
 
 def _repo_root() -> Path:

@@ -27,6 +27,9 @@ class _StubDoctor:
     def check(self):
         return [_Issue()]
 
+    def check_installed_hooks(self):
+        return []
+
     def scan(self):
         return ()
 

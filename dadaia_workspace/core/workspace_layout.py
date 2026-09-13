@@ -22,6 +22,7 @@ import re
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import cached_property
+from pathlib import Path
 from typing import Literal
 
 from dadaia_workspace.core.specs_version import RELEASE_ID_FRAGMENT
@@ -39,6 +40,7 @@ __all__ = [
     "LAW_HARNESS_DIRS",
     "MEMORY_TOPLEVEL_FILES",
     "REPO_TREE_ARTIFACTS",
+    "INSTALLED_GIT_HOOKS",
     "REPO_TREE_EXCLUDED",
     "REQUIRED_ROOT_DIRS",
     "ROOT_ALLOWED_DIRS",
@@ -54,6 +56,7 @@ __all__ = [
     "ZoneClass",
     "additive_prefixes",
     "parse_exception_globs",
+    "public_scripts_dir",
     "repo_excluded_display",
     "root_entries_display",
     "specs_canon_table_rows",
@@ -283,6 +286,25 @@ def zone_table_rows() -> tuple[tuple[str, str, str, str, str], ...]:
         )
         for zone in DADAIA_ZONES
     )
+
+
+#: The git chokepoints (DADAIA.md 3.4) and the shipped script each is installed FROM:
+#: ``(.git/hooks/<target>, public/scripts/<source>)``. One home for "which hooks exist
+#: and what they are made of" — ``cli.commands.ci`` installs them, the workspace doctor
+#: compares the installed copies to them (HOOKS-DRIFT-1).
+INSTALLED_GIT_HOOKS: tuple[tuple[str, str], ...] = (
+    ("pre-commit", "pre-commit-presence-gate.sh"),
+    ("pre-push", "pre-push-ci-gate.sh"),
+)
+
+
+def public_scripts_dir() -> Path:
+    """The shipped ``public/scripts/`` directory inside the installed package.
+
+    Pure path arithmetic on this module's own location — no filesystem read, so the
+    core-purity ratchet is untouched.
+    """
+    return Path(__file__).resolve().parents[1] / "public" / "scripts"
 
 
 #: Basenames of the projected LAW files — human-only in an instantiated workspace.

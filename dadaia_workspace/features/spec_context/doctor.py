@@ -124,6 +124,44 @@ class DoctorService:
             )
         return issues
 
+    def check_installed_hooks(self) -> list[DoctorIssue]:
+        """HOOKS-DRIFT-1: an ALIVE repo's installed git hook differs from the shipped one.
+
+        The git chokepoints are the ONE mechanical backstop that runs outside every
+        harness hook (``DADAIA.md`` 3.4). An installed copy that has drifted — hand-edited,
+        never installed, or left behind by an older release — is a chokepoint silently
+        enforcing yesterday's contract, and nothing else in the workspace can notice.
+        Compared BYTE-WISE against ``public/scripts/``: the installer copies verbatim, so
+        any difference at all is drift. A repo that is not a git checkout has no
+        ``.git/hooks/`` to drift and is never a finding.
+        """
+        issues: list[DoctorIssue] = []
+        for top in self._alive_repo_tops():
+            hooks_dir = top / ".git" / "hooks"
+            if not hooks_dir.is_dir():
+                continue
+            for target, source in workspace_layout.INSTALLED_GIT_HOOKS:
+                shipped = workspace_layout.public_scripts_dir() / source
+                installed = hooks_dir / target
+                try:
+                    drifted = installed.read_bytes() != shipped.read_bytes()
+                except OSError:
+                    drifted = True
+                if drifted:
+                    rel = top.relative_to(self._workspace_root).as_posix()
+                    issues.append(
+                        DoctorIssue(
+                            code="HOOKS-DRIFT-1",
+                            description=(
+                                f"{rel}/.git/hooks/{target} differs from the shipped "
+                                f"{source} — the chokepoint is enforcing something other "
+                                "than what this release ships."
+                            ),
+                            fixable=False,
+                        )
+                    )
+        return issues
+
     def _check_venv_health(self) -> list[DoctorIssue]:
         """VENV-1 — the workspace venv exists with an executable ``dadaia`` entrypoint.
 
@@ -732,6 +770,21 @@ def workspace_rules(
             for issue in service.check()
         ]
 
+    def installed_hooks(service: DoctorService) -> list[SectionFinding]:
+        """HOOKS-DRIFT-1 — its own rule because its fix is its own runnable line."""
+        if expired_only:
+            return []
+        return [
+            SectionFinding(
+                code=issue.code,
+                verdict="error",
+                message=issue.description,
+                canonical=False,
+                error=True,
+            )
+            for issue in service.check_installed_hooks()
+        ]
+
     def entries(service: DoctorService) -> list[SectionFinding]:
         findings = service.scan()
         if expired_only:
@@ -754,6 +807,12 @@ def workspace_rules(
             SECTION,
             invariants,
             fix_help=".dadaia/.venv/bin/dadaia doctor --fix",
+        ),
+        Rule(
+            ("HOOKS-DRIFT-1",),
+            SECTION,
+            installed_hooks,
+            fix_help=".dadaia/.venv/bin/dadaia ci install-hook --force",
         ),
         Rule(
             ("WS-ENTRY",),

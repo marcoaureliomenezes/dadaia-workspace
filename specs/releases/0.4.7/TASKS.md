@@ -70,7 +70,7 @@
   doctor.py`, `dadaia_workspace/features/specs/{rules,doctor_structural}.py`,
   `tests/**`. Blocked by: T-047-19. Delivers: a `.pytest_cache/` under a repo is moved
   at the next throttled PostToolUse and expires a week later; nothing else moves.
-- [-] T-047-21 — FR6c: `HOOKS-DRIFT-1` — every ALIVE repo's `.git/hooks/{pre-commit,
+- [x] T-047-21 — FR6c: `HOOKS-DRIFT-1` — every ALIVE repo's `.git/hooks/{pre-commit,
   pre-push}` compared byte-wise to `public/scripts/`; error class, `fix: … ci
   install-hook --force`; rendered in the workspace section. Write set:
   `dadaia_workspace/features/spec_context/doctor.py`, `tests/**`. Blocked by:
