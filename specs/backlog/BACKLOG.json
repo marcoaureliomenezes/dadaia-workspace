@@ -2,92 +2,6 @@
   "schema": "backlog-v1",
   "active": [
     {
-      "id": "one-canon-registry",
-      "title": "One canon registry for root, .dadaia zones and specs",
-      "opened": "2026-09-12",
-      "status": "picked",
-      "description": "Audit C3 allowlist oscillation (7 bugs), GV-8/GV-9, C9/C10; grill Q8. The canonical set of the workspace root (ROOT_ALLOWED_*, DADAIA 5.1, instance_exceptions), of .dadaia/ (DADAIA_ZONES) and of specs/ (canon.py, disagreeing with DADAIA 6.2 on releases_histo.jsonl and consumed_backlog_histo.jsonl) live in one core registry from which DADAIA 5.1/6.2/8.5 tables are rendered at public stage, and which the gate, the doctor and the scaffold consume. Any second list of canonical names is a finding.",
-      "provenance": "operator-ratified grill 2026-09-12 (SDD lifecycle audit, rulings Q1-Q17)",
-      "intents": [
-        {
-          "subject": {
-            "kind": "catalog",
-            "ref": "workspace-init"
-          },
-          "change": "root, .dadaia zones and specs canon from one core registry"
-        },
-        {
-          "subject": {
-            "kind": "cli",
-            "ref": "public stage"
-          },
-          "change": "DADAIA 5.1/6.2/8.5 tables rendered from the registry"
-        }
-      ]
-    },
-    {
-      "id": "gate-context-scope-antistall",
-      "title": "Gate: block only PROTECTED, root whitelist and context scope; every BLOCK carries an executable fix",
-      "opened": "2026-09-12",
-      "status": "picked",
-      "description": "Audit GV-1, GV-4, GV-6/7/8, C1, C4/C5/C6; grill Q1/Q2/Q12. The PreToolUse gate blocks exactly three things: PROTECTED paths, a new root entry, and — in WRITE mode — a MUTATING write outside the bound spec context's repos (main + associated; the workspace-root specs/ only for the self-hosting context without its own specs/), with fix: `dadaia context bind <ctx>`. The MEMORY phase branch is deleted (the gate reads zero spec artifacts, as DADAIA 3.5 says); venv-guard rule 2 is deleted and cache redirection moves to pyproject/ruff/mypy config; path classes shrink accordingly. Anti-stall invariant: every BLOCK verdict from any enforcement point (gate, pre-push, ci verdict-check, doctor exit 1) carries one `fix:` line naming a single executable command, checked by a contract test; a BLOCK whose fix is itself blocked is a CRITICAL bug by definition (a stall). DADAIA 3.1/3.2/3.4/3.5/7.4/8.2 rewritten to match the code once.",
-      "provenance": "operator-ratified grill 2026-09-12 (SDD lifecycle audit, rulings Q1-Q17)",
-      "intents": [
-        {
-          "subject": {
-            "kind": "catalog",
-            "ref": "sdd-gate-v3"
-          },
-          "change": "three blocks only (PROTECTED, root whitelist, context scope); no _RELEASE.json read; fix: line on every BLOCK"
-        },
-        {
-          "subject": {
-            "kind": "catalog",
-            "ref": "context-management"
-          },
-          "change": "the bound context defines the writable repo set (main + associated)"
-        },
-        {
-          "subject": {
-            "kind": "cli",
-            "ref": "context bind"
-          },
-          "change": "fix: target of a scope BLOCK; implementation mode binds without a release id"
-        },
-        {
-          "subject": {
-            "kind": "cli",
-            "ref": "ci verdict-check"
-          },
-          "change": "every refusal carries an executable fix: line"
-        }
-      ]
-    },
-    {
-      "id": "continuous-reaper-reaped-zone",
-      "title": "Continuous cleaning: slop moved to .dadaia/tmp/reaped/, never deleted",
-      "opened": "2026-09-12",
-      "status": "picked",
-      "description": "Audit C3 (doctor-ptr-gc-deletes-valid-lock-free-bind CRIT), GV-15; grill Q7/Q15. Agent-created non-canonical entries at the workspace root, in the harness dirs, in .dadaia/ and at the top of every repos/<slug>/ (plus the DADAIA 5.3 cache dirs at any depth, never source dirs) are moved to .dadaia/tmp/reaped/<YYYYMMDD>/ with a 7-day TTL, at SessionStart and on a throttled PostToolUse, and listed in the doctor report; direct deletion is reserved to TTL expiry of reaped/ itself. One guarded traversal primitive (walk + stat + move) replaces the per-call-site guards in features/spec_context/doctor.py. Installed git hooks are compared to public/scripts and drift is a finding.",
-      "provenance": "operator-ratified grill 2026-09-12 (SDD lifecycle audit, rulings Q1-Q17)",
-      "intents": [
-        {
-          "subject": {
-            "kind": "catalog",
-            "ref": "workspace-doctor"
-          },
-          "change": "reaper moves slop to .dadaia/tmp/reaped/ (7-day TTL); one guarded traversal primitive; installed git hooks drift finding"
-        },
-        {
-          "subject": {
-            "kind": "catalog",
-            "ref": "spec-context-project"
-          },
-          "change": "repos/<slug> top-level and cache-dir hygiene"
-        }
-      ]
-    },
-    {
       "id": "governance-verbs-telemetry",
       "title": "Governance verbs: backlog exit, audit close, telemetry event per verb",
       "opened": "2026-09-12",
@@ -193,30 +107,6 @@
             "ref": "harness-claude-code"
           },
           "change": "ctx_inject bootstrap drops the duplicated slop blocks"
-        }
-      ]
-    },
-    {
-      "id": "privacy-selfscan-scope",
-      "title": "Privacy self-scan scoped to the publication boundary",
-      "opened": "2026-09-12",
-      "status": "picked",
-      "description": "Audit C5/BG-4 (26 bugs, 22 in August, every fix a literal/baseline/regex edit). The push-time denylist scan applies to what is published (dadaia_workspace/public/ and projected assets) or to secret-shaped patterns; library test fixtures and spec prose leave its scope and the hand-kept shrink-only privacy baseline entries for them are deleted. gitleaks stays on PRs to main and is added to develop's required checks.",
-      "provenance": "operator-ratified grill 2026-09-12 (SDD lifecycle audit, rulings Q1-Q17)",
-      "intents": [
-        {
-          "subject": {
-            "kind": "cli",
-            "ref": "ci push-gate-check"
-          },
-          "change": "denylist scan scoped to the publication boundary; prose/fixture baseline entries deleted"
-        },
-        {
-          "subject": {
-            "kind": "cli",
-            "ref": "ci pre-commit-check"
-          },
-          "change": "bundled-ledger advisory unchanged; no self-scan of fixtures"
         }
       ]
     },
