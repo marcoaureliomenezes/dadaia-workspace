@@ -266,6 +266,24 @@ def test_archive_verbs_refuse_without_a_live_release_with_a_runnable_fix(
     assert_block_carries_a_runnable_fix(str(exc.value))
 
 
+# ── context heartbeat (exit 1) ──────────────────────────────────────────────────
+
+
+def test_context_heartbeat_without_a_session_carries_a_runnable_fix(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No caller-owned session identity is a refusal — it hands back one bind command."""
+    from dadaia_workspace.cli.commands import context as context_cmd
+    from dadaia_workspace.core.invocation import HARNESS_SESSION_ID_ENV_VARS
+
+    for name in ("DADAIA_SESSION_ID", *HARNESS_SESSION_ID_ENV_VARS):
+        monkeypatch.delenv(name, raising=False)
+
+    result = CliRunner().invoke(context_cmd.app, ["heartbeat"])
+    assert result.exit_code == 1, result.output
+    assert_block_carries_a_runnable_fix(result.output)
+
+
 # ── dadaia doctor (exit 1) ──────────────────────────────────────────────────────
 
 

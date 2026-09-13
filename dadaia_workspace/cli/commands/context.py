@@ -703,11 +703,11 @@ def heartbeat() -> None:
     session_id = _resolve_own_session_id()
     if not session_id:
         err_console.print(
-            "[red]Error:[/red] No caller-owned session identity. Run "
-            "'dadaia context bind <name> --mode <mode>' inside a supported harness, "
-            "or use 'eval $(dadaia context bind <name> --mode <mode> --print-env)' "
-            "in a plain shell."
+            "[red]Error:[/red] No caller-owned session identity: bind this session "
+            "first (in a plain shell, wrap the bind in "
+            "'eval $(... --print-env)' so the id reaches this process)."
         )
+        err_console.print("fix: .dadaia/.venv/bin/dadaia context bind <name>")
         raise typer.Exit(1) from None
 
     workspace_root = resolve_workspace_root()
