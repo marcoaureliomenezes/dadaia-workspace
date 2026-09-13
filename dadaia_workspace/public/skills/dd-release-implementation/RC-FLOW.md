@@ -46,7 +46,7 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 - Memory is closure procedure, never a task: a TASKS.md task whose write set names
   `specs/memory` is refused by `dadaia doctor` (SPEC-DOC-047).
 - Update `specs/memory/**` atoms to the product's current state — protocol detail: `MEMORY-UPDATE.md`.
-- Done when: `dadaia doctor`'s `specs` section reports the memory atoms clean and one `kind: memory` log entry records atoms reviewed-unchanged vs changed.
+- Done when: `dadaia doctor`'s `specs` section reports the memory atoms clean, the derived-docs test is green, and one `kind: memory` log entry records atoms reviewed-unchanged vs changed.
 
 **Step 6 — Record the candidate's closure narrative.**
 - Append the `log` entries `RELEASE-EVENTS.md` describes, each with its `kind`: `summary`, `size`, `drifts`, `artifact-gc`, `test-dispositions`, `dispositions`.

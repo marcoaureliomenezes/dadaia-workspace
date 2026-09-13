@@ -7,8 +7,10 @@ Disclosed reference reached at `SKILL.md` step 6 — `product-engineer` reads th
 1. The live release is in `CLOSURE` phase (`dadaia release phase CLOSURE --sha <sha>`) before any `specs/memory/**` write; the gate blocks it otherwise.
 2. Apply the candidate's deltas to the corresponding `specs/memory/*.md` and `specs/memory/product/**` atoms.
 3. Heading rule, forbidden history sections and the atom's shape: `specs/memory/AGENTS.md`.
-4. Point the operator to this release's `_RELEASE.json` `log` or git if they ask for history.
-5. Validate with `dadaia doctor` — its `specs` section checks atomicity and Mermaid script presence.
+4. Run `pytest tests/contract/test_docs_derived_from_memory.py` after the atom writes — a red row names the atom to re-read and the doc line to re-record.
+5. Re-derive each red section of `README.md`, `llms.txt` and `docs/*.md` from its atom, and re-record its `derived-from` marker's `sha256:<12 hex>`.
+6. Re-record in the SAME commit as the atom — a doc and its source move together, never in a follow-up commit.
+7. `docs/cli.md` regenerates from `dadaia help tree` whenever the candidate changed a verb.
 
 ## Product memory is a folder catalog
 
@@ -18,9 +20,7 @@ Disclosed reference reached at `SKILL.md` step 6 — `product-engineer` reads th
 - `index.md` uses plain Markdown headings — no HTML `<section>` wrapper.
 - `<area>/<feature-slug>.md` — one atom per production feature: Purpose (2-3 paragraphs), Usage flow (3-5 steps, optional Mermaid).
 - `<area>/<feature-slug>.md` (continued): Typical trigger (1 sentence), Differentiator, Runtime state touched, Dependencies.
-- Feature atoms follow English canon, curated headings only (`specs/memory/AGENTS.md`'s heading rule).
 - Top-level trio's scaffold source: `dadaia_workspace/public/scaffold/memory/ARCHITECTURE.md` and `.../TECHSTACK.md` (no `.j2` templating).
-- Product atoms are authored directly as Markdown during release closure.
 - Update `index.md` only if the catalog order changed or a feature was added/removed; update affected atoms; leave the rest intact.
 - A new feature gets its atom created and linked from `index.md`.
 - A deprecated feature's link and its atom are deleted outright — memory carries no archive of its own (history lives in git).
