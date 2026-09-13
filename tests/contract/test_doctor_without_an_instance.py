@@ -1,4 +1,5 @@
-"""`dadaia doctor` over an explicit ``--specs-dir`` needs no instance around it.
+"""Intent: CONTRACT — `dadaia doctor` over an explicit ``--specs-dir`` needs no
+instance around it.
 
 CI runs the doctor over a bare checkout (``dadaia doctor --specs-dir specs``): there
 is no ``.dadaia/states/`` above the runner's cwd. The `specs` and `ledgers` sections
