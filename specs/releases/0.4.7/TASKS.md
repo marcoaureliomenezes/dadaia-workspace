@@ -36,7 +36,7 @@
   ci_preflight/**`, `dadaia_workspace/cli/commands/context.py`, `dadaia_workspace/core/
   session_store.py`, `tests/**`. Blocked by: T-047-15. Delivers: the bug's repro exits
   0 with no live release; a bare `pytest` leaves no `.pytest_cache/`.
-- [ ] T-047-17 — FR5a: move the `CanonEntry` rows and add `REPO_TREE_EXCLUDED` to
+- [-] T-047-17 — FR5a: move the `CanonEntry` rows and add `REPO_TREE_EXCLUDED` to
   `core/workspace_layout.py`; `features/specs/canon.py` imports the rows and keeps
   render/check; `privacy_check._PUBLIC_ASSET_IGNORED_DIRS` and `pyproject` `exclude`
   derive; widen `test_zone_registry.py`'s ratchet to root names, specs members and the
