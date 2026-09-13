@@ -1,8 +1,8 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.7",
-  "phase": "CLOSURE",
-  "rc": 1,
+  "phase": "DEFINITION",
+  "rc": 2,
   "defined": {
     "sha": "0140296f",
     "ts": "2026-09-13T01:46:31Z"
@@ -175,6 +175,18 @@
       "agent": "product-engineer",
       "kind": "note",
       "text": "SPEC-DOC-005 (PLAN over 300 lines) is advisory since ec27c4b1 — its only exit-1 path (`HARD_LIMIT_PLAN_CUTOFF`) was deleted with the truncating fix line; `PLAN.md` has no byte ratchet (V34 pins SPEC/TASKS). Recorded as a drift; a PLAN row in `test_slop_ratchets.py` is candidate 3 dedupe work if the operator wants it enforced."
+    },
+    {
+      "ts": "2026-09-13T06:09:56Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate 2 archived to rc-2/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
+    },
+    {
+      "ts": "2026-09-13T06:09:56Z",
+      "agent": "project-manager",
+      "kind": "note",
+      "text": "Sequencing deviation (same cause as rc-1): rc-archive ran before candidate 2 merged — PR #253 (candidate 1) still cannot run CI (GitHub account locked for billing), so candidates 2+ will ride one later PR with a fresh security verdict on its head; the candidate-2 verdict (978372e5 covering 9c4e031c) is consumed by SPEC-DOC-044 as the head moves."
     }
   ]
 }
