@@ -73,6 +73,20 @@ def _sibling_marked(same_line_remainder: str, next_line: str) -> bool:
     return bool(_SIBLING_MARKER_RE.match(stripped_next))
 
 
+def _resolves_inside(repo_root: Path, token: str) -> bool:
+    """Containment (CWE-22): a citation is alive only when it names a real, non-symlinked
+    file INSIDE *repo_root*. A token that escapes the checkout — by traversal or through
+    a symlink — is dead by definition, so existence is never probed outside the repo."""
+    candidate = repo_root / token
+    if candidate.is_symlink():
+        return False
+    try:
+        resolved = candidate.resolve()
+        return resolved.is_relative_to(repo_root.resolve()) and resolved.exists()
+    except OSError:
+        return False
+
+
 def dead_path_citations(
     text: str,
     *,
@@ -103,7 +117,7 @@ def dead_path_citations(
             if token.startswith(CITABLE_PATH_PREFIXES):
                 if token in exempt:
                     continue
-                if not (repo_root / token).exists():
+                if not _resolves_inside(repo_root, token):
                     violations.append(f"{rel}:{idx + 1}: dead path `{token}`")
                 continue
             if sibling_dir is None and not sibling_roots:
@@ -223,7 +237,8 @@ def memory_citation_violations(
 
 
 def _markdown_files(root: Path) -> list[Path]:
-    return sorted(root.glob("**/*.md"))
+    """Symlinks are skipped — the walk stays inside the tree it was handed (CWE-22)."""
+    return sorted(p for p in root.glob("**/*.md") if not p.is_symlink())
 
 
 def dead_path_citations_in_tree(

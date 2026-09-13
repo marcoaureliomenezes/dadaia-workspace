@@ -14,6 +14,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dadaia_workspace.features.specs.citations import (
+    dead_path_citations,
+    memory_citation_violations,
+)
 from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
 from dadaia_workspace.features.specs.doctor_types import Severity
 
@@ -92,3 +96,57 @@ def test_no_command_tree_or_no_memory_dir_is_silent(tmp_path: Path) -> None:
         )
         == []
     )
+
+
+def test_a_citation_escaping_the_repo_is_dead_even_when_the_target_exists(tmp_path: Path) -> None:
+    """Containment (CWE-22): a token is alive only when it resolves INSIDE the repo. A
+    traversal token naming a real file outside the checkout is dead by definition.
+
+    Intent: CONTRACT — 0.4.7 T-047-35 (security finding, path traversal).
+    """
+    repo_root = tmp_path / "repo"
+    outside = tmp_path / "outside"
+    outside.mkdir(parents=True)
+    (outside / "x.md").write_text("secret", encoding="utf-8")
+    specs = repo_root / "specs"
+    specs.mkdir(parents=True)
+
+    violations = dead_path_citations(
+        "See `specs/../../outside/x.md`.\n", rel="a.md", repo_root=repo_root
+    )
+
+    assert violations == ["a.md:1: dead path `specs/../../outside/x.md`"]
+
+
+def test_a_symlinked_citation_target_is_dead(tmp_path: Path) -> None:
+    """A symlink inside the repo is not a containment proof — its target may sit anywhere.
+
+    Intent: CONTRACT — 0.4.7 T-047-35 (security finding, path traversal).
+    """
+    repo_root = tmp_path / "repo"
+    outside = tmp_path / "outside"
+    outside.mkdir(parents=True)
+    (outside / "x.md").write_text("secret", encoding="utf-8")
+    (repo_root / "specs").mkdir(parents=True)
+    (repo_root / "specs" / "link.md").symlink_to(outside / "x.md")
+
+    assert dead_path_citations("`specs/link.md`\n", rel="a.md", repo_root=repo_root) == [
+        "a.md:1: dead path `specs/link.md`"
+    ]
+
+
+def test_the_markdown_walk_skips_symlinks(tmp_path: Path) -> None:
+    """`memory_citation_violations` never reads a symlinked atom — the walk stays inside
+    the tree it was handed.
+
+    Intent: CONTRACT — 0.4.7 T-047-35 (security finding, path traversal).
+    """
+    repo_root = tmp_path / "repo"
+    outside = tmp_path / "outside"
+    outside.mkdir(parents=True)
+    (outside / "planted.md").write_text("Run `dadaia fixture-verb`.\n", encoding="utf-8")
+    memory = repo_root / "specs" / "memory"
+    memory.mkdir(parents=True)
+    (memory / "planted.md").symlink_to(outside / "planted.md")
+
+    assert memory_citation_violations(memory, repo_root=repo_root, command_paths=_TREE) == []
