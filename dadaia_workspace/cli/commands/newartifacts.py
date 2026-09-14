@@ -43,6 +43,7 @@ from dadaia_workspace.features.specs.candidate import (
     ArchiveError,
     archive_candidate,
     archive_release,
+    fold_release,
     set_phase,
 )
 from dadaia_workspace.features.specs.canon import release_new
@@ -252,6 +253,101 @@ def _histo_appender(target: Path) -> Callable[[HistoRecord], None]:
         )
 
     return append
+
+
+# ── dadaia release fold ───────────────────────────────────────────────────────
+
+
+def _histo_updater(
+    target: Path,
+) -> Callable[[str, Callable[[HistoRecord], HistoRecord]], HistoRecord | None]:
+    """The in-place rewrite of one ``releases_histo.jsonl`` record — the same store the
+    appender builds, one governance event per rewritten record; ``None`` when no record
+    carries that id (a pre-canon release may have none)."""
+    from dadaia_workspace.infrastructure.jsonl_record_store import RecordNotFoundError
+
+    store: JsonlRecordStore[HistoRecord] = JsonlRecordStore(
+        target / "releases" / "_archive" / "releases_histo.jsonl",
+        to_dict=HistoRecord.to_dict,
+        from_dict=HistoRecord.from_dict,
+    )
+
+    def update(record_id: str, mutate: Callable[[HistoRecord], HistoRecord]) -> HistoRecord | None:
+        try:
+            record = store.update(record_id, mutate)
+        except RecordNotFoundError:
+            return None
+        record_governance_event(
+            verb="fold",
+            ledger="releases-histo",
+            record_id=record.id,
+            record=record.to_dict(),
+            specs_dir=target,
+        )
+        return record
+
+    return update
+
+
+@release_app.command("fold")
+def release_fold_cmd(
+    folded_id: str = typer.Argument(
+        ..., help="The wrongly archived release under _archive/, e.g. 0.5.2."
+    ),
+    into: str = typer.Option(
+        ..., "--into", help="The published version that shipped it, e.g. 0.4.5."
+    ),
+    shipped: str | None = typer.Option(
+        None, "--shipped", help="Publication sha — required when _archive/<into>/ is born here."
+    ),
+    pr: int | None = typer.Option(
+        None, "--pr", help="Ship PR number — required when _archive/<into>/ is born here."
+    ),
+    shipped_ts: str | None = typer.Option(
+        None, "--shipped-ts", help="The publication's UTC timestamp (default: now)."
+    ),
+    final: bool = typer.Option(
+        False, "--final", help="Place the trio at the target's root (the final candidate)."
+    ),
+    specs_dir: str | None = typer.Option(
+        None,
+        "--specs-dir",
+        help="Path to specs/ directory. Default: resolve from bound context session.",
+    ),
+) -> None:
+    """Fold a wrongly archived release into rc-N/ of the version that published it.
+
+    The archive holds PUBLISHED versions only (operator ruling 2026-09-14, ADR 0014): a
+    candidate closed between two PyPI publications is rc-N of the version that
+    published it, never its own archived release — the shape RELEASE-TREE-ARCHIVE-ID /
+    RELEASE-TREE-ARCHIVE-UNSHIPPED refuse. One transactional act: moves the trio(s),
+    merges the state logs, deletes the folded directory, rewrites the histo record(s)
+    in place, and records one governance event.
+    """
+    target = _resolve_specs_dir(specs_dir)
+    if not target.is_dir():
+        typer.echo(f"[error] specs_dir not found: {target}", err=True)
+        sys.exit(1)
+    try:
+        result = fold_release(
+            target,
+            folded_id,
+            into=into,
+            shipped_sha=shipped,
+            pr=pr,
+            shipped_ts=shipped_ts,
+            final=final,
+            histo_update=_histo_updater(target),
+        )
+    except ArchiveError as exc:
+        typer.echo(f"[error] {exc}", err=True)
+        sys.exit(1)
+    _record_release_event("fold", target, result.into)
+    typer.echo(
+        f"[ok] {result.folded} folded into {result.into} at "
+        f"{result.placed_at.relative_to(target).as_posix()} (rc={result.rc}); "
+        f"histo rewritten: {', '.join(result.histo_ids) or 'none'}."
+    )
 
 
 # ── dadaia release archive ────────────────────────────────────────────────────

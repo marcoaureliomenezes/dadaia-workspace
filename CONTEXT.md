@@ -118,6 +118,7 @@ One closed-scope SDD cycle inside the live Release (grill → SPEC/PLAN/TASKS `A
 
 **rc-N**:
 The archive folder of the N-th completed-but-not-shipped Candidate's trio, created by `dadaia release rc-archive`. _Avoid_: "rc" as a branch name, a fixes-only round, or a scaffolded sub-phase — the segment lane (`alpha-N`) is retired (ADR 0006).
+Every Candidate closed between two publications is an rc-N of the version that publishes it; `_archive/` never holds a version that was not published (ADR 0014).
 _Avoid_: version (for the unit), sprint
 
 **Memory**:

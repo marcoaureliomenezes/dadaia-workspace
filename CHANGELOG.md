@@ -286,6 +286,25 @@ Open-scope release (ADRs 0005–0009): version minted at birth from the PyPI lin
   (`tests/unit/features/specs/test_ledgers_fix_canonical_form.py`, c79f9997) after its test was deleted
   at 717c08ae — a stewardship gap, not a product bug.
 
+### Post-closure fixes on the branch (no candidate — bugs fix in any phase)
+
+#### Added
+- `dadaia release fold <id> --into <published> [--shipped <sha> --pr <n> --shipped-ts <ts>] [--final]`:
+  the one governed repair for a wrongly archived release (ADR 0014); `RELEASE-TREE-ARCHIVE-ID` and
+  `RELEASE-TREE-ARCHIVE-UNSHIPPED` refuse an archive entry at or above the live release or without a
+  publication.
+- The archive rebuilt as PyPI history: `_archive/0.4.5/` = rc-1 v0.4.5, rc-2 0.5.0, rc-3 0.5.1, rc-4 0.5.2,
+  root 0.5.3 (all published together as 0.4.5); the four `0.5.x` archived releases are gone.
+
+#### Fixed
+- `dadaia doctor --specs-dir` reads an explicit tree with no instance around the run (CI over a bare
+  checkout); two trees is a usage error before any resolution.
+- Verdict liveness on merge commits: the git port exposes `parents(sha)`; `live_verdict_shas` follows each
+  merged line along gitflow's two edges; the compliance job checks out full history.
+- Pre-push canon scan range-scoped and pattern-aware; the published-slug amnesty is a subset of detection by
+  construction (ADR 0013).
+- Windows runner: derived-doc hashes over LF bytes, POSIX path filters, the telemetry backstop assertion.
+
 ## [0.4.6] — 2026-09-04
 
 Open-scope release under the release-candidates model it implements (ADRs

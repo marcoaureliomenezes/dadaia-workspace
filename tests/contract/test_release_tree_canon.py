@@ -187,3 +187,40 @@ def test_ideas_and_histo_are_not_release_dirs(tmp_path: Path) -> None:
     (archive / "releases_histo.jsonl").write_text("", encoding="utf-8")
 
     assert validate_release_tree(tmp_path) == []
+
+
+def _archived(release: str, **overrides: Any) -> dict[str, Any]:
+    doc = _valid_document(
+        release=release,
+        phase="ARCHIVED",
+        rc=1,
+        implemented={"sha": "b" * 40, "rc": 1, "ts": "2026-09-01T12:00:00Z"},
+        shipped={"sha": "c" * 40, "pr": 7, "ts": "2026-09-02T00:00:00Z"},
+    )
+    doc.update(overrides)
+    return doc
+
+
+def test_archived_release_at_or_above_the_live_one_is_refused(tmp_path: Path) -> None:
+    """The archive holds published versions only (operator ruling 2026-09-14, ADR 0014):
+    the live release is last-published + 1 patch, so nothing at or above it shipped."""
+    _write_release(tmp_path, "0.4.7", _valid_document(release="0.4.7"), trio=False)
+    _write_release(tmp_path, "_archive/0.5.0", _archived("0.5.0"))
+    _write_release(tmp_path, "_archive/0.4.6", _archived("0.4.6"))
+    issues = validate_release_tree(tmp_path)
+    assert _codes(issues) == ["RELEASE-TREE-ARCHIVE-ID"], issues
+    assert "fix: dadaia release fold 0.5.0 --into" in issues[0].message
+
+
+def test_archived_release_without_a_publication_is_refused(tmp_path: Path) -> None:
+    _write_release(tmp_path, "0.4.7", _valid_document(release="0.4.7"), trio=False)
+    _write_release(tmp_path, "_archive/0.4.5", _archived("0.4.5", shipped=None))
+    issues = validate_release_tree(tmp_path)
+    assert _codes(issues) == ["RELEASE-TREE-ARCHIVE-UNSHIPPED"], issues
+    assert "fix: dadaia release fold 0.4.5 --into" in issues[0].message
+
+
+def test_a_published_archived_release_below_the_live_one_is_clean(tmp_path: Path) -> None:
+    _write_release(tmp_path, "0.4.7", _valid_document(release="0.4.7"), trio=False)
+    _write_release(tmp_path, "_archive/0.4.6", _archived("0.4.6"))
+    assert validate_release_tree(tmp_path) == []

@@ -21,6 +21,7 @@ Scope: this file governs only `specs/releases/`.
 - `verdicts/` — required-check evidence handoffs, deleted once consumed.
 - `_ideas/<release-id>/` — pre-approval drafts; own scoped rule, `_ideas/AGENTS.md`.
 - `_archive/<release-id>/` — the whole archived release directory, moved there by `dadaia release archive`.
+- `_archive/` holds published versions only (ADR 0014): a candidate closed between two publications is `rc-N/` of the version that published it. `dadaia release fold <id> --into <published> [--shipped <sha> --pr <n> --shipped-ts <ts>] [--final]` is the one path that repairs a wrongly archived release; `RELEASE-TREE-ARCHIVE-ID` / `RELEASE-TREE-ARCHIVE-UNSHIPPED` refuse the shape.
 - `_archive/releases_histo.jsonl` — one summary record appended per archived release.
 
 ## 2. Authoring rules

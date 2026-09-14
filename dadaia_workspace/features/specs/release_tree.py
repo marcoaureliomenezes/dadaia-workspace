@@ -213,7 +213,9 @@ def validate_release_tree(
     """
     issues: list[ReleaseTreeIssue] = []
     validator = validator_for(_SCHEMA_NAME)
-    for release_dir, archived in _release_dirs(specs_dir / "releases"):
+    dirs = _release_dirs(specs_dir / "releases")
+    live_ids = [d.name for d, archived in dirs if not archived]
+    for release_dir, archived in dirs:
         dir_rel = release_dir.relative_to(specs_dir).as_posix()
         state_path = release_state_file(release_dir)
         if state_path is None:
@@ -231,6 +233,57 @@ def validate_release_tree(
         issues.extend(_trio_issues(release_dir, dir_rel, doc, archived=archived))
         issues.extend(_hand_edit_issue(doc, rel, release_dir.name, governance))
         issues.extend(_document_issues(doc, text, rel, archived=archived, validator=validator))
+        if archived:
+            issues.extend(_archive_issues(doc, rel, release_dir.name, live_ids))
+    return issues
+
+
+def _semver_key(release_id: str) -> tuple[int, ...]:
+    return tuple(int(part) for part in release_id.split("."))
+
+
+def _archive_issues(
+    doc: Any, rel: str, release_id: str, live_ids: list[str]
+) -> list[ReleaseTreeIssue]:
+    """The archive holds PUBLISHED versions only (operator ruling 2026-09-14, ADR 0014):
+    every candidate closed between two publications is an ``rc-N/`` of the version that
+    published it, never its own archived release. Two shapes violate that and both are
+    errors: an archived id at or above the live release (a version that was never
+    minted at deploy — the live release IS last-published + 1 patch, so nothing above it
+    can have shipped), and an archived release whose ``shipped`` carries no sha/pr (it
+    never went through the ship lane). Both repair through ONE governed verb,
+    ``dadaia release fold``, never a hand move."""
+    if (
+        not isinstance(doc, Mapping)
+        or doc.get("phase") != "ARCHIVED"
+        or not _SEMVER_RE.match(release_id)
+    ):
+        return []  # a non-ARCHIVED document under the archive is RELEASE-TREE-ARCHIVED's
+    issues: list[ReleaseTreeIssue] = []
+    fix = f"dadaia release fold {release_id} --into <published-id> --shipped <sha> --pr <n>"
+    above = [live for live in live_ids if _semver_key(release_id) >= _semver_key(live)]
+    if above:
+        issues.append(
+            ReleaseTreeIssue(
+                rel,
+                "RELEASE-TREE-ARCHIVE-ID",
+                f"archived release {release_id} is not below the live release "
+                f"{above[0]} — the archive holds published versions only; a candidate "
+                f"closed before a publication is rc-N of the version that published it. "
+                f"fix: {fix}",
+            )
+        )
+    shipped = doc.get("shipped")
+    if not (isinstance(shipped, Mapping) and shipped.get("sha") and shipped.get("pr")):
+        issues.append(
+            ReleaseTreeIssue(
+                rel,
+                "RELEASE-TREE-ARCHIVE-UNSHIPPED",
+                f"archived release {release_id} carries no shipped sha/pr — it never went "
+                f"through the ship lane and is a candidate of the version that published "
+                f"it. fix: {fix}",
+            )
+        )
     return issues
 
 
