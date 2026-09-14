@@ -213,9 +213,11 @@ _UNEXERCISED: dict[str, str] = {
     "SPEC-DOC-047": "the fix deletes a memory task line from TASKS.md; the line is "
     "operator content",
     "RELEASE-TREE-SCHEMA/RELEASE-TREE-PARSE/RELEASE-TREE-TS-ORDER/RELEASE-TREE-PHASE/"
-    "RELEASE-TREE-ARCHIVED/RELEASE-TREE-TRIO/RELEASE-TREE-STATE-MISSING": "the fix "
-    "rewrites one _RELEASE.json value; which value depends on which of the seven codes "
-    "fired",
+    "RELEASE-TREE-ARCHIVED/RELEASE-TREE-TRIO/RELEASE-TREE-STATE-MISSING/"
+    "RELEASE-TREE-ARCHIVE-ID/RELEASE-TREE-ARCHIVE-UNSHIPPED": "the fix "
+    "rewrites one _RELEASE.json value; which value depends on which of the seven "
+    "conformance codes fired; the two archive codes name `dadaia release fold`, "
+    "exercised by tests/unit/features/specs/test_candidate_fold.py",
     "SPEC-DOC-046": "auto-fixed rule (`fix_release_state_filename`), covered by the "
     "release doctor unit tests",
 }

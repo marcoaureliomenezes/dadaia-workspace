@@ -276,6 +276,8 @@ RULES: tuple[SpecsRule, ...] = (
             "RELEASE-TREE-ARCHIVED",
             "RELEASE-TREE-TRIO",
             "RELEASE-TREE-STATE-MISSING",
+            "RELEASE-TREE-ARCHIVE-ID",
+            "RELEASE-TREE-ARCHIVE-UNSHIPPED",
         ),
         lambda d: [i for i in release_tree_issues(d.specs_dir) if i.code != _HAND_EDIT_CODE],
         fix_help="sed -i 's|<invalid value>|<canonical value>|' specs/releases/<id>/_RELEASE.json",

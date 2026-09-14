@@ -122,6 +122,7 @@
 - Exactly one live `feature/{M.m.p}`, named for the live release; at deploy, delete it and cut `feature/{next}` in the same step; bugs fix on it in any phase, no ceremony.
 - The release version = last published PyPI + 1 patch, minted at birth; it increments ONLY at operator-approved deploy (ADR 0005).
 - `rc-N/` is an archived candidate folder under the live release (`dadaia release rc-archive`), never a branch name and never a scaffolded sub-phase.
+- `releases/_archive/<M.m.p>/` holds PUBLISHED versions only: a candidate closed between two publications is an `rc-N/` of the version that published it, never its own archived release; `dadaia release fold <id> --into <published>` is the one repair (ADR 0014).
 - Each candidate closure burns one `feature -> develop` merge; after it the agent asks the operator: promote (deploy) or continue (archive the trio to `rc-N/`, stack more backlog/bugs/findings).
 - Both PRs need an APPROVED `security-reviewer` verdict on the PR head sha, consumed once by the merge, then deleted; a survivor is slop (§7.6).
 - Ship-PR verdict names develop's tip, staged on the feature branch before the final `rc` merge.

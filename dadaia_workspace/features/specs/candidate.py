@@ -46,6 +46,8 @@ from dadaia_workspace.features.specs.doctor_common import resolve_live_release_i
 from dadaia_workspace.features.specs.release_tree import validate_release_tree
 
 __all__ = [
+    "ReleaseFold",
+    "fold_release",
     "ArchiveError",
     "CandidateArchive",
     "ReleaseArchive",
@@ -540,3 +542,240 @@ def _bump_patch(version: str) -> str:
     """``1.2.3`` -> ``1.2.4`` — the suggestion in the "--next already exists" fix line."""
     major, minor, patch = version.split(".")
     return f"{major}.{minor}.{int(patch) + 1}"
+
+
+# ═════════════════════════════════════════════════════════════════════════════════
+# ── release fold — the archive holds PUBLISHED versions only (ADR 0014) ───────────
+# ═════════════════════════════════════════════════════════════════════════════════
+
+
+@dataclass(frozen=True)
+class ReleaseFold:
+    """The completed fold: which archived release became which candidate of which
+    published version, where its trio now lives, and the histo records rewritten."""
+
+    folded: str
+    into: str
+    rc: int | None
+    placed_at: Path
+    target_dir: Path
+    histo_ids: tuple[str, ...]
+
+
+def _semver_key(release_id: str) -> tuple[int, ...]:
+    return tuple(int(part) for part in release_id.split("."))
+
+
+def _read_state(path: Path) -> dict[str, Any]:
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise ArchiveError(f"unreadable state document {path}: {exc}") from exc
+    if not isinstance(doc, dict):
+        raise ArchiveError(f"state document {path} is not an object.")
+    return doc
+
+
+def _rc_numbers(release_dir: Path) -> list[int]:
+    return sorted(
+        int(m.group(1))
+        for d in release_dir.iterdir()
+        if d.is_dir() and (m := _RC_DIR_RE.match(d.name))
+    )
+
+
+def fold_release(
+    specs_dir: Path,
+    folded_id: str,
+    *,
+    into: str,
+    shipped_sha: str | None,
+    pr: int | None,
+    shipped_ts: str | None = None,
+    final: bool,
+    histo_update: Callable[[str, Callable[[HistoRecord], HistoRecord]], HistoRecord | None],
+) -> ReleaseFold:
+    """Fold a wrongly archived release into ``rc-N/`` of the version that published it.
+
+    The archive holds published versions only (operator ruling 2026-09-14, ADR 0014):
+    a candidate closed between two PyPI publications belongs to the version that
+    published it, never to its own archived release. This is the ONE governed path for
+    that repair — `RELEASE-TREE-ARCHIVE-ID` / `RELEASE-TREE-ARCHIVE-UNSHIPPED` name it
+    in their ``fix:`` line — so the move, the state merge and the histo rewrite happen
+    together or not at all; never a hand move.
+
+    Refuses, writing nothing, unless ``_archive/<folded_id>/`` exists with a state
+    document, *into* is bare SemVer below every live release, and
+    ``_archive/<into>/`` either exists ARCHIVED with a shipped sha/pr or is born here
+    from *shipped_sha*/*pr* (both then required; *shipped_ts* is the publication's own
+    timestamp, defaulting to now). With *final* the folded trio takes
+    the target's ROOT (the final candidate, ADR 0009) — refused when a root trio is
+    already there; otherwise it becomes the next ``rc-N/``. A folded release that
+    itself carries ``rc-K/`` folders contributes them first, in order.
+
+    On success: the trio(s) move; the target state merges both logs in ``ts`` order
+    plus one ``note``, ``rc`` becomes the highest ``rc-N`` present, ``defined`` keeps
+    the earliest milestone and ``implemented`` the folded one when the target has
+    none; the folded directory is deleted; LAST, every histo record whose id is
+    *folded_id* or ``v<folded_id>`` is rewritten in place through *histo_update* —
+    ``release`` becomes *into* and the summary names the placement.
+    """
+    if not is_release_semver(into):
+        raise ArchiveError(
+            f"--into {into!r} is not bare SemVer M.m.p.\n"
+            f"fix: {DADAIA_BIN} release fold {folded_id} --into <published M.m.p>"
+        )
+    if folded_id == into:
+        raise ArchiveError(
+            f"{folded_id} cannot be folded into itself.\n"
+            f"fix: {DADAIA_BIN} release fold {folded_id} --into <the version that published it>"
+        )
+    archive_root = specs_dir / "releases" / "_archive"
+    folded_dir = archive_root / folded_id
+    folded_state_path = release_state_file(folded_dir) if folded_dir.is_dir() else None
+    if folded_state_path is None:
+        raise ArchiveError(
+            f"_archive/{folded_id}/ is not an archived release (no directory or no state "
+            f"document).\nfix: ls {archive_root}"
+        )
+    live_ids = [
+        d.name
+        for d in (specs_dir / "releases").iterdir()
+        if d.is_dir() and is_release_semver(d.name)
+    ]
+    above = [live for live in live_ids if _semver_key(into) >= _semver_key(live)]
+    if above:
+        raise ArchiveError(
+            f"--into {into} is not below the live release {above[0]} — the archive holds "
+            "published versions only.\n"
+            f"fix: {DADAIA_BIN} release fold {folded_id} --into <last published M.m.p>"
+        )
+    folded_state = _read_state(folded_state_path)
+
+    target_dir = archive_root / into
+    target_state_path = release_state_file(target_dir) if target_dir.is_dir() else None
+    born_target = target_state_path is None
+    if born_target:
+        if not shipped_sha or not pr:
+            raise ArchiveError(
+                f"_archive/{into}/ carries no state document yet — its publication must "
+                "be named to birth it.\n"
+                f"fix: {DADAIA_BIN} release fold {folded_id} --into {into} "
+                "--shipped <develop->main sha> --pr <ship PR>"
+            )
+        if not _SHA_RE.match(shipped_sha) or pr <= 0:
+            raise ArchiveError(
+                f"--shipped {shipped_sha!r} / --pr {pr} are not a commit sha and a PR number.\n"
+                "fix: git log --oneline origin/main | head"
+            )
+        target_state: dict[str, Any] = {
+            "schema": "release-state-v1",
+            "release": into,
+            "phase": "ARCHIVED",
+            "rc": None,
+            "defined": None,
+            "implemented": None,
+            "shipped": {"sha": shipped_sha, "pr": pr, "ts": shipped_ts or _utc_now()},
+            "log": [],
+        }
+    else:
+        assert target_state_path is not None
+        target_state = _read_state(target_state_path)
+        shipped = target_state.get("shipped")
+        if target_state.get("phase") != "ARCHIVED" or not (
+            isinstance(shipped, dict) and shipped.get("sha") and shipped.get("pr")
+        ):
+            raise ArchiveError(
+                f"_archive/{into}/ is not a published, ARCHIVED release.\n"
+                f"fix: {DADAIA_BIN} doctor --specs-dir {specs_dir}"
+            )
+    target_dir.mkdir(parents=True, exist_ok=True)
+    if final and any((target_dir / name).is_file() for name in _TRIO):
+        raise ArchiveError(
+            f"_archive/{into}/ already carries a root trio — only one final candidate.\n"
+            f"fix: {DADAIA_BIN} release fold {folded_id} --into {into}"
+        )
+
+    # ── the move plan: folded rc-K/ first, then the folded root trio ────────────
+    next_rc = max(_rc_numbers(target_dir), default=0) + 1
+    moves: list[tuple[Path, Path]] = []
+    for k in _rc_numbers(folded_dir):
+        moves.append((folded_dir / f"rc-{k}", target_dir / f"rc-{next_rc}"))
+        next_rc += 1
+    root_trio = [name for name in _TRIO if (folded_dir / name).is_file()]
+    placed_at = target_dir if final else target_dir / f"rc-{next_rc}"
+    for name in root_trio:
+        moves.append((folded_dir / name, placed_at / name))
+    rc_after = max([*_rc_numbers(target_dir), next_rc if (root_trio and not final) else 0] + [0])
+    if not root_trio and not final:
+        rc_after = next_rc - 1
+
+    placement = "root (final candidate)" if final else placed_at.name
+    note = {
+        "ts": _utc_now(),
+        "agent": "release-candidates",
+        "kind": "note",
+        "text": (
+            f"Folded former archived release {folded_id} into {into}/{placement}: the "
+            "archive holds published versions only (operator ruling 2026-09-14, ADR 0014)."
+        ),
+    }
+    merged_log = sorted(
+        [*target_state.get("log", []), *folded_state.get("log", [])],
+        key=lambda e: str(e.get("ts", "")),
+    ) + [note]
+    new_state = dict(target_state)
+    new_state["log"] = merged_log
+    new_state["rc"] = rc_after or None
+    defined = [
+        d for d in (target_state.get("defined"), folded_state.get("defined")) if isinstance(d, dict)
+    ]
+    new_state["defined"] = min(defined, key=lambda d: str(d.get("ts", ""))) if defined else None
+    if new_state.get("implemented") is None or final:
+        new_state["implemented"] = folded_state.get("implemented") or new_state.get("implemented")
+
+    original_target_bytes = target_state_path.read_bytes() if target_state_path else None
+    done: list[tuple[Path, Path]] = []
+    try:
+        for src, dst in moves:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            src.rename(dst)
+            done.append((src, dst))
+        (target_dir / RELEASE_STATE_FILENAME).write_text(
+            json.dumps(new_state, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        shutil.rmtree(folded_dir)
+    except BaseException:
+        for src, dst in reversed(done):
+            dst.rename(src)
+        if original_target_bytes is not None:
+            (target_dir / RELEASE_STATE_FILENAME).write_bytes(original_target_bytes)
+        elif born_target:
+            shutil.rmtree(target_dir, ignore_errors=True)
+        raise
+
+    rewritten: list[str] = []
+    suffix = f" | folded into {into}/{placement} (operator ruling 2026-09-14, ADR 0014)"
+
+    def _mutate(record: HistoRecord) -> HistoRecord:
+        return HistoRecord(
+            id=record.id,
+            ts=record.ts,
+            disposition=record.disposition,
+            release=into,
+            reason=record.reason,
+            summary=(record.summary or "") + suffix,
+            entry=record.entry,
+        )
+
+    for histo_id in (folded_id, f"v{folded_id}"):
+        if histo_update(histo_id, _mutate) is not None:
+            rewritten.append(histo_id)
+    return ReleaseFold(
+        folded=folded_id,
+        into=into,
+        rc=new_state["rc"],
+        placed_at=placed_at,
+        target_dir=target_dir,
+        histo_ids=tuple(rewritten),
+    )

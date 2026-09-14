@@ -81,4 +81,4 @@ The arc ends here. Gate -> ship -> archive -> branch cut: `dd-gitflow-default` s
 - Writing source code, tests, or pipelines (other agents) — the closer records test dispositions, never authors a test.
 - Modifying `specs/constitution.md` (requires explicit operator approval).
 - Memory updates outside CLOSURE phase (or DEFINITION under its own authorization) — gate-blocked for any other agent/phase.
-- Re-opening an archived release — once archived, the next minted version supersedes it.
+- Re-opening an archived release, or archiving a candidate as its own release — once archived the next minted version supersedes it, and between two publications a closed candidate is `rc-N/` of the version that will publish it (ADR 0014); `dadaia release fold` repairs the mistake, never a hand move.

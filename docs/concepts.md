@@ -22,7 +22,7 @@ is not a binding.
 
 ## Release and candidate
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:bc20d301cfe8 -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:8c75f3f83bf9 -->
 
 Exactly one *release* is live at a time, named last-published-PyPI + 1 patch, with
 OPEN scope; it grows by *candidates*, each a closed-scope SDD cycle whose SPEC, PLAN
@@ -35,7 +35,7 @@ deploy.
 
 ## The flow
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:bc20d301cfe8 -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:8c75f3f83bf9 -->
 <!-- derived-from: audits-canon sha256:a96df64d264c -->
 
 Every demand takes one of two arms. **Arm A**, a feature, enters through the backlog
@@ -82,7 +82,7 @@ or path an atom cites that no longer exists — reported as a warning, never a r
 
 ## Bugs and backlog
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:bc20d301cfe8 -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:8c75f3f83bf9 -->
 
 Both are records with one shape and one owning verb. `specs/bugs/BUGS.jsonl` holds one
 record per bug, appended once and keyed by `id`, with no git-derived cache — git is the

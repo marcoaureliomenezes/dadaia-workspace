@@ -69,7 +69,7 @@
       "skill": "dd-gitflow-default",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:84f81b26ae4f3629ccd5040fc183b92739061c1624785ee30d6c943a7bf33bac",
+        "section": "sha256:f6239e2f3432ca0e2abb0a692886deb95ce6aa7f8c10ff77d38378038d7f31b3",
         "skill": "sha256:1b13828ad71eb730366c78f3cb229ced3f0765009d79598065563df08cd2cc9a",
         "scoped": []
       },
@@ -168,7 +168,7 @@
         "section": "sha256:2ef9f074230f35dd0095eb76df6c129cc085a28bb54a1764381ef995f1d5ad46",
         "skill": "sha256:f5fc2ad0cd07a8f3896905080ab2c16a0abb5b087d448a44aeef73bee9e88a01",
         "scoped": [
-          "sha256:fa6807beb5f94e5aba949c2708dce49428453382d2aa26ebb06552b4283225e7"
+          "sha256:068932774d313f384a30ae351bb2455a5c499c740b243a6f72148ad75e5d960f"
         ]
       },
       "recorded_by": "ai-engineer",

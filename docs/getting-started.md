@@ -114,7 +114,7 @@ atomically.
 
 ## Run the first candidate
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:bc20d301cfe8 -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:8c75f3f83bf9 -->
 
 A candidate is one closed-scope SDD cycle inside the live release. Nothing drives it:
 the documents are the state, the verbs move the state document, and the markers in
