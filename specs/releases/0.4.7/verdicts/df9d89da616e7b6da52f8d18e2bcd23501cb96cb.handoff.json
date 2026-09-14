@@ -1,0 +1,83 @@
+{
+  "schema_version": "handoff-v1.2",
+  "self_pull": {
+    "refs": [
+      "specs/releases/0.4.7/_RELEASE.json",
+      "specs/releases/0.4.7/SPEC.md",
+      "specs/releases/0.4.7/TASKS.md",
+      "specs/memory/ARCHITECTURE.md",
+      "specs/memory/TECHSTACK.md"
+    ]
+  },
+  "agent": "security-reviewer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-09-14T13:41:23Z",
+  "release_id": "0.4.7",
+  "artifact": {
+    "type": "other"
+  },
+  "scope": "PR-gate re-verdict after rework: feature/0.4.7 -> develop, delta 7450393442d49003c05666cdb10807837e871173..df9d89da616e7b6da52f8d18e2bcd23501cb96cb (6 commits: 3f9dd6c3, b14b577c, 7e7e07d1, 8f64a9bb, d564e213, df9d89da). Of these, 3f9dd6c3/b14b577c/7e7e07d1/8f64a9bb/d564e213 were already reviewed under the superseded 74503934 chain and the REJECTED d564e213 delta verdict (never committed, since only APPROVED verdicts are committed); this session re-verifies that prior content is unchanged and reviews the one new commit, df9d89da, which closes the HIGH (CWE-22) this agent raised on d564e213. Prior chain: e214a463, 62369eb9, 448d365e, 00497199, 18f655ca, 6225e866, 74503934.",
+  "verdict": "APPROVED",
+  "verdict_reason": "Prior HIGH (CWE-22, `fold_release` accepting a traversal-shaped `folded_id` on an existence check alone) closed by df9d89da. Read `git show df9d89da` in full: the diff touches exactly two files, dadaia_workspace/features/specs/candidate.py (8 insertions, 0 deletions) and tests/unit/features/specs/test_candidate_fold.py (19 insertions, 0 deletions) -- no other file, confirmed by `git diff --numstat df9d89da~1 df9d89da`. The added guard `if not is_release_semver(folded_id): raise ArchiveError(...)` is the FIRST statement in `fold_release`'s body, appearing before `archive_root = specs_dir / 'releases' / '_archive'` and `folded_dir = archive_root / folded_id` -- both path-join sites now execute strictly after the refusal, never before. `is_release_semver` (dadaia_workspace/core/specs_version.py:100) matches the fully-anchored `RELEASE_SEMVER_RE = re.compile(r'^v?\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z][0-9A-Za-z.]*)?$')` and additionally refuses any `v`-prefixed value -- a two-dot parent-reference segment prepended to a version-shaped suffix cannot match this pattern (it contains characters and a leading segment the anchored regex forbids), so the guard is airtight for path-segment-shaped payloads, not merely a denylist of one string. The one caller of `fold_release` (dadaia_workspace/cli/commands/newartifacts.py:332) passes the CLI `folded_id` argument straight through with no prior validation or path construction, so the new guard is the sole and first checkpoint on that argument. New test `test_a_traversal_shaped_id_is_refused_before_any_path_is_built` constructs the exact live-release-targeting traversal id named in the prior finding, asserts `ArchiveError` with the refusal message, and asserts the specs tree is byte-identical (`sorted(rglob('*'))` before/after) plus the live release directory and its state document still exist. Independent reproduction on a scratch tmp tree (not the committed fixture) with a synthetic live release and a synthetic ARCHIVED target, calling `fold_release` directly with the same traversal-shaped id: raises `ArchiveError` naming the id as not a bare SemVer archived release id; the tmp tree's file listing is identical before and after; the live release directory and its state document are untouched -- confirms the refusal fires before any `Path` join, `mkdir`, `shutil.move` or `shutil.rmtree` is reachable, closing the exploitable window the prior REJECTED verdict identified. Ran `pytest tests/unit/features/specs/test_candidate_fold.py tests/contract/test_release_tree_canon.py tests/unit/features/specs -q -p no:cacheprovider` -> 304 passed, 0 failed, 0 skipped. Re-verified the five already-reviewed commits in this delta (3f9dd6c3 verdict-file housekeeping only; b14b577c the `release fold` verb plus two doctor rules under ADR 0014; 7e7e07d1 the archive-as-PyPI-history rename/move with no code change; 8f64a9bb backlog-only, BACKLOG.json alone; d564e213 verdict-file deletion only) via `git log --oneline` and `git diff --stat` over the same range against the record in this agent's own prior chain -- commit set and file set match exactly, no additional change slipped in alongside the fix. Secret-pattern grep `(password|passwd|secret|token|api_key|apikey|private_key)\\s*=\\s*[\"'][^\"']{6,}` over df9d89da's diff -> 0 hits. Private-key-header grep over the same diff -> 0 hits. No dependency lockfile, no CI workflow file, no IaC file touched in df9d89da. No CRITICAL/HIGH/MEDIUM finding remains open. Snapshot, not a guarantee of 'secure' (DADAIA.md 7.5) -- the operator owns the merge decision.",
+  "findings": [
+    {
+      "severity": "HIGH",
+      "message": "RESOLVED by df9d89da: fold_release accepted a traversal-shaped folded_id on an existence check alone (CWE-22), reachable via the release fold CLI verb, risking an rmtree outside _archive/.",
+      "detail_md": "Originally raised on this agent's REJECTED delta verdict for commit d564e213 (not committed to disk, since only APPROVED verdicts are recorded under specs/releases/<id>/verdicts/). In b14b577c's `fold_release`, `archive_root / folded_id` was joined and `.is_dir()`-checked before any shape validation on `folded_id`, so a two-dot parent-reference segment naming a real directory carrying a state document -- including the live release's own directory one level up from _archive/ -- would pass the existence check and reach the function's later `shutil.move`/`shutil.rmtree` calls. Closed in df9d89da: `is_release_semver(folded_id)` is now the first statement in the function body, refusing any non-bare-SemVer id (including any two-dot or slash-bearing segment) before `archive_root` or `folded_dir` is ever constructed. Verified line-by-line in `git show df9d89da`, by an independent reproduction on a scratch tree, and by the new regression test `test_a_traversal_shaped_id_is_refused_before_any_path_is_built`, which proves the specs tree stays byte-identical and the live release survives.",
+      "fix_recommendation": "None required -- already fixed in df9d89da. No further action."
+    }
+  ],
+  "metrics": {
+    "commit_sha": "df9d89da616e7b6da52f8d18e2bcd23501cb96cb",
+    "review_range": "6cef01f854ee4e3c1178791270c9813fa9947730..df9d89da616e7b6da52f8d18e2bcd23501cb96cb",
+    "delta_review_range": "7450393442d49003c05666cdb10807837e871173..df9d89da616e7b6da52f8d18e2bcd23501cb96cb",
+    "commits_in_delta": 6,
+    "commits_new_since_prior_rejected_verdict": 1,
+    "fixing_commit_files_changed": 2,
+    "fixing_commit_insertions": 27,
+    "fixing_commit_deletions": 0,
+    "fixing_commit_production_files_changed": 1,
+    "fixing_commit_production_insertions": 8,
+    "fixing_commit_test_files_changed": 1,
+    "fixing_commit_test_insertions": 19,
+    "tests_run": 304,
+    "tests_passed": 304,
+    "tests_failed": 0,
+    "tests_skipped": 0,
+    "independent_repro_traversal_id_refused": true,
+    "independent_repro_tree_byte_identical": true,
+    "independent_repro_live_release_survived": true,
+    "secret_pattern_scan_raw_hits": 0,
+    "secret_pattern_scan_genuine_findings": 0,
+    "private_key_header_grep_hits": 0,
+    "private_key_header_genuine_findings": 0,
+    "dependency_lockfile_touched": false,
+    "ci_workflow_touched": false,
+    "iac_touched": false,
+    "prior_verdicts_covered": [
+      "e214a463 (candidate 4 PR-gate, APPROVED, 0 findings)",
+      "62369eb9 (candidates 2-4 PR-gate, APPROVED, 0 findings)",
+      "448d365efc57fc8f4e0ba37e58f2156f7cb258a2 (delta re-verdict, APPROVED, 0 findings)",
+      "0049719977f91cb75938d852b43271a2eba162b1 (delta re-verdict, APPROVED, 0 findings)",
+      "18f655cadc10eb7734c0e375419659154d0d0825 (PR-gate delta re-verdict, APPROVED, 1 finding, consumed)",
+      "6225e866804b2764f4f15254f8fd49fae24c4cb2 (PR-gate delta re-verdict, APPROVED, 0 findings, consumed)",
+      "7450393442d49003c05666cdb10807837e871173 (PR-gate delta re-verdict, APPROVED, 1 INFO finding, superseded by this verdict)",
+      "d564e213 (PR-gate delta re-verdict, REJECTED, 1 HIGH finding CWE-22, never committed, resolved and superseded by this verdict)"
+    ],
+    "findings_critical": 0,
+    "findings_high": 1,
+    "findings_high_resolved": 1,
+    "findings_medium": 0,
+    "findings_low": 0,
+    "findings_info": 0,
+    "findings_new_in_this_review": 0,
+    "pr_edge": "feature -> develop",
+    "pr_number": null
+  },
+  "decisions_required": [],
+  "next_handoff": {
+    "agent": "project-manager",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "other"
+  }
+}
