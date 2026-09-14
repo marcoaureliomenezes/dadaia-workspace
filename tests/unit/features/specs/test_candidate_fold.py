@@ -213,3 +213,22 @@ def test_a_folded_release_with_its_own_rc_folders_contributes_them_first(specs: 
     target = specs / "releases" / "_archive" / "0.4.5"
     assert (target / "rc-1" / "SPEC.md").read_text() == "old rc\n"
     assert result.placed_at == target / "rc-2" and result.rc == 2
+
+
+def test_a_traversal_shaped_id_is_refused_before_any_path_is_built(specs: Path) -> None:
+    """CWE-22: the folded id is a path segment under _archive/ — only bare SemVer is ever
+    joined, moved or removed. A `..` id naming the live release must not archive it."""
+    live = specs / "releases" / "0.4.7"
+    before = sorted(p.as_posix() for p in specs.rglob("*"))
+    with pytest.raises(ArchiveError, match="not a bare SemVer archived release id"):
+        fold_release(
+            specs,
+            "../0.4.7",
+            into="0.4.5",
+            shipped_sha="fe04319a",
+            pr=240,
+            final=False,
+            histo_update=_Histo().update,
+        )
+    assert live.is_dir() and (live / "_RELEASE.json").is_file()
+    assert sorted(p.as_posix() for p in specs.rglob("*")) == before

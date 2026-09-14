@@ -620,6 +620,14 @@ def fold_release(
     *folded_id* or ``v<folded_id>`` is rewritten in place through *histo_update* —
     ``release`` becomes *into* and the summary names the placement.
     """
+    if not is_release_semver(folded_id):
+        # The id is a path segment under _archive/: only a bare SemVer name may ever be
+        # joined, moved or removed — anything else (a `..`, a slash, a legacy `v` id)
+        # is refused before a single path is built (CWE-22).
+        raise ArchiveError(
+            f"{folded_id!r} is not a bare SemVer archived release id.\n"
+            f"fix: ls {specs_dir / 'releases' / '_archive'}"
+        )
     if not is_release_semver(into):
         raise ArchiveError(
             f"--into {into!r} is not bare SemVer M.m.p.\n"
