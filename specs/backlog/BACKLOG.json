@@ -214,6 +214,117 @@
           "change": "change — code-reviewer, security-reviewer, qa-engineer, software-architect and project-auditor lose Write/Edit; the PM writes their handoff and HTML report from the returned text"
         }
       ]
+    },
+    {
+      "id": "one-line-bootstrap",
+      "title": "One-line bootstrap: uvx dadaia-workspace init <dir> [--repo <url>] scaffolds a full workspace",
+      "opened": "2026-09-18",
+      "status": "candidate",
+      "description": "Adoption blocker #1: today a first workspace takes 7 stages (install, init, context create/alive/bind, doctor, panel, install-hook) while every tool above 20k stars installs in one line. One command, run by the operator with a VALID directory name (required), scaffolds the whole workspace state: root law, harness projections, .dadaia/ zones, venv, hooks. Multi-repo stays the foundation: repos live INSIDE the workspace under repos/<slug>/, never as a monorepo; the minimal case is one workspace with one repo. The first repo is OPTIONAL at bootstrap (--repo <url> clones it, creates its context ALIVE and binds the shell in the same step); without a URL the operator is oriented to repos/ as the place of work and to `dadaia context create/alive` for the first project. No verb of the context lifecycle is visible before the second project.",
+      "provenance": "operator ruling 2026-09-18 (competitive report 'dadaia-workspace: diferencial e panorama competitivo'): five urgencies before any public launch",
+      "intents": [
+        {
+          "subject": {
+            "kind": "catalog",
+            "ref": "workspace-init"
+          },
+          "change": "change — init accepts a required valid directory name and an optional --repo <url>; scaffolds the complete workspace state in one transaction and prints the next step (repos/ orientation or the bound context)"
+        },
+        {
+          "subject": {
+            "kind": "catalog",
+            "ref": "spec-context-project"
+          },
+          "change": "change — the bootstrap repo is born ALIVE and bound in the same step; a single-repo workspace needs no explicit context verb until the second repo"
+        }
+      ]
+    },
+    {
+      "id": "english-only-surface",
+      "title": "100% English surface: law, code, status tokens, catalog headings, recipes, changelog",
+      "opened": "2026-09-18",
+      "status": "candidate",
+      "description": "Adoption blocker #2: control vocabulary in Portuguese (`Aprovado`, `Em revisão`, 'Catálogo de features', APROVADA/BLOQUEADA/APROVADA COM EXCEÇÃO EXPLÍCITA, 'em progresso') sits inside otherwise English law and code; a non-Portuguese adopter meets untranslated status tokens on day 1. Everything public becomes English: DADAIA.md status tokens (`Approved`, `In review`, `Draft`) with a `specs upgrade` migration for existing trees and doctor rules updated in the same change, memory index headings, the consumer validation recipe verdicts, CHANGELOG entries, docstrings and test names. Operator-private rules and memory stay the operator's own. The public-privacy gate gains a language check (no Portuguese control vocabulary under dadaia_workspace/public/), scoped inside this entry's own change.",
+      "provenance": "operator ruling 2026-09-18 (competitive report 'dadaia-workspace: diferencial e panorama competitivo'): five urgencies before any public launch",
+      "intents": [
+        {
+          "subject": {
+            "kind": "catalog",
+            "ref": "sdd-bug-backlog-governance"
+          },
+          "change": "change — canonical status tokens become English; specs upgrade rewrites `Aprovado`/`Em revisão` in every SPEC/PLAN/TASKS; SPEC-DOC rules accept only the English tokens after the migration"
+        },
+        {
+          "subject": {
+            "kind": "catalog",
+            "ref": "consumer-agent-support"
+          },
+          "change": "change — consumer validation recipe verdicts become APPROVED / BLOCKED / APPROVED WITH EXPLICIT EXCEPTION"
+        }
+      ]
+    },
+    {
+      "id": "standalone-skills-distribution",
+      "title": "Publish the self-sufficient skills as Agent Skills packages on every harness channel",
+      "opened": "2026-09-18",
+      "status": "candidate",
+      "description": "Adoption channel: distribution in 2026 is the marketplace, and the Claude marketplace alone is not viable because we support Codex and Kimi Code. The Agent Skills open standard (agentskills.io, 45+ adopters) IS cross-harness: Codex reads .agents/skills, Kimi Code reads .agents/skills, Claude Code reads it via plugin or `--add-dir`, and `npx skills add <repo>` installs into any of them. Publish the skills that survive without the workspace (dd-grill-me, dd-bug-resolution, dd-code-review three-axis, dd-test-stewardship) as one skills repo in the standard layout, registered on the Anthropic marketplace (claude-plugins-official / claude-community), the Codex marketplace (`codex marketplace add`) and installable by `npx skills add`; each skill names dadaia-workspace as the place where the full lifecycle lives. Complements plugin-packaging-and-skill-evals (the whole AI surface as one Claude plugin): this entry is the harness-neutral entry door.",
+      "provenance": "operator ruling 2026-09-18 (competitive report 'dadaia-workspace: diferencial e panorama competitivo'): five urgencies before any public launch",
+      "intents": [
+        {
+          "subject": {
+            "kind": "catalog",
+            "ref": "public-asset-distribution"
+          },
+          "change": "new — a second distribution beside the wheel: a standard Agent Skills repo built from public/skills by one verb, validated by skills-ref"
+        },
+        {
+          "subject": {
+            "kind": "catalog",
+            "ref": "harness-codex"
+          },
+          "change": "change — skills reachable through `codex marketplace add` and `.agents/skills`, no workspace required"
+        },
+        {
+          "subject": {
+            "kind": "catalog",
+            "ref": "harness-kimi-code"
+          },
+          "change": "change — skills reachable through `.agents/skills`, no workspace required"
+        }
+      ]
+    },
+    {
+      "id": "public-presence-and-launch",
+      "title": "Public presence: docs site, 5-minute quickstart, one video, Show HN, awesome-list PRs",
+      "opened": "2026-09-18",
+      "status": "candidate",
+      "description": "Discoverability is zero: 1 star, 0 forks, 0 independent mentions; PyPI is the only channel; search engines return repo PRs before the README; 418 lines of docs for 55 commands. Deliver: a docs site (quickstart in 5 minutes, the bug -> RED -> fix -> resolve loop, and the page 'your product repos never carry agent config, one law governs ten projects'); one short video of the flow; a Show HN post; PRs to awesome-claude-code, awesome-agents.md and awesome-spec-driven-development; one article on the 512-record bug ledger and what it taught about fixes that breed bugs. Always promote the full slug 'dadaia-workspace' (the bare word collides with unrelated content). Gated on one-line-bootstrap, english-only-surface and the ceremony reduction: launching the product as it is invites the BMAD critique.",
+      "provenance": "operator ruling 2026-09-18 (competitive report 'dadaia-workspace: diferencial e panorama competitivo'): five urgencies before any public launch",
+      "intents": [
+        {
+          "subject": {
+            "kind": "catalog",
+            "ref": "brand-identity"
+          },
+          "change": "new — docs site, quickstart, positioning page and launch assets under the dadaia-workspace slug"
+        },
+        {
+          "subject": {
+            "kind": "catalog",
+            "ref": "pypi-distribution"
+          },
+          "change": "change — PyPI/README point at the docs site; README outranks PRs (canonical links, topics, description)"
+        }
+      ]
+    },
+    {
+      "id": "panel-scope-to-unique-value",
+      "title": "Panel: keep only what no harness dashboard has, define the rest with the operator",
+      "opened": "2026-09-18",
+      "status": "idea",
+      "description": "Panel + telemetry are 8.6k LOC (17% of production) and 17 bugs for a surface that codex agents, Copilot Agent HQ and Cursor Agents Window now cover generically. Two things are unique and the operator values them: the cross-harness view per project with cost per model, and managing sub-agents and the model/effort each one gets (the agent_model_policy editor, the only governance UI). To define calmly before picking: (a) is a CLI verb the better home for the policy — `dadaia agents list` / `dadaia agents model <agent> --model <id> --effort <level>` writing agent_model_policy.json and reprojecting, scriptable and diff-able, with the panel as a read-only view; (b) delete what is generic (Servers tab together with the dev-server registry; anything the native dashboards show); (c) keep or drop the loopback web UI itself once the two unique functions live in the CLI. If nothing unique remains in the UI, the panel is deleted, not trimmed.",
+      "provenance": "operator ruling 2026-09-18 (competitive report 'dadaia-workspace: diferencial e panorama competitivo'): five urgencies before any public launch"
     }
   ]
 }
