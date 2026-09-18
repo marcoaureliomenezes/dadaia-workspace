@@ -356,6 +356,102 @@
           "change": "change — the behavior map hash tuple covers scripts/; the 11 canonical skills carry scripts, the 7 generic skills are removed from public/ and published via standalone-skills-distribution"
         }
       ]
+    },
+    {
+      "id": "roster-three-roles-review-lenses",
+      "title": "Roster 9 -> 3: project-manager, software-engineer, code-reviewer; every other role becomes a review lens",
+      "opened": "2026-09-18",
+      "status": "candidate",
+      "description": "Value scale class 14 (roles and orchestration) carries the second-strongest negative signal in the community: coordination tax, subagents starving for context, orchestrators producing garbage. Operator verdict: keep only PM (intake, dispatch, backlog), engineer (all production code and tests) and reviewer (the verdict). Architecture, security, QA, product-engineering, auditing and AI-engineering stop being staffed agents with dispatch bands and become REVIEW LENSES: named axes the reviewer (and the engineer before handing off) applies from a skill, each lens with its checklist and its verdict line, no separate context, no handoff between personas. Ownership table in DADAIA.md section 2 shrinks to three rows; behavior-map and registry drop six personas; the security push verdict is one lens of the reviewer.",
+      "provenance": "operator verdict 2026-09-18 on the competitive report's value scale",
+      "intents": [
+        {
+          "subject": {
+            "kind": "catalog",
+            "ref": "agent-orchestration"
+          },
+          "change": "change — dispatch protocol reduced to three roles; no PM-to-specialist handoff for architecture, security, QA, product, audit or AI-entity work"
+        },
+        {
+          "subject": {
+            "kind": "catalog",
+            "ref": "agent-comms"
+          },
+          "change": "change — inter-persona handoffs for the six retired roles are deleted; lenses report inside the reviewer's one handoff"
+        }
+      ]
+    },
+    {
+      "id": "panel-demolition",
+      "title": "Demolish the panel; server control and sub-agent model injection stay as JSON managed by skill scripts",
+      "opened": "2026-09-18",
+      "status": "candidate",
+      "description": "Operator verdict: the panel (4.9k LOC, 17 bugs, three redesigns) is demolished together with its telemetry UI. What it controlled survives in the new paradigm: (a) sub-agent model and effort per agent remain a JSON policy (agent_model_policy.json) injected into the projected agents at install, managed by a minimal script under the owning skill's scripts/ (list, set model/effort, validate, reproject); (b) dev-server control (register, list, next, release, scan, clean) becomes a minimal script under a skill's scripts/ with the same registry file, ports and TTL. No HTTP server, no SQLite session ingestion, no CSP, no Host allowlist. Flexibility is kept as files plus scripts, not as a UI. Supersedes panel-scope-to-unique-value.",
+      "provenance": "operator verdict 2026-09-18 on the competitive report's value scale",
+      "intents": [
+        {
+          "subject": {
+            "kind": "catalog",
+            "ref": "panel"
+          },
+          "change": "change — the panel feature package, its routes, views and telemetry UI are deleted; the catalog atom is retired"
+        },
+        {
+          "subject": {
+            "kind": "catalog",
+            "ref": "agent-monitoring"
+          },
+          "change": "change — session ingestion and cost tables go; the agent model policy JSON and its skill script are the one control surface"
+        },
+        {
+          "subject": {
+            "kind": "catalog",
+            "ref": "server-registry"
+          },
+          "change": "change — the registry stays a JSON file; its verbs move to a skill-local script; the CLI group server is retired after migration"
+        }
+      ]
+    },
+    {
+      "id": "doctor-drop-scores",
+      "title": "Doctor without scores: keep the rules, run in CI, fail on dead references and superseded decisions",
+      "opened": "2026-09-18",
+      "status": "candidate",
+      "description": "Value scale class 13: nobody in the community asks for a compliance percentage; they ask 'fail my CI when a rule points at a superseded decision'. Operator verdict: remove the compliance(<section>) N/M (P%) and compliance(total) lines and the canonical-count scoring machinery; a doctor run is a list of findings and an exit code, nothing else. Keep every rule. Add the two checks the community names: a memory atom, rule or skill citing an ADR that is superseded, and a citation of a path or symbol that no longer exists, both errors. Wire the doctor as a CI job on every push. Coordinates with sdd-verbs-to-skill-scripts (the ledgers section delegates to skill scripts' check).",
+      "provenance": "operator verdict 2026-09-18 on the competitive report's value scale",
+      "intents": [
+        {
+          "subject": {
+            "kind": "cli",
+            "ref": "doctor"
+          },
+          "change": "change — output is findings + exit code; the compliance score lines, per-section canonical counts and total_compliance are deleted; two new error rules: superseded-ADR citation and dead path/symbol citation; a CI job runs it"
+        }
+      ]
+    },
+    {
+      "id": "spec-context-foundation-hardening",
+      "title": "Spec Context Project is the heart: audit its bug history, rename to main-repo/associated-repos, harden the paradigm",
+      "opened": "2026-09-18",
+      "status": "candidate",
+      "description": "Operator verdict: the foundation stays and must improve. The paradigm that gave birth to dadaia-workspace: open an agent in ONE folder (the workspace) and manage projects that live in repos inside it, with skills, rules, AGENTS.md and the .dadaia/ runtime OUTSIDE every repo; canonical rules that steer away from slop; and the Spec Context Project, where projects are created and managed, each project multi-repo, the main repo hosting specs/. Multi-project where each project can be multi-repo, never a monorepo. Work: (1) a bug-history audit of the spec_context surface (160 of 512 records touch context, bind, session or presence; 8 context deciders before ADR 0003) naming the weak points and the structural fixes; (2) rename the vocabulary everywhere (CLI, JSON state, docs, memory, glossary): repo_slug -> main-repo, associated_repos -> associated-repos, and 'main repo' is defined as the repo where specs/ lives; (3) freeze the context surface: no new verb, no new state, single-repo is the degenerate case of multi-repo; (4) write the paradigm as the first page of the docs. Complements one-line-bootstrap (which owns init and the first-run path) and delete-advisory-presence.",
+      "provenance": "operator verdict 2026-09-18 on the competitive report's value scale",
+      "intents": [
+        {
+          "subject": {
+            "kind": "catalog",
+            "ref": "context-management"
+          },
+          "change": "change — vocabulary main-repo/associated-repos across CLI options, state files, memory and glossary; a bug-history audit of the surface precedes any structural change"
+        },
+        {
+          "subject": {
+            "kind": "catalog",
+            "ref": "product-vision"
+          },
+          "change": "change — the founding paradigm (one workspace folder, projects in repos inside, governance outside, multi-project x multi-repo, never monorepo) becomes the first statement of the product vision atom"
+        }
+      ]
     }
   ]
 }
