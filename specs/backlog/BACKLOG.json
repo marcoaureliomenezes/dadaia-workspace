@@ -319,14 +319,6 @@
       ]
     },
     {
-      "id": "panel-scope-to-unique-value",
-      "title": "Panel: keep only what no harness dashboard has, define the rest with the operator",
-      "opened": "2026-09-18",
-      "status": "idea",
-      "description": "Panel + telemetry are 8.6k LOC (17% of production) and 17 bugs for a surface that codex agents, Copilot Agent HQ and Cursor Agents Window now cover generically. Two things are unique and the operator values them: the cross-harness view per project with cost per model, and managing sub-agents and the model/effort each one gets (the agent_model_policy editor, the only governance UI). To define calmly before picking: (a) is a CLI verb the better home for the policy — `dadaia agents list` / `dadaia agents model <agent> --model <id> --effort <level>` writing agent_model_policy.json and reprojecting, scriptable and diff-able, with the panel as a read-only view; (b) delete what is generic (Servers tab together with the dev-server registry; anything the native dashboards show); (c) keep or drop the loopback web UI itself once the two unique functions live in the CLI. If nothing unique remains in the UI, the panel is deleted, not trimmed.",
-      "provenance": "operator ruling 2026-09-18 (competitive report 'dadaia-workspace: diferencial e panorama competitivo'): five urgencies before any public launch"
-    },
-    {
       "id": "sdd-verbs-to-skill-scripts",
       "title": "SDD ledger verbs move from the CLI into skill-local scripts/ (stdlib, path-parameterized)",
       "opened": "2026-09-18",
