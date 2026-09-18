@@ -32,7 +32,11 @@ from dadaia_workspace.cli._governance_event import record_governance_event
 from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.core.atomic_write import ConcurrentModificationError
 from dadaia_workspace.core.models.backlog import SubjectKind
-from dadaia_workspace.core.models.histo import HistoRecord
+from dadaia_workspace.core.models.histo import (
+    BACKLOG_HISTO_DISPOSITIONS,
+    REQUIRED_EVIDENCE,
+    HistoRecord,
+)
 from dadaia_workspace.core.release_state import RELEASE_STATE_FILENAME
 from dadaia_workspace.features.backlog.document import (
     BacklogExitError,
@@ -491,14 +495,17 @@ def backlog_exit_cmd(
     disposition: str = typer.Option(
         ...,
         "--disposition",
-        help="delivered (needs --release) | superseded (needs --reason) | rejected (needs --reason).",
+        help=" | ".join(
+            f"{word} (needs --{REQUIRED_EVIDENCE[word]})" for word in BACKLOG_HISTO_DISPOSITIONS
+        )
+        + ".",
     ),
     release: str | None = typer.Option(
-        None, "--release", help="The release that delivered the item (live or archived)."
+        None,
+        "--release",
+        help="The release that delivered or superseded the item (live or archived).",
     ),
-    reason: str | None = typer.Option(
-        None, "--reason", help="Why it left: the superseding record, or why it was refused."
-    ),
+    reason: str | None = typer.Option(None, "--reason", help="Why it was refused (rejected)."),
     specs_dir: str | None = typer.Option(
         None,
         "--specs-dir",
