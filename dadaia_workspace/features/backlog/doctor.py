@@ -306,19 +306,22 @@ RULES: tuple[LedgerRule, ...] = (
         (BacklogDoctorCode.BL_SCHEMA.value,),
         SECTION,
         _check_schema,
-        fix_help=f"{DADAIA_BIN} backlog update <slug> --<field> <value>",
+        fix_help="sed -i '<line>s|.*|<the corrected entry line>|' specs/backlog/BACKLOG.json",
     ),
     Rule(
         (BacklogDoctorCode.BL_CONFLICT.value,),
         SECTION,
         _check_conflict,
-        fix_help=f"{DADAIA_BIN} backlog update <slug> --status rejected",
+        fix_help=f"{DADAIA_BIN} backlog exit <slug> --disposition superseded --reason <the-twin-slug>",
     ),
     Rule(
         (BacklogDoctorCode.BL_STALE.value,),
         SECTION,
         _check_stale,
-        fix_help=f"{DADAIA_BIN} backlog update <slug> --status <disposition>",
+        fix_help=(
+            f"{DADAIA_BIN} backlog exit <slug> --disposition <disposition> "
+            "<--release id|--reason why>"
+        ),
     ),
 )
 

@@ -215,7 +215,10 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-035",),
         lambda d: d._governance.check_unarchived_terminal_backlog(),
-        fix_help=f"{DADAIA_BIN} backlog archive",
+        fix_help=(
+            f"{DADAIA_BIN} backlog exit <slug> --disposition <disposition> "
+            "<--release id|--reason why>"
+        ),
     ),
     _rule(
         ("SPEC-DOC-036",),

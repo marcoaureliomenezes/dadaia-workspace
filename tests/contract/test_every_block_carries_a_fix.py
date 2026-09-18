@@ -564,3 +564,51 @@ def test_every_doctor_rule_renders_a_runnable_fix(
         fix=rule.fix_help,
     )
     assert_block_carries_a_runnable_fix(doctor_rules.render_finding(finding))
+
+
+# ── every dadaia fix line names a verb the CLI tree really has ──────────────────
+
+
+def _cli_tree_has(tokens: list[str]) -> bool:
+    """True when ``tokens`` (the words after the dadaia binary, up to the first option
+    or placeholder) walk the live Typer command tree down to a leaf command."""
+    import typer.main
+
+    from dadaia_workspace.cli.main import app
+
+    root = typer.main.get_command(app)
+    ctx = root.make_context("dadaia", [], resilient_parsing=True)
+    cmd: Any = root
+    for token in tokens:
+        if token.startswith(("-", "<")):
+            break
+        subcommands = cmd.list_commands(ctx) if hasattr(cmd, "list_commands") else []
+        if token not in subcommands:
+            return False
+        cmd = cmd.get_command(ctx, token)
+    return not (hasattr(cmd, "list_commands") and cmd.list_commands(ctx))
+
+
+@pytest.mark.parametrize(
+    ("codes", "rule"), _DOCTOR_RULES, ids=[codes for codes, _ in _DOCTOR_RULES]
+)
+def test_every_doctor_fix_names_a_verb_the_cli_has(
+    codes: str, rule: doctor_rules.Rule[Any, Any]
+) -> None:
+    """A ``fix:`` that invokes the dadaia binary must name a verb the CLI tree has.
+
+    Bug ``backlog-doctor-fix-names-missing-update-verb``: BL-SCHEMA, BL-CONFLICT and
+    BL-STALE handed back ``dadaia backlog update``, a verb that no longer exists — the
+    finding's only fix was not executable. A fix line is a free string; nothing tied it
+    to the command tree, so a deleted verb could survive in a fix line forever. This
+    test walks every ``fix_help`` that starts with the dadaia binary through the live
+    command tree and fails on the first verb it cannot find.
+    """
+    from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
+
+    if rule.fix_help is None or not rule.fix_help.startswith(DADAIA_BIN):
+        pytest.skip(f"{codes}: fix line is not a dadaia invocation")
+    tokens = rule.fix_help.split()[1:]
+    assert _cli_tree_has(tokens), (
+        f"{codes}: fix line names a verb the CLI does not have: {rule.fix_help!r}"
+    )
