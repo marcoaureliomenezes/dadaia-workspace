@@ -249,8 +249,8 @@
       "intents": [
         {
           "subject": {
-            "kind": "catalog",
-            "ref": "sdd-bug-backlog-governance"
+            "kind": "cli",
+            "ref": "specs upgrade"
           },
           "change": "change — canonical status tokens become English; specs upgrade rewrites `Aprovado`/`Em revisão` in every SPEC/PLAN/TASKS; SPEC-DOC rules accept only the English tokens after the migration"
         },
@@ -325,6 +325,37 @@
       "status": "idea",
       "description": "Panel + telemetry are 8.6k LOC (17% of production) and 17 bugs for a surface that codex agents, Copilot Agent HQ and Cursor Agents Window now cover generically. Two things are unique and the operator values them: the cross-harness view per project with cost per model, and managing sub-agents and the model/effort each one gets (the agent_model_policy editor, the only governance UI). To define calmly before picking: (a) is a CLI verb the better home for the policy — `dadaia agents list` / `dadaia agents model <agent> --model <id> --effort <level>` writing agent_model_policy.json and reprojecting, scriptable and diff-able, with the panel as a read-only view; (b) delete what is generic (Servers tab together with the dev-server registry; anything the native dashboards show); (c) keep or drop the loopback web UI itself once the two unique functions live in the CLI. If nothing unique remains in the UI, the panel is deleted, not trimmed.",
       "provenance": "operator ruling 2026-09-18 (competitive report 'dadaia-workspace: diferencial e panorama competitivo'): five urgencies before any public launch"
+    },
+    {
+      "id": "sdd-verbs-to-skill-scripts",
+      "title": "SDD ledger verbs move from the CLI into skill-local scripts/ (stdlib, path-parameterized)",
+      "opened": "2026-09-18",
+      "status": "candidate",
+      "description": "Structural cause named by the bug history: every specs/ ledger contract lives in three places that drift separately — the CLI verb that writes, the doctor rule that validates, the skill that instructs (specs 44 bugs, backlog 18, bugs 18, spec_context 48; 'doctor' in 102 titles, 'release' in 56). Every verb also drags context resolution, venv guard and session binding, which have nothing to do with writing one JSON line. Decision: what touches only specs/ (bugs, backlog, release, audit, ADR) becomes a minimal stdlib script under the owning skill's scripts/ (Agent Skills standard name; never python/), parameterized by the specs/ path, no import of dadaia_workspace, one file per verb, <= ~150 lines, tested by the lib's pytest from public/skills/<skill>/scripts/. Each script is the ONE writer and the ONE validator of its ledger (append|resolve|check); dadaia doctor calls check instead of re-implementing the schema. What touches .dadaia/ (init, context, projection, hooks, git chokepoints, workspace doctor) stays in the CLI, which shrinks to workspace operations; dd-cli-library shrinks with it. HANDEDIT/governance-event telemetry for specs/ ledgers is deleted (a WARNING nobody acts on). Contract test: every fix: line of every doctor names a script or verb that exists. Gate for one-line-bootstrap and standalone-skills-distribution: a skill is only distributable alone when it no longer calls the workspace CLI. Skill split by behavior-map: 11 canonical skills keep coming from the lib and gain scripts/ (manager-orchestration, gitflow-default, handoff-emitter, backlog-definition, release-definition, release-implementation, audit-project, spec-navigator, bug-registration, bug-resolution, cli-library); 7 generic ones (grill-me, codebase-design, code-review, domain-modeling, test-stewardship, architecture-survey, ai-eng-knowhow) leave dadaia-workspace for the marketplace repo.",
+      "provenance": "operator demand 2026-09-18, ratified after the competitive report and bug backlog-doctor-fix-names-missing-update-verb (three doctor fix: lines naming a deleted CLI verb)",
+      "intents": [
+        {
+          "subject": {
+            "kind": "catalog",
+            "ref": "sdd-bug-backlog-governance"
+          },
+          "change": "change — bugs/backlog/release/audit/ADR verbs become skill-local scripts/ (stdlib, specs-path parameter); the CLI groups bugs, backlog, release, audit are retired after migration"
+        },
+        {
+          "subject": {
+            "kind": "catalog",
+            "ref": "workspace-doctor"
+          },
+          "change": "change — the ledgers section delegates to each skill script's check; every fix: line names an existing script or verb, enforced by one contract test; HANDEDIT rules for specs/ ledgers deleted"
+        },
+        {
+          "subject": {
+            "kind": "catalog",
+            "ref": "agentic-entities"
+          },
+          "change": "change — the behavior map hash tuple covers scripts/; the 11 canonical skills carry scripts, the 7 generic skills are removed from public/ and published via standalone-skills-distribution"
+        }
+      ]
     }
   ]
 }
