@@ -297,58 +297,6 @@ def test_archive_verbs_refuse_without_a_live_release_with_a_runnable_fix(
 # ── the governance verbs (0.4.7 FR3/FR4/FR5) ───────────────────────────────────
 
 
-def _backlog_tree(tmp_path: Path) -> Path:
-    specs = _specs_tree(tmp_path)
-    (specs / "backlog").mkdir()
-    (specs / "backlog" / "BACKLOG.json").write_text(
-        '{"schema": "backlog-v1", "active": [{"id": "a-thing", "title": "t", '
-        '"opened": "2026-01-01", "status": "picked", "description": "d", '
-        '"provenance": "operator request"}]}',
-        encoding="utf-8",
-    )
-    return specs
-
-
-@pytest.mark.parametrize(
-    ("name", "kwargs"),
-    [
-        ("unknown-disposition", {"disposition": "nope", "reason": "r", "release": "0.0.1"}),
-        (
-            "delivered-without-release",
-            {"disposition": "delivered", "reason": None, "release": None},
-        ),
-        ("rejected-without-reason", {"disposition": "rejected", "reason": None, "release": None}),
-        ("unknown-release", {"disposition": "delivered", "reason": None, "release": "9.9.9"}),
-    ],
-)
-def test_backlog_exit_refusals_carry_a_runnable_fix(
-    name: str, kwargs: dict[str, Any], tmp_path: Path
-) -> None:
-    from dadaia_workspace.features.backlog import document
-
-    specs = _backlog_tree(tmp_path)
-    with pytest.raises(document.BacklogExitError) as exc:
-        document.backlog_exit(specs, "a-thing", histo_store=None, denylist_terms=(), **kwargs)
-    assert_block_carries_a_runnable_fix(str(exc.value))
-
-
-def test_backlog_exit_unknown_slug_carries_a_runnable_fix(tmp_path: Path) -> None:
-    from dadaia_workspace.features.backlog import document
-
-    specs = _backlog_tree(tmp_path)
-    with pytest.raises(document.BacklogExitError) as exc:
-        document.backlog_exit(
-            specs,
-            "never-existed",
-            histo_store=None,
-            disposition="rejected",
-            reason="r",
-            release=None,
-            denylist_terms=(),
-        )
-    assert_block_carries_a_runnable_fix(str(exc.value))
-
-
 def _audit_tree(tmp_path: Path, disposition: str = "open") -> Path:
     specs = _specs_tree(tmp_path)
     audit = specs / "audits" / "20260101-slug"

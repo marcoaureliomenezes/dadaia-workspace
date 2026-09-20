@@ -42,7 +42,7 @@
   `cli/commands/bugs.py` (deleted), `features/bugs/**` (deleted), `container.py`, `setup.cfg`,
   `docs/cli.md`, `public/{scaffold,templates,skills,agents}/**`, `tests/**`.
 
-- [-] T-047-65 — FR2: the backlog ledger moves. `dd-backlog-definition/scripts/backlog.py` with
+- [x] T-047-65 — FR2: the backlog ledger moves. `dd-backlog-definition/scripts/backlog.py` with
   `new exit subjects check` over `backlog/BACKLOG.json` + `_archive/backlog_histo.jsonl`, reading
   `scripts/schemas/{backlog-v1,histo-record-v1}.schema.json`. `exit <slug> --disposition` stays
   once-only and terminal. The CLI-anchor subject registry (`cli/anchors.py`,

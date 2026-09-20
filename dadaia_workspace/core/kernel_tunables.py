@@ -12,6 +12,7 @@ Retired lease/CAS constants are intentionally absent; no tunable in this module 
 from __future__ import annotations
 
 __all__ = [
+    "BACKLOG_SCRIPT",
     "DADAIA_BIN",
     "RECONCILER_THROTTLE_TTL_SECONDS",
     "SENTINEL_GC_TTL_SECONDS",
@@ -39,3 +40,7 @@ RECONCILER_THROTTLE_TTL_SECONDS: int = 30
 #: relative path the venv guard accepts (``hooks/venv_guard``). One home, so a refusal
 #: can never teach an agent a command the guard will block.
 DADAIA_BIN: str = ".dadaia/.venv/bin/dadaia"
+
+#: The backlog ledger's ONE writer since 0.4.7 c7 — every `fix:` naming a backlog
+#: repair names the script that can perform it, never a retired CLI verb.
+BACKLOG_SCRIPT: str = "python3 .agents/skills/dd-backlog-definition/scripts/backlog.py"

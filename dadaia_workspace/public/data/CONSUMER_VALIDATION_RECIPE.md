@@ -175,7 +175,7 @@ an initialized workspace, create it:
 - Run against the IN-REPO specs tree from F-04: `$D doctor --json --specs-dir
   repos/valproj/specs` (must be valid JSON); plant the malformed item as an `active[]`
   entry directly in `repos/valproj/specs/backlog/BACKLOG.json` (the single source —
-  `dadaia backlog new <slug> --specs-dir repos/valproj/specs` creates the document if it
+  `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --specs repos/valproj/specs` creates the document if it
   does not exist yet; then edit the new entry's `status` to `candidate` and leave it
   with no `intents[]` array), then re-run `$D doctor --specs-dir repos/valproj/specs`:
   the `ledgers` section carries BL-SCHEMA. Assert its exit code directly, not through a
@@ -326,8 +326,8 @@ never exercised the live backlog path was false confidence).
 ### R-02 — Real-demand backlog is canonical and consumable
 
 - Author a B3/CVM-style real capture item as `dd-project-manager` would
-  (`dadaia backlog new <slug>` then fill in its `**Intents:**` block, the single-source
-  ACTIVE subsection — SPEC v0.12.0 FR3, ADR #14), then `dadaia backlog subjects
+  (`python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug>` then fill in its `**Intents:**` block, the single-source
+  ACTIVE subsection — SPEC v0.12.0 FR3, ADR #14), then `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py subjects
   --specs-dir <ctx>/specs`.
 - **PASS if:** every emitted `intents[].ref` resolves against the live registry (no
   unresolved subjects) AND a release SPEC naming the item under `**Consumes:**` is

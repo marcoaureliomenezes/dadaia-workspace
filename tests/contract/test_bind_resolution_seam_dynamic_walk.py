@@ -368,7 +368,7 @@ def test_no_resolver_driven_verb_hardcodes_the_dadaia_workspace_default() -> Non
     commands = _walk_leaf_commands()
     # v0.4.5 FR5 (scan-test-vacuity-guard): a broken Typer app tree could dynamically
     # walk to zero leaf commands, under which `offenders` below stays empty vacuously.
-    assert_populated([path for path, _cmd in commands], sentinel=("backlog", "new"))
+    assert_populated([path for path, _cmd in commands], sentinel=("release", "new"))
     offenders: list[str] = []
     for path, cmd in commands:
         for param in _resolution_params(cmd):

@@ -67,7 +67,7 @@ a fuzzy term in the demand becomes a canonical term before it reaches the SPEC.
 - Declare a slug only when fully consumed (all its bound anchors shipped); abort on
   an unknown slug — fix it before it lands in the SPEC.
 - A picked entry stays in `active[]` as `status: picked`; it exits once, at closure,
-  by `dadaia backlog exit` (`dd-release-implementation` RC-FLOW step 7).
+  by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit` (`dd-release-implementation` RC-FLOW step 7).
 - Mechanical backstop: `dadaia doctor`'s `ledgers` section schema-validates
   `BACKLOG.json` and `backlog_histo.jsonl` on every run.
 

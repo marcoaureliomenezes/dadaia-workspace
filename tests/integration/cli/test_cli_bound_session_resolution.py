@@ -25,10 +25,10 @@ pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
 _runner = CliRunner()
 
-#: 0.4.7 FR2 (T-047-64): `dadaia bugs` retired with the ledger's move to
-#: `dd-bug-resolution/scripts/bugs.py`; the seam under test is the SHARED resolution
+#: 0.4.7 FR2 (T-047-64/65): `dadaia bugs` and `dadaia backlog` retired with their
+#: ledgers' move into skill scripts; the seam under test is the SHARED resolution
 #: authority (`cli._specs_resolution`), so any resolver-driven verb exercises it.
-_RESOLVED_ARGS = ["backlog", "new", "fixture-entry"]
+_RESOLVED_ARGS = ["release", "new", "0.0.1"]
 
 
 def _make_workspace(root: Path) -> None:
@@ -60,7 +60,7 @@ def test_bound_session_resolution_context_flag_rootlaw_and_no_workspace_fails_cl
     # error (not the old specific "Workspace Root Law" message — that patch is gone).
     rootlaw_ws = tmp_path / "rootlaw-ws"
     _make_workspace(rootlaw_ws)
-    (rootlaw_ws / "specs" / "backlog").mkdir(parents=True)
+    (rootlaw_ws / "specs" / "releases").mkdir(parents=True)
 
     monkeypatch.chdir(rootlaw_ws)
     rootlaw_result = _runner.invoke(app, _RESOLVED_ARGS)
@@ -73,10 +73,10 @@ def test_bound_session_resolution_context_flag_rootlaw_and_no_workspace_fails_cl
     # (3) T-50-05: outside any dadaia workspace, the old cwd/specs fallback is deleted —
     # this now fails clean instead of silently writing into an ungoverned directory.
     repo = tmp_path / "repo"
-    (repo / "specs" / "backlog").mkdir(parents=True)
+    (repo / "specs" / "releases").mkdir(parents=True)
 
     monkeypatch.chdir(repo)
     repo_result = _runner.invoke(app, _RESOLVED_ARGS)
 
     assert repo_result.exit_code != 0
-    assert not list((repo / "specs" / "backlog").glob("*.json"))
+    assert not list((repo / "specs" / "releases").glob("*"))

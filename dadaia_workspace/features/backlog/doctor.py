@@ -51,7 +51,7 @@ from enum import StrEnum
 from pathlib import Path
 
 from dadaia_workspace.core.doctor_rules import Rule
-from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
+from dadaia_workspace.core.kernel_tunables import BACKLOG_SCRIPT
 from dadaia_workspace.core.models.backlog import (
     INTENTS_EXEMPT_STATUS,
     is_intents_exempt,
@@ -312,15 +312,14 @@ RULES: tuple[LedgerRule, ...] = (
         (BacklogDoctorCode.BL_CONFLICT.value,),
         SECTION,
         _check_conflict,
-        fix_help=f"{DADAIA_BIN} backlog exit <slug> --disposition superseded --reason <the-twin-slug>",
+        fix_help=f"{BACKLOG_SCRIPT} exit <slug> --disposition superseded --reason <the-twin-slug>",
     ),
     Rule(
         (BacklogDoctorCode.BL_STALE.value,),
         SECTION,
         _check_stale,
         fix_help=(
-            f"{DADAIA_BIN} backlog exit <slug> --disposition <disposition> "
-            "<--release id|--reason why>"
+            f"{BACKLOG_SCRIPT} exit <slug> --disposition <disposition> <--release id|--reason why>"
         ),
     ),
 )

@@ -6,11 +6,6 @@
 - audit close — Archive one fully dispositioned audit: the histo record is appended LAST, then
 - audit disposition — Rewrite one finding's disposition, release and reason, in place.
 
-## dadaia backlog — Backlog entry management commands.
-- backlog exit — Retire <slug> out of active[] and append its one backlog_histo record.
-- backlog new — Append one ``active[]`` entry for <slug> to specs/backlog/BACKLOG.json.
-- backlog subjects — List the live canonical-subject anchors, or resolve one proposed subject (read-only).
-
 ## dadaia capabilities — Describe public dadaia-workspace features supported by this installation.
 
 ## dadaia certify — Certify assembled public features in a disposable local workspace.

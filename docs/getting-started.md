@@ -120,7 +120,7 @@ the documents are the state, the verbs move the state document, and the markers 
 
 1. **Demand enters the backlog.** Only the operator creates demand; `project-manager`
    curates `specs/backlog/BACKLOG.json`'s `active[]` through its intake, and
-   `dadaia backlog new` appends the entry. Maturation (`idea → candidate → picked`)
+   `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new` appends the entry. Maturation (`idea → candidate → picked`)
    is hand-written and doctor-validated.
 2. **Birth the release.** `dadaia release new <M.m.p>` writes `SPEC.md` and
    `_RELEASE.json` in phase `DEFINITION` under `specs/releases/<M.m.p>/`, in one
@@ -134,7 +134,7 @@ the documents are the state, the verbs move the state document, and the markers 
    declared write set, then `[-] → [x]` with a `conventional-commit(task-id)` commit.
 6. **Close the candidate.** `dadaia release phase CLOSURE --sha <sha>` requires every
    task `[x]` and stamps `implemented {sha, rc: rc + 1, ts}`. Then the memory update,
-   the closure `log` entries, the disposition sweep (`dadaia backlog exit`,
+   the closure `log` entries, the disposition sweep (`python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit`,
    `dadaia audit disposition`), artifact GC, and the `feature → develop` pull request.
 7. **Continue or promote.** `dadaia release rc-archive` moves the completed trio into
    the next `rc-N/`, sets `rc = N` and returns the release to `DEFINITION` for another

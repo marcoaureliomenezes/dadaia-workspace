@@ -2,7 +2,7 @@
 is canon checked."
 
 The property this task exists to hold: for every shape the scaffolder produces,
-``canon.scaffold(t)`` (or the on-demand ``canon.release_new``/``backlog_new`` siblings)
+``canon.scaffold(t)`` (or the on-demand ``canon.release_new`` sibling)
 leaves a tree where ``canon.check_tree(t) == []`` AND the full ``SpecsDoctor`` reports
 ZERO errors. This ONE parametrized test replaces the six historical regression tests
 that each pinned one bug where a fresh scaffold failed its own doctor (all resolved,
@@ -32,7 +32,6 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.backlog.document import backlog_new
 from dadaia_workspace.features.specs import SpecsDoctor
 from dadaia_workspace.features.specs import canon as canon_mod
 from dadaia_workspace.features.specs.canon import release_new
@@ -120,22 +119,12 @@ def _fresh_release(tmp_path: Path) -> Path:
     return specs_dir
 
 
-def _fresh_backlog_entry(tmp_path: Path) -> Path:
-    """Fresh root specs/ plus one freshly-created backlog entry (``dadaia backlog
-    new``, ``features.backlog.document.backlog_new`` — untouched by this task, but a
-    canon-conformant writer this property test must also hold for)."""
-    specs_dir = _fresh_root_specs(tmp_path)
-    backlog_new(specs_dir, "a-fresh-idea")
-    return specs_dir
-
-
 @pytest.mark.parametrize(
     "make_tree",
     [
         pytest.param(_fresh_root_specs, id="fresh-root-specs"),
         pytest.param(_fresh_repo_specs, id="fresh-repo-specs"),
         pytest.param(_fresh_release, id="fresh-release"),
-        pytest.param(_fresh_backlog_entry, id="fresh-backlog-entry"),
     ],
 )
 def test_scaffold_then_check_tree_and_doctor_are_both_clean(tmp_path, make_tree) -> None:  # type: ignore[no-untyped-def]

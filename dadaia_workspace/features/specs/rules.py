@@ -16,7 +16,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from dadaia_workspace.core.doctor_rules import Rule
-from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
+from dadaia_workspace.core.kernel_tunables import BACKLOG_SCRIPT, DADAIA_BIN
 from dadaia_workspace.features.specs import doctor_adr
 from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
 from dadaia_workspace.features.specs.release_tree import release_tree_issues
@@ -218,8 +218,7 @@ RULES: tuple[SpecsRule, ...] = (
         ("SPEC-DOC-035",),
         lambda d: d._governance.check_unarchived_terminal_backlog(),
         fix_help=(
-            f"{DADAIA_BIN} backlog exit <slug> --disposition <disposition> "
-            "<--release id|--reason why>"
+            f"{BACKLOG_SCRIPT} exit <slug> --disposition <disposition> <--release id|--reason why>"
         ),
     ),
     _rule(

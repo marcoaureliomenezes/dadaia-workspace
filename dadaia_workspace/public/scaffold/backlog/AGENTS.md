@@ -19,13 +19,15 @@ Scope: this file governs only `specs/backlog/`.
 
 ## 2. Authoring rules
 
-- Create and append entries with `dadaia backlog new <slug>` — never hand-edit `BACKLOG.json`.
+- `BACKLOG_PY` below is `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py` — this ledger's ONE writer.
+
+- Create and append entries with `BACKLOG_PY new <slug>` — never hand-edit `BACKLOG.json`.
 - `<slug>` matches `^[a-z][a-z0-9-]+$`.
 - Every `active[]` entry carries five required fields: `title`, `opened` (`YYYY-MM-DD`), `status`, `description`, `provenance`.
 - `status` is `idea`, `candidate`, `picked`, or another live (non-terminal) token.
 - Plus one optional field: `intents` (see §4).
 - An entry must be picked into a release (`dadaia release new`, naming the slug under `**Consumes:**`) to enter SDD.
-- Never delete an entry — `dadaia backlog exit <slug> --disposition …` removes the `active[]` object and appends its one histo record.
+- Never delete an entry — `BACKLOG_PY exit <slug> --disposition …` removes the `active[]` object and appends its one histo record.
 
 ## 3. Terminal disposition tokens
 
@@ -55,15 +57,15 @@ Scope: this file governs only `specs/backlog/`.
 | `invariant` | an `INV-*` identifier | invariant declarations |
 
 ```bash
-dadaia backlog subjects            # list canonical anchors (optionally --kind <kind>)
-dadaia backlog subjects --resolve <ref> --kind <kind>   # preview how one subject resolves
+BACKLOG_PY subjects            # list the bindable anchors (--kind <kind> filters)
+BACKLOG_PY subjects --resolve <ref> --kind <kind>   # how one subject binds
 ```
 
 ### 4.2 Non-Python repos
 
 - `code` anchors derive from Python sources only.
 - A repo with no Python has no `code` anchors — bind `catalog`, `doc`, or `invariant` anchors instead.
-- Use `dadaia backlog subjects` to see what is bindable.
+- Use `BACKLOG_PY subjects` to see what is bindable.
 
 ## 5. Relationship to releases
 

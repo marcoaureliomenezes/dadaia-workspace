@@ -31,7 +31,7 @@ Root workspace behavior is in the workspace `AGENTS.md`; production-source behav
 | `releases/<id>/_RELEASE.json` | `dadaia release phase|new|rc-archive|archive`; `log` entries by the narrating agent |
 | `releases/<id>/{SPEC,PLAN,TASKS}.md` | `dd-project-manager` (SPEC), `dd-software-engineer` (PLAN, TASKS); implementers change only their own task marker |
 | `memory/**` | `dd-project-manager`, in `DEFINITION` and `CLOSURE` phase |
-| `backlog/**` | `dd-project-manager`; entries exit by `dadaia backlog exit` |
+| `backlog/**` | `dd-project-manager`; entries exit by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit` |
 | `bugs/**` | any agent, after the operator confirms the proposal; verbs only |
 | `audits/**` | `dd-code-reviewer` (audit lens); findings move by `dadaia audit disposition|close` |
 
