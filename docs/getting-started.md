@@ -64,14 +64,16 @@ with `dadaia ci install-hook`.
 ## Bind a context — `dadaia context bind`
 
 <!-- derived-from: spec-context-project sha256:b39739176d42 -->
-<!-- derived-from: context-management sha256:a15d8103d473 -->
+<!-- derived-from: context-management sha256:9166a06fab52 -->
 
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
 owned by one main repository, optionally spanning associated repositories that live and
-die with it. Specs, bind, memory, releases and backlog resolve only from the main repo.
+die with it. Specs, bind, memory, releases and backlog resolve only from the main repo —
+the repo where `specs/` lives; a single-repo context is the degenerate multi-repo case,
+and the context surface is frozen (no new verb, state file or session field).
 
 ```bash
-dadaia context create <ctx> --repo-url <url>   # registers it DEAD in the registry
+dadaia context create <ctx> --main-repo <slug> # registers it DEAD in the registry
 dadaia context alive <ctx>                     # clones the repos, folds the canon scaffold over specs/
 dadaia context bind <ctx>                      # this session's scope
 dadaia context show --json                     # what this session resolved

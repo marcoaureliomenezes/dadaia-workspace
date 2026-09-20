@@ -18,28 +18,23 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `public-asset-distribution` | public-asset-distribution | Canonical public assets staged to .dadaia/agentic and projected to the Claude Code, Codex, Kimi Code and .agents roots, hash-compared by doctor. |
+| `brand-identity` | brand-identity | The brand — the dadaia-workspace slug, the rhino mark and the five-colour palette — for the docs site and launch assets; no in-package UI carries it any more. |
+| `public-asset-distribution` | public-asset-distribution | Public assets staged once, projected into the authored set (root map, scoped AGENTS.md, .agents/skills, .agents/agents); .claude/ entries are symlinks. |
 | `pypi-distribution` | pypi-distribution | The published PyPI package on one version axis, the OIDC publish pipeline, and the wheel content contract. |
 
 ### harness
 
 | slug | title | tldr |
 |------|-------|------|
-| `harness-claude-code` | Harness — Claude Code | Entry harness with native sub-agent dispatch; its scaffold is the CLAUDE.md bridge plus the .claude/ projection. |
-| `harness-codex` | Harness — Codex | Entry harness on the operator's Codex CLI — native AGENTS.md, Starlark command policy, version-qualified hook fire, `.codex/` projection. |
-| `harness-kimi-code` | Harness — Kimi Code | Layer-1 harness — inert `.kimi-code/` projection plus user-level TOML hook shims; binds through `DADAIA_CONTEXT` exported at launch. |
-
-### panel
-
-| slug | title | tldr |
-|------|-------|------|
-| `brand-identity` | brand-identity | The brand — the dadaia-workspace slug, the rhino mark and the five-colour palette — for the docs site and launch assets; no in-package UI carries it any more. |
+| `harness-claude-code` | harness-claude-code | Entry harness with native sub-agent dispatch; reads the root AGENTS.md map natively and reaches skills and personas through per-entry symlinks into .agents/. |
+| `harness-codex` | harness-codex | Entry harness on the Codex CLI — native AGENTS.md chain and .agents/skills; .codex/ carries config, hooks, Starlark rules and the persona TOML transcode. |
+| `harness-kimi-code` | harness-kimi-code | Layer-1 harness with an empty projection set — reads root AGENTS.md, .agents/skills and .agents/agents natively; user-level hook shims; DADAIA_CONTEXT binding. |
 
 ### philosophy
 
 | slug | title | tldr |
 |------|-------|------|
-| `product-vision` | product-vision | A local-first, spec-driven workspace that gives AI agents current context, a document-governed lifecycle, visible concurrency and anti-slop boundaries. |
+| `product-vision` | product-vision | One workspace folder, an agent at its root, projects in repos inside, governance outside every repo; multi-project x multi-repo, never a monorepo; no slop. |
 | `spec-context-project` | spec-context-project | One canonical specs tree owned by one main repository, optionally spanning associated repos, bound per session and safe for visible concurrent work. |
 
 ### platform

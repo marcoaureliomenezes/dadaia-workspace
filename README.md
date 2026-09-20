@@ -13,7 +13,7 @@ its **associated repos** are the others it owns.
 
 ## What it is and principles
 
-<!-- derived-from: product-vision sha256:47aa88f339e9 -->
+<!-- derived-from: product-vision sha256:487f57ec4034 -->
 
 dadaia-workspace is the operating environment around repositories developed with AI
 agents. Its unit is the context — a Spec Context Project: one registered `specs/`
@@ -27,15 +27,16 @@ tree and the repositories it owns. Nine pillars:
 - **Deterministic boundaries** — path class, bind scope, root hygiene, venv-rooting and
   the git push gate are mechanical, each refusal carrying its own runnable fix.
 - **Law where mechanism cannot reach** — what cannot be enforced is written once, in
-  one always-on file.
-- **Visible concurrency** — sessions may race; presence warnings and git expose the
-  overlap, and nothing freezes waiting on a lock.
+  the root `AGENTS.md` map or in the scoped `AGENTS.md` that owns the area.
+- **Visible concurrency** — sessions may race; git exposes the overlap, and nothing
+  freezes waiting on a lock.
 - **No mechanism without a demand** — a capability exists only while it earns its
   maintenance cost, and deleted surface beats accreted surface.
 - **No slop** — runtime state, reports, handoffs, caches, projections and temporary
   files have canonical homes and never leak into repositories.
 - **Three Layer-1 entry harnesses** — Claude Code, Codex and Kimi Code; public assets
-  originate once, stage once and project to each runtime root.
+  originate once, stage once, and the authored set is read natively or through
+  per-entry symlinks.
 - **Evidence, never prose** — success is evidenced by reviews, task markers, commands
   and artifacts.
 
@@ -47,7 +48,7 @@ atom under its content hash.
 
 <!-- derived-from: pypi-distribution sha256:80d67bd879ea -->
 <!-- derived-from: workspace-init sha256:5b20a0d9dc80 -->
-<!-- derived-from: context-management sha256:a15d8103d473 -->
+<!-- derived-from: context-management sha256:9166a06fab52 -->
 <!-- derived-from: workspace-doctor sha256:f17e827caadc -->
 
 ```bash
@@ -75,8 +76,8 @@ scope: the context's main repo plus its associated repos.
 
 `dadaia doctor` is the one validator. Three sections run in fixed order — `workspace`,
 `specs`, `ledgers` — each finding printed as one `<CODE> <verdict> <message>` line with
-a mandatory `fix: <command>` under every error, each section ending in a compliance
-line. `--json` mirrors the run; `--fix` applies the repairs a rule owns.
+a mandatory `fix: <command>` under every error; the findings and the exit code are the
+whole report. `--json` mirrors the run; `--fix` applies the repairs a rule owns.
 
 The SDD flow is five verbs of discipline, not an engine: **register** a demand in the
 backlog, **define** a candidate's SPEC/PLAN/TASKS, **implement** one reserved task at a
@@ -84,12 +85,12 @@ time, **review** before the push, **close** the candidate and merge it.
 
 ## An agent reads AGENTS.md and uses it
 
-<!-- derived-from: agentic-entities sha256:17de3503dfb4 -->
+<!-- derived-from: agentic-entities sha256:9ba010732782 -->
 <!-- derived-from: sdd-gate-v3 sha256:a3fcecc38fa6 -->
 <!-- derived-from: sdd-bug-backlog-governance sha256:5268cc21ea84 -->
-<!-- derived-from: harness-claude-code sha256:40422c418b12 -->
-<!-- derived-from: harness-codex sha256:6288bb267eb0 -->
-<!-- derived-from: harness-kimi-code sha256:622511bee49b -->
+<!-- derived-from: harness-claude-code sha256:c2aa6df58b83 -->
+<!-- derived-from: harness-codex sha256:97bdd20f5612 -->
+<!-- derived-from: harness-kimi-code sha256:e65ffffccd63 -->
 <!-- derived-from: agent-comms sha256:8434208d28f3 -->
 
 The always-on law is the root `AGENTS.md` map: the flow, the roles, the gate
@@ -98,18 +99,19 @@ invariants, where output is written. Every governed area carries its own scoped
 acting. Sessions launch at the workspace root.
 
 Three Layer-1 entry harnesses run the same law and read the same authored set — Claude
-Code, Codex and Kimi Code all load `AGENTS.md` natively and reach `.agents/skills` and
-`.agents/agents` through per-entry symlinks. Claude Code is the only one with native
-sub-agent dispatch and carries the three-agent roster. No harness gets a mirror, a copy
-or an underived core surface.
+Code, Codex and Kimi Code all load `AGENTS.md` natively; Codex and Kimi Code read
+`.agents/skills` and `.agents/agents` natively, Claude Code reaches them through
+per-entry symlinks under `.claude/`. Claude Code is the only one with native sub-agent
+dispatch and carries the three `dd-` personas. No harness gets a mirror, a copy or an
+underived core surface.
 
 The gate is a PreToolUse chain of three policies in fixed order — root whitelist, venv
 guard, SDD gate — first block wins; a policy that raises is ALLOW. It blocks exactly
 three things: a new workspace-root entry, a `dadaia`/`pip`/`python -m dadaia_workspace`
 token run outside the workspace virtualenv, and a PROTECTED write or a bound session's
 out-of-scope write under another context's repository. Three path classes, no fourth:
-ADDITIVE (always writable), MUTATING (everything else, scope-judged, records advisory
-presence), PROTECTED (session records and the projected law files, fail-closed). Every
+ADDITIVE (always writable), MUTATING (everything else, scope-judged), PROTECTED
+(session records and the projected `AGENTS.md` set, fail-closed). Every
 BLOCK carries exactly one `fix:` line naming one runnable command, and a contract test
 feeds each fix back through the gate asserting ALLOW — a refusal whose fix is itself
 refused cannot exist. No lease, mutex or wait path exists, and no phase is consulted.

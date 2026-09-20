@@ -46,6 +46,82 @@ tags: [context, lifecycle, session, no-locks, privacy]
 - `dadaia export` refreshes each ALIVE repo's checked-out branch, then writes one file, `.dadaia/dist/spec-contexts.json` (`spec-contexts-export-v1`: per context slug, name, state, repo URL, branch, associated repos, last sync); anything else in `dist/` is `WS-dist-slop` ([[workspace-doctor]]).
 - `dadaia import <file>` accepts only that schema version, registers each unknown name DEAD with its branch and associated repos, prints `skipped (exists)` for a known name and names `dadaia context alive <name>` as the restore step.
 
+## Freeze
+
+- The context surface is frozen (0.4.7 c6, FR6): no new context verb, no new state file, no new session field; a single-repo context is the degenerate case of multi-repo.
+- User-facing vocabulary: **main repo** (where `specs/` lives) and **associated repos** — `context create --main-repo <slug> [--associated-repos a,b]`, `context show --json` keys `main_repo`/`associated_repos`; internal identifiers and the state schema keep their names.
+
+## Bug history (audit 2026-09-20, 0.4.7 c6 FR6)
+
+Window: every `BUGS.jsonl` record whose surface is `spec_context` or whose id/title names
+context, bind, presence, heartbeat or ctx — 89 of 514 records (17 CRITICAL, 33 HIGH, 37 MEDIUM,
+11 LOW); 63 of them opened in July 2026, 12 in August, 12 in September; 0 open today.
+
+### Weak points, by family (structural reading)
+
+1. **Context resolution had many deciders (38 records).** `specs doctor`, `bugs append`,
+   `context show`, `context heartbeat`, `ctx_inject`, the lifecycle runner and the PI adapter
+   each resolved "which context am I in" on their own: persisted bind ignored
+   (`specs-doctor-ignores-persisted-context-bind`, `bugs-append-ignores-persisted-bind`,
+   `context-heartbeat-ignores-persisted-bind`), first-ALIVE fallback stealing the caller's
+   context (`first-alive-fallback-violates-caller-owned-context-contract`,
+   `ctx-inject-newest-bind-epoch-steals-other-sessions-context`,
+   `pi-headless-loads-foreign-context-files`), a context name that differed from its repo slug
+   breaking 9 modules (`lifecycle-*-context-created-with-repo-slug-differs-from-name`).
+   Fix chain: eight per-verb patches (June–July) were symptom patches; the structural fix was ADR
+   0003's one executed-path resolver (`DADAIA_CONTEXT` -> session binding -> repo of cwd,
+   `core/invocation.resolve`) in v0.1.72; no resolution bug after 2026-07-26 except
+   `sdd-gate-resolves-context-from-cwd-not-written-path` (2026-08-28), fixed at the same seam.
+2. **Session identity minted per invocation (11 records, 3 causal chains).**
+   `bind-session-id-divergence` -> `bind-alias-dual-record`; `context-bind-session-id-mismatch`
+   -> `context-heartbeat-requires-env-after-persisted-bind`; `bind-mode-session-record-keyed-by-
+   cli-sid` -> `specs-doctor-ignores-persisted-context-bind`. Every fix that added a second
+   record or an alias bred the next bug; the structural fix was one session-id resolution order
+   (`DADAIA_SESSION_ID` -> harness id -> payload) and one record per session; the heartbeat verb
+   and presence died in 0.4.7 c5, removing the last consumer of the divergence.
+3. **Locks, leases and presence (9 records, 5 CRITICAL).** `rebind-does-not-adopt-same-process-
+   lease`, `layer1-rebind-adopts-lease-to-synthetic-session-self-block`, `release-for-session-
+   misses-unindexed-cross-context-lease`, `doctor-ptr-gc-deletes-valid-lock-free-bind`,
+   `no-locks-doctrine-retains-blocking-context-locks`. Each lease fix moved the deadlock; the
+   structural fix was deletion: NO-LOCKS (v0.1.75), then advisory presence, then presence itself
+   (0.4.7 c5, ADR 0016: one session per checked-out tree). Nothing of the family survives.
+4. **Doctor as a second authority over the root and the zones (14 records).** ROOT-1/ROOT-3/
+   ROOT-4 contradictions with the law (`doctor-root-whitelist-contradicts-root-law`,
+   `doctor-flags-allowed-claude-bridge`, `doctor-root1-flags-env-that-dadaia-md-9-declares-
+   canonical`), exit 0 with issues, --fix aborting a pass, walking a symlinked zone into a repo.
+   Structural fix: one registry (`workspace_layout.DADAIA_ZONES`, root whitelist as the single
+   constant the hook identity-asserts), rendered into `.dadaia/AGENTS.md`; the September doctor
+   records are all fail-open/robustness fixes at that one seam, not new authorities.
+5. **`alive`/`dead`/`baseline` git side effects (9 records).** Auto-commit needing identity,
+   sweeping unrelated worktree changes, refusing the scaffold it just wrote, copying a scaffold
+   image past the canon fold (`context-alive-copies-scaffold-image-bypassing-canon-fold` ->
+   `scaffold-copytree-route-carries-orphaned-releases-active-md`). The verbs that mutate git
+   (`baseline`, `update`, `repo`, `create`, `delete`) are the stale-verb set candidate 7 retires
+   into skill scripts; the structural fix is fewer verbs with git effects, not more guards.
+6. **Slug ownership (3 records, one chain).** `context-create-accepts-slug-owned-by-another-
+   context` -> `context-repo-add-accepts-foreign-context-slug` -> `context-alive-sweeps-
+   unrelated-worktree-changes`: ownership was checked per verb. Structural fix landed 2026-08-24
+   in the service (one ownership check); FR5's vocabulary (main repo = where `specs/` lives)
+   names the invariant those bugs violated.
+
+### Symptom patches, named
+
+`bugs-append-ledger-ignores-context-flag`, `context-show-noarg-ignores-bound-session`,
+`context-show-json-traceback-unbound`, `context-list-json-documented-but-unsupported` and
+`context-heartbeat-*` each fixed one verb's resolution; they were superseded by the single
+resolver and by the death of the verbs. `bind-alias-dual-record` added a second record to fix a
+mismatch and is the clearest puxadinho in the ledger.
+
+### Structural fixes still owed (candidate 7 / 8 scope)
+
+- Retire the git-mutating context verbs (`baseline`, `update`, `repo`, `create`, `delete`) into
+  the one skill script with one ownership check (c7).
+- `init <dir> [--repo]` creates the first context; single-repo is the degenerate multi-repo case
+  and needs no verb of its own (c8).
+- The surface is frozen: no new context verb, no new state file, no new session field.
+
+Bug ids judged: all 89 listed in the audit dataset (`0.4.7 c6 closure log`).
+
 ## Runtime state
 
 `.dadaia/states/spec_contexts.json`; `.dadaia/sessions/`; `.dadaia/dist/spec-contexts.json`; `repos/<slug>/`, where only the main repo carries canonical specs.

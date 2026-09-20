@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-20T19:19:58Z",
+  "generated_at": "2026-09-20T22:36:46Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -63,7 +63,7 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 803,
+      "token_estimate": 842,
       "depends_on": [
         "QUALITY",
         "ARCHITECTURE",
@@ -74,10 +74,29 @@
     },
     {
       "rank": 4,
+      "slug": "brand-identity",
+      "title": "brand-identity",
+      "area": "distribution",
+      "tldr": "The brand — the dadaia-workspace slug, the rhino mark and the five-colour palette — for the docs site and launch assets; no in-package UI carries it any more.",
+      "summary": "The canonical palette and mark survive the panel's demolition as the brand for public presence (docs site, README, launch assets); they live in the repository's public assets, never in a served UI.",
+      "path": "specs/memory/product/distribution/brand-identity.md",
+      "tags": [
+        "brand",
+        "design",
+        "palette"
+      ],
+      "token_estimate": 81,
+      "depends_on": [
+        "pypi-distribution",
+        "product-vision"
+      ]
+    },
+    {
+      "rank": 5,
       "slug": "public-asset-distribution",
       "title": "public-asset-distribution",
       "area": "distribution",
-      "tldr": "Canonical public assets staged to .dadaia/agentic and projected to the Claude Code, Codex, Kimi Code and .agents roots, hash-compared by doctor.",
+      "tldr": "Public assets staged once, projected into the authored set (root map, scoped AGENTS.md, .agents/skills, .agents/agents); .claude/ entries are symlinks.",
       "summary": "The stage, install and doctor chain distributing the agentic surface into runtime roots, with hash-compare overwrite, rendered agents, whole-folder skills and a privacy gate.",
       "path": "specs/memory/product/distribution/public-asset-distribution.md",
       "tags": [
@@ -87,7 +106,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 944,
+      "token_estimate": 1065,
       "depends_on": [
         "agentic-entities",
         "workspace-doctor",
@@ -95,7 +114,7 @@
       ]
     },
     {
-      "rank": 5,
+      "rank": 6,
       "slug": "pypi-distribution",
       "title": "pypi-distribution",
       "area": "distribution",
@@ -117,43 +136,44 @@
       ]
     },
     {
-      "rank": 6,
+      "rank": 7,
       "slug": "harness-claude-code",
-      "title": "Harness — Claude Code",
+      "title": "harness-claude-code",
       "area": "harness",
-      "tldr": "Entry harness with native sub-agent dispatch; its scaffold is the CLAUDE.md bridge plus the .claude/ projection.",
-      "summary": "Claude Code is the only harness with native sub-agent dispatch, loading the law through the CLAUDE.md import chain and running the three-agent roster under the Python hooks.",
+      "tldr": "Entry harness with native sub-agent dispatch; reads the root AGENTS.md map natively and reaches skills and personas through per-entry symlinks into .agents/.",
+      "summary": "How Claude Code loads the workspace law, attaches scoped law, dispatches the three dd- personas, and which hooks and gates it runs; the CLAUDE.md bridge and the DADAIA.md chain died at 0.4.7 candidate 6 (ADR 0017).",
       "path": "specs/memory/product/harness/harness-claude-code.md",
       "tags": [
         "harness",
         "claude-code",
         "projection",
-        "dispatch"
+        "hooks"
       ],
-      "token_estimate": 356,
+      "token_estimate": 414,
       "depends_on": [
+        "agentic-entities",
+        "public-asset-distribution",
         "context-management",
         "sdd-gate-v3",
-        "public-asset-distribution",
         "TECHSTACK",
         "agent-orchestration"
       ]
     },
     {
-      "rank": 7,
+      "rank": 8,
       "slug": "harness-codex",
-      "title": "Harness — Codex",
+      "title": "harness-codex",
       "area": "harness",
-      "tldr": "Entry harness on the operator's Codex CLI — native AGENTS.md, Starlark command policy, version-qualified hook fire, `.codex/` projection.",
-      "summary": "Capability and scaffold truth for the Codex harness — native AGENTS.md discovery, version-qualified hook certification, Starlark command policy and the .codex/ projection.",
+      "tldr": "Entry harness on the Codex CLI — native AGENTS.md chain and .agents/skills; .codex/ carries config, hooks, Starlark rules and the persona TOML transcode.",
+      "summary": "Codex reads the root map, the root->cwd AGENTS.md chain and .agents/skills natively; .codex/ holds config.toml, hooks.json, rules and the three dd- persona TOMLs transcoded from .agents/agents/. The .codex/skills copies and the DADAIA.md mirror died at 0.4.7 candidate 6.",
       "path": "specs/memory/product/harness/harness-codex.md",
       "tags": [
         "harness",
         "codex",
         "projection",
-        "enforcement"
+        "hooks"
       ],
-      "token_estimate": 238,
+      "token_estimate": 279,
       "depends_on": [
         "sdd-gate-v3",
         "TECHSTACK",
@@ -163,23 +183,23 @@
       ]
     },
     {
-      "rank": 8,
+      "rank": 9,
       "slug": "harness-kimi-code",
-      "title": "Harness — Kimi Code",
+      "title": "harness-kimi-code",
       "area": "harness",
-      "tldr": "Layer-1 harness — inert `.kimi-code/` projection plus user-level TOML hook shims; binds through `DADAIA_CONTEXT` exported at launch.",
-      "summary": "Kimi Code is a Layer-1 entry harness whose live wiring is five POSIX shims registered in a managed block of the user-level Kimi config; it binds through DADAIA_CONTEXT.",
+      "tldr": "Layer-1 harness with an empty projection set — reads root AGENTS.md, .agents/skills and .agents/agents natively; user-level hook shims; DADAIA_CONTEXT binding.",
+      "summary": "Kimi Code consumes the universal authored set directly; the .kimi-code/ mirror died at 0.4.7 candidate 6 (ADR 0017). Hooks stay user-level shims; binding is the exported DADAIA_CONTEXT.",
       "path": "specs/memory/product/harness/harness-kimi-code.md",
       "tags": [
         "harness",
         "kimi-code",
-        "layer-1",
-        "projection",
+        "hooks",
         "binding"
       ],
-      "token_estimate": 335,
+      "token_estimate": 331,
       "depends_on": [
         "public-asset-distribution",
+        "agentic-entities",
         "context-management",
         "workspace-init",
         "TECHSTACK",
@@ -188,42 +208,23 @@
       ]
     },
     {
-      "rank": 9,
-      "slug": "brand-identity",
-      "title": "brand-identity",
-      "area": "panel",
-      "tldr": "The brand — the dadaia-workspace slug, the rhino mark and the five-colour palette — for the docs site and launch assets; no in-package UI carries it any more.",
-      "summary": "The canonical palette and mark survive the panel's demolition as the brand for public presence (docs site, README, launch assets); they live in the repository's public assets, never in a served UI.",
-      "path": "specs/memory/product/panel/brand-identity.md",
-      "tags": [
-        "brand",
-        "design",
-        "palette"
-      ],
-      "token_estimate": 81,
-      "depends_on": [
-        "pypi-distribution",
-        "product-vision"
-      ]
-    },
-    {
       "rank": 10,
       "slug": "product-vision",
       "title": "product-vision",
       "area": "philosophy",
-      "tldr": "A local-first, spec-driven workspace that gives AI agents current context, a document-governed lifecycle, visible concurrency and anti-slop boundaries.",
-      "summary": "dadaia-workspace is a local-first environment for context-bound agent work — canonical specs and memory, deterministic gates, a document-governed lifecycle and auditable evidence.",
+      "tldr": "One workspace folder, an agent at its root, projects in repos inside, governance outside every repo; multi-project x multi-repo, never a monorepo; no slop.",
+      "summary": "The founding paradigm and the pillars of dadaia-workspace, plus the two usage paths (a human from a shell, an agent from the root AGENTS.md map).",
       "path": "specs/memory/product/philosophy/product-vision.md",
       "tags": [
         "vision",
-        "philosophy",
-        "identity",
-        "lifecycle",
-        "anti-slop"
+        "paradigm",
+        "pillars"
       ],
-      "token_estimate": 466,
+      "token_estimate": 603,
       "depends_on": [
         "spec-context-project",
+        "context-management",
+        "agentic-entities",
         "sdd-gate-v3",
         "public-asset-distribution",
         "pypi-distribution",
@@ -292,7 +293,7 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 1114,
+      "token_estimate": 1999,
       "depends_on": [
         "workspace-doctor",
         "sdd-gate-v3",

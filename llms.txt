@@ -4,9 +4,9 @@
 
 ## What it is
 
-<!-- derived-from: product-vision sha256:47aa88f339e9 -->
+<!-- derived-from: product-vision sha256:487f57ec4034 -->
 
-- [README](README.md): the unit is the context (a Spec Context Project); documents are the lifecycle; boundaries are mechanical; concurrency is visible, never locked.
+- [README](README.md): one workspace folder, projects in repos inside it, governance outside every repo; the unit is the context (main repo + associated repos); documents are the lifecycle; boundaries are mechanical.
 
 ## Install
 
@@ -18,15 +18,15 @@
 
 ## The law
 
-<!-- derived-from: agentic-entities sha256:17de3503dfb4 -->
+<!-- derived-from: agentic-entities sha256:9ba010732782 -->
 <!-- derived-from: sdd-gate-v3 sha256:a3fcecc38fa6 -->
 
-- [DADAIA.md](dadaia_workspace/public/data/DADAIA.md): the always-on law, projected to the workspace root and to each harness runtime root.
+- [AGENTS.md](dadaia_workspace/public/data/AGENTS.md): the always-on law — the root map, projected once to the workspace root; every governed area carries its own scoped `AGENTS.md`.
 - [Constitution](specs/constitution.md): the derivation law for personas, behaviors, rules and skills.
 
 ## Reference
 
-<!-- derived-from: context-management sha256:a15d8103d473 -->
+<!-- derived-from: context-management sha256:9166a06fab52 -->
 <!-- derived-from: workspace-doctor sha256:f17e827caadc -->
 
 - [CLI reference](docs/cli.md): the committed output of `dadaia help tree`.

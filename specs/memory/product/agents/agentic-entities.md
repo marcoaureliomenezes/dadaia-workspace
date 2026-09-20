@@ -11,14 +11,14 @@ tags: [agents, entities, derivation, governance]
 - Behaviors, personas, rules and skills are defined harness-agnostically, then implemented per entry harness.
 - The derivation law forbids underived core surface (`specs/constitution.md` §3 Dispatcher Purity names the registry as the one source of a persona; the constitution is at 6.0.0, four articles plus the fixed slop block): every `public/agents/*.md` sub-agent derives from a registry Persona and every Persona has its sub-agent, a bijection.
 - Every wired `dadaia_workspace.hooks.*` entrypoint is named by a Behavior, derived for every entry harness, and every core rule projection traces to an Abstract Rule.
-- Skills under `.agents/skills/` and the `AGENTS.md` guardrail files are the universal surface, read natively by every harness, so they carry no derivation and no registry entry.
+- The universal surface — the root `AGENTS.md` map, the scoped `AGENTS.md` files, `.agents/skills/dd-*` and `.agents/agents/dd-*.md` — is authored once and read natively (Codex, Kimi) or through per-entry symlinks (Claude), so it carries no derivation and no registry entry; every dd- skill opens its area's scoped law as step 1, which is how a scoped file reaches a harness that loads only the root->cwd chain.
 - Operator-created sub-agents, skills and rules are exempt; the law governs only what the library scaffolds.
 - `public/entities/registry.json` (`agentic-entities-v1`) carries `personas`, `behaviors` and `rules` with their per-harness `implementations`, plus `universal`; a persona's `mandate` is one sentence and the registry's only restatement of a role (the reviewers' say "validates at candidate close" and "three-axis review", nothing more).
 
 ## The behavior map
 
 - `public/entities/behavior-map.json` is the single declaration of which skill and which scoped rule file operate which section of the law.
-- A row is `{section, anchor, skill, scoped_agents_md[], hash_tuple, recorded_by, recorded_at}`, keyed by the law's section heading.
+- A row is `{section, anchor, skill, scoped_agents_md[], hash_tuple, recorded_by, recorded_at}`, keyed by a section heading of the root map.
 - Every skill and every scoped `AGENTS.md` source on disk has exactly one row, every law section has at least one owner, and several skills may own one section.
 - The map also carries `declared_overlaps`, the canonical home of an intended skill-activation overlap, and the `SKILL.md` line ceiling; no CLI verb and no hook reads it.
 - The corpus is 18 `dd-*` skill directories; `tests/contract/test_slop_ratchets.py` V35 pins the directory count and the total `public/skills/**/*.md` line count at their measured post-closure values, down only, re-pinned at every corpus-touching closure ([[QUALITY]]).
@@ -30,9 +30,8 @@ tags: [agents, entities, derivation, governance]
 
 ## Always-on budget
 
-- The always-on load — law chain, three persona bodies, listed skill descriptions — is measured every release against a stated ceiling by the `words × 1.33` estimator `dd-ai-eng-knowhow`'s `CONTEXT-ENGINEERING.md` defines, with per-section attribution — a closure readout, not a ratchet.
-- A release measuring above its declared ceiling cuts text; the number is never re-measured, averaged or renegotiated to fit.
-- Three personas (ADR 0016) — `project-manager`, `software-engineer`, `code-reviewer`; least privilege derives from each persona's `activity_class` at install (Claude `permissionMode`/`disallowedTools`, Codex `sandbox_mode`); a persona states a rule once and points at the skill that operates it — no playbook table, no restated handoff-schema bullet ([[ARCHITECTURE]]).
+- The always-on load is the root map alone (<= 8192 B); scoped law (<= 4096 B each) and skills (<= 6144 B each) load on demand; `public/data/CONTEXT-MAP.md` records every surface's ceiling, measured bytes and per-harness load trigger, and `tests/contract/test_context_map.py` is the ratchet (ADR 0017).
+- Three personas (ADR 0016) — `dd-project-manager`, `dd-software-engineer`, `dd-code-reviewer`, rendered once into `.agents/agents/`; least privilege derives from each persona's `activity_class` at install (Claude `permissionMode`/`disallowedTools`, Codex `sandbox_mode`); a persona states a rule once and points at the skill that operates it — no playbook table, no restated handoff-schema bullet ([[ARCHITECTURE]]).
 
 ## Dependencies
 

@@ -8,7 +8,7 @@ is `dadaia_workspace/public/data/AGENTS.md`, and the walkthrough is
 ## Context
 
 <!-- derived-from: spec-context-project sha256:b39739176d42 -->
-<!-- derived-from: context-management sha256:a15d8103d473 -->
+<!-- derived-from: context-management sha256:9166a06fab52 -->
 
 A *context* — a Spec Context Project — is one canonical `specs/` tree owned by one
 main repository, the unit for memory, backlog, bugs, releases, reports and handoffs.
@@ -18,7 +18,10 @@ holds each context ALIVE or DEAD; `dadaia context bind` writes one session recor
 resolution answers workspace root, session, context, repo slug, specs dir and the
 session's scope in one call, from `DADAIA_CONTEXT`, then this session's record, then
 the repo containing the cwd — never from the cwd alone, so sitting inside a repository
-is not a binding.
+is not a binding. The vocabulary is the paradigm's: the **main repo** is the repo where
+`specs/` lives, the **associated repos** are the others the context owns; the surface is
+frozen — no new context verb, no new state file, no new session field — and a
+single-repo context is the degenerate case of multi-repo.
 
 ## Release and candidate
 
@@ -57,8 +60,8 @@ It blocks exactly three things: a new workspace-root entry, a leading `dadaia`, 
 or `python -m dadaia_workspace` token run outside the workspace virtualenv, and a
 PROTECTED write or a bound session's write under a repository outside its scope.
 Paths fall in three classes, no fourth: ADDITIVE (always writable), MUTATING
-(everything else, scope-judged, recording advisory presence) and PROTECTED (session
-records and the projected law files, fail-closed). No lease, mutex or wait path exists
+(everything else, scope-judged) and PROTECTED (session records and the projected
+`AGENTS.md` set, fail-closed). No lease, mutex or wait path exists
 and no phase is ever consulted. Every refusal, here and at every other enforcement
 point, carries exactly one `fix:` line naming one runnable command — a refusal whose
 fix is itself refused (a Stall) is unrepresentable, and a contract test proves it by
@@ -66,7 +69,7 @@ feeding each fix back through the gate.
 
 ## Memory
 
-<!-- derived-from: context-management sha256:a15d8103d473 -->
+<!-- derived-from: context-management sha256:9166a06fab52 -->
 <!-- derived-from: workspace-doctor sha256:f17e827caadc -->
 
 *Memory* is current product truth, never history: one Markdown atom per subject under

@@ -397,6 +397,12 @@
       "agent": "dd-software-engineer",
       "kind": "note",
       "text": "AC2.2 headless probes on the live instance, Claude Code. Probe 1 (root map, cwd = workspace root): asked for the first bullet under '# dadaia-workspace' in the attached AGENTS.md rules; reply verbatim '- One workspace folder; the agent session launches at its root, always.' — the root map loads, PASS. Probe 2 (nested scoped law): asked to Read repos/dadaia-workspace/specs/bugs/BUGS.jsonl and then report the first bullet of the specs/bugs/AGENTS.md rules that attached; the correct bullet came back ('- This directory holds the bug ledger: `BUGS.jsonl`, one JSON record per bug, appended once.') but the session reported it read the file directly and that NO rule attached automatically on the Read. The content is reachable; the automatic nested-attachment leg of AC2.2 is UNCONFIRMED on this harness version and is the reviewer's open item. Codex: deferred — the operator's Codex account is stopped, no session could be launched. Kimi: deferred — no provider on this machine; the CONTEXT-MAP row cites the source-verified chain."
+    },
+    {
+      "ts": "2026-09-20T22:34:49Z",
+      "agent": "dd-project-manager",
+      "kind": "note",
+      "text": "AC2.2 nested-attachment leg re-run with a token probe on the live instance (Claude Code 2.1.278, cwd = workspace root): a throwaway .dadaia/tmp/probe/specs/bugs/AGENTS.md carried the token WOMBAT-7; the session was told to Read only x.jsonl in that directory and to open no AGENTS.md; it replied WOMBAT-7. The scoped law attaches automatically on Read — PASS. The earlier self-reported 'no rule attached' was the model's narration, not the harness."
     }
   ]
 }
