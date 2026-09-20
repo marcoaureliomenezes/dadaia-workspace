@@ -385,6 +385,18 @@
       "agent": "release-candidates",
       "kind": "note",
       "text": "Candidate defined at 7cf1538f; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-09-20T22:32:43Z",
+      "agent": "dd-software-engineer",
+      "kind": "size",
+      "text": "Candidate 6 closure measurements (installed bytes, registry tables rendered as `public stage` writes them). Root map AGENTS.md 6107 B (ceiling 8192). Scoped laws (ceiling 4096): specs/memory 4080, .dadaia 4086, specs/releases 3986, specs/backlog 3933, specs/bugs 3923, specs/ADRs and specs/audits under 3900, specs 3506, repos/<slug> 3155, .dadaia/handoff and .dadaia/tmp under 2000, .dadaia/states 1355. Largest SKILL.md dd-codebase-design 5455 B (ceiling 6144). Personas (unbounded): dd-software-engineer 8664 B, dd-project-manager 7266 B, dd-code-reviewer 6341 B. dadaia_workspace/ 36315 LOC (36100 at rc-5); tests 321 files / 1820 functions (371 / 1790 at rc-5). Ratchets: V26 38 statements / 35 files, V31 unit 89 / integration 33 / contract 0 / e2e 0, V32 765, V33 37, V35 18 dirs / 2881 lines, doctor module ceiling 700, import-linter ignore cap 2."
+    },
+    {
+      "ts": "2026-09-20T22:32:43Z",
+      "agent": "dd-software-engineer",
+      "kind": "note",
+      "text": "AC2.2 headless probes on the live instance, Claude Code. Probe 1 (root map, cwd = workspace root): asked for the first bullet under '# dadaia-workspace' in the attached AGENTS.md rules; reply verbatim '- One workspace folder; the agent session launches at its root, always.' — the root map loads, PASS. Probe 2 (nested scoped law): asked to Read repos/dadaia-workspace/specs/bugs/BUGS.jsonl and then report the first bullet of the specs/bugs/AGENTS.md rules that attached; the correct bullet came back ('- This directory holds the bug ledger: `BUGS.jsonl`, one JSON record per bug, appended once.') but the session reported it read the file directly and that NO rule attached automatically on the Read. The content is reachable; the automatic nested-attachment leg of AC2.2 is UNCONFIRMED on this harness version and is the reviewer's open item. Codex: deferred — the operator's Codex account is stopped, no session could be launched. Kimi: deferred — no provider on this machine; the CONTEXT-MAP row cites the source-verified chain."
     }
   ]
 }

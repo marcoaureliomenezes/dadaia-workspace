@@ -151,7 +151,7 @@
   `test_test_suite_ratchets.py` re-pinned. Depends on T-047-57.
   Write set: `tests/contract/**`, `setup.cfg`, `pyproject.toml`.
 
-- [ ] T-047-62 — FR7b: closure. CHANGELOG "Candidate 6 — universal context core";
+- [x] T-047-62 — FR7b: closure. CHANGELOG "Candidate 6 — universal context core";
   `_RELEASE.json` log with the AC2.2 probe results and the measured bytes per surface; live
   instance reflected (stage -> install --target all -> public doctor -> `dadaia doctor --fix`
   exit 0); preflight; push; CI green; `dd-code-review` three axes + six lenses; PR #260

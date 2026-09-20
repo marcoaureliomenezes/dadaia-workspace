@@ -305,6 +305,46 @@ Open-scope release (ADRs 0005–0009): version minted at birth from the PyPI lin
   construction (ADR 0013).
 - Windows runner: derived-doc hashes over LF bytes, POSIX path filters, the telemetry backstop assertion.
 
+### Candidate 6 — universal context core (ADRs 0017-0021; grill 2026-09-20)
+
+#### Removed
+- `public/data/DADAIA.md` and every reference to it. The workspace law had two homes — the
+  36 KB monolith and the scoped files — and loaded twice per Claude session. ONE root
+  `AGENTS.md` map now carries the flow, the roster, the gate, the output paths and the
+  pointers; each governed area's scoped `AGENTS.md` is the system of record for its own rules.
+- `_law_projection_rules` and the per-harness law copies: `.codex/DADAIA.md`,
+  `.kimi-code/DADAIA.md`, `.kimi-code/AGENTS.md`, `repos/<slug>/CLAUDE.md`.
+- The per-harness byte-drift finding classes, replaced by the single `SYMLINK-TARGET-1`.
+- The scoped-subtree pointer list in `.dadaia/AGENTS.md` (the root map's §5 table is its
+  one home).
+
+#### Added
+- `public/data/CONTEXT-MAP.md` — a library document, projected nowhere: one row per context
+  surface (root map, each scoped law, each skill, each persona) with purpose, what belongs
+  there, byte ceiling and measured installed bytes, plus the 10-harness compatibility table.
+- `tests/contract/test_context_map.py` — every scoped law is cited by the map or by a skill's
+  step 1, every step-1 path names a shipped file, every row names a real surface, and the
+  AC1.1 ceilings hold on the INSTALLED (registry-rendered) form.
+- Every `dd-` skill opens its area's scoped `AGENTS.md` as step 1 of its procedure, by
+  workspace-relative path, so it works from any harness with any config.
+- The FR6 freeze statement in `.dadaia/AGENTS.md` (no new context verb, state file or session
+  field) and the founding paradigm opening `README.md`.
+
+#### Changed
+- One authored entity set under `.agents/`, projected by symlink; personas renamed `dd-*`.
+- A link target is a POSIX relative path on every OS; `read_link_target` is the one reading of
+  it, shared by the ledger digest, the doctor compare, the install skip and the tests.
+- `main repo` / `associated repos` is the user-facing vocabulary; a single-repo context is the
+  degenerate multi-repo case, never a second mode.
+- English control vocabulary, one status authority.
+- Measured at closure (installed bytes, registry tables rendered): root `AGENTS.md` 6,107 B
+  (ceiling 8,192); largest scoped law `specs/memory/AGENTS.md` 4,080 B and `.dadaia/AGENTS.md`
+  4,086 B (ceiling 4,096); largest `SKILL.md` `dd-codebase-design` 5,455 B (ceiling 6,144);
+  largest persona `dd-software-engineer` 8,664 B. `dadaia_workspace/` 36,100 -> 36,315 LOC;
+  tests 371 -> 321 files (1,790 -> 1,820 functions). Ratchets re-pinned downward: V26 38/35,
+  V31 unit 89 / integration 33, V32 765; held at their measured value V33 37, V35 18 dirs /
+  2,881 lines.
+
 ### Candidate 5 — demolition (ADR 0016; grill 2026-09-18..20)
 
 #### Removed
