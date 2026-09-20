@@ -5,6 +5,12 @@
 
 A local-first, spec-driven workspace that gives AI agents current context, a document-governed lifecycle, visible concurrency and anti-slop boundaries.
 
+A workspace is one folder. You open an agent session there. Your projects live in repos
+inside it, and the governance — `AGENTS.md`, `.agents/`, `.dadaia/` — sits outside every
+repo, above them all. One workspace holds many projects and many repos; it is never a
+monorepo. Each project is a context: its **main repo** is the repo where `specs/` lives,
+its **associated repos** are the others it owns.
+
 ## What it is and principles
 
 <!-- derived-from: product-vision sha256:47aa88f339e9 -->
@@ -33,9 +39,9 @@ tree and the repositories it owns. Nine pillars:
 - **Evidence, never prose** — success is evidenced by reviews, task markers, commands
   and artifacts.
 
-Two usage paths follow — a human drives it from a shell, an agent reads `DADAIA.md` —
-and both read one truth: every section below derives from a named memory atom under
-its content hash.
+Two usage paths follow — a human drives it from a shell, an agent reads the root
+`AGENTS.md` — and both read one truth: every section below derives from a named memory
+atom under its content hash.
 
 ## A human installs and uses it
 
@@ -47,7 +53,7 @@ its content hash.
 ```bash
 pip install dadaia-workspace
 dadaia init                       # provision a workspace where you stand
-dadaia context create <ctx> --repo-url <url> && dadaia context alive <ctx>
+dadaia context create <ctx> --main-repo <slug> && dadaia context alive <ctx>
 dadaia context bind <ctx>         # this session's scope
 dadaia doctor --context <ctx>     # compliance before any implementation write
 ```
@@ -76,7 +82,7 @@ The SDD flow is five verbs of discipline, not an engine: **register** a demand i
 backlog, **define** a candidate's SPEC/PLAN/TASKS, **implement** one reserved task at a
 time, **review** before the push, **close** the candidate and merge it.
 
-## An agent reads DADAIA.md and uses it
+## An agent reads AGENTS.md and uses it
 
 <!-- derived-from: agentic-entities sha256:17de3503dfb4 -->
 <!-- derived-from: sdd-gate-v3 sha256:a3fcecc38fa6 -->
@@ -86,16 +92,16 @@ time, **review** before the push, **close** the candidate and merge it.
 <!-- derived-from: harness-kimi-code sha256:622511bee49b -->
 <!-- derived-from: agent-comms sha256:8434208d28f3 -->
 
-The complete always-on law is one file, `DADAIA.md`, at the workspace root and mirrored
-into the Codex and Kimi Code runtime roots; Claude Code reaches it through the import
-chain `CLAUDE.md` → `AGENTS.md` → `DADAIA.md`. A scoped `AGENTS.md` governs its own
-subtree and takes precedence there.
+The always-on law is the root `AGENTS.md` map: the flow, the roles, the gate
+invariants, where output is written. Every governed area carries its own scoped
+`AGENTS.md`, which takes precedence in its subtree; the skills open theirs before
+acting. Sessions launch at the workspace root.
 
-Three Layer-1 entry harnesses run the same law. Claude Code is the only one with native
-sub-agent dispatch and carries the nine-agent roster; Codex reads Starlark `.rules` and
-TOML personas; Kimi Code is wired by POSIX hook shims under its own home. Behaviors,
-personas, rules and skills are declared harness-agnostically in one registry and then
-implemented per harness — no underived core surface.
+Three Layer-1 entry harnesses run the same law and read the same authored set — Claude
+Code, Codex and Kimi Code all load `AGENTS.md` natively and reach `.agents/skills` and
+`.agents/agents` through per-entry symlinks. Claude Code is the only one with native
+sub-agent dispatch and carries the three-agent roster. No harness gets a mirror, a copy
+or an underived core surface.
 
 The gate is a PreToolUse chain of three policies in fixed order — root whitelist, venv
 guard, SDD gate — first block wins; a policy that raises is ALLOW. It blocks exactly

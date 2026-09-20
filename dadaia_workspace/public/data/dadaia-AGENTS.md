@@ -15,7 +15,6 @@ Scope: `.dadaia/**` and the deterministic enforcement riding on it.
 - `handoff/AGENTS.md` — machine-readable handoffs.
 - `tmp/AGENTS.md` — scratch files and evidence captures.
 - `states/AGENTS.md` — JSON state files.
-- `agentic/manifest.json` — the lib-originated projection inventory.
 
 ## 3. Context, scope and races
 
@@ -26,6 +25,8 @@ Scope: `.dadaia/**` and the deterministic enforcement riding on it.
 - An out-of-scope write is BLOCKed with `fix: dadaia context bind <owner>`; an unbound session, an unregistered slug and a workspace-root path are never scope-blocked.
 - Races surface, never block — no locks, leases or ownership blocks; alert the operator only at zero ALIVE contexts.
 - One harness session per checked-out tree; a parallel session's worktree is created before launch.
+- The context surface is frozen: no new context verb, no new state file, no new session field.
+- A single-repo context is the degenerate case of multi-repo: the main repo is the one where `specs/` lives, the associated repos are the others the context owns.
 
 ## 4. Git chokepoints
 
@@ -47,8 +48,6 @@ dadaia public install --target all
 dadaia public doctor
 ```
 
-- `--force` is only for a projection hand-edited away from both source and staging.
-- Runtime JSON state changes through `dadaia` CLI commands or the owning service code — never ad hoc text edits.
 
 ## 6. Doctor — the one scan and reaper
 
