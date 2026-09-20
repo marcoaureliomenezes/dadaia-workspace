@@ -23,7 +23,7 @@ Scope: this file governs only `specs/bugs/`.
 - Register a new bug with `dadaia bugs append --bug-id <slug> --title ... --severity ...` and the remaining required flags.
 - Full command reference: `dd-bug-registration`.
 - Never hand-edit `BUGS.jsonl` to keep every entry schema-valid.
-- Every record change is one governance verb: `dadaia bugs append|update|resolve|supersede|defer|reject|archive`; a hand edit surfaces as `LEDGER-BUGS-HANDEDIT`.
+- Every record change is one governance verb: `dadaia bugs append|update|resolve|supersede|defer|reject|archive`.
 - That seam is atomic, refuse-stale, redacted, and refuses any `immutable-core` field or a differing re-set of a `write-once` field.
 - `status` and `closed_at` change only through the four terminal transitions, never through `--set`; `dadaia bugs archive` ages by `closed_at`.
 - `status` has no `picked` value — a pick is the bundled release-definition commit, never a ledger write.

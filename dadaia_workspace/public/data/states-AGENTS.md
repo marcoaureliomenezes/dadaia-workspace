@@ -29,6 +29,5 @@ The closed canon of `.dadaia/states/`, rendered from `core/workspace_layout.py`
 
 ```bash
 dadaia context show --json
-dadaia server list
 dadaia public doctor
 ```

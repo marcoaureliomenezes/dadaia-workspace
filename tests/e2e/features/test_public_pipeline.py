@@ -291,18 +291,12 @@ class TestContentConsistency:
                 assert (skill_dir / "SKILL.md").exists(), (
                     f"Skill directory '{skill_dir.name}' has no SKILL.md"
                 )
-        # T-053-25: dev-server-registry merged into the CLI-help surface — the law's
-        # non-derivable half lives in dd-cli-library §6 now.
-        cli_library_skill = (skills_dir / "dd-cli-library" / "SKILL.md").read_text(encoding="utf-8")
-        for cmd in (
-            "dadaia server list",
-            "dadaia server next",
-            "dadaia server register",
-            "dadaia server release",
-        ):
-            assert cmd in cli_library_skill, (
-                f"dd-cli-library SKILL.md missing dev-server law mention for {cmd!r}"
-            )
+        # 0.4.7 c5 T-047-45: the dev-server registry is the dd-dev-server skill script.
+        registry_script = (skills_dir / "dd-dev-server" / "scripts" / "registry.py").read_text(
+            encoding="utf-8"
+        )
+        for verb in ("register", "release", "next", "clean"):
+            assert f'sub.add_parser("{verb}")' in registry_script, f"registry.py lost {verb!r}"
 
 
 # ---------------------------------------------------------------------------

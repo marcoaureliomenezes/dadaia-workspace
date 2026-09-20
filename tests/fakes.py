@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
-from dadaia_workspace.core.models.server_registry import PortEntry
 from dadaia_workspace.core.models.spec_context import SpecContextProject
 
 
@@ -260,31 +259,6 @@ class FakePythonEnvironmentManager:
             f"{workspace_root}/.dadaia/.venv"
             f"/{PLATFORM.venv_scripts_dir}/pip{PLATFORM.venv_exe_suffix}"
         )
-
-
-class FakeServerRegistryStore:
-    """In-memory ServerRegistryStore — keyed by port number."""
-
-    def __init__(self) -> None:
-        self._store: dict[int, PortEntry] = {}
-
-    def save(self, entry: PortEntry) -> None:
-        self._store[entry.port] = entry
-
-    def update(self, entry: PortEntry) -> None:
-        self._store[entry.port] = entry
-
-    def get(self, port: int) -> PortEntry | None:
-        return self._store.get(port)
-
-    def list_all(self) -> list[PortEntry]:
-        return sorted(self._store.values(), key=lambda e: e.port)
-
-    def delete(self, port: int) -> None:
-        self._store.pop(port, None)
-
-    def count(self) -> int:
-        return len(self._store)
 
 
 class FakeProcessProbe:

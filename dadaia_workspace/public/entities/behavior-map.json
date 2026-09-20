@@ -296,7 +296,7 @@
         "section": "sha256:b060da3f846481122e84561cc2e676a6ac75c0ece954b9b6d9fa14a13934f51c",
         "skill": null,
         "scoped": [
-          "sha256:3dc21b9de72f0ba15398bd97b9be38133978ec44fa0611021c3220890db153ad"
+          "sha256:ed4d20b4157f3a6b9e2b0910e945fdf978cca60eb97ab2337a3003e2c7272157"
         ]
       },
       "recorded_by": "ai-engineer",
@@ -308,8 +308,8 @@
       "skill": "dd-cli-library",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:ebd803da29d54a4a0f43f337494b7b6218c1e0d28827e30721c545922f4c1501",
-        "skill": "sha256:18c3dcdbe9899fc1a7d9b74552a56d9a56a1fec1d020a7852d5310a9950a94a3",
+        "section": "sha256:a5f56f582b1655a0246c1b82becec2be6e86899e99cfdda2d68f5e01ae87bb35",
+        "skill": "sha256:74f68fc8eef2aece4ca4a2ae0c63d35ecff2c18a1ee218260ba54c7de680cb42",
         "scoped": []
       },
       "recorded_by": "ai-engineer",
@@ -340,7 +340,7 @@
         "dadaia_workspace/public/templates/specs-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:faa846ffd42fed43a7b9ce4228937ba11855d1460f61b2495ef60258ffb253a9",
+        "section": "sha256:48f21ea075339c299b711ac1acfb6178078fc57cd4a0be256fb390152f4249de",
         "skill": null,
         "scoped": [
           "sha256:31fe0e6f92c0627356d0015233a94f67d4346ac40ab5a29cd98ba602c031f01f"
@@ -404,6 +404,19 @@
       },
       "recorded_by": "ai-engineer",
       "recorded_at": "2026-09-13"
+    },
+    {
+      "section": "§8 The library surface",
+      "anchor": null,
+      "skill": "dd-dev-server",
+      "scoped_agents_md": [],
+      "hash_tuple": {
+        "section": "sha256:a5f56f582b1655a0246c1b82becec2be6e86899e99cfdda2d68f5e01ae87bb35",
+        "skill": "sha256:bbf082cfd1962de363ad57e12789cd3e4e6bd683e441029170b6b91e03d54d6c",
+        "scoped": []
+      },
+      "recorded_by": "software-engineer",
+      "recorded_at": "2026-09-20"
     }
   ]
 }

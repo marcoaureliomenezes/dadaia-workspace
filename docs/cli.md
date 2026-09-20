@@ -83,15 +83,6 @@
 ## dadaia repos — Query the known repos catalog.
 - repos list — List repos from repos.xlsx catalog.
 
-## dadaia server — Manage the dev server port registry.
-- server clean — Remove stale port entries (dead PID or expired TTL).
-- server list — List registered dev servers.
-- server next — Suggest the next available port for a project (deterministic, does not register).
-- server register — Register a port for a project.
-- server release — Release a port (or all ports for a project).
-- server scan — Detect TCP listeners not in the registry (orphan dev servers).
-- server show — Show registered servers for a project.
-
 ## dadaia specs — SDD release-lifecycle structural checks and helpers.
 - specs init — Bootstrap a SDD release-lifecycle specs/ directory structure.
 - specs upgrade — Upgrade a specs/ tree to the canonical pattern version.

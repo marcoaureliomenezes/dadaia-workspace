@@ -23,7 +23,7 @@ unless a protocol or an adapter class is renamed/added.
 
 1. ``_CROSS_FEATURE_COMPOSITION_EXCEPTIONS`` — a handful of ``core/protocols`` classes
    exist not as I/O-boundary ports (ADR-0001's target) but so the ``panel`` feature can
-   depend on a sibling feature (``agents``/``spec_context``/``server_registry``)
+   depend on a sibling feature (``spec_context``)
    WITHOUT importing it directly — the ``features-no-cross-feature`` import-linter
    contract's independence guarantee. Their sole implementer lives under
    ``features/``, never ``infrastructure/`` — ADR-0001 (P-08) only retires the
@@ -56,7 +56,6 @@ _INFRA_DIR = _REPO_ROOT / "dadaia_workspace" / "infrastructure"
 _CROSS_FEATURE_COMPOSITION_EXCEPTIONS: dict[str, str] = {
     "AgentsProvider": "implementer is features.agents.reader.FileSystemAgentsProvider",
     "ContextProjectProvider": "implementer is features.spec_context.service.SpecContextService",
-    "ServerRegistryProvider": "implementer is features.server_registry.service.ServerRegistryService",
 }
 
 # Single-adapter protocols NOT yet retired this pass — visible debt, not silent debt.

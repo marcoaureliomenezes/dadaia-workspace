@@ -13,6 +13,7 @@ tools:
   - Glob
   - Grep
 skills:
+  - dd-dev-server
   - dd-codebase-design
   - dd-cli-library
   - dd-handoff-emitter

@@ -316,7 +316,7 @@
 ### 8.4 Venv and servers
 
 - Invoke `.dadaia/.venv/bin/dadaia` and `.dadaia/.venv/bin/pip` directly, with absolute paths.
-- Register every dev server you start with `dadaia server register`; check the registry before opening a port.
+- Register every dev server you start through `dd-dev-server` (`scripts/registry.py register`); check the registry before opening a port.
 
 ### 8.5 Instance compliance
 
@@ -350,7 +350,7 @@
 |---|---|
 | Scoped law | `specs/AGENTS.md`, `.dadaia/AGENTS.md`, `.dadaia/handoff/AGENTS.md`, `repos/<slug>/AGENTS.md`, any nested `AGENTS.md` |
 | Skills | `.claude/skills/`, `.agents/skills/` — skill-to-rule mapping declared once in `public/entities/behavior-map.json` |
-| State | `dadaia context show --json`, `dadaia doctor`, `dadaia public doctor`, `dadaia server list`, `dadaia bugs status` |
+| State | `dadaia context show --json`, `dadaia doctor`, `dadaia public doctor`, `dadaia bugs status` |
 
 - Language: operator preference, default English. Tone: direct, concise, operational.
 

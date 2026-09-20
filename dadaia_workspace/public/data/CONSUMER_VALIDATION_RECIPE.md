@@ -202,14 +202,13 @@ an initialized workspace, create it:
   (non-zero, names the failure).
 
 ### F-14 — Server registry
-- Run: `$D server register --port <p> --project val`; `$D server list`; then re-register
-  the SAME port for the SAME project (`--project val`); then register the same port for a
-  DIFFERENT project (`--project other`).
+- Run the `dd-dev-server` script: `$S register --port <p> --project val`; `$S list`; then
+  re-register the SAME port for the SAME project; then register the same port for a
+  DIFFERENT project (`--project other`), where `$S` is
+  `python3 .agents/skills/dd-dev-server/scripts/registry.py`.
 - **PASS if:** first register + list round-trip; the same-project re-register is an
-  idempotent no-op (exit 0 — a dev server re-registering its own port on restart must not
-  be refused); and the different-project registration is REFUSED with guidance (non-zero,
-  names the owning project). Assert exit codes directly — do not read them through a pipe,
-  which masks them.
+  idempotent no-op (exit 0); and the different-project registration is REFUSED (exit 1,
+  names the owning project). Assert exit codes directly — do not read them through a pipe.
 
 ### F-15 — Memory & injection
 - Setup: an in-repo scaffolded specs tree `S` (`S=repos/vp/specs`; `mkdir -p repos/vp &&

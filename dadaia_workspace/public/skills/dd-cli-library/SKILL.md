@@ -46,12 +46,11 @@ line here and `--help` disagree, `--help` wins.
 
 ## Dev-server law
 
-- Never open a port without the registry: `dadaia server list` →
-  `dadaia server next --project <name> --json` → start →
-  `dadaia server register --port N --project <name>`.
+- Never open a port without the registry: `dd-dev-server` (`scripts/registry.py list`
+  → `next --project <name> --json` → start → `register --port N --project <name>`);
+  release it when the server stops (`release --port N`).
 - Use the returned port even when `is_base_port: false`; release on stop
-  (`dadaia server release --port N`); on `PortConflictError`: `server list`,
-  `server clean` if stale, `server next` again.
+  On a conflict: `list --status all`, `clean`, then `next` again.
 
 ## Done when
 

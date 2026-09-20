@@ -8,7 +8,7 @@ now delegates directly to the primitive, so this file's remaining job is proving
 higher-level JSON store abstraction round-trips non-ASCII data end to end, not the
 primitive's own byte-level contract).
 
-Ensures that JSON stores (JsonContextStore, JsonServerRegistryStore) round-trip
+Ensures that the JSON context store round-trips
 non-ASCII data (paths, project names) correctly and the files on disk are valid UTF-8.
 """
 
@@ -35,7 +35,7 @@ def _make_ctx(name: str, repo_slug: str = "test-repo") -> object:
 
 
 def test_json_stores_roundtrip_non_ascii_and_valid_utf8(tmp_path: Path) -> None:
-    """JsonContextStore and JsonServerRegistryStore both round-trip non-ASCII data
+    """JsonContextStore round-trips non-ASCII data
     (names/paths) correctly and the on-disk file is valid UTF-8."""
     from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 
@@ -56,39 +56,3 @@ def test_json_stores_roundtrip_non_ascii_and_valid_utf8(tmp_path: Path) -> None:
     ctx_decoded = ctx_raw.decode("utf-8")  # must not raise
     ctx_data = json.loads(ctx_decoded)
     assert "contexts" in ctx_data
-
-    from dadaia_workspace.core.models.server_registry import PortEntry
-    from dadaia_workspace.infrastructure.json_server_registry_store import (
-        JsonServerRegistryStore,
-    )
-
-    registry_states_dir = tmp_path / "registry-states"
-    registry_states_dir.mkdir()
-    registry_store = JsonServerRegistryStore(registry_states_dir)
-
-    registry_store.save(
-        PortEntry(
-            port=3100,
-            project="café-résumé-テスト",
-            reserved_at="2026-06-09T00:00:00Z",
-            expires_at="2026-06-09T08:00:00Z",
-            url="http://localhost:3100",
-        )
-    )
-    registry_store.save(
-        PortEntry(
-            port=3200,
-            project="日本語プロジェクト",
-            reserved_at="2026-06-09T00:00:00Z",
-            expires_at="2026-06-09T08:00:00Z",
-            url="http://localhost:3200",
-        )
-    )
-
-    all_entries = registry_store.list_all()
-    assert any(e.project == "café-résumé-テスト" for e in all_entries)
-    assert any(e.project == "日本語プロジェクト" for e in all_entries)
-
-    registry_state_file = registry_states_dir / "server_registry.json"
-    registry_raw = registry_state_file.read_bytes()
-    registry_raw.decode("utf-8")  # must not raise — verifies UTF-8 encoding on disk
