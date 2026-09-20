@@ -362,11 +362,17 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+    env:
+      CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 2
+      - name: "Secret missing: the review cannot run (operator adds CLAUDE_API_KEY, then requires this check)"
+        if: env.CLAUDE_API_KEY == ''
+        run: echo "::warning::CLAUDE_API_KEY is not set; security-review skipped. Add the secret and require this check in the branch ruleset."
       - uses: anthropics/claude-code-security-review@0c6a49f1fa56a1d472575da86a94dbc1edb78eda  # main 2026-02-11
+        if: env.CLAUDE_API_KEY != ''
         with:
           comment-pr: true
           claude-api-key: ${{ secrets.CLAUDE_API_KEY }}

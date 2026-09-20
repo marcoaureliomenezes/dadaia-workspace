@@ -49,8 +49,8 @@ with `dadaia ci install-hook`.
 
 ## Bind a context — `dadaia context bind`
 
-<!-- derived-from: spec-context-project sha256:a80fd443036b -->
-<!-- derived-from: context-management sha256:a66534def71e -->
+<!-- derived-from: spec-context-project sha256:b39739176d42 -->
+<!-- derived-from: context-management sha256:a15d8103d473 -->
 
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
 owned by one main repository, optionally spanning associated repositories that live and
@@ -72,7 +72,7 @@ the context's main repo plus its associated repos, and it constrains nothing els
 
 ## Check compliance — `dadaia doctor`
 
-<!-- derived-from: workspace-doctor sha256:d487df63fe2b -->
+<!-- derived-from: workspace-doctor sha256:f17e827caadc -->
 
 ```bash
 dadaia doctor --context <ctx> [--json] [--fix] [--redact]
@@ -96,7 +96,7 @@ its own TTL expired.
 
 ## Run the first candidate
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:8c75f3f83bf9 -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:5268cc21ea84 -->
 
 A candidate is one closed-scope SDD cycle inside the live release. Nothing drives it:
 the documents are the state, the verbs move the state document, and the markers in

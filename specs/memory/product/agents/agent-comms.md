@@ -15,7 +15,7 @@ tags: [agent-comms, handoff, schema]
 
 ## Validation and lifecycle
 
-- `dadaia reports validate` exits 0 valid, 1 invalid (or soft violation under `--strict`), 2 file not found, 3 bad invocation, and discovers `.dadaia/handoff/` under `--all`; `dadaia reports doctor` is the only sibling verb.
+- `dadaia reports validate` exits 0 valid, 1 invalid (or soft violation under `--strict`), 2 file not found, 3 bad invocation, and discovers `.dadaia/handoff/` under `--all`; it is the `reports` group's only verb.
 - `core/handoff_index.py` is the one handoff reader: `HandoffIndex.scan()` discovers, `Handoff.schema_version` routes, `Handoff.artifact_path()` resolves and `Handoff.validate()` checks; every other consumer calls it.
 - Validation is stdlib-only and internal to that module, and a schema keyword outside its supported set raises rather than passing unchecked.
 - The `self_pull` rule lives in the service, not the schema: non-empty `refs`, each existing inside the workspace, and role-map coverage — an agent mapped in `core/role_atom_map.py` must list its atom.

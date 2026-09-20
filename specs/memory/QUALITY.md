@@ -43,7 +43,7 @@ Measured by: `pytest tests/contract/test_test_suite_ratchets.py -k v31` (the tes
 ADR: none
 Rationale: an undeclared test is SCAFFOLD by default.
 
-### P-25 · We expire SCAFFOLD: every `Intent: SCAFFOLD` names `expires: <M.m.p>`, and one naming an archived release is red until renewed by a `qa-engineer` verdict.
+### P-25 · We expire SCAFFOLD: every `Intent: SCAFFOLD` names `expires: <M.m.p>`, and one naming an archived release is red until renewed by a `code-reviewer` verdict.
 Measured by: `pytest tests/contract/test_test_suite_ratchets.py -k v28`.
 ADR: none
 Rationale: a temporary test that never expires is a permanent cost.
@@ -67,7 +67,7 @@ Rationale: a document written beside memory rots; one that names its source is r
 
 ### Layers and intent
 
-- Size tiers: unit and contract SMALL, integration MEDIUM, E2E LARGE (Python journeys plus Playwright panel), live Codex-binary validation opt-in outside CI.
+- Size tiers: unit and contract SMALL, integration MEDIUM, E2E LARGE (Python journeys), live Codex-binary validation opt-in outside CI.
 - The suite is hermetic; `tests/conftest.py` blocks a real Codex call without its live flag and fakes `ensure_workspace_venv`.
 - `tests/conftest.py` prepends this checkout to `PYTHONPATH` once for the whole session, so every spawned CLI/hook subprocess imports the worktree under test, never the venv's installed package.
 - Every suite ratchet enumerates the same set — `tests/helpers/suite_files.tracked_test_files()` over `git ls-files -- tests` — so scratch files a concurrent xdist worker writes are outside the measurement by construction.
@@ -78,23 +78,22 @@ Rationale: a document written beside memory rots; one that names its source is r
 
 - `flaky` marks a pass-and-fail on identical code; `quarantine` leaves every gating selector, is bug-gated by P-22, and the lane is empty.
 - Quarantine cap, escalation clock, diagnostic reruns, flake-rate target and the LARGE cap have one home each in `dd-test-stewardship`'s `PARAMETERS.md`.
-- A fail-closed step on the retrying panel E2E job turns an unregistered pass-on-retry red.
 - The structural audit fires when a `PARAMETERS.md` ceiling is crossed — flake rate, LARGE count, quarantine cap; wall-clock growth is a closure readout with no pinned number.
 - Every LARGE test carries a demotion, supersession or keep-justification, and the tree misses the LARGE cap.
-- Curation is a `qa-engineer` verdict; `software-engineer` executes.
+- Curation is a `code-reviewer` verdict (QA lens); `software-engineer` executes.
 - Mutation testing runs once per release off the push path (`mutmut==3.7.0`); its score is evidence, never a gate, and the `core/models/` score ratchets upward only.
 
 ### CI gates
 
-- CI runs the preflight ladder plus cross-OS subsets, integration, Python and panel E2E, repo hygiene, `dadaia doctor` over the checked-out tree, PR governance, the security-verdict gate and gitleaks — every one of the eighteen a required status check on `develop`, gitleaks included.
+- CI runs the preflight ladder plus cross-OS subsets, integration, Python E2E, repo hygiene, `dadaia doctor` over the checked-out tree, PR governance, the `security-review` job (the official `anthropics/claude-code-security-review` Action) and gitleaks — every job a required status check on `develop`, gitleaks included.
 - Push triggers are `main`, `develop` and `feature/**`; PRs to `develop` or `main` run the same matrix as the local preflight.
-- `pr-source-guard` is fail-closed, and the security-verdict gate needs an APPROVED handoff covering the PR head sha from `specs/releases/<id>/verdicts/` ([[sdd-gate-v3]]).
+- `pr-source-guard` is fail-closed, and `security-review` reviews the PR diff on both edges ([[sdd-gate-v3]]).
 - Every review verdict states the bug-surface delta from `dadaia bugs stats`, and no deploy is approved without the consumer-side matrix ([[consumer-agent-support]]).
 - Ruff `C901` and `PLR1702` are scoped to `dadaia_workspace/` with ceilings pinned in `pyproject.toml` against the enforcing tool; `radon cc` reports and never gates.
 - Caches redirect by configuration, never by a remembered flag: `[tool.pytest.ini_options] addopts` (`-p no:cacheprovider`), `[tool.ruff] cache-dir` and `[tool.mypy] cache_dir` (`../../.dadaia/tmp/<tool>-cache`, relative on every OS), hypothesis `database = None`; a bare `pytest`, `ruff check`, `ruff format --check`, `mypy --strict` from the repo root leaves the tree clean (`tests/unit/features/ci_preflight/test_no_pollution.py`), so `dadaia ci preflight` runs exactly the bare commands.
 - The forbidden repo-local set is `core/workspace_layout.REPO_TREE_EXCLUDED`, measured by `tests/contract/test_source_repo_hygiene.py` and swept at every ALIVE repo by `dadaia doctor` ([[workspace-doctor]]).
 - Memory-vs-code drift is a `dadaia doctor` `specs`-section WARNING (`MEM-DRIFT-1` for the features package map, `MEM-DRIFT-2` for a dead `dadaia <verb>` or path an atom cites), never a push-gated test: a package added or a verb deleted mid-implementation is memory drift to fix at the next closure, not a red build ([[workspace-doctor]]).
-- A hand edit of a verb-owned governance record is likewise a WARNING (`LEDGER-*-HANDEDIT`, `RELEASE-TREE-HANDEDIT`), exit 0, measured only where a governance-event store exists — CI has none, so no build turns red on it ([[sdd-bug-backlog-governance]]).
+- A citation of a superseded decision is an ERROR (`ADR-SUPERSEDED-CITATION`): a rule pointing at a dead ADR fails the build ([[workspace-doctor]]).
 - A doctor fix is proven on the executed path: `tests/contract/test_ledgers_validate.py` locates the issue and `tests/unit/features/specs/test_ledgers_fix_canonical_form.py` runs `--fix` over a committed-shaped record file and asserts the re-serialized line, never the fixer's return value; a schema drop ships with its repair and its test in the same change.
 
 ### Slop measurement
@@ -106,7 +105,7 @@ Rationale: a document written beside memory rots; one that names its source is r
 
 ### Dependencies
 
-[[TECHSTACK]], [[ARCHITECTURE]], [[panel]], [[consumer-agent-support]], [[sdd-gate-v3]], [[sdd-bug-backlog-governance]], [[workspace-doctor]].
+[[TECHSTACK]], [[ARCHITECTURE]], [[consumer-agent-support]], [[sdd-gate-v3]], [[sdd-bug-backlog-governance]], [[workspace-doctor]].
 
 <!-- dadaia:fixed slop-tests -->
 ### Slop — tests (fixed)

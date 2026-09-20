@@ -77,7 +77,7 @@
   doctor`; citations purged; `docs/cli.md` regenerated. Write set: `features/specs/**`,
   `features/repos/**`, `core/**`, `cli/**`, `infrastructure/excel_reader.py`, `public/**`,
   `pyproject.toml`, `poetry.lock`, `docs/cli.md`, `tests/**`.
-- [ ] T-047-50 — FR8 closure: ratchets re-pinned; LOC/test counts in `_RELEASE.json` log;
+- [x] T-047-50 — FR8 closure: ratchets re-pinned; LOC/test counts in `_RELEASE.json` log;
   `CHANGELOG.md`; memory pass (atoms retired/corrected per SPEC FR8); stage -> install ->
   public doctor -> doctor on the live instance; preflight; push; CI green; `dd-code-review`
   three-axis pass; `feature -> develop` merge; gate. Write set: `tests/contract/**`,

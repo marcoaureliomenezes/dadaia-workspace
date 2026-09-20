@@ -91,8 +91,8 @@ _ALLOWLIST_MARKER = "# allow-private-import:"
 # number requires a same-commit justification — a newly-added private-symbol
 # import is a newly-frozen Hyrum's-Law liability (test-minimization-literature.md
 # §1.6, Part 3.1).
-_V26_STATEMENT_CEILING = 60
-_V26_FILE_CEILING = 54
+_V26_STATEMENT_CEILING = 39
+_V26_FILE_CEILING = 36
 
 
 def _private_symbol_import_statements(

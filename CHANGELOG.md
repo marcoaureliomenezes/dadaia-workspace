@@ -305,6 +305,47 @@ Open-scope release (ADRs 0005–0009): version minted at birth from the PyPI lin
   construction (ADR 0013).
 - Windows runner: derived-doc hashes over LF bytes, POSIX path filters, the telemetry backstop assertion.
 
+### Candidate 5 — demolition (ADR 0016; grill 2026-09-18..20)
+
+#### Removed
+- The panel (`features/panel`, `dadaia panel`, `panel_composition`, `mistune`, the Playwright
+  suite and the `e2e-panel` CI jobs) and `features/agents` (its only seam); the model/effort
+  policy stays a JSON edited by hand with two templates (`balanced`, `max-quality`).
+- Telemetry (`features/telemetry`, the SQLite store, the session readers, the locks and models),
+  the governance-event writer and every call site, `LEDGER-*-HANDEDIT` and
+  `RELEASE-TREE-HANDEDIT`.
+- Advisory presence (`presence.py`, the presence zone, `PRESENCE-GC`), the pre-commit hook and
+  `ci pre-commit-check`, `context heartbeat`, `context release`; a MUTATING write records
+  nothing. The throttle-marker idiom moved to `features/spec_context/markers.py`.
+- The `dadaia server` group and `features/server_registry` — the registry JSON is now owned by
+  `dd-cli-library/scripts/registry.py` (list, next, register, release, clean, scan).
+- The sha-keyed security verdict (`chokepoints/verdict.py`, `ci verdict-check`,
+  `pr-verdict-check.sh`, `check-verdict.sh`, the `verdict-gate` jobs, `SPEC-DOC-044`, the
+  `verdicts/` canon row).
+- Six personas — `ai-engineer`, `product-engineer`, `project-auditor`, `qa-engineer`,
+  `security-reviewer`, `software-architect` — and the nine-persona router; the role-atom map.
+- The doctor's `compliance(<section>)` and `compliance(total)` lines and the `--json`
+  compliance payload.
+- `specs/releases/_ideas/` (canon, scaffold, tests), `repos list` with `openpyxl` and
+  `repos.xlsx`, `public list`, `reports doctor`.
+
+#### Changed
+- Roster 9 -> 3: `project-manager` (SPEC, memory, dispatch), `software-engineer` (PLAN, TASKS,
+  code, tests), `code-reviewer` (three axes plus six lenses: architecture, security, QA,
+  product, audit, AI surface). Fable is never assigned to `code-reviewer`.
+- Least privilege derives from each persona's `activity_class` at install: Claude
+  `permissionMode`/`disallowedTools`, Codex `sandbox_mode`.
+- The PR gate is CI's `security-review` job — the official
+  `anthropics/claude-code-security-review` Action over the diff (`CLAUDE_API_KEY` secret,
+  branch ruleset owned by the operator).
+- `dadaia doctor` is findings plus an exit code; new error rule `ADR-SUPERSEDED-CITATION`.
+- Retired feature names (`agents`, `panel`, `repos`, `telemetry`) stay valid on committed bug
+  records (`RETIRED_FEATURE_PACKAGES`).
+- `specs upgrade` removes a live `releases/_ideas/` that holds only its scaffolded AGENTS.md.
+- Measured at closure: `dadaia_workspace/` 48,816 -> 36,100 LOC; tests 464 -> 371 files
+  (2,147 -> 1,790 functions); ratchets re-pinned downward (V26 39/36, V32 769, V33 37,
+  V35 2,906 lines).
+
 ## [0.4.6] — 2026-09-04
 
 Open-scope release under the release-candidates model it implements (ADRs

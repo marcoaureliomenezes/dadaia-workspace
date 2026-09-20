@@ -15,28 +15,25 @@ tags: [sdd, gate, hooks, enforcement, no-locks, privacy]
 | Class | Behavior |
 |---|---|
 | ADDITIVE | `specs/{bugs,backlog,audits}` at the root or context-relative, `.dadaia/{handoff,tmp,reaped,mcps,.cache}` — the registry's output and ephemeral zones — always writable, bound or not |
-| MUTATING | Everything else, `specs/memory/` and `specs/releases/**` included in every phase; scope-judged under `repos/<slug>/`, records advisory presence |
+| MUTATING | Everything else, `specs/memory/` and `specs/releases/**` included in every phase; scope-judged under `repos/<slug>/` |
 | PROTECTED | `.dadaia/sessions/` and the projected law files — fail-closed |
 
 - Three classes, no fourth: a workspace-root path matching no ADDITIVE or PROTECTED prefix is MUTATING; the projected-law origin is decided with zero I/O — basename `DADAIA.md`, `AGENTS.md` or `CLAUDE.md` at the root or a harness-projection dir, both sets from `core/workspace_layout.py` — so a repo's scoped `AGENTS.md` is MUTATING.
 - Scope is the bound context's main repo plus its associated repos: `hooks/sdd_gate.py` resolves one `core.invocation.Invocation` per write target and passes its `Bind` (context name + `all_repos()` slugs) and the target's owner to `gate_policy.evaluate` as plain data; the policy module imports nothing from `core.invocation` ([[context-management]]).
 - Only `repos/<slug>/` is scope-judged; an unbound session, a slug no context registers and a workspace-root path are never scope-blocked — the gate cannot attribute them and fails open.
-- Every BLOCK from every enforcement point — the three gate blocks, `ci push-gate-check`, `ci verdict-check`, the release verbs, `context heartbeat`, every error-class doctor rule through its mandatory `fix_help` — carries exactly one `fix: <command>` line naming one executable command, venv-rooted when it is `dadaia`; `tests/contract/test_every_block_carries_a_fix.py` drives each refusal through its public seam and feeds the line back through `pre_gate.evaluate_payload` asserting ALLOW, so a BLOCK whose fix is itself blocked (a Stall) is unrepresentable.
+- Every BLOCK from every enforcement point — the three gate blocks, `ci push-gate-check`, the release verbs, every error-class doctor rule through its mandatory `fix_help` — carries exactly one `fix: <command>` line naming one executable command, venv-rooted when it is `dadaia`; `tests/contract/test_every_block_carries_a_fix.py` drives each refusal through its public seam and feeds the line back through `pre_gate.evaluate_payload` asserting ALLOW, so a BLOCK whose fix is itself blocked (a Stall) is unrepresentable.
 - The fix lines: root entry → append the name to `.dadaia/states/instance_exceptions.txt`; session record → `context bind <ctx>`; projected law → `public stage && public install --target all`; out-of-scope write → `context bind <owner>`; venv → the same command venv-rooted.
-- A MUTATING write best-effort upserts a presence record, another live record warning once per throttle window without changing the verdict; presence I/O never raises.
-- The PostToolUse hook renews this session's presence and `last_seen_at` and, on one throttle, runs the workspace reaper (`doctor.reap`, which owns presence GC); it never blocks; `bound_at` against the injection sentinel is the only injection trigger ([[context-management]], [[workspace-doctor]]).
+- A MUTATING write records nothing about its session; races between sessions surface through git (ADR 0016).
+- The PostToolUse hook touches `last_seen_at` and, on one throttle, runs the workspace reaper (`doctor.reap`, which owns marker GC); it never blocks; `bound_at` against the injection sentinel is the only injection trigger ([[context-management]], [[workspace-doctor]]).
 
 ## Git chokepoints
 
-- `pre-commit-presence-gate.sh` is advisory-only, always exits 0, and only warns about another live session.
 - `pre-push-ci-gate.sh` delegates to `ci push-gate-check`, whose refusals are a direct `develop`/`main` push or invalid branch name, a mismatched refspec, an unparseable stdin line, a non-canon `specs/` path, a denylist hit and a git read failure — each one `fix:` line — and it reads no security handoff.
 - `refs/heads/feature/{M.m.p}` is the only pushable ref; the patterns `^main$`, `^develop$`, `^feature/\d+\.\d+\.\d+$` have one source in the package plus a POSIX-ERE translation in CI.
 - A refspec aiming a local ref at a different remote ref is refused; an unparseable stdin line refuses the push naming `git push --no-verify` as the one bypass, empty stdin being the nothing-to-gate allow.
-- The installed pair `.git/hooks/{pre-commit,pre-push}` is `core/workspace_layout.INSTALLED_GIT_HOOKS`, written by `dadaia ci install-hook` and byte-compared per ALIVE repo by `dadaia doctor` (`HOOKS-DRIFT-1`, [[workspace-doctor]]).
-- The security verdict is a pull-request gate: a CI job on both edges requires an APPROVED `security-reviewer` handoff whose `metrics.commit_sha` is the PR head sha, or an ancestor whose only intervening diff is the verdict evidence at `specs/releases/<release-id>/verdicts/<sha>.handoff.json`.
-- The dual qa-plus-security closure gate is the only mechanical check of the qa-engineer verdict.
-- `features/chokepoints` is five modules — `branch_policy`, `denylist_scan`, `pre_commit`, `push_gate`, `verdict` — and `verdict.covering_verdict(paths, head_sha)` is the single verdict reader the push gate, `dadaia doctor` and the PR check all call.
-- A consumed verdict is deleted by hand after the merge; one naming none of the live shas (head, first parent, develop tip — `verdict.live_verdict_shas`) is `SPEC-DOC-044`, refused by the pre-push gate and deleted by `dadaia doctor --fix` ([[workspace-doctor]]).
+- The installed hook `.git/hooks/pre-push` is `core/workspace_layout.INSTALLED_GIT_HOOKS`, written by `dadaia ci install-hook` and byte-compared per ALIVE repo by `dadaia doctor` (`HOOKS-DRIFT-1`, [[workspace-doctor]]).
+- The security review is a pull-request gate: CI's `security-review` job (the official `anthropics/claude-code-security-review` Action, `CLAUDE_API_KEY` secret) reviews the diff on both edges and is required by the branch ruleset; no verdict file exists in the tree (ADR 0016).
+- `features/chokepoints` is three modules — `branch_policy`, `denylist_scan`, `push_gate`.
 - `secret-scan.yml` (gitleaks) runs on every PR to `develop` and `main` and is a required status check on `develop`'s branch protection.
 
 ### Push-range denylist scan
@@ -51,4 +48,4 @@ tags: [sdd, gate, hooks, enforcement, no-locks, privacy]
 
 ## Dependencies
 
-[[context-management]], [[workspace-doctor]], [[ARCHITECTURE]], [[agent-monitoring]].
+[[context-management]], [[workspace-doctor]], [[ARCHITECTURE]].

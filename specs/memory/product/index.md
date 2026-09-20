@@ -11,7 +11,6 @@
 | slug | title | tldr |
 |------|-------|------|
 | `agent-comms` | agent-comms | The handoff-v1 JSON contract agents emit, its stdlib validator behind `dadaia reports`, and ack-on-consume deletion. |
-| `agent-monitoring` | agent-monitoring | Stdlib-only local agent telemetry and the governance-event table in one SQLite store, plus where each runtime artifact under .dadaia/ lives and expires. |
 | `agent-orchestration` | agent-orchestration | Nine core Layer-1 roles, two dispatchers, document-governed ordered work, and advisory-only concurrency. |
 | `agentic-entities` | agentic-entities | Abstract-entity registry — Personas, Behaviors, Rules — plus the behavior map binding every skill and scoped rule file to one law section. |
 
@@ -34,8 +33,7 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `brand-identity` | brand-identity | The panel's canonical five-colour palette and its CSS token mapping, sourced only from `views/assets/css/tokens.py`. |
-| `panel` | panel | Local loopback-only four-tab workspace UI — Projects, Agents, Agentic Entities, Servers. |
+| `brand-identity` | brand-identity | The brand — the dadaia-workspace slug, the rhino mark and the five-colour palette — for the docs site and launch assets; no in-package UI carries it any more. |
 
 ### philosophy
 
@@ -49,9 +47,9 @@
 | slug | title | tldr |
 |------|-------|------|
 | `consumer-agent-support` | Consumer validation gate | A consumer-side validation agent running the shipped recipe on a real workspace is the release gate; no wheel publishes until every statement reports PASS. |
-| `context-management` | context-management | ALIVE/DEAD registry of one main repo plus N associated repos, one Invocation per process, a Bind carrying scope, bind-driven injection, advisory presence. |
+| `context-management` | context-management | ALIVE/DEAD registry of one main repo plus N associated repos, one Invocation per process, a Bind carrying scope, bind-driven injection. |
 | `cross-platform-portability` | cross-platform-portability | Linux, macOS and Windows through one platform capability seam, injected adapters, Python hooks and hard-gated cross-OS CI legs. |
-| `server-registry` | server-registry | Port registry with TTL and PID tracking so parallel agents' dev servers never collide; the 3000-3999 range binds only `next_port`. |
+| `server-registry` | server-registry | Port registry with TTL and PID tracking so parallel agents' dev servers never collide, owned by one stdlib script under the dd-cli-library skill. |
 | `workspace-doctor` | workspace-doctor | The one compliance surface — dadaia doctor scores workspace, specs and ledgers from one rule record; --fix is the reaper, moving slop, deleting only by TTL. |
 | `workspace-init` | workspace-init | Idempotent bootstrap of workspace state, the Python venv, the selected harness projections and the governance hooks. |
 
@@ -60,6 +58,6 @@
 | slug | title | tldr |
 |------|-------|------|
 | `audits-canon` | audits-canon | Audits are committed spec artifacts — three pillars over a sha window, JSONL findings moved by dadaia audit disposition, archived by dadaia audit close. |
-| `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | One bug record shape with no derived cache, one verb per governance record change writing one governance event, and a hand edit measured as a WARNING. |
+| `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | One bug record shape with no derived cache, one verb per governance record change, and every committed record schema-validated by dadaia doctor. |
 | `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write), one fix line per BLOCK, chokepoints at the push. |
 

@@ -30,10 +30,10 @@ tags: [agents, entities, derivation, governance]
 
 ## Always-on budget
 
-- The always-on load — law chain, nine persona bodies, listed skill descriptions — is measured every release against a stated ceiling by the `words × 1.33` estimator `dd-ai-eng-knowhow`'s `CONTEXT-ENGINEERING.md` defines, with per-section attribution — a closure readout, not a ratchet.
+- The always-on load — law chain, three persona bodies, listed skill descriptions — is measured every release against a stated ceiling by the `words × 1.33` estimator `dd-ai-eng-knowhow`'s `CONTEXT-ENGINEERING.md` defines, with per-section attribution — a closure readout, not a ratchet.
 - A release measuring above its declared ceiling cuts text; the number is never re-measured, averaged or renegotiated to fit.
-- Nine personas; a persona states a rule once and points at the skill that operates it — no playbook table, no restated handoff-schema bullet ([[ARCHITECTURE]]).
+- Three personas (ADR 0016) — `project-manager`, `software-engineer`, `code-reviewer`; least privilege derives from each persona's `activity_class` at install (Claude `permissionMode`/`disallowedTools`, Codex `sandbox_mode`); a persona states a rule once and points at the skill that operates it — no playbook table, no restated handoff-schema bullet ([[ARCHITECTURE]]).
 
 ## Dependencies
 
-[[agent-orchestration]], [[panel]], [[public-asset-distribution]], [[TECHSTACK]], [[QUALITY]].
+[[agent-orchestration]], [[public-asset-distribution]], [[TECHSTACK]], [[QUALITY]].

@@ -11,7 +11,7 @@ tags: [sdd, audits, findings, governance, evidence]
 - The audit is the only full-tree inspection lane; every other quality boundary is diff-scoped.
 - It is a committed spec artifact, not a report: `AUDIT.md` carries scope, the window `[from-sha, to-sha]`, method per pillar, eight forensic metrics as `baseline → measured`, the score and the summary.
 - `FINDINGS.jsonl` carries one record per finding, appended once with file tools (immutable core, like an ADR); `specs/audits/AGENTS.md` holds the scoped law and the index, and the HTML report is derived, never a substitute.
-- `specs/audits/**` is ADDITIVE and writable bound or not; `project-auditor` writes the folder, and `BUGS.jsonl` only through the bug verbs ([[sdd-bug-backlog-governance]]).
+- `specs/audits/**` is ADDITIVE and writable bound or not; `code-reviewer` (the audit lens) writes the folder, and `BUGS.jsonl` only through the bug verbs ([[sdd-bug-backlog-governance]]).
 - `finding-record-v1` splits per property into immutable — `id`, `pillar` (`bugs | specs | memory`), `severity`, `refs`, `claim`, `evidence` — and mutable `disposition`, `release`, `reason`; `disposition` is `open resolved superseded deferred rejected`, the terminal four being `core.models.histo.FINDINGS_DISPOSITIONS`; `dadaia doctor`'s `ledgers` section validates every committed line (`LEDGER-FINDINGS-SCHEMA`, [[workspace-doctor]]).
 - `evidence` is a reproducible command plus a hand-redacted one-line result, never replaced by a capture.
 - Before the audit is trusted the whole folder runs through the same detector a push uses.

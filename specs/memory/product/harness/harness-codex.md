@@ -13,7 +13,7 @@ tags: [harness, codex, projection, enforcement]
 - Command policy is evaluated natively from `.codex/rules/*.rules` — Starlark prefix rules over venv-form paths, not configuration keys.
 - Hook fire is version-qualified: hooks are live-certified at `codex-cli 0.144.4` (`_CODEX_HOOKS_LIVE_CERTIFIED_VERSION`, `infrastructure/codex_doctor.py`) for both the TUI and headless `codex exec`.
 - Any other version is probe-driven: `dadaia certify`'s `codex-live-probe` invokes the binary and reports what it observed, an absent or different version yielding UNVERIFIED.
-- `dadaia public install --target codex` projects `.codex/{config.toml,hooks.json,rules,skills,DADAIA.md}` plus `.codex/agents/` — nine role-only TOML personas carrying no inline law restatement.
+- `dadaia public install --target codex` projects `.codex/{config.toml,hooks.json,rules,skills,DADAIA.md}` plus `.codex/agents/` — three role-only TOML personas (`sandbox_mode` derived from `activity_class`) carrying no inline law restatement.
 - Codex tier identity is native `(model id × model_reasoning_effort)`, registry-derived via `core/model_registry.codex_tier_views()`, failing loudly when two tiers collapse to one pair.
 - Doctor lint `D-CX-4` blocks Anthropic tier names and Claude model or tool-name leaks ([[sdd-gate-v3]]).
 

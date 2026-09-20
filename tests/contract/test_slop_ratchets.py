@@ -34,7 +34,7 @@ _DOCSTRING_OWNERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctio
 # RECORDED CEILING (ratchet DOWN ONLY) — measured 2026-09-03 on this HEAD, every comment
 # token plus every docstring line under dadaia_workspace/**/*.py. Lower it in the commit
 # that deletes the ids; raising it is never a ratchet move.
-_V32_CEILING = 912
+_V32_CEILING = 769
 
 
 def _governance_id_lines(source: str) -> int:
@@ -53,7 +53,7 @@ def _governance_id_lines(source: str) -> int:
 
 def test_v32_governance_ids_in_production_comments_and_docstrings() -> None:
     """V32 — comment tokens and docstring lines under dadaia_workspace/ naming an FR, T-,
-    ADR or v0.x id, pinned at 912. Ratchet DOWN ONLY; target 0 (tests/ are excluded)."""
+    ADR or v0.x id, pinned at 769. Ratchet DOWN ONLY; target 0 (tests/ are excluded)."""
     total = sum(
         _governance_id_lines(path.read_text(encoding="utf-8"))
         for path in tracked_test_files(_REPO_ROOT, "*.py", tree="dadaia_workspace")
@@ -85,7 +85,7 @@ _V33_RATIFIED_FAMILIES = frozenset({"FR", "AC", "T"})
 
 # RECORDED CEILING (ratchet DOWN ONLY) — measured 2026-09-03 on this HEAD; the failing
 # assertion prints the orphan family list so the number is reproducible.
-_V33_CEILING = 51
+_V33_CEILING = 37
 
 
 def _family_witnesses(texts: Iterable[str]) -> dict[str, set[tuple[str, int]]]:
@@ -240,7 +240,7 @@ def test_v34_live_candidate_trio_bytes_under_the_fixed_ceiling() -> None:
 # tracked `*.md` under dadaia_workspace/public/skills/. Re-pinned at every closure that
 # touches the corpus, downward only; raising either is never a ratchet move.
 _V35_DIR_CEILING = 18
-_V35_LINE_CEILING = 2916
+_V35_LINE_CEILING = 2906
 
 
 def _skill_corpus_markdown() -> list[Path]:
@@ -256,7 +256,7 @@ def _skill_corpus_lines(paths: Iterable[Path]) -> int:
 
 
 def test_v35_skill_corpus_is_pinned() -> None:
-    """V35 — at most 18 skill directories and 2,917 total lines of skill Markdown.
+    """V35 — at most 18 skill directories and 2,906 total lines of skill Markdown.
     A rule lives in one home: a growing corpus is a rule restated, not a rule added."""
     corpus = _skill_corpus_markdown()
     dirs = {

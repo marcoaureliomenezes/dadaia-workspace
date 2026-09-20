@@ -349,6 +349,18 @@
       "agent": "release-candidates",
       "kind": "note",
       "text": "Candidate defined at 15c30b50; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-09-20T19:19:12Z",
+      "agent": "project-manager",
+      "kind": "size",
+      "text": "Candidate 5 (demolition) measured at closure: dadaia_workspace/ 48,816 -> 36,100 LOC; tests 464 -> 371 files, 2,147 -> 1,790 functions; features packages 19 -> 14; personas 9 -> 3; skill Markdown 2,906 lines (18 dirs); ratchets re-pinned V26 39/36, V32 769, V33 37, V35 2,906."
+    },
+    {
+      "ts": "2026-09-20T19:19:12Z",
+      "agent": "project-manager",
+      "kind": "memory",
+      "text": "Memory pass: atoms panel and agent-monitoring retired; server-registry and brand-identity rewritten; ARCHITECTURE, TECHSTACK, QUALITY, agent-orchestration, agentic-entities, agent-comms, public-asset-distribution, harness-claude-code, harness-codex, product-vision, spec-context-project, cross-platform-portability, context-management, workspace-doctor, audits-canon, sdd-bug-backlog-governance, sdd-gate-v3 corrected against the code."
     }
   ]
 }

@@ -19,7 +19,7 @@ tags: [spec-context, sdd, lifecycle, concurrency]
 
 ## Runtime state
 
-`.dadaia/states/spec_contexts.json`, `.dadaia/sessions/<session-id>.json`, `.dadaia/states/presence/`, `repos/<slug>/specs/`; runtime state stays at the workspace root, a repo-local `.dadaia/` always being invalid.
+`.dadaia/states/spec_contexts.json`, `.dadaia/sessions/<session-id>.json`, `repos/<slug>/specs/`; runtime state stays at the workspace root, a repo-local `.dadaia/` always being invalid.
 
 ## Dependencies
 
