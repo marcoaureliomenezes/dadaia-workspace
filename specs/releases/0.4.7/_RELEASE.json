@@ -1,16 +1,16 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.7",
-  "phase": "IMPLEMENTATION",
+  "phase": "CLOSURE",
   "rc": 4,
   "defined": {
     "sha": "15c30b50",
     "ts": "2026-09-20T17:45:47Z"
   },
   "implemented": {
-    "sha": "c746592a",
-    "rc": 4,
-    "ts": "2026-09-13T10:49:36Z"
+    "sha": "260c6846",
+    "rc": 5,
+    "ts": "2026-09-20T19:21:27Z"
   },
   "shipped": null,
   "log": [
@@ -361,6 +361,12 @@
       "agent": "project-manager",
       "kind": "memory",
       "text": "Memory pass: atoms panel and agent-monitoring retired; server-registry and brand-identity rewritten; ARCHITECTURE, TECHSTACK, QUALITY, agent-orchestration, agentic-entities, agent-comms, public-asset-distribution, harness-claude-code, harness-codex, product-vision, spec-context-project, cross-platform-portability, context-management, workspace-doctor, audits-canon, sdd-bug-backlog-governance, sdd-gate-v3 corrected against the code."
+    },
+    {
+      "ts": "2026-09-20T19:21:27Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate 5 implemented at 260c6846; phase CLOSURE."
     }
   ]
 }
