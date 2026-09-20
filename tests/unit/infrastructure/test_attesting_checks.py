@@ -50,6 +50,6 @@ def test_attesting_registry_is_pinned() -> None:
         "rule-corpus",
         "trust-boundary",
         "public-privacy",
-        "law-projection",
+        "symlink-target",
         "entities-derivation",
     )

@@ -5,7 +5,8 @@ K3 (v0.5.1): install/doctor are now two folds over one ``ProjectionRule`` table
 compares against it. What remains here is genuinely bespoke: staging, plan
 resolution, the consumer-repo guardrail fan-out (N-target, provenance-gated — not a
 fixed-destination rule), install-ledger reconciliation, and the harness-independent
-doctor checks (privacy, entities-derivation, memory-phase, rule-corpus, git-dirty).
+doctor checks (privacy, entities-derivation, memory-phase, rule-corpus, symlink-target,
+git-dirty).
 """
 
 from __future__ import annotations
@@ -60,7 +61,12 @@ from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstal
 from dadaia_workspace.infrastructure.privacy_check import (
     check_public_privacy as _check_public_privacy_fn,
 )
-from dadaia_workspace.infrastructure.projection import Transcript, doctor_rules, install_rules
+from dadaia_workspace.infrastructure.projection import (
+    Transcript,
+    doctor_rules,
+    install_rules,
+    link_entry_defect,
+)
 from dadaia_workspace.infrastructure.projection_rules import (
     build_harnesses,
     projection_rules,
@@ -148,6 +154,11 @@ def _staged_bytes(src: Path) -> bytes:
 #: NOT in the persisted harness profile (A3, v0.1.58 FR3). Emitted in place of the scoped
 #: drift block so a stale/hand-installed out-of-profile runtime never reads green-with-zero-
 #: lines. ``[warn]`` is non-blocking (CLI exit stays 0) but visible.
+#: The one repair for every SYMLINK-TARGET-1 finding: re-project the claude views onto
+#: the authored set. One BLOCK, one executable ``fix:`` line.
+_SYMLINK_TARGET_FIX = "fix: .dadaia/.venv/bin/dadaia public install --target claude --force"
+
+
 def _out_of_profile_warn(harness: str) -> DoctorLine:
     return DoctorLine(
         DoctorStatus.WARN, f"{harness}: out-of-profile runtime present (drift unchecked)"
@@ -618,6 +629,7 @@ class FileSystemPublicAssetManager:
         reports.extend(attest("rule-corpus", check_codex_rule_corpus_reachable(workspace_root)))
         reports.extend(check_agent_skill_refs(self._public_dir))
         reports.extend(check_memory_phase_single_source(self._public_dir))
+        reports.extend(attest("symlink-target", self._check_symlink_targets(workspace_root)))
         reports.extend(attest("public-privacy", self._check_public_privacy()))
         reports.extend(attest("entities-derivation", check_entities_derivation(self._public_dir)))
 
@@ -680,6 +692,48 @@ class FileSystemPublicAssetManager:
         if _staged_bytes(src) != dst.read_bytes():
             return DoctorLine(DoctorStatus.DRIFT, f"{label}")
         return DoctorLine(DoctorStatus.OK, f"{label}")
+
+    def _check_symlink_targets(self, workspace_root: Path) -> list[DoctorLine]:
+        """SYMLINK-TARGET-1 — every ledgered ``.claude/`` view still points at the
+        authored set.
+
+        One authored set (``.agents/skills/``, ``.agents/agents/``) with N harness
+        views replaced the per-harness byte-drift classes that used to compare a copy
+        of the law per harness dir. The install ledger is what makes the replacement
+        checkable: it records each entry's KIND, so a view that was installed as a
+        symlink and is now a plain file — or a dangling link, or a link retargeted at
+        a foreign path, or a fallback copy that drifted — is nameable without
+        re-deriving the projection plan. ``file`` entries are ordinary projections,
+        already compared byte-wise by the rule table.
+        """
+        states_dir = workspace_root / ".dadaia" / "states"
+        ledger = self._install_ledger_store.read(states_dir)
+        if ledger is None:
+            return []
+        linked = [
+            entry
+            for entry in ledger.entries
+            if entry.kind != "file" and entry.relpath.startswith(".claude/")
+        ]
+        if not linked:
+            return []
+        out: list[DoctorLine] = []
+        for entry in sorted(linked, key=lambda e: e.relpath):
+            canonical = workspace_root / entry.relpath.replace(".claude/", ".agents/", 1)
+            defect = link_entry_defect(workspace_root / entry.relpath, canonical)
+            if defect is not None:
+                out.append(
+                    DoctorLine(DoctorStatus.ERROR, f"SYMLINK-TARGET-1 {entry.relpath}: {defect}")
+                )
+        if out:
+            out.append(DoctorLine(DoctorStatus.INFO, _SYMLINK_TARGET_FIX))
+            return out
+        return [
+            DoctorLine(
+                DoctorStatus.OK,
+                f"symlink-target: {len(linked)} .claude entries resolve to the authored set",
+            )
+        ]
 
     def _check_public_privacy(self) -> list[DoctorLine]:
         """Fail doctor if public distributed assets contain known private identifiers."""

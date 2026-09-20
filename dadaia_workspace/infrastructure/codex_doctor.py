@@ -40,7 +40,7 @@ ATTESTING_CHECK_IDS: tuple[str, ...] = (
     "rule-corpus",
     "trust-boundary",
     "public-privacy",
-    "law-projection",
+    "symlink-target",
     "entities-derivation",
 )
 

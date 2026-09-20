@@ -12,6 +12,18 @@ from dadaia_workspace.core.workspace_resolver import resolve_workspace_root_for_
 console = Console()
 app = typer.Typer()
 
+#: Printed once at the end of every successful init. The first line is the law
+#: (sessions launch at the workspace root); the second is a RECOMMENDATION about the
+#: operator's own ``~/.claude/settings.json`` — the library prints it and never writes
+#: user settings, so a stray repo-level ``CLAUDE.md`` hiding the workspace
+#: ``AGENTS.md`` stays the operator's decision to prevent.
+_CLOSING_NOTES = (
+    "Sessions launch at the workspace root.",
+    "Claude Code: set `instructionFiles: claude-md-and-agents-md` in your user settings "
+    "(~/.claude/settings.json) so a stray CLAUDE.md in a repo never hides the workspace "
+    "AGENTS.md.",
+)
+
 
 @app.command()
 def init(
@@ -25,7 +37,7 @@ def init(
         help="Harness set to scaffold: 'all' or a comma-separated subset of claude,codex,kimi-code.",
     ),
 ) -> None:
-    """Bootstrap a dadaia workspace: creates .dadaia/ and projects agent assets for the chosen harness set (default all: .claude/, .codex/, .kimi-code/, .agents/)."""
+    """Bootstrap a dadaia workspace: creates .dadaia/ and projects agent assets for the chosen harness set (default all: .agents/, .claude/, .codex/)."""
     # Parse --harness BEFORE any output so a bad value is a clean BadParameter
     # (exit 2, message on stderr, empty stdout — no partial payload leaks).
     try:
@@ -83,3 +95,6 @@ def init(
                 console.print(f"  {item}")
         else:
             console.print("[dim]No new assets to install (all up to date)[/dim]")
+
+    for note in _CLOSING_NOTES:
+        console.print(note, markup=False, soft_wrap=True)

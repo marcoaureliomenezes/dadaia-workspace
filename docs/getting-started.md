@@ -44,6 +44,20 @@ idempotent. It creates:
   `AGENTS.md` files) and the agent assets of each selected harness. Skipping assets
   leaves the workspace ungated, and the output says so.
 
+There is ONE authored set: the root `AGENTS.md`, the scoped `AGENTS.md` files,
+`.agents/skills/` and `.agents/agents/`. Every other harness view of it is a view, not
+a copy: `.claude/skills/*` and `.claude/agents/*.md` are relative symlinks into
+`.agents/` (a hash-verified copy only where the platform refuses a link), and
+`.codex/agents/*.toml` is a transcode. No `CLAUDE.md` and no `DADAIA.md` is projected
+anywhere — a second copy of the law is drift waiting to happen. `public doctor`'s
+`SYMLINK-TARGET-1` check reads the install ledger and fails on any `.claude/` entry
+that stopped resolving to its authored original.
+
+`init` closes by printing two lines: sessions launch at the workspace root, and the
+recommendation to set `instructionFiles: claude-md-and-agents-md` in your own
+`~/.claude/settings.json` so a stray `CLAUDE.md` inside a repo never hides the
+workspace `AGENTS.md`. The library prints that advice and never writes user settings.
+
 `init` deletes no projection and installs no git hook: the chokepoints go in per repo
 with `dadaia ci install-hook`.
 

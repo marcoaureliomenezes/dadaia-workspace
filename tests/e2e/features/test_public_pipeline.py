@@ -506,3 +506,75 @@ class TestPerProfileInit:
 
         assert _persisted_profile(ws) == ["claude", "codex", "kimi-code"]
         _assert_profile_doctor_green(ws, monkeypatch)
+
+
+class TestSymlinkTargetDoctor:
+    """SYMLINK-TARGET-1 — the ledger-driven replacement for the retired per-harness
+    byte-drift classes.
+
+    Intent: CONTRACT — 0.4.7 AC3.1/AC3.2 (T-047-57). Size: LARGE (real projection I/O).
+    """
+
+    @staticmethod
+    def _a_linked_skill(workspace: Path) -> Path:
+        entry = next(
+            (p for p in sorted((workspace / ".claude" / "skills").iterdir()) if p.is_symlink()),
+            None,
+        )
+        assert entry is not None, "install produced no .claude/skills symlink to break"
+        return entry
+
+    def test_retargeted_symlink_is_one_error_with_a_fix_line(self, tmp_path: Path) -> None:
+        workspace = tmp_path / "ws"
+        mgr = _manager()
+        mgr.install(workspace, target="all", force=True)
+        entry = self._a_linked_skill(workspace)
+        foreign = tmp_path / "foreign"
+        foreign.mkdir()
+        entry.unlink()
+        entry.symlink_to(foreign, target_is_directory=True)
+
+        report = [line.render() for line in mgr.doctor(workspace)]
+
+        findings = [line for line in report if "SYMLINK-TARGET-1" in line]
+        assert findings == [
+            f"[error] SYMLINK-TARGET-1 .claude/skills/{entry.name}: "
+            f"symlink target '{foreign}' is not the canonical "
+            f"'../../.agents/skills/{entry.name}'"
+        ], "\n".join(report)
+        assert (
+            "[info] fix: .dadaia/.venv/bin/dadaia public install --target claude --force" in report
+        )
+
+    def test_symlink_replaced_by_a_drifted_copy_is_an_error(self, tmp_path: Path) -> None:
+        workspace = tmp_path / "ws"
+        mgr = _manager()
+        mgr.install(workspace, target="all", force=True)
+        entry = self._a_linked_skill(workspace)
+        authored = workspace / ".agents" / "skills" / entry.name
+        entry.unlink()
+        entry.mkdir()
+        for source in sorted(authored.rglob("*")):
+            if source.is_file():
+                copied = entry / source.relative_to(authored)
+                copied.parent.mkdir(parents=True, exist_ok=True)
+                copied.write_bytes(source.read_bytes())
+        skill_md = entry / "SKILL.md"
+        skill_md.write_text(skill_md.read_text(encoding="utf-8") + "\ndrifted\n", encoding="utf-8")
+
+        report = [line.render() for line in mgr.doctor(workspace)]
+
+        assert [line for line in report if "SYMLINK-TARGET-1" in line] == [
+            f"[error] SYMLINK-TARGET-1 .claude/skills/{entry.name}: copy diverged at SKILL.md"
+        ], "\n".join(report)
+
+    def test_clean_install_attests_the_class(self, tmp_path: Path) -> None:
+        workspace = tmp_path / "ws"
+        mgr = _manager()
+        mgr.install(workspace, target="all", force=True)
+
+        report = [line.render() for line in mgr.doctor(workspace)]
+
+        attestation = [line for line in report if "symlink-target:" in line]
+        assert len(attestation) == 1 and attestation[0].startswith("[ok] ")
+        assert not [line for line in report if "SYMLINK-TARGET-1" in line]

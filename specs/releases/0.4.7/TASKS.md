@@ -119,7 +119,7 @@
   `core/models/install_ledger.py`, `public/agents/**`, `public/entities/**`,
   `public/skills/**`, `tests/**`.
 
-- [-] T-047-57 — FR3c: `public doctor` and init. Delete the per-harness byte-drift classes
+- [x] T-047-57 — FR3c: `public doctor` and init. Delete the per-harness byte-drift classes
   that died with the collapsed copies; add `SYMLINK-TARGET-1` (a `.claude/` entry is a
   symlink resolving to its canonical `.agents/*` path, or a hash-equal copy);
   `public-privacy`, `entities-derivation`, `rule-corpus`, `trust-boundary` stay. `dadaia init`
