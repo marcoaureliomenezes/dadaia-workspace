@@ -1,8 +1,8 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.7",
-  "phase": "CLOSURE",
-  "rc": 3,
+  "phase": "DEFINITION",
+  "rc": 4,
   "defined": {
     "sha": "66718f33",
     "ts": "2026-09-13T09:56:42Z"
@@ -337,6 +337,12 @@
       "agent": "project-manager",
       "kind": "note",
       "text": "Candidate 4 reviews, completing the previous reviews entry: qa-engineer CHANGES_REQUESTED @ e214a463 (docs/cli.md's stated regeneration command did not reproduce the file) → fixed in 7fceafe3 (the generator emits its own header; the committed file equals `dadaia help tree` byte-for-byte, verified by the PM); security LOW CWE-22 in citations.py fixed in f874561f. Final security delta re-verdict requested on the head after this entry."
+    },
+    {
+      "ts": "2026-09-20T17:33:17Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate 4 archived to rc-4/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
     }
   ]
 }
