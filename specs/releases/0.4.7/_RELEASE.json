@@ -1,11 +1,11 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.7",
-  "phase": "CLOSURE",
-  "rc": 4,
+  "phase": "IMPLEMENTATION",
+  "rc": 5,
   "defined": {
-    "sha": "15c30b50",
-    "ts": "2026-09-20T17:45:47Z"
+    "sha": "7cf1538f",
+    "ts": "2026-09-20T20:43:25Z"
   },
   "implemented": {
     "sha": "260c6846",
@@ -373,6 +373,18 @@
       "agent": "project-manager",
       "kind": "reviews",
       "text": "dd-code-review three axes + six lenses over origin/develop..6b2d457d: REJECTED on F1 (security-review job green-by-skipping without CLAUDE_API_KEY). Remediated after the CLOSURE milestone (260c6846) in commits 9c2a6a6b, 50fe9f3b and the hygiene commit that follows this entry: job fails closed (F1); one parsed activity_class derivation shared by the Claude render and the Codex transcode, undeclared class refused (F2); specs upgrade plans one set for dry-run and real run (F3); registry.py walk-up, walk-up refusal and dead-pid staleness covered (F4); dead docstring citations of presence/verdict/panel deleted (F5); reports help without diagnose (F6); SPEC/TASKS name CLAUDE_API_KEY (F8). Accepted as-is: RETIRED_FEATURE_PACKAGES owes a retirement path at c8 (F7); brand-identity atom stays under memory/product/panel/ until the c6 memory pass (F9). Also found: test_no_pollution seeded a phantom .dadaia/ two levels above tmp_path; fixed by the real repos/<slug> topology. Re-review over the remediation: APPROVED (LOW: F5 residue, F9 deferral, log encoding, post-milestone remediation — all folded into the hygiene commit)."
+    },
+    {
+      "ts": "2026-09-20T20:34:59Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate 5 archived to rc-5/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
+    },
+    {
+      "ts": "2026-09-20T20:43:25Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate defined at 7cf1538f; phase IMPLEMENTATION."
     }
   ]
 }
