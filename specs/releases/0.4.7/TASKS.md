@@ -102,7 +102,7 @@
   `features/specs/doctor_coherence.py`,
   `public/kimi-code/**` (deleted), `public/runtime/codex/**`, `cli/commands/public.py`, `tests/**`.
 
-- [ ] T-047-56 — FR3b: one authored set, projected by symlink, and the persona rename.
+- [-] T-047-56 — FR3b: one authored set, projected by symlink, and the persona rename.
   `.agents/agents/dd-<persona>.md` is the rendered persona (`render_claude_agent` stays the
   one render seam); `_claude_agent_rules` and `_skills_tree_rules` emit relative symlinks for
   `.claude/agents/dd-*.md` and `.claude/skills/dd-*`, falling back to a hash-verified copy
