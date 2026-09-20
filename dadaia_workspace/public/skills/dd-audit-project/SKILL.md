@@ -46,6 +46,5 @@ three is not an audit. Append one `FINDINGS.jsonl` record per claim
   [`PILLAR-MEMORY.md`](PILLAR-MEMORY.md) — the pillar protocols.
 - [`FINDINGS-FORMAT.md`](FINDINGS-FORMAT.md) — record shape, evidence rule,
   disposition vocabulary.
-- `DADAIA.md` §6.8 — lifecycle: one audit binds to one remediation release,
-  archives once dispositioned; `dadaia audit disposition|close` are its verbs.
+- Lifecycle, pillars and verbs: `specs/audits/AGENTS.md`.
 - `dadaia doctor --json` / `dd-cli-library` — command reference.

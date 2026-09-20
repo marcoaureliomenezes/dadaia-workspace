@@ -45,14 +45,14 @@ Current-doc corrections to keep active:
 | You see / hear | What it actually is | Executable? | Enforces? |
 |---|---|---|---|
 | Codex "Rules" | Starlark `.rules` files under `.codex/rules/*.rules` | Yes (Starlark) | Command approval / prompt policy |
-| dadaia's rule-law corpus | Single consolidated `DADAIA.md`, projected byte-identically | No | Advisory text read via native discovery |
+| dadaia's rule-law corpus | One root `AGENTS.md` map plus scoped `AGENTS.md` files | No | Advisory text read via native discovery |
 
 - File extension is the ground truth: `.rules` = official Codex command policy, `.md` = dadaia's advisory law.
 - Current dadaia projection must not install Markdown law content into `.codex/rules/`.
 - A `.codex/rules/foo.md` file is projection drift — report it, fix the source installer/doctor.
 - In logs: an `allow`/`prompt`/`forbidden` decision on a command = a real Starlark Rule fired.
 - Plain instruction-following with no approval gate = the Markdown law was merely in context.
-- There is no `public/rules/` directory in this workspace — the former per-topic files consolidated into `DADAIA.md`.
+- There is no `public/rules/` directory in this workspace — law lives in the root map and the scoped `AGENTS.md` files.
 - Never document or project a `public/rules/*.md` taxonomy against a directory that does not exist.
 
 ---

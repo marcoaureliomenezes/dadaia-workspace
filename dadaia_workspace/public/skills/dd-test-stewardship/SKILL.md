@@ -9,9 +9,8 @@ description: >
 
 # dd-test-stewardship
 
-> The law (`DADAIA.md` §7) states five points once; this skill is where they operate.
-> Numeric values live in [`PARAMETERS.md`](PARAMETERS.md) — this workspace's declared
-> defaults, re-parameterized per consumer.
+> The test-lifecycle law and its mechanics. Numeric values live in
+> [`PARAMETERS.md`](PARAMETERS.md) — re-parameterized per consumer.
 
 ## Intent and admission — writing a new test
 
@@ -90,4 +89,3 @@ description: >
 - [`PARAMETERS.md`](PARAMETERS.md) — LARGE cap, flake ceiling, quarantine
   cap/escalation, timeouts, wall-clock budget, mutation cadence.
 - `dd-audit-project` — detection-quality scoring for drift audits.
-- `DADAIA.md` §5 — artifact retention and repo cleanliness; §7 — the five-point law.

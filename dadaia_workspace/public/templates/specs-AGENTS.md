@@ -3,18 +3,27 @@
 Scope: this file governs only the `specs/` tree of one Spec Context Project.
 Root workspace behavior is in the workspace `AGENTS.md`; production-source behavior is in the repo-local `AGENTS.md`.
 
-## 1. Load order
+## 1. Canon and status
+
+- `Approved`, `In review`, `Draft` are the canonical status tokens — keep them as-is, in any language.
+- The tree holds only these members; `dadaia doctor` flags anything else, and no stray root archive directory or dotfile is canon.
+
+<!-- specs-canon -->
+
+- Path classes: `bugs/`, `backlog/`, `audits/` and each area's `_archive/*_histo.jsonl` are ADDITIVE, always writable; everything else here is MUTATING, `memory/` included.
+
+## 2. Load order
 
 - Ground the session with `dd-spec-navigator` — context, memory bootstrap, live release and its trio, in that order.
 - `_archive/` and `backlog/` are history and intake; neither is an approval.
 
-## 2. Before implementing
+## 3. Before implementing
 
 - The live release's `_RELEASE.json` `phase` reads `IMPLEMENTATION`, and `SPEC.md`/`PLAN.md`/`TASKS.md` all carry `**Status:** Approved`.
 - The task is flipped `[ ]` -> `[-]` before any production edit, and its declared write set names every file touched.
 - Any item missing: stop and repair the SDD artifact instead of editing production.
 
-## 3. Artifact authority
+## 4. Artifact authority
 
 | Path | Writer |
 |---|---|
@@ -26,16 +35,16 @@ Root workspace behavior is in the workspace `AGENTS.md`; production-source behav
 | `bugs/**` | any agent, after the operator confirms the proposal; verbs only |
 | `audits/**` | `code-reviewer` (audit lens); findings move by `dadaia audit disposition|close` |
 
-## 4. Memory
+## 5. Memory
 
 - Memory describes the product as it is now; no changelog, history or version sections.
 - Stale memory found during implementation becomes a bug proposal or a closure note — never patched mid-implementation.
 
-## 5. Bugs
+## 6. Bugs
 
 - A bug is fixed on the live `feature/{M.m.p}` branch, in any phase, with no release ceremony.
 
-## 6. Escalation
+## 7. Escalation
 
 ```text
 [SDD BLOCKED]

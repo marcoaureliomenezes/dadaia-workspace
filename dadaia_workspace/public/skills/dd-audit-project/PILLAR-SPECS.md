@@ -43,7 +43,7 @@ dadaia doctor --context <ctx> --json
 ## Slop readout
 
 Input: the ratchet modules and the window `from-sha..HEAD`. Output: the "Slop readout" table in `AUDIT.md`
-(ratchet, baseline, HEAD, trend, verdict). Definition and signals: `DADAIA.md` §7.6, `dd-code-review`'s `SLOP.md`.
+(ratchet, baseline, HEAD, trend, verdict). Definition and signals: `dd-code-review`'s `SLOP.md`.
 
 1. Run `pytest tests/contract/test_slop_ratchets.py tests/contract/test_test_suite_ratchets.py`; record each count beside its pinned ceiling.
 2. Trend each ratchet over the window: the count at the from-sha against HEAD, via a temporary worktree under `.dadaia/tmp/` — never a stash.

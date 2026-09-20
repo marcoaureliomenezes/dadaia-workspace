@@ -9,7 +9,7 @@ description: >
 
 # dd-gitflow-default — The Branch Contract
 
-`DADAIA.md` §4 states the law once; this skill is where it operates.
+The branch contract, stated once, and the mechanics that operate it.
 
 ## 1. When
 
@@ -23,7 +23,7 @@ description: >
 2. Diff `main` against `develop` — a nonzero diff means `develop` carries undeployed work.
 3. Identify the one live `feature/{M.m.p}` branch.
 4. Surface a `feature/{v}` predating `develop`'s last move to the operator first — it is stale.
-5. Branch count, cut point and name follow `DADAIA.md` §4.2 — never restated here.
+5. Branch count, cut point and name follow §2a.
 6. Definition stage: author the candidate's SPEC/PLAN/TASKS at the release root on `feature/{M.m.p}`.
 7. Implementation stage: one commit per completed task group, shaped per §3a.
 8. Candidate closure: open one `feature/{M.m.p}` → `develop` PR and merge it green.
@@ -31,6 +31,21 @@ description: >
 10. Promote: open the PR `develop` → `main` (ship verdict pre-staged naming develop's tip, §3b).
 11. The moment it merges, run `dadaia release archive <v> --shipped <sha> --pr <n> --next <M.m.p>` — it ships, archives, appends the histo record and births the next release, then PRINTS the git `next:` lines: delete `feature/{M.m.p}`, cut `feature/{next}` from `main`, then `git merge -s ours origin/develop` — run them in that order.
 12. Tag `archive/<name>` then delete a branch the moment its work lands elsewhere.
+
+## 2a. The branch contract
+
+| Branch | Pushable | Cut from | Advances by |
+|---|---|---|---|
+| `feature/{M.m.p}` | Yes — local CI preflight + valid name | `main` | the PR below |
+| `develop` | No — never a direct push | `main` (bootstrap only) | PR from `feature/{M.m.p}`, at definition `Approved` and at each `rc` merge |
+| `main` | No — never a direct push | — | PR from `develop`, at the final `rc` |
+
+- No `v` prefix, no suffix, no fifth pattern; `hotfix/*` is retired (operator request only, no cadence).
+- Exactly one live `feature/{M.m.p}`, named for the live release; bugs fix on it in any phase, no ceremony.
+- The release version = last published PyPI + 1 patch, minted at birth; it increments ONLY at an operator-approved deploy.
+- `rc-N/` is an archived candidate folder under the live release, never a branch name.
+- Each candidate closure burns one `feature -> develop` merge; after it, ask the operator: promote or continue.
+- Every flow stage runs on `feature/{M.m.p}`; `develop` and `main` are PR targets only, never a working branch.
 
 ## 3a. Commit shapes — each write alone, in its own shape
 
@@ -57,7 +72,6 @@ description: >
 
 ## 5. References
 
-- `DADAIA.md` §4 — the branch-contract law this skill operates.
 - [`CICD-AUTOMATION.md`](CICD-AUTOMATION.md) — CI/CD checks to suggest a consumer operator.
 - Mechanical enforcement (pre-push hook / CI): branch-name pattern, push refusal,
   denylist scan, `pr-source-guard`, the `security-review` required check. Everything else in this skill is discipline, upheld by agents and

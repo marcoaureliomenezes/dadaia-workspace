@@ -229,11 +229,16 @@ def test_the_law_source_never_restates_a_canonical_set() -> None:
 
 
 def test_staged_law_canon_tables_equal_the_registry(staged_data: Path) -> None:
-    """The staged ``DADAIA.md``'s §6.2 table IS ``specs_canon_table_rows()``, row for row,
-    and its §5.1/§5.3 lines ARE the rendered root and repo-exclusion lists — documented ==
-    allowed, for the law exactly as for ``.dadaia/AGENTS.md``."""
+    """The staged ``specs-AGENTS.md`` canon table IS ``specs_canon_table_rows()``, row for
+    row; the staged law's root line and ``repo-AGENTS.md``'s exclusion line ARE the rendered
+    registry lists — documented == allowed, wherever the rule now lives."""
     text = (staged_data / "DADAIA.md").read_text("utf-8")
-    canon_tables = [t for t in _markdown_tables(text) if t and {"area", "members"} <= set(t[0])]
+    scoped = staged_data.parent / "templates"
+    specs_law = (scoped / "specs-AGENTS.md").read_text("utf-8")
+    repo_law = (scoped / "repo-AGENTS.md").read_text("utf-8")
+    canon_tables = [
+        t for t in _markdown_tables(specs_law) if t and {"area", "members"} <= set(t[0])
+    ]
     assert len(canon_tables) == 1, "exactly one rendered specs-canon table"
     rendered = [(_bare(row["area"]), row["members"].strip("`")) for row in canon_tables[0]]
     expected = [
@@ -243,9 +248,10 @@ def test_staged_law_canon_tables_equal_the_registry(staged_data: Path) -> None:
     assert rendered == expected
 
     assert f"- Root holds only: `{root_entries_display()}`." in text
-    assert f"- Excluded: `{repo_excluded_display()}`." in text
+    assert f"- These never appear in the tree: `{repo_excluded_display()}`." in repo_law
     for placeholder in ("<!-- root -->", "<!-- repo-excluded -->", "<!-- specs-canon -->"):
-        assert placeholder not in text, f"{placeholder} was left unrendered"
+        for rendered in (text, specs_law, repo_law):
+            assert placeholder not in rendered, f"{placeholder} was left unrendered"
 
 
 def test_every_zone_creator_exists() -> None:

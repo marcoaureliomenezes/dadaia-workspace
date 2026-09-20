@@ -3,7 +3,7 @@
 Disclosed reference of [`SKILL.md`](SKILL.md), report mode only (operator asked, or
 the next hop is human). A report is **self-contained** — inline `<style>`, inline SVG,
 zero external scripts or stylesheets; an external asset only when committed beside the
-report. Split any report over 30 KB behind an `index.html` (`DADAIA.md` §5.4).
+report. Split any report over 30 KB behind an `index.html` (`.dadaia/handoff/AGENTS.md`).
 
 ## Scaffold
 

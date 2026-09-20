@@ -130,12 +130,12 @@ def render_registry_tables(text: str) -> str:
     return text
 
 
-def _staged_bytes(src: Path, public_dir: Path) -> bytes:
+def _staged_bytes(src: Path) -> bytes:
     """What ``stage`` writes for the public asset *src* and what ``doctor`` compares the
-    staged copy against: a ``data/*.md`` law fragment with its registry tables rendered,
+    staged copy against: every Markdown rule asset with its registry tables rendered,
     every other asset byte for byte."""
     raw = src.read_bytes()
-    if src.suffix == ".md" and src.parent == public_dir / "data":
+    if src.suffix == ".md":
         return render_registry_tables(raw.decode("utf-8")).encode("utf-8")
     return raw
 
@@ -189,8 +189,8 @@ class FileSystemPublicAssetManager:
                 shutil.copy2(src, dst)
             staged.append(f"[stage] {dst}")
 
-        for src in self._iter_files(self._public_dir / "data"):
-            expected = _staged_bytes(src, self._public_dir)
+        for src in self._iter_files(self._public_dir):
+            expected = _staged_bytes(src)
             if expected != src.read_bytes():
                 dst = agentic_dir / src.relative_to(self._public_dir)
                 atomic_write(dst, expected)
@@ -649,7 +649,7 @@ class FileSystemPublicAssetManager:
     def _compare(self, src: Path, dst: Path, label: str) -> DoctorLine:
         if not dst.exists():
             return DoctorLine(DoctorStatus.MISSING, f"{label}")
-        if _staged_bytes(src, self._public_dir) != dst.read_bytes():
+        if _staged_bytes(src) != dst.read_bytes():
             return DoctorLine(DoctorStatus.DRIFT, f"{label}")
         return DoctorLine(DoctorStatus.OK, f"{label}")
 

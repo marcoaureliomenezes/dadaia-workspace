@@ -47,6 +47,12 @@ axes are reported side by side — an axis never outranks another.
   is a puxadinho; name it and recommend the replace-don't-layer shape instead.
 - An S4, S5 or S8 finding (`SLOP.md`) answers this axis "increased" until the finding is gone.
 
+## 4a. The root-cause and approval bars
+
+- A fix qualifies only when it reproduces the failure on the executed path, tests for the real reason, fixes the cause and proves it green — a workaround or symptom patch is a finding.
+- Approved means the operator and the consumer-side validation agent agree after validating a real workspace.
+- A green internal gate that diverges from real consumer behavior is itself a bug.
+
 ## 5. Reporting
 
 - Findings carry: axis, severity (CRITICAL/HIGH/MEDIUM/LOW/INFO), `file:line`, what the code does, fix direction (never code).
@@ -68,4 +74,3 @@ One reviewer, six checklists applied on every verdict (ADR 0016); the engineer a
 
 - `dd-codebase-design` — the vocabulary the Standards and Bug-surface axes speak.
 - `dd-test-stewardship` — test findings' lifecycle rules.
-- Security depth / CVE / OWASP: the security lens (§6), never a fourth axis.

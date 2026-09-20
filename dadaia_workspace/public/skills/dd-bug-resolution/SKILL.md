@@ -10,16 +10,14 @@ description: >
 # dd-bug-resolution — Arm B
 
 > `software-engineer` runs this directly once a bug carries a record.
-> Git chokepoints (`DADAIA.md` §3) are the only mechanical backstop.
+> Git chokepoints (`.dadaia/AGENTS.md`) are the only mechanical backstop.
 
 ## 1. Lifecycle frame
 
-- A bug fix rides the live `feature/{M.m.p}` branch in any phase (`DADAIA.md` §4):
-  no separate branch, no SPEC/PLAN/TASKS, no version mint.
+- A bug fix rides the live `feature/{M.m.p}` branch in any phase: no separate branch, no SPEC/PLAN/TASKS, no version mint.
 - Two fixers resolve by whichever `dadaia bugs resolve` lands first; a losing write
   fails non-zero — re-read and retry.
-- `dd-bug-registration`'s redaction rule applies to the whole arc: commands, outputs,
-  captured artifacts.
+- The redaction rule of `specs/bugs/AGENTS.md` applies to the whole arc: commands, outputs, captured artifacts.
 
 ## 2. The method — seven phases, each gated
 
@@ -65,7 +63,7 @@ gap is registered first).*
 
 **Phase 6 — Cleanup + resolve.** Grep the probe prefix to zero; the diff leaves the
 touched feature smaller or equal — a fix that grows it routes to
-the architecture lens first (net-positive rule, `DADAIA.md` §7). Then close the
+the architecture lens first (net-positive rule). Then close the
 record:
 
 ```
@@ -97,4 +95,3 @@ dadaia bugs resolve <bug-id> --cause … --caused-by … --resolved-release …
 - `dd-bug-registration` — classify-first registration; the record this skill requires.
 - `dd-gitflow-default` §3a — the exact commit shape.
 - `dd-test-stewardship` (intent and admission) — test intent/size declaration.
-- `DADAIA.md` §4 (Gitflow), §7 (Quality) — branch contract, root-cause law, net-positive routing.

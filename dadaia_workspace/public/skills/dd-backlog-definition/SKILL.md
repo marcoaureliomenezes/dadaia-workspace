@@ -43,7 +43,7 @@ description: >
 
 ## Pick and dispositions
 
-- A picked entry stays in `active[]` with `status: picked` (`DADAIA.md` §6.6) —
+- A picked entry stays in `active[]` with `status: picked` —
   nothing is purged at pick time.
 - It exits exactly once, at closure, by `dadaia backlog exit <slug> --disposition
   delivered|superseded|rejected [--release <id>] [--reason <text>]` — one histo
@@ -60,7 +60,6 @@ description: >
 
 ## References
 
-- `DADAIA.md` §6.6 — the backlog law this skill operates.
 - `dd-release-definition` — the picked-set consumer.
 - CLI: `dadaia backlog new`, `dadaia backlog exit`, `dadaia backlog subjects`,
   `dadaia doctor`.

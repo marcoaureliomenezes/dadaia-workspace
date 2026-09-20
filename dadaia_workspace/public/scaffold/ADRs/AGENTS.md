@@ -14,6 +14,7 @@ Scope: this file governs only `specs/ADRs/`.
 ## 2. Acceptance law (operator-only)
 
 - Any agent may append a record with `status: "proposed"`.
+- One decision per change set, naming every Part-1 principle it creates or changes — never one per principle that merely exists.
 - Only the operator flips `status` to `accepted` (in-place edit, `measured_by` set to a real check).
 - A record born from an operator grill ruling is `accepted` at append, the ruling date in `context`.
 - An agent that writes `status: "accepted"` has violated this law.
@@ -40,6 +41,7 @@ Scope: this file governs only `specs/ADRs/`.
 ## 5. Relationship to memory and audits
 
 - A Part-1 principle carries `ADR: NNNN (proposed|accepted)` naming the decision record that admitted it.
+- The commit touching a Part-1 principle carries its accepted decision; a pre-canon principle carries `ADR: none` until it is next touched.
 - The memory atom points at the ADR, never the reverse.
 - `dd-audit-project`'s pillar 3 (`PILLAR-MEMORY.md`) is the sole mechanical check that a Part-1 hunk and an accept commit pair.
 

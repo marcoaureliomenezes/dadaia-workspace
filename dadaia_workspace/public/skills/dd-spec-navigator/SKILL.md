@@ -36,7 +36,7 @@ read or any output written.
    dependency rules, agent topology or schema contracts; a task self-contained in one
    well-understood component skips that re-read.
 5. Memory is read-only here: atoms are written only by `project-manager` in
-   DEFINITION/CLOSURE phase (`DADAIA.md` §6) — discipline the audit measures, never a
+   DEFINITION/CLOSURE phase (`specs/memory/AGENTS.md`) — discipline the audit measures, never a
    gate block.
 
 ## Phase 3 — resolve the live release and its trio
@@ -58,8 +58,21 @@ read or any output written.
 - Every SPEC/PLAN/TASKS in scope carries `**Status:** Approved`, or the gap was
   reported first.
 
+## Glossary
+
+- **workspace** the root tree holding `.dadaia/`, `repos/` and the law · **instance** a live operator-run workspace · **library** the source repo that scaffolds one.
+- **context** the active Spec Context Project · **spec context** a `specs/` tree governed by the law · **main repo** where `specs/` lives · **associated repos** its other repos.
+- **release** the open-scope publication unit, exactly one live · **candidate** one closed-scope SDD cycle inside it · **rc-N** an archived candidate's trio.
+- **task marker** the `[ ] [-] [x]` trace in TASKS.md · **handoff** the JSON completion record · **verdict** a reviewer's `APPROVED`/`REJECTED` recommendation.
+- **gate** the deterministic PreToolUse chain · **path class** ADDITIVE / MUTATING / PROTECTED · **scope** the repo set a bind owns · **stall** a BLOCK whose own `fix:` is blocked.
+- **canon** the closed set of paths a `specs/` root may hold · **histo** an append-only JSONL history under an area's `_archive/` · **memory atom** one Markdown file of current truth.
+- **Part 1/Part 2** a memory doc's ADR-gated Principles vs Implementation · **ADR** an accepted decision record · **backlog entry** one live item in `active[]`.
+- **disposition** the terminal verdict — `delivered resolved superseded deferred rejected` · **audit** the periodic three-pillar review · **finding** one recorded observation.
+- **zone** one top-level `.dadaia/` directory with a registry record · **reaped** an entry held in `.dadaia/reaped/` awaiting its TTL · **operator** the human who owns the workspace.
+- **slop** what passes the deletion test without loss · **ratchet** a contract test pinning a count that moves down only · **projection** a lib-originated copy of a `public/` asset.
+
 ## References
 
-- `DADAIA.md` §3 — context resolution order; §6 — status tokens, memory ownership.
+- `specs/AGENTS.md` — canon and status tokens; `.dadaia/AGENTS.md` — context resolution order.
 - `dd-release-implementation` (`RELEASE-EVENTS.md`) — `_RELEASE.json` shape.
 - `_archive/` and `backlog/` are read-only history — never a source of approval.

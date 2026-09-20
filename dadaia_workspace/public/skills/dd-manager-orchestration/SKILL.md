@@ -8,19 +8,18 @@ description: >
 
 # dd-manager-orchestration
 
-> No engine runs the SDD flow — each stage is agent-dispatched (`DADAIA.md` §1).
+> No engine runs the SDD flow — each stage is agent-dispatched.
 > This skill is reference for the dispatcher, never a substitute for the SDD
 > documents. It stays generic: no operator-private names, hosts, or repo slugs.
 
 ## 1. Dispatch protocol
 
-1. Resolve the target agent from the ownership table (`DADAIA.md` §2.1); the stage
-   it enters is `DADAIA.md` §1.1.
+1. Resolve the target agent and the stage it enters from the root `AGENTS.md` map.
 2. Only the top-level dispatcher calls other agents — a leaf specialist cannot chain
    further dispatch; route a leaf's returned handoff to its `next_handoff.agent`.
 3. Open every dispatch prompt with the Input Contract block: context, specs_dir,
    release_id, task_id, report_dir, handoff_dir, allowed_write_paths.
-4. Reports land in the repo's reports home (`DADAIA.md` §5.2); every report
+4. Reports land in the repo's reports home; every report
    feeding another agent gets a handoff under `.dadaia/handoff/<context>/`.
 5. The review/QA sequence holds by discipline (dispatcher, implementer, reviewer
    each uphold their half); git chokepoints are the only mechanical backstop.
@@ -66,35 +65,9 @@ description: >
 | Editing production files without a `[-]` reservation | Breaks task traceability |
 | Private/project-specific details in public assets | Security and portability |
 
-## 4. The router — which skill, when
+## 4. The router
 
-The flow every demand travels, and the skill that owns each moment:
-
-**Arm A (feature):**
-`dd-grill-me` (ambiguous intake) → `dd-backlog-definition` (curation; the
-operator-gated intake) → `dd-release-definition` (candidate trio, mandatory grill)
-→ `dd-release-implementation` (task arc through the promote-or-continue gate).
-
-**Arm B (bug):** `dd-bug-registration` (classify, redact, append — any agent, the
-moment a contract breaks) → `dd-bug-resolution` (seven-phase method + resolve).
-
-**Running underneath, on every lane:**
-- `dd-spec-navigator` — session grounding (context → memory → trio).
-- `dd-gitflow-default` — branches, commit shapes, PRs, the push gate.
-- `dd-test-stewardship` — every test's lifecycle.
-- `dd-code-review` — the three-axis review before the candidate's PR.
-- `dd-handoff-emitter` — emission at every task end.
-
-**Vocabulary layers (reach for them when the words are the problem):**
-- `dd-codebase-design` — module/seam/depth; the deletion test on any growing diff.
-- `dd-domain-modeling` — the domain glossary; sharpening terms and offering ADRs.
-
-**Health and upkeep:**
-- `dd-architecture-survey` — deepening candidates at each candidate close (architecture lens).
-- `dd-audit-project` — the three-pillar drift audit (`DADAIA.md` §6.8, audit lens).
-
-**Harness:** `dd-ai-eng-knowhow` (primitives literacy and the AUTHORING contract),
-`dd-cli-library` (CLI idioms for every Bash-capable agent).
+- One line per skill, and the two arms they serve, live in the root `AGENTS.md` map — read it there, never a second roster.
 
 ## 5. Done when
 

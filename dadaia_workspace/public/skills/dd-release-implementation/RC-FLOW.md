@@ -65,7 +65,7 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 - Done when: the `kind: artifact-gc` log entry records the `compliance(total)` line and it reads 100%, or names the slop the operator holds.
 
 **Step 9 — Candidate PR.**
-- Open the `feature/{M.m.p}` -> `develop` PR (security verdict covering the head, `DADAIA.md` §4.2); watch CI to green; merge.
+- Open the `feature/{M.m.p}` -> `develop` PR (security verdict covering the head, `dd-gitflow-default` §2a); watch CI to green; merge.
 - Done when: it merges green.
 
 The arc ends here. Gate -> ship -> archive -> branch cut: `dd-gitflow-default` steps

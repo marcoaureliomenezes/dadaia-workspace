@@ -34,7 +34,7 @@
   Write set: `cli/commands/context.py`, `cli/redact.py`, `docs/cli.md`,
   `public/skills/dd-cli-library/**`, `public/data/*AGENTS.md`, `tests/**`.
 
-- [ ] T-047-51 — FR1a: the migration. Rewrite `public/data/AGENTS.md` as the map (<= 8192 B):
+- [x] T-047-51 — FR1a: the migration. Rewrite `public/data/AGENTS.md` as the map (<= 8192 B):
   flow, three roles, gate invariants (§3.1/3.2 only), root whitelist + output paths,
   credential boundary, the *sessions launch at the workspace root* sentence, and a one-line
   index of every scoped `AGENTS.md` and dd- skill. Move every other section into its owning

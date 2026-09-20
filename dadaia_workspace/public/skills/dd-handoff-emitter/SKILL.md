@@ -9,7 +9,7 @@ description: >
 
 # dd-handoff-emitter
 
-Handoff-first emission (`DADAIA.md` §5): the JSON handoff is the default output of a
+Handoff-first emission: the JSON handoff is the default output of a
 completed agent task; the HTML report is the exception, not the rule.
 
 ## Emitting
@@ -31,13 +31,6 @@ completed agent task; the HTML report is the exception, not the rule.
 **Done when** the handoff file exists at that exact path shape, `dadaia reports
 validate` exits 0, and (report mode) `artifact.content_hash` matches the file on disk.
 
-## The bug proposal
-
-- With no operator present, a suspected bug leaves the session as one ordinary
-  finding, never a `BUGS.jsonl` record (`dd-bug-registration`).
-- `message` starts `bug-proposal:` and names the contract line violated;
-  `fix_recommendation` is the exact `dadaia bugs append …` line the operator runs.
-
 ## Consuming (ack-on-consume)
 
 After reading and acting on a coordination handoff addressed to you:
@@ -54,4 +47,3 @@ validates.
 
 - `.dadaia/agentic/schemas/handoff-v1.schema.json` — field list, types, enums,
   patterns, `schema_version` posture.
-- `DADAIA.md` §5 — emission law, output paths, the 30 KB report split rule.

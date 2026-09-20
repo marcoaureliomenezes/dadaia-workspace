@@ -4,6 +4,9 @@ Scope: this file governs only `specs/audits/`.
 
 This directory contains audit records for this Spec Context Project.
 
+- An audit runs three pillars together — bug history, spec compliance, memory drift — over the window read from `_archive/audits_histo.jsonl`.
+- Suggested every 5 releases, never mandatory.
+
 ## 1. Authoring rules
 
 - Each audit session produces a directory named `<YYYYMMDD>-<slug>/` holding its committed findings and summary.
