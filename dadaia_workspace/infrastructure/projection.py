@@ -126,10 +126,16 @@ def _read_bytes(path: Path) -> bytes | None:
     return path.read_bytes() if path.is_file() else None
 
 
+def _posix_relpath(target: Path, start: Path) -> str:
+    """A relative path with ``/`` separators on every OS: the one spelling a link target
+    and its ledger digest carry, so Windows and POSIX agree byte for byte."""
+    return os.path.relpath(target, start).replace(os.sep, "/")
+
+
 def _link_target(rule: ProjectionRule) -> str:
     """The relative target a link rule's ``dst`` must carry (POSIX-shaped, portable)."""
-    assert rule.link_to is not None
-    return os.path.relpath(rule.link_to, rule.dst.parent)
+    assert rule.link_to is not None, "a link rule always carries link_to"
+    return _posix_relpath(rule.link_to, rule.dst.parent)
 
 
 def _source_files(src: Path) -> Iterator[tuple[Path, Path]]:
@@ -170,7 +176,7 @@ def _clear(dst: Path) -> None:
 def _install_link(rule: ProjectionRule, *, force: bool) -> list[TranscriptLine]:
     assert rule.link_to is not None
     target = _link_target(rule)
-    if not force and rule.dst.is_symlink() and os.readlink(rule.dst) == target:
+    if not force and rule.dst.is_symlink() and os.readlink(rule.dst).replace(os.sep, "/") == target:
         return [TranscriptLine("skip", rule.dst, "symlink")]
     rule.dst.parent.mkdir(parents=True, exist_ok=True)
     _clear(rule.dst)
@@ -183,21 +189,43 @@ def _install_link(rule: ProjectionRule, *, force: bool) -> list[TranscriptLine]:
     return [TranscriptLine("ok", rule.dst, "symlink")]
 
 
+def link_entry_defect(entry: Path, canonical: Path) -> str | None:
+    """What is wrong with one projected harness view of *canonical*, else ``None``.
+
+    The ONE definition of "a correct view of the authored set": a symlink carrying the
+    relative target of *canonical* and resolving to something that exists, or — on a
+    platform that refused the link — a copy equal to it byte for byte. The rule-table
+    compare (:func:`_doctor_link`) and the ledger-driven ``SYMLINK-TARGET-1`` sweep in
+    ``infrastructure/public_assets.py`` both read this, so a link entry cannot be
+    judged correct by one surface and broken by the other.
+    """
+    expected = _posix_relpath(canonical, entry.parent)
+    if entry.is_symlink():
+        actual = os.readlink(entry).replace(os.sep, "/")
+        if actual != expected:
+            return f"symlink target {actual!r} is not the canonical {expected!r}"
+        if not canonical.exists():
+            return f"symlink target {expected!r} does not exist"
+        return None
+    if not entry.exists():
+        return "missing"
+    if not canonical.exists():
+        return f"canonical {expected!r} does not exist"
+    for source, rel in _source_files(canonical):
+        copied = entry if rel == Path(".") else entry / rel
+        if not copied.is_file() or copied.read_bytes() != source.read_bytes():
+            return f"copy diverged at {rel.as_posix()}"
+    return None
+
+
 def _doctor_link(rule: ProjectionRule) -> DoctorLine:
     assert rule.link_to is not None
-    if rule.dst.is_symlink():
-        actual = os.readlink(rule.dst)
-        target = _link_target(rule)
-        if actual == target:
-            return DoctorLine(DoctorStatus.OK, rule.label)
-        return DoctorLine(DoctorStatus.DRIFT, f"{rule.label} (target {actual!r} != {target!r})")
-    if not rule.dst.exists():
+    if not rule.dst.is_symlink() and not rule.dst.exists():
         return DoctorLine(DoctorStatus.MISSING, rule.label)
-    for source, rel in _source_files(rule.link_to):
-        copied = rule.dst if rel == Path(".") else rule.dst / rel
-        if not copied.is_file() or copied.read_bytes() != source.read_bytes():
-            return DoctorLine(DoctorStatus.DRIFT, f"{rule.label} (copy diverged at {rel})")
-    return DoctorLine(DoctorStatus.OK, rule.label)
+    defect = link_entry_defect(rule.dst, rule.link_to)
+    if defect is None:
+        return DoctorLine(DoctorStatus.OK, rule.label)
+    return DoctorLine(DoctorStatus.DRIFT, f"{rule.label} ({defect})")
 
 
 def _apply_mode(path: Path, mode: int | None) -> None:
