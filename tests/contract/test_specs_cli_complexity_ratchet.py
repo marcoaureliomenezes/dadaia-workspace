@@ -60,7 +60,7 @@ _DOCTOR_CEILING = 8
 # "stamp v6 or refuse" rule) — same-commit justification per this test's own error
 # message; the SCAFFOLD's 0.6.0 expiry (A7) is unaffected, this is a same-generation
 # re-pin, not a renewal.
-_UPGRADE_MODULE_SHA256 = "73530efa93f56b0e2a8e7aabddd486681cd69f1418e9a61af5a99d293d3ec8ad"
+_UPGRADE_MODULE_SHA256 = "a5a37fbffe73c2ce19e528aead5cb6f84848895a3fd9943b0481167b675794f1"
 
 
 def _complexity_by_name(path: Path) -> dict[str, int]:

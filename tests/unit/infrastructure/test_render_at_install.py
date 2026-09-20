@@ -48,6 +48,7 @@ _GENERIC_BODY = (
     "---\n"
     "name: software-engineer\n"
     "description: generic implementer\n"
+    "activity_class: MUTATING\n"
     "dispatch_band: 3\n"
     "---\n"
     "\n"
@@ -58,6 +59,7 @@ _PACK_BODY = (
     "---\n"
     "name: frontend-engineer\n"
     "description: pack body\n"
+    "activity_class: MUTATING\n"
     "dispatch_band: 3\n"
     "model: claude-sonnet-5\n"
     "gate_role: implementer\n"
@@ -118,6 +120,38 @@ def test_render_claude_agent_seam(case: str) -> None:
         resolved = ResolvedAgentModel(model="claude-sonnet-5", effort="high", source="default")
         with pytest.raises(PublicAssetError):
             render_claude_agent("# no frontmatter\n", resolved)
+
+
+@pytest.mark.parametrize(
+    ("declared", "expected"),
+    [
+        ("ADDITIVE", ("permissionMode: default", "disallowedTools: [Edit, Write, NotebookEdit]")),
+        ("MUTATING", ("permissionMode: acceptEdits",)),
+    ],
+)
+def test_render_claude_agent_derives_privilege_from_parsed_activity_class(
+    declared: str, expected: tuple[str, ...]
+) -> None:
+    body = _GENERIC_BODY.replace("activity_class: MUTATING", f"activity_class: {declared}")
+    resolved = ResolvedAgentModel(model="claude-sonnet-5", effort="high", source="default")
+    fm = render_claude_agent(body, resolved).split("---\n", 2)[1].splitlines()
+    for line in expected:
+        assert line in fm
+    assert ("disallowedTools" in "\n".join(fm)) == (declared == "ADDITIVE")
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        _GENERIC_BODY.replace("activity_class: MUTATING\n", ""),
+        _GENERIC_BODY.replace("activity_class: MUTATING", "activity_class: additive"),
+    ],
+)
+def test_render_claude_agent_refuses_undeclared_activity_class(body: str) -> None:
+    """Privilege never falls back to a silent default (review 0.4.7 c5 F2)."""
+    resolved = ResolvedAgentModel(model="claude-sonnet-5", effort="high", source="default")
+    with pytest.raises(PublicAssetError, match="activity_class"):
+        render_claude_agent(body, resolved)
 
 
 # ---------------------------------------------------------------------------

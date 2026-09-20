@@ -26,3 +26,7 @@ def test_security_review_job_is_the_pinned_official_action() -> None:
     assert len(sha) == 40 and all(c in "0123456789abcdef" for c in sha), action
     step = next(s for s in job["steps"] if s.get("uses", "") == action)
     assert step["with"]["claude-api-key"] == "${{ secrets.CLAUDE_API_KEY }}"
+    assert step["if"] == "env.CLAUDE_API_KEY != ''"
+    # Fail closed: without the secret the job must go red, never green-by-skipping.
+    missing = next(s for s in job["steps"] if s.get("if") == "env.CLAUDE_API_KEY == ''")
+    assert "exit 1" in missing["run"] and "::error::" in missing["run"]

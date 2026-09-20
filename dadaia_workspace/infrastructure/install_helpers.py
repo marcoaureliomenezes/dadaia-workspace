@@ -8,7 +8,7 @@ the class delegates to; they take explicit Path arguments instead of ``self``.
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -25,8 +25,30 @@ from dadaia_workspace.infrastructure.public_assets_common import (
     _sha256,
 )
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
+    _parse_agent_frontmatter,
     _parse_write_allowlist,
 )
+
+_ACTIVITY_CLASSES: frozenset[str] = frozenset({"ADDITIVE", "MUTATING"})
+
+
+def activity_read_only(frontmatter: Mapping[str, object]) -> bool:
+    """Least privilege derives from the persona's ``activity_class`` (ADR 0016): ADDITIVE
+    (the reviewer) never edits; MUTATING accepts its own edits. The ONE derivation shared
+    by the Claude render and the Codex TOML transcode.
+
+    Raises:
+        PublicAssetError: fail-closed — a persona declaring no class, or an unknown one,
+            never renders on a silent privilege default.
+    """
+    declared = frontmatter.get("activity_class")
+    if declared not in _ACTIVITY_CLASSES:
+        raise PublicAssetError(
+            "cannot render agent projection: frontmatter must declare "
+            f"activity_class as one of {sorted(_ACTIVITY_CLASSES)}, got {declared!r}"
+        )
+    return declared == "ADDITIVE"
+
 
 # ---------------------------------------------------------------------------
 # Stage helpers (moved from FileSystemPublicAssetManager internal methods)
@@ -168,9 +190,7 @@ def render_claude_agent(staged_text: str, resolved: ResolvedAgentModel) -> str:
     rest = staged_text[end_idx + 5 :]
     derived = ("model:", "effort:", "permissionMode:", "disallowedTools:")
     kept = [line for line in frontmatter.splitlines() if not line.startswith(derived)]
-    # Least privilege derives from the persona's activity_class (ADR 0016): an ADDITIVE
-    # persona (the reviewer) never edits; a MUTATING one accepts its own edits.
-    if "activity_class: ADDITIVE" in frontmatter:
+    if activity_read_only(_parse_agent_frontmatter(staged_text)):
         kept.append("permissionMode: default")
         kept.append("disallowedTools: [Edit, Write, NotebookEdit]")
     else:

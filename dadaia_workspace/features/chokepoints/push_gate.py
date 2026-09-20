@@ -432,11 +432,8 @@ def push_gate_decision(
        policy; step 2's refusal is decided first) — under v2 this feature push is the
        first publication to ``origin`` (A3.3).
 
-    There is no fourth step: the former diff-based security-verdict check is DELETED
-    from this path (v0.4.4 A3.4) — it relocates to a PR gate covering
-    ``feature/{M.m.p}`` → ``develop`` and ``develop`` → ``main`` (``dadaia ci
-    verdict-check``, built over
-    :func:`~dadaia_workspace.features.chokepoints.verdict.covering_verdict`).
+    There is no fourth step: security review is the ``security-review`` PR check
+    (the official Action, 0.4.7 c5 FR5), never a pre-push step.
 
     Deletions (zero sha) are never scanned. Tag pushes ARE scanned but were never
     branch-policy-gated (publishing depends on tag pushes). A malformed stdin line

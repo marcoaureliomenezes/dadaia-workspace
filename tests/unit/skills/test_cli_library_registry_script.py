@@ -123,3 +123,49 @@ def test_scan_parses_ss_lines_and_skips_registered_and_privileged_ports() -> Non
     assert [f["port"] for f in findings] == [8080]
     assert findings[0]["lan_exposed"] is True and findings[0]["bind"] == "0.0.0.0"
     assert module.scan(doc, None) == []
+
+
+def _run_in(cwd: Path, *argv: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, str(_SCRIPT), *argv],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=cwd,
+    )
+
+
+def test_registry_resolves_by_walking_up_to_the_nearest_dadaia_dir(tmp_path: Path) -> None:
+    """The ancestor walk lands on the workspace that owns the cwd (review 0.4.7 c5 F4)."""
+    workspace = tmp_path / "ws"
+    nested = workspace / "repos" / "app" / "src"
+    nested.mkdir(parents=True)
+    (workspace / ".dadaia").mkdir()
+    assert _run_in(nested, "register", "--port", "3100", "--project", "demo").returncode == 0
+    reg = workspace / ".dadaia" / "states" / "server_registry.json"
+    assert [e["port"] for e in _entries(reg)] == [3100]
+    assert not (nested / ".dadaia").exists()
+
+
+def test_registry_refuses_when_no_dadaia_dir_is_above_the_cwd(tmp_path: Path) -> None:
+    """Never a silent registry in a foreign tree: no ``.dadaia/`` above → exit non-zero."""
+    lonely = tmp_path / "lonely"
+    lonely.mkdir()
+    result = _run_in(lonely, "list")
+    assert result.returncode != 0
+    assert "no .dadaia/ above the current directory" in result.stderr
+    assert not any(tmp_path.rglob("server_registry.json"))
+
+
+def test_entry_with_a_dead_pid_is_stale_before_its_ttl(tmp_path: Path) -> None:
+    reg = tmp_path / "r.json"
+    probe = subprocess.Popen([sys.executable, "-c", "pass"])
+    probe.wait()
+    dead_pid = probe.pid
+    _run(reg, "register", "--port", "3100", "--project", "demo", "--pid", str(dead_pid))
+    listed = json.loads(_run(reg, "list", "--json", "--status", "all").stdout)
+    assert listed[0]["status"] == "stale"
+    alive = _run(reg, "register", "--port", "3200", "--project", "live", "--pid", str(os.getpid()))
+    assert alive.returncode == 0
+    listed = json.loads(_run(reg, "list", "--json", "--status", "all").stdout)
+    assert {e["port"]: e["status"] for e in listed} == {3200: "active"}

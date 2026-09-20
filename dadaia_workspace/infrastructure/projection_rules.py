@@ -36,6 +36,7 @@ from dadaia_workspace.infrastructure.codex_doctor import (
     dcx9_codex_hook_shape,
 )
 from dadaia_workspace.infrastructure.install_helpers import (
+    activity_read_only,
     render_claude_agent,
     resolve_codex_agent_model,
 )
@@ -406,7 +407,7 @@ def _codex_agent_toml_bytes(
         description=codex_description,
         claude_model=claude_model,
         reasoning_effort=reasoning_effort,
-        read_only=(fm.get("activity_class") == "ADDITIVE") if fm else False,
+        read_only=activity_read_only(fm),
     )
     return toml_content.encode("utf-8")
 

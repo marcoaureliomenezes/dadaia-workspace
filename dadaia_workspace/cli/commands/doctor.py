@@ -79,10 +79,7 @@ def _resolve_caller_context_and_slug(workspace_root: Path) -> tuple[str | None, 
 
 
 def _build_redactor(workspace_root: Path) -> ContextRedactor:
-    """Candidates = every known registered context name/repo slug, PLUS every context
-    name that appears in an advisory presence record (`[stale-presence] context
-    '<name>'`, PRESENCE-GC) — a presence record can outlive its context's registry
-    entry, so the registry alone is not enough to cover A8.1's PRESENCE-GC line."""
+    """Candidates = every known registered context name/repo slug."""
     caller_name, caller_slug = _resolve_caller_context_and_slug(workspace_root)
     try:
         contexts = container.build_spec_context_service(workspace_root).list_all()

@@ -74,7 +74,7 @@
 - release phase — Move the live release to IMPLEMENTATION or CLOSURE, stamping its milestone.
 - release rc-archive — Archive the live release's completed candidate trio into the next rc-N/.
 
-## dadaia reports — Validate and diagnose agent handoff reports.
+## dadaia reports — Validate agent handoff reports.
 - reports validate — Validate one or more agent handoff JSON files.
 
 ## dadaia specs — SDD release-lifecycle structural checks and helpers.

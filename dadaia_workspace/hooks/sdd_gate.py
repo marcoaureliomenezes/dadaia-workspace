@@ -21,8 +21,7 @@ drifting copy alongside the bash gate).
    writes are blocked unconditionally (SEC-01).
 3. **Scope, not phase (0.4.7 FR1).** The only other block is a MUTATING write into a
    ``repos/<slug>/`` some OTHER context owns while this session is bound. The gate
-   reads no ``_RELEASE.json`` and knows no phase; mutating writes upsert advisory
-   presence.
+   reads no ``_RELEASE.json`` and knows no phase.
 """
 
 from __future__ import annotations
@@ -34,9 +33,8 @@ from dadaia_workspace.core import invocation
 from dadaia_workspace.features.spec_context import gate_policy
 from dadaia_workspace.hooks import _common
 
-#: The gate's own anonymous-session sentinel (FR5): an unresolvable session id never
-#: creates a presence record — the write is still allowed, there is simply nothing to
-#: be advisory about. Matches ``gate_policy._ANON_SESSION_ID``.
+#: The gate's own anonymous-session sentinel (FR5): an unresolvable session id still
+#: writes. Matches ``gate_policy._ANON_SESSION_ID``.
 _ANON_SESSION_ID = "anon-session"
 
 
@@ -88,7 +86,7 @@ def _evaluate_target(
 
     ctx = inv.context_name or ""
     # FR5: an anonymous identity (no harness-native id, no payload session_id) never
-    # creates a presence record — degrades presence accuracy only, never the write.
+    # blocks the write.
     session_id = inv.session_id or _ANON_SESSION_ID
 
     # MUTATING with no resolvable context → fail open (UNGATED, no presence target),

@@ -264,8 +264,8 @@ def _entities_registry_shape_problem(raw: Any) -> str | None:
 def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
     """ENT-DERIVE-1 (constitution §12.5): the abstract-entity registry grounds the scaffold.
 
-    Independent verifier read — deliberately does NOT share the features-layer loader
-    (``features.panel.entities``), so a loader bug cannot vouch for itself. Attests:
+    Independent verifier read — deliberately shares no loader with the scaffold, so a
+    loader bug cannot vouch for itself. Attests:
 
     1. ``public/entities/registry.json`` exists, parses, and carries the expected schema.
     2. Persona ↔ core sub-agent bijection: every ``public/agents/*.md`` derives from a

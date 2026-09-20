@@ -117,7 +117,7 @@ the contract tests named below.
   wiring (`push_gate.py`, `ci.py`), the handoff `verdict` emission in `dd-code-review` and
   `dd-release-implementation`, and every test naming them.
 - Add job `security-review` to `ci.yml`: `uses: anthropics/claude-code-security-review@<pinned
-  sha>` on `pull_request`, `ANTHROPIC_API_KEY` from repo secrets. Required checks for `develop`
+  sha>` on `pull_request`, `CLAUDE_API_KEY` from repo secrets. Required checks for `develop`
   and `main` = `security-review` + the existing lint/typecheck/test/doctor jobs. The operator
   sets the secret and the branch ruleset (dependency D1).
 - DADAIA §4.2 verdict sentences and the glossary `verdict` entry change to "both PRs need the
@@ -179,7 +179,7 @@ the contract tests named below.
 
 ## 5. Dependencies, risks, questions
 
-- **D1 (operator, before FR5 closes):** `ANTHROPIC_API_KEY` repo secret and the branch ruleset
+- **D1 (operator, before FR5 closes):** `CLAUDE_API_KEY` repo secret and the branch ruleset
   naming `security-review` as required on `develop` and `main`.
 - **R1:** the presence deletion touches 33 modules; the reaper must own the throttle marker
   before `presence.py` is deleted (order of work, PLAN).

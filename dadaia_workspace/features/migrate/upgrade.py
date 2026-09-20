@@ -53,21 +53,15 @@ def upgrade(
     _registry.check_upgradable(current, goal)
 
     if dry_run:
-        placeholder_planned = remove_placeholder_atoms(specs_dir, dry_run=True)
-        return UpgradeResult(
-            from_version=current,
-            to_version=goal,
-            dry_run=True,
-            no_op=not placeholder_planned,
-            placeholder_removed=placeholder_planned + plan_empty_ideas_dir(specs_dir),
+        removed = remove_placeholder_atoms(specs_dir, dry_run=True) + plan_empty_ideas_dir(
+            specs_dir
         )
-
-    removed = remove_placeholder_atoms(specs_dir)
-    removed.extend(remove_empty_ideas_dir(specs_dir))
+    else:
+        removed = remove_placeholder_atoms(specs_dir) + remove_empty_ideas_dir(specs_dir)
     return UpgradeResult(
         from_version=current,
         to_version=goal,
-        dry_run=False,
+        dry_run=dry_run,
         no_op=not removed,
         placeholder_removed=removed,
     )

@@ -1,4 +1,4 @@
-"""dadaia reports subcommands — validate handoff sidecars and diagnose their artifact links."""
+"""dadaia reports subcommands — validate handoff sidecars."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from dadaia_workspace.core.workspace_resolver import (
     resolve_cli_workspace_root,
 )
 
-app = typer.Typer(help="Validate and diagnose agent handoff reports.")
+app = typer.Typer(help="Validate agent handoff reports.")
 console = Console()
 err_console = Console(stderr=True)
 

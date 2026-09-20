@@ -352,7 +352,8 @@ jobs:
   # ---------------------------------------------------------------------------------
   # Security review (0.4.7 c5 FR5, ADR 0016): the official Anthropic Action reviews the
   # PR diff and reports a status check on the PR head. Required on develop and main by
-  # the branch ruleset (operator-owned, together with the CLAUDE_API_KEY secret). The
+  # the branch ruleset (operator-owned, together with the CLAUDE_API_KEY secret). With
+  # the secret absent the job fails closed: a green check always means a review ran. The
   # sha-keyed verdict file, its two-hop rule and the verdict-gate jobs are gone.
   security-review:
     name: Security review (anthropics/claude-code-security-review)
@@ -368,9 +369,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 2
-      - name: "Secret missing: the review cannot run (operator adds CLAUDE_API_KEY, then requires this check)"
+      - name: "Secret missing: fail closed (operator adds CLAUDE_API_KEY, then requires this check)"
         if: env.CLAUDE_API_KEY == ''
-        run: echo "::warning::CLAUDE_API_KEY is not set; security-review skipped. Add the secret and require this check in the branch ruleset."
+        run: |
+          echo "::error::CLAUDE_API_KEY is not set; the security review cannot run and this check fails closed. Add the secret, then require this check in the branch ruleset."
+          exit 1
       - uses: anthropics/claude-code-security-review@0c6a49f1fa56a1d472575da86a94dbc1edb78eda  # main 2026-02-11
         if: env.CLAUDE_API_KEY != ''
         with:
