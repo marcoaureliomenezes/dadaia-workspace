@@ -5,7 +5,7 @@ the full pipeline: canonical source → staging → Claude / Codex / Pi / .agent
 They catch content-level bugs that unit tests with fakes cannot detect.
 
 Intent: CONTRACT — v0.1.65 FR1/AC-1, FR5/AC-8 (public asset pipeline)
-Owner: software-engineer
+Owner: dd-software-engineer
 """
 
 from __future__ import annotations
@@ -31,9 +31,9 @@ _runner = CliRunner()
 # ---------------------------------------------------------------------------
 
 EXPECTED_AGENTS = {
-    "code-reviewer",
-    "project-manager",
-    "software-engineer",
+    "dd-code-reviewer",
+    "dd-project-manager",
+    "dd-software-engineer",
 }
 
 # These must NEVER appear in any staging or runtime target
@@ -318,27 +318,27 @@ class TestDoctor:
         mgr.install(workspace, target="all", force=True)
 
         if mutation == "drift":
-            target = workspace / ".claude" / "agents" / "software-engineer.md"
+            target = workspace / ".claude" / "agents" / "dd-software-engineer.md"
             target.write_text(
                 target.read_text(encoding="utf-8") + "\n# drifted\n", encoding="utf-8"
             )
             report = [line.render() for line in mgr.doctor(workspace)]
             drift_lines = [
-                line for line in report if "[drift]" in line and "software-engineer" in line
+                line for line in report if "[drift]" in line and "dd-software-engineer" in line
             ]
             assert drift_lines, (
-                "Doctor did not detect drift in .claude/agents/software-engineer.md.\n"
+                "Doctor did not detect drift in .claude/agents/dd-software-engineer.md.\n"
                 "Full report:\n" + "\n".join(report)
             )
         else:
-            target = workspace / ".claude" / "agents" / "code-reviewer.md"
+            target = workspace / ".claude" / "agents" / "dd-code-reviewer.md"
             target.unlink()
             report = [line.render() for line in mgr.doctor(workspace)]
             missing_lines = [
-                line for line in report if "[missing]" in line and "code-reviewer" in line
+                line for line in report if "[missing]" in line and "dd-code-reviewer" in line
             ]
             assert missing_lines, (
-                "Doctor did not detect missing .claude/agents/code-reviewer.md.\n"
+                "Doctor did not detect missing .claude/agents/dd-code-reviewer.md.\n"
                 "Full report:\n" + "\n".join(report)
             )
 

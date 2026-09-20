@@ -9,7 +9,7 @@ same way ``test_ci_v2_gitflow_pr_gate.py`` pins ``ci.yml``'s own v2 triggers: as
 YAML content directly, since executing the workflow is impractical in a unit test.
 
 Intent: CONTRACT — v0.5.1 A-12.1, A-12.2 (T-051-19)
-Owner: software-engineer
+Owner: dd-software-engineer
 """
 
 from __future__ import annotations

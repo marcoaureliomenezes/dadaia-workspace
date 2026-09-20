@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — core.agent_model_templates FR2 table and ruling G-1 (Fable never on code-reviewer)
+"""Intent: CONTRACT — core.agent_model_templates FR2 table and ruling G-1 (Fable never on dd-code-reviewer)
 
 MANDATORY tier-taxonomy contract (v0.1.60 FR6 / Ruling 17 — reworked v0.1.65 FR9).
 
@@ -16,7 +16,7 @@ registry** in ``core/agent_model_templates.py``:
 
   (a) the full contents of the 3 built-in templates (the FR2 table, verbatim);
   (b) ``balanced`` is the default;
-  (c) no template assigns ``claude-fable-5`` to code-reviewer (operator ruling G-1);
+  (c) no template assigns ``claude-fable-5`` to dd-code-reviewer (operator ruling G-1);
   (d) every template model resolves in REGISTRY with the expected tier;
   (e) staged core bodies carry NO ``model:``/``effort:`` frontmatter (AC-1);
   (f) roster count: exactly the 9 core agents.
@@ -72,14 +72,14 @@ def _core_agents() -> list[Path]:
 #: The FR2 table, pinned verbatim: template id -> agent -> (model, effort).
 _EXPECTED_TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
     "balanced": {
-        "project-manager": ("claude-fable-5-1", "high"),
-        "code-reviewer": ("claude-opus-5", "high"),
-        "software-engineer": ("claude-opus-5", "low"),
+        "dd-project-manager": ("claude-fable-5-1", "high"),
+        "dd-code-reviewer": ("claude-opus-5", "high"),
+        "dd-software-engineer": ("claude-opus-5", "low"),
     },
     "max-quality": {
-        "project-manager": ("claude-fable-5-1", "high"),
-        "code-reviewer": ("claude-opus-5", "xhigh"),
-        "software-engineer": ("claude-opus-5", "low"),
+        "dd-project-manager": ("claude-fable-5-1", "high"),
+        "dd-code-reviewer": ("claude-opus-5", "xhigh"),
+        "dd-software-engineer": ("claude-opus-5", "low"),
     },
 }
 
@@ -123,10 +123,10 @@ def test_builtin_templates_pin_fr2_table_default_and_registry_tiers() -> None:
 
 
 def test_no_template_assigns_fable_to_security_reviewer() -> None:
-    """(c): G-1 — Fable is NEVER assigned to code-reviewer, in any template."""
+    """(c): G-1 — Fable is NEVER assigned to dd-code-reviewer, in any template."""
     for template in list_templates():
-        assert not is_fable_model(template.assignments["code-reviewer"].model), (
-            f"template {template.id!r} assigns Fable to code-reviewer (G-1 violation)"
+        assert not is_fable_model(template.assignments["dd-code-reviewer"].model), (
+            f"template {template.id!r} assigns Fable to dd-code-reviewer (G-1 violation)"
         )
 
 

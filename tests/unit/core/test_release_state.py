@@ -37,7 +37,7 @@ def _doc(**overrides: object) -> dict[str, object]:
         "log": [
             {
                 "ts": "2026-08-27T12:25:47Z",
-                "agent": "software-engineer",
+                "agent": "dd-software-engineer",
                 "kind": "note",
                 "text": "T-050-02's definition PR is pending.",
             }

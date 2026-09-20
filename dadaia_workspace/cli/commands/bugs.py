@@ -134,7 +134,7 @@ def build_bug_service(target: Path, *, with_archive: bool = False) -> BugService
 def bugs_append_cmd(
     bug_id: str = typer.Option(..., "--bug-id", help="Stable kebab-case bug identifier."),
     reported_by: str = typer.Option(
-        "software-engineer", "--reported-by", help="Agent/runtime recording the record."
+        "dd-software-engineer", "--reported-by", help="Agent/runtime recording the record."
     ),
     ts: str | None = typer.Option(None, "--ts", help="ISO-8601 UTC timestamp. Default: now."),
     title: str | None = typer.Option(None, "--title", help="Short human-readable bug title."),

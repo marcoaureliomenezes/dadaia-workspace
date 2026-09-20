@@ -34,7 +34,7 @@ _TS = "2026-09-01T00:00:00Z"
 _BUG: dict[str, object] = {
     "id": "a-fixture-bug",
     "ts": _TS,
-    "reported_by": "software-engineer",
+    "reported_by": "dd-software-engineer",
     "title": "a-fixture-bug",
     "severity": "LOW",
     "surface": "specs",

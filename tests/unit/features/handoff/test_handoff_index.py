@@ -66,7 +66,7 @@ def _write(path: Path, doc: dict[str, object]) -> Path:
 def _base_doc(**overrides: object) -> dict[str, object]:
     doc: dict[str, object] = {
         "schema_version": "handoff-v1.1",
-        "agent": "software-engineer",
+        "agent": "dd-software-engineer",
         "context": "dadaia-workspace",
         "produced_at": "2026-08-28T12:00:00Z",
         "scope": "table-driven fixture",

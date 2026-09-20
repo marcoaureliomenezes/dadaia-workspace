@@ -40,7 +40,7 @@ def _legacy(bug_id: str, *, status: str, closed_at: str | None = None) -> dict[s
     return {
         "id": bug_id,
         "ts": _TS,
-        "reported_by": "software-engineer",
+        "reported_by": "dd-software-engineer",
         "title": "t",
         "severity": "HIGH",
         "surface": "bugs",

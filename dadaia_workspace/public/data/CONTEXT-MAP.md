@@ -41,13 +41,13 @@ path or entity as it appears in an installed workspace.
 | Surface | Purpose | Belongs | Ceiling | Measured |
 |---|---|---|---|---|
 | `AGENTS.md` | the root map: the flow, the roles, the gate invariants, the root, credentials, and one line per scoped file | statements; the index of every other surface | 8192 | 6037 |
-| `specs/AGENTS.md` | the canon of a specs tree and its status tokens | canon table, status tokens, doctor codes | 4096 | 2691 |
+| `specs/AGENTS.md` | the canon of a specs tree and its status tokens | canon table, status tokens, doctor codes | 4096 | 2709 |
 | `specs/releases/AGENTS.md` | candidates, phases, task markers, `rc-N` | release procedure and commit shapes | 4096 | 3986 |
-| `specs/backlog/AGENTS.md` | the operator's demand queue and its exits | `BACKLOG.json` shape, intake gate, dispositions | 4096 | 3930 |
+| `specs/backlog/AGENTS.md` | the operator's demand queue and its exits | `BACKLOG.json` shape, intake gate, dispositions | 4096 | 3933 |
 | `specs/bugs/AGENTS.md` | what a bug is and how it is proposed, recorded, resolved | bug procedure and the redaction rule | 4096 | 3923 |
-| `specs/memory/AGENTS.md` | current product truth and who writes it | atoms, Part 1/Part 2, ownership | 4096 | 4077 |
+| `specs/memory/AGENTS.md` | current product truth and who writes it | atoms, Part 1/Part 2, ownership | 4096 | 4080 |
 | `specs/ADRs/AGENTS.md` | the decision record | `decisions.jsonl` shape, acceptance | 4096 | 3284 |
-| `specs/audits/AGENTS.md` | the periodic three-pillar review | audit procedure, findings, closure | 4096 | 1681 |
+| `specs/audits/AGENTS.md` | the periodic three-pillar review | audit procedure, findings, closure | 4096 | 1687 |
 | `.dadaia/AGENTS.md` | the runtime tree: zones, doctor, reprojection, context | zone registry rules, chokepoints | 4096 | 4030 |
 | `.dadaia/handoff/AGENTS.md` | the handoff lane | emission, schema, ack-on-consume | 4096 | 1617 |
 | `.dadaia/tmp/AGENTS.md` | the TTL scratch lane | what may be written there and for how long | 4096 | 1135 |
@@ -62,23 +62,23 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 | Surface | Purpose | Step-1 law | Ceiling | Measured |
 |---|---|---|---|---|
 | `dd-ai-eng-knowhow` | harness literacy and the AI-entity authoring contract | — | 6144 | 2736 |
-| `dd-architecture-survey` | portfolio-level architecture candidates from bug history | — | 6144 | 4483 |
-| `dd-audit-project` | the three-pillar audit and its window | `specs/audits/AGENTS.md` | 6144 | 2341 |
-| `dd-backlog-definition` | backlog curation, the intake gate, dispositions | `specs/backlog/AGENTS.md` | 6144 | 2914 |
+| `dd-architecture-survey` | portfolio-level architecture candidates from bug history | — | 6144 | 4486 |
+| `dd-audit-project` | the three-pillar audit and its window | `specs/audits/AGENTS.md` | 6144 | 2344 |
+| `dd-backlog-definition` | backlog curation, the intake gate, dispositions | `specs/backlog/AGENTS.md` | 6144 | 2917 |
 | `dd-bug-registration` | classify-first bug proposal and its record | `specs/bugs/AGENTS.md` | 6144 | 2602 |
-| `dd-bug-resolution` | the seven-phase diagnosing method and the resolve record | `specs/bugs/AGENTS.md` | 6144 | 5270 |
+| `dd-bug-resolution` | the seven-phase diagnosing method and the resolve record | `specs/bugs/AGENTS.md` | 6144 | 5273 |
 | `dd-cli-library` | CLI idioms, CLI-owned state, the dev-server registry | `.dadaia/AGENTS.md` | 6144 | 3729 |
 | `dd-code-review` | the three review axes and the six lenses | `specs/memory/AGENTS.md` | 6144 | 4552 |
 | `dd-codebase-design` | the deep-module vocabulary and the deletion test | — | 6144 | 5455 |
 | `dd-domain-modeling` | the repo's domain terms and their one home | — | 6144 | 3622 |
 | `dd-gitflow-default` | the branch contract, commit shapes, the PR gate | — | 6144 | 4556 |
-| `dd-grill-me` | the operator grill that precedes a candidate | — | 6144 | 3117 |
+| `dd-grill-me` | the operator grill that precedes a candidate | — | 6144 | 3123 |
 | `dd-handoff-emitter` | handoff-first emission and ack-on-consume | `.dadaia/handoff/AGENTS.md` | 6144 | 2138 |
-| `dd-manager-orchestration` | intake, dispatch and the closure pass | — | 6144 | 3580 |
-| `dd-release-definition` | picking the set and authoring the trio | `specs/releases/AGENTS.md` | 6144 | 4410 |
-| `dd-release-implementation` | the candidate arc from reservation to the gate | `specs/releases/AGENTS.md` | 6144 | 3286 |
-| `dd-spec-navigator` | the three-phase session grounding protocol | `specs/AGENTS.md` | 6144 | 4905 |
-| `dd-test-stewardship` | test intent, admission, demotion, quarantine | — | 6144 | 4093 |
+| `dd-manager-orchestration` | intake, dispatch and the closure pass | — | 6144 | 3604 |
+| `dd-release-definition` | picking the set and authoring the trio | `specs/releases/AGENTS.md` | 6144 | 4413 |
+| `dd-release-implementation` | the candidate arc from reservation to the gate | `specs/releases/AGENTS.md` | 6144 | 3295 |
+| `dd-spec-navigator` | the three-phase session grounding protocol | `specs/AGENTS.md` | 6144 | 4908 |
+| `dd-test-stewardship` | test intent, admission, demotion, quarantine | — | 6144 | 4099 |
 
 ## 4. Personas — `.agents/agents/*.md`
 
@@ -86,9 +86,9 @@ Three roles, no fourth; every retired role is a lens the reviewer applies.
 
 | Surface | Purpose | Belongs | Ceiling | Measured |
 |---|---|---|---|---|
-| `project-manager` | intake, dispatch, SPEC, the memory pass at closure | role, activity class, model policy | — | 7221 |
-| `software-engineer` | PLAN/TASKS, production code and its tests | role, activity class, model policy | — | 8622 |
-| `code-reviewer` | the three-axis review and its six lenses | role, activity class, model policy | — | 6305 |
+| `dd-project-manager` | intake, dispatch, SPEC, the memory pass at closure | role, activity class, model policy | — | 7266 |
+| `dd-software-engineer` | PLAN/TASKS, production code and its tests | role, activity class, model policy | — | 8664 |
+| `dd-code-reviewer` | the three-axis review and its six lenses | role, activity class, model policy | — | 6341 |
 
 - A statement belongs to exactly one surface: the map indexes, the scoped file rules, the
   skill instructs, the persona declares who acts.

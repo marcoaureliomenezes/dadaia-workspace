@@ -42,7 +42,7 @@ labelled judgement call with the command that makes it verifiable in the diff.
 
 ## Readers
 
-- `code-reviewer` — all ten, on every review.
+- `dd-code-reviewer` — all ten, on every review.
 - QA lens — §Tests (S3), for curation verdicts.
 - Architecture lens — S4/S5, for the root-cause and fidelity gates.
 - Audit lens — all ten over the audit window (`dd-audit-project`, pillar 2, "Slop readout").

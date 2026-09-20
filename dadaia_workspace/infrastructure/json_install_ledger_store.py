@@ -7,7 +7,12 @@ idempotent no-op on identical bytes). Persists to
 ``.dadaia/states/install_ledger.json``:
 
     {"schema_version": "1",
-     "entries": [{"relpath": ".codex/AGENTS.md", "sha256": "…", "family": "law"}]}
+     "entries": [{"relpath": ".codex/AGENTS.md", "sha256": "…", "family": "law",
+                  "kind": "file"}]}
+
+``kind`` distinguishes a projected file from a symlink into the authored ``.agents/``
+set (and from that link's copy fallback); an entry persisted before ``kind`` existed
+migrates as ``"file"`` on read.
 
 A malformed/unreadable ledger reads as ``None`` — reconciliation then runs bootstrap
 semantics (record everything, prune nothing): a corrupt record must degrade to inaction,

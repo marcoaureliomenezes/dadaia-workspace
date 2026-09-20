@@ -9,7 +9,7 @@ description: >
 
 # dd-bug-resolution — Arm B
 
-> `software-engineer` runs this directly once a bug carries a record.
+> `dd-software-engineer` runs this directly once a bug carries a record.
 > Git chokepoints (`.dadaia/AGENTS.md`) are the only mechanical backstop.
 
 ## 1. Lifecycle frame

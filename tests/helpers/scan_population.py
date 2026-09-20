@@ -19,7 +19,7 @@ live in three files (``test_frozen_clock_aging_ratchet.py``,
 
 Census (T-045-17, produced by scan over ``tests/**`` at v0.4.5 S2 HEAD; the raw scan
 transcript is captured at
-``.dadaia/tmp/software-engineer/20260825/T-045-17-census.txt``). The v0.4.4 ruling
+``.dadaia/tmp/dd-software-engineer/20260825/T-045-17-census.txt``). The v0.4.4 ruling
 counted 15 tree-/package-walking + single-module source-scan tests at ITS HEAD
 (the same ruling's check (b), git history).
 Landing FR5 last inside S2 — after FR2 (T-045-14), FR3 (T-045-15) and FR4 (T-045-16),

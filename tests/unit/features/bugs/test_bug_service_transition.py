@@ -23,7 +23,7 @@ def _record(bug_id: str) -> BugRecord:
     return BugRecord(
         id=bug_id,
         ts="2026-08-27T00:00:00Z",
-        reported_by="software-engineer",
+        reported_by="dd-software-engineer",
         title="t",
         severity="HIGH",
         surface="bugs",
@@ -44,7 +44,7 @@ def test_transition_resolve_dispatches_to_the_matching_record_method(tmp_path: P
     service.register(
         bug_id="a",
         ts="2026-08-27T00:00:00Z",
-        reported_by="software-engineer",
+        reported_by="dd-software-engineer",
         title="t",
         severity="HIGH",
         surface="bugs",
@@ -79,7 +79,7 @@ def test_transition_refusal_never_reaches_the_store(tmp_path: Path) -> None:
     service.register(
         bug_id="a",
         ts="2026-08-27T00:00:00Z",
-        reported_by="software-engineer",
+        reported_by="dd-software-engineer",
         title="t",
         severity="HIGH",
         surface="bugs",

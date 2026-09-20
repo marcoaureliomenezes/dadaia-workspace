@@ -13,7 +13,7 @@ a rescue: it finds and argues candidates; it never edits code.
 
 ## 1. When
 
-- The operator or `project-manager` invokes it explicitly.
+- The operator or `dd-project-manager` invokes it explicitly.
 - At the close of each candidate or release (the `dd-release-implementation` cadence).
 
 ## 2. Scope before you scan — YAGNI

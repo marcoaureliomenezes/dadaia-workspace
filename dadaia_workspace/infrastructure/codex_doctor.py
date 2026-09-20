@@ -62,9 +62,14 @@ ATTESTING_CHECK_IDS: tuple[str, ...] = (
 
 
 def dcx7_codex_skill_refs(workspace_root: Path) -> list[DoctorLine]:
-    """D-CX-7: generated Codex agents must not reference missing skills."""
+    """D-CX-7: generated Codex agents must not reference a missing ``dd-`` member.
+
+    Since 0.4.7 a ``dd-`` token names either a skill directory or one of the three
+    personas — both live under the authored ``.agents/`` set, so both resolve here.
+    """
     codex_agents = workspace_root / ".codex" / "agents"
     skill_roots = (workspace_root / ".agents" / "skills",)
+    personas = {md.stem for md in (workspace_root / ".agents" / "agents").glob("*.md")}
     out: list[DoctorLine] = []
     if not codex_agents.exists():
         return out
@@ -79,6 +84,8 @@ def dcx7_codex_skill_refs(workspace_root: Path) -> list[DoctorLine]:
         for match in re.finditer(r"`([a-z][a-z0-9.\-]+)`", instructions):
             skill = match.group(1)
             if not skill.startswith(_CODEX_SKILL_REF_PREFIXES):
+                continue
+            if skill in personas:
                 continue
             if not any((root / skill / "SKILL.md").exists() for root in skill_roots):
                 out.append(

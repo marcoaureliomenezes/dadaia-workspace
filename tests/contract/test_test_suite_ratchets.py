@@ -3,7 +3,7 @@
 The five test-suite ratchets (**V26**, **V28**–**V31**), pinned in **one** file per T-050-18A
 (release 0.5.0, `specs/releases/0.5.0/SPEC.md` A22.10 / FR22; measurement baselines:
 `specs/releases/0.5.0/reviews/test-minimization-literature.md` Part 3, T-050-03's
-capture at `.dadaia/tmp/software-engineer/20260827/T-050-03-baselines.md`). Same
+capture at `.dadaia/tmp/dd-software-engineer/20260827/T-050-03-baselines.md`). Same
 measure-then-pin-then-ratchet law `test_module_size_ceiling.py` and
 `test_import_linter_ignore_cap.py` already use: pin the number measured *now*,
 lowering a pin in a later commit is welcome, growing one

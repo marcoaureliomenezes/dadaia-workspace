@@ -1,7 +1,7 @@
 """E2E handoff pipeline journey via the real CLI process.
 
 Intent: CONTRACT — T-AC-10 (handoff emit+validate pipeline)
-Owner: software-engineer
+Owner: dd-software-engineer
 """
 
 from __future__ import annotations
@@ -63,7 +63,7 @@ def _write_valid_handoff(base_dir: Path, stem: str = "report") -> Path:
 
     doc = {
         "schema_version": "handoff-v1",
-        "agent": "software-engineer",
+        "agent": "dd-software-engineer",
         "context": "dadaia-workspace",
         "produced_at": "2026-05-17T00:00:00Z",
         "scope": "dadaia-workspace/test",

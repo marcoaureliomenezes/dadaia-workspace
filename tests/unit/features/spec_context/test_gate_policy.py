@@ -272,7 +272,7 @@ _FIXTURE_MANIFEST: dict[str, object] = {
     "package_version": "0.0.0-test",
     "schema_version": 1,
     "assets": [
-        {"path": "agents/software-engineer.md", "sha256": "a" * 64, "type": "agents"},
+        {"path": "agents/dd-software-engineer.md", "sha256": "a" * 64, "type": "agents"},
         {"path": "data/AGENTS.md", "sha256": "b" * 64, "type": "data"},
         {"path": "data/dadaia-AGENTS.md", "sha256": "d" * 64, "type": "data"},
         {"path": "templates/repo-AGENTS.md", "sha256": "e" * 64, "type": "templates"},

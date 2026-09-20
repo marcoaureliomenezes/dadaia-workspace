@@ -9,7 +9,7 @@ candidates.
 | Boundary | Who validates | What unlocks |
 |---|---|---|
 | Per task | implementer discipline only (TDD, tests, local CI preflight, handoff); marker stays `[-]` | nothing; no per-task reviewer gate |
-| Candidate close | `code-reviewer` `APPROVED` (three axes, six lenses) on the same commit | `[x]`; the candidate's `feature -> develop` PR |
+| Candidate close | `dd-code-reviewer` `APPROVED` (three axes, six lenses) on the same commit | `[x]`; the candidate's `feature -> develop` PR |
 | Promote (ship) | pre-staged security verdict naming develop's tip | the `develop -> main` PR |
 
 - Any `REJECTED`, CRITICAL/HIGH finding, failed E2E, or missing evidence sends the work back to implementation.
@@ -38,10 +38,10 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 - Done when: `TASKS.md` carries zero `[ ]`/`[-]` rows.
 
 **Step 4 — Candidate trio review.**
-- `code-reviewer` `APPROVED` on the same commit.
+- `dd-code-reviewer` `APPROVED` on the same commit.
 - Done when: the verdict is `APPROVED` on that sha.
 
-**Step 5 — Memory update (`project-manager`).**
+**Step 5 — Memory update (`dd-project-manager`).**
 - `dadaia release phase CLOSURE --sha <sha>` — it refuses while any task is not `[x]`.
 - Memory is closure procedure, never a task: a TASKS.md task whose write set names
   `specs/memory` is refused by `dadaia doctor` (SPEC-DOC-047).

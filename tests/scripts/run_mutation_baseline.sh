@@ -64,7 +64,7 @@ REPO="$(cd "$SCRIPT_DIR/../.." && pwd)"                    # repos/dadaia-worksp
 # fake tmp_path tree without touching the real workspace's .dadaia/tmp/.
 WORKSPACE_ROOT="${DADAIA_WORKSPACE_ROOT:-$(cd "$REPO/../.." && pwd)}"
 DATE_STAMP="$(date -u +%Y%m%d)"
-OUT_DIR="$WORKSPACE_ROOT/.dadaia/tmp/software-engineer/$DATE_STAMP"
+OUT_DIR="$WORKSPACE_ROOT/.dadaia/tmp/dd-software-engineer/$DATE_STAMP"
 STAGE_ABS="$OUT_DIR/mutation-run"
 # Resolve the EXACT interpreter the workspace venv itself was built from, via its own
 # pyvenv.cfg `executable =` line, rather than invoking `.dadaia/.venv/bin/python -m venv`

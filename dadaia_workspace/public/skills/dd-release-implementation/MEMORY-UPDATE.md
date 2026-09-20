@@ -1,6 +1,6 @@
 # MEMORY-UPDATE — dd-release-implementation (RC-FLOW step 5 detail)
 
-Disclosed reference reached at `SKILL.md` step 6 — `project-manager` reads this before touching any `specs/memory/**` atom at closure.
+Disclosed reference reached at `SKILL.md` step 6 — `dd-project-manager` reads this before touching any `specs/memory/**` atom at closure.
 
 ## Protocol
 

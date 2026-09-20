@@ -25,7 +25,7 @@ def runner() -> CliRunner:
 def mock_svc() -> MagicMock:
     svc = MagicMock()
     svc.list_all.return_value = {
-        "agents": ["code-reviewer.md", "researcher.md"],
+        "agents": ["dd-code-reviewer.md", "researcher.md"],
         "skills": ["dd-handoff-emitter"],
         "rules": ["workspace-protocol.md"],
     }

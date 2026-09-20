@@ -23,7 +23,7 @@
 ## Phase 1 — Substrate upgrade + freshness gate (WS-1 / HOP-1.1)
 
 **T-1.1 — Re-pin dadaia-workspace + Codex CLI substrate** (HOP-1.1; FR-1.1)
-- Owner: software-engineer (+ ai-engineer for the breaking-change delta review)
+- Owner: dd-software-engineer (+ ai-engineer for the breaking-change delta review)
 - Write set: `docker/sample-capture/Dockerfile` (`DADAIA_WORKSPACE_VERSION`, `CODEX_VERSION`
   ARGs only)
 - Precondition: none
@@ -38,7 +38,7 @@
 ```
 
 **T-1.2 — Install `pi` CLI in the image** (HOP-1.1; FR-1.2)
-- Owner: software-engineer
+- Owner: dd-software-engineer
 - Write set: `docker/sample-capture/Dockerfile` (pi install layer, pinned)
 - Precondition: T-1.1
 - Done: the `pi` CLI (`pi-coding-agent`) is installed pinned and on `PATH`;
@@ -50,7 +50,7 @@
 ```
 
 **T-1.3 — Project `.pi/` into the in-container workspace** (HOP-1.1; FR-1.3)
-- Owner: ai-engineer (+ software-engineer for entrypoint wiring)
+- Owner: ai-engineer (+ dd-software-engineer for entrypoint wiring)
 - Write set: `docker/sample-capture/entrypoint.sh` (projection step),
   `docker/sample-capture/workspace/` (seed if the projection is baked)
 - Precondition: T-1.2
@@ -64,7 +64,7 @@
 ```
 
 **T-1.4 — Extend image-path gate for the new substrate** (HOP-1.1; FR-1.4)
-- Owner: software-engineer (path extraction) + ai-engineer (hook-import review)
+- Owner: dd-software-engineer (path extraction) + ai-engineer (hook-import review)
 - Write set: `scripts/check-image-paths.sh`
 - Precondition: T-1.1, T-1.2, T-1.3
 - Done: the existing build-time gate additionally asserts, in the built image:
@@ -79,7 +79,7 @@
 ```
 
 **T-1.5 — Substrate-freshness gate** (HOP-1.1; FR-1.5; DL-2 / AC-2)
-- Owner: software-engineer (+ ai-engineer for the policy definition)
+- Owner: dd-software-engineer (+ ai-engineer for the policy definition)
 - Write set: `scripts/check-substrate-freshness.sh` (new),
   `docker/sample-capture/substrate-policy.env` (new — approved-version policy)
 - Precondition: T-1.4
@@ -98,7 +98,7 @@
 ## Phase 2 — MinIO dev S3 for the Consumer lane (WS-2 / HOP-1.2)
 
 **T-2.1 — Bind the Consumer lane to MinIO in dev** (HOP-1.2; FR-2.1)
-- Owner: software-engineer
+- Owner: dd-software-engineer
 - Write set: `services/dev/dd-capture-peripherals.yml` (MinIO **standing dev profile** +
   attach MinIO to the `consumer-internal` network per SPEC DEC-7; standing dev-only creds),
   `services/dev/dd-capture-apps.yml` (Consumer service env `AWS_ENDPOINT_URL` + network
@@ -116,7 +116,7 @@
 ```
 
 **T-2.2 — Point `s3_uploader.py` at MinIO when the endpoint is set** (HOP-1.2; FR-2.1)
-- Owner: software-engineer
+- Owner: dd-software-engineer
 - Write set: `docker/sample-capture/workspace/scripts/s3_uploader.py`
 - Precondition: T-2.1
 - Done: `s3_uploader.py` honors **`AWS_ENDPOINT_URL`** (MinIO) when set — accepting the
@@ -131,7 +131,7 @@
 ```
 
 **T-2.3 — Dev bucket/prefix bootstrap mirrors prod** (HOP-1.2; FR-2.2)
-- Owner: software-engineer
+- Owner: dd-software-engineer
 - Write set: `services/dev/dd-capture-peripherals.yml` (minio-init bucket/prefix), dev env
   (new `sample-consumer-dev` bucket name — NOT `E2E_BUCKET`)
 - Precondition: T-2.1
@@ -146,7 +146,7 @@
 ```
 
 **T-2.4 — services/ audit: peripherals + Consumer only** (HOP-1.2; FR-2.4 / AC-4)
-- Owner: software-engineer (review: security-reviewer)
+- Owner: dd-software-engineer (review: security-reviewer)
 - Write set: none (audit); record findings in the task handoff
 - Precondition: T-2.1..T-2.3
 - Done: `services/dev/` contains ONLY peripheral containers (MinIO + inherited peripherals) +
@@ -162,7 +162,7 @@
 ## Phase 3 — Telegram command control plane (WS-3 / HOP-1.3) — parallel with Phase 2
 
 **T-3.1 — Inbound `getUpdates` listener (no inbound port, no replay)** (HOP-1.3; FR-3.1, FR-3.6)
-- Owner: software-engineer
+- Owner: dd-software-engineer
 - Write set: `docker/sample-capture/workspace/scripts/telegram_listener.py` (new),
   `docker/sample-capture/supervisord.conf` (listener program),
   `docker/sample-capture/workspace/scripts/secret_resolver.py` (reuse — no change expected)
@@ -179,7 +179,7 @@
 ```
 
 **T-3.2 — Deterministic command handlers** (HOP-1.3; FR-3.2)
-- Owner: software-engineer
+- Owner: dd-software-engineer
 - Write set: `docker/sample-capture/workspace/scripts/telegram_listener.py` (+ a handler
   module under `workspace/scripts/` if the handler set warrants separation)
 - Precondition: T-3.1
@@ -193,7 +193,7 @@
 ```
 
 **T-3.3 — Operator-only mutation gate** (HOP-1.3; FR-3.3)
-- Owner: software-engineer (review: security-reviewer)
+- Owner: dd-software-engineer (review: security-reviewer)
 - Write set: `docker/sample-capture/workspace/scripts/telegram_listener.py`
 - Precondition: T-3.1
 - Done: only the configured `OPERATOR_CHAT_ID_ENV` may issue **mutating** commands
@@ -206,7 +206,7 @@
 ```
 
 **T-3.4 — Demand→SDD refinement loop** (HOP-1.3; FR-3.4)
-- Owner: ai-engineer (loop design) + software-engineer (wiring)
+- Owner: ai-engineer (loop design) + dd-software-engineer (wiring)
 - Write set: `docker/sample-capture/workspace/scripts/telegram_listener.py`,
   `docker/sample-capture/defaults/playbook.md` (demand-intake flow),
   `docker/sample-capture/workspace/AGENTS.md` (refinement-before-implementation law)
@@ -222,7 +222,7 @@
 ```
 
 **T-3.5 — NDJSON logging (no secrets) + alert-path coexistence** (HOP-1.3; FR-3.5, FR-3.7 / AC-6)
-- Owner: software-engineer
+- Owner: dd-software-engineer
 - Write set: `docker/sample-capture/workspace/scripts/telegram_listener.py`,
   `docker/sample-capture/supervisord.conf`
 - Precondition: T-3.1
@@ -260,7 +260,7 @@
 ```
 
 **T-4.2 — Egress allowlist gains `openrouter.ai`** (HOP-1.4; FR-4.4 / AC-8)
-- Owner: software-engineer (review: security-reviewer)
+- Owner: dd-software-engineer (review: security-reviewer)
 - Write set: `docker/sample-capture/proxy/tinyproxy.filter` (+ `tinyproxy.conf` if needed),
   `deploy/vps-hardening.md` (egress table),
   `docker/sample-capture/workspace/rules/scrape-target-catalog.md` (egress note — keep-in-sync)
@@ -278,7 +278,7 @@
 ```
 
 **T-4.3 — Drive the pi worker with `--harness pi` + explicit pi/OpenRouter model** (HOP-1.4; FR-4.1, FR-4.3 / RL-1)
-- Owner: ai-engineer (lifecycle wiring) + software-engineer
+- Owner: ai-engineer (lifecycle wiring) + dd-software-engineer
 - Write set: Consumer driver (the `/new_app` handler path in `telegram_listener.py` and/or a
   dedicated `workspace/scripts/lifecycle_driver.py`),
   `docker/sample-capture/defaults/playbook.md` (Layer-2 invocation law)
@@ -295,7 +295,7 @@
 ```
 
 **T-4.4 — End-to-end pi/OpenRouter Layer-2 proof** (HOP-1.4; FR-4.3 / DL-4 / AC-7)
-- Owner: software-engineer (orchestration) + qa-engineer (acceptance)
+- Owner: dd-software-engineer (orchestration) + qa-engineer (acceptance)
 - Write set: `scripts/pi-layer2-proof.sh` (new); evidence captured for CLOSURE
 - Precondition: T-4.1, T-4.2, T-4.3
 - Done: **one** worker step runs a **real pi worker against an OpenRouter model
@@ -314,7 +314,7 @@
 ## Phase 5 — Integration proof (Done-line stitch)
 
 **T-5.1 — Full-loop acceptance + red-line audit** (DL-1..DL-7 / AC-1..AC-10)
-- Owner: qa-engineer (acceptance) + software-engineer (orchestration) + security-reviewer
+- Owner: qa-engineer (acceptance) + dd-software-engineer (orchestration) + security-reviewer
   (red-line audit)
 - Write set: `scripts/consumer-devfactory-loop.sh` (new — the stitched proof); evidence
   captured for CLOSURE

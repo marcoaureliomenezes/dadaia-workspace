@@ -34,7 +34,7 @@ state, exactly as PLAN.md Phase 4 describes it):
    with NO security-reviewer handoff written anywhere (A3.4) — the remote's
    ``feature/0.0.1`` ref lands on the amended sha.
 
-Owner: software-engineer (LARGE-tier e2e; tests/AGENTS.md "every file names an owner").
+Owner: dd-software-engineer (LARGE-tier e2e; tests/AGENTS.md "every file names an owner").
 """
 
 from __future__ import annotations

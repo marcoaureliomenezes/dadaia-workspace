@@ -269,7 +269,7 @@ def test_git_object_read_failure_refuses_naming_the_failure(tmp_path: Path) -> N
 
 
 # ---------------------------------------------------------------------------
-# code-reviewer MEDIUM finding (v0.11.0 pre-PR review) — `_run_denylist_scan` must
+# dd-code-reviewer MEDIUM finding (v0.11.0 pre-PR review) — `_run_denylist_scan` must
 # consume each Iterable term source ONLY ONCE. A one-shot generator passed as
 # `denylist_terms` must still refuse a push carrying that term — consuming the same
 # generator twice (once to build the `_PathMasker`, again to build `term_list`) would

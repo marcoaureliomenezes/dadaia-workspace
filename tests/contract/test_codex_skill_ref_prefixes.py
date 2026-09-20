@@ -67,14 +67,14 @@ def test_dcx7_reports_a_non_existent_dd_skill_reference(tmp_path: Path) -> None:
     """A citation of a synthetic ``dd-nonexistent`` skill trips the D-CX-7 ERROR line."""
     _make_codex_agent(
         tmp_path,
-        "software-engineer",
+        "dd-software-engineer",
         "Follow the `dd-nonexistent` skill for this stage.",
     )
 
     out = _rendered(dcx7_codex_skill_refs(tmp_path))
 
     assert len(out) == 1
-    assert out[0].startswith("[error] codex:agents/software-engineer.toml:")
+    assert out[0].startswith("[error] codex:agents/dd-software-engineer.toml:")
     assert "missing skill 'dd-nonexistent'" in out[0]
     assert "(D-CX-7)" in out[0]
 
@@ -83,7 +83,7 @@ def test_dcx7_does_not_report_a_real_dd_family_skill_reference(tmp_path: Path) -
     """A citation of a real, installed ``dd-`` skill produces no D-CX-7 finding."""
     _make_codex_agent(
         tmp_path,
-        "software-engineer",
+        "dd-software-engineer",
         "Follow the `dd-release-implementation` skill for this stage.",
     )
     _make_skill(tmp_path, "dd-release-implementation")

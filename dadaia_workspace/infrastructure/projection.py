@@ -31,7 +31,10 @@ still correctly detected as a byte difference). The renderer is the only verifie
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Callable, Sequence
+import hashlib
+import os
+import shutil
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -43,6 +46,19 @@ from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 #: Which fixed-point discipline a rule's ``render`` observes (documentation only —
 #: install/doctor run one algorithm regardless; see the module docstring).
 CompareSemantic = Literal["bytes", "owned-slice", "managed-block"]
+
+#: What a projected entry physically IS on disk. ``read_bytes()`` follows a link, so the
+#: digest alone can never tell a symlink from a copy of the same content — the kind
+#: travels with the entry, through the transcript, into the install ledger.
+EntryKind = Literal["file", "symlink", "copy"]
+
+
+def link_render(_current: bytes | None) -> bytes:
+    """A link rule projects an inode, not bytes — its canonical content is its target's.
+
+    Never called: install and doctor both branch on ``link_to`` before rendering.
+    """
+    return b""
 
 
 @dataclass(frozen=True)
@@ -66,6 +82,11 @@ class ProjectionRule:
     #: (e.g. a cleared executable bit on a hook shim) is repaired even when the
     #: content already matches. ``None`` leaves the destination's mode untouched.
     mode: int | None = None
+    #: When set, the rule projects a RELATIVE symlink at ``dst`` pointing at this
+    #: canonical path (one authored set, N harness views) — falling back to a
+    #: hash-verified copy when the platform refuses to create one (Windows without
+    #: Developer Mode raises ``OSError``/``NotImplementedError``). ``render`` is unused.
+    link_to: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -75,6 +96,7 @@ class TranscriptLine:
 
     status: Literal["ok", "skip"]
     path: Path
+    kind: EntryKind = "file"
 
     def render(self) -> str:
         prefix = "[ok]   " if self.status == "ok" else "[skip] "
@@ -104,6 +126,80 @@ def _read_bytes(path: Path) -> bytes | None:
     return path.read_bytes() if path.is_file() else None
 
 
+def _link_target(rule: ProjectionRule) -> str:
+    """The relative target a link rule's ``dst`` must carry (POSIX-shaped, portable)."""
+    assert rule.link_to is not None
+    return os.path.relpath(rule.link_to, rule.dst.parent)
+
+
+def _source_files(src: Path) -> Iterator[tuple[Path, Path]]:
+    """(source file, path relative to *src*) for a file or every file under a directory."""
+    if src.is_dir():
+        for path in sorted(src.rglob("*")):
+            if path.is_file():
+                yield path, path.relative_to(src)
+    elif src.is_file():
+        yield src, Path(".")
+
+
+def _copy_verified(src: Path, dst: Path) -> list[Path]:
+    """Copy *src* (file or tree) onto *dst*, verifying each written file by digest.
+
+    The fallback half of a link rule: a platform that refuses symlinks still gets the
+    same content, and the ledger records it as ``copy`` so the doctor can tell them apart.
+    """
+    written: list[Path] = []
+    for source, rel in _source_files(src):
+        target = dst if rel == Path(".") else dst / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        payload = source.read_bytes()
+        atomic_write(target, payload)
+        if hashlib.sha256(target.read_bytes()).digest() != hashlib.sha256(payload).digest():
+            raise PublicAssetError(f"copy fallback for {dst} did not verify at {target}")
+        written.append(target)
+    return written
+
+
+def _clear(dst: Path) -> None:
+    if dst.is_symlink() or dst.is_file():
+        dst.unlink()
+    elif dst.is_dir():
+        shutil.rmtree(dst)
+
+
+def _install_link(rule: ProjectionRule, *, force: bool) -> list[TranscriptLine]:
+    assert rule.link_to is not None
+    target = _link_target(rule)
+    if not force and rule.dst.is_symlink() and os.readlink(rule.dst) == target:
+        return [TranscriptLine("skip", rule.dst, "symlink")]
+    rule.dst.parent.mkdir(parents=True, exist_ok=True)
+    _clear(rule.dst)
+    try:
+        os.symlink(target, rule.dst, target_is_directory=rule.link_to.is_dir())
+    except (OSError, NotImplementedError):
+        return [
+            TranscriptLine("ok", path, "copy") for path in _copy_verified(rule.link_to, rule.dst)
+        ]
+    return [TranscriptLine("ok", rule.dst, "symlink")]
+
+
+def _doctor_link(rule: ProjectionRule) -> DoctorLine:
+    assert rule.link_to is not None
+    if rule.dst.is_symlink():
+        actual = os.readlink(rule.dst)
+        target = _link_target(rule)
+        if actual == target:
+            return DoctorLine(DoctorStatus.OK, rule.label)
+        return DoctorLine(DoctorStatus.DRIFT, f"{rule.label} (target {actual!r} != {target!r})")
+    if not rule.dst.exists():
+        return DoctorLine(DoctorStatus.MISSING, rule.label)
+    for source, rel in _source_files(rule.link_to):
+        copied = rule.dst if rel == Path(".") else rule.dst / rel
+        if not copied.is_file() or copied.read_bytes() != source.read_bytes():
+            return DoctorLine(DoctorStatus.DRIFT, f"{rule.label} (copy diverged at {rel})")
+    return DoctorLine(DoctorStatus.OK, rule.label)
+
+
 def _apply_mode(path: Path, mode: int | None) -> None:
     if mode is not None:
         with contextlib.suppress(OSError):
@@ -120,6 +216,9 @@ def install_rules(rules: Sequence[ProjectionRule], *, force: bool) -> Transcript
     """
     lines: list[TranscriptLine] = []
     for rule in rules:
+        if rule.link_to is not None:
+            lines.extend(_install_link(rule, force=force))
+            continue
         current = _read_bytes(rule.dst)
         desired = rule.render(current)
         if current is None or current != desired or force:
@@ -146,6 +245,9 @@ def doctor_rules(rules: Sequence[ProjectionRule]) -> list[DoctorLine]:
     """
     out: list[DoctorLine] = []
     for rule in rules:
+        if rule.link_to is not None:
+            out.append(_doctor_link(rule))
+            continue
         current = _read_bytes(rule.dst)
         if current is None:
             out.append(DoctorLine(DoctorStatus.MISSING, rule.label))

@@ -70,8 +70,8 @@ from dadaia_workspace.infrastructure.public_assets_common import (
     _COPY_DIRS,
     _VALID_TARGETS,
     OverwritePolicy,
+    _entry_digest,
     _json_dump,
-    _sha256,
     is_ignored_public_asset,
     iter_public_files,
 )
@@ -161,6 +161,23 @@ class FileSystemPublicAssetManager:
     ) -> None:
         self._public_dir = Path(__file__).parent.parent / "public"
         self._install_ledger_store = install_ledger_store
+
+    @staticmethod
+    def _reachable_without_link(path: Path, ws: Path) -> bool:
+        """True iff every directory between *ws* and *path* is a real directory.
+
+        A ledgered relpath whose parent became a SYMLINK is no longer the path the
+        ledger recorded: following it would unlink a file inside the authored
+        ``.agents/`` tree the link points at (bug class
+        ``doctor-walks-symlinked-zone-root-into-a-repo-tree``). Such an entry is retired
+        from the ledger untouched — the link rule that replaced it is already recorded.
+        """
+        for parent in path.parents:
+            if parent == ws:
+                return True
+            if parent.is_symlink():
+                return False
+        return False
 
     @staticmethod
     def _prune_empty_dirs(start: Path, stop: Path) -> None:
@@ -447,26 +464,30 @@ class FileSystemPublicAssetManager:
 
         current: dict[str, LedgerEntry] = {}
 
-        def _record(candidate: Path) -> None:
+        def _record(candidate: Path, kind: str) -> None:
             try:
-                rel = candidate.resolve().relative_to(ws)
+                # The PARENT is resolved, never the entry itself: a projected symlink
+                # must be ledgered at the path it occupies, not at the path it points
+                # at (bug class doctor-walks-symlinked-zone-root-into-a-repo-tree).
+                rel = (candidate.parent.resolve() / candidate.name).relative_to(ws)
             except (ValueError, OSError):
                 return  # user-level files (e.g. $KIMI_CODE_HOME) are not workspace state
             rel_posix = rel.as_posix()
             if rel_posix.startswith(".dadaia/states/"):
                 return  # never ledger the state dir (the ledger itself lives there)
-            if not candidate.is_file():
+            digest = _entry_digest(candidate)
+            if digest is None:
                 return
             family = rel.parts[0].lstrip(".") if len(rel.parts) > 1 else "root"
             current[rel_posix] = LedgerEntry(
-                relpath=rel_posix, sha256=_sha256(candidate), family=family
+                relpath=rel_posix, sha256=digest, family=family, kind=kind
             )
 
-        for path in transcript.paths():
-            _record(path)
+        for line in transcript.lines:
+            _record(line.path, line.kind)
 
         for path in extra_managed:
-            _record(path)
+            _record(path, "file")
 
         previous = self._install_ledger_store.read(states_dir)
         merged: dict[str, LedgerEntry] = {}
@@ -478,10 +499,14 @@ class FileSystemPublicAssetManager:
                 if rel_posix in current:
                     continue
                 path = ws / entry.relpath
-                if not path.is_file():
+                if not self._reachable_without_link(path, ws):
                     merged.pop(rel_posix, None)
                     continue
-                if _sha256(path) == entry.sha256:
+                digest = _entry_digest(path)
+                if digest is None:
+                    merged.pop(rel_posix, None)
+                    continue
+                if digest == entry.sha256:
                     path.unlink()
                     installed.append(f"[prune] {path}")
                     self._prune_empty_dirs(path.parent, ws)

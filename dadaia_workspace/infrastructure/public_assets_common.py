@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sys
 from collections.abc import Iterable
 from enum import StrEnum
@@ -94,6 +95,21 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _entry_digest(path: Path) -> str | None:
+    """The ledgerable digest of one projected entry, or ``None`` when there is none.
+
+    A symlink digests its TARGET STRING, never the bytes it points at: following the
+    link would make a link and a copy of the same content indistinguishable, and would
+    walk out of the workspace tree. A directory (the copy fallback's root) has no single
+    digest — its files are ledgered individually.
+    """
+    if path.is_symlink():
+        return hashlib.sha256(os.readlink(path).encode("utf-8")).hexdigest()
+    if path.is_file():
+        return _sha256(path)
+    return None
 
 
 def _package_version() -> str:

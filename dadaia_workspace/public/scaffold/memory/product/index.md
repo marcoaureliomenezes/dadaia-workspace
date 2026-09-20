@@ -2,7 +2,7 @@
 slug: index
 title: Product catalog
 tldr: Index of every product feature with summaries and context metadata.
-summary: Consolidated view of every product feature. Entry point for self-pulling a specific feature atom. Maintained by project-manager at each release CLOSURE.
+summary: Consolidated view of every product feature. Entry point for self-pulling a specific feature atom. Maintained by dd-project-manager at each release CLOSURE.
 tags:
   - catalog
   - product

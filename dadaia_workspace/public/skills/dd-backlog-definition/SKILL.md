@@ -9,7 +9,7 @@ description: >
 
 # dd-backlog-definition
 
-> `project-manager` runs this continuously — not a release-boundary event.
+> `dd-project-manager` runs this continuously — not a release-boundary event.
 
 ## The document
 

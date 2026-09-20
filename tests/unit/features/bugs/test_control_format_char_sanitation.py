@@ -56,7 +56,7 @@ def _register(
     service.register(
         bug_id=bug_id,
         ts=_TS,
-        reported_by="software-engineer",
+        reported_by="dd-software-engineer",
         title=title,
         severity="MEDIUM",
         surface="bugs",

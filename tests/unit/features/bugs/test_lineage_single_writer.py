@@ -23,7 +23,7 @@ def _service(tmp_path: Path) -> BugService:
     service.register(
         bug_id="a",
         ts="2026-08-27T00:00:00Z",
-        reported_by="software-engineer",
+        reported_by="dd-software-engineer",
         title="t",
         severity="HIGH",
         surface="bugs",

@@ -40,7 +40,7 @@ def test_sdd_gate_artifacts_visible_and_noncanonical_content_stays_gitignored() 
         # force-added exactly that way).
         "specs/releases/v9.9.9/ALPHA-1-QA.md",
         "specs/releases/v9.9.9/ALPHA-12-QA.md",
-        # The pre-PR six-axis code-reviewer review runs BEFORE the archive move,
+        # The pre-PR six-axis dd-code-reviewer review runs BEFORE the archive move,
         # committed to the branch (FR5/ADR R3, v0.4.2); bug
         # gitignore-code-review-artifact-untrackable: same class as the ALPHA-N-QA
         # gap above — the blanket /specs/releases/*/* ignore had no negation for it

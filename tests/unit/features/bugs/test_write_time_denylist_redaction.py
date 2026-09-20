@@ -44,7 +44,7 @@ def _register(
     service.register(
         bug_id=bug_id,
         ts=_TS,
-        reported_by="software-engineer",
+        reported_by="dd-software-engineer",
         title=title,
         severity="HIGH",
         surface="bugs",
@@ -90,7 +90,7 @@ def test_bug_record_redact_masks_denylisted_term_across_free_text_fields() -> No
     record = BugRecord(
         id="b1",
         ts=_TS,
-        reported_by="software-engineer",
+        reported_by="dd-software-engineer",
         title="incident at consumer-vps-7",
         severity="HIGH",
         surface="bugs",
@@ -188,7 +188,7 @@ def test_bug_record_redact_scrubs_every_non_identity_field() -> None:
     record = BugRecord(
         id="b1",
         ts=_TS,
-        reported_by="software-engineer",
+        reported_by="dd-software-engineer",
         title=f"leaked {term} here",
         severity="HIGH",
         surface="bugs",
@@ -225,4 +225,4 @@ def test_bug_record_redact_scrubs_every_non_identity_field() -> None:
     # Identity fields never touched.
     assert redacted.id == "b1"
     assert redacted.ts == _TS
-    assert redacted.reported_by == "software-engineer"
+    assert redacted.reported_by == "dd-software-engineer"

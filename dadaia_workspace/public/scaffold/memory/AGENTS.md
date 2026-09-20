@@ -11,7 +11,7 @@ there — read it before changing production behavior. History lives in each rel
 | Action | Allowed |
 |---|---|
 | Read any atom | every agent, any phase |
-| Write/edit any atom | `project-manager` only, in `DEFINITION` or `CLOSURE` phase |
+| Write/edit any atom | `dd-project-manager` only, in `DEFINITION` or `CLOSURE` phase |
 | Edit by any other agent | never, in any phase |
 
 - Neither half is gated: `specs/memory/**` is MUTATING in every phase; both are agent discipline, measured by the audit's memory pillar.

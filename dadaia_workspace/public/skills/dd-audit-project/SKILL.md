@@ -8,7 +8,7 @@ description: >
 
 # dd-audit-project — Three Pillars Over a SHA Window
 
-> `code-reviewer` drives this directly, dispatched by the operator or a dispatching
+> `dd-code-reviewer` drives this directly, dispatched by the operator or a dispatching
 > agent. Suggested every 5 releases, never mandatory.
 
 ## 1. The window — computed once per audit

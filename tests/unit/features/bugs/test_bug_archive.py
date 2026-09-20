@@ -28,7 +28,7 @@ def _record(
     return BugRecord(
         id=bug_id,
         ts=ts,
-        reported_by="software-engineer",
+        reported_by="dd-software-engineer",
         title="t",
         severity="HIGH",
         surface="bugs",

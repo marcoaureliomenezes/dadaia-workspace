@@ -123,11 +123,11 @@ def test_unknown_model_variants(
     overlay_dir.mkdir()
     bad_overlay = AgentModelPolicyOverlay(
         applied_template=None,
-        overrides={"software-engineer": AgentModelOverride(model="claude-ghost-9")},
+        overrides={"dd-software-engineer": AgentModelOverride(model="claude-ghost-9")},
     )
     overlay_reports = _rendered(check_model_resolution(overlay_dir, overlay=bad_overlay))
     assert _has_error(overlay_reports), overlay_reports
-    assert any("software-engineer" in line for line in overlay_reports), overlay_reports
+    assert any("dd-software-engineer" in line for line in overlay_reports), overlay_reports
 
     # valid overlay stays clean
     clean_overlay_dir = tmp_path / "overlay-clean"

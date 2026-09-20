@@ -11,7 +11,7 @@ second, independent symlink check.
 
 Intent: CONTRACT — FR8, A8.1-A8.3.
 Size: SMALL (CliRunner over the real app, real tmp filesystem, no network/subprocess).
-Owner: software-engineer
+Owner: dd-software-engineer
 """
 
 from __future__ import annotations

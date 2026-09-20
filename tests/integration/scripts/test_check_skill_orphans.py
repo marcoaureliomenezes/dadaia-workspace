@@ -14,7 +14,7 @@ no `DADAIA_WORKSPACE_ROOT` override (the script's own default resolves to the re
 root), so it is now part of the normal gating pytest run and regresses on any NEW orphan.
 
 Intent: CONTRACT — bug skill-orphans-unwired-agent-frontmatter
-Owner: software-engineer
+Owner: dd-software-engineer
 """
 
 import subprocess

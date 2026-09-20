@@ -58,7 +58,7 @@ def test_public_stage_install_force_smoke_and_doctor_exit_code_routing(
 
     ok_lines = DoctorReport(
         lines=(
-            DoctorLine(DoctorStatus.OK, "stage:agents/code-reviewer.md"),
+            DoctorLine(DoctorStatus.OK, "stage:agents/dd-code-reviewer.md"),
             DoctorLine(DoctorStatus.NOT_APPLICABLE, "codex:config.toml"),
         )
     )
@@ -80,7 +80,7 @@ def test_public_stage_install_force_smoke_and_doctor_exit_code_routing(
 
     drift_lines = DoctorReport(
         lines=(
-            DoctorLine(DoctorStatus.OK, "stage:agents/code-reviewer.md"),
+            DoctorLine(DoctorStatus.OK, "stage:agents/dd-code-reviewer.md"),
             DoctorLine(DoctorStatus.DRIFT, "claude:rules/some-rule.md"),
         )
     )

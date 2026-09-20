@@ -44,7 +44,7 @@ def _make_valid_handoff(
 
     doc: dict = {
         "schema_version": "handoff-v1",
-        "agent": "software-engineer",
+        "agent": "dd-software-engineer",
         "context": "dadaia-workspace",
         "produced_at": "2026-05-17T00:00:00Z",
         "scope": "dadaia-workspace/test",

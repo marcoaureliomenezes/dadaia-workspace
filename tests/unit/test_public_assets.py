@@ -176,7 +176,7 @@ def test_baseline_never_flags_placeholder_home_paths_on_any_declared_platform(
 
 
 # ---------------------------------------------------------------------------
-# SPEC v0.4.2 CR-2 (code-reviewer MEDIUM) — the windows-users-path pattern must share
+# SPEC v0.4.2 CR-2 (dd-code-reviewer MEDIUM) — the windows-users-path pattern must share
 # the SAME trailing-lookahead parity home-abs-path/users-abs-path already have: a hit
 # followed by a path separator, a word boundary (mid-sentence prose), OR end of line.
 # Pre-fix, the pattern's `(?=\\|$)` lookahead fired ONLY on a trailing backslash or

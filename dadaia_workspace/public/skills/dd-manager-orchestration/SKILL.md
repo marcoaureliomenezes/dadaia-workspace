@@ -1,7 +1,7 @@
 ---
 name: dd-manager-orchestration
 description: >
-  Dispatch reference for project-manager: the dispatch protocol, decision authority, escalation triggers, forbidden actions, and the
+  Dispatch reference for dd-project-manager: the dispatch protocol, decision authority, escalation triggers, forbidden actions, and the
   which-skill-when router. Use when dispatching work, resolving a conflict, or
   routing a demand to the right skill.
 ---
@@ -41,9 +41,9 @@ description: >
 
 | Domain | Primary authority | May object with evidence | Tie-breaker |
 |---|---|---|---|
-| Scope, SPEC, memory, backlog | project-manager | any agent | operator |
-| PLAN, TASKS, implementation, tests | software-engineer | code-reviewer | project-manager |
-| Every review lens (architecture, security, QA, product, audit, AI surface) | code-reviewer | software-engineer | project-manager |
+| Scope, SPEC, memory, backlog | dd-project-manager | any agent | operator |
+| PLAN, TASKS, implementation, tests | dd-software-engineer | dd-code-reviewer | dd-project-manager |
+| Every review lens (architecture, security, QA, product, audit, AI surface) | dd-code-reviewer | dd-software-engineer | dd-project-manager |
 
 ### Escalation triggers — stop and surface to the operator
 

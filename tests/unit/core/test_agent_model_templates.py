@@ -32,14 +32,14 @@ from dadaia_workspace.core.models.agent_model_policy import (
 )
 
 # ---------------------------------------------------------------------------
-# G-1 hard constraint: Fable is NEVER assigned to code-reviewer — kept standalone
+# G-1 hard constraint: Fable is NEVER assigned to dd-code-reviewer — kept standalone
 # (model-governance security constraint, not merged with other template shape checks).
 # ---------------------------------------------------------------------------
 
 
 def test_no_template_assigns_fable_to_security_reviewer() -> None:
     for template in list_templates():
-        assert not is_fable_model(template.assignments["code-reviewer"].model), template.id
+        assert not is_fable_model(template.assignments["dd-code-reviewer"].model), template.id
 
 
 # ---------------------------------------------------------------------------
@@ -58,9 +58,9 @@ def test_template_ids_default_and_balanced_roster_golden() -> None:
 
     balanced = default_template()
     expected = {
-        "project-manager": ("claude-fable-5-1", "high"),
-        "code-reviewer": ("claude-opus-5", "high"),
-        "software-engineer": ("claude-opus-5", "low"),
+        "dd-project-manager": ("claude-fable-5-1", "high"),
+        "dd-code-reviewer": ("claude-opus-5", "high"),
+        "dd-software-engineer": ("claude-opus-5", "low"),
     }
     assert {a: (v.model, v.effort) for a, v in balanced.assignments.items()} == expected
 
@@ -96,12 +96,12 @@ def _template_with(agent: str, model: str, effort: str, **kwargs: object) -> Age
     [
         (
             "unknown_model",
-            lambda: (_template_with("software-engineer", "claude-unknown-9-9", "high"),),
+            lambda: (_template_with("dd-software-engineer", "claude-unknown-9-9", "high"),),
             "claude-unknown-9-9",
         ),
         (
             "invalid_effort",
-            lambda: (_template_with("software-engineer", "claude-sonnet-5", "turbo"),),
+            lambda: (_template_with("dd-software-engineer", "claude-sonnet-5", "turbo"),),
             "turbo",
         ),
         (
@@ -109,15 +109,15 @@ def _template_with(agent: str, model: str, effort: str, **kwargs: object) -> Age
             # (a model-governance security constraint check, separate from G-1's
             # standalone live-registry sweep above).
             "fable_on_security_reviewer",
-            lambda: (_template_with("code-reviewer", "claude-fable-5", "high"),),
-            "code-reviewer",
+            lambda: (_template_with("dd-code-reviewer", "claude-fable-5", "high"),),
+            "dd-code-reviewer",
         ),
         (
             # G-1 is a FAMILY rule: the next Fable id is refused too (bug
             # g1-fable-guard-matches-only-claude-fable-5-so-fable-5-1-lands-on-code-reviewer).
             "fable_5_1_on_security_reviewer",
-            lambda: (_template_with("code-reviewer", "claude-fable-5-1", "high"),),
-            "code-reviewer",
+            lambda: (_template_with("dd-code-reviewer", "claude-fable-5-1", "high"),),
+            "dd-code-reviewer",
         ),
         (
             "incomplete_coverage",
@@ -129,11 +129,11 @@ def _template_with(agent: str, model: str, effort: str, **kwargs: object) -> Age
                     assignments={
                         k: v
                         for k, v in default_template().assignments.items()
-                        if k != "software-engineer"
+                        if k != "dd-software-engineer"
                     },
                 ),
             ),
-            "software-engineer",
+            "dd-software-engineer",
         ),
         ("duplicate_template_id", lambda: (default_template(), default_template()), "duplicate"),
         (
@@ -185,13 +185,13 @@ def test_codex_effort_clamp_map(claude_effort: str, codex_effort: str) -> None:
     [
         (
             "no_overlay_resolves_balanced_default",
-            "software-engineer",
+            "dd-software-engineer",
             lambda: None,
             ("claude-opus-5", "low", "default"),
         ),
         (
             "applied_template_resolves_source_template",
-            "project-manager",
+            "dd-project-manager",
             lambda: AgentModelPolicyOverlay(applied_template="max-quality", overrides={}),
             ("claude-fable-5-1", "high", "template"),
         ),
@@ -199,29 +199,29 @@ def test_codex_effort_clamp_map(claude_effort: str, codex_effort: str) -> None:
             # AC-3: template max-quality + override {SE: model=opus-4-8} →
             # SE = opus-4-8 (override model) / low (template effort), source=override.
             "per_field_override_merges_with_applied_template",
-            "software-engineer",
+            "dd-software-engineer",
             lambda: AgentModelPolicyOverlay(
                 applied_template="max-quality",
-                overrides={"software-engineer": AgentModelOverride(model="claude-opus-4-8")},
+                overrides={"dd-software-engineer": AgentModelOverride(model="claude-opus-4-8")},
             ),
             ("claude-opus-4-8", "low", "override"),
         ),
         (
             "effort_only_override_keeps_template_model",
-            "software-engineer",
+            "dd-software-engineer",
             lambda: AgentModelPolicyOverlay(
                 applied_template=None,
-                overrides={"software-engineer": AgentModelOverride(effort="max")},
+                overrides={"dd-software-engineer": AgentModelOverride(effort="max")},
             ),
             ("claude-opus-5", "max", "override"),
         ),
         (
             "full_override_beats_template",
-            "project-manager",
+            "dd-project-manager",
             lambda: AgentModelPolicyOverlay(
                 applied_template="max-quality",
                 overrides={
-                    "project-manager": AgentModelOverride(
+                    "dd-project-manager": AgentModelOverride(
                         model="claude-haiku-4-5-20251001", effort="low"
                     )
                 },
@@ -232,10 +232,10 @@ def test_codex_effort_clamp_map(claude_effort: str, codex_effort: str) -> None:
             # AC-3: an unrelated agent keeps the applied template when only ONE
             # other agent in the overlay is overridden.
             "ac3_other_agents_keep_applied_template_when_only_one_overridden",
-            "project-manager",
+            "dd-project-manager",
             lambda: AgentModelPolicyOverlay(
                 applied_template="max-quality",
-                overrides={"software-engineer": AgentModelOverride(model="claude-opus-4-8")},
+                overrides={"dd-software-engineer": AgentModelOverride(model="claude-opus-4-8")},
             ),
             ("claude-fable-5-1", "high", "template"),
         ),
@@ -258,7 +258,7 @@ def test_resolve_agent_model_precedence_table(
         ("unknown_agent", "not-an-agent", lambda: None, "unknown agent"),
         (
             "unknown_applied_template",
-            "software-engineer",
+            "dd-software-engineer",
             lambda: AgentModelPolicyOverlay(applied_template="nope", overrides={}),
             "nope",
         ),

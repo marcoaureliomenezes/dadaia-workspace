@@ -51,7 +51,7 @@ _ALLOWED_TOP_LEVEL = frozenset({"schema_version", "applied_template", "overrides
 _ALLOWED_OVERRIDE_KEYS = frozenset({"model", "effort"})
 
 #: The agent that must never resolve to a Fable-family model (G-1/D-7).
-_FABLE_FORBIDDEN_AGENT = "code-reviewer"
+_FABLE_FORBIDDEN_AGENT = "dd-code-reviewer"
 
 
 class JsonAgentModelPolicyStore:
@@ -163,6 +163,11 @@ class JsonAgentModelPolicyStore:
         overrides: dict[str, AgentModelOverride] = {}
         for agent_name, override_value in value.items():
             agent = str(agent_name)
+            if agent not in valid_agents and f"dd-{agent}" in valid_agents:
+                # 0.4.7 renamed the three personas to their dd- names. The policy JSON is
+                # the operator's interface: an overlay keyed by the pre-rename name keeps
+                # resolving instead of failing every install until it is hand-edited.
+                agent = f"dd-{agent}"
             if agent not in valid_agents:
                 raise AgentModelPolicyStoreError(
                     f"unknown agent {agent!r} in 'overrides'; valid agents: "
@@ -220,7 +225,7 @@ class JsonAgentModelPolicyStore:
     def _assert_never_fable_on_security(
         self, overlay: AgentModelPolicyOverlay, *, path: Path | None
     ) -> None:
-        """D-7: reject any overlay that RESOLVES Fable onto code-reviewer.
+        """D-7: reject any overlay that RESOLVES Fable onto dd-code-reviewer.
 
         Uses the single resolver (FR4) so the check covers every combination
         (override model, template interplay), not just the literal override value.
@@ -229,7 +234,7 @@ class JsonAgentModelPolicyStore:
         if is_fable_model(resolved.model):
             raise AgentModelPolicyStoreError(
                 f"policy resolves {resolved.model!r} onto {_FABLE_FORBIDDEN_AGENT!r}; "
-                "Fable is never assigned to code-reviewer (operator ruling G-1)",
+                "Fable is never assigned to dd-code-reviewer (operator ruling G-1)",
                 path,
             )
 

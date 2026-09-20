@@ -21,7 +21,7 @@ shape), then assert:
    failure, per AC3.1's parenthetical).
 
 Intent: CONTRACT — v0.1.69 FR1-FR4 (T-69-10)
-Owner: software-engineer
+Owner: dd-software-engineer
 """
 
 from __future__ import annotations

@@ -36,7 +36,7 @@ _SCHEMA_PATH = (
 _AS_APPENDED: dict[str, Any] = {
     "id": "sample-bug",
     "ts": "2026-08-27T12:00:00Z",
-    "reported_by": "software-engineer",
+    "reported_by": "dd-software-engineer",
     "title": "sample bug",
     "severity": "MEDIUM",
     "surface": "tests",

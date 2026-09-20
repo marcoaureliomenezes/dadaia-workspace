@@ -36,7 +36,7 @@ same shape the ctx_inject unit fixtures use. ``WorkspaceService.init`` is delibe
 avoided.
 
 Intent: CONTRACT — v0.1.14 FR-W2 (T-50-03)
-Owner: software-engineer
+Owner: dd-software-engineer
 """
 
 from __future__ import annotations

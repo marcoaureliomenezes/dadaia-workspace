@@ -187,7 +187,7 @@ Detection rule 3 — self-edit risk + topology-guard protocol:
 2. Confirm an operator-approved release task authorizes the specific change — no self-granted privileges.
 3. Make the edit minimal and single-purpose.
 4. Re-verify topology by hand: persona count matches the roster, required frontmatter keys are present and non-empty.
-5. Confirm `project-manager` still names every leaf agent.
+5. Confirm `dd-project-manager` still names every leaf agent.
 6. The security lens reviews any change adding a powerful tool or widening an allowlist.
 7. Re-validate frontmatter via the workspace reader test so the parse still succeeds.
 

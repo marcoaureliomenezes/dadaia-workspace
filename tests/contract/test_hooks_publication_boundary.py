@@ -33,7 +33,7 @@ test_planted_term_refused_then_clean_push_after_amend`` respectively; this modul
 no duplicate coverage of those two.
 
 Intent: CONTRACT — v0.5.0 A9.1, A9.2, A9.3
-Owner: software-engineer
+Owner: dd-software-engineer
 """
 
 from __future__ import annotations

@@ -39,7 +39,7 @@ from dadaia_workspace.infrastructure.install_helpers import (
     resolve_codex_agent_model,
 )
 from dadaia_workspace.infrastructure.install_plan import InstallPlan
-from dadaia_workspace.infrastructure.projection import ProjectionRule
+from dadaia_workspace.infrastructure.projection import ProjectionRule, link_render
 from dadaia_workspace.infrastructure.public_assets_common import (
     _CLAUDE_DIRS,
     iter_public_files,
@@ -120,6 +120,17 @@ def _bytes_rule(
     )
 
 
+def _link_rule(label: str, harness: str, dst: Path, link_to: Path) -> ProjectionRule:
+    """A rule that projects a RELATIVE symlink at *dst* onto the authored *link_to*.
+
+    One authored set, N harness views: the executor falls back to a hash-verified copy
+    where the platform refuses symlinks, and records which of the two it wrote.
+    """
+    return ProjectionRule(
+        label=label, harness=harness, dst=dst, render=link_render, link_to=link_to
+    )
+
+
 def _tree_bytes_rules(
     src_dir: Path,
     dst_dir: Path,
@@ -193,9 +204,9 @@ def _dadaia_family_agents_md_rules(plan: InstallPlan) -> tuple[ProjectionRule, .
 
 
 def _skills_tree_rules(plan: InstallPlan) -> tuple[ProjectionRule, ...]:
-    """The shared skills root (``.agents/skills/``) — Codex and Kimi Code read it
-    natively (no per-harness copy); Claude Code additionally gets its own copy
-    (``.claude/skills/``, part of :data:`_CLAUDE_DIRS`, built by ``ClaudeHarness``).
+    """The shared skills root (``.agents/skills/``) — the ONE authored copy. Codex and
+    Kimi Code read it natively; Claude Code reaches it through the per-skill symlinks
+    ``ClaudeHarness`` projects into ``.claude/skills/``.
     """
     return _tree_bytes_rules(
         plan.agentic_dir / "skills",
@@ -210,18 +221,23 @@ def _skills_tree_rules(plan: InstallPlan) -> tuple[ProjectionRule, ...]:
 # ---------------------------------------------------------------------------
 
 
-def _claude_agent_rules(
-    agentic_dir: Path, claude_dir: Path, resolved_models: Mapping[str, ResolvedAgentModel]
+def _agents_agent_rules(
+    agentic_dir: Path, workspace_root: Path, resolved_models: Mapping[str, ResolvedAgentModel]
 ) -> tuple[ProjectionRule, ...]:
+    """``.agents/agents/`` — the ONE rendered persona set every harness view points at.
+
+    ``render_claude_agent`` stays the single render seam (model, effort and permission
+    fields appended to the staged body); what changed is where its output lands.
+    """
     src_dir = agentic_dir / "agents"
-    dst_dir = claude_dir / "agents"
+    dst_dir = workspace_root / ".agents" / "agents"
     rules: list[ProjectionRule] = []
     for src in iter_public_files(src_dir):
         rel = src.relative_to(src_dir)
-        label = f"claude:agents/{rel.as_posix()}"
+        label = f"agents:agents/{rel.as_posix()}"
         resolved = resolved_models.get(src.stem)
         if resolved is None or src.suffix != ".md":
-            rules.append(_bytes_rule(label, "claude", dst_dir / rel, src.read_bytes()))
+            rules.append(_bytes_rule(label, "agents", dst_dir / rel, src.read_bytes()))
             continue
         staged_text = src.read_text(encoding="utf-8")
 
@@ -233,9 +249,41 @@ def _claude_agent_rules(
             return render_claude_agent(_text, _resolved).encode("utf-8")
 
         rules.append(
-            ProjectionRule(label=label, harness="claude", dst=dst_dir / rel, render=_render)
+            ProjectionRule(label=label, harness="agents", dst=dst_dir / rel, render=_render)
         )
     return tuple(rules)
+
+
+def _claude_agent_rules(agentic_dir: Path, workspace_root: Path) -> tuple[ProjectionRule, ...]:
+    """``.claude/agents/<name>.md`` — one relative symlink per rendered persona."""
+    src_dir = agentic_dir / "agents"
+    authored = workspace_root / ".agents" / "agents"
+    dst_dir = workspace_root / ".claude" / "agents"
+    return tuple(
+        _link_rule(
+            f"claude:agents/{src.relative_to(src_dir).as_posix()}",
+            "claude",
+            dst_dir / src.relative_to(src_dir),
+            authored / src.relative_to(src_dir),
+        )
+        for src in iter_public_files(src_dir)
+    )
+
+
+def _claude_skill_rules(agentic_dir: Path, workspace_root: Path) -> tuple[ProjectionRule, ...]:
+    """``.claude/skills/<skill>`` — one relative symlink per authored skill directory."""
+    src_dir = agentic_dir / "skills"
+    authored = workspace_root / ".agents" / "skills"
+    dst_dir = workspace_root / ".claude" / "skills"
+    if not src_dir.is_dir():
+        return ()
+    return tuple(
+        _link_rule(
+            f"claude:skills/{skill.name}", "claude", dst_dir / skill.name, authored / skill.name
+        )
+        for skill in sorted(src_dir.iterdir())
+        if skill.is_dir()
+    )
 
 
 def _claude_settings_rule(workspace_root: Path) -> ProjectionRule:
@@ -271,7 +319,8 @@ def _claude_settings_rule(workspace_root: Path) -> ProjectionRule:
 
 
 class ClaudeHarness:
-    """Claude Code adapter — one of the three real seams (K3)."""
+    """Claude Code adapter — one of the three real seams (K3). Agents and skills are
+    per-entry symlinks onto the authored ``.agents/`` set, never a second copy."""
 
     id = "claude"
     dirs: tuple[str, ...] = _CLAUDE_DIRS
@@ -282,9 +331,9 @@ class ClaudeHarness:
         rules: list[ProjectionRule] = []
         for name in dirs:
             if name == "agents":
-                rules.extend(
-                    _claude_agent_rules(plan.agentic_dir, claude_dir, plan.resolved_models)
-                )
+                rules.extend(_claude_agent_rules(plan.agentic_dir, plan.workspace_root))
+            elif name == "skills":
+                rules.extend(_claude_skill_rules(plan.agentic_dir, plan.workspace_root))
             else:
                 rules.extend(
                     _tree_bytes_rules(
@@ -581,10 +630,15 @@ def projection_rules(
     rules: list[ProjectionRule] = []
     rules.extend(_guardrail_pair_rules(plan))
     rules.extend(_dadaia_family_agents_md_rules(plan))
-    if (plan.only is None or plan.only == "skills") and (
-        "agents" in plan.harness_targets or "codex" in plan.harness_targets
-    ):
-        rules.extend(_skills_tree_rules(plan))
+    # The authored ``.agents/`` set is projected for every target that reads it —
+    # Codex and Kimi natively, Claude through the symlinks its adapter contributes.
+    if {"agents", "codex", "claude"} & set(plan.harness_targets):
+        if plan.only is None or plan.only == "skills":
+            rules.extend(_skills_tree_rules(plan))
+        if plan.only is None or plan.only == "agents":
+            rules.extend(
+                _agents_agent_rules(plan.agentic_dir, plan.workspace_root, plan.resolved_models)
+            )
     for name in L1_ENTRY_HARNESSES:
         if name in plan.harness_targets:
             rules.extend(harnesses[name].rules(plan))

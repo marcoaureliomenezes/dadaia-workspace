@@ -18,6 +18,7 @@ update — deliberately, not by regenerating a golden.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -213,3 +214,27 @@ def test_every_projected_skill_frontmatter_is_loadable(projected: Path) -> None:
         assert isinstance(desc, str) and desc.strip(), f"{path.parent.name}: no description"
         # Claude Code caps the matched description; an over-long one is silently truncated.
         assert len(desc) <= 1536, f"{path.parent.name}: description is {len(desc)} chars (cap 1536)"
+
+
+def test_claude_entries_are_symlinks_onto_the_authored_agents_set(projected: Path) -> None:
+    """One authored set, N harness views (FR3, AC3.2).
+
+    A second COPY under ``.claude/`` loads exactly as well as a symlink — and drifts
+    silently from the authored ``.agents/`` body the moment one of the two is rewritten.
+    Frontmatter is resolved THROUGH the link here: the link must both point at the
+    canonical path and deliver a loadable persona at the far end.
+    """
+    entries = sorted((projected / ".claude" / "agents").glob("*.md")) + sorted(
+        (projected / ".claude" / "skills").iterdir()
+    )
+    assert entries, "the claude projection installed nothing"
+    for entry in entries:
+        assert entry.is_symlink(), f"{entry.name}: not a symlink onto .agents/"
+        target = os.readlink(entry)
+        assert not os.path.isabs(target), f"{entry.name}: absolute link target {target!r}"
+        resolved = entry.resolve()
+        assert resolved.parent.parent == projected / ".agents", (
+            f"{entry.name}: resolves to {resolved}, outside the authored .agents/ set"
+        )
+        body = resolved if resolved.is_file() else resolved / "SKILL.md"
+        assert _frontmatter(body)

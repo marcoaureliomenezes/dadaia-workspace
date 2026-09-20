@@ -11,7 +11,7 @@ poetry. There is no pytest-inside-pytest — the stub "pytest" is a trivial shel
 script that exits 0. The real-tree run is final-gate item 7 (T-011-20).
 
 Intent: CONTRACT — bug ci-preflight-checks-hardcode-poetry-run (T-011-06, AC-W2-01)
-Owner: software-engineer
+Owner: dd-software-engineer
 """
 
 from __future__ import annotations

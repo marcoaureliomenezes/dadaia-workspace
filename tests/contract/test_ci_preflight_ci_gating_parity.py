@@ -31,7 +31,7 @@ missing check; removing the ``lint-imports`` step from ci.yml's ``lint`` job doe
 same from the CI side.
 
 Intent: CONTRACT — A6.2 (bug `prepush-gate-omits-import-boundary-contracts-ci-runs`)
-Owner: software-engineer
+Owner: dd-software-engineer
 """
 
 from __future__ import annotations

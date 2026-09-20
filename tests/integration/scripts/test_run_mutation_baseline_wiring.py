@@ -34,7 +34,7 @@ prove cheaply and deterministically:
      derived from the staged tests' own source, never a second hand-kept fixture list.
 
 Intent: CONTRACT — v0.4.3 A20.1, A20.3 (T-043-28, FR20); v0.5.1 A-12.1, A-12.2 (T-051-18)
-Owner: software-engineer
+Owner: dd-software-engineer
 """
 
 from __future__ import annotations
@@ -113,7 +113,7 @@ def _run_stage_only(tmp_path: Path) -> tuple[Path, Path]:
     )
 
     stage_dirs = list(
-        (fake_workspace / ".dadaia" / "tmp" / "software-engineer").glob("*/mutation-run")
+        (fake_workspace / ".dadaia" / "tmp" / "dd-software-engineer").glob("*/mutation-run")
     )
     assert len(stage_dirs) == 1, f"expected exactly one dated mutation-run dir, found {stage_dirs}"
     return fake_workspace, stage_dirs[0]

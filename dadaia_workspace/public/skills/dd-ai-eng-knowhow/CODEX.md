@@ -155,7 +155,7 @@ prefix_rule(
 | Recursion depth | A subagent should not spawn another subagent except in exceptional cases |
 | Output contract | Each subagent returns findings with severity, evidence, and a verdict |
 
-- dadaia mapping: `project-manager` = primary orchestrator; `code-reviewer` = the read-only custom agent.
+- dadaia mapping: `dd-project-manager` = primary orchestrator; `dd-code-reviewer` = the read-only custom agent.
 
 ---
 

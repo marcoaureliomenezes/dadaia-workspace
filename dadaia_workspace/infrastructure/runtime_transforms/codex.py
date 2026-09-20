@@ -65,7 +65,7 @@ def transform_for_codex(canonical_body: str, agent_id: str) -> str:  # noqa: ARG
     Args:
         canonical_body: Markdown text of the agent persona with frontmatter
             already removed.
-        agent_id: The agent identifier (e.g. ``"project-manager"``).
+        agent_id: The agent identifier (e.g. ``"dd-project-manager"``).
 
     Returns:
         A non-empty string (after :meth:`str.strip`) with Claude Code–specific

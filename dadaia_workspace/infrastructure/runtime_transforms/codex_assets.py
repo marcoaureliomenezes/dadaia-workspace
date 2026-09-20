@@ -58,7 +58,7 @@ _AGENT_FM_BLOCK_SCALAR_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*): [>|]$", re.M
 # per-directory ``AGENTS.md`` discovery (`ai-harness-codex` skill §1), a
 # mechanism that is entirely independent of the SessionStart/UserPromptSubmit
 # hooks (live-verified, codex-cli 0.147.0, T-043-33: a parent `codex exec`
-# session AND a delegated `agent_type="software-engineer"` subagent both
+# session AND a delegated `agent_type="dd-software-engineer"` subagent both
 # quoted the literal opening words of the projected root AGENTS.md from their
 # own context, unprompted by any tool call). Before this compaction, every
 # persona body ALSO restated fragments of that same law inline — the generic
@@ -376,7 +376,7 @@ def _render_agent_toml_block(name: str, fm: dict[str, object]) -> str:
     """Render a ``[agents."<name>"]`` TOML table block from parsed frontmatter *fm*.
 
     Keys are always quoted for safety (required for hyphenated names like
-    ``software-engineer``). Missing or None fields are omitted. The ``tools``
+    ``dd-software-engineer``). Missing or None fields are omitted. The ``tools``
     field, if present, is emitted as a TOML array of basic strings.
 
     Names containing ``]`` or newline characters are rejected (cannot appear

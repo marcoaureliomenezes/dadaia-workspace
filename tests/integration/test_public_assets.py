@@ -96,7 +96,7 @@ def test_stage_manifest_and_install_all(tmp_path: Path, monkeypatch: pytest.Monk
         assert (workspace / ".agents" / "skills" / skill / "SKILL.md").exists(), (
             f".agents/skills/{skill}/SKILL.md not installed"
         )
-    assert (workspace / ".claude" / "agents" / "code-reviewer.md").exists()
+    assert (workspace / ".claude" / "agents" / "dd-code-reviewer.md").exists()
     assert (workspace / ".codex" / "hooks.json").exists()
     assert (workspace / ".codex" / "config.toml").exists()
     # Codex receives Starlark .rules for command policy. Markdown behavioral
@@ -352,7 +352,9 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     doctor distinction (own workspace):
     1. Immediately after a policy re-render, doctor reports [ok] on every
        ``claude:agents/*.md`` line (no false [drift] against staged generic bytes).
-    2. A hand-edited projected ``.claude/agents/*.md`` reads [drift].
+    2. A hand edit made THROUGH the ``.claude/agents/*.md`` symlink lands on the
+       authored ``.agents/agents/*.md`` and reads [drift] there — one authored set,
+       so one drift line, not one per harness view.
     3. Non-agent ``stage:``/runtime compare lines stay [ok], untouched by the
        render seam (F-2 — never a global ``_compare`` patch).
     4. A missing overlay is not a doctor ERROR; an invalid overlay is.
@@ -364,16 +366,16 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     # AC-2: with no overlay, BOTH projections render the exact `balanced` roster from
     # the SAME resolved config — this lockstep IS the codex-correctness assurance (no
     # codex doctor byte-compare exists).
-    pm = _claude_frontmatter(ws, "project-manager")
+    pm = _claude_frontmatter(ws, "dd-project-manager")
     assert (pm["model"], pm["effort"]) == ("claude-fable-5-1", "high")
-    se = _claude_frontmatter(ws, "software-engineer")
+    se = _claude_frontmatter(ws, "dd-software-engineer")
     assert (se["model"], se["effort"]) == ("claude-opus-5", "low")
-    sec = _claude_frontmatter(ws, "code-reviewer")
-    assert not is_fable_model(sec["model"]), "never Fable on code-reviewer (G-1)"
+    sec = _claude_frontmatter(ws, "dd-code-reviewer")
+    assert not is_fable_model(sec["model"]), "never Fable on dd-code-reviewer (G-1)"
 
-    pm_toml = _codex_toml_fields(ws, "project-manager")
+    pm_toml = _codex_toml_fields(ws, "dd-project-manager")
     assert (pm_toml["model"], pm_toml["model_reasoning_effort"]) == ("gpt-5.6-sol", "high")
-    se_toml = _codex_toml_fields(ws, "software-engineer")
+    se_toml = _codex_toml_fields(ws, "dd-software-engineer")
     assert (se_toml["model"], se_toml["model_reasoning_effort"]) == ("gpt-5.6-sol", "low")
 
     # AC-3: an overlay change moves the .claude md AND .codex toml together at install.
@@ -384,21 +386,21 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
             {
                 "schema_version": "agent-model-policy-v1",
                 "applied_template": "max-quality",
-                "overrides": {"software-engineer": {"model": "claude-opus-4-8"}},
+                "overrides": {"dd-software-engineer": {"model": "claude-opus-4-8"}},
             }
         ),
         encoding="utf-8",
     )
     manager.install(ws, target="all")
 
-    se2 = _claude_frontmatter(ws, "software-engineer")
+    se2 = _claude_frontmatter(ws, "dd-software-engineer")
     assert (se2["model"], se2["effort"]) == ("claude-opus-4-8", "low")
-    pm2 = _claude_frontmatter(ws, "project-manager")
+    pm2 = _claude_frontmatter(ws, "dd-project-manager")
     assert (pm2["model"], pm2["effort"]) == ("claude-fable-5-1", "high")
 
-    se2_toml = _codex_toml_fields(ws, "software-engineer")
+    se2_toml = _codex_toml_fields(ws, "dd-software-engineer")
     assert (se2_toml["model"], se2_toml["model_reasoning_effort"]) == ("gpt-5.6-sol", "low")
-    pm2_toml = _codex_toml_fields(ws, "project-manager")
+    pm2_toml = _codex_toml_fields(ws, "dd-project-manager")
     assert (pm2_toml["model"], pm2_toml["model_reasoning_effort"]) == ("gpt-5.6-sol", "high")
 
     # Byte-stable repeated install: every agent projection line is a [skip].
@@ -422,21 +424,21 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     invalid_ws = tmp_path / "invalid-ws"
     invalid_manager = FileSystemPublicAssetManager()
     invalid_manager.install(invalid_ws, target="all")
-    before = (invalid_ws / ".claude" / "agents" / "software-engineer.md").read_bytes()
+    before = (invalid_ws / ".claude" / "agents" / "dd-software-engineer.md").read_bytes()
 
     invalid_states = invalid_ws / ".dadaia" / "states"
     (invalid_states / "agent_model_policy.json").write_text(
         json.dumps(
             {
                 "schema_version": "agent-model-policy-v1",
-                "overrides": {"code-reviewer": {"model": "claude-fable-5"}},
+                "overrides": {"dd-code-reviewer": {"model": "claude-fable-5"}},
             }
         ),
         encoding="utf-8",
     )
     with pytest.raises(AgentModelPolicyStoreError):
         invalid_manager.install(invalid_ws, target="all")
-    after = (invalid_ws / ".claude" / "agents" / "software-engineer.md").read_bytes()
+    after = (invalid_ws / ".claude" / "agents" / "dd-software-engineer.md").read_bytes()
     assert after == before
 
     # FR7 doctor rerender/hand-edit-drift/invalid-overlay-error, own workspace.
@@ -477,13 +479,17 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     law_lines = [r for r in reports if r.split(" ", 1)[-1].startswith("root:AGENTS.md")]
     assert law_lines and all(r.startswith("[ok]") for r in law_lines), law_lines[:5]
 
-    target = doctor_ws / ".claude" / "agents" / "software-engineer.md"
+    target = doctor_ws / ".claude" / "agents" / "dd-software-engineer.md"
     target.write_text(target.read_text(encoding="utf-8") + "\nHAND EDIT\n", encoding="utf-8")
     reports2 = _rendered(doctor_manager.doctor(doctor_ws))
     assert any(
-        r.startswith("[drift]") and r.endswith("claude:agents/software-engineer.md")
+        r.startswith("[drift]") and r.endswith("agents:agents/dd-software-engineer.md")
         for r in reports2
-    ), [r for r in reports2 if "software-engineer" in r]
+    ), [r for r in reports2 if "dd-software-engineer" in r]
+    assert any(
+        r.startswith("[ok]") and r.endswith("claude:agents/dd-software-engineer.md")
+        for r in reports2
+    ), "the claude view is a link: it is correct as long as it points at the authored set"
 
     (doctor_states / "agent_model_policy.json").write_text("{not json", encoding="utf-8")
     reports3 = _rendered(doctor_manager.doctor(doctor_ws))

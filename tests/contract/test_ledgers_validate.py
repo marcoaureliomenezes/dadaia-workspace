@@ -50,7 +50,7 @@ _VALID_BACKLOG = {
 _VALID_BUG = {
     "id": "a-fixture-bug",
     "ts": "2026-09-12T00:00:00Z",
-    "reported_by": "software-engineer",
+    "reported_by": "dd-software-engineer",
     "title": "a-fixture-bug",
     "severity": "LOW",
     "surface": "specs",

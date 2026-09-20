@@ -27,13 +27,13 @@ Root workspace behavior is in the workspace `AGENTS.md`; production-source behav
 
 | Path | Writer |
 |---|---|
-| `constitution.md` | operator, or `project-manager` under approved governance work |
+| `constitution.md` | operator, or `dd-project-manager` under approved governance work |
 | `releases/<id>/_RELEASE.json` | `dadaia release phase|new|rc-archive|archive`; `log` entries by the narrating agent |
-| `releases/<id>/{SPEC,PLAN,TASKS}.md` | `project-manager` (SPEC), `software-engineer` (PLAN, TASKS); implementers change only their own task marker |
-| `memory/**` | `project-manager`, in `DEFINITION` and `CLOSURE` phase |
-| `backlog/**` | `project-manager`; entries exit by `dadaia backlog exit` |
+| `releases/<id>/{SPEC,PLAN,TASKS}.md` | `dd-project-manager` (SPEC), `dd-software-engineer` (PLAN, TASKS); implementers change only their own task marker |
+| `memory/**` | `dd-project-manager`, in `DEFINITION` and `CLOSURE` phase |
+| `backlog/**` | `dd-project-manager`; entries exit by `dadaia backlog exit` |
 | `bugs/**` | any agent, after the operator confirms the proposal; verbs only |
-| `audits/**` | `code-reviewer` (audit lens); findings move by `dadaia audit disposition|close` |
+| `audits/**` | `dd-code-reviewer` (audit lens); findings move by `dadaia audit disposition|close` |
 
 ## 5. Memory
 
