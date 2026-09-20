@@ -13,7 +13,6 @@ from dadaia_workspace.cli.commands import (
     doctor,
     init,
     migrate,
-    panel,
     public,
     reconcile,
     reports,
@@ -96,7 +95,6 @@ app.add_typer(reports.app, name="reports", rich_help_panel="Management")
 app.add_typer(specs.app, name="specs", rich_help_panel="Common")
 app.add_typer(server.app, name="server", rich_help_panel="Management")
 app.add_typer(migrate.app, name="migrate", rich_help_panel="Management")
-app.add_typer(panel.app, name="panel", rich_help_panel="Common")
 app.add_typer(memory_app, name="memory", rich_help_panel="Management")
 app.add_typer(release_app, name="release", rich_help_panel="Common")
 app.add_typer(backlog_app, name="backlog", rich_help_panel="Common")

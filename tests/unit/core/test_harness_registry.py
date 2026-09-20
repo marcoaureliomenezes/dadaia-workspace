@@ -112,7 +112,6 @@ def test_parse_harness_set_reject_table(raw: str, expect_in_message: list[str]) 
 
 # Each site maps to (spaceless forbidden roster literal, required registry reference).
 _L1_SITES: dict[str, tuple[str, str]] = {
-    "features/panel/views/api_agents.py": ('"claude","codex"', "is_l1("),
     "infrastructure/public_assets_common.py": (
         '{"all","agents","claude","codex","pi"}',
         "INSTALL_TARGETS",

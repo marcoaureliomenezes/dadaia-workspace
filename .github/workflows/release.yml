@@ -111,78 +111,10 @@ jobs:
       - name: pytest e2e python
         run: poetry run pytest -q -m "e2e and not quarantine" tests/e2e/features --durations=30
 
-  e2e-panel:
-    name: E2E panel (Playwright)
-    runs-on: ubuntu-latest
-    needs: [check]
-    if: needs.check.outputs.skip == 'false'
-    timeout-minutes: 8
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
-        with:
-          python-version: "3.12"
-      - run: pipx install poetry==1.8.3
-      - run: poetry install --no-interaction --no-ansi --with dev
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: tests/e2e/package-lock.json
-      - name: Install Node deps
-        working-directory: tests/e2e
-        run: npm ci
-      # Browser cache — see ci.yml e2e-panel for the rationale
-      # (bug test-suite-real-venv-and-ci-longpole).
-      - name: Resolve Playwright version
-        id: playwright-version
-        working-directory: tests/e2e
-        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-      - name: Cache Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
-      - name: Install Chromium
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        working-directory: tests/e2e
-        run: npx playwright install --with-deps chromium
-      - name: Install Chromium system deps (cached browser)
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        working-directory: tests/e2e
-        run: npx playwright install-deps chromium
-      - name: playwright panel e2e
-        working-directory: tests/e2e
-        env:
-          # See ci.yml's e2e-panel job for the full root-cause note
-          # (T-65-14 CI-fix amendment). run-panel-e2e-server.sh bootstraps a
-          # hermetic temp workspace itself; the old bootstrap script +
-          # hardcoded --port 4999 override are retired.
-          PANEL_E2E_PYTHON: poetry run python
-          # Pin the hermetic temp workspace (AC-4 spec-context-operation-journey
-          # needs a known PANEL_TEST_REGISTRY to run for real, not skip).
-          PANEL_E2E_WS: ${{ runner.temp }}/dadaia-panel-e2e-ws
-          PANEL_TEST_REGISTRY: ${{ runner.temp }}/dadaia-panel-e2e-ws/.dadaia/states/spec_contexts.json
-          # Known artifact path for the failure-evidence upload below
-          # (bug panel-e2e-artifacts-no-consumer); CI runs list reporter only.
-          PLAYWRIGHT_OUTPUT_DIR: ${{ runner.temp }}/pw-output
-        run: npm run test:e2e
-      - name: Upload failure evidence (traces + screenshots)
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
-        with:
-          name: panel-e2e-failure-evidence
-          path: ${{ runner.temp }}/pw-output
-          retention-days: 7
-          if-no-files-found: ignore
-
   build:
     name: Build sdist + wheel
     runs-on: ubuntu-latest
-    needs: [check, unit-fast, contract-coverage, integration, e2e-python, e2e-panel]
+    needs: [check, unit-fast, contract-coverage, integration, e2e-python]
     if: needs.check.outputs.skip == 'false'
     timeout-minutes: 10
     steps:

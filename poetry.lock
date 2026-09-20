@@ -1291,17 +1291,6 @@ files = [
 ]
 
 [[package]]
-name = "mistune"
-version = "3.3.4"
-description = "A sane and fast Markdown parser with useful plugins and renderers"
-optional = false
-python-versions = ">=3.8"
-files = [
-    {file = "mistune-3.3.4-py3-none-any.whl", hash = "sha256:ee015381e955e370962968befe1d729ab60fafb6a715ac6751763fbce38c8d4a"},
-    {file = "mistune-3.3.4.tar.gz", hash = "sha256:58b5c96d6fcb61190dfe5fae498d2b2065f99cf61e9649418fd54cf1ada86dfe"},
-]
-
-[[package]]
 name = "mutmut"
 version = "3.7.0"
 description = "mutation testing for Python 3"
@@ -2433,4 +2422,4 @@ claude-sdk = ["claude-agent-sdk"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "2d6eeb54fb37d1a96003e21744761895a86393d86b62037c85b92e6c13424b38"
+content-hash = "a53089afffc03a780eb25d6219edf2eeb02def2368e14685818ed2d9d81bc5ea"

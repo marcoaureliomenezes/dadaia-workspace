@@ -6,10 +6,7 @@ import json
 import os
 import re
 import shutil
-import socket
 import sys
-import time
-import urllib.request
 import uuid
 from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass
@@ -46,12 +43,6 @@ def _git(process: SubprocessCertificationProcess, cwd: Path, *args: str) -> None
     )
     if proc.returncode != 0:
         raise RuntimeError(proc.stderr.strip() or proc.stdout.strip() or f"git {args} failed")
-
-
-def _free_loopback_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        return int(sock.getsockname()[1])
 
 
 class _CertificationSkip(Exception):
@@ -372,51 +363,6 @@ def certify(
         return "reports validate accepted a handoff-v1.2 record"
 
     check("reports-handoff-validation", handoff_validation)
-
-    port = _free_loopback_port()
-
-    def panel_check() -> str:
-        cli("server", "register", "--port", str(port), "--project", "certification-panel")
-        panel = process.start(
-            [
-                sys.executable,
-                "-m",
-                "dadaia_workspace.cli.main",
-                "panel",
-                "--port",
-                str(port),
-                "--no-open",
-            ],
-            cwd=target,
-            env=env,
-        )
-        try:
-            deadline = time.monotonic() + 15
-            last_error = "panel did not respond"
-            while time.monotonic() < deadline:
-                if panel.poll() is not None:
-                    stderr = panel.read_stderr()
-                    raise RuntimeError(f"panel exited early: {stderr}")
-                try:
-                    with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=1) as response:
-                        if response.status == 200:
-                            break
-                except Exception as exc:  # noqa: BLE001 - bounded readiness polling.
-                    last_error = str(exc)
-                    time.sleep(0.1)
-            else:
-                raise RuntimeError(last_error)
-        finally:
-            panel.terminate()
-            try:
-                panel.wait(timeout=10)
-            except TimeoutError:
-                panel.kill()
-                panel.wait(timeout=5)
-            cli("server", "release", "--port", str(port))
-        return f"HTTP 200 on loopback port {port}; registry released"
-
-    check("panel-and-server-registry", panel_check)
 
     def context_round_trip() -> str:
         cli("context", "dead", "certified-consumer", "--commit")

@@ -24,14 +24,66 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
-from dadaia_workspace.features.panel.entities import (
-    core_skills,
-    load_registry,
-    persona_ids,
+
+_REGISTRY_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "dadaia_workspace"
+    / "public"
+    / "entities"
+    / "registry.json"
 )
+_SKILLS_ROOT = _REGISTRY_PATH.parent.parent / "skills"
+SCHEMA_VERSION = "agentic-entities-v1"
+
+
+def load_registry() -> dict[str, Any]:
+    """The abstract-entity registry, shape-checked: the test reads the JSON itself now
+    that the panel's loader is gone (0.4.7 c5 FR1)."""
+    data = json.loads(_REGISTRY_PATH.read_text(encoding="utf-8"))
+    assert isinstance(data, dict) and data.get("schema_version") == SCHEMA_VERSION
+    for key in ("personas", "behaviors", "rules", "universal"):
+        assert key in data, key
+    return data
+
+
+def persona_ids(registry: dict[str, Any]) -> frozenset[str]:
+    return frozenset(p["id"] for p in registry["personas"])
+
+
+def _frontmatter_description(manifest: Path) -> str:
+    lines = manifest.read_text(encoding="utf-8").splitlines()
+    if not lines or lines[0].strip() != "---":
+        return ""
+    collected: list[str] = []
+    in_description = False
+    for line in lines[1:]:
+        stripped = line.strip()
+        if stripped == "---":
+            break
+        if in_description:
+            if line.startswith((" ", "\t")) and stripped:
+                collected.append(stripped)
+                continue
+            break
+        if stripped.startswith("description:"):
+            value = stripped.removeprefix("description:").strip()
+            if value and value not in (">", "|", ">-", "|-"):
+                return value
+            in_description = True
+    return " ".join(collected)
+
+
+def core_skills() -> list[tuple[str, str]]:
+    return [
+        (d.name, _frontmatter_description(d / "SKILL.md"))
+        for d in sorted(_SKILLS_ROOT.iterdir())
+        if d.is_dir() and (d / "SKILL.md").is_file()
+    ]
+
 
 _PKG_ROOT = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 _PUBLIC = _PKG_ROOT / "public"

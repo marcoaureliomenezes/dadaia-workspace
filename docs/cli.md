@@ -61,8 +61,6 @@
 
 ## dadaia migrate — Migration helpers for dadaia workspace and spec trees.
 
-## dadaia panel — Start the Dadaia Workspace Panel (local UI).
-
 ## dadaia public — Manage distributed public agent assets.
 - public doctor — Diagnose drift between package source, staging, and runtime projections.
 - public install — Install staged public assets into runtime projections.

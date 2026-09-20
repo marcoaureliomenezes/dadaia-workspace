@@ -82,17 +82,6 @@ _EXPECTED_TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
         "software-engineer": ("claude-opus-5", "low"),
         "qa-engineer": ("claude-opus-5", "low"),
     },
-    "subscription-saver": {
-        "project-manager": ("claude-opus-5", "high"),
-        "software-architect": ("claude-opus-5", "high"),
-        "product-engineer": ("claude-opus-5", "high"),
-        "project-auditor": ("claude-opus-5", "high"),
-        "security-reviewer": ("claude-sonnet-5", "high"),
-        "code-reviewer": ("claude-sonnet-5", "high"),
-        "ai-engineer": ("claude-sonnet-5", "medium"),
-        "software-engineer": ("claude-opus-5", "low"),
-        "qa-engineer": ("claude-sonnet-5", "low"),
-    },
     "max-quality": {
         "project-manager": ("claude-fable-5-1", "high"),
         "software-architect": ("claude-fable-5-1", "high"),

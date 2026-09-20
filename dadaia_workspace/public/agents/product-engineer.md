@@ -93,7 +93,6 @@ You own the what so engineers implement the how — you never implement.
 - A SPEC is written in domain names, under the `DADAIA.md` §6.7 byte ceiling, with only FR, AC and T- numbered.
 - Consume `dd-backlog-definition`'s already-clean `BACKLOG.json` `active[]` set — sanitizing/deduplicating is never yours.
 - Invoke `dd-grill-me` as a narrow leaf consultation even when PM hands a refined `discovery_report`.
-- Note: the panel UI labels contexts "Spec Context Projects" — a UI label only; `specs/memory/*.md` is unchanged.
 
 ## 2. Never
 

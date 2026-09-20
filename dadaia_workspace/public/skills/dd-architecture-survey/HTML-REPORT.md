@@ -68,7 +68,7 @@ No paragraphs of explanation — if the diagram needs a paragraph, redraw the di
 
 Draw every diagram as inline SVG (or bordered `<div>`s with absolutely-positioned
 SVG arrows). No diagram library, no external script: the report renders identically
-in the panel, a browser tab, or an offline copy, and carries no executable
+in a browser tab or an offline copy, and carries no executable
 dependency.
 
 Patterns that work:

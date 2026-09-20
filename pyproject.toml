@@ -51,7 +51,6 @@ openpyxl = "^3.1"
 pyyaml = "^6.0"
 jinja2 = "^3.1"
 jsonschema = "^4"
-mistune = ">=3.0,<4.0"
 
 # Optional runtime extra — the Claude Agent SDK enables live Claude execution via
 # ClaudeSdkAdapter. It is NOT a base dependency: the offline-first build and lockfile
@@ -132,9 +131,8 @@ target-version = "py312"
 # capture (`.dadaia/tmp/software-engineer/20260817/v0.4.3-T-043-29-v6-complexity-maxima.md`),
 # over the same scope this repo's `ruff check .` gate already covers (production +
 # tests + scripts) — never a smaller, aspirational number. The worst offender at
-# measurement time was `dadaia_workspace/features/panel/handler.py:make_handler_class`
-# (complexity 63) and `dadaia_workspace/features/telemetry/reader/allowlist.py` (nesting
-# depth 6); both already sit inside `dadaia_workspace/`, so no tests-only per-file-ignore
+# measurement time was `dadaia_workspace/features/telemetry/reader/allowlist.py` (nesting
+# depth 6); it already sits inside `dadaia_workspace/`, so no tests-only per-file-ignore
 # was needed to keep `ruff check` green at HEAD by construction (A21.2).
 #
 # RATCHET DIRECTION — read before touching either ceiling below:

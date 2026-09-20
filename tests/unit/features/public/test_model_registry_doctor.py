@@ -132,7 +132,7 @@ def test_unknown_model_variants(
     # valid overlay stays clean
     clean_overlay_dir = tmp_path / "overlay-clean"
     clean_overlay_dir.mkdir()
-    good_overlay = AgentModelPolicyOverlay(applied_template="subscription-saver", overrides={})
+    good_overlay = AgentModelPolicyOverlay(applied_template="max-quality", overrides={})
     clean_reports = _rendered(check_model_resolution(clean_overlay_dir, overlay=good_overlay))
     assert clean_reports == ["[ok] model-resolution"], clean_reports
 

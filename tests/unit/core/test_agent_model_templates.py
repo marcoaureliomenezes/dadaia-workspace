@@ -50,7 +50,6 @@ def test_no_template_assigns_fable_to_security_reviewer() -> None:
 def test_template_ids_default_and_balanced_roster_golden() -> None:
     assert [t.id for t in list_templates()] == [
         "balanced",
-        "subscription-saver",
         "max-quality",
     ]
     assert default_template().id == "balanced"
@@ -199,16 +198,16 @@ def test_codex_effort_clamp_map(claude_effort: str, codex_effort: str) -> None:
         (
             "applied_template_resolves_source_template",
             "project-manager",
-            lambda: AgentModelPolicyOverlay(applied_template="subscription-saver", overrides={}),
-            ("claude-opus-5", "high", "template"),
+            lambda: AgentModelPolicyOverlay(applied_template="max-quality", overrides={}),
+            ("claude-fable-5-1", "high", "template"),
         ),
         (
-            # AC-3: template subscription-saver + override {SE: model=opus-4-8} →
+            # AC-3: template max-quality + override {SE: model=opus-4-8} →
             # SE = opus-4-8 (override model) / low (template effort), source=override.
             "per_field_override_merges_with_applied_template",
             "software-engineer",
             lambda: AgentModelPolicyOverlay(
-                applied_template="subscription-saver",
+                applied_template="max-quality",
                 overrides={"software-engineer": AgentModelOverride(model="claude-opus-4-8")},
             ),
             ("claude-opus-4-8", "low", "override"),
@@ -241,10 +240,10 @@ def test_codex_effort_clamp_map(claude_effort: str, codex_effort: str) -> None:
             "ac3_other_agents_keep_applied_template_when_only_one_overridden",
             "qa-engineer",
             lambda: AgentModelPolicyOverlay(
-                applied_template="subscription-saver",
+                applied_template="max-quality",
                 overrides={"software-engineer": AgentModelOverride(model="claude-opus-4-8")},
             ),
-            ("claude-sonnet-5", "low", "template"),
+            ("claude-opus-5", "low", "template"),
         ),
     ],
 )

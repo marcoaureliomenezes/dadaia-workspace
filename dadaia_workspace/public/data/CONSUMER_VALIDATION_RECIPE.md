@@ -78,7 +78,7 @@ an initialized workspace, create it:
   proves the real surface, not just reachability: `capability-contract`,
   `exact-version-reconciliation`, `context-empty-remote-baseline`,
   `context-list-show-json`, `context-bind-heartbeat`, `reports-handoff-validation`,
-  `panel-and-server-registry`, and `context-dead-alive-delete-roundtrip` all PASS with
+  and `context-dead-alive-delete-roundtrip` all PASS with
   "no traceback".
 
 ### F-04 — Doctors
@@ -200,16 +200,6 @@ an initialized workspace, create it:
 - Run: `$D reports validate <good>.handoff.json`; `$D reports validate <bad>.handoff.json`.
 - **PASS if:** the valid file validates (exit 0) and the tampered one is rejected
   (non-zero, names the failure).
-
-### F-13 — Panel
-- Run: `$D panel --no-open --port <p>` in the background; hit the port with an HTTP GET;
-  `$D server list` WHILE the panel is up; then stop the panel. Use whatever HTTP client
-  the env has — `curl -fsS localhost:<p>/`, or, since `curl` is not guaranteed, the always
-  available stdlib: `python -c "import urllib.request as u; print(u.urlopen('http://localhost:<p>/').status)"`.
-- **PASS if:** HTTP 200; `server list` shows port `<p>` registered to `dadaia-panel`
-  while running (the panel self-registers per the dev-server-registry law); and the
-  entry is released after a clean stop. Only if the env cannot bind ANY port at all, mark
-  **EXCEPTION** — a missing `curl` is not an EXCEPTION (use the stdlib client above).
 
 ### F-14 — Server registry
 - Run: `$D server register --port <p> --project val`; `$D server list`; then re-register
@@ -423,7 +413,7 @@ gates cannot catch, because they never call the model.
   `effort`) and `.codex/agents/<a>.toml` (`model`, `model_reasoning_effort`) must
   render from the SAME resolved roster for all 9 core agents; the codex effort is
   the D-3 clamp of the claude effort (`xhigh` → `high`).
-- **Overlay round-trip:** apply a template + a per-agent override through the panel
+- **Overlay round-trip:** apply a template + a per-agent override by editing `.dadaia/states/agent_model_policy.json`
   API (`PUT /api/agent-model-policy`), re-install, and confirm BOTH surfaces moved
   together; `GET /api/agent-model-templates` offers every registry `claude_id` as a
   selectable model and the full effort vocabulary.

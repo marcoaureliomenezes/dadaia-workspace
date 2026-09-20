@@ -2,7 +2,7 @@
 
 Scope: this file governs `.dadaia/states/**`.
 
-State files are machine-owned JSON records used by dadaia services, hooks, and the panel.
+State files are machine-owned JSON records used by dadaia services and hooks.
 They are not documentation and not an implementation workspace.
 
 ## 1. Canon

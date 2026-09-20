@@ -351,7 +351,7 @@
 |---|---|
 | Scoped law | `specs/AGENTS.md`, `.dadaia/AGENTS.md`, `.dadaia/handoff/AGENTS.md`, `repos/<slug>/AGENTS.md`, any nested `AGENTS.md` |
 | Skills | `.claude/skills/`, `.agents/skills/` — skill-to-rule mapping declared once in `public/entities/behavior-map.json` |
-| State | `dadaia context show --json`, `dadaia doctor`, `dadaia public doctor`, `dadaia server list`, `dadaia bugs status`, `dadaia panel` |
+| State | `dadaia context show --json`, `dadaia doctor`, `dadaia public doctor`, `dadaia server list`, `dadaia bugs status` |
 
 - Language: operator preference, default English. Tone: direct, concise, operational.
 

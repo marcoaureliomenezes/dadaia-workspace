@@ -24,7 +24,7 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from dadaia_workspace.core.models import bugs as _bugs_module
-from dadaia_workspace.features.specs.schemas import load_schema
+from dadaia_workspace.features.specs.schemas import RETIRED_FEATURE_PACKAGES, load_schema
 
 pytestmark = pytest.mark.contract
 
@@ -181,7 +181,7 @@ def test_the_loaded_surface_enum_is_the_layers_plus_every_on_disk_feature_packag
 
     enum_values = set(load_schema("bugs/bug-record-v1")["properties"]["surface"]["enum"])
 
-    assert enum_values == on_disk | {
+    assert enum_values == on_disk | set(RETIRED_FEATURE_PACKAGES) | {
         "cli",
         "core",
         "hooks",

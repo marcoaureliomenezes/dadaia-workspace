@@ -32,7 +32,6 @@ line here and `--help` disagree, `--help` wins.
 7. On a failing command: preserve the evidence trail (command, exit code, output);
    classify and register a genuine bug (`dd-bug-registration`) before any
    workaround.
-8. `dadaia panel` (default port 4999) is the human view.
 
 ## Workspace state is CLI-owned
 

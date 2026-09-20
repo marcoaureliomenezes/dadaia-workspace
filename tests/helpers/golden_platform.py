@@ -63,7 +63,6 @@ __all__ = [
     "assert_golden",
     "canon_env_line",
     "is_env_doctor_line",
-    "norm_panel_body",
     "norm_path_line",
     "norm_stderr",
     "sort_line_lists",
@@ -115,19 +114,6 @@ def norm_path_line(line: str, ws: Path) -> str:
         "[ok] public-privacy",
     )
     return out.replace("\\", "/")
-
-
-def norm_panel_body(body: bytes, ws: Path) -> str:
-    """Normalize a panel JSON body (leak classes 4 + 5).
-
-    Strips the fixture root in plain, posix, and JSON-escaped forms to ``<WS>`` and
-    replaces every ISO-8601 timestamp with ``<TS>`` (panel endpoints stamp
-    ``generated_at`` with ``datetime.now``).
-    """
-    text = body.decode("utf-8")
-    ws_escaped = json.dumps(str(ws))[1:-1]
-    text = text.replace(ws.as_posix(), "<WS>").replace(ws_escaped, "<WS>").replace(str(ws), "<WS>")
-    return _TS_RE.sub("<TS>", text)
 
 
 def _as_text(line: object) -> str:

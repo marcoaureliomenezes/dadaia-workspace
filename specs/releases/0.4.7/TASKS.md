@@ -29,10 +29,13 @@
   `features/specs/{ledgers,rules,doctor,release_tree}.py`, `core/models/telemetry.py`,
   `public/data/DADAIA.md` (§8.5 HANDEDIT lines), `public/scaffold/**/AGENTS.md` (HANDEDIT
   mentions), `tests/**`.
-- [ ] T-047-44 — FR1b: delete `features/panel/`, `cli/commands/panel*.py`, `dadaia panel`,
+- [x] T-047-44 — FR1b: delete `features/panel/`, `cli/commands/panel*.py`, `dadaia panel`,
   `mistune`; rehome `load_registry` consumers onto `public/entities/registry.json`; two default
   templates with per-harness `(model, effort)` in `core/agent_model_templates.py`; `public
-  doctor` validates the policy JSON. Write set: `features/panel/**`, `cli/**`, `pyproject.toml`,
+  doctor` validates the policy JSON; `features/agents/` (panel-only seam) dies with it; the
+  `e2e-panel` CI jobs and `tests/e2e/panel` go; retired feature names stay valid on committed
+  bug records (`RETIRED_FEATURE_PACKAGES`). Write set: `features/panel/**`, `features/agents/**`,
+  `.github/**`, `setup.cfg`, `cli/**`, `pyproject.toml`,
   `poetry.lock`, `core/agent_model_templates.py`, `infrastructure/install_helpers.py`,
   `public/data/DADAIA.md` (§10.1 `dadaia panel`), `public/skills/dd-cli-library/**`,
   `specs/memory/product/{agents,platform}/**`, `tests/**`.

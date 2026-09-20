@@ -47,7 +47,7 @@ def _store(tmp_path: Path, **kwargs: object) -> JsonAgentModelPolicyStore:
 def _valid_doc() -> dict[str, object]:
     return {
         "schema_version": "agent-model-policy-v1",
-        "applied_template": "subscription-saver",
+        "applied_template": "max-quality",
         "overrides": {"software-engineer": {"model": "claude-opus-4-8"}},
     }
 
@@ -114,7 +114,7 @@ def test_parse_rejection_matrix(tmp_path: Path, mutate_doc: object, match: str) 
 def test_valid_doc_and_minimal_doc_parse(tmp_path: Path) -> None:
     store = _store(tmp_path)
     overlay = store.parse(_valid_doc())
-    assert overlay.applied_template == "subscription-saver"
+    assert overlay.applied_template == "max-quality"
     assert overlay.overrides["software-engineer"] == AgentModelOverride(model="claude-opus-4-8")
 
     minimal = store.parse({"schema_version": "agent-model-policy-v1"})
@@ -153,7 +153,7 @@ def test_save_atomic_last_good_and_reload(tmp_path: Path) -> None:
     reloads identically."""
     first = AgentModelPolicyOverlay(applied_template="balanced", overrides={})
     second = AgentModelPolicyOverlay(
-        applied_template="subscription-saver",
+        applied_template="max-quality",
         overrides={
             "software-engineer": AgentModelOverride(model="claude-opus-4-8"),
             "qa-engineer": AgentModelOverride(effort="max"),

@@ -78,22 +78,6 @@ _BUILT_IN: tuple[AgentModelTemplate, ...] = (
         },
     ),
     AgentModelTemplate(
-        id="subscription-saver",
-        label="Subscription saver",
-        default=False,
-        assignments={
-            "project-manager": _a("claude-opus-5", "high"),
-            "software-architect": _a("claude-opus-5", "high"),
-            "product-engineer": _a("claude-opus-5", "high"),
-            "project-auditor": _a("claude-opus-5", "high"),
-            "security-reviewer": _a("claude-sonnet-5", "high"),
-            "code-reviewer": _a("claude-sonnet-5", "high"),
-            "ai-engineer": _a("claude-sonnet-5", "medium"),
-            "software-engineer": _a("claude-opus-5", "low"),
-            "qa-engineer": _a("claude-sonnet-5", "low"),
-        },
-    ),
-    AgentModelTemplate(
         id="max-quality",
         label="Max quality",
         default=False,

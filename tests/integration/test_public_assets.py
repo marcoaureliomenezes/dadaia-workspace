@@ -385,7 +385,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
         json.dumps(
             {
                 "schema_version": "agent-model-policy-v1",
-                "applied_template": "subscription-saver",
+                "applied_template": "max-quality",
                 "overrides": {"software-engineer": {"model": "claude-opus-4-8"}},
             }
         ),
@@ -396,7 +396,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     se2 = _claude_frontmatter(ws, "software-engineer")
     assert (se2["model"], se2["effort"]) == ("claude-opus-4-8", "low")
     pm2 = _claude_frontmatter(ws, "project-manager")
-    assert (pm2["model"], pm2["effort"]) == ("claude-opus-5", "high")
+    assert (pm2["model"], pm2["effort"]) == ("claude-fable-5-1", "high")
 
     se2_toml = _codex_toml_fields(ws, "software-engineer")
     assert (se2_toml["model"], se2_toml["model_reasoning_effort"]) == ("gpt-5.6-sol", "low")

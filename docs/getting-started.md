@@ -95,23 +95,6 @@ run never stalls the flow. Each section ends in
 MOVES slop to `.dadaia/reaped/<YYYYMMDD>/` under a 7-day hold and deletes only what
 its own TTL expired.
 
-## Look at it — `dadaia panel`
-
-<!-- derived-from: panel sha256:c55db1d0ad51 -->
-
-```bash
-dadaia panel
-```
-
-The panel is the human view: a loopback-only, no-auth, Host-guarded,
-CSP-constrained UI over local workspace state, with four tabs — Projects (the
-contexts and their memory, each card listing main and associated repos), Agents
-(persona cards, model templates and overrides, plus the Sessions telemetry
-dashboard), Agentic Entities (the registry rendered server-side) and Servers. The
-Agents tab is its only governance editor: it validates a submitted model/effort pair
-against the registry catalog and writes `.dadaia/states/agent_model_policy.json`
-atomically.
-
 ## Run the first candidate
 
 <!-- derived-from: sdd-bug-backlog-governance sha256:8c75f3f83bf9 -->
