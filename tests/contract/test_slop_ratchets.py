@@ -31,10 +31,10 @@ _GOVERNANCE_ID_RE = re.compile(
 )
 _DOCSTRING_OWNERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
 
-# RECORDED CEILING (ratchet DOWN ONLY) — measured 2026-09-03 on this HEAD, every comment
+# RECORDED CEILING (ratchet DOWN ONLY) — measured 2026-09-20 on this HEAD, every comment
 # token plus every docstring line under dadaia_workspace/**/*.py. Lower it in the commit
 # that deletes the ids; raising it is never a ratchet move.
-_V32_CEILING = 769
+_V32_CEILING = 765
 
 
 def _governance_id_lines(source: str) -> int:
@@ -53,7 +53,7 @@ def _governance_id_lines(source: str) -> int:
 
 def test_v32_governance_ids_in_production_comments_and_docstrings() -> None:
     """V32 — comment tokens and docstring lines under dadaia_workspace/ naming an FR, T-,
-    ADR or v0.x id, pinned at 769. Ratchet DOWN ONLY; target 0 (tests/ are excluded)."""
+    ADR or v0.x id, pinned at 765. Ratchet DOWN ONLY; target 0 (tests/ are excluded)."""
     total = sum(
         _governance_id_lines(path.read_text(encoding="utf-8"))
         for path in tracked_test_files(_REPO_ROOT, "*.py", tree="dadaia_workspace")
@@ -83,7 +83,7 @@ _V33_TOKEN_TREES = ("specs", "dadaia_workspace", "tests")
 _V33_READER_TREES = ("dadaia_workspace", "tests")
 _V33_RATIFIED_FAMILIES = frozenset({"FR", "AC", "T"})
 
-# RECORDED CEILING (ratchet DOWN ONLY) — measured 2026-09-03 on this HEAD; the failing
+# RECORDED CEILING (ratchet DOWN ONLY) — measured 2026-09-20 on this HEAD; the failing
 # assertion prints the orphan family list so the number is reproducible.
 _V33_CEILING = 37
 

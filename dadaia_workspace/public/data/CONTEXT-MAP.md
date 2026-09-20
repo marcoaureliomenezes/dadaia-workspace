@@ -5,7 +5,9 @@ with the rest of `data/`, and no projection rule installs it into a runtime tree
 `tests/contract/test_context_map.py`.
 
 One row per surface: what it is for, what belongs in it, its byte ceiling, and its measured
-size at the last closure. Ceilings are ratchets — they move down. `Measured` is rewritten by
+size at the last closure — the INSTALLED bytes, with every `<!-- … -->` registry table
+rendered as `dadaia public stage` writes it, not the authored source size. Ceilings are
+ratchets — they move down. `Measured` is rewritten by
 `UPDATE_CONTEXT_MAP=1 pytest tests/contract/test_context_map.py`; a value above its ceiling
 fails the build.
 
@@ -40,19 +42,19 @@ path or entity as it appears in an installed workspace.
 
 | Surface | Purpose | Belongs | Ceiling | Measured |
 |---|---|---|---|---|
-| `AGENTS.md` | the root map: the flow, the roles, the gate invariants, the root, credentials, and one line per scoped file | statements; the index of every other surface | 8192 | 6037 |
-| `specs/AGENTS.md` | the canon of a specs tree and its status tokens | canon table, status tokens, doctor codes | 4096 | 2709 |
+| `AGENTS.md` | the root map: the flow, the roles, the gate invariants, the root, credentials, and one line per scoped file | statements; the index of every other surface | 8192 | 6107 |
+| `specs/AGENTS.md` | the canon of a specs tree and its status tokens | canon table, status tokens, doctor codes | 4096 | 3506 |
 | `specs/releases/AGENTS.md` | candidates, phases, task markers, `rc-N` | release procedure and commit shapes | 4096 | 3986 |
 | `specs/backlog/AGENTS.md` | the operator's demand queue and its exits | `BACKLOG.json` shape, intake gate, dispositions | 4096 | 3933 |
 | `specs/bugs/AGENTS.md` | what a bug is and how it is proposed, recorded, resolved | bug procedure and the redaction rule | 4096 | 3923 |
 | `specs/memory/AGENTS.md` | current product truth and who writes it | atoms, Part 1/Part 2, ownership | 4096 | 4080 |
 | `specs/ADRs/AGENTS.md` | the decision record | `decisions.jsonl` shape, acceptance | 4096 | 3284 |
 | `specs/audits/AGENTS.md` | the periodic three-pillar review | audit procedure, findings, closure | 4096 | 1687 |
-| `.dadaia/AGENTS.md` | the runtime tree: zones, doctor, reprojection, context | zone registry rules, chokepoints | 4096 | 4018 |
+| `.dadaia/AGENTS.md` | the runtime tree: zones, doctor, reprojection, context | zone registry rules, chokepoints | 4096 | 4086 |
 | `.dadaia/handoff/AGENTS.md` | the handoff lane | emission, schema, ack-on-consume | 4096 | 1617 |
 | `.dadaia/tmp/AGENTS.md` | the TTL scratch lane | what may be written there and for how long | 4096 | 1135 |
-| `.dadaia/states/AGENTS.md` | CLI-owned state files | who writes them and by which verb | 4096 | 1066 |
-| `repos/<slug>/AGENTS.md` | a repo working tree | clean-tree rule, cache redirection | 4096 | 3064 |
+| `.dadaia/states/AGENTS.md` | CLI-owned state files | who writes them and by which verb | 4096 | 1355 |
+| `repos/<slug>/AGENTS.md` | a repo working tree | clean-tree rule, cache redirection | 4096 | 3155 |
 | `tests/AGENTS.md` | a repo's test tree | admission, intent, size tiers | 4096 | 2694 |
 
 ## 3. Skills — `.agents/skills/dd-*/SKILL.md`

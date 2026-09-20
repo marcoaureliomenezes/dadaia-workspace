@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.infrastructure.public_assets import render_registry_tables
 from tests.helpers.scan_population import assert_populated
 
 pytestmark = pytest.mark.contract
@@ -107,6 +108,17 @@ _SKILL_CEILING = 6144
 _UNBOUNDED = "—"
 
 
+def installed_bytes(src: Path) -> int:
+    """Bytes of *src* as a workspace actually receives it.
+
+    `stage` renders every `<!-- … -->` registry placeholder before install, so the
+    source size is not what an agent loads: `.dadaia/AGENTS.md` carries the zone table
+    on top of its authored text. The ceiling and the CONTEXT-MAP Measured column are
+    both this number.
+    """
+    return len(render_registry_tables(src.read_text(encoding="utf-8")).encode("utf-8"))
+
+
 def _persona_sources() -> dict[str, Path]:
     return {p.stem: p for p in sorted((_PUBLIC / "agents").glob("*.md"))}
 
@@ -140,11 +152,12 @@ def surfaces() -> dict[str, tuple[Path, int | str]]:
 
 
 def test_ceilings_hold_on_every_context_surface() -> None:
-    """AC1.1 — 8192 for the root map, 4096 for a scoped law, 6144 for a skill."""
+    """AC1.1 — 8192 for the root map, 4096 for a scoped law, 6144 for a skill,
+    measured on the INSTALLED (registry-rendered) form, not the authored source."""
     over = sorted(
-        f"{key}: {src.stat().st_size} B > {ceiling} B ({src.name})"
+        f"{key}: {installed_bytes(src)} B > {ceiling} B ({src.name})"
         for key, (src, ceiling) in surfaces().items()
-        if isinstance(ceiling, int) and src.stat().st_size > ceiling
+        if isinstance(ceiling, int) and installed_bytes(src) > ceiling
     )
     assert over == [], "context surfaces over their byte ceiling:\n" + "\n".join(over)
 
@@ -234,7 +247,7 @@ def test_measured_column_matches_the_bytes_on_disk() -> None:
     updating = os.environ.get("UPDATE_CONTEXT_MAP") == "1"
     drift: list[str] = []
     for key, index in rows.items():
-        measured = known[key][0].stat().st_size
+        measured = installed_bytes(known[key][0])
         cells = lines[index].split("|")
         if updating:
             cells[-2] = f" {measured} "

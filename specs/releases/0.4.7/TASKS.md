@@ -144,7 +144,7 @@
   documentation of an existing one. Evidence: the audit findings recorded in the handoff.
   Write set: `public/data/dadaia-AGENTS.md`, `README.md`.
 
-- [ ] T-047-61 — FR7a: ratchets. V35 holds its 18-dir / 2906-line ceiling by deleting the
+- [x] T-047-61 — FR7a: ratchets. V35 holds its 18-dir / 2906-line ceiling by deleting the
   skill prose the migrated statements replace; new ratchets pin the AC1.1 byte ceilings in
   `test_context_map.py`; V26/V32/V33 re-pinned downward where the deletions allow;
   `import-linter` pins re-measured; `test_module_size_ceiling.py` and
