@@ -140,6 +140,16 @@ def render_registry_tables(text: str) -> str:
     return text
 
 
+#: A skill script enforces a shipped schema from its OWN copy beside it.
+#: ``stage`` copies the file in (never a symlink: it dies on Windows and in a zipped
+#: skill; never an import: that is the coupling a self-contained script forbids), so the copy travels with
+#: the staged skill folder and is projected and hash-checked with it. One line per
+#: (shipped schema, skill script directory) pair.
+_SKILL_SCRIPT_SCHEMAS: tuple[tuple[str, str], ...] = (
+    ("schemas/bugs/bug-record-v1.schema.json", "skills/dd-bug-resolution/scripts/schemas"),
+)
+
+
 def _staged_bytes(src: Path) -> bytes:
     """What ``stage`` writes for the public asset *src* and what ``doctor`` compares the
     staged copy against: every Markdown rule asset with its registry tables rendered,
@@ -219,6 +229,15 @@ class FileSystemPublicAssetManager:
                 shutil.copytree(src, dst)
             else:
                 shutil.copy2(src, dst)
+            staged.append(f"[stage] {dst}")
+
+        for schema_rel, scripts_rel in _SKILL_SCRIPT_SCHEMAS:
+            schema_src = self._public_dir / schema_rel
+            if not schema_src.exists():
+                continue
+            dst = agentic_dir / scripts_rel / Path(schema_rel).name
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(schema_src, dst)
             staged.append(f"[stage] {dst}")
 
         for src in self._iter_files(self._public_dir):

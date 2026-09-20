@@ -8,7 +8,7 @@
 
 ## Candidate 7 — ledger verbs to skill scripts
 
-- [ ] T-047-63 — FR1: the script contract. `dd-bug-resolution/scripts/bugs.py` lands
+- [x] T-047-63 — FR1: the script contract. `dd-bug-resolution/scripts/bugs.py` lands
   `check`-only as the tracer: stdlib only, `#!/usr/bin/env python3`, exec bit, `--specs <path>`
   defaulting to the nearest `specs/` at or above cwd whose parent holds `.git` (else exit 1 with
   one `fix:` line), `--json`, one `<CODE> error <message>` line per finding, exit 1 on any. It
