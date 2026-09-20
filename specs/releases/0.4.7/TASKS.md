@@ -130,7 +130,7 @@
   Write set: `infrastructure/{entity_doctor,codex_doctor,public_assets}.py`,
   `cli/commands/{public,init}.py`, `docs/**`, `tests/**`.
 
-- [ ] T-047-60 — FR6: spec-context audit, freeze, paradigm. Run the bug-history audit of the
+- [-] T-047-60 — FR6: spec-context audit, freeze, paradigm. Run the bug-history audit of the
   spec_context surface (every `BUGS.jsonl` record and `_archive/` closure whose surface or
   title names context, bind, session or presence): weak points, repeated symptoms, which
   fixes were symptom patches, structural fixes still owed, every bug id judged; no code
