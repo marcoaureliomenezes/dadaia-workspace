@@ -12,7 +12,7 @@ back by another. This module is the replacement, not a ninth layer on top: every
 above now calls :func:`resolve` once and reads the fields it needs off the returned
 :class:`Invocation`.
 
-``DADAIA.md`` §3 context-resolution law, verbatim, plus rung 0 (a caller's own explicit
+the root `AGENTS.md` map §3 context-resolution law, verbatim, plus rung 0 (a caller's own explicit
 input, which the law has always allowed a verb to pass):
 
     rung 0  ``explicit``, or the context derived from an explicit write TARGET
@@ -474,7 +474,7 @@ def resolve(
 
 def resolve_specs_dir(specs_dir: str | None) -> Path:
     """Resolve a specs/ dir: explicit input, else :func:`resolve` (no ``cwd/specs``
-    fallback — ``DADAIA.md`` §3 grants no such rung); unresolved reaches the error below.
+    fallback — the root `AGENTS.md` map §3 grants no such rung); unresolved reaches the error below.
 
     T-044-40 (bug ``symlinked-specs-root-is-followed-by-migration-and-repair``): a
     symlinked *explicit* root is refused HERE, once, at the one seam every

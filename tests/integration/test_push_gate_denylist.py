@@ -198,7 +198,7 @@ def test_same_value_introduced_into_a_new_path_still_refuses(tmp_path: Path) -> 
 
 # ---------------------------------------------------------------------------
 # bug new-branch-push-loses-prior-published-denylist-amnesty (v0.4.4) — the FIRST
-# push of a `feature/{M.m.p}` branch (gitflow v2's only pushable ref, DADAIA.md §4)
+# push of a `feature/{M.m.p}` branch (gitflow v2's only pushable ref, `dd-gitflow-default`)
 # is a NEW remote ref: git's own pre-push line reports `remote_sha` as the all-zero
 # sentinel. Every fixture above configures NO remote at all, so it never exercised
 # "a real origin already published this branch's own past" — exactly the gap that
@@ -229,7 +229,7 @@ def _feature_push_ref(local_sha: str, *, branch: str = "feature/1.0.0") -> PushR
 def test_new_branch_push_of_an_already_published_term_passes(tmp_path: Path) -> None:
     """(a) The first push of a brand-new `feature/M.m.p` branch (`remote_sha` is the
     all-zero sentinel) that only carries a term ALREADY published on `origin` must
-    pass — DADAIA.md §7's range scope: already-published history never needs a
+    pass — `dd-code-review`'s range scope: already-published history never needs a
     rewrite, regardless of whether THIS ref existed on origin before."""
     repo = tmp_path / "repo"
     _init_repo(repo)

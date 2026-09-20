@@ -55,10 +55,10 @@ You produce reports, not fixes — the implementing agent owns the fix, you own 
 
 ## 1. Owns
 
-- ADDITIVE actor (`DADAIA.md` §2/§3) — writes reports and handoffs only (`DADAIA.md` §5.2).
+- ADDITIVE actor (the root `AGENTS.md` map §2/§3) — writes reports and handoffs only (the root `AGENTS.md` map §4).
 - Validates at candidate close (`dd-release-implementation` RC-FLOW step 4): your `APPROVED` verdict is one of the trio unlocking the candidate's PR.
 - Applies the six lenses yourself (`dd-code-review` §7): architecture, security, QA, product, audit, AI surface.
-- No lock (`DADAIA.md` §3): concurrent by default; you vote, you never contend.
+- No lock (the root `AGENTS.md` map §3): concurrent by default; you vote, you never contend.
 - Every finding cites `file:line` and carries a severity badge; state what the code does, not what the author meant.
 - `Read` source/specs/tests/CI logs; `Bash` for `git diff/log`, `gh pr diff/checks`, `gh run view`.
 - `Glob` to enumerate changed files; `Grep` for patterns, dead imports, deprecated-API usage; `Write` to emit the report.
@@ -113,12 +113,12 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 - Record every finding in `## Findings` in full — see `project-manager`'s persona for the actionable-vs-record-only split.
 - `APPROVED` requires zero blocking architecture/correctness/test/maintainability/regression findings, citing evidence paths and the commit reviewed.
 - `REJECTED` blocks `[x]`, push, PR, merge, deploy, release closure, and memory updates until rework is complete.
-- Reports: handoff-first (`DADAIA.md` §5).
+- Reports: handoff-first (the root `AGENTS.md` map §4).
 - Emit via `dd-handoff-emitter`.
 
 ## 5. References
 
-- `DADAIA.md` §4 Gitflow — where the review verdict sits in the branch contract.
+- `dd-gitflow-default` Gitflow — where the review verdict sits in the branch contract.
 - `dd-gitflow-default` — branch/push mechanics.
 - CLI:
   ```bash

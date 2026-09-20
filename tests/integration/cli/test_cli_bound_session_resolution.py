@@ -8,7 +8,7 @@ shared CLI seam (`cli._specs_resolution`, T-50-04: now the single resolution aut
 
 T-50-05 (SPEC v0.5.0 FR1 deletion item 4): the `cwd/specs` fallback this module used to
 pin as a legitimate "outside any workspace" escape hatch is deleted outright —
-`DADAIA.md` §3 grants no rung for it. That case is re-pointed below to assert the new
+the root `AGENTS.md` map §3 grants no rung for it. That case is re-pointed below to assert the new
 terminal, actionable failure instead of a silent success into an ungoverned directory.
 """
 
@@ -77,7 +77,7 @@ def test_bound_session_resolution_context_flag_rootlaw_and_no_workspace_fails_cl
     the fallback it was bolted onto — the outcome, refusal, is unchanged); (3) T-50-05
     deletes the ``cwd/specs`` fallback outright — a bare directory outside any dadaia
     workspace no longer resolves via its own local specs/, even when one is right
-    there on disk, because ``DADAIA.md`` §3 grants no rung for it."""
+    there on disk, because the root `AGENTS.md` map §3 grants no rung for it."""
     # (1) --context routing key attribution.
     ws = tmp_path / "ws"
     _make_workspace(ws)

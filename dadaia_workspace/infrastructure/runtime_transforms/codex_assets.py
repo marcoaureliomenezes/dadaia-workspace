@@ -66,7 +66,7 @@ _AGENT_FM_BLOCK_SCALAR_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*): [>|]$", re.M
 # FR22 / A22.1 — Codex persona compaction (shared-law de-duplication)
 # ---------------------------------------------------------------------------
 #
-# The canonical law (DADAIA.md) reaches every Codex agent context — the parent
+# The canonical law (the root AGENTS.md map) reaches every Codex agent context — the parent
 # session AND any delegated custom agent alike — through Codex's NATIVE
 # per-directory ``AGENTS.md`` discovery (`ai-harness-codex` skill §1), a
 # mechanism that is entirely independent of the SessionStart/UserPromptSubmit
@@ -87,12 +87,6 @@ _AGENT_FM_BLOCK_SCALAR_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*): [>|]$", re.M
 # exactly once (A22.2). Role identity, role-specific decisions, authority and
 # write/refusal boundaries are never touched by these patterns.
 
-# The two generic pointer lines directly under the H1 title. Only an EXACT
-# match is stripped, so a persona (e.g. project-manager) that weaves
-# role-specific prose into the same blockquote keeps its own sentence.
-_CODEX_COMPACT_H1_REPORTS_POINTER_RE = re.compile(
-    r"> Reports follow the `DADAIA\.md` \(the workspace law\) §4 \(handoff-first\)[^\n]*\n\n?"
-)
 _CODEX_COMPACT_H1_PROTOCOL_POINTER_RE = re.compile(
     r"> This agent follows the shared workspace protocol: `AGENTS\.md` and the "
     r"projected workspace protocol\.\n\n?"
@@ -111,13 +105,6 @@ _CODEX_COMPACT_ARTIFACT_EMISSION_RE = re.compile(
     r"\n\n?"
 )
 
-# The trailing "> Report/handoff emission follows the DADAIA.md ... §4 ..."
-# blockquote — byte-identical (modulo one qa-engineer addendum clause) in
-# every persona, restating the same DADAIA.md §4 handoff-first policy already
-# named earlier in the same "## Report" section.
-_CODEX_COMPACT_HANDOFF_POINTER_RE = re.compile(
-    r"\n?> Report/handoff emission follows the `DADAIA\.md`[^\n]*\n\n?"
-)
 
 # "## Implementation review gate" — restates the `dd-task-manager`
 # skill's "Implementation complete is not DONE" review-gate paragraph
@@ -138,10 +125,8 @@ _CODEX_COMPACT_CLI_SECTION_RE = re.compile(r"(\n---\n)?## dadaia CLI\n.*?(?=\n##
 # order has no observable effect on the result, but a stable order keeps the
 # diff of any future addition minimal and reviewable.
 _CODEX_COMPACT_PATTERNS: tuple[re.Pattern[str], ...] = (
-    _CODEX_COMPACT_H1_REPORTS_POINTER_RE,
     _CODEX_COMPACT_H1_PROTOCOL_POINTER_RE,
     _CODEX_COMPACT_ARTIFACT_EMISSION_RE,
-    _CODEX_COMPACT_HANDOFF_POINTER_RE,
     _CODEX_COMPACT_REVIEW_GATE_SECTION_RE,
     _CODEX_COMPACT_CLI_SECTION_RE,
 )

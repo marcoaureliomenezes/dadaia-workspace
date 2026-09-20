@@ -310,7 +310,7 @@ def test_silent_matrix(tmp_path: Path) -> None:
     )
     assert "SPEC-DOC-028" not in _codes(SpecsDoctor(specs_f2).check())  # no repo_root
 
-    # DOC-030: canonical (DADAIA.md §6.8 <YYYYMMDD>-<slug>)/grandfathered dirs + absent
+    # DOC-030: canonical (`specs/audits/AGENTS.md` <YYYYMMDD>-<slug>)/grandfathered dirs + absent
     # audits/ -> silent.
     specs_g1 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-030ok"))
     (specs_g1 / "audits" / "20260701-my-audit-slug").mkdir(parents=True)
@@ -331,7 +331,7 @@ def test_silent_matrix(tmp_path: Path) -> None:
 
 
 def test_doc030_accepts_the_dadaia_md_6_8_canon_shape_yyyymmdd_dash_slug(tmp_path: Path) -> None:
-    """Bug spec-doc-030-audit-dir-rule-contradicts-dadaia-6-8-canon: DADAIA.md section
+    """Bug spec-doc-030-audit-dir-rule-contradicts-dadaia-6-8-canon: the root `AGENTS.md` map section
     6.8 (the current law) and features.specs.canon's own audits CanonEntry both declare
     an audit dir as ``<YYYYMMDD>-<slug>`` — the SAME shape a real audit dir on this repo
     carries (``20260827-canon-v6-first-audit``). SPEC-DOC-030 must accept it silently,

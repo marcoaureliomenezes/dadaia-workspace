@@ -112,7 +112,7 @@ def _specs_canon_table() -> str:
 
 #: Law-fragment placeholder -> the registry view that fills it. The projected law's
 #: canonical-name tables ARE ``core.workspace_layout`` (0.4.6 FR14/D14 for the zone and
-#: states tables; 0.4.7 FR5b for DADAIA.md §5.1, §5.3 and §6.2) — never a hand-kept copy
+#: states tables; 0.4.7 FR5b for the root map, repo-AGENTS.md and specs-AGENTS.md) — never a hand-kept copy
 #: that the next fix edits in one home and forgets in the other.
 _PLACEHOLDERS: dict[str, Callable[[], str]] = {
     "<!-- zones -->": _zone_table,
@@ -261,7 +261,7 @@ class FileSystemPublicAssetManager:
             )
             prune_stale_codex_tomls(workspace_root / ".codex", expected, installed)
 
-        # DADAIA.md lands via the rule table above; the remaining harness-independent
+        # the root `AGENTS.md` map lands via the rule table above; the remaining harness-independent
         # migrations are unconditional cleanup, unchanged.
         remove_retired_core_rules(workspace_root, installed)
         remove_legacy_workflow_projections(workspace_root, installed)

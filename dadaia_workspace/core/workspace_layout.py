@@ -3,7 +3,7 @@
 Bug class (transversal; the six-bug ``.dadaia/`` layout ledger): the
 same invariant declared in multiple modules diverges. The root whitelist lived in
 ``hooks/root_whitelist.py`` AND ``features/spec_context/doctor.py`` and diverged the day
-``DADAIA.md`` was added to one of them; the ``.dadaia/`` layout lived as bare name lists
+the root ``AGENTS.md`` map was added to one of them; the ``.dadaia/`` layout lived as bare name lists
 in four modules, and six fixes edited their membership without ever changing their shape.
 One fact, one place: every consumer DERIVES from this module (both ``hooks`` and
 ``features`` may import ``core``; the reverse edges are forbidden by import-linter), and a
@@ -68,7 +68,7 @@ __all__ = [
     "zones_with_ttl",
 ]
 
-#: SPEC-DOC-030 (DADAIA.md §6.8, v6 canon): every new ``specs/audits/`` directory must
+#: SPEC-DOC-030 (`specs/audits/AGENTS.md`, v6 canon): every new ``specs/audits/`` directory must
 #: be named ``<YYYYMMDD>-<slug>`` — the SAME shape ``features.specs.canon``'s own
 #: audits ``CanonEntry`` pattern uses (bug
 #: spec-doc-030-audit-dir-rule-contradicts-dadaia-6-8-canon: this constant used to
@@ -84,15 +84,14 @@ ROOT_ALLOWED_DIRS: frozenset[str] = frozenset(
     {".agents", ".claude", ".codex", ".dadaia", ".git", ".kimi-code", "repos"}
 )
 
-#: Files the workspace root may contain. ``DADAIA.md`` is the workspace system prompt
-#: (the single always-on law file); ``AGENTS.md`` its harness-discovery bridge;
-#: ``CLAUDE.md`` the Claude Code import bridge; ``prompt.md`` the optional operator
-#: long-prompt file; ``.env`` the one credential home (DADAIA.md §9); ``.gitignore`` the
-#: defence-in-depth exclusion list (§5.3) — bug
+#: Files the workspace root may contain. ``AGENTS.md`` is the root map (the one
+#: always-on law file); ``CLAUDE.md`` the Claude Code import bridge; ``prompt.md`` the
+#: optional operator long-prompt file; ``.env`` the one credential home (the map §4);
+#: ``.gitignore`` the defence-in-depth exclusion list — bug
 #: doctor-root1-flags-env-that-dadaia-md-9-declares-canonical: the law named both, this
 #: set named neither, and hook + doctor (both derived from here) contradicted the law.
 ROOT_ALLOWED_FILES: frozenset[str] = frozenset(
-    {"AGENTS.md", "CLAUDE.md", "DADAIA.md", "prompt.md", ".env", ".gitignore"}
+    {"AGENTS.md", "CLAUDE.md", "prompt.md", ".env", ".gitignore"}
 )
 
 
@@ -198,7 +197,7 @@ DADAIA_ZONES: tuple[Zone, ...] = (
         Creator.RUNTIME,
         _ONE_DAY,
         None,
-        "redirected tool caches (DADAIA.md 5.3)",
+        "redirected tool caches (repos/<slug>/AGENTS.md)",
     ),
     Zone(
         "dist",
@@ -287,7 +286,7 @@ def zone_table_rows() -> tuple[tuple[str, str, str, str, str], ...]:
     )
 
 
-#: The git chokepoints (DADAIA.md 3.4) and the shipped script each is installed FROM:
+#: The git chokepoints (`.dadaia/AGENTS.md`) and the shipped script each is installed FROM:
 #: ``(.git/hooks/<target>, public/scripts/<source>)``. One home for "which hooks exist
 #: and what they are made of" — ``cli.commands.ci`` installs them, the workspace doctor
 #: compares the installed copies to them (HOOKS-DRIFT-1).
@@ -304,26 +303,25 @@ def public_scripts_dir() -> Path:
 
 
 #: Basenames of the projected LAW files — human-only in an instantiated workspace.
-LAW_BASENAMES: frozenset[str] = frozenset({"DADAIA.md", "AGENTS.md", "CLAUDE.md"})
+LAW_BASENAMES: frozenset[str] = frozenset({"AGENTS.md", "CLAUDE.md"})
 
 #: Harness/projection directories that host a projected law file (relative to the
-#: workspace root). The gate composes its guarded set FROM this; the installer projects
-#: ``DADAIA.md`` into the subset in :data:`DADAIA_MD_HARNESS_TARGETS`.
+#: workspace root). The gate composes its guarded set FROM this.
 LAW_HARNESS_DIRS: frozenset[str] = frozenset({".claude/rules", ".codex", ".kimi-code", ".agents"})
 
 #: The harness directories themselves (the top segment of each of the above) — the one
 #: home of "which root directories a harness owns", derived, never respelled.
 HARNESS_DIRS: frozenset[str] = frozenset(path.split("/")[0] for path in LAW_HARNESS_DIRS)
 
-#: Where the law is projected per harness whose root-import chain does not already
-#: deliver it — Claude Code's does, so no entry here (bug FR31, see workspace-law rule).
+#: Retired law targets, kept until the projection surface collapses in T-047-55; the
+#: source they projected is gone, so :func:`_law_projection_rules` yields nothing.
 DADAIA_MD_HARNESS_TARGETS: dict[str, str] = {
     "codex": ".codex/DADAIA.md",
     "kimi-code": ".kimi-code/DADAIA.md",
 }
 
 # ---------------------------------------------------------------------------------
-# The repo working tree (DADAIA.md §5.3) and the ``specs/`` canon (§6.2) — the same
+# The repo working tree (``repo-AGENTS.md``) and the ``specs/`` canon (``specs-AGENTS.md``) — the same
 # registry regime as the root law and the zone table above. 0.4.7 FR5: these names
 # lived in three homes (the law's hand-typed bullets, ``features/specs/canon.py``'s
 # rows, ``infrastructure/privacy_check.py``'s literal) and the ledger counted seven
@@ -334,7 +332,7 @@ DADAIA_MD_HARNESS_TARGETS: dict[str, str] = {
 #: build output, coverage data. Bare names — the display form (trailing ``/`` for the
 #: directories) is :func:`repo_excluded_display`.
 REPO_TREE_ARTIFACTS: tuple[str, ...] = (
-    # ``.venv`` is here for the RENDERED law line only (DADAIA.md §5.3 lists `.venv/`
+    # ``.venv`` is here for the RENDERED law line only (`repos/<slug>/AGENTS.md` lists `.venv/`
     # and the rendering reads this tuple). It can never produce a finding: the repo-tree
     # walk consults ``_REPO_WALK_PRUNED`` first, which ends the walk at ``.venv``.
     ".venv",
@@ -348,7 +346,7 @@ REPO_TREE_ARTIFACTS: tuple[str, ...] = (
     ".coverage",
 )
 
-#: Everything a repo working tree must NOT carry (DADAIA.md §5.3): the tool artifacts
+#: Everything a repo working tree must NOT carry (`repos/<slug>/AGENTS.md`): the tool artifacts
 #: above plus ``.dadaia`` — a nested workspace control directory, excluded for its own
 #: reason (it corrupts context resolution for every tree-walking tool), which is why a
 #: consumer walking artifacts only (the public-asset walk, which lives UNDER
@@ -500,7 +498,7 @@ SCOPED_LAW_AREAS: tuple[str, ...] = tuple(
 )
 
 
-# Derived views — the rendered law tables (DADAIA.md §5.1, §5.3, §6.2).
+# Derived views — the rendered law tables (the root map, repo-AGENTS.md, specs-AGENTS.md).
 
 
 def root_entries_display() -> str:

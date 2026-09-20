@@ -80,7 +80,7 @@ survey never decides. During that session, keep the domain model current via
 
 ## 6. Boundaries (ADDITIVE)
 
-- Writes a report and/or a handoff only (`DADAIA.md` §5.2).
+- Writes a report and/or a handoff only (the root `AGENTS.md` map §4).
 - A candidate reaches the backlog only through the operator-gated intake.
 
 ## 7. Done when

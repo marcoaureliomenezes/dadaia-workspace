@@ -1,7 +1,7 @@
 # EMISSION-FORMAT — dd-grill-me (report mode only)
 
 Disclosed reference reached only when Step 5 writes the optional HTML report (operator asked for one, or the next handoff target is human).
-Report home: `DADAIA.md` §5.2; the sections below, in this order, are the report.
+Report home: the root `AGENTS.md` map §4; the sections below, in this order, are the report.
 
 | Section | Fill with |
 |---|---|

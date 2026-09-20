@@ -42,7 +42,7 @@ a fuzzy term in the demand becomes a canonical term before it reaches the SPEC.
 4. PLAN names the seams the work will cut — speak `dd-codebase-design`
    (module, seam, deletion test) when declaring what each FR grows or deletes.
 5. SPEC in domain names (`dd-domain-modeling`'s `CONTEXT.md`); only FR, AC and T-
-   numbered; `wc -c SPEC.md TASKS.md` under the `DADAIA.md` §6.7 ceiling before commit
+   numbered; `wc -c SPEC.md TASKS.md` under the `specs/releases/AGENTS.md` size ceiling before commit
    shape 5.
 
 ## 4. TASKS as tracer bullets

@@ -351,7 +351,7 @@ def test_bytecode_cache_ignored_and_baseline_data_loads_with_version_header(
 # handoff 2026-08-17T143407Z-security-reviewer-v0.4.3-definition-push) — SPEC v0.4.3
 # FR12/A12.2. The v5 email-address exclude_regex was anchored on the DOTTED no-reply
 # subdomain only (e.g. the vendor's and GitHub's no-reply subdomains) and never carved
-# out the LOCAL-PART form DADAIA.md mandates in every commit's Co-Authored-By trailer
+# out the LOCAL-PART form the root `AGENTS.md` map mandates in every commit's Co-Authored-By trailer
 # (local part 'noreply' at the vendor's bare apex domain) — a public, non-identifying
 # vendor mailbox already published unmasked in thousands of this repo's own commit
 # trailers. Any NEW tracked blob quoting it in prose (a release SPEC/TASKS document)
@@ -368,7 +368,7 @@ def test_bytecode_cache_ignored_and_baseline_data_loads_with_version_header(
 
 
 def _mandated_noreply_trailer_address() -> str:
-    """The exact law-mandated Co-Authored-By trailer address (DADAIA.md), composed at
+    """The exact law-mandated Co-Authored-By trailer address (the root `AGENTS.md` map), composed at
     runtime so it never appears contiguously in this module's own tracked source."""
     local_part = "no" + "reply"
     domain = "anthropic" + "." + "com"

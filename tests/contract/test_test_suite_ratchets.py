@@ -220,7 +220,7 @@ def test_v31_undeclared_intent_ceiling_per_tier(tmp_path: Path) -> None:
     violations = _v31_violations(counts, _V31_UNDECLARED_CEILINGS)
     assert not violations, (
         "test files without an `Intent:` header grew past the pinned ceiling — an "
-        "undeclared test is SCAFFOLD by default (DADAIA.md §7): declare it or delete it "
+        "undeclared test is SCAFFOLD by default (`dd-code-review`): declare it or delete it "
         f"under a qa-engineer verdict, never raise the ceiling. {violations}"
     )
 

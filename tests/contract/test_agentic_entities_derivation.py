@@ -154,11 +154,11 @@ def test_rule_implementations_target_known_harnesses_and_cover_the_law_projectio
         unknown = set(rule["implementations"]) - harnesses
         assert not unknown, f"rule {rule['id']} derives for unknown harnesses {sorted(unknown)}"
 
-    # The DADAIA.md law projection must be derived for every entry harness.
+    # The root `AGENTS.md` map projection must be derived for every entry harness.
     law_rule = next(r for r in registry["rules"] if r["id"] == "workspace-law")
     assert set(law_rule["implementations"]) == harnesses
     for impl in law_rule["implementations"].values():
-        assert "DADAIA.md" in impl
+        assert "AGENTS.md" in impl
 
     # The one non-law core rule file the installer projects (codex Starlark
     # command policy — public_assets.install) must trace to an abstract rule.

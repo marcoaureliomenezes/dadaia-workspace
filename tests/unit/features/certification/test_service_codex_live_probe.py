@@ -99,7 +99,7 @@ def test_codex_live_probe_fails_on_nonzero_exec_exit(
 # state. This fixture reproduces the stderr shape captured on the reporting machine
 # (`codex login status` -> "Logged in using ChatGPT", no Codex entitlement) — it
 # carries no account identifiers; the operator-local `workdir:` absolute path is
-# redacted (never a tracked-file literal, per DADAIA.md §8) and the `session id:` line
+# redacted (never a tracked-file literal, per `.dadaia/AGENTS.md`) and the `session id:` line
 # is a synthetic placeholder UUID (codex-probe-unit-fixture-carries-real-session-uuid),
 # both inert to the classifier under test (it parses the trailing `ERROR: {...}` JSON
 # payload, not either of these lines).

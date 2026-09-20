@@ -9,7 +9,7 @@ not own; and — in ``hooks/root_whitelist`` — a new workspace-root entry. The
 fourth block and no path class beyond ``ADDITIVE``/``MUTATING``/``PROTECTED``.
 
 The MEMORY class and its phase rule are DELETED, with the gate's ``_RELEASE.json``
-read behind them: the gate reads no SDD artifact (``DADAIA.md`` §3.5), and every gate
+read behind them: the gate reads no SDD artifact (the root `AGENTS.md` map §3), and every gate
 Stall in the bug ledger came from that read resolving an empty phase
 (``sdd-gate-memory-phase-resolves-empty…``, ``minted-feature-branch-without-live-
 release-blocks-every-memory-write``, ``context-bind-implementation-requires-release-id-
@@ -62,7 +62,7 @@ _PROTECTED_MESSAGE = (
     "(SEC-01 / CWE-284).\n"
     f"fix: {DADAIA_BIN} context bind <ctx>"
 )
-#: Projected LAW files. ``DADAIA.md`` is the workspace system prompt and the sole
+#: Projected LAW files. the root `AGENTS.md` map is the workspace system prompt and the sole
 #: always-on rule file the library ships; the ``AGENTS.md``/``CLAUDE.md`` pair is its
 #: scoped/bridge counterpart. In an INSTANTIATED workspace these are human-only: an agent
 #: changes the law by editing ``dadaia_workspace/public/`` and re-projecting, never by

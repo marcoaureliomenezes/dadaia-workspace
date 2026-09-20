@@ -220,7 +220,7 @@ def test_the_law_source_never_restates_a_canonical_set() -> None:
     """No line of the law SOURCE spells out a canonical set: §5.1 (root), §5.3 (repo
     exclusions) and §6.2 (specs canon) carry placeholders ``public stage`` fills from the
     registry, so the projected law cannot drift from ``core``."""
-    law = _PACKAGE / "public" / "data" / "DADAIA.md"
+    law = _PACKAGE / "public" / "data" / "AGENTS.md"
     hits = _restated_law_lines(law.read_text("utf-8"))
     assert not hits, (
         "the law restates a registry set instead of rendering it — replace the lines with "
@@ -232,7 +232,7 @@ def test_staged_law_canon_tables_equal_the_registry(staged_data: Path) -> None:
     """The staged ``specs-AGENTS.md`` canon table IS ``specs_canon_table_rows()``, row for
     row; the staged law's root line and ``repo-AGENTS.md``'s exclusion line ARE the rendered
     registry lists — documented == allowed, wherever the rule now lives."""
-    text = (staged_data / "DADAIA.md").read_text("utf-8")
+    text = (staged_data / "AGENTS.md").read_text("utf-8")
     scoped = staged_data.parent / "templates"
     specs_law = (scoped / "specs-AGENTS.md").read_text("utf-8")
     repo_law = (scoped / "repo-AGENTS.md").read_text("utf-8")
@@ -247,7 +247,7 @@ def test_staged_law_canon_tables_equal_the_registry(staged_data: Path) -> None:
     ]
     assert rendered == expected
 
-    assert f"- Root holds only: `{root_entries_display()}`." in text
+    assert f"- Root holds only: `{root_entries_display()}`" in text
     assert f"- These never appear in the tree: `{repo_excluded_display()}`." in repo_law
     for placeholder in ("<!-- root -->", "<!-- repo-excluded -->", "<!-- specs-canon -->"):
         for rendered in (text, specs_law, repo_law):

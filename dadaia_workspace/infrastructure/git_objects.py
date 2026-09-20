@@ -123,8 +123,7 @@ def _base_exclusions(repo: Path, remote_sha: str) -> list[str]:
     (bug new-branch-push-loses-prior-published-denylist-amnesty).
 
     ``--remotes`` (everything reachable from any locally-known remote-tracking ref)
-    is ALWAYS present — the only honest meaning of "already published" (DADAIA.md
-    §7's range scope). *remote_sha* is added too, but only when it resolves to a
+    is ALWAYS present — the only honest meaning of "already published" (`dd-code-review`'s range scope). *remote_sha* is added too, but only when it resolves to a
     real local commit (:func:`_is_resolvable_commit`) — the caller's claimed prior
     tip of the ref being pushed. In a real git-hook invocation this is normally
     REDUNDANT with ``--remotes`` (the local ``refs/remotes/origin/<branch>`` already

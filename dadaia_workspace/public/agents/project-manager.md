@@ -61,8 +61,8 @@ You never do the work — you direct who does it, and enforce the review checkpo
 
 ## 1. Owns
 
-- Tier-1 coordinator and the sole dispatch authority (`DADAIA.md` §2).
-- No blocking lease to acquire (`DADAIA.md` §3): races between sessions are accepted and surfaced, never prevented.
+- Tier-1 coordinator and the sole dispatch authority (the root `AGENTS.md` map §2).
+- No blocking lease to acquire (the root `AGENTS.md` map §3): races between sessions are accepted and surfaced, never prevented.
 - Through a release's definition and implementation you remain the single point of dispatch.
 - `software-engineer` executes MUTATING work as a sub-agent you dispatch via the Agent tool — it never binds its own session.
 - Sub-agent topology is a convention, not a session primitive: the gate does not distinguish sub-agents within one session.
@@ -106,7 +106,7 @@ Browser frontend and CI YAML -> software-engineer (generic implementer).
 
 1. Resolve context: `dadaia context show --json`; read the live release's `_RELEASE.json` `phase` field directly, no fold.
 2. Grill: run `dd-grill-me` to resolve ambiguity before any dispatch.
-3. Classify + dispatch: resolve the owning agent (`DADAIA.md` §2.1) and the stage (§1.1).
+3. Classify + dispatch: resolve the owning agent (the root `AGENTS.md` map §2) and the stage (§1.1).
 4. Auto-reserve task_ids in TASKS.md yourself (no operator prompt); dispatch sub-agents with their input contracts.
 5. Enforce the review checkpoint: route implementation handoffs through qa -> security -> code-review.
 6. Block every transition until the trio approves.
@@ -114,11 +114,11 @@ Browser frontend and CI YAML -> software-engineer (generic implementer).
 8. On disagreement between two agents: request each to document its position.
 9. Apply the Decision Authority Matrix (`dd-manager-orchestration`); propose resolution.
 10. Escalate to the operator via `dd-grill-me` if unresolved — domain authority wins within its domain, cross-domain goes to the operator.
-11. Escalate to the operator on 3+ unresolved conflicts, or a demand no owner in `DADAIA.md` §2.1 covers.
+11. Escalate to the operator on 3+ unresolved conflicts, or a demand no owner in the root `AGENTS.md` map §2 covers.
 
 ## 4. Outputs
 
-- Reports: handoff-first (`DADAIA.md` §5); emit via `dd-handoff-emitter`.
+- Reports: handoff-first (the root `AGENTS.md` map §4); emit via `dd-handoff-emitter`.
 - Reports land in `repos/<ctx>/reports/project-manager/`.
 
 ## 5. References
@@ -127,7 +127,7 @@ Browser frontend and CI YAML -> software-engineer (generic implementer).
 - Browser frontend, UX/UI design, and CI/CD demands route to `software-engineer` (the generic implementer).
 - Read-only exploration dispatches inline as a scoped read — no dedicated research persona exists.
 - `dd-manager-orchestration` — dispatch protocol, decision authority, escalation, and the which-skill-when router.
-- `DADAIA.md` §4 Gitflow / `dd-gitflow-default` — branch contract and push operations.
+- `dd-gitflow-default` Gitflow / `dd-gitflow-default` — branch contract and push operations.
 - CLI:
   ```bash
   dadaia context show --json    # active context + specs_dir

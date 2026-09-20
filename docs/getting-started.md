@@ -40,7 +40,7 @@ idempotent. It creates:
   empty documents, never overwriting existing data, and
   `.dadaia/states/harness_profile.json` through the profile store's one writer.
 - Unless `--skip-assets`, the staged and installed public assets — the one writer of
-  every hook wiring, and the source of the projected law (`DADAIA.md`, the scoped
+  every hook wiring, and the source of the projected law (the root `AGENTS.md` map, the scoped
   `AGENTS.md` files) and the agent assets of each selected harness. Skipping assets
   leaves the workspace ungated, and the output says so.
 

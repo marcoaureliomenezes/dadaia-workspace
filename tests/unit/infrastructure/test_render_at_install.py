@@ -260,7 +260,7 @@ def test_install_rules_rewrites_a_read_only_projection(tmp_path: Path) -> None:
     A changed read-only projection is made writable, rewritten, and re-pinned."""
     from dadaia_workspace.infrastructure.projection import ProjectionRule, install_rules
 
-    dst = tmp_path / "DADAIA.md"
+    dst = tmp_path / "AGENTS.md"
     dst.write_bytes(b"old")
     dst.chmod(0o444)
     rule = ProjectionRule(

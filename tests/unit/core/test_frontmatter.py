@@ -19,7 +19,7 @@ import pytest
 
 from dadaia_workspace.core.frontmatter import Frontmatter, FrontmatterError, missing_fields, parse
 
-#: The memory-atom 5-field contract (DADAIA.md §6.4).
+#: The memory-atom 5-field contract (`specs/memory/AGENTS.md`).
 _MEMORY_REQUIRED_FIELDS: tuple[str, ...] = (
     "slug",
     "title",

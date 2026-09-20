@@ -145,7 +145,7 @@ class ClosureAuditValidator:
         return issues
 
     def check_audits_naming_canon(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-030 (DADAIA.md §6.8, v6 canon): WARN on any non-conforming
+        """SPEC-DOC-030 (specs/audits/AGENTS.md, v6 canon): WARN on any non-conforming
         ``specs/audits/`` dir.
 
         Forward enforcement of the naming law: every audit directory must be named
@@ -179,7 +179,7 @@ class ClosureAuditValidator:
                     severity=Severity.WARNING,
                     description=(
                         f"Audit dir 'audits/{name}' does not follow the naming law "
-                        "<YYYYMMDD>-<slug> (DADAIA.md §6.8) — rename it (SPEC-DOC-030, "
+                        "<YYYYMMDD>-<slug> (specs/audits/AGENTS.md) — rename it (SPEC-DOC-030, "
                         "WARNING)."
                     ),
                     path=str(child),

@@ -1,7 +1,7 @@
 """Intent: CONTRACT — core.workspace_layout single authority (bug dadaia-reconcile-quarantines-sanctioned-references-clone; 0.4.6 AC1); size: SMALL.
 
 One authority per filesystem-layout invariant (2026-08-06 analysis). The root whitelist
-diverged the day DADAIA.md was added to the hook's copy and not the doctor's; the
+diverged the day the root `AGENTS.md` map was added to the hook's copy and not the doctor's; the
 ``.dadaia/`` layout diverged six times as bare name lists (architect G, 0.4.6). These
 tests pin that every consumer DERIVES from ``core/workspace_layout.py`` — identity where a
 constant is re-exported, equality against the registry view where a consumer derives —

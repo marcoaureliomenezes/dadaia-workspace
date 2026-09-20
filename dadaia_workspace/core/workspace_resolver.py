@@ -114,7 +114,7 @@ def _is_nested_inside_dotdadaia(start: Path) -> bool:
 
     A directory literally nested under a path component named ``.dadaia``
     (e.g. ``<root>/.dadaia/tmp/<agent>/<date>/<nested-ws>/`` — the R7-sanctioned
-    throwaway-workspace pattern, `DADAIA.md` §4) is workspace-INTERNAL scratch
+    throwaway-workspace pattern, `dd-gitflow-default`) is workspace-INTERNAL scratch
     space, never a sub-repo. This is a different shape than a sub-repo directory
     that merely happens to carry its own sibling ``.dadaia/`` (e.g.
     ``repos/<slug>/.dadaia/`` next to ``repos/<slug>/src/``) — that case is

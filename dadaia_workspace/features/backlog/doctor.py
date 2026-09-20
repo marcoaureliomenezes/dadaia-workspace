@@ -88,7 +88,7 @@ _INTENTS_DOCUMENT_ERROR_PREFIXES = ("malformed intents[] frontmatter:",)
 _INTENTS_EXEMPT_STATUS = INTENTS_EXEMPT_STATUS
 
 #: Statuses accepted as valid in BL-SCHEMA (kept permissive; the backlog status vocabulary is
-#: informal — see ``DADAIA.md`` §5, Backlog). ``None``/empty is the only invalid case here.
+#: informal — see the root `AGENTS.md` map §4, Backlog). ``None``/empty is the only invalid case here.
 _KNOWN_STATUSES = frozenset(
     {
         "idea",

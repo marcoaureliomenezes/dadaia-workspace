@@ -123,7 +123,7 @@ class DoctorService:
         """HOOKS-DRIFT-1: an ALIVE repo's installed git hook differs from the shipped one.
 
         The git chokepoints are the ONE mechanical backstop that runs outside every
-        harness hook (``DADAIA.md`` 3.4). An installed copy that has drifted — hand-edited,
+        harness hook (`.dadaia/AGENTS.md`). An installed copy that has drifted — hand-edited,
         never installed, or left behind by an older release — is a chokepoint silently
         enforcing yesterday's contract, and nothing else in the workspace can notice.
         Compared BYTE-WISE against ``public/scripts/``: the installer copies verbatim, so
@@ -330,7 +330,7 @@ class DoctorService:
         return tops
 
     def _scan_repo_trees(self) -> list[Finding]:
-        """The repo-cleanliness walk (DADAIA.md 5.3), one finding per excluded entry.
+        """The repo-cleanliness walk (`repos/<slug>/AGENTS.md`), one finding per excluded entry.
 
         Canonical at a repo top is EVERYTHING not on ``REPO_TREE_EXCLUDED`` (Q5): a repo
         working tree carries source and its own artifacts, and an untracked source entry
@@ -358,7 +358,7 @@ class DoctorService:
                                 self._workspace_root,
                                 entry,
                                 FindingVerdict.SLOP,
-                                "(a repo working tree carries source only — DADAIA.md 5.3)",
+                                "(a repo working tree carries source only — repos/<slug>/AGENTS.md)",
                             )
                         )
                         continue

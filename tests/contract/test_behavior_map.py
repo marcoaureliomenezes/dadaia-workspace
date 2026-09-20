@@ -28,8 +28,7 @@ the old map never covered at all: every **scoped `AGENTS.md`/`*-AGENTS.md` SOURC
 path — see the citation-bug note below), discovered the same structural way the skill
 inventory already is: **glob the generators, never a hand-written roster**
 (`_skills_on_disk`/`_scoped_agents_md_sources` below). `public/data/AGENTS.md` is
-excluded by name — it is, together with `public/data/DADAIA.md`, the LAW SOURCE itself
-(the two files `public/data/*.md` law state so), not a scoped rule.
+excluded by name — it is the LAW SOURCE itself (the root map), not a scoped rule.
 
 Five NEW RED conditions this map's own completeness requires, each with a dedicated
 mutation fixture (A10.2), listed in the name-diff's closing table:
@@ -37,7 +36,7 @@ mutation fixture (A10.2), listed in the name-diff's closing table:
 1. A member (skill or scoped `AGENTS.md` source) on disk has no row.
 2. A row names a member path that does not exist on disk.
 3. The same member maps to more than one row (A10.1's "exactly one" cardinality).
-4. A `DADAIA.md` section has zero owning rows (A10.1's "at least one owner" cardinality
+4. A root-map section has zero owning rows (A10.1's "at least one owner" cardinality
    — the OLD enforcer never checked this direction at all).
 5. A member's real content hash no longer matches its row's recorded `hash_tuple` entry
    (A10.4 — re-recording a hash is a deliberate, reviewed act).
@@ -130,7 +129,7 @@ _PKG_ROOT = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 _PUBLIC = _PKG_ROOT / "public"
 _MAP_PATH = _PUBLIC / "entities" / "behavior-map.json"
 _SCHEMA_PATH = _PUBLIC / "schemas" / "behavior-map-v1.schema.json"
-_LAW_PATH = _PUBLIC / "data" / "DADAIA.md"
+_LAW_PATH = _PUBLIC / "data" / "AGENTS.md"
 _SKILLS_DIR = _PUBLIC / "skills"
 _REPO_ROOT = _PKG_ROOT.parent
 
@@ -153,8 +152,8 @@ _UNIVERSAL_NAMES: frozenset[str] = frozenset({"dd-grill-me"})
 # --------------------------------------------------------------------------- #
 
 _SCOPED_SUBDIRS = ("data", "scaffold", "templates")
-# The law source itself — public/data/*.md carries DADAIA.md + AGENTS.md, the two LAW
-# files, never a "scoped" rule — is the ONE exclusion from an otherwise-structural glob.
+# The law source itself — public/data/AGENTS.md, the root map — is never a "scoped"
+# rule, and is the ONE exclusion from an otherwise-structural glob.
 _LAW_SOURCE_RELPATH = "dadaia_workspace/public/data/AGENTS.md"
 
 
@@ -316,7 +315,7 @@ def _find_members_mapped_to_two_sections(map_data: dict[str, Any]) -> list[str]:
 
 
 def _find_sections_without_an_owner(map_data: dict[str, Any], law_titles: set[str]) -> list[str]:
-    """A10.1's "at least one owner" direction — a `DADAIA.md` section with zero owning
+    """A10.1's "at least one owner" direction — a root-map section with zero owning
     rows. The retired enforcer never checked this direction: its schema had no notion
     of section completeness, only per-row validity."""
     owned = {_section_title(row["section"]) for row in map_data["rows"]}
@@ -351,7 +350,7 @@ def _find_stale_hash_tuples(
             if real_section_hash != row["hash_tuple"]["section"]:
                 violations.append(
                     f"row(skill={row['skill']!r}): section hash stale for {row['section']!r} — "
-                    f"re-read `dadaia_workspace/public/data/DADAIA.md` {row['section']} and "
+                    f"re-read `dadaia_workspace/public/data/AGENTS.md` {row['section']} and "
                     "re-record hash_tuple.section"
                 )
         if row["skill"] is not None:
@@ -551,7 +550,7 @@ def test_no_member_maps_to_two_sections() -> None:
 
 def test_every_law_section_has_an_owner() -> None:
     violations = _find_sections_without_an_owner(_real_map(), _law_section_titles())
-    assert violations == [], f"DADAIA.md section(s) with zero owning rows: {violations}"
+    assert violations == [], f"root-map section(s) with zero owning rows: {violations}"
 
 
 def test_every_hash_tuple_is_current() -> None:
@@ -678,7 +677,7 @@ def test_mutation_fixture_c_member_maps_to_two_sections_turns_red() -> None:
 
 
 def test_mutation_fixture_d_section_without_an_owner_turns_red() -> None:
-    """RED condition 4 (A10.1, the inverse cardinality direction) — a `DADAIA.md`
+    """RED condition 4 (A10.1, the inverse cardinality direction) — a root-map
     section with zero owning rows must be flagged. The retired enforcer never checked
     this direction: its schema had no notion of section completeness. A fabricated
     title is unioned into the law-titles set (never a real section demoted) — the

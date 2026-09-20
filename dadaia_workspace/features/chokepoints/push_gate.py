@@ -49,14 +49,14 @@ __all__ = ["push_gate_decision"]
 INTEGRATION_TIP_REF = "refs/remotes/origin/develop"
 
 #: The law this scan enforces (SPEC v0.9.0 FR5) — quoted verbatim in every refusal.
-_DENYLIST_LAW = "DADAIA.md §7 — private names never enter public/pushed material"
+_DENYLIST_LAW = "dd-release-implementation §2a — private names never enter public/pushed material"
 
 #: FR5/A5.4 — at most this many offending objects are listed before a remainder count.
 _MAX_LISTED_HITS = 10
 
 #: The fix hint every specs-canon refusal line carries (operator, 2026-08-28) — a
 #: canon or verdict violation has exactly one remediation: remove the offending path.
-_SPECS_CANON_FIX_HINT = "delete the path; canon: DADAIA.md §6"
+_SPECS_CANON_FIX_HINT = "delete the path; canon: specs/AGENTS.md"
 
 
 class ObjectSource(Protocol):
@@ -297,7 +297,7 @@ def _compose_specs_canon_refusal(violations: list[tuple[PushRef, str]]) -> str:
     the SAME shape :func:`_compose_denylist_refusal` uses."""
     lines = [
         f"[pre-push] BLOCKED: the pushed range publishes {len(violations)} specs/ "
-        "path(s) violating the v6 canon or the verdict rule (DADAIA.md §6)."
+        "path(s) violating the v6 canon or the verdict rule (specs/AGENTS.md)."
     ]
     shown = violations[:_MAX_LISTED_HITS]
     remainder = len(violations) - len(shown)
@@ -413,7 +413,7 @@ def push_gate_decision(
 
     Policy order, first refusal wins:
 
-    1. **Branch policy** (DADAIA.md §4, :func:`~dadaia_workspace.features.chokepoints.
+    1. **Branch policy** (dd-gitflow-default, :func:`~dadaia_workspace.features.chokepoints.
        branch_policy.check_branch_policy`) — every non-deletion, non-tag ref must be
        ``refs/heads/feature/{M.m.p}``, pushed to the SAME remote name: ``develop`` and
        ``main`` are refused outright (they advance by PR only); names outside the three

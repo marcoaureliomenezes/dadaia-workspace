@@ -38,7 +38,7 @@
 # to its invocation cwd, with no config key to redirect it (mutmut's own
 # configuration.py:107). Running it with cwd = repo root would create `mutants/` and a
 # mutation cache tree inside the repo, violating this workspace's "no caches in the repo
-# tree" law (DADAIA.md §4). This script therefore stages a scoped copy under
+# tree" law (`dd-gitflow-default`). This script therefore stages a scoped copy under
 # `.dadaia/tmp/`, creates a throwaway venv and runs mutmut entirely inside that staged
 # copy, and copies back only the JSON stats. It NEVER writes inside the repo tree.
 #

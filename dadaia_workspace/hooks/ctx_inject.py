@@ -2,7 +2,7 @@
 
 Invoked on SessionStart and UserPromptSubmit. It injects the lean workspace bootstrap
 (context line + TECHSTACK.md + catalog — FR30, T-044-60: the four-point dispatcher
-preflight restatement of ``DADAIA.md`` §1/§2 is deleted; it is law, not state). A
+preflight restatement of the root `AGENTS.md` map §1/§2 is deleted; it is law, not state). A
 session-keyed sentinel
 guards re-injection: subsequent prompts emit nothing UNLESS this session's own bind is
 newer than the sentinel (T-50-03, SPEC v0.5.0 FR1 coupling 1) — bind is the SOLE trigger
@@ -12,7 +12,7 @@ Bind-driven injection state machine (FR-W2-01 / FR-W2-02, v0.1.14; bound_at trig
 T-50-03)
 -----------------------------------------------------------------------------------
 Context NAME resolution (``_resolve_context``) delegates to the single resolution
-authority (``DADAIA.md`` §3, :func:`dadaia_workspace.core.invocation.resolve`): rung 0
+authority (the root `AGENTS.md` map §3, :func:`dadaia_workspace.core.invocation.resolve`): rung 0
 (none here) → ``DADAIA_CONTEXT`` env → this session's own live record (payload or env
 session id) → the repo containing the cwd → ``""``. There is no
 first-ALIVE fallback and — since T-50-03 — the bind-epoch marker subsystem is no longer
@@ -117,7 +117,7 @@ def _session_bound_at(workspace: Path, session_id: str) -> float | None:
 
 
 def _resolve_context(payload: dict[str, object]) -> str:
-    """Resolve the context to inject, in the ``DADAIA.md`` §3 law order (F-03).
+    """Resolve the context to inject, in the root `AGENTS.md` map §3 law order (F-03).
 
     ONE call into the single resolution authority (:mod:`dadaia_workspace.core.invocation`
     — hooks are sanctioned DIRECT importers per the seam contract; the container is
@@ -291,7 +291,7 @@ def _generic_preflight(workspace: Path) -> str:
     Emitted for an unbound session — NEVER any context memory (FR-W2-01). The ALIVE list is
     advisory (names from the registry) so the operator can bind one — it stays because it is
     useful only in this unbound case (FR30, T-044-60: the dispatcher preflight restatement of
-    ``DADAIA.md`` §1/§2 is deleted from every emission path, bound or not).
+    the root `AGENTS.md` map §1/§2 is deleted from every emission path, bound or not).
     """
     sections = ["[no bound context]"]
     alive = invocation.alive_context_slugs(workspace)
@@ -310,7 +310,7 @@ def _generic_preflight(workspace: Path) -> str:
 def _emit_bootstrap(workspace: Path, context: str) -> None:
     """Emit the bound context's bootstrap: the context header + the lean memory prefix.
 
-    FR30 (T-044-60): no dispatcher preflight — it restates ``DADAIA.md`` §1/§2, which the
+    FR30 (T-044-60): no dispatcher preflight — it restates the root `AGENTS.md` map §1/§2, which the
     agent already carries as law, not per-prompt state.
     """
     sections = [f"[{context}]"]

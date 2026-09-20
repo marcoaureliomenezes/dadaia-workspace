@@ -103,7 +103,7 @@ def remove_legacy_workflow_projections(
             legacy_dir.rmdir()
 
 
-#: The nine always-on rule files the library published before ``DADAIA.md``. Their law is
+#: The nine always-on rule files the library published before the root `AGENTS.md` map. Their law is
 #: carried in full by the single system-prompt file; the projections are removed by name.
 #: A blanket prune of the rules directory is NOT correct — it also hosts operator-authored
 #: rules, which this migration does not own.
@@ -140,7 +140,7 @@ def remove_legacy_bind_epoch_state(workspace_root: Path, installed: list[str]) -
 
 
 def remove_retired_core_rules(workspace_root: Path, installed: list[str]) -> None:
-    """Remove the pre-DADAIA.md core rule projections, by name, without touching others.
+    """Remove the pre-the root `AGENTS.md` map core rule projections, by name, without touching others.
 
     Bug ``retired-lib-asset-leaves-orphan-projection``: ``copy_tree`` returns before its
     orphan-prune loop when the source directory no longer exists, so retiring a whole

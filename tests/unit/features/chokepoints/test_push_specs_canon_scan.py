@@ -105,7 +105,7 @@ def test_a_non_canon_path_refuses_naming_the_fix_hint(tmp_path: Path) -> None:
     )
     assert not decision.allowed
     assert "specs/backlog/loose-entry.md" in decision.message
-    assert "delete the path; canon: DADAIA.md §6" in decision.message
+    assert "delete the path; canon: specs/AGENTS.md" in decision.message
 
 
 def test_a_non_canon_path_outside_the_pushed_range_never_blocks(tmp_path: Path) -> None:

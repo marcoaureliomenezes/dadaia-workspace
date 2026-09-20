@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "behavior-map-v1",
   "title": "Behavior Map v1",
-  "description": "D14 — the single declared map from a DADAIA.md section to the member(s) that operationalize it: EVERY core skill under dadaia_workspace/public/skills/*/SKILL.md and EVERY scoped AGENTS.md/*-AGENTS.md source under dadaia_workspace/public/{data,scaffold,templates}/ (never the projected instance path — see the two citation-path bugs cited in the enforcer). Supersedes rules-skills-map-v1 (retired, A10.3): the `skills` array + `justification` topic model is replaced by one row per member — a member (a skill name, or one scoped_agents_md path) maps to EXACTLY ONE row/section; a section MAY be owned by more than one row (A10.1). `anchor` carries T-050-20's future `<!-- behavior: ... -->` comment-anchor id inside the section body; null until that task lands. `hash_tuple` records the content hash of each side at the moment the row was last reviewed (A10.4) — the enforcer recomputes and compares, and a re-recording is a deliberate, reviewed act.",
+  "description": "D14 — the single declared map from a root `AGENTS.md` map section to the member(s) that operationalize it: EVERY core skill under dadaia_workspace/public/skills/*/SKILL.md and EVERY scoped AGENTS.md/*-AGENTS.md source under dadaia_workspace/public/{data,scaffold,templates}/ (never the projected instance path — see the two citation-path bugs cited in the enforcer). Supersedes rules-skills-map-v1 (retired, A10.3): the `skills` array + `justification` topic model is replaced by one row per member — a member (a skill name, or one scoped_agents_md path) maps to EXACTLY ONE row/section; a section MAY be owned by more than one row (A10.1). `anchor` carries T-050-20's future `<!-- behavior: ... -->` comment-anchor id inside the section body; null until that task lands. `hash_tuple` records the content hash of each side at the moment the row was last reviewed (A10.4) — the enforcer recomputes and compares, and a re-recording is a deliberate, reviewed act.",
   "type": "object",
   "required": ["schema_version", "rows"],
   "additionalProperties": false,
@@ -43,7 +43,7 @@
           "type": "string",
           "minLength": 1,
           "pattern": "^§[0-9]+ .+$",
-          "description": "The DADAIA.md section this row's member(s) operationalize, title-anchored: '§N <Section Title>' using the CURRENT numbering (never a bare '§N')."
+          "description": "The root `AGENTS.md` map section this row's member(s) operationalize, title-anchored: '§N <Section Title>' using the CURRENT numbering (never a bare '§N')."
         },
         "anchor": {
           "type": ["string", "null"],

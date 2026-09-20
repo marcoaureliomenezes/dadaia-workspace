@@ -29,7 +29,7 @@ from dadaia_workspace.core.workspace_layout import REPO_TREE_ARTIFACTS
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
 #: Directory names never walked when scanning public assets: the repo-tree artifact
-#: set (DADAIA.md §5.3, one registry — 0.4.7 FR5) plus Python's own bytecode cache.
+#: set (`repos/<slug>/AGENTS.md`, one registry — 0.4.7 FR5) plus Python's own bytecode cache.
 #: Never ``.dadaia`` — the staged assets this walk reads live inside it.
 _PUBLIC_ASSET_IGNORED_DIRS = {"__pycache__", *REPO_TREE_ARTIFACTS}
 _PUBLIC_ASSET_IGNORED_SUFFIXES = {".pyc", ".pyo"}

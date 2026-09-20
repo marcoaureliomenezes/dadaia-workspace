@@ -183,7 +183,7 @@ def _no_canon_violations(paths: Iterable[str]) -> list[str]:
 def push_gate_check() -> None:
     """Pre-push gate: branch-name validation + the range-scoped denylist scan.
 
-    Branch model: `DADAIA.md` §4 (Gitflow) + `dd-gitflow-default` — this docstring
+    Branch model: `dd-gitflow-default` (Gitflow) + `dd-gitflow-default` — this docstring
     states it nowhere else.
 
     Reads the pre-push ref lines from stdin (``<local-ref> <local-sha> <remote-ref>

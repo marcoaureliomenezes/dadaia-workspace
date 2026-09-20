@@ -361,7 +361,7 @@ def test_bound_session_carries_no_dispatcher_preflight_and_no_context_list(
     tmp_path: Path,
 ) -> None:
     """A30.1: a BOUND session's injected prefix restates neither the dispatcher
-    preflight (a restatement of ``DADAIA.md`` §1/§2) nor the ALIVE-context list —
+    preflight (a restatement of the root `AGENTS.md` map §1/§2) nor the ALIVE-context list —
     only the context header and the lean memory prefix (A30.3, untouched) survive."""
     _ws(tmp_path)
     sid = "fr30-bound"

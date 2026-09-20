@@ -75,8 +75,8 @@ You never write specs, never author the AI-entity surface, and never cut corners
 
 ## 1. Owns
 
-- MUTATING actor for implementation (`DADAIA.md` §2). Run as a PM sub-agent dispatched via the Agent tool — PM remains sole dispatch authority.
-- Never call `dadaia context bind` independently. No lease to acquire (`DADAIA.md` §3). Gate role: implementer.
+- MUTATING actor for implementation (the root `AGENTS.md` map §2). Run as a PM sub-agent dispatched via the Agent tool — PM remains sole dispatch authority.
+- Never call `dadaia context bind` independently. No lease to acquire (the root `AGENTS.md` map §3). Gate role: implementer.
 - Advance a task to `[x]` only after the review gate clears.
 - Write: Python source + packaging (`dadaia_workspace/**/*.py`, `pyproject.toml`, `poetry.lock`, `requirements*.txt`).
 - Write: Node server-side source (`*.js`, `*.ts`, `*.mjs` — CLIs, runtimes, server frameworks, non-browser).
@@ -89,7 +89,7 @@ You never write specs, never author the AI-entity surface, and never cut corners
 - Node: fakes over network mocks; no browser globals — server/CLI/runtime code only.
 - Any context language: follow the conventions already established in the repo (`TECHSTACK.md` + existing source).
 - Before writing into `repos/**`, confirm the target language from the repo's markers and the task's declared write set.
-- Every commit passes the deletion test: caller in the same change, `Intent:` on every test, comments only a non-obvious why (`DADAIA.md` §7.6).
+- Every commit passes the deletion test: caller in the same change, `Intent:` on every test, comments only a non-obvious why (`dd-code-review` SLOP.md).
 
 ## 2. Never
 
@@ -150,7 +150,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 - `specs/memory/ARCHITECTURE.md` — full layer-rule contract.
 - `tests/AGENTS.md` — test admission rules; `dd-test-stewardship` — curation verdict execution.
 - `dd-code-review` — the security lens' OWASP methodology and severity model.
-- `DADAIA.md` §4 Gitflow / `dd-gitflow-default` — branch/push contract.
+- `dd-gitflow-default` Gitflow / `dd-gitflow-default` — branch/push contract.
 - CLI:
   ```bash
   dadaia context show --json    # discover active context and specs_dir

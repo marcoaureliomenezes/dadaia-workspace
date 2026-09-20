@@ -34,7 +34,7 @@
 ## 3. What is enforced
 
 - One PreToolUse gate blocks exactly three things: a new workspace-root entry (§4), a `dadaia`/`pip` run outside `.dadaia/.venv/bin/`, a PROTECTED or out-of-scope write.
-- Path classes: ADDITIVE (`specs/{bugs,backlog,audits}/`, `_archive/*_histo.jsonl`, `.dadaia/{handoff,tmp,reaped,mcps,.cache}/`) always writable; PROTECTED (`.dadaia/sessions/`, the projected law files) blocked; everything else MUTATING, scope-judged under `repos/<slug>/`.
+- Path classes: ADDITIVE (the append-only governance areas of `specs/AGENTS.md` and the runtime scratch zones of `.dadaia/AGENTS.md`) always writable; PROTECTED (session state, the projected law files) blocked; everything else MUTATING, scope-judged under `repos/<slug>/`.
 - Every BLOCK carries exactly one `fix: <command>` line; a BLOCK whose fix is itself blocked is a Stall, CRITICAL.
 - Git chokepoints: pre-push allows `feature/{M.m.p}` after local preflight and refuses `develop`/`main`; both PRs need the `security-review` check green. Mechanics: `dd-gitflow-default`, `.dadaia/AGENTS.md`.
 - Races surface, never block; context binding: `dadaia context show --json`, `dadaia context bind <ctx>`.
@@ -86,4 +86,3 @@
 
 - Language: operator preference, default English. Tone: direct, concise, operational.
 - Instance state: `dadaia context show --json`, `dadaia doctor`, `dadaia public doctor`, `dadaia bugs status`.
-- The retired law source still projects until its deletion: @DADAIA.md

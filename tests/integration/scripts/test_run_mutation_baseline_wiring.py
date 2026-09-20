@@ -5,7 +5,7 @@ claim ("once per release, off the push path") once mutmut is selected and pinned
 (qa-engineer verdict, .dadaia/tmp/qa-engineer/20260817/
 v0.4.3-T-043-28-mutation-tool-verdict.md). Because a real invocation spins a throwaway
 venv and installs a package over the network, this suite never runs the script for
-real (dd-test-stewardship / DADAIA.md "Slop-test discipline": "No real venvs built
+real (dd-test-stewardship / the root `AGENTS.md` map "Slop-test discipline": "No real venvs built
 in tests — they exhaust disk"). Instead it proves the three things a gating test CAN
 prove cheaply and deterministically:
 
@@ -58,7 +58,7 @@ _CI_PREFLIGHT_SERVICE = _REPO_ROOT / "dadaia_workspace" / "features" / "ci_prefl
 
 def _repo_porcelain_excluding_additive() -> str:
     """`git status --porcelain`, filtered via the gate's own ``classify_path`` so this
-    test can never drift from the SDD gate's ADDITIVE class (DADAIA.md Sec 3): any live
+    test can never drift from the SDD gate's ADDITIVE class (the root `AGENTS.md` map §3): any live
     session may legitimately write there concurrently under the NO-LOCKS DOCTRINE, and
     the staging step under test never touches them (it writes only into the redirected
     fake workspace)."""

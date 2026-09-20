@@ -87,7 +87,7 @@ def _real_bind(
     process's own env — modeling a REAL harness, where the bind CLI (run through the
     harness's own shell tool) and the hook are both children of the SAME harness process
     and inherit the SAME native session-id env var. This is what lets the bind's session
-    record resolve through the hook's self-keyed leg (rung 2 of ``DADAIA.md`` §3 in
+    record resolve through the hook's self-keyed leg (rung 2 of the root `AGENTS.md` map §3 in
     spirit; the exact mechanism is ``_session_bound_context``, resolved via THIS hook's
     own ``session_id``). ``session_id=None`` inherits the ambient (pytest) env untouched —
     a bind with no matching harness env, minting its own sid.

@@ -127,7 +127,7 @@ def test_public_source_names_no_retired_surface() -> None:
             for needle in _RETIRED_SURFACES:
                 if needle in line:
                     hits.append(f"{rel}:{lineno}: {needle!r}")
-    assert_populated(scanned, "dadaia_workspace/public/data/DADAIA.md")
+    assert_populated(scanned, "dadaia_workspace/public/data/AGENTS.md")
     assert hits == []
 
 
@@ -146,7 +146,7 @@ def test_public_assets_carry_no_portuguese_control_vocabulary() -> None:
         for path in _PUBLIC_ROOT.rglob("*")
         if path.is_file() and path.suffix.lower() in {".md", ".json", ".py", ".txt", ".j2"}
     )
-    assert_populated(files, "dadaia_workspace/public/data/DADAIA.md")
+    assert_populated(files, "dadaia_workspace/public/data/AGENTS.md")
     for rel in files:
         path = _REPO_ROOT / rel
         text = path.read_text(encoding="utf-8", errors="ignore").lower()

@@ -70,7 +70,7 @@ from dadaia_workspace.infrastructure.workspace_guardrail import (
     _agents_md_source,
 )
 
-#: Read-only mode for projected law files (DADAIA.md §8.2) — closes the Bash-redirect
+#: Read-only mode for projected law files (`.dadaia/AGENTS.md`) — closes the Bash-redirect
 #: write path the gate does not parse. A human operator can still chmod and edit.
 _LAW_FILE_MODE = 0o444
 
@@ -191,21 +191,21 @@ def _guardrail_pair_rules(plan: InstallPlan) -> tuple[ProjectionRule, ...]:
 
 
 def _law_projection_rules(plan: InstallPlan) -> tuple[ProjectionRule, ...]:
-    """``DADAIA.md`` — the workspace system prompt — projected read-only.
+    """the root `AGENTS.md` map — the workspace system prompt — projected read-only.
 
     The workspace root always receives it; a harness directory receives it only when
     that harness does not already deliver the law through its own root-import chain
     (Claude Code's does — see :data:`DADAIA_MD_HARNESS_TARGETS`) AND is in scope.
     """
-    src = plan.agentic_dir / "data" / "DADAIA.md"
+    src = plan.agentic_dir / "data" / "the root `AGENTS.md` map"
     if not src.is_file():
         return ()
     content = src.read_bytes()
     rules = [
         _bytes_rule(
-            "law:DADAIA.md",
+            "law:the root `AGENTS.md` map",
             "agents",
-            plan.workspace_root / "DADAIA.md",
+            plan.workspace_root / "the root `AGENTS.md` map",
             content,
             mode=_LAW_FILE_MODE,
         )

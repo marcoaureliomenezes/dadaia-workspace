@@ -54,7 +54,7 @@
     },
     {
       "id": "git-chokepoints",
-      "mandate": "Harness-independent: pre-push allows only feature/{M.m.p} pushes with a green CI preflight and refuses develop/main direct pushes; the security APPROVED verdict is a CI PR gate keyed to the PR head sha, not a pre-push check (branch contract: DADAIA.md §4 Gitflow).",
+      "mandate": "Harness-independent: pre-push allows only feature/{M.m.p} pushes with a green CI preflight and refuses develop/main direct pushes; the security APPROVED verdict is a CI PR gate keyed to the PR head sha, not a pre-push check (branch contract: `dd-gitflow-default`).",
       "implementations": {
         "claude": ".dadaia git hook (pre-push-ci-gate.sh) — identical for every harness",
         "codex": "same git hooks (harness-independent)",
@@ -65,11 +65,11 @@
   "rules": [
     {
       "id": "workspace-law",
-      "mandate": "DADAIA.md — the one always-on law file (the workspace system prompt), projected read-only per harness; human-only in an instantiated workspace.",
+      "mandate": "AGENTS.md — the root map, the one always-on law file, projected read-only; scoped AGENTS.md files are the system of record per area; human-only in an instantiated workspace.",
       "implementations": {
-        "claude": "CLAUDE.md -> @AGENTS.md -> @DADAIA.md (root import chain)",
-        "codex": ".codex/DADAIA.md",
-        "kimi-code": ".kimi-code/DADAIA.md"
+        "claude": "AGENTS.md (native root discovery)",
+        "codex": "AGENTS.md (native root->cwd chain)",
+        "kimi-code": "AGENTS.md (native root->cwd chain)"
       }
     },
     {

@@ -64,7 +64,7 @@ def _resolve_specs_dir(specs_dir: str | None) -> Path:
     """Resolve the target specs/ directory.
 
     Priority: explicit ``--specs-dir``, else the single resolution authority
-    (``DADAIA.md`` §3: ``DADAIA_CONTEXT`` → own live session record → repo-of-cwd).
+    (the root `AGENTS.md` map §3: ``DADAIA_CONTEXT`` → own live session record → repo-of-cwd).
     """
     return resolve_specs_dir_for_cli(specs_dir)
 

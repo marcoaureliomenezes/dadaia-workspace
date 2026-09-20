@@ -34,7 +34,7 @@ def test_sdd_gate_artifacts_visible_and_noncanonical_content_stays_gitignored() 
         "specs/releases/v9.9.9/GRILL.md",
         "specs/releases/v9.9.9/OQ-DECISIONS.md",
         # Each alpha-N closes with a qa-engineer review COMMITTED to the branch
-        # (DADAIA.md §5); bug gitignore-alpha-qa-review-untrackable: the blanket
+        # (the root `AGENTS.md` map §4); bug gitignore-alpha-qa-review-untrackable: the blanket
         # /specs/releases/*/* ignore had no negation for it, so the law was
         # silently undefeatable without git add -f (v0.5.0's ALPHA-1-QA.md was
         # force-added exactly that way).
@@ -117,7 +117,7 @@ def test_sdd_gate_artifacts_visible_and_noncanonical_content_stays_gitignored() 
         # carried to specs/releases/** ONLY — every other newly-opened canon area
         # (audits/, ADRs/, bugs/_archive/, backlog/_archive/, root _archive/) had
         # neither local-notes.md nor tmp/ denied, so an agent writing scratch
-        # material there (a shape DADAIA.md §5 makes natural) had it staged by
+        # material there (a shape the root `AGENTS.md` map §4 makes natural) had it staged by
         # default.
         "specs/audits/20991231T235959Z/local-notes.md",
         "specs/audits/20991231T235959Z/tmp/debug.json",

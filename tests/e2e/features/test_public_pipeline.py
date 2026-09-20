@@ -129,11 +129,11 @@ class TestStage:
 
         agentic = workspace / ".dadaia" / "agentic"
         # ``rules`` is NOT staged: the nine core rules were consolidated into the single
-        # always-on law file (``data/DADAIA.md``), so the family no longer exists as a
+        # always-on law file (``data/AGENTS.md``), so the family no longer exists as a
         # core asset dir. Plugin-pack rules stage under ``plugins/<pack>/rules/``.
         for subdir in ("agents", "skills", "scripts", "data"):
             assert (agentic / subdir).is_dir(), f".dadaia/agentic/{subdir}/ not created by stage"
-        assert (agentic / "data" / "DADAIA.md").is_file(), "the workspace law file is not staged"
+        assert (agentic / "data" / "AGENTS.md").is_file(), "the workspace map is not staged"
 
         manifest_path = agentic / "manifest.json"
         assert manifest_path.exists(), "manifest.json not created"
@@ -415,8 +415,8 @@ class TestPerProfileInit:
         """AC-8 claude-only: `.claude/` (agents/skills) + ctx-inject hook; NO .codex/ NO .kimi-code/.
 
         FR31/T-044-59 (bug dadaia-md-projected-twice-into-claude-code-context): Claude
-        Code's own root-import chain (CLAUDE.md -> @AGENTS.md -> @DADAIA.md) already
-        resolves the law, so `.claude/rules/DADAIA.md` was the only thing that ever
+        Code's own native root `AGENTS.md` discovery already
+        resolves the law, so `.claude/rules/AGENTS.md` was the only thing that ever
         landed under `.claude/rules/` and its projection was retired — the directory is
         now never created for a claude profile at all.
         """

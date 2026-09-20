@@ -507,7 +507,7 @@ class StructuralValidator:
             code="TREE-8",
             severity=Severity.ERROR,
             description=(
-                f"specs/{rel} is not part of the v6 canon (DADAIA.md §6) — either a "
+                f"specs/{rel} is not part of the v6 canon (specs/AGENTS.md) — either a "
                 "stray root entry (not one of backlog/, bugs/, memory/, releases/, "
                 "audits/, ADRs/, constitution.md, AGENTS.md) or a file nested inside "
                 "a canon area whose shape does not match that area's canon (a "

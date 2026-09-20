@@ -474,10 +474,9 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     assert stage_agent_lines and all(r.startswith("[ok]") for r in stage_agent_lines), (
         stage_agent_lines
     )
-    # The nine core rules were consolidated into the single always-on law file, so the
-    # law-surface doctor lines are ``law:*`` (every projected copy byte-compared), not
-    # ``claude:rules/*``.
-    law_lines = [r for r in reports if r.split(" ", 1)[-1].startswith("law:")]
+    # The law is one projected file, the root map: its doctor line is ``root:AGENTS.md``
+    # (byte-compared), never a ``claude:rules/*`` per-rule line.
+    law_lines = [r for r in reports if r.split(" ", 1)[-1].startswith("root:AGENTS.md")]
     assert law_lines and all(r.startswith("[ok]") for r in law_lines), law_lines[:5]
 
     target = doctor_ws / ".claude" / "agents" / "software-engineer.md"

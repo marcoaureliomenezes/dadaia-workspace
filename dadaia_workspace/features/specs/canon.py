@@ -94,7 +94,7 @@ from dadaia_workspace.features.specs.memory_canon import (
 
 #: The canon rows live in ``core.workspace_layout`` (0.4.7 FR5: ONE registry of
 #: canonical names, shared with the root law, the zone table and the projected
-#: ``DADAIA.md`` §6.2 table). This module is their renderer and checker.
+#: ``specs/AGENTS.md`` canon table). This module is their renderer and checker.
 CANON: tuple[CanonEntry, ...] = SPECS_CANON
 
 __all__ = [
@@ -262,7 +262,7 @@ def check_tree(specs_dir: Path) -> list[Violation]:
             p.relative_to(specs_dir).as_posix() for p in sorted(specs_dir.rglob("*")) if p.is_file()
         ]
         violations.extend(
-            Violation(path, "not part of the v6 canon (DADAIA.md §6)")
+            Violation(path, "not part of the v6 canon (specs/AGENTS.md)")
             for path in canon_violations(paths)
         )
     for entry in CANON:

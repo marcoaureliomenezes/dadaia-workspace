@@ -118,7 +118,7 @@ def _write(path: Path) -> dict[str, Any]:
 _GATE_BLOCKS: tuple[tuple[str, str], ...] = (
     ("root-whitelist", "junk.txt"),
     ("protected-sessions", ".dadaia/sessions/some-session.json"),
-    ("protected-law", "DADAIA.md"),
+    ("protected-law", "AGENTS.md"),
 )
 
 

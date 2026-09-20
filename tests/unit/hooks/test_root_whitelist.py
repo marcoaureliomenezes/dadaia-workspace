@@ -66,7 +66,7 @@ def test_block_message_lists_every_whitelisted_entry(tmp_path: Path) -> None:
 def test_law_declared_root_files_are_canon_for_the_hook_and_the_doctor(
     tmp_path: Path, name: str
 ) -> None:
-    """Bug doctor-root1-flags-env-that-dadaia-md-9-declares-canonical: ``DADAIA.md`` §9
+    """Bug doctor-root1-flags-env-that-dadaia-md-9-declares-canonical: the root `AGENTS.md` map §4
     names the root ``.env`` as the one credential home and §5.3 presumes a root
     ``.gitignore``, yet ``ROOT_ALLOWED_FILES`` listed neither — the hook blocked the write
     and the doctor flagged the file. Both derive from that one set, so one row fixes both."""

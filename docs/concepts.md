@@ -2,7 +2,7 @@
 
 Seven terms, one paragraph each. The canonical sense of every term used across this
 repository is defined once in [`CONTEXT.md`](../CONTEXT.md); the law that binds them
-is `dadaia_workspace/public/data/DADAIA.md`, and the walkthrough is
+is `dadaia_workspace/public/data/AGENTS.md`, and the walkthrough is
 [getting started](getting-started.md).
 
 ## Context

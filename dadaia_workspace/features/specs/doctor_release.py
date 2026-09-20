@@ -291,7 +291,7 @@ class ReleaseValidator:
         return [m.group(1).lower() for m in _TASK_MARKER_RE.finditer(text)]
 
     def check_no_memory_task(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-047: memory is closure procedure, never a task. DADAIA.md §6.4 lets
+        """SPEC-DOC-047: memory is closure procedure, never a task. ``specs/memory/AGENTS.md`` lets
         ``specs/memory/**`` be written only in DEFINITION/CLOSURE (the gate's RULE A
         reads no SDD artifact), and §6.7 orders memory update -> closure narrative ->
         gate AFTER the last task; SPEC-DOC-024 refuses CLOSURE with an open task. A
@@ -319,7 +319,7 @@ class ReleaseValidator:
                     description=(
                         f"TASKS.md of release '{active.release}' schedules memory as a "
                         f"task ({task_line[:80]}): its write set names specs/memory. "
-                        "Memory update is closure procedure (RC-FLOW step 5, DADAIA.md "
+                        "Memory update is closure procedure (RC-FLOW step 5, "
                         "§6.7) run in CLOSURE after the last task — drop the task and "
                         "keep the memory work in the closure steps."
                     ),

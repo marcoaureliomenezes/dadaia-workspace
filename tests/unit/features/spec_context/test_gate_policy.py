@@ -263,7 +263,6 @@ def test_existing_nonmanifest_repo_agents_md_edit_is_allowed(tmp_path: Path) -> 
 # never a floor path; A1.1/A1.2 above pin it MUTATING.
 _LAW_ASSET_TARGETS: dict[str, tuple[str, ...]] = {
     "data/AGENTS.md": ("AGENTS.md",),
-    "data/DADAIA.md": ("DADAIA.md", ".codex/DADAIA.md", ".kimi-code/DADAIA.md"),
     "kimi-code/AGENTS.md": (".kimi-code/AGENTS.md",),
 }
 
@@ -276,7 +275,6 @@ _FIXTURE_MANIFEST: dict[str, object] = {
     "assets": [
         {"path": "agents/software-engineer.md", "sha256": "a" * 64, "type": "agents"},
         {"path": "data/AGENTS.md", "sha256": "b" * 64, "type": "data"},
-        {"path": "data/DADAIA.md", "sha256": "c" * 64, "type": "data"},
         {"path": "kimi-code/AGENTS.md", "sha256": "d" * 64, "type": "kimi-code"},
         {"path": "templates/repo-AGENTS.md", "sha256": "e" * 64, "type": "templates"},
     ],
@@ -329,11 +327,8 @@ def test_manifest_removal_never_demotes_a_statically_floored_law_path(tmp_path: 
     floor_paths = (
         "AGENTS.md",
         "CLAUDE.md",
-        "DADAIA.md",
         ".codex/AGENTS.md",
-        ".codex/DADAIA.md",
         ".kimi-code/AGENTS.md",
-        ".kimi-code/DADAIA.md",
         ".agents/AGENTS.md",
         ".claude/rules/AGENTS.md",
     )

@@ -1,7 +1,7 @@
 """v0.4.4 T-044-06 (FR3): the v2 branch contract — feature/{M.m.p} is pushable, develop
 and main are PR-only.
 
-The gitflow law (DADAIA.md §4, operator ruling 2026-08-23, SPEC v0.4.4 FR3): exactly
+The gitflow law (`dd-gitflow-default`, operator ruling 2026-08-23, SPEC v0.4.4 FR3): exactly
 three branch patterns exist — ``main``, ``develop``, ``feature/M.m.p`` (no ``v``, no
 suffix, no ``hotfix`` row — G2 retires it outright) — and ``feature/M.m.p`` is the ONLY
 pushable one. ``develop`` and ``main`` never take a direct push; both advance by PR only

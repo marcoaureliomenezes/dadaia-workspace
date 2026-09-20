@@ -244,7 +244,7 @@ def test_refusal_message_shape_and_ten_item_cap(tmp_path: Path) -> None:
     assert "file0.md:1" in message
     assert "z…m" in message  # masked form of the synthetic term.
     assert "operator denylist" in message
-    assert "DADAIA.md §7" in message
+    assert "dd-release-implementation §2a" in message
     assert "--amend" in message or "rebase" in message
     assert "already-published history never needs a rewrite" in message
     assert "2 more" in message or "and 2" in message  # 12 hits, 10 shown, 2 remainder.
@@ -281,7 +281,7 @@ def test_generator_denylist_terms_still_refuses_not_silently_emptied(tmp_path: P
     """Uses a TAG ref (scanned but never branch-policy-gated) so the only possible
     refusal source is the denylist scan itself — isolating this from the branch-policy
     refusal a ``refs/heads/develop`` push would now trigger outright (develop is never
-    pushable under v2; DADAIA.md §4)."""
+    pushable under v2; `dd-gitflow-default`)."""
     source = _FakeObjectSource(
         by_range={(_SHA_A, _ZERO): [_obj("leak.md", f"contains {_SYNTHETIC_TERM} here\n")]}
     )

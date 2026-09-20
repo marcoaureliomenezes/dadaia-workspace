@@ -33,7 +33,7 @@ def test_rule_corpus_check_speaks_on_empty_universe(tmp_path: Path) -> None:
     """Zero codex artifacts (no .codex/agents) ⇒ the check STILL yields a line.
 
     This is the exact silence that buried the check when the last by-name rule
-    citation was consolidated into DADAIA.md.
+    citation was consolidated into the root `AGENTS.md` map.
     """
     lines = attest("rule-corpus", check_codex_rule_corpus_reachable(tmp_path))
     assert lines, "an attesting check must never contribute zero lines"

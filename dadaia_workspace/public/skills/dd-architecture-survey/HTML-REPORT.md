@@ -7,7 +7,7 @@ report. Split any report over 30 KB behind an `index.html` (`.dadaia/handoff/AGE
 
 ## Scaffold
 
-One HTML file in the repo's reports home (`DADAIA.md` §5.2), everything inline:
+One HTML file in the repo's reports home (the root `AGENTS.md` map §4), everything inline:
 
 ```html
 <!doctype html>

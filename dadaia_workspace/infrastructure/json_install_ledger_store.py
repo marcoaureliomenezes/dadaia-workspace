@@ -7,7 +7,7 @@ idempotent no-op on identical bytes). Persists to
 ``.dadaia/states/install_ledger.json``:
 
     {"schema_version": "1",
-     "entries": [{"relpath": ".claude/rules/DADAIA.md", "sha256": "…", "family": "law"}]}
+     "entries": [{"relpath": ".codex/AGENTS.md", "sha256": "…", "family": "law"}]}
 
 A malformed/unreadable ledger reads as ``None`` — reconciliation then runs bootstrap
 semantics (record everything, prune nothing): a corrupt record must degrade to inaction,
