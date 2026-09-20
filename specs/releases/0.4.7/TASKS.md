@@ -73,7 +73,7 @@
   `test_context_map.py`, landed here as a failing assertion over the skill corpus.
   Write set: `public/skills/*/SKILL.md`, `public/entities/behavior-map.json`, `tests/**`.
 
-- [-] T-047-54 — FR2b: `public/data/CONTEXT-MAP.md` (a library document, projected nowhere) —
+- [x] T-047-54 — FR2b: `public/data/CONTEXT-MAP.md` (a library document, projected nowhere) —
   one row per surface (root map, each scoped `AGENTS.md`, each skill, each persona): purpose,
   what belongs there, byte ceiling, measured bytes at closure, per-harness load trigger; plus
   the 10-harness compatibility table from the 2026-09-20 research. New
