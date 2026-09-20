@@ -8,7 +8,7 @@
 
 ## Candidate 6 — universal context core
 
-- [ ] T-047-58 — FR4: English control vocabulary. `core/spec_status.py` tokens become
+- [-] T-047-58 — FR4: English control vocabulary. `core/spec_status.py` tokens become
   `Approved` / `In review` / `Draft` (`APPROVED_LINE`, `_TOKEN_SPELLINGS`, `CANONICAL_STATUS`
   — one authority, no compatibility branch); SPEC-DOC rules and `doctor_release` accept only
   them; the unconditional repair lane in `features/migrate/upgrade.py` rewrites the
