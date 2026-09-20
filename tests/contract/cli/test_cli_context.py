@@ -5,6 +5,7 @@ Public CLI contracts for `dadaia context`.
 
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -642,12 +643,17 @@ def test_bind_with_no_live_release_exits_zero_and_the_next_write_is_allowed(
 def test_context_create_help_names_main_repo_and_associated_repos(workspace: Path) -> None:
     """Intent: CONTRACT — AC5.1. The option surface names the paradigm's parts; the
     retired `--repo`/`--associated` spellings are gone, with no alias and no shim."""
-    result = _runner.invoke(app, ["context", "create", "--help"])
+    result = _runner.invoke(
+        app, ["context", "create", "--help"], env={"TERMINAL_WIDTH": "200", "NO_COLOR": "1"}
+    )
     assert result.exit_code == 0, result.output
-    assert "--main-repo" in result.output
-    assert "--associated-repos" in result.output
-    assert "--repo " not in result.output
-    assert "--associated " not in result.output
+    # Rich styles the option token inline on a colour-forcing runner (CI): assert on the
+    # plain text, never on the escaped stream.
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+    assert "--main-repo" in plain
+    assert "--associated-repos" in plain
+    assert "--repo " not in plain
+    assert "--associated " not in plain
 
 
 def test_context_show_and_list_json_emit_main_repo_key(workspace: Path) -> None:
