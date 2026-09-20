@@ -29,43 +29,23 @@ pytestmark = pytest.mark.contract
 _runner = CliRunner()
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SECTIONS = ("workspace", "specs", "ledgers")
-_COMPLIANCE_RE = re.compile(r"^compliance\((\w+)\): (\d+)/(\d+) (\w+) canonical \((\d+)%\)$")
 
 
 def _run(*args: str) -> Any:
     return _runner.invoke(app, ["doctor", *args])
 
 
-def test_the_real_tree_reports_three_sections_and_a_total() -> None:
-    """(a) the instance's own specs/ tree: three section scores, one total, and the
-    total is the sum of the three numerators and denominators."""
+def test_every_human_line_is_a_finding_or_its_fix() -> None:
+    """Every stdout line is `<CODE> <verdict> <message>` or a `fix: <command>` line —
+    no score line, no header, nothing else."""
     result = _run("--specs-dir", str(_REPO_ROOT / "specs"), "--source-root", str(_REPO_ROOT))
-
-    scores = {
-        m.group(1): (int(m.group(2)), int(m.group(3)), m.group(4))
-        for line in result.stdout.splitlines()
-        if (m := _COMPLIANCE_RE.match(line.strip()))
-    }
-    assert set(scores) == {*_SECTIONS, "total"}, result.stdout
-    assert [scores[s][2] for s in _SECTIONS] == ["entries", "rules", "records"]
-    assert scores["total"][0] == sum(scores[s][0] for s in _SECTIONS)
-    assert scores["total"][1] == sum(scores[s][1] for s in _SECTIONS)
-    assert scores["total"][2] == "checks"
+    for line in result.stdout.splitlines():
+        if not line.strip():
+            continue
+        assert line.startswith("fix: ") or re.match(r"^[A-Za-z][A-Za-z0-9-]+ [a-z]+ ", line), line
 
 
-def test_sections_render_in_order_with_one_line_per_finding() -> None:
-    """Section headers appear in workspace -> specs -> ledgers order and every finding
-    line is `<CODE> <verdict> <message>`."""
-    result = _run("--specs-dir", str(_REPO_ROOT / "specs"), "--source-root", str(_REPO_ROOT))
-    order = [
-        m.group(1)
-        for line in result.stdout.splitlines()
-        if (m := _COMPLIANCE_RE.match(line.strip()))
-    ]
-    assert order == [*_SECTIONS, "total"]
-
-
-def test_json_carries_every_section_and_the_total() -> None:
+def test_json_carries_every_section() -> None:
     result = _run(
         "--specs-dir", str(_REPO_ROOT / "specs"), "--source-root", str(_REPO_ROOT), "--json"
     )
@@ -73,10 +53,9 @@ def test_json_carries_every_section_and_the_total() -> None:
     assert set(payload["sections"]) == set(_SECTIONS)
     for name in _SECTIONS:
         section = payload["sections"][name]
-        assert set(section["compliance"]) == {"canonical", "total", "percent"}
         for finding in section["findings"]:
             assert set(finding) >= {"code", "verdict", "message"}
-    assert set(payload["compliance"]) == {"canonical", "total", "percent"}
+    assert "compliance" not in payload
     assert "fixed" in payload
 
 
@@ -106,7 +85,7 @@ def test_pre_wave0_release_document_makes_the_specs_section_non_compliant(
     tmp_path: Path,
 ) -> None:
     """(b) the invalid archived document every doctor was silent about is a
-    RELEASE-TREE-* error: the `specs` section scores < 100 % and the run exits 1."""
+    RELEASE-TREE-* error and the run exits 1."""
     specs = tmp_path / "specs"
     archived = specs / "releases" / "_archive" / "0.4.6"
     archived.mkdir(parents=True)
@@ -120,7 +99,6 @@ def test_pre_wave0_release_document_makes_the_specs_section_non_compliant(
 
     codes = [f["code"] for f in specs_section["findings"]]
     assert any(c.startswith("RELEASE-TREE-") for c in codes), codes
-    assert specs_section["compliance"]["percent"] < 100
     assert result.exit_code == 1
 
 

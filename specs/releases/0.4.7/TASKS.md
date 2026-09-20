@@ -65,7 +65,7 @@
   `public/agents/**`, `public/entities/**`, `public/skills/**`, `public/data/DADAIA.md` (§2),
   `public/scaffold/AGENTS.md`, `core/agent_model_templates.py`, `infrastructure/
   install_helpers.py`, `infrastructure/codex_*.py`, `public/runtime/codex/**`, `tests/**`.
-- [ ] T-047-48 — FR4: scores out of `cli/commands/doctor.py`, `core/doctor_rules.py`,
+- [x] T-047-48 — FR4: scores out of `cli/commands/doctor.py`, `core/doctor_rules.py`,
   `core/models/doctor_report.py`, `--json`; `ADR-SUPERSEDED-CITATION` error rule; DADAIA §8.5
   score sentence deleted. Write set: `cli/commands/doctor.py`, `core/doctor_rules.py`,
   `core/models/doctor_report.py`, `features/specs/doctor_memory.py`, `public/data/DADAIA.md`

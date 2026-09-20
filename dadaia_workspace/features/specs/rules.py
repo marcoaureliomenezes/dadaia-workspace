@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 
 from dadaia_workspace.core.doctor_rules import Rule
 from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
+from dadaia_workspace.features.specs import doctor_adr
 from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
 from dadaia_workspace.features.specs.release_tree import release_tree_issues
 
@@ -153,6 +154,11 @@ RULES: tuple[SpecsRule, ...] = (
         ("MEM-DRIFT-1",),
         lambda d: d._memory.check_mem_drift1_features_package_map(),
         fix_help="sed -i 's|<stale package line>|<package on disk>|' specs/memory/ARCHITECTURE.md",
+    ),
+    _rule(
+        ("ADR-SUPERSEDED-CITATION",),
+        lambda d: doctor_adr.superseded_adr_citations(d.specs_dir, d.public_dir),
+        fix_help="sed -i 's|ADR: <superseded id>|ADR: <successor id>|' <citing file>",
     ),
     _rule(
         ("MEM-DRIFT-2",),

@@ -177,6 +177,8 @@ _UNEXERCISED: dict[str, str] = {
     "TREE-8": "auto-fixed rule (`fix_tree8`), covered by the structural doctor unit tests",
     "CAT-1": "the fix is `memory catalog generate`, exercised by the catalog CLI suite",
     "LINT-1": "the fix inserts one missing frontmatter field; which field is per-atom",
+    "ADR-SUPERSEDED-CITATION": "no auto-fix by design (the successor is a judgment); covered "
+    "by tests/unit/features/specs/test_doctor_adr_citations.py",
     "MEM-DRIFT-1": "the fix rewrites one ARCHITECTURE.md package line against the real "
     "package tree, which a tmp specs tree has none of",
     "MEM-DRIFT-2": "the fix rewrites one dead citation inside one memory atom against "

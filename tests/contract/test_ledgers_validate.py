@@ -209,7 +209,6 @@ def test_the_doctor_ledgers_section_carries_the_schema_findings(tmp_path: Path) 
     codes = {finding["code"] for finding in section["findings"]}
 
     assert set(_EXPECTED_CODES) <= codes, sorted(codes)
-    assert section["compliance"]["percent"] < 100
     assert result.exit_code == 1
 
 

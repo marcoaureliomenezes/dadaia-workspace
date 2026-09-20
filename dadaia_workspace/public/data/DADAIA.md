@@ -313,7 +313,7 @@
 ### 8.5 Instance compliance
 
 - `dadaia doctor` is the one scan and reaper — sections `workspace`, `specs`, `ledgers`; `--fix`, `--specs-dir`, `--context`, `--public-dir`, `--json`; exit 1 on any error-class finding.
-- One finding per line, `<CODE> <verdict> <message>`; codes `WS-<zone>-<verdict>`, `SPEC-DOC-*`, `TREE-*`, `RELEASE-TREE-*`, `BL-SCHEMA|CONFLICT|STALE`, `LEDGER-<NAME>-SCHEMA`; scored `compliance(<section>): N/M <unit> canonical (P%)` plus `compliance(total)`.
+- One finding per line, `<CODE> <verdict> <message>`; codes `WS-<zone>-<verdict>`, `SPEC-DOC-*`, `TREE-*`, `RELEASE-TREE-*`, `BL-SCHEMA|CONFLICT|STALE`, `LEDGER-<NAME>-SCHEMA`, `ADR-SUPERSEDED-CITATION`; no score line — findings and the exit code are the whole report.
 - `ledgers` schema-validates every committed governance record: `decisions.jsonl`, `BACKLOG.json`, `BUGS.jsonl`, `FINDINGS.jsonl`, every `_RELEASE.json`, the three `_histo.jsonl`.
 - `.dadaia/` zones and the `states/` canon are one registry (`core/workspace_layout.DADAIA_ZONES`), rendered into `.dadaia/AGENTS.md` at `public stage`; outside manifest, registry and exceptions (§5.1) = slop.
 - The workspace section scans the root, the harness dirs, the `.dadaia/` zones and the top of every ALIVE registered repo — plus, at any depth in a repo, an excluded name or a nested `.dadaia/`.

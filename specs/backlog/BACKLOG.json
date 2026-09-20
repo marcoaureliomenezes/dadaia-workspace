@@ -198,23 +198,6 @@
       ]
     },
     {
-      "id": "doctor-drop-scores",
-      "title": "Doctor without scores: keep the rules, run in CI, fail on dead references and superseded decisions",
-      "opened": "2026-09-18",
-      "status": "picked",
-      "description": "Value scale class 13: nobody in the community asks for a compliance percentage; they ask 'fail my CI when a rule points at a superseded decision'. Operator verdict: remove the compliance(<section>) N/M (P%) and compliance(total) lines and the canonical-count scoring machinery; a doctor run is a list of findings and an exit code, nothing else. Keep every rule. Add the two checks the community names: a memory atom, rule or skill citing an ADR that is superseded, and a citation of a path or symbol that no longer exists, both errors. Wire the doctor as a CI job on every push. Coordinates with sdd-verbs-to-skill-scripts (the ledgers section delegates to skill scripts' check).",
-      "provenance": "operator verdict 2026-09-18 on the competitive report's value scale",
-      "intents": [
-        {
-          "subject": {
-            "kind": "cli",
-            "ref": "doctor"
-          },
-          "change": "change — output is findings + exit code; the compliance score lines, per-section canonical counts and total_compliance are deleted; two new error rules: superseded-ADR citation and dead path/symbol citation; a CI job runs it"
-        }
-      ]
-    },
-    {
       "id": "spec-context-foundation-hardening",
       "title": "Spec Context Project is the heart: audit its bug history, rename to main-repo/associated-repos, harden the paradigm",
       "opened": "2026-09-18",

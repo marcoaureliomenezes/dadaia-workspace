@@ -3,7 +3,7 @@
 Three sections in fixed order — ``workspace`` (zones, root, harness dirs), ``specs``
 (the SPEC-DOC + RELEASE-TREE rules), ``ledgers`` (BL-SCHEMA/CONFLICT/STALE) — collected
 from one rule registry (:mod:`dadaia_workspace.core.doctor_rules`), rendered by one
-grammar, scored by one formula, exited by one rule. ``dadaia specs doctor`` and
+grammar, exited by one rule. ``dadaia specs doctor`` and
 ``dadaia backlog doctor`` are DELETED, not aliased: three commands with three finding
 types, three renderings and three exit rules were the structural cause of a doctor bug
 family in which each doctor could independently report health over a tree the other two
@@ -38,8 +38,6 @@ from dadaia_workspace.core.doctor_rules import (
     merge_sections,
     render_finding,
     run_section,
-    total_compliance,
-    total_line,
 )
 from dadaia_workspace.core.exceptions import SchemaVersionError, WorkspaceNotInitializedError
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
@@ -106,10 +104,9 @@ def _workspace_section(service: DoctorService | None, *, expired_only: bool) -> 
     is the identity and no mapping table exists anywhere. No instance around the run
     (CI over a bare checkout), nothing to walk: an empty section, never a refusal."""
     if service is None:
-        return _empty_section("workspace", "entries")
+        return _empty_section("workspace")
     return run_section(
         "workspace",
-        "entries",
         workspace_rules(expired_only=expired_only),
         service,
         lambda _rule, finding: finding,
@@ -119,8 +116,7 @@ def _workspace_section(service: DoctorService | None, *, expired_only: bool) -> 
 def _specs_render(
     rule: Rule[SpecsDoctor, SpecsDoctorIssue], issue: SpecsDoctorIssue
 ) -> SectionFinding:
-    """The compliance unit of the `specs` section is the RULE: a rule that emitted no
-    error or warning is canonical, whatever the size of the tree it walked."""
+    """Render one specs-doctor issue as a section finding."""
     location = f" ({issue.path})" if issue.path else ""
     return SectionFinding(
         code=issue.code,
@@ -128,25 +124,22 @@ def _specs_render(
         message=f"{issue.description}{location}",
         canonical=False,
         error=issue.severity is Severity.ERROR,
-        unit=rule.codes[0],
     )
 
 
-def _empty_section(name: str, unit: str) -> SectionReport:
-    """A section with nothing to read: no findings, no units, nothing to fail."""
-    return SectionReport(name=name, unit=unit, findings=(), canonical=0, total=0)
+def _empty_section(name: str) -> SectionReport:
+    """A section with nothing to read: no findings, nothing to fail."""
+    return SectionReport(name=name, findings=())
 
 
 def _specs_section(doctor: SpecsDoctor | None) -> SectionReport:
     if doctor is None:
-        return _empty_section("specs", "rules")
+        return _empty_section("specs")
     return run_section(
         "specs",
-        "rules",
         SPECS_RULES,
         doctor,
         _specs_render,
-        total_units=len(SPECS_RULES),
     )
 
 
@@ -154,9 +147,7 @@ def _ledgers_render(
     _rule: Rule[backlog_doctor.DoctorContext, backlog_doctor.Finding],
     finding: backlog_doctor.Finding,
 ) -> SectionFinding:
-    """The compliance unit of the `ledgers` section is the RECORD (a backlog item). A
-    document-level error carries no record: it disqualifies nothing and still fails the
-    run."""
+    """Render one backlog finding as a section finding."""
     slug = f" [{finding.slug}]" if finding.slug else ""
     return SectionFinding(
         code=finding.code.value,
@@ -164,7 +155,6 @@ def _ledgers_render(
         message=f"{slug.strip()} {finding.message}".strip(),
         canonical=False,
         error=finding.severity is backlog_doctor.Severity.ERROR,
-        unit=finding.slug,
     )
 
 
@@ -172,12 +162,7 @@ def _ledger_schema_render(
     _rule: Rule[specs_ledgers.LedgersContext, specs_ledgers.LedgerIssue],
     issue: specs_ledgers.LedgerIssue,
 ) -> SectionFinding:
-    """The compliance unit of a schema-validated ledger is the RECORD, located
-    `path:line` — the same unit the backlog rules score, so the two rule groups add
-    into one score line.
-
-    A warning-class issue scores NOTHING (``unit=None``).
-    """
+    """Render one ledger issue as a section finding, located `path:line`."""
     error = issue.verdict == Severity.ERROR.value
     return SectionFinding(
         code=issue.code,
@@ -185,7 +170,6 @@ def _ledger_schema_render(
         message=f"{issue.unit} {issue.message}",
         canonical=False,
         error=error,
-        unit=issue.unit if error else None,
     )
 
 
@@ -203,7 +187,7 @@ def _ledgers_section(
     from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
     if specs_dir is None:
-        return _empty_section("ledgers", "records")
+        return _empty_section("ledgers")
 
     src, catalog_path, alias_map_path = resolve_backlog_roots(specs_dir, source_root, alias_map)
     context = backlog_doctor.build_context(
@@ -228,19 +212,15 @@ def _ledgers_section(
         [
             run_section(
                 "ledgers",
-                "records",
                 backlog_doctor.RULES,
                 context,
                 _ledgers_render,
-                total_units=len(context.items),
             ),
             run_section(
                 "ledgers",
-                "records",
                 specs_ledgers.RULES,
                 ledgers_context,
                 _ledger_schema_render,
-                total_units=ledgers_context.total_records,
             ),
         ]
     )
@@ -364,7 +344,7 @@ def doctor(
         ),
     ),
     json_out: bool = typer.Option(
-        False, "--json", help="Machine-readable output: sections, compliance, fixed."
+        False, "--json", help="Machine-readable output: sections and fixed."
     ),
     quiet: bool = typer.Option(
         False, "--quiet", help="Print only what --fix deleted (nothing on a compliant run)."
@@ -489,11 +469,9 @@ def _json_payload(
                         }
                         for f in report.printable
                     ],
-                    "compliance": _compliance(report),
                 }
                 for report in reports
             },
-            "compliance": _compliance(total_compliance(reports)),
             "fixed": [render(action) for action in fixed],
         },
         indent=2,
@@ -504,18 +482,11 @@ def _emit_human(
     reports: list[SectionReport], fixed: list[str], render: Callable[[str], str], *, fix: bool
 ) -> None:
     """One line per finding — `<CODE> <verdict> <message>`, each finding's OWN verdict
-    word — then that section's score, then the run's total."""
+    word; nothing else."""
     for report in reports:
         for finding in report.printable:
             typer.echo(render(render_finding(finding)))
-        typer.echo(report.score_line())
     if fix:
         typer.echo(f"\nApplied {len(fixed)} repair(s):")
         for action in fixed:
             typer.echo(f"  - {render(action)}")
-    typer.echo(total_line(reports))
-
-
-def _compliance(report: SectionReport) -> dict[str, int]:
-    """One score, rendered once — sections and the total alike."""
-    return {"canonical": report.canonical, "total": report.total, "percent": report.percent}

@@ -785,7 +785,6 @@ def workspace_rules(
                 message=f"{finding.path}  {finding.detail}",
                 canonical=finding.canonical and finding.scored,
                 error=finding.verdict in ERROR_VERDICTS,
-                unit=finding.path if finding.scored else None,
             )
             for finding in findings
         ]
