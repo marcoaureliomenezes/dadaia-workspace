@@ -181,7 +181,9 @@ def _install_link(rule: ProjectionRule, *, force: bool) -> list[TranscriptLine]:
     rule.dst.parent.mkdir(parents=True, exist_ok=True)
     _clear(rule.dst)
     try:
-        os.symlink(target, rule.dst, target_is_directory=rule.link_to.is_dir())
+        # The canonical target is POSIX-spelled (ledger, doctor); the OS gets its native
+        # separators only here — Windows cannot resolve a reparse target written with "/".
+        os.symlink(target.replace("/", os.sep), rule.dst, target_is_directory=rule.link_to.is_dir())
     except (OSError, NotImplementedError):
         return [
             TranscriptLine("ok", path, "copy") for path in _copy_verified(rule.link_to, rule.dst)
