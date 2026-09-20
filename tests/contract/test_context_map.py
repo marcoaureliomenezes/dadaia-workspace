@@ -273,3 +273,34 @@ def test_context_map_is_projected_nowhere() -> None:
         "CONTEXT-MAP.md is a library document — it is staged with `data/` and installed "
         "nowhere; a projection rule naming it is the bug."
     )
+
+
+def _norm_statement(line: str) -> str:
+    return re.sub(r"\s+", " ", line.strip().lstrip("-*#|> ")).rstrip(".").lower()
+
+
+def test_no_statement_lives_in_two_shipped_homes() -> None:
+    """AC1.2 (0.4.7 c6): a rule lives in one home — no normalised bullet statement of
+    60+ chars appears in two shipped rule files or skills (the root map, every scoped
+    AGENTS.md source, every skill Markdown, the fixed sections). A statement is a bullet;
+    numbered procedure steps (two skills may open the same scoped law) and prose headers
+    are not statements."""
+    shipped = [
+        *sorted(_PUBLIC.glob("skills/**/*.md")),
+        *sorted(_PUBLIC.glob("scaffold/**/AGENTS.md")),
+        *sorted(_PUBLIC.glob("templates/*-AGENTS.md")),
+        *sorted(_PUBLIC.glob("data/*.md")),
+        *sorted(_PUBLIC.glob("data/fixed/*.md")),
+    ]
+    homes: dict[str, set[str]] = {}
+    for path in shipped:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.lstrip().startswith("- "):
+                continue
+            key = _norm_statement(line)
+            if len(key) >= 60:
+                homes.setdefault(key, set()).add(path.relative_to(_PUBLIC).as_posix())
+    duplicated = {k: sorted(v) for k, v in homes.items() if len(v) > 1}
+    assert duplicated == {}, "a statement lives in two homes:\n" + "\n".join(
+        f"  {v} :: {k[:90]}" for k, v in duplicated.items()
+    )
