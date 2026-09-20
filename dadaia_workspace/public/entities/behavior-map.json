@@ -151,7 +151,7 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:28ecf5fe9aee7120a68ee5c0227efd9e985751b1835d7b1f4be0448a29b435d1",
-        "skill": "sha256:b02a995419b501ffbe92dbbf22e239e009bafb1172d5a3d3222ddc9e1acb0eb3",
+        "skill": "sha256:28d59f807366564a3104de48cd466220e5e86f7db6d4bed9eb9b1f4b62ffa789",
         "scoped": []
       },
       "recorded_by": "ai-engineer",
@@ -168,7 +168,7 @@
         "section": "sha256:28ecf5fe9aee7120a68ee5c0227efd9e985751b1835d7b1f4be0448a29b435d1",
         "skill": "sha256:79fd806eff4d56feb65521e57fc051577d7222864a96db25839303ece158f49e",
         "scoped": [
-          "sha256:a0fa490e815a25d5a775748abc6287b87aa3f12e4f70a361feebe3096d4606f6"
+          "sha256:36e1c5eff25a9b2a8ad97cf55f2289a794829d74070906adb75f0e678b311af9"
         ]
       },
       "recorded_by": "ai-engineer",
@@ -344,23 +344,6 @@
         "skill": null,
         "scoped": [
           "sha256:d5e683071361f9e9029e4beb6f924b9f227cf82722df54a6fd5f40f86d4c8e82"
-        ]
-      },
-      "recorded_by": "ai-engineer",
-      "recorded_at": "2026-09-13"
-    },
-    {
-      "section": "§6 Specs, tasks and memory",
-      "anchor": "releases",
-      "skill": null,
-      "scoped_agents_md": [
-        "dadaia_workspace/public/scaffold/releases/_ideas/AGENTS.md"
-      ],
-      "hash_tuple": {
-        "section": "sha256:28ecf5fe9aee7120a68ee5c0227efd9e985751b1835d7b1f4be0448a29b435d1",
-        "skill": null,
-        "scoped": [
-          "sha256:2693aba75a576d810bd903fcaa9801cada133918310fca0c157d2deaa3c344bc"
         ]
       },
       "recorded_by": "ai-engineer",

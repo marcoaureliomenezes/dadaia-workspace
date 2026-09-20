@@ -177,11 +177,7 @@ def test_release_dir_without_state_document_is_refused(tmp_path: Path) -> None:
     assert issues[0].path == "releases/9.9.9"
 
 
-def test_ideas_and_histo_are_not_release_dirs(tmp_path: Path) -> None:
-    (tmp_path / "releases" / "_ideas" / "some-draft").mkdir(parents=True)
-    (tmp_path / "releases" / "_ideas" / "some-draft" / "SPEC.md").write_text(
-        "x\n", encoding="utf-8"
-    )
+def test_the_histo_file_is_not_a_release_dir(tmp_path: Path) -> None:
     archive = tmp_path / "releases" / "_archive"
     archive.mkdir(parents=True)
     (archive / "releases_histo.jsonl").write_text("", encoding="utf-8")

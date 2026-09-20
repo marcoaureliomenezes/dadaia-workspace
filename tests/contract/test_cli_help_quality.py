@@ -33,12 +33,12 @@ def _leaves() -> list[tuple[str, object]]:
 _RATCHET = 30
 
 
-def test_deleted_reaper_verbs_are_gone_and_reports_keeps_validate_and_doctor() -> None:
+def test_deleted_reaper_verbs_are_gone_and_reports_keeps_validate() -> None:
     """Intent: CONTRACT — 0.4.6 AC4 (FR4).
 
     `dadaia doctor --fix` is the one reaper: `dadaia --help` lists no `clean`/`tmp`
     group, no `academy` group (FR10, T-046-28), and `dadaia reports --help` lists
-    exactly `validate` and `doctor`.
+    exactly `validate`.
     """
     from typer.main import get_command
 
@@ -50,7 +50,7 @@ def test_deleted_reaper_verbs_are_gone_and_reports_keeps_validate_and_doctor() -
     assert "tmp" not in groups
     assert "academy" not in groups
     reports = dict(getattr(groups["reports"], "commands", {}) or {})
-    assert set(reports) == {"validate", "doctor"}
+    assert set(reports) == {"validate"}
 
 
 def test_one_line_help_leaf_count_only_ratchets_down() -> None:

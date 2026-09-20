@@ -59,10 +59,11 @@ def upgrade(
             to_version=goal,
             dry_run=True,
             no_op=not placeholder_planned,
-            placeholder_removed=placeholder_planned,
+            placeholder_removed=placeholder_planned + plan_empty_ideas_dir(specs_dir),
         )
 
     removed = remove_placeholder_atoms(specs_dir)
+    removed.extend(remove_empty_ideas_dir(specs_dir))
     return UpgradeResult(
         from_version=current,
         to_version=goal,
@@ -70,3 +71,22 @@ def upgrade(
         no_op=not removed,
         placeholder_removed=removed,
     )
+
+
+def plan_empty_ideas_dir(specs_dir: Path) -> list[Path]:
+    """``specs/releases/_ideas/`` left the canon (0.4.7 c5, ADR 0019): a live tree whose
+    ``_ideas/`` holds nothing but the scaffolded ``AGENTS.md`` is repaired losslessly."""
+    ideas = specs_dir / "releases" / "_ideas"
+    if not ideas.is_dir():
+        return []
+    entries = [p.name for p in ideas.iterdir()]
+    return [ideas] if entries in ([], ["AGENTS.md"]) else []
+
+
+def remove_empty_ideas_dir(specs_dir: Path) -> list[Path]:
+    planned = plan_empty_ideas_dir(specs_dir)
+    for ideas in planned:
+        for child in ideas.iterdir():
+            child.unlink()
+        ideas.rmdir()
+    return planned

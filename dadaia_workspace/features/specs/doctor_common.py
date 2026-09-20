@@ -51,8 +51,7 @@ def resolve_live_release_id(specs_dir: Path) -> tuple[str | None, str | None]:
     RELEASE.jsonl fold; v0.5.0 FR4/T-050-21A, A4.1).
 
     The live release is the ONE directory directly under ``specs_dir/releases/`` —
-    excluding ``_archive`` and ``_ideas`` (A4.6: a Draft under ``_ideas/`` carries no
-    ``RELEASE.json`` by canon, D10) — that carries a ``RELEASE.json`` file
+    excluding ``_archive`` — that carries a ``RELEASE.json`` file
     (T-050-11 back-fills it the moment a release reaches DEFINITION). This directory
     scan is the sole replacement for ``ACTIVE.md``'s ``release:`` field; no file
     stands in its place.
@@ -70,7 +69,7 @@ def resolve_live_release_id(specs_dir: Path) -> tuple[str | None, str | None]:
     candidates = sorted(
         d.name
         for d in releases_root.iterdir()
-        if d.is_dir() and d.name not in ("_archive", "_ideas") and release_state_file(d) is not None
+        if d.is_dir() and d.name != "_archive" and release_state_file(d) is not None
     )
     if not candidates:
         return None, None

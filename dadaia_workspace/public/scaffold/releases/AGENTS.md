@@ -18,7 +18,6 @@ Scope: this file governs only `specs/releases/`.
 
 - `AGENTS.md` — this file.
 - `<release-id>/{SPEC.md, PLAN.md, TASKS.md, _RELEASE.json, rc-N/}` — the live release; `rc-N/{SPEC,PLAN,TASKS}.md` are archived candidates.
-- `_ideas/<release-id>/` — pre-approval drafts; own scoped rule, `_ideas/AGENTS.md`.
 - `_archive/<release-id>/` — the whole archived release directory, moved there by `dadaia release archive`.
 - `_archive/` holds published versions only (ADR 0014): a candidate closed between two publications is `rc-N/` of the version that published it. `dadaia release fold <id> --into <published> [--shipped <sha> --pr <n> --shipped-ts <ts>] [--final]` is the one path that repairs a wrongly archived release; `RELEASE-TREE-ARCHIVE-ID` / `RELEASE-TREE-ARCHIVE-UNSHIPPED` refuse the shape.
 - `_archive/releases_histo.jsonl` — one summary record appended per archived release.
@@ -37,12 +36,11 @@ Scope: this file governs only `specs/releases/`.
 - The active release's phase is its `phase` field — read directly, no fold, no event-stream replay.
 - Who sets which milestone, and the exact shape per field: `dd-release-implementation`'s `RELEASE-EVENTS.md`.
 - No dual-write, no mirror file.
-- The SDD gate resolves the active release directly: the ONE non-archived, non-`_ideas` directory with a `_RELEASE.json`.
+- The SDD gate resolves the active release directly: the ONE non-archived directory with a `_RELEASE.json`.
 - No such directory: no active release — honest absence, no placeholder file.
 
-## 4. `_ideas/` and `_archive/`
+## 4. `_archive/`
 
-- `_ideas/<release-id>/` holds a pre-approval Draft; stays MUTATING, never an evidence root, carries no `_RELEASE.json`.
 - Archiving (at deploy) is `dadaia release archive`: it validates, sets `shipped` + ARCHIVED, moves the whole directory (final trio at root, `rc-N/` folders, `_RELEASE.json`, verdicts) into `_archive/<release-id>/`, appends the histo record, births the next release and runs `bugs archive` — all-or-nothing.
 - Every archived directory's `_RELEASE.json` carries `phase: ARCHIVED`.
 - One `_archive/releases_histo.jsonl` record (`histo-record-v1`, `disposition: delivered`) is appended per archived release; the verb prints the git `next:` lines and never runs git.

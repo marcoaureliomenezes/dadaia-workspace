@@ -89,9 +89,8 @@ other two run; only a run with nothing to read refuses and points at `dadaia ini
 
 Every finding prints as one `<CODE> <verdict> <message>` line, and every error-class
 rule carries a mandatory `fix: <command>` under each of its findings — so an exit-1
-run never stalls the flow. Each section ends in
-`compliance(<section>): N/M <unit> canonical (P%)`, the run in
-`compliance(total): …`. `--json` mirrors the whole run; `--fix` is the reaper — it
+run never stalls the flow. There is no score line: the findings and the exit code are
+the report. `--json` mirrors the whole run; `--fix` is the reaper — it
 MOVES slop to `.dadaia/reaped/<YYYYMMDD>/` under a 7-day hold and deletes only what
 its own TTL expired.
 

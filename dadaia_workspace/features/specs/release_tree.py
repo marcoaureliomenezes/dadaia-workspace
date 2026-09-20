@@ -69,7 +69,7 @@ class ReleaseTreeIssue:
 
 def _release_dirs(releases_root: Path) -> list[tuple[Path, bool]]:
     """Every release directory as ``(dir, archived)``: the SemVer-named directories
-    directly under ``releases/`` (``_ideas``, ``_archive``, ``AGENTS.md`` and the
+    directly under ``releases/`` (``_archive``, ``AGENTS.md`` and the
     candidate ``rc-N/`` archives excluded by the name rule) and every directory under
     ``releases/_archive/`` (the histo file is not a directory)."""
     out: list[tuple[Path, bool]] = []

@@ -24,8 +24,6 @@ _CANON_PATHS: tuple[str, ...] = (
     "memory/product/catalog.json",
     "memory/product/sdd/specs-doctor.md",
     "releases/AGENTS.md",
-    "releases/_ideas/AGENTS.md",
-    "releases/_ideas/0.6.0/SPEC.md",
     "releases/_archive/releases_histo.jsonl",
     "releases/_archive/0.4.0/SPEC.md",
     "releases/_archive/0.4.0/nested/anything.txt",

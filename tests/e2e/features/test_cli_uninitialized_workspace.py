@@ -22,7 +22,6 @@ import pytest
 _VERBS = [
     ["doctor"],
     ["public", "doctor"],
-    ["reports", "doctor"],
 ]
 
 

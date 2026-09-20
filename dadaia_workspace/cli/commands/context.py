@@ -31,7 +31,6 @@ from dadaia_workspace.core.exceptions import (
     ContextStateError,
     GitSyncError,
     InvalidContextNameError,
-    RepoCatalogError,
     SchemaVersionError,
     WorkspaceNotInitializedError,
 )
@@ -218,22 +217,7 @@ def create(
         for slug, _, assoc_url in (raw.partition("=") for raw in associated)
     )
 
-    workspace_root = resolve_workspace_root()
-    # An explicit --url overrides the catalog lookup (FR-W2-03 a / T-011-08); otherwise
-    # look up repo_url from the repos catalog, failing gracefully if unavailable.
-    repo_url = ""
-    if url is not None:
-        repo_url = url
-    else:
-        try:
-            repos_svc = container.build_repos_service()
-            rows = repos_svc.list_known(workspace_root)
-            for row in rows:
-                if row.get("Repo Name") == repo:
-                    repo_url = row.get("Repo URL", "")
-                    break
-        except (RepoCatalogError, Exception):
-            pass
+    repo_url = url or ""
 
     try:
         ctx = _ctx_service().create(name, repo, repo_url, associated_repos=associated_repos)

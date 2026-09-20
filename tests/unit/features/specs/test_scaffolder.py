@@ -23,7 +23,7 @@ _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 # new ADRs/ root member. Every scaffold README.md retires into its area's AGENTS.md
 # (backlog/, bugs/, releases/, audits/, ADRs/ now each carry one, matching root and
 # memory/). A directory is kept by its AGENTS.md: the .gitkeep landing-zone mechanism
-# for releases/_ideas/, releases/_archive/ and the backlog/audits/bugs per-artifact
+# for releases/_archive/ and the backlog/audits/bugs per-artifact
 # _archive/ dirs is retired — none of those is pre-created by a fresh scaffold; each
 # lands on disk the moment its first real artifact is written into it.
 _EXPECTED_FILES = [
@@ -42,7 +42,6 @@ _EXPECTED_FILES = [
     "audits/AGENTS.md",
     "ADRs/AGENTS.md",
     "ADRs/decisions.jsonl",
-    "releases/_ideas/AGENTS.md",
     "releases/_archive/releases_histo.jsonl",
     "backlog/_archive/backlog_histo.jsonl",
     "bugs/_archive/bugs_histo.jsonl",

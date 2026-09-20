@@ -344,30 +344,9 @@
       "title": "CLI verbs cited by no skill, agent or law die or become skill scripts",
       "opened": "2026-09-20",
       "status": "picked",
-      "description": "Audit 2026-09-20 of the 55 verbs in dadaia help tree against public/skills, public/agents and public/data: 22 are cited by nothing. Die in the demolition: repos list with openpyxl and repos.xlsx, public list, reports doctor (server *, ci pre-commit-check, context heartbeat, context release and ci verdict-check die with their own entries). Become skill scripts in the scripts candidate: bugs defer, bugs reject, bugs supersede, memory catalog generate, memory product add. Stay as internals cited by dd-cli-library: specs init, specs upgrade, context create, baseline, update, repo, delete. Rule from ADR 0018: the CLI is audited at every candidate and a new verb enters only when an old one leaves.",
+      "description": "Audit 2026-09-20 of the 55 verbs in dadaia help tree against public/skills, public/agents and public/data: 22 are cited by nothing. Died in candidate 5 (T-047-49): repos list with openpyxl and repos.xlsx, public list, reports doctor (server *, ci pre-commit-check, context heartbeat, context release and ci verdict-check die with their own entries). Become skill scripts in the scripts candidate: bugs defer, bugs reject, bugs supersede, memory catalog generate, memory product add. Stay as internals cited by dd-cli-library: specs init, specs upgrade, context create, baseline, update, repo, delete. Rule from ADR 0018: the CLI is audited at every candidate and a new verb enters only when an old one leaves.",
       "provenance": "operator grill ruling 2026-09-20 (dd-grill-me rounds 1..3 over the 17 entries; ADRs 0016..0021) — Q32, ADR 0016/0018",
       "intents": [
-        {
-          "subject": {
-            "kind": "cli",
-            "ref": "repos list"
-          },
-          "change": "retire — with the openpyxl dependency and public/data/repos.xlsx"
-        },
-        {
-          "subject": {
-            "kind": "cli",
-            "ref": "public list"
-          },
-          "change": "retire — uncited; public doctor reports the asset set"
-        },
-        {
-          "subject": {
-            "kind": "cli",
-            "ref": "reports doctor"
-          },
-          "change": "retire — uncited; reports validate stays"
-        },
         {
           "subject": {
             "kind": "cli",

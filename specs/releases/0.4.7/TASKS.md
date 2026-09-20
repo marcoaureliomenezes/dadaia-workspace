@@ -70,7 +70,7 @@
   score sentence deleted. Write set: `cli/commands/doctor.py`, `core/doctor_rules.py`,
   `core/models/doctor_report.py`, `features/specs/doctor_memory.py`, `public/data/DADAIA.md`
   (§8.5), `docs/**`, `tests/**`.
-- [ ] T-047-49 — FR7: `_ideas/` out of canon, release tree, workspace layout, doctor_common,
+- [x] T-047-49 — FR7: `_ideas/` out of canon, release tree, workspace layout, doctor_common,
   release_state, specs_version, behavior map, shipped hashes, scaffold, `dd-release-definition`,
   5 tests; `specs upgrade` repair lane removes an empty live `_ideas/`; delete `repos list` (+
   `features/repos/`, `excel_reader.py`, `repos.xlsx`, `openpyxl`), `public list`, `reports

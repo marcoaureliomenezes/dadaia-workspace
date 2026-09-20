@@ -60,7 +60,7 @@ _DOCTOR_CEILING = 8
 # "stamp v6 or refuse" rule) — same-commit justification per this test's own error
 # message; the SCAFFOLD's 0.6.0 expiry (A7) is unaffected, this is a same-generation
 # re-pin, not a renewal.
-_UPGRADE_MODULE_SHA256 = "33b2683bb705bbc41cb7b25aa630c3e4dfbc1dd36d08734a7ea8ee9529fe3919"
+_UPGRADE_MODULE_SHA256 = "73530efa93f56b0e2a8e7aabddd486681cd69f1418e9a61af5a99d293d3ec8ad"
 
 
 def _complexity_by_name(path: Path) -> dict[str, int]:
@@ -89,6 +89,7 @@ def test_upgrade_and_doctor_complexity_stay_at_or_below_baseline() -> None:
 def test_migrate_upgrade_module_is_untouched_by_fr1() -> None:
     """A1.4: `features/migrate/upgrade.py` stays byte-identical under T-050-05 — the
     rename automation this module carries is explicitly cut from FR1's scope.
+    Re-pinned at 0.4.7 c5 T-047-49: the module gained the `_ideas/` removal lane.
 
     Intent: SCAFFOLD — T-050-05 — expires: 0.6.0 (S1 FR23 firing amendment A7)."""
     digest = hashlib.sha256(_UPGRADE_MODULE.read_bytes()).hexdigest()

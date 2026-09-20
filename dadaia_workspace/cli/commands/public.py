@@ -1,12 +1,10 @@
 """dadaia public subcommands."""
 
-import json
 from pathlib import Path
 from typing import Annotated, Literal
 
 import typer
 from rich.console import Console
-from rich.table import Table
 
 from dadaia_workspace import container
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
@@ -129,31 +127,6 @@ def install(
     from dadaia_workspace.cli.help_digest import write_digest
 
     write_digest(workspace_root)
-
-
-@app.command(name="list")
-def list_assets(
-    format: str = typer.Option("table", "--format", help="Output format: table or json"),
-) -> None:
-    """List all public assets grouped by category."""
-    if format not in ("table", "json"):
-        typer.echo("Error: --format must be 'table' or 'json'.", err=True)
-        raise typer.Exit(1)
-
-    svc = container.build_public_service()
-    assets = svc.list_all()
-
-    if format == "json":
-        typer.echo(json.dumps(assets, indent=2))
-        return
-
-    table = Table(title="Public Assets")
-    table.add_column("Type", style="bold cyan")
-    table.add_column("Count", justify="right")
-    table.add_column("Names")
-    for category, names in assets.items():
-        table.add_row(category, str(len(names)), "  ".join(names))
-    console.print(table)
 
 
 @app.command()

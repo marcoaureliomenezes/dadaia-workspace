@@ -442,9 +442,7 @@ SPECS_CANON: tuple[CanonEntry, ...] = (
     CanonEntry("memory/product/catalog.json", "memory", True),
     CanonEntry("memory/product/<area>/<slug>.md", "memory"),
     CanonEntry("releases/AGENTS.md", "releases", True),
-    CanonEntry("releases/_ideas/AGENTS.md", "releases", True),
     CanonEntry("releases/_archive/releases_histo.jsonl", "releases", True),
-    CanonEntry("releases/_ideas/<M.m.p>/SPEC.md", "releases"),
     CanonEntry("releases/_archive/<M.m.p>/**", "releases"),
     CanonEntry("releases/<M.m.p>/_RELEASE.json", "releases"),
     # Legacy state-file name (pre-0.4.6) — admitted ONLY as the rename-lane input:

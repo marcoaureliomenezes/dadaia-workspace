@@ -19,11 +19,9 @@ from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternL
 from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.import_.service import ImportService
 from dadaia_workspace.features.public.service import PublicAssetService
-from dadaia_workspace.features.repos.service import ReposService
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.features.spec_context.service import SpecContextService
 from dadaia_workspace.features.workspace.service import WorkspaceService
-from dadaia_workspace.infrastructure.excel_reader import OpenpyxlExcelReader
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
@@ -106,10 +104,6 @@ def build_public_service() -> PublicAssetService:
         public_assets=FileSystemPublicAssetManager(),
         agent_policy_loader=lambda root: JsonAgentModelPolicyStore(root).load(),
     )
-
-
-def build_repos_service() -> ReposService:
-    return ReposService(excel_reader=OpenpyxlExcelReader())
 
 
 def build_git_object_reader() -> GitSubprocessObjectReader:

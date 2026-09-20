@@ -1,11 +1,10 @@
-"""Intent: CONTRACT — dadaia public list / install --only (DADAIA §8.1 reprojection)
+"""Intent: CONTRACT — dadaia public install --only (DADAIA §8.1 reprojection)
 
 Contract tests for dadaia public CLI commands.
 """
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -47,30 +46,6 @@ def _patch_workspace(tmp_path: Path):
 
 
 class TestListCommand:
-    def test_list_table_json_and_invalid_format(
-        self, runner: CliRunner, mock_svc: MagicMock, tmp_path: Path
-    ) -> None:
-        with _patch_svc(mock_svc), _patch_workspace(tmp_path):
-            table_result = runner.invoke(app, ["list"])
-        assert table_result.exit_code == 0
-        assert "agents" in table_result.output
-        assert "skills" in table_result.output
-        assert "rules" in table_result.output
-
-        with _patch_svc(mock_svc), _patch_workspace(tmp_path):
-            json_result = runner.invoke(app, ["list", "--format", "json"])
-        assert json_result.exit_code == 0
-        data = json.loads(json_result.output)
-        assert "agents" in data
-        assert "code-reviewer.md" in data["agents"]
-        assert "skills" in data
-
-        with _patch_svc(mock_svc), _patch_workspace(tmp_path):
-            invalid_result = runner.invoke(app, ["list", "--format", "csv"])
-        assert invalid_result.exit_code != 0
-
-
-class TestInstallOnlyFlag:
     def test_install_only_flag_pass_invalid_and_none(
         self, runner: CliRunner, mock_svc: MagicMock, tmp_path: Path
     ) -> None:

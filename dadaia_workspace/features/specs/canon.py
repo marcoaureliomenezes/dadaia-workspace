@@ -39,8 +39,7 @@ The canon (operator, 2026-08-28) — the ONLY members permitted under ``specs/``
 
     AGENTS.md constitution.md memory/ releases/ backlog/ bugs/ audits/ ADRs/
 
-    releases/{AGENTS.md, _ideas/{AGENTS.md, <M.m.p>/SPEC.md},
-              _archive/{releases_histo.jsonl, <M.m.p>/**},
+    releases/{AGENTS.md, _archive/{releases_histo.jsonl, <M.m.p>/**},
               <M.m.p>/{_RELEASE.json, SPEC.md, PLAN.md, TASKS.md, rc-N/{SPEC,PLAN,TASKS}.md,
                        <alpha|rc>-N/{SPEC.md, PLAN.md, TASKS.md}}}
     backlog/{AGENTS.md, BACKLOG.json, _archive/backlog_histo.jsonl}
@@ -201,7 +200,6 @@ TEMPLATES: dict[str, tuple[Kind, str]] = {
     "memory/product/index.md": ("copy", "scaffold/memory/product/index.md"),
     "memory/product/catalog.json": ("json_catalog", ""),
     "releases/AGENTS.md": ("copy", "scaffold/releases/AGENTS.md"),
-    "releases/_ideas/AGENTS.md": ("copy", "scaffold/releases/_ideas/AGENTS.md"),
     "releases/_archive/releases_histo.jsonl": ("static", ""),
     "releases/<M.m.p>/SPEC.md": ("format", _RELEASE_SPEC_STUB),
     "backlog/AGENTS.md": ("copy", "scaffold/backlog/AGENTS.md"),
@@ -465,13 +463,13 @@ def release_new(specs_dir: Path, release_id: str) -> Path:
     releases_root = specs_dir / "releases"
     release_dir = releases_root / release_id
     # Exactly one live release, ever (release 0.4.6 FR4, ADR 0005): scope grows by
-    # candidates inside the live release, never by minting a sibling. _archive/_ideas
-    # are not live; the target id itself is caught by the no-clobber checks below.
+    # candidates inside the live release, never by minting a sibling. _archive is not
+    # live; the target id itself is caught by the no-clobber checks below.
     if releases_root.is_dir():
         others = sorted(
             d.name
             for d in releases_root.iterdir()
-            if d.is_dir() and d.name not in ("_archive", "_ideas") and d.name != release_id
+            if d.is_dir() and d.name != "_archive" and d.name != release_id
         )
         if others:
             live = others[0]

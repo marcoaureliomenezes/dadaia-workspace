@@ -85,4 +85,4 @@ a fuzzy term in the demand becomes a canonical term before it reaches the SPEC.
 - `dd-gitflow-default` §3a shape 5 — the definition commit shape.
 - `dd-release-implementation` (`RELEASE-EVENTS.md`, `RC-FLOW.md`) — state recipe, gate
   cadence, disposition sweep.
-- `specs/releases/AGENTS.md` — release-id format, `_ideas/`'s pre-approval role.
+- `specs/releases/AGENTS.md` — release-id format, `_RELEASE.json`, `rc-N/`.

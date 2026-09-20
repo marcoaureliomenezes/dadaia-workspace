@@ -63,7 +63,6 @@
 ## dadaia public — Manage distributed public agent assets.
 - public doctor — Diagnose drift between package source, staging, and runtime projections.
 - public install — Install staged public assets into runtime projections.
-- public list — List all public assets grouped by category.
 - public stage — Stage packaged public assets into .dadaia/agentic/.
 
 ## dadaia reconcile — Reconcile state and projections after installing an exact candidate wheel.
@@ -76,11 +75,7 @@
 - release rc-archive — Archive the live release's completed candidate trio into the next rc-N/.
 
 ## dadaia reports — Validate and diagnose agent handoff reports.
-- reports doctor — Diagnose structural invariants in .dadaia/handoff/.
 - reports validate — Validate one or more agent handoff JSON files.
-
-## dadaia repos — Query the known repos catalog.
-- repos list — List repos from repos.xlsx catalog.
 
 ## dadaia specs — SDD release-lifecycle structural checks and helpers.
 - specs init — Bootstrap a SDD release-lifecycle specs/ directory structure.

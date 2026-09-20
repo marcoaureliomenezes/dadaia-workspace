@@ -291,8 +291,8 @@ def test_cross_feature_contract_modules_equals_disk_and_contract_count_is_pinned
         if p.is_dir() and p.name != "__pycache__" and (p / "__init__.py").is_file()
     }
     assert (
-        len(on_disk_packages) == 15
-    )  # 0.4.6 T-046-26 (23 -> 21), T-046-28 (21 -> 20), T-046-25 reports pkg (20 -> 19), 0.4.7 c5 T-047-44 panel + agents (19 -> 17), T-047-43 telemetry (17 -> 16), T-047-45 server_registry (16 -> 15)
+        len(on_disk_packages) == 14
+    )  # 0.4.6 T-046-26 (23 -> 21), T-046-28 (21 -> 20), T-046-25 reports pkg (20 -> 19), 0.4.7 c5 T-047-44 panel + agents (19 -> 17), T-047-43 telemetry (17 -> 16), T-047-45 server_registry (16 -> 15), T-047-49 repos (15 -> 14)
 
     parser = configparser.ConfigParser()
     read = parser.read(_SETUP_CFG, encoding="utf-8")

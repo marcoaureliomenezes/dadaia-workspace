@@ -40,7 +40,7 @@ __all__ = [
 SCHEMA = "release-state-v1"
 
 #: The canonical release-state document filename (release 0.4.6 FR1, ADR 0007): the
-#: underscore prefix groups it with ``_archive``/``_ideas`` and sorts it apart from the
+#: underscore prefix groups it with ``_archive`` and sorts it apart from the
 #: working SPEC/PLAN/TASKS trio. ONE decider — no reader hand-builds this name.
 RELEASE_STATE_FILENAME = "_RELEASE.json"
 

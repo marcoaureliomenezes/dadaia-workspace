@@ -46,8 +46,8 @@ _FEATURE_PACKAGES = "feature-packages"
 
 #: Feature packages deleted from the tree whose name still lives on immutable-core
 #: fields of committed records (a bug's ``surface``): history stays valid after a
-#: demolition. Grows only when a feature dies (0.4.7 c5: panel, agents, telemetry).
-RETIRED_FEATURE_PACKAGES: tuple[str, ...] = ("agents", "panel", "telemetry")
+#: demolition. Grows only when a feature dies (0.4.7 c5: panel, agents, telemetry, repos).
+RETIRED_FEATURE_PACKAGES: tuple[str, ...] = ("agents", "panel", "repos", "telemetry")
 
 
 @cache
