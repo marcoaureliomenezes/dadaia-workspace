@@ -179,7 +179,6 @@ def _module_path_for_command_path(path: tuple[str, ...]) -> Path | None:
     special = {
         "release": _CLI_DIR / "commands" / "newartifacts.py",
         "backlog": _CLI_DIR / "commands" / "newartifacts.py",
-        "bugs": _CLI_DIR / "commands" / "bugs.py",
         "memory": _CLI_DIR / "commands" / "memory.py",
     }
     if group in special:
@@ -369,7 +368,7 @@ def test_no_resolver_driven_verb_hardcodes_the_dadaia_workspace_default() -> Non
     commands = _walk_leaf_commands()
     # v0.4.5 FR5 (scan-test-vacuity-guard): a broken Typer app tree could dynamically
     # walk to zero leaf commands, under which `offenders` below stays empty vacuously.
-    assert_populated([path for path, _cmd in commands], sentinel=("bugs", "append"))
+    assert_populated([path for path, _cmd in commands], sentinel=("backlog", "new"))
     offenders: list[str] = []
     for path, cmd in commands:
         for param in _resolution_params(cmd):

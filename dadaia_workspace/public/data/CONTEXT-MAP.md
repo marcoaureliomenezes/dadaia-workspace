@@ -42,11 +42,11 @@ path or entity as it appears in an installed workspace.
 
 | Surface | Purpose | Belongs | Ceiling | Measured |
 |---|---|---|---|---|
-| `AGENTS.md` | the root map: the flow, the roles, the gate invariants, the root, credentials, and one line per scoped file | statements; the index of every other surface | 8192 | 6107 |
+| `AGENTS.md` | the root map: the flow, the roles, the gate invariants, the root, credentials, and one line per scoped file | statements; the index of every other surface | 8192 | 6152 |
 | `specs/AGENTS.md` | the canon of a specs tree and its status tokens | canon table, status tokens, doctor codes | 4096 | 3506 |
 | `specs/releases/AGENTS.md` | candidates, phases, task markers, `rc-N` | release procedure and commit shapes | 4096 | 3986 |
 | `specs/backlog/AGENTS.md` | the operator's demand queue and its exits | `BACKLOG.json` shape, intake gate, dispositions | 4096 | 3933 |
-| `specs/bugs/AGENTS.md` | what a bug is and how it is proposed, recorded, resolved | bug procedure and the redaction rule | 4096 | 3923 |
+| `specs/bugs/AGENTS.md` | what a bug is and how it is proposed, recorded, resolved | bug procedure and the redaction rule | 4096 | 4046 |
 | `specs/memory/AGENTS.md` | current product truth and who writes it | atoms, Part 1/Part 2, ownership | 4096 | 4080 |
 | `specs/ADRs/AGENTS.md` | the decision record | `decisions.jsonl` shape, acceptance | 4096 | 3284 |
 | `specs/audits/AGENTS.md` | the periodic three-pillar review | audit procedure, findings, closure | 4096 | 1687 |
@@ -64,20 +64,20 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 | Surface | Purpose | Step-1 law | Ceiling | Measured |
 |---|---|---|---|---|
 | `dd-ai-eng-knowhow` | harness literacy and the AI-entity authoring contract | — | 6144 | 2736 |
-| `dd-architecture-survey` | portfolio-level architecture candidates from bug history | — | 6144 | 4486 |
-| `dd-audit-project` | the three-pillar audit and its window | `specs/audits/AGENTS.md` | 6144 | 2344 |
+| `dd-architecture-survey` | portfolio-level architecture candidates from bug history | — | 6144 | 4576 |
+| `dd-audit-project` | the three-pillar audit and its window | `specs/audits/AGENTS.md` | 6144 | 2389 |
 | `dd-backlog-definition` | backlog curation, the intake gate, dispositions | `specs/backlog/AGENTS.md` | 6144 | 2917 |
-| `dd-bug-registration` | classify-first bug proposal and its record | `specs/bugs/AGENTS.md` | 6144 | 2602 |
-| `dd-bug-resolution` | the seven-phase diagnosing method and the resolve record | `specs/bugs/AGENTS.md` | 6144 | 5273 |
-| `dd-cli-library` | CLI idioms, CLI-owned state, the dev-server registry | `.dadaia/AGENTS.md` | 6144 | 3729 |
-| `dd-code-review` | the three review axes and the six lenses | `specs/memory/AGENTS.md` | 6144 | 4552 |
-| `dd-codebase-design` | the deep-module vocabulary and the deletion test | — | 6144 | 5455 |
+| `dd-bug-registration` | classify-first bug proposal and its record | `specs/bugs/AGENTS.md` | 6144 | 2782 |
+| `dd-bug-resolution` | the seven-phase diagnosing method and the resolve record | `specs/bugs/AGENTS.md` | 6144 | 5245 |
+| `dd-cli-library` | CLI idioms, CLI-owned state, the dev-server registry | `.dadaia/AGENTS.md` | 6144 | 3774 |
+| `dd-code-review` | the three review axes and the six lenses | `specs/memory/AGENTS.md` | 6144 | 4642 |
+| `dd-codebase-design` | the deep-module vocabulary and the deletion test | — | 6144 | 5500 |
 | `dd-domain-modeling` | the repo's domain terms and their one home | — | 6144 | 3622 |
 | `dd-gitflow-default` | the branch contract, commit shapes, the PR gate | — | 6144 | 4556 |
 | `dd-grill-me` | the operator grill that precedes a candidate | — | 6144 | 3123 |
 | `dd-handoff-emitter` | handoff-first emission and ack-on-consume | `.dadaia/handoff/AGENTS.md` | 6144 | 2138 |
 | `dd-manager-orchestration` | intake, dispatch and the closure pass | — | 6144 | 3604 |
-| `dd-release-definition` | picking the set and authoring the trio | `specs/releases/AGENTS.md` | 6144 | 4413 |
+| `dd-release-definition` | picking the set and authoring the trio | `specs/releases/AGENTS.md` | 6144 | 4458 |
 | `dd-release-implementation` | the candidate arc from reservation to the gate | `specs/releases/AGENTS.md` | 6144 | 3295 |
 | `dd-spec-navigator` | the three-phase session grounding protocol | `specs/AGENTS.md` | 6144 | 4908 |
 | `dd-test-stewardship` | test intent, admission, demotion, quarantine | — | 6144 | 4099 |
@@ -90,7 +90,7 @@ Three roles, no fourth; every retired role is a lens the reviewer applies.
 |---|---|---|---|---|
 | `dd-project-manager` | intake, dispatch, SPEC, the memory pass at closure | role, activity class, model policy | — | 7266 |
 | `dd-software-engineer` | PLAN/TASKS, production code and its tests | role, activity class, model policy | — | 8664 |
-| `dd-code-reviewer` | the three-axis review and its six lenses | role, activity class, model policy | — | 6341 |
+| `dd-code-reviewer` | the three-axis review and its six lenses | role, activity class, model policy | — | 6476 |
 
 - A statement belongs to exactly one surface: the map indexes, the scoped file rules, the
   skill instructs, the persona declares who acts.

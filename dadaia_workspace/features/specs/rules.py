@@ -206,7 +206,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-033",),
         lambda d: d._governance.check_bugs_jsonl_invariant(),
-        fix_help=f"{DADAIA_BIN} bugs update <bug-id> --<field> <value>",
+        fix_help="python3 .agents/skills/dd-bug-resolution/scripts/bugs.py update <bug-id> --set <field>=<value>",
     ),
     _rule(
         ("SPEC-DOC-034",),
@@ -254,7 +254,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-041",),
         lambda d: d._governance.check_bug_archive_overdue(),
-        fix_help=f"{DADAIA_BIN} bugs archive",
+        fix_help="python3 .agents/skills/dd-bug-resolution/scripts/bugs.py archive",
     ),
     _rule(
         ("SPEC-DOC-045",),

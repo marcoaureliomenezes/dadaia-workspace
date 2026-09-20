@@ -48,5 +48,5 @@ Metrics 7 and 8 carry `target 0` and report their measured value even when it wo
 
 ## Pillar 1's one write
 
-- On each record reviewed, stamp `audited: <audit-slug>` through `dadaia bugs update <bug-id> --set audited=<slug>`.
+- On each record reviewed, stamp `audited: <audit-slug>` through `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py update <bug-id> --set audited=<slug>`.
 - One writer, one seam, one commit per rewritten record batch.

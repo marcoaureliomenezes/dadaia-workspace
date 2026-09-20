@@ -21,8 +21,9 @@ One deep verb each, zero options: everything a caller must know is "archive the 
 candidate" / "ship the live release"; validation, numbering, the move, the counter
 bump, the phase reset and the canonical
 :data:`~dadaia_workspace.core.release_state.RELEASE_STATE_FILENAME` write all live
-behind them. Neither verb runs git, and neither knows what a bug ledger is — the CLI
-composes ``bugs archive`` on top (P-07: features compose through the CLI/container).
+behind them. Neither verb runs git, and neither knows what a bug ledger is — ageing the bug
+ledger is its own numbered step in ``RC-FLOW.md`` (0.4.7 FR2: one writer per ledger,
+and scripts never call each other).
 """
 
 from __future__ import annotations

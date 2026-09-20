@@ -116,8 +116,8 @@ BLOCK carries exactly one `fix:` line naming one runnable command, and a contrac
 feeds each fix back through the gate asserting ALLOW — a refusal whose fix is itself
 refused cannot exist. No lease, mutex or wait path exists, and no phase is consulted.
 
-Governance records change only through their verbs: `dadaia bugs append|resolve|…` for
-one record per bug, `dadaia backlog new|exit` for the operator's demand queue,
+Governance records change only through their verbs: `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append|resolve|…` for one
+record per bug, `dadaia backlog new|exit` for the operator's demand queue,
 `dadaia release new|phase|rc-archive|archive` for the release state document, `dadaia
 audit disposition|close` for findings. A bug is proposed to the operator first and
 registered only after confirmation — an agent never files one on its own judgement.

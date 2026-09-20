@@ -17,7 +17,7 @@ description: >
 1. Open `specs/bugs/AGENTS.md` (the area's scoped law) and follow it — its redaction rule
    covers the whole arc: commands, outputs, captured artifacts.
 2. A bug fix rides the live `feature/{M.m.p}` branch in any phase: no separate branch, no SPEC/PLAN/TASKS, no version mint.
-3. Two fixers resolve by whichever `dadaia bugs resolve` lands first; a losing write
+3. Two fixers resolve by whichever `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve` lands first; a losing write
    fails non-zero — re-read and retry.
 
 ## 2. The method — seven phases, each gated
@@ -68,12 +68,11 @@ the architecture lens first (net-positive rule). Then close the
 record:
 
 ```
-dadaia bugs resolve <bug-id> --cause … --caused-by … --resolved-release …
+python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --cause … --caused-by … --resolved-release …
   --solution … --evidence-loop … --evidence-seam … --evidence-diff net-negative:…
 ```
 
 - `diff_direction` is derived from `--evidence-diff`'s `net-*:` prefix — there is no `--diff-direction` flag.
-- `closed_at` is stamped by the terminal transition; `dadaia bugs archive` ages by it, never by the filing date `ts`.
 - `--caused-by` is validated against the ledger or the literal `none`; an unknown id exits 1.
 - Stage code + regression test + the `BUGS.jsonl` line together — ONE commit, shape 3
   of `dd-gitflow-default` §3a.

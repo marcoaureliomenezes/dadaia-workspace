@@ -91,8 +91,7 @@ Both are records with one shape and one owning verb. `specs/bugs/BUGS.jsonl` hol
 record per bug, appended once and keyed by `id`, with no git-derived cache — git is the
 only authority for git facts; `status` is `open | resolved | superseded | deferred |
 rejected`, a terminal status is reachable only through a transition carrying its
-evidence, and registration is ask-first: the agent proposes and `dadaia bugs append`
-runs only after the operator confirms. `specs/backlog/BACKLOG.json`'s `active[]` is the
+evidence, and registration is ask-first: the agent proposes and `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append` runs only after the operator confirms. `specs/backlog/BACKLOG.json`'s `active[]` is the
 operator's demand queue, curated by `project-manager` and exited exactly once by
 `dadaia backlog exit`, which appends one histo record carrying the removed entry.
 

@@ -177,7 +177,7 @@ def test_the_loaded_surface_enum_is_the_layers_plus_every_on_disk_feature_packag
         for child in features_dir.iterdir()
         if (child / "__init__.py").is_file() and not child.name.startswith("_")
     }
-    assert "bugs" in on_disk and "__pycache__" not in on_disk
+    assert "chokepoints" in on_disk and "__pycache__" not in on_disk
 
     enum_values = set(load_schema("bugs/bug-record-v1")["properties"]["surface"]["enum"])
 

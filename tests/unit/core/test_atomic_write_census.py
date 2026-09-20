@@ -87,6 +87,14 @@ def _writes_then_replaces(func: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     return False
 
 
+def _is_skill_script(path: Path) -> bool:
+    """A `public/skills/*/scripts/` owner script runs from a projected skill folder with
+    no library on `sys.path` (0.4.7 FR1), so it cannot import `core.atomic_write` and
+    owns its own temp-then-replace — the one exemption, structural, not a name list."""
+    parts = path.parts
+    return "skills" in parts and "scripts" in parts and "public" in parts
+
+
 def _temp_then_replace_writer_defs(package_root: Path) -> list[str]:
     """Every module- or class-level ``def`` anywhere under *package_root* matching the
     temp-then-replace content-write idiom, as ``<relative-path>:<line>:<name>``."""
@@ -98,7 +106,7 @@ def _temp_then_replace_writer_defs(package_root: Path) -> list[str]:
     assert_populated(files, sentinel=package_root / "core" / "atomic_write.py")
     hits: list[str] = []
     for path in files:
-        if "__pycache__" in path.parts:
+        if "__pycache__" in path.parts or _is_skill_script(path):
             continue
         try:
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))

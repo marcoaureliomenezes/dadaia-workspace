@@ -59,17 +59,16 @@ __all__ = [
 #: non-terminal annotation exempt from the double-terminal coherence rule. Reused as the
 #: terminal ``BugRecord.status`` values ("resolved"/"superseded"/"deferred"/"rejected" —
 #: the ``status`` enum's four non-"open" members, ``bug-record-v1.schema.json``) rather
-#: than a second, independently-maintained constant: both ``features.bugs.service``
-#: (archive eligibility) and ``features.specs.doctor_governance`` (the archive-overdue
-#: WARN) import it from here, since neither may import the other
-#: (`features-no-cross-feature`).
+#: than a second, independently-maintained constant: ``features.specs
+#: .doctor_governance`` (the archive-overdue WARN) imports it from here; the ledger's
+#: writer is the ``dd-bug-resolution/scripts/bugs.py`` script, which carries its own copy (stdlib-only, FR1).
 #: 0.4.7 FR7: the four words themselves now come from the ONE terminal vocabulary
 #: (``core.models.histo.BUGS_DISPOSITIONS``) rather than being restated here — one
 #: constant per vocabulary, across every ledger.
 TERMINAL_EVENTS: frozenset[str] = frozenset(BUGS_DISPOSITIONS)
 
 #: v0.5.0 FR2/A2.8 — the default age (days) at which a terminal ``BugRecord`` becomes
-#: eligible for ``dadaia bugs archive`` and, if still live past it, trips the doctor's
+#: eligible for ``python3 .agents/skills/dd-bug-resolution/scripts/bugs.py archive`` and, if still live past it, trips the doctor's
 #: overdue WARN. One shared constant so the CLI verb and the doctor check can never
 #: drift apart on the threshold.
 BUG_ARCHIVE_THRESHOLD_DAYS: int = 90
@@ -264,10 +263,9 @@ class BugRecord:
     def apply_governance_update(self, changes: Mapping[str, object]) -> BugRecord:
         """Apply *changes*, returning a NEW record — the seam every writer of an
         EXISTING record goes through (registration is :meth:`from_dict`/the
-        constructor, not this method). ``features/bugs/service.py`` wraps this call
-        for ``dadaia bugs update``, for the fixer's resolution write and the
-        auditor's ``audited``/``resolved_commit`` write alike (A2.13 — one seam,
-        every writer role).
+        constructor, not this method). 0.4.7 FR2 moved every ledger WRITE into
+        ``dd-bug-resolution/scripts/bugs.py``; what remains here is the reader half the
+        doctor validates committed records with.
 
         Refuses (:class:`BugRecordImmutableFieldError`) a CHANGE to an immutable-core
         field's value — re-asserting its current value is a harmless no-op (A2.2a).

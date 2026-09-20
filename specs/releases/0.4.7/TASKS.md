@@ -25,7 +25,7 @@
   `dadaia_workspace/infrastructure/{public_assets,projection_rules}.py`,
   `tests/unit/skills/**`, `tests/contract/test_public_scripts_thin_wrapper.py`.
 
-- [-] T-047-64 — FR2: the bugs ledger moves. `bugs.py` gains `append resolve defer reject
+- [x] T-047-64 — FR2: the bugs ledger moves. `bugs.py` gains `append resolve defer reject
   supersede update archive status stats`; every write runs `check` on the result before an
   atomic replace. Carry the two governance refusals verbatim (PLAN): `update --set status=…`
   refused naming the transition subcommand, `update --set caused_by=…` refused naming `resolve

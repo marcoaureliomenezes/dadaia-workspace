@@ -139,7 +139,12 @@ def _tree_bytes_rules(
     label_prefix: str,
     mode: int | None = None,
 ) -> tuple[ProjectionRule, ...]:
-    """One ``compare="bytes"`` rule per real file under *src_dir* (verbatim copy)."""
+    """One ``compare="bytes"`` rule per real file under *src_dir* (verbatim copy).
+
+    A projection is a copy of the source, permissions included: an authored file that is
+    executable projects executable (0.4.7 FR1 — a skill script the agent runs directly).
+    The source's own exec bit is the whole rule; no path knows what a `scripts/` dir is.
+    """
     rules: list[ProjectionRule] = []
     for src in iter_public_files(src_dir):
         rel = src.relative_to(src_dir)
@@ -149,7 +154,7 @@ def _tree_bytes_rules(
                 harness,
                 dst_dir / rel,
                 src.read_bytes(),
-                mode=mode,
+                mode=mode if mode is not None else (0o755 if os.access(src, os.X_OK) else None),
             )
         )
     return tuple(rules)

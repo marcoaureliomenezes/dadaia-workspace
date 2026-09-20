@@ -56,8 +56,9 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 - Flip every bug/backlog item picked into (or superseded by) this candidate to a terminal token.
 - A picked backlog entry exits by `dadaia backlog exit <slug> --disposition …`, once.
 - An audit finding moves by `dadaia audit disposition <dir> <finding> --disposition …`; when none is `open`, `dadaia audit close <dir> --sha <window-end>` appends the histo record and deletes the directory.
-- A bug is never silently dropped — `dadaia bugs resolve` already closed it, or a superseder covers it.
-- Done when: `dadaia bugs stats` and `dadaia doctor`'s `ledgers` section show zero non-terminal picked items.
+- A bug is never silently dropped — `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve` already closed it, or a superseder covers it.
+- Age the ledger once the sweep is terminal: `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py archive` — a numbered step here, never a call another script makes (scripts never call each other).
+- Done when: `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats` and `dadaia doctor`'s `ledgers` section show zero non-terminal picked items.
 
 **Step 8 — Artifact GC sweep.**
 - `dadaia doctor` dry: read every `WS-<zone>-<verdict>` line and the `compliance:` score line.

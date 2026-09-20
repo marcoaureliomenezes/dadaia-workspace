@@ -56,7 +56,7 @@ Design for testability — good interfaces make testing natural:
 1. Extract the core problem: one sentence describing what must actually be solved.
 2. Extract constraints: time, existing systems the solution must live inside, the write set.
 3. Extract success criteria in testable terms, and make every implicit assumption explicit.
-4. Read the bug ledger for the feature touched (`dadaia bugs stats`) — prior fixes to the same surface are evidence about the structure.
+4. Read the bug ledger for the feature touched (`python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats`) — prior fixes to the same surface are evidence about the structure.
 5. Call the Skill tool with `dd-grill-me` for operator-facing clarification; never ask what `Read`/`Glob`/`Grep` can answer.
 6. Apply the deletion test to the module the change would grow; if the diff only adds, justify it against the replace-don't-layer principle explicitly.
 7. Prefer the shape that raises depth: fewer entry points, simpler parameters, more hidden complexity.

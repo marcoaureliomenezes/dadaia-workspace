@@ -179,7 +179,6 @@ def _ledgers_section(
     committed governance ledger (0.4.7 FR6). Two features contribute, neither imports
     the other, and the two reports merge into one section here — the composition root."""
     from dadaia_workspace.cli.anchors import derive_cli_anchors
-    from dadaia_workspace.cli.commands.bugs import build_bug_service
     from dadaia_workspace.core.models.histo import HistoRecord
     from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
@@ -200,10 +199,8 @@ def _ledgers_section(
         ),
     )
     # The `ledgers` section's ONE repair, injected here exactly as `bug_store_factory`
-    # is injected into the specs doctor: `features.specs` never imports `features.bugs`.
     ledgers_context = specs_ledgers.build_ledgers_context(
         specs_dir,
-        normalize_bug_records=build_bug_service(specs_dir, with_archive=True).normalize_records,
     )
     return merge_sections(
         [
@@ -425,13 +422,10 @@ def _ledger_fixes(
     `fix` callable, not in a branch here."""
     if specs_dir is None:
         return []
-    from dadaia_workspace.cli.commands.bugs import build_bug_service
-
     # No governance baseline on the fix path: no hand-edit rule carries a fixer (the
     # answer is the operator's judgment), so reading the store here would buy nothing.
     context = specs_ledgers.build_ledgers_context(
         specs_dir,
-        normalize_bug_records=build_bug_service(specs_dir, with_archive=True).normalize_records,
     )
     actions: list[str] = []
     for rule in specs_ledgers.RULES:

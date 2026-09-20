@@ -63,6 +63,9 @@ _EXECUTABLE_TOKENS: frozenset[str] = frozenset(
         "sed",
         "cp",
         "bash",
+        # 0.4.7 FR2: a ledger fix names its skill script, run through the interpreter
+        # (Windows has no exec bit), never a retired CLI verb.
+        "python3",
     }
 )
 

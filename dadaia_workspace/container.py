@@ -1,7 +1,6 @@
 """Composition root — builds services with concrete infrastructure."""
 
 import logging
-from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -124,13 +123,13 @@ def build_bug_record_store(specs_dir: Path) -> "JsonlRecordStore[BugRecord]":
     """Composition-root seam for the generic bug-record JSONL store (v0.5.0 FR2, AR-1
     ruling answer (b), ``specs/releases/0.5.0/reviews/S1-AR1-ruling.md`` §2).
 
-    Stays a container seam (ADR-0001: a store builder collapses into its single
-    consumer UNLESS two features share it) because two do: ``cli.commands.bugs``
-    (``_service`` -> ``features.bugs.service.BugService``) and ``cli.commands.specs``
-    (``bug_store_factory`` -> ``features.specs.doctor_governance.GovernanceValidator``).
+    Stays a container seam because the doctor reads the ledger through it
+    (``bug_store_factory`` -> ``features.specs.doctor_governance.GovernanceValidator``);
+    the ledger's ONE WRITER is the skill script ``dd-bug-resolution/scripts/bugs.py``
+    (0.4.7 FR2), which shares no code with this reader.
 
-    Takes *specs_dir* directly — the SAME resolved directory every ``dadaia bugs``
-    verb's ``--specs-dir``/bind-resolution seam already produces (never a
+    Takes *specs_dir* directly — the SAME resolved directory the doctor's
+    ``--specs-dir``/bind-resolution seam already produces (never a
     ``workspace_root``, which would silently assume ``<root>/specs`` and break every
     ``--specs-dir <tmp>`` test fixture and remote-context routing). The ledger's
     physical filename is ``BUGS.jsonl`` (T-050-10 physically migrated the ledger
@@ -145,25 +144,6 @@ def build_bug_record_store(specs_dir: Path) -> "JsonlRecordStore[BugRecord]":
         to_dict=BugRecord.to_dict,
         from_dict=BugRecord.from_dict,
     )
-
-
-def build_bug_record_validator() -> Callable[[Mapping[str, object]], None]:
-    """Composition-root seam for ``bug-record-v1`` validation (D9) — the ONE validation
-    table, loaded through the ONE packaged-schema loader
-    (``features.specs.schemas.validator_for``), so the ``surface`` enum a registration
-    is checked against is the SAME derived one every committed record is checked
-    against (0.4.7 FR1). It used to read and compile the schema file a second time
-    here, which is how a registration could accept a value the doctor refused.
-    Raises ``jsonschema.exceptions.ValidationError`` on the first schema violation.
-    """
-    from dadaia_workspace.features.specs.schemas import validator_for
-
-    validator = validator_for("bugs/bug-record-v1")
-
-    def _validate(payload: Mapping[str, object]) -> None:
-        validator.validate(payload)
-
-    return _validate
 
 
 def load_denylist_terms() -> tuple[tuple[str, str], ...]:

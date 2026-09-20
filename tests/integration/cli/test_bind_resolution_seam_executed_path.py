@@ -13,7 +13,6 @@ hardcoded/no-op fallback.
 
 Probed resolver-driven verbs:
   - ``context show`` (no positional name) — context.py
-  - ``bugs status`` (no ``--specs-dir``) — bugs.py
   - ``doctor --json`` (no ``--specs-dir``/``--context``) — doctor.py
 
 Reports commands accept optional run filters, not bound-context resolution inputs, so
@@ -148,50 +147,6 @@ def test_context_show_noarg_resolves_bound_context(two_ctx_workspace: Path) -> N
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert payload["name"] == _CTX_B, payload
-
-
-def test_bugs_status_resolves_bound_context(two_ctx_workspace: Path) -> None:
-    # Seed one bug per context via an explicit --specs-dir (setup only — never through the
-    # seam), then assert the unset-`--specs-dir` `bugs status` call surfaces ONLY ctx-b's.
-    specs_a = two_ctx_workspace / "repos" / _CTX_A / "specs"
-    specs_b = two_ctx_workspace / "repos" / _CTX_B / "specs"
-    for specs_dir, bug_id, meta_ctx in (
-        (specs_a, "bug-in-ctx-a", _CTX_A),
-        (specs_b, "bug-in-ctx-b", _CTX_B),
-    ):
-        append_result = _runner.invoke(
-            app,
-            [
-                "bugs",
-                "append",
-                "--bug-id",
-                bug_id,
-                "--title",
-                "seam probe bug",
-                "--severity",
-                "LOW",
-                "--surface",
-                "cli",
-                "--component",
-                "test",
-                "--context",
-                meta_ctx,
-                "--symptom",
-                "n/a",
-                "--repro",
-                "n/a",
-                "--expected",
-                "n/a",
-                "--specs-dir",
-                str(specs_dir),
-            ],
-        )
-        assert append_result.exit_code == 0, append_result.output
-
-    status_result = _runner.invoke(app, ["bugs", "status"])
-    assert status_result.exit_code == 0, status_result.output
-    assert "bug-in-ctx-b" in status_result.output
-    assert "bug-in-ctx-a" not in status_result.output
 
 
 def test_specs_doctor_resolves_bound_context(two_ctx_workspace: Path) -> None:

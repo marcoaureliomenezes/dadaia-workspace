@@ -11,7 +11,7 @@ Each `F-NN` below is one feature with an explicit, binary **PASS assertion**. Ru
 listed commands in the listed setup, capture command+exit+output as evidence, then mark:
 
 - **PASS** — the PASS assertion is objectively true from the captured output.
-- **FAIL** — the assertion is false (a real defect). Register a `dadaia bugs append`.
+- **FAIL** — the assertion is false (a real defect). Register a `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append`.
 - **EXCEPTION** — the assertion cannot run because the validation environment lacks a
   prerequisite the wheel does not own (e.g. no codex binary reachable for a live
   model-reachability check). Record why; an EXCEPTION is NOT a FAIL and does not block
@@ -159,14 +159,14 @@ an initialized workspace, create it:
 - Setup: an in-repo specs tree (`mkdir -p repos/vp && $D specs init --specs-dir
   repos/vp/specs`). `bugs` resolves its specs tree from `--specs-dir` OR a bound context —
   pass `--specs-dir` on EVERY `bugs` call (append AND status), the same way F-04/F-10/F-15
-  do; a `bugs status` with no `--specs-dir` and no bind correctly errors with guidance
+  do; a `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status` with no `--specs-dir` and no bind correctly errors with guidance
   ("Pass --specs-dir or bind a context"), which is expected, not a FAIL.
-- Run the complete append with EVERY required field (`bugs append` has no `--event`
+- Run the complete append with EVERY required field (`python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append` has no `--event`
   flag — one record per bug, appended once, v0.5.0 FR2) —
   `--bug-id valbug --reported-by selfrun --title t --severity LOW
   --surface unknown --component c --context vp --symptom sy --repro rp --expected ex
-  --specs-dir repos/vp/specs`; then `$D bugs status --specs-dir repos/vp/specs`;
-  then an INCOMPLETE append `$D bugs append --bug-id x --specs-dir
+  --specs-dir repos/vp/specs`; then `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status --specs repos/vp/specs`;
+  then an INCOMPLETE append `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append --bug-id x --specs
   repos/vp/specs` (omitting the fields above).
 - **PASS if:** the complete append exits 0 and appears in `bugs status --specs-dir
   repos/vp/specs`; the incomplete one exits non-zero and writes nothing.
@@ -354,8 +354,8 @@ never exercised the live backlog path was false confidence).
 
 ### R-06 — Bug ledger round-trip
 
-- Register a synthetic bug (`bugs append` with every required field), fix-and-mark
-  it (`resolved` with evidence), and query `bugs status`.
+- Register a synthetic bug (`python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append` with every required field), fix-and-mark
+  it (`resolved` with evidence), and query `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`.
 - **PASS if:** the events validate, stream order stays coherent (reported before
   resolved), and status reflects the resolution.
 

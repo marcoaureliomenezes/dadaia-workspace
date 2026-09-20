@@ -71,49 +71,6 @@ def _run(workspace: Path, *args: str) -> dict:
     return json.loads(proc.stdout)
 
 
-def test_bugs_append_resolves_the_slug_and_closure_lands_in_scope(workspace: Path) -> None:
-    """Two more sites that assumed name == slug, both validator-reported.
-
-    `bugs append --context <name>` validated `repos/<name>/specs` and REFUSED a perfectly
-    valid context (a2-bugs-append-context-resolution-ignores-repo-slug); and the close
-    step's CLOSURE.md was written under the name, landing outside its declared write scope
-    so the step was refused (a2-fake-implementation-close-closure-out-of-scope).
-
-    Both are the same disease as the first fix — a directory derived from the wrong
-    identity — which is why they are pinned here next to it.
-    """
-    proc = _dadaia(
-        workspace,
-        "bugs",
-        "append",
-        "--bug-id",
-        "probe",
-        "--reported-by",
-        "test",
-        "--title",
-        "t",
-        "--severity",
-        "LOW",
-        "--surface",
-        "cli",
-        "--component",
-        "c",
-        "--context",
-        _NAME,
-        "--symptom",
-        "sy",
-        "--repro",
-        "rp",
-        "--expected",
-        "ex",
-    )
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert (workspace / "repos" / _SLUG / "specs" / "bugs" / "BUGS.jsonl").is_file(), (
-        "the event must land in the context's real ledger, under its SLUG"
-    )
-
-
-@pytest.mark.timeout(180)
 def test_create_refuses_a_name_no_other_verb_can_use(workspace: Path) -> None:
     """`create` must refuse exactly what the rest of the CLI refuses.
 

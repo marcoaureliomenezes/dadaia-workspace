@@ -42,7 +42,7 @@ axes are reported side by side — an axis never outranks another.
 
 ## 4. Axis 3 — Bug-surface
 
-- Pull the touched feature's ledger slice: `dadaia bugs stats`, `dadaia bugs status --all` filtered to its surface/component.
+- Pull the touched feature's ledger slice: `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats`, `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status --all` filtered to its surface/component.
 - Answer WITH EVIDENCE: did this diff reduce, keep, or increase the feature's bug surface?
 - The operator's rule applied as a review axis: a diff that GROWS the feature is a stop —
   a branch, flag, special case, second code path or cross-feature reach-in added by a fix

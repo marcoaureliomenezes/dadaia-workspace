@@ -188,7 +188,13 @@ def _imported_roots(path: Path) -> set[str]:
 @pytest.mark.parametrize("script", _owner_scripts(), ids=lambda p: f"{p.parents[1].name}/{p.name}")
 def test_skill_owner_script_meets_the_contract(script: Path) -> None:
     """FR1: every skill script is a self-contained stdlib owner — ≤ 150 lines, no
-    import into the library, executable, and `--help` exits 0."""
+    import into the library, executable, and (for an entry point) `--help` exits 0.
+
+    The ceiling is per FILE: a script whose verb set outgrows it splits into `_`-prefixed
+    sibling modules in the same folder, imported through the script's own directory on
+    `sys.path`. A sibling is a module, not an entry point, so only the non-`_` scripts
+    answer `--help`; everything else applies to every file under `scripts/`.
+    """
     loc = _line_count(script)
     ceiling = _OWNER_SCRIPT_CEILINGS.get(script.name, _OWNER_SCRIPT_MAX_LINES)
     assert loc <= ceiling, (
@@ -196,7 +202,8 @@ def test_skill_owner_script_meets_the_contract(script: Path) -> None:
         f"{ceiling} — a skill script that no longer fits is logic that "
         "belongs behind a narrower interface, not a raised ceiling."
     )
-    foreign = _imported_roots(script) - set(sys.stdlib_module_names)
+    siblings = {module.stem for module in script.parent.glob("*.py")}
+    foreign = _imported_roots(script) - set(sys.stdlib_module_names) - siblings
     assert foreign == set(), (
         f"{script.name} imports non-stdlib module(s) {sorted(foreign)} — a skill script "
         "runs from a projected skill folder with no library on sys.path (FR1)."
@@ -205,6 +212,8 @@ def test_skill_owner_script_meets_the_contract(script: Path) -> None:
         f"{script.name} is missing the `#!/usr/bin/env python3` shebang."
     )
     assert os.access(script, os.X_OK), f"{script.name} is not executable (exec bit unset)."
+    if script.name.startswith("_"):
+        return  # a sibling module, imported by its entry point — it has no argv surface
 
     done = subprocess.run(
         [sys.executable, str(script), "--help"], capture_output=True, text=True, check=False

@@ -15,7 +15,7 @@ description: >
 ## 1. Pick the set
 
 1. Open `specs/releases/AGENTS.md` (the area's scoped law) and follow it.
-2. Inspect `specs/bugs/BUGS.jsonl` via `dadaia bugs status`/`stats`.
+2. Inspect `specs/bugs/BUGS.jsonl` via `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`/`stats`.
 3. Read `specs/backlog/BACKLOG.json`'s `active[]` — already sanitized by
    `dd-backlog-definition`, consumed with no further triage.
 4. Read `specs/audits/**` for undispositioned findings; each enters the SPEC with the

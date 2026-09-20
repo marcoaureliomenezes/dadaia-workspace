@@ -92,7 +92,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 4. Call the Skill tool with `dd-code-review` and walk its three axes as three passes, findings side by side, never reranked:
 5. Axis Standards — repo conventions first, then the twelve Fowler smells and `dd-code-review`'s `SLOP.md` S1-S10; skip what tooling enforces.
 6. Axis Spec — the diff does what the approved SPEC/TASKS say, nothing more, nothing less; write-set growth is a finding.
-7. Axis Bug-surface (required in every verdict) — reduced/increased/unchanged, evidenced by `dadaia bugs stats`; a diff that grows the feature is a stop.
+7. Axis Bug-surface (required in every verdict) — reduced/increased/unchanged, evidenced by `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats`; a diff that grows the feature is a stop.
 8. Classify each finding by severity; write the review report; emit the handoff.
 9. Confirm the implementer supplied unit/integration evidence, and QA/security/design handoffs are present when required.
 10. Check the diff does not leak public-asset privacy, secrets/tokens, auth assumptions, dependency additions, generated files, consumer data.
@@ -106,7 +106,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 - `## Target` — PR/branch/SHA, base ref, files changed.
 - `## CI status` — last run result, failing checks if any.
 - `## Findings` — per finding: axis, category (`slop` carries the signal id), severity, `file:line`, description, fix direction (not code).
-- `## Bug-surface delta` — reduced/increased/unchanged, with `dadaia bugs stats` evidence.
+- `## Bug-surface delta` — reduced/increased/unchanged, with `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats` evidence.
 - `## Summary` — counts by severity.
 - `## Recommendation` — `APPROVED` (zero HIGH/CRITICAL) / `REJECTED` (one or more HIGH/CRITICAL); an observations-only review is `APPROVED` with INFO findings.
 - Severity badges: CRITICAL / HIGH / MEDIUM / LOW / INFO.
@@ -123,5 +123,5 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 - CLI:
   ```bash
   dadaia context show --json    # discover active context and specs_dir
-  dadaia bugs stats             # bug-surface evidence for the bug-surface axis
+  python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats             # bug-surface evidence for the bug-surface axis
   ```

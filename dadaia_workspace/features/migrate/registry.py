@@ -9,7 +9,7 @@ rather than a live capability:
 
 1. **Zero live callers of what it fed.** ``bugs_jsonl.py``'s step converted legacy
    Markdown bugs into the v5 ``{event, data}`` JSONL shape — a shape
-   ``features/bugs/migrate_v5.py`` (also deleted, T-051-16) was the only reader of,
+   ``features/bugs/migrate_v5.py`` (deleted, T-051-16) was the only reader of,
    and that module itself had zero production callers (``BugService`` reads
    records through the injected ``RecordStore`` directly, never the v5 fold). A
    full v0 -> v6 run in THIS release would have produced a bugs ledger nothing in

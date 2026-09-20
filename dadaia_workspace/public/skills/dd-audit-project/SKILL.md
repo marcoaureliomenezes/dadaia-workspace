@@ -21,7 +21,7 @@ description: >
 
 - **Pillar 1 — bugs** ([`PILLAR-BUGS.md`](PILLAR-BUGS.md)): compute all eight
   forensic metrics on every `BUGS.jsonl` record in the window; stamp `audited` on each
-  reviewed record (`dadaia bugs update <id> --set audited=<slug>`, pillar 1's only write).
+  reviewed record (`python3 .agents/skills/dd-bug-resolution/scripts/bugs.py update <id> --set audited=<slug>`, pillar 1's only write).
 - **Pillar 2 — specs** ([`PILLAR-SPECS.md`](PILLAR-SPECS.md)): commit-shape
   conformance, canon pattern compliance, `_RELEASE.json` milestone completeness over
   the window.

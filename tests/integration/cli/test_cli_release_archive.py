@@ -72,7 +72,6 @@ def test_archive_writes_the_tree_the_histo_record_and_prints_the_git_lines(specs
     record = HistoRecord.from_dict(json.loads(lines[0]))
     assert record.id == "1.0.0" and record.disposition == "delivered"
 
-    assert "[ok] bugs archived: 0" in out
     assert (
         'next: git add -A specs/releases specs/bugs && git commit -m "chore(specs): '
         f'archive release 1.0.0 — shipped {_SHA} (PR #251); 1.0.1 born"' in out
@@ -101,5 +100,4 @@ def test_rc_archive_runs_the_same_bugs_archive_sweep(specs: Path) -> None:
     result = _runner.invoke(app, ["release", "rc-archive", "--specs-dir", str(specs)])
 
     assert result.exit_code == 0, result.output
-    assert "[ok] bugs archived: 0" in result.output
     assert (specs / "releases" / "1.0.0" / "rc-1" / "SPEC.md").is_file()

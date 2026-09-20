@@ -8,7 +8,7 @@ description: >
 
 # dd-bug-registration
 
-> The agent proposes; the operator confirms. `dadaia bugs append` runs after that
+> The agent proposes; the operator confirms. `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append` runs after that
 > confirmation, never on the agent's own judgement. Any agent runs this.
 
 ## 1. When
@@ -30,12 +30,12 @@ description: >
    or cosmetic defect.
 6. Put the proposal to the operator and wait.
 7. No operator in the session: emit it as one handoff finding whose `message` starts
-   `bug-proposal:` and whose `fix_recommendation` is the exact `dadaia bugs append`
+   `bug-proposal:` and whose `fix_recommendation` is the exact `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append`
    line (`dd-handoff-emitter`). A proposal is never a record.
 
 ## 3. Register — after the operator confirms
 
-1. `dadaia bugs append --bug-id <slug> --reported-by <agent> --title "…"
+1. `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append --bug-id <slug> --reported-by <agent> --title "…"
    --severity LOW|MEDIUM|HIGH|CRITICAL --surface … --component … --context …
    --symptom … --repro … --expected …`
 2. `--surface unknown` is refused; name the real surface.
@@ -55,4 +55,4 @@ description: >
 
 - `dd-bug-resolution` — the diagnosing method and the fix, once a record exists.
 - `dd-handoff-emitter` — the `bug-proposal:` finding shape.
-- `dadaia bugs append --help` — the full flag list.
+- `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append --help` — the full flag list.

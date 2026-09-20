@@ -11,17 +11,6 @@
 - backlog new — Append one ``active[]`` entry for <slug> to specs/backlog/BACKLOG.json.
 - backlog subjects — List the live canonical-subject anchors, or resolve one proposed subject (read-only).
 
-## dadaia bugs — One-record-per-bug ledger (append/status/stats/update/resolve/supersede/defer/reject/archive).
-- bugs append — Register a brand-new bug record (``status: "open"``) — validated against
-- bugs archive — Move terminal records older than ``--threshold-days`` from the live ledger to
-- bugs defer — The ONE way a record reaches ``status="deferred"`` — ``--reason`` is
-- bugs reject — The ONE way a record reaches ``status="rejected"`` — ``--reason`` is
-- bugs resolve — The ONE way a record reaches ``status="resolved"`` — every option above is
-- bugs stats — Print aggregate bug counts by status and by severity.
-- bugs status — List folded bug records (open by default), one ``id`` per line.
-- bugs supersede — The ONE way a record reaches ``status="superseded"`` — ``--by`` is REQUIRED.
-- bugs update — The one governance-write seam for every governance/write-once field OTHER than
-
 ## dadaia capabilities — Describe public dadaia-workspace features supported by this installation.
 
 ## dadaia certify — Certify assembled public features in a disposable local workspace.

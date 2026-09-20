@@ -56,5 +56,5 @@ line here and `--help` disagree, `--help` wins.
 
 ## References
 
-- `dd-bug-registration` — the ask-first proposal a genuine bug takes before `dadaia bugs append`.
+- `dd-bug-registration` — the ask-first proposal a genuine bug takes before `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append`.
 - `dd-handoff-emitter` — emit/validate the final handoff.

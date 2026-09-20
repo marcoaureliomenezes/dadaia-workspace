@@ -53,6 +53,20 @@ def test_deleted_reaper_verbs_are_gone_and_reports_keeps_validate() -> None:
     assert set(reports) == {"validate"}
 
 
+def test_the_bugs_group_is_retired_from_the_cli_tree() -> None:
+    """0.4.7 FR2 (T-047-64): the bug ledger's ONE writer is
+    `dd-bug-resolution/scripts/bugs.py`; no `dadaia bugs` group survives beside it —
+    two writers for one ledger is the drift this candidate deletes."""
+    from typer.main import get_command
+
+    from dadaia_workspace.cli.main import app
+
+    groups = dict(getattr(get_command(app), "commands", {}) or {})
+    assert groups, "the CLI tree walked to zero groups — mis-rooted app?"
+    assert "bugs" not in groups
+    assert {name for name, _cmd in _leaves() if name.startswith("bugs ")} == set()
+
+
 def test_one_line_help_leaf_count_only_ratchets_down() -> None:
     offenders = sorted(
         name

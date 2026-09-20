@@ -27,7 +27,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from dadaia_workspace.core.doctor_rules import Rule
-from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.models.bugs import BugRecord
 from dadaia_workspace.core.models.histo import (
     AUDITS_HISTO_DISPOSITIONS,
@@ -171,10 +170,6 @@ class LedgersContext:
 
     specs_dir: Path
     records: dict[str, tuple[_Located, ...]] = field(default_factory=dict)
-    #: Injected at the CLI composition root (``cli/commands/doctor.py``), exactly as
-    #: ``bug_store_factory`` is injected into the specs doctor — this feature never
-    #: imports ``features.bugs``. ``None`` = no repair is wired and the rule reports only.
-    normalize_bug_records: Callable[[], int] | None = field(default=None, compare=False)
 
     @property
     def total_records(self) -> int:
@@ -201,11 +196,7 @@ def _read_json(path: Path, rel: str) -> list[_Located]:
         return [_Located(rel, 1, None, f"document is not valid JSON: {exc.msg}")]
 
 
-def build_ledgers_context(
-    specs_dir: Path,
-    *,
-    normalize_bug_records: Callable[[], int] | None = None,
-) -> LedgersContext:
+def build_ledgers_context(specs_dir: Path) -> LedgersContext:
     """Read every committed record of every ledger once. An absent ledger file is an
     empty list, never an issue: a young specs tree has no audits and no history yet."""
     records: dict[str, tuple[_Located, ...]] = {}
@@ -217,11 +208,7 @@ def build_ledgers_context(
             rel = path.relative_to(specs_dir).as_posix()
             located.extend(_read_jsonl(path, rel) if ledger.jsonl else _read_json(path, rel))
         records[ledger.glob] = tuple(located)
-    return LedgersContext(
-        specs_dir=specs_dir,
-        records=records,
-        normalize_bug_records=normalize_bug_records,
-    )
+    return LedgersContext(specs_dir=specs_dir, records=records)
 
 
 def _validate(ledger: Ledger, ctx: LedgersContext) -> list[LedgerIssue]:
@@ -230,23 +217,16 @@ def _validate(ledger: Ledger, ctx: LedgersContext) -> list[LedgerIssue]:
         if located.parse_error is not None:
             issues.append(LedgerIssue(ledger.code, located.path, located.line, located.parse_error))
             continue
-        # A record the ledger's own model can re-serialize is repairable, so EVERY issue
-        # it raises carries the executable fix — including the schema's own
-        # "additionalProperties" message about a retired key, which re-serialization is
-        # exactly what removes. One decision per record, never one per message.
         drift = (
             ledger.canonical_issue(located.record)
             if ledger.canonical_issue is not None and isinstance(located.record, dict)
             else None
         )
-        fix = _FIX_COMMAND if drift is not None else ""
         schema_messages = list(schema_errors(located.record, ledger.schema))
         for message in schema_messages:
-            issues.append(LedgerIssue(ledger.code, located.path, located.line, message, fix=fix))
+            issues.append(LedgerIssue(ledger.code, located.path, located.line, message))
         if not schema_messages and drift is not None:
-            issues.append(
-                LedgerIssue(ledger.code, located.path, located.line, drift, fix=_FIX_COMMAND)
-            )
+            issues.append(LedgerIssue(ledger.code, located.path, located.line, drift))
         if ledger.dispositions is None:
             continue
         disposition = (
@@ -271,28 +251,15 @@ type LedgerRule = Rule[LedgersContext, LedgerIssue]
 
 SECTION = "ledgers"
 
-#: The ONE executable remediation for a model-invariant issue that ships a migration.
-_FIX_COMMAND = f"{DADAIA_BIN} doctor --fix"
-
-
-def _fix_canonical_form(ctx: LedgersContext, issue: LedgerIssue) -> None:
-    """Re-serialize every non-canonical committed record of this ledger. An issue the
-    fixer cannot repair (``issue.fix`` empty — a mistyped field, a bad enum value) is
-    hand-edited, never auto-repaired: this reader cannot know what a wrong value was
-    MEANT to say, and guessing would corrupt a record."""
-    if issue.fix != _FIX_COMMAND or ctx.normalize_bug_records is None:
-        return
-    ctx.normalize_bug_records()
-
-
-#: One rule per ledger — the codes a reader greps for. Only the ledger whose model
-#: invariant ships a migration carries a fixer; the rest are hand-edited.
+#: One rule per ledger — the codes a reader greps for. No rule carries a fixer: the
+#: ledger's ONE writer is its skill script (0.4.7 FR2), which runs `check` over the bytes
+#: it is about to commit, so a non-canonical committed record is hand-edited, never
+#: re-serialized by a second writer living in the validator.
 RULES: tuple[LedgerRule, ...] = tuple(
     Rule(
         (ledger.code,),
         SECTION,
         (lambda bound: lambda ctx: _validate(bound, ctx))(ledger),
-        fix=_fix_canonical_form if ledger.canonical_issue is not None else None,
         fix_help=(f"sed -i '<line>s|.*|<the corrected record>|' specs/{ledger.glob}"),
     )
     for ledger in LEDGERS

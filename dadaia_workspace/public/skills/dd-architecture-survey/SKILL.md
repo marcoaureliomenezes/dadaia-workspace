@@ -24,7 +24,7 @@ change actually happens:
 1. If the operator named a direction (a module, subsystem, pain point), take it and
    skip the inference below.
 2. Otherwise, measure — never impressionistic:
-   - `dadaia bugs stats` and `dadaia bugs status --all`, aggregated per
+   - `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats` and `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status --all`, aggregated per
      surface/component: re-bug rate, fix-induced `caused_by` edges,
      resolved-without-evidence count.
    - `git log --oneline --since=<window> -- <path>` churn per touched path; join the

@@ -12,7 +12,7 @@ Implements:
   deleted, not disabled, v0.5.0 A5.2)
 
 The legacy ``dadaia bug new`` Markdown scaffolder was retired in v0.1.53 — bugs are
-event-sourced JSONL via ``dadaia bugs append`` (the v0.1.46 canon). ``BACKLOG.md`` support
+event-sourced JSONL via the bugs skill script (the v0.1.46 canon). ``BACKLOG.md`` support
 is retired outright (operator ruling 2026-08-28) — the single source is
 ``specs/backlog/BACKLOG.json``, schema ``public/schemas/backlog/backlog-v1.schema.json``.
 """
@@ -173,29 +173,10 @@ def release_rc_archive_cmd(
     except ArchiveError as exc:
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
-    archived_bugs = _archive_bugs(target)
     typer.echo(
         f"[ok] candidate {result.rc} of release {result.release} archived -> "
         f"{result.rc_dir} — root is ready for the next candidate's SPEC/PLAN/TASKS."
     )
-    typer.echo(f"[ok] bugs archived: {archived_bugs}")
-
-
-# ── helper: the bugs-archive sweep both archive verbs run ─────────────────────
-
-
-def _archive_bugs(target: Path) -> int:
-    """Run ``bugs archive`` inside an archive verb and return how many records moved.
-
-    Composed HERE, at the CLI — ``features/specs`` must not import ``features/bugs``
-    (P-07: features compose through the container or the CLI). Archiving a candidate
-    or a release is exactly the moment the ledger's terminal records stop being live
-    history, so the sweep rides the same verb instead of being a step an agent
-    remembers (RC-FLOW's hand-driven lane is what 0.4.7 FR3 deletes).
-    """
-    from dadaia_workspace.cli.commands.bugs import build_bug_service
-
-    return build_bug_service(target, with_archive=True).archive().archived
 
 
 def _histo_appender(target: Path) -> Callable[[HistoRecord], None]:
@@ -329,7 +310,7 @@ def release_archive_cmd(
 
     Validates (release tree, every task [x], phase CLOSURE, `implemented` set), then
     writes `shipped` + ARCHIVED, moves specs/releases/<id>/ to _archive/<id>/, births
-    <next>, appends the one releases_histo record and sweeps `bugs archive` — all or
+    <next>, appends the one releases_histo record — all or
     nothing. Prints the git commands the operator runs next and NEVER runs git itself.
     """
     target = _resolve_specs_dir(specs_dir)
@@ -349,12 +330,10 @@ def release_archive_cmd(
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
 
-    archived_bugs = _archive_bugs(target)
     typer.echo(f"[ok] archived: {result.archived_dir}")
     typer.echo(f"[ok] created: {result.next_spec}")
     typer.echo(f"[ok] created: {result.next_spec.parent / RELEASE_STATE_FILENAME}")
     typer.echo(f"[ok] histo record: {result.histo_id} (delivered)")
-    typer.echo(f"[ok] bugs archived: {archived_bugs}")
     typer.echo(
         "next: git add -A specs/releases specs/bugs && git commit -m "
         f'"chore(specs): archive release {result.release} — shipped {shipped} '

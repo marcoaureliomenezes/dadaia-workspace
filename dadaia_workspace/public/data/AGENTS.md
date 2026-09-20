@@ -85,4 +85,4 @@
 | `dd-manager-orchestration` | dispatching the three roles |
 
 - Language: operator preference, default English. Tone: direct, concise, operational.
-- Instance state: `dadaia context show --json`, `dadaia doctor`, `dadaia public doctor`, `dadaia bugs status`.
+- Instance state: `dadaia context show --json`, `dadaia doctor`, `dadaia public doctor`, `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`.
