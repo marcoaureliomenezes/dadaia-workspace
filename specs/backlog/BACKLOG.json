@@ -277,37 +277,6 @@
       ]
     },
     {
-      "id": "panel-demolition",
-      "title": "Demolish the panel; server control and sub-agent model injection stay as JSON managed by skill scripts",
-      "opened": "2026-09-18",
-      "status": "picked",
-      "description": "Operator verdict: the panel (4.9k LOC, 17 bugs, three redesigns) is demolished together with its telemetry UI. What it controlled survives in the new paradigm: (a) sub-agent model and effort per agent remain a JSON policy (agent_model_policy.json) injected into the projected agents at install, managed by a minimal script under the owning skill's scripts/ (list, set model/effort, validate, reproject); (b) dev-server control (register, list, next, release, scan, clean) becomes a minimal script under a skill's scripts/ with the same registry file, ports and TTL. No HTTP server, no SQLite session ingestion, no CSP, no Host allowlist. Flexibility is kept as files plus scripts, not as a UI. Supersedes panel-scope-to-unique-value.",
-      "provenance": "operator verdict 2026-09-18 on the competitive report's value scale",
-      "intents": [
-        {
-          "subject": {
-            "kind": "catalog",
-            "ref": "panel"
-          },
-          "change": "change — the panel feature package, its routes, views and telemetry UI are deleted; the catalog atom is retired"
-        },
-        {
-          "subject": {
-            "kind": "catalog",
-            "ref": "agent-monitoring"
-          },
-          "change": "change — session ingestion and cost tables go; the agent model policy JSON and its skill script are the one control surface"
-        },
-        {
-          "subject": {
-            "kind": "catalog",
-            "ref": "server-registry"
-          },
-          "change": "change — the registry stays a JSON file; its verbs move to a skill-local script; the CLI group server is retired after migration"
-        }
-      ]
-    },
-    {
       "id": "doctor-drop-scores",
       "title": "Doctor without scores: keep the rules, run in CI, fail on dead references and superseded decisions",
       "opened": "2026-09-18",
