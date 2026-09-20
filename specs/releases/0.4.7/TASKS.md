@@ -61,7 +61,7 @@
   `public/templates/shipped-hashes.json`, `infrastructure/**`, `core/workspace_layout.py`
   (citation comments only), `tests/**`.
 
-- [ ] T-047-53 — FR2a: every dd- skill whose behaviour touches a governed area opens that
+- [-] T-047-53 — FR2a: every dd- skill whose behaviour touches a governed area opens that
   area's scoped `AGENTS.md` as **step 1**, naming the path relative to the workspace root
   (`dd-backlog-definition` -> `specs/backlog/AGENTS.md`, `dd-bug-registration` and
   `dd-bug-resolution` -> `specs/bugs/AGENTS.md`, `dd-release-definition` and
