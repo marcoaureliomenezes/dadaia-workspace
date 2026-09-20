@@ -33,21 +33,14 @@
 
 | The work | Owner |
 |---|---|
-| Backlog curation — what enters, matures, leaves `specs/backlog/**` | `project-manager` |
-| Coordination, grill-me intake, dispatch | `project-manager` |
-| SPEC / PLAN / TASKS / CLOSURE, and `specs/memory/**` | `product-engineer` |
-| Architecture: DRAFT, REVIEW, ONBOARD; root-cause and fidelity gates | `software-architect` |
-| Production code and its tests, in any language | `software-engineer` |
-| E2E, test pyramid, deploy validation; closes each candidate | `qa-engineer` |
-| Three-axis review (`dd-code-review`: standards, spec, bug-surface) before a PR | `code-reviewer` |
-| Vulnerabilities, secrets, CVEs (the PR gate is the `security-review` check, §4.2) | `security-reviewer` |
-| Agents, skills, rules, workflows, commands, hooks — the AI surface | `ai-engineer` |
-| Drift audits; dispatches evidence agents; scores compliance | `project-auditor` |
+| Intake, grill-me, dispatch; backlog curation; SPEC; the memory pass at closure | `project-manager` |
+| PLAN and TASKS as technical planning; production code and its tests, in any language | `software-engineer` |
+| The three-axis review (`dd-code-review`) and its six lenses — architecture, security, QA, product, audit, AI surface — before a PR and at candidate close | `code-reviewer` |
 
 ### 2.2 Cross-cutting
 
-- `product-engineer` authors releases from the PM-curated backlog; it never curates the backlog itself.
-- Every agent invokes `dd-ai-eng-knowhow` for harness literacy; only `ai-engineer` reads its depth siblings — others dispatch it.
+- Three roles, no fourth: every retired role (architect, product, QA, security, audit, AI surface) is a lens the reviewer applies and the engineer anticipates.
+- Every agent invokes `dd-ai-eng-knowhow` for harness literacy; an AI-entity change follows its AUTHORING contract and passes the AI-surface lens.
 
 ---
 
@@ -187,7 +180,7 @@
 <!-- behavior: memory -->
 
 - Current product truth, not history — read it before changing production behavior.
-- `product-engineer` writes `specs/memory/**` only in `DEFINITION`/`CLOSURE` phases; every other agent reads it.
+- `project-manager` writes `specs/memory/**` only in `DEFINITION`/`CLOSURE` phases; every other agent reads it.
 - Changelog and history live in each release's `_RELEASE.json` `log` and in git.
 - Atom frontmatter carries exactly 5 fields: `slug title tldr summary tags`.
 - `ARCHITECTURE.md QUALITY.md TECHSTACK.md` split into ADR-gated Part 1 Principles (each `Measured by:`) and Part 2 Implementation.
@@ -248,7 +241,7 @@
 
 - Every test declares its intent and size at birth; an undeclared test is SCAFFOLD and expires.
 - Demotion (LARGE test -> equivalent cheaper coverage) is planned release-closure work.
-- Pruning to go green is exclusively a `qa-engineer` verdict; deletion/skip/disable carries evidence, executed by `software-engineer`.
+- Pruning to go green is exclusively a `code-reviewer` verdict (QA lens); deletion/skip/disable carries evidence, executed by `software-engineer`.
 - Tombstones and expired SCAFFOLD die at closure (§7.6); artifact capture is failure-gated (§5.2). Protocol: `dd-test-stewardship`.
 
 ### 7.3 Bugs
@@ -261,7 +254,7 @@
 - `dadaia bugs append` runs only after that confirmation; with no operator, the proposal is a handoff finding whose `message` starts `bug-proposal:` — never a record.
 - Redact local paths, IPs, hostnames, private names, secrets from every field. Protocol: `dd-bug-registration`.
 - Close in the same session as the fix: `dadaia bugs resolve` with the red-loop command, the regression-test seam, the diff direction.
-- Commit exactly what the fix touched, never a blanket `-A`; a net-positive diff routes to `software-architect` first.
+- Commit exactly what the fix touched, never a blanket `-A`; a net-positive diff passes the architecture lens first.
 - Check prior resolutions on the same component first; declare `caused_by: <bug_id>|none` — protocol: `dd-bug-resolution`.
 - Commit shapes: `dd-gitflow-default` §3a — measured by audits via `git log`, never a hook.
 

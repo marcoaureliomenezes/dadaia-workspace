@@ -8,7 +8,7 @@ description: >
 
 # dd-release-definition
 
-> `product-engineer` (dispatched by `project-manager`) drives every step directly,
+> `project-manager` drives every step directly (the engineer authors PLAN and TASKS),
 > from picking the set through SPEC → PLAN → TASKS. A release has open scope; each
 > candidate does not.
 

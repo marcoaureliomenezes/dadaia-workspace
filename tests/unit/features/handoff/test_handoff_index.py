@@ -394,27 +394,6 @@ def test_self_pull_ref_existence_and_missing_ref_named(tmp_path: Path) -> None:
     )
 
 
-def test_self_pull_role_map_coverage_required_for_mapped_agent(tmp_path: Path) -> None:
-    doc = _v12_doc_with_refs(["specs/memory/product/catalog.json"])
-    doc["agent"] = "product-engineer"
-    (tmp_path / "repos" / "dadaia-workspace" / "specs" / "memory" / "product").mkdir(parents=True)
-    (
-        tmp_path / "repos" / "dadaia-workspace" / "specs" / "memory" / "product" / "catalog.json"
-    ).write_text("{}")
-    ok = Handoff.load(_write(tmp_path / "ok.handoff.json", doc))
-    assert ok.validate(workspace_root=tmp_path, schema=_SCHEMA).valid is True
-
-    doc_missing_coverage = _v12_doc_with_refs(["specs/memory/ARCHITECTURE.md"])
-    doc_missing_coverage["agent"] = "product-engineer"
-    (tmp_path / "repos" / "dadaia-workspace" / "specs" / "memory" / "ARCHITECTURE.md").write_text(
-        "x"
-    )
-    bad = Handoff.load(_write(tmp_path / "bad.handoff.json", doc_missing_coverage))
-    result = bad.validate(workspace_root=tmp_path, schema=_SCHEMA)
-    assert result.valid is False
-    assert any("role-mapped" in e.message for e in result.errors)
-
-
 def test_self_pull_resolves_against_reviewed_root_before_workspace(tmp_path: Path) -> None:
     """The open-bug fix (reports-validate-resolves-self-pull-refs-against-the-checked-out-
     branch-not-the-reviewed-tree): a ref present in a linked worktree (``reviewed_root``)
@@ -584,33 +563,3 @@ def test_validate_schema_shape_and_load_schema_are_the_standalone_public_primiti
     schema = load_schema(_SCHEMA_PATH)
     assert validate_schema_shape(_base_doc(), schema) == []
     assert validate_schema_shape({}, schema) != []
-
-
-def test_role_atom_rule_is_skipped_when_the_mapped_atom_is_absent_from_the_tree(
-    tmp_path: Path,
-) -> None:
-    """Bug `handoff-v12-role-atom-map-unsatisfiable-in-pattern5-tree`: the role-atom rule
-    and the ref-existence rule used to contradict each other in a specs pattern-5 tree,
-    whose memory files are `quality-assurance.md`/`architecture.md`, never `QUALITY.md`.
-    Listing the mapped atom failed existence; omitting it failed coverage — no honest
-    handoff could validate. The rule now demands the atom exactly when the tree HAS it.
-
-    Intent: CONTRACT — handoff-v12-role-atom-map-unsatisfiable-in-pattern5-tree
-    Size: SMALL — two fixture trees under tmp_path, no subprocess, no network.
-    """
-    memory = tmp_path / "repos" / "dadaia-workspace" / "specs" / "memory"
-    memory.mkdir(parents=True)
-    (memory / "quality-assurance.md").write_text("pattern-5 quality atom")
-
-    pattern5 = _v12_doc_with_refs(["specs/memory/quality-assurance.md"])
-    pattern5["agent"] = "qa-engineer"
-    handoff = Handoff.load(_write(tmp_path / "p5.handoff.json", pattern5))
-    result = handoff.validate(workspace_root=tmp_path, schema=_SCHEMA)
-    assert result.valid is True, [e.message for e in result.errors]
-
-    # The rule keeps its teeth where the atom EXISTS: same handoff, pattern-6 tree.
-    (memory / "QUALITY.md").write_text("pattern-6 quality atom")
-    still_refused = Handoff.load(_write(tmp_path / "p6.handoff.json", pattern5))
-    refused = still_refused.validate(workspace_root=tmp_path, schema=_SCHEMA)
-    assert refused.valid is False
-    assert any("role-mapped" in e.message for e in refused.errors)

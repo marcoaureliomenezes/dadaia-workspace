@@ -9,7 +9,7 @@ description: >
 
 # dd-bug-resolution — Arm B
 
-> `software-engineer`/`ai-engineer` run this directly once a bug carries a record.
+> `software-engineer` runs this directly once a bug carries a record.
 > Git chokepoints (`DADAIA.md` §3) are the only mechanical backstop.
 
 ## 1. Lifecycle frame
@@ -59,13 +59,13 @@ fix the cause, watch it pass, re-run the Phase 1 loop on the original scenario. 
 correct seam exercises the real bug pattern at its call site (`dd-codebase-design`
 owns the seam vocabulary and the deletion test the fix must pass); when none exists, that
 is itself the finding — register an architecture finding and dispatch
-`software-architect` before fixing.
+the architecture lens before fixing.
 *Done when the test fails for the real reason and passes with the fix (or the seam
 gap is registered first).*
 
 **Phase 6 — Cleanup + resolve.** Grep the probe prefix to zero; the diff leaves the
 touched feature smaller or equal — a fix that grows it routes to
-`software-architect` first (net-positive rule, `DADAIA.md` §7). Then close the
+the architecture lens first (net-positive rule, `DADAIA.md` §7). Then close the
 record:
 
 ```

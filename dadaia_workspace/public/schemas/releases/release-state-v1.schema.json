@@ -67,7 +67,7 @@
           "description": "When this milestone was recorded."
         }
       },
-      "description": "Set once, at the definition promotion commit (product-engineer). null before that point."
+      "description": "Set once, at the definition promotion commit (project-manager). null before that point."
     },
     "implemented": {
       "type": [
@@ -100,7 +100,7 @@
           "description": "When this milestone was recorded."
         }
       },
-      "description": "Set once, at the final-rc QA close (qa-engineer). null before that point."
+      "description": "Set once, at the final-rc close (code-reviewer). null before that point."
     },
     "shipped": {
       "type": [

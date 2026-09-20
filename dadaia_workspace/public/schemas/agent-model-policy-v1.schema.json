@@ -34,7 +34,7 @@
         "model": {
           "type": "string",
           "minLength": 1,
-          "description": "Claude model id from core/model_registry (e.g. 'claude-sonnet-5'). Never a Fable-family model when the agent is security-reviewer (G-1/D-7)."
+          "description": "Claude model id from core/model_registry (e.g. 'claude-sonnet-5'). Never a Fable-family model when the agent is code-reviewer (G-1/D-7)."
         },
         "effort": {
           "$ref": "#/$defs/claudeEffort",

@@ -1,8 +1,7 @@
 ---
 name: dd-manager-orchestration
 description: >
-  Dispatch reference for project-manager and project-auditor: the dispatch
-  protocol, decision authority, escalation triggers, forbidden actions, and the
+  Dispatch reference for project-manager: the dispatch protocol, decision authority, escalation triggers, forbidden actions, and the
   which-skill-when router. Use when dispatching work, resolving a conflict, or
   routing a demand to the right skill.
 ---
@@ -43,14 +42,9 @@ description: >
 
 | Domain | Primary authority | May object with evidence | Tie-breaker |
 |---|---|---|---|
-| Feature scope, SPEC, TASKS | product-engineer | all agents | product-engineer |
-| Architecture, ADRs, patterns | software-architect | software-engineer, security-reviewer | software-architect |
-| Production implementation | software-engineer | software-architect, security-reviewer | software-architect |
-| AI entities | ai-engineer | product-engineer, security-reviewer | product-engineer |
-| E2E acceptance | qa-engineer | software-engineer, product-engineer | qa-engineer |
-| Security posture | security-reviewer | software-engineer | security-reviewer |
-| Drift scoring | project-auditor | product-engineer | product-engineer |
-| Orchestration | project-manager | any agent | operator |
+| Scope, SPEC, memory, backlog | project-manager | any agent | operator |
+| PLAN, TASKS, implementation, tests | software-engineer | code-reviewer | project-manager |
+| Every review lens (architecture, security, QA, product, audit, AI surface) | code-reviewer | software-engineer | project-manager |
 
 ### Escalation triggers — stop and surface to the operator
 
@@ -68,7 +62,7 @@ description: >
 |---|---|
 | Recursive agent chains without operator approval | Breaks traceability |
 | Marking tasks DONE without validation evidence | Skips acceptance |
-| Push, PR, merge, deploy, closure, or `[x]` before QA/code/security approval | Bypasses the quality gate |
+| Push, PR, merge, deploy, closure, or `[x]` before the reviewer's `APPROVED` | Bypasses the quality gate |
 | Editing production files without a `[-]` reservation | Breaks task traceability |
 | Private/project-specific details in public assets | Security and portability |
 
@@ -96,10 +90,10 @@ moment a contract breaks) → `dd-bug-resolution` (seven-phase method + resolve)
 - `dd-domain-modeling` — the domain glossary; sharpening terms and offering ADRs.
 
 **Health and upkeep:**
-- `dd-architecture-survey` — deepening candidates at each candidate close (`software-architect`).
-- `dd-audit-project` — the three-pillar drift audit (`DADAIA.md` §6.8).
+- `dd-architecture-survey` — deepening candidates at each candidate close (architecture lens).
+- `dd-audit-project` — the three-pillar drift audit (`DADAIA.md` §6.8, audit lens).
 
-**Harness:** `dd-ai-eng-knowhow` (primitives literacy; `ai-engineer` depth),
+**Harness:** `dd-ai-eng-knowhow` (primitives literacy and the AUTHORING contract),
 `dd-cli-library` (CLI idioms for every Bash-capable agent).
 
 ## 5. Done when

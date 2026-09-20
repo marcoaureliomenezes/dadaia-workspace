@@ -18,7 +18,7 @@ axes are reported side by side — an axis never outranks another.
 ## 1. When
 
 - Reviewing a PR, branch or commit range before the candidate's PR.
-- A qa-engineer or software-architect verdict needs the Bug-surface axis.
+- A curation, architecture or audit verdict needs the Bug-surface axis (§6).
 
 ## 2. Axis 1 — Standards
 
@@ -53,8 +53,19 @@ axes are reported side by side — an axis never outranks another.
 - The three axes appear side by side in the report; the verdict (`APPROVED`/`REJECTED` — the handoff schema's enum) follows the caller persona's rules.
 - The Bug-surface answer is REQUIRED in every verdict — "tests green" is not a verdict.
 
-## 6. References
+## 6. The six lenses
+
+One reviewer, six checklists applied on every verdict (ADR 0016); the engineer anticipates them.
+
+- **Architecture** — root cause named; the diff shrinks or keeps the feature (`dd-codebase-design` deletion test); `dd-architecture-survey` at candidate close.
+- **Security** — OWASP top 10, secrets, dependency CVEs (`pip-audit`/`npm audit`), CWE id per finding; never Fable on this lens.
+- **QA** — every acceptance scenario has evidence; the pyramid holds; pruning only by a curation verdict (`dd-test-stewardship`).
+- **Product** — the diff matches SPEC scope; memory atoms still tell the truth (`dd-release-implementation` MEMORY-UPDATE).
+- **Audit** — `dd-audit-project` pillars over the window; findings, never fixes.
+- **AI surface** — every agent, skill, rule or hook change satisfies `dd-ai-eng-knowhow` AUTHORING's fifteen rules.
+
+## 7. References
 
 - `dd-codebase-design` — the vocabulary the Standards and Bug-surface axes speak.
 - `dd-test-stewardship` — test findings' lifecycle rules.
-- Security depth / CVE / OWASP: `security-reviewer`'s lane, never re-run here.
+- Security depth / CVE / OWASP: the security lens (§6), never a fourth axis.

@@ -24,15 +24,6 @@ from dadaia_workspace.infrastructure.public_assets_common import _toml_escape
 # Parallel workflow detection
 _FRONTMATTER_PARALLEL_GROUP_RE = re.compile(r"^\s*parallel_group:\s*\S", re.MULTILINE)
 
-_CODEX_READ_ONLY_AGENTS = frozenset(
-    {
-        "code-reviewer",
-        "project-auditor",
-        "qa-engineer",
-        "security-reviewer",
-        "software-architect",
-    }
-)
 # Fallback reasoning effort when an agent's ``model:`` is unknown to the registry
 # (defensive only — every canonical agent's model id is registry-backed).
 _CODEX_DEFAULT_EFFORT = "medium"
@@ -60,7 +51,9 @@ _CODEX_SKILL_REF_PREFIXES = (
 _CODEX_SKILL_REF_RUNTIME_ASSET_EXCEPTIONS: frozenset[str] = frozenset({"memory-ctx"})
 
 # Whitelist of agent frontmatter fields that may be emitted to codex config.toml.
-_TOML_SAFE_AGENT_FIELDS: frozenset[str] = frozenset({"name", "description", "model", "tools"})
+_TOML_SAFE_AGENT_FIELDS: frozenset[str] = frozenset(
+    {"name", "description", "model", "tools", "activity_class"}
+)
 
 # Matches a YAML list item under `tools:` (e.g. "  - Read")
 _AGENT_FM_TOOLS_ITEM_RE = re.compile(r"^  - (.+)$", re.MULTILINE)
@@ -240,6 +233,7 @@ def _render_codex_agent_toml(
     description: str | None = None,
     claude_model: str | None = None,
     reasoning_effort: str | None = None,
+    read_only: bool = False,
 ) -> str:
     """Serialize an agent as a TOML file for the Codex runtime.
 
@@ -247,7 +241,9 @@ def _render_codex_agent_toml(
     - ``name`` — basic string
     - ``description`` — basic string when available
     - ``model`` — basic string
-    - ``sandbox_mode`` — conservative role boundary
+    - ``sandbox_mode`` — ``read-only`` when *read_only* (the persona's
+      ``activity_class: ADDITIVE``, the same source the Claude render uses), else
+      ``workspace-write``
     - ``model_reasoning_effort`` — explicit reasoning profile: *reasoning_effort*
       when supplied (the D-3 clamp of the RESOLVED agent-model-policy effort,
       v0.1.65 FR5); otherwise derived from the registry tier of *claude_model*
@@ -280,7 +276,7 @@ def _render_codex_agent_toml(
     ]
     if description:
         lines.append(f"description = {_toml_escape(description)}\n")
-    sandbox_mode = "read-only" if name in _CODEX_READ_ONLY_AGENTS else "workspace-write"
+    sandbox_mode = "read-only" if read_only else "workspace-write"
     if reasoning_effort is None:
         reasoning_effort = _codex_reasoning_effort_for_model(claude_model)
     lines.extend(

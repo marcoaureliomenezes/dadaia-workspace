@@ -31,14 +31,8 @@ _runner = CliRunner()
 # ---------------------------------------------------------------------------
 
 EXPECTED_AGENTS = {
-    "ai-engineer",
     "code-reviewer",
-    "product-engineer",
-    "project-auditor",
     "project-manager",
-    "qa-engineer",
-    "security-reviewer",
-    "software-architect",
     "software-engineer",
 }
 
@@ -337,14 +331,14 @@ class TestDoctor:
                 "Full report:\n" + "\n".join(report)
             )
         else:
-            target = workspace / ".claude" / "agents" / "qa-engineer.md"
+            target = workspace / ".claude" / "agents" / "code-reviewer.md"
             target.unlink()
             report = [line.render() for line in mgr.doctor(workspace)]
             missing_lines = [
-                line for line in report if "[missing]" in line and "qa-engineer" in line
+                line for line in report if "[missing]" in line and "code-reviewer" in line
             ]
             assert missing_lines, (
-                "Doctor did not detect missing .claude/agents/qa-engineer.md.\n"
+                "Doctor did not detect missing .claude/agents/code-reviewer.md.\n"
                 "Full report:\n" + "\n".join(report)
             )
 

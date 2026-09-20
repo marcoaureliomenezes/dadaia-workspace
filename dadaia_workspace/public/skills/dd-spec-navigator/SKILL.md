@@ -35,7 +35,7 @@ read or any output written.
 4. Re-read `ARCHITECTURE.md` deliberately when the decision touches layer boundaries,
    dependency rules, agent topology or schema contracts; a task self-contained in one
    well-understood component skips that re-read.
-5. Memory is read-only here: atoms are written only by `product-engineer` in
+5. Memory is read-only here: atoms are written only by `project-manager` in
    DEFINITION/CLOSURE phase (`DADAIA.md` §6) — discipline the audit measures, never a
    gate block.
 

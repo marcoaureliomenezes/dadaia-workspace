@@ -8,12 +8,12 @@ description: >
 
 # dd-release-implementation
 
-> Not hook-enforced. No engine advances gates, drives closure, or reads `TASKS.md` — implementers, reviewers, `product-engineer` uphold it directly.
+> Not hook-enforced. No engine advances gates, drives closure, or reads `TASKS.md` — implementers, the reviewer, `project-manager` uphold it directly.
 
 ## 1. When
 
-- Any implementer (`software-engineer`, `ai-engineer`, `qa-engineer`) working a task inside an `Aprovado` candidate.
-- `product-engineer` at each candidate's closure.
+- `software-engineer` working a task inside an `Aprovado` candidate.
+- `project-manager` at each candidate's closure.
 - From the first reservation through the promote-or-continue gate (and, on promote, the ship + branch cut).
 
 ## 2. Steps

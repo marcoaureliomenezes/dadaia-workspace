@@ -1,14 +1,14 @@
 ---
 name: dd-audit-project
 description: >
-  project-auditor's three-pillar drift audit — bug history, spec compliance, memory
+  The three-pillar drift audit (the reviewer's audit lens) — bug history, spec compliance, memory
   drift — over the sha window read from audits_histo.jsonl. Use when dispatched to
   audit a context.
 ---
 
 # dd-audit-project — Three Pillars Over a SHA Window
 
-> `project-auditor` drives this directly, dispatched by the operator or a dispatching
+> `code-reviewer` drives this directly, dispatched by the operator or a dispatching
 > agent. Suggested every 5 releases, never mandatory.
 
 ## 1. The window — computed once per audit

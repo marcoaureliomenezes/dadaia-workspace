@@ -2,7 +2,7 @@
 slug: index
 title: Catálogo de Produtos
 tldr: Índice de todas as features do produto com resumos e metadados de contexto.
-summary: Visão consolidada de todas as features do produto. Ponto de entrada para self-pull de atoms de feature específicos. Mantido pelo product-engineer durante CLOSURE de cada release.
+summary: Visão consolidada de todas as features do produto. Ponto de entrada para self-pull de atoms de feature específicos. Mantido pelo project-manager durante CLOSURE de cada release.
 tags:
   - catalog
   - product

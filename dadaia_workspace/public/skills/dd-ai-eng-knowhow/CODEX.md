@@ -1,6 +1,6 @@
 # CODEX.md — Compiled Decision Protocols for the Codex Harness
 
-Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, `ai-engineer`-only depth).
+Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, authoring depth).
 A protocol reference, not a doc mirror — read official docs (§8) on demand for primitive-level detail.
 
 - Mental anchor: Codex assembles an instruction chain before working.
@@ -155,8 +155,7 @@ prefix_rule(
 | Recursion depth | A subagent should not spawn another subagent except in exceptional cases |
 | Output contract | Each subagent returns findings with severity, evidence, and a verdict |
 
-- dadaia mapping: `project-manager` = primary orchestrator; `project-auditor` = audit orchestrator.
-- Narrow roles (`qa-engineer`, `security-reviewer`, etc.) are candidate custom agents with scoped tools.
+- dadaia mapping: `project-manager` = primary orchestrator; `code-reviewer` = the read-only custom agent.
 
 ---
 
@@ -184,7 +183,7 @@ prefix_rule(
 - A trusted-project escalation must never be the path by which a repo silently rewrites credentials.
 - No runtime projections committed inside the source repo — `.codex/` belongs at the workspace runtime root.
 - No absolute paths or local-projection leakage into public packages — hooks/configs use portable paths only.
-- Treat enabling project-local config/hooks as a privileged review step (pair with security-reviewer).
+- Treat enabling project-local config/hooks as a privileged review step (the security lens).
 
 ---
 

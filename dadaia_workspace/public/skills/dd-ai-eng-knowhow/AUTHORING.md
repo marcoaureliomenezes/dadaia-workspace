@@ -1,7 +1,7 @@
 # AUTHORING.md — The Writing-for-Agents Contract
 
-Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, `ai-engineer`-only depth).
-House authoring contract for every AI-entity file `ai-engineer` writes: personas, skills, rules, hooks-facing instructions.
+Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, authoring depth).
+House authoring contract for every AI-entity file: personas, skills, rules, hooks-facing instructions.
 
 ## The 15-rule checklist
 
@@ -50,7 +50,7 @@ Every library skill must satisfy all fifteen; each rule's detail lives in the se
 | Cognitive load | The operator/reviewer | Zero context tax, but the human must remember the document exists |
 
 - This is `dd-ai-eng-knowhow`'s own shape in miniature: Part 1 is context-loaded for every agent, every session.
-- Siblings are reached only by pointer — free until `ai-engineer` needs them.
+- Siblings are reached only by pointer — free until an author needs them.
 
 ---
 

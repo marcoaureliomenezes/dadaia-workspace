@@ -2,20 +2,20 @@
 name: dd-ai-eng-knowhow
 description: >
   Harness literacy for every agent (persona, subagent, skill, rule, hook, AGENTS.md,
-  MCP — and the Claude-Code/Codex/Kimi-Code deltas), plus ai-engineer's disclosed
+  MCP — and the Claude-Code/Codex/Kimi-Code deltas), plus the disclosed
   authoring depth. Use when reasoning about your own harness configuration, before
-  touching any AI-entity file, or to decide when to defer to ai-engineer.
+  touching any AI-entity file.
 ---
 
-# dd-ai-eng-knowhow — Harness Literacy for Everyone, Depth for `ai-engineer`
+# dd-ai-eng-knowhow — Harness Literacy for Everyone, Depth on Demand
 
 ## 1. When
 
 - Every agent: reasoning about your own harness configuration (persona, skill, rule,
   hook, AGENTS.md, MCP).
-- `ai-engineer` only: authoring or auditing any AI-entity file.
+- Authoring or auditing any AI-entity file (the reviewer's AI-surface lens).
 - Any other agent needing to CHANGE (not read) a persona/skill/rule/hook: dispatch
-  `ai-engineer` instead.
+  the AUTHORING contract instead.
 
 ## 2. The working model
 
@@ -39,7 +39,7 @@ description: >
    `.kimi-code/` projection.
 2. Re-project: `dadaia public stage` → `dadaia public install --target all` →
    `dadaia public doctor`.
-3. `ai-engineer` authors against [`AUTHORING.md`](AUTHORING.md) — the 15-rule
+3. Author against [`AUTHORING.md`](AUTHORING.md) — the 15-rule
    writing-for-agents contract — and opens the relevant disclosed sibling instead of
    re-deriving harness behavior; public assets carry no consumer names, hostnames,
    IPs or secrets.
@@ -49,9 +49,8 @@ description: >
 - You can name the primitive and its harness-specific serialization before acting.
 - Any AI-entity edit landed in `public/` source and was re-projected and
   doctor-verified.
-- A non-`ai-engineer` agent needing an AI-entity change dispatched `ai-engineer`.
 
-## 5. Disclosed siblings (`ai-engineer` depth)
+## 5. Disclosed siblings (authoring depth)
 
 - [`AUTHORING.md`](AUTHORING.md) — the writing-for-agents contract and 15-rule
   checklist.

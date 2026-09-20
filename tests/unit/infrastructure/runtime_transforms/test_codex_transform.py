@@ -1,13 +1,13 @@
 """Unit tests for dadaia_workspace.infrastructure.runtime_transforms.codex.
 
 Covers (ADR-2 golden tests):
-- project-manager / project-auditor bodies: Agent tool references are replaced with
+- project-manager body: Agent tool references are replaced with
   Codex custom-agent wording.
 - Harness skill identifiers (e.g. ``ai-harness-claude-code``) are NOT model
   identifiers and survive intact; known Claude model identifiers ARE mapped;
   the Opus/Sonnet/Haiku tier-recommendation phrase is rewritten to Codex-native
   registry-tier terms (T-013-12 defense-in-depth).
-- software-architect body (no Agent tool): output is identical to input (verbatim).
+- software-engineer body (no Agent tool): output is identical to input (verbatim).
 - All 9 canonical core agents: output is non-empty after strip().
 """
 
@@ -45,16 +45,10 @@ def _load_body(agent_id: str) -> str:
     return _strip_frontmatter(raw)
 
 
-# All 9 canonical core agent IDs.
+# The three canonical core agent IDs (ADR 0016).
 _CANONICAL_AGENTS: tuple[str, ...] = (
-    "ai-engineer",
     "code-reviewer",
-    "product-engineer",
-    "project-auditor",
     "project-manager",
-    "qa-engineer",
-    "security-reviewer",
-    "software-architect",
     "software-engineer",
 )
 
@@ -63,7 +57,6 @@ _CANONICAL_AGENTS: tuple[str, ...] = (
     "case",
     [
         "project-manager-agent-tool-replaced",
-        "project-auditor-agent-tool-replaced",
         "preserves-claude-code-skill-identifier",
         "maps-known-claude-model-identifiers-only",
         "anthropic-tier-phrase-replaced",
@@ -82,46 +75,34 @@ def test_codex_transform_replacement_matrix(case: str) -> None:
         assert "subagent dispatch" not in result
         assert "explicit Codex subagent delegation" in result
 
-    elif case == "project-auditor-agent-tool-replaced":
-        body = _load_body("project-auditor")
-        result = transform_for_codex(body, "project-auditor")
-        assert "Agent tool" not in result, (
-            "Expected 'Agent tool' to be replaced in project-auditor output"
-        )
-        assert "`Agent`" not in result, (
-            "Expected '`Agent`' tool-table entry to be replaced in project-auditor output"
-        )
-        assert "subagent dispatch" not in result
-        assert "explicit Codex subagent delegation" in result
-
     elif case == "preserves-claude-code-skill-identifier":
         body = "Use `ai-harness-claude-code` when auditing Claude Code projections."
-        result = transform_for_codex(body, "ai-engineer")
+        result = transform_for_codex(body, "software-engineer")
         assert "`ai-harness-claude-code`" in result
         assert "ai-harness-gpt" not in result
 
     elif case == "maps-known-claude-model-identifiers-only":
         body = "Model row: claude-sonnet-4-6. Skill row: ai-harness-claude-code."
-        result = transform_for_codex(body, "ai-engineer")
+        result = transform_for_codex(body, "software-engineer")
         assert "gpt-5.6-terra" in result
         assert "claude-sonnet-4-6" not in result
         assert "ai-harness-claude-code" in result
 
     else:  # anthropic-tier-phrase-replaced
         body = "recommend Opus / Sonnet / Haiku based on the workload-character table."
-        result = transform_for_codex(body, "ai-engineer")
+        result = transform_for_codex(body, "software-engineer")
         assert "Opus / Sonnet / Haiku" not in result
         assert "deep / dispatch / fast registry tiers" in result
 
 
 def test_generic_agent_preserved_verbatim() -> None:
-    """software-architect has no Agent tool references — output must equal input
+    """code-reviewer has no Agent tool references — output must equal input
     (the only-coverage of the claude-string leak prevention into codex
     projections, pairing with D-CX-4)."""
-    body = _load_body("software-architect")
-    result = transform_for_codex(body, "software-architect")
+    body = _load_body("code-reviewer")
+    result = transform_for_codex(body, "code-reviewer")
     assert result == body, (
-        "Expected software-architect body to be preserved verbatim "
+        "Expected code-reviewer body to be preserved verbatim "
         "(no Agent tool patterns present), but got diff"
     )
 

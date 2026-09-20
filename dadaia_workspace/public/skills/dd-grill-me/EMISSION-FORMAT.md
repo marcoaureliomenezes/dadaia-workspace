@@ -11,4 +11,4 @@ Report home: `DADAIA.md` §5.2; the sections below, in this order, are the repor
 | `Spec impact` | The consolidated list of pending spec edits: file, section, what changes |
 | `Evidence` | Files, commands, and subagent findings used during Step 1 inspection |
 | `Result` | `pass` once the operator confirmed shared understanding, `blocked` otherwise |
-| `Next action` | e.g. "product-engineer authors SPEC.md" |
+| `Next action` | e.g. "project-manager authors SPEC.md" |

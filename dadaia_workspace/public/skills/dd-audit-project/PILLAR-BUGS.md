@@ -42,7 +42,7 @@ Metrics 7 and 8 carry `target 0` and report their measured value even when it wo
 ## Per-record checks (beyond the eight metrics)
 
 - A resolved record carrying no `cause`, or no `evidence_seam` (no regression seam).
-- A `diff_direction: net-positive` record whose resolving commit shows no `software-architect` routing evidence (`DADAIA.md` §7).
+- A `diff_direction: net-positive` record whose resolving commit shows no architecture-lens routing evidence (`DADAIA.md` §7).
 - Bug-scoped commit-shape conformance: shapes 1 (registration) and 3 (fix) of `dd-gitflow-default` §3a, read from `git log`.
 - The full five-shape sweep is `PILLAR-SPECS.md`'s — never duplicated here.
 

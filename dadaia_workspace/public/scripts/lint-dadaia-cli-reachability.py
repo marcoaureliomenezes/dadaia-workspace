@@ -3,8 +3,7 @@
 
 FR5 (v0.4.3, entry `dadaia-cli-skill-agent-grant` #36). The rule is mechanical: an
 agent whose `tools:` frontmatter includes `Bash` is shell-capable and must carry the
-`dd-cli-library` skill grant; an agent with no `Bash` (`product-engineer`,
-`software-architect`) would find the grant inert and must NOT carry it. This mirrors
+`dd-cli-library` skill grant; an agent with no `Bash` would find the grant inert and must NOT carry it. This mirrors
 `public/skills/dd-cli-library/SKILL.md`'s "Reachability" table — keep both in sync.
 
 Usage:

@@ -29,24 +29,20 @@ from dadaia_workspace.core.models.agent_model_policy import (
     ResolvedAgentModel,
 )
 
-#: The 9 core agents every template must cover exactly (G-4; constitution §14 roster).
+#: The three core agents every template must cover exactly (ADR 0016: PM, engineer,
+#: reviewer; every other role is a review lens of code-reviewer).
 CORE_AGENTS: tuple[str, ...] = (
     "project-manager",
-    "software-architect",
-    "product-engineer",
-    "project-auditor",
-    "security-reviewer",
-    "code-reviewer",
-    "ai-engineer",
     "software-engineer",
-    "qa-engineer",
+    "code-reviewer",
 )
 
 #: The default template id (G-5): used whenever no overlay / no applied_template exists.
 _DEFAULT_TEMPLATE_ID = "balanced"
 
-#: The agent that must NEVER receive a Fable-family model, in any template (G-1).
-_FABLE_FORBIDDEN_AGENT = "security-reviewer"
+#: The agent that must NEVER receive a Fable-family model, in any template (G-1; the
+#: security lens runs on code-reviewer since ADR 0016).
+_FABLE_FORBIDDEN_AGENT = "code-reviewer"
 
 
 def _a(model: str, effort: str) -> AgentModelAssignment:
@@ -67,14 +63,8 @@ _BUILT_IN: tuple[AgentModelTemplate, ...] = (
         default=True,
         assignments={
             "project-manager": _a("claude-fable-5-1", "high"),
-            "software-architect": _a("claude-fable-5-1", "high"),
-            "product-engineer": _a("claude-fable-5-1", "high"),
-            "project-auditor": _a("claude-fable-5-1", "high"),
-            "security-reviewer": _a("claude-sonnet-5", "xhigh"),
             "code-reviewer": _a("claude-opus-5", "high"),
-            "ai-engineer": _a("claude-opus-5", "medium"),
             "software-engineer": _a("claude-opus-5", "low"),
-            "qa-engineer": _a("claude-opus-5", "low"),
         },
     ),
     AgentModelTemplate(
@@ -83,14 +73,8 @@ _BUILT_IN: tuple[AgentModelTemplate, ...] = (
         default=False,
         assignments={
             "project-manager": _a("claude-fable-5-1", "high"),
-            "software-architect": _a("claude-fable-5-1", "high"),
-            "product-engineer": _a("claude-fable-5-1", "high"),
-            "project-auditor": _a("claude-fable-5-1", "high"),
-            "security-reviewer": _a("claude-opus-5", "xhigh"),
-            "code-reviewer": _a("claude-fable-5-1", "medium"),
-            "ai-engineer": _a("claude-opus-5", "medium"),
+            "code-reviewer": _a("claude-opus-5", "xhigh"),
             "software-engineer": _a("claude-opus-5", "low"),
-            "qa-engineer": _a("claude-opus-5", "low"),
         },
     ),
 )
@@ -100,9 +84,9 @@ def _assert_templates_resolve(templates: tuple[AgentModelTemplate, ...] = _BUILT
     """Fail loudly if any template is ungoverned (mirrors ``_assert_profiles_resolve``).
 
     Raises:
-        ValueError: on a duplicate template id; a roster not covering exactly the 9
+        ValueError: on a duplicate template id; a roster not covering exactly the
             core agents; a model unknown to the registry; an effort outside the D-3
-            vocabulary; a Fable-family model on ``security-reviewer`` (G-1); or when no
+            vocabulary; a Fable-family model on ``code-reviewer`` (G-1); or when no
             template is the ``balanced`` default.
     """
     known_models = registry_by_claude_id()
@@ -117,7 +101,7 @@ def _assert_templates_resolve(templates: tuple[AgentModelTemplate, ...] = _BUILT
             missing = sorted(expected - covered)
             extra = sorted(covered - expected)
             raise ValueError(
-                f"template {template.id!r} must cover exactly the 9 core agents; "
+                f"template {template.id!r} must cover exactly the core agents; "
                 f"missing: {missing}; unexpected: {extra}"
             )
         for agent, assignment in template.assignments.items():
@@ -137,7 +121,7 @@ def _assert_templates_resolve(templates: tuple[AgentModelTemplate, ...] = _BUILT
             raise ValueError(
                 f"template {template.id!r} assigns {forbidden!r} to "
                 f"{_FABLE_FORBIDDEN_AGENT!r}; Fable is NEVER assigned to "
-                "security-reviewer (operator ruling G-1)"
+                "code-reviewer (operator ruling G-1)"
             )
     defaults = [t.id for t in templates if t.default]
     if defaults != [_DEFAULT_TEMPLATE_ID]:

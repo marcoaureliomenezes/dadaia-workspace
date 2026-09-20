@@ -5,7 +5,7 @@ Mirrors the ``json_workflow_model_policy_store`` discipline: missing file ⇒ ``
 temp+rename write with a ``.last-good.json`` snapshot of the PRIOR valid file; a shared
 no-I/O :meth:`parse` path (consumed later by the panel validate endpoint). Every FR3
 rejection carries a distinct, actionable message; D-7 rejects any combination that
-resolves a Fable-family model onto ``security-reviewer``.
+resolves a Fable-family model onto ``code-reviewer``.
 
 The generic load/parse/save+last-good store contract (missing->None, corrupt->typed
 error, unknown-top-level-field, wrong schema_version, atomic-no-tmp, last-good
@@ -126,25 +126,25 @@ def test_valid_doc_and_minimal_doc_parse(tmp_path: Path) -> None:
 def test_d7_rejects_fable_on_security_reviewer_but_allows_on_other_agents(
     tmp_path: Path, fable_id: str
 ) -> None:
-    """D-7: an override putting ANY Fable-family model on security-reviewer is rejected
+    """D-7: an override putting ANY Fable-family model on code-reviewer is rejected
     at parse (bug g1-fable-guard-matches-only-claude-fable-5-so-fable-5-1-lands-on-
-    security-reviewer: the guard is the registry family, never one literal id); the
+    code-reviewer: the guard is the registry family, never one literal id); the
     same model is freely allowed on any other agent. This is the sole coverage of the
     D-7 governance invariant — keep both assertions explicit."""
     store = _store(tmp_path)
 
     doc = _valid_doc()
-    doc["overrides"] = {"security-reviewer": {"model": fable_id}}
+    doc["overrides"] = {"code-reviewer": {"model": fable_id}}
     with pytest.raises(
         AgentModelPolicyStoreError,
-        match=f"{fable_id}.*security-reviewer|security-reviewer.*{fable_id}",
+        match=f"{fable_id}.*code-reviewer|code-reviewer.*{fable_id}",
     ):
         store.parse(doc)
 
     doc2 = _valid_doc()
-    doc2["overrides"] = {"qa-engineer": {"model": fable_id}}
+    doc2["overrides"] = {"software-engineer": {"model": fable_id}}
     overlay = store.parse(doc2)
-    assert overlay.overrides["qa-engineer"].model == fable_id
+    assert overlay.overrides["software-engineer"].model == fable_id
 
 
 def test_save_atomic_last_good_and_reload(tmp_path: Path) -> None:
@@ -156,7 +156,7 @@ def test_save_atomic_last_good_and_reload(tmp_path: Path) -> None:
         applied_template="max-quality",
         overrides={
             "software-engineer": AgentModelOverride(model="claude-opus-4-8"),
-            "qa-engineer": AgentModelOverride(effort="max"),
+            "project-manager": AgentModelOverride(effort="max"),
         },
     )
 

@@ -4,39 +4,15 @@
   "personas": [
     {
       "id": "project-manager",
-      "mandate": "Coordinator and sole dispatch authority: intake, grill-me, backlog curation, dispatching every other persona. Never writes code, specs, memory or tests."
-    },
-    {
-      "id": "product-engineer",
-      "mandate": "Spec author and memory guardian: SPEC/PLAN/TASKS/CLOSURE and specs/memory/**. Never dispatches or implements code."
+      "mandate": "Coordinator and sole dispatch authority: intake, grill-me, backlog curation, SPEC and the memory pass, dispatching the engineer and the reviewer."
     },
     {
       "id": "software-engineer",
-      "mandate": "Generic implementer: production code and its tests, TDD-first, inside the task's declared write set."
-    },
-    {
-      "id": "qa-engineer",
-      "mandate": "E2E and test-pyramid owner; validates deploys; validates at candidate close (RC-FLOW step 4)."
+      "mandate": "Generic implementer: PLAN and TASKS as technical planning, production code and its tests, TDD-first, inside the task's declared write set."
     },
     {
       "id": "code-reviewer",
-      "mandate": "Three-axis review (standards, spec, bug surface) at candidate close, before the PR. Never edits code."
-    },
-    {
-      "id": "security-reviewer",
-      "mandate": "Vulnerability auditor and the PR verdict gate: OWASP, secrets, CVEs; emits the sha-matched PR verdict (branch contract: DADAIA.md §4 Gitflow)."
-    },
-    {
-      "id": "software-architect",
-      "mandate": "Anti-slop architecture specialist: DRAFT/REVIEW/ONBOARD; root-cause and fidelity gates on every spec review."
-    },
-    {
-      "id": "project-auditor",
-      "mandate": "Drift anchor: audits specs/memory vs code, dispatches evidence agents, scores compliance. Never fixes drift."
-    },
-    {
-      "id": "ai-engineer",
-      "mandate": "Exclusive owner of the AI surface: agents, skills, rules, hooks, context engineering, model tiering."
+      "mandate": "The reviewer: three-axis review (standards, spec, bug surface) plus the six lenses — architecture, security, QA, product, audit, AI surface — at candidate close, before the PR; verdict-only."
     }
   ],
   "behaviors": [

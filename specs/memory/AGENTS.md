@@ -11,11 +11,11 @@ History lives in each release's `_RELEASE.json` `log` entries and under `_archiv
 | Action | Allowed |
 |---|---|
 | Read any atom | every agent, any phase |
-| Write/edit any atom | `product-engineer` only, in `DEFINITION` or `CLOSURE` phase |
+| Write/edit any atom | `project-manager` only, in `DEFINITION` or `CLOSURE` phase |
 | Edit by any other agent | never, in any phase |
 
 - The SDD gate enforces neither half: `specs/memory/**` is MUTATING, writable in every phase.
-- Both halves — the phase and `product-engineer` as sole author — are agent discipline, measured by the audit's memory pillar.
+- Both halves — the phase and `project-manager` as sole author — are agent discipline, measured by the audit's memory pillar.
 - Discipline statement: `DADAIA.md` §6.4.
 - Stale memory found mid-implementation becomes a bug or a closure note — never patch it in place outside the allowed phases.
 

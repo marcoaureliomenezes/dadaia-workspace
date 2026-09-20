@@ -17,8 +17,7 @@ Scope: this file governs only `specs/releases/`.
 ## 1. Structure
 
 - `AGENTS.md` — this file.
-- `<release-id>/{SPEC.md, PLAN.md, TASKS.md, _RELEASE.json, rc-N/, verdicts/}` — the live release; `rc-N/{SPEC,PLAN,TASKS}.md` are archived candidates.
-- `verdicts/` — required-check evidence handoffs, deleted once consumed.
+- `<release-id>/{SPEC.md, PLAN.md, TASKS.md, _RELEASE.json, rc-N/}` — the live release; `rc-N/{SPEC,PLAN,TASKS}.md` are archived candidates.
 - `_ideas/<release-id>/` — pre-approval drafts; own scoped rule, `_ideas/AGENTS.md`.
 - `_archive/<release-id>/` — the whole archived release directory, moved there by `dadaia release archive`.
 - `_archive/` holds published versions only (ADR 0014): a candidate closed between two publications is `rc-N/` of the version that published it. `dadaia release fold <id> --into <published> [--shipped <sha> --pr <n> --shipped-ts <ts>] [--final]` is the one path that repairs a wrongly archived release; `RELEASE-TREE-ARCHIVE-ID` / `RELEASE-TREE-ARCHIVE-UNSHIPPED` refuse the shape.

@@ -192,7 +192,7 @@ an initialized workspace, create it:
   `next_handoff:{"agent":"human","context":<ctx>,"expected_artifact_type":"other"}`.
   `self_pull.refs` MUST list the memory atom the agent's role maps to, or the validator
   rejects it — correctly: an agent's handoff has to show it read its own memory. For
-  `agent:"qa-engineer"` that is `specs/memory/QUALITY.md` (context-relative, and
+  `agent:"code-reviewer"` that is `specs/memory/QUALITY.md` (context-relative, and
   it exists in any scaffolded context). A ref like `AGENTS.md` alone is NOT enough
   (bug recipe-f12-minimal-valid-handoff-is-invalid: the earlier wording prescribed exactly
   that, so following the recipe verbatim produced a FAIL against a healthy product).
@@ -325,7 +325,7 @@ never exercised the live backlog path was false confidence).
 
 ### R-02 — Real-demand backlog is canonical and consumable
 
-- Author a B3/CVM-style real capture item as `project-manager`/`product-engineer` would
+- Author a B3/CVM-style real capture item as `project-manager` would
   (`dadaia backlog new <slug>` then fill in its `**Intents:**` block, the single-source
   ACTIVE subsection — SPEC v0.12.0 FR3, ADR #14), then `dadaia backlog subjects
   --specs-dir <ctx>/specs`.
@@ -420,7 +420,7 @@ gates cannot catch, because they never call the model.
   registry tier resolves to exactly ONE codex id, and no two tiers collapse to an
   identical `(codex_id, reasoning_effort)` pair.
 - **G-1 stands:** `claude-fable-5` is NEVER the resolved model for
-  `security-reviewer`, under any template or override.
+  `code-reviewer`, under any template or override.
 - **PASS if ALL of the above hold.** A registry-derived allowlist narrowing (e.g. a
   provider-qualified model id that no longer maps) must fail LOUDLY at load with a
   message naming the rejected id — never silently accept an unmapped model.

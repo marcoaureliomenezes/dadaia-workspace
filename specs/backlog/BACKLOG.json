@@ -64,30 +64,6 @@
       ]
     },
     {
-      "id": "persona-least-privilege",
-      "title": "Per-persona least privilege: tools, permissionMode, maxTurns, worktree isolation",
-      "opened": "2026-09-12",
-      "status": "picked",
-      "description": "Deferred (grill Q16 item 8, audit A-010): each agent file declares tools/disallowedTools, permissionMode, maxTurns and isolation: worktree; reviewers get no Edit/Write; reports route through ADDITIVE paths first.",
-      "provenance": "operator-ratified deferral 2026-09-12 grill Q16 — standards replacement, own grill before pick — promoted to candidate 2026-09-14 (operator order: ideas are official backlog)",
-      "intents": [
-        {
-          "subject": {
-            "kind": "code",
-            "ref": "dadaia_workspace/infrastructure/install_helpers.py#render_claude_agent"
-          },
-          "change": "change — derives disallowedTools and permissionMode from activity_class (ADDITIVE -> read-only/default, MUTATING -> acceptEdits), the same source the Codex sandbox_mode render uses; no isolation: worktree"
-        },
-        {
-          "subject": {
-            "kind": "doc",
-            "ref": "memory/product/agents/agentic-entities.md#The derivation law"
-          },
-          "change": "change — code-reviewer, security-reviewer, qa-engineer, software-architect and project-auditor lose Write/Edit; the PM writes their handoff and HTML report from the returned text"
-        }
-      ]
-    },
-    {
       "id": "one-line-bootstrap",
       "title": "One-line bootstrap: uvx dadaia-workspace init <dir> [--repo <url>] scaffolds a full workspace",
       "opened": "2026-09-18",
@@ -218,30 +194,6 @@
             "ref": "agentic-entities"
           },
           "change": "change — the behavior map hash tuple covers scripts/; the 11 canonical skills carry scripts, the 7 generic skills are removed from public/ and published via standalone-skills-distribution"
-        }
-      ]
-    },
-    {
-      "id": "roster-three-roles-review-lenses",
-      "title": "Roster 9 -> 3: project-manager, software-engineer, code-reviewer; every other role becomes a review lens",
-      "opened": "2026-09-18",
-      "status": "picked",
-      "description": "Value scale class 14 (roles and orchestration) carries the second-strongest negative signal in the community: coordination tax, subagents starving for context, orchestrators producing garbage. Operator verdict: keep only PM (intake, dispatch, backlog), engineer (all production code and tests) and reviewer (the verdict). Architecture, security, QA, product-engineering, auditing and AI-engineering stop being staffed agents with dispatch bands and become REVIEW LENSES: named axes the reviewer (and the engineer before handing off) applies from a skill, each lens with its checklist and its verdict line, no separate context, no handoff between personas. Ownership table in DADAIA.md section 2 shrinks to three rows; behavior-map and registry drop six personas; the security push verdict is one lens of the reviewer.",
-      "provenance": "operator verdict 2026-09-18 on the competitive report's value scale",
-      "intents": [
-        {
-          "subject": {
-            "kind": "catalog",
-            "ref": "agent-orchestration"
-          },
-          "change": "change — dispatch protocol reduced to three roles; no PM-to-specialist handoff for architecture, security, QA, product, audit or AI-entity work"
-        },
-        {
-          "subject": {
-            "kind": "catalog",
-            "ref": "agent-comms"
-          },
-          "change": "change — inter-persona handoffs for the six retired roles are deleted; lenses report inside the reviewer's one handoff"
         }
       ]
     },

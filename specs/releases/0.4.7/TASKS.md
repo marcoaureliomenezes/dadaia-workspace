@@ -57,7 +57,7 @@
   `features/specs/**`, `core/workspace_layout.py`, `cli/commands/ci.py`, `public/skills/
   {dd-code-review,dd-release-implementation,dd-gitflow-default}/**`, `public/data/DADAIA.md`
   (§4.2, §10.2), `public/scaffold/releases/AGENTS.md`, `tests/**`.
-- [ ] T-047-47 — FR6: delete the six persona files; `CORE_AGENTS` = 3; behavior-map owner rows,
+- [x] T-047-47 — FR6: delete the six persona files; `CORE_AGENTS` = 3; behavior-map owner rows,
   grants, dispatch bands; `dd-manager-orchestration` three-role dispatch; six lens checklists in
   `dd-code-review`; `_FABLE_FORBIDDEN_AGENT = code-reviewer`; least-privilege render from
   `activity_class` (Claude + Codex); owner rows in DADAIA §2 and `specs/AGENTS.md`; `dd-ai-eng-

@@ -166,7 +166,15 @@ def render_claude_agent(staged_text: str, resolved: ResolvedAgentModel) -> str:
         )
     frontmatter = staged_text[4 : end_idx + 1]
     rest = staged_text[end_idx + 5 :]
-    kept = [line for line in frontmatter.splitlines() if not line.startswith(("model:", "effort:"))]
+    derived = ("model:", "effort:", "permissionMode:", "disallowedTools:")
+    kept = [line for line in frontmatter.splitlines() if not line.startswith(derived)]
+    # Least privilege derives from the persona's activity_class (ADR 0016): an ADDITIVE
+    # persona (the reviewer) never edits; a MUTATING one accepts its own edits.
+    if "activity_class: ADDITIVE" in frontmatter:
+        kept.append("permissionMode: default")
+        kept.append("disallowedTools: [Edit, Write, NotebookEdit]")
+    else:
+        kept.append("permissionMode: acceptEdits")
     kept.append(f"model: {resolved.model}")
     if resolved.effort is not None:
         kept.append(f"effort: {resolved.effort}")

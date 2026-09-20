@@ -9,7 +9,7 @@ candidates.
 | Boundary | Who validates | What unlocks |
 |---|---|---|
 | Per task | implementer discipline only (TDD, tests, local CI preflight, handoff); marker stays `[-]` | nothing; no per-task reviewer gate |
-| Candidate close | `qa-engineer` + `code-reviewer` + `security-reviewer`, all `APPROVED` on the same commit | `[x]`; the candidate's `feature -> develop` PR |
+| Candidate close | `code-reviewer` `APPROVED` (three axes, six lenses) on the same commit | `[x]`; the candidate's `feature -> develop` PR |
 | Promote (ship) | pre-staged security verdict naming develop's tip | the `develop -> main` PR |
 
 - Any `REJECTED`, CRITICAL/HIGH finding, failed E2E, or missing evidence sends the work back to implementation.
@@ -34,14 +34,14 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 - Done when: the suite is green and an `implementation-complete` handoff is emitted.
 
 **Step 3 — Scope-complete.**
-- All the candidate's tasks are `[x]`; `software-architect` runs `dd-architecture-survey` before the review closes.
+- All the candidate's tasks are `[x]`; the architecture lens runs `dd-architecture-survey` before the review closes.
 - Done when: `TASKS.md` carries zero `[ ]`/`[-]` rows.
 
 **Step 4 — Candidate trio review.**
-- `qa-engineer` + `code-reviewer` + `security-reviewer` all `APPROVED` on the same commit.
-- Done when: all three verdicts are `APPROVED` on that sha.
+- `code-reviewer` `APPROVED` on the same commit.
+- Done when: the verdict is `APPROVED` on that sha.
 
-**Step 5 — Memory update (`product-engineer`).**
+**Step 5 — Memory update (`project-manager`).**
 - `dadaia release phase CLOSURE --sha <sha>` — it refuses while any task is not `[x]`.
 - Memory is closure procedure, never a task: a TASKS.md task whose write set names
   `specs/memory` is refused by `dadaia doctor` (SPEC-DOC-047).

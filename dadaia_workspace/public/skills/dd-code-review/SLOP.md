@@ -37,7 +37,7 @@ labelled judgement call with the command that makes it verifiable in the diff.
 ## Readers
 
 - `code-reviewer` — all ten, on every review.
-- `qa-engineer` — §Tests (S3), for curation verdicts.
-- `software-architect` — S4/S5, for the root-cause and fidelity gates.
-- `project-auditor` — all ten over the audit window (`dd-audit-project`, pillar 2, "Slop readout").
+- QA lens — §Tests (S3), for curation verdicts.
+- Architecture lens — S4/S5, for the root-cause and fidelity gates.
+- Audit lens — all ten over the audit window (`dd-audit-project`, pillar 2, "Slop readout").
 - Ratchets: V31-V34 pin the counts (`tests/contract/test_test_suite_ratchets.py`, `tests/contract/test_slop_ratchets.py`); V35 is the audit readout.

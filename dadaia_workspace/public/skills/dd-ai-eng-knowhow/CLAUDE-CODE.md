@@ -1,6 +1,6 @@
 # CLAUDE-CODE.md — Claude Code Harness Mastery
 
-Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, `ai-engineer`-only depth).
+Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, authoring depth).
 A decision surface, not a doc mirror — official docs are an on-demand index at §9; consult, never transcribe.
 
 - Governing law: the model decides, the harness enforces.

@@ -98,7 +98,7 @@ def test_stage_manifest_codex_adapters_and_install_all(
         assert (workspace / ".agents" / "skills" / skill / "SKILL.md").exists(), (
             f".agents/skills/{skill}/SKILL.md not installed"
         )
-    assert (workspace / ".claude" / "agents" / "software-architect.md").exists()
+    assert (workspace / ".claude" / "agents" / "code-reviewer.md").exists()
     assert (workspace / ".codex" / "hooks.json").exists()
     assert (workspace / ".codex" / "config.toml").exists()
     # Codex receives Starlark .rules for command policy. Markdown behavioral
@@ -370,8 +370,8 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     assert (pm["model"], pm["effort"]) == ("claude-fable-5-1", "high")
     se = _claude_frontmatter(ws, "software-engineer")
     assert (se["model"], se["effort"]) == ("claude-opus-5", "low")
-    sec = _claude_frontmatter(ws, "security-reviewer")
-    assert not is_fable_model(sec["model"]), "never Fable on security-reviewer (G-1)"
+    sec = _claude_frontmatter(ws, "code-reviewer")
+    assert not is_fable_model(sec["model"]), "never Fable on code-reviewer (G-1)"
 
     pm_toml = _codex_toml_fields(ws, "project-manager")
     assert (pm_toml["model"], pm_toml["model_reasoning_effort"]) == ("gpt-5.6-sol", "high")
@@ -431,7 +431,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
         json.dumps(
             {
                 "schema_version": "agent-model-policy-v1",
-                "overrides": {"security-reviewer": {"model": "claude-fable-5"}},
+                "overrides": {"code-reviewer": {"model": "claude-fable-5"}},
             }
         ),
         encoding="utf-8",
@@ -518,7 +518,7 @@ def test_a_single_skill_rename_is_green_everywhere_after_one_place(
 
     A mirror tree (the T-045-15 pattern) is built — the real
     ``dadaia_workspace/public/`` tree is never mutated — and ONE skill directory is
-    renamed inside it, plus the same skill's references in the three agent frontmatter
+    renamed inside it, plus the same skill's references in every agent frontmatter
     files that list it (the edit a real rename requires; the ORACLE ITSELF needs no
     edit — A4.3, derived from the tree, never a literal list). What is asserted is that
     the pipeline expectation (the former ``EXPECTED_SKILLS`` comparison), the
@@ -544,7 +544,7 @@ def test_a_single_skill_rename_is_green_everywhere_after_one_place(
         if old_ref in text:
             agent_file.write_text(text.replace(old_ref, new_ref), encoding="utf-8")
             rewritten_agents += 1
-    assert rewritten_agents == 3, "expected exactly 3 agent frontmatter files to reference it"
+    assert rewritten_agents >= 1, "expected at least one agent frontmatter file to reference it"
 
     mutated_roster = skill_names(mirror_public)
     assert new_name in mutated_roster

@@ -49,14 +49,14 @@ description: >
 - Record the demotion map in `_RELEASE.json`'s `log`
   (`dd-release-implementation`).
 
-## Deletion — a qa-engineer verdict, executed by software-engineer
+## Deletion — a reviewer (QA lens) verdict, executed by software-engineer
 
 - Delete only on a decision-table criterion, cited with evidence in the commit:
   feature removed · duplicate coverage · tautology/no-op · reflex snapshot ·
   zero-defect flake history · expired quarantine.
 - A tombstone test dies together with its target — it validates a historical event,
   not live behavior.
-- Pruning to go green is exclusively a `qa-engineer` verdict; the implementer
+- Pruning to go green is exclusively a `code-reviewer` verdict; the implementer
   executes the commit.
 
 ## Flakes and quarantine

@@ -138,7 +138,7 @@
     "verdict": {
       "type": "string",
       "enum": ["APPROVED", "REJECTED"],
-      "description": "Optional approval verdict emitted by qa-engineer or security-reviewer. When present, must be APPROVED or REJECTED. Enables machine-checkable dual-approval gate at release CLOSURE."
+      "description": "Optional approval verdict emitted by code-reviewer. When present, must be APPROVED or REJECTED. Enables machine-checkable dual-approval gate at release CLOSURE."
     },
     "verdict_reason": {
       "type": "string",

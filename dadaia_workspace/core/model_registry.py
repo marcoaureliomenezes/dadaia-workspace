@@ -181,7 +181,7 @@ def registry_by_claude_id() -> dict[str, ModelEntry]:
 
 def fable_model_ids() -> frozenset[str]:
     """The Fable family — every registered ``claude-fable-*`` id. The G-1 ruling
-    ("Fable is never assigned to security-reviewer") is a FAMILY rule; both guards
+    ("Fable is never assigned to code-reviewer") is a FAMILY rule; both guards
     (template import, policy-store parse) derive it from here, never from one literal
     id that goes stale at the next Fable release (bug
     g1-fable-guard-matches-only-claude-fable-5-so-fable-5-1-lands-on-security-reviewer)."""

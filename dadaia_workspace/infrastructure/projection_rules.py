@@ -406,6 +406,7 @@ def _codex_agent_toml_bytes(
         description=codex_description,
         claude_model=claude_model,
         reasoning_effort=reasoning_effort,
+        read_only=(fm.get("activity_class") == "ADDITIVE") if fm else False,
     )
     return toml_content.encode("utf-8")
 
