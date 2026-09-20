@@ -209,20 +209,20 @@ def test_throttle_marker_rejects_traversal_shaped_identity_components(tmp_path: 
     """Direct-API defense-in-depth (v0.1.76 security-review LOW, carried into release
     0.5.1 K2's ONE throttle-marker idiom): a traversal-shaped composite marker name
     (built from a hostile ``session_id``/``ctx``) must never place the advisory throttle
-    marker outside ``.dadaia/tmp/`` — :func:`presence.throttled`/:func:`presence.
+    marker outside ``.dadaia/tmp/`` — :func:`markers.throttled`/:func:`presence.
     stamp_throttle` reject an invalid marker name outright (hook callers already
     sanitize their components; this pins the module's own guard)."""
-    from dadaia_workspace.features.spec_context import presence
+    from dadaia_workspace.features.spec_context import markers
 
     ws = _mk_workspace(tmp_path, "dadaia-workspace")
     escape_probe = tmp_path / "escape-probe"
     hostile_marker = f"presence-warn-../../../{escape_probe.name}-dadaia-workspace"
 
-    presence.stamp_throttle(ws, hostile_marker)
+    markers.stamp_throttle(ws, hostile_marker)
     assert not escape_probe.exists()
-    assert presence.throttled(ws, hostile_marker, window_seconds=300, now=0.0) is False
+    assert markers.throttled(ws, hostile_marker, window_seconds=300, now=0.0) is False
 
-    presence.stamp_throttle(ws, "presence-warn-session-ok-dadaia-workspace")
+    markers.stamp_throttle(ws, "presence-warn-session-ok-dadaia-workspace")
     marker = ws / ".dadaia" / "tmp" / "presence-warn-session-ok-dadaia-workspace"
     assert marker.is_file()
     assert marker.parent == ws / ".dadaia" / "tmp"

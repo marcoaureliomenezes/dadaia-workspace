@@ -8,9 +8,11 @@
 
 ## Candidate 5 — demolition
 
-- [ ] T-047-41 — FR2a: reaper owns the throttle marker (`features/workspace/sweep.py`); presence
-  keeps working through it. Write set: `features/workspace/sweep.py`, `hooks/sdd_post_gate.py`,
-  `tests/unit/features/workspace/**`.
+- [x] T-047-41 — FR2a: the reaper lane owns the throttle-marker idiom
+  (`features/spec_context/markers.py`: throttled, stamp_throttle, reap_markers); presence keeps
+  working through it. Write set: `features/spec_context/{markers,presence,gate_policy}.py`,
+  `hooks/sdd_post_gate.py`, `tests/unit/features/spec_context/**`, `tests/unit/hooks/**`,
+  `tests/unit/core/test_kernel_tunables.py`.
 - [ ] T-047-42 — FR2b: delete `features/spec_context/presence.py`, the presence zone row,
   `PRESENCE-GC`, `PRESENCE_TTL_SECONDS`, `pre_commit.py` + `pre-commit-presence-gate.sh` + the
   `INSTALLED_GIT_HOOKS` row, `ci pre-commit-check`, `context heartbeat`, `context release`; fix

@@ -57,6 +57,7 @@ from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
 from dadaia_workspace.core.record_liveness import is_stale
+from dadaia_workspace.features.spec_context import markers
 
 __all__ = [
     "GcReport",
@@ -67,26 +68,10 @@ __all__ = [
     "others_alive",
     "renew",
     "stale_records",
-    "stamp_throttle",
-    "throttled",
     "upsert",
 ]
 
 #: Marker filename prefixes under ``.dadaia/tmp/`` this module owns and reaps — the SAME
-#: prefixes ``hooks.sdd_post_gate`` (reconciler throttle), ``features.spec_context.
-#: gate_policy`` (advisory throttle) and ``hooks.ctx_inject`` (sentinel/compact markers)
-#: write. One reaper for all four (release 0.5.1 K2) — no marker prefix is ever "reaped
-#: by nobody" again.
-_MARKER_PREFIXES: tuple[str, ...] = (
-    "reconciler-last-",
-    "presence-warn-",
-    "ctx-inject-fired-",
-    "ctx-compact-",
-)
-
-#: GC TTL (mtime-only) for every advisory marker :func:`gc` owns — one generous floor
-#: (24h) for all four throttle/sentinel idioms; see the module docstring.
-_MARKER_GC_TTL_SECONDS = kernel_tunables.SENTINEL_GC_TTL_SECONDS
 
 
 @dataclass(frozen=True)
@@ -340,48 +325,6 @@ def stale_records(workspace: Path) -> list[StaleRecordRef]:
 
 
 # ---------------------------------------------------------------------------
-# throttled / stamp_throttle — the ONE mtime-throttle-marker idiom.
-# ---------------------------------------------------------------------------
-
-
-def throttled(workspace: Path, marker_name: str, *, window_seconds: float, now: float) -> bool:
-    """True iff ``marker_name`` under ``.dadaia/tmp/`` was stamped within
-    ``window_seconds`` of ``now`` (an epoch float, matching ``time.time()``).
-
-    The ONE mtime-throttle-marker idiom (release 0.5.1 K2) — used by the PostToolUse
-    reconciler (before spawning a git child) and the gate's advisory-warning throttle,
-    replacing two near-identical copies. A traversal-shaped or otherwise invalid
-    ``marker_name`` (anything outside ``[A-Za-z0-9_-]+`` — CWE-22/CWE-59) is rejected:
-    never throttled (the caller degrades to "run now"). A missing/unreadable marker is
-    likewise never throttled (fail-open -> run).
-    """
-    if not _valid_name(marker_name):
-        return False
-    marker = workspace / ".dadaia" / "tmp" / marker_name
-    try:
-        last = marker.stat().st_mtime
-    except OSError:
-        return False
-    return (now - last) < window_seconds
-
-
-def stamp_throttle(workspace: Path, marker_name: str) -> None:
-    """Record that ``marker_name`` fired now (best-effort; never raises).
-
-    A traversal-shaped or otherwise invalid ``marker_name`` is rejected outright — never
-    written outside ``.dadaia/tmp/`` (CWE-22/CWE-59).
-    """
-    if not _valid_name(marker_name):
-        return
-    marker = workspace / ".dadaia" / "tmp" / marker_name
-    try:
-        marker.parent.mkdir(parents=True, exist_ok=True)
-        marker.write_text(_utcnow_iso(), encoding="utf-8")
-    except OSError:
-        return
-
-
-# ---------------------------------------------------------------------------
 # gc — the ONLY reaper of presence records, throttle/sentinel markers, and now-empty
 # presence context dirs (release 0.5.1 K2). See the module docstring.
 # ---------------------------------------------------------------------------
@@ -457,36 +400,6 @@ def _reap_presence_records(
     return tuple(reaped), tuple(empty_dirs)
 
 
-def _reap_markers(workspace: Path, *, now: float) -> tuple[str, ...]:
-    """Advisory markers under ``.dadaia/tmp/`` matching :data:`_MARKER_PREFIXES`, older
-    than :data:`_MARKER_GC_TTL_SECONDS` by mtime. No session cross-reference (see the
-    module docstring: every marker this reaps is a spent throttle stamp).
-
-    AG.1/FR17: shares :func:`_within_dadaia` with the presence lane — the same guard,
-    one home."""
-    tmp_dir = workspace / ".dadaia" / "tmp"
-    try:
-        entries = sorted(tmp_dir.iterdir())
-    except OSError:
-        return ()
-    reaped: list[str] = []
-    for path in entries:
-        if not path.name.startswith(_MARKER_PREFIXES):
-            continue
-        if not _within_dadaia(path, workspace):
-            continue
-        try:
-            mtime = path.stat().st_mtime
-        except OSError:
-            continue
-        if (now - mtime) < _MARKER_GC_TTL_SECONDS:
-            continue
-        with contextlib.suppress(OSError):
-            path.unlink(missing_ok=True)
-            reaped.append(path.name)
-    return tuple(reaped)
-
-
 def gc(workspace: Path, *, now: datetime, own_session_id: str) -> GcReport:
     """The ONLY reaper of presence records, throttle/sentinel markers under
     ``.dadaia/tmp/``, and now-empty presence context dirs. NEVER raises (each lane is
@@ -502,8 +415,8 @@ def gc(workspace: Path, *, now: datetime, own_session_id: str) -> GcReport:
             workspace, own_session_id=own_session_id, now=now
         )
 
-    markers: tuple[str, ...] = ()
+    markers_reaped: tuple[str, ...] = ()
     with contextlib.suppress(Exception):  # GC must never raise (best-effort, per lane).
-        markers = _reap_markers(workspace, now=now.timestamp())
+        markers_reaped = markers.reap_markers(workspace, now=now.timestamp())
 
-    return GcReport(presence=presence_reaped, markers=markers, empty_context_dirs=empty_dirs)
+    return GcReport(presence=presence_reaped, markers=markers_reaped, empty_context_dirs=empty_dirs)

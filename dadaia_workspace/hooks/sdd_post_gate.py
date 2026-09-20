@@ -36,7 +36,7 @@ from pathlib import Path
 
 from dadaia_workspace.core import invocation, session_store
 from dadaia_workspace.core.kernel_tunables import RECONCILER_THROTTLE_TTL_SECONDS
-from dadaia_workspace.features.spec_context import presence
+from dadaia_workspace.features.spec_context import markers, presence
 from dadaia_workspace.hooks import _common
 
 
@@ -61,8 +61,8 @@ def _refresh_session_record(workspace: Path, sess_id: str) -> dict[str, object] 
 # ---------------------------------------------------------------------------------------
 # Throttled GC cadence (FR-W1-03 throttle, release 0.5.1 K2 reaper) — NEVER blocks.
 #
-# Throttle marker: ``.dadaia/tmp/reconciler-last-<sid>``, via :func:`presence.throttled` /
-# :func:`presence.stamp_throttle` — the ONE mtime-throttle-marker idiom. A second
+# Throttle marker: ``.dadaia/tmp/reconciler-last-<sid>``, via :func:`markers.throttled` /
+# :func:`markers.stamp_throttle` — the ONE mtime-throttle-marker idiom. A second
 # PostToolUse invocation inside the window does nothing; outside it, the hook calls the
 # ONE reaper, :func:`presence.gc`. The git-status reconciler that used to share this
 # cadence died with the log line that was its only output (FR11).
@@ -77,11 +77,11 @@ def _throttled_gc(workspace: Path, sess_id: str) -> None:
     (fail-open).
     """
     marker = f"reconciler-last-{sess_id}"
-    if presence.throttled(
+    if markers.throttled(
         workspace, marker, window_seconds=RECONCILER_THROTTLE_TTL_SECONDS, now=time.time()
     ):
         return
-    presence.stamp_throttle(workspace, marker)
+    markers.stamp_throttle(workspace, marker)
     # ONE cadence, ONE reaper (0.4.7 FR6b): ``doctor.reap`` seeds what is missing, moves
     # slop into ``.dadaia/reaped/``, deletes what TTL expired — and runs ``presence.gc``
     # itself, with THIS session id, so the hook no longer calls it separately and a live

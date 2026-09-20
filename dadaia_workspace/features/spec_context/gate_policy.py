@@ -29,7 +29,7 @@ from pathlib import Path
 
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
-from dadaia_workspace.features.spec_context import presence
+from dadaia_workspace.features.spec_context import markers, presence
 
 __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
 
@@ -106,7 +106,7 @@ _ANON_SESSION_ID = "anon-session"
 
 def _advisory_marker_name(session_id: str, ctx: str) -> str:
     """The advisory throttle marker's filename — validated by :func:`presence.throttled`/
-    :func:`presence.stamp_throttle` themselves (release 0.5.1 K2: the ONE
+    :func:`markers.stamp_throttle` themselves (release 0.5.1 K2: the ONE
     mtime-throttle-marker idiom, replacing this module's own copy)."""
     return f"presence-warn-{session_id}-{ctx}"
 
@@ -297,10 +297,10 @@ def evaluate(
             others = presence.others_alive(workspace, ctx, session_id)
             marker = _advisory_marker_name(session_id, ctx)
             now = time.time()
-            if others and not presence.throttled(
+            if others and not markers.throttled(
                 workspace, marker, window_seconds=_ADVISORY_THROTTLE_SECONDS, now=now
             ):
-                presence.stamp_throttle(workspace, marker)
+                markers.stamp_throttle(workspace, marker)
                 message = _advisory_message(ctx, rel_path, others)
                 return Decision.ALLOW, message
     except Exception:  # noqa: BLE001 — fail-safe contract (AC-04): never fail-dead.
