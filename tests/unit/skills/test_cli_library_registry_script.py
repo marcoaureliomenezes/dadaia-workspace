@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — dd-dev-server/scripts/registry.py owns the port registry JSON (0.4.7
+"""Intent: CONTRACT — dd-cli-library/scripts/registry.py owns the port registry JSON (0.4.7
 c5 T-047-45: the `dadaia server` group retired into one stdlib script). Size: SMALL."""
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ _SCRIPT = (
     / "dadaia_workspace"
     / "public"
     / "skills"
-    / "dd-dev-server"
+    / "dd-cli-library"
     / "scripts"
     / "registry.py"
 )

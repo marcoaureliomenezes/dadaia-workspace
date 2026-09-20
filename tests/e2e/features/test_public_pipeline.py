@@ -291,8 +291,8 @@ class TestContentConsistency:
                 assert (skill_dir / "SKILL.md").exists(), (
                     f"Skill directory '{skill_dir.name}' has no SKILL.md"
                 )
-        # 0.4.7 c5 T-047-45: the dev-server registry is the dd-dev-server skill script.
-        registry_script = (skills_dir / "dd-dev-server" / "scripts" / "registry.py").read_text(
+        # 0.4.7 c5 T-047-45: the dev-server registry is the dd-cli-library skill script.
+        registry_script = (skills_dir / "dd-cli-library" / "scripts" / "registry.py").read_text(
             encoding="utf-8"
         )
         for verb in ("register", "release", "next", "clean"):

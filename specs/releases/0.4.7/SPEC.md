@@ -91,7 +91,7 @@ the contract tests named below.
 
 ### FR3 — Server registry as a skill script
 
-- New skill `public/skills/dd-dev-server/` (SKILL.md <= 6 KB) with `scripts/registry.py`
+- `dd-cli-library/scripts/registry.py` (the V35 skill-corpus ratchet forbids a 19th skill dir)
   (stdlib, `--registry <path>` defaulting to `.dadaia/states/server_registry.json`): subcommands
   `register`, `list`, `next`, `release`, `scan`, `clean`, same JSON shape, ports and TTL as today.
 - Delete `features/server_registry/`, `cli/commands/server.py`, the `dadaia server` group, the

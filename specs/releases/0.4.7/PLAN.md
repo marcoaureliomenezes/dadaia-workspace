@@ -15,7 +15,7 @@ one CI job (security review), six lens checklists (for six personas), one doctor
 score machinery), two policy templates (for the panel's model UI).
 
 - **Seams kept.** `agent_model_policy.json` (interface, validated by `public doctor`);
-  `server_registry.json` (shape unchanged, new owner: `dd-dev-server/scripts/registry.py`);
+  `server_registry.json` (shape unchanged, new owner: `dd-cli-library/scripts/registry.py`);
   the PR head (the security-review check replaces the sha-keyed file at the same seam).
 - **Seams removed.** Presence (gate <-> spec_context), governance events (CLI <-> telemetry
   <-> doctor), verdict (chokepoints <-> ci <-> doctor), the nine-persona router.

@@ -46,11 +46,15 @@ line here and `--help` disagree, `--help` wins.
 
 ## Dev-server law
 
-- Never open a port without the registry: `dd-dev-server` (`scripts/registry.py list`
-  → `next --project <name> --json` → start → `register --port N --project <name>`);
-  release it when the server stops (`release --port N`).
-- Use the returned port even when `is_base_port: false`; release on stop
-  On a conflict: `list --status all`, `clean`, then `next` again.
+- The registry (`.dadaia/states/server_registry.json`) is the one record of who holds
+  which local port; every verb is `python3 <skill-dir>/scripts/registry.py <verb>` (the
+  script walks up from cwd to the nearest `.dadaia/`; `--registry <path>` overrides).
+- Open a port in this order: `list` → `next --project <name> --json` → start the server on
+  loopback → `register --port N --project <name> [--pid <pid>] [--ttl <hours>]` — idempotent
+  for the same project; a port held by another project exits 1 naming the owner.
+- Work ends with the port released (`release --port N`, or `--project <name>` for all);
+  on a conflict `list --status all`, `clean` (stale = TTL expired or pid gone), then `next`.
+- `scan [--json]` lists listeners no entry covers (Linux `ss`; empty elsewhere).
 
 ## Done when
 

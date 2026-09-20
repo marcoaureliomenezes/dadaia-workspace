@@ -8,7 +8,7 @@ at code will save you.
 
 1. **Failing test** at whatever seam reaches the bug: unit, integration, e2e.
 2. **Curl / HTTP script** against a running dev server (registered through
-   `dd-dev-server`).
+   `dd-cli-library`'s `scripts/registry.py`).
 3. **CLI invocation** with a fixture input, diffing stdout against a known-good
    snapshot.
 4. **Headless browser script** (Playwright) driving the UI, asserting on

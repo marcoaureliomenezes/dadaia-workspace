@@ -316,7 +316,7 @@
 ### 8.4 Venv and servers
 
 - Invoke `.dadaia/.venv/bin/dadaia` and `.dadaia/.venv/bin/pip` directly, with absolute paths.
-- Register every dev server you start through `dd-dev-server` (`scripts/registry.py register`); check the registry before opening a port.
+- Register every dev server you start through `dd-cli-library` (`scripts/registry.py register`); check the registry before opening a port.
 
 ### 8.5 Instance compliance
 

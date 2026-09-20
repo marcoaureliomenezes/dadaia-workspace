@@ -308,8 +308,8 @@
       "skill": "dd-cli-library",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:a5f56f582b1655a0246c1b82becec2be6e86899e99cfdda2d68f5e01ae87bb35",
-        "skill": "sha256:74f68fc8eef2aece4ca4a2ae0c63d35ecff2c18a1ee218260ba54c7de680cb42",
+        "section": "sha256:9aaedc5dfc4f903e7e7db366b37777581ee516f406de911a54d47cf4bfeb142d",
+        "skill": "sha256:30d25b90d7e58f2863e664766b0252a0aeca0f94df489b113527b71cee7cfbec",
         "scoped": []
       },
       "recorded_by": "ai-engineer",
@@ -404,19 +404,6 @@
       },
       "recorded_by": "ai-engineer",
       "recorded_at": "2026-09-13"
-    },
-    {
-      "section": "§8 The library surface",
-      "anchor": null,
-      "skill": "dd-dev-server",
-      "scoped_agents_md": [],
-      "hash_tuple": {
-        "section": "sha256:a5f56f582b1655a0246c1b82becec2be6e86899e99cfdda2d68f5e01ae87bb35",
-        "skill": "sha256:bbf082cfd1962de363ad57e12789cd3e4e6bd683e441029170b6b91e03d54d6c",
-        "scoped": []
-      },
-      "recorded_by": "software-engineer",
-      "recorded_at": "2026-09-20"
     }
   ]
 }

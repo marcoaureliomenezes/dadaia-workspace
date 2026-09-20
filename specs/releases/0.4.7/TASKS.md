@@ -40,11 +40,11 @@
   `poetry.lock`, `core/agent_model_templates.py`, `infrastructure/install_helpers.py`,
   `public/data/DADAIA.md` (§10.1 `dadaia panel`), `public/skills/dd-cli-library/**`,
   `specs/memory/product/{agents,platform}/**`, `tests/**`.
-- [x] T-047-45 — FR3: `public/skills/dd-dev-server/` (SKILL.md, `scripts/registry.py`:
+- [x] T-047-45 — FR3: `dd-cli-library/scripts/registry.py` (V35 forbids a 19th skill dir;
   register/list/next/release/scan/clean over `.dadaia/states/server_registry.json`); delete
   `features/server_registry/`, `cli/commands/server.py`, the `server` group, panel
   self-registration, `certify` `panel_check`; behavior map + hash tuple cover `scripts/`. Write
-  set: `public/skills/dd-dev-server/**`, `public/entities/behavior-map.json`,
+  set: `public/skills/dd-cli-library/scripts/**`, `public/entities/behavior-map.json`,
   `public/templates/shipped-hashes.json`, `features/server_registry/**`, `features/
   certification/**`, `cli/**`, `core/workspace_layout.py` (zone owner), `public/data/DADAIA.md`
   (§8.4, §10.1 server lines), `public/skills/dd-cli-library/**`, `tests/**`.

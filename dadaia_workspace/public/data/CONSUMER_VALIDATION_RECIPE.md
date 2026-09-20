@@ -202,10 +202,10 @@ an initialized workspace, create it:
   (non-zero, names the failure).
 
 ### F-14 — Server registry
-- Run the `dd-dev-server` script: `$S register --port <p> --project val`; `$S list`; then
+- Run the `dd-cli-library` registry script: `$S register --port <p> --project val`; `$S list`; then
   re-register the SAME port for the SAME project; then register the same port for a
   DIFFERENT project (`--project other`), where `$S` is
-  `python3 .agents/skills/dd-dev-server/scripts/registry.py`.
+  `python3 .agents/skills/dd-cli-library/scripts/registry.py`.
 - **PASS if:** first register + list round-trip; the same-project re-register is an
   idempotent no-op (exit 0); and the different-project registration is REFUSED (exit 1,
   names the owning project). Assert exit codes directly — do not read them through a pipe.
