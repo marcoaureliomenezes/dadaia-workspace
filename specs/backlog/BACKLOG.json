@@ -33,37 +33,6 @@
       ]
     },
     {
-      "id": "projection-collapse-native-agents-md",
-      "title": "Collapse the four-dir projection to AGENTS.md + .agents/skills read natively",
-      "opened": "2026-09-12",
-      "status": "picked",
-      "description": "Grill 2026-09-20 (ADR 0017/0020) supersedes the 09-12 deferral text: the authored set is root AGENTS.md (map) + scoped AGENTS.md + .agents/skills/dd-* + .agents/agents/dd-*.md, read natively by Codex and Kimi and by Claude Code >= 2.1.277 (AGENTS.md) plus per-entry symlinks (.claude/skills/<name>, .claude/agents/<name>.md; copy by hash when os.symlink fails). No CLAUDE.md, no DADAIA.md, no .kimi-code/, no law mirrors, no PROTECTED law rows. Only hook wiring and the Codex TOML transcode stay per harness. Verified by headless probes 2026-09-20 (root, nested-on-Read, per-skill and per-agent symlinks all load).",
-      "provenance": "operator-ratified deferral 2026-09-12 grill Q16 — standards replacement, own grill before pick — promoted to candidate 2026-09-14 (operator order: ideas are official backlog)",
-      "intents": [
-        {
-          "subject": {
-            "kind": "cli",
-            "ref": "public install"
-          },
-          "change": "change — --target all retired; one authored set (root + scoped AGENTS.md, .agents/skills, .agents/agents) read natively; .claude/ entries are per-entry symlinks with copy fallback; only hook wiring and the Codex TOML transcode stay per harness"
-        },
-        {
-          "subject": {
-            "kind": "code",
-            "ref": "dadaia_workspace/core/harness_registry.py#PROJECTION_TARGETS"
-          },
-          "change": "retire — no per-harness projection loop; .kimi-code/ and the DADAIA.md mirrors and their PROTECTED rows are deleted; the law lives once as the root AGENTS.md map"
-        },
-        {
-          "subject": {
-            "kind": "doc",
-            "ref": "memory/product/distribution/public-asset-distribution.md#Doctor"
-          },
-          "change": "change — public doctor keeps public-privacy, entities-derivation, rule-corpus and trust-boundary; the per-harness byte-drift classes die with every collapsed file; a symlink-target check replaces them for .claude/"
-        }
-      ]
-    },
-    {
       "id": "one-line-bootstrap",
       "title": "One-line bootstrap: uvx dadaia-workspace init <dir> [--repo <url>] scaffolds a full workspace",
       "opened": "2026-09-18",
@@ -84,30 +53,6 @@
             "ref": "spec-context-project"
           },
           "change": "change — the bootstrap repo is born ALIVE and bound in the same step; a single-repo workspace needs no explicit context verb until the second repo"
-        }
-      ]
-    },
-    {
-      "id": "english-only-surface",
-      "title": "100% English surface: law, code, status tokens, catalog headings, recipes, changelog",
-      "opened": "2026-09-18",
-      "status": "picked",
-      "description": "Adoption blocker #2: control vocabulary in Portuguese (`Aprovado`, `Em revisão`, 'Catálogo de features', APROVADA/BLOQUEADA/APROVADA COM EXCEÇÃO EXPLÍCITA, 'em progresso') sits inside otherwise English law and code; a non-Portuguese adopter meets untranslated status tokens on day 1. Everything public becomes English: DADAIA.md status tokens (`Approved`, `In review`, `Draft`) with a `specs upgrade` migration for existing trees and doctor rules updated in the same change, memory index headings, the consumer validation recipe verdicts, CHANGELOG entries, docstrings and test names. Operator-private rules and memory stay the operator's own. The public-privacy gate gains a language check (no Portuguese control vocabulary under dadaia_workspace/public/), scoped inside this entry's own change.",
-      "provenance": "operator ruling 2026-09-18 (competitive report 'dadaia-workspace: diferencial e panorama competitivo'): five urgencies before any public launch",
-      "intents": [
-        {
-          "subject": {
-            "kind": "cli",
-            "ref": "specs upgrade"
-          },
-          "change": "change — canonical status tokens become English; specs upgrade rewrites `Aprovado`/`Em revisão` in every SPEC/PLAN/TASKS; SPEC-DOC rules accept only the English tokens after the migration"
-        },
-        {
-          "subject": {
-            "kind": "catalog",
-            "ref": "consumer-agent-support"
-          },
-          "change": "change — consumer validation recipe verdicts become APPROVED / BLOCKED / APPROVED WITH EXPLICIT EXCEPTION"
         }
       ]
     },
@@ -170,7 +115,7 @@
       "id": "sdd-verbs-to-skill-scripts",
       "title": "SDD ledger verbs move from the CLI into skill-local scripts/ (stdlib, path-parameterized)",
       "opened": "2026-09-18",
-      "status": "candidate",
+      "status": "picked",
       "description": "Structural cause named by the bug history: every specs/ ledger contract lives in three places that drift separately — the CLI verb that writes, the doctor rule that validates, the skill that instructs (specs 44 bugs, backlog 18, bugs 18, spec_context 48; 'doctor' in 102 titles, 'release' in 56). Every verb also drags context resolution, venv guard and session binding, which have nothing to do with writing one JSON line. Decision: what touches only specs/ (bugs, backlog, release, audit, ADR) becomes a minimal stdlib script under the owning skill's scripts/ (Agent Skills standard name; never python/), parameterized by the specs/ path, no import of dadaia_workspace, one file per verb, <= ~150 lines, tested by the lib's pytest from public/skills/<skill>/scripts/. Each script is the ONE writer and the ONE validator of its ledger (append|resolve|check); dadaia doctor calls check instead of re-implementing the schema. What touches .dadaia/ (init, context, projection, hooks, git chokepoints, workspace doctor) stays in the CLI, which shrinks to workspace operations; dd-cli-library shrinks with it. HANDEDIT/governance-event telemetry for specs/ ledgers is deleted (a WARNING nobody acts on). Contract test: every fix: line of every doctor names a script or verb that exists. Gate for one-line-bootstrap and standalone-skills-distribution: a skill is only distributable alone when it no longer calls the workspace CLI. Skill split by behavior-map: 11 canonical skills keep coming from the lib and gain scripts/ (manager-orchestration, gitflow-default, handoff-emitter, backlog-definition, release-definition, release-implementation, audit-project, spec-navigator, bug-registration, bug-resolution, cli-library); 7 generic ones (grill-me, codebase-design, code-review, domain-modeling, test-stewardship, architecture-survey, ai-eng-knowhow) leave dadaia-workspace for the marketplace repo.",
       "provenance": "operator demand 2026-09-18, ratified after the competitive report and bug backlog-doctor-fix-names-missing-update-verb (three doctor fix: lines naming a deleted CLI verb)",
       "intents": [
@@ -194,62 +139,6 @@
             "ref": "agentic-entities"
           },
           "change": "change — the behavior map hash tuple covers scripts/; the 11 canonical skills carry scripts, the 7 generic skills are removed from public/ and published via standalone-skills-distribution"
-        }
-      ]
-    },
-    {
-      "id": "spec-context-foundation-hardening",
-      "title": "Spec Context Project is the heart: audit its bug history, rename to main-repo/associated-repos, harden the paradigm",
-      "opened": "2026-09-18",
-      "status": "picked",
-      "description": "Operator verdict: the foundation stays and must improve. The paradigm that gave birth to dadaia-workspace: open an agent in ONE folder (the workspace) and manage projects that live in repos inside it, with skills, rules, AGENTS.md and the .dadaia/ runtime OUTSIDE every repo; canonical rules that steer away from slop; and the Spec Context Project, where projects are created and managed, each project multi-repo, the main repo hosting specs/. Multi-project where each project can be multi-repo, never a monorepo. Work: (1) a bug-history audit of the spec_context surface (160 of 512 records touch context, bind, session or presence; 8 context deciders before ADR 0003) naming the weak points and the structural fixes; (2) rename the vocabulary everywhere (CLI, JSON state, docs, memory, glossary): repo_slug -> main-repo, associated_repos -> associated-repos, and 'main repo' is defined as the repo where specs/ lives; (3) freeze the context surface: no new verb, no new state, single-repo is the degenerate case of multi-repo; (4) write the paradigm as the first page of the docs. Complements one-line-bootstrap (which owns init and the first-run path) and delete-advisory-presence.",
-      "provenance": "operator verdict 2026-09-18 on the competitive report's value scale",
-      "intents": [
-        {
-          "subject": {
-            "kind": "catalog",
-            "ref": "context-management"
-          },
-          "change": "change — vocabulary main-repo/associated-repos across CLI options, state files, memory and glossary; a bug-history audit of the surface precedes any structural change"
-        },
-        {
-          "subject": {
-            "kind": "catalog",
-            "ref": "product-vision"
-          },
-          "change": "change — the founding paradigm (one workspace folder, projects in repos inside, governance outside, multi-project x multi-repo, never monorepo) becomes the first statement of the product vision atom"
-        }
-      ]
-    },
-    {
-      "id": "universal-context-core",
-      "title": "Universal context core: root AGENTS.md map <= 8 KB, scoped AGENTS.md as system of record, CONTEXT-MAP with byte ratchets, no CLAUDE.md, no DADAIA.md",
-      "opened": "2026-09-20",
-      "status": "picked",
-      "description": "The always-on law (DADAIA.md 27.7 KB) is an encyclopedia while the 12 scoped AGENTS.md (24.6 KB) are orphans no skill opens: the inverse of the harness-engineering balance (root = ~100-line map, docs = system of record, rules enforced by linters). Verified 2026-09-20: Claude Code 2.1.277+ reads root AGENTS.md natively (no CLAUDE.md on the path) and attaches a nested AGENTS.md on Read; Codex and Kimi load the root->cwd chain. Deliver: root AGENTS.md rewritten as a map (flow, three roles, gate invariants, where things live, index of every scoped AGENTS.md and dd- skill; <= 8 KB); every DADAIA.md section migrated to the scoped file that governs it (§6 -> specs/*/AGENTS.md, §8 -> .dadaia/AGENTS.md, §4 -> dd-gitflow-default) or deleted as slop; every dd- skill opens its area's scoped AGENTS.md as step 1 and a contract test proves each scoped file is cited by the map or a skill; public/data/CONTEXT-MAP.md (surface, purpose, what belongs, byte ceiling, measured size, per-harness load trigger, the 10-harness compatibility table) plus a ratchet test pinning root <= 8 KB, scoped <= 4 KB, SKILL.md <= 6 KB; CLAUDE.md and DADAIA.md deleted from the scaffold; the law states that sessions launch at the workspace root and init prints the claude-md-and-agents-md user-setting recommendation. No harness version floor.",
-      "provenance": "operator grill ruling 2026-09-20 (dd-grill-me rounds 1..3 over the 17 entries; ADRs 0016..0021) — ADR 0017",
-      "intents": [
-        {
-          "subject": {
-            "kind": "code",
-            "ref": "dadaia_workspace/core/workspace_layout.py#LAW_BASENAMES"
-          },
-          "change": "change — the law is one basename, AGENTS.md; DADAIA.md and CLAUDE.md leave the set and every mirror/PROTECTED row"
-        },
-        {
-          "subject": {
-            "kind": "doc",
-            "ref": "dadaia_workspace/public/data/CONTEXT-MAP.md",
-            "surface": "new"
-          },
-          "change": "new — the auditable context balance: one row per surface with ceiling, measured bytes and per-harness load trigger; pinned by a ratchet test"
-        },
-        {
-          "subject": {
-            "kind": "catalog",
-            "ref": "harness-claude-code"
-          },
-          "change": "change — Claude Code reads the root AGENTS.md natively (>= 2.1.277, no CLAUDE.md on the path) and attaches scoped AGENTS.md on Read; .claude/skills and .claude/agents entries are per-entry symlinks to .agents/*"
         }
       ]
     },
