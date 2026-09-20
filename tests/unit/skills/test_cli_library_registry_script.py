@@ -157,6 +157,10 @@ def test_registry_refuses_when_no_dadaia_dir_is_above_the_cwd(tmp_path: Path) ->
     assert not any(tmp_path.rglob("server_registry.json"))
 
 
+@pytest.mark.skipif(
+    os.name != "posix",
+    reason="liveness is probed by POSIX signal 0 only; elsewhere pid_alive() is True by contract",
+)
 def test_entry_with_a_dead_pid_is_stale_before_its_ttl(tmp_path: Path) -> None:
     reg = tmp_path / "r.json"
     probe = subprocess.Popen([sys.executable, "-c", "pass"])
