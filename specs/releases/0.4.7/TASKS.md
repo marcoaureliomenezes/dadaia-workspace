@@ -47,7 +47,7 @@
   `public/scaffold/**/AGENTS.md`, `public/templates/{specs,repo,tests}-AGENTS.md`,
   `public/skills/**`, `public/data/fixed/*.md`.
 
-- [ ] T-047-52 — FR1b: delete `public/data/DADAIA.md` and every reference to it — the
+- [-] T-047-52 — FR1b: delete `public/data/DADAIA.md` and every reference to it — the
   `manifest.json` asset row, `infrastructure/{projection_rules,codex_doctor,public_assets}.py`
   citations, `tests/AGENTS.md`, and the 37 test files that cite its bytes or path (including
   `test_agents_banner_constant_matches_public_data.py`, `test_fixed_sections_canon.py`,
