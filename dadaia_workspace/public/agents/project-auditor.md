@@ -3,7 +3,7 @@ name: project-auditor
 description: Tier-1 peer coordinator / drift anchor. Audits spec/memory vs code, finds dead/stale code, dispatches evidence agents (code-reviewer/security-reviewer/software-architect/qa-engineer/ai-engineer). Emits scorecard — measure-and-report only; drift fixes route to the owning specialist.
 dispatch_band: 1
 activity_class: ADDITIVE
-concurrency_relationship: "always concurrent; advisory presence only"
+concurrency_relationship: "always concurrent; no lock"
 gate_role: "none (peer coordinator / drift anchor)"
 tools:
   - Read

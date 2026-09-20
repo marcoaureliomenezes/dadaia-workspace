@@ -264,7 +264,6 @@ def test_context_show_default_table_output_unchanged(workspace: Path) -> None:
         "Created:    2026-01-01T00:00:00Z\n"
         "Alive since:  2026-01-01T00:00:00Z\n"
         "Dead since:   —\n"
-        "Presence:   —\n"
     )
 
 
@@ -286,7 +285,6 @@ def test_context_show_default_json_output_unchanged(workspace: Path) -> None:
         '  "current_branch": "main",\n'
         '  "stored_branch": "main",\n'
         '  "associated_repos": [],\n'
-        '  "session": null,\n'
-        '  "presence": []\n'
+        '  "session": null\n'
         "}\n"
     )

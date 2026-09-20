@@ -166,7 +166,7 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 - Gotcha: nothing enforces the per-persona write-allowlist.
 - Native frontmatter (`name`, `description`, `model`, `tools`, `skills`, `maxTurns`) is honored.
 - dadaia extras (`dispatch_band`, `input_contract`, `paths.write_allowlist`) are ignored by the runtime.
-- dadaia's PreToolUse gate is persona-blind: path-class x presence x phase x mode only.
+- dadaia's PreToolUse gate is persona-blind: path-class x scope only.
 - `write_allowlist` is a convention checked by tooling/tests/reviewers — no runtime or hook polices it.
 
 ---

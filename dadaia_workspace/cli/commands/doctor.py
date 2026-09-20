@@ -88,8 +88,6 @@ def _build_redactor(workspace_root: Path) -> ContextRedactor:
     name that appears in an advisory presence record (`[stale-presence] context
     '<name>'`, PRESENCE-GC) — a presence record can outlive its context's registry
     entry, so the registry alone is not enough to cover A8.1's PRESENCE-GC line."""
-    from dadaia_workspace.features.spec_context import presence
-
     caller_name, caller_slug = _resolve_caller_context_and_slug(workspace_root)
     try:
         contexts = container.build_spec_context_service(workspace_root).list_all()
@@ -99,7 +97,6 @@ def _build_redactor(workspace_root: Path) -> ContextRedactor:
     for ctx in contexts:
         candidates.append(ctx.name)
         candidates.append(ctx.repo_slug)
-    candidates.extend(ref.context for ref in presence.stale_records(workspace_root))
     return ContextRedactor(candidates, exclude=(caller_name, caller_slug))
 
 

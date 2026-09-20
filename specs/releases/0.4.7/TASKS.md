@@ -13,10 +13,12 @@
   working through it. Write set: `features/spec_context/{markers,presence,gate_policy}.py`,
   `hooks/sdd_post_gate.py`, `tests/unit/features/spec_context/**`, `tests/unit/hooks/**`,
   `tests/unit/core/test_kernel_tunables.py`.
-- [ ] T-047-42 — FR2b: delete `features/spec_context/presence.py`, the presence zone row,
+- [x] T-047-42 — FR2b: delete `features/spec_context/presence.py`, the presence zone row,
   `PRESENCE-GC`, `PRESENCE_TTL_SECONDS`, `pre_commit.py` + `pre-commit-presence-gate.sh` + the
   `INSTALLED_GIT_HOOKS` row, `ci pre-commit-check`, `context heartbeat`, `context release`; fix
-  the 33 importers (an allowed MUTATING write records nothing); `HOOKS-DRIFT-1` pre-push only.
+  the 11 importers (an allowed MUTATING write records nothing); `HOOKS-DRIFT-1` pre-push only;
+  the gate drops `runtime`/`pid`; certify drops the heartbeat/release steps; instance pre-commit
+  wrappers removed by hand on this workspace.
   Write set: `hooks/**`, `cli/commands/{ci,context,doctor}.py`, `cli/redact.py`,
   `cli/_specs_resolution.py`, `features/chokepoints/**`, `features/spec_context/**`,
   `features/specs/**`, `features/backlog/document.py`, `infrastructure/**`, `core/**`,

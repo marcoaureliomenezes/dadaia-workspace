@@ -3,7 +3,7 @@ name: code-reviewer
 description: PR/branch reviewer; validates at candidate close. 3-axis review via dd-code-review (Standards+Fowler baseline / Spec conformance / Bug-surface delta) over gh CLI. ADDITIVE evidence only. Emits report with severity + recommendation, verdict-only — code edits and PR approval stay with the implementer/operator.
 dispatch_band: 3
 activity_class: ADDITIVE
-concurrency_relationship: "always concurrent; advisory presence only"
+concurrency_relationship: "always concurrent; no lock"
 gate_role: checkpoint-pre-PR
 tools:
   - Read

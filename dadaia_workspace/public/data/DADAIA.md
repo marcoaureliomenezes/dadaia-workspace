@@ -68,7 +68,7 @@
 | Class | Paths | Verdict |
 |---|---|---|
 | ADDITIVE | `specs/bugs\|backlog\|audits/`, each area's `_archive/*_histo.jsonl`, `.dadaia/{handoff,tmp,reaped,mcps,.cache}/` | Always writable |
-| MUTATING | everything else in-repo | Writable, scope-judged under `repos/<slug>/`; records advisory presence |
+| MUTATING | everything else in-repo | Writable, scope-judged under `repos/<slug>/` |
 | PROTECTED | `.dadaia/sessions/`, projected law files (§8.2) | Blocked |
 
 - Three classes, no fourth: a workspace-root path matching no ADDITIVE or PROTECTED prefix is MUTATING.
@@ -79,8 +79,6 @@
 ### 3.3 Races, context, scope
 
 - Races surface, never block — no locks, leases, ownership blocks.
-- A MUTATING write records advisory presence and proceeds; one throttled warning names a colliding session.
-- Presence I/O errors are swallowed; the write proceeds.
 - Context: `DADAIA_CONTEXT` -> session binding -> repo of the cwd; inspect via `dadaia context show --json`.
 - `dadaia context bind <ctx> [--print-env]` is one verb: no mode, no release, no session state beyond the context — it refreshes the session and is the sole context-memory-injection trigger.
 - A plain shell's exported `DADAIA_CONTEXT` env var IS the binding.
@@ -91,8 +89,7 @@
 
 ### 3.4 Git chokepoints
 
-- Git hooks gate the `Bash` write path, outside the gate's own parsing, independent of any harness hook.
-- pre-commit: warns and always allows.
+- The pre-push git hook gates the `Bash` write path, outside the gate's own parsing, independent of any harness hook.
 - pre-push: allows `feature/*` after CI preflight + valid name.
 - pre-push: refuses a direct `develop`/`main` push (§4), a non-canon `specs/` path the pushed range introduces or rewrites, or a stale PR verdict.
 - pre-push scans the pushed range only: published history is the baseline and is never rescanned (ADR 0013).
@@ -331,9 +328,9 @@
 - Slop and dead-repo leftovers are MOVED to `.dadaia/reaped/<YYYYMMDD>/<workspace-relative-path>` (a zone, 7-day TTL from the move, one hold per origin per day) and listed `WS-reaped-reaped`.
 - Nothing is deleted directly: deletion happens only when a TTL zone's entry expires, `reaped/` included.
 - `--fix` runs that reaper then the specs fixes; `--expired-only` scopes the report to the TTL lane, never the deletion.
-- SessionStart runs `dadaia doctor --fix --expired-only --quiet`; the PostToolUse throttle runs the same reaper, which also owns presence GC.
+- SessionStart runs `dadaia doctor --fix --expired-only --quiet`; the PostToolUse throttle runs the same reaper, which also owns marker GC.
 - `LEDGER-<NAME>-HANDEDIT` and `RELEASE-TREE-HANDEDIT` (WARNING, never a block): a governance record changed with no matching governance event; silent where no telemetry store exists.
-- `HOOKS-DRIFT-1`: an ALIVE repo's installed `.git/hooks/{pre-commit,pre-push}` byte-differing from the shipped script; `fix: .dadaia/.venv/bin/dadaia ci install-hook --force`.
+- `HOOKS-DRIFT-1`: an ALIVE repo's installed `.git/hooks/pre-push` byte-differing from the shipped script; `fix: .dadaia/.venv/bin/dadaia ci install-hook --force`.
 
 ---
 
@@ -377,7 +374,6 @@
 - **scope** — the repo set a bind owns: the context's main repo plus its associated repos (§3.3).
 - **stall** — a BLOCK whose own `fix:` command is itself blocked; CRITICAL (§3.1).
 - **publication boundary** — the push, where the denylist scan runs over the pushed range against the published baseline (§7.4).
-- **presence** — the advisory record a session leaves when it writes, surfaced to others.
 - **canon** — the closed set of paths a `specs/` root may contain (§6.2).
 - **histo** — an append-only JSONL history file under an area's `_archive/`; one `histo-record-v1` per exited entry.
 - **memory atom** — one Markdown file under `specs/memory/product/**` carrying current truth.

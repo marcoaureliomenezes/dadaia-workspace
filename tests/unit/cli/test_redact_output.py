@@ -199,60 +199,6 @@ def _ctx_row(
     }
 
 
-def _write_corrupt_presence(workspace: Path, ctx: str, sid: str) -> None:
-    path = workspace / ".dadaia" / "states" / "presence" / ctx / f"{sid}.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("{not-json", encoding="utf-8")
-
-
-def test_doctor_redact_masks_presence_and_repo_coherence_lines(
-    workspace: Path, monkeypatch
-) -> None:
-    """A8.1: `dadaia doctor --redact` names no foreign context/slug in the
-    PRESENCE-GC ([stale-presence]), INV-4 and INV-5 lines; the caller's own context
-    stays visible."""
-    caller_repo = workspace / "repos" / "caller-ctx"
-    caller_repo.mkdir(parents=True)
-    alpha_repo_absent_slug = "alpha-repo"  # INV-4: ALIVE, repo missing on disk
-    bravo_repo_present_slug = "bravo-repo"  # INV-5: DEAD, repo present on disk
-    (workspace / "repos" / bravo_repo_present_slug).mkdir(parents=True)
-
-    _write_contexts(
-        workspace,
-        [
-            _ctx_row("caller-ctx", repo_slug="caller-ctx", state="alive"),
-            _ctx_row("alpha-secret", repo_slug=alpha_repo_absent_slug, state="alive"),
-            _ctx_row("bravo-secret", repo_slug=bravo_repo_present_slug, state="dead"),
-        ],
-    )
-    _write_corrupt_presence(workspace, "charlie-secret", "sess-corrupt")
-    # A stale presence record for the CALLER's own context too, so the PRESENCE-GC line
-    # gives us a positive control: it must stay visible, unlike the foreign ones.
-    _write_corrupt_presence(workspace, "caller-ctx", "sess-own-corrupt")
-    monkeypatch.setenv("DADAIA_CONTEXT", "caller-ctx")
-
-    # Sanity control: without --redact the foreign names are actually present (proves
-    # the fixture triggers the issue codes under test).
-    plain = _runner.invoke(app, ["doctor"])
-    assert plain.exit_code == 1, plain.output
-    assert "alpha-secret" in plain.output
-    assert "bravo-secret" in plain.output
-    assert "charlie-secret" in plain.output
-
-    result = _runner.invoke(app, ["doctor", "--redact"])
-    assert result.exit_code == 1, result.output
-    for foreign in (
-        "alpha-secret",
-        alpha_repo_absent_slug,
-        "bravo-secret",
-        bravo_repo_present_slug,
-        "charlie-secret",
-    ):
-        assert foreign not in result.output, result.output
-    assert "[REDACTED-CONTEXT-" in result.output
-    assert "caller-ctx" in result.output
-
-
 def test_context_list_redact_json_same_key_set_and_masks_foreign(
     workspace: Path, monkeypatch
 ) -> None:

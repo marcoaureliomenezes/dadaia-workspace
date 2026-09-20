@@ -1,7 +1,6 @@
-"""PostToolUse advisory presence, session heartbeat, and throttled-GC hook.
+"""PostToolUse session heartbeat and throttled-GC hook.
 
-Runs after every tool call. It renews this session's advisory presence record(s),
-best-effort refreshes ``last_seen_at`` in the CLI session record, and, on a throttle
+Runs after every tool call. It best-effort refreshes ``last_seen_at`` in the CLI session record, and, on a throttle
 cadence, runs the one GC reaper. It always returns zero and never blocks a tool call.
 
 Session id resolution (unchanged, FR-R2-01): via :func:`_common.resolve_session_id` — the
@@ -36,7 +35,7 @@ from pathlib import Path
 
 from dadaia_workspace.core import invocation, session_store
 from dadaia_workspace.core.kernel_tunables import RECONCILER_THROTTLE_TTL_SECONDS
-from dadaia_workspace.features.spec_context import markers, presence
+from dadaia_workspace.features.spec_context import markers
 from dadaia_workspace.hooks import _common
 
 
@@ -90,11 +89,11 @@ def _throttled_gc(workspace: Path, sess_id: str) -> None:
     # reaper's import cost; never through the container (P-12).
     from dadaia_workspace.features.spec_context import doctor
 
-    doctor.reap(workspace, own_session_id=sess_id)
+    doctor.reap(workspace)
 
 
 def main() -> int:
-    """Renew this session's advisory presence record(s). Never blocks (exit 0)."""
+    """Refresh this session's record and run the throttled reaper. Never blocks (exit 0)."""
     payload = _common.read_stdin_json()
     sess_id = _common.resolve_session_id(payload)
     if not sess_id:
@@ -108,7 +107,6 @@ def main() -> int:
         return 0
 
     try:
-        presence.renew(workspace, sess_id)
         _refresh_session_record(workspace, sess_id)
     except Exception:  # noqa: BLE001 — fail-open: any error ⇒ exit 0, never break harness
         return 0

@@ -21,7 +21,7 @@ the other harnesses use:
 | Event | Shim | Deterministic action |
 |---|---|---|
 | `PreToolUse` (`Edit\|Write\|Bash`) | `dadaia-kimi-pre-gate.sh` | merged gate: root-whitelist → venv-guard → SDD gate (blocks via exit 2) |
-| `PostToolUse` | `dadaia-kimi-post-gate.sh` | session/presence heartbeat |
+| `PostToolUse` | `dadaia-kimi-post-gate.sh` | session heartbeat |
 | `UserPromptSubmit` | `dadaia-kimi-ctx-inject.sh` | context injection after `dadaia context bind` |
 | `PostCompact` | `dadaia-kimi-post-compact.sh` | marks compaction and re-emits the bootstrap on stdout (observable; Kimi discards it) — the next prompt re-injects context |
 

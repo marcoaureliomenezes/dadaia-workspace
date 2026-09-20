@@ -6,23 +6,17 @@ core is the bottom layer every other layer may legally import (constitution §6)
 features, and cli all hold a legal edge to it. An import-linter contract pins the one-way
 edge (kernel modules → tunables; never the reverse).
 
-Retired lease/CAS constants are intentionally absent. Context concurrency is advisory
-presence only; no tunable in this module can make a workspace operation wait or block.
+Retired lease/CAS constants are intentionally absent; no tunable in this module can make a workspace operation wait or block.
 """
 
 from __future__ import annotations
 
 __all__ = [
     "DADAIA_BIN",
-    "PRESENCE_TTL_SECONDS",
     "RECONCILER_THROTTLE_TTL_SECONDS",
     "SENTINEL_GC_TTL_SECONDS",
     "SESSION_GC_TTL_SECONDS",
 ]
-
-#: Advisory presence heartbeat TTL. Expiry only removes a warning signal; it never grants,
-#: revokes, or blocks write authority.
-PRESENCE_TTL_SECONDS: int = 120
 
 #: Age after which a once-per-session ctx-inject sentinel (``ctx-inject-fired-<sid>``) is
 #: considered stale and GC'd at inject time. Generous (24 h) so a long-running live session

@@ -347,72 +347,9 @@ def test_bind_records_dadaia_runtime_env(workspace: Path) -> None:
     assert record2["runtime"] == "kimi-code"
 
 
-def test_context_heartbeat_resolves_harness_native_persisted_bind(
-    workspace: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _register_alive_ctx(workspace)
-    monkeypatch.delenv("DADAIA_SESSION_ID", raising=False)
-    monkeypatch.setenv("CODEX_THREAD_ID", "codex-heartbeat-session")
-
-    bind_result = _runner.invoke(app, ["context", "bind", "myctx"])
-    assert bind_result.exit_code == 0, bind_result.output
-
-    heartbeat_result = _runner.invoke(app, ["context", "heartbeat"])
-    assert heartbeat_result.exit_code == 0, heartbeat_result.output
-    assert "codex-heartbeat-session" in heartbeat_result.output
-
-
-def test_context_heartbeat_without_caller_identity_is_actionable(
-    workspace: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    for name in (
-        "DADAIA_SESSION_ID",
-        "CLAUDE_CODE_SESSION_ID",
-        "CODEX_SESSION_ID",
-        "CODEX_THREAD_ID",
-    ):
-        monkeypatch.delenv(name, raising=False)
-    result = _runner.invoke(app, ["context", "heartbeat"])
-    assert result.exit_code != 0
-    assert "--print-env" in result.output
-
-
 # ---------------------------------------------------------------------------
 # T-10d: context release
 # ---------------------------------------------------------------------------
-
-
-def test_context_release_deletes_session_and_without_session_exits_nonzero(
-    workspace: Path,
-) -> None:
-    """Release deletes the caller's session file; missing identity exits non-zero."""
-    _register_alive_ctx(workspace)
-    bind_result = _runner.invoke(
-        app,
-        ["context", "bind", "myctx", "--print-env"],
-    )
-    assert bind_result.exit_code == 0, bind_result.output
-
-    lines = bind_result.output.strip().split("\n")
-    session_line = next(line for line in lines if "DADAIA_SESSION_ID" in line)
-    session_id = session_line.split("=")[1].strip()
-
-    session_file = workspace / ".dadaia" / "sessions" / f"{session_id}.json"
-    assert session_file.exists()
-
-    # Release with DADAIA_SESSION_ID env var set
-    env = {**os.environ, "DADAIA_SESSION_ID": session_id}
-    release_result = _runner.invoke(
-        app,
-        ["context", "release"],
-        env=env,
-    )
-    assert release_result.exit_code == 0, release_result.output
-    assert not session_file.exists(), "Session file must be deleted after release"
-
-    no_session_env = {k: v for k, v in os.environ.items() if k != "DADAIA_SESSION_ID"}
-    no_session_result = _runner.invoke(app, ["context", "release"], env=no_session_env)
-    assert no_session_result.exit_code != 0
 
 
 # ---------------------------------------------------------------------------

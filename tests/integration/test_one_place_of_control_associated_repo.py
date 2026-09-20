@@ -221,25 +221,3 @@ def _run_gate(
     result = run_hook_subprocess("sdd_gate", full_payload, env, cwd=ws / "repos" / _ASSOC_SLUG)
     assert result.returncode == 0, result.stderr
     return result.block_envelope()
-
-
-def test_gate_mutating_write_inside_associated_repo_attributes_presence_to_the_owning_context(
-    workspace: Path,
-) -> None:
-    """A19.2 for the gate's presence side: a MUTATING write physically inside the
-    associated repo's directory records presence under the OWNING context's NAME
-    (``proj``) — never under a fictitious second context keyed by the associated repo's
-    own slug (the exact failure A16.4 fixed at the resolver seam, proven here end to
-    end through the real gate)."""
-    target = workspace / "repos" / _ASSOC_SLUG / "some_file.py"
-
-    block = _run_gate(
-        workspace,
-        {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
-        session_id="mut-sess",
-    )
-
-    assert block is None  # never blocks — NO-LOCKS doctrine
-    presence_root = workspace / ".dadaia" / "states" / "presence"
-    assert (presence_root / _MAIN_NAME / "mut-sess.json").exists()
-    assert not (presence_root / _ASSOC_SLUG).exists()

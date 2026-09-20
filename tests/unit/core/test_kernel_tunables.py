@@ -69,7 +69,6 @@ def _imports_name_from_kernel_tunables(source: str, name: str) -> bool:
 
 
 def test_tunables_are_pure_constants_with_no_io_imports() -> None:
-    assert isinstance(kernel_tunables.PRESENCE_TTL_SECONDS, int)
     assert isinstance(kernel_tunables.SENTINEL_GC_TTL_SECONDS, int)
     assert isinstance(kernel_tunables.SESSION_GC_TTL_SECONDS, int)
     assert isinstance(kernel_tunables.RECONCILER_THROTTLE_TTL_SECONDS, int)
@@ -95,7 +94,6 @@ def test_tunables_are_pure_constants_with_no_io_imports() -> None:
     ("module", "name"),
     [
         ("dadaia_workspace.features.spec_context.markers", "SENTINEL_GC_TTL_SECONDS"),
-        ("dadaia_workspace.features.spec_context.presence", "PRESENCE_TTL_SECONDS"),
     ],
 )
 def test_kernel_module_imports_tunable_from_single_home(module: str, name: str) -> None:
@@ -114,9 +112,9 @@ def test_record_liveness_observes_kernel_constant(monkeypatch: pytest.MonkeyPatc
 
     from dadaia_workspace.core import record_liveness
 
-    monkeypatch.setattr(kernel_tunables, "PRESENCE_TTL_SECONDS", 7)
-    assert kernel_tunables.PRESENCE_TTL_SECONDS == 7
-    ttl = kernel_tunables.PRESENCE_TTL_SECONDS
+    monkeypatch.setattr(kernel_tunables, "SESSION_GC_TTL_SECONDS", 7)
+    assert kernel_tunables.SESSION_GC_TTL_SECONDS == 7
+    ttl = kernel_tunables.SESSION_GC_TTL_SECONDS
     old_hb = (datetime.now(tz=UTC) - timedelta(seconds=ttl + 10)).isoformat()
     fresh_hb = datetime.now(tz=UTC).isoformat()
     assert record_liveness.is_stale({"heartbeat": old_hb, "ttl": ttl}) is True

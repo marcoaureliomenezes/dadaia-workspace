@@ -1,11 +1,11 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.7",
-  "phase": "DEFINITION",
+  "phase": "IMPLEMENTATION",
   "rc": 4,
   "defined": {
-    "sha": "66718f33",
-    "ts": "2026-09-13T09:56:42Z"
+    "sha": "15c30b50",
+    "ts": "2026-09-20T17:45:47Z"
   },
   "implemented": {
     "sha": "c746592a",
@@ -343,6 +343,12 @@
       "agent": "release-candidates",
       "kind": "note",
       "text": "Candidate 4 archived to rc-4/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
+    },
+    {
+      "ts": "2026-09-20T17:45:47Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate defined at 15c30b50; phase IMPLEMENTATION."
     }
   ]
 }

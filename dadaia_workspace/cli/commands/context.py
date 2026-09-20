@@ -35,14 +35,12 @@ from dadaia_workspace.core.exceptions import (
     SchemaVersionError,
     WorkspaceNotInitializedError,
 )
-from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.models.spec_context import (
     AssociatedRepo,
     ContextState,
     SpecContextProject,
 )
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-from dadaia_workspace.features.spec_context import presence
 from dadaia_workspace.features.spec_context.service import (
     DeadReviewRequiredError,
     DeadSecretFoundError,
@@ -396,23 +394,6 @@ def show(
             session_id = _resolve_own_session_id()
             session_obj = _live_session(workspace_root, session_id) if session_id else None
             data["session"] = session_obj
-            # v0.1.76 T-4 (FR7): "presence" — who else is currently active on this
-            # context, sourced from the ONLY concurrency-signal surface post-doctrine
-            # (features/spec_context/presence.py). Distinct from "session" above (which
-            # answers "what is MY session bound to" via the caller-owned record).
-            # ``others_alive`` with an empty self-sid excludes nothing (no
-            # real presence record is ever keyed by ""), so every live record on the
-            # context is listed.
-            data["presence"] = [
-                {
-                    "session_id": rec.session_id,
-                    "runtime": rec.runtime,
-                    "pid": rec.pid,
-                    "started_at": rec.started_at,
-                    "last_seen_at": rec.last_seen_at,
-                }
-                for rec in presence.others_alive(workspace_root, ctx.name, "")
-            ]
             if redactor is not None:
                 data = redactor.json_value(data)
             print(json.dumps(data, indent=2))
@@ -444,13 +425,6 @@ def show(
     console.print(f"[bold]Created:[/bold]    {ctx.created_at}")
     console.print(f"[bold]Alive since:[/bold]  {ctx.alive_since or '—'}")
     console.print(f"[bold]Dead since:[/bold]   {ctx.dead_since or '—'}")
-
-    presence_records = presence.others_alive(resolve_workspace_root(), ctx.name, "")
-    if presence_records:
-        names = ", ".join(f"{rec.session_id} ({rec.runtime})" for rec in presence_records)
-        console.print(f"[bold]Presence:[/bold]   {names}")
-    else:
-        console.print("[bold]Presence:[/bold]   —")
 
     if associated_statuses:
         assoc_table = Table(title="Associated repos")
@@ -638,100 +612,6 @@ def bind(
         return
 
     console.print(f"[green]✓[/green] Bound to '[bold]{name}[/bold]' (session id: {session_id})")
-
-
-@app.command(name="release")
-def release_cmd(
-    session: str | None = typer.Option(
-        None,
-        "--session",
-        help=(
-            "Session id to release (optional override). When omitted, the session id is "
-            "resolved from DADAIA_SESSION_ID (eval-flow override) or the harness-native "
-            "session id (CLAUDE_CODE_SESSION_ID / CODEX_SESSION_ID / CODEX_THREAD_ID) — "
-            "no flag is required in the normal harness case."
-        ),
-    ),
-) -> None:
-    """Release the current session's binding and advisory presence.
-
-    Run: dadaia context release
-
-    Resolution order for "this session's own id": ``--session``
-    override -> ``DADAIA_SESSION_ID`` (eval-flow override) -> the harness-native session id
-    (:func:`_harness_session_id`) -> the last bind's CLI-minted session id read back from the
-    session record directory (legacy default-flow fallback). Every presence record this
-    session owns (across every context) is deleted (:func:`presence.clear`, idempotent — a
-    session with no presence record is a clean no-op), then the CLI session record is
-    unlinked.
-    """
-    from dadaia_workspace.features.spec_context import presence
-
-    workspace_root = resolve_workspace_root()
-    sessions_dir = _sessions_dir(workspace_root)
-
-    resolved_sid = _resolve_own_session_id(explicit=session)
-    if not resolved_sid:
-        err_console.print(
-            "[red]Error:[/red] No active session. Pass --session <id> or set "
-            "DADAIA_SESSION_ID (e.g. eval $(dadaia context bind ... --print-env))."
-        )
-        raise typer.Exit(1) from None
-
-    session_file = sessions_dir / f"{resolved_sid}.json"
-
-    cleared = presence.clear(workspace_root, resolved_sid)
-    session_file.unlink(missing_ok=True)
-
-    if cleared:
-        console.print(
-            f"[green]✓[/green] Session '[bold]{resolved_sid}[/bold]' released "
-            f"(presence record(s) dropped: {cleared})"
-        )
-    else:
-        console.print(f"[green]✓[/green] Session '[bold]{resolved_sid}[/bold]' released")
-
-
-@app.command()
-def heartbeat() -> None:
-    """Renew the heartbeat for the current session.
-
-    Resolves the caller-owned session from the explicit eval-flow override or
-    the harness-native session id persisted by ``context bind``.
-
-    Run: dadaia context heartbeat
-    """
-    session_id = _resolve_own_session_id()
-    if not session_id:
-        err_console.print(
-            "[red]Error:[/red] No caller-owned session identity: bind this session "
-            "first (in a plain shell, wrap the bind in "
-            "'eval $(... --print-env)' so the id reaches this process)."
-        )
-        err_console.print(f"fix: {DADAIA_BIN} context bind <name>")
-        raise typer.Exit(1) from None
-
-    workspace_root = resolve_workspace_root()
-
-    session_data = session_store.read_session(workspace_root, session_id)
-    if session_data is None:
-        err_console.print(
-            f"[red]Error:[/red] Session '{session_id}' not found. "
-            "It may have already been released."
-        )
-        raise typer.Exit(1) from None
-
-    # Renew this session's advisory presence record(s), the sole concurrency signal.
-    from dadaia_workspace.features.spec_context import presence
-
-    ctx_name = session_data.get("context", "")
-    now = _now_iso()
-    presence.renew(workspace_root, session_id)
-    session_store.touch_last_seen_at(workspace_root, session_id, now=now)
-    console.print(
-        f"[green]✓[/green] Heartbeat renewed for session '[bold]{session_id}[/bold]' "
-        f"(context={ctx_name}, last_seen_at={now})"
-    )
 
 
 @app.command()

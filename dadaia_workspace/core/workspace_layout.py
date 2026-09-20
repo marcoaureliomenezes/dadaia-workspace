@@ -144,7 +144,6 @@ STATES_CANON: frozenset[str] = frozenset(
         "instance_exceptions.txt",
         "backlog_subject_aliases.txt",
         "harness_profile.json",
-        "presence",
         "AGENTS.md",
     }
 )
@@ -292,10 +291,7 @@ def zone_table_rows() -> tuple[tuple[str, str, str, str, str], ...]:
 #: ``(.git/hooks/<target>, public/scripts/<source>)``. One home for "which hooks exist
 #: and what they are made of" — ``cli.commands.ci`` installs them, the workspace doctor
 #: compares the installed copies to them (HOOKS-DRIFT-1).
-INSTALLED_GIT_HOOKS: tuple[tuple[str, str], ...] = (
-    ("pre-commit", "pre-commit-presence-gate.sh"),
-    ("pre-push", "pre-push-ci-gate.sh"),
-)
+INSTALLED_GIT_HOOKS: tuple[tuple[str, str], ...] = (("pre-push", "pre-push-ci-gate.sh"),)
 
 
 def public_scripts_dir() -> Path:

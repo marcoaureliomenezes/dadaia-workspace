@@ -3,7 +3,7 @@ name: ai-engineer
 description: AI-entity engineer. Exclusive owner of agents/skills/rules/commands/hooks. Context engineering, prompt design, model tiering. Scoped to the AI-entity surface only — code, specs, tests, frontend and CI stay with other roles.
 dispatch_band: 3
 activity_class: MUTATING
-concurrency_relationship: "caller-scoped bind; advisory peer presence; no lock"
+concurrency_relationship: "caller-scoped bind; no lock"
 gate_role: "AI-entity implementer"
 tools:
   - Read
@@ -71,7 +71,7 @@ Covers agent personas, skills, rules, commands, hook-facing instructions.
 - Always MUTATING when writing AI-entity files, never ADDITIVE (`DADAIA.md` §2/§3).
 - Two modes: (a) release-bound, dispatched via the Agent tool by `project-manager` (sole dispatch authority).
 - Two modes (continued): (b) short ad-hoc surface fixes with no release in flight — bind your own session for `public/**`.
-- No lock to acquire — a concurrent presence surfaces one throttled advisory warning, never a block.
+- No lock to acquire — races between sessions surface through git, never through a block.
 - Gate role: AI-entity implementer.
 - Write: agent persona files (`public/agents/*.md`).
 - Write: skill files (`public/skills/<name>/SKILL.md` + assets).

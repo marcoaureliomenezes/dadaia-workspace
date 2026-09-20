@@ -12,7 +12,6 @@ from pathlib import Path
 import typer
 
 from dadaia_workspace.cli._specs_resolution import (
-    resolve_session_id_for_cli,
     resolve_workspace_root_for_cli,
 )
 from dadaia_workspace.container import is_source_repo_root as _is_source_repo_root
@@ -38,7 +37,6 @@ _HOOK_SOURCES: dict[str, Path] = {
     target: _SCRIPTS_DIR / source for target, source in workspace_layout.INSTALLED_GIT_HOOKS
 }
 _HOOK_SOURCE = _HOOK_SOURCES["pre-push"]
-_PRE_COMMIT_HOOK_SOURCE = _HOOK_SOURCES["pre-commit"]
 
 
 def _repo_root() -> Path:
@@ -125,61 +123,6 @@ def preflight(
         raise typer.Exit(1)
 
     typer.secho("\nAll preflight checks passed.", fg=typer.colors.GREEN)
-
-
-@app.command("pre-commit-check")
-def pre_commit_check() -> None:
-    """Warn about other live context presence. Advisory only — never blocks the commit.
-
-    Concurrent-session detection is advisory and always allows the commit (NO-LOCKS
-    DOCTRINE, v0.1.76). v0.5.0 FR9/D9: the backlog-doctor BLOCK that used to run here
-    is DELETED — CI's `backlog-doctor` job already runs the unscoped sweep over the
-    whole tree; blocking a commit on pre-existing backlog debt only ever punished
-    humans and agents on a shared tree (bug
-    `precommit-backlog-doctor-blocks-unrelated-commits`). The installed
-    `pre-commit-presence-gate.sh` wrapper additionally guarantees exit 0 unconditionally,
-    regardless of what this command does.
-    """
-    from dadaia_workspace.features.chokepoints import (
-        bundled_ledger_advisory,
-        context_slug_for_path,
-        pre_commit_decision,
-    )
-    from dadaia_workspace.features.spec_context import presence
-
-    repo_root = _repo_root()
-    workspace = resolve_workspace_root_for_cli(repo_root)
-    ctx = context_slug_for_path(workspace, _repo_identity_root(repo_root))
-
-    # v0.5.1 K7: the presence read is injected — `presence.others_alive` is wired
-    # straight through, no adapter needed (its signature already matches). This is
-    # what drops `chokepoints -> spec_context.presence` out of the import-linter
-    # ignore list entirely; the retired ancestry/pid-probe wiring above it is DELETED
-    # with the dead `caller_pid`/`pid_probe`/`ancestry` parameters (never read).
-    decision = pre_commit_decision(
-        workspace,
-        ctx,
-        own_sid=resolve_session_id_for_cli(),
-        others_alive=presence.others_alive,
-    )
-    if decision.warn:
-        typer.echo(decision.warn, err=True)
-
-    # F015/F036 (20260827 audit): bundled-ledger advisory — WARN-only, never blocks.
-    staged = subprocess.run(  # noqa: S603 — fixed argv, repo-root cwd
-        ["git", "diff", "--cached", "--name-only"],
-        capture_output=True,
-        text=True,
-        cwd=repo_root,
-        check=False,
-    ).stdout.splitlines()
-    bundling_warn = bundled_ledger_advisory(staged)
-    if bundling_warn:
-        typer.echo(bundling_warn, err=True)
-
-    if not decision.allowed:
-        typer.secho(decision.message, fg=typer.colors.RED, err=True)
-        raise typer.Exit(1)
 
 
 def _foreign_repo_slugs(
@@ -446,17 +389,11 @@ def _install_one(source: Path, target: Path, *, label: str, force: bool) -> None
 def install_hook(
     force: bool = typer.Option(False, "--force", help="Overwrite existing git hooks."),
 ) -> None:
-    """Install the pre-commit presence check and pre-push CI/security gate."""
+    """Install the pre-push CI/security gate."""
     root = _repo_root()
     hooks_dir = root / ".git" / "hooks"
     if not hooks_dir.is_dir():
         raise typer.BadParameter(f"{hooks_dir} not found (is this a git repository?)")
-    _install_one(
-        _PRE_COMMIT_HOOK_SOURCE,
-        hooks_dir / "pre-commit",
-        label="pre-commit presence check",
-        force=force,
-    )
     _install_one(
         _HOOK_SOURCE,
         hooks_dir / "pre-push",

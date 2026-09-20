@@ -1,4 +1,4 @@
-"""Current path taxonomy and advisory-presence behavior of the SDD gate."""
+"""Current path taxonomy and scope behavior of the SDD gate."""
 
 from __future__ import annotations
 
@@ -183,51 +183,7 @@ def test_evaluate_area_histo_and_live_bugs_allow(
 
 
 # ---------------------------------------------------------------------------
-# Advisory presence is caller-owned state and never blocks.
 # ---------------------------------------------------------------------------
-
-
-def test_evaluate_mutating_write_upserts_presence(tmp_path: Path) -> None:
-    decision, _ = evaluate(
-        tmp_path,
-        "repos/dadaia-workspace/specs/releases/v0.1.46/TASKS.md",
-        ctx="dadaia-workspace",
-        session_id="sess-solo",
-        runtime="claude",
-        pid=1234,
-    )
-    assert decision == Decision.ALLOW
-    record = tmp_path / ".dadaia" / "states" / "presence" / "dadaia-workspace" / "sess-solo.json"
-    assert record.is_file()
-
-
-def test_evaluate_peer_presence_warns_but_allows(tmp_path: Path) -> None:
-    from dadaia_workspace.features.spec_context import presence
-
-    presence.upsert(tmp_path, "dadaia-workspace", "owner-A", runtime="claude", pid=1)
-
-    decision, message = evaluate(
-        tmp_path,
-        "repos/dadaia-workspace/specs/releases/v0.1.46/PLAN.md",
-        ctx="dadaia-workspace",
-        session_id="intruder",
-        runtime="codex",
-        pid=5678,
-    )
-    assert decision == Decision.ALLOW
-    assert "owner-A" in message
-
-
-def test_evaluate_anon_session_emits_no_presence_events(tmp_path: Path) -> None:
-    decision, _ = evaluate(
-        tmp_path,
-        "repos/dadaia-workspace/specs/releases/v0.1.46/TASKS.md",
-        ctx="dadaia-workspace",
-        session_id="anon-session",
-    )
-    assert decision == Decision.ALLOW
-    presence_dir = tmp_path / ".dadaia" / "states" / "presence" / "dadaia-workspace"
-    assert not presence_dir.exists()
 
 
 # ═════════════════════════════════════════════════════════════════════════════════

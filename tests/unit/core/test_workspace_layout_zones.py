@@ -38,7 +38,6 @@ _SPEC_STATES_CANON = {
     "instance_exceptions.txt",
     "backlog_subject_aliases.txt",
     "harness_profile.json",
-    "presence",
     "AGENTS.md",
 }
 

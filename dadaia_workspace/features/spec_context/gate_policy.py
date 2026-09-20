@@ -1,7 +1,6 @@
 """Path classifier and decision policy for the merged SDD PreToolUse gate.
 
-Races between sessions are surfaced through advisory presence and never prevented;
-there is no session mode. Protected CLI session records remain fail-closed against
+Races between sessions are never prevented; there is no session mode. Protected CLI session records remain fail-closed against
 file-tool writes.
 
 **The gate blocks three things (0.4.7 FR1).** A PROTECTED write (CLI-owned session
@@ -21,7 +20,6 @@ documented way out was a bind flag that no longer exists.
 
 from __future__ import annotations
 
-import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from enum import Enum
@@ -29,14 +27,8 @@ from pathlib import Path
 
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
-from dadaia_workspace.features.spec_context import markers, presence
 
 __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
-
-#: Throttle window (seconds) for the advisory concurrency warning (v0.1.76 FR1). A
-#: second write inside this window from the same session emits no repeat warning — the
-#: throttle marker lives at ``.dadaia/tmp/presence-warn-<sid>-<ctx>`` (mtime-based).
-_ADVISORY_THROTTLE_SECONDS = 300
 
 #: Ordered ADDITIVE prefixes — always allowed.
 #: Parallel audit sessions use collision-safe directories, named per the single home
@@ -96,37 +88,6 @@ _SCOPE_BLOCK_MESSAGE = (
     "session is bound to '{bound}', whose scope is: {scope}.\n"
     "fix: " + DADAIA_BIN + " context bind {owner}"
 )
-
-#: The default session id when no harness-native id resolves (``hooks/sdd_gate.py``'s
-#: ``resolve_session_id(payload, default="anon-session")``). FR5: an anonymous identity
-#: never creates a presence record — it degrades presence accuracy only, never the write
-#: (v0.1.76, kills the anon-session dual-writer facet of the CRITICAL bug at the root).
-_ANON_SESSION_ID = "anon-session"
-
-
-def _advisory_marker_name(session_id: str, ctx: str) -> str:
-    """The advisory throttle marker's filename — validated by :func:`presence.throttled`/
-    :func:`markers.stamp_throttle` themselves (release 0.5.1 K2: the ONE
-    mtime-throttle-marker idiom, replacing this module's own copy)."""
-    return f"presence-warn-{session_id}-{ctx}"
-
-
-def _advisory_message(ctx: str, rel_path: str, others: list[presence.PresenceRecord]) -> str:
-    """Build the one-line advisory naming every other live session (FR1).
-
-    Names each other session's id, runtime, and last-seen timestamp; states plainly that
-    the write was ALLOWED — this is a signal, never a block.
-    """
-    parts = [
-        f"{rec.session_id!r} (runtime={rec.runtime}, last seen at {rec.last_seen_at or 'unknown'})"
-        for rec in others
-    ]
-    names = "; ".join(parts)
-    return (
-        f"[PRESENCE] '{rel_path}' write ALLOWED in context {ctx!r}. Other live session(s) "
-        f"present: {names}. Races between sessions are accepted and surfaced, never "
-        "blocked — no action required."
-    )
 
 
 class PathClass(Enum):
@@ -244,8 +205,6 @@ def evaluate(
     target_slug: str | None = None,
     target_owner: str | None = None,
     clock: Callable[[], datetime] = _utcnow,
-    runtime: str = "unknown",
-    pid: int | None = None,
 ) -> tuple[Decision, str]:
     """Return the gate decision for one write target — the fail-safe contract.
 
@@ -285,24 +244,5 @@ def evaluate(
     if scope_block is not None:
         return Decision.BLOCK, scope_block
 
-    # MUTATING mode: advisory presence, never a peer-session block.
-    # anon-session (no harness-native id resolved, FR5) creates no presence record — the
-    # write is still allowed, there is simply nothing to be advisory about. The whole
-    # block is wrapped fail-safe (AC-04 defense-in-depth): ``presence`` already swallows
-    # its own errors internally, but a MUTATING write must NEVER be able to raise out of
-    # this function regardless of what future presence code does.
-    try:
-        if session_id and session_id != _ANON_SESSION_ID and ctx:
-            presence.upsert(workspace, ctx, session_id, runtime=runtime, pid=pid or 0)
-            others = presence.others_alive(workspace, ctx, session_id)
-            marker = _advisory_marker_name(session_id, ctx)
-            now = time.time()
-            if others and not markers.throttled(
-                workspace, marker, window_seconds=_ADVISORY_THROTTLE_SECONDS, now=now
-            ):
-                markers.stamp_throttle(workspace, marker)
-                message = _advisory_message(ctx, rel_path, others)
-                return Decision.ALLOW, message
-    except Exception:  # noqa: BLE001 — fail-safe contract (AC-04): never fail-dead.
-        return Decision.ALLOW, ""
+    # MUTATING: always allowed; races surface through git, never through a block.
     return Decision.ALLOW, ""

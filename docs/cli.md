@@ -27,8 +27,7 @@
 ## dadaia certify — Certify assembled public features in a disposable local workspace.
 
 ## dadaia ci — Local CI-equivalent preflight gate + git-hook chokepoints.
-- ci install-hook — Install the pre-commit presence check and pre-push CI/security gate.
-- ci pre-commit-check — Warn about other live context presence. Advisory only — never blocks the commit.
+- ci install-hook — Install the pre-push CI/security gate.
 - ci preflight — Run ruff + mypy --strict + pytest locally; exit non-zero if any fail.
 - ci push-gate-check — Pre-push gate: branch-name validation + the range-scoped denylist scan.
 - ci verdict-check — Require an APPROVED security-reviewer verdict covering ``--head`` (v0.4.4 FR4;
@@ -40,9 +39,7 @@
 - context create — Create a new Spec Context Project in state 'dead'.
 - context dead — Transition a context to DEAD; git sync + remove repo from disk.
 - context delete — Delete a context. Context must be dead.
-- context heartbeat — Renew the heartbeat for the current session.
 - context list — List all Spec Context Projects.
-- context release — Release the current session's binding and advisory presence.
 - context repo <add, list, remove> — Manage a context's associated repos (main repo excluded).
 - context show — Show details of a context.
 - context update — Repair a context's repo URL (FR-W2-03 c / T-011-08).

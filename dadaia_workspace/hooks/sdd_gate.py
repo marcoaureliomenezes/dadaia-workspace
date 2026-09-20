@@ -40,37 +40,6 @@ from dadaia_workspace.hooks import _common
 _ANON_SESSION_ID = "anon-session"
 
 
-def _resolve_holder_pid(payload: dict[str, object]) -> int:
-    """Resolve the LONG-LIVED pid to record in the presence record (WS-R2 lineage).
-
-    The gate runs as a short-lived ``python -m dadaia_workspace.hooks.sdd_gate`` child
-    that exits milliseconds after the write. Recording ``os.getpid()`` (this child's own
-    pid) would make the recorded pid meaningless the instant the hook exits. We
-    therefore record a pid that **outlives the hook**:
-
-    1. If the harness stdin payload carries an explicit harness pid (``harness_pid`` /
-       ``parent_pid`` / ``ppid``), prefer it — it names the long-lived harness process
-       most precisely. (No current harness sends one; this is forward-compatible and
-       lets tests pin a known-alive pid.)
-    2. Otherwise ``os.getppid()`` — the parent that spawned this hook child, i.e. the
-       harness process. It stays alive for the whole session.
-
-    A non-positive or unparseable payload pid falls back to ``os.getppid()``.
-    """
-    for key in ("harness_pid", "parent_pid", "ppid"):
-        raw = payload.get(key)
-        if isinstance(raw, int) and raw > 0:
-            return raw
-        if isinstance(raw, str):
-            try:
-                value = int(raw.strip())
-            except (TypeError, ValueError):
-                continue
-            if value > 0:
-                return value
-    return os.getppid()
-
-
 def _target_slug(workspace: Path, fpath: Path) -> str | None:
     """The ``repos/<slug>`` the write target lands in, or ``None`` for a root path."""
     try:
@@ -130,7 +99,6 @@ def _evaluate_target(
     if cls == gate_policy.PathClass.MUTATING and not ctx:
         return gate_policy.Decision.ALLOW, ""
 
-    runtime = os.environ.get("DADAIA_RUNTIME", "unknown")
     # SCOPE inputs (FR1): the repo the write lands in, the context that OWNS it, and the
     # session's OWN bind flattened to plain data (name + repo slugs). The policy module
     # stays pure — ``core.invocation`` is resolved HERE, once, and never imported by
@@ -150,10 +118,6 @@ def _evaluate_target(
         bound_repos=inv.bind.repos,
         target_slug=target_slug,
         target_owner=target_owner,
-        runtime=runtime,
-        # NF-1: record a LONG-LIVED pid (the harness, via getppid / payload), never this
-        # ephemeral hook child's own — a presence record naming a dead pid is misleading.
-        pid=_resolve_holder_pid(payload),
     )
 
 

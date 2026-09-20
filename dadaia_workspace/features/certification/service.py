@@ -337,14 +337,13 @@ def certify(
 
     harness_env = {"CODEX_THREAD_ID": "certification-session"}
 
-    def bind_heartbeat() -> str:
-        cli("context", "bind", "certified-consumer", extra_env=harness_env)
-        output = cli("context", "heartbeat", extra_env=harness_env)
-        if "certification-session" not in output:
+    def bind() -> str:
+        output = cli("context", "bind", "certified-consumer", extra_env=harness_env)
+        if "certified-consumer" not in output:
             raise RuntimeError(output)
-        return "caller-owned bind and heartbeat"
+        return "caller-owned bind"
 
-    check("context-bind-heartbeat", bind_heartbeat)
+    check("context-bind", bind)
     check(
         "context-specs-doctor",
         lambda: doctor_clean("specs", "doctor", "--context", "certified-consumer", "--json"),
@@ -420,7 +419,6 @@ def certify(
     check("panel-and-server-registry", panel_check)
 
     def context_round_trip() -> str:
-        cli("context", "release", extra_env=harness_env)
         cli("context", "dead", "certified-consumer", "--commit")
         cli("context", "alive", "certified-consumer")
         cli("context", "dead", "certified-consumer")

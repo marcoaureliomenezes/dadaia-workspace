@@ -44,10 +44,6 @@ from dadaia_workspace.features.chokepoints.branch_policy import (
     parse_push_refs,
     parse_push_stdin,
 )
-from dadaia_workspace.features.chokepoints.pre_commit import (
-    bundled_ledger_advisory,
-    pre_commit_decision,
-)
 from dadaia_workspace.features.chokepoints.push_gate import push_gate_decision
 from dadaia_workspace.features.chokepoints.verdict import Verdict, covering_verdict
 
@@ -56,11 +52,9 @@ __all__ = [
     "PushRef",
     "Verdict",
     "branch_name_is_permitted",
-    "bundled_ledger_advisory",
     "context_slug_for_path",
     "covering_verdict",
     "parse_push_refs",
     "parse_push_stdin",
-    "pre_commit_decision",
     "push_gate_decision",
 ]

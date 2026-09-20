@@ -22,7 +22,6 @@ __all__ = ["MARKER_PREFIXES", "reap_markers", "stamp_throttle", "throttled"]
 #: nobody"; a prefix not listed here is not a throttle marker.
 MARKER_PREFIXES: tuple[str, ...] = (
     "reconciler-last-",
-    "presence-warn-",
     "ctx-inject-fired-",
     "ctx-compact-",
 )

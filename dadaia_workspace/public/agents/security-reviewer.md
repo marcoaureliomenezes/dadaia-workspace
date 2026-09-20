@@ -3,7 +3,7 @@ name: security-reviewer
 description: "Vulnerability auditor; validates at candidate close and owns the push verdict. OWASP Top 10, secret detection, dep CVEs (pip-audit/npm audit/go list), IaC review. ADDITIVE evidence only. Findings: CWE id, file:line, redacted evidence, findings-only — fixes stay with the implementing agent."
 dispatch_band: 3
 activity_class: ADDITIVE
-concurrency_relationship: "always concurrent; advisory presence only"
+concurrency_relationship: "always concurrent; no lock"
 gate_role: checkpoint-pre-push
 tools:
   - Read

@@ -408,16 +408,6 @@ never exercised the live backlog path was false confidence).
   `candidate` status (must block; `idea` stays exempt), and an empty/absent field where
   the checks could be *vacuously* satisfied rather than actually passed.
 
-### R-14 — Live foreign presence is SURFACED on the allowed write
-
-- Bind two sessions in implementation mode on one context; drive a real `pre_gate`
-  MUTATING write payload for each.
-- **PASS if:** the second write is ALLOWED and its hook output visibly carries the
-  throttled `[PRESENCE]` advisory naming the other session (id, runtime, heartbeat
-  age) — in the allow envelope's `systemMessage` and on stderr; a neutral allow with
-  live foreign presence is the bug (pre-gate-drops-live-presence-advisory-042).
-  Repeat writes inside the throttle window stay quiet (at most one advisory).
-
 ### R-15 — L1 agent-model roster resolves, projects and RUNS on the mapped models
 
 The L1 roster is data (`core/agent_model_templates.py` + `core/model_registry.py`)

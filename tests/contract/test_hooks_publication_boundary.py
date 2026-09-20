@@ -59,7 +59,6 @@ pytestmark = [
 ]
 
 _SCRIPTS_DIR = Path(dadaia_workspace.__file__).parent / "public" / "scripts"
-_PRE_COMMIT_SCRIPT = _SCRIPTS_DIR / "pre-commit-presence-gate.sh"
 _PRE_PUSH_SCRIPT = _SCRIPTS_DIR / "pre-push-ci-gate.sh"
 
 _BASH = shutil.which("bash") or "/usr/bin/bash"
@@ -152,31 +151,6 @@ def _hook_env(workspace: Path, *, dadaia_bin: Path | None = None) -> dict[str, s
     else:
         env.pop("DADAIA_BIN", None)
     return env
-
-
-def test_pre_commit_exits_0_on_a_staged_set_backlog_doctor_would_reject(
-    tmp_path: Path,
-) -> None:
-    """A9.1: the real ``pre-commit-presence-gate.sh`` exits 0 on a staged set the
-    (now-deleted) backlog doctor block would have rejected — advisory-only, always
-    exit 0, never the script's text."""
-    workspace = tmp_path
-    repo = _init_context_repo(workspace, "demo-ctx")
-    _plant_backlog_doctor_violation(repo)
-    subprocess.run(["git", "add", "specs/backlog/BACKLOG.json"], cwd=repo, check=True)
-
-    stub = workspace / "dadaia-stub.sh"
-    _write_dadaia_forwarder(stub)
-
-    result = subprocess.run(
-        [_BASH, str(_PRE_COMMIT_SCRIPT)],
-        cwd=repo,
-        capture_output=True,
-        text=True,
-        env=_hook_env(workspace, dadaia_bin=stub),
-        timeout=_DEADLINE,
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def _write_preflight_fails_stub(path: Path) -> None:

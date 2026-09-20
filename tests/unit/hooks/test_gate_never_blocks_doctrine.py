@@ -64,7 +64,7 @@ def _assert_never_a_lock_block(block: dict[str, object] | None) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Two live sessions — both writes ALLOW, at most one throttled advisory each.
+# Two live sessions — both writes ALLOW.
 # --------------------------------------------------------------------------- #
 
 
@@ -84,79 +84,6 @@ def test_two_live_sessions_both_mutating_writes_allow(tmp_path: Path) -> None:
         ws, {"tool_name": "Write", "tool_input": {"file_path": str(target_b)}}, session_id=sid_b
     )
     _assert_never_a_lock_block(block_b)
-
-    # Both sessions' presence must now be recorded on this context (co-presence proof).
-    presence_dir = ws / ".dadaia" / "states" / "presence" / ctx
-    recorded = {p.stem for p in presence_dir.glob("*.json")} if presence_dir.is_dir() else set()
-    assert {sid_a, sid_b} <= recorded, recorded
-
-
-def test_second_session_write_surfaces_advisory_naming_the_other_session(tmp_path: Path) -> None:
-    ws = _mk_workspace(tmp_path, "dadaia-workspace")
-    ctx = "dadaia-workspace"
-    sid_a, sid_b = "session-alpha", "session-beta"
-
-    target_a = _write_target(ws, ctx, "TASKS.md")
-    _run(ws, {"tool_name": "Write", "tool_input": {"file_path": str(target_a)}}, session_id=sid_a)
-
-    target_b = _write_target(ws, ctx, "PLAN.md")
-    result_b = run_hook_subprocess(
-        "pre_gate",
-        {
-            "tool_name": "Write",
-            "tool_input": {"file_path": str(target_b)},
-            "session_id": sid_b,
-        },
-        (lambda e: (e.pop("CLAUDE_CODE_SESSION_ID", None), e.pop("DADAIA_CONTEXT", None), e)[-1])(
-            claude_hook_env(ws, session_id=sid_b)
-        ),
-    )
-    assert result_b.returncode == 0, result_b.stderr
-    # ALLOW: no block envelope on stdout.
-    assert result_b.block_envelope() is None
-    # Bug pre-gate-drops-live-presence-advisory-042 (Consumer R1-B): the doctrine
-    # MANDATES the throttled advisory on detection — a neutral allow envelope that
-    # swallows it blinds concurrency diagnosis. The advisory rides the allow
-    # envelope's systemMessage and names the other live session.
-    combined = result_b.stdout + result_b.stderr
-    assert "[PRESENCE]" in combined, (
-        f"allowed write with a live foreign presence must surface the advisory; "
-        f"got stdout={result_b.stdout!r} stderr={result_b.stderr!r}"
-    )
-    assert sid_a in combined
-
-
-def test_advisory_is_throttled_within_the_window(tmp_path: Path) -> None:
-    """A second write from the same session within the throttle window emits at most one
-    advisory total — never re-warns on every single write inside the window."""
-    ws = _mk_workspace(tmp_path, "dadaia-workspace")
-    ctx = "dadaia-workspace"
-    sid_a, sid_b = "session-alpha", "session-beta"
-
-    target_a = _write_target(ws, ctx, "TASKS.md")
-    _run(ws, {"tool_name": "Write", "tool_input": {"file_path": str(target_a)}}, session_id=sid_a)
-
-    outputs = []
-    for name in ("PLAN.md", "SPEC.md"):
-        target_b = _write_target(ws, ctx, name)
-        env = claude_hook_env(ws, session_id=sid_b)
-        env.pop("CLAUDE_CODE_SESSION_ID", None)
-        env.pop("DADAIA_CONTEXT", None)
-        result = run_hook_subprocess(
-            "pre_gate",
-            {
-                "tool_name": "Write",
-                "tool_input": {"file_path": str(target_b)},
-                "session_id": sid_b,
-            },
-            env,
-        )
-        assert result.returncode == 0, result.stderr
-        assert result.block_envelope() is None
-        outputs.append(result.stdout + result.stderr)
-
-    warned = sum(1 for o in outputs if sid_a in o)
-    assert warned <= 1, "advisory must be throttled — never re-warn on every write in-window"
 
 
 # --------------------------------------------------------------------------- #
@@ -178,31 +105,6 @@ def test_foreign_read_bind_never_imposes_read_on_my_mutating_write(tmp_path: Pat
         ws, {"tool_name": "Write", "tool_input": {"file_path": str(target)}}, session_id=my_sid
     )
     _assert_never_a_lock_block(block)
-
-
-def test_anon_session_write_allowed_but_creates_no_presence_record(tmp_path: Path) -> None:
-    ws = _mk_workspace(tmp_path, "dadaia-workspace")
-    ctx = "dadaia-workspace"
-
-    target = _write_target(ws, ctx, "TASKS.md")
-    env = claude_hook_env(ws, session_id="unused")
-    env.pop("CLAUDE_CODE_SESSION_ID", None)
-    env.pop("CODEX_SESSION_ID", None)
-    env.pop("DADAIA_CONTEXT", None)
-    env.pop("DADAIA_SESSION_ID", None)
-    # No session_id in the payload either -> resolves the anon-session default.
-    result = run_hook_subprocess(
-        "pre_gate",
-        {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
-        env,
-    )
-    assert result.returncode == 0, result.stderr
-    assert result.block_envelope() is None
-
-    presence_dir = ws / ".dadaia" / "states" / "presence" / ctx
-    recorded = {p.stem for p in presence_dir.glob("*.json")} if presence_dir.is_dir() else set()
-    assert "anon-session" not in recorded, recorded
-    assert recorded == set(), recorded
 
 
 def test_throttle_marker_rejects_traversal_shaped_identity_components(tmp_path: Path) -> None:

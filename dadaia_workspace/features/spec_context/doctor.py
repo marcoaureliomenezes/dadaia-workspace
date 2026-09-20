@@ -30,7 +30,7 @@ from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.workspace_layout import Creator, Zone
-from dadaia_workspace.features.spec_context import presence, sweep
+from dadaia_workspace.features.spec_context import markers, sweep
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
@@ -118,25 +118,6 @@ class DoctorService:
     # ------------------------------------------------------------------
     # check() — the context invariants (unchanged by the zone walk)
     # ------------------------------------------------------------------
-
-    def _check_presence_gc(self) -> list[DoctorIssue]:
-        """PRESENCE-GC: report stale/corrupt advisory presence records (FR7). Read-only —
-        the ONLY reclamation authority is presence.gc(), called by fix(); the same
-        read-only predicate keeps check and fix from ever disagreeing."""
-        issues: list[DoctorIssue] = []
-        for ref in presence.stale_records(self._workspace_root):
-            issues.append(
-                DoctorIssue(
-                    code="PRESENCE-GC",
-                    description=(
-                        f"[stale-presence] context '{ref.context}': advisory presence record "
-                        f"for session '{ref.session_id}' is stale or corrupt — safe to reclaim. "
-                        "Run 'dadaia doctor --fix' to garbage-collect it."
-                    ),
-                    fixable=True,
-                )
-            )
-        return issues
 
     def check_installed_hooks(self) -> list[DoctorIssue]:
         """HOOKS-DRIFT-1: an ALIVE repo's installed git hook differs from the shipped one.
@@ -297,7 +278,6 @@ class DoctorService:
                     )
                 )
 
-        issues.extend(self._check_presence_gc())
         issues.extend(self._check_venv_health())
         return issues
 
@@ -592,8 +572,8 @@ class DoctorService:
     # fix() — the one reaper, in the fixed FR4 order
     # ------------------------------------------------------------------
 
-    def fix(self, *, own_session_id: str = "") -> list[str]:
-        """The ONE reaper lane: presence.gc -> session reap -> migrate -> seed missing ->
+    def fix(self) -> list[str]:
+        """The ONE reaper lane: marker reap -> session reap -> migrate -> seed missing ->
         MOVE slop to ``reaped/`` -> reap dead contexts' repos (INV-5) -> delete expired.
 
         There is no second, smaller lane. ``--expired-only`` used to buy one by stopping
@@ -602,10 +582,6 @@ class DoctorService:
         means only what it always should have: which findings the REPORT shows. The
         SessionStart lane and ``sdd_post_gate``'s throttle run exactly this.
 
-        *own_session_id* is the caller's OWN session: ``presence.gc`` never reaps that
-        record. The CLI passes nothing (it is not a session); ``sdd_post_gate`` passes its
-        own id, which is why the hook no longer calls ``presence.gc`` itself — one cadence,
-        one reaper, and a live session can never reap its own presence.
 
         Nothing here deletes a live entry. Slop is MOVED and holds its 7 days in
         ``.dadaia/reaped/<YYYYMMDD>/<workspace-relative-path>``, the clock starting at the
@@ -616,17 +592,11 @@ class DoctorService:
         aborts, and never touches a location outside the workspace."""
         actions: list[str] = []
 
-        # presence.gc() is the ONE reaper of stale presence records, throttle/sentinel
-        # markers and now-empty presence context dirs (release 0.5.1 K2).
-        gc_report = presence.gc(
-            self._workspace_root, now=datetime.now(tz=UTC), own_session_id=own_session_id
-        )
-        for key in gc_report.presence:
-            actions.append(f"PRESENCE-GC: deleted stale presence record '{key}'")
-        for name in gc_report.markers:
-            actions.append(f"PRESENCE-GC: deleted stale marker '{name}'")
-        for name in gc_report.empty_context_dirs:
-            actions.append(f"PRESENCE-GC: removed empty presence context dir '{name}'")
+        # markers.reap_markers is the ONE reaper of spent throttle/sentinel markers.
+        for name in markers.reap_markers(
+            self._workspace_root, now=datetime.now(tz=UTC).timestamp()
+        ):
+            actions.append(f"MARKER-GC: deleted stale marker '{name}'")
 
         # The session-record owner's ONE reaper (core.session_store.reap_stale, F002).
         for sess_id in session_store.reap_stale(self._workspace_root):
@@ -738,7 +708,7 @@ class DoctorService:
         return actions
 
 
-def reap(workspace_root: Path, *, own_session_id: str = "") -> list[str]:
+def reap(workspace_root: Path) -> list[str]:
     """The reaper lane, composed without the container (P-12).
 
     ``sdd_post_gate``'s throttle and the SessionStart lane call this: seed what is
@@ -748,7 +718,7 @@ def reap(workspace_root: Path, *, own_session_id: str = "") -> list[str]:
     """
     states = workspace_root / ".dadaia" / "states"
     service = DoctorService(JsonContextStore(states), GitSubprocessClient(), workspace_root)
-    return service.fix(own_session_id=own_session_id)
+    return service.fix()
 
 
 # ── the `workspace` section of the one doctor (0.4.7 FR5, T-047-02) ──────────────

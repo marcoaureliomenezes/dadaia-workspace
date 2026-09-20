@@ -92,7 +92,7 @@ def _seed_stale_lock(tmp_path: Path, *, pid: int | None) -> Path:
     ctx_locks = tmp_path / ".dadaia" / "states" / "ctx_locks"
     ctx_locks.mkdir(parents=True, exist_ok=True)
     hb = (
-        datetime.now(tz=UTC) - timedelta(seconds=kernel_tunables.PRESENCE_TTL_SECONDS + 600)
+        datetime.now(tz=UTC) - timedelta(seconds=kernel_tunables.SESSION_GC_TTL_SECONDS + 600)
     ).isoformat()
     rec: dict[str, object] = {
         "context": _GC_CTX,
@@ -101,7 +101,7 @@ def _seed_stale_lock(tmp_path: Path, *, pid: int | None) -> Path:
         "mode": "IMPLEMENTATION",
         "acquired_at": hb,
         "heartbeat": hb,
-        "ttl": kernel_tunables.PRESENCE_TTL_SECONDS,
+        "ttl": kernel_tunables.SESSION_GC_TTL_SECONDS,
     }
     if pid is not None:
         rec["pid"] = pid
