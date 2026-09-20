@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from dadaia_workspace.core.models.bugs import BugRecord
     from dadaia_workspace.features.certification import CertificationResult
-    from dadaia_workspace.features.telemetry.store import TelemetryStore
     from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 from dadaia_workspace.core.exceptions import (
@@ -155,35 +154,6 @@ def build_bug_record_store(specs_dir: Path) -> "JsonlRecordStore[BugRecord]":
         to_dict=BugRecord.to_dict,
         from_dict=BugRecord.from_dict,
     )
-
-
-def telemetry_state_dir() -> Path:
-    """The ONE resolver for the machine-level telemetry state directory,
-    ``~/.dadaia/state/telemetry`` (0.4.7 FR2, SPEC line 221: one store per MACHINE, two
-    workspaces on it kept apart by each event's ``context``).
-
-    It is a seam, not a convenience: the literal used to sit inside
-    ``build_telemetry_store`` with nothing to intercept, so the suite's governance-event
-    tests wrote synthetic events into the OPERATOR'S real store. ``tests/conftest.py``
-    routes this one function at ``tmp_path`` for every test (backstop proved by
-    ``tests/contract/test_telemetry_store_backstop.py``). No env var is read — the
-    directory is machine-level by law, overridden only through this seam.
-    """
-    return Path.home() / ".dadaia" / "state" / "telemetry"
-
-
-def build_telemetry_store(state_dir: Path) -> "TelemetryStore":
-    """The ONE telemetry store: ``<state_dir>/telemetry.sqlite``. The panel's boot and
-    every governance verb build it here, so the migration set is stated once.
-
-    *state_dir* comes from the caller — ``telemetry_state_dir()`` in production, a
-    ``tmp_path`` in tests. Returns an UNOPENED store: the caller decides whether it
-    opens for write (and how it degrades when it cannot).
-    """
-    from dadaia_workspace.features.telemetry.store import TelemetryStore
-
-    state_dir.mkdir(parents=True, exist_ok=True)
-    return TelemetryStore(state_dir / "telemetry.sqlite")
 
 
 def build_bug_record_validator() -> Callable[[Mapping[str, object]], None]:

@@ -197,8 +197,6 @@ max-nested-blocks = 6
 "dadaia_workspace/cli/commands/*.py" = ["B904"]
 "dadaia_workspace/cli/commands/repos.py" = ["SIM118"]
 # Test files that place pytestmark before platform-gated imports (E402 is intentional).
-"tests/unit/infrastructure/test_telemetry_lock_posix.py" = ["E402", "I001"]
-"tests/unit/infrastructure/test_telemetry_lock_windows.py" = ["E402", "I001"]
 
 # Bug ruff-0-16-2-markdown-python-fence-format-drift: ruff 0.16.2 started reformatting
 # fenced Python code blocks embedded in Markdown by default, which reached 5

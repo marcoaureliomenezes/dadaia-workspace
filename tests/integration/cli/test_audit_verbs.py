@@ -12,15 +12,12 @@ half-done sweep left an audit that looked closed and was not.
 
 from __future__ import annotations
 
-import hashlib
 import json
-import sqlite3
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
-from dadaia_workspace import container
 from dadaia_workspace.cli.main import app
 from tests.contract.test_every_block_carries_a_fix import assert_block_carries_a_runnable_fix
 
@@ -100,25 +97,13 @@ def _histo_lines(specs_dir: Path) -> list[str]:
     return [line for line in path.read_text(encoding="utf-8").split("\n") if line.strip()]
 
 
-def _events(home_dir: Path) -> list[sqlite3.Row]:
-    db = container.telemetry_state_dir() / "telemetry.sqlite"
-    conn = sqlite3.connect(db)
-    conn.row_factory = sqlite3.Row
-    try:
-        return conn.execute("SELECT * FROM governance_events ORDER BY ts, verb").fetchall()
-    finally:
-        conn.close()
-
-
 def _disposition(specs_dir: Path, finding_id: str, *args: str) -> str:
     return _run("audit", "disposition", _AUDIT, finding_id, "--specs-dir", str(specs_dir), *args)
 
 
-def test_disposition_rewrites_only_the_governance_triple_and_writes_one_event(
-    home: Path, specs: Path
-) -> None:
+def test_disposition_rewrites_only_the_governance_triple(home: Path, specs: Path) -> None:
     """The verb rewrites `disposition`/`release`/`reason` in place; the immutable core
-    and every other finding are untouched; one event names the finding."""
+    and every other finding are untouched."""
     before = _findings(specs)
     _disposition(specs, f"{_AUDIT}-F001", "--disposition", "resolved", "--release", "0.4.7")
 
@@ -127,11 +112,6 @@ def test_disposition_rewrites_only_the_governance_triple_and_writes_one_event(
     assert after[f"{_AUDIT}-F001"]["release"] == "0.4.7"
     assert after[f"{_AUDIT}-F001"]["claim"] == before[f"{_AUDIT}-F001"]["claim"]
     assert after[f"{_AUDIT}-F002"] == before[f"{_AUDIT}-F002"]
-
-    rows = [row for row in _events(home) if row["verb"] == "disposition"]
-    assert len(rows) == 1
-    assert rows[0]["ledger"] == "audits"
-    assert rows[0]["record_id"] == f"{_AUDIT}-F001"
 
 
 def _disposition_all(specs_dir: Path) -> None:
@@ -144,8 +124,7 @@ def test_close_appends_one_histo_record_last_and_deletes_the_directory(
     home: Path, specs: Path
 ) -> None:
     """All-or-nothing: with every finding terminal, close leaves exactly one histo line
-    carrying the window-end sha and the per-pillar counts, the directory is gone, and one
-    event hashes that line."""
+    carrying the window-end sha and the per-pillar counts, and the directory is gone."""
     _disposition_all(specs)
     _run("audit", "close", _AUDIT, "--sha", _SHA, "--specs-dir", str(specs))
 
@@ -160,11 +139,6 @@ def test_close_appends_one_histo_record_last_and_deletes_the_directory(
     assert record["entry"]["pillars"] == {"bugs": 1, "specs": 1, "memory": 1}
     assert record["entry"]["dispositions"] == {"resolved": 1, "superseded": 1, "deferred": 1}
     assert "bugs 1" in (record["summary"] or "")
-
-    rows = [row for row in _events(home) if row["verb"] == "close"]
-    assert len(rows) == 1
-    assert rows[0]["record_id"] == _AUDIT
-    assert rows[0]["record_hash"] == hashlib.sha256(lines[0].encode("utf-8")).hexdigest()
 
 
 def test_close_refuses_while_one_finding_is_open_and_writes_nothing(

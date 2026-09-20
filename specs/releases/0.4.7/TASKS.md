@@ -24,8 +24,9 @@
   `features/specs/**`, `features/backlog/document.py`, `infrastructure/**`, `core/**`,
   `public/scripts/**`, `public/skills/dd-cli-library/**`, `public/data/DADAIA.md` (§3.2, §3.3,
   §8.5 presence sentences only), `tests/**`.
-- [ ] T-047-43 — FR1a: delete `features/telemetry/`, `cli/_governance_event.py` + 8 call sites,
-  the HANDEDIT rules, `container.py` wiring. Write set: `container.py`, `cli/**`,
+- [x] T-047-43 — FR1a: delete `features/telemetry/`, `cli/_governance_event.py` + 8 call sites,
+  the HANDEDIT rules, the telemetry locks and models, `container.py` wiring; retired surface
+  `telemetry` stays valid on committed bug records. Write set: `container.py`, `cli/**`,
   `features/specs/{ledgers,rules,doctor,release_tree}.py`, `core/models/telemetry.py`,
   `public/data/DADAIA.md` (§8.5 HANDEDIT lines), `public/scaffold/**/AGENTS.md` (HANDEDIT
   mentions), `tests/**`.

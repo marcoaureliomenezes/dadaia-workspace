@@ -329,7 +329,6 @@
 - Nothing is deleted directly: deletion happens only when a TTL zone's entry expires, `reaped/` included.
 - `--fix` runs that reaper then the specs fixes; `--expired-only` scopes the report to the TTL lane, never the deletion.
 - SessionStart runs `dadaia doctor --fix --expired-only --quiet`; the PostToolUse throttle runs the same reaper, which also owns marker GC.
-- `LEDGER-<NAME>-HANDEDIT` and `RELEASE-TREE-HANDEDIT` (WARNING, never a block): a governance record changed with no matching governance event; silent where no telemetry store exists.
 - `HOOKS-DRIFT-1`: an ALIVE repo's installed `.git/hooks/pre-push` byte-differing from the shipped script; `fix: .dadaia/.venv/bin/dadaia ci install-hook --force`.
 
 ---
@@ -393,8 +392,6 @@
 - **operator** — the human who owns the workspace and approves ADRs, deferrals, releases.
 - **dispatcher** — an agent authorized to invoke another agent via subagent dispatch.
 - **governance verb** — the one CLI command authorized to change a governance record (§6.6, §6.7, §6.8, §7.3).
-- **governance event** — the row a governance verb writes into the telemetry store, naming the record and its post-write hash.
-- **hand edit** — a governance record change with no matching governance event; measured as a WARNING, never blocked (§8.5).
 - **bug proposal** — the operator-facing case for a bug before any record exists; `bug-proposal:` in a handoff finding when no operator is present (§7.3).
 - **slop** — what passes the deletion test without loss (§7.6).
 - **ratchet** — a contract test pinning a measured count that moves down only (§7.6).

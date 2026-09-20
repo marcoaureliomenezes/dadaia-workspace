@@ -20,10 +20,6 @@ from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
 from dadaia_workspace.features.specs.release_tree import release_tree_issues
 
-#: The one RELEASE-TREE code that reports PROVENANCE over a valid document, so it rides
-#: its own row: the conformance row carries a `fix:` and this one cannot (0.4.7 FR6).
-_HAND_EDIT_CODE = "RELEASE-TREE-HANDEDIT"
-
 if TYPE_CHECKING:
     from dadaia_workspace.features.specs.doctor import SpecsDoctor
 
@@ -282,19 +278,8 @@ RULES: tuple[SpecsRule, ...] = (
             "RELEASE-TREE-ARCHIVE-ID",
             "RELEASE-TREE-ARCHIVE-UNSHIPPED",
         ),
-        lambda d: [i for i in release_tree_issues(d.specs_dir) if i.code != _HAND_EDIT_CODE],
+        lambda d: release_tree_issues(d.specs_dir),
         fix_help="sed -i 's|<invalid value>|<canonical value>|' specs/releases/<id>/_RELEASE.json",
-    ),
-    _rule(
-        (_HAND_EDIT_CODE,),
-        lambda d: [
-            i
-            for i in release_tree_issues(d.specs_dir, governance=d.governance)
-            if i.code == _HAND_EDIT_CODE
-        ],
-        # No fix line: re-running `dadaia release phase` and accepting the edit are both
-        # correct answers, and printing one would be a guess. WARNING-only, so the run
-        # never exits 1 on it (SPEC 0.4.7 FR6: measured, never blocked).
     ),
     _rule(
         ("SPEC-DOC-046",),

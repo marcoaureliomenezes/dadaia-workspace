@@ -31,17 +31,14 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
-from dadaia_workspace.core.models.telemetry import GovernanceBaseline
 from dadaia_workspace.core.release_state import PHASES, parse_release_state, release_state_file
 from dadaia_workspace.features.specs.doctor_common import RELEASE_ARTIFACTS
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 from dadaia_workspace.features.specs.schemas import validator_for
 
 __all__ = [
-    "GOVERNED_STATE_FIELDS",
     "RELEASE_TREE_PHASES",
     "ReleaseTreeIssue",
-    "governed_state",
     "release_tree_issues",
     "validate_release_tree",
 ]
@@ -54,13 +51,6 @@ __all__ = [
 RELEASE_TREE_PHASES: tuple[str, ...] = PHASES
 
 #: The ``_RELEASE.json`` fields a verb OWNS, and therefore the exact shape the
-#: ``releases`` governance event hashes (0.4.7 FR6 / SPEC Q3). Everything else in the
-#: document is hand-written by design — the `log` narrative above all — so hashing the
-#: whole state would read every closure paragraph as a hand edit. Stated here, beside
-#: the rule that recomputes it, and imported by the verb that writes it
-#: (``cli/commands/newartifacts.py::_record_release_event``): ONE shape, one home.
-GOVERNED_STATE_FIELDS: tuple[str, ...] = ("phase", "defined", "implemented")
-
 _SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 _SCHEMA_NAME = "releases/release-state-v1"
 
@@ -172,34 +162,7 @@ def _trio_issues(
     ]
 
 
-def governed_state(document: Mapping[str, Any]) -> dict[str, Any]:
-    """The verb-owned slice of a release state — the record a ``releases`` governance
-    event hashes. Absent keys are absent, never defaulted: a document missing `phase`
-    fails its schema, and inventing a value here would hash a record nobody wrote."""
-    return {key: document[key] for key in GOVERNED_STATE_FIELDS if key in document}
-
-
-def _hand_edit_issue(
-    doc: Any, rel: str, release_id: str, governance: GovernanceBaseline | None
-) -> list[ReleaseTreeIssue]:
-    """RELEASE-TREE-HANDEDIT (0.4.7 FR6): the live phase/milestones differ from what the
-    last `release` verb wrote.
-
-    ``record_ts=None`` by construction: a state document carries no timestamp of its
-    own, so the "no event at all" shape cannot be dated and stays silent — a release
-    that predates the verbs is history, not drift.
-    """
-    if governance is None or not isinstance(doc, dict):
-        return []
-    message = governance.hand_edit(
-        ledger="releases", record_id=release_id, record=governed_state(doc)
-    )
-    return [] if message is None else [ReleaseTreeIssue(rel, "RELEASE-TREE-HANDEDIT", message)]
-
-
-def validate_release_tree(
-    specs_dir: Path, *, governance: GovernanceBaseline | None = None
-) -> list[ReleaseTreeIssue]:
+def validate_release_tree(specs_dir: Path) -> list[ReleaseTreeIssue]:
     """Validate every release directory under ``specs_dir/releases/``.
 
     One issue per failure, in walk order: live releases first (SemVer-sorted by
@@ -231,7 +194,6 @@ def validate_release_tree(
             issues.append(ReleaseTreeIssue(rel, "RELEASE-TREE-PARSE", f"not valid JSON: {exc}"))
             continue
         issues.extend(_trio_issues(release_dir, dir_rel, doc, archived=archived))
-        issues.extend(_hand_edit_issue(doc, rel, release_dir.name, governance))
         issues.extend(_document_issues(doc, text, rel, archived=archived, validator=validator))
         if archived:
             issues.extend(_archive_issues(doc, rel, release_dir.name, live_ids))
@@ -289,25 +251,21 @@ def _archive_issues(
 
 #: The one code this validator emits that is not a conformance failure: the document
 #: is valid and merely unexplained (0.4.7 FR6). Judgment, so WARNING and no `fix:`.
-_HAND_EDIT_CODE = "RELEASE-TREE-HANDEDIT"
 
 
-def release_tree_issues(
-    specs_dir: Path, *, governance: GovernanceBaseline | None = None
-) -> list[SpecsDoctorIssue]:
+def release_tree_issues(specs_dir: Path) -> list[SpecsDoctorIssue]:
     """The validator rendered as doctor issues — the `specs` section's RELEASE-TREE rule.
 
     Every conformance failure is an ERROR: a committed governance record is either valid
-    or it is not. The one exception is :data:`_HAND_EDIT_CODE`, which reports PROVENANCE
-    over a valid document. Lives here, next to the validator it renders, so the rule
+    or it is not. Lives here, next to the validator it renders, so the rule
     registry stays a table of one-line rows and no validator module grows for it.
     """
     return [
         SpecsDoctorIssue(
             issue.code,
-            Severity.WARNING if issue.code == _HAND_EDIT_CODE else Severity.ERROR,
+            Severity.ERROR,
             issue.message,
             issue.path,
         )
-        for issue in validate_release_tree(specs_dir, governance=governance)
+        for issue in validate_release_tree(specs_dir)
     ]

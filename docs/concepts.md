@@ -92,8 +92,6 @@ evidence, and registration is ask-first: the agent proposes and `dadaia bugs app
 runs only after the operator confirms. `specs/backlog/BACKLOG.json`'s `active[]` is the
 operator's demand queue, curated by `project-manager` and exited exactly once by
 `dadaia backlog exit`, which appends one histo record carrying the removed entry.
-Every governance verb leaves one governance event in the telemetry store, and a record
-changed without one is a hand edit — reported as a WARNING, never rewritten.
 
 ## Audits
 

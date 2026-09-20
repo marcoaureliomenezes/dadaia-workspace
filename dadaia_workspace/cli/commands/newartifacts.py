@@ -19,7 +19,6 @@ is retired outright (operator ruling 2026-08-28) — the single source is
 
 from __future__ import annotations
 
-import json
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -28,7 +27,6 @@ import typer
 
 from dadaia_workspace import container
 from dadaia_workspace.cli._backlog_roots import resolve_backlog_roots
-from dadaia_workspace.cli._governance_event import record_governance_event
 from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.core.atomic_write import ConcurrentModificationError
 from dadaia_workspace.core.models.backlog import SubjectKind
@@ -51,7 +49,6 @@ from dadaia_workspace.features.specs.candidate import (
     set_phase,
 )
 from dadaia_workspace.features.specs.canon import release_new
-from dadaia_workspace.features.specs.release_tree import governed_state
 from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 # ── shared typer apps ─────────────────────────────────────────────────────────
@@ -110,7 +107,6 @@ def release_new_cmd(
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
 
-    _record_release_event("new", target, release_id)
     typer.echo(f"[ok] created: {spec_path}")
     typer.echo(f"[ok] created: {spec_path.parent / RELEASE_STATE_FILENAME}")
 
@@ -145,7 +141,6 @@ def release_phase_cmd(
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
 
-    _record_release_event("phase", target, change.release)
     typer.echo(f"[ok] release {change.release} -> phase {change.phase} ({change.ts})")
 
 
@@ -178,7 +173,6 @@ def release_rc_archive_cmd(
     except ArchiveError as exc:
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
-    _record_release_event("rc-archive", target, result.release)
     archived_bugs = _archive_bugs(target)
     typer.echo(
         f"[ok] candidate {result.rc} of release {result.release} archived -> "
@@ -204,33 +198,6 @@ def _archive_bugs(target: Path) -> int:
     return build_bug_service(target, with_archive=True).archive().archived
 
 
-def _record_release_event(verb: str, target: Path, release_id: str) -> None:
-    """One verb, one governance event (0.4.7 FR2) over the state document the verb just
-    wrote — the record whose hash `dadaia doctor` compares a hand edit against.
-
-    The hashed shape is ``release_tree.governed_state`` — ``phase``/``defined``/
-    ``implemented`` and nothing else — imported from the rule that recomputes it so the
-    two can never disagree. The rest of the document is hand-written by design (SPEC
-    0.4.7 Q3): hashing the whole state would read every closure paragraph appended to
-    `log` as a hand edit of a phase nobody touched.
-    """
-    state_path = target / "releases" / release_id / RELEASE_STATE_FILENAME
-    if not state_path.is_file():
-        # `archive` moved the document into _archive/<id>/ as part of the same act.
-        state_path = target / "releases" / "_archive" / release_id / RELEASE_STATE_FILENAME
-    try:
-        state = json.loads(state_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return
-    record_governance_event(
-        verb=verb,
-        ledger="releases",
-        record_id=release_id,
-        record=governed_state(state),
-        specs_dir=target,
-    )
-
-
 def _histo_appender(target: Path) -> Callable[[HistoRecord], None]:
     """The ``releases_histo.jsonl`` sink, built the way every other ledger store is
     built at the composition root — one record shape, one store, no second writer.
@@ -248,13 +215,6 @@ def _histo_appender(target: Path) -> Callable[[HistoRecord], None]:
 
     def append(record: HistoRecord) -> None:
         store.append(record)
-        record_governance_event(
-            verb="archive",
-            ledger="releases-histo",
-            record_id=record.id,
-            record=record.to_dict(),
-            specs_dir=target,
-        )
 
     return append
 
@@ -281,13 +241,6 @@ def _histo_updater(
             record = store.update(record_id, mutate)
         except RecordNotFoundError:
             return None
-        record_governance_event(
-            verb="fold",
-            ledger="releases-histo",
-            record_id=record.id,
-            record=record.to_dict(),
-            specs_dir=target,
-        )
         return record
 
     return update
@@ -346,7 +299,6 @@ def release_fold_cmd(
     except ArchiveError as exc:
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
-    _record_release_event("fold", target, result.into)
     typer.echo(
         f"[ok] {result.folded} folded into {result.into} at "
         f"{result.placed_at.relative_to(target).as_posix()} (rc={result.rc}); "
@@ -397,7 +349,6 @@ def release_archive_cmd(
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
 
-    _record_release_event("archive", target, result.release)
     archived_bugs = _archive_bugs(target)
     typer.echo(f"[ok] archived: {result.archived_dir}")
     typer.echo(f"[ok] created: {result.next_spec}")
@@ -463,10 +414,6 @@ def backlog_new_cmd(
         # rather than an uncaught traceback.
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
-
-    record_governance_event(
-        verb="new", ledger="backlog", record_id=slug, record=result.entry, specs_dir=target
-    )
 
     verb = "created" if result.created else "appended"
     typer.echo(
@@ -538,13 +485,6 @@ def backlog_exit_cmd(
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
 
-    record_governance_event(
-        verb="exit",
-        ledger="backlog",
-        record_id=record.id,
-        record=record.to_dict(),
-        specs_dir=target,
-    )
     typer.echo(f"[ok] exited {record.id!r} ({record.disposition}) -> {target / 'backlog'}")
 
 

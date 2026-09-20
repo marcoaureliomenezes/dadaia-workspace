@@ -26,7 +26,6 @@ Disclosed reference reached from `SKILL.md`/`RC-FLOW.md` wherever the arc says "
 | `phase: DEFINITION` | `dadaia release new` / `dadaia release rc-archive` | phase string |
 | `phase: ARCHIVED` + `shipped` | `dadaia release archive <id> --shipped <sha> --pr <n>` | phase string, `{sha, pr, ts}` |
 
-- A milestone changed by hand carries no governance event and surfaces as one `RELEASE-TREE-HANDEDIT` WARNING in `dadaia doctor`.
 
 ## `log` — the closure narrative's home
 

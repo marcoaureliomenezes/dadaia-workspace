@@ -38,7 +38,6 @@ Metrics 7 and 8 carry `target 0` and report their measured value even when it wo
 
 - Registration-to-resolution interval: diff `closed_at` against the record's `ts`; a seconds-long interval is the no-red-loop signature.
 - Core-field mutation: a hunk changing an immutable-core field (per the schema's `x-mutability`) of an existing `id` is a HIGH finding.
-- Hand edit: a record change with no matching governance event — `dadaia doctor`'s `LEDGER-BUGS-HANDEDIT` WARNING counted over the window.
 
 ## Per-record checks (beyond the eight metrics)
 

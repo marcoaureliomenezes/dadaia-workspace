@@ -26,7 +26,6 @@ from pathlib import Path
 import typer
 
 from dadaia_workspace import container
-from dadaia_workspace.cli._governance_event import record_governance_event
 from dadaia_workspace.cli._specs_resolution import (
     repo_slug_for_context,
     resolve_context_for_cli,
@@ -45,7 +44,7 @@ from dadaia_workspace.infrastructure.jsonl_record_store import (
 __all__ = ["bugs_app"]
 
 bugs_app = typer.Typer(
-    help="One-record-per-bug telemetry "
+    help="One-record-per-bug ledger "
     "(append/status/stats/update/resolve/supersede/defer/reject/archive)."
 )
 
@@ -292,13 +291,6 @@ def _record_event(verb: str, record: BugRecord, target: Path) -> None:
     """One verb, one governance event over the record it just wrote (0.4.7 FR2) — the
     ONE call site shape every bugs verb uses. *target* is the ledger tree the verb
     resolved, the event's only source of context."""
-    record_governance_event(
-        verb=verb,
-        ledger="bugs",
-        record_id=record.id,
-        record=record.to_dict(),
-        specs_dir=target,
-    )
 
 
 def _run_transition(

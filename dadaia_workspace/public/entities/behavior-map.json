@@ -262,7 +262,7 @@
         "section": "sha256:39b4ebb23f6e1142afba6f77b3a089221716600e857445604883be6ea7f1651f",
         "skill": "sha256:9cd358d50d1be5f9e89a0b5f6d587e577ed011ecf7ff6979aa8d5f19dd56f14f",
         "scoped": [
-          "sha256:390ab05209a733a1c3adf22a9286bd6bb1c9704cbb0587bf05534ca30be16dff"
+          "sha256:8c9e8352c5397ec5898d1532a88ba7af4192528b27c0fd3e6eb9cd225abf6ead"
         ]
       },
       "recorded_by": "ai-engineer",
@@ -308,7 +308,7 @@
       "skill": "dd-cli-library",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:c8a5aa4a4343ee0905d9738bdc0068f53801329583bda9c25073b5af57c5fa48",
+        "section": "sha256:ebd803da29d54a4a0f43f337494b7b6218c1e0d28827e30721c545922f4c1501",
         "skill": "sha256:18c3dcdbe9899fc1a7d9b74552a56d9a56a1fec1d020a7852d5310a9950a94a3",
         "scoped": []
       },
@@ -340,7 +340,7 @@
         "dadaia_workspace/public/templates/specs-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:2652c3e1efd6d0e6f41c9f1d8e16a61ed5635d028f19cdc999430086a5572740",
+        "section": "sha256:faa846ffd42fed43a7b9ce4228937ba11855d1460f61b2495ef60258ffb253a9",
         "skill": null,
         "scoped": [
           "sha256:31fe0e6f92c0627356d0015233a94f67d4346ac40ab5a29cd98ba602c031f01f"

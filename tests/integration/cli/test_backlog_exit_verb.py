@@ -1,4 +1,4 @@
-"""`dadaia backlog exit` — one verb, one histo record, one event (0.4.7 FR3, T-047-27).
+"""`dadaia backlog exit` — one verb, one histo record (0.4.7 FR3, T-047-27).
 
 Intent: CONTRACT — 0.4.7 FR3 (an item leaves `active[]` only by the verb; each
 disposition carries its own required evidence; every refusal hands back one `fix:`).
@@ -11,15 +11,12 @@ path; the event is the trace.
 
 from __future__ import annotations
 
-import hashlib
 import json
-import sqlite3
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
-from dadaia_workspace import container
 from dadaia_workspace.cli.main import app
 
 _runner = CliRunner()
@@ -73,21 +70,9 @@ def _histo_lines(specs_dir: Path) -> list[str]:
     return [line for line in path.read_text(encoding="utf-8").split("\n") if line.strip()]
 
 
-def _events(home_dir: Path) -> list[sqlite3.Row]:
-    db = container.telemetry_state_dir() / "telemetry.sqlite"
-    conn = sqlite3.connect(db)
-    conn.row_factory = sqlite3.Row
-    try:
-        return conn.execute("SELECT * FROM governance_events ORDER BY ts, verb").fetchall()
-    finally:
-        conn.close()
-
-
-def test_exit_removes_one_entry_appends_one_histo_record_and_one_event(
-    home: Path, specs: Path
-) -> None:
+def test_exit_removes_one_entry_and_appends_one_histo_record(home: Path, specs: Path) -> None:
     """The delivered lane: the object leaves `active[]`, the histo line carries it as
-    `entry`, and the event's `record_hash` is the sha256 of that exact line."""
+    `entry`."""
     _new(specs, "a-thing")
     _new(specs, "another-thing")
     _pick(specs, "a-thing")
@@ -107,15 +92,6 @@ def test_exit_removes_one_entry_appends_one_histo_record_and_one_event(
     assert record["disposition"] == "delivered"
     assert record["release"] == "0.4.7"
     assert record["entry"]["id"] == "a-thing"
-
-    rows = _events(home)
-    verbs = [row["verb"] for row in rows]
-    assert verbs.count("new") == 2, verbs
-    exits = [row for row in rows if row["verb"] == "exit"]
-    assert len(exits) == 1
-    assert exits[0]["ledger"] == "backlog"
-    assert exits[0]["record_id"] == "a-thing"
-    assert exits[0]["record_hash"] == hashlib.sha256(lines[0].encode("utf-8")).hexdigest()
 
 
 def test_an_archived_release_is_a_valid_delivered_target(home: Path, specs: Path) -> None:

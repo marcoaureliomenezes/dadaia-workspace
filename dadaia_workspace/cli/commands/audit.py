@@ -19,7 +19,6 @@ from pathlib import Path
 import typer
 
 from dadaia_workspace import container
-from dadaia_workspace.cli._governance_event import record_governance_event
 from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.core.models.histo import HistoRecord
 from dadaia_workspace.features.specs.audit import AuditError, close_audit, disposition_finding
@@ -74,13 +73,6 @@ def audit_disposition_cmd(
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
 
-    record_governance_event(
-        verb="disposition",
-        ledger="audits",
-        record_id=record.id,
-        record=record.to_dict(),
-        specs_dir=target,
-    )
     typer.echo(f"[ok] {record.id} -> {record.disposition}")
 
 
@@ -110,13 +102,6 @@ def audit_close_cmd(
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
 
-    record_governance_event(
-        verb="close",
-        ledger="audits",
-        record_id=record.id,
-        record=record.to_dict(),
-        specs_dir=target,
-    )
     typer.echo(
         f"[ok] archived audit {record.id} ({record.summary}) -> "
         "specs/audits/_archive/audits_histo.jsonl"

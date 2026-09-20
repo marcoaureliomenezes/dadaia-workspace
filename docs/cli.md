@@ -11,7 +11,7 @@
 - backlog new — Append one ``active[]`` entry for <slug> to specs/backlog/BACKLOG.json.
 - backlog subjects — List the live canonical-subject anchors, or resolve one proposed subject (read-only).
 
-## dadaia bugs — One-record-per-bug telemetry (append/status/stats/update/resolve/supersede/defer/reject/archive).
+## dadaia bugs — One-record-per-bug ledger (append/status/stats/update/resolve/supersede/defer/reject/archive).
 - bugs append — Register a brand-new bug record (``status: "open"``) — validated against
 - bugs archive — Move terminal records older than ``--threshold-days`` from the live ledger to
 - bugs defer — The ONE way a record reaches ``status="deferred"`` — ``--reason`` is
