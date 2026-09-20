@@ -48,7 +48,7 @@
   `public/templates/shipped-hashes.json`, `features/server_registry/**`, `features/
   certification/**`, `cli/**`, `core/workspace_layout.py` (zone owner), `public/data/DADAIA.md`
   (§8.4, §10.1 server lines), `public/skills/dd-cli-library/**`, `tests/**`.
-- [ ] T-047-46 — FR5: `security-review` job (`anthropics/claude-code-security-review@<sha>`,
+- [x] T-047-46 — FR5: `security-review` job (`anthropics/claude-code-security-review@<sha>`,
   `ANTHROPIC_API_KEY`); delete `features/chokepoints/verdict.py`, `ci verdict-check`,
   `.github/scripts/pr-verdict-check.sh`, jobs `verdict-gate` + `security-verdict-gate`,
   SPEC-DOC-044, the `verdicts/` canon rows, pre-push verdict wiring, the handoff verdict

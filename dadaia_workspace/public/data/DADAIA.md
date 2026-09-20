@@ -40,7 +40,7 @@
 | Production code and its tests, in any language | `software-engineer` |
 | E2E, test pyramid, deploy validation; closes each candidate | `qa-engineer` |
 | Three-axis review (`dd-code-review`: standards, spec, bug-surface) before a PR | `code-reviewer` |
-| Vulnerabilities, secrets, CVEs; the push verdict (§4.2) | `security-reviewer` |
+| Vulnerabilities, secrets, CVEs (the PR gate is the `security-review` check, §4.2) | `security-reviewer` |
 | Agents, skills, rules, workflows, commands, hooks — the AI surface | `ai-engineer` |
 | Drift audits; dispatches evidence agents; scores compliance | `project-auditor` |
 
@@ -91,7 +91,7 @@
 
 - The pre-push git hook gates the `Bash` write path, outside the gate's own parsing, independent of any harness hook.
 - pre-push: allows `feature/*` after CI preflight + valid name.
-- pre-push: refuses a direct `develop`/`main` push (§4), a non-canon `specs/` path the pushed range introduces or rewrites, or a stale PR verdict.
+- pre-push: refuses a direct `develop`/`main` push (§4) or a non-canon `specs/` path the pushed range introduces or rewrites.
 - pre-push scans the pushed range only: published history is the baseline and is never rescanned (ADR 0013).
 - pre-push applies the v6 canon only to a `specs/` tree stamped at the canonical pattern; a lower stamp is doctor drift, never a push block.
 
@@ -121,8 +121,7 @@
 - `rc-N/` is an archived candidate folder under the live release (`dadaia release rc-archive`), never a branch name and never a scaffolded sub-phase.
 - `releases/_archive/<M.m.p>/` holds PUBLISHED versions only: a candidate closed between two publications is an `rc-N/` of the version that published it, never its own archived release; `dadaia release fold <id> --into <published>` is the one repair (ADR 0014).
 - Each candidate closure burns one `feature -> develop` merge; after it the agent asks the operator: promote (deploy) or continue (archive the trio to `rc-N/`, stack more backlog/bugs/findings).
-- Both PRs need an APPROVED `security-reviewer` verdict on the PR head sha, consumed once by the merge, then deleted; a survivor is slop (§7.6).
-- Ship-PR verdict names develop's tip, staged on the feature branch before the final `rc` merge.
+- Both PRs need the `security-review` required check green on the PR head (the official `anthropics/claude-code-security-review` Action; secret and ruleset are the operator's).
 - Every flow stage runs on `feature/{M.m.p}`; `develop`/`main` are PR targets only, never a working branch.
 - Suggest CI/CD automation of this contract to the operator; mechanics: `dd-gitflow-default`.
 
@@ -366,7 +365,7 @@
 - **rc-N** — the archive folder of the N-th completed-but-not-shipped candidate's trio.
 - **task marker** — the `[ ] [-] [x]` open/in-progress/done trace in `TASKS.md`.
 - **handoff** — the machine-readable JSON completion record an agent emits (§5.4).
-- **verdict** — a PR-head-scoped approval record, consumed once, deleted after merge.
+- **verdict** — a reviewer's `APPROVED`/`REJECTED` recommendation in its handoff; the PR itself is gated by the `security-review` check.
 - **chokepoint** — a git hook that gates the write path outside the harness hook.
 - **gate** — the deterministic PreToolUse enforcement chain (§3.1).
 - **path class** — the ADDITIVE/MUTATING/PROTECTED category a write path belongs to (§3.2).

@@ -251,12 +251,6 @@ RULES: tuple[SpecsRule, ...] = (
         fix_help=f"{DADAIA_BIN} bugs archive",
     ),
     _rule(
-        ("SPEC-DOC-044",),
-        lambda d: d._release.check_stale_verdicts(live_shas=d.live_shas),
-        fix=lambda d, i: d._release.fix_stale_verdict(i),
-        fix_help=f"{DADAIA_BIN} doctor --fix",
-    ),
-    _rule(
         ("SPEC-DOC-045",),
         lambda d: d._release.check_pyproject_version_matches_release(d.repo_root),
         fix_help="sed -i 's/^version = .*/version = \"<live release id>\"/' pyproject.toml",

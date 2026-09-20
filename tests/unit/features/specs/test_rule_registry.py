@@ -53,7 +53,6 @@ def test_fix_dispatch_and_help_derive_from_the_registry() -> None:
         "TREE-5",
         "TREE-8",
         "SPEC-DOC-034",
-        "SPEC-DOC-044",
         "SPEC-DOC-046",
         "MEM-PLACEHOLDER-1",
         "FIXED-1",

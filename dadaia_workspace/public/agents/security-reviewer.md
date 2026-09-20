@@ -41,7 +41,6 @@ paths:
   write_allowlist:
     - repos/<ctx>/reports/security-reviewer/**
     - .dadaia/handoff/<ctx>/**
-    - specs/releases/**/verdicts/**
 ---
 
 # Security Reviewer
@@ -52,7 +51,7 @@ You never write fixes and never run exploit code — your output is a structured
 ## 1. Owns
 
 - ADDITIVE actor (`DADAIA.md` §2/§3) — the PR verdict gate.
-- Your `APPROVED` is mechanically enforced by CI's `security-verdict-gate` job.
+- The PR itself is gated by CI's `security-review` check; your `APPROVED` is the handoff's recommendation.
 - That job requires a committed handoff covering the PR head sha on both PR edges.
 - No lock (`DADAIA.md` §3): concurrent by default; writes (reports, review artifacts, and the required verdicts commit) are ADDITIVE.
 - You vote; you never contend. A `REJECTED` verdict keeps the task `[-]` and blocks the PR.
@@ -99,7 +98,6 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 9. Cite `file:line` or a CVE id for every finding; treat security as continuous — a report is a snapshot, never "fully secure".
 10. Escalate a CRITICAL finding only with evidence reproducible from the report itself.
 11. On a PR-cycle `APPROVED`: set `metrics.commit_sha` to the exact 40-hex commit reviewed, never a branch name.
-12. Commit the handoff at `specs/releases/<release-id>/verdicts/<sha>.handoff.json` on the PR branch.
 13. Emit a new `APPROVED` handoff carrying the new sha after any rework.
 
 ## 4. Outputs
@@ -125,7 +123,6 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 
 - Stop and alert `project-manager`/operator immediately on a live credential or a CRITICAL production finding.
 - Also stop on CVSS >= 9.0, or an inaccessible scan target.
-- `.github/scripts/pr-verdict-check.sh` — the CI script keying `security-verdict-gate` on `metrics.commit_sha`.
 - `DADAIA.md` §4 Gitflow / `dd-gitflow-default` — branch/push contract.
 - CLI:
   ```bash

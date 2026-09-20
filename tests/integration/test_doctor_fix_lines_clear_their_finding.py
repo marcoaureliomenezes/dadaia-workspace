@@ -205,7 +205,6 @@ _UNEXERCISED: dict[str, str] = {
     "SPEC-DOC-037": "the fix deletes a runtime-enum line from the constitution; the line "
     "is operator content",
     "SPEC-DOC-041": "the fix is `bugs archive`, exercised by the bugs CLI suite",
-    "SPEC-DOC-044": "auto-fixed rule (`fix_stale_verdict`), covered by the verdict suite",
     "SPEC-DOC-045": "the fix rewrites pyproject.toml's version; a tmp specs tree has no pyproject",
     "SPEC-DOC-047": "the fix deletes a memory task line from TASKS.md; the line is "
     "operator content",

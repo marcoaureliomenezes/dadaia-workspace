@@ -258,12 +258,10 @@ def _build_specs_doctor(specs_dir: Path | None, public_dir: str | None) -> Specs
         specs_dir,
         public_dir=resolved_public,
         templates_dir=_TEMPLATES_DIR,
-        # repo_root: specs/ sits directly at the repo root — the same convention
-        # _resolve_live_shas documents; feeds SPEC-DOC-028 and SPEC-DOC-045.
+        # repo_root: specs/ sits directly at the repo root; feeds SPEC-DOC-028 and SPEC-DOC-045.
         repo_root=specs_dir.parent,
-        live_shas=_resolve_live_shas(specs_dir),
-        # The ONE Typer walk (0.4.7 FR2), done here and handed in as plain data — the
-        # same shape `live_shas` travels in; `features` never imports `cli`.
+        # The ONE Typer walk (0.4.7 FR2), done here and handed in as plain data;
+        # `features` never imports `cli`.
         command_paths=command_paths(),
         bug_store_factory=container.build_bug_record_store,
     )
@@ -273,26 +271,6 @@ def _detect_public_dir(specs_dir: Path) -> Path | None:
     """``<repo-root>/specs/`` alongside ``<repo-root>/dadaia_workspace/public/``."""
     candidate = specs_dir.parent / "dadaia_workspace" / "public"
     return candidate if candidate.is_dir() else None
-
-
-def _resolve_live_shas(specs_dir: Path) -> tuple[str, ...] | None:
-    """The live verdict-sha set (head, first parent, develop tip) — plain data fed into
-    SPEC-DOC-044's stale-verdict check through the ONE
-    ``features.chokepoints.verdict.live_verdict_shas`` rule the pre-push gate also uses.
-    ``None`` (not a git repo, unresolvable HEAD or integration tip) keeps that check
-    silent rather than letting ``--fix`` delete staged ship evidence.
-    """
-    from dadaia_workspace.features.chokepoints.verdict import INTEGRATION_TIP_REF, live_verdict_shas
-
-    repo_root = specs_dir.parent
-    reader = container.build_git_object_reader()
-    try:
-        head_sha = reader.resolve_ref(repo_root, "HEAD")
-        if head_sha is None or reader.resolve_ref(repo_root, INTEGRATION_TIP_REF) is None:
-            return None
-        return live_verdict_shas(reader, repo_root, head_sha)
-    except Exception:  # noqa: BLE001 — a failed git read degrades to None, never a crash
-        return None
 
 
 def _resolve_run(

@@ -7,7 +7,7 @@ The pre-push hook advertises `dadaia ci preflight` as "CI-equivalent" (module do
 preflight names is a check CI also gates on, and vice versa, over the SAME comparable
 set — CI additionally gates matrix/e2e/panel/backlog/hygiene jobs that have no local
 preflight equivalent at all (importability-smoke, e2e-panel, backlog-doctor,
-repo-hygiene, pr-title, pr-source-guard, security-verdict-gate, verdict-gate); those are
+repo-hygiene, pr-title, pr-source-guard, security-review); those are
 OUT of the advertised equivalence claim by design and are never compared here.
 
 This test derives BOTH sides mechanically instead of hardcoding a list twice:
@@ -52,7 +52,7 @@ _CI_YML = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
 # The CI jobs that, together, stand in for what the local preflight advertises. Every
 # OTHER ci.yml job (importability-smoke, unit-fast-cross, contract-coverage-cross,
 # e2e-panel, pr-title, repo-hygiene, backlog-doctor, pr-source-guard,
-# security-verdict-gate, verdict-gate) is CI-only scope the local gate never claimed
+# security-review) is CI-only scope the local gate never claimed
 # equivalence to (module docstring: "ruff format --check, ruff check, mypy --strict,
 # pytest" plus lint-imports — never the cross-platform matrix, panel E2E, or the
 # governance/PR jobs).

@@ -41,9 +41,6 @@ class _SpyObjectSource:
         self.calls.append((repo, local_sha, remote_sha))
         return ()
 
-    def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
-        return []
-
     def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
         return ()
 

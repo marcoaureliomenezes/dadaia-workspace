@@ -42,7 +42,6 @@ The canon (operator, 2026-08-28) — the ONLY members permitted under ``specs/``
     releases/{AGENTS.md, _ideas/{AGENTS.md, <M.m.p>/SPEC.md},
               _archive/{releases_histo.jsonl, <M.m.p>/**},
               <M.m.p>/{_RELEASE.json, SPEC.md, PLAN.md, TASKS.md, rc-N/{SPEC,PLAN,TASKS}.md,
-                       verdicts/<40hex>.handoff.json,
                        <alpha|rc>-N/{SPEC.md, PLAN.md, TASKS.md}}}
     backlog/{AGENTS.md, BACKLOG.json, _archive/backlog_histo.jsonl}
     bugs/{AGENTS.md, BUGS.jsonl, _archive/bugs_histo.jsonl}
@@ -64,7 +63,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
-from collections.abc import Collection, Iterable
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -85,7 +84,6 @@ from dadaia_workspace.core.workspace_layout import (
     CANON_ROOT_MEMBERS,
     MEMORY_TOPLEVEL_FILES,
     REQUIRED_ROOT_DIRS,
-    SHAPE_FRAGMENTS,
     SPECS_CANON,
     CanonEntry,
 )
@@ -113,7 +111,6 @@ __all__ = [
     "release_new",
     "scaffold",
     "scaffold_entry",
-    "verdict_violations",
 ]
 
 _CONSTITUTION_STUB = """\
@@ -218,17 +215,6 @@ TEMPLATES: dict[str, tuple[Kind, str]] = {
     "ADRs/decisions.jsonl": ("static", ""),
 }
 
-#: The verdict-filename shape with its sha CAPTURED — the SAME canon row
-#: ``releases/<M.m.p>/verdicts/<40hex>.handoff.json`` every other consumer matches, with
-#: the sha fragment wrapped in a group so :func:`verdict_violations` can read the sha
-#: out of an otherwise-canon-conformant verdict path. Never a second hand-written regex.
-_SHA40 = SHAPE_FRAGMENTS["<40hex>"]
-_VERDICT_RE = re.compile(
-    next(
-        e for e in CANON if e.shape.endswith("verdicts/<40hex>.handoff.json")
-    ).pattern.pattern.replace(_SHA40, f"({_SHA40})")
-)
-
 #: The legacy release-id slug form new releases may still mint (pre-canon-v6 repos);
 #: bare SemVer (:func:`~dadaia_workspace.core.specs_version.is_release_semver`) is the
 #: preferred, canon-conformant form. A slug-named release directory does not match any
@@ -252,31 +238,6 @@ def canon_violations(paths: Iterable[str]) -> list[str]:
     specs_dir).as_posix()`` or a git tree listing's own native paths, identically.
     """
     return [path for path in paths if not is_canon_path(path)]
-
-
-def verdict_violations(paths: Iterable[str], live_shas: Collection[str]) -> list[str]:
-    """The verdict business rule (operator, 2026-08-28; ship shape 2026-09-05):
-    ``verdicts/`` may hold at most ONE file per LIVE sha.
-
-    *live_shas* is ``features.chokepoints.verdict.live_verdict_shas`` — head, head's
-    first parent, integration branch tip — resolved once by the composition root and
-    passed in as plain data. Every verdict-shaped path in *paths* naming a sha outside
-    that set is a violation (stale — SPEC-DOC-044); a second file naming the SAME live
-    sha is also a violation (the excess, never the first). Paths that are not
-    verdict-shaped at all (already covered by :func:`canon_violations`) are ignored
-    here, never double-reported.
-    """
-    seen: set[str] = set()
-    violations: list[str] = []
-    for path in paths:
-        match = _VERDICT_RE.match(path)
-        if match is None:
-            continue
-        sha = match.group(1)
-        if sha not in live_shas or sha in seen:
-            violations.append(path)
-        seen.add(sha)
-    return violations
 
 
 @dataclass(frozen=True)

@@ -27,7 +27,7 @@ from dadaia_workspace.cli.commands import ci
 from dadaia_workspace.core.models.git_scan import GitObjectReadError
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef
-from dadaia_workspace.features.specs.canon import canon_violations, verdict_violations
+from dadaia_workspace.features.specs.canon import canon_violations
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 
 _SYNTHETIC_TERM = "zz-frozen-invariant-term"
@@ -109,7 +109,6 @@ def test_git_mv_into_archive_produces_no_new_blob_and_a_clean_scan(tmp_path: Pat
         object_source=reader,
         repo=repo,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert decision.allowed, decision.message
@@ -138,7 +137,6 @@ def test_editing_a_path_that_already_published_the_value_no_longer_refuses(
         object_source=reader,
         repo=repo,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert decision.allowed, decision.message
@@ -168,7 +166,6 @@ def test_editing_a_tests_fixture_that_already_published_the_literal_no_longer_re
         object_source=reader,
         repo=repo,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert decision.allowed, decision.message
@@ -193,7 +190,6 @@ def test_same_value_introduced_into_a_new_path_still_refuses(tmp_path: Path) -> 
         object_source=reader,
         repo=repo,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert not decision.allowed
@@ -253,7 +249,6 @@ def test_new_branch_push_of_an_already_published_term_passes(tmp_path: Path) -> 
         object_source=reader,
         repo=repo,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert decision.allowed, decision.message
@@ -279,7 +274,6 @@ def test_new_branch_push_of_a_novel_term_still_refuses(tmp_path: Path) -> None:
         object_source=reader,
         repo=repo,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert not decision.allowed
@@ -322,7 +316,6 @@ def test_prior_side_lookup_failure_refuses_naming_the_failure_and_no_verify(
         object_source=reader,
         repo=repo,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
     )
 
     assert not decision.allowed
@@ -375,7 +368,6 @@ def test_dead_registry_context_name_and_slug_both_refuse_a_push_introducing_them
         object_source=reader,
         repo=repo,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         foreign_slugs=foreign_slugs,
     )
     assert not name_decision.allowed
@@ -388,7 +380,6 @@ def test_dead_registry_context_name_and_slug_both_refuse_a_push_introducing_them
         object_source=reader,
         repo=repo,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         foreign_slugs=foreign_slugs,
     )
     assert not slug_decision.allowed
@@ -473,7 +464,6 @@ def test_real_git_failure_refuses_naming_the_failure(tmp_path: Path) -> None:
         object_source=reader,
         repo=not_a_repo,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
     )
 
     assert not decision.allowed

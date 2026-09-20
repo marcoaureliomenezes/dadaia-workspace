@@ -387,8 +387,7 @@ _SHAPE_TOKENS: tuple[tuple[str, str], ...] = (
     ("**", r".+"),
 )
 
-#: The shape tokens as a lookup — a consumer needing one fragment (the verdict-sha
-#: capture in ``features.specs.canon``) reads it here instead of respelling it.
+#: The shape tokens as a lookup — a consumer needing one fragment reads it here.
 SHAPE_FRAGMENTS: dict[str, str] = dict(_SHAPE_TOKENS)
 
 _SHAPE_TOKEN_RE = re.compile("|".join(f"({re.escape(token)})" for token, _ in _SHAPE_TOKENS))
@@ -454,7 +453,6 @@ SPECS_CANON: tuple[CanonEntry, ...] = (
     CanonEntry("releases/<M.m.p>/SPEC.md", "releases"),
     CanonEntry("releases/<M.m.p>/PLAN.md", "releases"),
     CanonEntry("releases/<M.m.p>/TASKS.md", "releases"),
-    CanonEntry("releases/<M.m.p>/verdicts/<40hex>.handoff.json", "releases"),
     # An archived candidate's trio (ADR 0006): rc-N is ONLY an archive, opened on
     # demand by ``dadaia release rc-archive``, never required at birth.
     CanonEntry("releases/<M.m.p>/rc-N/SPEC.md", "releases"),
@@ -526,7 +524,7 @@ def specs_canon_table_rows() -> tuple[tuple[str, str], ...]:
     or more canon members (``""`` = the ``specs/`` root), members in table order.
 
     A directory holding exactly one member is path-compressed into its parent's cell
-    (``verdicts/<40hex>.handoff.json``) instead of earning a row of its own — nothing is
+    instead of earning a row of its own — nothing is
     elided and nothing is spelled twice: the rows ARE :data:`SPECS_CANON` read one path
     segment at a time.
     """

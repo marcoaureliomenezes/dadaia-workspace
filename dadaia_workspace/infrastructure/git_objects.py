@@ -889,19 +889,6 @@ class GitSubprocessObjectReader:
     """Subprocess-backed push-range object reader (SPEC v0.9.0 FR1/FR7; ADR-0001: the
     sole adapter — no ``GitObjectReader`` port)."""
 
-    def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
-        """``git ls-tree -r --name-only --full-tree <sha> -- <prefix>`` (v0.5.0
-        specs-canon closure) — see the port's own docstring for the full contract."""
-        if not sha or not _SHA_SHAPE_RE.match(sha):
-            raise GitObjectReadError(f"sha is not a valid sha shape: {sha!r}")
-        args = ["git", "ls-tree", "-r", "--name-only", "--full-tree", sha, "--", prefix]
-        result = _run(args, repo)
-        if result.returncode != 0:
-            raise GitObjectReadError(
-                f"git ls-tree -r --name-only failed: {_decode(result.stderr).strip()}"
-            )
-        return [line for line in _decode(result.stdout).splitlines() if line]
-
     def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
         """``git rev-list --parents -n 1 <sha>`` — the parent shas in order (first
         parent first; two or more for a merge commit); empty for a root commit, an

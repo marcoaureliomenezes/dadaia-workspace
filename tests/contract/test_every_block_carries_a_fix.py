@@ -24,13 +24,12 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from typer.testing import CliRunner
 
 from dadaia_workspace.core import doctor_rules
 from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObject
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_refs
-from dadaia_workspace.features.specs.canon import canon_violations, verdict_violations
+from dadaia_workspace.features.specs.canon import canon_violations
 from dadaia_workspace.hooks import pre_gate
 
 _FIX_LINE_RE = re.compile(r"^fix: (\S.*)$", re.MULTILINE)
@@ -149,9 +148,6 @@ class _FakeObjectSource:
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         return self.objects
 
-    def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
-        return self.tree_paths
-
     def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
         return ()
 
@@ -179,7 +175,6 @@ def _decide(
         object_source=source or _FakeObjectSource(),
         repo=Path("/nonexistent-repo"),
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         malformed_lines=malformed_lines,
         denylist_terms=denylist_terms,
     )
@@ -234,27 +229,6 @@ def test_push_gate_denylist_refusal_carries_a_runnable_fix() -> None:
 
 def test_push_gate_git_read_failure_carries_a_runnable_fix() -> None:
     assert_block_carries_a_runnable_fix(_decide(_feature_ref(), source=_FailingObjectSource()))
-
-
-# ── ci verdict-check ────────────────────────────────────────────────────────────
-
-
-@pytest.mark.parametrize(
-    ("name", "args"),
-    [
-        ("bad-head", ["--head", "nope"]),
-        ("bad-release-id", ["--head", _SHA_A, "--release-id", "not a release"]),
-        ("no-verdict", ["--head", _SHA_A, "--release-id", "0.0.1"]),
-    ],
-)
-def test_verdict_check_refusals_carry_a_runnable_fix(name: str, args: list[str]) -> None:
-    """Driven in the real repo — ``verdict-check`` reads git, and a refusal must still
-    hand back one command."""
-    from dadaia_workspace.cli.commands import ci
-
-    result = CliRunner().invoke(ci.app, ["verdict-check", *args])
-    assert result.exit_code == 1, result.output
-    assert_block_carries_a_runnable_fix(result.output)
 
 
 # ── the release verbs ───────────────────────────────────────────────────────────

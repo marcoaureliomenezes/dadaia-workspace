@@ -30,7 +30,6 @@
 - ci install-hook — Install the pre-push CI/security gate.
 - ci preflight — Run ruff + mypy --strict + pytest locally; exit non-zero if any fail.
 - ci push-gate-check — Pre-push gate: branch-name validation + the range-scoped denylist scan.
-- ci verdict-check — Require an APPROVED security-reviewer verdict covering ``--head`` (v0.4.4 FR4;
 
 ## dadaia context — Manage Spec Context Projects.
 - context alive — Transition a context to ALIVE; clone repo if absent. Idempotent if already ALIVE.

@@ -30,7 +30,7 @@ import pytest
 from dadaia_workspace.core.models.git_scan import ScannedObject
 from dadaia_workspace.features.chokepoints import Decision, push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_refs
-from dadaia_workspace.features.specs.canon import canon_violations, verdict_violations
+from dadaia_workspace.features.specs.canon import canon_violations
 
 _SHA_A = "a" * 40
 _ZERO = "0" * 40
@@ -45,9 +45,6 @@ class _EmptyObjectSource:
 
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         return ()
-
-    def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
-        return []
 
     def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
         return ()
@@ -67,7 +64,6 @@ def _decide(refs: list[PushRef], root: Path, **kwargs: Any) -> Decision:
     kwargs.setdefault("object_source", _EmptyObjectSource())
     kwargs.setdefault("repo", root)
     kwargs.setdefault("canon_violations_fn", canon_violations)
-    kwargs.setdefault("verdict_violations_fn", verdict_violations)
     return push_gate_decision(refs, **kwargs)
 
 

@@ -13,10 +13,6 @@ the former single ``service.py`` (~1,042 LOC gluing four concerns) into:
   advisory (:func:`pre_commit_decision`).
 * :mod:`~dadaia_workspace.features.chokepoints.push_gate` — branch policy + specs-canon
   scan + range-scoped denylist scan (:func:`push_gate_decision`).
-* :mod:`~dadaia_workspace.features.chokepoints.verdict` — the ONE verdict store
-  (:func:`covering_verdict`), reading the COMMITTED ``specs/releases/**/verdicts/``
-  evidence — never ``.dadaia/handoff/``, which is no longer a verdict source at all.
-
 The former push-verdict GC lifecycle (``iter_security_approvals``,
 ``gc_consumed_push_verdicts``, ``dadaia ci gc-push-verdicts``) is DELETED outright: it
 served the ``.dadaia/handoff/`` store, which no verdict reader consults any more.
@@ -45,15 +41,12 @@ from dadaia_workspace.features.chokepoints.branch_policy import (
     parse_push_stdin,
 )
 from dadaia_workspace.features.chokepoints.push_gate import push_gate_decision
-from dadaia_workspace.features.chokepoints.verdict import Verdict, covering_verdict
 
 __all__ = [
     "Decision",
     "PushRef",
-    "Verdict",
     "branch_name_is_permitted",
     "context_slug_for_path",
-    "covering_verdict",
     "parse_push_refs",
     "parse_push_stdin",
     "push_gate_decision",

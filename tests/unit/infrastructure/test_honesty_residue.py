@@ -13,14 +13,6 @@ from __future__ import annotations
 import inspect
 
 
-def test_ci_first_parent_delegates_to_the_one_parents_reader() -> None:
-    from dadaia_workspace.cli.commands import ci
-
-    src = inspect.getsource(ci._first_parent_sha)
-    assert "rev-parse" not in src, "ci.py must not hand-roll the first-parent git fact"
-    assert ".parents(" in src
-
-
 def test_python_env_narrates_a_failed_repack_install_honestly() -> None:
     from dadaia_workspace.infrastructure import python_env
 

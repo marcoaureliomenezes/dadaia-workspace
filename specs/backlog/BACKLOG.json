@@ -2,37 +2,6 @@
   "schema": "backlog-v1",
   "active": [
     {
-      "id": "verdict-as-required-check",
-      "title": "Security verdict file replaced by a required status check from a review job",
-      "opened": "2026-09-12",
-      "status": "picked",
-      "description": "Deferred (grill Q16 item 1, audit A-002/S-008): the sha-keyed verdict file, its two-hop rule, delta re-verdicts and the squash-vs-merge lore are replaced by a required status check produced by a review job on the PR head behind a branch ruleset; pre-push preflight stays local. Needs an ADR replacing the verdict half of ADR 0005-0009.",
-      "provenance": "operator-ratified deferral 2026-09-12 grill Q16 — standards replacement, own grill before pick — promoted to candidate 2026-09-14 (operator order: ideas are official backlog)",
-      "intents": [
-        {
-          "subject": {
-            "kind": "code",
-            "ref": "dadaia_workspace/features/chokepoints/verdict.py#covering_verdict"
-          },
-          "change": "retire — delete the tracked-verdict store (covering_verdict, live_verdict_shas, ShaSource, GITFLOW_EDGES); the PR gate reads a required commit status posted on the PR head by the security review"
-        },
-        {
-          "subject": {
-            "kind": "cli",
-            "ref": "ci verdict-check"
-          },
-          "change": "retire — delete the verb and .github/scripts/pr-verdict-check.sh (and the workflow_dispatch-only verdict-gate job); the security-verdict-gate required check is the review's commit status"
-        },
-        {
-          "subject": {
-            "kind": "doc",
-            "ref": "SPEC-DOC-044"
-          },
-          "change": "retire — no verdict file on disk, no staleness rule; the canon rows releases/<id>/verdicts/ and _archive/<id>/verdicts/ and ADR 0013's verdict tree-view clause are deleted"
-        }
-      ]
-    },
-    {
       "id": "release-please-semantics",
       "title": "Release model as a release PR (release-please semantics), rc-N archiving retired",
       "opened": "2026-09-12",

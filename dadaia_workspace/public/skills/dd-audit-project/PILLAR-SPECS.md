@@ -23,7 +23,6 @@ dadaia doctor --context <ctx> --json
 2. Each finding reads `<CODE> <verdict> <message>`; the message carries its own remediation.
 3. Every non-zero-severity issue inside the window becomes a `FINDINGS-FORMAT.md` record with `pillar: "specs"`.
 4. Record a WARN that `--fix` can repair mechanically as a finding too — this pillar measures, it never fixes.
-5. Treat an absent `specs/releases/**/verdicts/**` file on a merged PR as expected — the gate deletes a verdict once consumed.
 6. Treat an archived release carrying no directory (only its `releases_histo.jsonl` summary) as the canon shape, not drift.
 
 ## `_RELEASE.json` milestone completeness

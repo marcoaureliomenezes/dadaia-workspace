@@ -19,11 +19,9 @@ from __future__ import annotations
 
 import re
 import tomllib
-from collections.abc import Collection
 from datetime import date
 from pathlib import Path
 
-from dadaia_workspace.core.handoff_index import discover_handoff_paths
 from dadaia_workspace.core.release_state import (
     LEGACY_RELEASE_STATE_FILENAME,
     RELEASE_STATE_FILENAME,
@@ -32,7 +30,6 @@ from dadaia_workspace.core.release_state import PHASES as _PHASES
 from dadaia_workspace.core.spec_status import APPROVED, extract_status
 from dadaia_workspace.core.spec_status import CANONICAL_STATUS as _CANONICAL_STATUS
 from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
-from dadaia_workspace.features.specs.canon import verdict_violations
 from dadaia_workspace.features.specs.doctor_common import (
     RELEASE_ARTIFACTS,
     _read_and_parse_release_json,
@@ -558,55 +555,6 @@ class ReleaseValidator:
                 )
             )
         return issues
-
-    def check_stale_verdicts(self, *, live_shas: Collection[str] | None) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-044 (v0.5.0 specs-canon closure, operator ruling 2026-08-28): a
-        verdict under ``releases/<id>/verdicts/`` naming a sha outside the LIVE set —
-        branch HEAD, HEAD's first parent, the integration branch tip (the ship shape,
-        DADAIA.md §4.2) — is stale — ERROR, ``--fix`` deletes.
-
-        Uses :func:`~dadaia_workspace.features.specs.canon.verdict_violations` over
-        *live_shas* — the SAME predicate and the SAME set
-        (``features.chokepoints.verdict.live_verdict_shas``) the pre-push gate uses —
-        never a second, hand-kept rule. *live_shas* is resolved ONCE by the CLI
-        composition root and passed in as plain data; this validator stays zero-I/O.
-        ``None`` (no git context available) is a silent no-op — this check genuinely
-        cannot evaluate without a resolved head, so it stays silent rather than
-        guessing (mirrors the constitution file-ref check's own optional-``repo_root``
-        shape).
-        """
-        if live_shas is None:
-            return []
-        verdict_paths = discover_handoff_paths(self.specs_dir, "releases/*/verdicts/*.handoff.json")
-        if not verdict_paths:
-            return []
-        rel_paths = [p.relative_to(self.specs_dir).as_posix() for p in verdict_paths]
-        stale_rels = verdict_violations(rel_paths, live_shas)
-        live_display = ", ".join(sha[:12] for sha in live_shas)
-        issues: list[SpecsDoctorIssue] = []
-        for rel in stale_rels:
-            issues.append(
-                SpecsDoctorIssue(
-                    code="SPEC-DOC-044",
-                    severity=Severity.ERROR,
-                    description=(
-                        f"specs/{rel} is a stale verdict — its sha is none of the live "
-                        f"shas (head, first parent, develop tip: {live_display}), or a "
-                        "second file for one of them. A consumed-or-stale verdict never "
-                        "stays on disk (SPEC-DOC-044). Auto-fix available (run "
-                        "doctor --fix) to delete it."
-                    ),
-                    path=str(self.specs_dir / rel),
-                    fixable=True,
-                )
-            )
-        return issues
-
-    def fix_stale_verdict(self, issue: SpecsDoctorIssue) -> None:
-        """Delete a stale verdict file (SPEC-DOC-044 auto-fix)."""
-        assert issue.code == "SPEC-DOC-044"
-        target = Path(issue.path)  # type: ignore[arg-type]
-        target.unlink(missing_ok=True)
 
     def check_release_state_filename(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-046 (release 0.4.6 FR3, ADR 0007): the live release's state

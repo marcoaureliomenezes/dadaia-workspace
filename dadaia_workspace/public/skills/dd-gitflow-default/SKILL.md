@@ -43,33 +43,22 @@ description: >
 | 5 | Release definition | SPEC + PLAN + TASKS + the picked entries flipped to `status: picked` + picked bugs, one commit | `feat(specs): define candidate …` |
 | 6 | Task implementation | the task's declared write set | `conventional-commit(task-id): description` — the auditable trace |
 
-## 3b. The ship-PR verdict
+## 3b. The PR gate
 
-- Stage the verdict naming develop's CURRENT tip as the last commit on
-  `feature/{M.m.p}`, before the final `feature` → `develop` merge — the merged tip's
-  first parent is then the named sha.
-- Nothing else lands on `develop` between that staged verdict commit and the merge.
-- The verdict store is two-hop: PR head, or the head's first parent
-  (`features/chokepoints/verdict.py::covering_verdict`).
-- On disk a verdict is live while it names the head, the head's first parent, or
-  `origin/develop`'s tip — one file per sha; anything else is stale, refused by the
-  pre-push gate and deleted by `dadaia doctor --fix` (SPEC-DOC-044, one rule:
-  `features/chokepoints/verdict.py::live_verdict_shas`).
-- The ship PR's verdict is consumed and deleted after the `main` merge, like any
-  other.
+- Both PR edges require the `security-review` check (the official
+  `anthropics/claude-code-security-review` Action over the diff) green on the PR head,
+  next to lint, typecheck, tests and doctor; the secret and the ruleset are the operator's.
 
 ## 4. Done when
 
 - Every commit for a release traces to a candidate's definition, implementation,
   closure merge, or a bug fix — each write alone in its §3a shape, verifiable by
   `git log`.
-- Every staged verdict names a sha the merge will consume; no survivor on disk.
 
 ## 5. References
 
 - `DADAIA.md` §4 — the branch-contract law this skill operates.
 - [`CICD-AUTOMATION.md`](CICD-AUTOMATION.md) — CI/CD checks to suggest a consumer operator.
 - Mechanical enforcement (pre-push hook / CI): branch-name pattern, push refusal,
-  denylist scan, `pr-source-guard`, verdict-gate job requiring an APPROVED security
-  handoff. Everything else in this skill is discipline, upheld by agents and
+  denylist scan, `pr-source-guard`, the `security-review` required check. Everything else in this skill is discipline, upheld by agents and
   reviewers, unenforced by any hook.

@@ -3,9 +3,8 @@ name: CI
 # Gitflow law v2 (v0.4.4 FR3/FR4 / DADAIA.md §4 (Gitflow)): feature/{M.m.p} is the ONLY pushable
 # branch (its push triggers the full matrix below); develop and main advance by PR
 # only. Every PR is gated by pr-source-guard (both edges, one job) and by
-# security-verdict-gate (the diff-based security review, relocated here from the
-# pre-push hook — v0.4.4 A3.4/FR4). hotfix/* was retired outright (G2) and carries no
-# trigger.
+# security-review (the official anthropics/claude-code-security-review Action over the
+# PR diff — 0.4.7 c5 FR5). hotfix/* was retired outright (G2) and carries no trigger.
 on:
   push:
     branches:
@@ -15,21 +14,6 @@ on:
   pull_request:
     branches: [main, develop]
   workflow_dispatch:
-    # Optional: supply handoff paths when invoking from a CLOSURE workflow.
-    # Leave blank on regular manual runs — the gate auto-discovers or no-ops.
-    inputs:
-      qa_sidecar:
-        description: "Path to qa-engineer handoff (*.handoff.json). Optional."
-        required: false
-        default: ""
-      security_sidecar:
-        description: "Path to security-reviewer handoff (*.handoff.json). Optional."
-        required: false
-        default: ""
-      release_id:
-        description: "Release id expected in qa/security handoffs when supplied."
-        required: false
-        default: ""
 
 permissions:
   contents: read
@@ -366,80 +350,23 @@ jobs:
           fi
 
   # ---------------------------------------------------------------------------------
-  # Security-verdict PR gate (v0.4.4 FR4 / T-044-07) — DISTINCT from `verdict-gate`
-  # below: this job is auto-triggered by every PR (feature -> develop, develop ->
-  # main) and checks the SECURITY verdict only, keyed on the PR head sha; the
-  # `verdict-gate` job below is a manually `workflow_dispatch`-ed, DUAL (qa +
-  # security) gate for release CLOSURE. Two different constitutional moments, not a
-  # duplicated enforcement surface (AR-2).
-  #
-  # The diff-based security review that used to gate every push (pre-push hook,
-  # per-pushed-sha, DP-5) is DELETED from that path (A3.4, T-044-06) and relocates
-  # here. `.dadaia/handoff/` is a workspace-local, gitignored directory a GitHub
-  # Actions checkout never sees (features/chokepoints/service.py's module docstring;
-  # `dadaia ci gc-push-verdicts` only ever reads a local clone) — so the evidence
-  # this job reads is a COMMITTED copy of the security-reviewer's APPROVED handoff
-  # at `specs/releases/<release-id>/verdicts/<reviewed-sha>.handoff.json` (the same
-  # "review artifact committed on the branch" cadence DADAIA.md §4 (Gitflow) already
-  # uses for a qa-engineer segment-close review). See
-  # .github/scripts/pr-verdict-check.sh for exactly what "covers the PR head sha"
-  # means and why literal sha equality is not always achievable.
-  #
-  # A4.4 (recorded limit): a workflow job added on a feature branch does not run on
-  # the PR that introduces it AS A REQUIRED status check — it still runs and
-  # reports (the workflow file is read from the PR head), but branch protection
-  # cannot require a check GitHub has never observed against the base branch yet.
-  # rc-1's PR is the PR that *brings* this job to develop (milestone (a) still used
-  # the v1 mechanic, D2) — so this gate is ADVISORY on rc-1's PR and REQUIRED from
-  # rc-2 onward. Making it required is an operator/dispatcher repository-settings
-  # action (`gh api repos/<owner>/<repo>/branches/<branch>/protection/required_status_checks
-  # -X PATCH`) — that call CLOBBERS the whole required-checks list, so the full list
-  # must always be re-supplied whole, never as a delta.
-  security-verdict-gate:
-    name: Security verdict gate (PR head sha)
+  # Security review (0.4.7 c5 FR5, ADR 0016): the official Anthropic Action reviews the
+  # PR diff and reports a status check on the PR head. Required on develop and main by
+  # the branch ruleset (operator-owned, together with the CLAUDE_API_KEY secret). The
+  # sha-keyed verdict file, its two-hop rule and the verdict-gate jobs are gone.
+  security-review:
+    name: Security review (anthropics/claude-code-security-review)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     if: github.event_name == 'pull_request' && (github.base_ref == 'develop' || github.base_ref == 'main')
-    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          # The literal PR head — never the synthetic refs/pull/N/merge commit
-          # actions/checkout defaults to for pull_request events — and full history
-          # (fetch-depth: 0) so `dadaia ci verdict-check` can resolve the PR head's
-          # first parent (the covering verdict's expected commit sha).
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+          fetch-depth: 2
+      - uses: anthropics/claude-code-security-review@0c6a49f1fa56a1d472575da86a94dbc1edb78eda  # main 2026-02-11
         with:
-          python-version: "3.12"
-      - name: Install package (v0.5.1 K7 — the gate is now `dadaia ci verdict-check`)
-        run: pip install -e .
-      - name: Require an APPROVED security-reviewer verdict covering this PR head
-        env:
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: bash .github/scripts/pr-verdict-check.sh
-
-  # ---------------------------------------------------------------------------
-  # Dual-approval verdict gate (panel-kanban-v1 §3 K-3 / §9)
-  # ---------------------------------------------------------------------------
-  # Behaviour:
-  #   - Normal CI runs (push / PR): .dadaia/handoff/ is gitignored, no handoffs
-  #     are present in the checkout → check-verdict.sh exits 0 (no-op).
-  #   - Release CLOSURE: operator triggers `workflow_dispatch` supplying
-  #     qa_sidecar and security_sidecar inputs, OR places handoff files
-  #     inside the checkout (e.g. via upload-artifact / download-artifact in a
-  #     wrapping workflow). The script then asserts both verdicts == "APPROVED".
-  #   - ubuntu-latest ships with jq preinstalled; no extra setup needed.
-  verdict-gate:
-    name: Dual-approval verdict gate (qa + security)
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-      - name: Check qa-engineer + security-reviewer verdicts
-        env:
-          # Passed via workflow_dispatch inputs; empty on push/PR runs.
-          QA_HANDOFF: ${{ github.event.inputs.qa_sidecar || '' }}
-          SECURITY_HANDOFF: ${{ github.event.inputs.security_sidecar || '' }}
-          RELEASE_ID: ${{ github.event.inputs.release_id || '' }}
-        run: bash .github/scripts/check-verdict.sh
+          comment-pr: true
+          claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
