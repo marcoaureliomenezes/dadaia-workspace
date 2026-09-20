@@ -24,7 +24,11 @@ from pathlib import Path, PurePosixPath
 
 from dadaia_workspace.core import session_store, workspace_layout
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
-from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES, PROJECTION_TARGETS
+from dadaia_workspace.core.harness_registry import (
+    HARNESS_PROJECTION_DIRS,
+    L1_ENTRY_HARNESSES,
+    PROJECTION_TARGETS,
+)
 from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
@@ -57,6 +61,12 @@ _CANONICAL = frozenset({FindingVerdict.CANON, FindingVerdict.OPERATOR, FindingVe
 #: TTL expiry of this zone, so no scan verdict ever deletes anything directly — the shape
 #: behind the CRITICAL doctor-ptr-gc-deletes-valid-lock-free-bind.
 REAPED_ZONE = "reaped"
+
+#: The retired Claude bridge stub: the exact bytes a pre-0.4.7
+#: ``public install`` wrote into every consumer repo. Nothing writes it any more, so a
+#: repo-top ``CLAUDE.md`` carrying EXACTLY these bytes is a dead projection with no live
+#: generator — reaped like root slop. Any other content is operator authorship.
+_RETIRED_CLAUDE_BRIDGE_STUB: bytes = b"@AGENTS.md\n"
 
 #: Directory names that end the repo-tree walk: a nested VCS/venv/dependency tree is
 #: never ours to classify and is where the walk's cost would otherwise live.
@@ -346,6 +356,7 @@ class DoctorService:
         excluded = frozenset(workspace_layout.REPO_TREE_EXCLUDED)
         out: list[Finding] = []
         for top in self._alive_repo_tops():
+            out.extend(self._orphan_claude_bridge(top))
             pending = [top]
             while pending:
                 for entry in sweep.walk(pending.pop()):
@@ -365,6 +376,31 @@ class DoctorService:
                     if entry.is_dir() and not entry.is_symlink():
                         pending.append(entry)
         return out
+
+    def _orphan_claude_bridge(self, top: Path) -> list[Finding]:
+        """The retired Claude bridge left behind in a consumer repo.
+
+        A repo-top ``CLAUDE.md`` whose bytes are EXACTLY the stub a pre-0.4.7 install
+        wrote is a dead projection with no live generator — reaped like root slop. Any
+        other content is operator authorship and is never a finding.
+        """
+        dst = top / "CLAUDE.md"
+        if dst.is_symlink() or not dst.is_file():
+            return []
+        try:
+            if dst.read_bytes() != _RETIRED_CLAUDE_BRIDGE_STUB:
+                return []
+        except OSError:
+            return []
+        return [
+            self._finding(
+                "repos",
+                self._workspace_root,
+                dst,
+                FindingVerdict.SLOP,
+                "(the Claude bridge is retired — a repo carries the scoped AGENTS.md only)",
+            )
+        ]
 
     def _exception_globs(self) -> tuple[str, ...]:
         try:
@@ -687,7 +723,9 @@ class DoctorService:
         writer from the L1 harnesses whose projection dir exists at the root (FR8)."""
         if finding.target == JsonHarnessProfileStore.path(self._states):
             present = tuple(
-                h for h in L1_ENTRY_HARNESSES if (self._workspace_root / f".{h}").is_dir()
+                h
+                for h, dirs in HARNESS_PROJECTION_DIRS.items()
+                if any((self._workspace_root / d).is_dir() for d in dirs)
             )
             JsonHarnessProfileStore().write(self._states, HarnessProfile.of(present))
         else:

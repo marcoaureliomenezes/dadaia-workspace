@@ -26,7 +26,6 @@ from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.infrastructure.public_assets_common import _package_version
 from dadaia_workspace.infrastructure.workspace_guardrail import (
     _CANONICAL_AGENTS_BANNER,
-    _CLAUDE_MD_STUB,
     _doctor_consumer_pair_lines,
     _install_workspace_guardrail_pair,
 )
@@ -78,8 +77,8 @@ def _register_context(workspace_root: Path, slug: str, state: str = "alive") -> 
 def test_four_target_projection_write(tmp_path: Path) -> None:
     """Single source `data/AGENTS.md` fans out to 4 destinations.
 
-    AGENTS.md destinations are byte-identical to the source; CLAUDE.md
-    destinations contain only the 1-line stub (T-41: delegates to AGENTS.md).
+    AGENTS.md destinations are byte-identical to the source; no CLAUDE.md bridge is
+    written anywhere (0.4.7 FR3 retired it).
     """
     source = tmp_path / "data" / "AGENTS.md"
     source.parent.mkdir(parents=True)
@@ -108,19 +107,16 @@ def test_four_target_projection_write(tmp_path: Path) -> None:
             f"AGENTS.md at {dest} is not byte-identical to source."
         )
 
-    claude_destinations = [workspace_root / "CLAUDE.md", consumer / "CLAUDE.md"]
-    for dest in claude_destinations:
-        assert dest.exists(), f"Expected CLAUDE.md destination missing: {dest}"
-        assert dest.read_text(encoding="utf-8") == _CLAUDE_MD_STUB, (
-            f"CLAUDE.md at {dest} must contain only the 1-line stub (T-41)."
-        )
+    # 0.4.7 FR3: the Claude bridge is retired — the installer writes AGENTS.md only.
+    for dest in (workspace_root / "CLAUDE.md", consumer / "CLAUDE.md"):
+        assert not dest.exists(), f"install must not write a CLAUDE.md bridge: {dest}"
 
     ok_entries = [e for e in installed if e.startswith("[ok]")]
-    assert len(ok_entries) == 4, f"Expected exactly 4 '[ok]' entries, got {len(ok_entries)}."
+    assert len(ok_entries) == 2, f"Expected exactly 2 '[ok]' entries, got {len(ok_entries)}."
 
 
 def test_skip_and_doctor_matrix(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """Skip variants (unregistered repo, self-slug) + the doctor 4-line parity output."""
+    """Skip variants (unregistered repo, self-slug) + the doctor parity output."""
     source = tmp_path / "data" / "AGENTS.md"
     source.parent.mkdir(parents=True)
     source.write_bytes(b"# AGENTS\n")
@@ -175,9 +171,9 @@ def test_skip_and_doctor_matrix(tmp_path: Path, capsys: pytest.CaptureFixture[st
     _install_workspace_guardrail_pair(source, ws_b, force=True)
     assert (consumer_b / "AGENTS.md").read_bytes() == source.read_bytes()
 
-    # (c) doctor emits exactly 4 parity lines; bannerless source classifies the
-    #     consumer pair [foreign] while the lib-owned root pair stays [ok]
-    #     (v0.1.60 FR9 amendment).
+    # (c) doctor emits exactly 2 parity lines (0.4.7 FR3 collapsed the pair);
+    #     a bannerless source classifies the consumer [foreign] while the lib-owned
+    #     root AGENTS.md stays [ok] (v0.1.60 FR9 amendment).
     ws_c = tmp_path / "ws-doctor"
     ws_c.mkdir()
     slug = "some-consumer"
@@ -188,24 +184,14 @@ def test_skip_and_doctor_matrix(tmp_path: Path, capsys: pytest.CaptureFixture[st
     # K3 (v0.5.1): the root pair is 2 ProjectionRule entries, both [ok] right after a
     # fresh install; the retired `_doctor_guardrail_pair` duplicated this root check
     # alongside the single consumer-pair authority below.
-    root_lines = [
-        DoctorLine(DoctorStatus.OK, "root:AGENTS.md"),
-        DoctorLine(DoctorStatus.OK, "root:CLAUDE.md"),
-    ]
+    root_lines = [DoctorLine(DoctorStatus.OK, "root:AGENTS.md")]
     lines = _rendered(root_lines + _doctor_consumer_pair_lines(source, ws_c, emit_stderr=False))
-    expected_labels = {
-        "root:AGENTS.md",
-        "root:CLAUDE.md",
-        f"repos/{slug}:AGENTS.md",
-        f"repos/{slug}:CLAUDE.md",
-    }
+    expected_labels = {"root:AGENTS.md", f"repos/{slug}:AGENTS.md"}
     status = {ln.split(" ", 1)[1]: ln.split(" ", 1)[0] for ln in lines if " " in ln}
     assert set(status) == expected_labels
-    assert len(lines) == 4
+    assert len(lines) == 2
     assert status["root:AGENTS.md"] == "[ok]", lines
-    assert status["root:CLAUDE.md"] == "[ok]", lines
     assert status[f"repos/{slug}:AGENTS.md"] == "[foreign]", lines
-    assert status[f"repos/{slug}:CLAUDE.md"] == "[foreign]", lines
 
 
 def test_nested_pair_non_interference(tmp_path: Path) -> None:

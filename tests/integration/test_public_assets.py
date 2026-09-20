@@ -60,9 +60,7 @@ _runner = CliRunner()
 # ---------------------------------------------------------------------------
 
 
-def test_stage_manifest_codex_adapters_and_install_all(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_stage_manifest_and_install_all(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     stage_workspace = tmp_path / "stage-ws"
     stage_manager = FileSystemPublicAssetManager()
 
@@ -74,10 +72,10 @@ def test_stage_manifest_codex_adapters_and_install_all(
     assert manifest["schema_version"] == "1"
     assert any(asset["path"] == "data/AGENTS.md" for asset in manifest["assets"])
 
-    assert (
-        stage_workspace / ".dadaia" / "agentic" / "runtime" / "codex" / "memory-ctx" / "SKILL.md"
-    ).exists()
-    assert any(asset["path"] == "runtime/codex/memory-ctx/SKILL.md" for asset in manifest["assets"])
+    # 0.4.7 FR3: the Codex-only runtime-adapter family is retired — Codex reads the
+    # shared `.agents/skills` tree natively, so nothing stages under runtime/.
+    assert not (stage_workspace / ".dadaia" / "agentic" / "runtime").exists()
+    assert not any(asset["path"].startswith("runtime/") for asset in manifest["assets"])
 
     workspace = tmp_path / "ws"
     manager = FileSystemPublicAssetManager()

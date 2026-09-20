@@ -5,12 +5,13 @@ The **code embodiment** of the agent-runtime roster that ``specs/memory/tech-sta
 does not compete with that doc — it *types* the entry-harness roster so no bare string
 literal is scattered across the codebase.
 
-One roster lives here:
+Two facts live here:
 
 * :data:`L1_ENTRY_HARNESSES` — the Layer-1 *entry* harnesses an operator can drive the
   workspace from: ``claude``, ``codex``, ``kimi-code``. This is the identity set
   the panel runtime-validation and the ``dadaia init --harness`` / projection vocabulary
   key on.
+* :data:`HARNESS_PROJECTION_DIRS` — the workspace directory each of them owns.
 
 Layering: a pure ``core`` leaf — **stdlib only, no upward import** (import-linter clean).
 Consumed downward by ``infrastructure`` / ``features`` / ``cli``.
@@ -22,6 +23,16 @@ from __future__ import annotations
 #: from. Canonical order (also the ``init --harness all`` / projection order).
 #: ``kimi-code`` (v0.2.8) is Layer-1 only.
 L1_ENTRY_HARNESSES: tuple[str, ...] = ("claude", "codex", "kimi-code")
+
+#: The workspace directory each Layer-1 entry harness owns — the ONE home of
+#: "which root directory belongs to which harness". ``kimi-code`` owns none: it reads
+#: the shared ``.agents/*`` tree natively and registers its hooks at the user level,
+#: so its own projection set is empty.
+HARNESS_PROJECTION_DIRS: dict[str, tuple[str, ...]] = {
+    "claude": (".claude",),
+    "codex": (".codex",),
+    "kimi-code": (),
+}
 
 #: The projectable install targets in canonical order: the shared ``agents`` skills root
 #: plus one projection per Layer-1 entry harness. Consumed by ``public_assets.install``'s

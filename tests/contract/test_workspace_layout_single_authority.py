@@ -52,18 +52,21 @@ def test_gate_law_sets_are_the_same_objects() -> None:
     from dadaia_workspace.features.spec_context import gate_policy
 
     assert gate_policy._LAW_BASENAMES is workspace_layout.LAW_BASENAMES
-    assert gate_policy._LAW_HARNESS_DIRS is workspace_layout.LAW_HARNESS_DIRS
 
 
-def test_installer_targets_are_the_same_object() -> None:
-    """K3 (v0.5.1): the law-projection rule builder (``_law_projection_rules``) reads
-    ``DADAIA_MD_HARNESS_TARGETS`` straight off ``core.workspace_layout`` — no more
-    private per-module re-export to keep byte-identical (the retired
-    ``install_helpers._DADAIA_MD_HARNESS_TARGETS`` alias)."""
-    from dadaia_workspace.core import workspace_layout
-    from dadaia_workspace.infrastructure import projection_rules
+def test_harness_dirs_derive_from_the_one_harness_registry() -> None:
+    """0.4.7 FR3: "which root directory a harness owns" lives once, in
+    ``core.harness_registry.HARNESS_PROJECTION_DIRS``. ``HARNESS_DIRS`` is the shared
+    ``.agents`` tree plus that registry's values — never a second hand-kept name list,
+    and a harness with an empty set (``kimi-code``) contributes nothing."""
+    from dadaia_workspace.core import harness_registry, workspace_layout
 
-    assert projection_rules.DADAIA_MD_HARNESS_TARGETS is workspace_layout.DADAIA_MD_HARNESS_TARGETS
+    assert harness_registry.HARNESS_PROJECTION_DIRS["kimi-code"] == ()
+    derived = {".agents"} | {
+        d for dirs in harness_registry.HARNESS_PROJECTION_DIRS.values() for d in dirs
+    }
+    assert derived == workspace_layout.HARNESS_DIRS
+    assert ".kimi-code" not in workspace_layout.HARNESS_DIRS
 
 
 def test_gate_additive_prefixes_are_the_registry_view() -> None:

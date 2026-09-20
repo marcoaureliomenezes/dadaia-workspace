@@ -66,9 +66,10 @@ def test_scope_all_and_default_install_workspace_root_and_consumer_repos(
 
     manager.install(tmp_path, scope="all", force=True)
     assert (tmp_path / "AGENTS.md").exists(), "workspace-root AGENTS.md must be written"
-    assert (tmp_path / "CLAUDE.md").exists(), "workspace-root CLAUDE.md must be written"
     assert (consumer / "AGENTS.md").exists(), "consumer AGENTS.md must be written (scope=all)"
-    assert (consumer / "CLAUDE.md").exists(), "consumer CLAUDE.md must be written (scope=all)"
+    # 0.4.7 FR3: no CLAUDE.md bridge at either destination.
+    assert not (tmp_path / "CLAUDE.md").exists()
+    assert not (consumer / "CLAUDE.md").exists()
 
     # Calling install() without scope= behaves identically to scope='all'.
     manager2 = FileSystemPublicAssetManager()
@@ -82,16 +83,13 @@ def test_scope_all_and_default_install_workspace_root_and_consumer_repos(
 
 def test_scope_workspace_only_and_repos_only(tmp_path: Path) -> None:
     """workspace-only skips all consumers (even multiple); repos-only never touches/creates
-    the workspace-root pair and returns an empty installed list with no consumers present."""
+    the workspace-root AGENTS.md and returns an empty installed list with no consumers."""
     manager = FileSystemPublicAssetManager()
     consumer_a = _add_marker_consumer(tmp_path, "repo-a")
     consumer_b = _add_marker_consumer(tmp_path, "repo-b")
 
     manager.install(tmp_path, scope="workspace-only", force=True)
     assert (tmp_path / "AGENTS.md").exists(), "workspace root must be written"
-    assert (tmp_path / "CLAUDE.md").exists(), (
-        "workspace-root CLAUDE.md must be written with scope=workspace-only"
-    )
     assert not (consumer_a / "AGENTS.md").exists(), "repo-a must not be written"
     assert not (consumer_b / "AGENTS.md").exists(), "repo-b must not be written"
 
@@ -111,9 +109,6 @@ def test_scope_workspace_only_and_repos_only(tmp_path: Path) -> None:
     assert (consumer / "AGENTS.md").exists(), (
         "consumer AGENTS.md must be written with scope=repos-only"
     )
-    assert (consumer / "CLAUDE.md").exists(), (
-        "consumer CLAUDE.md must be written with scope=repos-only"
-    )
 
     # repos-only: no root AGENTS.md is created if absent.
     repos_only_no_root = tmp_path / "repos-only-no-root"
@@ -131,7 +126,5 @@ def test_scope_workspace_only_and_repos_only(tmp_path: Path) -> None:
     empty_root.mkdir()
     installed = FileSystemPublicAssetManager().install(empty_root, scope="repos-only", force=True)
     root_agents_path = str(empty_root / "AGENTS.md")
-    root_claude_path = str(empty_root / "CLAUDE.md")
     paths_installed = [e.split(None, 1)[-1] for e in installed]
     assert root_agents_path not in paths_installed
-    assert root_claude_path not in paths_installed

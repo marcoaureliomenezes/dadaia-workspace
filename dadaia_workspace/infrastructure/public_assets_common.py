@@ -65,13 +65,8 @@ _COPY_DIRS = (
     "data",
     "scaffold",
     "templates",
-    "runtime",
-    "kimi-code",
 )
 _CLAUDE_DIRS = ("rules", "skills", "agents")
-#: Subdirectories of the staged ``kimi-code/`` tree for ``--only`` filtering (v0.2.8).
-#: Empty for now — the tree currently ships a single root ``AGENTS.md``.
-_KIMI_DIRS: tuple[str, ...] = ()
 
 
 def is_ignored_public_asset(path: Path) -> bool:

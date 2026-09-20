@@ -11,15 +11,11 @@ _PUBLIC = Path(scoped_law.__file__).resolve().parents[2] / "public"
 
 _TEMPLATES = {
     "repo-AGENTS.md": "# repo law\n",
-    "repo-CLAUDE.md": "@AGENTS.md\n",
     "tests-AGENTS.md": "# tests law\n",
-    "tests-CLAUDE.md": "@AGENTS.md\n",
 }
 _ROWS = {
     "AGENTS.md": "repo-AGENTS.md",
-    "CLAUDE.md": "repo-CLAUDE.md",
     "tests/AGENTS.md": "tests-AGENTS.md",
-    "tests/CLAUDE.md": "tests-CLAUDE.md",
 }
 
 
@@ -35,7 +31,7 @@ def test_installs_every_absent_row(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     (repo / "tests").mkdir(parents=True)
     touched = scoped_law.install_scoped_law(repo, _public_dir(tmp_path))
-    assert touched == ["AGENTS.md", "CLAUDE.md", "tests/AGENTS.md", "tests/CLAUDE.md"]
+    assert touched == ["AGENTS.md", "tests/AGENTS.md"]
     for dest, template in _ROWS.items():
         assert (repo / dest).read_text(encoding="utf-8") == _TEMPLATES[template]
 
@@ -44,18 +40,16 @@ def test_present_rows_are_left_untouched(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     (repo / "tests").mkdir(parents=True)
     (repo / "AGENTS.md").write_text("mine\n", encoding="utf-8")
-    (repo / "tests" / "CLAUDE.md").write_text("mine\n", encoding="utf-8")
     touched = scoped_law.install_scoped_law(repo, _public_dir(tmp_path))
-    assert touched == ["CLAUDE.md", "tests/AGENTS.md"]
+    assert touched == ["tests/AGENTS.md"]
     assert (repo / "AGENTS.md").read_text(encoding="utf-8") == "mine\n"
-    assert (repo / "tests" / "CLAUDE.md").read_text(encoding="utf-8") == "mine\n"
 
 
 def test_tests_rows_are_skipped_without_a_tests_dir(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
     touched = scoped_law.install_scoped_law(repo, _public_dir(tmp_path))
-    assert touched == ["AGENTS.md", "CLAUDE.md"]
+    assert touched == ["AGENTS.md"]
     assert not (repo / "tests").exists()
 
 
@@ -67,8 +61,7 @@ def test_refuses_symlinked_destinations_and_directories(tmp_path: Path) -> None:
     outside_tests.mkdir()
     repo = tmp_path / "repo"
     repo.mkdir()
-    for dest in ("AGENTS.md", "CLAUDE.md"):
-        (repo / dest).symlink_to(outside)
+    (repo / "AGENTS.md").symlink_to(outside)
     (repo / "tests").symlink_to(outside_tests, target_is_directory=True)
     assert scoped_law.install_scoped_law(repo, public) == []
     assert outside.read_text(encoding="utf-8") == "x"
@@ -84,9 +77,11 @@ def test_symlinked_repo_root_is_never_written_through(tmp_path: Path) -> None:
     assert sorted(p.name for p in outside.rglob("*")) == ["tests"]
 
 
-def test_shipped_bridge_templates_are_one_import_line() -> None:
+def test_no_claude_bridge_template_ships() -> None:
+    """0.4.7 FR3: a consumer repo carries the scoped ``AGENTS.md`` only — the
+    ``@AGENTS.md`` bridge stub is retired at its source."""
     for name in ("repo-CLAUDE.md", "tests-CLAUDE.md"):
-        assert (_PUBLIC / "templates" / name).read_bytes() == b"@AGENTS.md\n"
+        assert not (_PUBLIC / "templates" / name).exists()
 
 
 def test_secret_scan_engine_lives_in_the_privacy_module() -> None:

@@ -27,10 +27,8 @@ from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.agent_model_policy import ResolvedAgentModel
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
-from dadaia_workspace.core.workspace_layout import DADAIA_MD_HARNESS_TARGETS
 from dadaia_workspace.infrastructure.codex_doctor import (
     codex_trust_boundary_info,
-    dcx6_codex_runtime_adapters,
     dcx7_codex_skill_refs,
     dcx8_codex_rules_shape,
     dcx9_codex_hook_shape,
@@ -66,13 +64,11 @@ from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
 )
 from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import map_model
 from dadaia_workspace.infrastructure.workspace_guardrail import (
-    _CLAUDE_MD_STUB,
     _agents_md_source,
 )
 
 #: Read-only mode for projected law files (`.dadaia/AGENTS.md`) — closes the Bash-redirect
 #: write path the gate does not parse. A human operator can still chmod and edit.
-_LAW_FILE_MODE = 0o444
 
 
 class HarnessProjection(Protocol):
@@ -154,9 +150,10 @@ def _tree_bytes_rules(
 
 
 def _guardrail_pair_rules(plan: InstallPlan) -> tuple[ProjectionRule, ...]:
-    """The root ``AGENTS.md``/``CLAUDE.md`` pair — 2 rules (K3's headline shape).
+    """The root ``AGENTS.md`` map — one rule, one destination (collapsed the
+    pair: the Claude bridge stub is retired, Claude Code reads ``AGENTS.md`` natively).
 
-    Consumer-repo fan-out (``repos/<slug>:*``) is provenance-gated, N-target
+    Consumer-repo fan-out (``repos/<slug>:AGENTS.md``) is provenance-gated, N-target
     discovery-based writing with foreign-authorship detection — a fundamentally
     different mechanism from "one rule, one destination" — and stays the bespoke
     ``workspace_guardrail._install_guardrail_pair`` path, invoked directly by the
@@ -164,22 +161,6 @@ def _guardrail_pair_rules(plan: InstallPlan) -> tuple[ProjectionRule, ...]:
     """
     if "workspace" not in plan.guardrail_targets:
         return ()
-    data_agents_md = plan.agentic_dir / "data" / "AGENTS.md"
-    if data_agents_md.is_file():
-        return (
-            _bytes_rule(
-                "root:AGENTS.md",
-                "agents",
-                plan.workspace_root / "AGENTS.md",
-                data_agents_md.read_bytes(),
-            ),
-            _bytes_rule(
-                "root:CLAUDE.md",
-                "agents",
-                plan.workspace_root / "CLAUDE.md",
-                _CLAUDE_MD_STUB.encode("utf-8"),
-            ),
-        )
     src = _agents_md_source(plan.agentic_dir)
     if src is None:
         return ()
@@ -188,36 +169,6 @@ def _guardrail_pair_rules(plan: InstallPlan) -> tuple[ProjectionRule, ...]:
             "root:AGENTS.md", "agents", plan.workspace_root / "AGENTS.md", src.read_bytes()
         ),
     )
-
-
-def _law_projection_rules(plan: InstallPlan) -> tuple[ProjectionRule, ...]:
-    """the root `AGENTS.md` map — the workspace system prompt — projected read-only.
-
-    The workspace root always receives it; a harness directory receives it only when
-    that harness does not already deliver the law through its own root-import chain
-    (Claude Code's does — see :data:`DADAIA_MD_HARNESS_TARGETS`) AND is in scope.
-    """
-    src = plan.agentic_dir / "data" / "the root `AGENTS.md` map"
-    if not src.is_file():
-        return ()
-    content = src.read_bytes()
-    rules = [
-        _bytes_rule(
-            "law:the root `AGENTS.md` map",
-            "agents",
-            plan.workspace_root / "the root `AGENTS.md` map",
-            content,
-            mode=_LAW_FILE_MODE,
-        )
-    ]
-    for name, rel in sorted(DADAIA_MD_HARNESS_TARGETS.items()):
-        if name in plan.active_harnesses:
-            rules.append(
-                _bytes_rule(
-                    f"law:{rel}", name, plan.workspace_root / rel, content, mode=_LAW_FILE_MODE
-                )
-            )
-    return tuple(rules)
 
 
 #: (staged source name, destination relpath, doctor label) for the ``.dadaia/**``
@@ -480,32 +431,6 @@ def _codex_rules_file_rule(workspace_root: Path) -> ProjectionRule:
     )
 
 
-def _codex_runtime_adapter_rules(
-    workspace_root: Path, public_dir: Path
-) -> tuple[ProjectionRule, ...]:
-    """Codex-only adapter ``SKILL.md`` files (``public/runtime/codex/*/SKILL.md``)."""
-    src_root = public_dir / "runtime" / "codex"
-    if not src_root.is_dir():
-        return ()
-    dst_root = workspace_root / ".codex" / "skills"
-    rules: list[ProjectionRule] = []
-    for slug_dir in sorted(src_root.iterdir()):
-        if not slug_dir.is_dir():
-            continue
-        skill_src = slug_dir / "SKILL.md"
-        if not skill_src.is_file():
-            continue
-        rules.append(
-            _bytes_rule(
-                f"codex:skills/{slug_dir.name}/SKILL.md",
-                "codex",
-                dst_root / slug_dir.name / "SKILL.md",
-                skill_src.read_bytes(),
-            )
-        )
-    return tuple(rules)
-
-
 def _codex_hooks_json_rule(workspace_root: Path) -> ProjectionRule:
     return _bytes_rule(
         "codex:hooks.json",
@@ -531,14 +456,12 @@ def _codex_hook_wrapper_rules(workspace_root: Path) -> tuple[ProjectionRule, ...
 class CodexHarness:
     """Codex adapter — one of the three real seams (K3). Per-agent TOML and
     ``config.toml`` are compared byte-wise, exactly like a Claude agent render,
-    replacing D-CX-1/2/4/5/10's shape/regex re-derivation of the same fact.
+    replacing D-CX-1/2/4/5/10's shape/regex re-derivation of the same fact. Codex reads
+    the shared ``.agents/skills`` tree natively, so it owns no skills copy.
     """
 
     id = "codex"
-    dirs: tuple[str, ...] = ("rules", "skills", "agents")
-
-    def __init__(self, public_dir: Path) -> None:
-        self._public_dir = public_dir
+    dirs: tuple[str, ...] = ("rules", "agents")
 
     def rules(self, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
         codex_dir = plan.workspace_root / ".codex"
@@ -548,7 +471,6 @@ class CodexHarness:
         if plan.only is None or plan.only == "agents":
             rules.extend(_codex_agent_rules(plan.agentic_dir, codex_dir, plan.resolved_models))
             rules.append(_codex_config_rule(plan.agentic_dir, codex_dir))
-            rules.extend(_codex_runtime_adapter_rules(plan.workspace_root, self._public_dir))
         if plan.only is None:
             rules.append(_codex_hooks_json_rule(plan.workspace_root))
             rules.extend(_codex_hook_wrapper_rules(plan.workspace_root))
@@ -561,7 +483,6 @@ class CodexHarness:
         doctor() attestation (never gated) — the ``rule-corpus`` id in
         ``ATTESTING_CHECK_IDS`` must never vanish for a codex-absent profile."""
         out: list[DoctorLine] = []
-        out.extend(dcx6_codex_runtime_adapters(workspace_root, self._public_dir))
         out.extend(dcx7_codex_skill_refs(workspace_root))
         out.extend(dcx8_codex_rules_shape(workspace_root / ".codex"))
         out.extend(dcx9_codex_hook_shape(workspace_root))
@@ -600,11 +521,7 @@ class KimiHarness:
     dirs: tuple[str, ...] = ()
 
     def rules(self, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
-        kimi_src = plan.agentic_dir / "kimi-code"
-        kimi_dst = plan.workspace_root / ".kimi-code"
-        rules = list(
-            _tree_bytes_rules(kimi_src, kimi_dst, harness="kimi-code", label_prefix="kimi-code:")
-        )
+        rules: list[ProjectionRule] = []
         if plan.only is None:
             home = kimi_code_home()
             for name, content in kimi_hook_shims().items():
@@ -647,12 +564,12 @@ class KimiHarness:
         return out
 
 
-def build_harnesses(public_dir: Path) -> dict[str, HarnessProjection]:
-    """The three real adapters (K3) — ``CodexHarness`` is the only one carrying
-    per-manager state (*public_dir*, for its runtime-adapter skill family)."""
+def build_harnesses() -> dict[str, HarnessProjection]:
+    """The three real adapters (K3) — each one stateless since the Codex-only runtime
+    adapter family was retired."""
     return {
         "claude": ClaudeHarness(),
-        "codex": CodexHarness(public_dir),
+        "codex": CodexHarness(),
         "kimi-code": KimiHarness(),
     }
 
@@ -671,5 +588,4 @@ def projection_rules(
     for name in L1_ENTRY_HARNESSES:
         if name in plan.harness_targets:
             rules.extend(harnesses[name].rules(plan))
-    rules.extend(_law_projection_rules(plan))
     return tuple(rules)

@@ -20,7 +20,11 @@ from typing import Literal
 from dadaia_workspace.core.agent_model_templates import CORE_AGENTS, resolve_agent_model
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.exceptions import PublicAssetError
-from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES, PROJECTION_TARGETS
+from dadaia_workspace.core.harness_registry import (
+    HARNESS_PROJECTION_DIRS,
+    L1_ENTRY_HARNESSES,
+    PROJECTION_TARGETS,
+)
 from dadaia_workspace.core.models.agent_model_policy import (
     AgentModelPolicyOverlay,
     AgentModelPolicyStoreError,
@@ -246,7 +250,7 @@ class FileSystemPublicAssetManager:
         plan = self._resolve_install_plan(
             workspace_root, agentic_dir, target, OverwritePolicy.of(force), scope, only
         )
-        harnesses = build_harnesses(self._public_dir)
+        harnesses = build_harnesses()
         rules = projection_rules(plan, harnesses)
         transcript = install_rules(rules, force=plan.overwrite.force)
         installed.extend(transcript.render())
@@ -558,7 +562,7 @@ class FileSystemPublicAssetManager:
             overlay=overlay,
             resolved_models=resolved_models,
         )
-        harnesses = build_harnesses(self._public_dir)
+        harnesses = build_harnesses()
         rules = projection_rules(doctor_plan, harnesses)
         reports.extend(doctor_rules(rules))
         for name in L1_ENTRY_HARNESSES:
@@ -566,15 +570,14 @@ class FileSystemPublicAssetManager:
                 reports.extend(harnesses[name].checks(workspace_root))
         # An out-of-profile runtime directory that physically exists is surfaced by a
         # `[warn]` line rather than staying silent (A3).
-        harness_dirs = {"claude": ".claude", "codex": ".codex", "kimi-code": ".kimi-code"}
-        for name, rel_dir in harness_dirs.items():
-            if name not in active and (workspace_root / rel_dir).exists():
+        for name, rel_dirs in HARNESS_PROJECTION_DIRS.items():
+            if name not in active and any((workspace_root / d).exists() for d in rel_dirs):
                 reports.append(_out_of_profile_warn(name))
 
-        # Consumer-repo guardrail pair (FR9, bug public-doctor-flags-hand-authored-consumer-
-        # agents-md): the `repos/<slug>:AGENTS.md`/`:CLAUDE.md` lines flow through the SINGLE
-        # provenance-aware authority — a hand-authored (no-banner) consumer reads [foreign] on
-        # BOTH paired lines (never [drift]/[missing]), so `public doctor` exits 0 (Ruling 16).
+        # Consumer-repo guardrail AGENTS.md (FR9, bug public-doctor-flags-hand-authored-
+        # consumer-agents-md): the `repos/<slug>:AGENTS.md` line flows through the SINGLE
+        # provenance-aware authority — a hand-authored (no-banner) consumer reads [foreign]
+        # (never [drift]/[missing]), so `public doctor` exits 0 (Ruling 16).
         consumer_source = self._agents_md_source(agentic_dir)
         if consumer_source is not None:
             reports.extend(

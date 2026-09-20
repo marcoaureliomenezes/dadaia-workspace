@@ -25,19 +25,18 @@ from functools import cached_property
 from pathlib import Path
 from typing import Literal
 
+from dadaia_workspace.core.harness_registry import HARNESS_PROJECTION_DIRS
 from dadaia_workspace.core.specs_version import RELEASE_ID_FRAGMENT
 
 __all__ = [
     "AUDIT_DIR_NAME_PATTERN",
     "AUDIT_DIR_NAME_RE",
     "CANON_ROOT_MEMBERS",
-    "DADAIA_MD_HARNESS_TARGETS",
     "DADAIA_ROOT_FILES",
     "DADAIA_ZONES",
     "HARNESS_DIRS",
     "INSTANCE_EXCEPTIONS",
     "LAW_BASENAMES",
-    "LAW_HARNESS_DIRS",
     "MEMORY_TOPLEVEL_FILES",
     "REPO_TREE_ARTIFACTS",
     "INSTALLED_GIT_HOOKS",
@@ -81,18 +80,16 @@ AUDIT_DIR_NAME_RE: re.Pattern[str] = re.compile(f"^{AUDIT_DIR_NAME_PATTERN}$")
 
 #: Directories the workspace root may contain (the Workspace Root Law).
 ROOT_ALLOWED_DIRS: frozenset[str] = frozenset(
-    {".agents", ".claude", ".codex", ".dadaia", ".git", ".kimi-code", "repos"}
+    {".agents", ".claude", ".codex", ".dadaia", ".git", "repos"}
 )
 
 #: Files the workspace root may contain. ``AGENTS.md`` is the root map (the one
-#: always-on law file); ``CLAUDE.md`` the Claude Code import bridge; ``prompt.md`` the
-#: optional operator long-prompt file; ``.env`` the one credential home (the map §4);
-#: ``.gitignore`` the defence-in-depth exclusion list — bug
+#: always-on law file the library projects); ``prompt.md`` the optional operator
+#: long-prompt file; ``.env`` the one credential home (the map §4); ``.gitignore`` the
+#: defence-in-depth exclusion list — bug
 #: doctor-root1-flags-env-that-dadaia-md-9-declares-canonical: the law named both, this
 #: set named neither, and hook + doctor (both derived from here) contradicted the law.
-ROOT_ALLOWED_FILES: frozenset[str] = frozenset(
-    {"AGENTS.md", "CLAUDE.md", "prompt.md", ".env", ".gitignore"}
-)
+ROOT_ALLOWED_FILES: frozenset[str] = frozenset({"AGENTS.md", "prompt.md", ".env", ".gitignore"})
 
 
 class ZoneClass(StrEnum):
@@ -302,23 +299,17 @@ def public_scripts_dir() -> Path:
     return Path(__file__).resolve().parents[1] / "public" / "scripts"
 
 
-#: Basenames of the projected LAW files — human-only in an instantiated workspace.
-LAW_BASENAMES: frozenset[str] = frozenset({"AGENTS.md", "CLAUDE.md"})
+#: Basename of the projected LAW file — human-only in an instantiated workspace. One
+#: authored set, one basename: the Claude bridge and the DADAIA.md mirrors
+#: are retired, so the projected law is ``AGENTS.md`` at the root and under ``.dadaia/``.
+LAW_BASENAMES: frozenset[str] = frozenset({"AGENTS.md"})
 
-#: Harness/projection directories that host a projected law file (relative to the
-#: workspace root). The gate composes its guarded set FROM this.
-LAW_HARNESS_DIRS: frozenset[str] = frozenset({".claude/rules", ".codex", ".kimi-code", ".agents"})
-
-#: The harness directories themselves (the top segment of each of the above) — the one
-#: home of "which root directories a harness owns", derived, never respelled.
-HARNESS_DIRS: frozenset[str] = frozenset(path.split("/")[0] for path in LAW_HARNESS_DIRS)
-
-#: Retired law targets, kept until the projection surface collapses in T-047-55; the
-#: source they projected is gone, so :func:`_law_projection_rules` yields nothing.
-DADAIA_MD_HARNESS_TARGETS: dict[str, str] = {
-    "codex": ".codex/DADAIA.md",
-    "kimi-code": ".kimi-code/DADAIA.md",
-}
+#: Every projection directory at the workspace root: the shared ``.agents`` tree plus
+#: the directory each entry harness owns (:data:`HARNESS_PROJECTION_DIRS` is the one
+#: home of the latter — a harness with an empty set contributes nothing here).
+HARNESS_DIRS: frozenset[str] = frozenset(
+    {".agents", *(d for dirs in HARNESS_PROJECTION_DIRS.values() for d in dirs)}
+)
 
 # ---------------------------------------------------------------------------------
 # The repo working tree (``repo-AGENTS.md``) and the ``specs/`` canon (``specs-AGENTS.md``) — the same

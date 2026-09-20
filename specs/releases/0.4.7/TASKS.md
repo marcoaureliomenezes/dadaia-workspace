@@ -84,7 +84,7 @@
   Write set: `public/data/CONTEXT-MAP.md`, `tests/contract/test_context_map.py`,
   `public/entities/behavior-map.json`.
 
-- [-] T-047-55 — FR3a: collapse the law-projection surface. `LAW_BASENAMES = {"AGENTS.md"}`;
+- [x] T-047-55 — FR3a: collapse the law-projection surface. `LAW_BASENAMES = {"AGENTS.md"}`;
   delete `LAW_HARNESS_DIRS`, `DADAIA_MD_HARNESS_TARGETS`, `_law_projection_rules`, the
   `CLAUDE.md` half of `_guardrail_pair_rules` + `_CLAUDE_MD_STUB`, the consumer `CLAUDE.md`
   decider/pair logic in `workspace_guardrail.py`, `public/kimi-code/`, the `.codex/DADAIA.md`

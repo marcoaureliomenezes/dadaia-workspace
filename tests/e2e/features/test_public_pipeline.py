@@ -412,7 +412,7 @@ def _assert_profile_doctor_green(workspace: Path, monkeypatch: pytest.MonkeyPatc
 
 class TestPerProfileInit:
     def test_claude_only_profile(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """AC-8 claude-only: `.claude/` (agents/skills) + ctx-inject hook; NO .codex/ NO .kimi-code/.
+        """AC-8 claude-only: `.claude/` (agents/skills) + ctx-inject hook; NO .codex/.
 
         FR31/T-044-59 (bug dadaia-md-projected-twice-into-claude-code-context): Claude
         Code's own native root `AGENTS.md` discovery already
@@ -438,13 +438,13 @@ class TestPerProfileInit:
         )
         # AC-9(f) discriminating anchor: the two un-chosen harnesses get NO projection dir.
         assert not (ws / ".codex").exists(), "codex must NOT be scaffolded for a claude profile"
-        assert not (ws / ".kimi-code").exists(), "kimi must NOT be scaffolded for a claude profile"
+        assert not (ws / ".kimi-code").exists(), "kimi-code owns no workspace directory"
 
         assert _persisted_profile(ws) == ["claude"]
         _assert_profile_doctor_green(ws, monkeypatch)
 
     def test_codex_only_profile(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """AC-8 codex-only: `.codex/` (agents/config/rules/hooks.json) + `.dadaia/hooks/codex-*`; NO .claude/ NO .kimi-code/."""
+        """AC-8 codex-only: `.codex/` (agents/config/rules/hooks.json) + `.dadaia/hooks/codex-*`; NO .claude/."""
         ws = tmp_path / "codex_only"
         monkeypatch.chdir(tmp_path)
         result = _run_init(ws, "codex")
@@ -459,7 +459,7 @@ class TestPerProfileInit:
         assert codex_wrappers, "expected .dadaia/hooks/codex-* wrappers for a codex profile"
         # un-chosen harnesses get no projection.
         assert not (ws / ".claude").exists(), "claude must NOT be scaffolded for a codex profile"
-        assert not (ws / ".kimi-code").exists(), "kimi must NOT be scaffolded for a codex profile"
+        assert not (ws / ".kimi-code").exists(), "kimi-code owns no workspace directory"
 
         assert _persisted_profile(ws) == ["codex"]
         # Green requires the W5 boundary completion (runtime_expectations claude:* loop scoped);
@@ -467,14 +467,17 @@ class TestPerProfileInit:
         _assert_profile_doctor_green(ws, monkeypatch)
 
     def test_kimi_code_only_profile(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """AC-8 kimi-code-only (v0.2.8): `.kimi-code/` projection; NO .claude/ NO .codex/ NO .kimi-code/."""
+        """AC-8 kimi-code-only: 0.4.7 FR3 gave kimi-code an EMPTY own-projection set — it
+        reads the shared `.agents/` tree natively and wires its hooks at the user level,
+        so the profile scaffolds no workspace directory of its own."""
         ws = tmp_path / "kimi_code_only"
         monkeypatch.chdir(tmp_path)
         result = _run_init(ws, "kimi-code")
         assert result.exit_code == 0, result.output
 
-        # EXACT structure — the `.kimi-code/` projection carries the staged AGENTS.md.
-        assert (ws / ".kimi-code" / "AGENTS.md").is_file(), ".kimi-code/AGENTS.md missing"
+        # EXACT structure — the shared `.agents/skills` tree, and nothing kimi-specific.
+        assert (ws / ".agents" / "skills").is_dir(), ".agents/skills missing"
+        assert not (ws / ".kimi-code").exists(), "kimi-code must project no workspace dir"
         # un-chosen harnesses get no projection.
         assert not (ws / ".claude").exists(), (
             "claude must NOT be scaffolded for a kimi-code profile"
@@ -487,18 +490,18 @@ class TestPerProfileInit:
         # every L1 target (v0.2.8), so the kimi-only tree is doctor-green directly.
         _assert_profile_doctor_green(ws, monkeypatch)
 
-    def test_default_no_flag_scaffolds_all_three(
+    def test_default_no_flag_scaffolds_the_full_roster(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """AC-8 all-harness: default (no `--harness`) is still all-four; green doctor (back-compat)."""
+        """AC-8 all-harness: default (no `--harness`) is still the full roster; green doctor."""
         ws = tmp_path / "all_default"
         monkeypatch.chdir(tmp_path)
-        result = _run_init(ws, None)  # omit --harness entirely → default all-four
+        result = _run_init(ws, None)  # omit --harness entirely → the full roster
         assert result.exit_code == 0, result.output
 
         assert (ws / ".claude" / "agents").is_dir()
         assert (ws / ".codex").is_dir()
-        assert (ws / ".kimi-code").is_dir()
+        assert not (ws / ".kimi-code").exists()
         assert _ctx_inject_registered(ws / ".claude")
 
         assert _persisted_profile(ws) == ["claude", "codex", "kimi-code"]

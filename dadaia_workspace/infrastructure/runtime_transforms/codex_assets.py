@@ -29,26 +29,13 @@ _FRONTMATTER_PARALLEL_GROUP_RE = re.compile(r"^\s*parallel_group:\s*\S", re.MULT
 _CODEX_DEFAULT_EFFORT = "medium"
 # Every name/prefix here gates which backtick-quoted skill references
 # ``dcx7_codex_skill_refs`` (D-CX-7) even bothers checking for existence, resolved
-# against BOTH ``.agents/skills/`` and ``.codex/skills/`` (codex_doctor.py). Each entry
-# must be either (a) an exact name or leading-hyphen prefix of a real
-# ``public/skills/`` SOURCE skill, or (b) a documented runtime-asset exception in
-# ``_CODEX_SKILL_REF_RUNTIME_ASSET_EXCEPTIONS`` below — a name that resolves to a
-# Codex-only adapter projected from ``public/runtime/codex/<name>/`` (installed under
-# ``.codex/skills/``, never ``public/skills/``). A name that is neither is a phantom
+# against the shared ``.agents/skills/`` tree Codex reads natively (codex_doctor.py).
+# Each entry must be an exact name or leading-hyphen prefix of a real
+# ``public/skills/<name>/SKILL.md`` SOURCE skill. A name that resolves to nothing is a phantom
 # prefix: it gates nothing real and would let D-CX-7 silently stop protecting the
 # family it was meant to cover (A22.6; a test derives this whole tuple from the
 # on-disk inventory — ``tests/contract/test_codex_skill_ref_prefixes.py``).
-_CODEX_SKILL_REF_PREFIXES = (
-    "dd-",
-    "memory-ctx",
-)
-
-# (A22.6) ``memory-ctx`` is a Codex-only runtime adapter — the packaged source lives
-# at ``public/runtime/codex/memory-ctx/SKILL.md`` and is projected to
-# ``.codex/skills/memory-ctx/SKILL.md`` by ``dcx6_codex_runtime_adapters``, never to
-# ``public/skills/``. It is a real, resolvable asset, not a phantom: it just lives on
-# the runtime-adapter surface instead of the skills surface D-CX-7 checks first.
-_CODEX_SKILL_REF_RUNTIME_ASSET_EXCEPTIONS: frozenset[str] = frozenset({"memory-ctx"})
+_CODEX_SKILL_REF_PREFIXES = ("dd-",)
 
 # Whitelist of agent frontmatter fields that may be emitted to codex config.toml.
 _TOML_SAFE_AGENT_FIELDS: frozenset[str] = frozenset(

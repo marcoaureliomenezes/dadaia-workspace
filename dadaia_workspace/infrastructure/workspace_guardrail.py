@@ -1,4 +1,4 @@
-"""Consumer-repo discovery and AGENTS.md/CLAUDE.md guardrail install/doctor.
+"""Consumer-repo discovery and AGENTS.md guardrail install/doctor.
 
 Extracted from ``public_assets.py`` to keep that module under 600 lines.
 All names remain importable from ``dadaia_workspace.infrastructure.public_assets``
@@ -17,13 +17,7 @@ from collections.abc import Callable
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Literal
 
-from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
-
-# T-021-18: CLAUDE.md is the Claude Code bridge that imports @AGENTS.md — the single
-# source of workspace law. Claude Code reads CLAUDE.md natively and follows the @-import
-# to load AGENTS.md (see code.claude.com/docs/en/memory#agentsmd). One line is sufficient.
-_CLAUDE_MD_STUB = "@AGENTS.md\n"
 
 # FR9 (v0.1.60) — provenance discriminator for the consumer-repo AGENTS.md fan-out.
 # A consumer root AGENTS.md that BEGINS WITH this exact banner block is a provable
@@ -195,17 +189,6 @@ def _classify_consumer_agents(dst: Path, source_sha: str) -> str:
     return "stale"  # stale canonical projection (banner-bearing, divergent)
 
 
-def _classify_consumer_claude(dst: Path) -> str:
-    """ONE decider for the CLAUDE.md bridge: symlink | absent | stub | foreign."""
-    if dst.is_symlink():
-        return "symlink"
-    if not dst.exists():
-        return "absent"
-    if dst.read_text(encoding="utf-8") == _CLAUDE_MD_STUB:
-        return "stub"
-    return "foreign"
-
-
 def _install_guardrail_pair(
     source: Path,
     workspace_root: Path,
@@ -213,7 +196,7 @@ def _install_guardrail_pair(
     installed: list[str] | None = None,
     targets: set[Literal["workspace", "repos"]] | None = None,
 ) -> list[Path]:
-    """Write the AGENTS.md + CLAUDE.md guardrail pair to the requested targets.
+    """Write the AGENTS.md guardrail file to the requested targets.
 
     This is the single implementation for all three scope variants:
     - ``targets={"workspace", "repos"}`` — workspace root + all consumer repos (scope="all")
@@ -256,7 +239,6 @@ def _install_guardrail_pair(
     managed: list[Path] = []
 
     src_sha = hashlib.sha256(source.read_bytes()).hexdigest()
-    stub_sha = hashlib.sha256(_CLAUDE_MD_STUB.encode()).hexdigest()
 
     def _write_one(
         dst: Path,
@@ -287,24 +269,22 @@ def _install_guardrail_pair(
         write_fn()
         installed.append(f"[ok]   {dst}")
 
-    def _write_consumer_agents(dst: Path) -> bool:
-        """FR9 provenance-gated consumer AGENTS.md write. Returns True iff the sibling
-        CLAUDE.md should be written (created / restored), False when the AGENTS.md is
-        foreign (hand-authored) and left untouched.
-        """
+    def _write_consumer_agents(dst: Path) -> None:
+        """FR9 provenance-gated consumer AGENTS.md write — a foreign (hand-authored)
+        file is left untouched."""
         dst.parent.mkdir(parents=True, exist_ok=True)
         state = _classify_consumer_agents(dst, src_sha)
         if state == "symlink":
             # FR6 (ADR-7): NEVER write through a destination-file symlink — a DANGLING
             # link is refused too (never "absent → create").
             installed.append(f"[foreign] {dst} — left untouched (symlink)")
-            return False
+            return
         if state == "absent":
             # An empty slot has nothing to clobber.
             shutil.copy2(source, dst)
             installed.append(f"[ok]   {dst}")
             managed.append(dst)
-            return True
+            return
         if state == "canonical":
             if force:
                 shutil.copy2(source, dst)
@@ -312,63 +292,24 @@ def _install_guardrail_pair(
             else:
                 installed.append(f"[skip] {dst}")
             managed.append(dst)
-            return True
+            return
         if state == "stale":
             # Stale canonical projection (banner match) → restore + DISTINCT line.
             shutil.copy2(source, dst)
             installed.append(f"[updated] {dst} (overwrote divergent workspace-law copy)")
             managed.append(dst)
-            return True
+            return
         # FOREIGN / repo-owned → NEVER overwrite (the bug fix).
         installed.append(f"[foreign] {dst} — left untouched")
-        return False
-
-    def _write_consumer_claude(dst: Path, sibling_written: bool) -> None:
-        """FR9: the CLAUDE.md bridge follows its sibling's fate.
-
-        Written ONLY when the sibling AGENTS.md was created/restored; when AGENTS.md is
-        foreign, no CLAUDE.md is dropped (the orphan-drop the bug flags). A foreign
-        (non-stub) existing CLAUDE.md is always left untouched.
-        """
-        state = _classify_consumer_claude(dst)
-        if state == "symlink":
-            # FR6 (ADR-7): a symlinked CLAUDE.md (incl. dangling) is never written through.
-            installed.append(f"[foreign] {dst} — left untouched (symlink)")
-            return
-        if sibling_written:
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            if state == "absent":
-                atomic_write(dst, _CLAUDE_MD_STUB)
-                installed.append(f"[ok]   {dst}")
-                managed.append(dst)
-            elif state == "stub":
-                if force:
-                    atomic_write(dst, _CLAUDE_MD_STUB)
-                    installed.append(f"[ok]   {dst}")
-                else:
-                    installed.append(f"[skip] {dst}")
-                managed.append(dst)
-            else:
-                installed.append(f"[foreign] {dst} — left untouched")
-        elif state == "foreign":
-            installed.append(f"[foreign] {dst} — left untouched")
 
     def _write_pair(target_dir: Path, is_consumer: bool) -> None:
         agents_dst = target_dir / "AGENTS.md"
-        claude_dst = target_dir / "CLAUDE.md"
         if is_consumer:
             # FR9: provenance-gated — never clobber a hand-authored consumer AGENTS.md.
-            sibling_written = _write_consumer_agents(agents_dst)
-            _write_consumer_claude(claude_dst, sibling_written)
+            _write_consumer_agents(agents_dst)
             return
         # Workspace root: lib-owned canonical (unchanged Ruling-L overwrite semantics).
         _write_one(agents_dst, src_sha, lambda: shutil.copy2(source, agents_dst), is_consumer)
-        _write_one(
-            claude_dst,
-            stub_sha,
-            lambda: atomic_write(claude_dst, _CLAUDE_MD_STUB),
-            is_consumer,
-        )
 
     if "workspace" in targets:
         _write_pair(workspace_root, is_consumer=False)
@@ -419,7 +360,7 @@ def _doctor_consumer_pair_lines(
     *,
     emit_stderr: bool = True,
 ) -> list[DoctorLine]:
-    """The SINGLE authority for provenance-aware CONSUMER guardrail-pair doctor lines (FR9).
+    """The SINGLE authority for provenance-aware CONSUMER guardrail doctor lines (FR9).
 
     This is the one classification ``manager.doctor()`` uses for the real ``dadaia public
     doctor`` consumer fan-out — the ``repos/<slug>:`` lines (K3, v0.5.1: the root pair is
@@ -430,11 +371,6 @@ def _doctor_consumer_pair_lines(
     Per registry-detected consumer repo:
       * **AGENTS.md** — absent → ``[missing]``; no canonical banner → ``[foreign]`` (repo-owned,
         NOT a drift); banner-bearing → ``[ok]``/``[drift]`` vs *source*.
-      * **CLAUDE.md** — paired (Ruling 16, CRITICAL): when the AGENTS.md line is ``[foreign]``
-        the CLAUDE.md line is ALSO ``[foreign]`` (whether absent OR a foreign non-stub) — never
-        ``[missing]``/``[drift]`` — so ``public doctor`` (exits 1 on any ``[missing]``/``[drift]``,
-        ``public.py:161-172``) EXITS 0 for a hand-authored consumer repo. Otherwise the stub
-        check applies (``[ok]``/``[drift]``/``[missing]``).
 
     Never ``[skip]`` for a consumer repo — the library checkout included: its
     hand-authored bannerless AGENTS.md classifies ``[foreign]`` like any repo-owned
@@ -469,17 +405,4 @@ def _doctor_consumer_pair_lines(
             a_label,
         )
         lines.append(_emit(agents_line))
-
-        claude_dst = consumer / "CLAUDE.md"
-        c_label = f"repos/{slug}:CLAUDE.md"
-        c_state = _classify_consumer_claude(claude_dst)
-        if agents_line.status is DoctorStatus.FOREIGN or c_state == "symlink":
-            claude_line = DoctorLine(DoctorStatus.FOREIGN, c_label)
-        elif c_state == "absent":
-            claude_line = DoctorLine(DoctorStatus.MISSING, c_label)
-        elif c_state == "foreign":
-            claude_line = DoctorLine(DoctorStatus.DRIFT, c_label)
-        else:
-            claude_line = DoctorLine(DoctorStatus.OK, c_label)
-        lines.append(_emit(claude_line))
     return lines

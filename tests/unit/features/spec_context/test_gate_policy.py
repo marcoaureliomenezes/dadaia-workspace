@@ -187,11 +187,11 @@ def test_evaluate_area_histo_and_live_bugs_allow(
 
 
 # ═════════════════════════════════════════════════════════════════════════════════
-# v0.4.5 FR1 (T-045-04) — LAW is a static, fail-closed floor decided by ORIGIN
-# (workspace root + LAW_HARNESS_DIRS), never by the basename alone. A repo's own
-# domain-scoped AGENTS.md/CLAUDE.md — fresh or existing, referenced by the manifest
-# or not — is never LAW: its parent (repos/<slug>/) never matches a harness dir, and
-# it is never a bare root basename, so the static floor excludes it by construction.
+# v0.4.5 FR1 (T-045-04), collapsed by 0.4.7 FR3 (T-047-55) — LAW is a static,
+# fail-closed floor decided by ORIGIN (the projected AGENTS.md set: the root map and
+# the `.dadaia/**` family), never by the basename alone. A repo's own domain-scoped
+# AGENTS.md — fresh or existing, referenced by the manifest or not — is never LAW: its
+# parent (repos/<slug>/) matches neither shape, so the floor excludes it by construction.
 # Bugs: sdd-gate-blocks-fresh-repo-root-agents-md +
 # repo-agents-md-law-gate-contradicts-template — one shared root cause: the
 # classifier decided by *name*, not by *origin*.
@@ -208,7 +208,6 @@ def test_fresh_repo_agents_md_classifies_mutating_not_law() -> None:
     """
     fresh_slug = "brand-new-repo-never-scaffolded-yet"
     assert classify_path(_in_repo(fresh_slug, "AGENTS.md")) == PathClass.MUTATING
-    assert classify_path(_in_repo(fresh_slug, "CLAUDE.md")) == PathClass.MUTATING
 
 
 def test_fresh_repo_agents_md_write_is_allowed_on_the_executed_path(tmp_path: Path) -> None:
@@ -263,7 +262,7 @@ def test_existing_nonmanifest_repo_agents_md_edit_is_allowed(tmp_path: Path) -> 
 # never a floor path; A1.1/A1.2 above pin it MUTATING.
 _LAW_ASSET_TARGETS: dict[str, tuple[str, ...]] = {
     "data/AGENTS.md": ("AGENTS.md",),
-    "kimi-code/AGENTS.md": (".kimi-code/AGENTS.md",),
+    "data/dadaia-AGENTS.md": (".dadaia/AGENTS.md",),
 }
 
 #: A fixture manifest — mirrors .dadaia/agentic/manifest.json's real shape
@@ -275,7 +274,7 @@ _FIXTURE_MANIFEST: dict[str, object] = {
     "assets": [
         {"path": "agents/software-engineer.md", "sha256": "a" * 64, "type": "agents"},
         {"path": "data/AGENTS.md", "sha256": "b" * 64, "type": "data"},
-        {"path": "kimi-code/AGENTS.md", "sha256": "d" * 64, "type": "kimi-code"},
+        {"path": "data/dadaia-AGENTS.md", "sha256": "d" * 64, "type": "data"},
         {"path": "templates/repo-AGENTS.md", "sha256": "e" * 64, "type": "templates"},
     ],
 }
@@ -286,14 +285,14 @@ def test_manifest_tracked_law_projections_stay_law() -> None:
 
     Enumerates the fixture manifest (never the operator's live file) and pins that
     every LAW-basename asset's installed TARGET still classifies LAW after the fix.
-    The static floor (workspace root + LAW_HARNESS_DIRS) already covers every
+    The static floor (the projected AGENTS.md set) already covers every
     lib-originated law projection this release's manifest ships — the additive
     manifest arm has nothing left to extend today, and nothing regresses.
     """
     law_assets = [
         asset
         for asset in _FIXTURE_MANIFEST["assets"]  # type: ignore[union-attr]
-        if Path(asset["path"]).name in LAW_BASENAMES
+        if Path(asset["path"]).name.endswith("AGENTS.md")
     ]
     assert law_assets, "fixture manifest must carry at least one LAW-basename asset"
     checked_any = False
@@ -326,11 +325,10 @@ def test_manifest_removal_never_demotes_a_statically_floored_law_path(tmp_path: 
 
     floor_paths = (
         "AGENTS.md",
-        "CLAUDE.md",
-        ".codex/AGENTS.md",
-        ".kimi-code/AGENTS.md",
-        ".agents/AGENTS.md",
-        ".claude/rules/AGENTS.md",
+        ".dadaia/AGENTS.md",
+        ".dadaia/handoff/AGENTS.md",
+        ".dadaia/tmp/AGENTS.md",
+        ".dadaia/states/AGENTS.md",
     )
     for floor_path in floor_paths:
         assert classify_path(floor_path) == PathClass.PROTECTED, floor_path
@@ -415,3 +413,48 @@ def test_a_memory_write_is_allowed_in_every_phase(tmp_path: Path, rel_path: str)
         tmp_path, rel_path, **_BOUND_A, target_slug="ctx-a", target_owner="ctx-a"
     )
     assert decision == Decision.ALLOW
+
+
+# ═════════════════════════════════════════════════════════════════════════════════
+# 0.4.7 FR3 (T-047-55) — one authored law basename. The Claude bridge stub and the
+# per-harness DADAIA.md mirrors are deleted, so the PROTECTED law rows collapse to the
+# projected AGENTS.md set. A root CLAUDE.md is operator authorship, not law.
+# ═════════════════════════════════════════════════════════════════════════════════
+
+
+def test_root_claude_md_is_no_longer_a_protected_law_path() -> None:
+    """Intent: CONTRACT — 0.4.7 AC3.1 (T-047-55).
+
+    Nothing projects a root ``CLAUDE.md`` any more; the gate must not hold a path the
+    library never writes. It classifies MUTATING, like any other root file.
+    """
+    assert frozenset({"AGENTS.md"}) == LAW_BASENAMES
+    assert classify_path("CLAUDE.md") == PathClass.MUTATING
+
+
+def test_retired_harness_law_mirrors_are_no_longer_protected() -> None:
+    """Intent: CONTRACT — 0.4.7 AC3.1 (T-047-55).
+
+    The harness-dir law row died with the files it guarded: no ``.codex/DADAIA.md``,
+    no ``.kimi-code/`` tree, no ``.claude/rules/AGENTS.md`` projection.
+    """
+    for retired in (
+        ".codex/AGENTS.md",
+        ".kimi-code/AGENTS.md",
+        ".agents/AGENTS.md",
+        ".claude/rules/AGENTS.md",
+    ):
+        assert classify_path(retired) == PathClass.MUTATING, retired
+
+
+def test_the_projected_agents_md_set_stays_protected() -> None:
+    """Intent: CONTRACT — 0.4.7 FR3 (T-047-55). The root map and every ``.dadaia/**``
+    scoped AGENTS.md the installer projects stay human-only."""
+    for projected in (
+        "AGENTS.md",
+        ".dadaia/AGENTS.md",
+        ".dadaia/handoff/AGENTS.md",
+        ".dadaia/tmp/AGENTS.md",
+        ".dadaia/states/AGENTS.md",
+    ):
+        assert classify_path(projected) == PathClass.PROTECTED, projected

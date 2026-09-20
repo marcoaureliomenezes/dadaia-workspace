@@ -1,9 +1,10 @@
 """AC-3 (v0.1.58 FR2) — ``dadaia init --harness <set>`` scaffolds ONLY the chosen harnesses.
 
 RED-first: before FR2 ``dadaia init`` had no ``--harness`` flag and ALWAYS produced the
-full scaffold (``.claude`` + ``.codex`` + ``.kimi-code``). This suite pins the harness-aware
-behaviour — each L1 harness gets its projection ONLY when named in the set, the default
-(omitted) stays all-four (back-compat), and a bad value is a width-independent Click
+full scaffold (``.claude`` + ``.codex``). This suite pins the harness-aware
+behaviour — each L1 harness that OWNS a workspace directory
+(``core.harness_registry.HARNESS_PROJECTION_DIRS``) gets its projection ONLY when named
+in the set, the default (omitted) stays the full roster, and a bad value is a Click
 ``BadParameter`` (exit 2, message on stderr, empty stdout). The AC-9(b) mutation-sanity
 sabotage (init ignores the harness set ⇒ always all-four) makes the claude-only case below
 FAIL — that is the discriminating proof the scaffold is genuinely harness-gated.
@@ -39,14 +40,14 @@ def _ctx_inject_commands(claude_dir: Path) -> list[str]:
     ("name", "harness_set", "expect_present", "expect_absent"),
     [
         # AC-9(b) sabotage detector: --harness claude → .claude/ + ctx-inject hook, and
-        # NO .codex/ / .kimi-code/.
-        ("claude_only", "claude", ("claude",), ("codex", "kimi-code")),
-        # --harness codex,kimi-code → .codex/ (+ .dadaia/hooks/codex-*) + .kimi-code/,
-        # NO .claude/ agents.
-        ("codex_and_kimi", "codex,kimi-code", ("codex", "kimi-code"), ("claude",)),
-        # v0.2.8: --harness kimi-code → .kimi-code/ (+ user-level shim/block wiring
-        # redirected by the conftest KIMI_CODE_HOME guard), NO .claude/ / .codex/.
-        ("kimi_only", "kimi-code", ("kimi-code",), ("claude", "codex")),
+        # NO .codex/.
+        ("claude_only", "claude", ("claude",), ("codex",)),
+        # --harness codex,kimi-code → .codex/ (+ .dadaia/hooks/codex-*), NO .claude/
+        # agents. kimi-code owns no workspace directory (0.4.7 FR3) — it reads the
+        # shared .agents/ tree natively and wires its hooks at the user level.
+        ("codex_and_kimi", "codex,kimi-code", ("codex",), ("claude", "kimi-code")),
+        # --harness kimi-code → nothing of its own; .claude/ and .codex/ stay absent.
+        ("kimi_only", "kimi-code", (), ("claude", "codex", "kimi-code")),
     ],
 )
 def test_harness_scopes_scaffold(
@@ -74,13 +75,14 @@ def test_harness_scopes_scaffold(
         assert codex_wrappers, "expected .dadaia/hooks/codex-* wrappers for a codex profile"
 
 
-def test_harness_omitted_scaffolds_all_four(
+def test_harness_omitted_scaffolds_the_full_roster(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """``--harness`` omitted → full-harness scaffold (back-compat with pre-v0.1.58 init).
 
-    The roster grew (kimi-code, v0.2.8); the back-compat contract is "the full
-    L1_ENTRY_HARNESSES set", so the new ``.kimi-code/`` projection is asserted too.
+    The back-compat contract is "the full ``L1_ENTRY_HARNESSES`` set"; ``kimi-code``
+    projects no workspace directory of its own (0.4.7 FR3), so the scaffold is exactly
+    the two dirs ``HARNESS_PROJECTION_DIRS`` names.
     """
     monkeypatch.chdir(tmp_path)
     result = _runner.invoke(app, ["init", "--workspace", str(tmp_path)])
@@ -88,7 +90,7 @@ def test_harness_omitted_scaffolds_all_four(
 
     assert (tmp_path / ".claude").is_dir()
     assert (tmp_path / ".codex").is_dir()
-    assert (tmp_path / ".kimi-code").is_dir()
+    assert not (tmp_path / ".kimi-code").exists()
 
 
 def test_harness_bad_value_is_bad_parameter(

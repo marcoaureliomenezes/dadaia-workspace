@@ -62,15 +62,12 @@ _PROTECTED_MESSAGE = (
     "(SEC-01 / CWE-284).\n"
     f"fix: {DADAIA_BIN} context bind <ctx>"
 )
-#: Projected LAW files. the root `AGENTS.md` map is the workspace system prompt and the sole
-#: always-on rule file the library ships; the ``AGENTS.md``/``CLAUDE.md`` pair is its
-#: scoped/bridge counterpart. In an INSTANTIATED workspace these are human-only: an agent
+#: Projected LAW files. The root ``AGENTS.md`` map is the workspace system prompt and
+#: the sole always-on rule file the library ships; the ``.dadaia/**`` family is its
+#: scoped counterpart. In an INSTANTIATED workspace these are human-only: an agent
 #: changes the law by editing ``dadaia_workspace/public/`` and re-projecting, never by
-#: writing the projection. Matched as exact relative paths (workspace root, harness dirs,
-#: and each ``repos/<slug>/`` root) so library sources and test fixtures — which live
-#: deeper — are never caught.
+#: writing the projection.
 _LAW_BASENAMES: frozenset[str] = workspace_layout.LAW_BASENAMES
-_LAW_HARNESS_DIRS: frozenset[str] = workspace_layout.LAW_HARNESS_DIRS
 _LAW_MESSAGE = (
     "[GATE] '{path}' is a projected law file (the workspace system prompt / scoped "
     "AGENTS.md). In an instantiated workspace only a human operator edits it by hand; "
@@ -133,16 +130,16 @@ def _is_law_path(rel_path: str) -> bool:
     PROTECTED path (0.4.7 FR1 folded the LAW class into PROTECTED; the two share one
     verdict and differ only in the message that names the way out).
 
-    Static, ORIGIN-only floor (v0.4.5 FR1): the workspace root or a fixed harness dir
-    (``_LAW_HARNESS_DIRS``). ``repos/<slug>/`` never matches either shape, so a repo's
-    own AGENTS.md/CLAUDE.md is never LAW (closes sdd-gate-blocks-fresh-repo-root-agents-md
-    + repo-agents-md-law-gate-contradicts-template) — never reads the manifest (CWE-284).
+    Static, ORIGIN-only floor (v0.4.5 FR1, since collapsed): the projected
+    ``AGENTS.md`` set — the root map and the ``.dadaia/**`` family. ``repos/<slug>/``
+    never matches either shape, so a repo's own AGENTS.md is never LAW (closes
+    sdd-gate-blocks-fresh-repo-root-agents-md + repo-agents-md-law-gate-contradicts-
+    template) — and the floor never reads the manifest (CWE-284).
     """
     parts = rel_path.split("/")
-    if len(parts) == 1:
-        return parts[0] in _LAW_BASENAMES
-    parent = "/".join(parts[:-1])
-    return parent in _LAW_HARNESS_DIRS and parts[-1] in _LAW_BASENAMES
+    if parts[-1] not in _LAW_BASENAMES:
+        return False
+    return len(parts) == 1 or parts[0] == ".dadaia"
 
 
 def classify_path(rel_path: str) -> PathClass:

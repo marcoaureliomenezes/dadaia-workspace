@@ -45,7 +45,7 @@ def _run(tmp_path: Path, payload: dict[str, Any]) -> tuple[str, dict[str, Any] |
 def test_block_message_lists_every_whitelisted_entry(tmp_path: Path) -> None:
     """The block reason is DERIVED from the policy — it can never lag the whitelist.
 
-    Consumer-gate bug class (v0.2.8): the message literal omitted `.kimi-code/` while the
+    Consumer-gate bug class (v0.2.8): the message literal omitted a whitelisted dir while the
     policy already allowed it. Assert the reason names EVERY whitelisted basename and the
     one exceptions file the policy reads.
     """
@@ -116,25 +116,6 @@ def test_block_table(
     [
         ("non_write_tool", None, lambda ws: "x", "Read", "path"),
         ("whitelisted_root_entry", None, lambda ws: ws / "AGENTS.md", "Write", "file_path"),
-        (
-            # `.kimi-code` is a whitelisted root entry (Kimi harness home). A write whose
-            # immediate parent is the workspace root and whose basename is `.kimi-code`
-            # must be ALLOWED.
-            "kimi_root_entry",
-            None,
-            lambda ws: ws / ".kimi-code",
-            "Write",
-            "file_path",
-        ),
-        (
-            # `.kimi-code` is a whitelisted root entry (Kimi Code Layer-1 harness home,
-            # v0.2.8) — a root-level write of that basename must be ALLOWED.
-            "kimi_code_root_entry",
-            None,
-            lambda ws: ws / ".kimi-code",
-            "Write",
-            "file_path",
-        ),
         ("subdir_write", None, lambda ws: ws / "repos" / "x" / "file.py", "Write", "file_path"),
         ("unparseable_path_fails_open", None, None, "Write", None),
         (
