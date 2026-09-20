@@ -1,8 +1,8 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.7",
-  "phase": "CLOSURE",
-  "rc": 5,
+  "phase": "DEFINITION",
+  "rc": 6,
   "defined": {
     "sha": "7cf1538f",
     "ts": "2026-09-20T20:43:25Z"
@@ -421,6 +421,12 @@
       "agent": "dd-project-manager",
       "kind": "reviews",
       "text": "dd-code-review three axes + six lenses over 37c6c6ac..e77ac0f5: APPROVED (0 CRITICAL/HIGH; MEDIUM F1 one-home check untracked, F2 audit ids not listed, F3 test-count baseline mismeasured, F4 _orphan_claude_bridge migration branch in the doctor walk, F8 security-review red on D1; LOW F5 dead link_render callable, F6 _clear without provenance check, F7 registry rendering widened to every public .md; INFO F9 Codex/Kimi AC2.2 legs deferred, F10 restart sessions after upgrade). Folded at closure: F1 (one-home invariant now in tests/contract/test_context_map.py), F2 (ids in this log), F3 (baseline restated). Accepted with a home: F4 dies in candidate 8 with the init/lazy-harness rework (delete the migration branch once no instance predates 0.4.7 c6); F5/F6/F7 are candidate-7 engineer hygiene on the projection module; F10 goes into the deploy notes."
+    },
+    {
+      "ts": "2026-09-20T22:45:41Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate 6 archived to rc-6/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
     }
   ]
 }
