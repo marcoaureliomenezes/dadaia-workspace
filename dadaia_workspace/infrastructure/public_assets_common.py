@@ -89,6 +89,12 @@ def iter_public_files(root: Path) -> Iterable[Path]:
     )
 
 
+def read_link_target(path: Path) -> str:
+    """A symlink's target in its canonical POSIX spelling on every OS — the one reading the
+    ledger digest, the doctor compare and the install skip agree on."""
+    return os.readlink(path).replace(os.sep, "/")
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -106,7 +112,7 @@ def _entry_digest(path: Path) -> str | None:
     digest — its files are ledgered individually.
     """
     if path.is_symlink():
-        return hashlib.sha256(os.readlink(path).encode("utf-8")).hexdigest()
+        return hashlib.sha256(read_link_target(path).encode("utf-8")).hexdigest()
     if path.is_file():
         return _sha256(path)
     return None

@@ -42,6 +42,7 @@ from typing import Literal
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
+from dadaia_workspace.infrastructure.public_assets_common import read_link_target
 
 #: Which fixed-point discipline a rule's ``render`` observes (documentation only —
 #: install/doctor run one algorithm regardless; see the module docstring).
@@ -176,7 +177,7 @@ def _clear(dst: Path) -> None:
 def _install_link(rule: ProjectionRule, *, force: bool) -> list[TranscriptLine]:
     assert rule.link_to is not None
     target = _link_target(rule)
-    if not force and rule.dst.is_symlink() and os.readlink(rule.dst).replace(os.sep, "/") == target:
+    if not force and rule.dst.is_symlink() and read_link_target(rule.dst) == target:
         return [TranscriptLine("skip", rule.dst, "symlink")]
     rule.dst.parent.mkdir(parents=True, exist_ok=True)
     _clear(rule.dst)
@@ -203,7 +204,7 @@ def link_entry_defect(entry: Path, canonical: Path) -> str | None:
     """
     expected = _posix_relpath(canonical, entry.parent)
     if entry.is_symlink():
-        actual = os.readlink(entry).replace(os.sep, "/")
+        actual = read_link_target(entry)
         if actual != expected:
             return f"symlink target {actual!r} is not the canonical {expected!r}"
         if not canonical.exists():

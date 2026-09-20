@@ -26,6 +26,7 @@ import yaml
 
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from dadaia_workspace.infrastructure.public_assets_common import read_link_target
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from dadaia_workspace.infrastructure.runtime_config import claude_settings
 
@@ -230,7 +231,7 @@ def test_claude_entries_are_symlinks_onto_the_authored_agents_set(projected: Pat
     assert entries, "the claude projection installed nothing"
     for entry in entries:
         assert entry.is_symlink(), f"{entry.name}: not a symlink onto .agents/"
-        target = os.readlink(entry)
+        target = read_link_target(entry)
         assert not os.path.isabs(target), f"{entry.name}: absolute link target {target!r}"
         resolved = entry.resolve()
         assert resolved.parent.parent == projected / ".agents", (

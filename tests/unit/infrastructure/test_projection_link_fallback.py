@@ -15,7 +15,7 @@ import pytest
 
 from dadaia_workspace.core.models.install_ledger import InstallLedger, LedgerEntry
 from dadaia_workspace.infrastructure.projection import ProjectionRule, install_rules, link_render
-from dadaia_workspace.infrastructure.public_assets_common import _entry_digest
+from dadaia_workspace.infrastructure.public_assets_common import _entry_digest, read_link_target
 
 pytestmark = pytest.mark.unit
 
@@ -45,7 +45,7 @@ def test_symlink_path_writes_one_relative_link_recorded_as_symlink(tmp_path: Pat
     transcript = install_rules([rule], force=False)
 
     assert [(line.path, line.kind) for line in transcript.lines] == [(rule.dst, "symlink")]
-    assert os.readlink(rule.dst) == "../../.agents/skills/dd-example"
+    assert read_link_target(rule.dst) == "../../.agents/skills/dd-example"
     assert (rule.dst / "SKILL.md").read_text(encoding="utf-8").startswith("---")
 
 
