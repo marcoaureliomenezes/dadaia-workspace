@@ -68,7 +68,7 @@
       "title": "Collapse the four-dir projection to AGENTS.md + .agents/skills read natively",
       "opened": "2026-09-12",
       "status": "candidate",
-      "description": "Deferred (grill Q16 item 3, audit A-004): author AGENTS.md (root + scoped) and .agents/skills once; CLAUDE.md = @AGENTS.md; Codex and Kimi read them natively; only hook wiring stays per harness; public install --target all and most projection-drift doctor classes retired. Constraint: Codex 32 KiB combined AGENTS.md cap.",
+      "description": "Grill 2026-09-20 (ADR 0017/0020) supersedes the 09-12 deferral text: the authored set is root AGENTS.md (map) + scoped AGENTS.md + .agents/skills/dd-* + .agents/agents/dd-*.md, read natively by Codex and Kimi and by Claude Code >= 2.1.277 (AGENTS.md) plus per-entry symlinks (.claude/skills/<name>, .claude/agents/<name>.md; copy by hash when os.symlink fails). No CLAUDE.md, no DADAIA.md, no .kimi-code/, no law mirrors, no PROTECTED law rows. Only hook wiring and the Codex TOML transcode stay per harness. Verified by headless probes 2026-09-20 (root, nested-on-Read, per-skill and per-agent symlinks all load).",
       "provenance": "operator-ratified deferral 2026-09-12 grill Q16 — standards replacement, own grill before pick — promoted to candidate 2026-09-14 (operator order: ideas are official backlog)",
       "intents": [
         {
@@ -76,87 +76,21 @@
             "kind": "cli",
             "ref": "public install"
           },
-          "change": "change — --target all retired; one authored set (root + scoped AGENTS.md, .agents/skills) read natively by Claude, Codex and Kimi; .claude/skills links to .agents/skills; only hook wiring stays per harness"
+          "change": "change — --target all retired; one authored set (root + scoped AGENTS.md, .agents/skills, .agents/agents) read natively; .claude/ entries are per-entry symlinks with copy fallback; only hook wiring and the Codex TOML transcode stay per harness"
         },
         {
           "subject": {
             "kind": "code",
             "ref": "dadaia_workspace/core/harness_registry.py#PROJECTION_TARGETS"
           },
-          "change": "retire — no per-harness projection loop; the .codex/ and .kimi-code/ DADAIA.md mirrors and their PROTECTED rows are deleted, DADAIA.md lives once at the root (Codex 32 KiB AGENTS.md cap forbids folding it in)"
+          "change": "retire — no per-harness projection loop; .kimi-code/ and the DADAIA.md mirrors and their PROTECTED rows are deleted; the law lives once as the root AGENTS.md map"
         },
         {
           "subject": {
             "kind": "doc",
             "ref": "memory/product/distribution/public-asset-distribution.md#Doctor"
           },
-          "change": "change — public doctor keeps public-privacy, entities-derivation, rule-corpus and trust-boundary; the per-harness byte-drift classes die with every collapsed file"
-        }
-      ]
-    },
-    {
-      "id": "plugin-packaging-and-skill-evals",
-      "title": "Ship the AI surface as one plugin with validate/eval in CI",
-      "opened": "2026-09-12",
-      "status": "candidate",
-      "description": "Deferred (grill Q16 item 4, audit A-005): one Claude plugin (skills + agents + hooks); CI runs claude plugin validate/eval on a small prompt set and skills-ref validate on every dd-* skill — the first behavioral measurement of whether a skill changes agent behavior.",
-      "provenance": "operator-ratified deferral 2026-09-12 grill Q16 — standards replacement, own grill before pick — promoted to candidate 2026-09-14 (operator order: ideas are official backlog)",
-      "intents": [
-        {
-          "subject": {
-            "kind": "doc",
-            "ref": "dadaia_workspace/public/.claude-plugin/plugin.json",
-            "surface": "new"
-          },
-          "change": "new — one Claude plugin (skills + agents + hooks shim walking up to .dadaia/.venv) built from the same public/ sources by one dadaia public plugin-build verb; a second distribution beside the wheel, not the instance projection"
-        },
-        {
-          "subject": {
-            "kind": "doc",
-            "ref": "memory/product/agents/agentic-entities.md#The behavior map"
-          },
-          "change": "change — the hash tuple extends to the whole skill folder; CI runs claude plugin validate/eval (key as a repo secret, only on public/skills|agents diffs) and skills-ref validate on every dd-* skill"
-        }
-      ]
-    },
-    {
-      "id": "per-task-spec-verifier",
-      "title": "Per-task verification against the SPEC before the next reservation",
-      "opened": "2026-09-12",
-      "status": "candidate",
-      "description": "Deferred (grill Q16 item 5, audit I-003): after each [x], a fresh read-only subagent checks the diff against the task's SPEC lines using the existing dd-code-review Spec axis, writes a graded finding, fix rounds capped; no new skill.",
-      "provenance": "operator-ratified deferral 2026-09-12 grill Q16 — standards replacement, own grill before pick — promoted to candidate 2026-09-14 (operator order: ideas are official backlog)",
-      "intents": [
-        {
-          "subject": {
-            "kind": "doc",
-            "ref": "memory/product/agents/agent-orchestration.md#Behavior"
-          },
-          "change": "change — after each [x] the PM dispatches code-reviewer on Axis 2 (Spec) only, read-only, against the task's SPEC lines; REJECTED blocks the next reservation, capped at 2 fix rounds; RC-FLOW's 'Per task' row and the §6.3 marker rule get one home"
-        }
-      ]
-    },
-    {
-      "id": "event-driven-audit",
-      "title": "Three-pillar audit triggered by the release event",
-      "opened": "2026-09-12",
-      "status": "candidate",
-      "description": "Deferred (grill Q16 item 6, audit I-004): a routine or gh-aw workflow on release.published runs the three pillars and opens the remediation SPEC as a draft PR; 'suggested every 5 releases' never fires today.",
-      "provenance": "operator-ratified deferral 2026-09-12 grill Q16 — standards replacement, own grill before pick — promoted to candidate 2026-09-14 (operator order: ideas are official backlog)",
-      "intents": [
-        {
-          "subject": {
-            "kind": "doc",
-            "ref": "memory/product/sdd/audits-canon.md#Lifecycle"
-          },
-          "change": "change — the three-pillar audit fires on workflow_run Release completed (the 'suggested every 5 releases' line is deleted); the job commits AUDIT.md + FINDINGS.jsonl on feature/{next} and opens a PR; the remediation SPEC stays a grill + release new act"
-        },
-        {
-          "subject": {
-            "kind": "doc",
-            "ref": "memory/product/distribution/pypi-distribution.md#Pipeline"
-          },
-          "change": "change — Release completion is the audit trigger; no GitHub Release object is created for it"
+          "change": "change — public doctor keeps public-privacy, entities-derivation, rule-corpus and trust-boundary; the per-harness byte-drift classes die with every collapsed file; a symlink-target check replaces them for .claude/"
         }
       ]
     },
@@ -442,6 +376,204 @@
             "ref": "product-vision"
           },
           "change": "change — the founding paradigm (one workspace folder, projects in repos inside, governance outside, multi-project x multi-repo, never monorepo) becomes the first statement of the product vision atom"
+        }
+      ]
+    },
+    {
+      "id": "universal-context-core",
+      "title": "Universal context core: root AGENTS.md map <= 8 KB, scoped AGENTS.md as system of record, CONTEXT-MAP with byte ratchets, no CLAUDE.md, no DADAIA.md",
+      "opened": "2026-09-20",
+      "status": "candidate",
+      "description": "The always-on law (DADAIA.md 27.7 KB) is an encyclopedia while the 12 scoped AGENTS.md (24.6 KB) are orphans no skill opens: the inverse of the harness-engineering balance (root = ~100-line map, docs = system of record, rules enforced by linters). Verified 2026-09-20: Claude Code 2.1.277+ reads root AGENTS.md natively (no CLAUDE.md on the path) and attaches a nested AGENTS.md on Read; Codex and Kimi load the root->cwd chain. Deliver: root AGENTS.md rewritten as a map (flow, three roles, gate invariants, where things live, index of every scoped AGENTS.md and dd- skill; <= 8 KB); every DADAIA.md section migrated to the scoped file that governs it (§6 -> specs/*/AGENTS.md, §8 -> .dadaia/AGENTS.md, §4 -> dd-gitflow-default) or deleted as slop; every dd- skill opens its area's scoped AGENTS.md as step 1 and a contract test proves each scoped file is cited by the map or a skill; public/data/CONTEXT-MAP.md (surface, purpose, what belongs, byte ceiling, measured size, per-harness load trigger, the 10-harness compatibility table) plus a ratchet test pinning root <= 8 KB, scoped <= 4 KB, SKILL.md <= 6 KB; CLAUDE.md and DADAIA.md deleted from the scaffold; the law states that sessions launch at the workspace root and init prints the claude-md-and-agents-md user-setting recommendation. No harness version floor.",
+      "provenance": "operator grill ruling 2026-09-20 (dd-grill-me rounds 1..3 over the 17 entries; ADRs 0016..0021) — ADR 0017",
+      "intents": [
+        {
+          "subject": {
+            "kind": "code",
+            "ref": "dadaia_workspace/core/workspace_layout.py#LAW_BASENAMES"
+          },
+          "change": "change — the law is one basename, AGENTS.md; DADAIA.md and CLAUDE.md leave the set and every mirror/PROTECTED row"
+        },
+        {
+          "subject": {
+            "kind": "code",
+            "ref": "dadaia_workspace/infrastructure/projection_rules.py#_law_projection_rules"
+          },
+          "change": "retire — no law projection: the root AGENTS.md map is authored once in public/data and installed once; scoped AGENTS.md via the scaffold"
+        },
+        {
+          "subject": {
+            "kind": "doc",
+            "ref": "dadaia_workspace/public/data/CONTEXT-MAP.md",
+            "surface": "new"
+          },
+          "change": "new — the auditable context balance: one row per surface with ceiling, measured bytes and per-harness load trigger; pinned by a ratchet test"
+        },
+        {
+          "subject": {
+            "kind": "catalog",
+            "ref": "harness-claude-code"
+          },
+          "change": "change — Claude Code reads the root AGENTS.md natively (>= 2.1.277, no CLAUDE.md on the path) and attaches scoped AGENTS.md on Read; .claude/skills and .claude/agents entries are per-entry symlinks to .agents/*"
+        }
+      ]
+    },
+    {
+      "id": "three-flows-release-model",
+      "title": "Three flows into a release: operator demand, bug composition, backlog; SPEC carries its origin; one candidate defined at a time; memory at every closure; _ideas retired",
+      "opened": "2026-09-20",
+      "status": "candidate",
+      "description": "Today a feature enters only through the backlog (§1.1/§6.6) and a bug never touches a release (§1.1), so onboarding pays the backlog ceremony and bugs that need research have no home. Deliver: (1) Flow 1 operator demand -> SPEC directly, the SPEC carrying **Origin:** operator-demand | backlog:<slug>[,..] | bugs:<id>[,..], required by the doctor; (2) Flow 2 a candidate composed of open bugs the operator picks, memory surgical or none — a single bug is still fixed immediately outside release material; (3) Flow 3 backlog items, research grade, heaviest memory pass. Exactly one candidate trio at the release root; the next is born only after rc-archive; each candidate closes with a push and the dd-code-review pass; memory updates at every candidate closure, never deferred to promote. The PM writes SPEC and memory, the software-engineer writes PLAN and TASKS. specs/releases/_ideas/ is redundant with the backlog and leaves the canon (canon.py, release_tree.py, workspace_layout.py, verdict.py, behavior-map, shipped-hashes, dd-release-definition, 5 tests).",
+      "provenance": "operator grill ruling 2026-09-20 (dd-grill-me rounds 1..3 over the 17 entries; ADRs 0016..0021) — ADR 0019",
+      "intents": [
+        {
+          "subject": {
+            "kind": "code",
+            "ref": "dadaia_workspace/features/specs/canon.py#CANON"
+          },
+          "change": "change — releases/_ideas/ leaves the canon (lib canon, doctor, behavior map, shipped hashes, tests)"
+        },
+        {
+          "subject": {
+            "kind": "doc",
+            "ref": "memory/product/sdd/sdd-bug-backlog-governance.md#Backlog"
+          },
+          "change": "change — the backlog is one of three origins: a candidate SPEC carries Origin operator-demand | backlog:<slug> | bugs:<id>; one candidate trio at a time; memory at every closure; PM writes SPEC+memory, engineer writes PLAN+TASKS"
+        },
+        {
+          "subject": {
+            "kind": "doc",
+            "ref": "memory/product/sdd/sdd-bug-backlog-governance.md#Bugs"
+          },
+          "change": "change — a single bug is fixed at once outside release material; a candidate may additionally be composed of open bugs the operator picks"
+        }
+      ]
+    },
+    {
+      "id": "harness-lazy-and-extension",
+      "title": "Lazy multi-harness: init --harness <one> required, harness add <name> replaces public install --target, all retired; then Cursor, Devin CLI and GitHub Copilot join the registry",
+      "opened": "2026-09-20",
+      "status": "candidate",
+      "description": "init --harness {all|claude|codex|kimi-code} exists with default all, so every workspace gets three harness dirs nobody asked for. Deliver: --harness <name> required on init; dadaia harness add <name> as the renamed public install --target <name> (one verb in, one out); all retired; PROJECTION_TARGETS becomes a lookup by name; the registry record is three fields (directory, agent transcode, hooks); .agents/skills and .agents/agents always projected; per-entry symlinks for Claude with copy fallback (os.symlink refused on Windows without Developer Mode). After the demolition and the universal core land, the registry gains cursor, devin and copilot — all three read root AGENTS.md and .agents/skills natively (Devin also .agents/agents); their records carry only directory, agent transcode and the hook derivation. Sub-agents stay three, maintained from the one .agents/agents source.",
+      "provenance": "operator grill ruling 2026-09-20 (dd-grill-me rounds 1..3 over the 17 entries; ADRs 0016..0021) — ADR 0020, amends ADR 0015",
+      "intents": [
+        {
+          "subject": {
+            "kind": "code",
+            "ref": "dadaia_workspace/cli/commands/init.py#init"
+          },
+          "change": "change — --harness <name> required, all removed; prints the next step and the claude-md-and-agents-md user-setting recommendation"
+        },
+        {
+          "subject": {
+            "kind": "code",
+            "ref": "dadaia_workspace/cli/commands/public.py#install"
+          },
+          "change": "change — public install --target <name> is renamed dadaia harness add <name>; stage runs inside it"
+        },
+        {
+          "subject": {
+            "kind": "code",
+            "ref": "dadaia_workspace/core/harness_registry.py#L1_ENTRY_HARNESSES"
+          },
+          "change": "change — registry record = directory, agent transcode, hooks; cursor, devin, copilot added after candidates 5..8"
+        }
+      ]
+    },
+    {
+      "id": "hooks-multi-harness-study",
+      "title": "Hook derivation study: every hook is the per-harness implementation of a deterministic behavior the workspace defines; design the derivation for Claude, Codex, Kimi, Cursor, Devin, Copilot",
+      "opened": "2026-09-20",
+      "status": "idea",
+      "description": "Doctrine (operator, 2026-09-20): a hook never exists on its own; the rule is the abstract entity — a deterministic behavior the workspace enforces (root whitelist, venv guard, SDD gate, session-start reaper, context injection) — and each harness gets that rule's implementation in its own hook format (Claude settings.json, Codex hooks.json, Kimi [[hooks]] in user config.toml, Cursor hooks.json, Devin hooks.v1.json, Copilot .github/hooks/*.json). Study: one rule registry -> one renderer per harness; which harnesses fire hooks headless (Codex does not); which support project-level hooks (Kimi and ZCode: user-level only); the Claude-hooks bridge DeepSeek dsh ships. Not this cycle.",
+      "provenance": "operator grill ruling 2026-09-20 (dd-grill-me rounds 1..3 over the 17 entries; ADRs 0016..0021) — Q31, deferred by the operator until the roster extends",
+      "intents": [
+        {
+          "subject": {
+            "kind": "code",
+            "ref": "dadaia_workspace/hooks/pre_gate.py#main"
+          },
+          "change": "change — hooks rendered per harness from one rule registry; a hook with no deterministic rule behind it is slop"
+        }
+      ]
+    },
+    {
+      "id": "cli-stale-verbs",
+      "title": "CLI verbs cited by no skill, agent or law die or become skill scripts",
+      "opened": "2026-09-20",
+      "status": "candidate",
+      "description": "Audit 2026-09-20 of the 55 verbs in dadaia help tree against public/skills, public/agents and public/data: 22 are cited by nothing. Die in the demolition: context heartbeat, context release (presence), repos list with openpyxl and repos.xlsx, public list, reports doctor (server *, ci pre-commit-check and ci verdict-check die with their own entries). Become skill scripts in the scripts candidate: bugs defer, bugs reject, bugs supersede, memory catalog generate, memory product add. Stay as internals cited by dd-cli-library: specs init, specs upgrade, context create, baseline, update, repo, delete. Rule from ADR 0018: the CLI is audited at every candidate and a new verb enters only when an old one leaves.",
+      "provenance": "operator grill ruling 2026-09-20 (dd-grill-me rounds 1..3 over the 17 entries; ADRs 0016..0021) — Q32, ADR 0016/0018",
+      "intents": [
+        {
+          "subject": {
+            "kind": "cli",
+            "ref": "context heartbeat"
+          },
+          "change": "retire — presence is deleted; nothing renews"
+        },
+        {
+          "subject": {
+            "kind": "cli",
+            "ref": "context release"
+          },
+          "change": "retire — presence is deleted"
+        },
+        {
+          "subject": {
+            "kind": "cli",
+            "ref": "repos list"
+          },
+          "change": "retire — with the openpyxl dependency and public/data/repos.xlsx"
+        },
+        {
+          "subject": {
+            "kind": "cli",
+            "ref": "public list"
+          },
+          "change": "retire — uncited; public doctor reports the asset set"
+        },
+        {
+          "subject": {
+            "kind": "cli",
+            "ref": "reports doctor"
+          },
+          "change": "retire — uncited; reports validate stays"
+        },
+        {
+          "subject": {
+            "kind": "cli",
+            "ref": "memory catalog generate"
+          },
+          "change": "change — becomes a script under dd-spec-navigator/scripts/ (touches only specs/)"
+        },
+        {
+          "subject": {
+            "kind": "cli",
+            "ref": "memory product add"
+          },
+          "change": "change — becomes a script under dd-spec-navigator/scripts/ (touches only specs/)"
+        },
+        {
+          "subject": {
+            "kind": "cli",
+            "ref": "bugs defer"
+          },
+          "change": "change — becomes a subcommand of the dd-bug-resolution script"
+        },
+        {
+          "subject": {
+            "kind": "cli",
+            "ref": "bugs reject"
+          },
+          "change": "change — becomes a subcommand of the dd-bug-resolution script"
+        },
+        {
+          "subject": {
+            "kind": "cli",
+            "ref": "bugs supersede"
+          },
+          "change": "change — becomes a subcommand of the dd-bug-resolution script"
         }
       ]
     }
