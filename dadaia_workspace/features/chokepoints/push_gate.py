@@ -5,9 +5,7 @@ specs-canon closure; split out of ``service.py`` at v0.5.1 K7).
 policy (:mod:`~dadaia_workspace.features.chokepoints.branch_policy`) first, then the
 specs/ canon scan, then the range-scoped denylist scan
 (:mod:`~dadaia_workspace.features.chokepoints.denylist_scan`) — first refusal wins.
-The former FR-W1-02/DP-5 security-verdict-per-pushed-sha check is DELETED from this
-path (v0.4.4 A3.4) — it relocates to a PR gate (``dadaia ci verdict-check``, built over
-:mod:`~dadaia_workspace.features.chokepoints.verdict`).
+Security review is the ``security-review`` PR check (0.4.7 c5 FR5), never a step here.
 
 This module is business logic: it imports ``core`` only, and NEVER imports
 ``infrastructure`` and NEVER spawns a subprocess. The canon predicates

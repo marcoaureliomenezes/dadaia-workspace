@@ -15,9 +15,8 @@ sits first in ``resolve_session_id``'s order).
 
 GC (release 0.5.1 K2): this hook no longer reaps anything itself. On its own throttle
 cadence (never on every single tool call) it calls the ONE workspace reaper,
-:func:`doctor.reap` (0.4.7 FR6b) —
-for presence records,
-throttle/sentinel markers and now-empty presence context dirs. Session-record graveyard
+:func:`doctor.reap` (0.4.7 FR6b) — for throttle/sentinel markers, slop and expired TTL
+entries. Session-record graveyard
 GC stays exclusively owned by ``DoctorService.fix()`` — this hook used to duplicate it at
 a different TTL multiplier via its own ``sid`` guard, which is exactly how it could reap
 a session's own bind record (bug family ``doctor-ptr-gc-deletes-valid-lock-free-bind`` /

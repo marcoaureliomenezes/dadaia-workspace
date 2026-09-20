@@ -31,8 +31,8 @@ SESSION_GC_TTL_SECONDS: int = 300
 #: Throttle window (seconds) for the advisory working-tree reconciler (FR-W1-03). A second
 #: PostToolUse invocation inside this window emits nothing and spawns no git child — checked
 #: BEFORE any subprocess is spawned. Consumed by ``hooks/sdd_post_gate.py`` (TG-5) and, on
-#: the same cadence, gates the ONE GC reaper's call (release 0.5.1 K2:
-#: ``features.spec_context.presence.gc``).
+#: the same cadence, gates the ONE GC reaper's call (0.4.7 FR6b:
+#: ``features.spec_context.doctor.reap``).
 RECONCILER_THROTTLE_TTL_SECONDS: int = 30
 
 #: The one spelling of the workspace CLI every ``fix:`` line names — the venv-rooted

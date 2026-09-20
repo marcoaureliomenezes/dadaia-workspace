@@ -342,7 +342,7 @@ def main() -> int:
 
     # Sentinel — path BYTE-IDENTICAL to the shell sentinel: .dadaia/tmp/ctx-inject-fired-<id>.
     # Its content records the last injected slug so a re-bind is detectable. Sentinel
-    # GC (release 0.5.1 K2) is owned by presence.gc(), never inject-time.
+    # GC (0.4.7 FR6b) is owned by doctor.reap(), never inject-time.
     tmp_dir = workspace / ".dadaia" / "tmp"
     sentinel = tmp_dir / f"{_SENTINEL_PREFIX}{session_id}"
     sentinel_mtime, recorded_slug = _read_sentinel(sentinel)
