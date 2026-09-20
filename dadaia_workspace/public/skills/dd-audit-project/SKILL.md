@@ -13,8 +13,9 @@ description: >
 
 ## 1. The window — computed once per audit
 
-1. Window mechanics: `dd-bug-resolution`'s `LINEAGE.md` §The window, cited never restated.
-2. Record the resulting `[from-sha, HEAD]` in `AUDIT.md`'s scope.
+1. Open `specs/audits/AGENTS.md` (the area's scoped law) and follow it.
+2. Window mechanics: `dd-bug-resolution`'s `LINEAGE.md` §The window, cited never restated.
+3. Record the resulting `[from-sha, HEAD]` in `AUDIT.md`'s scope.
 
 ## 2. The three pillars — run together, never fewer
 

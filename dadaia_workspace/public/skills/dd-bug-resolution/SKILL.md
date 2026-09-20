@@ -14,10 +14,11 @@ description: >
 
 ## 1. Lifecycle frame
 
-- A bug fix rides the live `feature/{M.m.p}` branch in any phase: no separate branch, no SPEC/PLAN/TASKS, no version mint.
-- Two fixers resolve by whichever `dadaia bugs resolve` lands first; a losing write
-  fails non-zero — re-read and retry.
-- The redaction rule of `specs/bugs/AGENTS.md` applies to the whole arc: commands, outputs, captured artifacts.
+1. Open `specs/bugs/AGENTS.md` (the area's scoped law) and follow it — its redaction rule
+   covers the whole arc: commands, outputs, captured artifacts.
+2. A bug fix rides the live `feature/{M.m.p}` branch in any phase: no separate branch, no SPEC/PLAN/TASKS, no version mint.
+3. Two fixers resolve by whichever `dadaia bugs resolve` lands first; a losing write
+   fails non-zero — re-read and retry.
 
 ## 2. The method — seven phases, each gated
 

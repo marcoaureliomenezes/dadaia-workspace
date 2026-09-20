@@ -18,15 +18,16 @@ description: >
 
 ## 2. Steps
 
-1. Resolve the live release by reading `_RELEASE.json`'s `phase` field directly.
-2. The live candidate's `TASKS.md` sits at `releases/<v>/TASKS.md` — always flat; `rc-N/` folders are archives, never routed to.
-3. Full navigation protocol: `dd-spec-navigator`.
-4. Read `RC-FLOW.md` for the candidate arc and gate cadence before acting past reservation.
-5. Update `_RELEASE.json` per `RELEASE-EVENTS.md`'s shape and `log` conventions.
-6. At `RC-FLOW.md` step 5, run `MEMORY-UPDATE.md`'s full protocol before touching any memory atom.
-7. Declare test intent at birth; pass the admission filter (`dd-test-stewardship`, intent and admission) before a test enters the suite.
-8. Before growing any module, run the deletion test and speak the seam vocabulary (`dd-codebase-design`) — a diff that only adds justifies itself against replace-don't-layer.
-9. Handle demotion and quarantine/SCAFFOLD expiry at closure time only (`RC-FLOW.md` step 6).
+1. Open `specs/releases/AGENTS.md` (the area's scoped law) and follow it.
+2. Resolve the live release by reading `_RELEASE.json`'s `phase` field directly.
+3. The live candidate's `TASKS.md` sits at `releases/<v>/TASKS.md` — always flat; `rc-N/` folders are archives, never routed to.
+4. Full navigation protocol: `dd-spec-navigator`.
+5. Read `RC-FLOW.md` for the candidate arc and gate cadence before acting past reservation.
+6. Update `_RELEASE.json` per `RELEASE-EVENTS.md`'s shape and `log` conventions.
+7. At `RC-FLOW.md` step 5, run `MEMORY-UPDATE.md`'s full protocol before touching any memory atom.
+8. Declare test intent at birth; pass the admission filter (`dd-test-stewardship`, intent and admission) before a test enters the suite.
+9. Before growing any module, run the deletion test and speak the seam vocabulary (`dd-codebase-design`) — a diff that only adds justifies itself against replace-don't-layer.
+10. Handle demotion and quarantine/SCAFFOLD expiry at closure time only (`RC-FLOW.md` step 6).
 
 ## 2a. Push green
 

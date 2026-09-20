@@ -14,12 +14,13 @@ description: >
 
 ## 1. Pick the set
 
-1. Inspect `specs/bugs/BUGS.jsonl` via `dadaia bugs status`/`stats`.
-2. Read `specs/backlog/BACKLOG.json`'s `active[]` — already sanitized by
+1. Open `specs/releases/AGENTS.md` (the area's scoped law) and follow it.
+2. Inspect `specs/bugs/BUGS.jsonl` via `dadaia bugs status`/`stats`.
+3. Read `specs/backlog/BACKLOG.json`'s `active[]` — already sanitized by
    `dd-backlog-definition`, consumed with no further triage.
-3. Read `specs/audits/**` for undispositioned findings; each enters the SPEC with the
+4. Read `specs/audits/**` for undispositioned findings; each enters the SPEC with the
    disposition it will take (`dadaia audit disposition`).
-4. Keep picking scoped to `specs/bugs/` + `specs/backlog/` + `specs/audits/` discovery.
+5. Keep picking scoped to `specs/bugs/` + `specs/backlog/` + `specs/audits/` discovery.
 
 **Done when** the picked set is recorded; it becomes the SPEC's scope.
 

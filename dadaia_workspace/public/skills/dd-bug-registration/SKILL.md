@@ -21,14 +21,15 @@ description: >
 
 - What is and is not a bug, the propose/confirm rule and the redaction rule: `specs/bugs/AGENTS.md`.
 
-1. Name the contract line violated: file and line, `--help` text, or schema key.
-2. Give ONE command that reproduces it, already run, with its exit code and output.
-3. State why it is not agent error — which not-a-bug arm you ruled out and how.
-4. Severity: CRITICAL a stall or data loss; HIGH a contract broken on the default
+1. Open `specs/bugs/AGENTS.md` (the area's scoped law) and follow it.
+2. Name the contract line violated: file and line, `--help` text, or schema key.
+3. Give ONE command that reproduces it, already run, with its exit code and output.
+4. State why it is not agent error — which not-a-bug arm you ruled out and how.
+5. Severity: CRITICAL a stall or data loss; HIGH a contract broken on the default
    path; MEDIUM off the default path or with a documented workaround; LOW a message
    or cosmetic defect.
-5. Put the proposal to the operator and wait.
-6. No operator in the session: emit it as one handoff finding whose `message` starts
+6. Put the proposal to the operator and wait.
+7. No operator in the session: emit it as one handoff finding whose `message` starts
    `bug-proposal:` and whose `fix_recommendation` is the exact `dadaia bugs append`
    line (`dd-handoff-emitter`). A proposal is never a record.
 

@@ -14,24 +14,14 @@ line here and `--help` disagree, `--help` wins.
 
 ## Core idioms
 
-1. `dadaia --help` lists the groups; `dadaia <group> --help` the subcommands; add
-   `--json` to read commands for machine-readable output.
-2. Run `dadaia capabilities --json` first in any new or upgraded session.
-3. Bind the session: `dadaia context bind <ctx>` — `--print-env` emits
-   `DADAIA_CONTEXT`/`DADAIA_SESSION_ID` for `eval $(…)`; the bind sets the write
-   scope to the context's main repo plus its associated repos (`.dadaia/AGENTS.md`).
-4. Workspace compliance: `dadaia doctor --context <ctx> [--json]` — clean before any
-   implementation write; `--fix` MOVES slop to `.dadaia/reaped/` (7-day hold) and
-   nothing is deleted before its own TTL; `--fix --expired-only` reaps without
-   touching slop (`.dadaia/AGENTS.md`).
-5. Pass explicit `--context`/`--release-id` on every command.
-6. Converge a runtime: resolve `provider.distribution_version` from
-   `dadaia capabilities --json`, then `dadaia reconcile --expect-version "$v"
-   --json`, then `dadaia certify --json` — a failed certify check is a release
-   blocker.
-7. On a failing command: preserve the evidence trail (command, exit code, output);
-   classify and register a genuine bug (`dd-bug-registration`) before any
-   workaround.
+1. Open `.dadaia/AGENTS.md` (the area's scoped law) and follow it.
+2. `dadaia --help` lists the groups; `dadaia <group> --help` the subcommands; add `--json` to read commands for machine-readable output.
+3. Run `dadaia capabilities --json` first in any new or upgraded session.
+4. Bind the session: `dadaia context bind <ctx>` — `--print-env` emits `DADAIA_CONTEXT`/`DADAIA_SESSION_ID` for `eval $(…)`; the bind sets the write scope to the context's main repo plus its associated repos (`.dadaia/AGENTS.md`).
+5. Workspace compliance: `dadaia doctor --context <ctx> [--json]` — clean before any implementation write; `--fix` MOVES slop to `.dadaia/reaped/` (7-day hold) and nothing is deleted before its own TTL; `--fix --expired-only` reaps without touching slop (`.dadaia/AGENTS.md`).
+6. Pass explicit `--context`/`--release-id` on every command.
+7. Converge a runtime: resolve `provider.distribution_version` from `dadaia capabilities --json`, then `dadaia reconcile --expect-version "$v" --json`, then `dadaia certify --json` — a failed certify check is a release blocker.
+8. On a failing command: preserve the evidence trail (command, exit code, output); classify and register a genuine bug (`dd-bug-registration`) before any workaround.
 
 - Invoke `.dadaia/.venv/bin/dadaia` and `.dadaia/.venv/bin/pip` directly, with absolute paths.
 

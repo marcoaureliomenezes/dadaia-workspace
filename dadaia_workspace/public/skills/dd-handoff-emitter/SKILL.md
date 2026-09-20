@@ -14,17 +14,18 @@ completed agent task; the HTML report is the exception, not the rule.
 
 ## Emitting
 
-1. Resolve the workspace root: walk up from cwd to the nearest ancestor already
+1. Open `.dadaia/handoff/AGENTS.md` (the area's scoped law) and follow it.
+2. Resolve the workspace root: walk up from cwd to the nearest ancestor already
    containing `.dadaia/` — never create a new one.
-2. Default to handoff-only; switch to report mode only when the operator asked or
+3. Default to handoff-only; switch to report mode only when the operator asked or
    `next_handoff.agent == "human"`.
-3. Report mode first writes the HTML to
+4. Report mode first writes the HTML to
    `repos/<slug>/reports/<agent>/<UTC>-<slug>.html`, then captures
    `sha256sum <report>` as `artifact.content_hash`.
-4. Assemble the handoff field-by-field against
+5. Assemble the handoff field-by-field against
    `.dadaia/agentic/schemas/handoff-v1.schema.json`; set `artifact.path` only for a
    file already on disk.
-5. Write `.dadaia/handoff/<context>/<YYYY-MM-DDTHHMMSSZ>-<agent>-<slug>.handoff.json`
+6. Write `.dadaia/handoff/<context>/<YYYY-MM-DDTHHMMSSZ>-<agent>-<slug>.handoff.json`
    (2-space indent) and run `dadaia reports validate <path>` — fix any non-zero exit
    before moving on.
 

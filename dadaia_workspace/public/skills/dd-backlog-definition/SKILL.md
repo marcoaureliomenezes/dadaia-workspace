@@ -13,10 +13,10 @@ description: >
 
 ## The document
 
-- `specs/backlog/BACKLOG.json` shape, required fields, live status tokens, the histo
-  record and the terminal dispositions: `specs/backlog/AGENTS.md`.
-- Append via `dadaia backlog new <slug>`; validate via `dadaia doctor` (`ledgers`
-  section).
+1. Open `specs/backlog/AGENTS.md` (the area's scoped law) and follow it — `BACKLOG.json`
+   shape, required fields, live status tokens, the histo record, the dispositions.
+2. Append via `dadaia backlog new <slug>`; validate via `dadaia doctor` (`ledgers`
+   section).
 
 ## Continuous curation
 

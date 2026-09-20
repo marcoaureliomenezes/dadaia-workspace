@@ -17,8 +17,10 @@ axes are reported side by side — an axis never outranks another.
 
 ## 1. When
 
-- Reviewing a PR, branch or commit range before the candidate's PR.
-- A curation, architecture or audit verdict needs the Bug-surface axis (§6).
+1. Open `specs/memory/AGENTS.md` (the area's scoped law) and follow it — the diff is
+   judged against current product truth.
+2. Reviewing a PR, branch or commit range before the candidate's PR.
+3. A curation, architecture or audit verdict needs the Bug-surface axis (§6).
 
 ## 2. Axis 1 — Standards
 
