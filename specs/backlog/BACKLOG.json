@@ -242,27 +242,6 @@
             "ref": "memory product add"
           },
           "change": "change — becomes a script under dd-spec-navigator/scripts/ (touches only specs/)"
-        },
-        {
-          "subject": {
-            "kind": "cli",
-            "ref": "bugs defer"
-          },
-          "change": "change — becomes a subcommand of the dd-bug-resolution script"
-        },
-        {
-          "subject": {
-            "kind": "cli",
-            "ref": "bugs reject"
-          },
-          "change": "change — becomes a subcommand of the dd-bug-resolution script"
-        },
-        {
-          "subject": {
-            "kind": "cli",
-            "ref": "bugs supersede"
-          },
-          "change": "change — becomes a subcommand of the dd-bug-resolution script"
         }
       ]
     }
