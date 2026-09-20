@@ -275,7 +275,7 @@ def test_context_show_redact_masks_explicit_foreign_context(workspace: Path, mon
     )
     assert set(data.keys()) == set(plain_json.keys())
     assert data["name"] == "[REDACTED-CONTEXT-1]"
-    assert data["repo_slug"] == "[REDACTED-CONTEXT-1]"
+    assert data["main_repo"] == "[REDACTED-CONTEXT-1]"
 
 
 def test_context_show_redact_keeps_callers_own_context_visible(

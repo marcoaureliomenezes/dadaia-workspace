@@ -99,7 +99,7 @@ an initialized workspace, create it:
 
 ### F-06 — Context lifecycle
 - Setup: a local source repo (`git init --bare /tmp/f06/src.git`).
-- Run: `$D context create alpha --repo alpha --url file:///tmp/f06/src.git`;
+- Run: `$D context create alpha --main-repo alpha --url file:///tmp/f06/src.git`;
   `$D context list --json`; `$D context show alpha --json`; `$D context alive alpha`;
   `$D context dead alpha`.
 - **PASS if:** create→list shows alpha `state:"dead"`; `alive` clones, scaffolds AND

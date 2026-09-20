@@ -309,11 +309,11 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:e4148d983ed0d8b8ff92e1c765c8e0446b5e09f82badd528482627acb46aa31d",
-        "skill": "sha256:30d25b90d7e58f2863e664766b0252a0aeca0f94df489b113527b71cee7cfbec",
+        "skill": "sha256:88b1f3b5e2eae42bba96814bdafacc454cf0b6661156b73b091c85e3d99d4a50",
         "scoped": []
       },
-      "recorded_by": "ai-engineer",
-      "recorded_at": "2026-09-13"
+      "recorded_by": "software-engineer",
+      "recorded_at": "2026-09-20"
     },
     {
       "section": "§9 Credentials",

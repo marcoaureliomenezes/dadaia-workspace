@@ -99,7 +99,7 @@ def _session_record_for(workspace: Path, output: str) -> dict:
 
 
 def test_context_create_show_list_happy_lifecycle(workspace: Path) -> None:
-    result = _runner.invoke(app, ["context", "create", "alpha", "--repo", "alpha"])
+    result = _runner.invoke(app, ["context", "create", "alpha", "--main-repo", "alpha"])
     assert result.exit_code == 0, result.output
 
     show = _runner.invoke(app, ["context", "show", "alpha", "--json"])
@@ -133,7 +133,7 @@ def test_context_create_show_list_happy_lifecycle(workspace: Path) -> None:
             "current_branch": None,
             "dead_since": None,
             "name": "alpha",
-            "repo_slug": "alpha",
+            "main_repo": "alpha",
             "repo_url": "",
             "state": "dead",
             "stored_branch": None,
@@ -172,8 +172,8 @@ def test_context_error_matrix(workspace: Path, invoke_args: list[str]) -> None:
 def test_context_create_duplicate_and_dead_requires_alive(workspace: Path) -> None:
     """A duplicate create fails, and (AC-T10d-2) dead <name> fails if the context is
     not ALIVE — both against the same freshly-created DEAD context."""
-    _runner.invoke(app, ["context", "create", "alpha", "--repo", "alpha"])
-    result = _runner.invoke(app, ["context", "create", "alpha", "--repo", "alpha"])
+    _runner.invoke(app, ["context", "create", "alpha", "--main-repo", "alpha"])
+    result = _runner.invoke(app, ["context", "create", "alpha", "--main-repo", "alpha"])
     assert result.exit_code != 0
 
     result = _runner.invoke(app, ["context", "dead", "alpha"])
@@ -632,3 +632,48 @@ def test_bind_with_no_live_release_exits_zero_and_the_next_write_is_allowed(
         {"tool_name": "Write", "tool_input": {"file_path": str(target)}}
     )
     assert block is None, block
+
+
+# ---------------------------------------------------------------------------
+# FR5 (T-047-59) — main-repo / associated-repos is the user-facing vocabulary
+# ---------------------------------------------------------------------------
+
+
+def test_context_create_help_names_main_repo_and_associated_repos(workspace: Path) -> None:
+    """Intent: CONTRACT — AC5.1. The option surface names the paradigm's parts; the
+    retired `--repo`/`--associated` spellings are gone, with no alias and no shim."""
+    result = _runner.invoke(app, ["context", "create", "--help"])
+    assert result.exit_code == 0, result.output
+    assert "--main-repo" in result.output
+    assert "--associated-repos" in result.output
+    assert "--repo " not in result.output
+    assert "--associated " not in result.output
+
+
+def test_context_show_and_list_json_emit_main_repo_key(workspace: Path) -> None:
+    """Intent: CONTRACT — AC5.1. `show --json` / `list --json` carry `main_repo`;
+    the retired output key `repo_slug` is absent (the state-file schema keeps it)."""
+    assert (
+        _runner.invoke(
+            app,
+            [
+                "context",
+                "create",
+                "alpha",
+                "--main-repo",
+                "alpha",
+                "--associated-repos",
+                "beta,gamma",
+            ],
+        ).exit_code
+        == 0
+    )
+
+    show = json.loads(_runner.invoke(app, ["context", "show", "alpha", "--json"]).stdout)
+    assert show["main_repo"] == "alpha"
+    assert "repo_slug" not in show
+    assert [r["slug"] for r in show["associated_repos"]] == ["beta", "gamma"]
+
+    listed = json.loads(_runner.invoke(app, ["context", "list", "--json"]).stdout)
+    assert listed[0]["main_repo"] == "alpha"
+    assert "repo_slug" not in listed[0]

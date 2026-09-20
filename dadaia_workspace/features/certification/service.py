@@ -300,7 +300,7 @@ def certify(
             "context",
             "create",
             "certified-consumer",
-            "--repo",
+            "--main-repo",
             "certified-consumer",
             "--url",
             str(bare),

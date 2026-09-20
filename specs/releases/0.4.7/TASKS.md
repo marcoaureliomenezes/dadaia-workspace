@@ -23,7 +23,7 @@
   `infrastructure/privacy_check.py`, `public/scaffold/**`, `public/templates/*-AGENTS.md`,
   `public/data/CONSUMER_VALIDATION_RECIPE.md`, `CHANGELOG.md`, `docs/**`, `tests/**`.
 
-- [ ] T-047-59 — FR5: main-repo / associated-repos, user-facing only. `dadaia context create
+- [x] T-047-59 — FR5: main-repo / associated-repos, user-facing only. `dadaia context create
   --main-repo <slug> [--associated-repos a,b]` replaces `--repo`/`--associated` (no alias);
   `context show --json` emits `main_repo` / `associated_repos`; help text, `docs/cli.md`
   (regenerated), the scoped files, skills and glossary use the two terms, `repo slug` only as

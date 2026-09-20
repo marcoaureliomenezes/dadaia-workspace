@@ -1,7 +1,7 @@
 """CLI integration tests for the context repo_url lifecycle (T-011-08 / FR-W2-03, ADR-7).
 
 Closes bug ``context-repo-url-not-settable-or-repairable``. Covers:
-- (a) ``context create --repo <slug> --url <url>`` persists the URL (overrides catalog).
+- (a) ``context create --main-repo <slug> --url <url>`` persists the URL (overrides catalog).
 - (b) ``context alive``/``dead`` back-fill repo_url from the on-disk origin remote when
       the record URL is empty (real git + local ``file://`` fixture remote).
 - (c) ``context update --url`` repair verb.
@@ -93,13 +93,13 @@ def test_create_update_url_persistence_ctx_url_1_doctor_flag_and_export_import_c
     ``alive`` on a second machine can clone instead of failing on ``git clone ""``.
     """
     result = _runner.invoke(
-        app, ["context", "create", "foo", "--repo", "foo", "--url", "https://x.test/foo.git"]
+        app, ["context", "create", "foo", "--main-repo", "foo", "--url", "https://x.test/foo.git"]
     )
     assert result.exit_code == 0, result.output
     rec = _record(workspace, "foo")
     assert rec["repo_url"] == "https://x.test/foo.git"
 
-    _runner.invoke(app, ["context", "create", "bar", "--repo", "bar"])
+    _runner.invoke(app, ["context", "create", "bar", "--main-repo", "bar"])
     rec_bar = _record(workspace, "bar")
     assert rec_bar["repo_url"] == ""  # no catalog hit, no --url
 
@@ -124,7 +124,7 @@ def test_create_update_url_persistence_ctx_url_1_doctor_flag_and_export_import_c
     repo_path.mkdir(parents=True)
     _git(["init"], cwd=repo_path)
 
-    _runner.invoke(app, ["context", "create", "baz", "--repo", "baz"])
+    _runner.invoke(app, ["context", "create", "baz", "--main-repo", "baz"])
     alive = _runner.invoke(app, ["context", "alive", "baz"])
     assert alive.exit_code == 0, alive.output
     assert _record(workspace, "baz")["repo_url"] == ""
@@ -140,7 +140,7 @@ def test_create_update_url_persistence_ctx_url_1_doctor_flag_and_export_import_c
     file_url = upstream.as_uri()
 
     # 2. context create with NO --url (and no catalog hit) → record repo_url == "".
-    _runner.invoke(app, ["context", "create", "qux", "--repo", "qux"])
+    _runner.invoke(app, ["context", "create", "qux", "--main-repo", "qux"])
     assert _record(workspace, "qux")["repo_url"] == ""
 
     # 3. The repo exists on disk with a valid origin remote (clone/populate by any means).

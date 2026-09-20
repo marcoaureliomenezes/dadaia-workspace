@@ -82,7 +82,7 @@ def _ctx_to_dict(svc: SpecContextService, ctx: SpecContextProject) -> dict:  # t
     return {
         "name": ctx.name,
         "state": ctx.state.value,
-        "repo_slug": ctx.repo_slug,
+        "main_repo": ctx.repo_slug,
         "repo_url": ctx.repo_url,
         "created_at": ctx.created_at,
         "alive_since": ctx.alive_since,
@@ -189,7 +189,11 @@ def _resolve_own_session_id(*, explicit: str | None = None, mint: bool = False) 
 @app.command()
 def create(
     name: str = typer.Argument(..., help="Context name"),
-    repo: str = typer.Option(..., "--repo", help="Repo slug (directory name under repos/)"),
+    repo: str = typer.Option(
+        ...,
+        "--main-repo",
+        help="Main repo (the repo where specs/ lives) — the directory name under repos/",
+    ),
     url: str | None = typer.Option(
         None,
         "--url",
@@ -200,11 +204,11 @@ def create(
     ),
     associated: list[str] = typer.Option(
         [],
-        "--associated",
+        "--associated-repos",
         help=(
-            "Register an associated repo at creation time (FR17). Repeatable. Each "
-            "value is SLUG or SLUG=URL — a bare slug registers with an empty URL, "
-            "settable later via 'context repo add' with --url."
+            "Associated repos (the other repos this context owns), comma-separated "
+            "and repeatable. Each value is SLUG or SLUG=URL — a bare slug registers "
+            "with an empty URL, settable later via 'context repo add' with --url."
         ),
     ),
 ) -> None:
@@ -214,7 +218,9 @@ def create(
     # never leaves a half-created context behind.
     associated_repos = tuple(
         AssociatedRepo(slug=slug.strip(), url=assoc_url.strip())
-        for slug, _, assoc_url in (raw.partition("=") for raw in associated)
+        for slug, _, assoc_url in (
+            raw.partition("=") for value in associated for raw in value.split(",") if raw.strip()
+        )
     )
 
     repo_url = url or ""
@@ -224,7 +230,7 @@ def create(
         suffix = f", {len(associated_repos)} associated repo(s)" if associated_repos else ""
         console.print(
             f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' created "
-            f"(repo: {ctx.repo_slug}, state: {ctx.state}{suffix})"
+            f"(main repo: {ctx.repo_slug}, state: {ctx.state}{suffix})"
         )
     except (ContextAlreadyExistsError, InvalidContextNameError, AssociatedRepoConflictError) as e:
         err_console.print(f"[red]Error:[/red] {e}")
@@ -256,33 +262,9 @@ def list_all(
     if json_output:
         payload = []
         for ctx in contexts:
-            # FR18/A18.1-A18.3: the SAME branch-resolution seam `show` uses
-            # (SpecContextService.repos_live_status) — list can no longer report a
-            # stale `current_branch` snapshot show would disagree with.
-            statuses = svc.repos_live_status(ctx)
-            main_status, associated_statuses = statuses[0], statuses[1:]
-            payload.append(
-                {
-                    "name": ctx.name,
-                    "state": ctx.state.value,
-                    "repo_slug": ctx.repo_slug,
-                    "repo_url": ctx.repo_url,
-                    "created_at": ctx.created_at,
-                    "alive_since": ctx.alive_since,
-                    "dead_since": ctx.dead_since,
-                    "current_branch": main_status.current_branch or ctx.current_branch,
-                    "stored_branch": ctx.current_branch,
-                    "associated_repos": [
-                        {
-                            "slug": status.slug,
-                            "url": status.url,
-                            "on_disk": status.on_disk,
-                            "current_branch": status.current_branch,
-                        }
-                        for status in associated_statuses
-                    ],
-                }
-            )
+            # FR18/A18.1-A18.3: the SAME payload builder `show --json` uses — one
+            # key set, so the two verbs cannot drift apart again.
+            payload.append(_ctx_to_dict(svc, ctx))
         if redactor is not None:
             payload = [redactor.json_value(row) for row in payload]
         print(json.dumps(payload, sort_keys=True))
@@ -294,8 +276,8 @@ def list_all(
     table = Table(title="Spec Context Projects")
     table.add_column("Name", style="bold")
     table.add_column("State")
-    table.add_column("Repo")
-    table.add_column("Associated")
+    table.add_column("Main repo")
+    table.add_column("Associated repos")
 
     state_style = {
         ContextState.ALIVE: "[green]alive[/green]",
@@ -403,7 +385,7 @@ def show(
 
     console.print(f"[bold]Name:[/bold]       {display_name}")
     console.print(f"[bold]State:[/bold]      {ctx.state.value}")
-    console.print(f"[bold]Repo:[/bold]       {display_repo}")
+    console.print(f"[bold]Main repo:[/bold]  {display_repo}")
     console.print(f"[bold]Repo URL:[/bold]   {repo_url_text}")
     console.print(f"[bold]Branch:[/bold]     {branch_text}")
     console.print(f"[bold]Created:[/bold]    {ctx.created_at}")
@@ -627,7 +609,9 @@ def update(
 @repo_app.command(name="add")
 def repo_add(
     ctx_name: str = typer.Argument(..., help="Context name"),
-    slug: str = typer.Argument(..., help="Repo slug to associate (directory name under repos/)"),
+    slug: str = typer.Argument(
+        ..., help="Associated repo to register — the directory name under repos/"
+    ),
     url: str = typer.Option("", "--url", help="Repo clone URL (optional; empty until set)"),
 ) -> None:
     """Register an associated repo on a context.

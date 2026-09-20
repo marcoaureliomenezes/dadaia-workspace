@@ -38,8 +38,8 @@ line here and `--help` disagree, `--help` wins.
 - Never edit `.dadaia/states/*.json`, never `git clone` into `repos/`, never
   `rm -rf repos/<slug>/`, never hand-write `.dadaia/dist/` — `dadaia context
   alive|dead` and `dadaia import|export` own those.
-- Lifecycle: `create (dead) → alive → bind → dead → delete`; `context dead` removes
-  the repo from disk — never run it casually mid-switch.
+- Lifecycle: `create --main-repo <slug> [--associated-repos a,b]` → alive → bind → dead
+  → delete; `context dead` removes the repo from disk — never run it mid-switch.
 - Portability: `dadaia export` writes `.dadaia/dist/spec-contexts.json` (overwritten
   each run); on the destination `dadaia import <file>` registers each unknown context
   DEAD, then `dadaia context alive <slug>` clones it; verify with `dadaia context list`.

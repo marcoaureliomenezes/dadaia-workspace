@@ -174,12 +174,12 @@ def test_context_list_default_table_output_unchanged(workspace: Path) -> None:
     # deliberate golden change. Regenerated with the same fixture, unrelated bytes
     # unchanged.
     assert result.output == (
-        "             Spec Context Projects              \n"
-        "┏━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┓\n"
-        "┃ Name       ┃ State ┃ Repo       ┃ Associated ┃\n"
-        "┡━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━┩\n"
-        "│ caller-ctx │ alive │ caller-ctx │ 0          │\n"
-        "└────────────┴───────┴────────────┴────────────┘\n"
+        "                Spec Context Projects                 \n"
+        "┏━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┓\n"
+        "┃ Name       ┃ State ┃ Main repo  ┃ Associated repos ┃\n"
+        "┡━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━┩\n"
+        "│ caller-ctx │ alive │ caller-ctx │ 0                │\n"
+        "└────────────┴───────┴────────────┴──────────────────┘\n"
     )
 
 
@@ -214,7 +214,7 @@ def test_context_list_default_json_output_unchanged(workspace: Path) -> None:
             "current_branch": "main",
             "dead_since": None,
             "name": "caller-ctx",
-            "repo_slug": "caller-ctx",
+            "main_repo": "caller-ctx",
             "repo_url": "https://example.com/caller-ctx.git",
             "state": "alive",
             "stored_branch": "main",
@@ -223,8 +223,9 @@ def test_context_list_default_json_output_unchanged(workspace: Path) -> None:
     assert result.output == (
         '[{"alive_since": "2026-01-01T00:00:00Z", "associated_repos": [], '
         '"created_at": "2026-01-01T00:00:00Z", '
-        '"current_branch": "main", "dead_since": null, "name": "caller-ctx", '
-        '"repo_slug": "caller-ctx", "repo_url": "https://example.com/caller-ctx.git", '
+        '"current_branch": "main", "dead_since": null, '
+        '"main_repo": "caller-ctx", "name": "caller-ctx", '
+        '"repo_url": "https://example.com/caller-ctx.git", '
         '"state": "alive", "stored_branch": "main"}]\n'
     )
 
@@ -244,7 +245,7 @@ def test_context_show_default_table_output_unchanged(workspace: Path) -> None:
     assert result.output == (
         "Name:       caller-ctx\n"
         "State:      alive\n"
-        "Repo:       caller-ctx\n"
+        "Main repo:  caller-ctx\n"
         "Repo URL:   https://example.com/caller-ctx.git\n"
         "Branch:     main\n"
         "Created:    2026-01-01T00:00:00Z\n"
@@ -263,7 +264,7 @@ def test_context_show_default_json_output_unchanged(workspace: Path) -> None:
         "{\n"
         '  "name": "caller-ctx",\n'
         '  "state": "alive",\n'
-        '  "repo_slug": "caller-ctx",\n'
+        '  "main_repo": "caller-ctx",\n'
         '  "repo_url": "https://example.com/caller-ctx.git",\n'
         '  "created_at": "2026-01-01T00:00:00Z",\n'
         '  "alive_since": "2026-01-01T00:00:00Z",\n'
