@@ -65,7 +65,7 @@ _STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+)$", re.MULTILINE)
 _FIXTURE_TASKS_MD = """\
 # TASKS — Release v1.0.0 — fixture
 
-**Status:** Em revisão
+**Status:** In review
 **Release ID:** v1.0.0
 **Owner:** product-engineer
 

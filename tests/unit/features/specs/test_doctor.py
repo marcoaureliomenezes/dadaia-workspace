@@ -37,7 +37,7 @@ agent_tier: self-pull
 token_estimate: 20
 ---
 
-## Catálogo de features
+## Feature catalog
 
 Feature atoms.
 """
@@ -152,9 +152,9 @@ def _make_clean_specs_tree(root: Path, release_id: str = "1.2.3") -> Path:
         encoding="utf-8",
     )
     _write_release_jsonl(specs, release_id, "IMPLEMENTATION")
-    spec_md = "# Spec\n\n> **Status:** Aprovado\n> **Created:** 2026-04-01\n\nContent.\n"
-    plan_md = "# Plan\n\n> **Status:** Aprovado\n\nShort.\n"
-    tasks_md = "# Tasks\n\n> **Status:** Aprovado\n\n- [-] T1 something\n"
+    spec_md = "# Spec\n\n> **Status:** Approved\n> **Created:** 2026-04-01\n\nContent.\n"
+    plan_md = "# Plan\n\n> **Status:** Approved\n\nShort.\n"
+    tasks_md = "# Tasks\n\n> **Status:** Approved\n\n- [-] T1 something\n"
     (specs / "releases" / release_id / "SPEC.md").write_text(spec_md, encoding="utf-8")
     (specs / "releases" / release_id / "PLAN.md").write_text(plan_md, encoding="utf-8")
     (specs / "releases" / release_id / "TASKS.md").write_text(tasks_md, encoding="utf-8")
@@ -235,7 +235,7 @@ def test_release_phase_flip_still_warns_on_draft_in_implementation(tmp_path: Pat
     retired at 0.4.6, ADR 0006: the trio always sits flat at the release root)."""
     specs = _make_clean_specs_tree(tmp_path, "v0.1.0")
     spec = specs / "releases" / "v0.1.0" / "SPEC.md"
-    spec.write_text(spec.read_text(encoding="utf-8").replace("Aprovado", "Draft"), encoding="utf-8")
+    spec.write_text(spec.read_text(encoding="utf-8").replace("Approved", "Draft"), encoding="utf-8")
     _write_release_jsonl(specs, "v0.1.0", "IMPLEMENTATION")
 
     issues = SpecsDoctor(specs).check()
@@ -512,7 +512,7 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
     # TREE-2: root SPEC.md is never auto-moved.
     specs2 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree2"))
     root_spec = specs2 / "SPEC.md"
-    root_spec.write_text("# Spec\n\n> **Status:** Aprovado\n", encoding="utf-8")
+    root_spec.write_text("# Spec\n\n> **Status:** Approved\n", encoding="utf-8")
     doctor2 = SpecsDoctor(specs2, templates_dir=_TEMPLATES_DIR)
     issues2 = doctor2.check()
     tree2 = [i for i in issues2 if i.code == "TREE-2"]
@@ -630,10 +630,10 @@ def test_doc005_oversized_plan_warns_whatever_the_spec_creation_date(
     the finding can never be error-class (which would exit 1 with no fix). The date-based
     hard-limit cutoff that used to raise it to ERROR is gone with the constant."""
     specs = _make_clean_specs_tree(tmp_path)
-    big = "# Plan\n\n> **Status:** Aprovado\n\n" + "\n".join(f"- line {i}" for i in range(400))
+    big = "# Plan\n\n> **Status:** Approved\n\n" + "\n".join(f"- line {i}" for i in range(400))
     (specs / "releases" / "1.2.3" / "PLAN.md").write_text(big, encoding="utf-8")
     (specs / "releases" / "1.2.3" / "SPEC.md").write_text(
-        f"# Spec\n\n> **Status:** Aprovado\n> **Created:** {created}\n", encoding="utf-8"
+        f"# Spec\n\n> **Status:** Approved\n> **Created:** {created}\n", encoding="utf-8"
     )
     issues = SpecsDoctor(specs).check()
     doc5 = [i for i in issues if i.code == "SPEC-DOC-005"]
@@ -681,7 +681,7 @@ def test_doc027_release_naming_boundary(
 ) -> None:
     specs = _make_clean_specs_tree(tmp_path, release_id=release_id)
     (specs / "releases" / release_id / "SPEC.md").write_text(
-        f"# Spec\n\n> **Status:** Aprovado\n> **Created:** {created}\n\nContent.\n",
+        f"# Spec\n\n> **Status:** Approved\n> **Created:** {created}\n\nContent.\n",
         encoding="utf-8",
     )
     issues = SpecsDoctor(specs).check()
@@ -795,7 +795,7 @@ def test_doc016_and_doc027_remedies_name_the_mintable_bare_axis(tmp_path: Path) 
     name the bare, mintable form. Intent: regression; size: unit."""
     specs = _make_clean_specs_tree(tmp_path, release_id="not-semver")
     (specs / "releases" / "not-semver" / "SPEC.md").write_text(
-        "# Spec\n\n> **Status:** Aprovado\n> **Created:** 2026-08-01\n\nContent.\n",
+        "# Spec\n\n> **Status:** Approved\n> **Created:** 2026-08-01\n\nContent.\n",
         encoding="utf-8",
     )
     issues = SpecsDoctor(specs).check()
@@ -837,7 +837,7 @@ def test_one_defect_one_code_nonconforming_release_name(tmp_path: Path) -> None:
     Intent: contract; size: unit."""
     specs = _make_clean_specs_tree(tmp_path, release_id="badname-release")
     (specs / "releases" / "badname-release" / "SPEC.md").write_text(
-        "# Spec\n\n> **Status:** Aprovado\n> **Created:** 2026-08-01\n\nContent.\n",
+        "# Spec\n\n> **Status:** Approved\n> **Created:** 2026-08-01\n\nContent.\n",
         encoding="utf-8",
     )
     issues = SpecsDoctor(specs).check()

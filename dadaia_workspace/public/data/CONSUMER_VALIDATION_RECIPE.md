@@ -3,7 +3,7 @@
 **Contract.** The canonical end-to-end validation matrix a consumer-side agent runs
 against EVERY candidate wheel before deploy. Ships inside the package so recipe and
 version never drift — always read the copy from the INSTALLED candidate. Verdict is
-exactly one of **APROVADA / BLOQUEADA / APROVADA COM EXCEÇÃO EXPLÍCITA**.
+exactly one of **APPROVED / BLOCKED / APPROVED WITH EXPLICIT EXCEPTION**.
 
 ## How to judge each statement (read first)
 
@@ -484,8 +484,8 @@ that WORKS. Apply the prescribed command literally; if it cannot resolve the con
 names, that is a product FAIL of this statement.
 
 **Verdict line (Telegram-short, last line of output):**
-`<version> — <APROVADA|BLOQUEADA|APROVADA COM EXCEÇÃO EXPLÍCITA> — <N> PASS / <M> FAIL / <K> EXCEPTION — bugs: <ids|nenhum> — evidência: <path>`
+`<version> — <APPROVED|BLOCKED|APPROVED WITH EXPLICIT EXCEPTION> — <N> PASS / <M> FAIL / <K> EXCEPTION — bugs: <ids|nenhum> — evidência: <path>`
 
-APROVADA requires 0 FAIL. EXCEPTIONs are listed but do not block; note each so the
+APPROVED requires 0 FAIL. EXCEPTIONs are listed but do not block; note each so the
 operator can decide. Persist per-statement evidence; register every FAIL as a bug
 before the run ends.

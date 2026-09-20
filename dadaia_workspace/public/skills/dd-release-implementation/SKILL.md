@@ -2,7 +2,7 @@
 name: dd-release-implementation
 description: >
   Implement a release candidate from the first task reservation through the
-  promote-or-continue gate. Use when working a task inside an Aprovado candidate, at
+  promote-or-continue gate. Use when working a task inside an Approved candidate, at
   candidate closure, and at the gate (rc-archive or ship + archive + branch cut).
 ---
 
@@ -12,7 +12,7 @@ description: >
 
 ## 1. When
 
-- `software-engineer` working a task inside an `Aprovado` candidate.
+- `software-engineer` working a task inside an `Approved` candidate.
 - `project-manager` at each candidate's closure.
 - From the first reservation through the promote-or-continue gate (and, on promote, the ship + branch cut).
 

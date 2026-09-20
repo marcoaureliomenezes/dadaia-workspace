@@ -1,6 +1,6 @@
 # SPEC — badname-release (non-SemVer, born after canon)
 
-**Status:** Aprovado
+**Status:** Approved
 **Created:** 2026-07-10
 
 Fixture release dir with a non-SemVer name and a Created date after the SemVer

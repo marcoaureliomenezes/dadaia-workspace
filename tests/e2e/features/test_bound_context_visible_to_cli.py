@@ -80,7 +80,7 @@ def _make_workspace(root: Path) -> Path:
     (repo / "specs" / "releases" / _RELEASE).mkdir(parents=True)
     for name in ("SPEC.md", "PLAN.md", "TASKS.md"):
         (repo / "specs" / "releases" / _RELEASE / name).write_text(
-            f"# {name}\n\n> **Status:** Aprovado\n", encoding="utf-8"
+            f"# {name}\n\n> **Status:** Approved\n", encoding="utf-8"
         )
     (repo / "specs" / "releases" / "ACTIVE.md").write_text(
         f"release: {_RELEASE}\nphase: IMPLEMENTATION\n", encoding="utf-8"

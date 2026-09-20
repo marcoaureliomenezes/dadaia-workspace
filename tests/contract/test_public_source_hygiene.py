@@ -29,6 +29,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.infrastructure.privacy_check import PORTUGUESE_CONTROL_TERMS
 from tests.helpers.scan_population import assert_populated
 
 pytestmark = pytest.mark.contract
@@ -128,3 +129,31 @@ def test_public_source_names_no_retired_surface() -> None:
                     hits.append(f"{rel}:{lineno}: {needle!r}")
     assert_populated(scanned, "dadaia_workspace/public/data/DADAIA.md")
     assert hits == []
+
+
+def test_public_assets_carry_no_portuguese_control_vocabulary() -> None:
+    """Intent: CONTRACT — 0.4.7 FR4/AC4.1 (T-047-58).
+
+    The published surface is 100 % English: a consumer meeting `Aprovado`,
+    `Em revisão`, `Catálogo` or an `APROVADA/BLOQUEADA` verdict on day 1 is the
+    adoption blocker this release closed. The check that enforces it at runtime is
+    `public-privacy`; this contract test asserts the tree it guards is actually clean,
+    so a regression fails in the suite and not only in the operator's doctor run.
+    """
+    offenders: list[str] = []
+    files = sorted(
+        path.relative_to(_REPO_ROOT).as_posix()
+        for path in _PUBLIC_ROOT.rglob("*")
+        if path.is_file() and path.suffix.lower() in {".md", ".json", ".py", ".txt", ".j2"}
+    )
+    assert_populated(files, "dadaia_workspace/public/data/DADAIA.md")
+    for rel in files:
+        path = _REPO_ROOT / rel
+        text = path.read_text(encoding="utf-8", errors="ignore").lower()
+        for term, _reason in PORTUGUESE_CONTROL_TERMS:
+            if term.lower() in text:
+                offenders.append(f"{rel}: {term}")
+    assert offenders == [], (
+        "Portuguese control vocabulary under dadaia_workspace/public/ — "
+        f"translate it (0.4.7 FR4): {offenders}"
+    )

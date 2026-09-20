@@ -4,7 +4,7 @@
 > The catalog section below is refreshed by `dadaia memory catalog generate`; other
 > sections of this file are preserved verbatim.
 
-## Catálogo de features
+## Feature catalog
 
 ### agents
 

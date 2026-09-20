@@ -110,7 +110,7 @@ the documents are the state, the verbs move the state document, and the markers 
    `_RELEASE.json` in phase `DEFINITION` under `specs/releases/<M.m.p>/`, in one
    transaction, refusing a second live release.
 3. **Define the candidate.** Author `SPEC.md`, `PLAN.md` and `TASKS.md` at the release
-   root, each carrying `**Status:** Aprovado`, and flip the picked backlog entry to
+   root, each carrying `**Status:** Approved`, and flip the picked backlog entry to
    `picked` in the same commit.
 4. **Open implementation.** `dadaia release phase IMPLEMENTATION --sha <sha>` requires
    the approved trio and stamps `defined {sha, ts}`.

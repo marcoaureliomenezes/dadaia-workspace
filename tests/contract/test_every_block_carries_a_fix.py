@@ -416,13 +416,13 @@ def test_audit_close_with_an_open_finding_carries_a_runnable_fix(tmp_path: Path)
     assert_block_carries_a_runnable_fix(str(exc.value))
 
 
-def _phase_tree(tmp_path: Path, *, phase: str, status: str = "Aprovado", tasks: str) -> Path:
+def _phase_tree(tmp_path: Path, *, phase: str, status: str = "Approved", tasks: str) -> Path:
     specs = _specs_tree(tmp_path)
     rdir = specs / "releases" / "0.0.1"
     rdir.mkdir()
-    (rdir / "SPEC.md").write_text("# S\n\n**Status:** Aprovado\n", encoding="utf-8")
+    (rdir / "SPEC.md").write_text("# S\n\n**Status:** Approved\n", encoding="utf-8")
     (rdir / "PLAN.md").write_text(f"# P\n\n**Status:** {status}\n", encoding="utf-8")
-    (rdir / "TASKS.md").write_text(f"# T\n\n**Status:** Aprovado\n\n{tasks}", encoding="utf-8")
+    (rdir / "TASKS.md").write_text(f"# T\n\n**Status:** Approved\n\n{tasks}", encoding="utf-8")
     (rdir / "_RELEASE.json").write_text(
         json.dumps(
             {

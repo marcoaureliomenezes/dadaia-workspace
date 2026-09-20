@@ -234,7 +234,7 @@ def test_subdirectory_discovery_and_area_derivation(tmp_path: Path) -> None:
 
     # index.md groups by area, not a single "product" bucket.
     index_md = render_index_md(catalog)
-    assert "## Catálogo de features" in index_md
+    assert "## Feature catalog" in index_md
     assert "### sdd" in index_md
     assert "### platform" in index_md
 
@@ -322,17 +322,17 @@ def test_cli_generate_emits_both_catalog_and_index(tmp_path: Path) -> None:
 #
 # `memory catalog generate` used to REPLACE index.md wholesale with a template whose
 # headings differ from the scaffold's — destroying canonical doc anchors
-# (memory/product/index.md#Catálogo de features) that accepted backlog intents bind.
-# Regeneration now surgically updates ONLY the `## Catálogo de features` section and
+# (memory/product/index.md#Feature catalog) that accepted backlog intents bind.
+# Regeneration now surgically updates ONLY the `## Feature catalog` section and
 # preserves every other heading/anchor; a fresh file is born with the canonical heading.
 
 
 def _scaffold_index(specs_dir) -> str:
     text = (
-        "---\nslug: index\ntitle: Catálogo de Produtos\n---\n\n"
+        "---\nslug: index\ntitle: Product catalog\n---\n\n"
         "## Visão atômica\n\nVisão do produto.\n\n"
         "## Usuários\n\n| Usuário | Descrição |\n|---|---|\n| dev | usa |\n\n"
-        "## Catálogo de features\n\n"
+        "## Feature catalog\n\n"
         "| Slug | Título | TL;DR |\n|------|--------|-------|\n"
         "| placeholder | placeholder | placeholder |\n\n"
         "## Mapa de capacidades\n\nmapa\n\n"
@@ -363,7 +363,7 @@ def test_write_index_preserves_existing_headings_and_updates_catalog_section(
     for heading in (
         "## Visão atômica",
         "## Usuários",
-        "## Catálogo de features",
+        "## Feature catalog",
         "## Mapa de capacidades",
         "## Limites conhecidos",
     ):
@@ -384,7 +384,7 @@ def test_write_index_fresh_file_carries_canonical_catalog_heading(tmp_path) -> N
     write_index(specs, catalog)
 
     text = (specs / "memory" / "product" / "index.md").read_text(encoding="utf-8")
-    assert "## Catálogo de features" in text
+    assert "## Feature catalog" in text
 
 
 # ---------------------------------------------------------------------------

@@ -10,7 +10,7 @@ Root workspace behavior is in the workspace `AGENTS.md`; production-source behav
 
 ## 2. Before implementing
 
-- The live release's `_RELEASE.json` `phase` reads `IMPLEMENTATION`, and `SPEC.md`/`PLAN.md`/`TASKS.md` all carry `**Status:** Aprovado`.
+- The live release's `_RELEASE.json` `phase` reads `IMPLEMENTATION`, and `SPEC.md`/`PLAN.md`/`TASKS.md` all carry `**Status:** Approved`.
 - The task is flipped `[ ]` -> `[-]` before any production edit, and its declared write set names every file touched.
 - Any item missing: stop and repair the SDD artifact instead of editing production.
 

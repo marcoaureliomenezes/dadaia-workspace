@@ -33,7 +33,7 @@ axes are reported side by side — an axis never outranks another.
 
 ## 3. Axis 2 — Spec
 
-- Read the approved SPEC/TASKS the diff claims to implement (`**Status:** Aprovado`).
+- Read the approved SPEC/TASKS the diff claims to implement (`**Status:** Approved`).
 - Does the diff do what they say — nothing more, nothing less?
 - Scope growth beyond the task's declared write set is a finding, even when the code is good.
 - Acceptance criteria without corresponding evidence (test/assertion) is a finding.

@@ -79,7 +79,7 @@ RULES: tuple[SpecsRule, ...] = (
         lambda d: d._release.check_active_release_artifacts(),
         fix_help=(
             "sed -i '\\|\\*\\*Status:\\*\\*|d' specs/releases/<id>/<document>.md && "
-            "printf '%s\\n' '**Status:** <Aprovado|Em revisão|Draft>' "
+            "printf '%s\\n' '**Status:** <Approved|In review|Draft>' "
             ">> specs/releases/<id>/<document>.md"
         ),
     ),

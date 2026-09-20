@@ -60,6 +60,9 @@ def upgrade(
     verb = "would remove" if dry_run else "removed"
     for path in result.placeholder_removed:
         typer.echo(f"[placeholder-repair] {verb} {path}")
+    rewrote = "would rewrite" if dry_run else "rewrote"
+    for path in result.status_rewritten:
+        typer.echo(f"[status-vocabulary] {rewrote} {path}")
     if result.no_op:
         typer.echo(f"[ok] {resolved} already at pattern version {current} (target {goal}) — no-op.")
     sys.exit(0)

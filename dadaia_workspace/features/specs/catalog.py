@@ -274,9 +274,11 @@ def write_catalog(specs_dir: Path, catalog: dict[str, Any]) -> Path:
 # ---------------------------------------------------------------------------
 
 #: The canonical, ANCHOR-STABLE catalog section heading. Backlog intents bind doc
-#: anchors like ``memory/product/index.md#Catálogo de features`` (bug
+#: anchors like ``memory/product/index.md#feature-catalog`` (bug
 #: closure-breaks-canonical-backlog-anchor) — regeneration must never rename it.
-CATALOG_SECTION_HEADING = "## Catálogo de features"
+#: Renamed once, when the control vocabulary went English and no backlog intent bound
+#: the old anchor.
+CATALOG_SECTION_HEADING = "## Feature catalog"
 
 _INDEX_MD_TEMPLATE = """\
 # Memory Catalog — {context}
@@ -294,7 +296,7 @@ _INDEX_MD_TEMPLATE = """\
 def merge_catalog_section(existing: str | None, tables: str, context: str) -> str:
     """Merge the regenerated catalog tables into *existing* index.md, anchor-stable.
 
-    When *existing* carries the canonical ``## Catálogo de features`` heading, ONLY that
+    When *existing* carries the canonical ``## Feature catalog`` heading, ONLY that
     section's body is replaced (up to the next ``## `` heading or EOF) — every other
     heading, and therefore every derivable doc anchor, survives regeneration verbatim
     (bug closure-breaks-canonical-backlog-anchor). A missing/absent file (or a legacy

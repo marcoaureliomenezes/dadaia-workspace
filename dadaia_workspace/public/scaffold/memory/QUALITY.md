@@ -9,23 +9,23 @@ tags:
   - anti-slop
 ---
 
-## Padrões de qualidade
+## Quality standards
 
-**Base greenfield (vale até a primeira release consolidar padrões próprios):**
+**Greenfield baseline (holds until the first release consolidates the project's own):**
 
-- TDD: todo comportamento novo nasce com um teste que falha primeiro; correção de bug
-  reproduz o defeito em teste antes do fix.
-- Testes rodam com o comando nu — o `pyproject.toml` redireciona todo cache para fora do repo — e devem
-  passar verdes antes de qualquer commit de fechamento de task.
-- Revisões julgam o artefato apresentado pelos critérios acima; num contexto novo, a
-  ausência de histórico não é motivo de rejeição — o SPEC vigente define a base.
+- TDD: every new behaviour is born with a test that fails first; a bug fix reproduces the
+  defect in a test before the fix.
+- Tests run with the bare command — `pyproject.toml` redirects every cache out of the repo —
+  and must be green before any task-closing commit.
+- Reviews judge the artifact presented by the criteria above; in a new context, an absent
+  history is no ground for rejection — the current SPEC defines the baseline.
 
-## Disciplina de testes
+## Test discipline
 
-Tamanho por diretório: SMALL = `tests/unit` + `tests/contract`; MEDIUM =
-`tests/integration`; LARGE = `tests/e2e`. Protocolo completo (intenção, admissão,
-rebaixamento, poda, flaky/quarentena): skill `dd-test-stewardship`. Lei de nível de
-projeto: constitution, seção "Disciplina de Testes".
+Size by directory: SMALL = `tests/unit` + `tests/contract`; MEDIUM = `tests/integration`;
+LARGE = `tests/e2e`. Full protocol (intent, admission, demotion, pruning,
+flaky/quarantine): the `dd-test-stewardship` skill. Project-level law: the constitution's
+"Test discipline" section.
 
 <!-- dadaia:fixed slop-tests -->
 <!-- /dadaia:fixed slop-tests -->

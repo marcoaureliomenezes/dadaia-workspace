@@ -1,6 +1,6 @@
 # SPEC — Release: 0.4.7
 
-**Status:** Aprovado
+**Status:** Approved
 **Release ID:** 0.4.7
 **Owner:** product-engineer
 **Opened:** 2026-09-13

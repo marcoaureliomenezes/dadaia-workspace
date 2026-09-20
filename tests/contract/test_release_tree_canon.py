@@ -65,7 +65,7 @@ def _write_release(root: Path, rel_dir: str, doc: dict[str, Any], *, trio: bool 
     (d / "_RELEASE.json").write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
     if trio:
         for artifact in ("SPEC.md", "PLAN.md", "TASKS.md"):
-            (d / artifact).write_text("**Status:** Aprovado\n", encoding="utf-8")
+            (d / artifact).write_text("**Status:** Approved\n", encoding="utf-8")
     return d
 
 

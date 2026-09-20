@@ -50,8 +50,8 @@ def _closed_release(specs: Path, release_id: str = "1.0.0", *, tasks: str = "- [
     specs.mkdir(parents=True, exist_ok=True)
     release_new(specs, release_id)
     rdir = specs / "releases" / release_id
-    (rdir / "PLAN.md").write_text("# PLAN\n\n**Status:** Aprovado\n", encoding="utf-8")
-    (rdir / "TASKS.md").write_text("# TASKS\n\n**Status:** Aprovado\n\n" + tasks, encoding="utf-8")
+    (rdir / "PLAN.md").write_text("# PLAN\n\n**Status:** Approved\n", encoding="utf-8")
+    (rdir / "TASKS.md").write_text("# TASKS\n\n**Status:** Approved\n\n" + tasks, encoding="utf-8")
     state = json.loads((rdir / "_RELEASE.json").read_text(encoding="utf-8"))
     state["phase"] = "CLOSURE"
     state["rc"] = 2

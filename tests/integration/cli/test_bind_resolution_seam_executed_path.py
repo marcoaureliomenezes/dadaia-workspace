@@ -56,7 +56,7 @@ def _seed_specs_tree(repo: Path, release: str) -> None:
     (repo / "specs" / "releases" / release).mkdir(parents=True)
     for name in ("SPEC.md", "PLAN.md", "TASKS.md"):
         (repo / "specs" / "releases" / release / name).write_text(
-            f"# {name}\n\n> **Status:** Aprovado\n", encoding="utf-8"
+            f"# {name}\n\n> **Status:** Approved\n", encoding="utf-8"
         )
     (repo / "specs" / "releases" / "ACTIVE.md").write_text(
         f"release: {release}\nphase: IMPLEMENTATION\n", encoding="utf-8"

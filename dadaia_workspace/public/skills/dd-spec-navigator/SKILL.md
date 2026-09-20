@@ -4,7 +4,7 @@ description: >
   Ground a session and load the specs in canonical order: resolve the context,
   bootstrap memory (tech digest, catalog, 1-3 feature atoms, ARCHITECTURE.md when the
   work is structural), resolve the live release via _RELEASE.json, read
-  SPEC/PLAN/TASKS and verify Aprovado. Use as the first act of any implementation,
+  SPEC/PLAN/TASKS and verify Approved. Use as the first act of any implementation,
   review, planning or closure task.
 ---
 
@@ -48,14 +48,14 @@ read or any output written.
    inform the operator.
 3. Read `SPEC.md`; add `PLAN.md` when planning or implementing; add `TASKS.md` when
    implementing; read `_RELEASE.json`'s `log` when `phase` is `CLOSURE`/`ARCHIVED`.
-4. Verify every loaded SPEC/PLAN/TASKS carries `**Status:** Aprovado` before any
+4. Verify every loaded SPEC/PLAN/TASKS carries `**Status:** Approved` before any
    implementation; stop and name the unapproved artifact otherwise.
 
 ## Done when
 
 - Context and live release are resolved and named.
 - Constitution, ARCHITECTURE.md, TECHSTACK.md and the 1-3 relevant atoms are read.
-- Every SPEC/PLAN/TASKS in scope carries `**Status:** Aprovado`, or the gap was
+- Every SPEC/PLAN/TASKS in scope carries `**Status:** Approved`, or the gap was
   reported first.
 
 ## References

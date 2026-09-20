@@ -21,10 +21,10 @@ def _specs_with_release(tmp_path: Path, *, legacy_name: bool) -> Path:
     rdir = specs / "releases" / "1.0.0"
     rdir.mkdir(parents=True)
     (rdir / "SPEC.md").write_text(
-        "# SPEC — Release: 1.0.0\n\n**Status:** Aprovado\n", encoding="utf-8"
+        "# SPEC — Release: 1.0.0\n\n**Status:** Approved\n", encoding="utf-8"
     )
-    (rdir / "PLAN.md").write_text("# PLAN\n\n**Status:** Aprovado\n", encoding="utf-8")
-    (rdir / "TASKS.md").write_text("# TASKS\n\n**Status:** Aprovado\n", encoding="utf-8")
+    (rdir / "PLAN.md").write_text("# PLAN\n\n**Status:** Approved\n", encoding="utf-8")
+    (rdir / "TASKS.md").write_text("# TASKS\n\n**Status:** Approved\n", encoding="utf-8")
     state = {
         "schema": "release-state-v1",
         "release": "1.0.0",

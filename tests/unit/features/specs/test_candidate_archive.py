@@ -27,9 +27,9 @@ def _live_release(
 ) -> Path:
     rdir = specs / "releases" / version
     rdir.mkdir(parents=True)
-    (rdir / "SPEC.md").write_text("# SPEC\n\n**Status:** Aprovado\n", encoding="utf-8")
-    (rdir / "PLAN.md").write_text("# PLAN\n\n**Status:** Aprovado\n", encoding="utf-8")
-    (rdir / "TASKS.md").write_text("# TASKS\n\n**Status:** Aprovado\n\n" + tasks, encoding="utf-8")
+    (rdir / "SPEC.md").write_text("# SPEC\n\n**Status:** Approved\n", encoding="utf-8")
+    (rdir / "PLAN.md").write_text("# PLAN\n\n**Status:** Approved\n", encoding="utf-8")
+    (rdir / "TASKS.md").write_text("# TASKS\n\n**Status:** Approved\n\n" + tasks, encoding="utf-8")
     state = {
         "schema": "release-state-v1",
         "release": version,

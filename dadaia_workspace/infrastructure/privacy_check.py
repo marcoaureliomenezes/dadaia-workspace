@@ -67,6 +67,22 @@ _PRIVACY_DENYLIST_REL = Path(".dadaia") / "states" / "privacy_denylist.json"
 _PRIVACY_BASELINE_PKG = "dadaia_workspace.infrastructure.data"
 _PRIVACY_BASELINE_FILE = "privacy_baseline.json"
 
+#: The published surface is English-only. These retired
+#: Portuguese control terms are the adoption blocker this closed: a consumer
+#: meets them on day 1, inside otherwise-English law. Scanned under ``public/`` only,
+#: on the same walk as the privacy layers, because the failure mode is identical —
+#: an authored asset leaking something that must never ship.
+PORTUGUESE_CONTROL_TERMS: tuple[tuple[str, str], ...] = (
+    ("Aprovado", "retired status token — use 'Approved'"),
+    ("Em revisão", "retired status token — use 'In review'"),
+    ("Em revisao", "retired status token — use 'In review'"),
+    ("Rascunho", "retired status token — use 'Draft'"),
+    ("Catálogo", "Portuguese heading — use 'catalog'"),
+    ("APROVADA", "Portuguese verdict — use 'APPROVED'"),
+    ("BLOQUEADA", "Portuguese verdict — use 'BLOCKED'"),
+    ("em progresso", "Portuguese marker prose — use 'in progress'"),
+)
+
 _OK_MARKER = DoctorLine(DoctorStatus.OK, "public-privacy")
 # Distinct ok line so an operator can tell which mode actually ran.
 _BASELINE_OK_MARKER = DoctorLine(
@@ -294,6 +310,15 @@ def check_public_privacy(
                             f"public-privacy:{rel.as_posix()}: contains '{term}' ({reason})",
                         )
                     )
+            if path.is_relative_to(public_dir):
+                for term, reason in PORTUGUESE_CONTROL_TERMS:
+                    if term.lower() in lowered:
+                        findings.append(
+                            DoctorLine(
+                                DoctorStatus.ERROR,
+                                f"public-privacy:{rel.as_posix()}: contains '{term}' ({reason})",
+                            )
+                        )
             for value, reason in _scan_text_for_baseline(text, baseline):
                 findings.append(
                     DoctorLine(

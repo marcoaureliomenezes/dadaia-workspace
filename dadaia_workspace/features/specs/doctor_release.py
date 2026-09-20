@@ -244,17 +244,17 @@ class ReleaseValidator:
                     )
                 )
             elif status != APPROVED and phase in ("IMPLEMENTATION", "CLOSURE"):
-                # Bug fresh-release-scaffold-emits-spec-doctor-warnings-042: Draft/Em
-                # revisão IS the legitimate state of a DEFINITION-phase release — the
+                # Bug fresh-release-scaffold-emits-spec-doctor-warnings-042: Draft/In
+                # review IS the legitimate state of a DEFINITION-phase release — the
                 # scaffolder emits exactly that. Only implementation-bound phases
-                # expect Aprovado artifacts.
+                # expect approved artifacts.
                 issues.append(
                     SpecsDoctorIssue(
                         code="SPEC-DOC-004",
                         severity=Severity.WARNING,
                         description=(
                             f"{fname} is '{status}' but the active release phase is "
-                            f"'{phase}'; expected 'Aprovado' for implementation-bound "
+                            f"'{phase}'; expected '{APPROVED}' for implementation-bound "
                             "phases"
                         ),
                         path=str(fpath),
@@ -337,7 +337,7 @@ class ReleaseValidator:
         - phase ∈ {SPEC, DEFINITION}: the active TASKS must NOT already be an
           ``[x]``-majority (work claimed complete before implementation began —
           the live audit incident where phase=SPEC but 19/19 tasks were ``[x]``).
-        - phase == IMPLEMENTATION: TASKS.md must exist and carry ``**Status:** Aprovado``.
+        - phase == IMPLEMENTATION: TASKS.md must exist and carry ``**Status:** Approved``.
         - phase == CLOSURE: every non-CLOSURE task must be ``[x]`` (no ``[ ]``/``[-]``).
         Other phases are not constrained here.
         """
@@ -393,7 +393,7 @@ class ReleaseValidator:
                         severity=Severity.ERROR,
                         description=(
                             f"Active release phase='IMPLEMENTATION' but TASKS.md of "
-                            f"release '{release}' is not '**Status:** Aprovado' "
+                            f"release '{release}' is not '**Status:** {APPROVED}' "
                             f"(found '{_extract_status(tasks)}'). Implementation phase "
                             "requires an approved TASKS.md (constitution §7)."
                         ),

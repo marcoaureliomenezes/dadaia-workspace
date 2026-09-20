@@ -1,6 +1,6 @@
 # TASKS: Release v0.2.0 — Consumer Dev-Factory Core
 
-**Status:** Aprovado
+**Status:** Approved
 **Release ID:** v0.2.0
 **Owner:** product-engineer
 

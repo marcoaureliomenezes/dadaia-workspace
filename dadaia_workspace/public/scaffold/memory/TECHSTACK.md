@@ -1,36 +1,36 @@
 ---
 slug: TECHSTACK
 title: Tech Stack
-tldr: Linguagens, runtimes, dependências aprovadas e restrições do stack tecnológico.
-summary: Cataloga todas as linguagens, runtimes e dependências em uso, além dos comandos canônicos e das restrições explícitas do stack. Referência obrigatória antes de propor novas dependências.
+tldr: Languages, runtimes, approved dependencies and stack constraints.
+summary: Catalogs every language, runtime and dependency in use, plus the canonical commands and the stack's explicit constraints. Mandatory reading before proposing a new dependency.
 tags:
   - tech-stack
   - dependencies
   - languages
 ---
 
-## Linguagens
+## Languages
 
-| Linguagem | Versão | Uso |
-|-----------|--------|-----|
-| placeholder | 0.0 | Descrever uso aqui. |
+| Language | Version | Use |
+|----------|---------|-----|
+| placeholder | 0.0 | Describe the use here. |
 
-## Runtimes e ferramentas
+## Runtimes and tooling
 
-| Ferramenta | Versão | Função |
-|------------|--------|--------|
-| placeholder | 0.0 | Descrever função aqui. |
+| Tool | Version | Role |
+|------|---------|------|
+| placeholder | 0.0 | Describe the role here. |
 
-## Dependências aprovadas
+## Approved dependencies
 
-Nenhuma dependência registrada ainda.
+No dependency registered yet.
 
-## Restrições e proibições
+## Constraints and prohibitions
 
-Sem restrições registradas.
+No constraint registered yet.
 
-## Comandos canônicos
+## Canonical commands
 
 ```bash
-# Sem comandos canônicos registrados
+# No canonical command registered
 ```

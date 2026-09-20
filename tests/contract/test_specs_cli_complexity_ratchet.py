@@ -60,7 +60,11 @@ _DOCTOR_CEILING = 8
 # "stamp v6 or refuse" rule) — same-commit justification per this test's own error
 # message; the SCAFFOLD's 0.6.0 expiry (A7) is unaffected, this is a same-generation
 # re-pin, not a renewal.
-_UPGRADE_MODULE_SHA256 = "a5a37fbffe73c2ce19e528aead5cb6f84848895a3fd9943b0481167b675794f1"
+# Re-pinned at 0.4.7 T-047-58 (FR4): the English control vocabulary gives `specs upgrade`
+# its status-token rewrite lane — an authorized, task-declared change to this module
+# (same-commit justification per this test's own error message), not a renewal of the
+# SCAFFOLD's 0.6.0 expiry.
+_UPGRADE_MODULE_SHA256 = "c87c9cd84f1bd5eb6f054adf99e108d6424fc2ff7dbc47366ccb35f1e0a71c30"
 
 
 def _complexity_by_name(path: Path) -> dict[str, int]:

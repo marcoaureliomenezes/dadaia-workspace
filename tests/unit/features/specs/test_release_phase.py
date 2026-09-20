@@ -1,6 +1,6 @@
 """`release phase` — phase and milestones move only by verb (0.4.7 FR5, T-047-29).
 
-Intent: CONTRACT — 0.4.7 FR5 (`IMPLEMENTATION` requires the trio `Aprovado` and stamps
+Intent: CONTRACT — 0.4.7 FR5 (`IMPLEMENTATION` requires the trio `Approved` and stamps
 `defined`; `CLOSURE` requires every task `[x]` and stamps `implemented {sha, rc+1, ts}`;
 an out-of-order or repeated transition is refused with one `fix:`; `archive` can no
 longer hang on a hand-set milestone).
@@ -35,7 +35,7 @@ def _live_release(
     *,
     phase: str = "DEFINITION",
     tasks: str = "- [x] T-1 done\n",
-    status: str = "Aprovado",
+    status: str = "Approved",
     plan_status: str | None = None,
     defined: dict[str, object] | None = None,
     rc: int | None = None,
@@ -70,7 +70,7 @@ def _state(rdir: Path) -> dict[str, object]:
 
 
 def test_implementation_stamps_defined_and_one_note(tmp_path: Path) -> None:
-    """The trio is `Aprovado`, so the candidate is defined: phase and milestone move
+    """The trio is `Approved`, so the candidate is defined: phase and milestone move
     together, in one act, with one `note` recording it."""
     rdir = _live_release(tmp_path)
     record = set_phase(tmp_path, "IMPLEMENTATION", sha=_SHA)

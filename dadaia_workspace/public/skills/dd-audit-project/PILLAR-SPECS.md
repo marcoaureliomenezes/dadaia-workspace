@@ -28,7 +28,7 @@ dadaia doctor --context <ctx> --json
 ## `_RELEASE.json` milestone completeness
 
 1. For every release whose `_RELEASE.json` the window's commits touch, confirm the three canonical milestones.
-2. Milestones: `defined` (SPEC `Aprovado`), `implemented` (final-rc QA close), `shipped` (merge to `main`).
+2. Milestones: `defined` (SPEC `Approved`), `implemented` (final-rc QA close), `shipped` (merge to `main`).
 3. Confirm each carries a `sha` (and, where applicable, a `pr`).
 4. Flag a release with a `shipped` milestone but no `defined`/`implemented` milestone — the chain has a gap.
 5. For an archived release, check the same via its `releases_histo.jsonl` summary.

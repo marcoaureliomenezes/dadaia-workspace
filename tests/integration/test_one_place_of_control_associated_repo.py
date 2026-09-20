@@ -72,7 +72,7 @@ def _seed_main_repo(repo: Path) -> None:
     release_dir = repo / "specs" / "releases" / _MAIN_RELEASE
     release_dir.mkdir(parents=True)
     for name in ("SPEC.md", "PLAN.md", "TASKS.md"):
-        (release_dir / name).write_text(f"# {name}\n\n> **Status:** Aprovado\n", encoding="utf-8")
+        (release_dir / name).write_text(f"# {name}\n\n> **Status:** Approved\n", encoding="utf-8")
     # ACTIVE.md retired (v0.5.0 FR4/T-050-21A) -- the live phase is read directly off
     # RELEASE.json (core.release_state.parse_release_state).
     write_release_phase(repo / "specs", _MAIN_RELEASE, _MAIN_PHASE)

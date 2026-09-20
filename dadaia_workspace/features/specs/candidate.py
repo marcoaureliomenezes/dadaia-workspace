@@ -39,7 +39,7 @@ from typing import Any
 from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.models.histo import RELEASES_HISTO_DISPOSITIONS, HistoRecord
 from dadaia_workspace.core.release_state import RELEASE_STATE_FILENAME, release_state_file
-from dadaia_workspace.core.spec_status import extract_status
+from dadaia_workspace.core.spec_status import APPROVED, extract_status
 from dadaia_workspace.core.specs_version import is_release_semver
 from dadaia_workspace.features.specs.canon import release_new
 from dadaia_workspace.features.specs.doctor_common import resolve_live_release_id
@@ -258,7 +258,7 @@ _PHASE_PREDECESSOR: dict[str, str] = {
 
 
 def _refuse_unapproved_trio(release_dir: Path, release_id: str) -> None:
-    """A candidate enters IMPLEMENTATION only with all three documents ``Aprovado`` —
+    """A candidate enters IMPLEMENTATION only with all three documents ``Approved`` —
     the same status token ``dd-spec-navigator`` reads, parsed by the one extractor."""
     for name in _TRIO:
         document = release_dir / name
@@ -269,12 +269,12 @@ def _refuse_unapproved_trio(release_dir: Path, release_id: str) -> None:
                 f"fix: {DADAIA_BIN} release new {release_id}"
             )
         status = extract_status(document.read_text(encoding="utf-8"))
-        if status != "Aprovado":
+        if status != APPROVED:
             raise ArchiveError(
                 f"specs/releases/{release_id}/{name} carries status {status!r} — a "
                 "candidate enters IMPLEMENTATION only once SPEC, PLAN and TASKS are all "
-                "'**Status:** Aprovado'.\n"
-                f"fix: sed -i 's/^\\*\\*Status:\\*\\* .*/**Status:** Aprovado/' "
+                f"'**Status:** {APPROVED}'.\n"
+                f"fix: sed -i 's/^\\*\\*Status:\\*\\* .*/**Status:** {APPROVED}/' "
                 f"specs/releases/{release_id}/{name}"
             )
 
@@ -287,7 +287,7 @@ def set_phase(specs_dir: Path, phase: str, *, sha: str) -> PhaseChange:
     ``release archive`` refused on a hand-set ``implemented`` that ``archive`` itself
     validated: a document with two writers, one of them indistinguishable from a typo.
 
-    - ``IMPLEMENTATION`` requires the trio at root, all ``Aprovado``, and stamps
+    - ``IMPLEMENTATION`` requires the trio at root, all ``Approved``, and stamps
       ``defined {sha, ts}`` (re-stamped when a later candidate is defined).
     - ``CLOSURE`` requires every task ``[x]`` and stamps ``implemented {sha, rc, ts}``
       where ``rc`` names the candidate being closed (the archived count + 1).

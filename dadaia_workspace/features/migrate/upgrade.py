@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from dadaia_workspace.core import specs_version as _version
+from dadaia_workspace.core.spec_status import APPROVED, DRAFT, IN_REVIEW
 from dadaia_workspace.core.specs_repair import remove_placeholder_atoms
 from dadaia_workspace.features.migrate import registry as _registry
 
@@ -34,6 +35,9 @@ class UpgradeResult:
     #: Placeholder atoms removed by the unconditional template-artifact repair
     #: (planned-only when ``dry_run``).
     placeholder_removed: list[Path] = field(default_factory=list)
+    #: Live-release trio documents whose retired Portuguese status token was rewritten
+    #: to the English vocabulary (planned-only when ``dry_run``).
+    status_rewritten: list[Path] = field(default_factory=list)
 
 
 def upgrade(
@@ -56,14 +60,17 @@ def upgrade(
         removed = remove_placeholder_atoms(specs_dir, dry_run=True) + plan_empty_ideas_dir(
             specs_dir
         )
+        restated = plan_status_token_rewrites(specs_dir)
     else:
         removed = remove_placeholder_atoms(specs_dir) + remove_empty_ideas_dir(specs_dir)
+        restated = rewrite_status_tokens(specs_dir)
     return UpgradeResult(
         from_version=current,
         to_version=goal,
         dry_run=dry_run,
-        no_op=not removed,
+        no_op=not (removed or restated),
         placeholder_removed=removed,
+        status_rewritten=restated,
     )
 
 
@@ -84,3 +91,59 @@ def remove_empty_ideas_dir(specs_dir: Path) -> list[Path]:
             child.unlink()
         ideas.rmdir()
     return planned
+
+
+#: The retired Portuguese status tokens mapped onto the one English vocabulary
+#: (``core.spec_status``). A tree is migrated ONCE, here — nothing downstream
+#: keeps a compatibility spelling, so the doctor keeps exactly one rule.
+_RETIRED_STATUS_TOKENS = {
+    "Aprovado": APPROVED,
+    "Em revisão": IN_REVIEW,
+    "Em revisao": IN_REVIEW,
+    "Rascunho": DRAFT,
+}
+_TRIO = ("SPEC.md", "PLAN.md", "TASKS.md")
+
+
+def _live_trio_documents(specs_dir: Path) -> list[Path]:
+    """Every trio document of every LIVE release — release root and its ``rc-N/``
+    archives. ``releases/_archive/`` is published history: excluded by path, never by
+    token, so an archived tree keeps reading as it shipped."""
+    releases = specs_dir / "releases"
+    return sorted(
+        path
+        for path in releases.glob("*/**/*.md")
+        if path.name in _TRIO and "_archive" not in path.relative_to(releases).parts
+    )
+
+
+def plan_status_token_rewrites(specs_dir: Path) -> list[Path]:
+    """Live trio documents still declaring a retired Portuguese status token."""
+    planned: list[Path] = []
+    for path in _live_trio_documents(specs_dir):
+        text = path.read_text(encoding="utf-8")
+        if _rewrite_status_line(text) != text:
+            planned.append(path)
+    return planned
+
+
+def rewrite_status_tokens(specs_dir: Path) -> list[Path]:
+    """Rewrite the planned set in place, returning what was rewritten."""
+    rewritten = plan_status_token_rewrites(specs_dir)
+    for path in rewritten:
+        text = path.read_text(encoding="utf-8")
+        path.write_text(_rewrite_status_line(text), encoding="utf-8")
+    return rewritten
+
+
+def _rewrite_status_line(text: str) -> str:
+    """Translate the document's ``**Status:**`` declaration, and nothing else."""
+    lines = text.splitlines(keepends=True)
+    for index, line in enumerate(lines):
+        if "**Status:**" not in line:
+            continue
+        for retired, english in _RETIRED_STATUS_TOKENS.items():
+            if retired in line:
+                lines[index] = line.replace(retired, english)
+                break
+    return "".join(lines)

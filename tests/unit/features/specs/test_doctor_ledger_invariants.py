@@ -121,9 +121,9 @@ def _make_clean_specs_tree(root: Path, release_id: str = "v0.1.10") -> Path:
         )
 
     _set_active(specs, release_id, "IMPLEMENTATION")
-    spec_md = "# Spec\n\n> **Status:** Aprovado\n> **Created:** 2026-06-09\n\nContent.\n"
-    plan_md = "# Plan\n\n> **Status:** Aprovado\n\nShort.\n"
-    tasks_md = "# Tasks\n\n> **Status:** Aprovado\n\n- [-] T1 something\n- [ ] T2 other\n"
+    spec_md = "# Spec\n\n> **Status:** Approved\n> **Created:** 2026-06-09\n\nContent.\n"
+    plan_md = "# Plan\n\n> **Status:** Approved\n\nShort.\n"
+    tasks_md = "# Tasks\n\n> **Status:** Approved\n\n- [-] T1 something\n- [ ] T2 other\n"
     (specs / "releases" / release_id / "SPEC.md").write_text(spec_md, encoding="utf-8")
     (specs / "releases" / release_id / "PLAN.md").write_text(plan_md, encoding="utf-8")
     (specs / "releases" / release_id / "TASKS.md").write_text(tasks_md, encoding="utf-8")
@@ -153,7 +153,7 @@ def _set_active(specs: Path, release_id: str, phase: str) -> None:
 
 def _write_tasks(specs: Path, release_id: str, body: str) -> None:
     (specs / "releases" / release_id / "TASKS.md").write_text(
-        f"# Tasks\n\n> **Status:** Aprovado\n\n{body}\n", encoding="utf-8"
+        f"# Tasks\n\n> **Status:** Approved\n\n{body}\n", encoding="utf-8"
     )
 
 
@@ -165,7 +165,7 @@ def _by_code(issues: list[SpecsDoctorIssue], code: str) -> list[SpecsDoctorIssue
     return [i for i in issues if i.code == code]
 
 
-_MINIMAL_SPEC_MD = "# Spec\n\n> **Status:** Aprovado\n"
+_MINIMAL_SPEC_MD = "# Spec\n\n> **Status:** Approved\n"
 
 
 def _write_minimal_spec(rel: Path) -> None:
@@ -353,7 +353,7 @@ def test_legacy_nested_and_allowlist_forward_enforcement(tmp_path: Path) -> None
     _write_minimal_spec(real)
     nested = specs_a / "_archive" / "releases" / "v0.2.0" / "v0.1.9"
     nested.mkdir(parents=True)
-    (nested / "SPEC.md").write_text("# Spec\n\n> **Status:** Aprovado\n", encoding="utf-8")
+    (nested / "SPEC.md").write_text("# Spec\n\n> **Status:** Approved\n", encoding="utf-8")
     # The v0.2.0 PARENT also needs its own artifact -- is_release_dir(parent) is what
     # makes is_legacy_nested_release recognize the nested v0.1.9 as a NESTED release
     # (v0.5.0 T-050-25A, A4.4: CLOSURE.md alone no longer counts).
@@ -449,8 +449,8 @@ def test_doc039_silent_on_segmented_dir_with_artifacts_in_segments(tmp_path: Pat
     for segment in ("alpha-1", "rc-1"):
         seg_dir = segmented / segment
         seg_dir.mkdir(parents=True)
-        (seg_dir / "SPEC.md").write_text("# Spec\n\n> **Status:** Aprovado\n", encoding="utf-8")
-        (seg_dir / "TASKS.md").write_text("# Tasks\n\n> **Status:** Aprovado\n", encoding="utf-8")
+        (seg_dir / "SPEC.md").write_text("# Spec\n\n> **Status:** Approved\n", encoding="utf-8")
+        (seg_dir / "TASKS.md").write_text("# Tasks\n\n> **Status:** Approved\n", encoding="utf-8")
     (segmented / "CLOSURE.md").write_text(_CLOSURE_MD, encoding="utf-8")
     assert "SPEC-DOC-039" not in _codes(SpecsDoctor(specs).check())
 
@@ -473,7 +473,7 @@ def test_doc039_silent_on_complete_archive(tmp_path: Path) -> None:
     complete = specs / "_archive" / "releases" / "v0.1.9"
     complete.mkdir(parents=True)
     for fname in ("SPEC.md", "PLAN.md", "TASKS.md"):
-        (complete / fname).write_text(f"# {fname}\n\n> **Status:** Aprovado\n", encoding="utf-8")
+        (complete / fname).write_text(f"# {fname}\n\n> **Status:** Approved\n", encoding="utf-8")
     (complete / "CLOSURE.md").write_text(_CLOSURE_MD, encoding="utf-8")
     assert "SPEC-DOC-039" not in _codes(SpecsDoctor(specs).check())
 

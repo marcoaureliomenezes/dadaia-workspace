@@ -103,7 +103,7 @@
 | Branch | Pushable | Cut from | Advances by |
 |---|---|---|---|
 | `feature/{M.m.p}` | Yes — local CI preflight + valid name | `main` | opens the PR below |
-| `develop` | No — never a direct push | `main` (bootstrap only) | PR from `feature/{M.m.p}`, at definition `Aprovado` and at each `rc` merge |
+| `develop` | No — never a direct push | `main` (bootstrap only) | PR from `feature/{M.m.p}`, at definition `Approved` and at each `rc` merge |
 | `main` | No — never a direct push | — | PR from `develop`, at the final `rc` |
 
 ### 4.2 Rules
@@ -160,7 +160,7 @@
 
 ### 6.1 Status tokens
 
-- `Aprovado`, `Em revisão`, `Draft` are the canonical status tokens — keep as-is, any language.
+- `Approved`, `In review`, `Draft` are the canonical status tokens — English, in any working language.
 
 ### 6.2 Canon
 
@@ -170,7 +170,7 @@
 
 ### 6.3 Tasks
 
-- Read SPEC, PLAN and TASKS — all three must carry `**Status:** Aprovado`.
+- Read SPEC, PLAN and TASKS — all three must carry `**Status:** Approved`.
 - Reserve: flip `[ ] -> [-]` before writing; one `[-]` at a time unless TASKS declares disjoint write sets.
 - Complete the work inside the task's declared write set.
 - Flip `[-] -> [x]` and commit as `conventional-commit(task-id): description` — the auditable trace.
@@ -211,7 +211,7 @@
 
 - A release is `major.minor.patch` with OPEN scope, born by `dadaia release new <id>` (SPEC.md + `_RELEASE.json`, DEFINITION, one transaction).
 - It grows by stacked closed-scope candidates; exactly one live release ever, a second is refused (ADR 0005).
-- A candidate is one full SDD cycle: grill -> SPEC/PLAN/TASKS `Aprovado` at the release root -> implementation -> memory -> CLOSURE -> `feature -> develop` merge.
+- A candidate is one full SDD cycle: grill -> SPEC/PLAN/TASKS `Approved` at the release root -> implementation -> memory -> CLOSURE -> `feature -> develop` merge.
 - `phase` and the `defined`/`implemented` milestones move only by `dadaia release phase IMPLEMENTATION|CLOSURE --sha <sha>`; `shipped` only by `release archive`.
 - A `dd-grill-me` session on the picked set precedes each candidate's SPEC.
 - After each merge, the promote-or-continue gate (§4.2): continue = `dadaia release rc-archive` moves the trio to `rc-N/` and a fresh trio is born at root; promote = the ship lane, then `dadaia release archive <id> --shipped --pr --next` (final trio stays at root, ADR 0009).

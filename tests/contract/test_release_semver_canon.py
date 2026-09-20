@@ -216,7 +216,7 @@ def test_v_prefixed_release_id_refused_at_mint_but_archived_dir_still_resolves(
     archived = specs / "_archive" / "releases" / "v0.4.4"
     archived.mkdir(parents=True)
     (archived / "SPEC.md").write_text(
-        "**Status:** Aprovado\n**Created:** 2026-08-01\n", encoding="utf-8"
+        "**Status:** Approved\n**Created:** 2026-08-01\n", encoding="utf-8"
     )
     for fname in ("PLAN.md", "TASKS.md"):
         (archived / fname).write_text("x", encoding="utf-8")

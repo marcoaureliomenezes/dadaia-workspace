@@ -70,7 +70,7 @@ def _plant_status_line_gone(root: Path) -> None:
 def _plant_oversized_plan(root: Path) -> None:
     plan = root / "specs" / "releases" / _RELEASE / "PLAN.md"
     body = "\n".join(f"- line {i}" for i in range(400))
-    plan.write_text(f"# Plan\n\n> **Status:** Aprovado\n\n{body}\n", encoding="utf-8")
+    plan.write_text(f"# Plan\n\n> **Status:** Approved\n\n{body}\n", encoding="utf-8")
 
 
 def _plant_changelog_heading(root: Path) -> None:
@@ -134,7 +134,7 @@ PLANTS: dict[str, Plant] = {
         {
             "<id>": _RELEASE,
             "<document>": "SPEC",
-            "<Aprovado|Em revisão|Draft>": "Aprovado",
+            "<Approved|In review|Draft>": "Approved",
         },
     ),
     "SPEC-DOC-005": Plant(_plant_oversized_plan),

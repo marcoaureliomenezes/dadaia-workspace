@@ -54,7 +54,7 @@ for this task, so none is touched here):
 
 Left exactly as written; a future task can pick this up.
 
-## [0.4.7] — em progresso
+## [0.4.7] — in progress
 
 Open-scope release (ADRs 0005–0009): version minted at birth from the PyPI lineage
 (latest published `0.4.6` + 1 patch); each closed-scope candidate appends here.
@@ -179,7 +179,7 @@ Open-scope release (ADRs 0005–0009): version minted at birth from the PyPI lin
 - `dadaia audit disposition <dir> <finding-id> --disposition resolved|superseded|deferred|rejected`
   and `dadaia audit close <dir> --sha <window-end>` (`features/specs/audit.py`): all-or-nothing,
   `<dir>` confined to `specs/audits/`, histo `entry {sha, pillars{bugs,specs,memory}, dispositions}`.
-- `dadaia release phase IMPLEMENTATION|CLOSURE --sha <sha>`: the trio-`Aprovado` and every-task-`[x]`
+- `dadaia release phase IMPLEMENTATION|CLOSURE --sha <sha>`: the trio-`Approved` and every-task-`[x]`
   checks stamp `defined` / `implemented {sha, rc, ts}`; `phase` and milestones move only by verb.
 - `GovernanceEvent {event_id, ts, session_id, context, verb, ledger, record_id, record_hash}` in the
   telemetry store (migration 7, `container.build_telemetry_store()`), written once per governance verb
@@ -1294,7 +1294,7 @@ contract.
   `develop`, `feature/{M.m.p}`, `hotfix/{M.m.p}` with PATCH ≥ 1; `develop` is the only
   pushable branch, feature and hotfix branches are local-only, and `main` advances only via
   a PR from `develop`. Stage placement, the two-milestone merge cadence
-  (definition-trio `Aprovado` and ship, each followed by a diff-based security review of
+  (definition-trio `Approved` and ship, each followed by a diff-based security review of
   `origin/develop..develop` and a push of `develop`) and the finalization order
   memory → CLOSURE → archive are stated once at law level; every other skill and agent
   references the skill instead of restating it. Always-on cost +389 tokens against a +400

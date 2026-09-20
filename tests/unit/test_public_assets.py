@@ -951,3 +951,41 @@ def test_internal_hostname_uppercase_initial_real_hostname_fires_through_the_doc
     )
     report = [line.render() for line in _manager(dirty_dir)._check_public_privacy()]  # noqa: SLF001
     assert any(line.startswith("[error] public-privacy:") for line in report)
+
+
+@pytest.mark.parametrize(
+    "term", ["Aprovado", "Em revisão", "Rascunho", "Catálogo", "APROVADA", "BLOQUEADA"]
+)
+def test_public_privacy_flags_portuguese_control_vocabulary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, term: str
+) -> None:
+    """Intent: CONTRACT — 0.4.7 FR4/AC4.1 (T-047-58): `public-privacy` is the runtime
+    guard that keeps the published surface English. Without it the translation is a
+    one-off cleanup that drifts back on the next authored asset."""
+    _disable_operator_denylist(monkeypatch, tmp_path)
+    public_dir = tmp_path / "public"
+    (public_dir / "data").mkdir(parents=True)
+    (public_dir / "data" / "AGENTS.md").write_text(
+        f"- Read SPEC, PLAN and TASKS — all three must carry `**Status:** {term}`.\n",
+        encoding="utf-8",
+    )
+
+    report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
+    assert any(line.startswith("[error] public-privacy:") and term in line for line in report), (
+        report
+    )
+
+
+def test_public_privacy_language_check_leaves_english_assets_alone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The negative case: the English vocabulary that replaced it never fires."""
+    _disable_operator_denylist(monkeypatch, tmp_path)
+    public_dir = tmp_path / "public"
+    (public_dir / "data").mkdir(parents=True)
+    (public_dir / "data" / "AGENTS.md").write_text(
+        "`Approved`, `In review`, `Draft` are the canonical status tokens.\n"
+        "The feature catalog lives in `memory/product/index.md`.\n",
+        encoding="utf-8",
+    )
+    assert _manager(public_dir)._check_public_privacy() == [_BASELINE_OK_MARKER]  # noqa: SLF001
