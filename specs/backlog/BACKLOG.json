@@ -238,13 +238,6 @@
         },
         {
           "subject": {
-            "kind": "code",
-            "ref": "dadaia_workspace/infrastructure/projection_rules.py#_law_projection_rules"
-          },
-          "change": "retire — no law projection: the root AGENTS.md map is authored once in public/data and installed once; scoped AGENTS.md via the scaffold"
-        },
-        {
-          "subject": {
             "kind": "doc",
             "ref": "dadaia_workspace/public/data/CONTEXT-MAP.md",
             "surface": "new"
