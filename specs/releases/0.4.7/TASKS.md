@@ -67,7 +67,7 @@
   because the job is absent.
   Write set: `.github/workflows/release.yml`, `tests/contract/test_ci_workflow_hygiene.py`.
 
-- [ ] T-047-83 — FR3: the four derived docs pages.
+- [x] T-047-83 — FR3: the four derived docs pages.
   `docs/index.md` (landing: the tagline once, links to the three pages and the skills repository),
   `docs/quickstart.md` (five minutes — install, `init <dir> --harness <name> --repo <url>`, bind,
   doctor, first backlog entry, first candidate; derived from `[[workspace-init]]`,

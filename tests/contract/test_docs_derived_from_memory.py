@@ -134,6 +134,12 @@ def test_the_derived_set_covers_the_readme_the_agent_index_and_every_authored_do
     names = {doc.relative_to(_REPO_ROOT).as_posix() for doc in _derived_docs()}
 
     assert {"README.md", "llms.txt"} <= names
+    assert {
+        "docs/index.md",
+        "docs/quickstart.md",
+        "docs/positioning.md",
+        "docs/bug-loop.md",
+    } <= names, "the site's entry pages are derived documents like any other"
     assert names - {"README.md", "llms.txt"} == {
         p.relative_to(_REPO_ROOT).as_posix()
         for p in _DOCS_DIR.glob("*.md")
