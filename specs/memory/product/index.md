@@ -55,4 +55,3 @@
 | `audits-canon` | audits-canon | Audits are committed spec artifacts — three pillars over a sha window, JSONL findings moved by dadaia audit disposition, archived by dadaia audit close. |
 | `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | One bug record shape with no derived cache, one verb per governance record change, and every committed record schema-validated by dadaia doctor. |
 | `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write), one fix line per BLOCK, chokepoints at the push. |
-

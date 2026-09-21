@@ -18,7 +18,6 @@ from typing import Any
 CODE = "LEDGER-BACKLOG-SCHEMA"
 LEDGER = "backlog/BACKLOG.json"
 HISTO = "backlog/_archive/backlog_histo.jsonl"
-_SCHEMAS = Path(__file__).resolve().parent / "schemas"
 #: A backlog item is delivered, superseded or rejected — `resolved` is a bug's word and
 #: a deferred item returns to active[] rather than exiting.
 DISPOSITIONS = ("delivered", "superseded", "rejected")
@@ -32,8 +31,15 @@ _JSON_TYPES: dict[str, Any] = {
 }  # fmt: skip
 
 
+_SCHEMAS = Path(__file__).resolve().parent / "schemas"
+#: Source-tree fallback: before `public stage` copies a schema in beside the script.
+_SHIPPED = Path(__file__).resolve().parents[3] / "schemas"
+
+
 def load_schema(name: str) -> dict[str, Any]:
-    schema: dict[str, Any] = json.loads((_SCHEMAS / f"{name}.schema.json").read_text("utf-8"))
+    own = _SCHEMAS / f"{name}.schema.json"
+    path = own if own.is_file() else next(_SHIPPED.rglob(own.name), own)
+    schema: dict[str, Any] = json.loads(path.read_text("utf-8"))
     return schema
 
 

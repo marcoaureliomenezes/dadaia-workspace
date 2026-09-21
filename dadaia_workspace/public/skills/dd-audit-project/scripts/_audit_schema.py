@@ -19,7 +19,6 @@ CODE = "LEDGER-FINDINGS-SCHEMA"
 AUDITS = "audits"
 HISTO = "audits/_archive/audits_histo.jsonl"
 FINDINGS = "FINDINGS.jsonl"
-_SCHEMAS = Path(__file__).resolve().parent / "schemas"
 #: The three pillars every audit reports counts for, in their fixed order.
 PILLARS = ("bugs", "specs", "memory")
 #: A finding is born `open` and exits by exactly one of these four words.
@@ -38,8 +37,15 @@ _JSON_TYPES: dict[str, Any] = {
 }  # fmt: skip
 
 
+_SCHEMAS = Path(__file__).resolve().parent / "schemas"
+#: Source-tree fallback: before `public stage` copies a schema in beside the script.
+_SHIPPED = Path(__file__).resolve().parents[3] / "schemas"
+
+
 def load_schema(name: str) -> dict[str, Any]:
-    schema: dict[str, Any] = json.loads((_SCHEMAS / f"{name}.schema.json").read_text("utf-8"))
+    own = _SCHEMAS / f"{name}.schema.json"
+    path = own if own.is_file() else next(_SHIPPED.rglob(own.name), own)
+    schema: dict[str, Any] = json.loads(path.read_text("utf-8"))
     return schema
 
 

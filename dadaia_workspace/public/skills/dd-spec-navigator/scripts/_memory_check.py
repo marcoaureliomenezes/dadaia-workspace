@@ -21,15 +21,16 @@ import _memory_index as idx  # noqa: E402
 from _memory_schema import CATALOG, CODE, INDEX, load_schema, parse, validate  # noqa: E402
 
 Finding = dict[str, Any]
-#: The one file under `memory/` that carries no frontmatter: the area's scoped law.
-_LAW = "AGENTS.md"
 
 
 def _atom_findings(specs: Path) -> list[Finding]:
     schema = load_schema()
     out: list[Finding] = []
-    for path in sorted((specs / "memory").rglob("*.md")):
-        if path.name in (_LAW, "index.md"):
+    # An ATOM is `memory/product/<area>/<slug>.md` (specs canon): `memory/`'s own
+    # AGENTS.md and the three Part-1/Part-2 documents carry no atom frontmatter, and a
+    # walk that read them called every scaffolded tree invalid.
+    for path in sorted((specs / "memory" / "product").rglob("*.md")):
+        if path.name == "index.md":
             continue
         rel = path.relative_to(specs).as_posix()
         data, _, error = parse(path.read_text(encoding="utf-8"))

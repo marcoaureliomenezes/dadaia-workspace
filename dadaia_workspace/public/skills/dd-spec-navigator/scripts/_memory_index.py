@@ -70,4 +70,7 @@ def render(specs: Path, catalog: dict[str, Any]) -> str:
     path = specs / INDEX
     existing = path.read_text(encoding="utf-8") if path.is_file() else None
     text = merge(existing, tables(catalog), str(catalog.get("context", "")))
-    return text if text.endswith("\n") else text + "\n"
+    # Exactly one trailing newline, whichever branch `merge` took: the fresh template and
+    # the section-replacement path used to differ by a blank line at EOF, so `generate`
+    # over a file it had just written disagreed with `check` forever.
+    return text.rstrip("\n") + "\n"

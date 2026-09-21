@@ -21,9 +21,7 @@ The product vision is not documented yet. Describe the project's core purpose he
 
 ## Feature catalog
 
-| Slug | Title | TL;DR |
-|------|-------|-------|
-| placeholder | placeholder | Placeholder — replace with the project's first real feature. |
+_No features found._
 
 ## Capability map
 

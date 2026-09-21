@@ -43,8 +43,7 @@ from dadaia_workspace.core.exceptions import SchemaVersionError, WorkspaceNotIni
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.backlog import doctor as backlog_doctor
 from dadaia_workspace.features.spec_context.doctor import DoctorService, workspace_rules
-from dadaia_workspace.features.specs import Severity, SpecsDoctor
-from dadaia_workspace.features.specs import ledgers as specs_ledgers
+from dadaia_workspace.features.specs import Severity, SpecsDoctor, doctor_adr
 from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
 from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 from dadaia_workspace.features.specs.rules import render_fix_help
@@ -110,9 +109,7 @@ def _workspace_section(service: DoctorService | None, *, expired_only: bool) -> 
     )
 
 
-def _specs_render(
-    rule: Rule[SpecsDoctor, SpecsDoctorIssue], issue: SpecsDoctorIssue
-) -> SectionFinding:
+def _specs_render[C](rule: Rule[C, SpecsDoctorIssue], issue: SpecsDoctorIssue) -> SectionFinding:
     """Render one specs-doctor issue as a section finding."""
     location = f" ({issue.path})" if issue.path else ""
     return SectionFinding(
@@ -155,32 +152,22 @@ def _ledgers_render(
     )
 
 
-def _ledger_schema_render(
-    _rule: Rule[specs_ledgers.LedgersContext, specs_ledgers.LedgerIssue],
-    issue: specs_ledgers.LedgerIssue,
-) -> SectionFinding:
-    """Render one ledger issue as a section finding, located `path:line`."""
-    error = issue.verdict == Severity.ERROR.value
-    return SectionFinding(
-        code=issue.code,
-        verdict=issue.verdict,
-        message=f"{issue.unit} {issue.message}",
-        canonical=False,
-        error=error,
-    )
-
-
 def _ledgers_section(
     specs_dir: Path | None,
     source_root: str | None,
     alias_map: str | None,
 ) -> SectionReport:
-    """The `ledgers` section: the backlog document's BL-* rules plus one schema rule per
-    committed governance ledger (0.4.7 FR6). Two features contribute, neither imports
-    the other, and the two reports merge into one section here — the composition root."""
+    """The `ledgers` section — three contributors, one name.
+
+    The backlog document's BL-* rules, the ADR ledger's own reader, and the five ledger
+    SCRIPTS (0.4.7 FR3): each ledger with a writer script is validated by THAT script's
+    `check`, run as a subprocess here. The doctor holds no second implementation of any
+    ledger schema — this is the one delegation point.
+    """
     from dadaia_workspace.cli.anchors import derive_cli_anchors
     from dadaia_workspace.core.models.histo import HistoRecord
     from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
+    from dadaia_workspace.infrastructure.ledger_scripts import script_findings
 
     if specs_dir is None:
         return _empty_section("ledgers")
@@ -198,10 +185,6 @@ def _ledgers_section(
             from_dict=HistoRecord.from_dict,
         ),
     )
-    # The `ledgers` section's ONE repair, injected here exactly as `bug_store_factory`
-    ledgers_context = specs_ledgers.build_ledgers_context(
-        specs_dir,
-    )
     return merge_sections(
         [
             run_section(
@@ -212,10 +195,11 @@ def _ledgers_section(
             ),
             run_section(
                 "ledgers",
-                specs_ledgers.RULES,
-                ledgers_context,
-                _ledger_schema_render,
+                doctor_adr.LEDGER_RULES,
+                specs_dir,
+                _specs_render,
             ),
+            SectionReport(name="ledgers", findings=tuple(script_findings(specs_dir))),
         ]
     )
 
@@ -407,34 +391,7 @@ def _apply_fixes(
     fixed = list(service.fix()) if service is not None else []
     if not expired_only and specs_doctor is not None:
         fixed.extend(f"[specs] {issue.code}: {issue.path}" for issue in specs_doctor.fix())
-    if not expired_only:
-        fixed.extend(_ledger_fixes(specs_dir, source_root, alias_map))
     return fixed
-
-
-def _ledger_fixes(
-    specs_dir: Path | None, source_root: str | None, alias_map: str | None
-) -> list[str]:
-    """Apply every `ledgers` rule that carries a fix, over ONE freshly-read context.
-
-    Only the rules whose issues name their own remediation repair anything (a hand-edited
-    schema violation is never guessed at) — that decision lives in the feature's own
-    `fix` callable, not in a branch here."""
-    if specs_dir is None:
-        return []
-    # No governance baseline on the fix path: no hand-edit rule carries a fixer (the
-    # answer is the operator's judgment), so reading the store here would buy nothing.
-    context = specs_ledgers.build_ledgers_context(
-        specs_dir,
-    )
-    actions: list[str] = []
-    for rule in specs_ledgers.RULES:
-        if rule.fix is None:
-            continue
-        for issue in rule.run(context):
-            rule.fix(context, issue)
-            actions.append(f"[ledgers] {issue.code}: {issue.unit}")
-    return actions
 
 
 def _json_payload(

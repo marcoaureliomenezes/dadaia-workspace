@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -40,6 +41,16 @@ from tests.helpers.release_state import write_release_phase
 pytestmark = [pytest.mark.integration]
 
 _runner = CliRunner()
+
+_MEMORY_SCRIPT = (
+    Path(__file__).resolve().parents[2]
+    / "dadaia_workspace"
+    / "public"
+    / "skills"
+    / "dd-spec-navigator"
+    / "scripts"
+    / "memory.py"
+)
 
 _MAIN_SLUG = "main-repo"
 _MAIN_NAME = "proj"
@@ -79,7 +90,21 @@ def _seed_main_repo(repo: Path) -> None:
     mem = repo / "specs" / "memory" / "product"
     mem.mkdir(parents=True)
     (repo / "specs" / "memory" / "TECHSTACK.md").write_text("# tech\nmain\n", encoding="utf-8")
-    (mem / "catalog.json").write_text('{"features": []}', encoding="utf-8")
+    # The catalog pair is written by its ONE writer (0.4.7 FR2/FR3: the doctor's
+    # `ledgers` section validates it by running that same script), never hand-shaped here.
+    subprocess.run(
+        [
+            sys.executable,
+            str(_MEMORY_SCRIPT),
+            "catalog",
+            "generate",
+            "--specs",
+            str(repo / "specs"),
+        ],
+        check=True,
+        capture_output=True,
+        timeout=60,
+    )
     # A2.8 (backlog doctor): an empty backlog/ dir with NO BACKLOG.json is a clean no-op.
     (repo / "specs" / "backlog").mkdir(parents=True)
     _git(repo, "-c", "init.defaultBranch=main", "init")

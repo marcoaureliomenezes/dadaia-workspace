@@ -92,7 +92,7 @@
   `cli/commands/{audit,memory}.py` (deleted), `features/specs/catalog.py`, `container.py`,
   `setup.cfg`, `docs/cli.md`, `public/scaffold/{audits,memory}/AGENTS.md`, `tests/**`.
 
-- [ ] T-047-68 — FR3: the doctor delegates. `cli/commands/doctor.py`'s `ledgers` section runs
+- [x] T-047-68 — FR3: the doctor delegates. `cli/commands/doctor.py`'s `ledgers` section runs
   each script's `check --specs <dir> --json` through `infrastructure/subprocess_runner.py`
   (`features` must not import `subprocess` — setup.cfg:42) and re-emits each line as
   `LEDGER-<NAME>-SCHEMA` with a `fix:` naming that script's subcommand. Invoke as

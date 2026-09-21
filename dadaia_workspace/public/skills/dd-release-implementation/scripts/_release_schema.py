@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 """The release ledger's vocabulary and the JSON-Schema subset its documents are read
 with — `release.py`'s one validation primitive.
-
-The schemas are ``schemas/release-state-v1.schema.json`` and
-``schemas/histo-record-v1.schema.json`` beside this file, copies `public stage` makes.
 """
 
 from __future__ import annotations
@@ -39,15 +36,21 @@ RC_DIR_RE = re.compile(r"^rc-(\d+)$")
 #: Task markers that mean the candidate is NOT closed: open ``[ ]`` or reserved ``[-]``.
 UNFINISHED_RE = re.compile(r"^\s*-\s\[( |-)\]\s.*$", re.MULTILINE)
 _STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)
-_SCHEMAS = Path(__file__).resolve().parent / "schemas"
 _JSON_TYPES: dict[str, Any] = {
     "string": str, "object": dict, "array": list, "boolean": bool,
     "null": type(None), "integer": int, "number": (int, float),
 }  # fmt: skip
 
 
+_SCHEMAS = Path(__file__).resolve().parent / "schemas"
+#: Source-tree fallback, before `public stage` copies the schema in.
+_SHIPPED = Path(__file__).resolve().parents[3] / "schemas"
+
+
 def load_schema(name: str) -> dict[str, Any]:
-    schema: dict[str, Any] = json.loads((_SCHEMAS / f"{name}.schema.json").read_text("utf-8"))
+    own = _SCHEMAS / f"{name}.schema.json"
+    path = own if own.is_file() else next(_SHIPPED.rglob(own.name), own)
+    schema: dict[str, Any] = json.loads(path.read_text("utf-8"))
     return schema
 
 

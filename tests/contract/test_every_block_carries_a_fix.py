@@ -17,6 +17,7 @@ size: SMALL.
 from __future__ import annotations
 
 import re
+import sys
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -242,7 +243,7 @@ def test_push_gate_git_read_failure_carries_a_runnable_fix() -> None:
 def _every_doctor_rule() -> list[tuple[str, doctor_rules.Rule[Any, Any]]]:
     from dadaia_workspace.features.backlog.doctor import RULES as BACKLOG_RULES
     from dadaia_workspace.features.spec_context.doctor import workspace_rules
-    from dadaia_workspace.features.specs.ledgers import RULES as LEDGER_SCHEMA_RULES
+    from dadaia_workspace.features.specs.doctor_adr import LEDGER_RULES as ADR_LEDGER_RULES
     from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 
     rules: list[tuple[str, doctor_rules.Rule[Any, Any]]] = []
@@ -250,7 +251,7 @@ def _every_doctor_rule() -> list[tuple[str, doctor_rules.Rule[Any, Any]]]:
         *workspace_rules(expired_only=False),
         *SPECS_RULES,
         *BACKLOG_RULES,
-        *LEDGER_SCHEMA_RULES,
+        *ADR_LEDGER_RULES,
     ):
         rules.append(("/".join(rule.codes), rule))
     return rules
@@ -331,3 +332,69 @@ def test_every_doctor_fix_names_a_verb_the_cli_has(
     assert _cli_tree_has(tokens), (
         f"{codes}: fix line names a verb the CLI does not have: {rule.fix_help!r}"
     )
+
+
+# ── every fix target resolves on disk ───────────────────────────────────────────
+
+#: Where a script-form fix line must resolve: the library's own skills tree. A fix may
+#: name the INSTALLED path (`.agents/skills/…`, what the operator pastes); the file it
+#: names is the one this repo ships.
+_PUBLIC_SKILLS = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public" / "skills"
+_INSTALLED_PREFIX = ".agents/skills/"
+
+
+def _script_target(command: str) -> tuple[Path, str] | None:
+    """The (shipped script, subcommand) a ``python3 …/scripts/x.py <verb>`` fix names."""
+    tokens = command.split()
+    if tokens[0] != "python3" or _INSTALLED_PREFIX not in tokens[1]:
+        return None
+    relative = tokens[1].split(_INSTALLED_PREFIX, 1)[1]
+    verb = next((token for token in tokens[2:] if not token.startswith(("-", "<"))), "")
+    return _PUBLIC_SKILLS / relative, verb
+
+
+def _fix_lines() -> list[tuple[str, str]]:
+    """Every doctor rule's fix line, plus the ledger scripts' own delegated fix."""
+    from dadaia_workspace.infrastructure.ledger_scripts import LEDGER_SCRIPTS
+
+    lines = [(codes, rule.fix_help) for codes, rule in _DOCTOR_RULES if rule.fix_help]
+    lines.extend(
+        (script.code, f"{script.invocation} check --specs specs") for script in LEDGER_SCRIPTS
+    )
+    return lines
+
+
+_FIX_LINES = _fix_lines()
+
+
+@pytest.mark.parametrize(("codes", "command"), _FIX_LINES, ids=[c for c, _ in _FIX_LINES])
+def test_every_fix_target_resolves_on_disk(codes: str, command: str) -> None:
+    """A ``fix:`` line is a free string — nothing tied it to a file or a verb that exists.
+
+    0.4.7 FR3: after the ledger verbs moved to skill scripts, a stale fix line names a
+    path nobody ships instead of a verb nobody has, and the Stall is identical. Both
+    forms are resolved HERE: a ``dadaia`` fix walks the live command tree; a script fix
+    must exist under ``public/skills/*/scripts/`` and its subcommand must accept
+    ``--help``.
+    """
+    import subprocess  # noqa: PLC0415 — a contract test executes the real script
+
+    from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
+
+    if command.startswith(DADAIA_BIN) or command.startswith("dadaia "):
+        tokens = command.split()[1:]
+        assert _cli_tree_has(tokens), f"{codes}: no such verb: {command!r}"
+        return
+    target = _script_target(command)
+    if target is None:
+        pytest.skip(f"{codes}: fix line names neither the CLI nor a skill script")
+    script, verb = target
+    assert script.is_file(), f"{codes}: fix line names a script this repo does not ship: {script}"
+    assert verb, f"{codes}: a script fix line names no subcommand: {command!r}"
+    help_run = subprocess.run(  # noqa: S603
+        [sys.executable, str(script), verb, "--help"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert help_run.returncode == 0, f"{codes}: {script.name} rejects {verb!r}: {help_run.stderr}"

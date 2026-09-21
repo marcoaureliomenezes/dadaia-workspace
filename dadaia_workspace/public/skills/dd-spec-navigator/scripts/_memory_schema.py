@@ -22,7 +22,6 @@ CODE = "LEDGER-MEMORY-SCHEMA"
 PRODUCT = "memory/product"
 CATALOG = "memory/product/catalog.json"
 INDEX = "memory/product/index.md"
-_SCHEMAS = Path(__file__).resolve().parent / "schemas"
 _DELIMITER = "---"
 _KEY_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):\s?(.*)$")
 WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
@@ -32,10 +31,18 @@ _JSON_TYPES: dict[str, Any] = {
 }  # fmt: skip
 
 
+_SCHEMAS = Path(__file__).resolve().parent / "schemas"
+#: Source-tree fallback: before `public stage` copies a schema in beside the script.
+_SHIPPED = Path(__file__).resolve().parents[3] / "schemas"
+
+
+def _schema_file() -> Path:
+    own = _SCHEMAS / "memory-frontmatter-v1.schema.json"
+    return own if own.is_file() else next(_SHIPPED.rglob(own.name), own)
+
+
 def load_schema() -> dict[str, Any]:
-    schema: dict[str, Any] = json.loads(
-        (_SCHEMAS / "memory-frontmatter-v1.schema.json").read_text("utf-8")
-    )
+    schema: dict[str, Any] = json.loads(_schema_file().read_text("utf-8"))
     return schema
 
 
