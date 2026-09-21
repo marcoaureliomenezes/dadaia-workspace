@@ -499,6 +499,12 @@
       "agent": "release.py",
       "kind": "note",
       "text": "Candidate defined at 8ad47a9a; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-09-21T04:45:59Z",
+      "agent": "dd-software-engineer",
+      "kind": "summary",
+      "text": "Candidate 9 implemented: T-047-80 5706948b (standalone_skills key + compatibility: frontmatter on the eight standalone skills, V35 2880->2877), T-047-81 693cdf86 (build-skills-repo.py: Agent Skills layout, Claude marketplace manifests, derived README, claude plugin validate clean), T-047-82 7431b681 (release job publish-skills-repo, fail-closed on SKILLS_REPO_TOKEN), T-047-83 2ae2e789 (index, quickstart, positioning, bug-loop pages derived from memory), T-047-84 b4bf69b9 (bug-ledger-lessons article, README Documentation section, llms.txt page list, Documentation url), T-047-85 079ede37 (dadaia-workspace console-script alias, quickstart shows uvx first). Deviations the reviewer must weigh: T-047-80 dropped the planned 'license:' frontmatter line (PM ruling); T-047-83 extended the quickstart's derived-from markers to pypi-distribution and workspace-doctor beyond the three atoms SPEC FR3 names; T-047-81 placed build-skills-repo.py in _STANDALONE_BY_DESIGN rather than giving it a skill invoker; the docs-site and skills-repository links ship before the operator creates either target, true-on-arrival by PM ruling. No verb entered or left (ADR 0018): the build is a script and the alias a second name for one callable."
     }
   ]
 }

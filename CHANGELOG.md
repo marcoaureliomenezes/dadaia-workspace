@@ -305,6 +305,38 @@ Open-scope release (ADRs 0005–0009): version minted at birth from the PyPI lin
   construction (ADR 0013).
 - Windows runner: derived-doc hashes over LF bytes, POSIX path filters, the telemetry backstop assertion.
 
+### Candidate 9 — skills as a package, a public face
+
+Commits `abaca618..079ede37`. No verb entered and no verb left: the skills repository is
+built by a script and the second install name is a table line, so ADR 0018's "no new CLI
+surface for a distribution concern" holds.
+
+#### Added
+- `standalone_skills` in `dadaia_workspace/public/manifest.json` and a `compatibility:`
+  frontmatter line on the eight standalone skills — the corpus states which harnesses it
+  runs under, and the slop ratchet V35 moves down 2880 -> 2877.
+- `dadaia_workspace/public/scripts/build-skills-repo.py`: the eight standalone skills built
+  into the Agent Skills layout with the Claude marketplace manifests and a derived README,
+  `claude plugin validate` clean over the output.
+- The release job `publish-skills-repo` publishes that build to the skills repository,
+  fail-closed on a missing `SKILLS_REPO_TOKEN` — no silent skip.
+- Five derived pages — `docs/index.md`, `docs/quickstart.md`, `docs/positioning.md`,
+  `docs/bug-loop.md`, `docs/bug-ledger-lessons.md` — each section naming the atom it derives
+  from under that atom's current hash; `README.md` gains a Documentation section, `llms.txt`
+  lists every page, and `[tool.poetry.urls]` `Documentation` is the Pages site.
+- `dadaia-workspace` in `[tool.poetry.scripts]` beside `dadaia`, both resolving to the one
+  callable, so `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` resolves once
+  0.4.7 is on PyPI; `docs/quickstart.md` shows the uvx line first and the pip line second.
+
+#### Removed
+- Nothing. The candidate is additive by construction: a package layout, a build script, a
+  workflow job, five pages and a second install name — no verb, no module, no behaviour
+  removed.
+
+#### Operator actions pending
+- Create the `dadaia-skills` repository and its `SKILLS_REPO_TOKEN`; enable GitHub Pages from
+  `/docs` on `main`; submit the plugin to the Claude marketplace; make the launch posts.
+
 ### Candidate 8 — one line, one harness (ADR 0020)
 
 #### Added

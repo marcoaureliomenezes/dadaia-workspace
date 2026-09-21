@@ -117,7 +117,7 @@
   absent from the table.
   Write set: `pyproject.toml`, `docs/quickstart.md`, `tests/unit/cli/test_console_scripts.py`.
 
-- [ ] T-047-86 — FR4: closure.
+- [x] T-047-86 — FR4: closure.
   `CHANGELOG.md` gains a "Candidate 9" section (the skills distribution, the docs site, the
   alias); `specs/releases/0.4.7/_RELEASE.json` gains the closure `log` entry and its milestone
   via `RELEASE_PY phase`; the live instance is re-projected (`public stage` → `public install` →
