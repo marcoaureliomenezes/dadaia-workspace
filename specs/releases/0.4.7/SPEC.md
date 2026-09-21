@@ -45,19 +45,21 @@ the release PR; ADR 0006, 0008, 0009 and 0014 are marked superseded by 0021.
 ### FR1 — release-please owns version, CHANGELOG and tag
 
 - `.github/workflows/release-please.yml` on `push` to `main`: `googleapis/release-please-action`
-  (pinned by sha), `release-type: python`, config + manifest files at the repository root
+  (pinned by sha), config + manifest files at the repository root (`release-type: python` inside the config's `packages["."]`, never as an action input)
   (`.release-please-manifest.json` carrying the current version, `release-please-config.json`
   with `changelog-sections` for `feat|fix|refactor|docs|ci|test|chore`, `include-component-in-tag:
   false`, tag `v<version>`). The action maintains one release PR `chore(main): release <version>`
   that bumps `pyproject.toml` and prepends the generated section to `CHANGELOG.md`.
-- `.github/workflows/release.yml` triggers on `release: published` (the event release-please
-  emits on merge) instead of a pushed version bump: the `check` job that compares pyproject to
-  tags dies; `publish` no longer creates the tag; `approve` (the `release-gate` environment)
-  stays as the second key before the upload; `smoke-test` and `publish-skills-repo` stay.
+- `release.yml` folds into `release-please.yml` (ruled 2026-09-21, D8): one workflow on `push:
+  main`; every publish-side job `needs` the `release-please` job and is gated on its
+  `release_created` output — no personal access token, no `release:` event, no `push: tags`.
+  The `check` job that compared pyproject to tags dies; `publish` no longer creates the tag;
+  `approve` (the `release-gate` environment) stays as the second key before the upload;
+  `smoke-test` and `publish-skills-repo` stay.
 - The hand-written CHANGELOG stops at 0.4.7's section: everything above `## [0.4.7]` is
   release-please's from the first release PR; nothing below is rewritten.
 - **AC1.1** `tests/contract/test_ci_workflow_hygiene.py`: the release-please workflow exists,
-  is sha-pinned, and `release.yml` has no version-vs-tag comparison and no `git tag` step;
+  is sha-pinned, `release.yml` no longer exists, and no workflow carries a version-vs-tag comparison or a `git tag` step;
   `tests/contract/test_release_semver_canon.py` (ADR 0021 measured_by) asserts the manifest
   version equals `pyproject.toml` version.
 
@@ -106,11 +108,12 @@ the release PR; ADR 0006, 0008, 0009 and 0014 are marked superseded by 0021.
 
 - D2 done 2026-09-21: ADR 0021 accepted (`docs(adr): accept 0021-release-please-semantics`); the
   superseded flips land in FR3 with the citation deletions.
-- D8 (operator): `release.yml` trigger — `release: published` (release-please's event) is the
-  proposed default; `push: tags: v*` is the alternative.
-- D9 (operator): the release directory id when release-please mints a minor instead of the
-  floor patch — rename at promote (proposed) or keep the floor id and record the minted version
-  in the log.
+- D8 ruled 2026-09-21: same-workflow chaining under `release_created`; neither `release:
+  published` nor `push: tags` is used (a `GITHUB_TOKEN`-created release starts no downstream
+  workflow).
+- D9/D10 ruled 2026-09-21: `pyproject.toml` and the manifest carry the published floor
+  (`0.4.6`); with `bump-minor-pre-major` and `bump-patch-for-minor-pre-major` the first release
+  PR proposes `0.4.7`, so the directory id and the minted version agree and no rename happens.
 - D1 stays: `CLAUDE_API_KEY` + required check.
 - ADR 0018: no verb enters; the scripts shrink (four files die).
 
