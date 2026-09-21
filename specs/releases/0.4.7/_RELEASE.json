@@ -1,11 +1,11 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.7",
-  "phase": "DEFINITION",
+  "phase": "IMPLEMENTATION",
   "rc": 8,
   "defined": {
-    "sha": "94bfdc26",
-    "ts": "2026-09-21T01:38:30Z"
+    "sha": "8ad47a9a",
+    "ts": "2026-09-21T04:16:13Z"
   },
   "implemented": {
     "sha": "09359755",
@@ -493,6 +493,12 @@
       "agent": "release.py",
       "kind": "note",
       "text": "Candidate 8 archived to rc-8/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
+    },
+    {
+      "ts": "2026-09-21T04:16:13Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate defined at 8ad47a9a; phase IMPLEMENTATION."
     }
   ]
 }
