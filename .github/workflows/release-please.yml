@@ -13,6 +13,9 @@ jobs:
   release-please:
     name: Maintain the release pull request
     runs-on: ubuntu-latest
+    # workflow_dispatch accepts any ref; minting a version from a branch's history
+    # is what this guard refuses. The push trigger is already main-only.
+    if: github.ref == 'refs/heads/main'
     timeout-minutes: 5
     outputs:
       release_created: ${{ steps.release-please.outputs.release_created }}
@@ -162,7 +165,9 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Release approved
-        run: echo "Release v${{ needs.build.outputs.version }} approved — proceeding to publish."
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: echo "Release v$VERSION approved — proceeding to publish."
 
   publish:
     name: Publish to PyPI (OIDC trusted publishing)
@@ -191,15 +196,30 @@ jobs:
     if: needs.release-please.outputs.release_created == 'true'
     permissions:
       contents: read
-    timeout-minutes: 5
+    timeout-minutes: 10
+    env:
+      VERSION: ${{ needs.build.outputs.version }}
     steps:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
-      - name: Wait for PyPI to propagate
-        run: sleep 30
+      - name: Wait for the published version to appear on PyPI
+        # A fixed sleep is a guess in both directions: too short and the install below
+        # fails on a release that was fine, too long and every release pays for the
+        # worst case. Poll the index for the exact version instead, and say which one
+        # never arrived.
+        run: |
+          for _ in $(seq 1 10); do
+            if pip download --no-deps --no-cache-dir \
+                "dadaia-workspace==$VERSION" -d "$RUNNER_TEMP/pypi-probe"; then
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "::error::dadaia-workspace==$VERSION did not appear on PyPI within 5 minutes."
+          exit 1
       - name: pip install released version
-        run: pip install "dadaia-workspace==${{ needs.build.outputs.version }}"
+        run: pip install "dadaia-workspace==$VERSION"
       - name: dadaia --help
         run: dadaia --help
       - name: dadaia init in tmpdir

@@ -27,6 +27,13 @@ _TOKEN = "SKILLS_REPO_TOKEN"
 _REMOTE_PREFIX = "https://x-access-token:"
 
 
+def _workflows() -> dict[str, Any]:
+    return {
+        path.name: yaml.safe_load(path.read_text(encoding="utf-8"))
+        for path in sorted(_WORKFLOWS.glob("*.yml"))
+    }
+
+
 def _jobs() -> dict[str, Any]:
     return dict(yaml.safe_load(_RELEASE_YML.read_text(encoding="utf-8"))["jobs"])
 
@@ -84,18 +91,32 @@ def test_the_token_is_interpolated_only_in_the_push_remote_url() -> None:
     )
 
 
-def test_no_run_body_of_the_skills_job_interpolates_a_workflow_expression() -> None:
-    """A workflow expression pasted into a shell body is the template-injection shape;
-    the version travels through the job env and is read as "$VERSION"."""
-    name, job = _skills_job()
-    offenders = [
-        (step.get("name"), line.strip())
-        for step in job["steps"]
+def _run_bodies() -> list[tuple[str, str, str | None, str]]:
+    """Every `run:` body in every workflow, as (workflow, job, step name, line)."""
+    return [
+        (name, job_name, step.get("name"), line)
+        for name, document in _workflows().items()
+        for job_name, job in (document.get("jobs") or {}).items()
+        for step in job.get("steps") or []
         for line in (step.get("run") or "").splitlines()
-        if "${{" in line
+    ]
+
+
+@pytest.mark.parametrize("workflow", sorted(p.name for p in _WORKFLOWS.glob("*.yml")))
+def test_no_run_body_of_any_workflow_interpolates_a_workflow_expression(workflow: str) -> None:
+    """A workflow expression pasted into a shell body is the template-injection shape:
+    the expression is substituted before the shell parses the line, so attacker-authored
+    text becomes code. Every value reaches a run body through `env:` and is read as a
+    quoted shell variable — in EVERY job of EVERY workflow, not just the ones that were
+    reviewed."""
+    offenders = [
+        f"{job}/{step or '<unnamed>'}: {line.strip()}"
+        for name, job, step, line in _run_bodies()
+        if name == workflow and "${{" in line
     ]
     assert offenders == [], (
-        f"job {name} must pass every workflow expression through env:, not a run body: {offenders}"
+        f"{workflow} must pass every workflow expression through env:, never a run "
+        f"body: {offenders}"
     )
 
 
@@ -134,6 +155,15 @@ def test_release_please_workflow_runs_on_a_push_to_main() -> None:
     )
 
 
+def test_the_release_please_job_runs_only_on_main() -> None:
+    """`workflow_dispatch` accepts any ref: without this guard a run started off a
+    feature branch would let the action read that history and mint a version from it."""
+    job = _jobs()["release-please"]
+    assert str(job.get("if") or "").strip() == "github.ref == 'refs/heads/main'", (
+        f"the version-minting job is main-only whatever ref dispatched it: {job.get('if')!r}"
+    )
+
+
 def test_release_please_action_is_sha_pinned_with_its_version_comment() -> None:
     """A mutable tag on a release-minting action is a supply-chain hole; the trailing
     `# v<x.y.z>` comment is what makes the pin auditable by a human."""
@@ -169,13 +199,6 @@ def test_release_please_reads_its_release_type_from_the_config_file() -> None:
 # ---------------------------------------------------------------------------
 
 _GATE = "needs.release-please.outputs.release_created == 'true'"
-
-
-def _workflows() -> dict[str, Any]:
-    return {
-        path.name: yaml.safe_load(path.read_text(encoding="utf-8"))
-        for path in sorted(_WORKFLOWS.glob("*.yml"))
-    }
 
 
 def test_the_folded_release_workflow_is_the_only_one_and_release_yml_is_gone() -> None:

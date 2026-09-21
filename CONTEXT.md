@@ -111,15 +111,11 @@ The one way a record changes status; refuses incomplete input.
 _Avoid_: update --set status, flip
 
 **Release**:
-The open-scope publication unit, named last-published-PyPI + 1 patch — exactly one live, growing by stacked Candidates; its state is `_RELEASE.json`, its narrative is that file's `log`. The version increments only at operator-approved deploy (ADR 0005). _Avoid_: "release" for one closed scope — that is a Candidate.
+The open-scope publication unit, named last-published-PyPI + 1 patch — exactly one live, growing by stacked Candidates; its state is `_RELEASE.json`, its narrative is that file's `log`. The version increments only at operator-approved deploy (ADR 0021). _Avoid_: "release" for one closed scope — that is a Candidate.
 
 **Candidate**:
-One closed-scope SDD cycle inside the live Release (grill → SPEC/PLAN/TASKS `Aprovado` → implementation → memory → closure → develop merge → promote-or-continue gate). The live Candidate's trio sits at the release root.
-
-**rc-N**:
-The archive folder of the N-th completed-but-not-shipped Candidate's trio, created by `dadaia release rc-archive`. _Avoid_: "rc" as a branch name, a fixes-only round, or a scaffolded sub-phase — the segment lane (`alpha-N`) is retired (ADR 0006).
-Every Candidate closed between two publications is an rc-N of the version that publishes it; `_archive/` never holds a version that was not published (ADR 0014).
-_Avoid_: version (for the unit), sprint
+One closed-scope SDD cycle inside the live Release (grill → SPEC/PLAN/TASKS `Aprovado` → implementation → memory → closure → develop merge → promote-or-continue gate). The live Candidate's trio sits at the release root and the next Candidate overwrites it in place — git is the archive, and no closed Candidate is ever copied into a folder of its own.
+_Avoid_: version (for the unit), sprint, "rc" as a branch name or a fixes-only round
 
 **Memory**:
 The current product truth under `specs/memory/`; never history.
@@ -128,7 +124,7 @@ _Avoid_: docs, notes
 ## Governance verbs and hand edits
 
 **Governance verb**:
-The one CLI command authorized to change a governance record — `dadaia bugs append|update|resolve|supersede|defer|reject|archive`, `backlog new|exit`, `release new|phase|rc-archive|archive`, `audit disposition|close`.
+The one CLI command authorized to change a governance record — `dadaia bugs append|update|resolve|supersede|defer|reject|archive`, `backlog new|exit`, `release new|phase|check`, `audit disposition|close`.
 _Avoid_: CLI command (generic), mutation, setter
 
 **Governance event**:

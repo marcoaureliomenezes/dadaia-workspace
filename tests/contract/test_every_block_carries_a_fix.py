@@ -502,12 +502,16 @@ _DEAD_RELEASE_VOCABULARY = re.compile(r"rc-archive|release\.py fold|release\.py 
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
-#: Where the law lives: the shipped AI-entity surface and the product's memory. History
-#: (`_archive/`, `rc-1..9/`) keeps its own words and is never rewritten.
+#: Where the law lives: the shipped AI-entity surface, the product's memory, and the
+#: glossary every one of them borrows its nouns from. History (`_archive/`, the archive
+#: folders a retired verb wrote, CHANGELOG.md) keeps its own words and is never rewritten.
 _LAW_ROOTS = (
     _REPO_ROOT / "dadaia_workspace" / "public",
     _REPO_ROOT / "specs" / "memory",
 )
+
+#: Single law FILES outside those roots.
+_LAW_FILES = (_REPO_ROOT / "CONTEXT.md",)
 
 
 def _law_files() -> list[Path]:
@@ -516,7 +520,7 @@ def _law_files() -> list[Path]:
         for root in _LAW_ROOTS
         for path in sorted(root.rglob("*"))
         if path.is_file() and "_archive" not in path.parts
-    ]
+    ] + [path for path in _LAW_FILES if path.is_file()]
 
 
 def test_no_law_file_names_a_retired_release_verb() -> None:

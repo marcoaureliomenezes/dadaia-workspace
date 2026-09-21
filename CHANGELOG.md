@@ -54,7 +54,7 @@ for this task, so none is touched here):
 
 Left exactly as written; a future task can pick this up.
 
-## [0.4.7] — in progress
+## 0.4.7 — candidate record (hand-written; the published section is written by release-please above)
 
 Open-scope release (ADRs 0005–0009): version minted at birth from the PyPI lineage
 (latest published `0.4.6` + 1 patch); each closed-scope candidate appends here.

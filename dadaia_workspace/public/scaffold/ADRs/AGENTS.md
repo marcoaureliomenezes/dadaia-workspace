@@ -29,7 +29,7 @@ Scope: this file governs only `specs/ADRs/`.
 | Accept | `docs(adr): accept <slug>` | the record's `status`/`measured_by` flip + the paired Part-1 memory hunk, same commit |
 
 - Never a third shape: rejecting is a `status: "rejected"` edit by the operator, staged alone.
-- Superseding is a new record proposal; once accepted, the superseded record stays in `decisions.jsonl` with `status: superseded` and the successor's `supersedes` naming it.
+- Superseding is a new record proposal; once accepted, the superseded record stays in `decisions.jsonl` with `status: superseded` and the successor's `supersedes` naming it (one id, or comma-separated ids ascending).
 - A superseded record's `id` is never reused, never re-numbered, and its line never moves.
 
 ## 4. Discovery
