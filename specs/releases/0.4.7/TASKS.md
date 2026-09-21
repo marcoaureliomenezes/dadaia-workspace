@@ -123,7 +123,7 @@
   Write set: `public/entities/behavior-map.json`, `public/scripts/lint-dadaia-cli-reachability.py`,
   `public/templates/shipped-hashes.json`, `tests/contract/**`, `setup.cfg`, `pyproject.toml`.
 
-- [ ] T-047-70 — FR5: closure. CHANGELOG "Candidate 7 — ledger verbs to skill scripts";
+- [x] T-047-70 — FR5: closure. CHANGELOG "Candidate 7 — ledger verbs to skill scripts";
   `_RELEASE.json` log with the measured LOC delta, the retired verb count and the per-ledger
   script sizes; live instance reflected (`public stage` -> `public install --target all` ->
   `public doctor` ok -> `dadaia doctor --fix` exit 0, scripts executable under

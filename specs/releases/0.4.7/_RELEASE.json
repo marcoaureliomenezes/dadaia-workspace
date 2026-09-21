@@ -433,6 +433,18 @@
       "agent": "release-candidates",
       "kind": "note",
       "text": "Candidate defined at 030820b3; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-09-21T01:11:10Z",
+      "agent": "dd-software-engineer",
+      "kind": "size",
+      "text": "Candidate 7 measured at T-047-69/70 against the candidate-6 close (c627131a): dadaia_workspace/ 36,315 -> 36,304 lines (AC4.1, below 36,315), of which 4,191 are the new stdlib-only skill scripts — the CLI and feature side fell by that much again. CLI verbs 41 -> 20 (AC2.1, ceiling 30): the groups bugs, backlog, release, audit and memory retired with their command modules, container wiring and feature packages, plus features/specs/ledgers.py. Script corpus 36 files / 4,191 lines: dd-bug-resolution 5/628, dd-backlog-definition 7/738, dd-release-implementation 12/1,367, dd-audit-project 5/527, dd-spec-navigator 6/592 (dd-cli-library's registry.py, 1/339, predates this candidate). Ratchets re-pinned downward on the measured tree: V32 707 -> 686 (the CI-red count, paid by deleting governance ids and three history-only module docstrings), V33 37 -> 35, V26 38/35 -> 37/34, V31 unit 89 -> 86 and integration 33 -> 29, #upgrade CC 26 -> 8, #doctor CC 8 -> 6, doctor*.py module ceiling 700 -> 699; V35 holds at 18 dirs / 2,880 lines; new V36 pins the script corpus at 36 files / 4,191 lines. import-linter contracts name only packages that exist — no stale module to drop."
+    },
+    {
+      "ts": "2026-09-21T01:11:10Z",
+      "agent": "dd-software-engineer",
+      "kind": "note",
+      "text": "AC2.2/AC3.1 verified from the installed tree: the five skill scripts' check verbs each exit 0 over this repo's specs/ (bugs.py, backlog.py, release.py, audit.py, memory.py), run as .agents/skills/<skill>/scripts/<x>.py with their projected exec bits, and the doctor's ledgers section delegates to exactly those checks. dadaia help tree lists 20 verbs. Live instance reflected: public stage -> public install --target all -> public doctor ok, then dadaia doctor --fix exit 0 at the workspace root. dadaia ci preflight green (ruff format, ruff check, mypy --strict, lint-imports, pytest)."
     }
   ]
 }

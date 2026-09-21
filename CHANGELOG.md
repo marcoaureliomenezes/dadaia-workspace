@@ -305,6 +305,42 @@ Open-scope release (ADRs 0005–0009): version minted at birth from the PyPI lin
   construction (ADR 0013).
 - Windows runner: derived-doc hashes over LF bytes, POSIX path filters, the telemetry backstop assertion.
 
+### Candidate 7 — ledger verbs to skill scripts (ADR 0018)
+
+#### Removed
+- The five ledger CLI groups — `dadaia bugs`, `dadaia backlog`, `dadaia release`, `dadaia audit`
+  and `dadaia memory` — with their command modules, their container wiring and the feature
+  packages behind them (`features/bugs/`, and the release/audit/memory ledger services). The
+  CLI's verb tree went 41 -> 20 verbs; `dadaia_workspace/` went 36,315 -> 36,304 lines, with
+  4,191 of those now the stdlib-only scripts the ledgers moved into (the CLI+feature side is
+  down by that much again).
+- `features/specs/ledgers.py`: the doctor's second implementation of every ledger schema. The
+  `ledgers` section now delegates to each script's own `check`, run as a subprocess.
+
+#### Added
+- One writer script per ledger, stdlib-only, self-contained and runnable straight from a
+  projected skill folder — 36 files / 4,191 lines under `public/skills/*/scripts/`:
+  `dd-bug-resolution/scripts/bugs.py` (5 files, 628 lines), `dd-backlog-definition/scripts/backlog.py`
+  (7 / 738), `dd-release-implementation/scripts/release.py` (12 / 1,367),
+  `dd-audit-project/scripts/audit.py` (5 / 527), `dd-spec-navigator/scripts/memory.py` (6 / 592).
+  Each ships a `check` verb, validates its own write before replacing the file atomically, and
+  carries its shipped JSON schema as a copy `dadaia public stage` puts beside it.
+- `hash_tuple.scripts` in `public/entities/behavior-map.json`: one sha256 over every file under
+  a skill's `scripts/` plus the shipped schemas copied in beside them — a script byte changed or
+  a schema forked without a re-record is RED.
+- A second reachability rule in `public/scripts/lint-dadaia-cli-reachability.py`: every
+  skill-script citation under `public/**/*.md`, long form and the `<ALIAS>_PY` short form a
+  scoped `AGENTS.md` defines, must actually run.
+
+#### Changed
+- A projection copies its source's exec bit, so a skill script projects runnable.
+- Every `dadaia <ledger> <verb>` citation under `public/**`, `README.md` and `docs/cli.md` names
+  the script instead.
+- Ratchets re-pinned downward on the measured tree: V32 707 -> 686, V33 37 -> 35, V26 38/35 ->
+  37/34, V31 unit 89 -> 86 and integration 33 -> 29, `#upgrade` CC 26 -> 8, `#doctor` CC 8 -> 6,
+  the `doctor*.py` module ceiling 700 -> 699. V35 holds at 18 dirs / 2,880 Markdown lines, and a
+  new V36 pins the skill-script corpus at 36 files / 4,191 lines.
+
 ### Candidate 6 — universal context core (ADRs 0017-0021; grill 2026-09-20)
 
 #### Removed
