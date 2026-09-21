@@ -231,15 +231,15 @@
       "intents": [
         {
           "subject": {
-            "kind": "cli",
-            "ref": "memory catalog generate"
+            "kind": "code",
+            "ref": "dadaia_workspace/public/skills/dd-spec-navigator/scripts/memory.py#_generate"
           },
           "change": "change — becomes a script under dd-spec-navigator/scripts/ (touches only specs/)"
         },
         {
           "subject": {
-            "kind": "cli",
-            "ref": "memory product add"
+            "kind": "code",
+            "ref": "dadaia_workspace/public/skills/dd-spec-navigator/scripts/_memory_add.py#add"
           },
           "change": "change — becomes a script under dd-spec-navigator/scripts/ (touches only specs/)"
         }
