@@ -130,7 +130,7 @@
   `dadaia_workspace/public/skills/dd-release-definition/SKILL.md`,
   `tests/unit/features/specs/test_spec_doc_048_origin.py`, `tests/contract/test_slop_ratchets.py`.
 
-- [ ] T-047-78 — FR5: CLI audit, docs, dead-branch deletions. Every verb in `dadaia help tree`
+- [x] T-047-78 — FR5: CLI audit, docs, dead-branch deletions. Every verb in `dadaia help tree`
   is cited by a skill, agent or the root map, or dies; the surviving groups are `init`,
   `harness`, `context`, `public`, `ci`, `doctor`, `reports`, `certify`, `export`, `import`,
   `reconcile`, `migrate`, `capabilities`, `help`, `specs`; total verb count <= 30.

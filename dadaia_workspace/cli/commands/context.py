@@ -580,29 +580,6 @@ def bind(
     console.print(f"[green]✓[/green] Bound to '[bold]{name}[/bold]' (session id: {session_id})")
 
 
-@app.command()
-def update(
-    name: str = typer.Argument(..., help="Context name to update"),
-    url: str = typer.Option(..., "--url", help="New repo clone URL to persist"),
-) -> None:
-    """Repair a context's repo URL (FR-W2-03 c / T-011-08).
-
-    Run: dadaia context update <name> --url <url>
-
-    The repair path for the VPS-migration scenario where no on-disk repo is present
-    to back-fill from. Persists through the store update() API, preserving the record
-    shape and locking.
-    """
-    try:
-        ctx = _ctx_service().update_url(name, url)
-        console.print(
-            f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' repo URL set to {ctx.repo_url}"
-        )
-    except ContextNotFoundError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
-
-
 # ------------------------------------------------------------------ context repo (FR17)
 
 
@@ -621,8 +598,7 @@ def repo_add(
     Idempotent: re-adding the same slug with the same URL is a no-op success. The
     same slug with a DIFFERENT URL is refused — this verb is the one place an
     associated repo's URL is set, so the recovery path is 'context repo remove'
-    then 'context repo add' again, never a second divergent URL-update verb
-    (compare 'context update --url', which repairs the MAIN repo's URL only).
+    then 'context repo add' again, never a second divergent URL-update verb.
     Adding the context's own main repo slug is refused (it is already covered).
     """
     try:
@@ -681,41 +657,6 @@ def repo_remove(
         )
     else:
         console.print(f"[dim]No on-disk checkout found at 'repos/{slug}'.[/dim]")
-
-
-@repo_app.command(name="list")
-def repo_list(
-    ctx_name: str = typer.Argument(..., help="Context name"),
-    json_output: bool = typer.Option(False, "--json", help="Output stable JSON contract"),
-) -> None:
-    """List a context's associated repos.
-
-    Run: dadaia context repo list <ctx>
-
-    The main repo is never listed here (FR19: it stays the sole specs/bind/memory
-    target, resolved via 'context show') — this is the associated set only.
-    """
-    try:
-        ctx = _ctx_service().show(ctx_name)
-    except ContextNotFoundError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
-
-    if json_output:
-        payload = [{"slug": r.slug, "url": r.url} for r in ctx.associated_repos]
-        print(json.dumps(payload, sort_keys=True))
-        return
-
-    if not ctx.associated_repos:
-        console.print(f"[dim]Context '{ctx_name}' has no associated repos.[/dim]")
-        return
-
-    table = Table(title=f"Associated repos — {ctx_name}")
-    table.add_column("Slug", style="bold")
-    table.add_column("URL")
-    for repo in ctx.associated_repos:
-        table.add_row(repo.slug, repo.url or "—")
-    console.print(table)
 
 
 @app.command()

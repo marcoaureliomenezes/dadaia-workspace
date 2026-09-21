@@ -62,12 +62,6 @@ _CANONICAL = frozenset({FindingVerdict.CANON, FindingVerdict.OPERATOR, FindingVe
 #: behind the CRITICAL doctor-ptr-gc-deletes-valid-lock-free-bind.
 REAPED_ZONE = "reaped"
 
-#: The retired Claude bridge stub: the exact bytes a pre-0.4.7
-#: ``public install`` wrote into every consumer repo. Nothing writes it any more, so a
-#: repo-top ``CLAUDE.md`` carrying EXACTLY these bytes is a dead projection with no live
-#: generator — reaped like root slop. Any other content is operator authorship.
-_RETIRED_CLAUDE_BRIDGE_STUB: bytes = b"@AGENTS.md\n"
-
 #: Directory names that end the repo-tree walk: a nested VCS/venv/dependency tree is
 #: never ours to classify and is where the walk's cost would otherwise live.
 _REPO_WALK_PRUNED: frozenset[str] = frozenset({".git", ".venv", "node_modules"})
@@ -240,10 +234,10 @@ class DoctorService:
                         code="CTX-URL-1",
                         description=(
                             f"Context '{ctx.name}' is alive but has an empty repo_url "
-                            "(un-portable). Run 'dadaia context update "
-                            f"{ctx.name} --url <url>' to set it, or re-run "
-                            f"'dadaia context alive {ctx.name}' while the repo's origin "
-                            "remote is on disk to back-fill it automatically."
+                            f"(un-portable). Re-run 'dadaia context alive {ctx.name}' "
+                            "while the repo's origin remote is on disk to back-fill it; "
+                            "with no such remote, 'dadaia context delete' and "
+                            "'dadaia context create --url <url>' re-register it."
                         ),
                         fixable=False,
                     )
@@ -356,7 +350,6 @@ class DoctorService:
         excluded = frozenset(workspace_layout.REPO_TREE_EXCLUDED)
         out: list[Finding] = []
         for top in self._alive_repo_tops():
-            out.extend(self._orphan_claude_bridge(top))
             pending = [top]
             while pending:
                 for entry in sweep.walk(pending.pop()):
@@ -376,31 +369,6 @@ class DoctorService:
                     if entry.is_dir() and not entry.is_symlink():
                         pending.append(entry)
         return out
-
-    def _orphan_claude_bridge(self, top: Path) -> list[Finding]:
-        """The retired Claude bridge left behind in a consumer repo.
-
-        A repo-top ``CLAUDE.md`` whose bytes are EXACTLY the stub a pre-0.4.7 install
-        wrote is a dead projection with no live generator — reaped like root slop. Any
-        other content is operator authorship and is never a finding.
-        """
-        dst = top / "CLAUDE.md"
-        if dst.is_symlink() or not dst.is_file():
-            return []
-        try:
-            if dst.read_bytes() != _RETIRED_CLAUDE_BRIDGE_STUB:
-                return []
-        except OSError:
-            return []
-        return [
-            self._finding(
-                "repos",
-                self._workspace_root,
-                dst,
-                FindingVerdict.SLOP,
-                "(the Claude bridge is retired — a repo carries the scoped AGENTS.md only)",
-            )
-        ]
 
     def _exception_globs(self) -> tuple[str, ...]:
         try:

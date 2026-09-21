@@ -176,38 +176,6 @@ def test_repo_remove_second_call_fails_loudly(workspace: Path) -> None:
     assert second.exit_code == 1
 
 
-# --------------------------------------------------------------------- repo list
-
-
-def test_repo_list_json(workspace: Path) -> None:
-    _runner.invoke(app, ["context", "create", "foo", "--main-repo", "foo-repo"])
-    _runner.invoke(
-        app, ["context", "repo", "add", "foo", "assoc-a", "--url", "https://x.test/a.git"]
-    )
-    _runner.invoke(app, ["context", "repo", "add", "foo", "assoc-b"])
-
-    result = _runner.invoke(app, ["context", "repo", "list", "foo", "--json"])
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
-    assert payload == [
-        {"slug": "assoc-a", "url": "https://x.test/a.git"},
-        {"slug": "assoc-b", "url": ""},
-    ]
-
-
-def test_repo_list_table_empty(workspace: Path) -> None:
-    _runner.invoke(app, ["context", "create", "foo", "--main-repo", "foo-repo"])
-    result = _runner.invoke(app, ["context", "repo", "list", "foo"])
-    assert result.exit_code == 0, result.output
-    assert "no associated repos" in result.output.lower()
-
-
-def test_repo_list_unknown_context_exits_1(workspace: Path) -> None:
-    result = _runner.invoke(app, ["context", "repo", "list", "nope"])
-    assert result.exit_code == 1
-    assert "not found" in result.output.lower()
-
-
 # --------------------------------------------------------------------- create --associated
 
 

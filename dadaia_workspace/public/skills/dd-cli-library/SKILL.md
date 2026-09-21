@@ -16,12 +16,13 @@ line here and `--help` disagree, `--help` wins.
 
 1. Open `.dadaia/AGENTS.md` (the area's scoped law) and follow it.
 2. `dadaia --help` lists the groups; `dadaia <group> --help` the subcommands; add `--json` to read commands for machine-readable output.
-3. Run `dadaia capabilities --json` first in any new or upgraded session.
-4. Bind the session: `dadaia context bind <ctx>` — `--print-env` emits `DADAIA_CONTEXT`/`DADAIA_SESSION_ID` for `eval $(…)`; the bind sets the write scope to the context's main repo plus its associated repos (`.dadaia/AGENTS.md`).
-5. Workspace compliance: `dadaia doctor --context <ctx> [--json]` — clean before any implementation write; `--fix` MOVES slop to `.dadaia/reaped/` (7-day hold) and nothing is deleted before its own TTL; `--fix --expired-only` reaps without touching slop (`.dadaia/AGENTS.md`).
-6. Pass explicit `--context`/`--release-id` on every command.
-7. Converge a runtime: resolve `provider.distribution_version` from `dadaia capabilities --json`, then `dadaia reconcile --expect-version "$v" --json`, then `dadaia certify --json` — a failed certify check is a release blocker.
-8. On a failing command: preserve the evidence trail (command, exit code, output); classify and register a genuine bug (`dd-bug-registration`) before any workaround.
+3. `dadaia harness list` names this workspace's projected runtimes; `dadaia harness add <name>` registers one more.
+4. Run `dadaia capabilities --json` first in any new or upgraded session.
+5. Bind the session: `dadaia context bind <ctx>` — `--print-env` emits `DADAIA_CONTEXT`/`DADAIA_SESSION_ID` for `eval $(…)`; the bind sets the write scope to the context's main repo plus its associated repos (`.dadaia/AGENTS.md`).
+6. Workspace compliance: `dadaia doctor --context <ctx> [--json]` — clean before any implementation write; `--fix` MOVES slop to `.dadaia/reaped/` (7-day hold) and nothing is deleted before its own TTL; `--fix --expired-only` reaps without touching slop (`.dadaia/AGENTS.md`).
+7. Pass explicit `--context`/`--release-id` on every command.
+8. Converge a runtime: resolve `provider.distribution_version` from `dadaia capabilities --json`, then `dadaia reconcile --expect-version "$v" --json`, then `dadaia certify --json` — a failed certify check is a release blocker.
+9. On a failing command: preserve the evidence trail (command, exit code, output); classify and register a genuine bug (`dd-bug-registration`) before any workaround.
 
 - Invoke `.dadaia/.venv/bin/dadaia` and `.dadaia/.venv/bin/pip` directly, with absolute paths.
 
@@ -30,11 +31,10 @@ line here and `--help` disagree, `--help` wins.
 - Never edit `.dadaia/states/*.json`, never `git clone` into `repos/`, never
   `rm -rf repos/<slug>/`, never hand-write `.dadaia/dist/` — `dadaia context
   alive|dead` and `dadaia import|export` own those.
-- Lifecycle: `create --main-repo <slug> [--associated-repos a,b]` → alive → bind → dead
-  → delete; `context dead` removes the repo from disk — never run it mid-switch.
-- Portability: `dadaia export` writes `.dadaia/dist/spec-contexts.json` (overwritten
-  each run); on the destination `dadaia import <file>` registers each unknown context
-  DEAD, then `dadaia context alive <slug>` clones it; verify with `dadaia context list`.
+- Lifecycle: `dadaia context create <ctx> --main-repo <slug> [--associated-repos a,b]` → `dadaia context alive` → bind → `dadaia context dead` → `dadaia context delete`; `context dead` removes the repo from disk — never run it mid-switch.
+- An unborn remote is born once by `dadaia context baseline <ctx> --yes --push`; every later write is an ordinary commit.
+- The associated set is written by `dadaia context repo add <ctx> <slug> [--url <url>]` / `dadaia context repo remove <ctx> <slug>` and READ only by `dadaia context show <ctx> --json`, whose `associated_repos` carries slug, url, on-disk and branch.
+- Portability: `dadaia export` writes `.dadaia/dist/spec-contexts.json` (overwritten each run); on the destination `dadaia import <file>` registers each unknown context DEAD, then `dadaia context alive <slug>` clones it; verify with `dadaia context list`.
 
 ## Dev-server law
 
@@ -51,8 +51,7 @@ line here and `--help` disagree, `--help` wins.
 ## Done when
 
 - The command run matches live `--help`, not a remembered table.
-- `dadaia doctor` clean before any implementation write; `certify --json` green
-  before promoting a runtime; every dev server started is registered.
+- `dadaia doctor` clean before any implementation write; `certify --json` green before promoting a runtime; every dev server started is registered.
 
 ## References
 

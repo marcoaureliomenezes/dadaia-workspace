@@ -296,14 +296,31 @@ def certify(
         except Exception as exc:  # noqa: BLE001 - complete ledger, not fail-fast prose.
             checks.append(CertificationCheck(name=name, status="FAIL", detail=str(exc)))
 
-    def doctor_clean(*args: str, **kwargs: Any) -> str:
-        payload = json.loads(cli(*args, **kwargs))
-        summary = payload.get("summary", {})
-        errors = int(summary.get("errors", 0))
-        warnings = int(summary.get("warnings", 0))
-        if errors or warnings or payload.get("issues"):
-            raise RuntimeError(f"doctor not clean: {json.dumps(payload, sort_keys=True)}")
-        return "0 errors, 0 warnings"
+    def doctor_clean(*args: str) -> str:
+        """`dadaia doctor` over the tree these arguments NAME, judged on the sections
+        that tree owns: `specs` and `ledgers`.
+
+        The `workspace` section reads the certification sandbox itself, which
+        `exact-version-reconciliation`'s own `workspace-doctor` step already owns — so
+        judging it here would make two checks fail for one defect, in a tree neither
+        argument names. The doctor's exit code is that whole-workspace verdict, hence
+        the direct run: a non-zero exit is not this check's failure to report.
+        """
+        proc = process.run(
+            [sys.executable, "-m", "dadaia_workspace.cli.main", "doctor", *args, "--json"],
+            cwd=target,
+            env=env,
+            timeout=180,
+        )
+        if not proc.stdout.strip():
+            raise RuntimeError(f"doctor emitted no payload: {(proc.stderr or '').strip()}")
+        sections = json.loads(proc.stdout)["sections"]
+        owned = {
+            name: sections[name]["findings"] for name in ("specs", "ledgers") if name in sections
+        }
+        if any(owned.values()):
+            raise RuntimeError(f"doctor not clean: {json.dumps(owned, sort_keys=True)}")
+        return "specs and ledgers sections clean"
 
     check(
         "workspace-init",
@@ -338,7 +355,7 @@ def certify(
         "specs-scaffold-and-doctor",
         lambda: (
             cli("specs", "init", "--specs-dir", str(standalone_specs), "--name", "certified")
-            and doctor_clean("specs", "doctor", "--specs-dir", str(standalone_specs), "--json")
+            and doctor_clean("--specs-dir", str(standalone_specs))
         ),
     )
 
@@ -387,7 +404,7 @@ def certify(
     check("context-bind", bind)
     check(
         "context-specs-doctor",
-        lambda: doctor_clean("specs", "doctor", "--context", "certified-consumer", "--json"),
+        lambda: doctor_clean("--context", "certified-consumer"),
     )
 
     def handoff_validation() -> str:

@@ -133,7 +133,7 @@ def test_ctx_url_1_table(
         assert "CTX-URL-1" in codes
         ctx_url = next(i for i in issues if i.code == "CTX-URL-1")
         assert ctx_url.fixable is False
-        assert "context update" in ctx_url.description
+        assert "dadaia context alive" in ctx_url.description
     else:
         assert "CTX-URL-1" not in codes
 

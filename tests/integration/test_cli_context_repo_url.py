@@ -4,7 +4,6 @@ Closes bug ``context-repo-url-not-settable-or-repairable``. Covers:
 - (a) ``context create --main-repo <slug> --url <url>`` persists the URL (overrides catalog).
 - (b) ``context alive``/``dead`` back-fill repo_url from the on-disk origin remote when
       the record URL is empty (real git + local ``file://`` fixture remote).
-- (c) ``context update --url`` repair verb.
 - (d) ``dadaia doctor`` flags an ALIVE context with empty repo_url (CTX-URL-1).
 - the named regression test reproducing the export/import clone scenario from the bug.
 """
@@ -80,12 +79,11 @@ def _record(workspace: Path, name: str) -> dict:  # type: ignore[type-arg]
 # --------------------------------------------------------------------- (a) create --url
 
 
-def test_create_update_url_persistence_ctx_url_1_doctor_flag_and_export_import_clone(
+def test_create_url_persistence_ctx_url_1_doctor_flag_and_export_import_clone(
     workspace: Path, tmp_path: Path
 ) -> None:
-    """(a) create --url persists (overrides catalog); (c) update --url repairs an empty
-    record; update on an unknown context exits 1; (d) doctor flags CTX-URL-1 for an ALIVE
-    context with an empty repo_url.
+    """(a) create --url persists (overrides catalog); (d) doctor flags CTX-URL-1 for an
+    ALIVE context with an empty repo_url.
 
     Plus the named regression for bug ``context-repo-url-not-settable-or-repairable``:
     reproduces the VPS export/import clone scenario — a context created without a URL
@@ -103,19 +101,6 @@ def test_create_update_url_persistence_ctx_url_1_doctor_flag_and_export_import_c
     _runner.invoke(app, ["context", "create", "bar", "--main-repo", "bar"])
     rec_bar = _record(workspace, "bar")
     assert rec_bar["repo_url"] == ""  # no catalog hit, no --url
-
-    update_result = _runner.invoke(
-        app, ["context", "update", "bar", "--url", "https://x.test/bar.git"]
-    )
-    assert update_result.exit_code == 0, update_result.output
-    rec_bar = _record(workspace, "bar")
-    assert rec_bar["repo_url"] == "https://x.test/bar.git"
-
-    unknown_result = _runner.invoke(
-        app, ["context", "update", "nope", "--url", "https://x.test/x.git"]
-    )
-    assert unknown_result.exit_code == 1
-    assert "not found" in unknown_result.output.lower()
 
     if not _HAS_GIT:
         return

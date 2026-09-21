@@ -98,6 +98,7 @@ universal-grant mechanism (failure mode 6's own ``_UNIVERSAL_NAMES`` /
 
 from __future__ import annotations
 
+import ast
 import copy
 import functools
 import hashlib
@@ -1163,3 +1164,78 @@ def test_mutation_fixture_12_dead_body_pointer_turns_red(tmp_path: Path) -> None
     assert "dead skill pointer `dd-gone`" in violations[0]
     assert "dead section pointer `dd-real` §9" in violations[1]
     assert "dead scoped-rule pointer `nowhere-AGENTS.md`" in violations[2]
+
+
+# ---------------------------------------------------------------------------
+# The inverse direction of the verb audit: what the library invokes on ITSELF
+# ---------------------------------------------------------------------------
+
+#: The production helpers that build a `dadaia` argv out of literal strings. Both live
+#: in `features/certification` — the one place the library runs its own CLI.
+_SELF_INVOKERS = frozenset({"cli", "doctor_clean"})
+
+#: The module a self-invoked argv names right before its verb path.
+_CLI_ENTRY = "dadaia_workspace.cli.main"
+
+
+def _leading_words(nodes: list[ast.expr]) -> tuple[str, ...]:
+    """The literal, non-flag words an argv starts with — the verb path it names."""
+    words: list[str] = []
+    for node in nodes:
+        if not isinstance(node, ast.Constant) or not isinstance(node.value, str):
+            break
+        if node.value.startswith("-"):
+            break
+        words.append(node.value)
+    return tuple(words)
+
+
+def _self_invoked_verb_paths() -> list[tuple[str, tuple[str, ...]]]:
+    """Every literal `dadaia` argv the package builds, as ``(file:line, verb path)``."""
+    found: list[tuple[str, tuple[str, ...]]] = []
+    package = _REPO_ROOT / "dadaia_workspace"
+    for path in sorted(package.rglob("*.py")):
+        if path.is_symlink():
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+                continue
+            if node.func.id not in _SELF_INVOKERS:
+                continue
+            words = _leading_words(node.args)
+            if words:
+                rel = path.relative_to(_REPO_ROOT).as_posix()
+                found.append((f"{rel}:{node.lineno}", words))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.List):
+                continue
+            for idx, element in enumerate(node.elts):
+                if isinstance(element, ast.Constant) and element.value == _CLI_ENTRY:
+                    words = _leading_words(node.elts[idx + 1 :])
+                    if words:
+                        rel = path.relative_to(_REPO_ROOT).as_posix()
+                        found.append((f"{rel}:{node.lineno}", words))
+    return found
+
+
+def test_every_self_invoked_dadaia_verb_exists() -> None:
+    """Intent: CONTRACT — 0.4.7 FR5 (T-047-78), bug `certify-invokes-a-retired-verb`.
+
+    `dead_verb_citations_in_tree` audits the verbs `public/` DOCUMENTS; this audits the
+    verbs the package itself RUNS. `dadaia certify` shelled out to `dadaia specs doctor`
+    for a whole candidate after that verb was retired, and reported `ok=false` with
+    `No such command 'doctor'` — a citation of a verb that does not exist, in the one
+    direction no test was watching. The longest literal prefix of each argv must resolve
+    to a LEAF of the live tree; resolving only to a GROUP means the subcommand is dead.
+    """
+    paths = set(command_paths())
+    leaves = {p for p in paths if not any(q[: len(p)] == p and len(q) > len(p) for q in paths)}
+    invocations = _self_invoked_verb_paths()
+    assert invocations, "the AST walk found no self-invoked dadaia argv — mis-rooted scan?"
+    violations = [
+        f"{where}: `dadaia {' '.join(words)}` resolves to no leaf verb"
+        for where, words in invocations
+        if not any(words[:n] in leaves for n in range(len(words), 0, -1))
+    ]
+    assert violations == [], "self-invoked dead verb(s):\n" + "\n".join(violations)

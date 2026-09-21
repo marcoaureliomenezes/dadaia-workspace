@@ -19,9 +19,8 @@
 - context dead — Transition a context to DEAD; git sync + remove repo from disk.
 - context delete — Delete a context. Context must be dead.
 - context list — List all Spec Context Projects.
-- context repo <add, list, remove> — Manage a context's associated repos (main repo excluded).
+- context repo <add, remove> — Manage a context's associated repos (main repo excluded).
 - context show — Show details of a context.
-- context update — Repair a context's repo URL (FR-W2-03 c / T-011-08).
 
 ## dadaia doctor — Diagnose and repair workspace, specs and ledger compliance.
 

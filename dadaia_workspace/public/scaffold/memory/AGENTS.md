@@ -77,5 +77,4 @@ Rationale: <one line — why this rule exists>
 - `MEMORY_PY check` validates every atom's frontmatter and both generated files; `dadaia doctor --context <ctx>` is the workspace scan.
 - Fix findings at the source atom — never hand-edit `catalog.json` to silence a check, regenerate it.
 
-Generated from `dadaia_workspace/public/scaffold/memory/AGENTS.md`.
-Project teams may customize this file; `dadaia doctor` reports drift instead of overwriting it.
+Generated from this release's scaffold image. Project teams may customize this file; `dadaia doctor` reports drift instead of overwriting it.

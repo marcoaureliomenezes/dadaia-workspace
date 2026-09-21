@@ -6,6 +6,9 @@ Ratchet: the offender count only goes down. Size: unit."""
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 
 def _leaves() -> list[tuple[str, object]]:
     from typer.main import get_command
@@ -77,4 +80,81 @@ def test_one_line_help_leaf_count_only_ratchets_down() -> None:
     assert len(offenders) <= _RATCHET, (
         f"{len(offenders)} leaf commands have a one-line/empty help (ratchet {_RATCHET}). "
         f"New leaves must ship a real docstring. Offenders: {offenders}"
+    )
+
+
+#: The verb ceiling. `help tree` is the audited interface: a leaf nobody cites is a verb
+#: nobody runs, and an uncited verb is slop. Measured after the audit deleted `context
+#: update` (the URL repair no caller ever ran) and `context repo list` (a second reader
+#: of what `context show --json` already emits). Moves DOWN only.
+_VERB_CEILING = 30
+
+_PUBLIC = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
+
+#: The forms a public asset invokes the CLI in: the bare name, and the `$D`/`$DADAIA`
+#: shell handles the consumer recipes bind to an absolute venv path.
+_INVOCATION = r"(?:dadaia|\$D|\$DADAIA)"
+
+
+def _verb_paths() -> list[tuple[str, ...]]:
+    from typer.main import get_command
+
+    from dadaia_workspace.cli.main import app
+
+    out: list[tuple[str, ...]] = []
+
+    def walk(cmd: object, prefix: tuple[str, ...]) -> None:
+        subs = dict(getattr(cmd, "commands", {}) or {})
+        if subs:
+            for name, sub in subs.items():
+                walk(sub, (*prefix, name))
+        else:
+            out.append(prefix)
+
+    walk(get_command(app), ())
+    return sorted(out)
+
+
+def _public_texts() -> dict[str, str]:
+    texts: dict[str, str] = {}
+    for path in sorted(_PUBLIC.rglob("*")):
+        if not path.is_file() or path.is_symlink():
+            continue
+        if path.suffix not in {".md", ".json", ".sh", ".txt", ".yml", ".yaml", ""}:
+            continue
+        try:
+            texts[str(path)] = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:  # pragma: no cover - binary asset
+            continue
+    return texts
+
+
+def test_the_verb_surface_stays_under_its_ceiling() -> None:
+    """Intent: CONTRACT — 0.4.7 FR5 (T-047-78). The audited interface is `help tree`:
+    at most 30 leaf verbs. A new verb enters only when an old one leaves (ADR 0018)."""
+    verbs = _verb_paths()
+    assert len(verbs) <= _VERB_CEILING, (
+        f"the CLI grew to {len(verbs)} leaf verbs (ceiling {_VERB_CEILING}). "
+        f"Delete one before adding one: {[' '.join(v) for v in verbs]}"
+    )
+
+
+def test_every_verb_is_cited_by_the_public_surface() -> None:
+    """Intent: CONTRACT — 0.4.7 FR5 (T-047-78). The inverse of the dead-verb citation
+    check: every leaf verb in the live tree is named by at least one skill, agent, map
+    or scaffold asset under `public/`. A verb no published asset tells an agent to run
+    is a verb nobody runs — it dies, or it earns a citation in the skill that owns it."""
+    texts = _public_texts()
+    assert texts, "the public asset tree walked to zero readable files"
+    uncited = [
+        " ".join(verb)
+        for verb in _verb_paths()
+        if not any(
+            re.search(_INVOCATION + r"\s+" + r"\s+".join(map(re.escape, verb)) + r"\b", text)
+            for text in texts.values()
+        )
+    ]
+    assert uncited == [], (
+        "verb(s) cited by no public asset — delete them, or cite each in the ONE skill "
+        f"that owns it (`dd-cli-library` is the CLI catalogue): {uncited}"
     )

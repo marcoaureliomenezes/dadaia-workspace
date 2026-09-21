@@ -47,7 +47,7 @@ path or entity as it appears in an installed workspace.
 | `specs/releases/AGENTS.md` | candidates, phases, task markers, `rc-N` | release procedure and commit shapes | 4096 | 4060 |
 | `specs/backlog/AGENTS.md` | the operator's demand queue and its exits | `BACKLOG.json` shape, intake gate, dispositions | 4096 | 4083 |
 | `specs/bugs/AGENTS.md` | what a bug is and how it is proposed, recorded, resolved | bug procedure and the redaction rule | 4096 | 4046 |
-| `specs/memory/AGENTS.md` | current product truth and who writes it | atoms, Part 1/Part 2, ownership | 4096 | 4031 |
+| `specs/memory/AGENTS.md` | current product truth and who writes it | atoms, Part 1/Part 2, ownership | 4096 | 4009 |
 | `specs/ADRs/AGENTS.md` | the decision record | `decisions.jsonl` shape, acceptance | 4096 | 3284 |
 | `specs/audits/AGENTS.md` | the periodic three-pillar review | audit procedure, findings, closure | 4096 | 1775 |
 | `.dadaia/AGENTS.md` | the runtime tree: zones, doctor, reprojection, context | zone registry rules, chokepoints | 4096 | 4073 |
@@ -69,7 +69,7 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 | `dd-backlog-definition` | backlog curation, the intake gate, dispositions | `specs/backlog/AGENTS.md` | 6144 | 3219 |
 | `dd-bug-registration` | classify-first bug proposal and its record | `specs/bugs/AGENTS.md` | 6144 | 2782 |
 | `dd-bug-resolution` | the seven-phase diagnosing method and the resolve record | `specs/bugs/AGENTS.md` | 6144 | 5245 |
-| `dd-cli-library` | CLI idioms, CLI-owned state, the dev-server registry | `.dadaia/AGENTS.md` | 6144 | 3774 |
+| `dd-cli-library` | CLI idioms, CLI-owned state, the dev-server registry | `.dadaia/AGENTS.md` | 6144 | 4325 |
 | `dd-code-review` | the three review axes and the six lenses | `specs/memory/AGENTS.md` | 6144 | 4642 |
 | `dd-codebase-design` | the deep-module vocabulary and the deletion test | — | 6144 | 5500 |
 | `dd-domain-modeling` | the repo's domain terms and their one home | — | 6144 | 3622 |
