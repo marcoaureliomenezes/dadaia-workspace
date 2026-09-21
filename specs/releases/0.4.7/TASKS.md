@@ -8,22 +8,24 @@
 
 ## Candidate 9 — skills distribution, public presence, uvx alias
 
-- [ ] T-047-80 — FR1: the eight standalone skills conform to the Agent Skills spec.
+- [x] T-047-80 — FR1: the eight standalone skills conform to the Agent Skills spec.
   `public/entities/behavior-map.json` gains one top-level key `standalone_skills` (beside
   `schema_version`, `skill_md_line_ceiling`, `declared_overlaps`, `rows`) naming `dd-grill-me`,
   `dd-bug-resolution`, `dd-code-review`, `dd-test-stewardship`, `dd-codebase-design`,
   `dd-domain-modeling`, `dd-architecture-survey`, `dd-ai-eng-knowhow`. Each of those eight
-  `SKILL.md` frontmatters gains `license: MIT` and a one-line `compatibility:` naming
+  `SKILL.md` frontmatters gains a one-line `compatibility:` naming
   dadaia-workspace as the home of the full lifecycle (`pip install dadaia-workspace`); every
   body step that opens a scoped `AGENTS.md` is rephrased "inside a dadaia workspace, open …".
-  V35 stays 18 dirs / 2880 lines — the two frontmatter lines are paid by deleting a redundant
+  V35 stays 18 dirs / 2880 lines — the frontmatter line is paid by deleting a redundant
   line inside the same skill, never in another.
   Seam: `standalone_skills` is the one data source for the set; no literal list in code or tests.
   RED: `tests/contract/test_standalone_skills.py` — for each name in `standalone_skills`, the
   frontmatter `name` equals the directory and matches `^[a-z0-9]+(-[a-z0-9]+)*$` (1–64, no
-  leading/trailing/double hyphen), `description` is 1–1024 chars, `license` and `compatibility`
-  (≤ 500) are present, `SKILL.md` is ≤ 500 lines, and no body line hard-requires a workspace
-  path; the run fails today because `license`/`compatibility` are absent from all eight.
+  leading/trailing/double hyphen), `description` is 1–1024 chars, `compatibility`
+  (≤ 500) is present, `SKILL.md` is ≤ 500 lines, and no body line hard-requires a workspace
+  path; the run fails today because `compatibility` is absent from all eight. Ruled at
+  implementation: no `license:` line — MIT is carried by the repository LICENSE and by the
+  marketplace manifests.
   `skills-ref validate <dir>` asserted per directory only when `shutil.which("skills-ref")`.
   Write set: `dadaia_workspace/public/entities/behavior-map.json`,
   `dadaia_workspace/public/skills/{dd-grill-me,dd-bug-resolution,dd-code-review,dd-test-stewardship,dd-codebase-design,dd-domain-modeling,dd-architecture-survey,dd-ai-eng-knowhow}/SKILL.md`,

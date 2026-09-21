@@ -5,14 +5,15 @@ description: >
   when writing or reading a term that has a glossary entry, naming a new concept,
   discussing codebase terminology, stress-testing domain relationships, or when a
   decision worth recording crystallises mid-session.
+compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install dadaia-workspace) it also drives the SDD lifecycle — specs, backlog, bugs, releases.
 ---
 
 # dd-domain-modeling
 
 One word carrying several meanings is how notes, grep-homonym patches and review
-confusion breed. The remedy is one bounded-context file — `CONTEXT.md`, one definition
-per term, explicit non-meanings — consumed inline while writing and actively sharpened
-while designing. Format: [`CONTEXT-FORMAT.md`](CONTEXT-FORMAT.md).
+confusion breed. The remedy is one bounded-context file — `CONTEXT.md`, one definition per
+term, explicit non-meanings — consumed inline while writing and actively sharpened while
+designing.
 
 ## Consuming the language (any agent, any prose)
 

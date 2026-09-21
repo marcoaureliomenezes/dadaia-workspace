@@ -5,6 +5,7 @@ description: >
   red loop, minimise, hypotheses, instrument, seam test, cleanup) plus the resolve
   record and commit. Use when a bug carries an open record in BUGS.jsonl; registering
   one is dd-bug-registration's job.
+compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install dadaia-workspace) it also drives the SDD lifecycle — specs, backlog, bugs, releases.
 ---
 
 # dd-bug-resolution — Arm B
@@ -14,7 +15,7 @@ description: >
 
 ## 1. Lifecycle frame
 
-1. Open `specs/bugs/AGENTS.md` (the area's scoped law) and follow it — its redaction rule
+1. Inside a dadaia workspace, open `specs/bugs/AGENTS.md` (the area's scoped law) and follow it — its redaction rule
    covers the whole arc: commands, outputs, captured artifacts.
 2. A bug fix rides the live `feature/{M.m.p}` branch in any phase: no separate branch, no SPEC/PLAN/TASKS, no version mint.
 3. Two fixers resolve by whichever `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve` lands first; a losing write
@@ -94,4 +95,3 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --caus
 - [`RED-LOOP.md`](RED-LOOP.md) — loop construction menu, tightening, non-deterministic bugs.
 - `dd-bug-registration` — classify-first registration; the record this skill requires.
 - `dd-gitflow-default` §3a — the exact commit shape.
-- `dd-test-stewardship` (intent and admission) — test intent/size declaration.

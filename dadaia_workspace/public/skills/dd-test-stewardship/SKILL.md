@@ -5,6 +5,7 @@ description: >
   demotion at closure, evidence-gated deletion, flake quarantine, artifact hygiene.
   Use when writing or reviewing a test, closing a release or task, handling a flaky
   test, or judging a deletion candidate.
+compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install dadaia-workspace) it also drives the SDD lifecycle — specs, backlog, bugs, releases.
 ---
 
 # dd-test-stewardship
@@ -45,8 +46,6 @@ description: >
 
 - For every demoted LARGE, yield the `file:line` of the replacement SMALL/MEDIUM
   coverage, or keep it as the seam's single SENTINEL.
-- Record the demotion map in `_RELEASE.json`'s `log`
-  (`dd-release-implementation`).
 
 ## Deletion — a reviewer (QA lens) verdict, executed by dd-software-engineer
 

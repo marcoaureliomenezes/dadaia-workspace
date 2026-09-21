@@ -5,6 +5,7 @@ description: >
   MCP — and the Claude-Code/Codex/Kimi-Code deltas), plus the disclosed
   authoring depth. Use when reasoning about your own harness configuration, before
   touching any AI-entity file.
+compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install dadaia-workspace) it also drives the SDD lifecycle — specs, backlog, bugs, releases.
 ---
 
 # dd-ai-eng-knowhow — Harness Literacy for Everyone, Depth on Demand
@@ -52,8 +53,7 @@ description: >
 
 ## 5. Disclosed siblings (authoring depth)
 
-- [`AUTHORING.md`](AUTHORING.md) — the writing-for-agents contract and 15-rule
-  checklist.
+- [`AUTHORING.md`](AUTHORING.md) — the writing-for-agents contract and 15-rule checklist.
 - [`CONTEXT-ENGINEERING.md`](CONTEXT-ENGINEERING.md) — token economy, instruction
   hierarchy, model-tier selection.
 - [`CLAUDE-CODE.md`](CLAUDE-CODE.md) · [`CODEX.md`](CODEX.md) — per-harness decision

@@ -3,6 +3,7 @@ name: dd-architecture-survey
 description: >
   Survey a codebase for deepening opportunities, oriented by the measured bug history.
   Produces architecture cards plus exactly ONE top candidate routed to dd-grill-me.
+compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install dadaia-workspace) it also drives the SDD lifecycle — specs, backlog, bugs, releases.
 ---
 
 # dd-architecture-survey
@@ -90,7 +91,6 @@ survey never decides. During that session, keep the domain model current via
 
 ## 8. References
 
-- `dd-codebase-design` — the vocabulary, the deletion test, design-it-twice.
 - `dd-domain-modeling` — glossary/ADR side effects during the grilling loop.
 - `dd-grill-me` — the mandatory next hop for the top candidate.
 - `dd-audit-project` — the three-pillar audit this survey feeds and complements.

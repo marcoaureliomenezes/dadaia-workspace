@@ -282,7 +282,7 @@ def test_v34_live_candidate_trio_bytes_under_the_fixed_ceiling() -> None:
 # tracked `*.md` under dadaia_workspace/public/skills/. Re-pinned at every closure that
 # touches the corpus, downward only; raising either is never a ratchet move.
 _V35_DIR_CEILING = 18
-_V35_LINE_CEILING = 2880
+_V35_LINE_CEILING = 2877
 
 
 def _skill_corpus_markdown() -> list[Path]:
@@ -298,7 +298,7 @@ def _skill_corpus_lines(paths: Iterable[Path]) -> int:
 
 
 def test_v35_skill_corpus_is_pinned() -> None:
-    """V35 — at most 18 skill directories and 2,881 total lines of skill Markdown.
+    """V35 — at most 18 skill directories and 2,877 total lines of skill Markdown.
     A rule lives in one home: a growing corpus is a rule restated, not a rule added."""
     corpus = _skill_corpus_markdown()
     dirs = {

@@ -6,6 +6,7 @@ description: >
   before any recommendation, fix or verdict. Use when designing or reviewing a
   module's interface, deciding where a seam goes, judging whether a diff grows or
   shrinks a feature, or naming a structural problem.
+compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install dadaia-workspace) it also drives the SDD lifecycle — specs, backlog, bugs, releases.
 ---
 
 # dd-codebase-design
@@ -38,9 +39,6 @@ flags, wrappers) breeding chains, and deletion-shaped fixes ending families.
 - **The interface is the test surface** — a test that reaches past the interface says the module is the wrong shape.
 - **One adapter = a hypothetical seam; two = a real one** — never introduce a port with a single adapter; that is indirection, not design.
 - **Replace, don't layer** — a fix that wraps the old path instead of replacing it is a layer, and layers are how the bug loop grows. The correct fix usually deletes a branch, collapses two paths, or moves logic back inside its owner.
-
-When designing an interface, ask: can I reduce the number of methods? simplify the
-parameters? hide more complexity inside?
 
 Design for testability — good interfaces make testing natural:
 

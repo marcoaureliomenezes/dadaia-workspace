@@ -2,9 +2,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "behavior-map-v1",
   "title": "Behavior Map v1",
-  "description": "D14 — the single declared map from a root `AGENTS.md` map section to the member(s) that operationalize it: EVERY core skill under dadaia_workspace/public/skills/*/SKILL.md and EVERY scoped AGENTS.md/*-AGENTS.md source under dadaia_workspace/public/{data,scaffold,templates}/ (never the projected instance path — see the two citation-path bugs cited in the enforcer). Supersedes rules-skills-map-v1 (retired, A10.3): the `skills` array + `justification` topic model is replaced by one row per member — a member (a skill name, or one scoped_agents_md path) maps to EXACTLY ONE row/section; a section MAY be owned by more than one row (A10.1). `anchor` carries T-050-20's future `<!-- behavior: ... -->` comment-anchor id inside the section body; null until that task lands. `hash_tuple` records the content hash of each side at the moment the row was last reviewed (A10.4) — the enforcer recomputes and compares, and a re-recording is a deliberate, reviewed act.",
+  "description": "D14 \u2014 the single declared map from a root `AGENTS.md` map section to the member(s) that operationalize it: EVERY core skill under dadaia_workspace/public/skills/*/SKILL.md and EVERY scoped AGENTS.md/*-AGENTS.md source under dadaia_workspace/public/{data,scaffold,templates}/ (never the projected instance path \u2014 see the two citation-path bugs cited in the enforcer). Supersedes rules-skills-map-v1 (retired, A10.3): the `skills` array + `justification` topic model is replaced by one row per member \u2014 a member (a skill name, or one scoped_agents_md path) maps to EXACTLY ONE row/section; a section MAY be owned by more than one row (A10.1). `anchor` carries T-050-20's future `<!-- behavior: ... -->` comment-anchor id inside the section body; null until that task lands. `hash_tuple` records the content hash of each side at the moment the row was last reviewed (A10.4) \u2014 the enforcer recomputes and compares, and a re-recording is a deliberate, reviewed act.",
   "type": "object",
-  "required": ["schema_version", "rows"],
+  "required": [
+    "schema_version",
+    "rows"
+  ],
   "additionalProperties": false,
   "properties": {
     "schema_version": {
@@ -15,55 +18,93 @@
     "skill_md_line_ceiling": {
       "type": "integer",
       "minimum": 1,
-      "description": "Ported from rules-skills-map-v1 unchanged (FR9/G12) — the declared line-count ceiling a SKILL.md's own content must stay within."
+      "description": "Ported from rules-skills-map-v1 unchanged (FR9/G12) \u2014 the declared line-count ceiling a SKILL.md's own content must stay within."
+    },
+    "standalone_skills": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+      },
+      "description": "The skills this project also distributes standalone, outside a dadaia workspace. The ONE data source for that set: every consumer of the set (contract tests, marketplace manifests) reads it here, never a literal roster of its own."
     },
     "declared_overlaps": {
       "type": "array",
-      "description": "Ported from rules-skills-map-v1 unchanged (FR9/D4) — pre-cleared applyTo activation-glob overlap groups among non-universal skills.",
+      "description": "Ported from rules-skills-map-v1 unchanged (FR9/D4) \u2014 pre-cleared applyTo activation-glob overlap groups among non-universal skills.",
       "items": {
         "type": "array",
         "minItems": 2,
-        "items": { "type": "string", "minLength": 1 },
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
         "uniqueItems": true
       }
     },
     "rows": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/row" }
+      "items": {
+        "$ref": "#/$defs/row"
+      }
     }
   },
   "$defs": {
     "row": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["section", "anchor", "skill", "scoped_agents_md", "hash_tuple", "recorded_by", "recorded_at"],
+      "required": [
+        "section",
+        "anchor",
+        "skill",
+        "scoped_agents_md",
+        "hash_tuple",
+        "recorded_by",
+        "recorded_at"
+      ],
       "properties": {
         "section": {
           "type": "string",
           "minLength": 1,
-          "pattern": "^§[0-9]+ .+$",
-          "description": "The root `AGENTS.md` map section this row's member(s) operationalize, title-anchored: '§N <Section Title>' using the CURRENT numbering (never a bare '§N')."
+          "pattern": "^\u00a7[0-9]+ .+$",
+          "description": "The root `AGENTS.md` map section this row's member(s) operationalize, title-anchored: '\u00a7N <Section Title>' using the CURRENT numbering (never a bare '\u00a7N')."
         },
         "anchor": {
-          "type": ["string", "null"],
-          "description": "T-050-20's future <!-- behavior: <id> --> comment-anchor id inside the section body. Null until that task lands (D14/D15 — this schema carries the field now so that task is additive, never a schema migration)."
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "T-050-20's future <!-- behavior: <id> --> comment-anchor id inside the section body. Null until that task lands (D14/D15 \u2014 this schema carries the field now so that task is additive, never a schema migration)."
         },
         "skill": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "minLength": 1,
           "description": "The single skill (under dadaia_workspace/public/skills/<name>/SKILL.md) this row owns, or null when the row is scoped_agents_md-only."
         },
         "scoped_agents_md": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1, "pattern": "^dadaia_workspace/public/" },
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^dadaia_workspace/public/"
+          },
           "uniqueItems": true,
-          "description": "Repo-relative POSIX SOURCE paths (never the projected instance path — the checkout-vs-instance bug this enforcer already guards against) under dadaia_workspace/public/{data,scaffold,templates}/ this row owns. May be empty when the row is skill-only."
+          "description": "Repo-relative POSIX SOURCE paths (never the projected instance path \u2014 the checkout-vs-instance bug this enforcer already guards against) under dadaia_workspace/public/{data,scaffold,templates}/ this row owns. May be empty when the row is skill-only."
         },
         "hash_tuple": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["section", "skill", "scripts", "scoped"],
+          "required": [
+            "section",
+            "skill",
+            "scripts",
+            "scoped"
+          ],
           "properties": {
             "section": {
               "type": "string",
@@ -71,18 +112,27 @@
               "description": "sha256 of the section body (from its '## N. Title' heading up to, exclusive of, the next heading) at last review."
             },
             "skill": {
-              "type": ["string", "null"],
+              "type": [
+                "string",
+                "null"
+              ],
               "pattern": "^sha256:[0-9a-f]{64}$",
               "description": "sha256 of the skill's SKILL.md content at last review; null exactly when 'skill' is null."
             },
             "scripts": {
-              "type": ["string", "null"],
+              "type": [
+                "string",
+                "null"
+              ],
               "pattern": "^sha256:[0-9a-f]{64}$",
               "description": "One sha256 over every file under the skill's scripts/ (each member's name and content, sorted) plus the shipped schemas stage copies in beside them, at last review; null exactly when the skill ships no scripts/. A script or a schema edited without this re-recorded is RED."
             },
             "scoped": {
               "type": "array",
-              "items": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+              "items": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
               "description": "sha256 of each scoped_agents_md source's content at last review, same order/length as scoped_agents_md."
             }
           }
@@ -99,24 +149,57 @@
         }
       },
       "anyOf": [
-        { "properties": { "skill": { "type": "string" } }, "required": ["skill"] },
-        { "properties": { "scoped_agents_md": { "minItems": 1 } }, "required": ["scoped_agents_md"] }
+        {
+          "properties": {
+            "skill": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "skill"
+          ]
+        },
+        {
+          "properties": {
+            "scoped_agents_md": {
+              "minItems": 1
+            }
+          },
+          "required": [
+            "scoped_agents_md"
+          ]
+        }
       ],
       "if": {
-        "properties": { "skill": { "type": "string" } },
-        "required": ["skill"]
+        "properties": {
+          "skill": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "skill"
+        ]
       },
       "then": {
         "properties": {
           "hash_tuple": {
-            "properties": { "skill": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" } }
+            "properties": {
+              "skill": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              }
+            }
           }
         }
       },
       "else": {
         "properties": {
           "hash_tuple": {
-            "properties": { "skill": { "type": "null" } }
+            "properties": {
+              "skill": {
+                "type": "null"
+              }
+            }
           }
         }
       }

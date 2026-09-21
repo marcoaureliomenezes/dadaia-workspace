@@ -63,24 +63,24 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 
 | Surface | Purpose | Step-1 law | Ceiling | Measured |
 |---|---|---|---|---|
-| `dd-ai-eng-knowhow` | harness literacy and the AI-entity authoring contract | — | 6144 | 2723 |
-| `dd-architecture-survey` | portfolio-level architecture candidates from bug history | — | 6144 | 4576 |
+| `dd-ai-eng-knowhow` | harness literacy and the AI-entity authoring contract | — | 6144 | 2886 |
+| `dd-architecture-survey` | portfolio-level architecture candidates from bug history | — | 6144 | 4662 |
 | `dd-audit-project` | the three-pillar audit and its window | `specs/audits/AGENTS.md` | 6144 | 2321 |
 | `dd-backlog-definition` | backlog curation, the intake gate, dispositions | `specs/backlog/AGENTS.md` | 6144 | 3219 |
 | `dd-bug-registration` | classify-first bug proposal and its record | `specs/bugs/AGENTS.md` | 6144 | 2782 |
-| `dd-bug-resolution` | the seven-phase diagnosing method and the resolve record | `specs/bugs/AGENTS.md` | 6144 | 5245 |
+| `dd-bug-resolution` | the seven-phase diagnosing method and the resolve record | `specs/bugs/AGENTS.md` | 6144 | 5356 |
 | `dd-cli-library` | CLI idioms, CLI-owned state, the dev-server registry | `.dadaia/AGENTS.md` | 6144 | 4325 |
-| `dd-code-review` | the three review axes and the six lenses | `specs/memory/AGENTS.md` | 6144 | 4642 |
-| `dd-codebase-design` | the deep-module vocabulary and the deletion test | — | 6144 | 5500 |
-| `dd-domain-modeling` | the repo's domain terms and their one home | — | 6144 | 3622 |
+| `dd-code-review` | the three review axes and the six lenses | `specs/memory/AGENTS.md` | 6144 | 4774 |
+| `dd-codebase-design` | the deep-module vocabulary and the deletion test | — | 6144 | 5540 |
+| `dd-domain-modeling` | the repo's domain terms and their one home | — | 6144 | 3737 |
 | `dd-gitflow-default` | the branch contract, commit shapes, the PR gate | — | 6144 | 4662 |
-| `dd-grill-me` | the operator grill that precedes a candidate | — | 6144 | 3123 |
+| `dd-grill-me` | the operator grill that precedes a candidate | — | 6144 | 3222 |
 | `dd-handoff-emitter` | handoff-first emission and ack-on-consume | `.dadaia/handoff/AGENTS.md` | 6144 | 2138 |
 | `dd-manager-orchestration` | intake, dispatch and the closure pass | — | 6144 | 3604 |
 | `dd-release-definition` | picking the set and authoring the trio | `specs/releases/AGENTS.md` | 6144 | 4666 |
 | `dd-release-implementation` | the candidate arc from reservation to the gate | `specs/releases/AGENTS.md` | 6144 | 3295 |
 | `dd-spec-navigator` | the three-phase session grounding protocol | `specs/AGENTS.md` | 6144 | 5053 |
-| `dd-test-stewardship` | test intent, admission, demotion, quarantine | — | 6144 | 4099 |
+| `dd-test-stewardship` | test intent, admission, demotion, quarantine | — | 6144 | 4178 |
 
 ## 4. Personas — `.agents/agents/*.md`
 

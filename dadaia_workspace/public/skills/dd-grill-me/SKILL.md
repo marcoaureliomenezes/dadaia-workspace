@@ -6,6 +6,7 @@ description: >
   for ambiguous intake, the mandatory pre-SPEC session of a release candidate, a
   focused spec question, or when the operator says "grill", "refine specs", or
   "review backlog".
+compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install dadaia-workspace) it also drives the SDD lifecycle — specs, backlog, bugs, releases.
 ---
 
 # dd-grill-me — SDD Spec Refinement
@@ -17,7 +18,6 @@ Reach shared understanding by mapping every open branch of the demand as a desig
 - The operator's demand is ambiguous and needs intake refinement (`dd-project-manager`).
 - A release is being defined and needs its mandatory pre-SPEC session (`dd-project-manager`, `dd-release-definition` §2).
 - A single spec or feature question needs a focused leaf answer.
-- The operator says "grill", "refine specs", or "review backlog".
 
 ## 2. Steps
 

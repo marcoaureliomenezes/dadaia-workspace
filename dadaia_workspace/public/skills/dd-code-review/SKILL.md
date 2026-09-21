@@ -7,6 +7,7 @@ description: >
   grew the touched feature's bug surface, evidenced from the ledger). Use when
   reviewing a PR, branch or commit range, or when a verdict needs the Bug-surface
   axis.
+compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install dadaia-workspace) it also drives the SDD lifecycle — specs, backlog, bugs, releases.
 ---
 
 # dd-code-review
@@ -17,7 +18,7 @@ axes are reported side by side — an axis never outranks another.
 
 ## 1. When
 
-1. Open `specs/memory/AGENTS.md` (the area's scoped law) and follow it — the diff is
+1. Inside a dadaia workspace, open `specs/memory/AGENTS.md` (the area's scoped law) and follow it — the diff is
    judged against current product truth.
 2. Reviewing a PR, branch or commit range before the candidate's PR.
 3. A curation, architecture or audit verdict needs the Bug-surface axis (§6).
@@ -75,4 +76,3 @@ One reviewer, six checklists applied on every verdict (ADR 0016); the engineer a
 ## 7. References
 
 - `dd-codebase-design` — the vocabulary the Standards and Bug-surface axes speak.
-- `dd-test-stewardship` — test findings' lifecycle rules.
