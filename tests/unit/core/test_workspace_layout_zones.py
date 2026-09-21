@@ -99,7 +99,7 @@ def test_zone_classes_match_architect_table() -> None:
 
 
 def test_creator_views_partition_the_registry() -> None:
-    by_creator = {c: [z.name for z in wl.zones_created_by(c)] for c in wl.Creator}
+    by_creator = {c: [z.name for z in wl.DADAIA_ZONES if z.creator is c] for c in wl.Creator}
     assert by_creator == {
         wl.Creator.INIT: ["states", ".venv"],
         wl.Creator.INSTALL: ["agentic", "hooks"],

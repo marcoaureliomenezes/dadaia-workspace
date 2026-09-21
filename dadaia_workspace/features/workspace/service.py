@@ -6,7 +6,7 @@ from pathlib import Path
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.core.models.workspace import Workspace
-from dadaia_workspace.core.workspace_layout import Creator, zones_created_by
+from dadaia_workspace.core.workspace_layout import provisioned_zones
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
@@ -54,7 +54,7 @@ class WorkspaceService:
         # The venv manager owns `.dadaia/.venv` and runs before the zone pass: an empty
         # pre-made `.venv` would read to it as an already-built venv.
         self._python_env.ensure_workspace_venv(str(workspace_root))
-        for zone in zones_created_by(Creator.INIT):
+        for zone in provisioned_zones():
             (workspace.dadaia_dir / zone.name).mkdir(parents=True, exist_ok=True)
         # The shared skills root is harness-independent — always created.
         (workspace.root / ".agents" / "skills").mkdir(parents=True, exist_ok=True)

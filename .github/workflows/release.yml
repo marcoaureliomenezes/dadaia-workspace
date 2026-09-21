@@ -184,7 +184,8 @@ jobs:
         run: dadaia --help
       - name: dadaia init in tmpdir
         # Use the runner temp dir (portable; no hardcoded /tmp — T-018-09).
+        # The directory is init's one positional argument and --harness its one required
+        # option; `--workspace` and the implied full harness set are retired.
         run: |
-          mkdir -p "$RUNNER_TEMP/smoke-ws"
-          dadaia init --workspace "$RUNNER_TEMP/smoke-ws"
+          dadaia init "$RUNNER_TEMP/smoke-ws" --harness claude
           test -f "$RUNNER_TEMP/smoke-ws/.dadaia/states/spec_contexts.json"

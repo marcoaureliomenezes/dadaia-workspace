@@ -469,6 +469,12 @@
       "agent": "release.py",
       "kind": "note",
       "text": "Candidate defined at 94bfdc26; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-09-21T02:30:00Z",
+      "agent": "dd-software-engineer",
+      "kind": "summary",
+      "text": "Candidate 8 implemented, T-047-71..79. FR1 one-line bootstrap: 06eb1b9d (init <dir>), 2713d689 (harness add in, public install --target out), 14df5918 (--harness <name>; all and the comma-set die), 8373e02e + 25901f2a (init --repo clones, composes the context lifecycle, re-entrant). FR3 roster: 78f3dd75 (cursor/devin/copilot records), 9c9e2906 + 35a0d5db (hook dialects, probes, V32 682). FR4: e698eef7 (SPEC-DOC-048 Origin, release.py --origin, flow weights). FR5: 0dd621dd (CLI audit, uncited verbs die, _orphan_claude_bridge deleted) and this task's e2e + closure. Deviations the review must weigh: (1) T-047-74 clones through SpecContextService.alive rather than a subprocess clone of its own — one clone implementation, no second URL validator; (2) T-047-76 reports an unprobeable harness as status SKIP with an 'UNVERIFIED:' detail instead of minting a new probe status; (3) the F5 registry.py split was ruled out — V36 holds at 36 files / 4,191 lines. T-047-79 also fixed WS-hooks-missing at its cause: init and the doctor held two views of 'which zone must exist'; workspace_layout.provisioned_zones() is now the only one and zones_created_by is deleted. HOOKS-DRIFT-1 did NOT reproduce — installer and comparator already read the same public_scripts_dir()."
     }
   ]
 }

@@ -33,7 +33,7 @@ from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.platform import PLATFORM
-from dadaia_workspace.core.workspace_layout import Creator, Zone
+from dadaia_workspace.core.workspace_layout import Zone
 from dadaia_workspace.features.spec_context import markers, sweep
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
@@ -484,8 +484,8 @@ class DoctorService:
             else:
                 verdict, detail = FindingVerdict.SLOP, "(not a zone)"
             out.append(self._finding("dadaia", self._dadaia, entry, verdict, detail))
-        for zone in workspace_layout.walked_zones():
-            if zone.creator in (Creator.INIT, Creator.INSTALL) and zone.name not in present:
+        for zone in workspace_layout.provisioned_zones():
+            if zone.name not in present:
                 out.append(
                     self._finding(
                         zone.name,

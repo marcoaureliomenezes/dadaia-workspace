@@ -62,7 +62,7 @@ __all__ = [
     "walked_zones",
     "zone_names",
     "zone_table_rows",
-    "zones_created_by",
+    "provisioned_zones",
     "zones_with_canon",
     "zones_with_ttl",
 ]
@@ -234,9 +234,18 @@ def zone_names() -> frozenset[str]:
     return frozenset(zone.name for zone in DADAIA_ZONES)
 
 
-def zones_created_by(creator: Creator) -> tuple[Zone, ...]:
-    """What ``init``/``install`` must create and the doctor reports ``missing`` for."""
-    return tuple(zone for zone in DADAIA_ZONES if zone.creator is creator)
+def provisioned_zones() -> tuple[Zone, ...]:
+    """The zones a bootstrapped workspace must carry — ONE predicate, two consumers.
+
+    ``init`` creates exactly these and the doctor reports exactly these as ``missing``
+    (bug WS-hooks-missing: ``init`` provisioned the ``init``-created rows only while the
+    doctor demanded the ``install``-created ones too, so a ``claude``-only workspace —
+    whose hook format projects no ``.dadaia/hooks/`` wrapper — was born red). ``creator``
+    stays the row's metadata; it is no longer a second, narrower answer to "must this
+    exist?". MANAGED/OPERATOR rows are excluded for the same reason the doctor never
+    walks them: ``.venv`` is the venv manager's, not the zone pass'.
+    """
+    return tuple(zone for zone in walked_zones() if zone.creator in (Creator.INIT, Creator.INSTALL))
 
 
 def zones_with_ttl() -> tuple[Zone, ...]:

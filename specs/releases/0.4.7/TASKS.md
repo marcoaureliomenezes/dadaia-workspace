@@ -147,7 +147,7 @@
   `tests/contract/test_cli_help_quality.py`, `tests/contract/test_slop_ratchets.py`,
   `tests/unit/features/spec_context/**`.
 
-- [ ] T-047-79 — FR5: the bootstrap e2e and closure. `tests/e2e/test_one_line_bootstrap.py`
+- [x] T-047-79 — FR5: the bootstrap e2e and closure. `tests/e2e/test_one_line_bootstrap.py`
   (LARGE, justified inline): a `tmp_path` workspace, a **local bare git repo** as `--repo` (no
   network, no container), the package installed from source into a tmp venv, then `dadaia init
   demo --harness claude --repo <bare>`, `cd demo && dadaia doctor` exit 0 and `dadaia context

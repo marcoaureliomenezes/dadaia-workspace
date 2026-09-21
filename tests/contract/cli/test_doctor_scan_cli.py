@@ -28,7 +28,7 @@ from dadaia_workspace import container
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.platform import PLATFORM
-from dadaia_workspace.core.workspace_layout import Creator, zones_created_by, zones_with_ttl
+from dadaia_workspace.core.workspace_layout import provisioned_zones, zones_with_ttl
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from tests.fakes import FakeContextStore, FakeGitClient
 
@@ -44,7 +44,7 @@ _FINDING_LINE = re.compile(
 @pytest.fixture
 def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     dadaia = tmp_path / ".dadaia"
-    for zone in (*zones_created_by(Creator.INIT), *zones_created_by(Creator.INSTALL)):
+    for zone in provisioned_zones():
         (dadaia / zone.name).mkdir(parents=True, exist_ok=True)
     (dadaia / "states" / "spec_contexts.json").write_text(
         '{"schema_version": "2", "contexts": []}', encoding="utf-8"

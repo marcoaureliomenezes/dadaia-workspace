@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.workspace_layout import Creator, zones_created_by
+from dadaia_workspace.core.workspace_layout import provisioned_zones
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from tests.fakes import FakePublicAssetManager, FakePythonEnvironmentManager
 
@@ -28,14 +28,14 @@ def test_init_creates_only_registry_init_zones_and_canon_seeds(
 ) -> None:
     """Intent: CONTRACT — 0.4.6 AC10 (FR1/FR10).
 
-    ``init`` materialises exactly the ``Creator.INIT`` rows of ``DADAIA_ZONES`` — the
-    registry view, never a second list — so a retired zone (``academy``, ``reports``,
+    ``init`` materialises exactly ``provisioned_zones()`` — the SAME view the doctor
+    reports ``missing`` for (bug WS-hooks-missing), never a second list — so a retired zone (``academy``, ``reports``,
     ``scripts``, an eager ``tmp``) cannot reappear, and no ``academy.json`` is seeded.
     """
     service.init(workspace_root, harnesses=("claude", "codex"), skip_assets=True)
 
     dadaia = workspace_root / ".dadaia"
-    assert {p.name for p in dadaia.iterdir()} == {z.name for z in zones_created_by(Creator.INIT)}
+    assert {p.name for p in dadaia.iterdir()} == {z.name for z in provisioned_zones()}
     assert (dadaia / "states").is_dir()
     for retired in ("academy", "reports", "scripts", "tmp", "src"):
         assert not (dadaia / retired).exists(), retired

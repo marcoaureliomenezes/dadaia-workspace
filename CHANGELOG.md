@@ -305,6 +305,45 @@ Open-scope release (ADRs 0005–0009): version minted at birth from the PyPI lin
   construction (ADR 0013).
 - Windows runner: derived-doc hashes over LF bytes, POSIX path filters, the telemetry backstop assertion.
 
+### Candidate 8 — one line, one harness (ADR 0020)
+
+#### Added
+- `dadaia init <dir> --harness <name> [--repo <url>]`: the directory is a required positional
+  argument and the harness a required option — one runtime at birth. With `--repo`, `init` is a
+  CALLER of the context lifecycle (`create` -> `alive`'s clone -> the pre-push chokepoint -> the
+  session binding) and closes with the `--print-env` export lines instead of the closing notes;
+  re-running the identical command is a no-op that exits 0.
+- `dadaia harness add <name>` and `dadaia harness list`: a harness joins a live workspace by
+  name, is recorded in `.dadaia/states/harness_profile.json`, and `public install` scopes to the
+  registered set.
+- `cursor`, `devin` and `copilot` as `core/harness_registry.py` records with their agent
+  transcodes, hook dialects and probes — a roster of six, every table derived from the record.
+- SPEC-DOC-048: every `SPEC.md` carries an `Origin` line; `release.py new --origin` seeds it, and
+  the flow weights are stated in `specs/releases/AGENTS.md`.
+- `tests/e2e/test_one_line_bootstrap.py` — AC1.1 through the INSTALLED console script: a local
+  bare repo as `--repo`, then `doctor` exit 0, `context show --json` reporting the repo ALIVE as
+  `main_repo`, and the cloned repo's `pre-push` byte-equal to the shipped gate.
+
+#### Changed
+- `core/workspace_layout.py::provisioned_zones()` is the ONE answer to "which `.dadaia/` zone
+  must exist": `init` creates exactly it and the doctor reports exactly it as `missing`.
+- The whole `tests/e2e` tree runs in CI's e2e job (the journeys at the tree root ran nowhere);
+  the release smoke job inits with the new signature.
+
+#### Removed
+- `dadaia public install --target <name>`, `--harness all`, the comma-separated harness set and
+  `init -w/--workspace` — one verb in, one verb out.
+- `dadaia context update`, `dadaia context repo list`, `_orphan_claude_bridge` and the
+  Codex-only hook-wrapper functions (generalised into the dialect table); `certify` no longer
+  probes retired verbs. Every verb in `dadaia help tree` is cited by a skill, an agent or the
+  map — 30 or fewer.
+
+#### Fixed
+- `WS-hooks-missing`: a `claude`-only `init` was born doctor-red. `init` provisioned the
+  `init`-created zones while the doctor demanded the `install`-created ones too, and a hook
+  format that projects no `.dadaia/hooks/` wrapper left the zone absent — two views of one
+  invariant, now one.
+
 ### Candidate 7 — ledger verbs to skill scripts (ADR 0018)
 
 #### Removed

@@ -261,8 +261,11 @@ jobs:
           key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
+      # The whole e2e tree, not `tests/e2e/features` alone: the journeys at the tree root
+      # (the push chokepoint, the denylist, and the one-line bootstrap through the
+      # installed console script) were outside every selector and ran nowhere in CI.
       - name: pytest e2e python
-        run: poetry run pytest -q -m "e2e and not quarantine" tests/e2e/features --durations=30
+        run: poetry run pytest -q -m "e2e and not quarantine" tests/e2e --durations=30
 
   pr-title:
     name: PR title (conventional commits)
