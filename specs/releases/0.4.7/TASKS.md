@@ -11,7 +11,7 @@
 - [x] T-047-71 — FR2: the harness record. `core/harness_registry.py` gains a frozen
   `HarnessRecord(name, directory, agent_transcode, hooks)` and a `HARNESS_RECORDS` table for
   `claude` (`.claude`, `claude-md-symlink`, `claude-settings`), `codex` (`.codex`, `codex-toml`,
-  `codex-hooks`) and `kimi-code` (none, `none`, `none`). `L1_ENTRY_HARNESSES`,
+  `codex-hooks`) and `kimi-code` (none, `none`, `kimi-hooks` — the user-level shims stay a hook derivation). `L1_ENTRY_HARNESSES`,
   `HARNESS_PROJECTION_DIRS`, `PROJECTION_TARGETS`, `INSTALL_TARGETS` and `parse_harness_set`
   derive from the table — no second literal. `infrastructure/projection_rules.py` drops the
   three `HarnessProjection` classes and `build_harnesses()`; `projection_rules()` iterates

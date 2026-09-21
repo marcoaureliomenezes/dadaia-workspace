@@ -75,7 +75,7 @@ in, an old one out).
   harness's set, records it in the profile; `harness list` shows the registered ones.
 - `core/harness_registry.py`: one record per harness — `directory`, `agent_transcode`
   (`none | claude-md-symlink | codex-toml | cursor-md | devin-md | copilot-agent-md`),
-  `hooks` (`none | claude-settings | codex-hooks | cursor-hooks | devin-hooks | copilot-hooks`);
+  `hooks` (`none | claude-settings | codex-hooks | kimi-hooks | cursor-hooks | devin-hooks | copilot-hooks`; `kimi-hooks` = the user-level shims and the managed `config.toml` block);
   `HARNESS_PROJECTION_DIRS`, `PROJECTION_TARGETS`, `INSTALL_TARGETS` and the adapters derive
   from it; `ProjectionRule` tables come from the record, never from a per-harness `if`.
 - **AC2.1** `dadaia init demo` without `--harness` exits 2 with one `fix:` line; `dadaia
