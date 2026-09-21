@@ -52,7 +52,7 @@
   Write set: `dadaia_workspace/public/scripts/build-skills-repo.py`,
   `tests/contract/test_skills_repo_build.py`, `tests/contract/test_slop_ratchets.py`.
 
-- [ ] T-047-82 — FR2: CI publishes the built repository.
+- [x] T-047-82 — FR2: CI publishes the built repository.
   `.github/workflows/release.yml` gains one job after the publish job (`needs:` it) that runs
   `python dadaia_workspace/public/scripts/build-skills-repo.py "$RUNNER_TEMP/skills-repo"` and
   pushes the result to `marcoaureliomenezes/dadaia-skills` `main` with the tag's version as the

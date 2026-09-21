@@ -189,3 +189,40 @@ jobs:
         run: |
           dadaia init "$RUNNER_TEMP/smoke-ws" --harness claude
           test -f "$RUNNER_TEMP/smoke-ws/.dadaia/states/spec_contexts.json"
+
+  publish-skills-repo:
+    name: Publish the dadaia-skills repository
+    runs-on: ubuntu-latest
+    needs: [check, publish]
+    if: needs.check.outputs.skip == 'false'
+    timeout-minutes: 5
+    # contents: read — the push targets the OTHER repository
+    # (marcoaureliomenezes/dadaia-skills) through SKILLS_REPO_TOKEN, never this one.
+    permissions:
+      contents: read
+    env:
+      SKILLS_REPO_TOKEN: ${{ secrets.SKILLS_REPO_TOKEN }}
+    steps:
+      - name: "Secret missing: fail closed (operator adds SKILLS_REPO_TOKEN)"
+        if: env.SKILLS_REPO_TOKEN == ''
+        run: |
+          echo "::error::SKILLS_REPO_TOKEN is not set; the skills repository cannot be published and this job fails closed. Add the secret (contents:write on marcoaureliomenezes/dadaia-skills)."
+          exit 1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Build the skills repository
+        run: python dadaia_workspace/public/scripts/build-skills-repo.py "$RUNNER_TEMP/skills-repo"
+      - name: Push the built tree to marcoaureliomenezes/dadaia-skills
+        # The generated out-dir is not this repository, so `git add -A` there is safe.
+        # The published repository is a build output whose history is this repository's
+        # tags: every release force-pushes the freshly rendered tree over main.
+        run: |
+          cd "$RUNNER_TEMP/skills-repo"
+          git init -b main
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "dadaia-skills ${{ needs.check.outputs.version }}"
+          git push --force "https://x-access-token:${SKILLS_REPO_TOKEN}@github.com/marcoaureliomenezes/dadaia-skills.git" main
