@@ -131,12 +131,30 @@ registered only after confirmation — an agent never files one on its own judge
 Completed work leaves a session as a machine-readable handoff under the workspace
 runtime tree, validated by `dadaia reports validate`.
 
+## Documentation
+
+<!-- derived-from: pypi-distribution sha256:80d67bd879ea -->
+<!-- derived-from: public-asset-distribution sha256:dc567ee9ad95 -->
+
+The site is <https://marcoaureliomenezes.github.io/dadaia-workspace/>:
+
+- [Quickstart](docs/quickstart.md) — install to a bound project, a backlog entry and a
+  live release; [positioning](docs/positioning.md) — why product repos carry no agent
+  config.
+- [The bug loop](docs/bug-loop.md) — register, RED, fix, resolve;
+  [what the bug ledger taught](docs/bug-ledger-lessons.md) — the counts and the
+  fix-chain lesson.
+- [CLI reference](docs/cli.md) · [concepts](docs/concepts.md) ·
+  [getting started](docs/getting-started.md) · [distribution](docs/distribution.md)
+
+The skills install without a workspace, from their own built repository:
+`npx skills add marcoaureliomenezes/dadaia-skills`.
+
 ## Links
 
 <!-- derived-from: pypi-distribution sha256:80d67bd879ea -->
 
 - GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
 - PyPI — <https://pypi.org/project/dadaia-workspace/>
-- Documentation — [`docs/`](docs/): [CLI reference](docs/cli.md)
 - Agent index — [`llms.txt`](llms.txt)
 - Changelog — [`CHANGELOG.md`](CHANGELOG.md)

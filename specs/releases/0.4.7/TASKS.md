@@ -85,7 +85,7 @@
   Write set: `docs/index.md`, `docs/quickstart.md`, `docs/positioning.md`, `docs/bug-loop.md`,
   `tests/contract/test_docs_derived_from_memory.py`.
 
-- [ ] T-047-84 — FR3: the ledger article and the public wiring.
+- [x] T-047-84 — FR3: the ledger article and the public wiring.
   `docs/bug-ledger-lessons.md` — the article: the closure-time counts from
   `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats` (514 records, 497 resolved,
   38 CRITICAL, 231 HIGH, stated as "at the 0.4.7 closure", never as a live figure) and the

@@ -36,7 +36,7 @@ classifiers = [
 [tool.poetry.urls]
 Homepage = "https://pypi.org/project/dadaia-workspace/"
 Repository = "https://github.com/marcoaureliomenezes/dadaia-workspace"
-Documentation = "https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/getting-started.md"
+Documentation = "https://marcoaureliomenezes.github.io/dadaia-workspace/"
 Changelog = "https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/CHANGELOG.md"
 Issues = "https://github.com/marcoaureliomenezes/dadaia-workspace/issues"
 

@@ -30,5 +30,20 @@
 <!-- derived-from: workspace-doctor sha256:f37b2ae38ea4 -->
 
 - [CLI reference](docs/cli.md): the committed output of `dadaia help tree`.
+- [Concepts](docs/concepts.md): the vocabulary — workspace, context, release, candidate, gate.
+- [Distribution](docs/distribution.md): how the public assets and the skills reach a harness.
+- [Getting started](docs/getting-started.md): the longer walkthrough behind the quickstart.
 - [Memory catalog](specs/memory/product/index.md): every product atom, its `tldr` and its path.
 - [Source repository](https://github.com/marcoaureliomenezes/dadaia-workspace): issues, releases and the full specs tree.
+
+## The site
+
+<!-- derived-from: product-vision sha256:89dc2ce6898d -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:8e4c85766c6a -->
+
+- [Documentation site](https://marcoaureliomenezes.github.io/dadaia-workspace/): the published pages, served from `docs/` on `main`.
+- [Landing](docs/index.md): the tagline and the three entry pages.
+- [Quickstart](docs/quickstart.md): install, init, bind, doctor, first backlog entry, first candidate.
+- [Positioning](docs/positioning.md): product repos never carry agent config; one law governs many projects.
+- [The bug loop](docs/bug-loop.md): register, RED, fix, resolve with evidence and lineage.
+- [What the bug ledger taught](docs/bug-ledger-lessons.md): the closure-time counts and the fix-chain lesson — an additive fix breeds the next bug, a deletion-shaped fix ends the family.
