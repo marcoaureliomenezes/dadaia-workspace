@@ -1,9 +1,14 @@
 """Intent: CONTRACT — T-047-82: the release workflow publishes the built skills
 repository and fails closed on the missing SKILLS_REPO_TOKEN secret, with the token
-never interpolated outside the push remote URL. Size: SMALL."""
+never interpolated outside the push remote URL.
+
+Intent: CONTRACT — T-047-87: release-please.yml is the one workflow minting the
+version, CHANGELOG and tag: push-to-main trigger, sha-pinned action, release type
+read from the config file rather than an input. Size: SMALL."""
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -86,4 +91,71 @@ def test_no_run_body_of_the_skills_job_interpolates_a_workflow_expression() -> N
     ]
     assert offenders == [], (
         f"job {name} must pass every workflow expression through env:, not a run body: {offenders}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# release-please.yml — the one workflow that mints the version, CHANGELOG and tag
+# ---------------------------------------------------------------------------
+
+_RELEASE_PLEASE_YML = (
+    Path(__file__).resolve().parents[2] / ".github" / "workflows" / "release-please.yml"
+)
+_ACTION = "googleapis/release-please-action"
+_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+
+
+def _release_please_step() -> dict[str, Any]:
+    """The single step invoking the release-please action, with its `uses:` comment."""
+    document = yaml.safe_load(_RELEASE_PLEASE_YML.read_text(encoding="utf-8"))
+    steps = [
+        step
+        for job in document["jobs"].values()
+        for step in job.get("steps") or []
+        if _ACTION in str(step.get("uses") or "")
+    ]
+    assert len(steps) == 1, f"expected exactly one release-please step, got {len(steps)}"
+    return dict(steps[0])
+
+
+def test_release_please_workflow_runs_on_a_push_to_main() -> None:
+    document = yaml.safe_load(_RELEASE_PLEASE_YML.read_text(encoding="utf-8"))
+    # PyYAML reads the bare `on:` key as the boolean True (the YAML 1.1 truthy set).
+    triggers = document.get("on", document.get(True))
+    assert triggers["push"]["branches"] == ["main"], (
+        f"the release workflow triggers on a push to main alone: {triggers}"
+    )
+    assert "workflow_dispatch" in triggers, "the workflow stays manually runnable"
+    assert document["permissions"] == {"contents": "write", "pull-requests": "write"}, (
+        "release-please writes the release PR and the tag — and nothing wider"
+    )
+
+
+def test_release_please_action_is_sha_pinned_with_its_version_comment() -> None:
+    """A mutable tag on a release-minting action is a supply-chain hole; the trailing
+    `# v<x.y.z>` comment is what makes the pin auditable by a human."""
+    raw = _RELEASE_PLEASE_YML.read_text(encoding="utf-8")
+    uses_lines = [line for line in raw.splitlines() if _ACTION in line and "uses:" in line]
+    assert len(uses_lines) == 1, uses_lines
+    ref, _, comment = uses_lines[0].partition("#")
+    sha = ref.split("@", 1)[1].strip()
+    assert _SHA_RE.match(sha), f"the action must be pinned to a 40-hex commit sha: {sha!r}"
+    assert re.match(r"^\s*v\d+\.\d+\.\d+\s*$", comment), (
+        f"the pin carries a trailing `# v<x.y.z>` comment naming the tag: {comment!r}"
+    )
+
+
+def test_release_please_reads_its_release_type_from_the_config_file() -> None:
+    """A `release-type:` input switches the action out of manifest mode and the config
+    file is then ignored — the type belongs in the config's root package instead."""
+    step = _release_please_step()
+    inputs = step.get("with") or {}
+    assert "release-type" not in inputs, (
+        f"no release-type input — it lives in release-please-config.json: {inputs}"
+    )
+    assert inputs["config-file"] == "release-please-config.json"
+    assert inputs["manifest-file"] == ".release-please-manifest.json"
+    assert step.get("id") == "release-please", (
+        "the step is identified so its release_created/tag_name outputs can gate the "
+        f"publishing jobs: {step}"
     )

@@ -8,7 +8,7 @@
 
 ## Candidate 10 — the release is a release PR
 
-- [ ] T-047-87 — FR1: release-please owns version, CHANGELOG and tag.
+- [x] T-047-87 — FR1: release-please owns version, CHANGELOG and tag.
   New `.github/workflows/release-please.yml` on `push: branches: [main]` plus
   `workflow_dispatch`, `permissions: contents: write, pull-requests: write`, one job, one step:
   `googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7  # v5.0.0` with

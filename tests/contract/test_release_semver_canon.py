@@ -215,3 +215,80 @@ def test_v_prefixed_archived_dir_still_resolves(tmp_path: Path) -> None:
         if i.code in ("SPEC-DOC-016", "SPEC-DOC-027") and i.severity == Severity.ERROR
     ]
     assert naming_issues == [], naming_issues
+
+
+# ---------------------------------------------------------------------------
+# release-please canon — the manifest floor and the pre-1.0 bump flags
+# ---------------------------------------------------------------------------
+
+_MANIFEST_PATH = _REPO_ROOT / ".release-please-manifest.json"
+_CONFIG_PATH = _REPO_ROOT / "release-please-config.json"
+
+
+def _published_tags() -> list[str]:
+    """Every ``v*`` tag reachable in this checkout, newest last (version order).
+
+    CI checks this repository out shallow and without tags, so an empty list is a
+    legitimate environment, not a failure — the caller skips on it.
+    """
+    import subprocess
+
+    result = subprocess.run(
+        ["git", "tag", "-l", "v*", "--sort=version:refname"],
+        cwd=_REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return []
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def test_release_please_manifest_sits_at_the_last_published_version() -> None:
+    """The manifest is release-please's floor: it must name the last PUBLISHED
+    version, so the first release PR proposes the next one rather than re-minting a
+    version that already carries a tag."""
+    import json
+
+    manifest = json.loads(_MANIFEST_PATH.read_text(encoding="utf-8"))
+    assert set(manifest) == {"."}, f"the manifest addresses one package, the root: {manifest}"
+    version = manifest["."]
+    from dadaia_workspace.core.specs_version import is_release_semver
+
+    assert isinstance(version, str) and is_release_semver(version), (
+        f"the manifest version must be a bare SemVer (no `v` prefix): {version!r}"
+    )
+
+    tags = _published_tags()
+    if not tags:
+        pytest.skip("no v* tags in this checkout (shallow CI clone) — floor unverifiable here")
+    assert f"v{version}" == tags[-1], (
+        f"the manifest floor must equal the latest published tag {tags[-1]!r}, got v{version}"
+    )
+
+
+def test_release_please_config_mints_a_patch_below_one_point_zero() -> None:
+    """Pre-1.0, release-please bumps the MINOR on a `feat` unless both flags are set.
+    The project mints patch releases from `feat` commits, so both must be true."""
+    import json
+
+    config = json.loads(_CONFIG_PATH.read_text(encoding="utf-8"))
+    assert config.get("bump-minor-pre-major") is True
+    assert config.get("bump-patch-for-minor-pre-major") is True
+    assert config.get("include-component-in-tag") is False, (
+        "tags are bare `v<version>` — a component prefix would break every tag consumer"
+    )
+
+    root_package = config["packages"]["."]
+    assert root_package["release-type"] == "python", (
+        "the release type lives in the config's root package, never as an action input "
+        f"(a `release-type:` input switches the action out of manifest mode): {root_package}"
+    )
+    assert root_package["changelog-path"] == "CHANGELOG.md"
+
+    sections = {entry["type"]: entry for entry in config["changelog-sections"]}
+    assert {"feat", "fix", "refactor", "docs", "ci", "test", "chore"} <= set(sections)
+    for commit_type, entry in sections.items():
+        assert entry["section"], f"section {commit_type} must carry a heading"
+        assert isinstance(entry["hidden"], bool)
