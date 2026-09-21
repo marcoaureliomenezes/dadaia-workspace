@@ -7,28 +7,28 @@
       "opened": "2026-09-12",
       "status": "candidate",
       "description": "Deferred (grill Q16 item 2, audit A-003): candidate = merge to develop; a long-lived release PR on main accumulates; promote = merge it; version derived from Conventional Commits; rc-N folders and birth-minted version retired. Changes ADR 0005; after release-lifecycle-verbs lands.",
-      "provenance": "operator-ratified deferral 2026-09-12 grill Q16 \u2014 standards replacement, own grill before pick \u2014 promoted to candidate 2026-09-14 (operator order: ideas are official backlog)",
+      "provenance": "operator-ratified deferral 2026-09-12 grill Q16 — standards replacement, own grill before pick — promoted to candidate 2026-09-14 (operator order: ideas are official backlog)",
       "intents": [
         {
           "subject": {
             "kind": "code",
             "ref": "dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_rc.py#rc_archive"
           },
-          "change": "retire \u2014 no rc-N/ lane: the closed candidate's trio is overwritten by the next candidate's; rc and implemented.rc leave release-state-v1; ADR 0006/0008/0009 superseded"
+          "change": "retire — no rc-N/ lane: the closed candidate's trio is overwritten by the next candidate's; rc and implemented.rc leave release-state-v1; ADR 0006/0008/0009 superseded"
         },
         {
           "subject": {
             "kind": "code",
             "ref": "dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_archive.py#archive_release"
           },
-          "change": "change \u2014 reads the merged release PR (number, merged sha) from gh instead of --shipped/--pr and prints the Conventional-Commits version suggestion the operator rules on at promote"
+          "change": "change — reads the merged release PR (number, merged sha) from gh instead of --shipped/--pr and prints the Conventional-Commits version suggestion the operator rules on at promote"
         },
         {
           "subject": {
             "kind": "doc",
             "ref": "memory/product/sdd/sdd-bug-backlog-governance.md#The release state document"
           },
-          "change": "change \u2014 one long-lived release PR develop->main accumulates candidates; the version stays last-published-PyPI+1-patch as the floor (ADR 0005 kept), raised only by operator ruling at promote"
+          "change": "change — one long-lived release PR develop->main accumulates candidates; the version stays last-published-PyPI+1-patch as the floor (ADR 0005 kept), raised only by operator ruling at promote"
         }
       ]
     },
@@ -36,7 +36,7 @@
       "id": "standalone-skills-distribution",
       "title": "Publish the self-sufficient skills as Agent Skills packages on every harness channel",
       "opened": "2026-09-18",
-      "status": "candidate",
+      "status": "picked",
       "description": "Adoption channel: distribution in 2026 is the marketplace, and the Claude marketplace alone is not viable because we support Codex and Kimi Code. The Agent Skills open standard (agentskills.io, 45+ adopters) IS cross-harness: Codex reads .agents/skills, Kimi Code reads .agents/skills, Claude Code reads it via plugin or `--add-dir`, and `npx skills add <repo>` installs into any of them. Publish the skills that survive without the workspace (dd-grill-me, dd-bug-resolution, dd-code-review three-axis, dd-test-stewardship) as one skills repo in the standard layout, registered on the Anthropic marketplace (claude-plugins-official / claude-community), the Codex marketplace (`codex marketplace add`) and installable by `npx skills add`; each skill names dadaia-workspace as the place where the full lifecycle lives. Complements plugin-packaging-and-skill-evals (the whole AI surface as one Claude plugin): this entry is the harness-neutral entry door.",
       "provenance": "operator ruling 2026-09-18 (competitive report 'dadaia-workspace: diferencial e panorama competitivo'): five urgencies before any public launch",
       "intents": [
@@ -45,21 +45,21 @@
             "kind": "catalog",
             "ref": "public-asset-distribution"
           },
-          "change": "new \u2014 a second distribution beside the wheel: a standard Agent Skills repo built from public/skills by one verb, validated by skills-ref"
+          "change": "new — a second distribution beside the wheel: a standard Agent Skills repo built from public/skills by one verb, validated by skills-ref"
         },
         {
           "subject": {
             "kind": "catalog",
             "ref": "harness-codex"
           },
-          "change": "change \u2014 skills reachable through `codex marketplace add` and `.agents/skills`, no workspace required"
+          "change": "change — skills reachable through `codex marketplace add` and `.agents/skills`, no workspace required"
         },
         {
           "subject": {
             "kind": "catalog",
             "ref": "harness-kimi-code"
           },
-          "change": "change \u2014 skills reachable through `.agents/skills`, no workspace required"
+          "change": "change — skills reachable through `.agents/skills`, no workspace required"
         }
       ]
     },
@@ -67,7 +67,7 @@
       "id": "public-presence-and-launch",
       "title": "Public presence: docs site, 5-minute quickstart, one video, Show HN, awesome-list PRs",
       "opened": "2026-09-18",
-      "status": "candidate",
+      "status": "picked",
       "description": "Discoverability is zero: 1 star, 0 forks, 0 independent mentions; PyPI is the only channel; search engines return repo PRs before the README; 418 lines of docs for 55 commands. Deliver: a docs site (quickstart in 5 minutes, the bug -> RED -> fix -> resolve loop, and the page 'your product repos never carry agent config, one law governs ten projects'); one short video of the flow; a Show HN post; PRs to awesome-claude-code, awesome-agents.md and awesome-spec-driven-development; one article on the 512-record bug ledger and what it taught about fixes that breed bugs. Always promote the full slug 'dadaia-workspace' (the bare word collides with unrelated content). Gated on one-line-bootstrap, english-only-surface and the ceremony reduction: launching the product as it is invites the BMAD critique.",
       "provenance": "operator ruling 2026-09-18 (competitive report 'dadaia-workspace: diferencial e panorama competitivo'): five urgencies before any public launch",
       "intents": [
@@ -76,14 +76,14 @@
             "kind": "catalog",
             "ref": "brand-identity"
           },
-          "change": "new \u2014 docs site, quickstart, positioning page and launch assets under the dadaia-workspace slug"
+          "change": "new — docs site, quickstart, positioning page and launch assets under the dadaia-workspace slug"
         },
         {
           "subject": {
             "kind": "catalog",
             "ref": "pypi-distribution"
           },
-          "change": "change \u2014 PyPI/README point at the docs site; README outranks PRs (canonical links, topics, description)"
+          "change": "change — PyPI/README point at the docs site; README outranks PRs (canonical links, topics, description)"
         }
       ]
     },
@@ -92,15 +92,15 @@
       "title": "Hook derivation study: every hook is the per-harness implementation of a deterministic behavior the workspace defines; design the derivation for Claude, Codex, Kimi, Cursor, Devin, Copilot",
       "opened": "2026-09-20",
       "status": "idea",
-      "description": "Doctrine (operator, 2026-09-20): a hook never exists on its own; the rule is the abstract entity \u2014 a deterministic behavior the workspace enforces (root whitelist, venv guard, SDD gate, session-start reaper, context injection) \u2014 and each harness gets that rule's implementation in its own hook format (Claude settings.json, Codex hooks.json, Kimi [[hooks]] in user config.toml, Cursor hooks.json, Devin hooks.v1.json, Copilot .github/hooks/*.json). Study: one rule registry -> one renderer per harness; which harnesses fire hooks headless (Codex does not); which support project-level hooks (Kimi and ZCode: user-level only); the Claude-hooks bridge DeepSeek dsh ships. Not this cycle.",
-      "provenance": "operator grill ruling 2026-09-20 (dd-grill-me rounds 1..3 over the 17 entries; ADRs 0016..0021) \u2014 Q31, deferred by the operator until the roster extends",
+      "description": "Doctrine (operator, 2026-09-20): a hook never exists on its own; the rule is the abstract entity — a deterministic behavior the workspace enforces (root whitelist, venv guard, SDD gate, session-start reaper, context injection) — and each harness gets that rule's implementation in its own hook format (Claude settings.json, Codex hooks.json, Kimi [[hooks]] in user config.toml, Cursor hooks.json, Devin hooks.v1.json, Copilot .github/hooks/*.json). Study: one rule registry -> one renderer per harness; which harnesses fire hooks headless (Codex does not); which support project-level hooks (Kimi and ZCode: user-level only); the Claude-hooks bridge DeepSeek dsh ships. Not this cycle.",
+      "provenance": "operator grill ruling 2026-09-20 (dd-grill-me rounds 1..3 over the 17 entries; ADRs 0016..0021) — Q31, deferred by the operator until the roster extends",
       "intents": [
         {
           "subject": {
             "kind": "code",
             "ref": "dadaia_workspace/hooks/pre_gate.py#main"
           },
-          "change": "change \u2014 hooks rendered per harness from one rule registry; a hook with no deterministic rule behind it is slop"
+          "change": "change — hooks rendered per harness from one rule registry; a hook with no deterministic rule behind it is slop"
         }
       ]
     }

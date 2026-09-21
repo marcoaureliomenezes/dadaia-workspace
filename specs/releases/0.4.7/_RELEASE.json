@@ -1,8 +1,8 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.7",
-  "phase": "CLOSURE",
-  "rc": 7,
+  "phase": "DEFINITION",
+  "rc": 8,
   "defined": {
     "sha": "94bfdc26",
     "ts": "2026-09-21T01:38:30Z"
@@ -487,6 +487,12 @@
       "agent": "dd-project-manager",
       "kind": "reviews",
       "text": "dd-code-reviewer on 462e557f..fb95c427: CHANGES REQUIRED -> folded fb95c427 (F1 HIGH SPEC-DOC-048 bugs: origin = ledger membership; F2 hook dialects declare ungated behaviours + event-coverage test; F3 init has no harness-named branch; F4 doctor_clean requires both sections; F5 is_l1 deleted; F6 INSTALL_TARGETS/'all' deleted). Record-only: F7 SPEC-DOC-048 sed fix line non-executable as printed; F8 AC1.1 wheel/container leg covered only by release.yml smoke (PARTIAL); F9 uvx alias -> candidate 9; F10 SYMLINK-TARGET-1 assumes mirrored layout. Deviations 1-7 ratified. Bug proposals (ask-first): cursor file writes ungated (declared, WARN in public doctor); SPEC-DOC-039 fix path (c7 F6) still unregistered."
+    },
+    {
+      "ts": "2026-09-21T04:12:26Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate 8 archived to rc-8/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
     }
   ]
 }
