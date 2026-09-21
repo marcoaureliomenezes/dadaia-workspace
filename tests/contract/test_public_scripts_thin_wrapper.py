@@ -83,6 +83,9 @@ _THIN_WRAPPER_SCRIPTS: dict[str, int] = {
 _STANDALONE_BY_DESIGN: frozenset[str] = frozenset(
     {
         "lint-dadaia-cli-reachability.py",
+        # A repository build step, not a mirror: it renders the standalone skills
+        # repository from `public/skills/` and has no package canonical to thin out.
+        "build-skills-repo.py",
     }
 )
 #: v0.5.1 T-051-16: generate-memory-catalog.py (the only member of this set) is

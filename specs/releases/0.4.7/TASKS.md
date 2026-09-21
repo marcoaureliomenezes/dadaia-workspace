@@ -31,7 +31,7 @@
   `dadaia_workspace/public/skills/{dd-grill-me,dd-bug-resolution,dd-code-review,dd-test-stewardship,dd-codebase-design,dd-domain-modeling,dd-architecture-survey,dd-ai-eng-knowhow}/SKILL.md`,
   `tests/contract/test_standalone_skills.py`, `tests/contract/test_slop_ratchets.py`.
 
-- [-] T-047-81 — FR2: the skills repository is built, not written.
+- [x] T-047-81 — FR2: the skills repository is built, not written.
   New `dadaia_workspace/public/scripts/build-skills-repo.py` — stdlib only, ≤ 150 lines, one
   `main(argv)`, the `lint-dadaia-cli-reachability.py` precedent, under `public/scripts/` and
   **not** under a skill (V36 untouched). `build-skills-repo.py <out>` renders: `skills/<name>/**`
