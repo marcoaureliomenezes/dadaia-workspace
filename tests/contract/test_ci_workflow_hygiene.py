@@ -72,3 +72,18 @@ def test_the_token_is_interpolated_only_in_the_push_remote_url() -> None:
         f"{_TOKEN} may appear only inside the {_REMOTE_PREFIX} remote URL or the "
         f"fail-closed guard — never echoed or logged: {offenders}"
     )
+
+
+def test_no_run_body_of_the_skills_job_interpolates_a_workflow_expression() -> None:
+    """A workflow expression pasted into a shell body is the template-injection shape;
+    the version travels through the job env and is read as "$VERSION"."""
+    name, job = _skills_job()
+    offenders = [
+        (step.get("name"), line.strip())
+        for step in job["steps"]
+        for line in (step.get("run") or "").splitlines()
+        if "${{" in line
+    ]
+    assert offenders == [], (
+        f"job {name} must pass every workflow expression through env:, not a run body: {offenders}"
+    )

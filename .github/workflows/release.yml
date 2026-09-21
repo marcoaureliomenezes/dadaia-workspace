@@ -202,6 +202,7 @@ jobs:
       contents: read
     env:
       SKILLS_REPO_TOKEN: ${{ secrets.SKILLS_REPO_TOKEN }}
+      VERSION: ${{ needs.check.outputs.version }}
     steps:
       - name: "Secret missing: fail closed (operator adds SKILLS_REPO_TOKEN)"
         if: env.SKILLS_REPO_TOKEN == ''
@@ -224,5 +225,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "dadaia-skills ${{ needs.check.outputs.version }}"
+          git commit -m "dadaia-skills $VERSION"
           git push --force "https://x-access-token:${SKILLS_REPO_TOKEN}@github.com/marcoaureliomenezes/dadaia-skills.git" main

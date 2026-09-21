@@ -55,6 +55,9 @@ git clone {repo}.git .agents/dadaia-skills && ln -s dadaia-skills/skills .agents
 | --- | --- |
 {table}
 
+This repository is generated from dadaia-workspace's `public/skills` at each release and
+force-published, so its history is dadaia-workspace's tags — edit the skills there.
+
 These skills are standalone. Inside a workspace created by `dadaia-workspace` they also
 drive the spec-driven lifecycle — specs, backlog, bugs, releases — with the ledger
 scripts, the projection chain and the governance hooks that ship with it:
@@ -115,6 +118,8 @@ def manifests() -> dict[str, object]:
             "description": DESCRIPTION,
             "version": release,
             "author": {"name": "Marco Menezes"},
+            "repository": REPO_URL,
+            "license": "MIT",
         },
     }
 

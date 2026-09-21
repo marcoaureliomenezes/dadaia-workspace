@@ -119,7 +119,16 @@ def test_manifests_carry_the_documented_field_set(built: Path) -> None:
     assert plugin["description"].strip()
 
     manifest = json.loads((built / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
-    assert set(manifest) == {"name", "description", "version", "author"}
+    assert set(manifest) == {
+        "name",
+        "description",
+        "version",
+        "author",
+        "repository",
+        "license",
+    }
+    assert manifest["repository"] == "https://github.com/marcoaureliomenezes/dadaia-skills"
+    assert manifest["license"] == "MIT"
     assert manifest["name"] == "dadaia-skills"
     assert manifest["version"] == version.group(1)
     assert manifest["author"] == {"name": "Marco Menezes"}
@@ -142,6 +151,10 @@ def test_readme_derives_from_the_atoms_under_their_current_hashes(built: Path) -
         "git clone https://github.com/marcoaureliomenezes/dadaia-skills.git",
     ):
         assert line in readme, f"README is missing the install line: {line}"
+    assert (
+        "This repository is generated from dadaia-workspace's `public/skills` at each "
+        "release and\nforce-published, so its history is dadaia-workspace's tags"
+    ) in readme, "the README must state that the tree is generated and force-published"
     for name in _standalone_skills():
         assert name in readme, f"README omits {name} from the skill table"
 
