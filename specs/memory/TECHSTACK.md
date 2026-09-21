@@ -24,7 +24,7 @@ Rationale: a hand-minted version and a hand-copied archive are two more writers 
 - Quality tooling is pytest with `pytest-cov`, `pytest-xdist`, `pytest-randomly` and `pytest-timeout`, Ruff, mypy `--strict`, import-linter, Hypothesis, Playwright and gitleaks; every cache is redirected by `pyproject.toml` (`addopts -p no:cacheprovider`, `[tool.ruff] cache-dir`, `[tool.mypy] cache_dir` → `../../.dadaia/tmp/<tool>-cache`), so the bare commands are the canonical ones and no per-command flag exists.
 - The closed marker set is eight — unit, contract, integration, e2e, slow, tmp, flaky, quarantine (P-28).
 - Mutation testing is `mutmut==3.7.0` in an optional Poetry group, absent from every push-path selector ([[QUALITY]]).
-- `ci.yml` checks out at the default depth (the `security-review` job fetches depth 2 for the PR diff); `release.yml` and `secret-scan.yml` fetch full history for tag derivation and the whole-history secret scan — no job fetches history for a bug record's sake ([[QUALITY]]).
+- `ci.yml` checks out at the default depth (the `security-review` job fetches depth 2 for the PR diff); `release-please.yml` and `secret-scan.yml` fetch full history for the release PR's commit range and the whole-history secret scan — no job fetches history for a bug record's sake ([[QUALITY]]).
 - Caches and artifacts live outside repos by configuration; the venv guard's one rule is venv-rooting, and a cache that still appears in a repo tree is moved to `.dadaia/reaped/` by the doctor's reaper ([[sdd-gate-v3]], [[workspace-doctor]]).
 
 ### Canonical commands

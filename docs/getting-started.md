@@ -97,7 +97,7 @@ the context's main repo plus its associated repos, and it constrains nothing els
 
 ## Check compliance — `dadaia doctor`
 
-<!-- derived-from: workspace-doctor sha256:c0ef9b213b31 -->
+<!-- derived-from: workspace-doctor sha256:8aea94a8199b -->
 
 ```bash
 dadaia doctor --context <ctx> [--json] [--fix] [--redact]

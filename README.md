@@ -49,7 +49,7 @@ atom under its content hash.
 <!-- derived-from: pypi-distribution sha256:7e18d9868790 -->
 <!-- derived-from: workspace-init sha256:871519580ea1 -->
 <!-- derived-from: context-management sha256:160b285ee271 -->
-<!-- derived-from: workspace-doctor sha256:c0ef9b213b31 -->
+<!-- derived-from: workspace-doctor sha256:8aea94a8199b -->
 
 ```bash
 pip install dadaia-workspace
