@@ -10,6 +10,10 @@ tags: [tech-stack, dependencies, toolchain, constraints]
 Measured by: `pytest tests/contract/test_stewardship_mechanics.py -k marker_set`.
 ADR: none
 Rationale: a marker known to one file and unknown to the other is a silent exclusion lane.
+### P-30 · The version, the CHANGELOG section and the tag of a release come from release-please over Conventional Commits, and promote is merging its release PR; a candidate's closed trio lives in git at its CLOSURE commit, never in a copied `rc-N/` or `_archive/` directory.
+Measured by: `pytest tests/contract/test_release_semver_canon.py tests/contract/test_ci_workflow_hygiene.py`.
+ADR: 0021 (accepted)
+Rationale: a hand-minted version and a hand-copied archive are two more writers of one fact each; the commit history already holds both.
 ## Part 2 — Implementation
 ### Snapshot
 - Python `^3.12`, Poetry Core build, console entrypoints `dadaia` and `dadaia-workspace` (one callable); the version lives in `pyproject.toml` alone ([[pypi-distribution]]).
