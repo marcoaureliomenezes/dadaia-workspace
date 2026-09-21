@@ -4,29 +4,29 @@
 
 ## What it is
 
-<!-- derived-from: product-vision sha256:487f57ec4034 -->
+<!-- derived-from: product-vision sha256:89dc2ce6898d -->
 
 - [README](README.md): one workspace folder, projects in repos inside it, governance outside every repo; the unit is the context (main repo + associated repos); documents are the lifecycle; boundaries are mechanical.
 
 ## Install
 
 <!-- derived-from: pypi-distribution sha256:80d67bd879ea -->
-<!-- derived-from: workspace-init sha256:5b20a0d9dc80 -->
+<!-- derived-from: workspace-init sha256:871519580ea1 -->
 
-- [PyPI project](https://pypi.org/project/dadaia-workspace/): `pip install dadaia-workspace`, then `dadaia init`.
+- [PyPI project](https://pypi.org/project/dadaia-workspace/): `pip install dadaia-workspace`, then `dadaia init <dir> --harness <name> [--repo <url>]`.
 - [Changelog](CHANGELOG.md): one section per published version.
 
 ## The law
 
-<!-- derived-from: agentic-entities sha256:9ba010732782 -->
-<!-- derived-from: sdd-gate-v3 sha256:a3fcecc38fa6 -->
+<!-- derived-from: agentic-entities sha256:9f032dda73ca -->
+<!-- derived-from: sdd-gate-v3 sha256:1c17b7e34596 -->
 
 - [AGENTS.md](dadaia_workspace/public/data/AGENTS.md): the always-on law — the root map, projected once to the workspace root; every governed area carries its own scoped `AGENTS.md`.
 - [Constitution](specs/constitution.md): the derivation law for personas, behaviors, rules and skills.
 
 ## Reference
 
-<!-- derived-from: context-management sha256:9166a06fab52 -->
+<!-- derived-from: context-management sha256:160b285ee271 -->
 <!-- derived-from: workspace-doctor sha256:f37b2ae38ea4 -->
 
 - [CLI reference](docs/cli.md): the committed output of `dadaia help tree`.

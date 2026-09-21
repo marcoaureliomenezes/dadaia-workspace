@@ -18,7 +18,7 @@ tags: [harness, claude-code, projection, hooks]
 - Writes pass PreToolUse `pre_gate` (matcher `Edit|Write|MultiEdit|NotebookEdit|Bash`), the throttled PostToolUse reaper, and the git chokepoints ([[sdd-gate-v3]]).
 - The pre-gate emits a merged envelope — `hookSpecificOutput.permissionDecision: deny` with its reason is the operative contract, the top-level `decision: block`/`reason` pair riding along for the Codex hooks and the Kimi shim; an ALLOW carries no permission verdict.
 - It never answers `permissionDecision: allow`, which would bypass the permission prompts.
-- `dadaia public install --target claude` writes `.claude/settings.json` and the symlink set; the personas themselves render once into `.agents/agents/` with resolved model/effort and `activity_class`-derived permissions ([[public-asset-distribution]]).
+- `dadaia harness add claude` (or `public install` with claude on the roster) writes `.claude/settings.json` and the symlink set; the personas themselves render once into `.agents/agents/` with resolved model/effort and `activity_class`-derived permissions ([[public-asset-distribution]]).
 
 ## Dependencies
 

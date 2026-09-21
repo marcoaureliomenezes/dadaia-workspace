@@ -1,7 +1,7 @@
 ---
 slug: TECHSTACK
 title: Tech Stack Memory
-tldr: Python 3.12 Typer CLI; stdlib services; three entry harnesses (Claude Code, Codex, Kimi Code); one closed marker set; strict quality gates.
+tldr: Python 3.12 Typer CLI; stdlib services; six entry harnesses as registry records (Claude, Codex, Kimi, Cursor, Devin, Copilot); closed marker set; strict gates.
 summary: Part 1 carries the measured marker-set principle; Part 2 is the current language, dependency, runtime, model, testing, packaging and command contract.
 tags: [tech-stack, dependencies, toolchain, constraints]
 ---
@@ -14,8 +14,8 @@ Rationale: a marker known to one file and unknown to the other is a silent exclu
 ### Snapshot
 - Python `^3.12`, Poetry Core build, console entrypoint `dadaia`; the version lives in `pyproject.toml` alone ([[pypi-distribution]]).
 - Deps are Typer, Rich, PyYAML, Jinja2 and jsonschema plus an optional `claude-sdk` extra; everything else is stdlib, and no database exists — every state is a JSON or JSONL file.
-- Codex and Kimi Code are operator-installed external CLIs, never Python deps, and the workspace runs no agent-execution runtime.
-- Entry harnesses are single-sourced as `L1_ENTRY_HARNESSES` in `core/harness_registry.py` — Claude Code, Codex, Kimi Code — each with its own projection plus the shared `.agents/` root.
+- Codex, Kimi Code, Cursor, Devin and Copilot are operator-installed external CLIs, never Python deps, and the workspace runs no agent-execution runtime.
+- Entry harnesses are single-sourced as `HARNESS_RECORDS` in `core/harness_registry.py` — Claude Code, Codex, Kimi Code, Cursor, Devin CLI, GitHub Copilot — one record each (directory, agent transcode, hook dialect) over the shared `.agents/` root; `dadaia certify` carries one `<harness>-live-probe` per record, SKIP `UNVERIFIED` when the binary is absent, no version floor.
 - Layer-1 agent bodies are model-agnostic in source and receive `(model, effort)` at `public install`; Codex projections carry registry-derived Codex-native tier identity.
 - Quality tooling is pytest with `pytest-cov`, `pytest-xdist`, `pytest-randomly` and `pytest-timeout`, Ruff, mypy `--strict`, import-linter, Hypothesis, Playwright and gitleaks; every cache is redirected by `pyproject.toml` (`addopts -p no:cacheprovider`, `[tool.ruff] cache-dir`, `[tool.mypy] cache_dir` → `../../.dadaia/tmp/<tool>-cache`), so the bare commands are the canonical ones and no per-command flag exists.
 - The closed marker set is eight — unit, contract, integration, e2e, slow, tmp, flaky, quarantine (P-28).

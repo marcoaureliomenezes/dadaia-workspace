@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-21T01:12:41Z",
+  "generated_at": "2026-09-21T03:45:46Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -63,7 +63,7 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 842,
+      "token_estimate": 910,
       "depends_on": [
         "QUALITY",
         "ARCHITECTURE",
@@ -106,7 +106,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1065,
+      "token_estimate": 1160,
       "depends_on": [
         "agentic-entities",
         "workspace-doctor",
@@ -149,7 +149,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 414,
+      "token_estimate": 424,
       "depends_on": [
         "agentic-entities",
         "public-asset-distribution",
@@ -173,7 +173,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 279,
+      "token_estimate": 289,
       "depends_on": [
         "sdd-gate-v3",
         "TECHSTACK",
@@ -184,6 +184,75 @@
     },
     {
       "rank": 9,
+      "slug": "harness-copilot",
+      "title": "harness-copilot",
+      "area": "harness",
+      "tldr": "Entry harness on GitHub Copilot CLI — native root AGENTS.md and .agents/skills; .github/ carries agents/*.agent.md transcodes and two hook files.",
+      "summary": "Copilot is a registry record (.github, copilot-agent-md, copilot-hooks) — personas render to .github/agents/<name>.agent.md (frontmatter name/description/tools + verbatim body), the four behaviours to two hook files answered in Copilot's permissionDecision JSON; nothing else under .github/ is projected.",
+      "path": "specs/memory/product/harness/harness-copilot.md",
+      "tags": [
+        "harness",
+        "copilot",
+        "projection",
+        "hooks"
+      ],
+      "token_estimate": 208,
+      "depends_on": [
+        "agentic-entities",
+        "TECHSTACK",
+        "public-asset-distribution",
+        "sdd-gate-v3",
+        "workspace-init"
+      ]
+    },
+    {
+      "rank": 10,
+      "slug": "harness-cursor",
+      "title": "harness-cursor",
+      "area": "harness",
+      "tldr": "Entry harness on Cursor — native root AGENTS.md and .agents/skills; .cursor/ carries hooks.json (gate + reaper) and persona symlinks.",
+      "summary": "Cursor is a registry record (.cursor, cursor-md, cursor-hooks) — the personas reach it as relative symlinks under .cursor/agents/, the four behaviours as wrappers cited by .cursor/hooks.json, answered in Cursor's permission JSON.",
+      "path": "specs/memory/product/harness/harness-cursor.md",
+      "tags": [
+        "harness",
+        "cursor",
+        "projection",
+        "hooks"
+      ],
+      "token_estimate": 215,
+      "depends_on": [
+        "TECHSTACK",
+        "agentic-entities",
+        "public-asset-distribution",
+        "sdd-gate-v3",
+        "workspace-init"
+      ]
+    },
+    {
+      "rank": 11,
+      "slug": "harness-devin",
+      "title": "harness-devin",
+      "area": "harness",
+      "tldr": "Entry harness on the Devin CLI — native AGENTS.md, .agents/skills and .agents/agents; .devin/hooks.v1.json registers gate and reaper, Claude-compatible.",
+      "summary": "Devin is a registry record (.devin, devin-md, devin-hooks) whose persona transcode projects nothing because Devin reads .agents/agents natively; its only projected file is .devin/hooks.v1.json, which reads the gate's native envelope without translation.",
+      "path": "specs/memory/product/harness/harness-devin.md",
+      "tags": [
+        "harness",
+        "devin",
+        "projection",
+        "hooks"
+      ],
+      "token_estimate": 174,
+      "depends_on": [
+        "agentic-entities",
+        "TECHSTACK",
+        "public-asset-distribution",
+        "sdd-gate-v3",
+        "workspace-init"
+      ]
+    },
+    {
+      "rank": 12,
       "slug": "harness-kimi-code",
       "title": "harness-kimi-code",
       "area": "harness",
@@ -208,7 +277,7 @@
       ]
     },
     {
-      "rank": 10,
+      "rank": 13,
       "slug": "product-vision",
       "title": "product-vision",
       "area": "philosophy",
@@ -220,7 +289,7 @@
         "paradigm",
         "pillars"
       ],
-      "token_estimate": 603,
+      "token_estimate": 633,
       "depends_on": [
         "spec-context-project",
         "context-management",
@@ -236,7 +305,7 @@
       ]
     },
     {
-      "rank": 11,
+      "rank": 14,
       "slug": "spec-context-project",
       "title": "spec-context-project",
       "area": "philosophy",
@@ -257,7 +326,7 @@
       ]
     },
     {
-      "rank": 12,
+      "rank": 15,
       "slug": "consumer-agent-support",
       "title": "Consumer validation gate",
       "area": "platform",
@@ -279,7 +348,7 @@
       ]
     },
     {
-      "rank": 13,
+      "rank": 16,
       "slug": "context-management",
       "title": "context-management",
       "area": "platform",
@@ -293,7 +362,7 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 1999,
+      "token_estimate": 2051,
       "depends_on": [
         "workspace-doctor",
         "sdd-gate-v3",
@@ -303,7 +372,7 @@
       ]
     },
     {
-      "rank": 14,
+      "rank": 17,
       "slug": "cross-platform-portability",
       "title": "cross-platform-portability",
       "area": "platform",
@@ -327,7 +396,7 @@
       ]
     },
     {
-      "rank": 15,
+      "rank": 18,
       "slug": "server-registry",
       "title": "server-registry",
       "area": "platform",
@@ -346,7 +415,7 @@
       ]
     },
     {
-      "rank": 16,
+      "rank": 19,
       "slug": "workspace-doctor",
       "title": "workspace-doctor",
       "area": "platform",
@@ -377,12 +446,12 @@
       ]
     },
     {
-      "rank": 17,
+      "rank": 20,
       "slug": "workspace-init",
       "title": "workspace-init",
       "area": "platform",
-      "tldr": "Idempotent bootstrap of workspace state, the Python venv, the selected harness projections and the governance hooks.",
-      "summary": "dadaia init provisions the venv, creates the registry's init zones and the selected harness roots, seeds the state files and the harness profile, then stages and installs public assets.",
+      "tldr": "One-line idempotent bootstrap — init <dir> --harness <name> [--repo <url>] — venv, zones, law, one harness; with --repo the first context ALIVE and bound.",
+      "summary": "dadaia init takes a required directory and exactly one registered harness, provisions the venv, the registry's init zones, the authored set and that harness's directory, seeds the states and the harness profile, stages and installs public assets; with --repo it clones the first repo and composes create/alive/bind plus the pre-push hook. `harness add` is the only later extension.",
       "path": "specs/memory/product/platform/workspace-init.md",
       "tags": [
         "workspace",
@@ -390,15 +459,16 @@
         "setup",
         "idempotent"
       ],
-      "token_estimate": 327,
+      "token_estimate": 593,
       "depends_on": [
         "workspace-doctor",
         "public-asset-distribution",
+        "context-management",
         "cross-platform-portability"
       ]
     },
     {
-      "rank": 18,
+      "rank": 21,
       "slug": "audits-canon",
       "title": "audits-canon",
       "area": "sdd",
@@ -421,7 +491,7 @@
       ]
     },
     {
-      "rank": 19,
+      "rank": 22,
       "slug": "sdd-bug-backlog-governance",
       "title": "sdd-bug-backlog-governance",
       "area": "sdd",
@@ -438,7 +508,7 @@
         "gitflow",
         "events"
       ],
-      "token_estimate": 2377,
+      "token_estimate": 2526,
       "depends_on": [
         "workspace-doctor",
         "sdd-gate-v3",
@@ -447,7 +517,7 @@
       ]
     },
     {
-      "rank": 20,
+      "rank": 23,
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "area": "sdd",
@@ -462,7 +532,7 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 1280,
+      "token_estimate": 1277,
       "depends_on": [
         "workspace-doctor",
         "context-management",

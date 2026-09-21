@@ -6,7 +6,7 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 ## Install
 
 <!-- derived-from: pypi-distribution sha256:80d67bd879ea -->
-<!-- derived-from: workspace-init sha256:5b20a0d9dc80 -->
+<!-- derived-from: workspace-init sha256:871519580ea1 -->
 
 ```bash
 python -m venv .venv && .venv/bin/pip install dadaia-workspace
@@ -24,7 +24,7 @@ own at `.dadaia/.venv`: `dadaia init` provisions it, every `dadaia`, `pip` and
 
 ## Provision the workspace — `dadaia init`
 
-<!-- derived-from: workspace-init sha256:5b20a0d9dc80 -->
+<!-- derived-from: workspace-init sha256:871519580ea1 -->
 
 ```bash
 dadaia init <dir> --harness claude|codex|kimi-code [--repo <url>] [--skip-assets]
@@ -73,7 +73,7 @@ with `dadaia ci install-hook`.
 ## Bind a context — `dadaia context bind`
 
 <!-- derived-from: spec-context-project sha256:b39739176d42 -->
-<!-- derived-from: context-management sha256:9166a06fab52 -->
+<!-- derived-from: context-management sha256:160b285ee271 -->
 
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
 owned by one main repository, optionally spanning associated repositories that live and
@@ -121,7 +121,7 @@ its own TTL expired.
 
 ## Run the first candidate
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:a6368b03c9fc -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:14217f0957ce -->
 
 A candidate is one closed-scope SDD cycle inside the live release. Nothing drives it:
 the documents are the state, the verbs move the state document, and the markers in

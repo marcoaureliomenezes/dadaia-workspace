@@ -22,12 +22,12 @@ tags: [vision, paradigm, pillars]
 - Visible concurrency — sessions may race, git exposes overlap, and nothing freezes waiting on a lock.
 - No mechanism without a demand — a capability exists only while it earns its maintenance cost, and deleted surface beats accreted surface.
 - No slop — runtime state, reports, handoffs, caches, projections and temporary files have canonical homes and never leak into repositories.
-- Claude Code, Codex and Kimi Code are Layer-1 entry harnesses; public assets originate once, stage once, and the authored set is read natively or through per-entry symlinks ([[public-asset-distribution]]).
+- Claude Code, Codex, Kimi Code, Cursor, Devin and GitHub Copilot are Layer-1 entry harnesses, one registry record each; public assets originate once, stage once, and the authored set is read natively or through per-entry symlinks ([[public-asset-distribution]]).
 - Success is evidenced by reviews, task markers, commands and artifacts, never inferred from prose.
 
 ## Two usage paths
 
-- A human installs it from PyPI and drives it from a shell: `dadaia init` provisions a workspace, `context create --main-repo`/`alive`/`bind` registers and scopes a context, `dadaia doctor` lists findings with a runnable fix under every refusal; `README.md` is that path, derived from memory ([[pypi-distribution]], [[workspace-init]], [[workspace-doctor]]).
+- A human installs it from PyPI and drives it from a shell: `dadaia init <dir> --harness <name> --repo <url>` provisions a workspace with its first project ALIVE and bound in one line (`context create --main-repo`/`alive`/`bind` add the next ones), `dadaia doctor` lists findings with a runnable fix under every refusal; `README.md` is that path, derived from memory ([[pypi-distribution]], [[workspace-init]], [[workspace-doctor]]).
 - An agent reads the root `AGENTS.md` map — flow, roles, gate invariants, where things live, and the index of every scoped law and skill — opens the scoped `AGENTS.md` of the area it works in, and works inside the gate, the record verbs and the handoff contract; `llms.txt` at the repository root is its index ([[sdd-gate-v3]], [[agent-comms]]).
 - Both paths read one truth: every human- and agent-facing document derives from a named memory atom under its content hash ([[QUALITY]] P-29).
 

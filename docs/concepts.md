@@ -8,7 +8,7 @@ is `dadaia_workspace/public/data/AGENTS.md`, and the walkthrough is
 ## Context
 
 <!-- derived-from: spec-context-project sha256:b39739176d42 -->
-<!-- derived-from: context-management sha256:9166a06fab52 -->
+<!-- derived-from: context-management sha256:160b285ee271 -->
 
 A *context* — a Spec Context Project — is one canonical `specs/` tree owned by one
 main repository, the unit for memory, backlog, bugs, releases, reports and handoffs.
@@ -25,7 +25,7 @@ single-repo context is the degenerate case of multi-repo.
 
 ## Release and candidate
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:a6368b03c9fc -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:14217f0957ce -->
 
 Exactly one *release* is live at a time, named last-published-PyPI + 1 patch, with
 OPEN scope; it grows by *candidates*, each a closed-scope SDD cycle whose SPEC, PLAN
@@ -38,7 +38,7 @@ deploy.
 
 ## The flow
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:a6368b03c9fc -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:14217f0957ce -->
 <!-- derived-from: audits-canon sha256:f33a4185f1ae -->
 
 Every demand takes one of two arms. **Arm A**, a feature, enters through the backlog
@@ -52,7 +52,7 @@ the verbs move the records.
 
 ## The gate
 
-<!-- derived-from: sdd-gate-v3 sha256:a3fcecc38fa6 -->
+<!-- derived-from: sdd-gate-v3 sha256:1c17b7e34596 -->
 
 The *gate* is a PreToolUse chain of three policies evaluated in fixed order — root
 whitelist, venv guard, SDD gate — first block wins, and a policy that raises is ALLOW.
@@ -69,7 +69,7 @@ feeding each fix back through the gate.
 
 ## Memory
 
-<!-- derived-from: context-management sha256:9166a06fab52 -->
+<!-- derived-from: context-management sha256:160b285ee271 -->
 <!-- derived-from: workspace-doctor sha256:f37b2ae38ea4 -->
 
 *Memory* is current product truth, never history: one Markdown atom per subject under
@@ -85,7 +85,7 @@ or path an atom cites that no longer exists — reported as a warning, never a r
 
 ## Bugs and backlog
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:a6368b03c9fc -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:14217f0957ce -->
 
 Both are records with one shape and one owning verb. `specs/bugs/BUGS.jsonl` holds one
 record per bug, appended once and keyed by `id`, with no git-derived cache — git is the

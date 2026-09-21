@@ -13,7 +13,7 @@ tags: [context, lifecycle, session, no-locks, privacy]
 - `context create` registers a DEAD context, back-filling `repo_url` from the repos catalog.
 - `context alive` clones or keeps every repo under `repos/`, restores the branch and folds the canon scaffold over `specs/` without overwriting an existing file; an associated repo is cloned clean and unbound.
 - `context dead` requires a clean, pushed state across the set, naming the offender otherwise, scans committed material with `--commit`, records the branch and removes the local repos.
-- `context repo add|remove|list` is idempotent, and `context update --url` repairs the remote URL.
+- `context repo add|remove` is idempotent; `context show --json` is the one reader of the repo set (`context repo list` and `context update --url` died at 0.4.7 c8 — a URL is repaired by `alive`, which back-fills from origin, or by delete + `create`).
 - A repo slug is owned by exactly one context: `create` and `repo add` refuse a slug another context owns through one ownership predicate, because `dead` destroys every entry it walks.
 - The v2→v3 migration is backup-first and additive, so historical collisions are detected instead — `INV-6` reports every multi-owner slug and never picks a winner ([[workspace-doctor]]).
 
@@ -116,8 +116,8 @@ mismatch and is the clearest puxadinho in the ledger.
 
 - Retire the git-mutating context verbs (`baseline`, `update`, `repo`, `create`, `delete`) into
   the one skill script with one ownership check (c7).
-- `init <dir> [--repo]` creates the first context; single-repo is the degenerate multi-repo case
-  and needs no verb of its own (c8).
+- `init <dir> --harness <name> --repo <url>` creates the first context (done, 0.4.7 c8: `features/workspace/bootstrap.py`
+  composes `create`/`alive`/binding); single-repo is the degenerate multi-repo case and has no verb of its own.
 - The surface is frozen: no new context verb, no new state file, no new session field.
 
 Bug ids judged: all 89 listed in the audit dataset (`0.4.7 c6 closure log`).
