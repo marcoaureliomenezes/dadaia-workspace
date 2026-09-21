@@ -10,7 +10,7 @@ than pretended into a task.
 
 | channel | artifact | state | who acts |
 |---|---|---|---|
-| PyPI | the wheel and sdist; `README.md` is the long description and `pyproject.toml` the metadata | live — published from `.github/workflows/release.yml` under OIDC trusted publishing, a version bump landing on `main` firing it | the release workflow, gated on the `release-gate` environment the operator approves |
+| PyPI | the wheel and sdist; `README.md` is the long description and `pyproject.toml` the metadata | live — published from `.github/workflows/release-please.yml` under OIDC trusted publishing, a version bump landing on `main` firing it | the release workflow, gated on the `release-gate` environment the operator approves |
 | GitHub repository | the repository description, its topics and its homepage — settings, carried by no file in the tree | set — description, homepage and topics from the same tagline and keyword set, each run recorded in `_RELEASE.json`'s `log` | `project-manager`: `gh repo edit --description … --homepage … --add-topic …`, then `gh repo view --json description,repositoryTopics,homepageUrl` |
 | Repository root | `llms.txt` — the llmstxt.org index an agent reads first: what it is, install, the law, the CLI reference, the memory catalog | live — every line links, none restates | `software-engineer`, re-derived at closure like every document under a `derived-from` marker |
 | Awesome-lists of agentic tooling | a submitted entry carrying the tagline and the repository link | pending — no submission made | the operator |

@@ -4,7 +4,11 @@ never interpolated outside the push remote URL.
 
 Intent: CONTRACT — T-047-87: release-please.yml is the one workflow minting the
 version, CHANGELOG and tag: push-to-main trigger, sha-pinned action, release type
-read from the config file rather than an input. Size: SMALL."""
+read from the config file rather than an input.
+
+Intent: CONTRACT — T-047-88: release.yml is gone and its publishing jobs live inside
+release-please.yml behind the single `release_created` gate: no `release:` event, no
+`push: tags`, no hand-rolled tag arithmetic. Size: SMALL."""
 
 from __future__ import annotations
 
@@ -17,7 +21,8 @@ import yaml
 
 pytestmark = pytest.mark.contract
 
-_RELEASE_YML = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "release.yml"
+_WORKFLOWS = Path(__file__).resolve().parents[2] / ".github" / "workflows"
+_RELEASE_YML = _WORKFLOWS / "release-please.yml"
 _TOKEN = "SKILLS_REPO_TOKEN"
 _REMOTE_PREFIX = "https://x-access-token:"
 
@@ -98,9 +103,7 @@ def test_no_run_body_of_the_skills_job_interpolates_a_workflow_expression() -> N
 # release-please.yml — the one workflow that mints the version, CHANGELOG and tag
 # ---------------------------------------------------------------------------
 
-_RELEASE_PLEASE_YML = (
-    Path(__file__).resolve().parents[2] / ".github" / "workflows" / "release-please.yml"
-)
+_RELEASE_PLEASE_YML = _RELEASE_YML
 _ACTION = "googleapis/release-please-action"
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
@@ -159,3 +162,108 @@ def test_release_please_reads_its_release_type_from_the_config_file() -> None:
         "the step is identified so its release_created/tag_name outputs can gate the "
         f"publishing jobs: {step}"
     )
+
+
+# ---------------------------------------------------------------------------
+# T-047-88 — one workflow, one trigger, one boolean deciding publication
+# ---------------------------------------------------------------------------
+
+_GATE = "needs.release-please.outputs.release_created == 'true'"
+
+
+def _workflows() -> dict[str, Any]:
+    return {
+        path.name: yaml.safe_load(path.read_text(encoding="utf-8"))
+        for path in sorted(_WORKFLOWS.glob("*.yml"))
+    }
+
+
+def test_the_folded_release_workflow_is_the_only_one_and_release_yml_is_gone() -> None:
+    assert not (_WORKFLOWS / "release.yml").exists(), (
+        "release.yml folded into release-please.yml (PLAN D8) and must not exist"
+    )
+    carriers = [
+        name for name in _workflows() if _ACTION in (_WORKFLOWS / name).read_text(encoding="utf-8")
+    ]
+    assert carriers == ["release-please.yml"], (
+        f"exactly one workflow may carry the release-please action: {carriers}"
+    )
+
+
+def test_no_workflow_listens_to_a_release_event_or_a_tag_push() -> None:
+    offenders: list[str] = []
+    for name, document in _workflows().items():
+        triggers = document.get("on", document.get(True)) or {}
+        if not isinstance(triggers, dict):
+            triggers = {str(triggers): {}}
+        if "release" in triggers:
+            offenders.append(f"{name}: release event")
+        push = triggers.get("push") or {}
+        if isinstance(push, dict) and ("tags" in push or "tags-ignore" in push):
+            offenders.append(f"{name}: push.tags")
+    assert offenders == [], (
+        f"same-workflow chaining only — a second trigger would need a PAT (PLAN D8): {offenders}"
+    )
+
+
+def test_every_publishing_job_needs_the_release_please_job_and_its_gate() -> None:
+    jobs = _jobs()
+    assert "release-please" in jobs
+    ungated = []
+    for name, job in jobs.items():
+        if name == "release-please":
+            continue
+        needs = job.get("needs") or []
+        needs = [needs] if isinstance(needs, str) else list(needs)
+        if "release-please" not in needs or str(job.get("if") or "").strip() != _GATE:
+            ungated.append(f"{name}: needs={needs} if={job.get('if')!r}")
+    assert ungated == [], (
+        f"every publishing job is gated on {_GATE!r} and reaches the release-please job: {ungated}"
+    )
+
+
+def test_no_job_needs_an_undefined_job() -> None:
+    jobs = _jobs()
+    dangling = []
+    for name, job in jobs.items():
+        needs = job.get("needs") or []
+        needs = [needs] if isinstance(needs, str) else list(needs)
+        dangling += [f"{name} -> {dep}" for dep in needs if dep not in jobs]
+    assert dangling == [], f"needs: naming a job that does not exist: {dangling}"
+
+
+def test_the_workflow_never_computes_a_version_or_a_tag_by_hand() -> None:
+    """The action creates the tag and owns the version; `check`'s pyproject-vs-tags
+    arithmetic and publish's `git tag` step died with it (T-047-88)."""
+    offenders = [
+        f"{job_name}: {line.strip()}"
+        for job_name, job in _jobs().items()
+        for step in job.get("steps") or []
+        for line in (step.get("run") or "").splitlines()
+        if "git ls-remote --tags" in line or "git tag " in line
+    ]
+    assert offenders == [], f"the tag is the action's to mint, never the workflow's: {offenders}"
+
+
+def test_the_approve_job_keeps_the_release_gate_environment() -> None:
+    approve = _jobs()["approve"]
+    assert approve.get("environment") == "release-gate", (
+        f"the human approval gate survives the fold: {approve.get('environment')}"
+    )
+
+
+def test_one_version_step_feeds_every_consumer_of_the_version() -> None:
+    """One `id: version` step in `build` strips the tag's `v`; artifact name, approval
+    message, pip install line and skills-repo subject all read that one output."""
+    build = _jobs()["build"]
+    assert build.get("outputs", {}).get("version") == "${{ steps.version.outputs.version }}"
+    step = next(s for s in build["steps"] if s.get("id") == "version")
+    assert step["env"] == {"TAG": "${{ needs.release-please.outputs.tag_name }}"}
+    assert 'echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"' in step["run"]
+    assert "${{" not in step["run"], "no workflow expression inside a run body"
+    consumers = [
+        name
+        for name, job in _jobs().items()
+        if "needs.build.outputs.version" in yaml.safe_dump(job)
+    ]
+    assert set(consumers) == {"approve", "publish", "smoke-test", "publish-skills-repo"}, consumers

@@ -35,7 +35,7 @@
   `.release-please-manifest.json`, `tests/contract/`
   `{test_release_semver_canon,test_ci_workflow_hygiene}.py`.
 
-- [ ] T-047-88 — FR1: `release.yml` folds into `release-please.yml`; `release.yml` is deleted.
+- [x] T-047-88 — FR1: `release.yml` folds into `release-please.yml`; `release.yml` is deleted.
   PM ruling: ONE workflow, one trigger, same-workflow chaining (the action's documented
   pattern) — no PAT, no `release:` event, no `push: tags`. Every `release.yml` job but `check`
   moves verbatim into `release-please.yml` under
