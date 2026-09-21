@@ -108,7 +108,7 @@
   `features/specs/ledgers.py` (deleted), `features/specs/rules.py`, `setup.cfg`,
   `tests/contract/test_every_block_carries_a_fix.py`, `tests/**`, `tests/**/_golden/**`.
 
-- [ ] T-047-69 — FR4: behavior map, lints, ratchets. `public/entities/behavior-map.json`'s
+- [-] T-047-69 — FR4: behavior map, lints, ratchets. `public/entities/behavior-map.json`'s
   `hash_tuple` gains a `scripts` member covering every file under the skill's `scripts/`
   (including the staged `scripts/schemas/*.json`, so a schema fork is red);
   `test_behavior_map.py`'s stale-hash finder extends to it. `lint-dadaia-cli-reachability.py`
