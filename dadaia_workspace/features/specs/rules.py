@@ -272,7 +272,7 @@ RULES: tuple[SpecsRule, ...] = (
     ),
     _rule(
         ("SPEC-DOC-048",),
-        lambda d: d._release.check_spec_origin(d._governance.open_bug_ids),
+        lambda d: d._release.check_spec_origin(d._governance.known_bug_ids),
         fix_help=(
             "sed -i '\\|^\\*\\*Opened:\\*\\*|a **Origin:** operator-demand' "
             "specs/releases/<id>/SPEC.md"

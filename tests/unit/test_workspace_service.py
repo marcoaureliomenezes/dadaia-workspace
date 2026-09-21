@@ -40,8 +40,10 @@ def test_init_creates_only_registry_init_zones_and_canon_seeds(
     for retired in ("academy", "reports", "scripts", "tmp", "src"):
         assert not (dadaia / retired).exists(), retired
     assert (workspace_root / ".agents" / "skills").is_dir()
-    assert (workspace_root / ".claude").is_dir()
-    assert (workspace_root / ".codex").is_dir()
+    # Harness directories belong to the projection (each record's `directory`), so a
+    # `skip_assets` init creates none — init owns no harness-named branch.
+    assert not (workspace_root / ".claude").exists()
+    assert not (workspace_root / ".codex").exists()
 
     spec_contexts_path = dadaia / "states" / "spec_contexts.json"
     assert json.loads(spec_contexts_path.read_text()) == {"schema_version": "2", "contexts": []}

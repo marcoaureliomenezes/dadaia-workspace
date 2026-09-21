@@ -97,7 +97,7 @@ def test_root_pair_always_present_and_ok(tmp_path: Path) -> None:
     ws.mkdir()
     manager = _mgr(public_dir)
     manager.stage(ws)
-    manager.install(ws, target="all", force=True)
+    manager.install(ws, force=True)
     lines = _rendered(manager.doctor(ws))
     assert "[ok] root:AGENTS.md" in lines, lines
 
@@ -108,7 +108,7 @@ def test_root_agents_md_detects_drift_when_tampered(tmp_path: Path) -> None:
     ws.mkdir()
     manager = _mgr(public_dir)
     manager.stage(ws)
-    manager.install(ws, target="all", force=True)
+    manager.install(ws, force=True)
     (ws / "AGENTS.md").write_bytes(b"# Tampered AGENTS\n")
     lines = _rendered(manager.doctor(ws))
     assert "[drift] root:AGENTS.md" in lines, lines
@@ -126,7 +126,7 @@ def test_consumer_pair_foreign_for_bannerless_source(tmp_path: Path) -> None:
     _add_consumer(ws, slug)
     manager = _mgr(public_dir)
     manager.stage(ws)
-    manager.install(ws, target="all", force=True)
+    manager.install(ws, force=True)
     lines = _rendered(manager.doctor(ws))
     assert "[ok] root:AGENTS.md" in lines, lines
     assert f"[foreign] repos/{slug}:AGENTS.md" in lines, lines
@@ -146,7 +146,7 @@ def test_consumer_pair_foreign_for_hand_authored_agents_md(tmp_path: Path) -> No
 
     manager = _mgr(public_dir)
     manager.stage(ws)
-    manager.install(ws, target="all", force=True)
+    manager.install(ws, force=True)
 
     assert (consumer / "AGENTS.md").read_text(encoding="utf-8") == hand_authored
     assert not (consumer / "CLAUDE.md").exists()
@@ -169,7 +169,7 @@ def test_unregistered_consumer_is_invisible_to_doctor(tmp_path: Path) -> None:
     no_marker.mkdir(parents=True)
     manager = _mgr(public_dir)
     manager.stage(ws)
-    manager.install(ws, target="all", force=True)
+    manager.install(ws, force=True)
     lines = _rendered(manager.doctor(ws))
     assert not any("no-marker-repo" in ln for ln in lines), lines
     assert "[ok] root:AGENTS.md" in lines, lines

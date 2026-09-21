@@ -220,14 +220,14 @@ def test_doctor_check_blocks_on_underived_subagent(tmp_path: Path) -> None:
 
     lines = check_entities_derivation(tmp_path)
     assert any("'rogue' has no abstract Persona" in line.text for line in lines)
-    assert all(line.status.blocking for line in lines)
+    assert all(line.status.blocking for line in lines if line.status is not DoctorStatus.WARN)
 
 
 def test_doctor_check_passes_on_the_packaged_registry() -> None:
     from dadaia_workspace.infrastructure.entity_doctor import check_entities_derivation
 
     lines = check_entities_derivation(_PUBLIC)
-    assert len(lines) == 1 and not lines[0].status.blocking
+    assert not any(line.status.blocking for line in lines)
     assert "entities-derivation" in lines[0].text
 
 

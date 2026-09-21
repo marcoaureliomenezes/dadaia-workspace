@@ -25,7 +25,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from dadaia_workspace.core.models.doctor_report import DoctorStatus
+from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.infrastructure.entity_doctor import check_entities_derivation
 from dadaia_workspace.infrastructure.projection_rules import harnesses_with_a_hook_derivation
 
@@ -95,13 +95,18 @@ def _texts(lines: list[object]) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+def _drift(lines: list[DoctorLine]) -> list[DoctorLine]:
+    """The drift verdict alone — the declared-gap WARNs are a separate statement."""
+    return [line for line in lines if line.status is not DoctorStatus.WARN]
+
+
 def test_clean_scratch_render_passes(tmp_path: Path) -> None:
     public_dir = _build_clean_scratch(tmp_path)
 
     lines = check_entities_derivation(public_dir)
 
-    assert len(lines) == 1
-    assert lines[0].status is DoctorStatus.OK
+    assert len(_drift(lines)) == 1
+    assert _drift(lines)[0].status is DoctorStatus.OK
 
 
 # ---------------------------------------------------------------------------
@@ -118,7 +123,7 @@ def test_orphan_subagent_without_persona_blocks(tmp_path: Path) -> None:
     lines = check_entities_derivation(public_dir)
 
     assert any("'rogue' has no abstract Persona" in text for text in _texts(lines))
-    assert all(line.status.blocking for line in lines)  # type: ignore[attr-defined]
+    assert all(line.status.blocking for line in _drift(lines))  # type: ignore[attr-defined]
 
 
 def test_dead_persona_without_subagent_blocks(tmp_path: Path) -> None:
@@ -128,7 +133,7 @@ def test_dead_persona_without_subagent_blocks(tmp_path: Path) -> None:
     lines = check_entities_derivation(public_dir)
 
     assert any("Persona 'beta' has no derived core" in text for text in _texts(lines))
-    assert all(line.status.blocking for line in lines)  # type: ignore[attr-defined]
+    assert all(line.status.blocking for line in _drift(lines))  # type: ignore[attr-defined]
 
 
 def test_behavior_missing_harness_key_blocks(tmp_path: Path) -> None:
@@ -141,7 +146,7 @@ def test_behavior_missing_harness_key_blocks(tmp_path: Path) -> None:
     lines = check_entities_derivation(public_dir)
 
     assert any("expected every harness with a hook derivation" in text for text in _texts(lines))
-    assert all(line.status.blocking for line in lines)  # type: ignore[attr-defined]
+    assert all(line.status.blocking for line in _drift(lines))  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------
@@ -161,7 +166,7 @@ def test_persona_stub_body_blocks(tmp_path: Path) -> None:
     lines = check_entities_derivation(public_dir)
 
     assert any("'alpha' has no parseable frontmatter identity" in text for text in _texts(lines))
-    assert all(line.status.blocking for line in lines)  # type: ignore[attr-defined]
+    assert all(line.status.blocking for line in _drift(lines))  # type: ignore[attr-defined]
 
 
 def test_persona_identity_mismatch_blocks(tmp_path: Path) -> None:
@@ -179,7 +184,7 @@ def test_persona_identity_mismatch_blocks(tmp_path: Path) -> None:
     assert any(
         "frontmatter name 'beta' does not match its filename" in text for text in _texts(lines)
     )
-    assert all(line.status.blocking for line in lines)  # type: ignore[attr-defined]
+    assert all(line.status.blocking for line in _drift(lines))  # type: ignore[attr-defined]
 
 
 def test_behavior_implementation_module_reference_broken_blocks(tmp_path: Path) -> None:
@@ -197,7 +202,7 @@ def test_behavior_implementation_module_reference_broken_blocks(tmp_path: Path) 
         "references module 'dadaia_workspace.hooks.pre_gate' which no longer exists" in text
         for text in _texts(lines)
     )
-    assert all(line.status.blocking for line in lines)  # type: ignore[attr-defined]
+    assert all(line.status.blocking for line in _drift(lines))  # type: ignore[attr-defined]
 
 
 def test_behavior_implementation_module_reference_as_package_blocks(tmp_path: Path) -> None:
@@ -211,8 +216,8 @@ def test_behavior_implementation_module_reference_as_package_blocks(tmp_path: Pa
 
     lines = check_entities_derivation(public_dir)
 
-    assert len(lines) == 1
-    assert lines[0].status is DoctorStatus.OK
+    assert len(_drift(lines)) == 1
+    assert _drift(lines)[0].status is DoctorStatus.OK
 
 
 def test_multiple_behavioral_drifts_all_reported(tmp_path: Path) -> None:
@@ -230,7 +235,7 @@ def test_multiple_behavioral_drifts_all_reported(tmp_path: Path) -> None:
 
     assert any("'alpha' has no parseable frontmatter identity" in text for text in texts)
     assert any("which no longer exists" in text for text in texts)
-    assert all(line.status.blocking for line in lines)  # type: ignore[attr-defined]
+    assert all(line.status.blocking for line in _drift(lines))  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------
@@ -244,5 +249,23 @@ def test_the_real_packaged_registry_has_no_behavioral_drift() -> None:
 
     lines = check_entities_derivation(real_public)
 
-    assert len(lines) == 1
-    assert lines[0].status is DoctorStatus.OK
+    assert len(_drift(lines)) == 1
+    assert _drift(lines)[0].status is DoctorStatus.OK
+
+
+def test_a_declared_ungated_action_is_reported_as_one_warn_line(tmp_path: Path) -> None:
+    """A harness whose dialect declares an action it exposes no pre-action event for is
+    a STATED gap, and `public doctor` states it once — never a silent pass and never a
+    blocking error, because the harness offers no event to fix it with.
+
+    Intent: CONTRACT — 0.4.7 FR3 (candidate 8 review F2). Size: SMALL.
+    """
+    public = _build_clean_scratch(tmp_path)
+
+    lines = check_entities_derivation(public)
+
+    warns = [ln for ln in lines if ln.status is DoctorStatus.WARN]
+    assert [ln.text for ln in warns] == [
+        "entities-derivation: cursor: 'file-write' has no pre-action hook event — "
+        "cursor exposes none, so the gate cannot run before it (ENT-DERIVE-1)"
+    ]

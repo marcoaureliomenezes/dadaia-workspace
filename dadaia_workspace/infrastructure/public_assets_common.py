@@ -16,7 +16,6 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
-from dadaia_workspace.core.harness_registry import INSTALL_TARGETS
 from dadaia_workspace.infrastructure.privacy_check import (
     _PUBLIC_ASSET_IGNORED_DIRS,
     _PUBLIC_ASSET_IGNORED_SUFFIXES,
@@ -52,10 +51,7 @@ class OverwritePolicy(StrEnum):
         return self is OverwritePolicy.FORCE
 
 
-# Shared layout constants for the install/stage pipeline. The valid ``--target``
-# vocabulary is single-sourced in ``core/harness_registry`` (v0.1.58 FR1); this name is
-# a back-compat re-export for tests/consumers that import ``_VALID_TARGETS`` from here.
-_VALID_TARGETS = INSTALL_TARGETS
+# Shared layout constants for the install/stage pipeline.
 _COPY_DIRS = (
     "rules",
     "skills",

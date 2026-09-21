@@ -57,7 +57,7 @@ _runner = CliRunner()
 
 # ---------------------------------------------------------------------------
 # stage() — manifest + codex runtime adapters, plus
-# install(target="all") full-projection block
+# install() full-projection block
 # ---------------------------------------------------------------------------
 
 
@@ -82,7 +82,7 @@ def test_stage_manifest_and_install_all(tmp_path: Path, monkeypatch: pytest.Monk
     manager = FileSystemPublicAssetManager()
 
     register_all(workspace)
-    manager.install(workspace, target="all")
+    manager.install(workspace)
 
     assert (workspace / "AGENTS.md").exists()
     assert (workspace / ".dadaia" / "AGENTS.md").exists()
@@ -136,7 +136,7 @@ def test_install_refuses_source_root_overwrite_skip_force_and_doctor_drift_track
     source_root_manager = FileSystemPublicAssetManager()
 
     with pytest.raises(PublicAssetError, match="Refusing to project public runtime assets"):
-        source_root_manager.install(source_root, target="all")
+        source_root_manager.install(source_root)
 
     assert not (source_root / ".dadaia").exists()
     assert not (source_root / ".codex").exists()
@@ -147,7 +147,7 @@ def test_install_refuses_source_root_overwrite_skip_force_and_doctor_drift_track
     agents_md.write_text("custom\n", encoding="utf-8")
 
     manager = FileSystemPublicAssetManager()
-    manager.install(workspace, target="all")
+    manager.install(workspace)
 
     content = agents_md.read_text(encoding="utf-8")
     assert content != "custom\n", "Expected stale AGENTS.md to be overwritten"
@@ -156,7 +156,7 @@ def test_install_refuses_source_root_overwrite_skip_force_and_doctor_drift_track
     mtime_before = agents_md.stat().st_mtime
 
     # Second install: same hash -> skip (no-op).
-    manager.install(workspace, target="all")
+    manager.install(workspace)
     assert agents_md.read_text(encoding="utf-8") == canonical_content
     assert agents_md.stat().st_mtime == mtime_before
 
@@ -165,7 +165,7 @@ def test_install_refuses_source_root_overwrite_skip_force_and_doctor_drift_track
     force_agents = force_ws / "AGENTS.md"
     force_agents.parent.mkdir(parents=True, exist_ok=True)
     force_agents.write_text("custom\n", encoding="utf-8")
-    FileSystemPublicAssetManager().install(force_ws, target="all", force=True)
+    FileSystemPublicAssetManager().install(force_ws, force=True)
     force_content = force_agents.read_text(encoding="utf-8")
     assert force_content != "custom\n"
     assert "# dadaia-workspace" in force_content
@@ -174,7 +174,7 @@ def test_install_refuses_source_root_overwrite_skip_force_and_doctor_drift_track
     drift_ws = tmp_path / "drift-ws"
     drift_manager = FileSystemPublicAssetManager()
     drift_manager.stage(drift_ws)
-    drift_manager.install(drift_ws, target="all", force=True)
+    drift_manager.install(drift_ws, force=True)
 
     clean_report = _rendered(drift_manager.doctor(drift_ws))
     assert "[ok] dadaia:AGENTS.md" in clean_report
@@ -278,7 +278,7 @@ def test_codex_projection_config_legacy_cleanup_and_native_rules(tmp_path: Path)
 
     # The retired Markdown workflow source is not projected.
     manager, workspace_root = _make_codex_install_manager(tmp_path)
-    manager.install(workspace_root, target="codex", force=True)
+    manager.install(workspace_root, harness="codex", force=True)
     assert not (workspace_root / ".codex" / "workflows").exists()
 
     # Installation removes only retired workflow files and preserves unrelated
@@ -290,7 +290,7 @@ def test_codex_projection_config_legacy_cleanup_and_native_rules(tmp_path: Path)
         "stale content\n", encoding="utf-8"
     )
     (legacy_workflows_dir / "operator-note.txt").write_text("keep\n", encoding="utf-8")
-    legacy_manager.install(legacy_ws, target="codex", force=True)
+    legacy_manager.install(legacy_ws, harness="codex", force=True)
     assert not (legacy_workflows_dir / "hotfix-release.workflow.md").exists()
     assert (legacy_workflows_dir / "operator-note.txt").read_text(encoding="utf-8") == "keep\n"
 
@@ -305,7 +305,7 @@ def test_codex_projection_config_legacy_cleanup_and_native_rules(tmp_path: Path)
     (rules_src / "workspace-protocol.md").write_text(
         "---\nname: workspace-protocol\n---\n# body\n", encoding="utf-8"
     )
-    rules_manager.install(rules_ws, target="codex", force=True)
+    rules_manager.install(rules_ws, harness="codex", force=True)
     rules_dst = rules_ws / ".codex" / "rules"
     assert not (rules_dst / "game-agents-coordination.md").exists(), (
         "Behavioral rule should NOT be projected to .codex/rules/"
@@ -364,7 +364,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     ws = tmp_path / "ws"
     manager = FileSystemPublicAssetManager()
     register_all(ws)
-    manager.install(ws, target="all")
+    manager.install(ws)
 
     # AC-2: with no overlay, BOTH projections render the exact `balanced` roster from
     # the SAME resolved config — this lockstep IS the codex-correctness assurance (no
@@ -394,7 +394,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
         ),
         encoding="utf-8",
     )
-    manager.install(ws, target="all")
+    manager.install(ws)
 
     se2 = _claude_frontmatter(ws, "dd-software-engineer")
     assert (se2["model"], se2["effort"]) == ("claude-opus-4-8", "low")
@@ -407,7 +407,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     assert (pm2_toml["model"], pm2_toml["model_reasoning_effort"]) == ("gpt-5.6-sol", "high")
 
     # Byte-stable repeated install: every agent projection line is a [skip].
-    third = manager.install(ws, target="all")
+    third = manager.install(ws)
     agent_lines = [
         line
         for line in third
@@ -427,7 +427,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     invalid_ws = tmp_path / "invalid-ws"
     invalid_manager = FileSystemPublicAssetManager()
     register_all(invalid_ws)
-    invalid_manager.install(invalid_ws, target="all")
+    invalid_manager.install(invalid_ws)
     before = (invalid_ws / ".claude" / "agents" / "dd-software-engineer.md").read_bytes()
 
     invalid_states = invalid_ws / ".dadaia" / "states"
@@ -441,7 +441,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
         encoding="utf-8",
     )
     with pytest.raises(AgentModelPolicyStoreError):
-        invalid_manager.install(invalid_ws, target="all")
+        invalid_manager.install(invalid_ws)
     after = (invalid_ws / ".claude" / "agents" / "dd-software-engineer.md").read_bytes()
     assert after == before
 
@@ -449,7 +449,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     doctor_ws = tmp_path / "doctor-ws"
     doctor_manager = FileSystemPublicAssetManager()
     register_all(doctor_ws)
-    doctor_manager.install(doctor_ws, target="all")
+    doctor_manager.install(doctor_ws)
 
     clean = _rendered(doctor_manager.doctor(doctor_ws))
     assert not any("agent-model-policy ERROR" in r for r in clean), (
@@ -467,7 +467,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
         ),
         encoding="utf-8",
     )
-    doctor_manager.install(doctor_ws, target="all")
+    doctor_manager.install(doctor_ws)
 
     reports = _rendered(doctor_manager.doctor(doctor_ws))
     agent_lines = [r for r in reports if r.split(" ", 1)[-1].startswith("claude:agents/")]
@@ -566,7 +566,7 @@ def test_a_single_skill_rename_is_green_everywhere_after_one_place(
     mgr._public_dir = mirror_public  # noqa: SLF001 — exercise the mirror only
     ws = tmp_path / "ws"
     ws.mkdir()
-    mgr.install(ws, target="all")
+    mgr.install(ws)
     installed_skills = {p.name for p in (ws / ".agents" / "skills").iterdir() if p.is_dir()}
     assert installed_skills == mutated_roster
 

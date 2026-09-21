@@ -218,13 +218,13 @@ class ReleaseValidator:
         return issues
 
     def check_spec_origin(
-        self, open_bug_ids: Callable[[], Collection[str]]
+        self, known_bug_ids: Callable[[], Collection[str]]
     ) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-048: the live SPEC and every candidate SPEC archived under it name
         where the work came from — the header is the flow's only machine-read input.
         Releases under ``_archive/`` are frozen history and out of scope.
 
-        ``open_bug_ids`` is read lazily: a tree citing no bug never touches the bug
+        ``known_bug_ids`` is read lazily: a tree citing no bug never touches the bug
         ledger, so this rule borrows the governance family's ONE bug reader without
         forcing its store on every construction site.
         """
@@ -236,7 +236,7 @@ class ReleaseValidator:
         for path in (rdir / "SPEC.md", *sorted(rdir.glob("rc-*/SPEC.md"))):
             if not path.exists():
                 continue
-            problem = self._origin_problem(path, open_bug_ids)
+            problem = self._origin_problem(path, known_bug_ids)
             if problem:
                 issues.append(
                     SpecsDoctorIssue(
@@ -248,7 +248,7 @@ class ReleaseValidator:
                 )
         return issues
 
-    def _origin_problem(self, path: Path, open_bug_ids: Callable[[], Collection[str]]) -> str:
+    def _origin_problem(self, path: Path, known_bug_ids: Callable[[], Collection[str]]) -> str:
         """One SPEC header judged — presence, vocabulary, then the cited ids; "" is clean."""
         match = _ORIGIN_RE.search(path.read_text(encoding="utf-8"))
         if match is None:
@@ -267,12 +267,11 @@ class ReleaseValidator:
                 else ""
             )
         if kind == "bugs" and cited:
-            live = set(open_bug_ids())
-            closed = [i for i in cited if i not in live]
+            known = set(known_bug_ids())
+            unknown = [i for i in cited if i not in known]
             return (
-                f"Origin cites bugs {', '.join(closed)} — a bug origin names an OPEN "
-                "bugs/BUGS.jsonl record"
-                if closed
+                f"Origin cites bugs {', '.join(unknown)} — no such record in bugs/BUGS.jsonl"
+                if unknown
                 else ""
             )
         return f"Origin {value!r} is not canonical. Valid: {_ORIGIN_VOCABULARY}"

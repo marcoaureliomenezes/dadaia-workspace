@@ -138,7 +138,7 @@ class FakeGitClient:
 class FakePublicAssetManager:
     def __init__(self) -> None:
         self.staged: list[Path] = []
-        self.installed: list[tuple[Path, str, bool]] = []
+        self.installed: list[tuple[Path, str | None, bool]] = []
         self.doctored: list[Path] = []
 
     def stage(self, workspace_root: Path) -> list[str]:
@@ -149,12 +149,12 @@ class FakePublicAssetManager:
     def install(
         self,
         workspace_root: Path,
-        target: str = "all",
+        harness: str | None = None,
         force: bool = False,
         scope: str = "all",
         only: str | None = None,
     ) -> list[str]:
-        self.installed.append((workspace_root, target, force))
+        self.installed.append((workspace_root, harness, force))
         return [str(workspace_root / ".agents" / "skills" / "fake-skill" / "SKILL.md")]
 
     def list_all(self) -> dict[str, list[str]]:

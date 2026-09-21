@@ -57,11 +57,11 @@ def initialized_workspace(
 
 @pytest.fixture(scope="session")
 def _codex_installed_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """A single full stage + install(target=codex) result, built once per session."""
+    """A single full stage + install(harness=codex) result, built once per session."""
     template_root = tmp_path_factory.mktemp("codex-installed-template")
     manager = FileSystemPublicAssetManager()
     manager.stage(template_root)
-    manager.install(template_root, target="codex", force=True)
+    manager.install(template_root, harness="codex", force=True)
     venv_bin = template_root / ".dadaia" / ".venv" / "bin"
     venv_bin.mkdir(parents=True, exist_ok=True)
     (venv_bin / "python").symlink_to(Path(sys.executable))

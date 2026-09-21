@@ -18,12 +18,14 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.infrastructure.projection_rules import harnesses_with_a_hook_derivation
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _parse_agent_frontmatter,
     _parse_skills_from_frontmatter,
 )
+from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import HOOK_DIALECTS
 
 
 def check_agent_skill_refs(public_dir: Path) -> list[DoctorLine]:
@@ -372,4 +374,17 @@ def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
                 f"derived for every harness with a hook derivation (ENT-DERIVE-1)",
             )
         )
+    # A declared gap is a fact about the harness, not drift in this repo: the gate rides
+    # every pre-action event the harness exposes, and where it exposes none the WARN says
+    # so once. Never an ERROR — no edit here can create an event the harness lacks.
+    for name in sorted(harnesses):
+        for action in HOOK_DIALECTS[HARNESS_RECORDS[name].hooks].ungated:
+            out.append(
+                DoctorLine(
+                    DoctorStatus.WARN,
+                    f"entities-derivation: {name}: {action!r} has no pre-action hook "
+                    f"event — {name} exposes none, so the gate cannot run before it "
+                    "(ENT-DERIVE-1)",
+                )
+            )
     return out

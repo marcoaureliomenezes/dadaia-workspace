@@ -1,6 +1,6 @@
 """Register the full harness roster in a test workspace's profile.
 
-0.4.7 T-047-72: `install(target="all")` and `doctor()` scope on
+0.4.7 T-047-72: `install()` and `doctor()` scope on
 `.dadaia/states/harness_profile.json` — the roster of record — and a workspace with
 no profile migrates to the harness directories physically present (an empty tmp
 workspace ⇒ nothing). A test that asserts the full multi-harness projection therefore

@@ -34,6 +34,7 @@ from dadaia_workspace.infrastructure.projection_rules import (
     harnesses_with_a_hook_derivation,
 )
 from dadaia_workspace.infrastructure.public_assets_common import OverwritePolicy
+from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import HOOK_DIALECTS
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PUBLIC = _REPO_ROOT / "dadaia_workspace" / "public"
@@ -54,7 +55,7 @@ def _plan(workspace_root: Path) -> InstallPlan:
     return InstallPlan(
         workspace_root=workspace_root,
         agentic_dir=_PUBLIC,
-        target="all",
+        harness=None,
         scope="all",
         only=None,
         overwrite=OverwritePolicy.PRESERVE,
@@ -179,3 +180,60 @@ def test_every_projected_wrapper_is_self_locating_and_executable(
         assert 'dirname -- "$0"' in body, (
             f"{rule.label} does not resolve its interpreter from its own location"
         )
+
+
+#: What each pre-action hook event can gate. A harness registers the gate on the events
+#: it exposes BEFORE the action; an event absent here is an event nobody classified —
+#: a new harness declares its coverage rather than inheriting a silent pass.
+_EVENT_COVERAGE: dict[str, frozenset[str]] = {
+    "PreToolUse": frozenset({"shell", "file-write"}),
+    "preToolUse": frozenset({"shell", "file-write"}),
+    "beforeShellExecution": frozenset({"shell"}),
+}
+#: The actions the SDD gate exists to police.
+_GATED_ACTIONS = ("shell", "file-write")
+
+
+def _events_citing_the_gate(record: HarnessRecord, workspace_root: Path) -> set[str]:
+    """Every event name a rendered hook registration binds to the gate wrapper/module."""
+    events: set[str] = set()
+    for text in _rendered(_hook_rules(record, workspace_root)).values():
+        try:
+            hooks = json.loads(text).get("hooks", {})
+        except (ValueError, AttributeError):
+            for block in text.split("[[hooks]]")[1:]:
+                found = re.search(r'event\s*=\s*"([^"]+)"', block)
+                if found and "pre-gate" in block:
+                    events.add(found.group(1))
+            continue
+        for event, entries in hooks.items():
+            if "pre-gate" in json.dumps(entries) or _PRE_GATE in json.dumps(entries):
+                events.add(event)
+    return events
+
+
+@pytest.mark.parametrize("record", _derived_records(), ids=_record_ids)
+def test_every_gated_action_has_a_pre_action_event_or_a_declared_gap(
+    record: HarnessRecord, workspace: Path
+) -> None:
+    """Coverage is per EVENT, not per string: a harness that registers the gate only on
+    shell execution leaves file writes ungated, and that gap must be DECLARED in its
+    dialect (``HookDialect.ungated``) rather than implied by a passing string search."""
+    events = _events_citing_the_gate(record, workspace)
+    assert events, f"{record.name}: no event registers the gate"
+    unclassified = events - set(_EVENT_COVERAGE)
+    assert not unclassified, (
+        f"{record.name}: unclassified pre-action event(s) {sorted(unclassified)} — "
+        "add them to _EVENT_COVERAGE with the actions they gate"
+    )
+    covered = set().union(*(_EVENT_COVERAGE[e] for e in events))
+    declared = set(HOOK_DIALECTS[record.hooks].ungated)
+    for action in _GATED_ACTIONS:
+        assert action in covered or action in declared, (
+            f"{record.name}: {action} is neither gated by a pre-action event "
+            f"{sorted(events)} nor declared ungated in its HookDialect"
+        )
+    assert not (declared & covered), (
+        f"{record.name}: declares {sorted(declared & covered)} ungated while an event "
+        "already gates it — the declaration is stale"
+    )

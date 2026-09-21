@@ -18,14 +18,15 @@ from types import ModuleType
 
 import pytest
 
+from dadaia_workspace.cli.commands import init as init_module
 from dadaia_workspace.core.harness_registry import (
     HARNESS_PROJECTION_DIRS,
     HARNESS_RECORDS,
-    INSTALL_TARGETS,
     L1_ENTRY_HARNESSES,
     PROJECTION_TARGETS,
     parse_harness_name,
 )
+from dadaia_workspace.features.workspace import service as workspace_service_module
 from dadaia_workspace.infrastructure import agent_transcodes as agent_transcodes_module
 from dadaia_workspace.infrastructure import projection_rules as projection_rules_module
 from dadaia_workspace.infrastructure.install_plan import InstallPlan
@@ -45,7 +46,7 @@ def render_table(workspace_root: Path, kimi_home: Path) -> list[dict[str, object
     plan = InstallPlan(
         workspace_root=workspace_root,
         agentic_dir=_PUBLIC,
-        target="all",
+        harness=None,
         scope="all",
         only=None,
         overwrite=OverwritePolicy.PRESERVE,
@@ -112,16 +113,23 @@ def test_the_legacy_constants_derive_from_the_record_table() -> None:
         for name, record in HARNESS_RECORDS.items()
     } == HARNESS_PROJECTION_DIRS
     assert ("agents", *HARNESS_RECORDS) == PROJECTION_TARGETS
-    assert frozenset({"all", "agents", *HARNESS_RECORDS}) == INSTALL_TARGETS
     last = next(reversed(HARNESS_RECORDS))
     assert parse_harness_name(last) == last
 
 
 @pytest.mark.parametrize(
-    "module", [projection_rules_module, agent_transcodes_module], ids=lambda m: m.__name__
+    "module",
+    [
+        projection_rules_module,
+        agent_transcodes_module,
+        workspace_service_module,
+        init_module,
+    ],
+    ids=lambda m: m.__name__,
 )
 def test_the_projection_table_carries_no_harness_named_literal(module: ModuleType) -> None:
-    """A harness name in the projection table IS the per-harness branch coming back."""
+    """A harness name in the projection table — or in `init`, which owns no projection —
+    IS the per-harness branch coming back."""
     source = Path(module.__file__ or "").read_text(encoding="utf-8")
     offenders = [
         f'"{name}"' for name in L1_ENTRY_HARNESSES if f'"{name}"' in source or f"'{name}'" in source

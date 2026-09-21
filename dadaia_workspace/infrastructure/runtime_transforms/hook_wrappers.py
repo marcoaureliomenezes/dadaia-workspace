@@ -90,6 +90,9 @@ class HookDialect:
         typed: the entry carries ``"type": "command"``.
         version: a top-level ``"version"`` field, when the format declares one.
         answer: the flat permission shape, or ``None`` for a native-envelope reader.
+        ungated: the actions this harness exposes NO pre-action event for, declared so
+            the gap is a stated fact (one ``public doctor`` WARN) instead of a silent
+            hole a string-search coverage test would pass.
     """
 
     lanes: tuple[HookLane, ...] = ()
@@ -98,6 +101,7 @@ class HookDialect:
     typed: bool = True
     version: int | None = None
     answer: HookAnswer | None = None
+    ungated: tuple[str, ...] = ()
 
 
 #: The gate lane: one entrypoint, three behaviours (root whitelist, venv guard, SDD gate).
@@ -149,6 +153,7 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
         typed=False,
         version=1,
         answer=HookAnswer("permission", "user_message", "allow", "deny"),
+        ungated=("file-write",),
     ),
     HookFormat.DEVIN_HOOKS: HookDialect(
         lanes=_FOUR_BEHAVIOURS,

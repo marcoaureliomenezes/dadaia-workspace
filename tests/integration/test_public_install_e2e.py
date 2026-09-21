@@ -195,11 +195,11 @@ def _table_rows(text: str) -> list[str]:
 
 
 def test_installed_dadaia_agents_md_carries_the_rendered_zone_table(tmp_path: Path) -> None:
-    """After ``install(target="all")`` the projected ``.dadaia/AGENTS.md`` carries exactly one
+    """After ``install()`` the projected ``.dadaia/AGENTS.md`` carries exactly one
     row per registry zone and no placeholder; ``states/AGENTS.md`` carries the closed canon."""
     ws = tmp_path / "ws"
     ws.mkdir()
-    FileSystemPublicAssetManager().install(ws, target="all")
+    FileSystemPublicAssetManager().install(ws)
 
     zones = (ws / ".dadaia" / "AGENTS.md").read_text(encoding="utf-8")
     assert "<!-- zones -->" not in zones
@@ -215,12 +215,12 @@ def test_installed_dadaia_agents_md_carries_the_rendered_zone_table(tmp_path: Pa
 
 
 def test_install_all_projects_no_dadaia_scripts(tmp_path: Path) -> None:
-    """0.4.6 AC10 (FR12): ``install(target="all")`` creates no ``.dadaia/scripts`` and the
+    """0.4.6 AC10 (FR12): ``install()`` creates no ``.dadaia/scripts`` and the
     staged manifest names no such path. Git hooks and CI execute the package copy under
     ``dadaia_workspace/public/scripts/``; only the ``agentic/scripts`` staging survives."""
     ws = tmp_path / "ws"
     ws.mkdir()
-    FileSystemPublicAssetManager().install(ws, target="all")
+    FileSystemPublicAssetManager().install(ws)
 
     assert not (ws / ".dadaia" / "scripts").exists()
     assert (ws / ".dadaia" / "agentic" / "scripts").is_dir()

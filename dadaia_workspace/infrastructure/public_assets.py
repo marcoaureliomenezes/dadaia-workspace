@@ -23,6 +23,7 @@ from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.harness_registry import (
     HARNESS_PROJECTION_DIRS,
+    HARNESS_RECORDS,
     L1_ENTRY_HARNESSES,
 )
 from dadaia_workspace.core.models.agent_model_policy import (
@@ -73,7 +74,6 @@ from dadaia_workspace.infrastructure.projection_rules import (
 )
 from dadaia_workspace.infrastructure.public_assets_common import (
     _COPY_DIRS,
-    _VALID_TARGETS,
     OverwritePolicy,
     _entry_digest,
     _json_dump,
@@ -296,12 +296,12 @@ class FileSystemPublicAssetManager:
     def install(
         self,
         workspace_root: Path,
-        target: str = "all",
+        harness: str | None = None,
         force: bool = False,
         scope: Literal["all", "repos-only", "workspace-only"] = "all",
         only: str | None = None,
     ) -> list[str]:
-        self._validate_install_target(target)
+        self._validate_install_harness(harness)
         self._guard_source_root_install(workspace_root)
 
         agentic_dir = workspace_root / ".dadaia" / "agentic"
@@ -310,7 +310,7 @@ class FileSystemPublicAssetManager:
             installed.extend(self.stage(workspace_root))
 
         plan = self._resolve_install_plan(
-            workspace_root, agentic_dir, target, OverwritePolicy.of(force), scope, only
+            workspace_root, agentic_dir, harness, OverwritePolicy.of(force), scope, only
         )
         rules = projection_rules(plan)
         transcript = install_rules(rules, force=plan.overwrite.force)
@@ -356,18 +356,19 @@ class FileSystemPublicAssetManager:
             transcript,
             guardrail_managed,
             installed,
-            full=(plan.target == "all" and plan.scope == "all"),
+            full=(plan.harness is None and plan.scope == "all"),
         )
 
         return installed
 
     @staticmethod
-    def _validate_install_target(target: str) -> None:
-        if target not in _VALID_TARGETS:
-            valid = ", ".join(sorted(_VALID_TARGETS))
-            raise PublicAssetError(
-                f"Unsupported public install target '{target}'. Expected one of: {valid}"
-            )
+    def _validate_install_harness(harness: str | None) -> None:
+        if harness is None or harness in HARNESS_RECORDS:
+            return
+        valid = ", ".join(sorted(HARNESS_RECORDS))
+        raise PublicAssetError(
+            f"Unsupported public install harness '{harness}'. Expected one of: {valid}"
+        )
 
     @staticmethod
     def _guard_source_root_install(workspace_root: Path) -> None:
@@ -385,7 +386,7 @@ class FileSystemPublicAssetManager:
         self,
         workspace_root: Path,
         agentic_dir: Path,
-        target: str,
+        harness: str | None,
         overwrite: OverwritePolicy,
         scope: Literal["all", "repos-only", "workspace-only"],
         only: str | None,
@@ -400,24 +401,24 @@ class FileSystemPublicAssetManager:
         overlay = self._load_agent_policy(workspace_root, agentic_dir)
         resolved_models = self._resolved_core_models(overlay)
 
-        # Install-all projects the roster of record: the shared authored set plus every
-        # harness registered in the profile (0.4.7 FR2 — `harness add` is the one way in).
-        # `target=<name>` is `harness add`'s own scoped projection, never an operator flag.
-        if target == "all":
+        # No harness named: project the roster of record — the shared authored set plus
+        # every harness registered in the profile (0.4.7 FR2 — `harness add` is the one
+        # way in). A named harness is `harness add`'s own scoped projection, never a flag.
+        if harness is None:
             profile_harnesses = self._profile_harnesses(workspace_root)
             harness_targets: tuple[str, ...] = (
                 "agents",
                 *(h for h in L1_ENTRY_HARNESSES if h in profile_harnesses),
             )
         else:
-            harness_targets = (target,)
+            harness_targets = (harness,)
 
         active_harnesses = frozenset(item for item in harness_targets if item in L1_ENTRY_HARNESSES)
 
         return InstallPlan(
             workspace_root=workspace_root,
             agentic_dir=agentic_dir,
-            target=target,
+            harness=harness,
             scope=scope,
             only=only,
             overwrite=overwrite,
@@ -609,14 +610,14 @@ class FileSystemPublicAssetManager:
             reports.append(DoctorLine(DoctorStatus.DRIFT, f"agent-model-policy ERROR: {exc}"))
         resolved_models = self._resolved_core_models(overlay)
 
-        # The doctor plan is "install(target=all, scope=all)" scoped to the PERSISTED
+        # The doctor plan is "install(scope=all)" over the roster, scoped to the PERSISTED
         # profile — never an operator's scoped --target selection. It is never executed
         # (install_rules is never called against it); it exists only to build the SAME
         # rule table doctor_rules() compares.
         doctor_plan = InstallPlan(
             workspace_root=workspace_root,
             agentic_dir=agentic_dir,
-            target="all",
+            harness=None,
             scope="all",
             only=None,
             overwrite=OverwritePolicy.PRESERVE,

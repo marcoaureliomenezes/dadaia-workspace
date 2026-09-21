@@ -62,7 +62,7 @@ def test_legacy_agents_md_install_and_repos_only_skip(tmp_path: Path) -> None:
     templates_dir.mkdir()
     (templates_dir / "AGENTS.md").write_text("# TEMPLATES AGENTS\n", encoding="utf-8")
 
-    FileSystemPublicAssetManager().install(workspace_root, target="claude", force=True)
+    FileSystemPublicAssetManager().install(workspace_root, harness="claude", force=True)
     assert (workspace_root / "AGENTS.md").exists()
 
     repos_only_case = tmp_path / "repos-only-case"
@@ -73,7 +73,7 @@ def test_legacy_agents_md_install_and_repos_only_skip(tmp_path: Path) -> None:
     (templates_dir2 / "AGENTS.md").write_text("# TEMPLATES AGENTS\n", encoding="utf-8")
 
     FileSystemPublicAssetManager().install(
-        workspace_root2, target="claude", force=True, scope="repos-only"
+        workspace_root2, harness="claude", force=True, scope="repos-only"
     )
     assert not (workspace_root2 / "AGENTS.md").exists()
 
@@ -82,7 +82,7 @@ def test_invalid_target_raises_and_only_rules_agents_filters(tmp_path: Path) -> 
     """Invalid target raises + only=rules / only=agents each filter out the other."""
     _, workspace_root = _build_minimal_agentic_dir(tmp_path)
     with pytest.raises(PublicAssetError, match="Unsupported"):
-        FileSystemPublicAssetManager().install(workspace_root, target="invalid-target")
+        FileSystemPublicAssetManager().install(workspace_root, harness="invalid-target")
 
     public_dir = tmp_path / "public"
     public_dir.mkdir()
@@ -91,7 +91,7 @@ def test_invalid_target_raises_and_only_rules_agents_filters(tmp_path: Path) -> 
     _make_minimal_agentic(ws_rules)
     manager = _make_manager(public_dir)
 
-    installed = manager.install(ws_rules, target="claude", force=True, only="rules")
+    installed = manager.install(ws_rules, harness="claude", force=True, only="rules")
     installed_paths = " ".join(installed)
     assert "rules" in installed_paths or len(installed) == 0
     agents_dir = ws_rules / ".claude" / "agents"
@@ -102,7 +102,7 @@ def test_invalid_target_raises_and_only_rules_agents_filters(tmp_path: Path) -> 
     _make_minimal_agentic(ws_agents)
     manager2 = _make_manager(public_dir)
 
-    manager2.install(ws_agents, target="claude", force=True, only="agents")
+    manager2.install(ws_agents, harness="claude", force=True, only="agents")
     rules_dir = ws_agents / ".claude" / "rules"
     assert not rules_dir.exists() or list(rules_dir.iterdir()) == []
 
@@ -120,7 +120,7 @@ def test_install_leaves_only_ledger_owned_entries_under_claude(tmp_path: Path) -
     states_dir = workspace_root / ".dadaia" / "states"
     states_dir.mkdir(parents=True)
 
-    FileSystemPublicAssetManager().install(workspace_root, target="claude")
+    FileSystemPublicAssetManager().install(workspace_root, harness="claude")
 
     ledger = JsonInstallLedgerStore().read(states_dir)
     assert ledger is not None

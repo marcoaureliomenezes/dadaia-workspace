@@ -90,7 +90,7 @@ time, **review** before the push, **close** the candidate and merge it.
 
 <!-- derived-from: agentic-entities sha256:9f032dda73ca -->
 <!-- derived-from: sdd-gate-v3 sha256:1c17b7e34596 -->
-<!-- derived-from: sdd-bug-backlog-governance sha256:14217f0957ce -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:8e4c85766c6a -->
 <!-- derived-from: harness-claude-code sha256:71f1a21a61f8 -->
 <!-- derived-from: harness-codex sha256:a4d6209e93b4 -->
 <!-- derived-from: harness-kimi-code sha256:e65ffffccd63 -->

@@ -105,7 +105,7 @@ def projected(tmp_path_factory: pytest.TempPathFactory) -> Path:
     ).init(workspace, harnesses=L1_ENTRY_HARNESSES)
     manager = FileSystemPublicAssetManager()
     manager.stage(workspace)
-    manager.install(workspace, target="claude")
+    manager.install(workspace, harness="claude")
     return workspace
 
 

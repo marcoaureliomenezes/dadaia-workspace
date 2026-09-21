@@ -102,7 +102,7 @@ in, an old one out).
 
 - `SPEC-DOC-048`: every live SPEC carries `**Origin:** operator-demand | backlog:<slug>[,..] |
   bugs:<id>[,..]`; `backlog:` slugs must exist in `BACKLOG.json` or the histo; `bugs:` ids must
-  be open records.
+  be records of the ledger.
 - Flow 2 shape: `release.py new <id> --origin bugs:<id>,...` seeds the SPEC with one FR per
   bug (title + repro line); the memory pass is "surgical or none"; a single bug stays Arm B.
 - Flow weights written once in `specs/releases/AGENTS.md` (Flow 1 default, Flow 2 surgical

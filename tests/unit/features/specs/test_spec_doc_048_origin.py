@@ -2,7 +2,7 @@
 
 The SPEC header is the flow's only machine-read input: `operator-demand` names an
 operator's direct order, `backlog:<id>` an entry that must resolve in `BACKLOG.json` or
-the archived histo, `bugs:<id>` a record that must still be open. Archived releases
+the archived histo, `bugs:<id>` a record of the ledger, whatever its status. Archived releases
 under `_archive/` are frozen history and out of scope.
 
 Intent: CONTRACT — AC4.1. Size: SMALL.
@@ -127,17 +127,22 @@ def test_a_backlog_id_resolving_only_in_the_histo_passes(tmp_path: Path) -> None
     assert _issues(specs) == []
 
 
-def test_a_closed_bug_id_is_an_error_and_an_open_one_passes(tmp_path: Path) -> None:
+def test_a_bug_id_passes_whatever_its_status_and_an_unknown_one_errors(tmp_path: Path) -> None:
+    """Resolving the cited bug is the flow's purpose — it must not turn the SPEC
+    that fixed it into a permanent doctor ERROR. Membership in the ledger is the
+    judgement, exactly as `backlog:` judges membership in BACKLOG.json or the histo.
+    """
     specs = _make_clean_specs_tree(tmp_path, _RELEASE)
     _write_bugs(specs, [_bug("still-broken", "open"), _bug("already-fixed", "resolved")])
 
-    _write_spec(specs, "**Origin:** bugs:still-broken")
+    _write_spec(specs, "**Origin:** bugs:still-broken,already-fixed")
     assert _issues(specs) == []
 
-    _write_spec(specs, "**Origin:** bugs:still-broken,already-fixed")
+    _write_spec(specs, "**Origin:** bugs:still-broken,a-ghost")
     issues = _issues(specs)
     assert len(issues) == 1
-    assert "already-fixed" in issues[0]
+    assert "a-ghost" in issues[0]
+    assert "still-broken" not in issues[0]
 
 
 def test_a_non_canonical_origin_value_is_an_error(tmp_path: Path) -> None:
@@ -166,6 +171,6 @@ def test_an_archived_candidate_spec_under_the_live_release_is_in_scope(tmp_path:
 def test_this_repos_live_and_candidate_specs_all_pass() -> None:
     doctor = SpecsDoctor(_REPO_ROOT / "specs", bug_store_factory=build_bug_record_store)
 
-    issues = doctor._release.check_spec_origin(doctor._governance.open_bug_ids)
+    issues = doctor._release.check_spec_origin(doctor._governance.known_bug_ids)
 
     assert _by_code(issues, "SPEC-DOC-048") == []

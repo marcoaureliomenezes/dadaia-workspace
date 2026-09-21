@@ -1,8 +1,7 @@
 """AC-2 — the typed core harness registry is the single roster source (v0.1.58 T-58-11).
 
 Covers:
-* the canonical L1 entry roster and the projection/install vocabularies;
-* the capability predicate ``is_l1``;
+* the canonical L1 entry roster and the projection vocabulary;
 * ``parse_harness_name`` (the one registered name / bad-name-listing-error);
 * a grep proving the tuple/set roster literals are GONE from the repointed sites.
 
@@ -17,10 +16,8 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.harness_registry import (
-    INSTALL_TARGETS,
     L1_ENTRY_HARNESSES,
     PROJECTION_TARGETS,
-    is_l1,
     parse_harness_name,
 )
 
@@ -39,29 +36,6 @@ def test_roster_vocabulary_golden() -> None:
     assert roster == L1_ENTRY_HARNESSES
     assert ("agents", *roster) == PROJECTION_TARGETS
     assert ("agents", *L1_ENTRY_HARNESSES) == PROJECTION_TARGETS
-    assert frozenset({"all", "agents", *roster}) == INSTALL_TARGETS
-    assert frozenset({"all", *PROJECTION_TARGETS}) == INSTALL_TARGETS
-
-
-# ---------------------------------------------------------------------------
-# Capability predicates.
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    ("harness", "expect_l1"),
-    [
-        ("claude", True),
-        ("codex", True),
-        ("kimi-code", True),
-        ("bogus", False),
-        ("fake", False),
-        ("opencode", False),
-        ("", False),
-    ],
-)
-def test_capability_predicates_table(harness: str, expect_l1: bool) -> None:
-    assert is_l1(harness) is expect_l1
 
 
 # ---------------------------------------------------------------------------
@@ -101,12 +75,8 @@ def test_parse_harness_name_reject_table(raw: str) -> None:
 
 # Each site maps to (spaceless forbidden roster literal, required registry reference).
 _L1_SITES: dict[str, tuple[str, str]] = {
-    "infrastructure/public_assets_common.py": (
-        '{"all","agents","claude","codex","pi"}',
-        "INSTALL_TARGETS",
-    ),
     # 0.4.7 T-047-72: install/doctor scope on the PROFILE roster, so the site consumes
-    # the L1 roster directly — `PROJECTION_TARGETS` left with the `--target` flag.
+    # the L1 roster directly.
     "infrastructure/public_assets.py": (
         '("agents","claude","codex","pi")',
         "L1_ENTRY_HARNESSES",

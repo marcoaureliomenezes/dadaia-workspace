@@ -44,7 +44,7 @@ path or entity as it appears in an installed workspace.
 |---|---|---|---|---|
 | `AGENTS.md` | the root map: the flow, the roles, the gate invariants, the root, credentials, and one line per scoped file | statements; the index of every other surface | 8192 | 6178 |
 | `specs/AGENTS.md` | the canon of a specs tree and its status tokens | canon table, status tokens, doctor codes | 4096 | 3652 |
-| `specs/releases/AGENTS.md` | candidates, phases, task markers, `rc-N` | release procedure and commit shapes | 4096 | 4060 |
+| `specs/releases/AGENTS.md` | candidates, phases, task markers, `rc-N` | release procedure and commit shapes | 4096 | 4055 |
 | `specs/backlog/AGENTS.md` | the operator's demand queue and its exits | `BACKLOG.json` shape, intake gate, dispositions | 4096 | 4083 |
 | `specs/bugs/AGENTS.md` | what a bug is and how it is proposed, recorded, resolved | bug procedure and the redaction rule | 4096 | 4046 |
 | `specs/memory/AGENTS.md` | current product truth and who writes it | atoms, Part 1/Part 2, ownership | 4096 | 4009 |

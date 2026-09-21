@@ -234,6 +234,30 @@ def _all_checks_ok(checks: Iterable[CertificationCheck]) -> bool:
     return all(item.status in ("PASS", "SKIP") for item in checks)
 
 
+#: The doctor sections the certification tree owns — the `workspace` section reads the
+#: sandbox itself and belongs to `exact-version-reconciliation`'s own step.
+_OWNED_DOCTOR_SECTIONS = ("specs", "ledgers")
+
+
+def _owned_doctor_sections_clean(stdout: str) -> str:
+    """The verdict on a `dadaia doctor --json` payload: both owned sections, no findings.
+
+    An absent section is a FAILURE, never a silent pass: a renamed or dropped section
+    means the check saw nothing, and "clean" about nothing is not a verdict.
+    """
+    sections = json.loads(stdout)["sections"]
+    missing = [name for name in _OWNED_DOCTOR_SECTIONS if name not in sections]
+    if missing:
+        raise RuntimeError(
+            f"doctor payload carries no {', '.join(missing)} section — this check judges "
+            f"{', '.join(_OWNED_DOCTOR_SECTIONS)} and cannot vouch for a section it never read"
+        )
+    owned = {name: sections[name]["findings"] for name in _OWNED_DOCTOR_SECTIONS}
+    if any(owned.values()):
+        raise RuntimeError(f"doctor not clean: {json.dumps(owned, sort_keys=True)}")
+    return "specs and ledgers sections clean"
+
+
 def certify(
     workspace_root: Path, process: SubprocessCertificationProcess, *, keep: bool = False
 ) -> CertificationResult:
@@ -314,13 +338,7 @@ def certify(
         )
         if not proc.stdout.strip():
             raise RuntimeError(f"doctor emitted no payload: {(proc.stderr or '').strip()}")
-        sections = json.loads(proc.stdout)["sections"]
-        owned = {
-            name: sections[name]["findings"] for name in ("specs", "ledgers") if name in sections
-        }
-        if any(owned.values()):
-            raise RuntimeError(f"doctor not clean: {json.dumps(owned, sort_keys=True)}")
-        return "specs and ledgers sections clean"
+        return _owned_doctor_sections_clean(proc.stdout)
 
     check(
         "workspace-init",

@@ -58,13 +58,8 @@ class WorkspaceService:
             (workspace.dadaia_dir / zone.name).mkdir(parents=True, exist_ok=True)
         # The shared skills root is harness-independent — always created.
         (workspace.root / ".agents" / "skills").mkdir(parents=True, exist_ok=True)
-        # Per-harness projection directories — only for the chosen set.
-        if "claude" in chosen_set:
-            workspace.claude_dir.mkdir(parents=True, exist_ok=True)
-        if "codex" in chosen_set:
-            (workspace.root / ".codex").mkdir(parents=True, exist_ok=True)
-        # `.kimi-code/` is materialised by its install target below (no
-        # bare mkdir).
+        # Every harness directory is created by its own projection (the record's
+        # `directory`), never by a branch here.
 
         # Initialize JSON state files (idempotent — never overwrite existing data)
         self._init_json_file(workspace.states_dir / "spec_contexts.json", _EMPTY_CONTEXTS)
@@ -87,9 +82,9 @@ class WorkspaceService:
         installed: list[str] = []
         if not skip_assets:
             installed.extend(self._public_assets.stage(workspace_root))
-            # `target="all"` resolves the chosen-harness SUBSET on its own: it reads the
-            # profile persisted above to scope its harness targets (v0.1.58 FR3).
-            installed.extend(self._public_assets.install(workspace_root, target="all"))
+            # The roster install resolves the chosen-harness SUBSET on its own: it reads
+            # the profile persisted above to scope its harness targets (v0.1.58 FR3).
+            installed.extend(self._public_assets.install(workspace_root))
         else:
             installed.append(
                 "[warn] assets skipped — no hooks configured; the workspace is ungated "

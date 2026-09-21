@@ -110,7 +110,6 @@ def reconcile_workspace(
         projections_started = True
         public_service.install(
             workspace_root,
-            target="all",
             force=True,
             scope="all",
             only=None,

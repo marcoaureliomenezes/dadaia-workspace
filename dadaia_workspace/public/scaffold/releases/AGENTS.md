@@ -20,7 +20,7 @@ Scope: this file governs only `specs/releases/`.
 
 ## 2. Authoring rules
 
-- Three flows, one `**Origin:**` per SPEC (`SPEC-DOC-048`): Flow 1 `backlog:<ids>` is the default weight, full memory pass; Flow 2 `bugs:<ids>` composes open bugs, memory pass surgical or none; Flow 3 `operator-demand` is the heaviest — grill first, full memory pass.
+- Three flows, one `**Origin:**` per SPEC (`SPEC-DOC-048`): Flow 1 `backlog:<ids>` is the default weight, full memory pass; Flow 2 `bugs:<ids>` composes bugs, memory pass surgical or none; Flow 3 `operator-demand` is the heaviest — grill first, full memory pass.
 - SDD lifecycle order PER CANDIDATE: grill -> `SPEC.md` (Draft) -> operator approval -> `PLAN.md` -> `TASKS.md` -> implementation -> closure -> develop merge -> promote-or-continue gate.
 - Candidate closure order: memory update -> closure narrative in `_RELEASE.json`'s `log` -> disposition sweep -> artifact GC -> merge -> gate (continue = `rc-archive`; promote = ship, then `RELEASE_PY archive <id> --shipped <sha> --pr <n> --next <M.m.p>` — final trio at root, ADR 0009).
 - Full arc, gate cadence, the step-by-step ladder: `dd-release-implementation`'s `RC-FLOW.md`.

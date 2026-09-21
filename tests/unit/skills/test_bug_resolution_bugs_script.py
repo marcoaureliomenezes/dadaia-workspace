@@ -407,7 +407,7 @@ def test_the_projection_rule_carries_the_exec_bit_for_an_executable_source(
     plan = InstallPlan(
         workspace_root=tmp_path,
         agentic_dir=_PUBLIC,
-        target="agents",
+        harness=None,
         scope="workspace-only",
         only="skills",
         overwrite=OverwritePolicy.PRESERVE,

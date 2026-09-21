@@ -4,7 +4,7 @@ The **code embodiment** of the agent-runtime roster that ``specs/memory/tech-sta
 ("Agent runtimes") documents as the single source of truth (SPEC-DOC-037). One
 :class:`HarnessRecord` per harness is the whole registry: every other constant here
 (:data:`L1_ENTRY_HARNESSES`, :data:`HARNESS_PROJECTION_DIRS`,
-:data:`PROJECTION_TARGETS`, :data:`INSTALL_TARGETS`) and every projection rule in
+:data:`PROJECTION_TARGETS`) and every projection rule in
 ``infrastructure/projection_rules.py`` derives from it, so a harness fact is stated
 once and a per-harness ``if`` has nowhere to live (0.4.7 FR2).
 
@@ -126,16 +126,7 @@ HARNESS_PROJECTION_DIRS: dict[str, tuple[str, ...]] = {
 #: root plus one projection per Layer-1 entry harness.
 PROJECTION_TARGETS: tuple[str, ...] = ("agents", *L1_ENTRY_HARNESSES)
 
-#: The full ``--target`` vocabulary the public-asset installer accepts: every projectable
-#: target plus the ``all`` meta-target.
-INSTALL_TARGETS: frozenset[str] = frozenset({"all", *PROJECTION_TARGETS})
-
 _L1_SET: frozenset[str] = frozenset(L1_ENTRY_HARNESSES)
-
-
-def is_l1(harness: str) -> bool:
-    """Return ``True`` iff *harness* is a Layer-1 entry harness."""
-    return harness in _L1_SET
 
 
 def parse_harness_name(value: str) -> str:

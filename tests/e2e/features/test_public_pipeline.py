@@ -113,7 +113,7 @@ def _staged_install(workspace: Path) -> FileSystemPublicAssetManager:
     """Stage then install; return the manager for further assertions."""
     mgr = _manager()
     register_all(workspace)
-    mgr.install(workspace, target="all", force=True)
+    mgr.install(workspace, force=True)
     return mgr
 
 
@@ -305,7 +305,7 @@ class TestDoctor:
         workspace = tmp_path / "ws"
         mgr = _manager()
         register_all(workspace)
-        mgr.install(workspace, target="all", force=True)
+        mgr.install(workspace, force=True)
 
         report = [line.render() for line in mgr.doctor(workspace)]
 
@@ -319,7 +319,7 @@ class TestDoctor:
         workspace = tmp_path / "ws"
         mgr = _manager()
         register_all(workspace)
-        mgr.install(workspace, target="all", force=True)
+        mgr.install(workspace, force=True)
 
         if mutation == "drift":
             target = workspace / ".claude" / "agents" / "dd-software-engineer.md"
@@ -509,7 +509,7 @@ class TestSymlinkTargetDoctor:
         workspace = tmp_path / "ws"
         mgr = _manager()
         register_all(workspace)
-        mgr.install(workspace, target="all", force=True)
+        mgr.install(workspace, force=True)
         entry = self._a_linked_skill(workspace)
         foreign = tmp_path / "foreign"
         foreign.mkdir()
@@ -530,7 +530,7 @@ class TestSymlinkTargetDoctor:
         workspace = tmp_path / "ws"
         mgr = _manager()
         register_all(workspace)
-        mgr.install(workspace, target="all", force=True)
+        mgr.install(workspace, force=True)
         entry = self._a_linked_skill(workspace)
         authored = workspace / ".agents" / "skills" / entry.name
         entry.unlink()
@@ -553,7 +553,7 @@ class TestSymlinkTargetDoctor:
         workspace = tmp_path / "ws"
         mgr = _manager()
         register_all(workspace)
-        mgr.install(workspace, target="all", force=True)
+        mgr.install(workspace, force=True)
 
         report = [line.render() for line in mgr.doctor(workspace)]
 
