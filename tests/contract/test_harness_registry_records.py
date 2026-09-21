@@ -68,7 +68,8 @@ def render_table(workspace_root: Path, kimi_home: Path) -> list[dict[str, object
                 "dst": rel(rule.dst),
                 "compare": rule.compare,
                 "link_to": None if rule.link_to is None else rel(rule.link_to),
-                "mode": rule.mode,
+                # mode is OS-derived (the source exec bit; Windows reports none) and has
+                # its own test — the golden holds OS-independent fields only.
             }
             for rule in projection_rules(plan)
         ),
