@@ -116,9 +116,11 @@ _L1_SITES: dict[str, tuple[str, str]] = {
         '{"all","agents","claude","codex","pi"}',
         "INSTALL_TARGETS",
     ),
+    # 0.4.7 T-047-72: install/doctor scope on the PROFILE roster, so the site consumes
+    # the L1 roster directly — `PROJECTION_TARGETS` left with the `--target` flag.
     "infrastructure/public_assets.py": (
         '("agents","claude","codex","pi")',
-        "PROJECTION_TARGETS",
+        "L1_ENTRY_HARNESSES",
     ),
 }
 

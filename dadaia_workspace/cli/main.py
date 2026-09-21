@@ -11,6 +11,7 @@ from dadaia_workspace.cli.commands import (
     ci,
     context,
     doctor,
+    harness,
     init,
     migrate,
     public,
@@ -80,6 +81,7 @@ app.command(name="reconcile", rich_help_panel="Management")(reconcile.reconcile)
 app.add_typer(context.app, name="context", rich_help_panel="Common")
 app.add_typer(ci.app, name="ci", rich_help_panel="Management")
 app.add_typer(public.app, name="public", rich_help_panel="Common")
+app.add_typer(harness.app, name="harness", rich_help_panel="Common")
 app.add_typer(doctor.app, name="doctor", rich_help_panel="Common")
 app.add_typer(reports.app, name="reports", rich_help_panel="Management")
 app.add_typer(specs.app, name="specs", rich_help_panel="Common")

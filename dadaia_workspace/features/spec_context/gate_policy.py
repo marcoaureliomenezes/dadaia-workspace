@@ -74,7 +74,7 @@ _LAW_MESSAGE = (
     "an agent changes the law at its source and re-projects.\n"
     "The source is dadaia_workspace/public/; this re-projects it:\n"
     f"fix: {DADAIA_BIN} public stage && {DADAIA_BIN} public "
-    "install --target all"
+    "install"
 )
 
 #: BLOCK message for a MUTATING write into a repo outside the Bind's scope (FR1, Q1).

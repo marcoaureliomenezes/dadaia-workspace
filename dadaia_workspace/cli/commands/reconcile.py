@@ -40,7 +40,7 @@ def reconcile(
         if result.rollback_required:
             typer.echo(
                 "[rollback-required] reinstall the previous exact provider version, then run "
-                "its matching 'dadaia public stage' and 'dadaia public install --target all'.",
+                "its matching 'dadaia public stage' and 'dadaia public install'.",
                 err=True,
             )
     if not result.ok:

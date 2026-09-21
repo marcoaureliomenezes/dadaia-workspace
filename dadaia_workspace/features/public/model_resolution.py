@@ -9,7 +9,7 @@ the fleet honest against future hand-edits:
 1. **Agent-frontmatter resolution.** Every ``model:`` value declared in a canonical
    ``public/agents/*.md`` frontmatter must resolve to a ``claude_id`` registered in
    :data:`dadaia_workspace.core.model_registry.REGISTRY`. An unknown id would crash
-   ``dadaia public install --target codex`` (no Codex mapping) and cost telemetry out
+   ``dadaia harness add codex`` (no Codex mapping) and cost telemetry out
    as ``NULL`` — so it is an ERROR.
 
 2. **Key-set coherence.** ``MODEL_MAP`` keys, ``PRICING_TABLE`` keys, and the

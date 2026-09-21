@@ -26,7 +26,7 @@
   `dadaia_workspace/infrastructure/public_assets_common.py`,
   `tests/contract/test_harness_registry_records.py`, `tests/unit/infrastructure/**`.
 
-- [ ] T-047-72 — FR2: `harness add` in, `public install --target` out. New `cli/commands/
+- [x] T-047-72 — FR2: `harness add` in, `public install --target` out. New `cli/commands/
   harness.py` with `add <name>` (stage if needed, install that record's set, append the name to
   `.dadaia/states/harness_profile.json` through `JsonHarnessProfileStore.write` — the one writer)
   and `list` (the profile's roster). `cli/commands/public.py` loses `--target` entirely;

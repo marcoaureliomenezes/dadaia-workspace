@@ -93,7 +93,7 @@ an initialized workspace, create it:
   slop probe is F-02).
 
 ### F-05 — Projections
-- Run: `$D public stage`; `$D public install --target all`; `$D public doctor`.
+- Run: `$D public stage`; `$D public install`; `$D public doctor`.
 - **PASS if:** stage+install exit 0 and `public doctor` reports every asset `[ok]`
   (no `[drift]`/`[missing]`), exit 0.
 
@@ -469,7 +469,7 @@ lie that sends the consumer into an infinite repair loop and fails `reconcile` w
 `rollback_required`. Two known limits, both real on hardened hosts:
 
 - **A `noexec` `KIMI_CODE_HOME`.** Point `KIMI_CODE_HOME` at a directory on a `noexec`
-  mount (a tmpfs `/tmp` is the common case), run `dadaia public install --target kimi-code`,
+  mount (a tmpfs `/tmp` is the common case), run `dadaia harness add kimi-code`,
   then `dadaia public doctor`. **PASS if:** the four `kimi-code:hooks/*.sh` lines are
   `[unsupported]`, name the `noexec` mount as the cause and `KIMI_CODE_HOME` as the remedy,
   `public doctor` exits 0, and `dadaia reconcile --expect-version <ver>` succeeds. **FAIL
@@ -477,7 +477,7 @@ lie that sends the consumer into an infinite repair loop and fails `reconcile` w
   reinstalling cannot clear a mount flag, so the run would never converge.
 - **The repairable boundary must survive.** `chmod 0o644` one shim on a NORMAL filesystem
   and re-run the doctor. **PASS if** it reads `[drift] … (not executable)` and a plain
-  `dadaia public install --target kimi-code` clears it. Turning every executability failure
+  `dadaia harness add kimi-code` clears it. Turning every executability failure
   into `[unsupported]` is the opposite defect and also a FAIL.
 
 Generalize while you sweep: any doctor/gate line that prescribes a remedy must be a remedy

@@ -127,7 +127,7 @@ def validate(
     except HandoffSchemaError as exc:
         err_console.print(
             f"[red]Error:[/red] Could not load handoff schema: {exc}\n"
-            "Run [bold]dadaia public stage && dadaia public install --target all[/bold] first."
+            "Run [bold]dadaia public stage && dadaia public install[/bold] first."
         )
         raise typer.Exit(3) from None
 

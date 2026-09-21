@@ -17,10 +17,12 @@ import shutil
 from pathlib import Path
 
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from tests.helpers.harness_profile import register_all
 
 
 def _install_all(ws: Path) -> FileSystemPublicAssetManager:
     mgr = FileSystemPublicAssetManager()
+    register_all(ws)
     mgr.install(ws, target="all")
     return mgr
 

@@ -36,7 +36,7 @@ data_flow_diagram: |
   flowchart LR
     A[public/<type>/<file>] --> B[dadaia public stage]
     B --> C[.dadaia/agentic/<type>/<file>]
-    C --> D[dadaia public install --target all]
+    C --> D[dadaia public install]
     D --> E[.claude/<type>/<file>]
     D --> F[.codex/<type>/<file>]
 

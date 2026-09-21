@@ -24,7 +24,6 @@ from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.harness_registry import (
     HARNESS_PROJECTION_DIRS,
     L1_ENTRY_HARNESSES,
-    PROJECTION_TARGETS,
 )
 from dadaia_workspace.core.models.agent_model_policy import (
     AgentModelPolicyOverlay,
@@ -182,7 +181,7 @@ def _staged_bytes(src: Path) -> bytes:
 #: lines. ``[warn]`` is non-blocking (CLI exit stays 0) but visible.
 #: The one repair for every SYMLINK-TARGET-1 finding: re-project the claude views onto
 #: the authored set. One BLOCK, one executable ``fix:`` line.
-_SYMLINK_TARGET_FIX = "fix: .dadaia/.venv/bin/dadaia public install --target claude --force"
+_SYMLINK_TARGET_FIX = "fix: .dadaia/.venv/bin/dadaia public install --force"
 
 
 def _out_of_profile_warn(harness: str) -> DoctorLine:
@@ -401,18 +400,15 @@ class FileSystemPublicAssetManager:
         overlay = self._load_agent_policy(workspace_root, agentic_dir)
         resolved_models = self._resolved_core_models(overlay)
 
-        # Install-all reads the persisted profile (Ruling D, FR3): a claude-only workspace
-        # installs only the claude projection. An absent profile ⇒ all-four (back-compat).
-        # An explicit --target X always overrides (it never reaches this branch).
+        # Install-all projects the roster of record: the shared authored set plus every
+        # harness registered in the profile (0.4.7 FR2 — `harness add` is the one way in).
+        # `target=<name>` is `harness add`'s own scoped projection, never an operator flag.
         if target == "all":
             profile_harnesses = self._profile_harnesses(workspace_root)
-            if profile_harnesses is None:
-                harness_targets: tuple[str, ...] = PROJECTION_TARGETS
-            else:
-                harness_targets = (
-                    "agents",
-                    *(h for h in L1_ENTRY_HARNESSES if h in profile_harnesses),
-                )
+            harness_targets: tuple[str, ...] = (
+                "agents",
+                *(h for h in L1_ENTRY_HARNESSES if h in profile_harnesses),
+            )
         else:
             harness_targets = (target,)
 
@@ -438,17 +434,16 @@ class FileSystemPublicAssetManager:
             resolved_models=resolved_models,
         )
 
-    def _profile_harnesses(self, workspace_root: Path) -> set[str] | None:
-        """Return the persisted harness set, or ``None`` when no profile file exists.
+    def _profile_harnesses(self, workspace_root: Path) -> set[str]:
+        """Return the roster of record for *workspace_root*.
 
         Reads ``.dadaia/states/harness_profile.json`` via the same-layer
-        ``JsonHarnessProfileStore`` adapter (infrastructure consuming infrastructure). An
-        absent profile ⇒ ``None``, and every consumer treats ``None`` as the full all-four
-        install/doctor scope (back-compat with pre-v0.1.58 workspaces).
+        ``JsonHarnessProfileStore`` adapter (infrastructure consuming infrastructure),
+        whose ``resolve`` migrates a pre-profile workspace to the harness directories
+        physically present at the root — never to the full roster.
         """
         states_dir = workspace_root / ".dadaia" / "states"
-        profile = JsonHarnessProfileStore().read(states_dir)
-        return set(profile.harnesses) if profile is not None else None
+        return set(JsonHarnessProfileStore().resolve(states_dir, workspace_root).harnesses)
 
     # ------------------------------------------------------------------
     # Agent-model policy (v0.1.65 FR4/FR5) — loaded ONCE per install/doctor run
@@ -601,8 +596,7 @@ class FileSystemPublicAssetManager:
         # EXISTS on disk is never silent (A3): a `[warn]` line replaces the scoped
         # drift block so a stale/hand-installed runtime cannot read green-with-zero-
         # lines.
-        profile_harnesses = self._profile_harnesses(workspace_root)
-        active = set(L1_ENTRY_HARNESSES) if profile_harnesses is None else profile_harnesses
+        active = self._profile_harnesses(workspace_root)
 
         # v0.1.65 FR7: load the agent-model policy ONCE per doctor run. An INVALID
         # overlay is a doctor ERROR line (and the render compare below degrades to the

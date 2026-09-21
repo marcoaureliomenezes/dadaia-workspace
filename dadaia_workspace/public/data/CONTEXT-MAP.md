@@ -50,7 +50,7 @@ path or entity as it appears in an installed workspace.
 | `specs/memory/AGENTS.md` | current product truth and who writes it | atoms, Part 1/Part 2, ownership | 4096 | 4031 |
 | `specs/ADRs/AGENTS.md` | the decision record | `decisions.jsonl` shape, acceptance | 4096 | 3284 |
 | `specs/audits/AGENTS.md` | the periodic three-pillar review | audit procedure, findings, closure | 4096 | 1775 |
-| `.dadaia/AGENTS.md` | the runtime tree: zones, doctor, reprojection, context | zone registry rules, chokepoints | 4096 | 4086 |
+| `.dadaia/AGENTS.md` | the runtime tree: zones, doctor, reprojection, context | zone registry rules, chokepoints | 4096 | 4073 |
 | `.dadaia/handoff/AGENTS.md` | the handoff lane | emission, schema, ack-on-consume | 4096 | 1617 |
 | `.dadaia/tmp/AGENTS.md` | the TTL scratch lane | what may be written there and for how long | 4096 | 1135 |
 | `.dadaia/states/AGENTS.md` | CLI-owned state files | who writes them and by which verb | 4096 | 1355 |
@@ -63,7 +63,7 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 
 | Surface | Purpose | Step-1 law | Ceiling | Measured |
 |---|---|---|---|---|
-| `dd-ai-eng-knowhow` | harness literacy and the AI-entity authoring contract | — | 6144 | 2736 |
+| `dd-ai-eng-knowhow` | harness literacy and the AI-entity authoring contract | — | 6144 | 2723 |
 | `dd-architecture-survey` | portfolio-level architecture candidates from bug history | — | 6144 | 4576 |
 | `dd-audit-project` | the three-pillar audit and its window | `specs/audits/AGENTS.md` | 6144 | 2321 |
 | `dd-backlog-definition` | backlog curation, the intake gate, dispositions | `specs/backlog/AGENTS.md` | 6144 | 3219 |

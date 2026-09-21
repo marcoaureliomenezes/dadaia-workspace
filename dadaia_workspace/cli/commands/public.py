@@ -1,7 +1,7 @@
 """dadaia public subcommands."""
 
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Literal
 
 import typer
 from rich.console import Console
@@ -25,14 +25,6 @@ _STYLE_BY_STATUS: dict[DoctorStatus, str] = {
 
 app = typer.Typer(help="Manage distributed public agent assets.")
 console = Console()
-TargetOption = Annotated[
-    str,
-    typer.Option(
-        "--target",
-        help="Runtime target: all, agents, claude, codex, or kimi-code",
-    ),
-]
-
 _ONLY_CHOICES = (
     "agents",
     "skills",
@@ -70,11 +62,8 @@ def stage() -> None:
         console.print("[dim]No assets to stage.[/dim]")
 
 
-@app.command(
-    epilog="Recipe: dadaia public stage && dadaia public install --target all && dadaia public doctor"
-)
+@app.command(epilog="Recipe: dadaia public stage && dadaia public install && dadaia public doctor")
 def install(
-    target: TargetOption = "all",
     force: bool = typer.Option(False, "--force", help="Overwrite existing files"),
     repos_only: bool = typer.Option(
         False, "--repos-only", help="Install only consumer repo assets."
@@ -88,7 +77,12 @@ def install(
         help=f"Install only one asset category: {', '.join(_ONLY_CHOICES)}",
     ),
 ) -> None:
-    """Install staged public assets into runtime projections."""
+    """Install staged public assets into runtime projections.
+
+    Projects the shared authored set plus every harness registered in
+    `.dadaia/states/harness_profile.json` — the roster of record. A harness enters
+    that roster through `dadaia harness add <name>`, never through a flag here.
+    """
     if repos_only and workspace_only:
         typer.echo("Error: --repos-only and --workspace-only are mutually exclusive.", err=True)
         raise typer.Exit(1)
@@ -111,9 +105,7 @@ def install(
 
     workspace_root = resolve_workspace_root()
     svc = container.build_public_service()
-    installed = svc.install(
-        workspace_root, target=target, force=force, scope=scope, only=only_value
-    )
+    installed = svc.install(workspace_root, force=force, scope=scope, only=only_value)
 
     if installed:
         console.print(f"[green]✓[/green] {len(installed)} asset(s) processed:")
@@ -131,7 +123,11 @@ def install(
 
 @app.command()
 def doctor() -> None:
-    """Diagnose drift between package source, staging, and runtime projections."""
+    """Diagnose drift between package source, staging, and runtime projections.
+
+    Scoped to the same roster `install` projects: the shared authored set plus the
+    harnesses registered in the profile.
+    """
     workspace_root = resolve_workspace_root()
     report = container.build_public_service().doctor(workspace_root)
     lines: list[DoctorLine] = list(report.lines)

@@ -25,7 +25,7 @@ _runner = CliRunner()
 
 
 def _install_skills(workspace: Path) -> None:
-    """Build the installed skills tree the way `public install --target agents` does:
+    """Build the installed skills tree the way `public install` does:
     every script plus the shipped schema copied beside it."""
     skills = workspace / ".agents" / "skills"
     for script in LEDGER_SCRIPTS:

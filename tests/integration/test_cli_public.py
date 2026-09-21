@@ -1,6 +1,6 @@
 """dadaia public CLI — stage / install / doctor commands.
 
-Merged per plan-integration.md (4 -> 2): (1) stage + install --target all + --force
+Merged per plan-integration.md (4 -> 2): (1) stage + install + --force
 smoke; (2) doctor exit-code routing (mocked service, both cases — the non-zero-on-drift
 exit contract).
 """
@@ -33,7 +33,7 @@ def _init_ws(tmp_path: Path) -> Path:
 def test_public_stage_install_force_smoke_and_doctor_exit_code_routing(
     tmp_path: Path, monkeypatch
 ) -> None:
-    """Stage + install --target all + --force smoke, then T-PROP-02 integration: doctor
+    """Stage + install + --force smoke, then T-PROP-02 integration: doctor
     CLI exits 0 on clean workspace, non-zero on drift.
 
     The doctor sub-cases are tested using patched service responses so the test is
@@ -50,7 +50,7 @@ def test_public_stage_install_force_smoke_and_doctor_exit_code_routing(
     assert stage_result.exit_code == 0, stage_result.output
     assert "staged" in stage_result.output.lower() or "No assets" in stage_result.output
 
-    install_result = _runner.invoke(app, ["public", "install", "--target", "all"])
+    install_result = _runner.invoke(app, ["public", "install"])
     assert install_result.exit_code == 0, install_result.output
 
     force_result = _runner.invoke(app, ["public", "install", "--force"])

@@ -19,6 +19,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app as cli_app
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from tests.helpers.harness_profile import register_all
 from tests.helpers.scan_population import assert_populated
 from tests.helpers.skill_inventory_oracle import skill_names
 
@@ -111,6 +112,7 @@ def _is_plugin_stub(content: str) -> bool:
 def _staged_install(workspace: Path) -> FileSystemPublicAssetManager:
     """Stage then install; return the manager for further assertions."""
     mgr = _manager()
+    register_all(workspace)
     mgr.install(workspace, target="all", force=True)
     return mgr
 
@@ -178,7 +180,7 @@ class TestStage:
 
 
 # ---------------------------------------------------------------------------
-# TestInstallAll — validates runtime targets after dadaia public install --target all
+# TestInstallAll — validates runtime targets after dadaia public install
 # ---------------------------------------------------------------------------
 
 
@@ -302,6 +304,7 @@ class TestDoctor:
     def test_doctor_reports_all_ok_after_clean_install(self, tmp_path: Path) -> None:
         workspace = tmp_path / "ws"
         mgr = _manager()
+        register_all(workspace)
         mgr.install(workspace, target="all", force=True)
 
         report = [line.render() for line in mgr.doctor(workspace)]
@@ -315,6 +318,7 @@ class TestDoctor:
     ) -> None:
         workspace = tmp_path / "ws"
         mgr = _manager()
+        register_all(workspace)
         mgr.install(workspace, target="all", force=True)
 
         if mutation == "drift":
@@ -527,6 +531,7 @@ class TestSymlinkTargetDoctor:
     def test_retargeted_symlink_is_one_error_with_a_fix_line(self, tmp_path: Path) -> None:
         workspace = tmp_path / "ws"
         mgr = _manager()
+        register_all(workspace)
         mgr.install(workspace, target="all", force=True)
         entry = self._a_linked_skill(workspace)
         foreign = tmp_path / "foreign"
@@ -542,13 +547,12 @@ class TestSymlinkTargetDoctor:
             f"symlink target '{foreign}' is not the canonical "
             f"'../../.agents/skills/{entry.name}'"
         ], "\n".join(report)
-        assert (
-            "[info] fix: .dadaia/.venv/bin/dadaia public install --target claude --force" in report
-        )
+        assert "[info] fix: .dadaia/.venv/bin/dadaia public install --force" in report
 
     def test_symlink_replaced_by_a_drifted_copy_is_an_error(self, tmp_path: Path) -> None:
         workspace = tmp_path / "ws"
         mgr = _manager()
+        register_all(workspace)
         mgr.install(workspace, target="all", force=True)
         entry = self._a_linked_skill(workspace)
         authored = workspace / ".agents" / "skills" / entry.name
@@ -571,6 +575,7 @@ class TestSymlinkTargetDoctor:
     def test_clean_install_attests_the_class(self, tmp_path: Path) -> None:
         workspace = tmp_path / "ws"
         mgr = _manager()
+        register_all(workspace)
         mgr.install(workspace, target="all", force=True)
 
         report = [line.render() for line in mgr.doctor(workspace)]

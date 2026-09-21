@@ -39,7 +39,7 @@ __all__ = [
 _PACKAGE_SKILLS = Path(__file__).resolve().parents[1] / "public" / "skills"
 
 #: The one remediation for a script that cannot run at all: re-project the skills.
-_INSTALL_FIX = f"{DADAIA_BIN} public install --target all"
+_INSTALL_FIX = f"{DADAIA_BIN} public install"
 
 #: A `check` run may only exit 0 (clean) or 1 (findings); anything else is a broken
 #: script, not a broken ledger.

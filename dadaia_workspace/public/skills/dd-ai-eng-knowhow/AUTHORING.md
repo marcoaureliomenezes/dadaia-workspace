@@ -143,7 +143,7 @@ A skill never moves alone. Any authoring act (create, merge, rename, delete, res
 2. Persona `skills:` grants — the orphan checker requires every model-invoked skill granted somewhere; a `disable-model-invocation` skill is exempt.
 3. Law citations — the root map and every scoped `AGENTS.md` SOURCE under `public/` that names the skill.
 4. Cross-citations in sibling skills (the citation contract test checks every path-shaped token in `public/**`).
-5. Reprojection — `dadaia public stage` → `install --target all` → `public doctor` `[ok]`; stale projected directories removed from every harness target.
+5. Reprojection — `dadaia public stage` → `install` → `public doctor` `[ok]`; stale projected directories removed from every harness target.
 
 ---
 

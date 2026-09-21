@@ -27,6 +27,10 @@
 
 ## dadaia export — Write `.dadaia/dist/spec-contexts.json` — one record per spec context.
 
+## dadaia harness — Register and inspect the workspace's agent runtimes (harnesses).
+- harness add — Register a harness and project its runtime set into this workspace.
+- harness list — Show the harnesses registered in this workspace's profile.
+
 ## dadaia help — Derived help surfaces (docker-style; generated, never transcribed).
 - help tree — Print the compact CLI digest derived from the live command tree.
 

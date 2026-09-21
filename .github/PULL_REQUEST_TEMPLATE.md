@@ -20,7 +20,7 @@
 - [ ] `poetry run ruff check . && poetry run ruff format --check .` passes
 - [ ] `poetry run mypy --strict dadaia_workspace/` passes (the cache is redirected by `[tool.mypy] cache_dir` in `pyproject.toml`; no flag or env var needed)
 - [ ] No secrets, absolute machine paths, or consumer-specific data introduced
-- [ ] `dadaia public stage && dadaia public install --target all` run if `public/` assets changed
+- [ ] `dadaia public stage && dadaia public install` run if `public/` assets changed
 
 ## Related issues / tasks
 

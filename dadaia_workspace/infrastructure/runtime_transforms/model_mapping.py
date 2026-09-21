@@ -3,8 +3,8 @@
 The canonical agent frontmatter uses Claude model identifiers (e.g.
 ``claude-sonnet-4-6``).  Codex TOML files must not contain any ``claude-*``
 strings (AC3).  This module provides the authoritative translation table and a
-helper that raises explicitly on unknown identifiers so that ``dadaia public
-install --target codex`` fails loudly rather than silently emitting a bad model
+helper that raises explicitly on unknown identifiers so that ``dadaia harness
+add codex`` fails loudly rather than silently emitting a bad model
 field.
 
 ``MODEL_MAP`` is no longer hand-maintained: it is **derived** from the single
