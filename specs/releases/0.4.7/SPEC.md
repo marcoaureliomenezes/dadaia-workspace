@@ -1,155 +1,123 @@
 # SPEC — Release: 0.4.7
 
-**Status:** Approved
+**Status:** Draft
 **Release ID:** 0.4.7
 **Owner:** dd-project-manager
 **Opened:** 2026-09-21
-**Origin:** backlog:standalone-skills-distribution,public-presence-and-launch
-**Consumes:** standalone-skills-distribution, public-presence-and-launch
+**Origin:** backlog:release-please-semantics
+**Consumes:** release-please-semantics
 
 ---
 
 ## 1. Problem and context
 
-Candidate 9 — "skills as a standard package, and a public face" — is the fifth candidate cut by
-the 2026-09-18..20 grill (Q13, Q14, Q30; ADR 0016/0017 in force). It takes the two launch
-entries whose library half is implementable without an operator act, and lists the operator
-acts (repository creation, marketplace submission, posts, video) as decisions with their exact
-commands. `release-please-semantics` stays out: ADR 0021 is `proposed` and only the operator
-accepts it (D2).
+Candidate 10 — "the release is a release PR" — is the last entry of the 2026-09-18..20 grill
+(Q6 A: adopt release-please in the LAST candidate of the cycle so the plane is not changed in
+flight; Q19 A: no event-driven audit). It is DRAFT until the operator accepts ADR 0021 (D2):
+while ADR 0021 is `proposed`, ADR 0005, 0006, 0008, 0009 and 0014 stay in force and nothing
+below may be implemented. Definition is written now so the whole backlog is a candidate.
 
-Measured on the candidate 8 closure (781a2d65):
+Measured on the candidate 9 closure (449c4267):
 
-- **The skills exist only inside a workspace.** Eight `dd-*` skills stand on their own —
-  `dd-grill-me`, `dd-bug-resolution`, `dd-code-review`, `dd-test-stewardship`,
-  `dd-codebase-design`, `dd-domain-modeling`, `dd-architecture-survey`, `dd-ai-eng-knowhow` —
-  yet reach a user only through `pip install dadaia-workspace && dadaia init`. Their `SKILL.md`
-  frontmatter already carries `name` (= directory) and `description`; the Agent Skills
-  specification (agentskills.io) asks for exactly those, plus optional `license`,
-  `compatibility`, `metadata`; `skills-ref validate <dir>` checks one skill directory.
-- **One repository layout serves every harness.** `npx skills add <repo>` discovers
-  `skills/<name>/SKILL.md` (and `.agents/skills`), installs by per-skill symlink into
-  `.claude/skills` (Claude Code) or `.agents/skills` (Codex, Cursor, Cline, Kimi Code); a Claude
-  Code marketplace is `.claude-plugin/marketplace.json` with a plugin whose `skills` list points
-  at `./skills/`; Codex reads a cloned `.agents/skills` natively and installs curated skills
-  through `$skill-installer` (a "codex marketplace add" verb is UNVERIFIED — the backlog text
-  named it; the layout above needs none).
-- **Discoverability is a README and a PyPI page.** `docs/` holds four derived pages; there is
-  no quickstart under five minutes, no positioning page, no page on the bug loop, no index a
-  static site could serve; the repository's homepage points at PyPI. The bug ledger holds
-  the material for the article the entry asks for (`bugs.py stats`).
-- **The backlog names a spelling the wheel cannot honour.** `uvx dadaia-workspace init …`
-  fails because the only console script is `dadaia` (candidate 8 review F9, ratified for this
-  candidate); `uvx --from dadaia-workspace dadaia init …` works once 0.4.7 is on PyPI.
+- **The version is minted by hand.** `pyproject.toml` `version` is bumped in a commit; the
+  release workflow's `check` job compares it with the existing `v*` tags and publishes when the
+  number is new; the tag is created by the publish job; `CHANGELOG.md` (119 KB) is hand-written
+  per candidate. `SPEC-DOC-045` requires pyproject to equal the live release id.
+- **Candidates archive by copying.** `release.py rc-archive` moves the closed trio to `rc-N/`
+  (nine of them under `0.4.7/`), `release.py fold` reconciles, `release.py archive` moves the
+  whole release under `_archive/<id>/` at promote; `RELEASE-TREE-*` doctor rules police the
+  layout; `_release_rc.py`, `_release_fold.py`, `_release_fold_plan.py`, `_release_archive.py`
+  are four of the twelve release scripts (1,381 lines under V36).
+- **The promote decision is a manual approve** on the `release-gate` environment inside the
+  same workflow run that publishes; nothing reviews the version or the notes before the tag.
 
 ## 2. Objective
 
-One candidate, one CLOSURE: the eight standalone skills validate against the Agent Skills
-specification and declare where the full lifecycle lives; one stdlib build script renders the
-`dadaia-skills` repository (skills, README, LICENSE, Claude marketplace manifests) from
-`public/skills` and CI publishes it on release; the docs gain a five-minute quickstart, a
-positioning page, the bug-loop page and the ledger article, every one derived from a memory
-atom under its hash and served as a static site from `docs/`; `uvx dadaia-workspace …`
-resolves; every operator act is a decision with its command.
+One candidate, one CLOSURE: release-please owns the version (Conventional Commits), the
+CHANGELOG and the tag through a long-lived release PR on `main`; the publish workflow fires on
+the tag release-please creates; the trio per candidate stays at `specs/releases/<id>/`, the
+closed candidate's trio is overwritten by the next candidate's, and git is the archive — `rc-N/`,
+`rc-archive`, `fold` and `archive` retire with their doctor rules and scripts; promote = merging
+the release PR; ADR 0006, 0008, 0009 and 0014 are marked superseded by 0021.
 
-## 3. Scope (candidate 9)
+## 3. Scope (candidate 10)
 
-### FR1 — Standalone skills conform to the Agent Skills specification
+### FR1 — release-please owns version, CHANGELOG and tag
 
-- The standalone set is data: `public/entities/behavior-map.json` gains one top-level key
-  `standalone_skills` naming the eight skills that need no workspace (beside
-  `declared_overlaps`); the rest are workspace-bound.
-- Each standalone `SKILL.md` frontmatter validates against the spec: `name` 1–64 chars,
-  lowercase/digits/hyphens, equals the directory; `description` 1–1024 chars; plus
-  `license: MIT` and `compatibility:` one line naming dadaia-workspace as the home of the full
-  lifecycle (`pip install dadaia-workspace`). Its body must not hard-require a workspace file:
-  a step that opens a scoped `AGENTS.md` reads "inside a dadaia workspace, open …".
-- **AC1.1** `tests/contract/test_standalone_skills.py` validates the eight against the spec
-  rules (name, description, required fields, no consecutive hyphens, `SKILL.md` ≤ 500 lines)
-  and runs `skills-ref validate` on each when the binary is present; V35 stays 18 dirs /
-  2880 lines (lines added to a frontmatter are paid by deletions in the same skill).
+- `.github/workflows/release-please.yml` on `push` to `main`: `googleapis/release-please-action`
+  (pinned by sha), `release-type: python`, config + manifest files at the repository root
+  (`.release-please-manifest.json` carrying the current version, `release-please-config.json`
+  with `changelog-sections` for `feat|fix|refactor|docs|ci|test|chore`, `include-component-in-tag:
+  false`, tag `v<version>`). The action maintains one release PR `chore(main): release <version>`
+  that bumps `pyproject.toml` and prepends the generated section to `CHANGELOG.md`.
+- `.github/workflows/release.yml` triggers on `release: published` (the event release-please
+  emits on merge) instead of a pushed version bump: the `check` job that compares pyproject to
+  tags dies; `publish` no longer creates the tag; `approve` (the `release-gate` environment)
+  stays as the second key before the upload; `smoke-test` and `publish-skills-repo` stay.
+- The hand-written CHANGELOG stops at 0.4.7's section: everything above `## [0.4.7]` is
+  release-please's from the first release PR; nothing below is rewritten.
+- **AC1.1** `tests/contract/test_ci_workflow_hygiene.py`: the release-please workflow exists,
+  is sha-pinned, and `release.yml` has no version-vs-tag comparison and no `git tag` step;
+  `tests/contract/test_release_semver_canon.py` (ADR 0021 measured_by) asserts the manifest
+  version equals `pyproject.toml` version.
 
-### FR2 — The skills repository is built, not written
+### FR2 — one directory per release id, no rc-N, git is the archive
 
-- `dadaia_workspace/public/scripts/build-skills-repo.py` (stdlib, ≤ 150 lines, the
-  `lint-dadaia-cli-reachability.py` precedent) renders `<out>/` as: `skills/<name>/**` (the
-  eight, every file), `README.md` (derived from [[public-asset-distribution]] and
-  [[agentic-entities]] under their hashes; install lines for `npx skills add`, Claude
-  marketplace, Codex clone), `LICENSE` (copied), `.claude-plugin/marketplace.json` (`name:
-  dadaia-skills`, `owner`, one plugin `dadaia-skills` with `source: "./"` and `skills:
-  ["./skills/"]`), `.claude-plugin/plugin.json` (`name`, `description`, `version` = pyproject
-  version, `author`, `repository`, `license`). Idempotent; byte-identical on re-run.
-- `.github/workflows/release.yml` gains one job after publish: build the repo and push it
-  to `marcoaureliomenezes/dadaia-skills` (`main`) with the tag's version — fail-closed on the
-  missing `SKILLS_REPO_TOKEN` secret with one `::error::` naming the secret (the
-  `security-review` precedent).
-- **AC2.1** `tests/contract/test_skills_repo_build.py`: the build output has exactly the
-  manifest set above, every skill directory equals its `public/skills` source, both JSON
-  manifests validate against the documented field set, and a second build changes nothing;
-  `claude plugin validate <out>` runs when the binary is present.
+- `release.py rc-archive`, `release.py fold` and `release.py archive` retire; `_release_rc.py`,
+  `_release_fold.py`, `_release_fold_plan.py`, `_release_archive.py` are deleted; the
+  `release-state-v1` schema loses `rc` and `implemented.rc`; a closed candidate's trio is
+  overwritten by the next candidate's `release.py new`-seeded SPEC (the closed trio lives in git
+  at the CLOSURE commit, named in the `_RELEASE.json` log).
+- `specs/releases/0.4.7/rc-1..rc-9` and `specs/releases/_archive/**` stay as they are (history
+  is never rewritten) but no new `rc-N/` or `_archive/<id>/` is ever created; the
+  `RELEASE-TREE-ARCHIVE-*` and rc-layout rules in `features/specs/release_tree.py` and
+  `doctor_release.py` become read-only tolerance of the existing dirs, then die with the last
+  candidate that references them; `SPEC-DOC-045` dies (release-please owns the number).
+- Promote = the operator merges the release PR; `release.py phase CLOSURE` on the last candidate
+  plus the merged release PR number recorded in the `_RELEASE.json` log is the whole ceremony;
+  the release directory id is the version release-please minted (renamed once at promote if the
+  floor id and the minted version differ — D9).
+- **AC2.1** `dadaia help tree` unchanged (no verb enters or leaves — these are scripts);
+  `tests/contract/test_public_scripts_thin_wrapper.py` and V36 re-pinned DOWN (36 → 32 files);
+  `tests/contract/test_release_state_schema.py` closes the schema without `rc`;
+  `release.py check` passes on this repository's live state.
 
-### FR3 — Public presence, library side
+### FR3 — law, skills and memory follow
 
-- `docs/index.md` (landing, the tagline once, the three pages), `docs/quickstart.md` (five
-  minutes: install, `init <dir> --harness <name> --repo <url>`, bind, doctor, first backlog entry,
-  first candidate — derived from [[workspace-init]], [[context-management]],
-  [[sdd-bug-backlog-governance]]), `docs/positioning.md` ("your product repos never carry agent
-  config; one law governs ten projects" — derived from [[product-vision]],
-  [[spec-context-project]]), `docs/bug-loop.md` (register → RED → fix → resolve, derived from
-  [[sdd-bug-backlog-governance]]), `docs/bug-ledger-lessons.md` (the article: the ledger's
-  counts from `bugs.py stats` — 514 records, 497 resolved, 38 CRITICAL / 231 HIGH at closure
-  — and the fix-chain lesson, derived from [[QUALITY]] and [[sdd-bug-backlog-governance]]). Every page carries `<!-- derived-from: … -->` markers;
-  `tests/contract/test_docs_derived_from_memory.py`'s coverage set includes them.
-- `README.md` gains a Documentation section linking the site (`https://marcoaureliomenezes.github.io/dadaia-workspace/`) and the skills repository; `llms.txt` lists the new pages;
-  `pyproject.toml` `[tool.poetry.urls]` gains `Documentation`; the docs site is GitHub Pages
-  from `/docs` on `main` (D3, operator: enable Pages; no build tooling enters the repo).
-- `pyproject.toml` `[tool.poetry.scripts]` gains `dadaia-workspace = "dadaia_workspace.cli.main:_safe_app"`
-  so `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` resolves (review F9);
-  `docs/quickstart.md` shows the uvx line first and the pip line second.
-- **AC3.1** `dadaia doctor` on the live instance exit 0; the derived-docs test passes with the
-  five new pages in its covered set; `tests/unit/cli/test_console_scripts.py` proves both
-  entry points resolve to the same callable.
-
-### FR4 — Closure
-
-- Memory pass (`public-asset-distribution`: the second distribution; `harness-codex`,
-  `harness-kimi-code`, `harness-claude-code`: the skills reachable without a workspace;
-  `pypi-distribution`: the docs site and the alias; `brand-identity`: the site, the slug rule
-  "always `dadaia-workspace`"), CHANGELOG "Candidate 9", `_RELEASE.json` log, live instance
-  reflected, dd-code-review, PR #260 updated.
-- **AC4.1** Every CI job green except the by-design red `security-review` (D1); review
-  APPROVED; `dadaia doctor` exit 0.
+- `specs/releases/AGENTS.md` and `public/scaffold/releases/AGENTS.md`, `dd-release-definition`
+  and `dd-release-implementation` `SKILL.md`, and `CONSUMER_VALIDATION_RECIPE.md` stop naming
+  `rc-archive`/`fold`/`archive`; the root map's flow section names the release PR as promote;
+  ADR 0006, 0008, 0009, 0014 → `superseded_by: 0021` in `decisions.jsonl` (the operator's act,
+  D2, recorded in the same commit that accepts 0021).
+- Memory pass: `sdd-bug-backlog-governance` (the release state document, promote), 
+  `pypi-distribution` (pipeline, one version axis), `agent-orchestration` if it names the verbs;
+  docs re-derived; CHANGELOG "Candidate 10" is the LAST hand-written section.
+- **AC3.1** grep for `rc-archive|release.py fold|release.py archive|rc-N` under `public/` and
+  `specs/memory/` returns nothing; every `fix:` names an existing verb/script; `dadaia doctor`
+  exit 0 on the live instance; CI green except the by-design red `security-review` (D1).
 
 ## 4. Out of scope
 
-- `release-please-semantics` — candidate 10, gated on ADR 0021 (D2).
-- The operator acts of D3–D7 below; a Codex marketplace verb (unverified); a docs build
-  toolchain (mkdocs, Docusaurus); the video and the posts themselves.
-- `hooks-multi-harness-study` stays an idea (Q31).
+- Event-driven audit (Q19 A rejected); any change to bugs, backlog, audit or memory scripts.
+- Rewriting `_archive/**` or `rc-1..rc-9`.
+- The operator acts of candidate 9 (D3–D6) and the launch itself.
 
 ## 5. Decisions and constraints
 
-- D1 (operator): `CLAUDE_API_KEY` + required check — PR #260 stays red on it.
-- D2 (operator): accept ADR 0021 to unlock candidate 10.
-- D3 (operator): create `marcoaureliomenezes/dadaia-skills` (public, empty, `main`), add the
-  `SKILLS_REPO_TOKEN` secret (fine-grained, contents:write on that repo), enable GitHub Pages
-  on this repository from `main` `/docs`.
-- D4 (operator): submit the marketplace — a PR adding `dadaia-skills` to
-  `anthropics/claude-plugins-official` (or the community index), the `npx skills add
-  marcoaureliomenezes/dadaia-skills` line in the README once the repo exists.
-- D5 (operator): `gh repo edit --homepage https://marcoaureliomenezes.github.io/dadaia-workspace/ --add-topic agent-skills --add-topic cursor --add-topic github-copilot --add-topic devin`.
-- D6 (operator): the video, the Show HN post, the awesome-list PRs — the handoff carries the
-  drafts; always the full slug `dadaia-workspace`.
-- D7 (operator): a bug proposal remains unregistered from candidate 7 — `SPEC-DOC-039` names a
-  non-canon fix path (ask-first policy).
-- ADR 0018: a new verb enters only when an old one leaves — this candidate adds no verb; the
-  build is a script, the alias is a second name for the one entry point.
+- D2 (operator, BLOCKING): accept ADR 0021 and mark 0006/0008/0009/0014 superseded; until then
+  this SPEC stays Draft and candidate 10 has no PLAN/TASKS.
+- D8 (operator): `release.yml` trigger — `release: published` (release-please's event) is the
+  proposed default; `push: tags: v*` is the alternative.
+- D9 (operator): the release directory id when release-please mints a minor instead of the
+  floor patch — rename at promote (proposed) or keep the floor id and record the minted version
+  in the log.
+- D1 stays: `CLAUDE_API_KEY` + required check.
+- ADR 0018: no verb enters; the scripts shrink (four files die).
 
 ## 6. Traceability
 
 | Requirement | Tasks |
 |---|---|
-| FR1 | T-047-80 |
-| FR2 | T-047-81, T-047-82 |
-| FR3 | T-047-83, T-047-84, T-047-85 |
-| FR4 | T-047-86 |
+| FR1 | T-047-87, T-047-88 |
+| FR2 | T-047-89, T-047-90 |
+| FR3 | T-047-91, T-047-92 |
