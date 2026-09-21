@@ -10,7 +10,7 @@
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:80d67bd879ea -->
+<!-- derived-from: pypi-distribution sha256:5c6e6759831f -->
 <!-- derived-from: workspace-init sha256:871519580ea1 -->
 
 - [PyPI project](https://pypi.org/project/dadaia-workspace/): `pip install dadaia-workspace`, then `dadaia init <dir> --harness <name> [--repo <url>]`.
@@ -18,7 +18,7 @@
 
 ## The law
 
-<!-- derived-from: agentic-entities sha256:9f032dda73ca -->
+<!-- derived-from: agentic-entities sha256:2ab5fd5308c8 -->
 <!-- derived-from: sdd-gate-v3 sha256:1c17b7e34596 -->
 
 - [AGENTS.md](dadaia_workspace/public/data/AGENTS.md): the always-on law — the root map, projected once to the workspace root; every governed area carries its own scoped `AGENTS.md`.

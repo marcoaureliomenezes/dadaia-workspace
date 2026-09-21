@@ -12,7 +12,7 @@ ADR: none
 Rationale: a marker known to one file and unknown to the other is a silent exclusion lane.
 ## Part 2 — Implementation
 ### Snapshot
-- Python `^3.12`, Poetry Core build, console entrypoint `dadaia`; the version lives in `pyproject.toml` alone ([[pypi-distribution]]).
+- Python `^3.12`, Poetry Core build, console entrypoints `dadaia` and `dadaia-workspace` (one callable); the version lives in `pyproject.toml` alone ([[pypi-distribution]]).
 - Deps are Typer, Rich, PyYAML, Jinja2 and jsonschema plus an optional `claude-sdk` extra; everything else is stdlib, and no database exists — every state is a JSON or JSONL file.
 - Codex, Kimi Code, Cursor, Devin and Copilot are operator-installed external CLIs, never Python deps, and the workspace runs no agent-execution runtime.
 - Entry harnesses are single-sourced as `HARNESS_RECORDS` in `core/harness_registry.py` — Claude Code, Codex, Kimi Code, Cursor, Devin CLI, GitHub Copilot — one record each (directory, agent transcode, hook dialect) over the shared `.agents/` root; `dadaia certify` carries one `<harness>-live-probe` per record, SKIP `UNVERIFIED` when the binary is absent, no version floor.

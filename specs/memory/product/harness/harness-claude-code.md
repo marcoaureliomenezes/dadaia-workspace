@@ -20,6 +20,8 @@ tags: [harness, claude-code, projection, hooks]
 - It never answers `permissionDecision: allow`, which would bypass the permission prompts.
 - `dadaia harness add claude` (or `public install` with claude on the roster) writes `.claude/settings.json` and the symlink set; the personas themselves render once into `.agents/agents/` with resolved model/effort and `activity_class`-derived permissions ([[public-asset-distribution]]).
 
+- Without a workspace, the standalone dd- skills reach Claude Code as the `dadaia-skills` marketplace (`/plugin marketplace add marcoaureliomenezes/dadaia-skills`, `/plugin install dadaia-skills@dadaia-skills`) or by `npx skills add` into `.claude/skills` ([[public-asset-distribution]]).
+
 ## Dependencies
 
 [[TECHSTACK]], [[sdd-gate-v3]], [[public-asset-distribution]], [[agent-orchestration]], [[agentic-entities]].

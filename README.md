@@ -46,7 +46,7 @@ atom under its content hash.
 
 ## A human installs and uses it
 
-<!-- derived-from: pypi-distribution sha256:80d67bd879ea -->
+<!-- derived-from: pypi-distribution sha256:5c6e6759831f -->
 <!-- derived-from: workspace-init sha256:871519580ea1 -->
 <!-- derived-from: context-management sha256:160b285ee271 -->
 <!-- derived-from: workspace-doctor sha256:f37b2ae38ea4 -->
@@ -88,12 +88,12 @@ time, **review** before the push, **close** the candidate and merge it.
 
 ## An agent reads AGENTS.md and uses it
 
-<!-- derived-from: agentic-entities sha256:9f032dda73ca -->
+<!-- derived-from: agentic-entities sha256:2ab5fd5308c8 -->
 <!-- derived-from: sdd-gate-v3 sha256:1c17b7e34596 -->
 <!-- derived-from: sdd-bug-backlog-governance sha256:8e4c85766c6a -->
-<!-- derived-from: harness-claude-code sha256:71f1a21a61f8 -->
-<!-- derived-from: harness-codex sha256:a4d6209e93b4 -->
-<!-- derived-from: harness-kimi-code sha256:e65ffffccd63 -->
+<!-- derived-from: harness-claude-code sha256:23883db47f8c -->
+<!-- derived-from: harness-codex sha256:2391531daea2 -->
+<!-- derived-from: harness-kimi-code sha256:ec6b118dc6ac -->
 <!-- derived-from: harness-cursor sha256:aeb19cebd0e1 -->
 <!-- derived-from: harness-devin sha256:93ac9b208971 -->
 <!-- derived-from: harness-copilot sha256:47a805e79df0 -->
@@ -133,8 +133,8 @@ runtime tree, validated by `dadaia reports validate`.
 
 ## Documentation
 
-<!-- derived-from: pypi-distribution sha256:80d67bd879ea -->
-<!-- derived-from: public-asset-distribution sha256:dc567ee9ad95 -->
+<!-- derived-from: pypi-distribution sha256:5c6e6759831f -->
+<!-- derived-from: public-asset-distribution sha256:a0f6d60dd1f1 -->
 
 The site is <https://marcoaureliomenezes.github.io/dadaia-workspace/>:
 
@@ -152,7 +152,7 @@ The skills install without a workspace, from their own built repository:
 
 ## Links
 
-<!-- derived-from: pypi-distribution sha256:80d67bd879ea -->
+<!-- derived-from: pypi-distribution sha256:5c6e6759831f -->
 
 - GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
 - PyPI — <https://pypi.org/project/dadaia-workspace/>

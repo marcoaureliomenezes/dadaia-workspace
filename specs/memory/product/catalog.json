@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-21T03:45:46Z",
+  "generated_at": "2026-09-21T04:47:31Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -63,12 +63,12 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 910,
+      "token_estimate": 940,
       "depends_on": [
+        "public-asset-distribution",
         "QUALITY",
         "ARCHITECTURE",
         "agent-orchestration",
-        "public-asset-distribution",
         "TECHSTACK"
       ]
     },
@@ -85,7 +85,7 @@
         "design",
         "palette"
       ],
-      "token_estimate": 81,
+      "token_estimate": 120,
       "depends_on": [
         "pypi-distribution",
         "product-vision"
@@ -106,9 +106,10 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1160,
+      "token_estimate": 1277,
       "depends_on": [
         "agentic-entities",
+        "pypi-distribution",
         "workspace-doctor",
         "workspace-init"
       ]
@@ -118,7 +119,7 @@
       "slug": "pypi-distribution",
       "title": "pypi-distribution",
       "area": "distribution",
-      "tldr": "The published PyPI package on one version axis, the OIDC publish pipeline, and the wheel content contract.",
+      "tldr": "The PyPI package on one version axis, two console-script names, the OIDC pipeline that also publishes the skills repo, the wheel contract and the docs site.",
       "summary": "dadaia-workspace publishes to PyPI from the release workflow under OIDC trusted publishing; pyproject version is the single source of the number, and minting is separate from publishing.",
       "path": "specs/memory/product/distribution/pypi-distribution.md",
       "tags": [
@@ -127,7 +128,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 667,
+      "token_estimate": 798,
       "depends_on": [
         "public-asset-distribution",
         "consumer-agent-support",
@@ -149,7 +150,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 424,
+      "token_estimate": 464,
       "depends_on": [
         "agentic-entities",
         "public-asset-distribution",
@@ -173,12 +174,12 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 289,
+      "token_estimate": 323,
       "depends_on": [
+        "public-asset-distribution",
         "sdd-gate-v3",
         "TECHSTACK",
         "agentic-entities",
-        "public-asset-distribution",
         "agent-orchestration"
       ]
     },
@@ -265,7 +266,7 @@
         "hooks",
         "binding"
       ],
-      "token_estimate": 331,
+      "token_estimate": 355,
       "depends_on": [
         "public-asset-distribution",
         "agentic-entities",

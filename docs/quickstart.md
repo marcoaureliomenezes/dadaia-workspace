@@ -7,7 +7,7 @@ defined in [concepts](concepts.md); the long walkthrough is
 
 ## 1. Install
 
-<!-- derived-from: pypi-distribution sha256:80d67bd879ea -->
+<!-- derived-from: pypi-distribution sha256:5c6e6759831f -->
 <!-- derived-from: workspace-init sha256:871519580ea1 -->
 
 ```bash

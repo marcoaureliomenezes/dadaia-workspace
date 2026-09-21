@@ -8,7 +8,7 @@ tags: [harness, codex, projection, hooks]
 
 ## Surface
 
-- Codex is an entry harness — the `codex` TUI and headless `codex exec` — governed by the root `AGENTS.md` map and the root->cwd `AGENTS.md` chain read natively (32 KiB cap, no longer a design constraint), plus `.agents/skills/` read natively (probe PANDA/KOALA 2026-09-20, codex 0.145).
+- Codex is an entry harness — the `codex` TUI and headless `codex exec` — governed by the root `AGENTS.md` map and the root->cwd `AGENTS.md` chain read natively (32 KiB cap, no longer a design constraint), plus `.agents/skills/` read natively (probe PANDA/KOALA 2026-09-20, codex 0.145); the standalone dd- skills reach a Codex user without a workspace through the `dadaia-skills` repository cloned or installed by `npx skills add` into `.agents/skills` ([[public-asset-distribution]]).
 - PreToolUse `pre_gate` (matcher `^(apply_patch|Edit|Write|Bash)$`) and a matcher-less PostToolUse reaper are registered in `.codex/hooks.json` through wrappers under `.dadaia/hooks/codex-*`.
 - Command policy is evaluated natively from `.codex/rules/*.rules` — Starlark prefix rules over venv-form paths, not configuration keys.
 - Hook fire is version-qualified: hooks are live-certified at `codex-cli 0.144.4` (`_CODEX_HOOKS_LIVE_CERTIFIED_VERSION`, `infrastructure/codex_doctor.py`); any other version is probe-driven by `dadaia certify`'s `codex-live-probe`, an absent or different version yielding UNVERIFIED. No version floor is enforced.

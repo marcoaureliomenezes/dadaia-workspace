@@ -9,7 +9,7 @@ tags: [brand, design, palette]
 ## Brand
 
 - The product is promoted under its full slug `dadaia-workspace`; the rhino mark and the five-colour palette (mint, sage, warm and their neutrals) are the only visual identity.
-- The panel that rendered them was demolished at 0.4.7 candidate 5 (ADR 0016); the docs site and launch assets (`public-presence-and-launch`) are the palette's next home.
+- The panel that rendered them was demolished at 0.4.7 candidate 5 (ADR 0016); the docs site (`docs/` on GitHub Pages, from 0.4.7 c9) and the launch assets are the palette's home, and every public surface — README, site, skills repository, posts — names the product by its full slug, never the bare word ([[pypi-distribution]]).
 
 ## Dependencies
 

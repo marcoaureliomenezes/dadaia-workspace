@@ -20,7 +20,7 @@
 |------|-------|------|
 | `brand-identity` | brand-identity | The brand — the dadaia-workspace slug, the rhino mark and the five-colour palette — for the docs site and launch assets; no in-package UI carries it any more. |
 | `public-asset-distribution` | public-asset-distribution | Public assets staged once, projected into the authored set (root map, scoped AGENTS.md, .agents/skills, .agents/agents); .claude/ entries are symlinks. |
-| `pypi-distribution` | pypi-distribution | The published PyPI package on one version axis, the OIDC publish pipeline, and the wheel content contract. |
+| `pypi-distribution` | pypi-distribution | The PyPI package on one version axis, two console-script names, the OIDC pipeline that also publishes the skills repo, the wheel contract and the docs site. |
 
 ### harness
 
