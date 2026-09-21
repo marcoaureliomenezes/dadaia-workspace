@@ -260,8 +260,11 @@ def test_v34_live_candidate_trio_bytes_under_the_fixed_ceiling() -> None:
     if live is not None:
         # A candidate in DEFINITION may hold only its SPEC.md at the root (rc-archive
         # ran, PLAN/TASKS not yet authored): measure what exists, never demand the trio.
+        # Content bytes, LF-normalised: a CRLF checkout must not move a ratchet.
         sizes = {
-            name: (live / name).stat().st_size for name in _V34_CEILINGS if (live / name).is_file()
+            name: len((live / name).read_bytes().replace(b"\r\n", b"\n"))
+            for name in _V34_CEILINGS
+            if (live / name).is_file()
         }
         assert _byte_ceiling_violations(sizes) == [], (
             f"{live.name} trio exceeds the byte ceiling — above it the scope is open "
