@@ -401,7 +401,7 @@ def test_the_projection_rule_carries_the_exec_bit_for_an_executable_source(
     a copy of its source, permissions included (0.4.7 FR1). Asserted over the real
     authored `public/skills/` tree through the public rule-table seam."""
     from dadaia_workspace.infrastructure.install_plan import InstallPlan
-    from dadaia_workspace.infrastructure.projection_rules import build_harnesses, projection_rules
+    from dadaia_workspace.infrastructure.projection_rules import projection_rules
     from dadaia_workspace.infrastructure.public_assets_common import OverwritePolicy
 
     plan = InstallPlan(
@@ -419,7 +419,7 @@ def test_the_projection_rule_carries_the_exec_bit_for_an_executable_source(
     )
     modes = {
         rule.dst.name: rule.mode
-        for rule in projection_rules(plan, build_harnesses())
+        for rule in projection_rules(plan)
         if rule.dst.parent.name == "scripts" and rule.dst.parent.parent.name == "dd-bug-resolution"
     }
     assert modes, "the skills rule table produced no dd-bug-resolution script rules"

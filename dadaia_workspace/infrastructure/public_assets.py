@@ -68,7 +68,7 @@ from dadaia_workspace.infrastructure.projection import (
     link_entry_defect,
 )
 from dadaia_workspace.infrastructure.projection_rules import (
-    build_harnesses,
+    harness_checks,
     projection_rules,
     prune_stale_codex_tomls,
 )
@@ -313,8 +313,7 @@ class FileSystemPublicAssetManager:
         plan = self._resolve_install_plan(
             workspace_root, agentic_dir, target, OverwritePolicy.of(force), scope, only
         )
-        harnesses = build_harnesses()
-        rules = projection_rules(plan, harnesses)
+        rules = projection_rules(plan)
         transcript = install_rules(rules, force=plan.overwrite.force)
         installed.extend(transcript.render())
 
@@ -633,12 +632,11 @@ class FileSystemPublicAssetManager:
             overlay=overlay,
             resolved_models=resolved_models,
         )
-        harnesses = build_harnesses()
-        rules = projection_rules(doctor_plan, harnesses)
+        rules = projection_rules(doctor_plan)
         reports.extend(doctor_rules(rules))
         for name in L1_ENTRY_HARNESSES:
             if name in active:
-                reports.extend(harnesses[name].checks(workspace_root))
+                reports.extend(harness_checks(name, workspace_root))
         # An out-of-profile runtime directory that physically exists is surfaced by a
         # `[warn]` line rather than staying silent (A3).
         for name, rel_dirs in HARNESS_PROJECTION_DIRS.items():
@@ -660,7 +658,7 @@ class FileSystemPublicAssetManager:
         # package public dir, not a runtime projection. `rule-corpus` stays a TOP-LEVEL,
         # unconditional attestation (never gated on codex-in-profile — ATTESTING_CHECK_IDS
         # must never vanish silently for a codex-absent profile); `trust-boundary` stays
-        # gated (moved into CodexHarness.checks() above, matching the historical guard).
+        # gated (the codex-hooks record check above, matching the historical guard).
         reports.extend(attest("rule-corpus", check_codex_rule_corpus_reachable(workspace_root)))
         reports.extend(check_agent_skill_refs(self._public_dir))
         reports.extend(check_memory_phase_single_source(self._public_dir))

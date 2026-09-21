@@ -8,7 +8,7 @@
 
 ## Candidate 8 — bootstrap, lazy harness, three flows
 
-- [-] T-047-71 — FR2: the harness record. `core/harness_registry.py` gains a frozen
+- [x] T-047-71 — FR2: the harness record. `core/harness_registry.py` gains a frozen
   `HarnessRecord(name, directory, agent_transcode, hooks)` and a `HARNESS_RECORDS` table for
   `claude` (`.claude`, `claude-md-symlink`, `claude-settings`), `codex` (`.codex`, `codex-toml`,
   `codex-hooks`) and `kimi-code` (none, `none`, `none`). `L1_ENTRY_HARNESSES`,

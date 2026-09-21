@@ -1,17 +1,18 @@
 """``projection_rules(plan)`` — the ONE table every projection family renders from.
 
-K3 (v0.5.1): the harness is a real seam (Claude Code, Codex, Kimi Code vary
-independently — three production adapters), never a hypothetical one. Each
-:class:`HarnessProjection` adapter owns exactly two things: which
-:class:`~dadaia_workspace.infrastructure.projection.ProjectionRule` entries it
-contributes for a given
-:class:`~dadaia_workspace.infrastructure.install_plan.InstallPlan`, and which doctor
-lines fall outside a byte-compare (a structural/semantic claim a single rendered file
-cannot express, e.g. "does this TOML's cited skill exist"). :func:`projection_rules`
-assembles the harness-independent rules (the guardrail pair, the law file, the shared
-skills tree, the ``.dadaia/**`` ``AGENTS.md`` family) alongside each active
-harness's own — one call builds the exact same table ``install()`` writes and
-``doctor()`` compares.
+0.4.7 FR2: the harness seam is a *record*, not a class. Each
+:class:`~dadaia_workspace.core.harness_registry.HarnessRecord` names how its harness
+consumes the authored persona set (``agent_transcode``) and which format its hook
+registration serializes into (``hooks``); this module holds one builder per enum value
+and dispatches on it. :func:`projection_rules` assembles the harness-independent rules
+(the guardrail pair, the law file, the shared skills tree, the ``.dadaia/**``
+``AGENTS.md`` family) alongside each active record's own — one call builds the exact
+same table ``install()`` writes and ``doctor()`` compares. :func:`harness_checks` holds
+the residue a byte-compare cannot express (a structural/semantic claim, e.g. "does this
+TOML's cited skill exist"), keyed by the same ``hooks`` value.
+
+There is no per-harness branch here and no harness name in this file: a harness fact
+lives in ``core/harness_registry.py`` or nowhere.
 """
 
 from __future__ import annotations
@@ -21,10 +22,14 @@ import os
 import stat as stat_module
 from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Protocol
 
 from dadaia_workspace.core.exceptions import PublicAssetError
-from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
+from dadaia_workspace.core.harness_registry import (
+    HARNESS_RECORDS,
+    AgentTranscode,
+    HarnessRecord,
+    HookFormat,
+)
 from dadaia_workspace.core.models.agent_model_policy import ResolvedAgentModel
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.infrastructure.codex_doctor import (
@@ -66,28 +71,6 @@ from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import map
 from dadaia_workspace.infrastructure.workspace_guardrail import (
     _agents_md_source,
 )
-
-#: Read-only mode for projected law files (`.dadaia/AGENTS.md`) — closes the Bash-redirect
-#: write path the gate does not parse. A human operator can still chmod and edit.
-
-
-class HarnessProjection(Protocol):
-    """One Layer-1 entry harness's projection surface — the real seam (K3): three
-    production adapters vary independently, so a Protocol earns its keep here (unlike
-    a single-adapter seam, which would be indirection alone)."""
-
-    id: str
-    dirs: tuple[str, ...]
-
-    def rules(self, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
-        """The full rule set this harness projects for *plan*."""
-        ...
-
-    def checks(self, workspace_root: Path) -> list[DoctorLine]:
-        """Doctor lines beyond the rule table — a structural/semantic claim a single
-        byte-compare cannot express."""
-        ...
-
 
 # ---------------------------------------------------------------------------
 # Small building blocks
@@ -259,127 +242,59 @@ def _agents_agent_rules(
     return tuple(rules)
 
 
-def _claude_agent_rules(agentic_dir: Path, workspace_root: Path) -> tuple[ProjectionRule, ...]:
-    """``.claude/agents/<name>.md`` — one relative symlink per rendered persona."""
-    src_dir = agentic_dir / "agents"
-    authored = workspace_root / ".agents" / "agents"
-    dst_dir = workspace_root / ".claude" / "agents"
-    return tuple(
-        _link_rule(
-            f"claude:agents/{src.relative_to(src_dir).as_posix()}",
-            "claude",
-            dst_dir / src.relative_to(src_dir),
-            authored / src.relative_to(src_dir),
-        )
-        for src in iter_public_files(src_dir)
-    )
+# ---------------------------------------------------------------------------
+# agent_transcode builders — one per enum value
+# ---------------------------------------------------------------------------
 
 
-def _claude_skill_rules(agentic_dir: Path, workspace_root: Path) -> tuple[ProjectionRule, ...]:
-    """``.claude/skills/<skill>`` — one relative symlink per authored skill directory."""
-    src_dir = agentic_dir / "skills"
-    authored = workspace_root / ".agents" / "skills"
-    dst_dir = workspace_root / ".claude" / "skills"
-    if not src_dir.is_dir():
-        return ()
-    return tuple(
-        _link_rule(
-            f"claude:skills/{skill.name}", "claude", dst_dir / skill.name, authored / skill.name
-        )
-        for skill in sorted(src_dir.iterdir())
-        if skill.is_dir()
-    )
+def _no_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
+    """``none``: reads the authored tree natively / registers no hooks — projects nothing."""
+    del record, plan
+    return ()
 
 
-def _claude_settings_rule(workspace_root: Path) -> ProjectionRule:
-    """``.claude/settings.json`` — an ``owned-slice`` compare (K3): the render MERGES
-    the operator's file, folding in only the dadaia hook wiring and preserving every
-    other top-level key and every non-dadaia hook entry untouched — the SAME algorithm
-    (install=write(render), doctor=compare(render)) that governs a plain byte-compare,
-    because the merge is a fixed point on already-canonical content.
-    """
-    dst = workspace_root / ".claude" / "settings.json"
-
-    def _render(current: bytes | None) -> bytes:
-        existing: dict[str, object] | None = None
-        if current is not None:
-            try:
-                loaded = json.loads(current.decode("utf-8"))
-            except (json.JSONDecodeError, ValueError, UnicodeDecodeError) as exc:
-                raise PublicAssetError(
-                    f"{dst} is not readable JSON ({exc}). It carries operator settings, so "
-                    "dadaia will not overwrite it. Fix or move the file, then re-run install."
-                ) from None
-            existing = loaded if isinstance(loaded, dict) else None
-        merged = merge_claude_settings(existing, workspace_root)
-        return (json.dumps(merged, indent=2, sort_keys=True) + "\n").encode("utf-8")
-
-    return ProjectionRule(
-        label="claude:settings.json",
-        harness="claude",
-        dst=dst,
-        render=_render,
-        compare="owned-slice",
-    )
-
-
-class ClaudeHarness:
-    """Claude Code adapter — one of the three real seams (K3). Agents and skills are
-    per-entry symlinks onto the authored ``.agents/`` set, never a second copy."""
-
-    id = "claude"
-    dirs: tuple[str, ...] = _CLAUDE_DIRS
-
-    def rules(self, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
-        claude_dir = plan.workspace_root / ".claude"
-        dirs = self.dirs if plan.only is None else tuple(d for d in self.dirs if d == plan.only)
-        rules: list[ProjectionRule] = []
-        for name in dirs:
-            if name == "agents":
-                rules.extend(_claude_agent_rules(plan.agentic_dir, plan.workspace_root))
-            elif name == "skills":
-                rules.extend(_claude_skill_rules(plan.agentic_dir, plan.workspace_root))
-            else:
-                rules.extend(
-                    _tree_bytes_rules(
-                        plan.agentic_dir / name,
-                        claude_dir / name,
-                        harness="claude",
-                        label_prefix=f"claude:{name}/",
-                    )
+def _md_symlink_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
+    """``claude-md-symlink``: agents and skills are per-entry relative symlinks onto the
+    authored ``.agents/`` set, never a second copy; other content dirs copy verbatim."""
+    harness_dir = plan.workspace_root / str(record.directory)
+    authored = plan.workspace_root / ".agents"
+    src_agents = plan.agentic_dir / "agents"
+    src_skills = plan.agentic_dir / "skills"
+    dirs = _CLAUDE_DIRS if plan.only is None else tuple(d for d in _CLAUDE_DIRS if d == plan.only)
+    rules: list[ProjectionRule] = []
+    for name in dirs:
+        if name == "agents":
+            rules.extend(
+                _link_rule(
+                    f"{record.name}:agents/{src.relative_to(src_agents).as_posix()}",
+                    record.name,
+                    harness_dir / "agents" / src.relative_to(src_agents),
+                    authored / "agents" / src.relative_to(src_agents),
                 )
-        if plan.only is None:
-            rules.append(_claude_settings_rule(plan.workspace_root))
-        return tuple(rules)
-
-    def checks(self, workspace_root: Path) -> list[DoctorLine]:
-        """The one claude check a byte-compare cannot express: a foreign hook command
-        is preserved (never drift — the file is the operator's) but never silenced.
-        """
-        dst = workspace_root / ".claude" / "settings.json"
-        if not dst.is_file():
-            return []
-        try:
-            loaded = json.loads(dst.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return []
-        if not isinstance(loaded, dict):
-            return []
-        foreign = foreign_claude_hook_commands(loaded, claude_settings(workspace_root))
-        if not foreign:
-            return []
-        return [
-            DoctorLine(
-                DoctorStatus.WARN,
-                "claude:settings.json: non-dadaia hook command(s) in gated event(s) — "
-                + ", ".join(foreign),
+                for src in iter_public_files(src_agents)
             )
-        ]
-
-
-# ---------------------------------------------------------------------------
-# Codex adapter
-# ---------------------------------------------------------------------------
+        elif name == "skills":
+            skills = sorted(src_skills.iterdir()) if src_skills.is_dir() else []
+            rules.extend(
+                _link_rule(
+                    f"{record.name}:skills/{skill.name}",
+                    record.name,
+                    harness_dir / "skills" / skill.name,
+                    authored / "skills" / skill.name,
+                )
+                for skill in skills
+                if skill.is_dir()
+            )
+        else:
+            rules.extend(
+                _tree_bytes_rules(
+                    plan.agentic_dir / name,
+                    harness_dir / name,
+                    harness=record.name,
+                    label_prefix=f"{record.name}:{name}/",
+                )
+            )
+    return tuple(rules)
 
 
 def _codex_agent_toml_bytes(
@@ -417,36 +332,65 @@ def _codex_agent_toml_bytes(
     return toml_content.encode("utf-8")
 
 
-def _codex_agent_rules(
-    agentic_dir: Path, codex_dir: Path, resolved_models: Mapping[str, ResolvedAgentModel]
-) -> tuple[ProjectionRule, ...]:
-    agents_src = agentic_dir / "agents"
-    agents_dst = codex_dir / "agents"
+def _toml_transcode_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
+    """``codex-toml``: per-agent TOML, ``config.toml`` and the command-policy rules file,
+    all compared byte-wise. The shared ``.agents/skills`` tree is read natively."""
+    harness_dir = plan.workspace_root / str(record.directory)
     rules: list[ProjectionRule] = []
-    for md_file in sorted(agents_src.glob("*.md")):
-        fm = _parse_agent_frontmatter(md_file.read_text(encoding="utf-8"))
-        agent_name = str(fm.get("name", "")) if fm else ""
-        if not agent_name:
-            continue
-        resolved = resolved_models.get(agent_name)
-
-        def _render(
-            _current: bytes | None,
-            _md_file: Path = md_file,
-            _agent_name: str = agent_name,
-            _resolved: ResolvedAgentModel | None = resolved,
-        ) -> bytes:
-            return _codex_agent_toml_bytes(_md_file, _agent_name, _resolved)
-
+    if plan.only is None or plan.only == "rules":
         rules.append(
-            ProjectionRule(
-                label=f"codex:agents/{agent_name}.toml",
-                harness="codex",
-                dst=agents_dst / f"{agent_name}.toml",
-                render=_render,
+            _bytes_rule(
+                f"{record.name}:rules/dadaia-command-policy.rules",
+                record.name,
+                harness_dir / "rules" / "dadaia-command-policy.rules",
+                _render_codex_command_policy_rules().encode("utf-8"),
+            )
+        )
+    if plan.only is None or plan.only == "agents":
+        agents_src = plan.agentic_dir / "agents"
+        for md_file in sorted(agents_src.glob("*.md")):
+            fm = _parse_agent_frontmatter(md_file.read_text(encoding="utf-8"))
+            agent_name = str(fm.get("name", "")) if fm else ""
+            if not agent_name:
+                continue
+            resolved = plan.resolved_models.get(agent_name)
+
+            def _render(
+                _current: bytes | None,
+                _md_file: Path = md_file,
+                _agent_name: str = agent_name,
+                _resolved: ResolvedAgentModel | None = resolved,
+            ) -> bytes:
+                return _codex_agent_toml_bytes(_md_file, _agent_name, _resolved)
+
+            rules.append(
+                ProjectionRule(
+                    label=f"{record.name}:agents/{agent_name}.toml",
+                    harness=record.name,
+                    dst=harness_dir / "agents" / f"{agent_name}.toml",
+                    render=_render,
+                )
+            )
+        rules.append(
+            _bytes_rule(
+                f"{record.name}:config.toml",
+                record.name,
+                harness_dir / "config.toml",
+                codex_config(plan.agentic_dir).encode("utf-8"),
             )
         )
     return tuple(rules)
+
+
+#: One builder per :class:`AgentTranscode` value — the dispatch that replaced a class
+#: per harness.
+_AGENT_RULE_BUILDERS: dict[
+    AgentTranscode, Callable[[HarnessRecord, InstallPlan], tuple[ProjectionRule, ...]]
+] = {
+    AgentTranscode.NONE: _no_rules,
+    AgentTranscode.CLAUDE_MD_SYMLINK: _md_symlink_rules,
+    AgentTranscode.CODEX_TOML: _toml_transcode_rules,
+}
 
 
 def prune_stale_codex_tomls(
@@ -467,184 +411,228 @@ def prune_stale_codex_tomls(
             installed.append(f"[rm]   {stale}")
 
 
-def _codex_config_rule(agentic_dir: Path, codex_dir: Path) -> ProjectionRule:
-    return _bytes_rule(
-        "codex:config.toml",
-        "codex",
-        codex_dir / "config.toml",
-        codex_config(agentic_dir).encode("utf-8"),
+# ---------------------------------------------------------------------------
+# hooks builders — one per enum value, plus the checks a byte-compare cannot express
+# ---------------------------------------------------------------------------
+
+
+def _settings_merge_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
+    """``claude-settings``: an ``owned-slice`` compare — the render MERGES the operator's
+    file, folding in only the dadaia hook wiring and leaving every other top-level key and
+    non-dadaia hook entry untouched. Still one algorithm, because the merge is a fixed
+    point on already-canonical content."""
+    if plan.only is not None:
+        return ()
+    workspace_root = plan.workspace_root
+    dst = workspace_root / str(record.directory) / "settings.json"
+
+    def _render(current: bytes | None) -> bytes:
+        existing: dict[str, object] | None = None
+        if current is not None:
+            try:
+                loaded = json.loads(current.decode("utf-8"))
+            except (json.JSONDecodeError, ValueError, UnicodeDecodeError) as exc:
+                raise PublicAssetError(
+                    f"{dst} is not readable JSON ({exc}). It carries operator settings, so "
+                    "dadaia will not overwrite it. Fix or move the file, then re-run install."
+                ) from None
+            existing = loaded if isinstance(loaded, dict) else None
+        merged = merge_claude_settings(existing, workspace_root)
+        return (json.dumps(merged, indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+    return (
+        ProjectionRule(
+            label=f"{record.name}:settings.json",
+            harness=record.name,
+            dst=dst,
+            render=_render,
+            compare="owned-slice",
+        ),
     )
 
 
-def _codex_rules_file_rule(workspace_root: Path) -> ProjectionRule:
-    return _bytes_rule(
-        "codex:rules/dadaia-command-policy.rules",
-        "codex",
-        workspace_root / ".codex" / "rules" / "dadaia-command-policy.rules",
-        _render_codex_command_policy_rules().encode("utf-8"),
-    )
+def _settings_merge_checks(record: HarnessRecord, workspace_root: Path) -> list[DoctorLine]:
+    """The one check a byte-compare cannot express: a foreign hook command is preserved
+    (never drift — the file is the operator's) but never silenced."""
+    dst = workspace_root / str(record.directory) / "settings.json"
+    if not dst.is_file():
+        return []
+    try:
+        loaded = json.loads(dst.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if not isinstance(loaded, dict):
+        return []
+    foreign = foreign_claude_hook_commands(loaded, claude_settings(workspace_root))
+    if not foreign:
+        return []
+    return [
+        DoctorLine(
+            DoctorStatus.WARN,
+            f"{record.name}:settings.json: non-dadaia hook command(s) in gated event(s) — "
+            + ", ".join(foreign),
+        )
+    ]
 
 
-def _codex_hooks_json_rule(workspace_root: Path) -> ProjectionRule:
-    return _bytes_rule(
-        "codex:hooks.json",
-        "codex",
-        workspace_root / ".codex" / "hooks.json",
-        (json.dumps(codex_hooks(workspace_root), indent=2, sort_keys=True) + "\n").encode("utf-8"),
-    )
-
-
-def _codex_hook_wrapper_rules(workspace_root: Path) -> tuple[ProjectionRule, ...]:
-    return tuple(
+def _hooks_json_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
+    """``codex-hooks``: a project-level ``hooks.json`` plus the shared wrapper scripts the
+    harness shells out to."""
+    if plan.only is not None:
+        return ()
+    workspace_root = plan.workspace_root
+    rules = [
+        _bytes_rule(
+            f"{record.name}:hooks.json",
+            record.name,
+            workspace_root / str(record.directory) / "hooks.json",
+            (json.dumps(codex_hooks(workspace_root), indent=2, sort_keys=True) + "\n").encode(
+                "utf-8"
+            ),
+        )
+    ]
+    rules.extend(
         _bytes_rule(
             f"dadaia:hooks/{name}",
-            "codex",
+            record.name,
             workspace_root / ".dadaia" / "hooks" / name,
             content.encode("utf-8"),
             mode=0o755,
         )
         for name, content in codex_hook_wrapper_contents().items()
     )
+    return tuple(rules)
 
 
-class CodexHarness:
-    """Codex adapter — one of the three real seams (K3). Per-agent TOML and
-    ``config.toml`` are compared byte-wise, exactly like a Claude agent render,
-    replacing D-CX-1/2/4/5/10's shape/regex re-derivation of the same fact. Codex reads
-    the shared ``.agents/skills`` tree natively, so it owns no skills copy.
-    """
-
-    id = "codex"
-    dirs: tuple[str, ...] = ("rules", "agents")
-
-    def rules(self, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
-        codex_dir = plan.workspace_root / ".codex"
-        rules: list[ProjectionRule] = []
-        if plan.only is None or plan.only == "rules":
-            rules.append(_codex_rules_file_rule(plan.workspace_root))
-        if plan.only is None or plan.only == "agents":
-            rules.extend(_codex_agent_rules(plan.agentic_dir, codex_dir, plan.resolved_models))
-            rules.append(_codex_config_rule(plan.agentic_dir, codex_dir))
-        if plan.only is None:
-            rules.append(_codex_hooks_json_rule(plan.workspace_root))
-            rules.extend(_codex_hook_wrapper_rules(plan.workspace_root))
-        return tuple(rules)
-
-    def checks(self, workspace_root: Path) -> list[DoctorLine]:
-        """D-CX-6/7/8/9 plus the version-qualified trust-boundary INFO line — all
-        gated on codex being in profile, matching the historical ``"codex" in active``
-        guard. ``check_codex_rule_corpus_reachable`` stays a top-level, UNCONDITIONAL
-        doctor() attestation (never gated) — the ``rule-corpus`` id in
-        ``ATTESTING_CHECK_IDS`` must never vanish for a codex-absent profile."""
-        out: list[DoctorLine] = []
-        out.extend(dcx7_codex_skill_refs(workspace_root))
-        out.extend(dcx8_codex_rules_shape(workspace_root / ".codex"))
-        out.extend(dcx9_codex_hook_shape(workspace_root))
-        out.extend(codex_trust_boundary_info())
-        return out
+def _hooks_json_checks(record: HarnessRecord, workspace_root: Path) -> list[DoctorLine]:
+    """D-CX-6/7/8/9 plus the version-qualified trust-boundary INFO line — all gated on the
+    harness being in profile. ``check_codex_rule_corpus_reachable`` stays a top-level,
+    UNCONDITIONAL doctor() attestation (never gated): the ``rule-corpus`` id in
+    ``ATTESTING_CHECK_IDS`` must never vanish for an out-of-profile harness."""
+    out: list[DoctorLine] = []
+    out.extend(dcx7_codex_skill_refs(workspace_root))
+    out.extend(dcx8_codex_rules_shape(workspace_root / str(record.directory)))
+    out.extend(dcx9_codex_hook_shape(workspace_root))
+    out.extend(codex_trust_boundary_info())
+    return out
 
 
-# ---------------------------------------------------------------------------
-# Kimi Code adapter
-# ---------------------------------------------------------------------------
+def _user_home_hook_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
+    """``kimi-hooks``: no project-level config file — hook registration is a managed block
+    folded into the user-level ``$KIMI_CODE_HOME/config.toml``, the same fixed-point
+    algorithm as every other rule."""
+    if plan.only is not None:
+        return ()
+    home = kimi_code_home()
+    rules = [
+        _bytes_rule(
+            f"{record.name}:hooks/{name}",
+            record.name,
+            home / "hooks" / name,
+            content.encode("utf-8"),
+            mode=0o755,
+        )
+        for name, content in kimi_hook_shims().items()
+    ]
 
-
-def _kimi_config_block_rule(home: Path) -> ProjectionRule:
     def _render(current: bytes | None) -> bytes:
         existing = current.decode("utf-8") if current is not None else ""
         return upsert_kimi_hooks_block(existing, kimi_hooks_block(home)).encode("utf-8")
 
-    return ProjectionRule(
-        label="kimi-code:config.toml managed hooks block",
-        harness="kimi-code",
-        dst=home / "config.toml",
-        render=_render,
-        compare="managed-block",
+    rules.append(
+        ProjectionRule(
+            label=f"{record.name}:config.toml managed hooks block",
+            harness=record.name,
+            dst=home / "config.toml",
+            render=_render,
+            compare="managed-block",
+        )
     )
+    return tuple(rules)
 
 
-class KimiHarness:
-    """Kimi Code adapter — one of the three real seams (K3). Kimi has no
-    project-level config file: hook registration is a managed block folded into the
-    user-level ``$KIMI_CODE_HOME/config.toml`` — the SAME fixed-point algorithm as
-    every other rule, because ``upsert_kimi_hooks_block`` is already a pure
-    ``render(existing) -> full content`` merge.
-    """
-
-    id = "kimi-code"
-    dirs: tuple[str, ...] = ()
-
-    def rules(self, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
-        rules: list[ProjectionRule] = []
-        if plan.only is None:
-            home = kimi_code_home()
-            for name, content in kimi_hook_shims().items():
-                rules.append(
-                    _bytes_rule(
-                        f"kimi-code:hooks/{name}",
-                        "kimi-code",
-                        home / "hooks" / name,
-                        content.encode("utf-8"),
-                        mode=0o755,
-                    )
+def _user_home_hook_checks(record: HarnessRecord, workspace_root: Path) -> list[DoctorLine]:
+    """Executability is not a byte-compare claim: a cleared exec bit is repairable DRIFT,
+    but a noexec mount is UNSUPPORTED — reinstalling can never fix a mount option."""
+    del workspace_root  # these hooks live at the user-level home, not the workspace
+    home = kimi_code_home()
+    out: list[DoctorLine] = []
+    for name in kimi_hook_shims():
+        dst = home / "hooks" / name
+        label = f"{record.name}:hooks/{name}"
+        if not dst.is_file() or os.access(dst, os.X_OK):
+            continue
+        if dst.stat().st_mode & stat_module.S_IXUSR:
+            out.append(
+                DoctorLine(
+                    DoctorStatus.UNSUPPORTED,
+                    f"{label} (filesystem mounted noexec — the exec bits are set "
+                    "but the mount forbids execution; point KIMI_CODE_HOME at a path "
+                    "on an executable filesystem)",
                 )
-            rules.append(_kimi_config_block_rule(home))
-        return tuple(rules)
-
-    def checks(self, workspace_root: Path) -> list[DoctorLine]:
-        """Executability is not a byte-compare claim: a cleared exec bit on an
-        otherwise-correct shim is repairable DRIFT, but a noexec-mounted
-        ``$KIMI_CODE_HOME`` is UNSUPPORTED (reinstalling can never fix a mount option).
-        """
-        del workspace_root  # kimi hooks live at the user-level home, not the workspace
-        home = kimi_code_home()
-        out: list[DoctorLine] = []
-        for name in kimi_hook_shims():
-            dst = home / "hooks" / name
-            label = f"kimi-code:hooks/{name}"
-            if not dst.is_file() or os.access(dst, os.X_OK):
-                continue
-            if dst.stat().st_mode & stat_module.S_IXUSR:
-                out.append(
-                    DoctorLine(
-                        DoctorStatus.UNSUPPORTED,
-                        f"{label} (filesystem mounted noexec — the exec bits are set "
-                        "but the mount forbids execution; point KIMI_CODE_HOME at a path "
-                        "on an executable filesystem)",
-                    )
-                )
-            else:
-                out.append(DoctorLine(DoctorStatus.DRIFT, f"{label} (not executable)"))
-        return out
+            )
+        else:
+            out.append(DoctorLine(DoctorStatus.DRIFT, f"{label} (not executable)"))
+    return out
 
 
-def build_harnesses() -> dict[str, HarnessProjection]:
-    """The three real adapters (K3) — each one stateless since the Codex-only runtime
-    adapter family was retired."""
-    return {
-        "claude": ClaudeHarness(),
-        "codex": CodexHarness(),
-        "kimi-code": KimiHarness(),
+def _no_checks(record: HarnessRecord, workspace_root: Path) -> list[DoctorLine]:
+    del record, workspace_root
+    return []
+
+
+#: One builder per :class:`HookFormat` value.
+_HOOK_RULE_BUILDERS: dict[
+    HookFormat, Callable[[HarnessRecord, InstallPlan], tuple[ProjectionRule, ...]]
+] = {
+    HookFormat.NONE: _no_rules,
+    HookFormat.CLAUDE_SETTINGS: _settings_merge_rules,
+    HookFormat.CODEX_HOOKS: _hooks_json_rules,
+    HookFormat.KIMI_HOOKS: _user_home_hook_rules,
+}
+
+#: The doctor residue per :class:`HookFormat` value — a structural/semantic claim a
+#: single rendered file cannot express.
+_HOOK_CHECKS: dict[HookFormat, Callable[[HarnessRecord, Path], list[DoctorLine]]] = {
+    HookFormat.NONE: _no_checks,
+    HookFormat.CLAUDE_SETTINGS: _settings_merge_checks,
+    HookFormat.CODEX_HOOKS: _hooks_json_checks,
+    HookFormat.KIMI_HOOKS: _user_home_hook_checks,
+}
+
+#: Which targets pull in the authored ``.agents/`` persona + skills set: the shared
+#: target itself, plus every harness that transcodes it into a view of its own.
+_AUTHORED_SET_TARGETS: frozenset[str] = frozenset(
+    {"agents"}
+    | {
+        record.name
+        for record in HARNESS_RECORDS.values()
+        if record.agent_transcode is not AgentTranscode.NONE
     }
+)
 
 
-def projection_rules(
-    plan: InstallPlan, harnesses: Mapping[str, HarnessProjection]
-) -> tuple[ProjectionRule, ...]:
+def harness_checks(name: str, workspace_root: Path) -> list[DoctorLine]:
+    """The doctor lines for harness *name* that its rule table cannot express."""
+    record = HARNESS_RECORDS[name]
+    return _HOOK_CHECKS[record.hooks](record, workspace_root)
+
+
+def projection_rules(plan: InstallPlan) -> tuple[ProjectionRule, ...]:
     """Assemble the exact rule table ``install()`` writes and ``doctor()`` compares."""
     rules: list[ProjectionRule] = []
     rules.extend(_guardrail_pair_rules(plan))
     rules.extend(_dadaia_family_agents_md_rules(plan))
-    # The authored ``.agents/`` set is projected for every target that reads it —
-    # Codex and Kimi natively, Claude through the symlinks its adapter contributes.
-    if {"agents", "codex", "claude"} & set(plan.harness_targets):
+    if _AUTHORED_SET_TARGETS & set(plan.harness_targets):
         if plan.only is None or plan.only == "skills":
             rules.extend(_skills_tree_rules(plan))
         if plan.only is None or plan.only == "agents":
             rules.extend(
                 _agents_agent_rules(plan.agentic_dir, plan.workspace_root, plan.resolved_models)
             )
-    for name in L1_ENTRY_HARNESSES:
-        if name in plan.harness_targets:
-            rules.extend(harnesses[name].rules(plan))
+    for name, record in HARNESS_RECORDS.items():
+        if name not in plan.harness_targets:
+            continue
+        rules.extend(_AGENT_RULE_BUILDERS[record.agent_transcode](record, plan))
+        rules.extend(_HOOK_RULE_BUILDERS[record.hooks](record, plan))
     return tuple(rules)

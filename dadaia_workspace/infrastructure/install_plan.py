@@ -1,7 +1,7 @@
 """``InstallPlan`` — the ONE resolution of ``install()``'s port-conforming arguments.
 
 Split out from ``public_assets.py`` (FR6, T-30-10 / K3, v0.5.1) so both the manager and
-``projection_rules.py``'s ``HarnessProjection`` adapters can share the single resolved
+``projection_rules.py``'s record-driven rule builders can share the single resolved
 plan type without a circular import between the two.
 """
 
