@@ -1,6 +1,6 @@
 # SPEC — Release: 0.4.7
 
-**Status:** Draft
+**Status:** Approved
 **Release ID:** 0.4.7
 **Owner:** dd-project-manager
 **Opened:** 2026-09-21
@@ -13,9 +13,9 @@
 
 Candidate 10 — "the release is a release PR" — is the last entry of the 2026-09-18..20 grill
 (Q6 A: adopt release-please in the LAST candidate of the cycle so the plane is not changed in
-flight; Q19 A: no event-driven audit). It is DRAFT until the operator accepts ADR 0021 (D2):
-while ADR 0021 is `proposed`, ADR 0005, 0006, 0008, 0009 and 0014 stay in force and nothing
-below may be implemented. Definition is written now so the whole backlog is a candidate.
+flight; Q19 A: no event-driven audit). ADR 0021 was accepted on 2026-09-21 (operator ruling, D2); ADR 0005, 0006, 0008, 0009 and
+0014 stay `accepted` until FR3 deletes their 15 live citations and flips them to `superseded`
+in the same commit (`ADR-SUPERSEDED-CITATION` errors on any citation of a superseded record).
 
 Measured on the candidate 9 closure (449c4267):
 
@@ -87,8 +87,8 @@ the release PR; ADR 0006, 0008, 0009 and 0014 are marked superseded by 0021.
 - `specs/releases/AGENTS.md` and `public/scaffold/releases/AGENTS.md`, `dd-release-definition`
   and `dd-release-implementation` `SKILL.md`, and `CONSUMER_VALIDATION_RECIPE.md` stop naming
   `rc-archive`/`fold`/`archive`; the root map's flow section names the release PR as promote;
-  ADR 0006, 0008, 0009, 0014 → `superseded_by: 0021` in `decisions.jsonl` (the operator's act,
-  D2, recorded in the same commit that accepts 0021).
+  ADR 0005, 0006, 0008, 0009, 0014 → `status: superseded` in `decisions.jsonl`, in the same commit
+  that deletes their last citation (`ADR-SUPERSEDED-CITATION`).
 - Memory pass: `sdd-bug-backlog-governance` (the release state document, promote), 
   `pypi-distribution` (pipeline, one version axis), `agent-orchestration` if it names the verbs;
   docs re-derived; CHANGELOG "Candidate 10" is the LAST hand-written section.
@@ -104,8 +104,8 @@ the release PR; ADR 0006, 0008, 0009 and 0014 are marked superseded by 0021.
 
 ## 5. Decisions and constraints
 
-- D2 (operator, BLOCKING): accept ADR 0021 and mark 0006/0008/0009/0014 superseded; until then
-  this SPEC stays Draft and candidate 10 has no PLAN/TASKS.
+- D2 done 2026-09-21: ADR 0021 accepted (`docs(adr): accept 0021-release-please-semantics`); the
+  superseded flips land in FR3 with the citation deletions.
 - D8 (operator): `release.yml` trigger — `release: published` (release-please's event) is the
   proposed default; `push: tags: v*` is the alternative.
 - D9 (operator): the release directory id when release-please mints a minor instead of the
