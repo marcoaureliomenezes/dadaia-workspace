@@ -118,7 +118,7 @@ refused cannot exist. No lease, mutex or wait path exists, and no phase is consu
 
 Governance records change only through their verbs: `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append|resolve|…` for one
 record per bug, `backlog.py new|exit` for the operator's demand queue,
-`dadaia release new|phase|rc-archive|archive` for the release state document, `dadaia
+`python3 .agents/skills/dd-release-implementation/scripts/release.py new|phase|rc-archive|archive` for the release state document, `dadaia
 audit disposition|close` for findings. A bug is proposed to the operator first and
 registered only after confirmation — an agent never files one on its own judgement.
 Completed work leaves a session as a machine-readable handoff under the workspace

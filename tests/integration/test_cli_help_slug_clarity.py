@@ -18,7 +18,6 @@ _runner = CliRunner()
 # (argv-to-help, must-not-contain-mangled, must-contain-any-of)
 _CASES = [
     (["memory", "product", "add", "--help"], "^+$", ("a-z0-9", "kebab")),
-    (["release", "new", "--help"], "^+$", ("a-z0-9", "kebab")),
 ]
 
 

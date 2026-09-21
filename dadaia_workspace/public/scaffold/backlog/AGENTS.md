@@ -26,7 +26,7 @@ Scope: this file governs only `specs/backlog/`.
 - Every `active[]` entry carries five required fields: `title`, `opened` (`YYYY-MM-DD`), `status`, `description`, `provenance`.
 - `status` is `idea`, `candidate`, `picked`, or another live (non-terminal) token.
 - Plus one optional field: `intents` (see §4).
-- An entry must be picked into a release (`dadaia release new`, naming the slug under `**Consumes:**`) to enter SDD.
+- An entry must be picked into a release (`python3 .agents/skills/dd-release-implementation/scripts/release.py new`, naming the slug under `**Consumes:**`) to enter SDD.
 - Never delete an entry — `BACKLOG_PY exit <slug> --disposition …` removes the `active[]` object and appends its one histo record.
 
 ## 3. Terminal disposition tokens

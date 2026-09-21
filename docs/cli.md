@@ -51,13 +51,6 @@
 
 ## dadaia reconcile — Reconcile state and projections after installing an exact candidate wheel.
 
-## dadaia release — Release management commands.
-- release archive — Ship the live release: one transactional promote verb (0.4.7 FR3).
-- release fold — Fold a wrongly archived release into rc-N/ of the version that published it.
-- release new — Create specs/releases/<id>/ with its SPEC.md stub and _RELEASE.json state.
-- release phase — Move the live release to IMPLEMENTATION or CLOSURE, stamping its milestone.
-- release rc-archive — Archive the live release's completed candidate trio into the next rc-N/.
-
 ## dadaia reports — Validate agent handoff reports.
 - reports validate — Validate one or more agent handoff JSON files.
 

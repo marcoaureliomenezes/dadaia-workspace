@@ -1,6 +1,7 @@
 """Release 0.4.6 candidate 1, FR3 (ADR 0007) — SPEC-DOC-046: a live release carrying
 the legacy ``RELEASE.json`` name gets a WARNING with a doctor ``--fix`` rename to the
-canonical ``_RELEASE.json``. Also FR4: ``release_new`` refuses a second live release.
+canonical ``_RELEASE.json``. The FR4 second-live-release refusal is the release script's
+own contract now (``tests/unit/skills/test_release_implementation_release_script.py``).
 
 Intent: CONTRACT (the migration lane for consumer instances). Size: SMALL.
 """
@@ -10,9 +11,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
-from dadaia_workspace.features.specs.canon import release_new
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 
 
@@ -58,9 +56,3 @@ def test_canonical_filename_emits_nothing(tmp_path: Path) -> None:
     specs = _specs_with_release(tmp_path, legacy_name=False)
     issues = [i for i in SpecsDoctor(specs).check() if i.code == "SPEC-DOC-046"]
     assert issues == []
-
-
-def test_release_new_refuses_second_live_release(tmp_path: Path) -> None:
-    specs = _specs_with_release(tmp_path, legacy_name=False)
-    with pytest.raises(FileExistsError, match="live release"):
-        release_new(specs, "1.0.1")

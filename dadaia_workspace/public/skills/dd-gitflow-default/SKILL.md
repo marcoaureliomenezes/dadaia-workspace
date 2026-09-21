@@ -27,9 +27,9 @@ The branch contract, stated once, and the mechanics that operate it.
 6. Definition stage: author the candidate's SPEC/PLAN/TASKS at the release root on `feature/{M.m.p}`.
 7. Implementation stage: one commit per completed task group, shaped per §3a.
 8. Candidate closure: open one `feature/{M.m.p}` → `develop` PR and merge it green.
-9. After the merge, ask the operator: **promote or continue?** Continue = `dadaia release rc-archive`; promote = step 10.
+9. After the merge, ask the operator: **promote or continue?** Continue = `python3 .agents/skills/dd-release-implementation/scripts/release.py rc-archive`; promote = step 10.
 10. Promote: open the PR `develop` → `main` (ship verdict pre-staged naming develop's tip, §3b).
-11. The moment it merges, run `dadaia release archive <v> --shipped <sha> --pr <n> --next <M.m.p>` — it ships, archives, appends the histo record and births the next release, then PRINTS the git `next:` lines: delete `feature/{M.m.p}`, cut `feature/{next}` from `main`, then `git merge -s ours origin/develop` — run them in that order.
+11. The moment it merges, run `python3 .agents/skills/dd-release-implementation/scripts/release.py archive <v> --shipped <sha> --pr <n> --next <M.m.p>` — it ships, archives, appends the histo record and births the next release, then PRINTS the git `next:` lines: delete `feature/{M.m.p}`, cut `feature/{next}` from `main`, then `git merge -s ours origin/develop` — run them in that order.
 12. Tag `archive/<name>` then delete a branch the moment its work lands elsewhere.
 
 ## 2a. The branch contract

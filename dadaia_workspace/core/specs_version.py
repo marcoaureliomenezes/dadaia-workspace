@@ -71,7 +71,7 @@ def is_release_semver(value: str) -> bool:
     release/segment may be created under?" A ``v``-prefixed id matches the broader
     :data:`RELEASE_SEMVER_RE` (it must still resolve for archived-directory lookups) but
     is refused here — the retired axis is read-only, never mintable again. Used by
-    ``dadaia release new`` (``new_artifacts.release_new``). Callers that also accept the
+    ``release.py new``. Callers that also accept the
     legacy slug form compose this with their own slug check.
     """
     return RELEASE_SEMVER_RE.match(value) is not None and not value.startswith("v")

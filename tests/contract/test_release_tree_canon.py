@@ -205,7 +205,7 @@ def test_archived_release_at_or_above_the_live_one_is_refused(tmp_path: Path) ->
     _write_release(tmp_path, "_archive/0.4.6", _archived("0.4.6"))
     issues = validate_release_tree(tmp_path)
     assert _codes(issues) == ["RELEASE-TREE-ARCHIVE-ID"], issues
-    assert "fix: dadaia release fold 0.5.0 --into" in issues[0].message
+    assert "scripts/release.py fold 0.5.0 --into" in issues[0].message
 
 
 def test_archived_release_without_a_publication_is_refused(tmp_path: Path) -> None:
@@ -213,7 +213,7 @@ def test_archived_release_without_a_publication_is_refused(tmp_path: Path) -> No
     _write_release(tmp_path, "_archive/0.4.5", _archived("0.4.5", shipped=None))
     issues = validate_release_tree(tmp_path)
     assert _codes(issues) == ["RELEASE-TREE-ARCHIVE-UNSHIPPED"], issues
-    assert "fix: dadaia release fold 0.4.5 --into" in issues[0].message
+    assert "scripts/release.py fold 0.4.5 --into" in issues[0].message
 
 
 def test_a_published_archived_release_below_the_live_one_is_clean(tmp_path: Path) -> None:

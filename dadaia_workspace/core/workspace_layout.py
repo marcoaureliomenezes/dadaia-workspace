@@ -441,7 +441,7 @@ SPECS_CANON: tuple[CanonEntry, ...] = (
     CanonEntry("releases/<M.m.p>/PLAN.md", "releases"),
     CanonEntry("releases/<M.m.p>/TASKS.md", "releases"),
     # An archived candidate's trio (ADR 0006): rc-N is ONLY an archive, opened on
-    # demand by ``dadaia release rc-archive``, never required at birth.
+    # demand by ``release.py rc-archive``, never required at birth.
     CanonEntry("releases/<M.m.p>/rc-N/SPEC.md", "releases"),
     CanonEntry("releases/<M.m.p>/rc-N/PLAN.md", "releases"),
     CanonEntry("releases/<M.m.p>/rc-N/TASKS.md", "releases"),

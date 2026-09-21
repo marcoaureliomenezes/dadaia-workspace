@@ -149,6 +149,14 @@ _SKILL_SCRIPT_SCHEMAS: tuple[tuple[str, str], ...] = (
     ("schemas/bugs/bug-record-v1.schema.json", "skills/dd-bug-resolution/scripts/schemas"),
     ("schemas/backlog/backlog-v1.schema.json", "skills/dd-backlog-definition/scripts/schemas"),
     ("schemas/histo/histo-record-v1.schema.json", "skills/dd-backlog-definition/scripts/schemas"),
+    (
+        "schemas/releases/release-state-v1.schema.json",
+        "skills/dd-release-implementation/scripts/schemas",
+    ),
+    (
+        "schemas/histo/histo-record-v1.schema.json",
+        "skills/dd-release-implementation/scripts/schemas",
+    ),
 )
 
 

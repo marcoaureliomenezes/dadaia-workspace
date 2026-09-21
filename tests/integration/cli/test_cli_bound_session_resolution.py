@@ -25,10 +25,11 @@ pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
 _runner = CliRunner()
 
-#: 0.4.7 FR2 (T-047-64/65): `dadaia bugs` and `dadaia backlog` retired with their
-#: ledgers' move into skill scripts; the seam under test is the SHARED resolution
-#: authority (`cli._specs_resolution`), so any resolver-driven verb exercises it.
-_RESOLVED_ARGS = ["release", "new", "0.0.1"]
+#: 0.4.7 FR2 (T-047-64/65/66): `dadaia bugs`, `dadaia backlog` and `dadaia release`
+#: retired with their ledgers' move into skill scripts; the seam under test is the
+#: SHARED resolution authority (`cli._specs_resolution`), so any resolver-driven verb
+#: exercises it.
+_RESOLVED_ARGS = ["memory", "catalog", "generate"]
 
 
 def _make_workspace(root: Path) -> None:

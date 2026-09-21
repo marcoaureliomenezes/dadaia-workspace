@@ -13,6 +13,7 @@ from __future__ import annotations
 
 __all__ = [
     "BACKLOG_SCRIPT",
+    "RELEASE_SCRIPT",
     "DADAIA_BIN",
     "RECONCILER_THROTTLE_TTL_SECONDS",
     "SENTINEL_GC_TTL_SECONDS",
@@ -44,3 +45,8 @@ DADAIA_BIN: str = ".dadaia/.venv/bin/dadaia"
 #: The backlog ledger's ONE writer since 0.4.7 c7 — every `fix:` naming a backlog
 #: repair names the script that can perform it, never a retired CLI verb.
 BACKLOG_SCRIPT: str = "python3 .agents/skills/dd-backlog-definition/scripts/backlog.py"
+
+#: The release ledger's ONE writer (0.4.7 FR2, T-047-66): `_RELEASE.json`, the candidate
+#: trio and `releases_histo.jsonl`. Every `RELEASE-TREE-*` `fix:` that named a retired
+#: `dadaia release` verb names this script instead.
+RELEASE_SCRIPT: str = "python3 .agents/skills/dd-release-implementation/scripts/release.py"

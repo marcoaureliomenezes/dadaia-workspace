@@ -122,23 +122,23 @@ the documents are the state, the verbs move the state document, and the markers 
    curates `specs/backlog/BACKLOG.json`'s `active[]` through its intake, and
    `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new` appends the entry. Maturation (`idea → candidate → picked`)
    is hand-written and doctor-validated.
-2. **Birth the release.** `dadaia release new <M.m.p>` writes `SPEC.md` and
+2. **Birth the release.** `python3 .agents/skills/dd-release-implementation/scripts/release.py new <M.m.p>` writes `SPEC.md` and
    `_RELEASE.json` in phase `DEFINITION` under `specs/releases/<M.m.p>/`, in one
    transaction, refusing a second live release.
 3. **Define the candidate.** Author `SPEC.md`, `PLAN.md` and `TASKS.md` at the release
    root, each carrying `**Status:** Approved`, and flip the picked backlog entry to
    `picked` in the same commit.
-4. **Open implementation.** `dadaia release phase IMPLEMENTATION --sha <sha>` requires
+4. **Open implementation.** `python3 .agents/skills/dd-release-implementation/scripts/release.py phase IMPLEMENTATION --sha <sha>` requires
    the approved trio and stamps `defined {sha, ts}`.
 5. **Implement one task at a time.** Reserve a row `[ ] → [-]`, do the work inside its
    declared write set, then `[-] → [x]` with a `conventional-commit(task-id)` commit.
-6. **Close the candidate.** `dadaia release phase CLOSURE --sha <sha>` requires every
+6. **Close the candidate.** `python3 .agents/skills/dd-release-implementation/scripts/release.py phase CLOSURE --sha <sha>` requires every
    task `[x]` and stamps `implemented {sha, rc: rc + 1, ts}`. Then the memory update,
    the closure `log` entries, the disposition sweep (`python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit`,
    `dadaia audit disposition`), artifact GC, and the `feature → develop` pull request.
-7. **Continue or promote.** `dadaia release rc-archive` moves the completed trio into
+7. **Continue or promote.** `python3 .agents/skills/dd-release-implementation/scripts/release.py rc-archive` moves the completed trio into
    the next `rc-N/`, sets `rc = N` and returns the release to `DEFINITION` for another
-   candidate; `dadaia release archive <id> --shipped <sha> --pr <n> --next <M.m.p>`
+   candidate; `python3 .agents/skills/dd-release-implementation/scripts/release.py archive <id> --shipped <sha> --pr <n> --next <M.m.p>`
    ships it instead — archiving the directory, birthing the next release, appending
    the `delivered` histo record, and printing the git lines it never runs.
 

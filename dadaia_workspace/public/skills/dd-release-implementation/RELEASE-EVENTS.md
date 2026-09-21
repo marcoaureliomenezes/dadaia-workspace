@@ -21,10 +21,10 @@ Disclosed reference reached from `SKILL.md`/`RC-FLOW.md` wherever the arc says "
 
 | Milestone | Set by | Shape |
 |---|---|---|
-| `phase` + `defined` | `dadaia release phase IMPLEMENTATION --sha <sha>` | phase string, `{sha, ts}` |
-| `phase` + `implemented` | `dadaia release phase CLOSURE --sha <sha>` | phase string, `{sha, rc, ts}` |
-| `phase: DEFINITION` | `dadaia release new` / `dadaia release rc-archive` | phase string |
-| `phase: ARCHIVED` + `shipped` | `dadaia release archive <id> --shipped <sha> --pr <n>` | phase string, `{sha, pr, ts}` |
+| `phase` + `defined` | `python3 .agents/skills/dd-release-implementation/scripts/release.py phase IMPLEMENTATION --sha <sha>` | phase string, `{sha, ts}` |
+| `phase` + `implemented` | `python3 .agents/skills/dd-release-implementation/scripts/release.py phase CLOSURE --sha <sha>` | phase string, `{sha, rc, ts}` |
+| `phase: DEFINITION` | `python3 .agents/skills/dd-release-implementation/scripts/release.py new` / `python3 .agents/skills/dd-release-implementation/scripts/release.py rc-archive` | phase string |
+| `phase: ARCHIVED` + `shipped` | `python3 .agents/skills/dd-release-implementation/scripts/release.py archive <id> --shipped <sha> --pr <n>` | phase string, `{sha, pr, ts}` |
 
 
 ## `log` — the closure narrative's home

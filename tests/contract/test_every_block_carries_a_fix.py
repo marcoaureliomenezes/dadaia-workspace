@@ -234,67 +234,13 @@ def test_push_gate_git_read_failure_carries_a_runnable_fix() -> None:
     assert_block_carries_a_runnable_fix(_decide(_feature_ref(), source=_FailingObjectSource()))
 
 
-# ── the release verbs ───────────────────────────────────────────────────────────
+# ── the governance verbs (0.4.7 FR3/FR4/FR5) ───────────────────────────────────
 
 
 def _specs_tree(tmp_path: Path) -> Path:
     specs = tmp_path / "specs"
     (specs / "releases").mkdir(parents=True)
     return specs
-
-
-def test_release_new_refuses_a_second_live_release_with_a_runnable_fix(tmp_path: Path) -> None:
-    from dadaia_workspace.features.specs import canon
-
-    specs = _specs_tree(tmp_path)
-    (specs / "releases" / "0.0.1").mkdir()
-    with pytest.raises(FileExistsError) as exc:
-        canon.release_new(specs, "0.0.2")
-    assert_block_carries_a_runnable_fix(str(exc.value))
-
-
-@pytest.mark.parametrize(
-    ("name", "kwargs"),
-    [
-        ("bad-sha", {"shipped_sha": "nope", "pr": 1, "next_release": "0.0.2"}),
-        ("bad-pr", {"shipped_sha": "a" * 40, "pr": 0, "next_release": "0.0.2"}),
-        ("bad-next", {"shipped_sha": "a" * 40, "pr": 1, "next_release": "nope"}),
-    ],
-)
-def test_archive_release_argument_refusals_carry_a_runnable_fix(
-    name: str, kwargs: dict[str, Any], tmp_path: Path
-) -> None:
-    from dadaia_workspace.features.specs import candidate
-
-    specs = _specs_tree(tmp_path)
-    with pytest.raises(candidate.ArchiveError) as exc:
-        candidate.archive_release(specs, "0.0.1", histo_append=lambda _r: None, **kwargs)
-    assert_block_carries_a_runnable_fix(str(exc.value))
-
-
-@pytest.mark.parametrize("verb", ["archive_release", "archive_candidate"])
-def test_archive_verbs_refuse_without_a_live_release_with_a_runnable_fix(
-    verb: str, tmp_path: Path
-) -> None:
-    from dadaia_workspace.features.specs import candidate
-
-    specs = _specs_tree(tmp_path)
-    with pytest.raises(candidate.ArchiveError) as exc:
-        if verb == "archive_release":
-            candidate.archive_release(
-                specs,
-                "0.0.1",
-                shipped_sha="a" * 40,
-                pr=1,
-                next_release="0.0.2",
-                histo_append=lambda _r: None,
-            )
-        else:
-            candidate.archive_candidate(specs)
-    assert_block_carries_a_runnable_fix(str(exc.value))
-
-
-# ── the governance verbs (0.4.7 FR3/FR4/FR5) ───────────────────────────────────
 
 
 def _audit_tree(tmp_path: Path, disposition: str = "open") -> Path:
@@ -364,63 +310,6 @@ def test_audit_close_with_an_open_finding_carries_a_runnable_fix(tmp_path: Path)
         audit_feature.close_audit(
             specs, "20260101-slug", sha="abc1234", histo_append=lambda _r: None, denylist_terms=()
         )
-    assert_block_carries_a_runnable_fix(str(exc.value))
-
-
-def _phase_tree(tmp_path: Path, *, phase: str, status: str = "Approved", tasks: str) -> Path:
-    specs = _specs_tree(tmp_path)
-    rdir = specs / "releases" / "0.0.1"
-    rdir.mkdir()
-    (rdir / "SPEC.md").write_text("# S\n\n**Status:** Approved\n", encoding="utf-8")
-    (rdir / "PLAN.md").write_text(f"# P\n\n**Status:** {status}\n", encoding="utf-8")
-    (rdir / "TASKS.md").write_text(f"# T\n\n**Status:** Approved\n\n{tasks}", encoding="utf-8")
-    (rdir / "_RELEASE.json").write_text(
-        json.dumps(
-            {
-                "schema": "release-state-v1",
-                "release": "0.0.1",
-                "phase": phase,
-                "rc": None,
-                "defined": None,
-                "implemented": None,
-                "shipped": None,
-                "log": [],
-            }
-        ),
-        encoding="utf-8",
-    )
-    return specs
-
-
-@pytest.mark.parametrize(
-    ("name", "tree", "target", "sha"),
-    [
-        ("bad-sha", {"phase": "DEFINITION", "tasks": "- [x] T-1\n"}, "IMPLEMENTATION", "nope"),
-        ("out-of-order", {"phase": "DEFINITION", "tasks": "- [x] T-1\n"}, "CLOSURE", _SHA_A),
-        ("re-run", {"phase": "IMPLEMENTATION", "tasks": "- [x] T-1\n"}, "IMPLEMENTATION", _SHA_A),
-        (
-            "unapproved-plan",
-            {"phase": "DEFINITION", "status": "Draft", "tasks": "- [x] T-1\n"},
-            "IMPLEMENTATION",
-            _SHA_A,
-        ),
-        (
-            "unfinished-task",
-            {"phase": "IMPLEMENTATION", "tasks": "- [-] T-1\n"},
-            "CLOSURE",
-            _SHA_A,
-        ),
-        ("unknown-phase", {"phase": "DEFINITION", "tasks": "- [x] T-1\n"}, "DEFINITION", _SHA_A),
-    ],
-)
-def test_release_phase_refusals_carry_a_runnable_fix(
-    name: str, tree: dict[str, str], target: str, sha: str, tmp_path: Path
-) -> None:
-    from dadaia_workspace.features.specs import candidate
-
-    specs = _phase_tree(tmp_path, **tree)
-    with pytest.raises(candidate.ArchiveError) as exc:
-        candidate.set_phase(specs, target, sha=sha)
     assert_block_carries_a_runnable_fix(str(exc.value))
 
 

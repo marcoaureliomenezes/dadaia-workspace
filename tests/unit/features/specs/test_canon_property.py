@@ -2,7 +2,7 @@
 is canon checked."
 
 The property this task exists to hold: for every shape the scaffolder produces,
-``canon.scaffold(t)`` (or the on-demand ``canon.release_new`` sibling)
+``canon.scaffold(t)``
 leaves a tree where ``canon.check_tree(t) == []`` AND the full ``SpecsDoctor`` reports
 ZERO errors. This ONE parametrized test replaces the six historical regression tests
 that each pinned one bug where a fresh scaffold failed its own doctor (all resolved,
@@ -34,7 +34,6 @@ import pytest
 
 from dadaia_workspace.features.specs import SpecsDoctor
 from dadaia_workspace.features.specs import canon as canon_mod
-from dadaia_workspace.features.specs.canon import release_new
 from dadaia_workspace.features.specs.scaffolder import scaffold
 
 pytestmark = pytest.mark.unit
@@ -80,17 +79,17 @@ def _fresh_repo_specs(tmp_path: Path) -> Path:
 
 
 def _fresh_release(tmp_path: Path) -> Path:
-    """Fresh root specs/ plus one freshly-opened release (``release_new`` — the flat
-    trio shape; the segment lane is retired at 0.4.6, ADR 0006). Successor of the
-    shape bug ``fresh-release-scaffold-emits-spec-doctor-warnings-042`` regressed on."""
+    """Fresh root specs/ plus one freshly-opened release — the flat trio shape (the
+    segment lane is retired at 0.4.6, ADR 0006). Successor of the shape bug
+    ``fresh-release-scaffold-emits-spec-doctor-warnings-042`` regressed on.
+
+    The release directory is written here rather than minted: `release new` is the skill
+    script's verb now (0.4.7 T-047-66), and what THIS property asserts is that a canon
+    release directory passes `check_tree`, not who wrote it."""
     specs_dir = _fresh_root_specs(tmp_path)
-    release_new(specs_dir, "0.6.0")
-    # `release_new` writes the SPEC stub only; the release-tree rule (0.4.7 FR1, now the
-    # doctor's RELEASE-TREE rule) requires the trio and the state document every resolver
-    # keys on. FR2/T-047-06 makes `release new` ONE birth act that writes them — these
-    # four lines are its deletion target, not a permanent fixture.
     release_dir = specs_dir / "releases" / "0.6.0"
-    for artifact in ("PLAN.md", "TASKS.md"):
+    release_dir.mkdir(parents=True)
+    for artifact in ("SPEC.md", "PLAN.md", "TASKS.md"):
         (release_dir / artifact).write_text("**Status:** Draft\n", encoding="utf-8")
     (release_dir / "_RELEASE.json").write_text(
         json.dumps(

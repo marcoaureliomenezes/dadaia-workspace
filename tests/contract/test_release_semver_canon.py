@@ -62,14 +62,14 @@ _CANON_REL = Path("core") / "specs_version.py"
 
 #: Modules that must reuse the canon object, as (import path, attribute name) — the
 #: attribute each module actually needs: the two naming/archive-lookup sites keep
-#: RELEASE_SEMVER_RE (the broader two-axis match); the one MINT site (features.specs.canon,
+#: RELEASE_SEMVER_RE (the broader two-axis match); the MINT site is the release skill
+#: script (0.4.7 T-047-66), stdlib-only and outside this package scan;
 #: T-050-06A) needs only the narrower is_release_semver predicate.
 #: v0.1.55 FR1: the SpecsDoctor RELEASE_SEMVER_RE consumer moved off the coordinator into the
 #: ``doctor_release`` validator sibling (the SemVer/naming-canon checks live there now).
 _CONSUMER_MODULES: tuple[tuple[str, str], ...] = (
     ("dadaia_workspace.features.specs.scaffolder", "RELEASE_SEMVER_RE"),
     ("dadaia_workspace.features.specs.doctor_release", "RELEASE_SEMVER_RE"),
-    ("dadaia_workspace.features.specs.canon", "is_release_semver"),
 )
 
 
@@ -184,34 +184,21 @@ def test_release_semver_single_canon_identity_scan_and_behavior() -> None:
     assert _typed_canon.match("v1.2.3-") is None
 
 
-def test_v_prefixed_release_id_refused_at_mint_but_archived_dir_still_resolves(
-    tmp_path: Path,
-) -> None:
-    """A1.10: a fixture proves a new release id carrying a `v` prefix is refused at
-    minting (`dadaia release new`), while an existing `v`-prefixed archived directory
-    still resolves as conformant (`specs doctor`'s SPEC-DOC-027 naming check —
+def test_v_prefixed_archived_dir_still_resolves(tmp_path: Path) -> None:
+    """A1.10, archive half: an existing `v`-prefixed archived directory still resolves
+    as conformant (`specs doctor`'s SPEC-DOC-027 naming check —
     SPEC-DOC-016 no longer scans root specs/_archive/releases/ at all, v6 canon:
     that root retired, T-050-14 deleted its last content, so this fixture's
     SPEC-DOC-016 exemption is now moot by construction rather than by allowlist;
     SPEC-DOC-027's own allowlist is the check still meaningfully exercised here)."""
     from dadaia_workspace.features.specs import Severity, SpecsDoctor
-    from dadaia_workspace.features.specs.canon import release_new
 
     specs = tmp_path / "specs"
     specs.mkdir()
 
-    # Half 1 — mint refusal: a v-prefixed id can never be created going forward.
-    with pytest.raises(ValueError, match="Invalid release ID"):
-        release_new(specs, "v0.9.9")
-    assert not (specs / "releases" / "v0.9.9").exists()
-    # The bare, current-axis form mints cleanly. `release_new` returns the minted
-    # SPEC.md path directly (v0.5.1 K4 — no wrapping result dataclass; the caller's
-    # own existence check IS the proof of creation).
-    result = release_new(specs, "0.9.9")
-    assert result == specs / "releases" / "0.9.9" / "SPEC.md"
-    assert result.is_file()
-
-    # Half 2 — archive resolution: an EXISTING v-prefixed archived directory (the
+    # The mint-refusal half moved with the minting verb (0.4.7 T-047-66):
+    # `tests/unit/skills/test_release_implementation_release_script.py`.
+    # An EXISTING v-prefixed archived directory (the
     # retired axis, pre-canon-v6) is still recognised as conformant, never flagged.
     archived = specs / "_archive" / "releases" / "v0.4.4"
     archived.mkdir(parents=True)

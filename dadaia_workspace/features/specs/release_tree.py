@@ -31,6 +31,7 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
+from dadaia_workspace.core.kernel_tunables import RELEASE_SCRIPT
 from dadaia_workspace.core.release_state import PHASES, parse_release_state, release_state_file
 from dadaia_workspace.features.specs.doctor_common import RELEASE_ARTIFACTS
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
@@ -214,7 +215,7 @@ def _archive_issues(
     minted at deploy — the live release IS last-published + 1 patch, so nothing above it
     can have shipped), and an archived release whose ``shipped`` carries no sha/pr (it
     never went through the ship lane). Both repair through ONE governed verb,
-    ``dadaia release fold``, never a hand move."""
+    ``release.py fold``, never a hand move."""
     if (
         not isinstance(doc, Mapping)
         or doc.get("phase") != "ARCHIVED"
@@ -222,7 +223,7 @@ def _archive_issues(
     ):
         return []  # a non-ARCHIVED document under the archive is RELEASE-TREE-ARCHIVED's
     issues: list[ReleaseTreeIssue] = []
-    fix = f"dadaia release fold {release_id} --into <published-id> --shipped <sha> --pr <n>"
+    fix = f"{RELEASE_SCRIPT} fold {release_id} --into <published-id> --shipped <sha> --pr <n>"
     above = [live for live in live_ids if _semver_key(release_id) >= _semver_key(live)]
     if above:
         issues.append(

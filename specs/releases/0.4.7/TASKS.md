@@ -57,7 +57,7 @@
   `cli/commands/newartifacts.py`, `features/backlog/**`, `cli/anchors.py`, `container.py`,
   `setup.cfg`, `docs/cli.md`, `public/scaffold/backlog/AGENTS.md`, `tests/**`.
 
-- [-] T-047-66 — FR2: the release ledger moves. `dd-release-implementation/scripts/release.py`
+- [x] T-047-66 — FR2: the release ledger moves. `dd-release-implementation/scripts/release.py`
   with `new phase rc-archive archive fold check` over `releases/<id>/_RELEASE.json`, the trio and
   `releases_histo.jsonl`. `archive` stays all-or-nothing: validate (tree, every task `[x]`,
   phase CLOSURE, `implemented` set), stage every file write, rename into place, append the histo

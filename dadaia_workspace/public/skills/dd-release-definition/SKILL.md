@@ -35,7 +35,7 @@ a fuzzy term in the demand becomes a canonical term before it reaches the SPEC.
 1. Author the SPEC (Draft) only after the grill: the picked bug+backlog set, their
    acceptance, every `superseded_by` link.
 2. Definition runs on `feature/{M.m.p}`; the trio lives at the RELEASE ROOT
-   (`specs/releases/<v>/`) — after a prior candidate, `dadaia release rc-archive`
+   (`specs/releases/<v>/`) — after a prior candidate, `python3 .agents/skills/dd-release-implementation/scripts/release.py rc-archive`
    has already cleared it.
 3. Commit shape 5 (`dd-gitflow-default` §3a): SPEC + PLAN + TASKS + the picked entries
    flipped to `status: picked` + picked bugs, one commit; set the `defined` milestone in `_RELEASE.json`

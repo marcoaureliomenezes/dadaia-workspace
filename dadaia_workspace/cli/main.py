@@ -25,9 +25,6 @@ from dadaia_workspace.cli.commands.audit import audit_app
 from dadaia_workspace.cli.commands.export import export
 from dadaia_workspace.cli.commands.import_ import import_workspace
 from dadaia_workspace.cli.commands.memory import app as memory_app
-from dadaia_workspace.cli.commands.newartifacts import (
-    release_app,
-)
 from dadaia_workspace.core.exceptions import DadaiaError
 
 app = typer.Typer(
@@ -90,7 +87,6 @@ app.add_typer(reports.app, name="reports", rich_help_panel="Management")
 app.add_typer(specs.app, name="specs", rich_help_panel="Common")
 app.add_typer(migrate.app, name="migrate", rich_help_panel="Management")
 app.add_typer(memory_app, name="memory", rich_help_panel="Management")
-app.add_typer(release_app, name="release", rich_help_panel="Common")
 app.add_typer(audit_app, name="audit", rich_help_panel="Common")
 app.add_typer(help_cmd.app, name="help", rich_help_panel="Common")
 

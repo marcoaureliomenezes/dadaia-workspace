@@ -4,7 +4,7 @@ Disclosed reference reached at `SKILL.md` step 6 — `dd-project-manager` reads 
 
 ## Protocol
 
-1. The live release is in `CLOSURE` phase (`dadaia release phase CLOSURE --sha <sha>`) before any `specs/memory/**` write; the gate blocks it otherwise.
+1. The live release is in `CLOSURE` phase (`python3 .agents/skills/dd-release-implementation/scripts/release.py phase CLOSURE --sha <sha>`) before any `specs/memory/**` write; the gate blocks it otherwise.
 2. Apply the candidate's deltas to the corresponding `specs/memory/*.md` and `specs/memory/product/**` atoms.
 3. Heading rule, forbidden history sections and the atom's shape: `specs/memory/AGENTS.md`.
 4. Run `pytest tests/contract/test_docs_derived_from_memory.py` after the atom writes — a red row names the atom to re-read and the doc line to re-record.

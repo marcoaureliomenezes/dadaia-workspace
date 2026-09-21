@@ -42,7 +42,7 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 - Done when: the verdict is `APPROVED` on that sha.
 
 **Step 5 — Memory update (`dd-project-manager`).**
-- `dadaia release phase CLOSURE --sha <sha>` — it refuses while any task is not `[x]`.
+- `python3 .agents/skills/dd-release-implementation/scripts/release.py phase CLOSURE --sha <sha>` — it refuses while any task is not `[x]`.
 - Memory is closure procedure, never a task: a TASKS.md task whose write set names
   `specs/memory` is refused by `dadaia doctor` (SPEC-DOC-047).
 - Update `specs/memory/**` atoms to the product's current state — protocol detail: `MEMORY-UPDATE.md`.
@@ -82,4 +82,4 @@ The arc ends here. Gate -> ship -> archive -> branch cut: `dd-gitflow-default` s
 - Writing source code, tests, or pipelines (other agents) — the closer records test dispositions, never authors a test.
 - Modifying `specs/constitution.md` (requires explicit operator approval).
 - Memory updates outside CLOSURE phase (or DEFINITION under its own authorization) — gate-blocked for any other agent/phase.
-- Re-opening an archived release, or archiving a candidate as its own release — once archived the next minted version supersedes it, and between two publications a closed candidate is `rc-N/` of the version that will publish it (ADR 0014); `dadaia release fold` repairs the mistake, never a hand move.
+- Re-opening an archived release, or archiving a candidate as its own release — once archived the next minted version supersedes it, and between two publications a closed candidate is `rc-N/` of the version that will publish it (ADR 0014); `python3 .agents/skills/dd-release-implementation/scripts/release.py fold` repairs the mistake, never a hand move.
