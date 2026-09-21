@@ -25,12 +25,12 @@ single-repo context is the degenerate case of multi-repo.
 
 ## Release and candidate
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:8e4c85766c6a -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:753748a55aa3 -->
 
-Exactly one *release* is live at a time, named last-published-PyPI + 1 patch, with
-OPEN scope; it grows by *candidates*, each a closed-scope SDD cycle whose SPEC, PLAN
-and TASKS sit flat at the release root while `rc-N/` folders hold the archived trios
-of completed candidates. `_RELEASE.json` is the state document: `phase` is one of
+Exactly one *release* is live at a time, with OPEN scope; it grows by *candidates*,
+each a closed-scope SDD cycle whose SPEC, PLAN and TASKS sit flat at the release root.
+A completed candidate's trio is overwritten in place by the next candidate's, and lives
+on in git at its closure commit — there is no copied archive directory. `_RELEASE.json` is the state document: `phase` is one of
 `DEFINITION`, `IMPLEMENTATION`, `CLOSURE`, `ARCHIVED`, the three milestones
 (`defined`, `implemented`, `shipped`) move only by verb, and `log` is the one
 append-only narrative array. The version increments only at an operator-approved
@@ -38,7 +38,7 @@ deploy.
 
 ## The flow
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:8e4c85766c6a -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:753748a55aa3 -->
 <!-- derived-from: audits-canon sha256:f33a4185f1ae -->
 
 Every demand takes one of two arms. **Arm A**, a feature, enters through the backlog
@@ -70,7 +70,7 @@ feeding each fix back through the gate.
 ## Memory
 
 <!-- derived-from: context-management sha256:160b285ee271 -->
-<!-- derived-from: workspace-doctor sha256:9d10438cd00e -->
+<!-- derived-from: workspace-doctor sha256:c0ef9b213b31 -->
 
 *Memory* is current product truth, never history: one Markdown atom per subject under
 `specs/memory/product/**`, plus `ARCHITECTURE.md`, `QUALITY.md` and `TECHSTACK.md`,
@@ -85,7 +85,7 @@ or path an atom cites that no longer exists — reported as a warning, never a r
 
 ## Bugs and backlog
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:8e4c85766c6a -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:753748a55aa3 -->
 
 Both are records with one shape and one owning verb. `specs/bugs/BUGS.jsonl` holds one
 record per bug, appended once and keyed by `id`, with no git-derived cache — git is the

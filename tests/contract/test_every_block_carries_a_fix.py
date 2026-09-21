@@ -491,3 +491,49 @@ def test_every_script_fix_line_names_its_folders_entry_script(module: Path) -> N
             )
     for named in _SCRIPT_CONST_RE.findall(text):
         assert named == entry, f"{module.name}: SCRIPT names {named!r}, not {entry!r}"
+
+
+# ── the law never names a verb the tooling dropped ──────────────────────────────
+
+#: The retired release vocabulary. `rc-archive`, `fold` and `archive` were verbs;
+#: `rc-N/` was the folder they wrote. None of the three exists: a closed candidate's
+#: trio is overwritten in place and git is the archive.
+_DEAD_RELEASE_VOCABULARY = re.compile(r"rc-archive|release\.py fold|release\.py archive|rc-N")
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+#: Where the law lives: the shipped AI-entity surface and the product's memory. History
+#: (`_archive/`, `rc-1..9/`) keeps its own words and is never rewritten.
+_LAW_ROOTS = (
+    _REPO_ROOT / "dadaia_workspace" / "public",
+    _REPO_ROOT / "specs" / "memory",
+)
+
+
+def _law_files() -> list[Path]:
+    return [
+        path
+        for root in _LAW_ROOTS
+        for path in sorted(root.rglob("*"))
+        if path.is_file() and "_archive" not in path.parts
+    ]
+
+
+def test_no_law_file_names_a_retired_release_verb() -> None:
+    """A rule that names a verb nobody ships is a Stall the doctor cannot catch.
+
+    The agent reads the law, runs the verb, gets `invalid choice`, and has no fix line
+    to fall back on — the same failure shape the fix-line cases above close from the
+    tooling side. This closes it from the prose side: the shipped law and the memory
+    atoms may only name vocabulary `release.py --help` still lists.
+    """
+    offenders = [
+        f"{path.relative_to(_REPO_ROOT)}:{number}"
+        for path in _law_files()
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1)
+        if _DEAD_RELEASE_VOCABULARY.search(line)
+    ]
+    assert not offenders, (
+        "the law names a retired release verb — delete the prose, never the check:\n"
+        + "\n".join(offenders)
+    )

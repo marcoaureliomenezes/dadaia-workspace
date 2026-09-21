@@ -60,7 +60,7 @@ def _directory_findings(
                     dir_rel,
                     1,
                     f"archived id {release_dir.name} is not below the live release "
-                    f"{above[0]} — the archive holds published versions only (ADR 0014)",
+                    f"{above[0]} — the archive holds published versions only",
                 )
             )
     return findings

@@ -7,10 +7,10 @@ Disclosed reference reached from `SKILL.md`/`RC-FLOW.md` wherever the arc says "
 
 ## Shape
 
-- Fields, all seven required: `{schema, release, phase, rc, defined, implemented, shipped, log[]}` (`rc` = archived-candidate count).
+- Fields, all seven required: `{schema, release, phase, defined, implemented, shipped, log[]}`.
 - An audit is not a release milestone; the audit window is read from `audits/_archive/audits_histo.jsonl`.
 - `phase` is one of `DEFINITION IMPLEMENTATION CLOSURE ARCHIVED` — nothing else validates.
-- `phase` and `rc` are rewritten in place on every transition — no history of prior values survives in the field.
+- `phase` is rewritten in place on every transition — no history of prior values survives in the field.
 - A transition worth remembering becomes a `log` entry.
 - `defined`/`implemented`/`shipped` are the three sha-bearing milestone facts.
 - Each milestone is set at most once meaningfully (a later legitimate rewrite is a correction, not a duplicate), or `null` before that point.
@@ -22,9 +22,9 @@ Disclosed reference reached from `SKILL.md`/`RC-FLOW.md` wherever the arc says "
 | Milestone | Set by | Shape |
 |---|---|---|
 | `phase` + `defined` | `python3 .agents/skills/dd-release-implementation/scripts/release.py phase IMPLEMENTATION --sha <sha>` | phase string, `{sha, ts}` |
-| `phase` + `implemented` | `python3 .agents/skills/dd-release-implementation/scripts/release.py phase CLOSURE --sha <sha>` | phase string, `{sha, rc, ts}` |
-| `phase: DEFINITION` | `python3 .agents/skills/dd-release-implementation/scripts/release.py new` / `python3 .agents/skills/dd-release-implementation/scripts/release.py rc-archive` | phase string |
-| `phase: ARCHIVED` + `shipped` | `python3 .agents/skills/dd-release-implementation/scripts/release.py archive <id> --shipped <sha> --pr <n>` | phase string, `{sha, pr, ts}` |
+| `phase` + `implemented` | `python3 .agents/skills/dd-release-implementation/scripts/release.py phase CLOSURE --sha <sha> [--pr <n>]` | phase string, `{sha, ts}` |
+| `phase: DEFINITION` | `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id>` | phase string |
+| `phase: ARCHIVED` | no verb writes it — it describes history only |
 
 
 ## `log` — the closure narrative's home

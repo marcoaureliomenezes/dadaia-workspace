@@ -46,10 +46,10 @@ atom under its content hash.
 
 ## A human installs and uses it
 
-<!-- derived-from: pypi-distribution sha256:5c6e6759831f -->
+<!-- derived-from: pypi-distribution sha256:7e18d9868790 -->
 <!-- derived-from: workspace-init sha256:871519580ea1 -->
 <!-- derived-from: context-management sha256:160b285ee271 -->
-<!-- derived-from: workspace-doctor sha256:9d10438cd00e -->
+<!-- derived-from: workspace-doctor sha256:c0ef9b213b31 -->
 
 ```bash
 pip install dadaia-workspace
@@ -90,7 +90,7 @@ time, **review** before the push, **close** the candidate and merge it.
 
 <!-- derived-from: agentic-entities sha256:2ab5fd5308c8 -->
 <!-- derived-from: sdd-gate-v3 sha256:1c17b7e34596 -->
-<!-- derived-from: sdd-bug-backlog-governance sha256:8e4c85766c6a -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:753748a55aa3 -->
 <!-- derived-from: harness-claude-code sha256:23883db47f8c -->
 <!-- derived-from: harness-codex sha256:2391531daea2 -->
 <!-- derived-from: harness-kimi-code sha256:ec6b118dc6ac -->
@@ -125,7 +125,7 @@ refused cannot exist. No lease, mutex or wait path exists, and no phase is consu
 
 Governance records change only through their verbs: `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append|resolve|…` for one
 record per bug, `backlog.py new|exit` for the operator's demand queue,
-`release.py new|phase|rc-archive|archive` for the release state document, and
+`release.py new|phase` for the release state document, and
 `audit.py disposition|close` for findings. A bug is proposed to the operator first and
 registered only after confirmation — an agent never files one on its own judgement.
 Completed work leaves a session as a machine-readable handoff under the workspace
@@ -133,7 +133,7 @@ runtime tree, validated by `dadaia reports validate`.
 
 ## Documentation
 
-<!-- derived-from: pypi-distribution sha256:5c6e6759831f -->
+<!-- derived-from: pypi-distribution sha256:7e18d9868790 -->
 <!-- derived-from: public-asset-distribution sha256:a0f6d60dd1f1 -->
 
 The site is <https://marcoaureliomenezes.github.io/dadaia-workspace/>:
@@ -152,7 +152,7 @@ The skills install without a workspace, from their own built repository:
 
 ## Links
 
-<!-- derived-from: pypi-distribution sha256:5c6e6759831f -->
+<!-- derived-from: pypi-distribution sha256:7e18d9868790 -->
 
 - GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
 - PyPI — <https://pypi.org/project/dadaia-workspace/>

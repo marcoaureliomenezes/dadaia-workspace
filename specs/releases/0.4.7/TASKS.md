@@ -109,7 +109,7 @@
   test_slop_ratchets}.py`, deletion of `test_doctor_pyproject_version.py` and
   `_release_histo.py`, `specs/memory/product/platform/workspace-doctor.md`.
 
-- [ ] T-047-91 — FR3: the law stops naming verbs that no longer exist.
+- [x] T-047-91 — FR3: the law stops naming verbs that no longer exist.
   Every `rc-archive` / `release.py fold` / `release.py archive` / `rc-N` mention leaves
   `dadaia_workspace/public/`: `scaffold/releases/AGENTS.md` (lines 7, 10, 12, 16, 25 — one live
   release directory per version, the trio overwritten by the next candidate, promote = merging

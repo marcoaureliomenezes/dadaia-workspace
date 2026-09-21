@@ -69,7 +69,7 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 - Open the `feature/{M.m.p}` -> `develop` PR (security verdict covering the head, `dd-gitflow-default` §2a); watch CI to green; merge.
 - Done when: it merges green.
 
-The arc ends here. Gate -> ship -> archive -> branch cut: `dd-gitflow-default` steps
+The arc ends here. Gate -> promote -> record -> branch cut: `dd-gitflow-default` steps
 9-12.
 
 ## Test-stewardship touchpoints (reference)
@@ -82,4 +82,4 @@ The arc ends here. Gate -> ship -> archive -> branch cut: `dd-gitflow-default` s
 - Writing source code, tests, or pipelines (other agents) — the closer records test dispositions, never authors a test.
 - Modifying `specs/constitution.md` (requires explicit operator approval).
 - Memory updates outside CLOSURE phase (or DEFINITION under its own authorization) — gate-blocked for any other agent/phase.
-- Re-opening an archived release, or archiving a candidate as its own release — once archived the next minted version supersedes it, and between two publications a closed candidate is `rc-N/` of the version that will publish it (ADR 0014); `python3 .agents/skills/dd-release-implementation/scripts/release.py fold` repairs the mistake, never a hand move.
+- Minting a version, writing a CHANGELOG section or moving a closed trio on disk — release-please owns the first two, git owns the third.

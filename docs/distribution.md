@@ -6,7 +6,7 @@ than pretended into a task.
 
 ## Channels
 
-<!-- derived-from: pypi-distribution sha256:5c6e6759831f -->
+<!-- derived-from: pypi-distribution sha256:7e18d9868790 -->
 
 | channel | artifact | state | who acts |
 |---|---|---|---|
@@ -18,7 +18,7 @@ than pretended into a task.
 
 ## The PyPI metadata contract
 
-<!-- derived-from: pypi-distribution sha256:5c6e6759831f -->
+<!-- derived-from: pypi-distribution sha256:7e18d9868790 -->
 
 Every field PyPI renders has exactly one home, and no number or sentence is restated
 in a second file:
@@ -45,7 +45,7 @@ in a second file:
 
 ## What the wheel carries
 
-<!-- derived-from: pypi-distribution sha256:5c6e6759831f -->
+<!-- derived-from: pypi-distribution sha256:7e18d9868790 -->
 
 The wheel ships `dadaia_workspace/` with the full `public/` tree, so `dadaia init`
 works offline from a bare `pip install`, and `CONSUMER_VALIDATION_RECIPE.md`, the

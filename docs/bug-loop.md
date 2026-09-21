@@ -6,7 +6,7 @@ and no version mint.
 
 ## 1. Register — ask first
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:8e4c85766c6a -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:753748a55aa3 -->
 
 Registration is ask-first. The agent proposes: the contract line violated, one command
 that reproduces it, why it is not agent error, and a severity from the one rubric —
@@ -33,7 +33,7 @@ backlog intake.
 
 ## 2. Lineage, then a RED test
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:8e4c85766c6a -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:753748a55aa3 -->
 
 Diagnosis is ordered, and its first phase is lineage: read the 20 most recent records
 sharing this bug's `surface` or `component` before proposing anything.
@@ -49,7 +49,7 @@ lives at, watch it fail for the real reason, and only then touch production code
 
 ## 3. Fix, and let the diff shrink
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:8e4c85766c6a -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:753748a55aa3 -->
 
 Fix the cause, watch the test go green, re-run the original reproduction. A resolved
 record requires a regression seam — no seam, no `resolved`.
@@ -60,7 +60,7 @@ code path is how the next bug in the family is born.
 
 ## 4. Resolve with evidence and lineage
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:8e4c85766c6a -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:753748a55aa3 -->
 
 ```bash
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> \
@@ -82,6 +82,6 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> \
 Stage the code, the regression test and the `BUGS.jsonl` line together, in one commit.
 
 Long-closed records leave the ledger on their own: `bugs.py archive` moves every
-record closed more than 90 days ago into the bugs histo, and the release archive verbs
-run it. `dadaia doctor`'s `ledgers` section validates every committed line, so a
+record closed more than 90 days ago into the bugs histo, and the candidate's closure
+sweep runs it as its own step. `dadaia doctor`'s `ledgers` section validates every committed line, so a
 malformed record is a finding, not a surprise.

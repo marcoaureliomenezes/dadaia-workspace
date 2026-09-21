@@ -83,7 +83,7 @@ def live_release(specs: Path) -> Live:
     if len(ids) > 1:
         raise Refusal(
             f"multiple live release directories carry {STATE}: {', '.join(ids)} — the "
-            "release-candidates model allows exactly one (ADR 0005)",
+            "release-candidates model allows exactly one",
             f"{SCRIPT} check --specs {specs}",
         )
     release_dir = specs / "releases" / ids[0]

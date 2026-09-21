@@ -15,7 +15,7 @@ surface, each one the price of the previous fix.
 
 ## The counts at the 0.4.7 closure
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:8e4c85766c6a -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:753748a55aa3 -->
 
 A snapshot, not a live figure: these are the numbers the ledger held when release 0.4.7
 closed. Re-measure them at any time with the ledger's own `stats` verb.
@@ -41,7 +41,7 @@ agreement.
 
 ## Lesson 1 — a per-caller fix breeds the next caller's bug
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:8e4c85766c6a -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:753748a55aa3 -->
 
 Four records, one missing guard. `context-alive-sweeps-unrelated-worktree-changes`
 (MEDIUM) →  `context-repo-add-accepts-foreign-context-slug` (HIGH) →
@@ -71,7 +71,7 @@ by construction rather than by a list somebody has to remember to extend.
 
 ## Lesson 3 — a derived cache breeds a bug per environment that derives it
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:8e4c85766c6a -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:753748a55aa3 -->
 
 Bug records once cached facts git already knew, among them the commit that resolved
 them. `contract-coverage-ci-shallow-checkout-collapses-resolved-commit-derivation-to-head`
@@ -86,7 +86,7 @@ derived wrong.
 ## The standing order the lessons produced
 
 <!-- derived-from: QUALITY sha256:0355c414bb59 -->
-<!-- derived-from: sdd-bug-backlog-governance sha256:8e4c85766c6a -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:753748a55aa3 -->
 
 The workspace is in a permanent state of architecture review, oriented by its bug
 history:

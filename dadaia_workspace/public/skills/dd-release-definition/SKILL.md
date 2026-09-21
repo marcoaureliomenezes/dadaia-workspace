@@ -35,8 +35,8 @@ a fuzzy term in the demand becomes a canonical term before it reaches the SPEC.
 1. Author the SPEC (Draft) only after the grill: the picked bug+backlog set, their
    acceptance, every `superseded_by` link.
 2. Definition runs on `feature/{M.m.p}`; the trio lives at the RELEASE ROOT
-   (`specs/releases/<v>/`) — after a prior candidate, `python3 .agents/skills/dd-release-implementation/scripts/release.py rc-archive`
-   has already cleared it.
+   (`specs/releases/<v>/`) and overwrites the prior candidate's, which stays in git at
+   its CLOSURE commit.
 3. Commit shape 5 (`dd-gitflow-default` §3a): SPEC + PLAN + TASKS + the picked entries
    flipped to `status: picked` + picked bugs, one commit; set the `defined` milestone in `_RELEASE.json`
    (`dd-release-implementation`'s `RELEASE-EVENTS.md`).
@@ -86,4 +86,4 @@ a fuzzy term in the demand becomes a canonical term before it reaches the SPEC.
 - `dd-gitflow-default` §3a shape 5 — the definition commit shape.
 - `dd-release-implementation` (`RELEASE-EVENTS.md`, `RC-FLOW.md`) — state recipe, gate
   cadence, disposition sweep.
-- `specs/releases/AGENTS.md` — release-id format, `_RELEASE.json`, `rc-N/`.
+- `specs/releases/AGENTS.md` — release-id format, `_RELEASE.json`, the promote act.

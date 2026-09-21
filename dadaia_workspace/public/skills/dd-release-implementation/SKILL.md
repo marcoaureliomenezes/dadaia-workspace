@@ -3,7 +3,7 @@ name: dd-release-implementation
 description: >
   Implement a release candidate from the first task reservation through the
   promote-or-continue gate. Use when working a task inside an Approved candidate, at
-  candidate closure, and at the gate (rc-archive or ship + archive + branch cut).
+  candidate closure, and at the gate (the next candidate, or promote + branch cut).
 ---
 
 # dd-release-implementation
@@ -20,7 +20,7 @@ description: >
 
 1. Open `specs/releases/AGENTS.md` (the area's scoped law) and follow it.
 2. Resolve the live release by reading `_RELEASE.json`'s `phase` field directly.
-3. The live candidate's `TASKS.md` sits at `releases/<v>/TASKS.md` — always flat; `rc-N/` folders are archives, never routed to.
+3. The live candidate's `TASKS.md` sits at `releases/<v>/TASKS.md` — always flat; the prior candidate's trio is in git, never on disk.
 4. Full navigation protocol: `dd-spec-navigator`.
 5. Read `RC-FLOW.md` for the candidate arc and gate cadence before acting past reservation.
 6. Update `_RELEASE.json` per `RELEASE-EVENTS.md`'s shape and `log` conventions.

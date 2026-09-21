@@ -27,9 +27,9 @@ The branch contract, stated once, and the mechanics that operate it.
 6. Definition stage: author the candidate's SPEC/PLAN/TASKS at the release root on `feature/{M.m.p}`.
 7. Implementation stage: one commit per completed task group, shaped per §3a.
 8. Candidate closure: open one `feature/{M.m.p}` → `develop` PR and merge it green.
-9. After the merge, ask the operator: **promote or continue?** Continue = `python3 .agents/skills/dd-release-implementation/scripts/release.py rc-archive`; promote = step 10.
-10. Promote: open the PR `develop` → `main` (ship verdict pre-staged naming develop's tip, §3b).
-11. The moment it merges, run `python3 .agents/skills/dd-release-implementation/scripts/release.py archive <v> --shipped <sha> --pr <n> --next <M.m.p>` — it ships, archives, appends the histo record and births the next release, then PRINTS the git `next:` lines: delete `feature/{M.m.p}`, cut `feature/{next}` from `main`, then `git merge -s ours origin/develop` — run them in that order.
+9. After the merge, ask the operator: **promote or continue?** Continue = the next candidate's `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id>`; promote = step 10.
+10. Promote: open the PR `develop` → `main` (ship verdict pre-staged naming develop's tip, §3b); merging it lets release-please open the release PR that carries the version, the CHANGELOG and the tag.
+11. The moment the release PR merges, record it — `python3 .agents/skills/dd-release-implementation/scripts/release.py phase CLOSURE --sha <sha> --pr <n>` — then delete `feature/{M.m.p}`, cut `feature/{next}` from `main` and `git merge -s ours origin/develop`, in that order.
 12. Tag `archive/<name>` then delete a branch the moment its work lands elsewhere.
 
 ## 2a. The branch contract
@@ -43,7 +43,6 @@ The branch contract, stated once, and the mechanics that operate it.
 - No `v` prefix, no suffix, no fifth pattern; `hotfix/*` is retired (operator request only, no cadence).
 - Exactly one live `feature/{M.m.p}`, named for the live release; bugs fix on it in any phase, no ceremony.
 - The release version = last published PyPI + 1 patch, minted at birth; it increments ONLY at an operator-approved deploy.
-- `rc-N/` is an archived candidate folder under the live release, never a branch name.
 - Each candidate closure burns one `feature -> develop` merge; after it, ask the operator: promote or continue.
 - Every flow stage runs on `feature/{M.m.p}`; `develop` and `main` are PR targets only, never a working branch.
 

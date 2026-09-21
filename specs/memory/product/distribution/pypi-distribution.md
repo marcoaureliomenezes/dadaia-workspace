@@ -2,23 +2,24 @@
 slug: pypi-distribution
 title: pypi-distribution
 tldr: The PyPI package on one version axis, two console-script names, the OIDC pipeline that also publishes the skills repo, the wheel contract and the docs site.
-summary: dadaia-workspace publishes to PyPI from the release workflow under OIDC trusted publishing; pyproject version is the single source of the number, and minting is separate from publishing.
+summary: dadaia-workspace publishes to PyPI under OIDC trusted publishing from the release-please workflow; release-please owns the version, the CHANGELOG and the tag, and pyproject carries the published floor.
 tags: [distribution, pypi, release, packaging]
 ---
 
 ## Pipeline
 
-- `pip install dadaia-workspace` installs the library and its CLI under two console-script names for one callable — `dadaia` and `dadaia-workspace`, the second so that `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` resolves without an install (0.4.7 c9; `tests/unit/cli/test_console_scripts.py` pins the identity); `pyproject.toml` `version` is the single source of the number, restated in no other file.
-- Publication is automated by `.github/workflows/release.yml` under OIDC trusted publishing: no long-lived PyPI token exists, and the `pypi` GitHub environment carries the trust binding.
-- A version bump landing on `main` fires the workflow: `check` (an existing `v*` tag skips everything downstream), five test legs, `build`, `approve` (blocking on the `release-gate` environment), `publish` (upload, then push the `v<version>` tag), `smoke-test` against the live index, and `publish-skills-repo` — the built `dadaia-skills` repository force-pushed to `marcoaureliomenezes/dadaia-skills` with the version as the commit subject, failing closed with one `::error::` when `SKILLS_REPO_TOKEN` is absent ([[public-asset-distribution]]).
+- `pip install dadaia-workspace` installs the library and its CLI under two console-script names for one callable — `dadaia` and `dadaia-workspace`, the second so that `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` resolves without an install (0.4.7 c9; `tests/unit/cli/test_console_scripts.py` pins the identity); `pyproject.toml` `version` and `.release-please-manifest.json` carry the LAST PUBLISHED number — the floor release-please bumps from, restated nowhere else.
+- Publication is automated by `.github/workflows/release-please.yml` under OIDC trusted publishing: no long-lived PyPI token exists, and the `pypi` GitHub environment carries the trust binding.
+- Every push to `main` runs the `release-please` job: it maintains one release PR proposing the next version from the Conventional Commits since the floor, and merging that PR is the promote act — it writes the CHANGELOG section and creates the tag.
+- The publish side runs in the same workflow, every job `needs` `release-please` and gated on `release_created == 'true'`: five test legs, `build`, `approve` (blocking on the `release-gate` environment), `publish`, `smoke-test` against the live index, and `publish-skills-repo` — the built `dadaia-skills` repository force-pushed with the version as the commit subject, failing closed with one `::error::` when its token is absent ([[public-asset-distribution]]).
 
 ## One version axis, two positions
 
-- A release id is the version it mints, so `pyproject.toml`, the release directory and the CHANGELOG section carry the same digits.
-- `pyproject.toml` on `main` is the newest minted number and PyPI the newest published one; a `v<version>` tag exists only for published numbers, because the publish job creates it.
-- Withholding release-gate approval is supported: the code shipped, no tag exists, and the minted-unpublished number keeps its CHANGELOG section and archived directory, retired rather than reused.
+- One axis, two positions: `pyproject.toml` and the manifest hold the published floor, and the release PR holds the number proposed next; nothing else states a version.
+- A `v<version>` tag exists only for published numbers, because release-please creates it when its PR merges.
+- Withholding release-gate approval is supported: the tag and the CHANGELOG section exist, the upload does not, and the number is never reused.
 - Consumer-validation candidate wheels are throwaway and never mint a published version; numbers advance only at deploy, on the operator's order.
-- `CHANGELOG.md` carries one `## [x.y.z]` section per published version, each citing a `git log` range, never renamed, renumbered or deleted.
+- `CHANGELOG.md` is written by release-please from the commit history; a hand-written section is legacy, never renamed, renumbered or deleted.
 
 ## Wheel content contract
 

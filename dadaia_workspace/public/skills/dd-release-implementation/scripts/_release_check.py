@@ -36,7 +36,7 @@ def finding(path: str, line: int, message: str) -> dict[str, Any]:
 def _phase_errors(document: dict[str, Any], *, archived: bool) -> list[str]:
     """The milestone invariants the schema alone cannot state: the phase vocabulary, the
     ARCHIVED-iff-under-_archive equivalence, and the publication an ARCHIVED release
-    must name (the archive holds published versions only, ADR 0014)."""
+    must name (the archive holds published versions only)."""
     phase = document.get("phase")
     if phase not in PHASES:
         return [f"phase {phase!r} is not one of {', '.join(PHASES)}"]

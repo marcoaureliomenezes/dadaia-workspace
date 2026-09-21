@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-21T12:39:37Z",
+  "generated_at": "2026-09-21T12:51:25Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -120,7 +120,7 @@
       "title": "pypi-distribution",
       "area": "distribution",
       "tldr": "The PyPI package on one version axis, two console-script names, the OIDC pipeline that also publishes the skills repo, the wheel contract and the docs site.",
-      "summary": "dadaia-workspace publishes to PyPI from the release workflow under OIDC trusted publishing; pyproject version is the single source of the number, and minting is separate from publishing.",
+      "summary": "dadaia-workspace publishes to PyPI under OIDC trusted publishing from the release-please workflow; release-please owns the version, the CHANGELOG and the tag, and pyproject carries the published floor.",
       "path": "specs/memory/product/distribution/pypi-distribution.md",
       "tags": [
         "distribution",
@@ -128,7 +128,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 798,
+      "token_estimate": 837,
       "depends_on": [
         "public-asset-distribution",
         "consumer-agent-support",
@@ -434,7 +434,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 2714,
+      "token_estimate": 2712,
       "depends_on": [
         "sdd-gate-v3",
         "context-management",
@@ -509,7 +509,7 @@
         "gitflow",
         "events"
       ],
-      "token_estimate": 2526,
+      "token_estimate": 2303,
       "depends_on": [
         "workspace-doctor",
         "sdd-gate-v3",

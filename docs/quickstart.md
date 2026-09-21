@@ -7,7 +7,7 @@ defined in [concepts](concepts.md); the long walkthrough is
 
 ## 1. Install
 
-<!-- derived-from: pypi-distribution sha256:5c6e6759831f -->
+<!-- derived-from: pypi-distribution sha256:7e18d9868790 -->
 <!-- derived-from: workspace-init sha256:871519580ea1 -->
 
 ```bash
@@ -73,7 +73,7 @@ repos — and constrains nothing else. Sitting inside a repository is not a bind
 
 ## 4. Check compliance
 
-<!-- derived-from: workspace-doctor sha256:9d10438cd00e -->
+<!-- derived-from: workspace-doctor sha256:c0ef9b213b31 -->
 
 ```bash
 dadaia doctor --context demo
@@ -86,7 +86,7 @@ stalls you. There is no score: the findings and the exit code are the report.
 
 ## 5. File the first backlog entry
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:8e4c85766c6a -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:753748a55aa3 -->
 
 ```bash
 python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new my-first-idea \
@@ -100,7 +100,7 @@ only the operator creates demand.
 
 ## 6. Open the first release
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:8e4c85766c6a -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:753748a55aa3 -->
 
 ```bash
 python3 .agents/skills/dd-release-implementation/scripts/release.py new 0.1.0 \

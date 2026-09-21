@@ -14,7 +14,7 @@
 ## 1. The flow
 
 - Classify every demand: Arm A (feature) or Arm B (bug); state the arm before acting.
-- Arm A: `demand -> backlog -> release candidate (SPEC/PLAN/TASKS) -> implementation + review -> memory -> closure`.
+- Arm A: `demand -> backlog -> release candidate (SPEC/PLAN/TASKS) -> implementation + review -> memory -> closure -> promote by merging the release PR`.
 - Arm B: `propose -> operator confirms -> register -> RED test -> root-cause fix -> GREEN -> resolved`.
 - Test: does the tool break its own contract? Yes -> Arm B, fixed now. No -> Arm A, via a candidate.
 - A feature enters only through the backlog or an operator demand recorded in the SPEC `Origin`; a confirmed bug is fixed immediately.
@@ -53,7 +53,7 @@
 | Area | File | Governs |
 |---|---|---|
 | specs tree | `specs/AGENTS.md` | canon, status tokens, doctor codes |
-| releases | `specs/releases/AGENTS.md` | candidates, phases, task markers, rc-N, commit shapes |
+| releases | `specs/releases/AGENTS.md` | candidates, phases, task markers, promote, commit shapes |
 | backlog | `specs/backlog/AGENTS.md` | demand queue, `exit`, dispositions |
 | bugs | `specs/bugs/AGENTS.md` | what a bug is, propose/confirm, records, resolution |
 | memory | `specs/memory/AGENTS.md` | product truth, atoms, Part 1/Part 2, ownership |

@@ -5,7 +5,7 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:5c6e6759831f -->
+<!-- derived-from: pypi-distribution sha256:7e18d9868790 -->
 <!-- derived-from: workspace-init sha256:871519580ea1 -->
 
 ```bash
@@ -97,7 +97,7 @@ the context's main repo plus its associated repos, and it constrains nothing els
 
 ## Check compliance — `dadaia doctor`
 
-<!-- derived-from: workspace-doctor sha256:9d10438cd00e -->
+<!-- derived-from: workspace-doctor sha256:c0ef9b213b31 -->
 
 ```bash
 dadaia doctor --context <ctx> [--json] [--fix] [--redact]
@@ -121,7 +121,7 @@ its own TTL expired.
 
 ## Run the first candidate
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:8e4c85766c6a -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:753748a55aa3 -->
 
 A candidate is one closed-scope SDD cycle inside the live release. Nothing drives it:
 the documents are the state, the verbs move the state document, and the markers in
@@ -142,14 +142,14 @@ the documents are the state, the verbs move the state document, and the markers 
 5. **Implement one task at a time.** Reserve a row `[ ] → [-]`, do the work inside its
    declared write set, then `[-] → [x]` with a `conventional-commit(task-id)` commit.
 6. **Close the candidate.** `python3 .agents/skills/dd-release-implementation/scripts/release.py phase CLOSURE --sha <sha>` requires every
-   task `[x]` and stamps `implemented {sha, rc: rc + 1, ts}`. Then the memory update,
+   task `[x]` and stamps `implemented {sha, ts}`. Then the memory update,
    the closure `log` entries, the disposition sweep (`python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit`,
    `python3 .agents/skills/dd-audit-project/scripts/audit.py disposition`), artifact GC, and the `feature → develop` pull request.
-7. **Continue or promote.** `python3 .agents/skills/dd-release-implementation/scripts/release.py rc-archive` moves the completed trio into
-   the next `rc-N/`, sets `rc = N` and returns the release to `DEFINITION` for another
-   candidate; `python3 .agents/skills/dd-release-implementation/scripts/release.py archive <id> --shipped <sha> --pr <n> --next <M.m.p>`
-   ships it instead — archiving the directory, birthing the next release, appending
-   the `delivered` histo record, and printing the git lines it never runs.
+7. **Continue or promote.** Continue: the next candidate's `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id>`
+   overwrites the trio at the release root, leaving the closed one in git. Promote:
+   merge the release pull request release-please maintains on `main` — it owns the
+   version, the `CHANGELOG.md` section and the tag, and the publish jobs run in the
+   same workflow under `release_created`.
 
 A bug needs none of this: register, root-cause, RED test, fix, GREEN, resolve with
 evidence, commit — on the live feature branch, in any phase.

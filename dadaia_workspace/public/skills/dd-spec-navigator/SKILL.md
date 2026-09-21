@@ -29,7 +29,7 @@ read or any output written.
 
 ## Phase 3 — resolve the live release and its trio
 
-1. Read `<specs-dir>/releases/<release-id>/_RELEASE.json` — its `phase` field is the resolver; the live candidate's trio is always flat at the release root, `rc-N/` folders are archived candidates.
+1. Read `<specs-dir>/releases/<release-id>/_RELEASE.json` — its `phase` field is the resolver; the live candidate's trio is always flat at the release root.
 2. No state-document-carrying release directory: stop before implementation and inform the operator.
 3. Read `SPEC.md`; add `PLAN.md` when planning or implementing; add `TASKS.md` when implementing; read `_RELEASE.json`'s `log` when `phase` is `CLOSURE`/`ARCHIVED`.
 4. Verify every loaded SPEC/PLAN/TASKS carries `**Status:** Approved` before any implementation; stop and name the unapproved artifact otherwise.
@@ -45,7 +45,7 @@ read or any output written.
 
 - **workspace** the root tree holding `.dadaia/`, `repos/` and the law · **instance** a live operator-run workspace · **library** the source repo that scaffolds one.
 - **context** the active Spec Context Project · **spec context** a `specs/` tree governed by the law · **main repo** where `specs/` lives · **associated repos** its other repos.
-- **release** the open-scope publication unit, exactly one live · **candidate** one closed-scope SDD cycle inside it · **rc-N** an archived candidate's trio.
+- **release** the open-scope publication unit, exactly one live · **candidate** one closed-scope SDD cycle inside it, its closed trio left in git · **promote** merging the release PR.
 - **task marker** the `[ ] [-] [x]` trace in TASKS.md · **handoff** the JSON completion record · **verdict** a reviewer's `APPROVED`/`REJECTED` recommendation.
 - **gate** the deterministic PreToolUse chain · **path class** ADDITIVE / MUTATING / PROTECTED · **scope** the repo set a bind owns · **stall** a BLOCK whose own `fix:` is blocked.
 - **canon** the closed set of paths a `specs/` root may hold · **histo** an append-only JSONL history under an area's `_archive/` · **memory atom** one Markdown file of current truth.
