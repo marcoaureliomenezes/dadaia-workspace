@@ -12,14 +12,14 @@
         {
           "subject": {
             "kind": "code",
-            "ref": "dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_rc.py#rc_archive"
+            "ref": "dadaia_workspace/public/skills/dd-release-implementation/scripts/release.py#main"
           },
           "change": "retire — no rc-N/ lane: the closed candidate's trio is overwritten by the next candidate's; rc and implemented.rc leave release-state-v1; ADR 0006/0008/0009 superseded"
         },
         {
           "subject": {
             "kind": "code",
-            "ref": "dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_archive.py#archive_release"
+            "ref": "dadaia_workspace/public/skills/dd-release-implementation/scripts/release.py#main"
           },
           "change": "change — reads the merged release PR (number, merged sha) from gh instead of --shipped/--pr and prints the Conventional-Commits version suggestion the operator rules on at promote"
         },
