@@ -25,7 +25,7 @@ single-repo context is the degenerate case of multi-repo.
 
 ## Release and candidate
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:5268cc21ea84 -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:a6368b03c9fc -->
 
 Exactly one *release* is live at a time, named last-published-PyPI + 1 patch, with
 OPEN scope; it grows by *candidates*, each a closed-scope SDD cycle whose SPEC, PLAN
@@ -38,8 +38,8 @@ deploy.
 
 ## The flow
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:5268cc21ea84 -->
-<!-- derived-from: audits-canon sha256:c97a3c4e65b1 -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:a6368b03c9fc -->
+<!-- derived-from: audits-canon sha256:f33a4185f1ae -->
 
 Every demand takes one of two arms. **Arm A**, a feature, enters through the backlog
 and leaves through a candidate: operator demand, curation into `active[]`, a picked
@@ -70,7 +70,7 @@ feeding each fix back through the gate.
 ## Memory
 
 <!-- derived-from: context-management sha256:9166a06fab52 -->
-<!-- derived-from: workspace-doctor sha256:f17e827caadc -->
+<!-- derived-from: workspace-doctor sha256:f37b2ae38ea4 -->
 
 *Memory* is current product truth, never history: one Markdown atom per subject under
 `specs/memory/product/**`, plus `ARCHITECTURE.md`, `QUALITY.md` and `TECHSTACK.md`,
@@ -85,7 +85,7 @@ or path an atom cites that no longer exists — reported as a warning, never a r
 
 ## Bugs and backlog
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:5268cc21ea84 -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:a6368b03c9fc -->
 
 Both are records with one shape and one owning verb. `specs/bugs/BUGS.jsonl` holds one
 record per bug, appended once and keyed by `id`, with no git-derived cache — git is the
@@ -97,7 +97,7 @@ operator's demand queue, curated by `project-manager` and exited exactly once by
 
 ## Audits
 
-<!-- derived-from: audits-canon sha256:c97a3c4e65b1 -->
+<!-- derived-from: audits-canon sha256:f33a4185f1ae -->
 
 An *audit* is the only full-tree inspection lane, every other quality boundary being
 diff-scoped, and it is a committed spec artifact rather than a report: a folder under

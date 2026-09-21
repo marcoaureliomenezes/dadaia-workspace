@@ -1,7 +1,7 @@
 ---
 slug: audits-canon
 title: audits-canon
-tldr: Audits are committed spec artifacts — three pillars over a sha window, JSONL findings moved by dadaia audit disposition, archived by dadaia audit close.
+tldr: Audits are committed spec artifacts — three pillars over a sha window, JSONL findings moved by audit.py disposition, archived by audit.py close.
 summary: An audit is a committed folder holding AUDIT.md and FINDINGS.jsonl; three pillars always run together over the window since the newest archived audit; a finding's disposition and the archive are two CLI verbs, each all-or-nothing and each leaving one governance event.
 tags: [sdd, audits, findings, governance, evidence]
 ---
@@ -18,8 +18,8 @@ tags: [sdd, audits, findings, governance, evidence]
 
 ## Verbs
 
-- `dadaia audit disposition <dir> <finding-id> --disposition resolved|superseded|deferred|rejected [--release <id>] [--reason <text>]` rewrites one finding's governance triple in place through `FindingRecord.apply_governance_update` inside `JsonlRecordStore.update`, every other byte identical; `resolved`/`superseded` need `--release`, `deferred`/`rejected` need `--reason` (`core.models.histo.REQUIRED_EVIDENCE`).
-- `dadaia audit close <dir> --sha <window-end>` refuses while any finding is `open` (naming the id), appends the one `audits_histo.jsonl` `histo-record-v1` line — `disposition: resolved`, `release` = the one remediation release, `summary` = the per-disposition counts, `entry = {sha, pillars: {bugs, specs, memory}, dispositions}` — and deletes the directory; all-or-nothing, the histo append last.
+- `audit.py disposition <dir> <finding-id> --disposition resolved|superseded|deferred|rejected [--release <id>] [--reason <text>]` rewrites one finding's governance triple in place through `FindingRecord.apply_governance_update` inside `JsonlRecordStore.update`, every other byte identical; `resolved`/`superseded` need `--release`, `deferred`/`rejected` need `--reason` (`core.models.histo.REQUIRED_EVIDENCE`).
+- `audit.py close <dir> --sha <window-end>` refuses while any finding is `open` (naming the id), appends the one `audits_histo.jsonl` `histo-record-v1` line — `disposition: resolved`, `release` = the one remediation release, `summary` = the per-disposition counts, `entry = {sha, pillars: {bugs, specs, memory}, dispositions}` — and deletes the directory; all-or-nothing, the histo append last.
 - Both live in `features/specs/audit.py`; `<dir>` is confined to `specs/audits/` (an escape of any shape names the live audits), every refusal is an `AuditError` carrying exactly one `fix:` line, and each verb leaves one governance event ([[sdd-bug-backlog-governance]]).
 - `SPEC-DOC-036` (an `open` finding in an archived audit) and `SPEC-DOC-038` (a live audit whose findings are all terminal) police both directions, their `fix:` lines naming the two verbs ([[workspace-doctor]]).
 
@@ -27,7 +27,7 @@ tags: [sdd, audits, findings, governance, evidence]
 
 - The window is `[from-sha, HEAD]`, `from-sha` being the newest record in `audits/_archive/audits_histo.jsonl` (the whole history when it is empty); an audit is not a release milestone — `_RELEASE.json` carries no `audited` field — and `_ideas/` is never scanned.
 - All three pillars run together — a run reporting one of them is incomplete.
-- Pillar 1, bug history, covers every record whose registration or resolution falls in the window (git history of `BUGS.jsonl`, no stored provenance), measuring recurrence, fix-induced bugs, resolutions with no cause or regression seam, unrouted net-positive diffs, commit-shape conformance and a hunk changing an immutable core field (HIGH); registrations per session read the governance events; the `audited` field is its one stamp, written through `dadaia bugs update --set`.
+- Pillar 1, bug history, covers every record whose registration or resolution falls in the window (git history of `BUGS.jsonl`, no stored provenance), measuring recurrence, fix-induced bugs, resolutions with no cause or regression seam, unrouted net-positive diffs, commit-shape conformance and a hunk changing an immutable core field (HIGH); registrations per session read the governance events; the `audited` field is its one stamp, written through `bugs.py update --set`.
 - Pillar 2, spec compliance, runs `dadaia doctor --json` over the tree (`specs` and `ledgers` sections) and checks canon conformance, `_RELEASE.json` milestone completeness, SPEC provenance and `**Consumes:**`, and commit shapes via `git log` ([[workspace-doctor]]).
 - Pillar 3, memory and constitution drift, runs every Part-1 principle through the check its own `Measured by:` line names, compares product atoms against the code they describe, and makes a Part-1 principle changed without an accepted ADR a HIGH finding.
 - An audit is suggested every five releases and never mandatory — five `releases_histo.jsonl` records since the newest archived audit.

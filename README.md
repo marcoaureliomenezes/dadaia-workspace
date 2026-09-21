@@ -49,7 +49,7 @@ atom under its content hash.
 <!-- derived-from: pypi-distribution sha256:80d67bd879ea -->
 <!-- derived-from: workspace-init sha256:5b20a0d9dc80 -->
 <!-- derived-from: context-management sha256:9166a06fab52 -->
-<!-- derived-from: workspace-doctor sha256:f17e827caadc -->
+<!-- derived-from: workspace-doctor sha256:f37b2ae38ea4 -->
 
 ```bash
 pip install dadaia-workspace
@@ -87,7 +87,7 @@ time, **review** before the push, **close** the candidate and merge it.
 
 <!-- derived-from: agentic-entities sha256:9ba010732782 -->
 <!-- derived-from: sdd-gate-v3 sha256:a3fcecc38fa6 -->
-<!-- derived-from: sdd-bug-backlog-governance sha256:5268cc21ea84 -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:a6368b03c9fc -->
 <!-- derived-from: harness-claude-code sha256:c2aa6df58b83 -->
 <!-- derived-from: harness-codex sha256:97bdd20f5612 -->
 <!-- derived-from: harness-kimi-code sha256:e65ffffccd63 -->

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-20T22:36:46Z",
+  "generated_at": "2026-09-21T01:12:41Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -35,7 +35,7 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 444,
+      "token_estimate": 443,
       "depends_on": [
         "ARCHITECTURE",
         "TECHSTACK",
@@ -364,7 +364,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 2676,
+      "token_estimate": 2727,
       "depends_on": [
         "sdd-gate-v3",
         "context-management",
@@ -402,7 +402,7 @@
       "slug": "audits-canon",
       "title": "audits-canon",
       "area": "sdd",
-      "tldr": "Audits are committed spec artifacts — three pillars over a sha window, JSONL findings moved by dadaia audit disposition, archived by dadaia audit close.",
+      "tldr": "Audits are committed spec artifacts — three pillars over a sha window, JSONL findings moved by audit.py disposition, archived by audit.py close.",
       "summary": "An audit is a committed folder holding AUDIT.md and FINDINGS.jsonl; three pillars always run together over the window since the newest archived audit; a finding's disposition and the archive are two CLI verbs, each all-or-nothing and each leaving one governance event.",
       "path": "specs/memory/product/sdd/audits-canon.md",
       "tags": [
@@ -412,7 +412,7 @@
         "governance",
         "evidence"
       ],
-      "token_estimate": 815,
+      "token_estimate": 811,
       "depends_on": [
         "sdd-bug-backlog-governance",
         "workspace-doctor",
@@ -438,7 +438,7 @@
         "gitflow",
         "events"
       ],
-      "token_estimate": 2314,
+      "token_estimate": 2377,
       "depends_on": [
         "workspace-doctor",
         "sdd-gate-v3",

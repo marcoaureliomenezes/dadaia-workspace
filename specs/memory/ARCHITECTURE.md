@@ -103,7 +103,7 @@ Rationale: law that no asset owns is law nobody applies.
 | what a `specs/` tree may contain | `core/workspace_layout.SPECS_CANON` rows; `features/specs/canon.py` is the renderer (`scaffold`, `release_new`) and checker (`check_tree`) over them |
 | whether a projection is current | `infrastructure/projection.py`'s `ProjectionRule` plus `infrastructure/projection_rules.py::projection_rules(plan, harnesses)`; install writes and doctor compares the same table |
 | which harness a projection targets | `HarnessProjection` in `infrastructure/projection_rules.py`, with three production adapters — Claude Code, Codex, Kimi Code |
-| a bug record's status, `closed_at`, lineage and shape | `core/models/bugs.py` transition methods, every terminal one ending in `_reach_terminal` (stamps `closed_at` once); `resolve` is the one `caused_by` writer; `from_dict`/`to_dict` are the one authority on which keys a record has (the seven git-derived provenance keys are retired — no stored fact a resolver re-derives, ADR 0011); `infrastructure/jsonl_record_store.py::JsonlRecordStore.scan()` is the one parser of every JSONL record store, yielding `MalformedLine` for a bad row |
+| a bug record's status, `closed_at`, lineage and shape | the skill script `dd-bug-resolution/scripts/bugs.py` and its siblings (`_bugs_transition.py` stamps `closed_at` once per terminal verb; `resolve` is the one `caused_by` writer; `_bugs_check.py` is the one authority on which keys a record has — the seven git-derived provenance keys are retired, ADR 0011); `infrastructure/jsonl_record_store.py::JsonlRecordStore.scan()` stays the one parser of every JSONL record store the doctor reads, yielding `MalformedLine` for a bad row |
 | the `surface` enum's feature arm | `features/specs/schemas.py` appends the `features/<name>/` packages on disk at load (`x-enum-append: feature-packages`); the schema lists only the six non-feature layers and `unknown` |
 | the histo record shape, the terminal vocabulary, which disposition needs which evidence | `core/models/histo.py` — `HistoRecord`, `TERMINAL_DISPOSITIONS`, the per-ledger subsets (`FINDINGS_DISPOSITIONS` serves findings and the audits histo) and `REQUIRED_EVIDENCE` (`release` vs `reason` per disposition), read by `backlog exit`, `audit disposition` and the doctor alike; `features/specs/ledgers.py::LEDGERS` is the one table of validated ledgers |
 | an audit finding's disposition and the audit archive | `features/specs/audit.py` — `disposition_finding` (the first caller of `FindingRecord.apply_governance_update`) and `close_audit` (all-or-nothing, histo append last); `_audit_dir` confines every `<dir>` argument to `specs/audits/` |
@@ -160,7 +160,7 @@ classDiagram
 ```mermaid
 flowchart TB
     subgraph features["dadaia_workspace/features"]
-      pkgs["backlog · bugs · capabilities · certification · chokepoints · ci_preflight · export · import_ · migrate · public · reconcile · spec_context · specs · workspace"]
+      pkgs["backlog · capabilities · certification · chokepoints · ci_preflight · export · import_ · migrate · public · reconcile · spec_context · specs · workspace"]
     end
     container["container.py"] --> features
     features --> core["core"]

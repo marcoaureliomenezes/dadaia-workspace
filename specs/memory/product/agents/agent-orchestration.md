@@ -24,7 +24,7 @@ The public core roster is three Layer-1 agents (`public/agents/*.md`, ADR 0016).
 - An agent resolves or binds its context, reads the constitution, [[ARCHITECTURE]], [[TECHSTACK]], the catalog, the relevant atoms and the release artifacts, reserves tasks `[ ] -> [-]`, validates, marks `[x]`, and emits a handoff ([[agentic-entities]]); a record change goes through its governance verb, never a file tool ([[sdd-bug-backlog-governance]]).
 - Concurrent sessions are allowed and never locked: no agent acquires, holds, hands off, releases or steals a lock; races surface through git.
 - Release definition passes the reviewer's architecture, QA and product lenses before approval; implementation passes the reviewer's `APPROVED` before a candidate closes, a rejection returning it to implementation.
-- A merge requires the `security-review` check green on the PR head ([[sdd-gate-v3]]), and every verdict states the bug-surface delta from the bug record store (`dadaia bugs stats`, [[QUALITY]]).
+- A merge requires the `security-review` check green on the PR head ([[sdd-gate-v3]]), and every verdict states the bug-surface delta from the bug record store (`bugs.py stats`, [[QUALITY]]).
 - Layer-1 agent sources are model-agnostic, receiving model and effort at `public install`.
 
 ## Dependencies

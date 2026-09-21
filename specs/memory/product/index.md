@@ -1,7 +1,7 @@
 # Memory Catalog — dadaia-workspace
 
 > Generated automatically from `specs/memory/product/<area>/*.md` frontmatter.
-> The catalog section below is refreshed by `dadaia memory catalog generate`; other
+> The catalog section below is refreshed by `.agents/skills/dd-spec-navigator/scripts/memory.py catalog generate`; other
 > sections of this file are preserved verbatim.
 
 ## Feature catalog
@@ -52,6 +52,6 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `audits-canon` | audits-canon | Audits are committed spec artifacts — three pillars over a sha window, JSONL findings moved by dadaia audit disposition, archived by dadaia audit close. |
+| `audits-canon` | audits-canon | Audits are committed spec artifacts — three pillars over a sha window, JSONL findings moved by audit.py disposition, archived by audit.py close. |
 | `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | One bug record shape with no derived cache, one verb per governance record change, and every committed record schema-validated by dadaia doctor. |
 | `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write), one fix line per BLOCK, chokepoints at the push. |

@@ -88,7 +88,7 @@ the context's main repo plus its associated repos, and it constrains nothing els
 
 ## Check compliance — `dadaia doctor`
 
-<!-- derived-from: workspace-doctor sha256:f17e827caadc -->
+<!-- derived-from: workspace-doctor sha256:f37b2ae38ea4 -->
 
 ```bash
 dadaia doctor --context <ctx> [--json] [--fix] [--redact]
@@ -112,7 +112,7 @@ its own TTL expired.
 
 ## Run the first candidate
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:5268cc21ea84 -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:a6368b03c9fc -->
 
 A candidate is one closed-scope SDD cycle inside the live release. Nothing drives it:
 the documents are the state, the verbs move the state document, and the markers in
