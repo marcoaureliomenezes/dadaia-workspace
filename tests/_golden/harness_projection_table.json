@@ -413,13 +413,6 @@
     "link_to": null
   },
   {
-    "label": "agents:skills/dd-release-implementation/scripts/_release_histo.py",
-    "harness": "agents",
-    "dst": "ws:.agents/skills/dd-release-implementation/scripts/_release_histo.py",
-    "compare": "bytes",
-    "link_to": null
-  },
-  {
     "label": "agents:skills/dd-release-implementation/scripts/_release_new.py",
     "harness": "agents",
     "dst": "ws:.agents/skills/dd-release-implementation/scripts/_release_new.py",

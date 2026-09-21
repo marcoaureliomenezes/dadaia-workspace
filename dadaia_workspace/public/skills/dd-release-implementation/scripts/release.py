@@ -49,6 +49,8 @@ def _parser() -> argparse.ArgumentParser:
         if verb == "phase":
             command.add_argument("phase", help="IMPLEMENTATION or CLOSURE")
             command.add_argument("--sha", required=True, help="the commit the milestone names")
+            command.add_argument("--pr", type=int, default=None,
+                                 help="CLOSURE only: the merged release PR number")  # fmt: skip
         if verb == "check":
             command.add_argument("--json", action="store_true", help="emit findings as JSON")
     return parser
@@ -62,7 +64,7 @@ def _new(args: argparse.Namespace, specs: Path) -> int:
 
 
 def _phase(args: argparse.Namespace, specs: Path) -> int:
-    release_id, ts = set_phase(specs, args.phase.upper(), args.sha)
+    release_id, ts = set_phase(specs, args.phase.upper(), args.sha, args.pr)
     print(f"[ok] release {release_id} -> phase {args.phase.upper()} ({ts})")
     return 0
 

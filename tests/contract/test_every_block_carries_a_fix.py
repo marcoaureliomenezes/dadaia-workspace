@@ -384,7 +384,6 @@ _SHELL_FIX_CODES: dict[str, str] = {
     "SPEC-DOC-030": "git mv — rename the audit directory to YYYYMMDD-slug",
     "SPEC-DOC-037": "sed — drop the stale enum line",
     "SPEC-DOC-039": "mkdir/git mv — move the abandoned release aside",
-    "SPEC-DOC-045": "sed — align pyproject's version with the live release",
     "SPEC-DOC-047": "sed — drop the stale memory task line",
     "SPEC-DOC-048": "sed — append the missing SPEC Origin line",
     "TREE-3": "printf — append the missing memory title",
@@ -396,8 +395,7 @@ _SHELL_FIX_CODES: dict[str, str] = {
     "BL-SCHEMA": "sed — correct the offending BACKLOG.json line",
     "LEDGER-ADR-SCHEMA": "sed — correct the offending decisions.jsonl record",
     "RELEASE-TREE-SCHEMA/RELEASE-TREE-PARSE/RELEASE-TREE-TS-ORDER/RELEASE-TREE-PHASE/"
-    "RELEASE-TREE-ARCHIVED/RELEASE-TREE-TRIO/RELEASE-TREE-STATE-MISSING/"
-    "RELEASE-TREE-ARCHIVE-ID/RELEASE-TREE-ARCHIVE-UNSHIPPED": (
+    "RELEASE-TREE-ARCHIVED/RELEASE-TREE-TRIO/RELEASE-TREE-STATE-MISSING": (
         "sed — correct the offending _RELEASE.json value"
     ),
 }

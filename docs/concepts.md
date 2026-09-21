@@ -70,7 +70,7 @@ feeding each fix back through the gate.
 ## Memory
 
 <!-- derived-from: context-management sha256:160b285ee271 -->
-<!-- derived-from: workspace-doctor sha256:f37b2ae38ea4 -->
+<!-- derived-from: workspace-doctor sha256:9d10438cd00e -->
 
 *Memory* is current product truth, never history: one Markdown atom per subject under
 `specs/memory/product/**`, plus `ARCHITECTURE.md`, `QUALITY.md` and `TECHSTACK.md`,

@@ -68,12 +68,21 @@ def refuse_unfinished(live: Live, what: str, fix: str) -> None:
         )
 
 
-def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
-    """Move the live release to *phase* and stamp the milestone that phase records."""
+def set_phase(specs: Path, phase: str, sha: str, pr: int | None = None) -> tuple[str, str]:
+    """Move the live release to *phase* and stamp the milestone that phase records.
+
+    *pr* is the merged release PR number, recorded in the CLOSURE note: promoting a
+    release leaves a number in the log, not a moved directory.
+    """
     if not SHA_RE.match(sha):
         raise Refusal(
             f"--sha {sha!r} is not a 7-40 character lowercase hex commit sha",
             f"{SCRIPT} phase {phase} --sha $(git rev-parse --short HEAD)",
+        )
+    if pr is not None and phase != "CLOSURE":
+        raise Refusal(
+            f"--pr names the merged release PR and belongs to CLOSURE, not {phase}",
+            f"{SCRIPT} phase {phase} --sha {sha}",
         )
     if phase not in PREDECESSOR:
         raise Refusal(
@@ -105,7 +114,8 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
             note(state, ts, f"Candidate defined at {sha}; phase IMPLEMENTATION.")
         else:
             state["implemented"] = {"sha": sha, "ts": ts}
-            note(state, ts, f"Candidate implemented at {sha}; phase CLOSURE.")
+            promoted = f" Release PR #{pr} merged." if pr is not None else ""
+            note(state, ts, f"Candidate implemented at {sha}; phase CLOSURE.{promoted}")
         state["phase"] = phase
         return state
 

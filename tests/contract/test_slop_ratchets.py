@@ -34,7 +34,7 @@ _DOCSTRING_OWNERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctio
 # RECORDED CEILING (ratchet DOWN ONLY) — measured 2026-09-20 on this HEAD, every comment
 # token plus every docstring line under dadaia_workspace/**/*.py. Lower it in the commit
 # that deletes the ids; raising it is never a ratchet move.
-_V32_CEILING = 682
+_V32_CEILING = 658
 
 
 def _governance_id_lines(source: str) -> int:
@@ -193,8 +193,8 @@ def test_v33_prefix_families_without_a_mechanical_reader() -> None:
 # RECORDED PINS (ratchet DOWN ONLY) — measured on the post-candidate corpus: every
 # tracked `*.py` under dadaia_workspace/public/skills/*/scripts/. A ledger's writer moved
 # out of the CLI ONCE; a growing corpus after that is CLI code re-typed, not code moved.
-_V36_FILE_CEILING = 32
-_V36_LINE_CEILING = 3720
+_V36_FILE_CEILING = 31
+_V36_LINE_CEILING = 3658
 
 
 def _skill_scripts() -> list[Path]:
@@ -206,7 +206,7 @@ def _skill_scripts() -> list[Path]:
 
 
 def test_v36_skill_script_corpus_is_pinned() -> None:
-    """V36 — at most 32 skill-script files and 3,720 total lines of skill Python. The
+    """V36 — at most 31 skill-script files and 3,658 total lines of skill Python. The
     ledger writers moved out of the CLI once: growth here is a verb regrown, never moved."""
     scripts = _skill_scripts()
     assert len(scripts) <= _V36_FILE_CEILING, (

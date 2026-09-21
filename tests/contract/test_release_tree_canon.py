@@ -212,23 +212,62 @@ def _archived(release: str, **overrides: Any) -> dict[str, Any]:
     return doc
 
 
-def test_archived_release_at_or_above_the_live_one_is_refused(tmp_path: Path) -> None:
-    """The archive holds published versions only (operator ruling 2026-09-14, ADR 0014):
-    the live release is last-published + 1 patch, so nothing at or above it shipped."""
+def test_an_archived_release_at_or_above_the_live_one_is_no_longer_ranked(
+    tmp_path: Path,
+) -> None:
+    """The archive stopped being ranked against the live release id (T-047-90). Its
+    documents are still listed, parsed and checked for phase and ts order — they are
+    simply no longer compared with a number a bot now mints, so a version above the
+    live one under _archive/ is history, not a finding."""
     _write_release(tmp_path, "0.4.7", _valid_document(release="0.4.7"), trio=False)
     _write_release(tmp_path, "_archive/0.5.0", _archived("0.5.0"))
     _write_release(tmp_path, "_archive/0.4.6", _archived("0.4.6"))
-    issues = validate_release_tree(tmp_path)
-    assert _codes(issues) == ["RELEASE-TREE-ARCHIVE-ID"], issues
-    assert "scripts/release.py fold 0.5.0 --into" in issues[0].message
+    assert validate_release_tree(tmp_path) == []
 
 
-def test_archived_release_without_a_publication_is_refused(tmp_path: Path) -> None:
+def test_an_archived_release_without_a_publication_is_no_longer_refused(
+    tmp_path: Path,
+) -> None:
+    """No verb moves a directory into _archive/ any more, so an archived document
+    carrying no shipped sha/pr has no verb to repair it — it is read, not ranked."""
     _write_release(tmp_path, "0.4.7", _valid_document(release="0.4.7"), trio=False)
     _write_release(tmp_path, "_archive/0.4.5", _archived("0.4.5", shipped=None))
-    issues = validate_release_tree(tmp_path)
-    assert _codes(issues) == ["RELEASE-TREE-ARCHIVE-UNSHIPPED"], issues
-    assert "scripts/release.py fold 0.4.5 --into" in issues[0].message
+    assert validate_release_tree(tmp_path) == []
+
+
+def test_an_archived_document_is_still_checked_for_phase_and_ts_order(
+    tmp_path: Path,
+) -> None:
+    """The walk kept every rule that reads the document itself: only the two rules
+    that ranked it against a live id died."""
+    _write_release(tmp_path, "0.4.7", _valid_document(release="0.4.7"), trio=False)
+    _write_release(
+        tmp_path,
+        "_archive/0.4.4",
+        _archived(
+            "0.4.4",
+            log=[
+                {"ts": "2026-09-02T00:00:00Z", "agent": "a", "kind": "note", "text": "y"},
+                {"ts": "2026-09-01T00:00:00Z", "agent": "a", "kind": "note", "text": "x"},
+            ],
+        ),
+    )
+    assert _codes(validate_release_tree(tmp_path)) == ["RELEASE-TREE-TS-ORDER"]
+
+
+def test_no_archive_ranking_code_is_emitted_anywhere(tmp_path: Path) -> None:
+    """`ARCHIVE-ID` and `ARCHIVE-UNSHIPPED` are gone from the validator's whole
+    vocabulary — asserted over its source, so a re-introduction is caught even by a
+    fixture nobody wrote."""
+    from dadaia_workspace.features.specs import release_tree
+
+    source = Path(release_tree.__file__).read_text(encoding="utf-8")
+    assert "ARCHIVE-ID" not in source and "ARCHIVE-UNSHIPPED" not in source, source
+
+    from dadaia_workspace.features.specs import rules
+
+    rules_source = Path(rules.__file__).read_text(encoding="utf-8")
+    assert "ARCHIVE-ID" not in rules_source and "ARCHIVE-UNSHIPPED" not in rules_source
 
 
 def test_a_published_archived_release_below_the_live_one_is_clean(tmp_path: Path) -> None:

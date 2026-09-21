@@ -208,12 +208,10 @@ _UNEXERCISED: dict[str, str] = {
     "SPEC-DOC-037": "the fix deletes a runtime-enum line from the constitution; the line "
     "is operator content",
     "SPEC-DOC-041": "the fix is `bugs archive`, exercised by the bugs CLI suite",
-    "SPEC-DOC-045": "the fix rewrites pyproject.toml's version; a tmp specs tree has no pyproject",
     "SPEC-DOC-047": "the fix deletes a memory task line from TASKS.md; the line is "
     "operator content",
     "RELEASE-TREE-SCHEMA/RELEASE-TREE-PARSE/RELEASE-TREE-TS-ORDER/RELEASE-TREE-PHASE/"
-    "RELEASE-TREE-ARCHIVED/RELEASE-TREE-TRIO/RELEASE-TREE-STATE-MISSING/"
-    "RELEASE-TREE-ARCHIVE-ID/RELEASE-TREE-ARCHIVE-UNSHIPPED": "the fix "
+    "RELEASE-TREE-ARCHIVED/RELEASE-TREE-TRIO/RELEASE-TREE-STATE-MISSING": "the fix "
     "rewrites one _RELEASE.json value; which value depends on which of the seven "
     "conformance codes fired; the two archive codes name `dadaia release fold`, "
     "exercised by tests/unit/features/specs/test_candidate_fold.py",

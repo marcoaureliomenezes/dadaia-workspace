@@ -76,12 +76,13 @@
   (measured after the deletion, whichever is lower); `test_public_scripts_thin_wrapper.py` roster
   unchanged for `release.py`, ceiling re-measured. Fails today: the schema still declares `rc`.
   Write set: the `dd-release-implementation/scripts/` survivors
-  `{release,_release_phase,_release_schema,_release_new,_release_tree,_release_check,_release_histo}.py`
+  `{release,_release_phase,_release_schema,_release_new,_release_tree,_release_check}.py`
   plus deletion of `{_release_rc,_release_fold,_release_fold_plan,_release_archive}.py`;
+
   `public/schemas/releases/release-state-v1.schema.json`; `tests/contract/`
   `{test_release_state_schema,test_slop_ratchets,test_public_scripts_thin_wrapper}.py`.
 
-- [ ] T-047-90 — FR2: the doctor stops policing an archive nobody writes.
+- [x] T-047-90 — FR2: the doctor stops policing an archive nobody writes.
   `release_tree.py`: `_archive_issues()` and the `RELEASE-TREE-ARCHIVE-ID` /
   `RELEASE-TREE-ARCHIVE-UNSHIPPED` codes are deleted; the walk keeps listing `_archive/**` and
   validating those documents against the schema, phase and ts-order rules (history stays
@@ -96,17 +97,17 @@
   RED: `test_release_tree_canon.py` — the two archive cases are REWRITTEN (not deleted) to assert
   the previously-refused fixtures now produce no issue, and `ARCHIVE-ID`/`ARCHIVE-UNSHIPPED`
   appear in no issue code anywhere; `test_doctor_pyproject_version.py` is deleted whole citing
-  "feature removed" (`dd-test-stewardship` decision table), `SPEC-DOC-045` asserted absent from
+  "feature removed", `SPEC-DOC-045` asserted absent from
   `test_every_block_carries_a_fix.py`'s roster; a new `phase CLOSURE --pr` case asserts the number
   lands in the `log` and that omitting the flag is still accepted; `test_release_semver_canon.py`
   tightens to manifest version == `pyproject.toml` version == `0.4.6` (D10). V32 (682), V33 (35) and the
-  module ceiling (699/700) re-pinned DOWN to measured. Fails today: both rules still fire.
+  module ceiling (699/700) re-pinned DOWN to measured. `_release_histo.py` dies with its importers.
   Write set: `features/specs/{release_tree,doctor_release}.py`, `pyproject.toml`,
   `.release-please-manifest.json`,
   `dd-release-implementation/scripts/{release,_release_phase}.py`, `tests/contract/`
-  `{test_release_tree_canon,test_every_block_carries_a_fix,test_slop_ratchets}.py`, deletion of
-  `tests/unit/features/specs/test_doctor_pyproject_version.py`,
-  `specs/memory/product/platform/workspace-doctor.md`.
+  `{test_release_tree_canon,test_release_semver_canon,test_every_block_carries_a_fix,
+  test_slop_ratchets}.py`, deletion of `test_doctor_pyproject_version.py` and
+  `_release_histo.py`, `specs/memory/product/platform/workspace-doctor.md`.
 
 - [ ] T-047-91 — FR3: the law stops naming verbs that no longer exist.
   Every `rc-archive` / `release.py fold` / `release.py archive` / `rc-N` mention leaves

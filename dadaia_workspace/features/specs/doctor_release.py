@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import json
 import re
-import tomllib
 from collections.abc import Callable, Collection
 from datetime import date
 from pathlib import Path
@@ -664,31 +663,3 @@ class ReleaseValidator:
         legacy = Path(issue.path)  # type: ignore[arg-type]
         if legacy.is_file():
             legacy.rename(legacy.with_name(RELEASE_STATE_FILENAME))
-
-    def check_pyproject_version_matches_release(
-        self, repo_root: Path | None
-    ) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-045 (bug release-shipped-without-a-pyproject-version-bump):
-        pyproject.toml's [tool.poetry].version must equal the release id once the
-        active release reaches CLOSURE/ARCHIVED — read directly off disk, never
-        installed-package metadata. Silent absent repo_root/pyproject.toml/release.
-        """
-        if repo_root is None or not (pyproject_path := repo_root / "pyproject.toml").is_file():
-            return []
-        active = self.tree.active_release
-        release, phase, err = active.release, active.phase, active.error
-        if err or not release or phase not in {"CLOSURE", "ARCHIVED"}:
-            return []
-        try:
-            data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
-        except (tomllib.TOMLDecodeError, OSError):
-            return []
-        version = data.get("tool", {}).get("poetry", {}).get("version", "")
-        if not version or version == release:
-            return []
-        description = (
-            f"Active release '{release}' is phase '{phase}' but pyproject.toml mints "
-            f"'{version}' — bump [tool.poetry].version to the release id (SPEC-DOC-045)."
-        )
-        issue = SpecsDoctorIssue("SPEC-DOC-045", Severity.ERROR, description, str(pyproject_path))
-        return [issue]

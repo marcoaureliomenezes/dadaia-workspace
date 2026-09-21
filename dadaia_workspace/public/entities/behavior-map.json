@@ -35,7 +35,7 @@
   ],
   "rows": [
     {
-      "section": "§2 Who does what",
+      "section": "\u00a72 Who does what",
       "anchor": null,
       "skill": "dd-manager-orchestration",
       "scoped_agents_md": [],
@@ -49,7 +49,7 @@
       "recorded_at": "2026-09-20"
     },
     {
-      "section": "§6 Skills — `.agents/skills/dd-*`",
+      "section": "\u00a76 Skills \u2014 `.agents/skills/dd-*`",
       "anchor": null,
       "skill": "dd-codebase-design",
       "scoped_agents_md": [],
@@ -63,7 +63,7 @@
       "recorded_at": "2026-09-21"
     },
     {
-      "section": "§2 Who does what",
+      "section": "\u00a72 Who does what",
       "anchor": null,
       "skill": "dd-ai-eng-knowhow",
       "scoped_agents_md": [],
@@ -77,7 +77,7 @@
       "recorded_at": "2026-09-21"
     },
     {
-      "section": "§3 What is enforced",
+      "section": "\u00a73 What is enforced",
       "anchor": null,
       "skill": "dd-gitflow-default",
       "scoped_agents_md": [],
@@ -91,7 +91,7 @@
       "recorded_at": "2026-09-20"
     },
     {
-      "section": "§4 Where things are written",
+      "section": "\u00a74 Where things are written",
       "anchor": null,
       "skill": "dd-handoff-emitter",
       "scoped_agents_md": [
@@ -109,7 +109,7 @@
       "recorded_at": "2026-09-20"
     },
     {
-      "section": "§5 Scoped law — open before acting there",
+      "section": "\u00a75 Scoped law \u2014 open before acting there",
       "anchor": null,
       "skill": null,
       "scoped_agents_md": [
@@ -127,7 +127,7 @@
       "recorded_at": "2026-09-20"
     },
     {
-      "section": "§4 Where things are written",
+      "section": "\u00a74 Where things are written",
       "anchor": null,
       "skill": null,
       "scoped_agents_md": [
@@ -145,7 +145,7 @@
       "recorded_at": "2026-09-20"
     },
     {
-      "section": "§1 The flow",
+      "section": "\u00a71 The flow",
       "anchor": "backlog",
       "skill": "dd-backlog-definition",
       "scoped_agents_md": [
@@ -163,7 +163,7 @@
       "recorded_at": "2026-09-20"
     },
     {
-      "section": "§1 The flow",
+      "section": "\u00a71 The flow",
       "anchor": "releases",
       "skill": "dd-release-definition",
       "scoped_agents_md": [],
@@ -177,7 +177,7 @@
       "recorded_at": "2026-09-20"
     },
     {
-      "section": "§1 The flow",
+      "section": "\u00a71 The flow",
       "anchor": "releases",
       "skill": "dd-release-implementation",
       "scoped_agents_md": [
@@ -186,7 +186,7 @@
       "hash_tuple": {
         "section": "sha256:92b4c51166643f34f0f704270976142e8a30d182ed374c13253d232ae53756da",
         "skill": "sha256:a4d24da4dfecb56c065531b661439def06f2bc7ccf3abbc4028e36fffad6e558",
-        "scripts": "sha256:3100b7606823ce5fe684e3e0c2be2fa074e9bf04efd9e1d0984cd1fcb4da4445",
+        "scripts": "sha256:0e8eb4bbb85f2014e8ea3f98210ba04e9e25bc45cdd5e35d36862feb1515dd3b",
         "scoped": [
           "sha256:0385fe2b0146d3365f4837db79d74f899af91b997c6fcb5452b79ff88ac154f3"
         ]
@@ -195,7 +195,7 @@
       "recorded_at": "2026-09-20"
     },
     {
-      "section": "§6 Skills — `.agents/skills/dd-*`",
+      "section": "\u00a76 Skills \u2014 `.agents/skills/dd-*`",
       "anchor": "audits",
       "skill": "dd-audit-project",
       "scoped_agents_md": [
@@ -213,7 +213,7 @@
       "recorded_at": "2026-09-20"
     },
     {
-      "section": "§5 Scoped law — open before acting there",
+      "section": "\u00a75 Scoped law \u2014 open before acting there",
       "anchor": "adrs",
       "skill": null,
       "scoped_agents_md": [
@@ -231,7 +231,7 @@
       "recorded_at": "2026-09-20"
     },
     {
-      "section": "§1 The flow",
+      "section": "\u00a71 The flow",
       "anchor": "releases",
       "skill": "dd-grill-me",
       "scoped_agents_md": [],
@@ -245,7 +245,7 @@
       "recorded_at": "2026-09-21"
     },
     {
-      "section": "§5 Scoped law — open before acting there",
+      "section": "\u00a75 Scoped law \u2014 open before acting there",
       "anchor": null,
       "skill": "dd-spec-navigator",
       "scoped_agents_md": [
@@ -263,7 +263,7 @@
       "recorded_at": "2026-09-20"
     },
     {
-      "section": "§1 The flow",
+      "section": "\u00a71 The flow",
       "anchor": "bugs",
       "skill": "dd-bug-resolution",
       "scoped_agents_md": [],
@@ -277,7 +277,7 @@
       "recorded_at": "2026-09-21"
     },
     {
-      "section": "§1 The flow",
+      "section": "\u00a71 The flow",
       "anchor": "bugs",
       "skill": "dd-bug-registration",
       "scoped_agents_md": [
@@ -295,7 +295,7 @@
       "recorded_at": "2026-09-20"
     },
     {
-      "section": "§6 Skills — `.agents/skills/dd-*`",
+      "section": "\u00a76 Skills \u2014 `.agents/skills/dd-*`",
       "anchor": null,
       "skill": "dd-test-stewardship",
       "scoped_agents_md": [
@@ -313,7 +313,7 @@
       "recorded_at": "2026-09-21"
     },
     {
-      "section": "§5 Scoped law — open before acting there",
+      "section": "\u00a75 Scoped law \u2014 open before acting there",
       "anchor": null,
       "skill": null,
       "scoped_agents_md": [
@@ -331,7 +331,7 @@
       "recorded_at": "2026-09-20"
     },
     {
-      "section": "§4 Where things are written",
+      "section": "\u00a74 Where things are written",
       "anchor": null,
       "skill": "dd-cli-library",
       "scoped_agents_md": [],
@@ -345,7 +345,7 @@
       "recorded_at": "2026-09-20"
     },
     {
-      "section": "§4 Where things are written",
+      "section": "\u00a74 Where things are written",
       "anchor": null,
       "skill": null,
       "scoped_agents_md": [
@@ -363,7 +363,7 @@
       "recorded_at": "2026-09-20"
     },
     {
-      "section": "§5 Scoped law — open before acting there",
+      "section": "\u00a75 Scoped law \u2014 open before acting there",
       "anchor": null,
       "skill": null,
       "scoped_agents_md": [
@@ -381,7 +381,7 @@
       "recorded_at": "2026-09-20"
     },
     {
-      "section": "§6 Skills — `.agents/skills/dd-*`",
+      "section": "\u00a76 Skills \u2014 `.agents/skills/dd-*`",
       "anchor": null,
       "skill": "dd-architecture-survey",
       "scoped_agents_md": [],
@@ -395,7 +395,7 @@
       "recorded_at": "2026-09-21"
     },
     {
-      "section": "§2 Who does what",
+      "section": "\u00a72 Who does what",
       "anchor": null,
       "skill": "dd-code-review",
       "scoped_agents_md": [],
@@ -409,7 +409,7 @@
       "recorded_at": "2026-09-21"
     },
     {
-      "section": "§6 Skills — `.agents/skills/dd-*`",
+      "section": "\u00a76 Skills \u2014 `.agents/skills/dd-*`",
       "anchor": null,
       "skill": "dd-domain-modeling",
       "scoped_agents_md": [],

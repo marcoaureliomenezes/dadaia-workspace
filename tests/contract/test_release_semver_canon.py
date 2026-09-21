@@ -260,6 +260,17 @@ def test_release_please_manifest_sits_at_the_last_published_version() -> None:
         f"the manifest version must be a bare SemVer (no `v` prefix): {version!r}"
     )
 
+    import tomllib
+
+    minted = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))["tool"][
+        "poetry"
+    ]["version"]
+    assert minted == version, (
+        f"pyproject.toml mints {minted!r} but the release-please manifest floor is "
+        f"{version!r} — release-please reads the manifest and expects pyproject to "
+        "agree; the two move together, in one bot-authored commit (D10, T-047-90)"
+    )
+
     tags = _published_tags()
     if not tags:
         pytest.skip("no v* tags in this checkout (shallow CI clone) — floor unverifiable here")

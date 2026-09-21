@@ -11,8 +11,7 @@ doctor printed zero errors (bug
 
 :func:`validate_release_tree` is that missing reader: ONE walk over every release
 directory, ONE list of issues, no I/O beyond reading each state document. Its callers
-are the doctor's release rule (T-047-02), ``rc-archive``/``release archive``
-(T-047-09) and the contract test over this repo's own tree —
+are the doctor's release rule and the contract test over this repo's own tree —
 ``doctor_common.iter_all_release_dirs`` is not one of them: it enumerates the
 pre-0.5.0 ``specs/_archive/releases/`` layout and classifies a directory by the
 presence of a SPEC/PLAN/TASKS artifact, while this validator must walk the current
@@ -24,14 +23,12 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from jsonschema import Draft202012Validator
 
-from dadaia_workspace.core.kernel_tunables import RELEASE_SCRIPT
 from dadaia_workspace.core.release_state import PHASES, parse_release_state, release_state_file
 from dadaia_workspace.features.specs.doctor_common import RELEASE_ARTIFACTS
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
@@ -51,7 +48,8 @@ __all__ = [
 #: here would be a copy that can drift.
 RELEASE_TREE_PHASES: tuple[str, ...] = PHASES
 
-#: The ``_RELEASE.json`` fields a verb OWNS, and therefore the exact shape the
+#: A release directory's name is its bare SemVer id — the one rule that tells a
+#: release directory apart from ``_archive``, ``AGENTS.md`` and an ``rc-N/`` archive.
 _SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 _SCHEMA_NAME = "releases/release-state-v1"
 
@@ -181,11 +179,15 @@ def validate_release_tree(specs_dir: Path) -> list[ReleaseTreeIssue]:
     ``ARCHIVED`` iff the directory sits under ``_archive/``; a live release in
     IMPLEMENTATION or CLOSURE carries its SPEC/PLAN/TASKS trio
     (:data:`_TRIO_REQUIRED_PHASES`).
+
+    Every rule here reads the document alone. An archived release is never ranked
+    against the live release id: no verb moves a directory into ``_archive/`` any
+    more, the version is minted by release-please rather than by this tree, and
+    history is read, not repaired.
     """
     issues: list[ReleaseTreeIssue] = []
     validator = validator_for(_SCHEMA_NAME)
     dirs = _release_dirs(specs_dir / "releases")
-    live_ids = [d.name for d, archived in dirs if not archived]
     for release_dir, archived in dirs:
         dir_rel = release_dir.relative_to(specs_dir).as_posix()
         state_path = release_state_file(release_dir)
@@ -203,62 +205,7 @@ def validate_release_tree(specs_dir: Path) -> list[ReleaseTreeIssue]:
             continue
         issues.extend(_trio_issues(release_dir, dir_rel, doc, archived=archived))
         issues.extend(_document_issues(doc, text, rel, archived=archived, validator=validator))
-        if archived:
-            issues.extend(_archive_issues(doc, rel, release_dir.name, live_ids))
     return issues
-
-
-def _semver_key(release_id: str) -> tuple[int, ...]:
-    return tuple(int(part) for part in release_id.split("."))
-
-
-def _archive_issues(
-    doc: Any, rel: str, release_id: str, live_ids: list[str]
-) -> list[ReleaseTreeIssue]:
-    """The archive holds PUBLISHED versions only (operator ruling 2026-09-14, ADR 0014):
-    every candidate closed between two publications is an ``rc-N/`` of the version that
-    published it, never its own archived release. Two shapes violate that and both are
-    errors: an archived id at or above the live release (a version that was never
-    minted at deploy — the live release IS last-published + 1 patch, so nothing above it
-    can have shipped), and an archived release whose ``shipped`` carries no sha/pr (it
-    never went through the ship lane). Both repair through ONE governed verb,
-    ``release.py fold``, never a hand move."""
-    if (
-        not isinstance(doc, Mapping)
-        or doc.get("phase") != "ARCHIVED"
-        or not _SEMVER_RE.match(release_id)
-    ):
-        return []  # a non-ARCHIVED document under the archive is RELEASE-TREE-ARCHIVED's
-    issues: list[ReleaseTreeIssue] = []
-    fix = f"{RELEASE_SCRIPT} fold {release_id} --into <published-id> --shipped <sha> --pr <n>"
-    above = [live for live in live_ids if _semver_key(release_id) >= _semver_key(live)]
-    if above:
-        issues.append(
-            ReleaseTreeIssue(
-                rel,
-                "RELEASE-TREE-ARCHIVE-ID",
-                f"archived release {release_id} is not below the live release "
-                f"{above[0]} — the archive holds published versions only; a candidate "
-                f"closed before a publication is rc-N of the version that published it. "
-                f"fix: {fix}",
-            )
-        )
-    shipped = doc.get("shipped")
-    if not (isinstance(shipped, Mapping) and shipped.get("sha") and shipped.get("pr")):
-        issues.append(
-            ReleaseTreeIssue(
-                rel,
-                "RELEASE-TREE-ARCHIVE-UNSHIPPED",
-                f"archived release {release_id} carries no shipped sha/pr — it never went "
-                f"through the ship lane and is a candidate of the version that published "
-                f"it. fix: {fix}",
-            )
-        )
-    return issues
-
-
-#: The one code this validator emits that is not a conformance failure: the document
-#: is valid and merely unexplained (0.4.7 FR6). Judgment, so WARNING and no `fix:`.
 
 
 def release_tree_issues(specs_dir: Path) -> list[SpecsDoctorIssue]:

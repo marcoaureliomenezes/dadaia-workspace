@@ -165,6 +165,40 @@ def test_phase_closure_stamps_the_implemented_milestone(script: Path, tmp_path: 
     assert state["implemented"] == {"sha": "beef123", "ts": state["implemented"]["ts"]}
 
 
+def test_phase_closure_records_the_merged_release_pr(script: Path, tmp_path: Path) -> None:
+    """T-047-90: the number `archive --pr <n>` carried moves to the one living verb.
+    Promote leaves a number in the log, not a moved directory."""
+    specs = _specs(tmp_path)
+    _release(specs, "0.5.0", phase="IMPLEMENTATION")
+    result = _run(
+        script, "phase", "CLOSURE", "--sha", "beef123", "--pr", "261", "--specs", str(specs)
+    )
+    assert result.returncode == 0, result.stderr
+    state = _read(specs / "releases" / "0.5.0" / "_RELEASE.json")
+    notes = [entry["text"] for entry in state["log"] if entry["kind"] == "note"]
+    assert any("#261" in text for text in notes), notes
+
+
+def test_phase_closure_without_a_pr_is_still_accepted(script: Path, tmp_path: Path) -> None:
+    """`--pr` is optional: a candidate that closes without promoting names no PR."""
+    specs = _specs(tmp_path)
+    _release(specs, "0.5.0", phase="IMPLEMENTATION")
+    result = _run(script, "phase", "CLOSURE", "--sha", "beef123", "--specs", str(specs))
+    assert result.returncode == 0, result.stderr
+    state = _read(specs / "releases" / "0.5.0" / "_RELEASE.json")
+    notes = [entry["text"] for entry in state["log"] if entry["kind"] == "note"]
+    assert not any("#" in text for text in notes), notes
+
+
+def test_phase_refuses_a_non_numeric_pr(script: Path, tmp_path: Path) -> None:
+    specs = _specs(tmp_path)
+    _release(specs, "0.5.0", phase="IMPLEMENTATION")
+    result = _run(
+        script, "phase", "CLOSURE", "--sha", "beef123", "--pr", "zero", "--specs", str(specs)
+    )
+    assert result.returncode != 0
+
+
 def test_phase_refuses_an_out_of_order_transition(script: Path, tmp_path: Path) -> None:
     specs = _specs(tmp_path)
     _release(specs, "0.5.0")

@@ -261,11 +261,6 @@ RULES: tuple[SpecsRule, ...] = (
         fix_help="python3 .agents/skills/dd-bug-resolution/scripts/bugs.py archive",
     ),
     _rule(
-        ("SPEC-DOC-045",),
-        lambda d: d._release.check_pyproject_version_matches_release(d.repo_root),
-        fix_help="sed -i 's/^version = .*/version = \"<live release id>\"/' pyproject.toml",
-    ),
-    _rule(
         ("SPEC-DOC-047",),
         lambda d: d._release.check_no_memory_task(),
         fix_help="sed -i '\\|<memory task line>|d' specs/releases/<id>/TASKS.md",
@@ -287,8 +282,6 @@ RULES: tuple[SpecsRule, ...] = (
             "RELEASE-TREE-ARCHIVED",
             "RELEASE-TREE-TRIO",
             "RELEASE-TREE-STATE-MISSING",
-            "RELEASE-TREE-ARCHIVE-ID",
-            "RELEASE-TREE-ARCHIVE-UNSHIPPED",
         ),
         lambda d: release_tree_issues(d.specs_dir),
         fix_help="sed -i 's|<invalid value>|<canonical value>|' specs/releases/<id>/_RELEASE.json",
