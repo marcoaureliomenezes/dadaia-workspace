@@ -258,7 +258,11 @@ def test_v34_live_candidate_trio_bytes_under_the_fixed_ceiling() -> None:
     a fixed ceiling, never a pin."""
     live = _live_release_dir()
     if live is not None:
-        sizes = {name: (live / name).stat().st_size for name in _V34_CEILINGS}
+        # A candidate in DEFINITION may hold only its SPEC.md at the root (rc-archive
+        # ran, PLAN/TASKS not yet authored): measure what exists, never demand the trio.
+        sizes = {
+            name: (live / name).stat().st_size for name in _V34_CEILINGS if (live / name).is_file()
+        }
         assert _byte_ceiling_violations(sizes) == [], (
             f"{live.name} trio exceeds the byte ceiling — above it the scope is open "
             "enough to be two candidates."
