@@ -426,7 +426,7 @@ def certify(
 
     check("context-dead-alive-delete-roundtrip", context_round_trip)
 
-    # 0.4.7 FR3: one `<harness>-live-probe` per REGISTERED record, by iteration — a
+    # One `<harness>-live-probe` per REGISTERED record, by iteration — a
     # harness that joins the registry is probed without a line here. Static projection
     # tests attest file shape only; these attest that the runtime answers. An absent
     # binary leaves the claim UNVERIFIED (honest SKIP), never a FAIL.

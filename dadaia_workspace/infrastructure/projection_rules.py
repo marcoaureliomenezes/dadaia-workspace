@@ -261,7 +261,7 @@ def _hooks_json_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Project
 
 def _wrapper_rules(record: HarnessRecord, workspace_root: Path) -> tuple[ProjectionRule, ...]:
     """The on-disk executables a record's hook format needs — the generalisation of the
-    former codex-only wrapper rule (0.4.7 FR3).
+    former codex-only wrapper rule.
 
     A harness that registers a command string gets ONE executable path per behaviour
     lane, with no arguments and no env-prefix syntax in its registration file. Which

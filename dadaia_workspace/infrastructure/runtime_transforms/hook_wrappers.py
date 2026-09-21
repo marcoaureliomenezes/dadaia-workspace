@@ -1,6 +1,6 @@
 """The hook derivation as DATA: lanes, wrapper scripts and hook-file payloads.
 
-0.4.7 FR3. The workspace defines four deterministic behaviours — root whitelist, venv
+The workspace defines four deterministic behaviours — root whitelist, venv
 guard, SDD gate (the ONE merged ``dadaia_workspace.hooks.pre_gate`` entrypoint) and the
 session-start reaper — and every harness gets the SAME four. What differs per harness is
 only *serialization*, so everything that differs lives here as a row keyed by
@@ -30,7 +30,7 @@ from dataclasses import dataclass
 
 from dadaia_workspace.core.harness_registry import HarnessRecord, HookFormat
 
-#: The SessionStart lane (0.4.6 FR4/D13): the one reaper, run as a CLI process at every
+#: The SessionStart lane: the one reaper, run as a CLI process at every
 #: session start — never a hook module (P-12). ``--quiet`` prints only what it deleted, so
 #: a compliant workspace adds nothing to the model context.
 REAPER_ARGS = "doctor --fix --expired-only --quiet"

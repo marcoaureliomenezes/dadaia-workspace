@@ -482,7 +482,7 @@ def kimi_hook_shims() -> dict[str, str]:
       the compact-epoch marker consumed by the next ``UserPromptSubmit`` AND re-emits
       the bootstrap on stdout (observable-contract posture; Kimi discards PostCompact
       stdout, so the deterministic re-injection still lands at the next prompt).
-    - doctor-expired: the SessionStart reaper (0.4.6 FR4/D13) as a CLI process — the same
+    - doctor-expired: the SessionStart reaper as a CLI process — the same
       ``REAPER_ARGS`` the Claude and Codex entries run.
     """
     pre_gate = (
