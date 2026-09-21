@@ -66,9 +66,8 @@ def _pre_wave0_046_document() -> dict[str, Any]:
         "schema": "release-state-v1",
         "release": "0.4.6",
         "phase": "ARCHIVED",
-        "rc": 3,
         "defined": {"sha": "a" * 40, "ts": "2026-09-01T00:00:00Z"},
-        "implemented": {"sha": "b" * 40, "rc": 3, "ts": "2026-09-05T00:00:00Z"},
+        "implemented": {"sha": "b" * 40, "ts": "2026-09-05T00:00:00Z"},
         "shipped": {"sha": "c" * 40, "ts": "2026-09-06T15:05:36Z"},
         "log": [
             {

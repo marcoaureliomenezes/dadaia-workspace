@@ -36,7 +36,6 @@ def _valid_document(**overrides: Any) -> dict[str, Any]:
         "schema": "release-state-v1",
         "release": "9.9.9",
         "phase": "DEFINITION",
-        "rc": None,
         "defined": {"sha": "a" * 40, "ts": "2026-09-01T00:00:00Z"},
         "implemented": None,
         "shipped": None,
@@ -75,9 +74,16 @@ def test_real_tree_validates() -> None:
     assert issues == [], [f"{i.path}: {i.code} {i.message}" for i in issues]
 
 
-def test_pre_wave0_046_document_is_refused(tmp_path: Path) -> None:
-    """The 0.4.6 archived document as committed before Wave 0: ``shipped`` without
-    ``pr`` (``git show 7db9553c^:specs/releases/_archive/0.4.6/_RELEASE.json``)."""
+def test_an_archived_document_is_read_not_ranked_against_the_live_schema(
+    tmp_path: Path,
+) -> None:
+    """History is never rewritten, so it is never validated against a schema written
+    after it: the 0.4.6 archived document still carries the retired candidate counter
+    and a ``shipped`` without ``pr`` (``git show
+    7db9553c^:specs/releases/_archive/0.4.6/_RELEASE.json``). No SHAPE issue is raised
+    over it — the same field in a LIVE document still is (the test below). Its structural
+    defects still surface: a milestone missing a required key is a fact about the
+    release, not about which schema version wrote the file."""
     doc = _valid_document(
         release="0.4.6",
         phase="ARCHIVED",
@@ -87,13 +93,22 @@ def test_pre_wave0_046_document_is_refused(tmp_path: Path) -> None:
     )
     _write_release(tmp_path, "_archive/0.4.6", doc, trio=False)
 
-    issues = validate_release_tree(tmp_path)
+    codes = _codes(validate_release_tree(tmp_path))
 
-    schema_issues = [i for i in issues if i.code == "RELEASE-TREE-SCHEMA"]
-    assert len(schema_issues) == 1, _codes(issues)
-    assert schema_issues[0].path == "releases/_archive/0.4.6/_RELEASE.json"
-    assert "pr" in schema_issues[0].message
-    assert "RELEASE-TREE-PARSE" in _codes(issues)
+    assert "RELEASE-TREE-SCHEMA" not in codes
+    assert "RELEASE-TREE-PARSE" in codes
+
+
+def test_a_live_document_carrying_the_retired_rc_is_refused(tmp_path: Path) -> None:
+    """The live schema closed without ``rc``: a document still carrying it is a shape
+    error, which is what forces the one live document to be migrated rather than
+    tolerated."""
+    _write_release(tmp_path, "9.9.9", _valid_document(rc=3))
+
+    issues = [i for i in validate_release_tree(tmp_path) if i.code == "RELEASE-TREE-SCHEMA"]
+
+    assert len(issues) == 1
+    assert "rc" in issues[0].message
 
 
 def test_non_monotonic_log_is_refused(tmp_path: Path) -> None:

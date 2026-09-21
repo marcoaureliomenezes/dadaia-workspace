@@ -406,30 +406,9 @@
     "link_to": null
   },
   {
-    "label": "agents:skills/dd-release-implementation/scripts/_release_archive.py",
-    "harness": "agents",
-    "dst": "ws:.agents/skills/dd-release-implementation/scripts/_release_archive.py",
-    "compare": "bytes",
-    "link_to": null
-  },
-  {
     "label": "agents:skills/dd-release-implementation/scripts/_release_check.py",
     "harness": "agents",
     "dst": "ws:.agents/skills/dd-release-implementation/scripts/_release_check.py",
-    "compare": "bytes",
-    "link_to": null
-  },
-  {
-    "label": "agents:skills/dd-release-implementation/scripts/_release_fold.py",
-    "harness": "agents",
-    "dst": "ws:.agents/skills/dd-release-implementation/scripts/_release_fold.py",
-    "compare": "bytes",
-    "link_to": null
-  },
-  {
-    "label": "agents:skills/dd-release-implementation/scripts/_release_fold_plan.py",
-    "harness": "agents",
-    "dst": "ws:.agents/skills/dd-release-implementation/scripts/_release_fold_plan.py",
     "compare": "bytes",
     "link_to": null
   },
@@ -451,13 +430,6 @@
     "label": "agents:skills/dd-release-implementation/scripts/_release_phase.py",
     "harness": "agents",
     "dst": "ws:.agents/skills/dd-release-implementation/scripts/_release_phase.py",
-    "compare": "bytes",
-    "link_to": null
-  },
-  {
-    "label": "agents:skills/dd-release-implementation/scripts/_release_rc.py",
-    "harness": "agents",
-    "dst": "ws:.agents/skills/dd-release-implementation/scripts/_release_rc.py",
     "compare": "bytes",
     "link_to": null
   },

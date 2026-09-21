@@ -20,7 +20,6 @@ def _state_doc(release: str) -> str:
             "schema": "release-state-v1",
             "release": release,
             "phase": "IMPLEMENTATION",
-            "rc": None,
             "defined": None,
             "implemented": None,
             "shipped": None,

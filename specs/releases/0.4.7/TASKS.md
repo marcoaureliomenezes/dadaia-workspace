@@ -58,7 +58,7 @@
   Write set: `.github/workflows/release-please.yml`, deletion of `.github/workflows/release.yml`,
   `CHANGELOG.md`, `tests/contract/test_ci_workflow_hygiene.py`.
 
-- [ ] T-047-89 — FR2: four scripts, two subcommands and the schema's `rc` die.
+- [x] T-047-89 — FR2: four scripts, two subcommands and the schema's `rc` die.
   Delete `_release_{rc,fold,fold_plan,archive}.py` (72+87+101+144 lines) under
   `dd-release-implementation/scripts/`; `release.py` loses the
   `rc-archive`, `fold` and `archive` `_HELP` entries, their imports and argument blocks —

@@ -27,7 +27,6 @@ def _specs_with_release(tmp_path: Path, *, legacy_name: bool) -> Path:
         "schema": "release-state-v1",
         "release": "1.0.0",
         "phase": "IMPLEMENTATION",
-        "rc": None,
         "defined": None,
         "implemented": None,
         "shipped": None,

@@ -30,7 +30,6 @@ def _doc(**overrides: object) -> dict[str, object]:
         "schema": SCHEMA,
         "release": "0.5.0",
         "phase": "IMPLEMENTATION",
-        "rc": None,
         "defined": {"sha": "a" * 40, "ts": "2026-08-27T10:31:16Z"},
         "implemented": None,
         "shipped": None,
@@ -53,7 +52,6 @@ def test_parse_release_state_reads_every_field() -> None:
     assert state.schema == SCHEMA
     assert state.release == "0.5.0"
     assert state.phase == "IMPLEMENTATION"
-    assert state.rc is None
     assert state.defined == {"sha": "a" * 40, "ts": "2026-08-27T10:31:16Z"}
     assert state.implemented is None
     assert state.shipped is None
@@ -74,7 +72,6 @@ def test_parse_release_state_ignores_legacy_segment_key() -> None:
         (lambda d: d.pop("phase"), "missing required"),
         (lambda d: d.__setitem__("schema", "release-event-v1"), "expected 'release-state-v1'"),
         (lambda d: d.__setitem__("phase", 3), "'phase' must be a string"),
-        (lambda d: d.__setitem__("rc", "one"), "'rc' must be an integer"),
         (lambda d: d.__setitem__("defined", {"sha": "a" * 40}), "missing required key"),
         (lambda d: d.__setitem__("log", [{"ts": "x"}]), "missing required key"),
         (lambda d: d.__setitem__("log", "not-a-list"), "'log' must be an array"),
@@ -119,7 +116,6 @@ def test_release_state_is_a_frozen_dataclass_value_object() -> None:
         schema=SCHEMA,
         release="0.6.0",
         phase="DISCOVERY",
-        rc=None,
         defined=None,
         implemented=None,
         shipped=None,

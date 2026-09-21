@@ -74,12 +74,11 @@ def seeded_scope(specs: Path, origin: str) -> str:
 
 
 def birth_state(release_id: str) -> State:
-    """The birth document: DEFINITION, no candidate yet, every milestone unreached."""
+    """The birth document: DEFINITION, every milestone unreached."""
     return {
         "schema": "release-state-v1",
         "release": release_id,
         "phase": "DEFINITION",
-        "rc": None,
         "defined": None,
         "implemented": None,
         "shipped": None,
@@ -107,7 +106,7 @@ def refuse_unfree(specs: Path, release_id: str) -> Path:
         raise Refusal(
             f"a live release already exists ({', '.join(others)}) — exactly one is "
             f"allowed: stack the work as a candidate, or ship {others[0]} first",
-            f"{SCRIPT} rc-archive --specs {specs}",
+            f"{SCRIPT} check --specs {specs}",
         )
     releases = specs / "releases"
     release_dir = releases / release_id

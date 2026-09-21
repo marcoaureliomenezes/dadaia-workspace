@@ -24,7 +24,7 @@ def _minimal_specs(tmp_path: Path) -> Path:
     (specs / "releases" / "1.2.3").mkdir(parents=True)
     (specs / "releases" / "1.2.3" / "RELEASE.json").write_text(
         '{"schema": "release-state-v1", "release": "1.2.3", "phase": "IMPLEMENTATION",'
-        ' "rc": 0, "defined": null, "implemented": null, "shipped": null,'
+        ' "defined": null, "implemented": null, "shipped": null,'
         ' "log": []}',
         encoding="utf-8",
     )

@@ -63,13 +63,19 @@ def _log_errors(document: dict[str, Any]) -> list[str]:
 
 
 def state_findings(text: str, rel: str, *, archived: bool) -> list[dict[str, Any]]:
-    """Every finding one release-state document's *text* carries, at *rel*."""
+    """Every finding one release-state document's *text* carries, at *rel*.
+
+    An ARCHIVED document is read, never ranked against the live schema: it was written
+    by a schema version that no longer exists and history is never rewritten, so the
+    shape rules apply to the live document alone. Its phase and log ordering still hold
+    — those are facts about the release, not about the document's declared fields.
+    """
     try:
         document = json.loads(text)
     except json.JSONDecodeError as exc:
         return [finding(rel, exc.lineno, f"document is not valid JSON: {exc.msg}")]
     schema = load_schema("release-state-v1")
-    messages = list(validate(document, schema, schema, "state"))
+    messages = [] if archived else list(validate(document, schema, schema, "state"))
     if messages:
         return [finding(rel, 1, message) for message in messages]
     return [

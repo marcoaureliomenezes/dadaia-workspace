@@ -2,14 +2,12 @@
   "schema": "release-state-v1",
   "release": "0.4.7",
   "phase": "IMPLEMENTATION",
-  "rc": 9,
   "defined": {
     "sha": "5addd4ef",
     "ts": "2026-09-21T12:04:47Z"
   },
   "implemented": {
     "sha": "d7ed41a1",
-    "rc": 9,
     "ts": "2026-09-21T04:49:16Z"
   },
   "shipped": null,
@@ -529,6 +527,12 @@
       "agent": "release.py",
       "kind": "note",
       "text": "Candidate defined at 5addd4ef; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-09-21T12:17:06Z",
+      "agent": "dd-software-engineer",
+      "kind": "note",
+      "text": "rc fields retired (release-please semantics)"
     }
   ]
 }

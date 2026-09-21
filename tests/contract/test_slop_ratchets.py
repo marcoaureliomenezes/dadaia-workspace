@@ -193,8 +193,8 @@ def test_v33_prefix_families_without_a_mechanical_reader() -> None:
 # RECORDED PINS (ratchet DOWN ONLY) — measured on the post-candidate corpus: every
 # tracked `*.py` under dadaia_workspace/public/skills/*/scripts/. A ledger's writer moved
 # out of the CLI ONCE; a growing corpus after that is CLI code re-typed, not code moved.
-_V36_FILE_CEILING = 36
-_V36_LINE_CEILING = 4191
+_V36_FILE_CEILING = 32
+_V36_LINE_CEILING = 3720
 
 
 def _skill_scripts() -> list[Path]:
@@ -206,7 +206,7 @@ def _skill_scripts() -> list[Path]:
 
 
 def test_v36_skill_script_corpus_is_pinned() -> None:
-    """V36 — at most 36 skill-script files and 4,191 total lines of skill Python. The
+    """V36 — at most 32 skill-script files and 3,720 total lines of skill Python. The
     ledger writers moved out of the CLI once: growth here is a verb regrown, never moved."""
     scripts = _skill_scripts()
     assert len(scripts) <= _V36_FILE_CEILING, (

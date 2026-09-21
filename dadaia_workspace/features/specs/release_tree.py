@@ -90,10 +90,14 @@ def _release_dirs(releases_root: Path) -> list[tuple[Path, bool]]:
 def _document_issues(
     doc: Any, text: str, rel: str, *, archived: bool, validator: Draft202012Validator
 ) -> list[ReleaseTreeIssue]:
-    issues = [
-        ReleaseTreeIssue(rel, "RELEASE-TREE-SCHEMA", err.message)
-        for err in sorted(validator.iter_errors(doc), key=str)
-    ]
+    issues: list[ReleaseTreeIssue] = (
+        []
+        if archived
+        else [
+            ReleaseTreeIssue(rel, "RELEASE-TREE-SCHEMA", err.message)
+            for err in sorted(validator.iter_errors(doc), key=str)
+        ]
+    )
     try:
         state = parse_release_state(text)
     except ValueError as exc:
@@ -171,6 +175,9 @@ def validate_release_tree(specs_dir: Path) -> list[ReleaseTreeIssue]:
     exists; it validates ``release-state-v1``; it parses with
     :func:`~dadaia_workspace.core.release_state.parse_release_state`; its ``log[].ts``
     values are non-decreasing; its ``phase`` is one of :data:`RELEASE_TREE_PHASES`;
+    the ``release-state-v1`` shape is asserted on the LIVE document alone — an archived
+    one was written by a schema version that no longer exists and history is never
+    rewritten, so it is listed and read, never ranked against the live schema;
     ``ARCHIVED`` iff the directory sits under ``_archive/``; a live release in
     IMPLEMENTATION or CLOSURE carries its SPEC/PLAN/TASKS trio
     (:data:`_TRIO_REQUIRED_PHASES`).

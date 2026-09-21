@@ -1,8 +1,8 @@
 """``release-state-v1`` schema shape (v0.5.x, successor to
 ``test_release_event_schema.py`` — RELEASE.jsonl -> RELEASE.json migration).
 
-Intent: CONTRACT — the schema closes the document to exactly the nine declared
-top-level properties, each milestone object
+Intent: CONTRACT — the schema closes the document to exactly the seven declared
+top-level properties, `rc` is unknown to it at every depth, each milestone object
 closes to its own declared shape, and the schema is internally valid Draft 2020-12.
 Size: SMALL — pure schema/document assertions, no I/O beyond reading the packaged
 schema fixture.
@@ -36,7 +36,7 @@ _SCHEMA_PATH = (
 )
 
 _REQUIRED_TOP_LEVEL = frozenset(
-    {"schema", "release", "phase", "rc", "defined", "implemented", "shipped", "log"}
+    {"schema", "release", "phase", "defined", "implemented", "shipped", "log"}
 )
 
 
@@ -49,7 +49,6 @@ def _minimal_document(**overrides: object) -> dict[str, object]:
         "schema": "release-state-v1",
         "release": "0.6.0",
         "phase": "IMPLEMENTATION",
-        "rc": None,
         "defined": {"sha": "a" * 40, "ts": "2026-08-27T10:31:16Z"},
         "implemented": None,
         "shipped": None,
@@ -64,7 +63,18 @@ def test_schema_is_valid_draft202012_and_closes_the_document() -> None:
     Draft202012Validator.check_schema(schema)
     assert schema["additionalProperties"] is False
     assert set(schema["required"]) == _REQUIRED_TOP_LEVEL
+    assert set(schema["properties"]) == _REQUIRED_TOP_LEVEL
     assert schema["properties"]["schema"]["const"] == "release-state-v1"
+    assert "rc" not in schema["properties"]["implemented"]["properties"]
+
+
+def test_a_document_carrying_rc_is_refused() -> None:
+    """The retired candidate counter is unknown to the live schema at every depth: a
+    document still carrying it is refused rather than silently tolerated."""
+    validator = Draft202012Validator(_schema())
+    assert list(validator.iter_errors(_minimal_document(rc=9))) != []
+    stale_milestone = {"sha": "a" * 40, "rc": 9, "ts": "2026-08-27T10:31:16Z"}
+    assert list(validator.iter_errors(_minimal_document(implemented=stale_milestone))) != []
 
 
 def test_a_minimal_document_validates() -> None:

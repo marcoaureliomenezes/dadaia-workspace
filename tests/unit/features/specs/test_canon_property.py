@@ -98,7 +98,6 @@ def _fresh_release(tmp_path: Path) -> Path:
                 "schema": "release-state-v1",
                 "release": "0.6.0",
                 "phase": "DEFINITION",
-                "rc": None,
                 "defined": {"sha": "0" * 40, "ts": "2026-09-12T00:00:00Z"},
                 "implemented": None,
                 "shipped": None,

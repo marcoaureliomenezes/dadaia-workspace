@@ -82,12 +82,12 @@ PHASES: tuple[str, ...] = ("DEFINITION", "IMPLEMENTATION", "CLOSURE", "ARCHIVED"
 #: schema implementation).
 _MILESTONE_REQUIRED: dict[str, frozenset[str]] = {
     "defined": frozenset({"sha", "ts"}),
-    "implemented": frozenset({"sha", "rc", "ts"}),
+    "implemented": frozenset({"sha", "ts"}),
     "shipped": frozenset({"sha", "pr", "ts"}),
 }
 
 _TOP_LEVEL_REQUIRED: frozenset[str] = frozenset(
-    {"schema", "release", "phase", "rc", "defined", "implemented", "shipped", "log"}
+    {"schema", "release", "phase", "defined", "implemented", "shipped", "log"}
 )
 
 _NOTE_REQUIRED: frozenset[str] = frozenset({"ts", "agent", "kind", "text"})
@@ -109,7 +109,6 @@ class ReleaseState:
     schema: str
     release: str
     phase: str
-    rc: int | None
     defined: dict[str, Any] | None
     implemented: dict[str, Any] | None
     shipped: dict[str, Any] | None
@@ -122,7 +121,6 @@ class ReleaseState:
             "schema": self.schema,
             "release": self.release,
             "phase": self.phase,
-            "rc": self.rc,
             "defined": self.defined,
             "implemented": self.implemented,
             "shipped": self.shipped,
@@ -183,14 +181,10 @@ def parse_release_state(text: str) -> ReleaseState:
         raise ValueError("'release' must be a string")
     if not isinstance(obj["phase"], str):
         raise ValueError("'phase' must be a string")
-    rc = obj["rc"]
-    if rc is not None and not isinstance(rc, int):
-        raise ValueError(f"'rc' must be an integer or null, got {type(rc).__name__}")
     return ReleaseState(
         schema=obj["schema"],
         release=obj["release"],
         phase=obj["phase"],
-        rc=rc,
         defined=_validate_milestone("defined", obj["defined"]),
         implemented=_validate_milestone("implemented", obj["implemented"]),
         shipped=_validate_milestone("shipped", obj["shipped"]),

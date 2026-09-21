@@ -17,7 +17,8 @@ CODE = "LEDGER-RELEASE-SCHEMA"
 RELEASES = "releases"
 STATE = "_RELEASE.json"
 HISTO = "releases/_archive/releases_histo.jsonl"
-#: The closed-scope candidate trio that lives at the release root and moves into rc-N/.
+#: The closed-scope candidate trio that lives at the release root; the next candidate's
+#: `new`-seeded SPEC overwrites it, and git holds the closed one at its CLOSURE commit.
 TRIO = ("SPEC.md", "PLAN.md", "TASKS.md")
 #: Every artifact `new` refuses to mint over (CWE-73): a release directory is one unit.
 ARTIFACTS = (*TRIO, STATE)
@@ -32,7 +33,6 @@ APPROVED = "Approved"
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 #: A shipped commit sha as a human pastes it from a merge: short (7) to full (40).
 SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")
-RC_DIR_RE = re.compile(r"^rc-(\d+)$")
 #: Task markers that mean the candidate is NOT closed: open ``[ ]`` or reserved ``[-]``.
 UNFINISHED_RE = re.compile(r"^\s*-\s\[( |-)\]\s.*$", re.MULTILINE)
 _STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)
@@ -77,14 +77,6 @@ def unfinished_tasks(release_dir: Path) -> list[str]:
         return []
     text = tasks.read_text(encoding="utf-8")
     return [match.group(0).strip() for match in UNFINISHED_RE.finditer(text)]
-
-
-def rc_numbers(release_dir: Path) -> list[int]:
-    return sorted(
-        int(m.group(1))
-        for d in release_dir.iterdir()
-        if d.is_dir() and (m := RC_DIR_RE.match(d.name))
-    )
 
 
 def find_specs(start: Path) -> Path:

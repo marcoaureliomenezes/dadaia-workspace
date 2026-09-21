@@ -24,7 +24,6 @@ def _write_release(specs_dir: Path, release_id: str, phase: str) -> None:
         "schema": "release-state-v1",
         "release": release_id,
         "phase": phase,
-        "rc": None,
         "defined": None,
         "implemented": None,
         "shipped": None,

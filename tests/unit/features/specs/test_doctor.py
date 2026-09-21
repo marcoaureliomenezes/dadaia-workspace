@@ -115,7 +115,6 @@ def _write_release_jsonl(specs: Path, release_id: str, phase: str) -> None:
         "schema": "release-state-v1",
         "release": release_id,
         "phase": phase,
-        "rc": None,
         "defined": None,
         "implemented": None,
         "shipped": None,
@@ -349,7 +348,7 @@ def test_scaffold_copytree_source_tree_carries_agents_md_per_area(tmp_path: Path
             "release-jsonl-carries-no-phase-record",
             lambda specs: (specs / "releases" / "1.2.3" / "RELEASE.json").write_text(
                 '{"schema":"release-state-v1","release":"1.2.3","phase":"",'
-                '"rc":null,"defined":null,"implemented":null,"shipped":null,'
+                '"defined":null,"implemented":null,"shipped":null,'
                 '"log":[]}\n',
                 encoding="utf-8",
             ),
