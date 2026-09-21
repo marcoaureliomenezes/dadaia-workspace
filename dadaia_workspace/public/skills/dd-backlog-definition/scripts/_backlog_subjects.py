@@ -17,7 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _backlog_schema import LEDGER  # noqa: E402
-from _backlog_store import read_active  # noqa: E402
+from _backlog_store import SCRIPT, read_active  # noqa: E402
 
 
 def _anchors(specs: Path, alias_map: Path) -> dict[str, tuple[str, str]]:
@@ -49,7 +49,7 @@ def subjects(args: argparse.Namespace, specs: Path, alias_default: str) -> int:
             print(f"RESOLVED  {args.resolve}  ->  {hit[1]}")
             return 0
         print(f"UNRESOLVED  {args.resolve}", file=sys.stderr)
-        print(f"fix: {Path(__file__).name} subjects --specs {specs}", file=sys.stderr)
+        print(f"fix: {SCRIPT} subjects --specs {specs}", file=sys.stderr)
         return 1
     listed = sorted(v for v in anchors.values() if args.kind is None or v[0] == args.kind)
     for kind, anchor in listed:

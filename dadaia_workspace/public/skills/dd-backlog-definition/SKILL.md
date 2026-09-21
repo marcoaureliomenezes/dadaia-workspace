@@ -61,5 +61,5 @@ description: >
 ## References
 
 - `dd-release-definition` — the picked-set consumer.
-- Script: `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py` — `new`, `exit`, `subjects`, `check`;
-  `dadaia doctor`.
+- Script: `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py` — `new`, `exit`, `check`, and `subjects` (the declared aliases plus the document's live bindings).
+- A `subject.ref` naming a code/doc/cli anchor is judged by `dadaia doctor` — `BL-SCHEMA` names the ref it cannot resolve.

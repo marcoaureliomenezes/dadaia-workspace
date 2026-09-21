@@ -82,15 +82,29 @@ class _Runner(Protocol):
     ) -> Any: ...
 
 
-def _skill_roots(specs_dir: Path) -> Iterator[Path]:
-    """The installed skills tree of the workspace holding *specs_dir*, then the package.
-
-    ONE resolution: walk up for `.agents/skills/`, and fall back to the packaged source
-    when the doctored tree sits outside any workspace.
+def _running_workspace() -> Path | None:
+    """The workspace this process runs FROM: the root whose `.dadaia/.venv/` holds our
+    interpreter, or ``None`` when `dadaia` runs from anywhere else (a bare pip install).
     """
+    for directory in Path(sys.executable).resolve().parents:
+        if directory.name == ".venv" and directory.parent.name == ".dadaia":
+            return directory.parent.parent
+    return None
+
+
+def _skill_roots(specs_dir: Path) -> Iterator[Path]:
+    """The skills tree whose scripts this run may execute, most-trusted first.
+
+    ONE resolution, and it is a trust decision: `specs_dir` is caller-supplied, so a
+    walk-up for `.agents/skills/` would execute whatever script a foreign tree happens
+    to carry (CWE-427). The installed tree is used only when `specs_dir` sits inside the
+    workspace this process was launched from — the operator's own. Every other tree,
+    including a bare `--specs-dir` checkout in CI, reads the packaged copy.
+    """
+    workspace = _running_workspace()
     here = specs_dir.resolve()
-    for directory in (here, *here.parents):
-        installed = directory / ".agents" / "skills"
+    if workspace is not None and (workspace == here or workspace in here.parents):
+        installed = workspace / ".agents" / "skills"
         if installed.is_dir():
             yield installed
     yield _PACKAGE_SKILLS

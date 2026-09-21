@@ -57,15 +57,12 @@ Scope: this file governs only `specs/backlog/`.
 | `invariant` | an `INV-*` identifier | invariant declarations |
 
 ```bash
-BACKLOG_PY subjects            # list the bindable anchors (--kind <kind> filters)
-BACKLOG_PY subjects --resolve <ref> --kind <kind>   # how one subject binds
+BACKLOG_PY subjects            # declared aliases + the document's own bindings
+BACKLOG_PY subjects --resolve <ref> --kind <kind>   # how one ref binds to those
 ```
 
-### 4.2 Non-Python repos
-
-- `code` anchors derive from Python sources only.
-- A repo with no Python has no `code` anchors — bind `catalog`, `doc`, or `invariant` anchors instead.
-- Use `BACKLOG_PY subjects` to see what is bindable.
+- It answers from those two; a `code`/`doc`/`cli` ref is judged by `dadaia doctor`, whose `BL-SCHEMA` finding names the ref it cannot resolve.
+- A repo with no Python sources has no `code` anchors — bind `catalog`, `doc` or `invariant`.
 
 ## 5. Relationship to releases
 

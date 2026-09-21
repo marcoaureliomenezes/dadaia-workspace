@@ -143,10 +143,10 @@
       ],
       "hash_tuple": {
         "section": "sha256:92b4c51166643f34f0f704270976142e8a30d182ed374c13253d232ae53756da",
-        "skill": "sha256:6c645d2e1072ae9f7f6bffa2ad46692ee2d89869cb4f08407144e9fdc624f804",
-        "scripts": "sha256:da1a4b6af5cf7b584e0eed634bbe70bfb30c1894449baee811968d0d637b4514",
+        "skill": "sha256:68ddeeef3fd4afea574d64cdc05aeed335dee748e93647e9b57e9711d52d1225",
+        "scripts": "sha256:c54f4ffc208d43f498c0d65e0b17d23131cf1aeb8542838432930072ebe4d52c",
         "scoped": [
-          "sha256:274a4fa2567f5fe25ebd1499f30df451a65c45d781241414b12129837ad438af"
+          "sha256:b9d7ca47462d204bd5ccb5a11b13ac7cfbdfcfa52ee492ca02996264fccbfb94"
         ]
       },
       "recorded_by": "dd-software-engineer",

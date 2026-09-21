@@ -366,6 +366,41 @@ def _fix_lines() -> list[tuple[str, str]]:
 
 _FIX_LINES = _fix_lines()
 
+#: The fix lines that are a shell command over a named file, not a `dadaia` verb and not
+#: a skill script: the finding is a hand edit the operator makes with the tool already on
+#: the line. Their head token is proven executable by `_assert_one_command`; what cannot
+#: be resolved here is a `sed`/`printf` placeholder, so each is listed ONCE with the tool
+#: it hands over. A NEW unresolvable fix line fails instead of quietly skipping.
+_SHELL_FIX_CODES: dict[str, str] = {
+    "SPEC-DOC-001": "printf — append the missing constitution section",
+    "SPEC-DOC-002/SPEC-DOC-002L/SPEC-DOC-008": "printf — append the missing memory title",
+    "SPEC-DOC-003/SPEC-DOC-009": "git rm — delete the retired document",
+    "SPEC-DOC-004": "sed — rewrite the document's Status line",
+    "SPEC-DOC-007": "git rm — delete the orphan path",
+    "SPEC-DOC-024": "sed — align the phase marker with _RELEASE.json",
+    "SPEC-DOC-026": "git mv — de-duplicate the release directory",
+    "SPEC-DOC-027": "git mv — rename the release directory to M.m.p",
+    "SPEC-DOC-028": "sed — drop the dangling constitution reference",
+    "SPEC-DOC-030": "git mv — rename the audit directory to YYYYMMDD-slug",
+    "SPEC-DOC-037": "sed — drop the stale enum line",
+    "SPEC-DOC-039": "mkdir/git mv — move the abandoned release aside",
+    "SPEC-DOC-045": "sed — align pyproject's version with the live release",
+    "SPEC-DOC-047": "sed — drop the stale memory task line",
+    "TREE-3": "printf — append the missing memory title",
+    "TREE-7": "sed — redact the session id out of BUGS.jsonl",
+    "LINT-1": "sed — insert the missing atom frontmatter field",
+    "MEM-DRIFT-1": "sed — align ARCHITECTURE.md with the package on disk",
+    "MEM-DRIFT-2": "sed — replace the dead citation",
+    "ADR-SUPERSEDED-CITATION": "sed — cite the successor decision",
+    "BL-SCHEMA": "sed — correct the offending BACKLOG.json line",
+    "LEDGER-ADR-SCHEMA": "sed — correct the offending decisions.jsonl record",
+    "RELEASE-TREE-SCHEMA/RELEASE-TREE-PARSE/RELEASE-TREE-TS-ORDER/RELEASE-TREE-PHASE/"
+    "RELEASE-TREE-ARCHIVED/RELEASE-TREE-TRIO/RELEASE-TREE-STATE-MISSING/"
+    "RELEASE-TREE-ARCHIVE-ID/RELEASE-TREE-ARCHIVE-UNSHIPPED": (
+        "sed — correct the offending _RELEASE.json value"
+    ),
+}
+
 
 @pytest.mark.parametrize(("codes", "command"), _FIX_LINES, ids=[c for c, _ in _FIX_LINES])
 def test_every_fix_target_resolves_on_disk(codes: str, command: str) -> None:
@@ -387,7 +422,12 @@ def test_every_fix_target_resolves_on_disk(codes: str, command: str) -> None:
         return
     target = _script_target(command)
     if target is None:
-        pytest.skip(f"{codes}: fix line names neither the CLI nor a skill script")
+        assert codes in _SHELL_FIX_CODES, (
+            f"{codes}: a fix line resolves against the CLI tree or a shipped skill "
+            f"script — a new shell-command fix joins _SHELL_FIX_CODES with its reason "
+            f"or names one of those two: {command!r}"
+        )
+        return
     script, verb = target
     assert script.is_file(), f"{codes}: fix line names a script this repo does not ship: {script}"
     assert verb, f"{codes}: a script fix line names no subcommand: {command!r}"
@@ -398,3 +438,57 @@ def test_every_fix_target_resolves_on_disk(codes: str, command: str) -> None:
         timeout=60,
     )
     assert help_run.returncode == 0, f"{codes}: {script.name} rejects {verb!r}: {help_run.stderr}"
+
+
+# ── every script-emitted fix line names its own folder's entry script ───────────
+
+#: The one entry script of each skill that ships scripts — what an operator pastes.
+#: A sibling `_module.py` has no `__main__`, so naming it is a Stall with a friendly face.
+_ENTRY_SCRIPTS: dict[str, str] = {
+    "dd-audit-project": "audit.py",
+    "dd-backlog-definition": "backlog.py",
+    "dd-bug-resolution": "bugs.py",
+    "dd-cli-library": "registry.py",
+    "dd-release-implementation": "release.py",
+    "dd-spec-navigator": "memory.py",
+}
+
+_LITERAL_FIX_RE = re.compile(r'"fix: ([^"]*)')
+_SCRIPT_CONST_RE = re.compile(r'^SCRIPT = Path\(__file__\)\.parent / "([^"]+)"', re.MULTILINE)
+_NAMED_SCRIPT_RE = re.compile(r"[\w.{}\[\]()/-]*\.py")
+
+
+def _script_modules() -> list[Path]:
+    return sorted(_PUBLIC_SKILLS.glob("*/scripts/*.py"))
+
+
+_SCRIPT_MODULES = _script_modules()
+
+
+@pytest.mark.parametrize(
+    "module", _SCRIPT_MODULES, ids=[f"{m.parts[-3]}/{m.name}" for m in _SCRIPT_MODULES]
+)
+def test_every_script_fix_line_names_its_folders_entry_script(module: Path) -> None:
+    """A skill script's own `fix:` lines must name the script the operator can run.
+
+    0.4.7 review fold (F3): `backlog.py subjects` printed
+    ``fix: _backlog_subjects.py subjects …`` — a sibling module with no ``__main__``.
+    The command was un-runnable, so the UNRESOLVED exit was a Stall. Every `fix:`
+    literal that NAMES a `.py` file, and every `SCRIPT` constant a `Refusal` fix is
+    built from, must name the entry script of the folder it is written in.
+    """
+    skill = module.parts[-3]
+    entry = _ENTRY_SCRIPTS[skill]
+    text = module.read_text(encoding="utf-8")
+    for body in _LITERAL_FIX_RE.findall(text):
+        assert "__file__" not in body, (
+            f"{skill}/{module.name}: a fix line built from this module's own `__file__` "
+            f"names the module, not the entry script {entry} — got {body!r}"
+        )
+        for named in _NAMED_SCRIPT_RE.findall(body):
+            assert named.endswith(entry), (
+                f"{skill}/{module.name}: a fix line names {entry}, never a sibling "
+                f"module with no __main__ — got {named!r} in {body!r}"
+            )
+    for named in _SCRIPT_CONST_RE.findall(text):
+        assert named == entry, f"{module.name}: SCRIPT names {named!r}, not {entry!r}"

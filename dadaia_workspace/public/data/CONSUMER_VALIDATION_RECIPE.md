@@ -328,11 +328,12 @@ never exercised the live backlog path was false confidence).
 - Author a B3/CVM-style real capture item as `dd-project-manager` would
   (`python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug>` then fill in its `**Intents:**` block, the single-source
   ACTIVE subsection — SPEC v0.12.0 FR3, ADR #14), then `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py subjects
-  --specs-dir <ctx>/specs`.
-- **PASS if:** every emitted `intents[].ref` resolves against the live registry (no
-  unresolved subjects) AND a release SPEC naming the item under `**Consumes:**` is
-  accepted by `dadaia doctor`, with the declared slug resolving to an `active[]` entry
-  in `specs/backlog/BACKLOG.json`.
+  --specs <ctx>/specs` — which lists the declared aliases and the bindings the live
+  document already carries, not the derived code/doc/cli anchors.
+- **PASS if:** every emitted `intents[].ref` is accepted by `dadaia doctor` (a ref it
+  cannot resolve is a `BL-SCHEMA` finding naming that ref) AND a release SPEC naming the
+  item under `**Consumes:**` is accepted too, with the declared slug resolving to an
+  `active[]` entry in `specs/backlog/BACKLOG.json`.
 
 ### R-03 — Fresh specs tree is doctor-clean with no manual edits
 

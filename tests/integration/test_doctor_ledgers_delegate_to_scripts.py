@@ -17,11 +17,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app as cli_app
-from dadaia_workspace.infrastructure.ledger_scripts import (
-    LEDGER_SCRIPTS,
-    resolve_script,
-    script_findings,
-)
+from dadaia_workspace.infrastructure.ledger_scripts import LEDGER_SCRIPTS, script_findings
 from dadaia_workspace.infrastructure.public_assets import _SKILL_SCRIPT_SCHEMAS
 
 _PUBLIC = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
@@ -88,19 +84,6 @@ class _BrokenRunner:
             stderr = ""
 
         return _Result()
-
-
-def test_resolution_prefers_the_installed_tree_over_the_package_source(workspace: Path) -> None:
-    """ONE resolution function: the workspace being doctored wins, the package is the
-    fallback for a bare `--specs-dir` outside any workspace."""
-    script = LEDGER_SCRIPTS[0]
-    installed = resolve_script(script, workspace / "specs")
-    assert (
-        installed == workspace / ".agents" / "skills" / script.skill / "scripts" / script.filename
-    )
-
-    fallback = resolve_script(script, Path("/"))
-    assert fallback == _PUBLIC / "skills" / script.skill / "scripts" / script.filename
 
 
 def test_the_doctor_prints_the_delegated_finding(workspace: Path) -> None:
