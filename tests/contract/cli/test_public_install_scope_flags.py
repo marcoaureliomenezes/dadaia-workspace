@@ -12,6 +12,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
@@ -67,7 +68,7 @@ def _init_workspace(path: Path) -> None:
     WorkspaceService(
         public_assets=_make_manager(),
         python_env=VenvPythonEnvironmentManager(),
-    ).init(path)
+    ).init(path, harnesses=L1_ENTRY_HARNESSES)
 
 
 def test_cli_install_both_flags_mutually_exclusive(

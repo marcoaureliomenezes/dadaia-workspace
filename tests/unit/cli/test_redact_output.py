@@ -153,7 +153,7 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:
     WorkspaceService(
         public_assets=FileSystemPublicAssetManager(),
         python_env=VenvPythonEnvironmentManager(),
-    ).init(tmp_path)
+    ).init(tmp_path, harnesses=("claude",))
     from dadaia_workspace.core.platform import PLATFORM
 
     venv_bin = tmp_path / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir

@@ -3,7 +3,7 @@
 Covers:
 * the canonical L1 entry roster and the projection/install vocabularies;
 * the capability predicate ``is_l1``;
-* ``parse_harness_set`` (``all`` / comma-subset / bad-name-listing-error);
+* ``parse_harness_name`` (the one registered name / bad-name-listing-error);
 * a grep proving the tuple/set roster literals are GONE from the repointed sites.
 
 The grep is the enforcement behind AC-9(a): reverting any repointed site to a bare
@@ -21,7 +21,7 @@ from dadaia_workspace.core.harness_registry import (
     L1_ENTRY_HARNESSES,
     PROJECTION_TARGETS,
     is_l1,
-    parse_harness_set,
+    parse_harness_name,
 )
 
 pytestmark = pytest.mark.unit
@@ -64,46 +64,34 @@ def test_capability_predicates_table(harness: str, expect_l1: bool) -> None:
 
 
 # ---------------------------------------------------------------------------
-# parse_harness_set ACCEPT paths.
+# parse_harness_name — exactly one registered record (0.4.7 T-047-73: `all` and the
+# comma subset are gone; `dadaia harness add` is how a second harness enters).
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
-        ("all", ("claude", "codex", "kimi-code")),
-        ("codex,kimi-code", ("codex", "kimi-code")),
-        # input order does not leak — result is always canonical L1 order.
-        ("kimi-code,codex", ("codex", "kimi-code")),
-        ("claude", ("claude",)),
-        ("CLAUDE,Codex", ("claude", "codex")),
-        ("Kimi-Code", ("kimi-code",)),
+        ("claude", "claude"),
+        ("  codex  ", "codex"),
+        ("Kimi-Code", "kimi-code"),
     ],
 )
-def test_parse_harness_set_accept_table(raw: str, expected: tuple[str, ...]) -> None:
-    assert parse_harness_set(raw) == expected
-
-
-# ---------------------------------------------------------------------------
-# parse_harness_set REJECT paths.
-# ---------------------------------------------------------------------------
+def test_parse_harness_name_accept_table(raw: str, expected: str) -> None:
+    assert parse_harness_name(raw) == expected
 
 
 @pytest.mark.parametrize(
-    ("raw", "expect_in_message"),
-    [
-        ("bogus", ["bogus", "claude", "codex", "kimi-code"]),
-        ("claude,zzz", ["zzz"]),
-        ("", []),
-        ("  ,  ", []),
-    ],
+    "raw",
+    ["bogus", "all", "codex,kimi-code", "", "  ,  "],
 )
-def test_parse_harness_set_reject_table(raw: str, expect_in_message: list[str]) -> None:
+def test_parse_harness_name_reject_table(raw: str) -> None:
     with pytest.raises(ValueError) as exc:
-        parse_harness_set(raw)
+        parse_harness_name(raw)
     msg = str(exc.value)
-    for fragment in expect_in_message:
-        assert fragment in msg
+    assert repr(raw) in msg
+    for registered in ("claude", "codex", "kimi-code"):
+        assert registered in msg
 
 
 # ---------------------------------------------------------------------------

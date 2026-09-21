@@ -23,6 +23,7 @@ pytest.importorskip("fcntl")
 from typer.testing import CliRunner  # noqa: E402
 
 from dadaia_workspace.cli.main import app  # noqa: E402
+from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.features.workspace.service import WorkspaceService  # noqa: E402
 from dadaia_workspace.infrastructure.public_assets import (  # noqa: E402
     FileSystemPublicAssetManager,
@@ -39,7 +40,7 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:  # type: ignore[no-untyped-d
     WorkspaceService(
         public_assets=FileSystemPublicAssetManager(),
         python_env=VenvPythonEnvironmentManager(),
-    ).init(tmp_path)
+    ).init(tmp_path, harnesses=L1_ENTRY_HARNESSES)
     monkeypatch.chdir(tmp_path)
     for var in ("DADAIA_SESSION_ID", "DADAIA_CONTEXT"):
         monkeypatch.delenv(var, raising=False)

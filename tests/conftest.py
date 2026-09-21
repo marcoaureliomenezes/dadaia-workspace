@@ -294,7 +294,7 @@ def _no_real_venv_in_tests() -> Iterator[None]:
             from dadaia_workspace.cli.main import app
 
             target = Path(cwd) if cwd is not None else Path.cwd()
-            result = CliRunner().invoke(app, ["init", "--workspace", str(target), *argv[2:]])
+            result = CliRunner().invoke(app, ["init", str(target), *argv[2:]])
             return ProcessResult(returncode=result.exit_code, stdout=result.output, stderr="")
         return real_run(self, argv, cwd=cwd, timeout=timeout)
 

@@ -62,10 +62,10 @@ dadaia doctor --context <ctx>     # compliance before any implementation write
 `pip install dadaia-workspace` installs the library and its `dadaia` CLI; the wheel
 ships the full public asset tree, so `init` works offline from a bare install.
 
-`dadaia init [--workspace PATH] [--skip-assets] [--harness <set>]` is the only verb
+`dadaia init <dir> --harness <name> [--skip-assets]` is the only verb
 that operates on a zero workspace, and re-running it is idempotent. It provisions the
 virtualenv, every zone the registry says `init` creates, the shared skills root and
-the chosen harness directories, seeds the state documents without overwriting them,
+the one chosen harness's directory, seeds the state documents without overwriting them,
 and (unless `--skip-assets`) stages and installs the public assets — the one writer of
 every hook wiring.
 

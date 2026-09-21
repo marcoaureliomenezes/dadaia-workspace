@@ -36,7 +36,7 @@ def _profile(workspace: Path) -> list[str]:
 def _claude_only_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     ws = tmp_path / "ws"
     monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(cli_app, ["init", "--workspace", str(ws), "--harness", "claude"])
+    result = _runner.invoke(cli_app, ["init", str(ws), "--harness", "claude"])
     assert result.exit_code == 0, result.output
     assert not (ws / ".codex").exists(), "fixture must start Claude-only"
     monkeypatch.chdir(ws)

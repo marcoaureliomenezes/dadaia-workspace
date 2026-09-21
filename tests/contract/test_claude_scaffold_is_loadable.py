@@ -24,6 +24,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.public_assets_common import read_link_target
@@ -101,7 +102,7 @@ def projected(tmp_path_factory: pytest.TempPathFactory) -> Path:
     WorkspaceService(
         public_assets=FileSystemPublicAssetManager(),
         python_env=VenvPythonEnvironmentManager(),
-    ).init(workspace)
+    ).init(workspace, harnesses=L1_ENTRY_HARNESSES)
     manager = FileSystemPublicAssetManager()
     manager.stage(workspace)
     manager.install(workspace, target="claude")

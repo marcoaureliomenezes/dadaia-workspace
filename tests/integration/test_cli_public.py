@@ -10,6 +10,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.doctor_report import (
     DoctorLine,
     DoctorReport,
@@ -26,7 +27,7 @@ def _init_ws(tmp_path: Path) -> Path:
     WorkspaceService(
         public_assets=FileSystemPublicAssetManager(),
         python_env=VenvPythonEnvironmentManager(),
-    ).init(tmp_path)
+    ).init(tmp_path, harnesses=L1_ENTRY_HARNESSES)
     return tmp_path
 
 

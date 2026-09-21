@@ -27,14 +27,14 @@ own at `.dadaia/.venv`: `dadaia init` provisions it, every `dadaia`, `pip` and
 <!-- derived-from: workspace-init sha256:5b20a0d9dc80 -->
 
 ```bash
-dadaia init [--workspace PATH] [--harness claude|codex|kimi-code|all] [--skip-assets]
+dadaia init <dir> --harness claude|codex|kimi-code [--skip-assets]
 ```
 
 `init` is the only verb that operates on a zero workspace, and re-running it is
 idempotent. It creates:
 
 - `.dadaia/.venv` and every zone whose registry creator is `init`, plus the shared
-  `.agents/skills` root and the harness directories the selected profile names —
+  `.agents/skills` root and the directory the one named harness owns —
   what it lays down is a view of one registry, `dadaia_workspace/core/workspace_layout.py`.
 - `.dadaia/states/spec_contexts.json` and `.dadaia/states/server_registry.json` as
   empty documents, never overwriting existing data, and

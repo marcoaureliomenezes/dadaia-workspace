@@ -24,6 +24,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
@@ -55,7 +56,7 @@ def workspace(tmp_path: Path) -> Path:
     WorkspaceService(
         public_assets=FileSystemPublicAssetManager(),
         python_env=VenvPythonEnvironmentManager(),
-    ).init(root)
+    ).init(root, harnesses=L1_ENTRY_HARNESSES)
     remote = tmp_path / "remote.git"
     subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True, timeout=_TIMEOUT)
     created = _dadaia(root, "context", "create", _NAME, "--main-repo", _SLUG, "--url", str(remote))

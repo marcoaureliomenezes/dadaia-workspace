@@ -47,7 +47,7 @@ def initialized_workspace(
 ) -> Path:
     """Per-test copy of the session-scoped ``WorkspaceService.init()`` template.
 
-    Equivalent in observable state to calling ``WorkspaceService.init(tmp_path)``
+    Equivalent in observable state to calling ``WorkspaceService.init(tmp_path, harnesses=L1_ENTRY_HARNESSES)``
     directly, but the expensive full public stage+install underneath ``init()``
     runs once per test session rather than once per test.
     """

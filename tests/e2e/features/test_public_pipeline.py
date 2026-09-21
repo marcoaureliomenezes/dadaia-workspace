@@ -364,15 +364,9 @@ class TestDoctor:
 _DOCTOR_BLOCKER_PREFIXES = ("[missing]", "[drift]", "[fail]")
 
 
-def _run_init(workspace: Path, harness: str | None) -> object:
-    """Scaffold *workspace* via the real `dadaia init` CLI (in-process, Q4).
-
-    ``harness=None`` omits ``--harness`` entirely (default = all-four back-compat path).
-    """
-    args = ["init", "--workspace", str(workspace)]
-    if harness is not None:
-        args += ["--harness", harness]
-    return _runner.invoke(cli_app, args)
+def _run_init(workspace: Path, harness: str) -> object:
+    """Scaffold *workspace* for exactly one *harness* via the real `dadaia init` CLI."""
+    return _runner.invoke(cli_app, ["init", str(workspace), "--harness", harness])
 
 
 def _persisted_profile(workspace: Path) -> list[str]:
@@ -492,23 +486,6 @@ class TestPerProfileInit:
 
         # Same scripts boundary: chokepoint scripts install for
         # every L1 target (v0.2.8), so the kimi-only tree is doctor-green directly.
-        _assert_profile_doctor_green(ws, monkeypatch)
-
-    def test_default_no_flag_scaffolds_the_full_roster(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """AC-8 all-harness: default (no `--harness`) is still the full roster; green doctor."""
-        ws = tmp_path / "all_default"
-        monkeypatch.chdir(tmp_path)
-        result = _run_init(ws, None)  # omit --harness entirely → the full roster
-        assert result.exit_code == 0, result.output
-
-        assert (ws / ".claude" / "agents").is_dir()
-        assert (ws / ".codex").is_dir()
-        assert not (ws / ".kimi-code").exists()
-        assert _ctx_inject_registered(ws / ".claude")
-
-        assert _persisted_profile(ws) == ["claude", "codex", "kimi-code"]
         _assert_profile_doctor_green(ws, monkeypatch)
 
 

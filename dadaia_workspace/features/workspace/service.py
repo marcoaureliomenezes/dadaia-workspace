@@ -31,14 +31,14 @@ class WorkspaceService:
     def init(
         self,
         workspace_root: Path,
+        harnesses: tuple[str, ...],
         skip_assets: bool = False,
-        harnesses: tuple[str, ...] | None = None,
     ) -> tuple[Workspace, list[str]]:
         """Bootstrap .dadaia/ template. Idempotent. Returns (workspace, installed_assets).
 
-        *harnesses* selects which Layer-1 entry harnesses to scaffold (the ``.claude``/
-        ``.codex``/``.kimi-code`` projections plus per-harness hook registration).
-        ``None`` ⇒ the full harness set (back-compat with pre-v0.1.58 init). Only the
+        *harnesses* names the Layer-1 entry harnesses to scaffold (their projection
+        directories plus per-harness hook registration) and is REQUIRED — there is no
+        implied full set (0.4.7 FR1: `init` takes exactly one `--harness`). Only the
         chosen harnesses' directories, hooks, and asset projections are created; the
         selected set is persisted through the profile store (the source of truth for
         profile-aware install/doctor scoping, v0.1.58 FR3).
@@ -48,7 +48,7 @@ class WorkspaceService:
         profile (canonical L1 order, unknown names appended sorted).
         """
         workspace = Workspace.from_root(workspace_root)
-        chosen = tuple(harnesses) if harnesses is not None else L1_ENTRY_HARNESSES
+        chosen = tuple(harnesses)
         chosen_set = set(chosen)
 
         # The venv manager owns `.dadaia/.venv` and runs before the zone pass: an empty

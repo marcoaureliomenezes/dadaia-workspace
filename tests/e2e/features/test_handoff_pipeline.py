@@ -38,10 +38,10 @@ def _run(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
 
 
 def _bootstrap(workspace: Path) -> None:
-    """Bootstrap a fresh dadaia workspace via `dadaia init -w <workspace>`."""
+    """Bootstrap a fresh dadaia workspace via `dadaia init <workspace> --harness claude`."""
     workspace.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
-        [*_CLI, "init", "-w", str(workspace)],
+        [*_CLI, "init", str(workspace), "--harness", "claude"],
         cwd=str(workspace),
         capture_output=True,
         text=True,

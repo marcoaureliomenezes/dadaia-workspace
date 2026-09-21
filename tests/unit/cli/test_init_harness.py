@@ -3,9 +3,9 @@
 RED-first: before FR2 ``dadaia init`` had no ``--harness`` flag and ALWAYS produced the
 full scaffold (``.claude`` + ``.codex``). This suite pins the harness-aware
 behaviour — each L1 harness that OWNS a workspace directory
-(``core.harness_registry.HARNESS_PROJECTION_DIRS``) gets its projection ONLY when named
-in the set, the default (omitted) stays the full roster, and a bad value is a Click
-``BadParameter`` (exit 2, message on stderr, empty stdout). The AC-9(b) mutation-sanity
+(``core.harness_registry.HARNESS_PROJECTION_DIRS``) gets its projection ONLY when it is
+THE named harness, and a bad value exits 2 with its message on stderr and empty stdout
+(0.4.7 T-047-73: one name, no default, no set). The AC-9(b) mutation-sanity
 sabotage (init ignores the harness set ⇒ always all-four) makes the claude-only case below
 FAIL — that is the discriminating proof the scaffold is genuinely harness-gated.
 
@@ -37,15 +37,15 @@ def _ctx_inject_commands(claude_dir: Path) -> list[str]:
 
 
 @pytest.mark.parametrize(
-    ("name", "harness_set", "expect_present", "expect_absent"),
+    ("name", "harness", "expect_present", "expect_absent"),
     [
         # AC-9(b) sabotage detector: --harness claude → .claude/ + ctx-inject hook, and
         # NO .codex/.
         ("claude_only", "claude", ("claude",), ("codex",)),
-        # --harness codex,kimi-code → .codex/ (+ .dadaia/hooks/codex-*), NO .claude/
-        # agents. kimi-code owns no workspace directory (0.4.7 FR3) — it reads the
-        # shared .agents/ tree natively and wires its hooks at the user level.
-        ("codex_and_kimi", "codex,kimi-code", ("codex",), ("claude", "kimi-code")),
+        # --harness codex → .codex/ (+ .dadaia/hooks/codex-*), NO .claude/ agents.
+        ("codex_only", "codex", ("codex",), ("claude", "kimi-code")),
+        # kimi-code owns no workspace directory (0.4.7 FR3) — it reads the shared
+        # .agents/ tree natively and wires its hooks at the user level.
         # --harness kimi-code → nothing of its own; .claude/ and .codex/ stay absent.
         ("kimi_only", "kimi-code", (), ("claude", "codex", "kimi-code")),
     ],
@@ -54,12 +54,12 @@ def test_harness_scopes_scaffold(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     name: str,
-    harness_set: str,
+    harness: str,
     expect_present: tuple[str, ...],
     expect_absent: tuple[str, ...],
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["init", "--workspace", str(tmp_path), "--harness", harness_set])
+    result = _runner.invoke(app, ["init", str(tmp_path), "--harness", harness])
     assert result.exit_code == 0, result.output
 
     for harness in expect_present:
@@ -75,30 +75,12 @@ def test_harness_scopes_scaffold(
         assert codex_wrappers, "expected .dadaia/hooks/codex-* wrappers for a codex profile"
 
 
-def test_harness_omitted_scaffolds_the_full_roster(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """``--harness`` omitted → full-harness scaffold (back-compat with pre-v0.1.58 init).
-
-    The back-compat contract is "the full ``L1_ENTRY_HARNESSES`` set"; ``kimi-code``
-    projects no workspace directory of its own (0.4.7 FR3), so the scaffold is exactly
-    the two dirs ``HARNESS_PROJECTION_DIRS`` names.
-    """
-    monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["init", "--workspace", str(tmp_path)])
-    assert result.exit_code == 0, result.output
-
-    assert (tmp_path / ".claude").is_dir()
-    assert (tmp_path / ".codex").is_dir()
-    assert not (tmp_path / ".kimi-code").exists()
-
-
 def test_harness_bad_value_is_bad_parameter(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """``--harness zzz`` → exit 2, width-independent stderr naming the bad value, empty stdout."""
     monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["init", "--workspace", str(tmp_path), "--harness", "zzz"])
+    result = _runner.invoke(app, ["init", str(tmp_path), "--harness", "zzz"])
     assert result.exit_code == 2
     norm = norm_stderr(result.stderr)
     assert "zzz" in norm, norm

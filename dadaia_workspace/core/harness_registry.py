@@ -114,36 +114,25 @@ def is_l1(harness: str) -> bool:
     return harness in _L1_SET
 
 
-def parse_harness_set(value: str) -> tuple[str, ...]:
-    """Parse a ``--harness`` selector into a validated, canonically-ordered L1 tuple.
+def parse_harness_name(value: str) -> str:
+    """Parse a ``--harness`` selector into the ONE registered harness name it denotes.
 
-    Accepts either the meta-value ``"all"`` (⇒ the full :data:`L1_ENTRY_HARNESSES`) or a
-    comma-separated subset of Layer-1 harness names (case-insensitive, whitespace-tolerant,
-    de-duplicated). The result is always ordered by :data:`L1_ENTRY_HARNESSES`, never by
-    input order.
+    Exactly one record, always. The ``"all"`` meta-value and the comma-separated subset
+    form were deleted with 0.4.7 FR2: a workspace is born with one harness and
+    ``dadaia harness add`` is the only way a second one enters.
 
     Args:
-        value: the raw selector, e.g. ``"claude"``, ``"codex,kimi-code"``, ``"all"``.
+        value: the raw selector, e.g. ``"claude"`` (case-insensitive, whitespace-tolerant).
 
     Returns:
-        The validated harness tuple in canonical L1 order.
+        The canonical harness name.
 
     Raises:
-        ValueError: if *value* is empty or names any harness outside
-            :data:`L1_ENTRY_HARNESSES`. The message lists the valid harnesses.
+        ValueError: if *value* is not a registered harness name. The message lists the
+            registered names.
     """
-    raw = value.strip().lower()
-    if raw == "all":
-        return L1_ENTRY_HARNESSES
-    parts = [p.strip() for p in raw.split(",") if p.strip()]
+    name = value.strip().lower()
     valid = ", ".join(L1_ENTRY_HARNESSES)
-    if not parts:
-        raise ValueError(
-            f"empty harness set {value!r}; expected 'all' or a comma-separated subset of {valid}"
-        )
-    unknown = [p for p in parts if p not in _L1_SET]
-    if unknown:
-        plural = "es" if len(unknown) > 1 else ""
-        named = ", ".join(repr(u) for u in unknown)
-        raise ValueError(f"unknown harness{plural} {named}; valid harnesses: {valid} (or 'all')")
-    return tuple(h for h in L1_ENTRY_HARNESSES if h in set(parts))
+    if name not in _L1_SET:
+        raise ValueError(f"unknown harness {value!r}; registered harnesses: {valid}")
+    return name

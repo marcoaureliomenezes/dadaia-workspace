@@ -47,7 +47,7 @@ local wheel when the index cannot resolve the exact version — F-25 asserts tha
 deliberately unset. Destructive statements use
 throwaway dirs under `/tmp` — never the production workspace. Where a statement needs
 an initialized workspace, create it:
-`mkdir -p /tmp/f<NN> && cd /tmp/f<NN> && $D init --harness all`.
+`$D init /tmp/f<NN> --harness claude && cd /tmp/f<NN>`.
 
 ---
 
@@ -245,7 +245,7 @@ an initialized workspace, create it:
 ### F-18 — Init / onboarding (bootstrap INTEGRITY, not just exit 0)
 - Run in an empty dir, with fail-fast shell discipline (`set -euo pipefail`, explicit
   `cd` into the target workspace, exit codes asserted directly — never through a pipe):
-  `$D init --harness all` with `DADAIA_BOOTSTRAP_PACKAGE` UNSET for this statement.
+  `$D init ws --harness claude` with `DADAIA_BOOTSTRAP_PACKAGE` UNSET for this statement.
 - **PASS if ALL of:**
   1. exit 0 and `.dadaia/` bootstrapped (venv + projections), `$D doctor` green after;
   2. the captured init output contains NO raw installer error (`ERROR:`/`Traceback`) —
@@ -307,7 +307,7 @@ an initialized workspace, create it:
 - **PASS if:** certification bootstraps its disposable workspace with the EXACT
   installed provider version even though the index does not serve it — the venv
   bootstrap re-packs the running installed distribution as a local wheel
-  (`workspace-init-all-harnesses` and `exact-version-reconciliation` PASS). "pip could
+  (`workspace-init` and `exact-version-reconciliation` PASS). "pip could
   not resolve dadaia-workspace==<candidate>" surfacing to the operator is a FAIL: an
   unpublished candidate is the validation norm and must bootstrap with no env var.
 
@@ -362,7 +362,7 @@ never exercised the live backlog path was false confidence).
 
 ### R-08 — Kimi Code harness end to end (v0.2.8 surface)
 
-- Setup: `export KIMI_CODE_HOME=<throwaway>`; `$D init --harness kimi-code` in a
+- Setup: `export KIMI_CODE_HOME=<throwaway>`; `$D init ws --harness kimi-code` in a
   disposable dir.
 - **Binding posture:** kimi-code exposes no session-id env var, so its binding is the
   exported `DADAIA_CONTEXT=<ctx>` at harness launch (the law's rung 1) — `dadaia

@@ -256,10 +256,10 @@ def certify(
         return "0 errors, 0 warnings"
 
     check(
-        "workspace-init-all-harnesses",
+        "workspace-init",
         lambda: (
-            cli("init", "--workspace", str(target), "--harness", "all", cwd=run_root)
-            and "workspace initialized with Claude, Codex, and Kimi projections"
+            cli("init", str(target), "--harness", "claude", cwd=run_root)
+            and "workspace initialized with the claude projection"
         ),
     )
 

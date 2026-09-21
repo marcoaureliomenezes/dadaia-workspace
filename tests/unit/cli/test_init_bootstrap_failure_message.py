@@ -59,7 +59,7 @@ def test_init_cli_maps_bootstrap_error_to_clean_exit(tmp_path: Path, monkeypatch
         ),
         raising=True,
     )
-    result = _runner.invoke(app, ["init", "--harness", "claude"])
+    result = _runner.invoke(app, ["init", "ws", "--harness", "claude"])
     assert result.exit_code != 0
     assert "Traceback" not in result.output
     assert "DADAIA_BOOTSTRAP_PACKAGE" in result.output

@@ -41,7 +41,7 @@
   `dadaia_workspace/infrastructure/public_assets.py`,
   `tests/integration/test_harness_add.py`, `tests/contract/test_cli_help_quality.py`.
 
-- [ ] T-047-73 — FR1: `init <dir> --harness <name>`. `cli/commands/init.py` takes a required
+- [x] T-047-73 — FR1: `init <dir> --harness <name>`. `cli/commands/init.py` takes a required
   positional `<dir>` (validated as a directory name; created if absent; refused with one `fix:`
   line if it holds a foreign tree) replacing the `--workspace/-w` resolution, and a required
   `--harness <name>` accepting exactly one registered record — `all` and the comma-subset form

@@ -1,4 +1,4 @@
-"""dadaia init command."""
+"""dadaia init command — one line, one directory, one harness (0.4.7 FR1)."""
 
 from pathlib import Path
 
@@ -7,7 +7,6 @@ from rich.console import Console
 
 from dadaia_workspace import container
 from dadaia_workspace.core import harness_registry
-from dadaia_workspace.core.workspace_resolver import resolve_workspace_root_for_init
 
 console = Console()
 app = typer.Typer()
@@ -25,54 +24,69 @@ _CLOSING_NOTES = (
 )
 
 
+def _refuse(message: str, fix: str) -> typer.Exit:
+    """Print *message* + its ONE executable ``fix:`` line on stderr and exit 2."""
+    typer.secho(message, err=True, fg=typer.colors.RED)
+    typer.secho(f"fix: {fix}", err=True, fg=typer.colors.RED)
+    return typer.Exit(2)
+
+
 @app.command()
 def init(
-    workspace: Path | None = typer.Option(None, "--workspace", "-w", help="Workspace root path"),
+    directory: str = typer.Argument(
+        ..., metavar="DIR", help="Workspace directory — created if absent."
+    ),
+    harness: str = typer.Option(
+        "",
+        "--harness",
+        help=f"The one agent runtime to scaffold: {', '.join(harness_registry.L1_ENTRY_HARNESSES)}.",
+    ),
     skip_assets: bool = typer.Option(
         False, "--skip-assets", help="Skip installing public agent assets"
     ),
-    harness: str = typer.Option(
-        "all",
-        "--harness",
-        help="Harness set to scaffold: 'all' or a comma-separated subset of claude,codex,kimi-code.",
-    ),
 ) -> None:
-    """Bootstrap a dadaia workspace: creates .dadaia/ and projects agent assets for the chosen harness set (default all: .agents/, .claude/, .codex/)."""
-    # Parse --harness BEFORE any output so a bad value is a clean BadParameter
-    # (exit 2, message on stderr, empty stdout — no partial payload leaks).
-    try:
-        harnesses = harness_registry.parse_harness_set(harness)
-    except ValueError as exc:
-        raise typer.BadParameter(str(exc), param_hint="--harness") from exc
-
-    # An explicit --workspace is authoritative (it may not exist yet: init creates it).
-    explicit = workspace is not None
-    root = workspace.resolve() if workspace is not None else resolve_workspace_root_for_init()
-
-    # Bug ancestor-walk-workspace-root-silent-mistarget (T-043-47/A30.5): the
-    # .dadaia/-nesting boundary in resolve_workspace_root_for_init already stops the
-    # dangerous case (a throwaway workspace nested under an ancestor's own .dadaia/
-    # tree) from silently mistargeting that ancestor. The one remaining shape where a
-    # bare invocation still walks to a directory OTHER than cwd is the legitimate
-    # sub-repo case (cwd nested under a sub-repo lacking its own sentinel) — still
-    # loudly named here, on stderr, so it is never mistaken for "init happened at cwd".
-    if not explicit and root != Path.cwd().resolve():
-        typer.secho(
-            f"Ancestor workspace detected: resolved root differs from cwd "
-            f"(cwd={Path.cwd().resolve()}, resolved_root={root}). "
-            "Pass --workspace to target a different directory explicitly.",
-            err=True,
-            fg=typer.colors.YELLOW,
+    """Bootstrap a dadaia workspace in DIR for one harness: .dadaia/, the law, and that harness's projection."""
+    # Every refusal happens BEFORE any output or filesystem write, so a rejected
+    # invocation leaves nothing behind (no partial workspace, no leaked payload).
+    if not harness:
+        raise _refuse(
+            "--harness is required: a workspace is born with exactly one agent runtime "
+            f"({', '.join(harness_registry.L1_ENTRY_HARNESSES)}); "
+            "`dadaia harness add <name>` adds any other later.",
+            f"dadaia init {directory} --harness {harness_registry.L1_ENTRY_HARNESSES[0]}",
         )
+    try:
+        chosen = harness_registry.parse_harness_name(harness)
+    except ValueError as exc:
+        raise _refuse(
+            str(exc),
+            f"dadaia init {directory} --harness {harness_registry.L1_ENTRY_HARNESSES[0]}",
+        ) from None
+
+    # The seam is argv: the directory is a parameter, never resolved from cwd.
+    root = Path(directory).expanduser()
+    root = (Path.cwd() / root).resolve() if not root.is_absolute() else root.resolve()
+    if root.exists() and not root.is_dir():
+        raise _refuse(
+            f"'{root}' is not a directory.", f"dadaia init {directory}-workspace --harness {chosen}"
+        )
+    # A directory that already holds `.dadaia/` is THIS workspace (a re-run, idempotent);
+    # anything else non-empty is a foreign tree and is never scaffolded over.
+    if root.is_dir() and any(root.iterdir()) and not (root / ".dadaia").is_dir():
+        raise _refuse(
+            f"'{root}' already holds a foreign tree (not a dadaia workspace).",
+            f"dadaia init {directory}-workspace --harness {chosen}",
+        )
+    root.mkdir(parents=True, exist_ok=True)
 
     console.print(f"[bold]Initializing workspace:[/bold] {root}")
-    console.print(f"[dim]Harness set:[/dim] {', '.join(harnesses)}")
+    console.print(f"[dim]Harness:[/dim] {chosen}")
 
     svc = container.build_workspace_service(root)
     from dadaia_workspace.core.exceptions import WorkspaceVenvBootstrapError
 
     try:
-        _, installed = svc.init(root, skip_assets=skip_assets, harnesses=harnesses)
+        _, installed = svc.init(root, skip_assets=skip_assets, harnesses=(chosen,))
     except WorkspaceVenvBootstrapError as exc:
         typer.secho(f"Error: {exc}", err=True, fg=typer.colors.RED)
         raise typer.Exit(1) from None

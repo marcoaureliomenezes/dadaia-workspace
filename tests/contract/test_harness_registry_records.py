@@ -21,7 +21,7 @@ from dadaia_workspace.core.harness_registry import (
     INSTALL_TARGETS,
     L1_ENTRY_HARNESSES,
     PROJECTION_TARGETS,
-    parse_harness_set,
+    parse_harness_name,
 )
 from dadaia_workspace.infrastructure import projection_rules as projection_rules_module
 from dadaia_workspace.infrastructure.install_plan import InstallPlan
@@ -109,8 +109,8 @@ def test_the_legacy_constants_derive_from_the_record_table() -> None:
     } == HARNESS_PROJECTION_DIRS
     assert ("agents", *HARNESS_RECORDS) == PROJECTION_TARGETS
     assert frozenset({"all", "agents", *HARNESS_RECORDS}) == INSTALL_TARGETS
-    assert parse_harness_set("all") == L1_ENTRY_HARNESSES
-    assert parse_harness_set(next(reversed(HARNESS_RECORDS))) == (next(reversed(HARNESS_RECORDS)),)
+    last = next(reversed(HARNESS_RECORDS))
+    assert parse_harness_name(last) == last
 
 
 def test_the_projection_table_carries_no_harness_named_literal() -> None:

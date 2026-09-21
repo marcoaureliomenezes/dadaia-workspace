@@ -19,7 +19,6 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.features.workspace import service as service_module
 from dadaia_workspace.features.workspace.service import WorkspaceService
@@ -39,9 +38,7 @@ def _profile_path(root: Path) -> Path:
     return root / ".dadaia" / "states" / "harness_profile.json"
 
 
-def test_persists_selected_set_roundtrips_and_defaults_to_all_four(
-    service: WorkspaceService, tmp_path: Path
-) -> None:
+def test_persists_selected_set_and_roundtrips(service: WorkspaceService, tmp_path: Path) -> None:
     # persists the selected harness set.
     service.init(tmp_path, skip_assets=True, harnesses=("codex",))
     data = json.loads(_profile_path(tmp_path).read_text(encoding="utf-8"))
@@ -56,12 +53,6 @@ def test_persists_selected_set_roundtrips_and_defaults_to_all_four(
     states_dir = tmp_path.parent / (tmp_path.name + "-roundtrip") / ".dadaia" / "states"
     profile = JsonHarnessProfileStore().read(states_dir)
     assert profile == HarnessProfile(schema_version="1", harnesses=("claude", "kimi-code"))
-
-    # omitting *harnesses* persists the full L1 roster (default all-four).
-    default_root = tmp_path.parent / (tmp_path.name + "-default")
-    service.init(default_root, skip_assets=True)
-    default_data = json.loads(_profile_path(default_root).read_text(encoding="utf-8"))
-    assert default_data["harnesses"] == list(L1_ENTRY_HARNESSES)
 
 
 def test_idempotent_reinit_and_absent_profile_reads_none(

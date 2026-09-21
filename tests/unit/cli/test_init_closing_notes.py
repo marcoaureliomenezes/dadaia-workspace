@@ -29,7 +29,7 @@ _RECOMMENDATION = (
 
 
 def test_init_prints_the_law_and_the_recommendation_exactly_once(tmp_path: Path) -> None:
-    result = _runner.invoke(app, ["init", "--workspace", str(tmp_path / "ws")])
+    result = _runner.invoke(app, ["init", str(tmp_path / "ws"), "--harness", "claude"])
 
     assert result.exit_code == 0, result.stdout
     assert result.stdout.count(_LAW) == 1
@@ -43,7 +43,7 @@ def test_init_never_writes_the_operator_user_settings(tmp_path: Path) -> None:
     (home / ".claude").mkdir(parents=True)
     workspace = tmp_path / "ws"
 
-    result = _runner.invoke(app, ["init", "--workspace", str(workspace)])
+    result = _runner.invoke(app, ["init", str(workspace), "--harness", "claude"])
 
     assert result.exit_code == 0, result.stdout
     assert list((home / ".claude").iterdir()) == []

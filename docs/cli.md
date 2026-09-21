@@ -36,7 +36,7 @@
 
 ## dadaia import — Register every context of a `dadaia export` file this workspace does not know as DEAD.
 
-## dadaia init — Bootstrap a dadaia workspace: creates .dadaia/ and projects agent assets for the chosen harness set (default all: .agents/, .claude/, .codex/).
+## dadaia init — Bootstrap a dadaia workspace in DIR for one harness: .dadaia/, the law, and that harness's projection.
 
 ## dadaia migrate — Migration helpers for dadaia workspace and spec trees.
 
