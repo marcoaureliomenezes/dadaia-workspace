@@ -8,14 +8,25 @@
 
 ## Assumptions (stated, not decided here)
 
-- **D8 default — `release: published`.** `release.yml` triggers on the `release` event
-  release-please emits when the release PR merges and the tag is cut. The alternative
-  (`push: tags: v*`) is not planned for; a PM reversal changes exactly one `on:` block in
-  T-047-88 and its two contract assertions.
-- **D9 default — rename at promote.** The release directory keeps its floor id while the
-  candidate runs; if release-please mints a different number, the directory is renamed once at
-  promote and the minted version recorded in the `_RELEASE.json` log. Under the version finding
-  below this rename is expected to be a no-op for 0.4.7.
+These are PM rulings of 2026-09-21, not open questions.
+
+- **D8 RULED — one workflow, same-workflow chaining.** There is no `release: published` trigger
+  and no `push: tags`. `release.yml` is folded INTO `release-please.yml`: a single workflow on
+  `push: main` runs the release-please action first, then `build → approve (release-gate) →
+  publish (OIDC) → smoke-test → publish-skills-repo`, every one of them gated on
+  `needs.release-please.outputs.release_created == 'true'` and reading
+  `needs.release-please.outputs.tag_name`. This is the pattern the action's README documents,
+  and it needs **no PAT**: the cross-workflow triggering restriction on `GITHUB_TOKEN` never
+  applies because there is no second workflow to trigger. `release.yml` is deleted in T-047-88.
+- **D9 RULED — a no-op.** Under D10 below, release-please's first PR proposes 0.4.7, so the
+  release directory id never changes and no rename happens. Rename-at-promote stays written only
+  as the general contract for a future candidate whose minted number differs.
+- **D10 RULED — the version floor.** `.release-please-manifest.json` carries the last PUBLISHED
+  version `0.4.6`; `pyproject.toml` is reset to `0.4.6` in the SAME commit that deletes
+  `SPEC-DOC-045` (T-047-90), so no intermediate tree is red. With the two pre-1.0 bump flags
+  below, release-please's first PR proposes **0.4.7** and bumps both files back in lockstep.
+  `test_release_semver_canon.py` asserts manifest version == `pyproject.toml` version from
+  T-047-90 on.
 
 ## The version release-please would mint (verified against the action, 2026-09-21)
 
@@ -38,13 +49,11 @@ project stays below 1.0. With that, the first release PR proposes **0.4.7** from
 floor, and D9's rename is a no-op. This is the plan's recommendation; changing it is a PM call,
 not an implementation call.
 
-**Corollary the PM must rule on before T-047-87 (see Risks, D10):** release-please reads the
-*current* version from `.release-please-manifest.json` and expects `pyproject.toml` to agree —
-both must carry the **last published** version, `0.4.6`. This repository's `pyproject.toml`
-carries `0.4.7` because `SPEC-DOC-045` requires pyproject to equal the live release id. That
-rule dies in T-047-90; the pyproject reset to `0.4.6` lands in the same commit as its death, so
-no task ever leaves the tree with a doctor error. T-047-87 therefore writes the manifest at
-`0.4.6` and its contract asserts *manifest == last published PyPI version*; the strict
+**This is D10, ruled.** release-please reads the *current* version from
+`.release-please-manifest.json` and expects `pyproject.toml` to agree — both carry the last
+published `0.4.6`. `pyproject.toml` carries `0.4.7` today only because `SPEC-DOC-045` requires
+it to equal the live release id; that rule and the reset land together in T-047-90. T-047-87
+writes the manifest at `0.4.6` and asserts *manifest == last published PyPI version*; the strict
 `manifest == pyproject` equality (ADR 0021's `measured_by`) is asserted from T-047-90 on.
 
 ## Design (codebase-design vocabulary)
@@ -58,9 +67,9 @@ T-047-87, which is the one addition.
 - **Seam: the release PR.** Today the seam between "this is done" and "this is published" is a
   pyproject edit compared against tags inside the publishing workflow — an implicit seam with no
   reviewable artifact. After this candidate the seam is a pull request on `main` whose body is
-  the generated changelog: reviewable, revertable, one place. `release.yml` stops deciding
-  *whether* to release and only executes a decision already made upstream (`check` dies,
-  `publish` stops creating the tag).
+  the generated changelog: reviewable, revertable, one place. the publish jobs stop deciding
+  *whether* to release and only execute a decision made earlier in the same run (`check` dies,
+  `publish` stops creating the tag, `release_created` is the one boolean).
 - **Deletion test on `_release_rc.py`/`_release_fold.py`/`_release_fold_plan.py`/`_release_archive.py`
   (404 of the 1,381 skill-script lines).** Delete them and the complexity does *not* reappear at
   any caller: "what was candidate 9's trio" is answered by `git show <CLOSURE sha>:specs/releases/0.4.7/…`,
@@ -93,17 +102,16 @@ Fixed by the SPEC: 87 → 88 → 89 → 90 → 91 → 92. Each task leaves `dada
 `dadaia doctor --specs-dir repos/dadaia-workspace/specs` at exit 0 on the live instance, and the
 instance re-projectable.
 
-1. **T-047-87 (FR1)** — the addition: the release-please workflow, config and manifest. Nothing
-   reads them yet, so this task is safe to land first and is the only place the new mechanism is
-   described.
-2. **T-047-88 (FR1)** — `release.yml` re-pointed at `release: published`; `check` and the tag
-   step die. 88 follows 87 because the tag it stops creating is the tag 87's action starts
-   creating.
+1. **T-047-87 (FR1)** — the addition: the release-please workflow (the action step alone),
+   config and manifest. Nothing reads them yet, so this task is safe to land first.
+2. **T-047-88 (FR1)** — `release.yml`'s jobs fold into `release-please.yml` under the
+   `release_created` gate and `release.yml` is deleted; `check` and the tag step die. 88 follows
+   87 because the gate it reads is the output 87's action step declares.
 3. **T-047-89 (FR2)** — the four scripts, the two subcommands and the schema's `rc` field die.
    89 follows 88 because `archive` is what `release.yml`'s old publish path paired with.
 4. **T-047-90 (FR2)** — the doctor half: `RELEASE-TREE-ARCHIVE-*` and `SPEC-DOC-045` die,
-   `phase CLOSURE --pr` arrives, `pyproject.toml` returns to the 0.4.6 floor. 90 follows 89
-   because a rule may only die after its last writer does.
+   `phase CLOSURE --pr` arrives, `pyproject.toml` returns to the 0.4.6 floor beside the manifest
+   (D10). 90 follows 89 because a rule may only die after its last writer does.
 5. **T-047-91 (FR3)** — law, skills, recipe, the root map, and the five ADRs → `superseded` in
    the same commit as the last citation deletion. 91 follows 89/90 because the law may only stop
    naming a verb after the verb is gone.
@@ -115,19 +123,21 @@ instance re-projectable.
 cannot be exercised before the merge.** Each task therefore proves what is provable statically
 and the plan names the residue explicitly.
 
-- **T-047-87/88 — proved locally:** `tests/contract/test_ci_workflow_hygiene.py` parses both
-  workflow YAMLs (the workflow exists; the action is pinned to a 40-hex sha with a version
-  comment; `release.yml`'s `on:` is the `release: published` event; no job compares pyproject to
-  tags; no step runs `git tag`; `approve`/`publish`/`smoke-test`/`publish-skills-repo` survive
-  with their `needs:` graph intact), and `tests/contract/test_release_semver_canon.py` parses
+- **T-047-87/88 — proved locally:** `tests/contract/test_ci_workflow_hygiene.py` parses the
+  workflow tree (exactly ONE workflow carries the release-please action, pinned to a 40-hex sha
+  with a version comment; `release.yml` is gone; no workflow listens to `release:` or
+  `push.tags`; no job compares pyproject to tags; no step runs `git tag`; every publish-side job
+  `needs` the `release-please` job and is gated on `release_created == 'true'`;
+  `approve`/`publish`/`smoke-test`/`publish-skills-repo` survive with their `needs:` graph
+  intact), and `tests/contract/test_release_semver_canon.py` parses
   `release-please-config.json` + `.release-please-manifest.json` (valid JSON, the two pre-1.0
   bump flags set as above, `include-component-in-tag: false`, `release-type: python` inside the
   config's `packages["."]` — **not** as an action input: with `config-file`/`manifest-file` set,
   passing `release-type` switches the action out of manifest mode).
 - **UNVERIFIED until the first release PR:** that release-please parses this commit history
   without error, that it proposes 0.4.7 rather than 0.4.6/0.5.0, that its CHANGELOG sections
-  render as configured, that the `release: published` event actually fires `release.yml`, and
-  that `publish` still finds its build artifact under the new trigger. These are one operator
+  render as configured, that `release_created`/`tag_name` carry the values the gate expects, and
+  that `publish` still finds its build artifact in the same run. These are one operator
   observation on the first PR after merge to `main`; no test in this repository can assert them.
   T-047-92 records that residue in the `_RELEASE.json` log so the next session inherits it.
 - **T-047-89/90 — proved locally, fully:** `tests/contract/test_release_state_schema.py` (the
@@ -172,15 +182,16 @@ task is wrong: stop and report.
   release-please to mint 0.4.7. That reset is coupled to `SPEC-DOC-045`'s death and both land in
   T-047-90. If the PM prefers pyproject to stay at 0.4.7, release-please will mint 0.4.8 and the
   release id must follow — decide before T-047-87 writes the manifest.
-- **The trigger is the one unprovable link.** `release: published` is emitted by release-please
-  through the `GITHUB_TOKEN`; a workflow triggered by the default token does not, by GitHub's
-  rule, trigger further workflows — the `release` event from an Action using `secrets.GITHUB_TOKEN`
-  will **not** start `release.yml`. T-047-87 must therefore either take a PAT
-  (`token: ${{ secrets.RELEASE_PLEASE_TOKEN }}`, an operator act) or T-047-88 must fall back to
-  D8's alternative (`push: tags: v*` — same hazard) or to `workflow_dispatch`. **This is the
-  single largest risk in the candidate and the implementer must resolve it with the PM at
-  T-047-87, not at T-047-88.** Fail-closed, like `SKILLS_REPO_TOKEN`: a missing secret is one
-  `::error::` and a non-zero exit, never a silent skip.
+- **The SPEC's FR1 is superseded on this point.** SPEC §3 FR1 reads "`.github/workflows/release.yml`
+  triggers on `release: published`". The PM's D8 ruling replaces that with same-workflow chaining
+  and the deletion of `release.yml`; the PM amends the SPEC line in the CLOSURE commit. This PLAN
+  and TASKS are the governing text for T-047-87/88 until then.
+- **The trigger hazard the ruling removes.** A workflow acting with the default `GITHUB_TOKEN`
+  cannot start another workflow, so a `release: published` (or `push: tags`) design would have
+  needed a PAT — an operator act, and a second secret to fail closed on. Folding the jobs into
+  one workflow deletes the hazard instead of guarding it: no secret, no second trigger, no
+  fallback branch. What remains unprovable locally is only that `release_created` is `'true'` on
+  the first real merge.
 - **Deleting a doctor rule cannot be tested by "doctor is still 0".** A deleted validator is
   invisible in a green run. T-047-90's tests must assert the *absence* of the code from the
   issue vocabulary on a tree that previously produced it — i.e. the deleted rule's fixture is
