@@ -305,6 +305,46 @@ Open-scope release (ADRs 0005–0009): version minted at birth from the PyPI lin
   construction (ADR 0013).
 - Windows runner: derived-doc hashes over LF bytes, POSIX path filters, the telemetry backstop assertion.
 
+### Candidate 10 — the release is a release PR
+
+Commits `8cafd923..8999f047`. **This is the LAST hand-written section in this file.**
+From the first release PR onward, release-please owns everything above it — the version,
+the section and the tag are written from the Conventional Commits, never by hand.
+
+#### Added
+- `.github/workflows/release-please.yml` with `release-please-config.json` and
+  `.release-please-manifest.json` at the `0.4.6` floor: one workflow on every push to `main`
+  maintains one release PR proposing the next version from the commit history.
+- The publish side folded into that same workflow — five test legs, `build`, `approve` on the
+  `release-gate` environment, `publish` under OIDC, `smoke-test` and `publish-skills-repo`,
+  every job `needs` the release-please job and gated on `release_created == 'true'`. One
+  workflow, no PAT, no second trigger.
+- `release.py phase CLOSURE --sha <sha> --pr <n>`: `--pr` names the merged release PR and
+  records the promote act in the candidate's note; promote is merging that PR, nothing else.
+
+#### Removed
+- `.github/workflows/release.yml`, its `check` job comparing `pyproject` to the `v*` tags, and
+  the step that pushed the tag — release-please creates the tag when its PR merges.
+- `release.py rc-archive`, `release.py fold` and `release.py archive`, with the five modules
+  behind them (`_release_rc`, `_release_fold`, `_release_fold_plan`, `_release_archive`,
+  `_release_histo`): a closed candidate's trio is overwritten in place and lives in git at its
+  CLOSURE commit, so nothing copies it anywhere.
+- `rc` from `release-state-v1` and `implemented.rc` with it; the archived-candidate count
+  counted a directory shape that no longer exists.
+- The `RELEASE-TREE-ARCHIVE-ID`/`-UNSHIPPED` doctor rules and `SPEC-DOC-045`: the doctor stops
+  policing an archive nobody writes and stops requiring `pyproject` to equal the live release id.
+- Every `rc-archive` / `fold` / `archive` / `rc-N` mention from the shipped law, the skills, the
+  templates, the root map and the memory atoms; ADR 0005, 0006, 0008, 0009 and 0014 are
+  `superseded` by ADR 0021, and ADR 0019's `measured_by` now names `SPEC-DOC-048`.
+- The hand-minted version: `pyproject.toml` is reset to `0.4.6`, the last published number and
+  the floor release-please bumps from — the first release PR is the one that proposes `0.4.7`.
+
+#### Operator actions pending
+- Merge the release PR when it appears on `main` — that merge IS promote, and it writes the
+  next section of this file.
+- D1 (`CLAUDE_API_KEY` for the `security-review` check) and D3–D6 from candidate 9 are
+  unchanged and still open.
+
 ### Candidate 9 — skills as a package, a public face
 
 Commits `abaca618..079ede37`. No verb entered and no verb left: the skills repository is

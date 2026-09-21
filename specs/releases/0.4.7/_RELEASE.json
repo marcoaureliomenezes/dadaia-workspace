@@ -533,6 +533,12 @@
       "agent": "dd-software-engineer",
       "kind": "note",
       "text": "rc fields retired (release-please semantics)"
+    },
+    {
+      "ts": "2026-09-21T12:57:19Z",
+      "agent": "dd-software-engineer",
+      "kind": "summary",
+      "text": "Candidate 10 implemented: T-047-87 26c71a11 (release-please workflow, config and manifest at the 0.4.6 floor; V34 CRLF fix 51b14199), T-047-88 8dc9da2e (release.yml deleted, the publish jobs folded under release_created in one workflow), T-047-89 efaa2aa2 (rc-archive, fold and archive die with their four scripts; release-state-v1 loses rc; backlog subject refs re-pointed 9cee62b1), T-047-90 737fd097 (RELEASE-TREE-ARCHIVE-* and SPEC-DOC-045 die, _release_histo.py deleted, pyproject back to the 0.4.6 floor, phase CLOSURE --pr records promote; docs/cli.md b5b78f47), T-047-91 8999f047 (the law stops naming the retired verbs; ADR 0005/0006/0008/0009/0014 superseded by 0021; ADR 0019 measured by SPEC-DOC-048). UNVERIFIED until the first push to main — no test in this repository can assert any of it: that release-please parses this history and proposes 0.4.7 rather than 0.4.6 or 0.5.0; that merging its release PR sets release_created true and carries tag_name; that the approve gate on the release-gate environment and the OIDC publish still run under the new trigger and find their build artifact in the same run. Deviations for the reviewer: T-047-89 left the archived candidate documents read but never ranked, rather than migrating them; T-047-90 tightened the regex in test_version_lineage_consistency instead of relaxing the assertion, and deleted _release_histo.py (a PM addition to the task); T-047-91 kept ADR 0021's supersedes at one id because the record schema's pattern admits exactly one, the five ids being named in its context instead, and corrected ADR 0019's measured_by rather than rewriting the accepted record."
     }
   ]
 }

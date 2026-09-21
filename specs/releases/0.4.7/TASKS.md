@@ -137,7 +137,7 @@
   `specs/memory/product/platform/pypi-distribution.md`, `specs/releases/AGENTS.md`, `AGENTS.md`,
   `tests/contract/{test_every_block_carries_a_fix,test_slop_ratchets}.py`.
 
-- [ ] T-047-92 — FR3: closure.
+- [x] T-047-92 — FR3: closure.
   `CHANGELOG.md` gains a "Candidate 10" section — the LAST hand-written section in this file,
   stated as such: release-please owns everything above it from the first release PR on. `_RELEASE.json` gains the closure `log` entry through `release.py phase CLOSURE
   --sha <sha>` (and `--pr <n>` once the release PR exists) naming the residue no test can cover:

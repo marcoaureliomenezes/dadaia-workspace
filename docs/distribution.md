@@ -10,7 +10,7 @@ than pretended into a task.
 
 | channel | artifact | state | who acts |
 |---|---|---|---|
-| PyPI | the wheel and sdist; `README.md` is the long description and `pyproject.toml` the metadata | live — published from `.github/workflows/release-please.yml` under OIDC trusted publishing, a version bump landing on `main` firing it | the release workflow, gated on the `release-gate` environment the operator approves |
+| PyPI | the wheel and sdist; `README.md` is the long description and `pyproject.toml` the metadata | live — published from `.github/workflows/release-please.yml` under OIDC trusted publishing, the merge of the release PR firing it | the same workflow, its publish jobs gated on `release_created` and on the `release-gate` environment the operator approves |
 | GitHub repository | the repository description, its topics and its homepage — settings, carried by no file in the tree | set — description, homepage and topics from the same tagline and keyword set, each run recorded in `_RELEASE.json`'s `log` | `project-manager`: `gh repo edit --description … --homepage … --add-topic …`, then `gh repo view --json description,repositoryTopics,homepageUrl` |
 | Repository root | `llms.txt` — the llmstxt.org index an agent reads first: what it is, install, the law, the CLI reference, the memory catalog | live — every line links, none restates | `software-engineer`, re-derived at closure like every document under a `derived-from` marker |
 | Awesome-lists of agentic tooling | a submitted entry carrying the tagline and the repository link | pending — no submission made | the operator |
@@ -23,10 +23,11 @@ than pretended into a task.
 Every field PyPI renders has exactly one home, and no number or sentence is restated
 in a second file:
 
-- **The number** — `pyproject.toml`'s `version`, the single source, restated in no
-  other file. The release id is the version it mints, so the release directory and
-  the `CHANGELOG.md` section carry the same digits; a `v<version>` tag exists only for
-  a published number, because the publish job creates it.
+- **The number** — `pyproject.toml`'s `version` and `.release-please-manifest.json`,
+  which carry the LAST PUBLISHED number: the floor release-please bumps from, restated
+  nowhere else. The number proposed next lives only in the open release PR, and a
+  `v<version>` tag exists only for a published number, because merging that PR creates
+  it.
 - **The summary** — `pyproject.toml`'s `description`, the tagline, byte-equal to the
   README's first non-badge paragraph and to `llms.txt`'s `> ` line, pinned by
   `tests/contract/test_docs_derived_from_memory.py`.
@@ -52,6 +53,5 @@ works offline from a bare `pip install`, and `CONSUMER_VALIDATION_RECIPE.md`, th
 matrix run against every candidate wheel before a deploy. Consumer-validation
 candidate wheels are throwaway and never mint a published number —
 `DADAIA_BOOTSTRAP_PACKAGE=<wheel>` makes a venv bootstrap install one instead of
-pinning from PyPI. Withholding release-gate approval is supported: the code shipped,
-no tag exists, and the minted-unpublished number keeps its CHANGELOG section and its
-archived directory, retired rather than reused.
+pinning from PyPI. Withholding release-gate approval is supported: the tag and the
+`CHANGELOG.md` section exist, the upload does not, and the number is never reused.
