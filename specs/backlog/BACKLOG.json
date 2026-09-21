@@ -36,7 +36,7 @@
       "id": "one-line-bootstrap",
       "title": "One-line bootstrap: uvx dadaia-workspace init <dir> [--repo <url>] scaffolds a full workspace",
       "opened": "2026-09-18",
-      "status": "candidate",
+      "status": "picked",
       "description": "Adoption blocker #1: today a first workspace takes 7 stages (install, init, context create/alive/bind, doctor, panel, install-hook) while every tool above 20k stars installs in one line. One command, run by the operator with a VALID directory name (required), scaffolds the whole workspace state: root law, harness projections, .dadaia/ zones, venv, hooks. Multi-repo stays the foundation: repos live INSIDE the workspace under repos/<slug>/, never as a monorepo; the minimal case is one workspace with one repo. The first repo is OPTIONAL at bootstrap (--repo <url> clones it, creates its context ALIVE and binds the shell in the same step); without a URL the operator is oriented to repos/ as the place of work and to `dadaia context create/alive` for the first project. No verb of the context lifecycle is visible before the second project.",
       "provenance": "operator ruling 2026-09-18 (competitive report 'dadaia-workspace: diferencial e panorama competitivo'): five urgencies before any public launch",
       "intents": [
@@ -112,41 +112,10 @@
       ]
     },
     {
-      "id": "sdd-verbs-to-skill-scripts",
-      "title": "SDD ledger verbs move from the CLI into skill-local scripts/ (stdlib, path-parameterized)",
-      "opened": "2026-09-18",
-      "status": "picked",
-      "description": "Structural cause named by the bug history: every specs/ ledger contract lives in three places that drift separately — the CLI verb that writes, the doctor rule that validates, the skill that instructs (specs 44 bugs, backlog 18, bugs 18, spec_context 48; 'doctor' in 102 titles, 'release' in 56). Every verb also drags context resolution, venv guard and session binding, which have nothing to do with writing one JSON line. Decision: what touches only specs/ (bugs, backlog, release, audit, ADR) becomes a minimal stdlib script under the owning skill's scripts/ (Agent Skills standard name; never python/), parameterized by the specs/ path, no import of dadaia_workspace, one file per verb, <= ~150 lines, tested by the lib's pytest from public/skills/<skill>/scripts/. Each script is the ONE writer and the ONE validator of its ledger (append|resolve|check); dadaia doctor calls check instead of re-implementing the schema. What touches .dadaia/ (init, context, projection, hooks, git chokepoints, workspace doctor) stays in the CLI, which shrinks to workspace operations; dd-cli-library shrinks with it. HANDEDIT/governance-event telemetry for specs/ ledgers is deleted (a WARNING nobody acts on). Contract test: every fix: line of every doctor names a script or verb that exists. Gate for one-line-bootstrap and standalone-skills-distribution: a skill is only distributable alone when it no longer calls the workspace CLI. Skill split by behavior-map: 11 canonical skills keep coming from the lib and gain scripts/ (manager-orchestration, gitflow-default, handoff-emitter, backlog-definition, release-definition, release-implementation, audit-project, spec-navigator, bug-registration, bug-resolution, cli-library); 7 generic ones (grill-me, codebase-design, code-review, domain-modeling, test-stewardship, architecture-survey, ai-eng-knowhow) leave dadaia-workspace for the marketplace repo.",
-      "provenance": "operator demand 2026-09-18, ratified after the competitive report and bug backlog-doctor-fix-names-missing-update-verb (three doctor fix: lines naming a deleted CLI verb)",
-      "intents": [
-        {
-          "subject": {
-            "kind": "catalog",
-            "ref": "sdd-bug-backlog-governance"
-          },
-          "change": "change — bugs/backlog/release/audit/ADR verbs become skill-local scripts/ (stdlib, specs-path parameter); the CLI groups bugs, backlog, release, audit are retired after migration"
-        },
-        {
-          "subject": {
-            "kind": "catalog",
-            "ref": "workspace-doctor"
-          },
-          "change": "change — the ledgers section delegates to each skill script's check; every fix: line names an existing script or verb, enforced by one contract test; HANDEDIT rules for specs/ ledgers deleted"
-        },
-        {
-          "subject": {
-            "kind": "catalog",
-            "ref": "agentic-entities"
-          },
-          "change": "change — the behavior map hash tuple covers scripts/; the 11 canonical skills carry scripts, the 7 generic skills are removed from public/ and published via standalone-skills-distribution"
-        }
-      ]
-    },
-    {
       "id": "three-flows-release-model",
       "title": "Three flows into a release: operator demand, bug composition, backlog; SPEC carries its origin; one candidate defined at a time; memory at every closure; _ideas retired",
       "opened": "2026-09-20",
-      "status": "candidate",
+      "status": "picked",
       "description": "Today a feature enters only through the backlog (§1.1/§6.6) and a bug never touches a release (§1.1), so onboarding pays the backlog ceremony and bugs that need research have no home. Deliver: (1) Flow 1 operator demand -> SPEC directly, the SPEC carrying **Origin:** operator-demand | backlog:<slug>[,..] | bugs:<id>[,..], required by the doctor; (2) Flow 2 a candidate composed of open bugs the operator picks, memory surgical or none — a single bug is still fixed immediately outside release material; (3) Flow 3 backlog items, research grade, heaviest memory pass. Exactly one candidate trio at the release root; the next is born only after rc-archive; each candidate closes with a push and the dd-code-review pass; memory updates at every candidate closure, never deferred to promote. The PM writes SPEC and memory, the software-engineer writes PLAN and TASKS. specs/releases/_ideas/ is redundant with the backlog and leaves the canon (canon.py, release_tree.py, workspace_layout.py, verdict.py, behavior-map, shipped-hashes, dd-release-definition, 5 tests).",
       "provenance": "operator grill ruling 2026-09-20 (dd-grill-me rounds 1..3 over the 17 entries; ADRs 0016..0021) — ADR 0019",
       "intents": [
@@ -177,7 +146,7 @@
       "id": "harness-lazy-and-extension",
       "title": "Lazy multi-harness: init --harness <one> required, harness add <name> replaces public install --target, all retired; then Cursor, Devin CLI and GitHub Copilot join the registry",
       "opened": "2026-09-20",
-      "status": "candidate",
+      "status": "picked",
       "description": "init --harness {all|claude|codex|kimi-code} exists with default all, so every workspace gets three harness dirs nobody asked for. Deliver: --harness <name> required on init; dadaia harness add <name> as the renamed public install --target <name> (one verb in, one out); all retired; PROJECTION_TARGETS becomes a lookup by name; the registry record is three fields (directory, agent transcode, hooks); .agents/skills and .agents/agents always projected; per-entry symlinks for Claude with copy fallback (os.symlink refused on Windows without Developer Mode). After the demolition and the universal core land, the registry gains cursor, devin and copilot — all three read root AGENTS.md and .agents/skills natively (Devin also .agents/agents); their records carry only directory, agent transcode and the hook derivation. Sub-agents stay three, maintained from the one .agents/agents source.",
       "provenance": "operator grill ruling 2026-09-20 (dd-grill-me rounds 1..3 over the 17 entries; ADRs 0016..0021) — ADR 0020, amends ADR 0015",
       "intents": [
@@ -218,30 +187,6 @@
             "ref": "dadaia_workspace/hooks/pre_gate.py#main"
           },
           "change": "change — hooks rendered per harness from one rule registry; a hook with no deterministic rule behind it is slop"
-        }
-      ]
-    },
-    {
-      "id": "cli-stale-verbs",
-      "title": "CLI verbs cited by no skill, agent or law die or become skill scripts",
-      "opened": "2026-09-20",
-      "status": "picked",
-      "description": "Audit 2026-09-20 of the 55 verbs in dadaia help tree against public/skills, public/agents and public/data: 22 are cited by nothing. Died in candidate 5 (T-047-49): repos list with openpyxl and repos.xlsx, public list, reports doctor (server *, ci pre-commit-check, context heartbeat, context release and ci verdict-check die with their own entries). Become skill scripts in the scripts candidate: bugs defer, bugs reject, bugs supersede, memory catalog generate, memory product add. Stay as internals cited by dd-cli-library: specs init, specs upgrade, context create, baseline, update, repo, delete. Rule from ADR 0018: the CLI is audited at every candidate and a new verb enters only when an old one leaves.",
-      "provenance": "operator grill ruling 2026-09-20 (dd-grill-me rounds 1..3 over the 17 entries; ADRs 0016..0021) — Q32, ADR 0016/0018",
-      "intents": [
-        {
-          "subject": {
-            "kind": "code",
-            "ref": "dadaia_workspace/public/skills/dd-spec-navigator/scripts/memory.py#_generate"
-          },
-          "change": "change — becomes a script under dd-spec-navigator/scripts/ (touches only specs/)"
-        },
-        {
-          "subject": {
-            "kind": "code",
-            "ref": "dadaia_workspace/public/skills/dd-spec-navigator/scripts/_memory_add.py#add"
-          },
-          "change": "change — becomes a script under dd-spec-navigator/scripts/ (touches only specs/)"
         }
       ]
     }

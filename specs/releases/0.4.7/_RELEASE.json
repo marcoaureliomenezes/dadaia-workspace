@@ -1,8 +1,8 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.7",
-  "phase": "CLOSURE",
-  "rc": 6,
+  "phase": "DEFINITION",
+  "rc": 7,
   "defined": {
     "sha": "030820b3",
     "ts": "2026-09-20T22:49:46Z"
@@ -451,6 +451,18 @@
       "agent": "release.py",
       "kind": "note",
       "text": "Candidate 7 implemented at 53b05854; phase CLOSURE."
+    },
+    {
+      "ts": "2026-09-21T01:34:01Z",
+      "agent": "dd-project-manager",
+      "kind": "reviews",
+      "text": "dd-code-review three axes + six lenses over a8369705..3434ce94: APPROVED (0 CRITICAL/HIGH; MEDIUM F1 fix-line test skipped shell fixes, F2 subjects contract wider than the script, F3 script fix: named a sibling module, F4 doctor executed the first .agents/skills found walking up; LOW F5 registry.py exempt from the 150-line ceiling, F6 SPEC-DOC-039 fix names a non-canon path (pre-existing, bug proposal); INFO F7 LOC headline understates the concentration). F1–F4 folded in 0155fcc7/4e8c3076. F5 -> candidate 8 (split registry.py). F6 -> operator bug proposal. Decision recorded: `subjects` answers only the declared aliases and live bindings; derived anchors are validated by the doctor's BL-SCHEMA, whose finding names the ref."
+    },
+    {
+      "ts": "2026-09-21T01:34:01Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate 7 archived to rc-7/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
     }
   ]
 }
