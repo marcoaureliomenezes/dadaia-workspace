@@ -4,9 +4,8 @@
 Every write in `backlog.py` runs these findings over the bytes it is about to commit,
 so a writer/validator disagreement about what a valid backlog is unrepresentable.
 
-Anchor RESOLUTION (does a bound subject name a live code/doc/cli anchor?) is NOT here:
-it needs the whole source tree and stays the doctor's `BL-SCHEMA` reader. This file
-validates only what the two ledger files themselves carry.
+Anchor RESOLUTION (does a bound subject name a live anchor?) needs the whole source
+tree and stays the doctor's `BL-SCHEMA` reader — this file validates the ledgers alone.
 """
 
 from __future__ import annotations
@@ -37,8 +36,7 @@ def finding(path: str, line: int, message: str) -> dict[str, Any]:
 
 def _item_errors(item: dict[str, Any]) -> Iterator[str]:
     """The live entry's own law: a live item never carries a terminal status, and an
-    item past ``idea`` binds at least one typed intent (whether each intent RESOLVES is
-    the doctor's question, not this file's)."""
+    item past ``idea`` binds at least one typed intent (resolution is the doctor's)."""
     status, slug = item.get("status"), item.get("id")
     if status in TERMINAL:
         yield (

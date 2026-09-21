@@ -4,6 +4,7 @@
 **Release ID:** 0.4.7
 **Owner:** product-engineer
 **Opened:** 2026-09-12
+**Origin:** backlog:release-lifecycle-verbs,one-doctor-one-rule-registry,adr-ledger-hygiene,memory-hygiene
 **Consumes:** release-lifecycle-verbs, one-doctor-one-rule-registry, adr-ledger-hygiene, memory-hygiene
 
 ---

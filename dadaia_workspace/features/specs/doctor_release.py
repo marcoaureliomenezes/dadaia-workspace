@@ -13,8 +13,10 @@ directories resolves cleanly to "no active release".
 
 from __future__ import annotations
 
+import json
 import re
 import tomllib
+from collections.abc import Callable, Collection
 from datetime import date
 from pathlib import Path
 
@@ -41,28 +43,14 @@ CANONICAL_STATUS = _CANONICAL_STATUS
 CANONICAL_PHASES = _PHASES
 PLAN_MAX_LINES = 300
 
-# Release-id canon cutoff (D3): a live release whose SPEC.md Created: is on/after
-# this date must carry a canon-conformant directory name (SPEC-DOC-027).
-# Vintage releases (Created: <= 2026-06-04) are excluded — this grandfathers the frozen
-# pre-June-5 _archive sub-patch releases (v0.1.4.1..v0.1.4.6, ctx-inject-v2-drift-fix-v1)
-# that predate the SemVer-folder mandate's rollout; the rule keeps hard-enforcing for
-# every release created after the cutoff (v0.1.44 onward). See specs/bugs/
-# specs-doctor-errors-on-frozen-nonsemver-archives.md (v0.1.45).
-# RELEASE_SEMVER_RE is the shared canon (core.specs_version), imported above — v0.1.53 FR3
-# centralised the pattern; the module-level name is preserved for the call sites below.
+# Release-id canon cutoff: a live release whose SPEC.md Created: is on/after this date
+# must carry a canon-conformant directory name (SPEC-DOC-027). Vintage releases are
+# excluded — this grandfathers the frozen pre-cutoff _archive sub-patch releases.
 RELEASE_SEMVER_CUTOFF = date(2026, 6, 1)  # WARNING starts here
 
-# SPEC-DOC-027 (ADR-9, v0.1.11): permanent documented allowlist of legacy ``_archive``
-# release-dir names that predate the SemVer naming canon. These are FROZEN HISTORY:
-# renaming an archived dir would break historical pointers and is pure churn, so the
-# honest permanent record is this enumerated allowlist (rationale: ADR-9). The doctor
-# stays silent for exactly these names *only inside _archive/releases/* — they never
-# silence a non-canon dir in the LIVE releases/ tree, and any name NOT in this set
-# still WARNs, so forward enforcement for new/unrecognised legacy dirs is intact.
-#   - ``ctx-inject-v2-drift-fix-v1`` / ``memory-markdown-source-v1``: pre-canon
-#     descriptive-slug releases (the slug-naming era before SemVer dirs).
-#   - ``v0.1.4.1``..``v0.1.4.6`` + ``v0.1.4.3-report-retention``: the v0.1.4.x hotfix
-#     family, four-segment + suffixed names that predate the three-segment canon.
+# SPEC-DOC-027: permanent allowlist of legacy ``_archive`` release-dir names that
+# predate the SemVer naming canon. FROZEN HISTORY — renaming an archived dir breaks
+# historical pointers. Silent only inside _archive/releases/; any name NOT here WARNs.
 RELEASE_NAMING_LEGACY_ALLOWLIST: frozenset[str] = frozenset(
     {
         "ctx-inject-v2-drift-fix-v1",
@@ -89,15 +77,10 @@ _MEMORY_WRITE_SET_RE = re.compile(r"Write set:[^\n]*specs/memory")
 
 def read_release_phase(specs_dir: Path, release_id: str) -> str | None:
     """The narrow ``RELEASE.json`` phase reader, given an ALREADY-KNOWN ``release_id``
-    (v0.5.x, successor to the RELEASE.jsonl fold; v0.5.0 FR4/T-050-11) — a thin
-    wrapper over :func:`doctor_common._read_and_parse_release_json`, the ONE
-    tri-state disk read (S1 FR23 amendment A6); it does not re-implement that read.
-    The hook's own read is deleted until T-050-21A actually needs the phase DECISION
-    value, and the container's uncalled seam is deleted with it — the hook instead
-    reads directly through ``core.release_state`` (its own light, hot-path exception;
-    importing this module's ``features.specs`` package pulls in the entire
-    ``SpecsDoctor`` decomposition, the exact heavy-import cost the container was
-    avoided for).
+    — a thin wrapper over :func:`doctor_common._read_and_parse_release_json`, the ONE
+    tri-state disk read; it does not re-implement it. The hook reads directly through
+    ``core.release_state`` instead, so a one-shot process never pays for importing the
+    whole ``SpecsDoctor`` decomposition.
 
     ``str`` when the document's ``phase`` field is readable (possibly ``""`` when it
     carries an empty phase value), ``""`` when
@@ -118,6 +101,42 @@ def _extract_status(md_path: Path) -> str | None:
     if not md_path.exists():
         return None
     return extract_status(md_path.read_text(encoding="utf-8"))
+
+
+_ORIGIN_RE = re.compile(r"^\*\*Origin:\*\*\s*(.+?)\s*$", re.MULTILINE)
+_OPERATOR_DEMAND = "operator-demand"
+_ORIGIN_VOCABULARY = f"{_OPERATOR_DEMAND} | backlog:<id>[,..] | bugs:<id>[,..]"
+
+
+def _json_records(path: Path) -> list[dict[str, object]]:
+    """Every JSON object in *path*, read as a document or as one object per line."""
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8")
+    lines = [text] if path.suffix == ".json" else text.splitlines()
+    records: list[dict[str, object]] = []
+    for line in lines:
+        if not line.strip():
+            continue
+        try:
+            parsed = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            records.append(parsed)
+    return records
+
+
+def _known_backlog_ids(specs_dir: Path) -> frozenset[str]:
+    """Every backlog id a SPEC may cite: the live entries plus the archived histo."""
+    backlog = specs_dir / "backlog"
+    document = _json_records(backlog / "BACKLOG.json")
+    active = document[0].get("active", []) if document else []
+    entries: list[object] = list(active) if isinstance(active, list) else []
+    entries += _json_records(backlog / "_archive" / "backlog_histo.jsonl")
+    return frozenset(
+        str(e["id"]) for e in entries if isinstance(e, dict) and e.get("id") is not None
+    )
 
 
 def _extract_created_date(md_path: Path) -> date | None:
@@ -197,6 +216,66 @@ class ReleaseValidator:
                     )
                 )
         return issues
+
+    def check_spec_origin(
+        self, open_bug_ids: Callable[[], Collection[str]]
+    ) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-048: the live SPEC and every candidate SPEC archived under it name
+        where the work came from — the header is the flow's only machine-read input.
+        Releases under ``_archive/`` are frozen history and out of scope.
+
+        ``open_bug_ids`` is read lazily: a tree citing no bug never touches the bug
+        ledger, so this rule borrows the governance family's ONE bug reader without
+        forcing its store on every construction site.
+        """
+        release = self.tree.active_release.release
+        if not release:
+            return []
+        rdir = self.specs_dir / "releases" / release
+        issues: list[SpecsDoctorIssue] = []
+        for path in (rdir / "SPEC.md", *sorted(rdir.glob("rc-*/SPEC.md"))):
+            if not path.exists():
+                continue
+            problem = self._origin_problem(path, open_bug_ids)
+            if problem:
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SPEC-DOC-048",
+                        severity=Severity.ERROR,
+                        description=f"{path.relative_to(self.specs_dir)} {problem}",
+                        path=str(path),
+                    )
+                )
+        return issues
+
+    def _origin_problem(self, path: Path, open_bug_ids: Callable[[], Collection[str]]) -> str:
+        """One SPEC header judged — presence, vocabulary, then the cited ids; "" is clean."""
+        match = _ORIGIN_RE.search(path.read_text(encoding="utf-8"))
+        if match is None:
+            return f"has no `**Origin:**` line — every live and candidate SPEC declares its origin ({_ORIGIN_VOCABULARY})"
+        value = match.group(1)
+        if value == _OPERATOR_DEMAND:
+            return ""
+        kind, _, rest = value.partition(":")
+        cited = [i.strip() for i in rest.split(",") if i.strip()]
+        if kind == "backlog" and cited:
+            unknown = [i for i in cited if i not in _known_backlog_ids(self.specs_dir)]
+            return (
+                f"Origin cites backlog {', '.join(unknown)} — no such entry in "
+                "backlog/BACKLOG.json or backlog/_archive/backlog_histo.jsonl"
+                if unknown
+                else ""
+            )
+        if kind == "bugs" and cited:
+            live = set(open_bug_ids())
+            closed = [i for i in cited if i not in live]
+            return (
+                f"Origin cites bugs {', '.join(closed)} — a bug origin names an OPEN "
+                "bugs/BUGS.jsonl record"
+                if closed
+                else ""
+            )
+        return f"Origin {value!r} is not canonical. Valid: {_ORIGIN_VOCABULARY}"
 
     def check_active_release_artifacts(self) -> list[SpecsDoctorIssue]:
         issues: list[SpecsDoctorIssue] = []

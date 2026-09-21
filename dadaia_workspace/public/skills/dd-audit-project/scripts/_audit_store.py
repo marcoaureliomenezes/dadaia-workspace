@@ -3,8 +3,7 @@
 
 `disposition` rewrites one finding's governance triple in the FINDINGS.jsonl it lives
 in; `close` appends one record to the archive and deletes the directory. Both build the
-candidate bytes, run the SAME `check` those bytes will be validated by afterwards, and
-only then replace the file atomically (`os.replace` from a temp file beside it).
+candidate bytes, run the SAME `check` they will be validated by, then `os.replace`.
 """
 
 from __future__ import annotations

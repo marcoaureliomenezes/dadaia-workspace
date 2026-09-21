@@ -4,6 +4,7 @@
 **Release ID:** 0.4.7
 **Owner:** product-engineer
 **Opened:** 2026-09-13
+**Origin:** backlog:bug-policy-one-model-ask-first,governance-verbs-telemetry,law-and-skill-dedupe
 **Consumes:** bug-policy-one-model-ask-first, governance-verbs-telemetry, law-and-skill-dedupe
 
 ---

@@ -271,6 +271,14 @@ RULES: tuple[SpecsRule, ...] = (
         fix_help="sed -i '\\|<memory task line>|d' specs/releases/<id>/TASKS.md",
     ),
     _rule(
+        ("SPEC-DOC-048",),
+        lambda d: d._release.check_spec_origin(d._governance.open_bug_ids),
+        fix_help=(
+            "sed -i '\\|^\\*\\*Opened:\\*\\*|a **Origin:** operator-demand' "
+            "specs/releases/<id>/SPEC.md"
+        ),
+    ),
+    _rule(
         (
             "RELEASE-TREE-SCHEMA",
             "RELEASE-TREE-PARSE",

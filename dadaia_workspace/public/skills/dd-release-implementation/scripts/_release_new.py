@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
-"""`release.py new <id>` — the ONE birth act of a release (0.4.7 FR2).
+"""`release.py new <id>` — the ONE birth act of a release.
 
-SPEC.md and `_RELEASE.json` are written in ONE transaction: the gate's MEMORY class,
-`dadaia context show`, `dd-spec-navigator` and `rc-archive` all resolve the live release
-by the state document's presence, so a SPEC minted without it exists for nobody (bug
-`release-new-writes-spec-only-never-creates-release-state`). Nothing touches disk until
-the state bytes have passed `check`, and a failure anywhere removes the whole directory.
-"""
+SPEC.md and `_RELEASE.json` are written in ONE transaction; a failure anywhere removes
+the whole directory. `--origin bugs:<ids>` seeds one scope clause per bug from the ledger."""
 
 from __future__ import annotations
 
+import json
 import shutil
 import sys
 from pathlib import Path
@@ -27,6 +24,7 @@ SPEC_STUB = """\
 **Release ID:** {release_id}
 **Owner:** product-engineer
 **Opened:** {today}
+**Origin:** {origin}
 
 ---
 
@@ -44,7 +42,7 @@ SPEC_STUB = """\
 
 ## 3. Scope
 
-(List the scope clusters / acceptance criteria.)
+{scope}
 
 ---
 
@@ -58,6 +56,21 @@ SPEC_STUB = """\
 
 (Upstream blockers, sequencing constraints, risk table.)
 """
+
+
+def seeded_scope(specs: Path, origin: str) -> str:
+    """One scope clause per bug named by a `bugs:` origin, else the placeholder."""
+    if not origin.startswith("bugs:"):
+        return "(List the scope clusters / acceptance criteria.)"
+    ledger = specs / "bugs" / "BUGS.jsonl"
+    lines = ledger.read_text(encoding="utf-8").splitlines() if ledger.is_file() else []
+    known = {str(r.get("id")): r for r in (json.loads(x) for x in lines if x.strip())}
+    bugs = [b.strip() for b in origin[5:].split(",") if b.strip()]
+    return "\n".join(
+        f"### FR{n} — {known.get(bug, {}).get('title', bug)}\n\n- Bug `{bug}`.\n"
+        f"- Repro: {known.get(bug, {}).get('repro', '(unrecorded)')}\n"
+        for n, bug in enumerate(bugs, start=1)
+    )
 
 
 def birth_state(release_id: str) -> State:
@@ -82,22 +95,18 @@ def birth_state(release_id: str) -> State:
 
 
 def refuse_unfree(specs: Path, release_id: str) -> Path:
-    """No-clobber, three layers deep: the single-live-release slot (ADR 0005), the
-    directory as one unit, and every canonical artifact inside it. A symlinked
-    ``releases/`` or release directory is refused outright (CWE-59) — minting through
-    one could write the stub outside *specs*."""
+    """No-clobber: the single-live-release slot, the directory, every artifact inside
+    it; a symlinked releases/ or release dir is refused outright (CWE-59)."""
     if not SEMVER_RE.match(release_id):
         raise Refusal(
-            f"{release_id!r} is not a bare SemVer release id (M.m.p; a 'v' prefix is the "
-            "retired archive axis and is refused at minting)",
+            f"{release_id!r} is not a bare SemVer release id (M.m.p)",
             f"{SCRIPT} new 0.1.23 --specs {specs}",
         )
     others = [other for other in live_ids(specs) if other != release_id]
     if others:
         raise Refusal(
-            f"a live release already exists ({', '.join(others)}) — the release-candidates "
-            f"model allows exactly one (ADR 0005): stack the work as a candidate, or ship "
-            f"{others[0]} first",
+            f"a live release already exists ({', '.join(others)}) — exactly one is "
+            f"allowed: stack the work as a candidate, or ship {others[0]} first",
             f"{SCRIPT} rc-archive --specs {specs}",
         )
     releases = specs / "releases"
@@ -110,14 +119,13 @@ def refuse_unfree(specs: Path, release_id: str) -> Path:
     for name in ARTIFACTS:
         if (release_dir / name).exists() or (release_dir / name).is_symlink():
             raise Refusal(
-                f"releases/{release_id}/{name} already exists — refusing to overwrite a "
-                "minted release artifact",
+                f"releases/{release_id}/{name} already exists — refusing to overwrite",
                 f"{SCRIPT} check --specs {specs}",
             )
     return release_dir
 
 
-def new_release(specs: Path, release_id: str, today: str) -> Path:
+def new_release(specs: Path, release_id: str, today: str, origin: str) -> Path:
     """Mint ``releases/<id>/`` with its SPEC stub and state document, all or nothing."""
     release_dir = refuse_unfree(specs, release_id)
     rel = f"releases/{release_id}/{STATE}"
@@ -126,7 +134,13 @@ def new_release(specs: Path, release_id: str, today: str) -> Path:
     try:
         release_dir.mkdir(parents=True, exist_ok=True)
         (release_dir / "SPEC.md").write_text(
-            SPEC_STUB.format(release_id=release_id, today=today), encoding="utf-8"
+            SPEC_STUB.format(
+                release_id=release_id,
+                today=today,
+                origin=origin,
+                scope=seeded_scope(specs, origin),
+            ),
+            encoding="utf-8",
         )
         replace(release_dir / STATE, text)
     except BaseException:

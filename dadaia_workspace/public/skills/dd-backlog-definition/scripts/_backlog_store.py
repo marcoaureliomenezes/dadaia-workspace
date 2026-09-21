@@ -1,18 +1,12 @@
 #!/usr/bin/env python3
 """The ONE write path onto the backlog files: read -> apply -> validate -> replace.
 
-Every subcommand of `backlog.py` that writes goes through :func:`commit`. It builds the
-candidate bytes, runs the SAME `check` those bytes will be validated by afterwards, and
-only then replaces the file atomically (`os.replace` from a temp file beside it). A
-concurrent write that landed while the change was being computed is detected by the
-file's own (size, mtime) and re-applied once — the backlog is ADDITIVE, so a race
-surfaces and retries, it never blocks.
+Every write goes through :func:`commit`: build the candidate bytes, run the SAME `check`
+they will be validated by, then `os.replace` atomically. A concurrent write is detected
+by the file's own (size, mtime) and re-applied once — a race surfaces and retries.
 
-An exit is the atomic pair of a removal and an append. The pair is ordered so a crash
-leaves the entry live (recoverable by re-running) rather than lost: the histo record is
-written first ONLY after the whole removal has been validated, and the removal lands
-last, so the cross-file check in `_backlog_check` sees at worst a duplicate that names
-itself.
+An exit is a removal plus an append, ordered so a crash leaves the entry live rather
+than lost: the histo record is written first, the removal lands last.
 """
 
 from __future__ import annotations

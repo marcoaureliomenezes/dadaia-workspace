@@ -16,11 +16,11 @@ description: >
 
 1. Open `specs/releases/AGENTS.md` (the area's scoped law) and follow it.
 2. Inspect `specs/bugs/BUGS.jsonl` via `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`/`stats`.
-3. Read `specs/backlog/BACKLOG.json`'s `active[]` — already sanitized by
-   `dd-backlog-definition`, consumed with no further triage.
+3. Read `specs/backlog/BACKLOG.json`'s `active[]` — sanitized by `dd-backlog-definition`, consumed untriaged.
 4. Read `specs/audits/**` for undispositioned findings; each enters the SPEC with the
    disposition it will take (`python3 .agents/skills/dd-audit-project/scripts/audit.py disposition`).
-5. Keep picking scoped to `specs/bugs/` + `specs/backlog/` + `specs/audits/` discovery.
+5. Name the SPEC's `**Origin:**`: `operator-demand`, `backlog:<ids>` or `bugs:<ids>`.
+6. Keep picking scoped to `specs/bugs/` + `specs/backlog/` + `specs/audits/` discovery.
 
 **Done when** the picked set is recorded; it becomes the SPEC's scope.
 

@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 """The ONE write path onto the release files: read -> apply -> validate -> replace.
 
-Every subcommand of `release.py` that writes a state document goes through
-:func:`commit`: it builds the candidate bytes, runs the SAME `check` those bytes will be
-validated by afterwards, and only then replaces the file atomically (`os.replace` from a
-temp file beside it). A concurrent write is detected by the file's own (size, mtime) and
-re-applied once — a race surfaces and retries, it never blocks.
+Every write goes through :func:`commit`: build the candidate bytes, run the SAME `check`
+they will be validated by, then `os.replace` atomically. A concurrent write is detected
+by the file's own (size, mtime) and re-applied once — a race surfaces and retries.
 
 :func:`live_release` is the preamble every write verb shares: resolve the ONE live
 release, read its state, refuse anything else.

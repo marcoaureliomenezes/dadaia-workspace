@@ -51,6 +51,8 @@ def _parser() -> argparse.ArgumentParser:
         command.add_argument("--specs", type=Path, default=None, help="path to the specs/ tree")
         if verb == "new":
             command.add_argument("release_id", help="the new release's bare SemVer id")
+            command.add_argument("--origin", default="operator-demand",
+                                 help="operator-demand | backlog:<id>[,..] | bugs:<id>[,..]")  # fmt: skip
         if verb == "phase":
             command.add_argument("phase", help="IMPLEMENTATION or CLOSURE")
             command.add_argument("--sha", required=True, help="the commit the milestone names")
@@ -74,7 +76,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _new(args: argparse.Namespace, specs: Path) -> int:
-    release_dir = new_release(specs, args.release_id, utc_now()[:10])
+    release_dir = new_release(specs, args.release_id, utc_now()[:10], args.origin)
     print(f"[ok] created: {release_dir / 'SPEC.md'}")
     print(f"[ok] created: {release_dir / STATE}")
     return 0

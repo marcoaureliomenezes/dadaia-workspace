@@ -67,6 +67,14 @@ def _plant_status_line_gone(root: Path) -> None:
     spec.write_text("# Spec\n\n> **Created:** 2026-04-01\n\nContent.\n", encoding="utf-8")
 
 
+def _plant_origin_line_gone(root: Path) -> None:
+    spec = root / "specs" / "releases" / _RELEASE / "SPEC.md"
+    spec.write_text(
+        "# Spec\n\n> **Status:** Approved\n**Opened:** 2026-09-21\n\nContent.\n",
+        encoding="utf-8",
+    )
+
+
 def _plant_oversized_plan(root: Path) -> None:
     plan = root / "specs" / "releases" / _RELEASE / "PLAN.md"
     body = "\n".join(f"- line {i}" for i in range(400))
@@ -138,6 +146,7 @@ PLANTS: dict[str, Plant] = {
         },
     ),
     "SPEC-DOC-005": Plant(_plant_oversized_plan),
+    "SPEC-DOC-048": Plant(_plant_origin_line_gone, {"<id>": _RELEASE}),
     "SPEC-DOC-010": Plant(_plant_changelog_heading),
     "AGENTS-PLACEHOLDER-1": Plant(_plant_tests_agents_placeholder),
     "TREE-2": Plant(_plant_root_spec_md),

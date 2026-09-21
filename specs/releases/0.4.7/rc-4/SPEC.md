@@ -4,6 +4,7 @@
 **Release ID:** 0.4.7
 **Owner:** product-engineer
 **Opened:** 2026-09-13
+**Origin:** backlog:docs-derived-from-memory-and-distribution
 **Consumes:** docs-derived-from-memory-and-distribution
 
 ---

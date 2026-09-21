@@ -81,6 +81,12 @@ class GovernanceValidator:
             )
         return self._bug_store_factory(self.specs_dir)
 
+    def open_bug_ids(self) -> frozenset[str]:
+        """The ids of every open record — the ONE bug reader, lent to SPEC-DOC-048."""
+        if not (self.specs_dir / "bugs" / "BUGS.jsonl").is_file():
+            return frozenset()
+        return frozenset(r.id for r in self._bug_store().iter_records() if r.status == "open")
+
     def check_bugs_jsonl_invariant(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-033: the single canonical ``specs/bugs/BUGS.jsonl`` ledger
         invariant. **Line validity** (ERROR) — each non-blank line must parse as a

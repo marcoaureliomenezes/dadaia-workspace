@@ -109,7 +109,7 @@
   `dadaia_workspace/features/certification/**`,
   `tests/contract/test_hook_behaviour_coverage.py`, `tests/unit/features/certification/**`.
 
-- [ ] T-047-77 — FR4: `SPEC-DOC-048`, `--origin`, flow weights. `features/specs/rules.py` +
+- [x] T-047-77 — FR4: `SPEC-DOC-048`, `--origin`, flow weights. `features/specs/rules.py` +
   `doctor_release.py` gain `SPEC-DOC-048`: every live and rc-N SPEC carries
   `**Origin:** operator-demand | backlog:<slug>[,..] | bugs:<id>[,..]`, parsed like
   `_extract_status`; `backlog:` slugs must resolve in `BACKLOG.json` or `backlog_histo.jsonl`,

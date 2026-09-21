@@ -90,7 +90,8 @@ def _fresh_release(tmp_path: Path) -> Path:
     release_dir = specs_dir / "releases" / "0.6.0"
     release_dir.mkdir(parents=True)
     for artifact in ("SPEC.md", "PLAN.md", "TASKS.md"):
-        (release_dir / artifact).write_text("**Status:** Draft\n", encoding="utf-8")
+        origin = "**Origin:** operator-demand\n" if artifact == "SPEC.md" else ""
+        (release_dir / artifact).write_text(f"**Status:** Draft\n{origin}", encoding="utf-8")
     (release_dir / "_RELEASE.json").write_text(
         json.dumps(
             {

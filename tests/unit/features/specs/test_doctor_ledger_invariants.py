@@ -121,7 +121,10 @@ def _make_clean_specs_tree(root: Path, release_id: str = "v0.1.10") -> Path:
         )
 
     _set_active(specs, release_id, "IMPLEMENTATION")
-    spec_md = "# Spec\n\n> **Status:** Approved\n> **Created:** 2026-06-09\n\nContent.\n"
+    spec_md = (
+        "# Spec\n\n> **Status:** Approved\n> **Created:** 2026-06-09\n"
+        "**Origin:** operator-demand\n\nContent.\n"
+    )
     plan_md = "# Plan\n\n> **Status:** Approved\n\nShort.\n"
     tasks_md = "# Tasks\n\n> **Status:** Approved\n\n- [-] T1 something\n- [ ] T2 other\n"
     (specs / "releases" / release_id / "SPEC.md").write_text(spec_md, encoding="utf-8")

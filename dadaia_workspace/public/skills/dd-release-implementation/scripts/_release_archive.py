@@ -121,7 +121,7 @@ def _ship(specs: Path, release_dir: Path, state: State, args: tuple[str, str, in
         destination.parent.mkdir(parents=True, exist_ok=True)
         release_dir.rename(destination)
         moved = True
-        born = new_release(specs, next_release, ts[:10])
+        born = new_release(specs, next_release, ts[:10], "operator-demand")
         append_histo(
             specs / HISTO,
             {

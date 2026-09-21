@@ -3,10 +3,8 @@
 the block is validated with — `memory.py`'s one validation primitive.
 
 The schema is ``schemas/memory-frontmatter-v1.schema.json`` beside this file, a copy
-`public stage` makes. The frontmatter block an atom carries is exactly five scalar/list
-keys (`slug title tldr summary tags`), so it is read here without a YAML dependency —
-a skill script is stdlib only, and a key it cannot read is a finding, never a silent
-drop.
+`public stage` makes. The block is exactly five scalar/list keys (`slug title tldr
+summary tags`), read without a YAML dependency — a key it cannot read is a finding.
 """
 
 from __future__ import annotations

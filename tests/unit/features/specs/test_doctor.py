@@ -152,7 +152,10 @@ def _make_clean_specs_tree(root: Path, release_id: str = "1.2.3") -> Path:
         encoding="utf-8",
     )
     _write_release_jsonl(specs, release_id, "IMPLEMENTATION")
-    spec_md = "# Spec\n\n> **Status:** Approved\n> **Created:** 2026-04-01\n\nContent.\n"
+    spec_md = (
+        "# Spec\n\n> **Status:** Approved\n> **Created:** 2026-04-01\n"
+        "**Origin:** operator-demand\n\nContent.\n"
+    )
     plan_md = "# Plan\n\n> **Status:** Approved\n\nShort.\n"
     tasks_md = "# Tasks\n\n> **Status:** Approved\n\n- [-] T1 something\n"
     (specs / "releases" / release_id / "SPEC.md").write_text(spec_md, encoding="utf-8")

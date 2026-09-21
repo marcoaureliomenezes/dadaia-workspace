@@ -386,6 +386,7 @@ _SHELL_FIX_CODES: dict[str, str] = {
     "SPEC-DOC-039": "mkdir/git mv — move the abandoned release aside",
     "SPEC-DOC-045": "sed — align pyproject's version with the live release",
     "SPEC-DOC-047": "sed — drop the stale memory task line",
+    "SPEC-DOC-048": "sed — append the missing SPEC Origin line",
     "TREE-3": "printf — append the missing memory title",
     "TREE-7": "sed — redact the session id out of BUGS.jsonl",
     "LINT-1": "sed — insert the missing atom frontmatter field",

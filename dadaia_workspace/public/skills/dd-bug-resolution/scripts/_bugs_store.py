@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 """The ONE write path onto a bug ledger file: read -> apply -> validate -> replace.
 
-Every subcommand of `bugs.py` that writes goes through :func:`commit`. It builds the
-candidate bytes, runs the SAME `check` those bytes will be validated by afterwards, and
-only then replaces the file atomically (`os.replace` from a temp file beside it). A
-concurrent write that landed while the change was being computed is detected by the
-file's own (size, mtime) and re-applied once — the ledger is ADDITIVE, so a race
-surfaces and retries, it never blocks.
+Every write goes through :func:`commit`: build the candidate bytes, run the SAME `check`
+they will be validated by, then `os.replace` atomically. A concurrent write is detected
+by the file's own (size, mtime) and re-applied once — a race surfaces and retries.
 """
 
 from __future__ import annotations
