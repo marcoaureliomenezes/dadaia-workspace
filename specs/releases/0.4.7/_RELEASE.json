@@ -1,16 +1,16 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.7",
-  "phase": "IMPLEMENTATION",
+  "phase": "CLOSURE",
   "rc": 6,
   "defined": {
     "sha": "030820b3",
     "ts": "2026-09-20T22:49:46Z"
   },
   "implemented": {
-    "sha": "1ebda330",
-    "rc": 6,
-    "ts": "2026-09-20T22:38:21Z"
+    "sha": "53b05854",
+    "rc": 7,
+    "ts": "2026-09-21T01:14:10Z"
   },
   "shipped": null,
   "log": [
@@ -445,6 +445,12 @@
       "agent": "dd-software-engineer",
       "kind": "note",
       "text": "AC2.2/AC3.1 verified from the installed tree: the five skill scripts' check verbs each exit 0 over this repo's specs/ (bugs.py, backlog.py, release.py, audit.py, memory.py), run as .agents/skills/<skill>/scripts/<x>.py with their projected exec bits, and the doctor's ledgers section delegates to exactly those checks. dadaia help tree lists 20 verbs. Live instance reflected: public stage -> public install --target all -> public doctor ok, then dadaia doctor --fix exit 0 at the workspace root. dadaia ci preflight green (ruff format, ruff check, mypy --strict, lint-imports, pytest)."
+    },
+    {
+      "ts": "2026-09-21T01:14:10Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate 7 implemented at 53b05854; phase CLOSURE."
     }
   ]
 }
