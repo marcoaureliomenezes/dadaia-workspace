@@ -1,24 +1,29 @@
 #!/usr/bin/env python3
-"""Derive the `dd-cli-library` skill grant from each agent's `Bash` tool and fail loud on drift.
+"""Two mechanical, fail-loud reachability rules over the public surface.
 
-FR5 (v0.4.3, entry `dadaia-cli-skill-agent-grant` #36). The rule is mechanical: an
-agent whose `tools:` frontmatter includes `Bash` is shell-capable and must carry the
-`dd-cli-library` skill grant; an agent with no `Bash` would find the grant inert and must NOT carry it. This mirrors
-`public/skills/dd-cli-library/SKILL.md`'s "Reachability" table — keep both in sync.
+1. The `dd-cli-library` grant is derived from each agent's `Bash` tool: shell-capable
+   agents carry it, shell-less agents would find it inert and must not.
+2. Every skill-script citation under `public/**/*.md` resolves — the script exists and
+   the cited verb is a real subcommand, in the long
+   `python3 .agents/skills/<skill>/scripts/<x>.py <verb>` form and in the `<ALIAS>_PY
+   <verb>` short form a scoped `AGENTS.md` defines for itself.
 
 Usage:
-    lint-dadaia-cli-reachability.py [--agents-dir <path>] [--self-test]
+    lint-dadaia-cli-reachability.py [--agents-dir <path>] [--public-dir <path>] [--self-test]
 
 Exit codes:
-    0 — every agent's grant matches its Bash-capability (or --self-test passed)
-    1 — at least one agent's grant disagrees with its Bash-capability
+    0 — every grant matches its Bash-capability and every script citation resolves
+        (or --self-test passed)
+    1 — at least one grant disagrees, or at least one citation names a dead target
 """
 
 from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 sys.dont_write_bytecode = True
@@ -58,6 +63,63 @@ def find_drift(agents: list[tuple[str, bool, bool]]) -> list[tuple[str, bool, bo
     """Return (name, has_bash, has_grant) triples where grant disagrees with Bash-capability."""
     return [
         (name, has_bash, has_grant) for name, has_bash, has_grant in agents if has_bash != has_grant
+    ]
+
+
+#: Citations are read inside a backticked span only, so the prose DEFINING an alias
+#: ("`RELEASE_PY` below is `python3 …`") never reads as a citation of the next word.
+_BACKTICK_SPAN_RE = re.compile(r"`([^`\n]+)`")
+_SCRIPT_RE = r"\.agents/skills/([a-z0-9-]+)/scripts/([a-z_]+\.py)"
+_ALIAS_DEF_RE = re.compile(rf"`([A-Z][A-Z0-9_]*_PY)`[^\n]*?`?python3 {_SCRIPT_RE}")
+_CITATION_RE = re.compile(rf"^(?:python3 {_SCRIPT_RE}|([A-Z][A-Z0-9_]*_PY)) ([a-z][a-z-]*)\b")
+
+Citations = dict[tuple[str, str, str], list[str]]
+
+
+def script_citations(text: str) -> list[tuple[str, str, str]]:
+    """Every (skill, script, verb) *text* cites; an alias resolves from that same file's
+    own definition, never from a global vocabulary."""
+    aliases = {name: (skill, script) for name, skill, script in _ALIAS_DEF_RE.findall(text)}
+    found: list[tuple[str, str, str]] = []
+    for span in _BACKTICK_SPAN_RE.findall(text):
+        match = _CITATION_RE.match(span)
+        if match is None:
+            continue
+        skill, script, alias, verb = match.groups()
+        if alias is not None:
+            if alias not in aliases:
+                continue
+            skill, script = aliases[alias]
+        found.append((skill, script, verb))
+    return found
+
+
+def collect_citations(public_dir: Path) -> Citations:
+    """Every citation under *public_dir*, mapped to the files making it."""
+    citations: Citations = {}
+    for md_path in sorted(public_dir.rglob("*.md")):
+        rel = md_path.relative_to(public_dir).as_posix()
+        for citation in script_citations(md_path.read_text(encoding="utf-8")):
+            citations.setdefault(citation, []).append(rel)
+    return citations
+
+
+def _verb_is_reachable(script_path: Path, verb: str) -> bool:
+    """True when ``<script> <verb> --help`` exits 0 — the script's own argparse is the
+    one authority on its verb set."""
+    argv = [sys.executable, str(script_path), verb, "--help"]
+    return subprocess.run(argv, capture_output=True, text=True).returncode == 0  # noqa: S603
+
+
+def find_dead_script_citations(
+    citations: Citations, *, skills_dir: Path, reachable: Callable[[Path, str], bool]
+) -> list[str]:
+    """One finding per cited (skill, script, verb) that does not run — a missing script
+    and an unknown verb are the same failure, so they are one rule."""
+    return [
+        f"{', '.join(sorted(set(sources)))}: `{skill}/scripts/{script} {verb}` does not run"
+        for (skill, script, verb), sources in sorted(citations.items())
+        if not reachable(skills_dir / skill / "scripts" / script, verb)
     ]
 
 
@@ -104,6 +166,22 @@ def _self_test() -> int:
     else:
         print(f"SELF-TEST PASS (c): inert grant on a shell-less agent fired: {findings_c}")
 
+    # (d) both halves of a dead citation — a script that does not exist and a real
+    # script cited with a verb it does not have — fire against the real reachability.
+    skills_dir = Path(__file__).resolve().parent.parent / "skills"
+    existing = next(skills_dir.glob("*/scripts/[a-z]*.py"), None)
+    fixtures: Citations = {("dd-fixture", "fixture.py", "append"): ["fixture/AGENTS.md"]}
+    if existing is not None:
+        fixtures[(existing.parts[-3], existing.name, "nosuchverb")] = ["fixture/AGENTS.md"]
+    dead = find_dead_script_citations(fixtures, skills_dir=skills_dir, reachable=_verb_is_reachable)
+    if len(dead) != len(fixtures):
+        print(
+            f"SELF-TEST FAIL (d): expected {len(fixtures)} finding(s), got {dead}", file=sys.stderr
+        )
+        ok = False
+    else:
+        print(f"SELF-TEST PASS (d): every dead citation fired: {dead}")
+
     return 0 if ok else 1
 
 
@@ -112,6 +190,7 @@ def main(argv: list[str] | None = None) -> int:
         description="Derive the dd-cli-library skill grant from each agent's Bash tool; fail loud on drift."
     )
     parser.add_argument("--agents-dir", type=Path, default=None)
+    parser.add_argument("--public-dir", type=Path, default=None)
     parser.add_argument(
         "--self-test",
         action="store_true",
@@ -139,10 +218,23 @@ def main(argv: list[str] | None = None) -> int:
             agents.append(parsed)
 
     findings = find_drift(agents)
+    public_dir = args.public_dir.resolve() if args.public_dir is not None else agents_dir.parent
+    citations = collect_citations(public_dir)
+    dead_citations = find_dead_script_citations(
+        citations, skills_dir=public_dir / "skills", reachable=_verb_is_reachable
+    )
 
-    print(f"lint-dadaia-cli-reachability: scanned {len(agents)} agent(s) in {agents_dir}")
-    if not findings:
-        print("Every agent's dd-cli-library grant agrees with its Bash-capability.")
+    print(
+        f"lint-dadaia-cli-reachability: scanned {len(agents)} agent(s) in {agents_dir} "
+        f"and {len(citations)} script citation(s) under {public_dir}"
+    )
+    for citation_finding in dead_citations:
+        print(f"  [ERROR] {citation_finding}", file=sys.stderr)
+    if not findings and not dead_citations:
+        print(
+            "Every agent's dd-cli-library grant agrees with its Bash-capability and "
+            "every skill-script citation resolves."
+        )
         return 0
 
     for name, has_bash, has_grant in findings:
@@ -153,8 +245,10 @@ def main(argv: list[str] | None = None) -> int:
                 f"  [ERROR] '{name}' has no Bash but carries an inert dd-cli-library grant.",
                 file=sys.stderr,
             )
+    total = len(findings) + len(dead_citations)
     print(
-        f"\n{len(findings)} drift finding(s) — reconcile the grant with the Bash tool.",
+        f"\n{total} finding(s) — reconcile each grant with its Bash tool and each "
+        "citation with the script it names.",
         file=sys.stderr,
     )
     return 1

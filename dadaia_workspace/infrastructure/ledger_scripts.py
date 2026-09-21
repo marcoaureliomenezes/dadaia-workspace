@@ -1,4 +1,4 @@
-"""The doctor's `ledgers` delegation seam (0.4.7 FR3, T-047-68).
+"""The doctor's `ledgers` delegation seam.
 
 Each `specs/` ledger has exactly ONE validator since FR2: the skill script that also
 writes it.  Before this module the doctor carried a second implementation of every

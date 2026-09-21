@@ -50,8 +50,8 @@ _UPGRADE_MODULE = _REPO_ROOT / "dadaia_workspace" / "features" / "migrate" / "up
 # measured HEAD value by the S1 FR23 firing, A8 — "a ratchet that does not ratchet
 # lets #doctor regrow to 30 silently"). Lowering is welcome; raising needs a
 # same-commit justification.
-_UPGRADE_CEILING = 26
-_DOCTOR_CEILING = 8
+_UPGRADE_CEILING = 8
+_DOCTOR_CEILING = 6
 
 # Pinned at T-050-05 (before that task touched anything else in the tree) — proved
 # `features/migrate/upgrade.py` was untouched by FR1's scaffold/doctor/--recipe work.
@@ -73,7 +73,7 @@ def _complexity_by_name(path: Path) -> dict[str, int]:
 
 
 def test_upgrade_and_doctor_complexity_stay_at_or_below_baseline() -> None:
-    """A1.4/V19/V35: `specs upgrade` <= 26, the one `dadaia doctor` <= 8."""
+    """A1.4/V19/V35: `specs upgrade` <= 8, the one `dadaia doctor` <= 6."""
     scores = _complexity_by_name(_SPECS_CLI)
     doctor_scores = _complexity_by_name(_DOCTOR_CLI)
     assert "upgrade" in scores, "cli/commands/specs.py must still define `upgrade`"

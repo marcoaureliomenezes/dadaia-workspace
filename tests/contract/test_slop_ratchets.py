@@ -1,6 +1,6 @@
-"""Intent: CONTRACT — V32, V33, V34, V35; size: SMALL (contract).
+"""Intent: CONTRACT — V32, V33, V34, V35, V36; size: SMALL (contract).
 
-Four repo-pure slop ratchets: measured at birth, pinned, ratcheting down only; every
+Five repo-pure slop ratchets: measured at birth, pinned, ratcheting down only; every
 tree walk goes through the one tracked-files enumeration the other ratchets use.
 """
 
@@ -34,7 +34,7 @@ _DOCSTRING_OWNERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctio
 # RECORDED CEILING (ratchet DOWN ONLY) — measured 2026-09-20 on this HEAD, every comment
 # token plus every docstring line under dadaia_workspace/**/*.py. Lower it in the commit
 # that deletes the ids; raising it is never a ratchet move.
-_V32_CEILING = 706
+_V32_CEILING = 686
 
 
 def _governance_id_lines(source: str) -> int:
@@ -85,7 +85,7 @@ _V33_RATIFIED_FAMILIES = frozenset({"FR", "AC", "T"})
 
 # RECORDED CEILING (ratchet DOWN ONLY) — measured 2026-09-20 on this HEAD; the failing
 # assertion prints the orphan family list so the number is reproducible.
-_V33_CEILING = 37
+_V33_CEILING = 35
 
 
 def _family_witnesses(texts: Iterable[str]) -> dict[str, set[tuple[str, int]]]:
@@ -184,6 +184,44 @@ def test_v33_prefix_families_without_a_mechanical_reader() -> None:
     corpus = ["foo-01 has a reader, bar-02 has none".upper()]
     assert _orphan_families(corpus, ["foo-".upper()]) == ["BAR"]
     assert _orphan_families(corpus, []) == ["BAR", "FOO"]
+
+
+# ---------------------------------------------------------------------------
+# V36 — the skill-script corpus: files and total Python lines
+# ---------------------------------------------------------------------------
+
+# RECORDED PINS (ratchet DOWN ONLY) — measured on the post-candidate corpus: every
+# tracked `*.py` under dadaia_workspace/public/skills/*/scripts/. A ledger's writer moved
+# out of the CLI ONCE; a growing corpus after that is CLI code re-typed, not code moved.
+_V36_FILE_CEILING = 36
+_V36_LINE_CEILING = 4191
+
+
+def _skill_scripts() -> list[Path]:
+    return [
+        path
+        for path in tracked_test_files(_REPO_ROOT, "*.py", tree="dadaia_workspace")
+        if "public/skills/" in path.as_posix() and "/scripts/" in path.as_posix()
+    ]
+
+
+def test_v36_skill_script_corpus_is_pinned() -> None:
+    """V36 — at most 36 skill-script files and 4,191 total lines of skill Python. The
+    ledger writers moved out of the CLI once: growth here is a verb regrown, never moved."""
+    scripts = _skill_scripts()
+    assert len(scripts) <= _V36_FILE_CEILING, (
+        f"skill-script files grew to {len(scripts)} (ceiling {_V36_FILE_CEILING}). A new "
+        "file earns its place by a verb leaving the CLI, never by restating one."
+    )
+    total = _skill_corpus_lines(scripts)
+    assert total <= _V36_LINE_CEILING, (
+        f"skill Python grew to {total} lines (ceiling {_V36_LINE_CEILING}). Delete the "
+        "duplicated helper — never raise the ceiling."
+    )
+
+    # Mutation fixture — the counter reads real files, and an empty set counts 0.
+    assert _skill_corpus_lines([]) == 0
+    assert scripts, "the skill-script corpus must not be empty"
 
 
 # ---------------------------------------------------------------------------

@@ -2,11 +2,11 @@
 
 Two rules live here because both read that one file: ADR-SUPERSEDED-CITATION over the
 tree that cites decisions, and LEDGER-ADR-SCHEMA over the records themselves. The ADR
-ledger has no writer script (0.4.7 FR2's table: agents append it with file tools), so
-when `features/specs/ledgers.py` was deleted in favour of the scripts (FR3) its ADR row
+ledger has no writer script (agents append it with file tools), so when
+`features/specs/ledgers.py` was deleted in favour of the scripts its ADR row
 moved HERE, to the reader that was already open on the file — not into a second walker.
 
-ADR-SUPERSEDED-CITATION (0.4.7 c5 FR4): a memory atom, rule file or skill that cites
+ADR-SUPERSEDED-CITATION: a memory atom, rule file or skill that cites
 an ADR id whose record is ``superseded`` — ERROR. A rule pointing at a dead decision is
 the drift the community asks CI to fail on; the successor lives in ``decisions.jsonl``.
 """

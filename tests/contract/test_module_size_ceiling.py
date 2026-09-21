@@ -31,8 +31,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SPECS_DIR = _REPO_ROOT / "dadaia_workspace" / "features" / "specs"
 
 # Recorded ceilings (ratchet). Lowering is welcome; raising needs same-commit justification.
-_DOCTOR_CEILING = 700
-_API_CEILING = 450
+_DOCTOR_CEILING = 699
 
 
 def _line_count(path: Path) -> int:

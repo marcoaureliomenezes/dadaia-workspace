@@ -1,23 +1,16 @@
-"""Push-gate orchestration (v0.4.4 FR3 — the gitflow v2 inversion; v0.9.0 FR1/FR2; v0.5.0
-specs-canon closure; split out of ``service.py`` at v0.5.1 K7).
+"""Push-gate orchestration.
 
 :func:`push_gate_decision` is the pre-push half of the chokepoint contract: branch
 policy (:mod:`~dadaia_workspace.features.chokepoints.branch_policy`) first, then the
 specs/ canon scan, then the range-scoped denylist scan
 (:mod:`~dadaia_workspace.features.chokepoints.denylist_scan`) — first refusal wins.
-Security review is the ``security-review`` PR check (0.4.7 c5 FR5), never a step here.
+Security review is the ``security-review`` PR check, never a step here.
 
-This module is business logic: it imports ``core`` only, and NEVER imports
-``infrastructure`` and NEVER spawns a subprocess. The canon predicates
-(``canon_violations_fn``/``verdict_violations_fn``) and the presence-check counterpart
-in ``pre_commit.py`` are INJECTED rather than imported at module scope (v0.5.1 K7):
-this is what drops ``chokepoints -> specs.canon`` out of the import-linter
-``ignore_imports`` list entirely — the CLI composition root
-(``cli/commands/ci.py``) wires ``features.specs.canon.canon_violations``/
-``verdict_violations`` straight through, no adapter needed, mirroring how
-*object_source* (the injected :class:`ObjectSource`) already works (FR7/A7.2: the
-decision function always takes it as a parameter; an unwired production call site is a
-CLI defect, never a bypass).
+This module is business logic: it imports ``core`` only, NEVER ``infrastructure``, and
+never spawns a subprocess. The canon predicates (``canon_violations_fn``/
+``verdict_violations_fn``) and the injected :class:`ObjectSource` are parameters, wired
+by the CLI composition root (``cli/commands/ci.py``) — an unwired production call site
+is a CLI defect, never a bypass.
 """
 
 from __future__ import annotations

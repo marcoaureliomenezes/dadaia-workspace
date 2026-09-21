@@ -91,8 +91,8 @@ _ALLOWLIST_MARKER = "# allow-private-import:"
 # number requires a same-commit justification — a newly-added private-symbol
 # import is a newly-frozen Hyrum's-Law liability (test-minimization-literature.md
 # §1.6, Part 3.1).
-_V26_STATEMENT_CEILING = 38
-_V26_FILE_CEILING = 35
+_V26_STATEMENT_CEILING = 37
+_V26_FILE_CEILING = 34
 
 
 def _private_symbol_import_statements(
@@ -128,8 +128,8 @@ def _private_symbol_import_statements(
 
 
 def test_v26_private_symbol_import_ratchet_pins_the_hyrums_law_liability() -> None:
-    """V26 (A22.10) — pins the AST-exact private-symbol-import count at **38
-    statements / 35 files**, measured on this HEAD (post-T-050-18; supersedes the
+    """V26 (A22.10) — pins the AST-exact private-symbol-import count at **37
+    statements / 34 files**, measured on this HEAD (post-T-050-18; supersedes the
     SPEC's quoted pre-measurement ~24, itself a single-line-grep undercount per
     T-050-03's capture). Ratchet DOWN ONLY; target 0."""
     total_statements = 0
@@ -181,8 +181,8 @@ _INTENT_HEADER_RE = re.compile(r"(?m)^\s*Intent:\s*\S")
 # declared and stays at 0. Lower a tier's ceiling in the same commit that declares or
 # deletes its undeclared files; raising one is never a ratchet move.
 _V31_UNDECLARED_CEILINGS: dict[str, int] = {
-    "unit": 89,
-    "integration": 33,
+    "unit": 86,
+    "integration": 29,
     "contract": 0,
     "e2e": 0,
 }
@@ -214,8 +214,8 @@ def _v31_violations(counts: dict[str, int], ceilings: dict[str, int]) -> list[st
 
 
 def test_v31_undeclared_intent_ceiling_per_tier(tmp_path: Path) -> None:
-    """V31 — test files without an `Intent:` header, pinned per tier (unit 89 /
-    integration 33 / contract 0 / e2e 0). Ratchet DOWN ONLY; target 0 everywhere."""
+    """V31 — test files without an `Intent:` header, pinned per tier (unit 86 /
+    integration 29 / contract 0 / e2e 0). Ratchet DOWN ONLY; target 0 everywhere."""
     counts = _undeclared_by_tier(tracked_test_files(_REPO_ROOT, "test_*.py"), _TESTS_DIR)
     violations = _v31_violations(counts, _V31_UNDECLARED_CEILINGS)
     assert not violations, (

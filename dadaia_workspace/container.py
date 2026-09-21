@@ -120,13 +120,12 @@ def build_git_object_reader() -> GitSubprocessObjectReader:
 
 
 def build_bug_record_store(specs_dir: Path) -> "JsonlRecordStore[BugRecord]":
-    """Composition-root seam for the generic bug-record JSONL store (v0.5.0 FR2, AR-1
-    ruling answer (b), ``specs/releases/0.5.0/reviews/S1-AR1-ruling.md`` §2).
+    """Composition-root seam for the generic bug-record JSONL store.
 
     Stays a container seam because the doctor reads the ledger through it
     (``bug_store_factory`` -> ``features.specs.doctor_governance.GovernanceValidator``);
     the ledger's ONE WRITER is the skill script ``dd-bug-resolution/scripts/bugs.py``
-    (0.4.7 FR2), which shares no code with this reader.
+    which shares no code with this reader.
 
     Takes *specs_dir* directly — the SAME resolved directory the doctor's
     ``--specs-dir``/bind-resolution seam already produces (never a

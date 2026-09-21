@@ -103,6 +103,7 @@ import functools
 import hashlib
 import json
 import re
+import shutil
 import tempfile
 from collections import Counter
 from itertools import combinations
@@ -118,6 +119,9 @@ from dadaia_workspace.features.specs.citations import (
     dead_path_citations_in_tree,
     dead_verb_citations_in_tree,
     posix_relpath,
+)
+from dadaia_workspace.infrastructure.public_assets import (
+    _SKILL_SCRIPT_SCHEMAS,  # allow-private-import: the one staging table naming which shipped schema each skill script carries a copy of; a second table here is the fork this hash guards against
 )
 from tests.helpers.scan_population import assert_populated
 
@@ -335,11 +339,45 @@ def _sha256_file(path: Path) -> str:
     return _sha256_text(path.read_text(encoding="utf-8"))
 
 
+def _script_members(skill: str, skills_dir: Path, public_dir: Path) -> list[tuple[str, Path]]:
+    """The (stable name, file) pairs `hash_tuple.scripts` covers for *skill*, sorted.
+
+    Every SOURCE file under the skill's `scripts/` plus, under `schemas/<name>`, the
+    shipped schema `stage` copies in beside them — hashing the shipped original (never
+    the staged copy, which does not exist in the source tree) is what makes a schema
+    fork red on both sides.
+    """
+    scripts_dir = skills_dir / skill / "scripts"
+    members = [
+        (path.relative_to(scripts_dir).as_posix(), path)
+        for path in sorted(scripts_dir.rglob("*"))
+        if path.is_file() and "schemas" not in path.relative_to(scripts_dir).parts
+    ]
+    members += sorted(
+        {
+            (f"schemas/{Path(schema_rel).name}", public_dir / schema_rel)
+            for schema_rel, scripts_rel in _SKILL_SCRIPT_SCHEMAS
+            if scripts_rel.split("/")[1] == skill
+        }
+    )
+    return members
+
+
+def _scripts_hash(skill: str, skills_dir: Path, public_dir: Path) -> str | None:
+    """The recorded `hash_tuple.scripts` value for *skill* — `None` when it ships no
+    scripts, otherwise one hash over every member's name and content in sorted order."""
+    members = _script_members(skill, skills_dir, public_dir)
+    if not members:
+        return None
+    return _sha256_text("".join(f"{name}:{_sha256_file(path)}\n" for name, path in members))
+
+
 def _find_stale_hash_tuples(
     map_data: dict[str, Any],
     law_sections: dict[str, str],
     skills_dir: Path = _SKILLS_DIR,
     repo_root: Path = _REPO_ROOT,
+    public_dir: Path = _PUBLIC,
 ) -> list[str]:
     violations: list[str] = []
     for row in map_data["rows"]:
@@ -362,6 +400,14 @@ def _find_stale_hash_tuples(
                     violations.append(
                         f"row(skill={row['skill']!r}): skill hash stale — re-read `{rel}` "
                         "and re-record hash_tuple.skill"
+                    )
+            if (skills_dir / row["skill"] / "scripts").is_dir():
+                real_scripts_hash = _scripts_hash(row["skill"], skills_dir, public_dir)
+                if real_scripts_hash != row["hash_tuple"]["scripts"]:
+                    violations.append(
+                        f"row(skill={row['skill']!r}): scripts hash stale — re-read every "
+                        f"file under `{row['skill']}/scripts/` and the shipped schemas it "
+                        "carries, and re-record hash_tuple.scripts"
                     )
         recorded_scoped = row["hash_tuple"]["scoped"]
         scoped_paths = row["scoped_agents_md"]
@@ -705,6 +751,29 @@ def test_mutation_fixture_e_stale_hash_tuple_turns_red() -> None:
 
     assert any("skill hash stale" in v for v in violations), violations
     assert any("section hash stale" in v for v in violations), violations
+
+
+def test_mutation_fixture_f_edited_skill_script_turns_red(tmp_path: Path) -> None:
+    """RED condition 5, scripts side — a skill script whose bytes changed without its
+    row's `hash_tuple.scripts` re-recorded must be flagged. The skill folder is copied
+    into a tmp tree and ONE byte appended to one script: the map's own rows and the real
+    corpus are never touched, and the finder is pointed at the copy."""
+    row = next(
+        r
+        for r in _real_map()["rows"]
+        if r["skill"] is not None and (_SKILLS_DIR / r["skill"] / "scripts").is_dir()
+    )
+    skill = row["skill"]
+    copied = tmp_path / "skills" / skill
+    shutil.copytree(_SKILLS_DIR / skill, copied)
+    edited = sorted((copied / "scripts").glob("*.py"))[0]
+    edited.write_text(edited.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+
+    violations = _find_stale_hash_tuples(
+        _real_map(), _law_section_bodies(), skills_dir=tmp_path / "skills"
+    )
+
+    assert any(f"row(skill={skill!r}): scripts hash stale" in v for v in violations), violations
 
 
 # --------------------------------------------------------------------------- #

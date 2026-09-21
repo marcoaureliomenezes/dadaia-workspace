@@ -160,7 +160,7 @@ def _ledgers_section(
     """The `ledgers` section — three contributors, one name.
 
     The backlog document's BL-* rules, the ADR ledger's own reader, and the five ledger
-    SCRIPTS (0.4.7 FR3): each ledger with a writer script is validated by THAT script's
+    SCRIPTS: each ledger with a writer script is validated by THAT script's
     `check`, run as a subprocess here. The doctor holds no second implementation of any
     ledger schema — this is the one delegation point.
     """

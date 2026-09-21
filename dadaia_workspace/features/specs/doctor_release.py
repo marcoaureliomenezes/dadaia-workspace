@@ -1,18 +1,14 @@
-"""Release validator (v0.1.55 FR1): the active release, its artifacts, SemVer + ledger
-invariants.
+"""Release validator: the active release, its artifacts, SemVer + ledger invariants.
 
-Single-responsibility sibling of the SpecsDoctor coordinator. Owns the active-release lifecycle
-checks (SPEC-DOC-003/004/005/009), the release ledger
-invariants (phase↔markers SPEC-DOC-024, unique ids SPEC-DOC-026, naming canon SPEC-DOC-027),
-and the partial-archive residue invariant (SPEC-DOC-039, v0.1.81 FR2), plus the family-local
-status/created-date extractors. Leaf-only: imports the shared leaves + core, never a sibling
-validator.
+Single-responsibility sibling of the SpecsDoctor coordinator. Owns the active-release
+lifecycle checks (SPEC-DOC-003/004/005/009), the release ledger invariants (phase<->markers
+SPEC-DOC-024, unique ids SPEC-DOC-026, naming canon SPEC-DOC-027) and the partial-archive
+residue invariant (SPEC-DOC-039), plus the family-local status/created-date extractors.
+Leaf-only: imports the shared leaves + core, never a sibling validator.
 
-v0.5.x (successor to the RELEASE.jsonl fold; v0.5.0 FR4/T-050-21A): ``ACTIVE.md`` is
-retired — the active release and its phase are read directly
-off ``RELEASE.json`` (see :func:`resolve_active_release`). No fallback branch
-survives; a workspace with zero live release directories resolves cleanly to "no
-active release", the same as the old scaffold default did.
+The active release and its phase are read directly off ``RELEASE.json``
+(:func:`resolve_active_release`) — no fallback branch: a workspace with zero live release
+directories resolves cleanly to "no active release".
 """
 
 from __future__ import annotations

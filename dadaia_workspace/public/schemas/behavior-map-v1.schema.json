@@ -63,7 +63,7 @@
         "hash_tuple": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["section", "skill", "scoped"],
+          "required": ["section", "skill", "scripts", "scoped"],
           "properties": {
             "section": {
               "type": "string",
@@ -74,6 +74,11 @@
               "type": ["string", "null"],
               "pattern": "^sha256:[0-9a-f]{64}$",
               "description": "sha256 of the skill's SKILL.md content at last review; null exactly when 'skill' is null."
+            },
+            "scripts": {
+              "type": ["string", "null"],
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "description": "One sha256 over every file under the skill's scripts/ (each member's name and content, sorted) plus the shipped schemas stage copies in beside them, at last review; null exactly when the skill ships no scripts/. A script or a schema edited without this re-recorded is RED."
             },
             "scoped": {
               "type": "array",
