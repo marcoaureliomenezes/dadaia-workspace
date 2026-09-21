@@ -134,6 +134,60 @@ def test_init_with_an_unreachable_repo_exits_1_with_one_fix_line(tmp_path: Path)
     assert not (workspace / "repos" / "nowhere").exists()
 
 
+def test_init_with_repo_is_idempotent_on_re_run(tmp_path: Path, origin: Path) -> None:
+    """SPEC FR1 "idempotent on re-run" holds for `--repo` too: the second run of the
+    identical command exits 0 and changes nothing."""
+    workspace = tmp_path / "ws"
+    argv = ["init", str(workspace), "--harness", "claude", "--skip-assets", "--repo", str(origin)]
+
+    assert _runner.invoke(app, argv).exit_code == 0
+
+    def _snapshot() -> dict[str, str]:
+        return {
+            str(path.relative_to(workspace)): path.read_text(encoding="utf-8", errors="replace")
+            for path in sorted(workspace.rglob("*"))
+            if path.is_file() and ".dadaia/sessions" not in path.as_posix()
+        }
+
+    before = _snapshot()
+    rerun = _runner.invoke(app, argv)
+
+    assert rerun.exit_code == 0, rerun.stdout
+    assert _snapshot() == before
+
+
+def test_the_printed_fix_line_succeeds_once_the_url_is_reachable(tmp_path: Path) -> None:
+    """The `fix:` line a failed `--repo` prints is the IDENTICAL command — it must be
+    runnable to success, never a stall that re-raises on the record the failed run left."""
+    workspace = tmp_path / "ws"
+    bare = tmp_path / "app.git"
+    argv = ["init", str(workspace), "--harness", "claude", "--skip-assets", "--repo", str(bare)]
+
+    failed = _runner.invoke(app, argv)
+    assert failed.exit_code == 1
+    assert f"fix: dadaia init {workspace} --harness claude" in failed.output
+
+    # The operator makes the URL reachable and re-runs the very same command.
+    _git("init", "--bare", "--initial-branch=main", str(bare), cwd=tmp_path)
+    work = tmp_path / "seed2"
+    work.mkdir()
+    _git("init", "--initial-branch=main", cwd=work)
+    (work / "README.md").write_text("app\n", encoding="utf-8")
+    _git("add", "README.md", cwd=work)
+    _git("commit", "-m", "seed", cwd=work)
+    _git("remote", "add", "origin", str(bare), cwd=work)
+    _git("push", "origin", "main", cwd=work)
+
+    retry = _runner.invoke(app, argv)
+
+    assert retry.exit_code == 0, retry.output
+    assert (workspace / "repos" / "app" / "README.md").read_text(encoding="utf-8") == "app\n"
+    registry = json.loads(
+        (workspace / ".dadaia" / "states" / "spec_contexts.json").read_text(encoding="utf-8")
+    )
+    assert [ctx["state"] for ctx in registry["contexts"] if ctx["name"] == "app"] == ["alive"]
+
+
 def test_init_without_repo_closes_with_exactly_three_lines(tmp_path: Path) -> None:
     result = _runner.invoke(app, ["init", str(tmp_path / "ws"), "--harness", "claude"])
 

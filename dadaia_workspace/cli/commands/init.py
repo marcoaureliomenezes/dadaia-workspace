@@ -141,6 +141,7 @@ def init(
             repo,
             session_id=session_id,
             create_context=ctx_svc.create,
+            main_repo_url=lambda name: ctx_svc.show(name).repo_url,
             alive_context=ctx_svc.alive,
         )
     except (DadaiaError, OSError) as exc:

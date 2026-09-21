@@ -7,6 +7,15 @@ binding is `core.session_store`'s record author. Nothing here re-implements any 
 the two lifecycle entry points arrive as parameters, the same "everything it needs is a
 parameter" discipline that let `push_gate_decision`/`pre_commit_decision` drop their
 cross-feature imports.
+
+Idempotence contract: re-running the identical command is a no-op that exits 0. Every
+step below is already idempotent on its own — `alive` re-confirms rather than re-clones,
+the hooks are copied over themselves, the binding is one record per session id — except
+registration, which refuses a name it already holds. So an existing context whose main
+repo url is the one asked for is REUSED; one whose url differs still raises
+`ContextAlreadyExistsError`, because that is a genuine name collision. This is what makes
+the `fix:` line a failed run prints truthful: the same command, run again once the url is
+reachable, succeeds.
 """
 
 from __future__ import annotations
@@ -19,7 +28,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from dadaia_workspace.core import session_store, workspace_layout
-from dadaia_workspace.core.exceptions import InvalidContextNameError
+from dadaia_workspace.core.exceptions import ContextAlreadyExistsError, InvalidContextNameError
 
 #: A repo slug is a directory name under ``repos/`` — never a traversal, never an option.
 _SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -73,6 +82,7 @@ def bootstrap_repo(
     *,
     session_id: str,
     create_context: Callable[[str, str, str], object],
+    main_repo_url: Callable[[str], str],
     alive_context: Callable[[str], object],
 ) -> tuple[str, tuple[str, str]]:
     """Make *repo_url* this workspace's first project; return its slug and env lines.
@@ -81,9 +91,16 @@ def bootstrap_repo(
     slug before writing anything) -> `alive_context` (clone + specs scaffold) -> the
     pre-push chokepoint on the tree that now exists -> the session binding. A failure at
     any step raises and the later steps never run.
+
+    Re-entrant per the module's idempotence contract: the one branch below reuses a
+    context already registered for THIS url and lets any other collision propagate.
     """
     slug = slug_from_url(repo_url)
-    create_context(slug, slug, repo_url)
+    try:
+        create_context(slug, slug, repo_url)
+    except ContextAlreadyExistsError:
+        if main_repo_url(slug) != repo_url:
+            raise
     alive_context(slug)
     install_git_hooks(workspace_root / "repos" / slug, force=True)
     session_store.write_session(
