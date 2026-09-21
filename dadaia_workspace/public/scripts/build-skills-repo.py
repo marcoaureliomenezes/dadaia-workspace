@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 """Render the standalone Agent Skills repository (`build-skills-repo.py <out-dir>`).
 
-A skill's bytes exist in one place — `dadaia_workspace/public/skills/` — and the prose
-in another: `specs/memory/`. Everything written here derives from those two, so the
-published repository cannot drift from the library that owns it; an installed wheel,
-carrying no `specs/`, refuses to build.
+Every byte derives from `public/skills/` and `specs/memory/` — a wheel refuses to build.
 """
 
 from __future__ import annotations
@@ -57,10 +54,8 @@ git clone {repo}.git .agents/dadaia-skills && ln -s dadaia-skills/skills .agents
 
 This repository is generated from dadaia-workspace's `public/skills` at each release and
 force-published, so its history is dadaia-workspace's tags — edit the skills there.
-
-These skills are standalone. Inside a workspace created by `dadaia-workspace` they also
-drive the spec-driven lifecycle — specs, backlog, bugs, releases — with the ledger
-scripts, the projection chain and the governance hooks that ship with it:
+Inside a workspace these skills also drive the spec-driven lifecycle — specs, backlog,
+bugs, releases — with the ledger scripts, projection chain and governance hooks:
 <https://github.com/{owner}/dadaia-workspace>.
 
 MIT licensed — see `LICENSE`.
