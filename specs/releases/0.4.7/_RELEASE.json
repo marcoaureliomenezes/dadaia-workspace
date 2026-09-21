@@ -511,6 +511,12 @@
       "agent": "release.py",
       "kind": "note",
       "text": "Candidate 9 implemented at d7ed41a1; phase CLOSURE."
+    },
+    {
+      "ts": "2026-09-21T05:00:24Z",
+      "agent": "dd-project-manager",
+      "kind": "reviews",
+      "text": "dd-code-reviewer on abaca618..449c4267: APPROVED (0 CRITICAL, 0 HIGH, 2 MEDIUM, 4 LOW, 3 INFO). Folded at closure cbed3298 + f233ccd3: F1 behavior-map/schema re-landed without escape churn, F3 release job version via env, F4 generated-tree note in the skills README, F5 plugin.json repository+license; build-skills-repo.py back to 150 lines. Record-only: F2 links to the docs site and skills repo 404 until D3 and the uvx line errors against 0.4.6 until 0.4.7 publishes — D3 must precede the tag; F6 standalone skills still cite workspace verbs outside the scoped-law step; F7 CONTEXT-MAP re-recorded; F8 Pages rendering UNVERIFIED until enabled; F9 CI verified by the PM (push runs green, PR run red only on the by-design security-review). Deviations 1-6 ratified. Bug proposals carried: SPEC-DOC-039 fix path (c7 F6); cursor file writes ungated (c8, declared)."
     }
   ]
 }
