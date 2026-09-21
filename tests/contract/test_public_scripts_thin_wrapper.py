@@ -66,7 +66,9 @@ _OWNER_SCRIPT_CEILINGS: dict[str, int] = {"registry.py": 339}
 
 #: Owner scripts whose verb set includes `check` (the ledger scripts of FR2). A
 #: script listed here must expose `check`; `registry.py` owns ports, not a ledger.
-_LEDGER_OWNER_SCRIPTS: frozenset[str] = frozenset({"bugs.py"})
+_LEDGER_OWNER_SCRIPTS: frozenset[str] = frozenset(
+    {"bugs.py", "backlog.py", "release.py", "audit.py", "memory.py"}
+)
 
 #: Data-driven registry (A16.2): script name -> max total line count for a genuine
 #: thin wrapper. Lowering a ceiling is welcome; raising one (or adding a script whose

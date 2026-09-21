@@ -33,7 +33,7 @@ Root workspace behavior is in the workspace `AGENTS.md`; production-source behav
 | `memory/**` | `dd-project-manager`, in `DEFINITION` and `CLOSURE` phase |
 | `backlog/**` | `dd-project-manager`; entries exit by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit` |
 | `bugs/**` | any agent, after the operator confirms the proposal; verbs only |
-| `audits/**` | `dd-code-reviewer` (audit lens); findings move by `dadaia audit disposition|close` |
+| `audits/**` | `dd-code-reviewer` (audit lens); findings move by `python3 .agents/skills/dd-audit-project/scripts/audit.py disposition|close` |
 
 ## 5. Memory
 

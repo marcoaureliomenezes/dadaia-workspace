@@ -32,25 +32,25 @@
     },
     {
       "code": "TREE-3",
-      "description": "memory/ARCHITECTURE.md is missing — required memory .md atom. Create it using `dadaia memory product add` or the born-markdown scaffold.",
+      "description": "memory/ARCHITECTURE.md is missing — required memory .md atom. Create it using `python3 .agents/skills/dd-spec-navigator/scripts/memory.py product add <area> <slug>`.",
       "path": "<SPECS>/memory/ARCHITECTURE.md",
       "severity": "warning"
     },
     {
       "code": "TREE-3",
-      "description": "memory/TECHSTACK.md is missing — required memory .md atom. Create it using `dadaia memory product add` or the born-markdown scaffold.",
+      "description": "memory/TECHSTACK.md is missing — required memory .md atom. Create it using `python3 .agents/skills/dd-spec-navigator/scripts/memory.py product add <area> <slug>`.",
       "path": "<SPECS>/memory/TECHSTACK.md",
       "severity": "warning"
     },
     {
       "code": "TREE-3",
-      "description": "memory/QUALITY.md is missing — required memory .md atom. Create it using `dadaia memory product add` or the born-markdown scaffold.",
+      "description": "memory/QUALITY.md is missing — required memory .md atom. Create it using `python3 .agents/skills/dd-spec-navigator/scripts/memory.py product add <area> <slug>`.",
       "path": "<SPECS>/memory/QUALITY.md",
       "severity": "warning"
     },
     {
       "code": "TREE-3",
-      "description": "memory/product/index.md is missing — required memory .md atom. Create it using `dadaia memory product add` or the born-markdown scaffold.",
+      "description": "memory/product/index.md is missing — required memory .md atom. Create it using `python3 .agents/skills/dd-spec-navigator/scripts/memory.py product add <area> <slug>`.",
       "path": "<SPECS>/memory/product/index.md",
       "severity": "warning"
     },

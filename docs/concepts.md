@@ -106,6 +106,6 @@ per pillar, metrics as `baseline → measured`, score and summary — and `FINDI
 one appended record per finding. Three pillars always run together over the window
 since the newest archived audit: bug history, spec compliance and memory drift. One
 audit is suggested every five releases, never mandatory, and generates exactly one
-remediation release: `dadaia audit disposition` rewrites a finding's disposition,
-release and reason in place, and `dadaia audit close` refuses while any finding is
+remediation release: `python3 .agents/skills/dd-audit-project/scripts/audit.py disposition` rewrites a finding's disposition,
+release and reason in place, and `python3 .agents/skills/dd-audit-project/scripts/audit.py close` refuses while any finding is
 `open`, appends the one `audits_histo.jsonl` record and deletes the directory.

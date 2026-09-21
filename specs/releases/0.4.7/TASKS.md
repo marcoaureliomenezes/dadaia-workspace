@@ -75,7 +75,7 @@
   `cli/commands/newartifacts.py` (deleted), `features/specs/{candidate,catalog}.py`,
   `container.py`, `setup.cfg`, `docs/cli.md`, `public/scaffold/releases/AGENTS.md`, `tests/**`.
 
-- [ ] T-047-67 — FR2: audit and memory move. `dd-audit-project/scripts/audit.py` —
+- [x] T-047-67 — FR2: audit and memory move. `dd-audit-project/scripts/audit.py` —
   `disposition close check` over `audits/<dir>/FINDINGS.jsonl` + `audits_histo.jsonl`, `close`
   refusing while any finding is `open`. `dd-spec-navigator/scripts/memory.py` — `catalog
   generate`, `product add`, `check` over `memory/product/{index.md,catalog.json}` and the atoms'

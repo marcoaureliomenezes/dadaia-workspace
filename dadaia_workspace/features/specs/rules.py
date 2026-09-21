@@ -16,7 +16,12 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from dadaia_workspace.core.doctor_rules import Rule
-from dadaia_workspace.core.kernel_tunables import BACKLOG_SCRIPT, DADAIA_BIN
+from dadaia_workspace.core.kernel_tunables import (
+    AUDIT_SCRIPT,
+    BACKLOG_SCRIPT,
+    DADAIA_BIN,
+    MEMORY_SCRIPT,
+)
 from dadaia_workspace.features.specs import doctor_adr
 from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
 from dadaia_workspace.features.specs.release_tree import release_tree_issues
@@ -143,7 +148,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("CAT-1",),
         lambda d: d._memory.check_cat1_catalog_sync(),
-        fix_help=f"{DADAIA_BIN} memory catalog generate --specs-dir <specs>",
+        fix_help=f"{MEMORY_SCRIPT} catalog generate --specs <specs>",
     ),
     _rule(
         ("LINT-1",),
@@ -225,7 +230,7 @@ RULES: tuple[SpecsRule, ...] = (
         ("SPEC-DOC-036",),
         lambda d: d._closure_audit.check_audit_disposition(),
         fix_help=(
-            f"{DADAIA_BIN} audit disposition <audit> <finding-id> "
+            f"{AUDIT_SCRIPT} disposition <audit> <finding-id> "
             "--disposition resolved --release <release>"
         ),
     ),
@@ -237,7 +242,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-038",),
         lambda d: d._closure_audit.check_loose_undisposed_audits(),
-        fix_help=f"{DADAIA_BIN} audit close <audit> --sha <sha>",
+        fix_help=f"{AUDIT_SCRIPT} close <audit> --sha <sha>",
     ),
     _rule(
         ("SPEC-DOC-039",),

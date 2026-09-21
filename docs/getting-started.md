@@ -135,7 +135,7 @@ the documents are the state, the verbs move the state document, and the markers 
 6. **Close the candidate.** `python3 .agents/skills/dd-release-implementation/scripts/release.py phase CLOSURE --sha <sha>` requires every
    task `[x]` and stamps `implemented {sha, rc: rc + 1, ts}`. Then the memory update,
    the closure `log` entries, the disposition sweep (`python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit`,
-   `dadaia audit disposition`), artifact GC, and the `feature → develop` pull request.
+   `python3 .agents/skills/dd-audit-project/scripts/audit.py disposition`), artifact GC, and the `feature → develop` pull request.
 7. **Continue or promote.** `python3 .agents/skills/dd-release-implementation/scripts/release.py rc-archive` moves the completed trio into
    the next `rc-N/`, sets `rc = N` and returns the release to `DEFINITION` for another
    candidate; `python3 .agents/skills/dd-release-implementation/scripts/release.py archive <id> --shipped <sha> --pr <n> --next <M.m.p>`

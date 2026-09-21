@@ -2,10 +2,6 @@
 
 # dadaia CLI digest (v0.4.7 — derived from the live command tree; authoritative help: `dadaia <group> --help`)
 
-## dadaia audit — Audit finding and archive commands.
-- audit close — Archive one fully dispositioned audit: the histo record is appended LAST, then
-- audit disposition — Rewrite one finding's disposition, release and reason, in place.
-
 ## dadaia capabilities — Describe public dadaia-workspace features supported by this installation.
 
 ## dadaia certify — Certify assembled public features in a disposable local workspace.
@@ -37,10 +33,6 @@
 ## dadaia import — Register every context of a `dadaia export` file this workspace does not know as DEAD.
 
 ## dadaia init — Bootstrap a dadaia workspace: creates .dadaia/ and projects agent assets for the chosen harness set (default all: .agents/, .claude/, .codex/).
-
-## dadaia memory — Memory catalog management commands.
-- memory catalog <generate> — Catalog JSON generation commands.
-- memory product <add> — Product memory catalog commands.
 
 ## dadaia migrate — Migration helpers for dadaia workspace and spec trees.
 

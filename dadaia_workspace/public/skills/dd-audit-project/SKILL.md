@@ -43,9 +43,7 @@ three is not an audit. Append one `FINDINGS.jsonl` record per claim
 
 ## 4. References
 
-- [`PILLAR-BUGS.md`](PILLAR-BUGS.md) · [`PILLAR-SPECS.md`](PILLAR-SPECS.md) ·
-  [`PILLAR-MEMORY.md`](PILLAR-MEMORY.md) — the pillar protocols.
 - [`FINDINGS-FORMAT.md`](FINDINGS-FORMAT.md) — record shape, evidence rule,
   disposition vocabulary.
+- Script: `python3 .agents/skills/dd-audit-project/scripts/audit.py` — `disposition`, `close`, `check`: this ledger's ONE writer and validator.
 - Lifecycle, pillars and verbs: `specs/audits/AGENTS.md`.
-- `dadaia doctor --json` / `dd-cli-library` — command reference.

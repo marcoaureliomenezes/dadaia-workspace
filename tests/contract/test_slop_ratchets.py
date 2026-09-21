@@ -34,7 +34,7 @@ _DOCSTRING_OWNERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctio
 # RECORDED CEILING (ratchet DOWN ONLY) — measured 2026-09-20 on this HEAD, every comment
 # token plus every docstring line under dadaia_workspace/**/*.py. Lower it in the commit
 # that deletes the ids; raising it is never a ratchet move.
-_V32_CEILING = 717
+_V32_CEILING = 706
 
 
 def _governance_id_lines(source: str) -> int:
@@ -53,7 +53,7 @@ def _governance_id_lines(source: str) -> int:
 
 def test_v32_governance_ids_in_production_comments_and_docstrings() -> None:
     """V32 — comment tokens and docstring lines under dadaia_workspace/ naming an FR, T-,
-    ADR or v0.x id, pinned at 765. Ratchet DOWN ONLY; target 0 (tests/ are excluded)."""
+    ADR or v0.x id, pinned at the recorded ceiling. Ratchet DOWN ONLY; target 0 (tests/ are excluded)."""
     total = sum(
         _governance_id_lines(path.read_text(encoding="utf-8"))
         for path in tracked_test_files(_REPO_ROOT, "*.py", tree="dadaia_workspace")
@@ -240,7 +240,7 @@ def test_v34_live_candidate_trio_bytes_under_the_fixed_ceiling() -> None:
 # tracked `*.md` under dadaia_workspace/public/skills/. Re-pinned at every closure that
 # touches the corpus, downward only; raising either is never a ratchet move.
 _V35_DIR_CEILING = 18
-_V35_LINE_CEILING = 2881
+_V35_LINE_CEILING = 2880
 
 
 def _skill_corpus_markdown() -> list[Path]:

@@ -14,6 +14,7 @@ import shutil
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.kernel_tunables import MEMORY_SCRIPT
 from dadaia_workspace.core.workspace_layout import SCOPED_LAW_AREAS
 from dadaia_workspace.features.specs import memory_canon
 from dadaia_workspace.features.specs.canon import (
@@ -151,7 +152,7 @@ class StructuralValidator:
                     severity=Severity.WARNING,
                     description=(
                         f"memory/{rel_path} is missing — required memory .md atom. "
-                        "Create it using `dadaia memory product add` or the born-markdown scaffold."
+                        f"Create it using `{MEMORY_SCRIPT} product add <area> <slug>`."
                     ),
                     path=str(target),
                     fixable=False,

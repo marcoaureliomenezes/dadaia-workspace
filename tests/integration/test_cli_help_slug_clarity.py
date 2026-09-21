@@ -16,9 +16,7 @@ from dadaia_workspace.cli.main import app
 _runner = CliRunner()
 
 # (argv-to-help, must-not-contain-mangled, must-contain-any-of)
-_CASES = [
-    (["memory", "product", "add", "--help"], "^+$", ("a-z0-9", "kebab")),
-]
+_CASES = []
 
 
 def _help_text(argv: list[str]) -> str:

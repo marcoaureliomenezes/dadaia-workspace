@@ -19,7 +19,7 @@ description: >
 3. Read `specs/backlog/BACKLOG.json`'s `active[]` — already sanitized by
    `dd-backlog-definition`, consumed with no further triage.
 4. Read `specs/audits/**` for undispositioned findings; each enters the SPEC with the
-   disposition it will take (`dadaia audit disposition`).
+   disposition it will take (`python3 .agents/skills/dd-audit-project/scripts/audit.py disposition`).
 5. Keep picking scoped to `specs/bugs/` + `specs/backlog/` + `specs/audits/` discovery.
 
 **Done when** the picked set is recorded; it becomes the SPEC's scope.

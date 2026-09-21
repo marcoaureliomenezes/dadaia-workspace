@@ -144,15 +144,6 @@ PLANTS: dict[str, Plant] = {
     "TREE-3": Plant(
         _plant_missing_memory_document, {"<document>": "QUALITY", "<title>": "Quality"}
     ),
-    "SPEC-DOC-038": Plant(
-        _plant_dispositioned_audit,
-        {
-            "<audit>": "20260101-lifecycle",
-            # The fixture tree is not a bound workspace, so the verb is told which
-            # specs/ it acts on — the one argument a real invocation resolves itself.
-            "<sha>": "abc1234 --specs-dir specs",
-        },
-    ),
     "SPEC-DOC-039": Plant(
         _plant_archived_release_residue,
         {"<release-id>": "0.0.9", "<why abandoned>": "abandoned: superseded by 0.1.0"},
@@ -175,7 +166,8 @@ _UNEXERCISED: dict[str, str] = {
     "TREE-7": "the fix redacts a session id inside BUGS.jsonl; the value is per-record "
     "and redaction is covered by the redaction suite",
     "TREE-8": "auto-fixed rule (`fix_tree8`), covered by the structural doctor unit tests",
-    "CAT-1": "the fix is `memory catalog generate`, exercised by the catalog CLI suite",
+    "CAT-1": "the fix is `memory.py catalog generate`, exercised by tests/unit/skills/test_spec_navigator_memory_script.py",
+    "SPEC-DOC-038": "the fix is `audit.py close`, exercised by tests/unit/skills/test_audit_project_audit_script.py",
     "LINT-1": "the fix inserts one missing frontmatter field; which field is per-atom",
     "ADR-SUPERSEDED-CITATION": "no auto-fix by design (the successor is a judgment); covered "
     "by tests/unit/features/specs/test_doctor_adr_citations.py",

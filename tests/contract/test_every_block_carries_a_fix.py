@@ -16,7 +16,6 @@ size: SMALL.
 
 from __future__ import annotations
 
-import json
 import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
@@ -232,85 +231,6 @@ def test_push_gate_denylist_refusal_carries_a_runnable_fix() -> None:
 
 def test_push_gate_git_read_failure_carries_a_runnable_fix() -> None:
     assert_block_carries_a_runnable_fix(_decide(_feature_ref(), source=_FailingObjectSource()))
-
-
-# ── the governance verbs (0.4.7 FR3/FR4/FR5) ───────────────────────────────────
-
-
-def _specs_tree(tmp_path: Path) -> Path:
-    specs = tmp_path / "specs"
-    (specs / "releases").mkdir(parents=True)
-    return specs
-
-
-def _audit_tree(tmp_path: Path, disposition: str = "open") -> Path:
-    specs = _specs_tree(tmp_path)
-    audit = specs / "audits" / "20260101-slug"
-    audit.mkdir(parents=True)
-    (audit / "FINDINGS.jsonl").write_text(
-        json.dumps(
-            {
-                "id": "20260101-slug-F001",
-                "pillar": "bugs",
-                "severity": "LOW",
-                "refs": ["a"],
-                "claim": "c",
-                "evidence": "e",
-                "disposition": disposition,
-                "release": "0.0.1" if disposition != "open" else None,
-                "reason": None,
-            }
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    return specs
-
-
-@pytest.mark.parametrize(
-    ("name", "audit", "finding", "kwargs"),
-    [
-        (
-            "unknown-audit",
-            "nope",
-            "20260101-slug-F001",
-            {"disposition": "resolved", "release": "0.0.1"},
-        ),
-        (
-            "unknown-finding",
-            "20260101-slug",
-            "F999",
-            {"disposition": "resolved", "release": "0.0.1"},
-        ),
-        ("retired-word", "20260101-slug", "20260101-slug-F001", {"disposition": "fixed"}),
-        (
-            "deferred-without-reason",
-            "20260101-slug",
-            "20260101-slug-F001",
-            {"disposition": "deferred"},
-        ),
-    ],
-)
-def test_audit_disposition_refusals_carry_a_runnable_fix(
-    name: str, audit: str, finding: str, kwargs: dict[str, Any], tmp_path: Path
-) -> None:
-    from dadaia_workspace.features.specs import audit as audit_feature
-
-    specs = _audit_tree(tmp_path)
-    with pytest.raises(audit_feature.AuditError) as exc:
-        audit_feature.disposition_finding(specs, audit, finding, **kwargs)
-    assert_block_carries_a_runnable_fix(str(exc.value))
-
-
-def test_audit_close_with_an_open_finding_carries_a_runnable_fix(tmp_path: Path) -> None:
-    from dadaia_workspace.features.specs import audit as audit_feature
-
-    specs = _audit_tree(tmp_path)
-    with pytest.raises(audit_feature.AuditError) as exc:
-        audit_feature.close_audit(
-            specs, "20260101-slug", sha="abc1234", histo_append=lambda _r: None, denylist_terms=()
-        )
-    assert_block_carries_a_runnable_fix(str(exc.value))
 
 
 # ── context heartbeat (exit 1) ──────────────────────────────────────────────────

@@ -12,7 +12,9 @@ Retired lease/CAS constants are intentionally absent; no tunable in this module 
 from __future__ import annotations
 
 __all__ = [
+    "AUDIT_SCRIPT",
     "BACKLOG_SCRIPT",
+    "MEMORY_SCRIPT",
     "RELEASE_SCRIPT",
     "DADAIA_BIN",
     "RECONCILER_THROTTLE_TTL_SECONDS",
@@ -50,3 +52,11 @@ BACKLOG_SCRIPT: str = "python3 .agents/skills/dd-backlog-definition/scripts/back
 #: trio and `releases_histo.jsonl`. Every `RELEASE-TREE-*` `fix:` that named a retired
 #: `dadaia release` verb names this script instead.
 RELEASE_SCRIPT: str = "python3 .agents/skills/dd-release-implementation/scripts/release.py"
+
+#: The audit ledger's ONE writer (0.4.7 FR2, T-047-67): a finding's governance triple
+#: and the all-or-nothing close that archives the audit.
+AUDIT_SCRIPT: str = "python3 .agents/skills/dd-audit-project/scripts/audit.py"
+
+#: The memory catalog's ONE writer (0.4.7 FR2, T-047-67): `catalog.json` and `index.md`
+#: are regenerated together from the atoms, and one new atom is born by `product add`.
+MEMORY_SCRIPT: str = "python3 .agents/skills/dd-spec-navigator/scripts/memory.py"

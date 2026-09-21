@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "finding-record-v1",
   "title": "Finding Record v1",
-  "description": "One record per audit finding, appended once — no event stream, no fold (v0.5.0 FR13, D5, D11). Each line of specs/audits/<YYYYMMDDTHHMMSSZ>-<session_id_8chars>/FINDINGS.jsonl is one object validating this schema, keyed by `id`. Every property carries a custom `x-mutability` keyword — `immutable-core` (never rewritten once appended: id, pillar, severity, refs, claim, evidence) or `mutable-governance` (rewritten in place by the remediation release that dispositions it: disposition, release, reason) — THIS is the one place the two-category split is documented; core/models/findings.py never re-declares it as a second, driftable list (A13.1, mirrors A2.1/A2.10). `specs/audits/**` has one CLI writer for the governance triple (`dadaia audit disposition`, 0.4.7 FR4); a finding is APPENDED by an agent's file tools (immutable core, like an ADR), so A13.5's hand-redaction rule (evidence is the reproducible command plus a redacted one-line result, never a raw transcript) is what keeps a record clean, not a write-time seam.",
+  "description": "One record per audit finding, appended once — no event stream, no fold (v0.5.0 FR13, D5, D11). Each line of specs/audits/<YYYYMMDDTHHMMSSZ>-<session_id_8chars>/FINDINGS.jsonl is one object validating this schema, keyed by `id`. Every property carries a custom `x-mutability` keyword — `immutable-core` (never rewritten once appended: id, pillar, severity, refs, claim, evidence) or `mutable-governance` (rewritten in place by the remediation release that dispositions it: disposition, release, reason) — THIS is the one place the two-category split is documented; core/models/findings.py never re-declares it as a second, driftable list (A13.1, mirrors A2.1/A2.10). `specs/audits/**` has one writer for the governance triple (`dd-audit-project/scripts/audit.py disposition`, 0.4.7 FR4); a finding is APPENDED by an agent's file tools (immutable core, like an ADR), so A13.5's hand-redaction rule (evidence is the reproducible command plus a redacted one-line result, never a raw transcript) is what keeps a record clean, not a write-time seam.",
   "type": "object",
   "additionalProperties": false,
   "required": ["id", "pillar", "severity", "refs", "claim", "evidence", "disposition", "release", "reason"],
@@ -48,7 +48,7 @@
       "type": "string",
       "enum": ["open", "resolved", "superseded", "deferred", "rejected"],
       "x-mutability": "mutable-governance",
-      "description": "Governance state, appended as `open` and rewritten in place by `dadaia audit disposition` (0.4.7 FR4). The terminal words are exactly `core.models.histo.FINDINGS_DISPOSITIONS` — one finding vocabulary; the historical `fixed` was renamed to `resolved` with zero committed FINDINGS.jsonl to migrate."
+      "description": "Governance state, appended as `open` and rewritten in place by `dd-audit-project/scripts/audit.py disposition` (0.4.7 FR4). The terminal words are exactly `core.models.histo.FINDINGS_DISPOSITIONS` — one finding vocabulary; the historical `fixed` was renamed to `resolved` with zero committed FINDINGS.jsonl to migrate."
     },
     "release": {
       "type": ["string", "null"],

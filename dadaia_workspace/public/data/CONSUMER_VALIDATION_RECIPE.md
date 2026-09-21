@@ -215,7 +215,7 @@ an initialized workspace, create it:
   $D specs init --specs-dir S`) that is doctor-clean — confirm `$D doctor
   --specs-dir S` reports **0 errors AND 0 warnings**.
 - Run: `$D memory product add <slug> --area <area> --specs-dir S`;
-  `$D memory catalog generate --specs-dir S`; then `$D doctor --specs-dir S` again.
+  `python3 .agents/skills/dd-spec-navigator/scripts/memory.py catalog generate --specs S`; then `$D doctor --specs-dir S` again.
 - **PASS if:** the verbs exist and exit 0; the atom is registered in the catalog; and the
   supported "add a feature" path leaves `dadaia doctor` at **0 errors AND 0 warnings** —
   the atom emitted by `memory product add` must lint clean out of the box (its template

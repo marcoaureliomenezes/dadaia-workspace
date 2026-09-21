@@ -17,6 +17,7 @@ from pathlib import Path
 
 from dadaia_workspace.core import frontmatter as _fm
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.kernel_tunables import MEMORY_SCRIPT
 from dadaia_workspace.core.specs_repair import has_unfilled_angle_placeholders, is_placeholder_atom
 from dadaia_workspace.features.specs import citations, memory_canon, memory_lint
 from dadaia_workspace.features.specs.canon import default_public_dir
@@ -638,11 +639,9 @@ class MemoryValidator:
                     SpecsDoctorIssue(
                         code="CAT-1",
                         severity=Severity.WARNING,
-                        description=(
-                            f"catalog.json absent; {len(md_slugs)} feature .md atom"
-                            f"{'s' if len(md_slugs) != 1 else ''} present; "
-                            "run `dadaia memory catalog generate` to create it."
-                        ),
+                        description=f"catalog.json absent; {len(md_slugs)} feature .md "
+                        f"atom{'s' if len(md_slugs) != 1 else ''} present; run "
+                        f"`{MEMORY_SCRIPT} catalog generate` to create it.",
                         path=str(catalog_path),
                     )
                 )
@@ -676,7 +675,7 @@ class MemoryValidator:
                     description=(
                         f"catalog.json lists slug '{slug}' but no corresponding "
                         f"'{slug}.md' exists in memory/product/. "
-                        "Run `dadaia memory catalog generate` to resync."
+                        f"Run `{MEMORY_SCRIPT} catalog generate` to resync."
                     ),
                     path=str(product_dir / f"{slug}.md"),
                 )
@@ -691,7 +690,7 @@ class MemoryValidator:
                     description=(
                         f"'{slug}.md' exists in memory/product/ but is not listed in "
                         "catalog.json. "
-                        "Run `dadaia memory catalog generate` to resync."
+                        f"Run `{MEMORY_SCRIPT} catalog generate` to resync."
                     ),
                     path=str(product_dir / f"{slug}.md"),
                 )
