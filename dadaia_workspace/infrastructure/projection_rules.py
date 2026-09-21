@@ -32,26 +32,23 @@ from dadaia_workspace.core.harness_registry import (
 )
 from dadaia_workspace.core.models.agent_model_policy import ResolvedAgentModel
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
+from dadaia_workspace.infrastructure.agent_transcodes import AGENT_RULE_BUILDERS, no_rules
 from dadaia_workspace.infrastructure.codex_doctor import (
     codex_trust_boundary_info,
     dcx7_codex_skill_refs,
     dcx8_codex_rules_shape,
     dcx9_codex_hook_shape,
 )
-from dadaia_workspace.infrastructure.install_helpers import (
-    activity_read_only,
-    render_claude_agent,
-    resolve_codex_agent_model,
-)
+from dadaia_workspace.infrastructure.install_helpers import render_claude_agent
 from dadaia_workspace.infrastructure.install_plan import InstallPlan
-from dadaia_workspace.infrastructure.projection import ProjectionRule, link_render
-from dadaia_workspace.infrastructure.public_assets_common import (
-    _CLAUDE_DIRS,
-    iter_public_files,
+from dadaia_workspace.infrastructure.projection import (
+    ProjectionRule,
+    bytes_rule,
+    tree_bytes_rules,
 )
+from dadaia_workspace.infrastructure.public_assets_common import iter_public_files
 from dadaia_workspace.infrastructure.runtime_config import (
     claude_settings,
-    codex_config,
     codex_hook_wrapper_contents,
     codex_hooks,
     foreign_claude_hook_commands,
@@ -61,87 +58,9 @@ from dadaia_workspace.infrastructure.runtime_config import (
     merge_claude_settings,
     upsert_kimi_hooks_block,
 )
-from dadaia_workspace.infrastructure.runtime_transforms.codex import transform_for_codex
-from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
-    _parse_agent_frontmatter,
-    _render_codex_agent_toml,
-    _render_codex_command_policy_rules,
-)
-from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import map_model
 from dadaia_workspace.infrastructure.workspace_guardrail import (
     _agents_md_source,
 )
-
-# ---------------------------------------------------------------------------
-# Small building blocks
-# ---------------------------------------------------------------------------
-
-
-def _fixed_content_render(content: bytes) -> Callable[[bytes | None], bytes]:
-    def _render(_current: bytes | None) -> bytes:
-        return content
-
-    return _render
-
-
-def _bytes_rule(
-    label: str,
-    harness: str,
-    dst: Path,
-    content: bytes,
-    *,
-    mode: int | None = None,
-) -> ProjectionRule:
-    """A rule whose canonical content is fixed at rule-build time (``compare="bytes"``)."""
-    return ProjectionRule(
-        label=label,
-        harness=harness,
-        dst=dst,
-        render=_fixed_content_render(content),
-        compare="bytes",
-        mode=mode,
-    )
-
-
-def _link_rule(label: str, harness: str, dst: Path, link_to: Path) -> ProjectionRule:
-    """A rule that projects a RELATIVE symlink at *dst* onto the authored *link_to*.
-
-    One authored set, N harness views: the executor falls back to a hash-verified copy
-    where the platform refuses symlinks, and records which of the two it wrote.
-    """
-    return ProjectionRule(
-        label=label, harness=harness, dst=dst, render=link_render, link_to=link_to
-    )
-
-
-def _tree_bytes_rules(
-    src_dir: Path,
-    dst_dir: Path,
-    *,
-    harness: str,
-    label_prefix: str,
-    mode: int | None = None,
-) -> tuple[ProjectionRule, ...]:
-    """One ``compare="bytes"`` rule per real file under *src_dir* (verbatim copy).
-
-    A projection is a copy of the source, permissions included: an authored file that is
-    executable projects executable (0.4.7 FR1 — a skill script the agent runs directly).
-    The source's own exec bit is the whole rule; no path knows what a `scripts/` dir is.
-    """
-    rules: list[ProjectionRule] = []
-    for src in iter_public_files(src_dir):
-        rel = src.relative_to(src_dir)
-        rules.append(
-            _bytes_rule(
-                f"{label_prefix}{rel.as_posix()}",
-                harness,
-                dst_dir / rel,
-                src.read_bytes(),
-                mode=mode if mode is not None else (0o755 if os.access(src, os.X_OK) else None),
-            )
-        )
-    return tuple(rules)
-
 
 # ---------------------------------------------------------------------------
 # Harness-independent rules: guardrail pair (root), law, dadaia-family AGENTS.md
@@ -164,9 +83,7 @@ def _guardrail_pair_rules(plan: InstallPlan) -> tuple[ProjectionRule, ...]:
     if src is None:
         return ()
     return (
-        _bytes_rule(
-            "root:AGENTS.md", "agents", plan.workspace_root / "AGENTS.md", src.read_bytes()
-        ),
+        bytes_rule("root:AGENTS.md", "agents", plan.workspace_root / "AGENTS.md", src.read_bytes()),
     )
 
 
@@ -186,7 +103,7 @@ def _dadaia_family_agents_md_rules(plan: InstallPlan) -> tuple[ProjectionRule, .
         src = plan.agentic_dir / "data" / source_name
         if src.is_file():
             rules.append(
-                _bytes_rule(label, "agents", plan.workspace_root / rel_dst, src.read_bytes())
+                bytes_rule(label, "agents", plan.workspace_root / rel_dst, src.read_bytes())
             )
     return tuple(rules)
 
@@ -196,17 +113,12 @@ def _skills_tree_rules(plan: InstallPlan) -> tuple[ProjectionRule, ...]:
     Kimi Code read it natively; Claude Code reaches it through the per-skill symlinks
     ``ClaudeHarness`` projects into ``.claude/skills/``.
     """
-    return _tree_bytes_rules(
+    return tree_bytes_rules(
         plan.agentic_dir / "skills",
         plan.workspace_root / ".agents" / "skills",
         harness="agents",
         label_prefix="agents:skills/",
     )
-
-
-# ---------------------------------------------------------------------------
-# Claude Code adapter
-# ---------------------------------------------------------------------------
 
 
 def _agents_agent_rules(
@@ -225,7 +137,7 @@ def _agents_agent_rules(
         label = f"agents:agents/{rel.as_posix()}"
         resolved = resolved_models.get(src.stem)
         if resolved is None or src.suffix != ".md":
-            rules.append(_bytes_rule(label, "agents", dst_dir / rel, src.read_bytes()))
+            rules.append(bytes_rule(label, "agents", dst_dir / rel, src.read_bytes()))
             continue
         staged_text = src.read_text(encoding="utf-8")
 
@@ -240,157 +152,6 @@ def _agents_agent_rules(
             ProjectionRule(label=label, harness="agents", dst=dst_dir / rel, render=_render)
         )
     return tuple(rules)
-
-
-# ---------------------------------------------------------------------------
-# agent_transcode builders — one per enum value
-# ---------------------------------------------------------------------------
-
-
-def _no_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
-    """``none``: reads the authored tree natively / registers no hooks — projects nothing."""
-    del record, plan
-    return ()
-
-
-def _md_symlink_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
-    """``claude-md-symlink``: agents and skills are per-entry relative symlinks onto the
-    authored ``.agents/`` set, never a second copy; other content dirs copy verbatim."""
-    harness_dir = plan.workspace_root / str(record.directory)
-    authored = plan.workspace_root / ".agents"
-    src_agents = plan.agentic_dir / "agents"
-    src_skills = plan.agentic_dir / "skills"
-    dirs = _CLAUDE_DIRS if plan.only is None else tuple(d for d in _CLAUDE_DIRS if d == plan.only)
-    rules: list[ProjectionRule] = []
-    for name in dirs:
-        if name == "agents":
-            rules.extend(
-                _link_rule(
-                    f"{record.name}:agents/{src.relative_to(src_agents).as_posix()}",
-                    record.name,
-                    harness_dir / "agents" / src.relative_to(src_agents),
-                    authored / "agents" / src.relative_to(src_agents),
-                )
-                for src in iter_public_files(src_agents)
-            )
-        elif name == "skills":
-            skills = sorted(src_skills.iterdir()) if src_skills.is_dir() else []
-            rules.extend(
-                _link_rule(
-                    f"{record.name}:skills/{skill.name}",
-                    record.name,
-                    harness_dir / "skills" / skill.name,
-                    authored / "skills" / skill.name,
-                )
-                for skill in skills
-                if skill.is_dir()
-            )
-        else:
-            rules.extend(
-                _tree_bytes_rules(
-                    plan.agentic_dir / name,
-                    harness_dir / name,
-                    harness=record.name,
-                    label_prefix=f"{record.name}:{name}/",
-                )
-            )
-    return tuple(rules)
-
-
-def _codex_agent_toml_bytes(
-    md_path: Path, agent_name: str, resolved: ResolvedAgentModel | None
-) -> bytes:
-    """The ONE codex-agent renderer — mirrors the historical ``install_codex_agents``
-    per-file body exactly (frontmatter parse, strip, Codex transform, resolve
-    ``(model, effort)``, render TOML). Shared by install (write) and doctor (compare)
-    through the :class:`ProjectionRule` seam, replacing D-CX-1/2/4/5/10's shape/regex
-    re-derivation of the same fact.
-    """
-    text = md_path.read_text(encoding="utf-8")
-    fm = _parse_agent_frontmatter(text)
-    if text.startswith("---\n"):
-        end_idx = text.find("\n---\n", 4)
-        body = text[end_idx + 5 :] if end_idx != -1 else text
-    else:
-        body = text
-    body = transform_for_codex(body, agent_name)
-    staged_model_raw = fm.get("model") if fm else None
-    staged_model = str(staged_model_raw) if staged_model_raw else None
-    claude_model, reasoning_effort = resolve_codex_agent_model(agent_name, staged_model, resolved)
-    codex_model = map_model(claude_model)
-    description = fm.get("description") if fm else None
-    codex_description = transform_for_codex(str(description), agent_name) if description else None
-    toml_content = _render_codex_agent_toml(
-        agent_name,
-        codex_model,
-        body,
-        description=codex_description,
-        claude_model=claude_model,
-        reasoning_effort=reasoning_effort,
-        read_only=activity_read_only(fm),
-    )
-    return toml_content.encode("utf-8")
-
-
-def _toml_transcode_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
-    """``codex-toml``: per-agent TOML, ``config.toml`` and the command-policy rules file,
-    all compared byte-wise. The shared ``.agents/skills`` tree is read natively."""
-    harness_dir = plan.workspace_root / str(record.directory)
-    rules: list[ProjectionRule] = []
-    if plan.only is None or plan.only == "rules":
-        rules.append(
-            _bytes_rule(
-                f"{record.name}:rules/dadaia-command-policy.rules",
-                record.name,
-                harness_dir / "rules" / "dadaia-command-policy.rules",
-                _render_codex_command_policy_rules().encode("utf-8"),
-            )
-        )
-    if plan.only is None or plan.only == "agents":
-        agents_src = plan.agentic_dir / "agents"
-        for md_file in sorted(agents_src.glob("*.md")):
-            fm = _parse_agent_frontmatter(md_file.read_text(encoding="utf-8"))
-            agent_name = str(fm.get("name", "")) if fm else ""
-            if not agent_name:
-                continue
-            resolved = plan.resolved_models.get(agent_name)
-
-            def _render(
-                _current: bytes | None,
-                _md_file: Path = md_file,
-                _agent_name: str = agent_name,
-                _resolved: ResolvedAgentModel | None = resolved,
-            ) -> bytes:
-                return _codex_agent_toml_bytes(_md_file, _agent_name, _resolved)
-
-            rules.append(
-                ProjectionRule(
-                    label=f"{record.name}:agents/{agent_name}.toml",
-                    harness=record.name,
-                    dst=harness_dir / "agents" / f"{agent_name}.toml",
-                    render=_render,
-                )
-            )
-        rules.append(
-            _bytes_rule(
-                f"{record.name}:config.toml",
-                record.name,
-                harness_dir / "config.toml",
-                codex_config(plan.agentic_dir).encode("utf-8"),
-            )
-        )
-    return tuple(rules)
-
-
-#: One builder per :class:`AgentTranscode` value — the dispatch that replaced a class
-#: per harness.
-_AGENT_RULE_BUILDERS: dict[
-    AgentTranscode, Callable[[HarnessRecord, InstallPlan], tuple[ProjectionRule, ...]]
-] = {
-    AgentTranscode.NONE: _no_rules,
-    AgentTranscode.CLAUDE_MD_SYMLINK: _md_symlink_rules,
-    AgentTranscode.CODEX_TOML: _toml_transcode_rules,
-}
 
 
 def prune_stale_codex_tomls(
@@ -482,7 +243,7 @@ def _hooks_json_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Project
         return ()
     workspace_root = plan.workspace_root
     rules = [
-        _bytes_rule(
+        bytes_rule(
             f"{record.name}:hooks.json",
             record.name,
             workspace_root / str(record.directory) / "hooks.json",
@@ -492,7 +253,7 @@ def _hooks_json_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Project
         )
     ]
     rules.extend(
-        _bytes_rule(
+        bytes_rule(
             f"dadaia:hooks/{name}",
             record.name,
             workspace_root / ".dadaia" / "hooks" / name,
@@ -525,7 +286,7 @@ def _user_home_hook_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Pro
         return ()
     home = kimi_code_home()
     rules = [
-        _bytes_rule(
+        bytes_rule(
             f"{record.name}:hooks/{name}",
             record.name,
             home / "hooks" / name,
@@ -581,15 +342,36 @@ def _no_checks(record: HarnessRecord, workspace_root: Path) -> list[DoctorLine]:
     return []
 
 
-#: One builder per :class:`HookFormat` value.
-_HOOK_RULE_BUILDERS: dict[
+#: One builder per :class:`HookFormat` value. The three most recently registered
+#: formats are declared on their records but have no hook rules yet — stated here as
+#: :func:`no_rules` so the table stays total and no harness falls through a missing key;
+#: a fake hook file would be worse than none.
+HOOK_RULE_BUILDERS: dict[
     HookFormat, Callable[[HarnessRecord, InstallPlan], tuple[ProjectionRule, ...]]
 ] = {
-    HookFormat.NONE: _no_rules,
+    HookFormat.NONE: no_rules,
     HookFormat.CLAUDE_SETTINGS: _settings_merge_rules,
     HookFormat.CODEX_HOOKS: _hooks_json_rules,
     HookFormat.KIMI_HOOKS: _user_home_hook_rules,
+    HookFormat.CURSOR_HOOKS: no_rules,
+    HookFormat.DEVIN_HOOKS: no_rules,
+    HookFormat.COPILOT_HOOKS: no_rules,
 }
+
+
+def harnesses_with_a_hook_derivation() -> frozenset[str]:
+    """The registered harnesses whose hook format renders something today.
+
+    A deterministic behaviour reaches a harness only through its hook derivation, so
+    this is what the entity registry may claim an implementation for. Derived from the
+    builder table, never listed: a format that grows a builder joins the set for free.
+    """
+    return frozenset(
+        name
+        for name, record in HARNESS_RECORDS.items()
+        if HOOK_RULE_BUILDERS[record.hooks] is not no_rules
+    )
+
 
 #: The doctor residue per :class:`HookFormat` value — a structural/semantic claim a
 #: single rendered file cannot express.
@@ -598,6 +380,9 @@ _HOOK_CHECKS: dict[HookFormat, Callable[[HarnessRecord, Path], list[DoctorLine]]
     HookFormat.CLAUDE_SETTINGS: _settings_merge_checks,
     HookFormat.CODEX_HOOKS: _hooks_json_checks,
     HookFormat.KIMI_HOOKS: _user_home_hook_checks,
+    HookFormat.CURSOR_HOOKS: _no_checks,
+    HookFormat.DEVIN_HOOKS: _no_checks,
+    HookFormat.COPILOT_HOOKS: _no_checks,
 }
 
 #: Which targets pull in the authored ``.agents/`` persona + skills set: the shared
@@ -633,6 +418,6 @@ def projection_rules(plan: InstallPlan) -> tuple[ProjectionRule, ...]:
     for name, record in HARNESS_RECORDS.items():
         if name not in plan.harness_targets:
             continue
-        rules.extend(_AGENT_RULE_BUILDERS[record.agent_transcode](record, plan))
-        rules.extend(_HOOK_RULE_BUILDERS[record.hooks](record, plan))
+        rules.extend(AGENT_RULE_BUILDERS[record.agent_transcode](record, plan))
+        rules.extend(HOOK_RULE_BUILDERS[record.hooks](record, plan))
     return tuple(rules)

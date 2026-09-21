@@ -18,8 +18,8 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
+from dadaia_workspace.infrastructure.projection_rules import harnesses_with_a_hook_derivation
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _parse_agent_frontmatter,
     _parse_skills_from_frontmatter,
@@ -346,7 +346,7 @@ def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
     for matched_id in sorted(personas & scaffolded):
         out.extend(_persona_content_drift(matched_id, agents_dir))
 
-    harnesses = set(L1_ENTRY_HARNESSES)
+    harnesses = set(harnesses_with_a_hook_derivation())
     package_root = public_dir.parent
     for behavior in registry.get("behaviors", []):
         implemented = set(behavior.get("implementations", {}))
@@ -355,7 +355,7 @@ def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
                 DoctorLine(
                     DoctorStatus.DRIFT,
                     f"entities-derivation: behavior '{behavior.get('id')}' is derived for "
-                    f"{sorted(implemented)}, expected every entry harness "
+                    f"{sorted(implemented)}, expected every harness with a hook derivation "
                     f"{sorted(harnesses)} (ENT-DERIVE-1)",
                 )
             )
@@ -369,7 +369,7 @@ def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
                 DoctorStatus.OK,
                 f"entities-derivation: {len(personas)} Personas ↔ {len(scaffolded)} core "
                 f"sub-agents; {len(registry.get('behaviors', []))} Deterministic Behaviors "
-                f"derived for all entry harnesses (ENT-DERIVE-1)",
+                f"derived for every harness with a hook derivation (ENT-DERIVE-1)",
             )
         )
     return out

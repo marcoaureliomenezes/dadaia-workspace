@@ -70,7 +70,7 @@
   Write set: `dadaia_workspace/cli/commands/init.py`,
   `dadaia_workspace/features/workspace/**`, `tests/integration/test_init_with_repo.py`.
 
-- [ ] T-047-75 — FR3: cursor, devin, copilot records and agent transcodes. Three rows added to
+- [x] T-047-75 — FR3: cursor, devin, copilot records and agent transcodes. Three rows added to
   `HARNESS_RECORDS`: `cursor` (`.cursor`, `cursor-md`, `cursor-hooks`), `devin` (`.devin`,
   `devin-md`, `devin-hooks`), `copilot` (`.github`, `copilot-agent-md`, `copilot-hooks`). The
   `cursor-md` and `devin-md` builders project `.cursor/agents/<name>.md` and (Devin reads

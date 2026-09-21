@@ -14,6 +14,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import ModuleType
+
+import pytest
 
 from dadaia_workspace.core.harness_registry import (
     HARNESS_PROJECTION_DIRS,
@@ -23,6 +26,7 @@ from dadaia_workspace.core.harness_registry import (
     PROJECTION_TARGETS,
     parse_harness_name,
 )
+from dadaia_workspace.infrastructure import agent_transcodes as agent_transcodes_module
 from dadaia_workspace.infrastructure import projection_rules as projection_rules_module
 from dadaia_workspace.infrastructure.install_plan import InstallPlan
 from dadaia_workspace.infrastructure.projection_rules import projection_rules
@@ -113,13 +117,16 @@ def test_the_legacy_constants_derive_from_the_record_table() -> None:
     assert parse_harness_name(last) == last
 
 
-def test_the_projection_table_carries_no_harness_named_literal() -> None:
+@pytest.mark.parametrize(
+    "module", [projection_rules_module, agent_transcodes_module], ids=lambda m: m.__name__
+)
+def test_the_projection_table_carries_no_harness_named_literal(module: ModuleType) -> None:
     """A harness name in the projection table IS the per-harness branch coming back."""
-    source = Path(projection_rules_module.__file__).read_text(encoding="utf-8")
+    source = Path(module.__file__ or "").read_text(encoding="utf-8")
     offenders = [
         f'"{name}"' for name in L1_ENTRY_HARNESSES if f'"{name}"' in source or f"'{name}'" in source
     ]
     assert not offenders, (
-        f"{Path(projection_rules_module.__file__).name} names harnesses {offenders}; "
+        f"{Path(module.__file__ or '').name} names harnesses {offenders}; "
         "every harness fact belongs to core/harness_registry.py's record table"
     )

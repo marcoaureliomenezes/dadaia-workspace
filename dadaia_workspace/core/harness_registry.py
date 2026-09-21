@@ -27,6 +27,9 @@ class AgentTranscode(StrEnum):
     NONE = "none"
     CLAUDE_MD_SYMLINK = "claude-md-symlink"
     CODEX_TOML = "codex-toml"
+    CURSOR_MD = "cursor-md"
+    DEVIN_MD = "devin-md"
+    COPILOT_AGENT_MD = "copilot-agent-md"
 
 
 class HookFormat(StrEnum):
@@ -40,6 +43,9 @@ class HookFormat(StrEnum):
     CLAUDE_SETTINGS = "claude-settings"
     CODEX_HOOKS = "codex-hooks"
     KIMI_HOOKS = "kimi-hooks"
+    CURSOR_HOOKS = "cursor-hooks"
+    DEVIN_HOOKS = "devin-hooks"
+    COPILOT_HOOKS = "copilot-hooks"
 
 
 @dataclass(frozen=True)
@@ -84,6 +90,24 @@ HARNESS_RECORDS: dict[str, HarnessRecord] = {
             directory=None,
             agent_transcode=AgentTranscode.NONE,
             hooks=HookFormat.KIMI_HOOKS,
+        ),
+        HarnessRecord(
+            name="cursor",
+            directory=".cursor",
+            agent_transcode=AgentTranscode.CURSOR_MD,
+            hooks=HookFormat.CURSOR_HOOKS,
+        ),
+        HarnessRecord(
+            name="devin",
+            directory=".devin",
+            agent_transcode=AgentTranscode.DEVIN_MD,
+            hooks=HookFormat.DEVIN_HOOKS,
+        ),
+        HarnessRecord(
+            name="copilot",
+            directory=".github",
+            agent_transcode=AgentTranscode.COPILOT_AGENT_MD,
+            hooks=HookFormat.COPILOT_HOOKS,
         ),
     )
 }

@@ -69,7 +69,10 @@
       "implementations": {
         "claude": "AGENTS.md (native root discovery)",
         "codex": "AGENTS.md (native root->cwd chain)",
-        "kimi-code": "AGENTS.md (native root->cwd chain)"
+        "kimi-code": "AGENTS.md (native root->cwd chain)",
+        "cursor": "AGENTS.md (native, read at session start)",
+        "devin": "AGENTS.md (native root + lazy on file access)",
+        "copilot": "AGENTS.md (native, path and touched-file ancestors)"
       }
     },
     {

@@ -24,8 +24,7 @@ from dadaia_workspace.core.models.doctor_report import (
     DoctorReport,
     DoctorStatus,
 )
-from dadaia_workspace.infrastructure.projection import doctor_rules
-from dadaia_workspace.infrastructure.projection_rules import _tree_bytes_rules
+from dadaia_workspace.infrastructure.projection import doctor_rules, tree_bytes_rules
 from dadaia_workspace.infrastructure.public_assets import (
     FileSystemPublicAssetManager,
 )
@@ -112,7 +111,7 @@ def test_clean_ok_paths_incl_scripts(tmp_path: Path) -> None:
     projected_scripts.mkdir(parents=True)
     _write(projected_scripts / "hook.sh", script_content)
 
-    rules = _tree_bytes_rules(
+    rules = tree_bytes_rules(
         agentic_scripts, projected_scripts, harness="agents", label_prefix="dadaia:scripts/"
     )
     lines = doctor_rules(rules)

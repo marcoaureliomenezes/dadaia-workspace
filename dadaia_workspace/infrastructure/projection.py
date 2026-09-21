@@ -42,7 +42,7 @@ from typing import Literal
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
-from dadaia_workspace.infrastructure.public_assets_common import read_link_target
+from dadaia_workspace.infrastructure.public_assets_common import iter_public_files, read_link_target
 
 #: Which fixed-point discipline a rule's ``render`` observes (documentation only —
 #: install/doctor run one algorithm regardless; see the module docstring).
@@ -52,6 +52,71 @@ CompareSemantic = Literal["bytes", "owned-slice", "managed-block"]
 #: digest alone can never tell a symlink from a copy of the same content — the kind
 #: travels with the entry, through the transcript, into the install ledger.
 EntryKind = Literal["file", "symlink", "copy"]
+
+
+def fixed_content_render(content: bytes) -> Callable[[bytes | None], bytes]:
+    """A render that ignores what is on disk — the staged bytes fully determine it."""
+
+    def _render(_current: bytes | None) -> bytes:
+        return content
+
+    return _render
+
+
+def bytes_rule(
+    label: str,
+    harness: str,
+    dst: Path,
+    content: bytes,
+    *,
+    mode: int | None = None,
+) -> ProjectionRule:
+    """A rule whose canonical content is fixed at rule-build time (``compare="bytes"``)."""
+    return ProjectionRule(
+        label=label,
+        harness=harness,
+        dst=dst,
+        render=fixed_content_render(content),
+        compare="bytes",
+        mode=mode,
+    )
+
+
+def link_rule(label: str, harness: str, dst: Path, link_to: Path) -> ProjectionRule:
+    """A rule that projects a RELATIVE symlink at *dst* onto the authored *link_to*.
+
+    One authored set, N harness views: the executor falls back to a hash-verified copy
+    where the platform refuses symlinks, and records which of the two it wrote.
+    """
+    return ProjectionRule(
+        label=label, harness=harness, dst=dst, render=link_render, link_to=link_to
+    )
+
+
+def tree_bytes_rules(
+    src_dir: Path,
+    dst_dir: Path,
+    *,
+    harness: str,
+    label_prefix: str,
+    mode: int | None = None,
+) -> tuple[ProjectionRule, ...]:
+    """One ``compare="bytes"`` rule per real file under *src_dir* (verbatim copy).
+
+    A projection is a copy of the source, permissions included: an authored file that is
+    executable projects executable — a skill script the agent runs directly. The source's
+    own exec bit is the whole rule; no path knows what a `scripts/` dir is.
+    """
+    return tuple(
+        bytes_rule(
+            f"{label_prefix}{src.relative_to(src_dir).as_posix()}",
+            harness,
+            dst_dir / src.relative_to(src_dir),
+            src.read_bytes(),
+            mode=mode if mode is not None else (0o755 if os.access(src, os.X_OK) else None),
+        )
+        for src in iter_public_files(src_dir)
+    )
 
 
 def link_render(_current: bytes | None) -> bytes:

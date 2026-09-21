@@ -749,6 +749,48 @@
     "link_to": null
   },
   {
+    "label": "copilot:agents/dd-code-reviewer.agent.md",
+    "harness": "copilot",
+    "dst": "ws:.github/agents/dd-code-reviewer.agent.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "copilot:agents/dd-project-manager.agent.md",
+    "harness": "copilot",
+    "dst": "ws:.github/agents/dd-project-manager.agent.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "copilot:agents/dd-software-engineer.agent.md",
+    "harness": "copilot",
+    "dst": "ws:.github/agents/dd-software-engineer.agent.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "cursor:agents/dd-code-reviewer.md",
+    "harness": "cursor",
+    "dst": "ws:.cursor/agents/dd-code-reviewer.md",
+    "compare": "bytes",
+    "link_to": "ws:.agents/agents/dd-code-reviewer.md"
+  },
+  {
+    "label": "cursor:agents/dd-project-manager.md",
+    "harness": "cursor",
+    "dst": "ws:.cursor/agents/dd-project-manager.md",
+    "compare": "bytes",
+    "link_to": "ws:.agents/agents/dd-project-manager.md"
+  },
+  {
+    "label": "cursor:agents/dd-software-engineer.md",
+    "harness": "cursor",
+    "dst": "ws:.cursor/agents/dd-software-engineer.md",
+    "compare": "bytes",
+    "link_to": "ws:.agents/agents/dd-software-engineer.md"
+  },
+  {
     "label": "dadaia:AGENTS.md",
     "harness": "agents",
     "dst": "ws:.dadaia/AGENTS.md",

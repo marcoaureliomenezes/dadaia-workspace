@@ -35,12 +35,12 @@ import pytest
 
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.models.agent_model_policy import ResolvedAgentModel
+from dadaia_workspace.infrastructure.agent_transcodes import codex_agent_toml_bytes
 from dadaia_workspace.infrastructure.install_helpers import (
     render_claude_agent,
     resolve_codex_agent_model,
 )
 from dadaia_workspace.infrastructure.projection import ProjectionRule, install_rules
-from dadaia_workspace.infrastructure.projection_rules import _codex_agent_toml_bytes
 
 pytestmark = pytest.mark.unit
 
@@ -207,19 +207,19 @@ def test_codex_agent_toml_bytes_fails_closed_for_core_agent_without_model(
 ) -> None:
     md = _staged_agent_md(tmp_path, "dd-software-engineer", _GENERIC_BODY)
     with pytest.raises(PublicAssetError, match="dd-software-engineer"):
-        _codex_agent_toml_bytes(md, "dd-software-engineer", None)
+        codex_agent_toml_bytes(md, "dd-software-engineer", None)
 
 
 def test_codex_agent_toml_bytes_keeps_authored_model_for_plugin_body(tmp_path: Path) -> None:
     md = _staged_agent_md(tmp_path, "frontend-engineer", _PACK_BODY)
-    toml = _codex_agent_toml_bytes(md, "frontend-engineer", None).decode("utf-8")
+    toml = codex_agent_toml_bytes(md, "frontend-engineer", None).decode("utf-8")
     assert 'model = "gpt-5.6-terra"' in toml
 
 
 def test_codex_agent_toml_bytes_uses_d3_clamp_of_resolved_effort(tmp_path: Path) -> None:
     md = _staged_agent_md(tmp_path, "dd-software-engineer", _GENERIC_BODY)
     resolved = ResolvedAgentModel(model="claude-sonnet-5", effort="xhigh", source="default")
-    toml = _codex_agent_toml_bytes(md, "dd-software-engineer", resolved).decode("utf-8")
+    toml = codex_agent_toml_bytes(md, "dd-software-engineer", resolved).decode("utf-8")
     assert 'model = "gpt-5.6-terra"' in toml
     assert 'model_reasoning_effort = "high"' in toml
 

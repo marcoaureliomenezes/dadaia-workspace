@@ -179,7 +179,7 @@ def _staged_bytes(src: Path) -> bytes:
 #: NOT in the persisted harness profile (A3, v0.1.58 FR3). Emitted in place of the scoped
 #: drift block so a stale/hand-installed out-of-profile runtime never reads green-with-zero-
 #: lines. ``[warn]`` is non-blocking (CLI exit stays 0) but visible.
-#: The one repair for every SYMLINK-TARGET-1 finding: re-project the claude views onto
+#: The one repair for every SYMLINK-TARGET-1 finding: re-project the harness views onto
 #: the authored set. One BLOCK, one executable ``fix:`` line.
 _SYMLINK_TARGET_FIX = "fix: .dadaia/.venv/bin/dadaia public install --force"
 
@@ -721,8 +721,7 @@ class FileSystemPublicAssetManager:
         return DoctorLine(DoctorStatus.OK, f"{label}")
 
     def _check_symlink_targets(self, workspace_root: Path) -> list[DoctorLine]:
-        """SYMLINK-TARGET-1 — every ledgered ``.claude/`` view still points at the
-        authored set.
+        """SYMLINK-TARGET-1 — every ledgered harness view still points at the authored set.
 
         One authored set (``.agents/skills/``, ``.agents/agents/``) with N harness
         views replaced the per-harness byte-drift classes that used to compare a copy
@@ -737,16 +736,12 @@ class FileSystemPublicAssetManager:
         ledger = self._install_ledger_store.read(states_dir)
         if ledger is None:
             return []
-        linked = [
-            entry
-            for entry in ledger.entries
-            if entry.kind != "file" and entry.relpath.startswith(".claude/")
-        ]
+        linked = [entry for entry in ledger.entries if entry.kind != "file"]
         if not linked:
             return []
         out: list[DoctorLine] = []
         for entry in sorted(linked, key=lambda e: e.relpath):
-            canonical = workspace_root / entry.relpath.replace(".claude/", ".agents/", 1)
+            canonical = workspace_root / ".agents" / entry.relpath.partition("/")[2]
             defect = link_entry_defect(workspace_root / entry.relpath, canonical)
             if defect is not None:
                 out.append(
@@ -758,7 +753,7 @@ class FileSystemPublicAssetManager:
         return [
             DoctorLine(
                 DoctorStatus.OK,
-                f"symlink-target: {len(linked)} .claude entries resolve to the authored set",
+                f"symlink-target: {len(linked)} projected views resolve to the authored set",
             )
         ]
 

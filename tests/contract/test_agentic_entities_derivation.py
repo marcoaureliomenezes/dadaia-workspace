@@ -28,6 +28,7 @@ from typing import Any
 
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
+from dadaia_workspace.infrastructure.projection_rules import harnesses_with_a_hook_derivation
 
 _REGISTRY_PATH = (
     Path(__file__).resolve().parents[2]
@@ -133,10 +134,16 @@ def test_every_wired_core_hook_derives_from_a_deterministic_behavior() -> None:
     )
 
 
-def test_behaviors_cover_every_entry_harness() -> None:
-    """A Deterministic Behavior is workspace law — it must be derived for ALL
-    entry harnesses, and never for an unknown one."""
-    harnesses = set(L1_ENTRY_HARNESSES)
+def test_behaviors_cover_every_harness_whose_hooks_are_derived() -> None:
+    """A Deterministic Behavior is workspace law — it must be derived for every
+    harness that has a hook derivation, and never for an unknown one.
+
+    The expected set is READ from the projection builder table, never listed here: the
+    day a declared-but-underived hook format grows a builder, this test demands its
+    registry rows with no edit of its own.
+    """
+    harnesses = set(harnesses_with_a_hook_derivation())
+    assert harnesses <= set(L1_ENTRY_HARNESSES)
     for behavior in load_registry()["behaviors"]:
         implemented = set(behavior["implementations"])
         assert implemented == harnesses, (

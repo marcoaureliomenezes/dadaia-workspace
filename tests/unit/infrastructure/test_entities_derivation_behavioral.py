@@ -138,7 +138,7 @@ def test_behavior_missing_harness_key_blocks(tmp_path: Path) -> None:
 
     lines = check_entities_derivation(public_dir)
 
-    assert any("expected every entry harness" in text for text in _texts(lines))
+    assert any("expected every harness with a hook derivation" in text for text in _texts(lines))
     assert all(line.status.blocking for line in lines)  # type: ignore[attr-defined]
 
 

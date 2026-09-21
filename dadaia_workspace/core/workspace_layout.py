@@ -78,10 +78,6 @@ __all__ = [
 AUDIT_DIR_NAME_PATTERN: str = r"\d{8}-[a-z0-9][a-z0-9-]*"
 AUDIT_DIR_NAME_RE: re.Pattern[str] = re.compile(f"^{AUDIT_DIR_NAME_PATTERN}$")
 
-#: Directories the workspace root may contain (the Workspace Root Law).
-ROOT_ALLOWED_DIRS: frozenset[str] = frozenset(
-    {".agents", ".claude", ".codex", ".dadaia", ".git", "repos"}
-)
 
 #: Files the workspace root may contain. ``AGENTS.md`` is the root map (the one
 #: always-on law file the library projects); ``prompt.md`` the optional operator
@@ -310,6 +306,9 @@ LAW_BASENAMES: frozenset[str] = frozenset({"AGENTS.md"})
 HARNESS_DIRS: frozenset[str] = frozenset(
     {".agents", *(d for dirs in HARNESS_PROJECTION_DIRS.values() for d in dirs)}
 )
+
+#: Directories the workspace root may contain (the Workspace Root Law).
+ROOT_ALLOWED_DIRS: frozenset[str] = frozenset({".dadaia", ".git", "repos"} | HARNESS_DIRS)
 
 # ---------------------------------------------------------------------------------
 # The repo working tree (``repo-AGENTS.md``) and the ``specs/`` canon (``specs-AGENTS.md``) — the same

@@ -76,6 +76,55 @@ def test_harness_add_projects_the_set_registers_it_and_is_idempotent(
     assert _profile(ws) == ["claude", "codex"]
 
 
+@pytest.mark.parametrize(
+    ("harness", "projected"),
+    [
+        ("cursor", ".cursor/agents/dd-software-engineer.md"),
+        ("devin", None),
+        ("copilot", ".github/agents/dd-software-engineer.agent.md"),
+    ],
+)
+def test_harness_add_registers_each_newly_recorded_harness(
+    harness: str, projected: str | None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AC3.1: `harness add cursor|devin|copilot` exits 0 and leaves `public doctor` at 0.
+
+    `devin` projects no persona view of its own — it reads the shared authored tree —
+    so the assertion for it is that the shared set is there and its own directory is
+    not fabricated.
+    """
+    ws = _claude_only_workspace(tmp_path, monkeypatch)
+
+    added = _runner.invoke(cli_app, ["harness", "add", harness])
+    assert added.exit_code == 0, added.output
+    assert _profile(ws) == ["claude", harness]
+
+    if projected is None:
+        assert (ws / ".agents" / "agents" / "dd-software-engineer.md").exists()
+        assert not (ws / ".devin").exists(), "devin projects nothing until its hooks land"
+    else:
+        assert (ws / projected).exists(), f"{projected} not projected by harness add {harness}"
+
+    doctor = _runner.invoke(cli_app, ["public", "doctor"])
+    assert doctor.exit_code == 0, doctor.output
+
+
+def test_harness_add_copilot_never_touches_the_repository_workflows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`.github/` is shared with the repository's own CI: the copilot record owns
+    `.github/agents/*.agent.md` and nothing else under it."""
+    ws = _claude_only_workspace(tmp_path, monkeypatch)
+    workflow = ws / ".github" / "workflows" / "ci.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: ci\n", encoding="utf-8")
+
+    added = _runner.invoke(cli_app, ["harness", "add", "copilot"])
+    assert added.exit_code == 0, added.output
+    assert workflow.read_text(encoding="utf-8") == "name: ci\n"
+    assert sorted(p.name for p in (ws / ".github").iterdir()) == ["agents", "workflows"]
+
+
 def test_harness_add_refuses_an_unregistered_name(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

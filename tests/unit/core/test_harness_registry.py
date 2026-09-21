@@ -35,10 +35,11 @@ _PKG = Path(__file__).resolve().parents[3] / "dadaia_workspace"
 
 
 def test_roster_vocabulary_golden() -> None:
-    assert L1_ENTRY_HARNESSES == ("claude", "codex", "kimi-code")
-    assert PROJECTION_TARGETS == ("agents", "claude", "codex", "kimi-code")
+    roster = ("claude", "codex", "kimi-code", "cursor", "devin", "copilot")
+    assert roster == L1_ENTRY_HARNESSES
+    assert ("agents", *roster) == PROJECTION_TARGETS
     assert ("agents", *L1_ENTRY_HARNESSES) == PROJECTION_TARGETS
-    assert frozenset({"all", "agents", "claude", "codex", "kimi-code"}) == INSTALL_TARGETS
+    assert frozenset({"all", "agents", *roster}) == INSTALL_TARGETS
     assert frozenset({"all", *PROJECTION_TARGETS}) == INSTALL_TARGETS
 
 
