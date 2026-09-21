@@ -545,6 +545,12 @@
       "agent": "release.py",
       "kind": "note",
       "text": "Candidate implemented at 452267b8; phase CLOSURE."
+    },
+    {
+      "ts": "2026-09-21T13:14:16Z",
+      "agent": "dd-project-manager",
+      "kind": "reviews",
+      "text": "dd-code-reviewer on 8cafd923..edec1d67: APPROVED (0 CRITICAL, 0 HIGH, 4 MEDIUM, 4 LOW, 3 INFO). Folded at closure 1781e527: F1 no workflow expression in any run body (env: VERSION, hygiene assertion over every job), F3 ADR supersedes as a comma list and 0021 names 0005,0006,0008,0009,0014 (PM ruling), F4 CONTEXT.md glossary without retired verbs (rc-N entry deleted, law-grep extended to CONTEXT.md), F5 the hand-written 0.4.7 changelog heading renamed so release-please owns `## [0.4.7]`, F6 release-please job main-only, F7 PyPI propagation polled. Record-only: F2 archived documents read-not-ranked incl. schema (ratified), F8-F11 deviations ratified. First release PR will propose 0.4.7 (0 breaking commits since v0.4.6). UNVERIFIED until the first push to main: release-please proposing 0.4.7, release_created/tag_name on merge, approve gate + OIDC publish under the new trigger. Bug proposals (ask-first): none new beyond the folded F1/F4/F5; carried: SPEC-DOC-039 fix path (c7), cursor file writes ungated (c8)."
     }
   ]
 }
