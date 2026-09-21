@@ -13,9 +13,9 @@ This directory contains audit records for this Spec Context Project.
 - That directory holds `AUDIT.md` and, where the schema is in force, `FINDINGS.jsonl` (one record per finding, appended once).
 - Required fields per audit: timestamp/window, agent(s), scope, findings, decisions.
 - Audits are immutable after commit — do not edit historical records.
-- A finding's disposition moves only by `dadaia audit disposition <dir> <finding-id> --disposition … --release <id>`; every other field stays byte-identical.
+- A finding's disposition moves only by `python3 .agents/skills/dd-audit-project/scripts/audit.py disposition <dir> <finding-id> --disposition … --release <id>`; every other field stays byte-identical.
 - An audit is never deleted while open.
-- Once none is `open`: `dadaia audit close <dir> --sha <window-end>` appends the one `histo-record-v1` and deletes the directory, all-or-nothing.
+- Once none is `open`: `python3 .agents/skills/dd-audit-project/scripts/audit.py close <dir> --sha <window-end>` appends the one `histo-record-v1` and deletes the directory, all-or-nothing.
 - No per-audit archive directory — history survives in git and the histo record.
 
 ## 2. Relationship to releases

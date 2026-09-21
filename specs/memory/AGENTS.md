@@ -2,9 +2,7 @@
 
 Scope: `specs/memory/**`; broader SDD rules are in the sibling `specs/AGENTS.md`.
 
-Memory is current product truth: it describes the product as it is now, never how it got
-there — read it before changing production behavior. History lives in each release's
-`_RELEASE.json` `log` entries, under `_archive/`, and in git.
+Memory is current product truth: what the product is now, never how it got there.
 
 ## 1. Write ownership
 
@@ -41,15 +39,11 @@ Rationale: <one line — why this rule exists>
 - A rule nobody can measure is not a principle — it is Part-2 description or a proposed ADR.
 - `ADR: <id>` points at a `decisions.jsonl` record and reads `(proposed)` until the operator accepts it.
 
-### 2.2 Part 2 is the living description
-
-- Where a rule without a measure lands, where every diagram lives, and where a number with a home elsewhere is referenced rather than restated.
-
-### 2.3 Never silently
+### 2.2 Never silently
 
 - Moving a block between parts, or deleting one, is recorded row by row in the reviewer's coverage table and its handoff: old section -> new home, or `deleted: <reason>`.
 
-### 2.4 `product/` atoms are functional descriptions only
+### 2.3 `product/` atoms are functional descriptions only
 
 - What a feature does for its user, its boundaries, its current behavior.
 - An architecture principle or implementation tour found in a `product/` atom belongs in Part 1/2 of the trio instead.
@@ -67,9 +61,8 @@ Rationale: <one line — why this rule exists>
 
 - `TECHSTACK.md`'s `Snapshot` bullets stay at the top of its Part 2 — the bootstrap hook injects only the leading lines.
 
-```bash
-dadaia memory catalog generate
-```
+- `MEMORY_PY` = `python3 .agents/skills/dd-spec-navigator/scripts/memory.py`, this tree's ONE writer.
+- `MEMORY_PY catalog generate` rewrites `index.md` and `catalog.json` together from the atoms; `MEMORY_PY product add <area> <slug>` writes one atom.
 
 ## 4. Atom format
 
@@ -81,11 +74,8 @@ dadaia memory catalog generate
 
 ## 5. Validation
 
-```bash
-dadaia doctor --context <ctx>
-```
-
-- Fix findings at the source atom — never hand-edit `catalog.json` to silence a check, regenerate it instead.
+- `MEMORY_PY check` validates every atom's frontmatter and both generated files; `dadaia doctor --context <ctx>` is the workspace scan.
+- Fix findings at the source atom — never hand-edit `catalog.json` to silence a check, regenerate it.
 
 Generated from `dadaia_workspace/public/scaffold/memory/AGENTS.md`.
 Project teams may customize this file; `dadaia doctor` reports drift instead of overwriting it.
