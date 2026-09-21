@@ -34,7 +34,7 @@ _DOCSTRING_OWNERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctio
 # RECORDED CEILING (ratchet DOWN ONLY) — measured 2026-09-20 on this HEAD, every comment
 # token plus every docstring line under dadaia_workspace/**/*.py. Lower it in the commit
 # that deletes the ids; raising it is never a ratchet move.
-_V32_CEILING = 686
+_V32_CEILING = 685
 
 
 def _governance_id_lines(source: str) -> int:

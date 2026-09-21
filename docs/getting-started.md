@@ -27,7 +27,7 @@ own at `.dadaia/.venv`: `dadaia init` provisions it, every `dadaia`, `pip` and
 <!-- derived-from: workspace-init sha256:5b20a0d9dc80 -->
 
 ```bash
-dadaia init <dir> --harness claude|codex|kimi-code [--skip-assets]
+dadaia init <dir> --harness claude|codex|kimi-code [--repo <url>] [--skip-assets]
 ```
 
 `init` is the only verb that operates on a zero workspace, and re-running it is
@@ -43,6 +43,15 @@ idempotent. It creates:
   every hook wiring, and the source of the projected law (the root `AGENTS.md` map, the scoped
   `AGENTS.md` files) and the agent assets of each selected harness. Skipping assets
   leaves the workspace ungated, and the output says so.
+
+With `--repo <url>`, `init` also makes that repo the workspace's first project. The
+URL's last path segment (minus `.git`) is the slug: the repo is cloned into
+`repos/<slug>/`, a context of the same name is created with that slug as its main repo,
+made ALIVE, given the pre-push chokepoint, and bound to this session — `init` prints the
+two `export` lines an `eval $(…)` needs. Every step is the context lifecycle's own
+implementation, reached by composition; a single-repo workspace is simply the degenerate
+multi-repo case. Without `--repo`, `init` closes by naming `repos/` and the one command
+that creates the first context.
 
 There is ONE authored set: the root `AGENTS.md`, the scoped `AGENTS.md` files,
 `.agents/skills/` and `.agents/agents/`. Every other harness view of it is a view, not

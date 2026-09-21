@@ -55,7 +55,7 @@
   `dadaia_workspace/core/harness_registry.py` (`parse_harness_set` -> single-name parse),
   `dadaia_workspace/features/workspace/**`, `tests/unit/cli/test_init_requires_dir_and_harness.py`.
 
-- [ ] T-047-74 — FR1: `--repo <url>` and the closing notes. With `--repo`, `init` clones into
+- [x] T-047-74 — FR1: `--repo <url>` and the closing notes. With `--repo`, `init` clones into
   `repos/<slug>/`, then calls the existing `context create --main-repo <slug>`, `context alive`
   and `context bind` implementations in `features/spec_context/` (composition, never a second
   implementation), prints the `--print-env` line, and installs the pre-push hook via the

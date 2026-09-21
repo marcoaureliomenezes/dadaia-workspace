@@ -1,4 +1,4 @@
-"""dadaia init command — one line, one directory, one harness (0.4.7 FR1)."""
+"""dadaia init command — one line, one directory, one harness."""
 
 from pathlib import Path
 
@@ -6,21 +6,29 @@ import typer
 from rich.console import Console
 
 from dadaia_workspace import container
+from dadaia_workspace.cli.commands.context import resolve_own_session_id
 from dadaia_workspace.core import harness_registry
+from dadaia_workspace.core.exceptions import DadaiaError
+from dadaia_workspace.features.workspace.bootstrap import bootstrap_repo
 
 console = Console()
 app = typer.Typer()
 
-#: Printed once at the end of every successful init. The first line is the law
+#: Printed once at the end of a successful init that got no ``--repo``. The first line is the law
 #: (sessions launch at the workspace root); the second is a RECOMMENDATION about the
 #: operator's own ``~/.claude/settings.json`` — the library prints it and never writes
 #: user settings, so a stray repo-level ``CLAUDE.md`` hiding the workspace
-#: ``AGENTS.md`` stays the operator's decision to prevent.
+#: ``AGENTS.md`` stays the operator's decision to prevent. The third names where projects
+#: live and the ONE verb that makes the first one — a single-repo workspace is the
+#: degenerate multi-repo case, so no other context verb is visible before the second
+#: project. With ``--repo`` these are replaced by the binding's export lines.
 _CLOSING_NOTES = (
     "Sessions launch at the workspace root.",
     "Claude Code: set `instructionFiles: claude-md-and-agents-md` in your user settings "
     "(~/.claude/settings.json) so a stray CLAUDE.md in a repo never hides the workspace "
     "AGENTS.md.",
+    "Projects live under repos/ — make the first with "
+    "`dadaia context create <name> --main-repo <slug> --url <url>`.",
 )
 
 
@@ -40,6 +48,11 @@ def init(
         "",
         "--harness",
         help=f"The one agent runtime to scaffold: {', '.join(harness_registry.L1_ENTRY_HARNESSES)}.",
+    ),
+    repo: str = typer.Option(
+        "",
+        "--repo",
+        help="Clone URL of this workspace's first project — cloned, made ALIVE and bound.",
     ),
     skip_assets: bool = typer.Option(
         False, "--skip-assets", help="Skip installing public agent assets"
@@ -110,5 +123,35 @@ def init(
         else:
             console.print("[dim]No new assets to install (all up to date)[/dim]")
 
-    for note in _CLOSING_NOTES:
-        console.print(note, markup=False, soft_wrap=True)
+    if not repo:
+        for note in _CLOSING_NOTES:
+            console.print(note, markup=False, soft_wrap=True)
+        return
+
+    # --repo: `init` is a CALLER of the context lifecycle. The clone, the registration
+    # and the binding are the implementations `context create|alive|bind` run — reached
+    # here by composition, so the two entry points can never disagree.
+    session_id = resolve_own_session_id(mint=True)
+    if session_id is None:  # pragma: no cover — mint=True always yields one
+        raise RuntimeError("session-id resolution returned None despite mint=True")
+    ctx_svc = container.build_spec_context_service(root)
+    try:
+        slug, env_lines = bootstrap_repo(
+            root,
+            repo,
+            session_id=session_id,
+            create_context=ctx_svc.create,
+            alive_context=ctx_svc.alive,
+        )
+    except (DadaiaError, OSError) as exc:
+        typer.secho(f"Error: {exc}", err=True, fg=typer.colors.RED)
+        typer.secho(
+            f"fix: dadaia init {directory} --harness {chosen} --repo <a reachable clone URL>",
+            err=True,
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1) from None
+
+    console.print(f"[green]✓[/green] {slug} cloned into {root / 'repos' / slug}, ALIVE and bound")
+    for line in env_lines:
+        console.print(line, markup=False, soft_wrap=True, highlight=False)

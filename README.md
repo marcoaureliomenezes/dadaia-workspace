@@ -53,21 +53,24 @@ atom under its content hash.
 
 ```bash
 pip install dadaia-workspace
-dadaia init                       # provision a workspace where you stand
-dadaia context create <ctx> --main-repo <slug> && dadaia context alive <ctx>
-dadaia context bind <ctx>         # this session's scope
+dadaia init demo --harness claude --repo <clone url>   # workspace + first project
+cd demo && eval $(dadaia context bind <ctx> --print-env)
 dadaia doctor --context <ctx>     # compliance before any implementation write
 ```
 
 `pip install dadaia-workspace` installs the library and its `dadaia` CLI; the wheel
 ships the full public asset tree, so `init` works offline from a bare install.
 
-`dadaia init <dir> --harness <name> [--skip-assets]` is the only verb
+`dadaia init <dir> --harness <name> [--repo <url>] [--skip-assets]` is the only verb
 that operates on a zero workspace, and re-running it is idempotent. It provisions the
 virtualenv, every zone the registry says `init` creates, the shared skills root and
 the one chosen harness's directory, seeds the state documents without overwriting them,
 and (unless `--skip-assets`) stages and installs the public assets — the one writer of
-every hook wiring.
+every hook wiring. With `--repo <url>` it goes one step further and makes that repo the
+workspace's first project: cloned into `repos/<slug>/`, registered as a context with
+that slug as its main repo, made ALIVE, given the pre-push chokepoint, and bound to the
+shell — `init` calls the context lifecycle, it never reimplements it. Without `--repo`
+it says where projects live and names the one command that creates the first one.
 
 `dadaia context bind <ctx>` writes one caller-owned session record carrying context,
 runtime, pid and bind time. It acquires nothing and requires no live release;

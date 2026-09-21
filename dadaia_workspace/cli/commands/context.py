@@ -160,7 +160,7 @@ def _harness_session_id() -> str | None:
     return None
 
 
-def _resolve_own_session_id(*, explicit: str | None = None, mint: bool = False) -> str | None:
+def resolve_own_session_id(*, explicit: str | None = None, mint: bool = False) -> str | None:
     """Resolve THIS caller's own session identity (T-50-05: the single helper every verb
     below used to duplicate as its own copy-pasted micro-ladder).
 
@@ -357,7 +357,7 @@ def show(
             # Show only this caller's session. A context-wide "last binder" fallback would
             # expose foreign state as the caller's own and can never be authoritative.
             workspace_root = resolve_workspace_root()
-            session_id = _resolve_own_session_id()
+            session_id = resolve_own_session_id()
             session_obj = _live_session(workspace_root, session_id) if session_id else None
             data["session"] = session_obj
             if redactor is not None:
@@ -540,7 +540,7 @@ def bind(
     # Stable session identity (bug bind-session-id-divergence, 2026-07-15): reuse the
     # SAME resolution order the gate/hooks use. Rebinds in one session therefore UPDATE
     # one record instead of minting a divergent sess_* per invocation.
-    session_id = _resolve_own_session_id(mint=True)
+    session_id = resolve_own_session_id(mint=True)
     if session_id is None:  # pragma: no cover — mint=True always yields one
         raise RuntimeError("session-id resolution returned None despite mint=True")
 
@@ -573,8 +573,8 @@ def bind(
         )
 
     if print_env:
-        print(f"export DADAIA_CONTEXT={name}")
-        print(f"export DADAIA_SESSION_ID={session_id}")
+        for line in session_store.binding_env_lines(name, session_id):
+            print(line)
         return
 
     console.print(f"[green]✓[/green] Bound to '[bold]{name}[/bold]' (session id: {session_id})")

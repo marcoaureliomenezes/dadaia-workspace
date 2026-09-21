@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-import shutil
 import subprocess
 import sys
 from collections.abc import Iterable
@@ -15,7 +14,6 @@ from dadaia_workspace.cli._specs_resolution import (
     resolve_workspace_root_for_cli,
 )
 from dadaia_workspace.container import is_source_repo_root as _is_source_repo_root
-from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.exceptions import CiPreflightScopeError
 from dadaia_workspace.features.ci_preflight import (
     all_passed,
@@ -24,18 +22,9 @@ from dadaia_workspace.features.ci_preflight import (
     run_preflight,
     subprocess_runner,
 )
+from dadaia_workspace.features.workspace.bootstrap import install_git_hooks
 
 app = typer.Typer(help="Local CI-equivalent preflight gate + git-hook chokepoints.")
-
-# .../dadaia_workspace/cli/commands/ci.py -> parents[2] == .../dadaia_workspace
-_SCRIPTS_DIR = workspace_layout.public_scripts_dir()
-#: Derived from the ONE registry of which chokepoints exist and what they are made of
-#: (``workspace_layout.INSTALLED_GIT_HOOKS``) — the same rows the workspace doctor
-#: compares the installed copies against (HOOKS-DRIFT-1). Never a second literal.
-_HOOK_SOURCES: dict[str, Path] = {
-    target: _SCRIPTS_DIR / source for target, source in workspace_layout.INSTALLED_GIT_HOOKS
-}
-_HOOK_SOURCE = _HOOK_SOURCES["pre-push"]
 
 
 def _repo_root() -> Path:
@@ -278,31 +267,20 @@ def push_gate_check() -> None:
 _SHA40_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 
 
-def _install_one(source: Path, target: Path, *, label: str, force: bool) -> None:
-    """Copy a hook script into ``.git/hooks/`` (0755), honoring ``--force``."""
-    if target.exists() and not force:
-        typer.secho(
-            f"{target.name} hook already exists at {target}; use --force to overwrite.",
-            fg=typer.colors.YELLOW,
-        )
-        raise typer.Exit(1)
-    shutil.copyfile(source, target)
-    target.chmod(0o755)
-    typer.secho(f"Installed {label} -> {target}", fg=typer.colors.GREEN)
-
-
 @app.command("install-hook")
 def install_hook(
     force: bool = typer.Option(False, "--force", help="Overwrite existing git hooks."),
 ) -> None:
     """Install the pre-push CI/security gate."""
-    root = _repo_root()
-    hooks_dir = root / ".git" / "hooks"
-    if not hooks_dir.is_dir():
-        raise typer.BadParameter(f"{hooks_dir} not found (is this a git repository?)")
-    _install_one(
-        _HOOK_SOURCE,
-        hooks_dir / "pre-push",
-        label="pre-push CI + security gate",
-        force=force,
-    )
+    try:
+        installed = install_git_hooks(_repo_root(), force=force)
+    except FileNotFoundError as exc:
+        raise typer.BadParameter(str(exc)) from None
+    except FileExistsError as exc:
+        typer.secho(
+            f"{Path(str(exc)).name} hook already exists at {exc}; use --force to overwrite.",
+            fg=typer.colors.YELLOW,
+        )
+        raise typer.Exit(1) from None
+    for target in installed:
+        typer.secho(f"Installed pre-push CI + security gate -> {target}", fg=typer.colors.GREEN)
