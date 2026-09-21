@@ -102,7 +102,7 @@
   Write set: `docs/bug-ledger-lessons.md`, `README.md`, `llms.txt`, `pyproject.toml`,
   `tests/contract/test_docs_derived_from_memory.py`.
 
-- [ ] T-047-85 — FR3: the `dadaia-workspace` console-script alias.
+- [x] T-047-85 — FR3: the `dadaia-workspace` console-script alias.
   `pyproject.toml` `[tool.poetry.scripts]` gains
   `dadaia-workspace = "dadaia_workspace.cli.main:_safe_app"` beside the existing `dadaia`, so
   `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` resolves once 0.4.7 is on PyPI

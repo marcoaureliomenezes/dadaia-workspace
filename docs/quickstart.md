@@ -11,13 +11,20 @@ defined in [concepts](concepts.md); the long walkthrough is
 <!-- derived-from: workspace-init sha256:871519580ea1 -->
 
 ```bash
+uvx dadaia-workspace init demo --harness claude --repo https://github.com/<you>/<your-repo>.git
+```
+
+One command, nothing installed globally (needs uv); or install once with pip:
+
+```bash
 python -m venv .venv && .venv/bin/pip install dadaia-workspace
 ```
 
-`pip install dadaia-workspace` installs the library and its `dadaia` CLI. Install into
-a virtualenv, never into the system interpreter — the workspace you create next keeps
-its own at `.dadaia/.venv`, and every `dadaia` and `pip` invocation inside it is
-expected to come from there.
+`pip install dadaia-workspace` installs the library under two console-script names —
+`dadaia` and `dadaia-workspace` — both the same CLI, so the name a reader already knows
+from PyPI works as a command. Install into a virtualenv, never into the system
+interpreter — the workspace you create next keeps its own at `.dadaia/.venv`, and every
+`dadaia` and `pip` invocation inside it is expected to come from there.
 
 ## 2. Provision the workspace and its first project
 

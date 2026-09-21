@@ -42,6 +42,7 @@ Issues = "https://github.com/marcoaureliomenezes/dadaia-workspace/issues"
 
 [tool.poetry.scripts]
 dadaia = "dadaia_workspace.cli.main:_safe_app"
+dadaia-workspace = "dadaia_workspace.cli.main:_safe_app"
 
 [tool.poetry.dependencies]
 python = "^3.12"
