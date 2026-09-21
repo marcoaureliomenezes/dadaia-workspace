@@ -25,6 +25,10 @@ from pathlib import Path
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _render_agents_config_file_blocks,
 )
+from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
+    REAPER_ARGS,
+    hook_wrapper_command,
+)
 
 
 def _python_bin(workspace_root: Path) -> str:
@@ -54,64 +58,8 @@ def _hook_cmd(workspace_root: Path, module: str) -> str:
     return f"{_python_bin(workspace_root)} -B -m {module}"
 
 
-#: The SessionStart lane (0.4.6 FR4/D13): the one reaper, run as a CLI process at every
-#: session start — never a hook module (P-12). ``--quiet`` prints only what it deleted, so
-#: a compliant workspace adds nothing to the model context.
-_REAPER_ARGS = "doctor --fix --expired-only --quiet"
-
-
 def _reaper_cmd(workspace_root: Path) -> str:
-    return f"{_hook_cmd(workspace_root, 'dadaia_workspace')} {_REAPER_ARGS}"
-
-
-#: ``{wrapper name: (argv after ``-m``, exported env)}`` — hook modules forward the
-#: harness payload (``"$@"``); the reaper is a fixed CLI invocation.
-_CODEX_HOOK_WRAPPERS: dict[str, tuple[str, dict[str, str]]] = {
-    "codex-pre-gate": ('dadaia_workspace.hooks.pre_gate "$@"', {}),
-    "codex-post-gate": ('dadaia_workspace.hooks.sdd_post_gate "$@"', {}),
-    "codex-ctx-inject": (
-        'dadaia_workspace.hooks.ctx_inject "$@"',
-        {"DADAIA_HOOK_OUTPUT": "codex-json"},
-    ),
-    "codex-ctx-inject-session-start": (
-        'dadaia_workspace.hooks.ctx_inject "$@"',
-        {"DADAIA_HOOK_OUTPUT": "codex-json", "DADAIA_HOOK_EVENT": "SessionStart"},
-    ),
-    "codex-doctor-expired": (f"dadaia_workspace {_REAPER_ARGS}", {}),
-}
-
-
-def codex_hook_wrapper_contents() -> dict[str, str]:
-    """Return generated executable wrapper contents for Codex command hooks.
-
-    Codex command execution differs across surfaces: some paths shell-parse command
-    strings, while others direct-exec the string as an executable. The wrappers make the
-    hook contract one executable path with no arguments or env-prefix syntax in
-    ``hooks.json``. Each wrapper resolves the workspace venv Python relative to its own
-    location, so moving/importing a workspace does not leave stale absolute Python paths.
-    """
-    wrappers: dict[str, str] = {}
-    for name, (argv, env) in _CODEX_HOOK_WRAPPERS.items():
-        exports = "".join(f'{key}="{value}"\nexport {key}\n' for key, value in env.items())
-        wrappers[name] = (
-            "#!/usr/bin/env sh\n"
-            "set -eu\n"
-            'SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\n'
-            'WORKSPACE_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)\n'
-            'PYTHON_BIN="$WORKSPACE_ROOT/.dadaia/.venv/bin/python"\n'
-            'if [ ! -x "$PYTHON_BIN" ]; then\n'
-            '  echo "dadaia Codex hook wrapper: missing executable $PYTHON_BIN" >&2\n'
-            "  exit 127\n"
-            "fi\n"
-            f"{exports}"
-            f'exec "$PYTHON_BIN" -B -m {argv}\n'
-        )
-    return wrappers
-
-
-def codex_hook_wrapper_command(name: str) -> str:
-    """Return a direct-exec-safe hook command path for a generated wrapper."""
-    return f".dadaia/hooks/{name}"
+    return f"{_hook_cmd(workspace_root, 'dadaia_workspace')} {REAPER_ARGS}"
 
 
 # T-010-18 (R6c, AC-R6-05, ai C-12): Claude Code PreToolUse gate matcher.
@@ -390,7 +338,7 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": codex_hook_wrapper_command("codex-pre-gate"),
+                            "command": hook_wrapper_command("codex-pre-gate"),
                             "statusMessage": "Checking dadaia PreToolUse gate",
                         }
                     ],
@@ -403,7 +351,7 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": codex_hook_wrapper_command("codex-post-gate"),
+                            "command": hook_wrapper_command("codex-post-gate"),
                             "statusMessage": "Refreshing SDD session heartbeat",
                         }
                     ],
@@ -419,12 +367,12 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": codex_hook_wrapper_command("codex-ctx-inject-session-start"),
+                            "command": hook_wrapper_command("codex-ctx-inject-session-start"),
                             "statusMessage": "Loading dadaia context",
                         },
                         {
                             "type": "command",
-                            "command": codex_hook_wrapper_command("codex-doctor-expired"),
+                            "command": hook_wrapper_command("codex-doctor-expired"),
                             "statusMessage": "Reaping expired workspace files",
                         },
                     ],
@@ -435,7 +383,7 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": codex_hook_wrapper_command("codex-ctx-inject"),
+                            "command": hook_wrapper_command("codex-ctx-inject"),
                             "statusMessage": "Loading dadaia context",
                         }
                     ],
@@ -535,7 +483,7 @@ def kimi_hook_shims() -> dict[str, str]:
       the bootstrap on stdout (observable-contract posture; Kimi discards PostCompact
       stdout, so the deterministic re-injection still lands at the next prompt).
     - doctor-expired: the SessionStart reaper (0.4.6 FR4/D13) as a CLI process — the same
-      ``_REAPER_ARGS`` the Claude and Codex entries run.
+      ``REAPER_ARGS`` the Claude and Codex entries run.
     """
     pre_gate = (
         _KIMI_SHIM_PROLOGUE
@@ -581,7 +529,7 @@ exit 0
     doctor_expired = (
         _KIMI_SHIM_PROLOGUE
         + f"""
-"$PYTHON_BIN" -B -m dadaia_workspace {_REAPER_ARGS} 2>/dev/null || true
+"$PYTHON_BIN" -B -m dadaia_workspace {REAPER_ARGS} 2>/dev/null || true
 exit 0
 """
     )

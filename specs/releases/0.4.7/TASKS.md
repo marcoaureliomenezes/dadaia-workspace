@@ -90,7 +90,7 @@
   `tests/contract/test_agentic_entities_derivation.py`, `tests/contract/test_context_map.py`,
   `tests/unit/infrastructure/**`.
 
-- [ ] T-047-76 — FR3: the four behaviours in three hook formats, plus live probes. Each new
+- [x] T-047-76 — FR3: the four behaviours in three hook formats, plus live probes. Each new
   record's `hooks` value derives the SAME four deterministic behaviours — root whitelist, venv
   guard, SDD gate (one `pre_gate` entrypoint) and the session-start reaper — into that harness's
   file: `cursor` -> `.cursor/hooks.json`; `devin` -> `.devin/hooks.v1.json`; `copilot` ->

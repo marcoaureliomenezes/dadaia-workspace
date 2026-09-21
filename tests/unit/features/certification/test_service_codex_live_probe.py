@@ -59,7 +59,7 @@ def test_codex_live_probe_skips_honestly_when_codex_absent(
     )
     fake = _FakeCertificationProcess({})
     with pytest.raises(_CertificationSkip):
-        _codex_live_probe_detail(fake, tmp_path)
+        _codex_live_probe_detail(fake, tmp_path, "codex", "codex")
     assert fake.calls == [], "an absent binary must never be shelled out to"
 
 
@@ -72,7 +72,7 @@ def test_codex_live_probe_fails_on_nonzero_version_exit(
     )
     fake = _FakeCertificationProcess({"--version": CertificationProcessResult(1, "", "boom")})
     with pytest.raises(RuntimeError, match="codex --version exited 1"):
-        _codex_live_probe_detail(fake, tmp_path)
+        _codex_live_probe_detail(fake, tmp_path, "codex", "codex")
 
 
 def test_codex_live_probe_fails_on_nonzero_exec_exit(
@@ -89,7 +89,7 @@ def test_codex_live_probe_fails_on_nonzero_exec_exit(
         }
     )
     with pytest.raises(RuntimeError, match="codex exec exited 1"):
-        _codex_live_probe_detail(fake, tmp_path)
+        _codex_live_probe_detail(fake, tmp_path, "codex", "codex")
 
 
 # codex-live-probe-gate-checks-presence-not-usability (MEDIUM, reported 2026-08-23):
@@ -150,7 +150,7 @@ def test_codex_live_probe_skips_honestly_when_installed_codex_lacks_entitlement(
         }
     )
     with pytest.raises(_CertificationSkip, match="installed but unusable") as excinfo:
-        _codex_live_probe_detail(fake, tmp_path)
+        _codex_live_probe_detail(fake, tmp_path, "codex", "codex")
     assert "not supported when using Codex with a ChatGPT account" in str(excinfo.value)
 
 
@@ -168,7 +168,7 @@ def test_codex_live_probe_fails_when_marker_absent_from_stdout(
         }
     )
     with pytest.raises(RuntimeError, match="did not echo the expected marker"):
-        _codex_live_probe_detail(fake, tmp_path)
+        _codex_live_probe_detail(fake, tmp_path, "codex", "codex")
 
 
 def test_codex_live_probe_passes_and_reports_version_and_marker(
@@ -184,7 +184,7 @@ def test_codex_live_probe_passes_and_reports_version_and_marker(
             "exec": CertificationProcessResult(0, "DADAIA-LIVE-PROBE-OK\n", ""),
         }
     )
-    detail = _codex_live_probe_detail(fake, tmp_path)
+    detail = _codex_live_probe_detail(fake, tmp_path, "codex", "codex")
     assert "codex-cli 0.147.0" in detail
     assert "DADAIA-LIVE-PROBE-OK" in detail
     # bounded, non-interactive, sandboxed exec — never a live-write / trusted-git call.

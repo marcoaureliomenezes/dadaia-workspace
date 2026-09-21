@@ -16,13 +16,14 @@ import tomllib
 from collections.abc import Callable
 from pathlib import Path
 
+from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
-from dadaia_workspace.infrastructure.runtime_config import (
-    codex_hook_wrapper_command,
-    codex_hook_wrapper_contents,
-)
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _CODEX_SKILL_REF_PREFIXES,
+)
+from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
+    hook_wrapper_command,
+    hook_wrapper_contents,
 )
 
 # ---------------------------------------------------------------------------
@@ -144,8 +145,8 @@ def dcx9_codex_hook_shape(workspace_root: Path) -> list[DoctorLine]:
     except (OSError, json.JSONDecodeError):
         return [DoctorLine(DoctorStatus.ERROR, "codex:hooks.json missing or invalid (D-CX-9)")]
 
-    wrappers = codex_hook_wrapper_contents()
-    expected = {codex_hook_wrapper_command(name) for name in wrappers}
+    wrappers = hook_wrapper_contents(HARNESS_RECORDS["codex"])
+    expected = {hook_wrapper_command(name) for name in wrappers}
     # The exec probe feeds a fake hook payload on stdin: a no-op for a ``hooks.*`` module,
     # a real run for the CLI reaper wrapper — a doctor never mutates, so it is not probed.
     probeable = {

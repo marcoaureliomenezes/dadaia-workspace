@@ -22,7 +22,10 @@
       "implementations": {
         "claude": "PreToolUse hook (.claude/settings.json → dadaia_workspace.hooks.pre_gate)",
         "codex": ".codex/hooks.json wrapper → .dadaia/hooks/pre_gate.sh (interactive sessions)",
-        "kimi-code": "managed hook block in $KIMI_CODE_HOME/config.toml → the same Python gate"
+        "kimi-code": "managed hook block in $KIMI_CODE_HOME/config.toml → the same Python gate",
+        "cursor": ".cursor/hooks.json beforeShellExecution → .dadaia/hooks/cursor-pre-gate → the same Python gate",
+        "devin": ".devin/hooks.v1.json PreToolUse → .dadaia/hooks/devin-pre-gate → the same Python gate",
+        "copilot": ".github/hooks/pre-tool-use.json preToolUse → .dadaia/hooks/copilot-pre-gate → the same Python gate"
       }
     },
     {
@@ -31,7 +34,10 @@
       "implementations": {
         "claude": "PreToolUse hook (Bash payloads) via dadaia_workspace.hooks.pre_gate",
         "codex": ".codex/hooks.json wrapper → the same Python gate",
-        "kimi-code": "managed hook block → the same Python gate"
+        "kimi-code": "managed hook block → the same Python gate",
+        "cursor": ".cursor/hooks.json beforeShellExecution (the shell lane the guard polices) → dadaia_workspace.hooks.pre_gate",
+        "devin": ".devin/hooks.v1.json PreToolUse (Bash payloads) → dadaia_workspace.hooks.pre_gate",
+        "copilot": ".github/hooks/pre-tool-use.json preToolUse (Bash payloads) → dadaia_workspace.hooks.pre_gate"
       }
     },
     {
@@ -40,7 +46,10 @@
       "implementations": {
         "claude": "PreToolUse hook via dadaia_workspace.hooks.pre_gate (single merged entrypoint) + PostToolUse session heartbeat and the throttled workspace reaper via dadaia_workspace.hooks.sdd_post_gate",
         "codex": ".codex/hooks.json wrapper → the same Python gate (pre + post)",
-        "kimi-code": "managed hook block → the same Python gate (pre + post)"
+        "kimi-code": "managed hook block → the same Python gate (pre + post)",
+        "cursor": ".cursor/hooks.json beforeShellExecution → dadaia_workspace.hooks.pre_gate; its file-edit event fires AFTER the write, so IDE edits are ungated by Cursor's own event vocabulary",
+        "devin": ".devin/hooks.v1.json PreToolUse → dadaia_workspace.hooks.pre_gate (single merged entrypoint)",
+        "copilot": ".github/hooks/pre-tool-use.json preToolUse → dadaia_workspace.hooks.pre_gate (single merged entrypoint)"
       }
     },
     {
@@ -49,7 +58,10 @@
       "implementations": {
         "claude": "UserPromptSubmit + SessionStart hooks via dadaia_workspace.hooks.ctx_inject; SessionStart also runs dadaia doctor --fix --expired-only --quiet (the reaper lane)",
         "codex": "session bootstrap via the projected wrapper (headless sessions read AGENTS.md natively)",
-        "kimi-code": "managed hook block → the same ctx_inject module"
+        "kimi-code": "managed hook block → the same ctx_inject module",
+        "cursor": ".cursor/hooks.json sessionStart runs dadaia doctor --fix --expired-only --quiet (the reaper lane); the root AGENTS.md map is read natively",
+        "devin": ".devin/hooks.v1.json SessionStart runs the same reaper lane; the root AGENTS.md map is read natively",
+        "copilot": ".github/hooks/session-start.json sessionStart runs the same reaper lane; the root AGENTS.md map is read natively"
       }
     },
     {
@@ -58,7 +70,10 @@
       "implementations": {
         "claude": ".dadaia git hook (pre-push-ci-gate.sh) — identical for every harness",
         "codex": "same git hooks (harness-independent)",
-        "kimi-code": "same git hooks (harness-independent)"
+        "kimi-code": "same git hooks (harness-independent)",
+        "cursor": "same git hooks (harness-independent)",
+        "devin": "same git hooks (harness-independent)",
+        "copilot": "same git hooks (harness-independent)"
       }
     }
   ],

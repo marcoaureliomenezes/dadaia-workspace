@@ -10,9 +10,11 @@ import sys
 import uuid
 from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass
+from functools import partial
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.redaction import Redactor
 from dadaia_workspace.infrastructure.certification_process import SubprocessCertificationProcess
 
@@ -55,6 +57,10 @@ class _CertificationSkip(Exception):
     this as ``SKIP``, never ``FAIL``; a caller that runs the same check outside
     ``certify`` (e.g. a live pytest sentinel) catches it and skips honestly too.
     """
+
+
+#: One live probe: ``(process, cwd, harness, binary) -> detail``.
+_LiveProbe = Callable[[SubprocessCertificationProcess, Path, str, str], str]
 
 
 # A22.4 — codex-live-probe: exercises the INSTALLED Codex CLI with a real `codex exec`
@@ -116,7 +122,62 @@ def _codex_probe_outcome(output: str, cwd: Path) -> tuple[bool, str]:
     )
 
 
-def _codex_live_probe_detail(process: SubprocessCertificationProcess, cwd: Path) -> str:
+#: The CLI binary each registered harness installs. It is NOT a field on
+#: ``HarnessRecord``: the record describes what the workspace PROJECTS for a harness, and
+#: nothing in the projection depends on the binary's name — only this probe does, so the
+#: fact lives with its one consumer instead of widening a core dataclass.
+_HARNESS_PROBE_BINARIES: dict[str, str] = {
+    "claude": "claude",
+    "codex": "codex",
+    "kimi-code": "kimi",
+    "cursor": "cursor-agent",
+    "devin": "devin",
+    "copilot": "copilot",
+}
+
+#: A record with a probe deeper than "the binary answers" names it here; every other
+#: record falls back to :func:`_version_probe_detail`. There is NO version floor: the
+#: workspace derives the same four behaviours into every harness and pins no release of
+#: any of them, so a version comparison would assert a policy that does not exist.
+_DEEP_LIVE_PROBES: dict[str, _LiveProbe] = {}
+
+
+def _installed_binary(
+    process: SubprocessCertificationProcess, cwd: Path, harness: str, binary: str
+) -> tuple[str, str]:
+    """Return ``(resolved path, version line)`` for *binary*, or degrade honestly.
+
+    Raises :class:`_CertificationSkip` when the binary is absent: an optional local
+    runtime that is not installed leaves the claim UNVERIFIED for this environment, which
+    is an honest degrade and never a certification failure. A binary that IS installed but
+    cannot answer ``--version`` is a genuine failure and raises.
+    """
+    resolved = shutil.which(binary)
+    if resolved is None:
+        raise _CertificationSkip(
+            f"UNVERIFIED: no {binary!r} binary on PATH, so the {harness} runtime claim is "
+            "unproven in this environment (A22.4 honest degrade; the projection tests "
+            "validate file shape only, never runtime behavior)"
+        )
+    proc = process.run([resolved, "--version"], cwd=cwd, timeout=_CODEX_VERSION_PROBE_TIMEOUT)
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"{binary} --version exited {proc.returncode}: {(proc.stderr or proc.stdout).strip()}"
+        )
+    return resolved, proc.stdout.strip()
+
+
+def _version_probe_detail(
+    process: SubprocessCertificationProcess, cwd: Path, harness: str, binary: str
+) -> str:
+    """The default live probe: the harness's own CLI is installed and answers."""
+    _resolved, version = _installed_binary(process, cwd, harness, binary)
+    return f"{binary} installed and answering: {version}"
+
+
+def _codex_live_probe_detail(
+    process: SubprocessCertificationProcess, cwd: Path, harness: str, binary: str
+) -> str:
     """A22.4: prove the installed Codex CLI actually answers, not just that its files exist.
 
     Runs ``codex --version`` then a bounded, read-only, non-interactive ``codex exec``
@@ -129,21 +190,7 @@ def _codex_live_probe_detail(process: SubprocessCertificationProcess, cwd: Path)
     any genuine probe failure (crash, timeout, missing marker); both exceptions'
     detail is bounded/redacted, never the raw blob (CWE-532).
     """
-    codex_bin = shutil.which("codex")
-    if codex_bin is None:
-        raise _CertificationSkip(
-            "codex CLI not found on PATH — live probe skipped (A22.4 honest degrade; "
-            "static Codex projection tests validate shape only, never runtime behavior)"
-        )
-    version_proc = process.run(
-        [codex_bin, "--version"], cwd=cwd, timeout=_CODEX_VERSION_PROBE_TIMEOUT
-    )
-    if version_proc.returncode != 0:
-        raise RuntimeError(
-            f"codex --version exited {version_proc.returncode}: "
-            f"{(version_proc.stderr or version_proc.stdout).strip()}"
-        )
-    version = version_proc.stdout.strip()
+    codex_bin, version = _installed_binary(process, cwd, harness, binary)
     exec_proc = process.run(
         [
             codex_bin,
@@ -172,6 +219,9 @@ def _codex_live_probe_detail(process: SubprocessCertificationProcess, cwd: Path)
             f"stdout={exec_proc.stdout[:200]!r}"
         )
     return f"{version}: live exec probe observed {_CODEX_LIVE_PROBE_MARKER!r}"
+
+
+_DEEP_LIVE_PROBES["codex"] = _codex_live_probe_detail
 
 
 def _all_checks_ok(checks: Iterable[CertificationCheck]) -> bool:
@@ -376,10 +426,14 @@ def certify(
 
     check("context-dead-alive-delete-roundtrip", context_round_trip)
 
-    # A22.4: exercise the INSTALLED Codex CLI live — never rely on static Codex
-    # projection tests (TOML shape only) to attest runtime behavior. Honest SKIP
-    # (never FAIL) when no `codex` binary is reachable on this host.
-    check("codex-live-probe", lambda: _codex_live_probe_detail(process, target))
+    # 0.4.7 FR3: one `<harness>-live-probe` per REGISTERED record, by iteration — a
+    # harness that joins the registry is probed without a line here. Static projection
+    # tests attest file shape only; these attest that the runtime answers. An absent
+    # binary leaves the claim UNVERIFIED (honest SKIP), never a FAIL.
+    for harness in L1_ENTRY_HARNESSES:
+        binary = _HARNESS_PROBE_BINARIES[harness]
+        probe = _DEEP_LIVE_PROBES.get(harness, _version_probe_detail)
+        check(f"{harness}-live-probe", partial(probe, process, target, harness, binary))
 
     ok = _all_checks_ok(checks)
     result = CertificationResult(

@@ -27,6 +27,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.models.doctor_report import DoctorStatus
 from dadaia_workspace.infrastructure.entity_doctor import check_entities_derivation
+from dadaia_workspace.infrastructure.projection_rules import harnesses_with_a_hook_derivation
 
 # ---------------------------------------------------------------------------
 # Scratch-render builder
@@ -64,9 +65,10 @@ def _build_clean_scratch(root: Path) -> Path:
                 "id": "gate-behavior",
                 "mandate": "gates something",
                 "implementations": {
-                    "claude": "PreToolUse hook via dadaia_workspace.hooks.pre_gate",
-                    "codex": ".codex/hooks.json wrapper -> the same gate",
-                    "kimi-code": "managed hook block -> the same gate",
+                    # Read from the builder table, never listed: the fixture must stay
+                    # correct when a hook format grows a derivation (0.4.7 FR3).
+                    name: "hook wiring via dadaia_workspace.hooks.pre_gate"
+                    for name in harnesses_with_a_hook_derivation()
                 },
             }
         ],

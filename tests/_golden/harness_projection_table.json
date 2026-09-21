@@ -770,6 +770,20 @@
     "link_to": null
   },
   {
+    "label": "copilot:hooks/pre-tool-use.json",
+    "harness": "copilot",
+    "dst": "ws:.github/hooks/pre-tool-use.json",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "copilot:hooks/session-start.json",
+    "harness": "copilot",
+    "dst": "ws:.github/hooks/session-start.json",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
     "label": "cursor:agents/dd-code-reviewer.md",
     "harness": "cursor",
     "dst": "ws:.cursor/agents/dd-code-reviewer.md",
@@ -789,6 +803,13 @@
     "dst": "ws:.cursor/agents/dd-software-engineer.md",
     "compare": "bytes",
     "link_to": "ws:.agents/agents/dd-software-engineer.md"
+  },
+  {
+    "label": "cursor:hooks.json",
+    "harness": "cursor",
+    "dst": "ws:.cursor/hooks.json",
+    "compare": "bytes",
+    "link_to": null
   },
   {
     "label": "dadaia:AGENTS.md",
@@ -833,6 +854,48 @@
     "link_to": null
   },
   {
+    "label": "dadaia:hooks/copilot-doctor-expired",
+    "harness": "copilot",
+    "dst": "ws:.dadaia/hooks/copilot-doctor-expired",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "dadaia:hooks/copilot-pre-gate",
+    "harness": "copilot",
+    "dst": "ws:.dadaia/hooks/copilot-pre-gate",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "dadaia:hooks/cursor-doctor-expired",
+    "harness": "cursor",
+    "dst": "ws:.dadaia/hooks/cursor-doctor-expired",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "dadaia:hooks/cursor-pre-gate",
+    "harness": "cursor",
+    "dst": "ws:.dadaia/hooks/cursor-pre-gate",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "dadaia:hooks/devin-doctor-expired",
+    "harness": "devin",
+    "dst": "ws:.dadaia/hooks/devin-doctor-expired",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "dadaia:hooks/devin-pre-gate",
+    "harness": "devin",
+    "dst": "ws:.dadaia/hooks/devin-pre-gate",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
     "label": "dadaia:states/AGENTS.md",
     "harness": "agents",
     "dst": "ws:.dadaia/states/AGENTS.md",
@@ -843,6 +906,13 @@
     "label": "dadaia:tmp/AGENTS.md",
     "harness": "agents",
     "dst": "ws:.dadaia/tmp/AGENTS.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "devin:hooks.v1.json",
+    "harness": "devin",
+    "dst": "ws:.devin/hooks.v1.json",
     "compare": "bytes",
     "link_to": null
   },

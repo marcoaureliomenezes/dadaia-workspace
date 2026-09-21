@@ -49,7 +49,6 @@ from dadaia_workspace.infrastructure.projection import (
 from dadaia_workspace.infrastructure.public_assets_common import iter_public_files
 from dadaia_workspace.infrastructure.runtime_config import (
     claude_settings,
-    codex_hook_wrapper_contents,
     codex_hooks,
     foreign_claude_hook_commands,
     kimi_code_home,
@@ -57,6 +56,10 @@ from dadaia_workspace.infrastructure.runtime_config import (
     kimi_hooks_block,
     merge_claude_settings,
     upsert_kimi_hooks_block,
+)
+from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
+    hook_file_payloads,
+    hook_wrapper_contents,
 )
 from dadaia_workspace.infrastructure.workspace_guardrail import (
     _agents_md_source,
@@ -252,7 +255,20 @@ def _hooks_json_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Project
             ),
         )
     ]
-    rules.extend(
+    rules.extend(_wrapper_rules(record, workspace_root))
+    return tuple(rules)
+
+
+def _wrapper_rules(record: HarnessRecord, workspace_root: Path) -> tuple[ProjectionRule, ...]:
+    """The on-disk executables a record's hook format needs — the generalisation of the
+    former codex-only wrapper rule (0.4.7 FR3).
+
+    A harness that registers a command string gets ONE executable path per behaviour
+    lane, with no arguments and no env-prefix syntax in its registration file. Which
+    lanes exist, and whether the wrapper translates the gate's answer into the harness's
+    shape, is the format's row in ``HOOK_DIALECTS`` — never a branch here.
+    """
+    return tuple(
         bytes_rule(
             f"dadaia:hooks/{name}",
             record.name,
@@ -260,8 +276,30 @@ def _hooks_json_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Project
             content.encode("utf-8"),
             mode=0o755,
         )
-        for name, content in codex_hook_wrapper_contents().items()
+        for name, content in hook_wrapper_contents(record).items()
     )
+
+
+def _hook_files_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
+    """A format whose whole registration is one or more plain JSON files citing wrappers.
+
+    The files are data (``HOOK_DIALECTS``) and the behaviours are the wrappers', so a
+    harness joining this builder cannot invent a fifth behaviour nor drop one of the four.
+    """
+    if plan.only is not None:
+        return ()
+    workspace_root = plan.workspace_root
+    directory = workspace_root / str(record.directory)
+    rules = [
+        bytes_rule(
+            f"{record.name}:{relpath}",
+            record.name,
+            directory / relpath,
+            payload.encode("utf-8"),
+        )
+        for relpath, payload in hook_file_payloads(record).items()
+    ]
+    rules.extend(_wrapper_rules(record, workspace_root))
     return tuple(rules)
 
 
@@ -342,10 +380,10 @@ def _no_checks(record: HarnessRecord, workspace_root: Path) -> list[DoctorLine]:
     return []
 
 
-#: One builder per :class:`HookFormat` value. The three most recently registered
-#: formats are declared on their records but have no hook rules yet — stated here as
-#: :func:`no_rules` so the table stays total and no harness falls through a missing key;
-#: a fake hook file would be worse than none.
+#: One builder per :class:`HookFormat` value — total, so no harness can fall through a
+#: missing key. ``no_rules`` remains reachable for a format that genuinely registers
+#: nothing; every format that registers a plain JSON file shares ``_hook_files_rules``,
+#: which reads that file's events and entry shape from ``HOOK_DIALECTS``.
 HOOK_RULE_BUILDERS: dict[
     HookFormat, Callable[[HarnessRecord, InstallPlan], tuple[ProjectionRule, ...]]
 ] = {
@@ -353,9 +391,9 @@ HOOK_RULE_BUILDERS: dict[
     HookFormat.CLAUDE_SETTINGS: _settings_merge_rules,
     HookFormat.CODEX_HOOKS: _hooks_json_rules,
     HookFormat.KIMI_HOOKS: _user_home_hook_rules,
-    HookFormat.CURSOR_HOOKS: no_rules,
-    HookFormat.DEVIN_HOOKS: no_rules,
-    HookFormat.COPILOT_HOOKS: no_rules,
+    HookFormat.CURSOR_HOOKS: _hook_files_rules,
+    HookFormat.DEVIN_HOOKS: _hook_files_rules,
+    HookFormat.COPILOT_HOOKS: _hook_files_rules,
 }
 
 
@@ -380,6 +418,8 @@ _HOOK_CHECKS: dict[HookFormat, Callable[[HarnessRecord, Path], list[DoctorLine]]
     HookFormat.CLAUDE_SETTINGS: _settings_merge_checks,
     HookFormat.CODEX_HOOKS: _hooks_json_checks,
     HookFormat.KIMI_HOOKS: _user_home_hook_checks,
+    # The rendered files and the wrappers are byte-compared, and the exec bit rides the
+    # rule's own mode — these formats leave no residue a byte-compare cannot express.
     HookFormat.CURSOR_HOOKS: _no_checks,
     HookFormat.DEVIN_HOOKS: _no_checks,
     HookFormat.COPILOT_HOOKS: _no_checks,

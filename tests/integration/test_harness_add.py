@@ -101,7 +101,10 @@ def test_harness_add_registers_each_newly_recorded_harness(
 
     if projected is None:
         assert (ws / ".agents" / "agents" / "dd-software-engineer.md").exists()
-        assert not (ws / ".devin").exists(), "devin projects nothing until its hooks land"
+        assert [p.name for p in (ws / ".devin").iterdir()] == ["hooks.v1.json"], (
+            "devin reads the authored persona tree natively; its directory carries the "
+            "hook registration and nothing else"
+        )
     else:
         assert (ws / projected).exists(), f"{projected} not projected by harness add {harness}"
 
@@ -113,7 +116,7 @@ def test_harness_add_copilot_never_touches_the_repository_workflows(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """`.github/` is shared with the repository's own CI: the copilot record owns
-    `.github/agents/*.agent.md` and nothing else under it."""
+    `.github/agents/*.agent.md` plus `.github/hooks/*.json`, and nothing else under it."""
     ws = _claude_only_workspace(tmp_path, monkeypatch)
     workflow = ws / ".github" / "workflows" / "ci.yml"
     workflow.parent.mkdir(parents=True)
@@ -122,7 +125,15 @@ def test_harness_add_copilot_never_touches_the_repository_workflows(
     added = _runner.invoke(cli_app, ["harness", "add", "copilot"])
     assert added.exit_code == 0, added.output
     assert workflow.read_text(encoding="utf-8") == "name: ci\n"
-    assert sorted(p.name for p in (ws / ".github").iterdir()) == ["agents", "workflows"]
+    assert sorted(p.name for p in (ws / ".github").iterdir()) == [
+        "agents",
+        "hooks",
+        "workflows",
+    ]
+    assert sorted(p.name for p in (ws / ".github" / "hooks").iterdir()) == [
+        "pre-tool-use.json",
+        "session-start.json",
+    ]
 
 
 def test_harness_add_refuses_an_unregistered_name(

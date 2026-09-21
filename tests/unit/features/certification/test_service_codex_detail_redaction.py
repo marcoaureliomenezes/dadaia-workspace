@@ -98,7 +98,9 @@ def test_skip_detail_never_leaks_workdir_or_session_id_on_not_logged_in(
         lambda name: "/usr/bin/codex",
     )
     with pytest.raises(_CertificationSkip) as excinfo:
-        _codex_live_probe_detail(_fake_process(_FAKE_NOT_LOGGED_IN_STDERR), tmp_path)
+        _codex_live_probe_detail(
+            _fake_process(_FAKE_NOT_LOGGED_IN_STDERR), tmp_path, "codex", "codex"
+        )
     detail = str(excinfo.value)
     assert _SENTINEL_WORKDIR not in detail
     assert _SENTINEL_SESSION_ID not in detail
@@ -113,7 +115,9 @@ def test_fail_detail_never_leaks_workdir_or_session_id_on_genuine_failure(
         lambda name: "/usr/bin/codex",
     )
     with pytest.raises(RuntimeError) as excinfo:
-        _codex_live_probe_detail(_fake_process(_FAKE_GENUINE_FAILURE_STDERR), tmp_path)
+        _codex_live_probe_detail(
+            _fake_process(_FAKE_GENUINE_FAILURE_STDERR), tmp_path, "codex", "codex"
+        )
     detail = str(excinfo.value)
     assert _SENTINEL_WORKDIR not in detail
     assert _SENTINEL_SESSION_ID not in detail
@@ -132,7 +136,7 @@ def test_fail_detail_never_leaks_raw_output_when_no_json_error_is_parseable(
     )
     raw_crash = f"segfault while probing {_SENTINEL_WORKDIR} session={_SENTINEL_SESSION_ID}"
     with pytest.raises(RuntimeError) as excinfo:
-        _codex_live_probe_detail(_fake_process(raw_crash), tmp_path)
+        _codex_live_probe_detail(_fake_process(raw_crash), tmp_path, "codex", "codex")
     detail = str(excinfo.value)
     assert _SENTINEL_WORKDIR not in detail
     assert _SENTINEL_SESSION_ID not in detail
@@ -146,7 +150,7 @@ def test_skip_detail_is_length_capped(tmp_path: Path, monkeypatch: pytest.Monkey
     )
     long_line = "not logged in - " + ("x" * 500)
     with pytest.raises(_CertificationSkip) as excinfo:
-        _codex_live_probe_detail(_fake_process(long_line), tmp_path)
+        _codex_live_probe_detail(_fake_process(long_line), tmp_path, "codex", "codex")
     detail = str(excinfo.value)
     assert "x" * 500 not in detail
     assert len(detail) < 400
