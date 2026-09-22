@@ -3,8 +3,7 @@
 This module implements the v1-to-v2 context-record migration.
 It is called by ``dadaia migrate [--dry-run] [--yes]``.
 
-Migration is idempotent on v2 workspaces (no-op).
-On unknown schema versions it raises ValueError.
+A registry at or above schema 2 is a no-op; a non-numeric version raises ValueError.
 """
 
 from __future__ import annotations
@@ -30,7 +29,9 @@ class MigrationPlan:
 def _detect_schema_version(data: dict) -> str:  # type: ignore[type-arg]
     """Return the schema version string from the data dict.
 
-    Returns "1", "2", or raises ValueError on unknown versions.
+    Returns "1" for a v1 registry, "2" for any registry at or above the target
+    (the context store itself writes newer schemas), or raises ValueError on a
+    non-numeric version.
     """
     # Support both "schema_version" (v2 key) and "version" (v1 key)
     ver = data.get("schema_version") or data.get("version")
@@ -41,7 +42,11 @@ def _detect_schema_version(data: dict) -> str:  # type: ignore[type-arg]
                 return "1"
         # No recognisable markers — treat as v2
         return "2"
-    return str(ver)
+    if not str(ver).isdigit():
+        raise ValueError(
+            f"Unknown schema_version '{ver}' in spec_contexts.json. Manual intervention required."
+        )
+    return "1" if int(str(ver)) < 2 else "2"
 
 
 def plan_migration(states_dir: Path) -> MigrationPlan:
@@ -67,12 +72,6 @@ def plan_migration(states_dir: Path) -> MigrationPlan:
             contexts_to_migrate=[],
             primary_context_exists=primary_file.exists(),
             already_v2=True,
-        )
-
-    if schema_ver != "1":
-        raise ValueError(
-            f"Unknown schema_version '{schema_ver}' in spec_contexts.json. "
-            "Manual intervention required."
         )
 
     # Build list of context changes
@@ -130,12 +129,6 @@ def execute_migration(states_dir: Path, workspace_root: Path) -> None:
         # Idempotent: nothing to do for the JSON file, but ensure dirs exist
         _create_dirs(workspace_root)
         return
-
-    if schema_ver != "1":
-        raise ValueError(
-            f"Unknown schema_version '{schema_ver}' in spec_contexts.json. "
-            "Manual intervention required."
-        )
 
     # Transform context rows
     new_contexts = []
