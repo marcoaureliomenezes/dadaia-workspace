@@ -30,7 +30,7 @@ Disclosed reference reached from `SKILL.md`/`RC-FLOW.md` wherever the arc says "
 ## `log` — the closure narrative's home
 
 - Every closure-narrative class lands as one `log` entry whose `kind` names it — `summary`, `size`, `drifts`, `artifact-gc`, `test-dispositions`, `dispositions`, `memory`, `reviews`, `merge`.
-- The `memory` entry records atoms reviewed-unchanged vs changed; `dispositions` records the sweep.
+- The `memory` entry is written only by `release.py memory`; it adds `since`, `reviewed`, `changed` to `{ts, agent, kind, text}` — the drift window sha, the atoms read and left byte-identical, the atoms rewritten or created; `dispositions` records the sweep.
 - Already-native facts need no entry: tasks completed (`TASKS.md` `[x]` + sha) and the trio `APPROVED` handoffs.
 
 ## Write seam

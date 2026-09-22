@@ -124,7 +124,7 @@
   `tests/unit/features/specs/**`
   `blocked by:` T-047-99 · `delivers:` FR1 (scaffold law)
 
-- [-] **T-047-103 — `MEMORY-UPDATE.md` is the reconciliation protocol.**
+- [x] **T-047-103 — `MEMORY-UPDATE.md` is the reconciliation protocol.**
   Replace wholesale with the PM's draft: drift → per-atom `git diff` → DELETE → UPDATE → ADD → atom
   per uncovered package → `catalog generate` → derived docs in the SAME commit → `release.py memory`.
   `RC-FLOW.md` step 5 names it; `RELEASE-EVENTS.md` documents the `memory` entry shape.

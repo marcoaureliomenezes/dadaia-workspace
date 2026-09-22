@@ -42,11 +42,9 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 - Done when: the verdict is `APPROVED` on that sha.
 
 **Step 5 — Memory update (`dd-product-engineer`).**
-- `python3 .agents/skills/dd-release-implementation/scripts/release.py phase CLOSURE --sha <sha>` — it refuses while any task is not `[x]`.
-- Memory is closure procedure, never a task: a TASKS.md task whose write set names
-  `specs/memory` is refused by `dadaia doctor` (SPEC-DOC-047).
-- Update `specs/memory/**` atoms to the product's current state — protocol detail: `MEMORY-UPDATE.md`.
-- Done when: `dadaia doctor`'s `specs` section reports the memory atoms clean, the derived-docs test is green, and one `kind: memory` log entry records atoms reviewed-unchanged vs changed.
+- Memory is closure procedure, never a task: a TASKS.md task whose write set names `specs/memory` is refused by `dadaia doctor` (SPEC-DOC-047).
+- Reconcile product atoms from the code diff — `memory.py drift`, per-atom `git diff`, DELETE → UPDATE → ADD, `catalog generate`, derived docs in the same commit, `release.py memory` — protocol: `MEMORY-UPDATE.md`.
+- Done when: `memory.py drift --since <sha>` exits 0, `dadaia doctor` is clean, the derived-docs test is green, and one `kind: memory` log entry names every worklist atom as reviewed or changed.
 
 **Step 6 — Record the candidate's closure narrative.**
 - Append the `log` entries `RELEASE-EVENTS.md` describes, each with its `kind`: `summary`, `size`, `drifts`, `artifact-gc`, `test-dispositions`, `dispositions`.
