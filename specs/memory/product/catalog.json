@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-22T21:38:04Z",
+  "generated_at": "2026-09-22T21:39:10Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -72,7 +72,7 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 825,
+      "token_estimate": 838,
       "depends_on": [
         "agent-orchestration",
         "sdd-gate-v3",

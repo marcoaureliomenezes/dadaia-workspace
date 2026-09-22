@@ -28,7 +28,7 @@ The one enumeration; every harness atom links here.
 | `venv-guard` | blocks `dadaia`/`pip`/`python -m dadaia_workspace` run outside the workspace venv, naming the corrected command | pre-tool gate |
 | `sdd-gate` | classifies each write ADDITIVE / PROTECTED / MUTATING and scope-judges MUTATING writes under `repos/<slug>/` for a bound session | pre-tool gate (+ post-tool reaper where the harness has one) |
 | `context-memory-injection` | runs the session-start reaper (`dadaia doctor --fix --expired-only --quiet`) and, where the harness has a prompt hook, injects the bound context's bootstrap | session start (+ prompt) |
-| `git-chokepoints` | pre-push allows only `feature/{M.m.p}` with a green preflight | git hooks, identical for every harness |
+| `git-chokepoints` | pre-push allows only `feature/{M.m.p}` and refuses a non-canon `specs/` path or a denylisted secret in the pushed range | git hooks, identical for every harness |
 
 - The first three ride ONE merged entrypoint, `dadaia_workspace.hooks.pre_gate`; with the session-start reaper they are the four hook behaviours every harness receives, and every BLOCK carries one `fix:` line.
 - A harness differs only in serialization — the event names, the hook file and the answer shape its wrapper translates to; no harness adds a behaviour ([[sdd-gate-v3]]).
