@@ -332,7 +332,7 @@ def show(
     """Show details of a context."""
     svc = _ctx_service()
     if name is None:
-        # No name: use only explicit/caller-owned/cwd resolution; never foreign presence.
+        # No name: use only explicit/caller-owned/cwd resolution.
         ctx = _resolve_default_context(svc, resolve_workspace_root())
     else:
         try:

@@ -379,7 +379,7 @@ class SpecContextService:
         Idempotent: calling alive() on an already-ALIVE context is a no-op beyond
         re-confirming every repo is present (no error, no re-clone of anything already
         on disk). Sets alive_since=now and clears dead_since. Concurrent races are
-        accepted and surfaced by advisory presence; this operation never acquires a lock.
+        accepted and surface through git; this operation never acquires a lock.
 
         FR16/A16.1/A16.3: every repo in the set — the main repo first, then each
         associated repo in order (``SpecContextProject.all_repos()``, the one accessor,
@@ -658,7 +658,7 @@ class SpecContextService:
            untracked content is gated), then the repo is removed. A clean tree behaves
            exactly as before.
 
-        Concurrent races are accepted and surfaced by advisory presence; this operation
+        Concurrent races are accepted and surface through git; this operation
         never waits for or refuses another session.
         """
         ctx = self._store.get(name)

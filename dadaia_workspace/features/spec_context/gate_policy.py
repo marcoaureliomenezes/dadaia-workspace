@@ -20,10 +20,7 @@ documented way out was a bind flag that no longer exists.
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from datetime import UTC, datetime
 from enum import Enum
-from pathlib import Path
 
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
@@ -99,10 +96,6 @@ class PathClass(Enum):
 class Decision(Enum):
     ALLOW = "allow"
     BLOCK = "block"
-
-
-def _utcnow() -> datetime:
-    return datetime.now(tz=UTC)
 
 
 def _is_specs_additive(spec_rel: str) -> bool:
@@ -192,39 +185,27 @@ def _scope_block(
 
 
 def evaluate(
-    workspace: Path,
     rel_path: str,
     *,
-    ctx: str,
-    session_id: str,
     bound_context: str | None = None,
     bound_repos: frozenset[str] = frozenset(),
     target_slug: str | None = None,
     target_owner: str | None = None,
-    clock: Callable[[], datetime] = _utcnow,
 ) -> tuple[Decision, str]:
-    """Return the gate decision for one write target — the fail-safe contract.
+    """Return the gate decision and its message for one write target.
 
     Three blocks, in order: PROTECTED (fail-CLOSED, the projected-law message or the
     session-record message), then — for a MUTATING write — the bind's SCOPE, received as
     plain data (*bound_context* / *bound_repos*), never re-resolved here. Everything
-    else ALLOWS, upserting advisory presence.
+    else ALLOWS with an empty message.
 
     SCOPE (FR1, Q1): only ``repos/<slug>/`` is scope-judged. *target_slug* is the repo
     the write lands in and *target_owner* the context that registers it; the write is
     refused only when the session is BOUND, some context demonstrably owns that slug,
     and it is not the bound context's own (*bound_repos* = main + associated). An
     unbound session, a workspace-root path, and a slug no context registers all ALLOW —
-    the gate cannot attribute them, and fail-open is the posture.
-
-    NO-LOCKS DOCTRINE (v0.1.76): a MUTATING write is NEVER blocked on another session.
-    It upserts an advisory :mod:`presence` record for this ``(ctx, session_id)`` and,
-    when another live session is visible on the same context, ALLOWS with a throttled
-    one-line advisory. Presence I/O never raises (FR2).
-
-    ``runtime``/``pid`` are recorded into the presence record. An anonymous session id
-    (``anon-session``) never creates one (FR5): the write is still allowed, there is
-    simply nothing to be advisory about.
+    the gate cannot attribute them, and fail-open is the posture. A MUTATING write is
+    never blocked on another session: races surface through git.
     """
     cls = classify_path(rel_path)
 

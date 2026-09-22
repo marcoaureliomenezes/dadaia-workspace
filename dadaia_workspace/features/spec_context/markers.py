@@ -4,7 +4,7 @@ idiom and the ONE reaper of the markers it leaves behind.
 Writers: ``hooks.sdd_post_gate`` (reconciler throttle), ``hooks.ctx_inject``
 (sentinel/compact markers). Every marker is a spent throttle stamp: no session
 cross-reference exists to get wrong, so :func:`reap_markers` reaps by mtime alone.
-Owned by the reaper lane (``spec_context.doctor.reap``), not by presence (0.4.7 c5 FR2).
+Owned by the reaper lane (``spec_context.doctor.reap``).
 """
 
 from __future__ import annotations

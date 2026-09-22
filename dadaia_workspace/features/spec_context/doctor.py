@@ -1,6 +1,6 @@
 """DoctorService — the one scan and reaper of the workspace instance (0.4.6 FR3/FR4).
 
-``check()`` reports the context invariants (INV-4/5/6, CTX-URL-1, VENV-1, PRESENCE-GC).
+``check()`` reports the context invariants (INV-4/5/6, CTX-URL-1, VENV-1).
 ``scan()`` is the ONE walk over the instance — one traversal primitive
 (``features.spec_context.sweep``) serves both it and ``fix()``, driven by the zone registry
 (``core.workspace_layout.DADAIA_ZONES``): root, harness dirs, the ``.dadaia/`` top level,

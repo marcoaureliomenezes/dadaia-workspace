@@ -171,12 +171,7 @@ def test_first_match_wins_ordering_in_repo() -> None:
 def test_evaluate_area_histo_and_live_bugs_allow(
     tmp_path: Path, rel_path: str, expected_decision: Decision, message_contains: str | None
 ) -> None:
-    decision, message = evaluate(
-        tmp_path,
-        rel_path,
-        ctx="dadaia-workspace",
-        session_id="sess-1",
-    )
+    decision, message = evaluate(rel_path)
     assert decision == expected_decision
     if message_contains is not None:
         assert message_contains in message.lower()
@@ -213,12 +208,7 @@ def test_fresh_repo_agents_md_classifies_mutating_not_law() -> None:
 def test_fresh_repo_agents_md_write_is_allowed_on_the_executed_path(tmp_path: Path) -> None:
     """Intent: CONTRACT — v0.4.5 A1.1 (evaluate()/Write envelope, not just classify_path)."""
     fresh_slug = "brand-new-repo-never-scaffolded-yet"
-    decision, message = evaluate(
-        tmp_path,
-        _in_repo(fresh_slug, "AGENTS.md"),
-        ctx=fresh_slug,
-        session_id="anon-session",
-    )
+    decision, message = evaluate(_in_repo(fresh_slug, "AGENTS.md"))
     assert decision == Decision.ALLOW
     assert "[GATE]" not in message
 
@@ -242,12 +232,7 @@ def test_existing_nonmanifest_repo_agents_md_edit_is_allowed(tmp_path: Path) -> 
 
     assert classify_path(_in_repo(slug, "AGENTS.md")) == PathClass.MUTATING
 
-    decision, message = evaluate(
-        tmp_path,
-        _in_repo(slug, "AGENTS.md"),
-        ctx=slug,
-        session_id="anon-session",
-    )
+    decision, message = evaluate(_in_repo(slug, "AGENTS.md"))
     assert decision == Decision.ALLOW
     assert "[GATE]" not in message
 
@@ -350,7 +335,7 @@ _BOUND_A: dict[str, object] = {
 
 
 def _evaluate_scope(tmp_path: Path, rel_path: str, **kwargs: object) -> tuple[Decision, str]:
-    return evaluate(tmp_path, rel_path, ctx="ctx-b", session_id="anon-session", **kwargs)  # type: ignore[arg-type]
+    return evaluate(rel_path, **kwargs)  # type: ignore[arg-type]
 
 
 def test_write_into_a_repo_outside_the_bind_scope_is_blocked_with_a_runnable_fix(

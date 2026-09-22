@@ -70,7 +70,7 @@ def _reaper_cmd(workspace_root: Path) -> str:
 # (match-all) form the ai audit flagged.
 _CLAUDE_WRITE_TOOLS = "Edit|Write|MultiEdit|NotebookEdit|Bash"
 # Claude Code's canonical explicit match-all for tool-matching events. Used on
-# PostToolUse so session/presence heartbeat fires after every tool, including Bash.
+# PostToolUse so session heartbeat fires after every tool, including Bash.
 _CLAUDE_MATCH_ALL = "*"
 
 
@@ -344,7 +344,7 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
                     ],
                 },
             ],
-            # Session/presence heartbeat fires after every tool. Codex's canonical
+            # Session heartbeat fires after every tool. Codex's canonical
             # match-all is an omitted matcher, mirroring Claude's explicit "*".
             "PostToolUse": [
                 {
@@ -475,7 +475,7 @@ def kimi_hook_shims() -> dict[str, str]:
     - pre-gate: forwards the payload to ``hooks.pre_gate`` and translates the dadaia
       envelope to the Kimi protocol — ``"decision": "block"`` ⇒ reason on stderr +
       exit 2; anything else ⇒ exit 0.
-    - post-gate: presence heartbeat via ``hooks.sdd_post_gate``; output discarded.
+    - post-gate: session heartbeat via ``hooks.sdd_post_gate``; output discarded.
     - ctx-inject: ``hooks.ctx_inject``; stdout passes through (Kimi appends
       ``UserPromptSubmit`` stdout to the context).
     - post-compact: ``hooks.ctx_inject`` with ``DADAIA_HOOK_EVENT=PostCompact`` — writes

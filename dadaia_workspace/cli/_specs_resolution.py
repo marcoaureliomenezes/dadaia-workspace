@@ -13,8 +13,7 @@ env rungs both feed a ``repos/<name>/specs`` path join further downstream (this 
 own :func:`resolve_specs_dir_for_cli`, and every ``container.build_*`` factory keyed by
 context name), unvalidated. Both rungs are gated by the SAME ``[A-Za-z0-9_-]+`` allowlist
 the resolution authority already enforces on every repo-slug path component
-(:data:`~dadaia_workspace.core.invocation.CONTEXT_NAME_RE`, mirrored in
-``features.spec_context.presence._valid_name``) BEFORE either value is used — an
+(:data:`~dadaia_workspace.core.invocation.CONTEXT_NAME_RE`) BEFORE either value is used — an
 operator-controlled input has no privilege elevation here (the operator can already touch
 any path directly), so this is defense-in-depth, not a privilege boundary. The two rungs
 get DIFFERENT dispositions on a traversal-shaped value: *explicit* is deliberate call-site

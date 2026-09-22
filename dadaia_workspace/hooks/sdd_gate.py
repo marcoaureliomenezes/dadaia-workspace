@@ -9,8 +9,8 @@ drifting copy alongside the bash gate).
 1. **One Invocation per target.** Session, context, root, mode and the session's own
    Bind are resolved in ONE call to :func:`dadaia_workspace.core.invocation.resolve`, called
    with ``target_path=fpath`` so the write-target path (``repos/<slug>/...``) wins
-   ahead of every other rung — a write under ``repos/B/...`` therefore never touches
-   ``repos/A``'s presence, even while ``DADAIA_CONTEXT`` names a different context.
+   ahead of every other rung — a write under ``repos/B/...`` is therefore judged against
+   ``repos/B``'s owner, even while ``DADAIA_CONTEXT`` names a different context.
    Because the workspace root is ALSO derived from the target first (the K1 open-bug
    fix), a write under NO repo still falls through the same Invocation's remaining
    rungs — ``DADAIA_CONTEXT``, this session's own live record, the repo containing the
@@ -32,10 +32,6 @@ from pathlib import Path
 from dadaia_workspace.core import invocation
 from dadaia_workspace.features.spec_context import gate_policy
 from dadaia_workspace.hooks import _common
-
-#: The gate's own anonymous-session sentinel (FR5): an unresolvable session id still
-#: writes. Matches ``gate_policy._ANON_SESSION_ID``.
-_ANON_SESSION_ID = "anon-session"
 
 
 def _target_slug(workspace: Path, fpath: Path) -> str | None:
@@ -82,14 +78,11 @@ def _evaluate_target(
 
     # PROTECTED short-circuit (sole fail-CLOSED path): no context work needed.
     if cls == gate_policy.PathClass.PROTECTED:
-        return gate_policy.evaluate(effective_workspace, rel_path, ctx="", session_id="")
+        return gate_policy.evaluate(rel_path)
 
     ctx = inv.context_name or ""
-    # FR5: an anonymous identity (no harness-native id, no payload session_id) never
-    # blocks the write.
-    session_id = inv.session_id or _ANON_SESSION_ID
 
-    # MUTATING with no resolvable context → fail open (UNGATED, no presence target),
+    # MUTATING with no resolvable context → fail open (the gate cannot attribute it),
     # matching legacy shell behavior. NOTE: a READ-bound session that *does* resolve a
     # context is still blocked below by gate_policy.evaluate (self-scoped, opt-in); the
     # no-context fail-open only covers MUTATING writes the gate cannot attribute to any
@@ -108,10 +101,7 @@ def _evaluate_target(
     owner_repos = invocation.all_repos(effective_workspace, ctx) if target_slug else frozenset()
     target_owner = ctx if target_slug in owner_repos else None
     return gate_policy.evaluate(
-        effective_workspace,
         rel_path,
-        ctx=ctx,
-        session_id=session_id,
         bound_context=inv.bind.context_name,
         bound_repos=inv.bind.repos,
         target_slug=target_slug,
@@ -123,46 +113,27 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
     """Pure SDD-gate policy over an ALREADY-PARSED hook payload.
 
     Returns a block reason string when the write must be BLOCKed, else ``None`` (ALLOW).
-    Back-compat surface — the merged ``pre_gate`` entrypoint drives
-    :func:`evaluate_payload_with_advisory` so an ALLOW's presence advisory survives.
-    """
-    block, _advisory = evaluate_payload_with_advisory(payload)
-    return block
-
-
-def evaluate_payload_with_advisory(payload: dict[str, object]) -> tuple[str | None, str | None]:
-    """Evaluate the SDD gate returning ``(block_reason, allow_advisory)``.
-
-    ``block_reason`` is non-``None`` when the write must be BLOCKed. ``allow_advisory``
-    carries the NO-LOCKS presence advisory an allowed MUTATING write may produce (bug
-    pre-gate-drops-live-presence-advisory-042: ``gate_policy.evaluate`` returns it, but
-    the old bool-shaped surface flattened ALLOW to ``None`` and the mandated throttled
-    warning never reached the caller).
-
     FR-W4-04: classify EVERY write target. A multi-file apply_patch surfaces every file
     header; the most restrictive verdict wins — the first BLOCK stops the whole patch.
     """
     name = _common.tool_name(payload)
     if not _common.is_write_tool(name):
-        return None, None
+        return None
 
     raw_paths = _common.target_paths(payload)
     if not raw_paths:
         # Fail-safe: unparseable target → ALLOW (never deadlock on a parse miss).
-        return None, None
+        return None
 
     try:
         workspace = invocation.resolve(env=os.environ, cwd=Path.cwd()).workspace_root
         if workspace is None:
             raise RuntimeError("workspace not resolved")
     except Exception:  # noqa: BLE001 — fail-open: unresolved workspace must not block
-        return None, None
+        return None
 
-    advisory: str | None = None
     for raw_path in raw_paths:
         decision, reason = _evaluate_target(payload, workspace, raw_path)
         if decision == gate_policy.Decision.BLOCK:
-            return reason, None
-        if reason and advisory is None:
-            advisory = reason
-    return None, advisory
+            return reason
+    return None
