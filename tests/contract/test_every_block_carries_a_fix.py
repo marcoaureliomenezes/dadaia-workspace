@@ -353,35 +353,68 @@ _FIX_LINES = _fix_lines()
 _INSTALLED_SKILL_PREFIX = ".agents/skills/"
 _VENV_BINARY_PREFIX = ".dadaia/"
 
-#: Artifact suffixes that make a token a path even when its first segment is not a
-#: top-level repo entry (a scaffold-only file the consumer's tree carries).
-_ARTIFACT_SUFFIXES = (".md", ".json", ".jsonl", ".py", ".txt", ".yml", ".yaml")
-
 _PLACEHOLDER_RE = re.compile(r"<[^>]*>")
+_FLAG_VALUE_RE = re.compile(r"^--[\w-]+=")
 
 
-def _top_level_entries() -> frozenset[str]:
-    return frozenset(p.name for p in _REPO_ROOT.iterdir())
+def _command_tokens(command: str) -> list[str]:
+    """The command's tokens with their quoting INTACT (``posix=False``).
+
+    Quoting is the signal that separates a path from a ``sed`` script: every fix line
+    quotes its script and leaves its paths bare, so ``'s/<session id>/<redacted>/g'``
+    keeps its quotes and is skipped while ``specs/bugs/BUGS.jsonl`` is not.
+    """
+    lexer = shlex.shlex(command, posix=False)
+    lexer.whitespace_split = True
+    return list(lexer)
 
 
-_TOP_LEVEL = _top_level_entries()
+def _path_token(token: str) -> str | None:
+    """The path *token* names, or ``None`` when it names none.
+
+    An UNQUOTED token containing a slash is a path — there is no suffix list and no
+    root list to fall out of date (0.4.7 c8 review MEDIUM-3: ``.codex/…`` and
+    ``.kimi-code/…`` fell out of a root list, and ``--in-place=<path>`` out of every
+    list at once). A ``--flag=value`` carries its path in the value.
+    """
+    if not token or token.startswith(("'", '"')):
+        return None
+    token = _FLAG_VALUE_RE.sub("", token)
+    if token.startswith(("-", ">", "&", "|")) or "/" not in token:
+        return None
+    return token
 
 
-def _is_path_token(token: str) -> bool:
-    """A token is a path iff its first segment is a top-level repo entry, a scaffold
-    root, or it ends in an artifact suffix. This is what keeps a `sed` script
-    (`s/<session id>/<redacted>/g`) from being mistaken for a path: its first segment
-    is not an entry anyone ships and it names no artifact."""
-    if not token or token.startswith(("-", ">", "&")):
-        return False
-    first = token.split("/", 1)[0]
-    if first in _TOP_LEVEL or first in {".agents", ".dadaia"}:
-        return True
-    return "/" in token and token.endswith(_ARTIFACT_SUFFIXES)
+def _tracked_dirs() -> frozenset[str]:
+    """Every directory the TRACKED tree carries, as repo-relative posix strings.
+
+    The oracle is `git ls-files`, never `iterdir()` of the working tree (0.4.7 c8
+    review MEDIUM-3): this checkout carries untracked `.claude/` and
+    `.import_linter_cache/` directories that CI's does not, so a filesystem oracle
+    answered differently on two machines for the same commit.
+    """
+    import subprocess  # noqa: PLC0415 — the tracked tree is git's answer, not the FS's
+
+    listed = subprocess.run(  # noqa: S603
+        ["git", "-C", str(_REPO_ROOT), "ls-files", "-z"],  # noqa: S607
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=60,
+    ).stdout
+    dirs: set[str] = {""}
+    for tracked in listed.split("\0"):
+        if not tracked:
+            continue
+        parts = PurePosixPath(tracked).parts
+        for depth in range(1, len(parts)):
+            dirs.add(PurePosixPath(*parts[:depth]).as_posix())
+    return frozenset(dirs)
 
 
-def _resolvable_prefix(token: str) -> Path:
-    """The deepest placeholder-free DIRECTORY the token names, mapped onto this repo.
+def _resolvable_prefix(token: str) -> str:
+    """The deepest placeholder-free DIRECTORY the token names, as a repo-relative
+    posix string.
 
     A fix creates, edits or deletes its leaf — `git rm specs/ACTIVE.md` names a file
     that must NOT exist — so the leaf itself is never required; the directory that
@@ -400,7 +433,7 @@ def _resolvable_prefix(token: str) -> Path:
         kept.append(segment)
     if len(kept) == len(segments):
         kept = kept[:-1]  # the leaf is created, edited or deleted by the fix itself
-    return _REPO_ROOT.joinpath(*kept) if kept else _REPO_ROOT
+    return PurePosixPath(*kept).as_posix() if kept else ""
 
 
 def _canon_dirs() -> frozenset[str]:
@@ -417,23 +450,21 @@ def _canon_dirs() -> frozenset[str]:
 
 
 _CANON_DIRS = _canon_dirs()
+_TRACKED_DIRS = _tracked_dirs()
 
 
 def _unresolved_paths(command: str) -> list[str]:
-    """Every path token in *command* whose directory neither exists in this repo nor is
+    """Every path token in *command* whose directory is neither tracked in this repo nor
     a directory the specs canon guarantees."""
     unresolved: list[str] = []
-    for token in shlex.split(command):
-        if token.startswith(_VENV_BINARY_PREFIX) or not _is_path_token(token):
+    for raw in _command_tokens(command):
+        if raw.startswith(_VENV_BINARY_PREFIX):
+            continue  # the venv-rooted binary is resolved by the CLI arm, not as a file
+        token = _path_token(raw)
+        if token is None:
             continue
         target = _resolvable_prefix(token)
-        if target.is_dir():
-            continue
-        try:
-            relative = target.relative_to(_REPO_ROOT).as_posix()
-        except ValueError:  # pragma: no cover — joinpath never escapes the root
-            relative = str(target)
-        if relative not in _CANON_DIRS:
+        if target not in _TRACKED_DIRS and target not in _CANON_DIRS:
             unresolved.append(token)
     return unresolved
 
@@ -498,6 +529,12 @@ def test_the_path_rule_bites_a_fix_naming_a_directory_nobody_ships() -> None:
     ]
     assert _unresolved_paths("git rm dadaia_workspace/features/no_such_feature/doctor.py") == [
         "dadaia_workspace/features/no_such_feature/doctor.py"
+    ]
+    # c8 review MEDIUM-3: a projection root other than .agents/.dadaia, and a path
+    # carried as a --flag=<value>. Both used to slip past as "not a path".
+    assert _unresolved_paths("rm -rf .codex/prompts/dead-lane") == [".codex/prompts/dead-lane"]
+    assert _unresolved_paths("sed -i '/x/d' --in-place=specs/ghost/atom.md") == [
+        "specs/ghost/atom.md"
     ]
 
 
