@@ -13,27 +13,19 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 import sys
 from pathlib import Path
-from typing import Any
 
 # A projected skill folder is not a package dir to litter: the sibling modules below
 # import without leaving a `__pycache__` beside them.
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _release_check import memory_refusals  # noqa: E402
 from _release_new import new_release  # noqa: E402
 from _release_phase import set_phase  # noqa: E402
 from _release_schema import CODE, STATE, find_specs, utc_now  # noqa: E402
 from _release_store import Refusal, State, commit, live_release, window_start  # noqa: E402
-from _release_tree import check  # noqa: E402
-
-# The worklist has ONE decider, the spec navigator's drift function, projected beside
-# this skill: importing a pure function is not a script calling a script (SPEC D6).
-sys.path.insert(1, str(Path(__file__).resolve().parents[2] / "dd-spec-navigator" / "scripts"))
-import _memory_drift as drift  # noqa: E402
+from _release_tree import check, drift, memory_errors  # noqa: E402
 
 _HELP = {
     "new": "mint the one live release: its SPEC.md stub and _RELEASE.json, in one act",
@@ -81,23 +73,20 @@ def _phase(args: argparse.Namespace, specs: Path) -> int:
 
 def _memory(args: argparse.Namespace, specs: Path) -> int:
     """Append the record over the ledger-derived window, refused unless its worklist was worked."""
-    live = live_release(specs)
+    live, ts = live_release(specs), utc_now()
     since = window_start(live.state)
+    lists = [[s for s in getattr(args, n).split(",") if s] for n in ("reviewed", "changed")]
     try:
-        worklist = drift.report(specs, since)
         until = drift.git(specs.parent, "rev-parse", "HEAD")[0]
+        entry = {"ts": ts, "agent": "release.py memory", "kind": "memory",
+                 "text": f"Memory reconciled over {since}..{until[:12]}: {len(lists[0])} "
+                 f"reviewed, {len(lists[1])} changed.", "since": since, "until": until,
+                 "reviewed": lists[0], "changed": lists[1]}  # fmt: skip
+        errors = memory_errors(specs, str(live.state.get("phase")), entry)
     except drift.Refusal as refusal:
         raise Refusal(str(refusal), refusal.fix) from refusal
-    lists = [[s for s in getattr(args, n).split(",") if s] for n in ("reviewed", "changed")]
-    errors = memory_refusals(str(live.state.get("phase")), worklist, *lists)
-    errors = errors or _unmoved(specs.parent, since, worklist, lists[1])
     if errors:
         raise Refusal(errors[0], f"{Path(__file__).name} memory --help")
-    ts = utc_now()
-    entry = {"ts": ts, "agent": "release.py memory", "kind": "memory",
-             "text": f"Memory reconciled over {since}..{until[:12]}: {len(lists[0])} reviewed, "
-             f"{len(lists[1])} changed.", "since": since, "until": until,
-             "reviewed": lists[0], "changed": lists[1]}  # fmt: skip
 
     def apply(state: State) -> State:
         state.setdefault("log", []).append(entry)
@@ -106,24 +95,6 @@ def _memory(args: argparse.Namespace, specs: Path) -> int:
     commit(live.release_dir / STATE, f"releases/{live.release_id}/{STATE}", apply)
     print(f"[ok] release {live.release_id} log <- kind memory {since}..{until[:12]} ({ts})")
     return 0
-
-
-def _unmoved(repo: Path, since: str, worklist: dict[str, Any], changed: list[str]) -> list[str]:
-    """A `changed` atom git says did not move over since..HEAD changed nothing."""
-    paths = {str(atom["slug"]): str(atom["path"]) for atom in worklist["atoms"]}
-    return [
-        f"--changed names {slug!r}, whose atom did not move since {since}"
-        for slug in changed
-        if slug in paths
-        # git decides "moved": it normalises line endings a byte compare would not.
-        and subprocess.run(
-            ["git", "diff", "--quiet", since, "HEAD", "--", paths[slug]],
-            cwd=repo,
-            capture_output=True,
-            check=False,
-        ).returncode
-        == 0  # fmt: skip
-    ]
 
 
 _VERBS = {"new": _new, "phase": _phase, "memory": _memory}

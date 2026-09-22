@@ -504,3 +504,41 @@ def test_memory_refuses_any_phase_but_closure(script: Path, tmp_path: Path) -> N
 
     assert result.returncode == 1
     assert "CLOSURE" in result.stderr
+
+
+def _hand_append(specs: Path, **entry: object) -> None:
+    """A `kind: memory` entry written by hand, bypassing the verb's refusals."""
+    state = specs / "releases" / "0.5.0" / "_RELEASE.json"
+    document = _read(state)
+    document["log"] = [{"ts": _TS, "agent": "hand", "kind": "memory", "text": "hand", **entry}]
+    state.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+
+
+def test_check_refuses_a_hand_appended_entry_that_worked_nothing(
+    script: Path, tmp_path: Path
+) -> None:
+    """A6: check re-runs the one decider over the entry's own [since, until] — an empty
+    disposition over a window where `alpha` moved is not a reconciliation record."""
+    root, specs, base = _memory_repo(tmp_path, script)
+    _hand_append(specs, since=base, until=_git(root, "rev-parse", "HEAD"), reviewed=[], changed=[])
+
+    result = _run(script, "check", "--specs", str(specs), cwd=root)
+
+    assert result.returncode == 1
+    assert "'alpha' is in neither --reviewed nor --changed" in result.stdout
+
+
+def test_check_refuses_code_that_moved_after_the_entry(script: Path, tmp_path: Path) -> None:
+    """A9: a source commit after the entry's `until` leaves memory unreconciled — check
+    names the atom whose sources moved."""
+    root, specs, base = _memory_repo(tmp_path, script)
+    until = _git(root, "rev-parse", "HEAD")
+    _hand_append(specs, since=base, until=until, reviewed=["alpha"], changed=[])
+    assert _run(script, "check", "--specs", str(specs), cwd=root).returncode == 0
+    (root / "dadaia_workspace" / "features" / "alpha" / "core.py").write_text("x = 3\n", "utf-8")
+    _git(root, "commit", "-qam", "code moved after the entry")
+
+    result = _run(script, "check", "--specs", str(specs), cwd=root)
+
+    assert result.returncode == 1
+    assert "'alpha'" in result.stdout and until[:12] in result.stdout

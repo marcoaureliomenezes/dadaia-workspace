@@ -43,11 +43,11 @@ def git(repo: Path, *argv: str) -> list[str]:
     return [line for line in done.stdout.splitlines() if line]
 
 
-def report(specs: Path, since: str) -> dict[str, Any]:
-    """The worklist for the window *since*..HEAD — the ONE decider both verbs call."""
+def report(specs: Path, since: str, until: str = "HEAD") -> dict[str, Any]:
+    """The worklist for the window *since*..*until* — the ONE decider every verb calls."""
     repo = specs.parent
     catalog = json.loads((specs / CATALOG).read_text(encoding="utf-8"))
-    changed = git(repo, "diff", "--name-only", f"{since}..HEAD")
+    changed = git(repo, "diff", "--name-only", f"{since}..{until}")
     return {"since": since, **worklist(catalog, changed, git(repo, "ls-files"))}
 
 

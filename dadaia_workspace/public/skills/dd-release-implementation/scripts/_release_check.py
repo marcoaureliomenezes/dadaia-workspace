@@ -116,18 +116,3 @@ def histo_findings(text: str) -> list[dict[str, Any]]:
                 finding(HISTO, number, f"{record['id']!r} ships twice (first at line {first})")
             )
     return findings
-
-
-def memory_refusals(
-    phase: str, worklist: dict[str, Any], reviewed: list[str], changed: list[str]
-) -> list[str]:
-    """Why this `kind: memory` entry is not a reconciliation record: the worklist must be
-    worked exactly — every entry reviewed or changed, nothing outside it named."""
-    if phase != "CLOSURE":
-        return [f"release is in phase {phase!r} — the memory reconciliation is CLOSURE work"]
-    named = set(reviewed) | set(changed)
-    listed = [str(atom["slug"]) for atom in worklist.get("atoms", [])]
-    listed += [str(unit) for unit in worklist.get("uncovered", [])]
-    errors = [f"worklist entry {e!r} is in neither --reviewed nor --changed"
-              for e in listed if e not in named]  # fmt: skip
-    return errors + [f"{e!r} is not in the window's worklist" for e in sorted(named - set(listed))]
