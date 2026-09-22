@@ -1,12 +1,7 @@
 """One derived skill-inventory oracle (v0.4.5 FR4, ``coupled-inventory-shared-oracle``).
 
-Before this module, three places each kept their OWN idea of "the set of skills":
-``tests/e2e/features/test_public_pipeline.py``'s hand-typed ``EXPECTED_SKILLS`` literal,
-a hand-kept single-skill path assertion in ``tests/integration/test_public_assets.py``,
-and ``tests/scripts/check_skill_orphans.py``'s own independent
-``{d.name for d in skills_dir.iterdir() if d.is_dir()}`` scan. Inside v0.4.4 alone that
-coupled-but-separately-maintained trio produced two bugs: a skill added/renamed/removed
-in the real tree and forgotten in one of the three copies.
+Skill inventories kept by hand drift from the tree: a skill added, renamed or removed
+is forgotten in one copy. Every consumer reads this one derived inventory instead.
 
 This module is the single, DERIVED source of that inventory: it reuses
 :func:`tests.helpers.public_asset_roster.scan` — itself a thin wrapper over

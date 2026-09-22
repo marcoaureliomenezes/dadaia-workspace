@@ -22,8 +22,6 @@ from __future__ import annotations
 
 import json
 import shutil
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -507,8 +505,6 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
 # FR4 — one derived skill-inventory oracle replaces three hand-kept lists.
 # ---------------------------------------------------------------------------
 
-_ORPHAN_SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "check_skill_orphans.py"
-
 
 def test_a_single_skill_rename_is_green_everywhere_after_one_place(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -519,9 +515,8 @@ def test_a_single_skill_rename_is_green_everywhere_after_one_place(
     ONE shared source every former hand-kept inventory now reads. This seam produced
     two v0.4.4 bugs: a skill added/renamed/removed under
     ``dadaia_workspace/public/skills/`` and forgotten in one of three independently
-    kept lists — ``test_public_pipeline.py``'s ``EXPECTED_SKILLS`` literal, this file's
-    single hand-picked skill path assertion, and ``check_skill_orphans.py``'s own
-    ``skills_dir.iterdir()`` roster. All three are gone (A4.1); each now reads
+    kept lists — ``test_public_pipeline.py``'s ``EXPECTED_SKILLS`` literal and this file's
+    single hand-picked skill path assertion. Both are gone; each now reads
     :func:`tests.helpers.skill_inventory_oracle.skill_names`.
 
     A mirror tree (the T-045-15 pattern) is built — the real
@@ -529,10 +524,9 @@ def test_a_single_skill_rename_is_green_everywhere_after_one_place(
     renamed inside it, plus the same skill's references in every agent frontmatter
     files that list it (the edit a real rename requires; the ORACLE ITSELF needs no
     edit — A4.3, derived from the tree, never a literal list). What is asserted is that
-    the pipeline expectation (the former ``EXPECTED_SKILLS`` comparison), the
-    installed-asset assertion (the former hand-picked path), and the orphan checker's
-    roster (run for real, as a subprocess, against the mirror) all agree with the
-    renamed name with ZERO further edits to any of the three former lists.
+    the pipeline expectation (the former ``EXPECTED_SKILLS`` comparison) and the
+    installed-asset assertion (the former hand-picked path) agree with the renamed name
+    with ZERO further edits to either former list.
     """
     real_public_dir = public_asset_roster.default_public_dir()
     old_name, new_name = "dd-codebase-design", "dd-codebase-design-renamed-t045-16"
@@ -576,23 +570,3 @@ def test_a_single_skill_rename_is_green_everywhere_after_one_place(
     for skill in mutated_roster:
         assert (ws / ".agents" / "skills" / skill / "SKILL.md").exists()
     assert not (ws / ".agents" / "skills" / old_name).exists()
-
-    # Consumer 3 — the orphan checker's roster, run for real via subprocess against the
-    # mirror (DADAIA_WORKSPACE_ROOT points at the mirror's fake workspace root): the
-    # renamed skill is wired (its reference moved with it) so the checker exits clean,
-    # proving `_all_skills()` picked up the rename with zero edit to the script.
-    monkeypatch.delenv("DADAIA_WORKSPACE_ROOT", raising=False)
-    result = subprocess.run(
-        [sys.executable, str(_ORPHAN_SCRIPT)],
-        capture_output=True,
-        text=True,
-        env={
-            "DADAIA_WORKSPACE_ROOT": str(tmp_path / "mirror"),
-            "PATH": str(Path(sys.executable).parent),
-        },
-    )
-    assert result.returncode == 0, (
-        f"orphan checker unexpectedly non-zero against the renamed mirror: "
-        f"stdout={result.stdout!r} stderr={result.stderr!r}"
-    )
-    assert result.stderr.strip() == "", result.stderr

@@ -33,7 +33,7 @@ Memory is current product truth: what the product is now, never how it got there
 - `MEMORY_PY` = `python3 .agents/skills/dd-spec-navigator/scripts/memory.py`; `RELEASE_PY` = `python3 .agents/skills/dd-release-implementation/scripts/release.py`.
 - `product/index.md` and `product/catalog.json` are generated together by `MEMORY_PY catalog generate`; an atom is added by writing its file, which `MEMORY_PY check` validates.
 - Frontmatter `memory-frontmatter-v1`: `slug`, `title`, `tldr`, `summary`, `tags` on every atom, `sources` on every product atom; a stray field is a hard error.
-- Body: curated headings only; `[[slug]]` wikilinks resolve by slug, never a path; no history heading, and no history line — a date or a release, candidate or task id anywhere, or a history phrase in a product atom, is `MEM-NARRATIVE-1`.
+- Body: curated headings only; `[[slug]]` wikilinks resolve by slug, never a path; no history heading, and no history line — a date or a release, candidate or task id anywhere, or a history phrase in a product atom, is a `LINT-1` history-line error.
 - The bootstrap hook injects `ARCHITECTURE.md`'s `## Tech Stack` section and the catalog digest.
 - Fix findings at the source atom; never hand-edit `catalog.json`, regenerate it.
 
