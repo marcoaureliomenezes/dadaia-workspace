@@ -35,6 +35,7 @@ from dadaia_workspace.features.specs.schemas import validator_for
 __all__ = [
     "RELEASE_TREE_PHASES",
     "ReleaseTreeIssue",
+    "release_memory_issues",
     "release_tree_issues",
     "validate_release_tree",
 ]
@@ -222,3 +223,61 @@ def release_tree_issues(specs_dir: Path) -> list[SpecsDoctorIssue]:
         )
         for issue in validate_release_tree(specs_dir)
     ]
+
+
+#: The three fields `release.py memory` stamps on its log entry. An entry carrying only
+#: `text` is the free prose this rule replaces: it names no window and dispositions no
+#: atom, so nothing can tell a closure that reconciled memory from one that wrote a
+#: sentence about it.
+_MEMORY_FIELDS: tuple[str, ...] = ("since", "reviewed", "changed")
+
+
+def release_memory_issues(specs_dir: Path) -> list[SpecsDoctorIssue]:
+    """RELEASE-TREE-MEMORY — a live release in CLOSURE names its memory reconciliation.
+
+    The LATEST `kind: memory` entry stamped after `implemented.ts` must carry
+    `since`/`reviewed`/`changed`; an entry predating the milestone reconciled a window the
+    candidate has since moved past. Reads the state document alone — no git, no
+    subprocess (P-02/P-03): whether the atoms really moved is the writing verb's refusal,
+    measured where a subprocess is legal.
+    """
+    issues: list[SpecsDoctorIssue] = []
+    for release_dir, archived in _release_dirs(specs_dir / "releases"):
+        state_path = release_state_file(release_dir)
+        if archived or state_path is None:
+            continue
+        try:
+            doc = json.loads(state_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue  # RELEASE-TREE-PARSE owns unreadable state
+        if not isinstance(doc, dict) or doc.get("phase") != "CLOSURE":
+            continue
+        rel = state_path.relative_to(specs_dir).as_posix()
+        message = _memory_message(doc)
+        if message is not None:
+            issues.append(SpecsDoctorIssue("RELEASE-TREE-MEMORY", Severity.ERROR, message, rel))
+    return issues
+
+
+def _memory_message(doc: dict[str, Any]) -> str | None:
+    """Why this CLOSURE release has no conformant reconciliation record, or ``None``."""
+    stamp = str((doc.get("implemented") or {}).get("ts") or "")
+    entries = [
+        entry
+        for entry in doc.get("log", [])
+        if isinstance(entry, dict)
+        and entry.get("kind") == "memory"
+        and str(entry.get("ts")) > stamp
+    ]
+    if not entries:
+        return (
+            f"release is in CLOSURE with no `kind: memory` log entry stamped after "
+            f"implemented.ts {stamp!r} — the closure reconciled no memory"
+        )
+    missing = [field for field in _MEMORY_FIELDS if field not in entries[-1]]
+    if missing:
+        return (
+            f"the latest `kind: memory` log entry lacks {', '.join(missing)} — a prose note "
+            "names no window and dispositions no atom"
+        )
+    return None

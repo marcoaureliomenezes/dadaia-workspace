@@ -24,7 +24,10 @@ from dadaia_workspace.core.kernel_tunables import (
 )
 from dadaia_workspace.features.specs import doctor_adr
 from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
-from dadaia_workspace.features.specs.release_tree import release_tree_issues
+from dadaia_workspace.features.specs.release_tree import (
+    release_memory_issues,
+    release_tree_issues,
+)
 
 if TYPE_CHECKING:
     from dadaia_workspace.features.specs.doctor import SpecsDoctor
@@ -274,6 +277,17 @@ RULES: tuple[SpecsRule, ...] = (
         ),
         lambda d: release_tree_issues(d.specs_dir),
         fix_help="sed -i 's|<invalid value>|<canonical value>|' specs/releases/<id>/_RELEASE.json",
+    ),
+    _rule(
+        ("RELEASE-TREE-MEMORY",),
+        lambda d: release_memory_issues(d.specs_dir),
+        fix_help=(
+            "python3 .agents/skills/dd-spec-navigator/scripts/memory.py drift "
+            "--since <implemented.sha> --json > .dadaia/tmp/drift.json && "
+            "python3 .agents/skills/dd-release-implementation/scripts/release.py memory "
+            "--since <implemented.sha> --worklist .dadaia/tmp/drift.json "
+            "--reviewed <slugs> --changed <slugs>"
+        ),
     ),
     _rule(
         ("SPEC-DOC-046",),
