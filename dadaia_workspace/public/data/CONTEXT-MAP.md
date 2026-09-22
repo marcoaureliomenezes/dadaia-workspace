@@ -79,7 +79,7 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 | `dd-manager-orchestration` | intake, dispatch and the closure pass | — | 6144 | 3661 |
 | `dd-release-definition` | picking the set and authoring the trio | `specs/releases/AGENTS.md` | 6144 | 4620 |
 | `dd-release-implementation` | the candidate arc from reservation to the gate | `specs/releases/AGENTS.md` | 6144 | 3351 |
-| `dd-spec-navigator` | the three-phase session grounding protocol | `specs/AGENTS.md` | 6144 | 5117 |
+| `dd-spec-navigator` | the three-phase session grounding protocol | `specs/AGENTS.md` | 6144 | 5115 |
 | `dd-test-stewardship` | test intent, admission, demotion, quarantine | — | 6144 | 4178 |
 
 ## 4. Personas — `.agents/agents/*.md`

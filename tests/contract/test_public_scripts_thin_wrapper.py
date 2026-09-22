@@ -190,6 +190,11 @@ def _imported_roots(path: Path) -> set[str]:
     return roots
 
 
+#: The ONE cross-skill import edge: the release skill reads the spec navigator's drift
+#: decider; the navigator imports nothing from the release skill.
+_CROSS_SKILL_EDGE = {"_memory_drift"}
+
+
 @pytest.mark.parametrize("script", _owner_scripts(), ids=lambda p: f"{p.parents[1].name}/{p.name}")
 def test_skill_owner_script_meets_the_contract(script: Path) -> None:
     """FR1: every skill script is a self-contained stdlib owner — ≤ 150 lines, no
@@ -197,7 +202,7 @@ def test_skill_owner_script_meets_the_contract(script: Path) -> None:
 
     The ceiling is per FILE: a script whose verb set outgrows it splits into `_`-prefixed
     sibling modules in the same folder, imported through the script's own directory on
-    `sys.path` (or a sibling skill's, projected beside it). A sibling is a module, not an entry point, so only the non-`_` scripts
+    `sys.path`. A sibling is a module, not an entry point, so only the non-`_` scripts
     answer `--help`; everything else applies to every file under `scripts/`.
     """
     loc = _line_count(script)
@@ -208,8 +213,8 @@ def test_skill_owner_script_meets_the_contract(script: Path) -> None:
         "belongs behind a narrower interface, not a raised ceiling."
     )
     siblings = {module.stem for module in script.parent.glob("*.py")}
-    # A `_` module of a sibling skill is projected beside this one (SPEC D6: one decider).
-    siblings |= {module.stem for module in script.parents[2].glob("*/scripts/_*.py")}
+    if script.parent.parent.name == "dd-release-implementation":
+        siblings |= _CROSS_SKILL_EDGE  # SPEC D6: the one drift decider, one way only
     foreign = _imported_roots(script) - set(sys.stdlib_module_names) - siblings
     assert foreign == set(), (
         f"{script.name} imports non-stdlib module(s) {sorted(foreign)} — a skill script "

@@ -43,14 +43,11 @@ def _git(cwd: Path, *argv: str) -> str:
 
 @pytest.fixture
 def script(tmp_path: Path) -> Path:
-    """memory.py staged with the release skill projected beside it, as install lays out."""
-    skills = tmp_path / "skills"
-    staged = skills / "dd-spec-navigator" / "scripts"
+    """memory.py staged alone: the navigator imports nothing from any other skill."""
+    staged = tmp_path / "skills" / "dd-spec-navigator" / "scripts"
     staged.mkdir(parents=True)
     for module in sorted(_SCRIPTS.glob("*.py")):
         shutil.copy2(module, staged / module.name)
-    shutil.copytree(_SCRIPTS.parents[1] / "dd-release-implementation" / "scripts",
-                    skills / "dd-release-implementation" / "scripts")  # fmt: skip
     return staged / "memory.py"
 
 
@@ -174,43 +171,9 @@ def test_an_atom_without_sources_covers_nothing(script: Path, repo: Path) -> Non
     assert "dadaia_workspace/features/alpha" in report["uncovered"]
 
 
-def test_no_milestone_refuses_with_a_fix_naming_since(script: Path, repo: Path) -> None:
-    """R5: a tree with no `implemented`/`defined` sha never defaults to the root commit and
-    reports the whole tree — it refuses and names the flag that unblocks it."""
-    releases = repo / "specs" / "releases" / "9.9.9"
-    releases.mkdir(parents=True)
-    (releases / "_RELEASE.json").write_text(
-        json.dumps({"schema": "release-state-v1", "release": "9.9.9", "phase": "DEFINITION"}),
-        "utf-8",
-    )
-
+def test_drift_requires_since_and_resolves_no_window_itself(script: Path, repo: Path) -> None:
+    """The window resolver is the release skill's alone: the human tool is told its start."""
     result = _run(script, repo)
 
-    assert result.returncode == 1
-    assert result.stdout == ""
-    assert "fix: " in result.stderr
-    assert "phase IMPLEMENTATION" in result.stderr
-
-
-def _live(repo: Path, **state: object) -> None:
-    releases = repo / "specs" / "releases" / "9.9.9"
-    releases.mkdir(parents=True)
-    document = {"schema": "release-state-v1", "release": "9.9.9", "phase": "CLOSURE", **state}
-    (releases / "_RELEASE.json").write_text(json.dumps(document), "utf-8")
-
-
-def test_since_defaults_to_the_live_release_defined_sha(script: Path, repo: Path) -> None:
-    """L1: the same rule `release.py memory` derives — no memory entry yet, defined.sha."""
-    base = _git(repo, "rev-parse", "HEAD")
-    _live(repo, defined={"sha": base, "ts": "2026-01-01T00:00:00Z"},
-          implemented={"sha": "deadbee", "ts": "2026-01-02T00:00:00Z"}, log=[])  # fmt: skip
-
-    assert json.loads(_run(script, repo, "--json").stdout)["since"] == base
-
-
-def test_since_defaults_to_the_last_memory_entry_until(script: Path, repo: Path) -> None:
-    base = _git(repo, "rev-parse", "HEAD")
-    entry = {"kind": "memory", "since": "deadbee", "until": base}
-    _live(repo, defined={"sha": "deadbee", "ts": "2026-01-01T00:00:00Z"}, log=[entry])
-
-    assert json.loads(_run(script, repo, "--json").stdout)["since"] == base
+    assert result.returncode == 2
+    assert "--since" in result.stderr
