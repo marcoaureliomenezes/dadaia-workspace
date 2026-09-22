@@ -43,25 +43,8 @@ PLAN_MAX_LINES = 300
 
 # Release-id canon cutoff: a live release whose SPEC.md Created: is on/after this date
 # must carry a canon-conformant directory name (SPEC-DOC-027). Vintage releases are
-# excluded — this grandfathers the frozen pre-cutoff _archive sub-patch releases.
+# excluded — this grandfathers the frozen pre-cutoff archived releases.
 RELEASE_SEMVER_CUTOFF = date(2026, 6, 1)  # WARNING starts here
-
-# SPEC-DOC-027: permanent allowlist of legacy ``_archive`` release-dir names that
-# predate the SemVer naming canon. FROZEN HISTORY — renaming an archived dir breaks
-# historical pointers. Silent only inside _archive/releases/; any name NOT here WARNs.
-RELEASE_NAMING_LEGACY_ALLOWLIST: frozenset[str] = frozenset(
-    {
-        "ctx-inject-v2-drift-fix-v1",
-        "memory-markdown-source-v1",
-        "v0.1.4.1",
-        "v0.1.4.2",
-        "v0.1.4.3",
-        "v0.1.4.3-report-retention",
-        "v0.1.4.4",
-        "v0.1.4.5",
-        "v0.1.4.6",
-    }
-)
 
 # SPEC-DOC-024: phase ↔ markers coherence.
 _TASK_MARKER_RE = re.compile(r"^\s*[-*]?\s*\[([ \-xX])\]", re.MULTILINE)
@@ -492,38 +475,26 @@ class ReleaseValidator:
 
     def check_unique_release_ids(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-026: release ids (dir basenames) must be unique across
-        ``releases/`` ∪ ``_archive/releases/`` (recursive).
-
-        A collision among two real (non-legacy) dirs is an ERROR. A collision that
-        involves a documented-legacy nested dir (``v0.2.0/v0.1.9`` milestone layout)
-        is a WARNING — these are slated for rename in T-010-15 and must not break
-        doctor exit-0 in the meantime.
+        ``releases/`` ∪ ``releases/_archive/`` (recursive). A collision is an ERROR.
         """
         issues: list[SpecsDoctorIssue] = []
-        by_name: dict[str, list[tuple[Path, bool]]] = {}
-        for d, _root, is_legacy in iter_all_release_dirs(self.specs_dir):
-            by_name.setdefault(d.name, []).append((d, is_legacy))
+        by_name: dict[str, list[Path]] = {}
+        for d, _root in iter_all_release_dirs(self.specs_dir):
+            by_name.setdefault(d.name, []).append(d)
 
         for name, entries in sorted(by_name.items()):
             if len(entries) < 2:
                 continue
-            any_legacy = any(is_legacy for _d, is_legacy in entries)
-            severity = Severity.WARNING if any_legacy else Severity.ERROR
-            paths = ", ".join(d.relative_to(self.specs_dir).as_posix() for d, _ in sorted(entries))
-            note = (
-                " (documented-legacy nested dir — slated for rename in T-010-15)"
-                if any_legacy
-                else ""
-            )
+            paths = ", ".join(d.relative_to(self.specs_dir).as_posix() for d in sorted(entries))
             issues.append(
                 SpecsDoctorIssue(
                     code="SPEC-DOC-026",
-                    severity=severity,
+                    severity=Severity.ERROR,
                     description=(
                         f"Release id '{name}' is not unique across releases/ + "
-                        f"_archive/releases/: {paths}{note}."
+                        f"releases/_archive/: {paths}."
                     ),
-                    path=str(self.specs_dir / "_archive" / "releases"),
+                    path=str(self.specs_dir / "releases"),
                 )
             )
         return issues
@@ -539,23 +510,14 @@ class ReleaseValidator:
           is an ERROR — a release born after the canon must be SemVer-clean.
         - Every other non-conforming dir (archive, pre-cutoff ``Created:``, or an
           undeterminable date) is a WARNING — legacy names predate the canon and are
-          preserved until renamed.
-
-        ADR-9 (v0.1.11): archived dirs whose name is in the permanent documented
-        ``RELEASE_NAMING_LEGACY_ALLOWLIST`` are silenced entirely — they are frozen
-        history that is never renamed. The allowlist is name-exact and ``_archive``-only,
-        so any unrecognised legacy dir still WARNs and forward enforcement holds.
+          preserved until renamed. The frozen ids themselves live in
+          ``releases/_archive/releases_histo.jsonl``, never as a name allowlist here.
         """
         issues: list[SpecsDoctorIssue] = []
-        for d, root, _is_legacy in iter_all_release_dirs(self.specs_dir):
+        for d, root in iter_all_release_dirs(self.specs_dir):
             if RELEASE_SEMVER_RE.match(d.name):
                 continue
             is_live = root == self.specs_dir / "releases"
-            # ADR-9: archived dirs on the permanent legacy allowlist are silent (frozen
-            # history, never renamed). The allowlist applies ONLY to _archive/ — a
-            # non-canon dir in the live releases/ tree is never silenced this way.
-            if not is_live and d.name in RELEASE_NAMING_LEGACY_ALLOWLIST:
-                continue
             spec_path = d / "SPEC.md"
             created = _extract_created_date(spec_path) if spec_path.exists() else None
             born_after_canon = created is not None and created >= RELEASE_SEMVER_CUTOFF

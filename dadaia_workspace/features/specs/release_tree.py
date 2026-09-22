@@ -12,11 +12,9 @@ doctor printed zero errors (bug
 :func:`validate_release_tree` is that missing reader: ONE walk over every release
 directory, ONE list of issues, no I/O beyond reading each state document. Its callers
 are the doctor's release rule and the contract test over this repo's own tree —
-``doctor_common.iter_all_release_dirs`` is not one of them: it enumerates the
-pre-0.5.0 ``specs/_archive/releases/`` layout and classifies a directory by the
-presence of a SPEC/PLAN/TASKS artifact, while this validator must walk the current
-``releases/_archive/<id>/`` layout and treat a release directory with NO state
-document as an issue rather than as "not a release".
+``doctor_common.iter_all_release_dirs`` is not one of them: it classifies a directory
+by the presence of a SPEC/PLAN/TASKS artifact, while this validator treats a release
+directory with NO state document as an issue rather than as "not a release".
 """
 
 from __future__ import annotations

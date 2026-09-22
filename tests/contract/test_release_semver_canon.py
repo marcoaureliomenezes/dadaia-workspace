@@ -186,11 +186,8 @@ def test_release_semver_single_canon_identity_scan_and_behavior() -> None:
 
 def test_v_prefixed_archived_dir_still_resolves(tmp_path: Path) -> None:
     """A1.10, archive half: an existing `v`-prefixed archived directory still resolves
-    as conformant (`specs doctor`'s SPEC-DOC-027 naming check —
-    SPEC-DOC-016 no longer scans root specs/_archive/releases/ at all, v6 canon:
-    that root retired, T-050-14 deleted its last content, so this fixture's
-    SPEC-DOC-016 exemption is now moot by construction rather than by allowlist;
-    SPEC-DOC-027's own allowlist is the check still meaningfully exercised here)."""
+    as conformant (`specs doctor`'s SPEC-DOC-027 naming check over the canonical
+    ``releases/_archive/`` root)."""
     from dadaia_workspace.features.specs import Severity, SpecsDoctor
 
     specs = tmp_path / "specs"
@@ -200,7 +197,7 @@ def test_v_prefixed_archived_dir_still_resolves(tmp_path: Path) -> None:
     # `tests/unit/skills/test_release_implementation_release_script.py`.
     # An EXISTING v-prefixed archived directory (the
     # retired axis, pre-canon-v6) is still recognised as conformant, never flagged.
-    archived = specs / "_archive" / "releases" / "v0.4.4"
+    archived = specs / "releases" / "_archive" / "v0.4.4"
     archived.mkdir(parents=True)
     (archived / "SPEC.md").write_text(
         "**Status:** Approved\n**Created:** 2026-08-01\n", encoding="utf-8"

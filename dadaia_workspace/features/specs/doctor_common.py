@@ -161,12 +161,11 @@ def is_release_dir(d: Path) -> bool:
 
 
 def iter_archive_release_dirs(arch: Path) -> list[Path]:
-    """All release dirs under ``_archive/releases/`` (recursive).
+    """All release dirs under ``releases/_archive/`` (recursive).
 
-    Recurses so nested legacy milestone layouts (``v0.2.0/v0.1.9``) are
-    discovered. A dir qualifies only when it carries an SDD release artifact;
-    plain segment containers without artifacts are skipped (their artifact-bearing
-    children are still found by the recursion).
+    A dir qualifies only when it carries an SDD release artifact; segment containers
+    (``rc-N``) are skipped by :func:`is_release_dir` while any artifact-bearing child
+    is still found by the recursion.
     """
     out: list[Path] = []
     for d in sorted(p for p in arch.rglob("*") if p.is_dir()):
@@ -175,38 +174,21 @@ def iter_archive_release_dirs(arch: Path) -> list[Path]:
     return out
 
 
-def is_legacy_nested_release(d: Path, releases_root: Path) -> bool:
-    """True when ``d`` is a release dir nested *below* the top level of a
-    releases root — i.e. its parent is itself a release dir, not the root.
+def iter_all_release_dirs(specs_dir: Path) -> list[tuple[Path, Path]]:
+    """Enumerate every release dir across ``releases/`` and ``releases/_archive/``.
 
-    These are the documented-legacy milestone dirs (audit §4 collision:
-    ``_archive/releases/v0.2.0/v0.1.{6..9}``). Per T-010-14 they earn a WARNING,
-    never an ERROR, until T-010-15 renames them.
+    Returns a list of ``(dir, releases_root)`` pairs. The live ``releases/`` root is
+    enumerated at its top level only (a release in progress has no nested release
+    dirs); the archive root is enumerated recursively.
     """
-    try:
-        d.relative_to(releases_root)
-    except ValueError:
-        return False
-    parent = d.parent
-    return parent != releases_root and is_release_dir(parent)
-
-
-def iter_all_release_dirs(specs_dir: Path) -> list[tuple[Path, Path, bool]]:
-    """Enumerate every release dir across ``releases/`` and ``_archive/releases/``.
-
-    Returns a list of ``(dir, releases_root, is_legacy_nested)`` triples. The
-    active ``releases/`` root is enumerated at its top level only (a release in
-    progress has no nested release dirs); the archive root is enumerated
-    recursively to surface the nested-collision legacy layout.
-    """
-    out: list[tuple[Path, Path, bool]] = []
+    out: list[tuple[Path, Path]] = []
     live_root = specs_dir / "releases"
+    arch_root = live_root / "_archive"
     if live_root.is_dir():
         for d in sorted(p for p in live_root.iterdir() if p.is_dir()):
             if is_release_dir(d):
-                out.append((d, live_root, False))
-    arch_root = specs_dir / "_archive" / "releases"
+                out.append((d, live_root))
     if arch_root.is_dir():
         for d in iter_archive_release_dirs(arch_root):
-            out.append((d, arch_root, is_legacy_nested_release(d, arch_root)))
+            out.append((d, arch_root))
     return out

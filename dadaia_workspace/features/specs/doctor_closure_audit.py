@@ -127,7 +127,7 @@ class ClosureAuditValidator:
         for name in ("SPEC.md", "PLAN.md", "TASKS.md"):
             for p in self.specs_dir.rglob(name):
                 rel = p.relative_to(self.specs_dir).as_posix()
-                if rel.startswith(("releases/", "_archive/")):
+                if rel.startswith("releases/"):
                     continue
                 # Top-level SPEC.md/PLAN.md/TASKS.md are legacy roots
                 # features/<x>/SPEC.md is legacy too
@@ -136,7 +136,7 @@ class ClosureAuditValidator:
                         code="SPEC-DOC-007",
                         severity=Severity.WARNING,
                         description=(
-                            f"Legacy {name} outside releases/ or _archive/releases/: {rel}. "
+                            f"Legacy {name} outside releases/ or releases/_archive/: {rel}. "
                             "Migrate to a release or archive as a legacy-feature."
                         ),
                         path=str(p),
