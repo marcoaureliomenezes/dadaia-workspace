@@ -1,6 +1,7 @@
 """Intent: CONTRACT — dd-spec-navigator/scripts/memory.py owns specs/memory/product/
-{index.md,catalog.json} and the atoms' five-field frontmatter (0.4.7 c7 T-047-67: the
-memory catalog renderer moves into a stdlib skill script). Size: SMALL.
+{index.md,catalog.json} and NOTHING else: the atoms' frontmatter is the library lint's
+fact (T-047-94, SPEC D5 — one validator per fact), so `check` compares the generated
+pair against the atoms and there is no atom generator. Size: SMALL.
 
 The byte-reproduction case is the anti-drift one: the script regenerates THIS repo's
 committed catalog.json and index.md byte for byte from the committed atoms, so a
@@ -22,18 +23,15 @@ pytestmark = pytest.mark.unit
 _REPO = Path(__file__).resolve().parents[3]
 _PUBLIC = _REPO / "dadaia_workspace" / "public"
 _SCRIPTS = _PUBLIC / "skills" / "dd-spec-navigator" / "scripts"
-_SCHEMAS = (_PUBLIC / "schemas" / "memory" / "memory-frontmatter-v1.schema.json",)
 
 
 @pytest.fixture
 def script(tmp_path: Path) -> Path:
-    """The staged shape: memory.py with its schema copy beside it."""
+    """The staged shape: the sibling modules copied beside memory.py."""
     staged = tmp_path / "staged" / "scripts"
-    (staged / "schemas").mkdir(parents=True)
+    staged.mkdir(parents=True)
     for module in sorted(_SCRIPTS.glob("*.py")):
         shutil.copy2(module, staged / module.name)
-    for schema in _SCHEMAS:
-        shutil.copy2(schema, staged / "schemas" / schema.name)
     return staged / "memory.py"
 
 
@@ -106,29 +104,22 @@ def test_catalog_generate_preserves_non_catalog_sections_verbatim(
     assert index.read_text(encoding="utf-8").endswith("## Operator notes\n\nkept verbatim.\n")
 
 
-def test_product_add_writes_an_atom_that_check_accepts(script: Path, specs: Path) -> None:
+def test_product_add_is_not_a_verb(script: Path, specs: Path) -> None:
+    """The atom generator is the stacking mechanism the SPEC measured: writing an atom is
+    the reconciliation's own act, and the library lint validates it."""
     result = _run(
         script, "product", "add", "platform", "widget-forge",
-        "--title", "widget-forge", "--tldr", "Forges widgets from the one registry.",
-        "--summary", "The widget forge reads the registry and emits one widget per row.",
-        "--tags", "platform,widgets", "--specs", str(specs),
+        "--title", "widget-forge", "--tldr", "t", "--summary", "s", "--specs", str(specs),
     )  # fmt: skip
 
-    assert result.returncode == 0, result.stderr
-    atom = specs / "memory" / "product" / "platform" / "widget-forge.md"
-    assert atom.is_file()
-    assert _run(script, "catalog", "generate", "--specs", str(specs)).returncode == 0
-    assert _run(script, "check", "--specs", str(specs)).returncode == 0
-    slugs = [
-        feature["slug"]
-        for feature in json.loads(
-            (specs / "memory" / "product" / "catalog.json").read_text("utf-8")
-        )["features"]
-    ]
-    assert "widget-forge" in slugs
+    assert result.returncode != 0
+    assert "invalid choice: 'product'" in result.stderr
+    assert not (specs / "memory" / "product" / "platform" / "widget-forge.md").exists()
 
 
-def test_check_flags_a_tldr_over_the_schema_ceiling(script: Path, specs: Path) -> None:
+def test_check_ignores_frontmatter_the_library_lint_owns(script: Path, specs: Path) -> None:
+    """A tldr over the schema ceiling is LINT-1's finding, not this script's: `check`
+    reports only the generated pair, so the two deciders cannot disagree."""
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
     atom = next((specs / "memory" / "product").glob("*/*.md"))
@@ -137,11 +128,11 @@ def test_check_flags_a_tldr_over_the_schema_ceiling(script: Path, specs: Path) -
         "".join(f"tldr: {'x' * 161}\n" if line.startswith("tldr: ") else line for line in lines),
         encoding="utf-8",
     )
-    broken = _run(script, "check", "--specs", str(specs))
+    over_ceiling = _run(script, "check", "--specs", str(specs))
 
-    assert broken.returncode == 1
-    assert "LEDGER-MEMORY-SCHEMA" in broken.stdout
-    assert "tldr" in broken.stdout
+    assert over_ceiling.returncode == 1, "the tldr edit drifted the catalog, which check owns"
+    assert "catalog.json" in over_ceiling.stdout
+    assert "tldr" not in over_ceiling.stdout
 
 
 def test_check_flags_a_catalog_that_drifted_from_the_atoms(script: Path, specs: Path) -> None:
@@ -154,3 +145,18 @@ def test_check_flags_a_catalog_that_drifted_from_the_atoms(script: Path, specs: 
 
     assert result.returncode == 1
     assert "catalog.json" in result.stdout
+
+
+def test_check_flags_an_index_that_drifted_from_the_atoms(script: Path, specs: Path) -> None:
+    """Both halves of the generated pair are checked — index.md is not the catalog's
+    shadow, it is the second file `catalog generate` writes in the same act."""
+    index = specs / "memory" / "product" / "index.md"
+    index.write_text(
+        index.read_text(encoding="utf-8").replace("| `agent-comms` |", "| `agent-coms` |", 1),
+        encoding="utf-8",
+    )
+
+    result = _run(script, "check", "--specs", str(specs))
+
+    assert result.returncode == 1
+    assert "index.md" in result.stdout

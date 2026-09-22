@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
-"""The memory atom's frontmatter schema, its stdlib reader, and the JSON-Schema subset
-the block is validated with — `memory.py`'s one validation primitive.
+"""The memory atom's frontmatter reader and the generated pair's path constants.
 
-The schema is ``schemas/memory-frontmatter-v1.schema.json`` beside this file, a copy
-`public stage` makes. The block is exactly five scalar/list keys (`slug title tldr
-summary tags`), read without a YAML dependency — a key it cannot read is a finding.
+The block is read without a YAML dependency, for the catalog writer alone: VALIDATING it
+is the library lint's fact (`features/specs/memory_lint.py`, the doctor's LINT-1), and a
+second validator here was a second decider of the same fact.
 """
 
 from __future__ import annotations
 
-import json
 import re
 import sys
-from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -23,25 +20,6 @@ INDEX = "memory/product/index.md"
 _DELIMITER = "---"
 _KEY_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):\s?(.*)$")
 WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
-_JSON_TYPES: dict[str, Any] = {
-    "string": str, "object": dict, "array": list, "boolean": bool,
-    "null": type(None), "integer": int, "number": (int, float),
-}  # fmt: skip
-
-
-_SCHEMAS = Path(__file__).resolve().parent / "schemas"
-#: Source-tree fallback: before `public stage` copies a schema in beside the script.
-_SHIPPED = Path(__file__).resolve().parents[3] / "schemas"
-
-
-def _schema_file() -> Path:
-    own = _SCHEMAS / "memory-frontmatter-v1.schema.json"
-    return own if own.is_file() else next(_SHIPPED.rglob(own.name), own)
-
-
-def load_schema() -> dict[str, Any]:
-    schema: dict[str, Any] = json.loads(_schema_file().read_text("utf-8"))
-    return schema
 
 
 def find_specs(start: Path) -> Path:
@@ -98,46 +76,3 @@ def parse(text: str) -> tuple[dict[str, Any] | None, str, str | None]:
         key = match.group(1)
         data[key] = _scalar(match.group(2)) if match.group(2).strip() else []
     return data, "\n".join(lines[end + 1 :]), None
-
-
-def _scalar_errors(where: str, value: object, spec: dict[str, Any]) -> Iterator[str]:
-    if not isinstance(value, str):
-        return
-    pattern = spec.get("pattern")
-    if pattern is not None and re.search(pattern, value) is None:
-        yield f"{where} value does not match {pattern}"
-    minimum = spec.get("minLength")
-    if minimum is not None and len(value) < minimum:
-        yield f"{where} is shorter than its minLength of {minimum}"
-    maximum = spec.get("maxLength")
-    if maximum is not None and len(value) > maximum:
-        yield f"{where} is {len(value)} characters, over its maxLength of {maximum}"
-
-
-def validate(value: object, spec: dict[str, Any], where: str) -> Iterator[str]:
-    """The JSON-Schema subset this frontmatter uses: type, pattern, minLength,
-    maxLength, uniqueItems, required, ``additionalProperties: false``, items."""
-    declared = spec.get("type")
-    allowed = declared if isinstance(declared, list) else [declared] if declared else []
-    if allowed and not any(isinstance(value, _JSON_TYPES[name]) for name in allowed):
-        yield f"{where} must be of type {declared}"
-        return
-    yield from _scalar_errors(where, value, spec)
-    if isinstance(value, list):
-        if spec.get("uniqueItems") and len(set(map(str, value))) != len(value):
-            yield f"{where} carries a duplicate item"
-        for index, item in enumerate(value):
-            if "items" in spec:
-                yield from validate(item, spec["items"], f"{where}[{index}]")
-    if not isinstance(value, dict):
-        return
-    properties: dict[str, Any] = spec.get("properties", {})
-    for name in spec.get("required", ()):
-        if name not in value:
-            yield f"{where} is missing required field {name!r}"
-    if spec.get("additionalProperties") is False:
-        for name in sorted(set(value) - set(properties)):
-            yield f"{where} carries field {name!r}, which the schema does not allow"
-    for name, child in value.items():
-        if name in properties:
-            yield from validate(child, properties[name], f"{where}.{name}")

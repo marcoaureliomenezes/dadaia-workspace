@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""The memory catalog's ONE writer and validator — `specs/memory/product/index.md`,
-`catalog.json` and the atoms they are generated from, stdlib only.
+"""The memory catalog's ONE writer — `specs/memory/product/{catalog.json,index.md}` and
+the atoms they are generated from, stdlib only.
 
 ``memory.py <verb> --specs <path>``. `catalog generate` rewrites both generated files
-from the atoms' frontmatter in one act, so the pair cannot drift apart; `product add`
-writes one complete atom; `check` validates every atom's five-field frontmatter and
-then that the two generated files say what the atoms say.
+from the atoms' frontmatter in one act, so the pair cannot drift apart; `check` reports
+where the pair stopped saying what the atoms say. Writing an atom is the closure
+reconciliation's own act and validating one is the library lint's fact: this script does
+neither.
 """
 
 from __future__ import annotations
@@ -20,9 +21,7 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import _memory_add as add  # noqa: E402
 import _memory_catalog as cat  # noqa: E402
-import _memory_index as idx  # noqa: E402
 from _memory_check import check  # noqa: E402
 from _memory_schema import CATALOG, INDEX, find_specs  # noqa: E402
 
@@ -34,18 +33,9 @@ def _parser() -> argparse.ArgumentParser:
         dest="noun", required=True
     )
     generate = catalog.add_parser("generate", help="rewrite catalog.json and index.md")
-    product = sub.add_parser("product", help="the product memory atoms").add_subparsers(
-        dest="noun", required=True
-    )
-    new = product.add_parser("add", help="write one new atom under its area")
-    new.add_argument("area", help="the canon area directory under memory/product/")
-    new.add_argument("slug", help="the atom slug, which is also its filename stem")
-    for option in ("--title", "--tldr", "--summary"):
-        new.add_argument(option, required=True)
-    new.add_argument("--tags", help="comma-separated tags (default: the area)")
-    validate = sub.add_parser("check", help="validate the atoms and the generated pair")
+    validate = sub.add_parser("check", help="validate the generated pair against the atoms")
     validate.add_argument("--json", action="store_true", help="emit findings as JSON")
-    for command in (generate, new, validate):
+    for command in (generate, validate):
         command.add_argument("--specs", type=Path, default=None, help="path to the specs/ tree")
     return parser
 
@@ -54,7 +44,7 @@ def _generate(specs: Path) -> str:
     """Rewrite BOTH generated files from the atoms — one act, no half-refresh."""
     catalog = cat.generate(specs)
     (specs / CATALOG).write_text(cat.serialize(catalog), encoding="utf-8")
-    (specs / INDEX).write_text(idx.render(specs, catalog), encoding="utf-8")
+    (specs / INDEX).write_text(cat.render(specs, catalog), encoding="utf-8")
     count = len(catalog["features"])
     return f"[ok] {CATALOG} and {INDEX} written ({count} feature{'s' if count != 1 else ''})"
 
@@ -74,11 +64,7 @@ def main(argv: list[str] | None = None) -> int:
                       f"{finding['message']}")  # fmt: skip
         return 1 if findings else 0
     try:
-        if args.verb == "catalog":
-            print(_generate(specs))
-        else:
-            values = {name: getattr(args, name) for name in ("title", "tldr", "summary", "tags")}
-            print(add.add(specs, args.area, args.slug, values))
+        print(_generate(specs))
     except cat.Refusal as refusal:
         print(f"[error] {refusal}", file=sys.stderr)
         print(f"fix: {refusal.fix}", file=sys.stderr)

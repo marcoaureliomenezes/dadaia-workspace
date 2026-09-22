@@ -462,13 +462,6 @@
     "link_to": null
   },
   {
-    "label": "agents:skills/dd-spec-navigator/scripts/_memory_add.py",
-    "harness": "agents",
-    "dst": "ws:.agents/skills/dd-spec-navigator/scripts/_memory_add.py",
-    "compare": "bytes",
-    "link_to": null
-  },
-  {
     "label": "agents:skills/dd-spec-navigator/scripts/_memory_catalog.py",
     "harness": "agents",
     "dst": "ws:.agents/skills/dd-spec-navigator/scripts/_memory_catalog.py",
@@ -479,13 +472,6 @@
     "label": "agents:skills/dd-spec-navigator/scripts/_memory_check.py",
     "harness": "agents",
     "dst": "ws:.agents/skills/dd-spec-navigator/scripts/_memory_check.py",
-    "compare": "bytes",
-    "link_to": null
-  },
-  {
-    "label": "agents:skills/dd-spec-navigator/scripts/_memory_index.py",
-    "harness": "agents",
-    "dst": "ws:.agents/skills/dd-spec-navigator/scripts/_memory_index.py",
     "compare": "bytes",
     "link_to": null
   },
