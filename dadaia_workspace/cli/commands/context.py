@@ -520,11 +520,8 @@ def bind(
 
     Run: dadaia context bind <name> [--print-env]
 
-    ONE verb, one argument (0.4.7 FR4). `--mode` is gone with the gate's READ block and
-    its phase rule; `--release` is gone because the release is a fact of `_RELEASE.json`,
-    never of a session record — requiring it here is what made
-    `context-bind-implementation-requires-release-id-stall-when-none-live` a Stall.
-    `--force` was a documented no-op and `--reason` was never read.
+    The bind sets this session's write scope to the context's main repo plus its
+    associated repos.
     """
     workspace_root = resolve_workspace_root()
     sessions_dir = _sessions_dir(workspace_root)

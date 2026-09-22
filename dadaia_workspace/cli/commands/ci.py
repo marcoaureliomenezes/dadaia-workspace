@@ -70,9 +70,10 @@ def preflight(
         True, "--fail-fast/--no-fail-fast", help="Stop at the first failing check."
     ),
 ) -> None:
-    """Run ruff + mypy --strict + pytest locally; exit non-zero if any fail.
+    """Run the five local CI checks; exit non-zero if any fail.
 
-    This is the gate the pre-push hook calls. Locally-solvable failures must
+    The checks, in order: ruff format --check, ruff check, mypy --strict,
+    lint-imports, pytest. Run it before pushing — locally-solvable failures must
     never reach a push.
     """
     root = _repo_root()

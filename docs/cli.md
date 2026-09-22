@@ -8,7 +8,7 @@
 
 ## dadaia ci — Local CI-equivalent preflight gate + git-hook chokepoints.
 - ci install-hook — Install the pre-push CI/security gate.
-- ci preflight — Run ruff + mypy --strict + pytest locally; exit non-zero if any fail.
+- ci preflight — Run the five local CI checks; exit non-zero if any fail.
 - ci push-gate-check — Pre-push gate: branch-name validation + the range-scoped denylist scan.
 
 ## dadaia context — Manage Spec Context Projects.
