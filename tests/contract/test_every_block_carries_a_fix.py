@@ -17,10 +17,11 @@ size: SMALL.
 from __future__ import annotations
 
 import re
+import shlex
 import sys
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import pytest
@@ -286,7 +287,13 @@ def test_every_doctor_rule_renders_a_runnable_fix(
     assert_block_carries_a_runnable_fix(doctor_rules.render_finding(finding))
 
 
-# ── every dadaia fix line names a verb the CLI tree really has ──────────────────
+# ── the live CLI tree, shared by the one fix-line rule below ───────────────────
+#
+# `test_every_doctor_fix_names_a_verb_the_cli_has` DELETED (0.4.7 c8 review F7). It
+# walked the command tree for every fix line opening with the dadaia binary and SKIPPED
+# every other shape — the same assertion `test_every_fix_target_resolves_on_disk` makes
+# over a superset of the same lines (the doctor rules plus the ledger scripts). Two
+# tests, one assertion, and a skip lane that grew as fix shapes did.
 
 
 def _cli_tree_has(tokens: list[str]) -> bool:
@@ -309,37 +316,10 @@ def _cli_tree_has(tokens: list[str]) -> bool:
     return not (hasattr(cmd, "list_commands") and cmd.list_commands(ctx))
 
 
-@pytest.mark.parametrize(
-    ("codes", "rule"), _DOCTOR_RULES, ids=[codes for codes, _ in _DOCTOR_RULES]
-)
-def test_every_doctor_fix_names_a_verb_the_cli_has(
-    codes: str, rule: doctor_rules.Rule[Any, Any]
-) -> None:
-    """A ``fix:`` that invokes the dadaia binary must name a verb the CLI tree has.
-
-    Bug ``backlog-doctor-fix-names-missing-update-verb``: BL-SCHEMA, BL-CONFLICT and
-    BL-STALE handed back ``dadaia backlog update``, a verb that no longer exists — the
-    finding's only fix was not executable. A fix line is a free string; nothing tied it
-    to the command tree, so a deleted verb could survive in a fix line forever. This
-    test walks every ``fix_help`` that starts with the dadaia binary through the live
-    command tree and fails on the first verb it cannot find.
-    """
-    from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
-
-    if rule.fix_help is None or not rule.fix_help.startswith(DADAIA_BIN):
-        pytest.skip(f"{codes}: fix line is not a dadaia invocation")
-    tokens = rule.fix_help.split()[1:]
-    assert _cli_tree_has(tokens), (
-        f"{codes}: fix line names a verb the CLI does not have: {rule.fix_help!r}"
-    )
-
-
-# ── every fix target resolves on disk ───────────────────────────────────────────
-
-#: Where a script-form fix line must resolve: the library's own skills tree. A fix may
 #: name the INSTALLED path (`.agents/skills/…`, what the operator pastes); the file it
 #: names is the one this repo ships.
-_PUBLIC_SKILLS = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public" / "skills"
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_PUBLIC_SKILLS = _REPO_ROOT / "dadaia_workspace" / "public" / "skills"
 _INSTALLED_PREFIX = ".agents/skills/"
 
 
@@ -366,53 +346,123 @@ def _fix_lines() -> list[tuple[str, str]]:
 
 _FIX_LINES = _fix_lines()
 
-#: The fix lines that are a shell command over a named file, not a `dadaia` verb and not
-#: a skill script: the finding is a hand edit the operator makes with the tool already on
-#: the line. Their head token is proven executable by `_assert_one_command`; what cannot
-#: be resolved here is a `sed`/`printf` placeholder, so each is listed ONCE with the tool
-#: it hands over. A NEW unresolvable fix line fails instead of quietly skipping.
-_SHELL_FIX_CODES: dict[str, str] = {
-    "SPEC-DOC-001": "printf — append the missing constitution section",
-    "SPEC-DOC-002/SPEC-DOC-002L/SPEC-DOC-008": "printf — append the missing memory title",
-    "SPEC-DOC-003/SPEC-DOC-009": "git rm — delete the retired document",
-    "SPEC-DOC-004": "sed — rewrite the document's Status line",
-    "SPEC-DOC-007": "git rm — delete the orphan path",
-    "SPEC-DOC-024": "sed — align the phase marker with _RELEASE.json",
-    "SPEC-DOC-026": "git mv — de-duplicate the release directory",
-    "SPEC-DOC-027": "git mv — rename the release directory to M.m.p",
-    "SPEC-DOC-028": "sed — drop the dangling constitution reference",
-    "SPEC-DOC-030": "git mv — rename the audit directory to YYYYMMDD-slug",
-    "SPEC-DOC-037": "sed — drop the stale enum line",
-    "SPEC-DOC-047": "sed — drop the stale memory task line",
-    "SPEC-DOC-048": "sed — append the missing SPEC Origin line",
-    "TREE-3": "printf — append the missing memory title",
-    "TREE-7": "sed — redact the session id out of BUGS.jsonl",
-    "LINT-1": "sed — insert the missing atom frontmatter field",
-    "MEM-DRIFT-1": "sed — align ARCHITECTURE.md with the package on disk",
-    "MEM-DRIFT-2": "sed — replace the dead citation",
-    "ADR-SUPERSEDED-CITATION": "sed — cite the successor decision",
-    "BL-SCHEMA": "sed — correct the offending BACKLOG.json line",
-    "LEDGER-ADR-SCHEMA": "sed — correct the offending decisions.jsonl record",
-    "RELEASE-TREE-SCHEMA/RELEASE-TREE-PARSE/RELEASE-TREE-TS-ORDER/RELEASE-TREE-PHASE/"
-    "RELEASE-TREE-ARCHIVED/RELEASE-TREE-TRIO/RELEASE-TREE-STATE-MISSING": (
-        "sed — correct the offending _RELEASE.json value"
-    ),
-}
+#: Scaffold roots a fix line may name that this repo does not carry at that path: the
+#: installed skill tree (`.agents/skills/…`, what the operator pastes) maps to the
+#: `public/skills/` source this repo ships, and the venv-rooted binary is resolved by the
+#: CLI arm below, never as a file.
+_INSTALLED_SKILL_PREFIX = ".agents/skills/"
+_VENV_BINARY_PREFIX = ".dadaia/"
+
+#: Artifact suffixes that make a token a path even when its first segment is not a
+#: top-level repo entry (a scaffold-only file the consumer's tree carries).
+_ARTIFACT_SUFFIXES = (".md", ".json", ".jsonl", ".py", ".txt", ".yml", ".yaml")
+
+_PLACEHOLDER_RE = re.compile(r"<[^>]*>")
+
+
+def _top_level_entries() -> frozenset[str]:
+    return frozenset(p.name for p in _REPO_ROOT.iterdir())
+
+
+_TOP_LEVEL = _top_level_entries()
+
+
+def _is_path_token(token: str) -> bool:
+    """A token is a path iff its first segment is a top-level repo entry, a scaffold
+    root, or it ends in an artifact suffix. This is what keeps a `sed` script
+    (`s/<session id>/<redacted>/g`) from being mistaken for a path: its first segment
+    is not an entry anyone ships and it names no artifact."""
+    if not token or token.startswith(("-", ">", "&")):
+        return False
+    first = token.split("/", 1)[0]
+    if first in _TOP_LEVEL or first in {".agents", ".dadaia"}:
+        return True
+    return "/" in token and token.endswith(_ARTIFACT_SUFFIXES)
+
+
+def _resolvable_prefix(token: str) -> Path:
+    """The deepest placeholder-free DIRECTORY the token names, mapped onto this repo.
+
+    A fix creates, edits or deletes its leaf — `git rm specs/ACTIVE.md` names a file
+    that must NOT exist — so the leaf itself is never required; the directory that
+    holds it is. Everything from the first `<placeholder>` segment down is unknowable
+    and drops away with it.
+    """
+    if token.startswith(_INSTALLED_SKILL_PREFIX):
+        relative = token.split(_INSTALLED_SKILL_PREFIX, 1)[1]
+        segments = ("dadaia_workspace", "public", "skills", *relative.split("/"))
+    else:
+        segments = tuple(token.split("/"))
+    kept: list[str] = []
+    for segment in segments:
+        if _PLACEHOLDER_RE.search(segment):
+            break
+        kept.append(segment)
+    if len(kept) == len(segments):
+        kept = kept[:-1]  # the leaf is created, edited or deleted by the fix itself
+    return _REPO_ROOT.joinpath(*kept) if kept else _REPO_ROOT
+
+
+def _canon_dirs() -> frozenset[str]:
+    """Every directory the specs canon guarantees, as `specs/`-rooted posix strings —
+    a consumer's tree carries these even when this repo's own does not."""
+    from dadaia_workspace.core.workspace_layout import SPECS_CANON
+
+    dirs: set[str] = {"specs"}
+    for entry in SPECS_CANON:
+        parts = PurePosixPath(entry.shape).parts
+        for depth in range(len(parts)):
+            dirs.add(PurePosixPath("specs", *parts[:depth]).as_posix())
+    return frozenset(dirs)
+
+
+_CANON_DIRS = _canon_dirs()
+
+
+def _unresolved_paths(command: str) -> list[str]:
+    """Every path token in *command* whose directory neither exists in this repo nor is
+    a directory the specs canon guarantees."""
+    unresolved: list[str] = []
+    for token in shlex.split(command):
+        if token.startswith(_VENV_BINARY_PREFIX) or not _is_path_token(token):
+            continue
+        target = _resolvable_prefix(token)
+        if target.is_dir():
+            continue
+        try:
+            relative = target.relative_to(_REPO_ROOT).as_posix()
+        except ValueError:  # pragma: no cover — joinpath never escapes the root
+            relative = str(target)
+        if relative not in _CANON_DIRS:
+            unresolved.append(token)
+    return unresolved
 
 
 @pytest.mark.parametrize(("codes", "command"), _FIX_LINES, ids=[c for c, _ in _FIX_LINES])
 def test_every_fix_target_resolves_on_disk(codes: str, command: str) -> None:
-    """A ``fix:`` line is a free string — nothing tied it to a file or a verb that exists.
+    """ONE rule for every fix line, whatever shape it takes (0.4.7 c8 review F7).
 
-    0.4.7 FR3: after the ledger verbs moved to skill scripts, a stale fix line names a
-    path nobody ships instead of a verb nobody has, and the Stall is identical. Both
-    forms are resolved HERE: a ``dadaia`` fix walks the live command tree; a script fix
-    must exist under ``public/skills/*/scripts/`` and its subcommand must accept
-    ``--help``.
+    A ``fix:`` line is a free string — nothing tied it to a file or a verb that exists.
+    Two Stalls came of that: ``backlog-doctor-fix-names-missing-update-verb`` (BL-SCHEMA
+    and friends handed back ``dadaia backlog update``, a verb the CLI had dropped) and,
+    after the ledger verbs moved to skill scripts, a fix line naming a path nobody
+    ships. Both resolve HERE, and no shape is exempt: a ``dadaia`` fix walks the live
+    command tree; a skill-script fix must exist under ``public/skills/*/scripts/`` with
+    a subcommand that accepts ``--help``; and EVERY fix line — ``sed``, ``git mv``,
+    ``printf`` included — has each path token it names resolved to a directory this
+    repo ships or the specs canon guarantees. The membership allowlist that used to
+    excuse the shell-command shapes is gone: it was a second rule whose only job was to
+    let a row skip the first one.
     """
     import subprocess  # noqa: PLC0415 — a contract test executes the real script
 
     from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
+
+    unresolved = _unresolved_paths(command)
+    assert unresolved == [], (
+        f"{codes}: fix line names a path neither this repo nor the specs canon "
+        f"carries: {unresolved} in {command!r}"
+    )
 
     if command.startswith(DADAIA_BIN) or command.startswith("dadaia "):
         tokens = command.split()[1:]
@@ -420,11 +470,6 @@ def test_every_fix_target_resolves_on_disk(codes: str, command: str) -> None:
         return
     target = _script_target(command)
     if target is None:
-        assert codes in _SHELL_FIX_CODES, (
-            f"{codes}: a fix line resolves against the CLI tree or a shipped skill "
-            f"script — a new shell-command fix joins _SHELL_FIX_CODES with its reason "
-            f"or names one of those two: {command!r}"
-        )
         return
     script, verb = target
     assert script.is_file(), f"{codes}: fix line names a script this repo does not ship: {script}"
@@ -436,6 +481,24 @@ def test_every_fix_target_resolves_on_disk(codes: str, command: str) -> None:
         timeout=60,
     )
     assert help_run.returncode == 0, f"{codes}: {script.name} rejects {verb!r}: {help_run.stderr}"
+
+
+def test_the_path_rule_bites_a_fix_naming_a_directory_nobody_ships() -> None:
+    """The control: without it, a resolver that silently classified every token as
+    "not a path" would pass the whole corpus and detect nothing.
+
+    A ``sed`` script is not a path; a real path under a directory neither this repo nor
+    the canon carries is — this is exactly the row the deleted allowlist waved through.
+    """
+    assert _unresolved_paths("sed -i 's/<session id>/<redacted>/g' specs/bugs/BUGS.jsonl") == []
+    assert _unresolved_paths("git mv specs/audits/<name> specs/audits/<YYYYMMDD>-<slug>") == []
+    assert _unresolved_paths("printf '%s\\n' '# <title>' >> specs/memory/<document>.md") == []
+    assert _unresolved_paths("sed -i '\\|x|d' specs/nowhere/<id>/SPEC.md") == [
+        "specs/nowhere/<id>/SPEC.md"
+    ]
+    assert _unresolved_paths("git rm dadaia_workspace/features/no_such_feature/doctor.py") == [
+        "dadaia_workspace/features/no_such_feature/doctor.py"
+    ]
 
 
 # ── every script-emitted fix line names its own folder's entry script ───────────
@@ -498,8 +561,6 @@ def test_every_script_fix_line_names_its_folders_entry_script(module: Path) -> N
 #: `rc-N/` was the folder they wrote. None of the three exists: a closed candidate's
 #: trio is overwritten in place and git is the archive.
 _DEAD_RELEASE_VOCABULARY = re.compile(r"rc-archive|release\.py fold|release\.py archive|rc-N")
-
-_REPO_ROOT = Path(__file__).resolve().parents[2]
 
 #: Where the law lives: the shipped AI-entity surface, the product's memory, and the
 #: glossary every one of them borrows its nouns from. History (`_archive/`, the archive
