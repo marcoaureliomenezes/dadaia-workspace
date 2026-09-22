@@ -89,9 +89,9 @@ def live_release(specs: Path) -> Live:
 
 def window_start(state: State) -> str:
     """The memory window's start: the last memory entry's `until`, else `defined.sha`."""
-    ends = [e.get("until") for e in state.get("log") or [] if e.get("kind") == "memory"]
-    start = next((u for u in reversed(ends) if u), (state.get("defined") or {}).get("sha"))
-    if not start:
+    ends = [e["until"] for e in state.get("log") or []
+            if isinstance(e, dict) and e.get("kind") == "memory" and e.get("until")]  # fmt: skip
+    if not (start := ends[-1] if ends else (state.get("defined") or {}).get("sha")):
         raise Refusal("the live release has no defined.sha to open the memory window at",
                       f"{SCRIPT} phase IMPLEMENTATION --sha <sha>")  # fmt: skip
     return str(start)

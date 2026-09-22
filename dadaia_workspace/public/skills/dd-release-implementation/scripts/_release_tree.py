@@ -100,7 +100,9 @@ def _window_findings(specs: Path) -> list[dict[str, Any]]:
         live = live_release(specs)
     except Refusal:
         return []  # the tree walk reports a missing or doubled live release
-    entries = [e for e in live.state.get("log") or [] if e.get("kind") == "memory"]
+    entries = [
+        e for e in live.state.get("log") or [] if isinstance(e, dict) and e.get("kind") == "memory"
+    ]
     if live.state.get("phase") != "CLOSURE" or not entries:
         return []  # the doctor's RELEASE-TREE-MEMORY owns a closure with no entry
     until, rel = str(entries[-1].get("until")), f"releases/{live.release_id}/{STATE}"

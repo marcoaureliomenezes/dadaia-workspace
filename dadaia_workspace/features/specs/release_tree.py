@@ -35,6 +35,7 @@ from dadaia_workspace.features.specs.schemas import validator_for
 __all__ = [
     "RELEASE_TREE_PHASES",
     "ReleaseTreeIssue",
+    "memory_window_start",
     "release_memory_issues",
     "release_tree_issues",
     "validate_release_tree",
@@ -260,6 +261,14 @@ def release_memory_issues(specs_dir: Path) -> list[SpecsDoctorIssue]:
     return issues
 
 
+def memory_window_start(doc: dict[str, Any]) -> str:
+    """The memory window's start: the last memory entry's `until`, else `defined.sha`,
+    else ``""`` — the rule `_release_store.window_start` states for the writer."""
+    ends = [str(e["until"]) for e in doc.get("log") or []
+            if isinstance(e, dict) and e.get("kind") == "memory" and e.get("until")]  # fmt: skip
+    return ends[-1] if ends else str((doc.get("defined") or {}).get("sha") or "")
+
+
 def _memory_message(doc: dict[str, Any]) -> str | None:
     """Why this CLOSURE release has no conformant reconciliation record, or ``None``."""
     stamp = str((doc.get("implemented") or {}).get("ts") or "")
@@ -282,9 +291,7 @@ def _memory_message(doc: dict[str, Any]) -> str | None:
             f"the latest `kind: memory` log entry lacks {', '.join(missing)} — a prose note "
             "names no window and dispositions no atom"
         )
-    earlier = [e for e in doc["log"][: doc["log"].index(latest)] if isinstance(e, dict)]
-    ends = [str(e["until"]) for e in earlier if e.get("kind") == "memory" and e.get("until")]
-    start = ends[-1] if ends else str((doc.get("defined") or {}).get("sha") or "")
+    start = memory_window_start({**doc, "log": doc["log"][: doc["log"].index(latest)]})
     if str(latest["since"]) != start:
         return (
             f"the latest `kind: memory` log entry opens at {latest['since']!r}, not at the "
