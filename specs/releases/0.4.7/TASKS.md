@@ -10,7 +10,7 @@
 > `docs(adr): accept 0022-memory-canon-v7`. Other tasks commit normally, explicit paths, never
 > `git add -A`. Ratchets: V35 2,876, V36 31 files / 3,657 lines, doctor module 699 — breach = stop and escalate.
 
-- [ ] **T-047-94 — Delete `product add` and the skill-side atom validator (SPEC D5).**
+- [-] **T-047-94 — Delete `product add` and the skill-side atom validator (SPEC D5).**
   `_memory_add.py` and `product add` die (an atom generator is the stacking mechanism). `_memory_schema.py`
   keeps `parse`/`find_specs` and loses `validate`; `_memory_check.py` keeps only the generated-pair
   check; `_memory_index.py` folds into `_memory_catalog.py`. Pure deletion first, so V36 never breaches.
