@@ -99,13 +99,13 @@ ADR: 0015 (accepted)
 Rationale: the law, the harness projections, the zones and the venv live outside every repo; a per-repo or monorepo tool cannot govern ten projects with one law.
 
 ### P-32 · We change canonical memory (`ARCHITECTURE.md`, `QUALITY.md`) only in the commit that carries its accepted ADR, and we reconcile product memory from the window's code diff at every closure — delete, update, then add — recorded as one `kind: memory` entry naming every drifted atom.
-Measured by: `pytest tests/contract/test_memory_canonical_shape.py`; `dadaia doctor` — `specs`-section rules `RELEASE-TREE-MEMORY` and `MEM-NARRATIVE-1`.
+Measured by: `pytest tests/contract/test_memory_canonical_shape.py`; `dadaia doctor` — `specs`-section rules `RELEASE-TREE-MEMORY` and `LINT-1` (history lines).
 ADR: 0023 (accepted)
 Rationale: three closures touched every product atom and left fifteen contradicted by the code; an append protocol stacks, a diff-driven one deletes first.
 
 ## Tech Stack
 
-- Python `^3.12`, built by Poetry Core; console entrypoints `dadaia` and `dadaia-workspace` are one callable, and the version lives in `pyproject.toml` alone ([[pypi-distribution]]).
+- Python `^3.12`, built by Poetry Core; console entrypoints `dadaia` and `dadaia-workspace` are one callable, and the version lives in `pyproject.toml` alone.
 - Runtime dependencies: Typer, Rich, PyYAML, Jinja2, jsonschema; `claude-sdk` is an optional extra.
 - Everything else is the standard library; there is no database — every state is a JSON or JSONL file.
 - Claude Code, Codex, Kimi Code, Cursor, Devin CLI and GitHub Copilot are operator-installed external CLIs, never Python dependencies; the workspace runs no agent-execution runtime.

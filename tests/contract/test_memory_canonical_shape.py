@@ -251,3 +251,14 @@ def test_principles_live_only_under_the_principles_section() -> None:
             assert principles_start < match.start() < next_section.start(), (
                 f"{name}: {match.group(0)!r} sits outside the `## Principles` section"
             )
+
+
+def test_canonical_memory_links_no_product_atom() -> None:
+    """ADR 0024: the two canonical files link only each other, so a product atom can be
+    split, renamed or deleted at closure without an edit to ADR-gated memory."""
+    for name in _CANONICAL_SECTIONS:
+        text = (_MEMORY_DIR / name).read_text(encoding="utf-8")
+        foreign = sorted(set(re.findall(r"\[\[([^\]]+)\]\]", text)) - {"ARCHITECTURE", "QUALITY"})
+        assert foreign == [], (
+            f"{name} links product atoms {foreign} — canonical memory links only [[ARCHITECTURE]] and [[QUALITY]] (ADR 0024)"
+        )

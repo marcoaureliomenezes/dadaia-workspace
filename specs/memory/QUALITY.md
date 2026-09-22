@@ -75,7 +75,7 @@ Rationale: a document written beside memory rots; one that names its source is r
 - `tests/conftest.py` prepends this checkout to `PYTHONPATH` once for the whole session, so every spawned CLI/hook subprocess imports the worktree under test, never the venv's installed package.
 - Every suite ratchet enumerates the same set — `tests/helpers/suite_files.tracked_test_files()` over `git ls-files -- tests` — so scratch files a concurrent xdist worker writes are outside the measurement by construction.
 - Module docstrings declare `Intent: <KIND> — <ref>` over CONTRACT, SENTINEL, SCAFFOLD and QUARANTINE; an undeclared test is SCAFFOLD, and intent is never a marker.
-- Output naming a foreign Spec Context is `--redact`ed before entering evidence ([[sdd-gate-v3]]).
+- Output naming a foreign Spec Context is `--redact`ed before entering evidence.
 
 - `flaky` marks a pass-and-fail on identical code; `quarantine` leaves every gating selector, is bug-gated by P-22, and the lane is empty.
 - Quarantine cap, escalation clock, diagnostic reruns, flake-rate target and the LARGE cap have one home each in `dd-test-stewardship`'s `PARAMETERS.md`.
@@ -88,23 +88,23 @@ Rationale: a document written beside memory rots; one that names its source is r
 
 - CI runs the preflight ladder plus cross-OS subsets, integration, Python E2E, repo hygiene, `dadaia doctor` over the checked-out tree, PR governance, the `security-review` job (the official `anthropics/claude-code-security-review` Action) and gitleaks — every job a required status check on `develop`, gitleaks included.
 - Push triggers are `main`, `develop` and `feature/**`; PRs to `develop` or `main` run the same matrix as the local preflight.
-- `pr-source-guard` is fail-closed, and `security-review` reviews the PR diff on both edges ([[sdd-gate-v3]]).
-- Every review verdict states the bug-surface delta from `bugs.py stats`, and no deploy is approved without the consumer-side matrix ([[consumer-agent-support]]).
+- `pr-source-guard` is fail-closed, and `security-review` reviews the PR diff on both edges.
+- Every review verdict states the bug-surface delta from `bugs.py stats`, and no deploy is approved without the consumer-side matrix.
 - Ruff `C901` and `PLR1702` are scoped to `dadaia_workspace/` with ceilings pinned in `pyproject.toml` against the enforcing tool; `radon cc` reports and never gates.
 - Caches redirect by configuration, never by a remembered flag: `[tool.pytest.ini_options] addopts` (`-p no:cacheprovider`), `[tool.ruff] cache-dir` and `[tool.mypy] cache_dir` (`../../.dadaia/tmp/<tool>-cache`, relative on every OS), hypothesis `database = None`; a bare `pytest`, `ruff check`, `ruff format --check`, `mypy --strict` from the repo root leaves the tree clean (`tests/unit/features/ci_preflight/test_no_pollution.py`), so `dadaia ci preflight` runs exactly the bare commands.
-- The forbidden repo-local set is `core/workspace_layout.REPO_TREE_EXCLUDED`, measured by `tests/contract/test_source_repo_hygiene.py` and swept at every ALIVE repo by `dadaia doctor` ([[workspace-doctor]]).
-- Memory-vs-code drift is a `dadaia doctor` `specs`-section WARNING (`MEM-DRIFT-1` for the features package map, `MEM-DRIFT-2` for a dead `dadaia <verb>` or path an atom cites), never a push-gated test: a package added or a verb deleted mid-implementation is memory drift to fix at the next closure, not a red build ([[workspace-doctor]]).
-- A citation of a superseded decision is an ERROR (`ADR-SUPERSEDED-CITATION`): a rule pointing at a dead ADR fails the build ([[workspace-doctor]]).
+- The forbidden repo-local set is `core/workspace_layout.REPO_TREE_EXCLUDED`, measured by `tests/contract/test_source_repo_hygiene.py` and swept at every ALIVE repo by `dadaia doctor`.
+- Memory-vs-code drift is a `dadaia doctor` `specs`-section WARNING (`MEM-DRIFT-1` for the features package map, `MEM-DRIFT-2` for a dead `dadaia <verb>` or path an atom cites), never a push-gated test: a package added or a verb deleted mid-implementation is memory drift to fix at the next closure, not a red build.
+- A citation of a superseded decision is an ERROR (`ADR-SUPERSEDED-CITATION`): a rule pointing at a dead ADR fails the build.
 - A doctor fix is proven on the executed path: `tests/contract/test_ledgers_validate.py` locates the issue and `tests/unit/features/specs/test_ledgers_fix_canonical_form.py` runs `--fix` over a committed-shaped record file and asserts the re-serialized line, never the fixer's return value; a schema drop ships with its repair and its test in the same change.
 - The closed pytest marker set is eight — unit, contract, integration, e2e, slow, tmp, flaky, quarantine (P-28).
 - `ci.yml` checks out at the default depth (the `security-review` job fetches depth 2 for the PR diff); `release-please.yml` and `secret-scan.yml` fetch full history; no job fetches history for a bug record's sake.
 
 - Five repo-pure ratchets pin slop counts and move only downward: V31 (Intent-less test files per tier) in `tests/contract/test_test_suite_ratchets.py`; V32 (governance ids in production comments and docstrings), V33 (`PREFIX-NN` families without a mechanical reader), V34 (live SPEC/TASKS byte ceiling) and V35 (skill directories ≤ 18 and total `public/skills/**/*.md` lines, pinned at the measured value and re-pinned at every corpus-touching closure) in `tests/contract/test_slop_ratchets.py`; `PLAN.md` has no byte ratchet (`SPEC-DOC-005` is advisory).
 - The derived-docs contract sits beside the ratchets: `tests/contract/test_docs_derived_from_memory.py` (P-29) checks every `<!-- derived-from: <slug> sha256:<12 hex> -->` marker's slug and hash over `README.md`, `llms.txt` and `docs/*.md`, the `docs/cli.md` body against `render_digest()`, the 10 KB README budget, the one tagline across `README.md`, `pyproject.toml` and `llms.txt`, the five `[tool.poetry.urls]` keys, and runs `dead_citations` over the same set; a red row is closure work — re-read the atom, re-derive the section, re-record the hash in the atom's own commit (`dd-release-implementation` MEMORY-UPDATE).
-- Stale handoffs and scratch are a closure readout, never a ratchet: `dd-release-implementation` RC-FLOW step 8 runs `dadaia doctor` dry, then `dadaia doctor --fix` (slop moved to `reaped/`, expired entries deleted), and the `kind: artifact-gc` log entry records the `compliance(total)` line and what the reaper holds ([[workspace-doctor]]).
+- Stale handoffs and scratch are a closure readout, never a ratchet: `dd-release-implementation` RC-FLOW step 8 runs `dadaia doctor` dry, then `dadaia doctor --fix` (slop moved to `reaped/`, expired entries deleted), and the `kind: artifact-gc` log entry records the `compliance(total)` line and what the reaper holds.
 - `dd-audit-project` pillar 2 re-measures the ratchets over the audit window and applies `dd-code-review` SLOP.md S1–S10 to a commit sample; the fixed law sections are kept byte-exact by `dadaia doctor` FIXED-1/2.
 
-Related: [[ARCHITECTURE]], [[consumer-agent-support]], [[sdd-gate-v3]], [[bug-ledger]], [[backlog-ledger]], [[release-lifecycle]], [[workspace-doctor]].
+Related: [[ARCHITECTURE]]
 
 <!-- dadaia:fixed slop-tests -->
 ### Slop — tests (fixed)
