@@ -59,7 +59,7 @@
   `tests/unit/skills/test_release_implementation_release_script.py`, `tests/contract/test_slop_ratchets.py`
   `blocked by:` T-047-95 · `delivers:` FR3 (the entry)
 
-- [ ] **T-047-97 — Doctor rule `RELEASE-TREE-MEMORY` (ERROR).**
+- [-] **T-047-97 — Doctor rule `RELEASE-TREE-MEMORY` (ERROR).**
   In `features/specs/release_tree.py` + its `rules.py` row: a live release in `CLOSURE` whose `log`
   has no `kind: memory` entry stamped after `implemented.ts`, or whose latest such entry lacks
   `since`/`reviewed`/`changed`, is non-conformant; `fix:` names `memory.py drift` then `release.py
