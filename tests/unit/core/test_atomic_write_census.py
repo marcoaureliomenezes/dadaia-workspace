@@ -4,13 +4,7 @@ Intent: CONTRACT — v0.4.5 A2.2. Size: SMALL.
 
 A2.2 demands the census "enumerates EVERY atomic write in the package ... zero
 remaining named writers, zero inline ``.tmp`` writers", derived BY SCAN — never a
-hand-kept list. ``tests/unit/features/specs/test_migration_symlink_hardening.py`` used
-to keep exactly that forbidden thing: a hand-authored, 10-case table of writer names.
-T-045-14 deleted every writer that table named (the eight T-045-13 shims, the three
-inline ``.tmp`` writers, plus the two writers T-045-13's sweep discovered beyond the
-original enumeration — ``state_v3._atomic_write_json`` and
-``bugs_single_file.migrate_bugs_single_file``'s inline ``.jsonl.tmp`` swap) and this
-module replaces that table with a scan.
+hand-kept list. This module is that scan.
 
 The predicate below identifies the temp-then-replace *content-write* idiom BY SHAPE,
 never by name: a function that (1) writes fresh content to a local path via
