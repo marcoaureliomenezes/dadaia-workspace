@@ -49,11 +49,16 @@ RELEASE_SEMVER_CUTOFF = date(2026, 6, 1)  # WARNING starts here
 # SPEC-DOC-024: phase ↔ markers coherence.
 _TASK_MARKER_RE = re.compile(r"^\s*[-*]?\s*\[([ \-xX])\]", re.MULTILINE)
 # SPEC-DOC-047: a task block runs from its marker line to the next marker line; a
-# ``Write set:`` naming ``specs/memory`` inside it schedules memory as implementation work.
+# ``Write set:`` naming the ``specs/memory`` tree inside it schedules memory as
+# implementation work. Both patterns are anchored: the block indent is HORIZONTAL space
+# only (``\s`` spans newlines, so a block matched from the blank line above it reported
+# an empty task id), and the path ends on a word boundary, so the source file
+# ``features/specs/memory_lint.py`` is not the memory tree.
 _TASK_BLOCK_RE = re.compile(
-    r"^\s*[-*]?\s*\[[ \-xX]\][^\n]*(?:\n(?![-*]?\s*\[[ \-xX]\])[^\n]*)*", re.MULTILINE
+    r"^[ \t]*[-*]?[ \t]*\[[ \-xX]\][^\n]*(?:\n(?![ \t]*[-*]?[ \t]*\[[ \-xX]\])[^\n]*)*",
+    re.MULTILINE,
 )
-_MEMORY_WRITE_SET_RE = re.compile(r"Write set:[^\n]*specs/memory")
+_MEMORY_WRITE_SET_RE = re.compile(r"Write set:[^\n]*\bspecs/memory\b")
 
 
 def read_release_phase(specs_dir: Path, release_id: str) -> str | None:
