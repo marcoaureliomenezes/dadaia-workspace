@@ -15,23 +15,27 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 # A projected skill folder is not a package dir to litter: the sibling modules below
 # import without leaving a `__pycache__` beside them.
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from _release_check import memory_refusals, memory_text  # noqa: E402
 from _release_new import new_release  # noqa: E402
 from _release_phase import set_phase  # noqa: E402
 from _release_schema import CODE, STATE, find_specs, utc_now  # noqa: E402
-from _release_store import Refusal  # noqa: E402
+from _release_store import Refusal, State, commit, live_release  # noqa: E402
 from _release_tree import check  # noqa: E402
 
 _HELP = {
     "new": "mint the one live release: its SPEC.md stub and _RELEASE.json, in one act",
     "phase": "move the live release to IMPLEMENTATION or CLOSURE, stamping its milestone",
+    "memory": "append the closure's one structured `kind: memory` entry to the live log",
     "check": "validate every _RELEASE.json under releases/ and the ship ledger",
 }
 
@@ -51,6 +55,12 @@ def _parser() -> argparse.ArgumentParser:
             command.add_argument("--sha", required=True, help="the commit the milestone names")
             command.add_argument("--pr", type=int, default=None,
                                  help="CLOSURE only: the merged release PR number")  # fmt: skip
+        if verb == "memory":
+            command.add_argument("--since", required=True, help="the window `drift` was run with")
+            command.add_argument("--worklist", type=Path, required=True,
+                                 help="the `memory.py drift --json` report for that window")  # fmt: skip
+            for name in ("--reviewed", "--changed"):
+                command.add_argument(name, default="", help="comma-separated worklist entries")
         if verb == "check":
             command.add_argument("--json", action="store_true", help="emit findings as JSON")
     return parser
@@ -69,7 +79,45 @@ def _phase(args: argparse.Namespace, specs: Path) -> int:
     return 0
 
 
-_VERBS = {"new": _new, "phase": _phase}
+def _memory(args: argparse.Namespace, specs: Path) -> int:
+    """Append the reconciliation record — refused unless the worklist was actually worked."""
+    live = live_release(specs)
+    worklist = json.loads(args.worklist.read_text(encoding="utf-8"))
+    lists = [[s for s in getattr(args, n).split(",") if s] for n in ("reviewed", "changed")]
+    errors = memory_refusals(str(live.state.get("phase")), worklist, *lists)
+    errors += _unmoved(specs.parent, args.since, worklist, lists[1])
+    if errors:
+        raise Refusal(errors[0], f"{Path(__file__).name} memory --help")
+    ts = utc_now()
+    entry = {"ts": ts, "agent": "release.py memory", "kind": "memory",
+             "text": memory_text(worklist, *lists), "since": args.since,
+             "reviewed": lists[0], "changed": lists[1]}  # fmt: skip
+
+    def apply(state: State) -> State:
+        state.setdefault("log", []).append(entry)
+        return state
+
+    commit(live.release_dir / STATE, f"releases/{live.release_id}/{STATE}", apply)
+    print(f"[ok] release {live.release_id} log <- kind memory ({ts})")
+    return 0
+
+
+def _unmoved(repo: Path, since: str, worklist: dict[str, Any], changed: list[str]) -> list[str]:
+    """A `changed` atom whose file is byte-identical to its state at *since* changed nothing."""
+    paths = {str(atom["slug"]): str(atom["path"]) for atom in worklist.get("atoms", [])}
+    errors: list[str] = []
+    for slug in changed:
+        path = paths.get(slug)
+        if path is None or not (repo / path).is_file():
+            continue
+        was = subprocess.run(["git", "show", f"{since}:{path}"], cwd=repo,
+                             capture_output=True, check=False)  # fmt: skip
+        if was.returncode == 0 and was.stdout == (repo / path).read_bytes():
+            errors.append(f"--changed names {slug!r}, whose atom is byte-identical at {since}")
+    return errors
+
+
+_VERBS = {"new": _new, "phase": _phase, "memory": _memory}
 
 
 def main(argv: list[str] | None = None) -> int:

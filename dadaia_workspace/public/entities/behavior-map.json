@@ -186,7 +186,7 @@
       "hash_tuple": {
         "section": "sha256:1f8d87d0cc5f518917270aa1cf19bf530b029a2219b7c17090ed8837f3b7d854",
         "skill": "sha256:f2f61cdedbafa2c0feba0985fbd44ce54fcc9aae26e684788a09fcad28ef6cf0",
-        "scripts": "sha256:89984818723dc5b4d8777f16ca2f2c791bf158c4a3b51d686266d1a81bd643fe",
+        "scripts": "sha256:f10edfb2980ad55c39e04b336515516a553a945980c797d71d572871886dedb0",
         "scoped": [
           "sha256:2e394d666bcbf18dd6dd3887c5cc63f59a4babff1606c7d2ad0b9e3c264045a3"
         ]

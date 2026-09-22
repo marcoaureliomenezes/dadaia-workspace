@@ -26,6 +26,7 @@ _SCHEMAS = (
     _PUBLIC / "schemas" / "histo" / "histo-record-v1.schema.json",
 )
 _TRIO = ("SPEC.md", "PLAN.md", "TASKS.md")
+_TS = "2026-09-22T00:00:00Z"
 
 
 @pytest.fixture
@@ -363,3 +364,129 @@ def test_every_refusal_carries_exactly_one_runnable_fix(
     fixes = [line for line in result.stderr.splitlines() if line.startswith("fix: ")]
     assert len(fixes) == 1, f"{name}: {result.stderr}"
     assert fixes[0].removeprefix("fix: ").strip(), name
+
+
+# ── memory ────────────────────────────────────────────────────────────────────
+
+
+def _memory_repo(tmp_path: Path, *, body: str = "# alpha\n") -> tuple[Path, Path, str]:
+    """A git repo whose specs tree holds one CLOSURE release and one committed atom."""
+    root = tmp_path / "repo"
+    specs = _specs(root)
+    _release(specs, "0.5.0", phase="CLOSURE", implemented={"sha": "abc1234", "ts": _TS})
+    atom = root / "specs" / "memory" / "product" / "platform" / "alpha.md"
+    atom.parent.mkdir(parents=True)
+    atom.write_text(body, encoding="utf-8")
+    for argv in (
+        ("init", "-q", "."),
+        ("config", "user.email", "fixture@example.invalid"),
+        ("config", "user.name", "fixture"),
+        ("add", "-A"),
+        ("commit", "-qm", "base"),
+    ):
+        subprocess.run(["git", *argv], cwd=root, check=True, capture_output=True)
+    sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=root, capture_output=True, text=True, check=True
+    ).stdout.strip()
+    return root, specs, sha
+
+
+def _worklist(tmp_path: Path, since: str, **over: object) -> Path:
+    document: dict[str, object] = {
+        "since": since,
+        "atoms": [
+            {
+                "slug": "alpha",
+                "path": "specs/memory/product/platform/alpha.md",
+                "matched": ["dadaia_workspace/features/alpha/core.py"],
+            }
+        ],
+        "uncovered": [],
+    }
+    document.update(over)
+    path = tmp_path / "drift.json"
+    path.write_text(json.dumps(document), encoding="utf-8")
+    return path
+
+
+def _memory(script: Path, root: Path, specs: Path, worklist: Path, since: str, **lists: str):
+    argv = [f"--{name}={value}" for name, value in lists.items()]
+    return _run(
+        script, "memory", "--since", since, "--worklist", str(worklist),
+        *argv, "--specs", str(specs), cwd=root,
+    )  # fmt: skip
+
+
+def test_memory_appends_one_structured_entry_the_schema_accepts(
+    script: Path, tmp_path: Path
+) -> None:
+    root, specs, sha = _memory_repo(tmp_path)
+    (root / "specs" / "memory" / "product" / "platform" / "alpha.md").write_text(
+        "# alpha rewritten\n", encoding="utf-8"
+    )
+
+    result = _memory(
+        script, root, specs, _worklist(tmp_path, sha), sha, reviewed="", changed="alpha"
+    )
+
+    assert result.returncode == 0, result.stderr
+    entry = _read(specs / "releases" / "0.5.0" / "_RELEASE.json")["log"][-1]
+    assert entry["kind"] == "memory"
+    assert entry["since"] == sha
+    assert entry["reviewed"] == []
+    assert entry["changed"] == ["alpha"]
+    assert "1" in entry["text"]
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
+def test_memory_refuses_a_worklist_entry_in_neither_list(script: Path, tmp_path: Path) -> None:
+    root, specs, sha = _memory_repo(tmp_path)
+    worklist = _worklist(tmp_path, sha, uncovered=["dadaia_workspace/features/beta"])
+
+    result = _memory(script, root, specs, worklist, sha, reviewed="alpha", changed="")
+
+    assert result.returncode == 1
+    assert "dadaia_workspace/features/beta" in result.stderr
+    assert _read(specs / "releases" / "0.5.0" / "_RELEASE.json")["log"] == []
+
+
+def test_memory_refuses_a_changed_slug_whose_atom_never_moved(script: Path, tmp_path: Path) -> None:
+    """The entry claims a reconciliation: a `changed` atom byte-identical to its state at
+    `--since` is the stacking this gate exists to refuse."""
+    root, specs, sha = _memory_repo(tmp_path)
+
+    result = _memory(
+        script, root, specs, _worklist(tmp_path, sha), sha, reviewed="", changed="alpha"
+    )
+
+    assert result.returncode == 1
+    assert "alpha" in result.stderr
+    assert _read(specs / "releases" / "0.5.0" / "_RELEASE.json")["log"] == []
+
+
+def test_memory_refuses_any_phase_but_closure(script: Path, tmp_path: Path) -> None:
+    root, specs, sha = _memory_repo(tmp_path)
+    state = specs / "releases" / "0.5.0" / "_RELEASE.json"
+    document = _read(state)
+    document["phase"] = "IMPLEMENTATION"
+    state.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+
+    result = _memory(
+        script, root, specs, _worklist(tmp_path, sha, atoms=[]), sha, reviewed="", changed=""
+    )
+
+    assert result.returncode == 1
+    assert "CLOSURE" in result.stderr
+
+
+def test_memory_accepts_an_empty_worklist(script: Path, tmp_path: Path) -> None:
+    """Nothing drifted is a real closure result — the entry records the window anyway."""
+    root, specs, sha = _memory_repo(tmp_path)
+
+    result = _memory(
+        script, root, specs, _worklist(tmp_path, sha, atoms=[]), sha, reviewed="", changed=""
+    )
+
+    assert result.returncode == 0, result.stderr
+    entry = _read(specs / "releases" / "0.5.0" / "_RELEASE.json")["log"][-1]
+    assert entry["reviewed"] == [] and entry["changed"] == []

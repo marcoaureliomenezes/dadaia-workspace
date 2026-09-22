@@ -162,6 +162,27 @@
             "type": "string",
             "minLength": 1,
             "description": "The note's free-text body."
+          },
+          "since": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{7,40}$",
+            "description": "kind 'memory' only: the commit the reconciliation window opened at, the same --since `memory.py drift` was run with."
+          },
+          "reviewed": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "kind 'memory' only: the worklist entries read against their sources' diff and left as they were."
+          },
+          "changed": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "kind 'memory' only: the worklist entries rewritten by this reconciliation."
           }
         }
       }

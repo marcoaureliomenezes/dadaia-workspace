@@ -45,7 +45,7 @@
   `tests/unit/skills/test_memory_drift.py`, `tests/contract/test_slop_ratchets.py`
   `blocked by:` T-047-93 · `delivers:` FR2 — **tracer: the operator SEES the live worklist here**
 
-- [-] **T-047-96 — `release.py memory` — the one structured `kind: memory` entry.**
+- [x] **T-047-96 — `release.py memory` — the one structured `kind: memory` entry.**
   `release.py memory --since <sha> --worklist <drift.json> --reviewed a,b --changed c,d` appends
   `{ts, agent, kind: "memory", text, since, reviewed, changed}` to the live `log`; refuses a worklist
   atom or package in neither list, a `changed` slug byte-identical to its state at `<sha>`, and any
