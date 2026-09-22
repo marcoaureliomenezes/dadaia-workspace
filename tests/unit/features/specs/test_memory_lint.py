@@ -443,6 +443,11 @@ def test_narrative_ignores_versions_that_are_not_release_ids(tmp_path: Path) -> 
     assert _canonical(tmp_path, "## Purpose\n\nBinds 127.0.0.1 on Python 3.12.\n") == []
 
 
+def test_narrative_ignores_a_pinned_dependency_version(tmp_path: Path) -> None:
+    """Intent: CONTRACT — T-047-98. `tool==x.y.z` is a dependency pin, a fact of the stack."""
+    assert _canonical(tmp_path, "## Purpose\n\nMutation runs `mutmut==3.7.0`.\n") == []
+
+
 @pytest.mark.parametrize(
     "phrase",
     [

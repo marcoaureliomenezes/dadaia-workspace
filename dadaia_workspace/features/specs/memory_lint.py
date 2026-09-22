@@ -135,7 +135,7 @@ def _check_sources(result: AtomResult, fm: dict[str, Any], repo_root: Path) -> N
 
 _NARRATIVE_TOKENS = (
     ("date", re.compile(r"\b\d{4}-\d{2}-\d{2}\b")),
-    ("release id", re.compile(r"(?<![\d.])\d+\.\d+\.\d+(?!\.?\d)")),
+    ("release id", re.compile(r"(?<![\d.=])\d+\.\d+\.\d+(?!\.?\d)")),
     ("candidate id", re.compile(r"\b(?:c|rc-)\d+\b")),
     ("task id", re.compile(r"\bT-\d+-\d+\b")),
     ("FR id", re.compile(r"\bFR\d+\b")),
