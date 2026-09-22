@@ -535,7 +535,7 @@ def test_a_single_skill_rename_is_green_everywhere_after_one_place(
     renamed name with ZERO further edits to any of the three former lists.
     """
     real_public_dir = public_asset_roster.default_public_dir()
-    old_name, new_name = "dd-grill-me", "dd-grill-me-renamed-t045-16"
+    old_name, new_name = "dd-codebase-design", "dd-codebase-design-renamed-t045-16"
     real_roster = skill_names()
     assert old_name in real_roster
     assert new_name not in real_roster
