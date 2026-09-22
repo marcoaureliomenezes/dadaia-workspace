@@ -880,10 +880,9 @@ def _find_flagged_but_granted(granted: set[str], flagged: set[str]) -> list[str]
 
 
 def test_disable_model_invocation_skills_are_in_no_allowlist() -> None:
-    """Direction 7b (A28.1) — a skill flagged `disable-model-invocation: true` must be
-    in NO persona's `skills:` allowlist — the equivalence holds both ways, not as a
-    one-way rule. Its converse (7a, "ungranted by any persona => user-invoke-only") is
-    deleted: the main thread invokes any skill, so a persona allowlist never bounds it."""
+    """Direction 7b (A28.1) — one way only: a skill flagged `disable-model-invocation:
+    true` sits in NO persona's `skills:` allowlist. An ungranted skill is not thereby
+    user-invoked-only: the main thread invokes any skill."""
     granted = _granted_to_any_model(_AGENTS_DIR, _SKILLS_DIR)
     flagged = _disable_model_invocation_flagged(_SKILLS_DIR)
     violations = _find_flagged_but_granted(granted, flagged)
