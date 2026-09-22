@@ -88,7 +88,7 @@ Three roles, no fourth; every retired role is a lens the reviewer applies.
 
 | Surface | Purpose | Belongs | Ceiling | Measured |
 |---|---|---|---|---|
-| `dd-product-engineer` | backlog, SPEC, the product-memory pass at closure | role, activity class, model policy | — | 4468 |
+| `dd-product-engineer` | backlog, SPEC, the product-memory pass at closure | role, activity class, model policy | — | 4423 |
 | `dd-software-engineer` | PLAN/TASKS, production code and its tests | role, activity class, model policy | — | 8700 |
 | `dd-code-reviewer` | the three-axis review and its six lenses | role, activity class, model policy | — | 6493 |
 

@@ -92,8 +92,8 @@ acceptance line's own ``dadaia <verb> [<sub>]`` shape, resolved against the live
 **FR28 — ported verbatim.** A skill's model-invocation grant is derived, never
 hand-kept: the union of every persona frontmatter's ``skills:`` allowlist plus the
 universal-grant mechanism (failure mode 6's own ``_UNIVERSAL_NAMES`` /
-``_UNIVERSAL_GLOBS``), checked in both directions against
-``disable-model-invocation: true``.
+``_UNIVERSAL_GLOBS``); a flagged ``disable-model-invocation: true`` skill is in no
+allowlist. The converse is not checked — the main thread invokes every skill.
 """
 
 from __future__ import annotations
@@ -873,37 +873,17 @@ def _disable_model_invocation_flagged(skills_dir: Path) -> set[str]:
     return flagged
 
 
-def _find_ungranted_not_flagged(
-    skills: set[str], granted: set[str], flagged: set[str]
-) -> list[str]:
-    """Direction 7a — a skill in NO allowlist (and not universally granted) must carry
-    `disable-model-invocation: true`."""
-    return sorted(s for s in skills if s not in granted and s not in flagged)
-
-
 def _find_flagged_but_granted(granted: set[str], flagged: set[str]) -> list[str]:
     """Direction 7b — a skill carrying `disable-model-invocation: true` must be in NO
     allowlist — a model-granted skill can never also claim to be user-invoked-only."""
     return sorted(s for s in flagged if s in granted)
 
 
-def test_ungranted_skills_carry_disable_model_invocation() -> None:
-    """Direction 7a (A28.1) — a skill no persona's `skills:` allowlist grants to a
-    model, and that is not universally granted (failure mode 6's own exemption), must
-    carry `disable-model-invocation: true`."""
-    granted = _granted_to_any_model(_AGENTS_DIR, _SKILLS_DIR)
-    flagged = _disable_model_invocation_flagged(_SKILLS_DIR)
-    violations = _find_ungranted_not_flagged(_skills_on_disk(), granted, flagged)
-    assert violations == [], (
-        f"skill(s) granted by no persona allowlist and not universally granted, but "
-        f"missing disable-model-invocation: true: {violations}"
-    )
-
-
 def test_disable_model_invocation_skills_are_in_no_allowlist() -> None:
     """Direction 7b (A28.1) — a skill flagged `disable-model-invocation: true` must be
     in NO persona's `skills:` allowlist — the equivalence holds both ways, not as a
-    one-way rule."""
+    one-way rule. Its converse (7a, "ungranted by any persona => user-invoke-only") is
+    deleted: the main thread invokes any skill, so a persona allowlist never bounds it."""
     granted = _granted_to_any_model(_AGENTS_DIR, _SKILLS_DIR)
     flagged = _disable_model_invocation_flagged(_SKILLS_DIR)
     violations = _find_flagged_but_granted(granted, flagged)
@@ -911,21 +891,6 @@ def test_disable_model_invocation_skills_are_in_no_allowlist() -> None:
         f"skill(s) flagged disable-model-invocation: true but still granted by a "
         f"persona allowlist (contradicts A28.1's user-invoked-only meaning): {violations}"
     )
-
-
-def test_mutation_fixture_7_ungranted_skill_without_flag_turns_red() -> None:
-    """Direction 7a mutation fixture: drop a real, explicitly-allowlisted (non-
-    universal) skill out of the granted set without flagging it — the finder must
-    catch it."""
-    target = "dd-cli-library"
-    granted = _granted_to_any_model(_AGENTS_DIR, _SKILLS_DIR)
-    assert target in granted, "fixture precondition: target must start out granted"
-    mutated_granted = granted - {target}
-    flagged = _disable_model_invocation_flagged(_SKILLS_DIR)
-    assert target not in flagged, "fixture precondition: target must start out unflagged"
-
-    violations = _find_ungranted_not_flagged(_skills_on_disk(), mutated_granted, flagged)
-    assert violations == [target]
 
 
 def test_mutation_fixture_8_flagged_skill_still_granted_turns_red() -> None:

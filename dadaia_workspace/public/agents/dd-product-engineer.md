@@ -16,9 +16,7 @@ skills:
   - dd-domain-modeling
   - dd-codebase-design
   - dd-cli-library
-  - dd-grill-me
   - dd-spec-navigator
-  - dd-manager-orchestration
   - dd-handoff-emitter
   - dd-ai-eng-knowhow
   - dd-backlog-definition
