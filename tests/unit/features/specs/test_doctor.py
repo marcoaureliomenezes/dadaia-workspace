@@ -74,22 +74,6 @@ token_estimate: 20
 Layers.
 """
 
-MINIMAL_MEMORY_TECH_STACK_MD = """\
----
-slug: tech-stack
-title: Tech Stack Memory
-tldr: 'Technology stack.'
-summary: 'Technology stack and approved dependencies.'
-tags: []
-agent_tier: self-pull
-token_estimate: 20
----
-
-## Linguagens
-
-Python, Go.
-"""
-
 
 @pytest.fixture(autouse=True)
 def _skip_memory_lint_subprocess(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -142,7 +126,6 @@ def _make_clean_specs_tree(root: Path, release_id: str = "1.2.3") -> Path:
     (specs / "memory" / "ARCHITECTURE.md").write_text(
         MINIMAL_MEMORY_ARCHITECTURE_MD, encoding="utf-8"
     )
-    (specs / "memory" / "TECHSTACK.md").write_text(MINIMAL_MEMORY_TECH_STACK_MD, encoding="utf-8")
     (specs / "memory" / "QUALITY.md").write_text(
         "---\nslug: quality-assurance\ntitle: Quality Assurance\n"
         "tldr: 'QA standards.'\nsummary: 'QA standards and anti-slop rules.'\n"

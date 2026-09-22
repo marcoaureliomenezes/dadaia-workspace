@@ -4,6 +4,11 @@ title: Consumer validation gate
 tldr: A consumer-side validation agent running the shipped recipe on a real workspace is the release gate; no wheel publishes until every statement reports PASS.
 summary: The canonical release gate is a consumer-side validation agent running the shipped recipe on a real workspace; a deterministic internal gate never approves a release by itself.
 tags: [consumer-validation, release-gate, sdd]
+sources:
+  - dadaia_workspace/public/data/CONSUMER_VALIDATION_RECIPE.md
+  - dadaia_workspace/features/certification/**
+  - dadaia_workspace/infrastructure/certification_process.py
+  - dadaia_workspace/cli/commands/certify.py
 ---
 
 ## The gate
@@ -19,4 +24,4 @@ tags: [consumer-validation, release-gate, sdd]
 
 ## Dependencies
 
-[[workspace-init]], [[TECHSTACK]], [[spec-context-project]], [[sdd-gate-v3]], [[workspace-doctor]].
+[[workspace-init]], [[ARCHITECTURE]], [[spec-context-project]], [[sdd-gate-v3]], [[workspace-doctor]].

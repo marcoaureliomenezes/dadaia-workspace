@@ -4,6 +4,19 @@ title: sdd-bug-backlog-governance
 tldr: One bug record shape with no derived cache, one verb per governance record change, and every committed record schema-validated by dadaia doctor.
 summary: The bug record store, the backlog live photo, the release state document and the decision record store — one record per bug with no git-derived cache, one histo-record-v1 shape for every exit, every record change a CLI verb, every committed record schema-validated by dadaia doctor.
 tags: [sdd, governance, release-lifecycle, backlog, bugs, adrs, gitflow, events]
+sources:
+  - dadaia_workspace/features/backlog/**
+  - dadaia_workspace/core/models/**
+  - dadaia_workspace/core/release_state.py
+  - dadaia_workspace/public/skills/dd-bug-resolution/scripts/**
+  - dadaia_workspace/public/skills/dd-bug-registration/**
+  - dadaia_workspace/public/skills/dd-backlog-definition/scripts/**
+  - dadaia_workspace/public/skills/dd-release-implementation/scripts/**
+  - dadaia_workspace/public/skills/dd-release-definition/**
+  - dadaia_workspace/public/schemas/bugs/**
+  - dadaia_workspace/public/schemas/backlog/**
+  - dadaia_workspace/public/schemas/releases/**
+  - dadaia_workspace/public/schemas/ADRs/**
 ---
 
 ## Bugs

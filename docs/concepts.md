@@ -7,8 +7,8 @@ is `dadaia_workspace/public/data/AGENTS.md`, and the walkthrough is
 
 ## Context
 
-<!-- derived-from: spec-context-project sha256:b39739176d42 -->
-<!-- derived-from: context-management sha256:160b285ee271 -->
+<!-- derived-from: spec-context-project sha256:fa8187312a52 -->
+<!-- derived-from: context-management sha256:4e721bb8d89a -->
 
 A *context* — a Spec Context Project — is one canonical `specs/` tree owned by one
 main repository, the unit for memory, backlog, bugs, releases, reports and handoffs.
@@ -25,7 +25,7 @@ single-repo context is the degenerate case of multi-repo.
 
 ## Release and candidate
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:753748a55aa3 -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:828ff63c54dd -->
 
 Exactly one *release* is live at a time, with OPEN scope; it grows by *candidates*,
 each a closed-scope SDD cycle whose SPEC, PLAN and TASKS sit flat at the release root.
@@ -38,8 +38,8 @@ deploy.
 
 ## The flow
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:753748a55aa3 -->
-<!-- derived-from: audits-canon sha256:f33a4185f1ae -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:828ff63c54dd -->
+<!-- derived-from: audits-canon sha256:3266c387c86b -->
 
 Every demand takes one of two arms. **Arm A**, a feature, enters through the backlog
 and leaves through a candidate: operator demand, curation into `active[]`, a picked
@@ -52,7 +52,7 @@ the verbs move the records.
 
 ## The gate
 
-<!-- derived-from: sdd-gate-v3 sha256:1c17b7e34596 -->
+<!-- derived-from: sdd-gate-v3 sha256:8ecf5034a2e0 -->
 
 The *gate* is a PreToolUse chain of three policies evaluated in fixed order — root
 whitelist, venv guard, SDD gate — first block wins, and a policy that raises is ALLOW.
@@ -69,8 +69,8 @@ feeding each fix back through the gate.
 
 ## Memory
 
-<!-- derived-from: context-management sha256:160b285ee271 -->
-<!-- derived-from: workspace-doctor sha256:06aea1796d92 -->
+<!-- derived-from: context-management sha256:4e721bb8d89a -->
+<!-- derived-from: workspace-doctor sha256:707aef160b29 -->
 
 *Memory* is current product truth, never history: one Markdown atom per subject under
 `specs/memory/product/**`, plus `ARCHITECTURE.md`, `QUALITY.md` and `TECHSTACK.md`,
@@ -85,7 +85,7 @@ or path an atom cites that no longer exists — reported as a warning, never a r
 
 ## Bugs and backlog
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:753748a55aa3 -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:828ff63c54dd -->
 
 Both are records with one shape and one owning verb. `specs/bugs/BUGS.jsonl` holds one
 record per bug, appended once and keyed by `id`, with no git-derived cache — git is the
@@ -97,7 +97,7 @@ operator's demand queue, curated by `dd-product-engineer` and exited exactly onc
 
 ## Audits
 
-<!-- derived-from: audits-canon sha256:f33a4185f1ae -->
+<!-- derived-from: audits-canon sha256:3266c387c86b -->
 
 An *audit* is the only full-tree inspection lane, every other quality boundary being
 diff-scoped, and it is a committed spec artifact rather than a report: a folder under

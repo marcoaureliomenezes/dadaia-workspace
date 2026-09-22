@@ -24,8 +24,10 @@ from dadaia_workspace.core.frontmatter import FRONTMATTER_RE as _FRONTMATTER_RE
 #: v3 = agent-tier-frontmatter (v0.1.72 FR1); v4 = bugs-single-file (v0.1.73 FR1 —
 #: the operator's ONE-append-only-ledger contract); v5 = specs-canon-v6's tree shape
 #: (T-050-05); v6 = this stamp, T-050-06A — the version number itself, deferred by
-#: T-050-05 because RELEASE_SEMVER_RE's axis flip (below) is this task's write set.
-CANONICAL_SPECS_VERSION = 6
+#: T-050-05 because RELEASE_SEMVER_RE's axis flip (below) is this task's write set;
+#: v7 = memory canon v7 — ``memory/TECHSTACK.md`` left the canon and its body became
+#: ``ARCHITECTURE.md``'s ``## Tech Stack`` section, which ``features/migrate`` folds.
+CANONICAL_SPECS_VERSION = 7
 
 #: Version assigned to a tree with no stamp (pre-framework flat layout).
 UNSTAMPED_VERSION = 0

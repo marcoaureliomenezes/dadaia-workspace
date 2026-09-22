@@ -4,6 +4,10 @@ title: harness-cursor
 tldr: Entry harness on Cursor — native root AGENTS.md and .agents/skills; .cursor/ carries hooks.json (gate + reaper) and persona symlinks.
 summary: Cursor is a registry record (.cursor, cursor-md, cursor-hooks) — the personas reach it as relative symlinks under .cursor/agents/, the four behaviours as wrappers cited by .cursor/hooks.json, answered in Cursor's permission JSON.
 tags: [harness, cursor, projection, hooks]
+sources:
+  - dadaia_workspace/core/harness_registry.py
+  - dadaia_workspace/infrastructure/agent_transcodes.py
+  - dadaia_workspace/infrastructure/runtime_transforms/hook_wrappers.py
 ---
 
 ## Surface
@@ -12,7 +16,7 @@ tags: [harness, cursor, projection, hooks]
 - `dadaia harness add cursor` projects `.cursor/agents/dd-*.md` as relative symlinks onto `.agents/agents/dd-*.md` (hash-verified copy fallback, `SYMLINK-TARGET-1`) and `.cursor/hooks.json` (`version: 1`).
 - `hooks.json` cites two wrappers under `.dadaia/hooks/cursor-*`: `beforeShellExecution` -> the merged `pre_gate` (root whitelist, venv guard, SDD gate) and `sessionStart` -> the expired-state reaper; Cursor decides by stdout JSON, so the wrapper remaps the gate's native envelope to `{"permission": allow|deny, "user_message"}` — the adapter is the wrapper, never a fifth behaviour.
 - Cursor's file-edit event fires after the write, so the IDE edit lane is ungated by Cursor's own vocabulary; the gap is stated in the entity registry's `sdd-gate` row, not hidden.
-- `dadaia certify`'s `cursor-live-probe` reports SKIP `UNVERIFIED` when `cursor-agent` is absent from PATH, no version floor ([[TECHSTACK]]).
+- `dadaia certify`'s `cursor-live-probe` reports SKIP `UNVERIFIED` when `cursor-agent` is absent from PATH, no version floor ([[ARCHITECTURE]]).
 
 ## Dependencies
 

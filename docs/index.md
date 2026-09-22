@@ -15,7 +15,7 @@ skills, packaged standalone: <https://github.com/marcoaureliomenezes/dadaia-skil
 
 ## What it is
 
-<!-- derived-from: product-vision sha256:89dc2ce6898d -->
+<!-- derived-from: product-vision sha256:036b17f66118 -->
 
 dadaia-workspace is the operating environment around repositories developed with AI
 agents, and its unit is the context.
@@ -43,7 +43,7 @@ What it rests on:
 
 ## Two ways in
 
-<!-- derived-from: product-vision sha256:89dc2ce6898d -->
+<!-- derived-from: product-vision sha256:036b17f66118 -->
 
 A human installs it from PyPI and drives it from a shell: `dadaia init <dir> --harness <name> --repo <url>`
 provisions a workspace with its first project ALIVE and bound in one line, and

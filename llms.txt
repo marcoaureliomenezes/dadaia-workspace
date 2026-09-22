@@ -4,30 +4,30 @@
 
 ## What it is
 
-<!-- derived-from: product-vision sha256:89dc2ce6898d -->
+<!-- derived-from: product-vision sha256:036b17f66118 -->
 
 - [README](README.md): one workspace folder, projects in repos inside it, governance outside every repo; the unit is the context (main repo + associated repos); documents are the lifecycle; boundaries are mechanical.
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:7e18d9868790 -->
-<!-- derived-from: workspace-init sha256:871519580ea1 -->
+<!-- derived-from: pypi-distribution sha256:6cac718559b3 -->
+<!-- derived-from: workspace-init sha256:0be78b874815 -->
 
 - [PyPI project](https://pypi.org/project/dadaia-workspace/): `pip install dadaia-workspace`, then `dadaia init <dir> --harness <name> [--repo <url>]`.
 - [Changelog](CHANGELOG.md): one section per published version.
 
 ## The law
 
-<!-- derived-from: agentic-entities sha256:2ab5fd5308c8 -->
-<!-- derived-from: sdd-gate-v3 sha256:1c17b7e34596 -->
+<!-- derived-from: agentic-entities sha256:499100ebcf67 -->
+<!-- derived-from: sdd-gate-v3 sha256:8ecf5034a2e0 -->
 
 - [AGENTS.md](dadaia_workspace/public/data/AGENTS.md): the always-on law — the root map, projected once to the workspace root; every governed area carries its own scoped `AGENTS.md`.
 - [Constitution](specs/constitution.md): the derivation law for personas, behaviors, rules and skills.
 
 ## Reference
 
-<!-- derived-from: context-management sha256:160b285ee271 -->
-<!-- derived-from: workspace-doctor sha256:06aea1796d92 -->
+<!-- derived-from: context-management sha256:4e721bb8d89a -->
+<!-- derived-from: workspace-doctor sha256:707aef160b29 -->
 
 - [CLI reference](docs/cli.md): the committed output of `dadaia help tree`.
 - [Concepts](docs/concepts.md): the vocabulary — workspace, context, release, candidate, gate.
@@ -38,8 +38,8 @@
 
 ## The site
 
-<!-- derived-from: product-vision sha256:89dc2ce6898d -->
-<!-- derived-from: sdd-bug-backlog-governance sha256:753748a55aa3 -->
+<!-- derived-from: product-vision sha256:036b17f66118 -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:828ff63c54dd -->
 
 - [Documentation site](https://marcoaureliomenezes.github.io/dadaia-workspace/): the published pages, served from `docs/` on `main`.
 - [Landing](docs/index.md): the tagline and the three entry pages.

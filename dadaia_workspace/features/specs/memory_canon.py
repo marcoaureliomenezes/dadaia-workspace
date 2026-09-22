@@ -22,12 +22,12 @@ from dadaia_workspace.core.workspace_layout import (
     MEMORY_TOPLEVEL_FILES as _MEMORY_TOPLEVEL_FILES,
 )
 
-#: Top-level memory files (.md canonical source; v6 canon FR1/A1.5/A1.6, T-050-06).
+#: Top-level memory files (.md canonical source; v7 canon).
 #: Re-exported from the one canonical-name registry (0.4.7 FR5) — the canon rows that
-#: admit these three files are built from the SAME tuple.
+#: admit these files are built from the SAME tuple.
 MEMORY_TOPLEVEL_FILES = _MEMORY_TOPLEVEL_FILES
 
-#: Memory files that must exist (TREE-3): the top-level trio plus the product index.
+#: Memory files that must exist (TREE-3): the canonical pair plus the product index.
 MEMORY_REQUIRED_FILES: tuple[str, ...] = (*MEMORY_TOPLEVEL_FILES, "product/index.md")
 
 #: Forbidden memory H2 headings: changelog/history sections violate the atomicity

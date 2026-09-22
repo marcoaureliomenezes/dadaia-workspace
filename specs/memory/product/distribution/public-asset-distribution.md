@@ -4,6 +4,22 @@ title: public-asset-distribution
 tldr: Public assets staged once, projected into the authored set (root map, scoped AGENTS.md, .agents/skills, .agents/agents); .claude/ entries are symlinks.
 summary: The stage, install and doctor chain distributing the agentic surface into runtime roots, with hash-compare overwrite, rendered agents, whole-folder skills and a privacy gate.
 tags: [public, assets, distribution, projection, privacy]
+sources:
+  - dadaia_workspace/features/public/**
+  - dadaia_workspace/infrastructure/projection.py
+  - dadaia_workspace/infrastructure/projection_rules.py
+  - dadaia_workspace/infrastructure/public_assets.py
+  - dadaia_workspace/infrastructure/public_assets_common.py
+  - dadaia_workspace/infrastructure/install_plan.py
+  - dadaia_workspace/infrastructure/install_helpers.py
+  - dadaia_workspace/infrastructure/agent_transcodes.py
+  - dadaia_workspace/infrastructure/runtime_transforms/**
+  - dadaia_workspace/infrastructure/privacy_check.py
+  - dadaia_workspace/core/harness_registry.py
+  - dadaia_workspace/public/scaffold/**
+  - dadaia_workspace/public/templates/**
+  - dadaia_workspace/public/scripts/build-skills-repo.py
+  - dadaia_workspace/cli/commands/public.py
 ---
 
 ## The chain

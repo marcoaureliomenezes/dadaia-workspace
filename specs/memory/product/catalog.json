@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-22T02:01:25Z",
+  "generated_at": "2026-09-22T19:33:31Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -19,6 +19,11 @@
       "depends_on": [
         "workspace-doctor",
         "public-asset-distribution"
+      ],
+      "sources": [
+        "dadaia_workspace/core/handoff_index.py",
+        "dadaia_workspace/cli/commands/reports.py",
+        "dadaia_workspace/public/schemas/handoff-v1.schema.json"
       ]
     },
     {
@@ -35,10 +40,9 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 443,
+      "token_estimate": 441,
       "depends_on": [
         "ARCHITECTURE",
-        "TECHSTACK",
         "agentic-entities",
         "sdd-bug-backlog-governance",
         "sdd-gate-v3",
@@ -47,6 +51,12 @@
         "harness-claude-code",
         "harness-codex",
         "harness-kimi-code"
+      ],
+      "sources": [
+        "dadaia_workspace/public/agents/**",
+        "dadaia_workspace/core/agent_model_templates.py",
+        "dadaia_workspace/core/model_registry.py",
+        "dadaia_workspace/public/skills/dd-manager-orchestration/**"
       ]
     },
     {
@@ -68,31 +78,17 @@
         "public-asset-distribution",
         "QUALITY",
         "ARCHITECTURE",
-        "agent-orchestration",
-        "TECHSTACK"
+        "agent-orchestration"
+      ],
+      "sources": [
+        "dadaia_workspace/public/entities/**",
+        "dadaia_workspace/public/data/CONTEXT-MAP.md",
+        "dadaia_workspace/public/skills/**",
+        "dadaia_workspace/infrastructure/entity_doctor.py"
       ]
     },
     {
       "rank": 4,
-      "slug": "brand-identity",
-      "title": "brand-identity",
-      "area": "distribution",
-      "tldr": "The brand — the dadaia-workspace slug, the rhino mark and the five-colour palette — for the docs site and launch assets; no in-package UI carries it any more.",
-      "summary": "The canonical palette and mark survive the panel's demolition as the brand for public presence (docs site, README, launch assets); they live in the repository's public assets, never in a served UI.",
-      "path": "specs/memory/product/distribution/brand-identity.md",
-      "tags": [
-        "brand",
-        "design",
-        "palette"
-      ],
-      "token_estimate": 120,
-      "depends_on": [
-        "pypi-distribution",
-        "product-vision"
-      ]
-    },
-    {
-      "rank": 5,
       "slug": "public-asset-distribution",
       "title": "public-asset-distribution",
       "area": "distribution",
@@ -113,10 +109,27 @@
         "pypi-distribution",
         "workspace-doctor",
         "workspace-init"
+      ],
+      "sources": [
+        "dadaia_workspace/features/public/**",
+        "dadaia_workspace/infrastructure/projection.py",
+        "dadaia_workspace/infrastructure/projection_rules.py",
+        "dadaia_workspace/infrastructure/public_assets.py",
+        "dadaia_workspace/infrastructure/public_assets_common.py",
+        "dadaia_workspace/infrastructure/install_plan.py",
+        "dadaia_workspace/infrastructure/install_helpers.py",
+        "dadaia_workspace/infrastructure/agent_transcodes.py",
+        "dadaia_workspace/infrastructure/runtime_transforms/**",
+        "dadaia_workspace/infrastructure/privacy_check.py",
+        "dadaia_workspace/core/harness_registry.py",
+        "dadaia_workspace/public/scaffold/**",
+        "dadaia_workspace/public/templates/**",
+        "dadaia_workspace/public/scripts/build-skills-repo.py",
+        "dadaia_workspace/cli/commands/public.py"
       ]
     },
     {
-      "rank": 6,
+      "rank": 5,
       "slug": "pypi-distribution",
       "title": "pypi-distribution",
       "area": "distribution",
@@ -135,10 +148,19 @@
         "consumer-agent-support",
         "QUALITY",
         "cross-platform-portability"
+      ],
+      "sources": [
+        "pyproject.toml",
+        ".github/workflows/**",
+        "release-please-config.json",
+        ".release-please-manifest.json",
+        "dadaia_workspace/cli/main.py",
+        "dadaia_workspace/__main__.py",
+        "docs/**"
       ]
     },
     {
-      "rank": 7,
+      "rank": 6,
       "slug": "harness-claude-code",
       "title": "harness-claude-code",
       "area": "harness",
@@ -157,12 +179,16 @@
         "public-asset-distribution",
         "context-management",
         "sdd-gate-v3",
-        "TECHSTACK",
+        "ARCHITECTURE",
         "agent-orchestration"
+      ],
+      "sources": [
+        "dadaia_workspace/core/harness_registry.py",
+        "dadaia_workspace/infrastructure/runtime_transforms/hook_wrappers.py"
       ]
     },
     {
-      "rank": 8,
+      "rank": 7,
       "slug": "harness-codex",
       "title": "harness-codex",
       "area": "harness",
@@ -179,13 +205,19 @@
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
-        "TECHSTACK",
+        "ARCHITECTURE",
         "agentic-entities",
         "agent-orchestration"
+      ],
+      "sources": [
+        "dadaia_workspace/core/harness_registry.py",
+        "dadaia_workspace/infrastructure/codex_doctor.py",
+        "dadaia_workspace/infrastructure/agent_transcodes.py",
+        "dadaia_workspace/infrastructure/runtime_transforms/hook_wrappers.py"
       ]
     },
     {
-      "rank": 9,
+      "rank": 8,
       "slug": "harness-copilot",
       "title": "harness-copilot",
       "area": "harness",
@@ -201,14 +233,19 @@
       "token_estimate": 208,
       "depends_on": [
         "agentic-entities",
-        "TECHSTACK",
+        "ARCHITECTURE",
         "public-asset-distribution",
         "sdd-gate-v3",
         "workspace-init"
+      ],
+      "sources": [
+        "dadaia_workspace/core/harness_registry.py",
+        "dadaia_workspace/infrastructure/agent_transcodes.py",
+        "dadaia_workspace/infrastructure/runtime_transforms/hook_wrappers.py"
       ]
     },
     {
-      "rank": 10,
+      "rank": 9,
       "slug": "harness-cursor",
       "title": "harness-cursor",
       "area": "harness",
@@ -223,15 +260,20 @@
       ],
       "token_estimate": 215,
       "depends_on": [
-        "TECHSTACK",
+        "ARCHITECTURE",
         "agentic-entities",
         "public-asset-distribution",
         "sdd-gate-v3",
         "workspace-init"
+      ],
+      "sources": [
+        "dadaia_workspace/core/harness_registry.py",
+        "dadaia_workspace/infrastructure/agent_transcodes.py",
+        "dadaia_workspace/infrastructure/runtime_transforms/hook_wrappers.py"
       ]
     },
     {
-      "rank": 11,
+      "rank": 10,
       "slug": "harness-devin",
       "title": "harness-devin",
       "area": "harness",
@@ -247,14 +289,19 @@
       "token_estimate": 174,
       "depends_on": [
         "agentic-entities",
-        "TECHSTACK",
+        "ARCHITECTURE",
         "public-asset-distribution",
         "sdd-gate-v3",
         "workspace-init"
+      ],
+      "sources": [
+        "dadaia_workspace/core/harness_registry.py",
+        "dadaia_workspace/infrastructure/agent_transcodes.py",
+        "dadaia_workspace/infrastructure/runtime_transforms/hook_wrappers.py"
       ]
     },
     {
-      "rank": 12,
+      "rank": 11,
       "slug": "harness-kimi-code",
       "title": "harness-kimi-code",
       "area": "harness",
@@ -273,13 +320,18 @@
         "agentic-entities",
         "context-management",
         "workspace-init",
-        "TECHSTACK",
+        "ARCHITECTURE",
         "sdd-gate-v3",
         "harness-claude-code"
+      ],
+      "sources": [
+        "dadaia_workspace/core/harness_registry.py",
+        "dadaia_workspace/infrastructure/runtime_config.py",
+        "dadaia_workspace/infrastructure/runtime_transforms/hook_wrappers.py"
       ]
     },
     {
-      "rank": 13,
+      "rank": 12,
       "slug": "product-vision",
       "title": "product-vision",
       "area": "philosophy",
@@ -304,10 +356,15 @@
         "agent-comms",
         "QUALITY",
         "ARCHITECTURE"
+      ],
+      "sources": [
+        "AGENTS.md",
+        "dadaia_workspace/public/data/AGENTS.md",
+        "specs/constitution.md"
       ]
     },
     {
-      "rank": 14,
+      "rank": 13,
       "slug": "spec-context-project",
       "title": "spec-context-project",
       "area": "philosophy",
@@ -325,10 +382,15 @@
         "context-management",
         "sdd-gate-v3",
         "ARCHITECTURE"
+      ],
+      "sources": [
+        "dadaia_workspace/features/spec_context/**",
+        "dadaia_workspace/core/invocation.py",
+        "dadaia_workspace/cli/commands/context.py"
       ]
     },
     {
-      "rank": 15,
+      "rank": 14,
       "slug": "consumer-agent-support",
       "title": "Consumer validation gate",
       "area": "platform",
@@ -343,14 +405,20 @@
       "token_estimate": 347,
       "depends_on": [
         "workspace-init",
-        "TECHSTACK",
+        "ARCHITECTURE",
         "spec-context-project",
         "sdd-gate-v3",
         "workspace-doctor"
+      ],
+      "sources": [
+        "dadaia_workspace/public/data/CONSUMER_VALIDATION_RECIPE.md",
+        "dadaia_workspace/features/certification/**",
+        "dadaia_workspace/infrastructure/certification_process.py",
+        "dadaia_workspace/cli/commands/certify.py"
       ]
     },
     {
-      "rank": 16,
+      "rank": 15,
       "slug": "context-management",
       "title": "context-management",
       "area": "platform",
@@ -371,10 +439,21 @@
         "spec-context-project",
         "workspace-init",
         "QUALITY"
+      ],
+      "sources": [
+        "dadaia_workspace/hooks/ctx_inject.py",
+        "dadaia_workspace/hooks/_common.py",
+        "dadaia_workspace/core/invocation.py",
+        "dadaia_workspace/core/session_store.py",
+        "dadaia_workspace/core/record_liveness.py",
+        "dadaia_workspace/features/spec_context/injection_policy.py",
+        "dadaia_workspace/features/spec_context/markers.py",
+        "dadaia_workspace/infrastructure/json_context_store.py",
+        "dadaia_workspace/cli/commands/context.py"
       ]
     },
     {
-      "rank": 17,
+      "rank": 16,
       "slug": "cross-platform-portability",
       "title": "cross-platform-portability",
       "area": "platform",
@@ -395,10 +474,16 @@
         "workspace-init",
         "ARCHITECTURE",
         "public-asset-distribution"
+      ],
+      "sources": [
+        "dadaia_workspace/core/platform.py",
+        "dadaia_workspace/infrastructure/file_permission_*.py",
+        "dadaia_workspace/infrastructure/signal_shutdown_*.py",
+        "dadaia_workspace/core/protocols/**"
       ]
     },
     {
-      "rank": 18,
+      "rank": 17,
       "slug": "server-registry",
       "title": "server-registry",
       "area": "platform",
@@ -414,10 +499,13 @@
       "token_estimate": 231,
       "depends_on": [
         "workspace-init"
+      ],
+      "sources": [
+        "dadaia_workspace/public/skills/dd-cli-library/scripts/registry.py"
       ]
     },
     {
-      "rank": 19,
+      "rank": 18,
       "slug": "workspace-doctor",
       "title": "workspace-doctor",
       "area": "platform",
@@ -445,10 +533,21 @@
         "public-asset-distribution",
         "workspace-init",
         "audits-canon"
+      ],
+      "sources": [
+        "dadaia_workspace/cli/commands/doctor.py",
+        "dadaia_workspace/core/doctor_rules.py",
+        "dadaia_workspace/core/workspace_layout.py",
+        "dadaia_workspace/features/specs/**",
+        "dadaia_workspace/features/spec_context/doctor.py",
+        "dadaia_workspace/features/spec_context/sweep.py",
+        "dadaia_workspace/features/backlog/doctor.py",
+        "dadaia_workspace/features/reconcile/**",
+        "dadaia_workspace/cli/commands/reconcile.py"
       ]
     },
     {
-      "rank": 20,
+      "rank": 19,
       "slug": "workspace-init",
       "title": "workspace-init",
       "area": "platform",
@@ -467,10 +566,18 @@
         "public-asset-distribution",
         "context-management",
         "cross-platform-portability"
+      ],
+      "sources": [
+        "dadaia_workspace/cli/commands/init.py",
+        "dadaia_workspace/cli/commands/harness.py",
+        "dadaia_workspace/features/workspace/**",
+        "dadaia_workspace/infrastructure/python_env.py",
+        "dadaia_workspace/infrastructure/json_harness_profile_store.py",
+        "dadaia_workspace/core/workspace_resolver.py"
       ]
     },
     {
-      "rank": 21,
+      "rank": 20,
       "slug": "audits-canon",
       "title": "audits-canon",
       "area": "sdd",
@@ -490,10 +597,15 @@
         "workspace-doctor",
         "sdd-gate-v3",
         "agent-comms"
+      ],
+      "sources": [
+        "dadaia_workspace/features/specs/doctor_closure_audit.py",
+        "dadaia_workspace/public/skills/dd-audit-project/**",
+        "dadaia_workspace/public/schemas/audits/**"
       ]
     },
     {
-      "rank": 22,
+      "rank": 21,
       "slug": "sdd-bug-backlog-governance",
       "title": "sdd-bug-backlog-governance",
       "area": "sdd",
@@ -516,10 +628,24 @@
         "sdd-gate-v3",
         "agent-comms",
         "audits-canon"
+      ],
+      "sources": [
+        "dadaia_workspace/features/backlog/**",
+        "dadaia_workspace/core/models/**",
+        "dadaia_workspace/core/release_state.py",
+        "dadaia_workspace/public/skills/dd-bug-resolution/scripts/**",
+        "dadaia_workspace/public/skills/dd-bug-registration/**",
+        "dadaia_workspace/public/skills/dd-backlog-definition/scripts/**",
+        "dadaia_workspace/public/skills/dd-release-implementation/scripts/**",
+        "dadaia_workspace/public/skills/dd-release-definition/**",
+        "dadaia_workspace/public/schemas/bugs/**",
+        "dadaia_workspace/public/schemas/backlog/**",
+        "dadaia_workspace/public/schemas/releases/**",
+        "dadaia_workspace/public/schemas/ADRs/**"
       ]
     },
     {
-      "rank": 23,
+      "rank": 22,
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "area": "sdd",
@@ -539,6 +665,18 @@
         "workspace-doctor",
         "context-management",
         "ARCHITECTURE"
+      ],
+      "sources": [
+        "dadaia_workspace/hooks/__init__.py",
+        "dadaia_workspace/hooks/pre_gate.py",
+        "dadaia_workspace/hooks/sdd_gate.py",
+        "dadaia_workspace/hooks/sdd_post_gate.py",
+        "dadaia_workspace/hooks/root_whitelist.py",
+        "dadaia_workspace/hooks/venv_guard.py",
+        "dadaia_workspace/features/spec_context/gate_policy.py",
+        "dadaia_workspace/features/chokepoints/**",
+        "dadaia_workspace/infrastructure/data/privacy_baseline.json",
+        "dadaia_workspace/cli/commands/ci.py"
       ]
     }
   ]

@@ -133,7 +133,7 @@ def _live_feature_package_names() -> set[str]:
 def _iter_memory_md_files(mem_dir: Path) -> list[Path]:
     """All memory .md atom files that should be checked for atomicity.
 
-    Includes the top-level singles (ARCHITECTURE.md, TECHSTACK.md, QUALITY.md) and every
+    Includes the top-level singles (ARCHITECTURE.md, QUALITY.md) and every
     *.md under product/ except index.md (the catalog folder).
     """
     out: list[Path] = []

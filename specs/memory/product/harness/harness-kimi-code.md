@@ -4,6 +4,10 @@ title: harness-kimi-code
 tldr: Layer-1 harness with an empty projection set — reads root AGENTS.md, .agents/skills and .agents/agents natively; user-level hook shims; DADAIA_CONTEXT binding.
 summary: Kimi Code consumes the universal authored set directly; the .kimi-code/ mirror died at 0.4.7 candidate 6 (ADR 0017). Hooks stay user-level shims; binding is the exported DADAIA_CONTEXT.
 tags: [harness, kimi-code, hooks, binding]
+sources:
+  - dadaia_workspace/core/harness_registry.py
+  - dadaia_workspace/infrastructure/runtime_config.py
+  - dadaia_workspace/infrastructure/runtime_transforms/hook_wrappers.py
 ---
 
 ## Load path, hooks and binding
@@ -19,4 +23,4 @@ tags: [harness, kimi-code, hooks, binding]
 
 ## Dependencies
 
-[[workspace-init]], [[TECHSTACK]], [[sdd-gate-v3]], [[harness-claude-code]].
+[[workspace-init]], [[ARCHITECTURE]], [[sdd-gate-v3]], [[harness-claude-code]].

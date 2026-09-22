@@ -4,6 +4,10 @@ title: product-vision
 tldr: One workspace folder, an agent at its root, projects in repos inside, governance outside every repo; multi-project x multi-repo, never a monorepo; no slop.
 summary: The founding paradigm and the pillars of dadaia-workspace, plus the two usage paths (a human from a shell, an agent from the root AGENTS.md map).
 tags: [vision, paradigm, pillars]
+sources:
+  - AGENTS.md
+  - dadaia_workspace/public/data/AGENTS.md
+  - specs/constitution.md
 ---
 
 ## The paradigm

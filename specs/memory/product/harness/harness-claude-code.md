@@ -4,6 +4,9 @@ title: harness-claude-code
 tldr: Entry harness with native sub-agent dispatch; reads the root AGENTS.md map natively and reaches skills and personas through per-entry symlinks into .agents/.
 summary: How Claude Code loads the workspace law, attaches scoped law, dispatches the three dd- personas, and which hooks and gates it runs; the CLAUDE.md bridge and the DADAIA.md chain died at 0.4.7 candidate 6 (ADR 0017).
 tags: [harness, claude-code, projection, hooks]
+sources:
+  - dadaia_workspace/core/harness_registry.py
+  - dadaia_workspace/infrastructure/runtime_transforms/hook_wrappers.py
 ---
 
 ## Load path and gates
@@ -24,4 +27,4 @@ tags: [harness, claude-code, projection, hooks]
 
 ## Dependencies
 
-[[TECHSTACK]], [[sdd-gate-v3]], [[public-asset-distribution]], [[agent-orchestration]], [[agentic-entities]].
+[[ARCHITECTURE]], [[sdd-gate-v3]], [[public-asset-distribution]], [[agent-orchestration]], [[agentic-entities]].

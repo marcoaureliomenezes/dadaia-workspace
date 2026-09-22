@@ -47,9 +47,9 @@
         {
           "subject": {
             "kind": "catalog",
-            "ref": "brand-identity"
+            "ref": "public-asset-distribution"
           },
-          "change": "deleted at the candidate's closure reconciliation"
+          "change": "the product memory tier is reconciled delete-update-add; the dead brand-identity atom is deleted"
         }
       ]
     }

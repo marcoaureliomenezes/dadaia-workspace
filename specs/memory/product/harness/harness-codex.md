@@ -4,6 +4,11 @@ title: harness-codex
 tldr: Entry harness on the Codex CLI — native AGENTS.md chain and .agents/skills; .codex/ carries config, hooks, Starlark rules and the persona TOML transcode.
 summary: Codex reads the root map, the root->cwd AGENTS.md chain and .agents/skills natively; .codex/ holds config.toml, hooks.json, rules and the three dd- persona TOMLs transcoded from .agents/agents/. The .codex/skills copies and the DADAIA.md mirror died at 0.4.7 candidate 6.
 tags: [harness, codex, projection, hooks]
+sources:
+  - dadaia_workspace/core/harness_registry.py
+  - dadaia_workspace/infrastructure/codex_doctor.py
+  - dadaia_workspace/infrastructure/agent_transcodes.py
+  - dadaia_workspace/infrastructure/runtime_transforms/hook_wrappers.py
 ---
 
 ## Surface
@@ -18,4 +23,4 @@ tags: [harness, codex, projection, hooks]
 
 ## Dependencies
 
-[[TECHSTACK]], [[sdd-gate-v3]], [[agentic-entities]], [[public-asset-distribution]], [[agent-orchestration]].
+[[ARCHITECTURE]], [[sdd-gate-v3]], [[agentic-entities]], [[public-asset-distribution]], [[agent-orchestration]].

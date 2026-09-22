@@ -2,8 +2,10 @@
 
 Sequence (v0.5.1 K10): resolve the current pattern version, then apply the registry's
 one surviving rule (:func:`~dadaia_workspace.features.migrate.registry.check_upgradable`)
--- ``current < goal`` raises :class:`~dadaia_workspace.features.migrate.registry.UpgradeRefused`
-without touching the filesystem; ``current >= goal`` is a no-op except for the
+-- a tree below the one live hop raises
+:class:`~dadaia_workspace.features.migrate.registry.UpgradeRefused` without touching the
+filesystem; a tree at 6 walks the 6 -> 7 hop (:func:`fold_tech_stack`) and is re-stamped;
+a tree already at canonical is a no-op except for the
 unconditional template-artifact repair (bug
 scaffold-repair-cannot-remediate-invalid-placeholder-atom), which runs regardless of
 version since it is unrelated to the retired migration chain.
@@ -19,6 +21,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from dadaia_workspace.core import specs_version as _version
+from dadaia_workspace.core.frontmatter import FRONTMATTER_RE
 from dadaia_workspace.core.spec_status import APPROVED, DRAFT, IN_REVIEW
 from dadaia_workspace.core.specs_repair import remove_placeholder_atoms
 from dadaia_workspace.features.migrate import registry as _registry
@@ -38,6 +41,9 @@ class UpgradeResult:
     #: Live-release trio documents whose retired Portuguese status token was rewritten
     #: to the English vocabulary (planned-only when ``dry_run``).
     status_rewritten: list[Path] = field(default_factory=list)
+    #: ``memory/TECHSTACK.md`` folded into ``ARCHITECTURE.md``'s ``## Tech Stack``
+    #: section and deleted by the 6 -> 7 hop (planned-only when ``dry_run``).
+    tech_stack_folded: list[Path] = field(default_factory=list)
 
 
 def upgrade(
@@ -61,17 +67,73 @@ def upgrade(
             specs_dir
         )
         restated = plan_status_token_rewrites(specs_dir)
+        folded = plan_tech_stack_fold(specs_dir)
     else:
         removed = remove_placeholder_atoms(specs_dir) + remove_empty_ideas_dir(specs_dir)
         restated = rewrite_status_tokens(specs_dir)
+        folded = fold_tech_stack(specs_dir)
+        if current < goal:
+            _version.write_pattern_version(specs_dir, goal)
     return UpgradeResult(
         from_version=current,
         to_version=goal,
         dry_run=dry_run,
-        no_op=not (removed or restated),
+        no_op=not (removed or restated or folded),
         placeholder_removed=removed,
         status_rewritten=restated,
+        tech_stack_folded=folded,
     )
+
+
+#: The section ``TECHSTACK.md``'s body becomes, appended at the END of ``ARCHITECTURE.md``
+#: so the canonical file's existing sections keep their order and their anchors.
+_TECH_STACK_HEADING = "## Tech Stack"
+
+#: A tree whose canonical memory still carries the retired two-tier shape. The fold is a
+#: text append, and appending a section to a document organised as Part 1 / Part 2 would
+#: put it outside both parts — silent corruption. Such a tree is left byte-identical and
+#: the doctor names it (TREE-5's canonical-law comparator and the memory shape rules).
+_RETIRED_PART_HEADING = "## Part 1 — Principles"
+
+
+def plan_tech_stack_fold(specs_dir: Path) -> list[Path]:
+    """``memory/TECHSTACK.md``, when it exists and ``ARCHITECTURE.md`` can absorb it."""
+    tech = specs_dir / "memory" / "TECHSTACK.md"
+    architecture = specs_dir / "memory" / "ARCHITECTURE.md"
+    if not (tech.is_file() and architecture.is_file()):
+        return []
+    if _RETIRED_PART_HEADING in architecture.read_text(encoding="utf-8"):
+        return []
+    return [tech]
+
+
+def fold_tech_stack(specs_dir: Path) -> list[Path]:
+    """Append ``TECHSTACK.md``'s body under ``## Tech Stack`` at the end of
+    ``ARCHITECTURE.md``, then delete the file — the 6 -> 7 hop (memory canon v7).
+
+    The body is everything after the document's own H1/frontmatter title block, taken
+    verbatim: the hop moves a consumer's authored text, it never rewrites it.
+    """
+    planned = plan_tech_stack_fold(specs_dir)
+    for tech in planned:
+        architecture = tech.parent / "ARCHITECTURE.md"
+        body = _tech_stack_body(tech.read_text(encoding="utf-8"))
+        existing = architecture.read_text(encoding="utf-8").rstrip("\n")
+        architecture.write_text(
+            f"{existing}\n\n{_TECH_STACK_HEADING}\n\n{body}\n", encoding="utf-8"
+        )
+        tech.unlink()
+    return planned
+
+
+def _tech_stack_body(text: str) -> str:
+    """*text* minus its YAML frontmatter and its leading ``# `` title line."""
+    fm = FRONTMATTER_RE.match(text)
+    remainder = text[fm.end() :] if fm else text
+    lines = remainder.splitlines()
+    while lines and (not lines[0].strip() or lines[0].startswith("# ")):
+        lines.pop(0)
+    return "\n".join(lines).strip()
 
 
 def plan_empty_ideas_dir(specs_dir: Path) -> list[Path]:

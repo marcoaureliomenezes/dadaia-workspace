@@ -64,7 +64,12 @@ _DOCTOR_CEILING = 6
 # its status-token rewrite lane — an authorized, task-declared change to this module
 # (same-commit justification per this test's own error message), not a renewal of the
 # SCAFFOLD's 0.6.0 expiry.
-_UPGRADE_MODULE_SHA256 = "c87c9cd84f1bd5eb6f054adf99e108d6424fc2ff7dbc47366ccb35f1e0a71c30"
+# Re-pinned at 0.4.7 c11 T-047-101 (FR1): memory canon v7 retires `memory/TECHSTACK.md`,
+# and a consumer tree stamped 6 reaches 7 only if something folds its body into
+# ARCHITECTURE.md's `## Tech Stack` section — the 6 -> 7 hop this module now carries
+# (`fold_tech_stack`), plus the re-stamp that hop requires. An authorized, task-declared
+# change (P-20's same-commit justification), not a renewal of the SCAFFOLD's 0.6.0 expiry.
+_UPGRADE_MODULE_SHA256 = "6d212b0afc2f92975178dcd6d55a613050cfbfe17f26956245bc4ecb27b5a471"
 
 
 def _complexity_by_name(path: Path) -> dict[str, int]:

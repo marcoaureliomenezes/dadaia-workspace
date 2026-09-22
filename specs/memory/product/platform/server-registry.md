@@ -4,6 +4,8 @@ title: server-registry
 tldr: Port registry with TTL and PID tracking so parallel agents' dev servers never collide, owned by one stdlib script under the dd-cli-library skill.
 summary: A JSON registry of dev-server ports with TTL and PID tracking, an expiry sweeper and a read-only scan against real OS listeners — read and written only by `dd-cli-library/scripts/registry.py`; no CLI verb.
 tags: [server, registry, ports, ttl]
+sources:
+  - dadaia_workspace/public/skills/dd-cli-library/scripts/registry.py
 ---
 
 ## Behavior

@@ -19,7 +19,6 @@ _CANON_PATHS: tuple[str, ...] = (
     "memory/AGENTS.md",
     "memory/ARCHITECTURE.md",
     "memory/QUALITY.md",
-    "memory/TECHSTACK.md",
     "memory/product/index.md",
     "memory/product/catalog.json",
     "memory/product/sdd/specs-doctor.md",

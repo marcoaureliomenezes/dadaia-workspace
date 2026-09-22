@@ -158,10 +158,6 @@ _SKILL_SCRIPT_SCHEMAS: tuple[tuple[str, str], ...] = (
     ),
     ("schemas/audits/finding-record-v1.schema.json", "skills/dd-audit-project/scripts/schemas"),
     ("schemas/histo/histo-record-v1.schema.json", "skills/dd-audit-project/scripts/schemas"),
-    (
-        "schemas/memory/memory-frontmatter-v1.schema.json",
-        "skills/dd-spec-navigator/scripts/schemas",
-    ),
 )
 
 

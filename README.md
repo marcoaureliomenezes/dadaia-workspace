@@ -13,7 +13,7 @@ its **associated repos** are the others it owns.
 
 ## What it is and principles
 
-<!-- derived-from: product-vision sha256:89dc2ce6898d -->
+<!-- derived-from: product-vision sha256:036b17f66118 -->
 
 dadaia-workspace is the operating environment around repositories developed with AI
 agents. Its unit is the context — a Spec Context Project: one registered `specs/`
@@ -46,10 +46,10 @@ atom under its content hash.
 
 ## A human installs and uses it
 
-<!-- derived-from: pypi-distribution sha256:7e18d9868790 -->
-<!-- derived-from: workspace-init sha256:871519580ea1 -->
-<!-- derived-from: context-management sha256:160b285ee271 -->
-<!-- derived-from: workspace-doctor sha256:06aea1796d92 -->
+<!-- derived-from: pypi-distribution sha256:6cac718559b3 -->
+<!-- derived-from: workspace-init sha256:0be78b874815 -->
+<!-- derived-from: context-management sha256:4e721bb8d89a -->
+<!-- derived-from: workspace-doctor sha256:707aef160b29 -->
 
 ```bash
 pip install dadaia-workspace
@@ -88,16 +88,16 @@ time, **review** before the push, **close** the candidate and merge it.
 
 ## An agent reads AGENTS.md and uses it
 
-<!-- derived-from: agentic-entities sha256:2ab5fd5308c8 -->
-<!-- derived-from: sdd-gate-v3 sha256:1c17b7e34596 -->
-<!-- derived-from: sdd-bug-backlog-governance sha256:753748a55aa3 -->
-<!-- derived-from: harness-claude-code sha256:23883db47f8c -->
-<!-- derived-from: harness-codex sha256:2391531daea2 -->
-<!-- derived-from: harness-kimi-code sha256:ec6b118dc6ac -->
-<!-- derived-from: harness-cursor sha256:aeb19cebd0e1 -->
-<!-- derived-from: harness-devin sha256:93ac9b208971 -->
-<!-- derived-from: harness-copilot sha256:47a805e79df0 -->
-<!-- derived-from: agent-comms sha256:8434208d28f3 -->
+<!-- derived-from: agentic-entities sha256:499100ebcf67 -->
+<!-- derived-from: sdd-gate-v3 sha256:8ecf5034a2e0 -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:828ff63c54dd -->
+<!-- derived-from: harness-claude-code sha256:90c7848d615e -->
+<!-- derived-from: harness-codex sha256:444777195526 -->
+<!-- derived-from: harness-kimi-code sha256:4806764e8fb7 -->
+<!-- derived-from: harness-cursor sha256:2067fc07ed62 -->
+<!-- derived-from: harness-devin sha256:cc0f06be0863 -->
+<!-- derived-from: harness-copilot sha256:103d6734ffcb -->
+<!-- derived-from: agent-comms sha256:7c62bb2d5835 -->
 
 The always-on law is the root `AGENTS.md` map: the flow, the roles, the gate
 invariants, where output is written. Every governed area carries its own scoped
@@ -133,8 +133,8 @@ runtime tree, validated by `dadaia reports validate`.
 
 ## Documentation
 
-<!-- derived-from: pypi-distribution sha256:7e18d9868790 -->
-<!-- derived-from: public-asset-distribution sha256:529c785de7b6 -->
+<!-- derived-from: pypi-distribution sha256:6cac718559b3 -->
+<!-- derived-from: public-asset-distribution sha256:0d1a30f19542 -->
 
 The site is <https://marcoaureliomenezes.github.io/dadaia-workspace/>:
 
@@ -152,7 +152,7 @@ The skills install without a workspace, from their own built repository:
 
 ## Links
 
-<!-- derived-from: pypi-distribution sha256:7e18d9868790 -->
+<!-- derived-from: pypi-distribution sha256:6cac718559b3 -->
 
 - GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
 - PyPI — <https://pypi.org/project/dadaia-workspace/>

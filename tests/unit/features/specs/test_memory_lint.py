@@ -319,3 +319,54 @@ def test_agent_tier_property_absent_from_schema() -> None:
     schema = load_frontmatter_schema()
     assert "agent_tier" not in schema["properties"]
     assert "agent_tier" not in schema.get("required", [])
+
+
+# --------------------------------------------------------------------------- #
+# T-047-93 — a product atom declares the code it describes (`sources`).
+# --------------------------------------------------------------------------- #
+
+
+def _product_tree(tmp_path: Path) -> tuple[Path, Path]:
+    """A repo with one real source file and an empty `specs/memory/product/area/`."""
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "code.py").write_text("x = 1\n", encoding="utf-8")
+    memory_dir = tmp_path / "specs" / "memory"
+    area = memory_dir / "product" / "area"
+    area.mkdir(parents=True)
+    return memory_dir, area
+
+
+def test_a_product_atom_without_sources_is_an_error(tmp_path: Path) -> None:
+    memory_dir, area = _product_tree(tmp_path)
+    atom = _make_atom(area, slug="feature")
+
+    result = lint_atom(atom, memory_dir, load_frontmatter_schema())
+
+    assert any("sources" in error for error in result.errors), result.errors
+
+
+def test_a_source_glob_that_matches_no_file_is_an_error(tmp_path: Path) -> None:
+    memory_dir, area = _product_tree(tmp_path)
+    atom = _make_atom(area, slug="feature", extra_fm_fields={"sources": ["src/gone/**"]})
+
+    result = lint_atom(atom, memory_dir, load_frontmatter_schema())
+
+    assert any("src/gone/**" in error for error in result.errors), result.errors
+
+
+def test_a_product_atom_whose_sources_match_real_code_is_clean(tmp_path: Path) -> None:
+    memory_dir, area = _product_tree(tmp_path)
+    atom = _make_atom(area, slug="feature", extra_fm_fields={"sources": ["src/**"]})
+
+    result = lint_atom(atom, memory_dir, load_frontmatter_schema())
+
+    assert result.errors == []
+
+
+def test_a_canonical_file_needs_no_sources(tmp_path: Path) -> None:
+    memory_dir, _ = _product_tree(tmp_path)
+    atom = _make_atom(memory_dir, slug="ARCHITECTURE", filename="ARCHITECTURE.md")
+
+    result = lint_atom(atom, memory_dir, load_frontmatter_schema())
+
+    assert result.errors == []

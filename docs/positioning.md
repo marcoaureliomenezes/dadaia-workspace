@@ -5,7 +5,7 @@ projects.
 
 ## The paradigm
 
-<!-- derived-from: product-vision sha256:89dc2ce6898d -->
+<!-- derived-from: product-vision sha256:036b17f66118 -->
 
 A workspace is one folder, and the agent session launches at its root, always.
 Projects live in repos inside it — `repos/<slug>/`. Governance lives outside every
@@ -22,7 +22,7 @@ single-repo project is simply the degenerate case of the multi-repo one.
 
 ## The unit is the context
 
-<!-- derived-from: spec-context-project sha256:b39739176d42 -->
+<!-- derived-from: spec-context-project sha256:fa8187312a52 -->
 
 A context — a Spec Context Project — is one canonical `specs/` tree owned by one main
 repository: the unit for memory, backlog, bugs, releases, reports and handoffs. A
@@ -43,8 +43,8 @@ bind that would allow it. An unbound session is never scope-judged.
 
 ## Ten repositories, one law
 
-<!-- derived-from: product-vision sha256:89dc2ce6898d -->
-<!-- derived-from: spec-context-project sha256:b39739176d42 -->
+<!-- derived-from: product-vision sha256:036b17f66118 -->
+<!-- derived-from: spec-context-project sha256:fa8187312a52 -->
 
 A team with ten repositories does not maintain ten copies of anything:
 

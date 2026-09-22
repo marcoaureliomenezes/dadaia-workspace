@@ -31,7 +31,6 @@ _EXPECTED_FILES = [
     "AGENTS.md",
     "memory/AGENTS.md",
     "memory/ARCHITECTURE.md",
-    "memory/TECHSTACK.md",
     "memory/QUALITY.md",
     "memory/product/index.md",
     "memory/product/catalog.json",
@@ -85,7 +84,7 @@ def test_scaffold_happy_path_creates_all_artifacts(tmp_path: Path) -> None:
     assert list((specs_dir / "releases").glob("*/RELEASE.json")) == []
 
     # Born-markdown .md stubs exist and start with YAML frontmatter (memory-markdown-source-v1).
-    for rel in ("memory/ARCHITECTURE.md", "memory/TECHSTACK.md", "memory/product/index.md"):
+    for rel in ("memory/ARCHITECTURE.md", "memory/QUALITY.md", "memory/product/index.md"):
         content = (specs_dir / rel).read_text(encoding="utf-8")
         assert content.startswith("---"), f"{rel} must start with YAML frontmatter"
 

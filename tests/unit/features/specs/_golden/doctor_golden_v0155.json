@@ -14,12 +14,6 @@
     },
     {
       "code": "SPEC-DOC-002",
-      "description": "memory/TECHSTACK.md is missing — memory must be Markdown (.md)",
-      "path": "<SPECS>/memory/TECHSTACK.md",
-      "severity": "error"
-    },
-    {
-      "code": "SPEC-DOC-002",
       "description": "memory/QUALITY.md is missing — memory must be Markdown (.md)",
       "path": "<SPECS>/memory/QUALITY.md",
       "severity": "error"
@@ -32,25 +26,19 @@
     },
     {
       "code": "TREE-3",
-      "description": "memory/ARCHITECTURE.md is missing — required memory .md atom. Create it using `python3 .agents/skills/dd-spec-navigator/scripts/memory.py product add <area> <slug>`.",
+      "description": "memory/ARCHITECTURE.md is missing — required memory .md atom. Author it, then regenerate the pair with `python3 .agents/skills/dd-spec-navigator/scripts/memory.py catalog generate`.",
       "path": "<SPECS>/memory/ARCHITECTURE.md",
       "severity": "warning"
     },
     {
       "code": "TREE-3",
-      "description": "memory/TECHSTACK.md is missing — required memory .md atom. Create it using `python3 .agents/skills/dd-spec-navigator/scripts/memory.py product add <area> <slug>`.",
-      "path": "<SPECS>/memory/TECHSTACK.md",
-      "severity": "warning"
-    },
-    {
-      "code": "TREE-3",
-      "description": "memory/QUALITY.md is missing — required memory .md atom. Create it using `python3 .agents/skills/dd-spec-navigator/scripts/memory.py product add <area> <slug>`.",
+      "description": "memory/QUALITY.md is missing — required memory .md atom. Author it, then regenerate the pair with `python3 .agents/skills/dd-spec-navigator/scripts/memory.py catalog generate`.",
       "path": "<SPECS>/memory/QUALITY.md",
       "severity": "warning"
     },
     {
       "code": "TREE-3",
-      "description": "memory/product/index.md is missing — required memory .md atom. Create it using `python3 .agents/skills/dd-spec-navigator/scripts/memory.py product add <area> <slug>`.",
+      "description": "memory/product/index.md is missing — required memory .md atom. Author it, then regenerate the pair with `python3 .agents/skills/dd-spec-navigator/scripts/memory.py catalog generate`.",
       "path": "<SPECS>/memory/product/index.md",
       "severity": "warning"
     },
@@ -86,7 +74,7 @@
     },
     {
       "code": "SPECS-VERSION",
-      "description": "specs_pattern_version is 0, below the canonical 6. Migrate the tree to canon v6 (dadaia-workspace 0.4.x, or by hand) and re-stamp constitution.md",
+      "description": "specs_pattern_version is 0, below the canonical 7. Migrate the tree to canon v7 (dadaia-workspace 0.4.x, or by hand) and re-stamp constitution.md",
       "path": "<SPECS>/constitution.md",
       "severity": "warning"
     },
@@ -117,7 +105,7 @@
   ],
   "specs_dir": "<SPECS>",
   "summary": {
-    "errors": 9,
-    "warnings": 10
+    "errors": 8,
+    "warnings": 9
   }
 }

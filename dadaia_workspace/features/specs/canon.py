@@ -47,7 +47,7 @@ The canon (operator, 2026-08-28) — the ONLY members permitted under ``specs/``
     audits/{AGENTS.md, _archive/audits_histo.jsonl,
             <YYYYMMDD-slug>/{AUDIT.md, FINDINGS.jsonl}}
     ADRs/{AGENTS.md, decisions.jsonl}
-    memory/{AGENTS.md, ARCHITECTURE.md, QUALITY.md, TECHSTACK.md,
+    memory/{AGENTS.md, ARCHITECTURE.md, QUALITY.md,
             product/index.md, product/catalog.json, product/<area>/<slug>.md}
 
 Nothing else — no ``.gitkeep``, no dotfiles, no ``remote-bugs/``, no ``reviews/``, no

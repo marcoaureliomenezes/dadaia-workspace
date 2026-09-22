@@ -4,6 +4,16 @@ title: workspace-doctor
 tldr: The one compliance surface — dadaia doctor scores workspace, specs and ledgers from one rule record; --fix is the reaper, moving slop, deleting only by TTL.
 summary: dadaia doctor runs the workspace walk, the specs rules and the ledger schema rules from one rule record, prints one line per finding and one compliance score per section plus a total, exits 1 on any error-class finding with a runnable fix line, and its reaper moves slop into a held zone and deletes only what a TTL expired.
 tags: [workspace, doctor, health, repair, zones, specs, ledgers, compliance, privacy]
+sources:
+  - dadaia_workspace/cli/commands/doctor.py
+  - dadaia_workspace/core/doctor_rules.py
+  - dadaia_workspace/core/workspace_layout.py
+  - dadaia_workspace/features/specs/**
+  - dadaia_workspace/features/spec_context/doctor.py
+  - dadaia_workspace/features/spec_context/sweep.py
+  - dadaia_workspace/features/backlog/doctor.py
+  - dadaia_workspace/features/reconcile/**
+  - dadaia_workspace/cli/commands/reconcile.py
 ---
 
 ## The command

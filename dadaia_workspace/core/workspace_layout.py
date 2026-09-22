@@ -356,9 +356,13 @@ REPO_TREE_EXCLUDED: tuple[str, ...] = (".dadaia", *REPO_TREE_ARTIFACTS)
 #: only fact the rendered law line needs beyond the names themselves.
 _REPO_TREE_EXCLUDED_FILES: frozenset[str] = frozenset({".coverage"})
 
-#: Top-level ``specs/memory/`` files (v6 canon). Named here, with every other canonical
+#: Top-level ``specs/memory/`` files (v7 canon). Named here, with every other canonical
 #: name; ``features.specs.memory_canon`` re-exports it for its own consumers.
-MEMORY_TOPLEVEL_FILES: tuple[str, ...] = ("ARCHITECTURE.md", "TECHSTACK.md", "QUALITY.md")
+#: ``TECHSTACK.md`` left the canon at specs_pattern_version 7: a third canonical file
+#: whose body is one section of the architecture is a second place the same fact could
+#: be stated, so it became ``ARCHITECTURE.md``'s ``## Tech Stack`` section and the
+#: upgrade lane folds a consumer's copy into it.
+MEMORY_TOPLEVEL_FILES: tuple[str, ...] = ("ARCHITECTURE.md", "QUALITY.md")
 
 #: The root member a :class:`CanonEntry` lives under. Distinct from a filesystem "area"
 #: only for the two bare root files (``AGENTS.md``, ``constitution.md``), each its own

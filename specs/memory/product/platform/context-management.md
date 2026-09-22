@@ -4,6 +4,16 @@ title: context-management
 tldr: ALIVE/DEAD registry of one main repo plus N associated repos, one Invocation per process, a Bind carrying scope, bind-driven injection.
 summary: Contexts (Spec Context Projects) and their repositories through a v3 registry, one resolution authority whose Bind carries the session's scope, one repo accessor, bind-driven injection.
 tags: [context, lifecycle, session, no-locks, privacy]
+sources:
+  - dadaia_workspace/hooks/ctx_inject.py
+  - dadaia_workspace/hooks/_common.py
+  - dadaia_workspace/core/invocation.py
+  - dadaia_workspace/core/session_store.py
+  - dadaia_workspace/core/record_liveness.py
+  - dadaia_workspace/features/spec_context/injection_policy.py
+  - dadaia_workspace/features/spec_context/markers.py
+  - dadaia_workspace/infrastructure/json_context_store.py
+  - dadaia_workspace/cli/commands/context.py
 ---
 
 ## Registry

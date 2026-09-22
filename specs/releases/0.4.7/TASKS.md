@@ -22,7 +22,7 @@
   `tests/unit/skills/test_spec_navigator_memory_script.py`
   `blocked by:` — · `delivers:` FR2 (V36 paid)
 
-- [ ] **T-047-93 — `sources:` in the schema, the lint and the catalog.**
+- [x] **T-047-93 — `sources:` in the schema, the lint and the catalog.**
   `memory-frontmatter-v1` admits `sources` (repo-relative path globs); `features/specs/memory_lint.py`
   requires it on every `product/<area>/<slug>.md` and refuses a glob matching no file under the repo
   root (`Path.glob`, no git); `catalog generate` carries it per feature.
@@ -80,7 +80,7 @@
   `Write set:` `dadaia_workspace/features/specs/memory_lint.py`, `tests/unit/features/specs/test_memory_lint.py`
   `blocked by:` — · `delivers:` FR4
 
-- [ ] **T-047-99 — `TECHSTACK.md` dies from the canon; the shape test becomes v7.** *(uncommitted)*
+- [x] **T-047-99 — `TECHSTACK.md` dies from the canon; the shape test becomes v7.** *(uncommitted)*
   Drop `"TECHSTACK.md"` from `core/workspace_layout.MEMORY_TOPLEVEL_FILES`; follow through `canon.py`,
   `doctor_structural.py` (TREE-3), `memory_canon.py`, `doctor_memory.py`, the schema text. A present
   `memory/TECHSTACK.md` in a v7 tree is a structural finding, `fix:` `specs upgrade`. Rename
@@ -93,7 +93,7 @@
   `tests/contract/test_memory_canonical_shape.py` (renamed), `tests/unit/features/specs/**`
   `blocked by:` PLAN A1 (the PM's canonical hunk in the tree) · `delivers:` FR1 (canon + shape)
 
-- [ ] **T-047-100 — The bootstrap injects the `## Tech Stack` section, not a digest.** *(uncommitted)*
+- [x] **T-047-100 — The bootstrap injects the `## Tech Stack` section, not a digest.** *(uncommitted)*
   `hooks/ctx_inject._build_memory` extracts `ARCHITECTURE.md`'s `## Tech Stack` section (to the next
   `## `) verbatim. `_TECH_STACK_DIGEST_MAX_LINES`, `_digest_tech_stack`'s truncation branch and the
   self-pull pointer are DELETED. Catalog digest untouched; a missing section is fail-open.
@@ -102,7 +102,7 @@
   `Write set:` `dadaia_workspace/hooks/ctx_inject.py`, `tests/unit/hooks/test_ctx_inject_digest.py`
   `blocked by:` T-047-99 · `delivers:` FR1 (bootstrap)
 
-- [ ] **T-047-101 — `specs_pattern_version` 7 and the 6 → 7 upgrade lane.** *(uncommitted)*
+- [x] **T-047-101 — `specs_pattern_version` 7 and the 6 → 7 upgrade lane.** *(uncommitted)*
   `core.specs_version.CANONICAL_SPECS_VERSION = 7` plus ONE hop in `features/migrate/{registry.py,
   upgrade.py}` (the registry refuses `current < goal` today; never a resurrected chain). The lane
   appends a consumer's `memory/TECHSTACK.md` body under `## Tech Stack` at the end of
@@ -115,7 +115,7 @@
   `tests/e2e/features/test_specs_upgrade_e2e.py`, `tests/contract/test_specs_cli_complexity_ratchet.py`
   `blocked by:` T-047-99 · `delivers:` FR1 (version + lane)
 
-- [ ] **T-047-102 — The scaffold memory law states the two tiers.** *(uncommitted)*
+- [x] **T-047-102 — The scaffold memory law states the two tiers.** *(uncommitted)*
   `public/scaffold/memory/AGENTS.md` becomes the PM's v7 law (3,657 B, cap 4,096); the scaffold drops
   `memory/TECHSTACK.md`; `scaffold/specs/ADRs/AGENTS.md` §5 says "canonical memory statement".
   `RED:` scaffold/canon test — no `TECHSTACK.md` shipped, the projected law states both tiers; `dadaia

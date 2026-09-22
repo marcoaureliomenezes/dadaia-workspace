@@ -1,5 +1,5 @@
 ---
-specs_pattern_version: 6
+specs_pattern_version: 7
 constitution_version: 6.0.0
 ---
 

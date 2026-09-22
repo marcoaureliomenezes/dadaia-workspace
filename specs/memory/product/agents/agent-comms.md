@@ -4,6 +4,10 @@ title: agent-comms
 tldr: The handoff-v1 JSON contract agents emit, its stdlib validator behind `dadaia reports`, and ack-on-consume deletion.
 summary: Agent-to-agent coordination is a JSON handoff under the workspace handoff tree, validated against the packaged handoff-v1 schema, with HTML reports as optional evidence.
 tags: [agent-comms, handoff, schema]
+sources:
+  - dadaia_workspace/core/handoff_index.py
+  - dadaia_workspace/cli/commands/reports.py
+  - dadaia_workspace/public/schemas/handoff-v1.schema.json
 ---
 
 ## The contract

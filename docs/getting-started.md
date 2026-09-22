@@ -5,8 +5,8 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:7e18d9868790 -->
-<!-- derived-from: workspace-init sha256:871519580ea1 -->
+<!-- derived-from: pypi-distribution sha256:6cac718559b3 -->
+<!-- derived-from: workspace-init sha256:0be78b874815 -->
 
 ```bash
 python -m venv .venv && .venv/bin/pip install dadaia-workspace
@@ -24,7 +24,7 @@ own at `.dadaia/.venv`: `dadaia init` provisions it, every `dadaia`, `pip` and
 
 ## Provision the workspace — `dadaia init`
 
-<!-- derived-from: workspace-init sha256:871519580ea1 -->
+<!-- derived-from: workspace-init sha256:0be78b874815 -->
 
 ```bash
 dadaia init <dir> --harness claude|codex|kimi-code [--repo <url>] [--skip-assets]
@@ -72,8 +72,8 @@ with `dadaia ci install-hook`.
 
 ## Bind a context — `dadaia context bind`
 
-<!-- derived-from: spec-context-project sha256:b39739176d42 -->
-<!-- derived-from: context-management sha256:160b285ee271 -->
+<!-- derived-from: spec-context-project sha256:fa8187312a52 -->
+<!-- derived-from: context-management sha256:4e721bb8d89a -->
 
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
 owned by one main repository, optionally spanning associated repositories that live and
@@ -97,7 +97,7 @@ the context's main repo plus its associated repos, and it constrains nothing els
 
 ## Check compliance — `dadaia doctor`
 
-<!-- derived-from: workspace-doctor sha256:06aea1796d92 -->
+<!-- derived-from: workspace-doctor sha256:707aef160b29 -->
 
 ```bash
 dadaia doctor --context <ctx> [--json] [--fix] [--redact]
@@ -121,7 +121,7 @@ its own TTL expired.
 
 ## Run the first candidate
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:753748a55aa3 -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:828ff63c54dd -->
 
 A candidate is one closed-scope SDD cycle inside the live release. Nothing drives it:
 the documents are the state, the verbs move the state document, and the markers in

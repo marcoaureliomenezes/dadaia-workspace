@@ -4,6 +4,13 @@ title: workspace-init
 tldr: One-line idempotent bootstrap — init <dir> --harness <name> [--repo <url>] — venv, zones, law, one harness; with --repo the first context ALIVE and bound.
 summary: dadaia init takes a required directory and exactly one registered harness, provisions the venv, the registry's init zones, the authored set and that harness's directory, seeds the states and the harness profile, stages and installs public assets; with --repo it clones the first repo and composes create/alive/bind plus the pre-push hook. `harness add` is the only later extension.
 tags: [workspace, init, setup, idempotent]
+sources:
+  - dadaia_workspace/cli/commands/init.py
+  - dadaia_workspace/cli/commands/harness.py
+  - dadaia_workspace/features/workspace/**
+  - dadaia_workspace/infrastructure/python_env.py
+  - dadaia_workspace/infrastructure/json_harness_profile_store.py
+  - dadaia_workspace/core/workspace_resolver.py
 ---
 
 ## Bootstrap

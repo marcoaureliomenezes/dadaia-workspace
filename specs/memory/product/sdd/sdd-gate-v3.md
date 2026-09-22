@@ -4,6 +4,17 @@ title: sdd-gate-v3
 tldr: No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write), one fix line per BLOCK, chokepoints at the push.
 summary: The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one executable fix line; the git chokepoints enforce the publication boundary and the full denylist scan over every pushed path.
 tags: [sdd, gate, hooks, enforcement, no-locks, privacy]
+sources:
+  - dadaia_workspace/hooks/__init__.py
+  - dadaia_workspace/hooks/pre_gate.py
+  - dadaia_workspace/hooks/sdd_gate.py
+  - dadaia_workspace/hooks/sdd_post_gate.py
+  - dadaia_workspace/hooks/root_whitelist.py
+  - dadaia_workspace/hooks/venv_guard.py
+  - dadaia_workspace/features/spec_context/gate_policy.py
+  - dadaia_workspace/features/chokepoints/**
+  - dadaia_workspace/infrastructure/data/privacy_baseline.json
+  - dadaia_workspace/cli/commands/ci.py
 ---
 
 ## PreToolUse

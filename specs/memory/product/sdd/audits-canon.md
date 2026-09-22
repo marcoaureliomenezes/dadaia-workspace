@@ -4,6 +4,10 @@ title: audits-canon
 tldr: Audits are committed spec artifacts — three pillars over a sha window, JSONL findings moved by audit.py disposition, archived by audit.py close.
 summary: An audit is a committed folder holding AUDIT.md and FINDINGS.jsonl; three pillars always run together over the window since the newest archived audit; a finding's disposition and the archive are two CLI verbs, each all-or-nothing and each leaving one governance event.
 tags: [sdd, audits, findings, governance, evidence]
+sources:
+  - dadaia_workspace/features/specs/doctor_closure_audit.py
+  - dadaia_workspace/public/skills/dd-audit-project/**
+  - dadaia_workspace/public/schemas/audits/**
 ---
 
 ## Shape

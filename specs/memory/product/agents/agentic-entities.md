@@ -4,6 +4,11 @@ title: agentic-entities
 tldr: Abstract-entity registry — Personas, Behaviors, Rules — plus the behavior map binding every skill and scoped rule file to one law section.
 summary: The entity registry defines the workspace method abstractly and every scaffolded sub-agent, hook and rule file derives from it; the behavior map binds each skill and scoped rule file to one law section.
 tags: [agents, entities, derivation, governance]
+sources:
+  - dadaia_workspace/public/entities/**
+  - dadaia_workspace/public/data/CONTEXT-MAP.md
+  - dadaia_workspace/public/skills/**
+  - dadaia_workspace/infrastructure/entity_doctor.py
 ---
 
 ## The derivation law
@@ -35,4 +40,4 @@ tags: [agents, entities, derivation, governance]
 
 ## Dependencies
 
-[[agent-orchestration]], [[public-asset-distribution]], [[TECHSTACK]], [[QUALITY]].
+[[agent-orchestration]], [[public-asset-distribution]], [[ARCHITECTURE]], [[QUALITY]].

@@ -4,6 +4,11 @@ title: cross-platform-portability
 tldr: Linux, macOS and Windows through one platform capability seam, injected adapters, Python hooks and hard-gated cross-OS CI legs.
 summary: core/platform.py is the single capability seam and the container selects adapters; security failures are loud, non-security features degrade explicitly, unsupported capabilities fail at construction.
 tags: [platform, cross-platform, portability, windows, macos, linux]
+sources:
+  - dadaia_workspace/core/platform.py
+  - dadaia_workspace/infrastructure/file_permission_*.py
+  - dadaia_workspace/infrastructure/signal_shutdown_*.py
+  - dadaia_workspace/core/protocols/**
 ---
 
 ## Seam and validation

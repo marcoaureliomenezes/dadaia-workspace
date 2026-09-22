@@ -7,8 +7,8 @@ defined in [concepts](concepts.md); the long walkthrough is
 
 ## 1. Install
 
-<!-- derived-from: pypi-distribution sha256:7e18d9868790 -->
-<!-- derived-from: workspace-init sha256:871519580ea1 -->
+<!-- derived-from: pypi-distribution sha256:6cac718559b3 -->
+<!-- derived-from: workspace-init sha256:0be78b874815 -->
 
 ```bash
 uvx dadaia-workspace init demo --harness claude --repo https://github.com/<you>/<your-repo>.git
@@ -28,7 +28,7 @@ interpreter — the workspace you create next keeps its own at `.dadaia/.venv`, 
 
 ## 2. Provision the workspace and its first project
 
-<!-- derived-from: workspace-init sha256:871519580ea1 -->
+<!-- derived-from: workspace-init sha256:0be78b874815 -->
 
 ```bash
 dadaia init demo --harness claude --repo https://github.com/<you>/<your-repo>.git
@@ -57,7 +57,7 @@ Without `--repo`, `init` names `repos/` and the single
 
 ## 3. Bind the session
 
-<!-- derived-from: context-management sha256:160b285ee271 -->
+<!-- derived-from: context-management sha256:4e721bb8d89a -->
 
 ```bash
 eval "$(dadaia context bind demo --print-env)"
@@ -73,7 +73,7 @@ repos — and constrains nothing else. Sitting inside a repository is not a bind
 
 ## 4. Check compliance
 
-<!-- derived-from: workspace-doctor sha256:06aea1796d92 -->
+<!-- derived-from: workspace-doctor sha256:707aef160b29 -->
 
 ```bash
 dadaia doctor --context demo
@@ -86,7 +86,7 @@ stalls you. There is no score: the findings and the exit code are the report.
 
 ## 5. File the first backlog entry
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:753748a55aa3 -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:828ff63c54dd -->
 
 ```bash
 python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new my-first-idea \
@@ -100,7 +100,7 @@ only the operator creates demand.
 
 ## 6. Open the first release
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:753748a55aa3 -->
+<!-- derived-from: sdd-bug-backlog-governance sha256:828ff63c54dd -->
 
 ```bash
 python3 .agents/skills/dd-release-implementation/scripts/release.py new 0.1.0 \
