@@ -83,7 +83,7 @@ ADR-gated files that hold statements, diagrams and laws only.
   without changing a statement) and product memory (`product/**`, the only tier a closure
   changes, reconciled delete → update → add). `specs/ADRs/AGENTS.md` §5 says "canonical
   memory statement" where it says "Part-1 principle".
-- ADR 0022 is appended `accepted` (grill-born, ruling date 2026-09-22 in `context`) in the same
+- ADR 0023 is appended `accepted` (grill-born, ruling date 2026-09-22 in `context`) in the same
   commit as the canonical-memory hunk and the code that measures the new shape; the hunk adds
   `P-32` (canonical memory ADR-gated, product memory reconciled delete → update → add) measured
   by the shape test, `RELEASE-TREE-MEMORY` and `MEM-NARRATIVE-1`. The PM hands the engineer the
@@ -177,7 +177,7 @@ ADR-gated files that hold statements, diagrams and laws only.
 
 ## 5. Decisions and constraints
 
-- D1 ruled 2026-09-22 (Q1–Q11), ADR 0022 grill-born: accepted at append, in FR1's commit.
+- D1 ruled 2026-09-22 (Q1–Q11), ADR 0023 grill-born: accepted at append, in FR1's commit.
 - D2: no new CLI verb — the mechanism is two skill-script verbs (`memory.py drift`,
   `release.py memory`) and one doctor rule; scripts never call each other, the worklist travels
   as JSON.

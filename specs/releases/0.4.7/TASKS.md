@@ -6,8 +6,8 @@
 ## Candidate 11 — memory that cannot stack
 
 > T-047-99..102 stay **uncommitted** in the working tree (`specs/memory/**` never in a `Write set:`,
-> SPEC-DOC-047): the PM stages their code with the canonical hunk and the ADR 0022 line as ONE commit
-> `docs(adr): accept 0022-memory-canon-v7`. Other tasks commit normally, explicit paths, never
+> SPEC-DOC-047): the PM stages their code with the canonical hunk and the ADR 0023 line as ONE commit
+> `docs(adr): accept 0023-memory-canon-v7`. Other tasks commit normally, explicit paths, never
 > `git add -A`. Ratchets: V35 2,876, V36 31 files / 3,657 lines, doctor module 699 — breach = stop and escalate.
 
 - [x] **T-047-94 — Delete `product add` and the skill-side atom validator (SPEC D5).**

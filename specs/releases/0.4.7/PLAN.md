@@ -11,9 +11,9 @@
 - **A1 — The canonical hunk arrives from the PM, not from a task.** `specs/memory/**` never
   appears in a task `Write set:` (SPEC-DOC-047). Before T-047-99's RED test can go green the PM
   must have placed `ARCHITECTURE.md` and `QUALITY.md` (the v7 drafts), deleted
-  `specs/memory/TECHSTACK.md`, and appended the ADR 0022 line. The engineer implements FR1's code
+  `specs/memory/TECHSTACK.md`, and appended the ADR 0023 line. The engineer implements FR1's code
   and tests in the working tree and does **not** commit them; the PM stages code + tests + the
-  memory hunk + the ADR line as ONE commit `docs(adr): accept 0022-memory-canon-v7`.
+  memory hunk + the ADR line as ONE commit `docs(adr): accept 0023-memory-canon-v7`.
 - **A2 — `ARCHITECTURE.md`'s `## Tech Stack` section is the only tech-stack source** after FR1;
   `ctx_inject` extracts it by heading, so its absence must be fail-open (empty bootstrap part),
   never a traceback on a v6 consumer tree.
