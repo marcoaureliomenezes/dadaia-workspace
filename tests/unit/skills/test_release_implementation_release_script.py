@@ -136,6 +136,47 @@ def test_new_refuses_a_second_live_release_with_one_fix_line(script: Path, tmp_p
     assert _tree_hash(specs) == before
 
 
+def test_new_births_the_stacked_candidate_on_a_closed_live_release(
+    script: Path, tmp_path: Path
+) -> None:
+    """The law's stacked candidate: `new <id>` on the live release in CLOSURE rewrites
+    SPEC.md, deletes the closed PLAN/TASKS, resets phase to DEFINITION and leaves the
+    milestones standing (`phase IMPLEMENTATION` restamps `defined`)."""
+    specs = _specs(tmp_path)
+    release_dir = _release(
+        specs,
+        "0.5.0",
+        phase="CLOSURE",
+        defined={"sha": "aaaaaaa", "ts": "2026-01-01T00:00:00Z"},
+        implemented={"sha": "beef123", "ts": "2026-01-02T00:00:00Z"},
+    )
+    result = _run(script, "new", "0.5.0", "--specs", str(specs))
+    assert result.returncode == 0, result.stderr
+    assert "**Status:** Draft" in (release_dir / "SPEC.md").read_text(encoding="utf-8")
+    assert not (release_dir / "PLAN.md").exists()
+    assert not (release_dir / "TASKS.md").exists()
+    state = _read(release_dir / "_RELEASE.json")
+    assert state["phase"] == "DEFINITION"
+    assert state["defined"] == {"sha": "aaaaaaa", "ts": "2026-01-01T00:00:00Z"}
+    assert state["implemented"] == {"sha": "beef123", "ts": "2026-01-02T00:00:00Z"}
+    notes = [entry["text"] for entry in state["log"]]
+    assert notes == ["Candidate born on 0.5.0 (prior candidate closed at beef123)"]
+
+
+def test_new_refuses_the_same_id_while_its_candidate_is_open(script: Path, tmp_path: Path) -> None:
+    """A candidate is stacked only on a CLOSURE state: mid-IMPLEMENTATION the live trio
+    is still being worked, and the refusal names the phase verb that unblocks it."""
+    specs = _specs(tmp_path)
+    _release(specs, "0.5.0", phase="IMPLEMENTATION")
+    before = _tree_hash(specs)
+    result = _run(script, "new", "0.5.0", "--specs", str(specs))
+    assert result.returncode == 1
+    assert "IMPLEMENTATION" in result.stderr
+    fixes = [line for line in result.stderr.splitlines() if line.startswith("fix: ")]
+    assert len(fixes) == 1 and "phase CLOSURE" in fixes[0], result.stderr
+    assert _tree_hash(specs) == before
+
+
 def test_new_refuses_a_non_semver_id(script: Path, tmp_path: Path) -> None:
     specs = _specs(tmp_path)
     assert _run(script, "new", "v0.6.0", "--specs", str(specs)).returncode == 1
