@@ -33,6 +33,8 @@ sources:
 - Scope is the bound context's main repo plus its associated repos ([[context-management]]); an unbound session, a slug no context registers and a workspace-root path are never scope-blocked.
 - Every BLOCK — the three gate blocks, `dadaia ci push-gate-check`, the ledger scripts, every error-class doctor rule — carries exactly one `fix: <command>` line, venv-rooted when it is `dadaia`; `tests/contract/test_every_block_carries_a_fix.py` feeds each fix back through the gate and asserts ALLOW, so a BLOCK whose fix is itself blocked (a Stall) cannot ship.
 - The fix lines: root entry → append the name to `.dadaia/states/instance_exceptions.txt`; session record → `dadaia context bind <ctx>`; projected law → `dadaia public stage && dadaia public install`; out-of-scope write → `dadaia context bind <owner>`; venv → the same command venv-rooted.
+- The gate returns a decision and its message per write target: a BLOCK's message is its reason, an ALLOW's is empty; there is no advisory channel.
+- A BLOCK is one envelope carrying `"decision": "block"` plus Claude Code's `permissionDecision: "deny"`; an ALLOW is an explicit envelope with no permission verdict and no `systemMessage`.
 - A MUTATING write records nothing about its session; races between sessions surface through git.
 - The PostToolUse hook refreshes the session record's `last_seen_at` and, on a throttle, runs the workspace reaper; it always exits zero ([[workspace-doctor]]).
 

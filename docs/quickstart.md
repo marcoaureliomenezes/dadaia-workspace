@@ -98,7 +98,7 @@ commit. Only the operator creates demand.
 
 ## 6. Open the first release
 
-<!-- derived-from: release-lifecycle sha256:74d49f4d629b -->
+<!-- derived-from: release-lifecycle sha256:09607348cc88 -->
 
 ```bash
 python3 .agents/skills/dd-release-implementation/scripts/release.py new 0.1.0 \

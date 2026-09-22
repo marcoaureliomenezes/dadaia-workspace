@@ -28,7 +28,7 @@ memory injection into the session.
 
 ## Release and candidate
 
-<!-- derived-from: release-lifecycle sha256:74d49f4d629b -->
+<!-- derived-from: release-lifecycle sha256:09607348cc88 -->
 
 Exactly one *release* is live, `specs/releases/<M.m.p>/`, with open scope; it grows by
 *candidates*, each a closed-scope cycle whose `SPEC.md`, `PLAN.md` and `TASKS.md` sit
@@ -41,7 +41,7 @@ is the last published one plus one patch and moves only at an operator-approved 
 
 ## The flow
 
-<!-- derived-from: release-lifecycle sha256:74d49f4d629b -->
+<!-- derived-from: release-lifecycle sha256:09607348cc88 -->
 <!-- derived-from: bug-ledger sha256:9534ded07707 -->
 <!-- derived-from: audits-canon sha256:5b000425c401 -->
 
@@ -57,7 +57,7 @@ carry the ordered work, and the ledger scripts move the records.
 
 ## The gate
 
-<!-- derived-from: sdd-gate-v3 sha256:9d9e63f48dfa -->
+<!-- derived-from: sdd-gate-v3 sha256:1b7c704d0a35 -->
 
 The *gate* is one PreToolUse pre-gate evaluating root whitelist, venv guard and SDD
 gate in that order — first block wins, and a policy that raises is ALLOW. It blocks
@@ -76,7 +76,7 @@ gate — a refusal whose fix is itself refused (a Stall) cannot ship.
 
 <!-- derived-from: context-management sha256:0227a5e43894 -->
 <!-- derived-from: workspace-doctor sha256:ef9c81d0d181 -->
-<!-- derived-from: release-lifecycle sha256:74d49f4d629b -->
+<!-- derived-from: release-lifecycle sha256:09607348cc88 -->
 <!-- derived-from: audits-canon sha256:5b000425c401 -->
 
 *Memory* is current product truth: the atoms under `specs/memory/product/**`, plus

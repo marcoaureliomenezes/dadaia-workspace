@@ -27,8 +27,8 @@ sources:
 - `python3 .agents/skills/dd-release-implementation/scripts/release.py <verb> [--specs <path>]` is the state document's one writer and validator; each write validates the new bytes before replacing the file atomically, and every refusal carries one `fix:` line.
 - `new <id> [--origin <origin>]` mints the live release: a `SPEC.md` stub plus `_RELEASE.json` in `DEFINITION`, all or nothing; on a live release already in `CLOSURE` with the same id it stacks the next candidate, reopening `DEFINITION` and deleting the closed `PLAN.md`/`TASKS.md`; a second live release, a non-SemVer id or a symlinked path is refused; `--origin bugs:<ids>` seeds one scope clause per bug with its repro line.
 - `phase IMPLEMENTATION --sha <sha>` requires all three trio files `**Status:** Approved` and stamps `defined`; `phase CLOSURE --sha <sha> [--pr <n>]` requires no `[ ]` or `[-]` task marker and stamps `implemented`, `--pr` recording the merged release PR in its note; each phase follows its predecessor exactly once, and `ARCHIVED` is written by no verb.
-- `memory --since <sha> --worklist <drift.json> --reviewed <slugs> --changed <slugs>` appends the closure's `kind: memory` log entry carrying `since`, `reviewed` and `changed`; it refuses outside `CLOSURE`, a worklist entry named in neither list, and a `changed` atom git reports unmoved since `<sha>`.
-- `check [--json]` validates every state document, live and archived, and the ship ledger; `dadaia doctor`'s `ledgers` section runs it (`LEDGER-RELEASE-SCHEMA`) and its `specs` section runs the `RELEASE-TREE-*` rules ([[workspace-doctor]]).
+- `memory --reviewed <slugs> --changed <slugs>` derives its window from the state document — the previous `kind: memory` entry's `until`, else `defined.sha` — to `HEAD`, computes the worklist itself and appends the closure's `kind: memory` log entry carrying `since`, `until`, `reviewed` and `changed`; it refuses outside `CLOSURE`, a worklist entry named in neither list, a name outside the worklist, and a `changed` atom git reports unmoved over the window.
+- `check [--json]` validates every state document, live and archived, and the ship ledger; on a live release in `CLOSURE` it also re-judges the latest `kind: memory` entry over its own `since`..`until` with the `memory` verb's rules and requires that no atom's sources moved after its `until`; `dadaia doctor`'s `ledgers` section runs it (`LEDGER-RELEASE-SCHEMA`) and its `specs` section runs the `RELEASE-TREE-*` rules ([[workspace-doctor]]).
 
 ## The candidate arc
 
@@ -39,9 +39,9 @@ sources:
 
 ## The memory reconciliation gate
 
-- `python3 .agents/skills/dd-spec-navigator/scripts/memory.py drift [--since <sha>] [--json]` lists the atoms whose `sources` globs match a path changed since `<sha>` (default: the live `implemented`, else `defined`, sha) and every feature package or hook module no atom covers.
+- `python3 .agents/skills/dd-spec-navigator/scripts/memory.py drift --since <sha> [--json]` lists the atoms whose `sources` globs match a path changed over `<sha>..HEAD` and every feature package or hook module no atom covers; `--since` is required and has no default window.
 - Each listed atom is reconciled from its sources' diff — delete, update, then add — and `memory.py catalog generate` regenerates the catalog pair ([[workspace-doctor]]).
-- `RELEASE-TREE-MEMORY` keeps a live release in `CLOSURE` red until a `kind: memory` entry stamped after `implemented.ts` carries `since`, `reviewed` and `changed`.
+- `RELEASE-TREE-MEMORY` keeps a live release in `CLOSURE` red until a `kind: memory` entry stamped after `implemented.ts` carries `since`, `until`, `reviewed` and `changed`, its `since` equal to the state-derived window start.
 
 ## Promote
 

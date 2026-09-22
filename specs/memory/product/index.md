@@ -43,7 +43,7 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `capabilities` | capabilities | dadaia capabilities [--json] prints the installed provider's contract — distribution version, specs pattern version, status tokens, certification entry point. |
+| `capabilities` | capabilities | dadaia capabilities [--json] prints the installed provider's contract — distribution version, specs pattern version, status tokens, the live verb set, the harnesses, the certification entry point. |
 | `ci-preflight` | ci-preflight | dadaia ci preflight runs the library's CI checks locally — ruff format, ruff check, mypy --strict, lint-imports, pytest — and refuses outside the source repo. |
 | `consumer-agent-support` | Consumer validation gate | A consumer-side validation agent running the shipped recipe on a real workspace is the release gate; no wheel publishes until every statement reports PASS. |
 | `context-management` | context-management | ALIVE/DEAD registry of one main repo plus N associated repos; one resolution per call; a bind names the session's scope and drives memory injection. |

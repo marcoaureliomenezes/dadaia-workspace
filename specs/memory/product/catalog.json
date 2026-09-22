@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-22T20:04:40Z",
+  "generated_at": "2026-09-22T21:38:04Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -395,8 +395,8 @@
       "slug": "capabilities",
       "title": "capabilities",
       "area": "platform",
-      "tldr": "dadaia capabilities [--json] prints the installed provider's contract — distribution version, specs pattern version, status tokens, certification entry point.",
-      "summary": "A read-only verb an agent runs first in a new or upgraded session: a dadaia-capabilities-v2 JSON payload naming the installed distribution version, the canonical specs pattern version and status tokens, context states and the certify command; the table view is a digest of the same payload.",
+      "tldr": "dadaia capabilities [--json] prints the installed provider's contract — distribution version, specs pattern version, status tokens, the live verb set, the harnesses, the certification entry point.",
+      "summary": "A read-only verb an agent runs first in a new or upgraded session: a dadaia-capabilities-v3 JSON payload naming the installed distribution version, the canonical specs pattern version and status tokens, the context states, commands and selection contract, the Layer-1 harnesses and every command group with its subcommands, all derived from the live command tree and the harness registry, plus the certify command; the table view is a digest of the same payload.",
       "path": "specs/memory/product/platform/capabilities.md",
       "tags": [
         "capabilities",
@@ -404,11 +404,12 @@
         "provider",
         "onboarding"
       ],
-      "token_estimate": 224,
+      "token_estimate": 325,
       "depends_on": [
         "consumer-agent-support",
         "workspace-doctor",
         "specs-migration",
+        "context-management",
         "pypi-distribution"
       ],
       "sources": [
@@ -606,7 +607,7 @@
         "specs",
         "registry"
       ],
-      "token_estimate": 385,
+      "token_estimate": 420,
       "depends_on": [
         "workspace-doctor",
         "context-management",
@@ -799,7 +800,7 @@
         "lifecycle",
         "memory"
       ],
-      "token_estimate": 882,
+      "token_estimate": 976,
       "depends_on": [
         "sdd-gate-v3",
         "backlog-ledger",
@@ -835,7 +836,7 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 886,
+      "token_estimate": 959,
       "depends_on": [
         "workspace-doctor",
         "context-management",
