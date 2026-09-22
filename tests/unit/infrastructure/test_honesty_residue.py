@@ -18,10 +18,12 @@ def test_python_env_narrates_a_failed_repack_install_honestly() -> None:
 
     src = inspect.getsource(python_env)
     assert "except subprocess.CalledProcessError:\n                        pass" not in src, (
-        "the repack-install failure must not be silently swallowed and re-narrated "
-        "as a repack failure"
+        "an install failure must not be silently swallowed and re-narrated as another"
     )
-    assert "re-packed running distribution" in src
+    # The paired assertion on the fallback's own narration ("re-packed running
+    # distribution") died with the fallback itself (bug
+    # init-venv-installs-index-version-not-running-distribution): there is one install
+    # now, so there is no second failure to narrate as the first.
 
 
 def test_handoff_index_docstring_claims_no_phantom_facade() -> None:
