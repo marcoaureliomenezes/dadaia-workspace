@@ -125,12 +125,6 @@ def _plant_dispositioned_audit(root: Path) -> None:
     )
 
 
-def _plant_archived_release_residue(root: Path) -> None:
-    residue = root / "specs" / "_archive" / "releases" / "0.0.9"
-    residue.mkdir(parents=True)
-    (residue / "GRILL.md").write_text("# Grill notes\n", encoding="utf-8")
-
-
 #: code -> how to make it fire. The eight remedies the 0.4.7 candidate-2 review named,
 #: plus the memory-document pair they share a shape with.
 PLANTS: dict[str, Plant] = {
@@ -152,10 +146,6 @@ PLANTS: dict[str, Plant] = {
     "TREE-2": Plant(_plant_root_spec_md),
     "TREE-3": Plant(
         _plant_missing_memory_document, {"<document>": "QUALITY", "<title>": "Quality"}
-    ),
-    "SPEC-DOC-039": Plant(
-        _plant_archived_release_residue,
-        {"<release-id>": "0.0.9", "<why abandoned>": "abandoned: superseded by 0.1.0"},
     ),
 }
 
@@ -292,38 +282,6 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
         f"{code}: the fix line ran but the finding survives — "
         f"{[i.description for i in after]}\n{command}"
     )
-
-
-def test_spec_doc_039_relocates_the_residue_instead_of_destroying_it(tmp_path: Path) -> None:
-    """The remedy the finding NAMES is the remedy its fix line RUNS.
-
-    ``doctor_release.check_partial_archived_release_dirs`` tells the operator to
-    relocate the residue to ``specs/_archive/wip-abandoned/<name>/`` with a README
-    breadcrumb. A fix line that removes the directory answers a different question.
-    """
-    root = _repo(tmp_path)
-    plant = PLANTS["SPEC-DOC-039"]
-    plant.plant(root)
-    _git(root, "add", "-A")
-    _git(root, "commit", "-qm", "fixture")
-    rule = next(r for r in SPECS_RULES if "SPEC-DOC-039" in r.codes)
-    assert rule.fix_help is not None
-
-    command = _resolve(rule.fix_help, plant).replace(_VENV_DADAIA, _THIS_VENV_DADAIA)
-    done = subprocess.run(
-        ["bash", "-c", command],
-        cwd=root,
-        env={**os.environ, "HOME": str(session_home())},
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert done.returncode == 0, f"{command}\n{done.stderr}"
-
-    relocated = root / "specs" / "_archive" / "wip-abandoned" / "0.0.9"
-    assert (relocated / "GRILL.md").read_text(encoding="utf-8") == "# Grill notes\n"
-    assert "abandoned" in (relocated / "README.md").read_text(encoding="utf-8")
-    assert not (root / "specs" / "_archive" / "releases" / "0.0.9").exists()
 
 
 def test_every_specs_rule_is_either_exercised_or_listed_with_a_reason() -> None:

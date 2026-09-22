@@ -73,7 +73,7 @@ repos — and constrains nothing else. Sitting inside a repository is not a bind
 
 ## 4. Check compliance
 
-<!-- derived-from: workspace-doctor sha256:8aea94a8199b -->
+<!-- derived-from: workspace-doctor sha256:06aea1796d92 -->
 
 ```bash
 dadaia doctor --context demo

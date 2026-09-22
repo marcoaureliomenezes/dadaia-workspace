@@ -2,8 +2,8 @@
 
 Single-responsibility sibling of the SpecsDoctor coordinator. Owns the active-release
 lifecycle checks (SPEC-DOC-003/004/005/009), the release ledger invariants (phase<->markers
-SPEC-DOC-024, unique ids SPEC-DOC-026, naming canon SPEC-DOC-027) and the partial-archive
-residue invariant (SPEC-DOC-039), plus the family-local status/created-date extractors.
+SPEC-DOC-024, unique ids SPEC-DOC-026, naming canon SPEC-DOC-027), plus the family-local
+status/created-date extractors.
 Leaf-only: imports the shared leaves + core, never a sibling validator.
 
 The active release and its phase are read directly off ``RELEASE.json``
@@ -28,7 +28,6 @@ from dadaia_workspace.core.spec_status import APPROVED, extract_status
 from dadaia_workspace.core.spec_status import CANONICAL_STATUS as _CANONICAL_STATUS
 from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
 from dadaia_workspace.features.specs.doctor_common import (
-    RELEASE_ARTIFACTS,
     _read_and_parse_release_json,
     iter_all_release_dirs,
     resolve_live_release_id,
@@ -575,56 +574,6 @@ class ReleaseValidator:
                         )
                     ),
                     path=str(d),
-                )
-            )
-        return issues
-
-    def check_partial_archived_release_dirs(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-039 (v0.1.81 FR2): WARN on a ``specs/_archive/releases/<id>/`` dir
-        that carries NONE of :data:`~dadaia_workspace.features.specs.doctor_common.
-        RELEASE_ARTIFACTS` (SPEC.md/PLAN.md/TASKS.md — ``CLOSURE.md`` dropped at v0.5.0
-        T-050-25A, A4.4: it retired as a going-forward artifact, so its bare presence is
-        no longer release-dir evidence) — directly, or nested under any of its
-        subdirectories (a segmented layout, e.g. ``<id>/alpha-1/``, ``<id>/rc-1/``, is a
-        legitimate archived-release shape whose artifacts live one level down).
-
-        Such a dir is residue masquerading as an archived release — the v0.1.41
-        precedent held only ``GRILL.md`` + ``OQ-DECISIONS.md`` and sat undetected until
-        the 2026-07-06 audit (audit G-23). The check honors the SPEC-DOC-027 permanent
-        legacy-name allowlist (ADR-9: frozen history, never flagged by name alone) and
-        only inspects ``_archive/releases/`` — the live ``releases/`` tree is untouched
-        (an active release under construction legitimately lacks a real artifact yet,
-        and SPEC-DOC-004/009 already cover it). WARNING severity only: historical trees
-        must never hard-fail doctor over this.
-        """
-        issues: list[SpecsDoctorIssue] = []
-        arch_root = self.specs_dir / "_archive" / "releases"
-        if not arch_root.is_dir():
-            return issues
-        for entry in sorted(p for p in arch_root.iterdir() if p.is_dir()):
-            if entry.name in RELEASE_NAMING_LEGACY_ALLOWLIST:
-                continue
-            if any((entry / artifact).exists() for artifact in RELEASE_ARTIFACTS):
-                continue
-            # Tolerate segmented layouts: any artifact anywhere under the dir (e.g. a
-            # nested alpha-N/rc-N segment subdir) counts as "this archived release has
-            # its artifacts" even though the parent dir carries none directly.
-            if any(next(entry.rglob(artifact), None) is not None for artifact in RELEASE_ARTIFACTS):
-                continue
-            issues.append(
-                SpecsDoctorIssue(
-                    code="SPEC-DOC-039",
-                    severity=Severity.WARNING,
-                    description=(
-                        f"_archive/releases/{entry.name} carries none of "
-                        "SPEC.md/PLAN.md/TASKS.md (directly or in any segment "
-                        "subdir) — residue masquerading as an archived release "
-                        "(the v0.1.41 precedent). Relocate it to "
-                        f"specs/_archive/wip-abandoned/{entry.name}/ with a README "
-                        "breadcrumb explaining why it was abandoned. SPEC-DOC-039, "
-                        "WARNING."
-                    ),
-                    path=str(entry),
                 )
             )
         return issues

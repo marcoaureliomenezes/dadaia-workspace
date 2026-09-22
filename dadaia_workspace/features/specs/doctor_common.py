@@ -31,8 +31,8 @@ from dadaia_workspace.core.release_state import (
 )
 
 # A dir counts as a "release dir" iff it carries at least one SDD release artifact.
-# Public name (v0.1.81 FR2): reused by doctor_release's partial-archive invariant
-# (SPEC-DOC-039) so both checks share one canonical artifact-filename set.
+# Public name (v0.1.81 FR2): reused by ``release_tree`` so both surfaces share one
+# canonical artifact-filename set.
 #
 # v0.5.0 T-050-25A (A4.4): ``CLOSURE.md`` dropped — FR4/T-050-21A retired it as a
 # going-forward artifact, so a lone CLOSURE.md with no SPEC/PLAN/TASKS is now an

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-21T12:58:36Z",
+  "generated_at": "2026-09-22T01:58:12Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -434,7 +434,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 2718,
+      "token_estimate": 2711,
       "depends_on": [
         "sdd-gate-v3",
         "context-management",

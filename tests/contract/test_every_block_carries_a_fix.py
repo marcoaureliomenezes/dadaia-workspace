@@ -383,7 +383,6 @@ _SHELL_FIX_CODES: dict[str, str] = {
     "SPEC-DOC-028": "sed — drop the dangling constitution reference",
     "SPEC-DOC-030": "git mv — rename the audit directory to YYYYMMDD-slug",
     "SPEC-DOC-037": "sed — drop the stale enum line",
-    "SPEC-DOC-039": "mkdir/git mv — move the abandoned release aside",
     "SPEC-DOC-047": "sed — drop the stale memory task line",
     "SPEC-DOC-048": "sed — append the missing SPEC Origin line",
     "TREE-3": "printf — append the missing memory title",

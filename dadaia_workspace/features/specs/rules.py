@@ -245,17 +245,6 @@ RULES: tuple[SpecsRule, ...] = (
         fix_help=f"{AUDIT_SCRIPT} close <audit> --sha <sha>",
     ),
     _rule(
-        ("SPEC-DOC-039",),
-        lambda d: d._release.check_partial_archived_release_dirs(),
-        fix_help=(
-            "mkdir -p specs/_archive/wip-abandoned && "
-            "git mv specs/_archive/releases/<release-id> "
-            "specs/_archive/wip-abandoned/<release-id> && "
-            "printf '%s\\n' '<why abandoned>' "
-            ">> specs/_archive/wip-abandoned/<release-id>/README.md"
-        ),
-    ),
-    _rule(
         ("SPEC-DOC-041",),
         lambda d: d._governance.check_bug_archive_overdue(),
         fix_help="python3 .agents/skills/dd-bug-resolution/scripts/bugs.py archive",

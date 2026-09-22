@@ -27,7 +27,7 @@
 ## Reference
 
 <!-- derived-from: context-management sha256:160b285ee271 -->
-<!-- derived-from: workspace-doctor sha256:8aea94a8199b -->
+<!-- derived-from: workspace-doctor sha256:06aea1796d92 -->
 
 - [CLI reference](docs/cli.md): the committed output of `dadaia help tree`.
 - [Concepts](docs/concepts.md): the vocabulary — workspace, context, release, candidate, gate.
