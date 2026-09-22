@@ -110,9 +110,10 @@ def _unmoved(repo: Path, since: str, worklist: dict[str, Any], changed: list[str
         path = paths.get(slug)
         if path is None or not (repo / path).is_file():
             continue
-        was = subprocess.run(["git", "show", f"{since}:{path}"], cwd=repo,
-                             capture_output=True, check=False)  # fmt: skip
-        if was.returncode == 0 and was.stdout == (repo / path).read_bytes():
+        # git decides "moved": it normalises line endings a byte compare would not.
+        same = subprocess.run(["git", "diff", "--quiet", since, "--", path], cwd=repo,
+                              capture_output=True, check=False)  # fmt: skip
+        if same.returncode == 0:
             errors.append(f"--changed names {slug!r}, whose atom is byte-identical at {since}")
     return errors
 
