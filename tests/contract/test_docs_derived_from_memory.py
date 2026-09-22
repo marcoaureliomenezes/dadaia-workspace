@@ -153,12 +153,12 @@ _PAGES_URL = "https://marcoaureliomenezes.github.io/dadaia-workspace/"
 
 def test_the_ledger_article_derives_from_the_quality_and_governance_atoms() -> None:
     """The article states counts a reader can re-measure and lessons the atoms carry:
-    both `[[QUALITY]]` and `[[sdd-bug-backlog-governance]]` are named under its sections,
+    both `[[QUALITY]]` and `[[bug-ledger]]` are named under its sections,
     and (by the marker test above) under their current hashes."""
     article = _REPO_ROOT / "docs" / "bug-ledger-lessons.md"
     slugs = {slug for _, markers in _sections(article.read_text("utf-8")) for slug, _ in markers}
 
-    assert {"QUALITY", "sdd-bug-backlog-governance"} <= slugs
+    assert {"QUALITY", "bug-ledger"} <= slugs
 
 
 def test_the_agent_index_lists_every_page_of_the_site() -> None:

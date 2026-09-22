@@ -1,14 +1,14 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.7",
-  "phase": "IMPLEMENTATION",
+  "phase": "CLOSURE",
   "defined": {
     "sha": "a84e9687",
     "ts": "2026-09-22T18:33:01Z"
   },
   "implemented": {
-    "sha": "452267b8",
-    "ts": "2026-09-21T13:00:24Z"
+    "sha": "cbd813d1",
+    "ts": "2026-09-22T20:03:26Z"
   },
   "shipped": null,
   "log": [
@@ -563,6 +563,49 @@
       "agent": "release.py",
       "kind": "note",
       "text": "Candidate defined at a84e9687; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-09-22T20:03:26Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate implemented at cbd813d1; phase CLOSURE."
+    },
+    {
+      "ts": "2026-09-22T20:05:20Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over the window: 27 drifted atom(s) and 0 uncovered unit(s) worked — 0 reviewed unchanged, 27 changed.",
+      "since": "6cef01f8",
+      "reviewed": [],
+      "changed": [
+        "agent-comms",
+        "agent-orchestration",
+        "agentic-entities",
+        "public-asset-distribution",
+        "pypi-distribution",
+        "harness-claude-code",
+        "harness-codex",
+        "harness-copilot",
+        "harness-cursor",
+        "harness-devin",
+        "harness-kimi-code",
+        "product-vision",
+        "spec-context-project",
+        "capabilities",
+        "ci-preflight",
+        "consumer-agent-support",
+        "context-management",
+        "cross-platform-portability",
+        "server-registry",
+        "specs-migration",
+        "workspace-doctor",
+        "workspace-init",
+        "audits-canon",
+        "backlog-ledger",
+        "bug-ledger",
+        "release-lifecycle",
+        "sdd-gate-v3"
+      ]
     }
   ]
 }

@@ -1,57 +1,50 @@
 # Distribution
 
-Where dadaia-workspace is published, what each channel carries, and who acts. A
-channel with no artifact in this repository is an operator step, recorded here rather
-than pretended into a task.
+Where dadaia-workspace is published and what each channel carries.
 
 ## Channels
 
-<!-- derived-from: pypi-distribution sha256:6cac718559b3 -->
+<!-- derived-from: pypi-distribution sha256:b7d1df6e7a7c -->
 
-| channel | artifact | state | who acts |
-|---|---|---|---|
-| PyPI | the wheel and sdist; `README.md` is the long description and `pyproject.toml` the metadata | live — published from `.github/workflows/release-please.yml` under OIDC trusted publishing, the merge of the release PR firing it | the same workflow, its publish jobs gated on `release_created` and on the `release-gate` environment the operator approves |
-| GitHub repository | the repository description, its topics and its homepage — settings, carried by no file in the tree | set — description, homepage and topics from the same tagline and keyword set, each run recorded in `_RELEASE.json`'s `log` | the main thread: `gh repo edit --description … --homepage … --add-topic …`, then `gh repo view --json description,repositoryTopics,homepageUrl` |
-| Repository root | `llms.txt` — the llmstxt.org index an agent reads first: what it is, install, the law, the CLI reference, the memory catalog | live — every line links, none restates | `software-engineer`, re-derived at closure like every document under a `derived-from` marker |
-| Awesome-lists of agentic tooling | a submitted entry carrying the tagline and the repository link | pending — no submission made | the operator |
-| Claude Code skills / plugin registry | a packaged plugin of the skill corpus | blocked — backlog `plugin-packaging-and-skill-evals` owns the packaging and the skill evaluations it requires | the operator picks the backlog entry; nothing ships from this candidate |
+| channel | artifact | how it is published |
+|---|---|---|
+| PyPI | the wheel; `README.md` is the long description and `pyproject.toml` the metadata | `.github/workflows/release-please.yml`: merging the release PR creates the tag, and the publish jobs, gated on `release_created` and on the operator's `release-gate` approval, upload under OIDC trusted publishing |
+| GitHub repository | the repository description, topics and homepage | set from the same tagline and keywords as `pyproject.toml` |
+| Repository root | `llms.txt` — an index whose every line links to a derived document, the law, the CLI reference or the memory catalog | committed, derived under its markers |
+| Docs site | GitHub Pages serving `docs/` from `main`, with no build toolchain | every page derived under its markers |
+| `dadaia-skills` repository | the standalone skills in the Agent Skills layout, installable by `npx skills add` and as a Claude Code marketplace | the `publish-skills-repo` job of the release workflow |
 
 ## The PyPI metadata contract
 
-<!-- derived-from: pypi-distribution sha256:6cac718559b3 -->
+<!-- derived-from: pypi-distribution sha256:b7d1df6e7a7c -->
 
-Every field PyPI renders has exactly one home, and no number or sentence is restated
-in a second file:
+Every field PyPI renders has exactly one home:
 
-- **The number** — `pyproject.toml`'s `version` and `.release-please-manifest.json`,
-  which carry the LAST PUBLISHED number: the floor release-please bumps from, restated
-  nowhere else. The number proposed next lives only in the open release PR, and a
-  `v<version>` tag exists only for a published number, because merging that PR creates
-  it.
+- **The number** — `pyproject.toml`'s `version` and `.release-please-manifest.json`
+  carry the last published number, the floor release-please bumps from; the number
+  proposed next lives only in the open release PR, and nothing else states a version.
+  A `v<version>` tag exists only for a number release-please released.
 - **The summary** — `pyproject.toml`'s `description`, the tagline, byte-equal to the
   README's first non-badge paragraph and to `llms.txt`'s `> ` line, pinned by
   `tests/contract/test_docs_derived_from_memory.py`.
-- **The long description** — `README.md` itself (`readme = "README.md"`), every
-  section of it derived from a named memory atom under that atom's content hash, and
-  capped at the 10 KB the same test measures.
-- **The links** — `[tool.poetry.urls]`: `Homepage` (the PyPI project page — no
-  documentation site exists), `Repository`, `Documentation` (`docs/getting-started.md`
-  in the repository), `Changelog` and `Issues`. The same test asserts the five keys.
-- **The keywords** — `pyproject.toml`'s `keywords`, which are also the GitHub topic
-  set; a keyword naming nothing the README says is deleted rather than kept for
-  search.
-- **The classifiers** — a claim, not decoration: the development status stays
-  `3 - Alpha` until a post-release wheel passes the consumer-validation recipe the
-  wheel itself ships.
+- **The long description** — `README.md` itself (`readme = "README.md"`), derived like
+  every other document.
+- **The links** — `[tool.poetry.urls]`: `Homepage`, `Repository`, `Documentation` (the
+  docs site), `Changelog` and `Issues`.
+- **The keywords** — every keyword names something the README says.
+- **The classifiers** — the `Development Status` stays `3 - Alpha` until a released
+  wheel passes the consumer-validation recipe.
 
 ## What the wheel carries
 
-<!-- derived-from: pypi-distribution sha256:6cac718559b3 -->
+<!-- derived-from: pypi-distribution sha256:b7d1df6e7a7c -->
 
 The wheel ships `dadaia_workspace/` with the full `public/` tree, so `dadaia init`
-works offline from a bare `pip install`, and `CONSUMER_VALIDATION_RECIPE.md`, the
-matrix run against every candidate wheel before a deploy. Consumer-validation
-candidate wheels are throwaway and never mint a published number —
-`DADAIA_BOOTSTRAP_PACKAGE=<wheel>` makes a venv bootstrap install one instead of
-pinning from PyPI. Withholding release-gate approval is supported: the tag and the
-`CHANGELOG.md` section exist, the upload does not, and the number is never reused.
+works offline from a bare install, and
+`dadaia_workspace/public/data/CONSUMER_VALIDATION_RECIPE.md`, the matrix run against
+every candidate wheel before a deploy. It installs one CLI under two console-script
+names, `dadaia` and `dadaia-workspace`. Consumer-validation candidate wheels are
+throwaway and never mint a published version; `DADAIA_BOOTSTRAP_PACKAGE=<wheel>` makes
+a venv bootstrap install one instead of the PyPI release. Withholding the
+`release-gate` approval leaves the tag and the `CHANGELOG.md` section without an
+upload, and the number is never reused.

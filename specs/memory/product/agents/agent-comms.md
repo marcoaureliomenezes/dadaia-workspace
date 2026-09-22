@@ -1,8 +1,8 @@
 ---
 slug: agent-comms
 title: agent-comms
-tldr: The handoff-v1 JSON contract agents emit, its stdlib validator behind `dadaia reports`, and ack-on-consume deletion.
-summary: Agent-to-agent coordination is a JSON handoff under the workspace handoff tree, validated against the packaged handoff-v1 schema, with HTML reports as optional evidence.
+tldr: The handoff-v1 JSON contract agents emit, its stdlib validator behind `dadaia reports validate`, and ack-on-consume deletion with a one-day TTL.
+summary: Agent-to-agent coordination is a JSON handoff under the workspace handoff tree, validated against the packaged handoff-v1 schema, with an HTML report as optional evidence.
 tags: [agent-comms, handoff, schema]
 sources:
   - dadaia_workspace/core/handoff_index.py
@@ -12,21 +12,26 @@ sources:
 
 ## The contract
 
-- `handoff-v1` is the JSON contract every agent emits, written to `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json`.
+- `handoff-v1` is the JSON record every agent emits, written to `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json`.
 - An optional HTML report under `repos/<slug>/reports/<agent>/` is referenced by `artifact.path` plus `artifact.content_hash`.
-- The current token is `handoff-v1.2`, carrying `self_pull.refs` — the `specs/`-prefixed atoms the session read; the enum also accepts `handoff-v1` and `handoff-v1.1` (historical documents stay valid), `handoff-v1.1` being the sanctioned emission for a session that read none.
-- `public/schemas/handoff-v1.schema.json` is the single source of field semantics, staged to `.dadaia/agentic/schemas/` and never projected into a harness root, since only the CLI reads it.
+- `schema_version` accepts `handoff-v1`, `handoff-v1.1` and `handoff-v1.2`; `handoff-v1.2` carries `self_pull.refs` — the `specs/`-prefixed atoms the session read — and `handoff-v1.1` is the emission for a session that read none.
+- An optional `verdict` (`APPROVED`/`REJECTED`) records `dd-code-reviewer`'s recommendation.
+- `dadaia_workspace/public/schemas/handoff-v1.schema.json` is the single source of field semantics, staged to `.dadaia/agentic/schemas/` and never projected into a harness root; only the CLI reads it.
 
-## Validation and lifecycle
+## Validation
 
-- `dadaia reports validate` exits 0 valid, 1 invalid (or soft violation under `--strict`), 2 file not found, 3 bad invocation, and discovers `.dadaia/handoff/` under `--all`; it is the `reports` group's only verb.
-- `core/handoff_index.py` is the one handoff reader: `HandoffIndex.scan()` discovers, `Handoff.schema_version` routes, `Handoff.artifact_path()` resolves and `Handoff.validate()` checks; every other consumer calls it.
-- Validation is stdlib-only and internal to that module, and a schema keyword outside its supported set raises rather than passing unchecked.
-- The `self_pull` rule lives in the service, not the schema: non-empty `refs`, each existing inside the workspace, and role-map coverage — an agent mapped in `core/role_atom_map.py` must list its atom.
-- With `artifact.path` present the artifact is resolved inside the workspace and its SHA-256 recomputed.
-- A consumed coordination handoff is deleted by the consumer that acted on it, scoped to that one file; every handoff expires one day after its mtime and `dadaia doctor --fix --expired-only` reaps it at SessionStart, `artifact.path` or not ([[workspace-doctor]]).
-- A consumer's deletion resolves its target, refuses one outside `.dadaia/`, and never follows a symlinked directory.
+- `dadaia reports validate` is the `reports` group's only verb: exit 0 all valid, 1 any invalid, 2 a path not found, 3 bad invocation or no workspace; `--all` scans `.dadaia/handoff/`, `--release` filters by `release_id`, `--json` emits machine output.
+- `--workspace` pins the workspace root; `--reviewed-root` resolves `self_pull.refs` against another tree (a worktree at the reviewed commit) before `repos/<context>/<ref>` and `<workspace>/<ref>`.
+- `dadaia_workspace/core/handoff_index.py` is the one handoff reader: `HandoffIndex.scan()` discovers, `Handoff.validate()` checks schema shape and version, the `self_pull` rule and the artifact hash; every other consumer calls it.
+- Validation is stdlib-only, and a schema keyword outside the supported set raises rather than passing unchecked.
+- The `self_pull` rule lives in the reader, not the schema: a `handoff-v1.2` record needs non-empty `refs`, each an existing file inside its boundary root.
+- With `artifact.path` present the artifact is resolved inside the workspace (no `..` or symlink escape) and its SHA-256 recomputed.
+
+## Lifecycle
+
+- A consumed coordination handoff is deleted by the consumer that acted on it, scoped to that one file, refusing a target outside `.dadaia/` and never following a symlinked directory (`dd-handoff-emitter`).
+- The `handoff` zone has a one-day TTL: every handoff expires one day after its mtime and `dadaia doctor --fix --expired-only` reaps it at session start, `artifact.path` or not ([[workspace-doctor]]).
 
 ## Dependencies
 
-[[public-asset-distribution]] — the `schemas` asset type reaches staging and the runtime roots.
+[[public-asset-distribution]] — the schema reaches `.dadaia/agentic/schemas/` through staging; [[workspace-doctor]] — the TTL reaper.

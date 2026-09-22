@@ -5,151 +5,138 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:6cac718559b3 -->
-<!-- derived-from: workspace-init sha256:0be78b874815 -->
+<!-- derived-from: pypi-distribution sha256:b7d1df6e7a7c -->
+<!-- derived-from: workspace-init sha256:ca5c835e94af -->
 
 ```bash
 python -m venv .venv && .venv/bin/pip install dadaia-workspace
 ```
 
-`pip install dadaia-workspace` installs the library and its `dadaia` CLI. The wheel
+`pip install dadaia-workspace` installs the library and one CLI under two
+console-script names, `dadaia` and `dadaia-workspace`; `uvx dadaia-workspace init
+<dir> --harness <name> --repo <url>` runs the next step without an install. The wheel
 ships `dadaia_workspace/` with the full public asset tree, so the next step works
-offline from a bare install. `pyproject.toml`'s `version` is the single source of the
-number, and a `v<version>` tag exists only for a published one.
-
-Install into a virtualenv, never into the system interpreter. A workspace keeps its
-own at `.dadaia/.venv`: `dadaia init` provisions it, every `dadaia`, `pip` and
-`python -m dadaia_workspace` invocation inside the workspace is expected to come from
-`.dadaia/.venv/bin/`, and the gate refuses one that does not.
+offline from a bare install. The workspace you create keeps its own virtualenv at
+`.dadaia/.venv`, which `dadaia init` provisions.
 
 ## Provision the workspace — `dadaia init`
 
-<!-- derived-from: workspace-init sha256:0be78b874815 -->
+<!-- derived-from: workspace-init sha256:ca5c835e94af -->
 
 ```bash
-dadaia init <dir> --harness claude|codex|kimi-code [--repo <url>] [--skip-assets]
+dadaia init <dir> --harness claude|codex|kimi-code|cursor|devin|copilot [--repo <url>] [--skip-assets]
 ```
 
-`init` is the only verb that operates on a zero workspace, and re-running it is
-idempotent. It creates:
+`init` is the only verb that works on an empty directory. `<dir>` is required —
+created if absent, refused with one `fix:` line if it holds a foreign tree, never
+resolved from the cwd — and a re-run is idempotent. It lays down:
 
-- `.dadaia/.venv` and every zone whose registry creator is `init`, plus the shared
-  `.agents/skills` root and the directory the one named harness owns —
-  what it lays down is a view of one registry, `dadaia_workspace/core/workspace_layout.py`.
+- `.dadaia/.venv`, every `.dadaia/` zone whose creator is init or install, and
+  `.agents/skills`; the harness's own directory comes from its projection. The tree is
+  a view of `dadaia_workspace/core/workspace_layout.py`.
 - `.dadaia/states/spec_contexts.json` and `.dadaia/states/server_registry.json` as
   empty documents, never overwriting existing data, and
-  `.dadaia/states/harness_profile.json` through the profile store's one writer.
+  `.dadaia/states/harness_profile.json`, the harness roster; a re-init with another
+  harness merges into it, never narrowing it.
 - Unless `--skip-assets`, the staged and installed public assets — the one writer of
-  every hook wiring, and the source of the projected law (the root `AGENTS.md` map, the scoped
-  `AGENTS.md` files) and the agent assets of each selected harness. Skipping assets
-  leaves the workspace ungated, and the output says so.
+  every hook wiring. With `--skip-assets` the output warns that the workspace is
+  ungated until `dadaia public install` runs.
 
-With `--repo <url>`, `init` also makes that repo the workspace's first project. The
-URL's last path segment (minus `.git`) is the slug: the repo is cloned into
-`repos/<slug>/`, a context of the same name is created with that slug as its main repo,
-made ALIVE, given the pre-push chokepoint, and bound to this session — `init` prints the
-two `export` lines an `eval $(…)` needs. Every step is the context lifecycle's own
-implementation, reached by composition; a single-repo workspace is simply the degenerate
-multi-repo case. Without `--repo`, `init` closes by naming `repos/` and the one command
-that creates the first context.
-
-There is ONE authored set: the root `AGENTS.md`, the scoped `AGENTS.md` files,
-`.agents/skills/` and `.agents/agents/`. Every other harness view of it is a view, not
-a copy: `.claude/skills/*` and `.claude/agents/*.md` are relative symlinks into
-`.agents/` (a hash-verified copy only where the platform refuses a link), and
-`.codex/agents/*.toml` is a transcode. No `CLAUDE.md` and no `DADAIA.md` is projected
-anywhere — a second copy of the law is drift waiting to happen. `public doctor`'s
-`SYMLINK-TARGET-1` check reads the install ledger and fails on any `.claude/` entry
-that stopped resolving to its authored original.
-
-`init` closes by printing two lines: sessions launch at the workspace root, and the
-recommendation to set `instructionFiles: claude-md-and-agents-md` in your own
-`~/.claude/settings.json` so a stray `CLAUDE.md` inside a repo never hides the
-workspace `AGENTS.md`. The library prints that advice and never writes user settings.
-
-`init` deletes no projection and installs no git hook: the chokepoints go in per repo
-with `dadaia ci install-hook`.
+With `--repo <url>`, `init` clones the repo into `repos/<slug>/` and composes the
+context verbs — `create --main-repo <slug>`, `alive`, the session bind, printing the
+`--print-env` line — then installs the pre-push hook. A re-run with the same URL reuses
+the context, and a failed clone prints the same command as its `fix:`. Without
+`--repo`, `init` closes with three lines: sessions launch at the root, the harness's
+law-loading note, and the `dadaia context create <name> --main-repo <slug>` that makes
+the first project. `init` deletes no projection; `dadaia harness add <name>` adds a
+harness later and `dadaia harness list` reads the roster.
 
 ## Bind a context — `dadaia context bind`
 
-<!-- derived-from: spec-context-project sha256:fa8187312a52 -->
-<!-- derived-from: context-management sha256:4e721bb8d89a -->
+<!-- derived-from: spec-context-project sha256:15dae861d543 -->
+<!-- derived-from: context-management sha256:0227a5e43894 -->
 
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
 owned by one main repository, optionally spanning associated repositories that live and
-die with it. Specs, bind, memory, releases and backlog resolve only from the main repo —
-the repo where `specs/` lives; a single-repo context is the degenerate multi-repo case,
-and the context surface is frozen (no new verb, state file or session field).
+die with it. Specs, bind, memory, releases and backlog resolve only from the main repo.
 
 ```bash
-dadaia context create <ctx> --main-repo <slug> # registers it DEAD in the registry
+dadaia context create <ctx> --main-repo <slug> # registers it DEAD
 dadaia context alive <ctx>                     # clones the repos, folds the canon scaffold over specs/
 dadaia context bind <ctx>                      # this session's scope
-dadaia context show --json                     # what this session resolved
+dadaia context show <ctx> --json               # the repo set
 ```
 
-`bind` writes exactly one artifact — the caller-owned
-`.dadaia/sessions/<session-id>.json` carrying context, runtime, pid and `bound_at`.
-It acquires nothing, requires no live release, and `--print-env` emits
-`DADAIA_CONTEXT` and `DADAIA_SESSION_ID` for an `eval $(…)` shell; in a session with
-no harness-native id, that exported variable *is* the binding. The bind's scope is
-the context's main repo plus its associated repos, and it constrains nothing else.
+`dadaia context alive` clones every missing repo; the main repo alone gets the canon
+scaffold folded over `specs/`, never overwriting a file. `bind` writes exactly one
+record, `.dadaia/sessions/<session-id>.json` (context, runtime, pid, `bound_at`), and
+acquires nothing; `--print-env` emits `DADAIA_CONTEXT` and `DADAIA_SESSION_ID` for an
+`eval $(…)` shell, and a session without a harness-native id carries the binding in
+`DADAIA_CONTEXT`. The bind's scope is the context's main repo plus its associated
+repos; a bound session's MUTATING write into a repo another context owns is refused
+with the bind that would allow it. After a bind, the ctx-inject hook injects the context
+header, `ARCHITECTURE.md`'s `## Tech Stack` section and the memory catalog digest once.
 
 ## Check compliance — `dadaia doctor`
 
-<!-- derived-from: workspace-doctor sha256:707aef160b29 -->
+<!-- derived-from: workspace-doctor sha256:ef9c81d0d181 -->
 
 ```bash
 dadaia doctor --context <ctx> [--json] [--fix] [--redact]
 ```
 
-`doctor` is the one validator, and three sections run in fixed order: `workspace`
-(the root, the harness dirs, the `.dadaia/` zones, every ALIVE repo tree, the
-installed git hooks), `specs` (the rules over one `specs/` tree) and `ledgers`
-(`BACKLOG.json` plus schema validation of every committed governance record).
+`doctor` is the one instance validator, and three sections run in fixed order:
+`workspace` (the root, the harness dirs, the `.dadaia/` zones, every ALIVE repo tree,
+the installed git hook), `specs` (the rules over one `specs/` tree) and `ledgers` (the
+backlog document, the ADR ledger and the ledger scripts' own `check`).
 
-With no instance around the run — CI over a bare checkout — `dadaia doctor
---specs-dir specs` still reads the tree: the `workspace` section is empty and the
-other two run; only a run with nothing to read refuses and points at `dadaia init`.
+The `specs` and `ledgers` tree resolves from `--context`, `--specs-dir` or the bound
+context; with none, those sections are empty and `workspace` still runs. With no
+instance around — CI over a checkout — `dadaia doctor --specs-dir specs --source-root .`
+runs the two tree sections.
 
-Every finding prints as one `<CODE> <verdict> <message>` line, and every error-class
-rule carries a mandatory `fix: <command>` under each of its findings — so an exit-1
-run never stalls the flow. There is no score line: the findings and the exit code are
-the report. `--json` mirrors the whole run; `--fix` is the reaper — it
-MOVES slop to `.dadaia/reaped/<YYYYMMDD>/` under a 7-day hold and deletes only what
-its own TTL expired.
+Every printed finding is one `<CODE> <verdict> <message>` line, every error-class
+finding carries one `fix: <command>` line, and any error-class finding exits 1. There
+is no score: the findings and the exit code are the run. `--json` mirrors it,
+`--redact` masks every foreign context name and repo slug, and `--fix` is the reaper —
+it moves slop to `.dadaia/reaped/<YYYYMMDD>/` under a 7-day hold and deletes only what
+a TTL expired.
 
 ## Run the first candidate
 
-<!-- derived-from: sdd-bug-backlog-governance sha256:828ff63c54dd -->
+<!-- derived-from: release-lifecycle sha256:74d49f4d629b -->
+<!-- derived-from: backlog-ledger sha256:46382434daf2 -->
+<!-- derived-from: bug-ledger sha256:9534ded07707 -->
 
-A candidate is one closed-scope SDD cycle inside the live release. Nothing drives it:
-the documents are the state, the verbs move the state document, and the markers in
+A candidate is one closed-scope cycle inside the live release. Nothing drives it: the
+documents are the state, the ledger scripts move the records, and the markers in
 `TASKS.md` are the trace.
 
-1. **Demand enters the backlog.** Only the operator creates demand; `dd-product-engineer`
-   curates `specs/backlog/BACKLOG.json`'s `active[]` through its intake, and
-   `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new` appends the entry. Maturation (`idea → candidate → picked`)
-   is hand-written and doctor-validated.
-2. **Birth the release.** `python3 .agents/skills/dd-release-implementation/scripts/release.py new <M.m.p>` writes `SPEC.md` and
-   `_RELEASE.json` in phase `DEFINITION` under `specs/releases/<M.m.p>/`, in one
-   transaction, refusing a second live release.
-3. **Define the candidate.** Author `SPEC.md`, `PLAN.md` and `TASKS.md` at the release
-   root, each carrying `**Status:** Approved`, and flip the picked backlog entry to
-   `picked` in the same commit.
-4. **Open implementation.** `python3 .agents/skills/dd-release-implementation/scripts/release.py phase IMPLEMENTATION --sha <sha>` requires
-   the approved trio and stamps `defined {sha, ts}`.
-5. **Implement one task at a time.** Reserve a row `[ ] → [-]`, do the work inside its
-   declared write set, then `[-] → [x]` with a `conventional-commit(task-id)` commit.
-6. **Close the candidate.** `python3 .agents/skills/dd-release-implementation/scripts/release.py phase CLOSURE --sha <sha>` requires every
-   task `[x]` and stamps `implemented {sha, ts}`. Then the memory update,
-   the closure `log` entries, the disposition sweep (`python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit`,
-   `python3 .agents/skills/dd-audit-project/scripts/audit.py disposition`), artifact GC, and the `feature → develop` pull request.
-7. **Continue or promote.** Continue: the next candidate's `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id>`
-   overwrites the trio at the release root, leaving the closed one in git. Promote:
-   merge the release pull request release-please maintains on `main` — it owns the
-   version, the `CHANGELOG.md` section and the tag, and the publish jobs run in the
-   same workflow under `release_created`.
+1. **Demand enters the backlog.** Only the operator creates demand;
+   `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug>` appends
+   one `active[]` entry born `idea`, and every later status (`candidate`, `picked`)
+   binds `intents[]` that resolve to a code, doc or CLI anchor.
+2. **Birth the release.**
+   `python3 .agents/skills/dd-release-implementation/scripts/release.py new <M.m.p>`
+   writes a `SPEC.md` stub and `_RELEASE.json` in `DEFINITION` under
+   `specs/releases/<M.m.p>/`, all or nothing, refusing a second live release.
+3. **Define the candidate.** The picked set, the mandatory grill, then `SPEC.md`,
+   `PLAN.md` and `TASKS.md` at the release root, in one definition commit on
+   `feature/<M.m.p>`.
+4. **Open implementation.** `release.py phase IMPLEMENTATION --sha <sha>` requires all
+   three files `**Status:** Approved` and stamps `defined`.
+5. **Implement one task at a time.** Reserve it `[-]` in its own commit, work
+   test-first, run the local CI preflight, and mark `[x]` only after the reviewer's
+   `APPROVED` on the same commit.
+6. **Close the candidate.** `release.py phase CLOSURE --sha <sha>` requires no `[ ]`
+   or `[-]` marker and stamps `implemented`. Then, in order: memory reconciliation, the
+   closure `log` entries, the disposition sweep (`backlog.py exit`,
+   `audit.py disposition`/`close`, `bugs.py archive`), artifact GC, and the
+   `feature -> develop` PR merged green.
+7. **Continue or promote.** Continue: `release.py new` with the same id stacks the next
+   candidate, reopening `DEFINITION`. Promote: merge `develop` into `main`, then merge
+   the release PR release-please opens there — it owns the version, the CHANGELOG
+   section and the tag, and the publish jobs run on it.
 
-A bug needs none of this: register, root-cause, RED test, fix, GREEN, resolve with
-evidence, commit — on the live feature branch, in any phase.
+A bug needs none of this: register, lineage, RED test, root-cause fix, GREEN, `resolve`
+with evidence, one commit — on the live feature branch, in any phase.

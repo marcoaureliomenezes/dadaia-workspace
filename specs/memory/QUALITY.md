@@ -104,7 +104,7 @@ Rationale: a document written beside memory rots; one that names its source is r
 - Stale handoffs and scratch are a closure readout, never a ratchet: `dd-release-implementation` RC-FLOW step 8 runs `dadaia doctor` dry, then `dadaia doctor --fix` (slop moved to `reaped/`, expired entries deleted), and the `kind: artifact-gc` log entry records the `compliance(total)` line and what the reaper holds ([[workspace-doctor]]).
 - `dd-audit-project` pillar 2 re-measures the ratchets over the audit window and applies `dd-code-review` SLOP.md S1–S10 to a commit sample; the fixed law sections are kept byte-exact by `dadaia doctor` FIXED-1/2.
 
-Related: [[ARCHITECTURE]], [[consumer-agent-support]], [[sdd-gate-v3]], [[sdd-bug-backlog-governance]], [[workspace-doctor]].
+Related: [[ARCHITECTURE]], [[consumer-agent-support]], [[sdd-gate-v3]], [[bug-ledger]], [[backlog-ledger]], [[release-lifecycle]], [[workspace-doctor]].
 
 <!-- dadaia:fixed slop-tests -->
 ### Slop — tests (fixed)

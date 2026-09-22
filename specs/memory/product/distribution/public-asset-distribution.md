@@ -1,8 +1,8 @@
 ---
 slug: public-asset-distribution
 title: public-asset-distribution
-tldr: Public assets staged once, projected into the authored set (root map, scoped AGENTS.md, .agents/skills, .agents/agents); .claude/ entries are symlinks.
-summary: The stage, install and doctor chain distributing the agentic surface into runtime roots, with hash-compare overwrite, rendered agents, whole-folder skills and a privacy gate.
+tldr: Public assets staged once, projected into the root map, scoped AGENTS.md, .agents/ and each registered harness's files; doctor reports drift.
+summary: The stage, install and doctor chain that distributes the agentic surface into a workspace — hash-compared overwrite, rendered personas, whole-folder skills, per-harness hook and agent files derived from one registry, the specs scaffold, and a privacy gate; plus the dadaia-skills repository built from the same skills.
 tags: [public, assets, distribution, projection, privacy]
 sources:
   - dadaia_workspace/features/public/**
@@ -24,35 +24,34 @@ sources:
 
 ## The chain
 
-- `dadaia public stage` copies `dadaia_workspace/public/` into `.dadaia/agentic/<type>/` with a SHA256 manifest.
-- `dadaia public install` projects staged assets into the authored set — the root `AGENTS.md` map, the scoped `AGENTS.md` family, `.agents/skills/`, `.agents/agents/` — plus `.claude/settings.json` and per-entry symlinks under `.claude/`, `.codex/{config.toml,hooks.json,rules,agents/*.toml}`, `.cursor/{hooks.json,agents/*.md}`, `.devin/hooks.v1.json`, `.github/{hooks/*.json,agents/*.agent.md}` and every hook wrapper under `.dadaia/hooks/<harness>-*`; Kimi Code's own set is empty (ADR 0017).
-- `projection_rules(plan, harnesses)` builds one `ProjectionRule(label, harness, dst, render, compare, mode)` table; `install` writes it, `doctor` compares it and the install ledger is its destination list — no second derivation of the managed set.
-- `core/harness_registry.HARNESS_RECORDS` is the one home of a harness: one `HarnessRecord(name, directory, agent_transcode, hooks)` per harness (six at 0.4.7 c8), the `agent_transcode` builders in `infrastructure/agent_transcodes.py` and the `HOOK_DIALECTS` table in `runtime_transforms/hook_wrappers.py` derive every rule from the record — the projection table has no harness-named branch, and adding a harness is one data row; a `ProjectionRule` is a file, a relative symlink (`link_to`) or its hash-verified copy fallback, and the install ledger records each entry's kind (`file|symlink|copy`) so a copy never passes as a link.
-- The renderer is the only verifier: a rule's `render` maps the bytes on disk to the bytes that belong there, so a `bytes` rule is a plain compare while an `owned-slice` or `managed-block` rule is a fixed point that leaves an operator's own keys alone.
-- There is no `public/hooks/`: governance hooks are the Python package `dadaia_workspace/hooks/`.
-- A hook never exists on its own (operator doctrine 2026-09-20, closed as delivered 2026-09-21 by the c8 registry): the rule is the abstract entity — four deterministic behaviours (pre-gate: root whitelist + venv guard + SDD gate; post-gate; context injection; session-start reaper) — and `HOOK_DIALECTS` renders each in the harness's own format, declaring in `ungated` every action the harness exposes no pre-event for (Cursor: file writes, one `public doctor` WARN). Three facts bound the derivation: Codex hooks never fire under headless `codex exec` (live-certified per version, `codex_doctor.py`); Kimi Code and ZCode accept hooks only in the user-level config, so a project ships shims, not registrations ([[harness-kimi-code]]); a harness outside the registry (DeepSeek dsh's Claude-hooks bridge) gets no derivation until it is one data row.
-- A second distribution stands beside the wheel (0.4.7 c9): `public/scripts/build-skills-repo.py <out>` renders the `dadaia-skills` repository in the Agent Skills layout — `skills/<name>/**` byte-identical to `public/skills` for every name in `behavior-map.json`'s `standalone_skills` (eight skills that need no workspace, each carrying a one-line `compatibility:` naming dadaia-workspace as the home of the full lifecycle), a README derived from this atom and [[agentic-entities]], the LICENSE, and the Claude marketplace manifests `.claude-plugin/{marketplace,plugin}.json` (`claude plugin validate` clean); the output is never tracked or read back, and the release workflow publishes it ([[pypi-distribution]]).
-- Install compares content, not existence — a differing staged hash overwrites without `--force`, which is reserved for a hand-edited projection.
-- The three `agents/dd-*.md` bodies stage generic and render once into `.agents/agents/` as `render(staged body + resolved (model, effort) + activity_class privileges)`, precedence override > template > `balanced` over `.dadaia/states/agent_model_policy.json`; a retired persona key in that JSON migrates on read.
-- Codex render fails closed without a model, and the manifest keeps hashing the policy-free staged bytes.
-- A skill is a folder and every file in it is projected once to `.agents/skills/<name>/`; `.claude/skills/<name>` is a relative symlink to it; Codex and Kimi Code read the shared root natively ([[agentic-entities]]).
-- `stage` renders five placeholders from `core/workspace_layout.py` through `render_registry_tables` — `<!-- zones -->` and `<!-- canon -->` in the `.dadaia/AGENTS.md` and `.dadaia/states/AGENTS.md` fragments, `<!-- root -->` in the root map, `<!-- repo-excluded -->` in `repo-AGENTS.md` and `<!-- specs-canon -->` in `specs-AGENTS.md` — so every canon table in the projected law is the registry, pinned row for row by `tests/contract/test_zone_registry.py` ([[workspace-doctor]]); scripts are staged under `agentic/scripts` and never projected — git hooks and CI execute the package copy, and the memory-atom lint lives in `features/specs/memory_lint.py`.
+- `dadaia public stage` copies `dadaia_workspace/public/` into `.dadaia/agentic/<type>/` with a SHA256 manifest, rendering the registry tables (zones, root canon, repo exclusions, specs canon) into the law fragments so every canon table in the projected law is the registry itself.
+- `dadaia public install` projects the staged assets into the authored set — the root `AGENTS.md` map, the scoped `AGENTS.md` family, `.agents/skills/`, `.agents/agents/` — plus, per registered harness, its own agent and hook files: `.claude/settings.json` and per-entry symlinks under `.claude/`, `.codex/{config.toml,hooks.json,rules,agents/*.toml}`, `.cursor/{hooks.json,agents/*.md}`, `.devin/hooks.v1.json`, `.github/{hooks/*.json,agents/*.agent.md}` and the hook wrappers under `.dadaia/hooks/`; Kimi Code reads the shared tree and gets no files of its own ([[harness-kimi-code]]).
+- One harness registry drives every per-harness file: each harness is one record naming its directory, its persona transcode and its hook format, so adding a harness is one data row ([[agentic-entities]]).
+- Hooks are the Python package `dadaia_workspace/hooks/`, rendered into each harness's own hook format; a harness action with no pre-event is declared ungated (Cursor file writes, one `public doctor` WARN).
+- Install compares content, not existence: a differing staged hash overwrites without `--force`, which is reserved for a hand-edited projection; an operator's own keys in a shared settings file are left alone.
+- A skill is a folder projected whole to `.agents/skills/<name>/`; `.claude/skills/<name>` is a relative symlink to it, or a hash-verified copy where links are unavailable, and the install ledger records which.
+- The three `agents/dd-*.md` personas stage generic and render into `.agents/agents/` with the resolved model and effort from `.dadaia/states/agent_model_policy.json`; the Codex transcode fails closed without a model.
+- `public install` refuses the dadaia-workspace source repository root unless `DADAIA_ALLOW_SOURCE_ROOT_PUBLIC_INSTALL=1`.
 
 ## Doctor
 
-- `dadaia public doctor` compares source against staging, then staging against each runtime projection, emitting `[ok]`, `[missing]`, `[drift]` or `[foreign]` per file and a non-zero exit on any mismatch.
-- A core `agents:agents/dd-*.md` label compares against `render(staged + resolved policy)`, so an applied policy reads `[ok]` and a hand-edit `[drift]`; a Codex TOML is byte-compared to its transcode; `SYMLINK-TARGET-1` attests every ledgered link entry of every harness: a symlink resolving to its canonical `.agents/` path or a hash-equal copy, anything else one finding with `fix: .dadaia/.venv/bin/dadaia public install --force`.
-- The privacy gate runs over source and staged assets, reporting `[ok] public-privacy` only on a clean surface, which CI treats as a release gate.
-- `install` and `doctor` cover the roster in `.dadaia/states/harness_profile.json` plus the shared authored set; `dadaia harness add <name>` is the one way a harness joins the roster (`public install --target` died at 0.4.7 c8), and a missing profile is read once as the harness directories present at the root ([[workspace-init]]).
-- Doctor builds its rule table for the profile's harnesses only; an entry inside a harness dir that the install ledger does not name is `dadaia doctor`'s `WS-<harness>-slop`, never a `public doctor` line ([[workspace-doctor]]).
+- `dadaia public doctor` compares source against staging, then staging against each projection, printing `[ok]`, `[missing]`, `[drift]` or `[foreign]` per file and exiting non-zero on any mismatch; a persona compares against its rendered form, so an applied policy reads `[ok]` and a hand-edit `[drift]`.
+- `SYMLINK-TARGET-1` attests every ledgered link: a symlink resolving to its `.agents/` path or a hash-equal copy, anything else one finding with `fix: .dadaia/.venv/bin/dadaia public install --force`.
+- The privacy gate runs over source and staged assets and reports `[ok] public-privacy` only on a clean surface; CI treats it as a release gate.
+- `install` and `doctor` cover the harnesses in `.dadaia/states/harness_profile.json` plus the shared authored set; `dadaia harness add <name>` is the one way a harness joins ([[workspace-init]]); an unledgered entry inside a harness directory is `dadaia doctor`'s `WS-<harness>-slop` ([[workspace-doctor]]).
 
 ## Scaffold and consumer fan-out
 
-- The scaffolded `specs/` tree is the v6 canon — `backlog/`, `bugs/`, `memory/`, `releases/`, `audits/`, `ADRs/`, `constitution.md`, `AGENTS.md` — stamped `specs_pattern_version: 6`.
-- The scaffolded `specs/AGENTS.md` (`templates/specs-AGENTS.md`) is a statement list — load order pointing at `dd-spec-navigator`, the authority table, escalation — with no gate claim and no root `_archive/`; every scoped scaffold `AGENTS.md` is the system of record of its area (<= 4096 B; the root map <= 8192 B; every `SKILL.md` <= 6144 B — `tests/contract/test_context_map.py`, `public/data/CONTEXT-MAP.md`), and `TREE-5` heals each by shipped hash ([[workspace-doctor]]).
-- Each scoped `AGENTS.md` is hash-projected and doctor-compared; operator-owned domain-scoped files are never overwritten.
-- Repo templates land at `alive()`, not at install: `repo-AGENTS.md` to the repo root, `tests-AGENTS.md` only when `tests/` is a real directory holding no such file.
-- Templates ship parameterized, so an installed file still carrying `<ANGLE-BRACKET>` placeholders is the finding `dadaia doctor`'s `specs` section reports (`AGENTS-PLACEHOLDER-1`, `MEM-PLACEHOLDER-1`; [[workspace-doctor]]).
-- Consumer-repo `AGENTS.md` fan-out is provenance-gated by the canonical banner: absent creates, a stale banner is restored as `[updated]`, a bannerless file is `[foreign]` and never overwritten.
-- A registry `repo_slug` is accepted only as a single, relative, non-dot path component validated lexically, so a symlinked `repos/<slug>` directory is allowed while a symlinked destination file is `[foreign]`.
-- `public install` refuses the `dadaia-workspace` source repo root unless `DADAIA_ALLOW_SOURCE_ROOT_PUBLIC_INSTALL=1` is set.
+- The scaffolded `specs/` tree is the canon — `AGENTS.md`, `constitution.md`, `memory/` (`ARCHITECTURE.md`, `QUALITY.md`, `product/`), `releases/`, `backlog/`, `bugs/`, `audits/`, `ADRs/` — stamped `specs_pattern_version: 7`.
+- Every scoped scaffold `AGENTS.md` is the system of record of its area, at most 4096 bytes (the root map 8192, a `SKILL.md` 6144 — `tests/contract/test_context_map.py`); `TREE-5` heals each by shipped hash, and operator-owned files are never overwritten ([[workspace-doctor]]).
+- Repo templates land when a context goes ALIVE: `repo-AGENTS.md` at the repo root, `tests-AGENTS.md` only into a real `tests/` directory holding none ([[context-management]]).
+- An installed file still carrying `<ANGLE-BRACKET>` placeholders is `AGENTS-PLACEHOLDER-1` or `MEM-PLACEHOLDER-1` in `dadaia doctor`'s `specs` section.
+- Consumer-repo `AGENTS.md` fan-out is gated by the canonical banner: absent creates, a stale banner is restored as `[updated]`, a bannerless file is `[foreign]` and never overwritten; a symlinked destination file is `[foreign]`.
+
+## The skills repository
+
+- `python dadaia_workspace/public/scripts/build-skills-repo.py <out>` renders the `dadaia-skills` repository in the Agent Skills layout: `skills/<name>/**` byte-identical to `public/skills` for the eight standalone skills `dadaia_workspace/public/entities/behavior-map.json` lists, a derived README, the LICENSE and the Claude marketplace manifests `.claude-plugin/{marketplace,plugin}.json`; the output is never tracked, and the release workflow publishes it ([[pypi-distribution]]).
+
+## Dependencies
+
+[[agentic-entities]], [[pypi-distribution]], [[workspace-init]], [[workspace-doctor]], [[context-management]], [[harness-kimi-code]].
