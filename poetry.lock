@@ -1434,6 +1434,17 @@ dev = ["pre-commit", "tox"]
 testing = ["coverage", "pytest", "pytest-benchmark"]
 
 [[package]]
+name = "poetry-core"
+version = "2.5.0"
+description = "Poetry PEP 517 Build Backend"
+optional = false
+python-versions = "<4.0,>=3.10"
+files = [
+    {file = "poetry_core-2.5.0-py3-none-any.whl", hash = "sha256:98ee465b66f7e14bb9fbe68fb5e00d0cff184f036993ec94610ae4b5612f3add"},
+    {file = "poetry_core-2.5.0.tar.gz", hash = "sha256:81d04c9253b19d0604718268d781867c8f7b2128e5b25bbf1e84141eec6b89c4"},
+]
+
+[[package]]
 name = "pycparser"
 version = "3.0"
 description = "C parser in Python"
@@ -2397,4 +2408,4 @@ claude-sdk = ["claude-agent-sdk"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "1d4eed90870200cf1fa4214dd58cafdd0b26dc09734f2c9d95a12f6921323d8c"
+content-hash = "4d123592132ac142b49fd8191e98f4fbd7863e171292387a529ded0fdfad9312"
