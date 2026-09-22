@@ -476,6 +476,13 @@
     "link_to": null
   },
   {
+    "label": "agents:skills/dd-spec-navigator/scripts/_memory_drift.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-spec-navigator/scripts/_memory_drift.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
     "label": "agents:skills/dd-spec-navigator/scripts/_memory_schema.py",
     "harness": "agents",
     "dst": "ws:.agents/skills/dd-spec-navigator/scripts/_memory_schema.py",

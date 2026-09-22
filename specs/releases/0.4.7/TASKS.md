@@ -33,7 +33,7 @@
   `tests/unit/features/specs/test_memory_lint.py`, `tests/unit/skills/test_spec_navigator_memory_script.py`
   `blocked by:` T-047-94 · `delivers:` FR2 (atom sources)
 
-- [-] **T-047-95 — `memory.py drift --since <sha> [--json]`.**
+- [x] **T-047-95 — `memory.py drift --since <sha> [--json]`.**
   New sibling `_memory_drift.py` (≤ 85 lines): a pure function of (`catalog.json`, `git diff
   --name-only <sha>..HEAD`, `git ls-files`) listing (a) every atom whose `sources` matched a changed
   path, with the matched paths, (b) every tracked `features/<pkg>/` package and `hooks/*.py` module no

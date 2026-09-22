@@ -5,11 +5,12 @@
 Both files are written in one act, so one module renders both: two renderers in two
 files were two writers of one fact, and the pair drifted apart between them.
 
-`rank` is the 1-based position in the sorted-path file order — an enumeration aid, NOT a
-priority. `token_estimate` is COMPUTED from the body (`word_count * 1.35`), never stored:
-a value both stored and derivable drifts. `generated_at` records when the CONTENT last
-changed, not when the command last ran, so regenerating an unchanged catalog is idempotent
-to the byte and a clean tree stays clean.
+`rank` is the position in sorted-path order — an enumeration aid, NOT a priority.
+`token_estimate` is COMPUTED (`word_count * 1.35`): a value both stored and derivable
+drifts. `sources` is omitted, never emitted empty — the field arrives atom by atom, and an
+empty list in every entry would rewrite a whole consumer catalog for no fact.
+`generated_at` records when the CONTENT last changed, not when the command last ran, so
+regenerating an unchanged catalog is idempotent to the byte and a clean tree stays clean.
 """
 
 from __future__ import annotations
@@ -55,10 +56,9 @@ def feature(path: Path, specs: Path, rank: int) -> dict[str, Any]:
     """One catalog entry built from *path*'s frontmatter and body."""
     data, body, error = parse(path.read_text(encoding="utf-8"))
     if error is not None or data is None:
-        raise Refusal(
-            f"{path}: {error}",
-            f"python3 {Path(__file__).parent / 'memory.py'} check --specs {specs}",
-        )
+        fix = f"python3 {Path(__file__).parent / 'memory.py'} check --specs {specs}"
+        raise Refusal(f"{path}: {error}", fix)
+    sources = [str(item) for item in data.get("sources") or []]
     return {
         "rank": rank,
         "slug": str(data.get("slug", path.stem)),
@@ -70,6 +70,7 @@ def feature(path: Path, specs: Path, rank: int) -> dict[str, Any]:
         "tags": list(data.get("tags") or []),
         "token_estimate": round(len(body.split()) * 1.35),
         "depends_on": _depends_on(body),
+        **({"sources": sources} if sources else {}),
     }
 
 

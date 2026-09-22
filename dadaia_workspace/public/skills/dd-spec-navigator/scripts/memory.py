@@ -3,8 +3,9 @@
 the atoms they are generated from, stdlib only.
 
 ``memory.py <verb> --specs <path>``. `catalog generate` rewrites both generated files
-from the atoms' frontmatter in one act, so the pair cannot drift apart; `check` reports
-where the pair stopped saying what the atoms say. Writing an atom is the closure
+from the atoms' frontmatter in one act, so the pair cannot drift apart; `drift` reports
+what a commit window left stale and what code no atom covers; `check` reports where the
+pair stopped saying what the atoms say. Writing an atom is the closure
 reconciliation's own act and validating one is the library lint's fact: this script does
 neither.
 """
@@ -22,6 +23,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import _memory_catalog as cat  # noqa: E402
+import _memory_drift as dft  # noqa: E402
 from _memory_check import check  # noqa: E402
 from _memory_schema import CATALOG, INDEX, find_specs  # noqa: E402
 
@@ -33,9 +35,14 @@ def _parser() -> argparse.ArgumentParser:
         dest="noun", required=True
     )
     generate = catalog.add_parser("generate", help="rewrite catalog.json and index.md")
+    drift = sub.add_parser("drift", help="what a commit window left stale, and what no atom covers")
+    drift.add_argument(
+        "--since", default=None, help="the window start (default: the live milestone)"
+    )
     validate = sub.add_parser("check", help="validate the generated pair against the atoms")
-    validate.add_argument("--json", action="store_true", help="emit findings as JSON")
-    for command in (generate, validate):
+    for command in (drift, validate):
+        command.add_argument("--json", action="store_true", help="emit the result as JSON")
+    for command in (generate, drift, validate):
         command.add_argument("--specs", type=Path, default=None, help="path to the specs/ tree")
     return parser
 
@@ -47,6 +54,17 @@ def _generate(specs: Path) -> str:
     (specs / INDEX).write_text(cat.render(specs, catalog), encoding="utf-8")
     count = len(catalog["features"])
     return f"[ok] {CATALOG} and {INDEX} written ({count} feature{'s' if count != 1 else ''})"
+
+
+def _drift(args: argparse.Namespace, specs: Path) -> int:
+    """The worklist for the window, exit 1 while either list is non-empty."""
+    repo = specs.parent
+    since = args.since or dft.since_default(specs)
+    catalog = json.loads((specs / CATALOG).read_text(encoding="utf-8"))
+    changed = dft.git(repo, "diff", "--name-only", f"{since}..HEAD")
+    report = {"since": since, **dft.worklist(catalog, changed, dft.git(repo, "ls-files"))}
+    print(json.dumps(report, indent=2) if args.json else dft.render(report))
+    return 1 if report["atoms"] or report["uncovered"] else 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -64,8 +82,10 @@ def main(argv: list[str] | None = None) -> int:
                       f"{finding['message']}")  # fmt: skip
         return 1 if findings else 0
     try:
+        if args.verb == "drift":
+            return _drift(args, specs)
         print(_generate(specs))
-    except cat.Refusal as refusal:
+    except (cat.Refusal, dft.Refusal) as refusal:
         print(f"[error] {refusal}", file=sys.stderr)
         print(f"fix: {refusal.fix}", file=sys.stderr)
         return 1
