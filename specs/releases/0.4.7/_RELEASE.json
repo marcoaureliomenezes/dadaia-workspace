@@ -629,6 +629,33 @@
         "backlog-ledger",
         "release-lifecycle"
       ]
+    },
+    {
+      "ts": "2026-09-22T21:39:17Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 66e588a97a3dffca186850c79c21aa34e3023b9d..d4302acc40bd: 10 reviewed, 5 changed.",
+      "since": "66e588a97a3dffca186850c79c21aa34e3023b9d",
+      "until": "d4302acc40bdf3f68cb90b10657b0f365b14803a",
+      "reviewed": [
+        "pypi-distribution",
+        "harness-claude-code",
+        "harness-codex",
+        "harness-kimi-code",
+        "spec-context-project",
+        "ci-preflight",
+        "consumer-agent-support",
+        "context-management",
+        "workspace-doctor",
+        "bug-ledger"
+      ],
+      "changed": [
+        "agentic-entities",
+        "capabilities",
+        "specs-migration",
+        "release-lifecycle",
+        "sdd-gate-v3"
+      ]
     }
   ]
 }
