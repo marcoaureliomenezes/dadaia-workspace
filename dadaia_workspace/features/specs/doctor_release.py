@@ -508,20 +508,26 @@ class ReleaseValidator:
         - A non-conforming dir in the live ``releases/`` tree whose SPEC.md
           ``Created:`` date is on/after the canon cutoff (``RELEASE_SEMVER_CUTOFF``)
           is an ERROR — a release born after the canon must be SemVer-clean.
-        - Every other non-conforming dir (archive, pre-cutoff ``Created:``, or an
-          undeterminable date) is a WARNING — legacy names predate the canon and are
-          preserved until renamed. The frozen ids themselves live in
-          ``releases/_archive/releases_histo.jsonl``, never as a name allowlist here.
+        - A non-conforming LIVE dir with a pre-cutoff or undeterminable ``Created:``
+          date is a WARNING — a legacy name predates the canon and is preserved until
+          renamed.
+
+        The archive is not this rule's unit (0.4.7 c8 review MEDIUM-2). ADR-9's
+        rationale is that frozen history is never renamed — renaming an archived dir
+        breaks every historical pointer into it — so an archived name is scored once, by
+        the canon (TREE-8), and a second opinion here only multiplied one fact into
+        several findings (ledger precedent
+        ``doctor-016-errors-archived-legacy-release-027-tolerates``).
         """
         issues: list[SpecsDoctorIssue] = []
+        live_root = self.specs_dir / "releases"
         for d, root in iter_all_release_dirs(self.specs_dir):
-            if RELEASE_SEMVER_RE.match(d.name):
+            if root != live_root or RELEASE_SEMVER_RE.match(d.name):
                 continue
-            is_live = root == self.specs_dir / "releases"
             spec_path = d / "SPEC.md"
             created = _extract_created_date(spec_path) if spec_path.exists() else None
             born_after_canon = created is not None and created >= RELEASE_SEMVER_CUTOFF
-            severity = Severity.ERROR if (is_live and born_after_canon) else Severity.WARNING
+            severity = Severity.ERROR if born_after_canon else Severity.WARNING
             issues.append(
                 SpecsDoctorIssue(
                     code="SPEC-DOC-027",

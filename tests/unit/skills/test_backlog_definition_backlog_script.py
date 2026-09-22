@@ -253,6 +253,32 @@ def test_rejected_requires_a_reason(script: Path, tmp_path: Path) -> None:
     assert _histo(specs)[0]["reason"] == "no release ever took it"
 
 
+def test_bl_conflict_fix_line_runs_as_printed(script: Path, tmp_path: Path) -> None:
+    """Intent: CONTRACT — 0.4.7 c8 review MEDIUM-4.
+
+    BL-CONFLICT's own ``fix:`` line, run verbatim against the two-twin shape it
+    diagnoses, must clear the finding. It printed ``--disposition superseded --reason
+    <the-twin-slug>`` while ``_backlog_exit.REQUIRED_EVIDENCE`` binds ``superseded`` to
+    ``--release``: the one remedy the operator was handed refused itself.
+    """
+    from dadaia_workspace.features.backlog.doctor import RULES
+
+    fix = next(rule.fix_help for rule in RULES if rule.codes == ("BL-CONFLICT",))
+    assert fix is not None
+    specs = _specs(tmp_path)
+    for slug in ("a-twin", "its-divergent-twin"):
+        assert _run(script, "new", slug, "--specs", str(specs)).returncode == 0
+
+    argv = fix.split()[2:]  # drop the interpreter and the script path
+    argv = [str(specs) if token == "specs" else token for token in argv]
+    argv = ["a-twin" if token == "<slug>" else token for token in argv]
+    argv = ["its-divergent-twin" if token == "<the-twin-slug>" else token for token in argv]
+    done = _run(script, *argv, "--specs", str(specs))
+    assert done.returncode == 0, f"BL-CONFLICT's own fix line refuses:\n{fix}\n{done.stderr}"
+    assert [item["id"] for item in _active(specs)] == ["its-divergent-twin"]
+    assert _histo(specs)[0]["reason"] == "its-divergent-twin"
+
+
 def test_exit_refuses_a_disposition_outside_the_backlog_vocabulary(
     script: Path, tmp_path: Path
 ) -> None:

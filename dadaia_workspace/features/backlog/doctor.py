@@ -312,7 +312,7 @@ RULES: tuple[LedgerRule, ...] = (
         (BacklogDoctorCode.BL_CONFLICT.value,),
         SECTION,
         _check_conflict,
-        fix_help=f"{BACKLOG_SCRIPT} exit <slug> --disposition superseded --reason <the-twin-slug>",
+        fix_help=f"{BACKLOG_SCRIPT} exit <slug> --disposition rejected --reason <the-twin-slug>",
     ),
     Rule(
         (BacklogDoctorCode.BL_STALE.value,),

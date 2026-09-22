@@ -351,17 +351,22 @@ def test_doc030_accepts_the_dadaia_md_6_8_canon_shape_yyyymmdd_dash_slug(tmp_pat
 # ---------------------------------------------------------------------------
 
 
-def test_doc027_forward_enforcement(tmp_path: Path) -> None:
-    """A non-canon archived dir WARNs; a non-canon LIVE dir born after the canon
-    cutoff is an ERROR."""
-    specs_b = _make_clean_specs_tree(tmp_path / "027unlisted")
-    legacy = specs_b / "releases" / "_archive" / "some-unlisted-legacy-name-v1"
-    _write_minimal_spec(legacy)
-    doc027_unlisted = _by_code(SpecsDoctor(specs_b).check(), "SPEC-DOC-027")
-    assert doc027_unlisted and all(i.severity == Severity.WARNING for i in doc027_unlisted)
+def test_doc027_scores_the_live_root_only(tmp_path: Path) -> None:
+    """Intent: CONTRACT — 0.4.7 c8 review MEDIUM-2/LOW-1.
 
-    specs_e = _make_clean_specs_tree(tmp_path / "027live", release_id="v0.1.4.6")
-    doc027_live = _by_code(SpecsDoctor(specs_e).check(), "SPEC-DOC-027")
+    An archived release dir's name is the canon's unit (TREE-8), not this rule's: three
+    readers of one fact made a single legacy archived name cost a TREE-8 ERROR per
+    reader plus a SPEC-DOC-027 WARNING (ledger precedent
+    ``doctor-016-errors-archived-legacy-release-027-tolerates``). SPEC-DOC-027 scores
+    the live ``releases/`` root and nothing else.
+    """
+    specs_archived = _make_clean_specs_tree(tmp_path / "027archived")
+    legacy = specs_archived / "releases" / "_archive" / "some-unlisted-legacy-name-v1"
+    _write_minimal_spec(legacy)
+    assert "SPEC-DOC-027" not in _codes(SpecsDoctor(specs_archived).check())
+
+    specs_live = _make_clean_specs_tree(tmp_path / "027live", release_id="v0.1.4.6")
+    doc027_live = _by_code(SpecsDoctor(specs_live).check(), "SPEC-DOC-027")
     assert any(i.severity == Severity.ERROR for i in doc027_live)
 
 

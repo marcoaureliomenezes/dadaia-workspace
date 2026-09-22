@@ -196,7 +196,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-027",),
         lambda d: d._release.check_release_naming_canon(),
-        fix_help="git mv specs/releases/<name> specs/releases/<M.m.p>",
+        fix_help="git mv <release dir> <release dir parent>/<M.m.p>",
     ),
     _rule(
         ("SPEC-DOC-028",),
