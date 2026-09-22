@@ -15,8 +15,8 @@ Reach shared understanding by mapping every open branch of the demand as a desig
 
 ## 1. When
 
-- The operator's demand is ambiguous and needs intake refinement (`dd-project-manager`).
-- A release is being defined and needs its mandatory pre-SPEC session (`dd-project-manager`, `dd-release-definition` §2).
+- The operator's demand is ambiguous and needs intake refinement (the main thread).
+- A release is being defined and needs its mandatory pre-SPEC session (the main thread, `dd-release-definition` §2).
 - A single spec or feature question needs a focused leaf answer.
 
 ## 2. Steps

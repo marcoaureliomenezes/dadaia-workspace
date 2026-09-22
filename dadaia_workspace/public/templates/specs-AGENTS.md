@@ -27,11 +27,11 @@ Root workspace behavior is in the workspace `AGENTS.md`; production-source behav
 
 | Path | Writer |
 |---|---|
-| `constitution.md` | operator, or `dd-project-manager` under approved governance work |
+| `constitution.md` | operator, or `dd-product-engineer` under approved governance work |
 | `releases/<id>/_RELEASE.json` | `python3 .agents/skills/dd-release-implementation/scripts/release.py new\|phase`; `log` entries by the narrating agent |
-| `releases/<id>/{SPEC,PLAN,TASKS}.md` | `dd-project-manager` (SPEC), `dd-software-engineer` (PLAN, TASKS); implementers change only their own task marker |
-| `memory/**` | `dd-project-manager`, in `DEFINITION` and `CLOSURE` phase |
-| `backlog/**` | `dd-project-manager`; entries exit by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit` |
+| `releases/<id>/{SPEC,PLAN,TASKS}.md` | `dd-product-engineer` (SPEC), `dd-software-engineer` (PLAN, TASKS); implementers change only their own task marker |
+| `memory/**` | `dd-product-engineer`, in `DEFINITION` and `CLOSURE` phase |
+| `backlog/**` | `dd-product-engineer`; entries exit by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit` |
 | `bugs/**` | any agent, after the operator confirms the proposal; verbs only |
 | `audits/**` | `dd-code-reviewer` (audit lens); findings move by `python3 .agents/skills/dd-audit-project/scripts/audit.py disposition|close` |
 

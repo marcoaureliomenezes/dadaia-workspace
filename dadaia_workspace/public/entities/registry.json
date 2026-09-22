@@ -3,8 +3,8 @@
   "doc": "The abstract, harness-agnostic entity registry — THE source the scaffolded core surface derives from. dadaia-workspace defines behaviors, personas, rules and skills agnostically; each harness receives an IMPLEMENTATION of them. A scaffolded core sub-agent without a Persona here, a core hook without a Deterministic Behavior here, or a core rule without an Abstract Rule here is forbidden (constitution, Anti-Slop Law, Derivation law). Operator-created entities are out of scope.",
   "personas": [
     {
-      "id": "dd-project-manager",
-      "mandate": "Coordinator and sole dispatch authority: intake, grill-me, backlog curation, SPEC and the memory pass, dispatching the engineer and the reviewer."
+      "id": "dd-product-engineer",
+      "mandate": "Owner of the specs: backlog curation, SPEC authoring from the main thread's grill handoff, and product-memory reconciliation at closure; never dispatches."
     },
     {
       "id": "dd-software-engineer",

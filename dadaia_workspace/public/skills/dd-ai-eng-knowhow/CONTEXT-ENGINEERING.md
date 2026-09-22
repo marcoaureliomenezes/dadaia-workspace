@@ -139,7 +139,7 @@ Fix protocol:
 
 - Current per-runtime model ids and Codex reasoning-effort come from `core/model_registry.py`, never hand-copied.
 - On Codex the tiering axis is (model id x model_reasoning_effort); on Claude it is the model id.
-- Quote the registry entry (id + latest pricing row) when recommending a move, so the cost delta comes from live data.
+- Quote the registry entry (id + tier) when recommending a move; take the price from the provider's published table, never from memory.
 - Move up a tier only when depth/breadth/error-cost are all high; move down only when the task is mechanical and high-volume.
 
 Justify a tier BUMP (down -> up):
@@ -187,7 +187,7 @@ Detection rule 3 — self-edit risk + topology-guard protocol:
 2. Confirm an operator-approved release task authorizes the specific change — no self-granted privileges.
 3. Make the edit minimal and single-purpose.
 4. Re-verify topology by hand: persona count matches the roster, required frontmatter keys are present and non-empty.
-5. Confirm `dd-project-manager` still names every leaf agent.
+5. Confirm `dd-manager-orchestration` still names every leaf agent.
 6. The security lens reviews any change adding a powerful tool or widening an allowlist.
 7. Re-validate frontmatter via the workspace reader test so the parse still succeeds.
 

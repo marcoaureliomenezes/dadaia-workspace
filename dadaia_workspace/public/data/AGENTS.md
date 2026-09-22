@@ -24,7 +24,8 @@
 
 | Work | Owner |
 |---|---|
-| Intake, grill, dispatch, backlog, SPEC, the memory pass at closure | `dd-project-manager` |
+| Intake, grill, dispatch, the review checkpoint, gates | the main thread (the operator's session) |
+| Backlog, SPEC, the product-memory pass at closure | `dd-product-engineer` |
 | PLAN, TASKS, production code and tests in any language | `dd-software-engineer` |
 | Three-axis review + six lenses (architecture, security, QA, product, audit, AI surface) | `dd-code-reviewer` |
 

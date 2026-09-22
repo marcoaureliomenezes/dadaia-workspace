@@ -2,9 +2,8 @@
 
 Closes the `model-catalog-modelmap-pricing-drift-no-registry` bug's doctor half:
 every ``model:`` frontmatter value across canonical ``public/agents/*.md`` must
-resolve in ``core.model_registry.REGISTRY``, and the three derived/source key-sets
-(``MODEL_MAP`` keys, ``PRICING_TABLE`` keys, ``REGISTRY`` claude ids) must be
-identical. Any breach is an ERROR line that makes ``dadaia public doctor`` exit
+resolve in ``core.model_registry.REGISTRY``, and ``MODEL_MAP`` keys must equal the
+``REGISTRY`` claude ids. Any breach is an ERROR line that makes ``dadaia public doctor`` exit
 nonzero (emitted with the ``[drift]`` prefix the CLI already treats as failing).
 """
 
@@ -79,18 +78,6 @@ def test_current_tree_resolves_clean() -> None:
 
     assert not _has_error(reports), reports
     assert "[ok] model-resolution" in reports
-
-    # PRICING_TABLE is no longer imported into model_resolution (audit A3 fix): the
-    # cross-feature `features.public -> features.telemetry.pricing` import was removed,
-    # since PRICING_TABLE is a derived view over core.model_registry (the registry
-    # claude-id set IS the pricing key-set by construction). Pins the symbol is gone
-    # from the module namespace so the old monkeypatch vector cannot silently reappear.
-    import dadaia_workspace.features.public.model_resolution as mod
-
-    assert not hasattr(mod, "PRICING_TABLE"), (
-        "model_resolution must not import PRICING_TABLE — that was the cross-feature "
-        "edge removed in audit A3; the pricing key-set is registry-derived."
-    )
 
 
 # ---------------------------------------------------------------------------

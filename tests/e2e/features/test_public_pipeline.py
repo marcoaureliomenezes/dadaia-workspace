@@ -33,7 +33,7 @@ _runner = CliRunner()
 
 EXPECTED_AGENTS = {
     "dd-code-reviewer",
-    "dd-project-manager",
+    "dd-product-engineer",
     "dd-software-engineer",
 }
 

@@ -6,20 +6,16 @@ Codex runtime.
 
 Transformations applied:
 
-1. Replace references to the Claude Code ``Agent`` tool with explicit Codex
-   subagent delegation wording. Codex has native custom agents/subagents; workflow
-   Markdown remains documentation and does not auto-execute fan-out.
-
-2. Preserve hook semantics. Claude-authored references to ``PreToolUse``,
+1. Preserve hook semantics. Claude-authored references to ``PreToolUse``,
    ``PostToolUse``, and ``UserPromptSubmit`` remain visible because Codex
    receives equivalent generated hooks where the runtime supports them.
 
-3. Replace only known Claude model identifiers with their Codex equivalents
+2. Replace only known Claude model identifiers with their Codex equivalents
    from the model mapping table. Other ``claude-*`` identifiers are preserved
    because they may be legitimate skill names such as
    ``ai-harness-claude-code``.
 
-4. Preserve all remaining content verbatim.
+3. Preserve all remaining content verbatim.
 
 The function is intentionally free of side effects, I/O, and non-determinism.
 """
@@ -29,17 +25,11 @@ import re
 from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import MODEL_MAP
 
 # ---------------------------------------------------------------------------
-# Replacement table — ordered from most-specific to least-specific so that
-# longer patterns take priority over shorter ones (e.g. "`Agent` tool" before
-# "`Agent`").
+# Replacement table — ordered from most-specific to least-specific.
 # ---------------------------------------------------------------------------
 
 _REPLACEMENTS: tuple[tuple[str, str], ...] = (
     (".claude/rules/workspace-protocol.md", "AGENTS.md, the projected workspace map"),
-    ("`Agent` tool", "explicit Codex subagent delegation"),
-    ("Agent tool", "explicit Codex subagent delegation"),
-    ("Agent.dispatch", "explicit Codex subagent delegation"),
-    ("`Agent`", "explicit Codex subagent delegation"),
     # Defense-in-depth (codex-personas-claude-model-tiering-leak, T-013-12): the
     # ai-engineer prose fix removes the Anthropic tier-recommendation phrase at
     # source, but if any persona still recommends Anthropic marketing tiers we
@@ -65,7 +55,7 @@ def transform_for_codex(canonical_body: str, agent_id: str) -> str:  # noqa: ARG
     Args:
         canonical_body: Markdown text of the agent persona with frontmatter
             already removed.
-        agent_id: The agent identifier (e.g. ``"dd-project-manager"``).
+        agent_id: The agent identifier (e.g. ``"dd-product-engineer"``).
 
     Returns:
         A non-empty string (after :meth:`str.strip`) with Claude Code–specific

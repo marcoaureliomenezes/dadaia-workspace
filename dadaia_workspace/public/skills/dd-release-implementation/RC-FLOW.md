@@ -41,7 +41,7 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 - `dd-code-reviewer` `APPROVED` on the same commit.
 - Done when: the verdict is `APPROVED` on that sha.
 
-**Step 5 — Memory update (`dd-project-manager`).**
+**Step 5 — Memory update (`dd-product-engineer`).**
 - `python3 .agents/skills/dd-release-implementation/scripts/release.py phase CLOSURE --sha <sha>` — it refuses while any task is not `[x]`.
 - Memory is closure procedure, never a task: a TASKS.md task whose write set names
   `specs/memory` is refused by `dadaia doctor` (SPEC-DOC-047).

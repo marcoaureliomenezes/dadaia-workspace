@@ -101,7 +101,7 @@ _CODEX_COMPACT_REVIEW_GATE_SECTION_RE = re.compile(
 )
 
 # "## dadaia CLI" (never "## dadaia CLI reference", which carries the
-# distinct D-1 shell-less routing content for `product-engineer` and is
+# distinct D-1 shell-less routing content for `dd-product-engineer` and is
 # never matched here) — the generic command-reference block duplicated from
 # the `dadaia-cli` skill. Matched up to the next top-level heading (or EOF)
 # so a persona that appends unrelated content after this heading (e.g.

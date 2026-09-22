@@ -11,4 +11,4 @@ Report home: the root `AGENTS.md` map §4; the sections below, in this order, ar
 | `Spec impact` | The consolidated list of pending spec edits: file, section, what changes |
 | `Evidence` | Files, commands, and subagent findings used during Step 1 inspection |
 | `Result` | `pass` once the operator confirmed shared understanding, `blocked` otherwise |
-| `Next action` | e.g. "dd-project-manager authors SPEC.md" |
+| `Next action` | e.g. "dd-product-engineer authors SPEC.md" |

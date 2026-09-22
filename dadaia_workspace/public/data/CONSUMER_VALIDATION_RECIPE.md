@@ -325,7 +325,7 @@ never exercised the live backlog path was false confidence).
 
 ### R-02 — Real-demand backlog is canonical and consumable
 
-- Author a B3/CVM-style real capture item as `dd-project-manager` would
+- Author a B3/CVM-style real capture item as `dd-product-engineer` would
   (`python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug>` then fill in its `**Intents:**` block, the single-source
   ACTIVE subsection — SPEC v0.12.0 FR3, ADR #14), then `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py subjects
   --specs <ctx>/specs` — which lists the declared aliases and the bindings the live

@@ -42,8 +42,8 @@ This lane is judgment-enforced, at human PR review.
 
 ## 3. Dispatcher Purity
 
-Only `project-manager` and `project-auditor` dispatch sub-agents; every other persona is a
-worker that surfaces needs to its dispatcher and never spawns agents.
+Only the main thread (the operator's session) dispatches sub-agents; every persona is a
+worker that surfaces needs to the main thread and never spawns agents.
 
 The scaffolded roster is **closed** — the library ships no plugin agent — and an operator's
 own agents are never scaffolded by it and never derived from the registry. A persona is a

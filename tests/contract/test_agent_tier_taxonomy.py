@@ -72,14 +72,19 @@ def _core_agents() -> list[Path]:
 #: The FR2 table, pinned verbatim: template id -> agent -> (model, effort).
 _EXPECTED_TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
     "balanced": {
-        "dd-project-manager": ("claude-fable-5-1", "high"),
-        "dd-code-reviewer": ("claude-opus-5", "high"),
-        "dd-software-engineer": ("claude-opus-5", "low"),
+        "dd-product-engineer": ("claude-opus-5-5", "high"),
+        "dd-code-reviewer": ("claude-opus-5-5", "high"),
+        "dd-software-engineer": ("claude-opus-5-5", "low"),
     },
     "max-quality": {
-        "dd-project-manager": ("claude-fable-5-1", "high"),
-        "dd-code-reviewer": ("claude-opus-5", "xhigh"),
-        "dd-software-engineer": ("claude-opus-5", "low"),
+        "dd-product-engineer": ("claude-fable-5-1", "high"),
+        "dd-code-reviewer": ("claude-opus-5-5", "xhigh"),
+        "dd-software-engineer": ("claude-opus-5-5", "medium"),
+    },
+    "economy": {
+        "dd-product-engineer": ("claude-opus-5-5", "high"),
+        "dd-code-reviewer": ("claude-sonnet-5", "high"),
+        "dd-software-engineer": ("claude-sonnet-5", "medium"),
     },
 }
 
@@ -88,6 +93,7 @@ _MODEL_TIER: dict[str, str] = {
     "claude-fable-5": "deep",
     "claude-fable-5-1": "deep",
     "claude-opus-5": "dispatch",
+    "claude-opus-5-5": "dispatch",
     "claude-sonnet-5": "standard",
 }
 

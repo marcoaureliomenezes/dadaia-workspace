@@ -25,7 +25,7 @@ read or any output written.
 2. Read `<specs-dir>/constitution.md`, `<specs-dir>/memory/ARCHITECTURE.md` and `<specs-dir>/memory/TECHSTACK.md`.
 3. Scan the catalog's `tldr`/`summary` fields; pick and read the 1-3 feature atoms most relevant to the task — `specs/memory/product/<area>/<slug>.md`, plain Markdown; resolve a `[[slug]]` wikilink by lookup for `<slug>.md` under `specs/memory/`.
 4. Re-read `ARCHITECTURE.md` deliberately when the decision touches layer boundaries, dependency rules, agent topology or schema contracts; a task self-contained in one well-understood component skips that re-read.
-5. Memory is read-only here: atoms are written only by `dd-project-manager` in DEFINITION/CLOSURE phase (`specs/memory/AGENTS.md`) — discipline the audit measures, never a gate block.
+5. Memory is read-only here: atoms are written only by `dd-product-engineer` in DEFINITION/CLOSURE phase (`specs/memory/AGENTS.md`) — discipline the audit measures, never a gate block.
 
 ## Phase 3 — resolve the live release and its trio
 

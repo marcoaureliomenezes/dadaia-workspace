@@ -15,7 +15,7 @@ users:
   - name: "Operador (único humano)"
     description: "Orchestrates work across 15 agents in a 3-tier topology. Activates contexts, approves specs, decides trade-offs."
   - name: "Tier 1 — orchestrators (com tool Agent)"
-    description: "dd-project-manager (intake + workflow dispatch), project-auditor (drift detection)."
+    description: "dd-product-engineer (backlog + SPEC + product memory), project-auditor (drift detection)."
   - name: "Tier 2 — curator (sem tool Agent)"
     description: "product-engineer: author of SPEC/PLAN/TASKS/CLOSURE and exclusive guardian of specs/memory/*.html in CLOSURE phase."
   - name: "Tier 3 — leaf specialists (12, sem tool Agent)"

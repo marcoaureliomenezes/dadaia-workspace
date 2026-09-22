@@ -8,7 +8,7 @@ Also input: `specs/memory/product/**` atoms and `specs/constitution.md`, over th
 1. For each `P-NN` entry across the three Part-1 sections, execute exactly the check its own `Measured by:` line names.
 2. Record the result: pass, fail, or "check does not run" — the last is itself a finding against whoever authored the principle.
 3. Flag a principle carrying no `Measured by:` line, or accepted with no `Accepted by: ADR NNNN`, as a finding on its own.
-4. Report the finding only — fixing it belongs to `dd-project-manager`'s memory lane, not this pillar.
+4. Report the finding only — fixing it belongs to `dd-product-engineer`'s memory lane, not this pillar.
 
 ## 2 — "Part 1 principle changed without an accepted ADR"
 

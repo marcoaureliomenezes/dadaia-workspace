@@ -2,8 +2,8 @@
 
 Scope: this file governs only `specs/backlog/`.
 
-- The backlog is the operator's demand queue: only the operator creates demand, `dd-project-manager` curates `active[]`.
-- An entry materializes only through the PM's operator-facing intake report; an operator-ratified in-release deferral already counts as intake.
+- The backlog is the operator's demand queue: only the operator creates demand, `dd-product-engineer` curates `active[]`.
+- An entry materializes only through the main thread's operator-facing intake report; an operator-ratified in-release deferral already counts as intake.
 - Retention covers bugs and backlog only — tests are prunable under the stewardship criteria (`dd-test-stewardship`).
 - The backlog is a single JSON document: `specs/backlog/BACKLOG.json`, `{schema: "backlog-v1", active: [...]}`.
 - No per-entry file per backlog item — every live candidate/idea is one `active[]` object (ADR #14).

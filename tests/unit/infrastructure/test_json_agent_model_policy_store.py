@@ -159,7 +159,7 @@ def test_save_atomic_last_good_and_reload(tmp_path: Path) -> None:
         applied_template="max-quality",
         overrides={
             "dd-software-engineer": AgentModelOverride(model="claude-opus-4-8"),
-            "dd-project-manager": AgentModelOverride(effort="max"),
+            "dd-product-engineer": AgentModelOverride(effort="max"),
         },
     )
 
@@ -168,12 +168,23 @@ def test_save_atomic_last_good_and_reload(tmp_path: Path) -> None:
     assert_saved_value_reloads_identically(_store(tmp_path / "reload"), second)
 
 
-def test_an_overlay_keyed_by_a_pre_rename_persona_name_still_resolves(tmp_path: Path) -> None:
-    """Intent: CONTRACT — T-047-56: the 0.4.7 persona rename never breaks an instance.
+@pytest.mark.parametrize(
+    ("retired_key", "current_key"),
+    [
+        ("code-reviewer", "dd-code-reviewer"),
+        ("project-manager", "dd-product-engineer"),
+        ("dd-project-manager", "dd-product-engineer"),
+    ],
+)
+def test_an_overlay_keyed_by_a_retired_persona_name_still_resolves(
+    tmp_path: Path, retired_key: str, current_key: str
+) -> None:
+    """Intent: CONTRACT — T-047-56 + roster-keeps-a-coordinator-persona-while-the-main-thread-coordinates.
 
     ``.dadaia/states/agent_model_policy.json`` is operator-owned state, not a projection:
-    nothing rewrites it on install. A retired key must migrate on read, or every install
-    on an upgraded instance fails loud on a name the library itself changed.
+    nothing rewrites it on install. A retired key (the pre-0.4.7 bare names, and the
+    ADR 0022 coordinator persona) must migrate on read, or every install on an upgraded
+    instance fails loud on a name the library itself changed.
     """
     states = tmp_path / ".dadaia" / "states"
     states.mkdir(parents=True)
@@ -181,7 +192,7 @@ def test_an_overlay_keyed_by_a_pre_rename_persona_name_still_resolves(tmp_path: 
         json.dumps(
             {
                 "schema_version": "agent-model-policy-v1",
-                "overrides": {"code-reviewer": {"model": "claude-sonnet-5"}},
+                "overrides": {retired_key: {"model": "claude-sonnet-5"}},
             }
         ),
         encoding="utf-8",
@@ -190,5 +201,5 @@ def test_an_overlay_keyed_by_a_pre_rename_persona_name_still_resolves(tmp_path: 
     overlay = JsonAgentModelPolicyStore(tmp_path).load()
 
     assert overlay is not None
-    assert set(overlay.overrides) == {"dd-code-reviewer"}
-    assert overlay.overrides["dd-code-reviewer"].model == "claude-sonnet-5"
+    assert set(overlay.overrides) == {current_key}
+    assert overlay.overrides[current_key].model == "claude-sonnet-5"
