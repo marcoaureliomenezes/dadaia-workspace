@@ -43,12 +43,12 @@ designing.
   whether the code agrees; surface any contradiction as a question, not a silent fix.
 - **Update `CONTEXT.md` inline.** Capture a resolved term the moment it crystallises;
   create the file lazily at the first resolved term. `CONTEXT.md` is a glossary and
-  nothing else — product truth stays in `specs/memory/`, decisions in `specs/ADRs/`.
+  nothing else (inside a dadaia workspace: truth in `specs/memory/`, decisions in ADRs).
 
 ## Offering a decision record
 
-Offer an ADR (`specs/ADRs/decisions.jsonl`, shape in `specs/ADRs/AGENTS.md`; only the
-operator flips it to `accepted`) only when all three hold:
+Offer an ADR (inside a dadaia workspace, `specs/ADRs/decisions.jsonl`, shape in
+`specs/ADRs/AGENTS.md`; only the operator flips it to `accepted`) only when all three hold:
 
 1. **Hard to reverse** — changing course later costs something real.
 2. **Surprising without context** — a future reader would ask "why this way?".

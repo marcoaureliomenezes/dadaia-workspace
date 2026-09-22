@@ -63,8 +63,8 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 
 | Surface | Purpose | Step-1 law | Ceiling | Measured |
 |---|---|---|---|---|
-| `dd-ai-eng-knowhow` | harness literacy and the AI-entity authoring contract | — | 6144 | 2886 |
-| `dd-architecture-survey` | portfolio-level architecture candidates from bug history | — | 6144 | 4662 |
+| `dd-ai-eng-knowhow` | harness literacy and the AI-entity authoring contract | — | 6144 | 2922 |
+| `dd-architecture-survey` | portfolio-level architecture candidates from bug history | — | 6144 | 4655 |
 | `dd-audit-project` | the three-pillar audit and its window | `specs/audits/AGENTS.md` | 6144 | 2321 |
 | `dd-backlog-definition` | backlog curation, the intake gate, dispositions | `specs/backlog/AGENTS.md` | 6144 | 3219 |
 | `dd-bug-registration` | classify-first bug proposal and its record | `specs/bugs/AGENTS.md` | 6144 | 2782 |
@@ -72,9 +72,9 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 | `dd-cli-library` | CLI idioms, CLI-owned state, the dev-server registry | `.dadaia/AGENTS.md` | 6144 | 4325 |
 | `dd-code-review` | the three review axes and the six lenses | `specs/memory/AGENTS.md` | 6144 | 4774 |
 | `dd-codebase-design` | the deep-module vocabulary and the deletion test | — | 6144 | 5540 |
-| `dd-domain-modeling` | the repo's domain terms and their one home | — | 6144 | 3737 |
+| `dd-domain-modeling` | the repo's domain terms and their one home | — | 6144 | 3766 |
 | `dd-gitflow-default` | the branch contract, commit shapes, the PR gate | — | 6144 | 4585 |
-| `dd-grill-me` | the operator grill that precedes a candidate | — | 6144 | 3222 |
+| `dd-grill-me` | the operator grill that precedes a candidate | — | 6144 | 3248 |
 | `dd-handoff-emitter` | handoff-first emission and ack-on-consume | `.dadaia/handoff/AGENTS.md` | 6144 | 2138 |
 | `dd-manager-orchestration` | intake, dispatch and the closure pass | — | 6144 | 3604 |
 | `dd-release-definition` | picking the set and authoring the trio | `specs/releases/AGENTS.md` | 6144 | 4620 |

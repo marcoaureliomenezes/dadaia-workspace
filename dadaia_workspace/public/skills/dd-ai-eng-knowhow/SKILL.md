@@ -38,8 +38,8 @@ compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install da
 1. Trace the harness file to its `dadaia_workspace/public/<type>/<file>` source —
    every authoring target is the source, never a `.claude/`, `.agents/`, `.codex/`,
    `.kimi-code/` projection.
-2. Re-project: `dadaia public stage` → `dadaia public install` →
-   `dadaia public doctor`.
+2. Re-project the source: inside a dadaia workspace, run `dadaia public stage`,
+   `dadaia public install`, `dadaia public doctor`.
 3. Author against [`AUTHORING.md`](AUTHORING.md) — the 15-rule
    writing-for-agents contract — and opens the relevant disclosed sibling instead of
    re-deriving harness behavior; public assets carry no consumer names, hostnames,

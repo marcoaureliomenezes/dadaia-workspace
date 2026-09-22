@@ -25,13 +25,13 @@ change actually happens:
 1. If the operator named a direction (a module, subsystem, pain point), take it and
    skip the inference below.
 2. Otherwise, measure — never impressionistic:
-   - `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats` and `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status --all`, aggregated per
-     surface/component: re-bug rate, fix-induced `caused_by` edges,
-     resolved-without-evidence count.
+   - The bug history aggregated per surface/component — re-bug rate, fix-induced
+     `caused_by` edges, resolved-without-evidence count; inside a dadaia workspace,
+     `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats` and `… status --all`.
    - `git log --oneline --since=<window> -- <path>` churn per touched path; join the
      two — the loop lives where re-bugs and churn coincide.
-   - The prior survey/audit's dispositions (`specs/audits/_archive/audits_histo.jsonl`)
-     — a candidate that recurs across surveys is structural by definition.
+   - The prior survey/audit's dispositions (inside a dadaia workspace,
+     `specs/audits/_archive/audits_histo.jsonl`) — recurrence across surveys is structural.
 
 ## 3. Explore — note where you feel friction
 
