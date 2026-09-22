@@ -370,3 +370,104 @@ def test_a_canonical_file_needs_no_sources(tmp_path: Path) -> None:
     result = lint_atom(atom, memory_dir, load_frontmatter_schema())
 
     assert result.errors == []
+
+
+# ---------------------------------------------------------------------------
+# MEM-NARRATIVE-1 — memory states current truth; a history line is an ERROR naming
+# the line. Expected values come from the SPEC's token and phrase tables.
+# ---------------------------------------------------------------------------
+
+_SOURCES_FM: dict[str, object] = {"sources": ["pyproject.toml"]}
+
+
+def _narrative(result_errors: list[str]) -> list[str]:
+    return [e for e in result_errors if e.startswith("MEM-NARRATIVE-1")]
+
+
+def _canonical(tmp_path: Path, body: str) -> list[str]:
+    """A body line in ARCHITECTURE.md (a canonical file, not a product atom)."""
+    path = _make_atom(tmp_path, slug="ARCHITECTURE", filename="ARCHITECTURE.md", body=body)
+    return _narrative(lint_atom(path, tmp_path, load_frontmatter_schema()).errors)
+
+
+def _product(tmp_path: Path, body: str) -> list[str]:
+    """A body line in product/<area>/<slug>.md, sources resolving to a real file."""
+    memory = tmp_path / "specs" / "memory"
+    area = memory / "product" / "area"
+    area.mkdir(parents=True)
+    (tmp_path / "pyproject.toml").write_text("", encoding="utf-8")
+    path = _make_atom(area, slug="atom", body=body, extra_fm_fields=_SOURCES_FM)
+    return _narrative(lint_atom(path, memory, load_frontmatter_schema()).errors)
+
+
+def _body_line(path_text: str, needle: str) -> int:
+    return path_text.splitlines().index(needle) + 1
+
+
+def test_narrative_exempts_the_principle_adr_line(tmp_path: Path) -> None:
+    """Intent: CONTRACT — T-047-98. `ADR: NNNN (accepted)` names the decision that
+    governs a principle — it is current truth, not history."""
+    assert _canonical(tmp_path, "## Principles\n\nADR: 0023 (accepted)\n") == []
+
+
+def test_narrative_exempts_code_fences(tmp_path: Path) -> None:
+    """Intent: CONTRACT — T-047-98. A fenced example may carry any token."""
+    body = "## Purpose\n\n```\nrelease 0.4.7 on 2026-09-22 for T-047-98\n```\n"
+    assert _canonical(tmp_path, body) == []
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Shipped on 2026-09-22.",
+        "Since 0.4.7 the gate reads nothing.",
+        "Candidate c11 rewrote it.",
+        "Built in rc-4.",
+        "Delivered by T-047-98.",
+        "Covers FR4.",
+    ],
+    ids=["iso-date", "release-id", "candidate", "rc", "task-id", "fr-id"],
+)
+def test_narrative_token_in_any_memory_file_names_its_line(tmp_path: Path, line: str) -> None:
+    """Intent: CONTRACT — T-047-98. Each token class is history in every memory file."""
+    body = f"## Purpose\n\nCurrent truth.\n{line}\n"
+    path = _make_atom(tmp_path, slug="QUALITY", filename="QUALITY.md", body=body)
+    errors = _narrative(lint_atom(path, tmp_path, load_frontmatter_schema()).errors)
+    expected = _body_line(path.read_text(encoding="utf-8"), line)
+    assert len(errors) == 1, errors
+    assert errors[0].startswith(f"MEM-NARRATIVE-1 line {expected}:"), errors
+
+
+def test_narrative_ignores_versions_that_are_not_release_ids(tmp_path: Path) -> None:
+    """Intent: CONTRACT — T-047-98. A loopback address or a two-part version is no release."""
+    assert _canonical(tmp_path, "## Purpose\n\nBinds 127.0.0.1 on Python 3.12.\n") == []
+
+
+@pytest.mark.parametrize(
+    "phrase",
+    [
+        "operator doctrine",
+        "operator decision",
+        "operator ruling",
+        "closed as",
+        "died",
+        "was deleted",
+        "retired",
+        "no longer",
+        "formerly",
+        "previously",
+    ],
+)
+def test_narrative_history_phrase_in_a_product_atom(tmp_path: Path, phrase: str) -> None:
+    """Intent: CONTRACT — T-047-98. A history phrase is an ERROR in a product atom."""
+    line = f"The verb {phrase} here."
+    errors = _product(tmp_path, f"## Purpose\n\nCurrent truth.\n{line}\n")
+    atom = tmp_path / "specs" / "memory" / "product" / "area" / "atom.md"
+    expected = _body_line(atom.read_text(encoding="utf-8"), line)
+    assert len(errors) == 1, errors
+    assert errors[0].startswith(f"MEM-NARRATIVE-1 line {expected}:"), errors
+
+
+def test_narrative_history_phrase_outside_product_is_not_flagged(tmp_path: Path) -> None:
+    """Intent: CONTRACT — T-047-98. The phrase table applies to product atoms only."""
+    assert _canonical(tmp_path, "## Principles\n\nA retired path is no longer read.\n") == []

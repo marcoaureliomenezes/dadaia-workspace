@@ -130,6 +130,48 @@ def _check_sources(result: AtomResult, fm: dict[str, Any], repo_root: Path) -> N
 
 
 # ---------------------------------------------------------------------------
+# MEM-NARRATIVE-1 — memory states what the product does, never when it started
+# ---------------------------------------------------------------------------
+
+_NARRATIVE_TOKENS = (
+    ("date", re.compile(r"\b\d{4}-\d{2}-\d{2}\b")),
+    ("release id", re.compile(r"(?<![\d.])\d+\.\d+\.\d+(?!\.?\d)")),
+    ("candidate id", re.compile(r"\b(?:c|rc-)\d+\b")),
+    ("task id", re.compile(r"\bT-\d+-\d+\b")),
+    ("FR id", re.compile(r"\bFR\d+\b")),
+)
+_HISTORY_PHRASE_RE = re.compile(
+    r"\b(?:operator (?:doctrine|decision|ruling)|closed as|died|was deleted|retired"
+    r"|no longer|formerly|previously)\b",
+    re.IGNORECASE,
+)
+_ADR_LINE_RE = re.compile(r"^\s*ADR:\s*\d{4}\b")
+_FENCE_RE = re.compile(r"^\s*(?:```|~~~)")
+
+
+def _check_narrative(result: AtomResult, content: str, body: str, product: bool) -> None:
+    """One ERROR per body line carrying a history token (any memory file) or a history
+    phrase (product atoms only); fenced code and a principle's ``ADR:`` line are exempt."""
+    offset = len(content.splitlines()) - len(body.splitlines())
+    fenced = False
+    for number, line in enumerate(body.splitlines(), start=offset + 1):
+        if _FENCE_RE.match(line):
+            fenced = not fenced
+            continue
+        if fenced or _ADR_LINE_RE.match(line):
+            continue
+        hits = [(kind, m.group(0)) for kind, rx in _NARRATIVE_TOKENS for m in rx.finditer(line)]
+        if product:
+            hits += [("phrase", m.group(0)) for m in _HISTORY_PHRASE_RE.finditer(line)]
+        if hits:
+            named = ", ".join(f"{kind} '{text}'" for kind, text in hits)
+            result.error(
+                f"MEM-NARRATIVE-1 line {number}: history in memory ({named}) — state what "
+                "the product does, never when it started."
+            )
+
+
+# ---------------------------------------------------------------------------
 # Per-atom lint
 # ---------------------------------------------------------------------------
 
@@ -208,8 +250,10 @@ def lint_atom(
         result.error(f"Frontmatter schema violation: {schema_error.message}")
         # Do not return early — continue with remaining checks.
 
-    if _is_product_atom(md_path, memory_dir):
+    product = _is_product_atom(md_path, memory_dir)
+    if product:
         _check_sources(result, fm, memory_dir.parent.parent)
+    _check_narrative(result, content, body, product)
 
     slug = fm.get("slug")
     if isinstance(slug, str) and slug != stem:
