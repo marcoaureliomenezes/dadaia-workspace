@@ -134,7 +134,7 @@ runtime tree, validated by `dadaia reports validate`.
 ## Documentation
 
 <!-- derived-from: pypi-distribution sha256:7e18d9868790 -->
-<!-- derived-from: public-asset-distribution sha256:a0f6d60dd1f1 -->
+<!-- derived-from: public-asset-distribution sha256:529c785de7b6 -->
 
 The site is <https://marcoaureliomenezes.github.io/dadaia-workspace/>:
 

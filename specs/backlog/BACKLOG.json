@@ -1,22 +1,4 @@
 {
   "schema": "backlog-v1",
-  "active": [
-    {
-      "id": "hooks-multi-harness-study",
-      "title": "Hook derivation study: every hook is the per-harness implementation of a deterministic behavior the workspace defines; design the derivation for Claude, Codex, Kimi, Cursor, Devin, Copilot",
-      "opened": "2026-09-20",
-      "status": "idea",
-      "description": "Doctrine (operator, 2026-09-20): a hook never exists on its own; the rule is the abstract entity \u2014 a deterministic behavior the workspace enforces (root whitelist, venv guard, SDD gate, session-start reaper, context injection) \u2014 and each harness gets that rule's implementation in its own hook format (Claude settings.json, Codex hooks.json, Kimi [[hooks]] in user config.toml, Cursor hooks.json, Devin hooks.v1.json, Copilot .github/hooks/*.json). Study: one rule registry -> one renderer per harness; which harnesses fire hooks headless (Codex does not); which support project-level hooks (Kimi and ZCode: user-level only); the Claude-hooks bridge DeepSeek dsh ships. Not this cycle.",
-      "provenance": "operator grill ruling 2026-09-20 (dd-grill-me rounds 1..3 over the 17 entries; ADRs 0016..0021) \u2014 Q31, deferred by the operator until the roster extends",
-      "intents": [
-        {
-          "subject": {
-            "kind": "code",
-            "ref": "dadaia_workspace/hooks/pre_gate.py#main"
-          },
-          "change": "change \u2014 hooks rendered per harness from one rule registry; a hook with no deterministic rule behind it is slop"
-        }
-      ]
-    }
-  ]
+  "active": []
 }

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-22T01:58:12Z",
+  "generated_at": "2026-09-22T02:01:25Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -106,8 +106,9 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1277,
+      "token_estimate": 1446,
       "depends_on": [
+        "harness-kimi-code",
         "agentic-entities",
         "pypi-distribution",
         "workspace-doctor",
