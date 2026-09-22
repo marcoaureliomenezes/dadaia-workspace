@@ -132,7 +132,7 @@
   `Write set:` `…/dd-release-implementation/{MEMORY-UPDATE.md,RC-FLOW.md,RELEASE-EVENTS.md}`, `tests/contract/test_slop_ratchets.py`
   `blocked by:` T-047-96, T-047-97 · `delivers:` FR5 (closure law)
 
-- [ ] **T-047-104 — `PILLAR-MEMORY.md` §1–§3 rewritten; §3 becomes scored.**
+- [-] **T-047-104 — `PILLAR-MEMORY.md` §1–§3 rewritten; §3 becomes scored.**
   The PM's draft (66 → 53 lines): §1 every principle's own check over both canonical files; §2 every
   canonical hunk paired with an accepted ADR or an audit text-rewrite commit; §3 scored over
   `memory.py drift` — an atom no `kind: memory` entry names is HIGH, a claim without implementation
