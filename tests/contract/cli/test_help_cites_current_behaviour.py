@@ -7,6 +7,7 @@ cites no retired verb.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -19,9 +20,12 @@ _SCHEMA = (
 
 
 def _help(*argv: str) -> str:
-    result = CliRunner().invoke(app, [*argv, "--help"], env={"COLUMNS": "400"})
+    env = {"COLUMNS": "400", "NO_COLOR": "1", "TERM": "dumb"}
+    result = CliRunner().invoke(app, [*argv, "--help"], env=env)
     assert result.exit_code == 0, result.output
-    return " ".join(result.output.split())
+    # CI forces colour and may wrap inside Rich's box: compare the words, not the drawing.
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+    return " ".join(re.sub(r"[\u2500-\u257f]", " ", plain).split())
 
 
 def test_preflight_help_names_its_five_checks_and_no_hook() -> None:
