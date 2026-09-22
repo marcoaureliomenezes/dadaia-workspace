@@ -21,8 +21,8 @@ read or any output written.
 
 ## Phase 2 — memory bootstrap
 
-1. The ctx-inject hook (`dadaia_workspace.hooks.ctx_inject`) injects the bootstrap prefix (tech-stack digest + `catalog.json` digest) once per bind and on every re-bind; running standalone with no prefix, self-pull `specs/memory/product/catalog.json`.
-2. Read `<specs-dir>/constitution.md`, `<specs-dir>/memory/ARCHITECTURE.md` and `<specs-dir>/memory/TECHSTACK.md`.
+1. The ctx-inject hook (`dadaia_workspace.hooks.ctx_inject`) injects the bootstrap prefix (`ARCHITECTURE.md`'s `## Tech Stack` section + `catalog.json` digest) once per bind and on every re-bind; running standalone with no prefix, self-pull `specs/memory/product/catalog.json`.
+2. Read `<specs-dir>/constitution.md`, `<specs-dir>/memory/ARCHITECTURE.md` (its `## Tech Stack` included) and `<specs-dir>/memory/QUALITY.md`.
 3. Scan the catalog's `tldr`/`summary` fields; pick and read the 1-3 feature atoms most relevant to the task — `specs/memory/product/<area>/<slug>.md`, plain Markdown; resolve a `[[slug]]` wikilink by lookup for `<slug>.md` under `specs/memory/`.
 4. Re-read `ARCHITECTURE.md` deliberately when the decision touches layer boundaries, dependency rules, agent topology or schema contracts; a task self-contained in one well-understood component skips that re-read.
 5. Memory is read-only here: atoms are written only by `dd-product-engineer` in DEFINITION/CLOSURE phase (`specs/memory/AGENTS.md`) — discipline the audit measures, never a gate block.
@@ -37,7 +37,7 @@ read or any output written.
 ## Done when
 
 - Context and live release are resolved and named.
-- Constitution, ARCHITECTURE.md, TECHSTACK.md and the 1-3 relevant atoms are read.
+- Constitution, ARCHITECTURE.md, QUALITY.md and the 1-3 relevant atoms are read.
 - Every SPEC/PLAN/TASKS in scope carries `**Status:** Approved`, or the gap was
   reported first.
 
@@ -56,7 +56,7 @@ read or any output written.
 
 ## References
 
-- Script: `python3 .agents/skills/dd-spec-navigator/scripts/memory.py` — `catalog generate`, `product add`, `check`: the catalog's ONE writer.
+- Script: `python3 .agents/skills/dd-spec-navigator/scripts/memory.py` — `catalog generate`, `product add`, `check`, `drift --since <sha>`: the catalog's ONE writer.
 - `specs/AGENTS.md` — canon and status tokens; `.dadaia/AGENTS.md` — context resolution order.
 - `dd-release-implementation` (`RELEASE-EVENTS.md`) — `_RELEASE.json` shape.
 - `_archive/` and `backlog/` are read-only history — never a source of approval.

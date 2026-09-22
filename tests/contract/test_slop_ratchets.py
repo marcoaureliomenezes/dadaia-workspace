@@ -34,7 +34,7 @@ _DOCSTRING_OWNERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctio
 # RECORDED CEILING (ratchet DOWN ONLY) — measured 2026-09-20 on this HEAD, every comment
 # token plus every docstring line under dadaia_workspace/**/*.py. Lower it in the commit
 # that deletes the ids; raising it is never a ratchet move.
-_V32_CEILING = 657
+_V32_CEILING = 646
 
 
 def _governance_id_lines(source: str) -> int:
@@ -198,9 +198,9 @@ def test_v33_prefix_families_without_a_mechanical_reader() -> None:
 # one — 31 -> 29 files, 3,657 -> 3,436 lines measured. The ceiling below is that measurement
 # plus the budget the SPEC already authorized for the drift verb and the `release.py memory`
 # verb (+1 file; +85 + 14 + 16 + 50 + 6 = +171 lines), so no later task in this candidate may
-# raise it; T-047-105 re-pins it to the measured post-candidate value.
+# raise it; T-047-105 re-pinned it to the measured post-candidate value (30 files, 3,618 lines).
 _V36_FILE_CEILING = 30
-_V36_LINE_CEILING = 3620
+_V36_LINE_CEILING = 3618
 
 
 def _skill_scripts() -> list[Path]:
@@ -212,7 +212,7 @@ def _skill_scripts() -> list[Path]:
 
 
 def test_v36_skill_script_corpus_is_pinned() -> None:
-    """V36 — at most 30 skill-script files and 3,620 total lines of skill Python. The
+    """V36 — at most 30 skill-script files and 3,618 total lines of skill Python. The
     ledger writers moved out of the CLI once: growth here is a verb regrown, never moved."""
     scripts = _skill_scripts()
     assert len(scripts) <= _V36_FILE_CEILING, (
@@ -291,7 +291,7 @@ def test_v34_live_candidate_trio_bytes_under_the_fixed_ceiling() -> None:
 # tracked `*.md` under dadaia_workspace/public/skills/. Re-pinned at every closure that
 # touches the corpus, downward only; raising either is never a ratchet move.
 _V35_DIR_CEILING = 18
-_V35_LINE_CEILING = 2876
+_V35_LINE_CEILING = 2863
 
 
 def _skill_corpus_markdown() -> list[Path]:
@@ -307,7 +307,7 @@ def _skill_corpus_lines(paths: Iterable[Path]) -> int:
 
 
 def test_v35_skill_corpus_is_pinned() -> None:
-    """V35 — at most 18 skill directories and 2,876 total lines of skill Markdown.
+    """V35 — at most 18 skill directories and 2,863 total lines of skill Markdown.
     A rule lives in one home: a growing corpus is a rule restated, not a rule added."""
     corpus = _skill_corpus_markdown()
     dirs = {

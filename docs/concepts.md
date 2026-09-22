@@ -73,9 +73,8 @@ feeding each fix back through the gate.
 <!-- derived-from: workspace-doctor sha256:707aef160b29 -->
 
 *Memory* is current product truth, never history: one Markdown atom per subject under
-`specs/memory/product/**`, plus `ARCHITECTURE.md`, `QUALITY.md` and `TECHSTACK.md`,
-each of the three split into an ADR-gated Part 1 of principles (every one carrying a
-`Measured by:` command) and a Part 2 of implementation. Frontmatter carries five
+`specs/memory/product/**`, plus `ARCHITECTURE.md` (its `## Tech Stack` section included) and `QUALITY.md`,
+each ADR-gated as a whole, every principle carrying its `Measured by:` command. Frontmatter carries five
 fields (`slug`, `title`, `tldr`, `summary`, `tags`), the catalog persists ten keys per
 atom, and the digest injected at bind keeps exactly `slug`, `title`, `tldr` and `path`
 — `summary` stays behind. `dadaia doctor`'s `specs` section polices it: atoms present

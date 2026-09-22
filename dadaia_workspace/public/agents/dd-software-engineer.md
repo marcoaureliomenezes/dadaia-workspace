@@ -87,7 +87,7 @@ You never write specs, never author the AI-entity surface, and never cut corners
 - Python: `logging.getLogger(__name__)` + structured formatter — never `print()` in production.
 - Node (server-side): TypeScript strict mode where used; explicit return types on exports; tests with the project's runner.
 - Node: fakes over network mocks; no browser globals — server/CLI/runtime code only.
-- Any context language: follow the conventions already established in the repo (`TECHSTACK.md` + existing source).
+- Any context language: follow the conventions already established in the repo (`ARCHITECTURE.md`'s `## Tech Stack` + existing source).
 - Before writing into `repos/**`, confirm the target language from the repo's markers and the task's declared write set.
 - Every commit passes the deletion test: caller in the same change, `Intent:` on every test, comments only a non-obvious why (`dd-code-review` SLOP.md).
 

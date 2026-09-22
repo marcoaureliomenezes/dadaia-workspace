@@ -141,7 +141,7 @@
   `Write set:` `…/dd-audit-project/PILLAR-MEMORY.md`, `tests/contract/test_slop_ratchets.py`
   `blocked by:` T-047-95 · `delivers:` FR5 (audit pillar)
 
-- [-] **T-047-105 — Citations follow; V35/V36 re-pinned to measured.**
+- [x] **T-047-105 — Citations follow; V35/V36 re-pinned to measured.**
   Every live `TECHSTACK` citation (skills, personas, `docs/*.md`, `README.md`, `llms.txt`) moves to
   `ARCHITECTURE.md`'s `## Tech Stack`; `dead_citations` and the derived-docs test are the oracle.
   Re-pin V35 and V36 DOWN to measured, arithmetic in the commit body.

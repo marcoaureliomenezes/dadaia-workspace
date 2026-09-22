@@ -79,7 +79,7 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 | `dd-manager-orchestration` | intake, dispatch and the closure pass | — | 6144 | 3661 |
 | `dd-release-definition` | picking the set and authoring the trio | `specs/releases/AGENTS.md` | 6144 | 4620 |
 | `dd-release-implementation` | the candidate arc from reservation to the gate | `specs/releases/AGENTS.md` | 6144 | 3351 |
-| `dd-spec-navigator` | the three-phase session grounding protocol | `specs/AGENTS.md` | 6144 | 5039 |
+| `dd-spec-navigator` | the three-phase session grounding protocol | `specs/AGENTS.md` | 6144 | 5115 |
 | `dd-test-stewardship` | test intent, admission, demotion, quarantine | — | 6144 | 4178 |
 
 ## 4. Personas — `.agents/agents/*.md`
@@ -89,7 +89,7 @@ Three roles, no fourth; every retired role is a lens the reviewer applies.
 | Surface | Purpose | Belongs | Ceiling | Measured |
 |---|---|---|---|---|
 | `dd-product-engineer` | backlog, SPEC, the product-memory pass at closure | role, activity class, model policy | — | 4468 |
-| `dd-software-engineer` | PLAN/TASKS, production code and its tests | role, activity class, model policy | — | 8679 |
+| `dd-software-engineer` | PLAN/TASKS, production code and its tests | role, activity class, model policy | — | 8700 |
 | `dd-code-reviewer` | the three-axis review and its six lenses | role, activity class, model policy | — | 6493 |
 
 - A statement belongs to exactly one surface: the map indexes, the scoped file rules, the
