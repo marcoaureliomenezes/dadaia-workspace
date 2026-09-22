@@ -353,7 +353,7 @@ def certify(
     def capability_check() -> str:
         nonlocal capability_payload
         capability_payload = json.loads(cli("capabilities", "--json"))
-        if capability_payload.get("schema_version") != "dadaia-capabilities-v2":
+        if capability_payload.get("schema_version") != "dadaia-capabilities-v3":
             raise RuntimeError("unexpected capability schema")
         return f"provider={capability_payload['provider']['distribution_version']}"
 

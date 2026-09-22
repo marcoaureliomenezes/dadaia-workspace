@@ -9,7 +9,7 @@ from importlib import metadata
 from pathlib import Path
 from typing import Any
 
-from dadaia_workspace.features.capabilities import build_capabilities
+from dadaia_workspace.features.capabilities import distribution_version
 from dadaia_workspace.features.migrate.state_v2 import execute_migration, plan_migration
 
 
@@ -130,10 +130,7 @@ def reconcile_workspace(
             raise RuntimeError("workspace doctor failed: " + summary)
         steps.append("workspace-doctor")
 
-        capabilities = build_capabilities()
-        if capabilities.get("schema_version") != "dadaia-capabilities-v2":
-            raise RuntimeError("capability canary returned an unsupported schema version")
-        if capabilities["provider"]["distribution_version"] != expected_version:
+        if distribution_version() != expected_version:
             raise RuntimeError("capability canary does not identify the expected provider")
         steps.append("capability-canary")
     except Exception as exc:  # noqa: BLE001 - transaction boundary returns structured failure.

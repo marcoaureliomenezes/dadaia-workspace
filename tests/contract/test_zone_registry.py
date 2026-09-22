@@ -84,12 +84,7 @@ _CANONICAL_SETS: dict[str, frozenset[str]] = {
 #: Literals whose names coincide with a canonical set by accident, not by restatement,
 #: each with the evidence that it is not a canon list. An entry whose file no longer
 #: holds such a literal is stale and fails the test.
-_NOT_A_NAME_LIST: dict[str, str] = {
-    "dadaia_workspace/features/capabilities/service.py": (
-        "`capabilities` surface groups: CLI verb-group labels that happen to read like "
-        "specs area names, never a specs canon member list"
-    ),
-}
+_NOT_A_NAME_LIST: dict[str, str] = {}
 
 
 def _second_list_hits(tree: ast.AST, names: frozenset[str]) -> list[str]:

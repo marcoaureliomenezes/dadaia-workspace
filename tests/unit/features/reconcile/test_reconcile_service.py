@@ -81,11 +81,8 @@ def test_failure_restores_migrated_state_and_requires_projection_rollback(tmp_pa
 def test_success_runs_all_postconditions(tmp_path: Path, monkeypatch) -> None:
     workspace = _v1_workspace(tmp_path)
     monkeypatch.setattr(
-        "dadaia_workspace.features.reconcile.service.build_capabilities",
-        lambda: {
-            "schema_version": "dadaia-capabilities-v2",
-            "provider": {"distribution_version": "1.2.3"},
-        },
+        "dadaia_workspace.features.reconcile.service.distribution_version",
+        lambda: "1.2.3",
     )
     result = reconcile_workspace(
         workspace,

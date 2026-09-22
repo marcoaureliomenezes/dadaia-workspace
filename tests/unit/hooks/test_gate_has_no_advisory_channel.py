@@ -10,7 +10,7 @@ from __future__ import annotations
 import inspect
 
 from dadaia_workspace.features.spec_context import gate_policy
-from dadaia_workspace.hooks import _common, pre_gate, sdd_gate
+from dadaia_workspace.hooks import pre_gate, sdd_gate
 
 
 def test_evaluate_takes_only_the_target_and_the_scope() -> None:
@@ -26,4 +26,4 @@ def test_hook_chain_has_no_advisory_surface() -> None:
     assert not hasattr(sdd_gate, "evaluate_payload_with_advisory")
     assert not hasattr(pre_gate, "evaluate_payload_with_advisory")
     assert sdd_gate.evaluate_payload in pre_gate._POLICIES  # noqa: SLF001
-    assert list(inspect.signature(_common.emit_allow).parameters) == []
+    assert list(inspect.signature(pre_gate._common.emit_allow).parameters) == []
