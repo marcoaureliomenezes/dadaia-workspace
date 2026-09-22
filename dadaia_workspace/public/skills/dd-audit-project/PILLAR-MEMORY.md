@@ -24,7 +24,7 @@ git log -p --since="<window start>" -- specs/memory/ARCHITECTURE.md specs/memory
 
 1. `python3 .agents/skills/dd-spec-navigator/scripts/memory.py drift --since <window start> --json` — every atom it lists that no `kind: memory` entry of the window names in `reviewed` or `changed` is HIGH (a closure that did not reconcile); every uncovered package is HIGH.
 2. For each atom in the window, read its `sources` and check every functional claim against the code: a claim with no implementation evidence is HIGH; code behavior no atom describes is LOW.
-3. Run `memory.py check` and the doctor's `MEM-NARRATIVE-1`, `MEM-DRIFT-1/2` over the tree; any finding is MEDIUM (the closure should have left them clean).
+3. Run `memory.py check` and the doctor's `LINT-1` (history lines, `MEM-NARRATIVE-1:` prefix), `MEM-DRIFT-1/2` over the tree; any finding is MEDIUM (the closure should have left them clean).
 4. `git log --format=%h -- specs/memory/product` over the window: an atom commit whose diff only adds lines to an existing atom is evidence of stacking — LOW, named per commit.
 5. Tech stack: for each line of `ARCHITECTURE.md`'s `## Tech Stack`, confirm the technology and its pin in `pyproject.toml`/the lockfile; an undeclared dependency or a line with no manifest counterpart is MEDIUM.
 6. This pillar is the one place a canonical file's text is rewritten outside an ADR: a rewrite lands as its own commit with the coverage table, statement-equal, never adding or removing a statement.
