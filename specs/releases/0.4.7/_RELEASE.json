@@ -656,6 +656,12 @@
         "release-lifecycle",
         "sdd-gate-v3"
       ]
+    },
+    {
+      "ts": "2026-09-22T21:46:09Z",
+      "agent": "main-thread",
+      "kind": "reviews",
+      "text": "Candidate 11 review: dd-code-reviewer REJECTED 7995570f (H1 caller-chosen/empty window passed the gate, H2 unmeetable done-when, M1-M3, L1-L2); rework 6817773c..66e588a9 + ADR 0024 (operator-accepted) re-reviewed APPROVED at 5c62bc78 with MEDIUM-1/2 + LOW-1/2 folded in d07251a2..e016576b (check re-judges the latest entry and requires no drift after its until; one-way skill dependency). Four operator-confirmed bugs fixed f9774c2d..0871698a. Note: the orphan-checker deletion landed in 7459ea80, not 66e588a9 as its message says. Final tip 422cd04b, CI push green."
     }
   ]
 }
