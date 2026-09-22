@@ -164,9 +164,9 @@ ADR-gated files that hold statements, diagrams and laws only.
   verb decides); `server-registry` describes the live `dd-cli-library/scripts/registry.py`;
   `agent-orchestration`'s tldr names three roles, `workspace-doctor`'s no scores;
   `sdd-bug-backlog-governance` splits by ledger; `context-management` loses its bug history.
-- Done when: `memory.py drift` exits 0 over the window, the `kind: memory` entry names every
-  atom, `dadaia doctor` is clean (`RELEASE-TREE-MEMORY`, `MEM-NARRATIVE-1`, `MEM-DRIFT-*`,
-  LINT-1), the derived-docs test is green, and `dd-code-reviewer` is `APPROVED` on the sha.
+- Done when: the `kind: memory` entry covers every worklist entry (drift's exit 1 means
+  "there is work"), `dadaia doctor` is clean (`RELEASE-TREE-MEMORY`, `MEM-DRIFT-*`, LINT-1
+  with its `MEM-NARRATIVE-1:` history lines), the derived-docs test is green, and `dd-code-reviewer` is `APPROVED` on the sha.
 
 ## 4. Out of scope
 
@@ -188,6 +188,8 @@ ADR-gated files that hold statements, diagrams and laws only.
 - D5 (PM, from PLAN §5): the skill-script frontmatter validator is a second decider of a fact the
   library lint owns; it dies, the lint gains `sources`, and `memory.py check` validates only the
   generated pair.
+- D6 (PM, review H1): release.py memory imports the pure drift function from the sibling skill —
+  one decider for the worklist; importing a pure function is not a script calling a script.
 
 ## 6. Traceability
 
