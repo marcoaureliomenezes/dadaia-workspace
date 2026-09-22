@@ -88,6 +88,11 @@ Measured by: `pytest tests/contract/test_behavior_map.py` (bijection, hash tuple
 ADR: none
 Rationale: law that no asset owns is law nobody applies.
 
+### P-31 · We hold every repo INSIDE the workspace under `repos/<slug>/`, each its own git repository with its own `specs/`; the workspace is never a monorepo, one repo is the degenerate case of many, and bootstrap is one command (`init <dir> --harness <name> [--repo <url>]`).
+Measured by: `pytest tests/unit/core/test_workspace_resolver.py tests/integration/test_cli_init.py`.
+ADR: 0015 (accepted)
+Rationale: the law, the harness projections, the zones and the venv live outside every repo; a per-repo or monorepo tool cannot govern ten projects with one law.
+
 ## Part 2 — Implementation
 
 ### One decider per fact

@@ -60,7 +60,7 @@ Rationale: a reported number promoted as if it gated is fabricated detection.
 
 ### P-29 · We derive every human- and agent-facing document from a named memory atom under a content hash: each `## ` section of `README.md`, `llms.txt` and every `docs/*.md` names its atom and the atom's current sha256, and `docs/cli.md` is the committed output of `dadaia help tree`.
 Measured by: `pytest tests/contract/test_docs_derived_from_memory.py`.
-ADR: 0012 (proposed)
+ADR: 0012 (accepted)
 Rationale: a document written beside memory rots; one that names its source is red the moment the source moves.
 
 ## Part 2 — Implementation

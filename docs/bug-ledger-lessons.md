@@ -56,7 +56,7 @@ had every writer delegate to it. The family stopped there.
 
 ## Lesson 2 — a per-measurement exclusion breeds the next measurement's bug
 
-<!-- derived-from: QUALITY sha256:0355c414bb59 -->
+<!-- derived-from: QUALITY sha256:2ca6c3e65379 -->
 
 Four records, one enumeration.
 `no-ratchet-against-frozen-clock-tests-that-age-fixtures-by-the-real-clock` (LOW) →
@@ -85,7 +85,7 @@ derived wrong.
 
 ## The standing order the lessons produced
 
-<!-- derived-from: QUALITY sha256:0355c414bb59 -->
+<!-- derived-from: QUALITY sha256:2ca6c3e65379 -->
 <!-- derived-from: sdd-bug-backlog-governance sha256:753748a55aa3 -->
 
 The workspace is in a permanent state of architecture review, oriented by its bug
