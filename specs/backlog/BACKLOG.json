@@ -1,4 +1,57 @@
 {
   "schema": "backlog-v1",
-  "active": []
+  "active": [
+    {
+      "id": "memory-canon-v7",
+      "title": "Memory canon v7: canonical memory ADR-gated whole, product memory reconciled from git diff",
+      "opened": "2026-09-22",
+      "status": "picked",
+      "description": "Operator grill ruling 2026-09-22 (Q1..Q11). TECHSTACK.md merges into ARCHITECTURE.md as a short Tech Stack section (8-15 lines, one per technology); ARCHITECTURE.md and QUALITY.md lose the Part 1/Part 2 split and are ADR-gated as a whole (text rewrites only in audits or on explicit operator order); the one-decider table and the doctor class diagram leave ARCHITECTURE.md. product/ is the only release-mutable tier: every atom declares sources (path globs), catalog.json carries them, memory.py drift --since <sha> lists atoms whose sources changed and packages no atom covers; closure reconciles in the order delete, update, add and records one structured kind: memory log entry via release.py memory, which refuses an uncovered worklist; a doctor rule makes the candidate PR red until the entry exists; MEM-NARRATIVE-1 (ERROR) forbids dates, release/candidate/task ids and history words in memory; specs_pattern_version 7 with a specs upgrade lane that merges a consumer TECHSTACK.md and deletes it; PILLAR-MEMORY becomes scored over memory.py drift. The candidate's own closure is the first reconciliation of all 23 atoms plus the uncovered packages; brand-identity is deleted.",
+      "provenance": "operator grill 2026-09-22; audit report Fechamento 0.4.7 §4 (15/23 atoms stale, 38 narrative lines, 7 uncovered packages)",
+      "intents": [
+        {
+          "subject": {
+            "kind": "code",
+            "ref": "dadaia_workspace/core/workspace_layout.py#MEMORY_TOPLEVEL_FILES"
+          },
+          "change": "TECHSTACK.md leaves the memory canon (ARCHITECTURE.md, QUALITY.md)"
+        },
+        {
+          "subject": {
+            "kind": "code",
+            "ref": "dadaia_workspace/core/specs_version.py#CANONICAL_SPECS_VERSION"
+          },
+          "change": "7, with the 6 -> 7 upgrade lane merging a consumer TECHSTACK.md into ARCHITECTURE.md"
+        },
+        {
+          "subject": {
+            "kind": "code",
+            "ref": "dadaia_workspace/features/specs/memory_lint.py#lint_atom"
+          },
+          "change": "requires sources on product atoms; MEM-NARRATIVE-1 ERROR on history-shaped lines"
+        },
+        {
+          "subject": {
+            "kind": "code",
+            "ref": "dadaia_workspace/features/specs/release_tree.py#validate_release_tree"
+          },
+          "change": "RELEASE-TREE-MEMORY: a CLOSURE release without a structured kind: memory entry is non-conformant"
+        },
+        {
+          "subject": {
+            "kind": "code",
+            "ref": "dadaia_workspace/hooks/ctx_inject.py#_build_memory"
+          },
+          "change": "injects ARCHITECTURE.md's Tech Stack section instead of the TECHSTACK.md line-capped digest"
+        },
+        {
+          "subject": {
+            "kind": "catalog",
+            "ref": "brand-identity"
+          },
+          "change": "deleted at the candidate's closure reconciliation"
+        }
+      ]
+    }
+  ]
 }

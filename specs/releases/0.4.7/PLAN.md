@@ -1,4 +1,4 @@
-# PLAN — Release: 0.4.7
+# PLAN — Release: 0.4.7 · Candidate 11 "memory that cannot stack"
 
 **Status:** Approved
 **Release ID:** 0.4.7
@@ -6,207 +6,173 @@
 
 ---
 
-## Assumptions (stated, not decided here)
+## 1. Assumptions
 
-These are PM rulings of 2026-09-21, not open questions.
+- **A1 — The canonical hunk arrives from the PM, not from a task.** `specs/memory/**` never
+  appears in a task `Write set:` (SPEC-DOC-047). Before T-047-99's RED test can go green the PM
+  must have placed `ARCHITECTURE.md` and `QUALITY.md` (the v7 drafts), deleted
+  `specs/memory/TECHSTACK.md`, and appended the ADR 0022 line. The engineer implements FR1's code
+  and tests in the working tree and does **not** commit them; the PM stages code + tests + the
+  memory hunk + the ADR line as ONE commit `docs(adr): accept 0022-memory-canon-v7`.
+- **A2 — `ARCHITECTURE.md`'s `## Tech Stack` section is the only tech-stack source** after FR1;
+  `ctx_inject` extracts it by heading, so its absence must be fail-open (empty bootstrap part),
+  never a traceback on a v6 consumer tree.
+- **A3 — The drift verb reads `catalog.json`, not 23 frontmatter blocks.** `sources` lands in the
+  catalog (FR2), so `_memory_drift.py` loads one generated document and matches globs. This is
+  what keeps it inside the V36 budget (§5).
+- **A4 — The bug-history reading below is evidence, not decoration.** 63 of 518 ledger records
+  mention memory (surfaces: `specs` 21, `unknown` 17, `tests` 6, `hooks` 2). The recurring shapes:
+  closure generating atoms (`product add` writing files nobody reconciled), catalog/index drift
+  (two generated files, two writers), the frontmatter schema rejecting live atoms, and a lint
+  blaming the wrong cause. Every one of those is a *second mechanism* bug, not a logic bug.
+- **A5 — Upgrade 6 → 7 needs a lane that does not exist today.** `features/migrate/registry.py`
+  currently *refuses* `current < goal` outright (the chain was retired at v0.5.1 K10). FR1's lane
+  is therefore a new single hop, not a resurrection of `MigrationStep`/`run_chain`.
 
-- **D8 RULED — one workflow, same-workflow chaining.** There is no `release: published` trigger
-  and no `push: tags`. `release.yml` is folded INTO `release-please.yml`: a single workflow on
-  `push: main` runs the release-please action first, then `build → approve (release-gate) →
-  publish (OIDC) → smoke-test → publish-skills-repo`, every one of them gated on
-  `needs.release-please.outputs.release_created == 'true'` and reading
-  `needs.release-please.outputs.tag_name`. This is the pattern the action's README documents,
-  and it needs **no PAT**: the cross-workflow triggering restriction on `GITHUB_TOKEN` never
-  applies because there is no second workflow to trigger. `release.yml` is deleted in T-047-88.
-- **D9 RULED — a no-op.** Under D10 below, release-please's first PR proposes 0.4.7, so the
-  release directory id never changes and no rename happens. Rename-at-promote stays written only
-  as the general contract for a future candidate whose minted number differs.
-- **D10 RULED — the version floor.** `.release-please-manifest.json` carries the last PUBLISHED
-  version `0.4.6`; `pyproject.toml` is reset to `0.4.6` in the SAME commit that deletes
-  `SPEC-DOC-045` (T-047-90), so no intermediate tree is red. With the two pre-1.0 bump flags
-  below, release-please's first PR proposes **0.4.7** and bumps both files back in lockstep.
-  `test_release_semver_canon.py` asserts manifest version == `pyproject.toml` version from
-  T-047-90 on.
+## 2. Design — per FR, in codebase-design vocabulary
 
-## The version release-please would mint (verified against the action, 2026-09-21)
+**FR1 — canon v7.** The seam is `core/workspace_layout.MEMORY_TOPLEVEL_FILES`: one tuple, already
+the single source the canon rows, `memory_canon`, TREE-3 and the scaffold copy-map are built from.
+Dropping `"TECHSTACK.md"` from it is a one-token edit that propagates to every reader — the module
+is deep and this candidate proves it. **Deletes:** the third canonical file and its 12 readers'
+special cases; `ctx_inject._TECH_STACK_DIGEST_MAX_LINES`, `_digest_tech_stack`'s truncation branch
+and the self-pull pointer (a bounded digest is a second, lossy representation of a file the agent
+can read — pure pass-through once the file itself is 8–15 lines); `ARCHITECTURE.md`'s "One decider
+per fact" table and the SpecsDoctor class diagram (text that drifts every candidate and no rule
+measures). `test_memory_two_tier_shape.py` is *renamed and rewritten*, not wrapped:
+`test_memory_canonical_shape.py` asserts the v7 headings and order for two files. Deletion test:
+delete `TECHSTACK.md` and no complexity reappears at any caller — the section survives inside a
+file that already had readers. **Bug surface: shrinks** — one fewer file in the canon, one fewer
+digest representation, one fewer schema clause; the `unknown`/`specs` memory-shape bug family
+loses the file it was mostly about.
 
-`v0.4.6..HEAD` carries 1,689 commits, 140 of them `feat:`, **zero** with a `!` breaking marker.
-release-please's pre-1.0 rules: `bump-minor-pre-major` (default `false`) governs BREAKING
-(→ major unless set); `bump-patch-for-minor-pre-major` (default `false`) governs `feat`. With
-both at their defaults a `feat` on a `0.x` version bumps the **minor** — the first release PR
-would propose **0.5.0**, not 0.4.7.
+**FR2 — sources + drift.** The seam is the atom's frontmatter, projected into `catalog.json`.
+`sources:` makes "which code does this atom describe" a *declared* fact instead of a guess, and the
+new sibling `_memory_drift.py` is a pure function of (catalog, `git diff --name-only`,
+`git ls-files`). It creates no new state and no new file format. **Deletes:** `_memory_add.py` and
+the `product add` verb — an atom generator is exactly the stacking mechanism the SPEC measured
+(closure ran `product add`, the atom existed, nobody reconciled it); the add step of a
+reconciliation is writing a file, which `check` already validates. `_memory_index.py` is folded
+into `_memory_catalog.py` (they are already one act — `_generate` writes both or neither), paying
+the rest of the V36 line budget. Deletion test on the drift verb: delete it and the whole FR3 gate
+degenerates to free prose again — it earns its keep.
 
-The operator wants 0.4.7. The config must therefore set, at the root of
-`release-please-config.json`:
+**FR3 — the closure gate.** Two seams, deliberately disjoint: the *writer* (`release.py memory`,
+a skill script, where `subprocess`/git is legal) and the *reader* (`RELEASE-TREE-MEMORY`, a doctor
+rule over `release_tree.py`, which reads the state document and nothing else — P-02/P-03 hold, no
+git in a feature). Scripts never call each other; the worklist crosses as JSON on the operator's
+command line. **Deletes:** the free-prose `kind: memory` entry as an accepted shape — after this,
+an entry without `since`/`reviewed`/`changed` is a doctor ERROR, so the old five prose entries are
+history, not a supported form. `release-state-v1` stays `additionalProperties: false` (P-15): the
+three fields are admitted on the `memory` log-entry object only.
 
-```
-"bump-minor-pre-major": true,
-"bump-patch-for-minor-pre-major": true
-```
+**FR4 — MEM-NARRATIVE-1.** One regex table, one home: `features/specs/memory_lint.py`, run
+in-process by the doctor as LINT-1. `doctor_memory.py` is at exactly 699 lines — the ceiling — so
+this is not a choice between homes, it is the only home, and it is also the right one (the lint
+already owns per-line body rules; the doctor owns tree rules). **Deletes:** nothing structurally,
+but it makes the existing `FORBIDDEN_MEMORY_HEADING_RE` a subset rule — the heading check stays
+where it is; the line check does not duplicate it. This FR only adds; justification against
+replace-don't-layer: it adds *one table in the module that already runs per-line body checks*, no
+new module, no flag, no second code path, and it retires 38 lines of memory prose at closure.
 
-— `feat` bumps patch, BREAKING bumps minor, `fix`/the rest bump patch, for as long as the
-project stays below 1.0. With that, the first release PR proposes **0.4.7** from the 0.4.6
-floor, and D9's rename is a no-op. This is the plan's recommendation; changing it is a PM call,
-not an implementation call.
+**FR5 — law follows code.** `MEMORY-UPDATE.md` is *replaced* by the reconciliation protocol (not
+amended), `PILLAR-MEMORY.md` §1–§3 likewise, and every `TECHSTACK` citation follows with
+`dead_citations` + the derived-docs test as the oracle. **Deletes:** 13 lines of unscored audit
+prose, the "every 5 releases, never mandatory" cadence, and the `TECHSTACK` name from the corpus.
 
-**This is D10, ruled.** release-please reads the *current* version from
-`.release-please-manifest.json` and expects `pyproject.toml` to agree — both carry the last
-published `0.4.6`. `pyproject.toml` carries `0.4.7` today only because `SPEC-DOC-045` requires
-it to equal the live release id; that rule and the reset land together in T-047-90. T-047-87
-writes the manifest at `0.4.6` and asserts *manifest == last published PyPI version*; the strict
-`manifest == pyproject` equality (ADR 0021's `measured_by`) is asserted from T-047-90 on.
+## 3. Order of work — tracer bullets
 
-## Design (codebase-design vocabulary)
+1. **See the worklist before moving anything.** T-047-93 (`sources` in schema + `check` + catalog)
+   then T-047-95 (`memory.py drift --json`) run over the LIVE tree: the operator gets the real
+   list of drifted atoms and uncovered packages before a single canonical byte moves. T-047-94
+   (the deletions that pay for it) lands first so the ratchet is never breached mid-candidate.
+2. **Close the loop end to end.** T-047-96 (`release.py memory`) + T-047-97 (`RELEASE-TREE-MEMORY`)
+   make the gate real: doctor red → run the two verbs → doctor green, demonstrable on this
+   candidate before FR1 touches the canon.
+3. **Then the canon** (T-047-98 lint, T-047-99..T-047-102 FR1, uncommitted, PM-staged).
+4. **Then the law** (T-047-103..T-047-105), whose oracle is the derived-docs/citation tests.
+5. FR6 is the closure procedure — no task, run by the PM with the machinery tasks 1–2 built.
 
-Candidate 10 is a **deletion candidate**. It buys one behaviour — a bot maintains the version,
-the CHANGELOG and the tag from the commit log — and pays for it by deleting four scripts, two
-subcommands, one schema field, one doctor rule family, one doctor rule and the hand-written
-CHANGELOG discipline. Every task's diff should be net-negative in the repository except
-T-047-87, which is the one addition.
+## 4. Verification — the RED test per task
 
-- **Seam: the release PR.** Today the seam between "this is done" and "this is published" is a
-  pyproject edit compared against tags inside the publishing workflow — an implicit seam with no
-  reviewable artifact. After this candidate the seam is a pull request on `main` whose body is
-  the generated changelog: reviewable, revertable, one place. the publish jobs stop deciding
-  *whether* to release and only execute a decision made earlier in the same run (`check` dies,
-  `publish` stops creating the tag, `release_created` is the one boolean).
-- **Deletion test on `_release_rc.py`/`_release_fold.py`/`_release_fold_plan.py`/`_release_archive.py`
-  (404 of the 1,381 skill-script lines).** Delete them and the complexity does *not* reappear at
-  any caller: "what was candidate 9's trio" is answered by `git show <CLOSURE sha>:specs/releases/0.4.7/…`,
-  which is the same answer `rc-9/` gives, without a copy. `fold` exists solely to repair a wrong
-  `archive`; with no `archive` there is nothing to repair. This is the textbook pass-through
-  cluster — it earns nothing and it is deleted, not wrapped.
-- **Replace, don't layer (the standing order).** Nothing in this candidate adds a flag or a
-  branch to keep the old path alive beside the new one. `rc-archive`, `fold` and `archive` do
-  not gain a `--legacy`; they cease to exist. The only additive surface is
-  `release.py phase CLOSURE --pr <n>`, justified below.
-- **ADR 0018 — no verb enters.** `dadaia help tree` is byte-identical after this candidate:
-  release-please is a GitHub Action, the config files are data, and `release.py` is a skill
-  script, not the CLI. `--pr` is one optional argument on an *existing* subcommand that records
-  the merged release PR number where `archive --pr <n>` used to record it — the verb count goes
-  6 → 4, the flag moves from a dying verb to a living one. That is a migration, not growth.
-- **Read-only tolerance, then death.** `specs/releases/0.4.7/rc-1..rc-9` and
-  `specs/releases/_archive/**` stay on disk forever (history is never rewritten). The
-  `RELEASE-TREE-ARCHIVE-*` rules are *validators*, so deleting them cannot make an existing
-  directory illegal — it makes it unvalidated. `_archive/` and `rc-N/` stay canon members of the
-  specs tree, excluded from the release-directory walk by the existing name rule. `doctor` and
-  `release.py check` are therefore green on the live instance at every commit of this candidate,
-  which is the plan's hardest constraint.
-- **The CHANGELOG freezes, it is not migrated.** Everything at and below `## [0.4.7]` is
-  hand-written history and is never rewritten; release-please prepends above it from the first
-  release PR on. T-047-92's "Candidate 10" section is the last hand-written text in the file.
-
-## Order of work
-
-Fixed by the SPEC: 87 → 88 → 89 → 90 → 91 → 92. Each task leaves `dadaia ci preflight` green,
-`dadaia doctor --specs-dir repos/dadaia-workspace/specs` at exit 0 on the live instance, and the
-instance re-projectable.
-
-1. **T-047-87 (FR1)** — the addition: the release-please workflow (the action step alone),
-   config and manifest. Nothing reads them yet, so this task is safe to land first.
-2. **T-047-88 (FR1)** — `release.yml`'s jobs fold into `release-please.yml` under the
-   `release_created` gate and `release.yml` is deleted; `check` and the tag step die. 88 follows
-   87 because the gate it reads is the output 87's action step declares.
-3. **T-047-89 (FR2)** — the four scripts, the two subcommands and the schema's `rc` field die.
-   89 follows 88 because `archive` is what `release.yml`'s old publish path paired with.
-4. **T-047-90 (FR2)** — the doctor half: `RELEASE-TREE-ARCHIVE-*` and `SPEC-DOC-045` die,
-   `phase CLOSURE --pr` arrives, `pyproject.toml` returns to the 0.4.6 floor beside the manifest
-   (D10). 90 follows 89 because a rule may only die after its last writer does.
-5. **T-047-91 (FR3)** — law, skills, recipe, the root map, and the five ADRs → `superseded` in
-   the same commit as the last citation deletion. 91 follows 89/90 because the law may only stop
-   naming a verb after the verb is gone.
-6. **T-047-92 (FR3)** — closure: CHANGELOG, `_RELEASE.json`, re-projection, derived docs.
-
-## Verification — what each task proves, and what it cannot
-
-`release-please.yml` runs on pushes to `main`; this branch is `feature/0.4.7`. **The mechanism
-cannot be exercised before the merge.** Each task therefore proves what is provable statically
-and the plan names the residue explicitly.
-
-- **T-047-87/88 — proved locally:** `tests/contract/test_ci_workflow_hygiene.py` parses the
-  workflow tree (exactly ONE workflow carries the release-please action, pinned to a 40-hex sha
-  with a version comment; `release.yml` is gone; no workflow listens to `release:` or
-  `push.tags`; no job compares pyproject to tags; no step runs `git tag`; every publish-side job
-  `needs` the `release-please` job and is gated on `release_created == 'true'`;
-  `approve`/`publish`/`smoke-test`/`publish-skills-repo` survive with their `needs:` graph
-  intact), and `tests/contract/test_release_semver_canon.py` parses
-  `release-please-config.json` + `.release-please-manifest.json` (valid JSON, the two pre-1.0
-  bump flags set as above, `include-component-in-tag: false`, `release-type: python` inside the
-  config's `packages["."]` — **not** as an action input: with `config-file`/`manifest-file` set,
-  passing `release-type` switches the action out of manifest mode).
-- **UNVERIFIED until the first release PR:** that release-please parses this commit history
-  without error, that it proposes 0.4.7 rather than 0.4.6/0.5.0, that its CHANGELOG sections
-  render as configured, that `release_created`/`tag_name` carry the values the gate expects, and
-  that `publish` still finds its build artifact in the same run. These are one operator
-  observation on the first PR after merge to `main`; no test in this repository can assert them.
-  T-047-92 records that residue in the `_RELEASE.json` log so the next session inherits it.
-- **T-047-89/90 — proved locally, fully:** `tests/contract/test_release_state_schema.py` (the
-  schema closes without `rc`/`implemented.rc`), `tests/contract/test_release_tree_canon.py`
-  (the `RELEASE-TREE-ARCHIVE-*` cases deleted, the survivors unchanged),
-  `tests/contract/test_public_scripts_thin_wrapper.py` + V36 re-pinned down,
-  `release.py check --specs specs` exit 0 on this repository's real tree (rc-1..rc-9 and
-  `_archive/` present and tolerated), `dadaia doctor` exit 0, `dadaia help tree` unchanged.
-- **T-047-91 — proved locally:** `grep -rnE "rc-archive|release\.py fold|release\.py archive|rc-N"`
-  over `dadaia_workspace/public/` and `specs/memory/` returns nothing; every `fix:` line names a
-  living verb (`tests/contract/test_every_block_carries_a_fix.py`); `ADR-SUPERSEDED-CITATION`
-  green with the five records at `status: superseded`.
-- **T-047-92 — proved locally:** V32/V33/V34/V35/V36 all green at their new (lower) pins,
-  `public stage` → `public install` → `public doctor` exit 0, `dadaia doctor` exit 0.
-
-## Ratchets — down only
-
-| Ratchet | Now | After |
+| Task | RED test | What it proves |
 |---|---|---|
-| V32 governance ids | 682 | re-pin to the measured value (four scripts' comments die) |
-| V33 orphan families | 35 | re-pin to measured; no family is added |
-| V34 trio bytes | SPEC ≤ 24 KB / TASKS ≤ 12 KB | unchanged (measured before each commit) |
-| V35 skill Markdown | 18 dirs / 2877 lines | re-pin DOWN (rc/fold/archive prose deleted); never raised |
-| V36 skill scripts | 36 files / 4191 lines | ≤ 32 files / ≤ 3787 lines, then to measured |
-| module ceiling | 699 / 700 | down (`release_tree.py`, `doctor_release.py` shrink) |
-| import-linter | 13 contracts | unchanged — no new module, no new edge |
+| T-047-93 | `tests/unit/skills/test_spec_navigator_memory_script.py` — `check` passes an atom with no `sources` | the field is required and a no-match glob is refused |
+| T-047-94 | `test_v36_skill_script_corpus_is_pinned` + the `product add` CLI test | the verb is gone and the corpus shrank |
+| T-047-95 | new `test_memory_drift.py` over a fixture repo | drift lists changed-source atoms and uncovered packages, exit 1 |
+| T-047-96 | `tests/unit/skills/test_release_implementation_release_script.py` | the verb refuses an uncovered worklist, a byte-identical `changed`, a non-CLOSURE phase |
+| T-047-97 | `tests/unit/features/specs/` release-tree rule test | doctor ERRORs on a CLOSURE release with no stamped `memory` entry |
+| T-047-98 | `tests/unit/features/specs/test_memory_lint.py` | a date/`M.m.p`/`c11`/`T-047-93`/`FR1` line errors; the `ADR:` line does not |
+| T-047-99 | `tests/contract/test_memory_canonical_shape.py` | two files, the three headings each, ids unique, no history heading |
+| T-047-100 | `tests/unit/hooks/test_ctx_inject_digest.py` | the bootstrap carries the `## Tech Stack` section verbatim; no pointer, no cap |
+| T-047-101 | `tests/e2e/features/test_specs_upgrade_e2e.py` | a v6 tree reaches 7 with `TECHSTACK` body appended and the file deleted; a `## Part 1` tree is left alone and named |
+| T-047-102 | `test_memory_canonical_shape` scaffold assertions + `dadaia public doctor` | the projected scaffold states the two tiers |
+| T-047-103/104 | `tests/contract/test_slop_ratchets.py::test_v35…` + the skill-reference tests | the law moved without growing the corpus |
+| T-047-105 | `test_docs_derived_from_memory.py` + `citations`/`dead_citations` | no live `TECHSTACK` citation survives |
 
-## Risks
+## 5. Ratchets — down only
 
-**Bug history (standing rule).** The families touching this surface are `release-verbs`
-(`rc-archive-discovery-state-rejected-by-doctor` — a verb's own legitimate intermediate state
-refused by the doctor; `archived-release-state-invalid-and-unparseable-doctor-silent` — the
-archive validated by nobody) and `release-workflow` (`release-workflow-coverage-file-in-checkout`).
-The recurring shape is **a rule and a writer disagreeing about the same directory**: every fix so
-far added a phase-scoped exception to `release_tree.py` so the rule would tolerate what the verb
-had just done. This candidate ends the family the only way that does not add a tenth exception —
-it deletes the writers and then the rules, so there is nothing left to disagree. If any task in
-this candidate finds itself *adding* a branch to `release_tree.py` or `doctor_release.py`, the
-task is wrong: stop and report.
+**V34.** SPEC.md is 12,859 B (≤ 24 KiB). TASKS.md is measured with `wc -c` before the definition
+commit and stays ≤ 12,288 B.
 
-- **D10 (open, PM) — the version floor.** `pyproject.toml` must drop 0.4.7 → 0.4.6 for
-  release-please to mint 0.4.7. That reset is coupled to `SPEC-DOC-045`'s death and both land in
-  T-047-90. If the PM prefers pyproject to stay at 0.4.7, release-please will mint 0.4.8 and the
-  release id must follow — decide before T-047-87 writes the manifest.
-- **The SPEC's FR1 is superseded on this point.** SPEC §3 FR1 reads "`.github/workflows/release.yml`
-  triggers on `release: published`". The PM's D8 ruling replaces that with same-workflow chaining
-  and the deletion of `release.yml`; the PM amends the SPEC line in the CLOSURE commit. This PLAN
-  and TASKS are the governing text for T-047-87/88 until then.
-- **The trigger hazard the ruling removes.** A workflow acting with the default `GITHUB_TOKEN`
-  cannot start another workflow, so a `release: published` (or `push: tags`) design would have
-  needed a PAT — an operator act, and a second secret to fail closed on. Folding the jobs into
-  one workflow deletes the hazard instead of guarding it: no secret, no second trigger, no
-  fallback branch. What remains unprovable locally is only that `release_created` is `'true'` on
-  the first real merge.
-- **Deleting a doctor rule cannot be tested by "doctor is still 0".** A deleted validator is
-  invisible in a green run. T-047-90's tests must assert the *absence* of the code from the
-  issue vocabulary on a tree that previously produced it — i.e. the deleted rule's fixture is
-  rewritten to assert no issue, not deleted outright, so the death is recorded as behaviour.
-- **The 15 ADR citations are load-bearing prose, not references.** Nine of them sit inside the
-  four dying scripts and vanish with them; six sit in `RC-FLOW.md`, `scaffold/releases/AGENTS.md`
-  and `_release_store.py`/`_release_tree.py`/`_release_check.py`. `ADR-SUPERSEDED-CITATION` errors
-  on *any* citation of a superseded record, so the flip and the last deletion are one commit
-  (T-047-91) or the tree is red in between. Stage them together or not at all.
-- **`specs/releases/AGENTS.md` and `public/scaffold/releases/AGENTS.md` are the same bytes.**
-  T-047-91 edits the scaffold source and re-projects; hand-editing the instance copy to match is
-  the forbidden move that hides drift.
-- **V35 must fall, not rise.** T-047-91 deletes prose from four SKILL.md/companion files; the
-  re-pin is measured after the deletion. If any edit would raise it, the task stops and reports.
-- **The candidate cannot be closed by `archive`.** Promote is the operator merging the release
-  PR. T-047-92 leaves `_RELEASE.json` at `CLOSURE` with the release PR number recorded through
-  `phase CLOSURE --pr <n>`; the `ARCHIVED` phase and the histo line are the PM's at promote,
-  under the new rules, with no script to run.
+**V35** (18 dirs / 2,876 lines, at the pin today). `PILLAR-MEMORY.md` 66 → 53 = **−13**;
+`MEMORY-UPDATE.md` 28 → 30 = **+2**; `RELEASE-EVENTS.md` ≤ **+5** (the `memory` entry shape);
+`dd-spec-navigator/SKILL.md` ≤ **+1** (drift verb, `TECHSTACK` line replaced in place); `RC-FLOW.md`
+**±0**. Net **≈ −5 → 2,871**. Dirs unchanged. The scaffold `specs/memory/AGENTS.md` and the
+`dd-software-engineer` persona are NOT in `public/skills/**` and do not score. Re-pin V35 to the
+measured post-candidate value at T-047-105.
+
+**V36** (31 files / 3,657 lines, ceiling 3,658 — one line of headroom today).
+
+```
+3657  base
+ -84  delete _memory_add.py                     (-1 file)
+ -17  memory.py: product-add parser + dispatch + import
+ -16  fold _memory_index.py into _memory_catalog.py  (-1 file, ~60 lines survive)
+----
+3540  after deletions, 29 files          budget to the ceiling: 118 lines
+ +85  _memory_drift.py                          (+1 file -> 30)
+ +14  memory.py drift wiring
+ +16  release.py memory verb wiring
+ +50  _release_check.py memory append + refusals (no new file: 30 files final)
+  +6  _release_schema.py optional since/reviewed/changed
+----
+3711  ESTIMATE — 53 lines OVER the ceiling
+```
+
+**Resolved by the PM (SPEC D5):** the named lever is taken. `_memory_schema.py`'s validate half
+and `_memory_check.py`'s atom half re-implement the frontmatter validation the library lint
+(`features/specs/memory_lint.py`, LINT-1) already owns — a duplicated decider. They die;
+`sources` is required by the lint; `memory.py check` keeps only the generated-pair check;
+`_memory_schema.py` keeps `parse`/`find_specs` for the catalog writer. Measured deletion ≥ 90
+lines, so the estimate lands at ≤ 3,621 with the drift sibling capped at 85 and the release side
+at 72. If any task's measurement still breaks 3,657, that task stops and escalates — the ceiling
+is never raised.
+
+**Doctor module ceiling 699.** `doctor_memory.py` is at 699 — it gains nothing. MEM-NARRATIVE-1
+lives in `memory_lint.py` (303) as the SPEC directs.
+
+**P-20 / `test_specs_cli_complexity_ratchet.py`.** The 6 → 7 lane edits
+`features/migrate/upgrade.py`, whose sha256 is pinned byte-identical. T-047-101 re-pins the hash
+**in the same commit** with the written justification (FR1's upgrade lane is the authorized
+change), exactly as the ratchet's own docstring requires.
+
+**import-linter.** No new edge: `_memory_drift.py` and `release.py` are skill scripts (stdlib +
+`subprocess`, outside the package); `RELEASE-TREE-MEMORY` lives in `features/specs/release_tree.py`
+and reads `_RELEASE.json` only — P-02 (no subprocess from a feature) and P-03 hold untouched.
+
+## 6. Risks
+
+- **R1 — the V36 budget (§5).** Mitigated by escalation, never by a ceiling raise.
+- **R2 — FR1's uncommitted working tree.** Four tasks' code sits uncommitted until the PM's single
+  ADR commit; a `git add -A` anywhere in that window corrupts the commit shape. Every task stages
+  explicit paths; the FR1 tasks stage nothing.
+- **R3 — the upgrade lane writes operator prose.** Bounded by A5 and by the SPEC: a tree still
+  carrying `## Part 1 — Principles` is *named by the doctor and left alone*. The e2e test asserts
+  the left-alone case, not only the happy one.
+- **R4 — MEM-NARRATIVE-1 false positives.** An ISO date or `FR3` inside a code fence or a
+  `Measured by:` line would blame the wrong cause — the historical failure mode of this lint. The
+  RED test carries the exemption cases (`ADR: NNNN (accepted)`) before the positive cases.
+- **R5 — drift's `--since` default** reads the live release's `implemented.sha` else `defined.sha`;
+  on a tree with neither, the verb must refuse with a `fix:` naming `--since`, never default to
+  the root commit and list the entire tree.

@@ -81,8 +81,8 @@ One of the entry AI runtimes — Claude Code, Codex, Kimi Code — each with its
 _Avoid_: target, runtime, agent-target, tool
 
 **Drift**:
-A projection whose bytes differ from its render. The only projection fault; doctor reports it, install repairs it.
-_Avoid_: parity, mismatch, stale copy
+A projection whose bytes differ from its render. The only projection fault; doctor reports it, install repairs it. Memory drift is the other live sense and is always written qualified.
+_Avoid_: parity, mismatch, stale copy, drift (bare) for memory drift
 
 ## Specs
 
@@ -118,8 +118,28 @@ One closed-scope SDD cycle inside the live Release (grill → SPEC/PLAN/TASKS `A
 _Avoid_: version (for the unit), sprint, "rc" as a branch name or a fixes-only round
 
 **Memory**:
-The current product truth under `specs/memory/`; never history.
+The current product truth under `specs/memory/`; never history. Two tiers: canonical memory and product memory.
 _Avoid_: docs, notes
+
+**Canonical memory**:
+`ARCHITECTURE.md` (with its `## Tech Stack` section) and `QUALITY.md` — statements, principles, diagrams and laws of the project, changed only in the commit that carries an accepted ADR; an audit or an explicit operator order may rewrite their text, never their statements.
+_Avoid_: the trio (retired with TECHSTACK.md), Part 1/Part 2, top-level atoms
+
+**Product memory**:
+The `specs/memory/product/**` atoms — one functional description per feature, the only memory tier a release closure changes, reconciled in the order delete, update, add.
+_Avoid_: feature docs, catalog (that is the generated pair)
+
+**Atom sources**:
+The `sources:` frontmatter field of a product atom — the repo path globs whose code the atom describes; `catalog.json` carries them and the drift verb reads them.
+_Avoid_: owners, paths, citations (a citation is a path named in the body)
+
+**Memory drift**:
+A product atom whose sources changed in a window while the atom was not reconciled, or a source package no atom covers; `memory.py drift --since <sha>` lists both. Always qualified — "drift" bare is projection drift.
+_Avoid_: stale memory, drift (bare)
+
+**Reconcile**:
+The closure pass over the drift worklist: for each atom read its sources' git diff, delete the claims the code contradicts, update the claims that changed, then add what is new; recorded as one `kind: memory` release log entry naming every atom reviewed or changed.
+_Avoid_: memory pass, apply the deltas, sync
 
 ## Governance verbs and hand edits
 
