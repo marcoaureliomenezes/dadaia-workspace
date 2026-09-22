@@ -69,7 +69,7 @@
   `Write set:` `dadaia_workspace/features/specs/{release_tree.py,rules.py}`, `tests/unit/features/specs/test_release_tree.py`
   `blocked by:` T-047-96 · `delivers:` FR3 (the gate)
 
-- [ ] **T-047-98 — `MEM-NARRATIVE-1`: no history line in any memory file.**
+- [-] **T-047-98 — `MEM-NARRATIVE-1`: no history line in any memory file.**
   One regex table in `features/specs/memory_lint.py` (LINT-1; `doctor_memory.py` sits at 699): ERROR
   on a body line carrying an ISO date, a `M.m.p` release id, `c[0-9]+`/`rc-[0-9]+`, `T-[0-9]+-[0-9]+`
   or `FR[0-9]+` in ANY memory file, exempting a principle block's `ADR: NNNN (...)` line; and, in a
