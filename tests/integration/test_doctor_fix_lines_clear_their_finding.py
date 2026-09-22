@@ -165,8 +165,8 @@ _UNEXERCISED: dict[str, str] = {
     "TREE-7": "the fix redacts a session id inside BUGS.jsonl; the value is per-record "
     "and redaction is covered by the redaction suite",
     "TREE-8": "auto-fixed rule (`fix_tree8`), covered by the structural doctor unit tests",
-    "RELEASE-TREE-MEMORY": "the fix runs `memory.py drift` then `release.py memory` over a "
-    "real commit window; the rule's own cases are tests/unit/features/specs/test_release_tree.py",
+    "RELEASE-TREE-MEMORY": "the fix runs `release.py memory` over the ledger-derived "
+    "commit window; the rule's own cases are tests/unit/features/specs/test_release_tree.py",
     "CAT-1": "the fix is `memory.py catalog generate`, exercised by tests/unit/skills/test_spec_navigator_memory_script.py",
     "SPEC-DOC-038": "the fix is `audit.py close`, exercised by tests/unit/skills/test_audit_project_audit_script.py",
     "LINT-1": "the fix inserts one missing frontmatter field; which field is per-atom",

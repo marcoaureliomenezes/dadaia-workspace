@@ -27,9 +27,12 @@ _SCRIPTS = _PUBLIC / "skills" / "dd-spec-navigator" / "scripts"
 
 @pytest.fixture
 def script(tmp_path: Path) -> Path:
-    """The staged shape: the sibling modules copied beside memory.py."""
-    staged = tmp_path / "staged" / "scripts"
+    """The staged shape: the sibling modules copied beside memory.py, and the release
+    skill projected beside this one (the live-release reader `drift` imports)."""
+    staged = tmp_path / "skills" / "dd-spec-navigator" / "scripts"
     staged.mkdir(parents=True)
+    shutil.copytree(_SCRIPTS.parents[1] / "dd-release-implementation" / "scripts",
+                    tmp_path / "skills" / "dd-release-implementation" / "scripts")  # fmt: skip
     for module in sorted(_SCRIPTS.glob("*.py")):
         shutil.copy2(module, staged / module.name)
     return staged / "memory.py"

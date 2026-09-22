@@ -229,14 +229,15 @@ def release_tree_issues(specs_dir: Path) -> list[SpecsDoctorIssue]:
 #: `text` is the free prose this rule replaces: it names no window and dispositions no
 #: atom, so nothing can tell a closure that reconciled memory from one that wrote a
 #: sentence about it.
-_MEMORY_FIELDS: tuple[str, ...] = ("since", "reviewed", "changed")
+_MEMORY_FIELDS: tuple[str, ...] = ("since", "until", "reviewed", "changed")
 
 
 def release_memory_issues(specs_dir: Path) -> list[SpecsDoctorIssue]:
     """RELEASE-TREE-MEMORY — a live release in CLOSURE names its memory reconciliation.
 
     The LATEST `kind: memory` entry stamped after `implemented.ts` must carry
-    `since`/`reviewed`/`changed`; an entry predating the milestone reconciled a window the
+    `since`/`until`/`reviewed`/`changed`, and its `since` must be the state-derived start
+    (the previous memory entry's `until`, else `defined.sha`); an entry predating the milestone reconciled a window the
     candidate has since moved past. Reads the state document alone — no git, no
     subprocess (P-02/P-03): whether the atoms really moved is the writing verb's refusal,
     measured where a subprocess is legal.
@@ -274,10 +275,19 @@ def _memory_message(doc: dict[str, Any]) -> str | None:
             f"release is in CLOSURE with no `kind: memory` log entry stamped after "
             f"implemented.ts {stamp!r} — the closure reconciled no memory"
         )
-    missing = [field for field in _MEMORY_FIELDS if field not in entries[-1]]
+    latest = entries[-1]
+    missing = [field for field in _MEMORY_FIELDS if field not in latest]
     if missing:
         return (
             f"the latest `kind: memory` log entry lacks {', '.join(missing)} — a prose note "
             "names no window and dispositions no atom"
+        )
+    earlier = [e for e in doc["log"][: doc["log"].index(latest)] if isinstance(e, dict)]
+    ends = [str(e["until"]) for e in earlier if e.get("kind") == "memory" and e.get("until")]
+    start = ends[-1] if ends else str((doc.get("defined") or {}).get("sha") or "")
+    if str(latest["since"]) != start:
+        return (
+            f"the latest `kind: memory` log entry opens at {latest['since']!r}, not at the "
+            f"ledger-derived start {start!r} — the window was chosen, not derived"
         )
     return None

@@ -3,11 +3,8 @@
 the atoms they are generated from, stdlib only.
 
 ``memory.py <verb> --specs <path>``. `catalog generate` rewrites both generated files
-from the atoms' frontmatter in one act, so the pair cannot drift apart; `drift` reports
-what a commit window left stale and what code no atom covers; `check` reports where the
-pair stopped saying what the atoms say. Writing an atom is the closure
-reconciliation's own act and validating one is the library lint's fact: this script does
-neither.
+from the atoms' frontmatter in one act; `drift` reports what a commit window left stale
+and what code no atom covers; `check` reports where the pair drifted from the atoms.
 """
 
 from __future__ import annotations
@@ -27,6 +24,13 @@ import _memory_drift as dft  # noqa: E402
 from _memory_check import check  # noqa: E402
 from _memory_schema import CATALOG, INDEX, find_specs  # noqa: E402
 
+# The window start is the release ledger's fact: read it by the release skill's own
+# live-release logic, projected beside this skill, never by a second resolver here.
+sys.path.insert(
+    1, str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts")
+)
+import _release_store as rel  # noqa: E402
+
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -37,7 +41,9 @@ def _parser() -> argparse.ArgumentParser:
     generate = catalog.add_parser("generate", help="rewrite catalog.json and index.md")
     drift = sub.add_parser("drift", help="what a commit window left stale, and what no atom covers")
     drift.add_argument(
-        "--since", default=None, help="the window start (default: the live milestone)"
+        "--since",
+        default=None,
+        help="the window start (default: the live release's last memory `until`, else defined.sha)",
     )
     validate = sub.add_parser("check", help="validate the generated pair against the atoms")
     for command in (drift, validate):
@@ -58,11 +64,8 @@ def _generate(specs: Path) -> str:
 
 def _drift(args: argparse.Namespace, specs: Path) -> int:
     """The worklist for the window, exit 1 while either list is non-empty."""
-    repo = specs.parent
-    since = args.since or dft.since_default(specs)
-    catalog = json.loads((specs / CATALOG).read_text(encoding="utf-8"))
-    changed = dft.git(repo, "diff", "--name-only", f"{since}..HEAD")
-    report = {"since": since, **dft.worklist(catalog, changed, dft.git(repo, "ls-files"))}
+    since = args.since or rel.window_start(rel.live_release(specs).state)
+    report = dft.report(specs, since)
     print(json.dumps(report, indent=2) if args.json else dft.render(report))
     return 1 if report["atoms"] or report["uncovered"] else 0
 
@@ -85,7 +88,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.verb == "drift":
             return _drift(args, specs)
         print(_generate(specs))
-    except (cat.Refusal, dft.Refusal) as refusal:
+    except (cat.Refusal, dft.Refusal, rel.Refusal) as refusal:
         print(f"[error] {refusal}", file=sys.stderr)
         print(f"fix: {refusal.fix}", file=sys.stderr)
         return 1

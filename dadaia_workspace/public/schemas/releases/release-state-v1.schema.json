@@ -166,7 +166,12 @@
           "since": {
             "type": "string",
             "pattern": "^[0-9a-f]{7,40}$",
-            "description": "kind 'memory' only: the commit the reconciliation window opened at, the same --since `memory.py drift` was run with."
+            "description": "kind 'memory' only: the commit the reconciliation window opened at — the previous memory entry's until, else defined.sha."
+          },
+          "until": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{7,40}$",
+            "description": "kind 'memory' only: the HEAD the reconciliation window closed at; the next window opens here."
           },
           "reviewed": {
             "type": "array",

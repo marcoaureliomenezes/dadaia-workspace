@@ -25,8 +25,8 @@ Memory is current product truth: what the product is now, never how it got there
 
 - An atom describes what a feature does for its user, its boundaries, its current behavior; an architecture principle found in one belongs in canonical memory.
 - Every atom declares `sources:` — the repo path globs of the code it describes; `catalog.json` carries them.
-- At closure, `MEMORY_PY drift --since <sha>` lists the atoms whose sources changed and the packages no atom covers. Per listed atom, read the sources' `git diff`, then in this order: DELETE every claim the code no longer supports, UPDATE every claim that changed, only then ADD what is new. An uncovered package gets its atom; a dead feature's atom is deleted outright.
-- The pass ends with `RELEASE_PY memory --since <sha> --worklist <drift.json> --reviewed … --changed …`; it refuses an uncovered worklist, and `dadaia doctor` (`RELEASE-TREE-MEMORY`) keeps the candidate red until the entry exists.
+- At closure, `MEMORY_PY drift` (window: the last memory entry's `until`, else `defined.sha`) lists the atoms whose sources changed and the packages no atom covers. Per listed atom, read the sources' `git diff`, then in this order: DELETE every claim the code no longer supports, UPDATE every claim that changed, only then ADD what is new. An uncovered package gets its atom; a dead feature's atom is deleted outright.
+- The pass ends with `RELEASE_PY memory --reviewed … --changed …`; it derives the window and worklist itself and refuses one not exactly worked, and `dadaia doctor` (`RELEASE-TREE-MEMORY`) keeps the candidate red until the entry exists.
 
 ## 4. Tree, format, validation
 

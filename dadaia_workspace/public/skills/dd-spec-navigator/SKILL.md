@@ -56,7 +56,7 @@ read or any output written.
 
 ## References
 
-- Script: `python3 .agents/skills/dd-spec-navigator/scripts/memory.py` — `catalog generate`, `product add`, `check`, `drift --since <sha>`: the catalog's ONE writer.
+- Script: `python3 .agents/skills/dd-spec-navigator/scripts/memory.py` — `catalog generate`, `product add`, `check`, `drift [--since <sha>]`: the catalog's ONE writer.
 - `specs/AGENTS.md` — canon and status tokens; `.dadaia/AGENTS.md` — context resolution order.
 - `dd-release-implementation` (`RELEASE-EVENTS.md`) — `_RELEASE.json` shape.
 - `_archive/` and `backlog/` are read-only history — never a source of approval.

@@ -6,9 +6,7 @@ the candidate trio and the append-only ship ledger, stdlib only.
 `check` over them, and only then replaces the file atomically — so this script's writer
 and its validator cannot disagree about what a valid release state is.
 
-Three verbs, no aliases: a release is born, it walks its phases, it is checked. Promotion
-is the operator merging the release PR — no verb archives anything, because git already
-holds every closed candidate trio at its CLOSURE commit.
+Promotion is the operator merging the release PR — no verb archives anything.
 """
 
 from __future__ import annotations
@@ -25,12 +23,17 @@ from typing import Any
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _release_check import memory_refusals, memory_text  # noqa: E402
+from _release_check import memory_refusals  # noqa: E402
 from _release_new import new_release  # noqa: E402
 from _release_phase import set_phase  # noqa: E402
 from _release_schema import CODE, STATE, find_specs, utc_now  # noqa: E402
-from _release_store import Refusal, State, commit, live_release  # noqa: E402
+from _release_store import Refusal, State, commit, live_release, window_start  # noqa: E402
 from _release_tree import check  # noqa: E402
+
+# The worklist has ONE decider, the spec navigator's drift function, projected beside
+# this skill: importing a pure function is not a script calling a script (SPEC D6).
+sys.path.insert(1, str(Path(__file__).resolve().parents[2] / "dd-spec-navigator" / "scripts"))
+import _memory_drift as drift  # noqa: E402
 
 _HELP = {
     "new": "mint the one live release: its SPEC.md stub and _RELEASE.json, in one act",
@@ -56,9 +59,6 @@ def _parser() -> argparse.ArgumentParser:
             command.add_argument("--pr", type=int, default=None,
                                  help="CLOSURE only: the merged release PR number")  # fmt: skip
         if verb == "memory":
-            command.add_argument("--since", required=True, help="the window `drift` was run with")
-            command.add_argument("--worklist", type=Path, required=True,
-                                 help="the `memory.py drift --json` report for that window")  # fmt: skip
             for name in ("--reviewed", "--changed"):
                 command.add_argument(name, default="", help="comma-separated worklist entries")
         if verb == "check":
@@ -80,17 +80,23 @@ def _phase(args: argparse.Namespace, specs: Path) -> int:
 
 
 def _memory(args: argparse.Namespace, specs: Path) -> int:
-    """Append the reconciliation record — refused unless the worklist was actually worked."""
+    """Append the record over the ledger-derived window, refused unless its worklist was worked."""
     live = live_release(specs)
-    worklist = json.loads(args.worklist.read_text(encoding="utf-8"))
+    since = window_start(live.state)
+    try:
+        worklist = drift.report(specs, since)
+        until = drift.git(specs.parent, "rev-parse", "HEAD")[0]
+    except drift.Refusal as refusal:
+        raise Refusal(str(refusal), refusal.fix) from refusal
     lists = [[s for s in getattr(args, n).split(",") if s] for n in ("reviewed", "changed")]
     errors = memory_refusals(str(live.state.get("phase")), worklist, *lists)
-    errors += _unmoved(specs.parent, args.since, worklist, lists[1])
+    errors = errors or _unmoved(specs.parent, since, worklist, lists[1])
     if errors:
         raise Refusal(errors[0], f"{Path(__file__).name} memory --help")
     ts = utc_now()
     entry = {"ts": ts, "agent": "release.py memory", "kind": "memory",
-             "text": memory_text(worklist, *lists), "since": args.since,
+             "text": f"Memory reconciled over {since}..{until[:12]}: {len(lists[0])} reviewed, "
+             f"{len(lists[1])} changed.", "since": since, "until": until,
              "reviewed": lists[0], "changed": lists[1]}  # fmt: skip
 
     def apply(state: State) -> State:
@@ -98,24 +104,26 @@ def _memory(args: argparse.Namespace, specs: Path) -> int:
         return state
 
     commit(live.release_dir / STATE, f"releases/{live.release_id}/{STATE}", apply)
-    print(f"[ok] release {live.release_id} log <- kind memory ({ts})")
+    print(f"[ok] release {live.release_id} log <- kind memory {since}..{until[:12]} ({ts})")
     return 0
 
 
 def _unmoved(repo: Path, since: str, worklist: dict[str, Any], changed: list[str]) -> list[str]:
-    """A `changed` atom whose file is byte-identical to its state at *since* changed nothing."""
-    paths = {str(atom["slug"]): str(atom["path"]) for atom in worklist.get("atoms", [])}
-    errors: list[str] = []
-    for slug in changed:
-        path = paths.get(slug)
-        if path is None or not (repo / path).is_file():
-            continue
+    """A `changed` atom git says did not move over since..HEAD changed nothing."""
+    paths = {str(atom["slug"]): str(atom["path"]) for atom in worklist["atoms"]}
+    return [
+        f"--changed names {slug!r}, whose atom did not move since {since}"
+        for slug in changed
+        if slug in paths
         # git decides "moved": it normalises line endings a byte compare would not.
-        same = subprocess.run(["git", "diff", "--quiet", since, "--", path], cwd=repo,
-                              capture_output=True, check=False)  # fmt: skip
-        if same.returncode == 0:
-            errors.append(f"--changed names {slug!r}, whose atom is byte-identical at {since}")
-    return errors
+        and subprocess.run(
+            ["git", "diff", "--quiet", since, "HEAD", "--", paths[slug]],
+            cwd=repo,
+            capture_output=True,
+            check=False,
+        ).returncode
+        == 0  # fmt: skip
+    ]
 
 
 _VERBS = {"new": _new, "phase": _phase, "memory": _memory}

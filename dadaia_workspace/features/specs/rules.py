@@ -282,10 +282,7 @@ RULES: tuple[SpecsRule, ...] = (
         ("RELEASE-TREE-MEMORY",),
         lambda d: release_memory_issues(d.specs_dir),
         fix_help=(
-            "python3 .agents/skills/dd-spec-navigator/scripts/memory.py drift "
-            "--since <implemented.sha> --json > .dadaia/tmp/drift.json && "
             "python3 .agents/skills/dd-release-implementation/scripts/release.py memory "
-            "--since <implemented.sha> --worklist .dadaia/tmp/drift.json "
             "--reviewed <slugs> --changed <slugs>"
         ),
     ),

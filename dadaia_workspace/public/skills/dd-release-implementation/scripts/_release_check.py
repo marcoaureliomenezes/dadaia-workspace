@@ -121,28 +121,13 @@ def histo_findings(text: str) -> list[dict[str, Any]]:
 def memory_refusals(
     phase: str, worklist: dict[str, Any], reviewed: list[str], changed: list[str]
 ) -> list[str]:
-    """Why this `kind: memory` entry is not a reconciliation record, worst first.
-
-    The entry claims the worklist was worked: every atom and every uncovered unit the
-    drift verb listed is either reviewed or changed. A dispositioned-nothing entry is the
-    free prose this gate replaces, so silence here is the only way to append one.
-    """
+    """Why this `kind: memory` entry is not a reconciliation record: the worklist must be
+    worked exactly — every entry reviewed or changed, nothing outside it named."""
     if phase != "CLOSURE":
         return [f"release is in phase {phase!r} — the memory reconciliation is CLOSURE work"]
     named = set(reviewed) | set(changed)
     listed = [str(atom["slug"]) for atom in worklist.get("atoms", [])]
     listed += [str(unit) for unit in worklist.get("uncovered", [])]
-    return [
-        f"worklist entry {entry!r} is in neither --reviewed nor --changed"
-        for entry in listed
-        if entry not in named
-    ]
-
-
-def memory_text(worklist: dict[str, Any], reviewed: list[str], changed: list[str]) -> str:
-    """The entry's one-line summary — counts, never prose: the lists carry the facts."""
-    return (
-        f"Memory reconciled over the window: {len(worklist.get('atoms', []))} drifted atom(s) "
-        f"and {len(worklist.get('uncovered', []))} uncovered unit(s) worked — "
-        f"{len(reviewed)} reviewed unchanged, {len(changed)} changed."
-    )
+    errors = [f"worklist entry {e!r} is in neither --reviewed nor --changed"
+              for e in listed if e not in named]  # fmt: skip
+    return errors + [f"{e!r} is not in the window's worklist" for e in sorted(named - set(listed))]

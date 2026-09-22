@@ -2,10 +2,8 @@
 """The closure worklist: which atoms the window's code changes touched, and which code no
 atom describes at all.
 
-A pure function of three inputs — the catalog's per-feature `sources`, `git diff
---name-only <since>..HEAD` and `git ls-files` — so the answer is reproducible from a
-commit window and nothing else. It creates no state and no file format; the worklist
-travels to `release.py memory` as JSON on the operator's command line.
+A pure function of the catalog's `sources`, `git diff --name-only <since>..HEAD` and `git
+ls-files`; `release.py memory` imports :func:`report`, so no caller hands it a worklist.
 
 `sources` globs are matched with `fnmatch` over repo-relative POSIX paths, where `*` and
 `**` both cross `/`: a prefix glob (`dadaia_workspace/features/specs/**`) is the shape the
@@ -19,6 +17,8 @@ import json
 import subprocess
 from pathlib import Path
 from typing import Any
+
+from _memory_schema import CATALOG
 
 FEATURES = "dadaia_workspace/features"
 HOOKS = "dadaia_workspace/hooks"
@@ -43,18 +43,12 @@ def git(repo: Path, *argv: str) -> list[str]:
     return [line for line in done.stdout.splitlines() if line]
 
 
-def since_default(specs: Path) -> str:
-    """The live release's `implemented.sha`, else its `defined.sha`."""
-    for state in sorted((specs / "releases").glob("*/_RELEASE.json")):
-        document = json.loads(state.read_text(encoding="utf-8"))
-        for milestone in ("implemented", "defined"):
-            sha = (document.get(milestone) or {}).get("sha")
-            if sha:
-                return str(sha)
-    raise Refusal(
-        "no live release milestone to date the window from",
-        "python3 memory.py drift --since <sha>",
-    )
+def report(specs: Path, since: str) -> dict[str, Any]:
+    """The worklist for the window *since*..HEAD — the ONE decider both verbs call."""
+    repo = specs.parent
+    catalog = json.loads((specs / CATALOG).read_text(encoding="utf-8"))
+    changed = git(repo, "diff", "--name-only", f"{since}..HEAD")
+    return {"since": since, **worklist(catalog, changed, git(repo, "ls-files"))}
 
 
 def _units(tracked: list[str]) -> dict[str, list[str]]:

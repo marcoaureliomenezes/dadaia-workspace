@@ -43,10 +43,14 @@ def _git(cwd: Path, *argv: str) -> str:
 
 @pytest.fixture
 def script(tmp_path: Path) -> Path:
-    staged = tmp_path / "staged" / "scripts"
+    """memory.py staged with the release skill projected beside it, as install lays out."""
+    skills = tmp_path / "skills"
+    staged = skills / "dd-spec-navigator" / "scripts"
     staged.mkdir(parents=True)
     for module in sorted(_SCRIPTS.glob("*.py")):
         shutil.copy2(module, staged / module.name)
+    shutil.copytree(_SCRIPTS.parents[1] / "dd-release-implementation" / "scripts",
+                    skills / "dd-release-implementation" / "scripts")  # fmt: skip
     return staged / "memory.py"
 
 
@@ -185,28 +189,28 @@ def test_no_milestone_refuses_with_a_fix_naming_since(script: Path, repo: Path) 
     assert result.returncode == 1
     assert result.stdout == ""
     assert "fix: " in result.stderr
-    assert "--since" in result.stderr
+    assert "phase IMPLEMENTATION" in result.stderr
 
 
-def test_since_defaults_to_the_live_release_implemented_sha(script: Path, repo: Path) -> None:
-    base = _git(repo, "rev-parse", "HEAD")
+def _live(repo: Path, **state: object) -> None:
     releases = repo / "specs" / "releases" / "9.9.9"
     releases.mkdir(parents=True)
-    (releases / "_RELEASE.json").write_text(
-        json.dumps(
-            {
-                "schema": "release-state-v1",
-                "release": "9.9.9",
-                "phase": "IMPLEMENTATION",
-                "defined": {"sha": "deadbee", "ts": "2026-01-01T00:00:00Z"},
-                "implemented": {"sha": base, "ts": "2026-01-02T00:00:00Z"},
-            }
-        ),
-        "utf-8",
-    )
-    _git(repo, "add", "-A")
-    _git(repo, "commit", "-qm", "release state")
+    document = {"schema": "release-state-v1", "release": "9.9.9", "phase": "CLOSURE", **state}
+    (releases / "_RELEASE.json").write_text(json.dumps(document), "utf-8")
 
-    report = json.loads(_run(script, repo, "--json").stdout)
 
-    assert report["since"] == base
+def test_since_defaults_to_the_live_release_defined_sha(script: Path, repo: Path) -> None:
+    """L1: the same rule `release.py memory` derives — no memory entry yet, defined.sha."""
+    base = _git(repo, "rev-parse", "HEAD")
+    _live(repo, defined={"sha": base, "ts": "2026-01-01T00:00:00Z"},
+          implemented={"sha": "deadbee", "ts": "2026-01-02T00:00:00Z"}, log=[])  # fmt: skip
+
+    assert json.loads(_run(script, repo, "--json").stdout)["since"] == base
+
+
+def test_since_defaults_to_the_last_memory_entry_until(script: Path, repo: Path) -> None:
+    base = _git(repo, "rev-parse", "HEAD")
+    entry = {"kind": "memory", "since": "deadbee", "until": base}
+    _live(repo, defined={"sha": "deadbee", "ts": "2026-01-01T00:00:00Z"}, log=[entry])
+
+    assert json.loads(_run(script, repo, "--json").stdout)["since"] == base

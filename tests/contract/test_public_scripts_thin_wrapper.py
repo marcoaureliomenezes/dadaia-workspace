@@ -197,7 +197,7 @@ def test_skill_owner_script_meets_the_contract(script: Path) -> None:
 
     The ceiling is per FILE: a script whose verb set outgrows it splits into `_`-prefixed
     sibling modules in the same folder, imported through the script's own directory on
-    `sys.path`. A sibling is a module, not an entry point, so only the non-`_` scripts
+    `sys.path` (or a sibling skill's, projected beside it). A sibling is a module, not an entry point, so only the non-`_` scripts
     answer `--help`; everything else applies to every file under `scripts/`.
     """
     loc = _line_count(script)
@@ -208,6 +208,8 @@ def test_skill_owner_script_meets_the_contract(script: Path) -> None:
         "belongs behind a narrower interface, not a raised ceiling."
     )
     siblings = {module.stem for module in script.parent.glob("*.py")}
+    # A `_` module of a sibling skill is projected beside this one (SPEC D6: one decider).
+    siblings |= {module.stem for module in script.parents[2].glob("*/scripts/_*.py")}
     foreign = _imported_roots(script) - set(sys.stdlib_module_names) - siblings
     assert foreign == set(), (
         f"{script.name} imports non-stdlib module(s) {sorted(foreign)} — a skill script "

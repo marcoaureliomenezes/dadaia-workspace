@@ -26,7 +26,8 @@ def _entry(ts: str, **over: object) -> dict[str, object]:
         "agent": "release.py memory",
         "kind": "memory",
         "text": "Memory reconciled over the window.",
-        "since": "abc1234",
+        "since": "0000001",
+        "until": "0000003",
         "reviewed": ["panel"],
         "changed": ["workspace-doctor"],
     }
@@ -128,3 +129,24 @@ def test_an_archived_release_is_history_not_a_live_candidate(tmp_path: Path) -> 
     )  # fmt: skip
 
     assert release_memory_issues(specs) == []
+
+
+def test_a_since_other_than_the_ledger_derived_start_is_an_error(tmp_path: Path) -> None:
+    """H1: the window is derived, never chosen — a `since` that is not `defined.sha` (no
+    prior memory entry) names a window the caller picked."""
+    specs = _specs(tmp_path, "CLOSURE", [_entry("2026-09-22T12:00:00Z", since="0000002")])
+
+    issues = release_memory_issues(specs)
+
+    assert [i.code for i in issues] == ["RELEASE-TREE-MEMORY"]
+    assert "0000001" in issues[0].description
+
+
+def test_a_later_entry_opens_where_the_previous_one_closed(tmp_path: Path) -> None:
+    """The second reconciliation starts at the first one's `until`, not at defined.sha."""
+    first = _entry("2026-09-22T12:00:00Z")
+    fresh = _entry("2026-09-22T13:00:00Z", since="0000003", until="0000004")
+    stale = _entry("2026-09-22T13:00:00Z", since="0000001", until="0000004")
+
+    assert release_memory_issues(_specs(tmp_path / "a", "CLOSURE", [first, fresh])) == []
+    assert release_memory_issues(_specs(tmp_path / "b", "CLOSURE", [first, stale])) != []

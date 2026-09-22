@@ -4,9 +4,6 @@
 Every write goes through :func:`commit`: build the candidate bytes, run the SAME `check`
 they will be validated by, then `os.replace` atomically. A concurrent write is detected
 by the file's own (size, mtime) and re-applied once — a race surfaces and retries.
-
-:func:`live_release` is the preamble every write verb shares: resolve the ONE live
-release, read its state, refuse anything else.
 """
 
 from __future__ import annotations
@@ -90,6 +87,16 @@ def live_release(specs: Path) -> Live:
     return Live(ids[0], release_dir, read_state(release_dir / STATE))
 
 
+def window_start(state: State) -> str:
+    """The memory window's start: the last memory entry's `until`, else `defined.sha`."""
+    ends = [e.get("until") for e in state.get("log") or [] if e.get("kind") == "memory"]
+    start = next((u for u in reversed(ends) if u), (state.get("defined") or {}).get("sha"))
+    if not start:
+        raise Refusal("the live release has no defined.sha to open the memory window at",
+                      f"{SCRIPT} phase IMPLEMENTATION --sha <sha>")  # fmt: skip
+    return str(start)
+
+
 def serialize(state: State) -> str:
     """The canonical bytes: 2-space indent, non-ASCII kept, one trailing newline."""
     return json.dumps(state, indent=2, ensure_ascii=False) + "\n"
@@ -124,9 +131,8 @@ def commit(
 ) -> State:
     """Apply *apply* to *path*'s state and replace the document atomically.
 
-    The candidate bytes are validated BEFORE the replace, so a refused write leaves the
-    file byte-identical. A file that changed under the computation is re-read and
-    re-applied ONCE; a second concurrent write refuses with a retry `fix:`.
+    Validated BEFORE the replace, so a refused write leaves the file byte-identical; a file
+    changed under the computation is re-applied ONCE, a second race refuses.
     """
     before = _stamp(path)
     written = apply(read_state(path))
