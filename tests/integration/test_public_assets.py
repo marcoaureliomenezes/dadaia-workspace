@@ -369,14 +369,14 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     # AC-2: with no overlay, BOTH projections render the exact `balanced` roster from
     # the SAME resolved config — this lockstep IS the codex-correctness assurance (no
     # codex doctor byte-compare exists).
-    pm = _claude_frontmatter(ws, "dd-project-manager")
-    assert (pm["model"], pm["effort"]) == ("claude-fable-5-1", "high")
+    pm = _claude_frontmatter(ws, "dd-product-engineer")
+    assert (pm["model"], pm["effort"]) == ("claude-opus-5-5", "high")
     se = _claude_frontmatter(ws, "dd-software-engineer")
-    assert (se["model"], se["effort"]) == ("claude-opus-5", "low")
+    assert (se["model"], se["effort"]) == ("claude-opus-5-5", "low")
     sec = _claude_frontmatter(ws, "dd-code-reviewer")
     assert not is_fable_model(sec["model"]), "never Fable on dd-code-reviewer (G-1)"
 
-    pm_toml = _codex_toml_fields(ws, "dd-project-manager")
+    pm_toml = _codex_toml_fields(ws, "dd-product-engineer")
     assert (pm_toml["model"], pm_toml["model_reasoning_effort"]) == ("gpt-5.6-sol", "high")
     se_toml = _codex_toml_fields(ws, "dd-software-engineer")
     assert (se_toml["model"], se_toml["model_reasoning_effort"]) == ("gpt-5.6-sol", "low")
@@ -397,13 +397,13 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     manager.install(ws)
 
     se2 = _claude_frontmatter(ws, "dd-software-engineer")
-    assert (se2["model"], se2["effort"]) == ("claude-opus-4-8", "low")
-    pm2 = _claude_frontmatter(ws, "dd-project-manager")
+    assert (se2["model"], se2["effort"]) == ("claude-opus-4-8", "medium")
+    pm2 = _claude_frontmatter(ws, "dd-product-engineer")
     assert (pm2["model"], pm2["effort"]) == ("claude-fable-5-1", "high")
 
     se2_toml = _codex_toml_fields(ws, "dd-software-engineer")
-    assert (se2_toml["model"], se2_toml["model_reasoning_effort"]) == ("gpt-5.6-sol", "low")
-    pm2_toml = _codex_toml_fields(ws, "dd-project-manager")
+    assert (se2_toml["model"], se2_toml["model_reasoning_effort"]) == ("gpt-5.6-sol", "medium")
+    pm2_toml = _codex_toml_fields(ws, "dd-product-engineer")
     assert (pm2_toml["model"], pm2_toml["model_reasoning_effort"]) == ("gpt-5.6-sol", "high")
 
     # Byte-stable repeated install: every agent projection line is a [skip].

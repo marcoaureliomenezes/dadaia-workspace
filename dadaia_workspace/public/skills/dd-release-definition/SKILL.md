@@ -8,7 +8,7 @@ description: >
 
 # dd-release-definition
 
-> `dd-project-manager` drives every step directly (the engineer authors PLAN and TASKS),
+> `dd-product-engineer` authors the SPEC (the engineer authors PLAN and TASKS),
 > from picking the set through SPEC → PLAN → TASKS. A release has open scope; each
 > candidate does not.
 
@@ -76,7 +76,7 @@ a fuzzy term in the demand becomes a canonical term before it reaches the SPEC.
 - Picked set recorded; the `dd-grill-me` session completed and emitted.
 - SPEC authored from the refined set; `**Consumes:**` declared or omitted.
 - Traceability: every approved requirement maps into PLAN strategy and >=1 TASKS entry.
-- Every unresolved gap routed to the PM's operator-gated intake report — never a
+- Every unresolved gap routed to the main thread's operator-gated intake report — never a
   direct backlog append.
 
 ## 7. References

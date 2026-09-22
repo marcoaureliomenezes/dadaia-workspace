@@ -1,13 +1,13 @@
 """Built-in L1 agent-model templates + the single resolver (v0.1.65 FR2/FR4).
 
-The Layer-1 agent-roster model catalog: three named :class:`AgentModelTemplate`s (``balanced`` — the default,
-``subscription-saver``, ``max-quality``), each a full 9-core-agent map of
-``(model, effort)`` — the FR2 table encoded verbatim.
+The agent-roster model catalog: three named :class:`AgentModelTemplate`s (``balanced`` —
+the default, ``max-quality``, ``economy``), each a full map of the three core agents to
+``(model, effort)`` — ADR 0022's table encoded verbatim.
 
 :func:`_assert_templates_resolve` runs at import time and fails loudly if any template
-is ungoverned: incomplete 9-agent coverage, a model unknown to ``core/model_registry``,
+is ungoverned: incomplete core-agent coverage, a model unknown to ``core/model_registry``,
 an effort outside the D-3 vocabulary, a Fable-family model assigned to
-``security-reviewer`` (operator ruling G-1 — cyber-safety classifiers can refuse
+``dd-code-reviewer`` (operator ruling G-1 — cyber-safety classifiers can refuse
 security-review-shaped work), a duplicate template id, or a missing ``balanced``
 default.
 
@@ -29,10 +29,10 @@ from dadaia_workspace.core.models.agent_model_policy import (
     ResolvedAgentModel,
 )
 
-#: The three core agents every template must cover exactly (ADR 0016: PM, engineer,
-#: reviewer; every other role is a review lens of dd-code-reviewer).
+#: The three core agents every template must cover exactly (ADR 0022: the main thread
+#: coordinates; every other role is a review lens of dd-code-reviewer).
 CORE_AGENTS: tuple[str, ...] = (
-    "dd-project-manager",
+    "dd-product-engineer",
     "dd-software-engineer",
     "dd-code-reviewer",
 )
@@ -46,25 +46,22 @@ _FABLE_FORBIDDEN_AGENT = "dd-code-reviewer"
 
 
 def _a(model: str, effort: str) -> AgentModelAssignment:
-    """Terse constructor for the FR2 table below (effort narrowed by the import assert)."""
+    """Terse constructor for the table below (effort narrowed by the import assert)."""
     return AgentModelAssignment(model=model, effort=effort)  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------
-# THE BUILT-IN TEMPLATES — the FR2 table, verbatim.
+# THE BUILT-IN TEMPLATES — ADR 0022's table, verbatim.
 # ---------------------------------------------------------------------------
 _BUILT_IN: tuple[AgentModelTemplate, ...] = (
-    # Operator re-table 2026-09-06: Fable 5.1 on the reasoning roles, Opus 5 on the
-    # implementing roles at low/medium effort, security-reviewer on Sonnet 5 except
-    # in max-quality (G-1 keeps it off Fable everywhere).
     AgentModelTemplate(
         id="balanced",
         label="Balanced (default)",
         default=True,
         assignments={
-            "dd-project-manager": _a("claude-fable-5-1", "high"),
-            "dd-code-reviewer": _a("claude-opus-5", "high"),
-            "dd-software-engineer": _a("claude-opus-5", "low"),
+            "dd-product-engineer": _a("claude-opus-5-5", "high"),
+            "dd-code-reviewer": _a("claude-opus-5-5", "high"),
+            "dd-software-engineer": _a("claude-opus-5-5", "low"),
         },
     ),
     AgentModelTemplate(
@@ -72,9 +69,19 @@ _BUILT_IN: tuple[AgentModelTemplate, ...] = (
         label="Max quality",
         default=False,
         assignments={
-            "dd-project-manager": _a("claude-fable-5-1", "high"),
-            "dd-code-reviewer": _a("claude-opus-5", "xhigh"),
-            "dd-software-engineer": _a("claude-opus-5", "low"),
+            "dd-product-engineer": _a("claude-fable-5-1", "high"),
+            "dd-code-reviewer": _a("claude-opus-5-5", "xhigh"),
+            "dd-software-engineer": _a("claude-opus-5-5", "medium"),
+        },
+    ),
+    AgentModelTemplate(
+        id="economy",
+        label="Economy",
+        default=False,
+        assignments={
+            "dd-product-engineer": _a("claude-opus-5-5", "high"),
+            "dd-code-reviewer": _a("claude-sonnet-5", "high"),
+            "dd-software-engineer": _a("claude-sonnet-5", "medium"),
         },
     ),
 )

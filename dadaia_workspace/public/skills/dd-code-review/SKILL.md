@@ -13,7 +13,7 @@ compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install da
 # dd-code-review
 
 Three axes, run as three sequential passes (this workspace's sub-agents cannot
-nest-dispatch; PM-dispatched siblings are the alternative). Findings from different
+nest-dispatch; main-thread-dispatched siblings are the alternative). Findings from different
 axes are reported side by side — an axis never outranks another.
 
 ## 1. When

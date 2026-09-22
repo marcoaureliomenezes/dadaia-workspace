@@ -21,5 +21,5 @@ This directory contains audit records for this Spec Context Project.
 ## 2. Relationship to releases
 
 - An audit may be referenced by a release SPEC or `_RELEASE.json`'s `log` entries, by its directory name; the audit window is read from `_archive/audits_histo.jsonl`, never from a release milestone.
-- Audit directories are created by `dd-code-reviewer` (audit lens) or `dd-project-manager`; audit paths are ADDITIVE, writable in any phase.
+- Audit directories are created by `dd-code-reviewer` (audit lens) or `dd-product-engineer`; audit paths are ADDITIVE, writable in any phase.
 - One audit generates exactly one remediation release, which must disposition every finding before the audit archives.

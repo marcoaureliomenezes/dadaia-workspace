@@ -2,30 +2,24 @@
 
 This is the doctor half of the
 ``model-catalog-modelmap-pricing-drift-no-registry`` fix. T-010-23 made
-``core/model_registry.py`` the single source of truth and turned ``MODEL_MAP`` and
-``PRICING_TABLE`` into derived views. This check is the standing guard that keeps
+``core/model_registry.py`` the single source of truth and turned ``MODEL_MAP``
+into a derived view. This check is the standing guard that keeps
 the fleet honest against future hand-edits:
 
 1. **Agent-frontmatter resolution.** Every ``model:`` value declared in a canonical
    ``public/agents/*.md`` frontmatter must resolve to a ``claude_id`` registered in
    :data:`dadaia_workspace.core.model_registry.REGISTRY`. An unknown id would crash
-   ``dadaia harness add codex`` (no Codex mapping) and cost telemetry out
-   as ``NULL`` — so it is an ERROR.
+   ``dadaia harness add codex`` (no Codex mapping) — so it is an ERROR.
 
-2. **Key-set coherence.** ``MODEL_MAP`` keys, ``PRICING_TABLE`` keys, and the
-   ``REGISTRY`` claude-id set must be identical. The derived views are generated from
-   the registry today, but this defends against a future hand-edit (or a partial
+2. **Key-set coherence.** ``MODEL_MAP`` keys and the ``REGISTRY`` claude-id set must
+   be identical. The derived view is generated from the registry today, but this defends against a future hand-edit (or a partial
    refactor) that reintroduces the original silent desync.
 
 Layering: this lives in ``features/public/`` and imports ``core.model_registry``
 (the single source of truth) plus the ``MODEL_MAP`` derived view from
 ``infrastructure`` (a documented ignore-edge — the infra view is a separate
-module that must be guarded against a hand-edit). The ``PRICING_TABLE`` key-set
-is no longer imported from the sibling ``features.telemetry`` module (that was a
-cross-feature import, audit A3): the registry is the single source from which
-``PRICING_TABLE`` is itself derived, so the registry claude-id set IS the
-pricing key-set by construction. ``features -> core`` is permitted (``core`` is
-the bottom layer); the ``features.telemetry`` cross-feature edge is gone.
+module that must be guarded against a hand-edit). ``features -> core`` is
+permitted (``core`` is the bottom layer).
 
 ERROR lines use the ``[drift]`` prefix — the same prefix ``check_agent_skill_refs``
 and ``check_memory_phase_single_source`` use for hard failures — because the
@@ -132,23 +126,15 @@ def check_model_resolution(
                 )
             )
 
-    # 2. Key-set coherence: MODEL_MAP keys == PRICING_TABLE keys == REGISTRY ids.
-    # PRICING_TABLE and MODEL_MAP are both DERIVED views over REGISTRY (one in
-    # features/telemetry, one in infrastructure). The registry claude-id set IS
-    # the canonical pricing key-set by construction, so we compute the pricing
-    # key-set from REGISTRY directly rather than importing across the
-    # features→features boundary into the sibling telemetry module (audit A3).
-    # The MODEL_MAP infra view lives in a SEPARATE module and is still imported
-    # so a hand-edit that desyncs it from the registry is caught here.
+    # 2. Key-set coherence: the MODEL_MAP infra view lives in a SEPARATE module, so a
+    # hand-edit that desyncs it from the registry is caught here.
     model_map_keys = set(MODEL_MAP)
-    pricing_keys = registry_ids  # PRICING_TABLE is derived from REGISTRY (== registry_ids).
-    if not (model_map_keys == pricing_keys == registry_ids):
+    if model_map_keys != registry_ids:
         out.append(
             DoctorLine(
                 DoctorStatus.DRIFT,
                 "model-resolution ERROR: key-set desync — "
                 f"MODEL_MAP={sorted(model_map_keys)} "
-                f"PRICING_TABLE={sorted(pricing_keys)} "
                 f"REGISTRY={sorted(registry_ids)}",
             )
         )

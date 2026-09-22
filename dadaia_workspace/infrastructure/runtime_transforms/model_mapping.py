@@ -9,8 +9,7 @@ field.
 
 ``MODEL_MAP`` is no longer hand-maintained: it is **derived** from the single
 source of truth in :mod:`dadaia_workspace.core.model_registry` (claude_id →
-codex_id). This guarantees its key-set is identical to ``PRICING_TABLE``'s
-(also derived from the same registry) — closing the drift documented in bug
+codex_id) — closing the drift documented in bug
 ``model-catalog-modelmap-pricing-drift-no-registry``. (infrastructure → core
 imports are permitted by the layering contracts.)
 """

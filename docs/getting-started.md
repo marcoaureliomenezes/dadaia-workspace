@@ -127,7 +127,7 @@ A candidate is one closed-scope SDD cycle inside the live release. Nothing drive
 the documents are the state, the verbs move the state document, and the markers in
 `TASKS.md` are the trace.
 
-1. **Demand enters the backlog.** Only the operator creates demand; `project-manager`
+1. **Demand enters the backlog.** Only the operator creates demand; `dd-product-engineer`
    curates `specs/backlog/BACKLOG.json`'s `active[]` through its intake, and
    `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new` appends the entry. Maturation (`idea → candidate → picked`)
    is hand-written and doctor-validated.

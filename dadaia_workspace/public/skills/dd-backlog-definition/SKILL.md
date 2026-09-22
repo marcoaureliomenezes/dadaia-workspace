@@ -9,7 +9,7 @@ description: >
 
 # dd-backlog-definition
 
-> `dd-project-manager` runs this continuously — not a release-boundary event.
+> `dd-product-engineer` runs this continuously — not a release-boundary event.
 
 ## The document
 
@@ -31,7 +31,7 @@ description: >
 
 ## The intake gate — the only path to a new entry
 
-- Only the operator creates demand. An entry materializes via the PM's
+- Only the operator creates demand. An entry materializes via the main thread's
   operator-facing intake report (handoff with `next_handoff.agent: "human"` plus its
   HTML report), or via an operator-ratified in-release deferral (already counts as
   intake).

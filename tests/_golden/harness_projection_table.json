@@ -7,9 +7,9 @@
     "link_to": null
   },
   {
-    "label": "agents:agents/dd-project-manager.md",
+    "label": "agents:agents/dd-product-engineer.md",
     "harness": "agents",
-    "dst": "ws:.agents/agents/dd-project-manager.md",
+    "dst": "ws:.agents/agents/dd-product-engineer.md",
     "compare": "bytes",
     "link_to": null
   },
@@ -511,11 +511,11 @@
     "link_to": "ws:.agents/agents/dd-code-reviewer.md"
   },
   {
-    "label": "claude:agents/dd-project-manager.md",
+    "label": "claude:agents/dd-product-engineer.md",
     "harness": "claude",
-    "dst": "ws:.claude/agents/dd-project-manager.md",
+    "dst": "ws:.claude/agents/dd-product-engineer.md",
     "compare": "bytes",
-    "link_to": "ws:.agents/agents/dd-project-manager.md"
+    "link_to": "ws:.agents/agents/dd-product-engineer.md"
   },
   {
     "label": "claude:agents/dd-software-engineer.md",
@@ -665,9 +665,9 @@
     "link_to": null
   },
   {
-    "label": "codex:agents/dd-project-manager.toml",
+    "label": "codex:agents/dd-product-engineer.toml",
     "harness": "codex",
-    "dst": "ws:.codex/agents/dd-project-manager.toml",
+    "dst": "ws:.codex/agents/dd-product-engineer.toml",
     "compare": "bytes",
     "link_to": null
   },
@@ -707,9 +707,9 @@
     "link_to": null
   },
   {
-    "label": "copilot:agents/dd-project-manager.agent.md",
+    "label": "copilot:agents/dd-product-engineer.agent.md",
     "harness": "copilot",
-    "dst": "ws:.github/agents/dd-project-manager.agent.md",
+    "dst": "ws:.github/agents/dd-product-engineer.agent.md",
     "compare": "bytes",
     "link_to": null
   },
@@ -742,11 +742,11 @@
     "link_to": "ws:.agents/agents/dd-code-reviewer.md"
   },
   {
-    "label": "cursor:agents/dd-project-manager.md",
+    "label": "cursor:agents/dd-product-engineer.md",
     "harness": "cursor",
-    "dst": "ws:.cursor/agents/dd-project-manager.md",
+    "dst": "ws:.cursor/agents/dd-product-engineer.md",
     "compare": "bytes",
-    "link_to": "ws:.agents/agents/dd-project-manager.md"
+    "link_to": "ws:.agents/agents/dd-product-engineer.md"
   },
   {
     "label": "cursor:agents/dd-software-engineer.md",

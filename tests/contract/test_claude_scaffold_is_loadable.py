@@ -77,6 +77,7 @@ _CLAUDE_TOOL_NAMES = frozenset(
 #: workspace's own sessions run on); it is listed deliberately, not by accident.
 _CLAUDE_MODEL_IDS = frozenset(
     {
+        "claude-opus-5-5",
         "claude-opus-5",
         "claude-opus-4-8",
         "claude-opus-4-7",

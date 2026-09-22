@@ -9,7 +9,7 @@ Memory is current product truth: what the product is now, never how it got there
 | Action | Allowed |
 |---|---|
 | Read any atom | every agent, any phase |
-| Write/edit any atom | `dd-project-manager` only, in `DEFINITION` or `CLOSURE` phase |
+| Write/edit any atom | `dd-product-engineer` only, in `DEFINITION` or `CLOSURE` phase |
 | Edit by any other agent | never, in any phase |
 
 - Neither half is gated: `specs/memory/**` is MUTATING in every phase; both are agent discipline, measured by the audit's memory pillar.

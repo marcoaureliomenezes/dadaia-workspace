@@ -1,14 +1,12 @@
 """Unit tests for dadaia_workspace.infrastructure.runtime_transforms.codex.
 
 Covers (ADR-2 golden tests):
-- dd-project-manager body: Agent tool references are replaced with
-  Codex custom-agent wording.
 - Harness skill identifiers (e.g. ``ai-harness-claude-code``) are NOT model
   identifiers and survive intact; known Claude model identifiers ARE mapped;
   the Opus/Sonnet/Haiku tier-recommendation phrase is rewritten to Codex-native
   registry-tier terms (T-013-12 defense-in-depth).
 - dd-software-engineer body (no Agent tool): output is identical to input (verbatim).
-- All 9 canonical core agents: output is non-empty after strip().
+- All three canonical core agents: output is non-empty after strip().
 """
 
 from __future__ import annotations
@@ -48,7 +46,7 @@ def _load_body(agent_id: str) -> str:
 # The three canonical core agent IDs (ADR 0016).
 _CANONICAL_AGENTS: tuple[str, ...] = (
     "dd-code-reviewer",
-    "dd-project-manager",
+    "dd-product-engineer",
     "dd-software-engineer",
 )
 
@@ -56,26 +54,13 @@ _CANONICAL_AGENTS: tuple[str, ...] = (
 @pytest.mark.parametrize(
     "case",
     [
-        "dd-project-manager-agent-tool-replaced",
         "preserves-claude-code-skill-identifier",
         "maps-known-claude-model-identifiers-only",
         "anthropic-tier-phrase-replaced",
     ],
 )
 def test_codex_transform_replacement_matrix(case: str) -> None:
-    if case == "dd-project-manager-agent-tool-replaced":
-        body = _load_body("dd-project-manager")
-        result = transform_for_codex(body, "dd-project-manager")
-        assert "Agent tool" not in result, (
-            "Expected 'Agent tool' to be replaced in dd-project-manager output"
-        )
-        assert "`Agent`" not in result, (
-            "Expected '`Agent`' tool-table entry to be replaced in dd-project-manager output"
-        )
-        assert "subagent dispatch" not in result
-        assert "explicit Codex subagent delegation" in result
-
-    elif case == "preserves-claude-code-skill-identifier":
+    if case == "preserves-claude-code-skill-identifier":
         body = "Use `ai-harness-claude-code` when auditing Claude Code projections."
         result = transform_for_codex(body, "dd-software-engineer")
         assert "`ai-harness-claude-code`" in result

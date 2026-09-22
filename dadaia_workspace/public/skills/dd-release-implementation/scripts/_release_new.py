@@ -22,7 +22,7 @@ SPEC_STUB = """\
 
 **Status:** Draft
 **Release ID:** {release_id}
-**Owner:** product-engineer
+**Owner:** dd-product-engineer
 **Opened:** {today}
 **Origin:** {origin}
 

@@ -1,6 +1,6 @@
 """Unit tests for the L1 agent-model template registry + resolver (v0.1.65 FR2/FR4).
 
-Covers the FR2 built-in templates (9-core-agent coverage, registry-known models,
+Covers the FR2 built-in templates (three-core-agent coverage, registry-known models,
 effort vocabulary, never-Fable-on-security — G-1, unique ids, ``balanced`` default),
 the import-time assert failure modes, the D-3 claude→codex effort clamp map, and the
 ``resolve_agent_model`` precedence matrix (FR4): per-agent overlay override > applied
@@ -43,26 +43,41 @@ def test_no_template_assigns_fable_to_security_reviewer() -> None:
 
 
 # ---------------------------------------------------------------------------
-# FR2 — built-in templates: ids/default, 9-core coverage, registry+vocab validity.
+# FR2 — built-in templates: ids/default, 3-core coverage, registry+vocab validity.
 # ---------------------------------------------------------------------------
 
 
-def test_template_ids_default_and_balanced_roster_golden() -> None:
-    assert [t.id for t in list_templates()] == [
-        "balanced",
-        "max-quality",
-    ]
+#: ADR 0022's table, pinned from the ADR (not from the code under test).
+_ADR_0022_TABLE: dict[str, dict[str, tuple[str, str]]] = {
+    "balanced": {
+        "dd-product-engineer": ("claude-opus-5-5", "high"),
+        "dd-code-reviewer": ("claude-opus-5-5", "high"),
+        "dd-software-engineer": ("claude-opus-5-5", "low"),
+    },
+    "max-quality": {
+        "dd-product-engineer": ("claude-fable-5-1", "high"),
+        "dd-code-reviewer": ("claude-opus-5-5", "xhigh"),
+        "dd-software-engineer": ("claude-opus-5-5", "medium"),
+    },
+    "economy": {
+        "dd-product-engineer": ("claude-opus-5-5", "high"),
+        "dd-code-reviewer": ("claude-sonnet-5", "high"),
+        "dd-software-engineer": ("claude-sonnet-5", "medium"),
+    },
+}
+
+
+def test_templates_pin_the_adr_0022_table_with_balanced_default() -> None:
+    """Intent: CONTRACT — agent-model-templates-pin-superseded-opus-and-lack-the-economy-template."""
+    assert set(CORE_AGENTS) == {"dd-product-engineer", "dd-code-reviewer", "dd-software-engineer"}
+    assert [t.id for t in list_templates()] == ["balanced", "max-quality", "economy"]
     assert default_template().id == "balanced"
     defaults = [t for t in list_templates() if t.default]
     assert len(defaults) == 1 and defaults[0].id == "balanced"
-
-    balanced = default_template()
-    expected = {
-        "dd-project-manager": ("claude-fable-5-1", "high"),
-        "dd-code-reviewer": ("claude-opus-5", "high"),
-        "dd-software-engineer": ("claude-opus-5", "low"),
+    actual = {
+        t.id: {a: (v.model, v.effort) for a, v in t.assignments.items()} for t in list_templates()
     }
-    assert {a: (v.model, v.effort) for a, v in balanced.assignments.items()} == expected
+    assert actual == _ADR_0022_TABLE
 
 
 def test_every_template_covers_the_three_core_agents_with_registry_known_effort_vocab() -> None:
@@ -187,24 +202,24 @@ def test_codex_effort_clamp_map(claude_effort: str, codex_effort: str) -> None:
             "no_overlay_resolves_balanced_default",
             "dd-software-engineer",
             lambda: None,
-            ("claude-opus-5", "low", "default"),
+            ("claude-opus-5-5", "low", "default"),
         ),
         (
             "applied_template_resolves_source_template",
-            "dd-project-manager",
+            "dd-product-engineer",
             lambda: AgentModelPolicyOverlay(applied_template="max-quality", overrides={}),
             ("claude-fable-5-1", "high", "template"),
         ),
         (
             # AC-3: template max-quality + override {SE: model=opus-4-8} →
-            # SE = opus-4-8 (override model) / low (template effort), source=override.
+            # SE = opus-4-8 (override model) / medium (template effort), source=override.
             "per_field_override_merges_with_applied_template",
             "dd-software-engineer",
             lambda: AgentModelPolicyOverlay(
                 applied_template="max-quality",
                 overrides={"dd-software-engineer": AgentModelOverride(model="claude-opus-4-8")},
             ),
-            ("claude-opus-4-8", "low", "override"),
+            ("claude-opus-4-8", "medium", "override"),
         ),
         (
             "effort_only_override_keeps_template_model",
@@ -213,15 +228,15 @@ def test_codex_effort_clamp_map(claude_effort: str, codex_effort: str) -> None:
                 applied_template=None,
                 overrides={"dd-software-engineer": AgentModelOverride(effort="max")},
             ),
-            ("claude-opus-5", "max", "override"),
+            ("claude-opus-5-5", "max", "override"),
         ),
         (
             "full_override_beats_template",
-            "dd-project-manager",
+            "dd-product-engineer",
             lambda: AgentModelPolicyOverlay(
                 applied_template="max-quality",
                 overrides={
-                    "dd-project-manager": AgentModelOverride(
+                    "dd-product-engineer": AgentModelOverride(
                         model="claude-haiku-4-5-20251001", effort="low"
                     )
                 },
@@ -232,7 +247,7 @@ def test_codex_effort_clamp_map(claude_effort: str, codex_effort: str) -> None:
             # AC-3: an unrelated agent keeps the applied template when only ONE
             # other agent in the overlay is overridden.
             "ac3_other_agents_keep_applied_template_when_only_one_overridden",
-            "dd-project-manager",
+            "dd-product-engineer",
             lambda: AgentModelPolicyOverlay(
                 applied_template="max-quality",
                 overrides={"dd-software-engineer": AgentModelOverride(model="claude-opus-4-8")},

@@ -92,7 +92,7 @@ record per bug, appended once and keyed by `id`, with no git-derived cache — g
 only authority for git facts; `status` is `open | resolved | superseded | deferred |
 rejected`, a terminal status is reachable only through a transition carrying its
 evidence, and registration is ask-first: the agent proposes and `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append` runs only after the operator confirms. `specs/backlog/BACKLOG.json`'s `active[]` is the
-operator's demand queue, curated by `project-manager` and exited exactly once by
+operator's demand queue, curated by `dd-product-engineer` and exited exactly once by
 `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit`, which appends one histo record carrying the removed entry.
 
 ## Audits
