@@ -1,7 +1,7 @@
 ---
 slug: capabilities
 title: capabilities
-tldr: "dadaia capabilities [--json] prints the installed provider's contract — distribution version, specs pattern version, status tokens, the live verb set, the harnesses, the certification entry point."
+tldr: "dadaia capabilities [--json] prints the installed contract: distribution and specs pattern versions, status tokens, the live verbs and harnesses."
 summary: "A read-only verb an agent runs first in a new or upgraded session: a dadaia-capabilities-v3 JSON payload naming the installed distribution version, the canonical specs pattern version and status tokens, the context states, commands and selection contract, the Layer-1 harnesses and every command group with its subcommands, all derived from the live command tree and the harness registry, plus the certify command; the table view is a digest of the same payload."
 tags: [capabilities, contract, provider, onboarding]
 sources:
