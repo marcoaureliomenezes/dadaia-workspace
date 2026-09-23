@@ -10,7 +10,7 @@
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:b7d1df6e7a7c -->
+<!-- derived-from: pypi-distribution sha256:c627d9e5be4d -->
 <!-- derived-from: workspace-init sha256:ca5c835e94af -->
 
 - [PyPI project](https://pypi.org/project/dadaia-workspace/): `pip install dadaia-workspace`, then `dadaia init <dir> --harness <name> [--repo <url>]`; `uvx dadaia-workspace init …` runs without an install.
@@ -25,7 +25,7 @@
 
 ## Reference
 
-<!-- derived-from: pypi-distribution sha256:b7d1df6e7a7c -->
+<!-- derived-from: pypi-distribution sha256:c627d9e5be4d -->
 
 - [CLI reference](docs/cli.md): the committed output of `dadaia help tree`.
 - [Concepts](docs/concepts.md): the vocabulary — context, release, candidate, gate, memory, ledgers, audits.
@@ -36,7 +36,7 @@
 
 ## The site
 
-<!-- derived-from: pypi-distribution sha256:b7d1df6e7a7c -->
+<!-- derived-from: pypi-distribution sha256:c627d9e5be4d -->
 <!-- derived-from: product-vision sha256:164c4a8b0eca -->
 
 - [Documentation site](https://marcoaureliomenezes.github.io/dadaia-workspace/): GitHub Pages serving `docs/` from `main`, every page derived under its markers.

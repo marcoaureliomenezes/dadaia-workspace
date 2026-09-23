@@ -5,10 +5,8 @@ tldr: The PyPI package on one version axis, two console-script names, the OIDC p
 summary: dadaia-workspace publishes to PyPI under OIDC trusted publishing from the release-please workflow; release-please owns the version, the CHANGELOG and the tag, pyproject carries the published floor, and the same release publishes the dadaia-skills repository.
 tags: [distribution, pypi, release, packaging]
 sources:
-  - pyproject.toml
   - .github/workflows/**
   - release-please-config.json
-  - .release-please-manifest.json
   - dadaia_workspace/cli/main.py
   - dadaia_workspace/__main__.py
   - docs/**
