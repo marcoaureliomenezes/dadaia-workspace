@@ -9,7 +9,7 @@ Four checks turn the branch contract from a convention into a machine boundary. 
 |---|---|---|
 | Branch-name guard | pre-push hook | any ref not `main`, `develop`, or `feature/{M.m.p}` (`^feature/\d+\.\d+\.\d+$` — no `v`, no suffix) |
 | Direct-push refusal | pre-push hook | any push to `develop`/`main`; message names the PR path instead |
-| `pr-source-guard` (1 job, 2 rules) | required CI check | PR to `main` not from `develop`; PR to `develop` not from `feature/{M.m.p}` |
+| `pr-source-guard` (1 job, 2 rules) | required CI check | PR to `main` not from `develop` or the release-please release PR; PR to `develop` not from `feature/{M.m.p}` |
 | Post-merge branch deletion | CI job on the `develop`-merge following a deploy | a stale `feature/{M.m.p}` left behind |
 
 ## Wiring notes
