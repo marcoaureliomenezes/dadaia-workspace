@@ -68,7 +68,7 @@ ruff = ">=0.16.2"
 mypy = ">=2.3.0,<3.0"
 types-PyYAML = ">=6"
 pytest-randomly = "^4.1.0"
-import-linter = ">=2.11"
+import-linter = ">=2.15"
 # The declared build backend, so the bootstrap e2e can `pip wheel --no-build-isolation`
 # the checkout offline in any environment that ran `poetry install --with dev` (CI included).
 poetry-core = ">=1.9"
