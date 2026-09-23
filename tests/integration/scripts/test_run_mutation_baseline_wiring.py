@@ -5,7 +5,7 @@ claim ("once per release, off the push path") once mutmut is selected and pinned
 (qa-engineer verdict, .dadaia/tmp/qa-engineer/20260817/
 v0.4.3-T-043-28-mutation-tool-verdict.md). Because a real invocation spins a throwaway
 venv and installs a package over the network, this suite never runs the script for
-real (dd-test-stewardship / DADAIA.md "Slop-test discipline": "No real venvs built
+real (dd-test-stewardship / the root `AGENTS.md` map "Slop-test discipline": "No real venvs built
 in tests — they exhaust disk"). Instead it proves the three things a gating test CAN
 prove cheaply and deterministically:
 
@@ -25,7 +25,7 @@ prove cheaply and deterministically:
      `tests/unit/core/` flat tier contains real cross-layer architecture tests that
      cannot run inside any sandbox narrower than the whole package).
   3. The script is never referenced from any push-path selector (A20.3): a permanent
-     regression guard against someone later wiring it into ci.yml, release.yml, or the
+     regression guard against someone later wiring it into ci.yml, release-please.yml, or the
      local pre-push preflight.
   4. Every ``dadaia_workspace/public/schemas/...`` fixture path a staged
      ``tests/unit/core/models/*.py`` file actually reads at runtime resolves inside the
@@ -34,7 +34,7 @@ prove cheaply and deterministically:
      derived from the staged tests' own source, never a second hand-kept fixture list.
 
 Intent: CONTRACT — v0.4.3 A20.1, A20.3 (T-043-28, FR20); v0.5.1 A-12.1, A-12.2 (T-051-18)
-Owner: software-engineer
+Owner: dd-software-engineer
 """
 
 from __future__ import annotations
@@ -52,13 +52,13 @@ pytestmark = [pytest.mark.integration]
 _SCRIPT = Path(__file__).resolve().parent.parent.parent / "scripts" / "run_mutation_baseline.sh"
 _REPO_ROOT = _SCRIPT.parent.parent.parent
 _CI_YML = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
-_RELEASE_YML = _REPO_ROOT / ".github" / "workflows" / "release.yml"
+_RELEASE_YML = _REPO_ROOT / ".github" / "workflows" / "release-please.yml"
 _CI_PREFLIGHT_SERVICE = _REPO_ROOT / "dadaia_workspace" / "features" / "ci_preflight" / "service.py"
 
 
 def _repo_porcelain_excluding_additive() -> str:
     """`git status --porcelain`, filtered via the gate's own ``classify_path`` so this
-    test can never drift from the SDD gate's ADDITIVE class (DADAIA.md Sec 3): any live
+    test can never drift from the SDD gate's ADDITIVE class (the root `AGENTS.md` map §3): any live
     session may legitimately write there concurrently under the NO-LOCKS DOCTRINE, and
     the staging step under test never touches them (it writes only into the redirected
     fake workspace)."""
@@ -113,7 +113,7 @@ def _run_stage_only(tmp_path: Path) -> tuple[Path, Path]:
     )
 
     stage_dirs = list(
-        (fake_workspace / ".dadaia" / "tmp" / "software-engineer").glob("*/mutation-run")
+        (fake_workspace / ".dadaia" / "tmp" / "dd-software-engineer").glob("*/mutation-run")
     )
     assert len(stage_dirs) == 1, f"expected exactly one dated mutation-run dir, found {stage_dirs}"
     return fake_workspace, stage_dirs[0]

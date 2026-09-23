@@ -400,5 +400,5 @@ def test_policies_tuple_is_the_wired_composition() -> None:
     assert (  # noqa: SLF001
         root_whitelist.evaluate_payload,
         pre_gate._venv_guard_reason,  # noqa: SLF001
-        sdd_gate.evaluate_payload_with_advisory,
+        sdd_gate.evaluate_payload,
     ) == pre_gate._POLICIES

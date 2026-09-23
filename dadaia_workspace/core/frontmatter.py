@@ -7,8 +7,7 @@ delimiter regex plus a hand-rolled ``yaml.safe_load`` + dict-check loop:
 its module, T-051-16), ``core/specs_version.py``, and the projected
 ``public/scripts/generate-memory-catalog.py`` (deleted, T-051-16). Six of those
 survive as consumers of THIS module; ``core/specs_version.py`` imports only
-:data:`FRONTMATTER_RE` (never :func:`parse`) — its bare-``python3 -c`` CI shell-out
-(``.github/scripts/pr-verdict-check.sh``) must import the module with zero
+:data:`FRONTMATTER_RE` (never :func:`parse`) and must stay importable with zero
 third-party dependencies, so ``import yaml`` here is deferred INSIDE :func:`parse`,
 never at module level (A10.2).
 

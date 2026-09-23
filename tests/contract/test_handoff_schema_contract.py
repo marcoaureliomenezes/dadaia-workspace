@@ -18,14 +18,14 @@ _SCHEMA_PATH = _REPO_ROOT / "dadaia_workspace" / "public" / "schemas" / "handoff
 def _valid_handoff() -> dict[str, object]:
     return {
         "schema_version": "handoff-v1.1",
-        "agent": "code-reviewer",
+        "agent": "dd-code-reviewer",
         "context": "dadaia-workspace",
         "produced_at": "2026-06-03T12:00:00Z",
         "scope": "dadaia-workspace/tests",
         "metrics": {"files_changed": 2, "tests_added": 1},
         "artifact": {
             "type": "report",
-            "path": ".dadaia/reports/dadaia-workspace/code-reviewer/report.html",
+            "path": ".dadaia/reports/dadaia-workspace/dd-code-reviewer/report.html",
             "content_hash": "a" * 64,
         },
         "findings": [

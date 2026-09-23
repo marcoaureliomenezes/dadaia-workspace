@@ -134,11 +134,53 @@ def test_the_derived_set_covers_the_readme_the_agent_index_and_every_authored_do
     names = {doc.relative_to(_REPO_ROOT).as_posix() for doc in _derived_docs()}
 
     assert {"README.md", "llms.txt"} <= names
+    assert {
+        "docs/index.md",
+        "docs/quickstart.md",
+        "docs/positioning.md",
+        "docs/bug-loop.md",
+        "docs/bug-ledger-lessons.md",
+    } <= names, "the site's entry pages are derived documents like any other"
     assert names - {"README.md", "llms.txt"} == {
         p.relative_to(_REPO_ROOT).as_posix()
         for p in _DOCS_DIR.glob("*.md")
         if p.name not in _GENERATED
     }
+
+
+_PAGES_URL = "https://marcoaureliomenezes.github.io/dadaia-workspace/"
+
+
+def test_the_ledger_article_derives_from_the_quality_and_governance_atoms() -> None:
+    """The article states counts a reader can re-measure and lessons the atoms carry:
+    both `[[QUALITY]]` and `[[bug-ledger]]` are named under its sections,
+    and (by the marker test above) under their current hashes."""
+    article = _REPO_ROOT / "docs" / "bug-ledger-lessons.md"
+    slugs = {slug for _, markers in _sections(article.read_text("utf-8")) for slug, _ in markers}
+
+    assert {"QUALITY", "bug-ledger"} <= slugs
+
+
+def test_the_agent_index_lists_every_page_of_the_site() -> None:
+    """`llms.txt` is the agent's map of the human site: a page it does not name is a page
+    no agent finds, so the list is the `docs/` glob and nothing narrower."""
+    index = (_REPO_ROOT / "llms.txt").read_text("utf-8")
+    missing = sorted(
+        p.relative_to(_REPO_ROOT).as_posix()
+        for p in _DOCS_DIR.glob("*.md")
+        if p.relative_to(_REPO_ROOT).as_posix() not in index
+    )
+
+    assert missing == [], f"llms.txt names no entry for: {', '.join(missing)}"
+
+
+def test_the_readme_sends_a_reader_to_the_published_site() -> None:
+    """PyPI renders the README: the published site URL is the one link that survives
+    being read outside the checkout, where a relative `docs/` path is a dead end."""
+    readme = (_REPO_ROOT / "README.md").read_text("utf-8")
+
+    assert _PAGES_URL in readme
+    assert _pyproject_poetry()["urls"]["Documentation"] == _PAGES_URL  # type: ignore[index]
 
 
 @pytest.mark.parametrize(

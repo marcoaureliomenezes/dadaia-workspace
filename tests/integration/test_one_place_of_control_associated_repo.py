@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -40,6 +41,16 @@ from tests.helpers.release_state import write_release_phase
 pytestmark = [pytest.mark.integration]
 
 _runner = CliRunner()
+
+_MEMORY_SCRIPT = (
+    Path(__file__).resolve().parents[2]
+    / "dadaia_workspace"
+    / "public"
+    / "skills"
+    / "dd-spec-navigator"
+    / "scripts"
+    / "memory.py"
+)
 
 _MAIN_SLUG = "main-repo"
 _MAIN_NAME = "proj"
@@ -72,14 +83,28 @@ def _seed_main_repo(repo: Path) -> None:
     release_dir = repo / "specs" / "releases" / _MAIN_RELEASE
     release_dir.mkdir(parents=True)
     for name in ("SPEC.md", "PLAN.md", "TASKS.md"):
-        (release_dir / name).write_text(f"# {name}\n\n> **Status:** Aprovado\n", encoding="utf-8")
+        (release_dir / name).write_text(f"# {name}\n\n> **Status:** Approved\n", encoding="utf-8")
     # ACTIVE.md retired (v0.5.0 FR4/T-050-21A) -- the live phase is read directly off
     # RELEASE.json (core.release_state.parse_release_state).
     write_release_phase(repo / "specs", _MAIN_RELEASE, _MAIN_PHASE)
     mem = repo / "specs" / "memory" / "product"
     mem.mkdir(parents=True)
     (repo / "specs" / "memory" / "TECHSTACK.md").write_text("# tech\nmain\n", encoding="utf-8")
-    (mem / "catalog.json").write_text('{"features": []}', encoding="utf-8")
+    # The catalog pair is written by its ONE writer (0.4.7 FR2/FR3: the doctor's
+    # `ledgers` section validates it by running that same script), never hand-shaped here.
+    subprocess.run(
+        [
+            sys.executable,
+            str(_MEMORY_SCRIPT),
+            "catalog",
+            "generate",
+            "--specs",
+            str(repo / "specs"),
+        ],
+        check=True,
+        capture_output=True,
+        timeout=60,
+    )
     # A2.8 (backlog doctor): an empty backlog/ dir with NO BACKLOG.json is a clean no-op.
     (repo / "specs" / "backlog").mkdir(parents=True)
     _git(repo, "-c", "init.defaultBranch=main", "init")
@@ -221,25 +246,3 @@ def _run_gate(
     result = run_hook_subprocess("sdd_gate", full_payload, env, cwd=ws / "repos" / _ASSOC_SLUG)
     assert result.returncode == 0, result.stderr
     return result.block_envelope()
-
-
-def test_gate_mutating_write_inside_associated_repo_attributes_presence_to_the_owning_context(
-    workspace: Path,
-) -> None:
-    """A19.2 for the gate's presence side: a MUTATING write physically inside the
-    associated repo's directory records presence under the OWNING context's NAME
-    (``proj``) — never under a fictitious second context keyed by the associated repo's
-    own slug (the exact failure A16.4 fixed at the resolver seam, proven here end to
-    end through the real gate)."""
-    target = workspace / "repos" / _ASSOC_SLUG / "some_file.py"
-
-    block = _run_gate(
-        workspace,
-        {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
-        session_id="mut-sess",
-    )
-
-    assert block is None  # never blocks — NO-LOCKS doctrine
-    presence_root = workspace / ".dadaia" / "states" / "presence"
-    assert (presence_root / _MAIN_NAME / "mut-sess.json").exists()
-    assert not (presence_root / _ASSOC_SLUG).exists()

@@ -6,6 +6,7 @@ description: >
   for ambiguous intake, the mandatory pre-SPEC session of a release candidate, a
   focused spec question, or when the operator says "grill", "refine specs", or
   "review backlog".
+compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install dadaia-workspace) it also drives the SDD lifecycle — specs, backlog, bugs, releases.
 ---
 
 # dd-grill-me — SDD Spec Refinement
@@ -14,10 +15,9 @@ Reach shared understanding by mapping every open branch of the demand as a desig
 
 ## 1. When
 
-- The operator's demand is ambiguous and needs intake refinement (`project-manager`).
-- A release is being defined and needs its mandatory pre-SPEC session (`product-engineer`, `dd-release-definition` §2).
+- The operator's demand is ambiguous and needs intake refinement (the main thread).
+- A release is being defined and needs its mandatory pre-SPEC session (the main thread, `dd-release-definition` §2).
 - A single spec or feature question needs a focused leaf answer.
-- The operator says "grill", "refine specs", or "review backlog".
 
 ## 2. Steps
 
@@ -48,11 +48,10 @@ Reach shared understanding by mapping every open branch of the demand as a desig
 
 - Every gap findable by inspection is resolved or promoted, not asked of the operator.
 - The frontier is empty and the operator has confirmed the shared understanding.
-- The handoff is emitted and passes `dadaia reports validate`.
+- The handoff is emitted; inside a dadaia workspace it passes `dadaia reports validate`.
 
 ## 4. References
 
 - `PROBLEM-TAXONOMY.md` — the problem-shape reference used at step 3.
 - `EMISSION-FORMAT.md` — the optional report's shape, report mode only.
 - `dd-release-definition` §2 — the mandatory pre-SPEC session rule.
-- `DADAIA.md` §5 — handoff-first emission law.

@@ -1,26 +1,27 @@
 ---
 name: dd-audit-project
 description: >
-  project-auditor's three-pillar drift audit — bug history, spec compliance, memory
+  The three-pillar drift audit (the reviewer's audit lens) — bug history, spec compliance, memory
   drift — over the sha window read from audits_histo.jsonl. Use when dispatched to
   audit a context.
 ---
 
 # dd-audit-project — Three Pillars Over a SHA Window
 
-> `project-auditor` drives this directly, dispatched by the operator or a dispatching
+> `dd-code-reviewer` drives this directly, dispatched by the operator or a dispatching
 > agent. Suggested every 5 releases, never mandatory.
 
 ## 1. The window — computed once per audit
 
-1. Window mechanics: `dd-bug-resolution`'s `LINEAGE.md` §The window, cited never restated.
-2. Record the resulting `[from-sha, HEAD]` in `AUDIT.md`'s scope.
+1. Open `specs/audits/AGENTS.md` (the area's scoped law) and follow it.
+2. Window mechanics: `dd-bug-resolution`'s `LINEAGE.md` §The window, cited never restated.
+3. Record the resulting `[from-sha, HEAD]` in `AUDIT.md`'s scope.
 
 ## 2. The three pillars — run together, never fewer
 
 - **Pillar 1 — bugs** ([`PILLAR-BUGS.md`](PILLAR-BUGS.md)): compute all eight
   forensic metrics on every `BUGS.jsonl` record in the window; stamp `audited` on each
-  reviewed record (`dadaia bugs update <id> --set audited=<slug>`, pillar 1's only write).
+  reviewed record (`python3 .agents/skills/dd-bug-resolution/scripts/bugs.py update <id> --set audited=<slug>`, pillar 1's only write).
 - **Pillar 2 — specs** ([`PILLAR-SPECS.md`](PILLAR-SPECS.md)): commit-shape
   conformance, canon pattern compliance, `_RELEASE.json` milestone completeness over
   the window.
@@ -42,10 +43,7 @@ three is not an audit. Append one `FINDINGS.jsonl` record per claim
 
 ## 4. References
 
-- [`PILLAR-BUGS.md`](PILLAR-BUGS.md) · [`PILLAR-SPECS.md`](PILLAR-SPECS.md) ·
-  [`PILLAR-MEMORY.md`](PILLAR-MEMORY.md) — the pillar protocols.
 - [`FINDINGS-FORMAT.md`](FINDINGS-FORMAT.md) — record shape, evidence rule,
   disposition vocabulary.
-- `DADAIA.md` §6.8 — lifecycle: one audit binds to one remediation release,
-  archives once dispositioned; `dadaia audit disposition|close` are its verbs.
-- `dadaia doctor --json` / `dd-cli-library` — command reference.
+- Script: `python3 .agents/skills/dd-audit-project/scripts/audit.py` — `disposition`, `close`, `check`: this ledger's ONE writer and validator.
+- Lifecycle, pillars and verbs: `specs/audits/AGENTS.md`.

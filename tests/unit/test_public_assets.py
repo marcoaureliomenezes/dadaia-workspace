@@ -176,7 +176,7 @@ def test_baseline_never_flags_placeholder_home_paths_on_any_declared_platform(
 
 
 # ---------------------------------------------------------------------------
-# SPEC v0.4.2 CR-2 (code-reviewer MEDIUM) — the windows-users-path pattern must share
+# SPEC v0.4.2 CR-2 (dd-code-reviewer MEDIUM) — the windows-users-path pattern must share
 # the SAME trailing-lookahead parity home-abs-path/users-abs-path already have: a hit
 # followed by a path separator, a word boundary (mid-sentence prose), OR end of line.
 # Pre-fix, the pattern's `(?=\\|$)` lookahead fired ONLY on a trailing backslash or
@@ -351,7 +351,7 @@ def test_bytecode_cache_ignored_and_baseline_data_loads_with_version_header(
 # handoff 2026-08-17T143407Z-security-reviewer-v0.4.3-definition-push) — SPEC v0.4.3
 # FR12/A12.2. The v5 email-address exclude_regex was anchored on the DOTTED no-reply
 # subdomain only (e.g. the vendor's and GitHub's no-reply subdomains) and never carved
-# out the LOCAL-PART form DADAIA.md mandates in every commit's Co-Authored-By trailer
+# out the LOCAL-PART form the root `AGENTS.md` map mandates in every commit's Co-Authored-By trailer
 # (local part 'noreply' at the vendor's bare apex domain) — a public, non-identifying
 # vendor mailbox already published unmasked in thousands of this repo's own commit
 # trailers. Any NEW tracked blob quoting it in prose (a release SPEC/TASKS document)
@@ -368,7 +368,7 @@ def test_bytecode_cache_ignored_and_baseline_data_loads_with_version_header(
 
 
 def _mandated_noreply_trailer_address() -> str:
-    """The exact law-mandated Co-Authored-By trailer address (DADAIA.md), composed at
+    """The exact law-mandated Co-Authored-By trailer address (the root `AGENTS.md` map), composed at
     runtime so it never appears contiguously in this module's own tracked source."""
     local_part = "no" + "reply"
     domain = "anthropic" + "." + "com"
@@ -951,3 +951,41 @@ def test_internal_hostname_uppercase_initial_real_hostname_fires_through_the_doc
     )
     report = [line.render() for line in _manager(dirty_dir)._check_public_privacy()]  # noqa: SLF001
     assert any(line.startswith("[error] public-privacy:") for line in report)
+
+
+@pytest.mark.parametrize(
+    "term", ["Aprovado", "Em revisão", "Rascunho", "Catálogo", "APROVADA", "BLOQUEADA"]
+)
+def test_public_privacy_flags_portuguese_control_vocabulary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, term: str
+) -> None:
+    """Intent: CONTRACT — 0.4.7 FR4/AC4.1 (T-047-58): `public-privacy` is the runtime
+    guard that keeps the published surface English. Without it the translation is a
+    one-off cleanup that drifts back on the next authored asset."""
+    _disable_operator_denylist(monkeypatch, tmp_path)
+    public_dir = tmp_path / "public"
+    (public_dir / "data").mkdir(parents=True)
+    (public_dir / "data" / "AGENTS.md").write_text(
+        f"- Read SPEC, PLAN and TASKS — all three must carry `**Status:** {term}`.\n",
+        encoding="utf-8",
+    )
+
+    report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
+    assert any(line.startswith("[error] public-privacy:") and term in line for line in report), (
+        report
+    )
+
+
+def test_public_privacy_language_check_leaves_english_assets_alone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The negative case: the English vocabulary that replaced it never fires."""
+    _disable_operator_denylist(monkeypatch, tmp_path)
+    public_dir = tmp_path / "public"
+    (public_dir / "data").mkdir(parents=True)
+    (public_dir / "data" / "AGENTS.md").write_text(
+        "`Approved`, `In review`, `Draft` are the canonical status tokens.\n"
+        "The feature catalog lives in `memory/product/index.md`.\n",
+        encoding="utf-8",
+    )
+    assert _manager(public_dir)._check_public_privacy() == [_BASELINE_OK_MARKER]  # noqa: SLF001

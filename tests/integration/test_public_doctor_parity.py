@@ -1,15 +1,15 @@
 """Integration tests for guardrail-pair doctor parity (AGT-r2-26).
 
-K3 (v0.5.1): the root ``AGENTS.md``/``CLAUDE.md`` pair is now 2 ``ProjectionRule``
-entries (``root:AGENTS.md``, ``root:CLAUDE.md``); the standalone
+K3 (v0.5.1): the root law is a ``ProjectionRule`` entry (``root:AGENTS.md``); 0.4.7
+FR3 retired its ``CLAUDE.md`` twin. The standalone
 ``_doctor_guardrail_pair`` helper — a duplicate of what ``manager.doctor()`` already
 computed inline — is retired. Every assertion below goes through the REAL production
 path (``manager.stage()`` / ``manager.install()`` / ``manager.doctor()``), which is a
 strictly more faithful test than calling a bespoke doctor helper directly.
 
 Verifies that ``FileSystemPublicAssetManager.doctor()`` emits:
-  - ``root:AGENTS.md`` / ``root:CLAUDE.md`` — always present, drift-detecting.
-  - ``repos/<slug>:AGENTS.md`` / ``repos/<slug>:CLAUDE.md`` — per registry-listed
+  - ``root:AGENTS.md`` — always present, drift-detecting.
+  - ``repos/<slug>:AGENTS.md`` — per registry-listed
     consumer (v0.1.58 FR4), provenance-gated ``[foreign]`` for a bannerless/
     hand-authored source (Ruling 16).
   - Nothing at all for a consumer repo absent from the registry (Ruling G).
@@ -97,23 +97,22 @@ def test_root_pair_always_present_and_ok(tmp_path: Path) -> None:
     ws.mkdir()
     manager = _mgr(public_dir)
     manager.stage(ws)
-    manager.install(ws, target="all", force=True)
+    manager.install(ws, force=True)
     lines = _rendered(manager.doctor(ws))
     assert "[ok] root:AGENTS.md" in lines, lines
-    assert "[ok] root:CLAUDE.md" in lines, lines
 
 
-def test_root_pair_detects_drift_on_tampered_claude_md(tmp_path: Path) -> None:
+def test_root_agents_md_detects_drift_when_tampered(tmp_path: Path) -> None:
     public_dir = _make_minimal_public(tmp_path)
     ws = tmp_path / "ws"
     ws.mkdir()
     manager = _mgr(public_dir)
     manager.stage(ws)
-    manager.install(ws, target="all", force=True)
-    (ws / "CLAUDE.md").write_bytes(b"# Tampered CLAUDE\n")
+    manager.install(ws, force=True)
+    (ws / "AGENTS.md").write_bytes(b"# Tampered AGENTS\n")
     lines = _rendered(manager.doctor(ws))
-    assert "[drift] root:CLAUDE.md" in lines, lines
-    assert "[ok] root:AGENTS.md" in lines, lines
+    assert "[drift] root:AGENTS.md" in lines, lines
+    assert not any("CLAUDE.md" in ln for ln in lines), lines
 
 
 def test_consumer_pair_foreign_for_bannerless_source(tmp_path: Path) -> None:
@@ -127,12 +126,11 @@ def test_consumer_pair_foreign_for_bannerless_source(tmp_path: Path) -> None:
     _add_consumer(ws, slug)
     manager = _mgr(public_dir)
     manager.stage(ws)
-    manager.install(ws, target="all", force=True)
+    manager.install(ws, force=True)
     lines = _rendered(manager.doctor(ws))
     assert "[ok] root:AGENTS.md" in lines, lines
-    assert "[ok] root:CLAUDE.md" in lines, lines
     assert f"[foreign] repos/{slug}:AGENTS.md" in lines, lines
-    assert f"[foreign] repos/{slug}:CLAUDE.md" in lines, lines
+    assert not any("CLAUDE.md" in ln for ln in lines), lines
 
 
 def test_consumer_pair_foreign_for_hand_authored_agents_md(tmp_path: Path) -> None:
@@ -148,14 +146,13 @@ def test_consumer_pair_foreign_for_hand_authored_agents_md(tmp_path: Path) -> No
 
     manager = _mgr(public_dir)
     manager.stage(ws)
-    manager.install(ws, target="all", force=True)
+    manager.install(ws, force=True)
 
     assert (consumer / "AGENTS.md").read_text(encoding="utf-8") == hand_authored
     assert not (consumer / "CLAUDE.md").exists()
 
     lines = _rendered(manager.doctor(ws))
     assert f"[foreign] repos/{slug}:AGENTS.md" in lines, lines
-    assert f"[foreign] repos/{slug}:CLAUDE.md" in lines, lines
     consumer_lines = [ln for ln in lines if f"repos/{slug}" in ln]
     assert consumer_lines and all(ln.startswith("[foreign]") for ln in consumer_lines), (
         f"the consumer pair must be [foreign] only — no legacy [drift]/[missing].\n  {consumer_lines}"
@@ -172,8 +169,7 @@ def test_unregistered_consumer_is_invisible_to_doctor(tmp_path: Path) -> None:
     no_marker.mkdir(parents=True)
     manager = _mgr(public_dir)
     manager.stage(ws)
-    manager.install(ws, target="all", force=True)
+    manager.install(ws, force=True)
     lines = _rendered(manager.doctor(ws))
     assert not any("no-marker-repo" in ln for ln in lines), lines
     assert "[ok] root:AGENTS.md" in lines, lines
-    assert "[ok] root:CLAUDE.md" in lines, lines

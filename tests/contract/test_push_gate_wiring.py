@@ -41,9 +41,6 @@ class _SpyObjectSource:
         self.calls.append((repo, local_sha, remote_sha))
         return ()
 
-    def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
-        return []
-
     def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
         return ()
 
@@ -112,9 +109,9 @@ def test_canon_scan_does_not_apply_to_a_tree_stamped_below_the_canon(
     monkeypatch, tmp_path: Path
 ) -> None:
     """Bug pre-push-canon-scan-not-range-scoped (operator ruling 2026-09-13): a specs/
-    tree stamped pattern 5 has nothing for the v6 canon scan to enforce — the push
+    tree stamped pattern 5 has nothing for the current canon scan to enforce — the push
     proceeds with one stderr note naming the migration; the same range is refused
-    once the tree is stamped 6."""
+    once the tree is stamped at the canonical version."""
     repo = tmp_path / "repo"
     tip_sha = _init_repo(repo)
     monkeypatch.setattr(ci, "_repo_root", lambda: repo)
@@ -128,7 +125,7 @@ def test_canon_scan_does_not_apply_to_a_tree_stamped_below_the_canon(
     assert "stamped pattern 5" in result.output
     assert "dadaia specs upgrade" in result.output
 
-    _stamped_specs(repo, 6)
+    _stamped_specs(repo, 7)
     result = _runner.invoke(app, ["ci", "push-gate-check"], input=stdin)
     assert result.exit_code == 1
     assert "specs/backlog/candidates.md" in result.output

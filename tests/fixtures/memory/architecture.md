@@ -22,7 +22,7 @@ Cada release passa por fases: SPEC → PLAN → TASKS → IMPLEMENTATION → CLO
 |------|-------------|---------|
 | SPEC | product-engineer | SPEC.md |
 | PLAN | product-engineer | PLAN.md |
-| TASKS | software-engineer | TASKS.md |
+| TASKS | dd-software-engineer | TASKS.md |
 
 ## Estado runtime tocado
 

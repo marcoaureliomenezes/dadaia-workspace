@@ -16,21 +16,21 @@ size: SMALL.
 
 from __future__ import annotations
 
-import json
 import re
+import shlex
+import sys
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import pytest
-from typer.testing import CliRunner
 
 from dadaia_workspace.core import doctor_rules
 from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObject
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_refs
-from dadaia_workspace.features.specs.canon import canon_violations, verdict_violations
+from dadaia_workspace.features.specs.canon import canon_violations
 from dadaia_workspace.hooks import pre_gate
 
 _FIX_LINE_RE = re.compile(r"^fix: (\S.*)$", re.MULTILINE)
@@ -64,6 +64,9 @@ _EXECUTABLE_TOKENS: frozenset[str] = frozenset(
         "sed",
         "cp",
         "bash",
+        # 0.4.7 FR2: a ledger fix names its skill script, run through the interpreter
+        # (Windows has no exec bit), never a retired CLI verb.
+        "python3",
     }
 )
 
@@ -119,7 +122,7 @@ def _write(path: Path) -> dict[str, Any]:
 _GATE_BLOCKS: tuple[tuple[str, str], ...] = (
     ("root-whitelist", "junk.txt"),
     ("protected-sessions", ".dadaia/sessions/some-session.json"),
-    ("protected-law", "DADAIA.md"),
+    ("protected-law", "AGENTS.md"),
 )
 
 
@@ -149,9 +152,6 @@ class _FakeObjectSource:
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         return self.objects
 
-    def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
-        return self.tree_paths
-
     def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
         return ()
 
@@ -179,7 +179,6 @@ def _decide(
         object_source=source or _FakeObjectSource(),
         repo=Path("/nonexistent-repo"),
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         malformed_lines=malformed_lines,
         denylist_terms=denylist_terms,
     )
@@ -236,285 +235,7 @@ def test_push_gate_git_read_failure_carries_a_runnable_fix() -> None:
     assert_block_carries_a_runnable_fix(_decide(_feature_ref(), source=_FailingObjectSource()))
 
 
-# ── ci verdict-check ────────────────────────────────────────────────────────────
-
-
-@pytest.mark.parametrize(
-    ("name", "args"),
-    [
-        ("bad-head", ["--head", "nope"]),
-        ("bad-release-id", ["--head", _SHA_A, "--release-id", "not a release"]),
-        ("no-verdict", ["--head", _SHA_A, "--release-id", "0.0.1"]),
-    ],
-)
-def test_verdict_check_refusals_carry_a_runnable_fix(name: str, args: list[str]) -> None:
-    """Driven in the real repo — ``verdict-check`` reads git, and a refusal must still
-    hand back one command."""
-    from dadaia_workspace.cli.commands import ci
-
-    result = CliRunner().invoke(ci.app, ["verdict-check", *args])
-    assert result.exit_code == 1, result.output
-    assert_block_carries_a_runnable_fix(result.output)
-
-
-# ── the release verbs ───────────────────────────────────────────────────────────
-
-
-def _specs_tree(tmp_path: Path) -> Path:
-    specs = tmp_path / "specs"
-    (specs / "releases").mkdir(parents=True)
-    return specs
-
-
-def test_release_new_refuses_a_second_live_release_with_a_runnable_fix(tmp_path: Path) -> None:
-    from dadaia_workspace.features.specs import canon
-
-    specs = _specs_tree(tmp_path)
-    (specs / "releases" / "0.0.1").mkdir()
-    with pytest.raises(FileExistsError) as exc:
-        canon.release_new(specs, "0.0.2")
-    assert_block_carries_a_runnable_fix(str(exc.value))
-
-
-@pytest.mark.parametrize(
-    ("name", "kwargs"),
-    [
-        ("bad-sha", {"shipped_sha": "nope", "pr": 1, "next_release": "0.0.2"}),
-        ("bad-pr", {"shipped_sha": "a" * 40, "pr": 0, "next_release": "0.0.2"}),
-        ("bad-next", {"shipped_sha": "a" * 40, "pr": 1, "next_release": "nope"}),
-    ],
-)
-def test_archive_release_argument_refusals_carry_a_runnable_fix(
-    name: str, kwargs: dict[str, Any], tmp_path: Path
-) -> None:
-    from dadaia_workspace.features.specs import candidate
-
-    specs = _specs_tree(tmp_path)
-    with pytest.raises(candidate.ArchiveError) as exc:
-        candidate.archive_release(specs, "0.0.1", histo_append=lambda _r: None, **kwargs)
-    assert_block_carries_a_runnable_fix(str(exc.value))
-
-
-@pytest.mark.parametrize("verb", ["archive_release", "archive_candidate"])
-def test_archive_verbs_refuse_without_a_live_release_with_a_runnable_fix(
-    verb: str, tmp_path: Path
-) -> None:
-    from dadaia_workspace.features.specs import candidate
-
-    specs = _specs_tree(tmp_path)
-    with pytest.raises(candidate.ArchiveError) as exc:
-        if verb == "archive_release":
-            candidate.archive_release(
-                specs,
-                "0.0.1",
-                shipped_sha="a" * 40,
-                pr=1,
-                next_release="0.0.2",
-                histo_append=lambda _r: None,
-            )
-        else:
-            candidate.archive_candidate(specs)
-    assert_block_carries_a_runnable_fix(str(exc.value))
-
-
-# ── the governance verbs (0.4.7 FR3/FR4/FR5) ───────────────────────────────────
-
-
-def _backlog_tree(tmp_path: Path) -> Path:
-    specs = _specs_tree(tmp_path)
-    (specs / "backlog").mkdir()
-    (specs / "backlog" / "BACKLOG.json").write_text(
-        '{"schema": "backlog-v1", "active": [{"id": "a-thing", "title": "t", '
-        '"opened": "2026-01-01", "status": "picked", "description": "d", '
-        '"provenance": "operator request"}]}',
-        encoding="utf-8",
-    )
-    return specs
-
-
-@pytest.mark.parametrize(
-    ("name", "kwargs"),
-    [
-        ("unknown-disposition", {"disposition": "nope", "reason": "r", "release": "0.0.1"}),
-        (
-            "delivered-without-release",
-            {"disposition": "delivered", "reason": None, "release": None},
-        ),
-        ("rejected-without-reason", {"disposition": "rejected", "reason": None, "release": None}),
-        ("unknown-release", {"disposition": "delivered", "reason": None, "release": "9.9.9"}),
-    ],
-)
-def test_backlog_exit_refusals_carry_a_runnable_fix(
-    name: str, kwargs: dict[str, Any], tmp_path: Path
-) -> None:
-    from dadaia_workspace.features.backlog import document
-
-    specs = _backlog_tree(tmp_path)
-    with pytest.raises(document.BacklogExitError) as exc:
-        document.backlog_exit(specs, "a-thing", histo_store=None, denylist_terms=(), **kwargs)
-    assert_block_carries_a_runnable_fix(str(exc.value))
-
-
-def test_backlog_exit_unknown_slug_carries_a_runnable_fix(tmp_path: Path) -> None:
-    from dadaia_workspace.features.backlog import document
-
-    specs = _backlog_tree(tmp_path)
-    with pytest.raises(document.BacklogExitError) as exc:
-        document.backlog_exit(
-            specs,
-            "never-existed",
-            histo_store=None,
-            disposition="rejected",
-            reason="r",
-            release=None,
-            denylist_terms=(),
-        )
-    assert_block_carries_a_runnable_fix(str(exc.value))
-
-
-def _audit_tree(tmp_path: Path, disposition: str = "open") -> Path:
-    specs = _specs_tree(tmp_path)
-    audit = specs / "audits" / "20260101-slug"
-    audit.mkdir(parents=True)
-    (audit / "FINDINGS.jsonl").write_text(
-        json.dumps(
-            {
-                "id": "20260101-slug-F001",
-                "pillar": "bugs",
-                "severity": "LOW",
-                "refs": ["a"],
-                "claim": "c",
-                "evidence": "e",
-                "disposition": disposition,
-                "release": "0.0.1" if disposition != "open" else None,
-                "reason": None,
-            }
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    return specs
-
-
-@pytest.mark.parametrize(
-    ("name", "audit", "finding", "kwargs"),
-    [
-        (
-            "unknown-audit",
-            "nope",
-            "20260101-slug-F001",
-            {"disposition": "resolved", "release": "0.0.1"},
-        ),
-        (
-            "unknown-finding",
-            "20260101-slug",
-            "F999",
-            {"disposition": "resolved", "release": "0.0.1"},
-        ),
-        ("retired-word", "20260101-slug", "20260101-slug-F001", {"disposition": "fixed"}),
-        (
-            "deferred-without-reason",
-            "20260101-slug",
-            "20260101-slug-F001",
-            {"disposition": "deferred"},
-        ),
-    ],
-)
-def test_audit_disposition_refusals_carry_a_runnable_fix(
-    name: str, audit: str, finding: str, kwargs: dict[str, Any], tmp_path: Path
-) -> None:
-    from dadaia_workspace.features.specs import audit as audit_feature
-
-    specs = _audit_tree(tmp_path)
-    with pytest.raises(audit_feature.AuditError) as exc:
-        audit_feature.disposition_finding(specs, audit, finding, **kwargs)
-    assert_block_carries_a_runnable_fix(str(exc.value))
-
-
-def test_audit_close_with_an_open_finding_carries_a_runnable_fix(tmp_path: Path) -> None:
-    from dadaia_workspace.features.specs import audit as audit_feature
-
-    specs = _audit_tree(tmp_path)
-    with pytest.raises(audit_feature.AuditError) as exc:
-        audit_feature.close_audit(
-            specs, "20260101-slug", sha="abc1234", histo_append=lambda _r: None, denylist_terms=()
-        )
-    assert_block_carries_a_runnable_fix(str(exc.value))
-
-
-def _phase_tree(tmp_path: Path, *, phase: str, status: str = "Aprovado", tasks: str) -> Path:
-    specs = _specs_tree(tmp_path)
-    rdir = specs / "releases" / "0.0.1"
-    rdir.mkdir()
-    (rdir / "SPEC.md").write_text("# S\n\n**Status:** Aprovado\n", encoding="utf-8")
-    (rdir / "PLAN.md").write_text(f"# P\n\n**Status:** {status}\n", encoding="utf-8")
-    (rdir / "TASKS.md").write_text(f"# T\n\n**Status:** Aprovado\n\n{tasks}", encoding="utf-8")
-    (rdir / "_RELEASE.json").write_text(
-        json.dumps(
-            {
-                "schema": "release-state-v1",
-                "release": "0.0.1",
-                "phase": phase,
-                "rc": None,
-                "defined": None,
-                "implemented": None,
-                "shipped": None,
-                "log": [],
-            }
-        ),
-        encoding="utf-8",
-    )
-    return specs
-
-
-@pytest.mark.parametrize(
-    ("name", "tree", "target", "sha"),
-    [
-        ("bad-sha", {"phase": "DEFINITION", "tasks": "- [x] T-1\n"}, "IMPLEMENTATION", "nope"),
-        ("out-of-order", {"phase": "DEFINITION", "tasks": "- [x] T-1\n"}, "CLOSURE", _SHA_A),
-        ("re-run", {"phase": "IMPLEMENTATION", "tasks": "- [x] T-1\n"}, "IMPLEMENTATION", _SHA_A),
-        (
-            "unapproved-plan",
-            {"phase": "DEFINITION", "status": "Draft", "tasks": "- [x] T-1\n"},
-            "IMPLEMENTATION",
-            _SHA_A,
-        ),
-        (
-            "unfinished-task",
-            {"phase": "IMPLEMENTATION", "tasks": "- [-] T-1\n"},
-            "CLOSURE",
-            _SHA_A,
-        ),
-        ("unknown-phase", {"phase": "DEFINITION", "tasks": "- [x] T-1\n"}, "DEFINITION", _SHA_A),
-    ],
-)
-def test_release_phase_refusals_carry_a_runnable_fix(
-    name: str, tree: dict[str, str], target: str, sha: str, tmp_path: Path
-) -> None:
-    from dadaia_workspace.features.specs import candidate
-
-    specs = _phase_tree(tmp_path, **tree)
-    with pytest.raises(candidate.ArchiveError) as exc:
-        candidate.set_phase(specs, target, sha=sha)
-    assert_block_carries_a_runnable_fix(str(exc.value))
-
-
 # ── context heartbeat (exit 1) ──────────────────────────────────────────────────
-
-
-def test_context_heartbeat_without_a_session_carries_a_runnable_fix(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """No caller-owned session identity is a refusal — it hands back one bind command."""
-    from dadaia_workspace.cli.commands import context as context_cmd
-    from dadaia_workspace.core.invocation import HARNESS_SESSION_ID_ENV_VARS
-
-    for name in ("DADAIA_SESSION_ID", *HARNESS_SESSION_ID_ENV_VARS):
-        monkeypatch.delenv(name, raising=False)
-
-    result = CliRunner().invoke(context_cmd.app, ["heartbeat"])
-    assert result.exit_code == 1, result.output
-    assert_block_carries_a_runnable_fix(result.output)
 
 
 # ── dadaia doctor (exit 1) ──────────────────────────────────────────────────────
@@ -523,7 +244,7 @@ def test_context_heartbeat_without_a_session_carries_a_runnable_fix(
 def _every_doctor_rule() -> list[tuple[str, doctor_rules.Rule[Any, Any]]]:
     from dadaia_workspace.features.backlog.doctor import RULES as BACKLOG_RULES
     from dadaia_workspace.features.spec_context.doctor import workspace_rules
-    from dadaia_workspace.features.specs.ledgers import RULES as LEDGER_SCHEMA_RULES
+    from dadaia_workspace.features.specs.doctor_adr import LEDGER_RULES as ADR_LEDGER_RULES
     from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 
     rules: list[tuple[str, doctor_rules.Rule[Any, Any]]] = []
@@ -531,7 +252,7 @@ def _every_doctor_rule() -> list[tuple[str, doctor_rules.Rule[Any, Any]]]:
         *workspace_rules(expired_only=False),
         *SPECS_RULES,
         *BACKLOG_RULES,
-        *LEDGER_SCHEMA_RULES,
+        *ADR_LEDGER_RULES,
     ):
         rules.append(("/".join(rule.codes), rule))
     return rules
@@ -564,3 +285,356 @@ def test_every_doctor_rule_renders_a_runnable_fix(
         fix=rule.fix_help,
     )
     assert_block_carries_a_runnable_fix(doctor_rules.render_finding(finding))
+
+
+# ── the live CLI tree, shared by the one fix-line rule below ───────────────────
+#
+# `test_every_doctor_fix_names_a_verb_the_cli_has` DELETED (0.4.7 c8 review F7). It
+# walked the command tree for every fix line opening with the dadaia binary and SKIPPED
+# every other shape — the same assertion `test_every_fix_target_resolves_on_disk` makes
+# over a superset of the same lines (the doctor rules plus the ledger scripts). Two
+# tests, one assertion, and a skip lane that grew as fix shapes did.
+
+
+def _cli_tree_has(tokens: list[str]) -> bool:
+    """True when ``tokens`` (the words after the dadaia binary, up to the first option
+    or placeholder) walk the live Typer command tree down to a leaf command."""
+    import typer.main
+
+    from dadaia_workspace.cli.main import app
+
+    root = typer.main.get_command(app)
+    ctx = root.make_context("dadaia", [], resilient_parsing=True)
+    cmd: Any = root
+    for token in tokens:
+        if token.startswith(("-", "<")):
+            break
+        subcommands = cmd.list_commands(ctx) if hasattr(cmd, "list_commands") else []
+        if token not in subcommands:
+            return False
+        cmd = cmd.get_command(ctx, token)
+    return not (hasattr(cmd, "list_commands") and cmd.list_commands(ctx))
+
+
+#: name the INSTALLED path (`.agents/skills/…`, what the operator pastes); the file it
+#: names is the one this repo ships.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_PUBLIC_SKILLS = _REPO_ROOT / "dadaia_workspace" / "public" / "skills"
+_INSTALLED_PREFIX = ".agents/skills/"
+
+
+def _script_target(command: str) -> tuple[Path, str] | None:
+    """The (shipped script, subcommand) a ``python3 …/scripts/x.py <verb>`` fix names."""
+    tokens = command.split()
+    if tokens[0] != "python3" or _INSTALLED_PREFIX not in tokens[1]:
+        return None
+    relative = tokens[1].split(_INSTALLED_PREFIX, 1)[1]
+    verb = next((token for token in tokens[2:] if not token.startswith(("-", "<"))), "")
+    return _PUBLIC_SKILLS / relative, verb
+
+
+def _fix_lines() -> list[tuple[str, str]]:
+    """Every doctor rule's fix line, plus the ledger scripts' own delegated fix."""
+    from dadaia_workspace.infrastructure.ledger_scripts import LEDGER_SCRIPTS
+
+    lines = [(codes, rule.fix_help) for codes, rule in _DOCTOR_RULES if rule.fix_help]
+    lines.extend(
+        (script.code, f"{script.invocation} check --specs specs") for script in LEDGER_SCRIPTS
+    )
+    return lines
+
+
+_FIX_LINES = _fix_lines()
+
+#: Scaffold roots a fix line may name that this repo does not carry at that path: the
+#: installed skill tree (`.agents/skills/…`, what the operator pastes) maps to the
+#: `public/skills/` source this repo ships, and the venv-rooted binary is resolved by the
+#: CLI arm below, never as a file.
+_INSTALLED_SKILL_PREFIX = ".agents/skills/"
+_VENV_BINARY_PREFIX = ".dadaia/"
+
+_PLACEHOLDER_RE = re.compile(r"<[^>]*>")
+_FLAG_VALUE_RE = re.compile(r"^--[\w-]+=")
+
+
+def _command_tokens(command: str) -> list[str]:
+    """The command's tokens with their quoting INTACT (``posix=False``).
+
+    Quoting is the signal that separates a path from a ``sed`` script: every fix line
+    quotes its script and leaves its paths bare, so ``'s/<session id>/<redacted>/g'``
+    keeps its quotes and is skipped while ``specs/bugs/BUGS.jsonl`` is not.
+    """
+    lexer = shlex.shlex(command, posix=False)
+    lexer.whitespace_split = True
+    return list(lexer)
+
+
+def _path_token(token: str) -> str | None:
+    """The path *token* names, or ``None`` when it names none.
+
+    An UNQUOTED token containing a slash is a path — there is no suffix list and no
+    root list to fall out of date (0.4.7 c8 review MEDIUM-3: ``.codex/…`` and
+    ``.kimi-code/…`` fell out of a root list, and ``--in-place=<path>`` out of every
+    list at once). A ``--flag=value`` carries its path in the value.
+    """
+    if not token or token.startswith(("'", '"')):
+        return None
+    token = _FLAG_VALUE_RE.sub("", token)
+    if token.startswith(("-", ">", "&", "|")) or "/" not in token:
+        return None
+    return token
+
+
+def _tracked_dirs() -> frozenset[str]:
+    """Every directory the TRACKED tree carries, as repo-relative posix strings.
+
+    The oracle is `git ls-files`, never `iterdir()` of the working tree (0.4.7 c8
+    review MEDIUM-3): this checkout carries untracked `.claude/` and
+    `.import_linter_cache/` directories that CI's does not, so a filesystem oracle
+    answered differently on two machines for the same commit.
+    """
+    import subprocess  # noqa: PLC0415 — the tracked tree is git's answer, not the FS's
+
+    listed = subprocess.run(  # noqa: S603
+        ["git", "-C", str(_REPO_ROOT), "ls-files", "-z"],  # noqa: S607
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=60,
+    ).stdout
+    dirs: set[str] = {""}
+    for tracked in listed.split("\0"):
+        if not tracked:
+            continue
+        parts = PurePosixPath(tracked).parts
+        for depth in range(1, len(parts)):
+            dirs.add(PurePosixPath(*parts[:depth]).as_posix())
+    return frozenset(dirs)
+
+
+def _resolvable_prefix(token: str) -> str:
+    """The deepest placeholder-free DIRECTORY the token names, as a repo-relative
+    posix string.
+
+    A fix creates, edits or deletes its leaf — `git rm specs/ACTIVE.md` names a file
+    that must NOT exist — so the leaf itself is never required; the directory that
+    holds it is. Everything from the first `<placeholder>` segment down is unknowable
+    and drops away with it.
+    """
+    if token.startswith(_INSTALLED_SKILL_PREFIX):
+        relative = token.split(_INSTALLED_SKILL_PREFIX, 1)[1]
+        segments = ("dadaia_workspace", "public", "skills", *relative.split("/"))
+    else:
+        segments = tuple(token.split("/"))
+    kept: list[str] = []
+    for segment in segments:
+        if _PLACEHOLDER_RE.search(segment):
+            break
+        kept.append(segment)
+    if len(kept) == len(segments):
+        kept = kept[:-1]  # the leaf is created, edited or deleted by the fix itself
+    return PurePosixPath(*kept).as_posix() if kept else ""
+
+
+def _canon_dirs() -> frozenset[str]:
+    """Every directory the specs canon guarantees, as `specs/`-rooted posix strings —
+    a consumer's tree carries these even when this repo's own does not."""
+    from dadaia_workspace.core.workspace_layout import SPECS_CANON
+
+    dirs: set[str] = {"specs"}
+    for entry in SPECS_CANON:
+        parts = PurePosixPath(entry.shape).parts
+        for depth in range(len(parts)):
+            dirs.add(PurePosixPath("specs", *parts[:depth]).as_posix())
+    return frozenset(dirs)
+
+
+_CANON_DIRS = _canon_dirs()
+_TRACKED_DIRS = _tracked_dirs()
+
+
+def _unresolved_paths(command: str) -> list[str]:
+    """Every path token in *command* whose directory is neither tracked in this repo nor
+    a directory the specs canon guarantees."""
+    unresolved: list[str] = []
+    for raw in _command_tokens(command):
+        if raw.startswith(_VENV_BINARY_PREFIX):
+            continue  # the venv-rooted binary is resolved by the CLI arm, not as a file
+        token = _path_token(raw)
+        if token is None:
+            continue
+        target = _resolvable_prefix(token)
+        if target not in _TRACKED_DIRS and target not in _CANON_DIRS:
+            unresolved.append(token)
+    return unresolved
+
+
+@pytest.mark.parametrize(("codes", "command"), _FIX_LINES, ids=[c for c, _ in _FIX_LINES])
+def test_every_fix_target_resolves_on_disk(codes: str, command: str) -> None:
+    """ONE rule for every fix line, whatever shape it takes (0.4.7 c8 review F7).
+
+    A ``fix:`` line is a free string — nothing tied it to a file or a verb that exists.
+    Two Stalls came of that: ``backlog-doctor-fix-names-missing-update-verb`` (BL-SCHEMA
+    and friends handed back ``dadaia backlog update``, a verb the CLI had dropped) and,
+    after the ledger verbs moved to skill scripts, a fix line naming a path nobody
+    ships. Both resolve HERE, and no shape is exempt: a ``dadaia`` fix walks the live
+    command tree; a skill-script fix must exist under ``public/skills/*/scripts/`` with
+    a subcommand that accepts ``--help``; and EVERY fix line — ``sed``, ``git mv``,
+    ``printf`` included — has each path token it names resolved to a directory this
+    repo ships or the specs canon guarantees. The membership allowlist that used to
+    excuse the shell-command shapes is gone: it was a second rule whose only job was to
+    let a row skip the first one.
+    """
+    import subprocess  # noqa: PLC0415 — a contract test executes the real script
+
+    from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
+
+    unresolved = _unresolved_paths(command)
+    assert unresolved == [], (
+        f"{codes}: fix line names a path neither this repo nor the specs canon "
+        f"carries: {unresolved} in {command!r}"
+    )
+
+    if command.startswith(DADAIA_BIN) or command.startswith("dadaia "):
+        tokens = command.split()[1:]
+        assert _cli_tree_has(tokens), f"{codes}: no such verb: {command!r}"
+        return
+    target = _script_target(command)
+    if target is None:
+        return
+    script, verb = target
+    assert script.is_file(), f"{codes}: fix line names a script this repo does not ship: {script}"
+    assert verb, f"{codes}: a script fix line names no subcommand: {command!r}"
+    help_run = subprocess.run(  # noqa: S603
+        [sys.executable, str(script), verb, "--help"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert help_run.returncode == 0, f"{codes}: {script.name} rejects {verb!r}: {help_run.stderr}"
+
+
+def test_the_path_rule_bites_a_fix_naming_a_directory_nobody_ships() -> None:
+    """The control: without it, a resolver that silently classified every token as
+    "not a path" would pass the whole corpus and detect nothing.
+
+    A ``sed`` script is not a path; a real path under a directory neither this repo nor
+    the canon carries is — this is exactly the row the deleted allowlist waved through.
+    """
+    assert _unresolved_paths("sed -i 's/<session id>/<redacted>/g' specs/bugs/BUGS.jsonl") == []
+    assert _unresolved_paths("git mv specs/audits/<name> specs/audits/<YYYYMMDD>-<slug>") == []
+    assert _unresolved_paths("printf '%s\\n' '# <title>' >> specs/memory/<document>.md") == []
+    assert _unresolved_paths("sed -i '\\|x|d' specs/nowhere/<id>/SPEC.md") == [
+        "specs/nowhere/<id>/SPEC.md"
+    ]
+    assert _unresolved_paths("git rm dadaia_workspace/features/no_such_feature/doctor.py") == [
+        "dadaia_workspace/features/no_such_feature/doctor.py"
+    ]
+    # c8 review MEDIUM-3: a projection root other than .agents/.dadaia, and a path
+    # carried as a --flag=<value>. Both used to slip past as "not a path".
+    assert _unresolved_paths("rm -rf .codex/prompts/dead-lane") == [".codex/prompts/dead-lane"]
+    assert _unresolved_paths("sed -i '/x/d' --in-place=specs/ghost/atom.md") == [
+        "specs/ghost/atom.md"
+    ]
+
+
+# ── every script-emitted fix line names its own folder's entry script ───────────
+
+#: The one entry script of each skill that ships scripts — what an operator pastes.
+#: A sibling `_module.py` has no `__main__`, so naming it is a Stall with a friendly face.
+_ENTRY_SCRIPTS: dict[str, str] = {
+    "dd-audit-project": "audit.py",
+    "dd-backlog-definition": "backlog.py",
+    "dd-bug-resolution": "bugs.py",
+    "dd-cli-library": "registry.py",
+    "dd-release-implementation": "release.py",
+    "dd-spec-navigator": "memory.py",
+}
+
+_LITERAL_FIX_RE = re.compile(r'"fix: ([^"]*)')
+_SCRIPT_CONST_RE = re.compile(r'^SCRIPT = Path\(__file__\)\.parent / "([^"]+)"', re.MULTILINE)
+_NAMED_SCRIPT_RE = re.compile(r"[\w.{}\[\]()/-]*\.py")
+
+
+def _script_modules() -> list[Path]:
+    return sorted(_PUBLIC_SKILLS.glob("*/scripts/*.py"))
+
+
+_SCRIPT_MODULES = _script_modules()
+
+
+@pytest.mark.parametrize(
+    "module", _SCRIPT_MODULES, ids=[f"{m.parts[-3]}/{m.name}" for m in _SCRIPT_MODULES]
+)
+def test_every_script_fix_line_names_its_folders_entry_script(module: Path) -> None:
+    """A skill script's own `fix:` lines must name the script the operator can run.
+
+    0.4.7 review fold (F3): `backlog.py subjects` printed
+    ``fix: _backlog_subjects.py subjects …`` — a sibling module with no ``__main__``.
+    The command was un-runnable, so the UNRESOLVED exit was a Stall. Every `fix:`
+    literal that NAMES a `.py` file, and every `SCRIPT` constant a `Refusal` fix is
+    built from, must name the entry script of the folder it is written in.
+    """
+    skill = module.parts[-3]
+    entry = _ENTRY_SCRIPTS[skill]
+    text = module.read_text(encoding="utf-8")
+    for body in _LITERAL_FIX_RE.findall(text):
+        assert "__file__" not in body, (
+            f"{skill}/{module.name}: a fix line built from this module's own `__file__` "
+            f"names the module, not the entry script {entry} — got {body!r}"
+        )
+        for named in _NAMED_SCRIPT_RE.findall(body):
+            assert named.endswith(entry), (
+                f"{skill}/{module.name}: a fix line names {entry}, never a sibling "
+                f"module with no __main__ — got {named!r} in {body!r}"
+            )
+    for named in _SCRIPT_CONST_RE.findall(text):
+        assert named == entry, f"{module.name}: SCRIPT names {named!r}, not {entry!r}"
+
+
+# ── the law never names a verb the tooling dropped ──────────────────────────────
+
+#: The retired release vocabulary. `rc-archive`, `fold` and `archive` were verbs;
+#: `rc-N/` was the folder they wrote. None of the three exists: a closed candidate's
+#: trio is overwritten in place and git is the archive.
+_DEAD_RELEASE_VOCABULARY = re.compile(r"rc-archive|release\.py fold|release\.py archive|rc-N")
+
+#: Where the law lives: the shipped AI-entity surface, the product's memory, and the
+#: glossary every one of them borrows its nouns from. History (`_archive/`, the archive
+#: folders a retired verb wrote, CHANGELOG.md) keeps its own words and is never rewritten.
+_LAW_ROOTS = (
+    _REPO_ROOT / "dadaia_workspace" / "public",
+    _REPO_ROOT / "specs" / "memory",
+)
+
+#: Single law FILES outside those roots.
+_LAW_FILES = (_REPO_ROOT / "CONTEXT.md",)
+
+
+def _law_files() -> list[Path]:
+    return [
+        path
+        for root in _LAW_ROOTS
+        for path in sorted(root.rglob("*"))
+        if path.is_file() and "_archive" not in path.parts
+    ] + [path for path in _LAW_FILES if path.is_file()]
+
+
+def test_no_law_file_names_a_retired_release_verb() -> None:
+    """A rule that names a verb nobody ships is a Stall the doctor cannot catch.
+
+    The agent reads the law, runs the verb, gets `invalid choice`, and has no fix line
+    to fall back on — the same failure shape the fix-line cases above close from the
+    tooling side. This closes it from the prose side: the shipped law and the memory
+    atoms may only name vocabulary `release.py --help` still lists.
+    """
+    offenders = [
+        f"{path.relative_to(_REPO_ROOT)}:{number}"
+        for path in _law_files()
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1)
+        if _DEAD_RELEASE_VOCABULARY.search(line)
+    ]
+    assert not offenders, (
+        "the law names a retired release verb — delete the prose, never the check:\n"
+        + "\n".join(offenders)
+    )

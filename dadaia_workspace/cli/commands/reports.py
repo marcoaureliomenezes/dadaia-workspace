@@ -1,8 +1,7 @@
-"""dadaia reports subcommands — validate handoff sidecars and diagnose their artifact links."""
+"""dadaia reports subcommands — validate handoff sidecars."""
 
 from __future__ import annotations
 
-import json as _json
 from pathlib import Path
 
 import typer
@@ -10,13 +9,12 @@ from rich.console import Console
 
 from dadaia_workspace import container
 from dadaia_workspace.core.exceptions import HandoffSchemaError, WorkspaceNotInitializedError
-from dadaia_workspace.core.handoff_index import Handoff, ValidationResult, scan_handoffs
+from dadaia_workspace.core.handoff_index import Handoff, ValidationResult
 from dadaia_workspace.core.workspace_resolver import (
     resolve_cli_workspace_root,
-    resolve_workspace_root,
 )
 
-app = typer.Typer(help="Validate and diagnose agent handoff reports.")
+app = typer.Typer(help="Validate agent handoff reports.")
 console = Console()
 err_console = Console(stderr=True)
 
@@ -129,7 +127,7 @@ def validate(
     except HandoffSchemaError as exc:
         err_console.print(
             f"[red]Error:[/red] Could not load handoff schema: {exc}\n"
-            "Run [bold]dadaia public stage && dadaia public install --target all[/bold] first."
+            "Run [bold]dadaia public stage && dadaia public install[/bold] first."
         )
         raise typer.Exit(3) from None
 
@@ -183,80 +181,3 @@ def validate(
 # ---------------------------------------------------------------------------
 # doctor subcommand (T-PANEL-02)
 # ---------------------------------------------------------------------------
-
-
-@app.command(name="doctor")
-def doctor(
-    json_output: bool = typer.Option(
-        False, "--json", help="Emit machine-readable JSON instead of human-readable text."
-    ),
-) -> None:
-    """Diagnose structural invariants in .dadaia/handoff/.
-
-    \b
-    Invariants checked:
-      RPT-1: a declared handoff artifact.path must resolve to an existing .html file.
-
-    \b
-    Flags emitted:
-      [dangling-artifact-path] <sidecar> → <artifact.path>  (RPT-1 violation)
-
-    \b
-    Exit codes:
-      0  No issues found.
-      1  One or more invariant violations detected.
-
-    \b
-    Examples:
-      dadaia reports doctor
-      dadaia reports doctor --json
-    """
-    workspace_root = resolve_workspace_root()
-    handoff_root = workspace_root / ".dadaia" / "handoff"
-    issues: list[dict[str, str | None]] = []
-    for handoff in scan_handoffs(handoff_root):
-        artifact_path_str = handoff.artifact_path_raw
-        if not artifact_path_str:
-            # No artifact.path declared — sidecar is valid (handoff-first emission).
-            continue
-        reason: str | None = None
-        resolved = handoff.artifact_path(workspace_root)
-        if resolved is None:
-            reason = "path traversal or boundary escape detected"
-        elif not resolved.exists():
-            reason = "file does not exist"
-        elif resolved.suffix.lower() != ".html":
-            reason = f"not an .html file — got {resolved.suffix!r}"
-        if reason is not None:
-            issues.append(
-                {
-                    "code": "RPT-1",
-                    "message": (
-                        f"[dangling-artifact-path] {handoff.path} → {artifact_path_str!r} "
-                        f"({reason})"
-                    ),
-                    "sidecar_path": str(handoff.path),
-                    "artifact_path": artifact_path_str,
-                }
-            )
-
-    if json_output:
-        typer.echo(
-            _json.dumps(
-                {
-                    "ok": not issues,
-                    "issue_count": len(issues),
-                    "issues": issues,
-                }
-            )
-        )
-        raise typer.Exit(0 if not issues else 1)
-
-    if not issues:
-        console.print("[green]OK[/green] No RPT-1 issues found.")
-        raise typer.Exit(0)
-
-    for issue in issues:
-        console.print(f"[red]{issue['code']}[/red] {issue['message']}", markup=False)
-    console.print(f"\n{len(issues)} issue(s) found.")
-    raise typer.Exit(1)

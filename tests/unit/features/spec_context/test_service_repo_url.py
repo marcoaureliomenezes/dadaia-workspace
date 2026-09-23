@@ -2,7 +2,6 @@
 
 Covers:
 - ``create`` persists an explicit repo_url (CLI layer overrides catalog; service stores it).
-- ``update_url`` repair verb through the store ``update()`` API.
 - ``alive``/``dead`` back-fill repo_url from ``git remote get-url origin`` when the record
   URL is empty and the repo is on disk — exercised against a REAL ``GitSubprocessClient``
   with a local ``file://`` fixture remote as origin (per AC-W2-03).
@@ -84,48 +83,19 @@ def _git(args: list[str], cwd: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# create + update_url — merged variants (explicit/empty url, repair, state-preserve)
+# create — explicit and empty repo_url
 # ---------------------------------------------------------------------------
 
 
-def test_create_and_update_url_matrix(
+def test_create_persists_explicit_and_empty_repo_url(
     fake_service: SpecContextService, store: FakeContextStore
 ) -> None:
-    # create() persists an explicit repo_url.
     ctx = fake_service.create("foo", "foo", "https://example.test/foo.git")
     assert ctx.repo_url == "https://example.test/foo.git"
     assert store.get("foo").repo_url == "https://example.test/foo.git"  # type: ignore[union-attr]
 
-    # create() persists an empty url when unknown.
     ctx2 = fake_service.create("bar", "bar", "")
     assert ctx2.repo_url == ""
-
-    # update_url repairs an empty url through the store.
-    updated = fake_service.update_url("bar", "https://example.test/bar.git")
-    assert updated.repo_url == "https://example.test/bar.git"
-    assert store.get("bar").repo_url == "https://example.test/bar.git"  # type: ignore[union-attr]
-
-    # update_url preserves state and branch on an ALIVE record.
-    fake_service.create("baz", "baz", "")
-    existing = store.get("baz")
-    assert existing is not None
-    store.update(
-        type(existing)(
-            name=existing.name,
-            state=ContextState.ALIVE,
-            repo_slug=existing.repo_slug,
-            repo_url="",
-            created_at=existing.created_at,
-            alive_since="2026-01-01T00:00:00+00:00",
-            dead_since=None,
-            current_branch="feature/x",
-        )
-    )
-    updated2 = fake_service.update_url("baz", "https://example.test/baz.git")
-    assert updated2.state == ContextState.ALIVE
-    assert updated2.current_branch == "feature/x"
-    assert updated2.alive_since == "2026-01-01T00:00:00+00:00"
-    assert updated2.repo_url == "https://example.test/baz.git"
 
 
 # ---------------------------------------------------------------------------

@@ -42,7 +42,7 @@ def test_error_line_exits_nonzero(monkeypatch, tmp_path: Path) -> None:
         monkeypatch,
         tmp_path,
         (
-            DoctorLine(DoctorStatus.OK, "stage:data/DADAIA.md"),
+            DoctorLine(DoctorStatus.OK, "stage:data/AGENTS.md"),
             DoctorLine(DoctorStatus.ERROR, "public-privacy:x.md: contains 'secret-name'"),
         ),
     )
@@ -56,7 +56,7 @@ def test_all_nonblocking_exits_zero(monkeypatch, tmp_path: Path) -> None:
         monkeypatch,
         tmp_path,
         (
-            DoctorLine(DoctorStatus.OK, "law:DADAIA.md"),
+            DoctorLine(DoctorStatus.OK, "root:AGENTS.md"),
             DoctorLine(DoctorStatus.WARN, "claude: out-of-profile runtime present"),
             DoctorLine(DoctorStatus.INFO, "codex:trust-boundary — informational"),
             DoctorLine(DoctorStatus.FOREIGN, "repos/consumer:AGENTS.md"),

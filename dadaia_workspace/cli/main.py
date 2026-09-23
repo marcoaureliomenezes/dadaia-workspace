@@ -11,28 +11,19 @@ from dadaia_workspace.cli.commands import (
     ci,
     context,
     doctor,
+    harness,
     init,
     migrate,
-    panel,
     public,
     reconcile,
     reports,
-    repos,
-    server,
     specs,
 )
 from dadaia_workspace.cli.commands import (
     help as help_cmd,
 )
-from dadaia_workspace.cli.commands.audit import audit_app
-from dadaia_workspace.cli.commands.bugs import bugs_app
 from dadaia_workspace.cli.commands.export import export
 from dadaia_workspace.cli.commands.import_ import import_workspace
-from dadaia_workspace.cli.commands.memory import app as memory_app
-from dadaia_workspace.cli.commands.newartifacts import (
-    backlog_app,
-    release_app,
-)
 from dadaia_workspace.core.exceptions import DadaiaError
 
 app = typer.Typer(
@@ -89,19 +80,12 @@ app.command(name="reconcile", rich_help_panel="Management")(reconcile.reconcile)
 # Sub-command groups
 app.add_typer(context.app, name="context", rich_help_panel="Common")
 app.add_typer(ci.app, name="ci", rich_help_panel="Management")
-app.add_typer(repos.app, name="repos", rich_help_panel="Management")
 app.add_typer(public.app, name="public", rich_help_panel="Common")
+app.add_typer(harness.app, name="harness", rich_help_panel="Common")
 app.add_typer(doctor.app, name="doctor", rich_help_panel="Common")
 app.add_typer(reports.app, name="reports", rich_help_panel="Management")
 app.add_typer(specs.app, name="specs", rich_help_panel="Common")
-app.add_typer(server.app, name="server", rich_help_panel="Management")
 app.add_typer(migrate.app, name="migrate", rich_help_panel="Management")
-app.add_typer(panel.app, name="panel", rich_help_panel="Common")
-app.add_typer(memory_app, name="memory", rich_help_panel="Management")
-app.add_typer(release_app, name="release", rich_help_panel="Common")
-app.add_typer(backlog_app, name="backlog", rich_help_panel="Common")
-app.add_typer(audit_app, name="audit", rich_help_panel="Common")
-app.add_typer(bugs_app, name="bugs", rich_help_panel="Common")
 app.add_typer(help_cmd.app, name="help", rich_help_panel="Common")
 
 

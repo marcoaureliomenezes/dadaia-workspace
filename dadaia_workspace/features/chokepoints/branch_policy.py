@@ -119,7 +119,7 @@ def parse_push_refs(stdin_text: str) -> list[PushRef]:
 
 
 # ── The three permitted branch patterns (v0.4.4 FR3 / T-044-06 — the gitflow v2 -------
-# inversion). The gitflow law (DADAIA.md §4, operator ruling 2026-08-23): exactly three
+# inversion). The gitflow law (dd-gitflow-default, operator ruling 2026-08-23): exactly three
 # branch patterns exist — no ``v`` prefix, no ``hotfix`` row (G2 retires it outright) —
 # and ``feature/{M.m.p}`` is the ONLY pushable one; ``develop`` and ``main`` advance by
 # PR only. This tuple is the ONE pattern source — the pre-push hook and the CI
@@ -150,7 +150,7 @@ def _refuse_branch(branch: str, local_ref: str) -> Decision:
             allowed=False,
             message=(
                 "[pre-push] BLOCKED: 'main' is never pushed directly — it advances only "
-                "via a PR from 'develop' (gitflow law, DADAIA.md §4).\n"
+                "via a PR from 'develop' (gitflow law, dd-gitflow-default).\n"
                 "fix: gh pr create --base main --head develop"
             ),
         )
@@ -159,7 +159,7 @@ def _refuse_branch(branch: str, local_ref: str) -> Decision:
             allowed=False,
             message=(
                 "[pre-push] BLOCKED: 'develop' is never pushed directly — it advances "
-                "only via a PR from 'feature/{M.m.p}' (gitflow law, DADAIA.md §4).\n"
+                "only via a PR from 'feature/{M.m.p}' (gitflow law, dd-gitflow-default).\n"
                 "fix: gh pr create --base develop --head feature/<M.m.p>"
             ),
         )
@@ -168,7 +168,7 @@ def _refuse_branch(branch: str, local_ref: str) -> Decision:
         message=(
             f"[pre-push] BLOCKED: ref '{local_ref}' is outside the three permitted "
             "branch patterns — main, develop, feature/M.m.p (gitflow law, "
-            "DADAIA.md §4). Only 'feature/M.m.p' is pushable.\n"
+            "dd-gitflow-default). Only 'feature/M.m.p' is pushable.\n"
             "fix: git checkout -b feature/<M.m.p> main && git push origin feature/<M.m.p>"
         ),
     )
@@ -176,7 +176,7 @@ def _refuse_branch(branch: str, local_ref: str) -> Decision:
 
 def check_branch_policy(refs: list[PushRef]) -> Decision | None:
     """Step 1 of :func:`~dadaia_workspace.features.chokepoints.push_gate.push_gate_decision`
-    (DADAIA.md §4): every non-deletion, non-tag ref must be
+    (dd-gitflow-default): every non-deletion, non-tag ref must be
     ``refs/heads/feature/{M.m.p}``, pushed to the SAME remote name — ``develop``/``main``
     are refused outright (PR only); names outside the three permitted patterns are
     refused as invalid. Returns the first refusal, or ``None`` when every ref clears
@@ -190,7 +190,7 @@ def check_branch_policy(refs: list[PushRef]) -> Decision | None:
                 message=(
                     f"[pre-push] BLOCKED: local ref '{ref.local_ref}' is not a branch "
                     "head — only a 'refs/heads/feature/M.m.p' branch may be pushed "
-                    "(gitflow law, DADAIA.md §4).\n"
+                    "(gitflow law, dd-gitflow-default).\n"
                     "fix: git checkout feature/<M.m.p> && git push origin feature/<M.m.p>"
                 ),
             )
@@ -203,7 +203,7 @@ def check_branch_policy(refs: list[PushRef]) -> Decision | None:
                 message=(
                     f"[pre-push] BLOCKED: refspec aims local '{branch}' at remote "
                     f"'{ref.remote_ref}' — only refs/heads/{branch} → "
-                    f"refs/heads/{branch} is pushable (gitflow law, DADAIA.md §4; "
+                    f"refs/heads/{branch} is pushable (gitflow law, dd-gitflow-default; "
                     "'develop' and 'main' advance via PR only).\n"
                     f"fix: git push origin {branch}:{branch}"
                 ),

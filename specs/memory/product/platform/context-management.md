@@ -1,56 +1,60 @@
 ---
 slug: context-management
 title: context-management
-tldr: ALIVE/DEAD registry of one main repo plus N associated repos, one Invocation per process, a Bind carrying scope, bind-driven injection, advisory presence.
-summary: Contexts (Spec Context Projects) and their repositories through a v3 registry, one resolution authority whose Bind carries the session's scope, one repo accessor, bind-driven injection and expiring presence records.
-tags: [context, lifecycle, session, no-locks, privacy]
+tldr: ALIVE/DEAD registry of one main repo plus N associated repos; one resolution per call; a bind names the session's scope and drives memory injection.
+summary: Spec Context Projects and their repos through one registry and the context verbs; one resolution authority whose Bind carries the session's scope; bind-driven injection of the tech stack, catalog and help digests; redaction at the render boundary.
+tags: [context, lifecycle, session, privacy]
+sources:
+  - dadaia_workspace/hooks/ctx_inject.py
+  - dadaia_workspace/hooks/_common.py
+  - dadaia_workspace/core/invocation.py
+  - dadaia_workspace/core/session_store.py
+  - dadaia_workspace/core/record_liveness.py
+  - dadaia_workspace/features/spec_context/injection_policy.py
+  - dadaia_workspace/features/spec_context/markers.py
+  - dadaia_workspace/features/spec_context/service.py
+  - dadaia_workspace/infrastructure/json_context_store.py
+  - dadaia_workspace/cli/commands/context.py
 ---
 
 ## Registry
 
-- The registry stores per context its name, main repo slug and URL, the ordered associated repos, state, branch and lifecycle timestamps.
-- The main repo is unique and the only specs, bind, memory, release and backlog target; associated repos are working checkouts, reached after it through the one repos accessor.
-- `context create` registers a DEAD context, back-filling `repo_url` from the repos catalog.
-- `context alive` clones or keeps every repo under `repos/`, restores the branch and folds the canon scaffold over `specs/` without overwriting an existing file; an associated repo is cloned clean and unbound.
-- `context dead` requires a clean, pushed state across the set, naming the offender otherwise, scans committed material with `--commit`, records the branch and removes the local repos.
-- `context repo add|remove|list` is idempotent, and `context update --url` repairs the remote URL.
-- A repo slug is owned by exactly one context: `create` and `repo add` refuse a slug another context owns through one ownership predicate, because `dead` destroys every entry it walks.
-- The v2→v3 migration is backup-first and additive, so historical collisions are detected instead — `INV-6` reports every multi-owner slug and never picks a winner ([[workspace-doctor]]).
+- `.dadaia/states/spec_contexts.json` stores per context its name, state, main repo slug and URL, ordered associated repos (slug + URL), branch and lifecycle timestamps; schema 2 and 3 files read alike, a schema 1 file is refused with `dadaia migrate` as the fix ([[specs-migration]]).
+- The main repo is where `specs/` lives and the only specs, bind, memory, release and backlog target; associated repos are working checkouts.
+- `dadaia context create <name> --main-repo <slug> [--url <url>] [--associated-repos a,b]` registers a DEAD context; without `--url` the URL comes from the repos catalog.
+- `dadaia context alive <name>` clones every missing repo of the set; the main repo alone gets the canon scaffold folded over `specs/` (never overwriting a file), its scaffold commit and branch restore; associated repos are cloned clean. It is idempotent on an ALIVE context.
+- `dadaia context dead <name> [--commit]` preflights the whole set before touching any repo: untracked files refuse without `--commit`, and with it a secret scan blocks on any hit; a repo with local commits and no remote refuses. Then tracked changes are committed and pushed, the branch recorded and every repo removed.
+- `alive` and `dead` back-fill an empty repo URL from the checkout's `origin`.
+- `dadaia context baseline <name> --yes [--push]` makes the first commit of an unborn repo; `dadaia context delete <name>` removes a DEAD context.
+- `dadaia context repo add|remove <ctx> <slug>` is idempotent; `dadaia context show <ctx> --json` is the one reader of the repo set.
+- A repo slug belongs to one context: `create`, `repo add` and `dadaia import` pass one ownership check; `INV-6` reports any multi-owner slug already on disk ([[workspace-doctor]]).
 
 ## Resolution
 
-- `core.invocation.resolve()` answers workspace root, session, context, repo slug, specs dir and the session's own `Bind` in one call; the CLI seam, `container`, the gate and ctx-inject each build one `Invocation` and re-derive nothing — no mode, release or phase is resolved anywhere.
-- `Bind` is the context the session named plus every repo slug that context owns (`all_repos()`: main plus associated) — its scope; `resolve_bind` reads `DADAIA_CONTEXT` then this session's live record and never the cwd, so sitting inside a repo is not a bind and an unbound `Bind` owns nothing.
-- Rung 0 is caller-supplied (`--context`, or a write target under `repos/<slug>/`), rung 1 `DADAIA_CONTEXT`, rung 2 this session's record keyed by its harness-native id, rung 3 the repo containing the cwd.
-- The workspace root is walked from an explicit `target_path` when one is given and only from the cwd otherwise, so every rung in a call shares one root.
-- Rungs 0 and 3 resolve a slug and recover the context name through the registry, falling back to the slug when unregistered.
-- Every rung fails soft, and when all are exhausted `resolve_specs_dir` raises rather than guessing.
-- One harness session runs per checked-out tree; a parallel session gets its own linked worktree before launch (ADR 0002, `DADAIA.md` §3.3).
-- `core.session_store` is the sole reader, writer and toucher of `.dadaia/sessions/`; `core.record_liveness.is_stale` is the one staleness predicate.
-- `DADAIA_CONTEXT` is the only environment variable in resolution; the other `DADAIA_*` variables are hook transport or the `DADAIA_SESSION_ID` identity override.
+- `resolve` in `dadaia_workspace/core/invocation.py` answers workspace root, session, context, repo slug, specs dir and the session's `Bind` in one call; the CLI, the container, the gate and ctx-inject each resolve once.
+- Rung 0 is caller-supplied (`--context`, or a write target under `repos/<slug>/`), rung 1 `DADAIA_CONTEXT`, rung 2 this session's live record keyed by its harness-native id, rung 3 the repo containing the cwd. Every rung fails soft; with all exhausted, specs-dir resolution raises instead of guessing.
+- The workspace root is walked from an explicit target path when one is given, else from the cwd, so every rung shares one root.
+- `Bind` is the named context plus every repo slug it owns (main plus associated); `resolve_bind` reads `DADAIA_CONTEXT` then the session record, never the cwd, and an unbound `Bind` owns nothing.
+- `dadaia_workspace/core/session_store.py` alone reads and writes `.dadaia/sessions/`; `is_stale` in `dadaia_workspace/core/record_liveness.py` is the one staleness predicate.
+- One harness session runs per checked-out tree; a parallel session uses its own linked worktree.
 
 ## Binding and injection
 
-- `dadaia context bind <context> [--print-env]` is one verb with one argument: it writes one artifact — the caller-owned `.dadaia/sessions/<session-id>.json` carrying context, runtime, pid and `bound_at` — acquiring nothing and requiring no live release; `--print-env` emits `DADAIA_CONTEXT` and `DADAIA_SESSION_ID` for the `eval $(…)` flow.
-- That record is reachable at rung 2 only when keyed by the session's own harness-native id; lacking one, `bind` warns that the `DADAIA_CONTEXT` export is the binding.
-- The injection carries state, never law: the tech-stack digest plus the product catalog digest, the ALIVE-context list going only to an unbound session.
-- Every emission also attaches the derived CLI help digest (`.dadaia/agentic/help-digest.md`, built by `public install`/`reconcile`/`dadaia help tree --digest`) bind-independent; the hook only reads the file, never builds it.
-- The catalog persists ten keys per atom (`slug title tldr summary path area tags depends_on rank token_estimate`); the injected digest keeps exactly `slug`, `title`, `tldr` and `path` (`hooks/ctx_inject.py::_DIGEST_FIELDS`) — `summary` stays behind.
-- Specs, bind, memory, releases and backlog resolve only from the main repo, so each doctor and the gate see exactly one `specs/` tree per context.
-- The bind's scope is the only thing it constrains: a bound session's MUTATING write under a `repos/<slug>/` another context owns is refused with `fix: … context bind <owner>`; ADDITIVE paths, workspace-root paths, unregistered slugs and an unbound session are never scope-judged ([[sdd-gate-v3]]).
+- `dadaia context bind <name> [--print-env]` writes one record, `.dadaia/sessions/<session-id>.json` (context, runtime, pid, `bound_at`), acquiring nothing; `--print-env` emits `DADAIA_CONTEXT` and `DADAIA_SESSION_ID` for `eval $(…)`.
+- The ctx-inject hook injects state, never law: a bound session gets its context header, `ARCHITECTURE.md`'s `## Tech Stack` section and the catalog digest (`slug`, `title`, `tldr`, `path` per atom); an unbound session gets `[no bound context]` and the ALIVE-context list.
+- Every emission also carries `.dadaia/agentic/help-digest.md`, which the hook reads and never builds.
+- Injection fires once per session, again after a later bind or a compaction, and stays silent on repeat prompts; its sentinel and compact markers live in `.dadaia/tmp/` and are reaped by mtime.
+- A bound session's MUTATING write under a `repos/<slug>/` another context owns is refused with a `fix:` naming the owner's bind ([[sdd-gate-v3]]).
 
-## Presence, redaction, export
+## Redaction
 
-- Mutating file-tool activity best-effort records advisory presence; a live peer warns, never denies, and records expire by heartbeat age.
-- `presence.gc()` is the only reaper of presence records, throttle markers, the injection sentinel and the directories they empty; the workspace reaper runs it — `doctor --fix` and, on one throttle, the PostToolUse hook through `doctor.reap(own_session_id=…)` — so a live session's own record is never touched ([[workspace-doctor]]).
-- `context list`, `context show` and `dadaia doctor` accept `--redact`, presence block included, turning every foreign context name and repo slug into a stable `[REDACTED-CONTEXT-<n>]` placeholder at the render boundary.
-- `dadaia export` refreshes each ALIVE repo's checked-out branch, then writes one file, `.dadaia/dist/spec-contexts.json` (`spec-contexts-export-v1`: per context slug, name, state, repo URL, branch, associated repos, last sync); anything else in `dist/` is `WS-dist-slop` ([[workspace-doctor]]).
-- `dadaia import <file>` accepts only that schema version, registers each unknown name DEAD with its branch and associated repos, prints `skipped (exists)` for a known name and names `dadaia context alive <name>` as the restore step.
+- `dadaia context list`, `dadaia context show` and `dadaia doctor` accept `--redact`, masking every foreign context name and repo slug as a stable placeholder at render time.
+- Moving the context set between workspaces is [[context-portability]].
 
 ## Runtime state
 
-`.dadaia/states/spec_contexts.json`; `.dadaia/sessions/`; `.dadaia/states/presence/`; `.dadaia/dist/spec-contexts.json`; `repos/<slug>/`, where only the main repo carries canonical specs.
+`.dadaia/states/spec_contexts.json`; `.dadaia/sessions/`; `.dadaia/tmp/ctx-*` markers; `repos/<slug>/`, where only the main repo carries `specs/`.
 
 ## Dependencies
 
-[[spec-context-project]], [[sdd-gate-v3]], [[workspace-doctor]], [[workspace-init]], [[QUALITY]].
+[[spec-context-project]], [[sdd-gate-v3]], [[workspace-doctor]], [[workspace-init]], [[context-portability]], [[QUALITY]].

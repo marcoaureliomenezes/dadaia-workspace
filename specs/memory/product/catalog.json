@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-13T10:43:12Z",
+  "generated_at": "2026-09-23T01:05:25Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -7,50 +7,32 @@
       "slug": "agent-comms",
       "title": "agent-comms",
       "area": "agents",
-      "tldr": "The handoff-v1 JSON contract agents emit, its stdlib validator behind `dadaia reports`, and ack-on-consume deletion.",
-      "summary": "Agent-to-agent coordination is a JSON handoff under the workspace handoff tree, validated against the packaged handoff-v1 schema, with HTML reports as optional evidence.",
+      "tldr": "The handoff-v1 JSON contract agents emit, its stdlib validator behind `dadaia reports validate`, and ack-on-consume deletion with a one-day TTL.",
+      "summary": "Agent-to-agent coordination is a JSON handoff under the workspace handoff tree, validated against the packaged handoff-v1 schema, with an HTML report as optional evidence.",
       "path": "specs/memory/product/agents/agent-comms.md",
       "tags": [
         "agent-comms",
         "handoff",
         "schema"
       ],
-      "token_estimate": 389,
+      "token_estimate": 431,
       "depends_on": [
         "workspace-doctor",
         "public-asset-distribution"
+      ],
+      "sources": [
+        "dadaia_workspace/core/handoff_index.py",
+        "dadaia_workspace/cli/commands/reports.py",
+        "dadaia_workspace/public/schemas/handoff-v1.schema.json"
       ]
     },
     {
       "rank": 2,
-      "slug": "agent-monitoring",
-      "title": "agent-monitoring",
-      "area": "agents",
-      "tldr": "Stdlib-only local agent telemetry and the governance-event table in one SQLite store, plus where each runtime artifact under .dadaia/ lives and expires.",
-      "summary": "Telemetry ingests Claude Code, Codex and Kimi Code session metadata into a local SQLite store behind an allowlist gate; the same store holds one governance event per record-changing verb; runtime artifacts live in registry zones and expire through dadaia doctor.",
-      "path": "specs/memory/product/agents/agent-monitoring.md",
-      "tags": [
-        "monitoring",
-        "telemetry",
-        "sessions",
-        "lifecycle"
-      ],
-      "token_estimate": 624,
-      "depends_on": [
-        "sdd-bug-backlog-governance",
-        "workspace-doctor",
-        "panel",
-        "context-management",
-        "brand-identity"
-      ]
-    },
-    {
-      "rank": 3,
       "slug": "agent-orchestration",
       "title": "agent-orchestration",
       "area": "agents",
-      "tldr": "Nine core Layer-1 roles, two dispatchers, document-governed ordered work, and advisory-only concurrency.",
-      "summary": "Role ownership, dispatch purity, task discipline and review checkpoints; the ordered lifecycle is carried by SDD documents and agent dispatch, never by a runtime.",
+      "tldr": "Three dd- personas dispatched by the main thread alone; ordered work carried by the SDD documents and handoffs, never a runtime; concurrent sessions, no locks.",
+      "summary": "Who owns which artifact, who may dispatch, how a stage's sequencing is evidenced by the documents themselves, and how each persona receives its model, effort and least-privilege tool set at install.",
       "path": "specs/memory/product/agents/agent-orchestration.md",
       "tags": [
         "orchestration",
@@ -58,27 +40,31 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 518,
+      "token_estimate": 536,
       "depends_on": [
-        "ARCHITECTURE",
-        "TECHSTACK",
         "agentic-entities",
-        "sdd-bug-backlog-governance",
-        "sdd-gate-v3",
-        "QUALITY",
         "agent-comms",
+        "ARCHITECTURE",
+        "release-lifecycle",
+        "QUALITY",
+        "sdd-gate-v3",
         "harness-claude-code",
-        "harness-codex",
-        "harness-kimi-code"
+        "harness-codex"
+      ],
+      "sources": [
+        "dadaia_workspace/public/agents/**",
+        "dadaia_workspace/core/agent_model_templates.py",
+        "dadaia_workspace/core/model_registry.py",
+        "dadaia_workspace/public/skills/dd-manager-orchestration/**"
       ]
     },
     {
-      "rank": 4,
+      "rank": 3,
       "slug": "agentic-entities",
       "title": "agentic-entities",
       "area": "agents",
-      "tldr": "Abstract-entity registry — Personas, Behaviors, Rules — plus the behavior map binding every skill and scoped rule file to one law section.",
-      "summary": "The entity registry defines the workspace method abstractly and every scaffolded sub-agent, hook and rule file derives from it; the behavior map binds each skill and scoped rule file to one law section.",
+      "tldr": "The entity registry — three personas, the deterministic behaviours every harness implements, the rules — and the behavior map binding each skill to law.",
+      "summary": "The registry defines the workspace method harness-agnostically and every scaffolded persona, hook and rule derives from it; this atom holds the one enumeration of the hook behaviours the harness atoms link to; the behavior map binds each skill and scoped rule file to one law section.",
       "path": "specs/memory/product/agents/agentic-entities.md",
       "tags": [
         "agents",
@@ -86,23 +72,28 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 779,
+      "token_estimate": 838,
       "depends_on": [
-        "QUALITY",
-        "ARCHITECTURE",
         "agent-orchestration",
-        "panel",
+        "sdd-gate-v3",
         "public-asset-distribution",
-        "TECHSTACK"
+        "QUALITY",
+        "ARCHITECTURE"
+      ],
+      "sources": [
+        "dadaia_workspace/public/entities/**",
+        "dadaia_workspace/public/data/CONTEXT-MAP.md",
+        "dadaia_workspace/public/skills/**",
+        "dadaia_workspace/infrastructure/entity_doctor.py"
       ]
     },
     {
-      "rank": 5,
+      "rank": 4,
       "slug": "public-asset-distribution",
       "title": "public-asset-distribution",
       "area": "distribution",
-      "tldr": "Canonical public assets staged to .dadaia/agentic and projected to the Claude Code, Codex, Kimi Code and .agents roots, hash-compared by doctor.",
-      "summary": "The stage, install and doctor chain distributing the agentic surface into runtime roots, with hash-compare overwrite, rendered agents, whole-folder skills and a privacy gate.",
+      "tldr": "Public assets staged once, projected into the root map, scoped AGENTS.md, .agents/ and each registered harness's files; doctor reports drift.",
+      "summary": "The stage, install and doctor chain that distributes the agentic surface into a workspace — hash-compared overwrite, rendered personas, whole-folder skills, per-harness hook and agent files derived from one registry, the specs scaffold, and a privacy gate; plus the dadaia-skills repository built from the same skills.",
       "path": "specs/memory/product/distribution/public-asset-distribution.md",
       "tags": [
         "public",
@@ -111,20 +102,40 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 944,
+      "token_estimate": 819,
       "depends_on": [
+        "harness-kimi-code",
         "agentic-entities",
+        "workspace-init",
         "workspace-doctor",
-        "workspace-init"
+        "context-management",
+        "pypi-distribution"
+      ],
+      "sources": [
+        "dadaia_workspace/features/public/**",
+        "dadaia_workspace/infrastructure/projection.py",
+        "dadaia_workspace/infrastructure/projection_rules.py",
+        "dadaia_workspace/infrastructure/public_assets.py",
+        "dadaia_workspace/infrastructure/public_assets_common.py",
+        "dadaia_workspace/infrastructure/install_plan.py",
+        "dadaia_workspace/infrastructure/install_helpers.py",
+        "dadaia_workspace/infrastructure/agent_transcodes.py",
+        "dadaia_workspace/infrastructure/runtime_transforms/**",
+        "dadaia_workspace/infrastructure/privacy_check.py",
+        "dadaia_workspace/core/harness_registry.py",
+        "dadaia_workspace/public/scaffold/**",
+        "dadaia_workspace/public/templates/**",
+        "dadaia_workspace/public/scripts/build-skills-repo.py",
+        "dadaia_workspace/cli/commands/public.py"
       ]
     },
     {
-      "rank": 6,
+      "rank": 5,
       "slug": "pypi-distribution",
       "title": "pypi-distribution",
       "area": "distribution",
-      "tldr": "The published PyPI package on one version axis, the OIDC publish pipeline, and the wheel content contract.",
-      "summary": "dadaia-workspace publishes to PyPI from the release workflow under OIDC trusted publishing; pyproject version is the single source of the number, and minting is separate from publishing.",
+      "tldr": "The PyPI package on one version axis, two console-script names, the OIDC pipeline that also publishes the skills repo, the wheel contract and the docs site.",
+      "summary": "dadaia-workspace publishes to PyPI under OIDC trusted publishing from the release-please workflow; release-please owns the version, the CHANGELOG and the tag, pyproject carries the published floor, and the same release publishes the dadaia-skills repository.",
       "path": "specs/memory/product/distribution/pypi-distribution.md",
       "tags": [
         "distribution",
@@ -132,126 +143,189 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 667,
+      "token_estimate": 598,
       "depends_on": [
+        "release-lifecycle",
         "public-asset-distribution",
         "consumer-agent-support",
         "QUALITY",
         "cross-platform-portability"
+      ],
+      "sources": [
+        "pyproject.toml",
+        ".github/workflows/**",
+        "release-please-config.json",
+        ".release-please-manifest.json",
+        "dadaia_workspace/cli/main.py",
+        "dadaia_workspace/__main__.py",
+        "docs/**"
       ]
     },
     {
-      "rank": 7,
+      "rank": 6,
       "slug": "harness-claude-code",
-      "title": "Harness — Claude Code",
+      "title": "harness-claude-code",
       "area": "harness",
-      "tldr": "Entry harness with native sub-agent dispatch; its scaffold is the CLAUDE.md bridge plus the .claude/ projection.",
-      "summary": "Claude Code is the only harness with native sub-agent dispatch, loading the law through the CLAUDE.md import chain and running the nine-agent roster under the Python hooks.",
+      "tldr": "Entry harness with native sub-agent dispatch; reads the root AGENTS.md map natively and reaches skills and personas through per-entry symlinks into .agents/.",
+      "summary": "How Claude Code loads the workspace law, reaches the three dd- personas and the skills, binds a session, and which hook events carry the workspace's behaviours.",
       "path": "specs/memory/product/harness/harness-claude-code.md",
       "tags": [
         "harness",
         "claude-code",
         "projection",
-        "dispatch"
+        "hooks"
       ],
-      "token_estimate": 352,
+      "token_estimate": 433,
       "depends_on": [
-        "context-management",
-        "sdd-gate-v3",
+        "agent-orchestration",
+        "agentic-entities",
         "public-asset-distribution",
-        "TECHSTACK",
-        "agent-orchestration"
+        "sdd-gate-v3",
+        "context-management"
+      ],
+      "sources": [
+        "dadaia_workspace/core/harness_registry.py",
+        "dadaia_workspace/infrastructure/runtime_config.py",
+        "dadaia_workspace/infrastructure/agent_transcodes.py",
+        "dadaia_workspace/infrastructure/runtime_transforms/hook_wrappers.py"
       ]
     },
     {
-      "rank": 8,
+      "rank": 7,
       "slug": "harness-codex",
-      "title": "Harness — Codex",
+      "title": "harness-codex",
       "area": "harness",
-      "tldr": "Entry harness on the operator's Codex CLI — native AGENTS.md, Starlark command policy, version-qualified hook fire, `.codex/` projection.",
-      "summary": "Capability and scaffold truth for the Codex harness — native AGENTS.md discovery, version-qualified hook certification, Starlark command policy and the .codex/ projection.",
+      "tldr": "Entry harness on the Codex CLI: native AGENTS.md chain and .agents/skills; .codex/ carries config, hooks, the command policy and persona TOML.",
+      "summary": "Codex reads the root map, the root->cwd AGENTS.md chain and .agents/skills natively; .codex/ holds config.toml, hooks.json, the command-policy rules and the three dd- persona TOMLs transcoded from .agents/agents/.",
       "path": "specs/memory/product/harness/harness-codex.md",
       "tags": [
         "harness",
         "codex",
         "projection",
-        "enforcement"
+        "hooks"
       ],
-      "token_estimate": 232,
+      "token_estimate": 366,
       "depends_on": [
-        "sdd-gate-v3",
-        "TECHSTACK",
         "agentic-entities",
         "public-asset-distribution",
+        "sdd-gate-v3",
         "agent-orchestration"
+      ],
+      "sources": [
+        "dadaia_workspace/core/harness_registry.py",
+        "dadaia_workspace/infrastructure/codex_doctor.py",
+        "dadaia_workspace/infrastructure/agent_transcodes.py",
+        "dadaia_workspace/infrastructure/runtime_config.py",
+        "dadaia_workspace/infrastructure/runtime_transforms/hook_wrappers.py"
+      ]
+    },
+    {
+      "rank": 8,
+      "slug": "harness-copilot",
+      "title": "harness-copilot",
+      "area": "harness",
+      "tldr": "Entry harness on GitHub Copilot CLI — native root AGENTS.md and .agents/skills; .github/ carries agents/*.agent.md transcodes and two hook files.",
+      "summary": "Copilot reads the universal surface natively; its projection is the three dd- personas as .github/agents/*.agent.md and two hook files answered in Copilot's permissionDecision JSON, and nothing else under .github/.",
+      "path": "specs/memory/product/harness/harness-copilot.md",
+      "tags": [
+        "harness",
+        "copilot",
+        "projection",
+        "hooks"
+      ],
+      "token_estimate": 204,
+      "depends_on": [
+        "agentic-entities",
+        "sdd-gate-v3",
+        "public-asset-distribution",
+        "workspace-init"
+      ],
+      "sources": [
+        "dadaia_workspace/core/harness_registry.py",
+        "dadaia_workspace/infrastructure/agent_transcodes.py",
+        "dadaia_workspace/infrastructure/runtime_transforms/hook_wrappers.py"
       ]
     },
     {
       "rank": 9,
-      "slug": "harness-kimi-code",
-      "title": "Harness — Kimi Code",
+      "slug": "harness-cursor",
+      "title": "harness-cursor",
       "area": "harness",
-      "tldr": "Layer-1 harness — inert `.kimi-code/` projection plus user-level TOML hook shims; binds through `DADAIA_CONTEXT` exported at launch.",
-      "summary": "Kimi Code is a Layer-1 entry harness whose live wiring is five POSIX shims registered in a managed block of the user-level Kimi config; it binds through DADAIA_CONTEXT.",
-      "path": "specs/memory/product/harness/harness-kimi-code.md",
+      "tldr": "Entry harness on Cursor — native root AGENTS.md and .agents/skills; .cursor/ carries hooks.json (gate on shell, reaper at session start) and persona symlinks.",
+      "summary": "Cursor reads the universal surface natively; its projection is the dd- personas as relative symlinks under .cursor/agents/ and one hooks.json whose wrappers answer in Cursor's permission JSON; IDE file edits are not gated.",
+      "path": "specs/memory/product/harness/harness-cursor.md",
       "tags": [
         "harness",
-        "kimi-code",
-        "layer-1",
+        "cursor",
         "projection",
-        "binding"
+        "hooks"
       ],
-      "token_estimate": 335,
+      "token_estimate": 192,
       "depends_on": [
-        "public-asset-distribution",
-        "context-management",
-        "workspace-init",
-        "TECHSTACK",
+        "agentic-entities",
         "sdd-gate-v3",
-        "harness-claude-code"
+        "public-asset-distribution",
+        "workspace-init"
+      ],
+      "sources": [
+        "dadaia_workspace/core/harness_registry.py",
+        "dadaia_workspace/infrastructure/agent_transcodes.py",
+        "dadaia_workspace/infrastructure/runtime_transforms/hook_wrappers.py"
       ]
     },
     {
       "rank": 10,
-      "slug": "brand-identity",
-      "title": "brand-identity",
-      "area": "panel",
-      "tldr": "The panel's canonical five-colour palette and its CSS token mapping, sourced only from `views/assets/css/tokens.py`.",
-      "summary": "The panel's canonical palette and CSS tokens, homed in one module and extended per theme.",
-      "path": "specs/memory/product/panel/brand-identity.md",
+      "slug": "harness-devin",
+      "title": "harness-devin",
+      "area": "harness",
+      "tldr": "Entry harness on the Devin CLI — native AGENTS.md, .agents/skills and .agents/agents; its one projected file, .devin/hooks.v1.json, registers gate and reaper.",
+      "summary": "Devin reads the universal surface including the personas natively, so its projection is only .devin/hooks.v1.json, which reads the gate's Claude-compatible envelope without translation.",
+      "path": "specs/memory/product/harness/harness-devin.md",
       "tags": [
-        "brand",
-        "design",
-        "css",
-        "tokens"
+        "harness",
+        "devin",
+        "projection",
+        "hooks"
       ],
-      "token_estimate": 148,
+      "token_estimate": 151,
       "depends_on": [
-        "panel"
+        "agentic-entities",
+        "sdd-gate-v3",
+        "public-asset-distribution",
+        "workspace-init"
+      ],
+      "sources": [
+        "dadaia_workspace/core/harness_registry.py",
+        "dadaia_workspace/infrastructure/agent_transcodes.py",
+        "dadaia_workspace/infrastructure/runtime_transforms/hook_wrappers.py"
       ]
     },
     {
       "rank": 11,
-      "slug": "panel",
-      "title": "panel",
-      "area": "panel",
-      "tldr": "Local loopback-only four-tab workspace UI — Projects, Agents, Agentic Entities, Servers.",
-      "summary": "The panel serves a loopback-only, no-auth, Host-guarded, CSP-constrained four-tab UI over local workspace state; the Agents tab is its only governance editor.",
-      "path": "specs/memory/product/panel/panel.md",
+      "slug": "harness-kimi-code",
+      "title": "harness-kimi-code",
+      "area": "harness",
+      "tldr": "Entry harness with an empty projection: reads root AGENTS.md, .agents/skills and .agents/agents natively; user-level hook shims; DADAIA_CONTEXT binds.",
+      "summary": "Kimi Code consumes the universal surface directly and projects nothing into the workspace; its hooks are a managed block and shims in the user-level Kimi home, and its session binds through an exported DADAIA_CONTEXT.",
+      "path": "specs/memory/product/harness/harness-kimi-code.md",
       "tags": [
-        "panel",
-        "ui",
-        "http",
-        "dashboard"
+        "harness",
+        "kimi-code",
+        "hooks",
+        "binding"
       ],
-      "token_estimate": 282,
+      "token_estimate": 355,
       "depends_on": [
-        "agent-monitoring",
-        "context-management",
         "agentic-entities",
-        "server-registry",
-        "agent-orchestration",
-        "brand-identity"
+        "public-asset-distribution",
+        "sdd-gate-v3",
+        "context-management",
+        "workspace-init"
+      ],
+      "sources": [
+        "dadaia_workspace/core/harness_registry.py",
+        "dadaia_workspace/infrastructure/runtime_config.py",
+        "dadaia_workspace/infrastructure/runtime_transforms/hook_wrappers.py"
       ]
     },
     {
@@ -259,28 +333,35 @@
       "slug": "product-vision",
       "title": "product-vision",
       "area": "philosophy",
-      "tldr": "A local-first, spec-driven workspace that gives AI agents current context, a document-governed lifecycle, visible concurrency and anti-slop boundaries.",
-      "summary": "dadaia-workspace is a local-first environment for context-bound agent work — canonical specs and memory, deterministic gates, a document-governed lifecycle and auditable evidence.",
+      "tldr": "One workspace folder, an agent at its root, projects in repos inside, governance outside every repo; multi-project x multi-repo, never a monorepo; no slop.",
+      "summary": "The founding paradigm and the pillars of dadaia-workspace, plus the two usage paths — a human from a shell, an agent from the root AGENTS.md map — reading one truth.",
       "path": "specs/memory/product/philosophy/product-vision.md",
       "tags": [
         "vision",
-        "philosophy",
-        "identity",
-        "lifecycle",
-        "anti-slop"
+        "paradigm",
+        "pillars"
       ],
-      "token_estimate": 479,
+      "token_estimate": 605,
       "depends_on": [
         "spec-context-project",
+        "context-management",
+        "agentic-entities",
+        "release-lifecycle",
+        "bug-ledger",
+        "backlog-ledger",
         "sdd-gate-v3",
         "public-asset-distribution",
         "pypi-distribution",
         "workspace-init",
         "workspace-doctor",
-        "panel",
         "agent-comms",
         "QUALITY",
         "ARCHITECTURE"
+      ],
+      "sources": [
+        "AGENTS.md",
+        "dadaia_workspace/public/data/AGENTS.md",
+        "specs/constitution.md"
       ]
     },
     {
@@ -297,66 +378,173 @@
         "lifecycle",
         "concurrency"
       ],
-      "token_estimate": 319,
+      "token_estimate": 316,
       "depends_on": [
-        "context-management",
         "sdd-gate-v3",
+        "context-management",
         "ARCHITECTURE"
+      ],
+      "sources": [
+        "dadaia_workspace/features/spec_context/**",
+        "dadaia_workspace/core/invocation.py",
+        "dadaia_workspace/cli/commands/context.py"
       ]
     },
     {
       "rank": 14,
+      "slug": "capabilities",
+      "title": "capabilities",
+      "area": "platform",
+      "tldr": "dadaia capabilities [--json] prints the installed contract: distribution and specs pattern versions, status tokens, the live verbs and harnesses.",
+      "summary": "A read-only verb an agent runs first in a new or upgraded session: a dadaia-capabilities-v3 JSON payload naming the installed distribution version, the canonical specs pattern version and status tokens, the context states, commands and selection contract, the Layer-1 harnesses and every command group with its subcommands, all derived from the live command tree and the harness registry, plus the certify command; the table view is a digest of the same payload.",
+      "path": "specs/memory/product/platform/capabilities.md",
+      "tags": [
+        "capabilities",
+        "contract",
+        "provider",
+        "onboarding"
+      ],
+      "token_estimate": 325,
+      "depends_on": [
+        "consumer-agent-support",
+        "workspace-doctor",
+        "specs-migration",
+        "context-management",
+        "pypi-distribution"
+      ],
+      "sources": [
+        "dadaia_workspace/features/capabilities/**",
+        "dadaia_workspace/cli/commands/capabilities.py"
+      ]
+    },
+    {
+      "rank": 15,
+      "slug": "ci-preflight",
+      "title": "ci-preflight",
+      "area": "platform",
+      "tldr": "dadaia ci preflight runs the library's CI checks locally — ruff format, ruff check, mypy --strict, lint-imports, pytest — and refuses outside the source repo.",
+      "summary": "The local CI-equivalent run a contributor makes before every push of the dadaia-workspace source repo: five ordered checks resolved from the running venv, fail-fast by default, exit 1 with each failing check's output tail; any other repo is refused with a message pointing at its own CI.",
+      "path": "specs/memory/product/platform/ci-preflight.md",
+      "tags": [
+        "ci",
+        "preflight",
+        "lint",
+        "typecheck",
+        "tests"
+      ],
+      "token_estimate": 277,
+      "depends_on": [
+        "sdd-gate-v3",
+        "pypi-distribution",
+        "QUALITY"
+      ],
+      "sources": [
+        "dadaia_workspace/features/ci_preflight/**",
+        "dadaia_workspace/cli/commands/ci.py",
+        "dadaia_workspace/infrastructure/subprocess_runner.py"
+      ]
+    },
+    {
+      "rank": 16,
       "slug": "consumer-agent-support",
       "title": "Consumer validation gate",
       "area": "platform",
       "tldr": "A consumer-side validation agent running the shipped recipe on a real workspace is the release gate; no wheel publishes until every statement reports PASS.",
-      "summary": "The canonical release gate is a consumer-side validation agent running the shipped recipe on a real workspace; a deterministic internal gate never approves a release by itself.",
+      "summary": "The release gate is a consumer-side validation agent running the shipped recipe on a real workspace; dadaia certify runs the deterministic journey in a disposable workspace and is necessary, never sufficient.",
       "path": "specs/memory/product/platform/consumer-agent-support.md",
       "tags": [
         "consumer-validation",
         "release-gate",
         "sdd"
       ],
-      "token_estimate": 347,
+      "token_estimate": 343,
       "depends_on": [
+        "pypi-distribution",
         "workspace-init",
-        "TECHSTACK",
+        "ARCHITECTURE",
         "spec-context-project",
         "sdd-gate-v3",
-        "workspace-doctor"
+        "workspace-doctor",
+        "capabilities"
+      ],
+      "sources": [
+        "dadaia_workspace/public/data/CONSUMER_VALIDATION_RECIPE.md",
+        "dadaia_workspace/features/certification/**",
+        "dadaia_workspace/infrastructure/certification_process.py",
+        "dadaia_workspace/cli/commands/certify.py"
       ]
     },
     {
-      "rank": 15,
+      "rank": 17,
       "slug": "context-management",
       "title": "context-management",
       "area": "platform",
-      "tldr": "ALIVE/DEAD registry of one main repo plus N associated repos, one Invocation per process, a Bind carrying scope, bind-driven injection, advisory presence.",
-      "summary": "Contexts (Spec Context Projects) and their repositories through a v3 registry, one resolution authority whose Bind carries the session's scope, one repo accessor, bind-driven injection and expiring presence records.",
+      "tldr": "ALIVE/DEAD registry of one main repo plus N associated repos; one resolution per call; a bind names the session's scope and drives memory injection.",
+      "summary": "Spec Context Projects and their repos through one registry and the context verbs; one resolution authority whose Bind carries the session's scope; bind-driven injection of the tech stack, catalog and help digests; redaction at the render boundary.",
       "path": "specs/memory/product/platform/context-management.md",
       "tags": [
         "context",
         "lifecycle",
         "session",
-        "no-locks",
         "privacy"
       ],
-      "token_estimate": 1183,
+      "token_estimate": 861,
       "depends_on": [
+        "specs-migration",
         "workspace-doctor",
         "sdd-gate-v3",
+        "context-portability",
         "spec-context-project",
         "workspace-init",
         "QUALITY"
+      ],
+      "sources": [
+        "dadaia_workspace/hooks/ctx_inject.py",
+        "dadaia_workspace/hooks/_common.py",
+        "dadaia_workspace/core/invocation.py",
+        "dadaia_workspace/core/session_store.py",
+        "dadaia_workspace/core/record_liveness.py",
+        "dadaia_workspace/features/spec_context/injection_policy.py",
+        "dadaia_workspace/features/spec_context/markers.py",
+        "dadaia_workspace/features/spec_context/service.py",
+        "dadaia_workspace/infrastructure/json_context_store.py",
+        "dadaia_workspace/cli/commands/context.py"
       ]
     },
     {
-      "rank": 16,
+      "rank": 18,
+      "slug": "context-portability",
+      "title": "context-portability",
+      "area": "platform",
+      "tldr": "dadaia export writes the workspace's context set to one file; dadaia import registers each unknown context DEAD elsewhere, ready for dadaia context alive.",
+      "summary": "Moving a workspace's Spec Context Projects to another workspace — export writes .dadaia/dist/spec-contexts.json (spec-contexts-export-v1) after refreshing ALIVE branches; import accepts only that schema, registers unknown names DEAD through the same guarded insert as context create, and names the alive command that restores each.",
+      "path": "specs/memory/product/platform/context-portability.md",
+      "tags": [
+        "context",
+        "export",
+        "import",
+        "portability"
+      ],
+      "token_estimate": 310,
+      "depends_on": [
+        "workspace-doctor",
+        "context-management"
+      ],
+      "sources": [
+        "dadaia_workspace/features/export/**",
+        "dadaia_workspace/features/import_/**",
+        "dadaia_workspace/cli/commands/export.py",
+        "dadaia_workspace/cli/commands/import_.py",
+        "dadaia_workspace/core/models/export.py"
+      ]
+    },
+    {
+      "rank": 19,
       "slug": "cross-platform-portability",
       "title": "cross-platform-portability",
       "area": "platform",
-      "tldr": "Linux, macOS and Windows through one platform capability seam, injected adapters, Python hooks and hard-gated cross-OS CI legs.",
-      "summary": "core/platform.py is the single capability seam and the container selects adapters; security failures are loud, non-security features degrade explicitly, unsupported capabilities fail at construction.",
+      "tldr": "Linux, macOS and Windows through one platform capability seam, injected adapters, Python hooks and cross-OS CI legs.",
+      "summary": "dadaia_workspace/core/platform.py is the single capability source and the container selects adapters; security failures are loud, non-security features degrade explicitly, unsupported critical capabilities fail at construction.",
       "path": "specs/memory/product/platform/cross-platform-portability.md",
       "tags": [
         "platform",
@@ -369,18 +557,26 @@
       "token_estimate": 231,
       "depends_on": [
         "sdd-gate-v3",
+        "server-registry",
         "workspace-init",
         "ARCHITECTURE",
         "public-asset-distribution"
+      ],
+      "sources": [
+        "dadaia_workspace/core/platform.py",
+        "dadaia_workspace/infrastructure/file_permission_*.py",
+        "dadaia_workspace/infrastructure/signal_shutdown_*.py",
+        "dadaia_workspace/infrastructure/process_probe_adapter.py",
+        "dadaia_workspace/core/protocols/**"
       ]
     },
     {
-      "rank": 17,
+      "rank": 20,
       "slug": "server-registry",
       "title": "server-registry",
       "area": "platform",
-      "tldr": "Port registry with TTL and PID tracking so parallel agents' dev servers never collide; the 3000-3999 range binds only `next_port`.",
-      "summary": "An internal registry of dev-server ports with TTL and PID tracking, an expiry sweeper that distinguishes unprobable from dead PIDs, and a read-only scan against real OS listeners.",
+      "tldr": "Dev-server port registry with TTL and PID tracking so parallel sessions never collide — one stdlib skill script over one JSON state file; no CLI verb.",
+      "summary": "python3 .agents/skills/dd-cli-library/scripts/registry.py keeps .dadaia/states/server_registry.json — per-project ports with TTL and PID, deterministic next-port allocation, idempotent register, release, stale sweep and a read-only scan of unregistered OS listeners.",
       "path": "specs/memory/product/platform/server-registry.md",
       "tags": [
         "server",
@@ -388,19 +584,49 @@
         "ports",
         "ttl"
       ],
-      "token_estimate": 255,
+      "token_estimate": 331,
       "depends_on": [
         "workspace-init",
-        "panel"
+        "agentic-entities"
+      ],
+      "sources": [
+        "dadaia_workspace/public/skills/dd-cli-library/scripts/registry.py"
       ]
     },
     {
-      "rank": 18,
+      "rank": 21,
+      "slug": "specs-migration",
+      "title": "specs-migration",
+      "area": "platform",
+      "tldr": "dadaia specs upgrade walks a specs/ tree from pattern 6 to the canonical 7 and repairs template leftovers; dadaia migrate lifts a v1 context registry to v2.",
+      "summary": "The two upgrade verbs for existing state — dadaia specs upgrade (one live hop, 6 to 7, folding memory/TECHSTACK.md into ARCHITECTURE.md, plus lossless template repairs; below 6 it refuses without writing) and dadaia migrate (spec_contexts.json v1 to v2, planned, confirmed, atomic).",
+      "path": "specs/memory/product/platform/specs-migration.md",
+      "tags": [
+        "migration",
+        "upgrade",
+        "specs",
+        "registry"
+      ],
+      "token_estimate": 420,
+      "depends_on": [
+        "workspace-doctor",
+        "context-management",
+        "spec-context-project"
+      ],
+      "sources": [
+        "dadaia_workspace/features/migrate/**",
+        "dadaia_workspace/cli/commands/migrate.py",
+        "dadaia_workspace/cli/commands/specs.py",
+        "dadaia_workspace/core/specs_version.py"
+      ]
+    },
+    {
+      "rank": 22,
       "slug": "workspace-doctor",
       "title": "workspace-doctor",
       "area": "platform",
-      "tldr": "The one compliance surface — dadaia doctor scores workspace, specs and ledgers from one rule record; --fix is the reaper, moving slop, deleting only by TTL.",
-      "summary": "dadaia doctor runs the workspace walk, the specs rules and the ledger schema rules from one rule record, prints one line per finding and one compliance score per section plus a total, exits 1 on any error-class finding with a runnable fix line, and its reaper moves slop into a held zone and deletes only what a TTL expired.",
+      "tldr": "dadaia doctor is the one compliance check — workspace, specs and ledgers sections, one line per finding, exit 1 with a fix line; --fix moves slop, TTL deletes.",
+      "summary": "dadaia doctor runs three sections (workspace walk, specs rules, ledger checks) from one rule record, prints each non-canonical finding as one line with a runnable fix, exits 1 on any error-class finding and reports no score; --fix is the reaper, moving slop into a held zone and deleting only what a TTL expired.",
       "path": "specs/memory/product/platform/workspace-doctor.md",
       "tags": [
         "workspace",
@@ -413,26 +639,37 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 2846,
+      "token_estimate": 1270,
       "depends_on": [
-        "sdd-gate-v3",
-        "context-management",
-        "agent-monitoring",
-        "QUALITY",
-        "ARCHITECTURE",
-        "sdd-bug-backlog-governance",
         "public-asset-distribution",
+        "context-management",
+        "QUALITY",
+        "sdd-gate-v3",
+        "release-lifecycle",
+        "specs-migration",
         "workspace-init",
         "audits-canon"
+      ],
+      "sources": [
+        "dadaia_workspace/cli/commands/doctor.py",
+        "dadaia_workspace/core/doctor_rules.py",
+        "dadaia_workspace/core/workspace_layout.py",
+        "dadaia_workspace/features/specs/**",
+        "dadaia_workspace/features/spec_context/doctor.py",
+        "dadaia_workspace/features/spec_context/sweep.py",
+        "dadaia_workspace/features/backlog/doctor.py",
+        "dadaia_workspace/infrastructure/ledger_scripts.py",
+        "dadaia_workspace/features/reconcile/**",
+        "dadaia_workspace/cli/commands/reconcile.py"
       ]
     },
     {
-      "rank": 19,
+      "rank": 23,
       "slug": "workspace-init",
       "title": "workspace-init",
       "area": "platform",
-      "tldr": "Idempotent bootstrap of workspace state, the Python venv, the selected harness projections and the governance hooks.",
-      "summary": "dadaia init provisions the venv, creates the registry's init zones and the selected harness roots, seeds the state files and the harness profile, then stages and installs public assets.",
+      "tldr": "Idempotent bootstrap — dadaia init <dir> --harness <name> [--repo <url>] — venv, zones, law, one harness; with --repo the first context ALIVE and bound.",
+      "summary": "dadaia init takes a required directory and one registered harness, provisions the venv, the registry's init/install zones, the shared skills root and that harness's projection, seeds the states and the harness profile, stages and installs public assets; with --repo it clones the first repo, makes it ALIVE, binds it and installs the pre-push hook. dadaia harness add extends the roster later.",
       "path": "specs/memory/product/platform/workspace-init.md",
       "tags": [
         "workspace",
@@ -440,70 +677,156 @@
         "setup",
         "idempotent"
       ],
-      "token_estimate": 327,
+      "token_estimate": 471,
       "depends_on": [
         "workspace-doctor",
         "public-asset-distribution",
+        "server-registry",
+        "context-management",
         "cross-platform-portability"
+      ],
+      "sources": [
+        "dadaia_workspace/cli/commands/init.py",
+        "dadaia_workspace/cli/commands/harness.py",
+        "dadaia_workspace/features/workspace/**",
+        "dadaia_workspace/infrastructure/python_env.py",
+        "dadaia_workspace/infrastructure/json_harness_profile_store.py",
+        "dadaia_workspace/core/workspace_resolver.py"
       ]
     },
     {
-      "rank": 20,
+      "rank": 24,
       "slug": "audits-canon",
       "title": "audits-canon",
       "area": "sdd",
-      "tldr": "Audits are committed spec artifacts — three pillars over a sha window, JSONL findings moved by dadaia audit disposition, archived by dadaia audit close.",
-      "summary": "An audit is a committed folder holding AUDIT.md and FINDINGS.jsonl; three pillars always run together over the window since the newest archived audit; a finding's disposition and the archive are two CLI verbs, each all-or-nothing and each leaving one governance event.",
+      "tldr": "Audits are committed three-pillar reviews over a sha window, their findings moved by audit.py; decisions are decisions.jsonl records the operator accepts.",
+      "summary": "The two governance records that police canonical truth — an audit folder (AUDIT.md plus FINDINGS.jsonl) whose findings move by audit.py disposition and which audit.py close archives, and the decision ledger specs/ADRs/decisions.jsonl whose accepted records admit every canonical memory statement.",
       "path": "specs/memory/product/sdd/audits-canon.md",
       "tags": [
         "sdd",
         "audits",
         "findings",
-        "governance",
-        "evidence"
+        "adrs",
+        "decisions",
+        "governance"
       ],
-      "token_estimate": 811,
+      "token_estimate": 728,
       "depends_on": [
-        "sdd-bug-backlog-governance",
-        "workspace-doctor",
+        "agent-orchestration",
         "sdd-gate-v3",
-        "agent-comms"
+        "bug-ledger",
+        "workspace-doctor",
+        "release-lifecycle"
+      ],
+      "sources": [
+        "dadaia_workspace/public/skills/dd-audit-project/**",
+        "dadaia_workspace/public/schemas/audits/**",
+        "dadaia_workspace/public/schemas/ADRs/**",
+        "dadaia_workspace/features/specs/doctor_closure_audit.py",
+        "dadaia_workspace/features/specs/doctor_adr.py"
       ]
     },
     {
-      "rank": 21,
-      "slug": "sdd-bug-backlog-governance",
-      "title": "sdd-bug-backlog-governance",
+      "rank": 25,
+      "slug": "backlog-ledger",
+      "title": "backlog-ledger",
       "area": "sdd",
-      "tldr": "One bug record shape with no derived cache, one verb per governance record change writing one governance event, and a hand edit measured as a WARNING.",
-      "summary": "The bug record store, the backlog live photo, the release state document and the decision record store — one record per bug with no git-derived cache, one histo-record-v1 shape for every exit, every record change a CLI verb that leaves one governance event in the telemetry store, every committed record schema-validated and every hand edit measured by dadaia doctor.",
-      "path": "specs/memory/product/sdd/sdd-bug-backlog-governance.md",
+      "tldr": "The operator's demand queue: BACKLOG.json active[] plus one histo record per exit; backlog.py writes it, dadaia doctor judges bound subjects.",
+      "summary": "The backlog ledger — specs/backlog/BACKLOG.json holding every live entry in active[], and _archive/backlog_histo.jsonl holding one terminal record per exited slug; backlog.py is the one writer and validator, and the doctor's ledgers section resolves each entry's bound intents.",
+      "path": "specs/memory/product/sdd/backlog-ledger.md",
       "tags": [
         "sdd",
-        "governance",
-        "release-lifecycle",
         "backlog",
-        "bugs",
-        "adrs",
-        "gitflow",
-        "events"
+        "ledger",
+        "governance"
       ],
-      "token_estimate": 2530,
+      "token_estimate": 541,
       "depends_on": [
-        "workspace-doctor",
-        "sdd-gate-v3",
-        "agent-comms",
-        "agent-monitoring",
-        "audits-canon"
+        "agent-orchestration",
+        "release-lifecycle",
+        "workspace-doctor"
+      ],
+      "sources": [
+        "dadaia_workspace/public/skills/dd-backlog-definition/**",
+        "dadaia_workspace/public/schemas/backlog/**",
+        "dadaia_workspace/public/schemas/histo/**",
+        "dadaia_workspace/features/backlog/**",
+        "dadaia_workspace/core/models/backlog.py",
+        "dadaia_workspace/core/models/histo.py"
       ]
     },
     {
-      "rank": 22,
+      "rank": 26,
+      "slug": "bug-ledger",
+      "title": "bug-ledger",
+      "area": "sdd",
+      "tldr": "One bug record per line in BUGS.jsonl, registered after operator confirmation, closed only by a transition carrying evidence; bugs.py writes it.",
+      "summary": "The bug ledger — specs/bugs/BUGS.jsonl, one record per bug keyed by id, with no git-derived cache; the stdlib script bugs.py is its one writer and validator, and the ask-first registration plus the seven-phase resolution method run over it.",
+      "path": "specs/memory/product/sdd/bug-ledger.md",
+      "tags": [
+        "sdd",
+        "bugs",
+        "ledger",
+        "governance"
+      ],
+      "token_estimate": 864,
+      "depends_on": [
+        "workspace-doctor",
+        "agent-comms",
+        "agent-orchestration",
+        "audits-canon",
+        "release-lifecycle"
+      ],
+      "sources": [
+        "dadaia_workspace/public/skills/dd-bug-resolution/**",
+        "dadaia_workspace/public/skills/dd-bug-registration/**",
+        "dadaia_workspace/public/schemas/bugs/**",
+        "dadaia_workspace/core/models/bugs.py",
+        "dadaia_workspace/features/specs/doctor_governance.py"
+      ]
+    },
+    {
+      "rank": 27,
+      "slug": "release-lifecycle",
+      "title": "release-lifecycle",
+      "area": "sdd",
+      "tldr": "One live release grown by closed-scope candidates; release.py moves _RELEASE.json; closure is gated on a memory reconciliation; promote merges the release PR.",
+      "summary": "The release lifecycle — one live release directory whose _RELEASE.json state document is written by release.py (new, phase, memory, check), candidates that each define, implement and close a SPEC/PLAN/TASKS trio at the release root, the memory reconciliation gate at closure, and promotion by merging the release PR release-please opens.",
+      "path": "specs/memory/product/sdd/release-lifecycle.md",
+      "tags": [
+        "sdd",
+        "release",
+        "candidate",
+        "lifecycle",
+        "memory"
+      ],
+      "token_estimate": 976,
+      "depends_on": [
+        "sdd-gate-v3",
+        "backlog-ledger",
+        "bug-ledger",
+        "workspace-doctor",
+        "agent-orchestration",
+        "audits-canon",
+        "pypi-distribution"
+      ],
+      "sources": [
+        "dadaia_workspace/public/skills/dd-release-implementation/**",
+        "dadaia_workspace/public/skills/dd-release-definition/**",
+        "dadaia_workspace/public/skills/dd-spec-navigator/scripts/**",
+        "dadaia_workspace/public/schemas/releases/**",
+        "dadaia_workspace/core/release_state.py",
+        "dadaia_workspace/features/specs/release_tree.py",
+        "dadaia_workspace/features/specs/doctor_release.py"
+      ]
+    },
+    {
+      "rank": 28,
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "area": "sdd",
       "tldr": "No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write), one fix line per BLOCK, chokepoints at the push.",
-      "summary": "The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one executable fix line; the git chokepoints enforce the publication boundary and the full denylist scan over every pushed path.",
+      "summary": "The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one executable fix line; the pre-push chokepoint enforces the branch contract, the specs canon and the denylist scan over every pushed object, and no CI job calls a model API — the security review is the reviewer's lens before each pull request.",
       "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
         "sdd",
@@ -513,12 +836,25 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 1428,
+      "token_estimate": 960,
       "depends_on": [
         "workspace-doctor",
         "context-management",
-        "ARCHITECTURE",
-        "agent-monitoring"
+        "release-lifecycle",
+        "ARCHITECTURE"
+      ],
+      "sources": [
+        ".github/workflows/ci.yml",
+        "dadaia_workspace/hooks/__init__.py",
+        "dadaia_workspace/hooks/pre_gate.py",
+        "dadaia_workspace/hooks/sdd_gate.py",
+        "dadaia_workspace/hooks/sdd_post_gate.py",
+        "dadaia_workspace/hooks/root_whitelist.py",
+        "dadaia_workspace/hooks/venv_guard.py",
+        "dadaia_workspace/features/spec_context/gate_policy.py",
+        "dadaia_workspace/features/chokepoints/**",
+        "dadaia_workspace/infrastructure/data/privacy_baseline.json",
+        "dadaia_workspace/cli/commands/ci.py"
       ]
     }
   ]

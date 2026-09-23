@@ -5,6 +5,7 @@ Public CLI contracts for `dadaia context`.
 
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -12,6 +13,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
@@ -25,7 +27,7 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:
     WorkspaceService(
         public_assets=FileSystemPublicAssetManager(),
         python_env=VenvPythonEnvironmentManager(),
-    ).init(tmp_path)
+    ).init(tmp_path, harnesses=L1_ENTRY_HARNESSES)
     monkeypatch.chdir(tmp_path)
     # Hermetic session identity: bind resolves DADAIA_SESSION_ID → harness-native id →
     # mint (bug bind-session-id-divergence). Strip inherited ids so each test controls
@@ -99,7 +101,7 @@ def _session_record_for(workspace: Path, output: str) -> dict:
 
 
 def test_context_create_show_list_happy_lifecycle(workspace: Path) -> None:
-    result = _runner.invoke(app, ["context", "create", "alpha", "--repo", "alpha"])
+    result = _runner.invoke(app, ["context", "create", "alpha", "--main-repo", "alpha"])
     assert result.exit_code == 0, result.output
 
     show = _runner.invoke(app, ["context", "show", "alpha", "--json"])
@@ -133,7 +135,7 @@ def test_context_create_show_list_happy_lifecycle(workspace: Path) -> None:
             "current_branch": None,
             "dead_since": None,
             "name": "alpha",
-            "repo_slug": "alpha",
+            "main_repo": "alpha",
             "repo_url": "",
             "state": "dead",
             "stored_branch": None,
@@ -172,8 +174,8 @@ def test_context_error_matrix(workspace: Path, invoke_args: list[str]) -> None:
 def test_context_create_duplicate_and_dead_requires_alive(workspace: Path) -> None:
     """A duplicate create fails, and (AC-T10d-2) dead <name> fails if the context is
     not ALIVE — both against the same freshly-created DEAD context."""
-    _runner.invoke(app, ["context", "create", "alpha", "--repo", "alpha"])
-    result = _runner.invoke(app, ["context", "create", "alpha", "--repo", "alpha"])
+    _runner.invoke(app, ["context", "create", "alpha", "--main-repo", "alpha"])
+    result = _runner.invoke(app, ["context", "create", "alpha", "--main-repo", "alpha"])
     assert result.exit_code != 0
 
     result = _runner.invoke(app, ["context", "dead", "alpha"])
@@ -347,72 +349,9 @@ def test_bind_records_dadaia_runtime_env(workspace: Path) -> None:
     assert record2["runtime"] == "kimi-code"
 
 
-def test_context_heartbeat_resolves_harness_native_persisted_bind(
-    workspace: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _register_alive_ctx(workspace)
-    monkeypatch.delenv("DADAIA_SESSION_ID", raising=False)
-    monkeypatch.setenv("CODEX_THREAD_ID", "codex-heartbeat-session")
-
-    bind_result = _runner.invoke(app, ["context", "bind", "myctx"])
-    assert bind_result.exit_code == 0, bind_result.output
-
-    heartbeat_result = _runner.invoke(app, ["context", "heartbeat"])
-    assert heartbeat_result.exit_code == 0, heartbeat_result.output
-    assert "codex-heartbeat-session" in heartbeat_result.output
-
-
-def test_context_heartbeat_without_caller_identity_is_actionable(
-    workspace: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    for name in (
-        "DADAIA_SESSION_ID",
-        "CLAUDE_CODE_SESSION_ID",
-        "CODEX_SESSION_ID",
-        "CODEX_THREAD_ID",
-    ):
-        monkeypatch.delenv(name, raising=False)
-    result = _runner.invoke(app, ["context", "heartbeat"])
-    assert result.exit_code != 0
-    assert "--print-env" in result.output
-
-
 # ---------------------------------------------------------------------------
 # T-10d: context release
 # ---------------------------------------------------------------------------
-
-
-def test_context_release_deletes_session_and_without_session_exits_nonzero(
-    workspace: Path,
-) -> None:
-    """Release deletes the caller's session file; missing identity exits non-zero."""
-    _register_alive_ctx(workspace)
-    bind_result = _runner.invoke(
-        app,
-        ["context", "bind", "myctx", "--print-env"],
-    )
-    assert bind_result.exit_code == 0, bind_result.output
-
-    lines = bind_result.output.strip().split("\n")
-    session_line = next(line for line in lines if "DADAIA_SESSION_ID" in line)
-    session_id = session_line.split("=")[1].strip()
-
-    session_file = workspace / ".dadaia" / "sessions" / f"{session_id}.json"
-    assert session_file.exists()
-
-    # Release with DADAIA_SESSION_ID env var set
-    env = {**os.environ, "DADAIA_SESSION_ID": session_id}
-    release_result = _runner.invoke(
-        app,
-        ["context", "release"],
-        env=env,
-    )
-    assert release_result.exit_code == 0, release_result.output
-    assert not session_file.exists(), "Session file must be deleted after release"
-
-    no_session_env = {k: v for k, v in os.environ.items() if k != "DADAIA_SESSION_ID"}
-    no_session_result = _runner.invoke(app, ["context", "release"], env=no_session_env)
-    assert no_session_result.exit_code != 0
 
 
 # ---------------------------------------------------------------------------
@@ -695,3 +634,53 @@ def test_bind_with_no_live_release_exits_zero_and_the_next_write_is_allowed(
         {"tool_name": "Write", "tool_input": {"file_path": str(target)}}
     )
     assert block is None, block
+
+
+# ---------------------------------------------------------------------------
+# FR5 (T-047-59) — main-repo / associated-repos is the user-facing vocabulary
+# ---------------------------------------------------------------------------
+
+
+def test_context_create_help_names_main_repo_and_associated_repos(workspace: Path) -> None:
+    """Intent: CONTRACT — AC5.1. The option surface names the paradigm's parts; the
+    retired `--repo`/`--associated` spellings are gone, with no alias and no shim."""
+    result = _runner.invoke(
+        app, ["context", "create", "--help"], env={"TERMINAL_WIDTH": "200", "NO_COLOR": "1"}
+    )
+    assert result.exit_code == 0, result.output
+    # Rich styles the option token inline on a colour-forcing runner (CI): assert on the
+    # plain text, never on the escaped stream.
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+    assert "--main-repo" in plain
+    assert "--associated-repos" in plain
+    assert "--repo " not in plain
+    assert "--associated " not in plain
+
+
+def test_context_show_and_list_json_emit_main_repo_key(workspace: Path) -> None:
+    """Intent: CONTRACT — AC5.1. `show --json` / `list --json` carry `main_repo`;
+    the retired output key `repo_slug` is absent (the state-file schema keeps it)."""
+    assert (
+        _runner.invoke(
+            app,
+            [
+                "context",
+                "create",
+                "alpha",
+                "--main-repo",
+                "alpha",
+                "--associated-repos",
+                "beta,gamma",
+            ],
+        ).exit_code
+        == 0
+    )
+
+    show = json.loads(_runner.invoke(app, ["context", "show", "alpha", "--json"]).stdout)
+    assert show["main_repo"] == "alpha"
+    assert "repo_slug" not in show
+    assert [r["slug"] for r in show["associated_repos"]] == ["beta", "gamma"]
+
+    listed = json.loads(_runner.invoke(app, ["context", "list", "--json"]).stdout)
+    assert listed[0]["main_repo"] == "alpha"
+    assert "repo_slug" not in listed[0]

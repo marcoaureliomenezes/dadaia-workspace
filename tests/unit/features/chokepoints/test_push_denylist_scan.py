@@ -17,7 +17,7 @@ from pathlib import Path
 from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObject
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_refs
-from dadaia_workspace.features.specs.canon import canon_violations, verdict_violations
+from dadaia_workspace.features.specs.canon import canon_violations
 
 _SHA_A = "a" * 40
 _SHA_B = "b" * 40
@@ -36,9 +36,6 @@ class _FakeObjectSource:
         self.calls.append((local_sha, remote_sha))
         return self.by_range.get((local_sha, remote_sha), [])
 
-    def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
-        return []
-
     def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
         return ()
 
@@ -52,9 +49,6 @@ class _FakeObjectSource:
 class _FailingObjectSource:
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         raise GitObjectReadError("simulated git rev-list failure")
-
-    def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
-        return []
 
     def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
         return ()
@@ -102,7 +96,6 @@ def test_branch_push_with_denylisted_blob_in_range_is_refused(tmp_path: Path) ->
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert not decision.allowed
@@ -123,7 +116,6 @@ def test_term_outside_the_range_does_not_refuse(tmp_path: Path) -> None:
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert decision.allowed
@@ -141,7 +133,6 @@ def test_deletion_ref_is_never_scanned(tmp_path: Path) -> None:
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert decision.allowed
@@ -169,7 +160,6 @@ def test_shared_blob_across_two_refs_is_deduped(tmp_path: Path) -> None:
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert not decision.allowed
@@ -190,7 +180,6 @@ def test_tainted_tag_push_is_refused(tmp_path: Path) -> None:
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert not decision.allowed
@@ -208,7 +197,6 @@ def test_clean_tag_push_is_allowed_with_no_verdict_required(tmp_path: Path) -> N
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert decision.allowed  # no handoff file exists anywhere under tmp_path.
@@ -227,7 +215,6 @@ def test_branch_policy_refusal_precedes_the_scan(tmp_path: Path) -> None:
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
     )
     assert not decision.allowed
     assert "main" in decision.message
@@ -249,7 +236,6 @@ def test_refusal_message_shape_and_ten_item_cap(tmp_path: Path) -> None:
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert not decision.allowed
@@ -258,7 +244,7 @@ def test_refusal_message_shape_and_ten_item_cap(tmp_path: Path) -> None:
     assert "file0.md:1" in message
     assert "z…m" in message  # masked form of the synthetic term.
     assert "operator denylist" in message
-    assert "DADAIA.md §7" in message
+    assert "dd-release-implementation §2a" in message
     assert "--amend" in message or "rebase" in message
     assert "already-published history never needs a rewrite" in message
     assert "2 more" in message or "and 2" in message  # 12 hits, 10 shown, 2 remainder.
@@ -276,7 +262,6 @@ def test_git_object_read_failure_refuses_naming_the_failure(tmp_path: Path) -> N
         object_source=_FailingObjectSource(),
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
     )
     assert not decision.allowed
     assert "simulated git rev-list failure" in decision.message
@@ -284,7 +269,7 @@ def test_git_object_read_failure_refuses_naming_the_failure(tmp_path: Path) -> N
 
 
 # ---------------------------------------------------------------------------
-# code-reviewer MEDIUM finding (v0.11.0 pre-PR review) — `_run_denylist_scan` must
+# dd-code-reviewer MEDIUM finding (v0.11.0 pre-PR review) — `_run_denylist_scan` must
 # consume each Iterable term source ONLY ONCE. A one-shot generator passed as
 # `denylist_terms` must still refuse a push carrying that term — consuming the same
 # generator twice (once to build the `_PathMasker`, again to build `term_list`) would
@@ -296,7 +281,7 @@ def test_generator_denylist_terms_still_refuses_not_silently_emptied(tmp_path: P
     """Uses a TAG ref (scanned but never branch-policy-gated) so the only possible
     refusal source is the denylist scan itself — isolating this from the branch-policy
     refusal a ``refs/heads/develop`` push would now trigger outright (develop is never
-    pushable under v2; DADAIA.md §4)."""
+    pushable under v2; `dd-gitflow-default`)."""
     source = _FakeObjectSource(
         by_range={(_SHA_A, _ZERO): [_obj("leak.md", f"contains {_SYNTHETIC_TERM} here\n")]}
     )
@@ -309,7 +294,6 @@ def test_generator_denylist_terms_still_refuses_not_silently_emptied(tmp_path: P
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         denylist_terms=_term_generator(),
     )
     assert not decision.allowed
@@ -415,7 +399,6 @@ def test_oversized_note_appears_in_decision_warn_on_allow(tmp_path: Path) -> Non
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
     )
     assert decision.allowed
     assert decision.warn is not None
@@ -438,7 +421,6 @@ def test_oversized_note_appears_in_decision_warn_on_refuse(tmp_path: Path) -> No
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert not decision.allowed
@@ -467,7 +449,6 @@ def test_foreign_slugs_carrying_a_registry_name_and_slug_both_refuse(tmp_path: P
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         foreign_slugs=(dead_name, dead_slug),
     )
     assert not decision.allowed
@@ -493,7 +474,6 @@ def test_refusal_path_segment_matching_a_foreign_slug_is_masked(tmp_path: Path) 
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
         foreign_slugs=(_FOREIGN_SLUG,),
     )
@@ -513,7 +493,6 @@ def test_refusal_path_with_no_matching_segment_is_byte_identical(tmp_path: Path)
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert not decision.allowed
@@ -531,7 +510,6 @@ def test_oversized_note_path_segment_is_masked_too(tmp_path: Path) -> None:
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         foreign_slugs=(_FOREIGN_SLUG,),
     )
     assert decision.allowed
@@ -578,7 +556,6 @@ def test_refusal_path_segment_uppercase_hyphenated_variant_of_term_is_masked(
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         denylist_terms=((_UPPERCASE_HYPHENATED_TERM, "synthetic"),),
     )
     assert not decision.allowed
@@ -605,9 +582,6 @@ class _FailingObjectSourceWithPath:
             path=f"repos/{_FOREIGN_SLUG}/leak.md",
         )
 
-    def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
-        return []
-
     def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
         return ()
 
@@ -624,7 +598,6 @@ def test_git_object_read_failure_at_a_denylisted_path_masks_the_path(tmp_path: P
         object_source=_FailingObjectSourceWithPath(),
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         foreign_slugs=(_FOREIGN_SLUG,),
     )
     assert not decision.allowed
@@ -651,7 +624,6 @@ def test_same_offending_segment_gets_the_same_ordinal_across_hit_and_note(
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
         foreign_slugs=(_FOREIGN_SLUG,),
     )
@@ -692,7 +664,6 @@ def test_push_with_denylisted_term_only_in_a_commit_message_body_is_refused(
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert not decision.allowed
@@ -735,7 +706,6 @@ def test_a_foreign_slug_already_published_in_the_remote_tip_passes(tmp_path: Pat
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         foreign_slugs=("zz-sibling-repo",),
     )
     assert decision.allowed, decision.message
@@ -756,7 +726,6 @@ def test_a_foreign_slug_not_yet_published_still_refuses(tmp_path: Path) -> None:
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         foreign_slugs=("zz-sibling-repo",),
     )
     assert not decision.allowed
@@ -773,7 +742,6 @@ def test_an_unreadable_baseline_amnesties_nothing(tmp_path: Path) -> None:
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         foreign_slugs=("zz-sibling-repo",),
     )
     assert not decision.allowed

@@ -14,9 +14,9 @@ Two load paths, deliberately distinct (NFR-4, "missing != invalid"):
   :class:`AgentModelPolicyStoreError` with a distinct, actionable message per FR3
   rejection: corrupt JSON, non-object root, unknown top-level/override key, wrong
   schema version, unknown ``applied_template`` id, unknown agent name (valid names =
-  the 9 core agents), a model not in the registry, an
+  the three core agents; a retired persona name migrates on read), a model not in the registry, an
   effort outside the D-3 vocabulary, an empty override, and — D-7 — any combination
-  that resolves a Fable-family model onto ``security-reviewer``.
+  that resolves a Fable-family model onto ``dd-code-reviewer``.
 
 :meth:`parse` is the shared no-I/O validation path (consumed by :meth:`load` and by the
 panel validate endpoint in Wave 4).
@@ -50,8 +50,18 @@ _ALLOWED_TOP_LEVEL = frozenset({"schema_version", "applied_template", "overrides
 #: Allowed keys inside one per-agent override (per-field: model, effort, or both).
 _ALLOWED_OVERRIDE_KEYS = frozenset({"model", "effort"})
 
+#: Retired persona names an operator-owned overlay may still carry -> the current name.
+#: The pre-0.4.7 bare names (T-047-56) and ADR 0022's deleted coordinator persona.
+_RETIRED_AGENT_NAMES: dict[str, str] = {
+    "project-manager": "dd-product-engineer",
+    "dd-project-manager": "dd-product-engineer",
+    "product-engineer": "dd-product-engineer",
+    "software-engineer": "dd-software-engineer",
+    "code-reviewer": "dd-code-reviewer",
+}
+
 #: The agent that must never resolve to a Fable-family model (G-1/D-7).
-_FABLE_FORBIDDEN_AGENT = "security-reviewer"
+_FABLE_FORBIDDEN_AGENT = "dd-code-reviewer"
 
 
 class JsonAgentModelPolicyStore:
@@ -162,7 +172,7 @@ class JsonAgentModelPolicyStore:
         valid_agents = set(CORE_AGENTS)
         overrides: dict[str, AgentModelOverride] = {}
         for agent_name, override_value in value.items():
-            agent = str(agent_name)
+            agent = _RETIRED_AGENT_NAMES.get(str(agent_name), str(agent_name))
             if agent not in valid_agents:
                 raise AgentModelPolicyStoreError(
                     f"unknown agent {agent!r} in 'overrides'; valid agents: "
@@ -220,7 +230,7 @@ class JsonAgentModelPolicyStore:
     def _assert_never_fable_on_security(
         self, overlay: AgentModelPolicyOverlay, *, path: Path | None
     ) -> None:
-        """D-7: reject any overlay that RESOLVES Fable onto security-reviewer.
+        """D-7: reject any overlay that RESOLVES Fable onto dd-code-reviewer.
 
         Uses the single resolver (FR4) so the check covers every combination
         (override model, template interplay), not just the literal override value.
@@ -229,7 +239,7 @@ class JsonAgentModelPolicyStore:
         if is_fable_model(resolved.model):
             raise AgentModelPolicyStoreError(
                 f"policy resolves {resolved.model!r} onto {_FABLE_FORBIDDEN_AGENT!r}; "
-                "Fable is never assigned to security-reviewer (operator ruling G-1)",
+                "Fable is never assigned to dd-code-reviewer (operator ruling G-1)",
                 path,
             )
 

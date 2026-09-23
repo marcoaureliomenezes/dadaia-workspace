@@ -67,7 +67,7 @@ FINDINGS_DISPOSITIONS: tuple[str, ...] = ("resolved", "superseded", "deferred", 
 #: An archived audit's histo record uses the findings subset.
 AUDITS_HISTO_DISPOSITIONS: tuple[str, ...] = FINDINGS_DISPOSITIONS
 
-#: The three pillars every audit runs together (``DADAIA.md`` §6.8) — the ONE
+#: The three pillars every audit runs together (`specs/audits/AGENTS.md`) — the ONE
 #: vocabulary an archived audit's counts are keyed by, so a pillar that found nothing
 #: is reported as 0 rather than missing. One record shape, whatever the window held.
 AUDIT_PILLARS: tuple[str, ...] = ("bugs", "specs", "memory")

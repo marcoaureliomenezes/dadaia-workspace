@@ -16,11 +16,10 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObject
+from dadaia_workspace.core.models.git_scan import ScannedObject
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_refs
-from dadaia_workspace.features.chokepoints.verdict import INTEGRATION_TIP_REF
-from dadaia_workspace.features.specs.canon import canon_violations, verdict_violations
+from dadaia_workspace.features.specs.canon import canon_violations
 
 _SHA_A = "a" * 40
 _SHA_B = "b" * 40
@@ -49,10 +48,6 @@ class _FakeCanonObjectSource:
             for i, path in enumerate(self.range_by_sha.get(local_sha, []))
         ]
 
-    def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
-        self.tree_calls.append((sha, prefix))
-        return self.tree_by_sha.get(sha, [])
-
     def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
         self.parent_calls.append(sha)
         parent = self.parent_by_sha.get(sha)
@@ -69,9 +64,6 @@ class _FakeCanonObjectSource:
 class _FailingTreeObjectSource:
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         return ()
-
-    def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
-        raise GitObjectReadError("simulated git ls-tree failure")
 
     def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
         return ()
@@ -96,10 +88,8 @@ def test_a_fully_canon_conformant_tree_passes(tmp_path: Path) -> None:
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
     )
     assert decision.allowed, decision.message
-    assert (_SHA_A, "specs") in source.tree_calls
 
 
 def test_a_non_canon_path_refuses_naming_the_fix_hint(tmp_path: Path) -> None:
@@ -112,11 +102,10 @@ def test_a_non_canon_path_refuses_naming_the_fix_hint(tmp_path: Path) -> None:
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
     )
     assert not decision.allowed
     assert "specs/backlog/loose-entry.md" in decision.message
-    assert "delete the path; canon: DADAIA.md §6" in decision.message
+    assert "delete the path; canon: specs/AGENTS.md" in decision.message
 
 
 def test_a_non_canon_path_outside_the_pushed_range_never_blocks(tmp_path: Path) -> None:
@@ -140,7 +129,6 @@ def test_a_non_canon_path_outside_the_pushed_range_never_blocks(tmp_path: Path) 
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=lambda paths: [p for p in paths if p.startswith("_archive/")],
-        verdict_violations_fn=verdict_violations,
     )
     assert decision.allowed, decision.message
 
@@ -155,7 +143,6 @@ def test_a_non_canon_path_inside_the_pushed_range_still_blocks(tmp_path: Path) -
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
     )
     assert not decision.allowed
     assert "specs/_archive/new.md" in decision.message
@@ -170,83 +157,9 @@ def test_a_stray_dotfile_refuses(tmp_path: Path) -> None:
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
     )
     assert not decision.allowed
     assert "specs/.gitkeep" in decision.message
-
-
-def test_a_verdict_matching_head_passes(tmp_path: Path) -> None:
-    verdict_path = f"specs/releases/0.5.0/verdicts/{_SHA_A}.handoff.json"
-    source = _FakeCanonObjectSource(tree_by_sha={_SHA_A: [verdict_path]})
-    decision = push_gate_decision(
-        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
-    )
-    assert decision.allowed, decision.message
-
-
-def test_a_verdict_matching_first_parent_passes(tmp_path: Path) -> None:
-    verdict_path = f"specs/releases/0.5.0/verdicts/{_SHA_B}.handoff.json"
-    source = _FakeCanonObjectSource(
-        tree_by_sha={_SHA_A: [verdict_path]},
-        parent_by_sha={_SHA_A: _SHA_B},
-    )
-    decision = push_gate_decision(
-        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
-    )
-    assert decision.allowed, decision.message
-    assert _SHA_A in source.parent_calls
-
-
-def test_the_ship_shape_pr_head_verdict_plus_develop_tip_verdict_passes(
-    tmp_path: Path,
-) -> None:
-    """DADAIA.md §4.2 / dd-gitflow-default §3b: the ship verdict names develop's tip,
-    staged on the feature branch next to the PR-head verdict — the pre-push gate must
-    let the shape the law mandates through (bug
-    verdict-staleness-rule-refuses-the-ship-verdict-the-gitflow-law-mandates)."""
-    parent_verdict = f"specs/releases/0.5.0/verdicts/{_SHA_B}.handoff.json"
-    ship_verdict = f"specs/releases/0.5.0/verdicts/{_SHA_C}.handoff.json"
-    source = _FakeCanonObjectSource(
-        tree_by_sha={_SHA_A: [parent_verdict, ship_verdict]},
-        parent_by_sha={_SHA_A: _SHA_B},
-        sha_by_ref={INTEGRATION_TIP_REF: _SHA_C},
-    )
-    decision = push_gate_decision(
-        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
-    )
-    assert decision.allowed, decision.message
-    assert source.ref_calls == [INTEGRATION_TIP_REF]
-
-
-def test_a_stale_verdict_refuses(tmp_path: Path) -> None:
-    stale_sha = "d" * 40
-    verdict_path = f"specs/releases/0.5.0/verdicts/{stale_sha}.handoff.json"
-    source = _FakeCanonObjectSource(
-        tree_by_sha={_SHA_A: [verdict_path]},
-        parent_by_sha={_SHA_A: _SHA_B},
-    )
-    decision = push_gate_decision(
-        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
-    )
-    assert not decision.allowed
-    assert verdict_path in decision.message
 
 
 def test_a_deletion_ref_is_never_scanned(tmp_path: Path) -> None:
@@ -256,7 +169,6 @@ def test_a_deletion_ref_is_never_scanned(tmp_path: Path) -> None:
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
     )
     assert decision.allowed, decision.message
     assert source.tree_calls == []
@@ -272,22 +184,9 @@ def test_a_tag_push_is_scanned_too(tmp_path: Path) -> None:
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
     )
     assert not decision.allowed
     assert "specs/backlog/loose.md" in decision.message
-
-
-def test_a_git_read_failure_on_list_tree_paths_refuses_fail_closed(tmp_path: Path) -> None:
-    decision = push_gate_decision(
-        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
-        object_source=_FailingTreeObjectSource(),
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
-    )
-    assert not decision.allowed
-    assert "reading the pushed specs/ tree failed" in decision.message
 
 
 def test_canon_scan_runs_before_the_denylist_scan(tmp_path: Path) -> None:
@@ -301,7 +200,6 @@ def test_canon_scan_runs_before_the_denylist_scan(tmp_path: Path) -> None:
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        verdict_violations_fn=verdict_violations,
         denylist_terms=(),
     )
     assert not decision.allowed

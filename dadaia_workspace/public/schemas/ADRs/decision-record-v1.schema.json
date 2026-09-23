@@ -70,8 +70,8 @@
         "string",
         "null"
       ],
-      "pattern": "^\\d{4}$",
-      "description": "Id (NNNN) of the record this one supersedes, or null."
+      "pattern": "^\\d{4}(,\\d{4})*$",
+      "description": "Id (NNNN) of the record this one supersedes — or comma-separated ids, ascending, when one decision retires several — or null."
     },
     "amends": {
       "type": [

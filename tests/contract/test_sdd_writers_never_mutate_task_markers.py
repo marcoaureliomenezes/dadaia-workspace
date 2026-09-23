@@ -39,10 +39,7 @@ Census (file:line, T-044-03):
    ``None``), so it cannot touch ``specs/releases/**`` by construction — proven below by
    assertion on the function's signature/behaviour rather than a before/after fixture
    diff, since there is no longer a write to diff around.
-3. ``dadaia_workspace/features/specs/canon.py`` (``release_new``) is a no-clobber
-   scaffold: ``FileExistsError`` on an existing release dir, never a touch of its
-   content.
-4. ``dadaia_workspace/core/specs_repair.py:73-90`` (``remove_placeholder_atoms``) is
+3. ``dadaia_workspace/core/specs_repair.py:73-90`` (``remove_placeholder_atoms``) is
    scoped to ``specs_dir/memory/**`` only.
 """
 
@@ -56,7 +53,6 @@ import pytest
 
 from dadaia_workspace.core import specs_repair
 from dadaia_workspace.features.migrate import registry as migrate_registry
-from dadaia_workspace.features.specs import canon
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 _MARKER_RE = re.compile(r"^- \[([ xX-])\]", re.MULTILINE)
@@ -65,7 +61,7 @@ _STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+)$", re.MULTILINE)
 _FIXTURE_TASKS_MD = """\
 # TASKS — Release v1.0.0 — fixture
 
-**Status:** Em revisão
+**Status:** In review
 **Release ID:** v1.0.0
 **Owner:** product-engineer
 
@@ -232,20 +228,6 @@ def test_migration_registry_check_upgradable_performs_no_filesystem_io() -> None
 # ---------------------------------------------------------------------------------------
 # 3. CLI-verb scaffolders/repairers explicitly named in the task's census.
 # ---------------------------------------------------------------------------------------
-
-
-def test_release_new_refuses_to_clobber_an_existing_release_tasks_md(tmp_path: Path) -> None:
-    # AS-13/T-050-06A: bare "1.0.0" is the current, mintable axis (a "v"-prefixed id
-    # is refused at mint before this no-clobber check is ever reached).
-    specs_dir = tmp_path / "specs"
-    target = _seed_release_tasks_md(specs_dir, release_id="1.0.0")
-    before = target.read_text(encoding="utf-8")
-
-    with pytest.raises(FileExistsError):
-        canon.release_new(specs_dir, "1.0.0")
-
-    after = target.read_text(encoding="utf-8")
-    _assert_sdd_invariants_preserved(before, after)
 
 
 def test_specs_repair_placeholder_removal_never_touches_releases(tmp_path: Path) -> None:

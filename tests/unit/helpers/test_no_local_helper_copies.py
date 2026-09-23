@@ -24,7 +24,6 @@ _CANONICAL_MODULE = _TESTS_ROOT / "helpers" / "golden_platform.py"
 # (underscore-prefixed local-copy) spellings.
 _CONSOLIDATED_NAMES = (
     "norm_path_line",
-    "norm_panel_body",
     "canon_env_line",
     "sort_line_lists",
     "is_env_doctor_line",
@@ -41,7 +40,6 @@ _CROSS_IMPORT = "from tests.unit.infrastructure.test_install_target_goldens impo
 # consolidated helper still fails this contract.
 _BESPOKE_EXEMPT = frozenset(
     {
-        "unit/features/panel/test_api_golden.py",
         "unit/features/specs/test_doctor_golden.py",
     }
 )

@@ -1,7 +1,7 @@
 # SLOP.md — detection signals
 
 Disclosed sibling of [`SKILL.md`](SKILL.md), read inside Axis 1 (Standards). The definition
-is `DADAIA.md` §7.6 — slop is what passes the deletion test without loss. Each signal is a
+is one line: slop is what passes the deletion test without loss. Each signal is a
 labelled judgement call with the command that makes it verifiable in the diff.
 
 ## Signals
@@ -13,7 +13,7 @@ labelled judgement call with the command that makes it verifiable in the diff.
 | S3 | Test slop: no `Intent:`, tautology, own-module mock, tombstone | §Tests below, one check each | HIGH (a, b); MEDIUM (c, d) | Declare; literal from an independent source; mock at the frontier; delete at closure |
 | S4 | Stub, unread parameter, port with one adapter | `grep -nE 'NotImplementedError\|^\s+pass$'`; ruff `ARG`; a `core/protocols` Protocol with one implementer (`test_protocols_have_two_adapters`) | HIGH | Delete until the second caller appears |
 | S5 | Layer over the old path; a second path | `--stat` adds only; `_v2\|_legacy\|_old`; `if legacy`; a swallowing `try/except`; a wrapper that delegates | HIGH (bug-surface) | Replace, don't layer; delete the old path in the same diff |
-| S6 | SPEC/TASKS over the ceiling, or codes outside FR/AC/T- | `wc -c SPEC.md TASKS.md` against `DADAIA.md` §6.7; the V33 family token of `tests/contract/test_slop_ratchets.py`, families outside FR/AC/T- | MEDIUM | Split the candidate; rename to glossary terms |
+| S6 | SPEC/TASKS over the ceiling, or codes outside FR/AC/T- | `wc -c SPEC.md TASKS.md` against `specs/releases/AGENTS.md`; the V33 family token of `tests/contract/test_slop_ratchets.py`, families outside FR/AC/T- | MEDIUM | Split the candidate; rename to glossary terms |
 | S7 | Acronym or generic name | a term outside the repo's `CONTEXT.md`; `Manager\|Helper\|Utils\|data\|result\|temp` in a new name | LOW | A domain name |
 | S8 | File outside the canon | `git diff --name-status \| grep '^A'` against the root whitelist, the specs canon, the `.dadaia/` canon; `*.bak`, `SUMMARY.md`, `NOTES.md` | HIGH | Delete, or move to its home |
 | S9 | Commit outside the six shapes; surviving branch | `git log --stat` against `dd-gitflow-default` §3a; `git branch -r --merged` | MEDIUM | Rewrite the series before the push; tag and delete |
@@ -26,6 +26,12 @@ labelled judgement call with the command that makes it verifiable in the diff.
 - S3c — own-module mock: `patch\(.dadaia_workspace\.|MagicMock\(\)` in the diff, `assert_called` on own code; MEDIUM; mock at the frontier.
 - S3d — tombstone/change-detector: a `removed|retired|no_longer|legacy` name, an absence assertion, a grep over source; MEDIUM; dies at closure.
 
+## Lifecycle
+
+- The deletion test applies to a file, line, comment, test, spec sentence, acronym, branch, release, rule or handoff alike.
+- Slop dies in the change that finds it — never commented out, marked, archived or deferred.
+- The writer proves the artifact fails the test, the reviewer applies it, the auditor measures the balance.
+
 ## Verdict rule
 
 - A diff that adds an S4, S5 or S8 finding grows the bug surface: Axis 3 answers "increased" until the finding is gone.
@@ -36,8 +42,8 @@ labelled judgement call with the command that makes it verifiable in the diff.
 
 ## Readers
 
-- `code-reviewer` — all ten, on every review.
-- `qa-engineer` — §Tests (S3), for curation verdicts.
-- `software-architect` — S4/S5, for the root-cause and fidelity gates.
-- `project-auditor` — all ten over the audit window (`dd-audit-project`, pillar 2, "Slop readout").
+- `dd-code-reviewer` — all ten, on every review.
+- QA lens — §Tests (S3), for curation verdicts.
+- Architecture lens — S4/S5, for the root-cause and fidelity gates.
+- Audit lens — all ten over the audit window (`dd-audit-project`, pillar 2, "Slop readout").
 - Ratchets: V31-V34 pin the counts (`tests/contract/test_test_suite_ratchets.py`, `tests/contract/test_slop_ratchets.py`); V35 is the audit readout.

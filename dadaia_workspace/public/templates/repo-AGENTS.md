@@ -49,7 +49,15 @@ Fill these in during onboarding:
 
 - Agents should prefer these commands over guessing toolchains.
 
-## 5. Source hygiene
+## 5. Tree hygiene
+
+- This tree carries source and its own artifacts only — never a nested `.dadaia/`, which corrupts context resolution for every tree-walking tool.
+- These never appear in the tree: `<!-- repo-excluded -->`.
+- Caches redirect by configuration, never by a remembered command flag: `[tool.pytest.ini_options] addopts`, `[tool.ruff] cache-dir`, `[tool.mypy] cache_dir`, hypothesis `database = None`, Playwright `outputDir` into `.dadaia/tmp/`.
+- A bare `pytest` / `ruff check` / `mypy --strict` from this root leaves the tree clean; gitignore is defence in depth, not permission to create them.
+- Published assets carry no private repo name, hostname, IP, customer or infrastructure name, operator-local path or secret.
+
+## 6. Source hygiene
 
 - A comment explains a non-obvious why only; the what and the history live in git and the ledgers.
 - A docstring states the contract in at most 3 lines.
@@ -57,7 +65,7 @@ Fill these in during onboarding:
 - A fix replaces the old path, never wraps it.
 - Full statements: `specs/memory/ARCHITECTURE.md`, fixed section Slop — code.
 
-## 6. Validation evidence
+## 7. Validation evidence
 
 Every implementation report must include:
 
@@ -66,9 +74,9 @@ Every implementation report must include:
 - changed production paths
 - known risk or `none`
 
-Write reports under this repo's `reports/<agent>/` (`DADAIA.md` §5.2).
+Write reports under this repo's `reports/<agent>/`.
 
-## 7. Stop conditions
+## 8. Stop conditions
 
 Stop before editing when:
 

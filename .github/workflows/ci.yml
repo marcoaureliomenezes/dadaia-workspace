@@ -2,10 +2,8 @@ name: CI
 
 # Gitflow law v2 (v0.4.4 FR3/FR4 / DADAIA.md §4 (Gitflow)): feature/{M.m.p} is the ONLY pushable
 # branch (its push triggers the full matrix below); develop and main advance by PR
-# only. Every PR is gated by pr-source-guard (both edges, one job) and by
-# security-verdict-gate (the diff-based security review, relocated here from the
-# pre-push hook — v0.4.4 A3.4/FR4). hotfix/* was retired outright (G2) and carries no
-# trigger.
+# only. Every PR is gated by pr-source-guard (both edges, one job); no job calls a model
+# API — the security review is the local dd-code-reviewer lens. hotfix/* carries no trigger.
 on:
   push:
     branches:
@@ -15,21 +13,6 @@ on:
   pull_request:
     branches: [main, develop]
   workflow_dispatch:
-    # Optional: supply handoff paths when invoking from a CLOSURE workflow.
-    # Leave blank on regular manual runs — the gate auto-discovers or no-ops.
-    inputs:
-      qa_sidecar:
-        description: "Path to qa-engineer handoff (*.handoff.json). Optional."
-        required: false
-        default: ""
-      security_sidecar:
-        description: "Path to security-reviewer handoff (*.handoff.json). Optional."
-        required: false
-        default: ""
-      release_id:
-        description: "Release id expected in qa/security handoffs when supplied."
-        required: false
-        default: ""
 
 permissions:
   contents: read
@@ -277,119 +260,11 @@ jobs:
           key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
+      # The whole e2e tree, not `tests/e2e/features` alone: the journeys at the tree root
+      # (the push chokepoint, the denylist, and the one-line bootstrap through the
+      # installed console script) were outside every selector and ran nowhere in CI.
       - name: pytest e2e python
-        run: poetry run pytest -q -m "e2e and not quarantine" tests/e2e/features --durations=30
-
-  e2e-panel:
-    name: E2E panel (Playwright)
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
-        with:
-          python-version: "3.12"
-      - name: Install Poetry
-        run: pipx install poetry==1.8.3
-      - name: Cache poetry deps
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-        with:
-          path: |
-            ~/.cache/pypoetry
-            ~/.cache/pip
-            .venv
-          key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
-      - name: Install Python deps
-        run: poetry install --no-interaction --no-ansi --with dev
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: tests/e2e/package-lock.json
-      - name: Install Node deps
-        working-directory: tests/e2e
-        run: npm ci
-      # Cache the browser download (~/.cache/ms-playwright) keyed on the resolved
-      # @playwright/test version — the browser build only changes when the package
-      # does (bug test-suite-real-venv-and-ci-longpole: Chromium was re-downloaded
-      # every run). On a hit only the apt system deps still install.
-      - name: Resolve Playwright version
-        id: playwright-version
-        working-directory: tests/e2e
-        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-      - name: Cache Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
-      - name: Install Chromium
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        working-directory: tests/e2e
-        run: npx playwright install --with-deps chromium
-      - name: Install Chromium system deps (cached browser)
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        working-directory: tests/e2e
-        run: npx playwright install-deps chromium
-      - name: playwright panel e2e
-        working-directory: tests/e2e
-        env:
-          # tests/e2e/panel/run-panel-e2e-server.sh (playwright.config.ts's
-          # default webServer command) bootstraps a hermetic temp workspace
-          # itself — the old "Bootstrap panel workspace" step + hardcoded
-          # --port 4999 override are retired (T-65-14 CI-fix amendment: the
-          # old bootstrap wrote spec_contexts.json directly at the checkout
-          # root, making workspace_root == the source repo root, which the
-          # `_is_source_repo_root` production guard correctly refused on the
-          # agent-policy Apply PUT's re-render).
-          PANEL_E2E_PYTHON: poetry run python
-          # Pin the hermetic temp workspace to a known path (instead of a
-          # fresh mktemp) so spec-context-operation-journey.spec.ts (AC-4)
-          # can point PANEL_TEST_REGISTRY at its spec_contexts.json and run
-          # for real in CI, rather than deterministically skipping.
-          PANEL_E2E_WS: ${{ runner.temp }}/dadaia-panel-e2e-ws
-          PANEL_TEST_REGISTRY: ${{ runner.temp }}/dadaia-panel-e2e-ws/.dadaia/states/spec_contexts.json
-          # Known artifact path so the failure-evidence upload below can find it
-          # (bug panel-e2e-artifacts-no-consumer: evidence used to land in an
-          # anonymous tmpdir and was discarded even on failure). In CI the
-          # config runs the list reporter only — failure evidence is the
-          # only-on-failure screenshots + first-retry traces in this dir.
-          PLAYWRIGHT_OUTPUT_DIR: ${{ runner.temp }}/pw-output
-          # Loud flake (v0.7.0 FR5): JSON report outside the repo; the step below
-          # fails the job on any unregistered pass-on-retry.
-          PLAYWRIGHT_JSON_REPORT: ${{ runner.temp }}/pw-flake.json
-        run: npm run test:e2e
-      - name: Fail on unregistered pass-on-retry (loud flake)
-        run: |
-          REPORT="${{ runner.temp }}/pw-flake.json"
-          if [ ! -f "$REPORT" ] || [ ! -s "$REPORT" ]; then
-            echo "::error::Playwright JSON report missing or empty at $REPORT — a missing report is a hard error, never a pass (v0.7.0 R9)."
-            exit 1
-          fi
-          # Degenerate-report hardening (T-070-09 finding 1): jq failure, a non-object
-          # report, or a missing stats key are all hard errors — never a silent pass.
-          FLAKY=$(jq -er '.stats.flaky' "$REPORT") || {
-            echo "::error::Playwright JSON report at $REPORT is malformed or lacks stats — hard error, never a pass (v0.7.0 R9)."
-            exit 1
-          }
-          case "$FLAKY" in (*[!0-9]*|"")
-            echo "::error::Playwright stats.flaky is not a number ('$FLAKY') — hard error."
-            exit 1 ;;
-          esac
-          if [ "$FLAKY" -gt 0 ]; then
-            jq -r '.. | objects | select(.tests? != null) | select([.tests[].status] | index("flaky")) | .title // empty' "$REPORT" | head -10
-            echo "::error::$FLAKY test(s) passed only on retry (flaky). A pass-on-retry is not a pass: register the flake (quarantine + bug via dadaia bugs append) or fix it (dd-test-stewardship, flakes and quarantine)."
-            exit 1
-          fi
-          echo "no unregistered pass-on-retry."
-      - name: Upload failure evidence (traces + screenshots)
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
-        with:
-          name: panel-e2e-failure-evidence
-          path: ${{ runner.temp }}/pw-output
-          retention-days: 7
-          if-no-files-found: ignore
+        run: poetry run pytest -q -m "e2e and not quarantine" tests/e2e --durations=30
 
   pr-title:
     name: PR title (conventional commits)
@@ -454,13 +329,14 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: |
           if [ "$BASE_REF" = "main" ]; then
-            # Rule 1 (unchanged): main accepts a PR only from develop.
-            if [ "$HEAD_REF" != "develop" ]; then
-              echo "::error::Gitflow law (DADAIA.md §4 (Gitflow)): main accepts PRs from 'develop' only. Got head '$HEAD_REF'."
+            # Rule 1: main accepts the promote PR from develop and release-please's
+            # release PR (ADR 0021: promote is merging the release PR), nothing else.
+            if [ "$HEAD_REF" != "develop" ] && [ "$HEAD_REF" != "release-please--branches--main" ]; then
+              echo "::error::Gitflow law: main accepts PRs from 'develop' or the release-please release PR only. Got head '$HEAD_REF'."
               echo "::error::Fix: merge your branch into develop, push develop, and open the PR develop -> main."
               exit 1
             fi
-            echo "PR head is develop - gitflow source rule satisfied (main)."
+            echo "PR head is $HEAD_REF - gitflow source rule satisfied (main)."
           elif [ "$BASE_REF" = "develop" ]; then
             # Rule 2 (v0.4.4 FR4): develop accepts a PR only from feature/{M.m.p} — no
             # 'v' prefix, M.m.p numeric. Derived from the SAME pattern as
@@ -475,82 +351,3 @@ jobs:
             fi
             echo "PR head matches feature/M.m.p - gitflow source rule satisfied (develop)."
           fi
-
-  # ---------------------------------------------------------------------------------
-  # Security-verdict PR gate (v0.4.4 FR4 / T-044-07) — DISTINCT from `verdict-gate`
-  # below: this job is auto-triggered by every PR (feature -> develop, develop ->
-  # main) and checks the SECURITY verdict only, keyed on the PR head sha; the
-  # `verdict-gate` job below is a manually `workflow_dispatch`-ed, DUAL (qa +
-  # security) gate for release CLOSURE. Two different constitutional moments, not a
-  # duplicated enforcement surface (AR-2).
-  #
-  # The diff-based security review that used to gate every push (pre-push hook,
-  # per-pushed-sha, DP-5) is DELETED from that path (A3.4, T-044-06) and relocates
-  # here. `.dadaia/handoff/` is a workspace-local, gitignored directory a GitHub
-  # Actions checkout never sees (features/chokepoints/service.py's module docstring;
-  # `dadaia ci gc-push-verdicts` only ever reads a local clone) — so the evidence
-  # this job reads is a COMMITTED copy of the security-reviewer's APPROVED handoff
-  # at `specs/releases/<release-id>/verdicts/<reviewed-sha>.handoff.json` (the same
-  # "review artifact committed on the branch" cadence DADAIA.md §4 (Gitflow) already
-  # uses for a qa-engineer segment-close review). See
-  # .github/scripts/pr-verdict-check.sh for exactly what "covers the PR head sha"
-  # means and why literal sha equality is not always achievable.
-  #
-  # A4.4 (recorded limit): a workflow job added on a feature branch does not run on
-  # the PR that introduces it AS A REQUIRED status check — it still runs and
-  # reports (the workflow file is read from the PR head), but branch protection
-  # cannot require a check GitHub has never observed against the base branch yet.
-  # rc-1's PR is the PR that *brings* this job to develop (milestone (a) still used
-  # the v1 mechanic, D2) — so this gate is ADVISORY on rc-1's PR and REQUIRED from
-  # rc-2 onward. Making it required is an operator/dispatcher repository-settings
-  # action (`gh api repos/<owner>/<repo>/branches/<branch>/protection/required_status_checks
-  # -X PATCH`) — that call CLOBBERS the whole required-checks list, so the full list
-  # must always be re-supplied whole, never as a delta.
-  security-verdict-gate:
-    name: Security verdict gate (PR head sha)
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && (github.base_ref == 'develop' || github.base_ref == 'main')
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          # The literal PR head — never the synthetic refs/pull/N/merge commit
-          # actions/checkout defaults to for pull_request events — and full history
-          # (fetch-depth: 0) so `dadaia ci verdict-check` can resolve the PR head's
-          # first parent (the covering verdict's expected commit sha).
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
-        with:
-          python-version: "3.12"
-      - name: Install package (v0.5.1 K7 — the gate is now `dadaia ci verdict-check`)
-        run: pip install -e .
-      - name: Require an APPROVED security-reviewer verdict covering this PR head
-        env:
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: bash .github/scripts/pr-verdict-check.sh
-
-  # ---------------------------------------------------------------------------
-  # Dual-approval verdict gate (panel-kanban-v1 §3 K-3 / §9)
-  # ---------------------------------------------------------------------------
-  # Behaviour:
-  #   - Normal CI runs (push / PR): .dadaia/handoff/ is gitignored, no handoffs
-  #     are present in the checkout → check-verdict.sh exits 0 (no-op).
-  #   - Release CLOSURE: operator triggers `workflow_dispatch` supplying
-  #     qa_sidecar and security_sidecar inputs, OR places handoff files
-  #     inside the checkout (e.g. via upload-artifact / download-artifact in a
-  #     wrapping workflow). The script then asserts both verdicts == "APPROVED".
-  #   - ubuntu-latest ships with jq preinstalled; no extra setup needed.
-  verdict-gate:
-    name: Dual-approval verdict gate (qa + security)
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-      - name: Check qa-engineer + security-reviewer verdicts
-        env:
-          # Passed via workflow_dispatch inputs; empty on push/PR runs.
-          QA_HANDOFF: ${{ github.event.inputs.qa_sidecar || '' }}
-          SECURITY_HANDOFF: ${{ github.event.inputs.security_sidecar || '' }}
-          RELEASE_ID: ${{ github.event.inputs.release_id || '' }}
-        run: bash .github/scripts/check-verdict.sh

@@ -1,9 +1,10 @@
 # SPEC — Release: 0.4.7
 
-**Status:** Aprovado
+**Status:** Approved
 **Release ID:** 0.4.7
 **Owner:** product-engineer
 **Opened:** 2026-09-12
+**Origin:** backlog:gate-context-scope-antistall,one-canon-registry,continuous-reaper-reaped-zone,privacy-selfscan-scope
 **Consumes:** gate-context-scope-antistall, one-canon-registry, continuous-reaper-reaped-zone, privacy-selfscan-scope
 
 ---

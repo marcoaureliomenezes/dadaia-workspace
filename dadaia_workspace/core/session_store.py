@@ -224,6 +224,16 @@ def new_binding_record(
     }
 
 
+def binding_env_lines(context: str, session_id: str) -> tuple[str, str]:
+    """The two eval-ready ``export`` lines that carry a binding into a shell.
+
+    The ONE author of the `eval $(...)` contract: `context bind --print-env` and the
+    `init --repo` bootstrap both print exactly these, so the two can never drift into
+    two spellings of the same handshake.
+    """
+    return (f"export DADAIA_CONTEXT={context}", f"export DADAIA_SESSION_ID={session_id}")
+
+
 def is_live(
     record: dict[str, object],
     *,

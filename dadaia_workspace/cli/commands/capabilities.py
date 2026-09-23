@@ -8,6 +8,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.features.capabilities import build_capabilities
 
 console = Console()
@@ -17,7 +18,7 @@ def capabilities(
     json_output: bool = typer.Option(False, "--json", help="Emit the stable JSON contract."),
 ) -> None:
     """Describe public dadaia-workspace features supported by this installation."""
-    payload = build_capabilities()
+    payload = build_capabilities(command_paths())
     if json_output:
         typer.echo(json.dumps(payload, sort_keys=True))
         return

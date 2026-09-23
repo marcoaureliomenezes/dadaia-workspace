@@ -33,13 +33,13 @@ class PublicAssetService:
     def install(
         self,
         workspace_root: Path,
-        target: str = "all",
+        harness: str | None = None,
         force: bool = False,
         scope: Literal["all", "repos-only", "workspace-only"] = "all",
         only: str | None = None,
     ) -> list[str]:
         return self._public_assets.install(
-            workspace_root, target=target, force=force, scope=scope, only=only
+            workspace_root, harness=harness, force=force, scope=scope, only=only
         )
 
     def list_all(self) -> dict[str, list[str]]:

@@ -21,7 +21,7 @@ hold: ``scaffold(t); check_tree(t) == []`` — proved by
 
 Pure module for its CHECKING half (:func:`is_canon_path`, :func:`canon_violations`,
 :func:`verdict_violations`): plain data in, plain data out, never touches a filesystem.
-Its RENDERING half (:func:`scaffold`, :func:`scaffold_entry`, :func:`release_new`) does
+Its RENDERING half (:func:`scaffold`, :func:`scaffold_entry`) does
 real file I/O by design (that is the whole point of a scaffolder) but touches nothing
 outside the *specs_dir*/*public_dir* it is given.
 
@@ -39,17 +39,15 @@ The canon (operator, 2026-08-28) — the ONLY members permitted under ``specs/``
 
     AGENTS.md constitution.md memory/ releases/ backlog/ bugs/ audits/ ADRs/
 
-    releases/{AGENTS.md, _ideas/{AGENTS.md, <M.m.p>/SPEC.md},
-              _archive/{releases_histo.jsonl, <M.m.p>/**},
+    releases/{AGENTS.md, _archive/{releases_histo.jsonl, <M.m.p>/**},
               <M.m.p>/{_RELEASE.json, SPEC.md, PLAN.md, TASKS.md, rc-N/{SPEC,PLAN,TASKS}.md,
-                       verdicts/<40hex>.handoff.json,
                        <alpha|rc>-N/{SPEC.md, PLAN.md, TASKS.md}}}
     backlog/{AGENTS.md, BACKLOG.json, _archive/backlog_histo.jsonl}
     bugs/{AGENTS.md, BUGS.jsonl, _archive/bugs_histo.jsonl}
     audits/{AGENTS.md, _archive/audits_histo.jsonl,
             <YYYYMMDD-slug>/{AUDIT.md, FINDINGS.jsonl}}
     ADRs/{AGENTS.md, decisions.jsonl}
-    memory/{AGENTS.md, ARCHITECTURE.md, QUALITY.md, TECHSTACK.md,
+    memory/{AGENTS.md, ARCHITECTURE.md, QUALITY.md,
             product/index.md, product/catalog.json, product/<area>/<slug>.md}
 
 Nothing else — no ``.gitkeep``, no dotfiles, no ``remote-bugs/``, no ``reviews/``, no
@@ -62,30 +60,19 @@ and a git tree listing (``git ls-tree``'s own native output) already produce.
 from __future__ import annotations
 
 import json
-import re
-import shutil
-from collections.abc import Collection, Iterable
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
-from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
-from dadaia_workspace.core.release_state import (
-    RELEASE_STATE_FILENAME,
-    ReleaseState,
-    parse_release_state,
-    serialize_release_state,
-)
 from dadaia_workspace.core.specs_version import (
     CANONICAL_SPECS_VERSION,
-    is_release_semver,
 )
 from dadaia_workspace.core.workspace_layout import (
     CANON_ROOT_MEMBERS,
     MEMORY_TOPLEVEL_FILES,
     REQUIRED_ROOT_DIRS,
-    SHAPE_FRAGMENTS,
     SPECS_CANON,
     CanonEntry,
 )
@@ -97,7 +84,7 @@ from dadaia_workspace.features.specs.memory_canon import (
 
 #: The canon rows live in ``core.workspace_layout`` (0.4.7 FR5: ONE registry of
 #: canonical names, shared with the root law, the zone table and the projected
-#: ``DADAIA.md`` §6.2 table). This module is their renderer and checker.
+#: ``specs/AGENTS.md`` canon table). This module is their renderer and checker.
 CANON: tuple[CanonEntry, ...] = SPECS_CANON
 
 __all__ = [
@@ -110,10 +97,8 @@ __all__ = [
     "canon_violations",
     "check_tree",
     "is_canon_path",
-    "release_new",
     "scaffold",
     "scaffold_entry",
-    "verdict_violations",
 ]
 
 _CONSTITUTION_STUB = """\
@@ -135,45 +120,6 @@ Declaração atômica do propósito do projeto e suas invariantes fundamentais.
 ## Exclusões canônicas
 
 - (Definir o que este projeto não é)
-"""
-
-_RELEASE_SPEC_STUB = """\
-# SPEC — Release: {release_id}
-
-**Status:** Draft
-**Release ID:** {release_id}
-**Owner:** product-engineer
-**Opened:** {today}
-
----
-
-## 1. Problem and context
-
-(Describe the problem this release solves.)
-
----
-
-## 2. Objective
-
-(State the release objective in one sentence.)
-
----
-
-## 3. Scope
-
-(List the scope clusters / acceptance criteria.)
-
----
-
-## 4. Out of scope
-
-(Explicitly list what this release does NOT cover.)
-
----
-
-## 5. Dependencies and risks
-
-(Upstream blockers, sequencing constraints, risk table.)
 """
 
 _BACKLOG_STUB = '{"schema": "backlog-v1", "active": []}\n'
@@ -204,9 +150,7 @@ TEMPLATES: dict[str, tuple[Kind, str]] = {
     "memory/product/index.md": ("copy", "scaffold/memory/product/index.md"),
     "memory/product/catalog.json": ("json_catalog", ""),
     "releases/AGENTS.md": ("copy", "scaffold/releases/AGENTS.md"),
-    "releases/_ideas/AGENTS.md": ("copy", "scaffold/releases/_ideas/AGENTS.md"),
     "releases/_archive/releases_histo.jsonl": ("static", ""),
-    "releases/<M.m.p>/SPEC.md": ("format", _RELEASE_SPEC_STUB),
     "backlog/AGENTS.md": ("copy", "scaffold/backlog/AGENTS.md"),
     "backlog/BACKLOG.json": ("static", _BACKLOG_STUB),
     "backlog/_archive/backlog_histo.jsonl": ("static", ""),
@@ -217,25 +161,6 @@ TEMPLATES: dict[str, tuple[Kind, str]] = {
     "ADRs/AGENTS.md": ("copy", "scaffold/ADRs/AGENTS.md"),
     "ADRs/decisions.jsonl": ("static", ""),
 }
-
-#: The verdict-filename shape with its sha CAPTURED — the SAME canon row
-#: ``releases/<M.m.p>/verdicts/<40hex>.handoff.json`` every other consumer matches, with
-#: the sha fragment wrapped in a group so :func:`verdict_violations` can read the sha
-#: out of an otherwise-canon-conformant verdict path. Never a second hand-written regex.
-_SHA40 = SHAPE_FRAGMENTS["<40hex>"]
-_VERDICT_RE = re.compile(
-    next(
-        e for e in CANON if e.shape.endswith("verdicts/<40hex>.handoff.json")
-    ).pattern.pattern.replace(_SHA40, f"({_SHA40})")
-)
-
-#: The legacy release-id slug form new releases may still mint (pre-canon-v6 repos);
-#: bare SemVer (:func:`~dadaia_workspace.core.specs_version.is_release_semver`) is the
-#: preferred, canon-conformant form. A slug-named release directory does not match any
-#: CANON entry above (the doctor's TREE-8/SPEC-DOC-027 checks already treat it as
-#: non-canon for a live release dir) — :func:`release_new` supports it anyway, honestly
-#: outside the canon-driven render path, for backward compatibility.
-_LEGACY_RELEASE_SLUG_RE = re.compile(r"^[a-z][a-z0-9-]+$")
 
 
 def is_canon_path(rel_posix: str) -> bool:
@@ -252,31 +177,6 @@ def canon_violations(paths: Iterable[str]) -> list[str]:
     specs_dir).as_posix()`` or a git tree listing's own native paths, identically.
     """
     return [path for path in paths if not is_canon_path(path)]
-
-
-def verdict_violations(paths: Iterable[str], live_shas: Collection[str]) -> list[str]:
-    """The verdict business rule (operator, 2026-08-28; ship shape 2026-09-05):
-    ``verdicts/`` may hold at most ONE file per LIVE sha.
-
-    *live_shas* is ``features.chokepoints.verdict.live_verdict_shas`` — head, head's
-    first parent, integration branch tip — resolved once by the composition root and
-    passed in as plain data. Every verdict-shaped path in *paths* naming a sha outside
-    that set is a violation (stale — SPEC-DOC-044); a second file naming the SAME live
-    sha is also a violation (the excess, never the first). Paths that are not
-    verdict-shaped at all (already covered by :func:`canon_violations`) are ignored
-    here, never double-reported.
-    """
-    seen: set[str] = set()
-    violations: list[str] = []
-    for path in paths:
-        match = _VERDICT_RE.match(path)
-        if match is None:
-            continue
-        sha = match.group(1)
-        if sha not in live_shas or sha in seen:
-            violations.append(path)
-        seen.add(sha)
-    return violations
 
 
 @dataclass(frozen=True)
@@ -303,7 +203,7 @@ def check_tree(specs_dir: Path) -> list[Violation]:
             p.relative_to(specs_dir).as_posix() for p in sorted(specs_dir.rglob("*")) if p.is_file()
         ]
         violations.extend(
-            Violation(path, "not part of the v6 canon (DADAIA.md §6)")
+            Violation(path, "not part of the v6 canon (specs/AGENTS.md)")
             for path in canon_violations(paths)
         )
     for entry in CANON:
@@ -338,7 +238,11 @@ def _render(entry: CanonEntry, *, public_dir: Path, context: dict[str, str]) -> 
             json.dumps(
                 {
                     "generated_at": f"{context['today']}T00:00:00Z",
-                    "context": context["project_name"],
+                    # The catalog's ONE writer is `memory.py catalog generate`, which
+                    # derives `context` from the tree's own directory name; a scaffold
+                    # writing the project label instead was invalid the moment it was
+                    # born (`memory.py check` regenerates and compares).
+                    "context": context["tree_name"],
                     "features": [],
                 },
                 indent=2,
@@ -370,6 +274,7 @@ def scaffold(
     context = {
         "today": _today(),
         "project_name": project_name,
+        "tree_name": specs_dir.resolve().parent.name,
         "specs_pattern_version": str(CANONICAL_SPECS_VERSION),
     }
     created: list[Path] = []
@@ -417,148 +322,3 @@ def scaffold_entry(specs_dir: Path, rel_path: str, /, **context: str) -> Path:
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(rendered, encoding="utf-8")
     return target
-
-
-#: Every artifact ``release_new`` refuses to mint over (CWE-73/CWE-59 hardening): a
-#: release directory a caller can already write artifacts into ahead of ``release new``
-#: must never have any of its canonical artifacts silently overwritten. Derived from the
-#: canon rows themselves (0.4.7 FR5) — never a second hand-kept list of the same names.
-_RELEASE_ARTIFACT_NAMES: tuple[str, ...] = tuple(
-    entry.shape.removeprefix("releases/<M.m.p>/")
-    for entry in CANON
-    if entry.shape.startswith("releases/<M.m.p>/")
-    and "/" not in entry.shape.removeprefix("releases/<M.m.p>/")
-)
-
-
-#: The ONE birth state document (0.4.7 FR2, T-047-06): phase DEFINITION, no candidate
-#: number yet, every milestone unreached, and one `note` entry recording the birth.
-#: Bug `release-new-writes-spec-only-never-creates-release-state`: the gate's MEMORY
-#: class, `dadaia context show`, dd-spec-navigator, V34 and `rc-archive` all resolve the
-#: live release by this file's presence — without it a minted release exists for nobody.
-def _birth_release_state_text(release_id: str) -> str:
-    """Serialize the birth ``release-state-v1`` document for *release_id*.
-
-    One serializer, ``core.release_state.serialize_release_state`` — never a second
-    hand-rolled JSON shape for the same schema."""
-    return serialize_release_state(
-        ReleaseState(
-            schema="release-state-v1",
-            release=release_id,
-            phase="DEFINITION",
-            rc=None,
-            defined=None,
-            implemented=None,
-            shipped=None,
-            log=(
-                {
-                    "ts": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    "agent": "dadaia release new",
-                    "kind": "note",
-                    "text": f"Release {release_id} born",
-                },
-            ),
-        )
-    )
-
-
-def release_new(specs_dir: Path, release_id: str) -> Path:
-    """Create ``specs/releases/<release_id>/SPEC.md`` with a canonical stub — the
-    ``dadaia release new`` implementation (moved here from the retired
-    ``features.spec_artifacts.new_artifacts``, v0.5.1 K4).
-
-    *release_id* must be the SemVer canon (``is_release_semver`` — preferred, matches
-    the ``specs doctor`` SPEC-DOC-027 naming canon) OR the legacy slug
-    (``^[a-z][a-z0-9-]+$``, backward compatibility for a pre-canon-v6 repo).
-
-    No-clobber, three layers deep:
-
-    1. Directory-level (unchanged, regression contract
-       ``test_existing_dir_raises_file_exists_error``): refuses whenever
-       ``releases/<release_id>/`` already exists at all, even if none of its four
-       canonical artifacts do yet — a release directory is a single unit, not a bag
-       of independently-clobberable files.
-    2. Per-artifact (defense in depth): even were the directory check ever bypassed,
-       refuses whenever any of SPEC.md/PLAN.md/TASKS.md/RELEASE.json already exists
-       under it.
-    3. Symlink refusal (CWE-59): refuses when ``releases/<release_id>`` (or
-       ``releases/`` itself) already exists as a symlink — minting through a symlink
-       could write the release stub outside *specs_dir* entirely.
-
-    A bare-SemVer *release_id* renders through :func:`scaffold_entry`, over the SAME
-    ``releases/<M.m.p>/SPEC.md`` CANON entry every other on-demand entry renders
-    through — one render path, not two (M5, 2026-08-29 six-axis review). A legacy slug
-    is not canon-shaped (no CANON entry matches it — TREE-8/SPEC-DOC-027 already treat
-    a live slug-named release dir as non-canon), so it falls back to rendering the same
-    stub template directly.
-    """
-    if not (is_release_semver(release_id) or _LEGACY_RELEASE_SLUG_RE.match(release_id)):
-        raise ValueError(
-            f"Invalid release ID {release_id!r}. "
-            "Must be bare SemVer ^\\d+\\.\\d+\\.\\d+$ (e.g. 0.1.23 — preferred, matches "
-            "the specs-doctor naming canon; a `v`-prefixed id is the retired archive axis "
-            "and is refused at minting, AS-13) or the legacy slug ^[a-z][a-z0-9-]+$ "
-            "(lowercase letters, digits, and hyphens; must start with a letter)."
-        )
-
-    releases_root = specs_dir / "releases"
-    release_dir = releases_root / release_id
-    # Exactly one live release, ever (release 0.4.6 FR4, ADR 0005): scope grows by
-    # candidates inside the live release, never by minting a sibling. _archive/_ideas
-    # are not live; the target id itself is caught by the no-clobber checks below.
-    if releases_root.is_dir():
-        others = sorted(
-            d.name
-            for d in releases_root.iterdir()
-            if d.is_dir() and d.name not in ("_archive", "_ideas") and d.name != release_id
-        )
-        if others:
-            live = others[0]
-            raise FileExistsError(
-                f"a live release already exists ({', '.join(others)}) — the "
-                f"release-candidates model allows exactly one (ADR 0005) — stack the "
-                f"work as a candidate, or ship {live} first "
-                f"({DADAIA_BIN} release archive {live} --shipped <sha> "
-                f"--pr <n> --next {release_id}).\n"
-                f"fix: {DADAIA_BIN} release rc-archive"
-            )
-    if releases_root.is_symlink() or release_dir.is_symlink():
-        raise FileExistsError(
-            f"{release_dir} resolves through a symlink — refusing to mint a release "
-            "through one (it could write outside the specs/ tree)."
-        )
-    for name in _RELEASE_ARTIFACT_NAMES:
-        artifact = release_dir / name
-        if artifact.exists() or artifact.is_symlink():
-            raise FileExistsError(
-                f"{artifact} already exists — refusing to overwrite a minted release artifact."
-            )
-
-    # Build and PROVE the state document before anything touches disk (0.4.7 FR2): a
-    # text that does not round-trip through parse_release_state is never written.
-    state_text = _birth_release_state_text(release_id)
-    parse_release_state(state_text)
-
-    created_dir = not release_dir.exists()
-    try:
-        if is_release_semver(release_id):
-            spec_path = scaffold_entry(
-                specs_dir, f"releases/{release_id}/SPEC.md", release_id=release_id
-            )
-        else:
-            # Legacy slug: no CANON entry matches it, so it is rendered directly from
-            # the same stub template scaffold_entry would otherwise use.
-            release_dir.mkdir(parents=True, exist_ok=True)
-            spec_path = release_dir / "SPEC.md"
-            spec_path.write_text(
-                _RELEASE_SPEC_STUB.format(release_id=release_id, today=_today()),
-                encoding="utf-8",
-            )
-        (release_dir / RELEASE_STATE_FILENAME).write_text(state_text, encoding="utf-8")
-    except BaseException:
-        # All-or-nothing: the directory-level no-clobber above guarantees this tree did
-        # not exist before, so removing it restores the pre-birth state exactly.
-        if created_dir:
-            shutil.rmtree(release_dir, ignore_errors=True)
-        raise
-    return spec_path

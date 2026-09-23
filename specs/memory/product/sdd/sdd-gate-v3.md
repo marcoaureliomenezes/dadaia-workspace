@@ -2,53 +2,58 @@
 slug: sdd-gate-v3
 title: sdd-gate-v3
 tldr: No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write), one fix line per BLOCK, chokepoints at the push.
-summary: The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one executable fix line; the git chokepoints enforce the publication boundary and the full denylist scan over every pushed path.
+summary: The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one executable fix line; the pre-push chokepoint enforces the branch contract, the specs canon and the denylist scan over every pushed object, and no CI job calls a model API — the security review is the reviewer's lens before each pull request.
 tags: [sdd, gate, hooks, enforcement, no-locks, privacy]
+sources:
+  - .github/workflows/ci.yml
+  - dadaia_workspace/hooks/__init__.py
+  - dadaia_workspace/hooks/pre_gate.py
+  - dadaia_workspace/hooks/sdd_gate.py
+  - dadaia_workspace/hooks/sdd_post_gate.py
+  - dadaia_workspace/hooks/root_whitelist.py
+  - dadaia_workspace/hooks/venv_guard.py
+  - dadaia_workspace/features/spec_context/gate_policy.py
+  - dadaia_workspace/features/chokepoints/**
+  - dadaia_workspace/infrastructure/data/privacy_baseline.json
+  - dadaia_workspace/cli/commands/ci.py
 ---
 
 ## PreToolUse
 
-- No lease, mutex, lock file, acquisition or wait path exists; the gate knows no session mode and reads no `_RELEASE.json`, so no phase is ever consulted.
-- `hooks/pre_gate.py` reads each payload once and evaluates three policies in order — root whitelist, venv guard, SDD gate — first block wins; a policy that raises is ALLOW.
-- The gate blocks exactly three things: a new workspace-root entry (root whitelist — the root law sets plus the instance exception globs, both from `core/workspace_layout.py`, [[workspace-doctor]]); a leading `dadaia`, `pip` or `python -m dadaia_workspace` token outside `.dadaia/.venv/bin/` (venv guard, Bash only, its one rule); a PROTECTED write or a bound session's MUTATING write under a `repos/<slug>/` outside its scope (SDD gate).
+- No lease, lock file or wait path exists; the gate knows no session mode and reads no `_RELEASE.json`.
+- One pre-gate reads each payload once and evaluates root whitelist, venv guard and SDD gate in that order, first block wins; a policy that raises is ALLOW.
+- It blocks exactly three things: a new workspace-root entry outside the root law and `.dadaia/states/instance_exceptions.txt` ([[workspace-doctor]]); a leading `dadaia`, `pip` or `python -m dadaia_workspace` outside `.dadaia/.venv/bin/` (Bash only); a PROTECTED write, or a bound session's MUTATING write into a `repos/<slug>/` outside its scope.
 
 | Class | Behavior |
 |---|---|
-| ADDITIVE | `specs/{bugs,backlog,audits}` at the root or context-relative, `.dadaia/{handoff,tmp,reaped,mcps,.cache}` — the registry's output and ephemeral zones — always writable, bound or not |
-| MUTATING | Everything else, `specs/memory/` and `specs/releases/**` included in every phase; scope-judged under `repos/<slug>/`, records advisory presence |
-| PROTECTED | `.dadaia/sessions/` and the projected law files — fail-closed |
+| ADDITIVE | `specs/bugs/`, `specs/backlog/`, `specs/audits/` at the root or inside a repo, and `.dadaia/{handoff,tmp,reaped,mcps,.cache}/` — always writable, bound or not |
+| MUTATING | everything else, `specs/memory/` and `specs/releases/` included; scope-judged under `repos/<slug>/` |
+| PROTECTED | `.dadaia/sessions/` and the projected law — `AGENTS.md` at the workspace root or under `.dadaia/` |
 
-- Three classes, no fourth: a workspace-root path matching no ADDITIVE or PROTECTED prefix is MUTATING; the projected-law origin is decided with zero I/O — basename `DADAIA.md`, `AGENTS.md` or `CLAUDE.md` at the root or a harness-projection dir, both sets from `core/workspace_layout.py` — so a repo's scoped `AGENTS.md` is MUTATING.
-- Scope is the bound context's main repo plus its associated repos: `hooks/sdd_gate.py` resolves one `core.invocation.Invocation` per write target and passes its `Bind` (context name + `all_repos()` slugs) and the target's owner to `gate_policy.evaluate` as plain data; the policy module imports nothing from `core.invocation` ([[context-management]]).
-- Only `repos/<slug>/` is scope-judged; an unbound session, a slug no context registers and a workspace-root path are never scope-blocked — the gate cannot attribute them and fails open.
-- Every BLOCK from every enforcement point — the three gate blocks, `ci push-gate-check`, `ci verdict-check`, the release verbs, `context heartbeat`, every error-class doctor rule through its mandatory `fix_help` — carries exactly one `fix: <command>` line naming one executable command, venv-rooted when it is `dadaia`; `tests/contract/test_every_block_carries_a_fix.py` drives each refusal through its public seam and feeds the line back through `pre_gate.evaluate_payload` asserting ALLOW, so a BLOCK whose fix is itself blocked (a Stall) is unrepresentable.
-- The fix lines: root entry → append the name to `.dadaia/states/instance_exceptions.txt`; session record → `context bind <ctx>`; projected law → `public stage && public install --target all`; out-of-scope write → `context bind <owner>`; venv → the same command venv-rooted.
-- A MUTATING write best-effort upserts a presence record, another live record warning once per throttle window without changing the verdict; presence I/O never raises.
-- The PostToolUse hook renews this session's presence and `last_seen_at` and, on one throttle, runs the workspace reaper (`doctor.reap`, which owns presence GC); it never blocks; `bound_at` against the injection sentinel is the only injection trigger ([[context-management]], [[workspace-doctor]]).
+- A repo's own `AGENTS.md` is MUTATING; nothing at the root escapes classification.
+- Scope is the bound context's main repo plus its associated repos ([[context-management]]); an unbound session, a slug no context registers and a workspace-root path are never scope-blocked.
+- Every BLOCK — the three gate blocks, `dadaia ci push-gate-check`, the ledger scripts, every error-class doctor rule — carries exactly one `fix: <command>` line, venv-rooted when it is `dadaia`; `tests/contract/test_every_block_carries_a_fix.py` feeds each fix back through the gate and asserts ALLOW, so a BLOCK whose fix is itself blocked (a Stall) cannot ship.
+- The fix lines: root entry → append the name to `.dadaia/states/instance_exceptions.txt`; session record → `dadaia context bind <ctx>`; projected law → `dadaia public stage && dadaia public install`; out-of-scope write → `dadaia context bind <owner>`; venv → the same command venv-rooted.
+- The gate returns a decision and its message per write target: a BLOCK's message is its reason, an ALLOW's is empty; there is no advisory channel.
+- A BLOCK is one envelope carrying `"decision": "block"` plus Claude Code's `permissionDecision: "deny"`; an ALLOW is an explicit envelope with no permission verdict and no `systemMessage`.
+- A MUTATING write records nothing about its session; races between sessions surface through git.
+- The PostToolUse hook refreshes the session record's `last_seen_at` and, on a throttle, runs the workspace reaper; it always exits zero ([[workspace-doctor]]).
 
 ## Git chokepoints
 
-- `pre-commit-presence-gate.sh` is advisory-only, always exits 0, and only warns about another live session.
-- `pre-push-ci-gate.sh` delegates to `ci push-gate-check`, whose refusals are a direct `develop`/`main` push or invalid branch name, a mismatched refspec, an unparseable stdin line, a non-canon `specs/` path, a denylist hit and a git read failure — each one `fix:` line — and it reads no security handoff.
-- `refs/heads/feature/{M.m.p}` is the only pushable ref; the patterns `^main$`, `^develop$`, `^feature/\d+\.\d+\.\d+$` have one source in the package plus a POSIX-ERE translation in CI.
-- A refspec aiming a local ref at a different remote ref is refused; an unparseable stdin line refuses the push naming `git push --no-verify` as the one bypass, empty stdin being the nothing-to-gate allow.
-- The installed pair `.git/hooks/{pre-commit,pre-push}` is `core/workspace_layout.INSTALLED_GIT_HOOKS`, written by `dadaia ci install-hook` and byte-compared per ALIVE repo by `dadaia doctor` (`HOOKS-DRIFT-1`, [[workspace-doctor]]).
-- The security verdict is a pull-request gate: a CI job on both edges requires an APPROVED `security-reviewer` handoff whose `metrics.commit_sha` is the PR head sha, or an ancestor whose only intervening diff is the verdict evidence at `specs/releases/<release-id>/verdicts/<sha>.handoff.json`.
-- The dual qa-plus-security closure gate is the only mechanical check of the qa-engineer verdict.
-- `features/chokepoints` is five modules — `branch_policy`, `denylist_scan`, `pre_commit`, `push_gate`, `verdict` — and `verdict.covering_verdict(paths, head_sha)` is the single verdict reader the push gate, `dadaia doctor` and the PR check all call.
-- A consumed verdict is deleted by hand after the merge; one naming none of the live shas (head, first parent, develop tip — `verdict.live_verdict_shas`) is `SPEC-DOC-044`, refused by the pre-push gate and deleted by `dadaia doctor --fix` ([[workspace-doctor]]).
-- `secret-scan.yml` (gitleaks) runs on every PR to `develop` and `main` and is a required status check on `develop`'s branch protection.
+- `dadaia ci install-hook` installs `.git/hooks/pre-push`, which delegates to `dadaia ci push-gate-check`; `dadaia doctor` byte-compares the installed hook per ALIVE repo (`HOOKS-DRIFT-1`).
+- Policy order, first refusal wins: branch policy — only `refs/heads/feature/<M.m.p>` pushed to the same remote name, `develop` and `main` refused; the `specs/` canon over every `specs/` path the range touches; the denylist scan. An unparseable stdin line refuses, naming `git push --no-verify` as the one bypass; empty stdin allows.
+- The security review is the `dd-code-reviewer` security lens on the PR head, run by the main thread before each pull request; no workflow calls a model API. `secret-scan.yml` runs gitleaks on every PR to `develop` and `main`.
 
 ### Push-range denylist scan
 
-- The push is the publication boundary: the repository is public, so every tracked path is scanned with the full layer set — no tolerated-pairs list and no path-scoped `exclude_regex` exist, and a test fixture needing a secret shape composes it at runtime from parts (`tests/helpers/privacy_fixtures.py`), never as a tracked literal.
-- The scan reads only the objects the push would publish, over `git rev-list --objects <local> --not <remote>` with a `--not --remotes` fallback, before any network I/O; working tree, history and author/committer headers are out of scope.
-- It runs last, after branch policy, and is the only policy running on a tag ref.
-- Terms come from three additive sources: the operator denylist (`$DADAIA_PRIVACY_DENYLIST` or `.dadaia/states/privacy_denylist.json`, never committed, shared with the bug store's masking loader), the packaged structural baseline (`infrastructure/data/privacy_baseline.json`, its `version` bumped on every change), and the foreign names — registry context names, repo slugs and `repos/` directory names, minus both identities of the pushed repository.
-- Amnesty suppresses a hit iff the range has a resolvable base and the exact value was already published at that same path; a new path, a multi-path object, an oversized object and the `--not --remotes` fallback are never amnestied.
-- The gate never reports coverage it did not achieve: a git failure, unresolvable prior side, desynchronised stream or absent prior blob refuses; a non-UTF-8 blob is skipped and counted, and a blob over the 5 MB cap is scanned to the cap.
-- The refusal names ref, blob path with the match line, short object sha, the term masked to `first…last`, the source layer and the remediation — never the matched line or the unmasked term.
+- The push is the publication boundary: every tracked path is scanned with the full layer set, no path is exempt, and a fixture needing a secret shape composes it at runtime (`tests/helpers/privacy_fixtures.py`).
+- It reads only the objects the push would publish (`git rev-list --objects <local> --not <remote>`, `--not --remotes` fallback), tags included, before any network I/O; working tree, history and author headers are out of scope.
+- Terms come from the operator denylist (`$DADAIA_PRIVACY_DENYLIST` or `.dadaia/states/privacy_denylist.json`, never committed), the packaged structural baseline (`dadaia_workspace/infrastructure/data/privacy_baseline.json`) and the foreign names — registry context names, repo slugs and `repos/` directory names, minus the pushed repository's own.
+- A hit is amnestied only when the range has a resolvable base and the exact value was already published at the same path; a new path, a multi-path object, an oversized object and the fallback range are never amnestied.
+- The gate never reports coverage it did not achieve: a git failure or an unresolvable prior side refuses; a non-UTF-8 blob is skipped and counted, a blob over 5 MB is scanned to the cap.
+- The refusal names ref, path and line, short object sha, the term masked to `first…last` and the source layer — never the matched line or the unmasked term.
 
 ## Dependencies
 
-[[context-management]], [[workspace-doctor]], [[ARCHITECTURE]], [[agent-monitoring]].
+[[context-management]], [[workspace-doctor]], [[release-lifecycle]], [[ARCHITECTURE]].

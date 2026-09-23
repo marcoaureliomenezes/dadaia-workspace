@@ -8,7 +8,7 @@ the class delegates to; they take explicit Path arguments instead of ``self``.
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -25,8 +25,30 @@ from dadaia_workspace.infrastructure.public_assets_common import (
     _sha256,
 )
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
+    _parse_agent_frontmatter,
     _parse_write_allowlist,
 )
+
+_ACTIVITY_CLASSES: frozenset[str] = frozenset({"ADDITIVE", "MUTATING"})
+
+
+def activity_read_only(frontmatter: Mapping[str, object]) -> bool:
+    """Least privilege derives from the persona's ``activity_class`` (ADR 0016): ADDITIVE
+    (the reviewer) never edits; MUTATING accepts its own edits. The ONE derivation shared
+    by the Claude render and the Codex TOML transcode.
+
+    Raises:
+        PublicAssetError: fail-closed — a persona declaring no class, or an unknown one,
+            never renders on a silent privilege default.
+    """
+    declared = frontmatter.get("activity_class")
+    if declared not in _ACTIVITY_CLASSES:
+        raise PublicAssetError(
+            "cannot render agent projection: frontmatter must declare "
+            f"activity_class as one of {sorted(_ACTIVITY_CLASSES)}, got {declared!r}"
+        )
+    return declared == "ADDITIVE"
+
 
 # ---------------------------------------------------------------------------
 # Stage helpers (moved from FileSystemPublicAssetManager internal methods)
@@ -81,7 +103,7 @@ def remove_legacy_workflow_projections(
             legacy_dir.rmdir()
 
 
-#: The nine always-on rule files the library published before ``DADAIA.md``. Their law is
+#: The nine always-on rule files the library published before the root `AGENTS.md` map. Their law is
 #: carried in full by the single system-prompt file; the projections are removed by name.
 #: A blanket prune of the rules directory is NOT correct — it also hosts operator-authored
 #: rules, which this migration does not own.
@@ -118,7 +140,7 @@ def remove_legacy_bind_epoch_state(workspace_root: Path, installed: list[str]) -
 
 
 def remove_retired_core_rules(workspace_root: Path, installed: list[str]) -> None:
-    """Remove the pre-DADAIA.md core rule projections, by name, without touching others.
+    """Remove the pre-the root `AGENTS.md` map core rule projections, by name, without touching others.
 
     Bug ``retired-lib-asset-leaves-orphan-projection``: ``copy_tree`` returns before its
     orphan-prune loop when the source directory no longer exists, so retiring a whole
@@ -166,7 +188,13 @@ def render_claude_agent(staged_text: str, resolved: ResolvedAgentModel) -> str:
         )
     frontmatter = staged_text[4 : end_idx + 1]
     rest = staged_text[end_idx + 5 :]
-    kept = [line for line in frontmatter.splitlines() if not line.startswith(("model:", "effort:"))]
+    derived = ("model:", "effort:", "permissionMode:", "disallowedTools:")
+    kept = [line for line in frontmatter.splitlines() if not line.startswith(derived)]
+    if activity_read_only(_parse_agent_frontmatter(staged_text)):
+        kept.append("permissionMode: default")
+        kept.append("disallowedTools: [Edit, Write, NotebookEdit]")
+    else:
+        kept.append("permissionMode: acceptEdits")
     kept.append(f"model: {resolved.model}")
     if resolved.effort is not None:
         kept.append(f"effort: {resolved.effort}")

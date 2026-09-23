@@ -178,6 +178,6 @@ def test_customised_scoped_law_is_never_overwritten(tmp_path: Path) -> None:
 def test_shipped_history_records_every_current_scaffold_law() -> None:
     """Anti-rot, scoped half: every scaffold AGENTS.md edit must append its new hash."""
     scaffold_root = _REPO_ROOT / "dadaia_workspace" / "public" / "scaffold"
-    for area in ("memory", "releases", "releases/_ideas", "backlog", "bugs", "audits", "ADRs"):
+    for area in ("memory", "releases", "backlog", "bugs", "audits", "ADRs"):
         text = (scaffold_root / area / "AGENTS.md").read_text(encoding="utf-8")
         assert was_shipped(text, f"scaffold/{area}/AGENTS.md", _REAL_TEMPLATES_DIR), area

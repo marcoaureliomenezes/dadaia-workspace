@@ -220,11 +220,11 @@ def test_a_live_bind_record_survives_a_full_doctor_fix_pass(tmp_path: Path) -> N
     from datetime import UTC, datetime
 
     from dadaia_workspace.core import session_store, workspace_layout
-    from dadaia_workspace.core.workspace_layout import Creator, zones_created_by
+    from dadaia_workspace.core.workspace_layout import provisioned_zones
     from dadaia_workspace.features.spec_context.doctor import DoctorService
 
     dadaia = tmp_path / ".dadaia"
-    for zone in (*zones_created_by(Creator.INIT), *zones_created_by(Creator.INSTALL)):
+    for zone in provisioned_zones():
         (dadaia / zone.name).mkdir(parents=True, exist_ok=True)
     (tmp_path / workspace_layout.INSTANCE_EXCEPTIONS).parent.mkdir(parents=True, exist_ok=True)
 

@@ -5,7 +5,7 @@ the full pipeline: canonical source → staging → Claude / Codex / Pi / .agent
 They catch content-level bugs that unit tests with fakes cannot detect.
 
 Intent: CONTRACT — v0.1.65 FR1/AC-1, FR5/AC-8 (public asset pipeline)
-Owner: software-engineer
+Owner: dd-software-engineer
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app as cli_app
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from tests.helpers.harness_profile import register_all
 from tests.helpers.scan_population import assert_populated
 from tests.helpers.skill_inventory_oracle import skill_names
 
@@ -31,15 +32,9 @@ _runner = CliRunner()
 # ---------------------------------------------------------------------------
 
 EXPECTED_AGENTS = {
-    "ai-engineer",
-    "code-reviewer",
-    "product-engineer",
-    "project-auditor",
-    "project-manager",
-    "qa-engineer",
-    "security-reviewer",
-    "software-architect",
-    "software-engineer",
+    "dd-code-reviewer",
+    "dd-product-engineer",
+    "dd-software-engineer",
 }
 
 # These must NEVER appear in any staging or runtime target
@@ -117,7 +112,8 @@ def _is_plugin_stub(content: str) -> bool:
 def _staged_install(workspace: Path) -> FileSystemPublicAssetManager:
     """Stage then install; return the manager for further assertions."""
     mgr = _manager()
-    mgr.install(workspace, target="all", force=True)
+    register_all(workspace)
+    mgr.install(workspace, force=True)
     return mgr
 
 
@@ -135,11 +131,11 @@ class TestStage:
 
         agentic = workspace / ".dadaia" / "agentic"
         # ``rules`` is NOT staged: the nine core rules were consolidated into the single
-        # always-on law file (``data/DADAIA.md``), so the family no longer exists as a
+        # always-on law file (``data/AGENTS.md``), so the family no longer exists as a
         # core asset dir. Plugin-pack rules stage under ``plugins/<pack>/rules/``.
         for subdir in ("agents", "skills", "scripts", "data"):
             assert (agentic / subdir).is_dir(), f".dadaia/agentic/{subdir}/ not created by stage"
-        assert (agentic / "data" / "DADAIA.md").is_file(), "the workspace law file is not staged"
+        assert (agentic / "data" / "AGENTS.md").is_file(), "the workspace map is not staged"
 
         manifest_path = agentic / "manifest.json"
         assert manifest_path.exists(), "manifest.json not created"
@@ -184,7 +180,7 @@ class TestStage:
 
 
 # ---------------------------------------------------------------------------
-# TestInstallAll — validates runtime targets after dadaia public install --target all
+# TestInstallAll — validates runtime targets after dadaia public install
 # ---------------------------------------------------------------------------
 
 
@@ -291,18 +287,12 @@ class TestContentConsistency:
                 assert (skill_dir / "SKILL.md").exists(), (
                     f"Skill directory '{skill_dir.name}' has no SKILL.md"
                 )
-        # T-053-25: dev-server-registry merged into the CLI-help surface — the law's
-        # non-derivable half lives in dd-cli-library §6 now.
-        cli_library_skill = (skills_dir / "dd-cli-library" / "SKILL.md").read_text(encoding="utf-8")
-        for cmd in (
-            "dadaia server list",
-            "dadaia server next",
-            "dadaia server register",
-            "dadaia server release",
-        ):
-            assert cmd in cli_library_skill, (
-                f"dd-cli-library SKILL.md missing dev-server law mention for {cmd!r}"
-            )
+        # 0.4.7 c5 T-047-45: the dev-server registry is the dd-cli-library skill script.
+        registry_script = (skills_dir / "dd-cli-library" / "scripts" / "registry.py").read_text(
+            encoding="utf-8"
+        )
+        for verb in ("register", "release", "next", "clean"):
+            assert f'sub.add_parser("{verb}")' in registry_script, f"registry.py lost {verb!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -314,7 +304,8 @@ class TestDoctor:
     def test_doctor_reports_all_ok_after_clean_install(self, tmp_path: Path) -> None:
         workspace = tmp_path / "ws"
         mgr = _manager()
-        mgr.install(workspace, target="all", force=True)
+        register_all(workspace)
+        mgr.install(workspace, force=True)
 
         report = [line.render() for line in mgr.doctor(workspace)]
 
@@ -327,30 +318,31 @@ class TestDoctor:
     ) -> None:
         workspace = tmp_path / "ws"
         mgr = _manager()
-        mgr.install(workspace, target="all", force=True)
+        register_all(workspace)
+        mgr.install(workspace, force=True)
 
         if mutation == "drift":
-            target = workspace / ".claude" / "agents" / "software-engineer.md"
+            target = workspace / ".claude" / "agents" / "dd-software-engineer.md"
             target.write_text(
                 target.read_text(encoding="utf-8") + "\n# drifted\n", encoding="utf-8"
             )
             report = [line.render() for line in mgr.doctor(workspace)]
             drift_lines = [
-                line for line in report if "[drift]" in line and "software-engineer" in line
+                line for line in report if "[drift]" in line and "dd-software-engineer" in line
             ]
             assert drift_lines, (
-                "Doctor did not detect drift in .claude/agents/software-engineer.md.\n"
+                "Doctor did not detect drift in .claude/agents/dd-software-engineer.md.\n"
                 "Full report:\n" + "\n".join(report)
             )
         else:
-            target = workspace / ".claude" / "agents" / "qa-engineer.md"
+            target = workspace / ".claude" / "agents" / "dd-code-reviewer.md"
             target.unlink()
             report = [line.render() for line in mgr.doctor(workspace)]
             missing_lines = [
-                line for line in report if "[missing]" in line and "qa-engineer" in line
+                line for line in report if "[missing]" in line and "dd-code-reviewer" in line
             ]
             assert missing_lines, (
-                "Doctor did not detect missing .claude/agents/qa-engineer.md.\n"
+                "Doctor did not detect missing .claude/agents/dd-code-reviewer.md.\n"
                 "Full report:\n" + "\n".join(report)
             )
 
@@ -372,15 +364,9 @@ class TestDoctor:
 _DOCTOR_BLOCKER_PREFIXES = ("[missing]", "[drift]", "[fail]")
 
 
-def _run_init(workspace: Path, harness: str | None) -> object:
-    """Scaffold *workspace* via the real `dadaia init` CLI (in-process, Q4).
-
-    ``harness=None`` omits ``--harness`` entirely (default = all-four back-compat path).
-    """
-    args = ["init", "--workspace", str(workspace)]
-    if harness is not None:
-        args += ["--harness", harness]
-    return _runner.invoke(cli_app, args)
+def _run_init(workspace: Path, harness: str) -> object:
+    """Scaffold *workspace* for exactly one *harness* via the real `dadaia init` CLI."""
+    return _runner.invoke(cli_app, ["init", str(workspace), "--harness", harness])
 
 
 def _persisted_profile(workspace: Path) -> list[str]:
@@ -424,11 +410,11 @@ def _assert_profile_doctor_green(workspace: Path, monkeypatch: pytest.MonkeyPatc
 
 class TestPerProfileInit:
     def test_claude_only_profile(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """AC-8 claude-only: `.claude/` (agents/skills) + ctx-inject hook; NO .codex/ NO .kimi-code/.
+        """AC-8 claude-only: `.claude/` (agents/skills) + ctx-inject hook; NO .codex/.
 
         FR31/T-044-59 (bug dadaia-md-projected-twice-into-claude-code-context): Claude
-        Code's own root-import chain (CLAUDE.md -> @AGENTS.md -> @DADAIA.md) already
-        resolves the law, so `.claude/rules/DADAIA.md` was the only thing that ever
+        Code's own native root `AGENTS.md` discovery already
+        resolves the law, so `.claude/rules/AGENTS.md` was the only thing that ever
         landed under `.claude/rules/` and its projection was retired — the directory is
         now never created for a claude profile at all.
         """
@@ -450,13 +436,13 @@ class TestPerProfileInit:
         )
         # AC-9(f) discriminating anchor: the two un-chosen harnesses get NO projection dir.
         assert not (ws / ".codex").exists(), "codex must NOT be scaffolded for a claude profile"
-        assert not (ws / ".kimi-code").exists(), "kimi must NOT be scaffolded for a claude profile"
+        assert not (ws / ".kimi-code").exists(), "kimi-code owns no workspace directory"
 
         assert _persisted_profile(ws) == ["claude"]
         _assert_profile_doctor_green(ws, monkeypatch)
 
     def test_codex_only_profile(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """AC-8 codex-only: `.codex/` (agents/config/rules/hooks.json) + `.dadaia/hooks/codex-*`; NO .claude/ NO .kimi-code/."""
+        """AC-8 codex-only: `.codex/` (agents/config/rules/hooks.json) + `.dadaia/hooks/codex-*`; NO .claude/."""
         ws = tmp_path / "codex_only"
         monkeypatch.chdir(tmp_path)
         result = _run_init(ws, "codex")
@@ -471,7 +457,7 @@ class TestPerProfileInit:
         assert codex_wrappers, "expected .dadaia/hooks/codex-* wrappers for a codex profile"
         # un-chosen harnesses get no projection.
         assert not (ws / ".claude").exists(), "claude must NOT be scaffolded for a codex profile"
-        assert not (ws / ".kimi-code").exists(), "kimi must NOT be scaffolded for a codex profile"
+        assert not (ws / ".kimi-code").exists(), "kimi-code owns no workspace directory"
 
         assert _persisted_profile(ws) == ["codex"]
         # Green requires the W5 boundary completion (runtime_expectations claude:* loop scoped);
@@ -479,14 +465,17 @@ class TestPerProfileInit:
         _assert_profile_doctor_green(ws, monkeypatch)
 
     def test_kimi_code_only_profile(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """AC-8 kimi-code-only (v0.2.8): `.kimi-code/` projection; NO .claude/ NO .codex/ NO .kimi-code/."""
+        """AC-8 kimi-code-only: 0.4.7 FR3 gave kimi-code an EMPTY own-projection set — it
+        reads the shared `.agents/` tree natively and wires its hooks at the user level,
+        so the profile scaffolds no workspace directory of its own."""
         ws = tmp_path / "kimi_code_only"
         monkeypatch.chdir(tmp_path)
         result = _run_init(ws, "kimi-code")
         assert result.exit_code == 0, result.output
 
-        # EXACT structure — the `.kimi-code/` projection carries the staged AGENTS.md.
-        assert (ws / ".kimi-code" / "AGENTS.md").is_file(), ".kimi-code/AGENTS.md missing"
+        # EXACT structure — the shared `.agents/skills` tree, and nothing kimi-specific.
+        assert (ws / ".agents" / "skills").is_dir(), ".agents/skills missing"
+        assert not (ws / ".kimi-code").exists(), "kimi-code must project no workspace dir"
         # un-chosen harnesses get no projection.
         assert not (ws / ".claude").exists(), (
             "claude must NOT be scaffolded for a kimi-code profile"
@@ -499,19 +488,75 @@ class TestPerProfileInit:
         # every L1 target (v0.2.8), so the kimi-only tree is doctor-green directly.
         _assert_profile_doctor_green(ws, monkeypatch)
 
-    def test_default_no_flag_scaffolds_all_three(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """AC-8 all-harness: default (no `--harness`) is still all-four; green doctor (back-compat)."""
-        ws = tmp_path / "all_default"
-        monkeypatch.chdir(tmp_path)
-        result = _run_init(ws, None)  # omit --harness entirely → default all-four
-        assert result.exit_code == 0, result.output
 
-        assert (ws / ".claude" / "agents").is_dir()
-        assert (ws / ".codex").is_dir()
-        assert (ws / ".kimi-code").is_dir()
-        assert _ctx_inject_registered(ws / ".claude")
+class TestSymlinkTargetDoctor:
+    """SYMLINK-TARGET-1 — the ledger-driven replacement for the retired per-harness
+    byte-drift classes.
 
-        assert _persisted_profile(ws) == ["claude", "codex", "kimi-code"]
-        _assert_profile_doctor_green(ws, monkeypatch)
+    Intent: CONTRACT — 0.4.7 AC3.1/AC3.2 (T-047-57). Size: LARGE (real projection I/O).
+    """
+
+    @staticmethod
+    def _a_linked_skill(workspace: Path) -> Path:
+        entry = next(
+            (p for p in sorted((workspace / ".claude" / "skills").iterdir()) if p.is_symlink()),
+            None,
+        )
+        assert entry is not None, "install produced no .claude/skills symlink to break"
+        return entry
+
+    def test_retargeted_symlink_is_one_error_with_a_fix_line(self, tmp_path: Path) -> None:
+        workspace = tmp_path / "ws"
+        mgr = _manager()
+        register_all(workspace)
+        mgr.install(workspace, force=True)
+        entry = self._a_linked_skill(workspace)
+        foreign = tmp_path / "foreign"
+        foreign.mkdir()
+        entry.unlink()
+        entry.symlink_to(foreign, target_is_directory=True)
+
+        report = [line.render() for line in mgr.doctor(workspace)]
+
+        findings = [line for line in report if "SYMLINK-TARGET-1" in line]
+        assert findings == [
+            f"[error] SYMLINK-TARGET-1 .claude/skills/{entry.name}: "
+            f"symlink target '{foreign}' is not the canonical "
+            f"'../../.agents/skills/{entry.name}'"
+        ], "\n".join(report)
+        assert "[info] fix: .dadaia/.venv/bin/dadaia public install --force" in report
+
+    def test_symlink_replaced_by_a_drifted_copy_is_an_error(self, tmp_path: Path) -> None:
+        workspace = tmp_path / "ws"
+        mgr = _manager()
+        register_all(workspace)
+        mgr.install(workspace, force=True)
+        entry = self._a_linked_skill(workspace)
+        authored = workspace / ".agents" / "skills" / entry.name
+        entry.unlink()
+        entry.mkdir()
+        for source in sorted(authored.rglob("*")):
+            if source.is_file():
+                copied = entry / source.relative_to(authored)
+                copied.parent.mkdir(parents=True, exist_ok=True)
+                copied.write_bytes(source.read_bytes())
+        skill_md = entry / "SKILL.md"
+        skill_md.write_text(skill_md.read_text(encoding="utf-8") + "\ndrifted\n", encoding="utf-8")
+
+        report = [line.render() for line in mgr.doctor(workspace)]
+
+        assert [line for line in report if "SYMLINK-TARGET-1" in line] == [
+            f"[error] SYMLINK-TARGET-1 .claude/skills/{entry.name}: copy diverged at SKILL.md"
+        ], "\n".join(report)
+
+    def test_clean_install_attests_the_class(self, tmp_path: Path) -> None:
+        workspace = tmp_path / "ws"
+        mgr = _manager()
+        register_all(workspace)
+        mgr.install(workspace, force=True)
+
+        report = [line.render() for line in mgr.doctor(workspace)]
+
+        attestation = [line for line in report if "symlink-target:" in line]
+        assert len(attestation) == 1 and attestation[0].startswith("[ok] ")
+        assert not [line for line in report if "SYMLINK-TARGET-1" in line]

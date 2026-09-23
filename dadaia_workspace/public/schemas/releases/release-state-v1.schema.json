@@ -2,14 +2,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "release-state-v1",
   "title": "Release State v1",
-  "description": "The whole content of specs/releases/<release-id>/_RELEASE.json — ONE mutable JSON object, the release's current state, never an append-only event stream (operator ruling: 'e um arquivo altamente mutavel onde acompanhamos o estado do release. Nao faz sentido ser append-only' — retires release-event-v1.schema.json and its _RELEASE.jsonl fold, core/release_events.py). `phase`, `rc`, `defined`, `implemented` and `shipped` are rewritten IN PLACE through core/atomic_write.py's compare-and-swap seam (expected_previous, refuse-stale) whenever a code path writes this document; an agent with file tools (product-engineer, at the phase boundaries this document's history used to record as separate `phase` lines) may also Read-then-Edit it directly, the same discipline a CAS write enforces mechanically. `defined`/`implemented`/`shipped` are the three sha-bearing milestone facts (each set at most once meaningfully — a later legitimate rewrite is a correction, not a second append, so there is no more 'duplicate milestone' finding to detect: SPEC-DOC-043 retires with the JSONL fold it existed to police). An audit is NOT a release milestone: the audit window is read from audits/_archive/audits_histo.jsonl (0.4.7 FR7), so the fourth `audited` milestone is deleted rather than left as a field no code path ever wrote. `log` is the one place free-form governance narrative survives INSIDE this otherwise-typed document — the closure narrative that _RELEASE.jsonl's `note` records used to carry, one entry per note, oldest first, never rewritten once appended, each classified by the closed `kind` enum.",
+  "description": "The whole content of specs/releases/<release-id>/_RELEASE.json — ONE mutable JSON object, the release's current state, never an append-only event stream (operator ruling: 'e um arquivo altamente mutavel onde acompanhamos o estado do release. Nao faz sentido ser append-only' — retires release-event-v1.schema.json and its _RELEASE.jsonl fold, core/release_events.py). `phase`, `defined`, `implemented` and `shipped` are rewritten IN PLACE through core/atomic_write.py's compare-and-swap seam (expected_previous, refuse-stale) whenever a code path writes this document; an agent with file tools (dd-product-engineer, at the phase boundaries this document's history used to record as separate `phase` lines) may also Read-then-Edit it directly, the same discipline a CAS write enforces mechanically. `defined`/`implemented`/`shipped` are the three sha-bearing milestone facts (each set at most once meaningfully — a later legitimate rewrite is a correction, not a second append, so there is no more 'duplicate milestone' finding to detect: SPEC-DOC-043 retires with the JSONL fold it existed to police). An audit is NOT a release milestone: the audit window is read from audits/_archive/audits_histo.jsonl (0.4.7 FR7), so the fourth `audited` milestone is deleted rather than left as a field no code path ever wrote. `log` is the one place free-form governance narrative survives INSIDE this otherwise-typed document — the closure narrative that _RELEASE.jsonl's `note` records used to carry, one entry per note, oldest first, never rewritten once appended, each classified by the closed `kind` enum.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schema",
     "release",
     "phase",
-    "rc",
     "defined",
     "implemented",
     "shipped",
@@ -36,14 +35,6 @@
         "ARCHIVED"
       ]
     },
-    "rc": {
-      "type": [
-        "integer",
-        "null"
-      ],
-      "minimum": 1,
-      "description": "The current/most recent rc round number, or null before any rc round has opened."
-    },
     "defined": {
       "type": [
         "object",
@@ -67,7 +58,7 @@
           "description": "When this milestone was recorded."
         }
       },
-      "description": "Set once, at the definition promotion commit (product-engineer). null before that point."
+      "description": "Set once, at the definition promotion commit (dd-product-engineer). null before that point."
     },
     "implemented": {
       "type": [
@@ -77,7 +68,6 @@
       "additionalProperties": false,
       "required": [
         "sha",
-        "rc",
         "ts"
       ],
       "properties": {
@@ -88,19 +78,12 @@
           ],
           "description": "The final-rc QA-close commit sha — not the merge commit (the two differ by the merge artifact)."
         },
-        "rc": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "description": "Which rc round closed this milestone."
-        },
         "ts": {
           "type": "string",
           "description": "When this milestone was recorded."
         }
       },
-      "description": "Set once, at the final-rc QA close (qa-engineer). null before that point."
+      "description": "Set once, at the implementation close (dd-code-reviewer). null before that point."
     },
     "shipped": {
       "type": [
@@ -179,6 +162,32 @@
             "type": "string",
             "minLength": 1,
             "description": "The note's free-text body."
+          },
+          "since": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{7,40}$",
+            "description": "kind 'memory' only: the commit the reconciliation window opened at — the previous memory entry's until, else defined.sha."
+          },
+          "until": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{7,40}$",
+            "description": "kind 'memory' only: the HEAD the reconciliation window closed at; the next window opens here."
+          },
+          "reviewed": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "kind 'memory' only: the worklist entries read against their sources' diff and left as they were."
+          },
+          "changed": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "kind 'memory' only: the worklist entries rewritten by this reconciliation."
           }
         }
       }

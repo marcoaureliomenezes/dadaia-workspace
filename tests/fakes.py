@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
-from dadaia_workspace.core.models.server_registry import PortEntry
 from dadaia_workspace.core.models.spec_context import SpecContextProject
 
 
@@ -139,7 +138,7 @@ class FakeGitClient:
 class FakePublicAssetManager:
     def __init__(self) -> None:
         self.staged: list[Path] = []
-        self.installed: list[tuple[Path, str, bool]] = []
+        self.installed: list[tuple[Path, str | None, bool]] = []
         self.doctored: list[Path] = []
 
     def stage(self, workspace_root: Path) -> list[str]:
@@ -150,12 +149,12 @@ class FakePublicAssetManager:
     def install(
         self,
         workspace_root: Path,
-        target: str = "all",
+        harness: str | None = None,
         force: bool = False,
         scope: str = "all",
         only: str | None = None,
     ) -> list[str]:
-        self.installed.append((workspace_root, target, force))
+        self.installed.append((workspace_root, harness, force))
         return [str(workspace_root / ".agents" / "skills" / "fake-skill" / "SKILL.md")]
 
     def list_all(self) -> dict[str, list[str]]:
@@ -260,31 +259,6 @@ class FakePythonEnvironmentManager:
             f"{workspace_root}/.dadaia/.venv"
             f"/{PLATFORM.venv_scripts_dir}/pip{PLATFORM.venv_exe_suffix}"
         )
-
-
-class FakeServerRegistryStore:
-    """In-memory ServerRegistryStore — keyed by port number."""
-
-    def __init__(self) -> None:
-        self._store: dict[int, PortEntry] = {}
-
-    def save(self, entry: PortEntry) -> None:
-        self._store[entry.port] = entry
-
-    def update(self, entry: PortEntry) -> None:
-        self._store[entry.port] = entry
-
-    def get(self, port: int) -> PortEntry | None:
-        return self._store.get(port)
-
-    def list_all(self) -> list[PortEntry]:
-        return sorted(self._store.values(), key=lambda e: e.port)
-
-    def delete(self, port: int) -> None:
-        self._store.pop(port, None)
-
-    def count(self) -> int:
-        return len(self._store)
 
 
 class FakeProcessProbe:

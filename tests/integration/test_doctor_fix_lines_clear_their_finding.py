@@ -67,10 +67,18 @@ def _plant_status_line_gone(root: Path) -> None:
     spec.write_text("# Spec\n\n> **Created:** 2026-04-01\n\nContent.\n", encoding="utf-8")
 
 
+def _plant_origin_line_gone(root: Path) -> None:
+    spec = root / "specs" / "releases" / _RELEASE / "SPEC.md"
+    spec.write_text(
+        "# Spec\n\n> **Status:** Approved\n**Opened:** 2026-09-21\n\nContent.\n",
+        encoding="utf-8",
+    )
+
+
 def _plant_oversized_plan(root: Path) -> None:
     plan = root / "specs" / "releases" / _RELEASE / "PLAN.md"
     body = "\n".join(f"- line {i}" for i in range(400))
-    plan.write_text(f"# Plan\n\n> **Status:** Aprovado\n\n{body}\n", encoding="utf-8")
+    plan.write_text(f"# Plan\n\n> **Status:** Approved\n\n{body}\n", encoding="utf-8")
 
 
 def _plant_changelog_heading(root: Path) -> None:
@@ -117,12 +125,6 @@ def _plant_dispositioned_audit(root: Path) -> None:
     )
 
 
-def _plant_archived_release_residue(root: Path) -> None:
-    residue = root / "specs" / "_archive" / "releases" / "0.0.9"
-    residue.mkdir(parents=True)
-    (residue / "GRILL.md").write_text("# Grill notes\n", encoding="utf-8")
-
-
 #: code -> how to make it fire. The eight remedies the 0.4.7 candidate-2 review named,
 #: plus the memory-document pair they share a shape with.
 PLANTS: dict[str, Plant] = {
@@ -134,28 +136,16 @@ PLANTS: dict[str, Plant] = {
         {
             "<id>": _RELEASE,
             "<document>": "SPEC",
-            "<Aprovado|Em revisão|Draft>": "Aprovado",
+            "<Approved|In review|Draft>": "Approved",
         },
     ),
     "SPEC-DOC-005": Plant(_plant_oversized_plan),
+    "SPEC-DOC-048": Plant(_plant_origin_line_gone, {"<id>": _RELEASE}),
     "SPEC-DOC-010": Plant(_plant_changelog_heading),
     "AGENTS-PLACEHOLDER-1": Plant(_plant_tests_agents_placeholder),
     "TREE-2": Plant(_plant_root_spec_md),
     "TREE-3": Plant(
         _plant_missing_memory_document, {"<document>": "QUALITY", "<title>": "Quality"}
-    ),
-    "SPEC-DOC-038": Plant(
-        _plant_dispositioned_audit,
-        {
-            "<audit>": "20260101-lifecycle",
-            # The fixture tree is not a bound workspace, so the verb is told which
-            # specs/ it acts on — the one argument a real invocation resolves itself.
-            "<sha>": "abc1234 --specs-dir specs",
-        },
-    ),
-    "SPEC-DOC-039": Plant(
-        _plant_archived_release_residue,
-        {"<release-id>": "0.0.9", "<why abandoned>": "abandoned: superseded by 0.1.0"},
     ),
 }
 
@@ -170,16 +160,18 @@ _UNEXERCISED: dict[str, str] = {
     "own call, not a fixture assertion",
     "TREE-1": "the fix is `specs upgrade`, a full scaffold run exercised by the specs "
     "upgrade integration suite",
-    "RELEASE-TREE-HANDEDIT": "carries no fix line by design (0.4.7 FR6: re-running the "
-    "verb and accepting the edit are both correct); the rule is exercised end to end by "
-    "tests/integration/cli/test_doctor_hand_edit.py",
     "TREE-4": "auto-fixed rule (`fix_tree4`), covered by the structural doctor unit tests",
     "TREE-5": "auto-fixed rule (`fix_tree5`), covered by the structural doctor unit tests",
     "TREE-7": "the fix redacts a session id inside BUGS.jsonl; the value is per-record "
     "and redaction is covered by the redaction suite",
     "TREE-8": "auto-fixed rule (`fix_tree8`), covered by the structural doctor unit tests",
-    "CAT-1": "the fix is `memory catalog generate`, exercised by the catalog CLI suite",
+    "RELEASE-TREE-MEMORY": "the fix runs `release.py memory` over the ledger-derived "
+    "commit window; the rule's own cases are tests/unit/features/specs/test_release_tree.py",
+    "CAT-1": "the fix is `memory.py catalog generate`, exercised by tests/unit/skills/test_spec_navigator_memory_script.py",
+    "SPEC-DOC-038": "the fix is `audit.py close`, exercised by tests/unit/skills/test_audit_project_audit_script.py",
     "LINT-1": "the fix inserts one missing frontmatter field; which field is per-atom",
+    "ADR-SUPERSEDED-CITATION": "no auto-fix by design (the successor is a judgment); covered "
+    "by tests/unit/features/specs/test_doctor_adr_citations.py",
     "MEM-DRIFT-1": "the fix rewrites one ARCHITECTURE.md package line against the real "
     "package tree, which a tmp specs tree has none of",
     "MEM-DRIFT-2": "the fix rewrites one dead citation inside one memory atom against "
@@ -208,14 +200,13 @@ _UNEXERCISED: dict[str, str] = {
     "SPEC-DOC-037": "the fix deletes a runtime-enum line from the constitution; the line "
     "is operator content",
     "SPEC-DOC-041": "the fix is `bugs archive`, exercised by the bugs CLI suite",
-    "SPEC-DOC-044": "auto-fixed rule (`fix_stale_verdict`), covered by the verdict suite",
-    "SPEC-DOC-045": "the fix rewrites pyproject.toml's version; a tmp specs tree has no pyproject",
     "SPEC-DOC-047": "the fix deletes a memory task line from TASKS.md; the line is "
     "operator content",
     "RELEASE-TREE-SCHEMA/RELEASE-TREE-PARSE/RELEASE-TREE-TS-ORDER/RELEASE-TREE-PHASE/"
     "RELEASE-TREE-ARCHIVED/RELEASE-TREE-TRIO/RELEASE-TREE-STATE-MISSING": "the fix "
-    "rewrites one _RELEASE.json value; which value depends on which of the seven codes "
-    "fired",
+    "rewrites one _RELEASE.json value; which value depends on which of the seven "
+    "conformance codes fired; the two archive codes name `dadaia release fold`, "
+    "exercised by tests/unit/features/specs/test_candidate_fold.py",
     "SPEC-DOC-046": "auto-fixed rule (`fix_release_state_filename`), covered by the "
     "release doctor unit tests",
 }
@@ -293,38 +284,6 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
         f"{code}: the fix line ran but the finding survives — "
         f"{[i.description for i in after]}\n{command}"
     )
-
-
-def test_spec_doc_039_relocates_the_residue_instead_of_destroying_it(tmp_path: Path) -> None:
-    """The remedy the finding NAMES is the remedy its fix line RUNS.
-
-    ``doctor_release.check_partial_archived_release_dirs`` tells the operator to
-    relocate the residue to ``specs/_archive/wip-abandoned/<name>/`` with a README
-    breadcrumb. A fix line that removes the directory answers a different question.
-    """
-    root = _repo(tmp_path)
-    plant = PLANTS["SPEC-DOC-039"]
-    plant.plant(root)
-    _git(root, "add", "-A")
-    _git(root, "commit", "-qm", "fixture")
-    rule = next(r for r in SPECS_RULES if "SPEC-DOC-039" in r.codes)
-    assert rule.fix_help is not None
-
-    command = _resolve(rule.fix_help, plant).replace(_VENV_DADAIA, _THIS_VENV_DADAIA)
-    done = subprocess.run(
-        ["bash", "-c", command],
-        cwd=root,
-        env={**os.environ, "HOME": str(session_home())},
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert done.returncode == 0, f"{command}\n{done.stderr}"
-
-    relocated = root / "specs" / "_archive" / "wip-abandoned" / "0.0.9"
-    assert (relocated / "GRILL.md").read_text(encoding="utf-8") == "# Grill notes\n"
-    assert "abandoned" in (relocated / "README.md").read_text(encoding="utf-8")
-    assert not (root / "specs" / "_archive" / "releases" / "0.0.9").exists()
 
 
 def test_every_specs_rule_is_either_exercised_or_listed_with_a_reason() -> None:

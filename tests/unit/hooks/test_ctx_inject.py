@@ -55,7 +55,9 @@ def _ws(tmp_path: Path, slug: str = "ctx", *, with_memory: bool = True) -> Path:
     if with_memory:
         mem = specs / "memory"
         mem.mkdir()
-        (mem / "TECHSTACK.md").write_text("# tech\nPython 3.12\n", encoding="utf-8")
+        (mem / "ARCHITECTURE.md").write_text(
+            "# Architecture\n\n## Tech Stack\n\nPython 3.12\n", encoding="utf-8"
+        )
         (mem / "product").mkdir()
         (mem / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
     return tmp_path
@@ -72,7 +74,9 @@ def _add_context(tmp_path: Path, slug: str, *, with_memory: bool = True) -> None
     if with_memory:
         mem = specs / "memory"
         mem.mkdir()
-        (mem / "TECHSTACK.md").write_text(f"# tech {slug}\nNode 20\n", encoding="utf-8")
+        (mem / "ARCHITECTURE.md").write_text(
+            f"# Architecture {slug}\n\n## Tech Stack\n\nNode 20\n", encoding="utf-8"
+        )
         (mem / "product").mkdir()
         (mem / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
 
@@ -361,7 +365,7 @@ def test_bound_session_carries_no_dispatcher_preflight_and_no_context_list(
     tmp_path: Path,
 ) -> None:
     """A30.1: a BOUND session's injected prefix restates neither the dispatcher
-    preflight (a restatement of ``DADAIA.md`` §1/§2) nor the ALIVE-context list —
+    preflight (a restatement of the root `AGENTS.md` map §1/§2) nor the ALIVE-context list —
     only the context header and the lean memory prefix (A30.3, untouched) survive."""
     _ws(tmp_path)
     sid = "fr30-bound"
@@ -434,7 +438,9 @@ def test_bound_context_name_maps_to_registry_repo_slug(tmp_path: Path) -> None:
     )
     specs = tmp_path / "repos" / "actual-dir" / "specs"
     (specs / "memory").mkdir(parents=True)
-    (specs / "memory" / "TECHSTACK.md").write_text("# tech\nPython 3.12\n", encoding="utf-8")
+    (specs / "memory" / "ARCHITECTURE.md").write_text(
+        "# Architecture\n\n## Tech Stack\n\nPython 3.12\n", encoding="utf-8"
+    )
     (specs / "memory" / "product").mkdir()
     (specs / "memory" / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
 

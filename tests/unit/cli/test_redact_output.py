@@ -153,7 +153,7 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:
     WorkspaceService(
         public_assets=FileSystemPublicAssetManager(),
         python_env=VenvPythonEnvironmentManager(),
-    ).init(tmp_path)
+    ).init(tmp_path, harnesses=("claude",))
     from dadaia_workspace.core.platform import PLATFORM
 
     venv_bin = tmp_path / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
@@ -197,60 +197,6 @@ def _ctx_row(
         "dead_since": "2026-05-01T00:00:00Z" if state == "dead" else None,
         "current_branch": "main",
     }
-
-
-def _write_corrupt_presence(workspace: Path, ctx: str, sid: str) -> None:
-    path = workspace / ".dadaia" / "states" / "presence" / ctx / f"{sid}.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("{not-json", encoding="utf-8")
-
-
-def test_doctor_redact_masks_presence_and_repo_coherence_lines(
-    workspace: Path, monkeypatch
-) -> None:
-    """A8.1: `dadaia doctor --redact` names no foreign context/slug in the
-    PRESENCE-GC ([stale-presence]), INV-4 and INV-5 lines; the caller's own context
-    stays visible."""
-    caller_repo = workspace / "repos" / "caller-ctx"
-    caller_repo.mkdir(parents=True)
-    alpha_repo_absent_slug = "alpha-repo"  # INV-4: ALIVE, repo missing on disk
-    bravo_repo_present_slug = "bravo-repo"  # INV-5: DEAD, repo present on disk
-    (workspace / "repos" / bravo_repo_present_slug).mkdir(parents=True)
-
-    _write_contexts(
-        workspace,
-        [
-            _ctx_row("caller-ctx", repo_slug="caller-ctx", state="alive"),
-            _ctx_row("alpha-secret", repo_slug=alpha_repo_absent_slug, state="alive"),
-            _ctx_row("bravo-secret", repo_slug=bravo_repo_present_slug, state="dead"),
-        ],
-    )
-    _write_corrupt_presence(workspace, "charlie-secret", "sess-corrupt")
-    # A stale presence record for the CALLER's own context too, so the PRESENCE-GC line
-    # gives us a positive control: it must stay visible, unlike the foreign ones.
-    _write_corrupt_presence(workspace, "caller-ctx", "sess-own-corrupt")
-    monkeypatch.setenv("DADAIA_CONTEXT", "caller-ctx")
-
-    # Sanity control: without --redact the foreign names are actually present (proves
-    # the fixture triggers the issue codes under test).
-    plain = _runner.invoke(app, ["doctor"])
-    assert plain.exit_code == 1, plain.output
-    assert "alpha-secret" in plain.output
-    assert "bravo-secret" in plain.output
-    assert "charlie-secret" in plain.output
-
-    result = _runner.invoke(app, ["doctor", "--redact"])
-    assert result.exit_code == 1, result.output
-    for foreign in (
-        "alpha-secret",
-        alpha_repo_absent_slug,
-        "bravo-secret",
-        bravo_repo_present_slug,
-        "charlie-secret",
-    ):
-        assert foreign not in result.output, result.output
-    assert "[REDACTED-CONTEXT-" in result.output
-    assert "caller-ctx" in result.output
 
 
 def test_context_list_redact_json_same_key_set_and_masks_foreign(
@@ -329,7 +275,7 @@ def test_context_show_redact_masks_explicit_foreign_context(workspace: Path, mon
     )
     assert set(data.keys()) == set(plain_json.keys())
     assert data["name"] == "[REDACTED-CONTEXT-1]"
-    assert data["repo_slug"] == "[REDACTED-CONTEXT-1]"
+    assert data["main_repo"] == "[REDACTED-CONTEXT-1]"
 
 
 def test_context_show_redact_keeps_callers_own_context_visible(

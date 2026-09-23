@@ -16,13 +16,18 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from dadaia_workspace.core.doctor_rules import Rule
-from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
+from dadaia_workspace.core.kernel_tunables import (
+    AUDIT_SCRIPT,
+    BACKLOG_SCRIPT,
+    DADAIA_BIN,
+    MEMORY_SCRIPT,
+)
+from dadaia_workspace.features.specs import doctor_adr
 from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
-from dadaia_workspace.features.specs.release_tree import release_tree_issues
-
-#: The one RELEASE-TREE code that reports PROVENANCE over a valid document, so it rides
-#: its own row: the conformance row carries a `fix:` and this one cannot (0.4.7 FR6).
-_HAND_EDIT_CODE = "RELEASE-TREE-HANDEDIT"
+from dadaia_workspace.features.specs.release_tree import (
+    release_memory_issues,
+    release_tree_issues,
+)
 
 if TYPE_CHECKING:
     from dadaia_workspace.features.specs.doctor import SpecsDoctor
@@ -82,7 +87,7 @@ RULES: tuple[SpecsRule, ...] = (
         lambda d: d._release.check_active_release_artifacts(),
         fix_help=(
             "sed -i '\\|\\*\\*Status:\\*\\*|d' specs/releases/<id>/<document>.md && "
-            "printf '%s\\n' '**Status:** <Aprovado|Em revisão|Draft>' "
+            "printf '%s\\n' '**Status:** <Approved|In review|Draft>' "
             ">> specs/releases/<id>/<document>.md"
         ),
     ),
@@ -146,7 +151,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("CAT-1",),
         lambda d: d._memory.check_cat1_catalog_sync(),
-        fix_help=f"{DADAIA_BIN} memory catalog generate --specs-dir <specs>",
+        fix_help=f"{MEMORY_SCRIPT} catalog generate --specs <specs>",
     ),
     _rule(
         ("LINT-1",),
@@ -157,6 +162,11 @@ RULES: tuple[SpecsRule, ...] = (
         ("MEM-DRIFT-1",),
         lambda d: d._memory.check_mem_drift1_features_package_map(),
         fix_help="sed -i 's|<stale package line>|<package on disk>|' specs/memory/ARCHITECTURE.md",
+    ),
+    _rule(
+        ("ADR-SUPERSEDED-CITATION",),
+        lambda d: doctor_adr.superseded_adr_citations(d.specs_dir, d.public_dir),
+        fix_help="sed -i 's|ADR: <superseded id>|ADR: <successor id>|' <citing file>",
     ),
     _rule(
         ("MEM-DRIFT-2",),
@@ -189,7 +199,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-027",),
         lambda d: d._release.check_release_naming_canon(),
-        fix_help="git mv specs/releases/<name> specs/releases/<M.m.p>",
+        fix_help="git mv <release-dir> <release-dir-parent>/<M.m.p>",
     ),
     _rule(
         ("SPEC-DOC-028",),
@@ -204,7 +214,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-033",),
         lambda d: d._governance.check_bugs_jsonl_invariant(),
-        fix_help=f"{DADAIA_BIN} bugs update <bug-id> --<field> <value>",
+        fix_help="python3 .agents/skills/dd-bug-resolution/scripts/bugs.py update <bug-id> --set <field>=<value>",
     ),
     _rule(
         ("SPEC-DOC-034",),
@@ -215,13 +225,15 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-035",),
         lambda d: d._governance.check_unarchived_terminal_backlog(),
-        fix_help=f"{DADAIA_BIN} backlog archive",
+        fix_help=(
+            f"{BACKLOG_SCRIPT} exit <slug> --disposition <disposition> <--release id|--reason why>"
+        ),
     ),
     _rule(
         ("SPEC-DOC-036",),
         lambda d: d._closure_audit.check_audit_disposition(),
         fix_help=(
-            f"{DADAIA_BIN} audit disposition <audit> <finding-id> "
+            f"{AUDIT_SCRIPT} disposition <audit> <finding-id> "
             "--disposition resolved --release <release>"
         ),
     ),
@@ -233,39 +245,25 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-038",),
         lambda d: d._closure_audit.check_loose_undisposed_audits(),
-        fix_help=f"{DADAIA_BIN} audit close <audit> --sha <sha>",
-    ),
-    _rule(
-        ("SPEC-DOC-039",),
-        lambda d: d._release.check_partial_archived_release_dirs(),
-        fix_help=(
-            "mkdir -p specs/_archive/wip-abandoned && "
-            "git mv specs/_archive/releases/<release-id> "
-            "specs/_archive/wip-abandoned/<release-id> && "
-            "printf '%s\\n' '<why abandoned>' "
-            ">> specs/_archive/wip-abandoned/<release-id>/README.md"
-        ),
+        fix_help=f"{AUDIT_SCRIPT} close <audit> --sha <sha>",
     ),
     _rule(
         ("SPEC-DOC-041",),
         lambda d: d._governance.check_bug_archive_overdue(),
-        fix_help=f"{DADAIA_BIN} bugs archive",
-    ),
-    _rule(
-        ("SPEC-DOC-044",),
-        lambda d: d._release.check_stale_verdicts(live_shas=d.live_shas),
-        fix=lambda d, i: d._release.fix_stale_verdict(i),
-        fix_help=f"{DADAIA_BIN} doctor --fix",
-    ),
-    _rule(
-        ("SPEC-DOC-045",),
-        lambda d: d._release.check_pyproject_version_matches_release(d.repo_root),
-        fix_help="sed -i 's/^version = .*/version = \"<live release id>\"/' pyproject.toml",
+        fix_help="python3 .agents/skills/dd-bug-resolution/scripts/bugs.py archive",
     ),
     _rule(
         ("SPEC-DOC-047",),
         lambda d: d._release.check_no_memory_task(),
         fix_help="sed -i '\\|<memory task line>|d' specs/releases/<id>/TASKS.md",
+    ),
+    _rule(
+        ("SPEC-DOC-048",),
+        lambda d: d._release.check_spec_origin(d._governance.known_bug_ids),
+        fix_help=(
+            "sed -i '\\|^\\*\\*Opened:\\*\\*|a **Origin:** operator-demand' "
+            "specs/releases/<id>/SPEC.md"
+        ),
     ),
     _rule(
         (
@@ -277,19 +275,16 @@ RULES: tuple[SpecsRule, ...] = (
             "RELEASE-TREE-TRIO",
             "RELEASE-TREE-STATE-MISSING",
         ),
-        lambda d: [i for i in release_tree_issues(d.specs_dir) if i.code != _HAND_EDIT_CODE],
+        lambda d: release_tree_issues(d.specs_dir),
         fix_help="sed -i 's|<invalid value>|<canonical value>|' specs/releases/<id>/_RELEASE.json",
     ),
     _rule(
-        (_HAND_EDIT_CODE,),
-        lambda d: [
-            i
-            for i in release_tree_issues(d.specs_dir, governance=d.governance)
-            if i.code == _HAND_EDIT_CODE
-        ],
-        # No fix line: re-running `dadaia release phase` and accepting the edit are both
-        # correct answers, and printing one would be a guess. WARNING-only, so the run
-        # never exits 1 on it (SPEC 0.4.7 FR6: measured, never blocked).
+        ("RELEASE-TREE-MEMORY",),
+        lambda d: release_memory_issues(d.specs_dir),
+        fix_help=(
+            "python3 .agents/skills/dd-release-implementation/scripts/release.py memory "
+            "--reviewed <slugs> --changed <slugs>"
+        ),
     ),
     _rule(
         ("SPEC-DOC-046",),

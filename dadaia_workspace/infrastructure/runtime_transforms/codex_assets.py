@@ -24,43 +24,23 @@ from dadaia_workspace.infrastructure.public_assets_common import _toml_escape
 # Parallel workflow detection
 _FRONTMATTER_PARALLEL_GROUP_RE = re.compile(r"^\s*parallel_group:\s*\S", re.MULTILINE)
 
-_CODEX_READ_ONLY_AGENTS = frozenset(
-    {
-        "code-reviewer",
-        "project-auditor",
-        "qa-engineer",
-        "security-reviewer",
-        "software-architect",
-    }
-)
 # Fallback reasoning effort when an agent's ``model:`` is unknown to the registry
 # (defensive only — every canonical agent's model id is registry-backed).
 _CODEX_DEFAULT_EFFORT = "medium"
 # Every name/prefix here gates which backtick-quoted skill references
 # ``dcx7_codex_skill_refs`` (D-CX-7) even bothers checking for existence, resolved
-# against BOTH ``.agents/skills/`` and ``.codex/skills/`` (codex_doctor.py). Each entry
-# must be either (a) an exact name or leading-hyphen prefix of a real
-# ``public/skills/`` SOURCE skill, or (b) a documented runtime-asset exception in
-# ``_CODEX_SKILL_REF_RUNTIME_ASSET_EXCEPTIONS`` below — a name that resolves to a
-# Codex-only adapter projected from ``public/runtime/codex/<name>/`` (installed under
-# ``.codex/skills/``, never ``public/skills/``). A name that is neither is a phantom
+# against the shared ``.agents/skills/`` tree Codex reads natively (codex_doctor.py).
+# Each entry must be an exact name or leading-hyphen prefix of a real
+# ``public/skills/<name>/SKILL.md`` SOURCE skill. A name that resolves to nothing is a phantom
 # prefix: it gates nothing real and would let D-CX-7 silently stop protecting the
 # family it was meant to cover (A22.6; a test derives this whole tuple from the
 # on-disk inventory — ``tests/contract/test_codex_skill_ref_prefixes.py``).
-_CODEX_SKILL_REF_PREFIXES = (
-    "dd-",
-    "memory-ctx",
-)
-
-# (A22.6) ``memory-ctx`` is a Codex-only runtime adapter — the packaged source lives
-# at ``public/runtime/codex/memory-ctx/SKILL.md`` and is projected to
-# ``.codex/skills/memory-ctx/SKILL.md`` by ``dcx6_codex_runtime_adapters``, never to
-# ``public/skills/``. It is a real, resolvable asset, not a phantom: it just lives on
-# the runtime-adapter surface instead of the skills surface D-CX-7 checks first.
-_CODEX_SKILL_REF_RUNTIME_ASSET_EXCEPTIONS: frozenset[str] = frozenset({"memory-ctx"})
+_CODEX_SKILL_REF_PREFIXES = ("dd-",)
 
 # Whitelist of agent frontmatter fields that may be emitted to codex config.toml.
-_TOML_SAFE_AGENT_FIELDS: frozenset[str] = frozenset({"name", "description", "model", "tools"})
+_TOML_SAFE_AGENT_FIELDS: frozenset[str] = frozenset(
+    {"name", "description", "model", "tools", "activity_class"}
+)
 
 # Matches a YAML list item under `tools:` (e.g. "  - Read")
 _AGENT_FM_TOOLS_ITEM_RE = re.compile(r"^  - (.+)$", re.MULTILINE)
@@ -73,12 +53,12 @@ _AGENT_FM_BLOCK_SCALAR_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*): [>|]$", re.M
 # FR22 / A22.1 — Codex persona compaction (shared-law de-duplication)
 # ---------------------------------------------------------------------------
 #
-# The canonical law (DADAIA.md) reaches every Codex agent context — the parent
+# The canonical law (the root AGENTS.md map) reaches every Codex agent context — the parent
 # session AND any delegated custom agent alike — through Codex's NATIVE
 # per-directory ``AGENTS.md`` discovery (`ai-harness-codex` skill §1), a
 # mechanism that is entirely independent of the SessionStart/UserPromptSubmit
 # hooks (live-verified, codex-cli 0.147.0, T-043-33: a parent `codex exec`
-# session AND a delegated `agent_type="software-engineer"` subagent both
+# session AND a delegated `agent_type="dd-software-engineer"` subagent both
 # quoted the literal opening words of the projected root AGENTS.md from their
 # own context, unprompted by any tool call). Before this compaction, every
 # persona body ALSO restated fragments of that same law inline — the generic
@@ -94,12 +74,6 @@ _AGENT_FM_BLOCK_SCALAR_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*): [>|]$", re.M
 # exactly once (A22.2). Role identity, role-specific decisions, authority and
 # write/refusal boundaries are never touched by these patterns.
 
-# The two generic pointer lines directly under the H1 title. Only an EXACT
-# match is stripped, so a persona (e.g. project-manager) that weaves
-# role-specific prose into the same blockquote keeps its own sentence.
-_CODEX_COMPACT_H1_REPORTS_POINTER_RE = re.compile(
-    r"> Reports follow the `DADAIA\.md` \(the workspace law\) §4 \(handoff-first\)[^\n]*\n\n?"
-)
 _CODEX_COMPACT_H1_PROTOCOL_POINTER_RE = re.compile(
     r"> This agent follows the shared workspace protocol: `AGENTS\.md` and the "
     r"projected workspace protocol\.\n\n?"
@@ -118,13 +92,6 @@ _CODEX_COMPACT_ARTIFACT_EMISSION_RE = re.compile(
     r"\n\n?"
 )
 
-# The trailing "> Report/handoff emission follows the DADAIA.md ... §4 ..."
-# blockquote — byte-identical (modulo one qa-engineer addendum clause) in
-# every persona, restating the same DADAIA.md §4 handoff-first policy already
-# named earlier in the same "## Report" section.
-_CODEX_COMPACT_HANDOFF_POINTER_RE = re.compile(
-    r"\n?> Report/handoff emission follows the `DADAIA\.md`[^\n]*\n\n?"
-)
 
 # "## Implementation review gate" — restates the `dd-task-manager`
 # skill's "Implementation complete is not DONE" review-gate paragraph
@@ -134,7 +101,7 @@ _CODEX_COMPACT_REVIEW_GATE_SECTION_RE = re.compile(
 )
 
 # "## dadaia CLI" (never "## dadaia CLI reference", which carries the
-# distinct D-1 shell-less routing content for `product-engineer` and is
+# distinct D-1 shell-less routing content for `dd-product-engineer` and is
 # never matched here) — the generic command-reference block duplicated from
 # the `dadaia-cli` skill. Matched up to the next top-level heading (or EOF)
 # so a persona that appends unrelated content after this heading (e.g.
@@ -145,10 +112,8 @@ _CODEX_COMPACT_CLI_SECTION_RE = re.compile(r"(\n---\n)?## dadaia CLI\n.*?(?=\n##
 # order has no observable effect on the result, but a stable order keeps the
 # diff of any future addition minimal and reviewable.
 _CODEX_COMPACT_PATTERNS: tuple[re.Pattern[str], ...] = (
-    _CODEX_COMPACT_H1_REPORTS_POINTER_RE,
     _CODEX_COMPACT_H1_PROTOCOL_POINTER_RE,
     _CODEX_COMPACT_ARTIFACT_EMISSION_RE,
-    _CODEX_COMPACT_HANDOFF_POINTER_RE,
     _CODEX_COMPACT_REVIEW_GATE_SECTION_RE,
     _CODEX_COMPACT_CLI_SECTION_RE,
 )
@@ -240,6 +205,7 @@ def _render_codex_agent_toml(
     description: str | None = None,
     claude_model: str | None = None,
     reasoning_effort: str | None = None,
+    read_only: bool = False,
 ) -> str:
     """Serialize an agent as a TOML file for the Codex runtime.
 
@@ -247,7 +213,9 @@ def _render_codex_agent_toml(
     - ``name`` — basic string
     - ``description`` — basic string when available
     - ``model`` — basic string
-    - ``sandbox_mode`` — conservative role boundary
+    - ``sandbox_mode`` — ``read-only`` when *read_only* (the persona's
+      ``activity_class: ADDITIVE``, the same source the Claude render uses), else
+      ``workspace-write``
     - ``model_reasoning_effort`` — explicit reasoning profile: *reasoning_effort*
       when supplied (the D-3 clamp of the RESOLVED agent-model-policy effort,
       v0.1.65 FR5); otherwise derived from the registry tier of *claude_model*
@@ -280,7 +248,7 @@ def _render_codex_agent_toml(
     ]
     if description:
         lines.append(f"description = {_toml_escape(description)}\n")
-    sandbox_mode = "read-only" if name in _CODEX_READ_ONLY_AGENTS else "workspace-write"
+    sandbox_mode = "read-only" if read_only else "workspace-write"
     if reasoning_effort is None:
         reasoning_effort = _codex_reasoning_effort_for_model(claude_model)
     lines.extend(
@@ -301,7 +269,7 @@ def _render_codex_command_policy_rules() -> str:
     Markdown guidance in AGENTS.md, skills, agents, and workflows; only command
     approval/denial belongs in ``.codex/rules/*.rules``.
     """
-    return """# Generated by "dadaia public install --target codex".
+    return """# Generated by "dadaia harness add codex".
 
 prefix_rule(
     pattern = [["rg", "ls", "find", "cat", "sed"]],
@@ -336,7 +304,7 @@ prefix_rule(
     pattern = [".dadaia/.venv/bin/dadaia", "public", "install"],
     decision = "prompt",
     justification = "Public install rewrites generated runtime projections.",
-    match = [".dadaia/.venv/bin/dadaia public install --target codex", ".dadaia/.venv/bin/dadaia public install --target all"],
+    match = [".dadaia/.venv/bin/dadaia public install", ".dadaia/.venv/bin/dadaia public install --force"],
     not_match = [".dadaia/.venv/bin/dadaia public doctor"],
 )
 
@@ -344,7 +312,7 @@ prefix_rule(
     pattern = ["dadaia", "public", "install"],
     decision = "prompt",
     justification = "Public install rewrites generated runtime projections (bare-name fallback).",
-    match = ["dadaia public install --target codex", "dadaia public install --target all"],
+    match = ["dadaia public install", "dadaia public install --force"],
 )
 
 prefix_rule(
@@ -408,7 +376,7 @@ def _render_agent_toml_block(name: str, fm: dict[str, object]) -> str:
     """Render a ``[agents."<name>"]`` TOML table block from parsed frontmatter *fm*.
 
     Keys are always quoted for safety (required for hyphenated names like
-    ``software-engineer``). Missing or None fields are omitted. The ``tools``
+    ``dd-software-engineer``). Missing or None fields are omitted. The ``tools``
     field, if present, is emitted as a TOML array of basic strings.
 
     Names containing ``]`` or newline characters are rejected (cannot appear

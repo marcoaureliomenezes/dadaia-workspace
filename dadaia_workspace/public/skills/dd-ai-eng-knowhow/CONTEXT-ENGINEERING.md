@@ -1,6 +1,6 @@
 # CONTEXT-ENGINEERING.md — Authoring and Auditing the AI-Entity Surface
 
-Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, `ai-engineer`-only depth).
+Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, authoring depth).
 Persona files, skills, and rules are themselves prompts — every shipped line is paid for in tokens by every downstream invocation.
 The craft: maximize behavior-change-per-token under a hard context budget, keeping every persona structurally identical.
 
@@ -139,7 +139,7 @@ Fix protocol:
 
 - Current per-runtime model ids and Codex reasoning-effort come from `core/model_registry.py`, never hand-copied.
 - On Codex the tiering axis is (model id x model_reasoning_effort); on Claude it is the model id.
-- Quote the registry entry (id + latest pricing row) when recommending a move, so the cost delta comes from live data.
+- Quote the registry entry (id + tier) when recommending a move; take the price from the provider's published table, never from memory.
 - Move up a tier only when depth/breadth/error-cost are all high; move down only when the task is mechanical and high-volume.
 
 Justify a tier BUMP (down -> up):
@@ -162,7 +162,7 @@ Justify a tier DOWNGRADE (up -> down):
 
 ## 5. Recursive Scope-Drift Detection
 
-- The AI-entity surface is recursive: an agent can edit another agent's file, and `ai-engineer` can edit `ai-engineer`.
+- The AI-entity surface is recursive: an agent can edit another agent's file.
 - Failure signature: agent A "fixes" agent B's persona -> B's behavior shifts -> agent C (dispatches B) breaks, far from the edit.
 - Defense: three detection rules applied before the edit lands, plus a topology guard for the self-edit case.
 
@@ -183,16 +183,16 @@ Detection rule 2 — forbidden-actions table propagates via release, not spot-ed
 
 Detection rule 3 — self-edit risk + topology-guard protocol:
 
-1. `ai-engineer` editing `ai-engineer.md` (or any dispatch-graph/allowlist/tool-grant change) is the highest-risk operation.
+1. Any dispatch-graph/allowlist/tool-grant change is the highest-risk operation.
 2. Confirm an operator-approved release task authorizes the specific change — no self-granted privileges.
 3. Make the edit minimal and single-purpose.
 4. Re-verify topology by hand: persona count matches the roster, required frontmatter keys are present and non-empty.
-5. Confirm `project-manager` and `project-auditor` each still name every leaf agent.
-6. Pair with `security-reviewer` for any change adding a powerful tool or widening an allowlist.
+5. Confirm `dd-manager-orchestration` still names every leaf agent.
+6. The security lens reviews any change adding a powerful tool or widening an allowlist.
 7. Re-validate frontmatter via the workspace reader test so the parse still succeeds.
 
 Re-verify topology invariants whenever: `write_allowlist` changes, `tools` changes (esp. adding `Agent`), or a persona is added/removed.
-Re-verify topology invariants also when: `ai-engineer` self-edits, or a `[SCOPE ERROR]` redirect set changes.
+Re-verify topology invariants also when a `[SCOPE ERROR]` redirect set changes.
 
 - Skill-extraction trigger: when two or more personas restate the same protocol, extract it into `public/skills/<name>/SKILL.md`.
 - Replace every inline copy with a one-line reference — a skill loads once and is referenced; inline content loads N times and drifts N ways.

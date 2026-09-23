@@ -29,11 +29,9 @@ pytestmark = pytest.mark.contract
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SPECS_DIR = _REPO_ROOT / "dadaia_workspace" / "features" / "specs"
-_PANEL_VIEWS_DIR = _REPO_ROOT / "dadaia_workspace" / "features" / "panel" / "views"
 
 # Recorded ceilings (ratchet). Lowering is welcome; raising needs same-commit justification.
-_DOCTOR_CEILING = 700
-_API_CEILING = 450
+_DOCTOR_CEILING = 699
 
 
 def _line_count(path: Path) -> int:
@@ -44,7 +42,6 @@ def _line_count(path: Path) -> int:
     ("glob", "ceiling", "directory"),
     [
         pytest.param("doctor*.py", _DOCTOR_CEILING, _SPECS_DIR, id="doctor"),
-        pytest.param("api*.py", _API_CEILING, _PANEL_VIEWS_DIR, id="panel-api"),
     ],
 )
 def test_no_module_exceeds_ceiling(glob: str, ceiling: int, directory: Path) -> None:
@@ -52,12 +49,6 @@ def test_no_module_exceeds_ceiling(glob: str, ceiling: int, directory: Path) -> 
     ratchet (AC-1). The monolithic panel api.py must also stay deleted (FR2)."""
     modules = sorted(directory.glob(glob))
     assert modules, f"no {glob} modules found under {directory}"
-    if glob == "api*.py":
-        # The monolithic api.py is DELETED by FR2 — its re-appearance is a regression.
-        assert not any(p.name == "api.py" for p in modules), (
-            "features/panel/views/api.py must stay deleted (FR2 per-domain decomposition; "
-            "no facade)."
-        )
     offenders = {p.name: _line_count(p) for p in modules if _line_count(p) > ceiling}
     assert not offenders, (
         f"module(s) matching {glob} exceed the {ceiling}-line ceiling: {offenders}. "

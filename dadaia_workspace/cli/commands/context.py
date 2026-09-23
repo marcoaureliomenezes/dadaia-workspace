@@ -31,18 +31,15 @@ from dadaia_workspace.core.exceptions import (
     ContextStateError,
     GitSyncError,
     InvalidContextNameError,
-    RepoCatalogError,
     SchemaVersionError,
     WorkspaceNotInitializedError,
 )
-from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.models.spec_context import (
     AssociatedRepo,
     ContextState,
     SpecContextProject,
 )
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-from dadaia_workspace.features.spec_context import presence
 from dadaia_workspace.features.spec_context.service import (
     DeadReviewRequiredError,
     DeadSecretFoundError,
@@ -85,7 +82,7 @@ def _ctx_to_dict(svc: SpecContextService, ctx: SpecContextProject) -> dict:  # t
     return {
         "name": ctx.name,
         "state": ctx.state.value,
-        "repo_slug": ctx.repo_slug,
+        "main_repo": ctx.repo_slug,
         "repo_url": ctx.repo_url,
         "created_at": ctx.created_at,
         "alive_since": ctx.alive_since,
@@ -163,7 +160,7 @@ def _harness_session_id() -> str | None:
     return None
 
 
-def _resolve_own_session_id(*, explicit: str | None = None, mint: bool = False) -> str | None:
+def resolve_own_session_id(*, explicit: str | None = None, mint: bool = False) -> str | None:
     """Resolve THIS caller's own session identity (T-50-05: the single helper every verb
     below used to duplicate as its own copy-pasted micro-ladder).
 
@@ -192,7 +189,11 @@ def _resolve_own_session_id(*, explicit: str | None = None, mint: bool = False) 
 @app.command()
 def create(
     name: str = typer.Argument(..., help="Context name"),
-    repo: str = typer.Option(..., "--repo", help="Repo slug (directory name under repos/)"),
+    repo: str = typer.Option(
+        ...,
+        "--main-repo",
+        help="Main repo (the repo where specs/ lives) — the directory name under repos/",
+    ),
     url: str | None = typer.Option(
         None,
         "--url",
@@ -203,11 +204,11 @@ def create(
     ),
     associated: list[str] = typer.Option(
         [],
-        "--associated",
+        "--associated-repos",
         help=(
-            "Register an associated repo at creation time (FR17). Repeatable. Each "
-            "value is SLUG or SLUG=URL — a bare slug registers with an empty URL, "
-            "settable later via 'context repo add' with --url."
+            "Associated repos (the other repos this context owns), comma-separated "
+            "and repeatable. Each value is SLUG or SLUG=URL — a bare slug registers "
+            "with an empty URL, settable later via 'context repo add' with --url."
         ),
     ),
 ) -> None:
@@ -217,32 +218,19 @@ def create(
     # never leaves a half-created context behind.
     associated_repos = tuple(
         AssociatedRepo(slug=slug.strip(), url=assoc_url.strip())
-        for slug, _, assoc_url in (raw.partition("=") for raw in associated)
+        for slug, _, assoc_url in (
+            raw.partition("=") for value in associated for raw in value.split(",") if raw.strip()
+        )
     )
 
-    workspace_root = resolve_workspace_root()
-    # An explicit --url overrides the catalog lookup (FR-W2-03 a / T-011-08); otherwise
-    # look up repo_url from the repos catalog, failing gracefully if unavailable.
-    repo_url = ""
-    if url is not None:
-        repo_url = url
-    else:
-        try:
-            repos_svc = container.build_repos_service()
-            rows = repos_svc.list_known(workspace_root)
-            for row in rows:
-                if row.get("Repo Name") == repo:
-                    repo_url = row.get("Repo URL", "")
-                    break
-        except (RepoCatalogError, Exception):
-            pass
+    repo_url = url or ""
 
     try:
         ctx = _ctx_service().create(name, repo, repo_url, associated_repos=associated_repos)
         suffix = f", {len(associated_repos)} associated repo(s)" if associated_repos else ""
         console.print(
             f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' created "
-            f"(repo: {ctx.repo_slug}, state: {ctx.state}{suffix})"
+            f"(main repo: {ctx.repo_slug}, state: {ctx.state}{suffix})"
         )
     except (ContextAlreadyExistsError, InvalidContextNameError, AssociatedRepoConflictError) as e:
         err_console.print(f"[red]Error:[/red] {e}")
@@ -274,33 +262,9 @@ def list_all(
     if json_output:
         payload = []
         for ctx in contexts:
-            # FR18/A18.1-A18.3: the SAME branch-resolution seam `show` uses
-            # (SpecContextService.repos_live_status) — list can no longer report a
-            # stale `current_branch` snapshot show would disagree with.
-            statuses = svc.repos_live_status(ctx)
-            main_status, associated_statuses = statuses[0], statuses[1:]
-            payload.append(
-                {
-                    "name": ctx.name,
-                    "state": ctx.state.value,
-                    "repo_slug": ctx.repo_slug,
-                    "repo_url": ctx.repo_url,
-                    "created_at": ctx.created_at,
-                    "alive_since": ctx.alive_since,
-                    "dead_since": ctx.dead_since,
-                    "current_branch": main_status.current_branch or ctx.current_branch,
-                    "stored_branch": ctx.current_branch,
-                    "associated_repos": [
-                        {
-                            "slug": status.slug,
-                            "url": status.url,
-                            "on_disk": status.on_disk,
-                            "current_branch": status.current_branch,
-                        }
-                        for status in associated_statuses
-                    ],
-                }
-            )
+            # FR18/A18.1-A18.3: the SAME payload builder `show --json` uses — one
+            # key set, so the two verbs cannot drift apart again.
+            payload.append(_ctx_to_dict(svc, ctx))
         if redactor is not None:
             payload = [redactor.json_value(row) for row in payload]
         print(json.dumps(payload, sort_keys=True))
@@ -312,8 +276,8 @@ def list_all(
     table = Table(title="Spec Context Projects")
     table.add_column("Name", style="bold")
     table.add_column("State")
-    table.add_column("Repo")
-    table.add_column("Associated")
+    table.add_column("Main repo")
+    table.add_column("Associated repos")
 
     state_style = {
         ContextState.ALIVE: "[green]alive[/green]",
@@ -368,7 +332,7 @@ def show(
     """Show details of a context."""
     svc = _ctx_service()
     if name is None:
-        # No name: use only explicit/caller-owned/cwd resolution; never foreign presence.
+        # No name: use only explicit/caller-owned/cwd resolution.
         ctx = _resolve_default_context(svc, resolve_workspace_root())
     else:
         try:
@@ -393,26 +357,9 @@ def show(
             # Show only this caller's session. A context-wide "last binder" fallback would
             # expose foreign state as the caller's own and can never be authoritative.
             workspace_root = resolve_workspace_root()
-            session_id = _resolve_own_session_id()
+            session_id = resolve_own_session_id()
             session_obj = _live_session(workspace_root, session_id) if session_id else None
             data["session"] = session_obj
-            # v0.1.76 T-4 (FR7): "presence" — who else is currently active on this
-            # context, sourced from the ONLY concurrency-signal surface post-doctrine
-            # (features/spec_context/presence.py). Distinct from "session" above (which
-            # answers "what is MY session bound to" via the caller-owned record).
-            # ``others_alive`` with an empty self-sid excludes nothing (no
-            # real presence record is ever keyed by ""), so every live record on the
-            # context is listed.
-            data["presence"] = [
-                {
-                    "session_id": rec.session_id,
-                    "runtime": rec.runtime,
-                    "pid": rec.pid,
-                    "started_at": rec.started_at,
-                    "last_seen_at": rec.last_seen_at,
-                }
-                for rec in presence.others_alive(workspace_root, ctx.name, "")
-            ]
             if redactor is not None:
                 data = redactor.json_value(data)
             print(json.dumps(data, indent=2))
@@ -438,19 +385,12 @@ def show(
 
     console.print(f"[bold]Name:[/bold]       {display_name}")
     console.print(f"[bold]State:[/bold]      {ctx.state.value}")
-    console.print(f"[bold]Repo:[/bold]       {display_repo}")
+    console.print(f"[bold]Main repo:[/bold]  {display_repo}")
     console.print(f"[bold]Repo URL:[/bold]   {repo_url_text}")
     console.print(f"[bold]Branch:[/bold]     {branch_text}")
     console.print(f"[bold]Created:[/bold]    {ctx.created_at}")
     console.print(f"[bold]Alive since:[/bold]  {ctx.alive_since or '—'}")
     console.print(f"[bold]Dead since:[/bold]   {ctx.dead_since or '—'}")
-
-    presence_records = presence.others_alive(resolve_workspace_root(), ctx.name, "")
-    if presence_records:
-        names = ", ".join(f"{rec.session_id} ({rec.runtime})" for rec in presence_records)
-        console.print(f"[bold]Presence:[/bold]   {names}")
-    else:
-        console.print("[bold]Presence:[/bold]   —")
 
     if associated_statuses:
         assoc_table = Table(title="Associated repos")
@@ -580,11 +520,8 @@ def bind(
 
     Run: dadaia context bind <name> [--print-env]
 
-    ONE verb, one argument (0.4.7 FR4). `--mode` is gone with the gate's READ block and
-    its phase rule; `--release` is gone because the release is a fact of `_RELEASE.json`,
-    never of a session record — requiring it here is what made
-    `context-bind-implementation-requires-release-id-stall-when-none-live` a Stall.
-    `--force` was a documented no-op and `--reason` was never read.
+    The bind sets this session's write scope to the context's main repo plus its
+    associated repos.
     """
     workspace_root = resolve_workspace_root()
     sessions_dir = _sessions_dir(workspace_root)
@@ -600,7 +537,7 @@ def bind(
     # Stable session identity (bug bind-session-id-divergence, 2026-07-15): reuse the
     # SAME resolution order the gate/hooks use. Rebinds in one session therefore UPDATE
     # one record instead of minting a divergent sess_* per invocation.
-    session_id = _resolve_own_session_id(mint=True)
+    session_id = resolve_own_session_id(mint=True)
     if session_id is None:  # pragma: no cover — mint=True always yields one
         raise RuntimeError("session-id resolution returned None despite mint=True")
 
@@ -633,128 +570,11 @@ def bind(
         )
 
     if print_env:
-        print(f"export DADAIA_CONTEXT={name}")
-        print(f"export DADAIA_SESSION_ID={session_id}")
+        for line in session_store.binding_env_lines(name, session_id):
+            print(line)
         return
 
     console.print(f"[green]✓[/green] Bound to '[bold]{name}[/bold]' (session id: {session_id})")
-
-
-@app.command(name="release")
-def release_cmd(
-    session: str | None = typer.Option(
-        None,
-        "--session",
-        help=(
-            "Session id to release (optional override). When omitted, the session id is "
-            "resolved from DADAIA_SESSION_ID (eval-flow override) or the harness-native "
-            "session id (CLAUDE_CODE_SESSION_ID / CODEX_SESSION_ID / CODEX_THREAD_ID) — "
-            "no flag is required in the normal harness case."
-        ),
-    ),
-) -> None:
-    """Release the current session's binding and advisory presence.
-
-    Run: dadaia context release
-
-    Resolution order for "this session's own id": ``--session``
-    override -> ``DADAIA_SESSION_ID`` (eval-flow override) -> the harness-native session id
-    (:func:`_harness_session_id`) -> the last bind's CLI-minted session id read back from the
-    session record directory (legacy default-flow fallback). Every presence record this
-    session owns (across every context) is deleted (:func:`presence.clear`, idempotent — a
-    session with no presence record is a clean no-op), then the CLI session record is
-    unlinked.
-    """
-    from dadaia_workspace.features.spec_context import presence
-
-    workspace_root = resolve_workspace_root()
-    sessions_dir = _sessions_dir(workspace_root)
-
-    resolved_sid = _resolve_own_session_id(explicit=session)
-    if not resolved_sid:
-        err_console.print(
-            "[red]Error:[/red] No active session. Pass --session <id> or set "
-            "DADAIA_SESSION_ID (e.g. eval $(dadaia context bind ... --print-env))."
-        )
-        raise typer.Exit(1) from None
-
-    session_file = sessions_dir / f"{resolved_sid}.json"
-
-    cleared = presence.clear(workspace_root, resolved_sid)
-    session_file.unlink(missing_ok=True)
-
-    if cleared:
-        console.print(
-            f"[green]✓[/green] Session '[bold]{resolved_sid}[/bold]' released "
-            f"(presence record(s) dropped: {cleared})"
-        )
-    else:
-        console.print(f"[green]✓[/green] Session '[bold]{resolved_sid}[/bold]' released")
-
-
-@app.command()
-def heartbeat() -> None:
-    """Renew the heartbeat for the current session.
-
-    Resolves the caller-owned session from the explicit eval-flow override or
-    the harness-native session id persisted by ``context bind``.
-
-    Run: dadaia context heartbeat
-    """
-    session_id = _resolve_own_session_id()
-    if not session_id:
-        err_console.print(
-            "[red]Error:[/red] No caller-owned session identity: bind this session "
-            "first (in a plain shell, wrap the bind in "
-            "'eval $(... --print-env)' so the id reaches this process)."
-        )
-        err_console.print(f"fix: {DADAIA_BIN} context bind <name>")
-        raise typer.Exit(1) from None
-
-    workspace_root = resolve_workspace_root()
-
-    session_data = session_store.read_session(workspace_root, session_id)
-    if session_data is None:
-        err_console.print(
-            f"[red]Error:[/red] Session '{session_id}' not found. "
-            "It may have already been released."
-        )
-        raise typer.Exit(1) from None
-
-    # Renew this session's advisory presence record(s), the sole concurrency signal.
-    from dadaia_workspace.features.spec_context import presence
-
-    ctx_name = session_data.get("context", "")
-    now = _now_iso()
-    presence.renew(workspace_root, session_id)
-    session_store.touch_last_seen_at(workspace_root, session_id, now=now)
-    console.print(
-        f"[green]✓[/green] Heartbeat renewed for session '[bold]{session_id}[/bold]' "
-        f"(context={ctx_name}, last_seen_at={now})"
-    )
-
-
-@app.command()
-def update(
-    name: str = typer.Argument(..., help="Context name to update"),
-    url: str = typer.Option(..., "--url", help="New repo clone URL to persist"),
-) -> None:
-    """Repair a context's repo URL (FR-W2-03 c / T-011-08).
-
-    Run: dadaia context update <name> --url <url>
-
-    The repair path for the VPS-migration scenario where no on-disk repo is present
-    to back-fill from. Persists through the store update() API, preserving the record
-    shape and locking.
-    """
-    try:
-        ctx = _ctx_service().update_url(name, url)
-        console.print(
-            f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' repo URL set to {ctx.repo_url}"
-        )
-    except ContextNotFoundError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
 
 
 # ------------------------------------------------------------------ context repo (FR17)
@@ -763,7 +583,9 @@ def update(
 @repo_app.command(name="add")
 def repo_add(
     ctx_name: str = typer.Argument(..., help="Context name"),
-    slug: str = typer.Argument(..., help="Repo slug to associate (directory name under repos/)"),
+    slug: str = typer.Argument(
+        ..., help="Associated repo to register — the directory name under repos/"
+    ),
     url: str = typer.Option("", "--url", help="Repo clone URL (optional; empty until set)"),
 ) -> None:
     """Register an associated repo on a context.
@@ -773,8 +595,7 @@ def repo_add(
     Idempotent: re-adding the same slug with the same URL is a no-op success. The
     same slug with a DIFFERENT URL is refused — this verb is the one place an
     associated repo's URL is set, so the recovery path is 'context repo remove'
-    then 'context repo add' again, never a second divergent URL-update verb
-    (compare 'context update --url', which repairs the MAIN repo's URL only).
+    then 'context repo add' again, never a second divergent URL-update verb.
     Adding the context's own main repo slug is refused (it is already covered).
     """
     try:
@@ -833,41 +654,6 @@ def repo_remove(
         )
     else:
         console.print(f"[dim]No on-disk checkout found at 'repos/{slug}'.[/dim]")
-
-
-@repo_app.command(name="list")
-def repo_list(
-    ctx_name: str = typer.Argument(..., help="Context name"),
-    json_output: bool = typer.Option(False, "--json", help="Output stable JSON contract"),
-) -> None:
-    """List a context's associated repos.
-
-    Run: dadaia context repo list <ctx>
-
-    The main repo is never listed here (FR19: it stays the sole specs/bind/memory
-    target, resolved via 'context show') — this is the associated set only.
-    """
-    try:
-        ctx = _ctx_service().show(ctx_name)
-    except ContextNotFoundError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
-
-    if json_output:
-        payload = [{"slug": r.slug, "url": r.url} for r in ctx.associated_repos]
-        print(json.dumps(payload, sort_keys=True))
-        return
-
-    if not ctx.associated_repos:
-        console.print(f"[dim]Context '{ctx_name}' has no associated repos.[/dim]")
-        return
-
-    table = Table(title=f"Associated repos — {ctx_name}")
-    table.add_column("Slug", style="bold")
-    table.add_column("URL")
-    for repo in ctx.associated_repos:
-        table.add_row(repo.slug, repo.url or "—")
-    console.print(table)
 
 
 @app.command()

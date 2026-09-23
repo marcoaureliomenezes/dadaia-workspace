@@ -7,7 +7,7 @@ These rules override general workspace guidance for everything under `tests/`.
 Agents creating or editing tests must follow them. Full protocol: skill
 `dd-test-stewardship`.
 
-- Intent, admission, deletion, tombstone: `dd-test-stewardship`; slop: `DADAIA.md` §7.6 and `specs/memory/QUALITY.md` fixed section.
+- Intent, admission, deletion, tombstone: `dd-test-stewardship`; slop: `dd-code-review` SLOP.md and `specs/memory/QUALITY.md` fixed section.
 
 ## Architecture
 

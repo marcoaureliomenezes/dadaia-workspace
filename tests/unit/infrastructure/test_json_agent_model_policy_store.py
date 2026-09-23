@@ -5,7 +5,7 @@ Mirrors the ``json_workflow_model_policy_store`` discipline: missing file ⇒ ``
 temp+rename write with a ``.last-good.json`` snapshot of the PRIOR valid file; a shared
 no-I/O :meth:`parse` path (consumed later by the panel validate endpoint). Every FR3
 rejection carries a distinct, actionable message; D-7 rejects any combination that
-resolves a Fable-family model onto ``security-reviewer``.
+resolves a Fable-family model onto ``dd-code-reviewer``.
 
 The generic load/parse/save+last-good store contract (missing->None, corrupt->typed
 error, unknown-top-level-field, wrong schema_version, atomic-no-tmp, last-good
@@ -16,6 +16,7 @@ the D-7 governance invariant.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -47,8 +48,8 @@ def _store(tmp_path: Path, **kwargs: object) -> JsonAgentModelPolicyStore:
 def _valid_doc() -> dict[str, object]:
     return {
         "schema_version": "agent-model-policy-v1",
-        "applied_template": "subscription-saver",
-        "overrides": {"software-engineer": {"model": "claude-opus-4-8"}},
+        "applied_template": "max-quality",
+        "overrides": {"dd-software-engineer": {"model": "claude-opus-4-8"}},
     }
 
 
@@ -81,25 +82,27 @@ def test_load_contract(tmp_path: Path) -> None:
             id="unknown-agent",
         ),
         pytest.param(
-            lambda d: {**d, "overrides": {"software-engineer": {"model": "claude-unknown-9-9"}}},
+            lambda d: {**d, "overrides": {"dd-software-engineer": {"model": "claude-unknown-9-9"}}},
             "unknown model.*claude-unknown-9-9",
             id="unknown-model",
         ),
         pytest.param(
-            lambda d: {**d, "overrides": {"software-engineer": {"effort": "turbo"}}},
+            lambda d: {**d, "overrides": {"dd-software-engineer": {"effort": "turbo"}}},
             "invalid effort.*turbo",
             id="invalid-effort",
         ),
         pytest.param(
             lambda d: {
                 **d,
-                "overrides": {"software-engineer": {"model": "claude-opus-4-8", "speed": "fast"}},
+                "overrides": {
+                    "dd-software-engineer": {"model": "claude-opus-4-8", "speed": "fast"}
+                },
             },
             "unknown field.*speed",
             id="unknown-override-key",
         ),
         pytest.param(
-            lambda d: {**d, "overrides": {"software-engineer": {}}},
+            lambda d: {**d, "overrides": {"dd-software-engineer": {}}},
             "must carry 'model', 'effort', or both",
             id="empty-override",
         ),
@@ -114,8 +117,8 @@ def test_parse_rejection_matrix(tmp_path: Path, mutate_doc: object, match: str) 
 def test_valid_doc_and_minimal_doc_parse(tmp_path: Path) -> None:
     store = _store(tmp_path)
     overlay = store.parse(_valid_doc())
-    assert overlay.applied_template == "subscription-saver"
-    assert overlay.overrides["software-engineer"] == AgentModelOverride(model="claude-opus-4-8")
+    assert overlay.applied_template == "max-quality"
+    assert overlay.overrides["dd-software-engineer"] == AgentModelOverride(model="claude-opus-4-8")
 
     minimal = store.parse({"schema_version": "agent-model-policy-v1"})
     assert minimal.applied_template is None
@@ -126,25 +129,25 @@ def test_valid_doc_and_minimal_doc_parse(tmp_path: Path) -> None:
 def test_d7_rejects_fable_on_security_reviewer_but_allows_on_other_agents(
     tmp_path: Path, fable_id: str
 ) -> None:
-    """D-7: an override putting ANY Fable-family model on security-reviewer is rejected
+    """D-7: an override putting ANY Fable-family model on dd-code-reviewer is rejected
     at parse (bug g1-fable-guard-matches-only-claude-fable-5-so-fable-5-1-lands-on-
-    security-reviewer: the guard is the registry family, never one literal id); the
+    dd-code-reviewer: the guard is the registry family, never one literal id); the
     same model is freely allowed on any other agent. This is the sole coverage of the
     D-7 governance invariant — keep both assertions explicit."""
     store = _store(tmp_path)
 
     doc = _valid_doc()
-    doc["overrides"] = {"security-reviewer": {"model": fable_id}}
+    doc["overrides"] = {"dd-code-reviewer": {"model": fable_id}}
     with pytest.raises(
         AgentModelPolicyStoreError,
-        match=f"{fable_id}.*security-reviewer|security-reviewer.*{fable_id}",
+        match=f"{fable_id}.*dd-code-reviewer|dd-code-reviewer.*{fable_id}",
     ):
         store.parse(doc)
 
     doc2 = _valid_doc()
-    doc2["overrides"] = {"qa-engineer": {"model": fable_id}}
+    doc2["overrides"] = {"dd-software-engineer": {"model": fable_id}}
     overlay = store.parse(doc2)
-    assert overlay.overrides["qa-engineer"].model == fable_id
+    assert overlay.overrides["dd-software-engineer"].model == fable_id
 
 
 def test_save_atomic_last_good_and_reload(tmp_path: Path) -> None:
@@ -153,13 +156,50 @@ def test_save_atomic_last_good_and_reload(tmp_path: Path) -> None:
     reloads identically."""
     first = AgentModelPolicyOverlay(applied_template="balanced", overrides={})
     second = AgentModelPolicyOverlay(
-        applied_template="subscription-saver",
+        applied_template="max-quality",
         overrides={
-            "software-engineer": AgentModelOverride(model="claude-opus-4-8"),
-            "qa-engineer": AgentModelOverride(effort="max"),
+            "dd-software-engineer": AgentModelOverride(model="claude-opus-4-8"),
+            "dd-product-engineer": AgentModelOverride(effort="max"),
         },
     )
 
     assert_save_is_atomic_no_tmp_leftover(_store(tmp_path / "atomic"), first)
     assert_last_good_snapshot_of_prior_valid_file(_store(tmp_path / "lastgood"), first, second)
     assert_saved_value_reloads_identically(_store(tmp_path / "reload"), second)
+
+
+@pytest.mark.parametrize(
+    ("retired_key", "current_key"),
+    [
+        ("code-reviewer", "dd-code-reviewer"),
+        ("project-manager", "dd-product-engineer"),
+        ("dd-project-manager", "dd-product-engineer"),
+    ],
+)
+def test_an_overlay_keyed_by_a_retired_persona_name_still_resolves(
+    tmp_path: Path, retired_key: str, current_key: str
+) -> None:
+    """Intent: CONTRACT — T-047-56 + roster-keeps-a-coordinator-persona-while-the-main-thread-coordinates.
+
+    ``.dadaia/states/agent_model_policy.json`` is operator-owned state, not a projection:
+    nothing rewrites it on install. A retired key (the pre-0.4.7 bare names, and the
+    ADR 0022 coordinator persona) must migrate on read, or every install on an upgraded
+    instance fails loud on a name the library itself changed.
+    """
+    states = tmp_path / ".dadaia" / "states"
+    states.mkdir(parents=True)
+    (states / "agent_model_policy.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "agent-model-policy-v1",
+                "overrides": {retired_key: {"model": "claude-sonnet-5"}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    overlay = JsonAgentModelPolicyStore(tmp_path).load()
+
+    assert overlay is not None
+    assert set(overlay.overrides) == {current_key}
+    assert overlay.overrides[current_key].model == "claude-sonnet-5"

@@ -38,16 +38,15 @@ Metrics 7 and 8 carry `target 0` and report their measured value even when it wo
 
 - Registration-to-resolution interval: diff `closed_at` against the record's `ts`; a seconds-long interval is the no-red-loop signature.
 - Core-field mutation: a hunk changing an immutable-core field (per the schema's `x-mutability`) of an existing `id` is a HIGH finding.
-- Hand edit: a record change with no matching governance event — `dadaia doctor`'s `LEDGER-BUGS-HANDEDIT` WARNING counted over the window.
 
 ## Per-record checks (beyond the eight metrics)
 
 - A resolved record carrying no `cause`, or no `evidence_seam` (no regression seam).
-- A `diff_direction: net-positive` record whose resolving commit shows no `software-architect` routing evidence (`DADAIA.md` §7).
+- A `diff_direction: net-positive` record whose resolving commit shows no architecture-lens routing evidence (`dd-code-review`).
 - Bug-scoped commit-shape conformance: shapes 1 (registration) and 3 (fix) of `dd-gitflow-default` §3a, read from `git log`.
 - The full five-shape sweep is `PILLAR-SPECS.md`'s — never duplicated here.
 
 ## Pillar 1's one write
 
-- On each record reviewed, stamp `audited: <audit-slug>` through `dadaia bugs update <bug-id> --set audited=<slug>`.
+- On each record reviewed, stamp `audited: <audit-slug>` through `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py update <bug-id> --set audited=<slug>`.
 - One writer, one seam, one commit per rewritten record batch.

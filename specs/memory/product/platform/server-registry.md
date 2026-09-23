@@ -1,23 +1,27 @@
 ---
 slug: server-registry
 title: server-registry
-tldr: Port registry with TTL and PID tracking so parallel agents' dev servers never collide; the 3000-3999 range binds only `next_port`.
-summary: An internal registry of dev-server ports with TTL and PID tracking, an expiry sweeper that distinguishes unprobable from dead PIDs, and a read-only scan against real OS listeners.
+tldr: Dev-server port registry with TTL and PID tracking so parallel sessions never collide — one stdlib skill script over one JSON state file; no CLI verb.
+summary: python3 .agents/skills/dd-cli-library/scripts/registry.py keeps .dadaia/states/server_registry.json — per-project ports with TTL and PID, deterministic next-port allocation, idempotent register, release, stale sweep and a read-only scan of unregistered OS listeners.
 tags: [server, registry, ports, ttl]
+sources:
+  - dadaia_workspace/public/skills/dd-cli-library/scripts/registry.py
 ---
 
 ## Behavior
 
-- `dadaia server {list,next,register,release,show,clean,scan}` keeps a registry of ports per project so parallel dev servers do not collide and other sessions can discover a project's URL.
-- The 3000-3999 range is enforced only by `next_port` allocation; `register()` accepts any explicit port.
-- A sweeper expires entries whose TTL elapsed or whose PID is gone, distinguishing `ProcessLookupError` (dead, swept) from `PermissionError` (alive but unprobable, kept), so a root-owned PID survives.
-- `dadaia server scan` is read-only: it parses `ss -tlnp` for the operator's uid, lists unregistered LISTEN ports enriched from `/proc/<pid>/`, and marks `lan_exposed` for `0.0.0.0` binds.
-- With `ss` absent, scan returns an empty list plus a warning.
-- A malformed record emits the warning `registry_entry_malformed` and is skipped rather than breaking `list_all()`.
-- `dadaia panel` self-registers its port as `dadaia-panel` before serving and releases it on a clean stop.
-- Runtime state is `.dadaia/states/server_registry.json`, an array of `PortEntry` with TTL and PID.
-- `resolve_workspace_root(cwd)` requires `.dadaia/states/spec_contexts.json`, not merely `.dadaia/`, so a sub-repo with an agentic projection cannot confuse the walk-up.
+- Every verb is `python3 .agents/skills/dd-cli-library/scripts/registry.py <verb>`: `list`, `next`, `register`, `release`, `clean`, `scan`; exit 0 on success, 1 on a refused verb. The source is `dadaia_workspace/public/skills/dd-cli-library/scripts/registry.py`, stdlib only.
+- `list [--project <name>] [--status active|stale|all] [--json]` shows entries, active by default.
+- `next --project <name> [--min-port N] [--max-port N] [--json]` returns the project's live port if it holds one, else a base port hashed from the project name in 3000-3999, else the first free port; a full range exits 1 naming `clean`.
+- `register --port N --project <name> [--url] [--pid] [--ttl <hours, default 8>] [--description]` drops stale entries first, is idempotent for the same project, and exits 1 naming the owner when another project holds the port; any explicit port is accepted.
+- `release --port N` and/or `--project <name>` removes matching entries; a port owned by another project exits 1.
+- `clean [--dry-run]` removes entries whose TTL elapsed or whose PID is gone; on a non-POSIX host only the TTL is judged.
+- `scan [--json]` is read-only: it parses `ss -tlnp`, lists LISTEN ports above 1024 that no entry covers, enriched with the process command line and cwd, and marks `lan_exposed` for wildcard binds; without `/proc` or `ss` it returns an empty list.
+
+## Runtime state
+
+`.dadaia/states/server_registry.json` — `{"version", "range", "entries": [{port, project, url, status, pid, reserved_at, expires_at, description}]}`, seeded by [[workspace-init]]; the script finds it by walking up from the cwd to the nearest `.dadaia/`, and `--registry <path>` overrides.
 
 ## Dependencies
 
-[[workspace-init]] creates the state directory; [[panel]]'s Servers tab reads it through `ServerRegistryService`. Stdlib only.
+[[workspace-init]], [[agentic-entities]].

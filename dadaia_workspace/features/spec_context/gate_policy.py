@@ -1,7 +1,6 @@
 """Path classifier and decision policy for the merged SDD PreToolUse gate.
 
-Races between sessions are surfaced through advisory presence and never prevented;
-there is no session mode. Protected CLI session records remain fail-closed against
+Races between sessions are never prevented; there is no session mode. Protected CLI session records remain fail-closed against
 file-tool writes.
 
 **The gate blocks three things (0.4.7 FR1).** A PROTECTED write (CLI-owned session
@@ -10,7 +9,7 @@ not own; and — in ``hooks/root_whitelist`` — a new workspace-root entry. The
 fourth block and no path class beyond ``ADDITIVE``/``MUTATING``/``PROTECTED``.
 
 The MEMORY class and its phase rule are DELETED, with the gate's ``_RELEASE.json``
-read behind them: the gate reads no SDD artifact (``DADAIA.md`` §3.5), and every gate
+read behind them: the gate reads no SDD artifact (the root `AGENTS.md` map §3), and every gate
 Stall in the bug ledger came from that read resolving an empty phase
 (``sdd-gate-memory-phase-resolves-empty…``, ``minted-feature-branch-without-live-
 release-blocks-every-memory-write``, ``context-bind-implementation-requires-release-id-
@@ -21,22 +20,12 @@ documented way out was a bind flag that no longer exists.
 
 from __future__ import annotations
 
-import time
-from collections.abc import Callable
-from datetime import UTC, datetime
 from enum import Enum
-from pathlib import Path
 
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
-from dadaia_workspace.features.spec_context import presence
 
 __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
-
-#: Throttle window (seconds) for the advisory concurrency warning (v0.1.76 FR1). A
-#: second write inside this window from the same session emits no repeat warning — the
-#: throttle marker lives at ``.dadaia/tmp/presence-warn-<sid>-<ctx>`` (mtime-based).
-_ADVISORY_THROTTLE_SECONDS = 300
 
 #: Ordered ADDITIVE prefixes — always allowed.
 #: Parallel audit sessions use collision-safe directories, named per the single home
@@ -70,22 +59,19 @@ _PROTECTED_MESSAGE = (
     "(SEC-01 / CWE-284).\n"
     f"fix: {DADAIA_BIN} context bind <ctx>"
 )
-#: Projected LAW files. ``DADAIA.md`` is the workspace system prompt and the sole
-#: always-on rule file the library ships; the ``AGENTS.md``/``CLAUDE.md`` pair is its
-#: scoped/bridge counterpart. In an INSTANTIATED workspace these are human-only: an agent
+#: Projected LAW files. The root ``AGENTS.md`` map is the workspace system prompt and
+#: the sole always-on rule file the library ships; the ``.dadaia/**`` family is its
+#: scoped counterpart. In an INSTANTIATED workspace these are human-only: an agent
 #: changes the law by editing ``dadaia_workspace/public/`` and re-projecting, never by
-#: writing the projection. Matched as exact relative paths (workspace root, harness dirs,
-#: and each ``repos/<slug>/`` root) so library sources and test fixtures — which live
-#: deeper — are never caught.
+#: writing the projection.
 _LAW_BASENAMES: frozenset[str] = workspace_layout.LAW_BASENAMES
-_LAW_HARNESS_DIRS: frozenset[str] = workspace_layout.LAW_HARNESS_DIRS
 _LAW_MESSAGE = (
     "[GATE] '{path}' is a projected law file (the workspace system prompt / scoped "
     "AGENTS.md). In an instantiated workspace only a human operator edits it by hand; "
     "an agent changes the law at its source and re-projects.\n"
     "The source is dadaia_workspace/public/; this re-projects it:\n"
     f"fix: {DADAIA_BIN} public stage && {DADAIA_BIN} public "
-    "install --target all"
+    "install"
 )
 
 #: BLOCK message for a MUTATING write into a repo outside the Bind's scope (FR1, Q1).
@@ -96,37 +82,6 @@ _SCOPE_BLOCK_MESSAGE = (
     "session is bound to '{bound}', whose scope is: {scope}.\n"
     "fix: " + DADAIA_BIN + " context bind {owner}"
 )
-
-#: The default session id when no harness-native id resolves (``hooks/sdd_gate.py``'s
-#: ``resolve_session_id(payload, default="anon-session")``). FR5: an anonymous identity
-#: never creates a presence record — it degrades presence accuracy only, never the write
-#: (v0.1.76, kills the anon-session dual-writer facet of the CRITICAL bug at the root).
-_ANON_SESSION_ID = "anon-session"
-
-
-def _advisory_marker_name(session_id: str, ctx: str) -> str:
-    """The advisory throttle marker's filename — validated by :func:`presence.throttled`/
-    :func:`presence.stamp_throttle` themselves (release 0.5.1 K2: the ONE
-    mtime-throttle-marker idiom, replacing this module's own copy)."""
-    return f"presence-warn-{session_id}-{ctx}"
-
-
-def _advisory_message(ctx: str, rel_path: str, others: list[presence.PresenceRecord]) -> str:
-    """Build the one-line advisory naming every other live session (FR1).
-
-    Names each other session's id, runtime, and last-seen timestamp; states plainly that
-    the write was ALLOWED — this is a signal, never a block.
-    """
-    parts = [
-        f"{rec.session_id!r} (runtime={rec.runtime}, last seen at {rec.last_seen_at or 'unknown'})"
-        for rec in others
-    ]
-    names = "; ".join(parts)
-    return (
-        f"[PRESENCE] '{rel_path}' write ALLOWED in context {ctx!r}. Other live session(s) "
-        f"present: {names}. Races between sessions are accepted and surfaced, never "
-        "blocked — no action required."
-    )
 
 
 class PathClass(Enum):
@@ -141,10 +96,6 @@ class PathClass(Enum):
 class Decision(Enum):
     ALLOW = "allow"
     BLOCK = "block"
-
-
-def _utcnow() -> datetime:
-    return datetime.now(tz=UTC)
 
 
 def _is_specs_additive(spec_rel: str) -> bool:
@@ -172,16 +123,16 @@ def _is_law_path(rel_path: str) -> bool:
     PROTECTED path (0.4.7 FR1 folded the LAW class into PROTECTED; the two share one
     verdict and differ only in the message that names the way out).
 
-    Static, ORIGIN-only floor (v0.4.5 FR1): the workspace root or a fixed harness dir
-    (``_LAW_HARNESS_DIRS``). ``repos/<slug>/`` never matches either shape, so a repo's
-    own AGENTS.md/CLAUDE.md is never LAW (closes sdd-gate-blocks-fresh-repo-root-agents-md
-    + repo-agents-md-law-gate-contradicts-template) — never reads the manifest (CWE-284).
+    Static, ORIGIN-only floor (v0.4.5 FR1, since collapsed): the projected
+    ``AGENTS.md`` set — the root map and the ``.dadaia/**`` family. ``repos/<slug>/``
+    never matches either shape, so a repo's own AGENTS.md is never LAW (closes
+    sdd-gate-blocks-fresh-repo-root-agents-md + repo-agents-md-law-gate-contradicts-
+    template) — and the floor never reads the manifest (CWE-284).
     """
     parts = rel_path.split("/")
-    if len(parts) == 1:
-        return parts[0] in _LAW_BASENAMES
-    parent = "/".join(parts[:-1])
-    return parent in _LAW_HARNESS_DIRS and parts[-1] in _LAW_BASENAMES
+    if parts[-1] not in _LAW_BASENAMES:
+        return False
+    return len(parts) == 1 or parts[0] == ".dadaia"
 
 
 def classify_path(rel_path: str) -> PathClass:
@@ -234,41 +185,27 @@ def _scope_block(
 
 
 def evaluate(
-    workspace: Path,
     rel_path: str,
     *,
-    ctx: str,
-    session_id: str,
     bound_context: str | None = None,
     bound_repos: frozenset[str] = frozenset(),
     target_slug: str | None = None,
     target_owner: str | None = None,
-    clock: Callable[[], datetime] = _utcnow,
-    runtime: str = "unknown",
-    pid: int | None = None,
 ) -> tuple[Decision, str]:
-    """Return the gate decision for one write target — the fail-safe contract.
+    """Return the gate decision and its message for one write target.
 
     Three blocks, in order: PROTECTED (fail-CLOSED, the projected-law message or the
     session-record message), then — for a MUTATING write — the bind's SCOPE, received as
     plain data (*bound_context* / *bound_repos*), never re-resolved here. Everything
-    else ALLOWS, upserting advisory presence.
+    else ALLOWS with an empty message.
 
     SCOPE (FR1, Q1): only ``repos/<slug>/`` is scope-judged. *target_slug* is the repo
     the write lands in and *target_owner* the context that registers it; the write is
     refused only when the session is BOUND, some context demonstrably owns that slug,
     and it is not the bound context's own (*bound_repos* = main + associated). An
     unbound session, a workspace-root path, and a slug no context registers all ALLOW —
-    the gate cannot attribute them, and fail-open is the posture.
-
-    NO-LOCKS DOCTRINE (v0.1.76): a MUTATING write is NEVER blocked on another session.
-    It upserts an advisory :mod:`presence` record for this ``(ctx, session_id)`` and,
-    when another live session is visible on the same context, ALLOWS with a throttled
-    one-line advisory. Presence I/O never raises (FR2).
-
-    ``runtime``/``pid`` are recorded into the presence record. An anonymous session id
-    (``anon-session``) never creates one (FR5): the write is still allowed, there is
-    simply nothing to be advisory about.
+    the gate cannot attribute them, and fail-open is the posture. A MUTATING write is
+    never blocked on another session: races surface through git.
     """
     cls = classify_path(rel_path)
 
@@ -285,24 +222,5 @@ def evaluate(
     if scope_block is not None:
         return Decision.BLOCK, scope_block
 
-    # MUTATING mode: advisory presence, never a peer-session block.
-    # anon-session (no harness-native id resolved, FR5) creates no presence record — the
-    # write is still allowed, there is simply nothing to be advisory about. The whole
-    # block is wrapped fail-safe (AC-04 defense-in-depth): ``presence`` already swallows
-    # its own errors internally, but a MUTATING write must NEVER be able to raise out of
-    # this function regardless of what future presence code does.
-    try:
-        if session_id and session_id != _ANON_SESSION_ID and ctx:
-            presence.upsert(workspace, ctx, session_id, runtime=runtime, pid=pid or 0)
-            others = presence.others_alive(workspace, ctx, session_id)
-            marker = _advisory_marker_name(session_id, ctx)
-            now = time.time()
-            if others and not presence.throttled(
-                workspace, marker, window_seconds=_ADVISORY_THROTTLE_SECONDS, now=now
-            ):
-                presence.stamp_throttle(workspace, marker)
-                message = _advisory_message(ctx, rel_path, others)
-                return Decision.ALLOW, message
-    except Exception:  # noqa: BLE001 — fail-safe contract (AC-04): never fail-dead.
-        return Decision.ALLOW, ""
+    # MUTATING: always allowed; races surface through git, never through a block.
     return Decision.ALLOW, ""

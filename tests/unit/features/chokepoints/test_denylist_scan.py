@@ -118,7 +118,7 @@ def test_foreign_slug_embedded_in_longer_word_does_not_match() -> None:
 
 
 def test_foreign_slug_matches_case_insensitively() -> None:
-    """code-reviewer LOW finding: operator terms are case-insensitive (`.lower()` on
+    """dd-code-reviewer LOW finding: operator terms are case-insensitive (`.lower()` on
     both sides) but the slug layer compiled its regex with no `re.IGNORECASE`, an
     undocumented asymmetry in the same matcher. A foreign slug referenced with
     different casing must still be caught."""
@@ -249,7 +249,7 @@ def test_baseline_excludes_rfc2606_reserved_tld_emails() -> None:
 
 
 def test_baseline_excludes_the_products_own_synthetic_workspace_local_host() -> None:
-    """code-reviewer CRITICAL finding (v0.9.0 pre-PR review): the product's own
+    """dd-code-reviewer CRITICAL finding (v0.9.0 pre-PR review): the product's own
     synthetic git identity host (``git_subprocess.py``'s ``user.email=dadaia@workspace.
     local`` fallback, quoted verbatim in ``architecture.md``) is a synthetic literal, not
     a real internal hostname — same carve-out family as the RFC-2606 email exclusion.
@@ -399,7 +399,7 @@ def test_amnesty_applies_to_the_foreign_slug_layer_too() -> None:
 
 
 # ---------------------------------------------------------------------------
-# code-reviewer MEDIUM finding (v0.11.0 pre-PR review) — the amnesty predicate must
+# dd-code-reviewer MEDIUM finding (v0.11.0 pre-PR review) — the amnesty predicate must
 # suppress a candidate ONLY when the SAME layer's matcher, re-run against prior_text,
 # produces a matched value EQUAL (case-normalized) to the current matched value — never
 # raw substring containment, which lets a DIFFERENT, longer prior-published value
@@ -417,7 +417,7 @@ _SYNTHETIC_SLUG_STANDALONE = "zz-fake-context-name"
 
 
 def test_amnesty_does_not_suppress_a_baseline_hit_via_a_different_superstring_prior_value() -> None:
-    """code-reviewer repro 1: a prior home-path value that is a SUPERSTRING of the new
+    """dd-code-reviewer repro 1: a prior home-path value that is a SUPERSTRING of the new
     one (``_POSITIVE_HOME_PATH_SUPERSTRING`` extends ``_POSITIVE_HOME_PATH_SUBSTRING``
     by four characters) must NOT suppress the new, DIFFERENT, standalone value merely
     because it is an unanchored substring of the old one — the SAME `home-abs-path`
@@ -454,7 +454,7 @@ def test_amnesty_still_suppresses_the_exact_same_anchored_baseline_value() -> No
 
 
 def test_amnesty_does_not_suppress_a_slug_hit_lacking_a_word_boundary_match_in_prior_text() -> None:
-    """code-reviewer repro 2: prior text carrying `zz-fake-context-namecorp` (the
+    """dd-code-reviewer repro 2: prior text carrying `zz-fake-context-namecorp` (the
     synthetic slug glued to a longer word, so `\\bzz-fake-context-name\\b` never matches
     it) must NOT suppress a new STANDALONE occurrence of the slug — the slug layer's own
     word-boundary pattern, re-run against prior_text, finds no match at all, so there is
@@ -558,7 +558,7 @@ class _CountingSlugPattern:
 def test_first_match_short_circuits_at_the_first_hit_line() -> None:
     """The slug pattern's ``.search`` must never be invoked past the line carrying the
     first hit — proof the matcher stops scanning rather than walking every remaining
-    line of a large blob and sorting a full candidate list (code-reviewer LOW finding)."""
+    line of a large blob and sorting a full candidate list (dd-code-reviewer LOW finding)."""
     counting = _CountingSlugPattern(re.compile(r"\b" + re.escape(_SYNTHETIC_FOREIGN_SLUG) + r"\b"))
     text = f"line one has {_SYNTHETIC_FOREIGN_SLUG} right here\n" + "noise line\n" * 500
     obj = _obj("big.md", text)
@@ -682,7 +682,7 @@ def test_oversized_object_with_undecodable_prefix_counts_as_binary_only() -> Non
 
 
 # ---------------------------------------------------------------------------
-# code-reviewer MEDIUM finding M3 support (v0.11.0 pre-PR review) — pin the matcher
+# dd-code-reviewer MEDIUM finding M3 support (v0.11.0 pre-PR review) — pin the matcher
 # side of the "oversized-never-amnestied" boundary: the suppression predicate is
 # evaluated identically for an oversized object exactly as for any other — `oversized`
 # never special-cases it. The real product-level guarantee that an oversized CURRENT

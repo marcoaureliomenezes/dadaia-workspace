@@ -50,10 +50,6 @@ _Avoid_: hook, guard
 The push — where a blob becomes public. This repository is public, so the full denylist scan applies to every tracked path, with no tolerated-pairs list and no path exemption; a fixture needing a secret shape composes it at runtime.
 _Avoid_: release boundary, publish step, baseline (for a tolerated literal)
 
-**Verdict**:
-A security-reviewer APPROVED handoff bound to one commit sha, committed under `releases/<id>/verdicts/`, consumed once by the PR gate and deleted after merge.
-_Avoid_: approval, decision (the gate's boolean), review
-
 **Path class**:
 The category a written path belongs to — ADDITIVE, MUTATING, PROTECTED, three and no fourth — and the only thing the gate classifies. `specs/memory/` is MUTATING in every phase.
 _Avoid_: lane, zone, MEMORY, LAW, UNGATED, FROZEN (retired classes)
@@ -81,8 +77,8 @@ One of the entry AI runtimes — Claude Code, Codex, Kimi Code — each with its
 _Avoid_: target, runtime, agent-target, tool
 
 **Drift**:
-A projection whose bytes differ from its render. The only projection fault; doctor reports it, install repairs it.
-_Avoid_: parity, mismatch, stale copy
+A projection whose bytes differ from its render. The only projection fault; doctor reports it, install repairs it. Memory drift is the other live sense and is always written qualified.
+_Avoid_: parity, mismatch, stale copy, drift (bare) for memory drift
 
 ## Specs
 
@@ -111,23 +107,40 @@ The one way a record changes status; refuses incomplete input.
 _Avoid_: update --set status, flip
 
 **Release**:
-The open-scope publication unit, named last-published-PyPI + 1 patch — exactly one live, growing by stacked Candidates; its state is `_RELEASE.json`, its narrative is that file's `log`. The version increments only at operator-approved deploy (ADR 0005). _Avoid_: "release" for one closed scope — that is a Candidate.
+The open-scope publication unit, named last-published-PyPI + 1 patch — exactly one live, growing by stacked Candidates; its state is `_RELEASE.json`, its narrative is that file's `log`. The version increments only at operator-approved deploy (ADR 0021). _Avoid_: "release" for one closed scope — that is a Candidate.
 
 **Candidate**:
-One closed-scope SDD cycle inside the live Release (grill → SPEC/PLAN/TASKS `Aprovado` → implementation → memory → closure → develop merge → promote-or-continue gate). The live Candidate's trio sits at the release root.
-
-**rc-N**:
-The archive folder of the N-th completed-but-not-shipped Candidate's trio, created by `dadaia release rc-archive`. _Avoid_: "rc" as a branch name, a fixes-only round, or a scaffolded sub-phase — the segment lane (`alpha-N`) is retired (ADR 0006).
-_Avoid_: version (for the unit), sprint
+One closed-scope SDD cycle inside the live Release (grill → SPEC/PLAN/TASKS `Aprovado` → implementation → memory → closure → develop merge → promote-or-continue gate). The live Candidate's trio sits at the release root and the next Candidate overwrites it in place — git is the archive, and no closed Candidate is ever copied into a folder of its own.
+_Avoid_: version (for the unit), sprint, "rc" as a branch name or a fixes-only round
 
 **Memory**:
-The current product truth under `specs/memory/`; never history.
+The current product truth under `specs/memory/`; never history. Two tiers: canonical memory and product memory.
 _Avoid_: docs, notes
+
+**Canonical memory**:
+`ARCHITECTURE.md` (with its `## Tech Stack` section) and `QUALITY.md` — statements, principles, diagrams and laws of the project, changed only in the commit that carries an accepted ADR; an audit or an explicit operator order may rewrite their text, never their statements.
+_Avoid_: the trio (retired with TECHSTACK.md), Part 1/Part 2, top-level atoms
+
+**Product memory**:
+The `specs/memory/product/**` atoms — one functional description per feature, the only memory tier a release closure changes, reconciled in the order delete, update, add.
+_Avoid_: feature docs, catalog (that is the generated pair)
+
+**Atom sources**:
+The `sources:` frontmatter field of a product atom — the repo path globs whose code the atom describes; `catalog.json` carries them and the drift verb reads them.
+_Avoid_: owners, paths, citations (a citation is a path named in the body)
+
+**Memory drift**:
+A product atom whose sources changed in a window while the atom was not reconciled, or a source package no atom covers; `memory.py drift --since <sha>` lists both. Always qualified — "drift" bare is projection drift.
+_Avoid_: stale memory, drift (bare)
+
+**Reconcile**:
+The closure pass over the drift worklist: for each atom read its sources' git diff, delete the claims the code contradicts, update the claims that changed, then add what is new; recorded as one `kind: memory` release log entry naming every atom reviewed or changed.
+_Avoid_: memory pass, apply the deltas, sync
 
 ## Governance verbs and hand edits
 
 **Governance verb**:
-The one CLI command authorized to change a governance record — `dadaia bugs append|update|resolve|supersede|defer|reject|archive`, `backlog new|exit`, `release new|phase|rc-archive|archive`, `audit disposition|close`.
+The one CLI command authorized to change a governance record — `dadaia bugs append|update|resolve|supersede|defer|reject|archive`, `backlog new|exit`, `release new|phase|check`, `audit disposition|close`.
 _Avoid_: CLI command (generic), mutation, setter
 
 **Governance event**:

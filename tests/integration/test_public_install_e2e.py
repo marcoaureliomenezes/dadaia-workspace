@@ -7,7 +7,7 @@ Intent: CONTRACT — AGT-r2-28 FR10 (guardrail pair) + 0.4.6 AC12 (FR14) + 0.4.6
 Verifies that `_install_workspace_guardrail_pair` (the Option C installer):
 
 1. Does NOT overwrite operator-authored `services/CLAUDE.md` and `services/AGENTS.md`.
-2. DOES write workspace-root `AGENTS.md` and `CLAUDE.md` byte-identical to the source.
+2. DOES write workspace-root `AGENTS.md` byte-identical to the source.
 3. DOES write consumer-repo pair byte-identical to the source when a marker-bearing
    consumer repo exists in `repos/`.
 
@@ -28,7 +28,6 @@ from pathlib import Path
 from dadaia_workspace.core.workspace_layout import DADAIA_ZONES, STATES_CANON
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.workspace_guardrail import (
-    _CLAUDE_MD_STUB,
     _install_workspace_guardrail_pair,
 )
 
@@ -106,7 +105,7 @@ def test_nested_operator_pair_untouched_and_all_projections_share_single_sha(
     consumer-repo roots — operator-authored files in ``services/`` remain byte-identical
     to their pre-install content, both with and without consumer repos present. Option C
     (ADR): a single source file fans out to N projections, and all N destinations share
-    exactly one SHA-256 per file kind (AGENTS.md vs the T-41 CLAUDE.md stub)."""
+    exactly one SHA-256 (0.4.7 FR3: AGENTS.md is the only projected kind)."""
     source = _make_source(tmp_path)
     workspace_root = tmp_path / "workspace"
     workspace_root.mkdir()
@@ -137,20 +136,17 @@ def test_nested_operator_pair_untouched_and_all_projections_share_single_sha(
     )
 
     source_sha = hashlib.sha256(_SOURCE_GUARDRAIL_CONTENT).hexdigest()
-    stub_sha = hashlib.sha256(_CLAUDE_MD_STUB.encode()).hexdigest()
 
     agents_files = [
         workspace_root / "AGENTS.md",
         consumer_a / "AGENTS.md",
         consumer_b / "AGENTS.md",
     ]
-    claude_files = [
-        workspace_root / "CLAUDE.md",
-        consumer_a / "CLAUDE.md",
-        consumer_b / "CLAUDE.md",
-    ]
-    for path in agents_files + claude_files:
+    for path in agents_files:
         assert path.exists(), f"Expected projected file missing: {path}"
+    # 0.4.7 FR3: no CLAUDE.md bridge is projected anywhere.
+    for path in (workspace_root, consumer_a, consumer_b):
+        assert not (path / "CLAUDE.md").exists(), f"unexpected CLAUDE.md bridge: {path}"
 
     agents_sha_set = {_sha256(p) for p in agents_files}
     assert agents_sha_set == {source_sha}, (
@@ -158,16 +154,10 @@ def test_nested_operator_pair_untouched_and_all_projections_share_single_sha(
         f"  Expected: {{{source_sha!r}}}\n"
         f"  Got: {agents_sha_set}"
     )
-    claude_sha_set = {_sha256(p) for p in claude_files}
-    assert claude_sha_set == {stub_sha}, (
-        f"All CLAUDE.md projections must be the T-41 stub (single SHA-256).\n"
-        f"  Expected: {{{stub_sha!r}}}\n"
-        f"  Got: {claude_sha_set}"
-    )
 
     ok_entries = [e for e in installed if e.startswith("[ok]")]
-    assert len(ok_entries) == 6, (
-        f"Expected 6 '[ok]' entries in installed list (2 root + 4 consumer), "
+    assert len(ok_entries) == 3, (
+        f"Expected 3 '[ok]' entries in installed list (1 root + 2 consumer), "
         f"got {len(ok_entries)}.\n  installed: {installed}"
     )
 
@@ -195,8 +185,8 @@ def test_nested_operator_pair_untouched_and_all_projections_share_single_sha(
     assert _sha256(no_consumer_ws / "AGENTS.md") == source_sha, (
         "workspace-root/AGENTS.md must be byte-identical to source after install."
     )
-    assert _sha256(no_consumer_ws / "CLAUDE.md") == stub_sha, (
-        "workspace-root/CLAUDE.md must be the T-41 stub after install."
+    assert not (no_consumer_ws / "CLAUDE.md").exists(), (
+        "install must not write a workspace-root CLAUDE.md bridge (0.4.7 FR3)."
     )
 
 
@@ -205,11 +195,11 @@ def _table_rows(text: str) -> list[str]:
 
 
 def test_installed_dadaia_agents_md_carries_the_rendered_zone_table(tmp_path: Path) -> None:
-    """After ``install(target="all")`` the projected ``.dadaia/AGENTS.md`` carries exactly one
+    """After ``install()`` the projected ``.dadaia/AGENTS.md`` carries exactly one
     row per registry zone and no placeholder; ``states/AGENTS.md`` carries the closed canon."""
     ws = tmp_path / "ws"
     ws.mkdir()
-    FileSystemPublicAssetManager().install(ws, target="all")
+    FileSystemPublicAssetManager().install(ws)
 
     zones = (ws / ".dadaia" / "AGENTS.md").read_text(encoding="utf-8")
     assert "<!-- zones -->" not in zones
@@ -225,12 +215,12 @@ def test_installed_dadaia_agents_md_carries_the_rendered_zone_table(tmp_path: Pa
 
 
 def test_install_all_projects_no_dadaia_scripts(tmp_path: Path) -> None:
-    """0.4.6 AC10 (FR12): ``install(target="all")`` creates no ``.dadaia/scripts`` and the
+    """0.4.6 AC10 (FR12): ``install()`` creates no ``.dadaia/scripts`` and the
     staged manifest names no such path. Git hooks and CI execute the package copy under
     ``dadaia_workspace/public/scripts/``; only the ``agentic/scripts`` staging survives."""
     ws = tmp_path / "ws"
     ws.mkdir()
-    FileSystemPublicAssetManager().install(ws, target="all")
+    FileSystemPublicAssetManager().install(ws)
 
     assert not (ws / ".dadaia" / "scripts").exists()
     assert (ws / ".dadaia" / "agentic" / "scripts").is_dir()

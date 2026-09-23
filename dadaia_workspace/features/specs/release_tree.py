@@ -11,37 +11,32 @@ doctor printed zero errors (bug
 
 :func:`validate_release_tree` is that missing reader: ONE walk over every release
 directory, ONE list of issues, no I/O beyond reading each state document. Its callers
-are the doctor's release rule (T-047-02), ``rc-archive``/``release archive``
-(T-047-09) and the contract test over this repo's own tree —
-``doctor_common.iter_all_release_dirs`` is not one of them: it enumerates the
-pre-0.5.0 ``specs/_archive/releases/`` layout and classifies a directory by the
-presence of a SPEC/PLAN/TASKS artifact, while this validator must walk the current
-``releases/_archive/<id>/`` layout and treat a release directory with NO state
-document as an issue rather than as "not a release".
+are the doctor's release rule and the contract test over this repo's own tree —
+``doctor_common.iter_all_release_dirs`` is not one of them: it classifies a directory
+by the presence of a SPEC/PLAN/TASKS artifact, while this validator treats a release
+directory with NO state document as an issue rather than as "not a release".
 """
 
 from __future__ import annotations
 
 import json
 import re
-from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from jsonschema import Draft202012Validator
 
-from dadaia_workspace.core.models.telemetry import GovernanceBaseline
 from dadaia_workspace.core.release_state import PHASES, parse_release_state, release_state_file
 from dadaia_workspace.features.specs.doctor_common import RELEASE_ARTIFACTS
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 from dadaia_workspace.features.specs.schemas import validator_for
 
 __all__ = [
-    "GOVERNED_STATE_FIELDS",
     "RELEASE_TREE_PHASES",
     "ReleaseTreeIssue",
-    "governed_state",
+    "memory_window_start",
+    "release_memory_issues",
     "release_tree_issues",
     "validate_release_tree",
 ]
@@ -53,14 +48,8 @@ __all__ = [
 #: here would be a copy that can drift.
 RELEASE_TREE_PHASES: tuple[str, ...] = PHASES
 
-#: The ``_RELEASE.json`` fields a verb OWNS, and therefore the exact shape the
-#: ``releases`` governance event hashes (0.4.7 FR6 / SPEC Q3). Everything else in the
-#: document is hand-written by design — the `log` narrative above all — so hashing the
-#: whole state would read every closure paragraph as a hand edit. Stated here, beside
-#: the rule that recomputes it, and imported by the verb that writes it
-#: (``cli/commands/newartifacts.py::_record_release_event``): ONE shape, one home.
-GOVERNED_STATE_FIELDS: tuple[str, ...] = ("phase", "defined", "implemented")
-
+#: A release directory's name is its bare SemVer id — the one rule that tells a
+#: release directory apart from ``_archive``, ``AGENTS.md`` and an ``rc-N/`` archive.
 _SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 _SCHEMA_NAME = "releases/release-state-v1"
 
@@ -79,7 +68,7 @@ class ReleaseTreeIssue:
 
 def _release_dirs(releases_root: Path) -> list[tuple[Path, bool]]:
     """Every release directory as ``(dir, archived)``: the SemVer-named directories
-    directly under ``releases/`` (``_ideas``, ``_archive``, ``AGENTS.md`` and the
+    directly under ``releases/`` (``_archive``, ``AGENTS.md`` and the
     candidate ``rc-N/`` archives excluded by the name rule) and every directory under
     ``releases/_archive/`` (the histo file is not a directory)."""
     out: list[tuple[Path, bool]] = []
@@ -99,10 +88,14 @@ def _release_dirs(releases_root: Path) -> list[tuple[Path, bool]]:
 def _document_issues(
     doc: Any, text: str, rel: str, *, archived: bool, validator: Draft202012Validator
 ) -> list[ReleaseTreeIssue]:
-    issues = [
-        ReleaseTreeIssue(rel, "RELEASE-TREE-SCHEMA", err.message)
-        for err in sorted(validator.iter_errors(doc), key=str)
-    ]
+    issues: list[ReleaseTreeIssue] = (
+        []
+        if archived
+        else [
+            ReleaseTreeIssue(rel, "RELEASE-TREE-SCHEMA", err.message)
+            for err in sorted(validator.iter_errors(doc), key=str)
+        ]
+    )
     try:
         state = parse_release_state(text)
     except ValueError as exc:
@@ -172,34 +165,7 @@ def _trio_issues(
     ]
 
 
-def governed_state(document: Mapping[str, Any]) -> dict[str, Any]:
-    """The verb-owned slice of a release state — the record a ``releases`` governance
-    event hashes. Absent keys are absent, never defaulted: a document missing `phase`
-    fails its schema, and inventing a value here would hash a record nobody wrote."""
-    return {key: document[key] for key in GOVERNED_STATE_FIELDS if key in document}
-
-
-def _hand_edit_issue(
-    doc: Any, rel: str, release_id: str, governance: GovernanceBaseline | None
-) -> list[ReleaseTreeIssue]:
-    """RELEASE-TREE-HANDEDIT (0.4.7 FR6): the live phase/milestones differ from what the
-    last `release` verb wrote.
-
-    ``record_ts=None`` by construction: a state document carries no timestamp of its
-    own, so the "no event at all" shape cannot be dated and stays silent — a release
-    that predates the verbs is history, not drift.
-    """
-    if governance is None or not isinstance(doc, dict):
-        return []
-    message = governance.hand_edit(
-        ledger="releases", record_id=release_id, record=governed_state(doc)
-    )
-    return [] if message is None else [ReleaseTreeIssue(rel, "RELEASE-TREE-HANDEDIT", message)]
-
-
-def validate_release_tree(
-    specs_dir: Path, *, governance: GovernanceBaseline | None = None
-) -> list[ReleaseTreeIssue]:
+def validate_release_tree(specs_dir: Path) -> list[ReleaseTreeIssue]:
     """Validate every release directory under ``specs_dir/releases/``.
 
     One issue per failure, in walk order: live releases first (SemVer-sorted by
@@ -207,13 +173,22 @@ def validate_release_tree(
     exists; it validates ``release-state-v1``; it parses with
     :func:`~dadaia_workspace.core.release_state.parse_release_state`; its ``log[].ts``
     values are non-decreasing; its ``phase`` is one of :data:`RELEASE_TREE_PHASES`;
+    the ``release-state-v1`` shape is asserted on the LIVE document alone — an archived
+    one was written by a schema version that no longer exists and history is never
+    rewritten, so it is listed and read, never ranked against the live schema;
     ``ARCHIVED`` iff the directory sits under ``_archive/``; a live release in
     IMPLEMENTATION or CLOSURE carries its SPEC/PLAN/TASKS trio
     (:data:`_TRIO_REQUIRED_PHASES`).
+
+    Every rule here reads the document alone. An archived release is never ranked
+    against the live release id: no verb moves a directory into ``_archive/`` any
+    more, the version is minted by release-please rather than by this tree, and
+    history is read, not repaired.
     """
     issues: list[ReleaseTreeIssue] = []
     validator = validator_for(_SCHEMA_NAME)
-    for release_dir, archived in _release_dirs(specs_dir / "releases"):
+    dirs = _release_dirs(specs_dir / "releases")
+    for release_dir, archived in dirs:
         dir_rel = release_dir.relative_to(specs_dir).as_posix()
         state_path = release_state_file(release_dir)
         if state_path is None:
@@ -229,32 +204,97 @@ def validate_release_tree(
             issues.append(ReleaseTreeIssue(rel, "RELEASE-TREE-PARSE", f"not valid JSON: {exc}"))
             continue
         issues.extend(_trio_issues(release_dir, dir_rel, doc, archived=archived))
-        issues.extend(_hand_edit_issue(doc, rel, release_dir.name, governance))
         issues.extend(_document_issues(doc, text, rel, archived=archived, validator=validator))
     return issues
 
 
-#: The one code this validator emits that is not a conformance failure: the document
-#: is valid and merely unexplained (0.4.7 FR6). Judgment, so WARNING and no `fix:`.
-_HAND_EDIT_CODE = "RELEASE-TREE-HANDEDIT"
-
-
-def release_tree_issues(
-    specs_dir: Path, *, governance: GovernanceBaseline | None = None
-) -> list[SpecsDoctorIssue]:
+def release_tree_issues(specs_dir: Path) -> list[SpecsDoctorIssue]:
     """The validator rendered as doctor issues — the `specs` section's RELEASE-TREE rule.
 
     Every conformance failure is an ERROR: a committed governance record is either valid
-    or it is not. The one exception is :data:`_HAND_EDIT_CODE`, which reports PROVENANCE
-    over a valid document. Lives here, next to the validator it renders, so the rule
+    or it is not. Lives here, next to the validator it renders, so the rule
     registry stays a table of one-line rows and no validator module grows for it.
     """
     return [
         SpecsDoctorIssue(
             issue.code,
-            Severity.WARNING if issue.code == _HAND_EDIT_CODE else Severity.ERROR,
+            Severity.ERROR,
             issue.message,
             issue.path,
         )
-        for issue in validate_release_tree(specs_dir, governance=governance)
+        for issue in validate_release_tree(specs_dir)
     ]
+
+
+#: The three fields `release.py memory` stamps on its log entry. An entry carrying only
+#: `text` is the free prose this rule replaces: it names no window and dispositions no
+#: atom, so nothing can tell a closure that reconciled memory from one that wrote a
+#: sentence about it.
+_MEMORY_FIELDS: tuple[str, ...] = ("since", "until", "reviewed", "changed")
+
+
+def release_memory_issues(specs_dir: Path) -> list[SpecsDoctorIssue]:
+    """RELEASE-TREE-MEMORY — a live release in CLOSURE names its memory reconciliation.
+
+    The LATEST `kind: memory` entry stamped after `implemented.ts` must carry
+    `since`/`until`/`reviewed`/`changed`, and its `since` must be the state-derived start
+    (the previous memory entry's `until`, else `defined.sha`); an entry predating the milestone reconciled a window the
+    candidate has since moved past. Reads the state document alone — no git, no
+    subprocess (P-02/P-03): whether the atoms really moved is the writing verb's refusal,
+    measured where a subprocess is legal.
+    """
+    issues: list[SpecsDoctorIssue] = []
+    for release_dir, archived in _release_dirs(specs_dir / "releases"):
+        state_path = release_state_file(release_dir)
+        if archived or state_path is None:
+            continue
+        try:
+            doc = json.loads(state_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue  # RELEASE-TREE-PARSE owns unreadable state
+        if not isinstance(doc, dict) or doc.get("phase") != "CLOSURE":
+            continue
+        rel = state_path.relative_to(specs_dir).as_posix()
+        message = _memory_message(doc)
+        if message is not None:
+            issues.append(SpecsDoctorIssue("RELEASE-TREE-MEMORY", Severity.ERROR, message, rel))
+    return issues
+
+
+def memory_window_start(doc: dict[str, Any]) -> str:
+    """The memory window's start: the last memory entry's `until`, else `defined.sha`,
+    else ``""`` — the rule `_release_store.window_start` states for the writer."""
+    ends = [str(e["until"]) for e in doc.get("log") or []
+            if isinstance(e, dict) and e.get("kind") == "memory" and e.get("until")]  # fmt: skip
+    return ends[-1] if ends else str((doc.get("defined") or {}).get("sha") or "")
+
+
+def _memory_message(doc: dict[str, Any]) -> str | None:
+    """Why this CLOSURE release has no conformant reconciliation record, or ``None``."""
+    stamp = str((doc.get("implemented") or {}).get("ts") or "")
+    entries = [
+        entry
+        for entry in doc.get("log", [])
+        if isinstance(entry, dict)
+        and entry.get("kind") == "memory"
+        and str(entry.get("ts")) > stamp
+    ]
+    if not entries:
+        return (
+            f"release is in CLOSURE with no `kind: memory` log entry stamped after "
+            f"implemented.ts {stamp!r} — the closure reconciled no memory"
+        )
+    latest = entries[-1]
+    missing = [field for field in _MEMORY_FIELDS if field not in latest]
+    if missing:
+        return (
+            f"the latest `kind: memory` log entry lacks {', '.join(missing)} — a prose note "
+            "names no window and dispositions no atom"
+        )
+    start = memory_window_start({**doc, "log": doc["log"][: doc["log"].index(latest)]})
+    if str(latest["since"]) != start:
+        return (
+            f"the latest `kind: memory` log entry opens at {latest['since']!r}, not at the "
+            f"ledger-derived start {start!r} — the window was chosen, not derived"
+        )
+    return None

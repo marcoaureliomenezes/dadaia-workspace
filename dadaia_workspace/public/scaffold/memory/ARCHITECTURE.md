@@ -1,45 +1,45 @@
 ---
 slug: ARCHITECTURE
-title: Arquitetura
-tldr: Visão geral das camadas, dependências e fluxos de dados do sistema.
-summary: Documenta as camadas de responsabilidade, regras de dependência e os principais fluxos de dados. Referência estrutural para decisões de design e integração.
+title: Architecture
+tldr: Overview of the system's layers, dependencies and data flows.
+summary: Documents the layers of responsibility, the dependency rules and the main data flows. The structural reference for design and integration decisions.
 tags:
   - architecture
   - layers
   - design
 ---
 
-## Visão geral
+## Overview
 
-**Contexto greenfield.** Este contexto ainda não tem arquitetura consolidada: a
-arquitetura NASCE com a primeira release aprovada. Enquanto este atom estiver neste
-estado, o SPEC da release vigente é a referência estrutural fundadora — ele deve
-propor o layout inicial de módulos, e revisores avaliam o SPEC pela coerência interna
-e pelos critérios observáveis que ele mesmo define (nunca rejeitar por "memória de
-arquitetura vazia": este é o estado legítimo de um contexto novo). No CLOSURE da
-release fundadora, este atom é atualizado com a arquitetura realmente implementada.
+**Greenfield context.** This context has no consolidated architecture yet: the architecture
+is BORN with the first approved release. While this atom sits in that state, the current
+release's SPEC is the founding structural reference — it must propose the initial module
+layout, and reviewers judge the SPEC by its internal coherence and the observable criteria
+it defines (never reject it for "empty architecture memory": that is the legitimate state
+of a new context). At the founding release's CLOSURE, this atom is updated with the
+architecture actually implemented.
 
-## Camadas
+## Layers
 
-| Camada | Responsabilidade |
-|--------|-----------------|
-| (a definir na release fundadora) | O SPEC vigente propõe o layout inicial; o CLOSURE o registra aqui. |
+| Layer | Responsibility |
+|-------|----------------|
+| (to be defined by the founding release) | The current SPEC proposes the initial layout; CLOSURE records it here. |
 
-## Regras de dependência
+## Dependency rules
 
 ```mermaid
 graph TD
-  A[Release fundadora define as regras]
+  A[The founding release defines the rules]
 ```
 
-## Contratos entre módulos
+## Contracts between modules
 
-Sem contratos consolidados ainda — os contratos da release fundadora valem como base e
-são registrados aqui no CLOSURE.
+No consolidated contract yet — the founding release's contracts stand as the baseline and
+are recorded here at CLOSURE.
 
-## Estado runtime
+## Runtime state
 
-Nenhum estado runtime registrado.
+No runtime state registered.
 
 <!-- dadaia:fixed slop-code -->
 <!-- /dadaia:fixed slop-code -->

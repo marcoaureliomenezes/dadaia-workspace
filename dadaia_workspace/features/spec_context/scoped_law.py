@@ -14,9 +14,7 @@ __all__ = ["install_scoped_law"]
 
 _ROWS: tuple[tuple[str, str], ...] = (
     ("repo-AGENTS.md", "AGENTS.md"),
-    ("repo-CLAUDE.md", "CLAUDE.md"),
     ("tests-AGENTS.md", "tests/AGENTS.md"),
-    ("tests-CLAUDE.md", "tests/CLAUDE.md"),
 )
 _CREATE_FLAGS = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0)
 

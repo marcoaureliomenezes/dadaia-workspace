@@ -1,29 +1,24 @@
-"""Release validator (v0.1.55 FR1): the active release, its artifacts, SemVer + ledger
-invariants.
+"""Release validator: the active release, its artifacts, SemVer + ledger invariants.
 
-Single-responsibility sibling of the SpecsDoctor coordinator. Owns the active-release lifecycle
-checks (SPEC-DOC-003/004/005/009), the release ledger
-invariants (phase↔markers SPEC-DOC-024, unique ids SPEC-DOC-026, naming canon SPEC-DOC-027),
-and the partial-archive residue invariant (SPEC-DOC-039, v0.1.81 FR2), plus the family-local
-status/created-date extractors. Leaf-only: imports the shared leaves + core, never a sibling
-validator.
+Single-responsibility sibling of the SpecsDoctor coordinator. Owns the active-release
+lifecycle checks (SPEC-DOC-003/004/005/009), the release ledger invariants (phase<->markers
+SPEC-DOC-024, unique ids SPEC-DOC-026, naming canon SPEC-DOC-027), plus the family-local
+status/created-date extractors.
+Leaf-only: imports the shared leaves + core, never a sibling validator.
 
-v0.5.x (successor to the RELEASE.jsonl fold; v0.5.0 FR4/T-050-21A): ``ACTIVE.md`` is
-retired — the active release and its phase are read directly
-off ``RELEASE.json`` (see :func:`resolve_active_release`). No fallback branch
-survives; a workspace with zero live release directories resolves cleanly to "no
-active release", the same as the old scaffold default did.
+The active release and its phase are read directly off ``RELEASE.json``
+(:func:`resolve_active_release`) — no fallback branch: a workspace with zero live release
+directories resolves cleanly to "no active release".
 """
 
 from __future__ import annotations
 
+import json
 import re
-import tomllib
-from collections.abc import Collection
+from collections.abc import Callable, Collection
 from datetime import date
 from pathlib import Path
 
-from dadaia_workspace.core.handoff_index import discover_handoff_paths
 from dadaia_workspace.core.release_state import (
     LEGACY_RELEASE_STATE_FILENAME,
     RELEASE_STATE_FILENAME,
@@ -32,9 +27,7 @@ from dadaia_workspace.core.release_state import PHASES as _PHASES
 from dadaia_workspace.core.spec_status import APPROVED, extract_status
 from dadaia_workspace.core.spec_status import CANONICAL_STATUS as _CANONICAL_STATUS
 from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
-from dadaia_workspace.features.specs.canon import verdict_violations
 from dadaia_workspace.features.specs.doctor_common import (
-    RELEASE_ARTIFACTS,
     _read_and_parse_release_json,
     iter_all_release_dirs,
     resolve_live_release_id,
@@ -48,63 +41,32 @@ CANONICAL_STATUS = _CANONICAL_STATUS
 CANONICAL_PHASES = _PHASES
 PLAN_MAX_LINES = 300
 
-# Release-id canon cutoff (D3): a live release whose SPEC.md Created: is on/after
-# this date must carry a canon-conformant directory name (SPEC-DOC-027).
-# Vintage releases (Created: <= 2026-06-04) are excluded — this grandfathers the frozen
-# pre-June-5 _archive sub-patch releases (v0.1.4.1..v0.1.4.6, ctx-inject-v2-drift-fix-v1)
-# that predate the SemVer-folder mandate's rollout; the rule keeps hard-enforcing for
-# every release created after the cutoff (v0.1.44 onward). See specs/bugs/
-# specs-doctor-errors-on-frozen-nonsemver-archives.md (v0.1.45).
-# RELEASE_SEMVER_RE is the shared canon (core.specs_version), imported above — v0.1.53 FR3
-# centralised the pattern; the module-level name is preserved for the call sites below.
+# Release-id canon cutoff: a live release whose SPEC.md Created: is on/after this date
+# must carry a canon-conformant directory name (SPEC-DOC-027). Vintage releases are
+# excluded — this grandfathers the frozen pre-cutoff archived releases.
 RELEASE_SEMVER_CUTOFF = date(2026, 6, 1)  # WARNING starts here
-
-# SPEC-DOC-027 (ADR-9, v0.1.11): permanent documented allowlist of legacy ``_archive``
-# release-dir names that predate the SemVer naming canon. These are FROZEN HISTORY:
-# renaming an archived dir would break historical pointers and is pure churn, so the
-# honest permanent record is this enumerated allowlist (rationale: ADR-9). The doctor
-# stays silent for exactly these names *only inside _archive/releases/* — they never
-# silence a non-canon dir in the LIVE releases/ tree, and any name NOT in this set
-# still WARNs, so forward enforcement for new/unrecognised legacy dirs is intact.
-#   - ``ctx-inject-v2-drift-fix-v1`` / ``memory-markdown-source-v1``: pre-canon
-#     descriptive-slug releases (the slug-naming era before SemVer dirs).
-#   - ``v0.1.4.1``..``v0.1.4.6`` + ``v0.1.4.3-report-retention``: the v0.1.4.x hotfix
-#     family, four-segment + suffixed names that predate the three-segment canon.
-RELEASE_NAMING_LEGACY_ALLOWLIST: frozenset[str] = frozenset(
-    {
-        "ctx-inject-v2-drift-fix-v1",
-        "memory-markdown-source-v1",
-        "v0.1.4.1",
-        "v0.1.4.2",
-        "v0.1.4.3",
-        "v0.1.4.3-report-retention",
-        "v0.1.4.4",
-        "v0.1.4.5",
-        "v0.1.4.6",
-    }
-)
 
 # SPEC-DOC-024: phase ↔ markers coherence.
 _TASK_MARKER_RE = re.compile(r"^\s*[-*]?\s*\[([ \-xX])\]", re.MULTILINE)
 # SPEC-DOC-047: a task block runs from its marker line to the next marker line; a
-# ``Write set:`` naming ``specs/memory`` inside it schedules memory as implementation work.
+# ``Write set:`` naming the ``specs/memory`` tree inside it schedules memory as
+# implementation work. Both patterns are anchored: the block indent is HORIZONTAL space
+# only (``\s`` spans newlines, so a block matched from the blank line above it reported
+# an empty task id), and the path ends on a word boundary, so the source file
+# ``features/specs/memory_lint.py`` is not the memory tree.
 _TASK_BLOCK_RE = re.compile(
-    r"^\s*[-*]?\s*\[[ \-xX]\][^\n]*(?:\n(?![-*]?\s*\[[ \-xX]\])[^\n]*)*", re.MULTILINE
+    r"^[ \t]*[-*]?[ \t]*\[[ \-xX]\][^\n]*(?:\n(?![ \t]*[-*]?[ \t]*\[[ \-xX]\])[^\n]*)*",
+    re.MULTILINE,
 )
-_MEMORY_WRITE_SET_RE = re.compile(r"Write set:[^\n]*specs/memory")
+_MEMORY_WRITE_SET_RE = re.compile(r"Write set:[^\n]*\bspecs/memory\b")
 
 
 def read_release_phase(specs_dir: Path, release_id: str) -> str | None:
     """The narrow ``RELEASE.json`` phase reader, given an ALREADY-KNOWN ``release_id``
-    (v0.5.x, successor to the RELEASE.jsonl fold; v0.5.0 FR4/T-050-11) — a thin
-    wrapper over :func:`doctor_common._read_and_parse_release_json`, the ONE
-    tri-state disk read (S1 FR23 amendment A6); it does not re-implement that read.
-    The hook's own read is deleted until T-050-21A actually needs the phase DECISION
-    value, and the container's uncalled seam is deleted with it — the hook instead
-    reads directly through ``core.release_state`` (its own light, hot-path exception;
-    importing this module's ``features.specs`` package pulls in the entire
-    ``SpecsDoctor`` decomposition, the exact heavy-import cost the container was
-    avoided for).
+    — a thin wrapper over :func:`doctor_common._read_and_parse_release_json`, the ONE
+    tri-state disk read; it does not re-implement it. The hook reads directly through
+    ``core.release_state`` instead, so a one-shot process never pays for importing the
+    whole ``SpecsDoctor`` decomposition.
 
     ``str`` when the document's ``phase`` field is readable (possibly ``""`` when it
     carries an empty phase value), ``""`` when
@@ -125,6 +87,42 @@ def _extract_status(md_path: Path) -> str | None:
     if not md_path.exists():
         return None
     return extract_status(md_path.read_text(encoding="utf-8"))
+
+
+_ORIGIN_RE = re.compile(r"^\*\*Origin:\*\*\s*(.+?)\s*$", re.MULTILINE)
+_OPERATOR_DEMAND = "operator-demand"
+_ORIGIN_VOCABULARY = f"{_OPERATOR_DEMAND} | backlog:<id>[,..] | bugs:<id>[,..]"
+
+
+def _json_records(path: Path) -> list[dict[str, object]]:
+    """Every JSON object in *path*, read as a document or as one object per line."""
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8")
+    lines = [text] if path.suffix == ".json" else text.splitlines()
+    records: list[dict[str, object]] = []
+    for line in lines:
+        if not line.strip():
+            continue
+        try:
+            parsed = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            records.append(parsed)
+    return records
+
+
+def _known_backlog_ids(specs_dir: Path) -> frozenset[str]:
+    """Every backlog id a SPEC may cite: the live entries plus the archived histo."""
+    backlog = specs_dir / "backlog"
+    document = _json_records(backlog / "BACKLOG.json")
+    active = document[0].get("active", []) if document else []
+    entries: list[object] = list(active) if isinstance(active, list) else []
+    entries += _json_records(backlog / "_archive" / "backlog_histo.jsonl")
+    return frozenset(
+        str(e["id"]) for e in entries if isinstance(e, dict) and e.get("id") is not None
+    )
 
 
 def _extract_created_date(md_path: Path) -> date | None:
@@ -205,6 +203,65 @@ class ReleaseValidator:
                 )
         return issues
 
+    def check_spec_origin(
+        self, known_bug_ids: Callable[[], Collection[str]]
+    ) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-048: the live SPEC and every candidate SPEC archived under it name
+        where the work came from — the header is the flow's only machine-read input.
+        Releases under ``_archive/`` are frozen history and out of scope.
+
+        ``known_bug_ids`` is read lazily: a tree citing no bug never touches the bug
+        ledger, so this rule borrows the governance family's ONE bug reader without
+        forcing its store on every construction site.
+        """
+        release = self.tree.active_release.release
+        if not release:
+            return []
+        rdir = self.specs_dir / "releases" / release
+        issues: list[SpecsDoctorIssue] = []
+        for path in (rdir / "SPEC.md", *sorted(rdir.glob("rc-*/SPEC.md"))):
+            if not path.exists():
+                continue
+            problem = self._origin_problem(path, known_bug_ids)
+            if problem:
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SPEC-DOC-048",
+                        severity=Severity.ERROR,
+                        description=f"{path.relative_to(self.specs_dir)} {problem}",
+                        path=str(path),
+                    )
+                )
+        return issues
+
+    def _origin_problem(self, path: Path, known_bug_ids: Callable[[], Collection[str]]) -> str:
+        """One SPEC header judged — presence, vocabulary, then the cited ids; "" is clean."""
+        match = _ORIGIN_RE.search(path.read_text(encoding="utf-8"))
+        if match is None:
+            return f"has no `**Origin:**` line — every live and candidate SPEC declares its origin ({_ORIGIN_VOCABULARY})"
+        value = match.group(1)
+        if value == _OPERATOR_DEMAND:
+            return ""
+        kind, _, rest = value.partition(":")
+        cited = [i.strip() for i in rest.split(",") if i.strip()]
+        if kind == "backlog" and cited:
+            unknown = [i for i in cited if i not in _known_backlog_ids(self.specs_dir)]
+            return (
+                f"Origin cites backlog {', '.join(unknown)} — no such entry in "
+                "backlog/BACKLOG.json or backlog/_archive/backlog_histo.jsonl"
+                if unknown
+                else ""
+            )
+        if kind == "bugs" and cited:
+            known = set(known_bug_ids())
+            unknown = [i for i in cited if i not in known]
+            return (
+                f"Origin cites bugs {', '.join(unknown)} — no such record in bugs/BUGS.jsonl"
+                if unknown
+                else ""
+            )
+        return f"Origin {value!r} is not canonical. Valid: {_ORIGIN_VOCABULARY}"
+
     def check_active_release_artifacts(self) -> list[SpecsDoctorIssue]:
         issues: list[SpecsDoctorIssue] = []
         active = self.tree.active_release
@@ -247,17 +304,17 @@ class ReleaseValidator:
                     )
                 )
             elif status != APPROVED and phase in ("IMPLEMENTATION", "CLOSURE"):
-                # Bug fresh-release-scaffold-emits-spec-doctor-warnings-042: Draft/Em
-                # revisão IS the legitimate state of a DEFINITION-phase release — the
+                # Bug fresh-release-scaffold-emits-spec-doctor-warnings-042: Draft/In
+                # review IS the legitimate state of a DEFINITION-phase release — the
                 # scaffolder emits exactly that. Only implementation-bound phases
-                # expect Aprovado artifacts.
+                # expect approved artifacts.
                 issues.append(
                     SpecsDoctorIssue(
                         code="SPEC-DOC-004",
                         severity=Severity.WARNING,
                         description=(
                             f"{fname} is '{status}' but the active release phase is "
-                            f"'{phase}'; expected 'Aprovado' for implementation-bound "
+                            f"'{phase}'; expected '{APPROVED}' for implementation-bound "
                             "phases"
                         ),
                         path=str(fpath),
@@ -294,7 +351,7 @@ class ReleaseValidator:
         return [m.group(1).lower() for m in _TASK_MARKER_RE.finditer(text)]
 
     def check_no_memory_task(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-047: memory is closure procedure, never a task. DADAIA.md §6.4 lets
+        """SPEC-DOC-047: memory is closure procedure, never a task. ``specs/memory/AGENTS.md`` lets
         ``specs/memory/**`` be written only in DEFINITION/CLOSURE (the gate's RULE A
         reads no SDD artifact), and §6.7 orders memory update -> closure narrative ->
         gate AFTER the last task; SPEC-DOC-024 refuses CLOSURE with an open task. A
@@ -322,7 +379,7 @@ class ReleaseValidator:
                     description=(
                         f"TASKS.md of release '{active.release}' schedules memory as a "
                         f"task ({task_line[:80]}): its write set names specs/memory. "
-                        "Memory update is closure procedure (RC-FLOW step 5, DADAIA.md "
+                        "Memory update is closure procedure (RC-FLOW step 5, "
                         "§6.7) run in CLOSURE after the last task — drop the task and "
                         "keep the memory work in the closure steps."
                     ),
@@ -340,7 +397,7 @@ class ReleaseValidator:
         - phase ∈ {SPEC, DEFINITION}: the active TASKS must NOT already be an
           ``[x]``-majority (work claimed complete before implementation began —
           the live audit incident where phase=SPEC but 19/19 tasks were ``[x]``).
-        - phase == IMPLEMENTATION: TASKS.md must exist and carry ``**Status:** Aprovado``.
+        - phase == IMPLEMENTATION: TASKS.md must exist and carry ``**Status:** Approved``.
         - phase == CLOSURE: every non-CLOSURE task must be ``[x]`` (no ``[ ]``/``[-]``).
         Other phases are not constrained here.
         """
@@ -396,7 +453,7 @@ class ReleaseValidator:
                         severity=Severity.ERROR,
                         description=(
                             f"Active release phase='IMPLEMENTATION' but TASKS.md of "
-                            f"release '{release}' is not '**Status:** Aprovado' "
+                            f"release '{release}' is not '**Status:** {APPROVED}' "
                             f"(found '{_extract_status(tasks)}'). Implementation phase "
                             "requires an approved TASKS.md (constitution §7)."
                         ),
@@ -423,38 +480,26 @@ class ReleaseValidator:
 
     def check_unique_release_ids(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-026: release ids (dir basenames) must be unique across
-        ``releases/`` ∪ ``_archive/releases/`` (recursive).
-
-        A collision among two real (non-legacy) dirs is an ERROR. A collision that
-        involves a documented-legacy nested dir (``v0.2.0/v0.1.9`` milestone layout)
-        is a WARNING — these are slated for rename in T-010-15 and must not break
-        doctor exit-0 in the meantime.
+        ``releases/`` ∪ ``releases/_archive/`` (recursive). A collision is an ERROR.
         """
         issues: list[SpecsDoctorIssue] = []
-        by_name: dict[str, list[tuple[Path, bool]]] = {}
-        for d, _root, is_legacy in iter_all_release_dirs(self.specs_dir):
-            by_name.setdefault(d.name, []).append((d, is_legacy))
+        by_name: dict[str, list[Path]] = {}
+        for d, _root in iter_all_release_dirs(self.specs_dir):
+            by_name.setdefault(d.name, []).append(d)
 
         for name, entries in sorted(by_name.items()):
             if len(entries) < 2:
                 continue
-            any_legacy = any(is_legacy for _d, is_legacy in entries)
-            severity = Severity.WARNING if any_legacy else Severity.ERROR
-            paths = ", ".join(d.relative_to(self.specs_dir).as_posix() for d, _ in sorted(entries))
-            note = (
-                " (documented-legacy nested dir — slated for rename in T-010-15)"
-                if any_legacy
-                else ""
-            )
+            paths = ", ".join(d.relative_to(self.specs_dir).as_posix() for d in sorted(entries))
             issues.append(
                 SpecsDoctorIssue(
                     code="SPEC-DOC-026",
-                    severity=severity,
+                    severity=Severity.ERROR,
                     description=(
                         f"Release id '{name}' is not unique across releases/ + "
-                        f"_archive/releases/: {paths}{note}."
+                        f"releases/_archive/: {paths}."
                     ),
-                    path=str(self.specs_dir / "_archive" / "releases"),
+                    path=str(self.specs_dir / "releases"),
                 )
             )
         return issues
@@ -468,29 +513,26 @@ class ReleaseValidator:
         - A non-conforming dir in the live ``releases/`` tree whose SPEC.md
           ``Created:`` date is on/after the canon cutoff (``RELEASE_SEMVER_CUTOFF``)
           is an ERROR — a release born after the canon must be SemVer-clean.
-        - Every other non-conforming dir (archive, pre-cutoff ``Created:``, or an
-          undeterminable date) is a WARNING — legacy names predate the canon and are
-          preserved until renamed.
+        - A non-conforming LIVE dir with a pre-cutoff or undeterminable ``Created:``
+          date is a WARNING — a legacy name predates the canon and is preserved until
+          renamed.
 
-        ADR-9 (v0.1.11): archived dirs whose name is in the permanent documented
-        ``RELEASE_NAMING_LEGACY_ALLOWLIST`` are silenced entirely — they are frozen
-        history that is never renamed. The allowlist is name-exact and ``_archive``-only,
-        so any unrecognised legacy dir still WARNs and forward enforcement holds.
+        The archive is not this rule's unit (0.4.7 c8 review MEDIUM-2). ADR-9's
+        rationale is that frozen history is never renamed — renaming an archived dir
+        breaks every historical pointer into it — so an archived name is scored once, by
+        the canon (TREE-8), and a second opinion here only multiplied one fact into
+        several findings (ledger precedent
+        ``doctor-016-errors-archived-legacy-release-027-tolerates``).
         """
         issues: list[SpecsDoctorIssue] = []
-        for d, root, _is_legacy in iter_all_release_dirs(self.specs_dir):
-            if RELEASE_SEMVER_RE.match(d.name):
-                continue
-            is_live = root == self.specs_dir / "releases"
-            # ADR-9: archived dirs on the permanent legacy allowlist are silent (frozen
-            # history, never renamed). The allowlist applies ONLY to _archive/ — a
-            # non-canon dir in the live releases/ tree is never silenced this way.
-            if not is_live and d.name in RELEASE_NAMING_LEGACY_ALLOWLIST:
+        live_root = self.specs_dir / "releases"
+        for d, root in iter_all_release_dirs(self.specs_dir):
+            if root != live_root or RELEASE_SEMVER_RE.match(d.name):
                 continue
             spec_path = d / "SPEC.md"
             created = _extract_created_date(spec_path) if spec_path.exists() else None
             born_after_canon = created is not None and created >= RELEASE_SEMVER_CUTOFF
-            severity = Severity.ERROR if (is_live and born_after_canon) else Severity.WARNING
+            severity = Severity.ERROR if born_after_canon else Severity.WARNING
             issues.append(
                 SpecsDoctorIssue(
                     code="SPEC-DOC-027",
@@ -508,105 +550,6 @@ class ReleaseValidator:
                 )
             )
         return issues
-
-    def check_partial_archived_release_dirs(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-039 (v0.1.81 FR2): WARN on a ``specs/_archive/releases/<id>/`` dir
-        that carries NONE of :data:`~dadaia_workspace.features.specs.doctor_common.
-        RELEASE_ARTIFACTS` (SPEC.md/PLAN.md/TASKS.md — ``CLOSURE.md`` dropped at v0.5.0
-        T-050-25A, A4.4: it retired as a going-forward artifact, so its bare presence is
-        no longer release-dir evidence) — directly, or nested under any of its
-        subdirectories (a segmented layout, e.g. ``<id>/alpha-1/``, ``<id>/rc-1/``, is a
-        legitimate archived-release shape whose artifacts live one level down).
-
-        Such a dir is residue masquerading as an archived release — the v0.1.41
-        precedent held only ``GRILL.md`` + ``OQ-DECISIONS.md`` and sat undetected until
-        the 2026-07-06 audit (audit G-23). The check honors the SPEC-DOC-027 permanent
-        legacy-name allowlist (ADR-9: frozen history, never flagged by name alone) and
-        only inspects ``_archive/releases/`` — the live ``releases/`` tree is untouched
-        (an active release under construction legitimately lacks a real artifact yet,
-        and SPEC-DOC-004/009 already cover it). WARNING severity only: historical trees
-        must never hard-fail doctor over this.
-        """
-        issues: list[SpecsDoctorIssue] = []
-        arch_root = self.specs_dir / "_archive" / "releases"
-        if not arch_root.is_dir():
-            return issues
-        for entry in sorted(p for p in arch_root.iterdir() if p.is_dir()):
-            if entry.name in RELEASE_NAMING_LEGACY_ALLOWLIST:
-                continue
-            if any((entry / artifact).exists() for artifact in RELEASE_ARTIFACTS):
-                continue
-            # Tolerate segmented layouts: any artifact anywhere under the dir (e.g. a
-            # nested alpha-N/rc-N segment subdir) counts as "this archived release has
-            # its artifacts" even though the parent dir carries none directly.
-            if any(next(entry.rglob(artifact), None) is not None for artifact in RELEASE_ARTIFACTS):
-                continue
-            issues.append(
-                SpecsDoctorIssue(
-                    code="SPEC-DOC-039",
-                    severity=Severity.WARNING,
-                    description=(
-                        f"_archive/releases/{entry.name} carries none of "
-                        "SPEC.md/PLAN.md/TASKS.md (directly or in any segment "
-                        "subdir) — residue masquerading as an archived release "
-                        "(the v0.1.41 precedent). Relocate it to "
-                        f"specs/_archive/wip-abandoned/{entry.name}/ with a README "
-                        "breadcrumb explaining why it was abandoned. SPEC-DOC-039, "
-                        "WARNING."
-                    ),
-                    path=str(entry),
-                )
-            )
-        return issues
-
-    def check_stale_verdicts(self, *, live_shas: Collection[str] | None) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-044 (v0.5.0 specs-canon closure, operator ruling 2026-08-28): a
-        verdict under ``releases/<id>/verdicts/`` naming a sha outside the LIVE set —
-        branch HEAD, HEAD's first parent, the integration branch tip (the ship shape,
-        DADAIA.md §4.2) — is stale — ERROR, ``--fix`` deletes.
-
-        Uses :func:`~dadaia_workspace.features.specs.canon.verdict_violations` over
-        *live_shas* — the SAME predicate and the SAME set
-        (``features.chokepoints.verdict.live_verdict_shas``) the pre-push gate uses —
-        never a second, hand-kept rule. *live_shas* is resolved ONCE by the CLI
-        composition root and passed in as plain data; this validator stays zero-I/O.
-        ``None`` (no git context available) is a silent no-op — this check genuinely
-        cannot evaluate without a resolved head, so it stays silent rather than
-        guessing (mirrors the constitution file-ref check's own optional-``repo_root``
-        shape).
-        """
-        if live_shas is None:
-            return []
-        verdict_paths = discover_handoff_paths(self.specs_dir, "releases/*/verdicts/*.handoff.json")
-        if not verdict_paths:
-            return []
-        rel_paths = [p.relative_to(self.specs_dir).as_posix() for p in verdict_paths]
-        stale_rels = verdict_violations(rel_paths, live_shas)
-        live_display = ", ".join(sha[:12] for sha in live_shas)
-        issues: list[SpecsDoctorIssue] = []
-        for rel in stale_rels:
-            issues.append(
-                SpecsDoctorIssue(
-                    code="SPEC-DOC-044",
-                    severity=Severity.ERROR,
-                    description=(
-                        f"specs/{rel} is a stale verdict — its sha is none of the live "
-                        f"shas (head, first parent, develop tip: {live_display}), or a "
-                        "second file for one of them. A consumed-or-stale verdict never "
-                        "stays on disk (SPEC-DOC-044). Auto-fix available (run "
-                        "doctor --fix) to delete it."
-                    ),
-                    path=str(self.specs_dir / rel),
-                    fixable=True,
-                )
-            )
-        return issues
-
-    def fix_stale_verdict(self, issue: SpecsDoctorIssue) -> None:
-        """Delete a stale verdict file (SPEC-DOC-044 auto-fix)."""
-        assert issue.code == "SPEC-DOC-044"
-        target = Path(issue.path)  # type: ignore[arg-type]
-        target.unlink(missing_ok=True)
 
     def check_release_state_filename(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-046 (release 0.4.6 FR3, ADR 0007): the live release's state
@@ -642,31 +585,3 @@ class ReleaseValidator:
         legacy = Path(issue.path)  # type: ignore[arg-type]
         if legacy.is_file():
             legacy.rename(legacy.with_name(RELEASE_STATE_FILENAME))
-
-    def check_pyproject_version_matches_release(
-        self, repo_root: Path | None
-    ) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-045 (bug release-shipped-without-a-pyproject-version-bump):
-        pyproject.toml's [tool.poetry].version must equal the release id once the
-        active release reaches CLOSURE/ARCHIVED — read directly off disk, never
-        installed-package metadata. Silent absent repo_root/pyproject.toml/release.
-        """
-        if repo_root is None or not (pyproject_path := repo_root / "pyproject.toml").is_file():
-            return []
-        active = self.tree.active_release
-        release, phase, err = active.release, active.phase, active.error
-        if err or not release or phase not in {"CLOSURE", "ARCHIVED"}:
-            return []
-        try:
-            data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
-        except (tomllib.TOMLDecodeError, OSError):
-            return []
-        version = data.get("tool", {}).get("poetry", {}).get("version", "")
-        if not version or version == release:
-            return []
-        description = (
-            f"Active release '{release}' is phase '{phase}' but pyproject.toml mints "
-            f"'{version}' — bump [tool.poetry].version to the release id (SPEC-DOC-045)."
-        )
-        issue = SpecsDoctorIssue("SPEC-DOC-045", Severity.ERROR, description, str(pyproject_path))
-        return [issue]

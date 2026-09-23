@@ -5,13 +5,13 @@ description: >
   demotion at closure, evidence-gated deletion, flake quarantine, artifact hygiene.
   Use when writing or reviewing a test, closing a release or task, handling a flaky
   test, or judging a deletion candidate.
+compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install dadaia-workspace) it also drives the SDD lifecycle — specs, backlog, bugs, releases.
 ---
 
 # dd-test-stewardship
 
-> The law (`DADAIA.md` §7) states five points once; this skill is where they operate.
-> Numeric values live in [`PARAMETERS.md`](PARAMETERS.md) — this workspace's declared
-> defaults, re-parameterized per consumer.
+> The test-lifecycle law and its mechanics. Numeric values live in
+> [`PARAMETERS.md`](PARAMETERS.md) — re-parameterized per consumer.
 
 ## Intent and admission — writing a new test
 
@@ -46,17 +46,15 @@ description: >
 
 - For every demoted LARGE, yield the `file:line` of the replacement SMALL/MEDIUM
   coverage, or keep it as the seam's single SENTINEL.
-- Record the demotion map in `_RELEASE.json`'s `log`
-  (`dd-release-implementation`).
 
-## Deletion — a qa-engineer verdict, executed by software-engineer
+## Deletion — a reviewer (QA lens) verdict, executed by dd-software-engineer
 
 - Delete only on a decision-table criterion, cited with evidence in the commit:
   feature removed · duplicate coverage · tautology/no-op · reflex snapshot ·
   zero-defect flake history · expired quarantine.
 - A tombstone test dies together with its target — it validates a historical event,
   not live behavior.
-- Pruning to go green is exclusively a `qa-engineer` verdict; the implementer
+- Pruning to go green is exclusively a `dd-code-reviewer` verdict; the implementer
   executes the commit.
 
 ## Flakes and quarantine
@@ -90,4 +88,3 @@ description: >
 - [`PARAMETERS.md`](PARAMETERS.md) — LARGE cap, flake ceiling, quarantine
   cap/escalation, timeouts, wall-clock budget, mutation cadence.
 - `dd-audit-project` — detection-quality scoring for drift audits.
-- `DADAIA.md` §5 — artifact retention and repo cleanliness; §7 — the five-point law.

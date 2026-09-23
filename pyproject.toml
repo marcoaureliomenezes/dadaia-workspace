@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dadaia-workspace"
-version = "0.4.7"
+version = "0.4.6"
 description = "A local-first, spec-driven workspace that gives AI agents current context, a document-governed lifecycle, visible concurrency and anti-slop boundaries."
 authors = ["Marco Menezes <marcoaureliomenezes@users.noreply.github.com>"]
 readme = "README.md"
@@ -36,22 +36,21 @@ classifiers = [
 [tool.poetry.urls]
 Homepage = "https://pypi.org/project/dadaia-workspace/"
 Repository = "https://github.com/marcoaureliomenezes/dadaia-workspace"
-Documentation = "https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/getting-started.md"
+Documentation = "https://marcoaureliomenezes.github.io/dadaia-workspace/"
 Changelog = "https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/CHANGELOG.md"
 Issues = "https://github.com/marcoaureliomenezes/dadaia-workspace/issues"
 
 [tool.poetry.scripts]
 dadaia = "dadaia_workspace.cli.main:_safe_app"
+dadaia-workspace = "dadaia_workspace.cli.main:_safe_app"
 
 [tool.poetry.dependencies]
 python = "^3.12"
 typer = ">=0.27.1"
 rich = ">=13,<16"
-openpyxl = "^3.1"
 pyyaml = "^6.0"
 jinja2 = "^3.1"
 jsonschema = "^4"
-mistune = ">=3.0,<4.0"
 
 # Optional runtime extra — the Claude Agent SDK enables live Claude execution via
 # ClaudeSdkAdapter. It is NOT a base dependency: the offline-first build and lockfile
@@ -70,6 +69,9 @@ mypy = ">=2.3.0,<3.0"
 types-PyYAML = ">=6"
 pytest-randomly = "^4.1.0"
 import-linter = ">=2.11"
+# The declared build backend, so the bootstrap e2e can `pip wheel --no-build-isolation`
+# the checkout offline in any environment that ran `poetry install --with dev` (CI included).
+poetry-core = ">=1.9"
 
 # Dev/build tooling CVE floors (security audit F-6, sec-reviewer 2026-06-10;
 # re-verified T-011-17 / residual R9, 2026-06-10).
@@ -132,9 +134,8 @@ target-version = "py312"
 # capture (`.dadaia/tmp/software-engineer/20260817/v0.4.3-T-043-29-v6-complexity-maxima.md`),
 # over the same scope this repo's `ruff check .` gate already covers (production +
 # tests + scripts) — never a smaller, aspirational number. The worst offender at
-# measurement time was `dadaia_workspace/features/panel/handler.py:make_handler_class`
-# (complexity 63) and `dadaia_workspace/features/telemetry/reader/allowlist.py` (nesting
-# depth 6); both already sit inside `dadaia_workspace/`, so no tests-only per-file-ignore
+# measurement time was `dadaia_workspace/features/telemetry/reader/allowlist.py` (nesting
+# depth 6); it already sits inside `dadaia_workspace/`, so no tests-only per-file-ignore
 # was needed to keep `ruff check` green at HEAD by construction (A21.2).
 #
 # RATCHET DIRECTION — read before touching either ceiling below:
@@ -199,8 +200,6 @@ max-nested-blocks = 6
 "dadaia_workspace/cli/commands/*.py" = ["B904"]
 "dadaia_workspace/cli/commands/repos.py" = ["SIM118"]
 # Test files that place pytestmark before platform-gated imports (E402 is intentional).
-"tests/unit/infrastructure/test_telemetry_lock_posix.py" = ["E402", "I001"]
-"tests/unit/infrastructure/test_telemetry_lock_windows.py" = ["E402", "I001"]
 
 # Bug ruff-0-16-2-markdown-python-fence-format-drift: ruff 0.16.2 started reformatting
 # fenced Python code blocks embedded in Markdown by default, which reached 5

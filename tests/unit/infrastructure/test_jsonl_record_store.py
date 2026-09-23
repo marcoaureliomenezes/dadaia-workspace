@@ -72,7 +72,7 @@ def _sample_record(record_id: str, **overrides: object) -> BugRecord:
     base: dict[str, object] = {
         "id": record_id,
         "ts": "2026-08-27T12:00:00Z",
-        "reported_by": "software-engineer",
+        "reported_by": "dd-software-engineer",
         "title": f"title for {record_id}",
         "severity": "MEDIUM",
         "surface": "bugs",

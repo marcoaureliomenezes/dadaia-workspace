@@ -73,7 +73,7 @@ def test_rule_corpus_reachable(tmp_path: pathlib.Path, case: str) -> None:
     if case == "all-reachable-ok":
         _make_codex_agent(
             tmp_path,
-            "software-engineer",
+            "dd-software-engineer",
             "Follow the `workspace-protocol` rule and the `release-governance` rule.",
         )
         _make_rule(tmp_path, "workspace-protocol")
@@ -85,7 +85,7 @@ def test_rule_corpus_reachable(tmp_path: pathlib.Path, case: str) -> None:
     elif case == "unreachable-reports-error":
         _make_codex_agent(
             tmp_path,
-            "software-engineer",
+            "dd-software-engineer",
             "See the `workspace-protocol` rule and the `nonexistent-rule` rule.",
         )
         _make_rule(tmp_path, "workspace-protocol")

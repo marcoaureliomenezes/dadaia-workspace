@@ -14,6 +14,7 @@ Scope: this file governs only `specs/ADRs/`.
 ## 2. Acceptance law (operator-only)
 
 - Any agent may append a record with `status: "proposed"`.
+- One decision per change set, naming every canonical memory statement it creates or changes — never one per statement that merely exists.
 - Only the operator flips `status` to `accepted` (in-place edit, `measured_by` set to a real check).
 - A record born from an operator grill ruling is `accepted` at append, the ruling date in `context`.
 - An agent that writes `status: "accepted"` has violated this law.
@@ -25,10 +26,10 @@ Scope: this file governs only `specs/ADRs/`.
 | Act | Commit | Stages |
 |---|---|---|
 | Propose | `docs(adr): propose <slug>` | the appended `decisions.jsonl` line, alone |
-| Accept | `docs(adr): accept <slug>` | the record's `status`/`measured_by` flip + the paired Part-1 memory hunk, same commit |
+| Accept | `docs(adr): accept <slug>` | the record's `status`/`measured_by` flip + the paired canonical-memory hunk, same commit |
 
 - Never a third shape: rejecting is a `status: "rejected"` edit by the operator, staged alone.
-- Superseding is a new record proposal; once accepted, the superseded record stays in `decisions.jsonl` with `status: superseded` and the successor's `supersedes` naming it.
+- Superseding is a new record proposal; once accepted, the superseded record stays in `decisions.jsonl` with `status: superseded` and the successor's `supersedes` naming it (one id, or comma-separated ids ascending).
 - A superseded record's `id` is never reused, never re-numbered, and its line never moves.
 
 ## 4. Discovery
@@ -39,13 +40,14 @@ Scope: this file governs only `specs/ADRs/`.
 
 ## 5. Relationship to memory and audits
 
-- A Part-1 principle carries `ADR: NNNN (proposed|accepted)` naming the decision record that admitted it.
-- The memory atom points at the ADR, never the reverse.
-- `dd-audit-project`'s pillar 3 (`PILLAR-MEMORY.md`) is the sole mechanical check that a Part-1 hunk and an accept commit pair.
+- A canonical memory statement — one `### P-NN ·` block under `## Principles` in `ARCHITECTURE.md` or `QUALITY.md` — carries `ADR: NNNN (proposed|accepted)` naming the decision record that admitted it.
+- The commit touching a canonical memory statement carries its accepted decision; a pre-canon statement carries `ADR: none` until it is next touched.
+- The memory statement points at the ADR, never the reverse.
+- `dd-audit-project`'s pillar 3 (`PILLAR-MEMORY.md`) is the sole mechanical check that a canonical hunk and an accept commit pair.
 
 ### 5.1 The first-inventory case (bootstrap)
 
-- The pairing law presupposes a Part 1 that already exists — it does not apply to the CREATING commit.
-- A CREATING commit's principles name a `proposed` decision, or the literal `ADR: none` for a pre-canon principle.
+- The pairing law presupposes a `## Principles` section that already exists — it does not apply to the CREATING commit.
+- A CREATING commit's statements name a `proposed` decision, or the literal `ADR: none` for a pre-canon statement.
 - Pillar 3 grades that as an operator finding, never a HIGH drift finding, and never agent-clearable.
 - From the first `docs(adr): accept <slug>` commit onward, the pairing law applies unconditionally.

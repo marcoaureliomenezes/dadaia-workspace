@@ -28,6 +28,12 @@ from dataclasses import dataclass
 #: On-disk schema version of ``install_ledger.json``.
 CURRENT_SCHEMA_VERSION = "1"
 
+#: What a ledgered entry physically is on disk. ``read_bytes()`` follows a symlink, so
+#: the digest alone cannot tell a link from a copy of the same content — the kind is
+#: recorded. A v0.4.6-and-earlier entry carries none and migrates as ``"file"``.
+_KINDS = frozenset({"file", "symlink", "copy"})
+_DEFAULT_KIND = "file"
+
 
 @dataclass(frozen=True)
 class LedgerEntry:
@@ -52,8 +58,14 @@ class LedgerEntry:
     relpath: str
     sha256: str
     family: str
+    #: ``"file"`` (rendered/copied projection), ``"symlink"`` (a relative link into the
+    #: authored ``.agents/`` set — ``sha256`` is then the digest of the LINK TARGET
+    #: string), or ``"copy"`` (that link's platform fallback).
+    kind: str = _DEFAULT_KIND
 
     def __post_init__(self) -> None:
+        if self.kind not in _KINDS:
+            raise ValueError(f"install_ledger: unknown entry kind: {self.kind!r}")
         relpath = self.relpath
         if not relpath:
             raise ValueError("install_ledger: relpath must not be empty")
@@ -109,19 +121,22 @@ class InstallLedger:
             relpath = raw.get("relpath")
             sha256 = raw.get("sha256")
             family = raw.get("family")
+            kind = raw.get("kind", _DEFAULT_KIND)
             if (
                 not isinstance(relpath, str)
                 or not isinstance(sha256, str)
                 or not isinstance(family, str)
+                or not isinstance(kind, str)
             ):
                 raise ValueError("install_ledger: entry fields malformed")
-            entries.append(LedgerEntry(relpath=relpath, sha256=sha256, family=family))
+            entries.append(LedgerEntry(relpath=relpath, sha256=sha256, family=family, kind=kind))
         return cls(schema_version=version, entries=tuple(entries))
 
     def to_dict(self) -> dict[str, object]:
         return {
             "schema_version": self.schema_version,
             "entries": [
-                {"relpath": e.relpath, "sha256": e.sha256, "family": e.family} for e in self.entries
+                {"relpath": e.relpath, "sha256": e.sha256, "family": e.family, "kind": e.kind}
+                for e in self.entries
             ],
         }

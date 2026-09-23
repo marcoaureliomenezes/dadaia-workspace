@@ -12,6 +12,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
@@ -30,7 +31,7 @@ def _init_workspace(workspace: Path) -> None:
     WorkspaceService(
         public_assets=FileSystemPublicAssetManager(),
         python_env=VenvPythonEnvironmentManager(),
-    ).init(workspace)
+    ).init(workspace, harnesses=L1_ENTRY_HARNESSES)
     FileSystemPublicAssetManager().stage(workspace)
 
 
@@ -44,7 +45,7 @@ def _make_valid_handoff(
 
     doc: dict = {
         "schema_version": "handoff-v1",
-        "agent": "software-engineer",
+        "agent": "dd-software-engineer",
         "context": "dadaia-workspace",
         "produced_at": "2026-05-17T00:00:00Z",
         "scope": "dadaia-workspace/test",

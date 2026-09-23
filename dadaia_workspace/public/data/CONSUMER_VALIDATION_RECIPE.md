@@ -3,7 +3,7 @@
 **Contract.** The canonical end-to-end validation matrix a consumer-side agent runs
 against EVERY candidate wheel before deploy. Ships inside the package so recipe and
 version never drift — always read the copy from the INSTALLED candidate. Verdict is
-exactly one of **APROVADA / BLOQUEADA / APROVADA COM EXCEÇÃO EXPLÍCITA**.
+exactly one of **APPROVED / BLOCKED / APPROVED WITH EXPLICIT EXCEPTION**.
 
 ## How to judge each statement (read first)
 
@@ -11,7 +11,7 @@ Each `F-NN` below is one feature with an explicit, binary **PASS assertion**. Ru
 listed commands in the listed setup, capture command+exit+output as evidence, then mark:
 
 - **PASS** — the PASS assertion is objectively true from the captured output.
-- **FAIL** — the assertion is false (a real defect). Register a `dadaia bugs append`.
+- **FAIL** — the assertion is false (a real defect). Register a `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append`.
 - **EXCEPTION** — the assertion cannot run because the validation environment lacks a
   prerequisite the wheel does not own (e.g. no codex binary reachable for a live
   model-reachability check). Record why; an EXCEPTION is NOT a FAIL and does not block
@@ -47,7 +47,7 @@ local wheel when the index cannot resolve the exact version — F-25 asserts tha
 deliberately unset. Destructive statements use
 throwaway dirs under `/tmp` — never the production workspace. Where a statement needs
 an initialized workspace, create it:
-`mkdir -p /tmp/f<NN> && cd /tmp/f<NN> && $D init --harness all`.
+`$D init /tmp/f<NN> --harness claude && cd /tmp/f<NN>`.
 
 ---
 
@@ -78,7 +78,7 @@ an initialized workspace, create it:
   proves the real surface, not just reachability: `capability-contract`,
   `exact-version-reconciliation`, `context-empty-remote-baseline`,
   `context-list-show-json`, `context-bind-heartbeat`, `reports-handoff-validation`,
-  `panel-and-server-registry`, and `context-dead-alive-delete-roundtrip` all PASS with
+  and `context-dead-alive-delete-roundtrip` all PASS with
   "no traceback".
 
 ### F-04 — Doctors
@@ -93,13 +93,13 @@ an initialized workspace, create it:
   slop probe is F-02).
 
 ### F-05 — Projections
-- Run: `$D public stage`; `$D public install --target all`; `$D public doctor`.
+- Run: `$D public stage`; `$D public install`; `$D public doctor`.
 - **PASS if:** stage+install exit 0 and `public doctor` reports every asset `[ok]`
   (no `[drift]`/`[missing]`), exit 0.
 
 ### F-06 — Context lifecycle
 - Setup: a local source repo (`git init --bare /tmp/f06/src.git`).
-- Run: `$D context create alpha --repo alpha --url file:///tmp/f06/src.git`;
+- Run: `$D context create alpha --main-repo alpha --url file:///tmp/f06/src.git`;
   `$D context list --json`; `$D context show alpha --json`; `$D context alive alpha`;
   `$D context dead alpha`.
 - **PASS if:** create→list shows alpha `state:"dead"`; `alive` clones, scaffolds AND
@@ -159,14 +159,14 @@ an initialized workspace, create it:
 - Setup: an in-repo specs tree (`mkdir -p repos/vp && $D specs init --specs-dir
   repos/vp/specs`). `bugs` resolves its specs tree from `--specs-dir` OR a bound context —
   pass `--specs-dir` on EVERY `bugs` call (append AND status), the same way F-04/F-10/F-15
-  do; a `bugs status` with no `--specs-dir` and no bind correctly errors with guidance
+  do; a `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status` with no `--specs-dir` and no bind correctly errors with guidance
   ("Pass --specs-dir or bind a context"), which is expected, not a FAIL.
-- Run the complete append with EVERY required field (`bugs append` has no `--event`
+- Run the complete append with EVERY required field (`python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append` has no `--event`
   flag — one record per bug, appended once, v0.5.0 FR2) —
   `--bug-id valbug --reported-by selfrun --title t --severity LOW
   --surface unknown --component c --context vp --symptom sy --repro rp --expected ex
-  --specs-dir repos/vp/specs`; then `$D bugs status --specs-dir repos/vp/specs`;
-  then an INCOMPLETE append `$D bugs append --bug-id x --specs-dir
+  --specs-dir repos/vp/specs`; then `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status --specs repos/vp/specs`;
+  then an INCOMPLETE append `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append --bug-id x --specs
   repos/vp/specs` (omitting the fields above).
 - **PASS if:** the complete append exits 0 and appears in `bugs status --specs-dir
   repos/vp/specs`; the incomplete one exits non-zero and writes nothing.
@@ -175,7 +175,7 @@ an initialized workspace, create it:
 - Run against the IN-REPO specs tree from F-04: `$D doctor --json --specs-dir
   repos/valproj/specs` (must be valid JSON); plant the malformed item as an `active[]`
   entry directly in `repos/valproj/specs/backlog/BACKLOG.json` (the single source —
-  `dadaia backlog new <slug> --specs-dir repos/valproj/specs` creates the document if it
+  `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --specs repos/valproj/specs` creates the document if it
   does not exist yet; then edit the new entry's `status` to `candidate` and leave it
   with no `intents[]` array), then re-run `$D doctor --specs-dir repos/valproj/specs`:
   the `ledgers` section carries BL-SCHEMA. Assert its exit code directly, not through a
@@ -192,7 +192,7 @@ an initialized workspace, create it:
   `next_handoff:{"agent":"human","context":<ctx>,"expected_artifact_type":"other"}`.
   `self_pull.refs` MUST list the memory atom the agent's role maps to, or the validator
   rejects it — correctly: an agent's handoff has to show it read its own memory. For
-  `agent:"qa-engineer"` that is `specs/memory/QUALITY.md` (context-relative, and
+  `agent:"dd-code-reviewer"` that is `specs/memory/QUALITY.md` (context-relative, and
   it exists in any scaffolded context). A ref like `AGENTS.md` alone is NOT enough
   (bug recipe-f12-minimal-valid-handoff-is-invalid: the earlier wording prescribed exactly
   that, so following the recipe verbatim produced a FAIL against a healthy product).
@@ -201,32 +201,21 @@ an initialized workspace, create it:
 - **PASS if:** the valid file validates (exit 0) and the tampered one is rejected
   (non-zero, names the failure).
 
-### F-13 — Panel
-- Run: `$D panel --no-open --port <p>` in the background; hit the port with an HTTP GET;
-  `$D server list` WHILE the panel is up; then stop the panel. Use whatever HTTP client
-  the env has — `curl -fsS localhost:<p>/`, or, since `curl` is not guaranteed, the always
-  available stdlib: `python -c "import urllib.request as u; print(u.urlopen('http://localhost:<p>/').status)"`.
-- **PASS if:** HTTP 200; `server list` shows port `<p>` registered to `dadaia-panel`
-  while running (the panel self-registers per the dev-server-registry law); and the
-  entry is released after a clean stop. Only if the env cannot bind ANY port at all, mark
-  **EXCEPTION** — a missing `curl` is not an EXCEPTION (use the stdlib client above).
-
 ### F-14 — Server registry
-- Run: `$D server register --port <p> --project val`; `$D server list`; then re-register
-  the SAME port for the SAME project (`--project val`); then register the same port for a
-  DIFFERENT project (`--project other`).
+- Run the `dd-cli-library` registry script: `$S register --port <p> --project val`; `$S list`; then
+  re-register the SAME port for the SAME project; then register the same port for a
+  DIFFERENT project (`--project other`), where `$S` is
+  `python3 .agents/skills/dd-cli-library/scripts/registry.py`.
 - **PASS if:** first register + list round-trip; the same-project re-register is an
-  idempotent no-op (exit 0 — a dev server re-registering its own port on restart must not
-  be refused); and the different-project registration is REFUSED with guidance (non-zero,
-  names the owning project). Assert exit codes directly — do not read them through a pipe,
-  which masks them.
+  idempotent no-op (exit 0); and the different-project registration is REFUSED (exit 1,
+  names the owning project). Assert exit codes directly — do not read them through a pipe.
 
 ### F-15 — Memory & injection
 - Setup: an in-repo scaffolded specs tree `S` (`S=repos/vp/specs`; `mkdir -p repos/vp &&
   $D specs init --specs-dir S`) that is doctor-clean — confirm `$D doctor
   --specs-dir S` reports **0 errors AND 0 warnings**.
 - Run: `$D memory product add <slug> --area <area> --specs-dir S`;
-  `$D memory catalog generate --specs-dir S`; then `$D doctor --specs-dir S` again.
+  `python3 .agents/skills/dd-spec-navigator/scripts/memory.py catalog generate --specs S`; then `$D doctor --specs-dir S` again.
 - **PASS if:** the verbs exist and exit 0; the atom is registered in the catalog; and the
   supported "add a feature" path leaves `dadaia doctor` at **0 errors AND 0 warnings** —
   the atom emitted by `memory product add` must lint clean out of the box (its template
@@ -256,7 +245,7 @@ an initialized workspace, create it:
 ### F-18 — Init / onboarding (bootstrap INTEGRITY, not just exit 0)
 - Run in an empty dir, with fail-fast shell discipline (`set -euo pipefail`, explicit
   `cd` into the target workspace, exit codes asserted directly — never through a pipe):
-  `$D init --harness all` with `DADAIA_BOOTSTRAP_PACKAGE` UNSET for this statement.
+  `$D init ws --harness claude` with `DADAIA_BOOTSTRAP_PACKAGE` UNSET for this statement.
 - **PASS if ALL of:**
   1. exit 0 and `.dadaia/` bootstrapped (venv + projections), `$D doctor` green after;
   2. the captured init output contains NO raw installer error (`ERROR:`/`Traceback`) —
@@ -318,7 +307,7 @@ an initialized workspace, create it:
 - **PASS if:** certification bootstraps its disposable workspace with the EXACT
   installed provider version even though the index does not serve it — the venv
   bootstrap re-packs the running installed distribution as a local wheel
-  (`workspace-init-all-harnesses` and `exact-version-reconciliation` PASS). "pip could
+  (`workspace-init` and `exact-version-reconciliation` PASS). "pip could
   not resolve dadaia-workspace==<candidate>" surfacing to the operator is a FAIL: an
   unpublished candidate is the validation norm and must bootstrap with no env var.
 
@@ -336,14 +325,15 @@ never exercised the live backlog path was false confidence).
 
 ### R-02 — Real-demand backlog is canonical and consumable
 
-- Author a B3/CVM-style real capture item as `project-manager`/`product-engineer` would
-  (`dadaia backlog new <slug>` then fill in its `**Intents:**` block, the single-source
-  ACTIVE subsection — SPEC v0.12.0 FR3, ADR #14), then `dadaia backlog subjects
-  --specs-dir <ctx>/specs`.
-- **PASS if:** every emitted `intents[].ref` resolves against the live registry (no
-  unresolved subjects) AND a release SPEC naming the item under `**Consumes:**` is
-  accepted by `dadaia doctor`, with the declared slug resolving to an `active[]` entry
-  in `specs/backlog/BACKLOG.json`.
+- Author a B3/CVM-style real capture item as `dd-product-engineer` would
+  (`python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug>` then fill in its `**Intents:**` block, the single-source
+  ACTIVE subsection — SPEC v0.12.0 FR3, ADR #14), then `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py subjects
+  --specs <ctx>/specs` — which lists the declared aliases and the bindings the live
+  document already carries, not the derived code/doc/cli anchors.
+- **PASS if:** every emitted `intents[].ref` is accepted by `dadaia doctor` (a ref it
+  cannot resolve is a `BL-SCHEMA` finding naming that ref) AND a release SPEC naming the
+  item under `**Consumes:**` is accepted too, with the declared slug resolving to an
+  `active[]` entry in `specs/backlog/BACKLOG.json`.
 
 ### R-03 — Fresh specs tree is doctor-clean with no manual edits
 
@@ -365,14 +355,14 @@ never exercised the live backlog path was false confidence).
 
 ### R-06 — Bug ledger round-trip
 
-- Register a synthetic bug (`bugs append` with every required field), fix-and-mark
-  it (`resolved` with evidence), and query `bugs status`.
+- Register a synthetic bug (`python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append` with every required field), fix-and-mark
+  it (`resolved` with evidence), and query `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`.
 - **PASS if:** the events validate, stream order stays coherent (reported before
   resolved), and status reflects the resolution.
 
 ### R-08 — Kimi Code harness end to end (v0.2.8 surface)
 
-- Setup: `export KIMI_CODE_HOME=<throwaway>`; `$D init --harness kimi-code` in a
+- Setup: `export KIMI_CODE_HOME=<throwaway>`; `$D init ws --harness kimi-code` in a
   disposable dir.
 - **Binding posture:** kimi-code exposes no session-id env var, so its binding is the
   exported `DADAIA_CONTEXT=<ctx>` at harness launch (the law's rung 1) — `dadaia
@@ -408,16 +398,6 @@ never exercised the live backlog path was false confidence).
   `candidate` status (must block; `idea` stays exempt), and an empty/absent field where
   the checks could be *vacuously* satisfied rather than actually passed.
 
-### R-14 — Live foreign presence is SURFACED on the allowed write
-
-- Bind two sessions in implementation mode on one context; drive a real `pre_gate`
-  MUTATING write payload for each.
-- **PASS if:** the second write is ALLOWED and its hook output visibly carries the
-  throttled `[PRESENCE]` advisory naming the other session (id, runtime, heartbeat
-  age) — in the allow envelope's `systemMessage` and on stderr; a neutral allow with
-  live foreign presence is the bug (pre-gate-drops-live-presence-advisory-042).
-  Repeat writes inside the throttle window stay quiet (at most one advisory).
-
 ### R-15 — L1 agent-model roster resolves, projects and RUNS on the mapped models
 
 The L1 roster is data (`core/agent_model_templates.py` + `core/model_registry.py`)
@@ -433,7 +413,7 @@ gates cannot catch, because they never call the model.
   `effort`) and `.codex/agents/<a>.toml` (`model`, `model_reasoning_effort`) must
   render from the SAME resolved roster for all 9 core agents; the codex effort is
   the D-3 clamp of the claude effort (`xhigh` → `high`).
-- **Overlay round-trip:** apply a template + a per-agent override through the panel
+- **Overlay round-trip:** apply a template + a per-agent override by editing `.dadaia/states/agent_model_policy.json`
   API (`PUT /api/agent-model-policy`), re-install, and confirm BOTH surfaces moved
   together; `GET /api/agent-model-templates` offers every registry `claude_id` as a
   selectable model and the full effort vocabulary.
@@ -441,7 +421,7 @@ gates cannot catch, because they never call the model.
   registry tier resolves to exactly ONE codex id, and no two tiers collapse to an
   identical `(codex_id, reasoning_effort)` pair.
 - **G-1 stands:** `claude-fable-5` is NEVER the resolved model for
-  `security-reviewer`, under any template or override.
+  `dd-code-reviewer`, under any template or override.
 - **PASS if ALL of the above hold.** A registry-derived allowlist narrowing (e.g. a
   provider-qualified model id that no longer maps) must fail LOUDLY at load with a
   message naming the rejected id — never silently accept an unmapped model.
@@ -489,7 +469,7 @@ lie that sends the consumer into an infinite repair loop and fails `reconcile` w
 `rollback_required`. Two known limits, both real on hardened hosts:
 
 - **A `noexec` `KIMI_CODE_HOME`.** Point `KIMI_CODE_HOME` at a directory on a `noexec`
-  mount (a tmpfs `/tmp` is the common case), run `dadaia public install --target kimi-code`,
+  mount (a tmpfs `/tmp` is the common case), run `dadaia harness add kimi-code`,
   then `dadaia public doctor`. **PASS if:** the four `kimi-code:hooks/*.sh` lines are
   `[unsupported]`, name the `noexec` mount as the cause and `KIMI_CODE_HOME` as the remedy,
   `public doctor` exits 0, and `dadaia reconcile --expect-version <ver>` succeeds. **FAIL
@@ -497,7 +477,7 @@ lie that sends the consumer into an infinite repair loop and fails `reconcile` w
   reinstalling cannot clear a mount flag, so the run would never converge.
 - **The repairable boundary must survive.** `chmod 0o644` one shim on a NORMAL filesystem
   and re-run the doctor. **PASS if** it reads `[drift] … (not executable)` and a plain
-  `dadaia public install --target kimi-code` clears it. Turning every executability failure
+  `dadaia harness add kimi-code` clears it. Turning every executability failure
   into `[unsupported]` is the opposite defect and also a FAIL.
 
 Generalize while you sweep: any doctor/gate line that prescribes a remedy must be a remedy
@@ -505,8 +485,8 @@ that WORKS. Apply the prescribed command literally; if it cannot resolve the con
 names, that is a product FAIL of this statement.
 
 **Verdict line (Telegram-short, last line of output):**
-`<version> — <APROVADA|BLOQUEADA|APROVADA COM EXCEÇÃO EXPLÍCITA> — <N> PASS / <M> FAIL / <K> EXCEPTION — bugs: <ids|nenhum> — evidência: <path>`
+`<version> — <APPROVED|BLOCKED|APPROVED WITH EXPLICIT EXCEPTION> — <N> PASS / <M> FAIL / <K> EXCEPTION — bugs: <ids|nenhum> — evidência: <path>`
 
-APROVADA requires 0 FAIL. EXCEPTIONs are listed but do not block; note each so the
+APPROVED requires 0 FAIL. EXCEPTIONs are listed but do not block; note each so the
 operator can decide. Persist per-statement evidence; register every FAIL as a bug
 before the run ends.

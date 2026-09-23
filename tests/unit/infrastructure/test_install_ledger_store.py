@@ -9,7 +9,7 @@ from dadaia_workspace.core.models.install_ledger import InstallLedger, LedgerEnt
 from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
 
 
-def _entry(rel: str = ".claude/rules/DADAIA.md") -> LedgerEntry:
+def _entry(rel: str = ".codex/AGENTS.md") -> LedgerEntry:
     return LedgerEntry(relpath=rel, sha256="a" * 64, family="law")
 
 
@@ -19,7 +19,7 @@ def test_read_absent_returns_none(tmp_path: Path) -> None:
 
 def test_write_read_roundtrip(tmp_path: Path) -> None:
     store = JsonInstallLedgerStore()
-    ledger = InstallLedger.of([_entry(), _entry(".codex/DADAIA.md")])
+    ledger = InstallLedger.of([_entry(), _entry(".claude/rules/dd-policy.md")])
     store.write(tmp_path, ledger)
     assert store.read(tmp_path) == ledger
     assert (tmp_path / "install_ledger.json").is_file()

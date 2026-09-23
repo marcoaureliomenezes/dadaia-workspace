@@ -1,8 +1,8 @@
 """Context-injection hook (the canonical, cross-platform gate surface).
 
 Invoked on SessionStart and UserPromptSubmit. It injects the lean workspace bootstrap
-(context line + TECHSTACK.md + catalog — FR30, T-044-60: the four-point dispatcher
-preflight restatement of ``DADAIA.md`` §1/§2 is deleted; it is law, not state). A
+(context line + the tech-stack section + catalog — FR30, T-044-60: the four-point dispatcher
+preflight restatement of the root `AGENTS.md` map §1/§2 is deleted; it is law, not state). A
 session-keyed sentinel
 guards re-injection: subsequent prompts emit nothing UNLESS this session's own bind is
 newer than the sentinel (T-50-03, SPEC v0.5.0 FR1 coupling 1) — bind is the SOLE trigger
@@ -12,7 +12,7 @@ Bind-driven injection state machine (FR-W2-01 / FR-W2-02, v0.1.14; bound_at trig
 T-50-03)
 -----------------------------------------------------------------------------------
 Context NAME resolution (``_resolve_context``) delegates to the single resolution
-authority (``DADAIA.md`` §3, :func:`dadaia_workspace.core.invocation.resolve`): rung 0
+authority (the root `AGENTS.md` map §3, :func:`dadaia_workspace.core.invocation.resolve`): rung 0
 (none here) → ``DADAIA_CONTEXT`` env → this session's own live record (payload or env
 session id) → the repo containing the cwd → ``""``. There is no
 first-ALIVE fallback and — since T-50-03 — the bind-epoch marker subsystem is no longer
@@ -117,7 +117,7 @@ def _session_bound_at(workspace: Path, session_id: str) -> float | None:
 
 
 def _resolve_context(payload: dict[str, object]) -> str:
-    """Resolve the context to inject, in the ``DADAIA.md`` §3 law order (F-03).
+    """Resolve the context to inject, in the root `AGENTS.md` map §3 law order (F-03).
 
     ONE call into the single resolution authority (:mod:`dadaia_workspace.core.invocation`
     — hooks are sanctioned DIRECT importers per the seam contract; the container is
@@ -177,39 +177,30 @@ def _digest_catalog(raw: str) -> str:
     return json.dumps({"features": digested}, ensure_ascii=False, indent=2)
 
 
-#: Max non-empty lines of ``TECHSTACK.md`` kept in the bind-time SESSION bootstrap digest.
-#: WS-C dehydration (v0.1.30 / T-30-E-05): the bootstrap is a lean session-orientation aid
-#: for an interactive agent session, so the hook does not dump the FULL tech-stack body —
-#: it emits a bounded digest plus a self-pull pointer. A small tech-stack file (≤ the cap)
-#: is emitted in full; a large one is reduced.
-_TECH_STACK_DIGEST_MAX_LINES = 24
+#: The ``ARCHITECTURE.md`` section carrying the tech stack — the one place the stack is
+#: stated since ``TECHSTACK.md`` left the canon at specs_pattern_version 7.
+_TECH_STACK_HEADING = "## Tech Stack"
 
 
-def _digest_tech_stack(raw: str) -> str:
-    """Return a bounded digest of ``TECHSTACK.md`` for the lean session bootstrap.
+def _tech_stack_section(raw: str) -> str:
+    """Return ``ARCHITECTURE.md``'s ``## Tech Stack`` section verbatim, heading included.
 
-    Keeps the leading non-empty lines, capped at :data:`_TECH_STACK_DIGEST_MAX_LINES`. When
-    the file is already within the cap it is returned verbatim (so a small atom is unchanged).
-    A truncated digest appends a self-pull pointer: the full atom stays on disk for the agent
-    to read directly when it needs more detail. Fail-open is implicit — the caller suppresses
-    OSError around the read.
+    The section runs to the next ``## `` heading (or EOF). It is emitted whole, not
+    digested: the section is already the bounded statement of the stack, and the digest
+    it replaces truncated mid-list and told the agent to self-pull the rest — a pointer
+    to a file the agent had no reason to believe was incomplete. A tree with no such
+    section yields the empty string, and the caller emits nothing.
     """
     lines = raw.splitlines()
-    non_empty_total = sum(1 for ln in lines if ln.strip())
-    if non_empty_total <= _TECH_STACK_DIGEST_MAX_LINES:
-        return raw.strip()
-    kept: list[str] = []
-    seen = 0
-    for ln in lines:
-        kept.append(ln)
-        if ln.strip():
-            seen += 1
-        if seen >= _TECH_STACK_DIGEST_MAX_LINES:
-            break
-    return (
-        "\n".join(kept).strip()
-        + "\n\n… (tech-stack digest — self-pull specs/memory/TECHSTACK.md for full detail)"
+    try:
+        start = next(i for i, line in enumerate(lines) if line.strip() == _TECH_STACK_HEADING)
+    except StopIteration:
+        return ""
+    end = next(
+        (i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")),
+        len(lines),
     )
+    return "\n".join(lines[start:end]).strip()
 
 
 def _build_memory(specs_dir: Path) -> str:
@@ -219,17 +210,20 @@ def _build_memory(specs_dir: Path) -> str:
     agent session — a lightweight orientation aid, not the full memory tree. The agent
     self-pulls deeper atoms (e.g. ``ARCHITECTURE.md``, a specific product atom) directly when
     a decision needs them, per the ``dd-spec-navigator`` skill (memory-bootstrap phase). So the bootstrap
-    stays lean — a bounded tech-stack digest + the lean catalog tldr-digest, never the full
-    memory tree, and never the fixed law blocks the law chain already loads.
+    stays lean — ``ARCHITECTURE.md``'s ``## Tech Stack`` section + the lean catalog
+    tldr-digest, never the full memory tree, and never the fixed law blocks the law
+    chain already loads.
     """
     memory_dir = specs_dir / "memory"
     if not memory_dir.is_dir():
         return ""
     parts = ["", "=== workspace memory (tech + catalog) ==="]
-    tech = memory_dir / "TECHSTACK.md"
-    if tech.is_file():
+    architecture = memory_dir / "ARCHITECTURE.md"
+    if architecture.is_file():
         with contextlib.suppress(OSError):
-            parts.append(_digest_tech_stack(tech.read_text(encoding="utf-8")))
+            section = _tech_stack_section(architecture.read_text(encoding="utf-8"))
+            if section:
+                parts.append(section)
     catalog = memory_dir / "product" / "catalog.json"
     index = memory_dir / "product" / "index.md"
     if catalog.is_file():
@@ -291,7 +285,7 @@ def _generic_preflight(workspace: Path) -> str:
     Emitted for an unbound session — NEVER any context memory (FR-W2-01). The ALIVE list is
     advisory (names from the registry) so the operator can bind one — it stays because it is
     useful only in this unbound case (FR30, T-044-60: the dispatcher preflight restatement of
-    ``DADAIA.md`` §1/§2 is deleted from every emission path, bound or not).
+    the root `AGENTS.md` map §1/§2 is deleted from every emission path, bound or not).
     """
     sections = ["[no bound context]"]
     alive = invocation.alive_context_slugs(workspace)
@@ -310,7 +304,7 @@ def _generic_preflight(workspace: Path) -> str:
 def _emit_bootstrap(workspace: Path, context: str) -> None:
     """Emit the bound context's bootstrap: the context header + the lean memory prefix.
 
-    FR30 (T-044-60): no dispatcher preflight — it restates ``DADAIA.md`` §1/§2, which the
+    FR30 (T-044-60): no dispatcher preflight — it restates the root `AGENTS.md` map §1/§2, which the
     agent already carries as law, not per-prompt state.
     """
     sections = [f"[{context}]"]
@@ -342,7 +336,7 @@ def main() -> int:
 
     # Sentinel — path BYTE-IDENTICAL to the shell sentinel: .dadaia/tmp/ctx-inject-fired-<id>.
     # Its content records the last injected slug so a re-bind is detectable. Sentinel
-    # GC (release 0.5.1 K2) is owned by presence.gc(), never inject-time.
+    # GC (0.4.7 FR6b) is owned by doctor.reap(), never inject-time.
     tmp_dir = workspace / ".dadaia" / "tmp"
     sentinel = tmp_dir / f"{_SENTINEL_PREFIX}{session_id}"
     sentinel_mtime, recorded_slug = _read_sentinel(sentinel)

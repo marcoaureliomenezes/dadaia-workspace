@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — core.agent_model_templates FR2 table and ruling G-1 (Fable never on security-reviewer)
+"""Intent: CONTRACT — core.agent_model_templates FR2 table and ruling G-1 (Fable never on dd-code-reviewer)
 
 MANDATORY tier-taxonomy contract (v0.1.60 FR6 / Ruling 17 — reworked v0.1.65 FR9).
 
@@ -16,7 +16,7 @@ registry** in ``core/agent_model_templates.py``:
 
   (a) the full contents of the 3 built-in templates (the FR2 table, verbatim);
   (b) ``balanced`` is the default;
-  (c) no template assigns ``claude-fable-5`` to security-reviewer (operator ruling G-1);
+  (c) no template assigns ``claude-fable-5`` to dd-code-reviewer (operator ruling G-1);
   (d) every template model resolves in REGISTRY with the expected tier;
   (e) staged core bodies carry NO ``model:``/``effort:`` frontmatter (AC-1);
   (f) roster count: exactly the 9 core agents.
@@ -72,37 +72,19 @@ def _core_agents() -> list[Path]:
 #: The FR2 table, pinned verbatim: template id -> agent -> (model, effort).
 _EXPECTED_TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
     "balanced": {
-        "project-manager": ("claude-fable-5-1", "high"),
-        "software-architect": ("claude-fable-5-1", "high"),
-        "product-engineer": ("claude-fable-5-1", "high"),
-        "project-auditor": ("claude-fable-5-1", "high"),
-        "security-reviewer": ("claude-sonnet-5", "xhigh"),
-        "code-reviewer": ("claude-opus-5", "high"),
-        "ai-engineer": ("claude-opus-5", "medium"),
-        "software-engineer": ("claude-opus-5", "low"),
-        "qa-engineer": ("claude-opus-5", "low"),
-    },
-    "subscription-saver": {
-        "project-manager": ("claude-opus-5", "high"),
-        "software-architect": ("claude-opus-5", "high"),
-        "product-engineer": ("claude-opus-5", "high"),
-        "project-auditor": ("claude-opus-5", "high"),
-        "security-reviewer": ("claude-sonnet-5", "high"),
-        "code-reviewer": ("claude-sonnet-5", "high"),
-        "ai-engineer": ("claude-sonnet-5", "medium"),
-        "software-engineer": ("claude-opus-5", "low"),
-        "qa-engineer": ("claude-sonnet-5", "low"),
+        "dd-product-engineer": ("claude-opus-5-5", "high"),
+        "dd-code-reviewer": ("claude-opus-5-5", "high"),
+        "dd-software-engineer": ("claude-opus-5-5", "low"),
     },
     "max-quality": {
-        "project-manager": ("claude-fable-5-1", "high"),
-        "software-architect": ("claude-fable-5-1", "high"),
-        "product-engineer": ("claude-fable-5-1", "high"),
-        "project-auditor": ("claude-fable-5-1", "high"),
-        "security-reviewer": ("claude-opus-5", "xhigh"),
-        "code-reviewer": ("claude-fable-5-1", "medium"),
-        "ai-engineer": ("claude-opus-5", "medium"),
-        "software-engineer": ("claude-opus-5", "low"),
-        "qa-engineer": ("claude-opus-5", "low"),
+        "dd-product-engineer": ("claude-fable-5-1", "high"),
+        "dd-code-reviewer": ("claude-opus-5-5", "xhigh"),
+        "dd-software-engineer": ("claude-opus-5-5", "medium"),
+    },
+    "economy": {
+        "dd-product-engineer": ("claude-opus-5-5", "high"),
+        "dd-code-reviewer": ("claude-sonnet-5", "high"),
+        "dd-software-engineer": ("claude-sonnet-5", "medium"),
     },
 }
 
@@ -111,6 +93,7 @@ _MODEL_TIER: dict[str, str] = {
     "claude-fable-5": "deep",
     "claude-fable-5-1": "deep",
     "claude-opus-5": "dispatch",
+    "claude-opus-5-5": "dispatch",
     "claude-sonnet-5": "standard",
 }
 
@@ -146,10 +129,10 @@ def test_builtin_templates_pin_fr2_table_default_and_registry_tiers() -> None:
 
 
 def test_no_template_assigns_fable_to_security_reviewer() -> None:
-    """(c): G-1 — Fable is NEVER assigned to security-reviewer, in any template."""
+    """(c): G-1 — Fable is NEVER assigned to dd-code-reviewer, in any template."""
     for template in list_templates():
-        assert not is_fable_model(template.assignments["security-reviewer"].model), (
-            f"template {template.id!r} assigns Fable to security-reviewer (G-1 violation)"
+        assert not is_fable_model(template.assignments["dd-code-reviewer"].model), (
+            f"template {template.id!r} assigns Fable to dd-code-reviewer (G-1 violation)"
         )
 
 
@@ -163,7 +146,7 @@ def test_core_agent_frontmatter_tiers() -> None:
     ``dispatch_band`` but NO ``model:``/``effort:`` (v0.1.65 FR1: the model/effort
     pinning moved from per-file frontmatter to the template registry, asserted above;
     the projected files carry them, the staged sources must not)."""
-    assert len(_core_agents()) == 9, [p.name for p in _core_agents()]
+    assert len(_core_agents()) == 3, [p.name for p in _core_agents()]
     assert {p.stem for p in _core_agents()} == set(CORE_AGENTS)
 
     seen: set[str] = set()

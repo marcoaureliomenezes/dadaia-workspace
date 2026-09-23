@@ -9,14 +9,14 @@ description: >
 
 # dd-backlog-definition
 
-> `project-manager` runs this continuously — not a release-boundary event.
+> `dd-product-engineer` runs this continuously — not a release-boundary event.
 
 ## The document
 
-- `specs/backlog/BACKLOG.json` shape, required fields, live status tokens, the histo
-  record and the terminal dispositions: `specs/backlog/AGENTS.md`.
-- Append via `dadaia backlog new <slug>`; validate via `dadaia doctor` (`ledgers`
-  section).
+1. Open `specs/backlog/AGENTS.md` (the area's scoped law) and follow it — `BACKLOG.json`
+   shape, required fields, live status tokens, the histo record, the dispositions.
+2. Append via `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug>`; validate via `dadaia doctor` (`ledgers`
+   section).
 
 ## Continuous curation
 
@@ -31,7 +31,7 @@ description: >
 
 ## The intake gate — the only path to a new entry
 
-- Only the operator creates demand. An entry materializes via the PM's
+- Only the operator creates demand. An entry materializes via the main thread's
   operator-facing intake report (handoff with `next_handoff.agent: "human"` plus its
   HTML report), or via an operator-ratified in-release deferral (already counts as
   intake).
@@ -43,9 +43,9 @@ description: >
 
 ## Pick and dispositions
 
-- A picked entry stays in `active[]` with `status: picked` (`DADAIA.md` §6.6) —
+- A picked entry stays in `active[]` with `status: picked` —
   nothing is purged at pick time.
-- It exits exactly once, at closure, by `dadaia backlog exit <slug> --disposition
+- It exits exactly once, at closure, by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit <slug> --disposition
   delivered|superseded|rejected [--release <id>] [--reason <text>]` — one histo
   record, refused on a second exit (`dd-release-implementation` RC-FLOW step 7).
 - `dd-release-definition` consumes the picked set with no further triage — the
@@ -60,7 +60,6 @@ description: >
 
 ## References
 
-- `DADAIA.md` §6.6 — the backlog law this skill operates.
 - `dd-release-definition` — the picked-set consumer.
-- CLI: `dadaia backlog new`, `dadaia backlog exit`, `dadaia backlog subjects`,
-  `dadaia doctor`.
+- Script: `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py` — `new`, `exit`, `check`, and `subjects` (the declared aliases plus the document's live bindings).
+- A `subject.ref` naming a code/doc/cli anchor is judged by `dadaia doctor` — `BL-SCHEMA` names the ref it cannot resolve.

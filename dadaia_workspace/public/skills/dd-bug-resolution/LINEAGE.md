@@ -9,7 +9,6 @@ The audit's pillar 1 cites this section, never restates it — if the two disagr
 - Read `specs/audits/_archive/audits_histo.jsonl` — an audit is not a release milestone.
 - Archived facts live in `releases/_archive/releases_histo.jsonl` (no per-release `_RELEASE.json` survives archiving).
 - The window is `[newest archived audit's sha, HEAD]`; the whole file when that histo is empty.
-- Never scan `specs/releases/_ideas/**` — a Draft carries no `_RELEASE.json`, so it carries no milestone.
 
 ## The filter
 
@@ -27,7 +26,7 @@ The audit's pillar 1 cites this section, never restates it — if the two disagr
 ## Declare `caused_by`
 
 1. After reading the matching records, declare the link on this bug's own record — never on a prior one.
-2. `dadaia bugs resolve <id> --caused-by <prior-bug-id>|none` is the one writer; it is validated against the ledger or the literal `none`.
+2. `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <id> --caused-by <prior-bug-id>|none` is the one writer; it is validated against the ledger or the literal `none`.
 3. `caused_by: none` carries the same evidentiary weight as naming a bug — the window was read, no link found.
 4. Echo the declaration in the fix commit body: `caused_by:`, `evidence:` (what the prior diff did), `prior diffs read:`.
 

@@ -19,12 +19,12 @@ def test_stage_install_doctor_delegate_to_manager(tmp_path: Path) -> None:
     assert tmp_path in fake.staged
     assert isinstance(stage_result, list)
 
-    install_result = svc.install(tmp_path, target="claude", force=True)
+    install_result = svc.install(tmp_path, harness="claude", force=True)
     assert (tmp_path, "claude", True) in fake.installed
     assert isinstance(install_result, list)
 
     svc.install(tmp_path)
-    assert (tmp_path, "all", False) in fake.installed
+    assert (tmp_path, None, False) in fake.installed
 
     doctor_result = svc.doctor(tmp_path)
     assert tmp_path in fake.doctored

@@ -1,7 +1,7 @@
 """v0.4.4 T-044-06 (FR3): the v2 branch contract — feature/{M.m.p} is pushable, develop
 and main are PR-only.
 
-The gitflow law (DADAIA.md §4, operator ruling 2026-08-23, SPEC v0.4.4 FR3): exactly
+The gitflow law (`dd-gitflow-default`, operator ruling 2026-08-23, SPEC v0.4.4 FR3): exactly
 three branch patterns exist — ``main``, ``develop``, ``feature/M.m.p`` (no ``v``, no
 suffix, no ``hotfix`` row — G2 retires it outright) — and ``feature/M.m.p`` is the ONLY
 pushable one. ``develop`` and ``main`` never take a direct push; both advance by PR only
@@ -30,7 +30,7 @@ import pytest
 from dadaia_workspace.core.models.git_scan import ScannedObject
 from dadaia_workspace.features.chokepoints import Decision, push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_refs
-from dadaia_workspace.features.specs.canon import canon_violations, verdict_violations
+from dadaia_workspace.features.specs.canon import canon_violations
 
 _SHA_A = "a" * 40
 _ZERO = "0" * 40
@@ -45,9 +45,6 @@ class _EmptyObjectSource:
 
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         return ()
-
-    def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
-        return []
 
     def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
         return ()
@@ -67,7 +64,6 @@ def _decide(refs: list[PushRef], root: Path, **kwargs: Any) -> Decision:
     kwargs.setdefault("object_source", _EmptyObjectSource())
     kwargs.setdefault("repo", root)
     kwargs.setdefault("canon_violations_fn", canon_violations)
-    kwargs.setdefault("verdict_violations_fn", verdict_violations)
     return push_gate_decision(refs, **kwargs)
 
 

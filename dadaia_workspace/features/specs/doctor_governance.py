@@ -81,6 +81,13 @@ class GovernanceValidator:
             )
         return self._bug_store_factory(self.specs_dir)
 
+    def known_bug_ids(self) -> frozenset[str]:
+        """The ids of every record, whatever its status — the ONE bug reader, lent to
+        SPEC-DOC-048, which judges membership in the ledger, never liveness."""
+        if not (self.specs_dir / "bugs" / "BUGS.jsonl").is_file():
+            return frozenset()
+        return frozenset(r.id for r in self._bug_store().iter_records())
+
     def check_bugs_jsonl_invariant(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-033: the single canonical ``specs/bugs/BUGS.jsonl`` ledger
         invariant. **Line validity** (ERROR) — each non-blank line must parse as a
@@ -125,7 +132,7 @@ class GovernanceValidator:
         """SPEC-DOC-041 — WARN when a terminal :class:`BugRecord` CLOSED (``closed_at``,
         0.4.7 FR4 — never ``ts``, the filing date) longer ago than
         :data:`~dadaia_workspace.core.models.bugs.BUG_ARCHIVE_THRESHOLD_DAYS` and is
-        still live (not yet moved by ``dadaia bugs archive``). Never a block; the
+        still live (not yet moved by ``python3 .agents/skills/dd-bug-resolution/scripts/bugs.py archive``). Never a block; the
         exit code is unchanged. Absent ``bugs/`` dir -> no-op.
         """
         ledger_path = self.specs_dir / "bugs" / "BUGS.jsonl"
@@ -146,7 +153,7 @@ class GovernanceValidator:
                             f"bugs/BUGS.jsonl record {record.id!r} has been terminal "
                             f"({record.status!r}) since {record.closed_at} — past the "
                             f"{BUG_ARCHIVE_THRESHOLD_DAYS}-day archive threshold; run "
-                            "'dadaia bugs archive' (SPEC-DOC-041, WARNING — never a "
+                            "'python3 .agents/skills/dd-bug-resolution/scripts/bugs.py archive' (SPEC-DOC-041, WARNING — never a "
                             "block, D15)."
                         ),
                         path=str(ledger_path),

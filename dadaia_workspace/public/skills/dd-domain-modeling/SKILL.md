@@ -5,14 +5,15 @@ description: >
   when writing or reading a term that has a glossary entry, naming a new concept,
   discussing codebase terminology, stress-testing domain relationships, or when a
   decision worth recording crystallises mid-session.
+compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install dadaia-workspace) it also drives the SDD lifecycle — specs, backlog, bugs, releases.
 ---
 
 # dd-domain-modeling
 
 One word carrying several meanings is how notes, grep-homonym patches and review
-confusion breed. The remedy is one bounded-context file — `CONTEXT.md`, one definition
-per term, explicit non-meanings — consumed inline while writing and actively sharpened
-while designing. Format: [`CONTEXT-FORMAT.md`](CONTEXT-FORMAT.md).
+confusion breed. The remedy is one bounded-context file — `CONTEXT.md`, one definition per
+term, explicit non-meanings — consumed inline while writing and actively sharpened while
+designing.
 
 ## Consuming the language (any agent, any prose)
 
@@ -42,12 +43,12 @@ while designing. Format: [`CONTEXT-FORMAT.md`](CONTEXT-FORMAT.md).
   whether the code agrees; surface any contradiction as a question, not a silent fix.
 - **Update `CONTEXT.md` inline.** Capture a resolved term the moment it crystallises;
   create the file lazily at the first resolved term. `CONTEXT.md` is a glossary and
-  nothing else — product truth stays in `specs/memory/`, decisions in `specs/ADRs/`.
+  nothing else (inside a dadaia workspace: truth in `specs/memory/`, decisions in ADRs).
 
 ## Offering a decision record
 
-Offer an ADR (`specs/ADRs/decisions.jsonl`, shape in `specs/ADRs/AGENTS.md`; only the
-operator flips it to `accepted`) only when all three hold:
+Offer an ADR (inside a dadaia workspace, `specs/ADRs/decisions.jsonl`, shape in
+`specs/ADRs/AGENTS.md`; only the operator flips it to `accepted`) only when all three hold:
 
 1. **Hard to reverse** — changing course later costs something real.
 2. **Surprising without context** — a future reader would ask "why this way?".

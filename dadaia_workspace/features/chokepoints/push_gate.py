@@ -1,30 +1,20 @@
-"""Push-gate orchestration (v0.4.4 FR3 — the gitflow v2 inversion; v0.9.0 FR1/FR2; v0.5.0
-specs-canon closure; split out of ``service.py`` at v0.5.1 K7).
+"""Push-gate orchestration.
 
 :func:`push_gate_decision` is the pre-push half of the chokepoint contract: branch
 policy (:mod:`~dadaia_workspace.features.chokepoints.branch_policy`) first, then the
 specs/ canon scan, then the range-scoped denylist scan
 (:mod:`~dadaia_workspace.features.chokepoints.denylist_scan`) — first refusal wins.
-The former FR-W1-02/DP-5 security-verdict-per-pushed-sha check is DELETED from this
-path (v0.4.4 A3.4) — it relocates to a PR gate (``dadaia ci verdict-check``, built over
-:mod:`~dadaia_workspace.features.chokepoints.verdict`).
+Security review is the reviewer's lens before each PR, never a step here.
 
-This module is business logic: it imports ``core`` only, and NEVER imports
-``infrastructure`` and NEVER spawns a subprocess. The canon predicates
-(``canon_violations_fn``/``verdict_violations_fn``) and the presence-check counterpart
-in ``pre_commit.py`` are INJECTED rather than imported at module scope (v0.5.1 K7):
-this is what drops ``chokepoints -> specs.canon`` out of the import-linter
-``ignore_imports`` list entirely — the CLI composition root
-(``cli/commands/ci.py``) wires ``features.specs.canon.canon_violations``/
-``verdict_violations`` straight through, no adapter needed, mirroring how
-*object_source* (the injected :class:`ObjectSource`) already works (FR7/A7.2: the
-decision function always takes it as a parameter; an unwired production call site is a
-CLI defect, never a bypass).
+This module is business logic: it imports ``core`` only, NEVER ``infrastructure``, and
+never spawns a subprocess. The canon predicate (``canon_violations_fn``) and the injected :class:`ObjectSource` are parameters, wired
+by the CLI composition root (``cli/commands/ci.py``) — an unwired production call site
+is a CLI defect, never a bypass.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Collection, Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -43,19 +33,22 @@ from dadaia_workspace.features.chokepoints.denylist_scan import (
     compile_slug_patterns,
     scan_objects,
 )
-from dadaia_workspace.features.chokepoints.verdict import INTEGRATION_TIP_REF, live_verdict_shas
 
 __all__ = ["push_gate_decision"]
 
+#: The integration branch's remote-tracking ref — the denylist baseline for a brand-new
+#: ref (nothing published yet) is its tip.
+INTEGRATION_TIP_REF = "refs/remotes/origin/develop"
+
 #: The law this scan enforces (SPEC v0.9.0 FR5) — quoted verbatim in every refusal.
-_DENYLIST_LAW = "DADAIA.md §7 — private names never enter public/pushed material"
+_DENYLIST_LAW = "dd-release-implementation §2a — private names never enter public/pushed material"
 
 #: FR5/A5.4 — at most this many offending objects are listed before a remainder count.
 _MAX_LISTED_HITS = 10
 
 #: The fix hint every specs-canon refusal line carries (operator, 2026-08-28) — a
 #: canon or verdict violation has exactly one remediation: remove the offending path.
-_SPECS_CANON_FIX_HINT = "delete the path; canon: DADAIA.md §6"
+_SPECS_CANON_FIX_HINT = "delete the path; canon: specs/AGENTS.md"
 
 
 class ObjectSource(Protocol):
@@ -69,8 +62,6 @@ class ObjectSource(Protocol):
     def new_objects(
         self, repo: Path, local_sha: str, remote_sha: str
     ) -> Iterable[ScannedObject]: ...
-
-    def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]: ...
 
     def parents(self, repo: Path, sha: str) -> tuple[str, ...]: ...
 
@@ -298,7 +289,7 @@ def _compose_specs_canon_refusal(violations: list[tuple[PushRef, str]]) -> str:
     the SAME shape :func:`_compose_denylist_refusal` uses."""
     lines = [
         f"[pre-push] BLOCKED: the pushed range publishes {len(violations)} specs/ "
-        "path(s) violating the v6 canon or the verdict rule (DADAIA.md §6)."
+        "path(s) violating the v6 canon or the verdict rule (specs/AGENTS.md)."
     ]
     shown = violations[:_MAX_LISTED_HITS]
     remainder = len(violations) - len(shown)
@@ -344,42 +335,19 @@ def _run_specs_canon_scan(
     object_source: ObjectSource,
     repo: Path,
     canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
-    verdict_violations_fn: Callable[[Sequence[str], Collection[str]], Sequence[str]],
 ) -> Decision | None:
     """SPEC v0.5.0 specs-canon closure (operator ruling 2026-08-28), range-scoped since
     2026-09-13: every ``specs/`` path the pushed range introduces or rewrites
     (*specs_paths_by_ref*, recorded by :func:`_record_specs_paths`) is checked against
-    the v6 canon; the verdict business rule ("at most ONE file per live sha") is a
-    property of the published TREE, so it alone keeps a tree view over the tip's
-    ``verdicts/`` paths — both via the INJECTED predicates (v0.5.1 K7: the SAME
-    predicates the doctor's TREE-8 check uses, never a second, hand-kept member list —
-    injected rather than imported at module scope so this module carries no
-    ``chokepoints -> specs.canon`` edge).
+    the v6 canon via the INJECTED predicate (v0.5.1 K7: the SAME predicate the doctor's
+    TREE-8 check uses, never a second, hand-kept member list — injected rather than
+    imported at module scope so this module carries no ``chokepoints -> specs.canon``
+    edge).
     """
     violations: list[tuple[PushRef, str]] = []
     for ref in scan_refs:
-        try:
-            tree_paths = object_source.list_tree_paths(repo, ref.local_sha, "specs")
-        except GitObjectReadError as exc:
-            return Decision(
-                allowed=False,
-                message=(
-                    f"[pre-push] BLOCKED: reading the pushed specs/ tree failed ({exc}) "
-                    "— a policy gate never skips what it cannot evaluate (fail "
-                    "closed). The sanctioned, traceable emergency bypass is "
-                    "`git push --no-verify` (discouraged; leaves a reflog trace).\n"
-                    "fix: git fetch origin && git push origin feature/<M.m.p> (repair "
-                    "the object store first — git fsck)"
-                ),
-            )
         range_rel = sorted({p[len("specs/") :] for p in specs_paths_by_ref.get(ref.local_sha, [])})
-        verdict_rel = [p[len("specs/") :] for p in tree_paths if "/verdicts/" in p]
         bad = set(canon_violations_fn(range_rel))
-        bad.update(
-            verdict_violations_fn(
-                verdict_rel, live_verdict_shas(object_source, repo, ref.local_sha)
-            )
-        )
         violations.extend((ref, path) for path in sorted(bad))
     if not violations:
         return None
@@ -428,7 +396,6 @@ def push_gate_decision(
     object_source: ObjectSource,
     repo: Path,
     canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
-    verdict_violations_fn: Callable[[Sequence[str], Collection[str]], Sequence[str]],
     malformed_lines: int = 0,
     denylist_terms: Iterable[tuple[str, str]] = (),
     baseline_patterns: Iterable[BaselinePatternLike] = (),
@@ -438,35 +405,30 @@ def push_gate_decision(
 
     Policy order, first refusal wins:
 
-    1. **Branch policy** (DADAIA.md §4, :func:`~dadaia_workspace.features.chokepoints.
+    1. **Branch policy** (dd-gitflow-default, :func:`~dadaia_workspace.features.chokepoints.
        branch_policy.check_branch_policy`) — every non-deletion, non-tag ref must be
        ``refs/heads/feature/{M.m.p}``, pushed to the SAME remote name: ``develop`` and
        ``main`` are refused outright (they advance by PR only); names outside the three
        permitted patterns are refused as invalid.
     2. **specs/ canon scan** (v0.5.0 specs-canon closure, operator ruling 2026-08-28)
        — every ``specs/`` path the pushed range introduces or rewrites is checked
-       against the v6 canon (range-scoped since 2026-09-13: a path no commit in the
-       range touches never blocks); the verdict business rule keeps its tree view over
-       the tip's ``verdicts/`` paths (the injected *canon_violations_fn*/
-       *verdict_violations_fn*).
+       against the canon (range-scoped: a path no commit in the range touches never
+       blocks), through the injected *canon_violations_fn*.
     3. **Range-scoped denylist scan** (v0.9.0 FR1/FR2) — every non-deletion ref, tags
        included, is scanned via *object_source* for new objects carrying a denylisted
        term. Steps 2 and 3 share ONE object walk (the walk runs once, after branch
        policy; step 2's refusal is decided first) — under v2 this feature push is the
        first publication to ``origin`` (A3.3).
 
-    There is no fourth step: the former diff-based security-verdict check is DELETED
-    from this path (v0.4.4 A3.4) — it relocates to a PR gate covering
-    ``feature/{M.m.p}`` → ``develop`` and ``develop`` → ``main`` (``dadaia ci
-    verdict-check``, built over
-    :func:`~dadaia_workspace.features.chokepoints.verdict.covering_verdict`).
+    There is no fourth step: security review is the reviewer's lens before each PR,
+    never a pre-push step.
 
     Deletions (zero sha) are never scanned. Tag pushes ARE scanned but were never
     branch-policy-gated (publishing depends on tag pushes). A malformed stdin line
     fails CLOSED (finding 1) and the REMOTE side of every branch-policy ref must
     match its LOCAL branch name (finding 2: ``push feature/0.0.1:develop``).
 
-    *object_source*, *repo*, *canon_violations_fn* and *verdict_violations_fn* are
+    *object_source*, *repo* and *canon_violations_fn* are
     REQUIRED — FR7/A7.2 (extended at v0.5.1 K7 to the canon predicates): the decision
     function always takes every external capability it needs as a parameter; an
     unwired production call site is a CLI defect, never a bypass (FR6 row 4), so there
@@ -514,7 +476,6 @@ def push_gate_decision(
         object_source,
         repo,
         canon_violations_fn,
-        verdict_violations_fn,
     )
     if canon_refusal is not None:
         return _annotate_skip(

@@ -1,9 +1,10 @@
 # SPEC — Release: 0.4.7
 
-**Status:** Aprovado
+**Status:** Approved
 **Release ID:** 0.4.7
 **Owner:** product-engineer
 **Opened:** 2026-09-13
+**Origin:** backlog:bug-policy-one-model-ask-first,governance-verbs-telemetry,law-and-skill-dedupe
 **Consumes:** bug-policy-one-model-ask-first, governance-verbs-telemetry, law-and-skill-dedupe
 
 ---
@@ -126,7 +127,7 @@ measured by the body-pointer test, the verb-citation test and a skill-corpus rat
   `disposition` ×N and `close`, SPEC-DOC-038 is silent, the histo line validates, the
   dir is gone; `close` on a missing dir names `specs/audits/`.
 - FR5 — **`dadaia release phase`.** `dadaia release phase IMPLEMENTATION --sha <sha>`
-  requires SPEC/PLAN/TASKS at root all `**Status:** Aprovado` and stamps `defined {sha,
+  requires SPEC/PLAN/TASKS at root all `**Status:** Approved` and stamps `defined {sha,
   ts}`; `dadaia release phase CLOSURE --sha <sha>` requires every task `[x]` and stamps
   `implemented {sha, rc: state.rc + 1, ts}`; another target, a wrong order or a re-run
   is refused with `fix:`; one `note` per transition; `DEFINITION` is set only by

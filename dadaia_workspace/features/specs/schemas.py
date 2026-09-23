@@ -44,6 +44,11 @@ _FEATURES_ROOT = Path(__file__).resolve().parents[1]
 _ENUM_APPEND = "x-enum-append"
 _FEATURE_PACKAGES = "feature-packages"
 
+#: Feature packages deleted from the tree whose name still lives on immutable-core
+#: fields of committed records (a bug's ``surface``): history stays valid after a
+#: demolition. Grows only when a feature dies (0.4.7 c5: panel, agents, telemetry, repos).
+RETIRED_FEATURE_PACKAGES: tuple[str, ...] = ("agents", "bugs", "panel", "repos", "telemetry")
+
 
 @cache
 def feature_packages() -> tuple[str, ...]:
@@ -62,7 +67,9 @@ def _resolve_derived_enums(schema: dict[str, Any]) -> None:
     loaded document, so the packaged file itself is never rewritten."""
     for prop in schema.get("properties", {}).values():
         if isinstance(prop, dict) and prop.get(_ENUM_APPEND) == _FEATURE_PACKAGES:
-            prop["enum"] = sorted({*prop.get("enum", []), *feature_packages()})
+            prop["enum"] = sorted(
+                {*prop.get("enum", []), *feature_packages(), *RETIRED_FEATURE_PACKAGES}
+            )
 
 
 def load_schema(name: str) -> dict[str, Any]:

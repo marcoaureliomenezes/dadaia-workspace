@@ -5,21 +5,21 @@ description: >
   red loop, minimise, hypotheses, instrument, seam test, cleanup) plus the resolve
   record and commit. Use when a bug carries an open record in BUGS.jsonl; registering
   one is dd-bug-registration's job.
+compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install dadaia-workspace) it also drives the SDD lifecycle — specs, backlog, bugs, releases.
 ---
 
 # dd-bug-resolution — Arm B
 
-> `software-engineer`/`ai-engineer` run this directly once a bug carries a record.
-> Git chokepoints (`DADAIA.md` §3) are the only mechanical backstop.
+> `dd-software-engineer` runs this directly once a bug carries a record.
+> Git chokepoints (`.dadaia/AGENTS.md`) are the only mechanical backstop.
 
 ## 1. Lifecycle frame
 
-- A bug fix rides the live `feature/{M.m.p}` branch in any phase (`DADAIA.md` §4):
-  no separate branch, no SPEC/PLAN/TASKS, no version mint.
-- Two fixers resolve by whichever `dadaia bugs resolve` lands first; a losing write
-  fails non-zero — re-read and retry.
-- `dd-bug-registration`'s redaction rule applies to the whole arc: commands, outputs,
-  captured artifacts.
+1. Inside a dadaia workspace, open `specs/bugs/AGENTS.md` (the area's scoped law) and follow it — its redaction rule
+   covers the whole arc: commands, outputs, captured artifacts.
+2. A bug fix rides the live `feature/{M.m.p}` branch in any phase: no separate branch, no SPEC/PLAN/TASKS, no version mint.
+3. Two fixers resolve by whichever `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve` lands first; a losing write
+   fails non-zero — re-read and retry.
 
 ## 2. The method — seven phases, each gated
 
@@ -59,22 +59,21 @@ fix the cause, watch it pass, re-run the Phase 1 loop on the original scenario. 
 correct seam exercises the real bug pattern at its call site (`dd-codebase-design`
 owns the seam vocabulary and the deletion test the fix must pass); when none exists, that
 is itself the finding — register an architecture finding and dispatch
-`software-architect` before fixing.
+the architecture lens before fixing.
 *Done when the test fails for the real reason and passes with the fix (or the seam
 gap is registered first).*
 
 **Phase 6 — Cleanup + resolve.** Grep the probe prefix to zero; the diff leaves the
 touched feature smaller or equal — a fix that grows it routes to
-`software-architect` first (net-positive rule, `DADAIA.md` §7). Then close the
+the architecture lens first (net-positive rule). Then close the
 record:
 
 ```
-dadaia bugs resolve <bug-id> --cause … --caused-by … --resolved-release …
+python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --cause … --caused-by … --resolved-release …
   --solution … --evidence-loop … --evidence-seam … --evidence-diff net-negative:…
 ```
 
 - `diff_direction` is derived from `--evidence-diff`'s `net-*:` prefix — there is no `--diff-direction` flag.
-- `closed_at` is stamped by the terminal transition; `dadaia bugs archive` ages by it, never by the filing date `ts`.
 - `--caused-by` is validated against the ledger or the literal `none`; an unknown id exits 1.
 - Stage code + regression test + the `BUGS.jsonl` line together — ONE commit, shape 3
   of `dd-gitflow-default` §3a.
@@ -96,5 +95,3 @@ dadaia bugs resolve <bug-id> --cause … --caused-by … --resolved-release …
 - [`RED-LOOP.md`](RED-LOOP.md) — loop construction menu, tightening, non-deterministic bugs.
 - `dd-bug-registration` — classify-first registration; the record this skill requires.
 - `dd-gitflow-default` §3a — the exact commit shape.
-- `dd-test-stewardship` (intent and admission) — test intent/size declaration.
-- `DADAIA.md` §4 (Gitflow), §7 (Quality) — branch contract, root-cause law, net-positive routing.

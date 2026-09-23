@@ -33,7 +33,6 @@ from pathlib import Path
 
 from dadaia_workspace.core.models.bugs import BugRecord
 from dadaia_workspace.core.models.findings import FindingRecord
-from dadaia_workspace.core.models.telemetry import GovernanceBaseline
 from dadaia_workspace.features.specs.doctor_closure_audit import ClosureAuditValidator
 from dadaia_workspace.features.specs.doctor_coherence import CoherenceValidator
 from dadaia_workspace.features.specs.doctor_governance import GovernanceValidator
@@ -74,21 +73,11 @@ class SpecsDoctor:
             ``container.build_bug_record_store`` (the SAME factory ``cli.commands
             .bugs`` already calls); ``None`` keeps ``GovernanceValidator``'s
             zero-dependency fallback reader (same model).
-        live_shas: Optional live verdict-sha set (head, first parent, develop tip —
-            ``features.chokepoints.verdict.live_verdict_shas``), resolved ONCE by the
-            CLI composition root and passed in as plain data — feeds SPEC-DOC-044
-            (stale verdicts). ``None`` (default) keeps that check a silent no-op; this
-            coordinator never resolves git state itself.
         command_paths: Optional live command-path set
             (``cli.help_digest.command_paths()``), walked ONCE by the CLI composition
-            root and passed in as plain data exactly as ``live_shas`` is — feeds
+            root and passed in as plain data — feeds
             MEM-DRIFT-2 (memory citations, 0.4.7 FR2). ``None`` (default) keeps that
             check silent.
-        governance: Optional governance-event baseline
-            (``core.models.telemetry.GovernanceBaseline``), read ONCE by the CLI
-            composition root and passed in as plain data exactly as ``live_shas`` is —
-            feeds RELEASE-TREE-HANDEDIT (0.4.7 FR6). ``None`` (default, and the only
-            value on a machine with no telemetry store) keeps that check silent.
     """
 
     def __init__(
@@ -99,8 +88,6 @@ class SpecsDoctor:
         repo_root: Path | None = None,
         findings_store_factory: Callable[[Path], JsonlRecordStore[FindingRecord]] | None = None,
         bug_store_factory: Callable[[Path], JsonlRecordStore[BugRecord]] | None = None,
-        live_shas: Collection[str] | None = None,
-        governance: GovernanceBaseline | None = None,
         command_paths: Collection[tuple[str, ...]] | None = None,
     ) -> None:
         self.specs_dir: Path = Path(specs_dir)
@@ -110,12 +97,6 @@ class SpecsDoctor:
         # release-id invariant (SPEC-DOC-045) reads pyproject.toml from it. None ->
         # both checks are a no-op.
         self.repo_root: Path | None = Path(repo_root) if repo_root is not None else None
-        # live_shas (v0.5.0 specs-canon closure): SPEC-DOC-044's plain-data input,
-        # resolved once by the CLI. None -> that check is a no-op.
-        self.live_shas: Collection[str] | None = live_shas
-        # governance (0.4.7 FR6): RELEASE-TREE-HANDEDIT's plain-data input, read once by
-        # the CLI. None -> that check is a no-op, as it is wherever no store exists.
-        self.governance: GovernanceBaseline | None = governance
         # command_paths (0.4.7 FR2): MEM-DRIFT-2's plain-data input — the ONE Typer walk
         # (`cli.help_digest.command_paths`), done by the CLI. None -> that check is a
         # no-op; `features` never imports `cli`.

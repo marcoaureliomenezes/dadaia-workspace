@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-import shutil
 import subprocess
 import sys
 from collections.abc import Iterable
@@ -12,13 +11,10 @@ from pathlib import Path
 import typer
 
 from dadaia_workspace.cli._specs_resolution import (
-    resolve_session_id_for_cli,
     resolve_workspace_root_for_cli,
 )
 from dadaia_workspace.container import is_source_repo_root as _is_source_repo_root
-from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.exceptions import CiPreflightScopeError
-from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.features.ci_preflight import (
     all_passed,
     checks_for,
@@ -26,19 +22,9 @@ from dadaia_workspace.features.ci_preflight import (
     run_preflight,
     subprocess_runner,
 )
+from dadaia_workspace.features.workspace.bootstrap import install_git_hooks
 
 app = typer.Typer(help="Local CI-equivalent preflight gate + git-hook chokepoints.")
-
-# .../dadaia_workspace/cli/commands/ci.py -> parents[2] == .../dadaia_workspace
-_SCRIPTS_DIR = workspace_layout.public_scripts_dir()
-#: Derived from the ONE registry of which chokepoints exist and what they are made of
-#: (``workspace_layout.INSTALLED_GIT_HOOKS``) — the same rows the workspace doctor
-#: compares the installed copies against (HOOKS-DRIFT-1). Never a second literal.
-_HOOK_SOURCES: dict[str, Path] = {
-    target: _SCRIPTS_DIR / source for target, source in workspace_layout.INSTALLED_GIT_HOOKS
-}
-_HOOK_SOURCE = _HOOK_SOURCES["pre-push"]
-_PRE_COMMIT_HOOK_SOURCE = _HOOK_SOURCES["pre-commit"]
 
 
 def _repo_root() -> Path:
@@ -84,9 +70,10 @@ def preflight(
         True, "--fail-fast/--no-fail-fast", help="Stop at the first failing check."
     ),
 ) -> None:
-    """Run ruff + mypy --strict + pytest locally; exit non-zero if any fail.
+    """Run the five local CI checks; exit non-zero if any fail.
 
-    This is the gate the pre-push hook calls. Locally-solvable failures must
+    The checks, in order: ruff format --check, ruff check, mypy --strict,
+    lint-imports, pytest. Run it before pushing — locally-solvable failures must
     never reach a push.
     """
     root = _repo_root()
@@ -125,61 +112,6 @@ def preflight(
         raise typer.Exit(1)
 
     typer.secho("\nAll preflight checks passed.", fg=typer.colors.GREEN)
-
-
-@app.command("pre-commit-check")
-def pre_commit_check() -> None:
-    """Warn about other live context presence. Advisory only — never blocks the commit.
-
-    Concurrent-session detection is advisory and always allows the commit (NO-LOCKS
-    DOCTRINE, v0.1.76). v0.5.0 FR9/D9: the backlog-doctor BLOCK that used to run here
-    is DELETED — CI's `backlog-doctor` job already runs the unscoped sweep over the
-    whole tree; blocking a commit on pre-existing backlog debt only ever punished
-    humans and agents on a shared tree (bug
-    `precommit-backlog-doctor-blocks-unrelated-commits`). The installed
-    `pre-commit-presence-gate.sh` wrapper additionally guarantees exit 0 unconditionally,
-    regardless of what this command does.
-    """
-    from dadaia_workspace.features.chokepoints import (
-        bundled_ledger_advisory,
-        context_slug_for_path,
-        pre_commit_decision,
-    )
-    from dadaia_workspace.features.spec_context import presence
-
-    repo_root = _repo_root()
-    workspace = resolve_workspace_root_for_cli(repo_root)
-    ctx = context_slug_for_path(workspace, _repo_identity_root(repo_root))
-
-    # v0.5.1 K7: the presence read is injected — `presence.others_alive` is wired
-    # straight through, no adapter needed (its signature already matches). This is
-    # what drops `chokepoints -> spec_context.presence` out of the import-linter
-    # ignore list entirely; the retired ancestry/pid-probe wiring above it is DELETED
-    # with the dead `caller_pid`/`pid_probe`/`ancestry` parameters (never read).
-    decision = pre_commit_decision(
-        workspace,
-        ctx,
-        own_sid=resolve_session_id_for_cli(),
-        others_alive=presence.others_alive,
-    )
-    if decision.warn:
-        typer.echo(decision.warn, err=True)
-
-    # F015/F036 (20260827 audit): bundled-ledger advisory — WARN-only, never blocks.
-    staged = subprocess.run(  # noqa: S603 — fixed argv, repo-root cwd
-        ["git", "diff", "--cached", "--name-only"],
-        capture_output=True,
-        text=True,
-        cwd=repo_root,
-        check=False,
-    ).stdout.splitlines()
-    bundling_warn = bundled_ledger_advisory(staged)
-    if bundling_warn:
-        typer.echo(bundling_warn, err=True)
-
-    if not decision.allowed:
-        typer.secho(decision.message, fg=typer.colors.RED, err=True)
-        raise typer.Exit(1)
 
 
 def _foreign_repo_slugs(
@@ -241,7 +173,7 @@ def _no_canon_violations(paths: Iterable[str]) -> list[str]:
 def push_gate_check() -> None:
     """Pre-push gate: branch-name validation + the range-scoped denylist scan.
 
-    Branch model: `DADAIA.md` §4 (Gitflow) + `dd-gitflow-default` — this docstring
+    Branch model: `dd-gitflow-default` (Gitflow) + `dd-gitflow-default` — this docstring
     states it nowhere else.
 
     Reads the pre-push ref lines from stdin (``<local-ref> <local-sha> <remote-ref>
@@ -268,7 +200,7 @@ def push_gate_check() -> None:
     from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, read_pattern_version
     from dadaia_workspace.features.chokepoints import context_slug_for_path, push_gate_decision
     from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
-    from dadaia_workspace.features.specs.canon import canon_violations, verdict_violations
+    from dadaia_workspace.features.specs.canon import canon_violations
 
     repo_root = _repo_root()
     workspace = resolve_workspace_root_for_cli(repo_root)
@@ -287,8 +219,7 @@ def push_gate_check() -> None:
         typer.echo(
             f"[pre-push] specs/ tree is stamped pattern {specs_version} "
             f"(< {CANONICAL_SPECS_VERSION}): the v6 canon scan does not apply until "
-            "`dadaia specs upgrade` migrates it; the verdict rule and the denylist "
-            "scan still run.",
+            "`dadaia specs upgrade` migrates it; the denylist scan still runs.",
             err=True,
         )
         canon_fn = _no_canon_violations
@@ -321,7 +252,6 @@ def push_gate_check() -> None:
         object_source=build_git_object_reader(),
         repo=repo_root,
         canon_violations_fn=canon_fn,
-        verdict_violations_fn=verdict_violations,
         malformed_lines=malformed,
         denylist_terms=denylist_terms,
         baseline_patterns=baseline_patterns,
@@ -338,128 +268,20 @@ def push_gate_check() -> None:
 _SHA40_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 
 
-def _first_parent_sha(repo_root: Path, sha: str) -> str | None:
-    """The first-parent sha of *sha* in *repo_root*, or ``None`` (root commit, or git
-    cannot resolve it — e.g. a shallow clone; the caller's CI job fetches full history).
-
-    Delegates to the ONE parents implementation (F015, 20260830 audit) —
-    ``git_objects.GitSubprocessObjectReader.parents`` — never a second raw subprocess
-    with its own error modes.
-    """
-    from dadaia_workspace.container import build_git_object_reader
-
-    parents = build_git_object_reader().parents(repo_root, sha)
-    return parents[0] if parents else None
-
-
-@app.command("verdict-check")
-def verdict_check(
-    head: str = typer.Option(
-        ..., "--head", help="The PR/push head sha to prove coverage for (40-hex)."
-    ),
-    release_id: str = typer.Option(
-        "",
-        "--release-id",
-        help="Optional release-id narrowing (default: search every release, live and archived).",
-    ),
-) -> None:
-    """Require an APPROVED security-reviewer verdict covering ``--head`` (v0.4.4 FR4;
-    v0.5.1 K7 — built over
-    :func:`~dadaia_workspace.features.chokepoints.verdict.covering_verdict`).
-
-    Backend for ``.github/scripts/pr-verdict-check.sh``'s ``security-verdict-gate`` CI
-    job (a thin wrapper as of v0.5.1 K7): reads the COMMITTED verdict evidence under
-    ``specs/releases/<id>/verdicts/`` (live) and ``specs/releases/_archive/<id>/
-    verdicts/`` (archived) — never ``.dadaia/handoff/``, a workspace-local, gitignored
-    directory a CI checkout never sees. Exit 0 (PASS) when a qualifying handoff's
-    ``metrics.commit_sha`` is ``--head`` itself or ``--head``'s first parent; exit 1
-    (FAIL) otherwise, naming the expected evidence shape.
-    """
-    from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
-    from dadaia_workspace.features.chokepoints.verdict import (
-        covering_verdict,
-        discover_verdict_candidates,
-    )
-
-    if not _SHA40_RE.match(head):
-        typer.secho(
-            f"[verdict-check] BLOCKED: --head '{head}' is not a 40-hex sha — refusing "
-            "to use it as a git argument or coverage anchor.\n"
-            "fix: git rev-parse HEAD",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    if release_id and release_id != "none" and not RELEASE_SEMVER_RE.match(release_id):
-        typer.secho(
-            f"[verdict-check] BLOCKED: --release-id '{release_id}' does not match the "
-            "canon release-id pattern — refusing to use it to narrow the search.\n"
-            f"fix: {DADAIA_BIN} ci verdict-check --head <sha> "
-            "--release-id 0.4.7",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    repo_root = _repo_root()
-    parent = _first_parent_sha(repo_root, head)
-    release_glob = release_id if (release_id and release_id != "none") else "*"
-    candidates = discover_verdict_candidates(repo_root, release_glob)
-    verdict = covering_verdict(candidates, head, parent)
-
-    if verdict is None:
-        typer.secho(
-            f"[verdict-check] BLOCKED: no APPROVED security-reviewer verdict covers "
-            f"head {head} — expected one at "
-            "specs/releases/<id>/verdicts/<sha>.handoff.json or "
-            "specs/releases/_archive/<id>/verdicts/<sha>.handoff.json "
-            f"(sha = {head} or its first parent {parent or 'none'}).\n"
-            f"The security-reviewer APPROVED handoff belongs at "
-            f"specs/releases/<id>/verdicts/{head}.handoff.json:\n"
-            f"fix: git add specs/releases/<id>/verdicts/{head}.handoff.json",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    typer.echo(
-        f"[verdict-check] PASS: {verdict.path} — security-reviewer APPROVED "
-        f"{verdict.commit_sha}, which covers head {head}."
-    )
-
-
-def _install_one(source: Path, target: Path, *, label: str, force: bool) -> None:
-    """Copy a hook script into ``.git/hooks/`` (0755), honoring ``--force``."""
-    if target.exists() and not force:
-        typer.secho(
-            f"{target.name} hook already exists at {target}; use --force to overwrite.",
-            fg=typer.colors.YELLOW,
-        )
-        raise typer.Exit(1)
-    shutil.copyfile(source, target)
-    target.chmod(0o755)
-    typer.secho(f"Installed {label} -> {target}", fg=typer.colors.GREEN)
-
-
 @app.command("install-hook")
 def install_hook(
     force: bool = typer.Option(False, "--force", help="Overwrite existing git hooks."),
 ) -> None:
-    """Install the pre-commit presence check and pre-push CI/security gate."""
-    root = _repo_root()
-    hooks_dir = root / ".git" / "hooks"
-    if not hooks_dir.is_dir():
-        raise typer.BadParameter(f"{hooks_dir} not found (is this a git repository?)")
-    _install_one(
-        _PRE_COMMIT_HOOK_SOURCE,
-        hooks_dir / "pre-commit",
-        label="pre-commit presence check",
-        force=force,
-    )
-    _install_one(
-        _HOOK_SOURCE,
-        hooks_dir / "pre-push",
-        label="pre-push CI + security gate",
-        force=force,
-    )
+    """Install the pre-push CI/security gate."""
+    try:
+        installed = install_git_hooks(_repo_root(), force=force)
+    except FileNotFoundError as exc:
+        raise typer.BadParameter(str(exc)) from None
+    except FileExistsError as exc:
+        typer.secho(
+            f"{Path(str(exc)).name} hook already exists at {exc}; use --force to overwrite.",
+            fg=typer.colors.YELLOW,
+        )
+        raise typer.Exit(1) from None
+    for target in installed:
+        typer.secho(f"Installed pre-push CI + security gate -> {target}", fg=typer.colors.GREEN)

@@ -5,10 +5,9 @@ following the SPEC-DOC-NNN convention:
 
 - SPEC-DOC-024 — phase<->markers coherence (ACTIVE.md phase vs TASKS markers).
 - SPEC-DOC-006 (extended) — CLOSURE-before-archive, recursive into nested archive dirs.
-- SPEC-DOC-026 — unique release ids across releases/ u _archive/releases/ (recursive),
-  WARN for documented legacy nested dirs.
-- SPEC-DOC-027 — the ONE release-dir naming canon (bare MAJOR.MINOR.PATCH), legacy WARN
-  (ADR-9 permanent allowlist, forward-enforced).
+- SPEC-DOC-026 — unique release ids across releases/ u releases/_archive/ (recursive).
+- SPEC-DOC-027 — the ONE release-dir naming canon (bare MAJOR.MINOR.PATCH), legacy WARN,
+  forward-enforced.
 - SPEC-DOC-028 — constitution file-ref resolution (WARN on a missing repo file).
 - SPEC-DOC-029 — RETIRED (v0.1.76 T-4, FR7, NO-LOCKS DOCTRINE). Formerly the
   lease<->session coherence backstop; retired along with the lease acquisition/CAS
@@ -121,9 +120,12 @@ def _make_clean_specs_tree(root: Path, release_id: str = "v0.1.10") -> Path:
         )
 
     _set_active(specs, release_id, "IMPLEMENTATION")
-    spec_md = "# Spec\n\n> **Status:** Aprovado\n> **Created:** 2026-06-09\n\nContent.\n"
-    plan_md = "# Plan\n\n> **Status:** Aprovado\n\nShort.\n"
-    tasks_md = "# Tasks\n\n> **Status:** Aprovado\n\n- [-] T1 something\n- [ ] T2 other\n"
+    spec_md = (
+        "# Spec\n\n> **Status:** Approved\n> **Created:** 2026-06-09\n"
+        "**Origin:** operator-demand\n\nContent.\n"
+    )
+    plan_md = "# Plan\n\n> **Status:** Approved\n\nShort.\n"
+    tasks_md = "# Tasks\n\n> **Status:** Approved\n\n- [-] T1 something\n- [ ] T2 other\n"
     (specs / "releases" / release_id / "SPEC.md").write_text(spec_md, encoding="utf-8")
     (specs / "releases" / release_id / "PLAN.md").write_text(plan_md, encoding="utf-8")
     (specs / "releases" / release_id / "TASKS.md").write_text(tasks_md, encoding="utf-8")
@@ -142,7 +144,6 @@ def _set_active(specs: Path, release_id: str, phase: str) -> None:
         "schema": "release-state-v1",
         "release": release_id,
         "phase": phase,
-        "rc": None,
         "defined": None,
         "implemented": None,
         "shipped": None,
@@ -153,7 +154,7 @@ def _set_active(specs: Path, release_id: str, phase: str) -> None:
 
 def _write_tasks(specs: Path, release_id: str, body: str) -> None:
     (specs / "releases" / release_id / "TASKS.md").write_text(
-        f"# Tasks\n\n> **Status:** Aprovado\n\n{body}\n", encoding="utf-8"
+        f"# Tasks\n\n> **Status:** Approved\n\n{body}\n", encoding="utf-8"
     )
 
 
@@ -165,7 +166,7 @@ def _by_code(issues: list[SpecsDoctorIssue], code: str) -> list[SpecsDoctorIssue
     return [i for i in issues if i.code == code]
 
 
-_MINIMAL_SPEC_MD = "# Spec\n\n> **Status:** Aprovado\n"
+_MINIMAL_SPEC_MD = "# Spec\n\n> **Status:** Approved\n"
 
 
 def _write_minimal_spec(rel: Path) -> None:
@@ -235,9 +236,9 @@ def test_sad_matrix(tmp_path: Path) -> None:
     # dead code behind a dead artifact. Verdict: criterion (a) feature removed,
     # dadaia_workspace/features/specs/doctor_closure_audit.py (this task's own commit).
 
-    # DOC-026: duplicate release id across releases/ and _archive/releases/ -> ERROR.
+    # DOC-026: duplicate release id across releases/ and releases/_archive/ -> ERROR.
     specs_d = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-026"))
-    dup = specs_d / "_archive" / "releases" / "v0.1.10"
+    dup = specs_d / "releases" / "_archive" / "v0.1.10"
     _write_minimal_spec(dup)
     doc026 = _by_code(SpecsDoctor(specs_d).check(), "SPEC-DOC-026")
     assert any(i.severity == Severity.ERROR for i in doc026)
@@ -287,13 +288,13 @@ def test_silent_matrix(tmp_path: Path) -> None:
 
     # DOC-026: distinct release ids -> silent.
     specs_d = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-026ok"))
-    arch_d = specs_d / "_archive" / "releases" / "v0.1.9"
+    arch_d = specs_d / "releases" / "_archive" / "v0.1.9"
     _write_minimal_spec(arch_d)
     assert "SPEC-DOC-026" not in _codes(SpecsDoctor(specs_d).check())
 
     # DOC-027: SemVer-clean dirs -> silent; allowlisted legacy names -> silent.
     specs_e = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-027ok"))
-    arch_e = specs_e / "_archive" / "releases" / "v0.1.9"
+    arch_e = specs_e / "releases" / "_archive" / "v0.1.9"
     _write_minimal_spec(arch_e)
     assert "SPEC-DOC-027" not in _codes(SpecsDoctor(specs_e).check())
 
@@ -310,7 +311,7 @@ def test_silent_matrix(tmp_path: Path) -> None:
     )
     assert "SPEC-DOC-028" not in _codes(SpecsDoctor(specs_f2).check())  # no repo_root
 
-    # DOC-030: canonical (DADAIA.md §6.8 <YYYYMMDD>-<slug>)/grandfathered dirs + absent
+    # DOC-030: canonical (`specs/audits/AGENTS.md` <YYYYMMDD>-<slug>)/grandfathered dirs + absent
     # audits/ -> silent.
     specs_g1 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-030ok"))
     (specs_g1 / "audits" / "20260701-my-audit-slug").mkdir(parents=True)
@@ -331,7 +332,7 @@ def test_silent_matrix(tmp_path: Path) -> None:
 
 
 def test_doc030_accepts_the_dadaia_md_6_8_canon_shape_yyyymmdd_dash_slug(tmp_path: Path) -> None:
-    """Bug spec-doc-030-audit-dir-rule-contradicts-dadaia-6-8-canon: DADAIA.md section
+    """Bug spec-doc-030-audit-dir-rule-contradicts-dadaia-6-8-canon: the root `AGENTS.md` map section
     6.8 (the current law) and features.specs.canon's own audits CanonEntry both declare
     an audit dir as ``<YYYYMMDD>-<slug>`` — the SAME shape a real audit dir on this repo
     carries (``20260827-canon-v6-first-audit``). SPEC-DOC-030 must accept it silently,
@@ -342,147 +343,77 @@ def test_doc030_accepts_the_dadaia_md_6_8_canon_shape_yyyymmdd_dash_slug(tmp_pat
 
 
 # ---------------------------------------------------------------------------
-# DOC-026/027 legacy-nested + allowlist forward-enforcement — 1 combined test
+# DOC-027 forward enforcement. The legacy-nested severity branch and the ADR-9
+# name allowlist died with the phantom ``specs/_archive/releases/`` root (bug
+# doctor-reads-phantom-specs-archive-releases-root): no nested milestone layout
+# and no legacy-named dir can exist under ``releases/_archive/``, and the frozen
+# ids live in ``releases/_archive/releases_histo.jsonl``.
 # ---------------------------------------------------------------------------
 
 
-def test_legacy_nested_and_allowlist_forward_enforcement(tmp_path: Path) -> None:
-    # DOC-026: legacy nested milestone collision -> WARNING (never ERROR).
-    specs_a = _make_clean_specs_tree(tmp_path)
-    real = specs_a / "_archive" / "releases" / "v0.1.9"
-    _write_minimal_spec(real)
-    nested = specs_a / "_archive" / "releases" / "v0.2.0" / "v0.1.9"
-    nested.mkdir(parents=True)
-    (nested / "SPEC.md").write_text("# Spec\n\n> **Status:** Aprovado\n", encoding="utf-8")
-    # The v0.2.0 PARENT also needs its own artifact -- is_release_dir(parent) is what
-    # makes is_legacy_nested_release recognize the nested v0.1.9 as a NESTED release
-    # (v0.5.0 T-050-25A, A4.4: CLOSURE.md alone no longer counts).
-    _write_minimal_spec(specs_a / "_archive" / "releases" / "v0.2.0")
-    doc026 = _by_code(SpecsDoctor(specs_a).check(), "SPEC-DOC-026")
-    assert doc026 and all(i.severity == Severity.WARNING for i in doc026)
+def test_doc027_scores_the_live_root_only(tmp_path: Path) -> None:
+    """Intent: CONTRACT — 0.4.7 c8 review MEDIUM-2/LOW-1.
 
-    # DOC-027: unlisted legacy archive dir -> WARNING.
-    specs_b = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-027unlisted"))
-    legacy = specs_b / "_archive" / "releases" / "some-unlisted-legacy-name-v1"
+    An archived release dir's name is the canon's unit (TREE-8), not this rule's: three
+    readers of one fact made a single legacy archived name cost a TREE-8 ERROR per
+    reader plus a SPEC-DOC-027 WARNING (ledger precedent
+    ``doctor-016-errors-archived-legacy-release-027-tolerates``). SPEC-DOC-027 scores
+    the live ``releases/`` root and nothing else.
+    """
+    specs_archived = _make_clean_specs_tree(tmp_path / "027archived")
+    legacy = specs_archived / "releases" / "_archive" / "some-unlisted-legacy-name-v1"
     _write_minimal_spec(legacy)
-    doc027_unlisted = _by_code(SpecsDoctor(specs_b).check(), "SPEC-DOC-027")
-    assert doc027_unlisted and all(i.severity == Severity.WARNING for i in doc027_unlisted)
+    assert "SPEC-DOC-027" not in _codes(SpecsDoctor(specs_archived).check())
 
-    # DOC-027: every enumerated ADR-9 allowlisted legacy dir -> silent.
-    specs_c = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-027allowlisted"))
-    for allowlisted_name in (
-        "ctx-inject-v2-drift-fix-v1",
-        "memory-markdown-source-v1",
-        "v0.1.4.1",
-        "v0.1.4.2",
-        "v0.1.4.3",
-        "v0.1.4.3-report-retention",
-        "v0.1.4.4",
-        "v0.1.4.5",
-        "v0.1.4.6",
-    ):
-        legacy_c = specs_c / "_archive" / "releases" / allowlisted_name
-        _write_minimal_spec(legacy_c)
-    assert "SPEC-DOC-027" not in _codes(SpecsDoctor(specs_c).check())
-
-    # DOC-027: forward enforcement — a NEW non-canon dir still WARNs alongside an
-    # allowlisted one; the allowlist NEVER silences the live releases/ tree.
-    specs_d = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-027forward"))
-    allowed = specs_d / "_archive" / "releases" / "v0.1.4.6"
-    _write_minimal_spec(allowed)
-    bad = specs_d / "_archive" / "releases" / "brand-new-non-canon-dir"
-    _write_minimal_spec(bad)
-    doc027_forward = _by_code(SpecsDoctor(specs_d).check(), "SPEC-DOC-027")
-    assert any("brand-new-non-canon-dir" in (i.path or "") for i in doc027_forward)
-    assert not any("v0.1.4.6" in (i.path or "") for i in doc027_forward)
-
-    specs_e = _make_clean_specs_tree(
-        tmp_path.parent / (tmp_path.name + "-027live"), release_id="v0.1.4.6"
-    )
-    doc027_live = _by_code(SpecsDoctor(specs_e).check(), "SPEC-DOC-027")
+    specs_live = _make_clean_specs_tree(tmp_path / "027live", release_id="v0.1.4.6")
+    doc027_live = _by_code(SpecsDoctor(specs_live).check(), "SPEC-DOC-027")
     assert any(i.severity == Severity.ERROR for i in doc027_live)
 
 
 # ---------------------------------------------------------------------------
-# DOC-039 (v0.1.81 FR2) — partial (artifact-empty) archived release dirs are residue.
-#
-# A ``specs/_archive/releases/<id>/`` dir that carries NONE of
-# SPEC.md/PLAN.md/TASKS.md/CLOSURE.md (directly or nested inside its segment
-# subdirs) is residue masquerading as an archived release — the v0.1.41 precedent
-# (only GRILL.md + OQ-DECISIONS.md, no real artifact). WARNING severity only.
+# DOC-039 DELETED (bug spec-doc-039-inspects-non-canon-path). The rule walked
+# ``specs/_archive/releases/`` and its fix: named ``specs/_archive/wip-abandoned/``
+# — neither root exists in the v6 specs canon (archived releases live under
+# ``specs/releases/_archive/``), so the check could never fire and its fix could
+# never be run. Deletion-shaped fix: the rule, its registry entry and its
+# behavioural tests are gone; this deletion test keeps them gone.
 # ---------------------------------------------------------------------------
 
 
-def test_doc039_partial_archive_fires_on_artifact_empty_dir(tmp_path: Path) -> None:
-    """An artifact-empty archived release dir (no SPEC/PLAN/TASKS/CLOSURE anywhere
-    under it) fires SPEC-DOC-039 at WARNING severity."""
-    specs = _make_clean_specs_tree(tmp_path)
-    residue = specs / "_archive" / "releases" / "wip-abandoned-thing-v1"
-    residue.mkdir(parents=True)
-    (residue / "NOTES.md").write_text("# Notes\n\nSome scratch notes.\n", encoding="utf-8")
-    doc039 = _by_code(SpecsDoctor(specs).check(), "SPEC-DOC-039")
-    assert doc039 and all(i.severity == Severity.WARNING for i in doc039)
-    assert any("wip-abandoned-thing-v1" in (i.path or "") for i in doc039)
-    text = " ".join(i.description for i in doc039)
-    assert "specs/_archive/wip-abandoned/" in text
+def test_no_specs_feature_file_names_the_phantom_archive_root() -> None:
+    """Intent: CONTRACT — bug doctor-reads-phantom-specs-archive-releases-root.
+
+    Archived releases live under ``specs/releases/_archive/``. The pre-0.5.0
+    ``specs/_archive/releases/`` root is never created by canon v6, so no walker,
+    rule, message or docstring may name it.
+    """
+    from dadaia_workspace.features.specs import rules as specs_rules
+
+    sources = sorted(Path(specs_rules.__file__).parent.glob("*.py"))
+    assert sources
+    for src in sources:
+        text = src.read_text(encoding="utf-8")
+        assert "_archive/releases/" not in text, src
+        assert '"_archive" / "releases"' not in text, src
 
 
-def test_doc039_partial_archive_fires_on_v0141_class_fixture(tmp_path: Path) -> None:
-    """The exact v0.1.41 precedent: a dir holding only GRILL.md + OQ-DECISIONS.md
-    (no SDD artifact) fires SPEC-DOC-039."""
-    specs = _make_clean_specs_tree(tmp_path)
-    residue = specs / "_archive" / "releases" / "some-old-feature-v1"
-    residue.mkdir(parents=True)
-    (residue / "GRILL.md").write_text("# Grill\n\nQuestions.\n", encoding="utf-8")
-    (residue / "OQ-DECISIONS.md").write_text("# OQ Decisions\n\nAnswers.\n", encoding="utf-8")
-    doc039 = _by_code(SpecsDoctor(specs).check(), "SPEC-DOC-039")
-    assert doc039 and all(i.severity == Severity.WARNING for i in doc039)
-    assert any("some-old-feature-v1" in (i.path or "") for i in doc039)
+def test_doc039_is_not_a_registered_rule_and_no_doctor_path_names_it() -> None:
+    """Intent: CONTRACT — bug spec-doc-039-inspects-non-canon-path.
 
+    SPEC-DOC-039 is deleted: it is absent from the specs rule registry, and no
+    doctor module names the two non-canon roots it inspected.
+    """
+    from dadaia_workspace.features.specs import rules as specs_rules
 
-def test_doc039_silent_on_segmented_dir_with_artifacts_in_segments(tmp_path: Path) -> None:
-    """A segmented archived release dir (alpha-1/rc-1 style) whose SEGMENT subdirs
-    carry the SDD artifacts is a legitimate layout — SPEC-DOC-039 stays silent even
-    though the parent dir itself holds none of the artifacts directly."""
-    specs = _make_clean_specs_tree(tmp_path)
-    segmented = specs / "_archive" / "releases" / "v0.1.50"
-    for segment in ("alpha-1", "rc-1"):
-        seg_dir = segmented / segment
-        seg_dir.mkdir(parents=True)
-        (seg_dir / "SPEC.md").write_text("# Spec\n\n> **Status:** Aprovado\n", encoding="utf-8")
-        (seg_dir / "TASKS.md").write_text("# Tasks\n\n> **Status:** Aprovado\n", encoding="utf-8")
-    (segmented / "CLOSURE.md").write_text(_CLOSURE_MD, encoding="utf-8")
-    assert "SPEC-DOC-039" not in _codes(SpecsDoctor(specs).check())
+    registered = {code for rule in specs_rules.RULES for code in rule.codes}
+    assert "SPEC-DOC-039" not in registered
 
-
-def test_doc039_silent_on_allowlisted_legacy_name(tmp_path: Path) -> None:
-    """A dir on the SPEC-DOC-027 permanent legacy-name allowlist (ADR-9) stays silent
-    for SPEC-DOC-039 too, even when it is artifact-empty — frozen history is never
-    flagged as residue by name alone (reuses the same allowlist)."""
-    specs = _make_clean_specs_tree(tmp_path)
-    legacy = specs / "_archive" / "releases" / "memory-markdown-source-v1"
-    legacy.mkdir(parents=True)
-    (legacy / "README.md").write_text("# Legacy\n\nHistorical note only.\n", encoding="utf-8")
-    assert "SPEC-DOC-039" not in _codes(SpecsDoctor(specs).check())
-
-
-def test_doc039_silent_on_complete_archive(tmp_path: Path) -> None:
-    """A properly closed archived release dir (SPEC/PLAN/TASKS/CLOSURE all present
-    directly) never fires SPEC-DOC-039."""
-    specs = _make_clean_specs_tree(tmp_path)
-    complete = specs / "_archive" / "releases" / "v0.1.9"
-    complete.mkdir(parents=True)
-    for fname in ("SPEC.md", "PLAN.md", "TASKS.md"):
-        (complete / fname).write_text(f"# {fname}\n\n> **Status:** Aprovado\n", encoding="utf-8")
-    (complete / "CLOSURE.md").write_text(_CLOSURE_MD, encoding="utf-8")
-    assert "SPEC-DOC-039" not in _codes(SpecsDoctor(specs).check())
-
-
-def test_doc039_silent_on_live_releases_tree(tmp_path: Path) -> None:
-    """SPEC-DOC-039 only inspects ``_archive/releases/`` — the active release dir
-    under the live ``releases/`` tree is never flagged, regardless of contents."""
-    specs = _make_clean_specs_tree(tmp_path)
-    assert "SPEC-DOC-039" not in _codes(SpecsDoctor(specs).check())
+    sources = sorted(Path(specs_rules.__file__).parent.glob("*.py"))
+    assert sources
+    for src in sources:
+        text = src.read_text(encoding="utf-8")
+        assert "SPEC-DOC-039" not in text, src
+        assert "wip-abandoned" not in text, src
 
 
 # ---------------------------------------------------------------------------

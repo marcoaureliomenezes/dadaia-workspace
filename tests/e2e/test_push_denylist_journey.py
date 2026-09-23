@@ -34,7 +34,7 @@ state, exactly as PLAN.md Phase 4 describes it):
    with NO security-reviewer handoff written anywhere (A3.4) — the remote's
    ``feature/0.0.1`` ref lands on the amended sha.
 
-Owner: software-engineer (LARGE-tier e2e; tests/AGENTS.md "every file names an owner").
+Owner: dd-software-engineer (LARGE-tier e2e; tests/AGENTS.md "every file names an owner").
 """
 
 from __future__ import annotations
@@ -185,7 +185,7 @@ def test_planted_term_refused_then_clean_push_after_amend(tmp_path: Path) -> Non
     assert "(blob " in out1, out1
     assert f"'{_MASKED_TERM}'" in out1, out1
     assert "operator denylist" in out1, out1
-    assert "DADAIA.md §7" in out1, out1  # "DADAIA.md §7"
+    assert "dd-release-implementation §2a" in out1, out1
 
     # A5.2 — the unmasked term and the raw offending line never appear anywhere.
     assert _PLANTED_TERM not in out1, out1

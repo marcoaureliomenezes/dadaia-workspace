@@ -24,7 +24,9 @@ def test_only_core_models_histo_defines_the_table() -> None:
     definers = sorted(
         path.relative_to(_SOURCE).as_posix()
         for path in (_SOURCE / "dadaia_workspace").rglob("*.py")
-        if path.resolve() != home and _ASSIGNMENT.search(path.read_text(encoding="utf-8"))
+        if path.resolve() != home
+        and "public/skills/" not in path.as_posix()
+        and _ASSIGNMENT.search(path.read_text(encoding="utf-8"))
     )
     assert definers == []
 

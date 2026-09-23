@@ -37,6 +37,9 @@ Scope is deliberately narrow — do NOT read "every script under public/scripts/
 from __future__ import annotations
 
 import ast
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -47,6 +50,25 @@ pytestmark = pytest.mark.contract
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCRIPTS_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "scripts"
+_SKILLS_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "skills"
+
+#: 0.4.7 FR1 (ADR 0018 measured_by) — the OTHER half of this contract. A
+#: `public/scripts/` mirror is thin because its logic lives in the package; a
+#: `public/skills/*/scripts/` script is the OWNER of its logic and must therefore be
+#: self-contained: stdlib imports only (no import path into `dadaia_workspace`), exec
+#: bit set, `--help` exits 0, and small enough that owning the logic stays honest.
+_OWNER_SCRIPT_MAX_LINES = 150
+
+#: Ratchet: a script measured ABOVE the ceiling when the contract landed keeps its
+#: measured count until it is split — `registry.py` (0.4.7 c5) predates FR1's 150-line
+#: rule. Lowering an entry is welcome; raising one defeats the contract.
+_OWNER_SCRIPT_CEILINGS: dict[str, int] = {"registry.py": 339}
+
+#: Owner scripts whose verb set includes `check` (the ledger scripts of FR2). A
+#: script listed here must expose `check`; `registry.py` owns ports, not a ledger.
+_LEDGER_OWNER_SCRIPTS: frozenset[str] = frozenset(
+    {"bugs.py", "backlog.py", "release.py", "audit.py", "memory.py"}
+)
 
 #: Data-driven registry (A16.2): script name -> max total line count for a genuine
 #: thin wrapper. Lowering a ceiling is welcome; raising one (or adding a script whose
@@ -61,6 +83,9 @@ _THIN_WRAPPER_SCRIPTS: dict[str, int] = {
 _STANDALONE_BY_DESIGN: frozenset[str] = frozenset(
     {
         "lint-dadaia-cli-reachability.py",
+        # A repository build step, not a mirror: it renders the standalone skills
+        # repository from `public/skills/` and has no package canonical to thin out.
+        "build-skills-repo.py",
     }
 )
 #: v0.5.1 T-051-16: generate-memory-catalog.py (the only member of this set) is
@@ -145,3 +170,82 @@ def test_thin_wrapper_registry_stays_data_driven_and_correctly_scoped() -> None:
         f"{sorted(unaccounted)} — add each to _THIN_WRAPPER_SCRIPTS (if its logic "
         "moved into the package), _PARTIALLY_ONE_SOURCED, or _STANDALONE_BY_DESIGN."
     )
+
+
+# --- Owner scripts: public/skills/*/scripts/*.py (0.4.7 FR1) ------------------------
+
+
+def _owner_scripts() -> list[Path]:
+    return sorted(_SKILLS_DIR.glob("*/scripts/*.py"))
+
+
+def _imported_roots(path: Path) -> set[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    roots: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            roots.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            roots.add(node.module.split(".")[0])
+    return roots
+
+
+#: The ONE cross-skill import edge: the release skill reads the spec navigator's drift
+#: decider; the navigator imports nothing from the release skill.
+_CROSS_SKILL_EDGE = {"_memory_drift"}
+
+
+@pytest.mark.parametrize("script", _owner_scripts(), ids=lambda p: f"{p.parents[1].name}/{p.name}")
+def test_skill_owner_script_meets_the_contract(script: Path) -> None:
+    """FR1: every skill script is a self-contained stdlib owner — ≤ 150 lines, no
+    import into the library, executable, and (for an entry point) `--help` exits 0.
+
+    The ceiling is per FILE: a script whose verb set outgrows it splits into `_`-prefixed
+    sibling modules in the same folder, imported through the script's own directory on
+    `sys.path`. A sibling is a module, not an entry point, so only the non-`_` scripts
+    answer `--help`; everything else applies to every file under `scripts/`.
+    """
+    loc = _line_count(script)
+    ceiling = _OWNER_SCRIPT_CEILINGS.get(script.name, _OWNER_SCRIPT_MAX_LINES)
+    assert loc <= ceiling, (
+        f"{script.name} has grown to {loc} lines, over the owner-script ceiling of "
+        f"{ceiling} — a skill script that no longer fits is logic that "
+        "belongs behind a narrower interface, not a raised ceiling."
+    )
+    siblings = {module.stem for module in script.parent.glob("*.py")}
+    if script.parent.parent.name == "dd-release-implementation":
+        siblings |= _CROSS_SKILL_EDGE  # SPEC D6: the one drift decider, one way only
+    foreign = _imported_roots(script) - set(sys.stdlib_module_names) - siblings
+    assert foreign == set(), (
+        f"{script.name} imports non-stdlib module(s) {sorted(foreign)} — a skill script "
+        "runs from a projected skill folder with no library on sys.path (FR1)."
+    )
+    assert script.read_text(encoding="utf-8").startswith("#!/usr/bin/env python3\n"), (
+        f"{script.name} is missing the `#!/usr/bin/env python3` shebang."
+    )
+    assert os.access(script, os.X_OK), f"{script.name} is not executable (exec bit unset)."
+    if script.name.startswith("_"):
+        return  # a sibling module, imported by its entry point — it has no argv surface
+
+    done = subprocess.run(
+        [sys.executable, str(script), "--help"], capture_output=True, text=True, check=False
+    )
+    assert done.returncode == 0, f"{script.name} --help exited {done.returncode}: {done.stderr}"
+
+
+def test_ledger_owner_scripts_expose_check() -> None:
+    """Every ledger script's read verb is `check` — the one name the doctor delegates to."""
+    present = {p.name for p in _owner_scripts()}
+    assert_populated(present, sentinel="registry.py")
+    missing = _LEDGER_OWNER_SCRIPTS - present
+    assert not missing, f"_LEDGER_OWNER_SCRIPTS names missing script(s): {sorted(missing)}"
+    for script in _owner_scripts():
+        if script.name not in _LEDGER_OWNER_SCRIPTS:
+            continue
+        done = subprocess.run(
+            [sys.executable, str(script), "check", "--help"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert done.returncode == 0, f"{script.name} has no `check` subcommand: {done.stderr}"

@@ -14,7 +14,7 @@ Disclosed sibling of `SKILL.md`. Every claim any pillar makes becomes exactly on
 | `refs` | immutable-core | file:line, bug ids, commit shas, and/or release ids the claim is anchored to |
 | `claim` | immutable-core | one sentence stating what the record asserts |
 | `evidence` | immutable-core | the reproducible command plus a redacted one-line result — never a path alone |
-| `disposition` | mutable-governance | `open` at append; rewritten by `dadaia audit disposition` |
+| `disposition` | mutable-governance | `open` at append; rewritten by `python3 .agents/skills/dd-audit-project/scripts/audit.py disposition` |
 | `release` | mutable-governance | `null` until dispositioned |
 | `reason` | mutable-governance | `null` until dispositioned |
 
@@ -25,7 +25,7 @@ Disclosed sibling of `SKILL.md`. Every claim any pillar makes becomes exactly on
 
 - `evidence` is always the reproducible command plus a redacted one-line result.
 - Example: `git show <sha> --stat -- <module> -> 2 files changed, second render path added`.
-- Never a bare pointer into `.dadaia/tmp/**` — that lane expires one day after its mtime (`DADAIA.md` §5.4).
+- Never a bare pointer into `.dadaia/tmp/**` — that lane expires one day after its mtime.
 - A `.dadaia/tmp/**` capture may accompany the command+result as a convenience pointer, never the sole citation.
 - Strip runner-absolute paths from a tool's raw output (`lint-imports`, `pytest`, ratchet scripts) by hand before writing the line.
 
@@ -37,7 +37,6 @@ Disclosed sibling of `SKILL.md`. Every claim any pillar makes becomes exactly on
 
 ## Disposition and close — by verb
 
-- `dadaia audit disposition <dir> <finding-id> --disposition resolved|superseded|deferred|rejected --release <id> [--reason]` rewrites the three governance fields in place; every immutable field stays byte-identical.
+- `python3 .agents/skills/dd-audit-project/scripts/audit.py disposition <dir> <finding-id> --disposition resolved|superseded|deferred|rejected --release <id> [--reason]` rewrites the three governance fields in place; every immutable field stays byte-identical.
 - `--reason` is required for `deferred` and `rejected`; a second disposition of the same finding is refused.
-- `dadaia audit close <dir> --sha <window-end>` refuses while any finding is `open`, appends the one `audits_histo.jsonl` record and deletes the directory — all-or-nothing.
-- Lifecycle (one audit -> one remediation release -> archive): `DADAIA.md` §6.8.
+- `python3 .agents/skills/dd-audit-project/scripts/audit.py close <dir> --sha <window-end>` refuses while any finding is `open`, appends the one `audits_histo.jsonl` record and deletes the directory — all-or-nothing.

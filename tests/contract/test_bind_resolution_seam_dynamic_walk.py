@@ -168,22 +168,13 @@ def _module_path_for_command_path(path: tuple[str, ...]) -> Path | None:
     """Map a CLI verb path (e.g. ``("lifecycle", "preflight")``) to its source module.
 
     Every command group in ``cli/main.py`` is backed by exactly one
-    ``cli/commands/<group>.py`` module (bugs/release/backlog live in ``newartifacts.py`` /
-    ``bugs.py`` — special-cased). Falls back to ``None`` (excluded from AST reachability,
+    ``cli/commands/<group>.py`` module. Falls back to ``None`` (excluded from AST reachability,
     never silently treated as resolver-driven) when no source module is found — the FR2
     literal-default check does not depend on this mapping at all.
     """
     if not path:
         return None
     group = path[0]
-    special = {
-        "release": _CLI_DIR / "commands" / "newartifacts.py",
-        "backlog": _CLI_DIR / "commands" / "newartifacts.py",
-        "bugs": _CLI_DIR / "commands" / "bugs.py",
-        "memory": _CLI_DIR / "commands" / "memory.py",
-    }
-    if group in special:
-        return special[group]
     candidate = _CLI_DIR / "commands" / f"{group}.py"
     return candidate if candidate.is_file() else None
 
@@ -369,7 +360,7 @@ def test_no_resolver_driven_verb_hardcodes_the_dadaia_workspace_default() -> Non
     commands = _walk_leaf_commands()
     # v0.4.5 FR5 (scan-test-vacuity-guard): a broken Typer app tree could dynamically
     # walk to zero leaf commands, under which `offenders` below stays empty vacuously.
-    assert_populated([path for path, _cmd in commands], sentinel=("bugs", "append"))
+    assert_populated([path for path, _cmd in commands], sentinel=("specs", "upgrade"))
     offenders: list[str] = []
     for path, cmd in commands:
         for param in _resolution_params(cmd):

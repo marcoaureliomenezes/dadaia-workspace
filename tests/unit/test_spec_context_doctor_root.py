@@ -30,7 +30,7 @@ from dadaia_workspace.core.workspace_layout import (
     INSTANCE_EXCEPTIONS,
     Creator,
     ZoneClass,
-    zones_created_by,
+    provisioned_zones,
     zones_with_canon,
     zones_with_ttl,
 )
@@ -46,7 +46,7 @@ from tests.fakes import FakeContextStore, FakeGitClient
 _TTL_ZONE = zones_with_ttl()[0]
 _STATE_ZONE = next(z for z in zones_with_canon() if z.creator is Creator.INIT)
 _OPERATOR_ZONE = next(z for z in workspace_layout.DADAIA_ZONES if z.creator is Creator.OPERATOR)
-_INSTALL_ZONE = zones_created_by(Creator.INSTALL)[0]
+_INSTALL_ZONE = next(z for z in provisioned_zones() if z.creator is Creator.INSTALL)
 _TWO_DAYS_AGO = time.time() - 2 * 86_400
 
 
@@ -63,7 +63,7 @@ def _reaped(root: Path, rel: str) -> Path:
 def _init_workspace(root: Path) -> None:
     """The minimal compliant skeleton: every INIT/INSTALL zone present, one root file."""
     dadaia = root / ".dadaia"
-    for zone in (*zones_created_by(Creator.INIT), *zones_created_by(Creator.INSTALL)):
+    for zone in provisioned_zones():
         (dadaia / zone.name).mkdir(parents=True, exist_ok=True)
     (dadaia / _STATE_ZONE.name / "spec_contexts.json").write_text(
         '{"schema_version": "2", "contexts": []}', encoding="utf-8"

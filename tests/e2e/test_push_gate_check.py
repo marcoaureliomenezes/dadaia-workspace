@@ -24,7 +24,7 @@ The CLI is invoked harness-free (no PreToolUse/PostToolUse payload), with only
 ``WORKSPACE_ROOT`` set, so this also covers the headless runtime the chokepoint protects.
 
 Intent: CONTRACT — v0.4.4 A3.1
-Owner: software-engineer
+Owner: dd-software-engineer
 """
 
 from __future__ import annotations

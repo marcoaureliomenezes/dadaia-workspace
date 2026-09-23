@@ -3,40 +3,16 @@
   "doc": "The abstract, harness-agnostic entity registry — THE source the scaffolded core surface derives from. dadaia-workspace defines behaviors, personas, rules and skills agnostically; each harness receives an IMPLEMENTATION of them. A scaffolded core sub-agent without a Persona here, a core hook without a Deterministic Behavior here, or a core rule without an Abstract Rule here is forbidden (constitution, Anti-Slop Law, Derivation law). Operator-created entities are out of scope.",
   "personas": [
     {
-      "id": "project-manager",
-      "mandate": "Coordinator and sole dispatch authority: intake, grill-me, backlog curation, dispatching every other persona. Never writes code, specs, memory or tests."
+      "id": "dd-product-engineer",
+      "mandate": "Owner of the specs: backlog curation, SPEC authoring from the main thread's grill handoff, and product-memory reconciliation at closure; never dispatches."
     },
     {
-      "id": "product-engineer",
-      "mandate": "Spec author and memory guardian: SPEC/PLAN/TASKS/CLOSURE and specs/memory/**. Never dispatches or implements code."
+      "id": "dd-software-engineer",
+      "mandate": "Generic implementer: PLAN and TASKS as technical planning, production code and its tests, TDD-first, inside the task's declared write set."
     },
     {
-      "id": "software-engineer",
-      "mandate": "Generic implementer: production code and its tests, TDD-first, inside the task's declared write set."
-    },
-    {
-      "id": "qa-engineer",
-      "mandate": "E2E and test-pyramid owner; validates deploys; validates at candidate close (RC-FLOW step 4)."
-    },
-    {
-      "id": "code-reviewer",
-      "mandate": "Three-axis review (standards, spec, bug surface) at candidate close, before the PR. Never edits code."
-    },
-    {
-      "id": "security-reviewer",
-      "mandate": "Vulnerability auditor and the PR verdict gate: OWASP, secrets, CVEs; emits the sha-matched PR verdict (branch contract: DADAIA.md §4 Gitflow)."
-    },
-    {
-      "id": "software-architect",
-      "mandate": "Anti-slop architecture specialist: DRAFT/REVIEW/ONBOARD; root-cause and fidelity gates on every spec review."
-    },
-    {
-      "id": "project-auditor",
-      "mandate": "Drift anchor: audits specs/memory vs code, dispatches evidence agents, scores compliance. Never fixes drift."
-    },
-    {
-      "id": "ai-engineer",
-      "mandate": "Exclusive owner of the AI surface: agents, skills, rules, hooks, context engineering, model tiering."
+      "id": "dd-code-reviewer",
+      "mandate": "The reviewer: three-axis review (standards, spec, bug surface) plus the six lenses — architecture, security, QA, product, audit, AI surface — at candidate close, before the PR; verdict-only."
     }
   ],
   "behaviors": [
@@ -46,7 +22,10 @@
       "implementations": {
         "claude": "PreToolUse hook (.claude/settings.json → dadaia_workspace.hooks.pre_gate)",
         "codex": ".codex/hooks.json wrapper → .dadaia/hooks/pre_gate.sh (interactive sessions)",
-        "kimi-code": "managed hook block in $KIMI_CODE_HOME/config.toml → the same Python gate"
+        "kimi-code": "managed hook block in $KIMI_CODE_HOME/config.toml → the same Python gate",
+        "cursor": ".cursor/hooks.json beforeShellExecution → .dadaia/hooks/cursor-pre-gate → the same Python gate",
+        "devin": ".devin/hooks.v1.json PreToolUse → .dadaia/hooks/devin-pre-gate → the same Python gate",
+        "copilot": ".github/hooks/pre-tool-use.json preToolUse → .dadaia/hooks/copilot-pre-gate → the same Python gate"
       }
     },
     {
@@ -55,16 +34,22 @@
       "implementations": {
         "claude": "PreToolUse hook (Bash payloads) via dadaia_workspace.hooks.pre_gate",
         "codex": ".codex/hooks.json wrapper → the same Python gate",
-        "kimi-code": "managed hook block → the same Python gate"
+        "kimi-code": "managed hook block → the same Python gate",
+        "cursor": ".cursor/hooks.json beforeShellExecution (the shell lane the guard polices) → dadaia_workspace.hooks.pre_gate",
+        "devin": ".devin/hooks.v1.json PreToolUse (Bash payloads) → dadaia_workspace.hooks.pre_gate",
+        "copilot": ".github/hooks/pre-tool-use.json preToolUse (Bash payloads) → dadaia_workspace.hooks.pre_gate"
       }
     },
     {
       "id": "sdd-gate",
       "mandate": "Three path classes on every write: ADDITIVE always writable, PROTECTED blocked, MUTATING writable but scope-judged under repos/<slug>/ when the session is bound; no phase, no mode; every block carries one fix: line; races surfaced, never prevented.",
       "implementations": {
-        "claude": "PreToolUse hook via dadaia_workspace.hooks.pre_gate (single merged entrypoint) + PostToolUse advisory presence and the throttled workspace reaper via dadaia_workspace.hooks.sdd_post_gate",
+        "claude": "PreToolUse hook via dadaia_workspace.hooks.pre_gate (single merged entrypoint) + PostToolUse session heartbeat and the throttled workspace reaper via dadaia_workspace.hooks.sdd_post_gate",
         "codex": ".codex/hooks.json wrapper → the same Python gate (pre + post)",
-        "kimi-code": "managed hook block → the same Python gate (pre + post)"
+        "kimi-code": "managed hook block → the same Python gate (pre + post)",
+        "cursor": ".cursor/hooks.json beforeShellExecution → dadaia_workspace.hooks.pre_gate; its file-edit event fires AFTER the write, so IDE edits are ungated by Cursor's own event vocabulary",
+        "devin": ".devin/hooks.v1.json PreToolUse → dadaia_workspace.hooks.pre_gate (single merged entrypoint)",
+        "copilot": ".github/hooks/pre-tool-use.json preToolUse → dadaia_workspace.hooks.pre_gate (single merged entrypoint)"
       }
     },
     {
@@ -73,27 +58,36 @@
       "implementations": {
         "claude": "UserPromptSubmit + SessionStart hooks via dadaia_workspace.hooks.ctx_inject; SessionStart also runs dadaia doctor --fix --expired-only --quiet (the reaper lane)",
         "codex": "session bootstrap via the projected wrapper (headless sessions read AGENTS.md natively)",
-        "kimi-code": "managed hook block → the same ctx_inject module"
+        "kimi-code": "managed hook block → the same ctx_inject module",
+        "cursor": ".cursor/hooks.json sessionStart runs dadaia doctor --fix --expired-only --quiet (the reaper lane); the root AGENTS.md map is read natively",
+        "devin": ".devin/hooks.v1.json SessionStart runs the same reaper lane; the root AGENTS.md map is read natively",
+        "copilot": ".github/hooks/session-start.json sessionStart runs the same reaper lane; the root AGENTS.md map is read natively"
       }
     },
     {
       "id": "git-chokepoints",
-      "mandate": "Harness-independent: pre-commit warns on peer presence and always allows; pre-push allows only feature/{M.m.p} pushes with a green CI preflight and refuses develop/main direct pushes; the security APPROVED verdict is a CI PR gate keyed to the PR head sha, not a pre-push check (branch contract: DADAIA.md §4 Gitflow).",
+      "mandate": "Harness-independent: pre-push allows only feature/{M.m.p} pushes with a green CI preflight and refuses develop/main direct pushes; the security APPROVED verdict is a CI PR gate keyed to the PR head sha, not a pre-push check (branch contract: `dd-gitflow-default`).",
       "implementations": {
-        "claude": ".dadaia git hooks (pre-commit-presence-gate.sh, pre-push-ci-gate.sh) — identical for every harness",
+        "claude": ".dadaia git hook (pre-push-ci-gate.sh) — identical for every harness",
         "codex": "same git hooks (harness-independent)",
-        "kimi-code": "same git hooks (harness-independent)"
+        "kimi-code": "same git hooks (harness-independent)",
+        "cursor": "same git hooks (harness-independent)",
+        "devin": "same git hooks (harness-independent)",
+        "copilot": "same git hooks (harness-independent)"
       }
     }
   ],
   "rules": [
     {
       "id": "workspace-law",
-      "mandate": "DADAIA.md — the one always-on law file (the workspace system prompt), projected read-only per harness; human-only in an instantiated workspace.",
+      "mandate": "AGENTS.md — the root map, the one always-on law file, projected read-only; scoped AGENTS.md files are the system of record per area; human-only in an instantiated workspace.",
       "implementations": {
-        "claude": "CLAUDE.md -> @AGENTS.md -> @DADAIA.md (root import chain)",
-        "codex": ".codex/DADAIA.md",
-        "kimi-code": ".kimi-code/DADAIA.md"
+        "claude": "AGENTS.md (native root discovery)",
+        "codex": "AGENTS.md (native root->cwd chain)",
+        "kimi-code": "AGENTS.md (native root->cwd chain)",
+        "cursor": "AGENTS.md (native, read at session start)",
+        "devin": "AGENTS.md (native root + lazy on file access)",
+        "copilot": "AGENTS.md (native, path and touched-file ancestors)"
       }
     },
     {

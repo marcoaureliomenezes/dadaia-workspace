@@ -1,4 +1,4 @@
-"""dadaia init command."""
+"""dadaia init command — one line, one directory, one harness."""
 
 from pathlib import Path
 
@@ -6,61 +6,100 @@ import typer
 from rich.console import Console
 
 from dadaia_workspace import container
+from dadaia_workspace.cli.commands.context import resolve_own_session_id
 from dadaia_workspace.core import harness_registry
-from dadaia_workspace.core.workspace_resolver import resolve_workspace_root_for_init
+from dadaia_workspace.core.exceptions import DadaiaError
+from dadaia_workspace.features.workspace.bootstrap import bootstrap_repo
 
 console = Console()
 app = typer.Typer()
 
+#: Printed once at the end of a successful init that got no ``--repo``. The first line is the law
+#: (sessions launch at the workspace root); the second is a RECOMMENDATION about the
+#: operator's own ``~/.claude/settings.json`` — the library prints it and never writes
+#: user settings, so a stray repo-level ``CLAUDE.md`` hiding the workspace
+#: ``AGENTS.md`` stays the operator's decision to prevent. The third names where projects
+#: live and the ONE verb that makes the first one — a single-repo workspace is the
+#: degenerate multi-repo case, so no other context verb is visible before the second
+#: project. With ``--repo`` these are replaced by the binding's export lines.
+_CLOSING_NOTES = (
+    "Sessions launch at the workspace root.",
+    "Claude Code: set `instructionFiles: claude-md-and-agents-md` in your user settings "
+    "(~/.claude/settings.json) so a stray CLAUDE.md in a repo never hides the workspace "
+    "AGENTS.md.",
+    "Projects live under repos/ — make the first with "
+    "`dadaia context create <name> --main-repo <slug> --url <url>`.",
+)
+
+
+def _refuse(message: str, fix: str) -> typer.Exit:
+    """Print *message* + its ONE executable ``fix:`` line on stderr and exit 2."""
+    typer.secho(message, err=True, fg=typer.colors.RED)
+    typer.secho(f"fix: {fix}", err=True, fg=typer.colors.RED)
+    return typer.Exit(2)
+
 
 @app.command()
 def init(
-    workspace: Path | None = typer.Option(None, "--workspace", "-w", help="Workspace root path"),
+    directory: str = typer.Argument(
+        ..., metavar="DIR", help="Workspace directory — created if absent."
+    ),
+    harness: str = typer.Option(
+        "",
+        "--harness",
+        help=f"The one agent runtime to scaffold: {', '.join(harness_registry.L1_ENTRY_HARNESSES)}.",
+    ),
+    repo: str = typer.Option(
+        "",
+        "--repo",
+        help="Clone URL of this workspace's first project — cloned, made ALIVE and bound.",
+    ),
     skip_assets: bool = typer.Option(
         False, "--skip-assets", help="Skip installing public agent assets"
     ),
-    harness: str = typer.Option(
-        "all",
-        "--harness",
-        help="Harness set to scaffold: 'all' or a comma-separated subset of claude,codex,kimi-code.",
-    ),
 ) -> None:
-    """Bootstrap a dadaia workspace: creates .dadaia/ and projects agent assets for the chosen harness set (default all: .claude/, .codex/, .kimi-code/, .agents/)."""
-    # Parse --harness BEFORE any output so a bad value is a clean BadParameter
-    # (exit 2, message on stderr, empty stdout — no partial payload leaks).
-    try:
-        harnesses = harness_registry.parse_harness_set(harness)
-    except ValueError as exc:
-        raise typer.BadParameter(str(exc), param_hint="--harness") from exc
-
-    # An explicit --workspace is authoritative (it may not exist yet: init creates it).
-    explicit = workspace is not None
-    root = workspace.resolve() if workspace is not None else resolve_workspace_root_for_init()
-
-    # Bug ancestor-walk-workspace-root-silent-mistarget (T-043-47/A30.5): the
-    # .dadaia/-nesting boundary in resolve_workspace_root_for_init already stops the
-    # dangerous case (a throwaway workspace nested under an ancestor's own .dadaia/
-    # tree) from silently mistargeting that ancestor. The one remaining shape where a
-    # bare invocation still walks to a directory OTHER than cwd is the legitimate
-    # sub-repo case (cwd nested under a sub-repo lacking its own sentinel) — still
-    # loudly named here, on stderr, so it is never mistaken for "init happened at cwd".
-    if not explicit and root != Path.cwd().resolve():
-        typer.secho(
-            f"Ancestor workspace detected: resolved root differs from cwd "
-            f"(cwd={Path.cwd().resolve()}, resolved_root={root}). "
-            "Pass --workspace to target a different directory explicitly.",
-            err=True,
-            fg=typer.colors.YELLOW,
+    """Bootstrap a dadaia workspace in DIR for one harness: .dadaia/, the law, and that harness's projection."""
+    # Every refusal happens BEFORE any output or filesystem write, so a rejected
+    # invocation leaves nothing behind (no partial workspace, no leaked payload).
+    if not harness:
+        raise _refuse(
+            "--harness is required: a workspace is born with exactly one agent runtime "
+            f"({', '.join(harness_registry.L1_ENTRY_HARNESSES)}); "
+            "`dadaia harness add <name>` adds any other later.",
+            f"dadaia init {directory} --harness {harness_registry.L1_ENTRY_HARNESSES[0]}",
         )
+    try:
+        chosen = harness_registry.parse_harness_name(harness)
+    except ValueError as exc:
+        raise _refuse(
+            str(exc),
+            f"dadaia init {directory} --harness {harness_registry.L1_ENTRY_HARNESSES[0]}",
+        ) from None
+
+    # The seam is argv: the directory is a parameter, never resolved from cwd.
+    root = Path(directory).expanduser()
+    root = (Path.cwd() / root).resolve() if not root.is_absolute() else root.resolve()
+    if root.exists() and not root.is_dir():
+        raise _refuse(
+            f"'{root}' is not a directory.", f"dadaia init {directory}-workspace --harness {chosen}"
+        )
+    # A directory that already holds `.dadaia/` is THIS workspace (a re-run, idempotent);
+    # anything else non-empty is a foreign tree and is never scaffolded over.
+    if root.is_dir() and any(root.iterdir()) and not (root / ".dadaia").is_dir():
+        raise _refuse(
+            f"'{root}' already holds a foreign tree (not a dadaia workspace).",
+            f"dadaia init {directory}-workspace --harness {chosen}",
+        )
+    root.mkdir(parents=True, exist_ok=True)
 
     console.print(f"[bold]Initializing workspace:[/bold] {root}")
-    console.print(f"[dim]Harness set:[/dim] {', '.join(harnesses)}")
+    console.print(f"[dim]Harness:[/dim] {chosen}")
 
     svc = container.build_workspace_service(root)
     from dadaia_workspace.core.exceptions import WorkspaceVenvBootstrapError
 
     try:
-        _, installed = svc.init(root, skip_assets=skip_assets, harnesses=harnesses)
+        _, installed = svc.init(root, skip_assets=skip_assets, harnesses=(chosen,))
     except WorkspaceVenvBootstrapError as exc:
         typer.secho(f"Error: {exc}", err=True, fg=typer.colors.RED)
         raise typer.Exit(1) from None
@@ -83,3 +122,37 @@ def init(
                 console.print(f"  {item}")
         else:
             console.print("[dim]No new assets to install (all up to date)[/dim]")
+
+    if not repo:
+        for note in _CLOSING_NOTES:
+            console.print(note, markup=False, soft_wrap=True)
+        return
+
+    # --repo: `init` is a CALLER of the context lifecycle. The clone, the registration
+    # and the binding are the implementations `context create|alive|bind` run — reached
+    # here by composition, so the two entry points can never disagree.
+    session_id = resolve_own_session_id(mint=True)
+    if session_id is None:  # pragma: no cover — mint=True always yields one
+        raise RuntimeError("session-id resolution returned None despite mint=True")
+    ctx_svc = container.build_spec_context_service(root)
+    try:
+        slug, env_lines = bootstrap_repo(
+            root,
+            repo,
+            session_id=session_id,
+            create_context=ctx_svc.create,
+            main_repo_url=lambda name: ctx_svc.show(name).repo_url,
+            alive_context=ctx_svc.alive,
+        )
+    except (DadaiaError, OSError) as exc:
+        typer.secho(f"Error: {exc}", err=True, fg=typer.colors.RED)
+        typer.secho(
+            f"fix: dadaia init {directory} --harness {chosen} --repo <a reachable clone URL>",
+            err=True,
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1) from None
+
+    console.print(f"[green]✓[/green] {slug} cloned into {root / 'repos' / slug}, ALIVE and bound")
+    for line in env_lines:
+        console.print(line, markup=False, soft_wrap=True, highlight=False)

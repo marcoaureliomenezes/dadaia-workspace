@@ -1,39 +1,56 @@
 ---
 slug: agentic-entities
 title: agentic-entities
-tldr: Abstract-entity registry — Personas, Behaviors, Rules — plus the behavior map binding every skill and scoped rule file to one law section.
-summary: The entity registry defines the workspace method abstractly and every scaffolded sub-agent, hook and rule file derives from it; the behavior map binds each skill and scoped rule file to one law section.
+tldr: The entity registry — three personas, the deterministic behaviours every harness implements, the rules — and the behavior map binding each skill to law.
+summary: The registry defines the workspace method harness-agnostically and every scaffolded persona, hook and rule derives from it; this atom holds the one enumeration of the hook behaviours the harness atoms link to; the behavior map binds each skill and scoped rule file to one law section.
 tags: [agents, entities, derivation, governance]
+sources:
+  - dadaia_workspace/public/entities/**
+  - dadaia_workspace/public/data/CONTEXT-MAP.md
+  - dadaia_workspace/public/skills/**
+  - dadaia_workspace/infrastructure/entity_doctor.py
 ---
 
-## The derivation law
+## The registry
 
-- Behaviors, personas, rules and skills are defined harness-agnostically, then implemented per entry harness.
-- The derivation law forbids underived core surface (`specs/constitution.md` §3 Dispatcher Purity names the registry as the one source of a persona; the constitution is at 6.0.0, four articles plus the fixed slop block): every `public/agents/*.md` sub-agent derives from a registry Persona and every Persona has its sub-agent, a bijection.
-- Every wired `dadaia_workspace.hooks.*` entrypoint is named by a Behavior, derived for every entry harness, and every core rule projection traces to an Abstract Rule.
-- Skills under `.agents/skills/` and the `AGENTS.md` guardrail files are the universal surface, read natively by every harness, so they carry no derivation and no registry entry.
-- Operator-created sub-agents, skills and rules are exempt; the law governs only what the library scaffolds.
-- `public/entities/registry.json` (`agentic-entities-v1`) carries `personas`, `behaviors` and `rules` with their per-harness `implementations`, plus `universal`; a persona's `mandate` is one sentence and the registry's only restatement of a role (the reviewers' say "validates at candidate close" and "three-axis review", nothing more).
+- `dadaia_workspace/public/entities/registry.json` (`agentic-entities-v1`) carries `personas`, `behaviors` and `rules`, each behaviour and rule with its per-harness `implementations`, plus `universal`.
+- Personas: `dd-product-engineer`, `dd-software-engineer`, `dd-code-reviewer`; a `mandate` is one sentence and the registry's only restatement of a role ([[agent-orchestration]]).
+- Every `dadaia_workspace/public/agents/*.md` persona derives from a registry persona and every registry persona has its file — a bijection; every wired `dadaia_workspace.hooks.*` entrypoint is named by a behaviour; every core rule projection traces to a registry rule.
+- Operator-created sub-agents, skills and rules are out of scope; the derivation governs only what the library scaffolds.
+
+## The deterministic behaviours
+
+The one enumeration; every harness atom links here.
+
+| Behaviour | What it does | Lane |
+|---|---|---|
+| `root-whitelist` | blocks a file-tool write that would mint a new workspace-root entry | pre-tool gate |
+| `venv-guard` | blocks `dadaia`/`pip`/`python -m dadaia_workspace` run outside the workspace venv, naming the corrected command | pre-tool gate |
+| `sdd-gate` | classifies each write ADDITIVE / PROTECTED / MUTATING and scope-judges MUTATING writes under `repos/<slug>/` for a bound session | pre-tool gate (+ post-tool reaper where the harness has one) |
+| `context-memory-injection` | runs the session-start reaper (`dadaia doctor --fix --expired-only --quiet`) and, where the harness has a prompt hook, injects the bound context's bootstrap | session start (+ prompt) |
+| `git-chokepoints` | pre-push allows only `feature/{M.m.p}` and refuses a non-canon `specs/` path or a denylisted secret in the pushed range | git hooks, identical for every harness |
+
+- The first three ride ONE merged entrypoint, `dadaia_workspace.hooks.pre_gate`; with the session-start reaper they are the four hook behaviours every harness receives, and every BLOCK carries one `fix:` line.
+- A harness differs only in serialization — the event names, the hook file and the answer shape its wrapper translates to; no harness adds a behaviour ([[sdd-gate-v3]]).
+
+## The universal surface
+
+- The root `AGENTS.md` map, the scoped `AGENTS.md` files, `.agents/skills/dd-*` and `.agents/agents/dd-*.md` are authored once and read natively or through per-entry symlinks and transcodes, so they carry no per-harness derivation.
+- Every `dd-` skill touching a governed area opens that area's scoped `AGENTS.md` as step 1 — how scoped law reaches a harness that loads only the root->cwd chain.
+- `dadaia_workspace/public/data/CONTEXT-MAP.md` records every surface's byte ceiling, measured installed size and per-harness load trigger: the always-on load is the root map (<= 8192 B), each scoped file <= 4096 B, each `SKILL.md` <= 6144 B; `tests/contract/test_context_map.py` is the ratchet.
 
 ## The behavior map
 
-- `public/entities/behavior-map.json` is the single declaration of which skill and which scoped rule file operate which section of the law.
-- A row is `{section, anchor, skill, scoped_agents_md[], hash_tuple, recorded_by, recorded_at}`, keyed by the law's section heading.
-- Every skill and every scoped `AGENTS.md` source on disk has exactly one row, every law section has at least one owner, and several skills may own one section.
-- The map also carries `declared_overlaps`, the canonical home of an intended skill-activation overlap, and the `SKILL.md` line ceiling; no CLI verb and no hook reads it.
-- The corpus is 18 `dd-*` skill directories; `tests/contract/test_slop_ratchets.py` V35 pins the directory count and the total `public/skills/**/*.md` line count at their measured post-closure values, down only, re-pinned at every corpus-touching closure ([[QUALITY]]).
-- `tests/contract/test_agentic_entities_derivation.py` pins the bijection, wired-hook coverage, harness coverage and the universal surface at source.
-- `public doctor`'s `entities-derivation` check (`ENT-DERIVE-1`, blocking) attests the installed package at behavioral-fidelity depth, a stub body, an identity swap and a broken reference each its own drift class.
-- `tests/contract/test_behavior_map.py` is the single map enforcer, red on a member with no row, a section with no owner, a row naming a missing member, a member changed without its hash tuple, or an undeclared overlap.
-- It also runs the citation check through `features/specs/citations.py::dead_citations` (every path and `dadaia` verb a public asset cites must resolve — the one finder `MEM-DRIFT-2` and the derived-docs test share), the body-pointer finder (every backticked `dd-*` token and every `` `dd-x` §N `` pair in `public/agents/*.md` and `public/skills/**/*.md` resolves to a skill directory and a `## N.` heading) and invocation-model equivalence (a skill no persona grants carries `disable-model-invocation: true`).
-- Overlap is checked only where it can mean something: universal skills claiming `**` are out of scope, and stage skills resolve by most-specific glob.
+- `dadaia_workspace/public/entities/behavior-map.json` declares which skill and which scoped rule file operate which section of the root map: `rows` of `{section, anchor, skill, scoped_agents_md[], hash_tuple, recorded_by, recorded_at}`, plus `skill_md_line_ceiling`, `declared_overlaps` and `standalone_skills` (the skills that stand without a workspace, read by the skills-repository build — [[public-asset-distribution]]).
+- Every skill and scoped `AGENTS.md` source has exactly one row, every law section at least one owner; several skills may own one section.
+- The corpus is 18 `dd-*` skill directories, pinned with the total skill Markdown line count by the down-only ratchet in `tests/contract/test_slop_ratchets.py` ([[QUALITY]]).
 
-## Always-on budget
+## Enforcement
 
-- The always-on load — law chain, nine persona bodies, listed skill descriptions — is measured every release against a stated ceiling by the `words × 1.33` estimator `dd-ai-eng-knowhow`'s `CONTEXT-ENGINEERING.md` defines, with per-section attribution — a closure readout, not a ratchet.
-- A release measuring above its declared ceiling cuts text; the number is never re-measured, averaged or renegotiated to fit.
-- Nine personas; a persona states a rule once and points at the skill that operates it — no playbook table, no restated handoff-schema bullet ([[ARCHITECTURE]]).
+- `tests/contract/test_agentic_entities_derivation.py` pins the bijection, wired-hook coverage, harness coverage and the universal surface.
+- `tests/contract/test_behavior_map.py` is the map enforcer: red on a member without a row, a section without an owner, a row naming a missing member, a changed member without its new hash tuple, or an undeclared overlap; it also resolves every path and `dadaia` verb a public asset cites (`dadaia_workspace/features/specs/citations.py`), every `dd-*` body pointer, and requires `disable-model-invocation: true` on a skill no persona grants.
+- `dadaia public doctor`'s attesting `entities-derivation` check (`ENT-DERIVE-1`) inspects the installed package: a stub persona, an identity swap between filename and `name:`, or a behaviour naming a missing hook module each report drift.
 
 ## Dependencies
 
-[[agent-orchestration]], [[panel]], [[public-asset-distribution]], [[TECHSTACK]], [[QUALITY]].
+[[agent-orchestration]], [[public-asset-distribution]], [[sdd-gate-v3]], [[ARCHITECTURE]], [[QUALITY]].

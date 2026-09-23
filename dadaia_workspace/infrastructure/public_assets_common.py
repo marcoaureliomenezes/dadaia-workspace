@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sys
 from collections.abc import Iterable
 from enum import StrEnum
@@ -15,7 +16,6 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
-from dadaia_workspace.core.harness_registry import INSTALL_TARGETS
 from dadaia_workspace.infrastructure.privacy_check import (
     _PUBLIC_ASSET_IGNORED_DIRS,
     _PUBLIC_ASSET_IGNORED_SUFFIXES,
@@ -51,10 +51,7 @@ class OverwritePolicy(StrEnum):
         return self is OverwritePolicy.FORCE
 
 
-# Shared layout constants for the install/stage pipeline. The valid ``--target``
-# vocabulary is single-sourced in ``core/harness_registry`` (v0.1.58 FR1); this name is
-# a back-compat re-export for tests/consumers that import ``_VALID_TARGETS`` from here.
-_VALID_TARGETS = INSTALL_TARGETS
+# Shared layout constants for the install/stage pipeline.
 _COPY_DIRS = (
     "rules",
     "skills",
@@ -65,13 +62,8 @@ _COPY_DIRS = (
     "data",
     "scaffold",
     "templates",
-    "runtime",
-    "kimi-code",
 )
 _CLAUDE_DIRS = ("rules", "skills", "agents")
-#: Subdirectories of the staged ``kimi-code/`` tree for ``--only`` filtering (v0.2.8).
-#: Empty for now — the tree currently ships a single root ``AGENTS.md``.
-_KIMI_DIRS: tuple[str, ...] = ()
 
 
 def is_ignored_public_asset(path: Path) -> bool:
@@ -93,12 +85,33 @@ def iter_public_files(root: Path) -> Iterable[Path]:
     )
 
 
+def read_link_target(path: Path) -> str:
+    """A symlink's target in its canonical POSIX spelling on every OS — the one reading the
+    ledger digest, the doctor compare and the install skip agree on."""
+    return os.readlink(path).replace(os.sep, "/")
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _entry_digest(path: Path) -> str | None:
+    """The ledgerable digest of one projected entry, or ``None`` when there is none.
+
+    A symlink digests its TARGET STRING, never the bytes it points at: following the
+    link would make a link and a copy of the same content indistinguishable, and would
+    walk out of the workspace tree. A directory (the copy fallback's root) has no single
+    digest — its files are ledgered individually.
+    """
+    if path.is_symlink():
+        return hashlib.sha256(read_link_target(path).encode("utf-8")).hexdigest()
+    if path.is_file():
+        return _sha256(path)
+    return None
 
 
 def _package_version() -> str:

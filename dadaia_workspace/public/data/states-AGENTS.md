@@ -2,7 +2,7 @@
 
 Scope: this file governs `.dadaia/states/**`.
 
-State files are machine-owned JSON records used by dadaia services, hooks, and the panel.
+State files are machine-owned JSON records used by dadaia services and hooks.
 They are not documentation and not an implementation workspace.
 
 ## 1. Canon
@@ -29,6 +29,5 @@ The closed canon of `.dadaia/states/`, rendered from `core/workspace_layout.py`
 
 ```bash
 dadaia context show --json
-dadaia server list
 dadaia public doctor
 ```

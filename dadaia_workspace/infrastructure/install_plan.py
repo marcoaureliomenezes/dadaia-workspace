@@ -1,7 +1,7 @@
 """``InstallPlan`` — the ONE resolution of ``install()``'s port-conforming arguments.
 
 Split out from ``public_assets.py`` (FR6, T-30-10 / K3, v0.5.1) so both the manager and
-``projection_rules.py``'s ``HarnessProjection`` adapters can share the single resolved
+``projection_rules.py``'s record-driven rule builders can share the single resolved
 plan type without a circular import between the two.
 """
 
@@ -21,9 +21,9 @@ from dadaia_workspace.infrastructure.public_assets_common import OverwritePolicy
 @dataclass(frozen=True)
 class InstallPlan:
     """``install()`` builds exactly one ``InstallPlan`` from its
-    ``(workspace_root, target, force, scope, only)`` parameters, THEN runs the rule
+    ``(workspace_root, harness, force, scope, only)`` parameters, THEN runs the rule
     table over it — the flags never travel any further than this dataclass. ``force``
-    is resolved to an :class:`OverwritePolicy`; ``target``/``scope`` are resolved to
+    is resolved to an :class:`OverwritePolicy`; ``harness``/``scope`` are resolved to
     the concrete harness targets and active-harness set the rule builders select on;
     the agent-model overlay and the resolved core-agent roster are loaded once and
     carried alongside so no rule builder re-reads them.
@@ -31,7 +31,7 @@ class InstallPlan:
 
     workspace_root: Path
     agentic_dir: Path
-    target: str
+    harness: str | None
     scope: Literal["all", "repos-only", "workspace-only"]
     only: str | None
     overwrite: OverwritePolicy

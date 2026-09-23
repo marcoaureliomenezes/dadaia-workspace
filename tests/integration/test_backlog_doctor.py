@@ -479,15 +479,36 @@ def test_duplicated_id_fires_bl_schema_through_the_wired_entry_point(
 
 
 def test_freshly_authored_entry_is_clean_under_both_doctors(tmp_path: Path) -> None:
-    """A3.5 (R-13, the producer-passes-its-own-validator rule): ``backlog_new``'s
-    freshly appended ``active[]`` entry is ``backlog doctor``-clean AND ``specs
-    doctor``-clean out of the box — proven over the real writer + both live doctors,
-    not fixtures hand-built to match the parser."""
-    from dadaia_workspace.features.backlog.document import backlog_new
+    """A3.5 (R-13, the producer-passes-its-own-validator rule): the entry the ONE writer
+    appends — `dd-backlog-definition/scripts/backlog.py new` (0.4.7 c7, T-047-65) — is
+    ``backlog doctor``-clean AND ``specs doctor``-clean out of the box, proven over the
+    real writer run as the script (staged with its schemas, exactly as `public stage`
+    installs it) plus both live doctors."""
+    import shutil
+    import subprocess
+    import sys
+
     from dadaia_workspace.features.specs import SpecsDoctor
 
+    public = Path(__file__).resolve().parents[1].parent / "dadaia_workspace" / "public"
+    staged = tmp_path / "staged" / "scripts"
+    (staged / "schemas").mkdir(parents=True)
+    for module in sorted((public / "skills" / "dd-backlog-definition" / "scripts").glob("*.py")):
+        shutil.copy2(module, staged / module.name)
+    for schema in (
+        public / "schemas" / "backlog" / "backlog-v1.schema.json",
+        public / "schemas" / "histo" / "histo-record-v1.schema.json",
+    ):
+        shutil.copy2(schema, staged / "schemas" / schema.name)
+
     specs, src = _build_roots(tmp_path)
-    backlog_new(specs, "fresh-entry")
+    done = subprocess.run(
+        [sys.executable, str(staged / "backlog.py"), "new", "fresh-entry", "--specs", str(specs)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert done.returncode == 0, done.stdout + done.stderr
 
     findings = _run_wired(specs, src)
     assert findings == [], [f.to_dict() for f in findings]

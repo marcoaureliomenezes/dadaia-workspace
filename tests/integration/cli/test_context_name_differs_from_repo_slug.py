@@ -3,7 +3,7 @@
 Bugs a1-context-specs-resolution-ignores-repo-slug and a1-audit-completes-without-audit-report,
 both reported by the consumer-side validator against the re-architected workflows.
 
-``dadaia context create meu-projeto --repo repo-diferente`` is ordinary usage: a context has
+``dadaia context create meu-projeto --main-repo repo-diferente`` is ordinary usage: a context has
 two identities — the NAME every session record and handoff uses, and the SLUG that is the
 directory under ``repos/``. 28 call sites across 9 modules derived the directory by
 interpolating the NAME, so any context where they differed resolved to a path that does not
@@ -24,6 +24,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
@@ -55,10 +56,10 @@ def workspace(tmp_path: Path) -> Path:
     WorkspaceService(
         public_assets=FileSystemPublicAssetManager(),
         python_env=VenvPythonEnvironmentManager(),
-    ).init(root)
+    ).init(root, harnesses=L1_ENTRY_HARNESSES)
     remote = tmp_path / "remote.git"
     subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True, timeout=_TIMEOUT)
-    created = _dadaia(root, "context", "create", _NAME, "--repo", _SLUG, "--url", str(remote))
+    created = _dadaia(root, "context", "create", _NAME, "--main-repo", _SLUG, "--url", str(remote))
     assert created.returncode == 0, created.stdout + created.stderr
     alive = _dadaia(root, "context", "alive", _NAME)
     assert alive.returncode == 0, alive.stdout + alive.stderr
@@ -71,49 +72,6 @@ def _run(workspace: Path, *args: str) -> dict:
     return json.loads(proc.stdout)
 
 
-def test_bugs_append_resolves_the_slug_and_closure_lands_in_scope(workspace: Path) -> None:
-    """Two more sites that assumed name == slug, both validator-reported.
-
-    `bugs append --context <name>` validated `repos/<name>/specs` and REFUSED a perfectly
-    valid context (a2-bugs-append-context-resolution-ignores-repo-slug); and the close
-    step's CLOSURE.md was written under the name, landing outside its declared write scope
-    so the step was refused (a2-fake-implementation-close-closure-out-of-scope).
-
-    Both are the same disease as the first fix — a directory derived from the wrong
-    identity — which is why they are pinned here next to it.
-    """
-    proc = _dadaia(
-        workspace,
-        "bugs",
-        "append",
-        "--bug-id",
-        "probe",
-        "--reported-by",
-        "test",
-        "--title",
-        "t",
-        "--severity",
-        "LOW",
-        "--surface",
-        "cli",
-        "--component",
-        "c",
-        "--context",
-        _NAME,
-        "--symptom",
-        "sy",
-        "--repro",
-        "rp",
-        "--expected",
-        "ex",
-    )
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert (workspace / "repos" / _SLUG / "specs" / "bugs" / "BUGS.jsonl").is_file(), (
-        "the event must land in the context's real ledger, under its SLUG"
-    )
-
-
-@pytest.mark.timeout(180)
 def test_create_refuses_a_name_no_other_verb_can_use(workspace: Path) -> None:
     """`create` must refuse exactly what the rest of the CLI refuses.
 
@@ -132,13 +90,13 @@ def test_create_refuses_a_name_no_other_verb_can_use(workspace: Path) -> None:
     opinion, so "created" and "usable" cannot drift apart.
     """
     for bad in ("meu projeto", "projeto-café", "../escape"):
-        proc = _dadaia(workspace, "context", "create", bad, "--repo", "r", "--url", "x")
+        proc = _dadaia(workspace, "context", "create", bad, "--main-repo", "r", "--url", "x")
         combined = proc.stdout + proc.stderr
         assert proc.returncode != 0, f"create accepted the unusable name {bad!r}"
         assert "Traceback" not in combined
         assert "letters, digits" in combined, combined
 
     ok = _dadaia(
-        workspace, "context", "create", "outro_valido-2", "--repo", "slug_ok", "--url", "x"
+        workspace, "context", "create", "outro_valido-2", "--main-repo", "slug_ok", "--url", "x"
     )
     assert ok.returncode == 0, ok.stdout + ok.stderr

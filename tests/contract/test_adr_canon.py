@@ -255,3 +255,27 @@ def test_the_pre_wave0_record_shape_is_red() -> None:
     the schema does not."""
     violations = find_field_violations({**_VALID_RECORD, "supersedes": []})
     assert any("[] is not of type" in v for v in violations), violations
+
+
+def test_supersedes_admits_the_list_one_decision_retiring_several_needs() -> None:
+    """A single-id `supersedes` left four retired records with no successor naming
+    them: the decision that replaced all of them could only cite one. The ascending
+    comma-separated list is what a reader follows from a dead record to the live one."""
+    assert find_field_violations({**_VALID_RECORD, "supersedes": "0005,0006,0008"}) == []
+    assert find_field_violations({**_VALID_RECORD, "supersedes": "0005, 0006"}) != []
+
+
+def test_every_superseded_record_is_named_by_some_successor() -> None:
+    """A `superseded` record whose successor nobody can find is a dead end for every
+    reader the status was meant to redirect."""
+    records = _read_jsonl_records(_DECISIONS_PATH)
+    named = {
+        adr_id
+        for record in records
+        for adr_id in (record.get("supersedes") or "").split(",")
+        if adr_id
+    }
+    orphans = sorted(
+        r["id"] for r in records if r["status"] == "superseded" and r["id"] not in named
+    )
+    assert orphans == [], f"superseded with no successor naming them: {orphans}"

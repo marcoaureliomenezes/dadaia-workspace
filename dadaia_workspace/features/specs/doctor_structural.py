@@ -14,6 +14,7 @@ import shutil
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.kernel_tunables import MEMORY_SCRIPT
 from dadaia_workspace.core.workspace_layout import SCOPED_LAW_AREAS
 from dadaia_workspace.features.specs import memory_canon
 from dadaia_workspace.features.specs.canon import (
@@ -25,8 +26,9 @@ from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIs
 from dadaia_workspace.features.specs.template_history import was_shipped
 
 # TREE-3: memory .md files that must exist.  No Jinja templates — .md is canonical source.
-# v6 canon (FR1/A1.5/A1.6, T-050-06): the top-level trio renamed to ARCHITECTURE.md,
-# TECHSTACK.md, QUALITY.md — case-only for the first, word-shortened for the other two.
+# v7 canon: the top-level pair is ARCHITECTURE.md and QUALITY.md. A tree still carrying
+# memory/TECHSTACK.md is no longer canon-conformant — TREE-8's sweep names it, and
+# `dadaia specs upgrade` folds its body into ARCHITECTURE.md's `## Tech Stack`.
 _TREE3_MEMORY_FILES: tuple[str, ...] = memory_canon.MEMORY_REQUIRED_FILES
 
 # TREE-5 scoped-law coverage (T-053-15, bug
@@ -133,8 +135,8 @@ class StructuralValidator:
     def check_tree3_memory_md(self) -> list[SpecsDoctorIssue]:
         """TREE-3: required memory .md atom files must exist.
 
-        Checks: memory/ARCHITECTURE.md, memory/TECHSTACK.md,
-        memory/QUALITY.md, memory/product/index.md.
+        Checks: memory/ARCHITECTURE.md, memory/QUALITY.md,
+        memory/product/index.md.
 
         .md is the canonical source (memory-markdown-source-v1 / D-4).
         No auto-fix: .md atoms are operator-authored, not generated from templates.
@@ -151,7 +153,8 @@ class StructuralValidator:
                     severity=Severity.WARNING,
                     description=(
                         f"memory/{rel_path} is missing — required memory .md atom. "
-                        "Create it using `dadaia memory product add` or the born-markdown scaffold."
+                        f"Author it, then regenerate the pair with "
+                        f"`{MEMORY_SCRIPT} catalog generate`."
                     ),
                     path=str(target),
                     fixable=False,
@@ -507,7 +510,7 @@ class StructuralValidator:
             code="TREE-8",
             severity=Severity.ERROR,
             description=(
-                f"specs/{rel} is not part of the v6 canon (DADAIA.md §6) — either a "
+                f"specs/{rel} is not part of the v6 canon (specs/AGENTS.md) — either a "
                 "stray root entry (not one of backlog/, bugs/, memory/, releases/, "
                 "audits/, ADRs/, constitution.md, AGENTS.md) or a file nested inside "
                 "a canon area whose shape does not match that area's canon (a "

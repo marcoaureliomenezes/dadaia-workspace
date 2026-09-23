@@ -1,4 +1,4 @@
-"""Specs-pattern upgrade policy (v0.5.1 T-051-16, K10): stamp v6 or refuse.
+"""Specs-pattern upgrade policy (v0.5.1 T-051-16, K10): walk the one live hop, or refuse.
 
 Retires the versioned migration-chain registry (``MigrationStep``/``plan``/
 ``run_chain``, six steps walking pattern version 0 -> 5 through ``tree_v2.py``,
@@ -9,7 +9,7 @@ rather than a live capability:
 
 1. **Zero live callers of what it fed.** ``bugs_jsonl.py``'s step converted legacy
    Markdown bugs into the v5 ``{event, data}`` JSONL shape — a shape
-   ``features/bugs/migrate_v5.py`` (also deleted, T-051-16) was the only reader of,
+   ``features/bugs/migrate_v5.py`` (deleted, T-051-16) was the only reader of,
    and that module itself had zero production callers (``BugService`` reads
    records through the injected ``RecordStore`` directly, never the v5 fold). A
    full v0 -> v6 run in THIS release would have produced a bugs ledger nothing in
@@ -40,14 +40,21 @@ class UpgradeRefused(Exception):
     """
 
 
+#: The one version this release still knows how to walk UP from, and the hop it walks:
+#: 6 -> 7 (memory canon v7 — ``memory/TECHSTACK.md`` folds into ``ARCHITECTURE.md``'s
+#: ``## Tech Stack`` section). One entry, not a resurrected chain: a tree below
+#: :data:`UPGRADABLE_FROM` still reaches canonical the way the refusal below says.
+UPGRADABLE_FROM = 6
+
+
 def check_upgradable(current: int, goal: int) -> None:
-    """Raise :class:`UpgradeRefused` when ``current < goal``; a no-op otherwise.
+    """Raise :class:`UpgradeRefused` when the tree sits below what this release walks.
 
     ``current >= goal`` (already at, or somehow past, the floor) is deliberately
     NOT an error here — the caller (:mod:`features.migrate.upgrade`) treats it as
-    "nothing to migrate."
+    "nothing to migrate." ``UPGRADABLE_FROM <= current < goal`` is the one live hop.
     """
-    if current < goal:
+    if current < min(goal, UPGRADABLE_FROM):
         raise UpgradeRefused(
             f"specs pattern version {current} is below {goal}, and this release no "
             "longer carries the migration chain that reaches it. Upgrade this specs/ "

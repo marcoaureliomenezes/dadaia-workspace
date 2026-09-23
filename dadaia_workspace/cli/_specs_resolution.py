@@ -13,8 +13,7 @@ env rungs both feed a ``repos/<name>/specs`` path join further downstream (this 
 own :func:`resolve_specs_dir_for_cli`, and every ``container.build_*`` factory keyed by
 context name), unvalidated. Both rungs are gated by the SAME ``[A-Za-z0-9_-]+`` allowlist
 the resolution authority already enforces on every repo-slug path component
-(:data:`~dadaia_workspace.core.invocation.CONTEXT_NAME_RE`, mirrored in
-``features.spec_context.presence._valid_name``) BEFORE either value is used — an
+(:data:`~dadaia_workspace.core.invocation.CONTEXT_NAME_RE`) BEFORE either value is used — an
 operator-controlled input has no privilege elevation here (the operator can already touch
 any path directly), so this is defense-in-depth, not a privilege boundary. The two rungs
 get DIFFERENT dispositions on a traversal-shaped value: *explicit* is deliberate call-site
@@ -33,7 +32,6 @@ from dadaia_workspace.core.invocation import CONTEXT_NAME_RE as _CONTEXT_NAME_RE
 from dadaia_workspace.core.invocation import (
     HARNESS_SESSION_ID_ENV_VARS as _HARNESS_SESSION_ID_ENV_VARS,
 )
-from dadaia_workspace.core.invocation import context_name_for_specs_dir
 from dadaia_workspace.core.invocation import repo_slug_for_context as _core_repo_slug
 from dadaia_workspace.core.invocation import resolve as _resolve_invocation
 from dadaia_workspace.core.invocation import (
@@ -109,23 +107,6 @@ def resolve_context_specs_dir_for_cli(workspace_root: Path, context: str) -> Pat
     ``repo_slug`` mapping + self-hosting root fallback. CLI verbs import THIS, never
     ``core.invocation`` directly (bind-resolution-seam-is-a-single-home)."""
     return _core_resolve_context_specs_dir(workspace_root, context)
-
-
-def resolve_event_context_for_cli(specs_dir: Path | None) -> str:
-    """The context name a governance verb ACTED IN, derived from the ``specs/`` tree it
-    resolved — the ONE decider both the writer
-    (:func:`~dadaia_workspace.cli._governance_event.record_governance_event`) and the
-    reader (``doctor``'s governance baseline) use, so an event can never be filtered out
-    by the verb that wrote it.
-
-    ``$DADAIA_CONTEXT`` is not a rung at all: it names where the SESSION is bound, and
-    every governance verb's ``--context``/``--specs-dir`` overrides that bind, so reading
-    it made `doctor --context B` report B's own verb-written records as hand edits. The
-    tree is the ONE source — including the self-hosting workspace-root ``specs/``, whose
-    context ``context_name_for_specs_dir`` names directly. A tree belonging to no context
-    resolves to ``""``: silence, never a name the verb did not write for.
-    """
-    return context_name_for_specs_dir(specs_dir) if specs_dir is not None else ""
 
 
 def resolve_specs_dir_for_cli(specs_dir: str | None) -> Path:

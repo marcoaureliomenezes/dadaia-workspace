@@ -1,7 +1,7 @@
 """E2E handoff pipeline journey via the real CLI process.
 
 Intent: CONTRACT — T-AC-10 (handoff emit+validate pipeline)
-Owner: software-engineer
+Owner: dd-software-engineer
 """
 
 from __future__ import annotations
@@ -38,10 +38,10 @@ def _run(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
 
 
 def _bootstrap(workspace: Path) -> None:
-    """Bootstrap a fresh dadaia workspace via `dadaia init -w <workspace>`."""
+    """Bootstrap a fresh dadaia workspace via `dadaia init <workspace> --harness claude`."""
     workspace.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
-        [*_CLI, "init", "-w", str(workspace)],
+        [*_CLI, "init", str(workspace), "--harness", "claude"],
         cwd=str(workspace),
         capture_output=True,
         text=True,
@@ -63,7 +63,7 @@ def _write_valid_handoff(base_dir: Path, stem: str = "report") -> Path:
 
     doc = {
         "schema_version": "handoff-v1",
-        "agent": "software-engineer",
+        "agent": "dd-software-engineer",
         "context": "dadaia-workspace",
         "produced_at": "2026-05-17T00:00:00Z",
         "scope": "dadaia-workspace/test",
