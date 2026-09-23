@@ -13,6 +13,7 @@ release-please.yml behind the single `release_created` gate: no `release:` event
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -333,6 +334,7 @@ def _guard_exit(head: str, base: str) -> int:
     return subprocess.run(["bash", "-c", step["run"]], env=env, capture_output=True).returncode
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="the guard is a bash step on ubuntu-latest")
 @pytest.mark.parametrize(
     ("head", "base", "allowed"),
     [
