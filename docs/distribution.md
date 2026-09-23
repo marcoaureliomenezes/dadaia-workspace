@@ -4,7 +4,7 @@ Where dadaia-workspace is published and what each channel carries.
 
 ## Channels
 
-<!-- derived-from: pypi-distribution sha256:b7d1df6e7a7c -->
+<!-- derived-from: pypi-distribution sha256:c627d9e5be4d -->
 
 | channel | artifact | how it is published |
 |---|---|---|
@@ -16,7 +16,7 @@ Where dadaia-workspace is published and what each channel carries.
 
 ## The PyPI metadata contract
 
-<!-- derived-from: pypi-distribution sha256:b7d1df6e7a7c -->
+<!-- derived-from: pypi-distribution sha256:c627d9e5be4d -->
 
 Every field PyPI renders has exactly one home:
 
@@ -37,7 +37,7 @@ Every field PyPI renders has exactly one home:
 
 ## What the wheel carries
 
-<!-- derived-from: pypi-distribution sha256:b7d1df6e7a7c -->
+<!-- derived-from: pypi-distribution sha256:c627d9e5be4d -->
 
 The wheel ships `dadaia_workspace/` with the full `public/` tree, so `dadaia init`
 works offline from a bare install, and

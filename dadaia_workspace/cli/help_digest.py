@@ -3,7 +3,7 @@
 Backlog `cli-help-architecture-and-session-injection` (operator request 2026-08-23,
 docker/cobra model): the hand-written CLI skill was structurally condemned to rot
 (ghost verbs, 53% coverage). The digest is introspected from the Typer/Click tree —
-ONE source — version-stamped, written under ``.dadaia/agentic/`` by ``public install``
+ONE source — written under ``.dadaia/agentic/`` by ``public install``
 and ``reconcile`` (NEVER at hook fire: hooks read the file, they never build it), and
 attached to every ctx-inject emission bind-independent.
 """
@@ -24,15 +24,6 @@ _MAX_CHARS = 16_000
 #: Emitted by the generator itself, so `dadaia help tree > docs/cli.md` reproduces the
 #: committed file byte-for-byte — the regenerate line names a command that is true.
 _HEADER = "<!-- derived-from: dadaia help tree — regenerate: `dadaia help tree > docs/cli.md` -->"
-
-
-def _version() -> str:
-    from importlib import metadata
-
-    try:
-        return metadata.version("dadaia-workspace")
-    except metadata.PackageNotFoundError:
-        return "0+source"
 
 
 def _first_line(text: str | None) -> str:
@@ -89,7 +80,7 @@ def render_digest() -> str:
     lines: list[str] = [
         _HEADER,
         "",
-        f"# dadaia CLI digest (v{_version()} — derived from the live command tree; "
+        "# dadaia CLI digest (derived from the live command tree; "
         "authoritative help: `dadaia <group> --help`)",
         "",
     ]
@@ -122,18 +113,18 @@ def digest_path(workspace_root: Path) -> Path:
 
 
 def write_digest(workspace_root: Path) -> Path | None:
-    """Write the digest, skipping when the on-disk stamp already matches this version.
+    """Write the digest, skipping when the file already holds exactly this digest.
 
     Fail-soft: any error returns ``None`` — regeneration is a convenience rider on
     install/reconcile, never a reason to fail them.
     """
     try:
         path = digest_path(workspace_root)
-        stamp = f"(v{_version()} "
-        if path.is_file() and stamp in path.read_text(encoding="utf-8")[:200]:
+        text = render_digest()
+        if path.is_file() and path.read_text(encoding="utf-8") == text:
             return path
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(render_digest(), encoding="utf-8")
+        path.write_text(text, encoding="utf-8")
         return path
     except Exception:  # noqa: BLE001 — advisory artifact only
         return None

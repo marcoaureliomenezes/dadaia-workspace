@@ -44,7 +44,7 @@ memory atom under its content hash.
 
 ## A human installs and uses it
 
-<!-- derived-from: pypi-distribution sha256:b7d1df6e7a7c -->
+<!-- derived-from: pypi-distribution sha256:c627d9e5be4d -->
 <!-- derived-from: workspace-init sha256:ca5c835e94af -->
 <!-- derived-from: context-management sha256:0227a5e43894 -->
 <!-- derived-from: workspace-doctor sha256:ef9c81d0d181 -->
@@ -125,7 +125,7 @@ with a RED test. Completed work leaves as a `handoff-v1` record, validated by
 
 ## Documentation
 
-<!-- derived-from: pypi-distribution sha256:b7d1df6e7a7c -->
+<!-- derived-from: pypi-distribution sha256:c627d9e5be4d -->
 <!-- derived-from: public-asset-distribution sha256:eb08a2e29f43 -->
 
 The site is <https://marcoaureliomenezes.github.io/dadaia-workspace/>:
@@ -144,7 +144,7 @@ The standalone skills install without a workspace from the `dadaia-skills` repos
 
 ## Links
 
-<!-- derived-from: pypi-distribution sha256:b7d1df6e7a7c -->
+<!-- derived-from: pypi-distribution sha256:c627d9e5be4d -->
 
 - GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
 - PyPI — <https://pypi.org/project/dadaia-workspace/>
