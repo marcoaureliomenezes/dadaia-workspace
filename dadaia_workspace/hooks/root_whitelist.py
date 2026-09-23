@@ -21,7 +21,7 @@ from dadaia_workspace.hooks import _common
 
 #: Whitelisted root-level basenames (The Law) — DERIVED from the single authority
 #: ``core/workspace_layout.py`` so this hook and the workspace doctor can never diverge
-#: (they did, the day DADAIA.md was added to one and not the other).
+#: (they did, the day the root `AGENTS.md` map was added to one and not the other).
 _WHITELIST: frozenset[str] = (
     workspace_layout.ROOT_ALLOWED_DIRS | workspace_layout.ROOT_ALLOWED_FILES
 )

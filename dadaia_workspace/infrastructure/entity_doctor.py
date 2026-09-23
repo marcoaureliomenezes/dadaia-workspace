@@ -18,12 +18,14 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
+from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
+from dadaia_workspace.infrastructure.projection_rules import harnesses_with_a_hook_derivation
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _parse_agent_frontmatter,
     _parse_skills_from_frontmatter,
 )
+from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import HOOK_DIALECTS
 
 
 def check_agent_skill_refs(public_dir: Path) -> list[DoctorLine]:
@@ -264,8 +266,8 @@ def _entities_registry_shape_problem(raw: Any) -> str | None:
 def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
     """ENT-DERIVE-1 (constitution §12.5): the abstract-entity registry grounds the scaffold.
 
-    Independent verifier read — deliberately does NOT share the features-layer loader
-    (``features.panel.entities``), so a loader bug cannot vouch for itself. Attests:
+    Independent verifier read — deliberately shares no loader with the scaffold, so a
+    loader bug cannot vouch for itself. Attests:
 
     1. ``public/entities/registry.json`` exists, parses, and carries the expected schema.
     2. Persona ↔ core sub-agent bijection: every ``public/agents/*.md`` derives from a
@@ -346,7 +348,7 @@ def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
     for matched_id in sorted(personas & scaffolded):
         out.extend(_persona_content_drift(matched_id, agents_dir))
 
-    harnesses = set(L1_ENTRY_HARNESSES)
+    harnesses = set(harnesses_with_a_hook_derivation())
     package_root = public_dir.parent
     for behavior in registry.get("behaviors", []):
         implemented = set(behavior.get("implementations", {}))
@@ -355,7 +357,7 @@ def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
                 DoctorLine(
                     DoctorStatus.DRIFT,
                     f"entities-derivation: behavior '{behavior.get('id')}' is derived for "
-                    f"{sorted(implemented)}, expected every entry harness "
+                    f"{sorted(implemented)}, expected every harness with a hook derivation "
                     f"{sorted(harnesses)} (ENT-DERIVE-1)",
                 )
             )
@@ -369,7 +371,20 @@ def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
                 DoctorStatus.OK,
                 f"entities-derivation: {len(personas)} Personas ↔ {len(scaffolded)} core "
                 f"sub-agents; {len(registry.get('behaviors', []))} Deterministic Behaviors "
-                f"derived for all entry harnesses (ENT-DERIVE-1)",
+                f"derived for every harness with a hook derivation (ENT-DERIVE-1)",
             )
         )
+    # A declared gap is a fact about the harness, not drift in this repo: the gate rides
+    # every pre-action event the harness exposes, and where it exposes none the WARN says
+    # so once. Never an ERROR — no edit here can create an event the harness lacks.
+    for name in sorted(harnesses):
+        for action in HOOK_DIALECTS[HARNESS_RECORDS[name].hooks].ungated:
+            out.append(
+                DoctorLine(
+                    DoctorStatus.WARN,
+                    f"entities-derivation: {name}: {action!r} has no pre-action hook "
+                    f"event — {name} exposes none, so the gate cannot run before it "
+                    "(ENT-DERIVE-1)",
+                )
+            )
     return out

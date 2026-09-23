@@ -6,6 +6,7 @@ description: >
   before any recommendation, fix or verdict. Use when designing or reviewing a
   module's interface, deciding where a seam goes, judging whether a diff grows or
   shrinks a feature, or naming a structural problem.
+compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install dadaia-workspace) it also drives the SDD lifecycle — specs, backlog, bugs, releases.
 ---
 
 # dd-codebase-design
@@ -34,13 +35,10 @@ flags, wrappers) breeding chains, and deletion-shaped fixes ending families.
 ## 3. Principles
 
 - **Depth is a property of the interface, not the implementation** — internal seams (private, used by the module's own tests) never surface through the interface.
-- **The deletion test** — imagine deleting the module: if complexity vanishes it was a pass-through; if it reappears across N callers it earned its keep. Apply it to the module you are about to GROW before growing it — the same test defines slop (`DADAIA.md` §7.6).
+- **The deletion test** — imagine deleting the module: if complexity vanishes it was a pass-through; if it reappears across N callers it earned its keep. Apply it to the module you are about to GROW before growing it — the same test defines slop (`dd-code-review`'s `SLOP.md`).
 - **The interface is the test surface** — a test that reaches past the interface says the module is the wrong shape.
 - **One adapter = a hypothetical seam; two = a real one** — never introduce a port with a single adapter; that is indirection, not design.
 - **Replace, don't layer** — a fix that wraps the old path instead of replacing it is a layer, and layers are how the bug loop grows. The correct fix usually deletes a branch, collapses two paths, or moves logic back inside its owner.
-
-When designing an interface, ask: can I reduce the number of methods? simplify the
-parameters? hide more complexity inside?
 
 Design for testability — good interfaces make testing natural:
 
@@ -56,7 +54,7 @@ Design for testability — good interfaces make testing natural:
 1. Extract the core problem: one sentence describing what must actually be solved.
 2. Extract constraints: time, existing systems the solution must live inside, the write set.
 3. Extract success criteria in testable terms, and make every implicit assumption explicit.
-4. Read the bug ledger for the feature touched (`dadaia bugs stats`) — prior fixes to the same surface are evidence about the structure.
+4. Read the bug ledger for the feature touched (`python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats`) — prior fixes to the same surface are evidence about the structure.
 5. Call the Skill tool with `dd-grill-me` for operator-facing clarification; never ask what `Read`/`Glob`/`Grep` can answer.
 6. Apply the deletion test to the module the change would grow; if the diff only adds, justify it against the replace-don't-layer principle explicitly.
 7. Prefer the shape that raises depth: fewer entry points, simpler parameters, more hidden complexity.

@@ -1,6 +1,6 @@
 # CODEX.md — Compiled Decision Protocols for the Codex Harness
 
-Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, `ai-engineer`-only depth).
+Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, authoring depth).
 A protocol reference, not a doc mirror — read official docs (§8) on demand for primitive-level detail.
 
 - Mental anchor: Codex assembles an instruction chain before working.
@@ -45,14 +45,14 @@ Current-doc corrections to keep active:
 | You see / hear | What it actually is | Executable? | Enforces? |
 |---|---|---|---|
 | Codex "Rules" | Starlark `.rules` files under `.codex/rules/*.rules` | Yes (Starlark) | Command approval / prompt policy |
-| dadaia's rule-law corpus | Single consolidated `DADAIA.md`, projected byte-identically | No | Advisory text read via native discovery |
+| dadaia's rule-law corpus | One root `AGENTS.md` map plus scoped `AGENTS.md` files | No | Advisory text read via native discovery |
 
 - File extension is the ground truth: `.rules` = official Codex command policy, `.md` = dadaia's advisory law.
 - Current dadaia projection must not install Markdown law content into `.codex/rules/`.
 - A `.codex/rules/foo.md` file is projection drift — report it, fix the source installer/doctor.
 - In logs: an `allow`/`prompt`/`forbidden` decision on a command = a real Starlark Rule fired.
 - Plain instruction-following with no approval gate = the Markdown law was merely in context.
-- There is no `public/rules/` directory in this workspace — the former per-topic files consolidated into `DADAIA.md`.
+- There is no `public/rules/` directory in this workspace — law lives in the root map and the scoped `AGENTS.md` files.
 - Never document or project a `public/rules/*.md` taxonomy against a directory that does not exist.
 
 ---
@@ -155,8 +155,7 @@ prefix_rule(
 | Recursion depth | A subagent should not spawn another subagent except in exceptional cases |
 | Output contract | Each subagent returns findings with severity, evidence, and a verdict |
 
-- dadaia mapping: `project-manager` = primary orchestrator; `project-auditor` = audit orchestrator.
-- Narrow roles (`qa-engineer`, `security-reviewer`, etc.) are candidate custom agents with scoped tools.
+- dadaia mapping: the main thread = primary orchestrator; `dd-code-reviewer` = the read-only custom agent.
 
 ---
 
@@ -184,7 +183,7 @@ prefix_rule(
 - A trusted-project escalation must never be the path by which a repo silently rewrites credentials.
 - No runtime projections committed inside the source repo — `.codex/` belongs at the workspace runtime root.
 - No absolute paths or local-projection leakage into public packages — hooks/configs use portable paths only.
-- Treat enabling project-local config/hooks as a privileged review step (pair with security-reviewer).
+- Treat enabling project-local config/hooks as a privileged review step (the security lens).
 
 ---
 

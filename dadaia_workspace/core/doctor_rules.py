@@ -33,14 +33,12 @@ __all__ = [
     "merge_sections",
     "render_finding",
     "run_section",
-    "total_compliance",
-    "total_line",
 ]
 
 
 @dataclass(frozen=True)
 class SectionFinding:
-    """One finding, normalized for rendering and scoring.
+    """One finding, normalized for rendering.
 
     ``verdict`` is the finding's OWN word — ``error``/``warning``/``info`` for the
     specs and ledgers sections, ``slop``/``expired``/``missing``/``operator``/``canon``
@@ -51,15 +49,11 @@ class SectionFinding:
     code: str
     verdict: str
     message: str
-    #: A canonical finding counts toward the numerator and is not printed (the workspace
-    #: scan classifies every entry it walks, including the compliant ones).
+    #: A canonical finding is not printed (the workspace scan classifies every entry it
+    #: walks, including the compliant ones).
     canonical: bool
     #: An error-class finding makes the run exit 1.
     error: bool
-    #: The compliance unit this finding disqualifies (entry path, rule code, record
-    #: slug). ``None`` = a finding outside the scored set (a workspace invariant is not
-    #: an entry).
-    unit: str | None = None
     #: The ONE executable remediation (0.4.7 FR2). Mandatory on an error-class finding:
     #: an exit-1 finding with nothing to run is a Stall. Stamped from the emitting
     #: rule's ``fix_help`` by :func:`run_section` when the section left it empty.
@@ -80,17 +74,10 @@ class Rule[C, I]:
 
 @dataclass(frozen=True)
 class SectionReport:
-    """One section's rendered findings and its score line's numbers."""
+    """One section's rendered findings."""
 
     name: str
-    unit: str
     findings: tuple[SectionFinding, ...]
-    canonical: int
-    total: int
-
-    @property
-    def percent(self) -> int:
-        return (100 * self.canonical) // self.total if self.total else 100
 
     @property
     def printable(self) -> tuple[SectionFinding, ...]:
@@ -100,83 +87,33 @@ class SectionReport:
     def failed(self) -> bool:
         return any(f.error for f in self.findings)
 
-    def score_line(self) -> str:
-        return (
-            f"compliance({self.name}): {self.canonical}/{self.total} "
-            f"{self.unit} canonical ({self.percent}%)"
-        )
-
 
 def run_section[C, I](
     name: str,
-    unit: str,
     rules: Sequence[Rule[C, I]],
     context: C,
     render: Callable[[Rule[C, I], I], SectionFinding],
-    total_units: int | None = None,
 ) -> SectionReport:
-    """Run every rule of one section over its context and score it.
+    """Run every rule of one section over its context.
 
     ``render`` is the section's adapter at the seam: it translates the feature's own
-    issue type into a :class:`SectionFinding` and names the compliance unit.
-    A section that KNOWS its denominator (rules run, records read) passes
-    ``total_units``; its numerator is that count minus the units a non-canonical
-    finding disqualified. A section that CLASSIFIES every unit as it goes (the
-    workspace scan emits one finding per entry it walked, compliant ones included)
-    passes ``None``: every finding is a unit, and the canonical ones are the numerator.
+    issue type into a :class:`SectionFinding`.
     """
     findings: list[SectionFinding] = []
     for rule in rules:
         for issue in rule.run(context):
             findings.append(_with_fix(render(rule, issue), rule))
-    scored = [f for f in findings if f.unit is not None]
-    if total_units is None:
-        canonical = sum(1 for f in scored if f.canonical)
-        total_units = len(scored)
-    else:
-        canonical = max(total_units - len({f.unit for f in scored if not f.canonical}), 0)
-    return SectionReport(
-        name=name,
-        unit=unit,
-        findings=tuple(findings),
-        canonical=canonical,
-        total=total_units,
-    )
+    return SectionReport(name=name, findings=tuple(findings))
 
 
 def merge_sections(reports: Sequence[SectionReport]) -> SectionReport:
-    """Fold the parts of ONE section contributed by different features into one report.
-
-    A section is not a feature: `ledgers` is scored over the backlog document's records
-    AND every other committed governance record, contributed by two features that may
-    not import each other. Merging their reports at the composition root keeps one
-    section, one grammar and one score line without any cross-feature reach-in — the
-    numerators and denominators simply add, exactly as :func:`total_line` adds sections.
-    """
-    first = reports[0]
+    """Fold the parts of ONE section contributed by different features into one report:
+    a section is not a feature, and two features that may not import each other still
+    print under one name."""
     return SectionReport(
-        name=first.name,
-        unit=first.unit,
+        name=reports[0].name,
         findings=tuple(f for report in reports for f in report.findings),
-        canonical=sum(report.canonical for report in reports),
-        total=sum(report.total for report in reports),
     )
-
-
-def total_compliance(reports: Sequence[SectionReport]) -> SectionReport:
-    """The run's total, as ONE report: the sections' numbers summed and scored by the
-    same :attr:`SectionReport.percent` every section line uses.
-
-    The human `compliance(total)` line and the `--json` total payload are two renderings
-    of this one object. A second formula on either side is exactly how they came to
-    disagree at a denominator that rounds up (1055/1056: floor 99, round 100).
-    """
-    return replace(merge_sections(reports), name="total", unit="checks")
-
-
-def total_line(reports: Sequence[SectionReport]) -> str:
-    """The run's final line."""
-    return total_compliance(reports).score_line()
 
 
 def _with_fix[C, I](finding: SectionFinding, rule: Rule[C, I]) -> SectionFinding:

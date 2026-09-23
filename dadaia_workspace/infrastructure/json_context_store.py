@@ -1,17 +1,8 @@
 """JsonContextStore — atomic CRUD over spec_contexts.json (schema v3).
 
-NOTE: _load must NOT be called outside SpecContextService methods.
-Calling it directly bypasses the fcntl lock (introduced in T-11) and re-opens
-the concurrent-write race R-1.
-
-FR15 (v0.4.4): v2 -> v3 adds ``associated_repos`` — purely additive, unlike the v1 -> v2
-state-string rename. ``_load`` therefore tolerates a v2 file exactly like a v3 one
-(missing ``associated_repos`` defaults to an empty tuple in ``_from_dict``) instead of
-hard-refusing it: this task's write set does not extend to the CLI wiring that would
-give a v2 workspace a repair path in every phase, and a version gate with no reachable
-repair path is precisely the ``memory-agent-tier-migration-deadlock`` bug class (CRITICAL,
-v0.1.72). The formal backup-first, idempotent upgrade to an explicit v3 file lives in
-``dadaia_workspace.features.migrate.state_v3``.
+Every write goes through ``atomic_write``; there is no lock. ``_load`` tolerates a v2
+file exactly like a v3 one — v3 only adds ``associated_repos``, which ``_from_dict``
+defaults to an empty tuple — so a v2 workspace needs no migration step.
 """
 
 import json

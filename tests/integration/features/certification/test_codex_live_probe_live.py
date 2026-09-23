@@ -57,7 +57,7 @@ def test_codex_live_probe_exercises_the_real_installed_codex(tmp_path: Path) -> 
     """
     process = SubprocessCertificationProcess()
     try:
-        detail = _codex_live_probe_detail(process, tmp_path)
+        detail = _codex_live_probe_detail(process, tmp_path, "codex", "codex")
     except _CertificationSkip as exc:
         pytest.skip(reason=f"{exc} — plan ref T-043-34 (v0.4.3 A22.4)")
     assert "live exec probe observed" in detail

@@ -3,7 +3,7 @@
 The five test-suite ratchets (**V26**, **V28**–**V31**), pinned in **one** file per T-050-18A
 (release 0.5.0, `specs/releases/0.5.0/SPEC.md` A22.10 / FR22; measurement baselines:
 `specs/releases/0.5.0/reviews/test-minimization-literature.md` Part 3, T-050-03's
-capture at `.dadaia/tmp/software-engineer/20260827/T-050-03-baselines.md`). Same
+capture at `.dadaia/tmp/dd-software-engineer/20260827/T-050-03-baselines.md`). Same
 measure-then-pin-then-ratchet law `test_module_size_ceiling.py` and
 `test_import_linter_ignore_cap.py` already use: pin the number measured *now*,
 lowering a pin in a later commit is welcome, growing one
@@ -84,15 +84,15 @@ _TESTS_DIR = _REPO_ROOT / "tests"
 
 _ALLOWLIST_MARKER = "# allow-private-import:"
 
-# RECORDED CEILING (ratchet DOWN ONLY) — measured 2026-08-27 on this HEAD, after
+# RECORDED CEILING (ratchet DOWN ONLY) — measured 2026-09-20 on this HEAD, after
 # T-050-18 (FR9) deleted the one hook-de-slop private import that dropped the
 # T-050-03 pre-T-050-18 AST-exact count from 59/53. Lowering these after a further
 # clean-up is welcome (re-pin in the same commit as the deletion). Raising either
 # number requires a same-commit justification — a newly-added private-symbol
 # import is a newly-frozen Hyrum's-Law liability (test-minimization-literature.md
 # §1.6, Part 3.1).
-_V26_STATEMENT_CEILING = 60
-_V26_FILE_CEILING = 54
+_V26_STATEMENT_CEILING = 37
+_V26_FILE_CEILING = 34
 
 
 def _private_symbol_import_statements(
@@ -128,8 +128,8 @@ def _private_symbol_import_statements(
 
 
 def test_v26_private_symbol_import_ratchet_pins_the_hyrums_law_liability() -> None:
-    """V26 (A22.10) — pins the AST-exact private-symbol-import count at **60
-    statements / 54 files**, measured on this HEAD (post-T-050-18; supersedes the
+    """V26 (A22.10) — pins the AST-exact private-symbol-import count at **37
+    statements / 34 files**, measured on this HEAD (post-T-050-18; supersedes the
     SPEC's quoted pre-measurement ~24, itself a single-line-grep undercount per
     T-050-03's capture). Ratchet DOWN ONLY; target 0."""
     total_statements = 0
@@ -177,12 +177,12 @@ def test_v26_private_symbol_import_ratchet_pins_the_hyrums_law_liability() -> No
 
 _INTENT_HEADER_RE = re.compile(r"(?m)^\s*Intent:\s*\S")
 
-# RECORDED CEILINGS (ratchet DOWN ONLY) — measured 2026-09-03 on this HEAD; e2e is fully
+# RECORDED CEILINGS (ratchet DOWN ONLY) — measured 2026-09-20 on this HEAD; e2e is fully
 # declared and stays at 0. Lower a tier's ceiling in the same commit that declares or
 # deletes its undeclared files; raising one is never a ratchet move.
 _V31_UNDECLARED_CEILINGS: dict[str, int] = {
-    "unit": 160,
-    "integration": 51,
+    "unit": 86,
+    "integration": 29,
     "contract": 0,
     "e2e": 0,
 }
@@ -214,13 +214,13 @@ def _v31_violations(counts: dict[str, int], ceilings: dict[str, int]) -> list[st
 
 
 def test_v31_undeclared_intent_ceiling_per_tier(tmp_path: Path) -> None:
-    """V31 — test files without an `Intent:` header, pinned per tier (unit 160 /
-    integration 52 / contract 0 / e2e 0). Ratchet DOWN ONLY; target 0 everywhere."""
+    """V31 — test files without an `Intent:` header, pinned per tier (unit 86 /
+    integration 29 / contract 0 / e2e 0). Ratchet DOWN ONLY; target 0 everywhere."""
     counts = _undeclared_by_tier(tracked_test_files(_REPO_ROOT, "test_*.py"), _TESTS_DIR)
     violations = _v31_violations(counts, _V31_UNDECLARED_CEILINGS)
     assert not violations, (
         "test files without an `Intent:` header grew past the pinned ceiling — an "
-        "undeclared test is SCAFFOLD by default (DADAIA.md §7): declare it or delete it "
+        "undeclared test is SCAFFOLD by default (`dd-code-review`): declare it or delete it "
         f"under a qa-engineer verdict, never raise the ceiling. {violations}"
     )
 

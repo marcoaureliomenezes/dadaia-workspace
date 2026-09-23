@@ -46,7 +46,7 @@ def test_canon_placeholder_renders_the_closed_canon_sorted() -> None:
     header, rule, *rows = out.splitlines()
     assert header == "| Entry |" and rule == "|---|"
     assert [row.strip("| `") for row in rows] == sorted(STATES_CANON)
-    assert len(rows) == 11
+    assert len(rows) == 10
 
 
 def test_text_without_placeholders_is_returned_unchanged() -> None:

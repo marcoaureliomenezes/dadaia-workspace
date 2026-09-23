@@ -31,7 +31,10 @@ still correctly detected as a byte difference). The renderer is the only verifie
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Callable, Sequence
+import hashlib
+import os
+import shutil
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -39,10 +42,89 @@ from typing import Literal
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
+from dadaia_workspace.infrastructure.public_assets_common import iter_public_files, read_link_target
 
 #: Which fixed-point discipline a rule's ``render`` observes (documentation only —
 #: install/doctor run one algorithm regardless; see the module docstring).
 CompareSemantic = Literal["bytes", "owned-slice", "managed-block"]
+
+#: What a projected entry physically IS on disk. ``read_bytes()`` follows a link, so the
+#: digest alone can never tell a symlink from a copy of the same content — the kind
+#: travels with the entry, through the transcript, into the install ledger.
+EntryKind = Literal["file", "symlink", "copy"]
+
+
+def fixed_content_render(content: bytes) -> Callable[[bytes | None], bytes]:
+    """A render that ignores what is on disk — the staged bytes fully determine it."""
+
+    def _render(_current: bytes | None) -> bytes:
+        return content
+
+    return _render
+
+
+def bytes_rule(
+    label: str,
+    harness: str,
+    dst: Path,
+    content: bytes,
+    *,
+    mode: int | None = None,
+) -> ProjectionRule:
+    """A rule whose canonical content is fixed at rule-build time (``compare="bytes"``)."""
+    return ProjectionRule(
+        label=label,
+        harness=harness,
+        dst=dst,
+        render=fixed_content_render(content),
+        compare="bytes",
+        mode=mode,
+    )
+
+
+def link_rule(label: str, harness: str, dst: Path, link_to: Path) -> ProjectionRule:
+    """A rule that projects a RELATIVE symlink at *dst* onto the authored *link_to*.
+
+    One authored set, N harness views: the executor falls back to a hash-verified copy
+    where the platform refuses symlinks, and records which of the two it wrote.
+    """
+    return ProjectionRule(
+        label=label, harness=harness, dst=dst, render=link_render, link_to=link_to
+    )
+
+
+def tree_bytes_rules(
+    src_dir: Path,
+    dst_dir: Path,
+    *,
+    harness: str,
+    label_prefix: str,
+    mode: int | None = None,
+) -> tuple[ProjectionRule, ...]:
+    """One ``compare="bytes"`` rule per real file under *src_dir* (verbatim copy).
+
+    A projection is a copy of the source, permissions included: an authored file that is
+    executable projects executable — a skill script the agent runs directly. The source's
+    own exec bit is the whole rule; no path knows what a `scripts/` dir is.
+    """
+    return tuple(
+        bytes_rule(
+            f"{label_prefix}{src.relative_to(src_dir).as_posix()}",
+            harness,
+            dst_dir / src.relative_to(src_dir),
+            src.read_bytes(),
+            mode=mode if mode is not None else (0o755 if os.access(src, os.X_OK) else None),
+        )
+        for src in iter_public_files(src_dir)
+    )
+
+
+def link_render(_current: bytes | None) -> bytes:
+    """A link rule projects an inode, not bytes — its canonical content is its target's.
+
+    Never called: install and doctor both branch on ``link_to`` before rendering.
+    """
+    return b""
 
 
 @dataclass(frozen=True)
@@ -66,6 +148,11 @@ class ProjectionRule:
     #: (e.g. a cleared executable bit on a hook shim) is repaired even when the
     #: content already matches. ``None`` leaves the destination's mode untouched.
     mode: int | None = None
+    #: When set, the rule projects a RELATIVE symlink at ``dst`` pointing at this
+    #: canonical path (one authored set, N harness views) — falling back to a
+    #: hash-verified copy when the platform refuses to create one (Windows without
+    #: Developer Mode raises ``OSError``/``NotImplementedError``). ``render`` is unused.
+    link_to: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -75,6 +162,7 @@ class TranscriptLine:
 
     status: Literal["ok", "skip"]
     path: Path
+    kind: EntryKind = "file"
 
     def render(self) -> str:
         prefix = "[ok]   " if self.status == "ok" else "[skip] "
@@ -104,6 +192,110 @@ def _read_bytes(path: Path) -> bytes | None:
     return path.read_bytes() if path.is_file() else None
 
 
+def _posix_relpath(target: Path, start: Path) -> str:
+    """A relative path with ``/`` separators on every OS: the one spelling a link target
+    and its ledger digest carry, so Windows and POSIX agree byte for byte."""
+    return os.path.relpath(target, start).replace(os.sep, "/")
+
+
+def _link_target(rule: ProjectionRule) -> str:
+    """The relative target a link rule's ``dst`` must carry (POSIX-shaped, portable)."""
+    assert rule.link_to is not None, "a link rule always carries link_to"
+    return _posix_relpath(rule.link_to, rule.dst.parent)
+
+
+def _source_files(src: Path) -> Iterator[tuple[Path, Path]]:
+    """(source file, path relative to *src*) for a file or every file under a directory."""
+    if src.is_dir():
+        for path in sorted(src.rglob("*")):
+            if path.is_file():
+                yield path, path.relative_to(src)
+    elif src.is_file():
+        yield src, Path(".")
+
+
+def _copy_verified(src: Path, dst: Path) -> list[Path]:
+    """Copy *src* (file or tree) onto *dst*, verifying each written file by digest.
+
+    The fallback half of a link rule: a platform that refuses symlinks still gets the
+    same content, and the ledger records it as ``copy`` so the doctor can tell them apart.
+    """
+    written: list[Path] = []
+    for source, rel in _source_files(src):
+        target = dst if rel == Path(".") else dst / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        payload = source.read_bytes()
+        atomic_write(target, payload)
+        if hashlib.sha256(target.read_bytes()).digest() != hashlib.sha256(payload).digest():
+            raise PublicAssetError(f"copy fallback for {dst} did not verify at {target}")
+        written.append(target)
+    return written
+
+
+def _clear(dst: Path) -> None:
+    if dst.is_symlink() or dst.is_file():
+        dst.unlink()
+    elif dst.is_dir():
+        shutil.rmtree(dst)
+
+
+def _install_link(rule: ProjectionRule, *, force: bool) -> list[TranscriptLine]:
+    assert rule.link_to is not None
+    target = _link_target(rule)
+    if not force and rule.dst.is_symlink() and read_link_target(rule.dst) == target:
+        return [TranscriptLine("skip", rule.dst, "symlink")]
+    rule.dst.parent.mkdir(parents=True, exist_ok=True)
+    _clear(rule.dst)
+    try:
+        # The canonical target is POSIX-spelled (ledger, doctor); the OS gets its native
+        # separators only here — Windows cannot resolve a reparse target written with "/".
+        os.symlink(target.replace("/", os.sep), rule.dst, target_is_directory=rule.link_to.is_dir())
+    except (OSError, NotImplementedError):
+        return [
+            TranscriptLine("ok", path, "copy") for path in _copy_verified(rule.link_to, rule.dst)
+        ]
+    return [TranscriptLine("ok", rule.dst, "symlink")]
+
+
+def link_entry_defect(entry: Path, canonical: Path) -> str | None:
+    """What is wrong with one projected harness view of *canonical*, else ``None``.
+
+    The ONE definition of "a correct view of the authored set": a symlink carrying the
+    relative target of *canonical* and resolving to something that exists, or — on a
+    platform that refused the link — a copy equal to it byte for byte. The rule-table
+    compare (:func:`_doctor_link`) and the ledger-driven ``SYMLINK-TARGET-1`` sweep in
+    ``infrastructure/public_assets.py`` both read this, so a link entry cannot be
+    judged correct by one surface and broken by the other.
+    """
+    expected = _posix_relpath(canonical, entry.parent)
+    if entry.is_symlink():
+        actual = read_link_target(entry)
+        if actual != expected:
+            return f"symlink target {actual!r} is not the canonical {expected!r}"
+        if not canonical.exists():
+            return f"symlink target {expected!r} does not exist"
+        return None
+    if not entry.exists():
+        return "missing"
+    if not canonical.exists():
+        return f"canonical {expected!r} does not exist"
+    for source, rel in _source_files(canonical):
+        copied = entry if rel == Path(".") else entry / rel
+        if not copied.is_file() or copied.read_bytes() != source.read_bytes():
+            return f"copy diverged at {rel.as_posix()}"
+    return None
+
+
+def _doctor_link(rule: ProjectionRule) -> DoctorLine:
+    assert rule.link_to is not None
+    if not rule.dst.is_symlink() and not rule.dst.exists():
+        return DoctorLine(DoctorStatus.MISSING, rule.label)
+    defect = link_entry_defect(rule.dst, rule.link_to)
+    if defect is None:
+        return DoctorLine(DoctorStatus.OK, rule.label)
+    return DoctorLine(DoctorStatus.DRIFT, f"{rule.label} ({defect})")
+
+
 def _apply_mode(path: Path, mode: int | None) -> None:
     if mode is not None:
         with contextlib.suppress(OSError):
@@ -120,6 +312,9 @@ def install_rules(rules: Sequence[ProjectionRule], *, force: bool) -> Transcript
     """
     lines: list[TranscriptLine] = []
     for rule in rules:
+        if rule.link_to is not None:
+            lines.extend(_install_link(rule, force=force))
+            continue
         current = _read_bytes(rule.dst)
         desired = rule.render(current)
         if current is None or current != desired or force:
@@ -146,6 +341,9 @@ def doctor_rules(rules: Sequence[ProjectionRule]) -> list[DoctorLine]:
     """
     out: list[DoctorLine] = []
     for rule in rules:
+        if rule.link_to is not None:
+            out.append(_doctor_link(rule))
+            continue
         current = _read_bytes(rule.dst)
         if current is None:
             out.append(DoctorLine(DoctorStatus.MISSING, rule.label))

@@ -23,13 +23,12 @@ dadaia doctor --context <ctx> --json
 2. Each finding reads `<CODE> <verdict> <message>`; the message carries its own remediation.
 3. Every non-zero-severity issue inside the window becomes a `FINDINGS-FORMAT.md` record with `pillar: "specs"`.
 4. Record a WARN that `--fix` can repair mechanically as a finding too — this pillar measures, it never fixes.
-5. Treat an absent `specs/releases/**/verdicts/**` file on a merged PR as expected — the gate deletes a verdict once consumed.
 6. Treat an archived release carrying no directory (only its `releases_histo.jsonl` summary) as the canon shape, not drift.
 
 ## `_RELEASE.json` milestone completeness
 
 1. For every release whose `_RELEASE.json` the window's commits touch, confirm the three canonical milestones.
-2. Milestones: `defined` (SPEC `Aprovado`), `implemented` (final-rc QA close), `shipped` (merge to `main`).
+2. Milestones: `defined` (SPEC `Approved`), `implemented` (final-rc QA close), `shipped` (merge to `main`).
 3. Confirm each carries a `sha` (and, where applicable, a `pr`).
 4. Flag a release with a `shipped` milestone but no `defined`/`implemented` milestone — the chain has a gap.
 5. For an archived release, check the same via its `releases_histo.jsonl` summary.
@@ -44,7 +43,7 @@ dadaia doctor --context <ctx> --json
 ## Slop readout
 
 Input: the ratchet modules and the window `from-sha..HEAD`. Output: the "Slop readout" table in `AUDIT.md`
-(ratchet, baseline, HEAD, trend, verdict). Definition and signals: `DADAIA.md` §7.6, `dd-code-review`'s `SLOP.md`.
+(ratchet, baseline, HEAD, trend, verdict). Definition and signals: `dd-code-review`'s `SLOP.md`.
 
 1. Run `pytest tests/contract/test_slop_ratchets.py tests/contract/test_test_suite_ratchets.py`; record each count beside its pinned ceiling.
 2. Trend each ratchet over the window: the count at the from-sha against HEAD, via a temporary worktree under `.dadaia/tmp/` — never a stash.

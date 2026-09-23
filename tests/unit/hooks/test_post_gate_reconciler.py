@@ -4,7 +4,7 @@ Intent: CONTRACT — T-046-29 (FR11 ruling: the reconciler's unobservable dirty-
 is deleted) + FR-W1-03 NEVER-BLOCKS, re-seated at the seams that survive.
 
 What remains of the "advisory working-tree reconciler" is its throttle marker
-(``.dadaia/tmp/reconciler-last-<sid>``) and the ONE reaper it gates (``presence.gc``,
+(``.dadaia/tmp/reconciler-last-<sid>``) and the ONE reaper it gates (``doctor.reap``,
 release 0.5.1 K2). The ``git status`` classification that used to feed a
 ``RECONCILER_FLAG`` log line died with the log: a dirty MUTATING path in the bound repo
 spawns no git child and writes nothing. Every branch must (1) exit 0, (2) fail open.
@@ -23,7 +23,7 @@ import pytest
 
 from dadaia_workspace.core import session_store
 from dadaia_workspace.core.kernel_tunables import RECONCILER_THROTTLE_TTL_SECONDS
-from dadaia_workspace.features.spec_context import presence
+from dadaia_workspace.features.spec_context import doctor
 from dadaia_workspace.hooks import _common, sdd_post_gate
 
 _SID = "session-recon"
@@ -120,10 +120,10 @@ def test_reaper_error_fails_open_exit_zero(monkeypatch: pytest.MonkeyPatch, tmp_
     _bind_session(ws)
     monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
 
-    def _boom(workspace: Path, *, now: datetime, own_session_id: str) -> presence.GcReport:
+    def _boom(workspace: Path) -> list[str]:
         raise RuntimeError("reaper blew up mid-pass")
 
-    monkeypatch.setattr(presence, "gc", _boom)
+    monkeypatch.setattr(doctor, "reap", _boom)
     monkeypatch.setattr(_common, "read_stdin_json", lambda: {"session_id": _SID})
     monkeypatch.setattr(_common, "resolve_session_id", lambda payload: _SID)
     assert sdd_post_gate.main() == 0
@@ -135,19 +135,19 @@ def test_throttle_skips_the_reaper_inside_the_window_and_runs_after_it(
     """Intent: CONTRACT — FR-W1-03 throttle + K2 cadence (byte-identical after T-046-29). Size: SMALL.
 
     The throttle marker is checked BEFORE the reaper runs: two passes inside the window
-    call ``presence.gc`` once; a third pass after the window calls it again.
+    call ``doctor.reap`` once; a third pass after the window calls it again.
     """
     ws = _make_workspace(tmp_path)
     monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
     _bind_session(ws)
     calls = {"n": 0}
-    real_gc = presence.gc
+    real_reap = doctor.reap
 
-    def _spy(workspace: Path, *, now: datetime, own_session_id: str) -> presence.GcReport:
+    def _spy(workspace: Path) -> list[str]:
         calls["n"] += 1
-        return real_gc(workspace, now=now, own_session_id=own_session_id)
+        return real_reap(workspace)
 
-    monkeypatch.setattr(presence, "gc", _spy)
+    monkeypatch.setattr(doctor, "reap", _spy)
 
     sdd_post_gate._throttled_gc(ws, _SID)  # first: stamps the marker, reaps
     sdd_post_gate._throttled_gc(ws, _SID)  # second: throttled before the reaper

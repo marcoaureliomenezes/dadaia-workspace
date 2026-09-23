@@ -60,7 +60,7 @@ _CATALOG: dict[str, object] = {
 }
 
 # A small tech-stack atom (≤ the 24 non-empty-line cap) is emitted verbatim (stripped).
-_TECH_STACK = "# Tech Stack\n\nPython 3.12 + poetry\npytest + mypy --strict + ruff\n"
+_TECH_STACK_SECTION = "## Tech Stack\n\nPython 3.12 + poetry\npytest + mypy --strict + ruff"
 
 # The constitution never reaches the bootstrap; of ARCHITECTURE.md and QUALITY.md only
 # the marked fixed block does — the sentinel bodies outside the markers prove it.
@@ -73,6 +73,7 @@ _ARCHITECTURE = (
     "### Slop — code (fixed)\n"
     "- LAW_CODE_BULLET\n"
     "<!-- /dadaia:fixed slop-code -->\n"
+    "\n" + _TECH_STACK_SECTION + "\n"
 )
 _QUALITY = (
     "# Quality\n"
@@ -92,7 +93,7 @@ _QUALITY = (
 _EXPECTED_BOOTSTRAP = (
     "\n"
     "=== workspace memory (tech + catalog) ===\n"
-    "# Tech Stack\n"
+    "## Tech Stack\n"
     "\n"
     "Python 3.12 + poetry\n"
     "pytest + mypy --strict + ruff\n"
@@ -122,7 +123,6 @@ def _build_fixture_specs(tmp_path: Path) -> Path:
     specs = tmp_path / "specs"
     mem = specs / "memory"
     (mem / "product").mkdir(parents=True)
-    (mem / "TECHSTACK.md").write_text(_TECH_STACK, encoding="utf-8")
     (mem / "product" / "catalog.json").write_text(
         json.dumps(_CATALOG, ensure_ascii=False, indent=2), encoding="utf-8"
     )

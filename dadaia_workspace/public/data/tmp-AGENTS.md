@@ -16,7 +16,7 @@ Nothing here is product source or an approval artifact.
 ## 2. Cleanup
 
 - Files here may be deleted after their evidence is summarized in a report.
-- If a temporary artifact is required for traceability, move the evidence reference into the repo's reports home (`DADAIA.md` §5.2).
+- If a temporary artifact is required for traceability, move the evidence reference into the repo's reports home (the root `AGENTS.md` map §4).
 - Mention the moved reference in the handoff JSON.
 
 ## 3. Validation

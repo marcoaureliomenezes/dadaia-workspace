@@ -24,8 +24,10 @@ from dadaia_workspace.core.frontmatter import FRONTMATTER_RE as _FRONTMATTER_RE
 #: v3 = agent-tier-frontmatter (v0.1.72 FR1); v4 = bugs-single-file (v0.1.73 FR1 —
 #: the operator's ONE-append-only-ledger contract); v5 = specs-canon-v6's tree shape
 #: (T-050-05); v6 = this stamp, T-050-06A — the version number itself, deferred by
-#: T-050-05 because RELEASE_SEMVER_RE's axis flip (below) is this task's write set.
-CANONICAL_SPECS_VERSION = 6
+#: T-050-05 because RELEASE_SEMVER_RE's axis flip (below) is this task's write set;
+#: v7 = memory canon v7 — ``memory/TECHSTACK.md`` left the canon and its body became
+#: ``ARCHITECTURE.md``'s ``## Tech Stack`` section, which ``features/migrate`` folds.
+CANONICAL_SPECS_VERSION = 7
 
 #: Version assigned to a tree with no stamp (pre-framework flat layout).
 UNSTAMPED_VERSION = 0
@@ -43,7 +45,7 @@ UNSTAMPED_VERSION = 0
 #: ``MAJOR.MINOR.PATCH`` (canon v6 moved live/archived release ids off the ``v`` prefix);
 #: the retired axis (every id shipped before v0.5.0's canon move) is ``vMAJOR.MINOR.PATCH``
 #: and stays matched here ONLY so an existing archived directory still resolves for
-#: read-only lookups (doctor naming checks, the CI verdict-evidence gate). The ``v``
+#: read-only lookups (doctor naming checks). The ``v``
 #: prefix is therefore OPTIONAL in this object, but ``is_release_semver()`` below narrows
 #: to the bare, current-axis form ONLY — nothing may *mint* a new ``v``-prefixed id. Both
 #: axes keep the optional ``-suffix`` segment (rc/canary/hotfix flows are legitimate
@@ -54,47 +56,13 @@ RELEASE_SEMVER_RE = re.compile(r"^v?\d+\.\d+\.\d+(-[0-9A-Za-z][0-9A-Za-z.]*)?$")
 #: derived from :data:`RELEASE_SEMVER_RE` — never a second hand-typed copy (F004,
 #: 20260830 audit). The one composable source for path regexes embedding a release id
 #: (``features/specs/canon.py``'s TREE-8 canon entries).
-#: The suffix group stays CAPTURING in the compiled pattern (bash's POSIX ERE, which
-#: ``release_semver_ere_pattern()`` feeds, has no ``(?:``) but is neutralized here so
+#: The suffix group stays CAPTURING in the compiled pattern but is neutralized here so
 #: embedding the fragment never shifts a consumer regex's group indices.
 RELEASE_ID_FRAGMENT: str = (
     RELEASE_SEMVER_RE.pattern.removeprefix("^v?").removesuffix("$").replace("(-", "(?:-")
 )
 
-#: The exactly-two verdict-evidence root templates the CI security-verdict gate
-#: (``.github/scripts/pr-verdict-check.sh``) resolves against (SPEC AS-15, T-050-06A
-#: boundary 2). Each string carries ONE ``{glob}`` placeholder the caller substitutes
-#: with either ``*`` (search every release, live and archived) or a narrowing value
-#: already validated against :data:`RELEASE_SEMVER_RE`. Never
-#: ``specs/releases/_ideas/`` — T-050-01 moves every verdict-bearing trio out of
-#: ``_ideas/`` before any PR exists, and ``_ideas/`` stays deliberately MUTATING
-#: (A6.3): a freely-writable directory is never a trust root of a required check.
-#: The gate shells out to a bare ``python3 -c`` importing this module (stdlib-only —
-#: ``re`` + ``pathlib``, no install step) to read this tuple and
-#: :data:`RELEASE_SEMVER_RE`'s pattern; a derivation failure there is fail-closed
-#: (SPEC §9.2 SEC-R2) — no fallback glob, ever.
-VERDICT_EVIDENCE_ROOT_TEMPLATES: tuple[str, str] = (
-    "specs/releases/{glob}/verdicts",
-    "specs/releases/_archive/{glob}/verdicts",
-)
-
 _STAMP_RE = re.compile(r"^specs_pattern_version:\s*(\d+)\s*$", re.MULTILINE)
-
-
-def release_semver_ere_pattern() -> str:
-    """Return :data:`RELEASE_SEMVER_RE`'s pattern translated to POSIX ERE syntax.
-
-    ``.github/scripts/pr-verdict-check.sh`` validates an optional ``RELEASE_ID``
-    narrowing value with bash's ``[[ value =~ pattern ]]`` — POSIX Extended Regular
-    Expressions, a different dialect from Python's ``re``. ``\\d`` is the ONLY
-    PCRE-only construct :data:`RELEASE_SEMVER_RE` uses (POSIX ERE has no digit-class
-    shorthand; bash's regex engine treats a literal ``\\d`` as an escaped ``d``,
-    silently rejecting every valid id — reproduced and fixed at T-050-06A). This is a
-    MECHANICAL syntax translation of the one canon pattern, computed here so the gate
-    reads a single derived value rather than a second, hand-typed copy; it is not a
-    second definition of the release-id shape.
-    """
-    return RELEASE_SEMVER_RE.pattern.replace(r"\d", "[0-9]")
 
 
 def is_release_semver(value: str) -> bool:
@@ -105,7 +73,7 @@ def is_release_semver(value: str) -> bool:
     release/segment may be created under?" A ``v``-prefixed id matches the broader
     :data:`RELEASE_SEMVER_RE` (it must still resolve for archived-directory lookups) but
     is refused here — the retired axis is read-only, never mintable again. Used by
-    ``dadaia release new`` (``new_artifacts.release_new``). Callers that also accept the
+    ``release.py new``. Callers that also accept the
     legacy slug form compose this with their own slug check.
     """
     return RELEASE_SEMVER_RE.match(value) is not None and not value.startswith("v")

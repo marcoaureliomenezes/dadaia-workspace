@@ -1,7 +1,7 @@
 # AUTHORING.md — The Writing-for-Agents Contract
 
-Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, `ai-engineer`-only depth).
-House authoring contract for every AI-entity file `ai-engineer` writes: personas, skills, rules, hooks-facing instructions.
+Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, authoring depth).
+House authoring contract for every AI-entity file: personas, skills, rules, hooks-facing instructions.
 
 ## The 15-rule checklist
 
@@ -50,7 +50,7 @@ Every library skill must satisfy all fifteen; each rule's detail lives in the se
 | Cognitive load | The operator/reviewer | Zero context tax, but the human must remember the document exists |
 
 - This is `dd-ai-eng-knowhow`'s own shape in miniature: Part 1 is context-loaded for every agent, every session.
-- Siblings are reached only by pointer — free until `ai-engineer` needs them.
+- Siblings are reached only by pointer — free until an author needs them.
 
 ---
 
@@ -105,7 +105,7 @@ Six checks, applied at authoring time and at review time:
 4. Relevance sweep — does each line still bear on what the document does?
 5. A line that never bears on the task, or went stale, is sediment — the default fate of an unpruned document.
    Governance provenance (FR ids, task ids, "renamed/absorbed from") is sediment by definition: git owns history.
-6. No-op hunt — does removing the sentence change what the model does? If not, delete it; the deletion test (`DADAIA.md` §7.6) is the general form.
+6. No-op hunt — does removing the sentence change what the model does? If not, delete it; the deletion test (`dd-code-review`'s `SLOP.md`) is the general form.
 
 Altitude belongs here too: state intent, not mechanics that go stale (file paths, code snippets). The one exception:
 a snippet that encodes a decision more precisely than prose (a schema, a state shape) may be inlined, trimmed to the
@@ -141,9 +141,9 @@ A skill never moves alone. Any authoring act (create, merge, rename, delete, res
 
 1. `entities/behavior-map.json` — the row (exactly one per skill), `declared_overlaps`, and the re-recorded hash tuple (a deliberate, reviewed act).
 2. Persona `skills:` grants — the orphan checker requires every model-invoked skill granted somewhere; a `disable-model-invocation` skill is exempt.
-3. Law citations — `DADAIA.md` and every scoped `AGENTS.md` SOURCE under `public/` that names the skill.
+3. Law citations — the root map and every scoped `AGENTS.md` SOURCE under `public/` that names the skill.
 4. Cross-citations in sibling skills (the citation contract test checks every path-shaped token in `public/**`).
-5. Reprojection — `dadaia public stage` → `install --target all` → `public doctor` `[ok]`; stale projected directories removed from every harness target.
+5. Reprojection — `dadaia public stage` → `install` → `public doctor` `[ok]`; stale projected directories removed from every harness target.
 
 ---
 

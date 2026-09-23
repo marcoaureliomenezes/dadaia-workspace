@@ -1,23 +1,33 @@
 ---
 slug: harness-claude-code
-title: Harness — Claude Code
-tldr: Entry harness with native sub-agent dispatch; its scaffold is the CLAUDE.md bridge plus the .claude/ projection.
-summary: Claude Code is the only harness with native sub-agent dispatch, loading the law through the CLAUDE.md import chain and running the nine-agent roster under the Python hooks.
-tags: [harness, claude-code, projection, dispatch]
+title: harness-claude-code
+tldr: Entry harness with native sub-agent dispatch; reads the root AGENTS.md map natively and reaches skills and personas through per-entry symlinks into .agents/.
+summary: How Claude Code loads the workspace law, reaches the three dd- personas and the skills, binds a session, and which hook events carry the workspace's behaviours.
+tags: [harness, claude-code, projection, hooks]
+sources:
+  - dadaia_workspace/core/harness_registry.py
+  - dadaia_workspace/infrastructure/runtime_config.py
+  - dadaia_workspace/infrastructure/agent_transcodes.py
+  - dadaia_workspace/infrastructure/runtime_transforms/hook_wrappers.py
 ---
 
-## Load path and gates
+## Load path
 
-- Claude Code is the only harness with native sub-agent dispatch (the Agent tool), and the nine-agent roster runs inside it as sub-agents.
-- `CLAUDE.md` imports `AGENTS.md`, which imports `DADAIA.md`; that chain is the single load path, so the law is in context exactly once per session and this harness receives no rules-directory mirror.
-- `dadaia context bind <ctx>` arms ctx-inject (`UserPromptSubmit`), which injects the bound context's tech-stack digest and feature catalog once per session — and never the fixed law blocks, which the law chain already loads.
-- Claude Code exposes a native session id, so the bind record is this session's own at rung 2 and a concurrent session's bind never reaches it ([[context-management]]).
-- `.claude/settings.json` registers `SessionStart` matchers `compact`, `clear`, `startup` and `resume` — the bootstrap re-emits after a compact or `/clear`, and a NEW session receives it at the event itself instead of waiting for its first prompt.
-- Writes pass PreToolUse `pre_gate` (matcher `Edit|Write|MultiEdit|NotebookEdit|Bash`), a match-all PostToolUse heartbeat/reconciler, and the git chokepoints ([[sdd-gate-v3]]).
-- The pre-gate emits a merged envelope — `hookSpecificOutput.permissionDecision: deny` (with its `permissionDecisionReason`) is the operative contract, the top-level `decision: block`/`reason` pair riding along for the Codex hooks and the Kimi shim; an ALLOW carries no permission verdict at all (`defer` is print-mode only and never emitted).
-- It never answers `permissionDecision: allow`, which would bypass the permission prompts.
-- `dadaia public install --target claude` projects `.claude/agents/` (the nine personas rendered with resolved model/effort), `.claude/skills/` and `.claude/settings.json`, manifest-tracked and never hand-edited ([[public-asset-distribution]]).
+- Claude Code is the harness with native sub-agent dispatch (the Agent tool): the main thread runs there and dispatches the three `dd-` personas as sub-agents ([[agent-orchestration]]).
+- It reads the root `AGENTS.md` map natively at session start when no `CLAUDE.md` sits on or above the cwd; a scoped `AGENTS.md` attaches when a file in its directory is read ([[agentic-entities]]).
+- The workspace ships no `CLAUDE.md`; `dadaia init` recommends the user setting `instructionFiles: claude-md-and-agents-md` so a repo's own `CLAUDE.md` never hides the map, and sessions launch at the workspace root.
+- `.claude/skills/<name>` and `.claude/agents/<name>.md` are relative symlinks into `.agents/skills/` and `.agents/agents/`, with a hash-verified copy where `os.symlink` fails; `dadaia public doctor`'s `SYMLINK-TARGET-1` attests every entry ([[public-asset-distribution]]).
+- Least privilege is rendered into each persona at install from its `activity_class`: `permissionMode` plus, for a read-only persona, `disallowedTools`.
+
+## Hooks and binding
+
+- `dadaia harness add claude` writes `.claude/settings.json` and the symlink set.
+- The four hook behaviours ([[agentic-entities]]) are registered there: `PreToolUse` `dadaia_workspace.hooks.pre_gate` (matcher `Edit|Write|MultiEdit|NotebookEdit|Bash`), a match-all `PostToolUse` `dadaia_workspace.hooks.sdd_post_gate` (the throttled reaper), `UserPromptSubmit` and `SessionStart` `dadaia_workspace.hooks.ctx_inject`, and the session-start reaper; the git chokepoints run beside them ([[sdd-gate-v3]]).
+- `SessionStart` matchers `startup`, `resume`, `compact` and `clear` re-emit the bootstrap after a compact or `/clear` as well as at a new session.
+- A block answers `hookSpecificOutput.permissionDecision: deny` with its reason, the top-level `decision: block`/`reason` pair riding along for other consumers; an allow carries no permission verdict, so the user's permission prompts are never bypassed.
+- `dadaia context bind <ctx>` records the bind in this session's own record, keyed by Claude Code's native session id; ctx-inject then injects that context's tech-stack section and feature catalog once, and again after a re-bind — never the law, which the map already loads ([[context-management]]).
+- Without a workspace, the standalone `dd-` skills reach Claude Code through the `dadaia-skills` plugin marketplace or `npx skills add` into `.claude/skills` ([[public-asset-distribution]]).
 
 ## Dependencies
 
-[[TECHSTACK]], [[sdd-gate-v3]], [[public-asset-distribution]], [[agent-orchestration]].
+[[agentic-entities]], [[agent-orchestration]], [[sdd-gate-v3]], [[context-management]], [[public-asset-distribution]].

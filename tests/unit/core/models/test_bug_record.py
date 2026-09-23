@@ -66,7 +66,7 @@ def test_from_dict_ignores_the_retired_provenance_keys_and_to_dict_never_emits_t
     legacy: dict[str, object] = {
         "id": "legacy-bug",
         "ts": "2026-08-27T12:00:00Z",
-        "reported_by": "software-engineer",
+        "reported_by": "dd-software-engineer",
         "title": "legacy bug",
         "severity": "MEDIUM",
         "surface": "bugs",
@@ -101,7 +101,7 @@ def _sample_record(**overrides: object) -> BugRecord:
     base: dict[str, object] = {
         "id": "sample-bug",
         "ts": "2026-08-27T12:00:00Z",
-        "reported_by": "software-engineer",
+        "reported_by": "dd-software-engineer",
         "title": "sample bug",
         "severity": "MEDIUM",
         "surface": "bugs",

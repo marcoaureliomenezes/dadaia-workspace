@@ -38,7 +38,7 @@
 # to its invocation cwd, with no config key to redirect it (mutmut's own
 # configuration.py:107). Running it with cwd = repo root would create `mutants/` and a
 # mutation cache tree inside the repo, violating this workspace's "no caches in the repo
-# tree" law (DADAIA.md §4). This script therefore stages a scoped copy under
+# tree" law (`dd-gitflow-default`). This script therefore stages a scoped copy under
 # `.dadaia/tmp/`, creates a throwaway venv and runs mutmut entirely inside that staged
 # copy, and copies back only the JSON stats. It NEVER writes inside the repo tree.
 #
@@ -64,7 +64,7 @@ REPO="$(cd "$SCRIPT_DIR/../.." && pwd)"                    # repos/dadaia-worksp
 # fake tmp_path tree without touching the real workspace's .dadaia/tmp/.
 WORKSPACE_ROOT="${DADAIA_WORKSPACE_ROOT:-$(cd "$REPO/../.." && pwd)}"
 DATE_STAMP="$(date -u +%Y%m%d)"
-OUT_DIR="$WORKSPACE_ROOT/.dadaia/tmp/software-engineer/$DATE_STAMP"
+OUT_DIR="$WORKSPACE_ROOT/.dadaia/tmp/dd-software-engineer/$DATE_STAMP"
 STAGE_ABS="$OUT_DIR/mutation-run"
 # Resolve the EXACT interpreter the workspace venv itself was built from, via its own
 # pyvenv.cfg `executable =` line, rather than invoking `.dadaia/.venv/bin/python -m venv`

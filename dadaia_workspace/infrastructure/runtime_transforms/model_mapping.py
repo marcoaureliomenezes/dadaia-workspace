@@ -3,14 +3,13 @@
 The canonical agent frontmatter uses Claude model identifiers (e.g.
 ``claude-sonnet-4-6``).  Codex TOML files must not contain any ``claude-*``
 strings (AC3).  This module provides the authoritative translation table and a
-helper that raises explicitly on unknown identifiers so that ``dadaia public
-install --target codex`` fails loudly rather than silently emitting a bad model
+helper that raises explicitly on unknown identifiers so that ``dadaia harness
+add codex`` fails loudly rather than silently emitting a bad model
 field.
 
 ``MODEL_MAP`` is no longer hand-maintained: it is **derived** from the single
 source of truth in :mod:`dadaia_workspace.core.model_registry` (claude_id →
-codex_id). This guarantees its key-set is identical to ``PRICING_TABLE``'s
-(also derived from the same registry) — closing the drift documented in bug
+codex_id) — closing the drift documented in bug
 ``model-catalog-modelmap-pricing-drift-no-registry``. (infrastructure → core
 imports are permitted by the layering contracts.)
 """

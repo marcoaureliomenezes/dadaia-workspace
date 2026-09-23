@@ -1,12 +1,12 @@
 ---
 slug: ARCHITECTURE
 title: Architecture Memory
-tldr: 16 measured architecture principles, then the one-decider module table and the diagrams of doctor classes, feature packages and panel view modules.
-summary: Part 1 carries the ADR-gated architecture principles and the check measuring each; Part 2 names the module deciding each cross-cutting fact and carries the three diagrams.
-tags: [architecture, layers, dependency-rules, agents, sdd]
+tldr: The measured architecture principles, the tech stack in one line per technology, and the layer ring with its feature package map.
+summary: Canonical memory — statements, laws and diagrams of the system's structure and stack; changed only in the commit that carries an accepted ADR.
+tags: [architecture, layers, dependency-rules, tech-stack, sdd]
 ---
 
-## Part 1 — Principles
+## Principles
 
 ### P-01 · We keep the dependency ring: core imports nothing internal, infrastructure imports only core, no layer imports upward; a feature imports the concrete infrastructure class it alone consumes.
 Measured by: `lint-imports --config setup.cfg --no-cache` — contracts `core-no-upper-layers` and `infrastructure-no-upper-layers` (zero ignored imports).
@@ -88,105 +88,67 @@ Measured by: `pytest tests/contract/test_behavior_map.py` (bijection, hash tuple
 ADR: none
 Rationale: law that no asset owns is law nobody applies.
 
-## Part 2 — Implementation
+### P-30 · The version, the CHANGELOG section and the tag of a release come from release-please over Conventional Commits, and promote is merging its release PR; a candidate's closed trio lives in git at its CLOSURE commit, never in a copied candidate or archive directory.
+Measured by: `pytest tests/contract/test_release_semver_canon.py tests/contract/test_ci_workflow_hygiene.py`.
+ADR: 0021 (accepted)
+Rationale: a hand-minted version and a hand-copied archive are two more writers of one fact each; the commit history already holds both.
 
-### One decider per fact
+### P-31 · We hold every repo INSIDE the workspace under `repos/<slug>/`, each its own git repository with its own `specs/`; the workspace is never a monorepo, one repo is the degenerate case of many, and bootstrap is one command (`init <dir> --harness <name> [--repo <url>]`).
+Measured by: `pytest tests/e2e/test_one_line_bootstrap.py tests/unit/core/test_workspace_resolver.py`.
+ADR: 0015 (accepted)
+Rationale: the law, the harness projections, the zones and the venv live outside every repo; a per-repo or monorepo tool cannot govern ten projects with one law.
 
-| Fact | The module that decides it |
-|---|---|
-| workspace root, session, context, the session's Bind | `core/invocation.py` — `resolve() -> Invocation`, over rungs 0 (explicit/`target_path`) … 3 (repo of the cwd); `Bind(context_name, repos)` with `all_repos()` (main + associated) is the scope, resolved from `DADAIA_CONTEXT` then the live session record, never the cwd |
-| the gate's three blocks and three path classes | `hooks/root_whitelist.py` (a new root entry), `hooks/venv_guard.py` (one rule: venv-rooting), `features/spec_context/gate_policy.py` (`classify_path` → ADDITIVE/MUTATING/PROTECTED; `evaluate` → PROTECTED or out-of-scope BLOCK, else ALLOW with presence); `hooks/sdd_gate.py` resolves the Invocation once and passes the Bind and target owner as plain data — no phase, no mode, no `_RELEASE.json` read |
-| the BLOCK envelope | one `fix: <command>` line per refusal, every enforcement point; `tests/contract/test_every_block_carries_a_fix.py` is the interface (every refusal case, each fed back through `pre_gate.evaluate_payload` as ALLOW) |
-| session record schema, read, liveness and reaping | `core/session_store.py` — `new_binding_record`/`is_live`/`live_session`/`reap_stale`; `core/record_liveness.py` holds the raw TTL predicate |
-| presence liveness and reaping | `features/spec_context/presence.py` — `gc()` is the only reaper of presence records, throttle markers, the injection sentinel and emptied directories |
-| every canonical name — the root law, `.dadaia/` zones (class, creator, TTL, canon; `reaped` at 7 days), the `states/` canon, the `specs/` canon rows, the repo-tree exclusion set, the installed git hooks | `core/workspace_layout.py` — `ROOT_ALLOWED_DIRS`/`ROOT_ALLOWED_FILES`, `INSTANCE_EXCEPTIONS`, `DADAIA_ZONES`, `STATES_CANON`, `SPECS_CANON` (`CanonEntry` shape → matcher, `CANON_ROOT_MEMBERS` derived), `REPO_TREE_EXCLUDED` (= `.dadaia` + `REPO_TREE_ARTIFACTS`), `INSTALLED_GIT_HOOKS`; init, `dadaia doctor`, the gate's ADDITIVE prefixes, the root-whitelist hook, `privacy_check`, `ci install-hook`, export and the stage renderer (`<!-- zones\|canon\|root\|repo-excluded\|specs-canon -->` into `.dadaia/AGENTS.md` and DADAIA §5.1/§5.3/§6.2) are derived views; a literal of three or more canonical names outside this module fails `tests/contract/test_zone_registry.py` |
-| what a `specs/` tree may contain | `core/workspace_layout.SPECS_CANON` rows; `features/specs/canon.py` is the renderer (`scaffold`, `release_new`) and checker (`check_tree`) over them |
-| whether a projection is current | `infrastructure/projection.py`'s `ProjectionRule` plus `infrastructure/projection_rules.py::projection_rules(plan, harnesses)`; install writes and doctor compares the same table |
-| which harness a projection targets | `HarnessProjection` in `infrastructure/projection_rules.py`, with three production adapters — Claude Code, Codex, Kimi Code |
-| a bug record's status, `closed_at`, lineage and shape | `core/models/bugs.py` transition methods, every terminal one ending in `_reach_terminal` (stamps `closed_at` once); `resolve` is the one `caused_by` writer; `from_dict`/`to_dict` are the one authority on which keys a record has (the seven git-derived provenance keys are retired — no stored fact a resolver re-derives, ADR 0011); `infrastructure/jsonl_record_store.py::JsonlRecordStore.scan()` is the one parser of every JSONL record store, yielding `MalformedLine` for a bad row |
-| the `surface` enum's feature arm | `features/specs/schemas.py` appends the `features/<name>/` packages on disk at load (`x-enum-append: feature-packages`); the schema lists only the six non-feature layers and `unknown` |
-| the histo record shape, the terminal vocabulary, which disposition needs which evidence | `core/models/histo.py` — `HistoRecord`, `TERMINAL_DISPOSITIONS`, the per-ledger subsets (`FINDINGS_DISPOSITIONS` serves findings and the audits histo) and `REQUIRED_EVIDENCE` (`release` vs `reason` per disposition), read by `backlog exit`, `audit disposition` and the doctor alike; `features/specs/ledgers.py::LEDGERS` is the one table of validated ledgers, each row naming its `events_ledger` or none |
-| a governance event and its record hash | `core/models/telemetry.py` — `GovernanceEvent {event_id, ts, session_id, context, verb, ledger, record_id, record_hash}` and `record_hash()` (sha256 of the canonical JSONL line), beside each other so writer and reader hash identically; `cli/_governance_event.py::record_governance_event` is the one writer every verb calls after its record write, swallowing a store that cannot open; `features/telemetry/store.py` migration 7 holds the table |
-| the context a governance event is stamped with | `cli/_specs_resolution.py::resolve_event_context_for_cli` — from the `specs/` tree the verb resolved, never the session's env binding; the doctor filters its baseline with the same function, so a verb-written record is never reported as a hand edit by the tree that owns it |
-| whether a verb-owned record was hand-edited | `features/specs/ledgers.py` (`LEDGER-<NAME>-HANDEDIT`, latest event hash vs committed record, baseline = the store's first event) and `features/specs/release_tree.py` (`RELEASE-TREE-HANDEDIT`, live phase/milestones vs the latest `release` event); `cli/commands/doctor.py` reads `latest_governance_events()` once and passes plain data — neither feature imports `features/telemetry` |
-| an audit finding's disposition and the audit archive | `features/specs/audit.py` — `disposition_finding` (the first caller of `FindingRecord.apply_governance_update`) and `close_audit` (all-or-nothing, histo append last); `_audit_dir` confines every `<dir>` argument to `specs/audits/` |
-| the release phase transition and its milestone | `features/specs/candidate.py` — `release phase IMPLEMENTATION` stamps `defined`, `release phase CLOSURE` stamps `implemented {sha, rc + 1, ts}`; `archive` validates `CLOSURE` only, so no milestone can be set by hand for it to hang on |
-| the venv `dadaia` spelling in every `fix:` line | `core/kernel_tunables.DADAIA_BIN` — one literal, imported by every verb and rule that renders a fix |
-| a packaged JSON schema | `features/specs/schemas.py::validator_for` — one loader, one cache, addressed as `<dir>/<id>` under `public/schemas/` |
-| a handoff's version, artifact and validity | `core/handoff_index.py` — `HandoffIndex`/`Handoff`, the stdlib schema walker internal to it |
-| the git publication boundary | `features/chokepoints/{branch_policy,denylist_scan,pre_commit,push_gate,verdict}.py`; `covering_verdict()` is the single verdict reader, `live_verdict_shas()` the one stale-verdict rule |
-| the telemetry database connection | `features/telemetry/store.py`'s `TelemetryStore`, owning open/migrate/`integrity_check`/`quarantine` |
-| a YAML frontmatter block | `core/frontmatter.py` |
-| the release phase vocabulary | `core/release_state.py` — `PHASES`; the schema enum, the doctor and the release verbs import it, the gate reads none |
-| the reaper's filesystem acts — walk, mtime, move, remove | `features/spec_context/sweep.py` — one primitive, one guard (symlink never followed, vanished = absent, outside the workspace = skipped, `OSError` = one `skipped` action, cross-device move = copy + remove); `DoctorService` classifies over `walk()` and dispatches `move()`/`remove()`; `doctor.reap()` is the container-free lane the PostToolUse throttle and SessionStart run |
-| the release-id shape | `core/specs_version.py` — `RELEASE_SEMVER_RE` with `RELEASE_ID_FRAGMENT` derived for path regexes; `is_release_semver` is the mint predicate |
-| memory-canon shape facts | `features/specs/memory_canon.py` — the top-level file tuple (a slug is its filename stem, no alias table), forbidden-heading matcher, wikilink grammar, fixed-section lookup |
-| fail-soft registry reads | `core/invocation.py` — `alive_context_slugs` + the name↔slug maps; `JsonContextStore` stays the schema-gated CRUD |
-| first parent of a sha | `infrastructure/git_objects.py::GitSubprocessObjectReader.first_parent` |
-| the ctx-inject decision | `features/spec_context/injection_policy.py::decide_injection` — pure over plain values; the hook is transport |
-| the doctor rule record, section scoring, the total line | `core/doctor_rules.py` — `Rule`, `SectionFinding`, `run_section`, `merge_sections`, `total_line`; `cli/commands/doctor.py` is the one composition point of the `workspace`/`specs`/`ledgers` sections |
-| specs-rule order, fix dispatch, --fix help | `features/specs/rules.py::RULES` — one ordered registry, three derived projections |
-| conformance of every `_RELEASE.json`, live or archived | `features/specs/release_tree.py::validate_release_tree` — the doctor, `rc-archive` and `release archive` all call it |
-| shared specs facts per doctor run | `features/specs/specs_tree.py::SpecsTree` — fresh per check(), active release parsed once |
-| a dead citation — a `dadaia <verb>` absent from the command tree, a `specs/`, `dadaia_workspace/` or `.github/` path absent from the repo | `features/specs/citations.py::dead_citations(text, *, command_paths, repo_root)` — one finder shared by `MEM-DRIFT-2`, `tests/contract/test_behavior_map.py` and `tests/contract/test_docs_derived_from_memory.py`; the command tree arrives as plain data |
-| the live command tree | `cli/help_digest.py::command_paths()` — the one Typer walk; `render_digest` (`dadaia help tree`, the injected help digest), the doctor CLI root and the two contract tests consume it, and `features` never imports `cli` |
+### P-32 · We change canonical memory (`ARCHITECTURE.md`, `QUALITY.md`) only in the commit that carries its accepted ADR, and we reconcile product memory from the window's code diff at every closure — delete, update, then add — recorded as one `kind: memory` entry naming every drifted atom.
+Measured by: `pytest tests/contract/test_memory_canonical_shape.py`; `dadaia doctor` — `specs`-section rules `RELEASE-TREE-MEMORY` and `LINT-1` (history lines).
+ADR: 0023 (accepted)
+Rationale: three closures touched every product atom and left fifteen contradicted by the code; an append protocol stacks, a diff-driven one deletes first.
 
-- `container.py` is composition wiring only, contract-tested so every definition keeps a production consumer (no orphaned factories); the panel's 15-route composition lives with its single consumer in `cli/commands/panel_composition.py`; a single-consumer adapter is imported directly by its feature and never passes through the container (ADR 0001).
-- `core/protocols/` holds six Protocols: three two-adapter OS seams (`FilePermissionSetter`, `ShutdownHandler`, `TelemetryRefreshLock`) and three panel cross-feature seams whose implementer lives under `features/` (`AgentsProvider`, `ContextProjectProvider`, `ServerRegistryProvider`); every other adapter is imported by its one consumer (the consumer-less `ProcessAncestry` chain was deleted at 0.5.3).
-- `setup.cfg` carries seven import-linter contracts; `features-no-infrastructure` and `cli-no-infrastructure` were deleted by ADR 0001, `features-no-subprocess` is direct-imports-only with no suppressed edge, and the two surviving suppressed edges (`reconcile.service` -> `capabilities`, `reconcile.service` -> `migrate.state_v2`) both sit under `features-no-cross-feature`.
-- `features/migrate` stamps `specs_pattern_version: 6` or refuses, instructing a tree below v6 to upgrade to 0.4.x first — no in-wheel pre-v6 lineage.
-- Hooks import `core.invocation` directly and build the `Invocation` once per process; they never import `container` (P-12); the PostToolUse hook `sdd_post_gate` renews presence, touches `last_seen_at` and runs `doctor.reap(own_session_id=…)` on one throttle (the reaper owns `presence.gc`) — it writes nothing else.
+## Tech Stack
 
-### `features/specs/doctor` — SpecsDoctor coordinator + validator siblings
+- Python `^3.12`, built by Poetry Core; console entrypoints `dadaia` and `dadaia-workspace` are one callable, and the version lives in `pyproject.toml` alone.
+- Runtime dependencies: Typer, Rich, PyYAML, Jinja2, jsonschema; `claude-sdk` is an optional extra.
+- Everything else is the standard library; there is no database — every state is a JSON or JSONL file.
+- Claude Code, Codex, Kimi Code, Cursor, Devin CLI and GitHub Copilot are operator-installed external CLIs, never Python dependencies; the workspace runs no agent-execution runtime.
+- Quality toolchain: pytest (`pytest-cov`, `pytest-xdist`, `pytest-randomly`, `pytest-timeout`, Hypothesis, Playwright), Ruff, mypy `--strict`, import-linter, gitleaks; `mutmut` sits in an optional group ([[QUALITY]]).
+- Packaging: wheel and sdist ship the `dadaia_workspace` package with `public/` inside it and no bytecode.
+- Canonical commands, from the workspace root:
 
-```mermaid
-classDiagram
-    class SpecsDoctor
-    class StructuralValidator
-    class MemoryValidator
-    class ReleaseValidator
-    class ClosureAuditValidator
-    class GovernanceValidator
-    class CoherenceValidator
-    SpecsDoctor --> StructuralValidator : owns ORDER
-    SpecsDoctor --> MemoryValidator : owns ORDER
-    SpecsDoctor --> ReleaseValidator : owns ORDER
-    SpecsDoctor --> ClosureAuditValidator : owns ORDER
-    SpecsDoctor --> GovernanceValidator : owns ORDER
-    SpecsDoctor --> CoherenceValidator : owns ORDER
-    note for MemoryValidator "takes the specs dir; runs the memory lint in-process; owns CAT-1, LINT-1, MEM-DRIFT-1 and MEM-DRIFT-2"
-    note for GovernanceValidator "sole features.backlog.document import; reads BUGS.jsonl only through the injected bug store"
-    note for SpecsDoctor "iterates rules.RULES over a fresh SpecsTree per check(); fix dispatch and --fix help derive from the same registry; takes bug_store_factory; imports neither spec_context nor infrastructure"
+```bash
+.dadaia/.venv/bin/dadaia --version
+.dadaia/.venv/bin/python -m pytest
+.dadaia/.venv/bin/dadaia ci preflight
+.dadaia/.venv/bin/dadaia doctor
+.dadaia/.venv/bin/dadaia public doctor
+.dadaia/.venv/bin/dadaia certify --json
 ```
 
-### `dadaia_workspace/features` — package map (19 packages)
+## Structure
+
+```mermaid
+flowchart TB
+    hooks["hooks (one-shot processes)"] --> core
+    cli["cli"] --> container["container.py"]
+    container --> features
+    features --> infrastructure
+    infrastructure --> core["core (bottom ring)"]
+    features --> core
+```
+
+- `container.py` is composition wiring only: every definition keeps a production consumer, and a single-consumer adapter is imported directly by its feature (P-08).
+- `core/protocols/` holds the two-adapter OS seams (`FilePermissionSetter`, `ShutdownHandler`) and the spec-context provider; every other adapter is imported by its one consumer.
+- `setup.cfg` carries seven import-linter contracts; `features-no-subprocess` has no suppressed edge, and the two suppressed edges (`reconcile.service` -> `capabilities`, `reconcile.service` -> `migrate.state_v2`) sit under `features-no-cross-feature` (P-10).
+- Hooks import `core.invocation` directly and build the `Invocation` once per process (P-12); `sdd_post_gate` touches `last_seen_at` and runs the reaper on one throttle and writes nothing else.
+- `features/migrate` stamps `specs_pattern_version: 7` or refuses; a tree below v6 upgrades to 0.4.x first.
+
+### `dadaia_workspace/features` — package map (13 packages)
 
 ```mermaid
 flowchart TB
     subgraph features["dadaia_workspace/features"]
-      pkgs["agents · backlog · bugs · capabilities · certification · chokepoints · ci_preflight · export · import_ · migrate · panel · public · reconcile · repos · server_registry · spec_context · specs · telemetry · workspace"]
+      pkgs["backlog · capabilities · certification · chokepoints · ci_preflight · export · import_ · migrate · public · reconcile · spec_context · specs · workspace"]
     end
     container["container.py"] --> features
     features --> core["core"]
-```
-
-### `features/panel/views` — per-domain API view modules
-
-```mermaid
-classDiagram
-    panel_composition : build_panel_views()
-    api_servers : render_api_servers()
-    api_contexts : render_api_contexts()
-    api_agents : render_api_agents_canonical()
-    api_agents : render_api_agent_prompt()
-    api_agents : render_api_agent_sessions()
-    agent_policy : render_api_agent_model_policy()
-    agent_policy : render_api_agent_model_templates()
-    agent_policy : render_put_agent_model_policy()
-    agent_policy : render_post_agent_model_policy_validate()
-    api_sessions : render_api_sessions()
-    api_health : render_health()
-    note "no api.py barrel — panel_composition named-imports each view from its own module; each view imports only features.panel.service and core.models; handler._ROUTES is the one _Route(method, pattern, view_name, requires_telemetry, mutation) table and a route absent from it cannot exist"
 ```
 
 <!-- dadaia:fixed slop-code -->

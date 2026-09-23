@@ -2,9 +2,8 @@
 
 Closes the `model-catalog-modelmap-pricing-drift-no-registry` bug's doctor half:
 every ``model:`` frontmatter value across canonical ``public/agents/*.md`` must
-resolve in ``core.model_registry.REGISTRY``, and the three derived/source key-sets
-(``MODEL_MAP`` keys, ``PRICING_TABLE`` keys, ``REGISTRY`` claude ids) must be
-identical. Any breach is an ERROR line that makes ``dadaia public doctor`` exit
+resolve in ``core.model_registry.REGISTRY``, and ``MODEL_MAP`` keys must equal the
+``REGISTRY`` claude ids. Any breach is an ERROR line that makes ``dadaia public doctor`` exit
 nonzero (emitted with the ``[drift]`` prefix the CLI already treats as failing).
 """
 
@@ -80,18 +79,6 @@ def test_current_tree_resolves_clean() -> None:
     assert not _has_error(reports), reports
     assert "[ok] model-resolution" in reports
 
-    # PRICING_TABLE is no longer imported into model_resolution (audit A3 fix): the
-    # cross-feature `features.public -> features.telemetry.pricing` import was removed,
-    # since PRICING_TABLE is a derived view over core.model_registry (the registry
-    # claude-id set IS the pricing key-set by construction). Pins the symbol is gone
-    # from the module namespace so the old monkeypatch vector cannot silently reappear.
-    import dadaia_workspace.features.public.model_resolution as mod
-
-    assert not hasattr(mod, "PRICING_TABLE"), (
-        "model_resolution must not import PRICING_TABLE — that was the cross-feature "
-        "edge removed in audit A3; the pricing key-set is registry-derived."
-    )
-
 
 # ---------------------------------------------------------------------------
 # Unknown-model / overlay variants — 1 param matrix
@@ -123,16 +110,16 @@ def test_unknown_model_variants(
     overlay_dir.mkdir()
     bad_overlay = AgentModelPolicyOverlay(
         applied_template=None,
-        overrides={"software-engineer": AgentModelOverride(model="claude-ghost-9")},
+        overrides={"dd-software-engineer": AgentModelOverride(model="claude-ghost-9")},
     )
     overlay_reports = _rendered(check_model_resolution(overlay_dir, overlay=bad_overlay))
     assert _has_error(overlay_reports), overlay_reports
-    assert any("software-engineer" in line for line in overlay_reports), overlay_reports
+    assert any("dd-software-engineer" in line for line in overlay_reports), overlay_reports
 
     # valid overlay stays clean
     clean_overlay_dir = tmp_path / "overlay-clean"
     clean_overlay_dir.mkdir()
-    good_overlay = AgentModelPolicyOverlay(applied_template="subscription-saver", overrides={})
+    good_overlay = AgentModelPolicyOverlay(applied_template="max-quality", overrides={})
     clean_reports = _rendered(check_model_resolution(clean_overlay_dir, overlay=good_overlay))
     assert clean_reports == ["[ok] model-resolution"], clean_reports
 

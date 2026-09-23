@@ -3,7 +3,7 @@
 Intent: CONTRACT — 0.4.7 FR6c / T-047-21. Size: SMALL (unit).
 
 A git chokepoint is the ONE mechanical backstop that runs outside every harness hook
-(DADAIA.md 3.4). An installed copy that has drifted from what the library ships is a
+(`.dadaia/AGENTS.md`). An installed copy that has drifted from what the library ships is a
 chokepoint enforcing yesterday's contract, silently — the doctor is the only place that
 can notice.
 """
@@ -83,10 +83,7 @@ def test_the_finding_carries_the_runnable_install_verb() -> None:
     assert rule.section == "workspace"
 
 
-def test_the_shipped_hook_registry_names_both_chokepoints() -> None:
-    assert workspace_layout.INSTALLED_GIT_HOOKS == (
-        ("pre-commit", "pre-commit-presence-gate.sh"),
-        ("pre-push", "pre-push-ci-gate.sh"),
-    )
+def test_the_shipped_hook_registry_names_the_pre_push_chokepoint() -> None:
+    assert workspace_layout.INSTALLED_GIT_HOOKS == (("pre-push", "pre-push-ci-gate.sh"),)
     for _, source in workspace_layout.INSTALLED_GIT_HOOKS:
         assert (workspace_layout.public_scripts_dir() / source).is_file()

@@ -1,10 +1,10 @@
 """FR16 (v0.4.4, T-044-27) — associated_repos survives every reconstruction site.
 
 Intent: CONTRACT — A16.1 (N=0 regression) plus the T-044-26 report's flagged gap:
-``alive()``, ``dead()`` and ``update_url()`` each rebuild a ``SpecContextProject`` by
+``alive()`` and ``dead()`` each rebuild a ``SpecContextProject`` by
 hand; before this task none of the three forwarded ``associated_repos``, so a context
 that had gained associated repos would silently lose them on its very next alive()/
-dead()/update_url() call. FakeGitClient-driven (SMALL/unit tier): this is a pure
+dead() call. FakeGitClient-driven (SMALL/unit tier): this is a pure
 reconstruction/propagation concern, no real git behavior under test — the real-git
 clone/commit/push/removal behavior for the associated set is proven in
 ``tests/integration/test_associated_repos_alive_dead.py``.
@@ -101,17 +101,6 @@ def test_dead_reconstruction_preserves_associated_repos(
     stored = store.get("proj")
     assert stored is not None
     assert stored.associated_repos == ctx.associated_repos
-
-
-def test_update_url_reconstruction_preserves_associated_repos(
-    service: SpecContextService, store: FakeContextStore, workspace_root: Path
-) -> None:
-    _seed_ctx_with_associated(store, workspace_root)
-    updated = service.update_url("proj", "https://github.com/org/main-repo-renamed")
-    assert updated.repo_url == "https://github.com/org/main-repo-renamed"
-    assert updated.associated_repos == (
-        AssociatedRepo(slug="assoc-repo", url="https://github.com/org/assoc-repo"),
-    )
 
 
 def test_alive_with_zero_associated_repos_behaves_exactly_as_today(

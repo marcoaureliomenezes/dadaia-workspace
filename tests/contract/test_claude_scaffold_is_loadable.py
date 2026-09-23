@@ -18,13 +18,16 @@ update — deliberately, not by regenerating a golden.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
 import yaml
 
+from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from dadaia_workspace.infrastructure.public_assets_common import read_link_target
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from dadaia_workspace.infrastructure.runtime_config import claude_settings
 
@@ -74,6 +77,7 @@ _CLAUDE_TOOL_NAMES = frozenset(
 #: workspace's own sessions run on); it is listed deliberately, not by accident.
 _CLAUDE_MODEL_IDS = frozenset(
     {
+        "claude-opus-5-5",
         "claude-opus-5",
         "claude-opus-4-8",
         "claude-opus-4-7",
@@ -99,10 +103,10 @@ def projected(tmp_path_factory: pytest.TempPathFactory) -> Path:
     WorkspaceService(
         public_assets=FileSystemPublicAssetManager(),
         python_env=VenvPythonEnvironmentManager(),
-    ).init(workspace)
+    ).init(workspace, harnesses=L1_ENTRY_HARNESSES)
     manager = FileSystemPublicAssetManager()
     manager.stage(workspace)
-    manager.install(workspace, target="claude")
+    manager.install(workspace, harness="claude")
     return workspace
 
 
@@ -213,3 +217,27 @@ def test_every_projected_skill_frontmatter_is_loadable(projected: Path) -> None:
         assert isinstance(desc, str) and desc.strip(), f"{path.parent.name}: no description"
         # Claude Code caps the matched description; an over-long one is silently truncated.
         assert len(desc) <= 1536, f"{path.parent.name}: description is {len(desc)} chars (cap 1536)"
+
+
+def test_claude_entries_are_symlinks_onto_the_authored_agents_set(projected: Path) -> None:
+    """One authored set, N harness views (FR3, AC3.2).
+
+    A second COPY under ``.claude/`` loads exactly as well as a symlink — and drifts
+    silently from the authored ``.agents/`` body the moment one of the two is rewritten.
+    Frontmatter is resolved THROUGH the link here: the link must both point at the
+    canonical path and deliver a loadable persona at the far end.
+    """
+    entries = sorted((projected / ".claude" / "agents").glob("*.md")) + sorted(
+        (projected / ".claude" / "skills").iterdir()
+    )
+    assert entries, "the claude projection installed nothing"
+    for entry in entries:
+        assert entry.is_symlink(), f"{entry.name}: not a symlink onto .agents/"
+        target = read_link_target(entry)
+        assert not os.path.isabs(target), f"{entry.name}: absolute link target {target!r}"
+        resolved = entry.resolve()
+        assert resolved.parent.parent == projected / ".agents", (
+            f"{entry.name}: resolves to {resolved}, outside the authored .agents/ set"
+        )
+        body = resolved if resolved.is_file() else resolved / "SKILL.md"
+        assert _frontmatter(body)

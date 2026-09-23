@@ -1,14 +1,10 @@
-"""Read-only resolve/preview surface (SPEC §3.4a).
+"""The intent binder the backlog doctor reads, and its YAML error formatter.
 
-Breaks the chicken-and-egg of the backfill (§3.5): the author cannot write bound ``intents[]``
-without *seeing* how a proposed subject resolves against the registry first. This surface is
-strictly read-only — it never writes a backlog file or the alias map.
+Read-only: it never writes a backlog file or the alias map. The author-facing listing
+and single-subject preview retired with ``dadaia backlog subjects`` (0.4.7 c7,
+T-047-65) — the skill script's ``subjects`` verb is the author's surface now.
 
-* :func:`list_anchors` — the live auto-derived anchor set (optionally filtered by kind).
-* :func:`resolve_one` — given a proposed subject, show its bound canonical anchor, or
-  ``UNRESOLVED``/``AMBIGUOUS`` with the candidate set + an actionable alias-map suggestion.
-
-It also hosts :func:`bound_anchor_changes`, the intent binder the doctor (T-120-05/08)
+It hosts :func:`bound_anchor_changes`, the intent binder the doctor (T-120-05/08)
 consumes to bind ``active[]`` entry intents from the single-source
 ``specs/backlog/BACKLOG.json`` (:mod:`dadaia_workspace.features.backlog.document`;
 operator ruling 2026-08-28) against the registry. Kept here rather than in
@@ -19,61 +15,20 @@ Protocol instead.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Protocol
 
 import yaml
 
-from dadaia_workspace.core.models.backlog import Intent, SubjectKind
+from dadaia_workspace.core.models.backlog import Intent
 from dadaia_workspace.features.backlog.subject_registry import (
-    Anchor,
     BindStatus,
     Registry,
 )
 
 __all__ = [
-    "PreviewResult",
     "bound_anchor_changes",
     "format_yaml_error",
-    "list_anchors",
-    "resolve_one",
 ]
-
-
-@dataclass(frozen=True)
-class PreviewResult:
-    """How one proposed subject resolves (read-only)."""
-
-    ref: str
-    status: BindStatus
-    anchor_id: str | None = None
-    message: str = ""
-    candidates: tuple[str, ...] = ()
-    alias_suggestion: str | None = None
-
-
-def resolve_one(registry: Registry, ref: str, kind: SubjectKind) -> PreviewResult:
-    """Resolve ``ref`` of ``kind`` through the registry; never mutates anything.
-
-    On an UNRESOLVED/AMBIGUOUS result, attach an actionable alias-map suggestion line
-    (``'<ref>' -> <canonical-anchor>``) the author can paste into the alias map.
-    """
-    result = registry.bind(ref, kind)
-    if result.status is BindStatus.RESOLVED and result.anchor is not None:
-        return PreviewResult(ref=ref, status=result.status, anchor_id=result.anchor.id)
-    suggestion = f"{ref} -> <canonical-anchor-for-{kind.value}>"
-    return PreviewResult(
-        ref=ref,
-        status=result.status,
-        message=result.message,
-        candidates=result.candidates,
-        alias_suggestion=suggestion,
-    )
-
-
-def list_anchors(registry: Registry, kind: SubjectKind | None = None) -> list[Anchor]:
-    """List the live anchor set, optionally filtered to one ``kind``. Read-only."""
-    return registry.list_anchors(kind)
 
 
 def format_yaml_error(exc: yaml.YAMLError, *, line_offset: int = 0) -> str:

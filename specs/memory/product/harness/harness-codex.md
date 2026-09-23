@@ -1,22 +1,35 @@
 ---
 slug: harness-codex
-title: Harness — Codex
-tldr: Entry harness on the operator's Codex CLI — native AGENTS.md, Starlark command policy, version-qualified hook fire, `.codex/` projection.
-summary: Capability and scaffold truth for the Codex harness — native AGENTS.md discovery, version-qualified hook certification, Starlark command policy and the .codex/ projection.
-tags: [harness, codex, projection, enforcement]
+title: harness-codex
+tldr: "Entry harness on the Codex CLI: native AGENTS.md chain and .agents/skills; .codex/ carries config, hooks, the command policy and persona TOML."
+summary: Codex reads the root map, the root->cwd AGENTS.md chain and .agents/skills natively; .codex/ holds config.toml, hooks.json, the command-policy rules and the three dd- persona TOMLs transcoded from .agents/agents/.
+tags: [harness, codex, projection, hooks]
+sources:
+  - dadaia_workspace/core/harness_registry.py
+  - dadaia_workspace/infrastructure/codex_doctor.py
+  - dadaia_workspace/infrastructure/agent_transcodes.py
+  - dadaia_workspace/infrastructure/runtime_config.py
+  - dadaia_workspace/infrastructure/runtime_transforms/hook_wrappers.py
 ---
 
 ## Surface
 
-- Codex is an entry harness — the `codex` TUI and headless `codex exec` — governed by `AGENTS.md` read natively up-tree plus the `.codex/` projection.
-- PreToolUse `pre_gate` (matcher `^(apply_patch|Edit|Write|Bash)$`) and a matcher-less PostToolUse heartbeat are registered in `.codex/hooks.json` through wrappers under `.dadaia/hooks/codex-*`.
-- Command policy is evaluated natively from `.codex/rules/*.rules` — Starlark prefix rules over venv-form paths, not configuration keys.
-- Hook fire is version-qualified: hooks are live-certified at `codex-cli 0.144.4` (`_CODEX_HOOKS_LIVE_CERTIFIED_VERSION`, `infrastructure/codex_doctor.py`) for both the TUI and headless `codex exec`.
-- Any other version is probe-driven: `dadaia certify`'s `codex-live-probe` invokes the binary and reports what it observed, an absent or different version yielding UNVERIFIED.
-- `dadaia public install --target codex` projects `.codex/{config.toml,hooks.json,rules,skills,DADAIA.md}` plus `.codex/agents/` — nine role-only TOML personas carrying no inline law restatement.
-- Codex tier identity is native `(model id × model_reasoning_effort)`, registry-derived via `core/model_registry.codex_tier_views()`, failing loudly when two tiers collapse to one pair.
-- Doctor lint `D-CX-4` blocks Anthropic tier names and Claude model or tool-name leaks ([[sdd-gate-v3]]).
+- Codex is an entry harness — the `codex` TUI and headless `codex exec` — reading the root `AGENTS.md` map, the root->cwd `AGENTS.md` chain and `.agents/skills/` natively; scoped law outside that chain reaches it by skill procedure ([[agentic-entities]]).
+- `dadaia harness add codex` projects `.codex/config.toml`, `.codex/hooks.json`, `.codex/rules/dadaia-command-policy.rules` and `.codex/agents/dd-*.toml` — each persona transcoded from `.agents/agents/` with `sandbox_mode` `read-only` or `workspace-write` derived from its `activity_class`; every file is compared byte-wise against its renderer, stale persona files pruned.
+- Command policy is the Starlark `.rules` file — prefix rules over venv-form paths, the one rule dialect Codex executes.
+- Without a workspace, the standalone `dd-` skills reach a Codex user through the `dadaia-skills` repository installed into `.agents/skills` ([[public-asset-distribution]]).
+
+## Hooks
+
+- The four hook behaviours ([[agentic-entities]]) are registered in `.codex/hooks.json` through wrappers under `.dadaia/hooks/codex-*`: `PreToolUse` the pre-gate (matcher `^(apply_patch|Edit|Write|Bash)$`), a matcher-less `PostToolUse` post-gate, `SessionStart` (`startup|resume`) ctx-inject plus the reaper, and `UserPromptSubmit` ctx-inject.
+- Codex reads the gate's `decision: block`/`reason` envelope directly; the wrappers translate nothing ([[sdd-gate-v3]]).
+- Hook firing is version-qualified: live-certified only at the one codex-cli version pinned in `_CODEX_HOOKS_LIVE_CERTIFIED_VERSION` (`dadaia_workspace/infrastructure/codex_doctor.py`); any other version is reported UNVERIFIED, no version floor enforced. `dadaia certify`'s `codex-live-probe` runs a real `codex exec`.
+
+## Models and doctor
+
+- Codex tier identity is native `(model id × model_reasoning_effort)`, derived from the model registry; two tiers collapsing to one pair fail loudly.
+- `dadaia public doctor` keeps the structural checks byte comparison cannot express: `D-CX-7` (every `dd-` token a persona cites resolves to a skill or persona), `D-CX-8` (rules are Starlark `.rules`, never Markdown) and `D-CX-9` (hooks invoke executable wrappers).
 
 ## Dependencies
 
-[[TECHSTACK]], [[sdd-gate-v3]], [[agentic-entities]], [[public-asset-distribution]], [[agent-orchestration]].
+[[agentic-entities]], [[agent-orchestration]], [[sdd-gate-v3]], [[public-asset-distribution]].

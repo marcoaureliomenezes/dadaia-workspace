@@ -1,5 +1,5 @@
 ---
-specs_pattern_version: 6
+specs_pattern_version: 7
 constitution_version: 6.0.0
 ---
 
@@ -42,8 +42,8 @@ This lane is judgment-enforced, at human PR review.
 
 ## 3. Dispatcher Purity
 
-Only `project-manager` and `project-auditor` dispatch sub-agents; every other persona is a
-worker that surfaces needs to its dispatcher and never spawns agents.
+Only the main thread (the operator's session) dispatches sub-agents; every persona is a
+worker that surfaces needs to the main thread and never spawns agents.
 
 The scaffolded roster is **closed** — the library ships no plugin agent — and an operator's
 own agents are never scaffolded by it and never derived from the registry. A persona is a
@@ -59,8 +59,8 @@ amending release's `_RELEASE.json` `log`, never inline.
 
 <!-- dadaia:fixed slop-law -->
 ## Slop — workspace law (fixed)
-- Slop is what passes the deletion test without loss: removed, no behavior changes and no decision loses its record (`DADAIA.md` §7.6).
-- A SPEC declares scope, observable criteria and decisions in domain names; it fits the byte ceiling of `DADAIA.md` §6.7.
+- Slop is what passes the deletion test without loss: removed, no behavior changes and no decision loses its record.
+- A SPEC declares scope, observable criteria and decisions in domain names; it fits the byte ceiling of `specs/releases/AGENTS.md`.
 - A concept takes a glossary name; a numbered code exists only where a mechanical index reads it (FR, AC, T-).
 - Every file has a canonical home and a GC path; summaries, backups, notes and scratch live in `.dadaia/tmp/` or do not exist.
 - A branch dies at merge; a candidate exists only with scope that changes behavior.

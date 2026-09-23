@@ -23,6 +23,7 @@ import json
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 
 _FILENAME = "harness_profile.json"
@@ -62,6 +63,26 @@ class JsonHarnessProfileStore:
             return None
         data = json.loads(path.read_text(encoding="utf-8"))
         return _from_dict(data)
+
+    def resolve(self, states_dir: Path, workspace_root: Path) -> HarnessProfile:
+        """Return the persisted profile, migrating a pre-profile workspace once.
+
+        A workspace scaffolded before the profile existed has no file and no flag to
+        fall back on: its roster IS the set of registered harness directories present
+        at *workspace_root*. Reading it here — the one reader — keeps every consumer
+        (``public install``, ``public doctor``, ``harness list``) on a single roster
+        and off an ``all`` default that would project harnesses nobody asked for.
+        """
+        persisted = self.read(states_dir)
+        if persisted is not None:
+            return persisted
+        return HarnessProfile.of(
+            tuple(
+                name
+                for name, record in HARNESS_RECORDS.items()
+                if record.directory is not None and (workspace_root / record.directory).is_dir()
+            )
+        )
 
     def write(self, states_dir: Path, profile: HarnessProfile) -> None:
         """Persist *profile* atomically; a no-op when the on-disk bytes already match."""

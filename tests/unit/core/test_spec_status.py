@@ -1,9 +1,12 @@
 """``core.spec_status`` — the one definition of the SDD status vocabulary.
 
 These tests pin the behaviour the four former copies disagreed on. Three sites used
-``"**Status:** Aprovado" in text``; that substring test is wrong in both directions, and
+``"**Status:** Approved" in text``; that substring test is wrong in both directions, and
 the doctor (which parsed the line properly) enforced something different — the drift that
 makes a gate look too-permissive and too-strict at the same time.
+
+The vocabulary is English-only since 0.4.7 FR4 (T-047-58): the retired Portuguese tokens
+are not a second accepted spelling — ``specs upgrade`` rewrites a live tree instead.
 """
 
 from __future__ import annotations
@@ -23,17 +26,26 @@ pytestmark = pytest.mark.unit
 
 
 def test_vocabulary_is_the_canonical_triple() -> None:
-    assert {"Draft", "Em revisão", "Aprovado"} == CANONICAL_STATUS
-    assert APPROVED == "Aprovado"
-    assert APPROVED_LINE == "> **Status:** Aprovado"
+    assert {"Draft", "In review", "Approved"} == CANONICAL_STATUS
+    assert APPROVED == "Approved"
+    assert APPROVED_LINE == "> **Status:** Approved"
+
+
+@pytest.mark.parametrize("retired", ["Aprovado", "Em revisão", "Em revisao", "Rascunho"])
+def test_the_retired_portuguese_tokens_are_not_canonical(retired: str) -> None:
+    """No compatibility branch: a tree still carrying them is migrated by
+    ``dadaia specs upgrade``, never quietly accepted by a second spelling."""
+    assert retired not in CANONICAL_STATUS
+    assert extract_status(f"# SPEC\n\n> **Status:** {retired}\n") == retired
+    assert is_approved(f"# SPEC\n\n> **Status:** {retired}\n") is False
 
 
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
-        ("# SPEC\n\n> **Status:** Aprovado\n", "Aprovado"),
-        ("# SPEC\n\n**Status:**   Aprovado\n", "Aprovado"),  # substring test would miss
-        ("# SPEC\n\n> **Status:** Aprovado (pendente)\n", "Aprovado (pendente)"),
+        ("# SPEC\n\n> **Status:** Approved\n", "Approved"),
+        ("# SPEC\n\n**Status:**   Approved\n", "Approved"),  # substring test would miss
+        ("# SPEC\n\n> **Status:** Approved (pending)\n", "Approved (pending)"),
         ("# SPEC\n\n> **Status:** Draft\n", "Draft"),
         ("# SPEC\n\nno status here\n", None),
     ],
@@ -45,16 +57,16 @@ def test_extract_status_returns_the_token_verbatim(text: str, expected: str | No
 
 def test_is_approved_is_a_token_comparison_not_a_substring_test() -> None:
     # Was rejected by the substring copies, accepted by the doctor — now consistently ok.
-    assert is_approved("# SPEC\n\n**Status:**  Aprovado\n") is True
+    assert is_approved("# SPEC\n\n**Status:**  Approved\n") is True
     # Was ACCEPTED by the substring copies — an unapproved artifact passing the gate.
-    assert is_approved("# SPEC\n\n> **Status:** Aprovado (pendente de review)\n") is False
+    assert is_approved("# SPEC\n\n> **Status:** Approved (pending review)\n") is False
     assert is_approved("# SPEC\n\n> **Status:** Draft\n") is False
     assert is_approved("# SPEC\n\nno status line\n") is False
 
 
 def test_status_line_is_only_read_from_the_document_head() -> None:
     """A status token quoted deep inside prose is not the artifact's status."""
-    body = "# SPEC\n" + "filler\n" * 60 + "> **Status:** Aprovado\n"
+    body = "# SPEC\n" + "filler\n" * 60 + "> **Status:** Approved\n"
     assert is_approved(body) is False
 
 
@@ -62,10 +74,10 @@ def test_status_line_is_only_read_from_the_document_head() -> None:
     "line",
     [
         "> **Status:** Draft",
-        "**Status:** Em revisao",  # accent-stripped worker spelling
-        "- **Status**: Aprovado",
+        "**Status:** In review",  # accent-stripped worker spelling
+        "- **Status**: Approved",
         "status: draft",
-        "  > **Status:**  Em revisão  ",
+        "  > **Status:**  In review  ",
     ],
 )
 def test_any_status_line_recognizes_every_worker_authored_variant(line: str) -> None:

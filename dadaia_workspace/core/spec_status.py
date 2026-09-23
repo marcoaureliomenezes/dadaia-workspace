@@ -2,8 +2,8 @@
 
 Before this module the vocabulary lived in four places that each re-implemented the same
 rule: ``doctor_release`` parsed the ``**Status:**`` line with its own regex, ``certification``
-and ``release_definition`` each asked ``"**Status:** Aprovado" in text`` (a substring test —
-it accepts ``**Status:** Aprovado (pending)`` and rejects a double-space variant the doctor
+and ``release_definition`` each asked ``"**Status:** <token>" in text`` (a substring test —
+it accepts ``**Status:** Approved (pending)`` and rejects a double-space variant the doctor
 accepts), ``release_definition`` rebuilt the token alternation to strip worker-authored
 lines, and ``capabilities`` published a hardcoded list to consumer-side validators.
 
@@ -15,7 +15,10 @@ fixes land at one site and not the others (``doctor-root-whitelist-contradicts-r
 Everything here is pure text (``core/`` may not touch the filesystem — see the
 ``test_core_file_io_purity`` ratchet); the path-shaped helpers stay in ``features``.
 
-The tokens are Portuguese and are canonical product vocabulary — never translate them.
+The vocabulary is English. The retired Portuguese tokens are NOT a second
+accepted spelling: a tree still carrying them is migrated once by ``dadaia specs upgrade``
+(``features/migrate/upgrade.py``), so this module keeps exactly one token per status and
+the doctor keeps exactly one rule.
 """
 
 from __future__ import annotations
@@ -23,20 +26,19 @@ from __future__ import annotations
 import re
 
 #: The approved token. The only status that unlocks IMPLEMENTATION/CLOSURE.
-APPROVED = "Aprovado"
+APPROVED = "Approved"
 #: The authored-but-unreviewed token (scaffold default).
 DRAFT = "Draft"
 #: The under-review token.
-IN_REVIEW = "Em revisão"
+IN_REVIEW = "In review"
 
 #: The complete canonical vocabulary. A status outside this set is a doctor ERROR.
 CANONICAL_STATUS = {DRAFT, IN_REVIEW, APPROVED}
 
-#: Accepted spellings per token, including the accent-stripped ``Em revisao`` a worker may
-#: author. Used to recognize/strip worker-written status lines — NOT to widen what counts
-#: as canonical (``extract_status`` returns the token verbatim, so the doctor still rejects
-#: ``Em revisao``).
-_TOKEN_SPELLINGS = (DRAFT, IN_REVIEW, "Em revisao", APPROVED)
+#: The spellings recognized when stripping worker-written status lines. Exactly the
+#: canonical vocabulary — one spelling per token, so "recognized" and "canonical" can
+#: never drift apart (``extract_status`` returns the token verbatim regardless).
+_TOKEN_SPELLINGS = (DRAFT, IN_REVIEW, APPROVED)
 
 #: Matches the canonical ``**Status:** <token>`` line as the doctor reads it.
 STATUS_LINE = re.compile(r"\*\*Status:\*\*\s*(.+?)\s*$")
@@ -69,10 +71,10 @@ def extract_status(text: str) -> str | None:
 
 
 def is_approved(text: str) -> bool:
-    """Whether the document carries a canonical ``**Status:** Aprovado``.
+    """Whether the document carries a canonical ``**Status:** Approved``.
 
     This is a full-token comparison on the parsed line, not a substring test: an artifact
-    whose status reads ``Aprovado (pendente)`` is NOT approved, and one written with extra
+    whose status reads ``Approved (pending)`` is NOT approved, and one written with extra
     whitespace IS — matching, in both directions, what the doctor enforces.
     """
     return extract_status(text) == APPROVED

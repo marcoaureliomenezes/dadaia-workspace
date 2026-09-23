@@ -62,14 +62,14 @@ _CANON_REL = Path("core") / "specs_version.py"
 
 #: Modules that must reuse the canon object, as (import path, attribute name) — the
 #: attribute each module actually needs: the two naming/archive-lookup sites keep
-#: RELEASE_SEMVER_RE (the broader two-axis match); the one MINT site (features.specs.canon,
+#: RELEASE_SEMVER_RE (the broader two-axis match); the MINT site is the release skill
+#: script (0.4.7 T-047-66), stdlib-only and outside this package scan;
 #: T-050-06A) needs only the narrower is_release_semver predicate.
 #: v0.1.55 FR1: the SpecsDoctor RELEASE_SEMVER_RE consumer moved off the coordinator into the
 #: ``doctor_release`` validator sibling (the SemVer/naming-canon checks live there now).
 _CONSUMER_MODULES: tuple[tuple[str, str], ...] = (
     ("dadaia_workspace.features.specs.scaffolder", "RELEASE_SEMVER_RE"),
     ("dadaia_workspace.features.specs.doctor_release", "RELEASE_SEMVER_RE"),
-    ("dadaia_workspace.features.specs.canon", "is_release_semver"),
 )
 
 
@@ -184,39 +184,23 @@ def test_release_semver_single_canon_identity_scan_and_behavior() -> None:
     assert _typed_canon.match("v1.2.3-") is None
 
 
-def test_v_prefixed_release_id_refused_at_mint_but_archived_dir_still_resolves(
-    tmp_path: Path,
-) -> None:
-    """A1.10: a fixture proves a new release id carrying a `v` prefix is refused at
-    minting (`dadaia release new`), while an existing `v`-prefixed archived directory
-    still resolves as conformant (`specs doctor`'s SPEC-DOC-027 naming check —
-    SPEC-DOC-016 no longer scans root specs/_archive/releases/ at all, v6 canon:
-    that root retired, T-050-14 deleted its last content, so this fixture's
-    SPEC-DOC-016 exemption is now moot by construction rather than by allowlist;
-    SPEC-DOC-027's own allowlist is the check still meaningfully exercised here)."""
+def test_v_prefixed_archived_dir_still_resolves(tmp_path: Path) -> None:
+    """A1.10, archive half: an existing `v`-prefixed archived directory still resolves
+    as conformant (`specs doctor`'s SPEC-DOC-027 naming check over the canonical
+    ``releases/_archive/`` root)."""
     from dadaia_workspace.features.specs import Severity, SpecsDoctor
-    from dadaia_workspace.features.specs.canon import release_new
 
     specs = tmp_path / "specs"
     specs.mkdir()
 
-    # Half 1 — mint refusal: a v-prefixed id can never be created going forward.
-    with pytest.raises(ValueError, match="Invalid release ID"):
-        release_new(specs, "v0.9.9")
-    assert not (specs / "releases" / "v0.9.9").exists()
-    # The bare, current-axis form mints cleanly. `release_new` returns the minted
-    # SPEC.md path directly (v0.5.1 K4 — no wrapping result dataclass; the caller's
-    # own existence check IS the proof of creation).
-    result = release_new(specs, "0.9.9")
-    assert result == specs / "releases" / "0.9.9" / "SPEC.md"
-    assert result.is_file()
-
-    # Half 2 — archive resolution: an EXISTING v-prefixed archived directory (the
+    # The mint-refusal half moved with the minting verb (0.4.7 T-047-66):
+    # `tests/unit/skills/test_release_implementation_release_script.py`.
+    # An EXISTING v-prefixed archived directory (the
     # retired axis, pre-canon-v6) is still recognised as conformant, never flagged.
-    archived = specs / "_archive" / "releases" / "v0.4.4"
+    archived = specs / "releases" / "_archive" / "v0.4.4"
     archived.mkdir(parents=True)
     (archived / "SPEC.md").write_text(
-        "**Status:** Aprovado\n**Created:** 2026-08-01\n", encoding="utf-8"
+        "**Status:** Approved\n**Created:** 2026-08-01\n", encoding="utf-8"
     )
     for fname in ("PLAN.md", "TASKS.md"):
         (archived / fname).write_text("x", encoding="utf-8")
@@ -228,3 +212,91 @@ def test_v_prefixed_release_id_refused_at_mint_but_archived_dir_still_resolves(
         if i.code in ("SPEC-DOC-016", "SPEC-DOC-027") and i.severity == Severity.ERROR
     ]
     assert naming_issues == [], naming_issues
+
+
+# ---------------------------------------------------------------------------
+# release-please canon — the manifest floor and the pre-1.0 bump flags
+# ---------------------------------------------------------------------------
+
+_MANIFEST_PATH = _REPO_ROOT / ".release-please-manifest.json"
+_CONFIG_PATH = _REPO_ROOT / "release-please-config.json"
+
+
+def _published_tags() -> list[str]:
+    """Every ``v*`` tag reachable in this checkout, newest last (version order).
+
+    CI checks this repository out shallow and without tags, so an empty list is a
+    legitimate environment, not a failure — the caller skips on it.
+    """
+    import subprocess
+
+    result = subprocess.run(
+        ["git", "tag", "-l", "v*", "--sort=version:refname"],
+        cwd=_REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return []
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def test_release_please_manifest_sits_at_the_last_published_version() -> None:
+    """The manifest is release-please's floor: it must name the last PUBLISHED
+    version, so the first release PR proposes the next one rather than re-minting a
+    version that already carries a tag."""
+    import json
+
+    manifest = json.loads(_MANIFEST_PATH.read_text(encoding="utf-8"))
+    assert set(manifest) == {"."}, f"the manifest addresses one package, the root: {manifest}"
+    version = manifest["."]
+    from dadaia_workspace.core.specs_version import is_release_semver
+
+    assert isinstance(version, str) and is_release_semver(version), (
+        f"the manifest version must be a bare SemVer (no `v` prefix): {version!r}"
+    )
+
+    import tomllib
+
+    minted = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))["tool"][
+        "poetry"
+    ]["version"]
+    assert minted == version, (
+        f"pyproject.toml mints {minted!r} but the release-please manifest floor is "
+        f"{version!r} — release-please reads the manifest and expects pyproject to "
+        "agree; the two move together, in one bot-authored commit (D10, T-047-90)"
+    )
+
+    tags = _published_tags()
+    if not tags:
+        pytest.skip("no v* tags in this checkout (shallow CI clone) — floor unverifiable here")
+    assert f"v{version}" == tags[-1], (
+        f"the manifest floor must equal the latest published tag {tags[-1]!r}, got v{version}"
+    )
+
+
+def test_release_please_config_mints_a_patch_below_one_point_zero() -> None:
+    """Pre-1.0, release-please bumps the MINOR on a `feat` unless both flags are set.
+    The project mints patch releases from `feat` commits, so both must be true."""
+    import json
+
+    config = json.loads(_CONFIG_PATH.read_text(encoding="utf-8"))
+    assert config.get("bump-minor-pre-major") is True
+    assert config.get("bump-patch-for-minor-pre-major") is True
+    assert config.get("include-component-in-tag") is False, (
+        "tags are bare `v<version>` — a component prefix would break every tag consumer"
+    )
+
+    root_package = config["packages"]["."]
+    assert root_package["release-type"] == "python", (
+        "the release type lives in the config's root package, never as an action input "
+        f"(a `release-type:` input switches the action out of manifest mode): {root_package}"
+    )
+    assert root_package["changelog-path"] == "CHANGELOG.md"
+
+    sections = {entry["type"]: entry for entry in config["changelog-sections"]}
+    assert {"feat", "fix", "refactor", "docs", "ci", "test", "chore"} <= set(sections)
+    for commit_type, entry in sections.items():
+        assert entry["section"], f"section {commit_type} must carry a heading"
+        assert isinstance(entry["hidden"], bool)

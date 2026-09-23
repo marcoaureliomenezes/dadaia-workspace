@@ -24,14 +24,67 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
-from dadaia_workspace.features.panel.entities import (
-    core_skills,
-    load_registry,
-    persona_ids,
+from dadaia_workspace.infrastructure.projection_rules import harnesses_with_a_hook_derivation
+
+_REGISTRY_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "dadaia_workspace"
+    / "public"
+    / "entities"
+    / "registry.json"
 )
+_SKILLS_ROOT = _REGISTRY_PATH.parent.parent / "skills"
+SCHEMA_VERSION = "agentic-entities-v1"
+
+
+def load_registry() -> dict[str, Any]:
+    """The abstract-entity registry, shape-checked: the test reads the JSON itself now
+    that the panel's loader is gone (0.4.7 c5 FR1)."""
+    data = json.loads(_REGISTRY_PATH.read_text(encoding="utf-8"))
+    assert isinstance(data, dict) and data.get("schema_version") == SCHEMA_VERSION
+    for key in ("personas", "behaviors", "rules", "universal"):
+        assert key in data, key
+    return data
+
+
+def persona_ids(registry: dict[str, Any]) -> frozenset[str]:
+    return frozenset(p["id"] for p in registry["personas"])
+
+
+def _frontmatter_description(manifest: Path) -> str:
+    lines = manifest.read_text(encoding="utf-8").splitlines()
+    if not lines or lines[0].strip() != "---":
+        return ""
+    collected: list[str] = []
+    in_description = False
+    for line in lines[1:]:
+        stripped = line.strip()
+        if stripped == "---":
+            break
+        if in_description:
+            if line.startswith((" ", "\t")) and stripped:
+                collected.append(stripped)
+                continue
+            break
+        if stripped.startswith("description:"):
+            value = stripped.removeprefix("description:").strip()
+            if value and value not in (">", "|", ">-", "|-"):
+                return value
+            in_description = True
+    return " ".join(collected)
+
+
+def core_skills() -> list[tuple[str, str]]:
+    return [
+        (d.name, _frontmatter_description(d / "SKILL.md"))
+        for d in sorted(_SKILLS_ROOT.iterdir())
+        if d.is_dir() and (d / "SKILL.md").is_file()
+    ]
+
 
 _PKG_ROOT = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 _PUBLIC = _PKG_ROOT / "public"
@@ -81,10 +134,16 @@ def test_every_wired_core_hook_derives_from_a_deterministic_behavior() -> None:
     )
 
 
-def test_behaviors_cover_every_entry_harness() -> None:
-    """A Deterministic Behavior is workspace law — it must be derived for ALL
-    entry harnesses, and never for an unknown one."""
-    harnesses = set(L1_ENTRY_HARNESSES)
+def test_behaviors_cover_every_harness_whose_hooks_are_derived() -> None:
+    """A Deterministic Behavior is workspace law — it must be derived for every
+    harness that has a hook derivation, and never for an unknown one.
+
+    The expected set is READ from the projection builder table, never listed here: the
+    day a declared-but-underived hook format grows a builder, this test demands its
+    registry rows with no edit of its own.
+    """
+    harnesses = set(harnesses_with_a_hook_derivation())
+    assert harnesses <= set(L1_ENTRY_HARNESSES)
     for behavior in load_registry()["behaviors"]:
         implemented = set(behavior["implementations"])
         assert implemented == harnesses, (
@@ -102,11 +161,11 @@ def test_rule_implementations_target_known_harnesses_and_cover_the_law_projectio
         unknown = set(rule["implementations"]) - harnesses
         assert not unknown, f"rule {rule['id']} derives for unknown harnesses {sorted(unknown)}"
 
-    # The DADAIA.md law projection must be derived for every entry harness.
+    # The root `AGENTS.md` map projection must be derived for every entry harness.
     law_rule = next(r for r in registry["rules"] if r["id"] == "workspace-law")
     assert set(law_rule["implementations"]) == harnesses
     for impl in law_rule["implementations"].values():
-        assert "DADAIA.md" in impl
+        assert "AGENTS.md" in impl
 
     # The one non-law core rule file the installer projects (codex Starlark
     # command policy — public_assets.install) must trace to an abstract rule.
@@ -161,14 +220,14 @@ def test_doctor_check_blocks_on_underived_subagent(tmp_path: Path) -> None:
 
     lines = check_entities_derivation(tmp_path)
     assert any("'rogue' has no abstract Persona" in line.text for line in lines)
-    assert all(line.status.blocking for line in lines)
+    assert all(line.status.blocking for line in lines if line.status is not DoctorStatus.WARN)
 
 
 def test_doctor_check_passes_on_the_packaged_registry() -> None:
     from dadaia_workspace.infrastructure.entity_doctor import check_entities_derivation
 
     lines = check_entities_derivation(_PUBLIC)
-    assert len(lines) == 1 and not lines[0].status.blocking
+    assert not any(line.status.blocking for line in lines)
     assert "entities-derivation" in lines[0].text
 
 

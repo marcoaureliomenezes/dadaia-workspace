@@ -80,15 +80,18 @@ def _mk_workspace_with_associated_repo(tmp_path: Path) -> Path:
     )
     main_mem = tmp_path / "repos" / _MAIN_SLUG / "specs" / "memory"
     main_mem.mkdir(parents=True)
-    (main_mem / "TECHSTACK.md").write_text("# tech\nPython 3.12\n", encoding="utf-8")
+    (main_mem / "ARCHITECTURE.md").write_text(
+        "# Architecture\n\n## Tech Stack\n\nPython 3.12\n", encoding="utf-8"
+    )
     (main_mem / "product").mkdir()
     (main_mem / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
 
     assoc_repo = tmp_path / "repos" / _ASSOC_SLUG
     assoc_mem = assoc_repo / "specs" / "memory"
     assoc_mem.mkdir(parents=True)
-    (assoc_mem / "TECHSTACK.md").write_text(
-        f"# the associated repo's OWN tech stack\n{_ASSOC_MARKER}\n", encoding="utf-8"
+    (assoc_mem / "ARCHITECTURE.md").write_text(
+        f"# Architecture\n\n## Tech Stack\n\nthe associated repo's OWN stack\n{_ASSOC_MARKER}\n",
+        encoding="utf-8",
     )
     (assoc_mem / "product").mkdir()
     (assoc_mem / "product" / "catalog.json").write_text(

@@ -46,8 +46,8 @@ def test_explicit_specs_dir_is_read_with_no_instance_around(no_instance: Path) -
 
     payload = json.loads(run.output)
     assert set(payload["sections"]) == {"workspace", "specs", "ledgers"}, run.output
-    assert payload["sections"]["workspace"]["compliance"]["total"] == 0
-    assert payload["sections"]["specs"]["compliance"]["total"] > 0
+    assert payload["sections"]["workspace"]["findings"] == []
+    assert "specs" in payload["sections"] and "ledgers" in payload["sections"]
     assert run.exit_code == 0, run.output
 
 

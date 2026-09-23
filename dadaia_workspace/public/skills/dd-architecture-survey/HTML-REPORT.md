@@ -3,11 +3,11 @@
 Disclosed reference of [`SKILL.md`](SKILL.md), report mode only (operator asked, or
 the next hop is human). A report is **self-contained** — inline `<style>`, inline SVG,
 zero external scripts or stylesheets; an external asset only when committed beside the
-report. Split any report over 30 KB behind an `index.html` (`DADAIA.md` §5.4).
+report. Split any report over 30 KB behind an `index.html` (`.dadaia/handoff/AGENTS.md`).
 
 ## Scaffold
 
-One HTML file in the repo's reports home (`DADAIA.md` §5.2), everything inline:
+One HTML file in the repo's reports home (the root `AGENTS.md` map §4), everything inline:
 
 ```html
 <!doctype html>
@@ -68,7 +68,7 @@ No paragraphs of explanation — if the diagram needs a paragraph, redraw the di
 
 Draw every diagram as inline SVG (or bordered `<div>`s with absolutely-positioned
 SVG arrows). No diagram library, no external script: the report renders identically
-in the panel, a browser tab, or an offline copy, and carries no executable
+in a browser tab or an offline copy, and carries no executable
 dependency.
 
 Patterns that work:

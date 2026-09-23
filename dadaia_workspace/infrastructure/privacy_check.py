@@ -29,7 +29,7 @@ from dadaia_workspace.core.workspace_layout import REPO_TREE_ARTIFACTS
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
 #: Directory names never walked when scanning public assets: the repo-tree artifact
-#: set (DADAIA.md §5.3, one registry — 0.4.7 FR5) plus Python's own bytecode cache.
+#: set (`repos/<slug>/AGENTS.md`, one registry — 0.4.7 FR5) plus Python's own bytecode cache.
 #: Never ``.dadaia`` — the staged assets this walk reads live inside it.
 _PUBLIC_ASSET_IGNORED_DIRS = {"__pycache__", *REPO_TREE_ARTIFACTS}
 _PUBLIC_ASSET_IGNORED_SUFFIXES = {".pyc", ".pyo"}
@@ -66,6 +66,22 @@ _PRIVACY_DENYLIST_REL = Path(".dadaia") / "states" / "privacy_denylist.json"
 # additive on top of these.
 _PRIVACY_BASELINE_PKG = "dadaia_workspace.infrastructure.data"
 _PRIVACY_BASELINE_FILE = "privacy_baseline.json"
+
+#: The published surface is English-only. These retired
+#: Portuguese control terms are the adoption blocker this closed: a consumer
+#: meets them on day 1, inside otherwise-English law. Scanned under ``public/`` only,
+#: on the same walk as the privacy layers, because the failure mode is identical —
+#: an authored asset leaking something that must never ship.
+PORTUGUESE_CONTROL_TERMS: tuple[tuple[str, str], ...] = (
+    ("Aprovado", "retired status token — use 'Approved'"),
+    ("Em revisão", "retired status token — use 'In review'"),
+    ("Em revisao", "retired status token — use 'In review'"),
+    ("Rascunho", "retired status token — use 'Draft'"),
+    ("Catálogo", "Portuguese heading — use 'catalog'"),
+    ("APROVADA", "Portuguese verdict — use 'APPROVED'"),
+    ("BLOQUEADA", "Portuguese verdict — use 'BLOCKED'"),
+    ("em progresso", "Portuguese marker prose — use 'in progress'"),
+)
 
 _OK_MARKER = DoctorLine(DoctorStatus.OK, "public-privacy")
 # Distinct ok line so an operator can tell which mode actually ran.
@@ -177,7 +193,7 @@ def load_privacy_terms() -> tuple[tuple[str, str], ...]:
 
     Reused by the push-range denylist scan (``features.chokepoints.denylist_scan``)
     AND, since v0.4.5 FR6 (T-045-19), by the bug-append write-time redaction
-    (``features.bugs.service.BugService``, threaded through
+    (the ``dd-bug-resolution/scripts/bugs.py`` write path, threaded through
     ``container.load_denylist_terms`` -> ``cli/commands/bugs.py``) — the SAME loader,
     consumed twice, never a second reader — so the CLI wires ONE operator term source,
     not a second denylist — same resolution order as :func:`check_public_privacy`
@@ -294,6 +310,15 @@ def check_public_privacy(
                             f"public-privacy:{rel.as_posix()}: contains '{term}' ({reason})",
                         )
                     )
+            if path.is_relative_to(public_dir):
+                for term, reason in PORTUGUESE_CONTROL_TERMS:
+                    if term.lower() in lowered:
+                        findings.append(
+                            DoctorLine(
+                                DoctorStatus.ERROR,
+                                f"public-privacy:{rel.as_posix()}: contains '{term}' ({reason})",
+                            )
+                        )
             for value, reason in _scan_text_for_baseline(text, baseline):
                 findings.append(
                     DoctorLine(

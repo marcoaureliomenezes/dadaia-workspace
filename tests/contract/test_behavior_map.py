@@ -28,8 +28,7 @@ the old map never covered at all: every **scoped `AGENTS.md`/`*-AGENTS.md` SOURC
 path — see the citation-bug note below), discovered the same structural way the skill
 inventory already is: **glob the generators, never a hand-written roster**
 (`_skills_on_disk`/`_scoped_agents_md_sources` below). `public/data/AGENTS.md` is
-excluded by name — it is, together with `public/data/DADAIA.md`, the LAW SOURCE itself
-(the two files `public/data/*.md` law state so), not a scoped rule.
+excluded by name — it is the LAW SOURCE itself (the root map), not a scoped rule.
 
 Five NEW RED conditions this map's own completeness requires, each with a dedicated
 mutation fixture (A10.2), listed in the name-diff's closing table:
@@ -37,7 +36,7 @@ mutation fixture (A10.2), listed in the name-diff's closing table:
 1. A member (skill or scoped `AGENTS.md` source) on disk has no row.
 2. A row names a member path that does not exist on disk.
 3. The same member maps to more than one row (A10.1's "exactly one" cardinality).
-4. A `DADAIA.md` section has zero owning rows (A10.1's "at least one owner" cardinality
+4. A root-map section has zero owning rows (A10.1's "at least one owner" cardinality
    — the OLD enforcer never checked this direction at all).
 5. A member's real content hash no longer matches its row's recorded `hash_tuple` entry
    (A10.4 — re-recording a hash is a deliberate, reviewed act).
@@ -93,17 +92,19 @@ acceptance line's own ``dadaia <verb> [<sub>]`` shape, resolved against the live
 **FR28 — ported verbatim.** A skill's model-invocation grant is derived, never
 hand-kept: the union of every persona frontmatter's ``skills:`` allowlist plus the
 universal-grant mechanism (failure mode 6's own ``_UNIVERSAL_NAMES`` /
-``_UNIVERSAL_GLOBS``), checked in both directions against
-``disable-model-invocation: true``.
+``_UNIVERSAL_GLOBS``); a flagged ``disable-model-invocation: true`` skill is in no
+allowlist. The converse is not checked — the main thread invokes every skill.
 """
 
 from __future__ import annotations
 
+import ast
 import copy
 import functools
 import hashlib
 import json
 import re
+import shutil
 import tempfile
 from collections import Counter
 from itertools import combinations
@@ -120,6 +121,9 @@ from dadaia_workspace.features.specs.citations import (
     dead_verb_citations_in_tree,
     posix_relpath,
 )
+from dadaia_workspace.infrastructure.public_assets import (
+    _SKILL_SCRIPT_SCHEMAS,  # allow-private-import: the one staging table naming which shipped schema each skill script carries a copy of; a second table here is the fork this hash guards against
+)
 from tests.helpers.scan_population import assert_populated
 
 pytestmark = pytest.mark.contract
@@ -130,7 +134,7 @@ _PKG_ROOT = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 _PUBLIC = _PKG_ROOT / "public"
 _MAP_PATH = _PUBLIC / "entities" / "behavior-map.json"
 _SCHEMA_PATH = _PUBLIC / "schemas" / "behavior-map-v1.schema.json"
-_LAW_PATH = _PUBLIC / "data" / "DADAIA.md"
+_LAW_PATH = _PUBLIC / "data" / "AGENTS.md"
 _SKILLS_DIR = _PUBLIC / "skills"
 _REPO_ROOT = _PKG_ROOT.parent
 
@@ -153,8 +157,8 @@ _UNIVERSAL_NAMES: frozenset[str] = frozenset({"dd-grill-me"})
 # --------------------------------------------------------------------------- #
 
 _SCOPED_SUBDIRS = ("data", "scaffold", "templates")
-# The law source itself — public/data/*.md carries DADAIA.md + AGENTS.md, the two LAW
-# files, never a "scoped" rule — is the ONE exclusion from an otherwise-structural glob.
+# The law source itself — public/data/AGENTS.md, the root map — is never a "scoped"
+# rule, and is the ONE exclusion from an otherwise-structural glob.
 _LAW_SOURCE_RELPATH = "dadaia_workspace/public/data/AGENTS.md"
 
 
@@ -316,7 +320,7 @@ def _find_members_mapped_to_two_sections(map_data: dict[str, Any]) -> list[str]:
 
 
 def _find_sections_without_an_owner(map_data: dict[str, Any], law_titles: set[str]) -> list[str]:
-    """A10.1's "at least one owner" direction — a `DADAIA.md` section with zero owning
+    """A10.1's "at least one owner" direction — a root-map section with zero owning
     rows. The retired enforcer never checked this direction: its schema had no notion
     of section completeness, only per-row validity."""
     owned = {_section_title(row["section"]) for row in map_data["rows"]}
@@ -336,11 +340,45 @@ def _sha256_file(path: Path) -> str:
     return _sha256_text(path.read_text(encoding="utf-8"))
 
 
+def _script_members(skill: str, skills_dir: Path, public_dir: Path) -> list[tuple[str, Path]]:
+    """The (stable name, file) pairs `hash_tuple.scripts` covers for *skill*, sorted.
+
+    Every SOURCE file under the skill's `scripts/` plus, under `schemas/<name>`, the
+    shipped schema `stage` copies in beside them — hashing the shipped original (never
+    the staged copy, which does not exist in the source tree) is what makes a schema
+    fork red on both sides.
+    """
+    scripts_dir = skills_dir / skill / "scripts"
+    members = [
+        (path.relative_to(scripts_dir).as_posix(), path)
+        for path in sorted(scripts_dir.rglob("*"))
+        if path.is_file() and "schemas" not in path.relative_to(scripts_dir).parts
+    ]
+    members += sorted(
+        {
+            (f"schemas/{Path(schema_rel).name}", public_dir / schema_rel)
+            for schema_rel, scripts_rel in _SKILL_SCRIPT_SCHEMAS
+            if scripts_rel.split("/")[1] == skill
+        }
+    )
+    return members
+
+
+def _scripts_hash(skill: str, skills_dir: Path, public_dir: Path) -> str | None:
+    """The recorded `hash_tuple.scripts` value for *skill* — `None` when it ships no
+    scripts, otherwise one hash over every member's name and content in sorted order."""
+    members = _script_members(skill, skills_dir, public_dir)
+    if not members:
+        return None
+    return _sha256_text("".join(f"{name}:{_sha256_file(path)}\n" for name, path in members))
+
+
 def _find_stale_hash_tuples(
     map_data: dict[str, Any],
     law_sections: dict[str, str],
     skills_dir: Path = _SKILLS_DIR,
     repo_root: Path = _REPO_ROOT,
+    public_dir: Path = _PUBLIC,
 ) -> list[str]:
     violations: list[str] = []
     for row in map_data["rows"]:
@@ -351,7 +389,7 @@ def _find_stale_hash_tuples(
             if real_section_hash != row["hash_tuple"]["section"]:
                 violations.append(
                     f"row(skill={row['skill']!r}): section hash stale for {row['section']!r} — "
-                    f"re-read `dadaia_workspace/public/data/DADAIA.md` {row['section']} and "
+                    f"re-read `dadaia_workspace/public/data/AGENTS.md` {row['section']} and "
                     "re-record hash_tuple.section"
                 )
         if row["skill"] is not None:
@@ -363,6 +401,14 @@ def _find_stale_hash_tuples(
                     violations.append(
                         f"row(skill={row['skill']!r}): skill hash stale — re-read `{rel}` "
                         "and re-record hash_tuple.skill"
+                    )
+            if (skills_dir / row["skill"] / "scripts").is_dir():
+                real_scripts_hash = _scripts_hash(row["skill"], skills_dir, public_dir)
+                if real_scripts_hash != row["hash_tuple"]["scripts"]:
+                    violations.append(
+                        f"row(skill={row['skill']!r}): scripts hash stale — re-read every "
+                        f"file under `{row['skill']}/scripts/` and the shipped schemas it "
+                        "carries, and re-record hash_tuple.scripts"
                     )
         recorded_scoped = row["hash_tuple"]["scoped"]
         scoped_paths = row["scoped_agents_md"]
@@ -551,7 +597,7 @@ def test_no_member_maps_to_two_sections() -> None:
 
 def test_every_law_section_has_an_owner() -> None:
     violations = _find_sections_without_an_owner(_real_map(), _law_section_titles())
-    assert violations == [], f"DADAIA.md section(s) with zero owning rows: {violations}"
+    assert violations == [], f"root-map section(s) with zero owning rows: {violations}"
 
 
 def test_every_hash_tuple_is_current() -> None:
@@ -678,7 +724,7 @@ def test_mutation_fixture_c_member_maps_to_two_sections_turns_red() -> None:
 
 
 def test_mutation_fixture_d_section_without_an_owner_turns_red() -> None:
-    """RED condition 4 (A10.1, the inverse cardinality direction) — a `DADAIA.md`
+    """RED condition 4 (A10.1, the inverse cardinality direction) — a root-map
     section with zero owning rows must be flagged. The retired enforcer never checked
     this direction: its schema had no notion of section completeness. A fabricated
     title is unioned into the law-titles set (never a real section demoted) — the
@@ -706,6 +752,29 @@ def test_mutation_fixture_e_stale_hash_tuple_turns_red() -> None:
 
     assert any("skill hash stale" in v for v in violations), violations
     assert any("section hash stale" in v for v in violations), violations
+
+
+def test_mutation_fixture_f_edited_skill_script_turns_red(tmp_path: Path) -> None:
+    """RED condition 5, scripts side — a skill script whose bytes changed without its
+    row's `hash_tuple.scripts` re-recorded must be flagged. The skill folder is copied
+    into a tmp tree and ONE byte appended to one script: the map's own rows and the real
+    corpus are never touched, and the finder is pointed at the copy."""
+    row = next(
+        r
+        for r in _real_map()["rows"]
+        if r["skill"] is not None and (_SKILLS_DIR / r["skill"] / "scripts").is_dir()
+    )
+    skill = row["skill"]
+    copied = tmp_path / "skills" / skill
+    shutil.copytree(_SKILLS_DIR / skill, copied)
+    edited = sorted((copied / "scripts").glob("*.py"))[0]
+    edited.write_text(edited.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+
+    violations = _find_stale_hash_tuples(
+        _real_map(), _law_section_bodies(), skills_dir=tmp_path / "skills"
+    )
+
+    assert any(f"row(skill={skill!r}): scripts hash stale" in v for v in violations), violations
 
 
 # --------------------------------------------------------------------------- #
@@ -804,37 +873,16 @@ def _disable_model_invocation_flagged(skills_dir: Path) -> set[str]:
     return flagged
 
 
-def _find_ungranted_not_flagged(
-    skills: set[str], granted: set[str], flagged: set[str]
-) -> list[str]:
-    """Direction 7a — a skill in NO allowlist (and not universally granted) must carry
-    `disable-model-invocation: true`."""
-    return sorted(s for s in skills if s not in granted and s not in flagged)
-
-
 def _find_flagged_but_granted(granted: set[str], flagged: set[str]) -> list[str]:
     """Direction 7b — a skill carrying `disable-model-invocation: true` must be in NO
     allowlist — a model-granted skill can never also claim to be user-invoked-only."""
     return sorted(s for s in flagged if s in granted)
 
 
-def test_ungranted_skills_carry_disable_model_invocation() -> None:
-    """Direction 7a (A28.1) — a skill no persona's `skills:` allowlist grants to a
-    model, and that is not universally granted (failure mode 6's own exemption), must
-    carry `disable-model-invocation: true`."""
-    granted = _granted_to_any_model(_AGENTS_DIR, _SKILLS_DIR)
-    flagged = _disable_model_invocation_flagged(_SKILLS_DIR)
-    violations = _find_ungranted_not_flagged(_skills_on_disk(), granted, flagged)
-    assert violations == [], (
-        f"skill(s) granted by no persona allowlist and not universally granted, but "
-        f"missing disable-model-invocation: true: {violations}"
-    )
-
-
 def test_disable_model_invocation_skills_are_in_no_allowlist() -> None:
-    """Direction 7b (A28.1) — a skill flagged `disable-model-invocation: true` must be
-    in NO persona's `skills:` allowlist — the equivalence holds both ways, not as a
-    one-way rule."""
+    """Direction 7b (A28.1) — one way only: a skill flagged `disable-model-invocation:
+    true` sits in NO persona's `skills:` allowlist. An ungranted skill is not thereby
+    user-invoked-only: the main thread invokes any skill."""
     granted = _granted_to_any_model(_AGENTS_DIR, _SKILLS_DIR)
     flagged = _disable_model_invocation_flagged(_SKILLS_DIR)
     violations = _find_flagged_but_granted(granted, flagged)
@@ -842,21 +890,6 @@ def test_disable_model_invocation_skills_are_in_no_allowlist() -> None:
         f"skill(s) flagged disable-model-invocation: true but still granted by a "
         f"persona allowlist (contradicts A28.1's user-invoked-only meaning): {violations}"
     )
-
-
-def test_mutation_fixture_7_ungranted_skill_without_flag_turns_red() -> None:
-    """Direction 7a mutation fixture: drop a real, explicitly-allowlisted (non-
-    universal) skill out of the granted set without flagging it — the finder must
-    catch it."""
-    target = "dd-cli-library"
-    granted = _granted_to_any_model(_AGENTS_DIR, _SKILLS_DIR)
-    assert target in granted, "fixture precondition: target must start out granted"
-    mutated_granted = granted - {target}
-    flagged = _disable_model_invocation_flagged(_SKILLS_DIR)
-    assert target not in flagged, "fixture precondition: target must start out unflagged"
-
-    violations = _find_ungranted_not_flagged(_skills_on_disk(), mutated_granted, flagged)
-    assert violations == [target]
 
 
 def test_mutation_fixture_8_flagged_skill_still_granted_turns_red() -> None:
@@ -1095,3 +1128,78 @@ def test_mutation_fixture_12_dead_body_pointer_turns_red(tmp_path: Path) -> None
     assert "dead skill pointer `dd-gone`" in violations[0]
     assert "dead section pointer `dd-real` §9" in violations[1]
     assert "dead scoped-rule pointer `nowhere-AGENTS.md`" in violations[2]
+
+
+# ---------------------------------------------------------------------------
+# The inverse direction of the verb audit: what the library invokes on ITSELF
+# ---------------------------------------------------------------------------
+
+#: The production helpers that build a `dadaia` argv out of literal strings. Both live
+#: in `features/certification` — the one place the library runs its own CLI.
+_SELF_INVOKERS = frozenset({"cli", "doctor_clean"})
+
+#: The module a self-invoked argv names right before its verb path.
+_CLI_ENTRY = "dadaia_workspace.cli.main"
+
+
+def _leading_words(nodes: list[ast.expr]) -> tuple[str, ...]:
+    """The literal, non-flag words an argv starts with — the verb path it names."""
+    words: list[str] = []
+    for node in nodes:
+        if not isinstance(node, ast.Constant) or not isinstance(node.value, str):
+            break
+        if node.value.startswith("-"):
+            break
+        words.append(node.value)
+    return tuple(words)
+
+
+def _self_invoked_verb_paths() -> list[tuple[str, tuple[str, ...]]]:
+    """Every literal `dadaia` argv the package builds, as ``(file:line, verb path)``."""
+    found: list[tuple[str, tuple[str, ...]]] = []
+    package = _REPO_ROOT / "dadaia_workspace"
+    for path in sorted(package.rglob("*.py")):
+        if path.is_symlink():
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+                continue
+            if node.func.id not in _SELF_INVOKERS:
+                continue
+            words = _leading_words(node.args)
+            if words:
+                rel = path.relative_to(_REPO_ROOT).as_posix()
+                found.append((f"{rel}:{node.lineno}", words))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.List):
+                continue
+            for idx, element in enumerate(node.elts):
+                if isinstance(element, ast.Constant) and element.value == _CLI_ENTRY:
+                    words = _leading_words(node.elts[idx + 1 :])
+                    if words:
+                        rel = path.relative_to(_REPO_ROOT).as_posix()
+                        found.append((f"{rel}:{node.lineno}", words))
+    return found
+
+
+def test_every_self_invoked_dadaia_verb_exists() -> None:
+    """Intent: CONTRACT — 0.4.7 FR5 (T-047-78), bug `certify-invokes-a-retired-verb`.
+
+    `dead_verb_citations_in_tree` audits the verbs `public/` DOCUMENTS; this audits the
+    verbs the package itself RUNS. `dadaia certify` shelled out to `dadaia specs doctor`
+    for a whole candidate after that verb was retired, and reported `ok=false` with
+    `No such command 'doctor'` — a citation of a verb that does not exist, in the one
+    direction no test was watching. The longest literal prefix of each argv must resolve
+    to a LEAF of the live tree; resolving only to a GROUP means the subcommand is dead.
+    """
+    paths = set(command_paths())
+    leaves = {p for p in paths if not any(q[: len(p)] == p and len(q) > len(p) for q in paths)}
+    invocations = _self_invoked_verb_paths()
+    assert invocations, "the AST walk found no self-invoked dadaia argv — mis-rooted scan?"
+    violations = [
+        f"{where}: `dadaia {' '.join(words)}` resolves to no leaf verb"
+        for where, words in invocations
+        if not any(words[:n] in leaves for n in range(len(words), 0, -1))
+    ]
+    assert violations == [], "self-invoked dead verb(s):\n" + "\n".join(violations)

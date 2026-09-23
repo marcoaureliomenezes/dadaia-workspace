@@ -17,11 +17,13 @@ import shutil
 from pathlib import Path
 
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from tests.helpers.harness_profile import register_all
 
 
 def _install_all(ws: Path) -> FileSystemPublicAssetManager:
     mgr = FileSystemPublicAssetManager()
-    mgr.install(ws, target="all")
+    register_all(ws)
+    mgr.install(ws)
     return mgr
 
 
@@ -39,7 +41,7 @@ def test_retired_family_is_pruned_on_next_install(tmp_path: Path) -> None:
 
     # Retire the WHOLE family from staging (the copy_tree early-return hole).
     shutil.rmtree(skills_src)
-    installed = mgr.install(ws, target="all")
+    installed = mgr.install(ws)
 
     assert not projected.exists(), (
         "a retired asset family must disappear from the instance on the next install "
@@ -59,7 +61,7 @@ def test_operator_modified_orphan_is_retained_and_surfaced(tmp_path: Path) -> No
     projected.write_text(projected.read_text(encoding="utf-8") + "\nOPERATOR EDIT\n")
 
     shutil.rmtree(skills_src)
-    installed = mgr.install(ws, target="all")
+    installed = mgr.install(ws)
 
     assert projected.exists(), "an operator-modified orphan must NEVER be deleted"
     assert any(
@@ -82,7 +84,7 @@ def test_no_ledger_bootstrap_prunes_nothing(tmp_path: Path) -> None:
     stray.parent.mkdir(parents=True)
     stray.write_text("mine\n", encoding="utf-8")
 
-    installed = mgr.install(ws, target="all")
+    installed = mgr.install(ws)
 
     assert stray.exists(), "bootstrap (no ledger) must prune nothing"
     assert not any("[prune]" in line and "operator-own-skill" in line for line in installed)
@@ -96,7 +98,7 @@ def test_scoped_install_never_prunes_other_scopes(tmp_path: Path) -> None:
     codex_agents = ws / ".codex" / "agents"
     assert any(codex_agents.glob("*.toml"))
 
-    mgr.install(ws, target="claude")
+    mgr.install(ws, harness="claude")
 
     assert any(codex_agents.glob("*.toml")), (
         "a claude-scoped install must never prune codex projections via the ledger"

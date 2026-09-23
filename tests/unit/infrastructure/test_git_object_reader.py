@@ -302,7 +302,7 @@ def test_new_objects_git_failure_raises_typed_error(tmp_path: Path) -> None:
 def test_new_objects_batch_check_timeout_raises_typed_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """code-reviewer MEDIUM finding: the ``--batch-check`` call must route through the
+    """dd-code-reviewer MEDIUM finding: the ``--batch-check`` call must route through the
     same typed-error wrapper as every other git invocation in this module — a subprocess
     timeout or a missing ``git`` executable must never escape as a raw exception
     (``core/protocols/git_object_reader.py`` — 'Any git failure raises
@@ -427,7 +427,7 @@ def test_is_resolvable_commit_rejects_option_shaped_sha_before_interpolation(
 
 
 # ---------------------------------------------------------------------------
-# code-reviewer LOW finding (v0.11.0 pre-PR review) — the module's stated second-layer
+# dd-code-reviewer LOW finding (v0.11.0 pre-PR review) — the module's stated second-layer
 # argv defence (git_objects.py:37-42) must also cover `local_sha`: it is shape-checked
 # BEFORE `_rev_list_candidates` ever interpolates it into the `git rev-list` argv,
 # exactly as `_is_resolvable_commit` already does for `remote_sha`.
@@ -706,7 +706,7 @@ def test_resolve_prior_texts_missing_row_still_treated_as_absence(tmp_path: Path
     assert new_obj.prior_text is None
 
 
-# Intent: CONTRACT — v0.4.2 CR-1 (code-reviewer HIGH, regression vs 741f2294)
+# Intent: CONTRACT — v0.4.2 CR-1 (dd-code-reviewer HIGH, regression vs 741f2294)
 
 
 def test_resolve_prior_texts_new_path_with_two_spaces_is_absence_not_a_raise(
@@ -904,7 +904,7 @@ def test_new_objects_undecodable_prior_blob_carries_no_prior_text(tmp_path: Path
 
 
 # ---------------------------------------------------------------------------
-# code-reviewer LOW finding (v0.11.0 pre-PR review) — `_resolve_prior_texts` must
+# dd-code-reviewer LOW finding (v0.11.0 pre-PR review) — `_resolve_prior_texts` must
 # discard `%(objecttype)` for real: only a `blob` may ever yield prior text. A path
 # that was a DIRECTORY (tree) at the base must resolve to explicit absence even in the
 # pathological case where the tree's raw bytes happen to decode as valid UTF-8 (a real
@@ -964,7 +964,7 @@ def test_new_objects_path_that_was_a_directory_at_base_carries_no_prior_text(
 
 
 # ---------------------------------------------------------------------------
-# code-reviewer MEDIUM finding M3 support (v0.11.0 pre-PR review, CLOSURE drift
+# dd-code-reviewer MEDIUM finding M3 support (v0.11.0 pre-PR review, CLOSURE drift
 # `oversized-never-amnestied-scope-boundary`) — pin the adapter-level guarantee that an
 # oversized CURRENT object never carries prior_text, even when the base IS resolvable
 # and the SAME path existed (under cap) at that base — the prior-side lookup rides only
@@ -1638,44 +1638,6 @@ def test_resolvable_remote_sha_and_new_branch_fallback_agree_on_the_same_final_s
 # ---------------------------------------------------------------------------------------
 # list_tree_paths / parents (v0.5.0 specs-canon closure, operator ruling 2026-08-28)
 # ---------------------------------------------------------------------------------------
-
-
-def test_list_tree_paths_lists_only_files_under_the_prefix(tmp_path: Path) -> None:
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    (repo / "specs").mkdir()
-    (repo / "specs" / "AGENTS.md").write_text("agents\n")
-    (repo / "specs" / "backlog").mkdir()
-    (repo / "specs" / "backlog" / "BACKLOG.json").write_text("{}\n")
-    (repo / "outside.txt").write_text("not under specs/\n")
-    tip_sha = _commit(repo, "seed")
-
-    reader = GitSubprocessObjectReader()
-    paths = reader.list_tree_paths(repo, tip_sha, "specs")
-
-    assert sorted(paths) == ["specs/AGENTS.md", "specs/backlog/BACKLOG.json"]
-
-
-def test_list_tree_paths_over_an_absent_prefix_is_empty(tmp_path: Path) -> None:
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    (repo / "a.txt").write_text("a\n")
-    tip_sha = _commit(repo, "seed")
-
-    reader = GitSubprocessObjectReader()
-    assert reader.list_tree_paths(repo, tip_sha, "specs") == []
-
-
-def test_list_tree_paths_rejects_an_option_shaped_sha(tmp_path: Path) -> None:
-    """CWE-88 — the same second-layer shape defence every other adapter call applies."""
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    (repo / "a.txt").write_text("a\n")
-    _commit(repo, "seed")
-
-    reader = GitSubprocessObjectReader()
-    with pytest.raises(GitObjectReadError):
-        reader.list_tree_paths(repo, "--upload-pack=evil", "specs")
 
 
 def test_parents_of_a_child_commit_is_the_base(tmp_path: Path) -> None:

@@ -19,7 +19,6 @@ from tests.helpers.golden_platform import (
     assert_golden,
     canon_env_line,
     is_env_doctor_line,
-    norm_panel_body,
     norm_path_line,
     norm_stderr,
     sort_line_lists,
@@ -146,20 +145,6 @@ def test_sort_line_lists_locks_sorted_multiset_recurses_and_leaves_mixed_untouch
 # ---------------------------------------------------------------------------
 # norm_panel_body — path/version (JSON-escaped) + clock leak classes
 # ---------------------------------------------------------------------------
-
-
-def test_norm_panel_body_scrubs_json_escaped_root_and_timestamps(tmp_path: Path) -> None:
-    payload = {
-        "root": str(tmp_path),
-        "generated_at": "2026-07-07T01:02:03.456+00:00",
-        "stamp": "2026-07-07T01:02:03Z",
-    }
-    body = json.dumps(payload).encode("utf-8")
-    out = norm_panel_body(body, tmp_path)
-    assert '"<WS>"' in out
-    assert str(tmp_path) not in out
-    assert out.count("<TS>") == 2
-    assert "2026-07-07" not in out
 
 
 # ---------------------------------------------------------------------------

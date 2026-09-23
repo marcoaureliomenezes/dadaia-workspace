@@ -13,23 +13,17 @@ from __future__ import annotations
 import inspect
 
 
-def test_ci_first_parent_delegates_to_the_one_parents_reader() -> None:
-    from dadaia_workspace.cli.commands import ci
-
-    src = inspect.getsource(ci._first_parent_sha)
-    assert "rev-parse" not in src, "ci.py must not hand-roll the first-parent git fact"
-    assert ".parents(" in src
-
-
 def test_python_env_narrates_a_failed_repack_install_honestly() -> None:
     from dadaia_workspace.infrastructure import python_env
 
     src = inspect.getsource(python_env)
     assert "except subprocess.CalledProcessError:\n                        pass" not in src, (
-        "the repack-install failure must not be silently swallowed and re-narrated "
-        "as a repack failure"
+        "an install failure must not be silently swallowed and re-narrated as another"
     )
-    assert "re-packed running distribution" in src
+    # The paired assertion on the fallback's own narration ("re-packed running
+    # distribution") died with the fallback itself (bug
+    # init-venv-installs-index-version-not-running-distribution): there is one install
+    # now, so there is no second failure to narrate as the first.
 
 
 def test_handoff_index_docstring_claims_no_phantom_facade() -> None:

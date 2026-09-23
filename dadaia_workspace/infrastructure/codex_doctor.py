@@ -16,13 +16,14 @@ import tomllib
 from collections.abc import Callable
 from pathlib import Path
 
+from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
-from dadaia_workspace.infrastructure.runtime_config import (
-    codex_hook_wrapper_command,
-    codex_hook_wrapper_contents,
-)
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _CODEX_SKILL_REF_PREFIXES,
+)
+from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
+    hook_wrapper_command,
+    hook_wrapper_contents,
 )
 
 # ---------------------------------------------------------------------------
@@ -40,7 +41,7 @@ ATTESTING_CHECK_IDS: tuple[str, ...] = (
     "rule-corpus",
     "trust-boundary",
     "public-privacy",
-    "law-projection",
+    "symlink-target",
     "entities-derivation",
 )
 
@@ -61,43 +62,15 @@ ATTESTING_CHECK_IDS: tuple[str, ...] = (
 # ---------------------------------------------------------------------------
 
 
-def dcx6_codex_runtime_adapters(workspace_root: Path, public_dir: Path) -> list[DoctorLine]:
-    """D-CX-6: public/runtime/codex/ adapters — LEAK check only (F006, 20260830 audit).
-
-    Missing/drift of ``.codex/skills/<slug>/SKILL.md`` belongs to the ProjectionRule
-    table (``projection_rules._codex_runtime_adapter_rules`` byte-compares it) — a
-    second decider re-deriving that fact was the install/doctor-disagreement class K3
-    retired. What stays here is the one check no fixed-destination rule can express:
-    a Codex-only adapter must not leak into the Claude skills tree.
-    """
-    src_root = public_dir / "runtime" / "codex"
-    out: list[DoctorLine] = []
-    if not src_root.exists():
-        return out
-    claude_skills = workspace_root / ".claude" / "skills"
-    for slug_dir in sorted(src_root.iterdir()):
-        if not slug_dir.is_dir() or not (slug_dir / "SKILL.md").exists():
-            continue
-        slug = slug_dir.name
-        leak_path = claude_skills / slug / "SKILL.md"
-        if leak_path.exists():
-            out.append(
-                DoctorLine(
-                    DoctorStatus.LEAK,
-                    f"claude:skills/{slug}/SKILL.md"
-                    " — Codex-only adapter must not appear here (D-CX-6)",
-                )
-            )
-    return out
-
-
 def dcx7_codex_skill_refs(workspace_root: Path) -> list[DoctorLine]:
-    """D-CX-7: generated Codex agents must not reference missing skills."""
+    """D-CX-7: generated Codex agents must not reference a missing ``dd-`` member.
+
+    Since 0.4.7 a ``dd-`` token names either a skill directory or one of the three
+    personas — both live under the authored ``.agents/`` set, so both resolve here.
+    """
     codex_agents = workspace_root / ".codex" / "agents"
-    skill_roots = (
-        workspace_root / ".agents" / "skills",
-        workspace_root / ".codex" / "skills",
-    )
+    skill_roots = (workspace_root / ".agents" / "skills",)
+    personas = {md.stem for md in (workspace_root / ".agents" / "agents").glob("*.md")}
     out: list[DoctorLine] = []
     if not codex_agents.exists():
         return out
@@ -112,6 +85,8 @@ def dcx7_codex_skill_refs(workspace_root: Path) -> list[DoctorLine]:
         for match in re.finditer(r"`([a-z][a-z0-9.\-]+)`", instructions):
             skill = match.group(1)
             if not skill.startswith(_CODEX_SKILL_REF_PREFIXES):
+                continue
+            if skill in personas:
                 continue
             if not any((root / skill / "SKILL.md").exists() for root in skill_roots):
                 out.append(
@@ -170,8 +145,8 @@ def dcx9_codex_hook_shape(workspace_root: Path) -> list[DoctorLine]:
     except (OSError, json.JSONDecodeError):
         return [DoctorLine(DoctorStatus.ERROR, "codex:hooks.json missing or invalid (D-CX-9)")]
 
-    wrappers = codex_hook_wrapper_contents()
-    expected = {codex_hook_wrapper_command(name) for name in wrappers}
+    wrappers = hook_wrapper_contents(HARNESS_RECORDS["codex"])
+    expected = {hook_wrapper_command(name) for name in wrappers}
     # The exec probe feeds a fake hook payload on stdin: a no-op for a ``hooks.*`` module,
     # a real run for the CLI reaper wrapper — a doctor never mutates, so it is not probed.
     probeable = {
@@ -302,17 +277,6 @@ def check_codex_rule_corpus_reachable(workspace_root: Path) -> list[DoctorLine]:
             cited_any = True
             if not (rules_dir / f"{name}.md").is_file():
                 unreachable.add(name)
-        # The nine by-name rules were consolidated into the single always-on law file, so
-        # artifacts now cite ``DADAIA.md`` instead. Same invariant, same verdict labels: an
-        # artifact that cites the law must be able to reach it. Without this the check
-        # would go SILENT once the last by-name citation disappeared — a check that stops
-        # emitting is a check that stopped protecting.
-        if "DADAIA.md" in text:
-            cited_any = True
-            # The workspace root copy is the canonical, profile-independent projection
-            # (a codex-only profile carries no .claude/rules/ at all).
-            if not (workspace_root / "DADAIA.md").is_file():
-                unreachable.add("DADAIA.md")
 
     if unreachable:
         for name in sorted(unreachable):
@@ -396,7 +360,7 @@ def codex_trust_boundary_info(
                 "codex:trust-boundary — no installed Codex CLI observed on PATH "
                 "('codex --version' unreachable); the interactive-vs-headless "
                 "hook-fire boundary is UNVERIFIED for this environment (the git "
-                "chokepoints — pre-commit presence advisory + pre-push CI/branch "
+                "chokepoints — the pre-push CI/branch "
                 "gate + the PR security-verdict gate — remain independent "
                 "defense-in-depth regardless). (WS-CDX-HYGIENE)",
             )

@@ -37,5 +37,5 @@
     "K11 git-index boundary: per-session worktree vs refusing pre-commit — architect ruling before any code",
     "Canonical terms for the 16 glossary conflicts (CONTEXT.md)"
   ],
-  "next_handoff": {"agent": "project-manager", "context": "dadaia-workspace", "expected_artifact_type": "other"}
+  "next_handoff": {"agent": "dd-product-engineer", "context": "dadaia-workspace", "expected_artifact_type": "other"}
 }

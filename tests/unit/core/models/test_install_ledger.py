@@ -25,7 +25,7 @@ class TestValidRelpathConstructs:
     @pytest.mark.parametrize(
         "relpath",
         [
-            ".claude/rules/DADAIA.md",
+            ".codex/AGENTS.md",
             "AGENTS.md",
             "a/b/c/d.txt",
             ".dadaia/agentic/manifest.json",
@@ -117,7 +117,7 @@ class TestCrossOsWriterGuard:
     @pytest.mark.parametrize(
         "windows_root,windows_candidate",
         [
-            ("C:/workspace/dadaia", "C:/workspace/dadaia/.claude/rules/DADAIA.md"),
+            ("C:/workspace/dadaia", "C:/workspace/dadaia/.codex/AGENTS.md"),
             ("C:/workspace/dadaia", "C:/workspace/dadaia/.codex/skills/dadaia-cli/SKILL.md"),
             ("C:/workspace/dadaia", "C:/workspace/dadaia/AGENTS.md"),
             (

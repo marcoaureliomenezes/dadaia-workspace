@@ -1,6 +1,6 @@
-"""Intent: CONTRACT — V32, V33, V34, V35; size: SMALL (contract).
+"""Intent: CONTRACT — V32, V33, V34, V35, V36; size: SMALL (contract).
 
-Four repo-pure slop ratchets: measured at birth, pinned, ratcheting down only; every
+Five repo-pure slop ratchets: measured at birth, pinned, ratcheting down only; every
 tree walk goes through the one tracked-files enumeration the other ratchets use.
 """
 
@@ -31,10 +31,10 @@ _GOVERNANCE_ID_RE = re.compile(
 )
 _DOCSTRING_OWNERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
 
-# RECORDED CEILING (ratchet DOWN ONLY) — measured 2026-09-03 on this HEAD, every comment
+# RECORDED CEILING (ratchet DOWN ONLY) — measured 2026-09-20 on this HEAD, every comment
 # token plus every docstring line under dadaia_workspace/**/*.py. Lower it in the commit
 # that deletes the ids; raising it is never a ratchet move.
-_V32_CEILING = 912
+_V32_CEILING = 646
 
 
 def _governance_id_lines(source: str) -> int:
@@ -53,7 +53,7 @@ def _governance_id_lines(source: str) -> int:
 
 def test_v32_governance_ids_in_production_comments_and_docstrings() -> None:
     """V32 — comment tokens and docstring lines under dadaia_workspace/ naming an FR, T-,
-    ADR or v0.x id, pinned at 912. Ratchet DOWN ONLY; target 0 (tests/ are excluded)."""
+    ADR or v0.x id, pinned at the recorded ceiling. Ratchet DOWN ONLY; target 0 (tests/ are excluded)."""
     total = sum(
         _governance_id_lines(path.read_text(encoding="utf-8"))
         for path in tracked_test_files(_REPO_ROOT, "*.py", tree="dadaia_workspace")
@@ -83,9 +83,9 @@ _V33_TOKEN_TREES = ("specs", "dadaia_workspace", "tests")
 _V33_READER_TREES = ("dadaia_workspace", "tests")
 _V33_RATIFIED_FAMILIES = frozenset({"FR", "AC", "T"})
 
-# RECORDED CEILING (ratchet DOWN ONLY) — measured 2026-09-03 on this HEAD; the failing
+# RECORDED CEILING (ratchet DOWN ONLY) — measured 2026-09-20 on this HEAD; the failing
 # assertion prints the orphan family list so the number is reproducible.
-_V33_CEILING = 51
+_V33_CEILING = 35
 
 
 def _family_witnesses(texts: Iterable[str]) -> dict[str, set[tuple[str, int]]]:
@@ -187,6 +187,50 @@ def test_v33_prefix_families_without_a_mechanical_reader() -> None:
 
 
 # ---------------------------------------------------------------------------
+# V36 — the skill-script corpus: files and total Python lines
+# ---------------------------------------------------------------------------
+
+# RECORDED PINS (ratchet DOWN ONLY) — measured on the post-candidate corpus: every
+# tracked `*.py` under dadaia_workspace/public/skills/*/scripts/. A ledger's writer moved
+# out of the CLI ONCE; a growing corpus after that is CLI code re-typed, not code moved.
+# T-047-94 re-pin (down only, never raised again this candidate): the atom generator and
+# the second frontmatter validator are gone and the index renderer folded into the catalog
+# one — 31 -> 29 files, 3,657 -> 3,436 lines measured. The ceiling below is that measurement
+# plus the budget the SPEC already authorized for the drift verb and the `release.py memory`
+# verb (+1 file; +85 + 14 + 16 + 50 + 6 = +171 lines), so no later task in this candidate may
+# raise it; T-047-105 re-pinned it to the measured post-candidate value (30 files, 3,618 lines).
+_V36_FILE_CEILING = 30
+_V36_LINE_CEILING = 3618
+
+
+def _skill_scripts() -> list[Path]:
+    return [
+        path
+        for path in tracked_test_files(_REPO_ROOT, "*.py", tree="dadaia_workspace")
+        if "public/skills/" in path.as_posix() and "/scripts/" in path.as_posix()
+    ]
+
+
+def test_v36_skill_script_corpus_is_pinned() -> None:
+    """V36 — at most 30 skill-script files and 3,618 total lines of skill Python. The
+    ledger writers moved out of the CLI once: growth here is a verb regrown, never moved."""
+    scripts = _skill_scripts()
+    assert len(scripts) <= _V36_FILE_CEILING, (
+        f"skill-script files grew to {len(scripts)} (ceiling {_V36_FILE_CEILING}). A new "
+        "file earns its place by a verb leaving the CLI, never by restating one."
+    )
+    total = _skill_corpus_lines(scripts)
+    assert total <= _V36_LINE_CEILING, (
+        f"skill Python grew to {total} lines (ceiling {_V36_LINE_CEILING}). Delete the "
+        "duplicated helper — never raise the ceiling."
+    )
+
+    # Mutation fixture — the counter reads real files, and an empty set counts 0.
+    assert _skill_corpus_lines([]) == 0
+    assert scripts, "the skill-script corpus must not be empty"
+
+
+# ---------------------------------------------------------------------------
 # V34 — bytes of the live candidate's SPEC.md and TASKS.md
 # ---------------------------------------------------------------------------
 
@@ -220,7 +264,14 @@ def test_v34_live_candidate_trio_bytes_under_the_fixed_ceiling() -> None:
     a fixed ceiling, never a pin."""
     live = _live_release_dir()
     if live is not None:
-        sizes = {name: (live / name).stat().st_size for name in _V34_CEILINGS}
+        # A candidate in DEFINITION may hold only its SPEC.md at the root (rc-archive
+        # ran, PLAN/TASKS not yet authored): measure what exists, never demand the trio.
+        # Content bytes, LF-normalised: a CRLF checkout must not move a ratchet.
+        sizes = {
+            name: len((live / name).read_bytes().replace(b"\r\n", b"\n"))
+            for name in _V34_CEILINGS
+            if (live / name).is_file()
+        }
         assert _byte_ceiling_violations(sizes) == [], (
             f"{live.name} trio exceeds the byte ceiling — above it the scope is open "
             "enough to be two candidates."
@@ -240,7 +291,7 @@ def test_v34_live_candidate_trio_bytes_under_the_fixed_ceiling() -> None:
 # tracked `*.md` under dadaia_workspace/public/skills/. Re-pinned at every closure that
 # touches the corpus, downward only; raising either is never a ratchet move.
 _V35_DIR_CEILING = 18
-_V35_LINE_CEILING = 2916
+_V35_LINE_CEILING = 2863
 
 
 def _skill_corpus_markdown() -> list[Path]:
@@ -256,7 +307,7 @@ def _skill_corpus_lines(paths: Iterable[Path]) -> int:
 
 
 def test_v35_skill_corpus_is_pinned() -> None:
-    """V35 — at most 18 skill directories and 2,917 total lines of skill Markdown.
+    """V35 — at most 18 skill directories and 2,863 total lines of skill Markdown.
     A rule lives in one home: a growing corpus is a rule restated, not a rule added."""
     corpus = _skill_corpus_markdown()
     dirs = {

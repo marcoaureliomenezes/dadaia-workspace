@@ -7,18 +7,21 @@ description: >
   grew the touched feature's bug surface, evidenced from the ledger). Use when
   reviewing a PR, branch or commit range, or when a verdict needs the Bug-surface
   axis.
+compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install dadaia-workspace) it also drives the SDD lifecycle — specs, backlog, bugs, releases.
 ---
 
 # dd-code-review
 
 Three axes, run as three sequential passes (this workspace's sub-agents cannot
-nest-dispatch; PM-dispatched siblings are the alternative). Findings from different
+nest-dispatch; main-thread-dispatched siblings are the alternative). Findings from different
 axes are reported side by side — an axis never outranks another.
 
 ## 1. When
 
-- Reviewing a PR, branch or commit range before the candidate's PR.
-- A qa-engineer or software-architect verdict needs the Bug-surface axis.
+1. Inside a dadaia workspace, open `specs/memory/AGENTS.md` (the area's scoped law) and follow it — the diff is
+   judged against current product truth.
+2. Reviewing a PR, branch or commit range before the candidate's PR.
+3. A curation, architecture or audit verdict needs the Bug-surface axis (§6).
 
 ## 2. Axis 1 — Standards
 
@@ -33,19 +36,25 @@ axes are reported side by side — an axis never outranks another.
 
 ## 3. Axis 2 — Spec
 
-- Read the approved SPEC/TASKS the diff claims to implement (`**Status:** Aprovado`).
+- Read the approved SPEC/TASKS the diff claims to implement (`**Status:** Approved`).
 - Does the diff do what they say — nothing more, nothing less?
 - Scope growth beyond the task's declared write set is a finding, even when the code is good.
 - Acceptance criteria without corresponding evidence (test/assertion) is a finding.
 
 ## 4. Axis 3 — Bug-surface
 
-- Pull the touched feature's ledger slice: `dadaia bugs stats`, `dadaia bugs status --all` filtered to its surface/component.
+- Pull the touched feature's ledger slice: `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats`, `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status --all` filtered to its surface/component.
 - Answer WITH EVIDENCE: did this diff reduce, keep, or increase the feature's bug surface?
 - The operator's rule applied as a review axis: a diff that GROWS the feature is a stop —
   a branch, flag, special case, second code path or cross-feature reach-in added by a fix
   is a puxadinho; name it and recommend the replace-don't-layer shape instead.
 - An S4, S5 or S8 finding (`SLOP.md`) answers this axis "increased" until the finding is gone.
+
+## 4a. The root-cause and approval bars
+
+- A fix qualifies only when it reproduces the failure on the executed path, tests for the real reason, fixes the cause and proves it green — a workaround or symptom patch is a finding.
+- Approved means the operator and the consumer-side validation agent agree after validating a real workspace.
+- A green internal gate that diverges from real consumer behavior is itself a bug.
 
 ## 5. Reporting
 
@@ -53,8 +62,17 @@ axes are reported side by side — an axis never outranks another.
 - The three axes appear side by side in the report; the verdict (`APPROVED`/`REJECTED` — the handoff schema's enum) follows the caller persona's rules.
 - The Bug-surface answer is REQUIRED in every verdict — "tests green" is not a verdict.
 
-## 6. References
+## 6. The six lenses
+
+One reviewer, six checklists applied on every verdict (ADR 0016); the engineer anticipates them.
+
+- **Architecture** — root cause named; the diff shrinks or keeps the feature (`dd-codebase-design` deletion test); `dd-architecture-survey` at candidate close.
+- **Security** — OWASP top 10, secrets, dependency CVEs (`pip-audit`/`npm audit`), CWE id per finding; never Fable on this lens.
+- **QA** — every acceptance scenario has evidence; the pyramid holds; pruning only by a curation verdict (`dd-test-stewardship`).
+- **Product** — the diff matches SPEC scope; memory atoms still tell the truth (`dd-release-implementation` MEMORY-UPDATE).
+- **Audit** — `dd-audit-project` pillars over the window; findings, never fixes.
+- **AI surface** — every agent, skill, rule or hook change satisfies `dd-ai-eng-knowhow` AUTHORING's fifteen rules.
+
+## 7. References
 
 - `dd-codebase-design` — the vocabulary the Standards and Bug-surface axes speak.
-- `dd-test-stewardship` — test findings' lifecycle rules.
-- Security depth / CVE / OWASP: `security-reviewer`'s lane, never re-run here.

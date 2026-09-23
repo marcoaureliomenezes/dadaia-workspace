@@ -6,16 +6,15 @@ import json
 import os
 import re
 import shutil
-import socket
 import sys
-import time
-import urllib.request
 import uuid
 from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass
+from functools import partial
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.redaction import Redactor
 from dadaia_workspace.infrastructure.certification_process import SubprocessCertificationProcess
 
@@ -48,12 +47,6 @@ def _git(process: SubprocessCertificationProcess, cwd: Path, *args: str) -> None
         raise RuntimeError(proc.stderr.strip() or proc.stdout.strip() or f"git {args} failed")
 
 
-def _free_loopback_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        return int(sock.getsockname()[1])
-
-
 class _CertificationSkip(Exception):
     """An honest, non-failing degrade for one certification check (A22.4).
 
@@ -64,6 +57,10 @@ class _CertificationSkip(Exception):
     this as ``SKIP``, never ``FAIL``; a caller that runs the same check outside
     ``certify`` (e.g. a live pytest sentinel) catches it and skips honestly too.
     """
+
+
+#: One live probe: ``(process, cwd, harness, binary) -> detail``.
+_LiveProbe = Callable[[SubprocessCertificationProcess, Path, str, str], str]
 
 
 # A22.4 — codex-live-probe: exercises the INSTALLED Codex CLI with a real `codex exec`
@@ -125,7 +122,62 @@ def _codex_probe_outcome(output: str, cwd: Path) -> tuple[bool, str]:
     )
 
 
-def _codex_live_probe_detail(process: SubprocessCertificationProcess, cwd: Path) -> str:
+#: The CLI binary each registered harness installs. It is NOT a field on
+#: ``HarnessRecord``: the record describes what the workspace PROJECTS for a harness, and
+#: nothing in the projection depends on the binary's name — only this probe does, so the
+#: fact lives with its one consumer instead of widening a core dataclass.
+_HARNESS_PROBE_BINARIES: dict[str, str] = {
+    "claude": "claude",
+    "codex": "codex",
+    "kimi-code": "kimi",
+    "cursor": "cursor-agent",
+    "devin": "devin",
+    "copilot": "copilot",
+}
+
+#: A record with a probe deeper than "the binary answers" names it here; every other
+#: record falls back to :func:`_version_probe_detail`. There is NO version floor: the
+#: workspace derives the same four behaviours into every harness and pins no release of
+#: any of them, so a version comparison would assert a policy that does not exist.
+_DEEP_LIVE_PROBES: dict[str, _LiveProbe] = {}
+
+
+def _installed_binary(
+    process: SubprocessCertificationProcess, cwd: Path, harness: str, binary: str
+) -> tuple[str, str]:
+    """Return ``(resolved path, version line)`` for *binary*, or degrade honestly.
+
+    Raises :class:`_CertificationSkip` when the binary is absent: an optional local
+    runtime that is not installed leaves the claim UNVERIFIED for this environment, which
+    is an honest degrade and never a certification failure. A binary that IS installed but
+    cannot answer ``--version`` is a genuine failure and raises.
+    """
+    resolved = shutil.which(binary)
+    if resolved is None:
+        raise _CertificationSkip(
+            f"UNVERIFIED: no {binary!r} binary on PATH, so the {harness} runtime claim is "
+            "unproven in this environment (A22.4 honest degrade; the projection tests "
+            "validate file shape only, never runtime behavior)"
+        )
+    proc = process.run([resolved, "--version"], cwd=cwd, timeout=_CODEX_VERSION_PROBE_TIMEOUT)
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"{binary} --version exited {proc.returncode}: {(proc.stderr or proc.stdout).strip()}"
+        )
+    return resolved, proc.stdout.strip()
+
+
+def _version_probe_detail(
+    process: SubprocessCertificationProcess, cwd: Path, harness: str, binary: str
+) -> str:
+    """The default live probe: the harness's own CLI is installed and answers."""
+    _resolved, version = _installed_binary(process, cwd, harness, binary)
+    return f"{binary} installed and answering: {version}"
+
+
+def _codex_live_probe_detail(
+    process: SubprocessCertificationProcess, cwd: Path, harness: str, binary: str
+) -> str:
     """A22.4: prove the installed Codex CLI actually answers, not just that its files exist.
 
     Runs ``codex --version`` then a bounded, read-only, non-interactive ``codex exec``
@@ -138,21 +190,7 @@ def _codex_live_probe_detail(process: SubprocessCertificationProcess, cwd: Path)
     any genuine probe failure (crash, timeout, missing marker); both exceptions'
     detail is bounded/redacted, never the raw blob (CWE-532).
     """
-    codex_bin = shutil.which("codex")
-    if codex_bin is None:
-        raise _CertificationSkip(
-            "codex CLI not found on PATH — live probe skipped (A22.4 honest degrade; "
-            "static Codex projection tests validate shape only, never runtime behavior)"
-        )
-    version_proc = process.run(
-        [codex_bin, "--version"], cwd=cwd, timeout=_CODEX_VERSION_PROBE_TIMEOUT
-    )
-    if version_proc.returncode != 0:
-        raise RuntimeError(
-            f"codex --version exited {version_proc.returncode}: "
-            f"{(version_proc.stderr or version_proc.stdout).strip()}"
-        )
-    version = version_proc.stdout.strip()
+    codex_bin, version = _installed_binary(process, cwd, harness, binary)
     exec_proc = process.run(
         [
             codex_bin,
@@ -183,6 +221,9 @@ def _codex_live_probe_detail(process: SubprocessCertificationProcess, cwd: Path)
     return f"{version}: live exec probe observed {_CODEX_LIVE_PROBE_MARKER!r}"
 
 
+_DEEP_LIVE_PROBES["codex"] = _codex_live_probe_detail
+
+
 def _all_checks_ok(checks: Iterable[CertificationCheck]) -> bool:
     """PASS and SKIP are both acceptable certification outcomes (A22.4).
 
@@ -191,6 +232,30 @@ def _all_checks_ok(checks: Iterable[CertificationCheck]) -> bool:
     FAIL does.
     """
     return all(item.status in ("PASS", "SKIP") for item in checks)
+
+
+#: The doctor sections the certification tree owns — the `workspace` section reads the
+#: sandbox itself and belongs to `exact-version-reconciliation`'s own step.
+_OWNED_DOCTOR_SECTIONS = ("specs", "ledgers")
+
+
+def _owned_doctor_sections_clean(stdout: str) -> str:
+    """The verdict on a `dadaia doctor --json` payload: both owned sections, no findings.
+
+    An absent section is a FAILURE, never a silent pass: a renamed or dropped section
+    means the check saw nothing, and "clean" about nothing is not a verdict.
+    """
+    sections = json.loads(stdout)["sections"]
+    missing = [name for name in _OWNED_DOCTOR_SECTIONS if name not in sections]
+    if missing:
+        raise RuntimeError(
+            f"doctor payload carries no {', '.join(missing)} section — this check judges "
+            f"{', '.join(_OWNED_DOCTOR_SECTIONS)} and cannot vouch for a section it never read"
+        )
+    owned = {name: sections[name]["findings"] for name in _OWNED_DOCTOR_SECTIONS}
+    if any(owned.values()):
+        raise RuntimeError(f"doctor not clean: {json.dumps(owned, sort_keys=True)}")
+    return "specs and ledgers sections clean"
 
 
 def certify(
@@ -255,20 +320,31 @@ def certify(
         except Exception as exc:  # noqa: BLE001 - complete ledger, not fail-fast prose.
             checks.append(CertificationCheck(name=name, status="FAIL", detail=str(exc)))
 
-    def doctor_clean(*args: str, **kwargs: Any) -> str:
-        payload = json.loads(cli(*args, **kwargs))
-        summary = payload.get("summary", {})
-        errors = int(summary.get("errors", 0))
-        warnings = int(summary.get("warnings", 0))
-        if errors or warnings or payload.get("issues"):
-            raise RuntimeError(f"doctor not clean: {json.dumps(payload, sort_keys=True)}")
-        return "0 errors, 0 warnings"
+    def doctor_clean(*args: str) -> str:
+        """`dadaia doctor` over the tree these arguments NAME, judged on the sections
+        that tree owns: `specs` and `ledgers`.
+
+        The `workspace` section reads the certification sandbox itself, which
+        `exact-version-reconciliation`'s own `workspace-doctor` step already owns — so
+        judging it here would make two checks fail for one defect, in a tree neither
+        argument names. The doctor's exit code is that whole-workspace verdict, hence
+        the direct run: a non-zero exit is not this check's failure to report.
+        """
+        proc = process.run(
+            [sys.executable, "-m", "dadaia_workspace.cli.main", "doctor", *args, "--json"],
+            cwd=target,
+            env=env,
+            timeout=180,
+        )
+        if not proc.stdout.strip():
+            raise RuntimeError(f"doctor emitted no payload: {(proc.stderr or '').strip()}")
+        return _owned_doctor_sections_clean(proc.stdout)
 
     check(
-        "workspace-init-all-harnesses",
+        "workspace-init",
         lambda: (
-            cli("init", "--workspace", str(target), "--harness", "all", cwd=run_root)
-            and "workspace initialized with Claude, Codex, and Kimi projections"
+            cli("init", str(target), "--harness", "claude", cwd=run_root)
+            and "workspace initialized with the claude projection"
         ),
     )
 
@@ -277,7 +353,7 @@ def certify(
     def capability_check() -> str:
         nonlocal capability_payload
         capability_payload = json.loads(cli("capabilities", "--json"))
-        if capability_payload.get("schema_version") != "dadaia-capabilities-v2":
+        if capability_payload.get("schema_version") != "dadaia-capabilities-v3":
             raise RuntimeError("unexpected capability schema")
         return f"provider={capability_payload['provider']['distribution_version']}"
 
@@ -297,7 +373,7 @@ def certify(
         "specs-scaffold-and-doctor",
         lambda: (
             cli("specs", "init", "--specs-dir", str(standalone_specs), "--name", "certified")
-            and doctor_clean("specs", "doctor", "--specs-dir", str(standalone_specs), "--json")
+            and doctor_clean("--specs-dir", str(standalone_specs))
         ),
     )
 
@@ -309,7 +385,7 @@ def certify(
             "context",
             "create",
             "certified-consumer",
-            "--repo",
+            "--main-repo",
             "certified-consumer",
             "--url",
             str(bare),
@@ -337,17 +413,16 @@ def certify(
 
     harness_env = {"CODEX_THREAD_ID": "certification-session"}
 
-    def bind_heartbeat() -> str:
-        cli("context", "bind", "certified-consumer", extra_env=harness_env)
-        output = cli("context", "heartbeat", extra_env=harness_env)
-        if "certification-session" not in output:
+    def bind() -> str:
+        output = cli("context", "bind", "certified-consumer", extra_env=harness_env)
+        if "certified-consumer" not in output:
             raise RuntimeError(output)
-        return "caller-owned bind and heartbeat"
+        return "caller-owned bind"
 
-    check("context-bind-heartbeat", bind_heartbeat)
+    check("context-bind", bind)
     check(
         "context-specs-doctor",
-        lambda: doctor_clean("specs", "doctor", "--context", "certified-consumer", "--json"),
+        lambda: doctor_clean("--context", "certified-consumer"),
     )
 
     def handoff_validation() -> str:
@@ -374,53 +449,7 @@ def certify(
 
     check("reports-handoff-validation", handoff_validation)
 
-    port = _free_loopback_port()
-
-    def panel_check() -> str:
-        cli("server", "register", "--port", str(port), "--project", "certification-panel")
-        panel = process.start(
-            [
-                sys.executable,
-                "-m",
-                "dadaia_workspace.cli.main",
-                "panel",
-                "--port",
-                str(port),
-                "--no-open",
-            ],
-            cwd=target,
-            env=env,
-        )
-        try:
-            deadline = time.monotonic() + 15
-            last_error = "panel did not respond"
-            while time.monotonic() < deadline:
-                if panel.poll() is not None:
-                    stderr = panel.read_stderr()
-                    raise RuntimeError(f"panel exited early: {stderr}")
-                try:
-                    with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=1) as response:
-                        if response.status == 200:
-                            break
-                except Exception as exc:  # noqa: BLE001 - bounded readiness polling.
-                    last_error = str(exc)
-                    time.sleep(0.1)
-            else:
-                raise RuntimeError(last_error)
-        finally:
-            panel.terminate()
-            try:
-                panel.wait(timeout=10)
-            except TimeoutError:
-                panel.kill()
-                panel.wait(timeout=5)
-            cli("server", "release", "--port", str(port))
-        return f"HTTP 200 on loopback port {port}; registry released"
-
-    check("panel-and-server-registry", panel_check)
-
     def context_round_trip() -> str:
-        cli("context", "release", extra_env=harness_env)
         cli("context", "dead", "certified-consumer", "--commit")
         cli("context", "alive", "certified-consumer")
         cli("context", "dead", "certified-consumer")
@@ -432,10 +461,14 @@ def certify(
 
     check("context-dead-alive-delete-roundtrip", context_round_trip)
 
-    # A22.4: exercise the INSTALLED Codex CLI live — never rely on static Codex
-    # projection tests (TOML shape only) to attest runtime behavior. Honest SKIP
-    # (never FAIL) when no `codex` binary is reachable on this host.
-    check("codex-live-probe", lambda: _codex_live_probe_detail(process, target))
+    # One `<harness>-live-probe` per REGISTERED record, by iteration — a
+    # harness that joins the registry is probed without a line here. Static projection
+    # tests attest file shape only; these attest that the runtime answers. An absent
+    # binary leaves the claim UNVERIFIED (honest SKIP), never a FAIL.
+    for harness in L1_ENTRY_HARNESSES:
+        binary = _HARNESS_PROBE_BINARIES[harness]
+        probe = _DEEP_LIVE_PROBES.get(harness, _version_probe_detail)
+        check(f"{harness}-live-probe", partial(probe, process, target, harness, binary))
 
     ok = _all_checks_ok(checks)
     result = CertificationResult(

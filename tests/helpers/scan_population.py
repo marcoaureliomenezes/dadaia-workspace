@@ -19,7 +19,7 @@ live in three files (``test_frozen_clock_aging_ratchet.py``,
 
 Census (T-045-17, produced by scan over ``tests/**`` at v0.4.5 S2 HEAD; the raw scan
 transcript is captured at
-``.dadaia/tmp/software-engineer/20260825/T-045-17-census.txt``). The v0.4.4 ruling
+``.dadaia/tmp/dd-software-engineer/20260825/T-045-17-census.txt``). The v0.4.4 ruling
 counted 15 tree-/package-walking + single-module source-scan tests at ITS HEAD
 (the same ruling's check (b), git history).
 Landing FR5 last inside S2 — after FR2 (T-045-14), FR3 (T-045-15) and FR4 (T-045-16),
@@ -86,20 +86,6 @@ Deliberately EXCLUDED:
 * ``tests/unit/core/test_kernel_tunables.py`` :: every case —
   ``importlib.import_module(dotted)`` on a fixed, parametrized dotted path; a
   mis-rooted/renamed module fails the import, never scans zero files silently.
-* ``tests/scripts/check_skill_orphans.py`` :: ``_all_skills()`` — its ``skills_dir``
-  parameter is CALLER-CONTROLLED (``DADAIA_WORKSPACE_ROOT``), and its own dedicated
-  suite (``tests/integration/scripts/test_check_skill_orphans.py``) legitimately drives
-  it against tiny SYNTHETIC scratch trees (``__wired_skill``/``__orphan_skill``) to
-  test the checker's reachability logic in isolation. A fixed real-skill sentinel
-  would break that by-design scratch usage — caught live: applying it here turned
-  ``test_orphan_detected_then_wired_exits_clean`` and
-  ``test_disable_model_invocation_skill_is_never_flagged_an_orphan`` RED for the wrong
-  reason (a missing sentinel in a deliberately-synthetic fixture tree, not a real
-  mis-rooted walker). The real-tree invocation is instead guarded by this module's own
-  ``tests/integration/test_public_assets.py`` call site above (always the real,
-  unparameterized ``skill_names()``) and by
-  ``test_real_repo_orphans_match_known_exemption_or_none``'s exemption-set equality
-  failing loudly on an empty/broken real tree.
 """
 
 from __future__ import annotations

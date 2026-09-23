@@ -197,33 +197,6 @@ class SpecContextService:
         self._store.save(ctx)
         return ctx
 
-    # ------------------------------------------------------------------ update_url
-
-    def update_url(self, name: str, repo_url: str) -> SpecContextProject:
-        """Repair a context's ``repo_url`` through the store ``update()`` API.
-
-        FR-W2-03 (c) / T-011-08: the operator repair verb for the VPS-migration
-        scenario where no on-disk repo is present to back-fill from. Preserves the
-        record shape and writes through the atomic store. Raises
-        ``ContextNotFoundError`` if the context does not exist.
-        """
-        ctx = self._store.get(name)
-        if ctx is None:
-            raise ContextNotFoundError(f"Context '{name}' not found.")
-        updated = SpecContextProject(
-            name=ctx.name,
-            state=ctx.state,
-            repo_slug=ctx.repo_slug,
-            repo_url=repo_url,
-            created_at=ctx.created_at,
-            alive_since=ctx.alive_since,
-            dead_since=ctx.dead_since,
-            current_branch=ctx.current_branch,
-            associated_repos=ctx.associated_repos,
-        )
-        self._store.update(updated)
-        return updated
-
     # ------------------------------------------------------------------ associated repos (FR17)
 
     def _refuse_slug(self, name: str, slug: str) -> None:
@@ -406,7 +379,7 @@ class SpecContextService:
         Idempotent: calling alive() on an already-ALIVE context is a no-op beyond
         re-confirming every repo is present (no error, no re-clone of anything already
         on disk). Sets alive_since=now and clears dead_since. Concurrent races are
-        accepted and surfaced by advisory presence; this operation never acquires a lock.
+        accepted and surface through git; this operation never acquires a lock.
 
         FR16/A16.1/A16.3: every repo in the set — the main repo first, then each
         associated repo in order (``SpecContextProject.all_repos()``, the one accessor,
@@ -685,7 +658,7 @@ class SpecContextService:
            untracked content is gated), then the repo is removed. A clean tree behaves
            exactly as before.
 
-        Concurrent races are accepted and surfaced by advisory presence; this operation
+        Concurrent races are accepted and surface through git; this operation
         never waits for or refuses another session.
         """
         ctx = self._store.get(name)

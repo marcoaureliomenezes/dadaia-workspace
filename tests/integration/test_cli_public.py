@@ -1,6 +1,6 @@
 """dadaia public CLI — stage / install / doctor commands.
 
-Merged per plan-integration.md (4 -> 2): (1) stage + install --target all + --force
+Merged per plan-integration.md (4 -> 2): (1) stage + install + --force
 smoke; (2) doctor exit-code routing (mocked service, both cases — the non-zero-on-drift
 exit contract).
 """
@@ -10,6 +10,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.doctor_report import (
     DoctorLine,
     DoctorReport,
@@ -26,14 +27,14 @@ def _init_ws(tmp_path: Path) -> Path:
     WorkspaceService(
         public_assets=FileSystemPublicAssetManager(),
         python_env=VenvPythonEnvironmentManager(),
-    ).init(tmp_path)
+    ).init(tmp_path, harnesses=L1_ENTRY_HARNESSES)
     return tmp_path
 
 
 def test_public_stage_install_force_smoke_and_doctor_exit_code_routing(
     tmp_path: Path, monkeypatch
 ) -> None:
-    """Stage + install --target all + --force smoke, then T-PROP-02 integration: doctor
+    """Stage + install + --force smoke, then T-PROP-02 integration: doctor
     CLI exits 0 on clean workspace, non-zero on drift.
 
     The doctor sub-cases are tested using patched service responses so the test is
@@ -50,7 +51,7 @@ def test_public_stage_install_force_smoke_and_doctor_exit_code_routing(
     assert stage_result.exit_code == 0, stage_result.output
     assert "staged" in stage_result.output.lower() or "No assets" in stage_result.output
 
-    install_result = _runner.invoke(app, ["public", "install", "--target", "all"])
+    install_result = _runner.invoke(app, ["public", "install"])
     assert install_result.exit_code == 0, install_result.output
 
     force_result = _runner.invoke(app, ["public", "install", "--force"])
@@ -58,7 +59,7 @@ def test_public_stage_install_force_smoke_and_doctor_exit_code_routing(
 
     ok_lines = DoctorReport(
         lines=(
-            DoctorLine(DoctorStatus.OK, "stage:agents/qa-engineer.md"),
+            DoctorLine(DoctorStatus.OK, "stage:agents/dd-code-reviewer.md"),
             DoctorLine(DoctorStatus.NOT_APPLICABLE, "codex:config.toml"),
         )
     )
@@ -80,7 +81,7 @@ def test_public_stage_install_force_smoke_and_doctor_exit_code_routing(
 
     drift_lines = DoctorReport(
         lines=(
-            DoctorLine(DoctorStatus.OK, "stage:agents/qa-engineer.md"),
+            DoctorLine(DoctorStatus.OK, "stage:agents/dd-code-reviewer.md"),
             DoctorLine(DoctorStatus.DRIFT, "claude:rules/some-rule.md"),
         )
     )

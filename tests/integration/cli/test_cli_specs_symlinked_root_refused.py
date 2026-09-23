@@ -17,7 +17,7 @@ puxadinho this bug forbids): ``specs upgrade`` and ``dadaia doctor --fix``.
 Intent: CONTRACT (bug ``symlinked-specs-root-is-followed-by-migration-and-repair``,
 T-044-40).
 Size: MEDIUM (CliRunner over the real ``app``, real tmp filesystem).
-Owner: software-engineer
+Owner: dd-software-engineer
 """
 
 from __future__ import annotations

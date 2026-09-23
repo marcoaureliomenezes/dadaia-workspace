@@ -51,7 +51,7 @@ from enum import StrEnum
 from pathlib import Path
 
 from dadaia_workspace.core.doctor_rules import Rule
-from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
+from dadaia_workspace.core.kernel_tunables import BACKLOG_SCRIPT
 from dadaia_workspace.core.models.backlog import (
     INTENTS_EXEMPT_STATUS,
     is_intents_exempt,
@@ -88,7 +88,7 @@ _INTENTS_DOCUMENT_ERROR_PREFIXES = ("malformed intents[] frontmatter:",)
 _INTENTS_EXEMPT_STATUS = INTENTS_EXEMPT_STATUS
 
 #: Statuses accepted as valid in BL-SCHEMA (kept permissive; the backlog status vocabulary is
-#: informal — see ``DADAIA.md`` §5, Backlog). ``None``/empty is the only invalid case here.
+#: informal — see the root `AGENTS.md` map §4, Backlog). ``None``/empty is the only invalid case here.
 _KNOWN_STATUSES = frozenset(
     {
         "idea",
@@ -306,19 +306,21 @@ RULES: tuple[LedgerRule, ...] = (
         (BacklogDoctorCode.BL_SCHEMA.value,),
         SECTION,
         _check_schema,
-        fix_help=f"{DADAIA_BIN} backlog update <slug> --<field> <value>",
+        fix_help="sed -i '<line>s|.*|<the corrected entry line>|' specs/backlog/BACKLOG.json",
     ),
     Rule(
         (BacklogDoctorCode.BL_CONFLICT.value,),
         SECTION,
         _check_conflict,
-        fix_help=f"{DADAIA_BIN} backlog update <slug> --status rejected",
+        fix_help=f"{BACKLOG_SCRIPT} exit <slug> --disposition rejected --reason <the-twin-slug>",
     ),
     Rule(
         (BacklogDoctorCode.BL_STALE.value,),
         SECTION,
         _check_stale,
-        fix_help=f"{DADAIA_BIN} backlog update <slug> --status <disposition>",
+        fix_help=(
+            f"{BACKLOG_SCRIPT} exit <slug> --disposition <disposition> <--release id|--reason why>"
+        ),
     ),
 )
 

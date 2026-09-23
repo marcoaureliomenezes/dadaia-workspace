@@ -14,14 +14,17 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.infrastructure.runtime_config import (
     claude_settings,
-    codex_hook_wrapper_contents,
     codex_hooks,
     dadaia_owned_claude_settings,
     kimi_hook_shims,
     kimi_hooks_block,
     merge_claude_settings,
+)
+from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
+    hook_wrapper_contents,
 )
 
 pytestmark = pytest.mark.unit
@@ -61,7 +64,7 @@ def test_codex_session_start_runs_the_reaper_once(tmp_path: Path) -> None:
     assert isinstance(hooks, dict)
     session_start = _commands(hooks["SessionStart"])
     assert {m for m, _ in session_start} == {"startup|resume"}
-    wrappers = codex_hook_wrapper_contents()
+    wrappers = hook_wrapper_contents(HARNESS_RECORDS["codex"])
     bodies = {command: wrappers[Path(command).name] for _, command in session_start}
     reapers = [c for c, body in bodies.items() if body.rstrip().endswith(_REAPER_TAIL)]
     assert len(reapers) == 1, bodies

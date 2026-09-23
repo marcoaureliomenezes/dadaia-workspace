@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "behavior-map-v1",
   "title": "Behavior Map v1",
-  "description": "D14 — the single declared map from a DADAIA.md section to the member(s) that operationalize it: EVERY core skill under dadaia_workspace/public/skills/*/SKILL.md and EVERY scoped AGENTS.md/*-AGENTS.md source under dadaia_workspace/public/{data,scaffold,templates}/ (never the projected instance path — see the two citation-path bugs cited in the enforcer). Supersedes rules-skills-map-v1 (retired, A10.3): the `skills` array + `justification` topic model is replaced by one row per member — a member (a skill name, or one scoped_agents_md path) maps to EXACTLY ONE row/section; a section MAY be owned by more than one row (A10.1). `anchor` carries T-050-20's future `<!-- behavior: ... -->` comment-anchor id inside the section body; null until that task lands. `hash_tuple` records the content hash of each side at the moment the row was last reviewed (A10.4) — the enforcer recomputes and compares, and a re-recording is a deliberate, reviewed act.",
+  "description": "D14 — the single declared map from a root `AGENTS.md` map section to the member(s) that operationalize it: EVERY core skill under dadaia_workspace/public/skills/*/SKILL.md and EVERY scoped AGENTS.md/*-AGENTS.md source under dadaia_workspace/public/{data,scaffold,templates}/ (never the projected instance path — see the two citation-path bugs cited in the enforcer). Supersedes rules-skills-map-v1 (retired, A10.3): the `skills` array + `justification` topic model is replaced by one row per member — a member (a skill name, or one scoped_agents_md path) maps to EXACTLY ONE row/section; a section MAY be owned by more than one row (A10.1). `anchor` carries T-050-20's future `<!-- behavior: ... -->` comment-anchor id inside the section body; null until that task lands. `hash_tuple` records the content hash of each side at the moment the row was last reviewed (A10.4) — the enforcer recomputes and compares, and a re-recording is a deliberate, reviewed act.",
   "type": "object",
   "required": ["schema_version", "rows"],
   "additionalProperties": false,
@@ -16,6 +16,13 @@
       "type": "integer",
       "minimum": 1,
       "description": "Ported from rules-skills-map-v1 unchanged (FR9/G12) — the declared line-count ceiling a SKILL.md's own content must stay within."
+    },
+    "standalone_skills": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+      "description": "The skills this project also distributes standalone, outside a dadaia workspace. The ONE data source for that set: every consumer of the set (contract tests, marketplace manifests) reads it here, never a literal roster of its own."
     },
     "declared_overlaps": {
       "type": "array",
@@ -43,7 +50,7 @@
           "type": "string",
           "minLength": 1,
           "pattern": "^§[0-9]+ .+$",
-          "description": "The DADAIA.md section this row's member(s) operationalize, title-anchored: '§N <Section Title>' using the CURRENT numbering (never a bare '§N')."
+          "description": "The root `AGENTS.md` map section this row's member(s) operationalize, title-anchored: '§N <Section Title>' using the CURRENT numbering (never a bare '§N')."
         },
         "anchor": {
           "type": ["string", "null"],
@@ -63,7 +70,7 @@
         "hash_tuple": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["section", "skill", "scoped"],
+          "required": ["section", "skill", "scripts", "scoped"],
           "properties": {
             "section": {
               "type": "string",
@@ -74,6 +81,11 @@
               "type": ["string", "null"],
               "pattern": "^sha256:[0-9a-f]{64}$",
               "description": "sha256 of the skill's SKILL.md content at last review; null exactly when 'skill' is null."
+            },
+            "scripts": {
+              "type": ["string", "null"],
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "description": "One sha256 over every file under the skill's scripts/ (each member's name and content, sorted) plus the shipped schemas stage copies in beside them, at last review; null exactly when the skill ships no scripts/. A script or a schema edited without this re-recorded is RED."
             },
             "scoped": {
               "type": "array",

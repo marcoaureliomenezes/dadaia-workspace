@@ -1,9 +1,8 @@
 """AC-2 — the typed core harness registry is the single roster source (v0.1.58 T-58-11).
 
 Covers:
-* the canonical L1 entry roster and the projection/install vocabularies;
-* the capability predicate ``is_l1``;
-* ``parse_harness_set`` (``all`` / comma-subset / bad-name-listing-error);
+* the canonical L1 entry roster and the projection vocabulary;
+* ``parse_harness_name`` (the one registered name / bad-name-listing-error);
 * a grep proving the tuple/set roster literals are GONE from the repointed sites.
 
 The grep is the enforcement behind AC-9(a): reverting any repointed site to a bare
@@ -17,11 +16,9 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.harness_registry import (
-    INSTALL_TARGETS,
     L1_ENTRY_HARNESSES,
     PROJECTION_TARGETS,
-    is_l1,
-    parse_harness_set,
+    parse_harness_name,
 )
 
 pytestmark = pytest.mark.unit
@@ -35,75 +32,41 @@ _PKG = Path(__file__).resolve().parents[3] / "dadaia_workspace"
 
 
 def test_roster_vocabulary_golden() -> None:
-    assert L1_ENTRY_HARNESSES == ("claude", "codex", "kimi-code")
-    assert PROJECTION_TARGETS == ("agents", "claude", "codex", "kimi-code")
+    roster = ("claude", "codex", "kimi-code", "cursor", "devin", "copilot")
+    assert roster == L1_ENTRY_HARNESSES
+    assert ("agents", *roster) == PROJECTION_TARGETS
     assert ("agents", *L1_ENTRY_HARNESSES) == PROJECTION_TARGETS
-    assert frozenset({"all", "agents", "claude", "codex", "kimi-code"}) == INSTALL_TARGETS
-    assert frozenset({"all", *PROJECTION_TARGETS}) == INSTALL_TARGETS
 
 
 # ---------------------------------------------------------------------------
-# Capability predicates.
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    ("harness", "expect_l1"),
-    [
-        ("claude", True),
-        ("codex", True),
-        ("kimi-code", True),
-        ("bogus", False),
-        ("fake", False),
-        ("opencode", False),
-        ("", False),
-    ],
-)
-def test_capability_predicates_table(harness: str, expect_l1: bool) -> None:
-    assert is_l1(harness) is expect_l1
-
-
-# ---------------------------------------------------------------------------
-# parse_harness_set ACCEPT paths.
+# parse_harness_name — exactly one registered record (0.4.7 T-047-73: `all` and the
+# comma subset are gone; `dadaia harness add` is how a second harness enters).
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
-        ("all", ("claude", "codex", "kimi-code")),
-        ("codex,kimi-code", ("codex", "kimi-code")),
-        # input order does not leak — result is always canonical L1 order.
-        ("kimi-code,codex", ("codex", "kimi-code")),
-        ("claude", ("claude",)),
-        ("CLAUDE,Codex", ("claude", "codex")),
-        ("Kimi-Code", ("kimi-code",)),
+        ("claude", "claude"),
+        ("  codex  ", "codex"),
+        ("Kimi-Code", "kimi-code"),
     ],
 )
-def test_parse_harness_set_accept_table(raw: str, expected: tuple[str, ...]) -> None:
-    assert parse_harness_set(raw) == expected
-
-
-# ---------------------------------------------------------------------------
-# parse_harness_set REJECT paths.
-# ---------------------------------------------------------------------------
+def test_parse_harness_name_accept_table(raw: str, expected: str) -> None:
+    assert parse_harness_name(raw) == expected
 
 
 @pytest.mark.parametrize(
-    ("raw", "expect_in_message"),
-    [
-        ("bogus", ["bogus", "claude", "codex", "kimi-code"]),
-        ("claude,zzz", ["zzz"]),
-        ("", []),
-        ("  ,  ", []),
-    ],
+    "raw",
+    ["bogus", "all", "codex,kimi-code", "", "  ,  "],
 )
-def test_parse_harness_set_reject_table(raw: str, expect_in_message: list[str]) -> None:
+def test_parse_harness_name_reject_table(raw: str) -> None:
     with pytest.raises(ValueError) as exc:
-        parse_harness_set(raw)
+        parse_harness_name(raw)
     msg = str(exc.value)
-    for fragment in expect_in_message:
-        assert fragment in msg
+    assert repr(raw) in msg
+    for registered in ("claude", "codex", "kimi-code"):
+        assert registered in msg
 
 
 # ---------------------------------------------------------------------------
@@ -112,14 +75,11 @@ def test_parse_harness_set_reject_table(raw: str, expect_in_message: list[str]) 
 
 # Each site maps to (spaceless forbidden roster literal, required registry reference).
 _L1_SITES: dict[str, tuple[str, str]] = {
-    "features/panel/views/api_agents.py": ('"claude","codex"', "is_l1("),
-    "infrastructure/public_assets_common.py": (
-        '{"all","agents","claude","codex","pi"}',
-        "INSTALL_TARGETS",
-    ),
+    # 0.4.7 T-047-72: install/doctor scope on the PROFILE roster, so the site consumes
+    # the L1 roster directly.
     "infrastructure/public_assets.py": (
         '("agents","claude","codex","pi")',
-        "PROJECTION_TARGETS",
+        "L1_ENTRY_HARNESSES",
     ),
 }
 

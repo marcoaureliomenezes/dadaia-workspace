@@ -294,7 +294,7 @@ def _no_real_venv_in_tests() -> Iterator[None]:
             from dadaia_workspace.cli.main import app
 
             target = Path(cwd) if cwd is not None else Path.cwd()
-            result = CliRunner().invoke(app, ["init", "--workspace", str(target), *argv[2:]])
+            result = CliRunner().invoke(app, ["init", str(target), *argv[2:]])
             return ProcessResult(returncode=result.exit_code, stdout=result.output, stderr="")
         return real_run(self, argv, cwd=cwd, timeout=timeout)
 
@@ -322,7 +322,7 @@ def _scrub_entry_signal_env(monkeypatch: pytest.MonkeyPatch) -> None:
 def _no_real_kimi_home_in_tests(tmp_path_factory: pytest.TempPathFactory) -> None:
     """Disk/user-config guard: never write the real ``~/.kimi-code`` during the suite.
 
-    v0.2.8 (kimi-code): ``public install --target kimi-code`` (and therefore
+    v0.2.8 (kimi-code): ``harness add kimi-code`` (and therefore
     ``--target all`` and ``dadaia init``) upserts the managed hook block into
     ``$KIMI_CODE_HOME/config.toml`` and writes shims under ``$KIMI_CODE_HOME/hooks/``.
     Unredirected, every all-target install test would mutate the developer's real Kimi
@@ -409,25 +409,3 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
         # Print visibly even when -q; session.config.option.verbose may be 0.
         print(msg)  # noqa: T201
         session.exitstatus = 1
-
-
-@pytest.fixture(autouse=True)
-def _no_real_telemetry_store_in_tests(
-    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Disk/user-data guard: never write the OPERATOR'S machine telemetry store.
-
-    ``container.telemetry_state_dir()`` resolves ``~/.dadaia/state/telemetry`` — one
-    store per machine (0.4.7 FR2). Before this backstop the builder resolved that
-    literal itself, so every governance-verb test (T-047-26..30) inserted synthetic
-    ``governance_events`` rows (contexts ``ctx-a``, ``ctx-b``, ``seam-ctx-b``,
-    ``meu-projeto``, ``projx``, ``''``) into the developer's real store.
-
-    Routing the ONE resolver — not ``HOME``, which tests set for their own reasons —
-    keeps the guard true for any test, whatever it does with the environment. Proved by
-    ``tests/contract/test_telemetry_store_backstop.py``.
-    """
-    from dadaia_workspace import container
-
-    state_dir = tmp_path_factory.mktemp("telemetry-state")
-    monkeypatch.setattr(container, "telemetry_state_dir", lambda: state_dir)

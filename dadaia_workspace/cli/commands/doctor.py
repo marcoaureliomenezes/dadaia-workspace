@@ -3,7 +3,7 @@
 Three sections in fixed order — ``workspace`` (zones, root, harness dirs), ``specs``
 (the SPEC-DOC + RELEASE-TREE rules), ``ledgers`` (BL-SCHEMA/CONFLICT/STALE) — collected
 from one rule registry (:mod:`dadaia_workspace.core.doctor_rules`), rendered by one
-grammar, scored by one formula, exited by one rule. ``dadaia specs doctor`` and
+grammar, exited by one rule. ``dadaia specs doctor`` and
 ``dadaia backlog doctor`` are DELETED, not aliased: three commands with three finding
 types, three renderings and three exit rules were the structural cause of a doctor bug
 family in which each doctor could independently report health over a tree the other two
@@ -17,7 +17,6 @@ its own adapter at the seam).
 from __future__ import annotations
 
 import json
-import sqlite3
 from collections.abc import Callable
 from pathlib import Path
 
@@ -28,7 +27,6 @@ from dadaia_workspace.cli._backlog_roots import resolve_backlog_roots
 from dadaia_workspace.cli._specs_resolution import (
     resolve_context_for_cli,
     resolve_context_specs_dir_for_cli,
-    resolve_event_context_for_cli,
     resolve_specs_dir_for_cli,
 )
 from dadaia_workspace.cli.help_digest import command_paths
@@ -40,16 +38,12 @@ from dadaia_workspace.core.doctor_rules import (
     merge_sections,
     render_finding,
     run_section,
-    total_compliance,
-    total_line,
 )
 from dadaia_workspace.core.exceptions import SchemaVersionError, WorkspaceNotInitializedError
-from dadaia_workspace.core.models.telemetry import GovernanceBaseline
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.backlog import doctor as backlog_doctor
 from dadaia_workspace.features.spec_context.doctor import DoctorService, workspace_rules
-from dadaia_workspace.features.specs import Severity, SpecsDoctor
-from dadaia_workspace.features.specs import ledgers as specs_ledgers
+from dadaia_workspace.features.specs import Severity, SpecsDoctor, doctor_adr
 from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
 from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 from dadaia_workspace.features.specs.rules import render_fix_help
@@ -84,12 +78,7 @@ def _resolve_caller_context_and_slug(workspace_root: Path) -> tuple[str | None, 
 
 
 def _build_redactor(workspace_root: Path) -> ContextRedactor:
-    """Candidates = every known registered context name/repo slug, PLUS every context
-    name that appears in an advisory presence record (`[stale-presence] context
-    '<name>'`, PRESENCE-GC) — a presence record can outlive its context's registry
-    entry, so the registry alone is not enough to cover A8.1's PRESENCE-GC line."""
-    from dadaia_workspace.features.spec_context import presence
-
+    """Candidates = every known registered context name/repo slug."""
     caller_name, caller_slug = _resolve_caller_context_and_slug(workspace_root)
     try:
         contexts = container.build_spec_context_service(workspace_root).list_all()
@@ -99,7 +88,6 @@ def _build_redactor(workspace_root: Path) -> ContextRedactor:
     for ctx in contexts:
         candidates.append(ctx.name)
         candidates.append(ctx.repo_slug)
-    candidates.extend(ref.context for ref in presence.stale_records(workspace_root))
     return ContextRedactor(candidates, exclude=(caller_name, caller_slug))
 
 
@@ -112,21 +100,17 @@ def _workspace_section(service: DoctorService | None, *, expired_only: bool) -> 
     is the identity and no mapping table exists anywhere. No instance around the run
     (CI over a bare checkout), nothing to walk: an empty section, never a refusal."""
     if service is None:
-        return _empty_section("workspace", "entries")
+        return _empty_section("workspace")
     return run_section(
         "workspace",
-        "entries",
         workspace_rules(expired_only=expired_only),
         service,
         lambda _rule, finding: finding,
     )
 
 
-def _specs_render(
-    rule: Rule[SpecsDoctor, SpecsDoctorIssue], issue: SpecsDoctorIssue
-) -> SectionFinding:
-    """The compliance unit of the `specs` section is the RULE: a rule that emitted no
-    error or warning is canonical, whatever the size of the tree it walked."""
+def _specs_render[C](rule: Rule[C, SpecsDoctorIssue], issue: SpecsDoctorIssue) -> SectionFinding:
+    """Render one specs-doctor issue as a section finding."""
     location = f" ({issue.path})" if issue.path else ""
     return SectionFinding(
         code=issue.code,
@@ -134,25 +118,22 @@ def _specs_render(
         message=f"{issue.description}{location}",
         canonical=False,
         error=issue.severity is Severity.ERROR,
-        unit=rule.codes[0],
     )
 
 
-def _empty_section(name: str, unit: str) -> SectionReport:
-    """A section with nothing to read: no findings, no units, nothing to fail."""
-    return SectionReport(name=name, unit=unit, findings=(), canonical=0, total=0)
+def _empty_section(name: str) -> SectionReport:
+    """A section with nothing to read: no findings, nothing to fail."""
+    return SectionReport(name=name, findings=())
 
 
 def _specs_section(doctor: SpecsDoctor | None) -> SectionReport:
     if doctor is None:
-        return _empty_section("specs", "rules")
+        return _empty_section("specs")
     return run_section(
         "specs",
-        "rules",
         SPECS_RULES,
         doctor,
         _specs_render,
-        total_units=len(SPECS_RULES),
     )
 
 
@@ -160,9 +141,7 @@ def _ledgers_render(
     _rule: Rule[backlog_doctor.DoctorContext, backlog_doctor.Finding],
     finding: backlog_doctor.Finding,
 ) -> SectionFinding:
-    """The compliance unit of the `ledgers` section is the RECORD (a backlog item). A
-    document-level error carries no record: it disqualifies nothing and still fails the
-    run."""
+    """Render one backlog finding as a section finding."""
     slug = f" [{finding.slug}]" if finding.slug else ""
     return SectionFinding(
         code=finding.code.value,
@@ -170,81 +149,28 @@ def _ledgers_render(
         message=f"{slug.strip()} {finding.message}".strip(),
         canonical=False,
         error=finding.severity is backlog_doctor.Severity.ERROR,
-        unit=finding.slug,
     )
-
-
-def _ledger_schema_render(
-    _rule: Rule[specs_ledgers.LedgersContext, specs_ledgers.LedgerIssue],
-    issue: specs_ledgers.LedgerIssue,
-) -> SectionFinding:
-    """The compliance unit of a schema-validated ledger is the RECORD, located
-    `path:line` — the same unit the backlog rules score, so the two rule groups add
-    into one score line.
-
-    A warning-class issue scores NOTHING (``unit=None``): the only one is
-    LEDGER-*-HANDEDIT (0.4.7 FR6), and the record it names is valid — what it reports
-    is provenance. Disqualifying a valid record would make compliance answer a question
-    it is not asking.
-    """
-    error = issue.verdict == Severity.ERROR.value
-    return SectionFinding(
-        code=issue.code,
-        verdict=issue.verdict,
-        message=f"{issue.unit} {issue.message}",
-        canonical=False,
-        error=error,
-        unit=issue.unit if error else None,
-    )
-
-
-def _resolve_governance(specs_dir: Path | None) -> GovernanceBaseline | None:
-    """The governance events, read ONCE into plain data and handed to the rules that
-    measure hand edits (0.4.7 FR6) — the same shape ``_resolve_live_shas`` has.
-
-    Scoped to ONE spec context, because the store is one file per MACHINE and two
-    workspaces on it are kept apart by each event's ``context`` (``container
-    .build_telemetry_store``). The context comes from the ``specs/`` tree this run
-    RESOLVED, through the same one decider the writer uses — never from the env, which
-    names the session's bind and made ``doctor --context B`` discard B's own events. No
-    context resolved, no store, an unreadable or unmigrated store: ``None``, and every
-    hand-edit rule is silent — a consumer without telemetry is not a consumer with
-    drift.
-    """
-    resolved = resolve_event_context_for_cli(specs_dir)
-    if not resolved:
-        return None
-    from dadaia_workspace.features.telemetry.store import TelemetryStore
-
-    try:
-        connection = container.build_telemetry_store(container.telemetry_state_dir()).open_read()
-    except (OSError, sqlite3.Error, ImportError):  # no store, no file, no permission
-        return None
-    try:
-        events = TelemetryStore.from_connection(connection).latest_governance_events()
-    except (OSError, sqlite3.Error, ImportError):  # corrupt or unmigrated store
-        return None
-    finally:
-        connection.close()
-    return GovernanceBaseline(tuple(e for e in events if e.context == resolved))
 
 
 def _ledgers_section(
     specs_dir: Path | None,
     source_root: str | None,
     alias_map: str | None,
-    governance: GovernanceBaseline | None,
 ) -> SectionReport:
-    """The `ledgers` section: the backlog document's BL-* rules plus one schema rule per
-    committed governance ledger (0.4.7 FR6). Two features contribute, neither imports
-    the other, and the two reports merge into one section here — the composition root."""
+    """The `ledgers` section — three contributors, one name.
+
+    The backlog document's BL-* rules, the ADR ledger's own reader, and the five ledger
+    SCRIPTS: each ledger with a writer script is validated by THAT script's
+    `check`, run as a subprocess here. The doctor holds no second implementation of any
+    ledger schema — this is the one delegation point.
+    """
     from dadaia_workspace.cli.anchors import derive_cli_anchors
-    from dadaia_workspace.cli.commands.bugs import build_bug_service
     from dadaia_workspace.core.models.histo import HistoRecord
     from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
+    from dadaia_workspace.infrastructure.ledger_scripts import script_findings
 
     if specs_dir is None:
-        return _empty_section("ledgers", "records")
+        return _empty_section("ledgers")
 
     src, catalog_path, alias_map_path = resolve_backlog_roots(specs_dir, source_root, alias_map)
     context = backlog_doctor.build_context(
@@ -259,31 +185,21 @@ def _ledgers_section(
             from_dict=HistoRecord.from_dict,
         ),
     )
-    # The `ledgers` section's ONE repair, injected here exactly as `bug_store_factory`
-    # is injected into the specs doctor: `features.specs` never imports `features.bugs`.
-    ledgers_context = specs_ledgers.build_ledgers_context(
-        specs_dir,
-        normalize_bug_records=build_bug_service(specs_dir, with_archive=True).normalize_records,
-        governance=governance,
-    )
     return merge_sections(
         [
             run_section(
                 "ledgers",
-                "records",
                 backlog_doctor.RULES,
                 context,
                 _ledgers_render,
-                total_units=len(context.items),
             ),
             run_section(
                 "ledgers",
-                "records",
-                specs_ledgers.RULES,
-                ledgers_context,
-                _ledger_schema_render,
-                total_units=ledgers_context.total_records,
+                doctor_adr.LEDGER_RULES,
+                specs_dir,
+                _specs_render,
             ),
+            SectionReport(name="ledgers", findings=tuple(script_findings(specs_dir))),
         ]
     )
 
@@ -291,9 +207,7 @@ def _ledgers_section(
 # ── composition ─────────────────────────────────────────────────────────────────
 
 
-def _build_specs_doctor(
-    specs_dir: Path | None, public_dir: str | None, governance: GovernanceBaseline | None = None
-) -> SpecsDoctor | None:
+def _build_specs_doctor(specs_dir: Path | None, public_dir: str | None) -> SpecsDoctor | None:
     """``None`` in, ``None`` out: a workspace with no specs tree has no specs doctor."""
     if specs_dir is None:
         return None
@@ -302,14 +216,11 @@ def _build_specs_doctor(
         specs_dir,
         public_dir=resolved_public,
         templates_dir=_TEMPLATES_DIR,
-        # repo_root: specs/ sits directly at the repo root — the same convention
-        # _resolve_live_shas documents; feeds SPEC-DOC-028 and SPEC-DOC-045.
+        # repo_root: specs/ sits directly at the repo root; feeds SPEC-DOC-028 and SPEC-DOC-045.
         repo_root=specs_dir.parent,
-        live_shas=_resolve_live_shas(specs_dir),
-        # The ONE Typer walk (0.4.7 FR2), done here and handed in as plain data — the
-        # same shape `live_shas` travels in; `features` never imports `cli`.
+        # The ONE Typer walk (0.4.7 FR2), done here and handed in as plain data;
+        # `features` never imports `cli`.
         command_paths=command_paths(),
-        governance=governance,
         bug_store_factory=container.build_bug_record_store,
     )
 
@@ -318,26 +229,6 @@ def _detect_public_dir(specs_dir: Path) -> Path | None:
     """``<repo-root>/specs/`` alongside ``<repo-root>/dadaia_workspace/public/``."""
     candidate = specs_dir.parent / "dadaia_workspace" / "public"
     return candidate if candidate.is_dir() else None
-
-
-def _resolve_live_shas(specs_dir: Path) -> tuple[str, ...] | None:
-    """The live verdict-sha set (head, first parent, develop tip) — plain data fed into
-    SPEC-DOC-044's stale-verdict check through the ONE
-    ``features.chokepoints.verdict.live_verdict_shas`` rule the pre-push gate also uses.
-    ``None`` (not a git repo, unresolvable HEAD or integration tip) keeps that check
-    silent rather than letting ``--fix`` delete staged ship evidence.
-    """
-    from dadaia_workspace.features.chokepoints.verdict import INTEGRATION_TIP_REF, live_verdict_shas
-
-    repo_root = specs_dir.parent
-    reader = container.build_git_object_reader()
-    try:
-        head_sha = reader.resolve_ref(repo_root, "HEAD")
-        if head_sha is None or reader.resolve_ref(repo_root, INTEGRATION_TIP_REF) is None:
-            return None
-        return live_verdict_shas(reader, repo_root, head_sha)
-    except Exception:  # noqa: BLE001 — a failed git read degrades to None, never a crash
-        return None
 
 
 def _resolve_run(
@@ -431,7 +322,7 @@ def doctor(
         ),
     ),
     json_out: bool = typer.Option(
-        False, "--json", help="Machine-readable output: sections, compliance, fixed."
+        False, "--json", help="Machine-readable output: sections and fixed."
     ),
     quiet: bool = typer.Option(
         False, "--quiet", help="Print only what --fix deleted (nothing on a compliant run)."
@@ -447,8 +338,7 @@ def doctor(
 ) -> None:
     """Report workspace, specs and ledger compliance; optionally repair."""
     workspace_root, service, target = _resolve_run(specs_dir, context)
-    governance = _resolve_governance(target)
-    specs_doctor = _build_specs_doctor(target, public_dir, governance)
+    specs_doctor = _build_specs_doctor(target, public_dir)
 
     fixed = _apply_fixes(
         service, specs_doctor, target, source_root, alias_map, fix=fix, expired_only=expired_only
@@ -456,7 +346,7 @@ def doctor(
     reports = [
         _workspace_section(service, expired_only=expired_only),
         _specs_section(specs_doctor),
-        _ledgers_section(target, source_root, alias_map, governance),
+        _ledgers_section(target, source_root, alias_map),
     ]
     # Render boundary ONLY: no doctor ever sees the redactor; every finding and fix action
     # keeps carrying true names inside the sections themselves.
@@ -501,37 +391,7 @@ def _apply_fixes(
     fixed = list(service.fix()) if service is not None else []
     if not expired_only and specs_doctor is not None:
         fixed.extend(f"[specs] {issue.code}: {issue.path}" for issue in specs_doctor.fix())
-    if not expired_only:
-        fixed.extend(_ledger_fixes(specs_dir, source_root, alias_map))
     return fixed
-
-
-def _ledger_fixes(
-    specs_dir: Path | None, source_root: str | None, alias_map: str | None
-) -> list[str]:
-    """Apply every `ledgers` rule that carries a fix, over ONE freshly-read context.
-
-    Only the rules whose issues name their own remediation repair anything (a hand-edited
-    schema violation is never guessed at) — that decision lives in the feature's own
-    `fix` callable, not in a branch here."""
-    if specs_dir is None:
-        return []
-    from dadaia_workspace.cli.commands.bugs import build_bug_service
-
-    # No governance baseline on the fix path: no hand-edit rule carries a fixer (the
-    # answer is the operator's judgment), so reading the store here would buy nothing.
-    context = specs_ledgers.build_ledgers_context(
-        specs_dir,
-        normalize_bug_records=build_bug_service(specs_dir, with_archive=True).normalize_records,
-    )
-    actions: list[str] = []
-    for rule in specs_ledgers.RULES:
-        if rule.fix is None:
-            continue
-        for issue in rule.run(context):
-            rule.fix(context, issue)
-            actions.append(f"[ledgers] {issue.code}: {issue.unit}")
-    return actions
 
 
 def _json_payload(
@@ -557,11 +417,9 @@ def _json_payload(
                         }
                         for f in report.printable
                     ],
-                    "compliance": _compliance(report),
                 }
                 for report in reports
             },
-            "compliance": _compliance(total_compliance(reports)),
             "fixed": [render(action) for action in fixed],
         },
         indent=2,
@@ -572,18 +430,11 @@ def _emit_human(
     reports: list[SectionReport], fixed: list[str], render: Callable[[str], str], *, fix: bool
 ) -> None:
     """One line per finding — `<CODE> <verdict> <message>`, each finding's OWN verdict
-    word — then that section's score, then the run's total."""
+    word; nothing else."""
     for report in reports:
         for finding in report.printable:
             typer.echo(render(render_finding(finding)))
-        typer.echo(report.score_line())
     if fix:
         typer.echo(f"\nApplied {len(fixed)} repair(s):")
         for action in fixed:
             typer.echo(f"  - {render(action)}")
-    typer.echo(total_line(reports))
-
-
-def _compliance(report: SectionReport) -> dict[str, int]:
-    """One score, rendered once — sections and the total alike."""
-    return {"canonical": report.canonical, "total": report.total, "percent": report.percent}

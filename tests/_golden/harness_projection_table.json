@@ -1,0 +1,933 @@
+[
+  {
+    "label": "agents:agents/dd-code-reviewer.md",
+    "harness": "agents",
+    "dst": "ws:.agents/agents/dd-code-reviewer.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:agents/dd-product-engineer.md",
+    "harness": "agents",
+    "dst": "ws:.agents/agents/dd-product-engineer.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:agents/dd-software-engineer.md",
+    "harness": "agents",
+    "dst": "ws:.agents/agents/dd-software-engineer.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-ai-eng-knowhow/AUTHORING.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-ai-eng-knowhow/AUTHORING.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-ai-eng-knowhow/CLAUDE-CODE.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-ai-eng-knowhow/CLAUDE-CODE.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-ai-eng-knowhow/CODEX.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-ai-eng-knowhow/CODEX.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-ai-eng-knowhow/CONTEXT-ENGINEERING.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-ai-eng-knowhow/CONTEXT-ENGINEERING.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-ai-eng-knowhow/SKILL.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-ai-eng-knowhow/SKILL.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-architecture-survey/HTML-REPORT.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-architecture-survey/HTML-REPORT.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-architecture-survey/SKILL.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-architecture-survey/SKILL.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-audit-project/FINDINGS-FORMAT.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-audit-project/FINDINGS-FORMAT.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-audit-project/PILLAR-BUGS.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-audit-project/PILLAR-BUGS.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-audit-project/PILLAR-MEMORY.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-audit-project/PILLAR-MEMORY.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-audit-project/PILLAR-SPECS.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-audit-project/PILLAR-SPECS.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-audit-project/SKILL.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-audit-project/SKILL.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-audit-project/scripts/_audit_check.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-audit-project/scripts/_audit_check.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-audit-project/scripts/_audit_schema.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-audit-project/scripts/_audit_schema.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-audit-project/scripts/_audit_store.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-audit-project/scripts/_audit_store.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-audit-project/scripts/_audit_verbs.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-audit-project/scripts/_audit_verbs.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-audit-project/scripts/audit.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-audit-project/scripts/audit.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-backlog-definition/SKILL.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-backlog-definition/SKILL.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-backlog-definition/scripts/_backlog_check.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-backlog-definition/scripts/_backlog_check.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-backlog-definition/scripts/_backlog_exit.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-backlog-definition/scripts/_backlog_exit.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-backlog-definition/scripts/_backlog_schema.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-backlog-definition/scripts/_backlog_schema.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-backlog-definition/scripts/_backlog_store.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-backlog-definition/scripts/_backlog_store.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-backlog-definition/scripts/_backlog_subjects.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-backlog-definition/scripts/_backlog_subjects.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-backlog-definition/scripts/_backlog_write.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-backlog-definition/scripts/_backlog_write.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-backlog-definition/scripts/backlog.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-backlog-definition/scripts/backlog.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-bug-registration/SKILL.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-bug-registration/SKILL.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-bug-resolution/LINEAGE.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-bug-resolution/LINEAGE.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-bug-resolution/RED-LOOP.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-bug-resolution/RED-LOOP.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-bug-resolution/SKILL.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-bug-resolution/SKILL.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-bug-resolution/scripts/_bugs_check.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-bug-resolution/scripts/_bugs_check.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-bug-resolution/scripts/_bugs_store.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-bug-resolution/scripts/_bugs_store.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-bug-resolution/scripts/_bugs_transition.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-bug-resolution/scripts/_bugs_transition.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-bug-resolution/scripts/_bugs_write.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-bug-resolution/scripts/_bugs_write.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-bug-resolution/scripts/bugs.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-bug-resolution/scripts/bugs.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-cli-library/SKILL.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-cli-library/SKILL.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-cli-library/scripts/registry.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-cli-library/scripts/registry.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-code-review/SKILL.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-code-review/SKILL.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-code-review/SLOP.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-code-review/SLOP.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-codebase-design/DEEPENING.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-codebase-design/DEEPENING.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-codebase-design/DESIGN-IT-TWICE.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-codebase-design/DESIGN-IT-TWICE.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-codebase-design/SKILL.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-codebase-design/SKILL.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-domain-modeling/CONTEXT-FORMAT.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-domain-modeling/CONTEXT-FORMAT.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-domain-modeling/SKILL.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-domain-modeling/SKILL.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-gitflow-default/CICD-AUTOMATION.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-gitflow-default/CICD-AUTOMATION.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-gitflow-default/SKILL.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-gitflow-default/SKILL.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-grill-me/EMISSION-FORMAT.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-grill-me/EMISSION-FORMAT.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-grill-me/PROBLEM-TAXONOMY.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-grill-me/PROBLEM-TAXONOMY.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-grill-me/SKILL.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-grill-me/SKILL.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-handoff-emitter/SKILL.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-handoff-emitter/SKILL.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-manager-orchestration/SKILL.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-manager-orchestration/SKILL.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-release-definition/SKILL.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-release-definition/SKILL.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-release-implementation/MEMORY-UPDATE.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-release-implementation/MEMORY-UPDATE.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-release-implementation/RC-FLOW.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-release-implementation/RC-FLOW.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-release-implementation/RELEASE-EVENTS.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-release-implementation/RELEASE-EVENTS.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-release-implementation/SKILL.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-release-implementation/SKILL.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-release-implementation/scripts/_release_check.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-release-implementation/scripts/_release_check.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-release-implementation/scripts/_release_new.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-release-implementation/scripts/_release_new.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-release-implementation/scripts/_release_phase.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-release-implementation/scripts/_release_phase.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-release-implementation/scripts/_release_schema.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-release-implementation/scripts/_release_schema.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-release-implementation/scripts/_release_store.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-release-implementation/scripts/_release_store.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-release-implementation/scripts/_release_tree.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-release-implementation/scripts/_release_tree.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-release-implementation/scripts/release.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-release-implementation/scripts/release.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-spec-navigator/SKILL.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-spec-navigator/SKILL.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-spec-navigator/scripts/_memory_catalog.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-spec-navigator/scripts/_memory_catalog.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-spec-navigator/scripts/_memory_check.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-spec-navigator/scripts/_memory_check.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-spec-navigator/scripts/_memory_drift.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-spec-navigator/scripts/_memory_drift.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-spec-navigator/scripts/_memory_schema.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-spec-navigator/scripts/_memory_schema.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-spec-navigator/scripts/memory.py",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-spec-navigator/scripts/memory.py",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-test-stewardship/PARAMETERS.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-test-stewardship/PARAMETERS.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "agents:skills/dd-test-stewardship/SKILL.md",
+    "harness": "agents",
+    "dst": "ws:.agents/skills/dd-test-stewardship/SKILL.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "claude:agents/dd-code-reviewer.md",
+    "harness": "claude",
+    "dst": "ws:.claude/agents/dd-code-reviewer.md",
+    "compare": "bytes",
+    "link_to": "ws:.agents/agents/dd-code-reviewer.md"
+  },
+  {
+    "label": "claude:agents/dd-product-engineer.md",
+    "harness": "claude",
+    "dst": "ws:.claude/agents/dd-product-engineer.md",
+    "compare": "bytes",
+    "link_to": "ws:.agents/agents/dd-product-engineer.md"
+  },
+  {
+    "label": "claude:agents/dd-software-engineer.md",
+    "harness": "claude",
+    "dst": "ws:.claude/agents/dd-software-engineer.md",
+    "compare": "bytes",
+    "link_to": "ws:.agents/agents/dd-software-engineer.md"
+  },
+  {
+    "label": "claude:settings.json",
+    "harness": "claude",
+    "dst": "ws:.claude/settings.json",
+    "compare": "owned-slice",
+    "link_to": null
+  },
+  {
+    "label": "claude:skills/dd-ai-eng-knowhow",
+    "harness": "claude",
+    "dst": "ws:.claude/skills/dd-ai-eng-knowhow",
+    "compare": "bytes",
+    "link_to": "ws:.agents/skills/dd-ai-eng-knowhow"
+  },
+  {
+    "label": "claude:skills/dd-architecture-survey",
+    "harness": "claude",
+    "dst": "ws:.claude/skills/dd-architecture-survey",
+    "compare": "bytes",
+    "link_to": "ws:.agents/skills/dd-architecture-survey"
+  },
+  {
+    "label": "claude:skills/dd-audit-project",
+    "harness": "claude",
+    "dst": "ws:.claude/skills/dd-audit-project",
+    "compare": "bytes",
+    "link_to": "ws:.agents/skills/dd-audit-project"
+  },
+  {
+    "label": "claude:skills/dd-backlog-definition",
+    "harness": "claude",
+    "dst": "ws:.claude/skills/dd-backlog-definition",
+    "compare": "bytes",
+    "link_to": "ws:.agents/skills/dd-backlog-definition"
+  },
+  {
+    "label": "claude:skills/dd-bug-registration",
+    "harness": "claude",
+    "dst": "ws:.claude/skills/dd-bug-registration",
+    "compare": "bytes",
+    "link_to": "ws:.agents/skills/dd-bug-registration"
+  },
+  {
+    "label": "claude:skills/dd-bug-resolution",
+    "harness": "claude",
+    "dst": "ws:.claude/skills/dd-bug-resolution",
+    "compare": "bytes",
+    "link_to": "ws:.agents/skills/dd-bug-resolution"
+  },
+  {
+    "label": "claude:skills/dd-cli-library",
+    "harness": "claude",
+    "dst": "ws:.claude/skills/dd-cli-library",
+    "compare": "bytes",
+    "link_to": "ws:.agents/skills/dd-cli-library"
+  },
+  {
+    "label": "claude:skills/dd-code-review",
+    "harness": "claude",
+    "dst": "ws:.claude/skills/dd-code-review",
+    "compare": "bytes",
+    "link_to": "ws:.agents/skills/dd-code-review"
+  },
+  {
+    "label": "claude:skills/dd-codebase-design",
+    "harness": "claude",
+    "dst": "ws:.claude/skills/dd-codebase-design",
+    "compare": "bytes",
+    "link_to": "ws:.agents/skills/dd-codebase-design"
+  },
+  {
+    "label": "claude:skills/dd-domain-modeling",
+    "harness": "claude",
+    "dst": "ws:.claude/skills/dd-domain-modeling",
+    "compare": "bytes",
+    "link_to": "ws:.agents/skills/dd-domain-modeling"
+  },
+  {
+    "label": "claude:skills/dd-gitflow-default",
+    "harness": "claude",
+    "dst": "ws:.claude/skills/dd-gitflow-default",
+    "compare": "bytes",
+    "link_to": "ws:.agents/skills/dd-gitflow-default"
+  },
+  {
+    "label": "claude:skills/dd-grill-me",
+    "harness": "claude",
+    "dst": "ws:.claude/skills/dd-grill-me",
+    "compare": "bytes",
+    "link_to": "ws:.agents/skills/dd-grill-me"
+  },
+  {
+    "label": "claude:skills/dd-handoff-emitter",
+    "harness": "claude",
+    "dst": "ws:.claude/skills/dd-handoff-emitter",
+    "compare": "bytes",
+    "link_to": "ws:.agents/skills/dd-handoff-emitter"
+  },
+  {
+    "label": "claude:skills/dd-manager-orchestration",
+    "harness": "claude",
+    "dst": "ws:.claude/skills/dd-manager-orchestration",
+    "compare": "bytes",
+    "link_to": "ws:.agents/skills/dd-manager-orchestration"
+  },
+  {
+    "label": "claude:skills/dd-release-definition",
+    "harness": "claude",
+    "dst": "ws:.claude/skills/dd-release-definition",
+    "compare": "bytes",
+    "link_to": "ws:.agents/skills/dd-release-definition"
+  },
+  {
+    "label": "claude:skills/dd-release-implementation",
+    "harness": "claude",
+    "dst": "ws:.claude/skills/dd-release-implementation",
+    "compare": "bytes",
+    "link_to": "ws:.agents/skills/dd-release-implementation"
+  },
+  {
+    "label": "claude:skills/dd-spec-navigator",
+    "harness": "claude",
+    "dst": "ws:.claude/skills/dd-spec-navigator",
+    "compare": "bytes",
+    "link_to": "ws:.agents/skills/dd-spec-navigator"
+  },
+  {
+    "label": "claude:skills/dd-test-stewardship",
+    "harness": "claude",
+    "dst": "ws:.claude/skills/dd-test-stewardship",
+    "compare": "bytes",
+    "link_to": "ws:.agents/skills/dd-test-stewardship"
+  },
+  {
+    "label": "codex:agents/dd-code-reviewer.toml",
+    "harness": "codex",
+    "dst": "ws:.codex/agents/dd-code-reviewer.toml",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "codex:agents/dd-product-engineer.toml",
+    "harness": "codex",
+    "dst": "ws:.codex/agents/dd-product-engineer.toml",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "codex:agents/dd-software-engineer.toml",
+    "harness": "codex",
+    "dst": "ws:.codex/agents/dd-software-engineer.toml",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "codex:config.toml",
+    "harness": "codex",
+    "dst": "ws:.codex/config.toml",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "codex:hooks.json",
+    "harness": "codex",
+    "dst": "ws:.codex/hooks.json",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "codex:rules/dadaia-command-policy.rules",
+    "harness": "codex",
+    "dst": "ws:.codex/rules/dadaia-command-policy.rules",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "copilot:agents/dd-code-reviewer.agent.md",
+    "harness": "copilot",
+    "dst": "ws:.github/agents/dd-code-reviewer.agent.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "copilot:agents/dd-product-engineer.agent.md",
+    "harness": "copilot",
+    "dst": "ws:.github/agents/dd-product-engineer.agent.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "copilot:agents/dd-software-engineer.agent.md",
+    "harness": "copilot",
+    "dst": "ws:.github/agents/dd-software-engineer.agent.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "copilot:hooks/pre-tool-use.json",
+    "harness": "copilot",
+    "dst": "ws:.github/hooks/pre-tool-use.json",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "copilot:hooks/session-start.json",
+    "harness": "copilot",
+    "dst": "ws:.github/hooks/session-start.json",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "cursor:agents/dd-code-reviewer.md",
+    "harness": "cursor",
+    "dst": "ws:.cursor/agents/dd-code-reviewer.md",
+    "compare": "bytes",
+    "link_to": "ws:.agents/agents/dd-code-reviewer.md"
+  },
+  {
+    "label": "cursor:agents/dd-product-engineer.md",
+    "harness": "cursor",
+    "dst": "ws:.cursor/agents/dd-product-engineer.md",
+    "compare": "bytes",
+    "link_to": "ws:.agents/agents/dd-product-engineer.md"
+  },
+  {
+    "label": "cursor:agents/dd-software-engineer.md",
+    "harness": "cursor",
+    "dst": "ws:.cursor/agents/dd-software-engineer.md",
+    "compare": "bytes",
+    "link_to": "ws:.agents/agents/dd-software-engineer.md"
+  },
+  {
+    "label": "cursor:hooks.json",
+    "harness": "cursor",
+    "dst": "ws:.cursor/hooks.json",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "dadaia:AGENTS.md",
+    "harness": "agents",
+    "dst": "ws:.dadaia/AGENTS.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "dadaia:hooks/codex-ctx-inject",
+    "harness": "codex",
+    "dst": "ws:.dadaia/hooks/codex-ctx-inject",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "dadaia:hooks/codex-ctx-inject-session-start",
+    "harness": "codex",
+    "dst": "ws:.dadaia/hooks/codex-ctx-inject-session-start",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "dadaia:hooks/codex-doctor-expired",
+    "harness": "codex",
+    "dst": "ws:.dadaia/hooks/codex-doctor-expired",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "dadaia:hooks/codex-post-gate",
+    "harness": "codex",
+    "dst": "ws:.dadaia/hooks/codex-post-gate",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "dadaia:hooks/codex-pre-gate",
+    "harness": "codex",
+    "dst": "ws:.dadaia/hooks/codex-pre-gate",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "dadaia:hooks/copilot-doctor-expired",
+    "harness": "copilot",
+    "dst": "ws:.dadaia/hooks/copilot-doctor-expired",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "dadaia:hooks/copilot-pre-gate",
+    "harness": "copilot",
+    "dst": "ws:.dadaia/hooks/copilot-pre-gate",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "dadaia:hooks/cursor-doctor-expired",
+    "harness": "cursor",
+    "dst": "ws:.dadaia/hooks/cursor-doctor-expired",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "dadaia:hooks/cursor-pre-gate",
+    "harness": "cursor",
+    "dst": "ws:.dadaia/hooks/cursor-pre-gate",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "dadaia:hooks/devin-doctor-expired",
+    "harness": "devin",
+    "dst": "ws:.dadaia/hooks/devin-doctor-expired",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "dadaia:hooks/devin-pre-gate",
+    "harness": "devin",
+    "dst": "ws:.dadaia/hooks/devin-pre-gate",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "dadaia:states/AGENTS.md",
+    "harness": "agents",
+    "dst": "ws:.dadaia/states/AGENTS.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "dadaia:tmp/AGENTS.md",
+    "harness": "agents",
+    "dst": "ws:.dadaia/tmp/AGENTS.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "devin:hooks.v1.json",
+    "harness": "devin",
+    "dst": "ws:.devin/hooks.v1.json",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "handoff:AGENTS.md",
+    "harness": "agents",
+    "dst": "ws:.dadaia/handoff/AGENTS.md",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "kimi-code:config.toml managed hooks block",
+    "harness": "kimi-code",
+    "dst": "kimi-home:config.toml",
+    "compare": "managed-block",
+    "link_to": null
+  },
+  {
+    "label": "kimi-code:hooks/dadaia-kimi-ctx-inject.sh",
+    "harness": "kimi-code",
+    "dst": "kimi-home:hooks/dadaia-kimi-ctx-inject.sh",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "kimi-code:hooks/dadaia-kimi-doctor-expired.sh",
+    "harness": "kimi-code",
+    "dst": "kimi-home:hooks/dadaia-kimi-doctor-expired.sh",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "kimi-code:hooks/dadaia-kimi-post-compact.sh",
+    "harness": "kimi-code",
+    "dst": "kimi-home:hooks/dadaia-kimi-post-compact.sh",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "kimi-code:hooks/dadaia-kimi-post-gate.sh",
+    "harness": "kimi-code",
+    "dst": "kimi-home:hooks/dadaia-kimi-post-gate.sh",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "kimi-code:hooks/dadaia-kimi-pre-gate.sh",
+    "harness": "kimi-code",
+    "dst": "kimi-home:hooks/dadaia-kimi-pre-gate.sh",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "root:AGENTS.md",
+    "harness": "agents",
+    "dst": "ws:AGENTS.md",
+    "compare": "bytes",
+    "link_to": null
+  }
+]

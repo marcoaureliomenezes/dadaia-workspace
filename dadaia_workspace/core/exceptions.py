@@ -61,14 +61,6 @@ class GitSyncError(DadaiaError):
     """Raised when committing or pushing changes before deactivate fails."""
 
 
-class PortConflictError(DadaiaError):
-    """Raised when a port is already registered as active by a different project."""
-
-
-class PortNotRegisteredError(DadaiaError):
-    """Raised when an operation targets a port not present in the registry."""
-
-
 class HandoffSchemaError(DadaiaError):
     """Raised when the schema file itself is invalid or contains unsupported keywords.
 

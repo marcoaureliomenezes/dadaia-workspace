@@ -10,8 +10,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-import pytest
-
 from dadaia_workspace.features.migrate.state_v2 import execute_migration, plan_migration
 
 
@@ -65,7 +63,7 @@ def _workspace(tmp_path: Path) -> tuple[Path, Path]:
 
 
 # ---------------------------------------------------------------------------
-# plan_migration: detection matrix (v1 / v2-noop / no-file / unknown-version)
+# plan_migration: detection matrix (v1 / v2-noop / no-file)
 # ---------------------------------------------------------------------------
 
 
@@ -92,12 +90,6 @@ def test_plan_migration_detection_matrix(tmp_path: Path) -> None:
     _, states_none = _workspace(tmp_path / "none")
     plan_none = plan_migration(states_none)
     assert plan_none.already_v2 is True
-
-    _, states_bad = _workspace(tmp_path / "bad")
-    bad = {"schema_version": "99", "contexts": []}
-    (states_bad / "spec_contexts.json").write_text(json.dumps(bad))
-    with pytest.raises(ValueError, match="Unknown schema_version"):
-        plan_migration(states_bad)
 
 
 # ---------------------------------------------------------------------------

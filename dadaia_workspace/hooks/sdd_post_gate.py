@@ -1,7 +1,6 @@
-"""PostToolUse advisory presence, session heartbeat, and throttled-GC hook.
+"""PostToolUse session heartbeat and throttled-GC hook.
 
-Runs after every tool call. It renews this session's advisory presence record(s),
-best-effort refreshes ``last_seen_at`` in the CLI session record, and, on a throttle
+Runs after every tool call. It best-effort refreshes ``last_seen_at`` in the CLI session record, and, on a throttle
 cadence, runs the one GC reaper. It always returns zero and never blocks a tool call.
 
 Session id resolution (unchanged, FR-R2-01): via :func:`_common.resolve_session_id` — the
@@ -15,10 +14,9 @@ sits first in ``resolve_session_id``'s order).
 - Fail-open: any exception ⇒ exit 0. The hook must never break the harness.
 
 GC (release 0.5.1 K2): this hook no longer reaps anything itself. On its own throttle
-cadence (never on every single tool call) it calls the ONE presence reaper,
-:func:`presence.gc`, and the ONE workspace reaper, :func:`doctor.reap` (0.4.7 FR6b) —
-for presence records,
-throttle/sentinel markers and now-empty presence context dirs. Session-record graveyard
+cadence (never on every single tool call) it calls the ONE workspace reaper,
+:func:`doctor.reap` (0.4.7 FR6b) — for throttle/sentinel markers, slop and expired TTL
+entries. Session-record graveyard
 GC stays exclusively owned by ``DoctorService.fix()`` — this hook used to duplicate it at
 a different TTL multiplier via its own ``sid`` guard, which is exactly how it could reap
 a session's own bind record (bug family ``doctor-ptr-gc-deletes-valid-lock-free-bind`` /
@@ -36,7 +34,7 @@ from pathlib import Path
 
 from dadaia_workspace.core import invocation, session_store
 from dadaia_workspace.core.kernel_tunables import RECONCILER_THROTTLE_TTL_SECONDS
-from dadaia_workspace.features.spec_context import presence
+from dadaia_workspace.features.spec_context import markers
 from dadaia_workspace.hooks import _common
 
 
@@ -61,40 +59,38 @@ def _refresh_session_record(workspace: Path, sess_id: str) -> dict[str, object] 
 # ---------------------------------------------------------------------------------------
 # Throttled GC cadence (FR-W1-03 throttle, release 0.5.1 K2 reaper) — NEVER blocks.
 #
-# Throttle marker: ``.dadaia/tmp/reconciler-last-<sid>``, via :func:`presence.throttled` /
-# :func:`presence.stamp_throttle` — the ONE mtime-throttle-marker idiom. A second
+# Throttle marker: ``.dadaia/tmp/reconciler-last-<sid>``, via :func:`markers.throttled` /
+# :func:`markers.stamp_throttle` — the ONE mtime-throttle-marker idiom. A second
 # PostToolUse invocation inside the window does nothing; outside it, the hook calls the
-# ONE reaper, :func:`presence.gc`. The git-status reconciler that used to share this
+# ONE reaper, :func:`doctor.reap`. The git-status reconciler that used to share this
 # cadence died with the log line that was its only output (FR11).
 # ---------------------------------------------------------------------------------------
 
 
 def _throttled_gc(workspace: Path, sess_id: str) -> None:
-    """On the throttle cadence, run :func:`presence.gc`; inside the window, do nothing.
+    """On the throttle cadence, run :func:`doctor.reap`; inside the window, do nothing.
 
     The marker is stamped BEFORE the reaper runs so even a slow or erroring pass throttles
     the next invocation. Any exception is swallowed by the caller's ``main`` try/except
     (fail-open).
     """
     marker = f"reconciler-last-{sess_id}"
-    if presence.throttled(
+    if markers.throttled(
         workspace, marker, window_seconds=RECONCILER_THROTTLE_TTL_SECONDS, now=time.time()
     ):
         return
-    presence.stamp_throttle(workspace, marker)
+    markers.stamp_throttle(workspace, marker)
     # ONE cadence, ONE reaper (0.4.7 FR6b): ``doctor.reap`` seeds what is missing, moves
-    # slop into ``.dadaia/reaped/``, deletes what TTL expired — and runs ``presence.gc``
-    # itself, with THIS session id, so the hook no longer calls it separately and a live
-    # session can never reap its own presence record. Imported HERE, not at module scope,
+    # slop into ``.dadaia/reaped/``, deletes what TTL expired. Imported HERE, not at module scope,
     # so the throttled-out path — the overwhelmingly common one — pays none of the
     # reaper's import cost; never through the container (P-12).
     from dadaia_workspace.features.spec_context import doctor
 
-    doctor.reap(workspace, own_session_id=sess_id)
+    doctor.reap(workspace)
 
 
 def main() -> int:
-    """Renew this session's advisory presence record(s). Never blocks (exit 0)."""
+    """Refresh this session's record and run the throttled reaper. Never blocks (exit 0)."""
     payload = _common.read_stdin_json()
     sess_id = _common.resolve_session_id(payload)
     if not sess_id:
@@ -108,7 +104,6 @@ def main() -> int:
         return 0
 
     try:
-        presence.renew(workspace, sess_id)
         _refresh_session_record(workspace, sess_id)
     except Exception:  # noqa: BLE001 — fail-open: any error ⇒ exit 0, never break harness
         return 0

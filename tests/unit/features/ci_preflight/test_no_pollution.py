@@ -66,8 +66,12 @@ def test_the_bare_command_writes_no_cache_into_the_tree(
     if not binary.exists():  # pragma: no cover — environment guard
         pytest.skip(f"{tool} not installed beside this interpreter")
 
-    tree = tmp_path / "checkout"
-    tree.mkdir()
+    # The real topology: the checkout sits at workspace/repos/<slug>, so the relative
+    # `../../.dadaia/tmp` redirect lands in THIS test's workspace — never two levels above
+    # tmp_path, where it would seed a phantom `.dadaia/` for every later test.
+    workspace = tmp_path
+    tree = workspace / "repos" / "checkout"
+    tree.mkdir(parents=True)
     shutil.copyfile(_REPO_ROOT / "pyproject.toml", tree / "pyproject.toml")
     (tree / "probe.py").write_text("VALUE: int = 1\n", encoding="utf-8")
 
@@ -75,3 +79,5 @@ def test_the_bare_command_writes_no_cache_into_the_tree(
 
     leaked = [name for name in _CACHE_DIRS if (tree / name).exists()]
     assert not leaked, f"bare `{tool} {' '.join(argv)}` wrote {leaked} into the tree"
+    assert (workspace / ".dadaia" / "tmp").is_dir(), "the cache must land in the workspace"
+    assert not (workspace.parent / ".dadaia").exists()

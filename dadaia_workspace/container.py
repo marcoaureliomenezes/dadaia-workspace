@@ -1,7 +1,6 @@
 """Composition root — builds services with concrete infrastructure."""
 
 import logging
-from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -9,7 +8,6 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from dadaia_workspace.core.models.bugs import BugRecord
     from dadaia_workspace.features.certification import CertificationResult
-    from dadaia_workspace.features.telemetry.store import TelemetryStore
     from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 from dadaia_workspace.core.exceptions import (
@@ -20,17 +18,12 @@ from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternL
 from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.import_.service import ImportService
 from dadaia_workspace.features.public.service import PublicAssetService
-from dadaia_workspace.features.repos.service import ReposService
-from dadaia_workspace.features.server_registry.service import ServerRegistryService
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.features.spec_context.service import SpecContextService
 from dadaia_workspace.features.workspace.service import WorkspaceService
-from dadaia_workspace.infrastructure.excel_reader import OpenpyxlExcelReader
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
-from dadaia_workspace.infrastructure.json_server_registry_store import JsonServerRegistryStore
-from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
@@ -112,10 +105,6 @@ def build_public_service() -> PublicAssetService:
     )
 
 
-def build_repos_service() -> ReposService:
-    return ReposService(excel_reader=OpenpyxlExcelReader())
-
-
 def build_git_object_reader() -> GitSubprocessObjectReader:
     """Composition-root seam for the push-range object reader (v0.9.0 FR1/FR7; ADR-0001:
     the sole adapter, shared by two CLI verbs — ``ci.push_gate_check`` and
@@ -131,16 +120,15 @@ def build_git_object_reader() -> GitSubprocessObjectReader:
 
 
 def build_bug_record_store(specs_dir: Path) -> "JsonlRecordStore[BugRecord]":
-    """Composition-root seam for the generic bug-record JSONL store (v0.5.0 FR2, AR-1
-    ruling answer (b), ``specs/releases/0.5.0/reviews/S1-AR1-ruling.md`` §2).
+    """Composition-root seam for the generic bug-record JSONL store.
 
-    Stays a container seam (ADR-0001: a store builder collapses into its single
-    consumer UNLESS two features share it) because two do: ``cli.commands.bugs``
-    (``_service`` -> ``features.bugs.service.BugService``) and ``cli.commands.specs``
-    (``bug_store_factory`` -> ``features.specs.doctor_governance.GovernanceValidator``).
+    Stays a container seam because the doctor reads the ledger through it
+    (``bug_store_factory`` -> ``features.specs.doctor_governance.GovernanceValidator``);
+    the ledger's ONE WRITER is the skill script ``dd-bug-resolution/scripts/bugs.py``
+    which shares no code with this reader.
 
-    Takes *specs_dir* directly — the SAME resolved directory every ``dadaia bugs``
-    verb's ``--specs-dir``/bind-resolution seam already produces (never a
+    Takes *specs_dir* directly — the SAME resolved directory the doctor's
+    ``--specs-dir``/bind-resolution seam already produces (never a
     ``workspace_root``, which would silently assume ``<root>/specs`` and break every
     ``--specs-dir <tmp>`` test fixture and remote-context routing). The ledger's
     physical filename is ``BUGS.jsonl`` (T-050-10 physically migrated the ledger
@@ -155,54 +143,6 @@ def build_bug_record_store(specs_dir: Path) -> "JsonlRecordStore[BugRecord]":
         to_dict=BugRecord.to_dict,
         from_dict=BugRecord.from_dict,
     )
-
-
-def telemetry_state_dir() -> Path:
-    """The ONE resolver for the machine-level telemetry state directory,
-    ``~/.dadaia/state/telemetry`` (0.4.7 FR2, SPEC line 221: one store per MACHINE, two
-    workspaces on it kept apart by each event's ``context``).
-
-    It is a seam, not a convenience: the literal used to sit inside
-    ``build_telemetry_store`` with nothing to intercept, so the suite's governance-event
-    tests wrote synthetic events into the OPERATOR'S real store. ``tests/conftest.py``
-    routes this one function at ``tmp_path`` for every test (backstop proved by
-    ``tests/contract/test_telemetry_store_backstop.py``). No env var is read — the
-    directory is machine-level by law, overridden only through this seam.
-    """
-    return Path.home() / ".dadaia" / "state" / "telemetry"
-
-
-def build_telemetry_store(state_dir: Path) -> "TelemetryStore":
-    """The ONE telemetry store: ``<state_dir>/telemetry.sqlite``. The panel's boot and
-    every governance verb build it here, so the migration set is stated once.
-
-    *state_dir* comes from the caller — ``telemetry_state_dir()`` in production, a
-    ``tmp_path`` in tests. Returns an UNOPENED store: the caller decides whether it
-    opens for write (and how it degrades when it cannot).
-    """
-    from dadaia_workspace.features.telemetry.store import TelemetryStore
-
-    state_dir.mkdir(parents=True, exist_ok=True)
-    return TelemetryStore(state_dir / "telemetry.sqlite")
-
-
-def build_bug_record_validator() -> Callable[[Mapping[str, object]], None]:
-    """Composition-root seam for ``bug-record-v1`` validation (D9) — the ONE validation
-    table, loaded through the ONE packaged-schema loader
-    (``features.specs.schemas.validator_for``), so the ``surface`` enum a registration
-    is checked against is the SAME derived one every committed record is checked
-    against (0.4.7 FR1). It used to read and compile the schema file a second time
-    here, which is how a registration could accept a value the doctor refused.
-    Raises ``jsonschema.exceptions.ValidationError`` on the first schema violation.
-    """
-    from dadaia_workspace.features.specs.schemas import validator_for
-
-    validator = validator_for("bugs/bug-record-v1")
-
-    def _validate(payload: Mapping[str, object]) -> None:
-        validator.validate(payload)
-
-    return _validate
 
 
 def load_denylist_terms() -> tuple[tuple[str, str], ...]:
@@ -313,15 +253,6 @@ def build_export_service(workspace_root: Path) -> ExportService:
 
 def build_import_service(workspace_root: Path) -> ImportService:
     return ImportService(build_spec_context_service(workspace_root))
-
-
-def build_server_registry_service(workspace_root: Path) -> ServerRegistryService:
-    _guard_initialized(workspace_root)
-    states = _states_dir(workspace_root)
-    return ServerRegistryService(
-        store=JsonServerRegistryStore(states),
-        probe=OsProcessProbe(),
-    )
 
 
 def run_certification(workspace_root: Path, *, keep: bool = False) -> "CertificationResult":

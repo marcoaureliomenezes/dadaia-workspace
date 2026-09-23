@@ -119,19 +119,32 @@ def test_healthy_venv_is_a_noop(tmp_path: Path, recorder: _Recorder) -> None:
     assert recorder.commands == []
 
 
-def test_install_spec_pins_version_when_not_a_source_checkout(
+def test_install_spec_repacks_the_running_distribution_when_not_a_source_checkout(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Wheel-installed distribution (no pyproject.toml next to the package) → pinned pin."""
+    """Intent: CONTRACT — bug init-venv-installs-index-version-not-running-distribution.
+
+    A wheel-installed distribution (no pyproject.toml beside the package) bootstraps the
+    venv from ITSELF, re-packed. It used to pin ``dadaia-workspace==<running version>``
+    from the INDEX, and under the release-please floor every unpublished build declares
+    the last published version — so the pin resolved, to somebody else's bytes.
+    """
     site = tmp_path / "site-packages" / "dadaia_workspace"
     site.mkdir(parents=True)
     (site / "__init__.py").write_text("")
     monkeypatch.setattr(python_env_module.dadaia_workspace, "__file__", str(site / "__init__.py"))
     monkeypatch.setattr(python_env_module.metadata, "version", lambda name: "9.9.9")
+    repacked = tmp_path / "wheel" / "dadaia_workspace-9.9.9-py3-none-any.whl"
+    repacked.parent.mkdir(parents=True)
+    repacked.write_bytes(b"fake-wheel")
+    monkeypatch.setattr(
+        python_env_module, "repack_installed_wheel", lambda dest_dir, dist=None: repacked
+    )
 
-    spec = VenvPythonEnvironmentManager()._install_spec()
+    spec = VenvPythonEnvironmentManager()._install_spec(str(tmp_path / "ws"))
 
-    assert spec == "dadaia-workspace==9.9.9"
+    assert spec == str(repacked)
+    assert "==" not in spec, "an index pin can resolve to bytes other than the running ones"
 
 
 def test_local_candidate_wheel_overrides_index_pin_without_editable(
@@ -225,61 +238,57 @@ def test_repack_returns_none_for_editable_install(tmp_path: Path) -> None:
     assert repack_installed_wheel(tmp_path / "out", dist=Distribution.at(dist_info)) is None
 
 
-def test_bootstrap_falls_back_to_repacked_wheel_when_index_cannot_resolve(
+def test_bootstrap_installs_the_repacked_running_distribution(
     tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The Consumer-consumer scenario: installed 0.X.Y is not on the index → repack + install."""
-    import subprocess as _subprocess
+    """Intent: CONTRACT — bug init-venv-installs-index-version-not-running-distribution.
 
+    The wheel path installs the re-packed running distribution DIRECTLY: one pip
+    install, no index attempt before it (the attempt is what used to succeed with the
+    wrong bytes), and the CI toolchain still rides along.
+    """
     mgr = VenvPythonEnvironmentManager()
-    monkeypatch.setattr(mgr, "_install_spec", lambda: "dadaia-workspace==9.9.9")
     repacked = tmp_path / "repacked" / "dadaia_workspace-9.9.9-py3-none-any.whl"
     repacked.parent.mkdir(parents=True)
     repacked.write_bytes(b"fake-wheel")
-    monkeypatch.setattr(
-        python_env_module, "repack_installed_wheel", lambda dest_dir, dist=None: repacked
-    )
+    monkeypatch.setattr(mgr, "_install_spec", lambda workspace_root: str(repacked))
 
     calls: list[list[str]] = []
 
-    def failing_then_ok(cmd: list[str], check: bool = False, **_kwargs: object) -> None:
+    def record(cmd: list[str], check: bool = False, **_kwargs: object) -> None:
         calls.append(list(cmd))
-        if cmd[-1] == "dadaia-workspace==9.9.9":
-            raise _subprocess.CalledProcessError(1, cmd)
 
-    monkeypatch.setattr(python_env_module.subprocess, "run", failing_then_ok)
+    monkeypatch.setattr(python_env_module.subprocess, "run", record)
 
     mgr.ensure_workspace_venv(str(tmp_path))
 
     assert calls[0][1:3] == ["-m", "venv"]  # venv-creation subprocess call, first
-    assert calls[1][-1] == "dadaia-workspace==9.9.9"
-    assert calls[2][-1] == str(repacked)
-    assert calls[3][-1] == "pytest"  # CI toolchain rides along on the fallback path too
+    assert calls[1][-1] == str(repacked)
+    assert not any("==" in token for call in calls for token in call), (
+        "no index pin is ever attempted — resolving one is how PyPI's bytes got in"
+    )
+    assert calls[2][-1] == "pytest"
 
 
-def test_bootstrap_error_names_escape_hatch_when_repack_also_unavailable(
-    tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
+def test_bootstrap_error_names_escape_hatch_when_the_running_dist_cannot_be_repacked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import subprocess as _subprocess
+    """Neither a source checkout nor a re-packable install: refuse, naming the override.
 
-    # Pre-existing bare venv (doctor VENV-1 repair shape): isolates this test to the
-    # install/repack-failure path under test, independent of venv-creation/interpreter
-    # resolution (each covered by their own dedicated tests).
-    (tmp_path / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir).mkdir(parents=True)
-
-    mgr = VenvPythonEnvironmentManager()
-    monkeypatch.setattr(mgr, "_install_spec", lambda: "dadaia-workspace==9.9.9")
+    Refusing is the honest outcome — the alternative the bug closed was installing
+    whatever the index happened to carry under the same version string.
+    """
+    site = tmp_path / "site-packages" / "dadaia_workspace"
+    site.mkdir(parents=True)
+    (site / "__init__.py").write_text("")
+    monkeypatch.setattr(python_env_module.dadaia_workspace, "__file__", str(site / "__init__.py"))
+    monkeypatch.setattr(python_env_module.metadata, "version", lambda name: "9.9.9")
     monkeypatch.setattr(
         python_env_module, "repack_installed_wheel", lambda dest_dir, dist=None: None
     )
 
-    def always_fail(cmd: list[str], check: bool = False, **_kwargs: object) -> None:
-        raise _subprocess.CalledProcessError(1, cmd)
-
-    monkeypatch.setattr(python_env_module.subprocess, "run", always_fail)
-
     with pytest.raises(python_env_module.WorkspaceVenvBootstrapError) as excinfo:
-        mgr.ensure_workspace_venv(str(tmp_path))
+        VenvPythonEnvironmentManager()._install_spec(str(tmp_path / "ws"))
     assert "DADAIA_BOOTSTRAP_PACKAGE" in str(excinfo.value)
 
 
@@ -292,45 +301,38 @@ def test_bootstrap_error_names_escape_hatch_when_repack_also_unavailable(
 # provider independently (clean env, exact running version) before reporting success.
 
 
-def test_index_install_is_output_captured_and_fallback_announces_itself(
+def test_the_install_stream_is_captured_and_its_failure_narrated(
     tmp_path: Path,
     recorder: _Recorder,
     monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
 ) -> None:
+    """pip's raw stream never reaches the operator; a failure is narrated as one error."""
     import subprocess as _subprocess
 
     mgr = VenvPythonEnvironmentManager()
-    monkeypatch.setattr(mgr, "_install_spec", lambda: "dadaia-workspace==9.9.9")
-    repacked = tmp_path / "repacked" / "dadaia_workspace-9.9.9-py3-none-any.whl"
-    repacked.parent.mkdir(parents=True)
-    repacked.write_bytes(b"fake-wheel")
-    monkeypatch.setattr(
-        python_env_module, "repack_installed_wheel", lambda dest_dir, dist=None: repacked
-    )
+    monkeypatch.setattr(mgr, "_install_spec", lambda workspace_root: "/tmp/w.whl")
 
     captured_kwargs: list[dict[str, object]] = []
 
-    def failing_then_ok(cmd: list[str], check: bool = False, **kwargs: object) -> None:
+    def failing(cmd: list[str], check: bool = False, **kwargs: object) -> None:
         captured_kwargs.append(dict(kwargs))
-        if cmd[-1] == "dadaia-workspace==9.9.9":
+        if cmd[-1] == "/tmp/w.whl":
             raise _subprocess.CalledProcessError(1, cmd, output="", stderr="ERROR: no dist")
 
-    monkeypatch.setattr(python_env_module.subprocess, "run", failing_then_ok)
+    monkeypatch.setattr(python_env_module.subprocess, "run", failing)
 
-    mgr.ensure_workspace_venv(str(tmp_path))
+    with pytest.raises(python_env_module.WorkspaceVenvBootstrapError) as excinfo:
+        mgr.ensure_workspace_venv(str(tmp_path))
 
-    # pip's own stream is captured — its raw ERROR never leaks to the operator.
     assert captured_kwargs and all(k.get("capture_output") for k in captured_kwargs)
-    out = capsys.readouterr().out
-    assert "re-packed" in out  # one clean, honest fallback line replaces the noise
+    assert "ERROR: no dist" in str(excinfo.value)
 
 
 def test_verification_failure_fails_the_bootstrap(
     tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     mgr = VenvPythonEnvironmentManager()
-    monkeypatch.setattr(mgr, "_install_spec", lambda: "dadaia-workspace==9.9.9")
+    monkeypatch.setattr(mgr, "_install_spec", lambda workspace_root: "/tmp/w.whl")
 
     def broken_verify(
         self: VenvPythonEnvironmentManager, ws: str, expected: str | None = None

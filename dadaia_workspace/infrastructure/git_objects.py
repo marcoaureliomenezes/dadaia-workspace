@@ -1,32 +1,16 @@
 """GitSubprocessObjectReader — the sole adapter for the push-range object scan (ADR-0001:
 no ``GitObjectReader`` port — one adapter, no swap seam).
 
-Reads over ``git rev-list --objects`` + ``git cat-file`` (SPEC v0.9.0 FR1). Kept in a
-sibling file to ``git_subprocess.py`` rather than grown inside it — the two modules serve
-different concerns (workspace-management git operations vs. the push-range object reader)
-and ``git_subprocess.py`` is already close to the size that would warrant a split
-(PLAN v0.9.0 §2).
+Reads over ``git rev-list --objects`` + ``git cat-file``. Every subprocess invocation
+here — including the batch calls that need ``input=`` — is routed through :func:`_run`,
+so a timeout or a missing ``git`` executable always surfaces as
+:class:`GitObjectReadError`, never a raw exception at the push boundary.
 
-Every subprocess invocation in this module — including the batch calls that need
-``input=`` — is routed through :func:`_run` so a timeout or a missing ``git`` executable
-always surfaces as :class:`GitObjectReadError` (SPEC v0.9.0 FR6 row 2: "Any git failure
-raises GitObjectReadError rather than returning a partial/empty result") — never a raw,
-unhandled exception at the push boundary (code-reviewer MEDIUM finding).
-
-**One exclusion formula for every push (bug
-new-branch-push-loses-prior-published-denylist-amnesty, v0.4.4).** Pre-fix, this
-module derived the "already published" baseline two DIFFERENT ways depending on
-whether ``remote_sha`` happened to resolve locally: a resolvable ``remote_sha`` used
-``--not <remote_sha>`` alone; an unresolvable/zero one (the shape of a brand-new
-``feature/{M.m.p}`` ref's FIRST push) fell back to ``--not --remotes`` for the range
-walk, but the FR2 prior-text anchor had no such fallback at all and simply went
-without a base — silently losing amnesty for every already-published path the new
-branch happened to touch. :func:`_base_exclusions` now returns ONE exclusion set for
-every call — ``--remotes`` unconditionally, plus ``remote_sha`` when it resolves —
-and every range/base derivation in this module (:func:`_rev_list_candidates`,
-:func:`_range_commit_shas`, :func:`_multi_path_shas`, :func:`_publication_boundaries`)
-consumes that SAME set. There is no branch left choosing between "the old sha" and
-"``--remotes``"; they are always asked for together.
+**One exclusion formula for every push.** :func:`_base_exclusions` returns ONE exclusion
+set for every call — ``--remotes`` unconditionally, plus ``remote_sha`` when it resolves
+— and every range/base derivation in this module consumes that SAME set. No branch
+chooses between "the old sha" and "``--remotes``"; a new branch's first push keeps the
+published baseline's amnesty because there is only one way to compute it.
 """
 
 from __future__ import annotations
@@ -123,8 +107,7 @@ def _base_exclusions(repo: Path, remote_sha: str) -> list[str]:
     (bug new-branch-push-loses-prior-published-denylist-amnesty).
 
     ``--remotes`` (everything reachable from any locally-known remote-tracking ref)
-    is ALWAYS present — the only honest meaning of "already published" (DADAIA.md
-    §7's range scope). *remote_sha* is added too, but only when it resolves to a
+    is ALWAYS present — the only honest meaning of "already published" (`dd-code-review`'s range scope). *remote_sha* is added too, but only when it resolves to a
     real local commit (:func:`_is_resolvable_commit`) — the caller's claimed prior
     tip of the ref being pushed. In a real git-hook invocation this is normally
     REDUNDANT with ``--remotes`` (the local ``refs/remotes/origin/<branch>`` already
@@ -888,19 +871,6 @@ def _read_blobs(
 class GitSubprocessObjectReader:
     """Subprocess-backed push-range object reader (SPEC v0.9.0 FR1/FR7; ADR-0001: the
     sole adapter — no ``GitObjectReader`` port)."""
-
-    def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
-        """``git ls-tree -r --name-only --full-tree <sha> -- <prefix>`` (v0.5.0
-        specs-canon closure) — see the port's own docstring for the full contract."""
-        if not sha or not _SHA_SHAPE_RE.match(sha):
-            raise GitObjectReadError(f"sha is not a valid sha shape: {sha!r}")
-        args = ["git", "ls-tree", "-r", "--name-only", "--full-tree", sha, "--", prefix]
-        result = _run(args, repo)
-        if result.returncode != 0:
-            raise GitObjectReadError(
-                f"git ls-tree -r --name-only failed: {_decode(result.stderr).strip()}"
-            )
-        return [line for line in _decode(result.stdout).splitlines() if line]
 
     def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
         """``git rev-list --parents -n 1 <sha>`` — the parent shas in order (first

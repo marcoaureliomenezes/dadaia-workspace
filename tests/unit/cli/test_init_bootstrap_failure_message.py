@@ -1,9 +1,11 @@
 """init venv-bootstrap failure must be actionable, never a traceback (validation-028).
 
 An unpublished candidate wheel is THE consumer-validation scenario: the workspace venv
-bootstrap pins `dadaia-workspace==<running version>` from PyPI and exploded with a raw
-CalledProcessError traceback when that version is not published, never naming the
-DADAIA_BOOTSTRAP_PACKAGE escape hatch that exists for exactly this case.
+bootstrap exploded with a raw CalledProcessError traceback, never naming the
+DADAIA_BOOTSTRAP_PACKAGE escape hatch that exists for exactly this case. (The index pin
+it used to explode on is gone — bug
+init-venv-installs-index-version-not-running-distribution — but the refusal it left
+behind is the same promise: actionable, never a traceback.)
 
 The conftest anti-disk-exhaustion backstop fakes ensure_workspace_venv globally, so the
 seam is exercised directly (subprocess.run mocked, pre-existing bare venv so
@@ -36,6 +38,17 @@ def test_ensure_workspace_venv_raises_actionable_error(tmp_path: Path, monkeypat
 
     (tmp_path / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir).mkdir(parents=True)
 
+    # The validation-028 shape, restated for the post-index bootstrap (bug
+    # init-venv-installs-index-version-not-running-distribution): a consumer running an
+    # installed distribution that cannot be re-packed. There is no index pin to fall
+    # back to any more, so the refusal itself must name the escape hatch.
+    site = tmp_path / "site-packages" / "dadaia_workspace"
+    site.mkdir(parents=True)
+    (site / "__init__.py").write_text("")
+    monkeypatch.setattr(pe.dadaia_workspace, "__file__", str(site / "__init__.py"))
+    monkeypatch.setattr(pe.metadata, "version", lambda name: "9.9.9")
+    monkeypatch.setattr(pe, "repack_installed_wheel", lambda dest_dir, dist=None: None)
+
     def _boom(cmd, check=False, **kwargs):
         raise subprocess.CalledProcessError(1, cmd)
 
@@ -59,7 +72,7 @@ def test_init_cli_maps_bootstrap_error_to_clean_exit(tmp_path: Path, monkeypatch
         ),
         raising=True,
     )
-    result = _runner.invoke(app, ["init", "--harness", "claude"])
+    result = _runner.invoke(app, ["init", "ws", "--harness", "claude"])
     assert result.exit_code != 0
     assert "Traceback" not in result.output
     assert "DADAIA_BOOTSTRAP_PACKAGE" in result.output

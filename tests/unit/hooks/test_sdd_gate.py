@@ -11,18 +11,17 @@ Two test layers, each driven through its harness-real channel:
   stdin.
 
 Mandatory invariants covered:
-  (a) PATH-first context slug: a write under repos/B records presence only for B.
+  (a) PATH-first context slug: a write under repos/B is attributed to B, never A.
   (b) Presence failures never block a mutating write.
   (c) PROTECTED (.dadaia/sessions/) is the sole fail-CLOSED path (kept as a standalone
       test AND as a param row under mode=READ — CRIT, never weakened).
 
-CRIT: this file covers path class, phase, caller-local mode, and advisory presence.
+CRIT: this file covers path class, scope and context attribution.
 """
 
 from __future__ import annotations
 
 import json
-import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -30,8 +29,6 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core import session_store
-from dadaia_workspace.features.spec_context import gate_policy, presence
-from dadaia_workspace.hooks import sdd_gate
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 
@@ -227,7 +224,7 @@ def test_path_first_context_slug_parity_no_context_fails_open_never_blocks(
     tmp_path: Path,
 ) -> None:
     # PARITY (a): first-ALIVE is repos/A, but a write under repos/B MUST attribute
-    # presence to repos/B, never repos/A (fixes gate-cross-context-lock-contamination).
+    # to repos/B, never repos/A (fixes gate-cross-context-lock-contamination).
     ws = _mk_workspace(tmp_path, "A", "B")  # A is first-ALIVE
     target = ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md"
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -238,13 +235,8 @@ def test_path_first_context_slug_parity_no_context_fails_open_never_blocks(
         session_id="sess-1",
     )
     assert block is None  # v0.1.76: never blocks on concurrency
-    # The presence record must be for context B, never A.
-    presence_root = ws / ".dadaia" / "states" / "presence"
-    assert (presence_root / "B" / "sess-1.json").exists()
-    assert not (presence_root / "A").exists()
 
-    # A specs/releases/ path with no repo slug + no DADAIA_CONTEXT -> fail open (no
-    # presence target attributable).
+    # A specs/releases/ path with no repo slug + no DADAIA_CONTEXT -> fail open.
     ws2 = _mk_workspace(tmp_path.parent / (tmp_path.name + "-no-ctx"), "a")
     target2 = ws2 / "specs" / "releases" / "x" / "TASKS.md"
     block2 = _run(
@@ -253,11 +245,8 @@ def test_path_first_context_slug_parity_no_context_fails_open_never_blocks(
     )
     assert block2 is None
 
-    # DOCTRINE (v0.1.76): a genuinely live foreign session's presence on the SAME
-    # context never blocks — the write ALLOWs (advisory only), reproduced harness-real
-    # by seeding a real presence record, no monkeypatch of the gate.
+    # DOCTRINE (v0.1.76): another session on the SAME context never blocks — the write ALLOWs.
     ws3 = _mk_workspace(tmp_path.parent / (tmp_path.name + "-foreign"), "B")
-    presence.upsert(ws3, "B", "owner-A", runtime="claude", pid=os.getpid())
     target3 = ws3 / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md"
     target3.parent.mkdir(parents=True, exist_ok=True)
     block3 = _run(
@@ -320,14 +309,10 @@ def test_gate_attributes_repo_target_over_dadaia_context_env(tmp_path: Path) -> 
     assert result.returncode == 0, result.stderr
     assert result.block_envelope() is None
 
-    presence_root = ws / ".dadaia" / "states" / "presence"
-    assert (presence_root / "x" / "sess-path-first.json").exists()
-    assert not (presence_root / "y").exists()
-
 
 def test_no_repo_write_resolves_via_rung2_live_session_record(tmp_path: Path) -> None:
     """(b) A write outside every ``repos/<slug>/`` — which used to resolve via
-    ``DADAIA_CONTEXT`` ONLY and fail open with no presence when that was absent — now
+    ``DADAIA_CONTEXT`` ONLY and fail open when that was absent — now
     falls through to rung 2: this session's own LIVE record. No ``DADAIA_CONTEXT`` is
     set here at all."""
     ws = _mk_workspace(tmp_path, "a")
@@ -348,9 +333,6 @@ def test_no_repo_write_resolves_via_rung2_live_session_record(tmp_path: Path) ->
     )
     assert result.returncode == 0, result.stderr
     assert result.block_envelope() is None
-
-    presence_root = ws / ".dadaia" / "states" / "presence"
-    assert (presence_root / "a" / "claude-live-sess.json").exists()
 
 
 def test_no_repo_write_resolves_via_rung3_cwd_repo(tmp_path: Path) -> None:
@@ -374,146 +356,3 @@ def test_no_repo_write_resolves_via_rung3_cwd_repo(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stderr
     assert result.block_envelope() is None
-
-    presence_root = ws / ".dadaia" / "states" / "presence"
-    assert (presence_root / "a" / "sess-cwd-repo.json").exists()
-
-
-def test_runtime_reads_dadaia_runtime_env(tmp_path: Path) -> None:
-    """T-50-05 (SPEC v0.5.0 FR1 deletion item 5): the sole surviving runtime source is
-    ``DADAIA_RUNTIME`` (which the kimi-code shims actually export); the dead alias this
-    site used to also read has zero writers anywhere in the tree and is deleted outright
-    — a grep for its exact name returns 0 matches in this code universe, so this test
-    proves the positive (the real var is honored) rather than naming the deleted one."""
-    ws = _mk_workspace(tmp_path, "a")
-    target = ws / "repos" / "a" / "specs" / "releases" / "rel-1" / "TASKS.md"
-
-    env = claude_hook_env(ws, session_id="sess-runtime-default")
-    result = run_hook_subprocess(
-        "sdd_gate",
-        {
-            "tool_name": "Write",
-            "tool_input": {"file_path": str(target)},
-            "session_id": "sess-runtime-default",
-        },
-        env,
-        cwd=ws,
-    )
-    assert result.returncode == 0, result.stderr
-    record = json.loads(
-        (ws / ".dadaia" / "states" / "presence" / "a" / "sess-runtime-default.json").read_text()
-    )
-    assert record["runtime"] == "unknown"
-
-    env2 = claude_hook_env(
-        ws, session_id="sess-runtime-real", extra={"DADAIA_RUNTIME": "kimi-code"}
-    )
-    result2 = run_hook_subprocess(
-        "sdd_gate",
-        {
-            "tool_name": "Write",
-            "tool_input": {"file_path": str(target)},
-            "session_id": "sess-runtime-real",
-        },
-        env2,
-        cwd=ws,
-    )
-    assert result2.returncode == 0, result2.stderr
-    record2 = json.loads(
-        (ws / ".dadaia" / "states" / "presence" / "a" / "sess-runtime-real.json").read_text()
-    )
-    assert record2["runtime"] == "kimi-code"
-
-
-# --------------------------------------------------------------------------- #
-# White-box: gate_policy.evaluate fail-safe contract (no hook, no stdin).
-# --------------------------------------------------------------------------- #
-
-
-def _evaluate_mutating(tmp_path: Path) -> tuple[gate_policy.Decision, str]:
-    ws = _mk_workspace(tmp_path, "B")
-    return gate_policy.evaluate(
-        ws,
-        "repos/B/specs/releases/rel-1/TASKS.md",
-        ctx="B",
-        session_id="s",
-    )
-
-
-def test_gate_policy_fail_safe_contract_presence_error_never_blocks(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    """v0.1.76 doctrine (AC-04 successor): a MUTATING write is NEVER blocked because of
-    another session. Even if the presence subsystem itself explodes, the write ALLOWs —
-    ``presence.upsert``/``others_alive`` are internally fail-soft (see
-    ``features/spec_context/presence.py``), and ``gate_policy.evaluate`` no longer has
-    any acquisition call site that can raise a block-worthy error at all."""
-
-    def boom(*_a: object, **_k: object) -> None:
-        raise RuntimeError("presence subsystem exploded")
-
-    monkeypatch.setattr(presence, "upsert", boom)
-    monkeypatch.setattr(presence, "others_alive", boom)
-    decision, _reason = _evaluate_mutating(tmp_path)
-    assert decision == gate_policy.Decision.ALLOW
-
-
-# --------------------------------------------------------------------------- #
-# White-box: NF-1 (rc-2) — the gate records a LONG-LIVED holder pid (getppid /
-# payload), never the ephemeral hook child's own. _resolve_holder_pid is pure.
-# --------------------------------------------------------------------------- #
-
-
-@pytest.mark.parametrize(
-    ("name", "payload", "expected"),
-    [
-        (
-            # In a real hook subprocess the harness is the PARENT; getppid() is the
-            # long-lived pid. The hook's own os.getpid() is ephemeral and would make the
-            # no-steal veto probe a dead pid, so it must NEVER be recorded. With no
-            # payload pid hint, getppid() is used.
-            "defaults_to_parent_pid",
-            {},
-            "getppid",
-        ),
-        # A harness that sends an explicit long-lived pid is honored (int and string
-        # forms).
-        ("prefers_payload_harness_pid_int", {"harness_pid": 4242}, 4242),
-        ("prefers_payload_parent_pid_str", {"parent_pid": "5151"}, 5151),
-        ("prefers_payload_ppid_int", {"ppid": 6262}, 6262),
-        # Non-positive / unparseable payload pids fall back to getppid(), never to
-        # 0/negative.
-        ("ignores_zero_pid", {"harness_pid": 0}, "getppid"),
-        ("ignores_negative_pid", {"harness_pid": -3}, "getppid"),
-        ("ignores_unparseable_pid", {"harness_pid": "nope"}, "getppid"),
-    ],
-)
-def test_resolve_holder_pid(
-    tmp_path: Path, name: str, payload: dict[str, object], expected: object
-) -> None:
-    want = os.getppid() if expected == "getppid" else expected
-    assert sdd_gate._resolve_holder_pid(payload) == want
-
-    if name == "prefers_payload_harness_pid_int":
-        # End-to-end companion: through the real hook subprocess, a payload-supplied
-        # harness pid is the pid stamped into the PRESENCE record (v0.1.76 — proving the
-        # gate threads the LONG-LIVED pid, not its own ephemeral child pid). Uses a
-        # known-alive pid (this test process), not the synthetic 4242 above.
-        ws = _mk_workspace(tmp_path, "B")
-        target = ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        my_pid = os.getpid()
-        block = _run(
-            tmp_path,
-            {
-                "tool_name": "Write",
-                "tool_input": {"file_path": str(target)},
-                "harness_pid": my_pid,
-            },
-            session_id="s-pid",
-        )
-        assert block is None
-        rec_path = ws / ".dadaia" / "states" / "presence" / "B" / "s-pid.json"
-        rec = json.loads(rec_path.read_text(encoding="utf-8"))
-        assert rec["pid"] == my_pid, rec

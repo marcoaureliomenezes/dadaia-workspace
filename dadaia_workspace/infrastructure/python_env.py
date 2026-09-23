@@ -300,13 +300,29 @@ class VenvPythonEnvironmentManager:
             / f"dadaia{PLATFORM.venv_exe_suffix}"
         )
 
-    def _install_spec(self) -> str:
-        """Resolve what to ``pip install`` so the venv mirrors the running distribution.
+    def _install_spec(self, workspace_root: str) -> str:
+        """Resolve what to ``pip install`` so the venv mirrors the RUNNING distribution.
 
-        Self-hosting (the package importable from a source checkout with a
-        ``pyproject.toml``): install that checkout editable, so the workspace venv tracks
-        source edits. Otherwise (wheel install, e.g. pipx/PyPI): pin the exact running
-        version from the index.
+        Two paths, no index:
+
+        * Self-hosting (the package importable from a source checkout with a
+          ``pyproject.toml``): install that checkout editable, so the workspace venv
+          tracks source edits.
+        * Any other install (pipx, uvx, a git clone, PyPI): re-pack the running
+          distribution into a local wheel and install THAT
+          (:func:`repack_installed_wheel`) — the installed distribution is itself a
+          reproducible source, so the venv gets the bootstrapper's own bytes.
+
+        Bug ``init-venv-installs-index-version-not-running-distribution``: this used to
+        pin ``dadaia-workspace==<running version>`` from the INDEX whenever the package
+        was not importable from a checkout. Under the release-please floor (ADR 0021)
+        every unpublished build declares the last PUBLISHED version, so the pin
+        resolved — to PyPI's bytes, not the bootstrapper's. The venv then ran different
+        code than the process that created it, silently.
+
+        ``DADAIA_BOOTSTRAP_PACKAGE`` still names an explicit local wheel: it is the
+        operator's override for validating a candidate build (see
+        ``CONSUMER_VALIDATION_RECIPE.md``), not a bootstrap path of its own.
         """
         candidate = os.environ.get("DADAIA_BOOTSTRAP_PACKAGE", "").strip()
         if candidate:
@@ -317,7 +333,19 @@ class VenvPythonEnvironmentManager:
         src_root = Path(dadaia_workspace.__file__).resolve().parent.parent
         if (src_root / "pyproject.toml").is_file():
             return str(src_root)
-        return f"dadaia-workspace=={metadata.version('dadaia-workspace')}"
+        repacked = repack_installed_wheel(
+            Path(workspace_root) / ".dadaia" / "tmp" / "bootstrap-wheel"
+        )
+        if repacked is None:
+            raise WorkspaceVenvBootstrapError(
+                "workspace venv bootstrap cannot mirror the running distribution: "
+                f"dadaia-workspace {metadata.version('dadaia-workspace')} is neither a "
+                "source checkout nor a re-packable installed distribution. Point "
+                "DADAIA_BOOTSTRAP_PACKAGE at a local wheel and retry, e.g. "
+                "DADAIA_BOOTSTRAP_PACKAGE=/path/to/dadaia_workspace-X.Y.Z-py3-none-any.whl "
+                "dadaia init."
+            )
+        return str(repacked)
 
     def ensure_workspace_venv(self, workspace_root: str) -> str:
         """Ensure a venv that satisfies doctor VENV-1: create it AND install the package.
@@ -386,7 +414,7 @@ class VenvPythonEnvironmentManager:
             # actionable "interpreter mismatch", never pip's bare, rootless "requires a
             # different Python" failure.
             self._assert_child_interpreter_version(workspace_root)
-            spec = self._install_spec()
+            spec = self._install_spec(workspace_root)
             pip = self.pip_executable(workspace_root)
             install_cmd = [pip, "install", "--quiet"]
             editable = Path(spec).is_dir()
@@ -394,66 +422,23 @@ class VenvPythonEnvironmentManager:
                 install_cmd.append("--editable")
             install_cmd.append(spec)
             # Bug init-succeeds-after-provider-bootstrap-failure: pip's stream is
-            # CAPTURED — a resolvable-from-fallback index miss must not leak a raw
-            # "ERROR: Could not find a version..." into init's output, where it reads
-            # as a masked broken bootstrap.
+            # CAPTURED — a failure must not leak a raw "ERROR: Could not find a
+            # version..." into init's output, where it reads as a masked broken
+            # bootstrap.
             try:
                 subprocess.run(install_cmd, check=True, capture_output=True, text=True)
             except subprocess.CalledProcessError as exc:
-                # Unpublished candidate wheels are the consumer-validation norm: the
-                # exact-version pin cannot resolve from the index (bug
-                # certify-cannot-install-installed-provider). The RUNNING installed
-                # distribution is itself a reproducible source — re-pack it as a wheel
-                # and install THAT, so init/certify/reconcile bootstrap the exact
-                # installed version with no index and no env var.
-                repacked = repack_installed_wheel(
-                    Path(workspace_root) / ".dadaia" / "tmp" / "bootstrap-wheel"
-                )
-                if repacked is not None:
-                    print(
-                        f"[bootstrap] index could not resolve '{spec}'; installing the "
-                        f"re-packed running distribution ({repacked.name}) instead"
-                    )
-                    try:
-                        subprocess.run(
-                            [pip, "install", "--quiet", str(repacked)],
-                            check=True,
-                            capture_output=True,
-                            text=True,
-                        )
-                        self._ensure_ci_toolchain(pip)
-                        self._verify_venv_provider(workspace_root, expected=self._running_version())
-                        return str(venv_dir)
-                    except subprocess.CalledProcessError as repack_exc:
-                        # F016 (20260830 audit): narrate THIS failure as what it is —
-                        # the repack SUCCEEDED and installing the re-packed wheel
-                        # failed — with its own stderr, never re-narrated below as
-                        # "could not be re-packed" with the wrong error's output.
-                        repack_tail = (repack_exc.stderr or repack_exc.output or "").strip()[-400:]
-                        raise WorkspaceVenvBootstrapError(
-                            f"workspace venv bootstrap failed installing '{spec}': the "
-                            "index could not resolve it, and installing the re-packed "
-                            f"running distribution ({repacked.name}) also failed. "
-                            f"Installer output: {repack_tail}"
-                        ) from repack_exc
-                # Name the escape hatch that exists for exactly this case (a raw
-                # CalledProcessError traceback pointed nowhere — validation-028 cascade).
                 pip_tail = ((exc.stderr or exc.output or "") if exc else "").strip()[-400:]
                 raise WorkspaceVenvBootstrapError(
-                    f"workspace venv bootstrap failed installing '{spec}' (and the "
-                    "running distribution could not be re-packed as a local wheel). If "
-                    "this version is not published on the index (e.g. a candidate wheel "
-                    "under validation) or the index is unreachable, point "
-                    "DADAIA_BOOTSTRAP_PACKAGE at the local wheel file and retry, e.g. "
-                    "DADAIA_BOOTSTRAP_PACKAGE=/path/to/dadaia_workspace-X.Y.Z-py3-none-any.whl "
-                    f"dadaia init. Installer output: {pip_tail}"
+                    f"workspace venv bootstrap failed installing '{spec}'. Installer "
+                    f"output: {pip_tail}"
                 ) from exc
             self._ensure_ci_toolchain(pip)
             # Success is only reported after the venv provider VERIFIES independently
-            # (clean env, no inherited PYTHONPATH). The exact running version is
-            # required for the pin path; an operator-chosen wheel (env override) or a
-            # self-hosting editable checkout may legitimately differ, so those verify
-            # import-integrity only.
+            # (clean env, no inherited PYTHONPATH). The re-packed path IS the running
+            # distribution, so its exact version is required; an operator-chosen wheel
+            # (env override) or a self-hosting editable checkout may legitimately
+            # differ, so those verify import-integrity only.
             expected = (
                 None
                 if editable or os.environ.get("DADAIA_BOOTSTRAP_PACKAGE", "").strip()

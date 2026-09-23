@@ -4,7 +4,7 @@ Every CI/release pytest --cov step must redirect COVERAGE_FILE out of the checko
 
 Bug release-workflow-coverage-file-in-checkout: pyproject's coverage ``data_file`` was
 removed in T-018-07 with the contract that WORKFLOWS redirect the data file to the
-runner temp dir. ci.yml honoured it; release.yml's contract-coverage job did not, so
+runner temp dir. ci.yml honoured it; the release workflow's contract-coverage job did not, so
 ``.coverage`` landed inside the repo checkout on every release run — the exact
 artifact class the "repos stay clean" law forbids. Two hand-maintained workflow files
 drifted apart; this contract pins them together.

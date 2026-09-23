@@ -185,16 +185,18 @@ def _numbered_headings(skill_md: Path) -> set[str]:
 
 
 def dead_body_pointers(text: str, *, rel: str, public_dir: Path) -> list[str]:
-    """Every backticked ``dd-<name>`` token names a skill directory under *public_dir*;
+    """Every backticked ``dd-<name>`` token names a skill directory or a persona file
+    under *public_dir* (since 0.4.7 the three personas are ``dd-`` named too);
     every `` `dd-x` §N `` pair names a ``## N.`` section of that skill's ``SKILL.md``;
     every backticked ``*-AGENTS.md`` filename resolves to an asset under *public_dir*.
     Returns ``file:line: …`` strings naming what to re-read."""
     skills = {d.name for d in (public_dir / "skills").iterdir() if d.is_dir()}
+    members = skills | {md.stem for md in (public_dir / "agents").glob("*.md")}
     violations: list[str] = []
     for idx, line in enumerate(text.splitlines()):
         for m in _CITATION_BACKTICK_RE.finditer(line):
             token = m.group(1).strip()
-            if _DD_SKILL_TOKEN_RE.match(token) and token not in skills:
+            if _DD_SKILL_TOKEN_RE.match(token) and token not in members:
                 violations.append(f"{rel}:{idx + 1}: dead skill pointer `{token}`")
             elif _SCOPED_AGENTS_TOKEN_RE.match(token) and not any(public_dir.glob(f"**/{token}")):
                 violations.append(f"{rel}:{idx + 1}: dead scoped-rule pointer `{token}`")

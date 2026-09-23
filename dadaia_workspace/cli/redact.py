@@ -3,8 +3,7 @@
 Applied ONLY at the CLI render boundary — ``dadaia doctor``, ``dadaia context list``
 and ``dadaia context show`` build a :class:`ContextRedactor` from the true names their
 underlying services already returned, then use it to mask text right before printing
-or JSON-serializing. Services (``DoctorService``, ``SpecContextService``,
-``features.spec_context.presence``) are never modified by this module and always keep
+or JSON-serializing. Services (``DoctorService``, ``SpecContextService``) are never modified by this module and always keep
 returning true names — redaction is a pure display-time concern, never a business-logic
 one.
 

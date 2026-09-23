@@ -24,7 +24,7 @@ def _minimal_specs(tmp_path: Path) -> Path:
     (specs / "releases" / "1.2.3").mkdir(parents=True)
     (specs / "releases" / "1.2.3" / "RELEASE.json").write_text(
         '{"schema": "release-state-v1", "release": "1.2.3", "phase": "IMPLEMENTATION",'
-        ' "rc": 0, "defined": null, "implemented": null, "shipped": null,'
+        ' "defined": null, "implemented": null, "shipped": null,'
         ' "log": []}',
         encoding="utf-8",
     )
@@ -53,7 +53,6 @@ def test_fix_dispatch_and_help_derive_from_the_registry() -> None:
         "TREE-5",
         "TREE-8",
         "SPEC-DOC-034",
-        "SPEC-DOC-044",
         "SPEC-DOC-046",
         "MEM-PLACEHOLDER-1",
         "FIXED-1",

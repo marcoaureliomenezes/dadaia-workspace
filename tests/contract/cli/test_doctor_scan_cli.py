@@ -28,7 +28,7 @@ from dadaia_workspace import container
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.platform import PLATFORM
-from dadaia_workspace.core.workspace_layout import Creator, zones_created_by, zones_with_ttl
+from dadaia_workspace.core.workspace_layout import provisioned_zones, zones_with_ttl
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from tests.fakes import FakeContextStore, FakeGitClient
 
@@ -39,13 +39,12 @@ _EXPIRED_CODE = f"WS-{_TTL_ZONE.name.lstrip('.')}-expired"
 _FINDING_LINE = re.compile(
     r"^WS-[a-z.-]+-(slop|expired|missing) (slop|expired|missing) \S+  \(.+\)$"
 )
-_SCORE_LINE = re.compile(r"^compliance\(workspace\): [0-9]+/[0-9]+ entries canonical \([0-9]+%\)$")
 
 
 @pytest.fixture
 def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     dadaia = tmp_path / ".dadaia"
-    for zone in (*zones_created_by(Creator.INIT), *zones_created_by(Creator.INSTALL)):
+    for zone in provisioned_zones():
         (dadaia / zone.name).mkdir(parents=True, exist_ok=True)
     (dadaia / "states" / "spec_contexts.json").write_text(
         '{"schema_version": "2", "contexts": []}', encoding="utf-8"
@@ -85,7 +84,7 @@ def _plant_expired(workspace: Path) -> Path:
     return stale
 
 
-def test_lists_findings_then_the_score_line_and_exits_1(workspace: Path) -> None:
+def test_lists_findings_and_exits_1(workspace: Path) -> None:
     (workspace / "junk.txt").write_text("", encoding="utf-8")
     _plant_expired(workspace)
 
@@ -96,27 +95,25 @@ def test_lists_findings_then_the_score_line_and_exits_1(workspace: Path) -> None
     finding_lines = [ln for ln in lines if ln.startswith("WS-")]
     assert len(finding_lines) == 2
     assert all(_FINDING_LINE.match(ln) for ln in finding_lines), finding_lines
-    score_lines = [ln for ln in lines if _SCORE_LINE.match(ln)]
-    assert len(score_lines) == 1, lines
+    assert not any(ln.startswith("compliance(") for ln in lines), lines
 
 
-def test_healthy_workspace_exits_0_with_a_full_score(workspace: Path) -> None:
+def test_healthy_workspace_exits_0_and_prints_nothing(workspace: Path) -> None:
     result = CliRunner().invoke(app, ["doctor"])
     lines = result.output.splitlines()
 
     assert result.exit_code == 0, result.output
-    assert [ln for ln in lines if _SCORE_LINE.match(ln)][0].endswith("(100%)")
-    assert not any(ln.startswith("WS-") for ln in lines)
+    assert lines == [], lines
 
 
-def test_json_carries_findings_compliance_and_fixed(workspace: Path) -> None:
+def test_json_carries_findings_and_fixed(workspace: Path) -> None:
     (workspace / "junk.txt").write_text("", encoding="utf-8")
 
     result = CliRunner().invoke(app, ["doctor", "--json"])
     payload = json.loads(result.output)
 
     assert result.exit_code == 1
-    assert {"sections", "compliance", "fixed"} <= set(payload)
+    assert {"sections", "fixed"} <= set(payload) and "compliance" not in payload
     workspace_section = payload["sections"]["workspace"]
     assert workspace_section["findings"] == [
         {
@@ -126,8 +123,7 @@ def test_json_carries_findings_compliance_and_fixed(workspace: Path) -> None:
             "fix": ".dadaia/.venv/bin/dadaia doctor --fix",
         }
     ]
-    assert set(workspace_section["compliance"]) == {"canonical", "total", "percent"}
-    assert set(payload["compliance"]) == {"canonical", "total", "percent"}
+    assert "compliance" not in workspace_section
     assert payload["fixed"] == []
 
 
@@ -181,15 +177,13 @@ def test_fix_expired_only_quiet_is_the_reaper_lane(workspace: Path) -> None:
     assert again.output == ""
 
 
-def test_fix_moves_slop_to_reaped_and_reports_the_post_fix_score(workspace: Path) -> None:
+def test_fix_moves_slop_to_reaped_and_lists_the_repair(workspace: Path) -> None:
     (workspace / "junk.txt").write_text("", encoding="utf-8")
 
     result = CliRunner().invoke(app, ["doctor", "--fix"])
-    lines = result.output.splitlines()
 
     assert result.exit_code == 0, result.output
     assert "WS-root-slop: moved 'junk.txt' -> '.dadaia/reaped/" in result.output
-    assert lines[-1].endswith("(100%)")
     assert not (workspace / "junk.txt").exists()
 
 
@@ -201,7 +195,7 @@ def _plant_hold(workspace: Path) -> Path:
     return held
 
 
-def test_a_held_entry_is_always_listed_and_never_scored(workspace: Path) -> None:
+def test_a_held_entry_is_always_listed_and_never_fails(workspace: Path) -> None:
     """Intent: CONTRACT — 0.4.7 FR6 AC (`dadaia doctor` LISTS what the reaper holds); size: SMALL.
 
     A hold is the one finding that is neither compliance nor failure: the operator must SEE
@@ -216,13 +210,11 @@ def test_a_held_entry_is_always_listed_and_never_scored(workspace: Path) -> None
 
     assert result.exit_code == 0, result.output
     assert held_lines == ["WS-reaped-reaped reaped reaped/20260913/x  (7d left)"], lines
-    assert [ln for ln in lines if _SCORE_LINE.match(ln)][0].endswith("(100%)"), lines
 
 
-def test_json_lists_a_held_entry_and_keeps_the_score_whole(workspace: Path) -> None:
+def test_json_lists_a_held_entry_and_does_not_fail(workspace: Path) -> None:
     """Intent: CONTRACT — 0.4.7 FR6 AC (the `--json` mirror of the held-entry listing); size: SMALL."""
     _plant_hold(workspace)
-    healthy = json.loads(CliRunner().invoke(app, ["doctor", "--json"]).output)
 
     result = CliRunner().invoke(app, ["doctor", "--json"])
     payload = json.loads(result.output)
@@ -232,6 +224,3 @@ def test_json_lists_a_held_entry_and_keeps_the_score_whole(workspace: Path) -> N
     (held,) = section["findings"]
     assert (held["code"], held["verdict"]) == ("WS-reaped-reaped", "reaped")
     assert held["message"] == "reaped/20260913/x  (7d left)"
-    assert section["compliance"]["percent"] == 100
-    # The hold is outside the scored set entirely — it neither helps nor hurts the count.
-    assert section["compliance"]["total"] == healthy["sections"]["workspace"]["compliance"]["total"]

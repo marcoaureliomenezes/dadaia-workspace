@@ -12,6 +12,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
@@ -27,7 +28,7 @@ def _workspace(root: Path) -> JsonContextStore:
     WorkspaceService(
         public_assets=FileSystemPublicAssetManager(),
         python_env=VenvPythonEnvironmentManager(),
-    ).init(root)
+    ).init(root, harnesses=L1_ENTRY_HARNESSES)
     return JsonContextStore(root / ".dadaia" / "states")
 
 

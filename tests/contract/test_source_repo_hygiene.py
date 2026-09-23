@@ -34,13 +34,13 @@ def test_sdd_gate_artifacts_visible_and_noncanonical_content_stays_gitignored() 
         "specs/releases/v9.9.9/GRILL.md",
         "specs/releases/v9.9.9/OQ-DECISIONS.md",
         # Each alpha-N closes with a qa-engineer review COMMITTED to the branch
-        # (DADAIA.md §5); bug gitignore-alpha-qa-review-untrackable: the blanket
+        # (the root `AGENTS.md` map §4); bug gitignore-alpha-qa-review-untrackable: the blanket
         # /specs/releases/*/* ignore had no negation for it, so the law was
         # silently undefeatable without git add -f (v0.5.0's ALPHA-1-QA.md was
         # force-added exactly that way).
         "specs/releases/v9.9.9/ALPHA-1-QA.md",
         "specs/releases/v9.9.9/ALPHA-12-QA.md",
-        # The pre-PR six-axis code-reviewer review runs BEFORE the archive move,
+        # The pre-PR six-axis dd-code-reviewer review runs BEFORE the archive move,
         # committed to the branch (FR5/ADR R3, v0.4.2); bug
         # gitignore-code-review-artifact-untrackable: same class as the ALPHA-N-QA
         # gap above — the blanket /specs/releases/*/* ignore had no negation for it
@@ -60,20 +60,15 @@ def test_sdd_gate_artifacts_visible_and_noncanonical_content_stays_gitignored() 
         # commit, had no whitelist line either — the class's fourth instance, closed
         # by inverting the rule (release-tree content tracked by default) instead of
         # a fifth per-artifact line.
-        "specs/releases/v9.9.9/verdicts/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.handoff.json",
         "specs/_archive/releases/v9.9.8/SPEC.md",
         "specs/_archive/releases/v9.9.8/PLAN.md",
         "specs/_archive/releases/v9.9.8/TASKS.md",
         "specs/_archive/releases/v9.9.8/CLOSURE.md",
         "specs/_archive/releases/v9.9.8/alpha-1/SPEC.md",
-        "specs/_archive/releases/v9.9.8/verdicts/"
-        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.handoff.json",
         # v9.9.8's per-area archive shape (FR6/T-050-06A): the new
         # specs/releases/_archive/<id>/ home, one level deeper than the old
         # specs/_archive/releases/<id>/ layout above — both are live until T-050-14/
         # T-050-41 finish the move, and both must stay visible in the meantime.
-        "specs/releases/_archive/v9.9.8/verdicts/"
-        "cccccccccccccccccccccccccccccccccccccccc.handoff.json",
         # Bug records are repository truth (bug-registration-guardrail); the
         # /specs/* privacy backstop must not hide them from review/CI. T-050-06A
         # (A1.7/V21) widened audits/ and bugs/_archive/ from *.md-only to every
@@ -122,7 +117,7 @@ def test_sdd_gate_artifacts_visible_and_noncanonical_content_stays_gitignored() 
         # carried to specs/releases/** ONLY — every other newly-opened canon area
         # (audits/, ADRs/, bugs/_archive/, backlog/_archive/, root _archive/) had
         # neither local-notes.md nor tmp/ denied, so an agent writing scratch
-        # material there (a shape DADAIA.md §5 makes natural) had it staged by
+        # material there (a shape the root `AGENTS.md` map §4 makes natural) had it staged by
         # default.
         "specs/audits/20991231T235959Z/local-notes.md",
         "specs/audits/20991231T235959Z/tmp/debug.json",

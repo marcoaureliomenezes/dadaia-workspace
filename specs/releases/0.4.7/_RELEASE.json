@@ -2,15 +2,13 @@
   "schema": "release-state-v1",
   "release": "0.4.7",
   "phase": "CLOSURE",
-  "rc": 3,
   "defined": {
-    "sha": "66718f33",
-    "ts": "2026-09-13T09:56:42Z"
+    "sha": "062332d4",
+    "ts": "2026-09-23T01:01:47Z"
   },
   "implemented": {
-    "sha": "c746592a",
-    "rc": 4,
-    "ts": "2026-09-13T10:49:36Z"
+    "sha": "184e67a8",
+    "ts": "2026-09-23T01:05:05Z"
   },
   "shipped": null,
   "log": [
@@ -337,6 +335,385 @@
       "agent": "project-manager",
       "kind": "note",
       "text": "Candidate 4 reviews, completing the previous reviews entry: qa-engineer CHANGES_REQUESTED @ e214a463 (docs/cli.md's stated regeneration command did not reproduce the file) → fixed in 7fceafe3 (the generator emits its own header; the committed file equals `dadaia help tree` byte-for-byte, verified by the PM); security LOW CWE-22 in citations.py fixed in f874561f. Final security delta re-verdict requested on the head after this entry."
+    },
+    {
+      "ts": "2026-09-20T17:33:17Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate 4 archived to rc-4/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
+    },
+    {
+      "ts": "2026-09-20T17:45:47Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate defined at 15c30b50; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-09-20T19:19:12Z",
+      "agent": "project-manager",
+      "kind": "size",
+      "text": "Candidate 5 (demolition) measured at closure: dadaia_workspace/ 48,816 -> 36,100 LOC; tests 464 -> 371 files, 2,147 -> 1,790 functions; features packages 19 -> 14; personas 9 -> 3; skill Markdown 2,906 lines (18 dirs); ratchets re-pinned V26 39/36, V32 769, V33 37, V35 2,906."
+    },
+    {
+      "ts": "2026-09-20T19:19:12Z",
+      "agent": "project-manager",
+      "kind": "memory",
+      "text": "Memory pass: atoms panel and agent-monitoring retired; server-registry and brand-identity rewritten; ARCHITECTURE, TECHSTACK, QUALITY, agent-orchestration, agentic-entities, agent-comms, public-asset-distribution, harness-claude-code, harness-codex, product-vision, spec-context-project, cross-platform-portability, context-management, workspace-doctor, audits-canon, sdd-bug-backlog-governance, sdd-gate-v3 corrected against the code."
+    },
+    {
+      "ts": "2026-09-20T19:21:27Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate 5 implemented at 260c6846; phase CLOSURE."
+    },
+    {
+      "ts": "2026-09-20T19:35:32Z",
+      "agent": "project-manager",
+      "kind": "reviews",
+      "text": "dd-code-review three axes + six lenses over origin/develop..6b2d457d: REJECTED on F1 (security-review job green-by-skipping without CLAUDE_API_KEY). Remediated after the CLOSURE milestone (260c6846) in commits 9c2a6a6b, 50fe9f3b and the hygiene commit that follows this entry: job fails closed (F1); one parsed activity_class derivation shared by the Claude render and the Codex transcode, undeclared class refused (F2); specs upgrade plans one set for dry-run and real run (F3); registry.py walk-up, walk-up refusal and dead-pid staleness covered (F4); dead docstring citations of presence/verdict/panel deleted (F5); reports help without diagnose (F6); SPEC/TASKS name CLAUDE_API_KEY (F8). Accepted as-is: RETIRED_FEATURE_PACKAGES owes a retirement path at c8 (F7); brand-identity atom stays under memory/product/panel/ until the c6 memory pass (F9). Also found: test_no_pollution seeded a phantom .dadaia/ two levels above tmp_path; fixed by the real repos/<slug> topology. Re-review over the remediation: APPROVED (LOW: F5 residue, F9 deferral, log encoding, post-milestone remediation — all folded into the hygiene commit)."
+    },
+    {
+      "ts": "2026-09-20T20:34:59Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate 5 archived to rc-5/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
+    },
+    {
+      "ts": "2026-09-20T20:43:25Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate defined at 7cf1538f; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-09-20T22:32:43Z",
+      "agent": "dd-software-engineer",
+      "kind": "size",
+      "text": "Candidate 6 closure measurements (installed bytes, registry tables rendered as `public stage` writes them). Root map AGENTS.md 6107 B (ceiling 8192). Scoped laws (ceiling 4096): specs/memory 4080, .dadaia 4086, specs/releases 3986, specs/backlog 3933, specs/bugs 3923, specs/ADRs and specs/audits under 3900, specs 3506, repos/<slug> 3155, .dadaia/handoff and .dadaia/tmp under 2000, .dadaia/states 1355. Largest SKILL.md dd-codebase-design 5455 B (ceiling 6144). Personas (unbounded): dd-software-engineer 8664 B, dd-project-manager 7266 B, dd-code-reviewer 6341 B. dadaia_workspace/ 36315 LOC (36100 at rc-5); tests 321 test modules / 403 tracked files / 1820 functions (319 / 401 / 1790 at rc-5, same measure). Ratchets: V26 38 statements / 35 files, V31 unit 89 / integration 33 / contract 0 / e2e 0, V32 765, V33 37, V35 18 dirs / 2881 lines, doctor module ceiling 700, import-linter ignore cap 2."
+    },
+    {
+      "ts": "2026-09-20T22:32:43Z",
+      "agent": "dd-software-engineer",
+      "kind": "note",
+      "text": "AC2.2 headless probes on the live instance, Claude Code. Probe 1 (root map, cwd = workspace root): asked for the first bullet under '# dadaia-workspace' in the attached AGENTS.md rules; reply verbatim '- One workspace folder; the agent session launches at its root, always.' — the root map loads, PASS. Probe 2 (nested scoped law): asked to Read repos/dadaia-workspace/specs/bugs/BUGS.jsonl and then report the first bullet of the specs/bugs/AGENTS.md rules that attached; the correct bullet came back ('- This directory holds the bug ledger: `BUGS.jsonl`, one JSON record per bug, appended once.') but the session reported it read the file directly and that NO rule attached automatically on the Read. The content is reachable; the automatic nested-attachment leg of AC2.2 is UNCONFIRMED on this harness version and is the reviewer's open item. Codex: deferred — the operator's Codex account is stopped, no session could be launched. Kimi: deferred — no provider on this machine; the CONTEXT-MAP row cites the source-verified chain."
+    },
+    {
+      "ts": "2026-09-20T22:34:49Z",
+      "agent": "dd-project-manager",
+      "kind": "note",
+      "text": "AC2.2 nested-attachment leg re-run with a token probe on the live instance (Claude Code 2.1.278, cwd = workspace root): a throwaway .dadaia/tmp/probe/specs/bugs/AGENTS.md carried the token WOMBAT-7; the session was told to Read only x.jsonl in that directory and to open no AGENTS.md; it replied WOMBAT-7. The scoped law attaches automatically on Read — PASS. The earlier self-reported 'no rule attached' was the model's narration, not the harness."
+    },
+    {
+      "ts": "2026-09-20T22:38:21Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate 6 implemented at 1ebda330; phase CLOSURE."
+    },
+    {
+      "ts": "2026-09-20T22:44:25Z",
+      "agent": "dd-project-manager",
+      "kind": "note",
+      "text": "FR6 bug-history audit — the 89 spec-context bug ids judged (surface spec_context or id/title matching context|bind|presence|spec.context|heartbeat|ctx): specs-doctor-does-not-resolve-persisted-bound-context, specs-doctor-ignores-persisted-context-bind, workspace-doctor-root4-false-positive-dadaia-hooks, ctx-inject-newest-bind-epoch-steals-other-sessions-context, bugs-append-bound-session-falls-through-to-cwd-specs, bugs-append-ignores-persisted-bind, e2e-panel-harness-toggle-ci-flake, pi-e2e-test-false-positive-loose-blocked-reason-assertion, codex-thread-id-bind-resolution-breaks-cli, context-bind-success-not-reflected-in-context-show, lifecycle-diagnostic-commands-missing-context-options, lifecycle-status-handoffs-doctor-missing-context, context-show-noarg-ignores-bound-session, rebind-does-not-adopt-same-process-lease, context-current-branch-stale-for-alive-repo, layer1-rebind-adopts-lease-to-synthetic-session-self-block, codex-liveness-sqlite-connection-leak, doctor-root-whitelist-contradicts-root-law, bugs-append-ledger-ignores-context-flag, doctor-fix-skips-graveyard-gc-when-check-clean, release-for-session-misses-unindexed-cross-context-lease, doctor-ptr-gc-deletes-valid-lock-free-bind, pi-headless-loads-foreign-context-files, context-relative-spec-ref-blocks-correct-deliverable, no-locks-doctrine-retains-blocking-context-locks, audit-drift-scan-injects-unbounded-source-context, lifecycle-review-context-stubs, context-heartbeat-ignores-persisted-bind, first-alive-fallback-violates-caller-owned-context-contract, context-list-json-documented-but-unsupported, context-show-json-traceback-unbound, bind-session-id-divergence, doctor-whitelist-legitimizes-slop-dirs, alive-scaffold-blocks-dead, bind-alias-dual-record, doctor-exit-zero-with-issues, dead-commit-fails-without-git-identity, baseline-refuses-alive-scaffold-commit, recipe-f23-demands-empty-stdout, kimi-postcompact-discards-context-reinjection, kimi-postcompact-omits-bound-context-bootstrap, impl-reviews-retry-prompt-exceeds-codex-window, context-delete-leaves-stale-session-bind, context-heartbeat-requires-env-after-persisted-bind, kimi-ctx-inject-bind-attribution-gap, ancestry-attribution-cross-session-ambiguity, pre-gate-drops-live-presence-advisory-042, backlog-cli-intent-hallucinated-anchor-045, context-baseline-rejects-official-scaffold-followup, context-show-unbound-traceback, doctor-misses-root4-nonsense-directory, default-context-scaffold-fails-specs-doctor, local-bare-remote-breaks-workspace-doctor, doctor-flags-allowed-claude-bridge, doctor-flags-product-created-dadaia-dirs-as-unknown, context-bind-spec-coerces-read, context-bind-session-id-mismatch, implementation-deliverable-zone-misses-context-repo, implementation-retry-overflows-codex-context-window, lifecycle-worker-executes-at-workspace-root-not-context-repo, r10-context-bind-explicit-mode-persisted-read, plan-review-approves-a-plan-missing-its-contract-bindings, a1-context-specs-resolution-ignores-repo-slug, a2-bugs-append-context-resolution-ignores-repo-slug, a3-context-create-accepts-unusable-name, context-dead-nonwritable-guard-rejects-standard-git-objects, context-dead-plain-git-push-fails-mismatched-upstream, context-alive-sweeps-unrelated-worktree-changes, specs-resolver-context-tests-flaky-under-xdist-full-suite, context-list-current-branch-stale-for-alive-repo, dadaia-md-projected-twice-into-claude-code-context, codex-live-probe-gate-checks-presence-not-usability, context-repo-add-accepts-foreign-context-slug, context-create-accepts-slug-owned-by-another-context, reports-validate-resolves-self-pull-refs-against-the-checked-out-branch-not-the-reviewed-tree, sdd-gate-memory-phase-resolves-empty-when-cwd-is-a-linked-worktree-outside-repos, secret-scan-workflow-never-runs-on-develop-prs-so-its-required-context-blocks-every-merge, pre-commit-presence-advisory-names-the-committing-session-itself, context-alive-copies-scaffold-image-bypassing-canon-fold, doctor-root1-flags-env-that-dadaia-md-9-declares-canonical, migrate-v3-backup-lands-in-closed-states-canon, memory-gate-requires-closure-phase-that-spec-doc-024-forbids-before-last-task, doctor-fix-aborts-whole-pass-on-first-undeletable-entry, doctor-unreadable-install-ledger-classifies-projections-as-slop, doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk, doctor-walks-symlinked-zone-root-into-a-repo-tree, minted-feature-branch-without-live-release-blocks-every-memory-write, context-bind-implementation-requires-release-id-stall-when-none-live, handoff-v12-role-atom-map-unsatisfiable-in-pattern5-tree"
+    },
+    {
+      "ts": "2026-09-20T22:44:25Z",
+      "agent": "dd-project-manager",
+      "kind": "reviews",
+      "text": "dd-code-review three axes + six lenses over 37c6c6ac..e77ac0f5: APPROVED (0 CRITICAL/HIGH; MEDIUM F1 one-home check untracked, F2 audit ids not listed, F3 test-count baseline mismeasured, F4 _orphan_claude_bridge migration branch in the doctor walk, F8 security-review red on D1; LOW F5 dead link_render callable, F6 _clear without provenance check, F7 registry rendering widened to every public .md; INFO F9 Codex/Kimi AC2.2 legs deferred, F10 restart sessions after upgrade). Folded at closure: F1 (one-home invariant now in tests/contract/test_context_map.py), F2 (ids in this log), F3 (baseline restated). Accepted with a home: F4 dies in candidate 8 with the init/lazy-harness rework (delete the migration branch once no instance predates 0.4.7 c6); F5/F6/F7 are candidate-7 engineer hygiene on the projection module; F10 goes into the deploy notes."
+    },
+    {
+      "ts": "2026-09-20T22:45:41Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate 6 archived to rc-6/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
+    },
+    {
+      "ts": "2026-09-20T22:49:46Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate defined at 030820b3; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-09-21T01:11:10Z",
+      "agent": "dd-software-engineer",
+      "kind": "size",
+      "text": "Candidate 7 measured at T-047-69/70 against the candidate-6 close (c627131a): dadaia_workspace/ 36,315 -> 36,304 lines (AC4.1, below 36,315), of which 4,191 are the new stdlib-only skill scripts — the CLI and feature side fell by that much again. CLI verbs 41 -> 20 (AC2.1, ceiling 30): the groups bugs, backlog, release, audit and memory retired with their command modules, container wiring and feature packages, plus features/specs/ledgers.py. Script corpus 36 files / 4,191 lines: dd-bug-resolution 5/628, dd-backlog-definition 7/738, dd-release-implementation 12/1,367, dd-audit-project 5/527, dd-spec-navigator 6/592 (dd-cli-library's registry.py, 1/339, predates this candidate). Ratchets re-pinned downward on the measured tree: V32 707 -> 686 (the CI-red count, paid by deleting governance ids and three history-only module docstrings), V33 37 -> 35, V26 38/35 -> 37/34, V31 unit 89 -> 86 and integration 33 -> 29, #upgrade CC 26 -> 8, #doctor CC 8 -> 6, doctor*.py module ceiling 700 -> 699; V35 holds at 18 dirs / 2,880 lines; new V36 pins the script corpus at 36 files / 4,191 lines. import-linter contracts name only packages that exist — no stale module to drop."
+    },
+    {
+      "ts": "2026-09-21T01:11:10Z",
+      "agent": "dd-software-engineer",
+      "kind": "note",
+      "text": "AC2.2/AC3.1 verified from the installed tree: the five skill scripts' check verbs each exit 0 over this repo's specs/ (bugs.py, backlog.py, release.py, audit.py, memory.py), run as .agents/skills/<skill>/scripts/<x>.py with their projected exec bits, and the doctor's ledgers section delegates to exactly those checks. dadaia help tree lists 20 verbs. Live instance reflected: public stage -> public install --target all -> public doctor ok, then dadaia doctor --fix exit 0 at the workspace root. dadaia ci preflight green (ruff format, ruff check, mypy --strict, lint-imports, pytest)."
+    },
+    {
+      "ts": "2026-09-21T01:14:10Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate 7 implemented at 53b05854; phase CLOSURE."
+    },
+    {
+      "ts": "2026-09-21T01:34:01Z",
+      "agent": "dd-project-manager",
+      "kind": "reviews",
+      "text": "dd-code-review three axes + six lenses over a8369705..3434ce94: APPROVED (0 CRITICAL/HIGH; MEDIUM F1 fix-line test skipped shell fixes, F2 subjects contract wider than the script, F3 script fix: named a sibling module, F4 doctor executed the first .agents/skills found walking up; LOW F5 registry.py exempt from the 150-line ceiling, F6 SPEC-DOC-039 fix names a non-canon path (pre-existing, bug proposal); INFO F7 LOC headline understates the concentration). F1–F4 folded in 0155fcc7/4e8c3076. F5 -> candidate 8 (split registry.py). F6 -> operator bug proposal. Decision recorded: `subjects` answers only the declared aliases and live bindings; derived anchors are validated by the doctor's BL-SCHEMA, whose finding names the ref."
+    },
+    {
+      "ts": "2026-09-21T01:34:01Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate 7 archived to rc-7/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
+    },
+    {
+      "ts": "2026-09-21T01:38:30Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate defined at 94bfdc26; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-09-21T02:30:00Z",
+      "agent": "dd-software-engineer",
+      "kind": "summary",
+      "text": "Candidate 8 implemented, T-047-71..79. FR1 one-line bootstrap: 06eb1b9d (init <dir>), 2713d689 (harness add in, public install --target out), 14df5918 (--harness <name>; all and the comma-set die), 8373e02e + 25901f2a (init --repo clones, composes the context lifecycle, re-entrant). FR3 roster: 78f3dd75 (cursor/devin/copilot records), 9c9e2906 + 35a0d5db (hook dialects, probes, V32 682). FR4: e698eef7 (SPEC-DOC-048 Origin, release.py --origin, flow weights). FR5: 0dd621dd (CLI audit, uncited verbs die, _orphan_claude_bridge deleted) and this task's e2e + closure. Deviations the review must weigh: (1) T-047-74 clones through SpecContextService.alive rather than a subprocess clone of its own — one clone implementation, no second URL validator; (2) T-047-76 reports an unprobeable harness as status SKIP with an 'UNVERIFIED:' detail instead of minting a new probe status; (3) the F5 registry.py split was ruled out — V36 holds at 36 files / 4,191 lines. T-047-79 also fixed WS-hooks-missing at its cause: init and the doctor held two views of 'which zone must exist'; workspace_layout.provisioned_zones() is now the only one and zones_created_by is deleted. HOOKS-DRIFT-1 did NOT reproduce — installer and comparator already read the same public_scripts_dir()."
+    },
+    {
+      "ts": "2026-09-21T03:47:51Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate 8 implemented at 09359755; phase CLOSURE."
+    },
+    {
+      "ts": "2026-09-21T04:11:17Z",
+      "agent": "dd-project-manager",
+      "kind": "reviews",
+      "text": "dd-code-reviewer on 462e557f..fb95c427: CHANGES REQUIRED -> folded fb95c427 (F1 HIGH SPEC-DOC-048 bugs: origin = ledger membership; F2 hook dialects declare ungated behaviours + event-coverage test; F3 init has no harness-named branch; F4 doctor_clean requires both sections; F5 is_l1 deleted; F6 INSTALL_TARGETS/'all' deleted). Record-only: F7 SPEC-DOC-048 sed fix line non-executable as printed; F8 AC1.1 wheel/container leg covered only by release.yml smoke (PARTIAL); F9 uvx alias -> candidate 9; F10 SYMLINK-TARGET-1 assumes mirrored layout. Deviations 1-7 ratified. Bug proposals (ask-first): cursor file writes ungated (declared, WARN in public doctor); SPEC-DOC-039 fix path (c7 F6) still unregistered."
+    },
+    {
+      "ts": "2026-09-21T04:12:26Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate 8 archived to rc-8/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
+    },
+    {
+      "ts": "2026-09-21T04:16:13Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate defined at 8ad47a9a; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-09-21T04:45:59Z",
+      "agent": "dd-software-engineer",
+      "kind": "summary",
+      "text": "Candidate 9 implemented: T-047-80 5706948b (standalone_skills key + compatibility: frontmatter on the eight standalone skills, V35 2880->2877), T-047-81 693cdf86 (build-skills-repo.py: Agent Skills layout, Claude marketplace manifests, derived README, claude plugin validate clean), T-047-82 7431b681 (release job publish-skills-repo, fail-closed on SKILLS_REPO_TOKEN), T-047-83 2ae2e789 (index, quickstart, positioning, bug-loop pages derived from memory), T-047-84 b4bf69b9 (bug-ledger-lessons article, README Documentation section, llms.txt page list, Documentation url), T-047-85 079ede37 (dadaia-workspace console-script alias, quickstart shows uvx first). Deviations the reviewer must weigh: T-047-80 dropped the planned 'license:' frontmatter line (PM ruling); T-047-83 extended the quickstart's derived-from markers to pypi-distribution and workspace-doctor beyond the three atoms SPEC FR3 names; T-047-81 placed build-skills-repo.py in _STANDALONE_BY_DESIGN rather than giving it a skill invoker; the docs-site and skills-repository links ship before the operator creates either target, true-on-arrival by PM ruling. No verb entered or left (ADR 0018): the build is a script and the alias a second name for one callable."
+    },
+    {
+      "ts": "2026-09-21T04:49:16Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate 9 implemented at d7ed41a1; phase CLOSURE."
+    },
+    {
+      "ts": "2026-09-21T05:00:24Z",
+      "agent": "dd-project-manager",
+      "kind": "reviews",
+      "text": "dd-code-reviewer on abaca618..449c4267: APPROVED (0 CRITICAL, 0 HIGH, 2 MEDIUM, 4 LOW, 3 INFO). Folded at closure cbed3298 + f233ccd3: F1 behavior-map/schema re-landed without escape churn, F3 release job version via env, F4 generated-tree note in the skills README, F5 plugin.json repository+license; build-skills-repo.py back to 150 lines. Record-only: F2 links to the docs site and skills repo 404 until D3 and the uvx line errors against 0.4.6 until 0.4.7 publishes — D3 must precede the tag; F6 standalone skills still cite workspace verbs outside the scoped-law step; F7 CONTEXT-MAP re-recorded; F8 Pages rendering UNVERIFIED until enabled; F9 CI verified by the PM (push runs green, PR run red only on the by-design security-review). Deviations 1-6 ratified. Bug proposals carried: SPEC-DOC-039 fix path (c7 F6); cursor file writes ungated (c8, declared)."
+    },
+    {
+      "ts": "2026-09-21T05:00:25Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate 9 archived to rc-9/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
+    },
+    {
+      "ts": "2026-09-21T12:04:47Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate defined at 5addd4ef; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-09-21T12:17:06Z",
+      "agent": "dd-software-engineer",
+      "kind": "note",
+      "text": "rc fields retired (release-please semantics)"
+    },
+    {
+      "ts": "2026-09-21T12:57:19Z",
+      "agent": "dd-software-engineer",
+      "kind": "summary",
+      "text": "Candidate 10 implemented: T-047-87 26c71a11 (release-please workflow, config and manifest at the 0.4.6 floor; V34 CRLF fix 51b14199), T-047-88 8dc9da2e (release.yml deleted, the publish jobs folded under release_created in one workflow), T-047-89 efaa2aa2 (rc-archive, fold and archive die with their four scripts; release-state-v1 loses rc; backlog subject refs re-pointed 9cee62b1), T-047-90 737fd097 (RELEASE-TREE-ARCHIVE-* and SPEC-DOC-045 die, _release_histo.py deleted, pyproject back to the 0.4.6 floor, phase CLOSURE --pr records promote; docs/cli.md b5b78f47), T-047-91 8999f047 (the law stops naming the retired verbs; ADR 0005/0006/0008/0009/0014 superseded by 0021; ADR 0019 measured by SPEC-DOC-048). UNVERIFIED until the first push to main — no test in this repository can assert any of it: that release-please parses this history and proposes 0.4.7 rather than 0.4.6 or 0.5.0; that merging its release PR sets release_created true and carries tag_name; that the approve gate on the release-gate environment and the OIDC publish still run under the new trigger and find their build artifact in the same run. Deviations for the reviewer: T-047-89 left the archived candidate documents read but never ranked, rather than migrating them; T-047-90 tightened the regex in test_version_lineage_consistency instead of relaxing the assertion, and deleted _release_histo.py (a PM addition to the task); T-047-91 kept ADR 0021's supersedes at one id because the record schema's pattern admits exactly one, the five ids being named in its context instead, and corrected ADR 0019's measured_by rather than rewriting the accepted record."
+    },
+    {
+      "ts": "2026-09-21T13:00:24Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate implemented at 452267b8; phase CLOSURE."
+    },
+    {
+      "ts": "2026-09-21T13:14:16Z",
+      "agent": "dd-project-manager",
+      "kind": "reviews",
+      "text": "dd-code-reviewer on 8cafd923..edec1d67: APPROVED (0 CRITICAL, 0 HIGH, 4 MEDIUM, 4 LOW, 3 INFO). Folded at closure 1781e527: F1 no workflow expression in any run body (env: VERSION, hygiene assertion over every job), F3 ADR supersedes as a comma list and 0021 names 0005,0006,0008,0009,0014 (PM ruling), F4 CONTEXT.md glossary without retired verbs (rc-N entry deleted, law-grep extended to CONTEXT.md), F5 the hand-written 0.4.7 changelog heading renamed so release-please owns `## [0.4.7]`, F6 release-please job main-only, F7 PyPI propagation polled. Record-only: F2 archived documents read-not-ranked incl. schema (ratified), F8-F11 deviations ratified. First release PR will propose 0.4.7 (0 breaking commits since v0.4.6). UNVERIFIED until the first push to main: release-please proposing 0.4.7, release_created/tag_name on merge, approve gate + OIDC publish under the new trigger. Bug proposals (ask-first): none new beyond the folded F1/F4/F5; carried: SPEC-DOC-039 fix path (c7), cursor file writes ungated (c8)."
+    },
+    {
+      "ts": "2026-09-22T13:34:42Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.4.7 (prior candidate closed at 452267b8)"
+    },
+    {
+      "ts": "2026-09-22T18:33:01Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate defined at a84e9687; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-09-22T20:03:26Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate implemented at cbd813d1; phase CLOSURE."
+    },
+    {
+      "ts": "2026-09-22T20:05:20Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over the window: 27 drifted atom(s) and 0 uncovered unit(s) worked — 0 reviewed unchanged, 27 changed.",
+      "since": "6cef01f8",
+      "reviewed": [],
+      "changed": [
+        "agent-comms",
+        "agent-orchestration",
+        "agentic-entities",
+        "public-asset-distribution",
+        "pypi-distribution",
+        "harness-claude-code",
+        "harness-codex",
+        "harness-copilot",
+        "harness-cursor",
+        "harness-devin",
+        "harness-kimi-code",
+        "product-vision",
+        "spec-context-project",
+        "capabilities",
+        "ci-preflight",
+        "consumer-agent-support",
+        "context-management",
+        "cross-platform-portability",
+        "server-registry",
+        "specs-migration",
+        "workspace-doctor",
+        "workspace-init",
+        "audits-canon",
+        "backlog-ledger",
+        "bug-ledger",
+        "release-lifecycle",
+        "sdd-gate-v3"
+      ]
+    },
+    {
+      "ts": "2026-09-22T21:01:38Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over a84e9687..66e588a97a3d: 0 reviewed, 12 changed.",
+      "since": "a84e9687",
+      "until": "66e588a97a3dffca186850c79c21aa34e3023b9d",
+      "reviewed": [],
+      "changed": [
+        "agent-orchestration",
+        "agentic-entities",
+        "public-asset-distribution",
+        "pypi-distribution",
+        "product-vision",
+        "consumer-agent-support",
+        "context-management",
+        "specs-migration",
+        "workspace-doctor",
+        "audits-canon",
+        "backlog-ledger",
+        "release-lifecycle"
+      ]
+    },
+    {
+      "ts": "2026-09-22T21:39:17Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 66e588a97a3dffca186850c79c21aa34e3023b9d..d4302acc40bd: 10 reviewed, 5 changed.",
+      "since": "66e588a97a3dffca186850c79c21aa34e3023b9d",
+      "until": "d4302acc40bdf3f68cb90b10657b0f365b14803a",
+      "reviewed": [
+        "pypi-distribution",
+        "harness-claude-code",
+        "harness-codex",
+        "harness-kimi-code",
+        "spec-context-project",
+        "ci-preflight",
+        "consumer-agent-support",
+        "context-management",
+        "workspace-doctor",
+        "bug-ledger"
+      ],
+      "changed": [
+        "agentic-entities",
+        "capabilities",
+        "specs-migration",
+        "release-lifecycle",
+        "sdd-gate-v3"
+      ]
+    },
+    {
+      "ts": "2026-09-22T21:46:09Z",
+      "agent": "main-thread",
+      "kind": "reviews",
+      "text": "Candidate 11 review: dd-code-reviewer REJECTED 7995570f (H1 caller-chosen/empty window passed the gate, H2 unmeetable done-when, M1-M3, L1-L2); rework 6817773c..66e588a9 + ADR 0024 (operator-accepted) re-reviewed APPROVED at 5c62bc78 with MEDIUM-1/2 + LOW-1/2 folded in d07251a2..e016576b (check re-judges the latest entry and requires no drift after its until; one-way skill dependency). Four operator-confirmed bugs fixed f9774c2d..0871698a. Note: the orphan-checker deletion landed in 7459ea80, not 66e588a9 as its message says. Final tip 422cd04b, CI push green."
+    },
+    {
+      "ts": "2026-09-23T01:01:32Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.4.7 (prior candidate closed at cbd813d1)"
+    },
+    {
+      "ts": "2026-09-23T01:01:47Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate defined at 062332d4; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-09-23T01:05:05Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate implemented at 184e67a8; phase CLOSURE."
+    },
+    {
+      "ts": "2026-09-23T01:05:33Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over d4302acc40bdf3f68cb90b10657b0f365b14803a..10cc3ab102f7: 3 reviewed, 1 changed.",
+      "since": "d4302acc40bdf3f68cb90b10657b0f365b14803a",
+      "until": "10cc3ab102f7c7692a64fe37d6f5880e33bee0dd",
+      "reviewed": [
+        "agentic-entities",
+        "pypi-distribution",
+        "product-vision"
+      ],
+      "changed": [
+        "sdd-gate-v3"
+      ]
+    },
+    {
+      "ts": "2026-09-23T01:10:55Z",
+      "agent": "main-thread",
+      "kind": "reviews",
+      "text": "Candidate 12 review APPROVED at 3dde4654 (CI fully green on PR #260, no security-review job). Folded: MEDIUM-1 push_gate/chokepoints docstrings no longer cite the removed check or the dead verdict_violations_fn; MEDIUM-2 the P-33 scan parses every *.yml/*.yaml, checks jobs.*.uses and steps[].uses case-insensitively and scans secret names and the API endpoint; LOW-2 stale TASKS note removed. LOW-1: the memory entry's changed list omits agent-orchestration, edited outside the drift worklist (its false security-review claim deleted)."
+    },
+    {
+      "ts": "2026-09-23T01:12:22Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 10cc3ab102f7c7692a64fe37d6f5880e33bee0dd..7647f4a7fba9: 1 reviewed, 0 changed.",
+      "since": "10cc3ab102f7c7692a64fe37d6f5880e33bee0dd",
+      "until": "7647f4a7fba935b1fdf9475a05126bd14192d34f",
+      "reviewed": [
+        "sdd-gate-v3"
+      ],
+      "changed": []
     }
   ]
 }

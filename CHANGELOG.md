@@ -54,7 +54,7 @@ for this task, so none is touched here):
 
 Left exactly as written; a future task can pick this up.
 
-## [0.4.7] — em progresso
+## 0.4.7 — candidate record (hand-written; the published section is written by release-please above)
 
 Open-scope release (ADRs 0005–0009): version minted at birth from the PyPI lineage
 (latest published `0.4.6` + 1 patch); each closed-scope candidate appends here.
@@ -179,7 +179,7 @@ Open-scope release (ADRs 0005–0009): version minted at birth from the PyPI lin
 - `dadaia audit disposition <dir> <finding-id> --disposition resolved|superseded|deferred|rejected`
   and `dadaia audit close <dir> --sha <window-end>` (`features/specs/audit.py`): all-or-nothing,
   `<dir>` confined to `specs/audits/`, histo `entry {sha, pillars{bugs,specs,memory}, dispositions}`.
-- `dadaia release phase IMPLEMENTATION|CLOSURE --sha <sha>`: the trio-`Aprovado` and every-task-`[x]`
+- `dadaia release phase IMPLEMENTATION|CLOSURE --sha <sha>`: the trio-`Approved` and every-task-`[x]`
   checks stamp `defined` / `implemented {sha, rc, ts}`; `phase` and milestones move only by verb.
 - `GovernanceEvent {event_id, ts, session_id, context, verb, ledger, record_id, record_hash}` in the
   telemetry store (migration 7, `container.build_telemetry_store()`), written once per governance verb
@@ -304,6 +304,234 @@ Open-scope release (ADRs 0005–0009): version minted at birth from the PyPI lin
 - Pre-push canon scan range-scoped and pattern-aware; the published-slug amnesty is a subset of detection by
   construction (ADR 0013).
 - Windows runner: derived-doc hashes over LF bytes, POSIX path filters, the telemetry backstop assertion.
+
+### Candidate 10 — the release is a release PR
+
+Commits `8cafd923..8999f047`. **This is the LAST hand-written section in this file.**
+From the first release PR onward, release-please owns everything above it — the version,
+the section and the tag are written from the Conventional Commits, never by hand.
+
+#### Added
+- `.github/workflows/release-please.yml` with `release-please-config.json` and
+  `.release-please-manifest.json` at the `0.4.6` floor: one workflow on every push to `main`
+  maintains one release PR proposing the next version from the commit history.
+- The publish side folded into that same workflow — five test legs, `build`, `approve` on the
+  `release-gate` environment, `publish` under OIDC, `smoke-test` and `publish-skills-repo`,
+  every job `needs` the release-please job and gated on `release_created == 'true'`. One
+  workflow, no PAT, no second trigger.
+- `release.py phase CLOSURE --sha <sha> --pr <n>`: `--pr` names the merged release PR and
+  records the promote act in the candidate's note; promote is merging that PR, nothing else.
+
+#### Removed
+- `.github/workflows/release.yml`, its `check` job comparing `pyproject` to the `v*` tags, and
+  the step that pushed the tag — release-please creates the tag when its PR merges.
+- `release.py rc-archive`, `release.py fold` and `release.py archive`, with the five modules
+  behind them (`_release_rc`, `_release_fold`, `_release_fold_plan`, `_release_archive`,
+  `_release_histo`): a closed candidate's trio is overwritten in place and lives in git at its
+  CLOSURE commit, so nothing copies it anywhere.
+- `rc` from `release-state-v1` and `implemented.rc` with it; the archived-candidate count
+  counted a directory shape that no longer exists.
+- The `RELEASE-TREE-ARCHIVE-ID`/`-UNSHIPPED` doctor rules and `SPEC-DOC-045`: the doctor stops
+  policing an archive nobody writes and stops requiring `pyproject` to equal the live release id.
+- Every `rc-archive` / `fold` / `archive` / `rc-N` mention from the shipped law, the skills, the
+  templates, the root map and the memory atoms; ADR 0005, 0006, 0008, 0009 and 0014 are
+  `superseded` by ADR 0021, and ADR 0019's `measured_by` now names `SPEC-DOC-048`.
+- The hand-minted version: `pyproject.toml` is reset to `0.4.6`, the last published number and
+  the floor release-please bumps from — the first release PR is the one that proposes `0.4.7`.
+
+#### Operator actions pending
+- Merge the release PR when it appears on `main` — that merge IS promote, and it writes the
+  next section of this file.
+- D1 (`CLAUDE_API_KEY` for the `security-review` check) and D3–D6 from candidate 9 are
+  unchanged and still open.
+
+### Candidate 9 — skills as a package, a public face
+
+Commits `abaca618..079ede37`. No verb entered and no verb left: the skills repository is
+built by a script and the second install name is a table line, so ADR 0018's "no new CLI
+surface for a distribution concern" holds.
+
+#### Added
+- `standalone_skills` in `dadaia_workspace/public/manifest.json` and a `compatibility:`
+  frontmatter line on the eight standalone skills — the corpus states which harnesses it
+  runs under, and the slop ratchet V35 moves down 2880 -> 2877.
+- `dadaia_workspace/public/scripts/build-skills-repo.py`: the eight standalone skills built
+  into the Agent Skills layout with the Claude marketplace manifests and a derived README,
+  `claude plugin validate` clean over the output.
+- The release job `publish-skills-repo` publishes that build to the skills repository,
+  fail-closed on a missing `SKILLS_REPO_TOKEN` — no silent skip.
+- Five derived pages — `docs/index.md`, `docs/quickstart.md`, `docs/positioning.md`,
+  `docs/bug-loop.md`, `docs/bug-ledger-lessons.md` — each section naming the atom it derives
+  from under that atom's current hash; `README.md` gains a Documentation section, `llms.txt`
+  lists every page, and `[tool.poetry.urls]` `Documentation` is the Pages site.
+- `dadaia-workspace` in `[tool.poetry.scripts]` beside `dadaia`, both resolving to the one
+  callable, so `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` resolves once
+  0.4.7 is on PyPI; `docs/quickstart.md` shows the uvx line first and the pip line second.
+
+#### Removed
+- Nothing. The candidate is additive by construction: a package layout, a build script, a
+  workflow job, five pages and a second install name — no verb, no module, no behaviour
+  removed.
+
+#### Operator actions pending
+- Create the `dadaia-skills` repository and its `SKILLS_REPO_TOKEN`; enable GitHub Pages from
+  `/docs` on `main`; submit the plugin to the Claude marketplace; make the launch posts.
+
+### Candidate 8 — one line, one harness (ADR 0020)
+
+#### Added
+- `dadaia init <dir> --harness <name> [--repo <url>]`: the directory is a required positional
+  argument and the harness a required option — one runtime at birth. With `--repo`, `init` is a
+  CALLER of the context lifecycle (`create` -> `alive`'s clone -> the pre-push chokepoint -> the
+  session binding) and closes with the `--print-env` export lines instead of the closing notes;
+  re-running the identical command is a no-op that exits 0.
+- `dadaia harness add <name>` and `dadaia harness list`: a harness joins a live workspace by
+  name, is recorded in `.dadaia/states/harness_profile.json`, and `public install` scopes to the
+  registered set.
+- `cursor`, `devin` and `copilot` as `core/harness_registry.py` records with their agent
+  transcodes, hook dialects and probes — a roster of six, every table derived from the record.
+- SPEC-DOC-048: every `SPEC.md` carries an `Origin` line; `release.py new --origin` seeds it, and
+  the flow weights are stated in `specs/releases/AGENTS.md`.
+- `tests/e2e/test_one_line_bootstrap.py` — AC1.1 through the INSTALLED console script: a local
+  bare repo as `--repo`, then `doctor` exit 0, `context show --json` reporting the repo ALIVE as
+  `main_repo`, and the cloned repo's `pre-push` byte-equal to the shipped gate.
+
+#### Changed
+- `core/workspace_layout.py::provisioned_zones()` is the ONE answer to "which `.dadaia/` zone
+  must exist": `init` creates exactly it and the doctor reports exactly it as `missing`.
+- The whole `tests/e2e` tree runs in CI's e2e job (the journeys at the tree root ran nowhere);
+  the release smoke job inits with the new signature.
+
+#### Removed
+- `dadaia public install --target <name>`, `--harness all`, the comma-separated harness set and
+  `init -w/--workspace` — one verb in, one verb out.
+- `dadaia context update`, `dadaia context repo list`, `_orphan_claude_bridge` and the
+  Codex-only hook-wrapper functions (generalised into the dialect table); `certify` no longer
+  probes retired verbs. Every verb in `dadaia help tree` is cited by a skill, an agent or the
+  map — 30 or fewer.
+
+#### Fixed
+- `WS-hooks-missing`: a `claude`-only `init` was born doctor-red. `init` provisioned the
+  `init`-created zones while the doctor demanded the `install`-created ones too, and a hook
+  format that projects no `.dadaia/hooks/` wrapper left the zone absent — two views of one
+  invariant, now one.
+
+### Candidate 7 — ledger verbs to skill scripts (ADR 0018)
+
+#### Removed
+- The five ledger CLI groups — `dadaia bugs`, `dadaia backlog`, `dadaia release`, `dadaia audit`
+  and `dadaia memory` — with their command modules, their container wiring and the feature
+  packages behind them (`features/bugs/`, and the release/audit/memory ledger services). The
+  CLI's verb tree went 41 -> 20 verbs; `dadaia_workspace/` went 36,315 -> 36,304 lines, with
+  4,191 of those now the stdlib-only scripts the ledgers moved into (the CLI+feature side is
+  down by that much again).
+- `features/specs/ledgers.py`: the doctor's second implementation of every ledger schema. The
+  `ledgers` section now delegates to each script's own `check`, run as a subprocess.
+
+#### Added
+- One writer script per ledger, stdlib-only, self-contained and runnable straight from a
+  projected skill folder — 36 files / 4,191 lines under `public/skills/*/scripts/`:
+  `dd-bug-resolution/scripts/bugs.py` (5 files, 628 lines), `dd-backlog-definition/scripts/backlog.py`
+  (7 / 738), `dd-release-implementation/scripts/release.py` (12 / 1,367),
+  `dd-audit-project/scripts/audit.py` (5 / 527), `dd-spec-navigator/scripts/memory.py` (6 / 592).
+  Each ships a `check` verb, validates its own write before replacing the file atomically, and
+  carries its shipped JSON schema as a copy `dadaia public stage` puts beside it.
+- `hash_tuple.scripts` in `public/entities/behavior-map.json`: one sha256 over every file under
+  a skill's `scripts/` plus the shipped schemas copied in beside them — a script byte changed or
+  a schema forked without a re-record is RED.
+- A second reachability rule in `public/scripts/lint-dadaia-cli-reachability.py`: every
+  skill-script citation under `public/**/*.md`, long form and the `<ALIAS>_PY` short form a
+  scoped `AGENTS.md` defines, must actually run.
+
+#### Changed
+- A projection copies its source's exec bit, so a skill script projects runnable.
+- Every `dadaia <ledger> <verb>` citation under `public/**`, `README.md` and `docs/cli.md` names
+  the script instead.
+- Ratchets re-pinned downward on the measured tree: V32 707 -> 686, V33 37 -> 35, V26 38/35 ->
+  37/34, V31 unit 89 -> 86 and integration 33 -> 29, `#upgrade` CC 26 -> 8, `#doctor` CC 8 -> 6,
+  the `doctor*.py` module ceiling 700 -> 699. V35 holds at 18 dirs / 2,880 Markdown lines, and a
+  new V36 pins the skill-script corpus at 36 files / 4,191 lines.
+
+### Candidate 6 — universal context core (ADRs 0017-0021; grill 2026-09-20)
+
+#### Removed
+- `public/data/DADAIA.md` and every reference to it. The workspace law had two homes — the
+  36 KB monolith and the scoped files — and loaded twice per Claude session. ONE root
+  `AGENTS.md` map now carries the flow, the roster, the gate, the output paths and the
+  pointers; each governed area's scoped `AGENTS.md` is the system of record for its own rules.
+- `_law_projection_rules` and the per-harness law copies: `.codex/DADAIA.md`,
+  `.kimi-code/DADAIA.md`, `.kimi-code/AGENTS.md`, `repos/<slug>/CLAUDE.md`.
+- The per-harness byte-drift finding classes, replaced by the single `SYMLINK-TARGET-1`.
+- The scoped-subtree pointer list in `.dadaia/AGENTS.md` (the root map's §5 table is its
+  one home).
+
+#### Added
+- `public/data/CONTEXT-MAP.md` — a library document, projected nowhere: one row per context
+  surface (root map, each scoped law, each skill, each persona) with purpose, what belongs
+  there, byte ceiling and measured installed bytes, plus the 10-harness compatibility table.
+- `tests/contract/test_context_map.py` — every scoped law is cited by the map or by a skill's
+  step 1, every step-1 path names a shipped file, every row names a real surface, and the
+  AC1.1 ceilings hold on the INSTALLED (registry-rendered) form.
+- Every `dd-` skill opens its area's scoped `AGENTS.md` as step 1 of its procedure, by
+  workspace-relative path, so it works from any harness with any config.
+- The FR6 freeze statement in `.dadaia/AGENTS.md` (no new context verb, state file or session
+  field) and the founding paradigm opening `README.md`.
+
+#### Changed
+- One authored entity set under `.agents/`, projected by symlink; personas renamed `dd-*`.
+- A link target is a POSIX relative path on every OS; `read_link_target` is the one reading of
+  it, shared by the ledger digest, the doctor compare, the install skip and the tests.
+- `main repo` / `associated repos` is the user-facing vocabulary; a single-repo context is the
+  degenerate multi-repo case, never a second mode.
+- English control vocabulary, one status authority.
+- Measured at closure (installed bytes, registry tables rendered): root `AGENTS.md` 6,107 B
+  (ceiling 8,192); largest scoped law `specs/memory/AGENTS.md` 4,080 B and `.dadaia/AGENTS.md`
+  4,086 B (ceiling 4,096); largest `SKILL.md` `dd-codebase-design` 5,455 B (ceiling 6,144);
+  largest persona `dd-software-engineer` 8,664 B. `dadaia_workspace/` 36,100 -> 36,315 LOC;
+  tests 371 -> 321 files (1,790 -> 1,820 functions). Ratchets re-pinned downward: V26 38/35,
+  V31 unit 89 / integration 33, V32 765; held at their measured value V33 37, V35 18 dirs /
+  2,881 lines.
+
+### Candidate 5 — demolition (ADR 0016; grill 2026-09-18..20)
+
+#### Removed
+- The panel (`features/panel`, `dadaia panel`, `panel_composition`, `mistune`, the Playwright
+  suite and the `e2e-panel` CI jobs) and `features/agents` (its only seam); the model/effort
+  policy stays a JSON edited by hand with two templates (`balanced`, `max-quality`).
+- Telemetry (`features/telemetry`, the SQLite store, the session readers, the locks and models),
+  the governance-event writer and every call site, `LEDGER-*-HANDEDIT` and
+  `RELEASE-TREE-HANDEDIT`.
+- Advisory presence (`presence.py`, the presence zone, `PRESENCE-GC`), the pre-commit hook and
+  `ci pre-commit-check`, `context heartbeat`, `context release`; a MUTATING write records
+  nothing. The throttle-marker idiom moved to `features/spec_context/markers.py`.
+- The `dadaia server` group and `features/server_registry` — the registry JSON is now owned by
+  `dd-cli-library/scripts/registry.py` (list, next, register, release, clean, scan).
+- The sha-keyed security verdict (`chokepoints/verdict.py`, `ci verdict-check`,
+  `pr-verdict-check.sh`, `check-verdict.sh`, the `verdict-gate` jobs, `SPEC-DOC-044`, the
+  `verdicts/` canon row).
+- Six personas — `ai-engineer`, `product-engineer`, `project-auditor`, `qa-engineer`,
+  `security-reviewer`, `software-architect` — and the nine-persona router; the role-atom map.
+- The doctor's `compliance(<section>)` and `compliance(total)` lines and the `--json`
+  compliance payload.
+- `specs/releases/_ideas/` (canon, scaffold, tests), `repos list` with `openpyxl` and
+  `repos.xlsx`, `public list`, `reports doctor`.
+
+#### Changed
+- Roster 9 -> 3: `project-manager` (SPEC, memory, dispatch), `software-engineer` (PLAN, TASKS,
+  code, tests), `code-reviewer` (three axes plus six lenses: architecture, security, QA,
+  product, audit, AI surface). Fable is never assigned to `code-reviewer`.
+- Least privilege derives from each persona's `activity_class` at install: Claude
+  `permissionMode`/`disallowedTools`, Codex `sandbox_mode`.
+- The PR gate is CI's `security-review` job — the official
+  `anthropics/claude-code-security-review` Action over the diff (`CLAUDE_API_KEY` secret,
+  branch ruleset owned by the operator).
+- `dadaia doctor` is findings plus an exit code; new error rule `ADR-SUPERSEDED-CITATION`.
+- Retired feature names (`agents`, `panel`, `repos`, `telemetry`) stay valid on committed bug
+  records (`RETIRED_FEATURE_PACKAGES`).
+- `specs upgrade` removes a live `releases/_ideas/` that holds only its scaffolded AGENTS.md.
+- Measured at closure: `dadaia_workspace/` 48,816 -> 36,100 LOC; tests 464 -> 371 files
+  (2,147 -> 1,790 functions); ratchets re-pinned downward (V26 39/36, V32 769, V33 37,
+  V35 2,906 lines).
 
 ## [0.4.6] — 2026-09-04
 
@@ -1253,7 +1481,7 @@ contract.
   `develop`, `feature/{M.m.p}`, `hotfix/{M.m.p}` with PATCH ≥ 1; `develop` is the only
   pushable branch, feature and hotfix branches are local-only, and `main` advances only via
   a PR from `develop`. Stage placement, the two-milestone merge cadence
-  (definition-trio `Aprovado` and ship, each followed by a diff-based security review of
+  (definition-trio `Approved` and ship, each followed by a diff-based security review of
   `origin/develop..develop` and a push of `develop`) and the finalization order
   memory → CLOSURE → archive are stated once at law level; every other skill and agent
   references the skill instead of restating it. Always-on cost +389 tokens against a +400

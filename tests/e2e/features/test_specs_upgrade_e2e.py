@@ -1,7 +1,8 @@
 """Consumer specs-upgrade path E2E — the v0.5.1 contract (K10, T-051-16).
 
-``dadaia specs upgrade`` no longer carries the pre-v6 migration chain: a tree below the
-canonical pattern version is REFUSED (exit non-zero, message names the 0.4.x release that
+``dadaia specs upgrade`` carries exactly one hop — 6 -> 7, memory canon v7, which folds a
+consumer's ``memory/TECHSTACK.md`` body into ``ARCHITECTURE.md``'s ``## Tech Stack``
+section and deletes the file. A tree below that hop is REFUSED (exit non-zero, message names the 0.4.x release that
 still carries the chain) and nothing is written; a tree already at the canonical version
 is a no-op (exit 0, byte-identical tree). The two scenarios are driven end-to-end through
 the real CLI subprocess against a real on-disk tree.
@@ -16,6 +17,7 @@ import sys
 from pathlib import Path
 
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
+from dadaia_workspace.features.specs.doctor_structural import StructuralValidator
 
 _MARKER = "specs_pattern_version"
 
@@ -53,10 +55,9 @@ def _seed_below_canonical_tree(root: Path) -> Path:
     # `specs upgrade` is not grown to rename these case-only (FR1, T-050-05/T-050-06:
     # the rename is a by-hand recipe step, never automated) — so the legacy lowercase
     # destination names are kept on purpose. Only the scaffold SOURCE filenames moved
-    # to the v6 canon (ARCHITECTURE.md/TECHSTACK.md/QUALITY.md).
+    # to the canon (ARCHITECTURE.md/QUALITY.md — TECHSTACK.md left it at v7).
     _legacy_to_canon_source = {
         "architecture.md": "ARCHITECTURE.md",
-        "tech-stack.md": "TECHSTACK.md",
         "quality-assurance.md": "QUALITY.md",
     }
     for rel, source_name in _legacy_to_canon_source.items():
@@ -117,3 +118,67 @@ def test_upgrade_at_the_canonical_version_is_a_byte_identical_no_op(tmp_path: Pa
 
     assert upgrade.returncode == 0, upgrade.stderr or upgrade.stdout
     assert _snapshot(specs) == before
+
+
+# ----------------------------------------------------------------- the 6 -> 7 hop (FR1)
+
+_V6_ARCHITECTURE = "# Architecture\n\n## Principles\n\nThe ring holds.\n"
+_V6_TECHSTACK = (
+    "---\nslug: TECHSTACK\ntitle: Tech Stack\n---\n\n"
+    "# Tech Stack\n\n## Languages\n\nCONSUMER_STACK_SENTINEL\n"
+)
+
+
+def _seed_v6_tree(root: Path, architecture: str) -> Path:
+    """A consumer tree stamped 6, carrying the retired ``memory/TECHSTACK.md``."""
+    specs = root / "consumer" / "specs"
+    (specs / "memory").mkdir(parents=True)
+    (specs / "constitution.md").write_text(
+        f"---\n{_MARKER}: 6\n---\n\n# Constitution — consumer\n", encoding="utf-8"
+    )
+    (specs / "memory" / "ARCHITECTURE.md").write_text(architecture, encoding="utf-8")
+    (specs / "memory" / "TECHSTACK.md").write_text(_V6_TECHSTACK, encoding="utf-8")
+    return specs
+
+
+def test_upgrade_folds_techstack_into_architecture_and_deletes_it(tmp_path: Path) -> None:
+    specs = _seed_v6_tree(tmp_path, _V6_ARCHITECTURE)
+
+    upgrade = _cli(tmp_path, "specs", "upgrade", "--specs-dir", str(specs))
+
+    assert upgrade.returncode == 0, upgrade.stderr or upgrade.stdout
+    assert not (specs / "memory" / "TECHSTACK.md").exists(), (
+        "the 6 -> 7 hop deletes the file it folded"
+    )
+    architecture = (specs / "memory" / "ARCHITECTURE.md").read_text(encoding="utf-8")
+    assert architecture.startswith(_V6_ARCHITECTURE.rstrip("\n")), (
+        "the consumer's own architecture text is kept verbatim, ahead of the fold"
+    )
+    assert "## Tech Stack" in architecture
+    # The body moved whole, minus the folded file's own frontmatter and H1 title.
+    assert "## Languages\n\nCONSUMER_STACK_SENTINEL" in architecture
+    assert "slug: TECHSTACK" not in architecture
+    assert architecture.index("## Principles") < architecture.index("## Tech Stack")
+    assert f"{_MARKER}: {CANONICAL_SPECS_VERSION}" in (specs / "constitution.md").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_upgrade_leaves_a_two_tier_tree_alone_and_the_doctor_names_it(tmp_path: Path) -> None:
+    """A tree still organised as Part 1 / Part 2 has nowhere safe to append a section:
+    the hop declines to corrupt it, and the doctor is what tells the operator."""
+    two_tier = "# Architecture\n\n## Part 1 — Principles\n\nx\n\n## Part 2 — Implementation\n\ny\n"
+    specs = _seed_v6_tree(tmp_path, two_tier)
+
+    upgrade = _cli(tmp_path, "specs", "upgrade", "--specs-dir", str(specs))
+
+    assert upgrade.returncode == 0, upgrade.stderr or upgrade.stdout
+    assert (specs / "memory" / "TECHSTACK.md").read_text(encoding="utf-8") == _V6_TECHSTACK
+    assert (specs / "memory" / "ARCHITECTURE.md").read_text(encoding="utf-8") == two_tier
+
+    findings = StructuralValidator(specs, None, None).check_tree8_canon_root()
+
+    assert any("TECHSTACK.md" in issue.path for issue in findings), (
+        "the doctor's canon sweep names the file the hop declined to fold; "
+        f"found {[issue.path for issue in findings]!r}"
+    )

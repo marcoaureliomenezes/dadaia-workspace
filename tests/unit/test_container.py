@@ -52,7 +52,7 @@ def test_build_service_raises_when_not_initialized(tmp_path: Path, builder: obje
 
 
 # ---------------------------------------------------------------------------
-# build_*_service — succeeds when initialized (+ repos/public, which need no init)
+# build_*_service — succeeds when initialized (+ public, which needs no init)
 # ---------------------------------------------------------------------------
 
 
@@ -60,14 +60,12 @@ def test_build_service_succeeds_table(tmp_path: Path) -> None:
     from dadaia_workspace.features.export.service import ExportService
     from dadaia_workspace.features.import_.service import ImportService
     from dadaia_workspace.features.public.service import PublicAssetService
-    from dadaia_workspace.features.repos.service import ReposService
     from dadaia_workspace.features.spec_context.doctor import DoctorService
     from dadaia_workspace.features.workspace.service import WorkspaceService
 
     # No initialization required.
     assert isinstance(container.build_workspace_service(tmp_path), WorkspaceService)
     assert isinstance(container.build_public_service(), PublicAssetService)
-    assert isinstance(container.build_repos_service(), ReposService)
 
     _init_states(tmp_path)
     assert container.build_spec_context_service(tmp_path) is not None
@@ -92,7 +90,7 @@ def _seed_stale_lock(tmp_path: Path, *, pid: int | None) -> Path:
     ctx_locks = tmp_path / ".dadaia" / "states" / "ctx_locks"
     ctx_locks.mkdir(parents=True, exist_ok=True)
     hb = (
-        datetime.now(tz=UTC) - timedelta(seconds=kernel_tunables.PRESENCE_TTL_SECONDS + 600)
+        datetime.now(tz=UTC) - timedelta(seconds=kernel_tunables.SESSION_GC_TTL_SECONDS + 600)
     ).isoformat()
     rec: dict[str, object] = {
         "context": _GC_CTX,
@@ -101,7 +99,7 @@ def _seed_stale_lock(tmp_path: Path, *, pid: int | None) -> Path:
         "mode": "IMPLEMENTATION",
         "acquired_at": hb,
         "heartbeat": hb,
-        "ttl": kernel_tunables.PRESENCE_TTL_SECONDS,
+        "ttl": kernel_tunables.SESSION_GC_TTL_SECONDS,
     }
     if pid is not None:
         rec["pid"] = pid

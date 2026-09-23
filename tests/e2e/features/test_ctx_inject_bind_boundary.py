@@ -36,7 +36,7 @@ same shape the ctx_inject unit fixtures use. ``WorkspaceService.init`` is delibe
 avoided.
 
 Intent: CONTRACT — v0.1.14 FR-W2 (T-50-03)
-Owner: software-engineer
+Owner: dd-software-engineer
 """
 
 from __future__ import annotations
@@ -74,7 +74,9 @@ def _add_context(workspace: Path, slug: str, *, tech: str) -> None:
 
     mem = workspace / "repos" / slug / "specs" / "memory"
     (mem / "product").mkdir(parents=True, exist_ok=True)
-    (mem / "TECHSTACK.md").write_text(tech, encoding="utf-8")
+    (mem / "ARCHITECTURE.md").write_text(
+        f"# Architecture\n\n## Tech Stack\n\n{tech}", encoding="utf-8"
+    )
     (mem / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
 
 
@@ -87,7 +89,7 @@ def _real_bind(
     process's own env — modeling a REAL harness, where the bind CLI (run through the
     harness's own shell tool) and the hook are both children of the SAME harness process
     and inherit the SAME native session-id env var. This is what lets the bind's session
-    record resolve through the hook's self-keyed leg (rung 2 of ``DADAIA.md`` §3 in
+    record resolve through the hook's self-keyed leg (rung 2 of the root `AGENTS.md` map §3 in
     spirit; the exact mechanism is ``_session_bound_context``, resolved via THIS hook's
     own ``session_id``). ``session_id=None`` inherits the ambient (pytest) env untouched —
     a bind with no matching harness env, minting its own sid.

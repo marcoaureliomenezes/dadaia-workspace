@@ -35,19 +35,20 @@ import pytest
 
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.models.agent_model_policy import ResolvedAgentModel
+from dadaia_workspace.infrastructure.agent_transcodes import codex_agent_toml_bytes
 from dadaia_workspace.infrastructure.install_helpers import (
     render_claude_agent,
     resolve_codex_agent_model,
 )
 from dadaia_workspace.infrastructure.projection import ProjectionRule, install_rules
-from dadaia_workspace.infrastructure.projection_rules import _codex_agent_toml_bytes
 
 pytestmark = pytest.mark.unit
 
 _GENERIC_BODY = (
     "---\n"
-    "name: software-engineer\n"
+    "name: dd-software-engineer\n"
     "description: generic implementer\n"
+    "activity_class: MUTATING\n"
     "dispatch_band: 3\n"
     "---\n"
     "\n"
@@ -58,6 +59,7 @@ _PACK_BODY = (
     "---\n"
     "name: frontend-engineer\n"
     "description: pack body\n"
+    "activity_class: MUTATING\n"
     "dispatch_band: 3\n"
     "model: claude-sonnet-5\n"
     "gate_role: implementer\n"
@@ -120,6 +122,38 @@ def test_render_claude_agent_seam(case: str) -> None:
             render_claude_agent("# no frontmatter\n", resolved)
 
 
+@pytest.mark.parametrize(
+    ("declared", "expected"),
+    [
+        ("ADDITIVE", ("permissionMode: default", "disallowedTools: [Edit, Write, NotebookEdit]")),
+        ("MUTATING", ("permissionMode: acceptEdits",)),
+    ],
+)
+def test_render_claude_agent_derives_privilege_from_parsed_activity_class(
+    declared: str, expected: tuple[str, ...]
+) -> None:
+    body = _GENERIC_BODY.replace("activity_class: MUTATING", f"activity_class: {declared}")
+    resolved = ResolvedAgentModel(model="claude-sonnet-5", effort="high", source="default")
+    fm = render_claude_agent(body, resolved).split("---\n", 2)[1].splitlines()
+    for line in expected:
+        assert line in fm
+    assert ("disallowedTools" in "\n".join(fm)) == (declared == "ADDITIVE")
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        _GENERIC_BODY.replace("activity_class: MUTATING\n", ""),
+        _GENERIC_BODY.replace("activity_class: MUTATING", "activity_class: additive"),
+    ],
+)
+def test_render_claude_agent_refuses_undeclared_activity_class(body: str) -> None:
+    """Privilege never falls back to a silent default (review 0.4.7 c5 F2)."""
+    resolved = ResolvedAgentModel(model="claude-sonnet-5", effort="high", source="default")
+    with pytest.raises(PublicAssetError, match="activity_class"):
+        render_claude_agent(body, resolved)
+
+
 # ---------------------------------------------------------------------------
 # resolve_codex_agent_model — F-3 fail-closed, precedence, D-3 clamp
 # ---------------------------------------------------------------------------
@@ -128,14 +162,14 @@ def test_render_claude_agent_seam(case: str) -> None:
 def test_resolve_codex_agent_model_fails_closed_for_core_agent_without_model() -> None:
     """F-3: a core agent with neither a staged ``model:`` nor a resolved policy model
     raises loudly — never a silent ``claude-sonnet-4-6`` default."""
-    with pytest.raises(PublicAssetError, match="software-engineer"):
-        resolve_codex_agent_model("software-engineer", None, None)
+    with pytest.raises(PublicAssetError, match="dd-software-engineer"):
+        resolve_codex_agent_model("dd-software-engineer", None, None)
 
 
 def test_resolve_codex_agent_model_prefers_resolved_over_staged() -> None:
     """Precedence: resolved policy wins over an authored staged ``model:``."""
     resolved = ResolvedAgentModel(model="claude-opus-4-8", effort="high", source="override")
-    model, effort = resolve_codex_agent_model("software-engineer", "claude-sonnet-5", resolved)
+    model, effort = resolve_codex_agent_model("dd-software-engineer", "claude-sonnet-5", resolved)
     assert model == "claude-opus-4-8"
     assert effort == "high"
 
@@ -159,7 +193,7 @@ def test_resolve_codex_agent_model_legacy_default_for_plugin_with_neither() -> N
 def test_resolve_codex_agent_model_uses_d3_clamp_of_resolved_effort() -> None:
     """D-3: resolved ``xhigh`` clamps to codex ``model_reasoning_effort = "high"``."""
     resolved = ResolvedAgentModel(model="claude-sonnet-5", effort="xhigh", source="default")
-    _model, effort = resolve_codex_agent_model("software-engineer", None, resolved)
+    _model, effort = resolve_codex_agent_model("dd-software-engineer", None, resolved)
     assert effort == "high"
 
 
@@ -171,21 +205,21 @@ def test_resolve_codex_agent_model_uses_d3_clamp_of_resolved_effort() -> None:
 def test_codex_agent_toml_bytes_fails_closed_for_core_agent_without_model(
     tmp_path: Path,
 ) -> None:
-    md = _staged_agent_md(tmp_path, "software-engineer", _GENERIC_BODY)
-    with pytest.raises(PublicAssetError, match="software-engineer"):
-        _codex_agent_toml_bytes(md, "software-engineer", None)
+    md = _staged_agent_md(tmp_path, "dd-software-engineer", _GENERIC_BODY)
+    with pytest.raises(PublicAssetError, match="dd-software-engineer"):
+        codex_agent_toml_bytes(md, "dd-software-engineer", None)
 
 
 def test_codex_agent_toml_bytes_keeps_authored_model_for_plugin_body(tmp_path: Path) -> None:
     md = _staged_agent_md(tmp_path, "frontend-engineer", _PACK_BODY)
-    toml = _codex_agent_toml_bytes(md, "frontend-engineer", None).decode("utf-8")
+    toml = codex_agent_toml_bytes(md, "frontend-engineer", None).decode("utf-8")
     assert 'model = "gpt-5.6-terra"' in toml
 
 
 def test_codex_agent_toml_bytes_uses_d3_clamp_of_resolved_effort(tmp_path: Path) -> None:
-    md = _staged_agent_md(tmp_path, "software-engineer", _GENERIC_BODY)
+    md = _staged_agent_md(tmp_path, "dd-software-engineer", _GENERIC_BODY)
     resolved = ResolvedAgentModel(model="claude-sonnet-5", effort="xhigh", source="default")
-    toml = _codex_agent_toml_bytes(md, "software-engineer", resolved).decode("utf-8")
+    toml = codex_agent_toml_bytes(md, "dd-software-engineer", resolved).decode("utf-8")
     assert 'model = "gpt-5.6-terra"' in toml
     assert 'model_reasoning_effort = "high"' in toml
 
@@ -202,14 +236,14 @@ def test_force_rerenders_diverged_claude_projection_to_render_output(
     never to the raw staged source bytes — through the same ``ProjectionRule`` seam
     every Claude agent rule uses (``projection_rules._claude_agent_rules``)."""
     resolved = ResolvedAgentModel(model="claude-sonnet-5", effort="xhigh", source="default")
-    dst = tmp_path / ".claude" / "agents" / "software-engineer.md"
+    dst = tmp_path / ".claude" / "agents" / "dd-software-engineer.md"
     expected = render_claude_agent(_GENERIC_BODY, resolved)
 
     def _render(_current: bytes | None) -> bytes:
         return expected.encode("utf-8")
 
     rule = ProjectionRule(
-        label="claude:agents/software-engineer.md", harness="claude", dst=dst, render=_render
+        label="claude:agents/dd-software-engineer.md", harness="claude", dst=dst, render=_render
     )
     install_rules((rule,), force=False)
     assert dst.read_text(encoding="utf-8") == expected
@@ -226,7 +260,7 @@ def test_install_rules_rewrites_a_read_only_projection(tmp_path: Path) -> None:
     A changed read-only projection is made writable, rewritten, and re-pinned."""
     from dadaia_workspace.infrastructure.projection import ProjectionRule, install_rules
 
-    dst = tmp_path / "DADAIA.md"
+    dst = tmp_path / "AGENTS.md"
     dst.write_bytes(b"old")
     dst.chmod(0o444)
     rule = ProjectionRule(

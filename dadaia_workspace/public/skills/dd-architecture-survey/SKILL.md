@@ -3,6 +3,7 @@ name: dd-architecture-survey
 description: >
   Survey a codebase for deepening opportunities, oriented by the measured bug history.
   Produces architecture cards plus exactly ONE top candidate routed to dd-grill-me.
+compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install dadaia-workspace) it also drives the SDD lifecycle — specs, backlog, bugs, releases.
 ---
 
 # dd-architecture-survey
@@ -13,7 +14,7 @@ a rescue: it finds and argues candidates; it never edits code.
 
 ## 1. When
 
-- The operator or `project-manager` invokes it explicitly.
+- The operator or the main thread invokes it explicitly.
 - At the close of each candidate or release (the `dd-release-implementation` cadence).
 
 ## 2. Scope before you scan — YAGNI
@@ -24,13 +25,13 @@ change actually happens:
 1. If the operator named a direction (a module, subsystem, pain point), take it and
    skip the inference below.
 2. Otherwise, measure — never impressionistic:
-   - `dadaia bugs stats` and `dadaia bugs status --all`, aggregated per
-     surface/component: re-bug rate, fix-induced `caused_by` edges,
-     resolved-without-evidence count.
+   - The bug history aggregated per surface/component — re-bug rate, fix-induced
+     `caused_by` edges, resolved-without-evidence count; inside a dadaia workspace,
+     `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats` and `… status --all`.
    - `git log --oneline --since=<window> -- <path>` churn per touched path; join the
      two — the loop lives where re-bugs and churn coincide.
-   - The prior survey/audit's dispositions (`specs/audits/_archive/audits_histo.jsonl`)
-     — a candidate that recurs across surveys is structural by definition.
+   - The prior survey/audit's dispositions (inside a dadaia workspace,
+     `specs/audits/_archive/audits_histo.jsonl`) — recurrence across surveys is structural.
 
 ## 3. Explore — note where you feel friction
 
@@ -80,7 +81,7 @@ survey never decides. During that session, keep the domain model current via
 
 ## 6. Boundaries (ADDITIVE)
 
-- Writes a report and/or a handoff only (`DADAIA.md` §5.2).
+- Writes a report and/or a handoff only (the root `AGENTS.md` map §4).
 - A candidate reaches the backlog only through the operator-gated intake.
 
 ## 7. Done when
@@ -90,7 +91,6 @@ survey never decides. During that session, keep the domain model current via
 
 ## 8. References
 
-- `dd-codebase-design` — the vocabulary, the deletion test, design-it-twice.
 - `dd-domain-modeling` — glossary/ADR side effects during the grilling loop.
 - `dd-grill-me` — the mandatory next hop for the top candidate.
 - `dd-audit-project` — the three-pillar audit this survey feeds and complements.

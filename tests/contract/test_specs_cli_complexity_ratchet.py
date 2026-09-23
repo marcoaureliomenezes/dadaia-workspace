@@ -50,8 +50,8 @@ _UPGRADE_MODULE = _REPO_ROOT / "dadaia_workspace" / "features" / "migrate" / "up
 # measured HEAD value by the S1 FR23 firing, A8 — "a ratchet that does not ratchet
 # lets #doctor regrow to 30 silently"). Lowering is welcome; raising needs a
 # same-commit justification.
-_UPGRADE_CEILING = 26
-_DOCTOR_CEILING = 8
+_UPGRADE_CEILING = 8
+_DOCTOR_CEILING = 6
 
 # Pinned at T-050-05 (before that task touched anything else in the tree) — proved
 # `features/migrate/upgrade.py` was untouched by FR1's scaffold/doctor/--recipe work.
@@ -60,7 +60,16 @@ _DOCTOR_CEILING = 8
 # "stamp v6 or refuse" rule) — same-commit justification per this test's own error
 # message; the SCAFFOLD's 0.6.0 expiry (A7) is unaffected, this is a same-generation
 # re-pin, not a renewal.
-_UPGRADE_MODULE_SHA256 = "33b2683bb705bbc41cb7b25aa630c3e4dfbc1dd36d08734a7ea8ee9529fe3919"
+# Re-pinned at 0.4.7 T-047-58 (FR4): the English control vocabulary gives `specs upgrade`
+# its status-token rewrite lane — an authorized, task-declared change to this module
+# (same-commit justification per this test's own error message), not a renewal of the
+# SCAFFOLD's 0.6.0 expiry.
+# Re-pinned at 0.4.7 c11 T-047-101 (FR1): memory canon v7 retires `memory/TECHSTACK.md`,
+# and a consumer tree stamped 6 reaches 7 only if something folds its body into
+# ARCHITECTURE.md's `## Tech Stack` section — the 6 -> 7 hop this module now carries
+# (`fold_tech_stack`), plus the re-stamp that hop requires. An authorized, task-declared
+# change (P-20's same-commit justification), not a renewal of the SCAFFOLD's 0.6.0 expiry.
+_UPGRADE_MODULE_SHA256 = "6d212b0afc2f92975178dcd6d55a613050cfbfe17f26956245bc4ecb27b5a471"
 
 
 def _complexity_by_name(path: Path) -> dict[str, int]:
@@ -69,7 +78,7 @@ def _complexity_by_name(path: Path) -> dict[str, int]:
 
 
 def test_upgrade_and_doctor_complexity_stay_at_or_below_baseline() -> None:
-    """A1.4/V19/V35: `specs upgrade` <= 26, the one `dadaia doctor` <= 8."""
+    """A1.4/V19/V35: `specs upgrade` <= 8, the one `dadaia doctor` <= 6."""
     scores = _complexity_by_name(_SPECS_CLI)
     doctor_scores = _complexity_by_name(_DOCTOR_CLI)
     assert "upgrade" in scores, "cli/commands/specs.py must still define `upgrade`"
@@ -89,6 +98,7 @@ def test_upgrade_and_doctor_complexity_stay_at_or_below_baseline() -> None:
 def test_migrate_upgrade_module_is_untouched_by_fr1() -> None:
     """A1.4: `features/migrate/upgrade.py` stays byte-identical under T-050-05 — the
     rename automation this module carries is explicitly cut from FR1's scope.
+    Re-pinned at 0.4.7 c5 T-047-49: the module gained the `_ideas/` removal lane.
 
     Intent: SCAFFOLD — T-050-05 — expires: 0.6.0 (S1 FR23 firing amendment A7)."""
     digest = hashlib.sha256(_UPGRADE_MODULE.read_bytes()).hexdigest()

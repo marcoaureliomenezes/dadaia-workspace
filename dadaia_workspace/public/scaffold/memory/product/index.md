@@ -1,37 +1,35 @@
 ---
 slug: index
-title: Catálogo de Produtos
-tldr: Índice de todas as features do produto com resumos e metadados de contexto.
-summary: Visão consolidada de todas as features do produto. Ponto de entrada para self-pull de atoms de feature específicos. Mantido pelo product-engineer durante CLOSURE de cada release.
+title: Product catalog
+tldr: Index of every product feature with summaries and context metadata.
+summary: Consolidated view of every product feature. Entry point for self-pulling a specific feature atom. Maintained by dd-product-engineer at each release CLOSURE.
 tags:
   - catalog
   - product
   - index
 ---
 
-## Visão atômica
+## Atomic view
 
-Visão do produto ainda não documentada. Descrever o propósito central do projeto aqui.
+The product vision is not documented yet. Describe the project's core purpose here.
 
-## Usuários
+## Users
 
-| Usuário | Descrição |
-|---------|-----------|
-| placeholder | Usuários ainda não documentados. Descrever quem usa o produto e como. |
+| User | Description |
+|------|-------------|
+| placeholder | Users not documented yet. Describe who uses the product and how. |
 
-## Catálogo de features
+## Feature catalog
 
-| Slug | Título | TL;DR |
-|------|--------|-------|
-| placeholder | placeholder | Placeholder — substituir pela primeira feature real do projeto. |
+_No features found._
 
-## Mapa de capacidades
+## Capability map
 
 ```mermaid
 graph TD
-  A[Sem dados]
+  A[No data]
 ```
 
-## Limites conhecidos
+## Known limits
 
-Limites ainda não documentados.
+Limits not documented yet.

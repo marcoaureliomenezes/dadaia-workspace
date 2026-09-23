@@ -8,18 +8,19 @@ description: >
 
 # dd-release-definition
 
-> `product-engineer` (dispatched by `project-manager`) drives every step directly,
+> `dd-product-engineer` authors the SPEC (the engineer authors PLAN and TASKS),
 > from picking the set through SPEC → PLAN → TASKS. A release has open scope; each
 > candidate does not.
 
 ## 1. Pick the set
 
-1. Inspect `specs/bugs/BUGS.jsonl` via `dadaia bugs status`/`stats`.
-2. Read `specs/backlog/BACKLOG.json`'s `active[]` — already sanitized by
-   `dd-backlog-definition`, consumed with no further triage.
-3. Read `specs/audits/**` for undispositioned findings; each enters the SPEC with the
-   disposition it will take (`dadaia audit disposition`).
-4. Keep picking scoped to `specs/bugs/` + `specs/backlog/` + `specs/audits/` discovery.
+1. Open `specs/releases/AGENTS.md` (the area's scoped law) and follow it.
+2. Inspect `specs/bugs/BUGS.jsonl` via `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`/`stats`.
+3. Read `specs/backlog/BACKLOG.json`'s `active[]` — sanitized by `dd-backlog-definition`, consumed untriaged.
+4. Read `specs/audits/**` for undispositioned findings; each enters the SPEC with the
+   disposition it will take (`python3 .agents/skills/dd-audit-project/scripts/audit.py disposition`).
+5. Name the SPEC's `**Origin:**`: `operator-demand`, `backlog:<ids>` or `bugs:<ids>`.
+6. Keep picking scoped to `specs/bugs/` + `specs/backlog/` + `specs/audits/` discovery.
 
 **Done when** the picked set is recorded; it becomes the SPEC's scope.
 
@@ -34,15 +35,15 @@ a fuzzy term in the demand becomes a canonical term before it reaches the SPEC.
 1. Author the SPEC (Draft) only after the grill: the picked bug+backlog set, their
    acceptance, every `superseded_by` link.
 2. Definition runs on `feature/{M.m.p}`; the trio lives at the RELEASE ROOT
-   (`specs/releases/<v>/`) — after a prior candidate, `dadaia release rc-archive`
-   has already cleared it.
+   (`specs/releases/<v>/`) and overwrites the prior candidate's, which stays in git at
+   its CLOSURE commit.
 3. Commit shape 5 (`dd-gitflow-default` §3a): SPEC + PLAN + TASKS + the picked entries
    flipped to `status: picked` + picked bugs, one commit; set the `defined` milestone in `_RELEASE.json`
    (`dd-release-implementation`'s `RELEASE-EVENTS.md`).
 4. PLAN names the seams the work will cut — speak `dd-codebase-design`
    (module, seam, deletion test) when declaring what each FR grows or deletes.
 5. SPEC in domain names (`dd-domain-modeling`'s `CONTEXT.md`); only FR, AC and T-
-   numbered; `wc -c SPEC.md TASKS.md` under the `DADAIA.md` §6.7 ceiling before commit
+   numbered; `wc -c SPEC.md TASKS.md` under the `specs/releases/AGENTS.md` size ceiling before commit
    shape 5.
 
 ## 4. TASKS as tracer bullets
@@ -66,7 +67,7 @@ a fuzzy term in the demand becomes a canonical term before it reaches the SPEC.
 - Declare a slug only when fully consumed (all its bound anchors shipped); abort on
   an unknown slug — fix it before it lands in the SPEC.
 - A picked entry stays in `active[]` as `status: picked`; it exits once, at closure,
-  by `dadaia backlog exit` (`dd-release-implementation` RC-FLOW step 7).
+  by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit` (`dd-release-implementation` RC-FLOW step 7).
 - Mechanical backstop: `dadaia doctor`'s `ledgers` section schema-validates
   `BACKLOG.json` and `backlog_histo.jsonl` on every run.
 
@@ -75,7 +76,7 @@ a fuzzy term in the demand becomes a canonical term before it reaches the SPEC.
 - Picked set recorded; the `dd-grill-me` session completed and emitted.
 - SPEC authored from the refined set; `**Consumes:**` declared or omitted.
 - Traceability: every approved requirement maps into PLAN strategy and >=1 TASKS entry.
-- Every unresolved gap routed to the PM's operator-gated intake report — never a
+- Every unresolved gap routed to the main thread's operator-gated intake report — never a
   direct backlog append.
 
 ## 7. References
@@ -85,4 +86,4 @@ a fuzzy term in the demand becomes a canonical term before it reaches the SPEC.
 - `dd-gitflow-default` §3a shape 5 — the definition commit shape.
 - `dd-release-implementation` (`RELEASE-EVENTS.md`, `RC-FLOW.md`) — state recipe, gate
   cadence, disposition sweep.
-- `specs/releases/AGENTS.md` — release-id format, `_ideas/`'s pre-approval role.
+- `specs/releases/AGENTS.md` — release-id format, `_RELEASE.json`, the promote act.

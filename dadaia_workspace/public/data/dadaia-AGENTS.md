@@ -1,50 +1,40 @@
 # .dadaia/AGENTS.md — Runtime Control Plane
 
-Scope: this file governs `.dadaia/**`, the workspace runtime control plane.
-Treat it as operational state, not product source.
-
 ## 1. Canonical folder law
 
-- `.dadaia/` may contain only the zones below, plus `AGENTS.md` and `.gitignore`; anything else is slop (`DADAIA.md` §8.5).
-- The table is rendered from `core/workspace_layout.DADAIA_ZONES` at `dadaia public stage`; TTL is seconds by mtime before `dadaia doctor` expires an entry, `never` = not clock-expired.
-- Never create a new top-level `.dadaia/` directory — route into the zone that owns that concern; a misfit file does not belong in `.dadaia/` at all.
+- `.dadaia/` holds only the zones below plus `AGENTS.md` and `.gitignore`; anything else is slop.
+- The table renders from `core/workspace_layout.DADAIA_ZONES` at `dadaia public stage`; TTL is seconds from mtime.
+- Never create a new top-level `.dadaia/` directory — route into the zone owning that concern.
 
 <!-- zones -->
 
-- Evidence goes under `tmp/<agent>/<date>/`, MCP working state under `mcps/<server>/`; HTML reports live in the repo (`DADAIA.md` §5.2).
+## 2. Context, scope and races
 
-## 2. Scoped subtree rules — follow the nearest first
+- Resolution order: `DADAIA_CONTEXT` -> session binding -> the repo of the cwd (`dadaia context show --json`).
+- `dadaia context bind <ctx> [--print-env]` is one verb — no mode, no release, no session state beyond the context; it is the sole context-memory-injection trigger. An exported `DADAIA_CONTEXT` IS the binding.
+- Binding is optional; ADDITIVE writes need none. Scope = the bound context's main repo plus its associated repos; only `repos/<slug>/` is scope-judged.
+- An out-of-scope write is BLOCKed with `fix: dadaia context bind <owner>`; an unbound session, an unregistered slug and a root path never are.
+- Races surface, never block — no locks or leases; alert the operator only at zero ALIVE contexts.
+- One harness session per checked-out tree; a parallel session's worktree is created before launch.
+- The context surface is frozen: no new context verb, no new state file, no new session field.
+- A single-repo context is the degenerate multi-repo case: the main repo is where `specs/` lives.
 
-- `handoff/AGENTS.md` — machine-readable handoffs.
-- `tmp/AGENTS.md` — scratch files and evidence captures.
-- `states/AGENTS.md` — JSON state files.
-- `agentic/manifest.json` — the lib-originated projection inventory.
+## 3. Git chokepoints
 
-## 3. Write policy
+- The pre-push hook gates the `Bash` write path outside the gate's parsing, independent of any harness hook.
+- It scans the pushed range only — published history is the baseline — and applies the specs canon only to a tree at the canonical stamp; a lower stamp is doctor drift, never a push block.
+- `HOOKS-DRIFT-1`: an ALIVE repo's `.git/hooks/pre-push` differing from the shipped script; `fix: dadaia ci install-hook --force`.
 
-- Do not hand-edit generated projections.
-- If a file is listed in `agentic/manifest.json`, edit the source under `dadaia_workspace/public/` and run:
+## 4. Projections and law files
 
-```bash
-dadaia public stage
-dadaia public install --target all
-dadaia public doctor
-```
+- Files in `agentic/manifest.json` are lib-originated projections; change them at the source under `dadaia_workspace/public/`, never in place.
+- `AGENTS.md` law files are projected read-only and PROTECTED; only a human hand-edits a projected copy.
+- Re-project with `dadaia public stage` then `dadaia public install`, then verify `[ok] public-privacy` with `dadaia public doctor`.
 
-- Runtime JSON state changes through `dadaia` CLI commands or the owning service code — never ad hoc text edits.
+## 5. Doctor — the one scan and reaper
 
-## 4. Hygiene
-
-- `dadaia doctor` is the one scan and reaper: a loose file or unknown directory at the `.dadaia/` root is a `WS-dadaia-slop` finding — route it into the zone that owns it.
-- The reaper MOVES slop into `reaped/<YYYYMMDD>/<workspace-relative-path>`; it never deletes directly — a held entry dies at its own 7-day TTL.
-- It runs at SessionStart, on the PostToolUse throttle, and on `dadaia doctor --fix`; recover a mistakenly held entry by moving it back before its TTL.
-
-## 5. Validation
-
-```bash
-dadaia doctor
-dadaia public doctor
-```
-
-- On drift or a `WS-*-slop` finding: fix the public source or the state owner; `dadaia doctor --fix` acts only on what its dry run listed.
-- Never patch the projection in place; never rubber-stamp a new folder into the canonical set to silence the check.
+- `dadaia doctor` scans `workspace`, `specs` and `ledgers`; flags `--fix`, `--specs-dir`, `--context`, `--public-dir`, `--json`, `--expired-only`; exit 1 on an error finding.
+- One finding per line, `<CODE> <verdict> <message>`; findings and the exit code are the whole report, no score line.
+- The workspace scan covers the root, the harness dirs, the zones and every ALIVE repo's top level, plus an excluded name or nested `.dadaia/` at any depth.
+- Slop and dead-repo leftovers are MOVED to `reaped/<YYYYMMDD>/<path>`, listed `WS-reaped-reaped`; nothing is deleted directly — an entry dies at its own TTL; move a mistakenly held one back before then.
+- The reaper runs at SessionStart, on the PostToolUse throttle and on `--fix`.

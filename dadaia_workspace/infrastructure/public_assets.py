@@ -5,7 +5,8 @@ K3 (v0.5.1): install/doctor are now two folds over one ``ProjectionRule`` table
 compares against it. What remains here is genuinely bespoke: staging, plan
 resolution, the consumer-repo guardrail fan-out (N-target, provenance-gated — not a
 fixed-destination rule), install-ledger reconciliation, and the harness-independent
-doctor checks (privacy, entities-derivation, memory-phase, rule-corpus, git-dirty).
+doctor checks (privacy, entities-derivation, memory-phase, rule-corpus, symlink-target,
+git-dirty).
 """
 
 from __future__ import annotations
@@ -20,7 +21,11 @@ from typing import Literal
 from dadaia_workspace.core.agent_model_templates import CORE_AGENTS, resolve_agent_model
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.exceptions import PublicAssetError
-from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES, PROJECTION_TARGETS
+from dadaia_workspace.core.harness_registry import (
+    HARNESS_PROJECTION_DIRS,
+    HARNESS_RECORDS,
+    L1_ENTRY_HARNESSES,
+)
 from dadaia_workspace.core.models.agent_model_policy import (
     AgentModelPolicyOverlay,
     AgentModelPolicyStoreError,
@@ -56,18 +61,22 @@ from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstal
 from dadaia_workspace.infrastructure.privacy_check import (
     check_public_privacy as _check_public_privacy_fn,
 )
-from dadaia_workspace.infrastructure.projection import Transcript, doctor_rules, install_rules
+from dadaia_workspace.infrastructure.projection import (
+    Transcript,
+    doctor_rules,
+    install_rules,
+    link_entry_defect,
+)
 from dadaia_workspace.infrastructure.projection_rules import (
-    build_harnesses,
+    harness_checks,
     projection_rules,
     prune_stale_codex_tomls,
 )
 from dadaia_workspace.infrastructure.public_assets_common import (
     _COPY_DIRS,
-    _VALID_TARGETS,
     OverwritePolicy,
+    _entry_digest,
     _json_dump,
-    _sha256,
     is_ignored_public_asset,
     iter_public_files,
 )
@@ -112,7 +121,7 @@ def _specs_canon_table() -> str:
 
 #: Law-fragment placeholder -> the registry view that fills it. The projected law's
 #: canonical-name tables ARE ``core.workspace_layout`` (0.4.6 FR14/D14 for the zone and
-#: states tables; 0.4.7 FR5b for DADAIA.md §5.1, §5.3 and §6.2) — never a hand-kept copy
+#: states tables; 0.4.7 FR5b for the root map, repo-AGENTS.md and specs-AGENTS.md) — never a hand-kept copy
 #: that the next fix edits in one home and forgets in the other.
 _PLACEHOLDERS: dict[str, Callable[[], str]] = {
     "<!-- zones -->": _zone_table,
@@ -130,12 +139,34 @@ def render_registry_tables(text: str) -> str:
     return text
 
 
-def _staged_bytes(src: Path, public_dir: Path) -> bytes:
+#: A skill script enforces a shipped schema from its OWN copy beside it.
+#: ``stage`` copies the file in (never a symlink: it dies on Windows and in a zipped
+#: skill; never an import: that is the coupling a self-contained script forbids), so the copy travels with
+#: the staged skill folder and is projected and hash-checked with it. One line per
+#: (shipped schema, skill script directory) pair.
+_SKILL_SCRIPT_SCHEMAS: tuple[tuple[str, str], ...] = (
+    ("schemas/bugs/bug-record-v1.schema.json", "skills/dd-bug-resolution/scripts/schemas"),
+    ("schemas/backlog/backlog-v1.schema.json", "skills/dd-backlog-definition/scripts/schemas"),
+    ("schemas/histo/histo-record-v1.schema.json", "skills/dd-backlog-definition/scripts/schemas"),
+    (
+        "schemas/releases/release-state-v1.schema.json",
+        "skills/dd-release-implementation/scripts/schemas",
+    ),
+    (
+        "schemas/histo/histo-record-v1.schema.json",
+        "skills/dd-release-implementation/scripts/schemas",
+    ),
+    ("schemas/audits/finding-record-v1.schema.json", "skills/dd-audit-project/scripts/schemas"),
+    ("schemas/histo/histo-record-v1.schema.json", "skills/dd-audit-project/scripts/schemas"),
+)
+
+
+def _staged_bytes(src: Path) -> bytes:
     """What ``stage`` writes for the public asset *src* and what ``doctor`` compares the
-    staged copy against: a ``data/*.md`` law fragment with its registry tables rendered,
+    staged copy against: every Markdown rule asset with its registry tables rendered,
     every other asset byte for byte."""
     raw = src.read_bytes()
-    if src.suffix == ".md" and src.parent == public_dir / "data":
+    if src.suffix == ".md":
         return render_registry_tables(raw.decode("utf-8")).encode("utf-8")
     return raw
 
@@ -144,6 +175,11 @@ def _staged_bytes(src: Path, public_dir: Path) -> bytes:
 #: NOT in the persisted harness profile (A3, v0.1.58 FR3). Emitted in place of the scoped
 #: drift block so a stale/hand-installed out-of-profile runtime never reads green-with-zero-
 #: lines. ``[warn]`` is non-blocking (CLI exit stays 0) but visible.
+#: The one repair for every SYMLINK-TARGET-1 finding: re-project the harness views onto
+#: the authored set. One BLOCK, one executable ``fix:`` line.
+_SYMLINK_TARGET_FIX = "fix: .dadaia/.venv/bin/dadaia public install --force"
+
+
 def _out_of_profile_warn(harness: str) -> DoctorLine:
     return DoctorLine(
         DoctorStatus.WARN, f"{harness}: out-of-profile runtime present (drift unchecked)"
@@ -157,6 +193,23 @@ class FileSystemPublicAssetManager:
     ) -> None:
         self._public_dir = Path(__file__).parent.parent / "public"
         self._install_ledger_store = install_ledger_store
+
+    @staticmethod
+    def _reachable_without_link(path: Path, ws: Path) -> bool:
+        """True iff every directory between *ws* and *path* is a real directory.
+
+        A ledgered relpath whose parent became a SYMLINK is no longer the path the
+        ledger recorded: following it would unlink a file inside the authored
+        ``.agents/`` tree the link points at (bug class
+        ``doctor-walks-symlinked-zone-root-into-a-repo-tree``). Such an entry is retired
+        from the ledger untouched — the link rule that replaced it is already recorded.
+        """
+        for parent in path.parents:
+            if parent == ws:
+                return True
+            if parent.is_symlink():
+                return False
+        return False
 
     @staticmethod
     def _prune_empty_dirs(start: Path, stop: Path) -> None:
@@ -189,8 +242,17 @@ class FileSystemPublicAssetManager:
                 shutil.copy2(src, dst)
             staged.append(f"[stage] {dst}")
 
-        for src in self._iter_files(self._public_dir / "data"):
-            expected = _staged_bytes(src, self._public_dir)
+        for schema_rel, scripts_rel in _SKILL_SCRIPT_SCHEMAS:
+            schema_src = self._public_dir / schema_rel
+            if not schema_src.exists():
+                continue
+            dst = agentic_dir / scripts_rel / Path(schema_rel).name
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(schema_src, dst)
+            staged.append(f"[stage] {dst}")
+
+        for src in self._iter_files(self._public_dir):
+            expected = _staged_bytes(src)
             if expected != src.read_bytes():
                 dst = agentic_dir / src.relative_to(self._public_dir)
                 atomic_write(dst, expected)
@@ -230,12 +292,12 @@ class FileSystemPublicAssetManager:
     def install(
         self,
         workspace_root: Path,
-        target: str = "all",
+        harness: str | None = None,
         force: bool = False,
         scope: Literal["all", "repos-only", "workspace-only"] = "all",
         only: str | None = None,
     ) -> list[str]:
-        self._validate_install_target(target)
+        self._validate_install_harness(harness)
         self._guard_source_root_install(workspace_root)
 
         agentic_dir = workspace_root / ".dadaia" / "agentic"
@@ -244,10 +306,9 @@ class FileSystemPublicAssetManager:
             installed.extend(self.stage(workspace_root))
 
         plan = self._resolve_install_plan(
-            workspace_root, agentic_dir, target, OverwritePolicy.of(force), scope, only
+            workspace_root, agentic_dir, harness, OverwritePolicy.of(force), scope, only
         )
-        harnesses = build_harnesses(self._public_dir)
-        rules = projection_rules(plan, harnesses)
+        rules = projection_rules(plan)
         transcript = install_rules(rules, force=plan.overwrite.force)
         installed.extend(transcript.render())
 
@@ -261,7 +322,7 @@ class FileSystemPublicAssetManager:
             )
             prune_stale_codex_tomls(workspace_root / ".codex", expected, installed)
 
-        # DADAIA.md lands via the rule table above; the remaining harness-independent
+        # the root `AGENTS.md` map lands via the rule table above; the remaining harness-independent
         # migrations are unconditional cleanup, unchanged.
         remove_retired_core_rules(workspace_root, installed)
         remove_legacy_workflow_projections(workspace_root, installed)
@@ -291,18 +352,19 @@ class FileSystemPublicAssetManager:
             transcript,
             guardrail_managed,
             installed,
-            full=(plan.target == "all" and plan.scope == "all"),
+            full=(plan.harness is None and plan.scope == "all"),
         )
 
         return installed
 
     @staticmethod
-    def _validate_install_target(target: str) -> None:
-        if target not in _VALID_TARGETS:
-            valid = ", ".join(sorted(_VALID_TARGETS))
-            raise PublicAssetError(
-                f"Unsupported public install target '{target}'. Expected one of: {valid}"
-            )
+    def _validate_install_harness(harness: str | None) -> None:
+        if harness is None or harness in HARNESS_RECORDS:
+            return
+        valid = ", ".join(sorted(HARNESS_RECORDS))
+        raise PublicAssetError(
+            f"Unsupported public install harness '{harness}'. Expected one of: {valid}"
+        )
 
     @staticmethod
     def _guard_source_root_install(workspace_root: Path) -> None:
@@ -320,7 +382,7 @@ class FileSystemPublicAssetManager:
         self,
         workspace_root: Path,
         agentic_dir: Path,
-        target: str,
+        harness: str | None,
         overwrite: OverwritePolicy,
         scope: Literal["all", "repos-only", "workspace-only"],
         only: str | None,
@@ -335,27 +397,24 @@ class FileSystemPublicAssetManager:
         overlay = self._load_agent_policy(workspace_root, agentic_dir)
         resolved_models = self._resolved_core_models(overlay)
 
-        # Install-all reads the persisted profile (Ruling D, FR3): a claude-only workspace
-        # installs only the claude projection. An absent profile ⇒ all-four (back-compat).
-        # An explicit --target X always overrides (it never reaches this branch).
-        if target == "all":
+        # No harness named: project the roster of record — the shared authored set plus
+        # every harness registered in the profile (0.4.7 FR2 — `harness add` is the one
+        # way in). A named harness is `harness add`'s own scoped projection, never a flag.
+        if harness is None:
             profile_harnesses = self._profile_harnesses(workspace_root)
-            if profile_harnesses is None:
-                harness_targets: tuple[str, ...] = PROJECTION_TARGETS
-            else:
-                harness_targets = (
-                    "agents",
-                    *(h for h in L1_ENTRY_HARNESSES if h in profile_harnesses),
-                )
+            harness_targets: tuple[str, ...] = (
+                "agents",
+                *(h for h in L1_ENTRY_HARNESSES if h in profile_harnesses),
+            )
         else:
-            harness_targets = (target,)
+            harness_targets = (harness,)
 
         active_harnesses = frozenset(item for item in harness_targets if item in L1_ENTRY_HARNESSES)
 
         return InstallPlan(
             workspace_root=workspace_root,
             agentic_dir=agentic_dir,
-            target=target,
+            harness=harness,
             scope=scope,
             only=only,
             overwrite=overwrite,
@@ -372,17 +431,16 @@ class FileSystemPublicAssetManager:
             resolved_models=resolved_models,
         )
 
-    def _profile_harnesses(self, workspace_root: Path) -> set[str] | None:
-        """Return the persisted harness set, or ``None`` when no profile file exists.
+    def _profile_harnesses(self, workspace_root: Path) -> set[str]:
+        """Return the roster of record for *workspace_root*.
 
         Reads ``.dadaia/states/harness_profile.json`` via the same-layer
-        ``JsonHarnessProfileStore`` adapter (infrastructure consuming infrastructure). An
-        absent profile ⇒ ``None``, and every consumer treats ``None`` as the full all-four
-        install/doctor scope (back-compat with pre-v0.1.58 workspaces).
+        ``JsonHarnessProfileStore`` adapter (infrastructure consuming infrastructure),
+        whose ``resolve`` migrates a pre-profile workspace to the harness directories
+        physically present at the root — never to the full roster.
         """
         states_dir = workspace_root / ".dadaia" / "states"
-        profile = JsonHarnessProfileStore().read(states_dir)
-        return set(profile.harnesses) if profile is not None else None
+        return set(JsonHarnessProfileStore().resolve(states_dir, workspace_root).harnesses)
 
     # ------------------------------------------------------------------
     # Agent-model policy (v0.1.65 FR4/FR5) — loaded ONCE per install/doctor run
@@ -443,26 +501,30 @@ class FileSystemPublicAssetManager:
 
         current: dict[str, LedgerEntry] = {}
 
-        def _record(candidate: Path) -> None:
+        def _record(candidate: Path, kind: str) -> None:
             try:
-                rel = candidate.resolve().relative_to(ws)
+                # The PARENT is resolved, never the entry itself: a projected symlink
+                # must be ledgered at the path it occupies, not at the path it points
+                # at (bug class doctor-walks-symlinked-zone-root-into-a-repo-tree).
+                rel = (candidate.parent.resolve() / candidate.name).relative_to(ws)
             except (ValueError, OSError):
                 return  # user-level files (e.g. $KIMI_CODE_HOME) are not workspace state
             rel_posix = rel.as_posix()
             if rel_posix.startswith(".dadaia/states/"):
                 return  # never ledger the state dir (the ledger itself lives there)
-            if not candidate.is_file():
+            digest = _entry_digest(candidate)
+            if digest is None:
                 return
             family = rel.parts[0].lstrip(".") if len(rel.parts) > 1 else "root"
             current[rel_posix] = LedgerEntry(
-                relpath=rel_posix, sha256=_sha256(candidate), family=family
+                relpath=rel_posix, sha256=digest, family=family, kind=kind
             )
 
-        for path in transcript.paths():
-            _record(path)
+        for line in transcript.lines:
+            _record(line.path, line.kind)
 
         for path in extra_managed:
-            _record(path)
+            _record(path, "file")
 
         previous = self._install_ledger_store.read(states_dir)
         merged: dict[str, LedgerEntry] = {}
@@ -474,10 +536,14 @@ class FileSystemPublicAssetManager:
                 if rel_posix in current:
                     continue
                 path = ws / entry.relpath
-                if not path.is_file():
+                if not self._reachable_without_link(path, ws):
                     merged.pop(rel_posix, None)
                     continue
-                if _sha256(path) == entry.sha256:
+                digest = _entry_digest(path)
+                if digest is None:
+                    merged.pop(rel_posix, None)
+                    continue
+                if digest == entry.sha256:
                     path.unlink()
                     installed.append(f"[prune] {path}")
                     self._prune_empty_dirs(path.parent, ws)
@@ -527,8 +593,7 @@ class FileSystemPublicAssetManager:
         # EXISTS on disk is never silent (A3): a `[warn]` line replaces the scoped
         # drift block so a stale/hand-installed runtime cannot read green-with-zero-
         # lines.
-        profile_harnesses = self._profile_harnesses(workspace_root)
-        active = set(L1_ENTRY_HARNESSES) if profile_harnesses is None else profile_harnesses
+        active = self._profile_harnesses(workspace_root)
 
         # v0.1.65 FR7: load the agent-model policy ONCE per doctor run. An INVALID
         # overlay is a doctor ERROR line (and the render compare below degrades to the
@@ -541,14 +606,14 @@ class FileSystemPublicAssetManager:
             reports.append(DoctorLine(DoctorStatus.DRIFT, f"agent-model-policy ERROR: {exc}"))
         resolved_models = self._resolved_core_models(overlay)
 
-        # The doctor plan is "install(target=all, scope=all)" scoped to the PERSISTED
+        # The doctor plan is "install(scope=all)" over the roster, scoped to the PERSISTED
         # profile — never an operator's scoped --target selection. It is never executed
         # (install_rules is never called against it); it exists only to build the SAME
         # rule table doctor_rules() compares.
         doctor_plan = InstallPlan(
             workspace_root=workspace_root,
             agentic_dir=agentic_dir,
-            target="all",
+            harness=None,
             scope="all",
             only=None,
             overwrite=OverwritePolicy.PRESERVE,
@@ -558,23 +623,21 @@ class FileSystemPublicAssetManager:
             overlay=overlay,
             resolved_models=resolved_models,
         )
-        harnesses = build_harnesses(self._public_dir)
-        rules = projection_rules(doctor_plan, harnesses)
+        rules = projection_rules(doctor_plan)
         reports.extend(doctor_rules(rules))
         for name in L1_ENTRY_HARNESSES:
             if name in active:
-                reports.extend(harnesses[name].checks(workspace_root))
+                reports.extend(harness_checks(name, workspace_root))
         # An out-of-profile runtime directory that physically exists is surfaced by a
         # `[warn]` line rather than staying silent (A3).
-        harness_dirs = {"claude": ".claude", "codex": ".codex", "kimi-code": ".kimi-code"}
-        for name, rel_dir in harness_dirs.items():
-            if name not in active and (workspace_root / rel_dir).exists():
+        for name, rel_dirs in HARNESS_PROJECTION_DIRS.items():
+            if name not in active and any((workspace_root / d).exists() for d in rel_dirs):
                 reports.append(_out_of_profile_warn(name))
 
-        # Consumer-repo guardrail pair (FR9, bug public-doctor-flags-hand-authored-consumer-
-        # agents-md): the `repos/<slug>:AGENTS.md`/`:CLAUDE.md` lines flow through the SINGLE
-        # provenance-aware authority — a hand-authored (no-banner) consumer reads [foreign] on
-        # BOTH paired lines (never [drift]/[missing]), so `public doctor` exits 0 (Ruling 16).
+        # Consumer-repo guardrail AGENTS.md (FR9, bug public-doctor-flags-hand-authored-
+        # consumer-agents-md): the `repos/<slug>:AGENTS.md` line flows through the SINGLE
+        # provenance-aware authority — a hand-authored (no-banner) consumer reads [foreign]
+        # (never [drift]/[missing]), so `public doctor` exits 0 (Ruling 16).
         consumer_source = self._agents_md_source(agentic_dir)
         if consumer_source is not None:
             reports.extend(
@@ -586,10 +649,11 @@ class FileSystemPublicAssetManager:
         # package public dir, not a runtime projection. `rule-corpus` stays a TOP-LEVEL,
         # unconditional attestation (never gated on codex-in-profile — ATTESTING_CHECK_IDS
         # must never vanish silently for a codex-absent profile); `trust-boundary` stays
-        # gated (moved into CodexHarness.checks() above, matching the historical guard).
+        # gated (the codex-hooks record check above, matching the historical guard).
         reports.extend(attest("rule-corpus", check_codex_rule_corpus_reachable(workspace_root)))
         reports.extend(check_agent_skill_refs(self._public_dir))
         reports.extend(check_memory_phase_single_source(self._public_dir))
+        reports.extend(attest("symlink-target", self._check_symlink_targets(workspace_root)))
         reports.extend(attest("public-privacy", self._check_public_privacy()))
         reports.extend(attest("entities-derivation", check_entities_derivation(self._public_dir)))
 
@@ -649,9 +713,46 @@ class FileSystemPublicAssetManager:
     def _compare(self, src: Path, dst: Path, label: str) -> DoctorLine:
         if not dst.exists():
             return DoctorLine(DoctorStatus.MISSING, f"{label}")
-        if _staged_bytes(src, self._public_dir) != dst.read_bytes():
+        if _staged_bytes(src) != dst.read_bytes():
             return DoctorLine(DoctorStatus.DRIFT, f"{label}")
         return DoctorLine(DoctorStatus.OK, f"{label}")
+
+    def _check_symlink_targets(self, workspace_root: Path) -> list[DoctorLine]:
+        """SYMLINK-TARGET-1 — every ledgered harness view still points at the authored set.
+
+        One authored set (``.agents/skills/``, ``.agents/agents/``) with N harness
+        views replaced the per-harness byte-drift classes that used to compare a copy
+        of the law per harness dir. The install ledger is what makes the replacement
+        checkable: it records each entry's KIND, so a view that was installed as a
+        symlink and is now a plain file — or a dangling link, or a link retargeted at
+        a foreign path, or a fallback copy that drifted — is nameable without
+        re-deriving the projection plan. ``file`` entries are ordinary projections,
+        already compared byte-wise by the rule table.
+        """
+        states_dir = workspace_root / ".dadaia" / "states"
+        ledger = self._install_ledger_store.read(states_dir)
+        if ledger is None:
+            return []
+        linked = [entry for entry in ledger.entries if entry.kind != "file"]
+        if not linked:
+            return []
+        out: list[DoctorLine] = []
+        for entry in sorted(linked, key=lambda e: e.relpath):
+            canonical = workspace_root / ".agents" / entry.relpath.partition("/")[2]
+            defect = link_entry_defect(workspace_root / entry.relpath, canonical)
+            if defect is not None:
+                out.append(
+                    DoctorLine(DoctorStatus.ERROR, f"SYMLINK-TARGET-1 {entry.relpath}: {defect}")
+                )
+        if out:
+            out.append(DoctorLine(DoctorStatus.INFO, _SYMLINK_TARGET_FIX))
+            return out
+        return [
+            DoctorLine(
+                DoctorStatus.OK,
+                f"symlink-target: {len(linked)} projected views resolve to the authored set",
+            )
+        ]
 
     def _check_public_privacy(self) -> list[DoctorLine]:
         """Fail doctor if public distributed assets contain known private identifiers."""

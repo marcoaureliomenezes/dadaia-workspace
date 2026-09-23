@@ -1,13 +1,13 @@
 """Built-in L1 agent-model templates + the single resolver (v0.1.65 FR2/FR4).
 
-The Layer-1 agent-roster model catalog: three named :class:`AgentModelTemplate`s (``balanced`` — the default,
-``subscription-saver``, ``max-quality``), each a full 9-core-agent map of
-``(model, effort)`` — the FR2 table encoded verbatim.
+The agent-roster model catalog: three named :class:`AgentModelTemplate`s (``balanced`` —
+the default, ``max-quality``, ``economy``), each a full map of the three core agents to
+``(model, effort)`` — ADR 0022's table encoded verbatim.
 
 :func:`_assert_templates_resolve` runs at import time and fails loudly if any template
-is ungoverned: incomplete 9-agent coverage, a model unknown to ``core/model_registry``,
+is ungoverned: incomplete core-agent coverage, a model unknown to ``core/model_registry``,
 an effort outside the D-3 vocabulary, a Fable-family model assigned to
-``security-reviewer`` (operator ruling G-1 — cyber-safety classifiers can refuse
+``dd-code-reviewer`` (operator ruling G-1 — cyber-safety classifiers can refuse
 security-review-shaped work), a duplicate template id, or a missing ``balanced``
 default.
 
@@ -29,68 +29,39 @@ from dadaia_workspace.core.models.agent_model_policy import (
     ResolvedAgentModel,
 )
 
-#: The 9 core agents every template must cover exactly (G-4; constitution §14 roster).
+#: The three core agents every template must cover exactly (ADR 0022: the main thread
+#: coordinates; every other role is a review lens of dd-code-reviewer).
 CORE_AGENTS: tuple[str, ...] = (
-    "project-manager",
-    "software-architect",
-    "product-engineer",
-    "project-auditor",
-    "security-reviewer",
-    "code-reviewer",
-    "ai-engineer",
-    "software-engineer",
-    "qa-engineer",
+    "dd-product-engineer",
+    "dd-software-engineer",
+    "dd-code-reviewer",
 )
 
 #: The default template id (G-5): used whenever no overlay / no applied_template exists.
 _DEFAULT_TEMPLATE_ID = "balanced"
 
-#: The agent that must NEVER receive a Fable-family model, in any template (G-1).
-_FABLE_FORBIDDEN_AGENT = "security-reviewer"
+#: The agent that must NEVER receive a Fable-family model, in any template (G-1; the
+#: security lens runs on dd-code-reviewer since ADR 0016).
+_FABLE_FORBIDDEN_AGENT = "dd-code-reviewer"
 
 
 def _a(model: str, effort: str) -> AgentModelAssignment:
-    """Terse constructor for the FR2 table below (effort narrowed by the import assert)."""
+    """Terse constructor for the table below (effort narrowed by the import assert)."""
     return AgentModelAssignment(model=model, effort=effort)  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------
-# THE BUILT-IN TEMPLATES — the FR2 table, verbatim.
+# THE BUILT-IN TEMPLATES — ADR 0022's table, verbatim.
 # ---------------------------------------------------------------------------
 _BUILT_IN: tuple[AgentModelTemplate, ...] = (
-    # Operator re-table 2026-09-06: Fable 5.1 on the reasoning roles, Opus 5 on the
-    # implementing roles at low/medium effort, security-reviewer on Sonnet 5 except
-    # in max-quality (G-1 keeps it off Fable everywhere).
     AgentModelTemplate(
         id="balanced",
         label="Balanced (default)",
         default=True,
         assignments={
-            "project-manager": _a("claude-fable-5-1", "high"),
-            "software-architect": _a("claude-fable-5-1", "high"),
-            "product-engineer": _a("claude-fable-5-1", "high"),
-            "project-auditor": _a("claude-fable-5-1", "high"),
-            "security-reviewer": _a("claude-sonnet-5", "xhigh"),
-            "code-reviewer": _a("claude-opus-5", "high"),
-            "ai-engineer": _a("claude-opus-5", "medium"),
-            "software-engineer": _a("claude-opus-5", "low"),
-            "qa-engineer": _a("claude-opus-5", "low"),
-        },
-    ),
-    AgentModelTemplate(
-        id="subscription-saver",
-        label="Subscription saver",
-        default=False,
-        assignments={
-            "project-manager": _a("claude-opus-5", "high"),
-            "software-architect": _a("claude-opus-5", "high"),
-            "product-engineer": _a("claude-opus-5", "high"),
-            "project-auditor": _a("claude-opus-5", "high"),
-            "security-reviewer": _a("claude-sonnet-5", "high"),
-            "code-reviewer": _a("claude-sonnet-5", "high"),
-            "ai-engineer": _a("claude-sonnet-5", "medium"),
-            "software-engineer": _a("claude-opus-5", "low"),
-            "qa-engineer": _a("claude-sonnet-5", "low"),
+            "dd-product-engineer": _a("claude-opus-5-5", "high"),
+            "dd-code-reviewer": _a("claude-opus-5-5", "high"),
+            "dd-software-engineer": _a("claude-opus-5-5", "low"),
         },
     ),
     AgentModelTemplate(
@@ -98,15 +69,19 @@ _BUILT_IN: tuple[AgentModelTemplate, ...] = (
         label="Max quality",
         default=False,
         assignments={
-            "project-manager": _a("claude-fable-5-1", "high"),
-            "software-architect": _a("claude-fable-5-1", "high"),
-            "product-engineer": _a("claude-fable-5-1", "high"),
-            "project-auditor": _a("claude-fable-5-1", "high"),
-            "security-reviewer": _a("claude-opus-5", "xhigh"),
-            "code-reviewer": _a("claude-fable-5-1", "medium"),
-            "ai-engineer": _a("claude-opus-5", "medium"),
-            "software-engineer": _a("claude-opus-5", "low"),
-            "qa-engineer": _a("claude-opus-5", "low"),
+            "dd-product-engineer": _a("claude-fable-5-1", "high"),
+            "dd-code-reviewer": _a("claude-opus-5-5", "xhigh"),
+            "dd-software-engineer": _a("claude-opus-5-5", "medium"),
+        },
+    ),
+    AgentModelTemplate(
+        id="economy",
+        label="Economy",
+        default=False,
+        assignments={
+            "dd-product-engineer": _a("claude-opus-5-5", "high"),
+            "dd-code-reviewer": _a("claude-sonnet-5", "high"),
+            "dd-software-engineer": _a("claude-sonnet-5", "medium"),
         },
     ),
 )
@@ -116,9 +91,9 @@ def _assert_templates_resolve(templates: tuple[AgentModelTemplate, ...] = _BUILT
     """Fail loudly if any template is ungoverned (mirrors ``_assert_profiles_resolve``).
 
     Raises:
-        ValueError: on a duplicate template id; a roster not covering exactly the 9
+        ValueError: on a duplicate template id; a roster not covering exactly the
             core agents; a model unknown to the registry; an effort outside the D-3
-            vocabulary; a Fable-family model on ``security-reviewer`` (G-1); or when no
+            vocabulary; a Fable-family model on ``dd-code-reviewer`` (G-1); or when no
             template is the ``balanced`` default.
     """
     known_models = registry_by_claude_id()
@@ -133,7 +108,7 @@ def _assert_templates_resolve(templates: tuple[AgentModelTemplate, ...] = _BUILT
             missing = sorted(expected - covered)
             extra = sorted(covered - expected)
             raise ValueError(
-                f"template {template.id!r} must cover exactly the 9 core agents; "
+                f"template {template.id!r} must cover exactly the core agents; "
                 f"missing: {missing}; unexpected: {extra}"
             )
         for agent, assignment in template.assignments.items():
@@ -153,7 +128,7 @@ def _assert_templates_resolve(templates: tuple[AgentModelTemplate, ...] = _BUILT
             raise ValueError(
                 f"template {template.id!r} assigns {forbidden!r} to "
                 f"{_FABLE_FORBIDDEN_AGENT!r}; Fable is NEVER assigned to "
-                "security-reviewer (operator ruling G-1)"
+                "dd-code-reviewer (operator ruling G-1)"
             )
     defaults = [t.id for t in templates if t.default]
     if defaults != [_DEFAULT_TEMPLATE_ID]:

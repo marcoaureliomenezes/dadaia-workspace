@@ -36,7 +36,7 @@ def _record(bug_id: str, **overrides: object) -> dict[str, Any]:
     base: dict[str, Any] = {
         "id": bug_id,
         "ts": "2026-08-27T10:00:00Z",
-        "reported_by": "software-engineer",
+        "reported_by": "dd-software-engineer",
         "title": f"title {bug_id}",
         "severity": "MEDIUM",
         "surface": "bugs",
@@ -145,7 +145,7 @@ def test_v5_shaped_line_is_a_single_error_never_folded(tmp_path: Path) -> None:
                 "bug_id": "legacy-bug",
                 "event": "reported",
                 "ts": "2026-07-01T13:00:00Z",
-                "reported_by": "software-engineer",
+                "reported_by": "dd-software-engineer",
             }
         )
         + "\n",
@@ -168,13 +168,13 @@ def test_two_v5_shaped_lines_are_two_independent_errors(tmp_path: Path) -> None:
             "bug_id": "legacy-bug",
             "event": "reported",
             "ts": "2026-07-01T13:00:00Z",
-            "reported_by": "software-engineer",
+            "reported_by": "dd-software-engineer",
         },
         {
             "bug_id": "legacy-bug",
             "event": "resolved",
             "ts": "2026-07-01T14:00:00Z",
-            "reported_by": "software-engineer",
+            "reported_by": "dd-software-engineer",
         },
     ]
     _write_ledger(bugs, rows)
