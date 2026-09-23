@@ -702,6 +702,18 @@
       "agent": "main-thread",
       "kind": "reviews",
       "text": "Candidate 12 review APPROVED at 3dde4654 (CI fully green on PR #260, no security-review job). Folded: MEDIUM-1 push_gate/chokepoints docstrings no longer cite the removed check or the dead verdict_violations_fn; MEDIUM-2 the P-33 scan parses every *.yml/*.yaml, checks jobs.*.uses and steps[].uses case-insensitively and scans secret names and the API endpoint; LOW-2 stale TASKS note removed. LOW-1: the memory entry's changed list omits agent-orchestration, edited outside the drift worklist (its false security-review claim deleted)."
+    },
+    {
+      "ts": "2026-09-23T01:12:22Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 10cc3ab102f7c7692a64fe37d6f5880e33bee0dd..7647f4a7fba9: 1 reviewed, 0 changed.",
+      "since": "10cc3ab102f7c7692a64fe37d6f5880e33bee0dd",
+      "until": "7647f4a7fba935b1fdf9475a05126bd14192d34f",
+      "reviewed": [
+        "sdd-gate-v3"
+      ],
+      "changed": []
     }
   ]
 }
