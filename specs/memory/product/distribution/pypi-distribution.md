@@ -16,7 +16,7 @@ sources:
 
 - `pip install dadaia-workspace` installs the library and one CLI under two console-script names, `dadaia` and `dadaia-workspace`, so `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` runs without an install (`tests/unit/cli/test_console_scripts.py`).
 - `pyproject.toml` `version` and `.release-please-manifest.json` carry the last published number — the floor release-please bumps from, stated nowhere else.
-- `.github/workflows/release-please.yml` runs on every push to `main`: the `release-please` job maintains one release PR proposing the next version from the Conventional Commits since the floor, and merging it writes the CHANGELOG section and creates the tag ([[release-lifecycle]]).
+- `.github/workflows/release.yml` runs on every push to `main`: the `release-please` job maintains one release PR proposing the next version from the Conventional Commits since the floor, and merging it writes the CHANGELOG section and creates the tag ([[release-lifecycle]]).
 - The publish side runs in the same workflow, every job gated on `release_created`: four test legs (`unit-fast`, `contract-coverage`, `integration`, `e2e-python`), `build`, `approve` (blocking on the `release-gate` environment), `publish` under OIDC trusted publishing with no long-lived token, `smoke-test` against the live index, and `publish-skills-repo`, which force-pushes the built `dadaia-skills` tree and fails closed without `SKILLS_REPO_TOKEN` ([[public-asset-distribution]]).
 
 ## One version axis, two positions

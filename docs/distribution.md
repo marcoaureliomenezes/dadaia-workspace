@@ -4,11 +4,11 @@ Where dadaia-workspace is published and what each channel carries.
 
 ## Channels
 
-<!-- derived-from: pypi-distribution sha256:c627d9e5be4d -->
+<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
 
 | channel | artifact | how it is published |
 |---|---|---|
-| PyPI | the wheel; `README.md` is the long description and `pyproject.toml` the metadata | `.github/workflows/release-please.yml`: merging the release PR creates the tag, and the publish jobs, gated on `release_created` and on the operator's `release-gate` approval, upload under OIDC trusted publishing |
+| PyPI | the wheel; `README.md` is the long description and `pyproject.toml` the metadata | `.github/workflows/release.yml`: merging the release PR creates the tag, and the publish jobs, gated on `release_created` and on the operator's `release-gate` approval, upload under OIDC trusted publishing |
 | GitHub repository | the repository description, topics and homepage | set from the same tagline and keywords as `pyproject.toml` |
 | Repository root | `llms.txt` — an index whose every line links to a derived document, the law, the CLI reference or the memory catalog | committed, derived under its markers |
 | Docs site | GitHub Pages serving `docs/` from `main`, with no build toolchain | every page derived under its markers |
@@ -16,7 +16,7 @@ Where dadaia-workspace is published and what each channel carries.
 
 ## The PyPI metadata contract
 
-<!-- derived-from: pypi-distribution sha256:c627d9e5be4d -->
+<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
 
 Every field PyPI renders has exactly one home:
 
@@ -37,7 +37,7 @@ Every field PyPI renders has exactly one home:
 
 ## What the wheel carries
 
-<!-- derived-from: pypi-distribution sha256:c627d9e5be4d -->
+<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
 
 The wheel ships `dadaia_workspace/` with the full `public/` tree, so `dadaia init`
 works offline from a bare install, and

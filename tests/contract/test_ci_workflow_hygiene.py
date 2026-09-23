@@ -2,12 +2,12 @@
 repository and fails closed on the missing SKILLS_REPO_TOKEN secret, with the token
 never interpolated outside the push remote URL.
 
-Intent: CONTRACT — T-047-87: release-please.yml is the one workflow minting the
+Intent: CONTRACT — T-047-87: release.yml is the one workflow minting the
 version, CHANGELOG and tag: push-to-main trigger, sha-pinned action, release type
 read from the config file rather than an input.
 
 Intent: CONTRACT — T-047-88: release.yml is gone and its publishing jobs live inside
-release-please.yml behind the single `release_created` gate: no `release:` event, no
+release.yml behind the single `release_created` gate: no `release:` event, no
 `push: tags`, no hand-rolled tag arithmetic. Size: SMALL."""
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ import yaml
 pytestmark = pytest.mark.contract
 
 _WORKFLOWS = Path(__file__).resolve().parents[2] / ".github" / "workflows"
-_RELEASE_YML = _WORKFLOWS / "release-please.yml"
+_RELEASE_YML = _WORKFLOWS / "release.yml"
 _TOKEN = "SKILLS_REPO_TOKEN"
 _REMOTE_PREFIX = "https://x-access-token:"
 
@@ -122,7 +122,7 @@ def test_no_run_body_of_any_workflow_interpolates_a_workflow_expression(workflow
 
 
 # ---------------------------------------------------------------------------
-# release-please.yml — the one workflow that mints the version, CHANGELOG and tag
+# release.yml — the one workflow that mints the version, CHANGELOG and tag
 # ---------------------------------------------------------------------------
 
 _RELEASE_PLEASE_YML = _RELEASE_YML
@@ -202,14 +202,11 @@ def test_release_please_reads_its_release_type_from_the_config_file() -> None:
 _GATE = "needs.release-please.outputs.release_created == 'true'"
 
 
-def test_the_folded_release_workflow_is_the_only_one_and_release_yml_is_gone() -> None:
-    assert not (_WORKFLOWS / "release.yml").exists(), (
-        "release.yml folded into release-please.yml (PLAN D8) and must not exist"
-    )
+def test_one_workflow_carries_release_please() -> None:
     carriers = [
         name for name in _workflows() if _ACTION in (_WORKFLOWS / name).read_text(encoding="utf-8")
     ]
-    assert carriers == ["release-please.yml"], (
+    assert carriers == ["release.yml"], (
         f"exactly one workflow may carry the release-please action: {carriers}"
     )
 
@@ -352,3 +349,31 @@ def test_pr_source_guard_admits_the_release_pr_into_main(
     """ADR 0021: promote is merging release-please's release PR, so main accepts exactly
     develop and release-please's own branch; develop accepts only feature/{M.m.p}."""
     assert (_guard_exit(head, base) == 0) is allowed
+
+
+def test_the_publish_workflow_is_release_yml_bound_to_the_pypi_publisher() -> None:
+    """ADR 0026: PyPI binds its trusted publisher to the workflow FILE NAME and the
+    environment, so the publish job lives in release.yml under environment `pypi` —
+    renaming the file breaks the OIDC exchange at the first publication, never in CI."""
+    publishers = [
+        path.name
+        for path in sorted([*_WORKFLOWS.glob("*.yml"), *_WORKFLOWS.glob("*.yaml")])
+        if "pypa/gh-action-pypi-publish" in path.read_text(encoding="utf-8")
+    ]
+    assert publishers == ["release.yml"], publishers
+    publish = _jobs()["publish"]
+    assert publish["environment"] == "pypi"
+    assert publish["permissions"]["id-token"] == "write"
+
+
+def test_a_dispatch_can_republish_an_existing_tag_through_the_same_chain() -> None:
+    """ADR 0026: `workflow_dispatch` with `tag` re-enters the one publish chain for an
+    existing tag; the build checks out that tag, so the wheel is exactly its content."""
+    document = yaml.safe_load(_RELEASE_YML.read_text(encoding="utf-8"))
+    triggers = document.get("on", document.get(True))
+    assert "tag" in triggers["workflow_dispatch"]["inputs"]
+    steps = _jobs()["release-please"]["steps"]
+    existing = [s for s in steps if s.get("id") == "existing"]
+    assert existing and "inputs.tag" in existing[0]["if"]
+    checkout = _jobs()["build"]["steps"][0]
+    assert checkout["with"]["ref"] == "${{ needs.release-please.outputs.tag_name }}"
