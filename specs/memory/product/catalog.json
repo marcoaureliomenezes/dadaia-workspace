@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-22T21:39:50Z",
+  "generated_at": "2026-09-23T01:05:25Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -40,7 +40,7 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 528,
+      "token_estimate": 536,
       "depends_on": [
         "agentic-entities",
         "agent-comms",
@@ -826,7 +826,7 @@
       "title": "sdd-gate-v3",
       "area": "sdd",
       "tldr": "No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write), one fix line per BLOCK, chokepoints at the push.",
-      "summary": "The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one executable fix line; the pre-push chokepoint enforces the branch contract, the specs canon and the denylist scan over every pushed object, and the security review is a pull-request check.",
+      "summary": "The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one executable fix line; the pre-push chokepoint enforces the branch contract, the specs canon and the denylist scan over every pushed object, and no CI job calls a model API — the security review is the reviewer's lens before each pull request.",
       "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
         "sdd",
@@ -836,7 +836,7 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 959,
+      "token_estimate": 960,
       "depends_on": [
         "workspace-doctor",
         "context-management",
@@ -844,6 +844,7 @@
         "ARCHITECTURE"
       ],
       "sources": [
+        ".github/workflows/ci.yml",
         "dadaia_workspace/hooks/__init__.py",
         "dadaia_workspace/hooks/pre_gate.py",
         "dadaia_workspace/hooks/sdd_gate.py",

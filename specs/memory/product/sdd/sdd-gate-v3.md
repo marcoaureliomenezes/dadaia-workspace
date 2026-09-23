@@ -2,9 +2,10 @@
 slug: sdd-gate-v3
 title: sdd-gate-v3
 tldr: No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write), one fix line per BLOCK, chokepoints at the push.
-summary: The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one executable fix line; the pre-push chokepoint enforces the branch contract, the specs canon and the denylist scan over every pushed object, and the security review is a pull-request check.
+summary: The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one executable fix line; the pre-push chokepoint enforces the branch contract, the specs canon and the denylist scan over every pushed object, and no CI job calls a model API — the security review is the reviewer's lens before each pull request.
 tags: [sdd, gate, hooks, enforcement, no-locks, privacy]
 sources:
+  - .github/workflows/ci.yml
   - dadaia_workspace/hooks/__init__.py
   - dadaia_workspace/hooks/pre_gate.py
   - dadaia_workspace/hooks/sdd_gate.py
@@ -42,7 +43,7 @@ sources:
 
 - `dadaia ci install-hook` installs `.git/hooks/pre-push`, which delegates to `dadaia ci push-gate-check`; `dadaia doctor` byte-compares the installed hook per ALIVE repo (`HOOKS-DRIFT-1`).
 - Policy order, first refusal wins: branch policy — only `refs/heads/feature/<M.m.p>` pushed to the same remote name, `develop` and `main` refused; the `specs/` canon over every `specs/` path the range touches; the denylist scan. An unparseable stdin line refuses, naming `git push --no-verify` as the one bypass; empty stdin allows.
-- The security review is a pull-request gate: CI's `security-review` job (the `anthropics/claude-code-security-review` Action, `CLAUDE_API_KEY` secret, failing closed without it) reviews the diff on both PR edges; `secret-scan.yml` runs gitleaks on every PR to `develop` and `main`.
+- The security review is the `dd-code-reviewer` security lens on the PR head, run by the main thread before each pull request; no workflow calls a model API. `secret-scan.yml` runs gitleaks on every PR to `develop` and `main`.
 
 ### Push-range denylist scan
 

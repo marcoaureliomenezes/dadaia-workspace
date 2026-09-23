@@ -31,7 +31,7 @@ The main thread — the operator's own session — coordinates: intake, the gril
 - An agent grounds itself with `dd-spec-navigator` (context, constitution, [[ARCHITECTURE]], the catalog, the relevant atoms, the live release), reserves a task `[ ] -> [-]`, validates, marks `[x]`, and emits a handoff; a record change goes through its governance script, never a hand edit ([[release-lifecycle]]).
 - Concurrent sessions are allowed and never locked: no agent acquires, holds or releases a lock; races surface through git.
 - The reviewer's `APPROVED` is required before a candidate's PR; a `REJECTED` keeps the task `[-]` and blocks the PR, and every verdict states the bug-surface delta from the bug ledger ([[QUALITY]]).
-- A merge further requires the `security-review` check green on the PR head ([[sdd-gate-v3]]).
+- A merge further requires CI green and a `dd-code-reviewer` APPROVED verdict, security lens included, on the PR head ([[sdd-gate-v3]]).
 
 ## Models and privilege
 
