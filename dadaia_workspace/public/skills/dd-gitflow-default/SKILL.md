@@ -59,9 +59,9 @@ The branch contract, stated once, and the mechanics that operate it.
 
 ## 3b. The PR gate
 
-- Both PR edges require the `security-review` check (the official
-  `anthropics/claude-code-security-review` Action over the diff) green on the PR head,
-  next to lint, typecheck, tests and doctor; the secret and the ruleset are the operator's.
+- Both PR edges require CI green (lint, typecheck, tests, doctor, gitleaks) and a
+  `dd-code-reviewer` APPROVED verdict, security lens included, on the PR head; no CI job
+  calls a model API. The ruleset is the operator's.
 
 ## 4. Done when
 
@@ -73,5 +73,5 @@ The branch contract, stated once, and the mechanics that operate it.
 
 - [`CICD-AUTOMATION.md`](CICD-AUTOMATION.md) — CI/CD checks to suggest a consumer operator.
 - Mechanical enforcement (pre-push hook / CI): branch-name pattern, push refusal,
-  denylist scan, `pr-source-guard`, the `security-review` required check. Everything else in this skill is discipline, upheld by agents and
+  denylist scan, `pr-source-guard`. Everything else in this skill is discipline, upheld by agents and
   reviewers, unenforced by any hook.

@@ -50,10 +50,6 @@ _Avoid_: hook, guard
 The push — where a blob becomes public. This repository is public, so the full denylist scan applies to every tracked path, with no tolerated-pairs list and no path exemption; a fixture needing a secret shape composes it at runtime.
 _Avoid_: release boundary, publish step, baseline (for a tolerated literal)
 
-**Verdict**:
-A security-reviewer APPROVED handoff bound to one commit sha, committed under `releases/<id>/verdicts/`, consumed once by the PR gate and deleted after merge.
-_Avoid_: approval, decision (the gate's boolean), review
-
 **Path class**:
 The category a written path belongs to — ADDITIVE, MUTATING, PROTECTED, three and no fourth — and the only thing the gate classifies. `specs/memory/` is MUTATING in every phase.
 _Avoid_: lane, zone, MEMORY, LAW, UNGATED, FROZEN (retired classes)

@@ -14,7 +14,7 @@
   `Write set:` `.github/workflows/ci.yml`, `tests/contract/{test_ci_security_review_job.py,test_ci_preflight_ci_gating_parity.py,test_ci_workflow_hygiene.py}`
   `blocked by:` — · `delivers:` FR1
 
-- [-] **T-047-107 — Law and skills state the local security lens, not a CI job.**
+- [x] **T-047-107 — Law and skills state the local security lens, not a CI job.**
   `public/data/AGENTS.md` §3, `dd-gitflow-default` `SKILL.md` and `CICD-AUTOMATION.md`, `tests/contract/README.md`:
   both PRs need CI green and a `dd-code-reviewer` APPROVED verdict (security lens) on the head; no CI job
   calls a model API. `CONTEXT.md` drops the verdict-file entry. Re-record behavior-map / CONTEXT-MAP hashes.

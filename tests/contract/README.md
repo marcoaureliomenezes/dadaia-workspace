@@ -45,7 +45,6 @@ contract over public assets). An undocumented asymmetric path is a gap, not cove
 | `test_install_skip_idempotent.py` | `write_generated` idempotent across newline conventions |
 | `test_codex_reference_only_wording.py` | Codex orchestration wording (agents vs workflow docs) |
 | `test_workflow_review_gate_contract.py` | Implementation-review-QA done gate |
-| `test_reviewer_persona_review_allowlist.py` | The 4 reviewer personas' declared `specs/releases/**/reviews/**` grant (+ `security-reviewer`'s `verdicts/**`), and non-admission of `specs/memory/**` |
 | `cli/` | CLI output/status contracts |
 
 When you add a contract, add a row here in the same change.
