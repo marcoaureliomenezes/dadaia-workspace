@@ -68,6 +68,11 @@ Measured by: `pytest tests/contract/test_docs_derived_from_memory.py`.
 ADR: 0012 (accepted)
 Rationale: a document written beside memory rots; one that names its source is red the moment the source moves.
 
+### P-33 · We run no model API in CI: no workflow uses an `anthropics/*` action or references a model API secret; the security review is the local `dd-code-reviewer` lens.
+Measured by: `pytest tests/contract/test_ci_workflow_hygiene.py -k model_api`.
+ADR: 0025 (accepted)
+Rationale: a CI job that needs a paid model key fails closed on every PR without it and forces admin merges.
+
 ## Test architecture
 
 - Size tiers: unit and contract SMALL, integration MEDIUM, E2E LARGE (Python journeys), live Codex-binary validation opt-in outside CI.
@@ -86,9 +91,9 @@ Rationale: a document written beside memory rots; one that names its source is r
 
 ## Gates
 
-- CI runs the preflight ladder plus cross-OS subsets, integration, Python E2E, repo hygiene, `dadaia doctor` over the checked-out tree, PR governance, the `security-review` job (the official `anthropics/claude-code-security-review` Action) and gitleaks — every job a required status check on `develop`, gitleaks included.
+- CI runs the preflight ladder plus cross-OS subsets, integration, Python E2E, repo hygiene, `dadaia doctor` over the checked-out tree, PR governance and gitleaks — every job a required status check on `develop`, gitleaks included; no job calls a model API (P-33).
 - Push triggers are `main`, `develop` and `feature/**`; PRs to `develop` or `main` run the same matrix as the local preflight.
-- `pr-source-guard` is fail-closed, and `security-review` reviews the PR diff on both edges.
+- `pr-source-guard` is fail-closed; the security review of both PR edges is the `dd-code-reviewer` security lens on the PR head, run by the main thread before the PR.
 - Every review verdict states the bug-surface delta from `bugs.py stats`, and no deploy is approved without the consumer-side matrix.
 - Ruff `C901` and `PLR1702` are scoped to `dadaia_workspace/` with ceilings pinned in `pyproject.toml` against the enforcing tool; `radon cc` reports and never gates.
 - Caches redirect by configuration, never by a remembered flag: `[tool.pytest.ini_options] addopts` (`-p no:cacheprovider`), `[tool.ruff] cache-dir` and `[tool.mypy] cache_dir` (`../../.dadaia/tmp/<tool>-cache`, relative on every OS), hypothesis `database = None`; a bare `pytest`, `ruff check`, `ruff format --check`, `mypy --strict` from the repo root leaves the tree clean (`tests/unit/features/ci_preflight/test_no_pollution.py`), so `dadaia ci preflight` runs exactly the bare commands.
@@ -97,7 +102,7 @@ Rationale: a document written beside memory rots; one that names its source is r
 - A citation of a superseded decision is an ERROR (`ADR-SUPERSEDED-CITATION`): a rule pointing at a dead ADR fails the build.
 - A doctor fix is proven on the executed path: `tests/contract/test_ledgers_validate.py` locates the issue and `tests/unit/features/specs/test_ledgers_fix_canonical_form.py` runs `--fix` over a committed-shaped record file and asserts the re-serialized line, never the fixer's return value; a schema drop ships with its repair and its test in the same change.
 - The closed pytest marker set is eight — unit, contract, integration, e2e, slow, tmp, flaky, quarantine (P-28).
-- `ci.yml` checks out at the default depth (the `security-review` job fetches depth 2 for the PR diff); `release-please.yml` and `secret-scan.yml` fetch full history; no job fetches history for a bug record's sake.
+- `ci.yml` checks out at the default depth; `release-please.yml` and `secret-scan.yml` fetch full history; no job fetches history for a bug record's sake.
 
 - Five repo-pure ratchets pin slop counts and move only downward: V31 (Intent-less test files per tier) in `tests/contract/test_test_suite_ratchets.py`; V32 (governance ids in production comments and docstrings), V33 (`PREFIX-NN` families without a mechanical reader), V34 (live SPEC/TASKS byte ceiling) and V35 (skill directories ≤ 18 and total `public/skills/**/*.md` lines, pinned at the measured value and re-pinned at every corpus-touching closure) in `tests/contract/test_slop_ratchets.py`; `PLAN.md` has no byte ratchet (`SPEC-DOC-005` is advisory).
 - The derived-docs contract sits beside the ratchets: `tests/contract/test_docs_derived_from_memory.py` (P-29) checks every `<!-- derived-from: <slug> sha256:<12 hex> -->` marker's slug and hash over `README.md`, `llms.txt` and `docs/*.md`, the `docs/cli.md` body against `render_digest()`, the 10 KB README budget, the one tagline across `README.md`, `pyproject.toml` and `llms.txt`, the five `[tool.poetry.urls]` keys, and runs `dead_citations` over the same set; a red row is closure work — re-read the atom, re-derive the section, re-record the hash in the atom's own commit (`dd-release-implementation` MEMORY-UPDATE).

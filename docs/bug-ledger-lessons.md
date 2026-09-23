@@ -42,7 +42,7 @@ multi-owner slug already on disk.
 
 ## Lesson 2 — a per-measurement exclusion breeds the next measurement's bug
 
-<!-- derived-from: QUALITY sha256:89d6642a5809 -->
+<!-- derived-from: QUALITY sha256:6a409bcf4674 -->
 
 When each measurement walks the tree itself and is fixed by its own special-case
 exclusion, the next measurement counts the same stray files. The structure that ends
@@ -54,7 +54,7 @@ construction, not by a list somebody has to remember to extend.
 ## Lesson 3 — a derived cache breeds a bug per environment that derives it
 
 <!-- derived-from: bug-ledger sha256:9534ded07707 -->
-<!-- derived-from: QUALITY sha256:89d6642a5809 -->
+<!-- derived-from: QUALITY sha256:6a409bcf4674 -->
 
 A record that caches a fact git already knows is wrong in every environment that
 derives it differently — a shallow checkout first among them. The structure that ends
@@ -63,7 +63,7 @@ history is that line's change log. No CI job fetches history for a bug record's 
 
 ## The standing order the lessons produced
 
-<!-- derived-from: QUALITY sha256:89d6642a5809 -->
+<!-- derived-from: QUALITY sha256:6a409bcf4674 -->
 <!-- derived-from: bug-ledger sha256:9534ded07707 -->
 
 The workspace is in a permanent state of architecture review, oriented by its bug

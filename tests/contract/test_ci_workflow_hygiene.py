@@ -290,3 +290,18 @@ def test_one_version_step_feeds_every_consumer_of_the_version() -> None:
         if "needs.build.outputs.version" in yaml.safe_dump(job)
     ]
     assert set(consumers) == {"approve", "publish", "smoke-test", "publish-skills-repo"}, consumers
+
+
+_MODEL_API = re.compile(r"uses:\s*anthropics/|CLAUDE_API_KEY|ANTHROPIC_API_KEY")
+
+
+def test_no_workflow_calls_a_model_api() -> None:
+    """P-33 (ADR 0025): no CI job calls a model API — no `anthropics/*` action and no model
+    API secret in any workflow; the security review is the local dd-code-reviewer lens."""
+    offenders = [
+        f"{path.name}:{number}: {line.strip()}"
+        for path in sorted(_WORKFLOWS.glob("*.yml"))
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1)
+        if _MODEL_API.search(line)
+    ]
+    assert offenders == [], "a workflow calls a model API:\n" + "\n".join(offenders)

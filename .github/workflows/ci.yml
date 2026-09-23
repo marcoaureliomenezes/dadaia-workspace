@@ -2,9 +2,8 @@ name: CI
 
 # Gitflow law v2 (v0.4.4 FR3/FR4 / DADAIA.md §4 (Gitflow)): feature/{M.m.p} is the ONLY pushable
 # branch (its push triggers the full matrix below); develop and main advance by PR
-# only. Every PR is gated by pr-source-guard (both edges, one job) and by
-# security-review (the official anthropics/claude-code-security-review Action over the
-# PR diff — 0.4.7 c5 FR5). hotfix/* was retired outright (G2) and carries no trigger.
+# only. Every PR is gated by pr-source-guard (both edges, one job); no job calls a model
+# API — the security review is the local dd-code-reviewer lens. hotfix/* carries no trigger.
 on:
   push:
     branches:
@@ -351,34 +350,3 @@ jobs:
             fi
             echo "PR head matches feature/M.m.p - gitflow source rule satisfied (develop)."
           fi
-
-  # ---------------------------------------------------------------------------------
-  # Security review (0.4.7 c5 FR5, ADR 0016): the official Anthropic Action reviews the
-  # PR diff and reports a status check on the PR head. Required on develop and main by
-  # the branch ruleset (operator-owned, together with the CLAUDE_API_KEY secret). With
-  # the secret absent the job fails closed: a green check always means a review ran. The
-  # sha-keyed verdict file, its two-hop rule and the verdict-gate jobs are gone.
-  security-review:
-    name: Security review (anthropics/claude-code-security-review)
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    if: github.event_name == 'pull_request' && (github.base_ref == 'develop' || github.base_ref == 'main')
-    permissions:
-      contents: read
-      pull-requests: write
-    env:
-      CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          fetch-depth: 2
-      - name: "Secret missing: fail closed (operator adds CLAUDE_API_KEY, then requires this check)"
-        if: env.CLAUDE_API_KEY == ''
-        run: |
-          echo "::error::CLAUDE_API_KEY is not set; the security review cannot run and this check fails closed. Add the secret, then require this check in the branch ruleset."
-          exit 1
-      - uses: anthropics/claude-code-security-review@0c6a49f1fa56a1d472575da86a94dbc1edb78eda  # main 2026-02-11
-        if: env.CLAUDE_API_KEY != ''
-        with:
-          comment-pr: true
-          claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
