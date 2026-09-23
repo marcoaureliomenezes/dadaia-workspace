@@ -27,7 +27,12 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 #: match, by design: a section without a publication date names no published version,
 #: and since T-047-90 ``pyproject.toml`` sits at the published floor release-please
 #: bumps from, not at the id of the release being written.
-_VERSION_HEADING = re.compile(r"^## \[(\d+\.\d+\.\d+)\] [-—] \d{4}-\d{2}-\d{2}\s*$", re.MULTILINE)
+# Both heading shapes are dated release sections: the hand-written `## [x.y.z] — date`
+# and release-please's `## [x.y.z](compare-url) (date)`.
+_VERSION_HEADING = re.compile(
+    r"^## \[(\d+\.\d+\.\d+)\](?:\([^)]*\))? (?:[-—] \d{4}-\d{2}-\d{2}|\(\d{4}-\d{2}-\d{2}\))\s*$",
+    re.MULTILINE,
+)
 
 
 def test_pyproject_version_equals_changelog_top_section() -> None:

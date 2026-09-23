@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-23T01:05:25Z",
+  "generated_at": "2026-09-23T03:22:58Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -152,10 +152,8 @@
         "cross-platform-portability"
       ],
       "sources": [
-        "pyproject.toml",
         ".github/workflows/**",
         "release-please-config.json",
-        ".release-please-manifest.json",
         "dadaia_workspace/cli/main.py",
         "dadaia_workspace/__main__.py",
         "docs/**"

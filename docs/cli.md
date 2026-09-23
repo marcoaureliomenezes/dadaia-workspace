@@ -1,6 +1,6 @@
 <!-- derived-from: dadaia help tree — regenerate: `dadaia help tree > docs/cli.md` -->
 
-# dadaia CLI digest (v0.4.6 — derived from the live command tree; authoritative help: `dadaia <group> --help`)
+# dadaia CLI digest (derived from the live command tree; authoritative help: `dadaia <group> --help`)
 
 ## dadaia capabilities — Describe public dadaia-workspace features supported by this installation.
 
