@@ -54,6 +54,18 @@ for this task, so none is touched here):
 
 Left exactly as written; a future task can pick this up.
 
+## [0.4.7](https://github.com/marcoaureliomenezes/dadaia-workspace/compare/v0.4.6...v0.4.7) (2026-09-23)
+
+
+### Features
+
+* dadaia-workspace 0.4.7 — one-line bootstrap, six harnesses, memory that cannot stack, release-please ([#262](https://github.com/marcoaureliomenezes/dadaia-workspace/issues/262)) ([b50f0c9](https://github.com/marcoaureliomenezes/dadaia-workspace/commit/b50f0c971c3d711841de843ec7d506ce7c6aa65a))
+
+
+### Bug Fixes
+
+* the release-please release PR passes CI — version-free CLI digest, release heading sentinel, memory sources ([#266](https://github.com/marcoaureliomenezes/dadaia-workspace/issues/266)) ([e44712b](https://github.com/marcoaureliomenezes/dadaia-workspace/commit/e44712bf234fa2725468b5db4223336d6e969e60))
+
 ## 0.4.7 — candidate record (hand-written; the published section is written by release-please above)
 
 Open-scope release (ADRs 0005–0009): version minted at birth from the PyPI lineage
