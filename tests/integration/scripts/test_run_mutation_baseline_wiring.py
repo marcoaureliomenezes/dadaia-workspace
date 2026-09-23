@@ -25,7 +25,7 @@ prove cheaply and deterministically:
      `tests/unit/core/` flat tier contains real cross-layer architecture tests that
      cannot run inside any sandbox narrower than the whole package).
   3. The script is never referenced from any push-path selector (A20.3): a permanent
-     regression guard against someone later wiring it into ci.yml, release-please.yml, or the
+     regression guard against someone later wiring it into ci.yml, release.yml, or the
      local pre-push preflight.
   4. Every ``dadaia_workspace/public/schemas/...`` fixture path a staged
      ``tests/unit/core/models/*.py`` file actually reads at runtime resolves inside the
@@ -52,7 +52,7 @@ pytestmark = [pytest.mark.integration]
 _SCRIPT = Path(__file__).resolve().parent.parent.parent / "scripts" / "run_mutation_baseline.sh"
 _REPO_ROOT = _SCRIPT.parent.parent.parent
 _CI_YML = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
-_RELEASE_YML = _REPO_ROOT / ".github" / "workflows" / "release-please.yml"
+_RELEASE_YML = _REPO_ROOT / ".github" / "workflows" / "release.yml"
 _CI_PREFLIGHT_SERVICE = _REPO_ROOT / "dadaia_workspace" / "features" / "ci_preflight" / "service.py"
 
 
