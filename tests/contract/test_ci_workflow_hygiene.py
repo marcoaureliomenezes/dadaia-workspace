@@ -13,6 +13,7 @@ release-please.yml behind the single `release_created` gate: no `release:` event
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -321,3 +322,33 @@ def test_no_workflow_calls_a_model_api() -> None:
                       for n, line in enumerate(text.splitlines(), start=1)
                       if _MODEL_API_TEXT.search(line)]  # fmt: skip
     assert offenders == [], "a workflow calls a model API:\n" + "\n".join(offenders)
+
+
+def _guard_exit(head: str, base: str) -> int:
+    """Run pr-source-guard's shell step exactly as CI does, for one (head, base) pair."""
+    import subprocess
+
+    ci = yaml.safe_load((_WORKFLOWS / "ci.yml").read_text(encoding="utf-8"))
+    step = ci["jobs"]["pr-source-guard"]["steps"][0]
+    env = {"HEAD_REF": head, "BASE_REF": base, "PATH": "/usr/bin:/bin"}
+    return subprocess.run(["bash", "-c", step["run"]], env=env, capture_output=True).returncode
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the guard is a bash step on ubuntu-latest")
+@pytest.mark.parametrize(
+    ("head", "base", "allowed"),
+    [
+        ("develop", "main", True),
+        ("release-please--branches--main", "main", True),
+        ("feature/0.4.7", "main", False),
+        ("release-please--branches--develop", "main", False),
+        ("feature/0.4.7", "develop", True),
+        ("develop", "develop", False),
+    ],
+)
+def test_pr_source_guard_admits_the_release_pr_into_main(
+    head: str, base: str, allowed: bool
+) -> None:
+    """ADR 0021: promote is merging release-please's release PR, so main accepts exactly
+    develop and release-please's own branch; develop accepts only feature/{M.m.p}."""
+    assert (_guard_exit(head, base) == 0) is allowed

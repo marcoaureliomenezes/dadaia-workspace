@@ -329,13 +329,14 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: |
           if [ "$BASE_REF" = "main" ]; then
-            # Rule 1 (unchanged): main accepts a PR only from develop.
-            if [ "$HEAD_REF" != "develop" ]; then
-              echo "::error::Gitflow law (DADAIA.md §4 (Gitflow)): main accepts PRs from 'develop' only. Got head '$HEAD_REF'."
+            # Rule 1: main accepts the promote PR from develop and release-please's
+            # release PR (ADR 0021: promote is merging the release PR), nothing else.
+            if [ "$HEAD_REF" != "develop" ] && [ "$HEAD_REF" != "release-please--branches--main" ]; then
+              echo "::error::Gitflow law: main accepts PRs from 'develop' or the release-please release PR only. Got head '$HEAD_REF'."
               echo "::error::Fix: merge your branch into develop, push develop, and open the PR develop -> main."
               exit 1
             fi
-            echo "PR head is develop - gitflow source rule satisfied (main)."
+            echo "PR head is $HEAD_REF - gitflow source rule satisfied (main)."
           elif [ "$BASE_REF" = "develop" ]; then
             # Rule 2 (v0.4.4 FR4): develop accepts a PR only from feature/{M.m.p} — no
             # 'v' prefix, M.m.p numeric. Derived from the SAME pattern as
