@@ -5,7 +5,7 @@
 
 ## Candidate 12 — no model API in CI
 
-- [x] **T-047-106 — The security-review job leaves CI; a scan refuses any model API in workflows.** *(uncommitted, PM-staged with ADR 0025)*
+- [x] **T-047-106 — The security-review job leaves CI; a scan refuses any model API in workflows.**
   Delete the `security-review` job and every `CLAUDE_API_KEY` reference from `.github/workflows/ci.yml`
   (and its header comment); delete `tests/contract/test_ci_security_review_job.py`; drop the job from
   `test_ci_preflight_ci_gating_parity.py`. Add the scan to `tests/contract/test_ci_workflow_hygiene.py`:

@@ -4,11 +4,10 @@
 policy (:mod:`~dadaia_workspace.features.chokepoints.branch_policy`) first, then the
 specs/ canon scan, then the range-scoped denylist scan
 (:mod:`~dadaia_workspace.features.chokepoints.denylist_scan`) — first refusal wins.
-Security review is the ``security-review`` PR check, never a step here.
+Security review is the reviewer's lens before each PR, never a step here.
 
 This module is business logic: it imports ``core`` only, NEVER ``infrastructure``, and
-never spawns a subprocess. The canon predicates (``canon_violations_fn``/
-``verdict_violations_fn``) and the injected :class:`ObjectSource` are parameters, wired
+never spawns a subprocess. The canon predicate (``canon_violations_fn``) and the injected :class:`ObjectSource` are parameters, wired
 by the CLI composition root (``cli/commands/ci.py``) — an unwired production call site
 is a CLI defect, never a bypass.
 """
@@ -413,25 +412,23 @@ def push_gate_decision(
        permitted patterns are refused as invalid.
     2. **specs/ canon scan** (v0.5.0 specs-canon closure, operator ruling 2026-08-28)
        — every ``specs/`` path the pushed range introduces or rewrites is checked
-       against the v6 canon (range-scoped since 2026-09-13: a path no commit in the
-       range touches never blocks); the verdict business rule keeps its tree view over
-       the tip's ``verdicts/`` paths (the injected *canon_violations_fn*/
-       *verdict_violations_fn*).
+       against the canon (range-scoped: a path no commit in the range touches never
+       blocks), through the injected *canon_violations_fn*.
     3. **Range-scoped denylist scan** (v0.9.0 FR1/FR2) — every non-deletion ref, tags
        included, is scanned via *object_source* for new objects carrying a denylisted
        term. Steps 2 and 3 share ONE object walk (the walk runs once, after branch
        policy; step 2's refusal is decided first) — under v2 this feature push is the
        first publication to ``origin`` (A3.3).
 
-    There is no fourth step: security review is the ``security-review`` PR check
-    (the official Action, 0.4.7 c5 FR5), never a pre-push step.
+    There is no fourth step: security review is the reviewer's lens before each PR,
+    never a pre-push step.
 
     Deletions (zero sha) are never scanned. Tag pushes ARE scanned but were never
     branch-policy-gated (publishing depends on tag pushes). A malformed stdin line
     fails CLOSED (finding 1) and the REMOTE side of every branch-policy ref must
     match its LOCAL branch name (finding 2: ``push feature/0.0.1:develop``).
 
-    *object_source*, *repo*, *canon_violations_fn* and *verdict_violations_fn* are
+    *object_source*, *repo* and *canon_violations_fn* are
     REQUIRED — FR7/A7.2 (extended at v0.5.1 K7 to the canon predicates): the decision
     function always takes every external capability it needs as a parameter; an
     unwired production call site is a CLI defect, never a bypass (FR6 row 4), so there

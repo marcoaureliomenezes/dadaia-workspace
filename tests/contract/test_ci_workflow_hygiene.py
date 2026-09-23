@@ -292,16 +292,32 @@ def test_one_version_step_feeds_every_consumer_of_the_version() -> None:
     assert set(consumers) == {"approve", "publish", "smoke-test", "publish-skills-repo"}, consumers
 
 
-_MODEL_API = re.compile(r"uses:\s*anthropics/|CLAUDE_API_KEY|ANTHROPIC_API_KEY")
+_MODEL_API_TEXT = re.compile(
+    r"CLAUDE_API_KEY|ANTHROPIC_(?:API_)?KEY|api\.anthropic\.com", re.IGNORECASE
+)
+
+
+def _uses(document: Any) -> list[str]:
+    """Every `uses:` a workflow declares — job-level reusable workflows and step actions."""
+    jobs = (document or {}).get("jobs") or {}
+    found = [str(job.get("uses", "")) for job in jobs.values() if isinstance(job, dict)]
+    for job in jobs.values():
+        for step in (job.get("steps") or []) if isinstance(job, dict) else []:
+            if isinstance(step, dict) and "uses" in step:
+                found.append(str(step["uses"]))
+    return [use for use in found if use]
 
 
 def test_no_workflow_calls_a_model_api() -> None:
-    """P-33 (ADR 0025): no CI job calls a model API — no `anthropics/*` action and no model
-    API secret in any workflow; the security review is the local dd-code-reviewer lens."""
-    offenders = [
-        f"{path.name}:{number}: {line.strip()}"
-        for path in sorted(_WORKFLOWS.glob("*.yml"))
-        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1)
-        if _MODEL_API.search(line)
-    ]
+    """P-33 (ADR 0025): no CI job calls a model API — no `anthropics/*` action (any case,
+    any quoting, `.yml` or `.yaml`) and no model API secret or endpoint in any workflow;
+    the security review is the local dd-code-reviewer lens."""
+    offenders: list[str] = []
+    for path in sorted([*_WORKFLOWS.glob("*.yml"), *_WORKFLOWS.glob("*.yaml")]):
+        text = path.read_text(encoding="utf-8")
+        offenders += [f"{path.name}: uses {u}" for u in _uses(yaml.safe_load(text))
+                      if u.lower().startswith("anthropics/")]  # fmt: skip
+        offenders += [f"{path.name}:{n}: {line.strip()}"
+                      for n, line in enumerate(text.splitlines(), start=1)
+                      if _MODEL_API_TEXT.search(line)]  # fmt: skip
     assert offenders == [], "a workflow calls a model API:\n" + "\n".join(offenders)
