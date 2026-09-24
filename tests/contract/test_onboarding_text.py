@@ -92,6 +92,43 @@ def test_every_onboarding_doc_cli_line_invokes_the_venv_path() -> None:
     assert violations == [], "\n".join(violations)
 
 
+# Ratchet — bare `dadaia <verb>` spans still shipped outside T-048-10's write set; a count
+# only moves down, and every law file or public skill not listed carries zero.
+_BARE_RATCHET = {
+    "data/AGENTS.md": 1,  # the banner, pinned by infrastructure/workspace_guardrail.py
+    "data/CONSUMER_VALIDATION_RECIPE.md": 14,
+    "data/dadaia-AGENTS.md": 9,
+    "data/handoff-AGENTS.md": 1,
+    "data/states-AGENTS.md": 4,
+    "skills/dd-ai-eng-knowhow/AUTHORING.md": 1,
+    "skills/dd-ai-eng-knowhow/CODEX.md": 4,
+    "skills/dd-ai-eng-knowhow/SKILL.md": 3,
+    "skills/dd-audit-project/FINDINGS-FORMAT.md": 1,
+    "skills/dd-audit-project/PILLAR-SPECS.md": 3,
+    "skills/dd-backlog-definition/SKILL.md": 2,
+    "skills/dd-gitflow-default/SKILL.md": 1,
+    "skills/dd-grill-me/SKILL.md": 1,
+    "skills/dd-handoff-emitter/SKILL.md": 2,
+    "skills/dd-release-definition/SKILL.md": 1,
+    "skills/dd-release-implementation/MEMORY-UPDATE.md": 3,
+    "skills/dd-release-implementation/RC-FLOW.md": 5,
+    "skills/dd-spec-navigator/SKILL.md": 2,
+}
+
+
+def test_law_files_and_public_skills_invoke_the_venv_path() -> None:
+    """Backticked spans and fences are what an agent copies; prose naming the product
+    (`dadaia-workspace`, "the dadaia CLI") is outside them and stays free."""
+    public = _PACKAGE / "public"
+    over = []
+    for path in sorted([*(public / "data").glob("*.md"), *(public / "skills").rglob("*.md")]):
+        name = path.relative_to(public).as_posix()
+        spans = [n for n, line in _code_lines(path.read_text("utf-8")) if _bare_invocations(line)]
+        if len(spans) > _BARE_RATCHET.get(name, 0):
+            over.append(f"{name}: bare `dadaia <verb>` on lines {spans}")
+    assert over == [], "\n".join(over)
+
+
 def test_no_shipped_text_names_the_repos_catalog() -> None:
     shipped = [
         *(_REPO_ROOT / doc for doc in _ONBOARDING_DOCS),

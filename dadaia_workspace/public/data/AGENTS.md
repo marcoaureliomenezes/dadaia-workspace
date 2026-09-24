@@ -38,7 +38,7 @@
 - Path classes: ADDITIVE (the append-only governance areas of `specs/AGENTS.md` and the runtime scratch zones of `.dadaia/AGENTS.md`) always writable; PROTECTED (session state, the projected law files) blocked; everything else MUTATING, scope-judged under `repos/<slug>/`.
 - Every BLOCK carries exactly one `fix: <command>` line; a BLOCK whose fix is itself blocked is a Stall, CRITICAL.
 - Git chokepoints: pre-push allows `feature/{M.m.p}` and refuses `develop`/`main`, a non-canon `specs/` path or a denylisted secret; both PRs need CI green and a `dd-code-reviewer` APPROVED verdict; no CI job calls a model API. Mechanics: `dd-gitflow-default`, `.dadaia/AGENTS.md`.
-- Races surface, never block; context binding: `dadaia context show --json`, `dadaia context bind <ctx>`.
+- Races surface, never block; context binding: `.dadaia/.venv/bin/dadaia context show --json`, `.dadaia/.venv/bin/dadaia context bind <ctx>`.
 - The gate reads no SDD artifact; procedure is skill-taught and audit-measured, never gated.
 
 ## 4. Where things are written
@@ -86,12 +86,12 @@
 | `dd-manager-orchestration` | dispatching the three roles |
 
 - Language: operator preference, default English. Tone: direct, concise, operational.
-- Instance state: `dadaia context show --json`, `dadaia doctor`, `dadaia public doctor`, `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`.
+- Instance state: `.dadaia/.venv/bin/dadaia context show --json`, `.dadaia/.venv/bin/dadaia doctor`, `.dadaia/.venv/bin/dadaia public doctor`, `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`.
 
 ## 7. Onboarding — three levels
 
 - Level 1 workspace: `uvx dadaia-workspace init [DIR]`; re-running it on an existing workspace is the upgrade.
 - Level 2 context: `.dadaia/.venv/bin/dadaia context create <name> --main-repo <url> [--associated-repo <url>]...` clones, hooks, marks ALIVE and binds in one step.
-- Level 3 specs: `dadaia specs init --context <ctx>` (`--replace-foreign` moves a foreign tree to `specs-bkp/`), then the `dd-audit-project` first pass fills memory.
+- Level 3 specs: `.dadaia/.venv/bin/dadaia specs init --context <ctx>` (`--replace-foreign` moves a foreign tree to `specs-bkp/`), then the `dd-audit-project` first pass fills memory.
 - A new project in an existing workspace is levels 2 + 3; procedure: `dd-cli-library` (1-2), `dd-audit-project` (3).
-- The next step is never guessed: `dadaia doctor` (`ONBOARDING`) and SessionStart print it with its `fix:` line.
+- The next step is never guessed: `.dadaia/.venv/bin/dadaia doctor` (`ONBOARDING`) and SessionStart print it with its `fix:` line.
