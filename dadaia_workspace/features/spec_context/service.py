@@ -10,7 +10,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 
-from dadaia_workspace.core import specs_backup as _backup
 from dadaia_workspace.core.exceptions import (
     AssociatedRepoConflictError,
     AssociatedRepoNotFoundError,
@@ -30,27 +29,23 @@ from dadaia_workspace.core.models.spec_context import (
     RepoLiveStatus,
     SpecContextProject,
 )
-from dadaia_workspace.features.spec_context import scoped_law
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.privacy_check import (
     scan_file_for_secrets as _scan_file_for_secrets,
 )
 
-# Scoped-law templates (`scoped_law.py`'s table) live inside the installed package
-_PUBLIC_DIR = Path(__file__).parent.parent.parent / "public"
-
 _log = logging.getLogger(__name__)
 
 
-class ScaffoldSpecs(Protocol):
-    """The ONE canon fold ``alive()`` scaffolds ``specs/`` through — the shape of
-    ``features.specs.canon.scaffold``, injected by the composition root (P-07: features
-    compose through the container, never a sibling import). It writes every canon entry
-    missing from *specs_dir*, never overwrites one, and returns the paths it wrote.
+class InstallHooks(Protocol):
+    """The one git-chokepoint installer ``alive()`` runs in every repo of the set —
+    injected by the composition root (P-07: features compose through the container,
+    never a sibling import). Overwrites an installed hook; raises when *repo_root* is
+    not a git repository.
     """
 
-    def __call__(self, specs_dir: Path, *, project_name: str) -> list[Path]: ...
+    def __call__(self, repo_root: Path) -> object: ...
 
 
 class DeadReviewRequiredError(DadaiaError):
@@ -131,21 +126,18 @@ class SpecContextService:
         context_store: JsonContextStore,
         git_client: GitSubprocessClient,
         workspace_root: Path,
-        scaffold_specs: ScaffoldSpecs,
+        install_hooks: InstallHooks,
     ) -> None:
         self._store = context_store
         self._git = git_client
         self._workspace_root = workspace_root
-        self._scaffold_specs = scaffold_specs
+        self._install_hooks = install_hooks
 
     def _repos_dir(self) -> Path:
         return self._workspace_root / "repos"
 
     def _repo_path(self, repo_slug: str) -> Path:
         return self._repos_dir() / repo_slug
-
-    def _specs_dir(self, repo_slug: str) -> Path:
-        return self._repo_path(repo_slug) / "specs"
 
     # ------------------------------------------------------------------ create
 
@@ -407,12 +399,9 @@ class SpecContextService:
 
         FR16/A16.1/A16.3: every repo in the set — the main repo first, then each
         associated repo in order (``SpecContextProject.all_repos()``, the one accessor,
-        A15.3) — is cloned if missing. Only the MAIN repo (below) receives the specs/
-        scaffold, ``AGENTS.md`` and ``tests/AGENTS.md``, checkout, and branch tracking:
-        an associated repo is cloned CLEAN, with no scaffold and no ``specs/`` bind of
-        its own — specs/bind/memory/releases/backlog resolve from the main repo only
-        (FR19/G13). This loop replaces the prior main-repo-only clone check; it is not
-        a second path beside it.
+        A15.3) — is cloned if missing and gets the pre-push hook. Only the MAIN repo
+        receives checkout and branch tracking. alive() writes no specs and commits
+        nothing (0.4.8 AC3.7): the working tree is exactly what the remote holds.
         """
         ctx = self._store.get(name)
         if ctx is None:
@@ -420,24 +409,24 @@ class SpecContextService:
 
         for repo in self._backfilled(ctx).all_repos():
             repo_dest = self._repo_path(repo.slug)
-            if repo_dest.exists():
-                continue
-            if not repo.url:
-                if repo.slug == ctx.repo_slug:
-                    fix = (
-                        f"{DADAIA_BIN} context delete {name} && {DADAIA_BIN} context create "
-                        f"{name} --main-repo {repo.slug} --url <clone-url>"
+            if not repo_dest.exists():
+                if not repo.url:
+                    if repo.slug == ctx.repo_slug:
+                        fix = (
+                            f"{DADAIA_BIN} context delete {name} && {DADAIA_BIN} context "
+                            f"create {name} --main-repo {repo.slug} --url <clone-url>"
+                        )
+                    else:
+                        fix = (
+                            f"{DADAIA_BIN} context repo remove {name} {repo.slug} && "
+                            f"{DADAIA_BIN} context repo add {name} {repo.slug} --url <clone-url>"
+                        )
+                    raise RepoUrlMissingError(
+                        f"'{repo.slug}' has no clone URL and no checkout at repos/{repo.slug} "
+                        f"— 'context alive {name}' cannot obtain it.\nfix: {fix}"
                     )
-                else:
-                    fix = (
-                        f"{DADAIA_BIN} context repo remove {name} {repo.slug} && {DADAIA_BIN} "
-                        f"context repo add {name} {repo.slug} --url <clone-url>"
-                    )
-                raise RepoUrlMissingError(
-                    f"'{repo.slug}' has no clone URL and no checkout at repos/{repo.slug} — "
-                    f"'context alive {name}' cannot obtain it.\nfix: {fix}"
-                )
-            self._git.clone(repo.url, repo_dest)
+                self._git.clone(repo.url, repo_dest)
+            self._install_hooks(repo_dest)
 
         if ctx.state == ContextState.ALIVE:
             return ctx
@@ -460,47 +449,6 @@ class SpecContextService:
             actual_branch = self._git.current_branch(repo_path)
         except Exception:
             actual_branch = None
-
-        # Bug context-alive-sweeps-unrelated-worktree-changes (MEDIUM): the scaffold
-        # commit below must stage EXACTLY the paths this method creates/modifies below
-        # — never a blanket ``git add -A``/``-u`` sweep that would silently fold in
-        # pre-existing unrelated dirty tracked files (e.g. an operator's mid-edit
-        # docker-compose.yml). `touched` accumulates only those repo-relative paths.
-        touched: list[str] = []
-
-        # The same canon fold `dadaia specs init` runs, so an alive-born tree is
-        # doctor-clean at birth; it never overwrites an existing entry, and only the
-        # files it wrote are staged — a pre-existing specs/ may carry unrelated dirt.
-        specs_dir = self._specs_dir(repo_slug)
-        preserved = _backup.preserve_specs(specs_dir) if specs_dir.exists() else None
-        created = self._scaffold_specs(specs_dir, project_name=repo_slug)
-        touched.extend(path.relative_to(repo_path).as_posix() for path in created)
-        if preserved is not None and not created:
-            shutil.rmtree(preserved, ignore_errors=True)
-            preserved = None
-        _log.info(
-            "scaffold: %d canon file(s) added to specs/; snapshot: %s", len(created), preserved
-        )
-
-        # Scoped-law placement (repo AGENTS.md + tests/AGENTS.md) — one home (F013):
-        # features.spec_context.scoped_law owns the hardened install-if-absent writes.
-        touched.extend(scoped_law.install_scoped_law(repo_path, _PUBLIC_DIR))
-
-        # Commit the scaffold alive() itself just wrote (bug alive-scaffold-blocks-dead,
-        # validation-027 F-06): leaving tool-created files untracked made an immediate
-        # dead() refuse via the untracked-consent guard, so create->alive->dead could
-        # never complete on a fresh context. Only tool-authored files are involved here;
-        # operator-created untracked files still hit dead()'s guard as designed (F-5).
-        # commit_paths (never commit_all) keeps this scoped to `touched` alone — any
-        # pre-existing unrelated dirty tracked file stays untouched and uncommitted
-        # (bug context-alive-sweeps-unrelated-worktree-changes).
-        with contextlib.suppress(Exception):
-            if touched and self._git.is_git_root(repo_path) and self._git.is_dirty(repo_path):
-                self._git.commit_paths(
-                    repo_path,
-                    "chore(scaffold): dadaia context alive specs baseline",
-                    tuple(touched),
-                )
 
         ctx_fresh = self._store.get(name)
         if ctx_fresh is None:
