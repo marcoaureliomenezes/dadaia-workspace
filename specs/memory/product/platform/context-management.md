@@ -48,7 +48,7 @@ sources:
 ## Binding and injection
 
 - `dadaia context bind <name> [--print-env]` writes one record, `.dadaia/sessions/<session-id>.json` (context, runtime, pid, `bound_at`), acquiring nothing; `--print-env` emits `DADAIA_CONTEXT` and `DADAIA_SESSION_ID` for `eval $(…)`.
-- The ctx-inject hook injects state, never law: a bound session gets its context header, `ARCHITECTURE.md`'s `## Tech Stack` section and the catalog digest (`slug`, `title`, `tldr`, `path` per atom); an unbound session gets `[no bound context]`, the derived onboarding next step ([[workspace-init]]) and the ALIVE-context list.
+- The ctx-inject hook injects state, never law: a bound session gets its context header, the derived onboarding next step focused on its context while one remains, `ARCHITECTURE.md`'s `## Tech Stack` section and the catalog digest (`slug`, `title`, `tldr`, `path` per atom); an unbound session gets `[no bound context]`, the same derived step ([[workspace-init]]) and the ALIVE-context list.
 - Every emission also carries `.dadaia/agentic/help-digest.md`, which the hook reads and never builds.
 - Injection fires once per session, again after a later bind or a compaction, and stays silent on repeat prompts; its sentinel and compact markers live in `.dadaia/tmp/` and are reaped by mtime.
 - A bound session's MUTATING write under a `repos/<slug>/` another context owns is refused with a `fix:` naming the owner's bind ([[sdd-gate-v3]]).

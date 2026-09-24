@@ -302,12 +302,17 @@ def _generic_preflight(workspace: Path) -> str:
 
 
 def _emit_bootstrap(workspace: Path, context: str) -> None:
-    """Emit the bound context's bootstrap: the context header + the lean memory prefix.
+    """Emit the bound context's bootstrap: the context header, the onboarding next step
+    focused on *context* while one remains (the text ``doctor`` reports) + the lean
+    memory prefix.
 
     FR30 (T-044-60): no dispatcher preflight — it restates the root `AGENTS.md` map §1/§2, which the
     agent already carries as law, not per-prompt state.
     """
     sections = [f"[{context}]"]
+    step = onboarding.next_step(workspace, invocation.alive_context_trees(workspace), context)
+    if step is not None:
+        sections.append(step.text())
     memory = _build_memory(invocation.resolve_context_specs_dir(workspace, context))
     if memory:
         sections.append(memory)
