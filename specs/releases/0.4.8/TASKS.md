@@ -58,7 +58,7 @@ Paths under `dadaia_workspace/` abbreviated `dw/`. Tasks in one parallel group (
   `Write set:` `dw/cli/commands/init.py`, `dw/infrastructure/python_env.py`, `dw/features/reconcile/service.py`, tests
   `blocked by:` T-048-04 · `group:` P3 · `delivers:` FR2 AC2.1–2.3; flips journey upgrade xfail
 
-- [ ] **T-048-07 — Derived onboarding status, one derivation, three callers.**
+- [-] **T-048-07 — Derived onboarding status, one derivation, three callers.**
   New `dw/features/workspace/onboarding.py` `next_step(root)`; doctor emits it as one info finding (exit unaffected,
   R2); `init`, `context create`, SessionStart (`hooks/ctx_inject.py`) print the same text; `doctor --context <ghost>`
   exits 1 + `fix: .dadaia/.venv/bin/dadaia context list`, no specs check (R4); hook check scoped to the context (R5).
