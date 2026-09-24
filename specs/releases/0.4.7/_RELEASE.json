@@ -764,6 +764,21 @@
       "changed": [
         "pypi-distribution"
       ]
+    },
+    {
+      "ts": "2026-09-24T01:42:20Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 7b60b0e46c68ccff95c6cc4429666401f7e60adb..c0f13acb2034: 2 reviewed, 1 changed.",
+      "since": "7b60b0e46c68ccff95c6cc4429666401f7e60adb",
+      "until": "c0f13acb20342d1c86148854a03df75a96bd644e",
+      "reviewed": [
+        "agentic-entities",
+        "pypi-distribution"
+      ],
+      "changed": [
+        "sdd-gate-v3"
+      ]
     }
   ]
 }
