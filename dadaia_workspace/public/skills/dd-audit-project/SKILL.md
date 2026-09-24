@@ -22,9 +22,7 @@ description: >
 - **Pillar 1 — bugs** ([`PILLAR-BUGS.md`](PILLAR-BUGS.md)): compute all eight
   forensic metrics on every `BUGS.jsonl` record in the window; stamp `audited` on each
   reviewed record (`python3 .agents/skills/dd-bug-resolution/scripts/bugs.py update <id> --set audited=<slug>`, pillar 1's only write).
-- **Pillar 2 — specs** ([`PILLAR-SPECS.md`](PILLAR-SPECS.md)): commit-shape
-  conformance, canon pattern compliance, `_RELEASE.json` milestone completeness over
-  the window.
+- **Pillar 2 — specs** ([`PILLAR-SPECS.md`](PILLAR-SPECS.md)): commit shapes, canon compliance, `_RELEASE.json` milestones over the window.
 - **Pillar 3 — memory** ([`PILLAR-MEMORY.md`](PILLAR-MEMORY.md)): execute every
   Part-1 principle's named `Measured by:` check; match every Part-1 hunk in the
   window to an `accepted` ADR in the same commit, or flag HIGH.
@@ -42,15 +40,9 @@ three is not an audit. Append one `FINDINGS.jsonl` record per claim
 
 ## 4. Done when
 
-- The window is computed once and recorded in `AUDIT.md`'s scope.
-- All eight bug-forensic metrics computed with baseline + target; every Part-1
-  principle's named check ran and was recorded.
-- `AUDIT.md` carries all three pillar sections; every claim has its
-  `FINDINGS.jsonl` record.
+- Window recorded; eight bug metrics with baseline + target; every Part-1 check ran; `AUDIT.md` has all three pillars, each claim a `FINDINGS.jsonl` record.
 
 ## 5. References
 
-- [`FINDINGS-FORMAT.md`](FINDINGS-FORMAT.md) — record shape, evidence rule,
-  disposition vocabulary.
 - Script: `python3 .agents/skills/dd-audit-project/scripts/audit.py` — `disposition`, `close`, `check`: this ledger's ONE writer and validator.
 - Lifecycle, pillars and verbs: `specs/audits/AGENTS.md`.

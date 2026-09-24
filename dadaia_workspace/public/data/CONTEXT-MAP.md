@@ -65,7 +65,7 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 |---|---|---|---|---|
 | `dd-ai-eng-knowhow` | harness literacy and the AI-entity authoring contract | — | 6144 | 2922 |
 | `dd-architecture-survey` | portfolio-level architecture candidates from bug history | — | 6144 | 4650 |
-| `dd-audit-project` | the three-pillar audit and its window | `specs/audits/AGENTS.md` | 6144 | 2944 |
+| `dd-audit-project` | the three-pillar audit and its window | `specs/audits/AGENTS.md` | 6144 | 2674 |
 | `dd-backlog-definition` | backlog curation, the intake gate, dispositions | `specs/backlog/AGENTS.md` | 6144 | 3229 |
 | `dd-bug-registration` | classify-first bug proposal and its record | `specs/bugs/AGENTS.md` | 6144 | 2782 |
 | `dd-bug-resolution` | the seven-phase diagnosing method and the resolve record | `specs/bugs/AGENTS.md` | 6144 | 5356 |
