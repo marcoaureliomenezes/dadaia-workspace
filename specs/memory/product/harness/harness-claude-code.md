@@ -15,7 +15,7 @@ sources:
 
 - Claude Code is the harness with native sub-agent dispatch (the Agent tool): the main thread runs there and dispatches the three `dd-` personas as sub-agents ([[agent-orchestration]]).
 - It reads the root `AGENTS.md` map natively at session start when no `CLAUDE.md` sits on or above the cwd; a scoped `AGENTS.md` attaches when a file in its directory is read ([[agentic-entities]]).
-- The workspace ships no `CLAUDE.md`; `dadaia init` recommends the user setting `instructionFiles: claude-md-and-agents-md` so a repo's own `CLAUDE.md` never hides the map, and sessions launch at the workspace root.
+- The workspace ships no `CLAUDE.md` and `dadaia init` prints no settings advice — the root `AGENTS.md` is read natively; sessions launch at the workspace root.
 - `.claude/skills/<name>` and `.claude/agents/<name>.md` are relative symlinks into `.agents/skills/` and `.agents/agents/`, with a hash-verified copy where `os.symlink` fails; `dadaia public doctor`'s `SYMLINK-TARGET-1` attests every entry ([[public-asset-distribution]]).
 - Least privilege is rendered into each persona at install from its `activity_class`: `permissionMode` plus, for a read-only persona, `disallowedTools`.
 

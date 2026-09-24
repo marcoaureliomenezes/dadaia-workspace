@@ -119,8 +119,9 @@ def init(
     elif kind == "dadaia":
         _echo_upgrade(target, upgrade_feature.upgrade(target))
 
-    written = canon.scaffold(target, project_name=name or target.parent.name)
-    for path in [*written, *canon.scaffold_repo_law(target.parent)]:
+    project = name or target.parent.name
+    written = canon.scaffold(target, project_name=project)
+    for path in [*written, *canon.scaffold_repo_law(target.parent, project_name=project)]:
         typer.echo(f"[created] {path}")
     if kind != "dadaia":
         typer.echo(f"[ok] {target} at pattern version {specs_version.CANONICAL_SPECS_VERSION}")

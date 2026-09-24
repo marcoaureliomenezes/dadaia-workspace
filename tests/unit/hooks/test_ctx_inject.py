@@ -474,3 +474,16 @@ def test_emissions_attach_the_derived_help_digest(tmp_path: Path) -> None:
     )
     out = _run(tmp_path, "sess-digest")
     assert "# dadaia CLI digest" in out
+
+
+def test_bound_session_carries_the_onboarding_next_step(tmp_path: Path) -> None:
+    """session-start-bound-session-omits-onboarding-next-step: a bound context with no
+    current specs tree still prints the doctor's ``Next:``/``fix:`` step."""
+    _ws(tmp_path)
+    _bind_session(tmp_path, "sb", "ctx")
+
+    out = _run(tmp_path, "sb")
+
+    assert out.startswith("[ctx]\n")
+    assert "\nNext: 'ctx' carries no current specs tree\n" in out
+    assert f"{os.sep}{_CLI} specs init --context ctx" in out

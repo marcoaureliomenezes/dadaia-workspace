@@ -1,7 +1,7 @@
 """dadaia init command — one plan, one directory, one harness."""
 
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import typer
@@ -38,6 +38,14 @@ class InitPlan:
     harness: str
     repo: str = ""
     associated: tuple[str, ...] = ()
+
+    def command(self, directory: object = None) -> str:
+        """The ``init`` invocation that runs this plan — every flag it carries, so a
+        ``fix:`` line built from it never drops a level (*directory* overrides DIR)."""
+        repos = [f"--repo {self.repo}"] if self.repo else []
+        repos += [f"--associated-repo {url}" for url in self.associated]
+        target = self.directory if directory is None else directory
+        return " ".join([_INIT, str(target), "--harness", self.harness, *repos])
 
 
 def _interactive() -> bool:
@@ -80,7 +88,7 @@ def _plan(directory: str, harness: str, repo: str, associated: tuple[str, ...]) 
         raise _refuse(
             "init needs DIR and --harness when no terminal can answer prompts; "
             f"harnesses: {', '.join(harness_registry.L1_ENTRY_HARNESSES)}.",
-            f"{_INIT} {directory or '<dir>'} --harness {harness or first}",
+            InitPlan(directory or "<dir>", harness or first, repo, associated).command(),
         )
     directory = directory or str(Path.cwd() / typer.prompt("Workspace name"))
     harness = harness or typer.prompt(
@@ -128,12 +136,12 @@ def init(
     except ValueError as exc:
         raise _refuse(
             str(exc),
-            f"{_INIT} {plan.directory} --harness {harness_registry.L1_ENTRY_HARNESSES[0]}",
+            replace(plan, harness=harness_registry.L1_ENTRY_HARNESSES[0]).command(),
         ) from None
 
     root = _root(plan.directory)
-    sibling_fix = (
-        f"{_INIT} {root.parent / ((root.name or 'dadaia') + '-workspace')} --harness {chosen}"
+    sibling_fix = replace(plan, harness=chosen).command(
+        root.parent / ((root.name or "dadaia") + "-workspace")
     )
     if root.exists() and not root.is_dir():
         raise _refuse(f"'{root}' is not a directory.", sibling_fix)
@@ -169,8 +177,7 @@ def init(
     else:
         console.print(f"[green]✓[/green] {len(installed)} asset(s) installed", highlight=False)
     console.print(f"CLI: {cli_path(root)}", markup=False, highlight=False, soft_wrap=True)
-    for note in filter(None, (_LAW_NOTE, harness_registry.HARNESS_RECORDS[chosen].init_note)):
-        console.print(note, markup=False, soft_wrap=True)
+    console.print(_LAW_NOTE, markup=False, soft_wrap=True)
 
     if action == "upgrade":
         _reconcile_upgrade(root, before, after)

@@ -77,11 +77,6 @@ def close(specs: Path, audit: str, sha: str) -> str:
     """Append the audit's ONE histo record, then delete the directory."""
     directory = audit_dir(specs, audit, f"{SCRIPT} close <audit-dir> --sha <window-end>")
     records = read_findings(directory)
-    if not records:
-        raise Refusal(
-            f"audit {audit!r} carries no findings — an audit closes on the record of what it found",
-            f"grep . specs/{AUDITS}/{audit}/{FINDINGS}",
-        )
     open_ids = [str(r.get("id")) for r in records if r.get("disposition") not in DISPOSITIONS]
     if open_ids:
         raise Refusal(

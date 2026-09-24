@@ -83,7 +83,8 @@ def test_absent_specs_scaffolds_lists_paths_and_commits_nothing(repo: Path) -> N
     assert _doctor_errors(repo / "specs") == []
     assert _git(repo, "rev-parse", "HEAD") == head
     template = _PUBLIC / "templates"
-    assert (repo / "AGENTS.md").read_bytes() == (template / "repo-AGENTS.md").read_bytes()
+    law = (template / "repo-AGENTS.md").read_text(encoding="utf-8")
+    assert (repo / "AGENTS.md").read_text(encoding="utf-8") == law.replace("<repo-name>", repo.name)
     # T-048-11: the tests law governs an existing test tree; init never invents one
     # (a manufactured tests/AGENTS.md is born with AGENTS-PLACEHOLDER-1 on a clean repo).
     assert not (repo / "tests").exists()

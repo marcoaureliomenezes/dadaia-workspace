@@ -252,10 +252,10 @@ def _resolve_run(
         raise typer.BadParameter("Pass either --context or --specs-dir, not both.")
     try:
         workspace_root = resolve_workspace_root()
-    except WorkspaceNotInitializedError:
+    except WorkspaceNotInitializedError as exc:
         if context is None and specs_dir is not None:
             return None, None, None, resolve_specs_dir_for_cli(specs_dir)
-        typer.echo("Error: Workspace not initialized. Run 'dadaia init' first.", err=True)
+        typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(1) from None
     service = container.build_doctor_service(workspace_root)
     if specs_dir is not None:

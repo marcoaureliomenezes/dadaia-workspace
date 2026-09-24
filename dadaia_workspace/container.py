@@ -10,10 +10,8 @@ if TYPE_CHECKING:
     from dadaia_workspace.features.certification import CertificationResult
     from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
-from dadaia_workspace.core.exceptions import (
-    WorkspaceNotInitializedError,
-)
 from dadaia_workspace.core.handoff_index import HandoffIndex
+from dadaia_workspace.core.workspace_resolver import not_initialized
 from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
 from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.import_.service import ImportService
@@ -65,9 +63,7 @@ def _states_dir(workspace_root: Path) -> Path:
 def _guard_initialized(workspace_root: Path) -> None:
     marker = _states_dir(workspace_root) / "spec_contexts.json"
     if not marker.exists():
-        raise WorkspaceNotInitializedError(
-            f"Workspace not initialized at '{workspace_root}'. Run 'dadaia init' first."
-        )
+        raise not_initialized(workspace_root)
 
 
 def build_workspace_service(workspace_root: Path) -> WorkspaceService:

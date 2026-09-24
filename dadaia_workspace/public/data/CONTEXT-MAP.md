@@ -35,8 +35,7 @@ path or entity as it appears in an installed workspace.
 - Every dd- skill that touches a governed area opens that area's scoped `AGENTS.md` as step 1,
   so the scoped law reaches every harness by procedure, not by loader luck.
 - Sessions launch at the workspace root: a `CLAUDE.md` inside `repos/<slug>/` hides the map
-  from a session started there; the operator's `instructionFiles: claude-md-and-agents-md`
-  setting removes that failure mode.
+  from a session started there.
 
 ## 2. The map and the scoped law
 

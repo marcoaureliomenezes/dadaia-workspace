@@ -319,19 +319,30 @@ def scaffold(
     return _write_absent(specs_dir, writes)
 
 
-def scaffold_repo_law(repo: Path, *, public_dir: Path | None = None) -> list[Path]:
+def scaffold_repo_law(
+    repo: Path, *, project_name: str, public_dir: Path | None = None
+) -> list[Path]:
     """Install the repo's scoped law (:data:`REPO_LAW`) where absent — never overwritten:
     once written it is the operator's — and only beside a directory the repo already has
-    (the tests law governs an existing test tree). Returns the paths written."""
+    (the tests law governs an existing test tree). ``<repo-name>`` renders as
+    *project_name*. Returns the paths written."""
     templates = (public_dir if public_dir is not None else default_public_dir()) / "templates"
     return _write_absent(
         repo,
         [
-            (repo / dest, (templates / template).read_text, False)
+            (
+                repo / dest,
+                partial(_fill_repo_name, templates / template, project_name),
+                False,
+            )
             for template, dest in REPO_LAW
             if (repo / dest).parent.is_dir()
         ],
     )
+
+
+def _fill_repo_name(template: Path, project_name: str) -> str:
+    return template.read_text(encoding="utf-8").replace("<repo-name>", project_name)
 
 
 def _write_absent(root: Path, writes: list[tuple[Path, Callable[[], str], bool]]) -> list[Path]:

@@ -120,6 +120,11 @@ _DEFAULT_FLOOR_MINOR = 12  # dadaia-workspace's floor today (pyproject.toml: pyt
 _VERSION_RE = re.compile(r"^(?P<release>\d+(?:\.\d+)*)(?:\+(?P<local>[a-z0-9.]+))?$")
 
 
+def _tail_lines(exc: subprocess.CalledProcessError, count: int = 5) -> str:
+    """The last *count* whole lines of a failed installer's output — never cut mid-line."""
+    return "\n".join((exc.stderr or exc.output or "").strip().splitlines()[-count:])
+
+
 def _version_key(version: str) -> tuple[tuple[int, ...], tuple[str, ...]]:
     """Order the versions dadaia-workspace publishes: ``M.m.p`` plus an optional local
     segment that sorts after its base (``0.4.7 < 0.4.7+e2e``). Anything else sorts lowest."""
@@ -398,7 +403,7 @@ class VenvPythonEnvironmentManager:
                 # ensurepip (Debian's python3-venv split) says so; anything else is
                 # most often the noexec class one level deeper (ensurepip executing
                 # the freshly-copied interpreter inside a noexec target dir).
-                stderr_tail = (exc.stderr or exc.output or "").strip()[-500:]
+                stderr_tail = _tail_lines(exc)
                 cause = (
                     "the base Python lacks the 'ensurepip'/'venv' modules (on Debian/"
                     "Ubuntu install python3-venv), then retry."
@@ -435,10 +440,10 @@ class VenvPythonEnvironmentManager:
                 try:
                     subprocess.run(install_cmd, check=True, capture_output=True, text=True)
                 except subprocess.CalledProcessError as exc:
-                    pip_tail = (exc.stderr or exc.output or "").strip()[-400:]
                     raise WorkspaceVenvBootstrapError(
-                        f"workspace venv bootstrap failed installing '{spec}'. Installer "
-                        f"output: {pip_tail}"
+                        f"workspace venv bootstrap failed installing '{spec}'. The "
+                        "workspace venv resolves its dependencies from PyPI (network "
+                        f"required). Installer output:\n{_tail_lines(exc)}"
                     ) from exc
             self._ensure_ci_toolchain(pip)
             # Success is only reported after the venv provider VERIFIES independently
