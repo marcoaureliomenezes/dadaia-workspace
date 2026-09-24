@@ -24,7 +24,7 @@ def test_skill_carries_the_first_pass_statements() -> None:
     section = text.split("## 3. First pass", 1)[1].split("\n## ", 1)[0]
     for statement in (
         "audits_histo.jsonl` holds no record",
-        "memory.py drift --since $(git rev-list --max-parents=0 HEAD) --specs <specs>",
+        "memory.py drift --since $(git -C repos/<slug> rev-list --max-parents=0 HEAD) --specs repos/<slug>/specs",
         "`dd-product-engineer` fills `ARCHITECTURE.md`, `QUALITY.md` and the product atoms",
         "`specs-bkp/`",
         "`memory.py check` exit 0",
@@ -73,3 +73,18 @@ def test_drift_from_root_exits_zero_once_the_worklist_is_covered(repo: Path) -> 
     result = _drift(repo, {"features": [feature]})
     assert result.returncode == 0, result.stdout + result.stderr
     assert "nothing drifted" in result.stdout
+
+
+def test_drift_from_root_lists_units_of_a_consumer_layout(tmp_path: Path) -> None:
+    """A consumer repo shares nothing with the library's layout: its units come from its
+    own tracked code — every directory holding a code file, outside specs/tests/docs."""
+    for path in ("app/core.py", "src/svc/api/routes.ts", "tests/test_core.py", "docs/x.md"):
+        (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / path).write_text("x\n", encoding="utf-8")
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-qm", "root")
+    result = _drift(tmp_path, {"features": []})
+    assert result.returncode == 1, result.stderr
+    listed = [line.split()[1] for line in result.stdout.splitlines() if "uncovered" in line]
+    assert listed == ["app", "src/svc/api"]

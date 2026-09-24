@@ -113,14 +113,14 @@ def test_a_changed_source_lists_its_atom_with_the_matched_path(script: Path, rep
     ]
 
 
-def test_every_package_and_hook_no_atom_covers_is_listed(script: Path, repo: Path) -> None:
+def test_every_code_directory_no_atom_covers_is_listed(script: Path, repo: Path) -> None:
     base = _git(repo, "rev-parse", "HEAD")
 
     report = json.loads(_run(script, repo, "--since", base, "--json").stdout)
 
     assert report["uncovered"] == [
         "dadaia_workspace/features/beta",
-        "dadaia_workspace/hooks/ctx_inject.py",
+        "dadaia_workspace/hooks",
     ]
 
 
