@@ -6,11 +6,11 @@ import typer
 from rich.console import Console
 
 from dadaia_workspace import container
-from dadaia_workspace.cli.commands.context import resolve_own_session_id
-from dadaia_workspace.core import harness_registry
-from dadaia_workspace.core.exceptions import DadaiaError
+from dadaia_workspace.cli.commands.context import bind_session
+from dadaia_workspace.core import harness_registry, session_store
+from dadaia_workspace.core.exceptions import ContextAlreadyExistsError, DadaiaError
 from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
-from dadaia_workspace.features.workspace.bootstrap import bootstrap_repo
+from dadaia_workspace.features.spec_context.service import slug_from_url
 
 console = Console()
 app = typer.Typer()
@@ -23,7 +23,7 @@ app = typer.Typer()
 _LAW_NOTE = "Sessions launch at the workspace root."
 _PROJECTS_NOTE = (
     "Projects live under repos/ — make the first with "
-    f"`{DADAIA_BIN} context create <name> --main-repo <slug> --url <url>`."
+    f"`{DADAIA_BIN} context create --main-repo <url>`."
 )
 
 
@@ -129,22 +129,18 @@ def init(
             console.print(note, markup=False, soft_wrap=True)
         return
 
-    # --repo: `init` is a CALLER of the context lifecycle. The clone, the registration
-    # and the binding are the implementations `context create|alive|bind` run — reached
-    # here by composition, so the two entry points can never disagree.
-    session_id = resolve_own_session_id(mint=True)
-    if session_id is None:  # pragma: no cover — mint=True always yields one
-        raise RuntimeError("session-id resolution returned None despite mint=True")
+    # --repo: `init` is a CALLER of `context create` (T-048-04 reshapes it). Re-running
+    # the identical command stays a no-op: a context already holding THIS url is reused.
     ctx_svc = container.build_spec_context_service(root)
     try:
-        slug, env_lines = bootstrap_repo(
-            root,
-            repo,
-            session_id=session_id,
-            create_context=ctx_svc.create,
-            main_repo_url=lambda name: ctx_svc.show(name).repo_url,
-            alive_context=ctx_svc.alive,
-        )
+        try:
+            slug = ctx_svc.create(repo).name
+        except ContextAlreadyExistsError:
+            slug = slug_from_url(repo)
+            if ctx_svc.show(slug).repo_url != repo:
+                raise
+            ctx_svc.alive(slug)
+        env_lines = session_store.binding_env_lines(slug, bind_session(root, slug))
     except (DadaiaError, OSError) as exc:
         typer.secho(f"Error: {exc}", err=True, fg=typer.colors.RED)
         typer.secho(

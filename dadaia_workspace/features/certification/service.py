@@ -381,16 +381,7 @@ def certify(
 
     def empty_remote() -> str:
         _git(process, run_root, "init", "--bare", str(bare))
-        cli(
-            "context",
-            "create",
-            "certified-consumer",
-            "--main-repo",
-            "certified-consumer",
-            "--url",
-            str(bare),
-        )
-        cli("context", "alive", "certified-consumer")
+        cli("context", "create", "certified-consumer", "--main-repo", str(bare))
         repo = target / "repos" / "certified-consumer"
         _git(process, repo, "config", "user.email", "certify@dadaia.invalid")
         _git(process, repo, "config", "user.name", "dadaia-certify")

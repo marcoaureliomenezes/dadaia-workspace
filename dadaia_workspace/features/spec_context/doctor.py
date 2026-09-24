@@ -237,7 +237,7 @@ class DoctorService:
                             f"(un-portable). Re-run 'dadaia context alive {ctx.name}' "
                             "while the repo's origin remote is on disk to back-fill it; "
                             "with no such remote, 'dadaia context delete' and "
-                            "'dadaia context create --url <url>' re-register it."
+                            "'dadaia context create --main-repo <url>' re-registers it."
                         ),
                         fixable=False,
                     )

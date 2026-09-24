@@ -22,7 +22,7 @@ from pathlib import Path  # noqa: E402
 
 from dadaia_workspace.core.models.spec_context import ContextState  # noqa: E402
 from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
-from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
+from tests.fakes import FakeContextStore, FakeGitClient, register_dead  # noqa: E402
 
 
 @pytest.fixture()
@@ -67,7 +67,7 @@ def test_dead_succeeds_on_non_writable_files(
     read-only files (git loose objects are 0444 BY DESIGN) no longer refuse dead() —
     rmtree runs with a chmod-and-retry handler, replacing the old GitSyncError guard.
     """
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    register_dead(service, "proj", "my-repo", "https://github.com/org/my-repo")
     service.alive("proj")
 
     repo = workspace_root / "repos" / "my-repo"
@@ -96,7 +96,7 @@ def test_alive_leaves_a_preexisting_specs_tree_untouched_and_hooks_the_repo(
         workspace_root=workspace_root,
         install_hooks=hooked.append,
     )
-    svc.create("proj", "my-repo", "https://github.com/org/my-repo")
+    register_dead(svc, "proj", "my-repo", "https://github.com/org/my-repo")
     repo = workspace_root / "repos" / "my-repo"
     (repo / "specs").mkdir(parents=True)
     (repo / "specs" / "constitution.md").write_text("# operator\n", encoding="utf-8")

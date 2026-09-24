@@ -21,8 +21,10 @@ from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     ContextState,
     SpecContextProject,
 )
-from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
-from dadaia_workspace.features.workspace.bootstrap import install_git_hooks  # noqa: E402
+from dadaia_workspace.features.spec_context.service import (
+    SpecContextService,  # noqa: E402
+    install_git_hooks,  # noqa: E402
+)
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
 from tests.fakes import FakeContextStore  # noqa: E402
 

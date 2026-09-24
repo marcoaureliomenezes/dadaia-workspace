@@ -33,7 +33,7 @@ from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     SpecContextProject,
 )
 from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
-from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
+from tests.fakes import FakeContextStore, FakeGitClient, register_dead  # noqa: E402
 
 
 @pytest.fixture()
@@ -255,7 +255,7 @@ def test_create_refuses_slug_owned_by_another_context_as_main_repo(
     _seed_other(store, "other-proj", "other-repo")
 
     with pytest.raises(AssociatedRepoConflictError, match="other-proj"):
-        service.create("new-proj", "other-repo", "https://github.com/org/other-repo")
+        register_dead(service, "new-proj", "other-repo", "https://github.com/org/other-repo")
 
     # Refused cleanly: no context was registered under the refused name.
     assert store.get("new-proj") is None
@@ -277,7 +277,7 @@ def test_create_refuses_slug_owned_by_another_context_as_associated_repo(
     )
 
     with pytest.raises(AssociatedRepoConflictError, match="other-proj"):
-        service.create("new-proj", "other-assoc", "https://github.com/org/other-assoc")
+        register_dead(service, "new-proj", "other-assoc", "https://github.com/org/other-assoc")
 
     assert store.get("new-proj") is None
 
@@ -290,7 +290,7 @@ def test_create_unowned_slug_is_still_accepted_no_regression(
     ownership conflicts, never slugs in general)."""
     _seed_other(store, "other-proj", "other-repo")
 
-    ctx = service.create("new-proj", "brand-new-repo", "https://github.com/org/new")
+    ctx = register_dead(service, "new-proj", "brand-new-repo", "https://github.com/org/new")
 
     assert ctx.repo_slug == "brand-new-repo"
     assert store.get("new-proj") is not None
@@ -365,7 +365,7 @@ def test_create_refuses_a_name_or_slug_outside_the_allowlist(
     writer and `dadaia import` the unguarded one. The allowlist now lives at
     `SpecContextService.register`, the ONE seam every registry insert goes through."""
     with pytest.raises(InvalidContextNameError, match="letters, digits"):
-        service.create(name, slug, "https://github.com/org/x")
+        register_dead(service, name, slug, "https://github.com/org/x")
 
     assert store.list_all() == []
 
@@ -377,10 +377,10 @@ def test_create_refuses_an_associated_slug_that_collides_or_repeats(
     given twice, is refused before anything is written."""
     own = AssociatedRepo(slug="main-repo", url="u")
     with pytest.raises(AssociatedRepoConflictError, match="own main repo"):
-        service.create("proj", "main-repo", "u", associated_repos=(own,))
+        register_dead(service, "proj", "main-repo", "u", associated_repos=(own,))
     twice = (AssociatedRepo(slug="infra", url="u"), AssociatedRepo(slug="infra", url="u"))
     with pytest.raises(AssociatedRepoConflictError, match="more than once"):
-        service.create("proj", "main-repo", "u", associated_repos=twice)
+        register_dead(service, "proj", "main-repo", "u", associated_repos=twice)
 
     assert store.list_all() == []
 
@@ -390,7 +390,9 @@ def test_create_registers_associated_repos_in_the_same_guarded_write(
 ) -> None:
     assoc = (AssociatedRepo(slug="infra", url="https://github.com/org/infra"),)
 
-    ctx = service.create("proj", "main-repo", "https://github.com/org/main", associated_repos=assoc)
+    ctx = register_dead(
+        service, "proj", "main-repo", "https://github.com/org/main", associated_repos=assoc
+    )
 
     assert ctx.associated_repos == assoc
     assert store.get("proj") == ctx
