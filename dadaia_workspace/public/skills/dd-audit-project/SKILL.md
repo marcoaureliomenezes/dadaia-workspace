@@ -36,7 +36,7 @@ three is not an audit. Append one `FINDINGS.jsonl` record per claim
 - Applies when `specs/audits/_archive/audits_histo.jsonl` holds no record: no window exists yet.
 - Worklist: `python3 .agents/skills/dd-spec-navigator/scripts/memory.py drift --since $(git -C repos/<slug> rev-list --max-parents=0 HEAD) --specs repos/<slug>/specs` — every uncovered unit from the first commit.
 - `dd-product-engineer` fills `ARCHITECTURE.md`, `QUALITY.md` and the product atoms from the code, and from `specs-bkp/` when present.
-- Done = every worklist line covered and `memory.py check` exit 0; then append the `audits_histo.jsonl` stamp — the next audit's window starts there.
+- Done = every worklist line covered and `memory.py check` exit 0; then stamp the window: create an empty `specs/audits/<YYYYMMDD>-first-pass/FINDINGS.jsonl`, run `python3 .agents/skills/dd-audit-project/scripts/audit.py close <YYYYMMDD>-first-pass --sha <HEAD sha> --specs repos/<slug>/specs`.
 
 ## 4. Done when
 

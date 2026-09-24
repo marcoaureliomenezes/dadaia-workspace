@@ -28,7 +28,7 @@ def test_skill_carries_the_first_pass_statements() -> None:
         "`dd-product-engineer` fills `ARCHITECTURE.md`, `QUALITY.md` and the product atoms",
         "`specs-bkp/`",
         "`memory.py check` exit 0",
-        "append the `audits_histo.jsonl` stamp",
+        "audit.py close <YYYYMMDD>-first-pass --sha <HEAD sha>",
     ):
         assert statement in section, statement
 
