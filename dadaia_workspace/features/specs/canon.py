@@ -60,6 +60,7 @@ and a git tree listing (``git ls-tree``'s own native output) already produce.
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -89,6 +90,8 @@ from dadaia_workspace.features.specs.memory_canon import (
 #: canonical names, shared with the root law, the zone table and the projected
 #: ``specs/AGENTS.md`` canon table). This module is their renderer and checker.
 CANON: tuple[CanonEntry, ...] = SPECS_CANON
+
+_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
 
 __all__ = [
     "CANON",
@@ -312,7 +315,7 @@ def scaffold(
         for entry in CANON
         if entry.required_at_birth and entry.dest is not None
     ]
-    return _write_absent(writes)
+    return _write_absent(specs_dir, writes)
 
 
 def scaffold_repo_law(repo: Path, *, public_dir: Path | None = None) -> list[Path]:
@@ -321,23 +324,32 @@ def scaffold_repo_law(repo: Path, *, public_dir: Path | None = None) -> list[Pat
     (the tests law governs an existing test tree). Returns the paths written."""
     templates = (public_dir if public_dir is not None else default_public_dir()) / "templates"
     return _write_absent(
+        repo,
         [
             (repo / dest, (templates / template).read_text, False)
             for template, dest in REPO_LAW
             if (repo / dest).parent.is_dir()
-        ]
+        ],
     )
 
 
-def _write_absent(writes: list[tuple[Path, Callable[[], str], bool]]) -> list[Path]:
-    """The one scaffold write: each ``(target, render, overwrite)`` whose target is absent
-    (or *overwrite*); a symlinked target is never written through."""
+def _write_absent(root: Path, writes: list[tuple[Path, Callable[[], str], bool]]) -> list[Path]:
+    """The one scaffold write under *root*: each ``(target, render, overwrite)`` through one
+    ``O_CREAT|O_NOFOLLOW`` open (``O_EXCL`` unless *overwrite*) — never through a symlinked
+    destination or a symlinked directory between *root* and it (CWE-59/CWE-367)."""
     created: list[Path] = []
     for target, render, overwrite in writes:
-        if target.is_symlink() or (target.exists() and not overwrite):
+        anchor = next(p for p in (target.parent, *target.parent.parents) if p.exists() or p == root)
+        if root.is_symlink() or anchor.resolve() != root.resolve() / anchor.relative_to(root):
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(render(), encoding="utf-8")
+        flags = os.O_WRONLY | os.O_CREAT | _NOFOLLOW | (os.O_TRUNC if overwrite else os.O_EXCL)
+        try:
+            fd = os.open(target, flags, 0o644)
+        except OSError:
+            continue
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(render())
         created.append(target)
     return created
 

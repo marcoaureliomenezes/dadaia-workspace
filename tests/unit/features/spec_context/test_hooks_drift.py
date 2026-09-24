@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.spec_context.doctor import DoctorService, workspace_rules
@@ -79,8 +81,32 @@ def test_a_repo_that_is_not_a_git_checkout_is_never_a_finding(tmp_path: Path) ->
 def test_the_finding_carries_the_runnable_install_verb() -> None:
     """The fix must be one executable line, and the verb must exist (0.4.7 FR2)."""
     rule = next(r for r in workspace_rules() if "HOOKS-DRIFT-1" in r.codes)
-    assert rule.fix_help == ".dadaia/.venv/bin/dadaia ci install-hook --force"
+    assert rule.fix_help == ".dadaia/.venv/bin/dadaia ci install-hook --force --repo <repo>"
     assert rule.section == "workspace"
+
+
+def test_the_fix_line_run_from_the_workspace_root_rehooks_the_named_repo(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review finding 5 (T-048-02): the finding names its repo, and its fix line, run from
+    the workspace root (itself a git checkout), re-hooks THAT repo — not the root's."""
+    import subprocess
+
+    from typer.testing import CliRunner
+
+    from dadaia_workspace.cli.main import app
+
+    root = _workspace(tmp_path, drifted=True)
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    [issue] = DoctorService(_Store([_ctx("demo")]), None, root).check_installed_hooks()  # type: ignore[arg-type]
+    fix = issue.fix.split()
+    monkeypatch.chdir(root)
+
+    result = CliRunner().invoke(app, fix[1:])
+
+    assert result.exit_code == 0, result.output
+    assert _codes(root, [_ctx("demo")]) == []
+    assert not (root / ".git" / "hooks" / "pre-push").exists()
 
 
 def test_the_shipped_hook_registry_names_the_pre_push_chokepoint() -> None:

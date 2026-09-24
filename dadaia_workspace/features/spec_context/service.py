@@ -43,8 +43,8 @@ _log = logging.getLogger(__name__)
 class InstallHooks(Protocol):
     """The one git-chokepoint installer ``alive()`` runs in every repo of the set —
     injected by the composition root (P-07: features compose through the container,
-    never a sibling import). Overwrites an installed hook; raises when *repo_root* is
-    not a git repository.
+    never a sibling import). Installs where absent, never over an existing hook; raises
+    when *repo_root* is not a git repository.
     """
 
     def __call__(self, repo_root: Path) -> object: ...
@@ -140,9 +140,10 @@ def install_git_hooks(repo_root: Path, *, force: bool = False) -> list[Path]:
     """Copy every ``workspace_layout.INSTALLED_GIT_HOOKS`` row into ``<repo>/.git/hooks``.
 
     The ONE git-chokepoint installer — `dadaia ci install-hook`, `context create` and
-    `context alive` are its callers. Raises :class:`FileNotFoundError` when *repo_root*
-    is not a git repository and :class:`FileExistsError` for an installed hook the
-    caller did not ask to overwrite; nothing is written in either case.
+    `context alive` are its callers. An installed hook is overwritten only when *force*
+    (never the operator's own hook in an adopted checkout: doctor's HOOKS-DRIFT-1 names
+    it). Returns the hooks written; raises :class:`FileNotFoundError` when *repo_root* is
+    not a git repository.
     """
     hooks_dir = repo_root / ".git" / "hooks"
     if not hooks_dir.is_dir():
@@ -151,10 +152,8 @@ def install_git_hooks(repo_root: Path, *, force: bool = False) -> list[Path]:
     planned = [
         (hooks_dir / target, scripts / source)
         for target, source in workspace_layout.INSTALLED_GIT_HOOKS
+        if force or not (hooks_dir / target).exists()
     ]
-    for dest, _ in planned:
-        if dest.exists() and not force:
-            raise FileExistsError(str(dest))
     for dest, source in planned:
         shutil.copyfile(source, dest)
         dest.chmod(0o755)

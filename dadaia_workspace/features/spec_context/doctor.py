@@ -101,6 +101,7 @@ class DoctorIssue:
     code: str
     description: str
     fixable: bool
+    fix: str = ""
 
 
 class DoctorService:
@@ -158,6 +159,7 @@ class DoctorService:
                                 "than what this release ships."
                             ),
                             fixable=False,
+                            fix=f"{DADAIA_BIN} ci install-hook --force --repo {rel}",
                         )
                     )
         return issues
@@ -777,6 +779,7 @@ def workspace_rules(
                 message=issue.description,
                 canonical=False,
                 error=True,
+                fix=issue.fix,
             )
             for issue in service.check_installed_hooks(context)
         ]
@@ -807,7 +810,7 @@ def workspace_rules(
             ("HOOKS-DRIFT-1",),
             SECTION,
             installed_hooks,
-            fix_help=f"{DADAIA_BIN} ci install-hook --force",
+            fix_help=f"{DADAIA_BIN} ci install-hook --force --repo <repo>",
         ),
         Rule(
             ("WS-ENTRY",),
