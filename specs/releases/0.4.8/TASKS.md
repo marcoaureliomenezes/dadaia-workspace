@@ -23,7 +23,7 @@ Paths under `dadaia_workspace/` abbreviated `dw/`. Tasks in one parallel group (
   `tests/unit/**` + `tests/integration/**` covering specs_backup/alive
   `blocked by:` — · `group:` P1 · `delivers:` AC3.7 (alive half), AC4.7, AC9.1 (part)
 
-- [ ] **T-048-03 — context create is one transactional step.**
+- [-] **T-048-03 — context create is one transactional step.**
   `create [<name>] --main-repo <url> [--associated-repo <url>]…`: clone (or adopt a matching `origin`), hook, ALIVE,
   bind; rollback of every dir it created on failure; one slug rule (AC3.2); fix line rebuilt from the parsed
   invocation (RV1); `--url`/`--associated-repos` removed. Move `install_git_hooks`/`slug_from_url` into
