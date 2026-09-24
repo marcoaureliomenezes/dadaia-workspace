@@ -112,7 +112,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("TREE-1",),
         lambda d: d._structural.check_tree1_foundation(),
-        fix_help=f"{DADAIA_BIN} specs upgrade --specs-dir <specs>",
+        # No fix line: no command migrates foundation/; operator consent. WARNING-only.
     ),
     _rule(
         ("TREE-2",),
@@ -145,8 +145,9 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("TREE-8",),
         lambda d: d._structural.check_tree8_canon_root(),
-        fix=lambda d, i: d._structural.fix_tree8(i),
-        fix_help=f"{DADAIA_BIN} doctor --fix",
+        # Never auto-fixed (operator decision D8): content vs slop is the operator's call.
+        # Plain mv serves untracked files and paths with no canon home alike.
+        fix_help="mv <path> <canon path|outside specs/>",
     ),
     _rule(
         ("CAT-1",),

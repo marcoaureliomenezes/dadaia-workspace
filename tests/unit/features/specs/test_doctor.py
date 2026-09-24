@@ -582,11 +582,7 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
     issues7 = doctor7.check()
     tree7 = [i for i in issues7 if i.code == "TREE-7"]
     assert tree7 and tree7[0].severity == Severity.ERROR and not tree7[0].fixable
-    # Fix only the TREE-7 finding itself (fixable=False, so this is a no-op for it) —
-    # the fuller issues7 set now ALSO carries a TREE-8 finding for this same legacy
-    # per-bug .md file (non-canon under v6: bugs/ permits only AGENTS.md/BUGS.jsonl/
-    # _archive/bugs_histo.jsonl), and TREE-8 IS fixable — invoking the full set would
-    # correctly delete it under TREE-8, which is not what this assertion is about.
+    # Fix only the TREE-7 finding itself (fixable=False, so this is a no-op for it).
     doctor7.fix(tree7)
     assert bug_path.read_text(encoding="utf-8") == original
 

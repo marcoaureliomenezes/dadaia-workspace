@@ -30,7 +30,7 @@ agreement.
 
 ## Lesson 1 — a per-caller fix breeds the next caller's bug
 
-<!-- derived-from: context-management sha256:0227a5e43894 -->
+<!-- derived-from: context-management sha256:896b60268c5d -->
 <!-- derived-from: bug-ledger sha256:9534ded07707 -->
 
 When a guard lives at the caller that was just caught, the next caller without it is

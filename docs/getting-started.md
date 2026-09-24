@@ -5,8 +5,8 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
-<!-- derived-from: workspace-init sha256:ca5c835e94af -->
+<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
+<!-- derived-from: workspace-init sha256:bc26cf0b24e2 -->
 
 ```bash
 python -m venv .venv && .venv/bin/pip install dadaia-workspace
@@ -15,13 +15,13 @@ python -m venv .venv && .venv/bin/pip install dadaia-workspace
 `pip install dadaia-workspace` installs the library and one CLI under two
 console-script names, `dadaia` and `dadaia-workspace`; `uvx dadaia-workspace init
 <dir> --harness <name> --repo <url>` runs the next step without an install. The wheel
-ships `dadaia_workspace/` with the full public asset tree, so the next step works
-offline from a bare install. The workspace you create keeps its own virtualenv at
+ships `dadaia_workspace/` with the full public asset tree; the next step still resolves
+the workspace venv's dependencies from PyPI, so it needs network access. The workspace you create keeps its own virtualenv at
 `.dadaia/.venv`, which `dadaia init` provisions.
 
 ## Provision the workspace — `dadaia init`
 
-<!-- derived-from: workspace-init sha256:ca5c835e94af -->
+<!-- derived-from: workspace-init sha256:bc26cf0b24e2 -->
 
 ```bash
 dadaia init <dir> --harness claude|codex|kimi-code|cursor|devin|copilot [--repo <url>] [--skip-assets]
@@ -46,22 +46,22 @@ With `--repo <url>`, `init` clones the repo into `repos/<slug>/` and composes th
 context verbs — `create --main-repo <slug>`, `alive`, the session bind, printing the
 `--print-env` line — then installs the pre-push hook. A re-run with the same URL reuses
 the context, and a failed clone prints the same command as its `fix:`. Without
-`--repo`, `init` closes with three lines: sessions launch at the root, the harness's
-law-loading note, and the `dadaia context create <name> --main-repo <slug>` that makes
+`--repo`, `init` closes by stating that sessions launch at the root, the harness's
+law-loading note when it has one, and the `dadaia context create <name> --main-repo <slug> --url <url>` that makes
 the first project. `init` deletes no projection; `dadaia harness add <name>` adds a
 harness later and `dadaia harness list` reads the roster.
 
 ## Bind a context — `dadaia context bind`
 
 <!-- derived-from: spec-context-project sha256:15dae861d543 -->
-<!-- derived-from: context-management sha256:0227a5e43894 -->
+<!-- derived-from: context-management sha256:896b60268c5d -->
 
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
 owned by one main repository, optionally spanning associated repositories that live and
 die with it. Specs, bind, memory, releases and backlog resolve only from the main repo.
 
 ```bash
-dadaia context create <ctx> --main-repo <slug> # registers it DEAD
+dadaia context create <ctx> --main-repo <slug> --url <url> # registers it DEAD
 dadaia context alive <ctx>                     # clones the repos, folds the canon scaffold over specs/
 dadaia context bind <ctx>                      # this session's scope
 dadaia context show <ctx> --json               # the repo set
@@ -79,7 +79,7 @@ header, `ARCHITECTURE.md`'s `## Tech Stack` section and the memory catalog diges
 
 ## Check compliance — `dadaia doctor`
 
-<!-- derived-from: workspace-doctor sha256:ef9c81d0d181 -->
+<!-- derived-from: workspace-doctor sha256:11d53d7927db -->
 
 ```bash
 dadaia doctor --context <ctx> [--json] [--fix] [--redact]

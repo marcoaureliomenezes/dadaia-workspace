@@ -9,27 +9,27 @@ from dadaia_workspace import container
 from dadaia_workspace.cli.commands.context import resolve_own_session_id
 from dadaia_workspace.core import harness_registry
 from dadaia_workspace.core.exceptions import DadaiaError
+from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.features.workspace.bootstrap import bootstrap_repo
 
 console = Console()
 app = typer.Typer()
 
-#: Printed once at the end of a successful init that got no ``--repo``. The first line is the law
-#: (sessions launch at the workspace root); the second is a RECOMMENDATION about the
-#: operator's own ``~/.claude/settings.json`` — the library prints it and never writes
-#: user settings, so a stray repo-level ``CLAUDE.md`` hiding the workspace
-#: ``AGENTS.md`` stays the operator's decision to prevent. The third names where projects
-#: live and the ONE verb that makes the first one — a single-repo workspace is the
-#: degenerate multi-repo case, so no other context verb is visible before the second
-#: project. With ``--repo`` these are replaced by the binding's export lines.
-_CLOSING_NOTES = (
-    "Sessions launch at the workspace root.",
-    "Claude Code: set `instructionFiles: claude-md-and-agents-md` in your user settings "
-    "(~/.claude/settings.json) so a stray CLAUDE.md in a repo never hides the workspace "
-    "AGENTS.md.",
+#: Printed once at the end of a successful init that got no ``--repo``, around the chosen
+#: harness's own ``init_note`` (the registry owns per-harness advice; the library prints
+#: it and never writes user settings). The first line is the law (sessions launch at the
+#: workspace root); the last names where projects live and the ONE verb that makes the
+#: first. With ``--repo`` these are replaced by the binding's export lines.
+_LAW_NOTE = "Sessions launch at the workspace root."
+_PROJECTS_NOTE = (
     "Projects live under repos/ — make the first with "
-    "`dadaia context create <name> --main-repo <slug> --url <url>`.",
+    f"`{DADAIA_BIN} context create <name> --main-repo <slug> --url <url>`."
 )
+
+
+#: How ``init`` is invoked before any workspace (and so any ``.dadaia/.venv``) exists —
+#: every ``fix:`` line init prints starts here, so each one runs as printed.
+_INIT = "uvx dadaia-workspace init"
 
 
 def _refuse(message: str, fix: str) -> typer.Exit:
@@ -65,30 +65,30 @@ def init(
         raise _refuse(
             "--harness is required: a workspace is born with exactly one agent runtime "
             f"({', '.join(harness_registry.L1_ENTRY_HARNESSES)}); "
-            "`dadaia harness add <name>` adds any other later.",
-            f"dadaia init {directory} --harness {harness_registry.L1_ENTRY_HARNESSES[0]}",
+            f"`{DADAIA_BIN} harness add <name>` adds any other later.",
+            f"{_INIT} {directory} --harness {harness_registry.L1_ENTRY_HARNESSES[0]}",
         )
     try:
         chosen = harness_registry.parse_harness_name(harness)
     except ValueError as exc:
         raise _refuse(
             str(exc),
-            f"dadaia init {directory} --harness {harness_registry.L1_ENTRY_HARNESSES[0]}",
+            f"{_INIT} {directory} --harness {harness_registry.L1_ENTRY_HARNESSES[0]}",
         ) from None
 
     # The seam is argv: the directory is a parameter, never resolved from cwd.
     root = Path(directory).expanduser()
     root = (Path.cwd() / root).resolve() if not root.is_absolute() else root.resolve()
+    sibling_fix = (
+        f"{_INIT} {root.parent / ((root.name or 'dadaia') + '-workspace')} --harness {chosen}"
+    )
     if root.exists() and not root.is_dir():
-        raise _refuse(
-            f"'{root}' is not a directory.", f"dadaia init {directory}-workspace --harness {chosen}"
-        )
+        raise _refuse(f"'{root}' is not a directory.", sibling_fix)
     # A directory that already holds `.dadaia/` is THIS workspace (a re-run, idempotent);
     # anything else non-empty is a foreign tree and is never scaffolded over.
     if root.is_dir() and any(root.iterdir()) and not (root / ".dadaia").is_dir():
         raise _refuse(
-            f"'{root}' already holds a foreign tree (not a dadaia workspace).",
-            f"dadaia init {directory}-workspace --harness {chosen}",
+            f"'{root}' already holds a foreign tree (not a dadaia workspace).", sibling_fix
         )
     root.mkdir(parents=True, exist_ok=True)
 
@@ -124,7 +124,8 @@ def init(
             console.print("[dim]No new assets to install (all up to date)[/dim]")
 
     if not repo:
-        for note in _CLOSING_NOTES:
+        notes = (_LAW_NOTE, harness_registry.HARNESS_RECORDS[chosen].init_note, _PROJECTS_NOTE)
+        for note in filter(None, notes):
             console.print(note, markup=False, soft_wrap=True)
         return
 
@@ -147,7 +148,7 @@ def init(
     except (DadaiaError, OSError) as exc:
         typer.secho(f"Error: {exc}", err=True, fg=typer.colors.RED)
         typer.secho(
-            f"fix: dadaia init {directory} --harness {chosen} --repo <a reachable clone URL>",
+            f"fix: {_INIT} {directory} --harness {chosen} --repo <a reachable clone URL>",
             err=True,
             fg=typer.colors.RED,
         )

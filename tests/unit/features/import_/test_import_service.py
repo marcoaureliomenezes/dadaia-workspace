@@ -137,6 +137,7 @@ def test_import_saves_unknown_names_dead_and_skips_known_names(tmp_path: Path) -
             ),
             "letters, digits",
         ),
+        (_record("no-url", "no-url", repo_url=""), "no clone URL"),
     ],
 )
 def test_import_skips_and_never_writes_a_record_the_registry_guard_refuses(

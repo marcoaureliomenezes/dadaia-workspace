@@ -10,22 +10,22 @@
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
-<!-- derived-from: workspace-init sha256:ca5c835e94af -->
+<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
+<!-- derived-from: workspace-init sha256:bc26cf0b24e2 -->
 
 - [PyPI project](https://pypi.org/project/dadaia-workspace/): `pip install dadaia-workspace`, then `dadaia init <dir> --harness <name> [--repo <url>]`; `uvx dadaia-workspace init …` runs without an install.
 - [Changelog](CHANGELOG.md): written by release-please, one section per released version.
 
 ## The law
 
-<!-- derived-from: agentic-entities sha256:98cb81d2e72c -->
-<!-- derived-from: sdd-gate-v3 sha256:ea8939698674 -->
+<!-- derived-from: agentic-entities sha256:9f356fd0a4ec -->
+<!-- derived-from: sdd-gate-v3 sha256:f5759190d3a1 -->
 
 - [AGENTS.md](dadaia_workspace/public/data/AGENTS.md): the always-on root map — flow, roles, gate invariants, where things live, the index of every scoped `AGENTS.md` and skill; projected once to the workspace root.
 
 ## Reference
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
+<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
 
 - [CLI reference](docs/cli.md): the committed output of `dadaia help tree`.
 - [Concepts](docs/concepts.md): the vocabulary — context, release, candidate, gate, memory, ledgers, audits.
@@ -36,7 +36,7 @@
 
 ## The site
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
+<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
 <!-- derived-from: product-vision sha256:164c4a8b0eca -->
 
 - [Documentation site](https://marcoaureliomenezes.github.io/dadaia-workspace/): GitHub Pages serving `docs/` from `main`, every page derived under its markers.

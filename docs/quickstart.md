@@ -6,32 +6,27 @@ compliance checked, one backlog entry filed and one release live. Terms are defi
 
 ## 1. Install
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
-<!-- derived-from: workspace-init sha256:ca5c835e94af -->
+<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
+<!-- derived-from: workspace-init sha256:bc26cf0b24e2 -->
 
 ```bash
 uvx dadaia-workspace init demo --harness claude --repo https://github.com/<you>/<your-repo>.git
+cd demo
 ```
 
-One command, nothing installed globally (needs uv); or install once with pip:
-
-```bash
-python -m venv .venv && .venv/bin/pip install dadaia-workspace
-```
+One command, nothing installed globally (needs uv); `pip install dadaia-workspace`
+into any venv gives the same `init`. Every later command runs from `demo/` through the
+workspace's own CLI, `.dadaia/.venv/bin/dadaia`.
 
 `pip install dadaia-workspace` installs the library and one CLI under two
 console-script names, `dadaia` and `dadaia-workspace`, so the name a reader knows from
-PyPI works as a command. The wheel ships the full public asset tree, so `init` works
-offline; the workspace it creates keeps its own virtualenv at `.dadaia/.venv`.
+PyPI works as a command. The wheel ships the full public asset tree; `init` resolves
+the workspace venv's dependencies from PyPI, so it needs network access. The workspace
+it creates keeps its own virtualenv at `.dadaia/.venv`.
 
-## 2. Provision the workspace and its first project
+## 2. What the one line provisioned
 
-<!-- derived-from: workspace-init sha256:ca5c835e94af -->
-
-```bash
-dadaia init demo --harness claude --repo https://github.com/<you>/<your-repo>.git
-cd demo
-```
+<!-- derived-from: workspace-init sha256:bc26cf0b24e2 -->
 
 `--harness` names one registered harness: `claude` | `codex` | `kimi-code` | `cursor` |
 `devin` | `copilot`. The directory is required, a re-run is idempotent, and a directory
@@ -45,20 +40,20 @@ What the one line produces:
 - the staged and installed public assets, the one writer of every hook wiring;
   `--skip-assets` leaves the workspace ungated until `dadaia public install` runs, and
   the output says so.
-- with `--repo <url>`, the repo cloned into `repos/<slug>/`, a context created with
-  that slug as its main repo, made ALIVE and bound — `init` prints the `--print-env`
+- with `--repo <url>`, the repo cloned into `repos/<slug>/`, a context named after
+  that slug (`<your-repo>` here) created with it as its main repo, made ALIVE and bound — `init` prints the `--print-env`
   line — and the pre-push hook installed.
 
-Without `--repo`, `init` prints the `dadaia context create <name> --main-repo <slug>`
+Without `--repo`, `init` prints the `dadaia context create <name> --main-repo <slug> --url <url>`
 that makes the first project instead.
 
 ## 3. Bind the session
 
-<!-- derived-from: context-management sha256:0227a5e43894 -->
+<!-- derived-from: context-management sha256:896b60268c5d -->
 
 ```bash
-eval "$(dadaia context bind demo --print-env)"
-dadaia context show demo --json
+eval "$(.dadaia/.venv/bin/dadaia context bind <your-repo> --print-env)"
+.dadaia/.venv/bin/dadaia context show <your-repo> --json
 ```
 
 `bind` writes one record, `.dadaia/sessions/<session-id>.json` (context, runtime, pid,
@@ -70,10 +65,10 @@ record, never the cwd: sitting inside a repository is not a binding.
 
 ## 4. Check compliance
 
-<!-- derived-from: workspace-doctor sha256:ef9c81d0d181 -->
+<!-- derived-from: workspace-doctor sha256:11d53d7927db -->
 
 ```bash
-dadaia doctor --context demo
+.dadaia/.venv/bin/dadaia doctor --context <your-repo>
 ```
 
 `doctor` is the one instance validator; three sections run in fixed order —
@@ -88,11 +83,12 @@ run. `--fix` moves slop to `.dadaia/reaped/` and deletes only what a TTL expired
 
 ```bash
 python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new my-first-idea \
-  --title "What I want" --description "Why I want it"
+  --specs repos/<your-repo>/specs --title "What I want" --description "Why I want it"
 ```
 
 It appends one entry, born `idea`, to `specs/backlog/BACKLOG.json`'s `active[]` — the
-operator's demand queue; `--specs <path>` points it at a specs tree. The script is the
+operator's demand queue; from the workspace root `--specs` names the context's specs
+tree, since no `specs/` sits at or above the cwd. The script is the
 document's one writer and validator: every write validates the bytes it is about to
 commit. Only the operator creates demand.
 
@@ -102,7 +98,7 @@ commit. Only the operator creates demand.
 
 ```bash
 python3 .agents/skills/dd-release-implementation/scripts/release.py new 0.1.0 \
-  --origin backlog:my-first-idea
+  --specs repos/<your-repo>/specs --origin backlog:my-first-idea
 ```
 
 One birth act, all or nothing: a `SPEC.md` stub plus `_RELEASE.json` in `DEFINITION`

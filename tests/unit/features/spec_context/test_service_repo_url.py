@@ -1,7 +1,7 @@
 """Unit tests for the repo_url lifecycle (T-011-08 / FR-W2-03, ADR-7).
 
 Covers:
-- ``create`` persists an explicit repo_url (CLI layer overrides catalog; service stores it).
+- ``create`` persists an explicit repo_url and refuses an empty one with no checkout.
 - ``alive``/``dead`` back-fill repo_url from ``git remote get-url origin`` when the record
   URL is empty and the repo is on disk — exercised against a REAL ``GitSubprocessClient``
   with a local ``file://`` fixture remote as origin (per AC-W2-03).
@@ -20,6 +20,7 @@ import shutil  # noqa: E402
 import subprocess  # noqa: E402
 from pathlib import Path  # noqa: E402
 
+from dadaia_workspace.core.exceptions import RepoUrlMissingError  # noqa: E402
 from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     ContextState,
     SpecContextProject,
@@ -87,15 +88,25 @@ def _git(args: list[str], cwd: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_create_persists_explicit_and_empty_repo_url(
-    fake_service: SpecContextService, store: FakeContextStore
+def test_create_persists_a_url_and_admits_an_empty_one_only_over_a_checkout(
+    fake_service: SpecContextService, store: FakeContextStore, workspace_root: Path
 ) -> None:
+    """Bug context-create-admits-uncloneable-empty-url: a repo with no URL and no
+    ``repos/<slug>`` checkout is refused before any write — ``alive`` could only run
+    ``git clone ''``; over an existing checkout the empty URL stays (alive back-fills)."""
     ctx = fake_service.create("foo", "foo", "https://example.test/foo.git")
     assert ctx.repo_url == "https://example.test/foo.git"
     assert store.get("foo").repo_url == "https://example.test/foo.git"  # type: ignore[union-attr]
 
-    ctx2 = fake_service.create("bar", "bar", "")
-    assert ctx2.repo_url == ""
+    with pytest.raises(RepoUrlMissingError, match="repos/bar"):
+        fake_service.create("bar", "bar", "")
+    with pytest.raises(RepoUrlMissingError, match="repos/side"):
+        fake_service.add_repo("foo", "side")
+    assert store.get("bar") is None
+    assert store.get("foo").associated_repos == ()  # type: ignore[union-attr]
+
+    (workspace_root / "repos" / "bar").mkdir()
+    assert fake_service.create("bar", "bar", "").repo_url == ""
 
 
 # ---------------------------------------------------------------------------

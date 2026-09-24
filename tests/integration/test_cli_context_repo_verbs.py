@@ -14,6 +14,7 @@ Covers:
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -61,7 +62,10 @@ def _record(workspace: Path, name: str) -> dict:  # type: ignore[type-arg]
 
 
 def test_repo_add_registers_and_is_idempotent(workspace: Path) -> None:
-    _runner.invoke(app, ["context", "create", "foo", "--main-repo", "foo-repo"])
+    _runner.invoke(
+        app,
+        ["context", "create", "foo", "--main-repo", "foo-repo", "--url", "https://x.test/foo.git"],
+    )
 
     result = _runner.invoke(
         app, ["context", "repo", "add", "foo", "assoc-a", "--url", "https://x.test/a.git"]
@@ -81,7 +85,10 @@ def test_repo_add_registers_and_is_idempotent(workspace: Path) -> None:
 
 
 def test_repo_add_refuses_conflicting_url(workspace: Path) -> None:
-    _runner.invoke(app, ["context", "create", "foo", "--main-repo", "foo-repo"])
+    _runner.invoke(
+        app,
+        ["context", "create", "foo", "--main-repo", "foo-repo", "--url", "https://x.test/foo.git"],
+    )
     _runner.invoke(
         app, ["context", "repo", "add", "foo", "assoc-a", "--url", "https://x.test/a.git"]
     )
@@ -96,7 +103,10 @@ def test_repo_add_refuses_conflicting_url(workspace: Path) -> None:
 
 
 def test_repo_add_refuses_main_repo_slug(workspace: Path) -> None:
-    _runner.invoke(app, ["context", "create", "foo", "--main-repo", "foo-repo"])
+    _runner.invoke(
+        app,
+        ["context", "create", "foo", "--main-repo", "foo-repo", "--url", "https://x.test/foo.git"],
+    )
 
     result = _runner.invoke(app, ["context", "repo", "add", "foo", "foo-repo"])
     assert result.exit_code == 1
@@ -112,7 +122,10 @@ def test_repo_add_unknown_context_exits_1(workspace: Path) -> None:
 
 
 def test_repo_add_invalid_slug_exits_1(workspace: Path) -> None:
-    _runner.invoke(app, ["context", "create", "foo", "--main-repo", "foo-repo"])
+    _runner.invoke(
+        app,
+        ["context", "create", "foo", "--main-repo", "foo-repo", "--url", "https://x.test/foo.git"],
+    )
     result = _runner.invoke(app, ["context", "repo", "add", "foo", "not a valid slug"])
     assert result.exit_code == 1
 
@@ -121,7 +134,10 @@ def test_repo_add_invalid_slug_exits_1(workspace: Path) -> None:
 
 
 def test_repo_remove_states_on_disk_checkout_left_untouched(workspace: Path) -> None:
-    _runner.invoke(app, ["context", "create", "foo", "--main-repo", "foo-repo"])
+    _runner.invoke(
+        app,
+        ["context", "create", "foo", "--main-repo", "foo-repo", "--url", "https://x.test/foo.git"],
+    )
     _runner.invoke(
         app, ["context", "repo", "add", "foo", "assoc-a", "--url", "https://x.test/a.git"]
     )
@@ -143,8 +159,13 @@ def test_repo_remove_states_on_disk_checkout_left_untouched(workspace: Path) -> 
 
 
 def test_repo_remove_states_no_on_disk_checkout_found(workspace: Path) -> None:
-    _runner.invoke(app, ["context", "create", "foo", "--main-repo", "foo-repo"])
-    _runner.invoke(app, ["context", "repo", "add", "foo", "assoc-a"])
+    _runner.invoke(
+        app,
+        ["context", "create", "foo", "--main-repo", "foo-repo", "--url", "https://x.test/foo.git"],
+    )
+    _runner.invoke(
+        app, ["context", "repo", "add", "foo", "assoc-a", "--url", "https://x.test/a.git"]
+    )
 
     result = _runner.invoke(app, ["context", "repo", "remove", "foo", "assoc-a"])
     assert result.exit_code == 0, result.output
@@ -152,7 +173,10 @@ def test_repo_remove_states_no_on_disk_checkout_found(workspace: Path) -> None:
 
 
 def test_repo_remove_unknown_slug_exits_1(workspace: Path) -> None:
-    _runner.invoke(app, ["context", "create", "foo", "--main-repo", "foo-repo"])
+    _runner.invoke(
+        app,
+        ["context", "create", "foo", "--main-repo", "foo-repo", "--url", "https://x.test/foo.git"],
+    )
     result = _runner.invoke(app, ["context", "repo", "remove", "foo", "never-added"])
     assert result.exit_code == 1
     assert "never-added" in result.output
@@ -167,8 +191,13 @@ def test_repo_remove_unknown_context_exits_1(workspace: Path) -> None:
 def test_repo_remove_second_call_fails_loudly(workspace: Path) -> None:
     """A17.1: remove converges to "not registered" — a second call on the same slug
     is a loud failure, not a silent no-op."""
-    _runner.invoke(app, ["context", "create", "foo", "--main-repo", "foo-repo"])
-    _runner.invoke(app, ["context", "repo", "add", "foo", "assoc-a"])
+    _runner.invoke(
+        app,
+        ["context", "create", "foo", "--main-repo", "foo-repo", "--url", "https://x.test/foo.git"],
+    )
+    _runner.invoke(
+        app, ["context", "repo", "add", "foo", "assoc-a", "--url", "https://x.test/a.git"]
+    )
     first = _runner.invoke(app, ["context", "repo", "remove", "foo", "assoc-a"])
     assert first.exit_code == 0
 
@@ -180,6 +209,12 @@ def test_repo_remove_second_call_fails_loudly(workspace: Path) -> None:
 
 
 def test_create_associated_repeatable_bare_slug_and_slug_equals_url(workspace: Path) -> None:
+    """A bare slug adopts an existing ``repos/<slug>`` git checkout (bugs
+    context-create-admits-uncloneable-empty-url, context-dead-destroys-associated-repo-
+    without-url: a bare or non-git directory is refused)."""
+    subprocess.run(
+        ["git", "init", str(workspace / "repos" / "assoc-a")], capture_output=True, check=True
+    )
     result = _runner.invoke(
         app,
         [
@@ -188,6 +223,8 @@ def test_create_associated_repeatable_bare_slug_and_slug_equals_url(workspace: P
             "foo",
             "--main-repo",
             "foo-repo",
+            "--url",
+            "https://x.test/foo.git",
             "--associated-repos",
             "assoc-a",
             "--associated-repos",
@@ -205,7 +242,17 @@ def test_create_associated_repeatable_bare_slug_and_slug_equals_url(workspace: P
 def test_create_associated_refuses_when_slug_equals_main_repo(workspace: Path) -> None:
     result = _runner.invoke(
         app,
-        ["context", "create", "foo", "--main-repo", "foo-repo", "--associated-repos", "foo-repo"],
+        [
+            "context",
+            "create",
+            "foo",
+            "--main-repo",
+            "foo-repo",
+            "--url",
+            "https://x.test/foo.git",
+            "--associated-repos",
+            "foo-repo",
+        ],
     )
     assert result.exit_code == 1
     assert "main repo" in result.output.lower()
@@ -224,11 +271,24 @@ def test_create_associated_refuses_slug_owned_by_another_context(workspace: Path
     verbatim for each `--associated` entry, so it must inherit the cross-context
     guard with no second code path. Pins that inheritance at the CLI seam, not a
     re-derivation of the rule (unit-level coverage: `test_repo_verbs.py`)."""
-    _runner.invoke(app, ["context", "create", "bar", "--main-repo", "bar-repo"])
+    _runner.invoke(
+        app,
+        ["context", "create", "bar", "--main-repo", "bar-repo", "--url", "https://x.test/bar.git"],
+    )
 
     result = _runner.invoke(
         app,
-        ["context", "create", "foo", "--main-repo", "foo-repo", "--associated-repos", "bar-repo"],
+        [
+            "context",
+            "create",
+            "foo",
+            "--main-repo",
+            "foo-repo",
+            "--url",
+            "https://x.test/foo.git",
+            "--associated-repos",
+            "bar-repo",
+        ],
     )
     assert result.exit_code == 1
     assert "bar" in result.output.lower()
@@ -242,11 +302,14 @@ def test_create_refuses_main_repo_slug_owned_by_another_context(workspace: Path)
     against the other's checkout. Pins the CLI seam for the MAIN slug, the
     counterpart of `test_create_associated_refuses_slug_owned_by_another_context`
     above (unit-level coverage: `test_repo_verbs.py`)."""
-    _runner.invoke(app, ["context", "create", "bar", "--main-repo", "bar-repo"])
+    _runner.invoke(
+        app,
+        ["context", "create", "bar", "--main-repo", "bar-repo", "--url", "https://x.test/bar.git"],
+    )
 
     result = _runner.invoke(
         app,
-        ["context", "create", "foo", "--main-repo", "bar-repo"],
+        ["context", "create", "foo", "--main-repo", "bar-repo", "--url", "https://x.test/bar.git"],
     )
     assert result.exit_code == 1
     assert "bar" in result.output.lower()
@@ -268,11 +331,26 @@ def test_create_associated_refuses_duplicate_slug_in_same_call(workspace: Path) 
             "foo",
             "--main-repo",
             "foo-repo",
+            "--url",
+            "https://x.test/foo.git",
             "--associated-repos",
-            "assoc-a",
+            "assoc-a=https://x.test/a.git",
             "--associated-repos",
             "assoc-a=https://x.test/a.git",
         ],
     )
     assert result.exit_code == 1
     assert "more than once" in result.output.lower()
+
+
+def test_create_refuses_a_bare_slug_over_a_non_git_directory(workspace: Path) -> None:
+    """A non-git ``repos/<slug>`` is no checkout: ``dead`` would delete it with no URL to
+    clone it back (bug context-dead-destroys-associated-repo-without-url)."""
+    (workspace / "repos" / "assoc-a").mkdir(parents=True)
+    result = _runner.invoke(
+        app,
+        ["context", "create", "foo", "--main-repo", "foo-repo", "--url", "https://x.test/f.git"]
+        + ["--associated-repos", "assoc-a"],
+    )
+    assert result.exit_code == 1
+    assert "fix:" in result.output

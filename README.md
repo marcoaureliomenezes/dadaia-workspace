@@ -44,10 +44,10 @@ memory atom under its content hash.
 
 ## A human installs and uses it
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
-<!-- derived-from: workspace-init sha256:ca5c835e94af -->
-<!-- derived-from: context-management sha256:0227a5e43894 -->
-<!-- derived-from: workspace-doctor sha256:ef9c81d0d181 -->
+<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
+<!-- derived-from: workspace-init sha256:bc26cf0b24e2 -->
+<!-- derived-from: context-management sha256:896b60268c5d -->
+<!-- derived-from: workspace-doctor sha256:11d53d7927db -->
 
 ```bash
 pip install dadaia-workspace
@@ -58,7 +58,8 @@ dadaia doctor --context <ctx>     # findings, each with a runnable fix
 
 `pip install dadaia-workspace` installs the library and one CLI under two names,
 `dadaia` and `dadaia-workspace`, so `uvx dadaia-workspace init …` runs without an
-install; the wheel ships the full public asset tree, so `init` works offline.
+install; the wheel ships the full public asset tree, and `init` resolves the workspace
+venv's dependencies from PyPI, so it needs network access.
 
 `dadaia init <dir> --harness <name> [--repo <url>] [--skip-assets]` is the only verb
 that works on an empty directory, and a re-run is idempotent. It provisions
@@ -67,7 +68,7 @@ projection, seeds the state documents without overwriting them, and (unless
 `--skip-assets`) stages and installs the public assets — the one writer of every hook
 wiring. With `--repo <url>` it clones the repo into `repos/<slug>/`, composes the
 context verbs — `create`, `alive`, the bind — and installs the pre-push hook. Without
-`--repo` it prints the `dadaia context create <name> --main-repo <slug>` that makes the
+`--repo` it prints the `dadaia context create <name> --main-repo <slug> --url <url>` that makes the
 first project. `dadaia harness add <name>` adds a harness later.
 
 `dadaia context bind <ctx>` writes one session record (context, runtime, pid,
@@ -84,13 +85,13 @@ and deletes only what a TTL expired.
 
 ## An agent reads AGENTS.md and uses it
 
-<!-- derived-from: agentic-entities sha256:98cb81d2e72c -->
-<!-- derived-from: sdd-gate-v3 sha256:ea8939698674 -->
+<!-- derived-from: agentic-entities sha256:9f356fd0a4ec -->
+<!-- derived-from: sdd-gate-v3 sha256:f5759190d3a1 -->
 <!-- derived-from: release-lifecycle sha256:09607348cc88 -->
 <!-- derived-from: bug-ledger sha256:9534ded07707 -->
-<!-- derived-from: harness-claude-code sha256:ee2f8a3870b4 -->
-<!-- derived-from: harness-codex sha256:868c0a658eab -->
-<!-- derived-from: harness-kimi-code sha256:fcfeb26d658b -->
+<!-- derived-from: harness-claude-code sha256:266fdf40eaed -->
+<!-- derived-from: harness-codex sha256:b907c260a862 -->
+<!-- derived-from: harness-kimi-code sha256:4300d3a1724d -->
 <!-- derived-from: harness-cursor sha256:480b18aa9b61 -->
 <!-- derived-from: harness-devin sha256:ab4a32c4a53d -->
 <!-- derived-from: harness-copilot sha256:b93cef868a6f -->
@@ -125,8 +126,8 @@ with a RED test. Completed work leaves as a `handoff-v1` record, validated by
 
 ## Documentation
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
-<!-- derived-from: public-asset-distribution sha256:eb08a2e29f43 -->
+<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
+<!-- derived-from: public-asset-distribution sha256:855c77cc15da -->
 
 The site is <https://marcoaureliomenezes.github.io/dadaia-workspace/>:
 
@@ -139,12 +140,9 @@ The site is <https://marcoaureliomenezes.github.io/dadaia-workspace/>:
 - [CLI reference](docs/cli.md) · [concepts](docs/concepts.md) ·
   [getting started](docs/getting-started.md) · [distribution](docs/distribution.md)
 
-The standalone skills install without a workspace from the `dadaia-skills` repository:
-`npx skills add marcoaureliomenezes/dadaia-skills`, or as a Claude Code marketplace.
-
 ## Links
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
+<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
 
 - GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
 - PyPI — <https://pypi.org/project/dadaia-workspace/>

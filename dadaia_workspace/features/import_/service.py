@@ -9,6 +9,7 @@ from dadaia_workspace.core.exceptions import (
     AssociatedRepoConflictError,
     ContextAlreadyExistsError,
     InvalidContextNameError,
+    RepoUrlMissingError,
 )
 from dadaia_workspace.core.models.export import SCHEMA_VERSION
 from dadaia_workspace.core.models.import_ import ImportResult
@@ -77,7 +78,11 @@ class ImportService:
                 self._registry.register(ctx)
             except ContextAlreadyExistsError:
                 skipped.append((ctx.name, "exists"))
-            except (InvalidContextNameError, AssociatedRepoConflictError) as exc:
+            except (
+                InvalidContextNameError,
+                AssociatedRepoConflictError,
+                RepoUrlMissingError,
+            ) as exc:
                 skipped.append((ctx.name, str(exc)))
             else:
                 registered.append(ctx.name)

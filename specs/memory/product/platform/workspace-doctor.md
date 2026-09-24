@@ -56,7 +56,7 @@ sources:
 
 ## The reaper
 
-- `--fix` runs one lane: marker GC, stale session records, the `root_exceptions.txt` to `instance_exceptions.txt` move, seed missing zones and the harness profile, move every `slop` entry, move a DEAD context's leftover repo (`INV-5`), delete expired; then, unless `--expired-only`, the specs fixes (`MEM-PLACEHOLDER-1`, `TREE-4`, `TREE-5`, `TREE-8`, `FIXED-1/2`, `SPEC-DOC-034`, `SPEC-DOC-046`).
+- `--fix` runs one lane: marker GC, stale session records, the `root_exceptions.txt` to `instance_exceptions.txt` move, seed missing zones and the harness profile, move every `slop` entry, move a DEAD context's leftover repo (`INV-5`), delete expired; then, unless `--expired-only`, the specs fixes (`MEM-PLACEHOLDER-1`, `TREE-4`, `TREE-5`, `FIXED-1/2`, `SPEC-DOC-034`, `SPEC-DOC-046`); a non-canon specs path (`TREE-8`) is reported, never removed.
 - Nothing is deleted directly: slop moves to `.dadaia/reaped/<YYYYMMDD>/<workspace-relative-path>` (7-day TTL from the move); deletion happens only when a TTL zone's entry expires.
 - The lane runs at SessionStart (`dadaia doctor --fix --expired-only --quiet` from each harness's runtime config) and on the PostToolUse hook's throttle; it judges by registry, never by liveness.
 - A fix invents no approval, completion, evidence or disposition, and every step reports what it did or skipped.

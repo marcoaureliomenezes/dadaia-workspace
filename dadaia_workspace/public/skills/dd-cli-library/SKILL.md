@@ -31,7 +31,7 @@ line here and `--help` disagree, `--help` wins.
 - Never edit `.dadaia/states/*.json`, never `git clone` into `repos/`, never
   `rm -rf repos/<slug>/`, never hand-write `.dadaia/dist/` — `dadaia context
   alive|dead` and `dadaia import|export` own those.
-- Lifecycle: `dadaia context create <ctx> --main-repo <slug> [--associated-repos a,b]` → `dadaia context alive` → bind → `dadaia context dead` → `dadaia context delete`; `context dead` removes the repo from disk — never run it mid-switch.
+- Lifecycle: `dadaia context create <ctx> --main-repo <slug> --url <url> [--associated-repos a,b]` → `dadaia context alive` → bind → `dadaia context dead` → `dadaia context delete`; `context dead` removes the repo from disk — never run it mid-switch.
 - An unborn remote is born once by `dadaia context baseline <ctx> --yes --push`; every later write is an ordinary commit.
 - The associated set is written by `dadaia context repo add <ctx> <slug> [--url <url>]` / `dadaia context repo remove <ctx> <slug>` and READ only by `dadaia context show <ctx> --json`, whose `associated_repos` carries slug, url, on-disk and branch.
 - Portability: `dadaia export` writes `.dadaia/dist/spec-contexts.json` (overwritten each run); on the destination `dadaia import <file>` registers each unknown context DEAD, then `dadaia context alive <slug>` clones it; verify with `dadaia context list`.

@@ -506,12 +506,12 @@ def test_resolve_specs_dir_resolves_from_cwd_inside_a_repo(
     assert invocation.resolve_specs_dir(None) == (ws / "repos" / "proj" / "specs").resolve()
 
 
-class TestAliveContextSlugs:
+class TestAliveContextNames:
     """F008 (20260830 audit): the registry read family has ONE home — invocation.
     ctx_inject's private ``_alive_context_names`` parser is deleted; the hook imports
-    :func:`invocation.alive_context_slugs`. Intent: contract; size: unit."""
+    :func:`invocation.alive_context_names`. Intent: contract; size: unit."""
 
-    def test_alive_filter_and_slug_preference(self, tmp_path: Path) -> None:
+    def test_alive_filter_yields_context_names(self, tmp_path: Path) -> None:
         states = tmp_path / ".dadaia" / "states"
         states.mkdir(parents=True)
         (states / "spec_contexts.json").write_text(
@@ -527,14 +527,14 @@ class TestAliveContextSlugs:
             ),
             encoding="utf-8",
         )
-        assert invocation.alive_context_slugs(tmp_path) == ["actual-dir", "bare"]
+        assert invocation.alive_context_names(tmp_path) == ["pretty", "bare"]
 
     def test_fail_soft_on_missing_or_malformed(self, tmp_path: Path) -> None:
-        assert invocation.alive_context_slugs(tmp_path) == []
+        assert invocation.alive_context_names(tmp_path) == []
         states = tmp_path / ".dadaia" / "states"
         states.mkdir(parents=True)
         (states / "spec_contexts.json").write_text("{not json", encoding="utf-8")
-        assert invocation.alive_context_slugs(tmp_path) == []
+        assert invocation.alive_context_names(tmp_path) == []
 
     def test_hook_has_no_private_registry_parser(self) -> None:
         from dadaia_workspace.hooks import ctx_inject

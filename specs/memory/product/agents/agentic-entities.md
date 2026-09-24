@@ -41,7 +41,7 @@ The one enumeration; every harness atom links here.
 
 ## The behavior map
 
-- `dadaia_workspace/public/entities/behavior-map.json` declares which skill and which scoped rule file operate which section of the root map: `rows` of `{section, anchor, skill, scoped_agents_md[], hash_tuple, recorded_by, recorded_at}`, plus `skill_md_line_ceiling`, `declared_overlaps` and `standalone_skills` (the skills that stand without a workspace, read by the skills-repository build — [[public-asset-distribution]]).
+- `dadaia_workspace/public/entities/behavior-map.json` declares which skill and which scoped rule file operate which section of the root map: `rows` of `{section, anchor, skill, scoped_agents_md[], hash_tuple, recorded_by, recorded_at}`, plus `skill_md_line_ceiling`, `declared_overlaps` and `standalone_skills` (the skills that stand without a workspace, pinned by `tests/contract/test_standalone_skills.py`).
 - Every skill and scoped `AGENTS.md` source has exactly one row, every law section at least one owner; several skills may own one section.
 - The corpus is 18 `dd-*` skill directories, pinned with the total skill Markdown line count by the down-only ratchet in `tests/contract/test_slop_ratchets.py` ([[QUALITY]]).
 

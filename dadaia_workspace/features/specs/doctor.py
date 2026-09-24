@@ -7,7 +7,7 @@ single-responsibility validator siblings plus two shared leaf modules:
   * ``doctor_types``     — ``Severity`` / ``SpecsDoctorIssue`` / ``_MemoryMdSummary``
   * ``doctor_common``    — cross-validator pure helpers (``resolve_live_release_id`` + release-dir discovery)
   * ``doctor_structural``   — TREE-1..8 spec-tree invariants; ``fix_tree4``,
-                              ``fix_tree8``
+                              ``fix_tree5``
   * ``doctor_memory``       — memory files/atomicity, CAT-1, LINT-1
   * ``doctor_release``      — active release (RELEASE.json state document), release artifacts, SemVer + ledger invariants
   * ``doctor_closure_audit``— orphan specs, audit disposition; ``fix_archive_dir``

@@ -26,7 +26,6 @@ sources:
 - `SessionStart` matchers `startup`, `resume`, `compact` and `clear` re-emit the bootstrap after a compact or `/clear` as well as at a new session.
 - A block answers `hookSpecificOutput.permissionDecision: deny` with its reason, the top-level `decision: block`/`reason` pair riding along for other consumers; an allow carries no permission verdict, so the user's permission prompts are never bypassed.
 - `dadaia context bind <ctx>` records the bind in this session's own record, keyed by Claude Code's native session id; ctx-inject then injects that context's tech-stack section and feature catalog once, and again after a re-bind — never the law, which the map already loads ([[context-management]]).
-- Without a workspace, the standalone `dd-` skills reach Claude Code through the `dadaia-skills` plugin marketplace or `npx skills add` into `.claude/skills` ([[public-asset-distribution]]).
 
 ## Dependencies
 

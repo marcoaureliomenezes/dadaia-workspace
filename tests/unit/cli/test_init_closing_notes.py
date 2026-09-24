@@ -47,3 +47,13 @@ def test_init_never_writes_the_operator_user_settings(tmp_path: Path) -> None:
 
     assert result.exit_code == 0, result.stdout
     assert list((home / ".claude").iterdir()) == []
+
+
+def test_init_for_another_harness_omits_the_claude_note(tmp_path: Path) -> None:
+    """Bug init-claude-note-printed-for-every-harness: the Claude Code recommendation is
+    advice about Claude Code's own settings — a codex workspace never prints it."""
+    result = _runner.invoke(app, ["init", str(tmp_path / "ws"), "--harness", "codex"])
+
+    assert result.exit_code == 0, result.stdout
+    assert result.stdout.count(_LAW) == 1
+    assert "instructionFiles" not in result.stdout

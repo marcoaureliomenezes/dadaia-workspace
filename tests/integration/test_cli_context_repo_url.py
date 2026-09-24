@@ -1,7 +1,9 @@
 """CLI integration tests for the context repo_url lifecycle (T-011-08 / FR-W2-03, ADR-7).
 
 Closes bug ``context-repo-url-not-settable-or-repairable``. Covers:
-- (a) ``context create --main-repo <slug> --url <url>`` persists the URL (overrides catalog).
+- (a) ``context create --main-repo <slug> --url <url>`` persists the URL; a repo with
+      neither a URL nor a ``repos/<slug>`` checkout is refused (bug
+      ``context-create-admits-uncloneable-empty-url``).
 - (b) ``context alive``/``dead`` back-fill repo_url from the on-disk origin remote when
       the record URL is empty (real git + local ``file://`` fixture remote).
 - (d) ``dadaia doctor`` flags an ALIVE context with empty repo_url (CTX-URL-1).
@@ -65,6 +67,13 @@ def _git(args: list[str], cwd: Path) -> None:
     )
 
 
+def _contexts(workspace: Path) -> list[dict]:  # type: ignore[type-arg]
+    data = json.loads(
+        (workspace / ".dadaia" / "states" / "spec_contexts.json").read_text(encoding="utf-8")
+    )
+    return list(data["contexts"])
+
+
 def _record(workspace: Path, name: str) -> dict:  # type: ignore[type-arg]
     data = json.loads(
         (workspace / ".dadaia" / "states" / "spec_contexts.json").read_text(encoding="utf-8")
@@ -82,7 +91,7 @@ def _record(workspace: Path, name: str) -> dict:  # type: ignore[type-arg]
 def test_create_url_persistence_ctx_url_1_doctor_flag_and_export_import_clone(
     workspace: Path, tmp_path: Path
 ) -> None:
-    """(a) create --url persists (overrides catalog); (d) doctor flags CTX-URL-1 for an
+    """(a) create --url persists; (d) doctor flags CTX-URL-1 for an
     ALIVE context with an empty repo_url.
 
     Plus the named regression for bug ``context-repo-url-not-settable-or-repairable``:
@@ -98,9 +107,14 @@ def test_create_url_persistence_ctx_url_1_doctor_flag_and_export_import_clone(
     rec = _record(workspace, "foo")
     assert rec["repo_url"] == "https://x.test/foo.git"
 
-    _runner.invoke(app, ["context", "create", "bar", "--main-repo", "bar"])
-    rec_bar = _record(workspace, "bar")
-    assert rec_bar["repo_url"] == ""  # no catalog hit, no --url
+    # No --url and no repos/bar checkout: nothing could ever clone it — refused, nothing
+    # registered, one runnable fix line (bug context-create-admits-uncloneable-empty-url).
+    refused = _runner.invoke(app, ["context", "create", "bar", "--main-repo", "bar"])
+    assert refused.exit_code == 1, refused.output
+    assert "fix: .dadaia/.venv/bin/dadaia context create bar --main-repo bar --url <clone-url>" in (
+        refused.output
+    )
+    assert "bar" not in [c["name"] for c in _contexts(workspace)]
 
     if not _HAS_GIT:
         return
@@ -125,11 +139,7 @@ def test_create_url_persistence_ctx_url_1_doctor_flag_and_export_import_clone(
     _git(["init", "--bare", str(upstream)], cwd=tmp_path)
     file_url = upstream.as_uri()
 
-    # 2. context create with NO --url (and no catalog hit) → record repo_url == "".
-    _runner.invoke(app, ["context", "create", "qux", "--main-repo", "qux"])
-    assert _record(workspace, "qux")["repo_url"] == ""
-
-    # 3. The repo exists on disk with a valid origin remote (clone/populate by any means).
+    # 2. The repo exists on disk with a valid origin remote (clone/populate by any means).
     repo_path = workspace / "repos" / "qux"
     repo_path.mkdir(parents=True)
     _git(["init"], cwd=repo_path)
@@ -139,6 +149,10 @@ def test_create_url_persistence_ctx_url_1_doctor_flag_and_export_import_clone(
     _git(["add", "-A"], cwd=repo_path)
     _git(["commit", "-m", "init"], cwd=repo_path)
     _git(["push", "-u", "origin", "main"], cwd=repo_path)
+
+    # 3. context create with NO --url adopts the checkout → record repo_url == "".
+    _runner.invoke(app, ["context", "create", "qux", "--main-repo", "qux"])
+    assert _record(workspace, "qux")["repo_url"] == ""
 
     # 4. context alive → back-fills repo_url from origin (the fix).
     qux_alive = _runner.invoke(app, ["context", "alive", "qux"])
@@ -155,3 +169,37 @@ def test_create_url_persistence_ctx_url_1_doctor_flag_and_export_import_clone(
     second_machine = tmp_path / "second-machine-repos" / "qux"
     _git(["clone", persisted, str(second_machine)], cwd=tmp_path)
     assert (second_machine / ".git").exists()
+
+
+def test_a_bare_associated_slug_with_no_checkout_is_refused(workspace: Path) -> None:
+    """Bug context-create-admits-uncloneable-empty-url, associated arm: ``--associated-repos
+    a`` with no ``=URL`` and no ``repos/a`` is the same dead end ``alive`` hits cloning
+    ``''`` — create and ``repo add`` refuse it with one runnable fix line."""
+    create = _runner.invoke(
+        app,
+        [
+            "context",
+            "create",
+            "m",
+            "--main-repo",
+            "m",
+            "--url",
+            "https://x.test/m.git",
+            "--associated-repos",
+            "a",
+        ],
+    )
+    assert create.exit_code == 1, create.output
+    assert (
+        "fix: .dadaia/.venv/bin/dadaia context create m --main-repo m "
+        "--url https://x.test/m.git --associated-repos a=<clone-url>"
+    ) in create.output
+    assert "m" not in [c["name"] for c in _contexts(workspace)]
+
+    ok = _runner.invoke(
+        app, ["context", "create", "m", "--main-repo", "m", "--url", "https://x.test/m.git"]
+    )
+    assert ok.exit_code == 0, ok.output
+    add = _runner.invoke(app, ["context", "repo", "add", "m", "a"])
+    assert add.exit_code == 1, add.output
+    assert "fix: .dadaia/.venv/bin/dadaia context repo add m a --url <clone-url>" in add.output

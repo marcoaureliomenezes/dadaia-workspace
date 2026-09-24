@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import hashlib
 import re
-import shutil
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
@@ -46,7 +45,8 @@ _TREE5_SCOPED_LAW_AREAS: tuple[str, ...] = SCOPED_LAW_AREAS
 _TREE4_REQUIRED_DIRS = REQUIRED_ROOT_DIRS
 
 # TREE-8: the v6 canon root (FR1, specs_pattern_version 5 -> 6) — nothing else is
-# conformant directly under specs/. ERROR + auto-fixable (v0.5.0 specs-canon closure):
+# conformant directly under specs/. ERROR, never auto-fixed (operator decision D8:
+# `doctor --fix` deletes nothing; bug doctor-fix-tree8-deletes-operator-content):
 # a stray root entry, or any non-canon file anywhere inside specs/ (a dotfile, a loose
 # per-entry file, a markdown ADR, an old reviews/ file, …), is real drift — a directory
 # is kept by its AGENTS.md, never a placeholder file — never a WARN-only migration
@@ -59,16 +59,8 @@ _TREE8_CANON_ROOT: frozenset[str] = CANON_ROOT_MEMBERS
 
 #: Deprecated-layout root entries TREE-1/TREE-2 already own (loud migration hint,
 #: fixable=False by explicit design: auto-moving may destroy SDD-approved content
-#: pending operator consent). TREE-8 must never additionally flag-and-auto-remove
-#: either — that would silently destroy exactly the content TREE-1/TREE-2 protect.
+#: pending operator consent). TREE-8 never flags either a second time.
 _TREE8_DEFERRED_TO_SIBLING_CHECKS: frozenset[str] = frozenset({"foundation", "SPEC.md"})
-
-# Migration hint printed loudly for TREE-1 and TREE-2 (regardless of --fix).
-_TREE_MIGRATION_HINT = (
-    "[TREE MIGRATION REQUIRED] Run: dadaia migrate tree-v2\n"
-    "  This command moves deprecated content to releases/legacy/ "
-    "without destroying SDD-approved artifacts."
-)
 
 
 class StructuralValidator:
@@ -87,10 +79,8 @@ class StructuralValidator:
     def check_tree1_foundation(self) -> list[SpecsDoctorIssue]:
         """TREE-1: specs/foundation/ must NOT exist (deprecated layout).
 
-        Warn-only (fixable=False).  A loud migration hint pointing to
-        ``dadaia migrate tree-v2`` is emitted regardless of the --fix flag.
-        Auto-moving is intentionally blocked: foundation/ may hold SDD-approved
-        content and reclassification requires operator consent.
+        Warn-only (fixable=False): foundation/ may hold SDD-approved content and
+        reclassifying it is the operator's call — no migrator exists.
         """
         foundation = self.specs_dir / "foundation"
         if not foundation.exists():
@@ -100,8 +90,8 @@ class StructuralValidator:
                 code="TREE-1",
                 severity=Severity.WARNING,
                 description=(
-                    "specs/foundation/ exists — this is the deprecated layout. "
-                    f"{_TREE_MIGRATION_HINT}"
+                    "specs/foundation/ exists — this is the deprecated layout. Move "
+                    "its content into releases/<id>/ or memory/ by hand (TREE-1)."
                 ),
                 path=str(foundation),
                 fixable=False,
@@ -111,10 +101,8 @@ class StructuralValidator:
     def check_tree2_root_spec_md(self) -> list[SpecsDoctorIssue]:
         """TREE-2: specs/SPEC.md at the tree root must NOT exist (deprecated).
 
-        Warn-only (fixable=False).  A loud migration hint pointing to
-        ``dadaia migrate tree-v2`` is emitted regardless of the --fix flag.
-        Auto-moving is intentionally blocked: root SPEC.md may hold
-        SDD-approved content that requires operator consent to reclassify.
+        Warn-only (fixable=False): root SPEC.md may hold SDD-approved content and
+        reclassifying it is the operator's call — no migrator exists.
         """
         root_spec = self.specs_dir / "SPEC.md"
         if not root_spec.exists():
@@ -124,8 +112,8 @@ class StructuralValidator:
                 code="TREE-2",
                 severity=Severity.WARNING,
                 description=(
-                    "specs/SPEC.md exists at the tree root — this is the deprecated layout. "
-                    f"{_TREE_MIGRATION_HINT}"
+                    "specs/SPEC.md exists at the tree root — this is the deprecated "
+                    "layout. Move it into releases/<id>/ by hand (TREE-2)."
                 ),
                 path=str(root_spec),
                 fixable=False,
@@ -449,28 +437,15 @@ class StructuralValidator:
 
         1. **Root membership** (:data:`CANON_ROOT_MEMBERS`) — a path directly under
            ``specs/`` whose NAME is not a v6 canon root member is flagged ONCE,
-           whether it is a file or a directory, ALWAYS fixable=True — a name that
-           is not even canon-shaped at the root (e.g. a scratch/legacy directory) is
-           unambiguously disposable, and the fix removes the whole stray subtree.
+           whether it is a file or a directory.
         2. **Nested canon-shape sweep** (:func:`~dadaia_workspace.features.specs
            .canon.is_canon_path`) — every FILE inside an otherwise-conformant
-           root member is checked against its full ``specs/``-relative POSIX path; a
-           non-matching file (a dotfile, a loose per-entry file, a markdown ADR, an
-           old ``reviews/`` file, an unmigrated legacy-cased memory atom, …) is
-           flagged individually. **Only a dotfile is auto-fixable here** — a
-           genuinely disposable placeholder (the retired ``.gitkeep`` landing-zone
-           mechanism). Every OTHER tier-2 finding is fixable=False, ERROR, loud: a
-           non-dotfile nested violation may be REAL, unmigrated content (bug data,
-           an archived legacy-release landing zone tree-v2 relocated specifically so
-           it would not be dropped, a memory atom under a pre-canon filename) —
-           mirrors ``_TREE8_DEFERRED_TO_SIBLING_CHECKS``'s own precedent
-           ("auto-moving may destroy SDD-approved content pending operator
-           consent"). A real, destructive incident this exact distinction closes:
-           an earlier draft of this widened sweep marked EVERY tier-2 finding
-           fixable=True and ``doctor --fix`` silently deleted a migrated bug
-           ledger, three renamed-but-real memory atoms, and a tree-v2 legacy
-           landing zone in one pass (caught by
-           ``tests/e2e/features/test_specs_upgrade_e2e.py`` before it ever shipped).
+           root member is checked against its full ``specs/``-relative POSIX path.
+
+        Every finding is fixable=False: the doctor cannot tell operator content from
+        slop, and two auto-removal fixes deleted real content (a migrated bug ledger
+        and memory atoms; then a foreign repo's specs/README.md and specs/features/).
+        The operator moves, renames or deletes by hand.
         """
         if not self.specs_dir.is_dir():
             return []
@@ -480,7 +455,7 @@ class StructuralValidator:
                 continue
             if entry.name in _TREE8_DEFERRED_TO_SIBLING_CHECKS:
                 continue
-            issues.append(self._tree8_issue(entry, fixable=True))
+            issues.append(self._tree8_issue(entry))
         for entry in sorted(self.specs_dir.rglob("*")):
             if entry.is_dir():
                 continue
@@ -495,17 +470,11 @@ class StructuralValidator:
                 continue
             rel_posix = entry.relative_to(self.specs_dir).as_posix()
             if not is_canon_path(rel_posix):
-                issues.append(self._tree8_issue(entry, fixable=entry.name.startswith(".")))
+                issues.append(self._tree8_issue(entry))
         return issues
 
-    def _tree8_issue(self, entry: Path, *, fixable: bool) -> SpecsDoctorIssue:
+    def _tree8_issue(self, entry: Path) -> SpecsDoctorIssue:
         rel = entry.relative_to(self.specs_dir).as_posix()
-        remedy = (
-            "Auto-fix available (run doctor --fix) to remove it"
-            if fixable
-            else "NOT auto-fixed — it may be real, unmigrated content; move/rename it "
-            "into the canon shape (or delete it) by hand"
-        )
         return SpecsDoctorIssue(
             code="TREE-8",
             severity=Severity.ERROR,
@@ -516,24 +485,9 @@ class StructuralValidator:
                 "a canon area whose shape does not match that area's canon (a "
                 "dotfile, a loose per-entry file, a markdown ADR, an old reviews/ "
                 "file, …) — a directory is kept by its AGENTS.md, never a "
-                f"placeholder. {remedy} (TREE-8)."
+                "placeholder. Never auto-fixed — it may be real content; move/rename it into "
+                "the canon shape, or delete it, by hand (TREE-8)."
             ),
             path=str(entry),
-            fixable=fixable,
+            fixable=False,
         )
-
-    def fix_tree8(self, issue: SpecsDoctorIssue) -> None:
-        """Remove a stray non-canon root entry or nested non-canon file (TREE-8 auto-fix).
-
-        Tolerant of an already-removed target: fixing a non-canon root DIRECTORY
-        first (via ``rmtree``) can make a separately-reported nested issue inside it
-        vanish in the same pass — never an error, just a no-op residual.
-        """
-        assert issue.code == "TREE-8"
-        target = Path(issue.path)  # type: ignore[arg-type]
-        if not target.exists() and not target.is_symlink():
-            return
-        if target.is_dir() and not target.is_symlink():
-            shutil.rmtree(target, ignore_errors=True)
-        else:
-            target.unlink(missing_ok=True)

@@ -50,7 +50,7 @@ path or entity as it appears in an installed workspace.
 | `specs/memory/AGENTS.md` | current product truth and who writes it | atoms, Part 1/Part 2, ownership | 4096 | 3724 |
 | `specs/ADRs/AGENTS.md` | the decision record | `decisions.jsonl` shape, acceptance | 4096 | 3476 |
 | `specs/audits/AGENTS.md` | the periodic three-pillar review | audit procedure, findings, closure | 4096 | 1776 |
-| `.dadaia/AGENTS.md` | the runtime tree: zones, doctor, reprojection, context | zone registry rules, chokepoints | 4096 | 4073 |
+| `.dadaia/AGENTS.md` | the runtime tree: zones, doctor, reprojection, context | zone registry rules, chokepoints | 4096 | 4091 |
 | `.dadaia/handoff/AGENTS.md` | the handoff lane | emission, schema, ack-on-consume | 4096 | 1617 |
 | `.dadaia/tmp/AGENTS.md` | the TTL scratch lane | what may be written there and for how long | 4096 | 1135 |
 | `.dadaia/states/AGENTS.md` | CLI-owned state files | who writes them and by which verb | 4096 | 1355 |
@@ -69,17 +69,17 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 | `dd-backlog-definition` | backlog curation, the intake gate, dispositions | `specs/backlog/AGENTS.md` | 6144 | 3229 |
 | `dd-bug-registration` | classify-first bug proposal and its record | `specs/bugs/AGENTS.md` | 6144 | 2782 |
 | `dd-bug-resolution` | the seven-phase diagnosing method and the resolve record | `specs/bugs/AGENTS.md` | 6144 | 5356 |
-| `dd-cli-library` | CLI idioms, CLI-owned state, the dev-server registry | `.dadaia/AGENTS.md` | 6144 | 4325 |
+| `dd-cli-library` | CLI idioms, CLI-owned state, the dev-server registry | `.dadaia/AGENTS.md` | 6144 | 4337 |
 | `dd-code-review` | the three review axes and the six lenses | `specs/memory/AGENTS.md` | 6144 | 4783 |
 | `dd-codebase-design` | the deep-module vocabulary and the deletion test | — | 6144 | 5540 |
 | `dd-domain-modeling` | the repo's domain terms and their one home | — | 6144 | 3766 |
-| `dd-gitflow-default` | the branch contract, commit shapes, the PR gate | — | 6144 | 4525 |
+| `dd-gitflow-default` | the branch contract, commit shapes, the PR gate | — | 6144 | 4677 |
 | `dd-grill-me` | the operator grill that precedes a candidate | — | 6144 | 3238 |
 | `dd-handoff-emitter` | handoff-first emission and ack-on-consume | `.dadaia/handoff/AGENTS.md` | 6144 | 2138 |
 | `dd-manager-orchestration` | intake, dispatch and the closure pass | — | 6144 | 3661 |
 | `dd-release-definition` | picking the set and authoring the trio | `specs/releases/AGENTS.md` | 6144 | 4620 |
 | `dd-release-implementation` | the candidate arc from reservation to the gate | `specs/releases/AGENTS.md` | 6144 | 3351 |
-| `dd-spec-navigator` | the three-phase session grounding protocol | `specs/AGENTS.md` | 6144 | 5115 |
+| `dd-spec-navigator` | the three-phase session grounding protocol | `specs/AGENTS.md` | 6144 | 5168 |
 | `dd-test-stewardship` | test intent, admission, demotion, quarantine | — | 6144 | 4178 |
 
 ## 4. Personas — `.agents/agents/*.md`

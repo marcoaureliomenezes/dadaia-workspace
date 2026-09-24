@@ -165,7 +165,7 @@ def test_the_printed_fix_line_succeeds_once_the_url_is_reachable(tmp_path: Path)
 
     failed = _runner.invoke(app, argv)
     assert failed.exit_code == 1
-    assert f"fix: dadaia init {workspace} --harness claude" in failed.output
+    assert f"fix: uvx dadaia-workspace init {workspace} --harness claude" in failed.output
 
     # The operator makes the URL reachable and re-runs the very same command.
     _git("init", "--bare", "--initial-branch=main", str(bare), cwd=tmp_path)

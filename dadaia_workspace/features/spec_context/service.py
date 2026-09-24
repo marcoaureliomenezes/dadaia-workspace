@@ -5,6 +5,7 @@ import logging
 import os
 import shutil
 import sys
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
@@ -19,7 +20,9 @@ from dadaia_workspace.core.exceptions import (
     DadaiaError,
     GitSyncError,
     InvalidContextNameError,
+    RepoUrlMissingError,
 )
+from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.models.spec_context import (
     CONTEXT_NAME_RE,
     AssociatedRepo,
@@ -180,7 +183,7 @@ class SpecContextService:
             raise ContextAlreadyExistsError(
                 f"Context '{ctx.name}' already exists. Use a different name."
             )
-        self._refuse_slug(ctx.name, ctx.repo_slug)
+        self._refuse_slug(ctx.name, ctx.repo_slug, ctx.repo_url)
         seen: set[str] = set()
         for repo in ctx.associated_repos:
             if repo.slug == ctx.repo_slug:
@@ -193,18 +196,25 @@ class SpecContextService:
                     f"associated repo slug '{repo.slug}' given more than once."
                 )
             seen.add(repo.slug)
-            self._refuse_slug(ctx.name, repo.slug)
+            self._refuse_slug(ctx.name, repo.slug, repo.url)
         self._store.save(ctx)
         return ctx
 
     # ------------------------------------------------------------------ associated repos (FR17)
 
-    def _refuse_slug(self, name: str, slug: str) -> None:
-        """Refuse *slug* for *name* unless allowlisted and unowned by any other context (its
-        main repo or an associated repo): every ``repos/<slug>`` checkout lives in the ONE
-        namespace ``dead()`` walks and destroys, so the two writers into it — ``register``
-        and ``add_repo`` — guard here, never ``dead()`` itself."""
+    def _refuse_slug(self, name: str, slug: str, url: str) -> None:
+        """Refuse *slug* for *name* unless allowlisted, obtainable and unowned by any other
+        context (its main repo or an associated repo): every ``repos/<slug>`` checkout lives
+        in the ONE namespace ``alive()`` clones into and ``dead()`` walks and destroys, so
+        the two writers into it — ``register`` and ``add_repo`` — guard here. Obtainable
+        means a clone *url* or an existing ``repos/<slug>`` checkout ``alive()`` adopts."""
         _require_allowlisted("repo slug", slug)
+        checkout = self._repo_path(slug)
+        if not url and not (checkout.is_dir() and self._git.is_git_root(checkout)):
+            raise RepoUrlMissingError(
+                f"'{slug}' has no clone URL and no checkout at repos/{slug} — "
+                "'context alive' could never obtain it."
+            )
         for other in self._store.list_all():
             if other.name == name:
                 continue
@@ -247,7 +257,7 @@ class SpecContextService:
                 "create time) — it is always included via all_repos() and can "
                 "never also be registered as an associated repo."
             )
-        self._refuse_slug(name, slug)
+        self._refuse_slug(name, slug, repo_url)
         existing = next((r for r in ctx.associated_repos if r.slug == slug), None)
         if existing is not None:
             if existing.url == repo_url:
@@ -327,6 +337,20 @@ class SpecContextService:
             return current_url
         return discovered or current_url
 
+    def _backfilled(self, ctx: SpecContextProject) -> SpecContextProject:
+        """*ctx* with EVERY repo's empty URL back-filled from its on-disk origin — the one
+        back-fill ``alive`` and ``dead`` share (bug
+        context-dead-destroys-associated-repo-without-url: a main-repo-only back-fill let
+        ``dead`` delete an associated checkout whose record kept url "")."""
+        return replace(
+            ctx,
+            repo_url=self._backfill_repo_url(ctx.repo_slug, ctx.repo_url),
+            associated_repos=tuple(
+                AssociatedRepo(slug=r.slug, url=self._backfill_repo_url(r.slug, r.url))
+                for r in ctx.associated_repos
+            ),
+        )
+
     # ------------------------------------------------------------------ list / show
 
     def list_all(self) -> list[SpecContextProject]:
@@ -394,10 +418,26 @@ class SpecContextService:
         if ctx is None:
             raise ContextNotFoundError(f"Context '{name}' not found.")
 
-        for repo in ctx.all_repos():
+        for repo in self._backfilled(ctx).all_repos():
             repo_dest = self._repo_path(repo.slug)
-            if not repo_dest.exists():
-                self._git.clone(repo.url, repo_dest)
+            if repo_dest.exists():
+                continue
+            if not repo.url:
+                if repo.slug == ctx.repo_slug:
+                    fix = (
+                        f"{DADAIA_BIN} context delete {name} && {DADAIA_BIN} context create "
+                        f"{name} --main-repo {repo.slug} --url <clone-url>"
+                    )
+                else:
+                    fix = (
+                        f"{DADAIA_BIN} context repo remove {name} {repo.slug} && {DADAIA_BIN} "
+                        f"context repo add {name} {repo.slug} --url <clone-url>"
+                    )
+                raise RepoUrlMissingError(
+                    f"'{repo.slug}' has no clone URL and no checkout at repos/{repo.slug} — "
+                    f"'context alive {name}' cannot obtain it.\nfix: {fix}"
+                )
+            self._git.clone(repo.url, repo_dest)
 
         if ctx.state == ContextState.ALIVE:
             return ctx
@@ -406,7 +446,6 @@ class SpecContextService:
         repo_path = self._repo_path(repo_slug)
 
         actual_branch: str | None = None
-        backfilled_url: str = ctx.repo_url
 
         if ctx.current_branch:
             try:
@@ -421,8 +460,6 @@ class SpecContextService:
             actual_branch = self._git.current_branch(repo_path)
         except Exception:
             actual_branch = None
-
-        backfilled_url = self._backfill_repo_url(repo_slug, ctx.repo_url)
 
         # Bug context-alive-sweeps-unrelated-worktree-changes (MEDIUM): the scaffold
         # commit below must stage EXACTLY the paths this method creates/modifies below
@@ -470,16 +507,12 @@ class SpecContextService:
             raise ContextNotFoundError(f"Context '{name}' not found.")
         if ctx_fresh.state == ContextState.ALIVE:
             return ctx_fresh
-        alive_ctx = SpecContextProject(
-            name=ctx_fresh.name,
+        alive_ctx = replace(
+            self._backfilled(ctx_fresh),
             state=ContextState.ALIVE,
-            repo_slug=ctx_fresh.repo_slug,
-            repo_url=ctx_fresh.repo_url or backfilled_url,
-            created_at=ctx_fresh.created_at,
             alive_since=_now(),
             dead_since=None,
             current_branch=actual_branch,
-            associated_repos=ctx_fresh.associated_repos,
         )
         self._store.update(alive_ctx)
 
@@ -667,15 +700,20 @@ class SpecContextService:
         if ctx.state != ContextState.ALIVE:
             raise ContextStateError(f"Context '{name}' is not ALIVE. It cannot be made DEAD.")
 
-        # Back-fill repo_url from the on-disk origin remote while the repo still
-        # exists (FR-W2-03 b / T-011-08), BEFORE the rmtree below removes it — a
-        # DEAD record with a known URL stays portable for a future alive clone.
-        backfilled_url: str = self._backfill_repo_url(ctx.repo_slug, ctx.repo_url)
-
+        # Back-fill every URL from the on-disk origin while the repos still exist
+        # (FR-W2-03 b), BEFORE the rmtree below — a DEAD record stays re-obtainable.
+        ctx = self._backfilled(ctx)
         repo_paths = [(repo.slug, self._repo_path(repo.slug)) for repo in ctx.all_repos()]
 
         # Phase 1 — preflight EVERY repo before mutating ANY (A16.2: no partial dead).
-        for slug, repo_path in repo_paths:
+        for repo in ctx.all_repos():
+            slug, repo_path = repo.slug, self._repo_path(repo.slug)
+            if repo_path.exists() and not repo.url:
+                raise RepoUrlMissingError(
+                    f"Context '{name}': repo '{slug}' has no clone URL (no origin remote) — "
+                    "removing it would leave nothing 'context alive' could clone back. "
+                    f"Nothing was touched.\nfix: git -C repos/{slug} remote add origin <clone-url>"
+                )
             if repo_path.exists() and self._git.is_git_root(repo_path):
                 self._enforce_dead_review_gate(name, repo_path, commit=commit, repo_slug=slug)
                 if self._git.has_commits(repo_path) and not self._git.has_remote(repo_path):
@@ -718,7 +756,7 @@ class SpecContextService:
             name=ctx.name,
             state=ContextState.DEAD,
             repo_slug=ctx.repo_slug,
-            repo_url=ctx.repo_url or backfilled_url,
+            repo_url=ctx.repo_url,
             created_at=ctx.created_at,
             alive_since=None,
             dead_since=_now(),

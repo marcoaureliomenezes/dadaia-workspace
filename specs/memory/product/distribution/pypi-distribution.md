@@ -1,8 +1,8 @@
 ---
 slug: pypi-distribution
 title: pypi-distribution
-tldr: The PyPI package on one version axis, two console-script names, the OIDC pipeline that also publishes the skills repo, the wheel contract and the docs site.
-summary: dadaia-workspace publishes to PyPI under OIDC trusted publishing from the release-please workflow; release-please owns the version, the CHANGELOG and the tag, pyproject carries the published floor, and the same release publishes the dadaia-skills repository.
+tldr: The PyPI package on one version axis, two console-script names, the OIDC pipeline, the wheel contract and the docs site.
+summary: dadaia-workspace publishes to PyPI under OIDC trusted publishing from the release-please workflow; release-please owns the version, the CHANGELOG and the tag, and pyproject carries the published floor.
 tags: [distribution, pypi, release, packaging]
 sources:
   - .github/workflows/**
@@ -17,7 +17,7 @@ sources:
 - `pip install dadaia-workspace` installs the library and one CLI under two console-script names, `dadaia` and `dadaia-workspace`, so `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` runs without an install (`tests/unit/cli/test_console_scripts.py`).
 - `pyproject.toml` `version` and `.release-please-manifest.json` carry the last published number — the floor release-please bumps from, stated nowhere else.
 - `.github/workflows/release.yml` runs on every push to `main`: the `release-please` job maintains one release PR proposing the next version from the Conventional Commits since the floor, and merging it writes the CHANGELOG section and creates the tag ([[release-lifecycle]]).
-- The publish side runs in the same workflow, every job gated on `release_created`: four test legs (`unit-fast`, `contract-coverage`, `integration`, `e2e-python`), `build`, `approve` (blocking on the `release-gate` environment), `publish` under OIDC trusted publishing with no long-lived token, `smoke-test` against the live index, and `publish-skills-repo`, which force-pushes the built `dadaia-skills` tree and fails closed without `SKILLS_REPO_TOKEN` ([[public-asset-distribution]]).
+- The publish side runs in the same workflow, every job gated on `release_created`: four test legs (`unit-fast`, `contract-coverage`, `integration`, `e2e-python`), `build`, `approve` (blocking on the `release-gate` environment), `publish` under OIDC trusted publishing with no long-lived token, and `smoke-test` against the live index.
 
 ## One version axis, two positions
 
@@ -28,15 +28,15 @@ sources:
 
 ## Wheel content contract
 
-- The wheel ships `dadaia_workspace/` with the full `public/` tree, so `dadaia init` works offline from a bare install ([[public-asset-distribution]]).
+- The wheel ships `dadaia_workspace/` with the full `public/` tree, so `dadaia init` needs no asset download; the workspace venv's dependencies still resolve from PyPI ([[public-asset-distribution]]).
 - It ships `dadaia_workspace/public/data/CONSUMER_VALIDATION_RECIPE.md`, the matrix run against every candidate wheel before deploy ([[consumer-agent-support]]).
-- `DADAIA_BOOTSTRAP_PACKAGE=<wheel>` makes a venv bootstrap install a candidate wheel instead of the PyPI release.
+- A venv bootstrap installs the running distribution (editable from a checkout, else its re-packed wheel); `DADAIA_BOOTSTRAP_PACKAGE=<wheel>` makes it install a named candidate wheel instead.
 
 ## Discovery surfaces
 
 - `pyproject.toml` `description` is the tagline, byte-equal to `README.md`'s first non-badge paragraph and to `llms.txt`'s `> ` line; `readme = "README.md"` makes the derived README the long description; `[tool.poetry.urls]` carries `Homepage`, `Repository`, `Documentation` (the docs site), `Changelog` and `Issues`; every keyword names something the README says — pinned by `tests/contract/test_docs_derived_from_memory.py` ([[QUALITY]]).
 - The `Development Status` classifier stays `3 - Alpha` until a released wheel passes the consumer-validation recipe ([[consumer-agent-support]]).
-- Channels: PyPI; the GitHub repository description, topics and homepage, set from the same tagline and keywords; `llms.txt` at the repository root, an index whose every line links to a derived document, the law, the CLI reference or the memory catalog; the docs site, GitHub Pages serving `docs/` from `main` with no build toolchain, every page derived under its markers; the `dadaia-skills` repository, installable by `npx skills add` and as a Claude Code marketplace. `docs/distribution.md` is derived from this list.
+- Channels: PyPI; the GitHub repository description, topics and homepage, set from the same tagline and keywords; `llms.txt` at the repository root, an index whose every line links to a derived document, the law, the CLI reference or the memory catalog; the docs site, GitHub Pages serving `docs/` from `main` with no build toolchain, every page derived under its markers. `docs/distribution.md` is derived from this list.
 
 ## Dependencies
 

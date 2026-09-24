@@ -10,8 +10,7 @@ Start here:
 
 Reference: [concepts](concepts.md) · [getting started](getting-started.md) · [CLI](cli.md) · [distribution](distribution.md).
 
-Repository: <https://github.com/marcoaureliomenezes/dadaia-workspace> ·
-skills, packaged standalone: <https://github.com/marcoaureliomenezes/dadaia-skills>
+Repository: <https://github.com/marcoaureliomenezes/dadaia-workspace>
 
 ## What it is
 

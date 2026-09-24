@@ -4,7 +4,7 @@ Where dadaia-workspace is published and what each channel carries.
 
 ## Channels
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
+<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
 
 | channel | artifact | how it is published |
 |---|---|---|
@@ -12,11 +12,10 @@ Where dadaia-workspace is published and what each channel carries.
 | GitHub repository | the repository description, topics and homepage | set from the same tagline and keywords as `pyproject.toml` |
 | Repository root | `llms.txt` — an index whose every line links to a derived document, the law, the CLI reference or the memory catalog | committed, derived under its markers |
 | Docs site | GitHub Pages serving `docs/` from `main`, with no build toolchain | every page derived under its markers |
-| `dadaia-skills` repository | the standalone skills in the Agent Skills layout, installable by `npx skills add` and as a Claude Code marketplace | the `publish-skills-repo` job of the release workflow |
 
 ## The PyPI metadata contract
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
+<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
 
 Every field PyPI renders has exactly one home:
 
@@ -37,14 +36,15 @@ Every field PyPI renders has exactly one home:
 
 ## What the wheel carries
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
+<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
 
-The wheel ships `dadaia_workspace/` with the full `public/` tree, so `dadaia init`
-works offline from a bare install, and
+The wheel ships `dadaia_workspace/` with the full `public/` tree (`dadaia init` still
+resolves the workspace venv's dependencies from PyPI), and
 `dadaia_workspace/public/data/CONSUMER_VALIDATION_RECIPE.md`, the matrix run against
 every candidate wheel before a deploy. It installs one CLI under two console-script
 names, `dadaia` and `dadaia-workspace`. Consumer-validation candidate wheels are
-throwaway and never mint a published version; `DADAIA_BOOTSTRAP_PACKAGE=<wheel>` makes
-a venv bootstrap install one instead of the PyPI release. Withholding the
+throwaway and never mint a published version; a venv bootstrap installs the running
+distribution itself, and `DADAIA_BOOTSTRAP_PACKAGE=<wheel>` makes it install a named
+candidate wheel instead. Withholding the
 `release-gate` approval leaves the tag and the `CHANGELOG.md` section without an
 upload, and the number is never reused.

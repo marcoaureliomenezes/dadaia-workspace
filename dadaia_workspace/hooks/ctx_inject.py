@@ -288,7 +288,7 @@ def _generic_preflight(workspace: Path) -> str:
     the root `AGENTS.md` map §1/§2 is deleted from every emission path, bound or not).
     """
     sections = ["[no bound context]"]
-    alive = invocation.alive_context_slugs(workspace)
+    alive = invocation.alive_context_names(workspace)
     if alive:
         sections.append("")
         sections.append("=== ALIVE contexts (bind one to inject its memory) ===")
