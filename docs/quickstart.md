@@ -7,8 +7,8 @@ live. Terms are defined in [concepts](concepts.md); the long walkthrough is
 
 ## 1. The three levels in one block
 
-<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
-<!-- derived-from: workspace-init sha256:bc26cf0b24e2 -->
+<!-- derived-from: pypi-distribution sha256:ab76c52ed560 -->
+<!-- derived-from: workspace-init sha256:0c2017836e6f -->
 
 Set `REPO_URL` to your repository's clone URL; everything else runs as printed (needs
 uv and network access):
@@ -39,7 +39,7 @@ from the parent directory; it prints `upgraded A -> B`, or `already at A` when c
 
 ## 2. What the init line provisioned
 
-<!-- derived-from: workspace-init sha256:bc26cf0b24e2 -->
+<!-- derived-from: workspace-init sha256:0c2017836e6f -->
 
 `--harness` names one registered harness: `claude` | `codex` | `kimi-code` | `cursor` |
 `devin` | `copilot`. The directory is required and a directory holding a foreign tree
@@ -60,7 +60,7 @@ clones every repo, installs the hook, makes the context ALIVE and binds the sess
 
 ## 3. The bind
 
-<!-- derived-from: context-management sha256:896b60268c5d -->
+<!-- derived-from: context-management sha256:d40d5eeb1115 -->
 
 ```bash
 eval "$(.dadaia/.venv/bin/dadaia context bind <your-repo> --print-env)"
@@ -76,7 +76,7 @@ record, never the cwd: sitting inside a repository is not a binding.
 
 ## 4. Compliance
 
-<!-- derived-from: workspace-doctor sha256:11d53d7927db -->
+<!-- derived-from: workspace-doctor sha256:6af42080bf04 -->
 
 `doctor` is the one instance validator; three sections run in fixed order —
 `workspace`, `specs`, `ledgers`. Every finding prints as one `<CODE> <verdict>
@@ -96,7 +96,7 @@ commit. Only the operator creates demand.
 
 ## 6. The first release
 
-<!-- derived-from: release-lifecycle sha256:09607348cc88 -->
+<!-- derived-from: release-lifecycle sha256:1151a261d24f -->
 
 `release.py new` is one birth act, all or nothing: a `SPEC.md` stub plus
 `_RELEASE.json` in `DEFINITION` under `specs/releases/<id>/`, refusing a second live

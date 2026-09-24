@@ -4,14 +4,14 @@
 
 ## What it is
 
-<!-- derived-from: product-vision sha256:164c4a8b0eca -->
+<!-- derived-from: product-vision sha256:16060412dc8a -->
 
 - [README](README.md): one workspace folder, projects in repos inside it, governance outside every repo; the unit is the context (main repo + associated repos); documents are the lifecycle; boundaries are mechanical.
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
-<!-- derived-from: workspace-init sha256:bc26cf0b24e2 -->
+<!-- derived-from: pypi-distribution sha256:ab76c52ed560 -->
+<!-- derived-from: workspace-init sha256:0c2017836e6f -->
 
 - [PyPI project](https://pypi.org/project/dadaia-workspace/): three levels — `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` (workspace + project: cloned, ALIVE, bound), then `.dadaia/.venv/bin/dadaia specs init --context <slug>` (specs on the canon) and `.dadaia/.venv/bin/dadaia doctor`; every later command runs through `.dadaia/.venv/bin/dadaia`; re-running the `uvx` init line upgrades the workspace.
 - [Changelog](CHANGELOG.md): written by release-please, one section per released version.
@@ -19,13 +19,13 @@
 ## The law
 
 <!-- derived-from: agentic-entities sha256:9f356fd0a4ec -->
-<!-- derived-from: sdd-gate-v3 sha256:f5759190d3a1 -->
+<!-- derived-from: sdd-gate-v3 sha256:d3f9d2e93776 -->
 
 - [AGENTS.md](dadaia_workspace/public/data/AGENTS.md): the always-on root map — flow, roles, gate invariants, where things live, the index of every scoped `AGENTS.md` and skill; projected once to the workspace root.
 
 ## Reference
 
-<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
+<!-- derived-from: pypi-distribution sha256:ab76c52ed560 -->
 
 - [CLI reference](docs/cli.md): the committed output of `.dadaia/.venv/bin/dadaia help tree`.
 - [Concepts](docs/concepts.md): the vocabulary — context, release, candidate, gate, memory, ledgers, audits.
@@ -36,8 +36,8 @@
 
 ## The site
 
-<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
-<!-- derived-from: product-vision sha256:164c4a8b0eca -->
+<!-- derived-from: pypi-distribution sha256:ab76c52ed560 -->
+<!-- derived-from: product-vision sha256:16060412dc8a -->
 
 - [Documentation site](https://marcoaureliomenezes.github.io/dadaia-workspace/): GitHub Pages serving `docs/` from `main`, every page derived under its markers.
 - [Landing](docs/index.md): the tagline, the paradigm and the two ways in.

@@ -1,7 +1,7 @@
 ---
 slug: public-asset-distribution
 title: public-asset-distribution
-tldr: Public assets staged once, projected into the root map, scoped AGENTS.md, .agents/ and each registered harness's files; doctor reports drift.
+tldr: Public assets staged once, projected into the root map, scoped AGENTS.md, .agents/ and each harness's files, with scaffold and scripts; doctor reports drift.
 summary: The stage, install and doctor chain that distributes the agentic surface into a workspace — hash-compared overwrite, rendered personas, whole-folder skills, per-harness hook and agent files derived from one registry, the specs scaffold, and a privacy gate.
 tags: [public, assets, distribution, projection, privacy]
 sources:
@@ -18,12 +18,13 @@ sources:
   - dadaia_workspace/core/harness_registry.py
   - dadaia_workspace/public/scaffold/**
   - dadaia_workspace/public/templates/**
+  - dadaia_workspace/public/scripts/**
   - dadaia_workspace/cli/commands/public.py
 ---
 
 ## The chain
 
-- `dadaia public stage` copies `dadaia_workspace/public/` into `.dadaia/agentic/<type>/` with a SHA256 manifest, rendering the registry tables (zones, root canon, repo exclusions, specs canon) into the law fragments so every canon table in the projected law is the registry itself.
+- `dadaia public stage` copies `dadaia_workspace/public/` into `.dadaia/agentic/<type>/` with a SHA256 manifest that carries no timestamp, so an unchanged stage writes identical bytes, rendering the registry tables (zones, root canon, repo exclusions, specs canon) into the law fragments so every canon table in the projected law is the registry itself.
 - `dadaia public install` projects the staged assets into the authored set — the root `AGENTS.md` map, the scoped `AGENTS.md` family, `.agents/skills/`, `.agents/agents/` — plus, per registered harness, its own agent and hook files: `.claude/settings.json` and per-entry symlinks under `.claude/`, `.codex/{config.toml,hooks.json,rules,agents/*.toml}`, `.cursor/{hooks.json,agents/*.md}`, `.devin/hooks.v1.json`, `.github/{hooks/*.json,agents/*.agent.md}` and the hook wrappers under `.dadaia/hooks/`; Kimi Code reads the shared tree and gets no files of its own ([[harness-kimi-code]]).
 - One harness registry drives every per-harness file: each harness is one record naming its directory, its persona transcode and its hook format, so adding a harness is one data row ([[agentic-entities]]).
 - Hooks are the Python package `dadaia_workspace/hooks/`, rendered into each harness's own hook format; a harness action with no pre-event is declared ungated (Cursor file writes, one `public doctor` WARN).
@@ -41,12 +42,17 @@ sources:
 
 ## Scaffold and consumer fan-out
 
-- The scaffolded `specs/` tree is the canon — `AGENTS.md`, `constitution.md`, `memory/` (`ARCHITECTURE.md`, `QUALITY.md`, `product/`), `releases/`, `backlog/`, `bugs/`, `audits/`, `ADRs/` — stamped `specs_pattern_version: 7`.
+- The scaffolded `specs/` tree is the canon — `AGENTS.md`, an English `constitution.md`, `memory/` (`ARCHITECTURE.md` with `## Principles`, `## Tech Stack`, `## Structure`; `QUALITY.md` with `## Principles`, `## Test architecture`, `## Gates`; `product/`), `releases/`, `backlog/`, `bugs/`, `audits/`, `ADRs/` — stamped `specs_pattern_version: 7`; `dadaia specs init` writes it ([[specs-migration]]).
+- The scaffold writes only absent files, each through one `O_CREAT|O_NOFOLLOW` open: an existing file or a symlinked destination is skipped, and a path escaping the tree through a symlinked parent is never written.
 - Every scoped scaffold `AGENTS.md` is the system of record of its area, at most 4096 bytes (the root map 8192, a `SKILL.md` 6144 — `tests/contract/test_context_map.py`); `TREE-5` heals each by shipped hash, and operator-owned files are never overwritten ([[workspace-doctor]]).
-- Repo templates land when a context goes ALIVE: `repo-AGENTS.md` at the repo root, `tests-AGENTS.md` only into a real `tests/` directory holding none ([[context-management]]).
+- Repo templates land with `dadaia specs init`: `repo-AGENTS.md` as the main repo's `AGENTS.md`, `tests-AGENTS.md` only into an existing `tests/` directory holding none; once written they are the operator's and never overwritten.
 - An installed file still carrying `<ANGLE-BRACKET>` placeholders is `AGENTS-PLACEHOLDER-1` or `MEM-PLACEHOLDER-1` in `dadaia doctor`'s `specs` section.
 - Consumer-repo `AGENTS.md` fan-out is gated by the canonical banner: absent creates, a stale banner is restored as `[updated]`, a bannerless file is `[foreign]` and never overwritten; a symlinked destination file is `[foreign]`.
 
+## Shipped scripts
+
+- `dadaia_workspace/public/scripts/` stages into `.dadaia/agentic/scripts/`: `pre-push-ci-gate.sh`, the source the hook installer copies into each repo's `.git/hooks/pre-push` ([[context-management]], [[sdd-gate-v3]]); `certify-dadaia-workspace.sh`, a one-command entry to `dadaia certify` through the workspace venv ([[consumer-agent-support]]); `lint-memory-atoms.py`, a standalone entry to the package's memory-atom lint; `lint-dadaia-cli-reachability.py`, which fails when a persona's `dd-cli-library` grant disagrees with its `Bash` tool or a public skill-script citation names a missing script or verb.
+
 ## Dependencies
 
-[[agentic-entities]], [[pypi-distribution]], [[workspace-init]], [[workspace-doctor]], [[context-management]], [[harness-kimi-code]].
+[[agentic-entities]], [[pypi-distribution]], [[workspace-init]], [[workspace-doctor]], [[context-management]], [[specs-migration]], [[sdd-gate-v3]], [[consumer-agent-support]], [[harness-kimi-code]].

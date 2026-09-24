@@ -5,8 +5,8 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
-<!-- derived-from: workspace-init sha256:bc26cf0b24e2 -->
+<!-- derived-from: pypi-distribution sha256:ab76c52ed560 -->
+<!-- derived-from: workspace-init sha256:0c2017836e6f -->
 
 ```bash
 uvx dadaia-workspace init <dir> --harness claude --repo <url>
@@ -25,7 +25,7 @@ it prints `upgraded A -> B`, or `already at A` when the workspace is current.
 
 ## Level 1 — the workspace
 
-<!-- derived-from: workspace-init sha256:bc26cf0b24e2 -->
+<!-- derived-from: workspace-init sha256:0c2017836e6f -->
 
 `uvx dadaia-workspace init <dir> --harness claude|codex|kimi-code|cursor|devin|copilot
 [--repo <url>] [--associated-repo <url>]… [--skip-assets]` is the only verb that works
@@ -48,8 +48,8 @@ harness later and `.dadaia/.venv/bin/dadaia harness list` reads the roster.
 
 ## Level 2 — the project
 
-<!-- derived-from: spec-context-project sha256:15dae861d543 -->
-<!-- derived-from: context-management sha256:896b60268c5d -->
+<!-- derived-from: spec-context-project sha256:4984ba691799 -->
+<!-- derived-from: context-management sha256:d40d5eeb1115 -->
 
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
 owned by one main repository, optionally spanning associated repositories that live and
@@ -75,7 +75,7 @@ bind, the ctx-inject hook injects the context header, `ARCHITECTURE.md`'s
 
 ## Level 3 — the specs
 
-<!-- derived-from: spec-context-project sha256:15dae861d543 -->
+<!-- derived-from: spec-context-project sha256:4984ba691799 -->
 
 ```bash
 .dadaia/.venv/bin/dadaia specs init --context <ctx> [--replace-foreign]
@@ -88,7 +88,7 @@ foreign `specs/` is moved to `specs-bkp/` (`git mv`, staged) after consent —
 
 ## Check compliance — `doctor`
 
-<!-- derived-from: workspace-doctor sha256:11d53d7927db -->
+<!-- derived-from: workspace-doctor sha256:6af42080bf04 -->
 
 ```bash
 .dadaia/.venv/bin/dadaia doctor --context <ctx> [--json] [--fix] [--redact]
@@ -113,7 +113,7 @@ a TTL expired.
 
 ## Run the first candidate
 
-<!-- derived-from: release-lifecycle sha256:09607348cc88 -->
+<!-- derived-from: release-lifecycle sha256:1151a261d24f -->
 <!-- derived-from: backlog-ledger sha256:46382434daf2 -->
 <!-- derived-from: bug-ledger sha256:9534ded07707 -->
 

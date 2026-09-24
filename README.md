@@ -13,7 +13,7 @@ its **associated repos** are the others it owns.
 
 ## What it is and principles
 
-<!-- derived-from: product-vision sha256:164c4a8b0eca -->
+<!-- derived-from: product-vision sha256:16060412dc8a -->
 
 dadaia-workspace is the operating environment around repositories developed with AI
 agents. Its unit is the context: one main repo, where `specs/` lives, plus its
@@ -44,10 +44,10 @@ memory atom under its content hash.
 
 ## A human installs and uses it
 
-<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
-<!-- derived-from: workspace-init sha256:bc26cf0b24e2 -->
-<!-- derived-from: context-management sha256:896b60268c5d -->
-<!-- derived-from: workspace-doctor sha256:11d53d7927db -->
+<!-- derived-from: pypi-distribution sha256:ab76c52ed560 -->
+<!-- derived-from: workspace-init sha256:0c2017836e6f -->
+<!-- derived-from: context-management sha256:d40d5eeb1115 -->
+<!-- derived-from: workspace-doctor sha256:6af42080bf04 -->
 
 ```bash
 uvx dadaia-workspace init demo --harness claude --repo <clone url>   # level 1 + 2
@@ -90,8 +90,8 @@ and deletes only what a TTL expired.
 ## An agent reads AGENTS.md and uses it
 
 <!-- derived-from: agentic-entities sha256:9f356fd0a4ec -->
-<!-- derived-from: sdd-gate-v3 sha256:f5759190d3a1 -->
-<!-- derived-from: release-lifecycle sha256:09607348cc88 -->
+<!-- derived-from: sdd-gate-v3 sha256:d3f9d2e93776 -->
+<!-- derived-from: release-lifecycle sha256:1151a261d24f -->
 <!-- derived-from: bug-ledger sha256:9534ded07707 -->
 <!-- derived-from: harness-claude-code sha256:266fdf40eaed -->
 <!-- derived-from: harness-codex sha256:b907c260a862 -->
@@ -130,8 +130,8 @@ with a RED test. Completed work leaves as a `handoff-v1` record, validated by
 
 ## Documentation
 
-<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
-<!-- derived-from: public-asset-distribution sha256:855c77cc15da -->
+<!-- derived-from: pypi-distribution sha256:ab76c52ed560 -->
+<!-- derived-from: public-asset-distribution sha256:6e3a34ba5b23 -->
 
 The site is <https://marcoaureliomenezes.github.io/dadaia-workspace/>:
 
@@ -146,7 +146,7 @@ The site is <https://marcoaureliomenezes.github.io/dadaia-workspace/>:
 
 ## Links
 
-<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
+<!-- derived-from: pypi-distribution sha256:ab76c52ed560 -->
 
 - GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
 - PyPI — <https://pypi.org/project/dadaia-workspace/>
