@@ -376,12 +376,12 @@ def test_create_refuses_an_associated_slug_that_collides_or_repeats(
 ) -> None:
     """A17.3 at the seam, not the CLI: an associated slug equal to the main slug, or
     given twice, is refused before anything is written."""
-    own = AssociatedRepo(slug="main-repo", url="")
+    own = AssociatedRepo(slug="main-repo", url="u")
     with pytest.raises(AssociatedRepoConflictError, match="own main repo"):
-        service.create("proj", "main-repo", "", associated_repos=(own,))
-    twice = (AssociatedRepo(slug="infra", url=""), AssociatedRepo(slug="infra", url="u"))
+        service.create("proj", "main-repo", "u", associated_repos=(own,))
+    twice = (AssociatedRepo(slug="infra", url="u"), AssociatedRepo(slug="infra", url="u"))
     with pytest.raises(AssociatedRepoConflictError, match="more than once"):
-        service.create("proj", "main-repo", "", associated_repos=twice)
+        service.create("proj", "main-repo", "u", associated_repos=twice)
 
     assert store.list_all() == []
 

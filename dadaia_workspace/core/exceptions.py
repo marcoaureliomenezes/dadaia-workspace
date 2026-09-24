@@ -49,8 +49,8 @@ class PublicAssetError(DadaiaError):
     """Raised when installing public assets fails."""
 
 
-class RepoCatalogError(DadaiaError):
-    """Raised when reading the repos catalog fails."""
+class RepoUrlMissingError(DadaiaError):
+    """A repo slug is registered with neither a clone URL nor a ``repos/<slug>`` checkout."""
 
 
 class GitCloneError(DadaiaError):

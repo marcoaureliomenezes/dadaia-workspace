@@ -19,6 +19,7 @@ from dadaia_workspace.core.exceptions import (
     DadaiaError,
     GitSyncError,
     InvalidContextNameError,
+    RepoUrlMissingError,
 )
 from dadaia_workspace.core.models.spec_context import (
     CONTEXT_NAME_RE,
@@ -180,7 +181,7 @@ class SpecContextService:
             raise ContextAlreadyExistsError(
                 f"Context '{ctx.name}' already exists. Use a different name."
             )
-        self._refuse_slug(ctx.name, ctx.repo_slug)
+        self._refuse_slug(ctx.name, ctx.repo_slug, ctx.repo_url)
         seen: set[str] = set()
         for repo in ctx.associated_repos:
             if repo.slug == ctx.repo_slug:
@@ -193,18 +194,24 @@ class SpecContextService:
                     f"associated repo slug '{repo.slug}' given more than once."
                 )
             seen.add(repo.slug)
-            self._refuse_slug(ctx.name, repo.slug)
+            self._refuse_slug(ctx.name, repo.slug, repo.url)
         self._store.save(ctx)
         return ctx
 
     # ------------------------------------------------------------------ associated repos (FR17)
 
-    def _refuse_slug(self, name: str, slug: str) -> None:
-        """Refuse *slug* for *name* unless allowlisted and unowned by any other context (its
-        main repo or an associated repo): every ``repos/<slug>`` checkout lives in the ONE
-        namespace ``dead()`` walks and destroys, so the two writers into it — ``register``
-        and ``add_repo`` — guard here, never ``dead()`` itself."""
+    def _refuse_slug(self, name: str, slug: str, url: str) -> None:
+        """Refuse *slug* for *name* unless allowlisted, obtainable and unowned by any other
+        context (its main repo or an associated repo): every ``repos/<slug>`` checkout lives
+        in the ONE namespace ``alive()`` clones into and ``dead()`` walks and destroys, so
+        the two writers into it — ``register`` and ``add_repo`` — guard here. Obtainable
+        means a clone *url* or an existing ``repos/<slug>`` checkout ``alive()`` adopts."""
         _require_allowlisted("repo slug", slug)
+        if not url and not self._repo_path(slug).exists():
+            raise RepoUrlMissingError(
+                f"'{slug}' has no clone URL and no checkout at repos/{slug} — "
+                "'context alive' could never obtain it."
+            )
         for other in self._store.list_all():
             if other.name == name:
                 continue
@@ -247,7 +254,7 @@ class SpecContextService:
                 "create time) — it is always included via all_repos() and can "
                 "never also be registered as an associated repo."
             )
-        self._refuse_slug(name, slug)
+        self._refuse_slug(name, slug, repo_url)
         existing = next((r for r in ctx.associated_repos if r.slug == slug), None)
         if existing is not None:
             if existing.url == repo_url:

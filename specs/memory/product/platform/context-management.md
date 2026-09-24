@@ -21,7 +21,7 @@ sources:
 
 - `.dadaia/states/spec_contexts.json` stores per context its name, state, main repo slug and URL, ordered associated repos (slug + URL), branch and lifecycle timestamps; schema 2 and 3 files read alike, a schema 1 file is refused with `dadaia migrate` as the fix ([[specs-migration]]).
 - The main repo is where `specs/` lives and the only specs, bind, memory, release and backlog target; associated repos are working checkouts.
-- `dadaia context create <name> --main-repo <slug> [--url <url>] [--associated-repos a,b]` registers a DEAD context; without `--url` the URL comes from the repos catalog.
+- `dadaia context create <name> --main-repo <slug> [--url <url>] [--associated-repos a,b]` registers a DEAD context; a repo with neither a URL (`--url`, `slug=URL`) nor a `repos/<slug>` checkout is refused, as by `repo add` and `dadaia import`.
 - `dadaia context alive <name>` clones every missing repo of the set; the main repo alone gets the canon scaffold folded over `specs/` (never overwriting a file), its scaffold commit and branch restore; associated repos are cloned clean. It is idempotent on an ALIVE context.
 - `dadaia context dead <name> [--commit]` preflights the whole set before touching any repo: untracked files refuse without `--commit`, and with it a secret scan blocks on any hit; a repo with local commits and no remote refuses. Then tracked changes are committed and pushed, the branch recorded and every repo removed.
 - `alive` and `dead` back-fill an empty repo URL from the checkout's `origin`.

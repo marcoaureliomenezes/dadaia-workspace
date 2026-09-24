@@ -101,7 +101,10 @@ def _session_record_for(workspace: Path, output: str) -> dict:
 
 
 def test_context_create_show_list_happy_lifecycle(workspace: Path) -> None:
-    result = _runner.invoke(app, ["context", "create", "alpha", "--main-repo", "alpha"])
+    result = _runner.invoke(
+        app,
+        ["context", "create", "alpha", "--main-repo", "alpha", "--url", "https://x.test/alpha.git"],
+    )
     assert result.exit_code == 0, result.output
 
     show = _runner.invoke(app, ["context", "show", "alpha", "--json"])
@@ -136,7 +139,7 @@ def test_context_create_show_list_happy_lifecycle(workspace: Path) -> None:
             "dead_since": None,
             "name": "alpha",
             "main_repo": "alpha",
-            "repo_url": "",
+            "repo_url": "https://x.test/alpha.git",
             "state": "dead",
             "stored_branch": None,
         }
@@ -174,8 +177,14 @@ def test_context_error_matrix(workspace: Path, invoke_args: list[str]) -> None:
 def test_context_create_duplicate_and_dead_requires_alive(workspace: Path) -> None:
     """A duplicate create fails, and (AC-T10d-2) dead <name> fails if the context is
     not ALIVE — both against the same freshly-created DEAD context."""
-    _runner.invoke(app, ["context", "create", "alpha", "--main-repo", "alpha"])
-    result = _runner.invoke(app, ["context", "create", "alpha", "--main-repo", "alpha"])
+    _runner.invoke(
+        app,
+        ["context", "create", "alpha", "--main-repo", "alpha", "--url", "https://x.test/alpha.git"],
+    )
+    result = _runner.invoke(
+        app,
+        ["context", "create", "alpha", "--main-repo", "alpha", "--url", "https://x.test/alpha.git"],
+    )
     assert result.exit_code != 0
 
     result = _runner.invoke(app, ["context", "dead", "alpha"])
@@ -669,8 +678,10 @@ def test_context_show_and_list_json_emit_main_repo_key(workspace: Path) -> None:
                 "alpha",
                 "--main-repo",
                 "alpha",
+                "--url",
+                "https://x.test/alpha.git",
                 "--associated-repos",
-                "beta,gamma",
+                "beta=https://x.test/beta.git,gamma=https://x.test/gamma.git",
             ],
         ).exit_code
         == 0

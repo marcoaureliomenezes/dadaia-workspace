@@ -54,7 +54,7 @@ that makes the first project instead.
 
 ## 3. Bind the session
 
-<!-- derived-from: context-management sha256:0227a5e43894 -->
+<!-- derived-from: context-management sha256:cbeec31adb58 -->
 
 ```bash
 eval "$(dadaia context bind demo --print-env)"

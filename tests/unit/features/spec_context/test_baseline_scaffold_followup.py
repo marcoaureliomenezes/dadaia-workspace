@@ -34,7 +34,7 @@ def _service(tmp_path: Path) -> tuple[SpecContextService, FakeGitClient, Path]:
         workspace_root=root,
         scaffold_specs=canon_scaffold,
     )
-    service.create(_CTX, repo_slug=_CTX, repo_url="")
+    service.create(_CTX, repo_slug=_CTX, repo_url="https://x.test/ctx.git")
     service.alive(_CTX)
     repo = root / "repos" / _CTX
     repo.mkdir(parents=True, exist_ok=True)

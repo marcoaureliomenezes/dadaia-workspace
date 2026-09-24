@@ -31,9 +31,11 @@ from dadaia_workspace.core.exceptions import (
     ContextStateError,
     GitSyncError,
     InvalidContextNameError,
+    RepoUrlMissingError,
     SchemaVersionError,
     WorkspaceNotInitializedError,
 )
+from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.models.spec_context import (
     AssociatedRepo,
     ContextState,
@@ -198,8 +200,8 @@ def create(
         None,
         "--url",
         help=(
-            "Repo clone URL. Overrides the repos-catalog lookup when given — use it "
-            "for a repo not in the catalog or to pin an explicit remote."
+            "Main repo clone URL — required unless repos/<slug> is already a checkout, "
+            "whose origin 'context alive' then records."
         ),
     ),
     associated: list[str] = typer.Option(
@@ -207,8 +209,8 @@ def create(
         "--associated-repos",
         help=(
             "Associated repos (the other repos this context owns), comma-separated "
-            "and repeatable. Each value is SLUG or SLUG=URL — a bare slug registers "
-            "with an empty URL, settable later via 'context repo add' with --url."
+            "and repeatable. Each value is SLUG=URL, or a bare SLUG when repos/<slug> "
+            "is already a checkout."
         ),
     ),
 ) -> None:
@@ -234,6 +236,19 @@ def create(
         )
     except (ContextAlreadyExistsError, InvalidContextNameError, AssociatedRepoConflictError) as e:
         err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    except RepoUrlMissingError as e:
+        # The fix is the same command with every missing URL named — runnable once filled.
+        assoc = "".join(
+            f" --associated-repos {r.slug}={r.url or '<clone-url>'}" for r in associated_repos
+        )
+        err_console.print(f"[red]Error:[/red] {e}")
+        err_console.print(
+            f"fix: {DADAIA_BIN} context create {name} --main-repo {repo} "
+            f"--url {repo_url or '<clone-url>'}{assoc}",
+            markup=False,
+            soft_wrap=True,
+        )
         raise typer.Exit(1) from None
 
 
@@ -586,7 +601,9 @@ def repo_add(
     slug: str = typer.Argument(
         ..., help="Associated repo to register — the directory name under repos/"
     ),
-    url: str = typer.Option("", "--url", help="Repo clone URL (optional; empty until set)"),
+    url: str = typer.Option(
+        "", "--url", help="Repo clone URL — required unless repos/<slug> is already a checkout"
+    ),
 ) -> None:
     """Register an associated repo on a context.
 
@@ -602,6 +619,14 @@ def repo_add(
         ctx, was_added = _ctx_service().add_repo(ctx_name, slug, url)
     except (ContextNotFoundError, InvalidContextNameError, AssociatedRepoConflictError) as e:
         err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    except RepoUrlMissingError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        err_console.print(
+            f"fix: {DADAIA_BIN} context repo add {ctx_name} {slug} --url <clone-url>",
+            markup=False,
+            soft_wrap=True,
+        )
         raise typer.Exit(1) from None
 
     if was_added:

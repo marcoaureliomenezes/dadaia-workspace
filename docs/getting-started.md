@@ -54,7 +54,7 @@ harness later and `dadaia harness list` reads the roster.
 ## Bind a context — `dadaia context bind`
 
 <!-- derived-from: spec-context-project sha256:15dae861d543 -->
-<!-- derived-from: context-management sha256:0227a5e43894 -->
+<!-- derived-from: context-management sha256:cbeec31adb58 -->
 
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
 owned by one main repository, optionally spanning associated repositories that live and
