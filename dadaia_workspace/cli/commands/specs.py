@@ -22,13 +22,6 @@ from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 
 app = typer.Typer(help="SDD release-lifecycle structural checks and helpers.")
 
-# `specs release open` / `specs segment open` RETIRED (v0.5.0 FR4/T-050-21A): both
-# wrote ACTIVE.md via `_write_active`; the phase is now read from RELEASE.json and no
-# file stands in ACTIVE.md's place, so both verbs are dead the moment there is nothing
-# left for them to write. `scaffold_release_segment` (features.specs.scaffolder)
-# stays — it still scaffolds the SPEC/PLAN/TASKS stubs of a dir-based segment
-# (ADR-1/ADR-5) and is exercised directly by its own unit tests.
-
 
 def _resolve_specs_dir(specs_dir: str | None) -> Path:
     return resolve_specs_dir_for_cli(specs_dir)

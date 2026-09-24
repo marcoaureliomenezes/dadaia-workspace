@@ -926,7 +926,7 @@ _SPECS_AGENTS_SOURCE_TEMPLATE = "specs-AGENTS.md"
 def _projected_specs_agents_relpath(repo_root: Path) -> str | None:
     """Prove — by actually EXECUTING the real installer mapping, never a second
     hand-kept allowlist (D4/D10) — that ``specs/AGENTS.md`` is a projected INSTANCE
-    path: ``dadaia_workspace.features.specs.scaffolder.scaffold`` writes it from
+    path: ``dadaia_workspace.features.specs.canon.scaffold`` writes it from
     ``dadaia_workspace/public/templates/specs-AGENTS.md`` (the generating public asset)
     into any ``<specs_dir>/AGENTS.md`` — at the workspace root and inside every
     ``repos/<slug>/`` alike. It is deliberately never tracked in ANY checkout of this
@@ -942,18 +942,18 @@ def _projected_specs_agents_relpath(repo_root: Path) -> str | None:
     if not source.exists():
         return None
 
-    from dadaia_workspace.features.specs.scaffolder import scaffold
+    from dadaia_workspace.features.specs.canon import scaffold
 
     with tempfile.TemporaryDirectory() as scratch:
         scratch_specs_dir = Path(scratch) / "specs"
-        result = scaffold(
-            specs_dir=scratch_specs_dir,
+        created = scaffold(
+            scratch_specs_dir,
             project_name="citation-enforcer-projection-probe",
             force=True,
-            templates_dir=templates_dir,
+            public_dir=templates_dir.parent,
         )
         target = scratch_specs_dir / _PROJECTED_SPECS_TARGET_RELPATH
-        if result.errors or target not in result.created:
+        if target not in created:
             return None
         if target.read_text(encoding="utf-8") != source.read_text(encoding="utf-8"):
             return None
@@ -981,7 +981,7 @@ def test_projected_specs_agents_md_citation_survives_bare_checkout() -> None:
     """Regression — bug ``citation-enforcer-resolves-projected-instance-paths-
     against-the-checkout`` (HIGH). ``specs/AGENTS.md`` is cited by public docs; it is
     an INSTANCE reality that
-    ``dadaia_workspace.features.specs.scaffolder.scaffold`` projects from
+    ``dadaia_workspace.features.specs.canon.scaffold`` projects from
     ``dadaia_workspace/public/templates/specs-AGENTS.md``, which this repo's own
     ``.gitignore``/repo-hygiene job both forbid ever tracking — so a bare CI clone
     never has it on disk even though a locally-instantiated workspace does. This test

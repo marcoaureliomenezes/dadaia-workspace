@@ -18,7 +18,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.features.specs.scaffolder import scaffold
+from dadaia_workspace.features.specs.canon import scaffold
 
 pytestmark = pytest.mark.contract
 
@@ -37,10 +37,7 @@ def no_instance(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def test_explicit_specs_dir_is_read_with_no_instance_around(no_instance: Path) -> None:
     specs = no_instance / "specs"
-    result = scaffold(
-        specs_dir=specs, project_name="bare", force=False, templates_dir=_TEMPLATES_DIR
-    )
-    assert result.errors == []
+    scaffold(specs, project_name="bare", force=False, public_dir=_TEMPLATES_DIR.parent)
 
     run = _runner.invoke(app, ["doctor", "--json", "--specs-dir", str(specs)])
 

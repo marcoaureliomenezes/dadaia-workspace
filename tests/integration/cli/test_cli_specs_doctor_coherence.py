@@ -18,7 +18,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.features.specs.scaffolder import scaffold
+from dadaia_workspace.features.specs.canon import scaffold
 
 _runner = CliRunner()
 
@@ -33,13 +33,12 @@ def _make_workspace(root: Path) -> Path:
     # The sentinel resolve_workspace_root() looks for.
     (states / "spec_contexts.json").write_text('{"contexts": []}', encoding="utf-8")
     specs = root / "specs"
-    result = scaffold(
-        specs_dir=specs,
+    scaffold(
+        specs,
         project_name="ws-coherence",
         force=False,
-        templates_dir=_TEMPLATES_DIR,
+        public_dir=_TEMPLATES_DIR.parent,
     )
-    assert result.errors == [], result.errors
     return specs
 
 

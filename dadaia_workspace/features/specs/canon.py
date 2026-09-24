@@ -290,9 +290,7 @@ def scaffold(
     An existing target is left untouched unless *force*; a symlinked target is never
     written through. Returns the paths actually
     (re)written, in :data:`CANON` order; a skipped (already-present, not forced) entry
-    is omitted — the caller that also needs skip/error bookkeeping is
-    ``features.specs.scaffolder.scaffold`` (the CLI-facing wrapper, which pre-checks
-    existence to report ``ScaffoldResult.skipped`` without changing this fold).
+    is omitted.
     """
     resolved_public = public_dir if public_dir is not None else default_public_dir()
     context = {

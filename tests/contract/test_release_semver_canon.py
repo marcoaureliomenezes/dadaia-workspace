@@ -14,7 +14,7 @@ centralisation two ways, both decidable and free of false positives:
 
 - **IDENTITY** — every consuming module resolves its canon reference to the *same*
   object the canon module defines (``is`` identity, not mere equality) — either
-  ``RELEASE_SEMVER_RE`` itself (scaffolder.py, doctor_release.py, which still need the
+  ``RELEASE_SEMVER_RE`` itself (doctor_release.py, which still needs the
   broader two-axis match for archive/naming lookups) or ``is_release_semver``
   (features.specs.canon, which only ever MINTS and so only needs the bare-axis predicate).
   A re-introduced private copy would be a different object and fail here.
@@ -68,7 +68,6 @@ _CANON_REL = Path("core") / "specs_version.py"
 #: v0.1.55 FR1: the SpecsDoctor RELEASE_SEMVER_RE consumer moved off the coordinator into the
 #: ``doctor_release`` validator sibling (the SemVer/naming-canon checks live there now).
 _CONSUMER_MODULES: tuple[tuple[str, str], ...] = (
-    ("dadaia_workspace.features.specs.scaffolder", "RELEASE_SEMVER_RE"),
     ("dadaia_workspace.features.specs.doctor_release", "RELEASE_SEMVER_RE"),
 )
 

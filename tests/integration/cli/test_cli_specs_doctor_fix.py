@@ -17,7 +17,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.features.specs.scaffolder import scaffold
+from dadaia_workspace.features.specs.canon import scaffold
 
 _runner = CliRunner()
 
@@ -55,13 +55,12 @@ def _make_minimal_specs(root: Path) -> Path:
     needed anymore.
     """
     specs = root / "specs"
-    result = scaffold(
-        specs_dir=specs,
+    scaffold(
+        specs,
         project_name="test-project",
         force=False,
-        templates_dir=_TEMPLATES_DIR,
+        public_dir=_TEMPLATES_DIR.parent,
     )
-    assert result.errors == [], f"Scaffold errors: {result.errors}"
     return specs
 
 

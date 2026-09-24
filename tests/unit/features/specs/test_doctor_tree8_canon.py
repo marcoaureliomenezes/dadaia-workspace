@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
-from dadaia_workspace.features.specs.scaffolder import scaffold
+from dadaia_workspace.features.specs.canon import scaffold
 
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
@@ -29,13 +29,12 @@ _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 
 def _make_v6_tree(tmp_path: Path) -> Path:
     specs_dir = tmp_path / "specs"
-    result = scaffold(
-        specs_dir=specs_dir,
+    scaffold(
+        specs_dir,
         project_name="tree8-project",
         force=False,
-        templates_dir=_TEMPLATES_DIR,
+        public_dir=_TEMPLATES_DIR.parent,
     )
-    assert result.errors == [], f"Scaffold errors: {result.errors}"
     return specs_dir
 
 

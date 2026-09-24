@@ -1,4 +1,4 @@
-"""Unit tests for the SDD scaffolder — scaffold() function and ScaffoldResult."""
+"""Unit tests for the SDD scaffold — ``canon.scaffold`` renders the birth canon."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.backlog.document import load_document
-from dadaia_workspace.features.specs.scaffolder import scaffold
+from dadaia_workspace.features.specs.canon import scaffold
 
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
@@ -60,18 +60,13 @@ def test_scaffold_happy_path_creates_all_artifacts(tmp_path: Path) -> None:
     the per-artifact _archive dirs (v0.1.46 AC-4)."""
     specs_dir = tmp_path / "specs"
     result = scaffold(
-        specs_dir=specs_dir,
+        specs_dir,
         project_name="my-project",
         force=False,
-        templates_dir=_TEMPLATES_DIR,
+        public_dir=_TEMPLATES_DIR.parent,
     )
 
-    assert result.errors == [], f"Unexpected errors: {result.errors}"
-    assert result.skipped == [], f"Unexpected skips on fresh dir: {result.skipped}"
-    assert len(result.created) == len(_EXPECTED_FILES), (
-        f"Expected {len(_EXPECTED_FILES)} created, got {len(result.created)}:\n"
-        f"  created: {[str(p) for p in result.created]}"
-    )
+    assert len(result) == len(_EXPECTED_FILES), [str(p) for p in result]
 
     for rel in _EXPECTED_FILES:
         full = specs_dir / rel
@@ -105,13 +100,12 @@ def test_scaffold_emits_exact_v6_canon_root_zero_readme_zero_assets(tmp_path: Pa
     in the scaffolded tree.
     """
     specs_dir = tmp_path / "specs"
-    result = scaffold(
-        specs_dir=specs_dir,
+    scaffold(
+        specs_dir,
         project_name="v6-project",
         force=False,
-        templates_dir=_TEMPLATES_DIR,
+        public_dir=_TEMPLATES_DIR.parent,
     )
-    assert result.errors == [], f"Unexpected errors: {result.errors}"
 
     root_entries = {p.name for p in specs_dir.iterdir()}
     assert root_entries == _V6_CANON_ROOT, (
@@ -135,13 +129,12 @@ def test_scaffolded_backlog_skeleton_pins_writer_and_round_trips_load_document(
     ``document.load_document`` with zero errors — an empty ``active`` array is a
     legitimate empty model."""
     specs_dir = tmp_path / "specs"
-    result = scaffold(
-        specs_dir=specs_dir,
+    scaffold(
+        specs_dir,
         project_name="pin-project",
         force=False,
-        templates_dir=_TEMPLATES_DIR,
+        public_dir=_TEMPLATES_DIR.parent,
     )
-    assert result.errors == []
 
     doc = load_document(specs_dir / "backlog")
     assert doc.errors == ()
@@ -149,41 +142,36 @@ def test_scaffolded_backlog_skeleton_pins_writer_and_round_trips_load_document(
 
 
 def test_scaffold_idempotent_force_and_template_render(tmp_path: Path) -> None:
-    """Idempotence (second run all-skipped) and --force overwrite (mutated content
+    """Idempotence (second run writes nothing) and --force overwrite (mutated content
     replaced)."""
     specs_dir = tmp_path / "specs"
 
     first = scaffold(
-        specs_dir=specs_dir,
+        specs_dir,
         project_name="idempotent-project",
         force=False,
-        templates_dir=_TEMPLATES_DIR,
+        public_dir=_TEMPLATES_DIR.parent,
     )
-    assert first.errors == []
-    assert len(first.created) == len(_EXPECTED_FILES)
+    assert len(first) == len(_EXPECTED_FILES)
 
     second = scaffold(
-        specs_dir=specs_dir,
+        specs_dir,
         project_name="idempotent-project",
         force=False,
-        templates_dir=_TEMPLATES_DIR,
+        public_dir=_TEMPLATES_DIR.parent,
     )
-    assert second.errors == []
-    assert second.created == []
-    assert len(second.skipped) == len(_EXPECTED_FILES)
+    assert second == []
 
     # --force overwrites existing (mutated) files with canonical scaffold content.
     arch_path = specs_dir / "memory" / "ARCHITECTURE.md"
     arch_path.write_text("# MUTATED\n", encoding="utf-8")
     third = scaffold(
-        specs_dir=specs_dir,
+        specs_dir,
         project_name="new-name",
         force=True,
-        templates_dir=_TEMPLATES_DIR,
+        public_dir=_TEMPLATES_DIR.parent,
     )
-    assert third.errors == []
-    assert third.skipped == []
-    assert len(third.created) == len(_EXPECTED_FILES)
+    assert len(third) == len(_EXPECTED_FILES)
     new_content = arch_path.read_text(encoding="utf-8")
     assert "MUTATED" not in new_content
     assert new_content.startswith("---")
