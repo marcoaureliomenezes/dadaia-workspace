@@ -17,7 +17,7 @@ read or any output written.
 
 1. Open `specs/AGENTS.md` (the area's scoped law) and follow it.
 2. Resolve the spec context: `DADAIA_CONTEXT` env var, else your session binding (`dadaia context show --json`), else the repo containing your cwd.
-3. Binding is optional — only zero ALIVE contexts stops navigation; alert the operator then, and only then.
+3. Nothing resolves (unbound, cwd outside `repos/<slug>/`): bind with `dadaia context bind <ctx>` — no ALIVE context is ever borrowed; zero ALIVE contexts: alert the operator.
 
 ## Phase 2 — memory bootstrap
 
@@ -56,7 +56,7 @@ read or any output written.
 
 ## References
 
-- Script: `python3 .agents/skills/dd-spec-navigator/scripts/memory.py` — `catalog generate`, `product add`, `check`, `drift --since <sha>`: the catalog's ONE writer.
+- Script: `python3 .agents/skills/dd-spec-navigator/scripts/memory.py` — `catalog generate`, `check`, `drift --since <sha>`: the catalog's ONE writer.
 - `specs/AGENTS.md` — canon and status tokens; `.dadaia/AGENTS.md` — context resolution order.
 - `dd-release-implementation` (`RELEASE-EVENTS.md`) — `_RELEASE.json` shape.
 - `_archive/` and `backlog/` are read-only history — never a source of approval.

@@ -1203,3 +1203,49 @@ def test_every_self_invoked_dadaia_verb_exists() -> None:
         if not any(words[:n] in leaves for n in range(len(words), 0, -1))
     ]
     assert violations == [], "self-invoked dead verb(s):\n" + "\n".join(violations)
+
+
+#: `memory.py drift` — a verb inline after the script name, inside the backticks.
+_INLINE_VERB_RE = re.compile(r"\b([a-z]+)\.py ([a-z][a-z-]*)")
+#: `memory.py` — `catalog generate`, `check` — a verb list following the script name.
+_LISTED_VERBS_RE = re.compile(r"\b([a-z]+)\.py` — ((?:`[a-z][^`]*`(?:, )?)+)")
+_ADD_PARSER_RE = re.compile(r"add_parser\(\s*\"([a-z][a-z-]*)\"")
+
+
+def _skill_script_verbs() -> dict[str, set[str]]:
+    """Each public skill script's argparse verbs, read from the `add_parser` literals of
+    the script and its private `_*.py` siblings — one flat set per script name."""
+    verbs: dict[str, set[str]] = {}
+    for script in sorted(_PUBLIC.glob("skills/*/scripts/[a-z]*.py")):
+        found = verbs.setdefault(script.stem, set())
+        for source in [script, *script.parent.glob(f"_{script.stem}*.py")]:
+            found.update(_ADD_PARSER_RE.findall(source.read_text(encoding="utf-8")))
+    return {name: found for name, found in verbs.items() if found}
+
+
+def test_every_cited_skill_script_verb_exists() -> None:
+    """Intent: CONTRACT — bug `spec-navigator-cites-dead-memory-verb-and-false-binding-claim`.
+
+    `dead_verb_citations_in_tree` resolves `dadaia <verb>`; a skill script's verbs had no
+    reader, so `memory.py product add` stayed cited after the verb was gone. On a line
+    citing `<script>.py`, the verb after it — inline (`memory.py drift`) or as the
+    backticked list that follows (`memory.py` — `catalog generate`, …) — must be one of
+    the script's `add_parser` names."""
+    verbs = _skill_script_verbs()
+    assert "memory" in verbs and "catalog" in verbs["memory"], "script verb scan mis-rooted"
+    violations: list[str] = []
+    for md_path in sorted(_PUBLIC.rglob("*.md")):
+        rel = md_path.relative_to(_REPO_ROOT).as_posix()
+        for number, line in enumerate(md_path.read_text(encoding="utf-8").splitlines(), 1):
+            cited = [(m.group(1), m.group(2)) for m in _INLINE_VERB_RE.finditer(line)]
+            for listed in _LISTED_VERBS_RE.finditer(line):
+                cited += [
+                    (listed.group(1), v.split()[0])
+                    for v in re.findall(r"`([^`]+)`", listed.group(2))
+                ]
+            violations += [
+                f"{rel}:{number}: `{script}.py {verb}` is not a verb of the script"
+                for script, verb in cited
+                if script in verbs and verb not in verbs[script]
+            ]
+    assert violations == [], "\n".join(violations)
