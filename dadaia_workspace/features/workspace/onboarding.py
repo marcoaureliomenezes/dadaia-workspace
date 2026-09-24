@@ -15,13 +15,20 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
+from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, read_pattern_version
 
 CODE = "ONBOARDING"
 
 _AUDITS_HISTO = Path("audits") / "_archive" / "audits_histo.jsonl"
 _MEMORY_SCRIPT = Path(".agents") / "skills" / "dd-spec-navigator" / "scripts" / "memory.py"
+
+
+def cli_path(root: Path) -> Path:
+    """The workspace CLI's real executable (``Scripts\\dadaia.exe`` on Windows)."""
+    return (
+        root / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir / f"dadaia{PLATFORM.venv_exe_suffix}"
+    )
 
 
 @dataclass(frozen=True)
@@ -52,7 +59,7 @@ def _first_pass_done(specs_dir: Path) -> bool:
 def next_step(root: Path, trees: Mapping[str, Path]) -> Step | None:
     """The lowest unmet level across *trees* (every ALIVE context name -> its ``specs/``
     dir, ``invocation.alive_context_trees``), or ``None``."""
-    cli = root / DADAIA_BIN
+    cli = cli_path(root)
     if not trees:
         return Step(
             "no ALIVE Spec Context — create one from its main repo",

@@ -16,10 +16,10 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceVenvBootstrapError,
     WorkspaceVenvNewerError,
 )
-from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.features.capabilities.service import distribution_version
 from dadaia_workspace.features.reconcile import reconcile_workspace
 from dadaia_workspace.features.spec_context.service import slug_from_url
+from dadaia_workspace.features.workspace.onboarding import cli_path
 
 console = Console()
 app = typer.Typer()
@@ -169,7 +169,7 @@ def init(
             console.print(item, markup=False)
     else:
         console.print(f"[green]✓[/green] {len(installed)} asset(s) installed", highlight=False)
-    console.print(f"CLI: {root / DADAIA_BIN}", markup=False, highlight=False, soft_wrap=True)
+    console.print(f"CLI: {cli_path(root)}", markup=False, highlight=False, soft_wrap=True)
     for note in filter(None, (_LAW_NOTE, harness_registry.HARNESS_RECORDS[chosen].init_note)):
         console.print(note, markup=False, soft_wrap=True)
 
@@ -195,7 +195,7 @@ def _report_upgrade(root: Path, before: str) -> None:
     )
     if not result.ok:
         typer.secho(f"Error: reconcile after upgrade failed: {result.error}", err=True, fg="red")
-        typer.secho(f"fix: {root / DADAIA_BIN} reconcile --expect-version {after}", err=True)
+        typer.secho(f"fix: {cli_path(root)} reconcile --expect-version {after}", err=True)
         raise typer.Exit(1)
     console.print(f"upgraded {before} -> {after}", markup=False, highlight=False)
 

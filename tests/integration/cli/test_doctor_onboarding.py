@@ -79,7 +79,14 @@ def test_zero_contexts_is_no_longer_silent(workspace: Path) -> None:
     """R2: the next step is one info finding with its fix line; the exit is unaffected."""
     result = _runner.invoke(app, ["doctor"])
     assert "ONBOARDING info Next:" in result.output, result.output
-    assert f"fix: {workspace}/.dadaia/.venv/bin/dadaia context create" in result.output
+    cli = (
+        workspace
+        / ".dadaia"
+        / ".venv"
+        / PLATFORM.venv_scripts_dir
+        / f"dadaia{PLATFORM.venv_exe_suffix}"
+    )
+    assert f"fix: {cli} context create" in result.output
 
 
 @pytest.mark.slow(reason="git init subprocess")

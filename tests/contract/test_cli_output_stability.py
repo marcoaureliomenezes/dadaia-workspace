@@ -41,6 +41,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
+from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
@@ -132,9 +133,16 @@ def _register_dead_ctx_with_repo_on_disk(workspace: Path, name: str = "stale-ctx
 
 def _next_step(workspace: Path) -> str:
     """0.4.8 R2 deliberate golden change: zero ALIVE contexts prints the onboarding step."""
+    cli = (
+        workspace
+        / ".dadaia"
+        / ".venv"
+        / PLATFORM.venv_scripts_dir
+        / f"dadaia{PLATFORM.venv_exe_suffix}"
+    )
     return (
         "ONBOARDING info Next: no ALIVE Spec Context — create one from its main repo\n"
-        f"fix: {workspace}/.dadaia/.venv/bin/dadaia context create <name> --main-repo <clone-url>\n"
+        f"fix: {cli} context create <name> --main-repo <clone-url>\n"
     )
 
 

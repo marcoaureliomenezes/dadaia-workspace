@@ -7,9 +7,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.workspace.onboarding import next_step
 
-_CLI = ".dadaia/.venv/bin/dadaia"
+_CLI = Path(".dadaia", ".venv", PLATFORM.venv_scripts_dir, f"dadaia{PLATFORM.venv_exe_suffix}")
 
 
 def _specs(tmp_path: Path, *, version: int = 7, stamped: bool = False) -> Path:
@@ -32,13 +33,13 @@ def _snapshot(root: Path) -> set[Path]:
 def test_zero_contexts_names_context_create(tmp_path: Path) -> None:
     step = next_step(tmp_path, {})
     assert step is not None
-    assert step.command == f"{tmp_path}/{_CLI} context create <name> --main-repo <clone-url>"
+    assert step.command == f"{tmp_path / _CLI} context create <name> --main-repo <clone-url>"
 
 
 def test_a_context_without_specs_names_specs_init(tmp_path: Path) -> None:
     step = next_step(tmp_path, {"app": tmp_path / "repos" / "app" / "specs"})
     assert step is not None
-    assert step.command == f"{tmp_path}/{_CLI} specs init --context app"
+    assert step.command == f"{tmp_path / _CLI} specs init --context app"
 
 
 def test_an_older_or_foreign_tree_is_still_level_two(tmp_path: Path) -> None:

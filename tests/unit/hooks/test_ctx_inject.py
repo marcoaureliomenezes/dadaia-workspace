@@ -33,6 +33,7 @@ already pinned implicitly.
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -40,7 +41,10 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core import session_store
+from dadaia_workspace.core.platform import PLATFORM
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+
+_CLI = Path(".dadaia", ".venv", PLATFORM.venv_scripts_dir, f"dadaia{PLATFORM.venv_exe_suffix}")
 
 
 def _ws(tmp_path: Path, slug: str = "ctx", *, with_memory: bool = True) -> Path:
@@ -167,7 +171,7 @@ def _assert_no_alive_context_still_generic(out: str) -> bool:
         "[no bound context]" in out
         and "end memory bootstrap" not in out
         and "\nNext: no ALIVE Spec Context" in out
-        and "/.dadaia/.venv/bin/dadaia context create <name> --main-repo <clone-url>" in out
+        and f"{os.sep}{_CLI} context create <name> --main-repo <clone-url>" in out
     )
 
 
