@@ -12,6 +12,7 @@ from within any sub-repo resolve to the workspace root correctly.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
@@ -67,16 +68,25 @@ def resolve_workspace_root(cwd: Path | None = None) -> Path:
             # Has .dadaia/ but not the sentinel — sub-repo or partial init.
             skipped.append(candidate)
 
-    # Nothing found.
-    skipped_msg = ""
-    if skipped:
-        skipped_list = ", ".join(str(p) for p in skipped)
-        skipped_msg = f" Skipped (partial .dadaia/, no states/): {skipped_list}."
+    raise not_initialized(start, skipped)
 
-    raise WorkspaceNotInitializedError(
-        f"No initialized workspace found from '{start}'."
-        f"{skipped_msg}"
-        f" Run 'dadaia init' at your workspace root."
+
+def not_initialized(
+    searched: Path, skipped: list[Path] | None = None
+) -> WorkspaceNotInitializedError:
+    """THE workspace-not-found error: the searched directory, any skipped partial
+    ``.dadaia/``, and one runnable ``fix:`` — ``cd`` to the running CLI's own workspace
+    (its venv lives at ``<root>/.dadaia/.venv``) when that root is initialized, else
+    the uvx bootstrap."""
+    own = Path(sys.prefix).resolve().parent.parent
+    fix = f"cd {own}" if (own / _SENTINEL).is_file() else "uvx dadaia-workspace init <dir>"
+    partial = (
+        f" Skipped (partial .dadaia/, no states/): {', '.join(map(str, skipped))}."
+        if skipped
+        else ""
+    )
+    return WorkspaceNotInitializedError(
+        f"No initialized workspace found from '{searched}'.{partial}\nfix: {fix}"
     )
 
 
@@ -102,8 +112,5 @@ def resolve_cli_workspace_root(workspace: Path | None, cwd: Path | None = None) 
         return resolve_workspace_root(cwd)
     root = workspace.resolve()
     if not (root / ".dadaia").is_dir():
-        raise WorkspaceNotInitializedError(
-            f"'{root}' is not an initialized workspace (no .dadaia/). "
-            f"Run 'dadaia init --workspace {root}' first."
-        )
+        raise not_initialized(root)
     return root

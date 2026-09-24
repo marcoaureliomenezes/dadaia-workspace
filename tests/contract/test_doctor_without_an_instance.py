@@ -48,11 +48,11 @@ def test_explicit_specs_dir_is_read_with_no_instance_around(no_instance: Path) -
     assert run.exit_code == 0, run.output
 
 
-def test_nothing_to_read_refuses_with_the_init_message(no_instance: Path) -> None:
+def test_nothing_to_read_refuses_with_one_fix(no_instance: Path) -> None:
     run = _runner.invoke(app, ["doctor"])
 
     assert run.exit_code == 1
-    assert "dadaia init" in run.output
+    assert run.output.count("\nfix: ") == 1
 
 
 def test_two_trees_is_a_usage_error_before_any_resolution(no_instance: Path) -> None:

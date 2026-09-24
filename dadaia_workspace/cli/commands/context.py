@@ -62,10 +62,8 @@ err_console = Console(stderr=True)
 def _ctx_service() -> SpecContextService:
     try:
         return container.build_spec_context_service(resolve_workspace_root())
-    except WorkspaceNotInitializedError:
-        err_console.print(
-            "[red]Error:[/red] Workspace not initialized. Run [bold]dadaia init[/bold] first."
-        )
+    except WorkspaceNotInitializedError as exc:
+        err_console.print(f"Error: {exc}", markup=False, highlight=False, soft_wrap=True)
         raise typer.Exit(1) from None
     except SchemaVersionError as exc:
         # Use plain stderr so CliRunner captures it in result.output (mix_stderr=True default)
