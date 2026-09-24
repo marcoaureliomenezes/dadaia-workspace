@@ -162,7 +162,13 @@ def _assert_lists_alive_contexts(out: str) -> bool:
 
 
 def _assert_no_alive_context_still_generic(out: str) -> bool:
-    return "[no bound context]" in out and "end memory bootstrap" not in out
+    # 0.4.8 AC6.2: zero contexts is never `[no bound context]` alone — the doctor's step.
+    return (
+        "[no bound context]" in out
+        and "end memory bootstrap" not in out
+        and "\nNext: no ALIVE Spec Context" in out
+        and "/.dadaia/.venv/bin/dadaia context create <name> --main-repo <clone-url>" in out
+    )
 
 
 def _setup_foreign_session_bind_never_leaks(tp: Path) -> None:
