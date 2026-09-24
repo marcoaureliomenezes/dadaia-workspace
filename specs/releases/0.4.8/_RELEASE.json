@@ -91,6 +91,21 @@
       "agent": "main-thread",
       "kind": "dispositions",
       "text": "No backlog entry picked (origin operator-demand); 0 open bugs; follow-ups noted: 58 bare `dadaia` spans pinned by _BARE_RATCHET, bare dadaia in service.py:335/context.py:649 runtime messages, first-pass worklist lists root tooling files."
+    },
+    {
+      "ts": "2026-09-24T07:47:43Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 09e75dd1a2aa70b7d0c950079e348d0b41eab90a..475b6cace633: 2 reviewed, 1 changed.",
+      "since": "09e75dd1a2aa70b7d0c950079e348d0b41eab90a",
+      "until": "475b6cace633d8a03e5f0cafdb477d1fcb391750",
+      "reviewed": [
+        "workspace-doctor",
+        "pypi-distribution"
+      ],
+      "changed": [
+        "release-lifecycle"
+      ]
     }
   ]
 }
