@@ -76,3 +76,37 @@ def test_init_cli_maps_bootstrap_error_to_clean_exit(tmp_path: Path, monkeypatch
     assert result.exit_code != 0
     assert "Traceback" not in result.output
     assert "DADAIA_BOOTSTRAP_PACKAGE" in result.output
+
+
+def test_install_failure_names_pypi_and_shows_whole_lines(tmp_path: Path, monkeypatch) -> None:
+    """Bug init-offline-error-truncated-mid-string: the refusal says the venv resolves
+    from PyPI (network required) and quotes whole installer lines, never a cut one."""
+    from dadaia_workspace.core.platform import PLATFORM
+
+    (tmp_path / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir).mkdir(parents=True)
+    wheel = tmp_path / "dadaia_workspace-9.9.9-py3-none-any.whl"
+    wheel.write_bytes(b"")
+    monkeypatch.setenv("DADAIA_BOOTSTRAP_PACKAGE", str(wheel))
+    monkeypatch.setattr(
+        pe.VenvPythonEnvironmentManager, "version_change", lambda s, r: (None, "9", "install")
+    )
+    monkeypatch.setattr(
+        pe.VenvPythonEnvironmentManager, "_assert_child_interpreter_version", lambda s, r: None
+    )
+    lines = [
+        f"WARNING: Retrying (Retry(total={n}, connect=None, read=None, status=None)) " + "x" * 60
+        for n in range(9)
+    ]
+    lines.append("ERROR: Could not find a version that satisfies the requirement typer")
+
+    def _boom(cmd, check=False, **kwargs):
+        raise subprocess.CalledProcessError(1, cmd, stderr="\n".join(lines))
+
+    monkeypatch.setattr(pe.subprocess, "run", _boom)
+    with pytest.raises(pe.WorkspaceVenvBootstrapError) as exc:
+        _REAL_ENSURE(pe.VenvPythonEnvironmentManager(), str(tmp_path))
+    message = str(exc.value)
+    assert "PyPI" in message and "network" in message
+    assert lines[-1] in message
+    quoted = message.split("Installer output:\n", 1)[1].splitlines()
+    assert all(line in lines for line in quoted), quoted
