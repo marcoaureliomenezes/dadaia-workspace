@@ -317,10 +317,15 @@ def scaffold(
 
 def scaffold_repo_law(repo: Path, *, public_dir: Path | None = None) -> list[Path]:
     """Install the repo's scoped law (:data:`REPO_LAW`) where absent — never overwritten:
-    once written it is the operator's. Returns the paths written."""
+    once written it is the operator's — and only beside a directory the repo already has
+    (the tests law governs an existing test tree). Returns the paths written."""
     templates = (public_dir if public_dir is not None else default_public_dir()) / "templates"
     return _write_absent(
-        [(repo / dest, (templates / template).read_text, False) for template, dest in REPO_LAW]
+        [
+            (repo / dest, (templates / template).read_text, False)
+            for template, dest in REPO_LAW
+            if (repo / dest).parent.is_dir()
+        ]
     )
 
 

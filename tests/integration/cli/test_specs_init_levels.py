@@ -84,14 +84,15 @@ def test_absent_specs_scaffolds_lists_paths_and_commits_nothing(repo: Path) -> N
     assert _git(repo, "rev-parse", "HEAD") == head
     template = _PUBLIC / "templates"
     assert (repo / "AGENTS.md").read_bytes() == (template / "repo-AGENTS.md").read_bytes()
-    assert (repo / "tests" / "AGENTS.md").read_bytes() == (
-        template / "tests-AGENTS.md"
-    ).read_bytes()
+    # T-048-11: the tests law governs an existing test tree; init never invents one
+    # (a manufactured tests/AGENTS.md is born with AGENTS-PLACEHOLDER-1 on a clean repo).
+    assert not (repo / "tests").exists()
     assert f"[created] {repo / 'AGENTS.md'}" in result.output
 
 
 def test_an_existing_scoped_law_is_never_overwritten(repo: Path) -> None:
     (repo / "AGENTS.md").write_text("# ours\n", encoding="utf-8")
+    (repo / "tests").mkdir()
 
     result = _runner.invoke(app, ["specs", "init", "--context", "c"])
 
