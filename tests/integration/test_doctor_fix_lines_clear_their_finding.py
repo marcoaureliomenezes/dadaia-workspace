@@ -164,7 +164,8 @@ _UNEXERCISED: dict[str, str] = {
     "TREE-5": "auto-fixed rule (`fix_tree5`), covered by the structural doctor unit tests",
     "TREE-7": "the fix redacts a session id inside BUGS.jsonl; the value is per-record "
     "and redaction is covered by the redaction suite",
-    "TREE-8": "auto-fixed rule (`fix_tree8`), covered by the structural doctor unit tests",
+    "TREE-8": "the fix is `git mv` to a canon path the operator chooses (never auto-fixed, "
+    "decision D8); covered by tests/unit/features/specs/test_doctor_tree8_canon.py",
     "RELEASE-TREE-MEMORY": "the fix runs `release.py memory` over the ledger-derived "
     "commit window; the rule's own cases are tests/unit/features/specs/test_release_tree.py",
     "CAT-1": "the fix is `memory.py catalog generate`, exercised by tests/unit/skills/test_spec_navigator_memory_script.py",

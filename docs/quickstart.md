@@ -70,7 +70,7 @@ record, never the cwd: sitting inside a repository is not a binding.
 
 ## 4. Check compliance
 
-<!-- derived-from: workspace-doctor sha256:ef9c81d0d181 -->
+<!-- derived-from: workspace-doctor sha256:11d53d7927db -->
 
 ```bash
 dadaia doctor --context demo

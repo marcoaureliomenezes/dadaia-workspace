@@ -103,10 +103,10 @@ def test_doctor_clean_tree_then_remove_backlog_then_fix_recreates_then_no_fix_ne
     assert not arch.exists(), "Without --fix, missing files must NOT be created"
 
 
-def test_tree8_stray_root_folder_errors_and_fix_removes_it(tmp_path: Path) -> None:
-    """v0.5.0 specs-canon closure: TREE-8 compliance is ERROR + auto-fixable — a
-    stray, non-canon top-level folder under specs/ flips the exit code non-zero,
-    and ``--fix`` removes it, restoring the baseline exit code."""
+def test_tree8_stray_root_folder_errors_and_fix_keeps_it(tmp_path: Path) -> None:
+    """TREE-8 is ERROR and never auto-fixed (bug doctor-fix-tree8-deletes-operator-
+    content, decision D8): a non-canon top-level folder flips the exit code non-zero,
+    and ``--fix`` leaves it and its content on disk, still reported."""
     specs = _make_minimal_specs(tmp_path)
 
     baseline = _runner.invoke(
@@ -115,23 +115,15 @@ def test_tree8_stray_root_folder_errors_and_fix_removes_it(tmp_path: Path) -> No
     )
     assert _specs_errors(baseline.output) == [], baseline.output
 
-    stray = specs / "scratch-legacy-folder"
+    stray = specs / "features"
     stray.mkdir()
-
-    stray_result = _runner.invoke(
-        app,
-        ["doctor", "--json", "--specs-dir", str(specs), "--public-dir", str(_PUBLIC_DIR)],
-    )
-    codes = [f["code"] for f in _specs_findings(stray_result.output)]
-    assert "TREE-8" in codes, f"Expected TREE-8 to fire on the stray folder; got {codes}"
-    assert stray_result.exit_code != 0, (
-        "TREE-8 ERROR must flip the exit code non-zero — got "
-        f"{stray_result.exit_code}:\n{stray_result.output}"
-    )
+    (stray / "login.md").write_text("# Login\n", encoding="utf-8")
 
     fix_result = _runner.invoke(
         app,
         ["doctor", "--json", "--fix", "--specs-dir", str(specs), "--public-dir", str(_PUBLIC_DIR)],
     )
-    assert not stray.exists(), f"--fix must remove the stray folder; output:\n{fix_result.output}"
-    assert _specs_errors(fix_result.output) == [], fix_result.output
+    assert (stray / "login.md").read_text(encoding="utf-8") == "# Login\n", fix_result.output
+    codes = [f["code"] for f in _specs_findings(fix_result.output)]
+    assert "TREE-8" in codes, f"TREE-8 must still be reported after --fix; got {codes}"
+    assert fix_result.exit_code != 0, fix_result.output

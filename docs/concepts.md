@@ -75,7 +75,7 @@ gate — a refusal whose fix is itself refused (a Stall) cannot ship.
 ## Memory
 
 <!-- derived-from: context-management sha256:0227a5e43894 -->
-<!-- derived-from: workspace-doctor sha256:ef9c81d0d181 -->
+<!-- derived-from: workspace-doctor sha256:11d53d7927db -->
 <!-- derived-from: release-lifecycle sha256:09607348cc88 -->
 <!-- derived-from: audits-canon sha256:5b000425c401 -->
 

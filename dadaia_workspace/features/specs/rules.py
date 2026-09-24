@@ -145,8 +145,8 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("TREE-8",),
         lambda d: d._structural.check_tree8_canon_root(),
-        fix=lambda d, i: d._structural.fix_tree8(i),
-        fix_help=f"{DADAIA_BIN} doctor --fix",
+        # Never auto-fixed (operator decision D8): content vs slop is the operator's call.
+        fix_help="git mv <path> <canon path>",
     ),
     _rule(
         ("CAT-1",),

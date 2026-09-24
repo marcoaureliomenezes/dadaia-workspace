@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-24T01:42:08Z",
+  "generated_at": "2026-09-24T03:00:08Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -636,7 +636,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 1270,
+      "token_estimate": 1281,
       "depends_on": [
         "public-asset-distribution",
         "context-management",

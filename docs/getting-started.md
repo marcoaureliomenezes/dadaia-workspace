@@ -79,7 +79,7 @@ header, `ARCHITECTURE.md`'s `## Tech Stack` section and the memory catalog diges
 
 ## Check compliance — `dadaia doctor`
 
-<!-- derived-from: workspace-doctor sha256:ef9c81d0d181 -->
+<!-- derived-from: workspace-doctor sha256:11d53d7927db -->
 
 ```bash
 dadaia doctor --context <ctx> [--json] [--fix] [--redact]
