@@ -146,7 +146,8 @@ RULES: tuple[SpecsRule, ...] = (
         ("TREE-8",),
         lambda d: d._structural.check_tree8_canon_root(),
         # Never auto-fixed (operator decision D8): content vs slop is the operator's call.
-        fix_help="git mv <path> <canon path>",
+        # Plain mv serves untracked files and paths with no canon home alike.
+        fix_help="mv <path> <canon path|outside specs/>",
     ),
     _rule(
         ("CAT-1",),

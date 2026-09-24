@@ -137,6 +137,12 @@ def _plant_dispositioned_audit(root: Path) -> None:
     )
 
 
+def _plant_stray_dotfile(root: Path) -> None:
+    # Untracked and with no canon home — the case a ``git mv`` fix line could not serve
+    # (bug tree8-fix-line-not-runnable-for-every-case).
+    (root / "specs" / ".DS_Store").write_bytes(b"\x00")
+
+
 #: code -> how to make it fire. The eight remedies the 0.4.7 candidate-2 review named,
 #: plus the memory-document pair they share a shape with.
 PLANTS: dict[str, Plant] = {
@@ -160,6 +166,10 @@ PLANTS: dict[str, Plant] = {
     "TREE-3": Plant(
         _plant_missing_memory_document, {"<document>": "QUALITY", "<title>": "Quality"}
     ),
+    "TREE-8": Plant(
+        _plant_stray_dotfile,
+        {"<path>": "specs/.DS_Store", "<canon path|outside specs/>": ".DS_Store"},
+    ),
 }
 
 _UNEXERCISED: dict[str, str] = {
@@ -175,8 +185,6 @@ _UNEXERCISED: dict[str, str] = {
     "TREE-5": "auto-fixed rule (`fix_tree5`), covered by the structural doctor unit tests",
     "TREE-7": "the fix redacts a session id inside BUGS.jsonl; the value is per-record "
     "and redaction is covered by the redaction suite",
-    "TREE-8": "the fix is `git mv` to a canon path the operator chooses (never auto-fixed, "
-    "decision D8); covered by tests/unit/features/specs/test_doctor_tree8_canon.py",
     "RELEASE-TREE-MEMORY": "the fix runs `release.py memory` over the ledger-derived "
     "commit window; the rule's own cases are tests/unit/features/specs/test_release_tree.py",
     "CAT-1": "the fix is `memory.py catalog generate`, exercised by tests/unit/skills/test_spec_navigator_memory_script.py",
