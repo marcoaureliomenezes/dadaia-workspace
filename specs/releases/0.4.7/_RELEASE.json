@@ -791,6 +791,21 @@
         "agentic-entities"
       ],
       "changed": []
+    },
+    {
+      "ts": "2026-09-24T03:05:33Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 3bcbb7e1574a70576ab5a56f470cdc04bb556f41..0b0322677285: 2 reviewed, 1 changed.",
+      "since": "3bcbb7e1574a70576ab5a56f470cdc04bb556f41",
+      "until": "0b03226772857e42c3965b1ccd5209531b761034",
+      "reviewed": [
+        "specs-migration",
+        "pypi-distribution"
+      ],
+      "changed": [
+        "workspace-doctor"
+      ]
     }
   ]
 }
