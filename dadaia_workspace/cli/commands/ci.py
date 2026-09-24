@@ -10,9 +10,6 @@ from pathlib import Path
 
 import typer
 
-from dadaia_workspace.cli._specs_resolution import (
-    resolve_workspace_root_for_cli,
-)
 from dadaia_workspace.container import is_source_repo_root as _is_source_repo_root
 from dadaia_workspace.core.exceptions import CiPreflightScopeError
 from dadaia_workspace.features.ci_preflight import (
@@ -39,28 +36,6 @@ def _repo_root() -> Path:
     except (subprocess.CalledProcessError, FileNotFoundError) as exc:
         raise typer.BadParameter("not inside a git repository") from exc
     return Path(out.stdout.strip())
-
-
-def _repo_identity_root(worktree_root: Path) -> Path:
-    """The repository's main working tree — its identity under ``<workspace>/repos/``.
-
-    A linked worktree (``git worktree add``) may sit anywhere on disk; the repo it
-    belongs to is named by the git common dir's parent, never by the worktree's own
-    filesystem position. Falls back to *worktree_root* when git cannot answer.
-    """
-    try:
-        out = subprocess.run(
-            ["git", "rev-parse", "--git-common-dir"],
-            cwd=worktree_root,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return worktree_root
-    # git prints ".git" (relative) from the main checkout and an absolute path from a
-    # linked worktree; anchoring on the worktree root covers both without a git>=2.31 flag.
-    return (worktree_root / out.stdout.strip()).resolve().parent
 
 
 @app.command()
@@ -114,55 +89,6 @@ def preflight(
     typer.secho("\nAll preflight checks passed.", fg=typer.colors.GREEN)
 
 
-def _foreign_repo_slugs(
-    workspace: Path,
-    own_slug: str | None,
-    registry_identities: Iterable[tuple[str, str]],
-) -> list[str]:
-    """The v0.11.0 FR5 registry-derived foreign-name set, union'd with the v0.9.0 FR3
-    directory-derived set, minus the pushed repo's own identities.
-
-    ``{registry context names} UNION {registry repo_slugs} UNION {repos/ dir names} -
-    {own context name, own repo slug}`` (SPEC v0.11.0 FR5). *own_slug* is the pushed
-    repo's directory name under ``repos/`` (``context_slug_for_path``); *own_name* is
-    resolved from *registry_identities* as the ``name`` of whichever entry's
-    ``repo_slug`` equals *own_slug* — ``None`` when the pushed repo is not itself
-    registered (a fresh/unregistered checkout), in which case only the slug is
-    subtracted, exactly as v0.9.0 did.
-
-    **Both** self-identities are subtracted (A5.2): a context's ``name`` and its
-    ``repo_slug`` are separate fields (``core/models/spec_context.py``) and may
-    differ — subtracting only the slug would re-open the A3.2 regression (matching the
-    pushed repo's own slug would block every push of this repository) through the new
-    door the registry-derived NAME opens.
-
-    DEAD and relocated registry contexts contribute their terms just like ALIVE ones
-    (the whole point of FR5 — a context whose repo directory is absent no longer
-    silently loses its protection). Hidden directory entries (dotfiles) are skipped; a
-    missing ``repos/`` directory (e.g. the library repo run standalone) contributes no
-    directory-derived term, and a missing/empty/malformed registry (already swallowed
-    by :func:`container.load_registry_context_identities`, A5.4) contributes no
-    registry-derived term — the union degrades gracefully to whichever source is
-    healthy, never crashing the push hook.
-    """
-    identities = list(registry_identities)
-    own_name = next((name for name, slug in identities if slug == own_slug), None)
-    own_identities = {value for value in (own_slug, own_name) if value}
-
-    registry_terms = {value for name, slug in identities for value in (name, slug) if value}
-
-    repos_dir = workspace / "repos"
-    dir_terms: set[str] = set()
-    if repos_dir.is_dir():
-        dir_terms = {
-            entry.name
-            for entry in repos_dir.iterdir()
-            if entry.is_dir() and not entry.name.startswith(".")
-        }
-
-    return sorted((registry_terms | dir_terms) - own_identities)
-
-
 def _no_canon_violations(paths: Iterable[str]) -> list[str]:
     """The canon predicate for a specs/ tree stamped below the canonical pattern: the
     v6 canon does not describe it, so no path in it is a v6 violation."""
@@ -181,23 +107,21 @@ def push_gate_check() -> None:
     Branch deletions are never scanned; tag pushes are scanned but never gated on branch
     policy. No security verdict is checked here — that runs as a PR gate.
 
-    The object source, denylist terms, baseline patterns and the registry-derived
-    foreign-slug set are all built here and injected; a call site that fails to wire the
-    object reader is a defect, never a bypass.
+    The object source, denylist terms and baseline patterns are all built here and
+    injected; a call site that fails to wire the object reader is a defect, never a
+    bypass. No repo or context name is a term source (ADR 0032).
     """
     from dadaia_workspace.container import (
         build_git_object_reader,
         load_denylist_baseline_patterns,
         load_denylist_terms,
-        load_registry_context_identities,
     )
     from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, read_pattern_version
-    from dadaia_workspace.features.chokepoints import context_slug_for_path, push_gate_decision
+    from dadaia_workspace.features.chokepoints import push_gate_decision
     from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
     from dadaia_workspace.features.specs.canon import canon_violations
 
     repo_root = _repo_root()
-    workspace = resolve_workspace_root_for_cli(repo_root)
 
     # Bug pre-push-canon-scan-not-range-scoped (operator ruling 2026-09-13): the v6
     # canon is a property of a v6 tree. A specs/ tree still stamped below
@@ -220,19 +144,6 @@ def push_gate_check() -> None:
 
     denylist_terms = load_denylist_terms()
     baseline_patterns = load_denylist_baseline_patterns()
-    own_slug = context_slug_for_path(workspace, _repo_identity_root(repo_root))
-    registry_result = load_registry_context_identities(workspace)
-    if registry_result.degraded:
-        # SPEC v0.4.2 FR8(2)/GRILL P13/A8.3: a malformed registry no longer shrinks the
-        # foreign-name layer silently — exactly one stderr note names the degradation,
-        # and the scan still proceeds against the repos/ directory-derived fallback.
-        typer.echo(
-            "[pre-push] context registry is malformed or unreadable — the "
-            "registry-derived foreign-name layer falls back to the repos/ "
-            "directory-derived set only; the scan still proceeds.",
-            err=True,
-        )
-    foreign_slugs = _foreign_repo_slugs(workspace, own_slug, registry_result.identities)
 
     mode = (
         "operator denylist + baseline" if denylist_terms else "baseline only (no operator denylist)"
@@ -249,7 +160,6 @@ def push_gate_check() -> None:
         malformed_lines=malformed,
         denylist_terms=denylist_terms,
         baseline_patterns=baseline_patterns,
-        foreign_slugs=foreign_slugs,
     )
     if decision.warn:
         typer.echo(decision.warn, err=True)

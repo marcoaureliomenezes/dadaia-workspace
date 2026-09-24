@@ -51,7 +51,7 @@ sources:
 
 - The push is the publication boundary: every tracked path is scanned with the full layer set, no path is exempt, and a fixture needing a secret shape composes it at runtime (`tests/helpers/privacy_fixtures.py`).
 - It reads only the objects the push would publish (`git rev-list --objects <local> --not <remote>`, `--not --remotes` fallback), tags included, before any network I/O; working tree, history and author headers are out of scope.
-- Terms come from the operator denylist (`$DADAIA_PRIVACY_DENYLIST` or `.dadaia/states/privacy_denylist.json`, never committed), the packaged structural baseline (`dadaia_workspace/infrastructure/data/privacy_baseline.json`) and the foreign names — registry context names, repo slugs and `repos/` directory names, minus the pushed repository's own.
+- Terms come from the operator denylist (`$DADAIA_PRIVACY_DENYLIST` or `.dadaia/states/privacy_denylist.json`, never committed) and the packaged structural baseline (`dadaia_workspace/infrastructure/data/privacy_baseline.json`); no context name, repo slug or `repos/` directory name is a term source — a private name is listed in the operator denylist.
 - A hit is amnestied only when the range has a resolvable base and the exact value was already published at the same path; a new path, a multi-path object, an oversized object and the fallback range are never amnestied.
 - The gate never reports coverage it did not achieve: a git failure or an unresolvable prior side refuses; a non-UTF-8 blob is skipped and counted, a blob over 5 MB is scanned to the cap.
 - The refusal names ref, path and line, short object sha, the term masked to `first…last` and the source layer — never the matched line or the unmasked term.

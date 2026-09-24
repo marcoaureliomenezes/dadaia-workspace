@@ -30,15 +30,10 @@ from dadaia_workspace.features.chokepoints.denylist_scan import (
     Hit,
     OversizedNote,
     PathMasker,
-    compile_slug_patterns,
     scan_objects,
 )
 
 __all__ = ["push_gate_decision"]
-
-#: The integration branch's remote-tracking ref — the denylist baseline for a brand-new
-#: ref (nothing published yet) is its tip.
-INTEGRATION_TIP_REF = "refs/remotes/origin/develop"
 
 #: The law this scan enforces (SPEC v0.9.0 FR5) — quoted verbatim in every refusal.
 _DENYLIST_LAW = "dd-release-implementation §2a — private names never enter public/pushed material"
@@ -64,10 +59,6 @@ class ObjectSource(Protocol):
     ) -> Iterable[ScannedObject]: ...
 
     def parents(self, repo: Path, sha: str) -> tuple[str, ...]: ...
-
-    def resolve_ref(self, repo: Path, ref: str) -> str | None: ...
-
-    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]: ...
 
 
 def _annotate_skip(
@@ -205,7 +196,6 @@ def _run_denylist_scan(
     repo: Path,
     terms: Iterable[tuple[str, str]],
     patterns: Iterable[BaselinePatternLike],
-    slugs: Iterable[str],
 ) -> _RangeScan:
     """Run the FR1/FR2 scan over *scan_refs* — every non-deletion ref, tags included.
 
@@ -214,12 +204,12 @@ def _run_denylist_scan(
     built from ``scan_objects`` runs over :func:`_dedup_new_objects`, which shares
     ``seen_shas`` across every ref in this scan, so a blob reachable from two refs
     contributes at most one note (mirrors the existing hit/skip dedup). The returned
-    ``path_masker`` (v0.11.0 FR6(b)) is built from the SAME three term sources and is
+    ``path_masker`` (v0.11.0 FR6(b)) is built from the SAME term sources and is
     reused by the caller for every subsequently rendered oversized note, so a repeated
     offending path segment gets one stable ordinal across the whole invocation.
 
-    code-reviewer MEDIUM finding (v0.11.0 pre-PR review): *terms*, *patterns* and
-    *slugs* are each materialized EXACTLY ONCE, right here, before either the
+    code-reviewer MEDIUM finding (v0.11.0 pre-PR review): *terms* and *patterns* are
+    each materialized EXACTLY ONCE, right here, before either the
     :class:`PathMasker` or the scan loop below touches them. A one-shot Iterable
     (e.g. a generator) consumed a second time yields nothing — building the masker from
     the raw parameter and separately re-``list()``-ing it later silently emptied the
@@ -228,16 +218,10 @@ def _run_denylist_scan(
     """
     term_list = list(terms)
     pattern_list = list(patterns)
-    slug_list = list(slugs)
-    path_masker = PathMasker(term_list, pattern_list, slug_list)
+    path_masker = PathMasker(term_list, pattern_list)
     specs_paths_by_ref: dict[str, list[str]] = {}
     if not scan_refs:
         return _RangeScan(None, False, 0, (), path_masker, specs_paths_by_ref)
-    try:
-        published = _published_slugs(scan_refs, object_source, repo, slug_list)
-    except GitObjectReadError:
-        published = set()  # fail CLOSED: an unreadable baseline amnesties nothing
-    scan_slugs = [slug for slug in slug_list if slug not in published]
     seen_shas: set[str] = set()
     per_ref_hits: list[tuple[PushRef, Hit]] = []
     skipped_total = 0
@@ -248,7 +232,7 @@ def _run_denylist_scan(
                 _dedup_new_objects(object_source, repo, ref, seen_shas),
                 specs_paths_by_ref.setdefault(ref.local_sha, []),
             )
-            outcome = scan_objects(fresh, term_list, pattern_list, scan_slugs)
+            outcome = scan_objects(fresh, term_list, pattern_list)
             skipped_total += outcome.skipped_binary_count
             oversized_all.extend(outcome.oversized_notes)
             per_ref_hits.extend((ref, hit) for hit in outcome.hits)
@@ -354,42 +338,6 @@ def _run_specs_canon_scan(
     return Decision(allowed=False, message=_compose_specs_canon_refusal(violations))
 
 
-def _published_slugs(
-    scan_refs: list[PushRef],
-    object_source: ObjectSource,
-    repo: Path,
-    slugs: Sequence[str],
-) -> set[str]:
-    """The foreign slugs the pushed refs' remote tips (or, for a brand-new ref, the
-    integration tip) already publish — a sibling repository's name this repository's
-    published history already carries is not a new disclosure (operator ruling
-    2026-09-13; extends the v0.11.0 FR1 per-path amnesty to the repository).
-
-    Amnesty is a SUBSET of detection by construction: the baseline is searched with
-    the very :func:`compile_slug_patterns` regexes the scan matches with (whole-token,
-    case-insensitive), one ``git grep`` per baseline carrying every pattern — never a
-    substring test (the 2026-08-27 substring bug on this layer must not recur on the
-    fail-open side). Raises :class:`GitObjectReadError` through; the caller then
-    amnesties nothing.
-    """
-    compiled = compile_slug_patterns(slugs)
-    if not compiled:
-        return set()
-    baselines: set[str] = set()
-    for ref in scan_refs:
-        if ref.remote_sha and ref.remote_sha != "0" * 40:
-            baselines.add(ref.remote_sha)
-        else:
-            tip = object_source.resolve_ref(repo, INTEGRATION_TIP_REF)
-            if tip:
-                baselines.add(tip)
-    regexes = [regex.pattern for _slug, regex in compiled]
-    matched: set[str] = set()
-    for sha in baselines:
-        matched |= {m.lower() for m in object_source.tree_matches(repo, sha, regexes)}
-    return {slug for slug, _regex in compiled if slug.lower() in matched}
-
-
 def push_gate_decision(
     refs: list[PushRef],
     *,
@@ -399,7 +347,6 @@ def push_gate_decision(
     malformed_lines: int = 0,
     denylist_terms: Iterable[tuple[str, str]] = (),
     baseline_patterns: Iterable[BaselinePatternLike] = (),
-    foreign_slugs: Iterable[str] = (),
 ) -> Decision:
     """Decide whether a push may proceed (v0.4.4 FR3 — the gitflow v2 inversion).
 
@@ -460,9 +407,7 @@ def push_gate_decision(
     # One streaming pass over the pushed-range objects feeds BOTH step 2 (specs canon,
     # range-scoped, operator ruling 2026-09-13) and step 3 (denylist); step 2's refusal
     # still takes precedence over step 3's.
-    scan = _run_denylist_scan(
-        scan_refs, object_source, repo, denylist_terms, baseline_patterns, foreign_slugs
-    )
+    scan = _run_denylist_scan(scan_refs, object_source, repo, denylist_terms, baseline_patterns)
     if scan.read_failed and scan.refusal is not None:
         # Nothing was streamed, so the canon scan has no input either — fail closed
         # on the read error itself.

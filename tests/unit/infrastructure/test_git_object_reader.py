@@ -1682,39 +1682,6 @@ def test_parents_of_an_option_shaped_sha_is_empty_never_raises(tmp_path: Path) -
     assert reader.parents(repo, "--upload-pack=evil") == ()
 
 
-def test_resolve_ref_of_head_is_the_tip(tmp_path: Path) -> None:
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    (repo / "a.txt").write_text("first\n")
-    tip_sha = _commit(repo, "c1")
-
-    reader = GitSubprocessObjectReader()
-    assert reader.resolve_ref(repo, "HEAD") == tip_sha
-
-
-def test_resolve_ref_of_an_absent_ref_is_none(tmp_path: Path) -> None:
-    """A fresh clone with no remote-tracking develop: ``None``, never a raise — the
-    liveness set simply shrinks (``live_verdict_shas``)."""
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    (repo / "a.txt").write_text("first\n")
-    _commit(repo, "c1")
-
-    reader = GitSubprocessObjectReader()
-    assert reader.resolve_ref(repo, "refs/remotes/origin/develop") is None
-
-
-def test_resolve_ref_rejects_an_option_shaped_ref(tmp_path: Path) -> None:
-    """CWE-88 — the same second-layer shape defence every other adapter call applies."""
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    (repo / "a.txt").write_text("first\n")
-    _commit(repo, "c1")
-
-    reader = GitSubprocessObjectReader()
-    assert reader.resolve_ref(repo, "--output=/tmp/x") is None
-
-
 def test_parents_of_a_merge_commit_lists_both_lines_first_parent_first(tmp_path: Path) -> None:
     """The shape `live_verdict_shas` reads on develop right after a feature merge."""
     repo = tmp_path / "repo"
