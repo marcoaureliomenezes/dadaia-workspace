@@ -297,7 +297,7 @@ class Greenfield(Scenario):
 
     def level3(self) -> None:
         def step() -> None:
-            self.level1()
+            self.guidance()  # observed before level 3 changes the answer (test order is random)
             done = self.ws.dadaia("specs", "init", "--context", "green")
             assert done.returncode == 0, f"{done.stdout}\n{done.stderr}"
             _specs_scaffolded(self.ws, "green")
