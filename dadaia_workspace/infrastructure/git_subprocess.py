@@ -162,10 +162,10 @@ class GitSubprocessClient:
         # by git as an option (argument injection). Legitimate https/ssh/git@ and
         # local-path / file:// clones are still allowed.
         if url.startswith("ext::") or url.startswith("-"):
-            raise GitCloneError(f"refusing to clone from unsafe URL: {url!r}")
+            raise GitCloneError(f"refusing to clone from unsafe URL: {url!r}", url)
         result = _run(["git", "clone", url, str(dest)])
         if result.returncode != 0:
-            raise GitCloneError(f"git clone failed for {url!r}: {result.stderr.strip()}")
+            raise GitCloneError(f"git clone failed for {url!r}: {result.stderr.strip()}", url)
 
     def move(self, repo: Path, src: str, dst: str) -> None:
         """Rename ``repo/src`` to ``repo/dst``, staging the rename of its tracked files —

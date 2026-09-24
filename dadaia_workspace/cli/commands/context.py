@@ -30,6 +30,7 @@ from dadaia_workspace.core.exceptions import (
     ContextNotFoundError,
     ContextStateError,
     DadaiaError,
+    GitCloneError,
     GitSyncError,
     InvalidContextNameError,
     RepoUrlMissingError,
@@ -223,7 +224,8 @@ def _create_fix(error: Exception, name: str | None, urls: list[str]) -> str:
         return f"{DADAIA_BIN} context list"
     if isinstance(error, ContextAlreadyExistsError):
         name = "<another-name>"
-    urls = [u if repr(u) not in str(error) else "<clone-url>" for u in urls]
+    failed = error.url if isinstance(error, GitCloneError) else None
+    urls = [u if u != failed else "<clone-url>" for u in urls]
     flags = [f"--associated-repo {u}" for u in urls[1:]]
     return " ".join(
         [f"{DADAIA_BIN} context create", *([name] if name else []), "--main-repo", urls[0], *flags]
