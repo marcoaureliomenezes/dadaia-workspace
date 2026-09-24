@@ -174,7 +174,11 @@ def test_upgrade_leaves_a_two_tier_tree_alone_and_the_doctor_names_it(tmp_path: 
 
     assert upgrade.returncode == 0, upgrade.stderr or upgrade.stdout
     assert (specs / "memory" / "TECHSTACK.md").read_text(encoding="utf-8") == _V6_TECHSTACK
-    assert (specs / "memory" / "ARCHITECTURE.md").read_text(encoding="utf-8") == two_tier
+    # The fold declined: the authored body is untouched and gains no `## Tech Stack`;
+    # only the library-owned fixed law block is appended, as `doctor --fix` would (T-048-05).
+    architecture = (specs / "memory" / "ARCHITECTURE.md").read_text(encoding="utf-8")
+    assert architecture.startswith(two_tier)
+    assert "## Tech Stack" not in architecture
 
     findings = StructuralValidator(specs, None, None).check_tree8_canon_root()
 

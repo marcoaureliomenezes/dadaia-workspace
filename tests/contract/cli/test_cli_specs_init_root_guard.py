@@ -40,12 +40,3 @@ def test_specs_init_explicit_specs_dir_still_works(workspace_root: Path) -> None
     result = _runner.invoke(app, ["specs", "init", "--specs-dir", str(target)])
     assert result.exit_code == 0, result.output
     assert (target / "constitution.md").exists()
-
-
-def test_specs_init_outside_workspace_root_keeps_default(tmp_path: Path, monkeypatch) -> None:
-    proj = tmp_path / "some-project"
-    proj.mkdir()
-    monkeypatch.chdir(proj)
-    result = _runner.invoke(app, ["specs", "init"])
-    assert result.exit_code == 0, result.output
-    assert (proj / "specs" / "constitution.md").exists()

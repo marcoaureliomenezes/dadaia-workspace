@@ -28,6 +28,8 @@ canonical tree needs no re-stamp of its own version.
 
 from __future__ import annotations
 
+from dadaia_workspace.core.specs_version import OLDEST_UPGRADABLE_VERSION
+
 
 class UpgradeRefused(Exception):
     """Raised by :func:`check_upgradable` when a specs/ tree's pattern version sits
@@ -44,7 +46,7 @@ class UpgradeRefused(Exception):
 #: 6 -> 7 (memory canon v7 — ``memory/TECHSTACK.md`` folds into ``ARCHITECTURE.md``'s
 #: ``## Tech Stack`` section). One entry, not a resurrected chain: a tree below
 #: :data:`UPGRADABLE_FROM` still reaches canonical the way the refusal below says.
-UPGRADABLE_FROM = 6
+UPGRADABLE_FROM = OLDEST_UPGRADABLE_VERSION
 
 
 def check_upgradable(current: int, goal: int) -> None:

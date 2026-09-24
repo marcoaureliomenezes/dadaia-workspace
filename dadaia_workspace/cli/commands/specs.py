@@ -7,8 +7,18 @@ from pathlib import Path
 
 import typer
 
-from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
-from dadaia_workspace.features.specs.scaffolder import scaffold
+from dadaia_workspace.cli._specs_resolution import (
+    repo_slug_for_context,
+    resolve_context_for_cli,
+    resolve_specs_dir_for_cli,
+)
+from dadaia_workspace.core import specs_version
+from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+from dadaia_workspace.features.migrate import upgrade as upgrade_feature
+from dadaia_workspace.features.migrate.registry import UpgradeRefused
+from dadaia_workspace.features.migrate.upgrade import UpgradeResult
+from dadaia_workspace.features.specs import canon
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 
 app = typer.Typer(help="SDD release-lifecycle structural checks and helpers.")
 
@@ -36,100 +46,113 @@ def upgrade(
 ) -> None:
     """Upgrade a specs/ tree to the canonical pattern version.
 
-    v0.5.1 T-051-16 (K10) retired the versioned migration chain this command used to
-    walk (backup-first, apply steps, re-stamp, doctor pre/post-diff) — see
-    ``features/migrate/registry.py``'s docstring for why. A tree below the target
-    now refuses immediately, no filesystem write, naming the dadaia-workspace 0.4.x
-    prerequisite. A tree already at (or above) the target is idempotent: only the
-    unconditional template-artifact repair runs.
+    A tree below the one live hop (v6) refuses, no filesystem write, naming the
+    dadaia-workspace 0.4.x prerequisite. A tree at v6 walks to v7; every tree gets its
+    fixed law sections and template-artifact repairs, so the doctor ends clean.
     """
-    from dadaia_workspace.core import specs_version as _ver
-    from dadaia_workspace.features.migrate import upgrade as _upgrade_feat
-    from dadaia_workspace.features.migrate.registry import UpgradeRefused
-
     resolved = _resolve_specs_dir(specs_dir)
-    current = _ver.read_pattern_version(resolved)
-    goal = _ver.CANONICAL_SPECS_VERSION if target is None else target
-
     try:
-        result = _upgrade_feat.upgrade(resolved, target=target, dry_run=dry_run)
+        result = upgrade_feature.upgrade(resolved, target=target, dry_run=dry_run)
     except UpgradeRefused as exc:
         typer.echo(f"[refused] {exc}", err=True)
         sys.exit(1)
-
-    verb = "would remove" if dry_run else "removed"
-    for path in result.placeholder_removed:
-        typer.echo(f"[placeholder-repair] {verb} {path}")
-    rewrote = "would rewrite" if dry_run else "rewrote"
-    for path in result.status_rewritten:
-        typer.echo(f"[status-vocabulary] {rewrote} {path}")
-    if result.no_op:
-        typer.echo(f"[ok] {resolved} already at pattern version {current} (target {goal}) — no-op.")
+    _echo_upgrade(resolved, result)
     sys.exit(0)
 
 
-# Canonical templates directory — inside the installed package
-_TEMPLATES_DIR = Path(__file__).parent.parent.parent / "public" / "templates"
+def _echo_upgrade(specs: Path, result: UpgradeResult) -> None:
+    will = "would " if result.dry_run else ""
+    for path in result.placeholder_removed:
+        typer.echo(f"[placeholder-repair] {will}remove {path}")
+    for path in result.status_rewritten:
+        typer.echo(f"[status-vocabulary] {will}rewrite {path}")
+    for path in result.tech_stack_folded:
+        typer.echo(f"[tech-stack] {will}fold {path} into memory/ARCHITECTURE.md")
+    for path in result.fixed_restored:
+        typer.echo(f"[fixed-section] {will}write {path}")
+    if result.from_version < result.to_version:
+        typer.echo(
+            f"[stamp] {will}stamp {specs / 'constitution.md'} "
+            f"{result.from_version} -> {result.to_version}"
+        )
+    if result.no_op:
+        typer.echo(
+            f"[ok] {specs} already at pattern version {result.from_version} "
+            f"(target {result.to_version}) — no-op."
+        )
+
+
+_FIX = "fix: .dadaia/.venv/bin/dadaia specs init"
+_BACKUP = "specs-bkp"
 
 
 @app.command("init")
 def init(
+    context: str | None = typer.Option(
+        None, "--context", help="Spec Context whose main repo gets specs/. Default: bound."
+    ),
     specs_dir: str | None = typer.Option(
-        None,
-        "--specs-dir",
-        help="Path to target specs/ directory. Default: ./specs/",
+        None, "--specs-dir", help="Explicit specs/ directory instead of a context's."
     ),
     name: str | None = typer.Option(
-        None,
-        "--name",
-        help="Project name for rendered templates. Default: parent directory name.",
+        None, "--name", help="Project name for the constitution. Default: the repo name."
     ),
-    force: bool = typer.Option(
+    replace_foreign: bool = typer.Option(
         False,
-        "--force",
-        help="Overwrite existing files. Without this flag, existing files are skipped.",
+        "--replace-foreign",
+        help=f"Move a foreign specs/ to {_BACKUP}/ (git mv, staged) without asking.",
     ),
 ) -> None:
-    """Bootstrap a SDD release-lifecycle specs/ directory structure."""
-    # Resolve specs_dir. An explicit --specs-dir routes through the same resolver seam
-    # every other resolver-driven verb shares (T-044-40, `core.invocation
-    # .resolve_specs_dir`) so a symlinked target is refused here too — reusing that
-    # seam's existing refusal, not adding a second one (T-045-21/FR8, A8.2). `None`
-    # keeps init's own default (cwd/specs, guarded by the Root Law check below) rather
-    # than falling into that seam's unrelated context-resolution fallback.
-    target = _resolve_specs_dir(specs_dir) if specs_dir else Path.cwd() / "specs"
+    """Bring a repo's specs/ to the canon, never committing.
 
-    # Coherence with `dadaia doctor` (validation-027 F-04/F-10): the doctor refuses the
-    # workspace-root specs/ fallback (Root Law), so init must refuse to CREATE it there.
-    # An explicit --specs-dir is a deliberate operator choice and always wins.
-    if specs_dir is None and (Path.cwd() / ".dadaia").is_dir():
-        typer.secho(
-            "Error: refusing to scaffold 'specs/' at the workspace root: the Workspace "
-            "Root Law forbids a top-level specs/ directory (and 'dadaia doctor' would "
-            "refuse it). Run inside a repo, or pass --specs-dir repos/<slug>/specs.",
+    Absent: scaffold. Dadaia (stamped >= 6): upgrade, then fill missing files. Foreign:
+    after consent, `git mv specs specs-bkp` (staged) and scaffold.
+    """
+    if specs_dir is not None:
+        target, rerun = resolve_specs_dir_for_cli(specs_dir), f"--specs-dir {specs_dir}"
+    else:
+        try:
+            ctx = resolve_context_for_cli(context)
+        except ValueError as exc:
+            typer.echo(f"[error] {exc}\n{_FIX} --context <name>", err=True)
+            raise typer.Exit(2) from exc
+        root = resolve_workspace_root()
+        target, rerun = (
+            root / "repos" / repo_slug_for_context(root, ctx) / "specs",
+            f"--context {ctx}",
+        )
+
+    kind = canon.classify(target)
+    if kind == "foreign":
+        _move_foreign(target, rerun, replace_foreign)
+    elif kind == "dadaia":
+        _echo_upgrade(target, upgrade_feature.upgrade(target))
+
+    written = canon.scaffold(target, project_name=name or target.parent.name)
+    for path in [*written, *canon.scaffold_repo_law(target.parent)]:
+        typer.echo(f"[created] {path}")
+    if kind != "dadaia":
+        typer.echo(f"[ok] {target} at pattern version {specs_version.CANONICAL_SPECS_VERSION}")
+
+
+def _move_foreign(target: Path, rerun: str, replace_foreign: bool) -> None:
+    """``specs/`` -> ``specs-bkp/`` after consent; exits on a refusal, writing nothing."""
+    backup = target.parent / _BACKUP
+    if backup.exists():
+        typer.echo(
+            f"[error] {backup} already exists — move or delete it first.\n"
+            f"fix: git -C {target.parent} rm -r -q {_BACKUP}",
             err=True,
-            fg=typer.colors.RED,
         )
         raise typer.Exit(1)
-
-    # Resolve project name
-    project_name = name or target.parent.name
-
-    result = scaffold(
-        specs_dir=target,
-        project_name=project_name,
-        force=force,
-        templates_dir=_TEMPLATES_DIR,
-    )
-
-    # Print created/skipped/error summary
-    for path in result.created:
-        action = "[overwrite]" if force else "[created]"
-        typer.echo(f"{action} {path}")
-    for path in result.skipped:
-        typer.echo(f"[skip] {path}")
-    for error in result.errors:
-        typer.echo(f"[error] {error}", err=True)
-
-    if result.errors:
-        sys.exit(1)
+    if not replace_foreign:
+        question = f"{target} is not a dadaia specs tree. Move it to {_BACKUP}/ and scaffold?"
+        if not (sys.stdin.isatty() and typer.confirm(question, default=False)):
+            typer.echo(
+                f"[refused] {target} is a foreign specs tree; nothing written.\n"
+                f"{_FIX} {rerun} --replace-foreign",
+                err=True,
+            )
+            raise typer.Exit(2)
+    GitSubprocessClient().move(target.parent, target.name, _BACKUP)
+    typer.echo(f"[moved] {target} -> {backup} (staged, not committed)")

@@ -21,6 +21,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from dadaia_workspace.core import specs_version as _version
+from dadaia_workspace.core.fixed_sections import (
+    FIXED_SECTIONS,
+    extract_fixed_section,
+    render_fixed_section,
+)
 from dadaia_workspace.core.frontmatter import FRONTMATTER_RE
 from dadaia_workspace.core.spec_status import APPROVED, DRAFT, IN_REVIEW
 from dadaia_workspace.core.specs_repair import remove_placeholder_atoms
@@ -44,6 +49,9 @@ class UpgradeResult:
     #: ``memory/TECHSTACK.md`` folded into ``ARCHITECTURE.md``'s ``## Tech Stack``
     #: section and deleted by the 6 -> 7 hop (planned-only when ``dry_run``).
     tech_stack_folded: list[Path] = field(default_factory=list)
+    #: Files whose fixed law section was inserted or refreshed from the library
+    #: fragment (planned-only when ``dry_run``).
+    fixed_restored: list[Path] = field(default_factory=list)
 
 
 def upgrade(
@@ -68,21 +76,55 @@ def upgrade(
         )
         restated = plan_status_token_rewrites(specs_dir)
         folded = plan_tech_stack_fold(specs_dir)
+        fixed = plan_fixed_sections(specs_dir)
     else:
         removed = remove_placeholder_atoms(specs_dir) + remove_empty_ideas_dir(specs_dir)
         restated = rewrite_status_tokens(specs_dir)
         folded = fold_tech_stack(specs_dir)
+        fixed = restore_fixed_sections(specs_dir)
         if current < goal:
             _version.write_pattern_version(specs_dir, goal)
     return UpgradeResult(
         from_version=current,
         to_version=goal,
         dry_run=dry_run,
-        no_op=not (removed or restated or folded),
+        no_op=current >= goal and not (removed or restated or folded or fixed),
         placeholder_removed=removed,
         status_rewritten=restated,
         tech_stack_folded=folded,
+        fixed_restored=fixed,
     )
+
+
+#: The library's fixed-law fragments, shipped beside this package (``public/data/fixed``).
+_FIXED_FRAGMENTS = Path(__file__).resolve().parents[2] / "public" / "data" / "fixed"
+
+
+def _fixed_renders(specs_dir: Path) -> list[tuple[Path, str]]:
+    """Every present fixed-section file whose block is missing or stale, with its render."""
+    renders: list[tuple[Path, str]] = []
+    for rel, section_id in FIXED_SECTIONS:
+        path = specs_dir / rel
+        if not path.is_file():
+            continue
+        fragment = (_FIXED_FRAGMENTS / f"{section_id}.md").read_text(encoding="utf-8")
+        text = path.read_text(encoding="utf-8")
+        if extract_fixed_section(text, section_id) != fragment:
+            renders.append((path, render_fixed_section(text, section_id, fragment)))
+    return renders
+
+
+def plan_fixed_sections(specs_dir: Path) -> list[Path]:
+    """Files whose fixed law section the upgrade would insert or refresh."""
+    return [path for path, _ in _fixed_renders(specs_dir)]
+
+
+def restore_fixed_sections(specs_dir: Path) -> list[Path]:
+    """Insert or refresh every fixed law section — the part of canon v7 a v6 tree lacks."""
+    renders = _fixed_renders(specs_dir)
+    for path, text in renders:
+        path.write_text(text, encoding="utf-8")
+    return [path for path, _ in renders]
 
 
 #: The section ``TECHSTACK.md``'s body becomes, appended at the END of ``ARCHITECTURE.md``

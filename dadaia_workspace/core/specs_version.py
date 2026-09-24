@@ -29,6 +29,10 @@ from dadaia_workspace.core.frontmatter import FRONTMATTER_RE as _FRONTMATTER_RE
 #: ``ARCHITECTURE.md``'s ``## Tech Stack`` section, which ``features/migrate`` folds.
 CANONICAL_SPECS_VERSION = 7
 
+#: The oldest stamp the one live upgrade hop starts from — and so the oldest a tree may
+#: carry and still be a dadaia tree (SPEC 0.4.8 D7, D9); anything older is foreign.
+OLDEST_UPGRADABLE_VERSION = 6
+
 #: Version assigned to a tree with no stamp (pre-framework flat layout).
 UNSTAMPED_VERSION = 0
 
