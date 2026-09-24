@@ -120,6 +120,9 @@ Every refusal below exits non-zero with exactly one `fix:` line whose command is
 - AC3.4 Transactional: any clone failure -> exit 1, no context record, every directory this call created
   under `repos/` removed; re-running the corrected command with the same slug succeeds (R3).
 - AC3.5 A refusal's `fix:` line reproduces the full invocation, every `--associated-repo` included (RV1).
+  _Amended 2026-09-24:_ the failed clone's URL is printed as `<clone-url>`, a taken name as
+  `<another-name>`, and a slug owned by another context points to `context list` — never the
+  failing command repeated verbatim.
 - AC3.6 `create` writes nothing inside any cloned repo but the hook; `git -C repos/<slug> status --porcelain`
   is empty and HEAD equals the remote's.
 - AC3.7 `context alive <name>` (DEAD -> ALIVE, e.g. after `import`) clones, installs the hook, writes no
@@ -149,6 +152,8 @@ Every refusal below exits non-zero with exactly one `fix:` line whose command is
 - AC5.1 A context with no first-pass stamp in `audits/_archive/audits_histo.jsonl` has a deterministic
   worklist: the `memory.py drift` invocation named by the onboarding status lists every code unit no atom
   covers, from the repo's first commit, exit 0.
+  _Amended 2026-09-24:_ `memory.py drift` exits 1 while the worklist is non-empty (its shared
+  contract with the closure gate); the worklist listing is the acceptance, not exit 0.
 - AC5.2 `dd-audit-project` carries a "first pass" section: `dd-product-engineer` fills `ARCHITECTURE.md`,
   `QUALITY.md` and product atoms from code + `specs-bkp/`, then records the stamp; done = worklist covered and
   `memory.py check` exit 0. No new skill. Agentic — asserted by contract test on the skill text, not in CI
@@ -160,6 +165,8 @@ Every refusal below exits non-zero with exactly one `fix:` line whose command is
   (exit code unaffected) with one `fix:` line: zero ALIVE contexts -> `context create`; an ALIVE context
   without a dadaia specs tree -> `specs init --context <c>`; no first-pass stamp -> the FR5 worklist command;
   complete -> no finding. Zero contexts no longer prints nothing (R2). No state file is written.
+  _Amended 2026-09-24:_ "no first-pass stamp" means `audits/_archive/audits_histo.jsonl` holds no
+  record (absent or empty); "no dadaia specs tree" means not stamped at the canonical version.
 - AC6.2 `init`, `context create` and the SessionStart hook print the same next-step text as AC6.1 (one
   derivation, three callers); SessionStart at zero contexts no longer prints `[no bound context]` alone.
 - AC6.3 `DADAIA doctor --context <ghost>` exits 1: `Error: Context 'ghost' not found.` +
@@ -198,6 +205,9 @@ Every refusal below exits non-zero with exactly one `fix:` line whose command is
   `bind` + implicit scaffold); no new verb, no new state file.
 - AC9.3 Net production diff under `dadaia_workspace/` (Python, `public/` Markdown excluded) from the
   definition commit to closure is ≤ 0 lines; PLAN justifies every growth against replace-don't-layer.
+  _Amended 2026-09-24:_ measured on all `dadaia_workspace/**/*.py` (git numstat): net −70 at
+  169fa5c5; −91 of it is d089d9b4 deleting nine pre-existing dead exception classes, so the
+  candidate's own onboarding work is ≈ +21 net — the ≤ 0 holds only with that unrelated deletion.
 
 ## 6. Acceptance gate
 
