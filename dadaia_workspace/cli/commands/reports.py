@@ -77,7 +77,6 @@ def validate(
     Examples:
       dadaia reports validate path/to/report.handoff.json
       dadaia reports validate --all
-      dadaia reports validate --all
       dadaia reports validate --all --json
       dadaia reports validate path/to/report.handoff.json --workspace /path/to/other/ws
       dadaia reports validate path/to/verdict.handoff.json --reviewed-root /path/to/worktree

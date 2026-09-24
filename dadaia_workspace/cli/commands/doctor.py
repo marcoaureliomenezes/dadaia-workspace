@@ -363,7 +363,7 @@ def doctor(
         "--redact",
         help=(
             "Mask every Spec Context name and repo slug other than this caller's "
-            "resolved context (SPEC v0.9.0 FR8a). Default output is unchanged."
+            "resolved context. Default output is unchanged."
         ),
     ),
 ) -> None:

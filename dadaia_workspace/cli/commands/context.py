@@ -276,7 +276,7 @@ def list_all(
         "--redact",
         help=(
             "Mask every context name and repo slug other than this caller's resolved "
-            "context (SPEC v0.9.0 FR8a). Default output is unchanged."
+            "context. Default output is unchanged."
         ),
     ),
 ) -> None:
@@ -361,7 +361,7 @@ def show(
         "--redact",
         help=(
             "Mask every context name and repo slug other than this caller's resolved "
-            "context (SPEC v0.9.0 FR8a). Default output is unchanged."
+            "context. Default output is unchanged."
         ),
     ),
 ) -> None:
@@ -648,7 +648,7 @@ def repo_remove(
 
     Run: dadaia context repo remove <ctx> <slug>
 
-    Registry-only (A17.2): this NEVER deletes the on-disk checkout at
+    Registry-only: this NEVER deletes the on-disk checkout at
     'repos/<slug>' — it only drops the registry entry, and always states
     explicitly what it leaves behind on disk. To also remove the checkout, delete
     it yourself, or run 'dadaia context dead <ctx>' first (which git-syncs and

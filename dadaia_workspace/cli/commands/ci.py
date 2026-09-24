@@ -173,23 +173,17 @@ def _no_canon_violations(paths: Iterable[str]) -> list[str]:
 def push_gate_check() -> None:
     """Pre-push gate: branch-name validation + the range-scoped denylist scan.
 
-    Branch model: `dd-gitflow-default` (Gitflow) + `dd-gitflow-default` — this docstring
-    states it nowhere else.
+    Branch model: `dd-gitflow-default`.
 
     Reads the pre-push ref lines from stdin (``<local-ref> <local-sha> <remote-ref>
-    <remote-sha>``). Every non-deletion ref (tags included) is then scanned for new
-    objects carrying a denylisted term (v0.9.0 FR1/FR2) — under v2 this feature push is
-    the first publication to ``origin``. Branch deletions are never scanned; tag pushes
-    are scanned but were never gated on branch policy. There is no security-verdict
-    check on this path (v0.4.4 A3.4) — it runs as a PR gate instead (FR4).
+    <remote-sha>``). Every non-deletion ref (tags included) is scanned for new objects
+    carrying a denylisted term — a feature push is the first publication to ``origin``.
+    Branch deletions are never scanned; tag pushes are scanned but never gated on branch
+    policy. No security verdict is checked here — that runs as a PR gate.
 
-    The object source, denylist terms, baseline patterns and foreign-slug set are ALL
-    built and passed here — the CLI is the sole composition point for the injected
-    ``GitObjectReader`` port (FR7); a production call site that failed to wire one
-    would be a defect, never a bypass (FR6 row 4). The foreign-slug set is now
-    REGISTRY-DERIVED (v0.11.0 FR5): it reaches the registry through the
-    ``container.load_registry_context_identities`` seam, never through a direct
-    ``infrastructure`` import (``cli-no-infrastructure``).
+    The object source, denylist terms, baseline patterns and the registry-derived
+    foreign-slug set are all built here and injected; a call site that fails to wire the
+    object reader is a defect, never a bypass.
     """
     from dadaia_workspace.container import (
         build_git_object_reader,
