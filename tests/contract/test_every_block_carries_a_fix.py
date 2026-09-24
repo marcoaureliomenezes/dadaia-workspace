@@ -19,7 +19,7 @@ from __future__ import annotations
 import re
 import shlex
 import sys
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -154,12 +154,6 @@ class _FakeObjectSource:
 
     def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
         return ()
-
-    def resolve_ref(self, repo: Path, ref: str) -> str | None:
-        return None
-
-    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]:
-        return set()
 
 
 class _FailingObjectSource(_FakeObjectSource):

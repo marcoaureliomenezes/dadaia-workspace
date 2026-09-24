@@ -1,10 +1,10 @@
 """Pure push-range denylist matcher (SPEC v0.9.0 FR3/FR5/FR6).
 
-Intent: CONTRACT — v0.9.0 A3.1, A3.2, A3.3, A3.4, A4.1, A5.2, A6.2; v0.11.0 A4.1, A4.4,
+Intent: CONTRACT — v0.9.0 A3.1, A3.4, A4.1, A5.2, A6.2; v0.11.0 A4.1, A4.4,
 A4.6, A1.1, A1.2, A1.3, A1.4
 
-Term sources (operator denylist, packaged baseline, foreign repo slugs) x masking x the
-undecodable-blob skip+count — no real operator term or foreign slug ever appears here
+Term sources (operator denylist, packaged baseline) x masking x the
+undecodable-blob skip+count — no real operator term ever appears here
 (synthetic-only, per the TASKS standing rule): only ``zz-``-prefixed synthetic terms and
 the packaged structural baseline (IPv4/home-path patterns, which are generic regexes,
 not private values).
@@ -13,6 +13,8 @@ not private values).
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
+from dataclasses import dataclass
 from pathlib import Path
 
 from dadaia_workspace.core.models.git_scan import ScannedObject
@@ -20,8 +22,6 @@ from dadaia_workspace.features.chokepoints.denylist_scan import _first_match, sc
 from dadaia_workspace.infrastructure.privacy_check import load_baseline_patterns
 
 _SYNTHETIC_TERM = "zz-secret-term"
-_SYNTHETIC_OWN_SLUG = "zz-self-context-name"
-_SYNTHETIC_FOREIGN_SLUG = "zz-fake-context-name"
 
 # Positive baseline fixtures — deliberately built via concatenation (never a whole
 # matching literal in THIS file's own source) so this module's own git blob never
@@ -55,7 +55,7 @@ def test_baseline_ipv4_literal_refused_with_no_operator_terms() -> None:
     baseline = load_baseline_patterns()
     objects = [_obj("notes.md", f"server lives at {_POSITIVE_IPV4} for now\n")]
 
-    outcome = scan_objects(objects, terms=(), patterns=baseline, slugs=())
+    outcome = scan_objects(objects, terms=(), patterns=baseline)
 
     assert len(outcome.hits) == 1
     hit = outcome.hits[0]
@@ -69,147 +69,10 @@ def test_baseline_home_path_refused_with_no_operator_terms() -> None:
     baseline = load_baseline_patterns()
     objects = [_obj("notes.md", f"logs at {_POSITIVE_HOME_PATH}/project/output.log\n")]
 
-    outcome = scan_objects(objects, terms=(), patterns=baseline, slugs=())
+    outcome = scan_objects(objects, terms=(), patterns=baseline)
 
     assert len(outcome.hits) == 1
     assert _POSITIVE_HOME_PATH not in outcome.hits[0].masked_term
-
-
-# ---------------------------------------------------------------------------
-# A3.2 — self-slug regression guard: a slug never passed in `slugs` never matches,
-# even though it appears in nearly every blob (mirroring the real repo's own name).
-# ---------------------------------------------------------------------------
-
-
-def test_own_slug_excluded_from_slugs_never_matches() -> None:
-    objects = [
-        _obj("a.md", f"{_SYNTHETIC_OWN_SLUG} appears here\n"),
-        _obj("b.md", f"and again: {_SYNTHETIC_OWN_SLUG}\n", sha="cafef00d"),
-    ]
-
-    outcome = scan_objects(objects, terms=(), patterns=(), slugs=(_SYNTHETIC_FOREIGN_SLUG,))
-
-    assert outcome.hits == ()
-
-
-# ---------------------------------------------------------------------------
-# A3.3 — foreign slug matched at a word boundary; embedded in a longer word, not.
-# ---------------------------------------------------------------------------
-
-
-def test_foreign_slug_matches_as_whole_word() -> None:
-    objects = [_obj("readme.md", f"see repos/{_SYNTHETIC_FOREIGN_SLUG}/README.md\n")]
-
-    outcome = scan_objects(objects, terms=(), patterns=(), slugs=(_SYNTHETIC_FOREIGN_SLUG,))
-
-    assert len(outcome.hits) == 1
-    assert outcome.hits[0].source_layer == "foreign repo slug"
-
-
-def test_foreign_slug_embedded_in_longer_word_does_not_match() -> None:
-    """A slug glued directly onto surrounding characters (no delimiter) is a different,
-    unrelated identifier — not a whole-word occurrence of the slug."""
-    embedded = f"prefix{_SYNTHETIC_FOREIGN_SLUG}suffix"
-    objects = [_obj("readme.md", f"see {embedded} elsewhere\n")]
-
-    outcome = scan_objects(objects, terms=(), patterns=(), slugs=(_SYNTHETIC_FOREIGN_SLUG,))
-
-    assert outcome.hits == ()
-
-
-def test_foreign_slug_matches_case_insensitively() -> None:
-    """dd-code-reviewer LOW finding: operator terms are case-insensitive (`.lower()` on
-    both sides) but the slug layer compiled its regex with no `re.IGNORECASE`, an
-    undocumented asymmetry in the same matcher. A foreign slug referenced with
-    different casing must still be caught."""
-    differently_cased = _SYNTHETIC_FOREIGN_SLUG.upper()
-    assert differently_cased != _SYNTHETIC_FOREIGN_SLUG
-    objects = [_obj("readme.md", f"see repos/{differently_cased}/README.md\n")]
-
-    outcome = scan_objects(objects, terms=(), patterns=(), slugs=(_SYNTHETIC_FOREIGN_SLUG,))
-
-    assert len(outcome.hits) == 1
-    assert outcome.hits[0].source_layer == "foreign repo slug"
-
-
-# ---------------------------------------------------------------------------
-# T-045-35 — whole-token slug match: a slug is a hit only as a whole TOKEN, never a
-# mere substring glued onto a longer hyphenated/dotted identifier. Python's `\b` treats
-# `-` and `.` as non-word delimiters, so the pre-fix `\bslug\b` anchor matched a
-# hyphenated slug INSIDE `<slug>-anything` and `<slug>.ext` — flagging the library's
-# own tracked asset basename and a ledger bug id as if either were a private-name
-# publication (architect ruling:
-# specs/releases/v0.4.5/reviews/T-045-35-foreign-slug-ruling.md).
-# ---------------------------------------------------------------------------
-
-
-def test_foreign_slug_inside_hyphenated_basename_and_bug_id_does_not_match() -> None:
-    """Intent: CONTRACT — T-045-35 (HIGH), rc-1 push-gate false positive. RED at HEAD:
-    the pre-fix `\\bslug\\b` anchor treats `-`/`.` as boundaries, so this synthetic
-    slug fires twice in this one blob — once glued inside a tracked-asset basename
-    (`ZZ-FAKE-context-name-AGENTS.md`), once glued inside a ledger bug-id substring
-    (`zz-fake-context-name-md-canonical-...`) — even though neither occurrence is a
-    whole-token publication of the slug itself. Both must produce ZERO hits."""
-    objects = [
-        _obj(
-            "specs/releases/x/reviews/r.md",
-            "cites public/data/ZZ-FAKE-context-name-AGENTS.md and bug id "
-            f"{_SYNTHETIC_FOREIGN_SLUG}-md-canonical-table-omits-sanctioned-references\n",
-        )
-    ]
-
-    outcome = scan_objects(objects, terms=(), patterns=(), slugs=(_SYNTHETIC_FOREIGN_SLUG,))
-
-    assert outcome.hits == ()
-
-
-def test_foreign_slug_bare_in_prose_still_matches() -> None:
-    """Intent: CONTRACT — T-045-35 control. A bare slug bounded by whitespace on both
-    sides is a whole-token occurrence and must still BLOCK — the fix narrows the
-    boundary to token edges, it does not disable the detector."""
-    objects = [_obj("notes.md", f"see {_SYNTHETIC_FOREIGN_SLUG} in prose\n")]
-
-    outcome = scan_objects(objects, terms=(), patterns=(), slugs=(_SYNTHETIC_FOREIGN_SLUG,))
-
-    assert len(outcome.hits) == 1
-    assert outcome.hits[0].source_layer == "foreign repo slug"
-
-
-def test_foreign_slug_at_sentence_end_before_period_still_matches() -> None:
-    """Intent: CONTRACT — T-045-35 control. A trailing `.` at sentence end is not a
-    dotted continuation into another identifier (no word character follows the dot),
-    so the slug is still a whole-token occurrence and must still BLOCK."""
-    objects = [_obj("notes.md", f"see {_SYNTHETIC_FOREIGN_SLUG}.\n")]
-
-    outcome = scan_objects(objects, terms=(), patterns=(), slugs=(_SYNTHETIC_FOREIGN_SLUG,))
-
-    assert len(outcome.hits) == 1
-    assert outcome.hits[0].source_layer == "foreign repo slug"
-
-
-def test_foreign_slug_in_repos_path_segment_still_matches() -> None:
-    """Intent: CONTRACT — T-045-35 no-regression control, restated explicitly next to
-    the new whole-token tests: `repos/<slug>/README.md` (slug bounded by `/` on both
-    sides) is unchanged by the fix — it was already covered by
-    ``test_foreign_slug_matches_as_whole_word`` above; this pins it under the T-045-35
-    section too so the ruling's three named controls are co-located."""
-    objects = [_obj("readme.md", f"see repos/{_SYNTHETIC_FOREIGN_SLUG}/README.md\n")]
-
-    outcome = scan_objects(objects, terms=(), patterns=(), slugs=(_SYNTHETIC_FOREIGN_SLUG,))
-
-    assert len(outcome.hits) == 1
-    assert outcome.hits[0].source_layer == "foreign repo slug"
-
-
-def test_foreign_slug_after_dotted_prefix_does_not_match() -> None:
-    """Intent: CONTRACT — T-045-35: a slug glued after a `word.` dotted prefix
-    (`pkg.<slug>`) is a different identifier — the dotted-continuation lookbehind must
-    refuse it even though a bare `\\b` would have matched (`.` is a non-word char)."""
-    objects = [_obj("notes.md", f"see pkg.{_SYNTHETIC_FOREIGN_SLUG} elsewhere\n")]
-
-    outcome = scan_objects(objects, terms=(), patterns=(), slugs=(_SYNTHETIC_FOREIGN_SLUG,))
-
-    assert outcome.hits == ()
 
 
 # ---------------------------------------------------------------------------
@@ -225,7 +88,7 @@ def test_baseline_excludes_loopback_and_documentation_values() -> None:
         _obj("c.md", "runner home is /home/runner/work\n", sha="feedface"),
     ]
 
-    outcome = scan_objects(objects, terms=(), patterns=baseline, slugs=())
+    outcome = scan_objects(objects, terms=(), patterns=baseline)
 
     assert outcome.hits == ()
 
@@ -243,7 +106,7 @@ def test_baseline_excludes_rfc2606_reserved_tld_emails() -> None:
         _obj("c.md", "or try someone@sub.example.test\n", sha="feedface"),
     ]
 
-    outcome = scan_objects(objects, terms=(), patterns=baseline, slugs=())
+    outcome = scan_objects(objects, terms=(), patterns=baseline)
 
     assert outcome.hits == ()
 
@@ -266,8 +129,8 @@ def test_baseline_excludes_the_products_own_synthetic_workspace_local_host() -> 
         _obj("e.md", f"see {_POSITIVE_INTERNAL_HOST_3} for the real box\n", sha="0ff1ce00"),
     ]
 
-    clean = scan_objects(carved_out, terms=(), patterns=baseline, slugs=())
-    dirty = scan_objects(still_flagged, terms=(), patterns=baseline, slugs=())
+    clean = scan_objects(carved_out, terms=(), patterns=baseline)
+    dirty = scan_objects(still_flagged, terms=(), patterns=baseline)
 
     assert clean.hits == ()
     assert len(dirty.hits) == len(still_flagged)
@@ -294,8 +157,8 @@ def test_baseline_excludes_the_stdlib_pathlib_home_method_call() -> None:
         ),
     ]
 
-    clean = scan_objects(carved_out, terms=(), patterns=baseline, slugs=())
-    dirty = scan_objects(still_flagged, terms=(), patterns=baseline, slugs=())
+    clean = scan_objects(carved_out, terms=(), patterns=baseline)
+    dirty = scan_objects(still_flagged, terms=(), patterns=baseline)
 
     assert clean.hits == ()
     assert len(dirty.hits) == len(still_flagged)
@@ -316,7 +179,7 @@ def test_amnesty_suppresses_a_value_already_published_at_the_same_path() -> None
         prior_text=f"had {_SYNTHETIC_TERM} before\n",
     )
 
-    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=(), slugs=())
+    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=())
 
     assert outcome.hits == ()
 
@@ -326,7 +189,7 @@ def test_amnesty_does_not_apply_to_a_new_path_carrying_the_same_value() -> None:
     still refuses — the amnesty is bound to the path, not the value."""
     obj = _obj_with_prior("new-path.md", f"here: {_SYNTHETIC_TERM}\n", prior_text=None)
 
-    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=(), slugs=())
+    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=())
 
     assert len(outcome.hits) == 1
 
@@ -348,7 +211,6 @@ def test_amnesty_does_not_apply_to_a_new_value_in_an_edited_path() -> None:
         [obj],
         terms=((_SYNTHETIC_TERM, "synthetic"), (other_term, "synthetic")),
         patterns=(),
-        slugs=(),
     )
 
     assert len(outcome.hits) == 1
@@ -364,7 +226,7 @@ def test_amnesty_suppression_is_case_insensitive_on_both_sides() -> None:
         prior_text=f"BEFORE: {_SYNTHETIC_TERM.upper()}\n",
     )
 
-    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=(), slugs=())
+    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=())
 
     assert outcome.hits == ()
 
@@ -380,20 +242,7 @@ def test_amnesty_applies_to_the_baseline_pattern_layer_too() -> None:
         prior_text=f"server at {_POSITIVE_IPV4} originally\n",
     )
 
-    outcome = scan_objects([obj], terms=(), patterns=baseline, slugs=())
-
-    assert outcome.hits == ()
-
-
-def test_amnesty_applies_to_the_foreign_slug_layer_too() -> None:
-    """FR1's suppression predicate applied to the foreign-slug layer."""
-    obj = _obj_with_prior(
-        "readme.md",
-        f"see repos/{_SYNTHETIC_FOREIGN_SLUG}/README.md again\n",
-        prior_text=f"see repos/{_SYNTHETIC_FOREIGN_SLUG}/README.md\n",
-    )
-
-    outcome = scan_objects([obj], terms=(), patterns=(), slugs=(_SYNTHETIC_FOREIGN_SLUG,))
+    outcome = scan_objects([obj], terms=(), patterns=baseline)
 
     assert outcome.hits == ()
 
@@ -412,8 +261,6 @@ def test_amnesty_applies_to_the_foreign_slug_layer_too() -> None:
 #: substring-amnesty predicate on a hit that actually reaches it.
 _POSITIVE_HOME_PATH_SUPERSTRING = "/hom" + "e/synthzqwxyz"  # a DIFFERENT prior value
 _POSITIVE_HOME_PATH_SUBSTRING = "/hom" + "e/synthzq"  # substring of the value above
-_SYNTHETIC_SLUG_SUPERSTRING_PRIOR = "the zz-fake-context-namecorp bundle"  # no \b match
-_SYNTHETIC_SLUG_STANDALONE = "zz-fake-context-name"
 
 
 def test_amnesty_does_not_suppress_a_baseline_hit_via_a_different_superstring_prior_value() -> None:
@@ -431,7 +278,7 @@ def test_amnesty_does_not_suppress_a_baseline_hit_via_a_different_superstring_pr
         prior_text=f"was at {_POSITIVE_HOME_PATH_SUPERSTRING}/project\n",
     )
 
-    outcome = scan_objects([obj], terms=(), patterns=baseline, slugs=())
+    outcome = scan_objects([obj], terms=(), patterns=baseline)
 
     assert len(outcome.hits) == 1
     assert _POSITIVE_HOME_PATH_SUBSTRING not in outcome.hits[0].masked_term  # A5.2 still holds.
@@ -448,27 +295,9 @@ def test_amnesty_still_suppresses_the_exact_same_anchored_baseline_value() -> No
         prior_text=f"was at {_POSITIVE_HOME_PATH_SUBSTRING}/project too\n",
     )
 
-    outcome = scan_objects([obj], terms=(), patterns=baseline, slugs=())
+    outcome = scan_objects([obj], terms=(), patterns=baseline)
 
     assert outcome.hits == ()
-
-
-def test_amnesty_does_not_suppress_a_slug_hit_lacking_a_word_boundary_match_in_prior_text() -> None:
-    """dd-code-reviewer repro 2: prior text carrying `zz-fake-context-namecorp` (the
-    synthetic slug glued to a longer word, so `\\bzz-fake-context-name\\b` never matches
-    it) must NOT suppress a new STANDALONE occurrence of the slug — the slug layer's own
-    word-boundary pattern, re-run against prior_text, finds no match at all, so there is
-    no equal matched value to amnesty against."""
-    obj = _obj_with_prior(
-        "readme.md",
-        f"see {_SYNTHETIC_SLUG_STANDALONE} here\n",
-        prior_text=f"{_SYNTHETIC_SLUG_SUPERSTRING_PRIOR}\n",
-    )
-
-    outcome = scan_objects([obj], terms=(), patterns=(), slugs=(_SYNTHETIC_SLUG_STANDALONE,))
-
-    assert len(outcome.hits) == 1
-    assert outcome.hits[0].source_layer == "foreign repo slug"
 
 
 def test_amnesty_short_circuit_continues_to_next_line_when_every_candidate_suppressed() -> None:
@@ -480,7 +309,7 @@ def test_amnesty_short_circuit_continues_to_next_line_when_every_candidate_suppr
         prior_text=f"{_SYNTHETIC_TERM} already published\n",
     )
 
-    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=(), slugs=())
+    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=())
 
     # Line 1 is fully suppressed (its only candidate is amnestied); line 2 carries the
     # SAME term but is amnestied too (same value, same prior text) -- both lines
@@ -497,7 +326,6 @@ def test_amnesty_short_circuit_continues_to_next_line_when_every_candidate_suppr
         [obj_with_new_value_on_line_two],
         terms=((_SYNTHETIC_TERM, "synthetic"), ("zz-brand-new-value", "synthetic")),
         patterns=(),
-        slugs=(),
     )
     assert len(outcome_two.hits) == 1
     assert outcome_two.hits[0].line == 2
@@ -542,33 +370,36 @@ def test_no_allowlist_or_sanctioned_terms_constant_in_matcher_source() -> None:
 # ---------------------------------------------------------------------------
 
 
-class _CountingSlugPattern:
-    """Duck-types the ``re.Pattern[str].search`` surface ``_first_match`` calls, and
+class _CountingRegex:
+    """Duck-types the ``re.Pattern[str].finditer`` surface ``_first_match`` calls, and
     counts invocations — a real ``re.Pattern`` cannot be subclassed to add counting."""
 
     def __init__(self, inner: re.Pattern[str]) -> None:
         self._inner = inner
         self.calls = 0
 
-    def search(self, text: str) -> re.Match[str] | None:
+    def finditer(self, text: str) -> Iterator[re.Match[str]]:
         self.calls += 1
-        return self._inner.search(text)
+        return self._inner.finditer(text)
+
+
+@dataclass(frozen=True)
+class _CountingPattern:
+    regex: _CountingRegex
+    id: str = "zz-synthetic"
+    reason: str = "synthetic"
+    exclude: re.Pattern[str] | None = None
 
 
 def test_first_match_short_circuits_at_the_first_hit_line() -> None:
-    """The slug pattern's ``.search`` must never be invoked past the line carrying the
+    """The pattern's ``.finditer`` must never be invoked past the line carrying the
     first hit — proof the matcher stops scanning rather than walking every remaining
     line of a large blob and sorting a full candidate list (dd-code-reviewer LOW finding)."""
-    counting = _CountingSlugPattern(re.compile(r"\b" + re.escape(_SYNTHETIC_FOREIGN_SLUG) + r"\b"))
-    text = f"line one has {_SYNTHETIC_FOREIGN_SLUG} right here\n" + "noise line\n" * 500
+    counting = _CountingRegex(re.compile(re.escape(_SYNTHETIC_TERM)))
+    text = f"line one has {_SYNTHETIC_TERM} right here\n" + "noise line\n" * 500
     obj = _obj("big.md", text)
 
-    hit = _first_match(
-        obj,
-        terms=[],
-        patterns=[],
-        slug_patterns=[(_SYNTHETIC_FOREIGN_SLUG, counting)],  # type: ignore[list-item]
-    )
+    hit = _first_match(obj, terms=[], patterns=[_CountingPattern(counting)])  # type: ignore[list-item]
 
     assert hit is not None
     assert hit.line == 1
@@ -583,7 +414,7 @@ def test_first_match_short_circuits_at_the_first_hit_line() -> None:
 def test_unmasked_operator_term_absent_from_every_hit_field() -> None:
     objects = [_obj("secret.md", f"the value is {_SYNTHETIC_TERM} right here\n")]
 
-    outcome = scan_objects(objects, terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=(), slugs=())
+    outcome = scan_objects(objects, terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=())
 
     assert len(outcome.hits) == 1
     hit = outcome.hits[0]
@@ -604,7 +435,7 @@ def test_undecodable_object_is_skipped_and_counted() -> None:
         _obj("clean.md", "nothing sensitive here\n", sha="cafef00d"),
     ]
 
-    outcome = scan_objects(objects, terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=(), slugs=())
+    outcome = scan_objects(objects, terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=())
 
     assert outcome.hits == ()
     assert outcome.skipped_binary_count == 1
@@ -646,7 +477,7 @@ def test_oversized_object_produces_a_hit_when_its_scanned_prefix_matches() -> No
     not zero coverage."""
     obj = _oversized_obj("big.md", f"leading noise {_SYNTHETIC_TERM} here\n")
 
-    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=(), slugs=())
+    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=())
 
     assert len(outcome.hits) == 1
     assert outcome.hits[0].path == "big.md"
@@ -657,7 +488,7 @@ def test_oversized_object_always_produces_a_note_even_with_no_hit() -> None:
     total size and scanned bytes — independent of whether a hit was found."""
     obj = _oversized_obj("big.md", "nothing sensitive here\n")
 
-    outcome = scan_objects([obj], terms=(), patterns=(), slugs=())
+    outcome = scan_objects([obj], terms=(), patterns=())
 
     assert outcome.hits == ()
     assert len(outcome.oversized_notes) == 1
@@ -674,7 +505,7 @@ def test_oversized_object_with_undecodable_prefix_counts_as_binary_only() -> Non
     that never ran)."""
     obj = _oversized_obj("big.bin", "", decodable=False)
 
-    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=(), slugs=())
+    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=())
 
     assert outcome.hits == ()
     assert outcome.skipped_binary_count == 1
@@ -702,7 +533,7 @@ def test_oversized_object_carrying_prior_text_still_hits_when_value_not_amnestie
         prior_text="unrelated prior content\n",
     )
 
-    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=(), slugs=())
+    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=())
 
     assert len(outcome.hits) == 1
     assert outcome.hits[0].path == "big.md"

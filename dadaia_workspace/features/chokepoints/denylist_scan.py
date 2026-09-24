@@ -2,7 +2,7 @@
 
 Zero I/O, exactly like the rest of ``features/chokepoints/**``: this module NEVER
 imports ``infrastructure`` and NEVER spawns a subprocess. Term sources — the operator
-denylist, the packaged baseline patterns, and the foreign repo-slug set — are loaded by
+denylist and the packaged baseline patterns (ADR 0032: no repo/context name) — are loaded by
 the CLI (``cli/commands/ci.py``) via ``infrastructure.privacy_check``'s public
 accessors and passed in here as plain data; :class:`BaselinePatternLike` is a
 structural Protocol so this module can accept those instances without importing the
@@ -37,13 +37,11 @@ __all__ = [
     "OversizedNote",
     "PathMasker",
     "ScanOutcome",
-    "compile_slug_patterns",
     "operator_terms_match",
     "scan_objects",
 ]
 
 _SOURCE_OPERATOR = "operator denylist"
-_SOURCE_SLUG = "foreign repo slug"
 
 
 class BaselinePatternLike(Protocol):
@@ -112,42 +110,6 @@ def _mask(term: str) -> str:
     return f"{term[0]}…{term[-1]}"
 
 
-def compile_slug_patterns(slugs: Iterable[str]) -> list[tuple[str, re.Pattern[str]]]:
-    """Whole-token regex per slug (T-045-35) — a slug is a hit only as a whole token,
-    never a mere substring glued onto a longer hyphenated/dotted identifier. Python's
-    ``\\b`` treats ``-`` and ``.`` as non-word delimiters, so a plain ``\\bslug\\b``
-    anchor (the pre-fix shape) matches a hyphenated slug INSIDE ``<slug>-anything`` and
-    ``<slug>.ext`` — every ``repos/`` slug is itself hyphenated, so this flagged the
-    library's own tracked asset basenames and ledger bug ids as private-name
-    publications (architect ruling:
-    ``specs/releases/v0.4.5/reviews/T-045-35-foreign-slug-ruling.md``). The lookaround
-    bounds the match to token edges instead: not preceded by a word char or ``-``, not
-    preceded by a dotted continuation (``word.``), not followed by a word char or
-    ``-``, not followed by a dotted continuation (``.word``). A bare slug in prose or a
-    slug bounded by ``/`` still matches; ``<slug>-x``, ``x-<slug>``, ``<slug>.ext`` and
-    ``pkg.<slug>`` do not — those are other identifiers. Case-insensitive
-    (``re.IGNORECASE``), matching the operator-term layer's case-insensitive substring
-    match — a foreign slug referenced with different casing (``MyClient`` vs
-    ``myclient``) is still caught (code-reviewer LOW finding).
-
-    Public (SPEC v0.4.2 FR4/GRILL D3): the SAME compiled matcher the gate-side path
-    masker (``features.chokepoints.service._PathMasker``) consumes for
-    ``_segment_is_offending`` — parity with the detector becomes structural rather than
-    a second, narrower predicate promised to stay in sync by convention.
-    """
-    return [
-        (
-            slug,
-            re.compile(
-                r"(?<![\w-])(?<!\w\.)" + re.escape(slug) + r"(?![\w-])(?!\.\w)",
-                re.IGNORECASE,
-            ),
-        )
-        for slug in slugs
-        if slug
-    ]
-
-
 def _term_occurs(term: str, lowered_text: str) -> bool:
     """FR3(1)'s definition of "occurs": a literal, case-insensitive substring — no
     word-boundary restriction. The ONE predicate both :func:`_first_match`'s per-line
@@ -173,13 +135,12 @@ def _first_match(
     obj: ScannedObject,
     terms: list[tuple[str, str]],
     patterns: list[BaselinePatternLike],
-    slug_patterns: list[tuple[str, re.Pattern[str]]],
 ) -> Hit | None:
-    """The earliest-line match across all three term sources, or ``None``.
+    """The earliest-line match across both term sources, or ``None``.
 
     Short-circuits at the first line that produces any candidate: lines are already
     iterated in ascending order, so that line's own first candidate (insertion order —
-    operator terms, then baseline patterns, then foreign slugs) is the answer. Neither
+    operator terms, then baseline patterns) is the answer. Neither
     the rest of the blob nor a global sort is needed to find it (code-reviewer LOW
     performance finding: the previous version paid the full-blob cost plus an
     O(n log n) sort for a result already known at the first hit).
@@ -221,13 +182,6 @@ def _first_match(
             match.group(0).lower() == value_lower for match in pattern.regex.finditer(prior_text)
         )
 
-    def _slug_suppressed(compiled: re.Pattern[str]) -> bool:
-        """Foreign-slug layer: *compiled* is ``\\bslug\\b`` (case-insensitive) — a
-        match against the prior text is already an anchored, exact-value occurrence of
-        this SAME slug (the pattern IS the value), so a boolean search doubles as the
-        value-equality check."""
-        return prior_text is not None and compiled.search(prior_text) is not None
-
     for lineno, line_text in enumerate(obj.text.splitlines(), start=1):
         line_candidates: list[Hit] = []
         lowered = line_text.lower()
@@ -252,9 +206,6 @@ def _first_match(
                         f"baseline pattern '{pattern.id}'",
                     )
                 )
-        for slug, compiled in slug_patterns:
-            if compiled.search(line_text) and not _slug_suppressed(compiled):
-                line_candidates.append(Hit(obj.path, lineno, obj.sha, _mask(slug), _SOURCE_SLUG))
         if line_candidates:
             return line_candidates[0]
     return None
@@ -264,15 +215,12 @@ def scan_objects(
     objects: Iterable[ScannedObject],
     terms: Iterable[tuple[str, str]],
     patterns: Iterable[BaselinePatternLike],
-    slugs: Iterable[str],
 ) -> ScanOutcome:
-    """Match *objects* against the three FR3 term sources.
+    """Match *objects* against the FR3 term sources.
 
     * ``terms`` — operator denylist entries (``(term, reason)``), case-insensitive
       substring match.
     * ``patterns`` — compiled baseline structural patterns, ``exclude_regex`` honored.
-    * ``slugs`` — foreign repo slugs (the pushed repo's own slug is expected to already
-      be excluded by the caller), word-boundary matched.
 
     Undecodable (binary) objects are skipped and counted, never matched (FR6 row 3).
     This class now ALSO covers an oversized blob whose scanned prefix failed to decode
@@ -287,7 +235,6 @@ def scan_objects(
     """
     term_list = list(terms)
     pattern_list = list(patterns)
-    slug_patterns = compile_slug_patterns(slugs)
     hits: list[Hit] = []
     oversized_notes: list[OversizedNote] = []
     skipped = 0
@@ -301,7 +248,7 @@ def scan_objects(
                     path=obj.path, size_bytes=obj.size_bytes, scanned_bytes=obj.scanned_bytes
                 )
             )
-        hit = _first_match(obj, term_list, pattern_list, slug_patterns)
+        hit = _first_match(obj, term_list, pattern_list)
         if hit is not None:
             hits.append(hit)
     return ScanOutcome(
@@ -320,16 +267,16 @@ _PATH_PLACEHOLDER_FMT = "[REDACTED-PATH-{n}]"
 
 
 class PathMasker:
-    """v0.11.0 FR6(b) — masks only the blob-path segments that match one of the THREE
-    FR3 term sources ``push_gate.push_gate_decision`` receives (operator denylist,
-    baseline structural patterns, foreign repo slugs) — entry #23 resolution A (ADR
+    """v0.11.0 FR6(b) — masks only the blob-path segments that match one of the FR3
+    term sources ``push_gate.push_gate_decision`` receives (operator denylist,
+    baseline structural patterns) — entry #23 resolution A (ADR
     D1/D1-a). Every operator-facing string the gate emits that names a blob path routes
     through :meth:`mask_path` before rendering (FR6's class rule, not a single call
     site) — today that is the denylist refusal and the FR4 oversized-blob note.
 
     v0.5.1 K7 ("one masking predicate"): this class used to be a private copy
     (``features.chokepoints.service._PathMasker``) that merely CALLED this module's own
-    :func:`operator_terms_match`/:func:`compile_slug_patterns`. Moved here — the module
+    :func:`operator_terms_match`. Moved here — the module
     that already owns those two predicates — so there is exactly ONE masking
     implementation, not a detector module plus a second class elsewhere that reaches
     into it.
@@ -339,8 +286,8 @@ class PathMasker:
     ordinal placeholder.
 
     SPEC v0.4.2 FR4/GRILL D3: the offending-segment TEST consumes the detector's OWN
-    compiled matchers (:func:`operator_terms_match` + :func:`compile_slug_patterns` —
-    the SAME predicates :func:`_first_match` uses, case-insensitive, whole-token
+    compiled matchers (:func:`operator_terms_match` + the baseline regexes — the SAME
+    predicates :func:`_first_match` uses, case-insensitive, whole-token
     boundaries) instead of a second, narrower predicate built from
     ``core.redaction.compile_candidates`` (case-SENSITIVE, and treats ``-`` as a word
     character rather than a boundary — GRILL P8: a path segment like ``Acme-Corp`` that
@@ -360,10 +307,8 @@ class PathMasker:
         self,
         denylist_terms: Iterable[tuple[str, str]],
         baseline_patterns: Iterable[BaselinePatternLike],
-        foreign_slugs: Iterable[str],
     ) -> None:
         self._term_values = [term for term, _reason in denylist_terms if term]
-        self._slug_patterns = compile_slug_patterns(foreign_slugs)
         self._pattern_list = list(baseline_patterns)
         self._map: dict[str, str] = {}
 
@@ -371,8 +316,6 @@ class PathMasker:
         if not segment:
             return False
         if operator_terms_match(self._term_values, segment):
-            return True
-        if any(compiled.search(segment) for _slug, compiled in self._slug_patterns):
             return True
         for pattern in self._pattern_list:
             for match in pattern.regex.finditer(segment):
@@ -384,7 +327,7 @@ class PathMasker:
 
     def mask_path(self, path: str) -> str:
         """Return *path* with every offending segment replaced; byte-identical to
-        *path* when no segment matches any of the three term sources (A6.2)."""
+        *path* when no segment matches any term source (A6.2)."""
         segments = path.split("/")
         masked_segments: list[str] = []
         for segment in segments:

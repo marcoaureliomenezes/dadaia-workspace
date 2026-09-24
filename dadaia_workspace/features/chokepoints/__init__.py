@@ -27,7 +27,6 @@ from dadaia_workspace.features.chokepoints.branch_policy import (
     Decision,
     PushRef,
     branch_name_is_permitted,
-    context_slug_for_path,
     parse_push_refs,
     parse_push_stdin,
 )
@@ -37,7 +36,6 @@ __all__ = [
     "Decision",
     "PushRef",
     "branch_name_is_permitted",
-    "context_slug_for_path",
     "parse_push_refs",
     "parse_push_stdin",
     "push_gate_decision",

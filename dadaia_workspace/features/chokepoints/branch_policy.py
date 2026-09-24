@@ -15,14 +15,12 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from pathlib import Path
 
 __all__ = [
     "Decision",
     "PushRef",
     "branch_name_is_permitted",
     "check_branch_policy",
-    "context_slug_for_path",
     "parse_push_refs",
     "parse_push_stdin",
 ]
@@ -209,24 +207,3 @@ def check_branch_policy(refs: list[PushRef]) -> Decision | None:
                 ),
             )
     return None
-
-
-# ---------------------------------------------------------------------------------------
-# Context resolution — derive the slug from the repo path, NEVER first-ALIVE.
-# ---------------------------------------------------------------------------------------
-def context_slug_for_path(workspace: Path, repo_root: Path) -> str | None:
-    """Return the context slug for a repo at ``repo_root`` under ``workspace``.
-
-    A Spec Context repo lives at ``<workspace>/repos/<slug>``. The slug is that single path
-    component — derived from the path, never from the first-ALIVE registry entry. Returns
-    ``None`` when ``repo_root`` is not directly under ``<workspace>/repos/`` (e.g. the
-    library repo run standalone, or the workspace root itself).
-    """
-    try:
-        rel = repo_root.resolve().relative_to((workspace / "repos").resolve())
-    except (ValueError, OSError):
-        return None
-    parts = rel.parts
-    if len(parts) != 1:
-        return None
-    return parts[0]

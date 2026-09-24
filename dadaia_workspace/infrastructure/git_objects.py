@@ -20,7 +20,7 @@ import queue
 import re
 import subprocess
 import threading
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator
 from pathlib import Path
 
 from dadaia_workspace.core.models.git_scan import ZERO_SHA, GitObjectReadError, ScannedObject
@@ -33,9 +33,6 @@ _TIMEOUT_S = 30
 #: option-shaped string into a git argv, regardless of what already validated the
 #: caller's input (CWE-88).
 _SHA_SHAPE_RE = re.compile(r"^[0-9a-fA-F]{40}$|^[0-9a-fA-F]{64}$")
-#: A plain ref name (``HEAD``, ``refs/remotes/origin/develop``): letters, digits, ``_ . / -``
-#: only, never option-shaped (CWE-88 — the same second-layer shape defence as the sha).
-_REF_SHAPE_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_./-]*$")
 
 #: SPEC v0.9.0 R3 — a per-blob size guard so one pathological blob cannot dominate the
 #: scan's wall clock or memory: a blob at or under this cap is read and decoded; a blob
@@ -884,45 +881,6 @@ class GitSubprocessObjectReader:
             return ()
         fields = _decode(result.stdout).split()
         return tuple(fields[1:])
-
-    def resolve_ref(self, repo: Path, ref: str) -> str | None:
-        """``git rev-parse --verify --quiet <ref>^{commit}`` — the commit sha a ref
-        names, or ``None`` when it does not exist (a fresh clone without the
-        remote-tracking branch, a shallow checkout) or *ref* is not a plain ref shape.
-        Never raises: ``live_verdict_shas`` shrinks its set instead."""
-        if not ref or not _REF_SHAPE_RE.match(ref):
-            return None
-        result = _run(["git", "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"], repo)
-        if result.returncode != 0:
-            return None
-        sha = _decode(result.stdout).strip()
-        return sha or None
-
-    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]:
-        """``git grep -I -i -P -o -h -e <p1> -e <p2> ... <sha>`` — the distinct text
-        the published tree at *sha* matches for *patterns* (operator ruling 2026-09-13:
-        a sibling repository's slug this repository's remote tip already publishes is
-        not a new disclosure). *patterns* are the SAME whole-token PCRE-compatible
-        regexes the denylist scan detects with (``compile_slug_patterns``), so amnesty
-        can never be broader than detection. Exit 1 -> empty set; anything but 0/1
-        raises :class:`GitObjectReadError` (the caller then amnesties nothing — fail
-        closed, including a ``git grep`` built without PCRE).
-        """
-        if not sha or not _SHA_SHAPE_RE.match(sha) or not patterns:
-            return set()
-        args = ["git", "grep", "-I", "-i", "-P", "-o", "-h"]
-        for pattern in patterns:
-            args += ["-e", pattern]
-        result = _run([*args, sha], repo)
-        if result.returncode == 1:
-            return set()
-        if result.returncode != 0:
-            raise GitObjectReadError(f"git grep failed: {_decode(result.stderr).strip()}")
-        return {
-            line.rsplit(":", 1)[-1].strip()
-            for line in _decode(result.stdout).splitlines()
-            if line.strip()
-        }
 
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterator[ScannedObject]:
         if not local_sha or local_sha == ZERO_SHA:
