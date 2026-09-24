@@ -60,7 +60,7 @@ def next_step(root: Path, trees: Mapping[str, Path], focus: str | None = None) -
     """The *focus* context's lowest unmet level (the doctored, just-created or bound one),
     else the lowest across *trees* (every ALIVE context name -> its ``specs/`` dir,
     ``invocation.alive_context_trees``), else ``None``."""
-    if focus in trees and (step := _lowest(root, {focus: trees[focus]})):
+    if focus is not None and focus in trees and (step := _lowest(root, {focus: trees[focus]})):
         return step
     return _lowest(root, trees)
 
