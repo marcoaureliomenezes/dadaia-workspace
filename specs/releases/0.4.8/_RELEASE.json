@@ -1,12 +1,15 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.8",
-  "phase": "IMPLEMENTATION",
+  "phase": "CLOSURE",
   "defined": {
     "sha": "1528a8e0469b4b24d4afea43db039d397e218073",
     "ts": "2026-09-24T05:16:14Z"
   },
-  "implemented": null,
+  "implemented": {
+    "sha": "e4b0e02f",
+    "ts": "2026-09-24T07:39:47Z"
+  },
   "shipped": null,
   "log": [
     {
@@ -26,6 +29,68 @@
       "agent": "release.py",
       "kind": "note",
       "text": "Candidate defined at 1528a8e0469b4b24d4afea43db039d397e218073; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-09-24T07:39:47Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate implemented at e4b0e02f; phase CLOSURE."
+    },
+    {
+      "ts": "2026-09-24T07:39:47Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 1528a8e0469b4b24d4afea43db039d397e218073..09e75dd1a2aa: 2 reviewed, 12 changed.",
+      "since": "1528a8e0469b4b24d4afea43db039d397e218073",
+      "until": "09e75dd1a2aa70b7d0c950079e348d0b41eab90a",
+      "reviewed": [
+        "agentic-entities",
+        "ci-preflight"
+      ],
+      "changed": [
+        "workspace-init",
+        "context-management",
+        "spec-context-project",
+        "specs-migration",
+        "workspace-doctor",
+        "public-asset-distribution",
+        "pypi-distribution",
+        "sdd-gate-v3",
+        "release-lifecycle",
+        "audits-canon",
+        "consumer-agent-support",
+        "product-vision"
+      ]
+    },
+    {
+      "ts": "2026-09-24T07:45:00Z",
+      "agent": "main-thread",
+      "kind": "summary",
+      "text": "Candidate 1 \"onboarding in three levels\" (operator demand 2026-09-23/24; grill D1-D13; ADRs 0027-0031): init [DIR] interactive/direct, <=12 lines, re-init = upgrade; context create = clone+hook+ALIVE+bind transactional; alive writes nothing; specs init classifies absent/dadaia/foreign (specs-bkp, v6->v7 with fixed sections); doctor/init/create/SessionStart print one derived next step (focus context first); ghost context exits 1; doctor --fix never deletes; journey e2e over uvx runs in CI and release; live audit 24 -> 96/100 (.dadaia/tmp/onboarding-audit/)."
+    },
+    {
+      "ts": "2026-09-24T07:45:00Z",
+      "agent": "main-thread",
+      "kind": "size",
+      "text": "AC9.3: dadaia_workspace/**/*.py 9e7af82f..e4b0e02f +967/-1037 = -70; -91 is d089d9b4 (nine pre-existing dead exception classes), so the onboarding work alone is about +21. Deleted modules: features/workspace/bootstrap.py, features/specs/scaffolder.py, features/spec_context/scoped_law.py, core/specs_backup.py."
+    },
+    {
+      "ts": "2026-09-24T07:45:00Z",
+      "agent": "main-thread",
+      "kind": "reviews",
+      "text": "dd-code-reviewer: CHANGES REQUESTED 8391f860 (4 HIGH/4 MEDIUM, handoff 2026-09-24T065249Z); APPROVED d089d9b4 (1 MEDIUM, handoff 2026-09-24T073000Z); APPROVED e4b0e02f (handoff 2026-09-24T073918Z). CI green at e4b0e02f (run 35970473839)."
+    },
+    {
+      "ts": "2026-09-24T07:45:00Z",
+      "agent": "main-thread",
+      "kind": "test-dispositions",
+      "text": "RED evidence: T-048-01 journey 15/15 xfail before levels landed; T-048-02/03/05/08 RED-first; T-048-06 and T-048-07 tests written with the code, RED confirmed afterwards against the pre-change code (review #12). Deleted with reason: test_cli_specs_init_root_guard (cwd default retired), baseline scaffold follow-up and alive-born-tree tests (alive writes nothing), specs_backup tests (module deleted); symlink scoped-law contracts ported to test_scaffold_repo_law.py. Quickstart doc-as-test restored as TestQuickstartVerbatim."
+    },
+    {
+      "ts": "2026-09-24T07:45:00Z",
+      "agent": "main-thread",
+      "kind": "dispositions",
+      "text": "No backlog entry picked (origin operator-demand); 0 open bugs; follow-ups noted: 58 bare `dadaia` spans pinned by _BARE_RATCHET, bare dadaia in service.py:335/context.py:649 runtime messages, first-pass worklist lists root tooling files."
     }
   ]
 }
