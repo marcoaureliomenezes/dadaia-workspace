@@ -177,9 +177,7 @@ def init(
     elif before is not None:
         console.print(f"already at {before}", markup=False, highlight=False)
 
-    if plan.repo:
-        _create_context(root, plan, chosen)
-    print_next_step(root)
+    print_next_step(root, _create_context(root, plan, chosen) if plan.repo else None)
 
 
 def _reconcile_upgrade(root: Path, before: str | None, after: str | None) -> None:
@@ -197,7 +195,7 @@ def _reconcile_upgrade(root: Path, before: str | None, after: str | None) -> Non
     console.print(f"upgraded {before} -> {after}", markup=False, highlight=False)
 
 
-def _create_context(root: Path, plan: InitPlan, chosen: str) -> None:
+def _create_context(root: Path, plan: InitPlan, chosen: str) -> str:
     """``--repo``: ``init`` is a CALLER of ``context create``.
 
     Re-running the identical command stays a no-op: a context already holding THIS url
@@ -224,3 +222,4 @@ def _create_context(root: Path, plan: InitPlan, chosen: str) -> None:
     console.print(f"[green]✓[/green] {slug} ALIVE and bound", highlight=False, soft_wrap=True)
     for line in env_lines:
         console.print(line, markup=False, soft_wrap=True, highlight=False)
+    return slug

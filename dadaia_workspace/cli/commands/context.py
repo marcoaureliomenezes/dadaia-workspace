@@ -208,9 +208,9 @@ def bind_session(workspace_root: Path, name: str) -> str:
     return session_id
 
 
-def print_next_step(workspace_root: Path) -> None:
+def print_next_step(workspace_root: Path, focus: str | None = None) -> None:
     """The derived onboarding next step (FR6 AC6.2) — the text ``doctor`` also reports."""
-    step = onboarding.next_step(workspace_root, alive_context_trees(workspace_root))
+    step = onboarding.next_step(workspace_root, alive_context_trees(workspace_root), focus)
     if step is not None:
         console.print(step.text(), markup=False, highlight=False, soft_wrap=True)
 
@@ -248,7 +248,7 @@ def create(
     )
     for line in session_store.binding_env_lines(ctx.name, session_id):
         console.print(line, markup=False, soft_wrap=True, highlight=False)
-    print_next_step(ws)
+    print_next_step(ws, ctx.name)
 
 
 @app.command(name="list")
