@@ -7,7 +7,7 @@ compliance checked, one backlog entry filed and one release live. Terms are defi
 ## 1. Install
 
 <!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
-<!-- derived-from: workspace-init sha256:d7239f43e736 -->
+<!-- derived-from: workspace-init sha256:bc26cf0b24e2 -->
 
 ```bash
 uvx dadaia-workspace init demo --harness claude --repo https://github.com/<you>/<your-repo>.git
@@ -26,7 +26,7 @@ it creates keeps its own virtualenv at `.dadaia/.venv`.
 
 ## 2. What the one line provisioned
 
-<!-- derived-from: workspace-init sha256:d7239f43e736 -->
+<!-- derived-from: workspace-init sha256:bc26cf0b24e2 -->
 
 `--harness` names one registered harness: `claude` | `codex` | `kimi-code` | `cursor` |
 `devin` | `copilot`. The directory is required, a re-run is idempotent, and a directory
@@ -49,7 +49,7 @@ that makes the first project instead.
 
 ## 3. Bind the session
 
-<!-- derived-from: context-management sha256:cbeec31adb58 -->
+<!-- derived-from: context-management sha256:896b60268c5d -->
 
 ```bash
 eval "$(.dadaia/.venv/bin/dadaia context bind <your-repo> --print-env)"

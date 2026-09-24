@@ -26,7 +26,7 @@ sources:
 ## First project
 
 - With `--repo <url>`, init clones into `repos/<slug>/` and composes the context verbs — `create --main-repo <slug>`, `alive`, the session bind (printing the `--print-env` line) — then installs the pre-push hook; a re-run with the same URL reuses the context, and a failed clone prints the same command as its `fix:` ([[context-management]]).
-- Without `--repo`, init closes with three lines: sessions launch at the root, the harness's law-loading note, and the `dadaia context create <name> --main-repo <slug> --url <url>` that makes the first project; a single-repo workspace is the degenerate multi-repo case.
+- Without `--repo`, init closes by stating that sessions launch at the root, the harness's law-loading note when it has one, and the `dadaia context create <name> --main-repo <slug> --url <url>` that makes the first project; a single-repo workspace is the degenerate multi-repo case.
 - `install_git_hooks` in `dadaia_workspace/features/workspace/bootstrap.py` is the one installer of the git hook (`pre-push`, from `dadaia_workspace/public/scripts/pre-push-ci-gate.sh`), called by `init --repo` and by `dadaia ci install-hook`; a drifted installed copy is [[workspace-doctor]]'s `HOOKS-DRIFT-1`.
 - Init deletes no projection.
 

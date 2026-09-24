@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-24T03:25:23Z",
+  "generated_at": "2026-09-24T03:46:16Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -485,7 +485,7 @@
         "session",
         "privacy"
       ],
-      "token_estimate": 878,
+      "token_estimate": 919,
       "depends_on": [
         "specs-migration",
         "workspace-doctor",
@@ -674,7 +674,7 @@
         "setup",
         "idempotent"
       ],
-      "token_estimate": 474,
+      "token_estimate": 479,
       "depends_on": [
         "workspace-doctor",
         "public-asset-distribution",

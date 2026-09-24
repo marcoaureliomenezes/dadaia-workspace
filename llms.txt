@@ -11,7 +11,7 @@
 ## Install
 
 <!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
-<!-- derived-from: workspace-init sha256:d7239f43e736 -->
+<!-- derived-from: workspace-init sha256:bc26cf0b24e2 -->
 
 - [PyPI project](https://pypi.org/project/dadaia-workspace/): `pip install dadaia-workspace`, then `dadaia init <dir> --harness <name> [--repo <url>]`; `uvx dadaia-workspace init …` runs without an install.
 - [Changelog](CHANGELOG.md): written by release-please, one section per released version.
