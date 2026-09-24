@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-23T23:15:45Z",
+  "generated_at": "2026-09-24T01:19:39Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -72,12 +72,12 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 838,
+      "token_estimate": 833,
       "depends_on": [
         "agent-orchestration",
         "sdd-gate-v3",
-        "public-asset-distribution",
         "QUALITY",
+        "public-asset-distribution",
         "ARCHITECTURE"
       ],
       "sources": [
@@ -311,12 +311,12 @@
         "hooks",
         "binding"
       ],
-      "token_estimate": 355,
+      "token_estimate": 329,
       "depends_on": [
         "agentic-entities",
-        "public-asset-distribution",
         "sdd-gate-v3",
         "context-management",
+        "public-asset-distribution",
         "workspace-init"
       ],
       "sources": [

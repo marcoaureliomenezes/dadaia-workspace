@@ -38,17 +38,21 @@ def _jobs() -> dict[str, Any]:
     return dict(yaml.safe_load(_RELEASE_YML.read_text(encoding="utf-8"))["jobs"])
 
 
-_UNORDERED_SKILLS_REPO = re.compile(r"dadaia-skills|SKILLS_REPO_TOKEN|build-skills-repo")
+_UNORDERED_SKILLS_REPO = re.compile(
+    r"dadaia-skills|SKILLS_REPO_TOKEN|build-skills-repo|npx skills add|skills-repository"
+)
 
 
 def test_the_release_publishes_no_skills_repository() -> None:
     """The operator never ordered a standalone skills repository (grill Q14: later); a job
-    publishing one fails every release and README/docs point at a repository that does not
-    exist."""
+    publishing one fails every release and README, docs and memory point at a repository
+    that does not exist. Delete this test when Q14's distribution is ordered."""
     surfaces = [
         *sorted(_WORKFLOWS.glob("*.yml")),
         _REPO_ROOT / "README.md",
+        _REPO_ROOT / "llms.txt",
         *sorted((_REPO_ROOT / "docs").rglob("*.md")),
+        *sorted((_REPO_ROOT / "specs" / "memory").rglob("*.md")),
     ]
     offenders = [
         f"{path.relative_to(_REPO_ROOT)}:{n}"
