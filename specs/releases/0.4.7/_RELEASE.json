@@ -806,6 +806,30 @@
       "changed": [
         "workspace-doctor"
       ]
+    },
+    {
+      "ts": "2026-09-24T03:20:15Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 0b03226772857e42c3965b1ccd5209531b761034..6b93c665e5ad: 10 reviewed, 2 changed.",
+      "since": "0b03226772857e42c3965b1ccd5209531b761034",
+      "until": "6b93c665e5ada81d04683632880b0139cb177e3e",
+      "reviewed": [
+        "public-asset-distribution",
+        "pypi-distribution",
+        "harness-claude-code",
+        "harness-codex",
+        "harness-copilot",
+        "harness-cursor",
+        "harness-devin",
+        "harness-kimi-code",
+        "spec-context-project",
+        "workspace-init"
+      ],
+      "changed": [
+        "context-management",
+        "context-portability"
+      ]
     }
   ]
 }
