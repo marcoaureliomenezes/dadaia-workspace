@@ -15,7 +15,7 @@ Paths under `dadaia_workspace/` abbreviated `dw/`. Tasks in one parallel group (
   `Write set:` `tests/e2e/test_onboarding_journey.py`
   `blocked by:` — · `group:` P1 · `delivers:` FR8 (RED)
 
-- [ ] **T-048-02 — Demolish alive's specs side effect.**
+- [-] **T-048-02 — Demolish alive's specs side effect.**
   Delete `dw/core/specs_backup.py` and its tests; remove from `SpecContextService.alive` the specs scaffold, the
   "run specs upgrade" hint and the `chore(scaffold)` commit; `alive` installs the pre-push hook in every repo.
   `RED:` alive on a DEAD context writes no specs, commits nothing, leaves the hook installed.
