@@ -40,7 +40,7 @@ The branch contract, stated once, and the mechanics that operate it.
 | `develop` | No — never a direct push | `main` (bootstrap only) | PR from `feature/{M.m.p}`, at definition `Approved` and at each `rc` merge; Dependabot update PRs (`target-branch: develop`) |
 | `main` | No — never a direct push | — | PR from `develop`, at the final `rc` |
 
-- No `v` prefix, no suffix, no fifth pattern; `hotfix/*` is retired (operator request only, no cadence).
+- No `v` prefix, no suffix, no other branch we cut; the only bot heads are release-please's release PR into `main` and Dependabot's into `develop`; `hotfix/*` is retired (operator request only, no cadence).
 - Exactly one live `feature/{M.m.p}`, named for the live release; bugs fix on it in any phase, no ceremony.
 - The release version = last published PyPI + 1 patch, minted at birth; it increments ONLY at an operator-approved deploy.
 - Each candidate closure burns one `feature -> develop` merge; after it, ask the operator: promote or continue.
