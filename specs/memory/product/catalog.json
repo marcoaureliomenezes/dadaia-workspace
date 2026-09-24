@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-24T03:19:02Z",
+  "generated_at": "2026-09-24T03:20:10Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -522,7 +522,7 @@
         "import",
         "portability"
       ],
-      "token_estimate": 310,
+      "token_estimate": 321,
       "depends_on": [
         "workspace-doctor",
         "context-management"
