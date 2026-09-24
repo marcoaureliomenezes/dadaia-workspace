@@ -338,16 +338,17 @@ jobs:
             fi
             echo "PR head is $HEAD_REF - gitflow source rule satisfied (main)."
           elif [ "$BASE_REF" = "develop" ]; then
-            # Rule 2 (v0.4.4 FR4): develop accepts a PR only from feature/{M.m.p} — no
-            # 'v' prefix, M.m.p numeric. Derived from the SAME pattern as
+            # Rule 2 (v0.4.4 FR4): develop accepts a PR from feature/{M.m.p} — no
+            # 'v' prefix, M.m.p numeric — or from a Dependabot update branch
+            # (dependabot.yml targets develop). The feature pattern is derived from the SAME pattern as
             # features/chokepoints/service.py::_FEATURE_RE
             # (r"^feature/\d+\.\d+\.\d+$") — the ONE pattern source (A3.2); POSIX ERE
             # has no \d, so [0-9]+ is its exact translation, never a second, drifted
             # regex literal.
-            if ! echo "$HEAD_REF" | grep -Eq '^feature/[0-9]+\.[0-9]+\.[0-9]+$'; then
-              echo "::error::Gitflow law (DADAIA.md §4 (Gitflow)): develop accepts PRs from 'feature/{M.m.p}' only (no 'v' prefix). Got head '$HEAD_REF'."
+            if ! echo "$HEAD_REF" | grep -Eq '^(feature/[0-9]+\.[0-9]+\.[0-9]+|dependabot/.+)$'; then
+              echo "::error::Gitflow law: develop accepts PRs from 'feature/{M.m.p}' (no 'v' prefix) or a Dependabot update branch only. Got head '$HEAD_REF'."
               echo "::error::Fix: rebuild your work on a feature/M.m.p branch and open the PR feature/M.m.p -> develop."
               exit 1
             fi
-            echo "PR head matches feature/M.m.p - gitflow source rule satisfied (develop)."
+            echo "PR head $HEAD_REF - gitflow source rule satisfied (develop)."
           fi

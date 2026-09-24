@@ -313,14 +313,27 @@ def _guard_exit(head: str, base: str) -> int:
         ("release-please--branches--develop", "main", False),
         ("feature/0.4.7", "develop", True),
         ("develop", "develop", False),
+        ("dependabot/pip/ruff-0.16.8", "develop", True),
+        ("dependabot/github_actions/actions/checkout-7.1.0", "develop", True),
+        ("dependabot/pip/ruff-0.16.8", "main", False),
     ],
 )
 def test_pr_source_guard_admits_the_release_pr_into_main(
     head: str, base: str, allowed: bool
 ) -> None:
     """ADR 0021: promote is merging release-please's release PR, so main accepts exactly
-    develop and release-please's own branch; develop accepts only feature/{M.m.p}."""
+    develop and release-please's own branch; develop accepts feature/{M.m.p} and the
+    Dependabot update branches (bug dependabot-targets-main-and-every-update-pr-is-refused)."""
     assert (_guard_exit(head, base) == 0) is allowed
+
+
+def test_every_dependabot_update_targets_develop() -> None:
+    """Bug dependabot-targets-main-and-every-update-pr-is-refused: without `target-branch`
+    Dependabot opens its PRs against main, which accepts only develop and the release PR,
+    so every update stalls red and the open-PR limit fills."""
+    config = yaml.safe_load((_WORKFLOWS.parent / "dependabot.yml").read_text(encoding="utf-8"))
+    targets = {u["package-ecosystem"]: u.get("target-branch") for u in config["updates"]}
+    assert targets and set(targets.values()) == {"develop"}, targets
 
 
 def test_the_publish_workflow_is_release_yml_bound_to_the_pypi_publisher() -> None:

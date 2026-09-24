@@ -73,7 +73,7 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 | `dd-code-review` | the three review axes and the six lenses | `specs/memory/AGENTS.md` | 6144 | 4783 |
 | `dd-codebase-design` | the deep-module vocabulary and the deletion test | — | 6144 | 5540 |
 | `dd-domain-modeling` | the repo's domain terms and their one home | — | 6144 | 3766 |
-| `dd-gitflow-default` | the branch contract, commit shapes, the PR gate | — | 6144 | 4525 |
+| `dd-gitflow-default` | the branch contract, commit shapes, the PR gate | — | 6144 | 4575 |
 | `dd-grill-me` | the operator grill that precedes a candidate | — | 6144 | 3238 |
 | `dd-handoff-emitter` | handoff-first emission and ack-on-consume | `.dadaia/handoff/AGENTS.md` | 6144 | 2138 |
 | `dd-manager-orchestration` | intake, dispatch and the closure pass | — | 6144 | 3661 |

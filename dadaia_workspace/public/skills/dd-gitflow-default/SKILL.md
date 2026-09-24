@@ -37,7 +37,7 @@ The branch contract, stated once, and the mechanics that operate it.
 | Branch | Pushable | Cut from | Advances by |
 |---|---|---|---|
 | `feature/{M.m.p}` | Yes — local CI preflight + valid name | `main` | the PR below |
-| `develop` | No — never a direct push | `main` (bootstrap only) | PR from `feature/{M.m.p}`, at definition `Approved` and at each `rc` merge |
+| `develop` | No — never a direct push | `main` (bootstrap only) | PR from `feature/{M.m.p}`, at definition `Approved` and at each `rc` merge; Dependabot update PRs (`target-branch: develop`) |
 | `main` | No — never a direct push | — | PR from `develop`, at the final `rc` |
 
 - No `v` prefix, no suffix, no fifth pattern; `hotfix/*` is retired (operator request only, no cadence).
