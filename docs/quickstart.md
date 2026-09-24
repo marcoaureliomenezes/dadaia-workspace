@@ -6,7 +6,7 @@ compliance checked, one backlog entry filed and one release live. Terms are defi
 
 ## 1. Install
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
+<!-- derived-from: pypi-distribution sha256:e1ebd09cf0ac -->
 <!-- derived-from: workspace-init sha256:ca5c835e94af -->
 
 ```bash

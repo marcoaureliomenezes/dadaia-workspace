@@ -1,6 +1,6 @@
-"""Intent: CONTRACT — T-047-82: the release workflow publishes the built skills
-repository and fails closed on the missing SKILLS_REPO_TOKEN secret, with the token
-never interpolated outside the push remote URL.
+"""Intent: CONTRACT — bug release-publishes-an-unordered-dadaia-skills-repository: the
+release publishes dadaia-workspace to PyPI and nothing else — no job, script or doc names
+a dadaia-skills repository.
 
 Intent: CONTRACT — T-047-87: release.yml is the one workflow minting the
 version, CHANGELOG and tag: push-to-main trigger, sha-pinned action, release type
@@ -24,8 +24,7 @@ pytestmark = pytest.mark.contract
 
 _WORKFLOWS = Path(__file__).resolve().parents[2] / ".github" / "workflows"
 _RELEASE_YML = _WORKFLOWS / "release.yml"
-_TOKEN = "SKILLS_REPO_TOKEN"
-_REMOTE_PREFIX = "https://x-access-token:"
+_REPO_ROOT = _WORKFLOWS.parents[1]
 
 
 def _workflows() -> dict[str, Any]:
@@ -39,57 +38,26 @@ def _jobs() -> dict[str, Any]:
     return dict(yaml.safe_load(_RELEASE_YML.read_text(encoding="utf-8"))["jobs"])
 
 
-def _skills_job() -> tuple[str, dict[str, Any]]:
-    candidates = [
-        (name, job)
-        for name, job in _jobs().items()
-        if any("build-skills-repo.py" in (step.get("run") or "") for step in job.get("steps") or [])
+_UNORDERED_SKILLS_REPO = re.compile(r"dadaia-skills|SKILLS_REPO_TOKEN|build-skills-repo")
+
+
+def test_the_release_publishes_no_skills_repository() -> None:
+    """The operator never ordered a standalone skills repository (grill Q14: later); a job
+    publishing one fails every release and README/docs point at a repository that does not
+    exist."""
+    surfaces = [
+        *sorted(_WORKFLOWS.glob("*.yml")),
+        _REPO_ROOT / "README.md",
+        *sorted((_REPO_ROOT / "docs").rglob("*.md")),
     ]
-    assert len(candidates) == 1, (
-        f"expected exactly one release job building the skills repository, got {[n for n, _ in candidates]}"
-    )
-    return candidates[0]
-
-
-def test_skills_repo_job_runs_after_publish_and_builds_the_repository() -> None:
-    name, job = _skills_job()
-    needs = job.get("needs") or []
-    needs = [needs] if isinstance(needs, str) else list(needs)
-    assert "publish" in needs, f"job {name} must depend on the publish job, needs={needs}"
-    build = next(s for s in job["steps"] if "build-skills-repo.py" in (s.get("run") or ""))
-    assert "dadaia_workspace/public/scripts/build-skills-repo.py" in build["run"]
-    assert job.get("permissions") == {"contents": "read"}, (
-        f"job {name} must declare minimal permissions; got {job.get('permissions')}"
-    )
-
-
-def test_missing_skills_repo_token_fails_closed_with_one_error_annotation() -> None:
-    name, job = _skills_job()
-    assert (job.get("env") or {}).get(_TOKEN) == "${{ secrets." + _TOKEN + " }}"
-    guards = [s for s in job["steps"] if f"env.{_TOKEN} == ''" in str(s.get("if") or "")]
-    assert len(guards) == 1, (
-        f"job {name} must carry exactly one fail-closed guard, got {len(guards)}"
-    )
-    run = guards[0]["run"]
-    assert run.count("::error::") == 1, f"the guard must emit exactly one annotation: {run!r}"
-    assert _TOKEN in run and "exit 1" in run
-
-
-def test_the_token_is_interpolated_only_in_the_push_remote_url() -> None:
-    offenders: list[str] = []
-    for job_name, job in _jobs().items():
-        for step in job.get("steps") or []:
-            for line in (step.get("run") or "").splitlines():
-                if _TOKEN not in line:
-                    continue
-                guard = f"env.{_TOKEN} == ''" in str(step.get("if") or "")
-                if guard or f"{_REMOTE_PREFIX}${{{_TOKEN}}}" in line:
-                    continue
-                offenders.append(f"{job_name}: {line.strip()}")
-    assert offenders == [], (
-        f"{_TOKEN} may appear only inside the {_REMOTE_PREFIX} remote URL or the "
-        f"fail-closed guard — never echoed or logged: {offenders}"
-    )
+    offenders = [
+        f"{path.relative_to(_REPO_ROOT)}:{n}"
+        for path in surfaces
+        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
+        if _UNORDERED_SKILLS_REPO.search(line)
+    ]
+    assert offenders == [], offenders
+    assert not (_REPO_ROOT / "dadaia_workspace/public/scripts/build-skills-repo.py").exists()
 
 
 def _run_bodies() -> list[tuple[str, str, str | None, str]]:
@@ -275,7 +243,7 @@ def test_the_approve_job_keeps_the_release_gate_environment() -> None:
 
 def test_one_version_step_feeds_every_consumer_of_the_version() -> None:
     """One `id: version` step in `build` strips the tag's `v`; artifact name, approval
-    message, pip install line and skills-repo subject all read that one output."""
+    message, and pip install line all read that one output."""
     build = _jobs()["build"]
     assert build.get("outputs", {}).get("version") == "${{ steps.version.outputs.version }}"
     step = next(s for s in build["steps"] if s.get("id") == "version")
@@ -287,7 +255,7 @@ def test_one_version_step_feeds_every_consumer_of_the_version() -> None:
         for name, job in _jobs().items()
         if "needs.build.outputs.version" in yaml.safe_dump(job)
     ]
-    assert set(consumers) == {"approve", "publish", "smoke-test", "publish-skills-repo"}, consumers
+    assert set(consumers) == {"approve", "publish", "smoke-test"}, consumers
 
 
 _MODEL_API_TEXT = re.compile(

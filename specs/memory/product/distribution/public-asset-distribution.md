@@ -2,7 +2,7 @@
 slug: public-asset-distribution
 title: public-asset-distribution
 tldr: Public assets staged once, projected into the root map, scoped AGENTS.md, .agents/ and each registered harness's files; doctor reports drift.
-summary: The stage, install and doctor chain that distributes the agentic surface into a workspace — hash-compared overwrite, rendered personas, whole-folder skills, per-harness hook and agent files derived from one registry, the specs scaffold, and a privacy gate; plus the dadaia-skills repository built from the same skills.
+summary: The stage, install and doctor chain that distributes the agentic surface into a workspace — hash-compared overwrite, rendered personas, whole-folder skills, per-harness hook and agent files derived from one registry, the specs scaffold, and a privacy gate.
 tags: [public, assets, distribution, projection, privacy]
 sources:
   - dadaia_workspace/features/public/**
@@ -18,7 +18,6 @@ sources:
   - dadaia_workspace/core/harness_registry.py
   - dadaia_workspace/public/scaffold/**
   - dadaia_workspace/public/templates/**
-  - dadaia_workspace/public/scripts/build-skills-repo.py
   - dadaia_workspace/cli/commands/public.py
 ---
 
@@ -47,10 +46,6 @@ sources:
 - Repo templates land when a context goes ALIVE: `repo-AGENTS.md` at the repo root, `tests-AGENTS.md` only into a real `tests/` directory holding none ([[context-management]]).
 - An installed file still carrying `<ANGLE-BRACKET>` placeholders is `AGENTS-PLACEHOLDER-1` or `MEM-PLACEHOLDER-1` in `dadaia doctor`'s `specs` section.
 - Consumer-repo `AGENTS.md` fan-out is gated by the canonical banner: absent creates, a stale banner is restored as `[updated]`, a bannerless file is `[foreign]` and never overwritten; a symlinked destination file is `[foreign]`.
-
-## The skills repository
-
-- `python dadaia_workspace/public/scripts/build-skills-repo.py <out>` renders the `dadaia-skills` repository in the Agent Skills layout: `skills/<name>/**` byte-identical to `public/skills` for the eight standalone skills `dadaia_workspace/public/entities/behavior-map.json` lists, a derived README, the LICENSE and the Claude marketplace manifests `.claude-plugin/{marketplace,plugin}.json`; the output is never tracked, and the release workflow publishes it ([[pypi-distribution]]).
 
 ## Dependencies
 

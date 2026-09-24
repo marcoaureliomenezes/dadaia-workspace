@@ -44,7 +44,7 @@ memory atom under its content hash.
 
 ## A human installs and uses it
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
+<!-- derived-from: pypi-distribution sha256:e1ebd09cf0ac -->
 <!-- derived-from: workspace-init sha256:ca5c835e94af -->
 <!-- derived-from: context-management sha256:0227a5e43894 -->
 <!-- derived-from: workspace-doctor sha256:ef9c81d0d181 -->
@@ -88,8 +88,8 @@ and deletes only what a TTL expired.
 <!-- derived-from: sdd-gate-v3 sha256:ea8939698674 -->
 <!-- derived-from: release-lifecycle sha256:09607348cc88 -->
 <!-- derived-from: bug-ledger sha256:9534ded07707 -->
-<!-- derived-from: harness-claude-code sha256:ee2f8a3870b4 -->
-<!-- derived-from: harness-codex sha256:868c0a658eab -->
+<!-- derived-from: harness-claude-code sha256:266fdf40eaed -->
+<!-- derived-from: harness-codex sha256:b907c260a862 -->
 <!-- derived-from: harness-kimi-code sha256:fcfeb26d658b -->
 <!-- derived-from: harness-cursor sha256:480b18aa9b61 -->
 <!-- derived-from: harness-devin sha256:ab4a32c4a53d -->
@@ -125,8 +125,8 @@ with a RED test. Completed work leaves as a `handoff-v1` record, validated by
 
 ## Documentation
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
-<!-- derived-from: public-asset-distribution sha256:eb08a2e29f43 -->
+<!-- derived-from: pypi-distribution sha256:e1ebd09cf0ac -->
+<!-- derived-from: public-asset-distribution sha256:855c77cc15da -->
 
 The site is <https://marcoaureliomenezes.github.io/dadaia-workspace/>:
 
@@ -139,12 +139,9 @@ The site is <https://marcoaureliomenezes.github.io/dadaia-workspace/>:
 - [CLI reference](docs/cli.md) · [concepts](docs/concepts.md) ·
   [getting started](docs/getting-started.md) · [distribution](docs/distribution.md)
 
-The standalone skills install without a workspace from the `dadaia-skills` repository:
-`npx skills add marcoaureliomenezes/dadaia-skills`, or as a Claude Code marketplace.
-
 ## Links
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
+<!-- derived-from: pypi-distribution sha256:e1ebd09cf0ac -->
 
 - GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
 - PyPI — <https://pypi.org/project/dadaia-workspace/>
