@@ -7,7 +7,7 @@ Paths under `dadaia_workspace/` abbreviated `dw/`. Tasks in one parallel group (
 
 ## Candidate 1 — onboarding in three levels
 
-- [ ] **T-048-01 — RED acceptance: the onboarding journey.**
+- [-] **T-048-01 — RED acceptance: the onboarding journey.**
   `tests/e2e/test_onboarding_journey.py`: builds the wheel with a `+e2e` local version, drives `uvx --from <wheel>`
   over file:// bare repos through the six AC8.1 scenarios; after every level asserts doctor 0 errors and user HEAD ==
   remote (AC8.2). Each level `xfail(strict=True, reason="T-048-nn")` naming the task that flips it.
