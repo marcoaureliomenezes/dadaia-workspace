@@ -32,6 +32,26 @@ _Avoid_: heartbeat, marker, sentinel
 The facts resolved once per process from environment, cwd and payload: workspace, session, context, repo, specs_dir and bind. Every policy receives an Invocation; none re-derives it, and none carries a release or a phase — the gate reads no SDD artifact.
 _Avoid_: resolution ladder, rung, resolve_context
 
+**Onboarding level**:
+One of three steps to a working project, derived from disk and never stored: 1 workspace (`init`), 2 context (`context create`), 3 specs (`specs init` + the first pass). A new project in an existing workspace is levels 2 + 3.
+_Avoid_: onboarding state, setup phase, wizard step
+
+**Next step**:
+The one command the derived onboarding level calls for, printed identically by `init`, `context create`, SessionStart and `doctor` (`ONBOARDING info Next: …` + `fix:`).
+_Avoid_: hint, suggestion, todo
+
+**Foreign specs tree**:
+A repo's existing `specs/` that is not a dadaia tree at canon v6 or later; `specs init` never merges into it.
+_Avoid_: legacy specs, old specs, migration source
+
+**specs-bkp**:
+The repo-root directory a foreign specs tree is moved to (`git mv`, staged) by `specs init --replace-foreign`; read-only input to the first pass.
+_Avoid_: specs backup, specs.old, archive
+
+**First pass**:
+The level-3 `dd-audit-project` run on a fresh specs tree: the deterministic worklist (`memory.py drift` uncovered units) drives `dd-product-engineer` to fill memory from code and `specs-bkp/`.
+_Avoid_: bootstrap audit, initial import, migration
+
 ## Enforcement
 
 **Gate**:

@@ -87,3 +87,11 @@
 
 - Language: operator preference, default English. Tone: direct, concise, operational.
 - Instance state: `dadaia context show --json`, `dadaia doctor`, `dadaia public doctor`, `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`.
+
+## 7. Onboarding — three levels
+
+- Level 1 workspace: `uvx dadaia-workspace init [DIR]`; re-running it on an existing workspace is the upgrade.
+- Level 2 context: `.dadaia/.venv/bin/dadaia context create <name> --main-repo <url> [--associated-repo <url>]...` clones, hooks, marks ALIVE and binds in one step.
+- Level 3 specs: `dadaia specs init --context <ctx>` (`--replace-foreign` moves a foreign tree to `specs-bkp/`), then the `dd-audit-project` first pass fills memory.
+- A new project in an existing workspace is levels 2 + 3; procedure: `dd-cli-library` (1-2), `dd-audit-project` (3).
+- The next step is never guessed: `dadaia doctor` (`ONBOARDING`) and SessionStart print it with its `fix:` line.

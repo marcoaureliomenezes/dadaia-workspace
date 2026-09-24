@@ -14,3 +14,5 @@ into the source tree it projects from, so nothing here is regenerated.
   projected instance file to fake the result.
 - Any failure of a workspace operation here is a product bug of this library:
   register it in `specs/bugs/`.
+- Versioning here: the release version = last version published on PyPI + 1 patch,
+  minted at birth (overrides `dd-gitflow-default`'s last-tag rule).

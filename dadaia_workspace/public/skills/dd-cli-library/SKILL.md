@@ -24,14 +24,13 @@ line here and `--help` disagree, `--help` wins.
 8. Converge a runtime: resolve `provider.distribution_version` from `dadaia capabilities --json`, then `dadaia reconcile --expect-version "$v" --json`, then `dadaia certify --json` — a failed certify check is a release blocker.
 9. On a failing command: preserve the evidence trail (command, exit code, output); classify and register a genuine bug (`dd-bug-registration`) before any workaround.
 
-- Invoke `.dadaia/.venv/bin/dadaia` and `.dadaia/.venv/bin/pip` directly, with absolute paths.
-
 ## Workspace state is CLI-owned
 
 - Never edit `.dadaia/states/*.json`, never `git clone` into `repos/`, never
   `rm -rf repos/<slug>/`, never hand-write `.dadaia/dist/` — `dadaia context
-  alive|dead` and `dadaia import|export` own those.
-- Lifecycle: `dadaia context create <ctx> --main-repo <slug> --url <url> [--associated-repos a,b]` → `dadaia context alive` → bind → `dadaia context dead` → `dadaia context delete`; `context dead` removes the repo from disk — never run it mid-switch.
+  create|alive|dead` and `dadaia import|export` own those.
+- Level 1: `uvx dadaia-workspace init [DIR] [--harness …] [--repo <url>]`; re-run = upgrade. Level 2: `dadaia context create [<name>] --main-repo <url> [--associated-repo <url>]…`
+  clones, hooks, ALIVEs and binds, transactionally; then `dadaia doctor` names the next step. Retire: `dadaia context dead` (removes the repo; never mid-switch) → `dadaia context delete`.
 - An unborn remote is born once by `dadaia context baseline <ctx> --yes --push`; every later write is an ordinary commit.
 - The associated set is written by `dadaia context repo add <ctx> <slug> [--url <url>]` / `dadaia context repo remove <ctx> <slug>` and READ only by `dadaia context show <ctx> --json`, whose `associated_repos` carries slug, url, on-disk and branch.
 - Portability: `dadaia export` writes `.dadaia/dist/spec-contexts.json` (overwritten each run); on the destination `dadaia import <file>` registers each unknown context DEAD, then `dadaia context alive <slug>` clones it; verify with `dadaia context list`.

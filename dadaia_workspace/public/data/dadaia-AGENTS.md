@@ -11,13 +11,13 @@
 ## 2. Context, scope and races
 
 - Resolution order: `DADAIA_CONTEXT` -> session binding -> the repo of the cwd (`dadaia context show --json`); none -> bind, never borrow one.
-- `dadaia context bind <ctx> [--print-env]` is one verb — no mode, no release, no session state beyond the context; it is the sole context-memory-injection trigger. An exported `DADAIA_CONTEXT` IS the binding.
+- `dadaia context bind <ctx> [--print-env]` is one verb — no mode, no release, no session state beyond the context; the sole memory-injection trigger. An exported `DADAIA_CONTEXT` IS the binding.
 - Binding is optional; ADDITIVE writes need none. Scope = the bound context's main repo plus its associated repos; only `repos/<slug>/` is scope-judged.
 - An out-of-scope write is BLOCKed with `fix: dadaia context bind <owner>`; an unbound session, an unregistered slug and a root path never are.
 - Races surface, never block — no locks or leases; zero ALIVE -> alert the operator.
 - One harness session per checked-out tree; a parallel session's worktree is created before launch.
-- The context surface is frozen: no new context verb, no new state file, no new session field.
-- A single-repo context is the degenerate multi-repo case: the main repo is where `specs/` lives.
+- Frozen context surface (ADR 0027): `context create` absorbs clone, hook, ALIVE, bind; no new state file or session field.
+- A single-repo context is the degenerate multi-repo case; the main repo holds `specs/`.
 
 ## 3. Git chokepoints
 
@@ -37,4 +37,4 @@
 - One finding per line, `<CODE> <verdict> <message>`; findings and the exit code are the whole report, no score line.
 - The workspace scan covers the root, the harness dirs, the zones and every ALIVE repo's top level, plus an excluded name or nested `.dadaia/` at any depth.
 - Slop and dead-repo leftovers are MOVED to `reaped/<YYYYMMDD>/<path>`, listed `WS-reaped-reaped`; nothing is deleted directly — an entry dies at its own TTL; move a mistakenly held one back before then.
-- The reaper runs at SessionStart, on the PostToolUse throttle and on `--fix`.
+- The reaper runs at SessionStart, the PostToolUse throttle and `--fix`.
