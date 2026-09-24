@@ -14,8 +14,11 @@ from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
     DadaiaError,
     WorkspaceVenvBootstrapError,
+    WorkspaceVenvNewerError,
 )
 from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
+from dadaia_workspace.features.capabilities.service import distribution_version
+from dadaia_workspace.features.reconcile import reconcile_workspace
 from dadaia_workspace.features.spec_context.service import slug_from_url
 
 console = Console()
@@ -50,12 +53,27 @@ def _refuse(message: str, fix: str) -> typer.Exit:
     return typer.Exit(2)
 
 
+def _root(directory: str) -> Path:
+    """The seam is argv: the directory is a parameter, never resolved from cwd."""
+    root = Path(directory).expanduser()
+    return (Path.cwd() / root).resolve() if not root.is_absolute() else root.resolve()
+
+
+def _profile_harness(directory: str) -> str:
+    """An existing workspace answers ``--harness`` from its own profile (AC2.1)."""
+    root = _root(directory)
+    if not (root / ".dadaia").is_dir():
+        return ""
+    return next(iter(container.build_workspace_service(root).harnesses(root)), "")
+
+
 def _plan(directory: str, harness: str, repo: str, associated: tuple[str, ...]) -> InitPlan:
     """Fill the plan: flags first; a missing DIR/harness is prompted on a TTY, else refused.
 
     An incomplete invocation on a TTY is an interview, so it also asks the main-repo URL
     and associated URLs (blank ends each); a complete one never prompts.
     """
+    harness = harness or (_profile_harness(directory) if directory else "")
     if directory and harness:
         return InitPlan(directory, harness, repo, associated)
     first = harness_registry.L1_ENTRY_HARNESSES[0]
@@ -122,9 +140,7 @@ def init(
             f"{_INIT} {plan.directory} --harness {harness_registry.L1_ENTRY_HARNESSES[0]}",
         ) from None
 
-    # The seam is argv: the directory is a parameter, never resolved from cwd.
-    root = Path(plan.directory).expanduser()
-    root = (Path.cwd() / root).resolve() if not root.is_absolute() else root.resolve()
+    root = _root(plan.directory)
     sibling_fix = (
         f"{_INIT} {root.parent / ((root.name or 'dadaia') + '-workspace')} --harness {chosen}"
     )
@@ -139,8 +155,15 @@ def init(
     root.mkdir(parents=True, exist_ok=True)
 
     svc = container.build_workspace_service(root)
+    before = svc.venv_version(root)
     try:
         _, installed = svc.init(root, skip_assets=skip_assets, harnesses=(chosen,))
+    except WorkspaceVenvNewerError as exc:
+        typer.secho(f"Error: {exc}", err=True, fg=typer.colors.RED)
+        typer.secho(
+            f"fix: uvx dadaia-workspace@{exc.installed} init {root}", err=True, fg=typer.colors.RED
+        )
+        raise typer.Exit(1) from None
     except WorkspaceVenvBootstrapError as exc:
         typer.secho(f"Error: {exc}", err=True, fg=typer.colors.RED)
         raise typer.Exit(1) from None
@@ -158,10 +181,32 @@ def init(
     for note in filter(None, (_LAW_NOTE, harness_registry.HARNESS_RECORDS[chosen].init_note)):
         console.print(note, markup=False, soft_wrap=True)
 
+    if before is not None:
+        _report_upgrade(root, before)
+
     slug = ""
     if plan.repo:
         slug = _create_context(root, plan, chosen)
     console.print(_next_step(root, slug), markup=False, highlight=False, soft_wrap=True)
+
+
+def _report_upgrade(root: Path, before: str) -> None:
+    """D3: re-init IS the upgrade — a changed venv is reconciled, an equal one reported."""
+    after = distribution_version()
+    if before == after:
+        console.print(f"already at {after}", markup=False, highlight=False)
+        return
+    result = reconcile_workspace(
+        root,
+        expected_version=after,
+        public_service=container.build_public_service(),
+        doctor_service=container.build_doctor_service(root),
+    )
+    if not result.ok:
+        typer.secho(f"Error: reconcile after upgrade failed: {result.error}", err=True, fg="red")
+        typer.secho(f"fix: {root / DADAIA_BIN} reconcile --expect-version {after}", err=True)
+        raise typer.Exit(1)
+    console.print(f"upgraded {before} -> {after}", markup=False, highlight=False)
 
 
 def _create_context(root: Path, plan: InitPlan, chosen: str) -> str:

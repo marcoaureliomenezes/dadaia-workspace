@@ -182,6 +182,21 @@ class WorkspaceVenvBootstrapError(DadaiaError, RuntimeError):
     """
 
 
+class WorkspaceVenvNewerError(WorkspaceVenvBootstrapError):
+    """The workspace venv carries a NEWER dadaia-workspace than the running one (AC2.3).
+
+    A downgrade is refused before any write; *installed* names the version to run
+    ``init`` with instead.
+    """
+
+    def __init__(self, installed: str, running: str) -> None:
+        self.installed = installed
+        super().__init__(
+            f"the workspace venv carries dadaia-workspace {installed}, newer than the "
+            f"running {running}; init never downgrades."
+        )
+
+
 class BootstrapPackageError(DadaiaError, ValueError):
     """``DADAIA_BOOTSTRAP_PACKAGE`` does not name an existing local wheel.
 

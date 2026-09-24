@@ -244,6 +244,9 @@ class FakePythonEnvironmentManager:
         self.ensured.append(workspace_root)
         return f"{workspace_root}/.dadaia/.venv"
 
+    def installed_version(self, workspace_root: str) -> str | None:
+        return None
+
     def python_executable(self, workspace_root: str) -> str:
         from dadaia_workspace.core.platform import PLATFORM
 

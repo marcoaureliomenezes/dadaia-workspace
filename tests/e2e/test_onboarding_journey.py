@@ -67,7 +67,6 @@ _PREVIOUS_PYPI = _SOURCE_VERSION
 
 XFAIL_L2 = pytest.mark.xfail(strict=True, reason="T-048-07 (doctor on no specs)")
 XFAIL_L3 = pytest.mark.xfail(strict=True, reason="T-048-05")
-XFAIL_UPGRADE = pytest.mark.xfail(strict=True, reason="T-048-06")
 XFAIL_GUIDANCE = pytest.mark.xfail(strict=True, reason="T-048-07")
 
 
@@ -543,11 +542,17 @@ class Upgrade(Scenario):
                 source=f"dadaia-workspace=={_PREVIOUS_PYPI}",
             )  # fmt: skip
             assert born.returncode == 0, f"{born.stdout}\n{born.stderr}"
+            # The previous release committed its specs baseline into the user repo at
+            # birth (the behaviour D6 retires); the upgrade must not move HEAD further.
+            repo = self.ws.path / "repos" / "green"
+            head = self.env.git("rev-parse", "HEAD", cwd=repo)
             done = self.env.uvx("init", "up")  # AC2.1: no --harness needed
             assert done.returncode == 0, f"{done.stdout}\n{done.stderr}"
+            assert f"upgraded {_PREVIOUS_PYPI} -> {_E2E_VERSION}" in done.stdout, done.stdout
             version = self.ws.dadaia("--version")
             assert _E2E_VERSION in version.stdout, version.stdout
-            self.ws.assert_level_clean("green", "green", self.url)
+            self.ws.doctor_json("green")
+            assert self.env.git("rev-parse", "HEAD", cwd=repo) == head
             again = self.env.uvx("init", "up")  # AC2.2
             assert again.returncode == 0 and f"already at {_E2E_VERSION}" in again.stdout
 
@@ -560,6 +565,5 @@ def upgrade(env: Env) -> Upgrade:
 
 
 class TestReinitUpgrade:
-    @XFAIL_UPGRADE
     def test_reinit_upgrades_from_previous_pypi(self, upgrade: Upgrade) -> None:
         upgrade.upgrade()

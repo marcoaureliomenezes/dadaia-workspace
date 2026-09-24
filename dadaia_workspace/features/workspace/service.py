@@ -93,6 +93,15 @@ class WorkspaceService:
 
         return workspace, installed
 
+    def venv_version(self, workspace_root: Path) -> str | None:
+        """The dadaia-workspace version installed in the workspace venv, or ``None``."""
+        return self._python_env.installed_version(str(workspace_root))
+
+    def harnesses(self, workspace_root: Path) -> tuple[str, ...]:
+        """The workspace's persisted harness profile — a re-init needs no ``--harness``."""
+        states_dir = Workspace.from_root(workspace_root).states_dir
+        return JsonHarnessProfileStore().resolve(states_dir, workspace_root).harnesses
+
     def is_initialized(self, workspace_root: Path) -> bool:
         return (workspace_root / ".dadaia" / "states" / "spec_contexts.json").exists()
 

@@ -29,6 +29,8 @@ class _Recorder:
     def __init__(self) -> None:
         self.venv_created: list[str] = []
         self.commands: list[list[str]] = []
+        # The fake venv's reported version; unknown (never probed) unless a test says.
+        self.installed: str | None = None
 
 
 @pytest.fixture()
@@ -60,11 +62,19 @@ def recorder(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _Recorder:
     monkeypatch.setattr(
         VenvPythonEnvironmentManager, "_verify_venv_provider", lambda self, ws, expected=None: None
     )
+    monkeypatch.setattr(
+        VenvPythonEnvironmentManager, "installed_version", lambda self, ws: rec.installed
+    )
     # Undo the suite-wide no-op backstop for these tests only.
     monkeypatch.setattr(
         VenvPythonEnvironmentManager, "ensure_workspace_venv", _REAL_ENSURE, raising=True
     )
     return rec
+
+
+@pytest.fixture()
+def running_100(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(python_env_module.metadata, "version", lambda name: "1.0.0")
 
 
 def _entrypoint(ws: Path) -> Path:
@@ -117,6 +127,66 @@ def test_healthy_venv_is_a_noop(tmp_path: Path, recorder: _Recorder) -> None:
 
     assert recorder.venv_created == []
     assert recorder.commands == []
+
+
+@pytest.mark.parametrize(
+    ("installed", "installs"),
+    [("0.4.7", True), ("1.0.0", False), ("1.0.0rc1", True), ("0.9.9+e2e", True)],
+)
+def test_reinit_reinstalls_only_an_older_venv(
+    tmp_path: Path, recorder: _Recorder, running_100: None, installed: str, installs: bool
+) -> None:
+    """Intent: CONTRACT — 0.4.8 AC2.1/AC2.2 (T-048-06): an older venv takes the one
+    bootstrap install path; an equal one is never written."""
+    entry = _entrypoint(tmp_path)
+    entry.parent.mkdir(parents=True)
+    entry.write_text("#!stub")
+    recorder.installed = installed
+
+    VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
+
+    assert recorder.venv_created == []
+    assert bool(recorder.commands) is installs
+    if installs:
+        assert recorder.commands[0][:3] == [
+            VenvPythonEnvironmentManager().pip_executable(str(tmp_path)),
+            "install",
+            "--quiet",
+        ]
+
+
+def test_reinit_refuses_a_newer_venv_before_any_write(
+    tmp_path: Path, recorder: _Recorder, running_100: None
+) -> None:
+    """Intent: CONTRACT — 0.4.8 AC2.3 (T-048-06): never downgrade; name the version."""
+    entry = _entrypoint(tmp_path)
+    entry.parent.mkdir(parents=True)
+    entry.write_text("#!stub")
+    recorder.installed = "1.0.0+e2e"
+
+    with pytest.raises(python_env_module.WorkspaceVenvNewerError) as exc:
+        VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
+
+    assert exc.value.installed == "1.0.0+e2e"
+    assert recorder.commands == []
+
+
+@pytest.mark.parametrize(
+    ("lower", "higher"),
+    [
+        ("0.4.7", "0.4.8"),
+        ("0.4.7", "0.4.7+e2e"),
+        ("0.4.8rc1", "0.4.8"),
+        ("0.4.8.dev1", "0.4.8a1"),
+        ("0.4.8", "0.4.8.post1"),
+        ("0.4.9", "0.4.10"),
+        ("0.4.7+e2e", "0.4.7+e2e.1"),
+    ],
+)
+def test_pep440_key_orders_published_version_shapes(lower: str, higher: str) -> None:
+    """Intent: CONTRACT — 0.4.8 T-048-06: PEP 440 order without a ``packaging`` dep."""
+    assert python_env_module._pep440_key(lower) < python_env_module._pep440_key(higher)
+    assert python_env_module._pep440_key("0.4") == python_env_module._pep440_key("0.4.0")
 
 
 def test_install_spec_repacks_the_running_distribution_when_not_a_source_checkout(

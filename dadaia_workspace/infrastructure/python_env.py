@@ -22,12 +22,14 @@ import dadaia_workspace
 from dadaia_workspace.core.exceptions import (
     BootstrapPackageError,
     WorkspaceVenvBootstrapError,
+    WorkspaceVenvNewerError,
 )
 from dadaia_workspace.core.platform import PLATFORM
 
 __all__ = [
     "VenvPythonEnvironmentManager",
     "WorkspaceVenvBootstrapError",
+    "WorkspaceVenvNewerError",
     "repack_installed_wheel",
 ]
 
@@ -128,6 +130,40 @@ def repack_installed_wheel(
 _REQUIRES_PYTHON_CLAUSE_RE = re.compile(r"(>=|<=|==|!=|>|<)\s*([0-9]+(?:\.[0-9]+){0,2})")
 _REQUIRES_PYTHON_FLOOR_RE = re.compile(r">=\s*3\.(\d+)")
 _DEFAULT_FLOOR_MINOR = 12  # dadaia-workspace's floor today (pyproject.toml: python = "^3.12")
+
+
+_PEP440_RE = re.compile(
+    r"^v?(?P<release>\d+(?:\.\d+)*)"
+    r"(?:[-_.]?(?P<pre>a|b|rc)[-_.]?(?P<pre_n>\d*))?"
+    r"(?:[-_.]?post[-_.]?(?P<post>\d*))?"
+    r"(?:[-_.]?dev[-_.]?(?P<dev>\d*))?"
+    r"(?:\+(?P<local>[a-z0-9.]+))?$"
+)
+
+
+def _pep440_key(version: str) -> tuple[object, ...]:
+    """A sort key for the PEP 440 subset dadaia-workspace publishes (no ``packaging``).
+
+    Release, then pre < final < post, dev before its base, and a local segment
+    (``0.4.7+e2e``) orders after its public version. Unparseable input sorts lowest.
+    """
+    m = _PEP440_RE.match(version.strip().lower())
+    if m is None:
+        return ((-1,),)
+    release = tuple(int(p) for p in m["release"].split("."))
+    while len(release) > 1 and release[-1] == 0:
+        release = release[:-1]
+    pre = ({"a": 0, "b": 1, "rc": 2}[m["pre"]], int(m["pre_n"] or 0)) if m["pre"] else (3, 0)
+    if m["dev"] is not None and m["pre"] is None and m["post"] is None:
+        pre = (-1, 0)
+    post = int(m["post"] or 0) if m["post"] is not None else -1
+    dev = int(m["dev"] or 0) if m["dev"] is not None else float("inf")
+    local = tuple(
+        (1, int(part), "") if part.isdigit() else (0, 0, part)
+        for part in (m["local"] or "").split(".")
+        if part
+    )
+    return (release, pre, post, dev, local)
 
 
 def _version_satisfies(version: tuple[int, ...], spec: str | None) -> bool:
@@ -410,7 +446,7 @@ class VenvPythonEnvironmentManager:
                     f"could not create the workspace venv at '{venv_dir}' with "
                     f"interpreter '{interpreter}': {cause} Diagnostics: {stderr_tail}"
                 ) from exc
-        if not self._dadaia_entrypoint(workspace_root).exists():
+        if self._needs_install(workspace_root):
             # Post-condition (BEFORE any pip install): the venv's OWN python must
             # satisfy Requires-Python. Catches an interpreter mismatch from ANY path —
             # a fresh creation this method did not anticipate, or a pre-existing/
@@ -451,6 +487,45 @@ class VenvPythonEnvironmentManager:
             )
             self._verify_venv_provider(workspace_root, expected=expected)
         return str(venv_dir)
+
+    def _needs_install(self, workspace_root: str) -> bool:
+        """Install when the entrypoint is missing or the venv is OLDER than the running
+        distribution (D3: re-init is the upgrade, through this one install path); a
+        NEWER venv is refused before any write (AC2.3).
+        """
+        if not self._dadaia_entrypoint(workspace_root).exists():
+            return True
+        installed, running = self.installed_version(workspace_root), self._running_version()
+        if installed is None or running is None:
+            return False
+        if _pep440_key(installed) > _pep440_key(running):
+            raise WorkspaceVenvNewerError(installed, running)
+        return _pep440_key(installed) < _pep440_key(running)
+
+    def installed_version(self, workspace_root: str) -> str | None:
+        """The dadaia-workspace version the venv's own python reports, or ``None``."""
+        if not self._dadaia_entrypoint(workspace_root).exists():
+            return None
+        try:
+            proc = self._probe_provider(workspace_root)
+        except OSError:
+            return None
+        return (proc.stdout or "").strip() or None if proc.returncode == 0 else None
+
+    def _probe_provider(self, workspace_root: str) -> "subprocess.CompletedProcess[str]":
+        """Ask the venv's own python, under a CLEAN env, which dadaia-workspace it imports."""
+        return subprocess.run(
+            [
+                self.python_executable(workspace_root),
+                "-c",
+                "import dadaia_workspace, importlib.metadata as m; "
+                "print(m.version('dadaia-workspace'))",
+            ],
+            capture_output=True,
+            text=True,
+            env={"PATH": os.environ.get("PATH", "")},
+            check=False,
+        )
 
     def _resolve_child_venv_interpreter(self) -> str:
         """Resolve an interpreter for a NEW child venv that PROVABLY satisfies the
@@ -587,19 +662,7 @@ class VenvPythonEnvironmentManager:
         venv's own interpreter under a CLEAN environment and, when *expected* is given,
         requires the exact version.
         """
-        clean_env = {"PATH": os.environ.get("PATH", "")}
-        proc = subprocess.run(
-            [
-                self.python_executable(workspace_root),
-                "-c",
-                "import dadaia_workspace, importlib.metadata as m; "
-                "print(m.version('dadaia-workspace'))",
-            ],
-            capture_output=True,
-            text=True,
-            env=clean_env,
-            check=False,
-        )
+        proc = self._probe_provider(workspace_root)
         if proc.returncode != 0:
             raise WorkspaceVenvBootstrapError(
                 "workspace venv provider verification failed: the venv python cannot "
