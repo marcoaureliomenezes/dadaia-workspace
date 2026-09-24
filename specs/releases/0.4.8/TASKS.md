@@ -34,7 +34,7 @@ Paths under `dadaia_workspace/` abbreviated `dw/`. Tasks in one parallel group (
   `dw/cli/commands/ci.py`, `dw/cli/commands/init.py` (import only), tests for these
   `blocked by:` T-048-02 · `group:` P2 · `delivers:` FR3 AC3.1–3.6, 3.8; flips journey level-2 xfails
 
-- [ ] **T-048-04 — init: one plan object, quiet output, --repo delegates.**
+- [-] **T-048-04 — init: one plan object, quiet output, --repo delegates.**
   `InitPlan` filled by flags or TTY prompts (name, harness from `core/harness_registry.py`, main URL, associated until
   blank); non-TTY missing DIR/`--harness` → exit 2 + fix; ≤ 12 lines (asset count, absolute venv path, next step);
   `--repo` → `SpecContextService.create`; no temp re-packed wheel; ensurepip absence named.
