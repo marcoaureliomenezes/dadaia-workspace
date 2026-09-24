@@ -326,7 +326,6 @@ def test_no_onboarding_text_claims_offline_operation() -> None:
     assert violations == [], "\n".join(violations)
 
 
-@pytest.mark.xfail(strict=True, reason="T-048-10 rewrites the docs to the 0.4.8 create verb")
 def test_no_onboarding_text_cites_a_retired_create_flag() -> None:
     """Intent: CONTRACT — AC3.8, bug `onboarding-docs-contradict-the-cli`. `context
     create` takes `--main-repo <url>` and repeatable `--associated-repo <url>`; a cited
