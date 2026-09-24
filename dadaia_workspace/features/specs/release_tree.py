@@ -236,7 +236,7 @@ _MEMORY_FIELDS: tuple[str, ...] = ("since", "until", "reviewed", "changed")
 def release_memory_issues(specs_dir: Path) -> list[SpecsDoctorIssue]:
     """RELEASE-TREE-MEMORY — a live release in CLOSURE names its memory reconciliation.
 
-    The LATEST `kind: memory` entry stamped after `implemented.ts` must carry
+    The LATEST `kind: memory` entry stamped at or after `implemented.ts` must carry
     `since`/`until`/`reviewed`/`changed`, and its `since` must be the state-derived start
     (the previous memory entry's `until`, else `defined.sha`); an entry predating the milestone reconciled a window the
     candidate has since moved past. Reads the state document alone — no git, no
@@ -277,11 +277,11 @@ def _memory_message(doc: dict[str, Any]) -> str | None:
         for entry in doc.get("log", [])
         if isinstance(entry, dict)
         and entry.get("kind") == "memory"
-        and str(entry.get("ts")) > stamp
+        and str(entry.get("ts")) >= stamp
     ]
     if not entries:
         return (
-            f"release is in CLOSURE with no `kind: memory` log entry stamped after "
+            f"release is in CLOSURE with no `kind: memory` log entry stamped at or after "
             f"implemented.ts {stamp!r} — the closure reconciled no memory"
         )
     latest = entries[-1]
