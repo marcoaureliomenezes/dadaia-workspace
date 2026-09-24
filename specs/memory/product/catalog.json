@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-24T01:19:39Z",
+  "generated_at": "2026-09-24T01:42:08Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -833,7 +833,7 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 960,
+      "token_estimate": 1006,
       "depends_on": [
         "workspace-doctor",
         "context-management",
@@ -841,6 +841,7 @@
         "ARCHITECTURE"
       ],
       "sources": [
+        ".github/dependabot.yml",
         ".github/workflows/ci.yml",
         "dadaia_workspace/hooks/__init__.py",
         "dadaia_workspace/hooks/pre_gate.py",

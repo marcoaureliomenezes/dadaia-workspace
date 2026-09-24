@@ -5,6 +5,7 @@ tldr: No-lock enforcement — three gate blocks (root entry, non-venv command, P
 summary: The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one executable fix line; the pre-push chokepoint enforces the branch contract, the specs canon and the denylist scan over every pushed object, and no CI job calls a model API — the security review is the reviewer's lens before each pull request.
 tags: [sdd, gate, hooks, enforcement, no-locks, privacy]
 sources:
+  - .github/dependabot.yml
   - .github/workflows/ci.yml
   - dadaia_workspace/hooks/__init__.py
   - dadaia_workspace/hooks/pre_gate.py
@@ -44,6 +45,7 @@ sources:
 - `dadaia ci install-hook` installs `.git/hooks/pre-push`, which delegates to `dadaia ci push-gate-check`; `dadaia doctor` byte-compares the installed hook per ALIVE repo (`HOOKS-DRIFT-1`).
 - Policy order, first refusal wins: branch policy — only `refs/heads/feature/<M.m.p>` pushed to the same remote name, `develop` and `main` refused; the `specs/` canon over every `specs/` path the range touches; the denylist scan. An unparseable stdin line refuses, naming `git push --no-verify` as the one bypass; empty stdin allows.
 - The security review is the `dd-code-reviewer` security lens on the PR head, run by the main thread before each pull request; no workflow calls a model API. `secret-scan.yml` runs gitleaks on every PR to `develop` and `main`.
+- CI's `pr-source-guard` admits into `main` only `develop` and the release-please release PR, and into `develop` only `feature/{M.m.p}` and Dependabot update branches; `.github/dependabot.yml` targets `develop`, so dependency updates reach `main` with the next promote.
 
 ### Push-range denylist scan
 
