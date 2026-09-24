@@ -160,7 +160,7 @@ def init(
         typer.secho(f"Error: {exc}", err=True, fg=typer.colors.RED)
         raise typer.Exit(1) from None
 
-    console.print(f"[green]✓[/green] Workspace {root} ({chosen})", highlight=False)
+    console.print(f"[green]✓[/green] Workspace {root} ({chosen})", highlight=False, soft_wrap=True)
     if skip_assets:
         # The service's one [warn] item: the workspace has NO hook wiring until
         # `public install` runs. markup=False keeps the literal token out of Rich's tag
@@ -224,6 +224,6 @@ def _create_context(root: Path, plan: InitPlan, chosen: str) -> None:
             fg=typer.colors.RED,
         )
         raise typer.Exit(1) from None
-    console.print(f"[green]✓[/green] {slug} ALIVE and bound", highlight=False)
+    console.print(f"[green]✓[/green] {slug} ALIVE and bound", highlight=False, soft_wrap=True)
     for line in env_lines:
         console.print(line, markup=False, soft_wrap=True, highlight=False)

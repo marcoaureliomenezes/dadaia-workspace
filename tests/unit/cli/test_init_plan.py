@@ -17,6 +17,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.commands import init as init_cmd
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.features.workspace.onboarding import cli_path
 
 _runner = CliRunner()
 
@@ -55,7 +56,7 @@ def test_output_is_at_most_twelve_lines_with_count_and_venv_path(tmp_path: Path)
     assert result.exit_code == 0, result.output
     lines = result.stdout.splitlines()
     assert len(lines) <= 12, result.stdout
-    assert str(ws / ".dadaia" / ".venv" / "bin" / "dadaia") in result.stdout
+    assert f"CLI: {cli_path(ws)}" in result.stdout.splitlines()
     assert not any(line.startswith("  ") for line in lines), "no per-asset listing"
 
 
