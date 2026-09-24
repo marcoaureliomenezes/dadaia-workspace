@@ -67,7 +67,7 @@ Paths under `dadaia_workspace/` abbreviated `dw/`. Tasks in one parallel group (
   `dw/features/spec_context/doctor.py`, `dw/hooks/ctx_inject.py`, tests
   `blocked by:` T-048-03, T-048-05, T-048-06 · `group:` P4 · `delivers:` FR6 AC6.1–6.3, AC3.7 (doctor half)
 
-- [ ] **T-048-08 — First pass in dd-audit-project.**
+- [-] **T-048-08 — First pass in dd-audit-project.**
   "First pass" section: worklist = `memory.py drift` from the first commit + `audits_histo.jsonl` stamp;
   `dd-product-engineer` fills ARCHITECTURE/QUALITY/atoms from code + `specs-bkp/`; done = worklist covered +
   `memory.py check` 0. Contract test on the skill text; drift-from-root exit 0 on a fixture repo. Reproject.
