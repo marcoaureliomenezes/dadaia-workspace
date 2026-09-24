@@ -60,14 +60,17 @@ and a git tree listing (``git ls-tree``'s own native output) already produce.
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 from typing import Literal
 
 from dadaia_workspace.core.specs_version import (
     CANONICAL_SPECS_VERSION,
+    OLDEST_UPGRADABLE_VERSION,
+    read_pattern_version,
 )
 from dadaia_workspace.core.workspace_layout import (
     CANON_ROOT_MEMBERS,
@@ -90,15 +93,18 @@ CANON: tuple[CanonEntry, ...] = SPECS_CANON
 __all__ = [
     "CANON",
     "CANON_ROOT_MEMBERS",
+    "REPO_LAW",
     "REQUIRED_ROOT_DIRS",
     "TEMPLATES",
     "CanonEntry",
     "Violation",
     "canon_violations",
     "check_tree",
+    "classify",
     "is_canon_path",
     "scaffold",
     "scaffold_entry",
+    "scaffold_repo_law",
 ]
 
 _CONSTITUTION_STUB = """\
@@ -109,17 +115,17 @@ specs_pattern_version: {specs_pattern_version}
 
 > **Created:** {today}
 
-## Propósito
+## Purpose
 
-Declaração atômica do propósito do projeto e suas invariantes fundamentais.
+One statement of what this project is for.
 
-## Invariantes
+## Invariants
 
-1. (Definir invariantes aqui)
+1. (State the invariants every release must keep.)
 
-## Exclusões canônicas
+## Exclusions
 
-- (Definir o que este projeto não é)
+- (State what this project is not.)
 """
 
 _BACKLOG_STUB = '{"schema": "backlog-v1", "active": []}\n'
@@ -161,6 +167,13 @@ TEMPLATES: dict[str, tuple[Kind, str]] = {
     "ADRs/AGENTS.md": ("copy", "scaffold/ADRs/AGENTS.md"),
     "ADRs/decisions.jsonl": ("static", ""),
 }
+
+
+#: The main repo's scoped law, beside ``specs/``: ``templates/<name>`` -> ``<repo>/<dest>``.
+REPO_LAW: tuple[tuple[str, str], ...] = (
+    ("repo-AGENTS.md", "AGENTS.md"),
+    ("tests-AGENTS.md", "tests/AGENTS.md"),
+)
 
 
 def is_canon_path(rel_posix: str) -> bool:
@@ -214,6 +227,16 @@ def check_tree(specs_dir: Path) -> list[Violation]:
     return violations
 
 
+TreeKind = Literal["absent", "dadaia", "foreign"]
+
+
+def classify(specs_dir: Path) -> TreeKind:
+    """``absent`` (no directory), ``dadaia`` (constitution stamped >= 6) or ``foreign``."""
+    if not specs_dir.exists():
+        return "absent"
+    return "dadaia" if read_pattern_version(specs_dir) >= OLDEST_UPGRADABLE_VERSION else "foreign"
+
+
 def default_public_dir() -> Path:
     """``dadaia_workspace/public/`` resolved relative to this installed module — the
     same module-relative idiom already used by ``features.spec_artifacts.memory``
@@ -264,7 +287,8 @@ def scaffold(
 ) -> list[Path]:
     """Write every ``required_at_birth`` CANON entry — scaffold is canon rendered.
 
-    An existing target is left untouched unless *force*. Returns the paths actually
+    An existing target is left untouched unless *force*; a symlinked target is never
+    written through. Returns the paths actually
     (re)written, in :data:`CANON` order; a skipped (already-present, not forced) entry
     is omitted — the caller that also needs skip/error bookkeeping is
     ``features.specs.scaffolder.scaffold`` (the CLI-facing wrapper, which pre-checks
@@ -277,21 +301,40 @@ def scaffold(
         "tree_name": specs_dir.resolve().parent.name,
         "specs_pattern_version": str(CANONICAL_SPECS_VERSION),
     }
-    created: list[Path] = []
-    for entry in CANON:
+    writes: list[tuple[Path, Callable[[], str], bool]] = [
         # Only "no destination" disqualifies an entry: a required_at_birth row always
         # has a renderer (``memory/product/catalog.json``'s is computed, not a template —
         # a prior guard skipped it for having no template string and silently dropped it
         # from every fresh scaffold: fresh-specs-scaffold-fails-specs-doctor's own class).
-        if not entry.required_at_birth or entry.dest is None:
-            continue
-        target = specs_dir / entry.dest
-        if target.exists() and not force:
+        (
+            specs_dir / entry.dest,
+            partial(_render, entry, public_dir=resolved_public, context=context),
+            force,
+        )
+        for entry in CANON
+        if entry.required_at_birth and entry.dest is not None
+    ]
+    return _write_absent(writes)
+
+
+def scaffold_repo_law(repo: Path, *, public_dir: Path | None = None) -> list[Path]:
+    """Install the repo's scoped law (:data:`REPO_LAW`) where absent — never overwritten:
+    once written it is the operator's. Returns the paths written."""
+    templates = (public_dir if public_dir is not None else default_public_dir()) / "templates"
+    return _write_absent(
+        [(repo / dest, (templates / template).read_text, False) for template, dest in REPO_LAW]
+    )
+
+
+def _write_absent(writes: list[tuple[Path, Callable[[], str], bool]]) -> list[Path]:
+    """The one scaffold write: each ``(target, render, overwrite)`` whose target is absent
+    (or *overwrite*); a symlinked target is never written through."""
+    created: list[Path] = []
+    for target, render, overwrite in writes:
+        if target.is_symlink() or (target.exists() and not overwrite):
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(
-            _render(entry, public_dir=resolved_public, context=context), encoding="utf-8"
-        )
+        target.write_text(render(), encoding="utf-8")
         created.append(target)
     return created
 

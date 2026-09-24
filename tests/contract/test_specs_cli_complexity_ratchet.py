@@ -69,7 +69,10 @@ _DOCTOR_CEILING = 6
 # ARCHITECTURE.md's `## Tech Stack` section — the 6 -> 7 hop this module now carries
 # (`fold_tech_stack`), plus the re-stamp that hop requires. An authorized, task-declared
 # change (P-20's same-commit justification), not a renewal of the SCAFFOLD's 0.6.0 expiry.
-_UPGRADE_MODULE_SHA256 = "6d212b0afc2f92975178dcd6d55a613050cfbfe17f26956245bc4ecb27b5a471"
+# Re-pinned at 0.4.8 T-048-05 (AC4.3, R6): a v6 tree must end v7 with its fixed law
+# sections, so the hop restores them (`restore_fixed_sections`) and a re-stamp is no
+# longer reported as a no-op — the S3 dead end. Authorized, task-declared change.
+_UPGRADE_MODULE_SHA256 = "fbc6db82eafb0a15928372c6eb0300828df88763e0738f54f5dfd761207377c2"
 
 
 def _complexity_by_name(path: Path) -> dict[str, int]:

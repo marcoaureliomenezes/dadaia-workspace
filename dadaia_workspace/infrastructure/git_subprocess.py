@@ -167,6 +167,16 @@ class GitSubprocessClient:
         if result.returncode != 0:
             raise GitCloneError(f"git clone failed for {url!r}: {result.stderr.strip()}")
 
+    def move(self, repo: Path, src: str, dst: str) -> None:
+        """Rename ``repo/src`` to ``repo/dst``, staging the rename of its tracked files —
+        never committing. A tree git does not track is renamed on disk alone."""
+        if not _run(["git", "ls-files", "--", src], cwd=repo).stdout.strip():
+            (repo / src).rename(repo / dst)
+            return
+        result = _run(["git", "mv", "--", src, dst], cwd=repo)
+        if result.returncode != 0:
+            raise GitSyncError(f"git mv {src} {dst} failed in {repo}: {result.stderr.strip()}")
+
     def is_dirty(self, path: Path) -> bool:
         result = _run(["git", "status", "--porcelain"], cwd=path)
         return bool(result.stdout.strip())

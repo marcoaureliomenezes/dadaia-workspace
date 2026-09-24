@@ -50,5 +50,5 @@
 - reports validate — Validate one or more agent handoff JSON files.
 
 ## dadaia specs — SDD release-lifecycle structural checks and helpers.
-- specs init — Bootstrap a SDD release-lifecycle specs/ directory structure.
+- specs init — Bring a repo's specs/ to the canon, never committing.
 - specs upgrade — Upgrade a specs/ tree to the canonical pattern version.

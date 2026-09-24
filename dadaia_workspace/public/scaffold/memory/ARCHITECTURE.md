@@ -1,45 +1,26 @@
 ---
 slug: ARCHITECTURE
 title: Architecture
-tldr: Overview of the system's layers, dependencies and data flows.
-summary: Documents the layers of responsibility, the dependency rules and the main data flows. The structural reference for design and integration decisions.
+tldr: The system's principles, technology stack and structure.
+summary: Part 1 holds the architecture principles, changed only by an accepted ADR; the Tech Stack and Structure sections describe what the code is today.
 tags:
   - architecture
   - layers
   - design
 ---
 
-## Overview
+## Principles
 
-**Greenfield context.** This context has no consolidated architecture yet: the architecture
-is BORN with the first approved release. While this atom sits in that state, the current
-release's SPEC is the founding structural reference — it must propose the initial module
-layout, and reviewers judge the SPEC by its internal coherence and the observable criteria
-it defines (never reject it for "empty architecture memory": that is the legitimate state
-of a new context). At the founding release's CLOSURE, this atom is updated with the
-architecture actually implemented.
+Greenfield: no principle is accepted yet. The founding release's SPEC proposes the initial
+layout; an accepted ADR records each principle here.
 
-## Layers
+## Tech Stack
 
-| Layer | Responsibility |
-|-------|----------------|
-| (to be defined by the founding release) | The current SPEC proposes the initial layout; CLOSURE records it here. |
+- (one line per technology, filled from the code by the first audit pass)
 
-## Dependency rules
+## Structure
 
-```mermaid
-graph TD
-  A[The founding release defines the rules]
-```
-
-## Contracts between modules
-
-No consolidated contract yet — the founding release's contracts stand as the baseline and
-are recorded here at CLOSURE.
-
-## Runtime state
-
-No runtime state registered.
+No module layout is recorded yet; the founding release's CLOSURE records the implemented one.
 
 <!-- dadaia:fixed slop-code -->
 <!-- /dadaia:fixed slop-code -->
