@@ -60,7 +60,9 @@ def next_step(root: Path, trees: Mapping[str, Path]) -> Step | None:
         )
     for name, specs in trees.items():
         if not specs_ready(specs):
-            return Step(f"'{name}' has no dadaia specs tree", f"{cli} specs init --context {name}")
+            return Step(
+                f"'{name}' carries no current specs tree", f"{cli} specs init --context {name}"
+            )
     for name, specs in trees.items():
         if not _first_pass_done(specs):
             repo = specs.parent

@@ -65,10 +65,6 @@ _E2E_VERSION = f"{_SOURCE_VERSION}+e2e"
 # Until release-please bumps, the source version IS the previous published one.
 _PREVIOUS_PYPI = _SOURCE_VERSION
 
-XFAIL_L2 = pytest.mark.xfail(strict=True, reason="T-048-07 (doctor on no specs)")
-XFAIL_L3 = pytest.mark.xfail(strict=True, reason="T-048-05")
-XFAIL_GUIDANCE = pytest.mark.xfail(strict=True, reason="T-048-07")
-
 
 # ── the harness ──────────────────────────────────────────────────────────────────
 
@@ -314,15 +310,12 @@ def greenfield(env: Env) -> Greenfield:
 
 
 class TestGreenfield:
-    @XFAIL_L2  # init --repo passes; doctor on the specs-less clone is T-048-07
     def test_level1_init_with_repo(self, greenfield: Greenfield) -> None:
         greenfield.level1()
 
-    @XFAIL_GUIDANCE
     def test_guidance_names_specs_init(self, greenfield: Greenfield) -> None:
         greenfield.guidance()
 
-    @XFAIL_L3
     def test_level3_specs_init(self, greenfield: Greenfield) -> None:
         greenfield.level3()
 
@@ -401,11 +394,9 @@ class TestDadaiaV6Specs:
     def test_level1_init(self, dadaia_v6: DadaiaV6) -> None:
         dadaia_v6.level1()
 
-    @XFAIL_L2
     def test_level2_context_create(self, dadaia_v6: DadaiaV6) -> None:
         dadaia_v6.level2()
 
-    @XFAIL_L3
     def test_level3_upgrades_v6_to_v7(self, dadaia_v6: DadaiaV6) -> None:
         dadaia_v6.level3()
 
@@ -452,11 +443,9 @@ class TestForeignSpecs:
     def test_level1_init(self, foreign: Foreign) -> None:
         foreign.level1()
 
-    @XFAIL_L2
     def test_level2_context_create(self, foreign: Foreign) -> None:
         foreign.level2()
 
-    @XFAIL_L3
     def test_level3_replace_foreign_keeps_bytes(self, foreign: Foreign) -> None:
         foreign.level3()
 
@@ -478,11 +467,9 @@ class TestSecondProjectWithAssociated:
     def test_level1_init(self, second: SecondProject) -> None:
         second.level1()
 
-    @XFAIL_L2
     def test_level2_create_clones_main_and_associated(self, second: SecondProject) -> None:
         second.level2()
 
-    @XFAIL_L3
     def test_level3_specs_init(self, second: SecondProject) -> None:
         second.level3()
 
@@ -517,7 +504,6 @@ class TestFailedCreateThenRetry:
     def test_level1_init(self, failed_create: FailedCreate) -> None:
         failed_create.level1()
 
-    @XFAIL_L2
     def test_level2_failure_leaves_nothing_then_retry_succeeds(
         self, failed_create: FailedCreate
     ) -> None:
