@@ -92,7 +92,7 @@ Paths under `dadaia_workspace/` abbreviated `dw/`. Tasks in one parallel group (
   not held by an open task
   `blocked by:` T-048-07 · `group:` P5 · `delivers:` AC2.4, AC6.4, AC7.1 (text)
 
-- [ ] **T-048-11 — Journey green in CI and release.**
+- [-] **T-048-11 — Journey green in CI and release.**
   Flip remaining xfails; journey runs the quickstart block verbatim (AC7.1); `ci.yml` provisions uv for `e2e-python`;
   `release.yml` runs the journey before publish and the greenfield scenario from PyPI after it; re-run the audit
   script on the new CLI (≥ 90/100, recorded in `_RELEASE.json` log).
