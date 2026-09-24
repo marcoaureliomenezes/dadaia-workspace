@@ -9,6 +9,7 @@ from dadaia_workspace import container
 from dadaia_workspace.cli.commands.context import resolve_own_session_id
 from dadaia_workspace.core import harness_registry
 from dadaia_workspace.core.exceptions import DadaiaError
+from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.features.workspace.bootstrap import bootstrap_repo
 
 console = Console()
@@ -22,7 +23,7 @@ app = typer.Typer()
 _LAW_NOTE = "Sessions launch at the workspace root."
 _PROJECTS_NOTE = (
     "Projects live under repos/ — make the first with "
-    "`.dadaia/.venv/bin/dadaia context create <name> --main-repo <slug> --url <url>`."
+    f"`{DADAIA_BIN} context create <name> --main-repo <slug> --url <url>`."
 )
 
 

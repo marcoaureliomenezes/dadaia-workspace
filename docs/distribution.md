@@ -4,7 +4,7 @@ Where dadaia-workspace is published and what each channel carries.
 
 ## Channels
 
-<!-- derived-from: pypi-distribution sha256:e1ebd09cf0ac -->
+<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
 
 | channel | artifact | how it is published |
 |---|---|---|
@@ -15,7 +15,7 @@ Where dadaia-workspace is published and what each channel carries.
 
 ## The PyPI metadata contract
 
-<!-- derived-from: pypi-distribution sha256:e1ebd09cf0ac -->
+<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
 
 Every field PyPI renders has exactly one home:
 
@@ -36,14 +36,15 @@ Every field PyPI renders has exactly one home:
 
 ## What the wheel carries
 
-<!-- derived-from: pypi-distribution sha256:e1ebd09cf0ac -->
+<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
 
-The wheel ships `dadaia_workspace/` with the full `public/` tree, so `dadaia init`
-works offline from a bare install, and
+The wheel ships `dadaia_workspace/` with the full `public/` tree (`dadaia init` still
+resolves the workspace venv's dependencies from PyPI), and
 `dadaia_workspace/public/data/CONSUMER_VALIDATION_RECIPE.md`, the matrix run against
 every candidate wheel before a deploy. It installs one CLI under two console-script
 names, `dadaia` and `dadaia-workspace`. Consumer-validation candidate wheels are
-throwaway and never mint a published version; `DADAIA_BOOTSTRAP_PACKAGE=<wheel>` makes
-a venv bootstrap install one instead of the PyPI release. Withholding the
+throwaway and never mint a published version; a venv bootstrap installs the running
+distribution itself, and `DADAIA_BOOTSTRAP_PACKAGE=<wheel>` makes it install a named
+candidate wheel instead. Withholding the
 `release-gate` approval leaves the tag and the `CHANGELOG.md` section without an
 upload, and the number is never reused.

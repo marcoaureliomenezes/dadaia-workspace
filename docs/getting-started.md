@@ -5,8 +5,8 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:e1ebd09cf0ac -->
-<!-- derived-from: workspace-init sha256:ca5c835e94af -->
+<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
+<!-- derived-from: workspace-init sha256:d7239f43e736 -->
 
 ```bash
 python -m venv .venv && .venv/bin/pip install dadaia-workspace
@@ -15,13 +15,13 @@ python -m venv .venv && .venv/bin/pip install dadaia-workspace
 `pip install dadaia-workspace` installs the library and one CLI under two
 console-script names, `dadaia` and `dadaia-workspace`; `uvx dadaia-workspace init
 <dir> --harness <name> --repo <url>` runs the next step without an install. The wheel
-ships `dadaia_workspace/` with the full public asset tree, so the next step works
-offline from a bare install. The workspace you create keeps its own virtualenv at
+ships `dadaia_workspace/` with the full public asset tree; the next step still resolves
+the workspace venv's dependencies from PyPI, so it needs network access. The workspace you create keeps its own virtualenv at
 `.dadaia/.venv`, which `dadaia init` provisions.
 
 ## Provision the workspace — `dadaia init`
 
-<!-- derived-from: workspace-init sha256:ca5c835e94af -->
+<!-- derived-from: workspace-init sha256:d7239f43e736 -->
 
 ```bash
 dadaia init <dir> --harness claude|codex|kimi-code|cursor|devin|copilot [--repo <url>] [--skip-assets]
@@ -47,7 +47,7 @@ context verbs — `create --main-repo <slug>`, `alive`, the session bind, printi
 `--print-env` line — then installs the pre-push hook. A re-run with the same URL reuses
 the context, and a failed clone prints the same command as its `fix:`. Without
 `--repo`, `init` closes with three lines: sessions launch at the root, the harness's
-law-loading note, and the `dadaia context create <name> --main-repo <slug>` that makes
+law-loading note, and the `dadaia context create <name> --main-repo <slug> --url <url>` that makes
 the first project. `init` deletes no projection; `dadaia harness add <name>` adds a
 harness later and `dadaia harness list` reads the roster.
 
@@ -61,7 +61,7 @@ owned by one main repository, optionally spanning associated repositories that l
 die with it. Specs, bind, memory, releases and backlog resolve only from the main repo.
 
 ```bash
-dadaia context create <ctx> --main-repo <slug> # registers it DEAD
+dadaia context create <ctx> --main-repo <slug> --url <url> # registers it DEAD
 dadaia context alive <ctx>                     # clones the repos, folds the canon scaffold over specs/
 dadaia context bind <ctx>                      # this session's scope
 dadaia context show <ctx> --json               # the repo set

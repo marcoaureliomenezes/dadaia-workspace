@@ -28,9 +28,9 @@ sources:
 
 ## Wheel content contract
 
-- The wheel ships `dadaia_workspace/` with the full `public/` tree, so `dadaia init` works offline from a bare install ([[public-asset-distribution]]).
+- The wheel ships `dadaia_workspace/` with the full `public/` tree, so `dadaia init` needs no asset download; the workspace venv's dependencies still resolve from PyPI ([[public-asset-distribution]]).
 - It ships `dadaia_workspace/public/data/CONSUMER_VALIDATION_RECIPE.md`, the matrix run against every candidate wheel before deploy ([[consumer-agent-support]]).
-- `DADAIA_BOOTSTRAP_PACKAGE=<wheel>` makes a venv bootstrap install a candidate wheel instead of the PyPI release.
+- A venv bootstrap installs the running distribution (editable from a checkout, else its re-packed wheel); `DADAIA_BOOTSTRAP_PACKAGE=<wheel>` makes it install a named candidate wheel instead.
 
 ## Discovery surfaces
 

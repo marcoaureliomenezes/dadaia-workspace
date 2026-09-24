@@ -44,8 +44,8 @@ memory atom under its content hash.
 
 ## A human installs and uses it
 
-<!-- derived-from: pypi-distribution sha256:e1ebd09cf0ac -->
-<!-- derived-from: workspace-init sha256:ca5c835e94af -->
+<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
+<!-- derived-from: workspace-init sha256:d7239f43e736 -->
 <!-- derived-from: context-management sha256:cbeec31adb58 -->
 <!-- derived-from: workspace-doctor sha256:11d53d7927db -->
 
@@ -58,7 +58,8 @@ dadaia doctor --context <ctx>     # findings, each with a runnable fix
 
 `pip install dadaia-workspace` installs the library and one CLI under two names,
 `dadaia` and `dadaia-workspace`, so `uvx dadaia-workspace init …` runs without an
-install; the wheel ships the full public asset tree, so `init` works offline.
+install; the wheel ships the full public asset tree, and `init` resolves the workspace
+venv's dependencies from PyPI, so it needs network access.
 
 `dadaia init <dir> --harness <name> [--repo <url>] [--skip-assets]` is the only verb
 that works on an empty directory, and a re-run is idempotent. It provisions
@@ -67,7 +68,7 @@ projection, seeds the state documents without overwriting them, and (unless
 `--skip-assets`) stages and installs the public assets — the one writer of every hook
 wiring. With `--repo <url>` it clones the repo into `repos/<slug>/`, composes the
 context verbs — `create`, `alive`, the bind — and installs the pre-push hook. Without
-`--repo` it prints the `dadaia context create <name> --main-repo <slug>` that makes the
+`--repo` it prints the `dadaia context create <name> --main-repo <slug> --url <url>` that makes the
 first project. `dadaia harness add <name>` adds a harness later.
 
 `dadaia context bind <ctx>` writes one session record (context, runtime, pid,
@@ -125,7 +126,7 @@ with a RED test. Completed work leaves as a `handoff-v1` record, validated by
 
 ## Documentation
 
-<!-- derived-from: pypi-distribution sha256:e1ebd09cf0ac -->
+<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
 <!-- derived-from: public-asset-distribution sha256:855c77cc15da -->
 
 The site is <https://marcoaureliomenezes.github.io/dadaia-workspace/>:
@@ -141,7 +142,7 @@ The site is <https://marcoaureliomenezes.github.io/dadaia-workspace/>:
 
 ## Links
 
-<!-- derived-from: pypi-distribution sha256:e1ebd09cf0ac -->
+<!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
 
 - GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
 - PyPI — <https://pypi.org/project/dadaia-workspace/>

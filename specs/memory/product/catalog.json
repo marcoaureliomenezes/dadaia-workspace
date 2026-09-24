@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-24T03:20:10Z",
+  "generated_at": "2026-09-24T03:25:23Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -142,7 +142,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 562,
+      "token_estimate": 583,
       "depends_on": [
         "release-lifecycle",
         "public-asset-distribution",
@@ -674,7 +674,7 @@
         "setup",
         "idempotent"
       ],
-      "token_estimate": 471,
+      "token_estimate": 474,
       "depends_on": [
         "workspace-doctor",
         "public-asset-distribution",

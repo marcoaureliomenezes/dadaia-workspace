@@ -302,3 +302,58 @@ def test_every_pypi_link_a_reader_needs_is_declared() -> None:
     assert isinstance(urls, dict)
     assert sorted(urls) == ["Changelog", "Documentation", "Homepage", "Issues", "Repository"]
     assert all(str(value).startswith("https://") for value in urls.values())
+
+
+_CONTEXT_CREATE_RE = re.compile(r"dadaia context create [^`\n]*")
+
+
+def _onboarding_texts() -> list[Path]:
+    """Every surface a newcomer copies a command from: the derived docs, the memory
+    atoms they derive from, and the public skills."""
+    skills = sorted((_REPO_ROOT / "dadaia_workspace" / "public" / "skills").glob("*/SKILL.md"))
+    return [*_derived_docs(), *sorted(_MEMORY_DIR.rglob("*.md")), *skills]
+
+
+def test_no_onboarding_text_claims_what_the_cli_refuses() -> None:
+    """Intent: CONTRACT — bug `onboarding-docs-contradict-the-cli`.
+
+    `context create` refuses a repo with neither `--url` nor a checkout, so every cited
+    invocation carries `--url`; `init` resolves its dependencies from PyPI, so no
+    surface may call it offline."""
+    violations: list[str] = []
+    for path in _onboarding_texts():
+        rel = path.relative_to(_REPO_ROOT).as_posix()
+        for number, line in enumerate(path.read_text("utf-8").splitlines(), start=1):
+            for match in _CONTEXT_CREATE_RE.finditer(line):
+                if "--url" not in match.group(0):
+                    violations.append(f"{rel}:{number}: `{match.group(0).strip()}` omits --url")
+            if re.search(r"\boffline\b", line, re.IGNORECASE):
+                violations.append(f"{rel}:{number}: claims offline operation")
+
+    assert violations == [], "\n".join(violations)
+
+
+def test_the_quickstart_runs_as_printed_after_one_uvx_init() -> None:
+    """Intent: CONTRACT — bug `onboarding-docs-contradict-the-cli`.
+
+    After `uvx dadaia-workspace init` only `.dadaia/.venv/bin/dadaia` exists, init runs
+    once, and the ledger scripts run from the workspace root, where no specs tree sits
+    at or above the cwd — so each carries `--specs`."""
+    text = (_DOCS_DIR / "quickstart.md").read_text("utf-8")
+    commands = [
+        line.strip()
+        for block in re.findall(r"```bash\n(.*?)```", text, re.DOTALL)
+        for line in block.splitlines()
+        if line.strip()
+    ]
+    joined = "\n".join(commands)
+
+    assert len(re.findall(r"\binit\b", joined)) == 1, "the quickstart runs init more than once"
+    assert not [c for c in commands if re.match(r"(eval \"\$\()?dadaia ", c)], (
+        "a bare `dadaia` is not on PATH after uvx — cite .dadaia/.venv/bin/dadaia"
+    )
+    for script in ("backlog.py new", "release.py new"):
+        start = joined.index(script)
+        assert "--specs" in joined[start : joined.find("\n", joined.find("--", start + 1) + 60)], (
+            f"`{script}` from the workspace root needs --specs"
+        )
