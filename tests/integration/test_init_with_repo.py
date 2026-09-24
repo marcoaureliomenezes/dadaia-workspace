@@ -188,16 +188,18 @@ def test_the_printed_fix_line_succeeds_once_the_url_is_reachable(tmp_path: Path)
     assert [ctx["state"] for ctx in registry["contexts"] if ctx["name"] == "app"] == ["alive"]
 
 
-def test_init_without_repo_closes_with_exactly_three_lines(tmp_path: Path) -> None:
-    result = _runner.invoke(app, ["init", str(tmp_path / "ws"), "--harness", "claude"])
+def test_init_without_repo_closes_with_the_law_the_note_and_the_next_step(
+    tmp_path: Path,
+) -> None:
+    """0.4.8 AC1.1 reshaped the 0.4.7 closing: the last line is the next step, run
+    through the workspace's own venv CLI by absolute path (D2)."""
+    ws = tmp_path / "ws"
+    result = _runner.invoke(app, ["init", str(ws), "--harness", "claude"])
 
     assert result.exit_code == 0, result.stdout
     lines = [line for line in result.stdout.splitlines() if line.strip()]
     closing = lines[-3:]
     assert closing[0] == _LAW
     assert closing[1].startswith("Claude Code: set `instructionFiles:")
-    # The third line: where projects live, and the ONE command that makes the first.
-    assert "repos/" in closing[2]
-    assert "dadaia context create" in closing[2]
-    # Exactly three — nothing above them is a closing note.
+    assert f"{ws / '.dadaia' / '.venv' / 'bin' / 'dadaia'} context create" in closing[2]
     assert _LAW not in "\n".join(lines[:-3])

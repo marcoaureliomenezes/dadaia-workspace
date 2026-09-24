@@ -4,7 +4,6 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-import click
 import typer
 from rich.console import Console
 
@@ -68,9 +67,7 @@ def _plan(directory: str, harness: str, repo: str, associated: tuple[str, ...]) 
         )
     directory = directory or str(Path.cwd() / typer.prompt("Workspace name"))
     harness = harness or typer.prompt(
-        "Harness",
-        default=first,
-        type=click.Choice(harness_registry.L1_ENTRY_HARNESSES),
+        f"Harness ({', '.join(harness_registry.L1_ENTRY_HARNESSES)})", default=first
     )
     repo = repo or typer.prompt("Main repo URL (blank = none)", default="", show_default=False)
     urls = list(associated)

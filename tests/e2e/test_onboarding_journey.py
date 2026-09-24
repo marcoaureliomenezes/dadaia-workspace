@@ -65,10 +65,7 @@ _E2E_VERSION = f"{_SOURCE_VERSION}+e2e"
 # Until release-please bumps, the source version IS the previous published one.
 _PREVIOUS_PYPI = _SOURCE_VERSION
 
-XFAIL_L1 = pytest.mark.xfail(strict=True, reason="T-048-04")
-XFAIL_L2 = pytest.mark.xfail(
-    strict=True, reason="T-048-04 (init lines), T-048-07 (doctor on no specs)"
-)
+XFAIL_L2 = pytest.mark.xfail(strict=True, reason="T-048-07 (doctor on no specs)")
 XFAIL_L3 = pytest.mark.xfail(strict=True, reason="T-048-05")
 XFAIL_UPGRADE = pytest.mark.xfail(strict=True, reason="T-048-06")
 XFAIL_GUIDANCE = pytest.mark.xfail(strict=True, reason="T-048-07")
@@ -318,7 +315,7 @@ def greenfield(env: Env) -> Greenfield:
 
 
 class TestGreenfield:
-    @XFAIL_L1
+    @XFAIL_L2  # init --repo passes; doctor on the specs-less clone is T-048-07
     def test_level1_init_with_repo(self, greenfield: Greenfield) -> None:
         greenfield.level1()
 
@@ -402,7 +399,6 @@ def dadaia_v6(env: Env) -> DadaiaV6:
 
 
 class TestDadaiaV6Specs:
-    @XFAIL_L1
     def test_level1_init(self, dadaia_v6: DadaiaV6) -> None:
         dadaia_v6.level1()
 
@@ -454,7 +450,6 @@ def foreign(env: Env) -> Foreign:
 
 
 class TestForeignSpecs:
-    @XFAIL_L1
     def test_level1_init(self, foreign: Foreign) -> None:
         foreign.level1()
 
@@ -481,7 +476,6 @@ def second(env: Env) -> SecondProject:
 
 
 class TestSecondProjectWithAssociated:
-    @XFAIL_L1
     def test_level1_init(self, second: SecondProject) -> None:
         second.level1()
 
@@ -521,7 +515,6 @@ def failed_create(env: Env) -> FailedCreate:
 
 
 class TestFailedCreateThenRetry:
-    @XFAIL_L1
     def test_level1_init(self, failed_create: FailedCreate) -> None:
         failed_create.level1()
 
