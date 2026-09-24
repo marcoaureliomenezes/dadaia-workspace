@@ -447,6 +447,9 @@ def alive(name: str = typer.Argument(..., help="Context name to make ALIVE")) ->
     except SchemaVersionError as exc:
         print(str(exc), file=sys.stderr)
         raise typer.Exit(1) from None
+    except RepoUrlMissingError as e:
+        err_console.print(f"Error: {e}", markup=False, soft_wrap=True)
+        raise typer.Exit(1) from None
     except (ContextNotFoundError, ContextStateError) as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
@@ -505,6 +508,9 @@ def dead(
         raise typer.Exit(1) from None
     except DeadSecretFoundError as e:
         err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    except RepoUrlMissingError as e:
+        err_console.print(f"Error: {e}", markup=False, soft_wrap=True)
         raise typer.Exit(1) from None
     except GitSyncError as e:
         # Residual git failures (network, refs) surface as a clean error, not a

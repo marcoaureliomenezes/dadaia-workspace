@@ -14,6 +14,7 @@ Covers:
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -208,9 +209,12 @@ def test_repo_remove_second_call_fails_loudly(workspace: Path) -> None:
 
 
 def test_create_associated_repeatable_bare_slug_and_slug_equals_url(workspace: Path) -> None:
-    """A bare slug adopts an existing ``repos/<slug>`` checkout (bug
-    context-create-admits-uncloneable-empty-url: without one it is refused)."""
-    (workspace / "repos" / "assoc-a").mkdir(parents=True)
+    """A bare slug adopts an existing ``repos/<slug>`` git checkout (bugs
+    context-create-admits-uncloneable-empty-url, context-dead-destroys-associated-repo-
+    without-url: a bare or non-git directory is refused)."""
+    subprocess.run(
+        ["git", "init", str(workspace / "repos" / "assoc-a")], capture_output=True, check=True
+    )
     result = _runner.invoke(
         app,
         [
@@ -337,3 +341,16 @@ def test_create_associated_refuses_duplicate_slug_in_same_call(workspace: Path) 
     )
     assert result.exit_code == 1
     assert "more than once" in result.output.lower()
+
+
+def test_create_refuses_a_bare_slug_over_a_non_git_directory(workspace: Path) -> None:
+    """A non-git ``repos/<slug>`` is no checkout: ``dead`` would delete it with no URL to
+    clone it back (bug context-dead-destroys-associated-repo-without-url)."""
+    (workspace / "repos" / "assoc-a").mkdir(parents=True)
+    result = _runner.invoke(
+        app,
+        ["context", "create", "foo", "--main-repo", "foo-repo", "--url", "https://x.test/f.git"]
+        + ["--associated-repos", "assoc-a"],
+    )
+    assert result.exit_code == 1
+    assert "fix:" in result.output
