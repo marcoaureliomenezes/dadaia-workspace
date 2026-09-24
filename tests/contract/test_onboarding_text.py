@@ -93,11 +93,15 @@ def test_every_onboarding_doc_cli_line_invokes_the_venv_path() -> None:
 
 
 # Ratchet — bare `dadaia <verb>` spans still shipped outside T-048-10's write set; a count
-# only moves down, and every law file or public skill not listed carries zero.
+# only moves down and is re-pinned with every reduction (exact match); every persona, law
+# file or public skill not listed carries zero.
 _BARE_RATCHET = {
+    "agents/dd-code-reviewer.md": 1,
+    "agents/dd-product-engineer.md": 4,
+    "agents/dd-software-engineer.md": 3,
     "data/AGENTS.md": 1,  # the banner, pinned by infrastructure/workspace_guardrail.py
     "data/CONSUMER_VALIDATION_RECIPE.md": 14,
-    "data/dadaia-AGENTS.md": 9,
+    "data/dadaia-AGENTS.md": 8,
     "data/handoff-AGENTS.md": 1,
     "data/states-AGENTS.md": 4,
     "skills/dd-ai-eng-knowhow/AUTHORING.md": 1,
@@ -121,11 +125,12 @@ def test_law_files_and_public_skills_invoke_the_venv_path() -> None:
     (`dadaia-workspace`, "the dadaia CLI") is outside them and stays free."""
     public = _PACKAGE / "public"
     over = []
-    for path in sorted([*(public / "data").glob("*.md"), *(public / "skills").rglob("*.md")]):
+    docs = [*(public / "agents").glob("*.md"), *(public / "data").glob("*.md")]
+    for path in sorted([*docs, *(public / "skills").rglob("*.md")]):
         name = path.relative_to(public).as_posix()
         spans = [n for n, line in _code_lines(path.read_text("utf-8")) if _bare_invocations(line)]
-        if len(spans) > _BARE_RATCHET.get(name, 0):
-            over.append(f"{name}: bare `dadaia <verb>` on lines {spans}")
+        if len(spans) != _BARE_RATCHET.get(name, 0):
+            over.append(f"{name}: {len(spans)} bare `dadaia <verb>` (pin it) on lines {spans}")
     assert over == [], "\n".join(over)
 
 
