@@ -582,6 +582,8 @@ class SpecContextService:
 
         self._require_no_untracked_secrets(name, repo_path)
 
+        # Born on the one pushable branch (dd-gitflow-default) of a first release, 0.1.0.
+        self._git.create_branch(repo_path, "feature/0.1.0")
         self._git.commit_all(repo_path, message)
         if not self._git.has_commits(repo_path):
             raise GitSyncError(
@@ -754,7 +756,7 @@ class SpecContextService:
                     except GitSyncError as exc:
                         raise GitSyncError(
                             f"Git push failed for context '{name}' repo '{slug}' at "
-                            f"'{repo_path}'. Resolve the issue and retry dead()."
+                            f"'{repo_path}'; nothing was removed.\n{exc}"
                         ) from exc
             shutil.rmtree(repo_path, onexc=_rmtree_chmod_retry)
 

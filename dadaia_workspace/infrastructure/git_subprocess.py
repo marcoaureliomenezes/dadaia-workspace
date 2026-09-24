@@ -259,6 +259,11 @@ class GitSubprocessClient:
         result = _run(["git", "branch", "--show-current"], cwd=path)
         return result.stdout.strip()
 
+    def create_branch(self, path: Path, branch: str) -> None:
+        result = _run(["git", "checkout", "-b", branch], cwd=path)
+        if result.returncode != 0:
+            raise GitSyncError(f"git checkout -b {branch!r} failed in {path}: {result.stderr.strip()}")
+
     def checkout(self, path: Path, branch: str) -> None:
         result = _run(["git", "checkout", branch], cwd=path)
         if result.returncode != 0:

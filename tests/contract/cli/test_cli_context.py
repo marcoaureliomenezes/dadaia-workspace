@@ -489,12 +489,16 @@ def test_context_baseline_creates_and_pushes_initial_history(
     result = _runner.invoke(app, ["context", "baseline", "baseline", "--yes", "--push"])
     assert result.exit_code == 0, result.output
     assert GitSubprocessClient().has_commits(repo) is True
+    # T-048-11: the birth push lands on feature/0.1.0 — the one pushable branch
+    # (dd-gitflow-default) named for a consumer's first release — so the pre-push hook
+    # every repo now carries admits it.
     remote_head = subprocess.run(
-        ["git", "--git-dir", str(bare), "rev-parse", "--verify", "HEAD"],
+        ["git", "--git-dir", str(bare), "rev-parse", "--verify", "refs/heads/feature/0.1.0"],
         capture_output=True,
         text=True,
     )
     assert remote_head.returncode == 0, remote_head.stderr
+    assert GitSubprocessClient().current_branch(repo) == "feature/0.1.0"
 
     # Bug baseline-refuses-alive-scaffold-commit: baseline is CONVERGENT — a repo
     # that already carries history with a clean tree is success (idempotent no-op),
@@ -512,6 +516,32 @@ def test_context_baseline_creates_and_pushes_initial_history(
     dirty = _runner.invoke(app, ["context", "baseline", "baseline", "--yes"])
     assert dirty.exit_code != 0
     assert "already has Git history" in dirty.output
+
+
+def test_context_dead_surfaces_the_refused_push_with_its_fix_line(
+    workspace: Path, tmp_path: Path
+) -> None:
+    """T-048-11: a push the pre-push hook refuses reaches the operator verbatim — its
+    one ``fix:`` line included — instead of a bare "resolve the issue and retry"."""
+    bare = tmp_path / "refused.git"
+    subprocess.run(["git", "init", "--bare", str(bare)], capture_output=True, check=True)
+    repo = workspace / "repos" / "refused"
+    subprocess.run(["git", "clone", str(bare), str(repo)], capture_output=True, check=True)
+    for key, value in (("user.email", "t@example.com"), ("user.name", "T")):
+        subprocess.run(["git", "config", key, value], cwd=repo, check=True)
+    (repo / "README.md").write_text("x\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-qm", "init"], cwd=repo, check=True)
+    hook = repo / ".git" / "hooks" / "pre-push"
+    hook.write_text("#!/bin/sh\necho 'fix: git checkout -b feature/0.1.0' >&2\nexit 1\n")
+    hook.chmod(0o755)
+    _register_alive_ctx(workspace, "refused")
+
+    result = _runner.invoke(app, ["context", "dead", "refused"])
+
+    assert result.exit_code != 0
+    assert "fix: git checkout -b feature/0.1.0" in " ".join(result.output.split())
+    assert repo.is_dir()
 
 
 # ---------------------------------------------------------------------------

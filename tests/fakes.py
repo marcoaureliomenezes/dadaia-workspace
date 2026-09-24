@@ -105,6 +105,9 @@ class FakeGitClient:
     def current_branch(self, path: Path) -> str:
         return self._branches.get(path, "main")
 
+    def create_branch(self, path: Path, branch: str) -> None:
+        self._branches[path] = branch
+
     def checkout(self, path: Path, branch: str) -> None:
         self.checked_out.append((path, branch))
         self._branches[path] = branch
