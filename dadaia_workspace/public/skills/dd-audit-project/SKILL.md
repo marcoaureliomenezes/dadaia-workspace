@@ -33,7 +33,14 @@ Refuse to write `AUDIT.md` until all three pillar sections are present — fewer
 three is not an audit. Append one `FINDINGS.jsonl` record per claim
 ([`FINDINGS-FORMAT.md`](FINDINGS-FORMAT.md)).
 
-## 3. Done when
+## 3. First pass — a freshly onboarded context
+
+- Applies when `specs/audits/_archive/audits_histo.jsonl` holds no record: no window exists yet.
+- Worklist: `python3 .agents/skills/dd-spec-navigator/scripts/memory.py drift --since $(git rev-list --max-parents=0 HEAD) --specs <specs>` — every uncovered unit from the first commit.
+- `dd-product-engineer` fills `ARCHITECTURE.md`, `QUALITY.md` and the product atoms from the code, and from `specs-bkp/` when present.
+- Done = every worklist line covered and `memory.py check` exit 0; then append the `audits_histo.jsonl` stamp — the next audit's window starts there.
+
+## 4. Done when
 
 - The window is computed once and recorded in `AUDIT.md`'s scope.
 - All eight bug-forensic metrics computed with baseline + target; every Part-1
@@ -41,7 +48,7 @@ three is not an audit. Append one `FINDINGS.jsonl` record per claim
 - `AUDIT.md` carries all three pillar sections; every claim has its
   `FINDINGS.jsonl` record.
 
-## 4. References
+## 5. References
 
 - [`FINDINGS-FORMAT.md`](FINDINGS-FORMAT.md) — record shape, evidence rule,
   disposition vocabulary.
