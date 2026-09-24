@@ -89,6 +89,10 @@ def build_spec_context_service(workspace_root: Path) -> SpecContextService:
     )
 
 
+def build_git_client() -> GitSubprocessClient:
+    return GitSubprocessClient()
+
+
 def build_public_service() -> PublicAssetService:
     # v0.1.65 FR7 (D-4): the agent-model-policy overlay loader is injected here so the
     # features-layer service never imports the infrastructure store directly.

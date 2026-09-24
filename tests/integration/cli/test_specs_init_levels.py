@@ -14,7 +14,7 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli._specs_resolution import HARNESS_SESSION_ID_ENV_VARS
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core import specs_version
-from dadaia_workspace.features.specs import SpecsDoctor
+from dadaia_workspace.features.specs import SpecsDoctor, canon
 
 pytestmark = pytest.mark.integration
 
@@ -160,3 +160,39 @@ def test_no_context_resolved_exits_2_with_a_fix_line(repo: Path) -> None:
 
     assert result.exit_code == 2, result.output
     assert "fix: .dadaia/.venv/bin/dadaia specs init --context <name>" in result.output
+
+
+def test_existing_specs_bkp_fix_line_is_non_destructive_and_clears_the_refusal(
+    repo: Path,
+) -> None:
+    """Review finding 8: the fix line keeps the prior backup instead of deleting it."""
+    _foreign(repo)
+    (repo / "specs-bkp").mkdir()
+    (repo / "specs-bkp" / "old.md").write_text("previous backup\n", encoding="utf-8")
+    refused = _runner.invoke(app, ["specs", "init", "--context", "c", "--replace-foreign"])
+    fix = next(ln for ln in refused.output.splitlines() if ln.startswith("fix: "))[5:]
+    assert " rm " not in fix
+
+    subprocess.run(fix, shell=True, check=True, cwd=repo.parent.parent)
+    result = _runner.invoke(app, ["specs", "init", "--context", "c", "--replace-foreign"])
+
+    assert result.exit_code == 0, result.output
+    kept = [p for p in repo.glob("specs-bkp-*/old.md")]
+    assert [p.read_text(encoding="utf-8") for p in kept] == ["previous backup\n"]
+
+
+def test_a_symlinked_context_specs_root_is_refused_and_nothing_written(
+    repo: Path, tmp_path: Path
+) -> None:
+    """Review finding 7: ``--context`` routes through the one symlink-refusal seam."""
+    real = tmp_path / "elsewhere-specs"
+    canon.scaffold(real)
+    specs_version.write_pattern_version(real, 6)
+    (repo / "specs").symlink_to(real, target_is_directory=True)
+    before, before_real = _snapshot(repo), _snapshot(real)
+
+    result = _runner.invoke(app, ["specs", "init", "--context", "c"])
+
+    assert result.exit_code != 0, result.output
+    assert "symlink" in result.output.lower()
+    assert (_snapshot(repo), _snapshot(real)) == (before, before_real)

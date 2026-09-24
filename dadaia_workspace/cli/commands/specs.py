@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 import typer
 
+from dadaia_workspace import container
 from dadaia_workspace.cli._specs_resolution import (
-    repo_slug_for_context,
     resolve_context_for_cli,
+    resolve_context_specs_dir_for_cli,
     resolve_specs_dir_for_cli,
 )
 from dadaia_workspace.core import specs_version
@@ -18,7 +20,6 @@ from dadaia_workspace.features.migrate import upgrade as upgrade_feature
 from dadaia_workspace.features.migrate.registry import UpgradeRefused
 from dadaia_workspace.features.migrate.upgrade import UpgradeResult
 from dadaia_workspace.features.specs import canon
-from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 
 app = typer.Typer(help="SDD release-lifecycle structural checks and helpers.")
 
@@ -101,19 +102,16 @@ def init(
     Absent: scaffold. Dadaia (stamped >= 6): upgrade, then fill missing files. Foreign:
     after consent, `git mv specs specs-bkp` (staged) and scaffold.
     """
-    if specs_dir is not None:
-        target, rerun = resolve_specs_dir_for_cli(specs_dir), f"--specs-dir {specs_dir}"
-    else:
+    rerun = f"--specs-dir {specs_dir}"
+    if specs_dir is None:
         try:
             ctx = resolve_context_for_cli(context)
         except ValueError as exc:
             typer.echo(f"[error] {exc}\n{_FIX} --context <name>", err=True)
             raise typer.Exit(2) from exc
-        root = resolve_workspace_root()
-        target, rerun = (
-            root / "repos" / repo_slug_for_context(root, ctx) / "specs",
-            f"--context {ctx}",
-        )
+        specs_dir = str(resolve_context_specs_dir_for_cli(resolve_workspace_root(), ctx))
+        rerun = f"--context {ctx}"
+    target = resolve_specs_dir_for_cli(specs_dir)
 
     kind = canon.classify(target)
     if kind == "foreign":
@@ -133,8 +131,8 @@ def _move_foreign(target: Path, rerun: str, replace_foreign: bool) -> None:
     backup = target.parent / _BACKUP
     if backup.exists():
         typer.echo(
-            f"[error] {backup} already exists — move or delete it first.\n"
-            f"fix: git -C {target.parent} rm -r -q {_BACKUP}",
+            f"[error] {backup} already exists — move it aside first.\n"
+            f"fix: mv {backup} {backup}-{datetime.now(UTC):%Y%m%dT%H%M%SZ}",
             err=True,
         )
         raise typer.Exit(1)
@@ -147,5 +145,5 @@ def _move_foreign(target: Path, rerun: str, replace_foreign: bool) -> None:
                 err=True,
             )
             raise typer.Exit(2)
-    GitSubprocessClient().move(target.parent, target.name, _BACKUP)
+    container.build_git_client().move(target.parent, target.name, _BACKUP)
     typer.echo(f"[moved] {target} -> {backup} (staged, not committed)")
