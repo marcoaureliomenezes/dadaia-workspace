@@ -83,3 +83,20 @@ def test_non_tty_missing_field_exits_2_with_one_fix(
     assert fixes[0].startswith("fix: uvx dadaia-workspace init "), fixes
     assert "--harness" in fixes[0]
     assert not list(tmp_path.iterdir())
+
+
+def test_non_tty_fix_line_repeats_the_repo_flags(tmp_path: Path, monkeypatch) -> None:
+    """Bug init-missing-harness-fix-line-drops-repo-flags: running the fix as printed
+    keeps level 2 — every --repo/--associated-repo the invocation carried."""
+    monkeypatch.chdir(tmp_path)
+    argv = ["init", "myws", "--repo", "https://h/m.git", "--associated-repo", "https://h/a.git"]
+    argv += ["--associated-repo", "https://h/b.git"]
+
+    result = _runner.invoke(app, argv)
+
+    assert result.exit_code == 2, result.output
+    [fix] = [ln for ln in result.output.splitlines() if ln.startswith("fix: ")]
+    assert fix == (
+        "fix: uvx dadaia-workspace init myws --harness claude --repo https://h/m.git "
+        "--associated-repo https://h/a.git --associated-repo https://h/b.git"
+    )
