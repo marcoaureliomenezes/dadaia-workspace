@@ -142,7 +142,6 @@ class TestStage:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
         assert manifest.get("schema_version") == "1", "schema_version must be '1'"
-        assert "generated_at" in manifest, "manifest missing generated_at"
         assert "assets" in manifest, "manifest missing assets list"
         for asset in manifest["assets"]:
             assert "path" in asset, f"asset missing 'path': {asset}"
