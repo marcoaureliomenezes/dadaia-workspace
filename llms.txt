@@ -34,12 +34,12 @@
 - [Memory catalog](specs/memory/product/index.md): every product atom, its `tldr` and its path.
 - [Source repository](https://github.com/marcoaureliomenezes/dadaia-workspace): issues, releases and the full specs tree.
 
-## The site
+## The docs
 
 <!-- derived-from: pypi-distribution sha256:ab76c52ed560 -->
 <!-- derived-from: product-vision sha256:16060412dc8a -->
 
-- [Documentation site](https://marcoaureliomenezes.github.io/dadaia-workspace/): GitHub Pages serving `docs/` from `main`, every page derived under its markers.
+- [Documentation](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs): the repository's `docs/` folder on `main`, every page derived under its markers.
 - [Landing](docs/index.md): the tagline, the paradigm and the two ways in.
 - [Quickstart](docs/quickstart.md): the three levels (workspace, project, specs) in one shell block, doctor, first backlog entry, first release, upgrade.
 - [Positioning](docs/positioning.md): product repos never carry agent config; one law governs many projects.

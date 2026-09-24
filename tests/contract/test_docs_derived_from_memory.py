@@ -148,7 +148,7 @@ def test_the_derived_set_covers_the_readme_the_agent_index_and_every_authored_do
     }
 
 
-_PAGES_URL = "https://marcoaureliomenezes.github.io/dadaia-workspace/"
+_DOCS_URL = "https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs"
 
 
 def test_the_ledger_article_derives_from_the_quality_and_governance_atoms() -> None:
@@ -174,13 +174,23 @@ def test_the_agent_index_lists_every_page_of_the_site() -> None:
     assert missing == [], f"llms.txt names no entry for: {', '.join(missing)}"
 
 
-def test_the_readme_sends_a_reader_to_the_published_site() -> None:
-    """PyPI renders the README: the published site URL is the one link that survives
-    being read outside the checkout, where a relative `docs/` path is a dead end."""
+def test_the_readme_sends_a_reader_to_the_docs_folder() -> None:
+    """Intent: CONTRACT — docs-url-dead-and-readme-links-break-on-pypi. No Pages site
+    exists: the Documentation URL and the README both name the repository's docs folder."""
     readme = (_REPO_ROOT / "README.md").read_text("utf-8")
 
-    assert _PAGES_URL in readme
-    assert _pyproject_poetry()["urls"]["Documentation"] == _PAGES_URL  # type: ignore[index]
+    assert _DOCS_URL in readme
+    assert _pyproject_poetry()["urls"]["Documentation"] == _DOCS_URL  # type: ignore[index]
+    assert "github.io" not in readme
+
+
+def test_every_readme_link_is_absolute() -> None:
+    """Intent: CONTRACT — docs-url-dead-and-readme-links-break-on-pypi. PyPI renders the
+    README outside the checkout, where a relative link or image target is a dead end."""
+    readme = (_REPO_ROOT / "README.md").read_text("utf-8")
+    targets = re.findall(r"\]\(([^)\s]+)", readme) + re.findall(r'(?:src|href)="([^"]+)"', readme)
+    relative = [t for t in targets if not re.match(r"(?:https?:|mailto:|#)", t)]
+    assert relative == []
 
 
 @pytest.mark.parametrize(

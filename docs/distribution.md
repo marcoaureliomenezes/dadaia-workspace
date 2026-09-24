@@ -11,7 +11,7 @@ Where dadaia-workspace is published and what each channel carries.
 | PyPI | the wheel; `README.md` is the long description and `pyproject.toml` the metadata | `.github/workflows/release.yml`: merging the release PR creates the tag, and the publish jobs, gated on `release_created` and on the operator's `release-gate` approval, upload under OIDC trusted publishing |
 | GitHub repository | the repository description, topics and homepage | set from the same tagline and keywords as `pyproject.toml` |
 | Repository root | `llms.txt` — an index whose every line links to a derived document, the law, the CLI reference or the memory catalog | committed, derived under its markers |
-| Docs site | GitHub Pages serving `docs/` from `main`, with no build toolchain | every page derived under its markers |
+| Docs | the repository's `docs/` folder on `main`, with no build toolchain or site | every page derived under its markers |
 
 ## The PyPI metadata contract
 
@@ -29,7 +29,7 @@ Every field PyPI renders has exactly one home:
 - **The long description** — `README.md` itself (`readme = "README.md"`), derived like
   every other document.
 - **The links** — `[tool.poetry.urls]`: `Homepage`, `Repository`, `Documentation` (the
-  docs site), `Changelog` and `Issues`.
+  repository's `docs/` folder), `Changelog` and `Issues`.
 - **The keywords** — every keyword names something the README says.
 - **The classifiers** — the `Development Status` stays `3 - Alpha` until a released
   wheel passes the consumer-validation recipe.

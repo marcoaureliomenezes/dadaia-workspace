@@ -1,6 +1,6 @@
 # dadaia-workspace
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/dadaia-workspace)](https://pypi.org/project/dadaia-workspace/)
 
 A local-first, spec-driven workspace that gives AI agents current context, a document-governed lifecycle, visible concurrency and anti-slop boundaries.
@@ -133,16 +133,16 @@ with a RED test. Completed work leaves as a `handoff-v1` record, validated by
 <!-- derived-from: pypi-distribution sha256:ab76c52ed560 -->
 <!-- derived-from: public-asset-distribution sha256:6e3a34ba5b23 -->
 
-The site is <https://marcoaureliomenezes.github.io/dadaia-workspace/>:
+The documentation is the repository's [docs folder](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs):
 
-- [Quickstart](docs/quickstart.md) — install to a bound project, a backlog entry and a
-  live release; [positioning](docs/positioning.md) — why product repos carry no agent
+- [Quickstart](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/quickstart.md) — install to a bound project, a backlog entry and a
+  live release; [positioning](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/positioning.md) — why product repos carry no agent
   config.
-- [The bug loop](docs/bug-loop.md) — register, RED, fix, resolve;
-  [what the bug ledger taught](docs/bug-ledger-lessons.md) — measuring the ledger and
+- [The bug loop](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/bug-loop.md) — register, RED, fix, resolve;
+  [what the bug ledger taught](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/bug-ledger-lessons.md) — measuring the ledger and
   the fix-chain lesson.
-- [CLI reference](docs/cli.md) · [concepts](docs/concepts.md) ·
-  [getting started](docs/getting-started.md) · [distribution](docs/distribution.md)
+- [CLI reference](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/cli.md) · [concepts](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/concepts.md) ·
+  [getting started](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/getting-started.md) · [distribution](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/distribution.md)
 
 ## Links
 
@@ -150,5 +150,5 @@ The site is <https://marcoaureliomenezes.github.io/dadaia-workspace/>:
 
 - GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
 - PyPI — <https://pypi.org/project/dadaia-workspace/>
-- Agent index — [`llms.txt`](llms.txt)
-- Changelog — [`CHANGELOG.md`](CHANGELOG.md)
+- Agent index — [`llms.txt`](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/llms.txt)
+- Changelog — [`CHANGELOG.md`](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/CHANGELOG.md)
