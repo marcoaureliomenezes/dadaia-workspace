@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-24T07:32:24Z",
+  "generated_at": "2026-09-24T07:47:29Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -809,7 +809,7 @@
         "lifecycle",
         "memory"
       ],
-      "token_estimate": 1079,
+      "token_estimate": 1081,
       "depends_on": [
         "sdd-gate-v3",
         "backlog-ledger",

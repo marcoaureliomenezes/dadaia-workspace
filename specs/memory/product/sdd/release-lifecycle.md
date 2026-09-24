@@ -42,7 +42,7 @@ sources:
 - `python3 .agents/skills/dd-spec-navigator/scripts/memory.py drift --since <sha> [--json]` lists the atoms whose `sources` globs match a path changed over `<sha>..HEAD` and every code unit no atom covers, exiting 1 while that worklist is non-empty; `--since` is required and has no default window.
 - A code unit is derived from the audited repo alone: each directory directly holding a tracked code file, or a root-level code file on its own; `specs/`, `tests/`, `test/`, `docs/` and dot-directories hold none, and a unit is covered once any atom's `sources` match a file under it.
 - Each listed atom is reconciled from its sources' diff — delete, update, then add — and `memory.py catalog generate` regenerates the catalog pair ([[workspace-doctor]]).
-- `RELEASE-TREE-MEMORY` keeps a live release in `CLOSURE` red until a `kind: memory` entry stamped after `implemented.ts` carries `since`, `until`, `reviewed` and `changed`, its `since` equal to the state-derived window start.
+- `RELEASE-TREE-MEMORY` keeps a live release in `CLOSURE` red until a `kind: memory` entry stamped at or after `implemented.ts` carries `since`, `until`, `reviewed` and `changed`, its `since` equal to the state-derived window start.
 
 ## Promote
 

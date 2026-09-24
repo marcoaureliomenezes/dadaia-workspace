@@ -96,7 +96,7 @@ commit. Only the operator creates demand.
 
 ## 6. The first release
 
-<!-- derived-from: release-lifecycle sha256:1151a261d24f -->
+<!-- derived-from: release-lifecycle sha256:7d025467878a -->
 
 `release.py new` is one birth act, all or nothing: a `SPEC.md` stub plus
 `_RELEASE.json` in `DEFINITION` under `specs/releases/<id>/`, refusing a second live
