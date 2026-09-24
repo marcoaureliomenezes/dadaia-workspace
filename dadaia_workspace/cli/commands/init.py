@@ -32,6 +32,11 @@ _CLOSING_NOTES = (
 )
 
 
+#: How ``init`` is invoked before any workspace (and so any ``.dadaia/.venv``) exists —
+#: every ``fix:`` line init prints starts here, so each one runs as printed.
+_INIT = "uvx dadaia-workspace init"
+
+
 def _refuse(message: str, fix: str) -> typer.Exit:
     """Print *message* + its ONE executable ``fix:`` line on stderr and exit 2."""
     typer.secho(message, err=True, fg=typer.colors.RED)
@@ -66,29 +71,27 @@ def init(
             "--harness is required: a workspace is born with exactly one agent runtime "
             f"({', '.join(harness_registry.L1_ENTRY_HARNESSES)}); "
             "`dadaia harness add <name>` adds any other later.",
-            f"dadaia init {directory} --harness {harness_registry.L1_ENTRY_HARNESSES[0]}",
+            f"{_INIT} {directory} --harness {harness_registry.L1_ENTRY_HARNESSES[0]}",
         )
     try:
         chosen = harness_registry.parse_harness_name(harness)
     except ValueError as exc:
         raise _refuse(
             str(exc),
-            f"dadaia init {directory} --harness {harness_registry.L1_ENTRY_HARNESSES[0]}",
+            f"{_INIT} {directory} --harness {harness_registry.L1_ENTRY_HARNESSES[0]}",
         ) from None
 
     # The seam is argv: the directory is a parameter, never resolved from cwd.
     root = Path(directory).expanduser()
     root = (Path.cwd() / root).resolve() if not root.is_absolute() else root.resolve()
+    sibling_fix = f"{_INIT} {root.with_name(root.name + '-workspace')} --harness {chosen}"
     if root.exists() and not root.is_dir():
-        raise _refuse(
-            f"'{root}' is not a directory.", f"dadaia init {directory}-workspace --harness {chosen}"
-        )
+        raise _refuse(f"'{root}' is not a directory.", sibling_fix)
     # A directory that already holds `.dadaia/` is THIS workspace (a re-run, idempotent);
     # anything else non-empty is a foreign tree and is never scaffolded over.
     if root.is_dir() and any(root.iterdir()) and not (root / ".dadaia").is_dir():
         raise _refuse(
-            f"'{root}' already holds a foreign tree (not a dadaia workspace).",
-            f"dadaia init {directory}-workspace --harness {chosen}",
+            f"'{root}' already holds a foreign tree (not a dadaia workspace).", sibling_fix
         )
     root.mkdir(parents=True, exist_ok=True)
 
@@ -147,7 +150,7 @@ def init(
     except (DadaiaError, OSError) as exc:
         typer.secho(f"Error: {exc}", err=True, fg=typer.colors.RED)
         typer.secho(
-            f"fix: dadaia init {directory} --harness {chosen} --repo <a reachable clone URL>",
+            f"fix: {_INIT} {directory} --harness {chosen} --repo <a reachable clone URL>",
             err=True,
             fg=typer.colors.RED,
         )
