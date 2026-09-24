@@ -162,3 +162,68 @@ def test_the_detector_flags_bare_calls_and_spares_the_venv_path_and_uvx_init() -
     assert _bare_invocations("uvx dadaia-workspace init demo --repo x") == []
     assert _bare_invocations("uvx dadaia-workspace@0.4.8 init demo") == []
     assert _bare_invocations("{} context list") == []
+
+
+_VENV_CALL_RE = re.compile(r"\.dadaia/\.venv/bin/dadaia((?: [a-z][\w-]*)+)([^`]*)")
+_FLAG_RE = re.compile(r"(?<![\w-])--[a-z][\w-]*")
+
+
+def _cli_tree() -> dict[str, set[str]]:
+    """Every command path (`context bind`) mapped to the flags it accepts."""
+    from typer.main import get_command
+
+    from dadaia_workspace.cli.main import app
+
+    tree: dict[str, set[str]] = {}
+
+    def walk(cmd: object, path: str) -> None:
+        opts = {o for p in getattr(cmd, "params", []) for o in getattr(p, "opts", [])}
+        tree[path] = {o for o in opts if o.startswith("--")} | {"--help"}
+        for name, sub in (getattr(cmd, "commands", {}) or {}).items():
+            walk(sub, f"{path} {name}".strip())
+
+    walk(get_command(app), "")
+    return tree
+
+
+def _dead_flags(span: str, tree: dict[str, set[str]]) -> list[str]:
+    match = _VENV_CALL_RE.search(span)
+    if match is None:
+        return []
+    words, path = match.group(1).split(), ""
+    for word in words:
+        if f"{path} {word}".strip() not in tree:
+            break
+        path = f"{path} {word}".strip()
+    return [f for f in _FLAG_RE.findall(match.group(0)) if f not in tree[path]]
+
+
+def test_every_flag_cited_beside_a_venv_call_exists_in_that_verbs_help() -> None:
+    """Intent: CONTRACT — dd-cli-library-cites-a-dead-flag-and-omits-level-3. A flag the
+    law or a skill cites next to `.dadaia/.venv/bin/dadaia <verb>` is one that verb takes;
+    the dd-cli-library core idioms cite no flag the CLI tree lacks."""
+    tree = _cli_tree()
+    every_flag = set().union(*tree.values())
+    public = _PACKAGE / "public"
+    violations = [
+        f"{path.relative_to(public).as_posix()}:{n}: {dead}"
+        for path in sorted([*(public / "data").glob("*.md"), *(public / "skills").rglob("*.md")])
+        for n, span in _code_lines(path.read_text("utf-8"))
+        for dead in _dead_flags(span, tree)
+    ]
+    idioms = (public / "skills/dd-cli-library/SKILL.md").read_text("utf-8").split("## Dev-server")[0]
+    violations += [
+        f"dd-cli-library core idioms:{n}: {flag}"
+        for n, span in _code_lines(idioms)
+        if span.startswith("--")
+        for flag in _FLAG_RE.findall(span)
+        if flag not in every_flag
+    ]
+    assert violations == [], "\n".join(violations)
+
+
+def test_the_cli_library_onboarding_line_names_level_3() -> None:
+    """Intent: CONTRACT — dd-cli-library-cites-a-dead-flag-and-omits-level-3."""
+    text = (_PACKAGE / "public/skills/dd-cli-library/SKILL.md").read_text("utf-8")
+    assert "Level 3: `.dadaia/.venv/bin/dadaia specs init --context <ctx>`" in text
+    assert "dd-audit-project" in text
