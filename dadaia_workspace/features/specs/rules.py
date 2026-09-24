@@ -112,7 +112,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("TREE-1",),
         lambda d: d._structural.check_tree1_foundation(),
-        fix_help=f"{DADAIA_BIN} specs upgrade --specs-dir <specs>",
+        # No fix line: no command migrates foundation/; operator consent. WARNING-only.
     ),
     _rule(
         ("TREE-2",),

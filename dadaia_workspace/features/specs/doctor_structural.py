@@ -62,13 +62,6 @@ _TREE8_CANON_ROOT: frozenset[str] = CANON_ROOT_MEMBERS
 #: pending operator consent). TREE-8 never flags either a second time.
 _TREE8_DEFERRED_TO_SIBLING_CHECKS: frozenset[str] = frozenset({"foundation", "SPEC.md"})
 
-# Migration hint printed loudly for TREE-1 and TREE-2 (regardless of --fix).
-_TREE_MIGRATION_HINT = (
-    "[TREE MIGRATION REQUIRED] Run: dadaia migrate tree-v2\n"
-    "  This command moves deprecated content to releases/legacy/ "
-    "without destroying SDD-approved artifacts."
-)
-
 
 class StructuralValidator:
     """TREE-1..8 structural invariants for the spec tree."""
@@ -86,10 +79,8 @@ class StructuralValidator:
     def check_tree1_foundation(self) -> list[SpecsDoctorIssue]:
         """TREE-1: specs/foundation/ must NOT exist (deprecated layout).
 
-        Warn-only (fixable=False).  A loud migration hint pointing to
-        ``dadaia migrate tree-v2`` is emitted regardless of the --fix flag.
-        Auto-moving is intentionally blocked: foundation/ may hold SDD-approved
-        content and reclassification requires operator consent.
+        Warn-only (fixable=False): foundation/ may hold SDD-approved content and
+        reclassifying it is the operator's call — no migrator exists.
         """
         foundation = self.specs_dir / "foundation"
         if not foundation.exists():
@@ -99,8 +90,8 @@ class StructuralValidator:
                 code="TREE-1",
                 severity=Severity.WARNING,
                 description=(
-                    "specs/foundation/ exists — this is the deprecated layout. "
-                    f"{_TREE_MIGRATION_HINT}"
+                    "specs/foundation/ exists — this is the deprecated layout. Move "
+                    "its content into releases/<id>/ or memory/ by hand (TREE-1)."
                 ),
                 path=str(foundation),
                 fixable=False,
@@ -110,10 +101,8 @@ class StructuralValidator:
     def check_tree2_root_spec_md(self) -> list[SpecsDoctorIssue]:
         """TREE-2: specs/SPEC.md at the tree root must NOT exist (deprecated).
 
-        Warn-only (fixable=False).  A loud migration hint pointing to
-        ``dadaia migrate tree-v2`` is emitted regardless of the --fix flag.
-        Auto-moving is intentionally blocked: root SPEC.md may hold
-        SDD-approved content that requires operator consent to reclassify.
+        Warn-only (fixable=False): root SPEC.md may hold SDD-approved content and
+        reclassifying it is the operator's call — no migrator exists.
         """
         root_spec = self.specs_dir / "SPEC.md"
         if not root_spec.exists():
@@ -123,8 +112,8 @@ class StructuralValidator:
                 code="TREE-2",
                 severity=Severity.WARNING,
                 description=(
-                    "specs/SPEC.md exists at the tree root — this is the deprecated layout. "
-                    f"{_TREE_MIGRATION_HINT}"
+                    "specs/SPEC.md exists at the tree root — this is the deprecated "
+                    "layout. Move it into releases/<id>/ by hand (TREE-2)."
                 ),
                 path=str(root_spec),
                 fixable=False,

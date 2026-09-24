@@ -2,7 +2,7 @@
 ``upgrade-never-refreshes-uncustomised-scoped-law-projection`` (MEDIUM).
 
 A projected law file (``specs/AGENTS.md``) is installed once and then never refreshed:
-overwriting it could destroy operator customisation, so ``specs doctor`` reports drift
+overwriting it could destroy operator customisation, so ``dadaia doctor`` reports drift
 (TREE-5) and declines to repair. Without a way to recognise our own earlier output, a file
 nobody ever edited is protected exactly like a hand-written one — and every instance kept
 scoped law citing a command the CLI had already removed.
