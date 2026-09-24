@@ -54,20 +54,20 @@ def report(specs: Path, since: str, until: str = "HEAD") -> dict[str, Any]:
 
 
 def _units(tracked: list[str]) -> dict[str, list[str]]:
-    """Every directory directly holding a tracked code file, mapped to every file beneath it.
+    """Every directory directly holding a tracked code file, mapped to every file beneath it;
+    a root-level code file is its own unit.
 
-    Derived from the audited repo alone: `specs/`, `tests/`, `docs/`, dot-dirs and root
-    files hold no unit, so a parent directory is covered as soon as any child is.
+    Derived from the audited repo alone: `specs/`, `tests/`, `docs/` and dot-dirs hold no
+    unit, so a parent directory is covered as soon as any child is.
     """
-    dirs = {
-        path.rsplit("/", 1)[0]
+    units = {
+        path.rpartition("/")[0] or path
         for path in tracked
-        if "/" in path
-        and Path(path).suffix in CODE
+        if Path(path).suffix in CODE
         and not (top := path.split("/", 1)[0]).startswith(".")
         and top not in NOT_CODE
     }
-    return {d: [p for p in tracked if p.startswith(f"{d}/")] for d in dirs}
+    return {u: [p for p in tracked if p == u or p.startswith(f"{u}/")] for u in units}
 
 
 def _matches(sources: list[str], paths: list[str]) -> list[str]:

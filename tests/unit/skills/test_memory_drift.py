@@ -177,3 +177,15 @@ def test_drift_requires_since_and_resolves_no_window_itself(script: Path, repo: 
 
     assert result.returncode == 2
     assert "--since" in result.stderr
+
+
+def test_a_root_level_code_file_is_its_own_unit(script: Path, repo: Path) -> None:
+    """Review N5: a repo whose code sits at its root must not yield an empty worklist."""
+    (repo / "main.py").write_text("z = 1\n", "utf-8")
+    _git(repo, "add", "main.py")
+    _git(repo, "commit", "-qm", "root code")
+    base = _git(repo, "rev-parse", "HEAD")
+
+    report = json.loads(_run(script, repo, "--since", base, "--json").stdout)
+
+    assert "main.py" in report["uncovered"]
