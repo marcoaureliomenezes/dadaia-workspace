@@ -42,7 +42,7 @@ Paths under `dadaia_workspace/` abbreviated `dw/`. Tasks in one parallel group (
   `Write set:` `dw/cli/commands/init.py`, `dw/features/workspace/service.py`, `dw/infrastructure/python_env.py`, tests
   `blocked by:` T-048-03 · `group:` P3 · `delivers:` FR1, AC9.1 (init listing)
 
-- [ ] **T-048-05 — specs init: level 3 with specs-bkp.**
+- [-] **T-048-05 — specs init: level 3 with specs-bkp.**
   `canon` classifies dadaia (constitution with `specs_pattern_version` ≥ 6) vs foreign; `specs init --context <c>`
   (bound when omitted, none → exit 2): absent → scaffold; dadaia → `specs upgrade` path (v6 → v7 with law sections);
   foreign → TTY y/N or `--replace-foreign`, `git mv specs specs-bkp` (staged), scaffold; existing `specs-bkp/` → exit 1.
