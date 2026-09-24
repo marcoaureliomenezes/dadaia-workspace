@@ -47,11 +47,13 @@ What it rests on:
 
 <!-- derived-from: product-vision sha256:164c4a8b0eca -->
 
-A human installs it from PyPI and drives it from a shell:
-`dadaia init <dir> --harness <name> --repo <url>` provisions a workspace with its first
-project ALIVE and bound, `dadaia context create`, `dadaia context alive` and
-`dadaia context bind` add the next ones, and `dadaia doctor` lists findings with a
-runnable fix under each.
+A human drives it from a shell in three levels:
+`uvx dadaia-workspace init <dir> --harness <name> --repo <url>` provisions the
+workspace and its first project ALIVE and bound,
+`.dadaia/.venv/bin/dadaia specs init --context <slug>` brings the project's `specs/`
+to the canon, and `.dadaia/.venv/bin/dadaia doctor` lists findings with a runnable fix
+under each; `.dadaia/.venv/bin/dadaia context create --main-repo <url>` adds the next
+project, and re-running the `uvx` init line upgrades the workspace.
 
 An agent reads the root `AGENTS.md` map — flow, roles, gate invariants, where things
 live, the index of every scoped law and skill — opens the scoped `AGENTS.md` of its

@@ -13,7 +13,7 @@
 <!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
 <!-- derived-from: workspace-init sha256:bc26cf0b24e2 -->
 
-- [PyPI project](https://pypi.org/project/dadaia-workspace/): `pip install dadaia-workspace`, then `dadaia init <dir> --harness <name> [--repo <url>]`; `uvx dadaia-workspace init …` runs without an install.
+- [PyPI project](https://pypi.org/project/dadaia-workspace/): three levels — `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` (workspace + project: cloned, ALIVE, bound), then `.dadaia/.venv/bin/dadaia specs init --context <slug>` (specs on the canon) and `.dadaia/.venv/bin/dadaia doctor`; every later command runs through `.dadaia/.venv/bin/dadaia`; re-running the `uvx` init line upgrades the workspace.
 - [Changelog](CHANGELOG.md): written by release-please, one section per released version.
 
 ## The law
@@ -27,7 +27,7 @@
 
 <!-- derived-from: pypi-distribution sha256:ed8fdd86720a -->
 
-- [CLI reference](docs/cli.md): the committed output of `dadaia help tree`.
+- [CLI reference](docs/cli.md): the committed output of `.dadaia/.venv/bin/dadaia help tree`.
 - [Concepts](docs/concepts.md): the vocabulary — context, release, candidate, gate, memory, ledgers, audits.
 - [Distribution](docs/distribution.md): the publication channels and what each carries.
 - [Getting started](docs/getting-started.md): the longer walkthrough behind the quickstart.
@@ -41,7 +41,7 @@
 
 - [Documentation site](https://marcoaureliomenezes.github.io/dadaia-workspace/): GitHub Pages serving `docs/` from `main`, every page derived under its markers.
 - [Landing](docs/index.md): the tagline, the paradigm and the two ways in.
-- [Quickstart](docs/quickstart.md): install, init, bind, doctor, first backlog entry, first release.
+- [Quickstart](docs/quickstart.md): the three levels (workspace, project, specs) in one shell block, doctor, first backlog entry, first release, upgrade.
 - [Positioning](docs/positioning.md): product repos never carry agent config; one law governs many projects.
 - [The bug loop](docs/bug-loop.md): register, RED, fix, resolve with evidence and lineage.
 - [What the bug ledger taught](docs/bug-ledger-lessons.md): how to measure the ledger, and the fix-chain lesson — an additive fix breeds the next bug, a deletion-shaped fix ends the family.
