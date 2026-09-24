@@ -65,7 +65,7 @@ def init(
         raise _refuse(
             "--harness is required: a workspace is born with exactly one agent runtime "
             f"({', '.join(harness_registry.L1_ENTRY_HARNESSES)}); "
-            "`dadaia harness add <name>` adds any other later.",
+            f"`{DADAIA_BIN} harness add <name>` adds any other later.",
             f"{_INIT} {directory} --harness {harness_registry.L1_ENTRY_HARNESSES[0]}",
         )
     try:
@@ -79,7 +79,9 @@ def init(
     # The seam is argv: the directory is a parameter, never resolved from cwd.
     root = Path(directory).expanduser()
     root = (Path.cwd() / root).resolve() if not root.is_absolute() else root.resolve()
-    sibling_fix = f"{_INIT} {root.with_name(root.name + '-workspace')} --harness {chosen}"
+    sibling_fix = (
+        f"{_INIT} {root.parent / ((root.name or 'dadaia') + '-workspace')} --harness {chosen}"
+    )
     if root.exists() and not root.is_dir():
         raise _refuse(f"'{root}' is not a directory.", sibling_fix)
     # A directory that already holds `.dadaia/` is THIS workspace (a re-run, idempotent);

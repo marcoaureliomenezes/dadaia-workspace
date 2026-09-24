@@ -343,7 +343,7 @@ class VenvPythonEnvironmentManager:
                 "source checkout nor a re-packable installed distribution. Point "
                 "DADAIA_BOOTSTRAP_PACKAGE at a local wheel and retry, e.g. "
                 "DADAIA_BOOTSTRAP_PACKAGE=/path/to/dadaia_workspace-X.Y.Z-py3-none-any.whl "
-                "dadaia init."
+                "uvx dadaia-workspace init <dir> --harness <name>."
             )
         return str(repacked)
 

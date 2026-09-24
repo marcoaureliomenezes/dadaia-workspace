@@ -125,3 +125,12 @@ def test_init_foreign_tree_fix_names_a_runnable_sibling(tmp_path: Path, monkeypa
     assert _the_fix(result.output) == (
         f"uvx dadaia-workspace init {tmp_path / 'proj-workspace'} --harness claude"
     )
+
+
+def test_init_refusing_the_filesystem_root_still_prints_its_fix(tmp_path: Path) -> None:
+    """Bug init-root-dir-crashes-deriving-sibling-fix: `/` has no name, so deriving the
+    sibling with ``Path.with_name`` raised ValueError before any refusal ran."""
+    result = _runner.invoke(app, ["init", "/", "--harness", "claude"])
+
+    assert result.exit_code == 2, result.output
+    assert _the_fix(result.output) == "uvx dadaia-workspace init /dadaia-workspace --harness claude"
