@@ -73,6 +73,7 @@ from pathlib import Path
 
 from dadaia_workspace.core import invocation, session_store
 from dadaia_workspace.features.spec_context import injection_policy
+from dadaia_workspace.features.workspace import onboarding
 from dadaia_workspace.hooks import _common
 
 #: Lean fields kept in the INJECTED catalog digest. The heavy ``summary`` is dropped from
@@ -280,14 +281,13 @@ def _read_help_digest(workspace: Path) -> str:
 
 
 def _generic_preflight(workspace: Path) -> str:
-    """Generic preflight payload: ``[no bound context]`` + the ALIVE-context list.
-
-    Emitted for an unbound session — NEVER any context memory (FR-W2-01). The ALIVE list is
-    advisory (names from the registry) so the operator can bind one — it stays because it is
-    useful only in this unbound case (FR30, T-044-60: the dispatcher preflight restatement of
-    the root `AGENTS.md` map §1/§2 is deleted from every emission path, bound or not).
-    """
+    """Generic preflight payload for an unbound session: ``[no bound context]``, the
+    derived onboarding next step (FR6 AC6.2 — the text ``doctor`` reports) and the
+    ALIVE-context list. NEVER any context memory (FR-W2-01)."""
     sections = ["[no bound context]"]
+    step = onboarding.next_step(workspace, invocation.alive_context_trees(workspace))
+    if step is not None:
+        sections.append(step.text())
     alive = invocation.alive_context_names(workspace)
     if alive:
         sections.append("")

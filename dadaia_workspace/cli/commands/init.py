@@ -8,7 +8,7 @@ import typer
 from rich.console import Console
 
 from dadaia_workspace import container
-from dadaia_workspace.cli.commands.context import bind_session
+from dadaia_workspace.cli.commands.context import bind_session, print_next_step
 from dadaia_workspace.core import harness_registry, session_store
 from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
@@ -96,14 +96,6 @@ def _plan(directory: str, harness: str, repo: str, associated: tuple[str, ...]) 
     return InitPlan(directory, harness, repo, tuple(urls))
 
 
-def _next_step(root: Path, slug: str) -> str:
-    """The one next-step line (T-048-07 centralizes it in ``onboarding.next_step``)."""
-    cli = root / DADAIA_BIN
-    if slug:
-        return f"Next: {cli} specs init --context {slug}"
-    return f"Next: {cli} context create <name> --main-repo <clone-url>"
-
-
 @app.command()
 def init(
     directory: str = typer.Argument(
@@ -184,10 +176,9 @@ def init(
     if before is not None:
         _report_upgrade(root, before)
 
-    slug = ""
     if plan.repo:
-        slug = _create_context(root, plan, chosen)
-    console.print(_next_step(root, slug), markup=False, highlight=False, soft_wrap=True)
+        _create_context(root, plan, chosen)
+    print_next_step(root)
 
 
 def _report_upgrade(root: Path, before: str) -> None:
@@ -209,8 +200,8 @@ def _report_upgrade(root: Path, before: str) -> None:
     console.print(f"upgraded {before} -> {after}", markup=False, highlight=False)
 
 
-def _create_context(root: Path, plan: InitPlan, chosen: str) -> str:
-    """``--repo``: ``init`` is a CALLER of ``context create``; returns the bound slug.
+def _create_context(root: Path, plan: InitPlan, chosen: str) -> None:
+    """``--repo``: ``init`` is a CALLER of ``context create``.
 
     Re-running the identical command stays a no-op: a context already holding THIS url
     is reused.
@@ -236,4 +227,3 @@ def _create_context(root: Path, plan: InitPlan, chosen: str) -> str:
     console.print(f"[green]✓[/green] {slug} ALIVE and bound", highlight=False)
     for line in env_lines:
         console.print(line, markup=False, soft_wrap=True, highlight=False)
-    return slug

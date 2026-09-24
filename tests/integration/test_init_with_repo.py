@@ -198,8 +198,11 @@ def test_init_without_repo_closes_with_the_law_the_note_and_the_next_step(
 
     assert result.exit_code == 0, result.stdout
     lines = [line for line in result.stdout.splitlines() if line.strip()]
-    closing = lines[-3:]
+    closing = lines[-4:]
     assert closing[0] == _LAW
     assert closing[1].startswith("Claude Code: set `instructionFiles:")
-    assert f"{ws / '.dadaia' / '.venv' / 'bin' / 'dadaia'} context create" in closing[2]
-    assert _LAW not in "\n".join(lines[:-3])
+    assert closing[2].startswith("Next: ")  # the onboarding step, AC6.2
+    assert closing[3].startswith(
+        f"fix: {ws / '.dadaia' / '.venv' / 'bin' / 'dadaia'} context create"
+    )
+    assert _LAW not in "\n".join(lines[:-4])

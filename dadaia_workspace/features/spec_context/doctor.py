@@ -123,7 +123,7 @@ class DoctorService:
     # check() — the context invariants (unchanged by the zone walk)
     # ------------------------------------------------------------------
 
-    def check_installed_hooks(self) -> list[DoctorIssue]:
+    def check_installed_hooks(self, context: str | None = None) -> list[DoctorIssue]:
         """HOOKS-DRIFT-1: an ALIVE repo's installed git hook differs from the shipped one.
 
         The git chokepoints are the ONE mechanical backstop that runs outside every
@@ -132,10 +132,11 @@ class DoctorService:
         enforcing yesterday's contract, and nothing else in the workspace can notice.
         Compared BYTE-WISE against ``public/scripts/``: the installer copies verbatim, so
         any difference at all is drift. A repo that is not a git checkout has no
-        ``.git/hooks/`` to drift and is never a finding.
+        ``.git/hooks/`` to drift and is never a finding. A named *context* scopes the
+        check to its own repos (0.4.8 R5): another context's hooks are not this run's.
         """
         issues: list[DoctorIssue] = []
-        for top in self._alive_repo_tops():
+        for top in self._alive_repo_tops(context):
             hooks_dir = top / ".git" / "hooks"
             if not hooks_dir.is_dir():
                 continue
@@ -317,14 +318,14 @@ class DoctorService:
         except (KeyError, OSError, TypeError, ValueError):
             return []
 
-    def _alive_repo_tops(self) -> list[Path]:
+    def _alive_repo_tops(self, context: str | None = None) -> list[Path]:
         """Every ALIVE registered repo's top — main plus associated — that exists on disk.
         A DEAD context's repo is INV-5's business, not the tree walk's.
 
         Reads the registry through :meth:`_contexts`, which degrades to inaction."""
         tops: list[Path] = []
         for ctx in self._contexts():
-            if ctx.state is not ContextState.ALIVE:
+            if ctx.state is not ContextState.ALIVE or context not in (None, ctx.name):
                 continue
             slugs = (ctx.repo_slug, *(repo.slug for repo in ctx.associated_repos))
             for slug in slugs:
@@ -736,7 +737,7 @@ ERROR_VERDICTS = frozenset({FindingVerdict.SLOP, FindingVerdict.EXPIRED, Finding
 
 
 def workspace_rules(
-    *, expired_only: bool = False
+    *, expired_only: bool = False, context: str | None = None
 ) -> tuple[Rule[DoctorService, SectionFinding], ...]:
     """This section's contribution to the ONE rule registry.
 
@@ -777,7 +778,7 @@ def workspace_rules(
                 canonical=False,
                 error=True,
             )
-            for issue in service.check_installed_hooks()
+            for issue in service.check_installed_hooks(context)
         ]
 
     def entries(service: DoctorService) -> list[SectionFinding]:

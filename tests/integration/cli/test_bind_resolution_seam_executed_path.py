@@ -53,6 +53,10 @@ def _git(cwd: Path, *args: str) -> None:
 
 def _seed_specs_tree(repo: Path, release: str) -> None:
     (repo / "specs" / "releases" / release).mkdir(parents=True)
+    # Stamped: an unstamped tree is onboarding level 2, which the doctor never judges.
+    (repo / "specs" / "constitution.md").write_text(
+        "---\nspecs_pattern_version: 7\n---\n", encoding="utf-8"
+    )
     for name in ("SPEC.md", "PLAN.md", "TASKS.md"):
         (repo / "specs" / "releases" / release / name).write_text(
             f"# {name}\n\n> **Status:** Approved\n", encoding="utf-8"

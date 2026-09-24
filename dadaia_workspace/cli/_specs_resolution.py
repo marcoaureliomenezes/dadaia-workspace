@@ -32,6 +32,7 @@ from dadaia_workspace.core.invocation import CONTEXT_NAME_RE as _CONTEXT_NAME_RE
 from dadaia_workspace.core.invocation import (
     HARNESS_SESSION_ID_ENV_VARS as _HARNESS_SESSION_ID_ENV_VARS,
 )
+from dadaia_workspace.core.invocation import alive_context_trees as _alive_context_trees
 from dadaia_workspace.core.invocation import repo_slug_for_context as _core_repo_slug
 from dadaia_workspace.core.invocation import resolve as _resolve_invocation
 from dadaia_workspace.core.invocation import (
@@ -47,6 +48,7 @@ from dadaia_workspace.core.invocation import sanitize_session_id as _sanitize_se
 #: name->repo-slug mapping routes through this seam.
 HARNESS_SESSION_ID_ENV_VARS = _HARNESS_SESSION_ID_ENV_VARS
 sanitize_session_id = _sanitize_session_id
+alive_context_trees = _alive_context_trees
 
 
 def repo_slug_for_context(workspace_root: Path, name: str) -> str:
@@ -104,7 +106,7 @@ def resolve_context_for_cli(explicit: str | None) -> str:
 
 def resolve_context_specs_dir_for_cli(workspace_root: Path, context: str) -> Path:
     """Seam wrapper over the ONE context->specs resolver (T-053-01/F003): registry
-    ``repo_slug`` mapping + self-hosting root fallback. CLI verbs import THIS, never
+    ``repo_slug`` mapping, no fallback tree (0.4.8 R4). CLI verbs import THIS, never
     ``core.invocation`` directly (bind-resolution-seam-is-a-single-home)."""
     return _core_resolve_context_specs_dir(workspace_root, context)
 

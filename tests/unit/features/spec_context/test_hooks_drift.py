@@ -87,3 +87,11 @@ def test_the_shipped_hook_registry_names_the_pre_push_chokepoint() -> None:
     assert workspace_layout.INSTALLED_GIT_HOOKS == (("pre-push", "pre-push-ci-gate.sh"),)
     for _, source in workspace_layout.INSTALLED_GIT_HOOKS:
         assert (workspace_layout.public_scripts_dir() / source).is_file()
+
+
+def test_a_named_context_checks_only_its_own_repos(tmp_path: Path) -> None:
+    """0.4.8 R5 / AC3.7: `doctor --context X` judges X's hooks, never another context's."""
+    root = _workspace(tmp_path, drifted=True)
+    service = DoctorService(_Store([_ctx("demo"), _ctx("other")]), None, root)  # type: ignore[arg-type]
+    assert service.check_installed_hooks("other") == []
+    assert [i.code for i in service.check_installed_hooks("demo")] == ["HOOKS-DRIFT-1"]
