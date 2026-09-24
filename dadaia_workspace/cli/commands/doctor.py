@@ -284,11 +284,13 @@ def _bound_context() -> str | None:
         return None
 
 
-def _onboarding_section(workspace_root: Path | None, *, expired_only: bool) -> SectionReport:
+def _onboarding_section(
+    workspace_root: Path | None, scope: str | None, *, expired_only: bool
+) -> SectionReport:
     """The derived next step (FR6 AC6.1) as one info finding — never an error."""
     if workspace_root is None or expired_only:
         return _empty_section("workspace")
-    step = onboarding.next_step(workspace_root, alive_context_trees(workspace_root))
+    step = onboarding.next_step(workspace_root, alive_context_trees(workspace_root), scope)
     if step is None:
         return _empty_section("workspace")
     finding = SectionFinding(
@@ -376,7 +378,7 @@ def doctor(
         merge_sections(
             [
                 _workspace_section(service, scope, expired_only=expired_only),
-                _onboarding_section(workspace_root, expired_only=expired_only),
+                _onboarding_section(workspace_root, scope, expired_only=expired_only),
             ]
         ),
         _specs_section(specs_doctor),

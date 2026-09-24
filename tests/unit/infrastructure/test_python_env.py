@@ -177,16 +177,15 @@ def test_reinit_refuses_a_newer_venv_before_any_write(
         ("0.4.7", "0.4.8"),
         ("0.4.7", "0.4.7+e2e"),
         ("0.4.8rc1", "0.4.8"),
-        ("0.4.8.dev1", "0.4.8a1"),
-        ("0.4.8", "0.4.8.post1"),
         ("0.4.9", "0.4.10"),
         ("0.4.7+e2e", "0.4.7+e2e.1"),
     ],
 )
-def test_pep440_key_orders_published_version_shapes(lower: str, higher: str) -> None:
-    """Intent: CONTRACT — 0.4.8 T-048-06: PEP 440 order without a ``packaging`` dep."""
-    assert python_env_module._pep440_key(lower) < python_env_module._pep440_key(higher)
-    assert python_env_module._pep440_key("0.4") == python_env_module._pep440_key("0.4.0")
+def test_version_key_orders_published_version_shapes(lower: str, higher: str) -> None:
+    """Intent: CONTRACT — 0.4.8 T-048-06: release tuple, then the local segment after its
+    base; an unpublished shape (``rc``) sorts lowest, so it is upgraded, never kept."""
+    assert python_env_module._version_key(lower) < python_env_module._version_key(higher)
+    assert python_env_module._version_key("0.4") == python_env_module._version_key("0.4.0")
 
 
 def test_install_spec_repacks_the_running_distribution_when_not_a_source_checkout(

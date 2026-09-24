@@ -41,32 +41,29 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return tmp_path
 
 
-def _register_specless_context(root: Path, name: str) -> None:
-    repo = root / "repos" / name
-    repo.mkdir(parents=True)
-    subprocess.run(["git", "init", "-q", str(repo)], check=True)  # noqa: S603, S607
-    for target, source in workspace_layout.INSTALLED_GIT_HOOKS:  # what `create` installs
-        shipped = (workspace_layout.public_scripts_dir() / source).read_bytes()
-        (repo / ".git" / "hooks" / target).write_bytes(shipped)
-    (root / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        json.dumps(
+def _register_specless_context(root: Path, *names: str) -> None:
+    contexts = []
+    for name in names:
+        repo = root / "repos" / name
+        repo.mkdir(parents=True)
+        subprocess.run(["git", "init", "-q", str(repo)], check=True)  # noqa: S603, S607
+        for target, source in workspace_layout.INSTALLED_GIT_HOOKS:  # what `create` installs
+            shipped = (workspace_layout.public_scripts_dir() / source).read_bytes()
+            (repo / ".git" / "hooks" / target).write_bytes(shipped)
+        contexts.append(
             {
-                "schema_version": "2",
-                "contexts": [
-                    {
-                        "name": name,
-                        "state": "alive",
-                        "repo_slug": name,
-                        "repo_url": f"file:///nowhere/{name}.git",
-                        "created_at": "2026-01-01T00:00:00Z",
-                        "alive_since": "2026-01-01T00:00:00Z",
-                        "dead_since": None,
-                        "current_branch": None,
-                    }
-                ],
+                "name": name,
+                "state": "alive",
+                "repo_slug": name,
+                "repo_url": f"file:///nowhere/{name}.git",
+                "created_at": "2026-01-01T00:00:00Z",
+                "alive_since": "2026-01-01T00:00:00Z",
+                "dead_since": None,
+                "current_branch": None,
             }
-        ),
-        encoding="utf-8",
+        )
+    (root / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        json.dumps({"schema_version": "2", "contexts": contexts}), encoding="utf-8"
     )
 
 
@@ -108,3 +105,11 @@ def test_a_ghost_context_exits_one_with_no_specs_check(workspace: Path) -> None:
     assert "Error: Context 'ghost' not found." in result.output
     assert "fix: .dadaia/.venv/bin/dadaia context list" in result.output
     assert "SPEC-DOC" not in result.output
+
+
+@pytest.mark.slow(reason="git init subprocess")
+def test_the_doctored_context_names_its_own_next_step(workspace: Path) -> None:
+    """Live audit G1: ``doctor --context b`` reports b's step, not the first context's."""
+    _register_specless_context(workspace, "a", "b")
+    result = _runner.invoke(app, ["doctor", "--context", "b"])
+    assert "specs init --context b" in result.output, result.output

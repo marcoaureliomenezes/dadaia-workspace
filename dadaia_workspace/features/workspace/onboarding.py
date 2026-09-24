@@ -56,9 +56,16 @@ def _first_pass_done(specs_dir: Path) -> bool:
     return any(line.strip() for line in text.splitlines())
 
 
-def next_step(root: Path, trees: Mapping[str, Path]) -> Step | None:
-    """The lowest unmet level across *trees* (every ALIVE context name -> its ``specs/``
-    dir, ``invocation.alive_context_trees``), or ``None``."""
+def next_step(root: Path, trees: Mapping[str, Path], focus: str | None = None) -> Step | None:
+    """The *focus* context's lowest unmet level (the doctored, just-created or bound one),
+    else the lowest across *trees* (every ALIVE context name -> its ``specs/`` dir,
+    ``invocation.alive_context_trees``), else ``None``."""
+    if focus is not None and focus in trees and (step := _lowest(root, {focus: trees[focus]})):
+        return step
+    return _lowest(root, trees)
+
+
+def _lowest(root: Path, trees: Mapping[str, Path]) -> Step | None:
     cli = cli_path(root)
     if not trees:
         return Step(

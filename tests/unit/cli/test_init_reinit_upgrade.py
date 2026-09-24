@@ -3,7 +3,8 @@
 Intent: CONTRACT — 0.4.8 FR2 AC2.1-AC2.3 (T-048-06).
 
 The venv is fake (the conftest backstop no-ops the builder): its reported version is the
-``installed_version`` seam, and the running distribution is ``distribution_version``.
+``installed_version`` seam, and the running distribution is ``_running_version`` — the
+one ``version_change`` decider reads both, for the install and for the report.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.commands import init as init_module
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.core.exceptions import WorkspaceVenvNewerError
+from dadaia_workspace.features.workspace.onboarding import cli_path
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
 _runner = CliRunner()
@@ -29,19 +30,29 @@ def workspace(tmp_path: Path) -> Path:
     return ws
 
 
-def _versions(monkeypatch: pytest.MonkeyPatch, venv: str, running: str) -> None:
+def _bytes(tree: Path) -> dict[Path, bytes]:
+    return {p: p.read_bytes() for p in sorted(tree.rglob("*")) if p.is_file()}
+
+
+def _versions(monkeypatch: pytest.MonkeyPatch, ws: Path, venv: str, running: str) -> None:
+    cli_path(ws).parent.mkdir(parents=True, exist_ok=True)
+    cli_path(ws).write_text("#!stub")
     monkeypatch.setattr(VenvPythonEnvironmentManager, "installed_version", lambda self, ws: venv)
-    monkeypatch.setattr(init_module, "distribution_version", lambda: running)
+    monkeypatch.setattr(
+        VenvPythonEnvironmentManager, "_running_version", staticmethod(lambda: running)
+    )
 
 
 def test_equal_version_reports_already_at_without_harness(
     workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _versions(monkeypatch, "0.4.8", "0.4.8")
+    _versions(monkeypatch, workspace, "0.4.8", "0.4.8")
+    before = _bytes(workspace / ".dadaia")
 
     result = _runner.invoke(app, ["init", str(workspace)])
 
     assert result.exit_code == 0, result.output
+    assert _bytes(workspace / ".dadaia") == before
     assert "already at 0.4.8" in result.output
     assert "upgraded" not in result.output
 
@@ -49,7 +60,7 @@ def test_equal_version_reports_already_at_without_harness(
 def test_newer_running_version_reconciles_and_reports_the_transition(
     workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _versions(monkeypatch, "0.4.7", "0.4.8")
+    _versions(monkeypatch, workspace, "0.4.7", "0.4.8")
     reconciled: list[str] = []
 
     def _reconcile(root: Path, *, expected_version: str, **_: object) -> object:
@@ -68,12 +79,8 @@ def test_newer_running_version_reconciles_and_reports_the_transition(
 def test_older_running_version_exits_1_with_the_pinned_fix(
     workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _versions(monkeypatch, "0.4.9", "0.4.8")
+    _versions(monkeypatch, workspace, "0.4.9", "0.4.8")
 
-    def _refuse(self: object, ws: str) -> str:
-        raise WorkspaceVenvNewerError("0.4.9", "0.4.8")
-
-    monkeypatch.setattr(VenvPythonEnvironmentManager, "ensure_workspace_venv", _refuse)
     before = sorted(p for p in workspace.rglob("*"))
 
     result = _runner.invoke(app, ["init", str(workspace)])

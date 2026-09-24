@@ -106,64 +106,30 @@ def repack_installed_wheel(
 
 # ── requires-python interpreter resolution ────────────────────────────────────────
 #
-# Bug init-venv-bootstrap-inherits-degraded-base-python: stdlib ``venv.create()``
-# resolves a NEW venv's base interpreter through ``sys._base_executable`` of the
-# CALLING process. On a venv created with ``symlinks=False`` ("--copies" — exactly
-# what ``venv.create(..., with_pip=True)`` used here without an explicit ``symlinks``
-# argument), CPython's getpath.c re-derives that value via a landmark search for the
-# OS-level *unversioned* ``python3`` name inside the recorded ``home`` directory — NOT
-# the version-pinned ``executable`` its own ``pyvenv.cfg`` records. When the host's
-# unversioned ``/usr/bin/python3`` is a symlink to an OLDER interpreter than the one
-# actually running (e.g. a Debian/Ubuntu host that keeps 3.10 as the OS default
-# alongside an installed 3.12), every child venv silently degrades and the subsequent
-# package install fails opaquely with "requires a different Python". Reproduced on
-# this exact host class: a `.dadaia/.venv` built with `--copies` reports
-# `sys._base_executable == "/usr/bin/python3"` (a symlink to 3.10) while its own
-# `pyvenv.cfg` `executable` field correctly names `/usr/bin/python3.12` (the
-# interpreter that actually built it), and the running interpreter is itself 3.12.
-#
-# The fix: never trust that implicit resolution. Resolve and VERIFY an interpreter
-# explicitly (by executing each candidate and checking ITS reported version), then
-# hand it to ``python -m venv`` via subprocess — which re-derives its OWN base
-# correctly because IT is not the degraded ``--copies`` binary.
+# Bug init-venv-bootstrap-inherits-degraded-base-python: ``venv.create()`` takes a new
+# venv's base from the caller's ``sys._base_executable``, which a ``--copies`` venv
+# re-derives from the host's unversioned ``python3`` (possibly an OLDER interpreter), so
+# child venvs silently degrade. Resolve and VERIFY an interpreter by executing it, then
+# run ``python -m venv`` from THAT interpreter via subprocess.
 
 _REQUIRES_PYTHON_CLAUSE_RE = re.compile(r"(>=|<=|==|!=|>|<)\s*([0-9]+(?:\.[0-9]+){0,2})")
 _REQUIRES_PYTHON_FLOOR_RE = re.compile(r">=\s*3\.(\d+)")
 _DEFAULT_FLOOR_MINOR = 12  # dadaia-workspace's floor today (pyproject.toml: python = "^3.12")
 
 
-_PEP440_RE = re.compile(
-    r"^v?(?P<release>\d+(?:\.\d+)*)"
-    r"(?:[-_.]?(?P<pre>a|b|rc)[-_.]?(?P<pre_n>\d*))?"
-    r"(?:[-_.]?post[-_.]?(?P<post>\d*))?"
-    r"(?:[-_.]?dev[-_.]?(?P<dev>\d*))?"
-    r"(?:\+(?P<local>[a-z0-9.]+))?$"
-)
+_VERSION_RE = re.compile(r"^(?P<release>\d+(?:\.\d+)*)(?:\+(?P<local>[a-z0-9.]+))?$")
 
 
-def _pep440_key(version: str) -> tuple[object, ...]:
-    """A sort key for the PEP 440 subset dadaia-workspace publishes (no ``packaging``).
-
-    Release, then pre < final < post, dev before its base, and a local segment
-    (``0.4.7+e2e``) orders after its public version. Unparseable input sorts lowest.
-    """
-    m = _PEP440_RE.match(version.strip().lower())
+def _version_key(version: str) -> tuple[tuple[int, ...], tuple[str, ...]]:
+    """Order the versions dadaia-workspace publishes: ``M.m.p`` plus an optional local
+    segment that sorts after its base (``0.4.7 < 0.4.7+e2e``). Anything else sorts lowest."""
+    m = _VERSION_RE.match(version.strip().lower())
     if m is None:
-        return ((-1,),)
+        return ((-1,), ())
     release = tuple(int(p) for p in m["release"].split("."))
     while len(release) > 1 and release[-1] == 0:
         release = release[:-1]
-    pre = ({"a": 0, "b": 1, "rc": 2}[m["pre"]], int(m["pre_n"] or 0)) if m["pre"] else (3, 0)
-    if m["dev"] is not None and m["pre"] is None and m["post"] is None:
-        pre = (-1, 0)
-    post = int(m["post"] or 0) if m["post"] is not None else -1
-    dev = int(m["dev"] or 0) if m["dev"] is not None else float("inf")
-    local = tuple(
-        (1, int(part), "") if part.isdigit() else (0, 0, part)
-        for part in (m["local"] or "").split(".")
-        if part
-    )
-    return (release, pre, post, dev, local)
+    return release, tuple((m["local"] or "").split(".")) if m["local"] else ()
 
 
 def _version_satisfies(version: tuple[int, ...], spec: str | None) -> bool:
@@ -446,7 +412,7 @@ class VenvPythonEnvironmentManager:
                     f"could not create the workspace venv at '{venv_dir}' with "
                     f"interpreter '{interpreter}': {cause} Diagnostics: {stderr_tail}"
                 ) from exc
-        if self._needs_install(workspace_root):
+        if self.version_change(workspace_root)[2] != "same":
             # Post-condition (BEFORE any pip install): the venv's OWN python must
             # satisfy Requires-Python. Catches an interpreter mismatch from ANY path —
             # a fresh creation this method did not anticipate, or a pre-existing/
@@ -488,19 +454,23 @@ class VenvPythonEnvironmentManager:
             self._verify_venv_provider(workspace_root, expected=expected)
         return str(venv_dir)
 
-    def _needs_install(self, workspace_root: str) -> bool:
-        """Install when the entrypoint is missing or the venv is OLDER than the running
-        distribution (D3: re-init is the upgrade, through this one install path); a
-        NEWER venv is refused before any write (AC2.3).
+    def version_change(self, workspace_root: str) -> tuple[str | None, str | None, str]:
+        """The ONE decider of "did the version change": ``(before, after, action)``.
+
+        ``action`` is ``install`` (no entrypoint), ``upgrade`` (the venv is OLDER than the
+        running distribution — D3: re-init is the upgrade) or ``same``; a NEWER venv is
+        refused before any write (AC2.3).
         """
+        running = self._running_version()
         if not self._dadaia_entrypoint(workspace_root).exists():
-            return True
-        installed, running = self.installed_version(workspace_root), self._running_version()
+            return None, running, "install"
+        installed = self.installed_version(workspace_root)
         if installed is None or running is None:
-            return False
-        if _pep440_key(installed) > _pep440_key(running):
+            return installed, running, "same"
+        if _version_key(installed) > _version_key(running):
             raise WorkspaceVenvNewerError(installed, running)
-        return _pep440_key(installed) < _pep440_key(running)
+        action = "upgrade" if _version_key(installed) < _version_key(running) else "same"
+        return installed, running, action
 
     def installed_version(self, workspace_root: str) -> str | None:
         """The dadaia-workspace version the venv's own python reports, or ``None``."""

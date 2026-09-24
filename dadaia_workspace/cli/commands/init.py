@@ -16,7 +16,6 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceVenvBootstrapError,
     WorkspaceVenvNewerError,
 )
-from dadaia_workspace.features.capabilities.service import distribution_version
 from dadaia_workspace.features.reconcile import reconcile_workspace
 from dadaia_workspace.features.spec_context.service import slug_from_url
 from dadaia_workspace.features.workspace.onboarding import cli_path
@@ -147,8 +146,8 @@ def init(
     root.mkdir(parents=True, exist_ok=True)
 
     svc = container.build_workspace_service(root)
-    before = svc.venv_version(root)
     try:
+        before, after, action = svc.venv_change(root)
         _, installed = svc.init(root, skip_assets=skip_assets, harnesses=(chosen,))
     except WorkspaceVenvNewerError as exc:
         typer.secho(f"Error: {exc}", err=True, fg=typer.colors.RED)
@@ -173,23 +172,19 @@ def init(
     for note in filter(None, (_LAW_NOTE, harness_registry.HARNESS_RECORDS[chosen].init_note)):
         console.print(note, markup=False, soft_wrap=True)
 
-    if before is not None:
-        _report_upgrade(root, before)
+    if action == "upgrade":
+        _reconcile_upgrade(root, before, after)
+    elif before is not None:
+        console.print(f"already at {before}", markup=False, highlight=False)
 
-    if plan.repo:
-        _create_context(root, plan, chosen)
-    print_next_step(root)
+    print_next_step(root, _create_context(root, plan, chosen) if plan.repo else None)
 
 
-def _report_upgrade(root: Path, before: str) -> None:
-    """D3: re-init IS the upgrade — a changed venv is reconciled, an equal one reported."""
-    after = distribution_version()
-    if before == after:
-        console.print(f"already at {after}", markup=False, highlight=False)
-        return
+def _reconcile_upgrade(root: Path, before: str | None, after: str | None) -> None:
+    """D3: re-init IS the upgrade — the freshly installed venv is reconciled."""
     result = reconcile_workspace(
         root,
-        expected_version=after,
+        expected_version=after or "",
         public_service=container.build_public_service(),
         doctor_service=container.build_doctor_service(root),
     )
@@ -200,7 +195,7 @@ def _report_upgrade(root: Path, before: str) -> None:
     console.print(f"upgraded {before} -> {after}", markup=False, highlight=False)
 
 
-def _create_context(root: Path, plan: InitPlan, chosen: str) -> None:
+def _create_context(root: Path, plan: InitPlan, chosen: str) -> str:
     """``--repo``: ``init`` is a CALLER of ``context create``.
 
     Re-running the identical command stays a no-op: a context already holding THIS url
@@ -227,3 +222,4 @@ def _create_context(root: Path, plan: InitPlan, chosen: str) -> None:
     console.print(f"[green]✓[/green] {slug} ALIVE and bound", highlight=False, soft_wrap=True)
     for line in env_lines:
         console.print(line, markup=False, soft_wrap=True, highlight=False)
+    return slug

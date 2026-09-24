@@ -131,7 +131,7 @@ def test_a_failed_clone_leaves_nothing_and_the_same_command_then_succeeds(
     ws: Path, tmp_path: Path
 ) -> None:
     """AC3.4 + AC3.5 (RV1): rollback of every created dir, no record, a fix line that
-    carries every --associated-repo, and a clean retry (R3)."""
+    carries every --associated-repo (the failed one a placeholder), and a clean retry (R3)."""
     main = _remote(tmp_path, "core.git")
     ok_assoc = _remote(tmp_path, "one.git")
     missing = tmp_path / "two.git"
@@ -143,7 +143,7 @@ def test_a_failed_clone_leaves_nothing_and_the_same_command_then_succeeds(
     assert code == 1
     assert (
         f"context create proj --main-repo {main} --associated-repo {ok_assoc} "
-        f"--associated-repo {missing}"
+        "--associated-repo <clone-url>"
     ) in out.replace("\n", "")
     assert "proj" not in _names(ws)
     assert sorted(p.name for p in (ws / "repos").iterdir()) == []
@@ -178,3 +178,33 @@ def test_retired_flags_exit_2(ws: Path, flag: str) -> None:
     """AC3.8."""
     code, _ = _create("x", "--main-repo", "https://h.test/x.git", flag, "y")
     assert code == 2
+
+
+def test_refusal_fix_lines_never_repeat_the_failing_command(ws: Path, tmp_path: Path) -> None:
+    """Live audit G3/G4: a bad URL points at a clone-URL placeholder, an owned slug at
+    the list that names its owner — neither echoes the command that just failed (G6: the
+    empty list names the runnable create)."""
+    listed = _runner.invoke(app, ["context", "list"]).output
+    assert "context create <name> --main-repo <clone-url>" in listed
+    code, out = _create("bad", "--main-repo", str(tmp_path / "nothere.git"))
+    assert code == 1
+    assert out.splitlines()[-1].endswith("context create bad --main-repo <clone-url>")
+
+    second = _remote(tmp_path, "second.git")
+    assert _create("--main-repo", str(second))[0] == 0
+    code, out = _create("bad", "--main-repo", str(second))
+    assert code == 1
+    assert out.splitlines()[-1].endswith("context list")
+
+
+def test_the_created_line_is_one_line_and_the_next_step_is_the_new_contexts(
+    ws: Path, tmp_path: Path
+) -> None:
+    """Live audit G1 + G5: the new context's own next step, not another context's; the
+    success line never wraps at 80 columns."""
+    assert _create("--main-repo", str(_remote(tmp_path, "second.git")))[0] == 0
+    code, out = _create("--main-repo", str(_remote(tmp_path, "a-rather-long-repo-name.git")))
+    assert code == 0, out
+    assert any(ln.endswith("(main repo: repos/a-rather-long-repo-name)") for ln in out.splitlines())
+    assert "specs init --context a-rather-long-repo-name" in out
+    assert "'second'" not in out

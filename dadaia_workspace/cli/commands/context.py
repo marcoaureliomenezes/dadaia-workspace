@@ -26,6 +26,7 @@ from dadaia_workspace.core import session_store
 from dadaia_workspace.core.exceptions import (
     AssociatedRepoConflictError,
     AssociatedRepoNotFoundError,
+    ContextAlreadyExistsError,
     ContextNotFoundError,
     ContextStateError,
     DadaiaError,
@@ -208,11 +209,25 @@ def bind_session(workspace_root: Path, name: str) -> str:
     return session_id
 
 
-def print_next_step(workspace_root: Path) -> None:
+def print_next_step(workspace_root: Path, focus: str | None = None) -> None:
     """The derived onboarding next step (FR6 AC6.2) — the text ``doctor`` also reports."""
-    step = onboarding.next_step(workspace_root, alive_context_trees(workspace_root))
+    step = onboarding.next_step(workspace_root, alive_context_trees(workspace_root), focus)
     if step is not None:
         console.print(step.text(), markup=False, highlight=False, soft_wrap=True)
+
+
+def _create_fix(error: Exception, name: str | None, urls: list[str]) -> str:
+    """The invocation, every ``--associated-repo`` kept (AC3.5), with what failed made a
+    placeholder — never the failing command repeated; an owned slug names its owner."""
+    if isinstance(error, AssociatedRepoConflictError):
+        return f"{DADAIA_BIN} context list"
+    if isinstance(error, ContextAlreadyExistsError):
+        name = "<another-name>"
+    urls = [u if repr(u) not in str(error) else "<clone-url>" for u in urls]
+    flags = [f"--associated-repo {u}" for u in urls[1:]]
+    return " ".join(
+        [f"{DADAIA_BIN} context create", *([name] if name else []), "--main-repo", urls[0], *flags]
+    )
 
 
 @app.command()
@@ -234,21 +249,21 @@ def create(
         )
     except (DadaiaError, OSError) as e:
         err_console.print(f"Error: {e}", markup=False, soft_wrap=True)
-        invocation = " ".join(
-            [f"{DADAIA_BIN} context create", *([name] if name else []), "--main-repo", main_repo]
-            + [f"--associated-repo {u}" for u in associated]
+        err_console.print(
+            f"fix: {_create_fix(e, name, [main_repo, *associated])}", markup=False, soft_wrap=True
         )
-        err_console.print(f"fix: {invocation}", markup=False, soft_wrap=True)
         raise typer.Exit(1) from None
     session_id = bind_session(ws, ctx.name)
     suffix = f", {len(ctx.associated_repos)} associated repo(s)" if ctx.associated_repos else ""
     console.print(
         f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' created, ALIVE and bound "
-        f"(main repo: repos/{ctx.repo_slug}{suffix})"
+        f"(main repo: repos/{ctx.repo_slug}{suffix})",
+        highlight=False,
+        soft_wrap=True,
     )
     for line in session_store.binding_env_lines(ctx.name, session_id):
         console.print(line, markup=False, soft_wrap=True, highlight=False)
-    print_next_step(ws)
+    print_next_step(ws, ctx.name)
 
 
 @app.command(name="list")
@@ -284,7 +299,12 @@ def list_all(
         print(json.dumps(payload, sort_keys=True))
         return
     if not contexts:
-        console.print("[dim]No contexts found. Use 'dadaia context create' to create one.[/dim]")
+        console.print(
+            f"No contexts found. Create one: {DADAIA_BIN} context create <name> "
+            "--main-repo <clone-url>",
+            markup=False,
+            soft_wrap=True,
+        )
         return
 
     table = Table(title="Spec Context Projects")

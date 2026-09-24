@@ -64,6 +64,17 @@ def test_the_lowest_unmet_level_wins_across_contexts(tmp_path: Path) -> None:
     assert step.command.endswith("specs init --context new")
 
 
+def test_the_focus_context_answers_before_the_global_scan(tmp_path: Path) -> None:
+    """Live audit G1: ``context create other`` / ``doctor --context other`` name
+    ``other``'s step, not a lower level another context still owes."""
+    trees = {"app": _specs(tmp_path), "new": tmp_path / "repos" / "new" / "specs"}
+    step = next_step(tmp_path, trees, focus="app")
+    assert step is not None
+    assert "'app' has no first-pass audit" in step.reason
+    trees["app"] = _specs(tmp_path / "done", stamped=True)
+    assert next_step(tmp_path, trees, focus="app") == next_step(tmp_path, trees)
+
+
 def test_a_complete_workspace_has_no_step_and_nothing_is_written(tmp_path: Path) -> None:
     trees = {"app": _specs(tmp_path, stamped=True)}
     before = _snapshot(tmp_path)
