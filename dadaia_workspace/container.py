@@ -85,7 +85,7 @@ def build_spec_context_service(workspace_root: Path) -> SpecContextService:
         context_store=JsonContextStore(states),
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
-        install_hooks=lambda repo: install_git_hooks(repo, force=True),
+        install_hooks=install_git_hooks,
     )
 
 

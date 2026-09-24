@@ -85,3 +85,27 @@ def test_alive_on_dead_context_writes_no_specs_commits_nothing_and_hooks_every_r
         assert _git(repo, "status", "--porcelain") == "", f"{slug}: alive must write nothing"
         assert not (repo / "specs").exists(), f"{slug}: alive must write no specs"
         assert (repo / ".git" / "hooks" / "pre-push").is_file(), f"{slug}: hook missing"
+
+
+def test_an_adopted_checkouts_own_pre_push_survives_create_and_alive(tmp_path: Path) -> None:
+    """Review finding 5 (T-048-02): the composition root never overwrites an operator's
+    hook in an adopted checkout; a repo this call cloned is still hooked."""
+    from dadaia_workspace import container
+
+    workspace = tmp_path / "ws"
+    states = workspace / ".dadaia" / "states"
+    states.mkdir(parents=True)
+    (states / "spec_contexts.json").write_text('{"contexts": []}', encoding="utf-8")
+    main_url, _ = _seeded_remote(tmp_path, "app")
+    assoc_url, _ = _seeded_remote(tmp_path, "lib")
+    adopted = workspace / "repos" / "app"
+    subprocess.run(["git", "clone", "-q", str(main_url), str(adopted)], check=True)
+    own = b"#!/bin/sh\n# the operator's own pre-push\nexit 0\n"
+    (adopted / ".git" / "hooks" / "pre-push").write_bytes(own)
+    service = container.build_spec_context_service(workspace)
+
+    service.create(str(main_url), associated_urls=(str(assoc_url),))
+    service.alive("app")
+
+    assert (adopted / ".git" / "hooks" / "pre-push").read_bytes() == own
+    assert (workspace / "repos" / "lib" / ".git" / "hooks" / "pre-push").is_file()

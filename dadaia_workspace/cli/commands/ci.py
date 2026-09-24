@@ -271,17 +271,15 @@ _SHA40_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 @app.command("install-hook")
 def install_hook(
     force: bool = typer.Option(False, "--force", help="Overwrite existing git hooks."),
+    repo: Path | None = typer.Option(None, "--repo", help="Target repo. Default: cwd's repo."),
 ) -> None:
     """Install the pre-push CI/security gate."""
     try:
-        installed = install_git_hooks(_repo_root(), force=force)
+        installed = install_git_hooks(repo or _repo_root(), force=force)
     except FileNotFoundError as exc:
         raise typer.BadParameter(str(exc)) from None
-    except FileExistsError as exc:
-        typer.secho(
-            f"{Path(str(exc)).name} hook already exists at {exc}; use --force to overwrite.",
-            fg=typer.colors.YELLOW,
-        )
-        raise typer.Exit(1) from None
+    if not installed:
+        typer.secho("pre-push hook already exists; use --force to overwrite.", fg="yellow")
+        raise typer.Exit(1)
     for target in installed:
         typer.secho(f"Installed pre-push CI + security gate -> {target}", fg=typer.colors.GREEN)
