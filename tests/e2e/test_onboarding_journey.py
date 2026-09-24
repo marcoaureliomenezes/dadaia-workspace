@@ -2,6 +2,8 @@
 
 Intent: CONTRACT — 0.4.8 FR8 / AC8.1, AC8.2 (T-048-01).
 
+Owner: dd-software-engineer (LARGE-tier e2e; tests/AGENTS.md "every file names an owner").
+
 Size: LARGE, justified — FR8 is a statement about the *published shape* of the tool: an
 operator runs ``uvx --from <wheel> dadaia-workspace …`` and walks level 1 (workspace),
 level 2 (Spec Context Project) and level 3 (canonical specs). Every seam the journey
@@ -44,7 +46,10 @@ _UVX = shutil.which("uvx")
 
 pytestmark = [
     pytest.mark.e2e,
-    pytest.mark.slow,
+    pytest.mark.slow(reason="uvx + real workspace venvs + git clones per level"),
+    # Justified over the e2e default: a first level provisions two real venvs (uvx's and
+    # the workspace's) from the network; the memoized first test of a scenario pays it.
+    pytest.mark.timeout(900),
     pytest.mark.skipif(
         _UVX is None, reason="uvx is not on PATH — the onboarding journey drives `uvx --from`"
     ),
