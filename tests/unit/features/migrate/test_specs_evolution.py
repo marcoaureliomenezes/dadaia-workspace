@@ -3,8 +3,7 @@ v0.5.1 T-051-16, K10).
 
 Covers FR-S02 (version stamp), the registry's surviving "stamp v6 or refuse" rule
 (FR-S03, replacing the retired versioned migration chain — see
-``features/migrate/registry.py``'s docstring), FR-S04 (backup module + doctor
-integration, unaffected by the chain's retirement), and FR-S05 (upgrade
+``features/migrate/registry.py``'s docstring), and FR-S05 (upgrade
 orchestration).
 
 The versioned-chain tests this file used to carry (``test_registry_plan_...``,
@@ -18,17 +17,13 @@ floor_and_is_silent_at_or_above_it`` and
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core import specs_backup as _backup
 from dadaia_workspace.core import specs_version as _version
 from dadaia_workspace.features.migrate import registry as _registry
 from dadaia_workspace.features.migrate import upgrade as _upgrade
-
-_FIXED = lambda: datetime(2026, 6, 8, 3, 8, 8, tzinfo=UTC)  # noqa: E731
 
 
 def _write_constitution(specs_dir: Path, body: str) -> Path:
@@ -93,38 +88,6 @@ def test_check_upgradable_refuses_below_floor_and_is_silent_at_or_above_it() -> 
     # At, or past, the floor: no exception (the caller treats it as "nothing to do").
     _registry.check_upgradable(current=6, goal=6)
     _registry.check_upgradable(current=7, goal=6)
-
-
-# ───────────────────────────── backup (FR-S04) + doctor integration — 1 param ─
-
-
-def test_backup_label_location_copy_and_doctor_visibility(tmp_path: Path) -> None:
-    label = _backup.backup_label(0, 1, clock=_FIXED)
-    assert label == "0→1-20260608T030808Z"
-
-    specs = tmp_path / "specs"
-    specs.mkdir()
-    (specs / "constitution.md").write_text("# C\n", encoding="utf-8")
-    assert _backup.backup_root(specs) == tmp_path / "specs_bkp"
-
-    dest = _backup.backup_specs(specs, 0, 1, clock=_FIXED)
-    assert dest.parent.name == "specs_bkp"
-    assert (dest / "constitution.md").read_text(encoding="utf-8") == "# C\n"
-
-    # Doctor: below-canonical tree warns; canonical-stamped tree is silent.
-    from dadaia_workspace.features.specs import Severity, SpecsDoctor
-
-    below = SpecsDoctor(specs).check()
-    version_warns = [i for i in below if i.code == "SPECS-VERSION"]
-    assert len(version_warns) == 1
-    assert version_warns[0].severity == Severity.WARNING
-    assert "re-stamp constitution.md" in version_warns[0].description
-
-    canonical_specs = tmp_path / "specs_canonical"
-    stamp = _version.CANONICAL_SPECS_VERSION
-    _write_constitution(canonical_specs, f"---\nspecs_pattern_version: {stamp}\n---\n# C\n")
-    canonical_issues = SpecsDoctor(canonical_specs).check()
-    assert [i for i in canonical_issues if i.code == "SPECS-VERSION"] == []
 
 
 # ───────────────────────────── upgrade (FR-S05) ────────────────────────────────

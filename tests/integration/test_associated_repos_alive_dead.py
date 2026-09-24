@@ -1,10 +1,10 @@
 """FR16 (v0.4.4, T-044-27) — ALIVE/DEAD covers every repo in the set.
 
-Intent: CONTRACT — A16.1, A16.2, A16.3.
+Intent: CONTRACT — A16.1, A16.2 (A16.3's clean-clone half: test_context_alive_writes_nothing.py).
 
 Drives the REAL ``GitSubprocessClient`` against real git repos + bare remotes in
 ``tmp_path`` (never real network, never a real venv), mirroring the existing
-``test_dead_review_gate.py`` / ``test_context_alive_scaffold_commit.py`` conventions.
+``test_dead_review_gate.py`` conventions.
 alive()/dead() now iterate ``SpecContextProject.all_repos()`` — main repo first, then
 every associated repo in order (the one accessor, A15.3) — this suite proves that loop
 end to end: real clones, real untracked-file detection, real commit/push, real rmtree.
@@ -29,7 +29,6 @@ from dadaia_workspace.features.spec_context.service import (  # noqa: E402
     DeadUnpushedCommitsError,
     SpecContextService,
 )
-from dadaia_workspace.features.specs.canon import scaffold as canon_scaffold  # noqa: E402
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
 from tests.fakes import FakeContextStore  # noqa: E402
 
@@ -83,7 +82,7 @@ def _make_service(workspace_root: Path) -> tuple[SpecContextService, FakeContext
         context_store=store,
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
-        scaffold_specs=canon_scaffold,
+        install_hooks=lambda _repo: None,
     )
     return service, store
 
@@ -143,52 +142,6 @@ def test_alive_clones_main_and_associated_repos_idempotently(
 
 
 # ------------------------------------------------------------------ A16.3
-
-
-def test_alive_associated_repos_get_no_scaffold_and_keep_their_own_specs(
-    tmp_path: Path, workspace_root: Path
-) -> None:
-    """A16.3: an associated repo is cloned CLEAN — no scaffold, no ``specs/`` bind.
-
-    Its own pre-existing ``specs/`` (simulated here as content already in the
-    associated repo's git history) is left byte-identical and untouched.
-    """
-    main_remote = _bare_remote(tmp_path, "main-remote.git")
-    assoc_remote = _bare_remote(tmp_path, "assoc-remote.git")
-    _clone_with_initial_commit(main_remote, tmp_path / "seed-main")
-    own_specs_content = "# the associated repo's OWN specs\nnot dadaia's scaffold\n"
-    _clone_with_initial_commit(
-        assoc_remote, tmp_path / "seed-assoc", extra={"specs/README.md": own_specs_content}
-    )
-
-    service, store = _make_service(workspace_root)
-    store.save(
-        SpecContextProject(
-            name="proj",
-            state=ContextState.DEAD,
-            repo_slug="main-repo",
-            repo_url=str(main_remote),
-            created_at="2026-08-23T00:00:00+00:00",
-            associated_repos=(AssociatedRepo(slug="assoc-repo", url=str(assoc_remote)),),
-        )
-    )
-
-    service.alive("proj")
-
-    main_path = workspace_root / "repos" / "main-repo"
-    assoc_path = workspace_root / "repos" / "assoc-repo"
-
-    # Main repo: scaffolded and committed, as always (regression, untouched by FR16).
-    assert (main_path / "specs").exists()
-
-    # Associated repo: its OWN specs/README.md is untouched, byte-identical; no
-    # AGENTS.md/tests/AGENTS.md planted; no scaffold commit was ever made — exactly
-    # the one seed commit remains.
-    assoc_specs_readme = assoc_path / "specs" / "README.md"
-    assert assoc_specs_readme.read_text() == own_specs_content
-    assert not (assoc_path / "AGENTS.md").exists()
-    assert _commit_count(assoc_path) == 1
-    assert _commit_count(main_path) > 1  # the scaffold commit landed on the MAIN repo
 
 
 # ------------------------------------------------------------------ A16.2

@@ -24,7 +24,6 @@ from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     SpecContextProject,
 )
 from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
-from dadaia_workspace.features.specs.canon import scaffold as canon_scaffold  # noqa: E402
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
 from tests.fakes import FakeContextStore  # noqa: E402
 
@@ -68,7 +67,7 @@ def _setup(tmp_path: Path, lib_url: str) -> tuple[SpecContextService, FakeContex
         context_store=store,
         git_client=GitSubprocessClient(),
         workspace_root=ws,
-        scaffold_specs=canon_scaffold,
+        install_hooks=lambda _repo: None,
     )
     return service, store, ws
 

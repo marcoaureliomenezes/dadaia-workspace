@@ -6,7 +6,7 @@ Fix: detect non-writable files before rmtree and raise GitSyncError with
 
 T-10b: activate()/deactivate() removed; alive()/dead() replace them.
 
-CRITICAL ALIVE/DEAD state machine — operator data preservation on alive-merge is the
+CRITICAL ALIVE/DEAD state machine — alive() leaving operator specs untouched is the
 data-loss guard this file exists to keep, alongside the non-writable-files dead() fix.
 """
 
@@ -22,7 +22,6 @@ from pathlib import Path  # noqa: E402
 
 from dadaia_workspace.core.models.spec_context import ContextState  # noqa: E402
 from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
-from dadaia_workspace.features.specs.canon import scaffold as canon_scaffold  # noqa: E402
 from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
 
 
@@ -54,7 +53,7 @@ def service(
         context_store=store,
         git_client=git,
         workspace_root=workspace_root,
-        scaffold_specs=canon_scaffold,
+        install_hooks=lambda _repo: None,
     )
 
 
@@ -83,121 +82,29 @@ def test_dead_succeeds_on_non_writable_files(
     assert not repo.exists()
 
 
-def test_alive_with_preexisting_specs_adds_missing_files_without_overwriting(
-    workspace_root: Path,
+def test_alive_leaves_a_preexisting_specs_tree_untouched_and_hooks_the_repo(
     store: FakeContextStore,
     git: FakeGitClient,
+    workspace_root: Path,
 ) -> None:
-    """T-021-16 (b): when specs/ already exists alive() must merge missing canonical
-    files into it without overwriting any file that is already present.
-
-    Invariants:
-    - Pre-existing operator file is NOT overwritten.
-    - Missing canonical scaffold file IS added.
-    - alive() succeeds (no exception).
-    """
+    """0.4.8 AC3.7: alive() never merges, backs up or commits specs — an operator tree
+    stays byte-identical, nothing is committed, and the hook installer runs on the repo."""
+    hooked: list[Path] = []
     svc = SpecContextService(
         context_store=store,
         git_client=git,
         workspace_root=workspace_root,
-        scaffold_specs=canon_scaffold,
+        install_hooks=hooked.append,
     )
     svc.create("proj", "my-repo", "https://github.com/org/my-repo")
-
-    # Pre-create the repo dir (FakeGitClient.clone does this, but we also need specs/)
-    repo_dir = workspace_root / "repos" / "my-repo"
-    repo_dir.mkdir(parents=True, exist_ok=True)
-    specs_dir = repo_dir / "specs"
-    specs_dir.mkdir(parents=True, exist_ok=True)
-
-    # Place an operator file that must NOT be overwritten
-    operator_file = specs_dir / "constitution.md"
-    original_content = "# My custom constitution\n\nOperator-authored content.\n"
-    operator_file.write_text(original_content, encoding="utf-8")
-
-    # alive() must not raise and must not overwrite constitution.md
-    svc.alive("proj")
-
-    # Operator file preserved
-    assert operator_file.read_text(encoding="utf-8") == original_content, (
-        "alive() must NOT overwrite pre-existing operator files in specs/"
-    )
-
-    # The missing canon entries were rendered in beside it.
-    assert (specs_dir / "memory" / "ARCHITECTURE.md").exists(), (
-        "alive() must add the canon entries missing from a pre-existing specs/"
-    )
-
-
-def test_dead_writable_alive_safe_preserve_and_merge_not_skipped(
-    workspace_root: Path,
-    store: FakeContextStore,
-    git: FakeGitClient,
-) -> None:
-    """Baseline dead() on all-writable files; alive()'s safe-preserve backup snapshot
-    (FR-S06 path a / T-016-S01); and alive() on a pre-existing (empty) specs/ actually
-    executes the merge path rather than silently skipping it."""
-    svc = SpecContextService(
-        context_store=store,
-        git_client=git,
-        workspace_root=workspace_root,
-        scaffold_specs=canon_scaffold,
-    )
-
-    # Baseline: dead() succeeds when all files are writable.
-    svc.create("proj", "my-repo", "https://github.com/org/my-repo")
-    svc.alive("proj")
     repo = workspace_root / "repos" / "my-repo"
-    (repo / "writable.txt").write_text("data")
-    svc.dead("proj")
-    assert not repo.exists()
-
-    # Safe-preserve: a pre-existing tree is snapshotted to specs_bkp/preserve-<UTC>/.
-    svc.create("projbk", "repobk", "https://github.com/org/repobk")
-    repo_dir_bk = workspace_root / "repos" / "repobk"
-    specs_dir_bk = repo_dir_bk / "specs"
-    specs_dir_bk.mkdir(parents=True, exist_ok=True)
-    (specs_dir_bk / "constitution.md").write_text("# operator\n", encoding="utf-8")
-    svc.alive("projbk")
-
-    from dadaia_workspace.core import specs_backup as _sb
-
-    backups = list(_sb.backup_root(specs_dir_bk).glob("preserve-*"))
-    assert backups, "alive() must safe-preserve the pre-existing specs/ before merging"
-    assert (backups[0] / "constitution.md").read_text(encoding="utf-8") == "# operator\n"
-
-    # No silent-skip: an empty pre-existing specs/ still gets merge-enriched.
-    svc.create("proj2", "repo2", "https://github.com/org/repo2")
-    repo_dir2 = workspace_root / "repos" / "repo2"
-    specs_dir2 = repo_dir2 / "specs"
-    specs_dir2.mkdir(parents=True, exist_ok=True)
-    svc.alive("proj2")
-
-    for rel in ("constitution.md", "memory/ARCHITECTURE.md", "backlog/BACKLOG.json"):
-        assert (specs_dir2 / rel).is_file(), (
-            f"alive() did not render the canon into an empty pre-existing specs/: {rel} missing"
-        )
-
-
-def test_alive_commits_its_own_scaffold(
-    service: SpecContextService,
-    store: FakeContextStore,
-    git: FakeGitClient,
-    workspace_root: Path,
-) -> None:
-    """Bug alive-scaffold-blocks-dead (validation-027 F-06).
-
-    alive() scaffolds specs/ + AGENTS.md into the cloned repo but left them
-    UNTRACKED, so an immediate dead() hit the untracked-consent guard and the
-    create->alive->dead lifecycle could never complete on a fresh context. The
-    tool must commit the files IT created: alive() ends with a scaffold commit.
-    """
-    repo = workspace_root / "repos" / "my-repo"
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    # The fake reports the working tree dirty (as the real client does right after
-    # alive() writes the scaffold into the fresh clone).
+    (repo / "specs").mkdir(parents=True)
+    (repo / "specs" / "constitution.md").write_text("# operator\n", encoding="utf-8")
     git._dirty.add(repo)
-    service.alive("proj")
 
-    assert (repo / "specs").exists(), "scaffold must exist"
-    assert repo in git.committed, "alive() must commit the scaffold it created"
+    svc.alive("proj")
+
+    assert sorted(p.name for p in (repo / "specs").iterdir()) == ["constitution.md"]
+    assert not (workspace_root / "repos" / "my-repo" / "specs_bkp").exists()
+    assert repo not in git.committed
+    assert hooked == [repo]

@@ -18,7 +18,6 @@ from dadaia_workspace.core.models.spec_context import (
 )
 from dadaia_workspace.features.import_.service import ImportService
 from dadaia_workspace.features.spec_context.service import SpecContextService
-from dadaia_workspace.features.specs.canon import scaffold as canon_scaffold
 from tests.fakes import FakeContextStore, FakeGitClient
 
 _EXPORT = {
@@ -64,7 +63,7 @@ def _importer(tmp_path: Path, store: FakeContextStore) -> ImportService:
         context_store=store,
         git_client=FakeGitClient(),
         workspace_root=tmp_path,
-        scaffold_specs=canon_scaffold,
+        install_hooks=lambda _repo: None,
     )
     return ImportService(contexts)
 
