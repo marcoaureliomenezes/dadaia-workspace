@@ -75,7 +75,7 @@ Paths under `dadaia_workspace/` abbreviated `dw/`. Tasks in one parallel group (
   (only if drift-from-root fails), `tests/contract/test_audit_first_pass.py`
   `blocked by:` — · `group:` P1 · `delivers:` FR5
 
-- [ ] **T-048-09 — Law and skills speak three levels.**
+- [-] **T-048-09 — Law and skills speak three levels.**
   `public/data/AGENTS.md` ≤ 5-bullet onboarding section; `public/data/dadaia-AGENTS.md` frozen-surface line amended per
   ADR 0027; `dd-cli-library` levels 1–2 procedure (new create shape); `dd-gitflow-default` consumer versioning rule;
   PyPI+1 rule moved to `AGENTS.md` (repo root); `CONTEXT.md` gains §4 terms; re-record behavior-map/CONTEXT-MAP hashes;
