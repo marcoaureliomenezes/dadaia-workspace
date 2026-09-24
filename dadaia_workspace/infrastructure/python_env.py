@@ -106,26 +106,11 @@ def repack_installed_wheel(
 
 # ── requires-python interpreter resolution ────────────────────────────────────────
 #
-# Bug init-venv-bootstrap-inherits-degraded-base-python: stdlib ``venv.create()``
-# resolves a NEW venv's base interpreter through ``sys._base_executable`` of the
-# CALLING process. On a venv created with ``symlinks=False`` ("--copies" — exactly
-# what ``venv.create(..., with_pip=True)`` used here without an explicit ``symlinks``
-# argument), CPython's getpath.c re-derives that value via a landmark search for the
-# OS-level *unversioned* ``python3`` name inside the recorded ``home`` directory — NOT
-# the version-pinned ``executable`` its own ``pyvenv.cfg`` records. When the host's
-# unversioned ``/usr/bin/python3`` is a symlink to an OLDER interpreter than the one
-# actually running (e.g. a Debian/Ubuntu host that keeps 3.10 as the OS default
-# alongside an installed 3.12), every child venv silently degrades and the subsequent
-# package install fails opaquely with "requires a different Python". Reproduced on
-# this exact host class: a `.dadaia/.venv` built with `--copies` reports
-# `sys._base_executable == "/usr/bin/python3"` (a symlink to 3.10) while its own
-# `pyvenv.cfg` `executable` field correctly names `/usr/bin/python3.12` (the
-# interpreter that actually built it), and the running interpreter is itself 3.12.
-#
-# The fix: never trust that implicit resolution. Resolve and VERIFY an interpreter
-# explicitly (by executing each candidate and checking ITS reported version), then
-# hand it to ``python -m venv`` via subprocess — which re-derives its OWN base
-# correctly because IT is not the degraded ``--copies`` binary.
+# Bug init-venv-bootstrap-inherits-degraded-base-python: ``venv.create()`` takes a new
+# venv's base from the caller's ``sys._base_executable``, which a ``--copies`` venv
+# re-derives from the host's unversioned ``python3`` (possibly an OLDER interpreter), so
+# child venvs silently degrade. Resolve and VERIFY an interpreter by executing it, then
+# run ``python -m venv`` from THAT interpreter via subprocess.
 
 _REQUIRES_PYTHON_CLAUSE_RE = re.compile(r"(>=|<=|==|!=|>|<)\s*([0-9]+(?:\.[0-9]+){0,2})")
 _REQUIRES_PYTHON_FLOOR_RE = re.compile(r">=\s*3\.(\d+)")
