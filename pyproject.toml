@@ -46,7 +46,7 @@ dadaia-workspace = "dadaia_workspace.cli.main:_safe_app"
 
 [tool.poetry.dependencies]
 python = "^3.12"
-typer = ">=0.27.1"
+typer = ">=0.27.2"
 rich = ">=13,<16"
 pyyaml = "^6.0"
 jinja2 = "^3.1"
