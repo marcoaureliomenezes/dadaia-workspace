@@ -66,7 +66,9 @@ _E2E_VERSION = f"{_SOURCE_VERSION}+e2e"
 _PREVIOUS_PYPI = _SOURCE_VERSION
 
 XFAIL_L1 = pytest.mark.xfail(strict=True, reason="T-048-04")
-XFAIL_L2 = pytest.mark.xfail(strict=True, reason="T-048-03")
+XFAIL_L2 = pytest.mark.xfail(
+    strict=True, reason="T-048-04 (init lines), T-048-07 (doctor on no specs)"
+)
 XFAIL_L3 = pytest.mark.xfail(strict=True, reason="T-048-05")
 XFAIL_UPGRADE = pytest.mark.xfail(strict=True, reason="T-048-06")
 XFAIL_GUIDANCE = pytest.mark.xfail(strict=True, reason="T-048-07")
