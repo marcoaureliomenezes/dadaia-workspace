@@ -84,7 +84,7 @@ Paths under `dadaia_workspace/` abbreviated `dw/`. Tasks in one parallel group (
   `dw/public/skills/{dd-cli-library,dd-gitflow-default}/**`, `AGENTS.md`, `CONTEXT.md`
   `blocked by:` T-048-07 · `group:` P5 · `delivers:` AC6.5, AC7.2
 
-- [ ] **T-048-10 — Docs and the fix-line contract.**
+- [-] **T-048-10 — Docs and the fix-line contract.**
   `docs/quickstart.md` one shell block (REPO_URL only); `README.md`, `docs/getting-started.md`, `docs/cli.md`,
   `llms.txt` describe the three levels with `.dadaia/.venv/bin/dadaia`; offline claim removed. Contract test: every
   shipped `fix:` literal and doc CLI line uses the venv path (uvx init lines excepted); no "repos catalog" text.
