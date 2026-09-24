@@ -125,7 +125,7 @@ jobs:
     if: needs.release-please.outputs.release_created == 'true'
     permissions:
       contents: read
-    timeout-minutes: 8
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -135,8 +135,15 @@ jobs:
           python-version: "3.12"
       - run: pipx install poetry==1.8.3
       - run: poetry install --no-interaction --no-ansi --with dev
+      - run: pipx install uv==0.11.16
+      # AC8.3: the onboarding journey and the one-line bootstrap run before publish.
       - name: pytest e2e python
-        run: poetry run pytest -q -m "e2e and not quarantine" tests/e2e/features --durations=30
+        env:
+          DADAIA_REQUIRE_UVX: "1"
+        run: >-
+          poetry run pytest -q -m "e2e and not quarantine" --durations=30
+          tests/e2e/features tests/e2e/test_one_line_bootstrap.py
+          tests/e2e/test_onboarding_journey.py
 
   build:
     name: Build sdist + wheel
@@ -240,10 +247,21 @@ jobs:
         run: pip install "dadaia-workspace==$VERSION"
       - name: dadaia --help
         run: dadaia --help
-      - name: dadaia init in tmpdir
-        # Use the runner temp dir (portable; no hardcoded /tmp — T-018-09).
-        # The directory is init's one positional argument and --harness its one required
-        # option; `--workspace` and the implied full harness set are retired.
+      - run: pipx install uv==0.11.16
+      - name: Greenfield from PyPI (init --repo + specs init + doctor)
+        # AC8.3: the published wheel walks the three levels over a file:// bare repo
+        # created here; the runner temp dir keeps it portable (no hardcoded /tmp).
         run: |
-          dadaia init "$RUNNER_TEMP/smoke-ws" --harness claude
-          test -f "$RUNNER_TEMP/smoke-ws/.dadaia/states/spec_contexts.json"
+          git config --global user.name smoke
+          git config --global user.email smoke@example.invalid
+          git config --global init.defaultBranch main
+          src="$RUNNER_TEMP/smoke-src"
+          mkdir -p "$src" && echo "# smoke" > "$src/README.md"
+          git -C "$src" init -q && git -C "$src" add -A && git -C "$src" commit -qm init
+          git clone -q --bare "$src" "$RUNNER_TEMP/smoke.git"
+          cd "$RUNNER_TEMP"
+          uvx "dadaia-workspace==$VERSION" init smoke-ws --harness claude \
+            --repo "file://$RUNNER_TEMP/smoke.git"
+          cd smoke-ws
+          .dadaia/.venv/bin/dadaia specs init --context smoke
+          .dadaia/.venv/bin/dadaia doctor --context smoke

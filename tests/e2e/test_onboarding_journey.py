@@ -50,8 +50,10 @@ pytestmark = [
     # Justified over the e2e default: a first level provisions two real venvs (uvx's and
     # the workspace's) from the network; the memoized first test of a scenario pays it.
     pytest.mark.timeout(900),
+    # CI sets DADAIA_REQUIRE_UVX=1 so an absent uvx fails the journey instead of skipping it.
     pytest.mark.skipif(
-        _UVX is None, reason="uvx is not on PATH — the onboarding journey drives `uvx --from`"
+        _UVX is None and not os.environ.get("DADAIA_REQUIRE_UVX"),
+        reason="uvx is not on PATH — the onboarding journey drives `uvx --from`",
     ),
 ]
 
@@ -553,3 +555,22 @@ def upgrade(env: Env) -> Upgrade:
 class TestReinitUpgrade:
     def test_reinit_upgrades_from_previous_pypi(self, upgrade: Upgrade) -> None:
         upgrade.upgrade()
+
+
+# ── AC7.1: the quickstart block, verbatim ────────────────────────────────────────
+
+
+class TestQuickstartVerbatim:
+    """AC7.1: docs/quickstart.md's first bash block runs as printed with only ``REPO_URL``
+    set — the one other substitution points ``uvx`` at the built wheel instead of PyPI."""
+
+    def test_the_quickstart_block_runs_as_printed(self, env: Env) -> None:
+        text = (_REPO_ROOT / "docs" / "quickstart.md").read_text("utf-8")
+        block = re.findall(r"```bash\n(.*?)```", text, re.DOTALL)[0]
+        url = env.bare("quick")
+        script, count = re.subn(r"^REPO_URL=.*$", f"REPO_URL={url}", block, flags=re.M)
+        assert count == 1, block
+        script = script.replace("uvx dadaia-workspace", f"uvx --from {env.wheel} dadaia-workspace")
+        done = env.run("bash", "-euo", "pipefail", "-c", script, cwd=env.root)
+        assert done.returncode == 0, f"quickstart failed:\n{done.stdout}\n{done.stderr}"
+        Workspace(env, "demo").assert_level_clean("quick", "quick", url)

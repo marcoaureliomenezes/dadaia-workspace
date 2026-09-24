@@ -362,3 +362,33 @@ def test_a_dispatch_can_republish_an_existing_tag_through_the_same_chain() -> No
     assert existing and "inputs.tag" in existing[0]["if"]
     checkout = _jobs()["build"]["steps"][0]
     assert checkout["with"]["ref"] == "${{ needs.release-please.outputs.tag_name }}"
+
+
+def _step_texts(workflow: str, job: str) -> str:
+    document = yaml.safe_load((_WORKFLOWS / workflow).read_text(encoding="utf-8"))
+    steps = document["jobs"][job]["steps"]
+    return "\n".join(f"{s.get('run', '')}\n{s.get('env', '')}" for s in steps)
+
+
+@pytest.mark.parametrize(
+    ("workflow", "job"), [("ci.yml", "e2e-python"), ("release.yml", "e2e-python")]
+)
+def test_the_onboarding_journey_runs_with_uv_and_cannot_skip(workflow: str, job: str) -> None:
+    """Intent: CONTRACT — 0.4.8 AC8.3 (T-048-11). The e2e job installs uv, requires uvx
+    (an absent uvx fails instead of skipping) and selects the journey."""
+    steps = _step_texts(workflow, job)
+    assert "install uv==" in steps and "'DADAIA_REQUIRE_UVX': '1'" in steps, steps
+    assert re.search(r"tests/e2e(?:\s|$|/test_onboarding_journey\.py)", steps), steps
+
+
+def test_the_post_publish_smoke_walks_greenfield_from_pypi() -> None:
+    """Intent: CONTRACT — 0.4.8 AC8.3 (T-048-11): the smoke job runs the published version
+    through `init --repo` + `specs init` + `doctor`."""
+    steps = _step_texts("release.yml", "smoke-test")
+    for needle in (
+        'uvx "dadaia-workspace==$VERSION" init',
+        "--repo",
+        "specs init --context",
+        "doctor --context",
+    ):
+        assert needle in steps, needle
