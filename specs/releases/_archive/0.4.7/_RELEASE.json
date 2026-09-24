@@ -1,7 +1,7 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.7",
-  "phase": "CLOSURE",
+  "phase": "ARCHIVED",
   "defined": {
     "sha": "062332d4",
     "ts": "2026-09-23T01:01:47Z"
@@ -10,7 +10,11 @@
     "sha": "184e67a8",
     "ts": "2026-09-23T01:05:05Z"
   },
-  "shipped": null,
+  "shipped": {
+    "sha": "2d1f4351a46c8081f488a055d36c89abc20f6af9",
+    "ts": "2026-09-23T03:43:08Z",
+    "pr": 264
+  },
   "log": [
     {
       "ts": "2026-09-12T18:28:07Z",
@@ -863,6 +867,12 @@
         "workspace-init",
         "context-management"
       ]
+    },
+    {
+      "ts": "2026-09-24T05:00:00Z",
+      "agent": "main-thread",
+      "kind": "merge",
+      "text": "SHIPPED + PUBLISHED: release PR #264 squash 2d1f4351 on main; PyPI 0.4.7 published by release.yml (ADR 0026), install from PyPI verified with uvx. Post-publish bug fixes on feature/0.4.7 (PR #270, 20 commits, reviewer APPROVED 22a9ff72) carried into feature/0.4.8 by merge 9e7af82f."
     }
   ]
 }
