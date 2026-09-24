@@ -849,3 +849,68 @@ def test_interpreter_version_probe_degrades_to_none_on_timeout(
     monkeypatch.setattr(python_env_module.subprocess, "run", hanging_run)
 
     assert python_env_module._interpreter_version("/usr/bin/python-that-hangs") is None
+
+
+def test_base_python_without_ensurepip_is_named_not_blamed_on_noexec(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Intent: CONTRACT — 0.4.8 AC1.6 (T-048-04).
+
+    Debian's base python3 without ``python3-venv`` fails ``-m venv`` with venv's own
+    "ensurepip is not available" line; the error names that, never a noexec mount.
+    """
+    monkeypatch.setattr(
+        VenvPythonEnvironmentManager, "ensure_workspace_venv", _REAL_ENSURE, raising=True
+    )
+    monkeypatch.setattr(
+        VenvPythonEnvironmentManager,
+        "_resolve_child_venv_interpreter",
+        lambda self: "/usr/bin/python3.12",
+    )
+
+    def no_ensurepip(cmd: list[str], check: bool = False, **_kwargs: object) -> None:
+        import subprocess as _subprocess
+
+        raise _subprocess.CalledProcessError(
+            1,
+            cmd,
+            output="The virtual environment was not created successfully because "
+            "ensurepip is not available.",
+            stderr="",
+        )
+
+    monkeypatch.setattr(python_env_module.subprocess, "run", no_ensurepip)
+
+    with pytest.raises(python_env_module.WorkspaceVenvBootstrapError) as excinfo:
+        VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
+
+    message = str(excinfo.value)
+    assert "ensurepip" in message
+    assert "noexec" not in message.lower()
+
+
+def test_repacked_wheel_is_not_left_behind(
+    tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Intent: CONTRACT — 0.4.8 AC1.6 (T-048-04): the re-packed wheel is scratch."""
+    site = tmp_path / "site-packages" / "dadaia_workspace"
+    site.mkdir(parents=True)
+    (site / "__init__.py").write_text("")
+    monkeypatch.setattr(python_env_module.dadaia_workspace, "__file__", str(site / "__init__.py"))
+    written: list[Path] = []
+
+    def repack(dest_dir: Path, dist: object = None) -> Path:
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        wheel = dest_dir / "dadaia_workspace-9.9.9-py3-none-any.whl"
+        wheel.write_bytes(b"fake-wheel")
+        written.append(wheel)
+        return wheel
+
+    monkeypatch.setattr(python_env_module, "repack_installed_wheel", repack)
+    ws = tmp_path / "ws"
+
+    VenvPythonEnvironmentManager().ensure_workspace_venv(str(ws))
+
+    assert written and recorder.commands[1][-1] == str(written[0])
+    assert not written[0].exists()
+    assert not (ws / ".dadaia" / "tmp").exists()

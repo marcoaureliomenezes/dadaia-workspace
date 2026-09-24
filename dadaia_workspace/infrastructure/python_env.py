@@ -13,6 +13,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import zipfile
 from importlib import metadata
 from pathlib import Path
@@ -300,8 +301,11 @@ class VenvPythonEnvironmentManager:
             / f"dadaia{PLATFORM.venv_exe_suffix}"
         )
 
-    def _install_spec(self, workspace_root: str) -> str:
+    def _install_spec(self, scratch_dir: str) -> str:
         """Resolve what to ``pip install`` so the venv mirrors the RUNNING distribution.
+
+        A re-packed wheel is written under *scratch_dir*, which the caller deletes after
+        the install (0.4.8 AC1.6: no wheel is left behind).
 
         Two paths, no index:
 
@@ -333,9 +337,7 @@ class VenvPythonEnvironmentManager:
         src_root = Path(dadaia_workspace.__file__).resolve().parent.parent
         if (src_root / "pyproject.toml").is_file():
             return str(src_root)
-        repacked = repack_installed_wheel(
-            Path(workspace_root) / ".dadaia" / "tmp" / "bootstrap-wheel"
-        )
+        repacked = repack_installed_wheel(Path(scratch_dir))
         if repacked is None:
             raise WorkspaceVenvBootstrapError(
                 "workspace venv bootstrap cannot mirror the running distribution: "
@@ -390,21 +392,23 @@ class VenvPythonEnvironmentManager:
                     "filesystem, or remount it without 'noexec', then retry."
                 ) from exc
             except subprocess.CalledProcessError as exc:
-                # Same noexec class, one level deeper: the interpreter spawns fine (it
-                # lives outside the noexec mount) but venv's internal ensurepip step
-                # fails EXECUTING the freshly-copied interpreter inside the
-                # noexec-mounted target dir, surfacing here as a non-zero child exit
-                # rather than an OSError on our own spawn.
+                # venv's own diagnostics name the cause: a base Python without
+                # ensurepip (Debian's python3-venv split) says so; anything else is
+                # most often the noexec class one level deeper (ensurepip executing
+                # the freshly-copied interpreter inside a noexec target dir).
                 stderr_tail = (exc.stderr or exc.output or "").strip()[-500:]
+                cause = (
+                    "the base Python lacks the 'ensurepip'/'venv' modules (on Debian/"
+                    "Ubuntu install python3-venv), then retry."
+                    if "ensurepip is not available" in stderr_tail
+                    else "the most common cause is a target filesystem mounted 'noexec' "
+                    "(or lacking execute permission), where the venv's own python "
+                    "cannot be run. Re-target the workspace onto an exec-capable "
+                    "filesystem, or remount it without 'noexec', then retry."
+                )
                 raise WorkspaceVenvBootstrapError(
                     f"could not create the workspace venv at '{venv_dir}' with "
-                    f"interpreter '{interpreter}': venv creation failed. "
-                    "The most common cause is a target filesystem mounted 'noexec' "
-                    "(or lacking execute permission), where the venv's own python "
-                    "cannot be run — /tmp is mounted this way on many hardened hosts "
-                    "and containers. Re-target the workspace onto an exec-capable "
-                    "filesystem, or remount it without 'noexec', then retry. "
-                    f"Diagnostics: {stderr_tail}"
+                    f"interpreter '{interpreter}': {cause} Diagnostics: {stderr_tail}"
                 ) from exc
         if not self._dadaia_entrypoint(workspace_root).exists():
             # Post-condition (BEFORE any pip install): the venv's OWN python must
@@ -414,25 +418,26 @@ class VenvPythonEnvironmentManager:
             # actionable "interpreter mismatch", never pip's bare, rootless "requires a
             # different Python" failure.
             self._assert_child_interpreter_version(workspace_root)
-            spec = self._install_spec(workspace_root)
             pip = self.pip_executable(workspace_root)
-            install_cmd = [pip, "install", "--quiet"]
-            editable = Path(spec).is_dir()
-            if editable:
-                install_cmd.append("--editable")
-            install_cmd.append(spec)
-            # Bug init-succeeds-after-provider-bootstrap-failure: pip's stream is
-            # CAPTURED — a failure must not leak a raw "ERROR: Could not find a
-            # version..." into init's output, where it reads as a masked broken
-            # bootstrap.
-            try:
-                subprocess.run(install_cmd, check=True, capture_output=True, text=True)
-            except subprocess.CalledProcessError as exc:
-                pip_tail = ((exc.stderr or exc.output or "") if exc else "").strip()[-400:]
-                raise WorkspaceVenvBootstrapError(
-                    f"workspace venv bootstrap failed installing '{spec}'. Installer "
-                    f"output: {pip_tail}"
-                ) from exc
+            with tempfile.TemporaryDirectory(prefix="dadaia-wheel-") as scratch:
+                spec = self._install_spec(scratch)
+                install_cmd = [pip, "install", "--quiet"]
+                editable = Path(spec).is_dir()
+                if editable:
+                    install_cmd.append("--editable")
+                install_cmd.append(spec)
+                # Bug init-succeeds-after-provider-bootstrap-failure: pip's stream is
+                # CAPTURED — a failure must not leak a raw "ERROR: Could not find a
+                # version..." into init's output, where it reads as a masked broken
+                # bootstrap.
+                try:
+                    subprocess.run(install_cmd, check=True, capture_output=True, text=True)
+                except subprocess.CalledProcessError as exc:
+                    pip_tail = (exc.stderr or exc.output or "").strip()[-400:]
+                    raise WorkspaceVenvBootstrapError(
+                        f"workspace venv bootstrap failed installing '{spec}'. Installer "
+                        f"output: {pip_tail}"
+                    ) from exc
             self._ensure_ci_toolchain(pip)
             # Success is only reported after the venv provider VERIFIES independently
             # (clean env, no inherited PYTHONPATH). The re-packed path IS the running
