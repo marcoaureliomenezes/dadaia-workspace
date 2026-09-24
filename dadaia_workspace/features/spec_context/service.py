@@ -3,6 +3,7 @@
 import contextlib
 import logging
 import os
+import re
 import shutil
 import sys
 from dataclasses import replace
@@ -10,6 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 
+from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.exceptions import (
     AssociatedRepoConflictError,
     AssociatedRepoNotFoundError,
@@ -120,6 +122,45 @@ def _require_allowlisted(label: str, value: str) -> None:
         )
 
 
+def slug_from_url(url: str) -> str:
+    """The ONE slug rule (0.4.8 AC3.2): a clone URL's last path segment minus a trailing
+    ``.git``, every char outside ``[A-Za-z0-9_-]`` replaced by ``-`` — so
+    ``my.repo.git`` derives ``my-repo`` and any URL with a non-empty tail yields a slug
+    the allowlist accepts. The context name defaults to the main repo's slug.
+    """
+    tail = url.rstrip("/").replace("\\", "/").rsplit("/", 1)[-1].rsplit(":", 1)[-1]
+    tail = tail[: -len(".git")] if tail.endswith(".git") else tail
+    slug = re.sub(r"[^A-Za-z0-9_-]", "-", tail)
+    if not slug:
+        raise InvalidContextNameError(f"cannot derive a repo directory name from {url!r}.")
+    return slug
+
+
+def install_git_hooks(repo_root: Path, *, force: bool = False) -> list[Path]:
+    """Copy every ``workspace_layout.INSTALLED_GIT_HOOKS`` row into ``<repo>/.git/hooks``.
+
+    The ONE git-chokepoint installer — `dadaia ci install-hook`, `context create` and
+    `context alive` are its callers. Raises :class:`FileNotFoundError` when *repo_root*
+    is not a git repository and :class:`FileExistsError` for an installed hook the
+    caller did not ask to overwrite; nothing is written in either case.
+    """
+    hooks_dir = repo_root / ".git" / "hooks"
+    if not hooks_dir.is_dir():
+        raise FileNotFoundError(f"{hooks_dir} not found (is this a git repository?)")
+    scripts = workspace_layout.public_scripts_dir()
+    planned = [
+        (hooks_dir / target, scripts / source)
+        for target, source in workspace_layout.INSTALLED_GIT_HOOKS
+    ]
+    for dest, _ in planned:
+        if dest.exists() and not force:
+            raise FileExistsError(str(dest))
+    for dest, source in planned:
+        shutil.copyfile(source, dest)
+        dest.chmod(0o755)
+    return [dest for dest, _ in planned]
+
+
 class SpecContextService:
     def __init__(
         self,
@@ -143,33 +184,69 @@ class SpecContextService:
 
     def create(
         self,
-        name: str,
-        repo_slug: str,
-        repo_url: str,
+        main_repo_url: str,
         *,
-        associated_repos: tuple[AssociatedRepo, ...] = (),
+        name: str | None = None,
+        associated_urls: tuple[str, ...] = (),
     ) -> SpecContextProject:
-        """Register a new Spec Context Project in state ``DEAD`` — see ``register``."""
-        return self.register(
-            SpecContextProject(
-                name=name,
-                state=ContextState.DEAD,
-                repo_slug=repo_slug,
-                repo_url=repo_url,
-                created_at=_now(),
-                alive_since=None,
-                dead_since=None,
-                associated_repos=associated_repos,
-            )
+        """Make a context ALIVE from its clone URLs in ONE transactional step (0.4.8 FR3).
+
+        Every slug comes from :func:`slug_from_url`; *name* defaults to the main repo's.
+        The record is validated first, then each repo is cloned — or adopted when
+        ``repos/<slug>`` already holds a checkout whose ``origin`` is that URL — and
+        hooked. Any failure removes every directory this call created and writes no
+        record, so the corrected command re-runs cleanly (R3). Writes nothing inside a
+        repo but the hook.
+        """
+        main_slug = slug_from_url(main_repo_url)
+        ctx = SpecContextProject(
+            name=name or main_slug,
+            state=ContextState.ALIVE,
+            repo_slug=main_slug,
+            repo_url=main_repo_url,
+            created_at=_now(),
+            alive_since=_now(),
+            dead_since=None,
+            associated_repos=tuple(AssociatedRepo(slug_from_url(u), u) for u in associated_urls),
         )
+        self._validate(ctx)
+        created: list[Path] = []
+        try:
+            for repo in ctx.all_repos():
+                dest = self._repo_path(repo.slug)
+                if dest.exists():
+                    if not self._git.is_git_root(dest) or self._git.remote_url(dest) != repo.url:
+                        raise ContextStateError(
+                            f"repos/{repo.slug} exists but is not a checkout of {repo.url} — "
+                            "move it away or pick another URL."
+                        )
+                else:
+                    self._git.clone(repo.url, dest)
+                    created.append(dest)
+                self._install_hooks(dest)
+        except BaseException:
+            for dest in created:
+                shutil.rmtree(dest, onexc=_rmtree_chmod_retry)
+            raise
+        branch: str | None = None
+        with contextlib.suppress(Exception):
+            branch = self._git.current_branch(self._repo_path(main_slug))
+        ctx = replace(ctx, current_branch=branch)
+        self._store.save(ctx)
+        return ctx
 
     def register(self, ctx: SpecContextProject) -> SpecContextProject:
-        """The ONE seam that inserts a context into the registry — ``create`` (CLI) and
-        ``dadaia import`` both pass here, so a record is refused the same way whoever built
-        it: name and every slug allowlisted (``InvalidContextNameError``), name new
-        (``ContextAlreadyExistsError``), every slug free — not the main slug repeated, not
-        given twice, not owned by another context (``AssociatedRepoConflictError``). Nothing
-        is written unless every check passes."""
+        """Insert an already-built record (``dadaia import``) — validated exactly as
+        ``create`` validates, nothing materialized."""
+        self._validate(ctx)
+        self._store.save(ctx)
+        return ctx
+
+    def _validate(self, ctx: SpecContextProject) -> None:
+        """The ONE refusal seam every inserted record passes: name and every slug
+        allowlisted (``InvalidContextNameError``), name new (``ContextAlreadyExistsError``),
+        every slug free — not the main slug repeated, not given twice, not owned by
+        another context (``AssociatedRepoConflictError``). Writes nothing."""
         _require_allowlisted("context name", ctx.name)
         if self._store.get(ctx.name) is not None:
             raise ContextAlreadyExistsError(
@@ -189,8 +266,6 @@ class SpecContextService:
                 )
             seen.add(repo.slug)
             self._refuse_slug(ctx.name, repo.slug, repo.url)
-        self._store.save(ctx)
-        return ctx
 
     # ------------------------------------------------------------------ associated repos (FR17)
 
@@ -414,7 +489,7 @@ class SpecContextService:
                     if repo.slug == ctx.repo_slug:
                         fix = (
                             f"{DADAIA_BIN} context delete {name} && {DADAIA_BIN} context "
-                            f"create {name} --main-repo {repo.slug} --url <clone-url>"
+                            f"create {name} --main-repo <clone-url>"
                         )
                     else:
                         fix = (
@@ -490,28 +565,11 @@ class SpecContextService:
                 f"Context '{name}' has no materialized Git repository at '{repo_path}'."
             )
         if self._git.has_commits(repo_path):
-            # Convergent contract (bug baseline-refuses-alive-scaffold-commit):
-            # alive() commits its own scaffold, so history + clean tree is the
-            # canonical post-alive state — success, not refusal. A dirty tree on top
-            # of history converges too when EVERY dirty path is scaffold-shaped
-            # (specs/** or AGENTS.md) — the official alive → `specs init` → baseline
-            # sequence leaves exactly those tool-authored files (bug
-            # context-baseline-rejects-official-scaffold-followup). Anything else
-            # refuses: operator content must never be swept into a baseline commit.
             if self._git.is_dirty(repo_path):
-                dirty = tuple(self._git.diff_name_only(repo_path))
-                scaffold_shaped = bool(dirty) and all(
-                    rel == "AGENTS.md" or rel.startswith("specs/") for rel in dirty
+                raise ContextStateError(
+                    f"Context '{name}' already has Git history; baseline only births an "
+                    "unborn repo. Commit your changes as an ordinary commit."
                 )
-                if not scaffold_shaped:
-                    raise ContextStateError(
-                        f"Context '{name}' already has Git history with uncommitted "
-                        "changes outside the scaffold envelope (specs/**, AGENTS.md); "
-                        "baseline never sweeps operator content. Commit or stash your "
-                        "changes first."
-                    )
-                self._require_no_untracked_secrets(name, repo_path)
-                self._git.commit_all(repo_path, message)
             if push:
                 if not self._git.has_remote(repo_path):
                     raise GitSyncError(f"Context '{name}' has no remote; baseline cannot push.")

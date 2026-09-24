@@ -22,7 +22,7 @@ from dadaia_workspace.features.ci_preflight import (
     run_preflight,
     subprocess_runner,
 )
-from dadaia_workspace.features.workspace.bootstrap import install_git_hooks
+from dadaia_workspace.features.spec_context.service import install_git_hooks
 
 app = typer.Typer(help="Local CI-equivalent preflight gate + git-hook chokepoints.")
 

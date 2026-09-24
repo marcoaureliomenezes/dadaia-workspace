@@ -15,7 +15,7 @@
 - context alive — Transition a context to ALIVE; clone repo if absent. Idempotent if already ALIVE.
 - context baseline — Create the explicit initial scaffold commit for an unborn repository.
 - context bind — Bind this shell session to a context.
-- context create — Create a new Spec Context Project in state 'dead'.
+- context create — Clone (or adopt) every repo, install the pre-push hook, make the context ALIVE and
 - context dead — Transition a context to DEAD; git sync + remove repo from disk.
 - context delete — Delete a context. Context must be dead.
 - context list — List all Spec Context Projects.

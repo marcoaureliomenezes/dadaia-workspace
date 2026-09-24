@@ -25,9 +25,9 @@ from dadaia_workspace.core import session_store
 from dadaia_workspace.core.exceptions import (
     AssociatedRepoConflictError,
     AssociatedRepoNotFoundError,
-    ContextAlreadyExistsError,
     ContextNotFoundError,
     ContextStateError,
+    DadaiaError,
     GitSyncError,
     InvalidContextNameError,
     RepoUrlMissingError,
@@ -36,7 +36,6 @@ from dadaia_workspace.core.exceptions import (
 )
 from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.models.spec_context import (
-    AssociatedRepo,
     ContextState,
     SpecContextProject,
 )
@@ -187,68 +186,59 @@ def resolve_own_session_id(*, explicit: str | None = None, mint: bool = False) -
     return None
 
 
+def bind_session(workspace_root: Path, name: str) -> str:
+    """Record THIS session's binding to *name*; return the session id — the one
+    binding author ``bind``, ``create`` and ``init --repo`` share."""
+    session_id = resolve_own_session_id(mint=True)
+    if session_id is None:  # pragma: no cover — mint=True always yields one
+        raise RuntimeError("session-id resolution returned None despite mint=True")
+    session_store.write_session(
+        workspace_root,
+        session_id,
+        session_store.new_binding_record(
+            session_id=session_id,
+            context=name,
+            runtime=os.environ.get("DADAIA_RUNTIME", "unknown"),
+            pid=os.getpid(),
+            now=_now_iso(),
+        ),
+    )
+    return session_id
+
+
 @app.command()
 def create(
-    name: str = typer.Argument(..., help="Context name"),
-    repo: str = typer.Option(
-        ...,
-        "--main-repo",
-        help="Main repo (the repo where specs/ lives) — the directory name under repos/",
-    ),
-    url: str | None = typer.Option(
-        None,
-        "--url",
-        help=(
-            "Main repo clone URL — required unless repos/<slug> is already a checkout, "
-            "whose origin 'context alive' then records."
-        ),
+    name: str | None = typer.Argument(None, help="Context name (default: the main repo's slug)"),
+    main_repo: str = typer.Option(
+        ..., "--main-repo", help="Clone URL of the main repo (the repo where specs/ lives)"
     ),
     associated: list[str] = typer.Option(
-        [],
-        "--associated-repos",
-        help=(
-            "Associated repos (the other repos this context owns), comma-separated "
-            "and repeatable. Each value is SLUG=URL, or a bare SLUG when repos/<slug> "
-            "is already a checkout."
-        ),
+        [], "--associated-repo", help="Clone URL of an associated repo; repeatable"
     ),
 ) -> None:
-    """Create a new Spec Context Project in state 'dead'."""
-    # Every check — allowlist, own-slug, duplicates, foreign owner — runs at
-    # SpecContextService.register before anything is written, so a refused --associated
-    # never leaves a half-created context behind.
-    associated_repos = tuple(
-        AssociatedRepo(slug=slug.strip(), url=assoc_url.strip())
-        for slug, _, assoc_url in (
-            raw.partition("=") for value in associated for raw in value.split(",") if raw.strip()
-        )
-    )
-
-    repo_url = url or ""
-
+    """Clone (or adopt) every repo, install the pre-push hook, make the context ALIVE and
+    bind this session — one step; on failure nothing is left behind."""
+    ws = resolve_workspace_root()
     try:
-        ctx = _ctx_service().create(name, repo, repo_url, associated_repos=associated_repos)
-        suffix = f", {len(associated_repos)} associated repo(s)" if associated_repos else ""
-        console.print(
-            f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' created "
-            f"(main repo: {ctx.repo_slug}, state: {ctx.state}{suffix})"
+        ctx = container.build_spec_context_service(ws).create(
+            main_repo, name=name, associated_urls=tuple(associated)
         )
-    except (ContextAlreadyExistsError, InvalidContextNameError, AssociatedRepoConflictError) as e:
-        err_console.print(f"[red]Error:[/red] {e}")
+    except (DadaiaError, OSError) as e:
+        err_console.print(f"Error: {e}", markup=False, soft_wrap=True)
+        invocation = " ".join(
+            [f"{DADAIA_BIN} context create", *([name] if name else []), "--main-repo", main_repo]
+            + [f"--associated-repo {u}" for u in associated]
+        )
+        err_console.print(f"fix: {invocation}", markup=False, soft_wrap=True)
         raise typer.Exit(1) from None
-    except RepoUrlMissingError as e:
-        # The fix is the same command with every missing URL named — runnable once filled.
-        assoc = "".join(
-            f" --associated-repos {r.slug}={r.url or '<clone-url>'}" for r in associated_repos
-        )
-        err_console.print(f"[red]Error:[/red] {e}")
-        err_console.print(
-            f"fix: {DADAIA_BIN} context create {name} --main-repo {repo} "
-            f"--url {repo_url or '<clone-url>'}{assoc}",
-            markup=False,
-            soft_wrap=True,
-        )
-        raise typer.Exit(1) from None
+    session_id = bind_session(ws, ctx.name)
+    suffix = f", {len(ctx.associated_repos)} associated repo(s)" if ctx.associated_repos else ""
+    console.print(
+        f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' created, ALIVE and bound "
+        f"(main repo: repos/{ctx.repo_slug}{suffix})"
+    )
+    for line in session_store.binding_env_lines(ctx.name, session_id):
+        console.print(line, markup=False, soft_wrap=True, highlight=False)
 
 
 @app.command(name="list")
@@ -540,24 +530,9 @@ def bind(
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
 
-    # Stable session identity (bug bind-session-id-divergence, 2026-07-15): reuse the
-    # SAME resolution order the gate/hooks use. Rebinds in one session therefore UPDATE
-    # one record instead of minting a divergent sess_* per invocation.
-    session_id = resolve_own_session_id(mint=True)
-    if session_id is None:  # pragma: no cover — mint=True always yields one
-        raise RuntimeError("session-id resolution returned None despite mint=True")
-
-    session_store.write_session(
-        workspace_root,
-        session_id,
-        session_store.new_binding_record(
-            session_id=session_id,
-            context=name,
-            runtime=os.environ.get("DADAIA_RUNTIME", "unknown"),
-            pid=os.getpid(),
-            now=_now_iso(),
-        ),
-    )
+    # Stable session identity (bug bind-session-id-divergence, 2026-07-15): the SAME
+    # resolution order the gate/hooks use, so rebinds UPDATE one record.
+    session_id = bind_session(workspace_root, name)
 
     # T-50-05 (SPEC v0.5.0 FR1): without this loud warning, a caller with no
     # harness-native id and no DADAIA_CONTEXT gets a silent no-op. stderr only, so it

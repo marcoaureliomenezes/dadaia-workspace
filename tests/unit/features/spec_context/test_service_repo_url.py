@@ -27,7 +27,7 @@ from dadaia_workspace.core.models.spec_context import (  # noqa: E402
 )
 from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
-from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
+from tests.fakes import FakeContextStore, FakeGitClient, register_dead  # noqa: E402
 
 _HAS_GIT = shutil.which("git") is not None
 
@@ -93,19 +93,19 @@ def test_create_persists_a_url_and_admits_an_empty_one_only_over_a_checkout(
     """Bug context-create-admits-uncloneable-empty-url: a repo with no URL and no
     ``repos/<slug>`` checkout is refused before any write — ``alive`` could only run
     ``git clone ''``; over an existing checkout the empty URL stays (alive back-fills)."""
-    ctx = fake_service.create("foo", "foo", "https://example.test/foo.git")
+    ctx = register_dead(fake_service, "foo", "foo", "https://example.test/foo.git")
     assert ctx.repo_url == "https://example.test/foo.git"
     assert store.get("foo").repo_url == "https://example.test/foo.git"  # type: ignore[union-attr]
 
     with pytest.raises(RepoUrlMissingError, match="repos/bar"):
-        fake_service.create("bar", "bar", "")
+        register_dead(fake_service, "bar", "bar", "")
     with pytest.raises(RepoUrlMissingError, match="repos/side"):
         fake_service.add_repo("foo", "side")
     assert store.get("bar") is None
     assert store.get("foo").associated_repos == ()  # type: ignore[union-attr]
 
     (workspace_root / "repos" / "bar").mkdir()
-    assert fake_service.create("bar", "bar", "").repo_url == ""
+    assert register_dead(fake_service, "bar", "bar", "").repo_url == ""
 
 
 # ---------------------------------------------------------------------------
@@ -136,7 +136,7 @@ def test_alive_backfills_repo_url_from_origin_remote(
         workspace_root=workspace_root,
         install_hooks=lambda _repo: None,
     )
-    service.create("foo", "foo", "")
+    register_dead(service, "foo", "foo", "")
 
     ctx = service.alive("foo")
     assert ctx.state == ContextState.ALIVE

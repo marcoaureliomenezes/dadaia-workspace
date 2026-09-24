@@ -18,6 +18,7 @@ from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+from tests.fakes import seed_dead_context
 
 _runner = CliRunner()
 
@@ -101,11 +102,7 @@ def _session_record_for(workspace: Path, output: str) -> dict:
 
 
 def test_context_create_show_list_happy_lifecycle(workspace: Path) -> None:
-    result = _runner.invoke(
-        app,
-        ["context", "create", "alpha", "--main-repo", "alpha", "--url", "https://x.test/alpha.git"],
-    )
-    assert result.exit_code == 0, result.output
+    seed_dead_context(workspace, "alpha", "alpha", "https://x.test/alpha.git")
 
     show = _runner.invoke(app, ["context", "show", "alpha", "--json"])
     assert show.exit_code == 0, show.output
@@ -176,14 +173,10 @@ def test_context_error_matrix(workspace: Path, invoke_args: list[str]) -> None:
 
 def test_context_create_duplicate_and_dead_requires_alive(workspace: Path) -> None:
     """A duplicate create fails, and (AC-T10d-2) dead <name> fails if the context is
-    not ALIVE — both against the same freshly-created DEAD context."""
-    _runner.invoke(
-        app,
-        ["context", "create", "alpha", "--main-repo", "alpha", "--url", "https://x.test/alpha.git"],
-    )
+    not ALIVE — both against the same DEAD context."""
+    seed_dead_context(workspace, "alpha", "alpha", "https://x.test/alpha.git")
     result = _runner.invoke(
-        app,
-        ["context", "create", "alpha", "--main-repo", "alpha", "--url", "https://x.test/alpha.git"],
+        app, ["context", "create", "alpha", "--main-repo", "https://x.test/alpha.git"]
     )
     assert result.exit_code != 0
 
@@ -651,8 +644,8 @@ def test_bind_with_no_live_release_exits_zero_and_the_next_write_is_allowed(
 
 
 def test_context_create_help_names_main_repo_and_associated_repos(workspace: Path) -> None:
-    """Intent: CONTRACT — AC5.1. The option surface names the paradigm's parts; the
-    retired `--repo`/`--associated` spellings are gone, with no alias and no shim."""
+    """Intent: CONTRACT — AC5.1, AC3.8. The option surface names the paradigm's parts;
+    the retired `--repo`/`--associated`/`--url`/`--associated-repos` spellings are gone."""
     result = _runner.invoke(
         app, ["context", "create", "--help"], env={"TERMINAL_WIDTH": "200", "NO_COLOR": "1"}
     )
@@ -661,7 +654,9 @@ def test_context_create_help_names_main_repo_and_associated_repos(workspace: Pat
     # plain text, never on the escaped stream.
     plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
     assert "--main-repo" in plain
-    assert "--associated-repos" in plain
+    assert "--associated-repo " in plain
+    assert "--associated-repos" not in plain
+    assert "--url" not in plain
     assert "--repo " not in plain
     assert "--associated " not in plain
 
@@ -669,22 +664,17 @@ def test_context_create_help_names_main_repo_and_associated_repos(workspace: Pat
 def test_context_show_and_list_json_emit_main_repo_key(workspace: Path) -> None:
     """Intent: CONTRACT — AC5.1. `show --json` / `list --json` carry `main_repo`;
     the retired output key `repo_slug` is absent (the state-file schema keeps it)."""
-    assert (
-        _runner.invoke(
-            app,
-            [
-                "context",
-                "create",
-                "alpha",
-                "--main-repo",
-                "alpha",
-                "--url",
-                "https://x.test/alpha.git",
-                "--associated-repos",
-                "beta=https://x.test/beta.git,gamma=https://x.test/gamma.git",
-            ],
-        ).exit_code
-        == 0
+    from dadaia_workspace.core.models.spec_context import AssociatedRepo
+
+    seed_dead_context(
+        workspace,
+        "alpha",
+        "alpha",
+        "https://x.test/alpha.git",
+        associated_repos=(
+            AssociatedRepo("beta", "https://x.test/beta.git"),
+            AssociatedRepo("gamma", "https://x.test/gamma.git"),
+        ),
     )
 
     show = json.loads(_runner.invoke(app, ["context", "show", "alpha", "--json"]).stdout)
