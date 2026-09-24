@@ -169,8 +169,7 @@ def init(
     else:
         console.print(f"[green]✓[/green] {len(installed)} asset(s) installed", highlight=False)
     console.print(f"CLI: {cli_path(root)}", markup=False, highlight=False, soft_wrap=True)
-    for note in filter(None, (_LAW_NOTE, harness_registry.HARNESS_RECORDS[chosen].init_note)):
-        console.print(note, markup=False, soft_wrap=True)
+    console.print(_LAW_NOTE, markup=False, soft_wrap=True)
 
     if action == "upgrade":
         _reconcile_upgrade(root, before, after)
