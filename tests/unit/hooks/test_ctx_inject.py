@@ -47,7 +47,7 @@ def _ws(tmp_path: Path, slug: str = "ctx", *, with_memory: bool = True) -> Path:
     states = tmp_path / ".dadaia" / "states"
     states.mkdir(parents=True)
     (states / "spec_contexts.json").write_text(
-        json.dumps({"contexts": [{"repo_slug": slug, "state": "alive"}]}),
+        json.dumps({"contexts": [{"name": slug, "repo_slug": slug, "state": "alive"}]}),
         encoding="utf-8",
     )
     specs = tmp_path / "repos" / slug / "specs"
@@ -67,7 +67,7 @@ def _add_context(tmp_path: Path, slug: str, *, with_memory: bool = True) -> None
     """Add a second ALIVE context + its memory to an already-built workspace."""
     states = tmp_path / ".dadaia" / "states"
     data = json.loads((states / "spec_contexts.json").read_text(encoding="utf-8"))
-    data["contexts"].append({"repo_slug": slug, "state": "alive"})
+    data["contexts"].append({"name": slug, "repo_slug": slug, "state": "alive"})
     (states / "spec_contexts.json").write_text(json.dumps(data), encoding="utf-8")
     specs = tmp_path / "repos" / slug / "specs"
     specs.mkdir(parents=True)
@@ -143,7 +143,7 @@ def _setup_unbound_session_lists_alive_contexts(tp: Path) -> None:
 def _setup_no_alive_context_still_generic(tp: Path) -> None:
     (tp / ".dadaia" / "states").mkdir(parents=True)
     (tp / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        json.dumps({"contexts": [{"repo_slug": "x", "state": "dead"}]}),
+        json.dumps({"contexts": [{"name": "x", "repo_slug": "x", "state": "dead"}]}),
         encoding="utf-8",
     )
 
@@ -407,8 +407,8 @@ def test_env_context_beats_own_session_record(tmp_path: Path) -> None:
         json.dumps(
             {
                 "contexts": [
-                    {"repo_slug": "ctx", "state": "alive"},
-                    {"repo_slug": "other", "state": "alive"},
+                    {"name": "ctx", "repo_slug": "ctx", "state": "alive"},
+                    {"name": "other", "repo_slug": "other", "state": "alive"},
                 ]
             }
         ),

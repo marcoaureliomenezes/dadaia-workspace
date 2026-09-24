@@ -66,7 +66,7 @@ def _ws_with_catalog(tmp_path: Path, slug: str = "ctx") -> Path:
     states = tmp_path / ".dadaia" / "states"
     states.mkdir(parents=True)
     (states / "spec_contexts.json").write_text(
-        json.dumps({"contexts": [{"repo_slug": slug, "state": "alive"}]}),
+        json.dumps({"contexts": [{"name": slug, "repo_slug": slug, "state": "alive"}]}),
         encoding="utf-8",
     )
     mem = tmp_path / "repos" / slug / "specs" / "memory"
@@ -150,7 +150,7 @@ def test_index_md_fallback_emitted_verbatim_when_no_catalog(tmp_path: Path) -> N
     states = tmp_path / ".dadaia" / "states"
     states.mkdir(parents=True)
     (states / "spec_contexts.json").write_text(
-        json.dumps({"contexts": [{"repo_slug": "ctx", "state": "alive"}]}),
+        json.dumps({"contexts": [{"name": "ctx", "repo_slug": "ctx", "state": "alive"}]}),
         encoding="utf-8",
     )
     mem = tmp_path / "repos" / "ctx" / "specs" / "memory"
