@@ -50,34 +50,38 @@ memory atom under its content hash.
 <!-- derived-from: workspace-doctor sha256:11d53d7927db -->
 
 ```bash
-pip install dadaia-workspace
-dadaia init demo --harness claude --repo <clone url>   # workspace + first project
-cd demo && eval $(dadaia context bind <ctx> --print-env)
-dadaia doctor --context <ctx>     # findings, each with a runnable fix
+uvx dadaia-workspace init demo --harness claude --repo <clone url>   # level 1 + 2
+cd demo
+.dadaia/.venv/bin/dadaia specs init --context <slug>                 # level 3
+.dadaia/.venv/bin/dadaia doctor --context <slug>   # findings, each with a runnable fix
 ```
 
-`pip install dadaia-workspace` installs the library and one CLI under two names,
-`dadaia` and `dadaia-workspace`, so `uvx dadaia-workspace init …` runs without an
-install; the wheel ships the full public asset tree, and `init` resolves the workspace
-venv's dependencies from PyPI, so it needs network access.
+Onboarding has three levels. **Workspace:** `uvx dadaia-workspace init <dir> --harness
+<name>` (or `pip install dadaia-workspace`, which installs one CLI under two names,
+`dadaia` and `dadaia-workspace`) provisions `.dadaia/.venv`, the `.dadaia/` zones,
+`.agents/skills` and the named harness's projection, seeds the state documents without
+overwriting them, and (unless `--skip-assets`) stages and installs the public assets —
+the one writer of every hook wiring. The wheel ships the full public asset tree, and
+`init` resolves the workspace venv's dependencies from PyPI, so it needs network
+access. Every later command runs through the workspace's own CLI,
+`.dadaia/.venv/bin/dadaia`. **Project:** `--repo <url>` (plus repeatable
+`--associated-repo <url>`) clones the repo into `repos/<slug>/`, installs the pre-push
+hook, makes the context ALIVE and binds it; a later project is
+`.dadaia/.venv/bin/dadaia context create --main-repo <url> [--associated-repo <url>]`.
+**Specs:** `.dadaia/.venv/bin/dadaia specs init --context <slug>` brings the repo's
+`specs/` to the canon, moving a foreign tree to `specs-bkp/` after consent.
 
-`dadaia init <dir> --harness <name> [--repo <url>] [--skip-assets]` is the only verb
-that works on an empty directory, and a re-run is idempotent. It provisions
-`.dadaia/.venv`, the `.dadaia/` zones, `.agents/skills` and the named harness's
-projection, seeds the state documents without overwriting them, and (unless
-`--skip-assets`) stages and installs the public assets — the one writer of every hook
-wiring. With `--repo <url>` it clones the repo into `repos/<slug>/`, composes the
-context verbs — `create`, `alive`, the bind — and installs the pre-push hook. Without
-`--repo` it prints the `dadaia context create <name> --main-repo <slug> --url <url>` that makes the
-first project. `dadaia harness add <name>` adds a harness later.
+**Upgrade:** re-run the `uvx dadaia-workspace init <dir> --harness <name>` line; it
+prints `upgraded A -> B`, or `already at A`.
+`.dadaia/.venv/bin/dadaia harness add <name>` adds a harness later.
 
-`dadaia context bind <ctx>` writes one session record (context, runtime, pid,
-`bound_at`) and acquires nothing; `--print-env` emits `DADAIA_CONTEXT` and
-`DADAIA_SESSION_ID` for `eval $(…)`. The bind's scope is the context's main repo plus
-its associated repos, and it drives the injection of the tech stack and the memory
-catalog digest into the session.
+`.dadaia/.venv/bin/dadaia context bind <ctx>` writes one session record (context,
+runtime, pid, `bound_at`) and acquires nothing; `--print-env` emits `DADAIA_CONTEXT`
+and `DADAIA_SESSION_ID` for `eval $(…)`. The bind's scope is the context's main repo
+plus its associated repos, and it drives the injection of the tech stack and the
+memory catalog digest into the session.
 
-`dadaia doctor` is the one instance validator. Three sections run in fixed order —
+`.dadaia/.venv/bin/dadaia doctor` is the one instance validator. Three sections run in fixed order —
 `workspace`, `specs`, `ledgers` — each finding one `<CODE> <verdict> <message>` line,
 every error-class finding with one `fix: <command>` line and exit 1; there is no score.
 `--json` mirrors the run; `--fix` is the reaper: it moves slop to `.dadaia/reaped/`
@@ -122,7 +126,7 @@ ledger scripts under `.agents/skills/*/scripts/` (`bugs.py`, `backlog.py`,
 `release.py`, `audit.py`) are each record's one writer. A bug is proposed to the
 operator and registered only after confirmation, then fixed on the live feature branch
 with a RED test. Completed work leaves as a `handoff-v1` record, validated by
-`dadaia reports validate`.
+`.dadaia/.venv/bin/dadaia reports validate`.
 
 ## Documentation
 
