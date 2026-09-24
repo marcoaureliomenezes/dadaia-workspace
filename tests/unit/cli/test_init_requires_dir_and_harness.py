@@ -133,4 +133,7 @@ def test_init_refusing_the_filesystem_root_still_prints_its_fix(tmp_path: Path) 
     result = _runner.invoke(app, ["init", "/", "--harness", "claude"])
 
     assert result.exit_code == 2, result.output
-    assert _the_fix(result.output) == "uvx dadaia-workspace init /dadaia-workspace --harness claude"
+    root = Path("/").resolve()  # `D:\\` on Windows, `/` on POSIX
+    assert _the_fix(result.output) == (
+        f"uvx dadaia-workspace init {root / 'dadaia-workspace'} --harness claude"
+    )
