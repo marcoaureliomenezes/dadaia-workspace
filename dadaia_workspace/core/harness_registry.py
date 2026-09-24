@@ -60,12 +60,15 @@ class HarnessRecord:
             the user level).
         agent_transcode: how it consumes the authored persona set.
         hooks: the format its hook registration serializes into.
+        init_note: the harness-specific advice ``init`` prints among its closing lines,
+            or ``""`` when the harness needs none.
     """
 
     name: str
     directory: str | None
     agent_transcode: AgentTranscode
     hooks: HookFormat
+    init_note: str = ""
 
 
 #: The registry. Insertion order IS the canonical order (``init --harness`` and the
@@ -78,6 +81,11 @@ HARNESS_RECORDS: dict[str, HarnessRecord] = {
             directory=".claude",
             agent_transcode=AgentTranscode.CLAUDE_MD_SYMLINK,
             hooks=HookFormat.CLAUDE_SETTINGS,
+            init_note=(
+                "Claude Code: set `instructionFiles: claude-md-and-agents-md` in your user "
+                "settings (~/.claude/settings.json) so a stray CLAUDE.md in a repo never hides "
+                "the workspace AGENTS.md."
+            ),
         ),
         HarnessRecord(
             name="codex",

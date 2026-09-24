@@ -14,21 +14,15 @@ from dadaia_workspace.features.workspace.bootstrap import bootstrap_repo
 console = Console()
 app = typer.Typer()
 
-#: Printed once at the end of a successful init that got no ``--repo``. The first line is the law
-#: (sessions launch at the workspace root); the second is a RECOMMENDATION about the
-#: operator's own ``~/.claude/settings.json`` — the library prints it and never writes
-#: user settings, so a stray repo-level ``CLAUDE.md`` hiding the workspace
-#: ``AGENTS.md`` stays the operator's decision to prevent. The third names where projects
-#: live and the ONE verb that makes the first one — a single-repo workspace is the
-#: degenerate multi-repo case, so no other context verb is visible before the second
-#: project. With ``--repo`` these are replaced by the binding's export lines.
-_CLOSING_NOTES = (
-    "Sessions launch at the workspace root.",
-    "Claude Code: set `instructionFiles: claude-md-and-agents-md` in your user settings "
-    "(~/.claude/settings.json) so a stray CLAUDE.md in a repo never hides the workspace "
-    "AGENTS.md.",
+#: Printed once at the end of a successful init that got no ``--repo``, around the chosen
+#: harness's own ``init_note`` (the registry owns per-harness advice; the library prints
+#: it and never writes user settings). The first line is the law (sessions launch at the
+#: workspace root); the last names where projects live and the ONE verb that makes the
+#: first. With ``--repo`` these are replaced by the binding's export lines.
+_LAW_NOTE = "Sessions launch at the workspace root."
+_PROJECTS_NOTE = (
     "Projects live under repos/ — make the first with "
-    "`dadaia context create <name> --main-repo <slug> --url <url>`.",
+    "`.dadaia/.venv/bin/dadaia context create <name> --main-repo <slug> --url <url>`."
 )
 
 
@@ -127,7 +121,8 @@ def init(
             console.print("[dim]No new assets to install (all up to date)[/dim]")
 
     if not repo:
-        for note in _CLOSING_NOTES:
+        notes = (_LAW_NOTE, harness_registry.HARNESS_RECORDS[chosen].init_note, _PROJECTS_NOTE)
+        for note in filter(None, notes):
             console.print(note, markup=False, soft_wrap=True)
         return
 
