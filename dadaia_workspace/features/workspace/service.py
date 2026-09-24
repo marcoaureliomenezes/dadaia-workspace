@@ -93,9 +93,9 @@ class WorkspaceService:
 
         return workspace, installed
 
-    def venv_version(self, workspace_root: Path) -> str | None:
-        """The dadaia-workspace version installed in the workspace venv, or ``None``."""
-        return self._python_env.installed_version(str(workspace_root))
+    def venv_change(self, workspace_root: Path) -> tuple[str | None, str | None, str]:
+        """``(before, after, action)`` of the venv against the running distribution."""
+        return self._python_env.version_change(str(workspace_root))
 
     def harnesses(self, workspace_root: Path) -> tuple[str, ...]:
         """The workspace's persisted harness profile — a re-init needs no ``--harness``."""

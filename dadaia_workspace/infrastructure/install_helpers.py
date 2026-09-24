@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import contextlib
 from collections.abc import Callable, Iterable, Mapping
-from datetime import UTC, datetime
 from pathlib import Path
 
 from dadaia_workspace.core.agent_model_templates import CORE_AGENTS
@@ -80,7 +79,6 @@ def build_manifest(
     return {
         "schema_version": _SCHEMA_VERSION,
         "package_version": _package_version(),
-        "generated_at": datetime.now(tz=UTC).isoformat(),
         "assets": assets,
     }
 
