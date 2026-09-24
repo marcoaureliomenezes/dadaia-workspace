@@ -113,3 +113,17 @@ def test_scaffold_never_writes_through_a_symlinked_parent_dir(tmp_path: Path) ->
     (specs / "memory").symlink_to(outside, target_is_directory=True)
     canon.scaffold(specs)
     assert list(outside.iterdir()) == []
+
+
+def test_an_unwritable_directory_raises_instead_of_skipping(tmp_path: Path, public: Path) -> None:
+    """Review N2: only an existing file or a symlinked target is skipped."""
+    if os.geteuid() == 0:
+        pytest.skip("root ignores directory permissions")
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    repo.chmod(0o555)
+    try:
+        with pytest.raises(PermissionError):
+            canon.scaffold_repo_law(repo, public_dir=public)
+    finally:
+        repo.chmod(0o755)

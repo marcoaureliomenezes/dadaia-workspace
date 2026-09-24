@@ -59,6 +59,7 @@ and a git tree listing (``git ls-tree``'s own native output) already produce.
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 from collections.abc import Callable, Iterable
@@ -335,8 +336,10 @@ def scaffold_repo_law(repo: Path, *, public_dir: Path | None = None) -> list[Pat
 
 def _write_absent(root: Path, writes: list[tuple[Path, Callable[[], str], bool]]) -> list[Path]:
     """The one scaffold write under *root*: each ``(target, render, overwrite)`` through one
-    ``O_CREAT|O_NOFOLLOW`` open (``O_EXCL`` unless *overwrite*) — never through a symlinked
-    destination or a symlinked directory between *root* and it (CWE-59/CWE-367)."""
+    ``O_CREAT|O_NOFOLLOW`` open (``O_EXCL`` unless *overwrite*): the final component is
+    created atomically and never through a symlink (CWE-59); intermediate directories are
+    checked for escape before ``mkdir``, not atomically. An existing file or a symlinked
+    destination (ELOOP; EMLINK on BSD) is skipped; any other ``OSError`` propagates."""
     created: list[Path] = []
     for target, render, overwrite in writes:
         anchor = next(p for p in (target.parent, *target.parent.parents) if p.exists() or p == root)
@@ -346,8 +349,10 @@ def _write_absent(root: Path, writes: list[tuple[Path, Callable[[], str], bool]]
         flags = os.O_WRONLY | os.O_CREAT | _NOFOLLOW | (os.O_TRUNC if overwrite else os.O_EXCL)
         try:
             fd = os.open(target, flags, 0o644)
-        except OSError:
-            continue
+        except OSError as exc:
+            if isinstance(exc, FileExistsError) or exc.errno in (errno.ELOOP, errno.EMLINK):
+                continue
+            raise
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(render())
         created.append(target)
