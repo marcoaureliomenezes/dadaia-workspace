@@ -16,8 +16,8 @@ read or any output written.
 ## Phase 1 — resolve the context
 
 1. Open `specs/AGENTS.md` (the area's scoped law) and follow it.
-2. Resolve the spec context: `DADAIA_CONTEXT` env var, else your session binding (`dadaia context show --json`), else the repo containing your cwd.
-3. Nothing resolves (unbound, cwd outside `repos/<slug>/`): bind with `dadaia context bind <ctx>` — no ALIVE context is ever borrowed; zero ALIVE contexts: alert the operator.
+2. Resolve the spec context: `DADAIA_CONTEXT` env var, else your session binding (`.dadaia/.venv/bin/dadaia context show --json`), else the repo containing your cwd.
+3. Nothing resolves (unbound, cwd outside `repos/<slug>/`): bind with `.dadaia/.venv/bin/dadaia context bind <ctx>` — no ALIVE context is ever borrowed; zero ALIVE contexts: alert the operator.
 
 ## Phase 2 — memory bootstrap
 

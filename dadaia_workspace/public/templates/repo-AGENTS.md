@@ -3,7 +3,7 @@
 Scope: this file governs production-source work inside this repo.
 Workspace SDD rules live in the root `AGENTS.md`; spec artifact rules live in `specs/AGENTS.md`.
 
-Edit this file directly for repo-specific behavior. It is not overwritten by `dadaia public install`.
+Edit this file directly for repo-specific behavior. It is not overwritten by `.dadaia/.venv/bin/dadaia public install`.
 
 ## 1. Repo purpose
 
@@ -26,7 +26,7 @@ Edit this file directly for repo-specific behavior. It is not overwritten by `da
 
 Before editing production source:
 
-1. Resolve context with `dadaia context show --json`.
+1. Resolve context with `.dadaia/.venv/bin/dadaia context show --json`.
 2. Read the active release under `specs/releases/<release-id>/`.
 3. Confirm `SPEC.md`, `PLAN.md`, and `TASKS.md` are approved.
 4. Confirm your task is marked `[-]`.

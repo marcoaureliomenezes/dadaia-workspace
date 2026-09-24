@@ -38,7 +38,7 @@ Every field PyPI renders has exactly one home:
 
 <!-- derived-from: pypi-distribution sha256:ab76c52ed560 -->
 
-The wheel ships `dadaia_workspace/` with the full `public/` tree (`dadaia init` still
+The wheel ships `dadaia_workspace/` with the full `public/` tree (`.dadaia/.venv/bin/dadaia init` still
 resolves the workspace venv's dependencies from PyPI), and
 `dadaia_workspace/public/data/CONSUMER_VALIDATION_RECIPE.md`, the matrix run against
 every candidate wheel before a deploy. It installs one CLI under two console-script

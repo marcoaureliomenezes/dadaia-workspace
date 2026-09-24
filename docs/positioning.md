@@ -26,8 +26,8 @@ single-repo context is the minimal case of the multi-repo one.
 A context — a Spec Context Project — is one canonical `specs/` tree owned by one main
 repository: the unit for memory, backlog, bugs, releases, reports and handoffs. A
 product spanning several repositories is still one project: the context carries
-associated repositories, added by `dadaia context repo add` and removed by
-`dadaia context repo remove`, which live and die with it.
+associated repositories, added by `.dadaia/.venv/bin/dadaia context repo add` and removed by
+`.dadaia/.venv/bin/dadaia context repo remove`, which live and die with it.
 
 The asymmetry is deliberate:
 
@@ -36,7 +36,7 @@ The asymmetry is deliberate:
 - specs, bind, memory, releases and backlog resolve from the main repo alone — an
   associated repo's own `specs/` is never read.
 
-`dadaia context bind <ctx>` selects a context and nothing else, changing only the
+`.dadaia/.venv/bin/dadaia context bind <ctx>` selects a context and nothing else, changing only the
 caller's own session record; a session without a harness-native id carries the binding
 in `DADAIA_CONTEXT`. The bind carries a scope — the main repo plus its associated
 repos — and a bound session's MUTATING write into a repo another context owns is

@@ -1,4 +1,4 @@
-<!-- derived-from: dadaia help tree — regenerate: `dadaia help tree > docs/cli.md` -->
+<!-- derived-from: dadaia help tree — regenerate: `.dadaia/.venv/bin/dadaia help tree > docs/cli.md` -->
 
 # dadaia CLI digest (derived from the live command tree; authoritative help: `dadaia <group> --help`)
 
@@ -33,7 +33,7 @@
 ## dadaia help — Derived help surfaces (docker-style; generated, never transcribed).
 - help tree — Print the compact CLI digest derived from the live command tree.
 
-## dadaia import — Register every context of a `dadaia export` file this workspace does not know as DEAD.
+## dadaia import — Register every context of an exported `spec-contexts.json` not known here as DEAD.
 
 ## dadaia init — Bootstrap a dadaia workspace in DIR for one harness: .dadaia/, the law, and that harness's projection.
 

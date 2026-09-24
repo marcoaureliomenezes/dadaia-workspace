@@ -86,7 +86,7 @@ session receives the Tech Stack section and the catalog digest (`slug`, `title`,
 `tldr`, `path` per atom). At each candidate's closure, `memory.py drift` lists the
 atoms whose sources changed, each is reconciled — delete, update, then add — and
 `RELEASE-TREE-MEMORY` keeps the release red until the reconciliation is logged.
-`dadaia doctor`'s `specs` section polices the tree: `CAT-1` (catalog equals atom
+`.dadaia/.venv/bin/dadaia doctor`'s `specs` section polices the tree: `CAT-1` (catalog equals atom
 files), `LINT-1` (frontmatter, headings, wikilinks, `sources` globs, history lines) and
 the warnings `MEM-DRIFT-1` (features package map vs the live tree) and `MEM-DRIFT-2`
 (a cited verb or path that does not exist).

@@ -48,7 +48,7 @@ Reach shared understanding by mapping every open branch of the demand as a desig
 
 - Every gap findable by inspection is resolved or promoted, not asked of the operator.
 - The frontier is empty and the operator has confirmed the shared understanding.
-- The handoff is emitted; inside a dadaia workspace it passes `dadaia reports validate`.
+- The handoff is emitted; inside a dadaia workspace it passes `.dadaia/.venv/bin/dadaia reports validate`.
 
 ## 4. References
 

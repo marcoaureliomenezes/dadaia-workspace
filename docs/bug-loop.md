@@ -83,6 +83,6 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> \
 One commit holds the code, the regression test and the `BUGS.jsonl` line.
 
 `bugs.py archive` moves records whose `closed_at` is older than 90 days into
-`specs/bugs/_archive/bugs_histo.jsonl`. `dadaia doctor`'s `ledgers` section runs
+`specs/bugs/_archive/bugs_histo.jsonl`. `.dadaia/.venv/bin/dadaia doctor`'s `ledgers` section runs
 `bugs.py check` (`LEDGER-BUGS-SCHEMA`), and `SPEC-DOC-041` warns on a terminal record
 closed longer ago than the archive threshold.

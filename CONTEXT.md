@@ -21,7 +21,7 @@ One harness process, identified by exactly one `session_id` — the harness's ow
 _Avoid_: sid ladder, CLI-minted session, thread id
 
 **Bind**:
-The session record that names the context a session works in, and nothing else — `dadaia context bind <ctx> [--print-env]` is one verb with no mode, release, force or reason. A context with at least one live bind is alive; a bind carries a Scope.
+The session record that names the context a session works in, and nothing else — `.dadaia/.venv/bin/dadaia context bind <ctx> [--print-env]` is one verb with no mode, release, force or reason. A context with at least one live bind is alive; a bind carries a Scope.
 _Avoid_: alive flag, lease, lock, bind mode, bind release
 
 **Presence**:
@@ -160,7 +160,7 @@ _Avoid_: memory pass, apply the deltas, sync
 ## Governance verbs and hand edits
 
 **Governance verb**:
-The one CLI command authorized to change a governance record — `dadaia bugs append|update|resolve|supersede|defer|reject|archive`, `backlog new|exit`, `release new|phase|check`, `audit disposition|close`.
+The one CLI command authorized to change a governance record — `bugs.py append|update|resolve|supersede|defer|reject|archive`, `backlog new|exit`, `release new|phase|check`, `audit disposition|close`.
 _Avoid_: CLI command (generic), mutation, setter
 
 **Governance event**:
@@ -186,7 +186,7 @@ The HTML rendering of a handoff, written only for a human hop.
 _Avoid_: artifact (bare), page
 
 **Doctor**:
-`dadaia doctor` — the one validator and reaper over three Compliance sections (`workspace`, `specs`, `ledgers`), reporting one finding per line as `<CODE> <verdict> <message>`; `--fix` runs the reaper then the specs repairs, `--expired-only` scopes the report to the TTL lane; exit 1 on any error-class finding, each carrying one `fix:` line. `dadaia public doctor` (lib-vs-projection) is the only other one, always qualified.
+`.dadaia/.venv/bin/dadaia doctor` — the one validator and reaper over three Compliance sections (`workspace`, `specs`, `ledgers`), reporting one finding per line as `<CODE> <verdict> <message>`; `--fix` runs the reaper then the specs repairs, `--expired-only` scopes the report to the TTL lane; exit 1 on any error-class finding, each carrying one `fix:` line. `.dadaia/.venv/bin/dadaia public doctor` (lib-vs-projection) is the only other one, always qualified.
 _Avoid_: specs doctor, backlog doctor (both retired, not aliased), checker, linter (for doctors), audit (for doctors)
 
 **Compliance section**:

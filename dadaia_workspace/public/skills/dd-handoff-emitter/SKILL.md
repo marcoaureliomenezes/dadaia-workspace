@@ -26,7 +26,7 @@ completed agent task; the HTML report is the exception, not the rule.
    `.dadaia/agentic/schemas/handoff-v1.schema.json`; set `artifact.path` only for a
    file already on disk.
 6. Write `.dadaia/handoff/<context>/<YYYY-MM-DDTHHMMSSZ>-<agent>-<slug>.handoff.json`
-   (2-space indent) and run `dadaia reports validate <path>` — fix any non-zero exit
+   (2-space indent) and run `.dadaia/.venv/bin/dadaia reports validate <path>` — fix any non-zero exit
    before moving on.
 
 **Done when** the handoff file exists at that exact path shape, `dadaia reports
@@ -39,7 +39,7 @@ After reading and acting on a coordination handoff addressed to you:
 1. Resolve its real target path; act only on a path inside `.dadaia/`, and never
    follow a symlinked directory.
 2. Delete only that one consumed handoff file; every other handoff expires one day
-   after its mtime and `dadaia doctor` reaps it, `artifact.path` or not.
+   after its mtime and `.dadaia/.venv/bin/dadaia doctor` reaps it, `artifact.path` or not.
 
 **Done when** the consumed coordination handoff is gone and every other handoff still
 validates.

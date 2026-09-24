@@ -37,7 +37,7 @@ When a guard lives at the caller that was just caught, the next caller without i
 the next bug in the family, and each such fix is `net-positive`: it grows the feature.
 The structure that ends the family is one guarded seam every writer delegates to. The
 context registry is the example: a repo slug belongs to one context, and `create`,
-`repo add` and `dadaia import` pass one ownership check; `INV-6` reports any
+`repo add` and `.dadaia/.venv/bin/dadaia import` pass one ownership check; `INV-6` reports any
 multi-owner slug already on disk.
 
 ## Lesson 2 — a per-measurement exclusion breeds the next measurement's bug

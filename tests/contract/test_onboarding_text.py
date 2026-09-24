@@ -82,56 +82,36 @@ def _code_lines(text: str) -> list[tuple[int, str]]:
     return lines
 
 
-def test_every_onboarding_doc_cli_line_invokes_the_venv_path() -> None:
+# The one exempt span: the provenance banner is a fixed literal that
+# `infrastructure/workspace_guardrail.py` matches byte-for-byte to recognise a projected
+# AGENTS.md; rewording it would orphan every copy already projected.
+_BANNER_SPAN = ("dadaia_workspace/public/data/AGENTS.md", 2)
+
+
+def _shipped_text() -> list[Path]:
+    public = _PACKAGE / "public"
+    return sorted(
+        {
+            *public.rglob("*.md"),
+            *public.rglob("*.txt"),
+            *(_REPO_ROOT / "docs").glob("*.md"),
+            *(_REPO_ROOT / name for name in ("README.md", "llms.txt", "CONTEXT.md")),
+        }
+    )
+
+
+def test_all_shipped_text_invokes_the_cli_by_its_venv_path() -> None:
+    """Intent: CONTRACT — shipped-text-cites-bare-dadaia-the-gate-blocks. Backticked spans
+    and fences are what an agent copies; prose naming the product (`dadaia-workspace`,
+    "the dadaia CLI") is outside them and stays free. Zero tolerance."""
     violations = [
-        f"{doc}:{number}: `{line.strip()}`"
-        for doc in _ONBOARDING_DOCS
-        for number, line in _code_lines((_REPO_ROOT / doc).read_text("utf-8"))
-        if _bare_invocations(line)
+        f"{name}:{n}: `{line.strip()}`"
+        for path in _shipped_text()
+        for name in [path.relative_to(_REPO_ROOT).as_posix()]
+        for n, line in _code_lines(path.read_text("utf-8"))
+        if _bare_invocations(line) and (name, n) != _BANNER_SPAN
     ]
     assert violations == [], "\n".join(violations)
-
-
-# Ratchet — bare `dadaia <verb>` spans still shipped outside T-048-10's write set; a count
-# only moves down and is re-pinned with every reduction (exact match); every persona, law
-# file or public skill not listed carries zero.
-_BARE_RATCHET = {
-    "agents/dd-code-reviewer.md": 1,
-    "agents/dd-product-engineer.md": 4,
-    "agents/dd-software-engineer.md": 3,
-    "data/AGENTS.md": 1,  # the banner, pinned by infrastructure/workspace_guardrail.py
-    "data/CONSUMER_VALIDATION_RECIPE.md": 14,
-    "data/dadaia-AGENTS.md": 8,
-    "data/handoff-AGENTS.md": 1,
-    "data/states-AGENTS.md": 4,
-    "skills/dd-ai-eng-knowhow/AUTHORING.md": 1,
-    "skills/dd-ai-eng-knowhow/CODEX.md": 4,
-    "skills/dd-ai-eng-knowhow/SKILL.md": 3,
-    "skills/dd-audit-project/FINDINGS-FORMAT.md": 1,
-    "skills/dd-audit-project/PILLAR-SPECS.md": 3,
-    "skills/dd-backlog-definition/SKILL.md": 2,
-    "skills/dd-gitflow-default/SKILL.md": 1,
-    "skills/dd-grill-me/SKILL.md": 1,
-    "skills/dd-handoff-emitter/SKILL.md": 2,
-    "skills/dd-release-definition/SKILL.md": 1,
-    "skills/dd-release-implementation/MEMORY-UPDATE.md": 3,
-    "skills/dd-release-implementation/RC-FLOW.md": 5,
-    "skills/dd-spec-navigator/SKILL.md": 2,
-}
-
-
-def test_law_files_and_public_skills_invoke_the_venv_path() -> None:
-    """Backticked spans and fences are what an agent copies; prose naming the product
-    (`dadaia-workspace`, "the dadaia CLI") is outside them and stays free."""
-    public = _PACKAGE / "public"
-    over = []
-    docs = [*(public / "agents").glob("*.md"), *(public / "data").glob("*.md")]
-    for path in sorted([*docs, *(public / "skills").rglob("*.md")]):
-        name = path.relative_to(public).as_posix()
-        spans = [n for n, line in _code_lines(path.read_text("utf-8")) if _bare_invocations(line)]
-        if len(spans) != _BARE_RATCHET.get(name, 0):
-            over.append(f"{name}: {len(spans)} bare `dadaia <verb>` (pin it) on lines {spans}")
-    assert over == [], "\n".join(over)
 
 
 def test_no_shipped_text_names_the_repos_catalog() -> None:
@@ -211,7 +191,9 @@ def test_every_flag_cited_beside_a_venv_call_exists_in_that_verbs_help() -> None
         for n, span in _code_lines(path.read_text("utf-8"))
         for dead in _dead_flags(span, tree)
     ]
-    idioms = (public / "skills/dd-cli-library/SKILL.md").read_text("utf-8").split("## Dev-server")[0]
+    idioms = (
+        (public / "skills/dd-cli-library/SKILL.md").read_text("utf-8").split("## Dev-server")[0]
+    )
     violations += [
         f"dd-cli-library core idioms:{n}: {flag}"
         for n, span in _code_lines(idioms)

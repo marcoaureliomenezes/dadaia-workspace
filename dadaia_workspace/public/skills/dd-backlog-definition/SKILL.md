@@ -15,7 +15,7 @@ description: >
 
 1. Open `specs/backlog/AGENTS.md` (the area's scoped law) and follow it — `BACKLOG.json`
    shape, required fields, live status tokens, the histo record, the dispositions.
-2. Append via `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug>`; validate via `dadaia doctor` (`ledgers`
+2. Append via `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug>`; validate via `.dadaia/.venv/bin/dadaia doctor` (`ledgers`
    section).
 
 ## Continuous curation
@@ -62,4 +62,4 @@ description: >
 
 - `dd-release-definition` — the picked-set consumer.
 - Script: `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py` — `new`, `exit`, `check`, and `subjects` (the declared aliases plus the document's live bindings).
-- A `subject.ref` naming a code/doc/cli anchor is judged by `dadaia doctor` — `BL-SCHEMA` names the ref it cannot resolve.
+- A `subject.ref` naming a code/doc/cli anchor is judged by `.dadaia/.venv/bin/dadaia doctor` — `BL-SCHEMA` names the ref it cannot resolve.

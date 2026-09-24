@@ -1,7 +1,7 @@
 # PILLAR-SPECS — spec compliance
 
 Disclosed sibling of `SKILL.md`, pillar 2. Input: `git log` over every commit in the audit window.
-Also input: `dadaia doctor` against every release the window touches.
+Also input: `.dadaia/.venv/bin/dadaia doctor` against every release the window touches.
 
 ## Commit-shape conformance
 
@@ -16,7 +16,7 @@ Also input: `dadaia doctor` against every release the window touches.
 ## Canon-v6 pattern compliance
 
 ```bash
-dadaia doctor --context <ctx> --json
+.dadaia/.venv/bin/dadaia doctor --context <ctx> --json
 ```
 
 1. `--json` gives the structured sections, findings and `compliance(...)` scores.
@@ -48,7 +48,7 @@ Input: the ratchet modules and the window `from-sha..HEAD`. Output: the "Slop re
 1. Run `pytest tests/contract/test_slop_ratchets.py tests/contract/test_test_suite_ratchets.py`; record each count beside its pinned ceiling.
 2. Trend each ratchet over the window: the count at the from-sha against HEAD, via a temporary worktree under `.dadaia/tmp/` — never a stash.
 3. Read the density of every SPEC in the window: bytes, words, codes per 1,000 words, numbered families outside FR/AC/T-.
-4. Read the GC: each closure's recorded `dadaia doctor` score line, `archive/` tags whose branch survives.
+4. Read the GC: each closure's recorded `.dadaia/.venv/bin/dadaia doctor` score line, `archive/` tags whose branch survives.
 5. Sample the ten commits with the most additions; apply `SLOP.md` S1-S5 to each diff — the audit proves the review worked, it never redoes it.
 6. One `FINDINGS-FORMAT.md` record per ratchet that rose or signal hit; ratchet rose HIGH, density over the ceiling MEDIUM, S4/S5 in a sample HIGH.
 

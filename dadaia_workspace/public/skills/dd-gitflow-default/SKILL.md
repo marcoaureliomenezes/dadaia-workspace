@@ -53,7 +53,7 @@ The branch contract, stated once, and the mechanics that operate it.
 | 1 | Bug registration | `specs/bugs/BUGS.jsonl` alone | `chore(bugs): report <id>` |
 | 2 | Backlog / ADR | `BACKLOG.json` alone, or `ADRs/decisions.jsonl` alone | `chore(backlog): …` / `chore(adrs): …` |
 | 3 | Bug fix | code + regression test + the `BUGS.jsonl` line, together | `fix(bugs): <id> — <cause>` |
-| 4 | Resolve record | commits only; a push happens when asked, `dadaia ci preflight` first | — |
+| 4 | Resolve record | commits only; a push happens when asked, `.dadaia/.venv/bin/dadaia ci preflight` first | — |
 | 5 | Release definition | SPEC + PLAN + TASKS + the picked entries flipped to `status: picked` + picked bugs, one commit | `feat(specs): define candidate …` |
 | 6 | Task implementation | the task's declared write set | `conventional-commit(task-id): description` — the auditable trace |
 

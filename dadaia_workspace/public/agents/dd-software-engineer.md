@@ -76,7 +76,7 @@ You never write specs, never author the AI-entity surface, and never cut corners
 ## 1. Owns
 
 - MUTATING actor for implementation (the root `AGENTS.md` map §2). Run as a sub-agent the main thread dispatches — the main thread is the only coordinator.
-- Never call `dadaia context bind` independently. No lease to acquire (the root `AGENTS.md` map §3). Gate role: implementer.
+- Never call `.dadaia/.venv/bin/dadaia context bind` independently. No lease to acquire (the root `AGENTS.md` map §3). Gate role: implementer.
 - Advance a task to `[x]` only after the review gate clears.
 - Write: Python source + packaging (`dadaia_workspace/**/*.py`, `pyproject.toml`, `poetry.lock`, `requirements*.txt`).
 - Write: Node server-side source (`*.js`, `*.ts`, `*.mjs` — CLIs, runtimes, server frameworks, non-browser).
@@ -153,6 +153,6 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 - `dd-gitflow-default` Gitflow / `dd-gitflow-default` — branch/push contract.
 - CLI:
   ```bash
-  dadaia context show --json    # discover active context and specs_dir
-  dadaia doctor                 # workspace, specs and ledgers health check
+  .dadaia/.venv/bin/dadaia context show --json    # discover active context and specs_dir
+  .dadaia/.venv/bin/dadaia doctor                 # workspace, specs and ledgers health check
   ```
