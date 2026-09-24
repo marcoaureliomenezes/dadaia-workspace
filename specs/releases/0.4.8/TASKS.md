@@ -51,7 +51,7 @@ Paths under `dadaia_workspace/` abbreviated `dw/`. Tasks in one parallel group (
   `Write set:` `dw/cli/commands/specs.py`, `dw/features/specs/{canon,scaffolder}.py`, `dw/public/templates/specs-AGENTS.md`, tests
   `blocked by:` — · `group:` P1 · `delivers:` FR4 AC4.1–4.6; flips journey level-3 xfails
 
-- [ ] **T-048-06 — Re-init is the upgrade.**
+- [-] **T-048-06 — Re-init is the upgrade.**
   `init <existing ws>` compares venv version: newer → reinstall + `reconcile` + `upgraded A -> B`; equal →
   `already at A`, no write; older → exit 1 + `fix: uvx dadaia-workspace@A init <ws>`. `--harness` not required.
   `RED:` three version cases on a fake venv (no real venv built in tests).
