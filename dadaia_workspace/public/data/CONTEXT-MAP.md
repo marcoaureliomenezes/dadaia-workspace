@@ -50,7 +50,7 @@ path or entity as it appears in an installed workspace.
 | `specs/memory/AGENTS.md` | current product truth and who writes it | atoms, Part 1/Part 2, ownership | 4096 | 3724 |
 | `specs/ADRs/AGENTS.md` | the decision record | `decisions.jsonl` shape, acceptance | 4096 | 3476 |
 | `specs/audits/AGENTS.md` | the periodic three-pillar review | audit procedure, findings, closure | 4096 | 1776 |
-| `.dadaia/AGENTS.md` | the runtime tree: zones, doctor, reprojection, context | zone registry rules, chokepoints | 4096 | 4091 |
+| `.dadaia/AGENTS.md` | the runtime tree: zones, doctor, reprojection, context | zone registry rules, chokepoints | 4096 | 4087 |
 | `.dadaia/handoff/AGENTS.md` | the handoff lane | emission, schema, ack-on-consume | 4096 | 1617 |
 | `.dadaia/tmp/AGENTS.md` | the TTL scratch lane | what may be written there and for how long | 4096 | 1135 |
 | `.dadaia/states/AGENTS.md` | CLI-owned state files | who writes them and by which verb | 4096 | 1355 |

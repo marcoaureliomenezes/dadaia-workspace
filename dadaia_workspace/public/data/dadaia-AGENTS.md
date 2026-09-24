@@ -23,7 +23,7 @@
 
 - The pre-push hook gates the `Bash` write path outside the gate's parsing, independent of any harness hook.
 - It scans the pushed range only — published history is the baseline — and applies the specs canon only to a tree at the canonical stamp; a lower stamp is doctor drift, never a push block.
-- `HOOKS-DRIFT-1`: an ALIVE repo's `.git/hooks/pre-push` differing from the shipped script; `fix: dadaia ci install-hook --force`.
+- `HOOKS-DRIFT-1`: an ALIVE repo's `.git/hooks/pre-push` differing from the shipped script; run doctor's per-repo `fix:` line.
 
 ## 4. Projections and law files
 
