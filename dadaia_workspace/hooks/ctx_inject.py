@@ -280,14 +280,18 @@ def _read_help_digest(workspace: Path) -> str:
         return ""
 
 
-def _generic_preflight(workspace: Path) -> str:
+def _head(workspace: Path, header: str, focus: str | None, session: str | None) -> list[str]:
+    """The ONE onboarding call site of SessionStart, bound or not: the header and the
+    derived next step — the text ``doctor`` reports."""
+    trees = invocation.alive_context_trees(workspace)
+    step = onboarding.next_step(workspace, trees, focus, session)
+    return [header] if step is None else [header, step.text()]
+
+
+def _generic_preflight(workspace: Path, session: str | None = None) -> str:
     """Generic preflight payload for an unbound session: ``[no bound context]``, the
-    derived onboarding next step (FR6 AC6.2 — the text ``doctor`` reports) and the
-    ALIVE-context list. NEVER any context memory (FR-W2-01)."""
-    sections = ["[no bound context]"]
-    step = onboarding.next_step(workspace, invocation.alive_context_trees(workspace))
-    if step is not None:
-        sections.append(step.text())
+    next step and the ALIVE-context list. NEVER any context memory (FR-W2-01)."""
+    sections = _head(workspace, "[no bound context]", None, session)
     alive = invocation.alive_context_names(workspace)
     if alive:
         sections.append("")
@@ -301,18 +305,10 @@ def _generic_preflight(workspace: Path) -> str:
     return "\n".join(sections) + "\n"
 
 
-def _emit_bootstrap(workspace: Path, context: str) -> None:
-    """Emit the bound context's bootstrap: the context header, the onboarding next step
-    focused on *context* while one remains (the text ``doctor`` reports) + the lean
-    memory prefix.
-
-    FR30 (T-044-60): no dispatcher preflight — it restates the root `AGENTS.md` map §1/§2, which the
-    agent already carries as law, not per-prompt state.
-    """
-    sections = [f"[{context}]"]
-    step = onboarding.next_step(workspace, invocation.alive_context_trees(workspace), context)
-    if step is not None:
-        sections.append(step.text())
+def _emit_bootstrap(workspace: Path, context: str, session: str | None = None) -> None:
+    """Emit the bound context's bootstrap: the header and next step (:func:`_head`) + the
+    lean memory prefix."""
+    sections = _head(workspace, f"[{context}]", context, session)
     memory = _build_memory(invocation.resolve_context_specs_dir(workspace, context))
     if memory:
         sections.append(memory)
@@ -388,10 +384,11 @@ def main() -> int:
         has_specs=lambda name: invocation.resolve_context_specs_dir(workspace, name).is_dir(),
     )
 
+    own = _common.resolve_session_id(payload) or None
     if decision.emit == "bootstrap":
-        _emit_bootstrap(workspace, decision.context)
+        _emit_bootstrap(workspace, decision.context, own)
     elif decision.emit == "preflight":
-        _emit(_generic_preflight(workspace))
+        _emit(_generic_preflight(workspace, own))
     if decision.stamp_slug is not None:
         _stamp_sentinel(tmp_dir, sentinel, decision.stamp_slug)
     return 0

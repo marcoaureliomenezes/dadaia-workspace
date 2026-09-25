@@ -42,7 +42,9 @@ import pytest
 
 from dadaia_workspace.core import session_store
 from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.invocation import alive_context_trees
 from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.features.workspace.onboarding import next_step
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 _CLI = Path(".dadaia", ".venv", PLATFORM.venv_scripts_dir, f"dadaia{PLATFORM.venv_exe_suffix}")
@@ -171,7 +173,7 @@ def _assert_no_alive_context_still_generic(out: str) -> bool:
     return (
         "[no bound context]" in out
         and "end memory bootstrap" not in out
-        and "\nNext: no ALIVE Spec Context" in out
+        and "\nNext (command step context): no ALIVE Spec Context" in out
         and os.sep + fix_line(Path(), "context", "create", "<name>", "--main-repo", "<clone-url>")
         in out
     )
@@ -479,13 +481,14 @@ def test_emissions_attach_the_derived_help_digest(tmp_path: Path) -> None:
 
 
 def test_bound_session_carries_the_onboarding_next_step(tmp_path: Path) -> None:
-    """session-start-bound-session-omits-onboarding-next-step: a bound context with no
-    current specs tree still prints the doctor's ``Next:``/``fix:`` step."""
+    """AC1.5 + session-start-bound-session-omits-onboarding-next-step: the bound path
+    prints exactly the step text ``doctor`` reports (the one helper both paths call)."""
     _ws(tmp_path)
     _bind_session(tmp_path, "sb", "ctx")
 
     out = _run(tmp_path, "sb")
 
     assert out.startswith("[ctx]\n")
-    assert "\nNext: 'ctx' carries no current specs tree\n" in out
-    assert f"{os.sep}{_CLI} specs init --context ctx" in out
+    step = next_step(tmp_path, alive_context_trees(tmp_path), "ctx", "sb")
+    assert step is not None and step.id == "specs"
+    assert f"\n{step.text()}\n" in out

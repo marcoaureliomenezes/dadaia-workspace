@@ -190,12 +190,13 @@ def resolve_own_session_id(*, explicit: str | None = None, mint: bool = False) -
 
 def print_next_step(workspace_root: Path, focus: str | None = None) -> None:
     """The derived onboarding next step (FR6 AC6.2) — the text ``doctor`` also reports."""
-    step = onboarding.next_step(workspace_root, alive_context_trees(workspace_root), focus)
+    trees = alive_context_trees(workspace_root)
+    step = onboarding.next_step(workspace_root, trees, focus, resolve_own_session_id())
     if step is not None:
         console.print(step.text(), markup=False, highlight=False, soft_wrap=True)
 
 
-def _create_fix(root: Path, error: Exception, name: str | None, urls: list[str]) -> str:
+def create_fix(root: Path, error: Exception, name: str | None, urls: list[str]) -> str:
     """The invocation, every ``--associated-repo`` kept (AC3.5), with what failed made a
     placeholder — never the failing command repeated; an owned slug names its owner."""
     if isinstance(error, AssociatedRepoConflictError):
@@ -230,7 +231,7 @@ def create(
     except (DadaiaError, OSError) as e:
         err_console.print(f"Error: {e}", markup=False, soft_wrap=True)
         err_console.print(
-            f"fix: {_create_fix(ws, e, name, [main_repo, *associated])}",
+            f"fix: {create_fix(ws, e, name, [main_repo, *associated])}",
             markup=False,
             soft_wrap=True,
         )

@@ -26,6 +26,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.cli_line import fix_line
 
 _runner = CliRunner()
 
@@ -152,16 +153,20 @@ def test_init_with_repo_is_idempotent_on_re_run(tmp_path: Path, origin: Path) ->
     assert _snapshot() == before
 
 
-def test_the_printed_fix_line_succeeds_once_the_url_is_reachable(tmp_path: Path) -> None:
-    """The `fix:` line a failed `--repo` prints is the IDENTICAL command — it must be
-    runnable to success, never a stall that re-raises on the record the failed run left."""
+def test_the_printed_fix_line_succeeds_once_the_url_is_reachable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The `fix:` line a failed `--repo` prints (the venv's `context create`, the failing
+    URL a placeholder — AC2.6) runs to success once the URL is reachable, never a stall
+    that re-raises on the record the failed run left."""
     workspace = tmp_path / "ws"
     bare = tmp_path / "app.git"
     argv = ["init", str(workspace), "--harness", "claude", "--skip-assets", "--repo", str(bare)]
 
     failed = _runner.invoke(app, argv)
     assert failed.exit_code == 1
-    assert f"fix: uvx dadaia-workspace init {workspace} --harness claude" in failed.output
+    fix = next(ln for ln in failed.output.splitlines() if ln.startswith("fix: "))
+    assert fix == "fix: " + fix_line(workspace, "context", "create", "--main-repo", "<clone-url>")
 
     # The operator makes the URL reachable and re-runs the very same command.
     _git("init", "--bare", "--initial-branch=main", str(bare), cwd=tmp_path)
@@ -174,7 +179,8 @@ def test_the_printed_fix_line_succeeds_once_the_url_is_reachable(tmp_path: Path)
     _git("remote", "add", "origin", str(bare), cwd=work)
     _git("push", "origin", "main", cwd=work)
 
-    retry = _runner.invoke(app, argv)
+    monkeypatch.chdir(workspace)
+    retry = _runner.invoke(app, ["context", "create", "--main-repo", str(bare)])
 
     assert retry.exit_code == 0, retry.output
     assert (workspace / "repos" / "app" / "README.md").read_text(encoding="utf-8") == "app\n"
@@ -196,7 +202,7 @@ def test_init_without_repo_closes_with_the_law_and_the_next_step(
     lines = [line for line in result.stdout.splitlines() if line.strip()]
     closing = lines[-3:]
     assert closing[0] == _LAW
-    assert closing[1].startswith("Next: ")  # the onboarding step, AC6.2
+    assert closing[1].startswith("Next (")  # the onboarding step, AC6.2
     assert closing[2].startswith(
         f"fix: {ws / '.dadaia' / '.venv' / 'bin' / 'dadaia'} context create"
     )

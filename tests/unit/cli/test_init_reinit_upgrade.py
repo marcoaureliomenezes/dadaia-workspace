@@ -16,7 +16,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.commands import init as init_module
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.core.cli_line import cli_path
+from dadaia_workspace.core.cli_line import cli_path, fix_line
 from dadaia_workspace.core.platform import detect
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
@@ -115,5 +115,6 @@ def test_older_running_version_exits_1_with_the_pinned_fix(
     result = _runner.invoke(app, ["init", str(workspace)])
 
     assert result.exit_code == 1
-    assert f"fix: uvx dadaia-workspace@0.4.9 init {workspace.resolve()}" in result.output
+    root = workspace.resolve()
+    assert f"fix: {fix_line(root, 'init', str(root))}" in result.output
     assert sorted(p for p in workspace.rglob("*")) == before

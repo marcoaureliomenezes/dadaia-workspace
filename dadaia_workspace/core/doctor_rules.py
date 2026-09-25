@@ -62,6 +62,8 @@ class SectionFinding:
     #: an exit-1 finding with nothing to run is a Stall. Stamped from the emitting
     #: rule's ``fix_help`` by :func:`run_section` when the section left it empty.
     fix: str = ""
+    #: Machine-readable keys ``--json`` adds verbatim (the onboarding ``step``/``kind``).
+    extra: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)

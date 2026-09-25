@@ -134,9 +134,7 @@ def _register_dead_ctx_with_repo_on_disk(workspace: Path, name: str = "stale-ctx
 def _next_step(workspace: Path) -> str:
     """0.4.8 R2 deliberate golden change: zero ALIVE contexts prints the onboarding step."""
     fix = fix_line(workspace, "context", "create", "<name>", "--main-repo", "<clone-url>")
-    return (
-        f"ONBOARDING info Next: no ALIVE Spec Context — create one from its main repo\nfix: {fix}\n"
-    )
+    return f"ONBOARDING info Next (command step context): no ALIVE Spec Context — create one\nfix: {fix}\n"
 
 
 def test_doctor_default_output_healthy_workspace_unchanged(workspace: Path) -> None:

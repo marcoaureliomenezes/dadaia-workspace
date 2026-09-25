@@ -223,5 +223,5 @@ def test_the_created_line_is_one_line_and_the_next_step_is_the_new_contexts(
     code, out = _create("--main-repo", str(_remote(tmp_path, "a-rather-long-repo-name.git")))
     assert code == 0, out
     assert any(ln.endswith("(main repo: repos/a-rather-long-repo-name)") for ln in out.splitlines())
-    assert "specs init --context a-rather-long-repo-name" in out
+    assert "context bind a-rather-long-repo-name" in out  # AC7.2: a session, unbound
     assert "'second'" not in out

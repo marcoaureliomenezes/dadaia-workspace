@@ -75,7 +75,7 @@ def _findings(output: str) -> list[dict[str, str]]:
 def test_zero_contexts_is_no_longer_silent(workspace: Path) -> None:
     """R2: the next step is one info finding with its fix line; the exit is unaffected."""
     result = _runner.invoke(app, ["doctor"])
-    assert "ONBOARDING info Next:" in result.output, result.output
+    assert "ONBOARDING info Next (command step context):" in result.output, result.output
     cli = (
         workspace
         / ".dadaia"
@@ -95,7 +95,7 @@ def test_a_specless_context_is_level_two_not_an_error(workspace: Path) -> None:
     assert [f for f in findings if f["verdict"] == "error"] == [], result.output
     assert result.exit_code == 0, result.output
     info = [f["fix"] for f in findings if f["verdict"] == "info"]
-    assert any(fix.endswith("specs init --context app") for fix in info), info
+    assert any("specs init --context app --principal" in fix for fix in info), info
 
 
 def test_a_ghost_context_exits_one_with_no_specs_check(workspace: Path) -> None:

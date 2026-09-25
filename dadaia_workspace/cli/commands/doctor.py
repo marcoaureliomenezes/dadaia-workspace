@@ -30,6 +30,7 @@ from dadaia_workspace.cli._specs_resolution import (
     resolve_context_specs_dir_for_cli,
     resolve_specs_dir_for_cli,
 )
+from dadaia_workspace.cli.commands.context import resolve_own_session_id
 from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.cli.redact import ContextRedactor
 from dadaia_workspace.core.cli_line import fix_line
@@ -296,16 +297,18 @@ def _onboarding_section(
     """The derived next step (FR6 AC6.1) as one info finding — never an error."""
     if workspace_root is None or expired_only:
         return _empty_section("workspace")
-    step = onboarding.next_step(workspace_root, alive_context_trees(workspace_root), scope)
+    trees = alive_context_trees(workspace_root)
+    step = onboarding.next_step(workspace_root, trees, scope, resolve_own_session_id())
     if step is None:
         return _empty_section("workspace")
     finding = SectionFinding(
         code=onboarding.CODE,
         verdict="info",
-        message=f"Next: {step.reason}",
+        message=step.text().split("\n")[0],
         canonical=False,
         error=False,
         fix=step.command,
+        extra=(("step", step.id), ("kind", step.kind)),
     )
     return SectionReport(name="workspace", findings=(finding,))
 
@@ -456,6 +459,7 @@ def _json_payload(
                             "verdict": f.verdict,
                             "message": render(f.message),
                             "fix": render(f.fix),
+                            **dict(f.extra),
                         }
                         for f in report.printable
                     ],

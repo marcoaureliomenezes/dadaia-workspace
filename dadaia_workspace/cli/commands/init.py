@@ -8,7 +8,7 @@ import typer
 from rich.console import Console
 
 from dadaia_workspace import container
-from dadaia_workspace.cli.commands.context import print_next_step
+from dadaia_workspace.cli.commands.context import create_fix, print_next_step
 from dadaia_workspace.core import harness_registry
 from dadaia_workspace.core.cli_line import cli_path, fix_line
 from dadaia_workspace.core.exceptions import (
@@ -159,9 +159,7 @@ def init(
         _, installed = svc.init(root, skip_assets=skip_assets, harnesses=(chosen,))
     except WorkspaceVenvNewerError as exc:
         typer.secho(f"Error: {exc}", err=True, fg=typer.colors.RED)
-        typer.secho(
-            f"fix: uvx dadaia-workspace@{exc.installed} init {root}", err=True, fg=typer.colors.RED
-        )
+        typer.secho(f"fix: {fix_line(root, 'init', str(root))}", err=True, fg=typer.colors.RED)
         raise typer.Exit(1) from None
     except WorkspaceVenvBootstrapError as exc:
         typer.secho(f"Error: {exc}", err=True, fg=typer.colors.RED)
@@ -184,7 +182,7 @@ def init(
     elif before is not None:
         console.print(f"already at {before}", markup=False, highlight=False)
 
-    print_next_step(root, _create_context(root, plan, chosen) if plan.repo else None)
+    print_next_step(root, _create_context(root, plan) if plan.repo else None)
 
 
 def _reconcile_upgrade(root: Path, before: str | None, after: str | None) -> None:
@@ -205,7 +203,7 @@ def _reconcile_upgrade(root: Path, before: str | None, after: str | None) -> Non
     console.print(f"upgraded {before} -> {after}", markup=False, highlight=False)
 
 
-def _create_context(root: Path, plan: InitPlan, chosen: str) -> str:
+def _create_context(root: Path, plan: InitPlan) -> str:
     """``--repo``: ``init`` is a CALLER of ``context create``.
 
     Re-running the identical command stays a no-op: a context already holding THIS url
@@ -223,7 +221,7 @@ def _create_context(root: Path, plan: InitPlan, chosen: str) -> str:
     except (DadaiaError, OSError) as exc:
         typer.secho(f"Error: {exc}", err=True, fg=typer.colors.RED)
         typer.secho(
-            f"fix: {_INIT} {plan.directory} --harness {chosen} --repo <a reachable clone URL>",
+            f"fix: {create_fix(root, exc, None, [plan.repo, *plan.associated])}",
             err=True,
             fg=typer.colors.RED,
         )
