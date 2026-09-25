@@ -71,6 +71,24 @@ class CoherenceValidator:
             )
         ]
 
+    def check_gitflow(self) -> list[SpecsDoctorIssue]:
+        """GITFLOW-1, WARN-only (ADR 0037): the constitution's ``gitflow:`` block is absent
+        or malformed, so the pre-push gate falls back to the default."""
+        from dadaia_workspace.core.specs_version import read_gitflow
+
+        constitution = self.specs_dir / "constitution.md"
+        _, warning = read_gitflow(self.specs_dir)
+        if warning is None or not constitution.is_file():
+            return []
+        return [
+            SpecsDoctorIssue(
+                code="GITFLOW-1",
+                severity=Severity.WARNING,
+                description=warning,
+                path=str(constitution),
+            )
+        ]
+
     def check_constitution_file_refs(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-028: every path-like backtick reference in constitution.md to a
         repo file should resolve.

@@ -42,6 +42,7 @@ import pytest
 
 from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.core.doctor_rules import Rule, rule_fix
+from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.specs.citations import dead_verb_citations
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
@@ -66,6 +67,16 @@ class Plant:
 
 def _plant_missing_memory_document(root: Path) -> None:
     (root / "specs" / "memory" / "QUALITY.md").unlink()
+
+
+def _plant_gitflow_gone(root: Path) -> None:
+    """A current dadaia tree whose constitution frontmatter has no gitflow block."""
+    constitution = root / "specs" / "constitution.md"
+    constitution.write_text(
+        f"---\nspecs_pattern_version: {CANONICAL_SPECS_VERSION}\n---\n"
+        + constitution.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
 
 
 def _plant_status_line_gone(root: Path) -> None:
@@ -157,6 +168,7 @@ PLANTS: dict[str, Plant] = {
         },
     ),
     "SPEC-DOC-005": Plant(_plant_oversized_plan),
+    "GITFLOW-1": Plant(_plant_gitflow_gone, {"<specs>": "specs"}),
     "SPEC-DOC-048": Plant(_plant_origin_line_gone, {"<id>": _RELEASE}),
     "SPEC-DOC-010": Plant(_plant_changelog_heading),
     "AGENTS-PLACEHOLDER-1": Plant(_plant_tests_agents_placeholder),

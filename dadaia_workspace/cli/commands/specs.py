@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -17,6 +18,7 @@ from dadaia_workspace.cli._specs_resolution import (
 from dadaia_workspace.core import specs_version
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, from_mapping
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.migrate import upgrade as upgrade_feature
 from dadaia_workspace.features.migrate.registry import UpgradeRefused
@@ -106,6 +108,17 @@ def init(
         "--replace-foreign",
         help=f"Move a foreign specs/ to {_BACKUP}/ (git mv, staged) without asking.",
     ),
+    principal: str | None = typer.Option(
+        None, "--principal", help="Principal branch. Default: kept, else origin/HEAD, else main."
+    ),
+    integration: str | None = typer.Option(
+        None, "--integration", help="Integration branch. Default: kept, else develop."
+    ),
+    work_prefix: str | None = typer.Option(
+        None,
+        "--work-prefix",
+        help="Work-branch prefix before <M.m.p>. Default: kept, else feature/.",
+    ),
 ) -> None:
     """Bring a repo's specs/ to the canon, never committing.
 
@@ -122,6 +135,7 @@ def init(
         specs_dir = str(resolve_context_specs_dir_for_cli(resolve_workspace_root(), ctx))
         rerun = ("--context", ctx)
     target = resolve_specs_dir_for_cli(specs_dir)
+    flow = _gitflow(target, principal, integration, work_prefix, rerun)
 
     kind = canon.classify(target)
     if kind == "foreign":
@@ -133,8 +147,41 @@ def init(
     written = canon.scaffold(target, project_name=project)
     for path in [*written, *canon.scaffold_repo_law(target.parent, project_name=project)]:
         typer.echo(f"[created] {path}")
+    specs_version.merge_frontmatter(target, gitflow=flow)
+    typer.echo(
+        f"[gitflow] principal {flow.principal}, integration {flow.integration}, "
+        f"work {flow.work_prefix}<M.m.p>"
+    )
     if kind != "dadaia":
         typer.echo(f"[ok] {target} at pattern version {specs_version.CANONICAL_SPECS_VERSION}")
+
+
+def _gitflow(
+    target: Path,
+    principal: str | None,
+    integration: str | None,
+    work_prefix: str | None,
+    rerun: tuple[str, ...],
+) -> Gitflow:
+    """Flags over the tree's own valid block, over detection (``origin/HEAD``, else
+    ``main``); an invalid result refuses before anything is written."""
+    kept, warning = specs_version.read_gitflow(target)
+    if warning is not None:
+        kept = replace(
+            DEFAULT, principal=container.build_git_client().default_branch(target.parent)
+        )
+    try:
+        return from_mapping(
+            {
+                "principal": principal or kept.principal,
+                "integration": integration or kept.integration,
+                "work": work_prefix or kept.work_prefix,
+            }
+        )
+    except ValueError as exc:
+        fixed = ("--principal", "main", "--integration", "develop", "--work-prefix", "feature/")
+        typer.echo(f"[error] {exc}\n{_init_fix(*rerun, *fixed)}", err=True)
+        raise typer.Exit(2) from exc
 
 
 def _move_foreign(target: Path, rerun: tuple[str, ...], replace_foreign: bool) -> None:

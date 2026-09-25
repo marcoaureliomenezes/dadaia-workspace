@@ -73,7 +73,7 @@ DELETE/REBUILD rows (PLAN §1) land first. RED = the named test fails before the
   work branch; refusals name its branches; an associated repo inherits
   `RED:` custom-gitflow cases in `test_push_branch_policy.py`.
 
-- [-] **T-050-13 — `specs init` gitflow flags + GITFLOW-1.**
+- [x] **T-050-13 — `specs init` gitflow flags + GITFLOW-1.**
   `--principal/--integration/--work-prefix`; principal detected by `GitSubprocessClient.default_branch`
   (local `symbolic-ref`, else `main`); written fresh or merged; idempotent; stdout names it; GITFLOW-1 WARN
   with the `specs init` fix line carrying the detected flags.

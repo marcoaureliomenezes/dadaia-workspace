@@ -187,6 +187,12 @@ RULES: tuple[SpecsRule, ...] = (
         fix_help=("specs", "upgrade", "--specs-dir", "<specs>"),
     ),
     _rule(
+        ("GITFLOW-1",),
+        lambda d: d._coherence.check_gitflow(),
+        # No flag: `specs init` keeps a valid block, else writes the detected gitflow.
+        fix_help=("specs", "init", "--specs-dir", "<specs>"),
+    ),
+    _rule(
         ("SPEC-DOC-024",),
         lambda d: d._release.check_phase_markers_coherence(),
         fix_help="sed -i 's/<stale phase marker>/<_RELEASE.json phase>/' <document>",

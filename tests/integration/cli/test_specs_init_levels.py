@@ -197,3 +197,50 @@ def test_a_symlinked_context_specs_root_is_refused_and_nothing_written(
     assert result.exit_code != 0, result.output
     assert "symlink" in result.output.lower()
     assert (_snapshot(repo), _snapshot(real)) == (before, before_real)
+
+
+# ── T-050-13 (AC6.3): the gitflow flags ──────────────────────────────────────────────
+
+
+def test_fresh_tree_writes_the_detected_gitflow_and_names_it(repo: Path) -> None:
+    from dadaia_workspace.core.gitflow import Gitflow
+
+    remote = repo.parent / "origin.git"
+    _git(repo.parent, "init", "-q", "--bare", "-b", "trunk", str(remote))
+    _git(repo, "remote", "add", "origin", str(remote))
+    _git(repo, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/trunk")
+
+    result = _runner.invoke(app, ["specs", "init", "--context", "c"])
+
+    assert result.exit_code == 0, result.output
+    flow, warning = specs_version.read_gitflow(repo / "specs")
+    assert (flow, warning) == (Gitflow("trunk", "develop", "feature/"), None)
+    assert "[gitflow] principal trunk, integration develop, work feature/<M.m.p>" in result.output
+
+
+def test_flags_merge_into_an_existing_tree_and_rerun_is_a_no_op(repo: Path) -> None:
+    from dadaia_workspace.core.gitflow import Gitflow
+
+    assert _runner.invoke(app, ["specs", "init", "--context", "c"]).exit_code == 0
+    constitution = repo / "specs" / "constitution.md"
+    constitution.write_text(
+        constitution.read_text(encoding="utf-8").replace("---\n#", "owner: me\n---\n#", 1),
+        encoding="utf-8",
+    )
+    flags = ["--principal", "trunk", "--integration", "next", "--work-prefix", "work/"]
+
+    first = _runner.invoke(app, ["specs", "init", "--context", "c", *flags])
+    snapshot = _snapshot(repo / "specs")
+    second = _runner.invoke(app, ["specs", "init", "--context", "c", *flags])
+
+    assert first.exit_code == 0 and second.exit_code == 0, first.output + second.output
+    assert specs_version.read_gitflow(repo / "specs")[0] == Gitflow("trunk", "next", "work/")
+    assert "owner: me" in constitution.read_text(encoding="utf-8")
+    assert _snapshot(repo / "specs") == snapshot
+
+
+def test_an_invalid_flag_refuses_with_a_fix_and_writes_nothing(repo: Path) -> None:
+    result = _runner.invoke(app, ["specs", "init", "--context", "c", "--integration", "main"])
+    assert result.exit_code == 2
+    assert "fix: " in result.output
+    assert not (repo / "specs").exists()

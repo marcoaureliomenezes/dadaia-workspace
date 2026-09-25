@@ -255,6 +255,14 @@ class GitSubprocessClient:
         if result.returncode != 0:
             raise GitSyncError(f"git push failed in {path}: {result.stderr.strip()}")
 
+    def default_branch(self, path: Path) -> str:
+        """The remote's default branch from the local ``origin/HEAD``; ``main`` when unset."""
+        result = _run(
+            ["git", "-C", str(path), "symbolic-ref", "--short", "refs/remotes/origin/HEAD"]
+        )
+        name = result.stdout.strip().removeprefix("origin/")
+        return name if result.returncode == 0 and name else "main"
+
     def current_branch(self, path: Path) -> str:
         result = _run(["git", "branch", "--show-current"], cwd=path)
         return result.stdout.strip()
