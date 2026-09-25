@@ -10,18 +10,16 @@ from pathlib import Path
 
 import typer
 
+from dadaia_workspace.cli._specs_resolution import (
+    alive_context_owning_repo,
+    resolve_context_specs_dir_for_cli,
+    resolve_workspace_root_for_cli,
+)
 from dadaia_workspace.container import is_source_repo_root as _is_source_repo_root
 from dadaia_workspace.core.cli_line import fix_line
-from dadaia_workspace.core.exceptions import CiPreflightScopeError, WorkspaceNotInitializedError
+from dadaia_workspace.core.exceptions import CiPreflightScopeError
 from dadaia_workspace.core.gitflow import Gitflow
-from dadaia_workspace.core.invocation import (
-    alive_context_names,
-    context_name_for_repo_slug,
-    repo_slug_under_repos,
-    resolve_context_specs_dir,
-)
 from dadaia_workspace.core.specs_version import read_gitflow
-from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.ci_preflight import (
     all_passed,
     checks_for,
@@ -108,22 +106,16 @@ def _no_canon_violations(paths: Iterable[str]) -> list[str]:
 def _gitflow_for(repo_root: Path) -> Gitflow:
     """ADR 0046, once per push: the repo's own constitution, else its owning context's
     main-repo constitution (an associated repo), else the default with one warning."""
-    specs_dir, context = repo_root / "specs", None
-    try:
-        workspace: Path | None = resolve_workspace_root(repo_root)
-    except WorkspaceNotInitializedError:
-        workspace = None
-    slug = repo_slug_under_repos(workspace, repo_root) if workspace else None
-    if workspace and slug:
-        name = context_name_for_repo_slug(workspace, slug)
-        context = name if name in alive_context_names(workspace) else None
-    if workspace and context and not (specs_dir / "constitution.md").is_file():
-        specs_dir = resolve_context_specs_dir(workspace, context)
+    workspace = resolve_workspace_root_for_cli(repo_root)
+    context = alive_context_owning_repo(workspace, repo_root)
+    specs_dir = repo_root / "specs"
+    if context and not (specs_dir / "constitution.md").is_file():
+        specs_dir = resolve_context_specs_dir_for_cli(workspace, context)
     gitflow, warning = read_gitflow(specs_dir)
     if warning:
         fix = (
             f"\nfix: {fix_line(workspace, 'specs', 'init', '--context', context)}"
-            if workspace and context
+            if context
             else ""
         )
         typer.echo(f"[pre-push] WARNING: {warning}{fix}", err=True)
