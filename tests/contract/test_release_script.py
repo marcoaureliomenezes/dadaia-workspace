@@ -181,3 +181,8 @@ def test_every_fix_names_an_existing_absolute_path(script: Path, tmp_path: Path)
     fix = [ln for ln in _phase(script, _specs(tmp_path, "", plan_status="Draft")).stderr.splitlines()
            if ln.lstrip().startswith("fix:")][0]  # fmt: skip
     assert Path(fix.split(" in ", 1)[1].strip()).is_file()
+
+
+def test_a_sentence_naming_the_columns_above_the_table_passes(script: Path, tmp_path: Path) -> None:
+    prose = "## 1. As-is review\n\nColumns are `unit | today` and more.\n\n"
+    _admits(script, tmp_path, prose + _HEADER + _ROW.format(verdict="KEEP"))

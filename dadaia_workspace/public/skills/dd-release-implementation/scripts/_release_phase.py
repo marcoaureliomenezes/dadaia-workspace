@@ -62,14 +62,14 @@ def _refuse_missing_as_is_table(plan: str) -> None:
     heading = AS_IS.search(plan)
     if heading is None:
         raise Refusal("PLAN.md has no '## … As-is review' heading", AS_IS_FIX)
-    rows: list[list[str]] = []  # the first table under the heading, split on unescaped pipes
+    rows: list[list[str]] = []  # from the first COLUMNS header line to the first non-row line
     for line in plan[heading.end() :].split("\n## ")[0].splitlines()[1:]:
-        if "|" not in line and rows:
+        cells = [c.strip(" \t`*") for c in re.split(r"(?<!\\)\|", line.strip().strip("|"))]
+        if rows and "|" not in line:
             break
-        if "|" in line:
-            cells = re.split(r"(?<!\\)\|", line.strip().strip("|"))
-            rows.append([cell.strip(" \t`*") for cell in cells])
-    if len(rows) < 3 or [c.lower() for c in rows[0]] != COLUMNS:
+        if rows or [c.lower() for c in cells] == COLUMNS:
+            rows.append(cells)
+    if len(rows) < 3:
         raise Refusal("PLAN.md's As-is review heading is not followed by a table with header "
                       "'unit | today | bugs | verdict | why' and >= 1 row", AS_IS_FIX)  # fmt: skip
     for row in (r + [""] * 4 for r in rows[2:]):

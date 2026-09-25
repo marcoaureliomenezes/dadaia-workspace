@@ -47,9 +47,12 @@ Verdict counts: DELETE 4 · REBUILD 3 · UPDATE 14 · KEEP 2 · ADD 1.
   skill section, and its own skeleton is test-proven to pass (`scaffold-artifacts-fail-own-workflow-gates`).
 - Deletion test on `_release_phase.py`: the admission already reads the trio; the check lands there
   (≈ 30 lines, one private function) — no new module, the complexity has exactly one caller.
-- The parse: find `^## (\d+\.\s*)?As-is review\s*$` (case-insensitive); take lines up to the next `^## `;
-  first `|` line is the header, second the separator, the rest data rows; verdict = cell 4 stripped of
-  whitespace, `` ` `` and `*`.
+- The parse: the first level-2 heading containing `as-is review` or `as is review` (case-insensitive,
+  any prefix or suffix); within its section (up to the next `## `), the table starts at the first line whose
+  cells, split on unescaped pipes and stripped of whitespace, `` ` `` and `*`, equal the five columns;
+  the next line is the separator; data rows follow until the first line without a pipe (outer pipes
+  optional); verdict = cell 4, case-insensitive. A missing heading and a missing/malformed table refuse
+  with distinct messages; every fix line names an absolute path.
 - Law text edits are statements; projections move only by `public stage` + `public install`; doctor and
   `CONTEXT-MAP.md` re-recorded when tests demand.
 
