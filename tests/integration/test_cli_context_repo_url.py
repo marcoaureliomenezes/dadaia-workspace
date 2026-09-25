@@ -170,4 +170,4 @@ def test_a_bare_associated_slug_with_no_checkout_is_refused(workspace: Path) -> 
     seed_dead_context(workspace, "m", "m", "https://x.test/m.git")
     add = _runner.invoke(app, ["context", "repo", "add", "m", "a"])
     assert add.exit_code == 1, add.output
-    assert "fix: .dadaia/.venv/bin/dadaia context repo add m a --url <clone-url>" in add.output
+    assert ".dadaia/.venv/bin/dadaia context repo add m a --url '<clone-url>'" in add.output

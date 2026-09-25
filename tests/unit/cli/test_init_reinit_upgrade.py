@@ -17,6 +17,7 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli.commands import init as init_module
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import cli_path
+from dadaia_workspace.core.platform import detect
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
 _runner = CliRunner()
@@ -74,6 +75,27 @@ def test_newer_running_version_reconciles_and_reports_the_transition(
     assert result.exit_code == 0, result.output
     assert "upgraded 0.4.7 -> 0.4.8" in result.output
     assert reconciled == ["0.4.8"]
+
+
+def test_a_failed_reconcile_prints_the_windows_fix_line(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AC2.6 (T-050-08): the refusal's fix is built by ``fix_line`` — on Windows the CLI is
+    ``Scripts\\dadaia.exe``, quoted by the MSVCRT rules."""
+    _versions(monkeypatch, workspace, "0.4.7", "0.4.8")
+
+    def _reconcile(root: Path, *, expected_version: str, **_: object) -> object:
+        # Windows from here on: only the refusal is rendered after the reconcile.
+        monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", detect("win32"))
+        return type("R", (), {"ok": False, "error": "boom"})()
+
+    monkeypatch.setattr(init_module, "reconcile_workspace", _reconcile)
+
+    result = _runner.invoke(app, ["init", str(workspace)])
+
+    exe = workspace.resolve() / ".dadaia" / ".venv" / "Scripts" / "dadaia.exe"
+    assert result.exit_code == 1
+    assert f"fix: {exe} reconcile --expect-version 0.4.8" in result.output
 
 
 def test_older_running_version_exits_1_with_the_pinned_fix(

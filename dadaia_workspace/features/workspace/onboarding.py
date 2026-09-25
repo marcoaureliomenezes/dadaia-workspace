@@ -15,7 +15,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from dadaia_workspace.core.cli_line import cli_path
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, read_pattern_version
 
 CODE = "ONBOARDING"
@@ -59,16 +59,16 @@ def next_step(root: Path, trees: Mapping[str, Path], focus: str | None = None) -
 
 
 def _lowest(root: Path, trees: Mapping[str, Path]) -> Step | None:
-    cli = cli_path(root)
     if not trees:
         return Step(
             "no ALIVE Spec Context — create one from its main repo",
-            f"{cli} context create <name> --main-repo <clone-url>",
+            fix_line(root, "context", "create", "<name>", "--main-repo", "<clone-url>"),
         )
     for name, specs in trees.items():
         if not specs_ready(specs):
             return Step(
-                f"'{name}' carries no current specs tree", f"{cli} specs init --context {name}"
+                f"'{name}' carries no current specs tree",
+                fix_line(root, "specs", "init", "--context", name),
             )
     for name, specs in trees.items():
         if not _first_pass_done(specs):

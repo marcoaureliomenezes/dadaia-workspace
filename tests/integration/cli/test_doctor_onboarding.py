@@ -103,7 +103,7 @@ def test_a_ghost_context_exits_one_with_no_specs_check(workspace: Path) -> None:
     result = _runner.invoke(app, ["doctor", "--context", "ghost"])
     assert result.exit_code == 1
     assert "Error: Context 'ghost' not found." in result.output
-    assert "fix: .dadaia/.venv/bin/dadaia context list" in result.output
+    assert "/.dadaia/.venv/bin/dadaia context list" in result.output
     assert "SPEC-DOC" not in result.output
 
 

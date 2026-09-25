@@ -101,7 +101,9 @@ def test_dead_refuses_to_delete_a_repo_it_could_never_clone_back(tmp_path: Path)
 def test_alive_refuses_a_legacy_url_less_missing_repo_with_a_fix_line(tmp_path: Path) -> None:
     service, store, ws = _setup(tmp_path, "")
 
-    with pytest.raises(RepoUrlMissingError, match=r"fix: \.dadaia/\.venv/bin/dadaia context repo"):
+    with pytest.raises(
+        RepoUrlMissingError, match=r"fix: \S*/\.dadaia/\.venv/bin/dadaia context repo"
+    ):
         service.alive("proj")
 
     assert store.get("proj").state == ContextState.DEAD  # type: ignore[union-attr]

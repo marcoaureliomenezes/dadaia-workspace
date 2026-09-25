@@ -143,7 +143,7 @@ def test_a_failed_clone_leaves_nothing_and_the_same_command_then_succeeds(
     assert code == 1
     assert (
         f"context create proj --main-repo {main} --associated-repo {ok_assoc} "
-        "--associated-repo <clone-url>"
+        "--associated-repo '<clone-url>'"
     ) in out.replace("\n", "")
     assert "proj" not in _names(ws)
     assert sorted(p.name for p in (ws / "repos").iterdir()) == []
@@ -203,10 +203,10 @@ def test_refusal_fix_lines_never_repeat_the_failing_command(ws: Path, tmp_path: 
     the list that names its owner — neither echoes the command that just failed (G6: the
     empty list names the runnable create)."""
     listed = _runner.invoke(app, ["context", "list"]).output
-    assert "context create <name> --main-repo <clone-url>" in listed
+    assert "context create '<name>' --main-repo '<clone-url>'" in listed
     code, out = _create("bad", "--main-repo", str(tmp_path / "nothere.git"))
     assert code == 1
-    assert out.splitlines()[-1].endswith("context create bad --main-repo <clone-url>")
+    assert out.splitlines()[-1].endswith("context create bad --main-repo '<clone-url>'")
 
     second = _remote(tmp_path, "second.git")
     assert _create("--main-repo", str(second))[0] == 0

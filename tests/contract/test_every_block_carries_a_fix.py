@@ -27,6 +27,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core import doctor_rules
+from dadaia_workspace.core.cli_line import cli_path
 from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObject
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_refs
@@ -34,6 +35,9 @@ from dadaia_workspace.features.specs.canon import canon_violations
 from dadaia_workspace.hooks import pre_gate
 
 _FIX_LINE_RE = re.compile(r"^fix: (\S.*)$", re.MULTILINE)
+
+#: The workspace CLI as a fix line spells it, relative to its root (``fix_line``).
+_CLI = str(cli_path(Path()))
 
 _SHA_A = "a" * 40
 _ZERO = "0" * 40
@@ -81,7 +85,9 @@ def _assert_one_command(command: str) -> None:
     the operator pastes. Prose ("author the missing document", "fix it and then push")
     does not: an agent cannot run it, so the BLOCK is a Stall with a friendly face.
     """
-    head = command.split()[0]
+    head = shlex.split(command)[0]
+    if head.endswith(_CLI):  # ``fix_line`` roots the CLI at the workspace it runs in
+        head = ".dadaia/.venv/bin/dadaia"
     assert head in _EXECUTABLE_TOKENS, (
         f"a fix line opens with an executable, not prose — got {head!r} in:\n{command}"
     )
@@ -276,7 +282,7 @@ def test_every_doctor_rule_renders_a_runnable_fix(
         message="synthetic finding",
         canonical=False,
         error=True,
-        fix=rule.fix_help,
+        fix=doctor_rules.rule_fix(rule, Path()),
     )
     assert_block_carries_a_runnable_fix(doctor_rules.render_finding(finding))
 
@@ -331,7 +337,11 @@ def _fix_lines() -> list[tuple[str, str]]:
     """Every doctor rule's fix line, plus the ledger scripts' own delegated fix."""
     from dadaia_workspace.infrastructure.ledger_scripts import LEDGER_SCRIPTS
 
-    lines = [(codes, rule.fix_help) for codes, rule in _DOCTOR_RULES if rule.fix_help]
+    lines = [
+        (codes, doctor_rules.rule_fix(rule, Path()))
+        for codes, rule in _DOCTOR_RULES
+        if rule.fix_help
+    ]
     lines.extend(
         (script.code, f"{script.invocation} check --specs specs") for script in LEDGER_SCRIPTS
     )
@@ -481,15 +491,13 @@ def test_every_fix_target_resolves_on_disk(codes: str, command: str) -> None:
     """
     import subprocess  # noqa: PLC0415 — a contract test executes the real script
 
-    from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
-
     unresolved = _unresolved_paths(command)
     assert unresolved == [], (
         f"{codes}: fix line names a path neither this repo nor the specs canon "
         f"carries: {unresolved} in {command!r}"
     )
 
-    if command.startswith(DADAIA_BIN) or command.startswith("dadaia "):
+    if command.startswith(_CLI) or command.startswith("dadaia "):
         tokens = command.split()[1:]
         assert _cli_tree_has(tokens), f"{codes}: no such verb: {command!r}"
         return

@@ -23,13 +23,13 @@ from functools import partial
 from pathlib import Path, PurePosixPath
 
 from dadaia_workspace.core import session_store, workspace_layout
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
 from dadaia_workspace.core.harness_registry import (
     HARNESS_PROJECTION_DIRS,
     L1_ENTRY_HARNESSES,
     PROJECTION_TARGETS,
 )
-from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.platform import PLATFORM
@@ -159,7 +159,9 @@ class DoctorService:
                                 "than what this release ships."
                             ),
                             fixable=False,
-                            fix=f"{DADAIA_BIN} ci install-hook --force --repo {rel}",
+                            fix=fix_line(
+                                self._workspace_root, "ci", "install-hook", "--force", "--repo", rel
+                            ),
                         )
                     )
         return issues
@@ -804,18 +806,18 @@ def workspace_rules(
             ("WS-INVARIANT",),
             SECTION,
             invariants,
-            fix_help=f"{DADAIA_BIN} doctor --fix",
+            fix_help=("doctor", "--fix"),
         ),
         Rule(
             ("HOOKS-DRIFT-1",),
             SECTION,
             installed_hooks,
-            fix_help=f"{DADAIA_BIN} ci install-hook --force --repo <repo>",
+            fix_help=("ci", "install-hook", "--force", "--repo", "<repo>"),
         ),
         Rule(
             ("WS-ENTRY",),
             SECTION,
             entries,
-            fix_help=f"{DADAIA_BIN} doctor --fix",
+            fix_help=("doctor", "--fix"),
         ),
     )

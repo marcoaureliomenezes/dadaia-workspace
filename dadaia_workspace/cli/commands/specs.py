@@ -15,6 +15,8 @@ from dadaia_workspace.cli._specs_resolution import (
     resolve_specs_dir_for_cli,
 )
 from dadaia_workspace.core import specs_version
+from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.migrate import upgrade as upgrade_feature
 from dadaia_workspace.features.migrate.registry import UpgradeRefused
@@ -76,7 +78,15 @@ def _echo_upgrade(specs: Path, result: UpgradeResult) -> None:
         )
 
 
-_FIX = "fix: .dadaia/.venv/bin/dadaia specs init"
+def _init_fix(*argv: str) -> str:
+    """``fix:`` re-running ``specs init`` — workspace-relative when no instance is around."""
+    try:
+        root = resolve_workspace_root()
+    except WorkspaceNotInitializedError:
+        root = Path()
+    return f"fix: {fix_line(root, 'specs', 'init', *argv)}"
+
+
 _BACKUP = "specs-bkp"
 
 
@@ -102,15 +112,15 @@ def init(
     Absent: scaffold. Dadaia (stamped >= 6): upgrade, then fill missing files. Foreign:
     after consent, `git mv specs specs-bkp` (staged) and scaffold.
     """
-    rerun = f"--specs-dir {specs_dir}"
+    rerun: tuple[str, ...] = ("--specs-dir", str(specs_dir))
     if specs_dir is None:
         try:
             ctx = resolve_context_for_cli(context)
         except ValueError as exc:
-            typer.echo(f"[error] {exc}\n{_FIX} --context <name>", err=True)
+            typer.echo(f"[error] {exc}\n{_init_fix('--context', '<name>')}", err=True)
             raise typer.Exit(2) from exc
         specs_dir = str(resolve_context_specs_dir_for_cli(resolve_workspace_root(), ctx))
-        rerun = f"--context {ctx}"
+        rerun = ("--context", ctx)
     target = resolve_specs_dir_for_cli(specs_dir)
 
     kind = canon.classify(target)
@@ -127,7 +137,7 @@ def init(
         typer.echo(f"[ok] {target} at pattern version {specs_version.CANONICAL_SPECS_VERSION}")
 
 
-def _move_foreign(target: Path, rerun: str, replace_foreign: bool) -> None:
+def _move_foreign(target: Path, rerun: tuple[str, ...], replace_foreign: bool) -> None:
     """``specs/`` -> ``specs-bkp/`` after consent; exits on a refusal, writing nothing."""
     backup = target.parent / _BACKUP
     if backup.exists():
@@ -142,7 +152,7 @@ def _move_foreign(target: Path, rerun: str, replace_foreign: bool) -> None:
         if not (sys.stdin.isatty() and typer.confirm(question, default=False)):
             typer.echo(
                 f"[refused] {target} is a foreign specs tree; nothing written.\n"
-                f"{_FIX} {rerun} --replace-foreign",
+                f"{_init_fix(*rerun, '--replace-foreign')}",
                 err=True,
             )
             raise typer.Exit(2)

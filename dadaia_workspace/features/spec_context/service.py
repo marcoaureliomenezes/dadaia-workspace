@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Protocol
 
 from dadaia_workspace.core import workspace_layout
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import (
     AssociatedRepoConflictError,
     AssociatedRepoNotFoundError,
@@ -23,7 +24,6 @@ from dadaia_workspace.core.exceptions import (
     InvalidContextNameError,
     RepoUrlMissingError,
 )
-from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.models.spec_context import (
     CONTEXT_NAME_RE,
     AssociatedRepo,
@@ -486,15 +486,14 @@ class SpecContextService:
             if not repo_dest.exists():
                 if not repo.url:
                     if repo.slug == ctx.repo_slug:
-                        fix = (
-                            f"{DADAIA_BIN} context delete {name} && {DADAIA_BIN} context "
-                            f"create {name} --main-repo <clone-url>"
-                        )
+                        steps = (f"delete {name}", f"create {name} --main-repo <clone-url>")
                     else:
-                        fix = (
-                            f"{DADAIA_BIN} context repo remove {name} {repo.slug} && "
-                            f"{DADAIA_BIN} context repo add {name} {repo.slug} --url <clone-url>"
+                        steps = (
+                            f"repo remove {name} {repo.slug}",
+                            f"repo add {name} {repo.slug} --url <clone-url>",
                         )
+                    ws = self._workspace_root
+                    fix = " && ".join(fix_line(ws, "context", *step.split()) for step in steps)
                     raise RepoUrlMissingError(
                         f"'{repo.slug}' has no clone URL and no checkout at repos/{repo.slug} "
                         f"— 'context alive {name}' cannot obtain it.\nfix: {fix}"

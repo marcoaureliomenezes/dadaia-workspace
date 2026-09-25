@@ -10,7 +10,7 @@ from rich.console import Console
 from dadaia_workspace import container
 from dadaia_workspace.cli.commands.context import bind_session, print_next_step
 from dadaia_workspace.core import harness_registry, session_store
-from dadaia_workspace.core.cli_line import cli_path
+from dadaia_workspace.core.cli_line import cli_path, fix_line
 from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
     DadaiaError,
@@ -197,7 +197,9 @@ def _reconcile_upgrade(root: Path, before: str | None, after: str | None) -> Non
     )
     if not result.ok:
         typer.secho(f"Error: reconcile after upgrade failed: {result.error}", err=True, fg="red")
-        typer.secho(f"fix: {cli_path(root)} reconcile --expect-version {after}", err=True)
+        typer.secho(
+            f"fix: {fix_line(root, 'reconcile', '--expect-version', after or '')}", err=True
+        )
         raise typer.Exit(1)
     console.print(f"upgraded {before} -> {after}", markup=False, highlight=False)
 

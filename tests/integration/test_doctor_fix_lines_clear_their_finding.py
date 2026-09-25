@@ -41,7 +41,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.cli.help_digest import command_paths
-from dadaia_workspace.core.doctor_rules import Rule
+from dadaia_workspace.core.doctor_rules import Rule, rule_fix
 from dadaia_workspace.features.specs.citations import dead_verb_citations
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
@@ -51,10 +51,9 @@ from tests.fixtures.harness_env import session_home
 from ..unit.features.specs.test_doctor import _make_clean_specs_tree
 
 _RELEASE = "1.2.3"
-_VENV_DADAIA = ".dadaia/.venv/bin/dadaia"
-#: The fix line names the venv binary by its workspace-relative path; the fixture tree is
-#: not a workspace, so it is resolved to the venv running this suite — the SAME binary.
-_THIS_VENV_DADAIA = str(Path(sys.executable).parent / "dadaia")
+#: The fixture tree is not a workspace, so a CLI fix line is rendered from the workspace
+#: whose venv runs this suite (``<root>/.dadaia/.venv/bin/python``) — the SAME binary.
+_THIS_WORKSPACE = Path(sys.executable).parents[3]
 
 
 @dataclass(frozen=True)
@@ -296,7 +295,7 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
         )
         return
 
-    command = _resolve(rule.fix_help, plant).replace(_VENV_DADAIA, _THIS_VENV_DADAIA)
+    command = _resolve(rule_fix(rule, _THIS_WORKSPACE), plant)
     done = subprocess.run(
         ["bash", "-c", command],
         cwd=root,
@@ -332,7 +331,7 @@ def test_every_specs_rule_is_either_exercised_or_listed_with_a_reason() -> None:
 
 
 def _iter_fix_helps() -> list[tuple[str, Any]]:
-    return [("/".join(r.codes), r.fix_help) for r in SPECS_RULES]
+    return [("/".join(r.codes), rule_fix(r, Path()) or None) for r in SPECS_RULES]
 
 
 #: a bare ``rm`` invocation with a recursive flag, at the head of the line or of any
@@ -370,7 +369,7 @@ def test_a_judgment_only_rule_never_makes_the_run_exit_1(tmp_path: Path) -> None
     for code in ("SPEC-DOC-005", "SPEC-DOC-010", "TREE-2", "AGENTS-PLACEHOLDER-1"):
         PLANTS[code].plant(root)
 
-    report = _specs_section(SpecsDoctor(root / "specs"))
+    report = _specs_section(SpecsDoctor(root / "specs"), Path())
     fired = {f.code for f in report.printable}
     assert {"SPEC-DOC-005", "SPEC-DOC-008", "TREE-2", "AGENTS-PLACEHOLDER-1"} <= fired, fired
     errors = {f.code for f in report.findings if f.error}

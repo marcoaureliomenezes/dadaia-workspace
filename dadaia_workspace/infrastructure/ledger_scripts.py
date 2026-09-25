@@ -23,8 +23,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.doctor_rules import SectionFinding
-from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner
 
 __all__ = [
@@ -37,9 +37,6 @@ __all__ = [
 #: The package's own copy of the skills — the fallback when the doctored tree is a bare
 #: `--specs-dir` with no workspace above it (CI over a checkout).
 _PACKAGE_SKILLS = Path(__file__).resolve().parents[1] / "public" / "skills"
-
-#: The one remediation for a script that cannot run at all: re-project the skills.
-_INSTALL_FIX = f"{DADAIA_BIN} public install"
 
 #: A `check` run may only exit 0 (clean) or 1 (findings); anything else is a broken
 #: script, not a broken ledger.
@@ -126,7 +123,8 @@ def _unrunnable(script: LedgerScript, reason: str) -> SectionFinding:
         message=f"{script.skill}/scripts/{script.filename} {reason}",
         canonical=False,
         error=True,
-        fix=_INSTALL_FIX,
+        # The one remediation for a script that cannot run at all: re-project the skills.
+        fix=fix_line(_running_workspace() or Path(), "public", "install"),
     )
 
 

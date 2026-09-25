@@ -142,7 +142,7 @@ def _next_step(workspace: Path) -> str:
     )
     return (
         "ONBOARDING info Next: no ALIVE Spec Context — create one from its main repo\n"
-        f"fix: {cli} context create <name> --main-repo <clone-url>\n"
+        f"fix: {cli} context create '<name>' --main-repo '<clone-url>'\n"
     )
 
 
@@ -158,7 +158,7 @@ def test_doctor_default_output_with_issue_unchanged(workspace: Path) -> None:
     assert result.exit_code == 1, result.output
     assert result.output == (
         "INV-5 error Context 'stale-ctx' is dead but repo 'stale-ctx' is on disk\n"
-        "fix: .dadaia/.venv/bin/dadaia doctor --fix\n" + _next_step(workspace)
+        f"fix: {workspace}/.dadaia/.venv/bin/dadaia doctor --fix\n" + _next_step(workspace)
     )
 
 

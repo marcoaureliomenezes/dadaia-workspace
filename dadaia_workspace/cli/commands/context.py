@@ -23,6 +23,7 @@ from dadaia_workspace.cli._specs_resolution import (
 )
 from dadaia_workspace.cli.redact import ContextRedactor
 from dadaia_workspace.core import session_store
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import (
     AssociatedRepoConflictError,
     AssociatedRepoNotFoundError,
@@ -37,7 +38,6 @@ from dadaia_workspace.core.exceptions import (
     SchemaVersionError,
     WorkspaceNotInitializedError,
 )
-from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.models.spec_context import (
     ContextState,
     SpecContextProject,
@@ -215,18 +215,18 @@ def print_next_step(workspace_root: Path, focus: str | None = None) -> None:
         console.print(step.text(), markup=False, highlight=False, soft_wrap=True)
 
 
-def _create_fix(error: Exception, name: str | None, urls: list[str]) -> str:
+def _create_fix(root: Path, error: Exception, name: str | None, urls: list[str]) -> str:
     """The invocation, every ``--associated-repo`` kept (AC3.5), with what failed made a
     placeholder — never the failing command repeated; an owned slug names its owner."""
     if isinstance(error, AssociatedRepoConflictError):
-        return f"{DADAIA_BIN} context list"
+        return fix_line(root, "context", "list")
     if isinstance(error, ContextAlreadyExistsError):
         name = "<another-name>"
     failed = error.url if isinstance(error, GitCloneError) else None
     urls = [u if u != failed else "<clone-url>" for u in urls]
-    flags = [f"--associated-repo {u}" for u in urls[1:]]
-    return " ".join(
-        [f"{DADAIA_BIN} context create", *([name] if name else []), "--main-repo", urls[0], *flags]
+    flags = [arg for u in urls[1:] for arg in ("--associated-repo", u)]
+    return fix_line(
+        root, "context", "create", *([name] if name else []), "--main-repo", urls[0], *flags
     )
 
 
@@ -250,7 +250,9 @@ def create(
     except (DadaiaError, OSError) as e:
         err_console.print(f"Error: {e}", markup=False, soft_wrap=True)
         err_console.print(
-            f"fix: {_create_fix(e, name, [main_repo, *associated])}", markup=False, soft_wrap=True
+            f"fix: {_create_fix(ws, e, name, [main_repo, *associated])}",
+            markup=False,
+            soft_wrap=True,
         )
         raise typer.Exit(1) from None
     session_id = bind_session(ws, ctx.name)
@@ -300,8 +302,11 @@ def list_all(
         return
     if not contexts:
         console.print(
-            f"No contexts found. Create one: {DADAIA_BIN} context create <name> "
-            "--main-repo <clone-url>",
+            "No contexts found. Create one: "
+            + fix_line(
+                resolve_workspace_root(),
+                *["context", "create", "<name>", "--main-repo", "<clone-url>"],
+            ),
             markup=False,
             soft_wrap=True,
         )
@@ -619,7 +624,13 @@ def repo_add(
     except RepoUrlMissingError as e:
         err_console.print(f"[red]Error:[/red] {e}")
         err_console.print(
-            f"fix: {DADAIA_BIN} context repo add {ctx_name} {slug} --url <clone-url>",
+            "fix: "
+            + fix_line(
+                resolve_workspace_root(),
+                *f"context repo add {ctx_name} {slug}".split(),
+                "--url",
+                "<clone-url>",
+            ),
             markup=False,
             soft_wrap=True,
         )

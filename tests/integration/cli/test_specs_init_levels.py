@@ -160,7 +160,7 @@ def test_no_context_resolved_exits_2_with_a_fix_line(repo: Path) -> None:
     result = _runner.invoke(app, ["specs", "init"])
 
     assert result.exit_code == 2, result.output
-    assert "fix: .dadaia/.venv/bin/dadaia specs init --context <name>" in result.output
+    assert ".dadaia/.venv/bin/dadaia specs init --context '<name>'" in result.output
 
 
 def test_existing_specs_bkp_fix_line_is_non_destructive_and_clears_the_refusal(

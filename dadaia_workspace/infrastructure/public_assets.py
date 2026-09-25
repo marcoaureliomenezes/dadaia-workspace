@@ -20,6 +20,7 @@ from typing import Literal
 
 from dadaia_workspace.core.agent_model_templates import CORE_AGENTS, resolve_agent_model
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.harness_registry import (
     HARNESS_PROJECTION_DIRS,
@@ -175,9 +176,6 @@ def _staged_bytes(src: Path) -> bytes:
 #: NOT in the persisted harness profile (A3, v0.1.58 FR3). Emitted in place of the scoped
 #: drift block so a stale/hand-installed out-of-profile runtime never reads green-with-zero-
 #: lines. ``[warn]`` is non-blocking (CLI exit stays 0) but visible.
-#: The one repair for every SYMLINK-TARGET-1 finding: re-project the harness views onto
-#: the authored set. One BLOCK, one executable ``fix:`` line.
-_SYMLINK_TARGET_FIX = "fix: .dadaia/.venv/bin/dadaia public install --force"
 
 
 def _out_of_profile_warn(harness: str) -> DoctorLine:
@@ -745,7 +743,10 @@ class FileSystemPublicAssetManager:
                     DoctorLine(DoctorStatus.ERROR, f"SYMLINK-TARGET-1 {entry.relpath}: {defect}")
                 )
         if out:
-            out.append(DoctorLine(DoctorStatus.INFO, _SYMLINK_TARGET_FIX))
+            # The one repair for every SYMLINK-TARGET-1 finding: re-project the harness
+            # views onto the authored set.
+            repair = fix_line(workspace_root, "public", "install", "--force")
+            out.append(DoctorLine(DoctorStatus.INFO, f"fix: {repair}"))
             return out
         return [
             DoctorLine(

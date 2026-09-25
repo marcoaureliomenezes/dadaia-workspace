@@ -171,7 +171,7 @@ def _assert_no_alive_context_still_generic(out: str) -> bool:
         "[no bound context]" in out
         and "end memory bootstrap" not in out
         and "\nNext: no ALIVE Spec Context" in out
-        and f"{os.sep}{_CLI} context create <name> --main-repo <clone-url>" in out
+        and f"{os.sep}{_CLI} context create '<name>' --main-repo '<clone-url>'" in out
     )
 
 

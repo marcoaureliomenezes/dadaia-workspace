@@ -32,6 +32,7 @@ from dadaia_workspace.cli._specs_resolution import (
 )
 from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.cli.redact import ContextRedactor
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.doctor_rules import (
     Rule,
     SectionFinding,
@@ -45,7 +46,6 @@ from dadaia_workspace.core.exceptions import (
     SchemaVersionError,
     WorkspaceNotInitializedError,
 )
-from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.backlog import doctor as backlog_doctor
 from dadaia_workspace.features.spec_context.doctor import DoctorService, workspace_rules
@@ -102,7 +102,7 @@ def _build_redactor(workspace_root: Path) -> ContextRedactor:
 
 
 def _workspace_section(
-    service: DoctorService | None, scope: str | None, *, expired_only: bool
+    service: DoctorService | None, root: Path, scope: str | None, *, expired_only: bool
 ) -> SectionReport:
     """`workspace`: the instance walk. Its findings already ARE the normalized record —
     the feature owns the translation of its own verdict vocabulary, so the adapter here
@@ -115,6 +115,7 @@ def _workspace_section(
         workspace_rules(expired_only=expired_only, context=scope),
         service,
         lambda _rule, finding: finding,
+        root,
     )
 
 
@@ -135,7 +136,7 @@ def _empty_section(name: str) -> SectionReport:
     return SectionReport(name=name, findings=())
 
 
-def _specs_section(doctor: SpecsDoctor | None) -> SectionReport:
+def _specs_section(doctor: SpecsDoctor | None, root: Path) -> SectionReport:
     if doctor is None:
         return _empty_section("specs")
     return run_section(
@@ -143,6 +144,7 @@ def _specs_section(doctor: SpecsDoctor | None) -> SectionReport:
         SPECS_RULES,
         doctor,
         _specs_render,
+        root,
     )
 
 
@@ -162,6 +164,7 @@ def _ledgers_render(
 
 
 def _ledgers_section(
+    root: Path,
     specs_dir: Path | None,
     source_root: str | None,
     alias_map: str | None,
@@ -201,12 +204,14 @@ def _ledgers_section(
                 backlog_doctor.RULES,
                 context,
                 _ledgers_render,
+                root,
             ),
             run_section(
                 "ledgers",
                 doctor_adr.LEDGER_RULES,
                 specs_dir,
                 _specs_render,
+                root,
             ),
             SectionReport(name="ledgers", findings=tuple(script_findings(specs_dir))),
         ]
@@ -269,7 +274,7 @@ def _resolve_run(
         if context is None:  # a stale ambient bind is no bind — only a NAMED ghost refuses
             return workspace_root, service, None, None
         typer.echo(f"Error: {exc}", err=True)
-        typer.echo(f"fix: {DADAIA_BIN} context list", err=True)
+        typer.echo(f"fix: {fix_line(workspace_root, 'context', 'list')}", err=True)
         raise typer.Exit(1) from None
     target = resolve_context_specs_dir_for_cli(workspace_root, name)
     # The ONE place a context's tree is resolved: a tree `specs init` has not stamped yet
@@ -370,6 +375,7 @@ def doctor(
     """Report workspace, specs and ledger compliance; optionally repair."""
     workspace_root, service, scope, target = _resolve_run(specs_dir, context)
     specs_doctor = _build_specs_doctor(target, public_dir)
+    fix_root = _fix_root(workspace_root)
 
     fixed = _apply_fixes(
         service, specs_doctor, target, source_root, alias_map, fix=fix, expired_only=expired_only
@@ -377,12 +383,12 @@ def doctor(
     reports = [
         merge_sections(
             [
-                _workspace_section(service, scope, expired_only=expired_only),
+                _workspace_section(service, fix_root, scope, expired_only=expired_only),
                 _onboarding_section(workspace_root, scope, expired_only=expired_only),
             ]
         ),
-        _specs_section(specs_doctor),
-        _ledgers_section(target, source_root, alias_map),
+        _specs_section(specs_doctor, fix_root),
+        _ledgers_section(fix_root, target, source_root, alias_map),
     ]
     # Render boundary ONLY: no doctor ever sees the redactor; every finding and fix action
     # keeps carrying true names inside the sections themselves.
@@ -398,6 +404,12 @@ def doctor(
 
     if any(report.failed for report in reports):
         raise typer.Exit(1)
+
+
+def _fix_root(workspace_root: Path | None) -> Path:
+    """Every CLI remedy is built from this root; no instance around the run (CI over a
+    bare checkout) renders it workspace-relative."""
+    return workspace_root or Path()
 
 
 def _identity(text: str) -> str:
