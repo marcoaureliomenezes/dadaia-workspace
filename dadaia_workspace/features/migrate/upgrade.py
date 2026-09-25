@@ -83,7 +83,7 @@ def upgrade(
         folded = fold_tech_stack(specs_dir)
         fixed = restore_fixed_sections(specs_dir)
         if current < goal:
-            _version.write_pattern_version(specs_dir, goal)
+            _version.merge_frontmatter(specs_dir, specs_pattern_version=goal)
     return UpgradeResult(
         from_version=current,
         to_version=goal,

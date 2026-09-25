@@ -62,14 +62,14 @@ def test_write_version_creates_and_updates_stamp(tmp_path: Path) -> None:
     # Creates frontmatter on a bare file, preserving the body.
     specs = tmp_path / "specs"
     _write_constitution(specs, "# Constitution\n\nbody\n")
-    _version.write_pattern_version(specs, 1)
+    _version.merge_frontmatter(specs, specs_pattern_version=1)
     assert _version.read_pattern_version(specs) == 1
     assert "# Constitution" in (specs / "constitution.md").read_text(encoding="utf-8")
 
     # Updates an existing stamp, preserving sibling frontmatter keys.
     specs2 = tmp_path / "specs2"
     _write_constitution(specs2, "---\nspecs_pattern_version: 0\nother: keep\n---\n# C\n")
-    _version.write_pattern_version(specs2, 1)
+    _version.merge_frontmatter(specs2, specs_pattern_version=1)
     text = (specs2 / "constitution.md").read_text(encoding="utf-8")
     assert _version.read_pattern_version(specs2) == 1
     assert "other: keep" in text

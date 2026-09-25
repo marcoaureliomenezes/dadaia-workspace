@@ -109,7 +109,7 @@ def test_a_v6_tree_ends_v7_with_a_clean_doctor(repo: Path) -> None:
     constitution.write_text(
         constitution.read_text(encoding="utf-8").split("<!-- dadaia:fixed")[0], encoding="utf-8"
     )
-    specs_version.write_pattern_version(specs, 6)
+    specs_version.merge_frontmatter(specs, specs_pattern_version=6)
 
     result = _runner.invoke(app, ["specs", "init", "--context", "c"])
 
@@ -188,7 +188,7 @@ def test_a_symlinked_context_specs_root_is_refused_and_nothing_written(
     """Review finding 7: ``--context`` routes through the one symlink-refusal seam."""
     real = tmp_path / "elsewhere-specs"
     canon.scaffold(real)
-    specs_version.write_pattern_version(real, 6)
+    specs_version.merge_frontmatter(real, specs_pattern_version=6)
     (repo / "specs").symlink_to(real, target_is_directory=True)
     before, before_real = _snapshot(repo), _snapshot(real)
 

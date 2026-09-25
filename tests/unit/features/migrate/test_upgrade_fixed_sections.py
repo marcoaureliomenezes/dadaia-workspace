@@ -29,7 +29,7 @@ def _v6_tree(tmp_path: Path) -> Path:
     for rel, _ in FIXED_SECTIONS:
         path = specs / rel
         path.write_text(_FIXED_BLOCK.sub("\n", path.read_text(encoding="utf-8")), encoding="utf-8")
-    specs_version.write_pattern_version(specs, 6)
+    specs_version.merge_frontmatter(specs, specs_pattern_version=6)
     return specs
 
 

@@ -51,7 +51,7 @@ DELETE/REBUILD rows (PLAN §1) land first. RED = the named test fails before the
 
 ### G3 — the project gitflow (FR6, FR8)
 
-- [-] **T-050-11 — `core/gitflow.py` + frontmatter merge-writer.**
+- [x] **T-050-11 — `core/gitflow.py` + frontmatter merge-writer.**
   `Gitflow`, `DEFAULT`, `from_mapping`, `role_of`; `read_gitflow` and one `merge_frontmatter` on
   `frontmatter.parse`; `_STAMP_RE` deleted; stub and library constitution carry the block.
   `Write set:` `core/{gitflow,specs_version}.py`, `features/specs/canon.py`, `specs/constitution.md`,

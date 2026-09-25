@@ -114,6 +114,7 @@ __all__ = [
 _CONSTITUTION_STUB = """\
 ---
 specs_pattern_version: {specs_pattern_version}
+gitflow: {{principal: main, integration: develop, work: feature/}}
 ---
 # Constitution — {project_name}
 
