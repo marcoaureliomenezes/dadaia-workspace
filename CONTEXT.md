@@ -130,8 +130,24 @@ _Avoid_: update --set status, flip
 The open-scope publication unit, named last-published-PyPI + 1 patch — exactly one live, growing by stacked Candidates; its state is `_RELEASE.json`, its narrative is that file's `log`. The version increments only at operator-approved deploy (ADR 0021). _Avoid_: "release" for one closed scope — that is a Candidate.
 
 **Candidate**:
-One closed-scope SDD cycle inside the live Release (grill → SPEC/PLAN/TASKS `Aprovado` → implementation → memory → closure → develop merge → promote-or-continue gate). The live Candidate's trio sits at the release root and the next Candidate overwrites it in place — git is the archive, and no closed Candidate is ever copied into a folder of its own.
+One closed-scope SDD cycle inside the live Release (as-is review → grill → SPEC/PLAN/TASKS `Aprovado` → implementation → memory → closure → develop merge → promote-or-continue gate). The live Candidate's trio sits at the release root and the next Candidate overwrites it in place — git is the archive, and no closed Candidate is ever copied into a folder of its own.
 _Avoid_: version (for the unit), sprint, "rc" as a branch name or a fixes-only round
+
+**As-is review**:
+Definition step 2: the read-only reading of every unit a picked set touches, its bug history included, ending in one As-is verdict per unit — PLAN §1.
+_Avoid_: audit (the three-pillar review), inventory, survey (`dd-architecture-survey`)
+
+**As-is verdict**:
+One of `DELETE REBUILD UPDATE KEEP ADD` on one row of PLAN §1; always written qualified.
+_Avoid_: verdict (bare — the PR approval record), finding verdict (the doctor's)
+
+**As-is unit**:
+The row subject of an As-is review: a module (`dd-codebase-design`) or a law/skill/doc section with a today-behaviour.
+_Avoid_: code unit (`memory.py drift`'s directory holding code files)
+
+**Replaces**:
+The SPEC section naming the current behaviours a Candidate removes — the prose mirror of its DELETE/REBUILD rows.
+_Avoid_: removed features, deprecations
 
 **Memory**:
 The current product truth under `specs/memory/`; never history. Two tiers: canonical memory and product memory.

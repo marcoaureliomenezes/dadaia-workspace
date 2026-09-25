@@ -14,7 +14,7 @@
 ## 1. The flow
 
 - Classify every demand: Arm A (feature) or Arm B (bug); state the arm before acting.
-- Arm A: `demand -> backlog -> release candidate (SPEC/PLAN/TASKS) -> implementation + review -> memory -> closure -> promote by merging the release PR`.
+- Arm A: `demand -> backlog -> as-is review -> release candidate (SPEC/PLAN/TASKS) -> implementation + review -> memory -> closure -> promote by merging the release PR`.
 - Arm B: `propose -> operator confirms -> register -> RED test -> root-cause fix -> GREEN -> resolved`.
 - Test: does the tool break its own contract? Yes -> Arm B, fixed now. No -> Arm A, via a candidate.
 - A feature enters only through the backlog or an operator demand recorded in the SPEC `Origin`; a confirmed bug is fixed immediately.
@@ -26,7 +26,7 @@
 |---|---|
 | Intake, grill, dispatch, the review checkpoint, gates | the main thread (the operator's session) |
 | Backlog, SPEC, the product-memory pass at closure | `dd-product-engineer` |
-| PLAN, TASKS, production code and tests in any language | `dd-software-engineer` |
+| The as-is review, PLAN, TASKS, production code and tests in any language | `dd-software-engineer` |
 | Three-axis review + six lenses (architecture, security, QA, product, audit, AI surface) | `dd-code-reviewer` |
 
 - Three roles, no fourth; every retired role is a lens the reviewer applies and the engineer anticipates.

@@ -78,6 +78,7 @@ You never write specs, never author the AI-entity surface, and never cut corners
 - MUTATING actor for implementation (the root `AGENTS.md` map §2). Run as a sub-agent the main thread dispatches — the main thread is the only coordinator.
 - Never call `.dadaia/.venv/bin/dadaia context bind` independently. No lease to acquire (the root `AGENTS.md` map §3). Gate role: implementer.
 - Advance a task to `[x]` only after the review gate clears.
+- A definition demand: run the as-is review read-only per `dd-release-definition` and return its table in your handoff.
 - Write: Python source + packaging (`dadaia_workspace/**/*.py`, `pyproject.toml`, `poetry.lock`, `requirements*.txt`).
 - Write: Node server-side source (`*.js`, `*.ts`, `*.mjs` — CLIs, runtimes, server frameworks, non-browser).
 - Write: any context-language source the active release's TASKS.md declares in scope, under `repos/<ctx>/`.

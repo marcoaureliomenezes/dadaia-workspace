@@ -41,9 +41,9 @@ path or entity as it appears in an installed workspace.
 
 | Surface | Purpose | Belongs | Ceiling | Measured |
 |---|---|---|---|---|
-| `AGENTS.md` | the root map: the flow, the roles, the gate invariants, the root, credentials, and one line per scoped file | statements; the index of every other surface | 8192 | 7211 |
+| `AGENTS.md` | the root map: the flow, the roles, the gate invariants, the root, credentials, and one line per scoped file | statements; the index of every other surface | 8192 | 7245 |
 | `specs/AGENTS.md` | the canon of a specs tree and its status tokens | canon table, status tokens, doctor codes | 4096 | 3661 |
-| `specs/releases/AGENTS.md` | candidates, phases, task markers, promote | release procedure and commit shapes | 4096 | 3416 |
+| `specs/releases/AGENTS.md` | candidates, phases, task markers, promote | release procedure and commit shapes | 4096 | 3432 |
 | `specs/backlog/AGENTS.md` | the operator's demand queue and its exits | `BACKLOG.json` shape, intake gate, dispositions | 4096 | 4081 |
 | `specs/bugs/AGENTS.md` | what a bug is and how it is proposed, recorded, resolved | bug procedure and the redaction rule | 4096 | 4046 |
 | `specs/memory/AGENTS.md` | current product truth and who writes it | atoms, Part 1/Part 2, ownership | 4096 | 3760 |
@@ -87,8 +87,8 @@ Three roles, no fourth; every retired role is a lens the reviewer applies.
 
 | Surface | Purpose | Belongs | Ceiling | Measured |
 |---|---|---|---|---|
-| `dd-product-engineer` | backlog, SPEC, the product-memory pass at closure | role, activity class, model policy | — | 4495 |
-| `dd-software-engineer` | PLAN/TASKS, production code and its tests | role, activity class, model policy | — | 8754 |
+| `dd-product-engineer` | backlog, SPEC, the product-memory pass at closure | role, activity class, model policy | — | 4583 |
+| `dd-software-engineer` | PLAN/TASKS, production code and its tests | role, activity class, model policy | — | 8874 |
 | `dd-code-reviewer` | the three-axis review and its six lenses | role, activity class, model policy | — | 6511 |
 
 - A statement belongs to exactly one surface: the map indexes, the scoped file rules, the

@@ -62,6 +62,7 @@ You own the specs: what the product is, what it must become, and what it now is.
 - MUTATING specifier, dispatched by the main thread (the root `AGENTS.md` map §2); no lease to acquire (§3).
 - Backlog curation, `specs/backlog/**` (`dd-backlog-definition`); curation follows an operator decision, never precedes it.
 - The SPEC half of a candidate (`dd-release-definition`), drafted from the main thread's grill handoff.
+- The SPEC's `Replaces` names every behaviour the as-is review marks DELETE or REBUILD.
 - `_RELEASE.json` milestones and phase moves (`dd-release-implementation` `RELEASE-EVENTS.md`).
 - Product memory reconciliation at closure (`dd-release-implementation` `MEMORY-UPDATE.md`); memory atoms are yours alone.
 - Primary authority for scope, SPEC, memory and backlog in the Decision Authority table (`dd-manager-orchestration`).
