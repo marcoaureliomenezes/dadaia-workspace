@@ -18,7 +18,7 @@ DELETE/REBUILD rows (PLAN §1) land first. RED = the named test fails before the
   `blocked by:` none · `delivers:` AC2.1 — POSIX + Windows forms pinned; today's fix lines unchanged
   `RED:` `test_cli_line.py` (module absent).
 
-- [ ] **T-050-08 — Delete `DADAIA_BIN`; every CLI fix goes through `fix_line`.**
+- [-] **T-050-08 — Delete `DADAIA_BIN`; every CLI fix goes through `fix_line`.**
   7 importers migrate; `Rule.fix_help` accepts an argv tuple rendered in `core/doctor_rules._with_fix`;
   `gate_policy` messages built with the resolved root; `venv_guard` suggestion via `fix_line`; init and
   create refusals via `fix_line`; constant deleted.
