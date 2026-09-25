@@ -38,7 +38,7 @@ Paths under `dadaia_workspace/public/` abbreviated `pub/`. DELETE/REBUILD rows (
   `Write set:` `pub/skills/dd-code-review/SKILL.md`, `pub/skills/dd-bug-resolution/{SKILL,LINEAGE}.md`
   `blocked by:` none · `delivers:` FR3, FR4 — a reviewer and a fixer apply the verdicts
 
-- [ ] **T-050-05 — Law, personas and terms name the step.**
+- [-] **T-050-05 — Law, personas and terms name the step.**
   Root map Arm A + §2 engineer row; scaffold releases lifecycle line + `specs/releases/AGENTS.md`
   reprojection; one line per persona; `CONTEXT.md` four terms + Candidate arc.
   `Write set:` `pub/data/AGENTS.md`, `pub/scaffold/releases/AGENTS.md`, `specs/releases/AGENTS.md`,
