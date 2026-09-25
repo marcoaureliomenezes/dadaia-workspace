@@ -161,7 +161,7 @@ DELETE/REBUILD rows (PLAN §1) land first. RED = the named test fails before the
 
 ### G8 — autopilot (FR10)
 
-- [ ] **T-050-21 — Autopilot E2E journey.**
+- [-] **T-050-21 — Autopilot E2E journey.**
   From an empty dir, `file://` remotes, `DADAIA_SESSION_ID` set, one `init … --repo`: loop `doctor --json` →
   run the ONBOARDING fix (`shlex.split`; agent step via scripted stand-in), cap 10; greenfield, v6 tree,
   foreign tree; HEAD == upstream; Upgrade scenario kept.
