@@ -41,6 +41,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core import session_store
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.platform import PLATFORM
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
@@ -171,7 +172,8 @@ def _assert_no_alive_context_still_generic(out: str) -> bool:
         "[no bound context]" in out
         and "end memory bootstrap" not in out
         and "\nNext: no ALIVE Spec Context" in out
-        and f"{os.sep}{_CLI} context create '<name>' --main-repo '<clone-url>'" in out
+        and os.sep + fix_line(Path(), "context", "create", "<name>", "--main-repo", "<clone-url>")
+        in out
     )
 
 

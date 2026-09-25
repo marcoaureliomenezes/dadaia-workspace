@@ -26,6 +26,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace import container
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.workspace_layout import provisioned_zones, zones_with_ttl
@@ -127,7 +128,7 @@ def test_json_carries_findings_and_fixed(workspace: Path) -> None:
             "code": "WS-root-slop",
             "verdict": "slop",
             "message": "junk.txt  (not in the root law or the exceptions)",
-            "fix": f"{workspace}/.dadaia/.venv/bin/dadaia doctor --fix",
+            "fix": fix_line(workspace, "doctor", "--fix"),
         }
     ]
     assert "compliance" not in workspace_section

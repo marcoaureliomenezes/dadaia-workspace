@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import subprocess
-from pathlib import Path, PureWindowsPath
+from pathlib import PurePosixPath, PureWindowsPath
 
 import pytest
 
@@ -13,8 +13,8 @@ from dadaia_workspace.core.platform import detect
 
 def test_posix_cli_path_and_fix_line(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", detect("linux"))
-    root = Path("/ws/my ws")
-    assert cli_line.cli_path(root) == Path("/ws/my ws/.dadaia/.venv/bin/dadaia")
+    root = PurePosixPath("/ws/my ws")
+    assert cli_line.cli_path(root) == PurePosixPath("/ws/my ws/.dadaia/.venv/bin/dadaia")
     assert (
         cli_line.fix_line(root, "context", "bind", "a b")
         == "'/ws/my ws/.dadaia/.venv/bin/dadaia' context bind 'a b'"

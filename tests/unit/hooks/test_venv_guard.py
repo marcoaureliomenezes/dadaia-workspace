@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import pytest
 
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.hooks import venv_guard
 
 
@@ -34,11 +35,16 @@ def _bash(command: str) -> dict[str, object]:
 # ----------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize("args", ["doctor", "context show --json"])
+def test_bare_dadaia_is_corrected_to_the_cli_fix_line(args: str) -> None:
+    reason = venv_guard.evaluate_payload(_bash(f"dadaia {args}"))
+    assert reason is not None
+    assert f"fix: {fix_line(venv_guard._workspace_root())} {args}" in reason
+
+
 @pytest.mark.parametrize(
     ("command", "expected_correction"),
     [
-        ("dadaia doctor", ".dadaia/.venv/bin/dadaia doctor"),
-        ("dadaia context show --json", ".dadaia/.venv/bin/dadaia context show --json"),
         ("pip install foo", ".dadaia/.venv/bin/pip install foo"),
         ("pip3 install foo", ".dadaia/.venv/bin/pip3 install foo"),
         ("python -m dadaia_workspace", ".dadaia/.venv/bin/python -m dadaia_workspace"),

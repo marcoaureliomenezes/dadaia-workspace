@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.workspace_layout import LAW_BASENAMES
 from dadaia_workspace.features.spec_context.gate_policy import (
     Decision,
@@ -350,7 +351,7 @@ def test_write_into_a_repo_outside_the_bind_scope_is_blocked_with_a_runnable_fix
         tmp_path, "repos/ctx-b/src/x.py", **_BOUND_A, target_slug="ctx-b", target_owner="ctx-b"
     )
     assert decision == Decision.BLOCK
-    assert "fix: /ws/.dadaia/.venv/bin/dadaia context bind ctx-b" in message
+    assert f"fix: {fix_line(_ROOT, 'context', 'bind', 'ctx-b')}" in message
 
 
 def test_an_associated_repo_of_the_bound_context_is_in_scope(tmp_path: Path) -> None:

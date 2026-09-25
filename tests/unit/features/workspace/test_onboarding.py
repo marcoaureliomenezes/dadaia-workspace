@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.workspace.onboarding import next_step
 
@@ -33,7 +34,9 @@ def _snapshot(root: Path) -> set[Path]:
 def test_zero_contexts_names_context_create(tmp_path: Path) -> None:
     step = next_step(tmp_path, {})
     assert step is not None
-    assert step.command == f"{tmp_path / _CLI} context create '<name>' --main-repo '<clone-url>'"
+    assert step.command == fix_line(
+        tmp_path, "context", "create", "<name>", "--main-repo", "<clone-url>"
+    )
 
 
 def test_a_context_without_specs_names_specs_init(tmp_path: Path) -> None:
