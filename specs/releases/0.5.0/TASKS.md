@@ -11,7 +11,7 @@ DELETE/REBUILD rows (PLAN §1) land first. RED = the named test fails before the
 
 ### G1 — one fix-line builder (FR2)
 
-- [-] **T-050-07 — `core/cli_line.py`; `cli_path` leaves onboarding.**
+- [x] **T-050-07 — `core/cli_line.py`; `cli_path` leaves onboarding.**
   Add `cli_path`/`fix_line`; onboarding and init import from core; delete `onboarding.cli_path` (no shim).
   `Write set:` `core/cli_line.py`, `features/workspace/onboarding.py`, `cli/commands/init.py`,
   `tests/unit/core/test_cli_line.py`, `tests/unit/cli/test_init_{reinit_upgrade,plan}.py`

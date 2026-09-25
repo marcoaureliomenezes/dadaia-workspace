@@ -16,7 +16,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.commands import init as init_module
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.features.workspace.onboarding import cli_path
+from dadaia_workspace.core.cli_line import cli_path
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
 _runner = CliRunner()

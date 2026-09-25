@@ -10,6 +10,7 @@ from rich.console import Console
 from dadaia_workspace import container
 from dadaia_workspace.cli.commands.context import bind_session, print_next_step
 from dadaia_workspace.core import harness_registry, session_store
+from dadaia_workspace.core.cli_line import cli_path
 from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
     DadaiaError,
@@ -18,7 +19,6 @@ from dadaia_workspace.core.exceptions import (
 )
 from dadaia_workspace.features.reconcile import reconcile_workspace
 from dadaia_workspace.features.spec_context.service import slug_from_url
-from dadaia_workspace.features.workspace.onboarding import cli_path
 
 console = Console()
 app = typer.Typer()

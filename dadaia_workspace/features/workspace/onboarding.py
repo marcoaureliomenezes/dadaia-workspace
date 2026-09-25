@@ -15,20 +15,13 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.core.cli_line import cli_path
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, read_pattern_version
 
 CODE = "ONBOARDING"
 
 _AUDITS_HISTO = Path("audits") / "_archive" / "audits_histo.jsonl"
 _MEMORY_SCRIPT = Path(".agents") / "skills" / "dd-spec-navigator" / "scripts" / "memory.py"
-
-
-def cli_path(root: Path) -> Path:
-    """The workspace CLI's real executable (``Scripts\\dadaia.exe`` on Windows)."""
-    return (
-        root / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir / f"dadaia{PLATFORM.venv_exe_suffix}"
-    )
 
 
 @dataclass(frozen=True)
