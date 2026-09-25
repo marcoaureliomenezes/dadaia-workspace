@@ -41,6 +41,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core.platform import PLATFORM
+from tests.helpers.previous_release import previous_release, published_releases
 
 _UVX = shutil.which("uvx")
 
@@ -64,8 +65,6 @@ _SOURCE_VERSION: str = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text("
 ]["version"]
 # Local version segment: the built wheel differs from the last PyPI release (risk §8).
 _E2E_VERSION = f"{_SOURCE_VERSION}+e2e"
-# Until release-please bumps, the source version IS the previous published one.
-_PREVIOUS_PYPI = _SOURCE_VERSION
 
 
 # ── the harness ──────────────────────────────────────────────────────────────────
@@ -525,9 +524,10 @@ class Upgrade(Scenario):
 
     def upgrade(self) -> None:
         def step() -> None:
+            previous = previous_release(_SOURCE_VERSION, published_releases())
             born = self.env.uvx(
                 "init", "up", "--harness", "claude", "--repo", self.url,
-                source=f"dadaia-workspace=={_PREVIOUS_PYPI}",
+                source=f"dadaia-workspace=={previous}",
             )  # fmt: skip
             assert born.returncode == 0, f"{born.stdout}\n{born.stderr}"
             # The previous release committed its specs baseline into the user repo at
@@ -536,7 +536,7 @@ class Upgrade(Scenario):
             head = self.env.git("rev-parse", "HEAD", cwd=repo)
             done = self.env.uvx("init", "up")  # AC2.1: no --harness needed
             assert done.returncode == 0, f"{done.stdout}\n{done.stderr}"
-            assert f"upgraded {_PREVIOUS_PYPI} -> {_E2E_VERSION}" in done.stdout, done.stdout
+            assert f"upgraded {previous} -> {_E2E_VERSION}" in done.stdout, done.stdout
             version = self.ws.dadaia("--version")
             assert _E2E_VERSION in version.stdout, version.stdout
             # The upgrade never writes a user repo; level 3 re-run refreshes its specs law.
