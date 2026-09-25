@@ -386,7 +386,7 @@ def certify(
         _git(process, repo, "config", "user.email", "certify@dadaia.invalid")
         _git(process, repo, "config", "user.name", "dadaia-certify")
         cli("specs", "init", "--context", "certified-consumer")
-        cli("context", "baseline", "certified-consumer", "--yes", "--push")
+        cli("context", "baseline", "certified-consumer")
         _git(process, repo, "rev-parse", "--verify", "HEAD")
         return "empty remote cloned, specs initialized, baseline committed and pushed"
 

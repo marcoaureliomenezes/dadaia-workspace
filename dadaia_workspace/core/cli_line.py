@@ -20,7 +20,11 @@ def cli_path[P: PurePath](root: P) -> P:
 
 def fix_line(root: PurePath, *argv: str) -> str:
     """``<absolute CLI> argv…`` quoted for the host shell."""
-    parts = [str(cli_path(root)), *argv]
+    return shell_line(str(cli_path(root)), *argv)
+
+
+def shell_line(*parts: str) -> str:
+    """*parts* joined into one command line quoted for the host shell."""
     if platform.PLATFORM.venv_exe_suffix:  # Windows
         return " ".join(_win_quote(part) for part in parts)
     return shlex.join(parts)

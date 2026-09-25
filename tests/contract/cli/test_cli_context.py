@@ -457,65 +457,26 @@ def test_push_uses_set_upstream_when_no_tracking(tmp_path: Path) -> None:
     )
 
 
-def test_context_baseline_creates_and_pushes_initial_history(
-    workspace: Path, tmp_path: Path
-) -> None:
+def test_context_baseline_is_consent_by_invocation(workspace: Path, tmp_path: Path) -> None:
+    """AC4.2/AC4.7: no --yes/--push; one invocation publishes, a re-run is a no-op."""
     bare = tmp_path / "baseline.git"
     subprocess.run(["git", "init", "--bare", str(bare)], capture_output=True, check=True)
     repo = workspace / "repos" / "baseline"
     subprocess.run(["git", "clone", str(bare), str(repo)], capture_output=True, check=True)
-    subprocess.run(
-        ["git", "config", "user.email", "test@example.com"],
-        cwd=repo,
-        capture_output=True,
-        check=True,
-    )
-    subprocess.run(
-        ["git", "config", "user.name", "Test"],
-        cwd=repo,
-        capture_output=True,
-        check=True,
-    )
+    for key, value in (("user.email", "t@example.com"), ("user.name", "T")):
+        subprocess.run(["git", "config", key, value], cwd=repo, check=True)
     (repo / "specs").mkdir()
     (repo / "specs" / "constitution.md").write_text(
-        "---\nspecs_pattern_version: 4\n---\n", encoding="utf-8"
+        "---\nspecs_pattern_version: 6\n---\n", encoding="utf-8"
     )
     _register_alive_ctx(workspace, "baseline")
 
-    no_consent = _runner.invoke(app, ["context", "baseline", "baseline"])
-    assert no_consent.exit_code != 0
-    assert "--yes" in no_consent.output
-
-    result = _runner.invoke(app, ["context", "baseline", "baseline", "--yes", "--push"])
+    assert _runner.invoke(app, ["context", "baseline", "baseline", "--yes"]).exit_code != 0
+    result = _runner.invoke(app, ["context", "baseline", "baseline"])
     assert result.exit_code == 0, result.output
-    assert GitSubprocessClient().has_commits(repo) is True
-    # T-048-11: the birth push lands on feature/0.1.0 — the one pushable branch
-    # (dd-gitflow-default) named for a consumer's first release — so the pre-push hook
-    # every repo now carries admits it.
-    remote_head = subprocess.run(
-        ["git", "--git-dir", str(bare), "rev-parse", "--verify", "refs/heads/feature/0.1.0"],
-        capture_output=True,
-        text=True,
-    )
-    assert remote_head.returncode == 0, remote_head.stderr
-    assert GitSubprocessClient().current_branch(repo) == "feature/0.1.0"
-
-    # Bug baseline-refuses-alive-scaffold-commit: baseline is CONVERGENT — a repo
-    # that already carries history with a clean tree is success (idempotent no-op),
-    # not a refusal. alive() commits its own scaffold, so the canonical
-    # create -> alive -> baseline flow always reaches this state.
-    repeated = _runner.invoke(app, ["context", "baseline", "baseline", "--yes"])
-    assert repeated.exit_code == 0, repeated.output
-
-    repushed = _runner.invoke(app, ["context", "baseline", "baseline", "--yes", "--push"])
-    assert repushed.exit_code == 0, repushed.output
-
-    # A dirty tree on top of existing history is NOT a baseline situation —
-    # operator content must never be swept into a "baseline" commit.
-    (repo / "operator-notes.md").write_text("do not auto-commit me", encoding="utf-8")
-    dirty = _runner.invoke(app, ["context", "baseline", "baseline", "--yes"])
-    assert dirty.exit_code != 0
-    assert "already has Git history" in dirty.output
+    assert "published on feature/0.1.0" in result.output
+    again = _runner.invoke(app, ["context", "baseline", "baseline"])
+    assert again.exit_code == 0 and "already published" in again.output
 
 
 def test_context_dead_surfaces_the_refused_push_with_its_fix_line(

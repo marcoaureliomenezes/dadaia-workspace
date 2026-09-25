@@ -467,33 +467,20 @@ def alive(name: str = typer.Argument(..., help="Context name to make ALIVE")) ->
 
 @app.command()
 def baseline(
-    name: str = typer.Argument(..., help="ALIVE context with an unborn Git repository"),
-    yes: bool = typer.Option(
-        False, "--yes", "-y", help="Explicitly consent to creating the initial commit."
-    ),
-    push: bool = typer.Option(False, "--push", help="Also push and configure upstream."),
+    name: str = typer.Argument(..., help="ALIVE context whose onboarding is published"),
     message: str = typer.Option(
-        "chore: establish dadaia scaffold baseline",
-        "--message",
-        help="Initial commit message.",
+        "chore: publish the dadaia specs", "--message", help="Commit message."
     ),
 ) -> None:
-    """Create the explicit initial scaffold commit for an unborn repository."""
-    if not yes:
-        err_console.print(
-            "[red]Error:[/red] Baseline creates a Git commit. Re-run with --yes after "
-            "reviewing the scaffold; add --push only if remote publication is intended."
-        )
-        raise typer.Exit(1)
+    """Publish the onboarded project: principal + integration branches, then the work
+    branch carrying specs/. Running it is the consent; a re-run is a no-op."""
     try:
-        ctx = _ctx_service().baseline(name, message=message, push=push)
-        suffix = " and pushed" if push else ""
-        console.print(
-            f"[green]✓[/green] Initial baseline committed{suffix} for '[bold]{ctx.name}[/bold]'"
-        )
-    except (ContextNotFoundError, ContextStateError, DeadSecretFoundError, GitSyncError) as exc:
-        err_console.print(f"[red]Error:[/red] {exc}")
+        work = _ctx_service().baseline(name, message=message)
+    except (DadaiaError, OSError) as exc:
+        err_console.print(f"Error: {exc}", markup=False, soft_wrap=True)
         raise typer.Exit(1) from None
+    done = f"published on {work}" if work else "already published — nothing to do"
+    console.print(f"✓ '{name}' {done}", markup=False, highlight=False, soft_wrap=True)
 
 
 @app.command()

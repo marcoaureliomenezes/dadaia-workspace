@@ -8,11 +8,12 @@ import shutil
 import sys
 from dataclasses import replace
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 from typing import Protocol
 
 from dadaia_workspace.core import workspace_layout
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import fix_line, shell_line
 from dadaia_workspace.core.exceptions import (
     AssociatedRepoConflictError,
     AssociatedRepoNotFoundError,
@@ -31,6 +32,7 @@ from dadaia_workspace.core.models.spec_context import (
     RepoLiveStatus,
     SpecContextProject,
 )
+from dadaia_workspace.core.specs_version import read_gitflow
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.privacy_check import (
@@ -38,6 +40,10 @@ from dadaia_workspace.infrastructure.privacy_check import (
 )
 
 _log = logging.getLogger(__name__)
+
+#: What onboarding writes into a main repo — the only paths ``baseline`` commits.
+_ONBOARDING = ("specs", "specs-bkp", "AGENTS.md")
+_TAG_RE = re.compile(r"v?(\d+)\.(\d+)\.(\d+)")
 
 
 class InstallHooks(Protocol):
@@ -541,60 +547,58 @@ class SpecContextService:
 
     # ------------------------------------------------------------------ baseline
 
-    def baseline(
-        self,
-        name: str,
-        *,
-        message: str = "chore: establish dadaia scaffold baseline",
-        push: bool = False,
-    ) -> SpecContextProject:
-        """Create the explicit initial Git commit for an ALIVE unborn repository."""
-        ctx = self._store.get(name)
-        if ctx is None:
-            raise ContextNotFoundError(f"Context '{name}' not found.")
-        if ctx.state != ContextState.ALIVE:
+    def baseline(self, name: str, *, message: str = "chore: publish the dadaia specs") -> str:
+        """Publish an onboarded project (ADRs 0035, 0042) and return its work branch: ensure
+        the gitflow's principal and integration branches on ``origin``, cut the work branch
+        from the integration branch, commit only the onboarding paths, push it with
+        upstream. Invoking it is the consent; a published project is a no-op (``""``)."""
+        repo = self._repo_path(self.show(name).repo_slug)
+        if not repo.is_dir() or not self._git.is_git_root(repo):
+            raise ContextStateError(f"Context '{name}' has no Git repository at '{repo}'.")
+        git = partial(self._git.git, repo)
+        for key in ("user.name", "user.email"):
+            with contextlib.suppress(GitSyncError):
+                if git("config", key):
+                    continue
             raise ContextStateError(
-                f"Context '{name}' is not ALIVE. Run 'dadaia context alive {name}' first."
+                f"Context '{name}': git {key} is unset.\n"
+                f"fix: {shell_line('git', '-C', str(repo), 'config', key, f'<{key}>')}"
             )
-
-        repo_path = self._repo_path(ctx.repo_slug)
-        if not repo_path.exists() or not self._git.is_git_root(repo_path):
+        foreign = [p for p in self._git.diff_name_only(repo) if p.split("/")[0] not in _ONBOARDING]
+        if foreign:
             raise ContextStateError(
-                f"Context '{name}' has no materialized Git repository at '{repo_path}'."
+                f"Context '{name}': changes outside {', '.join(_ONBOARDING)} are not published.\n"
+                "fix: " + shell_line("git", "-C", str(repo), "stash", "push", "-u", "--", *foreign)
             )
-        if self._git.has_commits(repo_path):
-            if self._git.is_dirty(repo_path):
-                raise ContextStateError(
-                    f"Context '{name}' already has Git history; baseline only births an "
-                    "unborn repo. Commit your changes as an ordinary commit."
-                )
-            if push:
-                if not self._git.has_remote(repo_path):
-                    raise GitSyncError(f"Context '{name}' has no remote; baseline cannot push.")
-                self._git.push(repo_path)
-            return ctx
-        if not self._git.is_dirty(repo_path):
-            raise ContextStateError(
-                f"Context '{name}' has no scaffold content to commit as a baseline."
-            )
-
-        self._require_no_untracked_secrets(name, repo_path)
-
-        # Born on the one pushable branch (dd-gitflow-default) of a first release, 0.1.0.
-        self._git.create_branch(repo_path, "feature/0.1.0")
-        self._git.commit_all(repo_path, message)
-        if not self._git.has_commits(repo_path):
+        try:
+            git("fetch", "--prune", "--tags", "origin")
+        except GitSyncError as exc:
             raise GitSyncError(
-                f"Initial baseline commit was not created for context '{name}'. "
-                "Configure Git user.name/user.email and retry."
-            )
-        if push:
-            if not self._git.has_remote(repo_path):
-                raise GitSyncError(
-                    f"Context '{name}' has no remote; baseline was committed locally but not pushed."
-                )
-            self._git.push(repo_path)
-        return ctx
+                f"{exc}\nfix: {fix_line(self._workspace_root, 'context', 'baseline', name)}"
+            ) from None
+        if self._git.published(repo, "specs/constitution.md"):
+            return ""
+        flow, _ = read_gitflow(repo / "specs")
+        heads = git("for-each-ref", "--format=%(refname:lstrip=3)", "refs/remotes/origin").split()
+        base, births = f"origin/{flow.principal}", []
+        if flow.principal not in heads:
+            tree = git("hash-object", "-t", "tree", "--stdin", stdin="")
+            base = git("commit-tree", tree, "-m", f"chore: birth of {flow.principal}")
+            births.append(f"{base}:refs/heads/{flow.principal}")
+        if flow.integration not in heads:
+            births.append(f"{base}:refs/heads/{flow.integration}")
+        if births:
+            git("push", "origin", *births)
+        tags = (_TAG_RE.fullmatch(t) for t in git("tag", "--sort=-v:refname").split())
+        last = next((m for m in tags if m), None)
+        work = f"{flow.work_prefix}{f'{last[1]}.{last[2]}.{int(last[3]) + 1}' if last else '0.1.0'}"
+        if self._git.current_branch(repo) != work:
+            git("checkout", "--no-track", "-b", work, f"origin/{flow.integration}")
+        self._require_no_untracked_secrets(name, repo)
+        paths = [p for p in _ONBOARDING if git("ls-files", "--", p) or (repo / p).exists()]
+        self._git.commit_paths(repo, message, paths)
+        self._git.push(repo)
+        return work
 
     def _require_no_untracked_secrets(self, name: str, repo_path: Path) -> None:
         """Secret-scan every untracked file; raise before any baseline commit sweeps one."""

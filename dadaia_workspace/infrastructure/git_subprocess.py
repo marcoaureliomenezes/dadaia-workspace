@@ -10,13 +10,10 @@ from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
 logger = logging.getLogger(__name__)
 
 
-def _run(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        args,
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-    )
+def _run(
+    args: list[str], cwd: Path | None = None, stdin: str | None = None
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(args, cwd=cwd, capture_output=True, text=True, input=stdin)
 
 
 def _has_embedded_git(directory: Path) -> bool:
@@ -254,6 +251,18 @@ class GitSubprocessClient:
 
         if result.returncode != 0:
             raise GitSyncError(f"git push failed in {path}: {result.stderr.strip()}")
+
+    def git(self, path: Path, *args: str, stdin: str | None = None) -> str:
+        """One git command in *path*: its stripped stdout, else ``GitSyncError``."""
+        result = _run(["git", *args], cwd=path, stdin=stdin)
+        if result.returncode != 0:
+            raise GitSyncError(f"git {args[0]} failed in {path}: {result.stderr.strip()}")
+        return result.stdout.strip()
+
+    def published(self, path: Path, rel: str) -> bool:
+        """Whether *rel* is reachable from a remote-tracking ref (local, offline)."""
+        result = _run(["git", "log", "--remotes", "-n1", "--format=%H", "--", rel], cwd=path)
+        return result.returncode == 0 and bool(result.stdout.strip())
 
     def default_branch(self, path: Path) -> str:
         """The remote's default branch from the local ``origin/HEAD``; ``main`` when unset."""

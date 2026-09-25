@@ -31,7 +31,7 @@ line here and `--help` disagree, `--help` wins.
   create|alive|dead` and `.dadaia/.venv/bin/dadaia import|export` own those.
 - Level 1: `uvx dadaia-workspace init [DIR] [--harness …] [--repo <url>]`; re-run = upgrade. Level 2: `.dadaia/.venv/bin/dadaia context create [<name>] --main-repo <url> [--associated-repo <url>]…`
   clones, hooks, ALIVEs and binds, transactionally. Level 3: `.dadaia/.venv/bin/dadaia specs init --context <ctx>`, then the `dd-audit-project` first pass. Retire: `.dadaia/.venv/bin/dadaia context dead` (removes the repo; never mid-switch) → `.dadaia/.venv/bin/dadaia context delete`.
-- An unborn remote is born once by `.dadaia/.venv/bin/dadaia context baseline <ctx> --yes --push`; every later write is an ordinary commit.
+- A project is published once by `.dadaia/.venv/bin/dadaia context baseline <ctx>` (principal, integration and work branches; a re-run is a no-op); every later write is an ordinary commit.
 - The associated set is written by `.dadaia/.venv/bin/dadaia context repo add <ctx> <slug> [--url <url>]` / `.dadaia/.venv/bin/dadaia context repo remove <ctx> <slug>` and READ only by `.dadaia/.venv/bin/dadaia context show <ctx> --json`, whose `associated_repos` carries slug, url, on-disk and branch.
 - Portability: `.dadaia/.venv/bin/dadaia export` writes `.dadaia/dist/spec-contexts.json` (overwritten each run); on the destination `.dadaia/.venv/bin/dadaia import <file>` registers each unknown context DEAD, then `.dadaia/.venv/bin/dadaia context alive <slug>` clones it; verify with `.dadaia/.venv/bin/dadaia context list`.
 
