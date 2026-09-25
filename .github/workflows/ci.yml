@@ -331,26 +331,41 @@ jobs:
     if: github.event_name == 'pull_request'
     timeout-minutes: 2
     steps:
-      # The gitflow is read from the BASE branch's constitution: a PR can never rename
-      # the roles that admit it. The stdlib-only core modules need no install.
+      # The PR's code evaluates the BASE branch's gitflow data: the roles that admit a PR
+      # come from the constitution it merges into, never from the PR itself.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          ref: ${{ github.base_ref }}
           persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Read the base branch's constitution
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          BASE_SPECS: ${{ runner.temp }}/base-specs
+        run: |
+          python -m pip install --quiet pyyaml==6.0.3
+          mkdir -p "$BASE_SPECS"
+          git fetch --quiet --depth=1 origin "refs/heads/$BASE_REF"
+          # Absent file: read_gitflow falls back to the default gitflow and warns.
+          git show "FETCH_HEAD:specs/constitution.md" > "$BASE_SPECS/constitution.md" || rm -f "$BASE_SPECS/constitution.md"
       - name: Refuse a PR whose head does not match its base's permitted source
         env:
           # head.ref/base_ref are fork-influenceable input: never interpolate them
           # into the shell command string — read from the environment and compare.
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           BASE_REF: ${{ github.base_ref }}
+          BASE_SPECS: ${{ runner.temp }}/base-specs
           PYTHONPATH: .
         run: |
-          python3 - <<'PY'
+          python - <<'PY'
           import os, sys
           from pathlib import Path
           from dadaia_workspace.core.specs_version import read_gitflow
 
-          flow, _ = read_gitflow(Path("specs"))
+          flow, warning = read_gitflow(Path(os.environ["BASE_SPECS"]))
+          if warning:
+              print(f"::warning::{warning}")
           head, base = os.environ["HEAD_REF"], os.environ["BASE_REF"]
           if base == flow.principal:
               # ADR 0021: the principal accepts the integration branch's promote PR and

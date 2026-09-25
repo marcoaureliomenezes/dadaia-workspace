@@ -300,9 +300,9 @@ def _guard_exit(head: str, base: str, cwd: Path = _REPO_ROOT) -> int:
     import subprocess
 
     ci = yaml.safe_load((_WORKFLOWS / "ci.yml").read_text(encoding="utf-8"))
-    step = next(s for s in ci["jobs"]["pr-source-guard"]["steps"] if "run" in s)
-    env = {"HEAD_REF": head, "BASE_REF": base, "PATH": os.environ["PATH"],
-           "PYTHONPATH": str(_REPO_ROOT)}  # fmt: skip
+    step = next(s for s in ci["jobs"]["pr-source-guard"]["steps"] if "HEAD_REF" in s.get("env", {}))
+    env = {"HEAD_REF": head, "BASE_REF": base, "PATH": os.pathsep.join([str(Path(sys.executable).parent), os.environ["PATH"]]),
+           "PYTHONPATH": str(_REPO_ROOT), "BASE_SPECS": str(cwd / "specs")}  # fmt: skip
     run = subprocess.run(["bash", "-c", step["run"]], env=env, cwd=cwd, capture_output=True)
     return run.returncode
 
@@ -435,3 +435,12 @@ def test_the_post_publish_smoke_walks_greenfield_from_pypi() -> None:
         "doctor --context",
     ):
         assert needle in steps, needle
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the guard is a bash step on ubuntu-latest")
+def test_pr_source_guard_defaults_when_the_base_has_no_constitution(tmp_path: Path) -> None:
+    """A base branch predating the gitflow block (or any constitution) reads the default
+    gitflow — the guard never needs code the base does not carry."""
+    (tmp_path / "specs").mkdir()
+    assert _guard_exit("develop", "main", tmp_path) == 0
+    assert _guard_exit("feature/0.5.0", "main", tmp_path) != 0
