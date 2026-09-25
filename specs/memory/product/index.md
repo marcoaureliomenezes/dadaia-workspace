@@ -19,7 +19,7 @@
 | slug | title | tldr |
 |------|-------|------|
 | `public-asset-distribution` | public-asset-distribution | Public assets staged once, projected into the root map, scoped AGENTS.md, .agents/ and each harness's files, with scaffold and scripts; doctor reports drift. |
-| `pypi-distribution` | pypi-distribution | The PyPI package on one version axis, two console-script names, the OIDC pipeline, the wheel contract and the docs site. |
+| `pypi-distribution` | pypi-distribution | The PyPI package on one version axis, two console-script names, the OIDC pipeline, the wheel contract and the docs folder. |
 
 ### harness
 

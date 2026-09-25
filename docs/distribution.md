@@ -4,7 +4,7 @@ Where dadaia-workspace is published and what each channel carries.
 
 ## Channels
 
-<!-- derived-from: pypi-distribution sha256:ab76c52ed560 -->
+<!-- derived-from: pypi-distribution sha256:618098346ed6 -->
 
 | channel | artifact | how it is published |
 |---|---|---|
@@ -15,7 +15,7 @@ Where dadaia-workspace is published and what each channel carries.
 
 ## The PyPI metadata contract
 
-<!-- derived-from: pypi-distribution sha256:ab76c52ed560 -->
+<!-- derived-from: pypi-distribution sha256:618098346ed6 -->
 
 Every field PyPI renders has exactly one home:
 
@@ -27,7 +27,7 @@ Every field PyPI renders has exactly one home:
   README's first non-badge paragraph and to `llms.txt`'s `> ` line, pinned by
   `tests/contract/test_docs_derived_from_memory.py`.
 - **The long description** — `README.md` itself (`readme = "README.md"`), derived like
-  every other document.
+  every other document; every README link is absolute, so it resolves on the PyPI page.
 - **The links** — `[tool.poetry.urls]`: `Homepage`, `Repository`, `Documentation` (the
   repository's `docs/` folder), `Changelog` and `Issues`.
 - **The keywords** — every keyword names something the README says.
@@ -36,7 +36,7 @@ Every field PyPI renders has exactly one home:
 
 ## What the wheel carries
 
-<!-- derived-from: pypi-distribution sha256:ab76c52ed560 -->
+<!-- derived-from: pypi-distribution sha256:618098346ed6 -->
 
 The wheel ships `dadaia_workspace/` with the full `public/` tree (`.dadaia/.venv/bin/dadaia init` still
 resolves the workspace venv's dependencies from PyPI), and

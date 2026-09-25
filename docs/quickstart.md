@@ -7,8 +7,8 @@ live. Terms are defined in [concepts](concepts.md); the long walkthrough is
 
 ## 1. The three levels in one block
 
-<!-- derived-from: pypi-distribution sha256:ab76c52ed560 -->
-<!-- derived-from: workspace-init sha256:0c2017836e6f -->
+<!-- derived-from: pypi-distribution sha256:618098346ed6 -->
+<!-- derived-from: workspace-init sha256:aa1f033df140 -->
 
 Set `REPO_URL` to your repository's clone URL; everything else runs as printed (needs
 uv and network access):
@@ -40,7 +40,7 @@ Then `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes the project
 
 ## 2. What the init line provisioned
 
-<!-- derived-from: workspace-init sha256:0c2017836e6f -->
+<!-- derived-from: workspace-init sha256:aa1f033df140 -->
 
 `--harness` names one registered harness: `claude` | `codex` | `kimi-code` | `cursor` |
 `devin` | `copilot`. The directory is required and a directory holding a foreign tree
@@ -77,7 +77,7 @@ record, never the cwd: sitting inside a repository is not a binding.
 
 ## 4. Compliance
 
-<!-- derived-from: workspace-doctor sha256:6af42080bf04 -->
+<!-- derived-from: workspace-doctor sha256:3fa0c321c7b0 -->
 
 `doctor` is the one instance validator; three sections run in fixed order —
 `workspace`, `specs`, `ledgers`. Every finding prints as one `<CODE> <verdict>

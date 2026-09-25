@@ -21,7 +21,7 @@ sources:
 - An absent `specs/` gets the canon scaffold ([[public-asset-distribution]]); a dadaia tree (stamped 6 or above) runs `specs upgrade`, then gains only its missing canon files; anything else is foreign.
 - A foreign tree is replaced only with consent: `--replace-foreign`, or a y/N confirm on a TTY; without it the run exits 2, writes nothing and prints `fix: … specs init --context <ctx> --replace-foreign`.
 - With consent, `specs/` is renamed to `specs-bkp/` in the same repo — tracked files through `git mv`, staged and uncommitted, every byte kept — then scaffolded; an existing `specs-bkp/` exits 1 with nothing written and a `fix:` that renames it aside.
-- It also installs the main repo's scoped law where absent: `AGENTS.md` at the repo root, and `tests/AGENTS.md` only when `tests/` exists; an existing or symlinked target is never overwritten or written through.
+- It also installs the main repo's scoped law where absent, its `<repo-name>` rendered as the project (`--name`, else the main repo's directory name): `AGENTS.md` at the repo root, and `tests/AGENTS.md` only when `tests/` exists; an existing or symlinked target is never overwritten or written through.
 - Every written path is printed (`[created]`, `[moved]`, the upgrade's own lines); `specs init` never commits — the operator reviews the worktree, and an unborn repo's first commit is `context baseline` ([[context-management]]).
 
 ## `dadaia specs upgrade`

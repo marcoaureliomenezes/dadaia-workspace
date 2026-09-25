@@ -43,7 +43,7 @@ is the last published one plus one patch and moves only at an operator-approved 
 
 <!-- derived-from: release-lifecycle sha256:7d025467878a -->
 <!-- derived-from: bug-ledger sha256:9534ded07707 -->
-<!-- derived-from: audits-canon sha256:18392c440e4b -->
+<!-- derived-from: audits-canon sha256:80207896fd17 -->
 
 Every demand takes one of two arms. **Arm A**, a feature, leaves through a candidate:
 the picked backlog and bug set, the mandatory grill, the SPEC, PLAN and TASKS, one
@@ -57,7 +57,7 @@ carry the ordered work, and the ledger scripts move the records.
 
 ## The gate
 
-<!-- derived-from: sdd-gate-v3 sha256:729431b8ca75 -->
+<!-- derived-from: sdd-gate-v3 sha256:7a6e11d84264 -->
 
 The *gate* is one PreToolUse pre-gate evaluating root whitelist, venv guard and SDD
 gate in that order — first block wins, and a policy that raises is ALLOW. It blocks
@@ -75,15 +75,15 @@ gate — a refusal whose fix is itself refused (a Stall) cannot ship.
 ## Memory
 
 <!-- derived-from: context-management sha256:3f48eef447f1 -->
-<!-- derived-from: workspace-doctor sha256:6af42080bf04 -->
+<!-- derived-from: workspace-doctor sha256:3fa0c321c7b0 -->
 <!-- derived-from: release-lifecycle sha256:7d025467878a -->
-<!-- derived-from: audits-canon sha256:18392c440e4b -->
+<!-- derived-from: audits-canon sha256:80207896fd17 -->
 
 *Memory* is current product truth: the atoms under `specs/memory/product/**`, plus
 `ARCHITECTURE.md` (its `## Tech Stack` section included) and `QUALITY.md`, whose
 canonical statements change only in the commit carrying an accepted decision. A bound
-session receives the Tech Stack section and the catalog digest (`slug`, `title`,
-`tldr`, `path` per atom). At each candidate's closure, `memory.py drift` lists the
+session receives its onboarding next step while one remains, the Tech Stack section and
+the catalog digest (`slug`, `title`, `tldr`, `path` per atom). At each candidate's closure, `memory.py drift` lists the
 atoms whose sources changed, each is reconciled — delete, update, then add — and
 `RELEASE-TREE-MEMORY` keeps the release red until the reconciliation is logged.
 `.dadaia/.venv/bin/dadaia doctor`'s `specs` section polices the tree: `CAT-1` (catalog equals atom
@@ -109,7 +109,7 @@ superseded deferred rejected`.
 
 ## Audits
 
-<!-- derived-from: audits-canon sha256:18392c440e4b -->
+<!-- derived-from: audits-canon sha256:80207896fd17 -->
 
 An *audit* is the only full-tree inspection lane, every other quality boundary being
 diff-scoped: a committed folder `specs/audits/<YYYYMMDD>-<slug>/` holding `AUDIT.md` —

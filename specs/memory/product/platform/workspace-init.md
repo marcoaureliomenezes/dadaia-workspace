@@ -22,15 +22,17 @@ sources:
 
 - `uvx dadaia-workspace init [DIR] [--harness <name>] [--repo <url> [--associated-repo <url>]...] [--skip-assets]` is the only verb that works on an empty directory; every later command runs through the workspace's own `.dadaia/.venv/bin/dadaia`.
 - Flags and prompts fill ONE plan: on a TTY a missing DIR or harness is asked (a bare name becomes `./<name>`), then the main-repo URL (blank = none) and associated URLs until a blank line; with no TTY a missing DIR or harness exits 2 with `fix: uvx dadaia-workspace init <dir> --harness <h>`; a missing `--repo` is never an error.
+- Every refusal's `fix:` line is rendered from the plan itself, so it repeats the invocation's `--repo` and every `--associated-repo`.
 - `--harness` names one registered harness (`claude`, `codex`, `kimi-code`, `cursor`, `devin`, `copilot`); on an existing workspace it defaults to the persisted profile's first harness.
 - DIR is created if absent and never resolved from the cwd; a non-directory or a non-empty directory without `.dadaia/` is refused, exit 2, with a sibling `<dir>-workspace` in the `fix:` line; every refusal happens before any write.
 - It provisions `.dadaia/.venv` (stdlib venv plus pip, the package's dependencies resolved from PyPI), every `.dadaia/` zone whose creator is init or install, and `.agents/skills`; the harness's own directory comes from its projection. An absent zone is [[workspace-doctor]]'s `WS-<zone>-missing`.
 - The venv mirrors the running distribution: editable from a source checkout, else its re-packed wheel written to a system temp directory deleted after the install; `DADAIA_BOOTSTRAP_PACKAGE=<wheel>` names another wheel. A base Python without `ensurepip` is reported as missing `ensurepip`/`venv`; any other venv creation failure names a `noexec` target as its likely cause.
+- A failed dependency install says the venv resolves its dependencies from PyPI (network required) and quotes the installer's last whole lines, never a mid-line cut.
 - The tree it lays down is a view of `dadaia_workspace/core/workspace_layout.py` — the root law, `DADAIA_ZONES`, `STATES_CANON` — the same rows `dadaia public stage` renders into the law files ([[public-asset-distribution]]).
 - It seeds `states/spec_contexts.json` and `states/server_registry.json` as empty documents without overwriting existing data ([[server-registry]]).
 - `states/harness_profile.json` is the roster, written through the profile store's one writer (shared with `dadaia doctor --fix`); a re-init with another harness merges into the persisted roster, never narrowing it.
 - Unless `--skip-assets`, init runs public stage and install, the one writer of every hook wiring; with `--skip-assets` the output carries the warning that the workspace is ungated until `dadaia public install` runs.
-- Output is at most twelve lines: the workspace line, one asset-count line (never a per-path listing), `CLI: <absolute path of .dadaia/.venv/bin/dadaia>`, the root-launch note and the harness's own law-loading note, then the next step; no line names a bare `dadaia` verb.
+- Output is at most twelve lines: the workspace line, one asset-count line (never a per-path listing), `CLI: <absolute path of .dadaia/.venv/bin/dadaia>`, the root-launch note, then the next step; no harness-specific or user-settings advice is printed; no line names a bare `dadaia` verb.
 - The only write outside the workspace is the documented Kimi Code user config ([[harness-kimi-code]]); init deletes no projection.
 - `dadaia harness add <name>` stages if needed, installs that harness's set and appends it to the roster; `dadaia harness list` reads it.
 
@@ -41,6 +43,7 @@ sources:
 - An equal venv prints `already at A` and writes no file under the workspace.
 - A newer venv is refused before any write, exit 1, `fix: uvx dadaia-workspace@A init <ws>`.
 - Versions order as `M.m.p` with an optional local segment sorting after its base.
+- The upgrade never writes a project repo; `<cli> specs init --context <ctx>`, re-run per project, then refreshes that project's specs law ([[specs-migration]]).
 
 ## First project
 
@@ -52,7 +55,11 @@ sources:
 - `dadaia_workspace/features/workspace/onboarding.py` derives the next unmet level from disk, never from a state file: no ALIVE context -> `<cli> context create <name> --main-repo <clone-url>`; an ALIVE context whose main repo's `specs/` is not stamped at the canonical pattern version -> `<cli> specs init --context <name>`; a context with no record in `specs/audits/_archive/audits_histo.jsonl` -> the first-pass `memory.py drift --since <first commit>` worklist; else nothing.
 - `<cli>` is the workspace's absolute venv CLI path (`Scripts\dadaia.exe` under Windows); the text is `Next: <reason>` plus one `fix: <command>` line.
 - A focus context (the one just created, doctored or bound) is judged first, then every ALIVE context in registry order.
-- Four callers print the same text: `init`, `context create`, [[workspace-doctor]]'s `ONBOARDING` finding and the unbound SessionStart injection ([[context-management]]).
+- Four callers print the same text: `init`, `context create`, [[workspace-doctor]]'s `ONBOARDING` finding and the SessionStart injection, unbound or bound (focused on the bound context) ([[context-management]]).
+
+## Workspace not found
+
+- A command that needs a workspace and finds none fails with one error: the searched directory, any skipped partial `.dadaia/`, and one `fix:` — `cd <root>` of the running CLI's own workspace when that root is initialized, else `uvx dadaia-workspace init <dir>`.
 
 ## Dependencies
 

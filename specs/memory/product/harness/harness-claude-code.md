@@ -25,7 +25,7 @@ sources:
 - The four hook behaviours ([[agentic-entities]]) are registered there: `PreToolUse` `dadaia_workspace.hooks.pre_gate` (matcher `Edit|Write|MultiEdit|NotebookEdit|Bash`), a match-all `PostToolUse` `dadaia_workspace.hooks.sdd_post_gate` (the throttled reaper), `UserPromptSubmit` and `SessionStart` `dadaia_workspace.hooks.ctx_inject`, and the session-start reaper; the git chokepoints run beside them ([[sdd-gate-v3]]).
 - `SessionStart` matchers `startup`, `resume`, `compact` and `clear` re-emit the bootstrap after a compact or `/clear` as well as at a new session.
 - A block answers `hookSpecificOutput.permissionDecision: deny` with its reason, the top-level `decision: block`/`reason` pair riding along for other consumers; an allow carries no permission verdict, so the user's permission prompts are never bypassed.
-- `dadaia context bind <ctx>` records the bind in this session's own record, keyed by Claude Code's native session id; ctx-inject then injects that context's tech-stack section and feature catalog once, and again after a re-bind — never the law, which the map already loads ([[context-management]]).
+- `dadaia context bind <ctx>` records the bind in this session's own record, keyed by Claude Code's native session id; ctx-inject then injects that context's bootstrap — its onboarding next step while one remains, tech-stack section and feature catalog — once, and again after a re-bind — never the law, which the map already loads ([[context-management]]).
 
 ## Dependencies
 

@@ -5,8 +5,8 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:ab76c52ed560 -->
-<!-- derived-from: workspace-init sha256:0c2017836e6f -->
+<!-- derived-from: pypi-distribution sha256:618098346ed6 -->
+<!-- derived-from: workspace-init sha256:aa1f033df140 -->
 
 ```bash
 uvx dadaia-workspace init <dir> --harness claude --repo <url>
@@ -27,12 +27,13 @@ refreshes each project's specs law.
 
 ## Level 1 — the workspace
 
-<!-- derived-from: workspace-init sha256:0c2017836e6f -->
+<!-- derived-from: workspace-init sha256:aa1f033df140 -->
 
 `uvx dadaia-workspace init <dir> --harness claude|codex|kimi-code|cursor|devin|copilot
 [--repo <url>] [--associated-repo <url>]… [--skip-assets]` is the only verb that works
 on an empty directory. `<dir>` is created if absent, refused with one `fix:` line if it
-holds a foreign tree, never resolved from the cwd. It lays down:
+holds a foreign tree, never resolved from the cwd; every `fix:` line repeats the
+invocation's `--repo` and `--associated-repo` flags. It lays down:
 
 - `.dadaia/.venv`, every `.dadaia/` zone whose creator is init or install, and
   `.agents/skills`; the harness's own directory comes from its projection. The tree is
@@ -90,7 +91,7 @@ foreign `specs/` is moved to `specs-bkp/` (`git mv`, staged) after consent —
 
 ## Check compliance — `doctor`
 
-<!-- derived-from: workspace-doctor sha256:6af42080bf04 -->
+<!-- derived-from: workspace-doctor sha256:3fa0c321c7b0 -->
 
 ```bash
 .dadaia/.venv/bin/dadaia doctor --context <ctx> [--json] [--fix] [--redact]
@@ -104,7 +105,8 @@ backlog document, the ADR ledger and the ledger scripts' own `check`).
 The `specs` and `ledgers` tree resolves from `--context`, `--specs-dir` or the bound
 context; with none, those sections are empty and `workspace` still runs. With no
 instance around — CI over a checkout — `.dadaia/.venv/bin/dadaia doctor --specs-dir specs --source-root .`
-runs the two tree sections.
+runs the two tree sections; any other run outside a workspace exits 1 with one
+workspace-not-found error whose `fix:` is `cd <root>` of the running CLI's own workspace.
 
 Every printed finding is one `<CODE> <verdict> <message>` line, every error-class
 finding carries one `fix: <command>` line, and any error-class finding exits 1. There

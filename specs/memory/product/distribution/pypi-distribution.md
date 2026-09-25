@@ -1,7 +1,7 @@
 ---
 slug: pypi-distribution
 title: pypi-distribution
-tldr: The PyPI package on one version axis, two console-script names, the OIDC pipeline, the wheel contract and the docs site.
+tldr: The PyPI package on one version axis, two console-script names, the OIDC pipeline, the wheel contract and the docs folder.
 summary: dadaia-workspace publishes to PyPI under OIDC trusted publishing from the release-please workflow; release-please owns the version, the CHANGELOG and the tag, and pyproject carries the published floor.
 tags: [distribution, pypi, release, packaging]
 sources:
@@ -36,9 +36,10 @@ sources:
 
 ## Discovery surfaces
 
-- `pyproject.toml` `description` is the tagline, byte-equal to `README.md`'s first non-badge paragraph and to `llms.txt`'s `> ` line; `readme = "README.md"` makes the derived README the long description; `[tool.poetry.urls]` carries `Homepage`, `Repository`, `Documentation` (the docs site), `Changelog` and `Issues`; every keyword names something the README says — pinned by `tests/contract/test_docs_derived_from_memory.py` ([[QUALITY]]).
+- `pyproject.toml` `description` is the tagline, byte-equal to `README.md`'s first non-badge paragraph and to `llms.txt`'s `> ` line; `readme = "README.md"` makes the derived README the long description; `[tool.poetry.urls]` carries `Homepage`, `Repository`, `Documentation` (`https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs`, the repository's `docs/` folder — no separate site is published), `Changelog` and `Issues`; every README link is absolute, so it resolves on the PyPI page; every keyword names something the README says — pinned by `tests/contract/test_docs_derived_from_memory.py` ([[QUALITY]]).
+- Every command's `--help` states behaviour in the reader's words — no requirement, task, audit or ADR id and no code seam name (`tests/contract/cli/test_help_carries_no_internal_ids.py`); `docs/cli.md` is derived from it.
 - The `Development Status` classifier stays `3 - Alpha` until a released wheel passes the consumer-validation recipe ([[consumer-agent-support]]).
-- Channels: PyPI; the GitHub repository description, topics and homepage, set from the same tagline and keywords; `llms.txt` at the repository root, an index whose every line links to a derived document, the law, the CLI reference or the memory catalog; the docs site, GitHub Pages serving `docs/` from `main` with no build toolchain, every page derived under its markers. `docs/distribution.md` is derived from this list.
+- Channels: PyPI; the GitHub repository description, topics and homepage, set from the same tagline and keywords; `llms.txt` at the repository root, an index whose every line links to a derived document, the law, the CLI reference or the memory catalog; the repository's `docs/` folder on `main`, with no build toolchain or site, every page derived under its markers. `docs/distribution.md` is derived from this list.
 
 ## Dependencies
 

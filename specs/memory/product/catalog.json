@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-24T18:55:39Z",
+  "generated_at": "2026-09-25T01:37:03Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -72,7 +72,7 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 833,
+      "token_estimate": 892,
       "depends_on": [
         "agent-orchestration",
         "sdd-gate-v3",
@@ -102,7 +102,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 948,
+      "token_estimate": 959,
       "depends_on": [
         "harness-kimi-code",
         "agentic-entities",
@@ -137,7 +137,7 @@
       "slug": "pypi-distribution",
       "title": "pypi-distribution",
       "area": "distribution",
-      "tldr": "The PyPI package on one version axis, two console-script names, the OIDC pipeline, the wheel contract and the docs site.",
+      "tldr": "The PyPI package on one version axis, two console-script names, the OIDC pipeline, the wheel contract and the docs folder.",
       "summary": "dadaia-workspace publishes to PyPI under OIDC trusted publishing from the release-please workflow; release-please owns the version, the CHANGELOG and the tag, and pyproject carries the published floor.",
       "path": "specs/memory/product/distribution/pypi-distribution.md",
       "tags": [
@@ -146,7 +146,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 697,
+      "token_estimate": 761,
       "depends_on": [
         "release-lifecycle",
         "public-asset-distribution",
@@ -176,7 +176,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 397,
+      "token_estimate": 410,
       "depends_on": [
         "agent-orchestration",
         "agentic-entities",
@@ -610,7 +610,7 @@
         "registry",
         "onboarding"
       ],
-      "token_estimate": 788,
+      "token_estimate": 806,
       "depends_on": [
         "public-asset-distribution",
         "context-management",
@@ -643,13 +643,13 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 1467,
+      "token_estimate": 1488,
       "depends_on": [
         "public-asset-distribution",
         "context-management",
+        "workspace-init",
         "QUALITY",
         "sdd-gate-v3",
-        "workspace-init",
         "release-lifecycle",
         "specs-migration",
         "audits-canon"
@@ -682,7 +682,7 @@
         "upgrade",
         "onboarding"
       ],
-      "token_estimate": 1080,
+      "token_estimate": 1247,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -718,7 +718,7 @@
         "decisions",
         "governance"
       ],
-      "token_estimate": 840,
+      "token_estimate": 849,
       "depends_on": [
         "agent-orchestration",
         "sdd-gate-v3",
@@ -845,7 +845,7 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 1071,
+      "token_estimate": 1118,
       "depends_on": [
         "workspace-doctor",
         "context-management",
