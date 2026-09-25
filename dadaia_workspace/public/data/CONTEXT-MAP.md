@@ -76,7 +76,7 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 | `dd-grill-me` | the operator grill that precedes a candidate | — | 6144 | 3256 |
 | `dd-handoff-emitter` | handoff-first emission and ack-on-consume | `.dadaia/handoff/AGENTS.md` | 6144 | 2174 |
 | `dd-manager-orchestration` | intake, dispatch and the closure pass | — | 6144 | 3661 |
-| `dd-release-definition` | picking the set and authoring the trio | `specs/releases/AGENTS.md` | 6144 | 4638 |
+| `dd-release-definition` | picking the set and authoring the trio | `specs/releases/AGENTS.md` | 6144 | 5269 |
 | `dd-release-implementation` | the candidate arc from reservation to the gate | `specs/releases/AGENTS.md` | 6144 | 3530 |
 | `dd-spec-navigator` | the three-phase session grounding protocol | `specs/AGENTS.md` | 6144 | 5204 |
 | `dd-test-stewardship` | test intent, admission, demotion, quarantine | — | 6144 | 4178 |

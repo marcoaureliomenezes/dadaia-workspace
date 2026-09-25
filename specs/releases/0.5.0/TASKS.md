@@ -7,7 +7,7 @@ Paths under `dadaia_workspace/public/` abbreviated `pub/`. DELETE/REBUILD rows (
 
 ## Candidate 2 — definition reviews the as-is before it adds
 
-- [-] **T-050-01 — Rebuild `dd-release-definition`: the as-is review step.**
+- [x] **T-050-01 — Rebuild `dd-release-definition`: the as-is review step.**
   Delete §3.4 (R1); sections become Pick the set → As-is review → The mandatory grill → Author the trio →
   TASKS as tracer bullets → Declaring consumption → Done when → References; As-is review states D1–D3 and
   the PLAN §1 skeleton once; §4 demolition bullet rewritten to DELETE/REBUILD-before-ADD (R4); Done when

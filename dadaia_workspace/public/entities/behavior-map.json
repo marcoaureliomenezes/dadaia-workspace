@@ -169,7 +169,7 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:1f8d87d0cc5f518917270aa1cf19bf530b029a2219b7c17090ed8837f3b7d854",
-        "skill": "sha256:21a3b17db06050c890c4023dd3d47b7b144b5435bb80dc43717d93254a57f513",
+        "skill": "sha256:228ccdf8d8c70cac8a162b759f89de1f0f9d76786a22f103cf33e8af4bb6beaa",
         "scripts": null,
         "scoped": []
       },
@@ -237,7 +237,7 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:1f8d87d0cc5f518917270aa1cf19bf530b029a2219b7c17090ed8837f3b7d854",
-        "skill": "sha256:7eaa772b9784ab28132e0f9236811e3fedbac32d55e92b4a063e11e93d713db3",
+        "skill": "sha256:38265ce891cf1d9d9580bc35a6eb20406956e0d1b6b3c38a85ec34457a459777",
         "scripts": null,
         "scoped": []
       },
