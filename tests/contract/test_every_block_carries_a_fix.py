@@ -647,3 +647,27 @@ def test_no_law_file_names_a_retired_release_verb() -> None:
         "the law names a retired release verb — delete the prose, never the check:\n"
         + "\n".join(offenders)
     )
+
+
+#: `memory.py check` decides only the generated catalog pair; the atoms' schema (tldr
+#: length and the rest) is LINT-1's alone. A law line making that script's exit 0 the
+#: mark of a finished memory elects a validator that never reads the rule.
+_NON_AUTHORITY_DONE = re.compile(r"memory\.py check`? exit 0")
+
+
+def test_no_shipped_text_makes_memory_py_check_the_memory_done_criterion() -> None:
+    """Intent: CONTRACT — bug memory-done-criterion-names-a-script-that-never-validates-atoms.
+
+    The one authority for a valid memory tree is `dadaia doctor` (LINT-1 over the atoms,
+    LEDGER-MEMORY over the pair). Product memory is its owner's to re-derive, so this
+    scan covers what ships: `public/`, `CONTEXT.md` and `docs/`.
+    """
+    memory = _REPO_ROOT / "specs" / "memory"
+    shipped = [path for path in _law_files() if memory not in path.parents]
+    offenders = [
+        f"{path.relative_to(_REPO_ROOT)}:{number}"
+        for path in [*shipped, *sorted((_REPO_ROOT / "docs").glob("*.md"))]
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1)
+        if _NON_AUTHORITY_DONE.search(line)
+    ]
+    assert not offenders, "\n".join(offenders)
