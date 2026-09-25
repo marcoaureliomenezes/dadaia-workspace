@@ -25,7 +25,7 @@ Paths under `dadaia_workspace/public/` abbreviated `pub/`. DELETE/REBUILD rows (
   `tests/contract/test_release_script.py`, `tests/unit/skills/test_release_implementation_release_script.py` (fixture PLAN only)
   `blocked by:` T-050-01 · `delivers:` FR2 AC2.1–AC2.6 — a PLAN without §1 cannot enter IMPLEMENTATION
 
-- [ ] **T-050-03 — SPEC stub carries `Replaces`.**
+- [-] **T-050-03 — SPEC stub carries `Replaces`.**
   `SPEC_STUB` gains `## Replaces` between Scope and Out of scope; `new` still writes no PLAN and deletes
   the closed PLAN/TASKS.
   `RED:` a `new` stub test asserts the section order.
