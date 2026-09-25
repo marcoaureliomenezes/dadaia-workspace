@@ -8,7 +8,7 @@ is `dadaia_workspace/public/data/AGENTS.md`, and the walkthrough is
 ## Context
 
 <!-- derived-from: spec-context-project sha256:4984ba691799 -->
-<!-- derived-from: context-management sha256:d40d5eeb1115 -->
+<!-- derived-from: context-management sha256:3f48eef447f1 -->
 
 A *context* — a Spec Context Project — is one canonical `specs/` tree owned by one
 main repository, the unit for memory, backlog, bugs, releases, reports and handoffs.
@@ -43,7 +43,7 @@ is the last published one plus one patch and moves only at an operator-approved 
 
 <!-- derived-from: release-lifecycle sha256:7d025467878a -->
 <!-- derived-from: bug-ledger sha256:9534ded07707 -->
-<!-- derived-from: audits-canon sha256:408165628710 -->
+<!-- derived-from: audits-canon sha256:18392c440e4b -->
 
 Every demand takes one of two arms. **Arm A**, a feature, leaves through a candidate:
 the picked backlog and bug set, the mandatory grill, the SPEC, PLAN and TASKS, one
@@ -57,7 +57,7 @@ carry the ordered work, and the ledger scripts move the records.
 
 ## The gate
 
-<!-- derived-from: sdd-gate-v3 sha256:d3f9d2e93776 -->
+<!-- derived-from: sdd-gate-v3 sha256:729431b8ca75 -->
 
 The *gate* is one PreToolUse pre-gate evaluating root whitelist, venv guard and SDD
 gate in that order — first block wins, and a policy that raises is ALLOW. It blocks
@@ -74,10 +74,10 @@ gate — a refusal whose fix is itself refused (a Stall) cannot ship.
 
 ## Memory
 
-<!-- derived-from: context-management sha256:d40d5eeb1115 -->
+<!-- derived-from: context-management sha256:3f48eef447f1 -->
 <!-- derived-from: workspace-doctor sha256:6af42080bf04 -->
 <!-- derived-from: release-lifecycle sha256:7d025467878a -->
-<!-- derived-from: audits-canon sha256:408165628710 -->
+<!-- derived-from: audits-canon sha256:18392c440e4b -->
 
 *Memory* is current product truth: the atoms under `specs/memory/product/**`, plus
 `ARCHITECTURE.md` (its `## Tech Stack` section included) and `QUALITY.md`, whose
@@ -109,14 +109,14 @@ superseded deferred rejected`.
 
 ## Audits
 
-<!-- derived-from: audits-canon sha256:408165628710 -->
+<!-- derived-from: audits-canon sha256:18392c440e4b -->
 
 An *audit* is the only full-tree inspection lane, every other quality boundary being
 diff-scoped: a committed folder `specs/audits/<YYYYMMDD>-<slug>/` holding `AUDIT.md` —
 scope, the `[from-sha, HEAD]` window, method per pillar, the eight forensic metrics,
 summary — and `FINDINGS.jsonl`. Three pillars always run together over the window
 since the newest archived audit: bug history, spec compliance and memory drift. One
-audit is suggested every five releases, never mandatory, and generates exactly one
-remediation release: `audit.py disposition` rewrites a finding's disposition, release
+audit is suggested every five releases, never mandatory, and generates at most one
+remediation release (a zero-finding audit closes with none): `audit.py disposition` rewrites a finding's disposition, release
 and reason in place, and `audit.py close` refuses while any finding is undispositioned,
 appends the one `audits_histo.jsonl` record and deletes the folder.

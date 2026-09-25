@@ -46,7 +46,7 @@ memory atom under its content hash.
 
 <!-- derived-from: pypi-distribution sha256:ab76c52ed560 -->
 <!-- derived-from: workspace-init sha256:0c2017836e6f -->
-<!-- derived-from: context-management sha256:d40d5eeb1115 -->
+<!-- derived-from: context-management sha256:3f48eef447f1 -->
 <!-- derived-from: workspace-doctor sha256:6af42080bf04 -->
 
 ```bash
@@ -90,10 +90,10 @@ and deletes only what a TTL expired.
 ## An agent reads AGENTS.md and uses it
 
 <!-- derived-from: agentic-entities sha256:9f356fd0a4ec -->
-<!-- derived-from: sdd-gate-v3 sha256:d3f9d2e93776 -->
+<!-- derived-from: sdd-gate-v3 sha256:729431b8ca75 -->
 <!-- derived-from: release-lifecycle sha256:7d025467878a -->
 <!-- derived-from: bug-ledger sha256:9534ded07707 -->
-<!-- derived-from: harness-claude-code sha256:266fdf40eaed -->
+<!-- derived-from: harness-claude-code sha256:5f846503a15d -->
 <!-- derived-from: harness-codex sha256:b907c260a862 -->
 <!-- derived-from: harness-kimi-code sha256:4300d3a1724d -->
 <!-- derived-from: harness-cursor sha256:480b18aa9b61 -->

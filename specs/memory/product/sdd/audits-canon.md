@@ -27,7 +27,7 @@ sources:
 - `disposition <audit> <finding-id> --disposition resolved|superseded|deferred|rejected [--release <id>] [--reason <text>]` rewrites one finding's governance triple in place, every other field unchanged; `resolved`/`superseded` need `--release`, `deferred`/`rejected` need `--reason`; an unknown finding is refused naming the known ids.
 - `close <audit> --sha <window-end>` refuses an audit with any undispositioned finding (naming it), or whose findings name more than one release; otherwise — a zero-finding audit included, a legitimate result — it appends one `histo-record-v1` to `audits_histo.jsonl` — `disposition: resolved`, the one remediation release or null, the per-pillar counts as `summary`, `entry = {sha, pillars, dispositions}` — and deletes the folder, the histo append last.
 - `check [--json]` validates every live `FINDINGS.jsonl` and `audits_histo.jsonl`; `dadaia doctor`'s `ledgers` section runs it (`LEDGER-FINDINGS-SCHEMA`), and `SPEC-DOC-036` (an open finding in an archived audit) and `SPEC-DOC-038` (a live audit whose findings are all terminal) police both directions ([[workspace-doctor]]).
-- One audit generates exactly one remediation release, which dispositions every finding at its closure sweep before the audit closes ([[release-lifecycle]]).
+- One audit generates at most one remediation release (none for a zero-finding audit), which dispositions every finding at its closure sweep before the audit closes ([[release-lifecycle]]).
 
 ## Decisions
 
