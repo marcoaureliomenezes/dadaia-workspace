@@ -192,13 +192,30 @@ def test_an_unborn_dirty_clone_publishes_and_leaves_foreign_files_untouched(env)
     assert "notes.md" not in _git(bare, "ls-tree", "-r", "--name-only", "feature/0.1.0")
 
 
-def test_missing_identity_refuses_before_any_write(env) -> None:
+def test_missing_identity_refuses_before_any_write(env, tmp_path: Path, monkeypatch) -> None:
     svc, repo, bare = env
+    # No guessing: a host whose name yields an email would otherwise hand git an identity.
+    (tmp_path / "gitconfig").write_text("[user]\n\tuseConfigOnly = true\n", encoding="utf-8")
+    for var in ("NAME", "EMAIL"):
+        monkeypatch.delenv(f"GIT_AUTHOR_{var}", raising=False)
+        monkeypatch.delenv(f"GIT_COMMITTER_{var}", raising=False)
     _clone_onboarded(bare, repo, identity=False)
-    with pytest.raises(ContextStateError, match="user.name") as refused:
+    with pytest.raises(ContextStateError, match="identity unknown") as refused:
         svc.baseline("proj")
-    assert "config user.name" in str(refused.value)
+    assert "fix: git -C" in str(refused.value)
     assert _heads(bare) == {}
+
+
+def test_an_env_identity_publishes_without_git_config(env, monkeypatch) -> None:
+    """Bug baseline-identity-precheck-ignores-git-env-identity: git's identity is
+    whatever git resolves — GIT_AUTHOR_*/GIT_COMMITTER_* included — never config alone."""
+    svc, repo, bare = env
+    for role in ("AUTHOR", "COMMITTER"):
+        monkeypatch.setenv(f"GIT_{role}_NAME", "T")
+        monkeypatch.setenv(f"GIT_{role}_EMAIL", "t@example.invalid")
+    _clone_onboarded(bare, repo, identity=False)
+    assert svc.baseline("proj") == "feature/0.1.0"
+    _assert_published(repo, bare, "feature/0.1.0", "develop")
 
 
 def test_offline_refuses_with_the_same_baseline_line(env, tmp_path: Path) -> None:

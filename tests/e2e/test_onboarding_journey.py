@@ -102,9 +102,6 @@ class Env:
             GIT_CONFIG_SYSTEM=os.devnull,
         )
         self.git("config", "--global", "init.defaultBranch", "main", cwd=root)
-        # An operator's identity lives in git config; `context baseline` reads it there.
-        self.git("config", "--global", "user.name", "t", cwd=root)
-        self.git("config", "--global", "user.email", "t@example.invalid", cwd=root)
         self._launchers: dict[str, Path] = {}
 
     def run(self, *argv: str, cwd: Path) -> subprocess.CompletedProcess[str]:

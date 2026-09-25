@@ -575,14 +575,13 @@ class SpecContextService:
         if not repo.is_dir() or not self._git.is_git_root(repo):
             raise ContextStateError(f"Context '{name}' has no Git repository at '{repo}'.")
         git = partial(self._git.git, repo)
-        for key in ("user.name", "user.email"):
-            with contextlib.suppress(GitSyncError):
-                if git("config", key):
-                    continue
-            raise ContextStateError(
-                f"Context '{name}': git {key} is unset.\n"
-                f"fix: {shell_line('git', '-C', str(repo), 'config', key, f'<{key}>')}"
-            )
+        try:  # git's own identity rule (env, config, auto-detection) — never a second one
+            for ident in ("GIT_AUTHOR_IDENT", "GIT_COMMITTER_IDENT"):
+                git("var", ident)
+        except GitSyncError as exc:
+            key = "user.name" if "ident name" in str(exc) else "user.email"
+            fix = shell_line("git", "-C", str(repo), "config", key, f"<{key}>")
+            raise ContextStateError(f"Context '{name}': {exc}\nfix: {fix}") from None
         foreign = [p for p in self._git.diff_name_only(repo) if p.split("/")[0] not in _ONBOARDING]
         if foreign and self._git.has_commits(repo):  # unborn: untracked, never committed
             raise ContextStateError(
