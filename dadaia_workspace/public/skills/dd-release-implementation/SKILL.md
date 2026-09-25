@@ -31,7 +31,7 @@ description: >
 
 ## 2a. Push green
 
-- Every `feature/{M.m.p}` push runs the local CI preflight first: `ruff format --check`, `ruff check`, `mypy --strict`, `pytest`.
+- Every work-branch push (`<work>M.m.p`, the constitution's `gitflow:`) runs the local CI preflight first: `ruff format --check`, `ruff check`, `mypy --strict`, `pytest`.
 - The push IS the publication boundary: pre-push scans every object the pushed range introduces or rewrites against the structural baseline and the operator denylist (`$DADAIA_PRIVACY_DENYLIST` or `.dadaia/states/privacy_denylist.json`) — a private repo or context name is protected only when listed there; no path is exempt.
 - Published history is the baseline and is never rescanned; a fixture needing a secret shape composes it at runtime, never as a tracked literal.
 - Only pushes are review-blocked; commits flow freely, and a full scan lives only in the audit lane.
@@ -43,7 +43,7 @@ description: >
 - Live release resolved by reading `_RELEASE.json` directly.
 - Task reserved (`[-]`) with an isolated `chore(tasks): start <id>` commit (`RC-FLOW.md` step 1).
 - Current step (`RC-FLOW.md`) identified before attempting its unlock action.
-- CI green before any push; trio `APPROVED` before the candidate's develop PR.
+- CI green before any push; trio `APPROVED` before the candidate's integration-branch PR.
 - At candidate closure: memory update -> closure narrative -> disposition sweep -> artifact GC -> merge -> the promote-or-continue gate.
 
 ## 4. References

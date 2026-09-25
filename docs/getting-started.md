@@ -138,7 +138,8 @@ documents are the state, the ledger scripts move the records, and the markers in
    REBUILD, UPDATE or KEEP, then ADD only for what no unit can carry; the mandatory
    grill; then `SPEC.md` (its `Replaces` naming what DELETE/REBUILD rows remove),
    `PLAN.md` (opening with that table as §1) and `TASKS.md` at the release root, in one
-   definition commit on `feature/<M.m.p>`.
+   definition commit on the work branch (`<work>M.m.p`; the names are the
+   `gitflow:` block of `specs/constitution.md`).
 4. **Open implementation.** `release.py phase IMPLEMENTATION --sha <sha>` requires all
    three files `**Status:** Approved` and PLAN's As-is review table, and stamps
    `defined`.
@@ -149,10 +150,10 @@ documents are the state, the ledger scripts move the records, and the markers in
    or `[-]` marker and stamps `implemented`. Then, in order: memory reconciliation, the
    closure `log` entries, the disposition sweep (`backlog.py exit`,
    `audit.py disposition`/`close`, `bugs.py archive`), artifact GC, and the
-   `feature -> develop` PR merged green.
+   work -> integration PR merged green.
 7. **Continue or promote.** Continue: `release.py new` with the same id stacks the next
-   candidate, reopening `DEFINITION`. Promote: merge `develop` into `main`, then merge
-   the release PR release-please opens there — it owns the version, the CHANGELOG
+   candidate, reopening `DEFINITION`. Promote: merge the integration branch into the
+   principal, then merge the release PR release-please opens there — it owns the version, the CHANGELOG
    section and the tag, and the publish jobs run on it.
 
 A bug needs none of this: register, lineage, RED test, root-cause fix, GREEN, `resolve`

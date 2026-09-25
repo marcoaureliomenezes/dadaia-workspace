@@ -9,7 +9,7 @@ description: >
 
 # dd-gitflow-default — The Branch Contract
 
-The branch contract, stated once, and the mechanics that operate it.
+The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` block (`<work>M.m.p` = work prefix + version).
 
 ## 1. When
 
@@ -20,31 +20,31 @@ The branch contract, stated once, and the mechanics that operate it.
 ## 2. Steps
 
 1. `git fetch --all --prune`.
-2. Diff `main` against `develop` — a nonzero diff means `develop` carries undeployed work.
-3. Identify the one live `feature/{M.m.p}` branch.
-4. Surface a `feature/{v}` predating `develop`'s last move to the operator first — it is stale.
+2. Read the gitflow block; diff the principal against the integration branch — a nonzero diff means the integration branch carries undeployed work.
+3. Identify the one live work branch `<work>M.m.p`.
+4. Surface a work branch predating the integration branch's last move to the operator first — it is stale.
 5. Branch count, cut point and name follow §2a.
-6. Definition stage: author the candidate's SPEC/PLAN/TASKS at the release root on `feature/{M.m.p}`.
+6. Definition stage: author the candidate's SPEC/PLAN/TASKS at the release root on the work branch.
 7. Implementation stage: one commit per completed task group, shaped per §3a.
-8. Candidate closure: open one `feature/{M.m.p}` → `develop` PR and merge it green.
+8. Candidate closure: open one work → integration PR and merge it green.
 9. After the merge, ask the operator: **promote or continue?** Continue = the next candidate's `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id>`; promote = step 10.
-10. Promote: open the PR `develop` → `main` (ship verdict pre-staged naming develop's tip, §3b); merging it lets release-please open the release PR that carries the version, the CHANGELOG and the tag.
-11. The moment the release PR merges, record it — `python3 .agents/skills/dd-release-implementation/scripts/release.py phase CLOSURE --sha <sha> --pr <n>` — then delete `feature/{M.m.p}`, cut `feature/{next}` from `main` and `git merge -s ours origin/develop`, in that order.
+10. Promote: open the PR integration → principal (ship verdict pre-staged naming the integration tip, §3b); merging it lets release-please open the release PR that carries the version, the CHANGELOG and the tag.
+11. The moment the release PR merges, record it — `python3 .agents/skills/dd-release-implementation/scripts/release.py phase CLOSURE --sha <sha> --pr <n>` — then delete the work branch, cut `<work>{next}` from the principal and `git merge -s ours origin/<integration>`, in that order.
 12. Tag `archive/<name>` then delete a branch the moment its work lands elsewhere.
 
 ## 2a. The branch contract
 
 | Branch | Pushable | Cut from | Advances by |
 |---|---|---|---|
-| `feature/{M.m.p}` | Yes — local CI preflight + valid name | `main` | the PR below |
-| `develop` | No — never a direct push | `main` (bootstrap only) | PR from `feature/{M.m.p}`, at definition `Approved` and at each `rc` merge; Dependabot update PRs (`target-branch: develop`) |
-| `main` | No — never a direct push | — | PR from `develop`, at the final `rc` |
+| work `<work>M.m.p` | Yes — local CI preflight + valid name | principal | the PR below |
+| integration | No — never a direct push | principal (bootstrap only) | PR from the work branch, at definition `Approved` and at each `rc` merge; Dependabot update PRs (`target-branch` = integration) |
+| principal | No — never a direct push | — | PR from the integration branch, at the final `rc` |
 
-- No `v` prefix, no suffix, no other branch we cut; the only bot heads are release-please's release PR into `main` and Dependabot's into `develop`; `hotfix/*` is retired (operator request only, no cadence).
-- Exactly one live `feature/{M.m.p}`, named for the live release; bugs fix on it in any phase, no ceremony.
+- No `v` prefix, no suffix, no other branch we cut; the only bot heads are release-please's release PR into the principal and Dependabot's into the integration branch; `hotfix/*` is retired (operator request only, no cadence).
+- Exactly one live work branch, named for the live release; bugs fix on it in any phase, no ceremony.
 - The release version = `0.1.0` when the repo has no tag, else last tag + 1 patch, minted at birth; it increments ONLY at an operator-approved deploy.
-- Each candidate closure burns one `feature -> develop` merge; after it, ask the operator: promote or continue.
-- Every flow stage runs on `feature/{M.m.p}`; `develop` and `main` are PR targets only, never a working branch.
+- Each candidate closure burns one work -> integration merge; after it, ask the operator: promote or continue.
+- Every flow stage runs on the work branch; the integration and principal branches are PR targets only, never a working branch.
 
 ## 3a. Commit shapes — each write alone, in its own shape
 

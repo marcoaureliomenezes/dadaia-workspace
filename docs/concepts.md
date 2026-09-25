@@ -50,8 +50,8 @@ the picked backlog and bug set, the as-is review (one As-is verdict — DELETE, 
 UPDATE, KEEP, then ADD — per touched unit, landing as PLAN §1), the mandatory grill, the
 SPEC with its `Replaces`, PLAN and TASKS, one reserved task at a time, then closure — memory reconciliation, the closure `log`
 entries, the disposition sweep (`backlog.py exit`, `audit.py disposition`/`close`,
-`bugs.py archive`), artifact GC, the `feature -> develop` merge and the operator's
-promote-or-continue choice. **Arm B**, a bug, is fixed on the live feature branch in
+`bugs.py archive`), artifact GC, the work -> integration merge (the constitution's `gitflow:`) and the operator's
+promote-or-continue choice. **Arm B**, a bug, is fixed on the live work branch in
 any phase with no SPEC, PLAN or TASKS: register, lineage, RED test, root-cause fix,
 GREEN, `resolve` with evidence, one commit; a unit fixed twice before is rebuilt, not
 patched a third time. No engine drives either arm: the documents

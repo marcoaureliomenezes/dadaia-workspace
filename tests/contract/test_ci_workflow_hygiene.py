@@ -12,6 +12,7 @@ release.yml behind the single `release_created` gate: no `release:` event, no
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 from pathlib import Path
@@ -293,14 +294,17 @@ def test_no_workflow_calls_a_model_api() -> None:
     assert offenders == [], "a workflow calls a model API:\n" + "\n".join(offenders)
 
 
-def _guard_exit(head: str, base: str) -> int:
-    """Run pr-source-guard's shell step exactly as CI does, for one (head, base) pair."""
+def _guard_exit(head: str, base: str, cwd: Path = _REPO_ROOT) -> int:
+    """Run pr-source-guard's python step exactly as CI does, for one (head, base) pair,
+    reading the gitflow of the constitution under *cwd*."""
     import subprocess
 
     ci = yaml.safe_load((_WORKFLOWS / "ci.yml").read_text(encoding="utf-8"))
-    step = ci["jobs"]["pr-source-guard"]["steps"][0]
-    env = {"HEAD_REF": head, "BASE_REF": base, "PATH": "/usr/bin:/bin"}
-    return subprocess.run(["bash", "-c", step["run"]], env=env, capture_output=True).returncode
+    step = next(s for s in ci["jobs"]["pr-source-guard"]["steps"] if "run" in s)
+    env = {"HEAD_REF": head, "BASE_REF": base, "PATH": os.environ["PATH"],
+           "PYTHONPATH": str(_REPO_ROOT)}  # fmt: skip
+    run = subprocess.run(["bash", "-c", step["run"]], env=env, cwd=cwd, capture_output=True)
+    return run.returncode
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the guard is a bash step on ubuntu-latest")
@@ -325,6 +329,45 @@ def test_pr_source_guard_admits_the_release_pr_into_main(
     develop and release-please's own branch; develop accepts feature/{M.m.p} and the
     Dependabot update branches (bug dependabot-targets-main-and-every-update-pr-is-refused)."""
     assert (_guard_exit(head, base) == 0) is allowed
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the guard is a bash step on ubuntu-latest")
+@pytest.mark.parametrize(
+    ("head", "base", "allowed"),
+    [
+        ("next", "trunk", True),
+        ("develop", "trunk", False),
+        ("work/1.2.3", "next", True),
+        ("feature/1.2.3", "next", False),
+    ],
+)
+def test_pr_source_guard_reads_the_gitflow_by_role(
+    tmp_path: Path, head: str, base: str, allowed: bool
+) -> None:
+    """T-050-19 AC6.8: the guard names no branch; a renamed gitflow moves its rules."""
+    (tmp_path / "specs").mkdir()
+    (tmp_path / "specs" / "constitution.md").write_text(
+        "---\nspecs_pattern_version: 6\n"
+        "gitflow: {principal: trunk, integration: next, work: work/}\n---\n# C\n",
+        encoding="utf-8",
+    )
+    assert (_guard_exit(head, base, tmp_path) == 0) is allowed
+
+
+def test_the_ci_triggers_are_the_library_gitflow() -> None:
+    """T-050-19 AC6.9: GitHub reads no file, so ci.yml's triggers stay literal — pinned
+    here to the library constitution's gitflow; changing one without the other is red."""
+    from dadaia_workspace.core.specs_version import read_gitflow
+
+    flow, warning = read_gitflow(_REPO_ROOT / "specs")
+    assert warning is None
+    on = yaml.safe_load((_WORKFLOWS / "ci.yml").read_text(encoding="utf-8"))[True]
+    assert on["push"]["branches"] == [flow.principal, flow.integration, f"{flow.work_prefix}**"]
+    assert on["pull_request"]["branches"] == [flow.principal, flow.integration]
+    release = yaml.safe_load((_WORKFLOWS / "release.yml").read_text(encoding="utf-8"))[True]
+    assert release["push"]["branches"] == [flow.principal]
+    bot = yaml.safe_load((_WORKFLOWS.parent / "dependabot.yml").read_text(encoding="utf-8"))
+    assert {u["target-branch"] for u in bot["updates"]} == {flow.integration}
 
 
 def test_every_dependabot_update_targets_develop() -> None:

@@ -122,7 +122,7 @@ through the gate asserting ALLOW. No lease, lock or wait path exists; the gate r
 
 Work runs as candidates inside one live release: a picked set, an as-is review of every
 unit it touches, a grill, SPEC, PLAN and TASKS, one reserved task at a time, `[x]` only after the reviewer's `APPROVED`, then
-closure — memory reconciliation, disposition sweep, the `feature -> develop` merge. The
+closure — memory reconciliation, disposition sweep, the work -> integration merge (branch names: the constitution's `gitflow:`). The
 ledger scripts under `.agents/skills/*/scripts/` (`bugs.py`, `backlog.py`,
 `release.py`, `audit.py`) are each record's one writer. A bug is proposed to the
 operator and registered only after confirmation, then fixed on the live feature branch

@@ -28,7 +28,7 @@ Also input: `.dadaia/.venv/bin/dadaia doctor` against every release the window t
 ## `_RELEASE.json` milestone completeness
 
 1. For every release whose `_RELEASE.json` the window's commits touch, confirm the three canonical milestones.
-2. Milestones: `defined` (SPEC `Approved`), `implemented` (final-rc QA close), `shipped` (merge to `main`).
+2. Milestones: `defined` (SPEC `Approved`), `implemented` (final-rc QA close), `shipped` (merge to the principal branch of the constitution's `gitflow:`).
 3. Confirm each carries a `sha` (and, where applicable, a `pr`).
 4. Flag a release with a `shipped` milestone but no `defined`/`implemented` milestone — the chain has a gap.
 5. For an archived release, check the same via its `releases_histo.jsonl` summary.

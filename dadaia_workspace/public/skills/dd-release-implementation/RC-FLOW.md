@@ -9,8 +9,8 @@ candidates.
 | Boundary | Who validates | What unlocks |
 |---|---|---|
 | Per task | implementer discipline only (TDD, tests, local CI preflight, handoff); marker stays `[-]` | nothing; no per-task reviewer gate |
-| Candidate close | `dd-code-reviewer` `APPROVED` (three axes, six lenses) on the same commit | `[x]`; the candidate's `feature -> develop` PR |
-| Promote (ship) | pre-staged security verdict naming develop's tip | the `develop -> main` PR |
+| Candidate close | `dd-code-reviewer` `APPROVED` (three axes, six lenses) on the same commit | `[x]`; the candidate's work -> integration PR |
+| Promote (ship) | pre-staged security verdict naming the integration tip | the integration -> principal PR |
 
 - Any `REJECTED`, CRITICAL/HIGH finding, failed E2E, or missing evidence sends the work back to implementation.
 - Rework continues until every required validator approves the same commit, or the operator stops the candidate.
@@ -64,7 +64,7 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 - Done when: the `kind: artifact-gc` log entry records the `compliance(total)` line and it reads 100%, or names the slop the operator holds.
 
 **Step 9 — Candidate PR.**
-- Open the `feature/{M.m.p}` -> `develop` PR (security verdict covering the head, `dd-gitflow-default` §2a); watch CI to green; merge.
+- Open the work -> integration PR (branch names: the constitution's `gitflow:`) (security verdict covering the head, `dd-gitflow-default` §2a); watch CI to green; merge.
 - Done when: it merges green.
 
 The arc ends here. Gate -> promote -> record -> branch cut: `dd-gitflow-default` steps

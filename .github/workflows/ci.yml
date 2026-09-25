@@ -1,9 +1,11 @@
 name: CI
 
-# Gitflow law v2 (v0.4.4 FR3/FR4 / DADAIA.md §4 (Gitflow)): feature/{M.m.p} is the ONLY pushable
-# branch (its push triggers the full matrix below); develop and main advance by PR
-# only. Every PR is gated by pr-source-guard (both edges, one job); no job calls a model
-# API — the security review is the local dd-code-reviewer lens. hotfix/* carries no trigger.
+# Gitflow by role (specs/constitution.md `gitflow:`): the work branch is the ONLY pushable
+# branch (its push triggers the full matrix below); the integration and principal branches
+# advance by PR only. The triggers below are literal (GitHub reads no file) and pinned to the
+# library gitflow by tests/contract/test_ci_workflow_hygiene.py; pr-source-guard reads the
+# gitflow itself. No job calls a model API — the security review is the local
+# dd-code-reviewer lens.
 on:
   push:
     branches:
@@ -324,39 +326,45 @@ jobs:
         run: dadaia doctor --specs-dir specs --source-root .
 
   pr-source-guard:
-    name: PR source guard (both gitflow v2 edges, one job)
+    name: PR source guard (both gitflow edges, one job)
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && (github.base_ref == 'main' || github.base_ref == 'develop')
-    timeout-minutes: 1
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 2
     steps:
+      # The gitflow is read from the BASE branch's constitution: a PR can never rename
+      # the roles that admit it. The stdlib-only core modules need no install.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ github.base_ref }}
+          persist-credentials: false
       - name: Refuse a PR whose head does not match its base's permitted source
         env:
           # head.ref/base_ref are fork-influenceable input: never interpolate them
           # into the shell command string — read from the environment and compare.
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           BASE_REF: ${{ github.base_ref }}
+          PYTHONPATH: .
         run: |
-          if [ "$BASE_REF" = "main" ]; then
-            # Rule 1: main accepts the promote PR from develop and release-please's
-            # release PR (ADR 0021: promote is merging the release PR), nothing else.
-            if [ "$HEAD_REF" != "develop" ] && [ "$HEAD_REF" != "release-please--branches--main" ]; then
-              echo "::error::Gitflow law: main accepts PRs from 'develop' or the release-please release PR only. Got head '$HEAD_REF'."
-              echo "::error::Fix: merge your branch into develop, push develop, and open the PR develop -> main."
-              exit 1
-            fi
-            echo "PR head is $HEAD_REF - gitflow source rule satisfied (main)."
-          elif [ "$BASE_REF" = "develop" ]; then
-            # Rule 2 (v0.4.4 FR4): develop accepts a PR from feature/{M.m.p} — no
-            # 'v' prefix, M.m.p numeric — or from a Dependabot update branch
-            # (dependabot.yml targets develop). The feature pattern is derived from the SAME pattern as
-            # features/chokepoints/service.py::_FEATURE_RE
-            # (r"^feature/\d+\.\d+\.\d+$") — the ONE pattern source (A3.2); POSIX ERE
-            # has no \d, so [0-9]+ is its exact translation, never a second, drifted
-            # regex literal.
-            if ! echo "$HEAD_REF" | grep -Eq '^(feature/[0-9]+\.[0-9]+\.[0-9]+|dependabot/.+)$'; then
-              echo "::error::Gitflow law: develop accepts PRs from 'feature/{M.m.p}' (no 'v' prefix) or a Dependabot update branch only. Got head '$HEAD_REF'."
-              echo "::error::Fix: rebuild your work on a feature/M.m.p branch and open the PR feature/M.m.p -> develop."
-              exit 1
-            fi
-            echo "PR head $HEAD_REF - gitflow source rule satisfied (develop)."
-          fi
+          python3 - <<'PY'
+          import os, sys
+          from pathlib import Path
+          from dadaia_workspace.core.specs_version import read_gitflow
+
+          flow, _ = read_gitflow(Path("specs"))
+          head, base = os.environ["HEAD_REF"], os.environ["BASE_REF"]
+          if base == flow.principal:
+              # ADR 0021: the principal accepts the integration branch's promote PR and
+              # release-please's release PR, nothing else.
+              ok = head in (flow.integration, f"release-please--branches--{flow.principal}")
+              want = f"'{flow.integration}' or the release-please release PR"
+          elif base == flow.integration:
+              # Dependabot targets the integration branch (dependabot.yml).
+              ok = flow.role_of(head) == "work" or head.startswith("dependabot/")
+              want = f"'{flow.work_prefix}<M.m.p>' or a Dependabot update branch"
+          else:
+              ok, want = True, ""
+          if not ok:
+              print(f"::error::Gitflow law: {base} accepts PRs from {want} only. Got head '{head}'.")
+              sys.exit(1)
+          print(f"PR head {head} - gitflow source rule satisfied ({base}).")
+          PY

@@ -46,17 +46,20 @@ def test_gitleaks_job_name_matches_the_required_branch_protection_context() -> N
 def test_pull_request_trigger_covers_both_develop_and_main_edges() -> None:
     """A-12.1/A-12.2: the required context must report on a feature -> develop PR, not
     only feature -> main — both PR edges `dd-gitflow-default` gates the same way."""
-    workflow = _load_workflow()
-    on = workflow[True]
-    assert on["pull_request"]["branches"] == ["main", "develop"]
+    from dadaia_workspace.core.specs_version import read_gitflow
+
+    flow, _ = read_gitflow(_REPO_ROOT / "specs")
+    on = _load_workflow()[True]
+    assert on["pull_request"]["branches"] == [flow.principal, flow.integration]
 
 
 def test_push_trigger_is_main_only_and_the_retired_hotfix_pattern_is_gone() -> None:
     """``hotfix/*`` was retired outright (`dd-gitflow-default` / G2) — its push trigger must
     not linger in a workflow that never got the memo."""
-    workflow = _load_workflow()
-    on = workflow[True]
-    assert on["push"]["branches"] == ["main"]
+    from dadaia_workspace.core.specs_version import read_gitflow
+
+    flow, _ = read_gitflow(_REPO_ROOT / "specs")
+    assert _load_workflow()[True]["push"]["branches"] == [flow.principal]
     text = _SECRET_SCAN_YML.read_text(encoding="utf-8")
     assert "hotfix" not in text
 

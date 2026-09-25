@@ -49,7 +49,7 @@ a fuzzy term in the demand becomes a canonical term before it reaches the SPEC.
 
 1. Author the SPEC (Draft) only after the grill: the picked bug+backlog set, their
    acceptance, every `superseded_by` link.
-2. Definition runs on `feature/{M.m.p}`; the trio's place is the releases law's.
+2. Definition runs on the work branch (`<work>M.m.p`, the constitution's `gitflow:`); the trio's place is the releases law's.
 3. Commit shape 5 (`dd-gitflow-default` §3a): SPEC + PLAN + TASKS + the picked entries
    flipped to `status: picked` + picked bugs, one commit; set the `defined` milestone in `_RELEASE.json`
    (`dd-release-implementation`'s `RELEASE-EVENTS.md`).
