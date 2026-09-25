@@ -43,6 +43,7 @@ _CLI = str(cli_path(Path()))
 
 _SHA_A = "a" * 40
 _ZERO = "0" * 40
+_SHA_B = "b" * 40
 
 
 def _the_fix(message: str) -> str:
@@ -162,8 +163,8 @@ class _FakeObjectSource:
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         return self.objects
 
-    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
-        return ()
+    def publishes_nothing(self, repo: Path, sha: str) -> bool:
+        return False
 
 
 class _FailingObjectSource(_FakeObjectSource):
@@ -202,8 +203,9 @@ def test_push_gate_malformed_stdin_carries_a_runnable_fix() -> None:
 @pytest.mark.parametrize(
     ("name", "line"),
     [
-        ("main", f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"),
-        ("develop", f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
+        ("main", f"refs/heads/main {_SHA_A} refs/heads/main {_SHA_B}"),
+        ("develop", f"refs/heads/develop {_SHA_A} refs/heads/develop {_SHA_B}"),
+        ("birth-with-content", f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
         ("invalid-name", f"refs/heads/wip/x {_SHA_A} refs/heads/wip/x {_ZERO}"),
         ("not-a-branch-head", f"refs/notes/x {_SHA_A} refs/notes/x {_ZERO}"),
         ("refspec", f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/develop {_ZERO}"),

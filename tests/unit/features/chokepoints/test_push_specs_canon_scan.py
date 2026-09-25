@@ -49,17 +49,9 @@ class _FakeCanonObjectSource:
             for i, path in enumerate(self.range_by_sha.get(local_sha, []))
         ]
 
-    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
-        self.parent_calls.append(sha)
-        parent = self.parent_by_sha.get(sha)
-        return (parent,) if parent else ()
-
 
 class _FailingTreeObjectSource:
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
-        return ()
-
-    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
         return ()
 
 

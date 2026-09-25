@@ -1,6 +1,6 @@
 """`ci push-gate-check` CLI wiring for the v0.9.0 range-scoped denylist scan.
 
-Intent: CONTRACT — v0.9.0 A3.5, A6.3
+Intent: CONTRACT — v0.9.0 A3.5, A6.3; 0.5.0 AC5.1, AC5.4 (T-050-14)
 
 Pins two composition-root guarantees:
 
@@ -39,9 +39,6 @@ class _SpyObjectSource:
 
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         self.calls.append((repo, local_sha, remote_sha))
-        return ()
-
-    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
         return ()
 
 
@@ -195,3 +192,66 @@ def test_a_sibling_repo_name_that_is_an_english_word_does_not_block_the_push(
     )
 
     assert result.exit_code == 0, result.output
+
+
+# ── 0.5.0 AC5.1/AC5.4 (T-050-14): the bootstrap birth through the REAL reader ──────────
+
+
+def _git(repo: Path, *args: str) -> str:
+    return subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t.invalid", *args],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
+def _remote_objects(remote: Path) -> set[str]:
+    listing = _git(remote, "cat-file", "--batch-all-objects", "--batch-check=%(objectname)")
+    return set(listing.split())
+
+
+def _gate(monkeypatch, tmp_path: Path, repo: Path, line: str) -> int:
+    monkeypatch.setattr(ci, "_repo_root", lambda: repo)
+    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
+    return _runner.invoke(app, ["ci", "push-gate-check"], input=line).exit_code
+
+
+def test_births_publish_nothing_and_a_birth_with_content_is_refused(
+    monkeypatch, tmp_path: Path
+) -> None:
+    remote = tmp_path / "origin.git"
+    remote.mkdir()
+    _git(remote, "init", "-q", "--bare")
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "main")
+    _git(repo, "remote", "add", "origin", str(remote))
+    _git(repo, "commit", "-q", "--allow-empty", "-m", "root")
+    root = _git(repo, "rev-parse", "HEAD")
+
+    # An orphan empty root pushed as the principal branch: allowed, publishes only itself.
+    assert (
+        _gate(monkeypatch, tmp_path, repo, f"refs/heads/main {root} refs/heads/main {_ZERO}\n") == 0
+    )
+    _git(repo, "push", "-q", "--no-verify", "origin", "main")
+    before = _remote_objects(remote)
+
+    # `git branch develop main` pushed: allowed, and the remote gains no object.
+    _git(repo, "branch", "develop", "main")
+    line = f"refs/heads/develop {root} refs/heads/develop {_ZERO}\n"
+    assert _gate(monkeypatch, tmp_path, repo, line) == 0
+    _git(repo, "push", "-q", "--no-verify", "origin", "develop")
+    assert _remote_objects(remote) == before
+
+    # A birth carrying a new commit is refused.
+    _git(repo, "checkout", "-q", "-b", "next", "main")
+    (repo / "x.txt").write_text("x\n", encoding="utf-8")
+    _git(repo, "add", "x.txt")
+    _git(repo, "commit", "-q", "-m", "content")
+    tip = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "update-ref", "-d", "refs/heads/develop")
+    _git(repo, "branch", "develop", tip)
+    line = f"refs/heads/develop {tip} refs/heads/develop {_ZERO}\n"
+    assert _gate(monkeypatch, tmp_path, repo, line) != 0

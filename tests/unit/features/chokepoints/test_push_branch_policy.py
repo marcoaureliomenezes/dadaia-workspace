@@ -26,18 +26,25 @@ from dadaia_workspace.features.specs.canon import canon_violations
 
 _SHA_A = "a" * 40
 _ZERO = "0" * 40
+_SHA_B = "b" * 40
 _CUSTOM = Gitflow(principal="trunk", integration="next", work_prefix="work/")
 _FLOWS = pytest.mark.parametrize("flow", [DEFAULT, _CUSTOM], ids=["default", "custom"])
 
 
 class _EmptyObjectSource:
-    """No object is new: the denylist and canon scans are pure pass-throughs here."""
+    """No object is new: the denylist and canon scans are pure pass-throughs here.
+    ``contentless`` names the shas whose push publishes nothing (a birth candidate)."""
+
+    def __init__(self, contentless: frozenset[str] = frozenset()) -> None:
+        self.contentless = contentless
+        self.asked: list[str] = []
 
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         return ()
 
-    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
-        return ()
+    def publishes_nothing(self, repo: Path, sha: str) -> bool:
+        self.asked.append(sha)
+        return sha in self.contentless
 
 
 def _decide(refs: list[PushRef], root: Path, flow: Gitflow = DEFAULT, **kwargs: Any) -> Decision:
@@ -51,8 +58,8 @@ def _refs(*lines: str) -> list[PushRef]:
     return parse_push_stdin("\n".join(lines))[0]
 
 
-def _push(local: str, remote: str | None = None) -> list[PushRef]:
-    return _refs(f"refs/heads/{local} {_SHA_A} refs/heads/{remote or local} {_ZERO}")
+def _push(local: str, remote: str | None = None, remote_sha: str = _ZERO) -> list[PushRef]:
+    return _refs(f"refs/heads/{local} {_SHA_A} refs/heads/{remote or local} {remote_sha}")
 
 
 def _fix(decision: Decision) -> list[str]:
@@ -69,7 +76,7 @@ def test_work_branch_push_is_allowed(tmp_path: Path, flow: Gitflow) -> None:
 def test_integration_push_is_refused_naming_the_pr_from_a_work_branch(
     tmp_path: Path, flow: Gitflow
 ) -> None:
-    decision = _decide(_push(flow.integration), tmp_path, flow)
+    decision = _decide(_push(flow.integration, remote_sha=_SHA_B), tmp_path, flow)
     assert not decision.allowed
     assert f"'{flow.integration}'" in decision.message
     assert _fix(decision) == [
@@ -87,7 +94,7 @@ def test_integration_push_is_refused_naming_the_pr_from_a_work_branch(
 def test_principal_push_is_refused_naming_the_pr_from_integration(
     tmp_path: Path, flow: Gitflow
 ) -> None:
-    decision = _decide(_push(flow.principal), tmp_path, flow)
+    decision = _decide(_push(flow.principal, remote_sha=_SHA_B), tmp_path, flow)
     assert not decision.allowed
     assert f"'{flow.principal}'" in decision.message
     assert _fix(decision) == [
@@ -130,6 +137,41 @@ def test_a_branch_outside_the_gitflow_is_refused_naming_the_work_branch(
 def test_the_default_names_are_ordinary_branches_under_a_custom_gitflow(tmp_path: Path) -> None:
     assert not _decide(_push("feature/0.0.0"), tmp_path, _CUSTOM).allowed
     assert "trunk" in _decide(_push("main"), tmp_path, _CUSTOM).message
+
+
+@_FLOWS
+@pytest.mark.parametrize("role", ["principal", "integration"])
+def test_a_contentless_birth_of_principal_or_integration_passes(
+    tmp_path: Path, flow: Gitflow, role: str
+) -> None:
+    """ADR 0036: an orphan empty root pushed as the principal, or `git branch <integration>
+    <principal>` pushed, creates the remote branch and publishes nothing."""
+    source = _EmptyObjectSource(frozenset({_SHA_A}))
+    decision = _decide(_push(getattr(flow, role)), tmp_path, flow, object_source=source)
+    assert decision.allowed, decision.message
+    assert source.asked == [_SHA_A]
+
+
+@_FLOWS
+def test_a_birth_carrying_a_commit_is_refused_naming_git_fetch(
+    tmp_path: Path, flow: Gitflow
+) -> None:
+    decision = _decide(_push(flow.integration), tmp_path, flow)
+    assert not decision.allowed
+    assert _fix(decision) == ["git", "fetch", "--all"]
+
+
+def test_an_existing_principal_is_never_a_birth(tmp_path: Path) -> None:
+    source = _EmptyObjectSource(frozenset({_SHA_A}))
+    refs = _push("main", remote_sha=_SHA_B)
+    decision = _decide(refs, tmp_path, object_source=source)
+    assert not decision.allowed
+    assert source.asked == []
+
+
+def test_a_birth_aimed_at_another_remote_name_is_refused(tmp_path: Path) -> None:
+    source = _EmptyObjectSource(frozenset({_SHA_A}))
+    assert not _decide(_push("main", "develop"), tmp_path, object_source=source).allowed
 
 
 def test_tag_push_still_passes(tmp_path: Path) -> None:

@@ -77,6 +77,11 @@ def _run(
         raise GitObjectReadError(f"git command timed out: {' '.join(args)}") from exc
 
 
+#: ``git hash-object -t tree /dev/null`` in each object format.
+_EMPTY_TREE_SHA1 = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+_EMPTY_TREE_SHA256 = "6ef19b41225c5369f1c104d45d8d85efa9b057b53b14b4b9b939dd74decc5321"
+
+
 def _decode(raw: bytes) -> str:
     return raw.decode("utf-8", errors="replace")
 
@@ -869,18 +874,23 @@ class GitSubprocessObjectReader:
     """Subprocess-backed push-range object reader (SPEC v0.9.0 FR1/FR7; ADR-0001: the
     sole adapter — no ``GitObjectReader`` port)."""
 
-    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
-        """``git rev-list --parents -n 1 <sha>`` — the parent shas in order (first
-        parent first; two or more for a merge commit); empty for a root commit, an
-        unresolvable sha or a non-sha shape. Never raises: ``live_verdict_shas`` shrinks
-        its set instead."""
-        if not sha or not _SHA_SHAPE_RE.match(sha):
-            return ()
-        result = _run(["git", "rev-list", "--parents", "-n", "1", sha], repo)
-        if result.returncode != 0:
-            return ()
-        fields = _decode(result.stdout).split()
-        return tuple(fields[1:])
+    def publishes_nothing(self, repo: Path, sha: str) -> bool:
+        """ADR 0036: pushing *sha* adds no object the remote lacks — its range under the
+        ONE "already published" rule (:func:`_base_exclusions`) is empty, or is a single
+        parentless commit on the empty tree. Fails closed (``False``) on any read error."""
+        if not _SHA_SHAPE_RE.match(sha):
+            return False
+        try:
+            commits = _range_commit_shas(repo, sha, _base_exclusions(repo, ZERO_SHA))
+        except GitObjectReadError:
+            return False
+        if len(commits) != 1:
+            return not commits
+        shown = _run(["git", "show", "-s", "--format=%T %P", commits[0], "--"], repo)
+        return shown.returncode == 0 and _decode(shown.stdout).split() in (
+            [_EMPTY_TREE_SHA1],
+            [_EMPTY_TREE_SHA256],
+        )
 
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterator[ScannedObject]:
         if not local_sha or local_sha == ZERO_SHA:

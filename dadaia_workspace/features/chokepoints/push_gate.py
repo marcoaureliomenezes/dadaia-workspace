@@ -23,6 +23,8 @@ from typing import Protocol
 from dadaia_workspace.core.gitflow import Gitflow
 from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObject
 from dadaia_workspace.features.chokepoints.branch_policy import (
+    HEADS_PREFIX,
+    ZERO_SHA,
     Decision,
     PushRef,
     check_branch_policy,
@@ -60,7 +62,7 @@ class ObjectSource(Protocol):
         self, repo: Path, local_sha: str, remote_sha: str
     ) -> Iterable[ScannedObject]: ...
 
-    def parents(self, repo: Path, sha: str) -> tuple[str, ...]: ...
+    def publishes_nothing(self, repo: Path, sha: str) -> bool: ...
 
 
 def _annotate_skip(
@@ -400,7 +402,14 @@ def push_gate_decision(
         )
 
     branch_policy_refs = [r for r in refs if not r.is_deletion and not r.is_tag]
-    branch_refusal = check_branch_policy(branch_policy_refs, gitflow)
+    births = frozenset(
+        r.local_sha
+        for r in branch_policy_refs
+        if r.remote_sha == ZERO_SHA
+        and gitflow.role_of(r.local_ref.removeprefix(HEADS_PREFIX)) in ("principal", "integration")
+        and object_source.publishes_nothing(repo, r.local_sha)
+    )
+    branch_refusal = check_branch_policy(branch_policy_refs, gitflow, births)
     if branch_refusal is not None:
         return branch_refusal
 

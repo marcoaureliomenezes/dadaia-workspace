@@ -37,16 +37,10 @@ class _FakeObjectSource:
         self.calls.append((local_sha, remote_sha))
         return self.by_range.get((local_sha, remote_sha), [])
 
-    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
-        return ()
-
 
 class _FailingObjectSource:
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         raise GitObjectReadError("simulated git rev-list failure")
-
-    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
-        return ()
 
 
 def _refs(*lines: str) -> list[PushRef]:
@@ -206,7 +200,7 @@ def test_clean_tag_push_is_allowed_with_no_verdict_required(tmp_path: Path) -> N
 def test_branch_policy_refusal_precedes_the_scan(tmp_path: Path) -> None:
     source = _FailingObjectSource()  # would raise if ever called.
     decision = push_gate_decision(
-        _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"),
+        _refs(f"refs/heads/main {_SHA_A} refs/heads/main {'b' * 40}"),
         gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
@@ -559,9 +553,6 @@ class _FailingObjectSourceWithPath:
             "git cat-file --batch stream desynchronised resolving prior content",
             path=f"repos/{_PRIVATE_SEGMENT}/leak.md",
         )
-
-    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
-        return ()
 
 
 def test_git_object_read_failure_at_a_denylisted_path_masks_the_path(tmp_path: Path) -> None:

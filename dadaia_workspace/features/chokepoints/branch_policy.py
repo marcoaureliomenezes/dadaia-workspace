@@ -122,9 +122,19 @@ def _work(gitflow: Gitflow) -> str:
     return f"{gitflow.work_prefix}<M.m.p>"
 
 
-def _refuse_branch(branch: str, local_ref: str, gitflow: Gitflow) -> Decision:
+def _refuse_branch(ref: PushRef, branch: str, gitflow: Gitflow) -> Decision:
     """Actionable refusal for a non-pushable ref: rule + permitted names + one fix."""
     role = gitflow.role_of(branch)
+    if role is not None and ref.remote_sha == ZERO_SHA:
+        return Decision(
+            allowed=False,
+            message=(
+                f"[pre-push] BLOCKED: creating the {role} branch '{branch}' would publish "
+                "new objects — a birth may carry only already-published history or one "
+                f"empty root commit ({_LAW}). Stale remote-tracking refs look the same: "
+                "refresh them, then push again.\nfix: git fetch --all"
+            ),
+        )
     if role == "principal":
         why = f"advances only via a PR from the integration branch '{gitflow.integration}'"
         fix = ["gh", "pr", "create", "--base", branch, "--head", gitflow.integration]
@@ -135,7 +145,7 @@ def _refuse_branch(branch: str, local_ref: str, gitflow: Gitflow) -> Decision:
         return Decision(
             allowed=False,
             message=(
-                f"[pre-push] BLOCKED: ref '{local_ref}' is outside the gitflow — principal "
+                f"[pre-push] BLOCKED: ref '{ref.local_ref}' is outside the gitflow — principal "
                 f"'{gitflow.principal}', integration '{gitflow.integration}', work "
                 f"'{_work(gitflow)}' ({_LAW}). Only a work branch is pushable.\n"
                 f"fix: {shlex.join(['git', 'checkout', '-b', _work(gitflow), gitflow.principal])}"
@@ -151,9 +161,13 @@ def _refuse_branch(branch: str, local_ref: str, gitflow: Gitflow) -> Decision:
     )
 
 
-def check_branch_policy(refs: list[PushRef], gitflow: Gitflow) -> Decision | None:
+def check_branch_policy(
+    refs: list[PushRef], gitflow: Gitflow, births: frozenset[str] = frozenset()
+) -> Decision | None:
     """Every non-deletion, non-tag ref must be a work branch of *gitflow*, pushed to the
-    SAME remote name; the principal and integration branches are PR-only. Returns the
+    SAME remote name; the principal and integration branches are PR-only, except their
+    birth (ADR 0036): a local sha in *births* (the caller proved it creates the remote
+    branch and publishes nothing). Returns the
     first refusal, or ``None`` when every ref clears (the caller has already excluded
     tags and deletions from *refs*).
     """
@@ -169,8 +183,10 @@ def check_branch_policy(refs: list[PushRef], gitflow: Gitflow) -> Decision | Non
                 ),
             )
         branch = ref.local_ref[len(HEADS_PREFIX) :]
-        if gitflow.role_of(branch) != "work":
-            return _refuse_branch(branch, ref.local_ref, gitflow)
+        role = gitflow.role_of(branch)
+        born = role in ("principal", "integration") and ref.local_sha in births
+        if role != "work" and not born:
+            return _refuse_branch(ref, branch, gitflow)
         if ref.remote_ref != f"{HEADS_PREFIX}{branch}":
             return Decision(
                 allowed=False,

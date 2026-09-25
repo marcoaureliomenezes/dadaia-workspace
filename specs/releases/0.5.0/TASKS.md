@@ -86,7 +86,7 @@ DELETE/REBUILD rows (PLAN §1) land first. RED = the named test fails before the
 
 ### G4 — bootstrap birth (FR5)
 
-- [-] **T-050-14 — `publishes_nothing` replaces `parents`; births pass.**
+- [x] **T-050-14 — `publishes_nothing` replaces `parents`; births pass.**
   Port and reader swap the method (reusing `_base_exclusions`); fake stubs deleted; births computed in
   `push_gate_decision` for principal/integration refs with a zero remote sha; stale tracking refs refuse with
   `fix: git fetch <remote>`.
