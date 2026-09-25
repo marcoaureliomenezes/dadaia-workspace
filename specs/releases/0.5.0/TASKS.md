@@ -111,7 +111,7 @@ DELETE/REBUILD rows (PLAN §1) land first. RED = the named test fails before the
 
 ### G6 — the derived step list (FR7, FR1, FR3)
 
-- [ ] **T-050-16 — Only `context bind` binds.**
+- [-] **T-050-16 — Only `context bind` binds.**
   `init`/`create` write no session record, print no export, drop "and bound"; `bind_session` inlined into
   `bind`.
   `Write set:` `cli/commands/{init,context}.py`, `tests/integration/{test_init_with_repo,
