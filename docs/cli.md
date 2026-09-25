@@ -15,7 +15,7 @@
 - context alive — Transition a context to ALIVE; clone repo if absent. Idempotent if already ALIVE.
 - context baseline — Publish the onboarded project: principal + integration branches, then the work
 - context bind — Bind this shell session to a context.
-- context create — Clone (or adopt) every repo, install the pre-push hook, make the context ALIVE and
+- context create — Clone (or adopt) every repo, install the pre-push hook, make the context ALIVE —
 - context dead — Transition a context to DEAD; git sync + remove repo from disk.
 - context delete — Delete a context. Context must be dead.
 - context list — List all Spec Context Projects.

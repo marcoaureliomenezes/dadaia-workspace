@@ -8,8 +8,8 @@ import typer
 from rich.console import Console
 
 from dadaia_workspace import container
-from dadaia_workspace.cli.commands.context import bind_session, print_next_step
-from dadaia_workspace.core import harness_registry, session_store
+from dadaia_workspace.cli.commands.context import print_next_step
+from dadaia_workspace.core import harness_registry
 from dadaia_workspace.core.cli_line import cli_path, fix_line
 from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
@@ -116,7 +116,7 @@ def init(
     repo: str = typer.Option(
         "",
         "--repo",
-        help="Clone URL of this workspace's first project — cloned, made ALIVE and bound.",
+        help="Clone URL of this workspace's first project — cloned and made ALIVE.",
     ),
     associated_repo: list[str] = typer.Option(  # noqa: B008 — typer's repeatable option
         [],
@@ -220,7 +220,6 @@ def _create_context(root: Path, plan: InitPlan, chosen: str) -> str:
             if ctx_svc.show(slug).repo_url != plan.repo:
                 raise
             ctx_svc.alive(slug)
-        env_lines = session_store.binding_env_lines(slug, bind_session(root, slug))
     except (DadaiaError, OSError) as exc:
         typer.secho(f"Error: {exc}", err=True, fg=typer.colors.RED)
         typer.secho(
@@ -229,7 +228,5 @@ def _create_context(root: Path, plan: InitPlan, chosen: str) -> str:
             fg=typer.colors.RED,
         )
         raise typer.Exit(1) from None
-    console.print(f"[green]✓[/green] {slug} ALIVE and bound", highlight=False, soft_wrap=True)
-    for line in env_lines:
-        console.print(line, markup=False, soft_wrap=True, highlight=False)
+    console.print(f"[green]✓[/green] {slug} ALIVE", highlight=False, soft_wrap=True)
     return slug

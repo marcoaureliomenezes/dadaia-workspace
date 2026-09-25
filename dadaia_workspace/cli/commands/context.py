@@ -188,26 +188,6 @@ def resolve_own_session_id(*, explicit: str | None = None, mint: bool = False) -
     return None
 
 
-def bind_session(workspace_root: Path, name: str) -> str:
-    """Record THIS session's binding to *name*; return the session id — the one
-    binding author ``bind``, ``create`` and ``init --repo`` share."""
-    session_id = resolve_own_session_id(mint=True)
-    if session_id is None:  # pragma: no cover — mint=True always yields one
-        raise RuntimeError("session-id resolution returned None despite mint=True")
-    session_store.write_session(
-        workspace_root,
-        session_id,
-        session_store.new_binding_record(
-            session_id=session_id,
-            context=name,
-            runtime=os.environ.get("DADAIA_RUNTIME", "unknown"),
-            pid=os.getpid(),
-            now=_now_iso(),
-        ),
-    )
-    return session_id
-
-
 def print_next_step(workspace_root: Path, focus: str | None = None) -> None:
     """The derived onboarding next step (FR6 AC6.2) — the text ``doctor`` also reports."""
     step = onboarding.next_step(workspace_root, alive_context_trees(workspace_root), focus)
@@ -240,8 +220,8 @@ def create(
         [], "--associated-repo", help="Clone URL of an associated repo; repeatable"
     ),
 ) -> None:
-    """Clone (or adopt) every repo, install the pre-push hook, make the context ALIVE and
-    bind this session — one step; on failure nothing is left behind."""
+    """Clone (or adopt) every repo, install the pre-push hook, make the context ALIVE —
+    one step; on failure nothing is left behind."""
     ws = resolve_workspace_root()
     try:
         ctx = container.build_spec_context_service(ws).create(
@@ -255,16 +235,13 @@ def create(
             soft_wrap=True,
         )
         raise typer.Exit(1) from None
-    session_id = bind_session(ws, ctx.name)
     suffix = f", {len(ctx.associated_repos)} associated repo(s)" if ctx.associated_repos else ""
     console.print(
-        f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' created, ALIVE and bound "
+        f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' created and ALIVE "
         f"(main repo: repos/{ctx.repo_slug}{suffix})",
         highlight=False,
         soft_wrap=True,
     )
-    for line in session_store.binding_env_lines(ctx.name, session_id):
-        console.print(line, markup=False, soft_wrap=True, highlight=False)
     print_next_step(ws, ctx.name)
 
 
@@ -554,7 +531,18 @@ def bind(
 
     # Stable session identity (bug bind-session-id-divergence, 2026-07-15): the SAME
     # resolution order the gate/hooks use, so rebinds UPDATE one record.
-    session_id = bind_session(workspace_root, name)
+    session_id = resolve_own_session_id(mint=True) or ""
+    session_store.write_session(
+        workspace_root,
+        session_id,
+        session_store.new_binding_record(
+            session_id=session_id,
+            context=name,
+            runtime=os.environ.get("DADAIA_RUNTIME", "unknown"),
+            pid=os.getpid(),
+            now=_now_iso(),
+        ),
+    )
 
     # T-50-05 (SPEC v0.5.0 FR1): without this loud warning, a caller with no
     # harness-native id and no DADAIA_CONTEXT gets a silent no-op. stderr only, so it

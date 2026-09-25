@@ -105,9 +105,7 @@ def test_one_slug_rule(url: str, slug: str) -> None:
     assert slug_from_url(url) == slug
 
 
-def test_create_clones_hooks_alives_binds_and_leaves_the_repo_untouched(
-    ws: Path, tmp_path: Path
-) -> None:
+def test_create_clones_hooks_alives_and_leaves_the_repo_untouched(ws: Path, tmp_path: Path) -> None:
     """AC3.1 + AC3.6: name defaults to the slug; porcelain clean; HEAD equals the
     remote's. Doctor's 0 errors needs a real venv — the onboarding journey pins it."""
     main = _remote(tmp_path, "my.app.git")
@@ -120,7 +118,8 @@ def test_create_clones_hooks_alives_binds_and_leaves_the_repo_untouched(
     record = json.loads(_runner.invoke(app, ["context", "show", "my-app", "--json"]).stdout)
     assert record["state"] == "alive"
     assert [r["slug"] for r in record["associated_repos"]] == ["lib"]
-    assert (session_store.read_session(ws, _SID) or {}).get("context") == "my-app"
+    assert session_store.read_session(ws, _SID) is None  # AC7.1: create binds nothing
+    assert "bound" not in out and "export DADAIA_" not in out
     for checkout in (repo, ws / "repos" / "lib"):
         assert (checkout / ".git" / "hooks" / "pre-push").is_file()
         assert _git("status", "--porcelain", cwd=checkout) == ""

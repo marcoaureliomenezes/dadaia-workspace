@@ -5,7 +5,7 @@ Intent: CONTRACT — 0.4.7 FR1 / AC1.1 (T-047-74). Size: MEDIUM (directory-tiere
 
 ``--repo`` makes ``init`` a CALLER of the context lifecycle: the repo is cloned into
 ``repos/<slug>/`` by the same ``SpecContextService.alive`` clone every other verb uses,
-the context is created with that slug as its main repo, alive'd, bound to this session,
+the context is created with that slug as its main repo, alive'd (never bound — ADR 0038),
 and the cloned repo gets the pre-push chokepoint. Network-free: the origin is a local
 bare repo, so the assertions below exercise the real git path with no remote.
 
@@ -92,20 +92,16 @@ def test_init_with_repo_clones_creates_alives_binds_and_installs_the_hook(
     assert contexts["demo-project"]["repo_slug"] == "demo-project"
     assert contexts["demo-project"]["state"] == "alive"
 
-    # 3. this session is bound to it.
-    sessions = list((workspace / ".dadaia" / "sessions").glob("*.json"))
-    bindings = [json.loads(path.read_text(encoding="utf-8")) for path in sessions]
-    assert [record["context"] for record in bindings] == ["demo-project"]
+    # 3. AC7.1: init binds nothing — no session record, `context bind` is the one binder.
+    assert not list((workspace / ".dadaia" / "sessions").glob("*.json"))
 
     # 4. the pre-push chokepoint is installed in the cloned repo, executable.
     hook = repo / ".git" / "hooks" / "pre-push"
     assert hook.is_file()
     assert os.access(hook, os.X_OK)
 
-    # 5. the eval-ready binding is printed — the SAME two lines `context bind
-    #    --print-env` emits, so the operator's shell reaches the context it just made.
-    assert "export DADAIA_CONTEXT=demo-project" in result.stdout
-    assert "export DADAIA_SESSION_ID=" in result.stdout
+    # 5. no export line, no "bound" claim.
+    assert "export DADAIA_" not in result.stdout and "bound" not in result.stdout
 
     # 6. `create` is the only context verb init ever names (FR1: a single-repo
     #    workspace is the degenerate multi-repo case).
