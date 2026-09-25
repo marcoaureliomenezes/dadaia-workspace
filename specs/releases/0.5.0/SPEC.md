@@ -129,21 +129,39 @@ below is the library source under `dadaia_workspace/public/`; projections follow
   table whose header cells are `unit | today | bugs | verdict | why` (trimmed, case-insensitive) and ≥ 1
   data row, each row's verdict cell — trimmed of whitespace, `` ` `` and `*` — one of `DELETE REBUILD UPDATE
   KEEP ADD` (case-insensitive) ⇒ the phase moves exactly as today (exit 0, `defined` stamped, one note).
+  _Amended 2026-09-25:_ the heading is the first level-2 heading whose text contains `as-is review` or
+  `as is review` (case-insensitive, any prefix or suffix); within its section (up to the next `## `) the
+  table starts at the first line whose cells equal the five columns — a sentence naming the columns
+  above it is prose; the next line is the separator; data rows run until the first line without a pipe;
+  cells split on unescaped pipes only, outer pipes optional.
 - AC2.2 Refusal — heading missing, heading with no table, a header other than the five columns, or zero
   data rows: exit non-zero, `_RELEASE.json` byte-identical, the message names `PLAN.md` and the missing
   structure, exactly one `fix:` line pointing at `dd-release-definition`'s As-is review section.
+  _Amended 2026-09-25:_ a missing heading and a missing or malformed table refuse with distinct
+  messages (`PLAN.md has no '## … As-is review' heading` vs `… is not followed by a table with header
+  'unit | today | bugs | verdict | why' and >= 1 row`); the `fix:` line names the absolute path of the
+  installed `dd-release-definition/SKILL.md`, never a cwd-relative path or a shell command.
 - AC2.3 Refusal — a row whose verdict is outside the vocabulary: same exit and `fix:`; the message names
   that row's unit and verdict.
 - AC2.4 Structure only: an all-ADD table passes; empty `bugs` and `why` cells pass; the check never
   counts bugs, resolves a unit, reads SPEC `Replaces`, TASKS order or any code. No other new refusal
   anywhere: `phase CLOSURE`, `new`, `memory`, `check` and `dadaia doctor` behave as today.
+  _Amended 2026-09-25:_ no new refusal; the `phase CLOSURE` open-task refusal's `fix:` line now names
+  the absolute path of `TASKS.md` instead of a `sed` command.
 - AC2.5 The check runs inside the trio admission `phase IMPLEMENTATION` already performs, after the
   Approved check (an unapproved trio refuses first, message unchanged); no flag, no verb, no new file
   under `scripts/`.
+  _Amended 2026-09-25:_ the unapproved-trio refusal still fires first; its message is reworded and its
+  `fix:` line names the document's absolute path instead of a `sed` command — every `phase` fix line
+  names an absolute path derived from the script's own location.
 - AC2.6 `tests/contract/test_release_script.py` (ADR 0041 `measured_by`) holds, RED before the check:
   the pass case; each AC2.2/AC2.3 refusal; numbered and unnumbered headings; a lowercase verdict; and the
   AC1.5 skeleton extracted from the skill's source text passing the check — the teaching and the gate
   cannot drift (`scaffold-artifacts-fail-own-workflow-gates`).
+  _Amended 2026-09-25:_ the file also holds any level-2 heading naming the review passing, rows
+  without outer pipes and with escaped pipes passing, the table ending at its first pipe-less line, the
+  heading-vs-table refusal messages, every fix naming an existing absolute path, and a sentence naming
+  the columns above the table passing.
 
 ### FR3 — Review: the spec axis confronts the as-is verdicts with the diff (`dd-code-review`)
 
