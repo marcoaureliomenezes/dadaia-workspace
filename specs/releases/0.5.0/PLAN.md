@@ -27,9 +27,16 @@ Paths are relative to `dadaia_workspace/public/` unless they start with `tests/`
 | `scaffold/releases/AGENTS.md` lifecycle line (+ `specs/releases/AGENTS.md` projection) | starts at `grill` | 1 (`releases-agents-projection-stale-vs-scaffold-source`, resolved) | UPDATE | one line; the projection is re-copied in the same change so the prior bug cannot recur |
 | `agents/dd-software-engineer.md`, `agents/dd-product-engineer.md` | no as-is duty | 0 | UPDATE | one line each (AC5.3) |
 | `CONTEXT.md` Candidate entry + Specs terms | Candidate arc starts at `grill` | 0 | UPDATE | arc names the as-is review; four terms enter (AC6.1) |
+| `_release_phase.py` `refuse_unfinished` | single-caller public helper for the CLOSURE open-task refusal | 0 | DELETE | fails the deletion test (one caller); inlined into `set_phase`'s CLOSURE branch to hold the module and V36 ceilings |
+| `_release_phase.py` fix lines (Status, TASKS, As-is) | cwd-relative, POSIX-only `sed` commands | 0 | REBUILD | review F1: a fix must work from any cwd — plain pointers to absolute paths derived from `__file__` |
+| `_release_new.py` `SPEC_STUB` `---` separators | a horizontal rule between every stub section | 0 | DELETE | carry nothing; removed so the stub gains `Replaces` without growing |
+| `skills/dd-release-definition` §1 step 6 | restates steps 2–4 (picking scoped to bugs/backlog/audits) | 0 | DELETE | a restatement; V35 ceiling |
+| `skills/dd-release-definition` §6 Consumes bullets + doctor backstop line | three Consumes bullets; the doctor `ledgers` backstop | 0 | UPDATE | Consumes bullets merged; the backstop line is doctor law's, deleted here |
+| `skills/dd-release-definition` §8 References | five cross-skill bullets, each already cited inline | 0 | UPDATE | reduced to the releases law; V35 ceiling |
+| `skills/dd-bug-resolution` References + LINEAGE "Twenty" line | LINEAGE/RED-LOOP bullets linked inline; cap restated | 0 | UPDATE | duplicates deleted; the audit redirect moved into Cost bound |
 | `tests/contract/test_release_script.py` | — | — | ADD | ADR 0041 `measured_by` path; the existing unit file stays the CLI-shape suite, this one pins the teaching ↔ gate contract (AC2.6) |
 
-Verdict counts: DELETE 1 · REBUILD 2 · UPDATE 11 · KEEP 2 · ADD 1.
+Verdict counts: DELETE 4 · REBUILD 3 · UPDATE 14 · KEEP 2 · ADD 1.
 
 ## 2. Strategy
 
