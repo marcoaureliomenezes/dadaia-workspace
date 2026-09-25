@@ -17,8 +17,8 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.template_history import SHIPPED_HASHES_FILENAME, was_shipped
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
-from dadaia_workspace.features.specs.template_history import SHIPPED_HASHES_FILENAME, was_shipped
 
 pytestmark = pytest.mark.contract
 

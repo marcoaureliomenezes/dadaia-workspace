@@ -29,11 +29,11 @@ import hashlib
 import json
 from pathlib import Path
 
-from dadaia_workspace.features.specs.doctor import SpecsDoctor
-from dadaia_workspace.features.specs.template_history import (
+from dadaia_workspace.core.template_history import (
     SHIPPED_HASHES_FILENAME,
     load_shipped_hashes,
 )
+from dadaia_workspace.features.specs.doctor import SpecsDoctor
 
 _REPO_ROOT = Path(__file__).parents[4]
 _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"

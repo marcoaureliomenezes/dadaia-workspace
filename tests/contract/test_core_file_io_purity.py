@@ -76,6 +76,9 @@ _AUTHORIZED_STEMS: frozenset[str] = frozenset(
         "invocation",
         "session_store",
         "handoff_index",
+        # T-050-10 (AC3.2): reads the shipped-hashes history beside the templates; moved
+        # to core so onboarding (a feature) and the specs doctor share it.
+        "template_history",
     }
 )
 

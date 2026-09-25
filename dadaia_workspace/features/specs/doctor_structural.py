@@ -15,6 +15,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.kernel_tunables import MEMORY_SCRIPT
+from dadaia_workspace.core.template_history import was_shipped
 from dadaia_workspace.core.workspace_layout import SCOPED_LAW_AREAS
 from dadaia_workspace.features.specs import memory_canon
 from dadaia_workspace.features.specs.canon import (
@@ -23,7 +24,6 @@ from dadaia_workspace.features.specs.canon import (
     is_canon_path,
 )
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
-from dadaia_workspace.features.specs.template_history import was_shipped
 
 # TREE-3: memory .md files that must exist.  No Jinja templates — .md is canonical source.
 # v7 canon: the top-level pair is ARCHITECTURE.md and QUALITY.md. A tree still carrying
