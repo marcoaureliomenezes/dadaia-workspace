@@ -584,7 +584,7 @@ class SpecContextService:
                 f"fix: {shell_line('git', '-C', str(repo), 'config', key, f'<{key}>')}"
             )
         foreign = [p for p in self._git.diff_name_only(repo) if p.split("/")[0] not in _ONBOARDING]
-        if foreign:
+        if foreign and self._git.has_commits(repo):  # unborn: untracked, never committed
             raise ContextStateError(
                 f"Context '{name}': changes outside {', '.join(_ONBOARDING)} are not published.\n"
                 "fix: " + shell_line("git", "-C", str(repo), "stash", "push", "-u", "--", *foreign)

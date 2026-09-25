@@ -159,6 +159,19 @@ def test_dirty_outside_the_paths_refuses_and_its_fix_lets_the_rerun_proceed(
     _assert_published(repo, bare, "feature/0.1.0", "develop")
 
 
+def test_an_unborn_dirty_clone_publishes_and_leaves_foreign_files_untouched(env) -> None:
+    """T-050-15 stall: `git stash` cannot run unborn; an unborn clone's foreign files are
+    untracked, never committed and never overwritten (the born branches are empty), so
+    baseline proceeds instead of printing a fix that cannot run."""
+    svc, repo, bare = env
+    _clone_onboarded(bare, repo)
+    (repo / "notes.md").write_text("operator\n", encoding="utf-8")
+    assert svc.baseline("proj") == "feature/0.1.0"
+    _assert_published(repo, bare, "feature/0.1.0", "develop")
+    assert (repo / "notes.md").read_text(encoding="utf-8") == "operator\n"
+    assert "notes.md" not in _git(bare, "ls-tree", "-r", "--name-only", "feature/0.1.0")
+
+
 def test_missing_identity_refuses_before_any_write(env) -> None:
     svc, repo, bare = env
     _clone_onboarded(bare, repo, identity=False)
