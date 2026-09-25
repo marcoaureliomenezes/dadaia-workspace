@@ -8,7 +8,7 @@ Scope: this file governs only `specs/releases/`.
   which writes `SPEC.md` + `_RELEASE.json` (DEFINITION) in one transaction and refuses a second one.
 - The release has OPEN scope: it grows by stacked closed-scope CANDIDATES, each trio written at the release root.
 - A closed candidate's trio is overwritten in place by the next candidate's `RELEASE_PY new`; that trio lives in git at its CLOSURE commit, which is the whole archive.
-- Canonical release state: `_RELEASE.json` — one mutable document (`phase`/milestones) plus an append-only `log`; a legacy `RELEASE.json` is renamed by `dadaia doctor --fix` (SPEC-DOC-046, ADR 0007).
+- Canonical release state: `_RELEASE.json` — one mutable document (`phase`/milestones) plus an append-only `log`; a legacy `RELEASE.json` is renamed by `.dadaia/.venv/bin/dadaia doctor --fix` (SPEC-DOC-046, ADR 0007).
 - No `_RELEASE.jsonl` event stream, no `CLOSURE.md`, no `reviews/` directory, no `segment`/`audited` fields.
 
 ## 1. Structure
