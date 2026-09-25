@@ -120,7 +120,7 @@ DELETE/REBUILD rows (PLAN §1) land first. RED = the named test fails before the
   `blocked by:` T-050-08 · `delivers:` AC7.1 — init/create leave no session record
   `RED:` `test_init_with_repo.py` asserts no session record.
 
-- [ ] **T-050-17 — `STEPS`: context, bind, specs, first-pass, publish; one caller helper.**
+- [-] **T-050-17 — `STEPS`: context, bind, specs, first-pass, publish; one caller helper.**
   Delete `_lowest`, `_first_pass_done`, `_AUDITS_HISTO`; `StepDef` tuple, `Step.kind`; first-pass via
   stripped digests + catalog atoms, fix = installed SKILL path + pending list; publish via
   `published(repo, "specs/constitution.md")`; bind only with a resolvable, unbound session id; doctor
