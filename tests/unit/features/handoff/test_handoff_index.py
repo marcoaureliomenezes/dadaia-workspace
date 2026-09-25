@@ -457,26 +457,6 @@ def test_self_pull_falls_back_to_workspace_when_reviewed_root_lacks_the_ref(tmp_
 # ---------------------------------------------------------------------------
 
 
-def test_findings_summary_and_severity_max(tmp_path: Path) -> None:
-    doc = _base_doc(
-        findings=[
-            {"severity": "LOW", "message": "l"},
-            {"severity": "HIGH", "message": "h1"},
-            {"severity": "HIGH", "message": "h2"},
-            {"severity": "INFO", "message": "info excluded from the 4-bucket summary"},
-        ]
-    )
-    handoff = Handoff.load(_write(tmp_path / "h.handoff.json", doc))
-
-    assert handoff.findings_summary() == {"CRITICAL": 0, "HIGH": 2, "MEDIUM": 0, "LOW": 1}
-    assert handoff.severity_max() == "HIGH"
-
-
-def test_severity_max_none_without_findings(tmp_path: Path) -> None:
-    handoff = Handoff.load(_write(tmp_path / "h.handoff.json", _base_doc()))
-    assert handoff.severity_max() is None
-
-
 def test_expires_at_uses_produced_at_then_filename_then_mtime(tmp_path: Path) -> None:
     ttl = timedelta(hours=48)
 
@@ -533,26 +513,6 @@ def test_handoff_index_validate_all_scoped_by_context_and_caches_the_schema(
     # Schema loaded once, cached — a second call must not raise even if the file moved.
     (tmp_path / ".dadaia" / "agentic" / "schemas" / "handoff-v1.schema.json").unlink()
     assert index.validate_file(scoped[0].path).valid is True
-
-
-def test_handoff_index_check_hash_matches_module_level_hash_status(tmp_path: Path) -> None:
-    content = b"x"
-    artifact = tmp_path / ".dadaia" / "reports" / "ctx" / "r.html"
-    artifact.parent.mkdir(parents=True)
-    artifact.write_bytes(content)
-    handoff_path = _write(
-        tmp_path / ".dadaia" / "handoff" / "ctx" / "h.handoff.json",
-        _base_doc(
-            artifact={
-                "type": "report",
-                "path": ".dadaia/reports/ctx/r.html",
-                "content_hash": hashlib.sha256(content).hexdigest(),
-            }
-        ),
-    )
-    index = HandoffIndex(tmp_path)
-
-    assert index.check_hash(handoff_path) == "match"
 
 
 def test_validate_schema_shape_and_load_schema_are_the_standalone_public_primitives() -> None:

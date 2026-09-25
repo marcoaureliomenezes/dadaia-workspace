@@ -354,11 +354,6 @@ class Handoff:
         return value if isinstance(value, dict) else {}
 
     @property
-    def artifact_type(self) -> str | None:
-        value = self.artifact.get("type")
-        return value if isinstance(value, str) else None
-
-    @property
     def artifact_path_raw(self) -> str | None:
         """The declared ``artifact.path`` string, unresolved — ``None`` if absent/empty."""
         value = self.artifact.get("path")
@@ -395,24 +390,6 @@ class Handoff:
         return tuple(ref for ref in refs if isinstance(ref, str))
 
     # -- derived helpers -------------------------------------------------
-
-    def findings_summary(self) -> dict[str, int]:
-        """Severity counts (``CRITICAL``/``HIGH``/``MEDIUM``/``LOW``) — ``INFO`` excluded,
-        matching every existing panel/reports reader's four-bucket shape."""
-        counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
-        for finding in self.findings:
-            sev = finding.severity.upper()
-            if sev in counts:
-                counts[sev] += 1
-        return counts
-
-    def severity_max(self) -> str | None:
-        """The highest-ranked severity present, or ``None`` when there are no findings."""
-        present = {finding.severity.upper() for finding in self.findings}
-        for sev in _SEVERITY_ORDER:
-            if sev in present:
-                return sev
-        return None
 
     def effective_timestamp(self) -> datetime:
         """``produced_at`` if parseable, else :func:`path_timestamp` of the file itself."""
@@ -713,7 +690,3 @@ class HandoffIndex:
             self.validate_file(path, reviewed_root=reviewed_root)
             for path in discover_handoff_paths(search_root, "**/*.handoff.json")
         ]
-
-    def check_hash(self, handoff_path: Path) -> str:
-        """``"match"``/``"mismatch"``/``"missing_artifact"`` for ``handoff_path``'s artifact."""
-        return Handoff.load(handoff_path).artifact_hash_status(self._workspace_root)

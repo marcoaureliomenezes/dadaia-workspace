@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import io
 import json
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -95,18 +94,3 @@ def test_sanitize_session_id_strips_traversal() -> None:
     assert _common.sanitize_session_id("../../etc/passwd") == "etcpasswd"
     assert _common.sanitize_session_id("abc-123_XYZ") == "abc-123_XYZ"
     assert _common.sanitize_session_id(None) == ""
-
-
-def test_default_python_bin_prefers_venv_else_never_empty(tmp_path: Path) -> None:
-    from dadaia_workspace.core.platform import PLATFORM
-
-    venv = tmp_path / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
-    venv.mkdir(parents=True)
-    py = venv / f"python{PLATFORM.venv_exe_suffix}"
-    py.write_text("#!/bin/sh\n", encoding="utf-8")
-    assert _common.default_python_bin(tmp_path) == str(py)
-
-    # No venv present → falls back to sys.executable or "python"; never empty.
-    other = tmp_path / "no-venv-here"
-    other.mkdir()
-    assert _common.default_python_bin(other)

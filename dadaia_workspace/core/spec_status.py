@@ -43,16 +43,6 @@ _TOKEN_SPELLINGS = (DRAFT, IN_REVIEW, APPROVED)
 #: Matches the canonical ``**Status:** <token>`` line as the doctor reads it.
 STATUS_LINE = re.compile(r"\*\*Status:\*\*\s*(.+?)\s*$")
 
-#: Matches ANY worker-authored status line — blockquoted or not, bullet-prefixed, colon
-#: inside or outside the bold markers, any case — for single-writer normalization.
-ANY_STATUS_LINE = re.compile(
-    r"(?mi)^\s*(?:[-*]\s*)?(?:>\s*)?(?:\*\*Status:?\*\*:?|Status:)\s*"
-    r"(?:" + "|".join(_TOKEN_SPELLINGS) + r")\s*$"
-)
-
-#: The canonical line Python writes. Single-writer law: workers never author this.
-APPROVED_LINE = f"> **Status:** {APPROVED}"
-
 #: How far into a document a status line is looked for.
 _HEAD_LINES = 30
 
@@ -68,13 +58,3 @@ def extract_status(text: str) -> str | None:
         if match:
             return match.group(1).strip()
     return None
-
-
-def is_approved(text: str) -> bool:
-    """Whether the document carries a canonical ``**Status:** Approved``.
-
-    This is a full-token comparison on the parsed line, not a substring test: an artifact
-    whose status reads ``Approved (pending)`` is NOT approved, and one written with extra
-    whitespace IS — matching, in both directions, what the doctor enforces.
-    """
-    return extract_status(text) == APPROVED

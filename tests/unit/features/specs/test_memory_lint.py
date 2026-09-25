@@ -14,7 +14,7 @@ script. Its behavioral coverage (lint_atom/lint_directory scenarios, main() exit
 already a byte-identical port of what this file covers — see
 the functions above this docstring's insertion point. Four checks in the deleted file were
 NOT duplicates — they validate real on-disk public assets (the frontmatter schema, the
-scaffold atoms, the memory-feature template) against this package's canon, independent of
+scaffold atoms) against this package's canon, independent of
 the script/package split — those four are ported below, now importing the package directly.
 
 Intent: CONTRACT — v0.4.3 A16.1.

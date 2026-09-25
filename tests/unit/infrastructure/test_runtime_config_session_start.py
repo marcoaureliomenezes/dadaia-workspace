@@ -18,7 +18,6 @@ from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.infrastructure.runtime_config import (
     claude_settings,
     codex_hooks,
-    dadaia_owned_claude_settings,
     kimi_hook_shims,
     kimi_hooks_block,
     merge_claude_settings,
@@ -95,5 +94,4 @@ def test_kimi_session_start_runs_the_reaper_once(tmp_path: Path) -> None:
 
 def test_reaper_entry_is_dadaia_owned_so_merge_is_idempotent(tmp_path: Path) -> None:
     canonical = claude_settings(tmp_path)
-    assert dadaia_owned_claude_settings(canonical) == {"hooks": canonical["hooks"]}
     assert merge_claude_settings(canonical, tmp_path) == canonical

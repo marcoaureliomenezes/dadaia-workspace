@@ -23,9 +23,6 @@ class _RunningProcess:
     def poll(self) -> int | None:
         return self._process.poll()
 
-    def read_stderr(self) -> str:
-        return self._process.stderr.read() if self._process.stderr else ""
-
     def terminate(self) -> None:
         self._process.terminate()
 

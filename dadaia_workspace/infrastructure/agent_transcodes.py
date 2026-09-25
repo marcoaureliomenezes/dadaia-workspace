@@ -39,9 +39,6 @@ from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
 )
 from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import map_model
 
-#: The authored persona tree every view below points at or reads from.
-_AUTHORED_AGENTS = (".agents", "agents")
-
 
 def no_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
     """The harness reads the authored tree natively — it projects no view of its own."""

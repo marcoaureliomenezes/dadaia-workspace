@@ -21,9 +21,6 @@ from dadaia_workspace.infrastructure.public_assets_common import _toml_escape
 # Constants
 # ---------------------------------------------------------------------------
 
-# Parallel workflow detection
-_FRONTMATTER_PARALLEL_GROUP_RE = re.compile(r"^\s*parallel_group:\s*\S", re.MULTILINE)
-
 # Fallback reasoning effort when an agent's ``model:`` is unknown to the registry
 # (defensive only — every canonical agent's model id is registry-backed).
 _CODEX_DEFAULT_EFFORT = "medium"
@@ -141,37 +138,6 @@ def _compact_codex_developer_instructions(body: str) -> str:
 # ---------------------------------------------------------------------------
 # Free functions
 # ---------------------------------------------------------------------------
-
-
-def _render_agents_into_codex_config(agents_dir: Path) -> str:
-    """Scan *agents_dir* for ``.md`` agent files and render TOML ``[agents.*]`` blocks.
-
-    For each ``.md`` file (sorted for determinism):
-    1. Parse YAML frontmatter via ``_parse_agent_frontmatter()``.
-    2. If the result is non-empty (i.e., ``name`` key present), render via
-       ``_render_agent_toml_block()``.
-    3. Agents whose frontmatter cannot be parsed or are missing ``name`` are
-       silently skipped (defensive — never breaks install).
-
-    Returns the concatenated block string (may be empty string when no agents
-    are found).
-    """
-    if not agents_dir.exists():
-        return ""
-    blocks: list[str] = []
-    for md_file in sorted(agents_dir.glob("*.md")):
-        try:
-            text = md_file.read_text(encoding="utf-8")
-            fm = _parse_agent_frontmatter(text)
-            if not fm:
-                continue
-            name = str(fm.get("name", ""))
-            if not name:
-                continue
-            blocks.append(_render_agent_toml_block(name, fm))
-        except (OSError, ValueError):
-            continue
-    return "\n".join(blocks) + ("\n" if blocks else "")
 
 
 def _codex_reasoning_effort_for_model(claude_model: str | None) -> str:
@@ -370,37 +336,6 @@ def _render_agents_config_file_blocks(agents_dir: Path) -> str:
         except (OSError, ValueError):
             continue
     return "".join(blocks)
-
-
-def _render_agent_toml_block(name: str, fm: dict[str, object]) -> str:
-    """Render a ``[agents."<name>"]`` TOML table block from parsed frontmatter *fm*.
-
-    Keys are always quoted for safety (required for hyphenated names like
-    ``dd-software-engineer``). Missing or None fields are omitted. The ``tools``
-    field, if present, is emitted as a TOML array of basic strings.
-
-    Names containing ``]`` or newline characters are rejected (cannot appear
-    safely inside a TOML table header, even with quoting). Double-quotes and
-    backslashes are escaped with a leading backslash so the header is valid
-    TOML (e.g. a name like ``a"b`` becomes ``[agents."a\\"b"]``).
-    """
-    if "]" in name:
-        raise ValueError(f"Agent name contains invalid character ']': {name!r}")
-    if "\n" in name:
-        raise ValueError(f"Agent name contains newline character: {name!r}")
-    # Escape backslash first (must precede quote escape to avoid double-escaping)
-    key_escaped = name.replace("\\", "\\\\").replace('"', '\\"')
-    lines: list[str] = [f'[agents."{key_escaped}"]\n']
-    for field in ("name", "description", "model"):
-        val = fm.get(field)
-        if val is None:
-            continue
-        lines.append(f"{field} = {_toml_escape(val)}\n")
-    tools_val = fm.get("tools")
-    if tools_val is not None and isinstance(tools_val, list):
-        items = ", ".join(_toml_escape(t) for t in tools_val)
-        lines.append(f"tools = [{items}]\n")
-    return "".join(lines)
 
 
 def _parse_agent_frontmatter(text: str) -> dict[str, object]:

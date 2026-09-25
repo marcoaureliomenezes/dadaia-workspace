@@ -5,9 +5,13 @@ from __future__ import annotations
 import pytest
 
 from dadaia_workspace.cli import main as cli_main
-from dadaia_workspace.core.exceptions import DadaiaError, TasksMarkerStateError
+from dadaia_workspace.core.exceptions import DadaiaError
 
 pytestmark = pytest.mark.unit
+
+
+class TasksMarkerStateError(DadaiaError):
+    """A stand-in operator-facing DadaiaError (the original class had no raiser)."""
 
 
 def test_safe_app_renders_tasks_marker_error_as_one_clean_line(

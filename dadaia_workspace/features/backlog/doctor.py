@@ -53,7 +53,6 @@ from pathlib import Path
 from dadaia_workspace.core.doctor_rules import Rule
 from dadaia_workspace.core.kernel_tunables import BACKLOG_SCRIPT
 from dadaia_workspace.core.models.backlog import (
-    INTENTS_EXEMPT_STATUS,
     is_intents_exempt,
 )
 from dadaia_workspace.core.models.histo import HistoRecord, is_terminal_disposition
@@ -78,14 +77,6 @@ __all__ = [
 #: loop below — skipped here so a malformed ``intents`` value never produces two
 #: findings for the same item.
 _INTENTS_DOCUMENT_ERROR_PREFIXES = ("malformed intents[] frontmatter:",)
-
-#: The one status EXEMPT from the resolvable-typed-intents requirement (v0.1.55 FR5, bug
-#: ``backlog-new-stub-readme-lag-intents-schema``). An ``idea`` is an unbound brainstorm: it
-#: carries no bound ``intents[]`` yet, so the "no intents[] declared" and unresolved-subject
-#: BL-SCHEMA errors are held until the item matures to ``candidate`` and beyond. This is a
-#: STATUS gate, NOT a blanket exemption — a malformed ``intents:`` frontmatter and an invalid
-#: status still fire at ANY status.
-_INTENTS_EXEMPT_STATUS = INTENTS_EXEMPT_STATUS
 
 #: Statuses accepted as valid in BL-SCHEMA (kept permissive; the backlog status vocabulary is
 #: informal — see the root `AGENTS.md` map §4, Backlog). ``None``/empty is the only invalid case here.

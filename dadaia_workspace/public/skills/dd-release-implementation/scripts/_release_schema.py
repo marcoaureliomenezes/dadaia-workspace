@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Any
 
 CODE = "LEDGER-RELEASE-SCHEMA"
-RELEASES = "releases"
 STATE = "_RELEASE.json"
 HISTO = "releases/_archive/releases_histo.jsonl"
 #: The closed-scope candidate trio that lives at the release root; the next candidate's

@@ -52,10 +52,6 @@ def test_init_creates_only_registry_init_zones_and_canon_seeds(
     assert registry_data["version"] == "1"
     assert registry_data["entries"] == []
 
-    never_inited = workspace_root.parent / "never"
-    assert not service.is_initialized(never_inited)
-    assert service.is_initialized(workspace_root)
-
     # Idempotent: modify the state file; second init must not overwrite it.
     spec_contexts_path.write_text(json.dumps({"version": "1", "contexts": [{"name": "x"}]}))
     service.init(workspace_root, harnesses=("claude", "codex"), skip_assets=True)

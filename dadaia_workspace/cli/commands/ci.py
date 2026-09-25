@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 import subprocess
 import sys
 from collections.abc import Iterable
@@ -198,9 +197,6 @@ def push_gate_check() -> None:
     if not decision.allowed:
         typer.secho(decision.message, fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
-
-
-_SHA40_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 
 
 @app.command("install-hook")
