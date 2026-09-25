@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import re
 import shlex
+import subprocess
 import sys
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -621,12 +622,11 @@ _LAW_FILES = (_REPO_ROOT / "CONTEXT.md",)
 
 
 def _law_files() -> list[Path]:
-    return [
-        path
-        for root in _LAW_ROOTS
-        for path in sorted(root.rglob("*"))
-        if path.is_file() and "_archive" not in path.parts
-    ] + [path for path in _LAW_FILES if path.is_file()]
+    # Tracked files only: ignored bytecode is not law, and decoding it is a crash.
+    roots = [str(root) for root in (*_LAW_ROOTS, *_LAW_FILES)]
+    listed = subprocess.run(["git", "ls-files", "-z", "--", *roots], cwd=_REPO_ROOT,
+                            capture_output=True, text=True, check=True).stdout  # fmt: skip
+    return [_REPO_ROOT / rel for rel in listed.split("\0") if rel and "_archive" not in rel]
 
 
 def test_no_law_file_names_a_retired_release_verb() -> None:
