@@ -45,7 +45,7 @@ Paths under `dadaia_workspace/public/` abbreviated `pub/`. DELETE/REBUILD rows (
   `pub/agents/dd-{software,product}-engineer.md`, `CONTEXT.md`, `CONTEXT-MAP.md`, recorded contract fixtures
   `blocked by:` T-050-01 · `delivers:` FR5, AC6.1 — every agent sees the step in its law
 
-- [ ] **T-050-06 — Reproject and verify.**
+- [-] **T-050-06 — Reproject and verify.**
   `public stage`/`install`/`doctor`, `dadaia doctor` exit 0; grep finds no "PLAN names the seams" and no
   lifecycle line starting at `grill` (AC7.3); `ci preflight --quick` green.
   `Write set:` recorded fixtures the suite demands (shipped hashes, behavior map, context map)
