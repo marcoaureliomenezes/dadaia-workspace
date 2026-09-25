@@ -133,7 +133,7 @@ DELETE/REBUILD rows (PLAN §1) land first. RED = the named test fails before the
   AC4.1, AC7.2 — doctor, init, create and SessionStart print the same next step
   `RED:` I1 (writing `audits_histo` changes a step today); bound SessionStart text ≠ doctor's.
 
-- [ ] **T-050-18 — Property test: every command fix clears its step.**
+- [-] **T-050-18 — Property test: every command fix clears its step.**
   Hypothesis over real-state prefixes (tmp dirs, `file://` remotes, `max_examples` ≤ 25): execute each
   pending command step's fix (placeholders substituted), assert cleared and index strictly increasing.
   `Write set:` `tests/integration/test_onboarding_steps_property.py`, `tests/unit/features/workspace/`
