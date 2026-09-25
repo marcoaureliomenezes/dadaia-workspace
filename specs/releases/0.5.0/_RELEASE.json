@@ -1,10 +1,10 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "DEFINITION",
+  "phase": "IMPLEMENTATION",
   "defined": {
-    "sha": "520655ee",
-    "ts": "2026-09-25T03:11:37Z"
+    "sha": "fa569482",
+    "ts": "2026-09-25T04:15:57Z"
   },
   "implemented": {
     "sha": "864645f3",
@@ -227,6 +227,12 @@
       "agent": "release.py new",
       "kind": "note",
       "text": "Candidate born on 0.5.0 (prior candidate closed at 864645f3)"
+    },
+    {
+      "ts": "2026-09-25T04:15:57Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate defined at fa569482; phase IMPLEMENTATION."
     }
   ]
 }
