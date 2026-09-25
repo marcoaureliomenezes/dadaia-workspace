@@ -1,10 +1,10 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "DEFINITION",
+  "phase": "IMPLEMENTATION",
   "defined": {
-    "sha": "1528a8e0469b4b24d4afea43db039d397e218073",
-    "ts": "2026-09-24T05:16:14Z"
+    "sha": "520655ee",
+    "ts": "2026-09-25T03:11:37Z"
   },
   "implemented": {
     "sha": "e4b0e02f",
@@ -160,6 +160,12 @@
       "agent": "dd-product-engineer",
       "kind": "note",
       "text": "Candidate 2 'definition reviews the as-is before it adds' SPEC Approved — Origin operator-demand 2026-09-25; grill Q1-Q5 accepted (ADR 0041, operator concern: structure-only checks, judgement stays human); FR1-FR7: definition step 2 as-is review (PLAN §1 table unit|today|bugs|verdict|why, DELETE/REBUILD/UPDATE/KEEP then justified ADD), SPEC Replaces, release.py phase IMPLEMENTATION structural refusal, spec-axis review rule, Arm B rebuild at >=2 prior fixes, root map/releases law/personas; PLAN/TASKS owed by dd-software-engineer."
+    },
+    {
+      "ts": "2026-09-25T03:11:37Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate defined at 520655ee; phase IMPLEMENTATION."
     }
   ]
 }
