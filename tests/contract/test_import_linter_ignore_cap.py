@@ -131,8 +131,8 @@ _SETUP_CFG = _REPO_ROOT / "setup.cfg"
 # ADR-0001 NOTE (protocol retirement — one adapter, no port): `features-no-infrastructure`
 # (6 edges) and `cli-no-infrastructure` (1 edge) contracts are DELETED outright — the port
 # requirement they enforced is retired; a feature/CLI verb now imports its sole concrete
-# infrastructure adapter directly (`tests/contract/test_protocols_have_two_adapters.py`
-# polices the remaining Protocol set instead). `features-no-subprocess` (P-02) stays and
+# infrastructure adapter directly (the panel-era ports left with no second adapter were
+# deleted in 0.5.0's shrink pass). `features-no-subprocess` (P-02) stays and
 # gains 4 new documented edges for the same reason: GitClient/CertificationProcess had one
 # adapter each (`git_subprocess`/`certification_process`, both `subprocess`-backed) —
 # `spec_context.service`, `spec_context.doctor`, `export.service` -> `git_subprocess`, and

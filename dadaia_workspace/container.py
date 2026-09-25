@@ -2,7 +2,7 @@
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from dadaia_workspace.core.models.bugs import BugRecord
@@ -25,34 +25,6 @@ from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetM
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
 logger = logging.getLogger(__name__)
-
-
-def build_shutdown_handler() -> Any:
-    """Return the appropriate ShutdownHandler for the current platform.
-
-    Reads ``PLATFORM.has_sigterm`` (the sole authorized platform capability flag)
-    and returns the POSIX adapter on platforms with effective SIGTERM support
-    (Linux, macOS), or the Windows adapter on platforms without it.  The import
-    is lazy so that importing ``container`` never triggers the Windows module's
-    guard on Linux/macOS.
-
-    Returns:
-        ``PosixSignalShutdownHandler`` on Linux / macOS (SIGTERM + SIGINT),
-        or ``WindowsSignalShutdownHandler`` on Windows (SIGINT only).
-    """
-    from dadaia_workspace.core.platform import PLATFORM
-
-    if not PLATFORM.has_sigterm:
-        from dadaia_workspace.infrastructure.signal_shutdown_windows import (
-            WindowsSignalShutdownHandler,
-        )
-
-        return WindowsSignalShutdownHandler()
-    from dadaia_workspace.infrastructure.signal_shutdown_posix import (
-        PosixSignalShutdownHandler,
-    )
-
-    return PosixSignalShutdownHandler()
 
 
 def _states_dir(workspace_root: Path) -> Path:

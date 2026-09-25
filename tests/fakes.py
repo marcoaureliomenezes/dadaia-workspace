@@ -1,7 +1,6 @@
-"""In-memory fakes for all protocols — enable unit tests without I/O."""
+"""In-memory fakes for the container-built collaborators — unit tests without I/O."""
 
-import sqlite3
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -29,20 +28,6 @@ class FakeContextStore:
         self._store.pop(name, None)
 
 
-class FakePrimaryContextStore:
-    def __init__(self) -> None:
-        self._data: dict[str, str] | None = None
-
-    def write(self, name: str, repo_slug: str, specs_dir: Path) -> None:
-        self._data = {"name": name, "repo_slug": repo_slug, "specs_dir": str(specs_dir)}
-
-    def read(self) -> dict[str, str] | None:
-        return self._data
-
-    def clear(self) -> None:
-        self._data = None
-
-
 class FakeGitClient:
     def __init__(self) -> None:
         self.cloned: list[tuple[str, Path]] = []
@@ -55,8 +40,6 @@ class FakeGitClient:
         self._branches: dict[Path, str] = {}
         self._untracked: dict[Path, list[str]] = {}
         self._remote_urls: dict[Path, str] = {}
-        self._upstream_branches: dict[Path, str | None] = {}
-        self._unpushed_commit_counts: dict[Path, int] = {}
         self._has_commits: set[Path] = set()
 
     def clone(self, url: str, dest: Path) -> None:
@@ -99,9 +82,6 @@ class FakeGitClient:
     def current_branch(self, path: Path) -> str:
         return self._branches.get(path, "main")
 
-    def create_branch(self, path: Path, branch: str) -> None:
-        self._branches[path] = branch
-
     def checkout(self, path: Path, branch: str) -> None:
         self.checked_out.append((path, branch))
         self._branches[path] = branch
@@ -114,22 +94,6 @@ class FakeGitClient:
 
     def remote_url(self, path: Path) -> str:
         return self._remote_urls.get(path, "")
-
-    def upstream_branch(self, path: Path) -> str | None:
-        """Configurable via ``self._upstream_branches[path] = "origin/main"``.
-
-        Defaults to ``None`` (no upstream configured) — mirrors
-        :class:`SubprocessGitClient`'s behavior on a checkout with no tracking branch.
-        """
-        return self._upstream_branches.get(path)
-
-    def unpushed_commit_count(self, path: Path) -> int:
-        """Configurable via ``self._unpushed_commit_counts[path] = 3``.
-
-        Defaults to ``0`` (nothing pending) — mirrors
-        :class:`SubprocessGitClient`'s behavior when there is no upstream to compare.
-        """
-        return self._unpushed_commit_counts.get(path, 0)
 
 
 class FakePublicAssetManager:
@@ -160,71 +124,6 @@ class FakePublicAssetManager:
     def doctor(self, workspace_root: Path) -> list[DoctorLine]:
         self.doctored.append(workspace_root)
         return [DoctorLine(DoctorStatus.OK, "fake")]
-
-
-class FakeExcelReader:
-    def __init__(self, rows: list[dict[str, str]] | None = None) -> None:
-        self._rows = rows or []
-
-    def read_rows(self, file_path: Path) -> list[dict[str, str]]:
-        return self._rows
-
-
-def shared_connection_factory(conn: sqlite3.Connection) -> Callable[[], Any]:
-    """Return a per-call connection factory that yields a non-closing view of *conn*.
-
-    ``TelemetryAggregator`` (per-call mode) closes each connection it opens; an in-memory
-    sqlite DB used by the aggregator tests cannot be reopened, so the factory hands back a
-    proxy whose ``close()`` is a no-op — keeping the seeded connection alive across the
-    queries of a single test (the seam the removed shared-``dao`` mode used to provide).
-    """
-
-    class _NonClosing:
-        # Transparent proxy: forward every attribute get AND set to the real connection
-        # (queries mutate e.g. ``conn.row_factory``), but neutralize ``close()`` so the
-        # seeded connection survives the aggregator's per-call ``finally: conn.close()``.
-        def __getattr__(self, name: str) -> Any:
-            return getattr(conn, name)
-
-        def __setattr__(self, name: str, value: Any) -> None:
-            setattr(conn, name, value)
-
-        def close(self) -> None:
-            return None
-
-    proxy = _NonClosing()
-    return lambda: proxy
-
-
-class FakeFilePermissionSetter:
-    """In-memory FilePermissionSetter — records calls, never performs I/O.
-
-    Optionally raises ``PlatformSecurityError`` on the next call when
-    ``_raise_on_next`` is set to ``True`` (for testing Tier-1 error paths).
-    """
-
-    def __init__(self, raise_on_next: bool = False) -> None:
-        self.restricted_files: list[tuple[Any, int]] = []
-        self.restricted_dirs: list[tuple[Any, int]] = []
-        self._raise_on_next = raise_on_next
-
-    def _maybe_raise(self) -> None:
-        if self._raise_on_next:
-            from dadaia_workspace.core.exceptions import PlatformSecurityError
-
-            raise PlatformSecurityError(
-                "FakeFilePermissionSetter: simulated failure",
-                feature_name="fake-permission-setter",
-                platform="test",
-            )
-
-    def restrict_to_owner(self, path: object, mode: int = 0o600) -> None:
-        self._maybe_raise()
-        self.restricted_files.append((path, mode))
-
-    def restrict_dir_to_owner(self, path: object, mode: int = 0o700) -> None:
-        self._maybe_raise()
-        self.restricted_dirs.append((path, mode))
 
 
 class FakePythonEnvironmentManager:
@@ -259,16 +158,6 @@ class FakePythonEnvironmentManager:
             f"{workspace_root}/.dadaia/.venv"
             f"/{PLATFORM.venv_scripts_dir}/pip{PLATFORM.venv_exe_suffix}"
         )
-
-
-class FakeProcessProbe:
-    """Controllable probe — add PIDs to _alive_pids to simulate live processes."""
-
-    def __init__(self) -> None:
-        self._alive_pids: set[int] = set()
-
-    def is_pid_alive(self, pid: int) -> bool:
-        return pid in self._alive_pids
 
 
 def register_dead(

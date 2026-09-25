@@ -92,7 +92,7 @@ class DeadUnpushedCommitsError(DadaiaError):
     push". dead()'s own Phase 2 (below) already auto-syncs and pushes pending commits
     whenever a remote exists — including the scaffold commit alive() itself just made
     (always locally unpushed by design, on every fresh repo). Refusing on
-    ``GitClient.unpushed_commit_count() > 0`` regardless of ``has_remote()`` would
+    "commits ahead of upstream" regardless of ``has_remote()`` would
     therefore make dead() refuse right after every ordinary alive()-then-dead() call —
     a false-positive landmine, not a safety net. Only the truly unrecoverable case
     (commits with no remote at all) refuses; a remote-backed repo is left to Phase 2's

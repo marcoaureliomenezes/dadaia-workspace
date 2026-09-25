@@ -473,17 +473,9 @@ def test_doctor_coherence_no_longer_imports_spec_context() -> None:
                     "(SPEC-DOC-029 retirement removed the sole reason for that edge): "
                     f"line {node.lineno}"
                 )
-                assert "process_probe_adapter" not in node.module, (
-                    f"{mod.__name__} must not import the infrastructure process-probe "
-                    f"adapter: line {node.lineno}"
-                )
             elif isinstance(node, ast.Import):
                 for alias in node.names:
                     assert "spec_context" not in alias.name, (
                         f"{mod.__name__} must not import dadaia_workspace.features."
                         f"spec_context: line {node.lineno}"
-                    )
-                    assert "process_probe_adapter" not in alias.name, (
-                        f"{mod.__name__} must not import the infrastructure "
-                        f"process-probe adapter: line {node.lineno}"
                     )
