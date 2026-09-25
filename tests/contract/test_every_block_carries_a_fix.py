@@ -28,10 +28,11 @@ import pytest
 
 from dadaia_workspace.core import doctor_rules
 from dadaia_workspace.core.cli_line import cli_path
+from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObject
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.chokepoints import push_gate_decision
-from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_refs
+from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_stdin
 from dadaia_workspace.features.specs.canon import canon_violations
 from dadaia_workspace.hooks import pre_gate
 
@@ -179,6 +180,7 @@ def _decide(
 ) -> str:
     decision = push_gate_decision(
         refs,
+        gitflow=DEFAULT,
         object_source=source or _FakeObjectSource(),
         repo=Path("/nonexistent-repo"),
         canon_violations_fn=canon_violations,
@@ -190,7 +192,7 @@ def _decide(
 
 
 def _refs(*lines: str) -> list[PushRef]:
-    return parse_push_refs("\n".join(lines))
+    return parse_push_stdin("\n".join(lines))[0]
 
 
 def test_push_gate_malformed_stdin_carries_a_runnable_fix() -> None:

@@ -60,7 +60,7 @@ DELETE/REBUILD rows (PLAN §1) land first. RED = the named test fails before the
   byte-identical after a merge
   `RED:` `test_gitflow.py` (module absent), merge preserves an unknown key.
 
-- [-] **T-050-12 — Branch policy reads the gitflow; dead gate code deleted.**
+- [x] **T-050-12 — Branch policy reads the gitflow; dead gate code deleted.**
   Delete the 3 regexes, `_PERMITTED_BRANCH_RES`, `branch_name_is_permitted`, `parse_push_refs`, their
   exports, unused `_run_specs_canon_scan` params, stale comments; `check_branch_policy(refs, gitflow)`;
   `push_gate_decision` requires `gitflow`; `ci.py` resolves main → associated (public

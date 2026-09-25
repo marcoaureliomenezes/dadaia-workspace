@@ -76,6 +76,7 @@ __all__ = [
     "alive_context_trees",
     "context_name_for_repo_slug",
     "repo_slug_for_context",
+    "repo_slug_under_repos",
     "resolve",
     "resolve_bind",
     "resolve_context_specs_dir",
@@ -249,7 +250,7 @@ def context_name_for_repo_slug(workspace_root: Path, slug: str) -> str:
     return slug
 
 
-def _repo_slug_under_repos(workspace_root: Path, path: Path) -> str | None:
+def repo_slug_under_repos(workspace_root: Path, path: Path) -> str | None:
     """First path component of *path* under ``<workspace_root>/repos/``, sanitized
     (CWE-22/CWE-59), or ``None``. *path* need not exist."""
     repos_dir = workspace_root / "repos"
@@ -387,7 +388,7 @@ def resolve(
     if explicit:
         context_name, rung = explicit, "explicit"
     elif workspace_root is not None and target_path is not None:
-        slug = _repo_slug_under_repos(workspace_root, target_path)
+        slug = repo_slug_under_repos(workspace_root, target_path)
         if slug:
             context_name = context_name_for_repo_slug(workspace_root, slug)
             rung = "target_path"
@@ -403,7 +404,7 @@ def resolve(
             context_name, rung = session_context, "session"
 
     if context_name is None and workspace_root is not None:
-        slug = _repo_slug_under_repos(workspace_root, cwd)
+        slug = repo_slug_under_repos(workspace_root, cwd)
         if slug:
             context_name = context_name_for_repo_slug(workspace_root, slug)
             rung = "cwd"

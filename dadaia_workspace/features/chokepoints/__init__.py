@@ -6,8 +6,8 @@ where hooks are absent, disabled, bypassed, or changed by a future harness relea
 
 The package holds three modules:
 
-* :mod:`~dadaia_workspace.features.chokepoints.branch_policy` — the gitflow v2 branch
-  contract, :class:`Decision` (shared outcome shape) and :class:`PushRef`.
+* :mod:`~dadaia_workspace.features.chokepoints.branch_policy` — the branch contract read
+  from the project gitflow, :class:`Decision` (shared outcome shape) and :class:`PushRef`.
 * :mod:`~dadaia_workspace.features.chokepoints.push_gate` — branch policy + specs-canon
   scan + range-scoped denylist scan (:func:`push_gate_decision`).
 * :mod:`~dadaia_workspace.features.chokepoints.denylist_scan` — the denylist scanner.
@@ -26,8 +26,6 @@ from __future__ import annotations
 from dadaia_workspace.features.chokepoints.branch_policy import (
     Decision,
     PushRef,
-    branch_name_is_permitted,
-    parse_push_refs,
     parse_push_stdin,
 )
 from dadaia_workspace.features.chokepoints.push_gate import push_gate_decision
@@ -35,8 +33,6 @@ from dadaia_workspace.features.chokepoints.push_gate import push_gate_decision
 __all__ = [
     "Decision",
     "PushRef",
-    "branch_name_is_permitted",
-    "parse_push_refs",
     "parse_push_stdin",
     "push_gate_decision",
 ]

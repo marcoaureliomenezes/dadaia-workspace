@@ -11,7 +11,17 @@ from pathlib import Path
 import typer
 
 from dadaia_workspace.container import is_source_repo_root as _is_source_repo_root
-from dadaia_workspace.core.exceptions import CiPreflightScopeError
+from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.exceptions import CiPreflightScopeError, WorkspaceNotInitializedError
+from dadaia_workspace.core.gitflow import Gitflow
+from dadaia_workspace.core.invocation import (
+    alive_context_names,
+    context_name_for_repo_slug,
+    repo_slug_under_repos,
+    resolve_context_specs_dir,
+)
+from dadaia_workspace.core.specs_version import read_gitflow
+from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.ci_preflight import (
     all_passed,
     checks_for,
@@ -95,15 +105,40 @@ def _no_canon_violations(paths: Iterable[str]) -> list[str]:
     return []
 
 
+def _gitflow_for(repo_root: Path) -> Gitflow:
+    """ADR 0046, once per push: the repo's own constitution, else its owning context's
+    main-repo constitution (an associated repo), else the default with one warning."""
+    specs_dir, context = repo_root / "specs", None
+    try:
+        workspace: Path | None = resolve_workspace_root(repo_root)
+    except WorkspaceNotInitializedError:
+        workspace = None
+    slug = repo_slug_under_repos(workspace, repo_root) if workspace else None
+    if workspace and slug:
+        name = context_name_for_repo_slug(workspace, slug)
+        context = name if name in alive_context_names(workspace) else None
+    if workspace and context and not (specs_dir / "constitution.md").is_file():
+        specs_dir = resolve_context_specs_dir(workspace, context)
+    gitflow, warning = read_gitflow(specs_dir)
+    if warning:
+        fix = (
+            f"\nfix: {fix_line(workspace, 'specs', 'init', '--context', context)}"
+            if workspace and context
+            else ""
+        )
+        typer.echo(f"[pre-push] WARNING: {warning}{fix}", err=True)
+    return gitflow
+
+
 @app.command("push-gate-check")
 def push_gate_check() -> None:
-    """Pre-push gate: branch-name validation + the range-scoped denylist scan.
+    """Pre-push gate: branch policy by the project gitflow + the range-scoped denylist scan.
 
-    Branch model: `dd-gitflow-default`.
+    Branch model: the constitution's gitflow block (`dd-gitflow-default`).
 
     Reads the pre-push ref lines from stdin (``<local-ref> <local-sha> <remote-ref>
     <remote-sha>``). Every non-deletion ref (tags included) is scanned for new objects
-    carrying a denylisted term — a feature push is the first publication to ``origin``.
+    carrying a denylisted term — a work-branch push is the first publication to ``origin``.
     Branch deletions are never scanned; tag pushes are scanned but never gated on branch
     policy. No security verdict is checked here — that runs as a PR gate.
 
@@ -160,6 +195,7 @@ def push_gate_check() -> None:
         object_source=build_git_object_reader(),
         repo=repo_root,
         canon_violations_fn=canon_fn,
+        gitflow=_gitflow_for(repo_root),
         malformed_lines=malformed,
         denylist_terms=denylist_terms,
         baseline_patterns=baseline_patterns,

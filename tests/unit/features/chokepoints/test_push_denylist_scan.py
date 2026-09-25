@@ -14,9 +14,10 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObject
 from dadaia_workspace.features.chokepoints import push_gate_decision
-from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_refs
+from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_stdin
 from dadaia_workspace.features.specs.canon import canon_violations
 
 _SHA_A = "a" * 40
@@ -49,7 +50,7 @@ class _FailingObjectSource:
 
 
 def _refs(*lines: str) -> list[PushRef]:
-    return parse_push_refs("\n".join(lines))
+    return parse_push_stdin("\n".join(lines))[0]
 
 
 def _obj(path: str, text: str, *, sha: str = "cafef00d") -> ScannedObject:
@@ -81,6 +82,7 @@ def test_branch_push_with_denylisted_blob_in_range_is_refused(tmp_path: Path) ->
     )
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -101,6 +103,7 @@ def test_term_outside_the_range_does_not_refuse(tmp_path: Path) -> None:
     source = _FakeObjectSource(by_range={})
     decision = push_gate_decision(
         _refs(f"refs/tags/v9.9.9 {_SHA_A} refs/tags/v9.9.9 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -118,6 +121,7 @@ def test_deletion_ref_is_never_scanned(tmp_path: Path) -> None:
     source = _FakeObjectSource()
     decision = push_gate_decision(
         _refs(f"refs/heads/old {_ZERO} refs/heads/old {_SHA_A}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -145,6 +149,7 @@ def test_shared_blob_across_two_refs_is_deduped(tmp_path: Path) -> None:
             f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}",
             f"refs/tags/v2 {_SHA_B} refs/tags/v2 {_ZERO}",
         ),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -165,6 +170,7 @@ def test_tainted_tag_push_is_refused(tmp_path: Path) -> None:
     )
     decision = push_gate_decision(
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -182,6 +188,7 @@ def test_clean_tag_push_is_allowed_with_no_verdict_required(tmp_path: Path) -> N
     source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): [_obj("clean.md", "nothing here\n")]})
     decision = push_gate_decision(
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -200,6 +207,7 @@ def test_branch_policy_refusal_precedes_the_scan(tmp_path: Path) -> None:
     source = _FailingObjectSource()  # would raise if ever called.
     decision = push_gate_decision(
         _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -221,6 +229,7 @@ def test_refusal_message_shape_and_ten_item_cap(tmp_path: Path) -> None:
     source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -247,6 +256,7 @@ def test_refusal_message_shape_and_ten_item_cap(tmp_path: Path) -> None:
 def test_git_object_read_failure_refuses_naming_the_failure(tmp_path: Path) -> None:
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=_FailingObjectSource(),
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -279,6 +289,7 @@ def test_generator_denylist_terms_still_refuses_not_silently_emptied(tmp_path: P
 
     decision = push_gate_decision(
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -384,6 +395,7 @@ def test_oversized_note_appears_in_decision_warn_on_allow(tmp_path: Path) -> Non
     )
     decision = push_gate_decision(
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -406,6 +418,7 @@ def test_oversized_note_appears_in_decision_warn_on_refuse(tmp_path: Path) -> No
     )
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -433,6 +446,7 @@ def test_refusal_path_segment_matching_an_operator_term_is_masked(tmp_path: Path
     source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -451,6 +465,7 @@ def test_refusal_path_with_no_matching_segment_is_byte_identical(tmp_path: Path)
     source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -468,6 +483,7 @@ def test_oversized_note_path_segment_is_masked_too(tmp_path: Path) -> None:
     source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
     decision = push_gate_decision(
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -514,6 +530,7 @@ def test_refusal_path_segment_uppercase_hyphenated_variant_of_term_is_masked(
     source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -550,6 +567,7 @@ class _FailingObjectSourceWithPath:
 def test_git_object_read_failure_at_a_denylisted_path_masks_the_path(tmp_path: Path) -> None:
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=_FailingObjectSourceWithPath(),
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -576,6 +594,7 @@ def test_same_offending_segment_gets_the_same_ordinal_across_hit_and_note(
     source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -615,6 +634,7 @@ def test_push_with_denylisted_term_only_in_a_commit_message_body_is_refused(
     )
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,

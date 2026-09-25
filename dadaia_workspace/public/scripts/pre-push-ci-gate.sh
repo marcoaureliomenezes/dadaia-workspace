@@ -2,13 +2,13 @@
 # Mandatory pre-push gate — dadaia-workspace (de-slopped to the publication boundary:
 # v0.5.0 FR9/D9).
 #
-# Branch model: this file states it nowhere — see `dd-gitflow-default` (Gitflow) +
-# `dd-gitflow-default`.
+# Branch model: this file states it nowhere — the project gitflow lives in the
+# `gitflow:` block of specs/constitution.md (`dd-gitflow-default`).
 #
-# What THIS script does — the publication boundary, and NOTHING else: branch-name
-# validation + the range-scoped denylist scan on the feature push (`ci
-# push-gate-check`) — `develop`/`main` refuse a direct push and name the PR path
-# instead. The pre-push ref lines git feeds on STDIN are forwarded there. This hook
+# What THIS script does — the publication boundary, and NOTHING else: branch policy by
+# that gitflow + the range-scoped denylist scan on the work-branch push (`ci
+# push-gate-check`) — the principal and integration branches refuse a direct push and
+# name the PR path instead. The pre-push ref lines git feeds on STDIN are forwarded there. This hook
 # refuses exactly three things: an invalid branch name, a denylist hit, and an
 # unresolvable runner (below) — never a fourth reason (v0.5.0 A9.2).
 #
@@ -110,5 +110,5 @@ if [ "$PROBE_ONLY" -eq 1 ]; then
     exit 0
 fi
 
-echo "[pre-push] branch-name + denylist gate (feature/{M.m.p} push; develop/main refused — PR path)…"
+echo "[pre-push] branch policy + denylist gate (work branch pushes; principal/integration refused — PR path; gitflow: specs/constitution.md)…"
 printf '%s' "$PUSH_REFS" | "${RUNNER_BIN[@]}" ci push-gate-check

@@ -14,11 +14,13 @@ is a CLI defect, never a bypass.
 
 from __future__ import annotations
 
+import shlex
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from dadaia_workspace.core.gitflow import Gitflow
 from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObject
 from dadaia_workspace.features.chokepoints.branch_policy import (
     Decision,
@@ -190,12 +192,17 @@ class _RangeScan:
     specs_paths_by_ref: dict[str, list[str]]
 
 
+def _push_again(gitflow: Gitflow) -> str:
+    return shlex.join(["git", "push", "origin", f"{gitflow.work_prefix}<M.m.p>"])
+
+
 def _run_denylist_scan(
     scan_refs: list[PushRef],
     object_source: ObjectSource,
     repo: Path,
     terms: Iterable[tuple[str, str]],
     patterns: Iterable[BaselinePatternLike],
+    gitflow: Gitflow,
 ) -> _RangeScan:
     """Run the FR1/FR2 scan over *scan_refs* — every non-deletion ref, tags included.
 
@@ -246,8 +253,8 @@ def _run_denylist_scan(
                     "skips what it cannot evaluate (fail closed). The sanctioned, "
                     "traceable emergency bypass is `git push --no-verify` "
                     "(discouraged; leaves a reflog trace).\n"
-                    "fix: git fetch origin && git push origin feature/<M.m.p> (repair "
-                    "the object store first — git fsck)"
+                    "Repair the object store first (git fsck), then push again.\n"
+                    f"fix: git fetch origin && {_push_again(gitflow)}"
                 ),
             ),
             True,
@@ -316,8 +323,6 @@ def _record_specs_paths(
 def _run_specs_canon_scan(
     scan_refs: list[PushRef],
     specs_paths_by_ref: dict[str, list[str]],
-    object_source: ObjectSource,
-    repo: Path,
     canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
 ) -> Decision | None:
     """SPEC v0.5.0 specs-canon closure (operator ruling 2026-08-28), range-scoped since
@@ -344,19 +349,19 @@ def push_gate_decision(
     object_source: ObjectSource,
     repo: Path,
     canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
+    gitflow: Gitflow,
     malformed_lines: int = 0,
     denylist_terms: Iterable[tuple[str, str]] = (),
     baseline_patterns: Iterable[BaselinePatternLike] = (),
 ) -> Decision:
-    """Decide whether a push may proceed (v0.4.4 FR3 — the gitflow v2 inversion).
+    """Decide whether a push may proceed.
 
     Policy order, first refusal wins:
 
-    1. **Branch policy** (dd-gitflow-default, :func:`~dadaia_workspace.features.chokepoints.
-       branch_policy.check_branch_policy`) — every non-deletion, non-tag ref must be
-       ``refs/heads/feature/{M.m.p}``, pushed to the SAME remote name: ``develop`` and
-       ``main`` are refused outright (they advance by PR only); names outside the three
-       permitted patterns are refused as invalid.
+    1. **Branch policy** (:func:`~dadaia_workspace.features.chokepoints.branch_policy.
+       check_branch_policy`, reading *gitflow*) — every non-deletion, non-tag ref must
+       be a work branch pushed to the SAME remote name; the principal and integration
+       branches advance by PR only.
     2. **specs/ canon scan** (v0.5.0 specs-canon closure, operator ruling 2026-08-28)
        — every ``specs/`` path the pushed range introduces or rewrites is checked
        against the canon (range-scoped: a path no commit in the range touches never
@@ -364,8 +369,8 @@ def push_gate_decision(
     3. **Range-scoped denylist scan** (v0.9.0 FR1/FR2) — every non-deletion ref, tags
        included, is scanned via *object_source* for new objects carrying a denylisted
        term. Steps 2 and 3 share ONE object walk (the walk runs once, after branch
-       policy; step 2's refusal is decided first) — under v2 this feature push is the
-       first publication to ``origin`` (A3.3).
+       policy; step 2's refusal is decided first) — a work-branch push is the
+       first publication to ``origin``.
 
     There is no fourth step: security review is the reviewer's lens before each PR,
     never a pre-push step.
@@ -373,9 +378,9 @@ def push_gate_decision(
     Deletions (zero sha) are never scanned. Tag pushes ARE scanned but were never
     branch-policy-gated (publishing depends on tag pushes). A malformed stdin line
     fails CLOSED (finding 1) and the REMOTE side of every branch-policy ref must
-    match its LOCAL branch name (finding 2: ``push feature/0.0.1:develop``).
+    match its LOCAL branch name (finding 2: a work branch aimed at the integration branch).
 
-    *object_source*, *repo* and *canon_violations_fn* are
+    *object_source*, *repo*, *canon_violations_fn* and *gitflow* are
     REQUIRED — FR7/A7.2 (extended at v0.5.1 K7 to the canon predicates): the decision
     function always takes every external capability it needs as a parameter; an
     unwired production call site is a CLI defect, never a bypass (FR6 row 4), so there
@@ -389,12 +394,13 @@ def push_gate_decision(
                 "line(s) — a policy gate never skips what it cannot parse (fail "
                 "closed). The sanctioned, traceable emergency bypass is "
                 "`git push --no-verify` (discouraged; leaves a reflog trace).\n"
-                "fix: git push origin feature/<M.m.p> (one explicit refspec)"
+                "Push one explicit refspec.\n"
+                f"fix: {_push_again(gitflow)}"
             ),
         )
 
     branch_policy_refs = [r for r in refs if not r.is_deletion and not r.is_tag]
-    branch_refusal = check_branch_policy(branch_policy_refs)
+    branch_refusal = check_branch_policy(branch_policy_refs, gitflow)
     if branch_refusal is not None:
         return branch_refusal
 
@@ -407,7 +413,9 @@ def push_gate_decision(
     # One streaming pass over the pushed-range objects feeds BOTH step 2 (specs canon,
     # range-scoped, operator ruling 2026-09-13) and step 3 (denylist); step 2's refusal
     # still takes precedence over step 3's.
-    scan = _run_denylist_scan(scan_refs, object_source, repo, denylist_terms, baseline_patterns)
+    scan = _run_denylist_scan(
+        scan_refs, object_source, repo, denylist_terms, baseline_patterns, gitflow
+    )
     if scan.read_failed and scan.refusal is not None:
         # Nothing was streamed, so the canon scan has no input either — fail closed
         # on the read error itself.
@@ -418,8 +426,6 @@ def push_gate_decision(
     canon_refusal = _run_specs_canon_scan(
         scan_refs,
         scan.specs_paths_by_ref,
-        object_source,
-        repo,
         canon_violations_fn,
     )
     if canon_refusal is not None:

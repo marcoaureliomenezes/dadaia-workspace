@@ -14,6 +14,9 @@ Scenarios (v2):
   FR4).
 * (b) a ``develop`` push is BLOCKED, naming the PR path (``feature/{M.m.p}`` → develop).
 * (c) branch deletion (zero local sha) and a tag push both pass — never review-gated.
+* (d) 0.5.0 AC6.4/AC6.5: the branch names come from the constitution gitflow — a custom
+  one (``trunk``/``next``/``work/``), an absent block (default + warning, never a block),
+  and an associated repo inheriting its context's main-repo gitflow.
 
 Supersedes v0.6.0's verdict-keyed scenarios (a covering security-reviewer APPROVE
 required for ``develop`` to flow, and the "keys on the stdin sha, never HEAD" regression,
@@ -23,12 +26,13 @@ not disabled.
 The CLI is invoked harness-free (no PreToolUse/PostToolUse payload), with only
 ``WORKSPACE_ROOT`` set, so this also covers the headless runtime the chokepoint protects.
 
-Intent: CONTRACT — v0.4.4 A3.1
+Intent: CONTRACT — v0.4.4 A3.1; 0.5.0 AC6.4, AC6.5 (T-050-12)
 Owner: dd-software-engineer
 """
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -130,3 +134,61 @@ def test_pass_matrix(tmp_path: Path, variant: str) -> None:
     else:
         result = _run_push_gate(repo, workspace, f"refs/tags/v1 {sha} refs/tags/v1 {_ZERO}\n")
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+_CUSTOM_BLOCK = "---\ngitflow: {principal: trunk, integration: next, work: work/}\n---\n# C\n"
+
+
+def _push(branch: str, sha: str) -> str:
+    return f"refs/heads/{branch} {sha} refs/heads/{branch} {_ZERO}\n"
+
+
+def _write_constitution(repo: Path, text: str) -> None:
+    (repo / "specs").mkdir()
+    (repo / "specs" / "constitution.md").write_text(text, encoding="utf-8")
+
+
+def test_a_custom_gitflow_governs_the_push(tmp_path: Path) -> None:
+    repo, sha = _init_repo(tmp_path, _SLUG)
+    _write_constitution(repo, _CUSTOM_BLOCK)
+
+    assert _run_push_gate(repo, tmp_path, _push("work/0.0.1", sha)).returncode == 0
+    refused = _run_push_gate(repo, tmp_path, _push("feature/0.0.1", sha))
+    assert refused.returncode != 0
+    assert "fix: git checkout -b 'work/<M.m.p>' trunk" in refused.stderr, refused.stderr
+
+
+def test_an_absent_gitflow_block_warns_and_falls_back_to_the_default(tmp_path: Path) -> None:
+    repo, sha = _init_repo(tmp_path, _SLUG)
+    _write_constitution(repo, "---\nspecs_pattern_version: 7\n---\n# C\n")
+
+    result = _run_push_gate(repo, tmp_path, _push("feature/0.0.1", sha))
+    assert result.returncode == 0, result.stderr
+    assert "WARNING" in result.stderr and "default gitflow" in result.stderr
+
+
+def test_an_associated_repo_inherits_its_context_gitflow(tmp_path: Path) -> None:
+    main, _ = _init_repo(tmp_path, _SLUG)
+    _write_constitution(main, _CUSTOM_BLOCK)
+    infra, sha = _init_repo(tmp_path, "demo-infra")
+    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "2",
+                "contexts": [
+                    {
+                        "name": _SLUG,
+                        "state": "alive",
+                        "repo_slug": _SLUG,
+                        "associated_repos": [{"slug": "demo-infra"}],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run_push_gate(infra, tmp_path, _push("work/0.0.1", sha))
+    assert result.returncode == 0, result.stderr
+    assert "WARNING" not in result.stderr
+    assert _run_push_gate(infra, tmp_path, _push("feature/0.0.1", sha)).returncode != 0

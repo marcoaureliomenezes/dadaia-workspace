@@ -9,7 +9,7 @@
 ## dadaia ci — Local CI-equivalent preflight gate + git-hook chokepoints.
 - ci install-hook — Install the pre-push CI/security gate.
 - ci preflight — Run the five local CI checks; exit non-zero if any fail.
-- ci push-gate-check — Pre-push gate: branch-name validation + the range-scoped denylist scan.
+- ci push-gate-check — Pre-push gate: branch policy by the project gitflow + the range-scoped denylist scan.
 
 ## dadaia context — Manage Spec Context Projects.
 - context alive — Transition a context to ALIVE; clone repo if absent. Idempotent if already ALIVE.
