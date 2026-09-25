@@ -201,6 +201,7 @@ def _reconcile_upgrade(root: Path, before: str | None, after: str | None) -> Non
             f"fix: {fix_line(root, 'reconcile', '--expect-version', after or '')}", err=True
         )
         raise typer.Exit(1)
+    container.build_spec_context_service(root).refresh_hooks()
     console.print(f"upgraded {before} -> {after}", markup=False, highlight=False)
 
 

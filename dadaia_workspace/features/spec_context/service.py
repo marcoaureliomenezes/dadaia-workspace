@@ -1,6 +1,7 @@
 """SpecContextService — full Spec Context Project lifecycle."""
 
 import contextlib
+import hashlib
 import logging
 import os
 import re
@@ -33,6 +34,7 @@ from dadaia_workspace.core.models.spec_context import (
     SpecContextProject,
 )
 from dadaia_workspace.core.specs_version import read_gitflow
+from dadaia_workspace.core.template_history import load_shipped_hashes
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.privacy_check import (
@@ -147,7 +149,8 @@ def install_git_hooks(repo_root: Path, *, force: bool = False) -> list[Path]:
 
     The ONE git-chokepoint installer — `dadaia ci install-hook`, `context create` and
     `context alive` are its callers. An installed hook is overwritten only when *force*
-    (never the operator's own hook in an adopted checkout: doctor's HOOKS-DRIFT-1 names
+    or when it is byte-identical to a version this library shipped (``shipped-hashes.json``
+    — an upgrade refreshes it); never the operator's own hook (HOOKS-DRIFT-1 names
     it). Returns the hooks written; raises :class:`FileNotFoundError` when *repo_root* is
     not a git repository.
     """
@@ -155,15 +158,23 @@ def install_git_hooks(repo_root: Path, *, force: bool = False) -> list[Path]:
     if not hooks_dir.is_dir():
         raise FileNotFoundError(f"{hooks_dir} not found (is this a git repository?)")
     scripts = workspace_layout.public_scripts_dir()
+    shipped = load_shipped_hashes(scripts.parent / "templates")
     planned = [
         (hooks_dir / target, scripts / source)
         for target, source in workspace_layout.INSTALLED_GIT_HOOKS
-        if force or not (hooks_dir / target).exists()
+        if force
+        or not (hooks_dir / target).exists()
+        or _sha256(hooks_dir / target) in shipped.get(f"scripts/{source}", set())
+        and _sha256(hooks_dir / target) != _sha256(scripts / source)
     ]
     for dest, source in planned:
         shutil.copyfile(source, dest)
         dest.chmod(0o755)
     return [dest for dest, _ in planned]
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 class SpecContextService:
@@ -544,6 +555,13 @@ class SpecContextService:
         self._store.update(alive_ctx)
 
         return alive_ctx
+
+    def refresh_hooks(self) -> None:
+        """Install, or refresh a shipped copy of, every ALIVE repo's git hooks (upgrade)."""
+        for ctx in self._store.list_all():
+            for repo in ctx.all_repos() if ctx.state == ContextState.ALIVE else ():
+                with contextlib.suppress(FileNotFoundError):
+                    self._install_hooks(self._repo_path(repo.slug))
 
     # ------------------------------------------------------------------ baseline
 

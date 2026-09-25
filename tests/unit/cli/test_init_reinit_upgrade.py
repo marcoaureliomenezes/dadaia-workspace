@@ -69,12 +69,19 @@ def test_newer_running_version_reconciles_and_reports_the_transition(
         return type("R", (), {"ok": True, "error": None})()
 
     monkeypatch.setattr(init_module, "reconcile_workspace", _reconcile)
+    refreshed: list[Path] = []
+    monkeypatch.setattr(
+        init_module.container,
+        "build_spec_context_service",
+        lambda root: type("S", (), {"refresh_hooks": lambda _s: refreshed.append(root)})(),
+    )
 
     result = _runner.invoke(app, ["init", str(workspace)])
 
     assert result.exit_code == 0, result.output
     assert "upgraded 0.4.7 -> 0.4.8" in result.output
     assert reconciled == ["0.4.8"]
+    assert refreshed == [workspace.resolve()]
 
 
 def test_a_failed_reconcile_prints_the_windows_fix_line(
