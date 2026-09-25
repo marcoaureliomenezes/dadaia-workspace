@@ -142,7 +142,7 @@ DELETE/REBUILD rows (PLAN §1) land first. RED = the named test fails before the
 
 ### G7 — text by role, law, docs (FR6, FR3, FR9)
 
-- [ ] **T-050-19 — Shipped text by role; library `pr-source-guard` reads the gitflow.**
+- [-] **T-050-19 — Shipped text by role; library `pr-source-guard` reads the gitflow.**
   Rewrite the ~36 PLAN §1 literals by role with a pointer to the constitution; `dd-gitflow-default` table by
   role; `ci.yml` guard reads `read_gitflow`; triggers stay literal, pinned by contract test.
   `Write set:` the PLAN §1 shipped-text files, `.github/workflows/ci.yml`,
