@@ -26,15 +26,6 @@ _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 _PUBLIC_DIR = _REPO_ROOT / "dadaia_workspace" / "public"
 
 
-def _make_workspace(root: Path) -> None:
-    """The sentinel `resolve_workspace_root()` looks for — the one doctor also runs its
-    `workspace` section, so these tests scope it to a tmp instance instead of the real
-    one the runner happens to sit in."""
-    states = root / ".dadaia" / "states"
-    states.mkdir(parents=True, exist_ok=True)
-    (states / "spec_contexts.json").write_text('{"contexts": []}', encoding="utf-8")
-
-
 def _specs_findings(output: str) -> list[dict[str, str]]:
     payload = json.loads(output)
     findings: list[dict[str, str]] = payload["sections"]["specs"]["findings"]
@@ -78,8 +69,7 @@ def test_doctor_clean_tree_then_remove_backlog_then_fix_recreates_then_no_fix_ne
         app,
         ["doctor", "--json", "--specs-dir", str(specs), "--public-dir", str(_PUBLIC_DIR)],
     )
-    # The exit code is the WHOLE run's (the `workspace` section scans the instance the
-    # runner sits in); this test's subject is the `specs` section's own verdict.
+    # This test's subject is the `specs` section's own verdict, not the run's exit code.
     assert _specs_errors(clean_result.output) == [], clean_result.output
 
     import shutil
