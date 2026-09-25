@@ -106,6 +106,42 @@
       "changed": [
         "release-lifecycle"
       ]
+    },
+    {
+      "ts": "2026-09-25T01:39:09Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 475b6cace633d8a03e5f0cafdb477d1fcb391750..0ba3f9c057f9: 14 reviewed, 10 changed.",
+      "since": "475b6cace633d8a03e5f0cafdb477d1fcb391750",
+      "until": "0ba3f9c057f9fb82e2a242236573623d0aff5d22",
+      "reviewed": [
+        "agent-comms",
+        "agent-orchestration",
+        "harness-codex",
+        "harness-copilot",
+        "harness-cursor",
+        "harness-devin",
+        "harness-kimi-code",
+        "product-vision",
+        "spec-context-project",
+        "ci-preflight",
+        "consumer-agent-support",
+        "context-portability",
+        "backlog-ledger",
+        "release-lifecycle"
+      ],
+      "changed": [
+        "workspace-init",
+        "pypi-distribution",
+        "public-asset-distribution",
+        "agentic-entities",
+        "harness-claude-code",
+        "sdd-gate-v3",
+        "audits-canon",
+        "workspace-doctor",
+        "specs-migration",
+        "context-management"
+      ]
     }
   ]
 }
