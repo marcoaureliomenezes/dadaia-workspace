@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import shlex
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
@@ -212,8 +213,7 @@ class StructuralValidator:
         ``specs/<area>/AGENTS.md`` vs ``public/scaffold/<area>/AGENTS.md`` for every
         area in :data:`_TREE5_SCOPED_LAW_AREAS` (memory excluded — single-ownership).
 
-        Absent root file → WARNING (fixable=False; intended for operator
-        customisation). Hash drift → WARNING; auto-fixable ONLY when the on-disk
+        Absent file → WARNING, fixable (writing the shipped template is lossless). Hash drift → WARNING; auto-fixable ONLY when the on-disk
         bytes equal a version this project shipped (``was_shipped``) and the file is
         not a symlink — anything else may hold operator content and stays warn-only.
         """
@@ -224,25 +224,12 @@ class StructuralValidator:
 
     def _tree5_root_issues(self) -> list[SpecsDoctorIssue]:
         agents_md = self.specs_dir / "AGENTS.md"
+        templates = self._templates_dir
+        canonical_path = templates / "specs-AGENTS.md" if templates else None
+        present = canonical_path is not None and canonical_path.exists()
         if not agents_md.exists():
-            return [
-                SpecsDoctorIssue(
-                    code="TREE-5",
-                    severity=Severity.WARNING,
-                    description=(
-                        "specs/AGENTS.md is missing — expected SDD workflow contract. "
-                        "Create it from the canonical template "
-                        "(dadaia_workspace/public/templates/specs-AGENTS.md) "
-                        "or run `dadaia specs init` to scaffold it."
-                    ),
-                    path=str(agents_md),
-                    fixable=False,
-                )
-            ]
-        if self._templates_dir is None:
-            return []
-        canonical_path = self._templates_dir / "specs-AGENTS.md"
-        if not canonical_path.exists():
+            return [self._tree5_missing(agents_md, "specs/AGENTS.md", present)]
+        if canonical_path is None or not present:
             return []
         return self._tree5_compare(
             dst=agents_md,
@@ -262,7 +249,7 @@ class StructuralValidator:
             if not canonical_path.exists():
                 continue
             if not dst.exists():
-                issues.append(self._tree5_missing(dst=dst, area=area))
+                issues.append(self._tree5_missing(dst, f"specs/{area}/AGENTS.md", fixable=True))
                 continue
             issues.extend(
                 self._tree5_compare(
@@ -274,25 +261,15 @@ class StructuralValidator:
             )
         return issues
 
-    def _tree5_missing(self, *, dst: Path, area: str) -> SpecsDoctorIssue:
-        """A scaffolded law file that is not there at all — the check TREE-5M owned for
-        ``memory/`` alone, now the one comparator's missing-file branch for every area.
-
-        WARNING, never fixable: `dadaia public install` scaffolds this file when it is
-        missing and never updates an existing copy, so the repair is the operator
-        copying the source in deliberately.
-        """
+    def _tree5_missing(self, dst: Path, label: str, fixable: bool) -> SpecsDoctorIssue:
+        """A law file that is not there at all: writing the shipped template loses
+        nothing, so ``doctor --fix`` writes it whenever the template is at hand (T-050-09)."""
         return SpecsDoctorIssue(
             code="TREE-5",
             severity=Severity.WARNING,
-            description=(
-                f"specs/{area}/AGENTS.md is missing — expected the scaffolded law "
-                f"contract for specs/{area}/. Restore it by copying the canonical "
-                f"source dadaia_workspace/public/scaffold/{area}/AGENTS.md into "
-                f"specs/{area}/AGENTS.md."
-            ),
+            description=f"{label} is missing — expected the shipped law contract.",
             path=str(dst),
-            fixable=False,
+            fixable=fixable,
         )
 
     def _tree5_compare(
@@ -322,7 +299,7 @@ class StructuralValidator:
                         f"template (current sha256:{current_hash[:12]}… is a previously "
                         f"shipped release; canonical sha256:{canonical_hash[:12]}…). "
                         "It carries no operator customisation, so it can be refreshed "
-                        "losslessly — run `dadaia doctor --fix`."
+                        "losslessly."
                     ),
                     path=str(dst),
                     fixable=True,
@@ -338,16 +315,16 @@ class StructuralValidator:
                     f"(current sha256:{current_hash[:12]}… vs "
                     f"canonical sha256:{canonical_hash[:12]}…). "
                     "Review the diff and merge any upstream changes manually — "
-                    "auto-overwrite is disabled to protect operator customisations. "
-                    f"Canonical source: {canonical_path}"
+                    "auto-overwrite is disabled to protect operator customisations."
                 ),
                 path=str(dst),
                 fixable=False,
+                fix=shlex.join(["git", "diff", "--no-index", "--", str(canonical_path), str(dst)]),
             )
         ]
 
     def fix_tree5(self, issue: SpecsDoctorIssue) -> None:
-        """Refresh a superseded projection from its canonical source (root or scoped).
+        """Write a missing law file, or refresh a superseded one, from its canonical source.
 
         Only ever reached for issues this validator marked ``fixable``. The repair
         target is resolved against a CLOSED set of known law files — the issue's path
@@ -377,11 +354,14 @@ class StructuralValidator:
         for dst, canonical_path, asset_name in targets:
             if issue_path is not None and dst.resolve() != issue_path:
                 continue
-            if dst.is_symlink() or not dst.exists() or not canonical_path.exists():
+            if dst.is_symlink() or not canonical_path.exists():
                 continue
-            current_text = dst.read_text(encoding="utf-8")
-            if not was_shipped(current_text, asset_name, self._templates_dir):
+            # Missing is lossless to write; present is refreshed only if we shipped it.
+            if dst.exists() and not was_shipped(
+                dst.read_text(encoding="utf-8"), asset_name, self._templates_dir
+            ):
                 continue
+            dst.parent.mkdir(parents=True, exist_ok=True)
             atomic_write(dst, canonical_path.read_text(encoding="utf-8"), preserve_mode=True)
             return
 

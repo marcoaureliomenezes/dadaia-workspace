@@ -29,7 +29,7 @@ DELETE/REBUILD rows (PLAN §1) land first. RED = the named test fails before the
   runnable from any cwd; one init refusal asserted in Windows form
   `RED:` `tests/contract/test_fix_lines_use_the_builder.py` (AST, fix positions per PLAN §2) lists the sites.
 
-- [-] **T-050-09 — FIXED/TREE remedies honest; missing law file is fixable.**
+- [x] **T-050-09 — FIXED/TREE remedies honest; missing law file is fixable.**
   FIXED-1/2 and TREE-4/5 drop their embedded commands; a missing `specs/AGENTS.md` or
   `specs/<area>/AGENTS.md` is `fixable=True` (writes the shipped template); the copy-path prose is gone;
   an unfixable TREE-5 case advertises no `doctor --fix`.

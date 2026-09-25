@@ -374,3 +374,55 @@ def test_a_judgment_only_rule_never_makes_the_run_exit_1(tmp_path: Path) -> None
     assert {"SPEC-DOC-005", "SPEC-DOC-008", "TREE-2", "AGENTS-PLACEHOLDER-1"} <= fired, fired
     errors = {f.code for f in report.findings if f.error}
     assert errors == {"LINT-1"}, errors
+
+
+# ── T-050-09: TREE-5 remedies are honest (AC2.3, AC2.4) ─────────────────────────
+
+
+def _doctor_json(specs: Path, *flags: str) -> list[dict[str, str]]:
+    from typer.testing import CliRunner
+
+    from dadaia_workspace.cli.main import app
+
+    result = CliRunner().invoke(app, ["doctor", "--json", *flags, "--specs-dir", str(specs)])
+    findings: list[dict[str, str]] = json.loads(result.output)["sections"]["specs"]["findings"]
+    return findings
+
+
+def test_doctor_fix_writes_a_missing_law_file_and_clears_its_finding(tmp_path: Path) -> None:
+    """A missing ``specs/AGENTS.md`` or ``specs/<area>/AGENTS.md`` is lossless to write:
+    ``doctor --fix`` writes the shipped template and the TREE-5 finding is gone."""
+    root = _repo(tmp_path)
+    specs = root / "specs"
+    before = [f for f in _doctor_json(specs) if f["code"] == "TREE-5"]
+    assert any(f["message"].startswith("specs/AGENTS.md is missing") for f in before), before
+    assert any(f["message"].startswith("specs/bugs/AGENTS.md is missing") for f in before)
+
+    _doctor_json(specs, "--fix")
+
+    public = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
+    assert (specs / "AGENTS.md").read_bytes() == (
+        public / "templates" / "specs-AGENTS.md"
+    ).read_bytes()
+    assert (specs / "bugs" / "AGENTS.md").read_bytes() == (
+        public / "scaffold" / "bugs" / "AGENTS.md"
+    ).read_bytes()
+    assert [f for f in _doctor_json(specs) if f["code"] == "TREE-5"] == []
+
+
+def test_a_tree5_case_fix_cannot_repair_advertises_no_doctor_fix(tmp_path: Path) -> None:
+    """Operator content (copy-drift) is never overwritten, so its finding must not hand
+    back ``doctor --fix``; no TREE/FIXED description embeds a bare CLI command."""
+    root = _repo(tmp_path)
+    specs = root / "specs"
+    _doctor_json(specs, "--fix")
+    (specs / "AGENTS.md").write_text("# operator law\n", encoding="utf-8")
+
+    findings = _doctor_json(specs, "--fix")
+
+    drift = [f for f in findings if f["code"] == "TREE-5"]
+    assert len(drift) == 1 and "copy-drift" in drift[0]["message"], drift
+    assert "doctor --fix" not in drift[0]["fix"]
+    assert (specs / "AGENTS.md").read_text(encoding="utf-8") == "# operator law\n"
+    for finding in findings:
+        assert not re.search(r"(?<![\w./-])dadaia\s", finding["message"]), finding

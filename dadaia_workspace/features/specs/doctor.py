@@ -110,14 +110,15 @@ class SpecsDoctor:
         else:
             self._templates_dir = None
 
-        # Scaffold source dir (for TREE-4 README content).
-        if self.public_dir is not None:
-            scaffold_candidate = self.public_dir / "scaffold"
-            self._scaffold_dir: Path | None = (
-                scaffold_candidate if scaffold_candidate.is_dir() else None
-            )
-        else:
-            self._scaffold_dir = None
+        # Scaffold source dir (TREE-4/TREE-5 law files): the templates' sibling in the
+        # same shipped ``public/`` tree, so a consumer repo repairs from the package too.
+        source = self.public_dir or (self._templates_dir.parent if self._templates_dir else None)
+        scaffold_candidate = source / "scaffold" if source is not None else None
+        self._scaffold_dir: Path | None = (
+            scaffold_candidate
+            if scaffold_candidate is not None and scaffold_candidate.is_dir()
+            else None
+        )
 
         # Build the six validators (each independently testable). The coordinator owns the
         # config resolution; validators own their family LOGIC and family-local helpers.

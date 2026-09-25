@@ -537,7 +537,10 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
     doctor_missing = SpecsDoctor(specs_missing, templates_dir=_TEMPLATES_DIR)
     tree5_missing = [i for i in doctor_missing.check() if i.code == "TREE-5"]
     assert tree5_missing and tree5_missing[0].severity == Severity.WARNING
-    assert not tree5_missing[0].fixable
+    # T-050-09 (AC2.4): writing the shipped template is lossless, so --fix writes it.
+    assert tree5_missing[0].fixable
+    doctor_missing.fix(tree5_missing)
+    assert agents_md.read_bytes() == (_TEMPLATES_DIR / "specs-AGENTS.md").read_bytes()
 
     specs_drift = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree5-drift"))
     (specs_drift / "AGENTS.md").write_text(
@@ -553,19 +556,20 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
     canonical = (_TEMPLATES_DIR / "specs-AGENTS.md").read_text(encoding="utf-8")
     (specs_ok / "AGENTS.md").write_text(canonical, encoding="utf-8")
     doctor_ok = SpecsDoctor(specs_ok, templates_dir=_TEMPLATES_DIR)
-    tree5_ok = [i for i in doctor_ok.check() if i.code == "TREE-5"]
+    root_law = str(specs_ok / "AGENTS.md")  # the scoped law files are not planted here
+    tree5_ok = [i for i in doctor_ok.check() if i.code == "TREE-5" and i.path == root_law]
     assert tree5_ok == []
 
-    # TREE-5, memory area (0.4.7 FR6): absence emits WARNING (never ERROR) naming the
-    # scaffold source to copy in — the check TREE-5M owned before the fold.
+    # TREE-5, memory area (0.4.7 FR6): absence emits WARNING (never ERROR); since
+    # T-050-09 it is fixable — `doctor --fix` writes the shipped scaffold.
     specs_mem_absent = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-mem-absent"))
     memory_agents = specs_mem_absent / "memory" / "AGENTS.md"
     if memory_agents.exists():
         memory_agents.unlink()
     issues_mem = SpecsDoctor(specs_mem_absent, public_dir=_PUBLIC_DIR).check()
     tree5_mem = [i for i in issues_mem if i.code == "TREE-5" and "memory" in (i.path or "")]
-    assert tree5_mem and tree5_mem[0].severity == Severity.WARNING and not tree5_mem[0].fixable
-    assert "public/scaffold/memory/AGENTS.md" in tree5_mem[0].description
+    assert tree5_mem and tree5_mem[0].severity == Severity.WARNING and tree5_mem[0].fixable
+    assert "dadaia" not in tree5_mem[0].description
     assert [i for i in issues_mem if i.severity == Severity.ERROR] == []
 
     # TREE-6 retired (0.5.3 T-053-04, F005): missing-artifact coverage lives in

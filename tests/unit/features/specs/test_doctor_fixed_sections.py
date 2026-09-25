@@ -61,13 +61,9 @@ def test_check_reports_missing_and_drifted_blocks_and_stays_silent_on_exact_ones
         ("FIXED-1", Severity.ERROR, True, str(specs / "constitution.md")),
         ("FIXED-2", Severity.ERROR, True, str(specs / "memory" / "ARCHITECTURE.md")),
     ]
-    assert issues[0].description == (
-        "constitution.md: fixed law section `slop-law` is missing — "
-        "`dadaia doctor --fix` inserts or refreshes it"
-    )
+    assert issues[0].description == ("constitution.md: fixed law section `slop-law` is missing")
     assert issues[1].description == (
-        "memory/ARCHITECTURE.md: fixed law section `slop-code` differs from the library "
-        "fragment — `dadaia doctor --fix` inserts or refreshes it"
+        "memory/ARCHITECTURE.md: fixed law section `slop-code` differs from the library fragment"
     )
 
 

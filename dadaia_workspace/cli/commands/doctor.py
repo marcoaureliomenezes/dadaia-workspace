@@ -128,6 +128,7 @@ def _specs_render[C](rule: Rule[C, SpecsDoctorIssue], issue: SpecsDoctorIssue) -
         message=f"{issue.description}{location}",
         canonical=False,
         error=issue.severity is Severity.ERROR,
+        fix=issue.fix,
     )
 
 
