@@ -305,7 +305,7 @@ def test_new_objects_batch_check_timeout_raises_typed_error(
     """dd-code-reviewer MEDIUM finding: the ``--batch-check`` call must route through the
     same typed-error wrapper as every other git invocation in this module — a subprocess
     timeout or a missing ``git`` executable must never escape as a raw exception
-    (``core/protocols/git_object_reader.py`` — 'Any git failure raises
+    (the reader's contract — 'Any git failure raises
     GitObjectReadError rather than returning a partial/empty result'). Forces the
     failure specifically on the batch-check call (the rev-list call that precedes it
     still runs for real) so this exercises the previously-untested gap distinctly from

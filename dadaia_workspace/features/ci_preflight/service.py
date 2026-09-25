@@ -50,8 +50,7 @@ _RUFF_PATHS: tuple[str, ...] = ("dadaia_workspace/", "tests/")
 _MYPY_PATHS: tuple[str, ...] = ("dadaia_workspace/",)
 
 # The import-linter (``lint-imports``) config lives in setup.cfg. ``--no-cache`` keeps
-# ``.import_linter_cache/`` out of the repo tree (repo-cleanliness law; see
-# ``tests/contract/test_import_linter_cache_hygiene.py``). This mirrors the CI
+# ``.import_linter_cache/`` out of the repo tree (repo-cleanliness law). This mirrors the CI
 # 'Lint (ruff)' job step ``lint-imports --config setup.cfg --no-cache``.
 _LINT_IMPORTS_CONFIG: str = "setup.cfg"
 
@@ -188,8 +187,7 @@ def _lint_imports_check(
 
     Mirrors the CI 'Lint (ruff)' job step ``lint-imports --config setup.cfg --no-cache``:
     ``--config setup.cfg`` selects the contract set; ``--no-cache`` keeps
-    ``.import_linter_cache/`` out of the repo tree (repo-cleanliness law;
-    ``test_import_linter_cache_hygiene.py``). The executable is resolved via the shared
+    ``.import_linter_cache/`` out of the repo tree (repo-cleanliness law). The executable is resolved via the shared
     ``_resolve_tool`` seam with ``require=True`` — a missing ``lint-imports`` binary FAILS
     CLOSED with an actionable message (architect A10), never a silent skip. When the tool
     is absent, ``_resolve_tool`` returns the self-contained fail-closed command (len > 1),

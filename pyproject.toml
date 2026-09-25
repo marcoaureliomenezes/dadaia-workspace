@@ -179,7 +179,7 @@ markers = [
     "unit: pure or near-pure fast tests",
     "contract: public API/schema/security contracts",
     "integration: multi-component tests using real tmp filesystem or CLI runner",
-    "e2e: full user journeys and browser-backed flows",
+    "e2e: full user journeys through the real CLI",
     "slow: tests over 1s or tests that start a server/subprocess",
     "tmp: temporary debugging tests excluded from default runs",
     "flaky: observed pass+fail on identical code; being diagnosed (dd-test-stewardship, flakes and quarantine)",

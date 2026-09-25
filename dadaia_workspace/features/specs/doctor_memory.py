@@ -80,11 +80,9 @@ def _parse_memory_md(path: Path) -> _MemoryMdSummary:
 # MEM-DRIFT-1: features package-map mermaid block vs the live tree
 # ---------------------------------------------------------------------------
 #
-# Relocated (v0.5.1 T-051-22 rework) from the deleted push-gated contract test
-# ``tests/contract/test_architecture_diagrams_current.py`` (removed at 5e0719af, bug
-# ``push-gate-test-pins-memory-package-count-that-only-closure-may-change``) per
-# qa-engineer's 2026-08-29 deletion-verdict handoff: the diagram-vs-code correspondence
-# guard is real and must survive, but never on a push-gated tier — every future package
+# Relocated (v0.5.1 T-051-22) from a push-gated contract test (bug
+# ``push-gate-test-pins-memory-package-count-that-only-closure-may-change``): the
+# diagram-vs-code correspondence guard is real, but never on a push-gated tier — every future package
 # add/delete during IMPLEMENTATION would go red before the next CLOSURE gets to update
 # memory. See ``check_mem_drift1_features_package_map`` below for the WARNING itself.
 
@@ -501,7 +499,7 @@ class MemoryValidator:
         citation contract tests use, never a second rule. WARNING and unfixable, like
         MEM-DRIFT-1: memory drift is a closure finding (QUALITY.md), so a verb retired
         mid-implementation never reddens an unrelated task. *command_paths* is plain data
-        from the CLI root, exactly as ``live_shas`` travels.
+        from the CLI root.
         """
         return [
             SpecsDoctorIssue(

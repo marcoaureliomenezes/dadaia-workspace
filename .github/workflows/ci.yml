@@ -67,7 +67,6 @@ jobs:
           path: |
             ~/.cache/pypoetry
             ~/.cache/pip
-            .venv
           key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
       - name: Install dev deps
         run: poetry install --no-interaction --no-ansi --with dev
@@ -99,7 +98,6 @@ jobs:
           path: |
             ~/.cache/pypoetry
             ~/.cache/pip
-            .venv
           key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
@@ -125,7 +123,6 @@ jobs:
           path: |
             ~/.cache/pypoetry
             ~/.cache/pip
-            .venv
           key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
@@ -149,7 +146,6 @@ jobs:
           path: |
             ~/.cache/pypoetry
             ~/.cache/pip
-            .venv
           key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
@@ -233,7 +229,6 @@ jobs:
           path: |
             ~/.cache/pypoetry
             ~/.cache/pip
-            .venv
           key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
@@ -260,7 +255,6 @@ jobs:
           path: |
             ~/.cache/pypoetry
             ~/.cache/pip
-            .venv
           key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
@@ -307,12 +301,6 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        # Full history: SPEC-DOC-044's liveness set is the head, its parents and each
-        # merged line's first parent (features.chokepoints.verdict.live_verdict_shas);
-        # a depth-1 checkout hides a merge commit's parents and calls the verdict the
-        # merge just consumed stale — the same reason the verdict-gate job fetches depth 0.
-        with:
-          fetch-depth: 0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"

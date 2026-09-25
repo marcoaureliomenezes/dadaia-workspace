@@ -322,7 +322,7 @@ def test_real_git_failure_refuses_naming_the_failure(tmp_path: Path) -> None:
     assert "--no-verify" in decision.message
 
 
-def test_git_object_read_error_is_importable_from_core_protocols() -> None:
+def test_git_object_read_error_is_importable_from_core_models() -> None:
     """Sentinel-level sanity: the typed failure the adapter raises stays importable
-    from `core.protocols` without pulling in infrastructure (purity boundary)."""
+    from `core.models` without pulling in infrastructure (purity boundary)."""
     assert issubclass(GitObjectReadError, Exception)

@@ -1,18 +1,8 @@
-"""Intent: CONTRACT — P-18 module line-count ceiling (doctor*, panel api*)
+"""Intent: CONTRACT — P-18 module line-count ceiling (doctor*)
 
-Anti-erosion module-size ratchet (v0.1.55 FR1 / AC-1).
-
-The 2,830-line ``features/specs/doctor.py`` god module and the 1,279-line
-``features/panel/views/api.py`` module were the erosion this release decomposes. Once split,
-nothing structurally prevents a future edit from re-growing a single module back toward a god
-module — the layering law (import-linter) constrains *edges*, not *line counts*.
-
-This contract pins per-module **line-count ceilings** as a ratchet:
-
-* No ``features/specs/doctor*.py`` module exceeds **700 lines** (the FR1 coordinator + validator
-  siblings + leaves).
-* No ``features/panel/views/api*.py`` module exceeds **450 lines** (the FR2 per-domain view
-  modules; ``api.py`` is deleted, so the monolith can never re-form).
+Anti-erosion module-size ratchet (v0.1.55 FR1 / AC-1): the 2,830-line
+``features/specs/doctor.py`` god module was split; the layering law constrains *edges*,
+not *line counts*, so this pins no ``features/specs/doctor*.py`` module above the ceiling.
 
 Lowering a ceiling after a further split is welcome — lower the constant here in the same commit.
 Raising one requires a same-commit justification (a module legitimately grew past the ratchet),
@@ -46,7 +36,7 @@ def _line_count(path: Path) -> int:
 )
 def test_no_module_exceeds_ceiling(glob: str, ceiling: int, directory: Path) -> None:
     """Every module matching *glob* under *directory* stays under its line-count
-    ratchet (AC-1). The monolithic panel api.py must also stay deleted (FR2)."""
+    ratchet (AC-1)."""
     modules = sorted(directory.glob(glob))
     assert modules, f"no {glob} modules found under {directory}"
     offenders = {p.name: _line_count(p) for p in modules if _line_count(p) > ceiling}

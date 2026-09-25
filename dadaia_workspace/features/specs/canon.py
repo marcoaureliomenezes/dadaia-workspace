@@ -30,9 +30,9 @@ copy (the drift class this module closes):
 
 * ``doctor_structural.StructuralValidator.check_tree8_canon_root`` — the doctor's
   full-tree conformance sweep.
-* ``features.chokepoints.service.push_gate_decision`` — the pre-push specs-canon gate
+* ``features.chokepoints.push_gate.push_gate_decision`` — the pre-push specs-canon gate
   (SPEC v0.5.0): every path a push would newly publish under ``specs/`` is checked
-  against the SAME predicate, through the existing ``GitObjectReader`` port
+  against the SAME predicate, through the injected git object reader
   (``list_tree_paths``) — never a second, hand-kept member list.
 
 The canon (operator, 2026-08-28) — the ONLY members permitted under ``specs/``:
@@ -244,8 +244,7 @@ def classify(specs_dir: Path) -> TreeKind:
 
 def default_public_dir() -> Path:
     """``dadaia_workspace/public/`` resolved relative to this installed module — the
-    same module-relative idiom already used by ``features.spec_artifacts.memory``
-    (retired by this task) and ``features.specs.doctor``'s CLI composition root."""
+    same module-relative idiom ``features.specs.doctor``'s CLI composition root uses."""
     return Path(__file__).resolve().parent.parent.parent / "public"
 
 

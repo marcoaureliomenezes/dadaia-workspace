@@ -6,8 +6,8 @@ for the L1 agent roster: an operator overlay (``applied_template`` + per-agent p
 ``core/agent_model_templates.py``.
 
 Layering (SPEC D-4): pure data, zero I/O, stdlib-only imports plus
-``core.model_registry`` — importable from both ``infrastructure`` (install pipeline) and
-``features`` (panel service) under the import-linter contracts
+``core.model_registry`` — importable from ``infrastructure`` (install pipeline) and ``features`` under the
+import-linter contracts
 (``core-no-os-primitives`` holds).
 
 D-3: the rendered Claude ``effort:`` vocabulary is ``low|medium|high|xhigh|max``; the
@@ -29,7 +29,7 @@ _SCHEMA_VERSION = "agent-model-policy-v1"
 #: Rendered Claude reasoning-effort vocabulary (D-3).
 ClaudeEffort = Literal["low", "medium", "high", "xhigh", "max"]
 
-#: The effort vocabulary as an ordered tuple (validation + panel payloads).
+#: The effort vocabulary as an ordered tuple (validation).
 CLAUDE_EFFORTS: tuple[ClaudeEffort, ...] = get_args(ClaudeEffort)
 
 #: Where a resolved (model, effort) came from (FR8 resolved-roster tagging).

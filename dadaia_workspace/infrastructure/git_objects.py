@@ -603,7 +603,7 @@ def _resolve_prior_texts_at_base(repo: Path, base: str, paths: list[str]) -> dic
         except ValueError as exc:
             # v0.4.2 FR4/GRILL P9: the offending PATH is a structured field, never
             # embedded in the message string — the single render boundary
-            # (features.chokepoints.service) masks it before it reaches any
+            # (features.chokepoints.push_gate) masks it before it reaches any
             # operator-facing string. `exc` (the ValueError) still names the parse
             # detail (an internal shape description, never a path) in the message.
             raise GitObjectReadError(

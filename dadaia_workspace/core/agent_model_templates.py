@@ -12,7 +12,7 @@ security-review-shaped work), a duplicate template id, or a missing ``balanced``
 default.
 
 :func:`resolve_agent_model` is the ONLY precedence implementation (FR4): install,
-doctor, codex projection, and the panel all consume it. Per-field precedence for core
+doctor and the codex projection consume it. Per-field precedence for core
 agents: per-agent overlay override > applied template > library default (``balanced``).
 
 Layering (D-4): pure data + pure functions, zero I/O (``core-no-os-primitives`` holds).

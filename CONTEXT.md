@@ -203,10 +203,6 @@ _Avoid_: memory pass, apply the deltas, sync
 The one CLI command authorized to change a governance record — `bugs.py append|update|resolve|supersede|defer|reject|archive`, `backlog new|exit`, `release new|phase|check`, `audit disposition|close`.
 _Avoid_: CLI command (generic), mutation, setter
 
-**Governance event**:
-The row a governance verb writes into the telemetry store after its record write — `{event_id, ts, session_id, context, verb, ledger, record_id, record_hash}`. Observability, never a gate.
-_Avoid_: record, audit trail, log entry
-
 **Hand edit**:
 A governance record change with no matching governance event. Measured as a WARNING (`LEDGER-*-HANDEDIT`, `RELEASE-TREE-HANDEDIT`), never blocked.
 _Avoid_: drift (a projection differing from its render), manual write, tampering

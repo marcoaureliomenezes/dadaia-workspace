@@ -17,8 +17,7 @@ CLOSURE.md-completeness) is DELETED here, not adapted — FR4/T-050-21A retired
 code behind a dead artifact, the exact shape this release exists to stop. The same task
 also swaps ``_iter_findings`` from a plain dict yield onto
 :class:`~dadaia_workspace.core.models.findings.FindingRecord`, the typed model T-050-23
-landed — through an optional ``findings_store_factory`` seam (mirrors
-``features.agents.reader``'s ``store_factory`` DI) so this leaf-only module never gains a
+landed — through an optional ``findings_store_factory`` seam so this leaf-only module never gains a
 ``features -> infrastructure`` edge: the production default is a zero-dependency parse
 over the SAME model; the generic
 :class:`~dadaia_workspace.infrastructure.jsonl_record_store.JsonlRecordStore` is the SAME

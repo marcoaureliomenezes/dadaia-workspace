@@ -7,7 +7,7 @@ before either specs-scan step). Branch names come from the injected
 :class:`~dadaia_workspace.core.gitflow.Gitflow`; none is spelled here.
 :class:`Decision` — the shared outcome shape every chokepoint gate returns — lives here
 too: this module has no internal-package dependency, so every sibling module (``pre_commit``,
-``push_gate``, ``verdict``) imports it from here rather than duplicating it or reaching
+``push_gate``) imports it from here rather than duplicating it or reaching
 into ``__init__.py`` (which itself re-exports from this module, never the reverse).
 """
 
@@ -71,12 +71,12 @@ class PushRef:
 
     @property
     def is_deletion(self) -> bool:
-        """True when this ref is being deleted (zero local sha) — passes with no verdict."""
+        """True when this ref is being deleted (zero local sha) — passes the branch policy."""
         return self.local_sha == ZERO_SHA or not self.local_sha
 
     @property
     def is_tag(self) -> bool:
-        """True when this ref is a tag push — passes with no verdict (DP-5)."""
+        """True when this ref is a tag push — passes the branch policy (DP-5)."""
         return self.local_ref.startswith("refs/tags/")
 
 

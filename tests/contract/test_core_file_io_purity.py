@@ -60,7 +60,7 @@ _CORE_DIR = _REPO_ROOT / "dadaia_workspace" / "core"
 #
 # handoff_index (release 0.5.1 K6, deepening candidate): the one handoff discovery +
 # artifact-path-resolution + version-routing module several MUTUALLY-INDEPENDENT feature
-# packages need (chokepoints, specs, panel, reports) — the P-07 cross-feature-independence
+# packages need (chokepoints, specs, reports) — the P-07 cross-feature-independence
 # contract's cap must never rise (GATE requirement), so this joins the SAME precedent as
 # specs_resolver/workspace_resolver (a filesystem-walking resolver several layers need,
 # placed in `core` rather than behind a new suppressed features-no-cross-feature edge per

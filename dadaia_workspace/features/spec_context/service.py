@@ -448,8 +448,7 @@ class SpecContextService:
     def repo_live_status(self, repo: AssociatedRepo) -> RepoLiveStatus:
         """THE single branch-resolution implementation (A18.3).
 
-        `context show`, `context list --json`, the export branch refresh and the
-        panel card all resolve a repo's on-disk presence and live checked-out
+        `context show`, `context list --json` and the export branch refresh all resolve a repo's on-disk presence and live checked-out
         branch through this ONE method — never a second ad hoc git-subprocess call
         at a CLI or feature boundary. That duplication is exactly what produced bug
         `context-list-current-branch-stale-for-alive-repo`: ``show`` queried git
@@ -473,7 +472,7 @@ class SpecContextService:
     def repos_live_status(self, ctx: SpecContextProject) -> list[RepoLiveStatus]:
         """Live status for every repo in ``ctx.all_repos()`` (main first, then every
         associated repo in registration order) — the ONE set ``show``/``list``/
-        export/panel render for "this context's repos" (FR18)."""
+        export render for "this context's repos" (FR18)."""
         return [self.repo_live_status(repo) for repo in ctx.all_repos()]
 
     # ------------------------------------------------------------------ alive (T-10b / T-11)

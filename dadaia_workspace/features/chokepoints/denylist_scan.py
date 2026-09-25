@@ -275,7 +275,7 @@ class PathMasker:
     site) — today that is the denylist refusal and the FR4 oversized-blob note.
 
     v0.5.1 K7 ("one masking predicate"): this class used to be a private copy
-    (``features.chokepoints.service._PathMasker``) that merely CALLED this module's own
+    (in the retired chokepoints service module) that merely CALLED this module's own
     :func:`operator_terms_match`. Moved here — the module
     that already owns those two predicates — so there is exactly ONE masking
     implementation, not a detector module plus a second class elsewhere that reaches

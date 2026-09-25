@@ -163,7 +163,7 @@ def remove_retired_core_rules(workspace_root: Path, installed: list[str]) -> Non
 def render_claude_agent(staged_text: str, resolved: ResolvedAgentModel) -> str:
     """Compose a staged generic agent body + its resolved policy (the D-6 seam).
 
-    The SINGLE injection point shared by install-write, doctor-compare, and panel
+    The SINGLE injection point shared by install-write and doctor-compare
     Apply: any pre-existing top-level ``model:``/``effort:`` frontmatter lines are
     stripped (pack bodies author ``model:`` as their pack default — D-5), then the
     resolved ``model:`` and ``effort:`` are appended deterministically as the LAST

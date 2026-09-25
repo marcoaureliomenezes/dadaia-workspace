@@ -1,9 +1,7 @@
 """JsonInstallLedgerStore — JSON adapter for the projection install ledger (schema v1).
 
-The ``infrastructure`` adapter for
-:class:`~dadaia_workspace.core.protocols.install_ledger_store.InstallLedgerStore`,
-(stateless, per-call ``states_dir``, atomic write,
-idempotent no-op on identical bytes). Persists to
+Stateless, per-call ``states_dir``, atomic write,
+idempotent no-op on identical bytes. Persists to
 ``.dadaia/states/install_ledger.json``:
 
     {"schema_version": "1",
