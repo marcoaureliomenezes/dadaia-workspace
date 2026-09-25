@@ -150,7 +150,7 @@ DELETE/REBUILD rows (PLAN §1) land first. RED = the named test fails before the
   `blocked by:` T-050-12 · `delivers:` AC6.7–AC6.9 — agents read the gitflow by role
   `RED:` trigger-equality contract test against a changed library gitflow.
 
-- [ ] **T-050-20 — Law, docs, first-pass skill, glossary; reproject.**
+- [-] **T-050-20 — Law, docs, first-pass skill, glossary; reproject.**
   `dd-audit-project` first pass ends at `memory.py check` (no FINDINGS, no `audit.py close`); bind and
   level-3 claims rewritten; `CONTEXT.md` gets the §3 terms; `public stage/install/doctor` + `doctor` exit 0.
   `Write set:` `pub/skills/{dd-audit-project,dd-cli-library}/SKILL.md`, `pub/data/{AGENTS.md,
