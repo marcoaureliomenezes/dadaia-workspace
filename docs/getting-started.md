@@ -6,7 +6,7 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 ## Install
 
 <!-- derived-from: pypi-distribution sha256:618098346ed6 -->
-<!-- derived-from: workspace-init sha256:aa1f033df140 -->
+<!-- derived-from: workspace-init sha256:6f9ad6e670eb -->
 
 ```bash
 uvx dadaia-workspace init <dir> --harness claude --repo <url>
@@ -27,7 +27,7 @@ refreshes each project's specs law.
 
 ## Level 1 — the workspace
 
-<!-- derived-from: workspace-init sha256:aa1f033df140 -->
+<!-- derived-from: workspace-init sha256:6f9ad6e670eb -->
 
 `uvx dadaia-workspace init <dir> --harness claude|codex|kimi-code|cursor|devin|copilot
 [--repo <url>] [--associated-repo <url>]… [--skip-assets]` is the only verb that works

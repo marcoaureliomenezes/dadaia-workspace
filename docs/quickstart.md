@@ -8,7 +8,7 @@ live. Terms are defined in [concepts](concepts.md); the long walkthrough is
 ## 1. The three levels in one block
 
 <!-- derived-from: pypi-distribution sha256:618098346ed6 -->
-<!-- derived-from: workspace-init sha256:aa1f033df140 -->
+<!-- derived-from: workspace-init sha256:6f9ad6e670eb -->
 
 Set `REPO_URL` to your repository's clone URL; everything else runs as printed (needs
 uv and network access):
@@ -44,7 +44,7 @@ Then `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes the project
 
 ## 2. What the init line provisioned
 
-<!-- derived-from: workspace-init sha256:aa1f033df140 -->
+<!-- derived-from: workspace-init sha256:6f9ad6e670eb -->
 
 `--harness` names one registered harness: `claude` | `codex` | `kimi-code` | `cursor` |
 `devin` | `copilot`. The directory is required and a directory holding a foreign tree

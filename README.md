@@ -45,7 +45,7 @@ memory atom under its content hash.
 ## A human installs and uses it
 
 <!-- derived-from: pypi-distribution sha256:618098346ed6 -->
-<!-- derived-from: workspace-init sha256:aa1f033df140 -->
+<!-- derived-from: workspace-init sha256:6f9ad6e670eb -->
 <!-- derived-from: context-management sha256:3f48eef447f1 -->
 <!-- derived-from: workspace-doctor sha256:3fa0c321c7b0 -->
 
