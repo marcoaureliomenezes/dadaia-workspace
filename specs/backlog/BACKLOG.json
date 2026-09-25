@@ -16,6 +16,14 @@
       "status": "idea",
       "description": "Deferred by ADR 0040 (operator grill 2026-09-24): consumer enforcement is local only \u2014 the pre-push gate reading the constitution gitflow block; dd-gitflow-default/CICD-AUTOMATION.md is a reference document and the workspace writes no CI workflow into a consumer repo. A later evolution would add server-side enforcement (a CI guard job and/or branch rulesets) derived from the same gitflow block. Operator: 'no momento n\u00e3o devemos ter nada referente a jobs de CI no github... depois evoluiremos isso' \u2014 not before the operator reopens it.",
       "provenance": "operator grill 2026-09-24 (onboarding foundation, Q10), ADR 0040 consequences: 'Server-side enforcement for consumers (CI guard, rulesets) enters through the backlog.'"
+    },
+    {
+      "id": "associated-repo-gitflow-override",
+      "title": "Per-repo gitflow override for an associated repo whose principal branch differs from the main repo's",
+      "opened": "2026-09-25",
+      "status": "idea",
+      "description": "Deferred by ADR 0046 (operator grill round 3, 2026-09-25): the pre-push gate resolves the gitflow from the pushed repo's own specs/constitution.md, else the owning context's main-repo constitution, else the default with a warning. An associated repo carries no specs/, so it inherits the main repo's gitflow block {principal, integration, work}. When an associated repo's principal (or integration) branch has a different name than the main repo's, the inherited block names the wrong branches and its pushes are judged against them. A later evolution would let the gitflow block (or a per-repo entry beside it) name an override for one associated repo, read by the same resolution at push time. Not before the operator reopens it.",
+      "provenance": "operator grill 2026-09-25 (onboarding foundation, round 3, Q5), ADR 0046 consequences: 'A per-repo override for an associated repo whose principal differs is backlog.'; grill handoff 2026-09-25T050500Z-main-thread-foundation-grill-r3: 'Backlog to add: per-repo gitflow override for associated repos.'"
     }
   ]
 }
