@@ -99,7 +99,7 @@ DELETE/REBUILD rows (PLAN §1) land first. RED = the named test fails before the
 
 ### G5 — the one publish verb (FR4)
 
-- [ ] **T-050-15 — Rebuild `context baseline`.**
+- [-] **T-050-15 — Rebuild `context baseline`.**
   Delete the convergent `has_commits` branch, `feature/0.1.0`, `--yes`/`--push`; straight-line flow per
   PLAN §2 with the new git reads; certification drops the flags.
   `Write set:` `features/spec_context/service.py`, `infrastructure/git_subprocess.py`,
