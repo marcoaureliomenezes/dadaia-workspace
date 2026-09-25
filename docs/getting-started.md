@@ -21,7 +21,9 @@ runs through the workspace's own CLI, `.dadaia/.venv/bin/dadaia`, which `init` p
 by its absolute path.
 
 **Upgrade:** re-run the same `uvx dadaia-workspace init <dir> --harness <name>` line;
-it prints `upgraded A -> B`, or `already at A` when the workspace is current.
+it prints `upgraded A -> B`, or `already at A` when the workspace is current. The upgrade
+never writes a project repo: `.dadaia/.venv/bin/dadaia specs init --context <ctx>` then
+refreshes each project's specs law.
 
 ## Level 1 — the workspace
 

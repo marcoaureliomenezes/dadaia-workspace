@@ -36,6 +36,7 @@ python3 .agents/skills/dd-release-implementation/scripts/release.py new 0.1.0 \
 
 **Upgrade:** re-run the same `uvx dadaia-workspace init demo --harness claude` line
 from the parent directory; it prints `upgraded A -> B`, or `already at A` when current.
+Then `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes the project's specs law.
 
 ## 2. What the init line provisioned
 

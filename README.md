@@ -72,7 +72,8 @@ hook, makes the context ALIVE and binds it; a later project is
 `specs/` to the canon, moving a foreign tree to `specs-bkp/` after consent.
 
 **Upgrade:** re-run the `uvx dadaia-workspace init <dir> --harness <name>` line; it
-prints `upgraded A -> B`, or `already at A`.
+prints `upgraded A -> B`, or `already at A`; then
+`.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes each project's specs law.
 `.dadaia/.venv/bin/dadaia harness add <name>` adds a harness later.
 
 `.dadaia/.venv/bin/dadaia context bind <ctx>` writes one session record (context,

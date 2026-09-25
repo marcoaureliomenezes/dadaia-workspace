@@ -539,6 +539,9 @@ class Upgrade(Scenario):
             assert f"upgraded {_PREVIOUS_PYPI} -> {_E2E_VERSION}" in done.stdout, done.stdout
             version = self.ws.dadaia("--version")
             assert _E2E_VERSION in version.stdout, version.stdout
+            # The upgrade never writes a user repo; level 3 re-run refreshes its specs law.
+            refreshed = self.ws.dadaia("specs", "init", "--context", "green")
+            assert refreshed.returncode == 0, f"{refreshed.stdout}\n{refreshed.stderr}"
             self.ws.doctor_json("green")
             assert self.env.git("rev-parse", "HEAD", cwd=repo) == head
             again = self.env.uvx("init", "up")  # AC2.2
