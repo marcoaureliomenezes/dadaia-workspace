@@ -1,7 +1,6 @@
 """SpecContextService — full Spec Context Project lifecycle."""
 
 import contextlib
-import hashlib
 import logging
 import os
 import re
@@ -34,7 +33,7 @@ from dadaia_workspace.core.models.spec_context import (
     SpecContextProject,
 )
 from dadaia_workspace.core.specs_version import read_gitflow
-from dadaia_workspace.core.template_history import load_shipped_hashes
+from dadaia_workspace.core.template_history import was_shipped
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.privacy_check import (
@@ -158,14 +157,10 @@ def install_git_hooks(repo_root: Path, *, force: bool = False) -> list[Path]:
     if not hooks_dir.is_dir():
         raise FileNotFoundError(f"{hooks_dir} not found (is this a git repository?)")
     scripts = workspace_layout.public_scripts_dir()
-    shipped = load_shipped_hashes(scripts.parent / "templates")
     planned = [
         (hooks_dir / target, scripts / source)
         for target, source in workspace_layout.INSTALLED_GIT_HOOKS
-        if force
-        or not (hooks_dir / target).exists()
-        or _sha256(hooks_dir / target) in shipped.get(f"scripts/{source}", set())
-        and _sha256(hooks_dir / target) != _sha256(scripts / source)
+        if force or _is_stale_shipped(hooks_dir / target, scripts / source)
     ]
     for dest, source in planned:
         shutil.copyfile(source, dest)
@@ -173,8 +168,14 @@ def install_git_hooks(repo_root: Path, *, force: bool = False) -> list[Path]:
     return [dest for dest, _ in planned]
 
 
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def _is_stale_shipped(installed: Path, source: Path) -> bool:
+    if not installed.exists():
+        return True
+    text = installed.read_text(encoding="utf-8")
+    current = source.read_text(encoding="utf-8")
+    return text != current and was_shipped(
+        text, f"scripts/{source.name}", source.parent.parent / "templates"
+    )
 
 
 class SpecContextService:

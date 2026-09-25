@@ -29,18 +29,21 @@ def _history() -> set[str]:
 def test_the_current_hook_is_recorded_as_shipped() -> None:
     import hashlib
 
-    assert hashlib.sha256(_SHIPPED.read_bytes()).hexdigest() in _history()
+    text = _SHIPPED.read_text(encoding="utf-8")
+    assert hashlib.sha256(text.encode("utf-8")).hexdigest() in _history()
 
 
 def test_a_previously_shipped_hook_is_refreshed(tmp_path: Path, monkeypatch) -> None:
+    """A CRLF checkout (Windows) of a shipped hook is still recognised as shipped."""
     old = "#!/bin/sh\n# an older shipped gate\n"
     import hashlib
 
     monkeypatch.setattr(
-        "dadaia_workspace.features.spec_context.service.load_shipped_hashes",
+        "dadaia_workspace.core.template_history.load_shipped_hashes",
         lambda _d: {"scripts/pre-push-ci-gate.sh": {hashlib.sha256(old.encode()).hexdigest()}},
     )
-    hook = _hooks(tmp_path, old)
+    hook = _hooks(tmp_path, "")
+    hook.write_bytes(old.replace("\n", "\r\n").encode("utf-8"))
     assert install_git_hooks(tmp_path) == [hook]
     assert hook.read_bytes() == _SHIPPED.read_bytes()
 
