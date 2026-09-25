@@ -92,8 +92,8 @@ and deletes only what a TTL expired.
 
 <!-- derived-from: agentic-entities sha256:63d2197ea839 -->
 <!-- derived-from: sdd-gate-v3 sha256:7a6e11d84264 -->
-<!-- derived-from: release-lifecycle sha256:7d025467878a -->
-<!-- derived-from: bug-ledger sha256:9534ded07707 -->
+<!-- derived-from: release-lifecycle sha256:ebb8441fde08 -->
+<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
 <!-- derived-from: harness-claude-code sha256:55ba15667a89 -->
 <!-- derived-from: harness-codex sha256:b907c260a862 -->
 <!-- derived-from: harness-kimi-code sha256:4300d3a1724d -->
@@ -120,8 +120,8 @@ Every BLOCK carries exactly one `fix:` line, and a contract test feeds each fix 
 through the gate asserting ALLOW. No lease, lock or wait path exists; the gate reads no
 `_RELEASE.json`.
 
-Work runs as candidates inside one live release: a picked set, a grill, SPEC, PLAN and
-TASKS, one reserved task at a time, `[x]` only after the reviewer's `APPROVED`, then
+Work runs as candidates inside one live release: a picked set, an as-is review of every
+unit it touches, a grill, SPEC, PLAN and TASKS, one reserved task at a time, `[x]` only after the reviewer's `APPROVED`, then
 closure — memory reconciliation, disposition sweep, the `feature -> develop` merge. The
 ledger scripts under `.agents/skills/*/scripts/` (`bugs.py`, `backlog.py`,
 `release.py`, `audit.py`) are each record's one writer. A bug is proposed to the

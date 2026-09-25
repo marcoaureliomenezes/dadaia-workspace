@@ -1,9 +1,9 @@
 ---
 slug: release-lifecycle
 title: release-lifecycle
-tldr: One live release grown by closed-scope candidates; release.py moves _RELEASE.json; closure is gated on a memory reconciliation; promote merges the release PR.
-summary: The release lifecycle — one live release directory whose _RELEASE.json state document is written by release.py (new, phase, memory, check), candidates that each define, implement and close a SPEC/PLAN/TASKS trio at the release root, the memory reconciliation gate at closure, and promotion by merging the release PR release-please opens.
-tags: [sdd, release, candidate, lifecycle, memory]
+tldr: Closed-scope candidates grow one live release, each defined from an as-is review; release.py writes _RELEASE.json; memory gates closure; promote merges a PR.
+summary: The release lifecycle — one live release directory whose _RELEASE.json state document is written by release.py (new, phase, memory, check), candidates that each review the as-is units their demand touches, then define, implement and close a SPEC/PLAN/TASKS trio at the release root, the structural PLAN §1 check at IMPLEMENTATION, the memory reconciliation gate at closure, and promotion by merging the release PR release-please opens.
+tags: [sdd, release, candidate, lifecycle, memory, as-is-review]
 sources:
   - dadaia_workspace/public/skills/dd-release-implementation/**
   - dadaia_workspace/public/skills/dd-release-definition/**
@@ -24,18 +24,31 @@ sources:
 
 ## The writer — `release.py`
 
-- `python3 .agents/skills/dd-release-implementation/scripts/release.py <verb> [--specs <path>]` is the state document's one writer and validator; each write validates the new bytes before replacing the file atomically, and every refusal carries one `fix:` line.
-- `new <id> [--origin <origin>]` mints the live release: a `SPEC.md` stub plus `_RELEASE.json` in `DEFINITION`, all or nothing; on a live release already in `CLOSURE` with the same id it stacks the next candidate, reopening `DEFINITION` and deleting the closed `PLAN.md`/`TASKS.md`; a second live release, a non-SemVer id or a symlinked path is refused; `--origin bugs:<ids>` seeds one scope clause per bug with its repro line.
-- `phase IMPLEMENTATION --sha <sha>` requires all three trio files `**Status:** Approved` and stamps `defined`; `phase CLOSURE --sha <sha> [--pr <n>]` requires no `[ ]` or `[-]` task marker and stamps `implemented`, `--pr` recording the merged release PR in its note; each phase follows its predecessor exactly once, and `ARCHIVED` is written by no verb.
+- `python3 .agents/skills/dd-release-implementation/scripts/release.py <verb> [--specs <path>]` is the state document's one writer and validator; each write validates the new bytes before replacing the file atomically, and every refusal carries one `fix:` line; a `phase` fix line names an absolute path derived from the script's own location — the trio document, `TASKS.md` or the installed `dd-release-definition/SKILL.md` — never a cwd-relative path or a shell command.
+- `new <id> [--origin <origin>]` mints the live release: a `SPEC.md` stub (Problem and context, Objective, Scope, Replaces, Out of scope, Dependencies and risks) plus `_RELEASE.json` in `DEFINITION`, all or nothing, writing no `PLAN.md`; on a live release already in `CLOSURE` with the same id it stacks the next candidate, reopening `DEFINITION` and deleting the closed `PLAN.md`/`TASKS.md`; a second live release, a non-SemVer id or a symlinked path is refused; `--origin bugs:<ids>` seeds one scope clause per bug with its repro line.
+- `phase IMPLEMENTATION --sha <sha>` requires all three trio files `**Status:** Approved`, then the PLAN §1 As-is review table (below), and stamps `defined`; `phase CLOSURE --sha <sha> [--pr <n>]` requires no `[ ]` or `[-]` task marker and stamps `implemented`, `--pr` recording the merged release PR in its note; each phase follows its predecessor exactly once, and `ARCHIVED` is written by no verb.
 - `memory --reviewed <slugs> --changed <slugs>` derives its window from the state document — the previous `kind: memory` entry's `until`, else `defined.sha` — to `HEAD`, computes the worklist itself and appends the closure's `kind: memory` log entry carrying `since`, `until`, `reviewed` and `changed`; it refuses outside `CLOSURE`, a worklist entry named in neither list, a name outside the worklist, and a `changed` atom git reports unmoved over the window.
 - `check [--json]` validates every state document, live and archived, and the ship ledger; on a live release in `CLOSURE` it also re-judges the latest `kind: memory` entry over its own `since`..`until` with the `memory` verb's rules and requires that no atom's sources moved after its `until`; `dadaia doctor`'s `ledgers` section runs it (`LEDGER-RELEASE-SCHEMA`) and its `specs` section runs the `RELEASE-TREE-*` rules ([[workspace-doctor]]).
 
 ## The candidate arc
 
-- Definition: the picked backlog and bug set, the mandatory grill, the SPEC by `dd-product-engineer`, PLAN and TASKS by `dd-software-engineer`, one definition commit on `feature/<M.m.p>` ([[agent-orchestration]]).
+- Definition: the picked backlog and bug set, the as-is review, the mandatory grill, the SPEC by `dd-product-engineer`, PLAN and TASKS by `dd-software-engineer`, one definition commit on `feature/<M.m.p>` ([[agent-orchestration]]).
+- The SPEC's `Replaces` names one current behaviour per DELETE or REBUILD row, or `none` with its reason; tasks realizing DELETE/REBUILD rows precede tasks realizing ADD rows, each expand–contract (add the new path, switch consumers, delete the old), each independently green.
 - Implementation: one task reserved `[-]` at a time in its own commit, TDD, local CI preflight, `[x]` only after the reviewer's `APPROVED` on the same commit.
 - Closure, in order: `phase CLOSURE`, memory reconciliation, closure `log` entries, disposition sweep (`backlog.py exit`, `audit.py disposition`/`close`, `bugs.py archive`), artifact GC, the `feature -> develop` PR merged green, then the operator's promote-or-continue choice ([[audits-canon]]).
 - `SPEC-DOC-047` refuses a task whose write set names `specs/memory`: memory is closure procedure, never a task.
+
+## The as-is review
+
+- Definition's second step, after the pick and before the grill: `dd-software-engineer`, dispatched by the main thread, reads every As-is unit the picked set touches and its bug-ledger slice (`bugs.py status`/`stats`, `git log` on the unit), read-only, and returns the table in its handoff; the main thread carries it into the grill; it lands as PLAN §1.
+- An As-is unit is a module or a law, skill or doc section with a today-behaviour — never `memory.py drift`'s code unit.
+- PLAN §1 is one Markdown table `unit | today | bugs | verdict | why`, one row per touched As-is unit; the As-is verdict is `DELETE`, `REBUILD`, `UPDATE` or `KEEP`, considered in that order (DELETE vs KEEP is the deletion test), then `ADD` rows with `today` `—` only for what no existing unit can carry, `why` saying why.
+- REBUILD is mandatory when the unit carries ≥ 2 bugs, the demand changes its fundamental behaviour, the change would need a flag, branch, special case or second path, or its contract contradicts the demand; the engineer and the reviewer judge these triggers — no script counts bugs or reads code.
+- The `dd-release-definition` skill carries the PLAN §1 skeleton; a contract test extracts it from the skill text and proves it passes the check, so the teaching and the gate cannot drift.
+- The check `phase IMPLEMENTATION` runs is structure only: the first level-2 heading whose text contains `as-is review` or `as is review` (case-insensitive); within its section, the table starts at the first line whose cells equal the five columns, the next line is the separator, data rows run until the first line without a pipe; cells split on unescaped pipes, outer pipes optional, trimmed of whitespace, `` ` `` and `*`; at least one data row; every As-is verdict one of the five, case-insensitive; an all-ADD table and empty `bugs`/`why` cells pass.
+- A missing heading and a missing or malformed table refuse with distinct messages; a verdict outside the vocabulary names its row's unit and verdict; `_RELEASE.json` stays byte-identical; the check never reads SPEC `Replaces`, TASKS order or code.
+- The review's spec axis reads PLAN §1 beside SPEC and TASKS: a DELETE or REBUILD unit the reviewed range leaves unchanged is a HIGH finding, a KEEP unit the range grew is a finding ([[agent-orchestration]]).
+- A bug fix on a unit with ≥ 2 prior fixes in its lineage window is a rebuild of that unit, never a third patch ([[bug-ledger]]).
 
 ## The memory reconciliation gate
 

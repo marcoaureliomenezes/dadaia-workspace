@@ -28,7 +28,7 @@ memory injection into the session.
 
 ## Release and candidate
 
-<!-- derived-from: release-lifecycle sha256:7d025467878a -->
+<!-- derived-from: release-lifecycle sha256:ebb8441fde08 -->
 
 Exactly one *release* is live, `specs/releases/<M.m.p>/`, with open scope; it grows by
 *candidates*, each a closed-scope cycle whose `SPEC.md`, `PLAN.md` and `TASKS.md` sit
@@ -41,18 +41,20 @@ is the last published one plus one patch and moves only at an operator-approved 
 
 ## The flow
 
-<!-- derived-from: release-lifecycle sha256:7d025467878a -->
-<!-- derived-from: bug-ledger sha256:9534ded07707 -->
+<!-- derived-from: release-lifecycle sha256:ebb8441fde08 -->
+<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
 <!-- derived-from: audits-canon sha256:80207896fd17 -->
 
 Every demand takes one of two arms. **Arm A**, a feature, leaves through a candidate:
-the picked backlog and bug set, the mandatory grill, the SPEC, PLAN and TASKS, one
-reserved task at a time, then closure — memory reconciliation, the closure `log`
+the picked backlog and bug set, the as-is review (one As-is verdict — DELETE, REBUILD,
+UPDATE, KEEP, then ADD — per touched unit, landing as PLAN §1), the mandatory grill, the
+SPEC with its `Replaces`, PLAN and TASKS, one reserved task at a time, then closure — memory reconciliation, the closure `log`
 entries, the disposition sweep (`backlog.py exit`, `audit.py disposition`/`close`,
 `bugs.py archive`), artifact GC, the `feature -> develop` merge and the operator's
 promote-or-continue choice. **Arm B**, a bug, is fixed on the live feature branch in
 any phase with no SPEC, PLAN or TASKS: register, lineage, RED test, root-cause fix,
-GREEN, `resolve` with evidence, one commit. No engine drives either arm: the documents
+GREEN, `resolve` with evidence, one commit; a unit fixed twice before is rebuilt, not
+patched a third time. No engine drives either arm: the documents
 carry the ordered work, and the ledger scripts move the records.
 
 ## The gate
@@ -76,7 +78,7 @@ gate — a refusal whose fix is itself refused (a Stall) cannot ship.
 
 <!-- derived-from: context-management sha256:3f48eef447f1 -->
 <!-- derived-from: workspace-doctor sha256:3fa0c321c7b0 -->
-<!-- derived-from: release-lifecycle sha256:7d025467878a -->
+<!-- derived-from: release-lifecycle sha256:ebb8441fde08 -->
 <!-- derived-from: audits-canon sha256:80207896fd17 -->
 
 *Memory* is current product truth: the atoms under `specs/memory/product/**`, plus
@@ -93,7 +95,7 @@ the warnings `MEM-DRIFT-1` (features package map vs the live tree) and `MEM-DRIF
 
 ## Bugs and backlog
 
-<!-- derived-from: bug-ledger sha256:9534ded07707 -->
+<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
 <!-- derived-from: backlog-ledger sha256:46382434daf2 -->
 
 Both are records with one shape and one writer script. `specs/bugs/BUGS.jsonl` holds

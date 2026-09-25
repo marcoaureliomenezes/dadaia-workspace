@@ -17,11 +17,12 @@ The main thread — the operator's own session — coordinates: intake, the gril
 
 | Persona | Owns |
 |---|---|
-| `dd-product-engineer` | backlog curation, the SPEC of a candidate (from the main thread's grill handoff), product-memory reconciliation at closure |
-| `dd-software-engineer` | PLAN and TASKS, production code and its tests, inside the task's declared write set |
+| `dd-product-engineer` | backlog curation, the SPEC of a candidate (from the main thread's grill handoff, its `Replaces` naming every behaviour the as-is review marks DELETE or REBUILD), product-memory reconciliation at closure |
+| `dd-software-engineer` | the as-is review (read-only, its table returned in the handoff), PLAN and TASKS, production code and its tests, inside the task's declared write set |
 | `dd-code-reviewer` | the three-axis review plus six lenses — architecture, security, QA, product, audit, AI surface — read-only and verdict-only |
 
 - A request outside a persona's scope is answered with a `[SCOPE ERROR]` block naming the owner; the main thread re-dispatches.
+- A definition demand (the as-is review, PLAN, TASKS) reaches `dd-software-engineer` without a task id; an implementation demand carries its TASKS.md task id.
 - `dd-manager-orchestration` is the main thread's reference: the Input Contract block that opens every dispatch prompt, the decision-authority table, the escalation triggers and the forbidden actions.
 
 ## Behaviour
@@ -31,6 +32,7 @@ The main thread — the operator's own session — coordinates: intake, the gril
 - An agent grounds itself with `dd-spec-navigator` (context, constitution, [[ARCHITECTURE]], the catalog, the relevant atoms, the live release), reserves a task `[ ] -> [-]`, validates, marks `[x]`, and emits a handoff; a record change goes through its governance script, never a hand edit ([[release-lifecycle]]).
 - Concurrent sessions are allowed and never locked: no agent acquires, holds or releases a lock; races surface through git.
 - The reviewer's `APPROVED` is required before a candidate's PR; a `REJECTED` keeps the task `[-]` and blocks the PR, and every verdict states the bug-surface delta from the bug ledger ([[QUALITY]]).
+- The reviewer's spec axis confronts PLAN §1's As-is verdicts with the diff: a DELETE or REBUILD unit left unchanged is HIGH, a KEEP unit that grew is a finding ([[release-lifecycle]]).
 - A merge further requires CI green and a `dd-code-reviewer` APPROVED verdict, security lens included, on the PR head ([[sdd-gate-v3]]).
 
 ## Models and privilege

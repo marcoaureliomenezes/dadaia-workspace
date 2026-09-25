@@ -97,13 +97,15 @@ commit. Only the operator creates demand.
 
 ## 6. The first release
 
-<!-- derived-from: release-lifecycle sha256:7d025467878a -->
+<!-- derived-from: release-lifecycle sha256:ebb8441fde08 -->
 
 `release.py new` is one birth act, all or nothing: a `SPEC.md` stub plus
 `_RELEASE.json` in `DEFINITION` under `specs/releases/<id>/`, refusing a second live
 release or a non-SemVer id with a `fix:` line. From there, author `SPEC.md`, `PLAN.md`
-and `TASKS.md` at the release root; `release.py phase IMPLEMENTATION --sha <sha>` opens
-implementation once all three carry `**Status:** Approved`.
+and `TASKS.md` at the release root, `PLAN.md` opening with the As-is review table
+(`unit | today | bugs | verdict | why`); `release.py phase IMPLEMENTATION --sha <sha>`
+opens implementation once all three carry `**Status:** Approved` and that table is
+present.
 
 Next: [positioning](positioning.md) for why this shape, [the bug loop](bug-loop.md)
 for the path a defect takes.

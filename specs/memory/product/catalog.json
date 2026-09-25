@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-25T01:37:03Z",
+  "generated_at": "2026-09-25T03:51:13Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -40,7 +40,7 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 536,
+      "token_estimate": 639,
       "depends_on": [
         "agentic-entities",
         "agent-comms",
@@ -778,13 +778,13 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 864,
+      "token_estimate": 960,
       "depends_on": [
         "workspace-doctor",
         "agent-comms",
+        "release-lifecycle",
         "agent-orchestration",
-        "audits-canon",
-        "release-lifecycle"
+        "audits-canon"
       ],
       "sources": [
         "dadaia_workspace/public/skills/dd-bug-resolution/**",
@@ -799,17 +799,18 @@
       "slug": "release-lifecycle",
       "title": "release-lifecycle",
       "area": "sdd",
-      "tldr": "One live release grown by closed-scope candidates; release.py moves _RELEASE.json; closure is gated on a memory reconciliation; promote merges the release PR.",
-      "summary": "The release lifecycle — one live release directory whose _RELEASE.json state document is written by release.py (new, phase, memory, check), candidates that each define, implement and close a SPEC/PLAN/TASKS trio at the release root, the memory reconciliation gate at closure, and promotion by merging the release PR release-please opens.",
+      "tldr": "Closed-scope candidates grow one live release, each defined from an as-is review; release.py writes _RELEASE.json; memory gates closure; promote merges a PR.",
+      "summary": "The release lifecycle — one live release directory whose _RELEASE.json state document is written by release.py (new, phase, memory, check), candidates that each review the as-is units their demand touches, then define, implement and close a SPEC/PLAN/TASKS trio at the release root, the structural PLAN §1 check at IMPLEMENTATION, the memory reconciliation gate at closure, and promotion by merging the release PR release-please opens.",
       "path": "specs/memory/product/sdd/release-lifecycle.md",
       "tags": [
         "sdd",
         "release",
         "candidate",
         "lifecycle",
-        "memory"
+        "memory",
+        "as-is-review"
       ],
-      "token_estimate": 1081,
+      "token_estimate": 1781,
       "depends_on": [
         "sdd-gate-v3",
         "backlog-ledger",

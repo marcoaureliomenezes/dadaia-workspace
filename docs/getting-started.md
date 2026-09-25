@@ -117,9 +117,9 @@ a TTL expired.
 
 ## Run the first candidate
 
-<!-- derived-from: release-lifecycle sha256:7d025467878a -->
+<!-- derived-from: release-lifecycle sha256:ebb8441fde08 -->
 <!-- derived-from: backlog-ledger sha256:46382434daf2 -->
-<!-- derived-from: bug-ledger sha256:9534ded07707 -->
+<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
 
 A candidate is one closed-scope cycle inside the live release. Nothing drives it: the
 documents are the state, the ledger scripts move the records, and the markers in
@@ -133,11 +133,15 @@ documents are the state, the ledger scripts move the records, and the markers in
    `python3 .agents/skills/dd-release-implementation/scripts/release.py new <M.m.p>`
    writes a `SPEC.md` stub and `_RELEASE.json` in `DEFINITION` under
    `specs/releases/<M.m.p>/`, all or nothing, refusing a second live release.
-3. **Define the candidate.** The picked set, the mandatory grill, then `SPEC.md`,
-   `PLAN.md` and `TASKS.md` at the release root, in one definition commit on
-   `feature/<M.m.p>`.
+3. **Define the candidate.** The picked set; the as-is review — one row per unit the
+   set touches, `unit | today | bugs | verdict | why`, the As-is verdict DELETE,
+   REBUILD, UPDATE or KEEP, then ADD only for what no unit can carry; the mandatory
+   grill; then `SPEC.md` (its `Replaces` naming what DELETE/REBUILD rows remove),
+   `PLAN.md` (opening with that table as §1) and `TASKS.md` at the release root, in one
+   definition commit on `feature/<M.m.p>`.
 4. **Open implementation.** `release.py phase IMPLEMENTATION --sha <sha>` requires all
-   three files `**Status:** Approved` and stamps `defined`.
+   three files `**Status:** Approved` and PLAN's As-is review table, and stamps
+   `defined`.
 5. **Implement one task at a time.** Reserve it `[-]` in its own commit, work
    test-first, run the local CI preflight, and mark `[x]` only after the reviewer's
    `APPROVED` on the same commit.
