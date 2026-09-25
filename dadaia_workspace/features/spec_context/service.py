@@ -157,25 +157,22 @@ def install_git_hooks(repo_root: Path, *, force: bool = False) -> list[Path]:
     if not hooks_dir.is_dir():
         raise FileNotFoundError(f"{hooks_dir} not found (is this a git repository?)")
     scripts = workspace_layout.public_scripts_dir()
-    planned = [
-        (hooks_dir / target, scripts / source)
-        for target, source in workspace_layout.INSTALLED_GIT_HOOKS
-        if force or _is_stale_shipped(hooks_dir / target, scripts / source)
-    ]
-    for dest, source in planned:
-        shutil.copyfile(source, dest)
-        dest.chmod(0o755)
-    return [dest for dest, _ in planned]
-
-
-def _is_stale_shipped(installed: Path, source: Path) -> bool:
-    if not installed.exists():
-        return True
-    text = installed.read_text(encoding="utf-8")
-    current = source.read_text(encoding="utf-8")
-    return text != current and was_shipped(
-        text, f"scripts/{source.name}", source.parent.parent / "templates"
-    )
+    written = []
+    for target, source in workspace_layout.INSTALLED_GIT_HOOKS:
+        dest, shipped = hooks_dir / target, scripts / source
+        old = dest.read_text(encoding="utf-8") if dest.exists() else None
+        if (
+            force
+            or old is None
+            or (
+                old != shipped.read_text(encoding="utf-8")
+                and was_shipped(old, f"scripts/{source}", scripts.parent / "templates")
+            )
+        ):
+            shutil.copyfile(shipped, dest)
+            dest.chmod(0o755)
+            written.append(dest)
+    return written
 
 
 class SpecContextService:
@@ -582,8 +579,13 @@ class SpecContextService:
             key = "user.name" if "ident name" in str(exc) else "user.email"
             fix = shell_line("git", "-C", str(repo), "config", key, f"<{key}>")
             raise ContextStateError(f"Context '{name}': {exc}\nfix: {fix}") from None
-        foreign = [p for p in self._git.diff_name_only(repo) if p.split("/")[0] not in _ONBOARDING]
-        if foreign and self._git.has_commits(repo):  # unborn: untracked, never committed
+        changed = (  # unborn: everything is untracked, never committed
+            {*git("diff", "--name-only", "HEAD").split("\n"), *self._git.list_untracked(repo)}
+            if self._git.has_commits(repo)
+            else set()
+        )
+        foreign = sorted(p for p in changed if p and p.split("/")[0] not in _ONBOARDING)
+        if foreign:
             raise ContextStateError(
                 f"Context '{name}': changes outside {', '.join(_ONBOARDING)} are not published.\n"
                 "fix: " + shell_line("git", "-C", str(repo), "stash", "push", "-u", "--", *foreign)

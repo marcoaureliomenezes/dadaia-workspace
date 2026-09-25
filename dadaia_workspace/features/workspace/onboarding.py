@@ -12,14 +12,13 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
 from dadaia_workspace.core import session_store, workspace_layout
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.fixed_sections import strip_fixed_sections
-from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.core.specs_version import (
     CANONICAL_SPECS_VERSION,
     read_gitflow,
@@ -86,20 +85,9 @@ def _first_pass(c: _Ctx) -> list[str]:
 
 
 def _specs_fix(c: _Ctx) -> str:
-    flow = replace(DEFAULT, principal=GitSubprocessClient().default_branch(c.specs.parent))
-    flags = ("--principal", flow.principal, "--integration", flow.integration)
-    # Running the printed line is the consent: a foreign tree moves to specs-bkp/.
-    return fix_line(
-        c.root,
-        "specs",
-        "init",
-        "--context",
-        c.name,
-        *flags,
-        "--work-prefix",
-        flow.work_prefix,
-        "--replace-foreign",
-    )
+    # Running the printed line is the consent: a foreign tree moves to specs-bkp/; specs
+    # init detects and prints the gitflow it writes.
+    return fix_line(c.root, "specs", "init", "--context", c.name, "--replace-foreign")
 
 
 _Pending = Callable[[_Ctx], str | None]

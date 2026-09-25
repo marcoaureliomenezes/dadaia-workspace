@@ -604,6 +604,8 @@ class Autopilot(Scenario):
                     f"fix of step {finding['step']} failed: {finding['fix']}\n"
                     f"{ran.stdout}{ran.stderr}"
                 )
+                if finding["step"] == "specs":  # the agent shows the operator what was written
+                    assert "[gitflow] principal main, integration develop" in ran.stdout, ran
             else:
                 pytest.fail(f"the autopilot hit the cap of {_AUTOPILOT_CAP}: {self.steps}")
 

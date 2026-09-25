@@ -58,7 +58,6 @@ class FakeGitClient:
         self._upstream_branches: dict[Path, str | None] = {}
         self._unpushed_commit_counts: dict[Path, int] = {}
         self._has_commits: set[Path] = set()
-        self._diff_names: dict[Path, tuple[str, ...]] = {}
 
     def clone(self, url: str, dest: Path) -> None:
         dest.mkdir(parents=True, exist_ok=True)
@@ -70,14 +69,10 @@ class FakeGitClient:
     def has_commits(self, path: Path) -> bool:
         return path in self._has_commits
 
-    def diff_name_only(self, path: Path) -> tuple[str, ...]:
-        return self._diff_names.get(path, ())
-
     def commit_all(self, path: Path, msg: str) -> None:
         self.committed.append(path)
         self._has_commits.add(path)
         self._dirty.discard(path)
-        self._diff_names.pop(path, None)
         self._untracked.pop(path, None)
 
     def commit_paths(self, path: Path, msg: str, paths: Sequence[str]) -> None:
@@ -93,7 +88,6 @@ class FakeGitClient:
         self.committed_paths.append((path, tuple(paths)))
         self._has_commits.add(path)
         self._dirty.discard(path)
-        self._diff_names.pop(path, None)
         self._untracked.pop(path, None)
 
     def has_remote(self, path: Path) -> bool:

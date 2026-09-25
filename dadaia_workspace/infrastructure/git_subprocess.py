@@ -270,12 +270,10 @@ class GitSubprocessClient:
         return born.returncode == 0 and result.returncode == 0 and bool(result.stdout.strip())
 
     def default_branch(self, path: Path) -> str:
-        """The remote's default branch from the local ``origin/HEAD``; ``main`` when unset."""
-        result = _run(
-            ["git", "-C", str(path), "symbolic-ref", "--short", "refs/remotes/origin/HEAD"]
-        )
-        name = result.stdout.strip().removeprefix("origin/")
-        return name if result.returncode == 0 and name else "main"
+        """The remote's default branch from the local ``origin/HEAD``; ``main`` when unset
+        (``-C``: *path* may not exist yet)."""
+        ref = _run(["git", "-C", str(path), "symbolic-ref", "--short", "refs/remotes/origin/HEAD"])
+        return ref.stdout.strip().removeprefix("origin/") if ref.returncode == 0 else "main"
 
     def current_branch(self, path: Path) -> str:
         result = _run(["git", "branch", "--show-current"], cwd=path)
@@ -312,25 +310,6 @@ class GitSubprocessClient:
             cwd=path,
         )
         return [line.strip() for line in result.stdout.splitlines() if line.strip()]
-
-    def diff_name_only(self, path: Path) -> tuple[str, ...]:
-        """Return the worker's net changed paths in *path*, model-independently.
-
-        Combines tracked modifications/deletions (``git diff --name-only``, plus
-        staged changes via ``--cached``) with untracked, non-gitignored files
-        (``git ls-files --others --exclude-standard``). The deduped, sorted tuple
-        is the trustworthy Ring-2 signal: it reflects what was actually written,
-        never a model self-report. Returns ``()`` on a clean tree or any failure.
-        """
-        changed: set[str] = set()
-        for extra in ([], ["--cached"]):
-            result = _run(["git", "diff", "--name-only", *extra], cwd=path)
-            if result.returncode == 0:
-                changed.update(line.strip() for line in result.stdout.splitlines() if line.strip())
-        untracked = _run(["git", "ls-files", "--others", "--exclude-standard"], cwd=path)
-        if untracked.returncode == 0:
-            changed.update(line.strip() for line in untracked.stdout.splitlines() if line.strip())
-        return tuple(sorted(changed))
 
     def upstream_branch(self, path: Path) -> str | None:
         """Return the configured upstream tracking branch (e.g. ``origin/main``), or ``None``.

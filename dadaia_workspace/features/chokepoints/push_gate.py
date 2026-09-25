@@ -194,10 +194,6 @@ class _RangeScan:
     specs_paths_by_ref: dict[str, list[str]]
 
 
-def _push_again(gitflow: Gitflow) -> str:
-    return shlex.join(["git", "push", "origin", f"{gitflow.work_prefix}<M.m.p>"])
-
-
 def _run_denylist_scan(
     scan_refs: list[PushRef],
     object_source: ObjectSource,
@@ -256,7 +252,7 @@ def _run_denylist_scan(
                     "traceable emergency bypass is `git push --no-verify` "
                     "(discouraged; leaves a reflog trace).\n"
                     "Repair the object store first (git fsck), then push again.\n"
-                    f"fix: git fetch origin && {_push_again(gitflow)}"
+                    f"fix: git fetch origin && {shlex.join(['git', 'push', 'origin', gitflow.work_pattern])}"
                 ),
             ),
             True,
@@ -397,7 +393,7 @@ def push_gate_decision(
                 "closed). The sanctioned, traceable emergency bypass is "
                 "`git push --no-verify` (discouraged; leaves a reflog trace).\n"
                 "Push one explicit refspec.\n"
-                f"fix: {_push_again(gitflow)}"
+                f"fix: {shlex.join(['git', 'push', 'origin', gitflow.work_pattern])}"
             ),
         )
 

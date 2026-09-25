@@ -144,18 +144,6 @@ def test_replace_foreign_moves_to_specs_bkp_staged_then_scaffolds(repo: Path) ->
     assert _doctor_errors(repo / "specs") == []
 
 
-def test_an_existing_specs_bkp_exits_1_and_writes_nothing(repo: Path) -> None:
-    _foreign(repo)
-    (repo / "specs-bkp").mkdir()
-    before = _snapshot(repo)
-
-    result = _runner.invoke(app, ["specs", "init", "--context", "c", "--replace-foreign"])
-
-    assert result.exit_code == 1, result.output
-    assert "fix:" in result.output
-    assert _snapshot(repo) == before
-
-
 def test_no_context_resolved_exits_2_with_a_fix_line(repo: Path) -> None:
     result = _runner.invoke(app, ["specs", "init"])
 
@@ -163,23 +151,19 @@ def test_no_context_resolved_exits_2_with_a_fix_line(repo: Path) -> None:
     assert ".dadaia/.venv/bin/dadaia specs init --context '<name>'" in result.output
 
 
-def test_existing_specs_bkp_fix_line_is_non_destructive_and_clears_the_refusal(
+def test_an_existing_specs_bkp_is_kept_and_the_tree_moves_to_a_stamped_sibling(
     repo: Path,
 ) -> None:
-    """Review finding 8: the fix line keeps the prior backup instead of deleting it."""
+    """Review finding 8: a prior backup is never overwritten nor deleted."""
     _foreign(repo)
     (repo / "specs-bkp").mkdir()
     (repo / "specs-bkp" / "old.md").write_text("previous backup\n", encoding="utf-8")
-    refused = _runner.invoke(app, ["specs", "init", "--context", "c", "--replace-foreign"])
-    fix = next(ln for ln in refused.output.splitlines() if ln.startswith("fix: "))[5:]
-    assert " rm " not in fix
 
-    subprocess.run(fix, shell=True, check=True, cwd=repo.parent.parent)
     result = _runner.invoke(app, ["specs", "init", "--context", "c", "--replace-foreign"])
 
     assert result.exit_code == 0, result.output
-    kept = [p for p in repo.glob("specs-bkp-*/old.md")]
-    assert [p.read_text(encoding="utf-8") for p in kept] == ["previous backup\n"]
+    assert (repo / "specs-bkp" / "old.md").read_text(encoding="utf-8") == "previous backup\n"
+    assert [p.name for p in repo.glob("specs-bkp-*/features/login.md")] == ["login.md"]
 
 
 def test_a_symlinked_context_specs_root_is_refused_and_nothing_written(

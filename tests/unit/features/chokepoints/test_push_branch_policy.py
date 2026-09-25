@@ -219,4 +219,4 @@ def test_detached_head_ref_gets_a_pushable_branch_diagnosis(tmp_path: Path) -> N
     outcome needs the right words."""
     decision = _decide(_refs(f"HEAD {_SHA_A} refs/heads/work/0.0.1 {_ZERO}"), tmp_path, _CUSTOM)
     assert not decision.allowed
-    assert _fix(decision)[:3] == ["git", "checkout", "work/<M.m.p>"]
+    assert _fix(decision)[:4] == ["git", "checkout", "-b", "work/<M.m.p>"]

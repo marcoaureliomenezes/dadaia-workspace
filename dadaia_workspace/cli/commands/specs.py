@@ -106,7 +106,7 @@ def init(
     replace_foreign: bool = typer.Option(
         False,
         "--replace-foreign",
-        help=f"Move a foreign specs/ to {_BACKUP}/ (git mv, staged) without asking.",
+        help=f"Consent to move a foreign specs/ to {_BACKUP}/ (git mv, staged).",
     ),
     principal: str | None = typer.Option(
         None, "--principal", help="Principal branch. Default: kept, else origin/HEAD, else main."
@@ -150,7 +150,7 @@ def init(
     specs_version.merge_frontmatter(target, gitflow=flow)
     typer.echo(
         f"[gitflow] principal {flow.principal}, integration {flow.integration}, "
-        f"work {flow.work_prefix}<M.m.p>"
+        f"work {flow.work_pattern}"
     )
     if kind != "dadaia":
         typer.echo(f"[ok] {target} at pattern version {specs_version.CANONICAL_SPECS_VERSION}")
@@ -185,23 +185,17 @@ def _gitflow(
 
 
 def _move_foreign(target: Path, rerun: tuple[str, ...], replace_foreign: bool) -> None:
-    """``specs/`` -> ``specs-bkp/`` after consent; exits on a refusal, writing nothing."""
-    backup = target.parent / _BACKUP
-    if backup.exists():
+    """``specs/`` -> ``specs-bkp/`` (a UTC-stamped sibling when that exists) under
+    ``--replace-foreign``; exits on a refusal, writing nothing."""
+    if not replace_foreign:
         typer.echo(
-            f"[error] {backup} already exists — move it aside first.\n"
-            f"fix: mv {backup} {backup}-{datetime.now(UTC):%Y%m%dT%H%M%SZ}",
+            f"[refused] {target} is a foreign specs tree; nothing written.\n"
+            f"{_init_fix(*rerun, '--replace-foreign')}",
             err=True,
         )
-        raise typer.Exit(1)
-    if not replace_foreign:
-        question = f"{target} is not a dadaia specs tree. Move it to {_BACKUP}/ and scaffold?"
-        if not (sys.stdin.isatty() and typer.confirm(question, default=False)):
-            typer.echo(
-                f"[refused] {target} is a foreign specs tree; nothing written.\n"
-                f"{_init_fix(*rerun, '--replace-foreign')}",
-                err=True,
-            )
-            raise typer.Exit(2)
-    container.build_git_client().move(target.parent, target.name, _BACKUP)
+        raise typer.Exit(2)
+    backup = target.parent / _BACKUP
+    if backup.exists():
+        backup = backup.with_name(f"{_BACKUP}-{datetime.now(UTC):%Y%m%dT%H%M%SZ}")
+    container.build_git_client().move(target.parent, target.name, backup.name)
     typer.echo(f"[moved] {target} -> {backup} (staged, not committed)")

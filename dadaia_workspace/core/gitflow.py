@@ -27,6 +27,10 @@ class Gitflow:
     integration: str
     work_prefix: str
 
+    @property
+    def work_pattern(self) -> str:
+        return f"{self.work_prefix}<M.m.p>"
+
     def role_of(self, branch: str) -> Role | None:
         """``principal`` | ``integration`` | ``work`` (``<prefix><M.m.p>``) | ``None``."""
         if branch == self.principal:
