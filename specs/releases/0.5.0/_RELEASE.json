@@ -1,6 +1,6 @@
 {
   "schema": "release-state-v1",
-  "release": "0.4.8",
+  "release": "0.5.0",
   "phase": "CLOSURE",
   "defined": {
     "sha": "1528a8e0469b4b24d4afea43db039d397e218073",
@@ -142,6 +142,12 @@
         "specs-migration",
         "context-management"
       ]
+    },
+    {
+      "ts": "2026-09-25T03:00:00Z",
+      "agent": "main-thread",
+      "kind": "note",
+      "text": "Release renamed 0.4.8 -> 0.5.0 by operator order 2026-09-24 (grill Q11: one release carries candidate 1 plus the onboarding foundation and docs candidates; the library's 'last PyPI + 1 patch' rule is overridden by the operator). Branch feature/0.4.8 -> feature/0.5.0; PR #271 closed, tip tagged archive/feature-0.4.8. Candidate 1 stays closed as c1."
     }
   ]
 }
