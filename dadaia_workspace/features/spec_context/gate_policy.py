@@ -21,9 +21,10 @@ documented way out was a bind flag that no longer exists.
 from __future__ import annotations
 
 from enum import Enum
+from pathlib import PurePath
 
 from dadaia_workspace.core import workspace_layout
-from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
+from dadaia_workspace.core.cli_line import fix_line
 
 __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
 
@@ -57,7 +58,6 @@ _PROTECTED_MESSAGE = (
     "[GATE] .dadaia/sessions/ is protected CLI-owned bind state. Agents must not write "
     "here via file tools. Blocked to preserve caller session identity integrity "
     "(SEC-01 / CWE-284).\n"
-    f"fix: {DADAIA_BIN} context bind <ctx>"
 )
 #: Projected LAW files. The root ``AGENTS.md`` map is the workspace system prompt and
 #: the sole always-on rule file the library ships; the ``.dadaia/**`` family is its
@@ -70,8 +70,6 @@ _LAW_MESSAGE = (
     "AGENTS.md). In an instantiated workspace only a human operator edits it by hand; "
     "an agent changes the law at its source and re-projects.\n"
     "The source is dadaia_workspace/public/; this re-projects it:\n"
-    f"fix: {DADAIA_BIN} public stage && {DADAIA_BIN} public "
-    "install"
 )
 
 #: BLOCK message for a MUTATING write into a repo outside the Bind's scope (FR1, Q1).
@@ -80,7 +78,6 @@ _LAW_MESSAGE = (
 _SCOPE_BLOCK_MESSAGE = (
     "[GATE] '{rel_path}' writes into repo '{slug}', owned by context '{owner}' — this "
     "session is bound to '{bound}', whose scope is: {scope}.\n"
-    "fix: " + DADAIA_BIN + " context bind {owner}"
 )
 
 
@@ -158,6 +155,7 @@ def classify_path(rel_path: str) -> PathClass:
 
 
 def _scope_block(
+    root: PurePath,
     rel_path: str,
     bound_context: str | None,
     bound_repos: frozenset[str],
@@ -175,24 +173,29 @@ def _scope_block(
         return None
     if target_slug in bound_repos or target_owner == bound_context:
         return None
-    return _SCOPE_BLOCK_MESSAGE.format(
-        rel_path=rel_path,
-        slug=target_slug,
-        owner=target_owner,
-        bound=bound_context,
-        scope=", ".join(sorted(bound_repos)) or "no registered repo",
+    return (
+        _SCOPE_BLOCK_MESSAGE.format(
+            rel_path=rel_path,
+            slug=target_slug,
+            owner=target_owner,
+            bound=bound_context,
+            scope=", ".join(sorted(bound_repos)) or "no registered repo",
+        )
+        + f"fix: {fix_line(root, 'context', 'bind', target_owner)}"
     )
 
 
 def evaluate(
     rel_path: str,
     *,
+    root: PurePath,
     bound_context: str | None = None,
     bound_repos: frozenset[str] = frozenset(),
     target_slug: str | None = None,
     target_owner: str | None = None,
 ) -> tuple[Decision, str]:
-    """Return the gate decision and its message for one write target.
+    """Return the gate decision and its message for one write target. *root* is the
+    workspace every ``fix:`` line's CLI path is built from.
 
     Three blocks, in order: PROTECTED (fail-CLOSED, the projected-law message or the
     session-record message), then — for a MUTATING write — the bind's SCOPE, received as
@@ -212,13 +215,21 @@ def evaluate(
     # PROTECTED is the sole fail-closed path and is evaluated before fail-open branches.
     if cls == PathClass.PROTECTED:
         if _is_law_path(rel_path.lstrip("/")):
-            return Decision.BLOCK, _LAW_MESSAGE.format(path=rel_path)
-        return Decision.BLOCK, _PROTECTED_MESSAGE
+            restage = " && ".join(
+                (fix_line(root, "public", "stage"), fix_line(root, "public", "install"))
+            )
+            return Decision.BLOCK, _LAW_MESSAGE.format(path=rel_path) + f"fix: {restage}"
+        return (
+            Decision.BLOCK,
+            _PROTECTED_MESSAGE + f"fix: {fix_line(root, 'context', 'bind', '<ctx>')}",
+        )
 
     if cls == PathClass.ADDITIVE:
         return Decision.ALLOW, ""
 
-    scope_block = _scope_block(rel_path, bound_context, bound_repos, target_slug, target_owner)
+    scope_block = _scope_block(
+        root, rel_path, bound_context, bound_repos, target_slug, target_owner
+    )
     if scope_block is not None:
         return Decision.BLOCK, scope_block
 

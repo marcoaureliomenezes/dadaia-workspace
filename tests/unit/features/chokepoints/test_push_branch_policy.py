@@ -1,207 +1,182 @@
-"""v0.4.4 T-044-06 (FR3): the v2 branch contract — feature/{M.m.p} is pushable, develop
-and main are PR-only.
+"""The branch contract, read from the project gitflow (ADRs 0037, 0046; SPEC 0.5.0 AC6.5,
+AC8.1): work branches ``<prefix><M.m.p>`` are pushable; the principal and integration
+branches are PR-only; every refusal and its fix line name the CONFIGURED branches.
+Tag pushes keep their carve-out. Every case runs under the default gitflow and a custom
+one (``trunk``/``next``/``work/``) — no branch name is hard-coded in the gate.
 
-The gitflow law (`dd-gitflow-default`, operator ruling 2026-08-23, SPEC v0.4.4 FR3): exactly
-three branch patterns exist — ``main``, ``develop``, ``feature/M.m.p`` (no ``v``, no
-suffix, no ``hotfix`` row — G2 retires it outright) — and ``feature/M.m.p`` is the ONLY
-pushable one. ``develop`` and ``main`` never take a direct push; both advance by PR only
-(``feature/{M.m.p}`` → ``develop``, ``develop`` → ``main``). Tag pushes keep their
-carve-out (publishing depends on it). The security verdict no longer lives on this path
-at all (A3.4) — it is relocated to a PR gate (FR4), so a ``feature/{M.m.p}`` push is
-allowed outright once branch policy and the denylist scan (``test_push_denylist_scan.py``)
-clear.
+Name validation itself is ``Gitflow.role_of`` (``tests/unit/core/test_gitflow.py``).
 
-This file supersedes T-060-04's v1 branch-policy tests (four patterns, ``develop``-only
-pushable, verdict-gated): every "allowed" case below refused under the pre-T-044-06 gate
-(it only knew ``develop``/``feature/v…``/``hotfix/v…``), and ``develop`` used to flow
-with a covering verdict — under v2 it never flows at all, verdict or not.
-
-Intent: CONTRACT — v0.4.4 A3.1, A3.2, A3.5
+Intent: CONTRACT — AC6.5, AC8.1 (T-050-12); v0.4.4 A3.1, A3.5
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+import shlex
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from dadaia_workspace.core.gitflow import DEFAULT, Gitflow
 from dadaia_workspace.core.models.git_scan import ScannedObject
 from dadaia_workspace.features.chokepoints import Decision, push_gate_decision
-from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_refs
+from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_stdin
 from dadaia_workspace.features.specs.canon import canon_violations
 
 _SHA_A = "a" * 40
 _ZERO = "0" * 40
+_SHA_B = "b" * 40
+_CUSTOM = Gitflow(principal="trunk", integration="next", work_prefix="work/")
+_FLOWS = pytest.mark.parametrize("flow", [DEFAULT, _CUSTOM], ids=["default", "custom"])
 
 
 class _EmptyObjectSource:
-    """No denylist configured for these tests — the scan step is a pure pass-through.
+    """No object is new: the denylist and canon scans are pure pass-throughs here.
+    ``contentless`` names the shas whose push publishes nothing (a birth candidate)."""
 
-    ``list_tree_paths``/``first_parent`` (v0.5.0 specs-canon closure) also return
-    empty/None — this fixture never publishes a specs/ tree, so the canon scan step
-    is a pure pass-through too."""
+    def __init__(self, contentless: frozenset[str] = frozenset()) -> None:
+        self.contentless = contentless
+        self.asked: list[str] = []
 
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         return ()
 
-    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
-        return ()
-
-    def resolve_ref(self, repo: Path, ref: str) -> str | None:
-        return None
-
-    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]:
-        return set()
+    def publishes_nothing(self, repo: Path, sha: str) -> bool:
+        self.asked.append(sha)
+        return sha in self.contentless
 
 
-def _decide(refs: list[PushRef], root: Path, **kwargs: Any) -> Decision:
-    """``push_gate_decision`` with a no-op object source unless a test overrides it —
-    these tests exercise branch-policy behavior only. The v0.9.0 denylist scan is
-    covered separately in ``test_push_denylist_scan.py``; the security verdict no
-    longer lives on this path at all (A3.4)."""
+def _decide(refs: list[PushRef], root: Path, flow: Gitflow = DEFAULT, **kwargs: Any) -> Decision:
     kwargs.setdefault("object_source", _EmptyObjectSource())
     kwargs.setdefault("repo", root)
     kwargs.setdefault("canon_violations_fn", canon_violations)
-    return push_gate_decision(refs, **kwargs)
+    return push_gate_decision(refs, gitflow=flow, **kwargs)
 
 
 def _refs(*lines: str) -> list[PushRef]:
-    return parse_push_refs("\n".join(lines))
+    return parse_push_stdin("\n".join(lines))[0]
 
 
-# ---------------------------------------------------------------------------
-# A3.1 case 1 — a feature/{M.m.p} push is allowed outright: no verdict, no handoff
-# on disk needed anywhere (A3.4 — the check simply does not exist on this path).
-# ---------------------------------------------------------------------------
+def _push(local: str, remote: str | None = None, remote_sha: str = _ZERO) -> list[PushRef]:
+    return _refs(f"refs/heads/{local} {_SHA_A} refs/heads/{remote or local} {remote_sha}")
 
 
-def test_push_of_feature_branch_is_allowed(tmp_path: Path) -> None:
-    decision = _decide(
-        _refs(f"refs/heads/feature/0.0.0 {_SHA_A} refs/heads/feature/0.0.0 {_ZERO}"), tmp_path
-    )
+def _fix(decision: Decision) -> list[str]:
+    return shlex.split(decision.message.rsplit("fix: ", 1)[1])
+
+
+@_FLOWS
+def test_work_branch_push_is_allowed(tmp_path: Path, flow: Gitflow) -> None:
+    decision = _decide(_push(f"{flow.work_prefix}0.0.0"), tmp_path, flow)
     assert decision.allowed, decision.message
 
 
-# ---------------------------------------------------------------------------
-# A3.1 case 2 — a develop push is refused outright, naming the PR path
-# (feature/{M.m.p} → develop) — never conditional on any verdict.
-# ---------------------------------------------------------------------------
-
-
-def test_push_of_develop_is_refused_naming_the_pr_path(tmp_path: Path) -> None:
-    decision = _decide(_refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"), tmp_path)
+@_FLOWS
+def test_integration_push_is_refused_naming_the_pr_from_a_work_branch(
+    tmp_path: Path, flow: Gitflow
+) -> None:
+    decision = _decide(_push(flow.integration, remote_sha=_SHA_B), tmp_path, flow)
     assert not decision.allowed
-    assert "develop" in decision.message
-    assert "PR" in decision.message
-    assert "feature/" in decision.message
+    assert f"'{flow.integration}'" in decision.message
+    assert _fix(decision) == [
+        "gh",
+        "pr",
+        "create",
+        "--base",
+        flow.integration,
+        "--head",
+        f"{flow.work_prefix}<M.m.p>",
+    ]
 
 
-# ---------------------------------------------------------------------------
-# A3.1 case 3 — a main push is refused, naming the PR path (develop → main).
-# ---------------------------------------------------------------------------
-
-
-def test_push_of_main_is_refused_naming_the_pr_path(tmp_path: Path) -> None:
-    decision = _decide(_refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"), tmp_path)
+@_FLOWS
+def test_principal_push_is_refused_naming_the_pr_from_integration(
+    tmp_path: Path, flow: Gitflow
+) -> None:
+    decision = _decide(_push(flow.principal, remote_sha=_SHA_B), tmp_path, flow)
     assert not decision.allowed
-    assert "main" in decision.message
-    assert "develop" in decision.message
-    assert "PR" in decision.message
+    assert f"'{flow.principal}'" in decision.message
+    assert _fix(decision) == [
+        "gh",
+        "pr",
+        "create",
+        "--base",
+        flow.principal,
+        "--head",
+        flow.integration,
+    ]
 
 
-# ---------------------------------------------------------------------------
-# A3.1 case 4 / A3.2 — the retired `feature/v…` shape is refused as an invalid name;
-# no second pattern anywhere resurrects the leading `v`.
-# ---------------------------------------------------------------------------
-
-
-def test_push_of_v_prefixed_feature_branch_is_refused(tmp_path: Path) -> None:
-    decision = _decide(
-        _refs(f"refs/heads/feature/v0.0.0 {_SHA_A} refs/heads/feature/v0.0.0 {_ZERO}"), tmp_path
-    )
+@_FLOWS
+@pytest.mark.parametrize("name", ["bugfix/x", "hotfix/0.6.1", "{prefix}v0.0.0", "{prefix}0.6"])
+def test_a_branch_outside_the_gitflow_is_refused_naming_the_work_branch(
+    tmp_path: Path, flow: Gitflow, name: str
+) -> None:
+    branch = name.format(prefix=flow.work_prefix)
+    decision = _decide(_push(branch), tmp_path, flow)
     assert not decision.allowed
-    assert "feature/v0.0.0" in decision.message
-    for pattern_word in ("main", "develop", "feature/"):
-        assert pattern_word in decision.message
+    assert branch in decision.message
+    for word in (flow.principal, flow.integration, flow.work_prefix):
+        assert word in decision.message
+    work = f"{flow.work_prefix}<M.m.p>"
+    assert _fix(decision) == [
+        "git",
+        "checkout",
+        "-b",
+        work,
+        flow.principal,
+        "&&",
+        "git",
+        "push",
+        "origin",
+        work,
+    ]
 
 
-# ---------------------------------------------------------------------------
-# G2 — the retired `hotfix/*` row is refused outright, exactly like any other name
-# outside the three permitted patterns (never a distinct "local-only" kind anymore).
-# ---------------------------------------------------------------------------
+def test_the_default_names_are_ordinary_branches_under_a_custom_gitflow(tmp_path: Path) -> None:
+    assert not _decide(_push("feature/0.0.0"), tmp_path, _CUSTOM).allowed
+    assert "trunk" in _decide(_push("main"), tmp_path, _CUSTOM).message
 
 
-def test_push_of_hotfix_branch_is_refused_pattern_retired(tmp_path: Path) -> None:
-    decision = _decide(
-        _refs(f"refs/heads/hotfix/0.6.1 {_SHA_A} refs/heads/hotfix/0.6.1 {_ZERO}"), tmp_path
-    )
+@_FLOWS
+@pytest.mark.parametrize("role", ["principal", "integration"])
+def test_a_contentless_birth_of_principal_or_integration_passes(
+    tmp_path: Path, flow: Gitflow, role: str
+) -> None:
+    """ADR 0036: an orphan empty root pushed as the principal, or `git branch <integration>
+    <principal>` pushed, creates the remote branch and publishes nothing."""
+    source = _EmptyObjectSource(frozenset({_SHA_A}))
+    decision = _decide(_push(getattr(flow, role)), tmp_path, flow, object_source=source)
+    assert decision.allowed, decision.message
+    assert source.asked == [_SHA_A]
+
+
+@_FLOWS
+def test_a_birth_carrying_a_commit_is_refused_naming_git_fetch(
+    tmp_path: Path, flow: Gitflow
+) -> None:
+    decision = _decide(_push(flow.integration), tmp_path, flow)
     assert not decision.allowed
-    for pattern_word in ("main", "develop", "feature/"):
-        assert pattern_word in decision.message
+    assert _fix(decision) == ["git", "fetch", "--all"]
 
 
-# ---------------------------------------------------------------------------
-# A2.2-equivalent — the tag carve-out survives byte-for-byte (publishing depends on it).
-# ---------------------------------------------------------------------------
+def test_an_existing_principal_is_never_a_birth(tmp_path: Path) -> None:
+    source = _EmptyObjectSource(frozenset({_SHA_A}))
+    refs = _push("main", remote_sha=_SHA_B)
+    decision = _decide(refs, tmp_path, object_source=source)
+    assert not decision.allowed
+    assert source.asked == []
 
 
-def test_tag_push_still_passes_with_no_verdict(tmp_path: Path) -> None:
+def test_a_birth_aimed_at_another_remote_name_is_refused(tmp_path: Path) -> None:
+    source = _EmptyObjectSource(frozenset({_SHA_A}))
+    assert not _decide(_push("main", "develop"), tmp_path, object_source=source).allowed
+
+
+def test_tag_push_still_passes(tmp_path: Path) -> None:
     decision = _decide(_refs(f"refs/tags/v9.9.9 {_SHA_A} refs/tags/v9.9.9 {_ZERO}"), tmp_path)
     assert decision.allowed
-
-
-# ---------------------------------------------------------------------------
-# A branch outside the three patterns entirely is refused as an invalid NAME.
-# ---------------------------------------------------------------------------
-
-
-def test_push_of_unpatterned_branch_is_refused_naming_the_three_patterns(
-    tmp_path: Path,
-) -> None:
-    decision = _decide(
-        _refs(f"refs/heads/bugfix/whatever {_SHA_A} refs/heads/bugfix/whatever {_ZERO}"), tmp_path
-    )
-    assert not decision.allowed
-    for pattern_word in ("main", "develop", "feature/"):
-        assert pattern_word in decision.message
-
-
-# ---------------------------------------------------------------------------
-# The name validator accepts exactly the three permitted patterns.
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "branch",
-    ["main", "develop", "feature/0.6.0", "feature/12.0.3", "feature/1.22.333", "feature/0.0.0"],
-)
-def test_permitted_branch_names_are_accepted_by_the_validator(branch: str) -> None:
-    from dadaia_workspace.features.chokepoints.branch_policy import branch_name_is_permitted
-
-    assert branch_name_is_permitted(branch)
-
-
-@pytest.mark.parametrize(
-    "branch",
-    [
-        "bugfix/whatever",
-        "release/0.6.0",
-        "feature/v0.6.0",  # the retired `v` prefix
-        "feature/0.6",  # not major.minor.patch
-        "feature/0.6.0-rc1",  # suffixes are release-id territory, not branch names
-        "hotfix/0.6.1",  # the retired hotfix pattern (G2)
-        "hotfix/v0.6.1",
-        "chore/cleanup",
-        "developp",
-        "Main",
-    ],
-)
-def test_unpatterned_branch_names_are_rejected_by_the_validator(branch: str) -> None:
-    from dadaia_workspace.features.chokepoints.branch_policy import branch_name_is_permitted
-
-    assert not branch_name_is_permitted(branch)
 
 
 # ---------------------------------------------------------------------------
@@ -217,8 +192,6 @@ def test_malformed_stdin_fails_closed_naming_the_sanctioned_bypass(tmp_path: Pat
     is a different case — the gate must fail CLOSED and name git's sanctioned,
     traceable bypass (--no-verify) instead of silently disabling the whole law.
     """
-    from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
-
     refs, malformed = parse_push_stdin("this line has three fields\n")
     assert refs == []
     assert malformed == 1
@@ -235,17 +208,15 @@ def test_pushing_feature_branch_to_a_foreign_remote_ref_is_refused(tmp_path: Pat
     """Finding 2, carried forward: `git push origin feature/0.0.1:develop` — local
     feature branch, remote develop. The policy must key on BOTH sides: a valid local
     feature/{M.m.p} tip aimed at any remote ref other than its own name is a refusal."""
-    decision = _decide(
-        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/develop {_ZERO}"), tmp_path
-    )
+    decision = _decide(_push("work/0.0.1", "next"), tmp_path, _CUSTOM)
     assert not decision.allowed
-    assert "refs/heads/develop" in decision.message
-    assert "feature/0.0.1" in decision.message
+    assert "refs/heads/next" in decision.message
+    assert _fix(decision) == ["git", "push", "origin", "work/0.0.1:work/0.0.1"]
 
 
 def test_detached_head_ref_gets_a_pushable_branch_diagnosis(tmp_path: Path) -> None:
     """Finding 6, carried forward: `git push origin HEAD:feature/0.0.1` — right
     outcome needs the right words."""
-    decision = _decide(_refs(f"HEAD {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"), tmp_path)
+    decision = _decide(_refs(f"HEAD {_SHA_A} refs/heads/work/0.0.1 {_ZERO}"), tmp_path, _CUSTOM)
     assert not decision.allowed
-    assert "feature/" in decision.message
+    assert _fix(decision)[:3] == ["git", "checkout", "work/<M.m.p>"]

@@ -40,6 +40,8 @@ axes are reported side by side — an axis never outranks another.
 - Does the diff do what they say — nothing more, nothing less?
 - Scope growth beyond the task's declared write set is a finding, even when the code is good.
 - Acceptance criteria without corresponding evidence (test/assertion) is a finding.
+- Read PLAN §1 (As-is review) beside SPEC/TASKS: a DELETE or REBUILD unit the range leaves unchanged is HIGH.
+- A KEEP unit the range grew is a finding.
 
 ## 4. Axis 3 — Bug-surface
 

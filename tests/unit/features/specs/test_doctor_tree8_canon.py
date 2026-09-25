@@ -1,7 +1,7 @@
 """TREE-8: the v6 canon root — nothing beyond canon (T-050-05, FR1, A1.2).
 
 v0.5.0 specs-canon closure: TREE-8 tightens from WARN-only/dotfile-exempt to
-ERROR + auto-fixable, and its dotfile sweep now reaches the WHOLE specs/ tree, not
+ERROR, and its dotfile sweep now reaches the WHOLE specs/ tree, not
 just the root — a directory is kept by its AGENTS.md, never a placeholder file
 (the retired .gitkeep landing-zone mechanism). TREE-1/TREE-2's own deprecated-layout
 paths (specs/foundation/, specs/SPEC.md) stay exempt: those checks already own
@@ -9,15 +9,19 @@ reporting them, fixable=False by explicit design (auto-moving may destroy
 SDD-approved content pending operator consent) — TREE-8 must never additionally
 flag-and-auto-remove either.
 
-Intent: CONTRACT — A1.2, v0.5.0 specs-canon closure.
+TREE-8 is never auto-fixed: ``doctor --fix`` deletes nothing (operator decision D8).
+
+Intent: CONTRACT — A1.2, v0.5.0 specs-canon closure; doctor-fix-tree8-deletes-operator-content.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
-from dadaia_workspace.features.specs.scaffolder import scaffold
+from dadaia_workspace.features.specs.canon import scaffold
 
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
@@ -25,13 +29,12 @@ _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 
 def _make_v6_tree(tmp_path: Path) -> Path:
     specs_dir = tmp_path / "specs"
-    result = scaffold(
-        specs_dir=specs_dir,
+    scaffold(
+        specs_dir,
         project_name="tree8-project",
         force=False,
-        templates_dir=_TEMPLATES_DIR,
+        public_dir=_TEMPLATES_DIR.parent,
     )
-    assert result.errors == [], f"Scaffold errors: {result.errors}"
     return specs_dir
 
 
@@ -45,69 +48,32 @@ def test_tree8_is_silent_on_a_conformant_v6_tree(tmp_path: Path) -> None:
     assert tree8 == [], f"Unexpected TREE-8 on a conformant v6 tree: {tree8}"
 
 
-def test_tree8_errors_on_a_stray_root_entry_and_fix_removes_it(tmp_path: Path) -> None:
-    """A stray path directly under specs/ that is not a v6 canon root member is
-    ERROR, auto-fixable — removing it via ``doctor --fix``."""
+@pytest.mark.parametrize(
+    "rel",
+    ["README.md", "features/login.md", ".DS_Store", "backlog/.gitkeep"],
+)
+def test_tree8_reports_a_non_canon_path_and_fix_never_deletes_it(tmp_path: Path, rel: str) -> None:
+    """Bug doctor-fix-tree8-deletes-operator-content (operator decision D8): a
+    non-canon path — root file, root folder with content, root or nested dotfile —
+    is a TREE-8 ERROR the operator resolves by hand; ``doctor --fix`` leaves it on
+    disk and the finding stands (the live repro rmtree'd specs/README.md and
+    specs/features/login.md)."""
     specs_dir = _make_v6_tree(tmp_path)
-    stray = specs_dir / "scratch-legacy-folder"
-    stray.mkdir()
-    (stray / "note.md").write_text("stray content\n", encoding="utf-8")
+    stray = specs_dir / rel
+    stray.parent.mkdir(parents=True, exist_ok=True)
+    stray.write_text("operator content\n", encoding="utf-8")
+    flagged = specs_dir / rel.split("/")[0] if rel.startswith("features/") else stray
 
     doctor = SpecsDoctor(specs_dir)
     issues = doctor.check()
-    tree8 = [i for i in issues if i.code == "TREE-8" and i.path == str(stray)]
-    assert len(tree8) == 1, f"Expected exactly one TREE-8 finding for {stray}, got: {tree8}"
-    finding = tree8[0]
-    assert finding.severity == Severity.ERROR
-    assert finding.fixable is True
-
-    fixed = doctor.fix(issues)
-    assert any(i.path == str(stray) for i in fixed)
-    assert not stray.exists()
-    residual = [i for i in doctor.check() if i.code == "TREE-8" and i.path == str(stray)]
-    assert residual == []
-
-
-def test_tree8_errors_on_a_dotfile_at_root_and_fix_removes_it(tmp_path: Path) -> None:
-    """A dotfile directly under specs/ (e.g. an editor/OS artifact, or a stray
-    .gitkeep) is ERROR, auto-fixable — the .gitkeep landing-zone mechanism is
-    retired (v0.5.0): a directory is kept by its AGENTS.md, never a dotfile."""
-    specs_dir = _make_v6_tree(tmp_path)
-    stray = specs_dir / ".DS_Store"
-    stray.write_text("", encoding="utf-8")
-
-    doctor = SpecsDoctor(specs_dir)
-    issues = doctor.check()
-    tree8 = [i for i in issues if i.code == "TREE-8" and i.path == str(stray)]
-    assert len(tree8) == 1, f"Expected exactly one TREE-8 finding for {stray}, got: {tree8}"
+    tree8 = [i for i in issues if i.code == "TREE-8" and i.path == str(flagged)]
+    assert len(tree8) == 1, f"Expected one TREE-8 finding for {flagged}, got: {tree8}"
     assert tree8[0].severity == Severity.ERROR
-    assert tree8[0].fixable is True
+    assert tree8[0].fixable is False
 
     doctor.fix(issues)
-    assert not stray.exists()
-
-
-def test_tree8_errors_on_a_nested_dotfile_and_fix_removes_only_it(tmp_path: Path) -> None:
-    """A dotfile NESTED inside an otherwise-conformant area (e.g. a stray
-    specs/backlog/.gitkeep) is also ERROR/auto-fixable — the sweep is full-tree,
-    not root-only — and the fix removes only the offending file, never the
-    conformant parent directory or its siblings."""
-    specs_dir = _make_v6_tree(tmp_path)
-    stray = specs_dir / "backlog" / ".gitkeep"
-    stray.write_text("", encoding="utf-8")
-    sibling = specs_dir / "backlog" / "AGENTS.md"
-    assert sibling.exists(), "precondition: backlog/AGENTS.md must already exist"
-
-    doctor = SpecsDoctor(specs_dir)
-    issues = doctor.check()
-    tree8 = [i for i in issues if i.code == "TREE-8" and i.path == str(stray)]
-    assert len(tree8) == 1, f"Expected exactly one TREE-8 finding for {stray}, got: {tree8}"
-    assert tree8[0].severity == Severity.ERROR
-    assert tree8[0].fixable is True
-
-    doctor.fix(issues)
-    assert not stray.exists()
-    assert sibling.exists(), "the fix must remove only the dotfile, never its conformant sibling"
+    assert stray.read_text(encoding="utf-8") == "operator content\n"
+    assert [i for i in doctor.check() if i.code == "TREE-8" and i.path == str(flagged)]
 
 
 def test_tree8_never_flags_the_deprecated_foundation_or_root_spec_md(tmp_path: Path) -> None:

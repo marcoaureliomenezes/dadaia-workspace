@@ -1,6 +1,6 @@
 # dadaia-workspace
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/dadaia-workspace)](https://pypi.org/project/dadaia-workspace/)
 
 A local-first, spec-driven workspace that gives AI agents current context, a document-governed lifecycle, visible concurrency and anti-slop boundaries.
@@ -13,7 +13,7 @@ its **associated repos** are the others it owns.
 
 ## What it is and principles
 
-<!-- derived-from: product-vision sha256:164c4a8b0eca -->
+<!-- derived-from: product-vision sha256:16060412dc8a -->
 
 dadaia-workspace is the operating environment around repositories developed with AI
 agents. Its unit is the context: one main repo, where `specs/` lives, plus its
@@ -44,39 +44,48 @@ memory atom under its content hash.
 
 ## A human installs and uses it
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
-<!-- derived-from: workspace-init sha256:ca5c835e94af -->
-<!-- derived-from: context-management sha256:0227a5e43894 -->
-<!-- derived-from: workspace-doctor sha256:ef9c81d0d181 -->
+<!-- derived-from: pypi-distribution sha256:618098346ed6 -->
+<!-- derived-from: workspace-init sha256:aa1f033df140 -->
+<!-- derived-from: context-management sha256:3f48eef447f1 -->
+<!-- derived-from: workspace-doctor sha256:3fa0c321c7b0 -->
 
 ```bash
-pip install dadaia-workspace
-dadaia init demo --harness claude --repo <clone url>   # workspace + first project
-cd demo && eval $(dadaia context bind <ctx> --print-env)
-dadaia doctor --context <ctx>     # findings, each with a runnable fix
+uvx dadaia-workspace init demo --harness claude --repo <clone url>   # level 1 + 2
+cd demo
+.dadaia/.venv/bin/dadaia specs init --context <slug>                 # level 3
+.dadaia/.venv/bin/dadaia doctor --context <slug>   # findings, each with a runnable fix
 ```
 
-`pip install dadaia-workspace` installs the library and one CLI under two names,
-`dadaia` and `dadaia-workspace`, so `uvx dadaia-workspace init …` runs without an
-install; the wheel ships the full public asset tree, so `init` works offline.
+Onboarding has three levels. **Workspace:** `uvx dadaia-workspace init <dir> --harness
+<name>` (or `pip install dadaia-workspace`, which installs one CLI under two names,
+`dadaia` and `dadaia-workspace`) provisions `.dadaia/.venv`, the `.dadaia/` zones,
+`.agents/skills` and the named harness's projection, seeds the state documents without
+overwriting them, and (unless `--skip-assets`) stages and installs the public assets —
+the one writer of every hook wiring. The wheel ships the full public asset tree, and
+`init` resolves the workspace venv's dependencies from PyPI, so it needs network
+access. Every later command runs through the workspace's own CLI,
+`.dadaia/.venv/bin/dadaia`. **Project:** `--repo <url>` (plus repeatable
+`--associated-repo <url>`) clones the repo into `repos/<slug>/`, installs the pre-push
+hook and makes the context ALIVE (only `context bind` binds); a later project is
+`.dadaia/.venv/bin/dadaia context create --main-repo <url> [--associated-repo <url>]`.
+**Specs:** `.dadaia/.venv/bin/dadaia specs init --context <slug>` brings the repo's
+`specs/` to the canon, moving a foreign tree to `specs-bkp/` after consent; the
+`dd-audit-project` first pass fills memory (done by real content, never a stamp) and
+`.dadaia/.venv/bin/dadaia context baseline <slug>` publishes it. `doctor` prints each
+next step with its `fix:` line.
 
-`dadaia init <dir> --harness <name> [--repo <url>] [--skip-assets]` is the only verb
-that works on an empty directory, and a re-run is idempotent. It provisions
-`.dadaia/.venv`, the `.dadaia/` zones, `.agents/skills` and the named harness's
-projection, seeds the state documents without overwriting them, and (unless
-`--skip-assets`) stages and installs the public assets — the one writer of every hook
-wiring. With `--repo <url>` it clones the repo into `repos/<slug>/`, composes the
-context verbs — `create`, `alive`, the bind — and installs the pre-push hook. Without
-`--repo` it prints the `dadaia context create <name> --main-repo <slug>` that makes the
-first project. `dadaia harness add <name>` adds a harness later.
+**Upgrade:** re-run the `uvx dadaia-workspace init <dir> --harness <name>` line; it
+prints `upgraded A -> B`, or `already at A`; then
+`.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes each project's specs law.
+`.dadaia/.venv/bin/dadaia harness add <name>` adds a harness later.
 
-`dadaia context bind <ctx>` writes one session record (context, runtime, pid,
-`bound_at`) and acquires nothing; `--print-env` emits `DADAIA_CONTEXT` and
-`DADAIA_SESSION_ID` for `eval $(…)`. The bind's scope is the context's main repo plus
-its associated repos, and it drives the injection of the tech stack and the memory
-catalog digest into the session.
+`.dadaia/.venv/bin/dadaia context bind <ctx>` writes one session record (context,
+runtime, pid, `bound_at`) and acquires nothing; `--print-env` emits `DADAIA_CONTEXT`
+and `DADAIA_SESSION_ID` for `eval $(…)`. The bind's scope is the context's main repo
+plus its associated repos, and it drives the injection of the tech stack and the
+memory catalog digest into the session.
 
-`dadaia doctor` is the one instance validator. Three sections run in fixed order —
+`.dadaia/.venv/bin/dadaia doctor` is the one instance validator. Three sections run in fixed order —
 `workspace`, `specs`, `ledgers` — each finding one `<CODE> <verdict> <message>` line,
 every error-class finding with one `fix: <command>` line and exit 1; there is no score.
 `--json` mirrors the run; `--fix` is the reaper: it moves slop to `.dadaia/reaped/`
@@ -84,13 +93,13 @@ and deletes only what a TTL expired.
 
 ## An agent reads AGENTS.md and uses it
 
-<!-- derived-from: agentic-entities sha256:98cb81d2e72c -->
-<!-- derived-from: sdd-gate-v3 sha256:ea8939698674 -->
-<!-- derived-from: release-lifecycle sha256:09607348cc88 -->
-<!-- derived-from: bug-ledger sha256:9534ded07707 -->
-<!-- derived-from: harness-claude-code sha256:ee2f8a3870b4 -->
-<!-- derived-from: harness-codex sha256:868c0a658eab -->
-<!-- derived-from: harness-kimi-code sha256:fcfeb26d658b -->
+<!-- derived-from: agentic-entities sha256:63d2197ea839 -->
+<!-- derived-from: sdd-gate-v3 sha256:7a6e11d84264 -->
+<!-- derived-from: release-lifecycle sha256:ebb8441fde08 -->
+<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
+<!-- derived-from: harness-claude-code sha256:55ba15667a89 -->
+<!-- derived-from: harness-codex sha256:b907c260a862 -->
+<!-- derived-from: harness-kimi-code sha256:4300d3a1724d -->
 <!-- derived-from: harness-cursor sha256:480b18aa9b61 -->
 <!-- derived-from: harness-devin sha256:ab4a32c4a53d -->
 <!-- derived-from: harness-copilot sha256:b93cef868a6f -->
@@ -114,39 +123,36 @@ Every BLOCK carries exactly one `fix:` line, and a contract test feeds each fix 
 through the gate asserting ALLOW. No lease, lock or wait path exists; the gate reads no
 `_RELEASE.json`.
 
-Work runs as candidates inside one live release: a picked set, a grill, SPEC, PLAN and
-TASKS, one reserved task at a time, `[x]` only after the reviewer's `APPROVED`, then
-closure — memory reconciliation, disposition sweep, the `feature -> develop` merge. The
+Work runs as candidates inside one live release: a picked set, an as-is review of every
+unit it touches, a grill, SPEC, PLAN and TASKS, one reserved task at a time, `[x]` only after the reviewer's `APPROVED`, then
+closure — memory reconciliation, disposition sweep, the work -> integration merge (branch names: the constitution's `gitflow:`). The
 ledger scripts under `.agents/skills/*/scripts/` (`bugs.py`, `backlog.py`,
 `release.py`, `audit.py`) are each record's one writer. A bug is proposed to the
 operator and registered only after confirmation, then fixed on the live feature branch
 with a RED test. Completed work leaves as a `handoff-v1` record, validated by
-`dadaia reports validate`.
+`.dadaia/.venv/bin/dadaia reports validate`.
 
 ## Documentation
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
-<!-- derived-from: public-asset-distribution sha256:eb08a2e29f43 -->
+<!-- derived-from: pypi-distribution sha256:618098346ed6 -->
+<!-- derived-from: public-asset-distribution sha256:8d0224bd2c3a -->
 
-The site is <https://marcoaureliomenezes.github.io/dadaia-workspace/>:
+The documentation is the repository's [docs folder](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs):
 
-- [Quickstart](docs/quickstart.md) — install to a bound project, a backlog entry and a
-  live release; [positioning](docs/positioning.md) — why product repos carry no agent
+- [Quickstart](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/quickstart.md) — install to a bound project, a backlog entry and a
+  live release; [positioning](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/positioning.md) — why product repos carry no agent
   config.
-- [The bug loop](docs/bug-loop.md) — register, RED, fix, resolve;
-  [what the bug ledger taught](docs/bug-ledger-lessons.md) — measuring the ledger and
+- [The bug loop](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/bug-loop.md) — register, RED, fix, resolve;
+  [what the bug ledger taught](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/bug-ledger-lessons.md) — measuring the ledger and
   the fix-chain lesson.
-- [CLI reference](docs/cli.md) · [concepts](docs/concepts.md) ·
-  [getting started](docs/getting-started.md) · [distribution](docs/distribution.md)
-
-The standalone skills install without a workspace from the `dadaia-skills` repository:
-`npx skills add marcoaureliomenezes/dadaia-skills`, or as a Claude Code marketplace.
+- [CLI reference](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/cli.md) · [concepts](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/concepts.md) ·
+  [getting started](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/getting-started.md) · [distribution](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/distribution.md)
 
 ## Links
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
+<!-- derived-from: pypi-distribution sha256:618098346ed6 -->
 
 - GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
 - PyPI — <https://pypi.org/project/dadaia-workspace/>
-- Agent index — [`llms.txt`](llms.txt)
-- Changelog — [`CHANGELOG.md`](CHANGELOG.md)
+- Agent index — [`llms.txt`](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/llms.txt)
+- Changelog — [`CHANGELOG.md`](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/CHANGELOG.md)

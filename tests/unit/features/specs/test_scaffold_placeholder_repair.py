@@ -18,8 +18,8 @@ import pytest
 
 from dadaia_workspace.core.specs_repair import is_placeholder_atom, remove_placeholder_atoms
 from dadaia_workspace.features.migrate import upgrade as upgrade_feat
+from dadaia_workspace.features.specs.canon import scaffold
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
-from dadaia_workspace.features.specs.scaffolder import scaffold
 
 pytestmark = pytest.mark.unit
 
@@ -44,13 +44,12 @@ Placeholder — documentar o propósito desta feature aqui.
 
 def _fresh_specs(tmp_path: Path) -> Path:
     specs = tmp_path / "specs"
-    result = scaffold(
-        specs_dir=specs,
+    scaffold(
+        specs,
         project_name="testproj",
         force=False,
-        templates_dir=_TEMPLATES_DIR,
+        public_dir=_TEMPLATES_DIR.parent,
     )
-    assert not result.errors, result.errors
     return specs
 
 
@@ -170,13 +169,12 @@ def _specs_with_installed_tests_agents(tmp_path: Path, content: str | None) -> P
 
 def _fresh_specs_at(repo: Path) -> Path:
     specs = repo / "specs"
-    result = scaffold(
-        specs_dir=specs,
+    scaffold(
+        specs,
         project_name="testproj",
         force=False,
-        templates_dir=_TEMPLATES_DIR,
+        public_dir=_TEMPLATES_DIR.parent,
     )
-    assert not result.errors, result.errors
     return specs
 
 

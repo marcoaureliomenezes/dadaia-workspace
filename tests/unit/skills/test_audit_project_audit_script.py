@@ -149,3 +149,21 @@ def test_check_passes_on_a_valid_tree_and_fails_on_a_broken_record(
     assert broken.returncode == 1
     assert "LEDGER-FINDINGS-SCHEMA" in broken.stdout
     assert "severity" in broken.stdout
+
+
+def test_close_archives_a_zero_finding_audit(script: Path, specs: Path) -> None:
+    """audit-close-refuses-a-clean-audit: a clean audit is a legitimate result."""
+    (specs / "audits" / _AUDIT / "FINDINGS.jsonl").write_text("", encoding="utf-8")
+
+    result = _run(script, "close", _AUDIT, "--sha", "abc1234", "--specs", str(specs))
+
+    assert result.returncode == 0, result.stderr
+    assert not (specs / "audits" / _AUDIT).exists()
+    [record] = _histo(specs)
+    assert record["release"] is None
+    assert record["summary"] == "bugs 0, specs 0, memory 0"
+    assert record["entry"] == {
+        "sha": "abc1234",
+        "pillars": {"bugs": 0, "specs": 0, "memory": 0},
+        "dispositions": {},
+    }

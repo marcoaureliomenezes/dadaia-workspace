@@ -18,7 +18,6 @@ from dadaia_workspace.core.models.spec_context import (
 )
 from dadaia_workspace.features.import_.service import ImportService
 from dadaia_workspace.features.spec_context.service import SpecContextService
-from dadaia_workspace.features.specs.canon import scaffold as canon_scaffold
 from tests.fakes import FakeContextStore, FakeGitClient
 
 _EXPORT = {
@@ -64,7 +63,7 @@ def _importer(tmp_path: Path, store: FakeContextStore) -> ImportService:
         context_store=store,
         git_client=FakeGitClient(),
         workspace_root=tmp_path,
-        scaffold_specs=canon_scaffold,
+        install_hooks=lambda _repo: None,
     )
     return ImportService(contexts)
 
@@ -137,6 +136,7 @@ def test_import_saves_unknown_names_dead_and_skips_known_names(tmp_path: Path) -
             ),
             "letters, digits",
         ),
+        (_record("no-url", "no-url", repo_url=""), "no clone URL"),
     ],
 )
 def test_import_skips_and_never_writes_a_record_the_registry_guard_refuses(

@@ -18,13 +18,16 @@ Compliance is one formula for all three sections: a section declares how many un
 scored (``total_units`` — entries, rules, records) and every non-canonical finding
 names the unit it disqualifies; the numerator is the units nothing disqualified.
 
-Pure module — no I/O, no dependencies outside the stdlib.
+Pure module — no I/O; its one internal edge is ``core.cli_line``, the CLI spelling.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
+from pathlib import PurePath
+
+from dadaia_workspace.core.cli_line import fix_line
 
 __all__ = [
     "Rule",
@@ -32,6 +35,7 @@ __all__ = [
     "SectionReport",
     "merge_sections",
     "render_finding",
+    "rule_fix",
     "run_section",
 ]
 
@@ -58,6 +62,8 @@ class SectionFinding:
     #: an exit-1 finding with nothing to run is a Stall. Stamped from the emitting
     #: rule's ``fix_help`` by :func:`run_section` when the section left it empty.
     fix: str = ""
+    #: Machine-readable keys ``--json`` adds verbatim (the onboarding ``step``/``kind``).
+    extra: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -69,7 +75,9 @@ class Rule[C, I]:
     section: str
     run: Callable[[C], list[I]]
     fix: Callable[[C, I], None] | None = None
-    fix_help: str | None = None
+    #: A shell line, or a workspace-CLI argv tuple that :func:`rule_fix` renders with
+    #: ``fix_line`` from the doctored workspace's root (ADR 0045).
+    fix_help: str | tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -93,16 +101,18 @@ def run_section[C, I](
     rules: Sequence[Rule[C, I]],
     context: C,
     render: Callable[[Rule[C, I], I], SectionFinding],
+    root: PurePath | None,
 ) -> SectionReport:
     """Run every rule of one section over its context.
 
     ``render`` is the section's adapter at the seam: it translates the feature's own
-    issue type into a :class:`SectionFinding`.
+    issue type into a :class:`SectionFinding`. *root* is the workspace a CLI remedy runs
+    from (``None`` when no instance surrounds the run: the running CLI).
     """
     findings: list[SectionFinding] = []
     for rule in rules:
         for issue in rule.run(context):
-            findings.append(_with_fix(render(rule, issue), rule))
+            findings.append(_with_fix(render(rule, issue), rule, root))
     return SectionReport(name=name, findings=tuple(findings))
 
 
@@ -116,7 +126,16 @@ def merge_sections(reports: Sequence[SectionReport]) -> SectionReport:
     )
 
 
-def _with_fix[C, I](finding: SectionFinding, rule: Rule[C, I]) -> SectionFinding:
+def rule_fix[C, I](rule: Rule[C, I], root: PurePath | None) -> str:
+    """*rule*'s remedy as one runnable line — the ONE render site of a rule's fix."""
+    if isinstance(rule.fix_help, tuple):
+        return fix_line(root, *rule.fix_help)
+    return rule.fix_help or ""
+
+
+def _with_fix[C, I](
+    finding: SectionFinding, rule: Rule[C, I], root: PurePath | None
+) -> SectionFinding:
     """Stamp the emitting rule's ``fix_help`` onto *finding*.
 
     0.4.7 FR2 — every BLOCK carries one executable fix. That every error-class rule
@@ -125,10 +144,12 @@ def _with_fix[C, I](finding: SectionFinding, rule: Rule[C, I]) -> SectionFinding
     turn a rule-authoring defect into a traceback, which is a refusal with no message
     at all.
     """
-    return replace(finding, fix=finding.fix or rule.fix_help or "")
+    return replace(finding, fix=finding.fix or rule_fix(rule, root))
 
 
 def render_finding(finding: SectionFinding) -> str:
-    """One finding, rendered: its line, plus the ``fix:`` line when it fails the run."""
+    """One finding, rendered: its line, plus the ``fix:`` line when it fails the run or
+    is itself guidance (an ``info`` finding such as the onboarding next step)."""
     line = f"{finding.code} {finding.verdict} {finding.message}"
-    return f"{line}\nfix: {finding.fix}" if finding.error and finding.fix else line
+    shows_fix = finding.error or finding.verdict == "info"
+    return f"{line}\nfix: {finding.fix}" if shows_fix and finding.fix else line

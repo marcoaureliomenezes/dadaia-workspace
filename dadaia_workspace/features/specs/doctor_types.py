@@ -27,6 +27,9 @@ class SpecsDoctorIssue:
     description: str
     path: str | None = None
     fixable: bool = False
+    #: The issue's own remedy when ``doctor --fix`` cannot repair it (the rule's
+    #: ``fix_help`` otherwise).
+    fix: str = ""
 
     def to_dict(self) -> dict[str, str | None]:
         return {

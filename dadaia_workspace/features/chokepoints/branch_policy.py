@@ -1,10 +1,10 @@
-"""Branch policy — the gitflow v2 contract (v0.4.4 FR3; split out of ``service.py`` at
-v0.5.1 K7, "split chokepoints.service into its four modules; one verdict store").
+"""Branch policy — the project gitflow read by role (ADRs 0037, 0046).
 
 Zero I/O, zero dependency on anything else in this package: :class:`PushRef` (the
-parsed pre-push stdin shape), the three permitted branch patterns, and
-:func:`push_ref_policy_decision` (the per-ref loop :func:`~dadaia_workspace.features.
-chokepoints.push_gate.push_gate_decision` runs first, before either specs-scan step).
+parsed pre-push stdin shape) and :func:`check_branch_policy` (the per-ref loop
+:func:`~dadaia_workspace.features.chokepoints.push_gate.push_gate_decision` runs first,
+before either specs-scan step). Branch names come from the injected
+:class:`~dadaia_workspace.core.gitflow.Gitflow`; none is spelled here.
 :class:`Decision` — the shared outcome shape every chokepoint gate returns — lives here
 too: this module has no internal-package dependency, so every sibling module (``pre_commit``,
 ``push_gate``, ``verdict``) imports it from here rather than duplicating it or reaching
@@ -14,16 +14,15 @@ into ``__init__.py`` (which itself re-exports from this module, never the revers
 from __future__ import annotations
 
 import re
+import shlex
 from dataclasses import dataclass
-from pathlib import Path
+
+from dadaia_workspace.core.gitflow import Gitflow
 
 __all__ = [
     "Decision",
     "PushRef",
-    "branch_name_is_permitted",
     "check_branch_policy",
-    "context_slug_for_path",
-    "parse_push_refs",
     "parse_push_stdin",
 ]
 
@@ -113,75 +112,64 @@ def parse_push_stdin(stdin_text: str) -> tuple[list[PushRef], int]:
     return refs, malformed
 
 
-def parse_push_refs(stdin_text: str) -> list[PushRef]:
-    """Back-compat wrapper over :func:`parse_push_stdin` (refs only)."""
-    return parse_push_stdin(stdin_text)[0]
-
-
-# ── The three permitted branch patterns (v0.4.4 FR3 / T-044-06 — the gitflow v2 -------
-# inversion). The gitflow law (dd-gitflow-default, operator ruling 2026-08-23): exactly three
-# branch patterns exist — no ``v`` prefix, no ``hotfix`` row (G2 retires it outright) —
-# and ``feature/{M.m.p}`` is the ONLY pushable one; ``develop`` and ``main`` advance by
-# PR only. This tuple is the ONE pattern source — the pre-push hook and the CI
-# pr-source-guard both encode the model, and any second regex copy is drift (A3.2).
-_MAIN_RE = re.compile(r"^main$")
-_DEVELOP_RE = re.compile(r"^develop$")
-_FEATURE_RE = re.compile(r"^feature/\d+\.\d+\.\d+$")
-
-_PERMITTED_BRANCH_RES: tuple[re.Pattern[str], ...] = (_MAIN_RE, _DEVELOP_RE, _FEATURE_RE)
-
 HEADS_PREFIX = "refs/heads/"
 
-
-def branch_name_is_permitted(branch: str) -> bool:
-    """True when *branch* matches one of the three permitted patterns.
-
-    ``main`` | ``develop`` | ``feature/M.m.p`` — no leading ``v``, no suffix, no
-    ``hotfix`` row (G2). Matching one of these patterns does not by itself mean
-    *branch* is pushable — only ``feature/M.m.p`` is (see :func:`check_branch_policy`).
-    """
-    return any(pattern.match(branch) for pattern in _PERMITTED_BRANCH_RES)
+#: Where the project gitflow is stated — every refusal points there.
+_LAW = "project gitflow: specs/constitution.md"
 
 
-def _refuse_branch(branch: str, local_ref: str) -> Decision:
-    """Actionable refusal for a non-pushable ref (A4.2 shape: rule + permitted + fix)."""
-    if branch == "main":
+def _work(gitflow: Gitflow) -> str:
+    return f"{gitflow.work_prefix}<M.m.p>"
+
+
+def _refuse_branch(ref: PushRef, branch: str, gitflow: Gitflow) -> Decision:
+    """Actionable refusal for a non-pushable ref: rule + permitted names + one fix."""
+    role = gitflow.role_of(branch)
+    if role is not None and ref.remote_sha == ZERO_SHA:
         return Decision(
             allowed=False,
             message=(
-                "[pre-push] BLOCKED: 'main' is never pushed directly — it advances only "
-                "via a PR from 'develop' (gitflow law, dd-gitflow-default).\n"
-                "fix: gh pr create --base main --head develop"
+                f"[pre-push] BLOCKED: creating the {role} branch '{branch}' would publish "
+                "new objects — a birth may carry only already-published history or one "
+                f"empty root commit ({_LAW}). Stale remote-tracking refs look the same: "
+                "refresh them, then push again.\nfix: git fetch --all"
             ),
         )
-    if branch == "develop":
+    if role == "principal":
+        why = f"advances only via a PR from the integration branch '{gitflow.integration}'"
+        fix = ["gh", "pr", "create", "--base", branch, "--head", gitflow.integration]
+    elif role == "integration":
+        why = f"advances only via a PR from a work branch '{_work(gitflow)}'"
+        fix = ["gh", "pr", "create", "--base", branch, "--head", _work(gitflow)]
+    else:
         return Decision(
             allowed=False,
             message=(
-                "[pre-push] BLOCKED: 'develop' is never pushed directly — it advances "
-                "only via a PR from 'feature/{M.m.p}' (gitflow law, dd-gitflow-default).\n"
-                "fix: gh pr create --base develop --head feature/<M.m.p>"
+                f"[pre-push] BLOCKED: ref '{ref.local_ref}' is outside the gitflow — principal "
+                f"'{gitflow.principal}', integration '{gitflow.integration}', work "
+                f"'{_work(gitflow)}' ({_LAW}). Only a work branch is pushable.\n"
+                f"fix: {shlex.join(['git', 'checkout', '-b', _work(gitflow), gitflow.principal])}"
+                f" && {shlex.join(['git', 'push', 'origin', _work(gitflow)])}"
             ),
         )
     return Decision(
         allowed=False,
         message=(
-            f"[pre-push] BLOCKED: ref '{local_ref}' is outside the three permitted "
-            "branch patterns — main, develop, feature/M.m.p (gitflow law, "
-            "dd-gitflow-default). Only 'feature/M.m.p' is pushable.\n"
-            "fix: git checkout -b feature/<M.m.p> main && git push origin feature/<M.m.p>"
+            f"[pre-push] BLOCKED: the {role} branch '{branch}' is never pushed directly — "
+            f"it {why} ({_LAW}).\nfix: {shlex.join(fix)}"
         ),
     )
 
 
-def check_branch_policy(refs: list[PushRef]) -> Decision | None:
-    """Step 1 of :func:`~dadaia_workspace.features.chokepoints.push_gate.push_gate_decision`
-    (dd-gitflow-default): every non-deletion, non-tag ref must be
-    ``refs/heads/feature/{M.m.p}``, pushed to the SAME remote name — ``develop``/``main``
-    are refused outright (PR only); names outside the three permitted patterns are
-    refused as invalid. Returns the first refusal, or ``None`` when every ref clears
-    branch policy (tags and deletions are never checked here — the caller has already
-    excluded them from *refs*).
+def check_branch_policy(
+    refs: list[PushRef], gitflow: Gitflow, births: frozenset[str] = frozenset()
+) -> Decision | None:
+    """Every non-deletion, non-tag ref must be a work branch of *gitflow*, pushed to the
+    SAME remote name; the principal and integration branches are PR-only, except their
+    birth (ADR 0036): a local sha in *births* (the caller proved it creates the remote
+    branch and publishes nothing). Returns the
+    first refusal, or ``None`` when every ref clears (the caller has already excluded
+    tags and deletions from *refs*).
     """
     for ref in refs:
         if not ref.local_ref.startswith(HEADS_PREFIX):
@@ -189,44 +177,24 @@ def check_branch_policy(refs: list[PushRef]) -> Decision | None:
                 allowed=False,
                 message=(
                     f"[pre-push] BLOCKED: local ref '{ref.local_ref}' is not a branch "
-                    "head — only a 'refs/heads/feature/M.m.p' branch may be pushed "
-                    "(gitflow law, dd-gitflow-default).\n"
-                    "fix: git checkout feature/<M.m.p> && git push origin feature/<M.m.p>"
+                    f"head — only a work branch '{_work(gitflow)}' may be pushed ({_LAW}).\n"
+                    f"fix: {shlex.join(['git', 'checkout', _work(gitflow)])}"
+                    f" && {shlex.join(['git', 'push', 'origin', _work(gitflow)])}"
                 ),
             )
         branch = ref.local_ref[len(HEADS_PREFIX) :]
-        if not _FEATURE_RE.match(branch):
-            return _refuse_branch(branch, ref.local_ref)
+        role = gitflow.role_of(branch)
+        born = role in ("principal", "integration") and ref.local_sha in births
+        if role != "work" and not born:
+            return _refuse_branch(ref, branch, gitflow)
         if ref.remote_ref != f"{HEADS_PREFIX}{branch}":
             return Decision(
                 allowed=False,
                 message=(
                     f"[pre-push] BLOCKED: refspec aims local '{branch}' at remote "
-                    f"'{ref.remote_ref}' — only refs/heads/{branch} → "
-                    f"refs/heads/{branch} is pushable (gitflow law, dd-gitflow-default; "
-                    "'develop' and 'main' advance via PR only).\n"
-                    f"fix: git push origin {branch}:{branch}"
+                    f"'{ref.remote_ref}' — only refs/heads/{branch} → refs/heads/{branch} "
+                    f"is pushable ({_LAW}).\n"
+                    f"fix: {shlex.join(['git', 'push', 'origin', f'{branch}:{branch}'])}"
                 ),
             )
     return None
-
-
-# ---------------------------------------------------------------------------------------
-# Context resolution — derive the slug from the repo path, NEVER first-ALIVE.
-# ---------------------------------------------------------------------------------------
-def context_slug_for_path(workspace: Path, repo_root: Path) -> str | None:
-    """Return the context slug for a repo at ``repo_root`` under ``workspace``.
-
-    A Spec Context repo lives at ``<workspace>/repos/<slug>``. The slug is that single path
-    component — derived from the path, never from the first-ALIVE registry entry. Returns
-    ``None`` when ``repo_root`` is not directly under ``<workspace>/repos/`` (e.g. the
-    library repo run standalone, or the workspace root itself).
-    """
-    try:
-        rel = repo_root.resolve().relative_to((workspace / "repos").resolve())
-    except (ValueError, OSError):
-        return None
-    parts = rel.parts
-    if len(parts) != 1:
-        return None
-    return parts[0]

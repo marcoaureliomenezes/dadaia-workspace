@@ -13,7 +13,7 @@ the price of the previous fix.
 
 ## Measuring the ledger
 
-<!-- derived-from: bug-ledger sha256:9534ded07707 -->
+<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
 
 The numbers are never copied into a page; the ledger's own verbs measure them.
 
@@ -30,14 +30,14 @@ agreement.
 
 ## Lesson 1 — a per-caller fix breeds the next caller's bug
 
-<!-- derived-from: context-management sha256:0227a5e43894 -->
-<!-- derived-from: bug-ledger sha256:9534ded07707 -->
+<!-- derived-from: context-management sha256:3f48eef447f1 -->
+<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
 
 When a guard lives at the caller that was just caught, the next caller without it is
 the next bug in the family, and each such fix is `net-positive`: it grows the feature.
 The structure that ends the family is one guarded seam every writer delegates to. The
 context registry is the example: a repo slug belongs to one context, and `create`,
-`repo add` and `dadaia import` pass one ownership check; `INV-6` reports any
+`repo add` and `.dadaia/.venv/bin/dadaia import` pass one ownership check; `INV-6` reports any
 multi-owner slug already on disk.
 
 ## Lesson 2 — a per-measurement exclusion breeds the next measurement's bug
@@ -53,7 +53,7 @@ construction, not by a list somebody has to remember to extend.
 
 ## Lesson 3 — a derived cache breeds a bug per environment that derives it
 
-<!-- derived-from: bug-ledger sha256:9534ded07707 -->
+<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
 <!-- derived-from: QUALITY sha256:56577c91b65d -->
 
 A record that caches a fact git already knows is wrong in every environment that
@@ -64,14 +64,15 @@ history is that line's change log. No CI job fetches history for a bug record's 
 ## The standing order the lessons produced
 
 <!-- derived-from: QUALITY sha256:56577c91b65d -->
-<!-- derived-from: bug-ledger sha256:9534ded07707 -->
+<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
 
 The workspace is in a permanent state of architecture review, oriented by its bug
 history:
 
 - Read the ledger before proposing a fix. Resolution opens with lineage over at most
   the 20 most recent records sharing this bug's surface or component, and the link is
-  declared at resolution as `caused_by: <bug-id> | none`.
+  declared at resolution as `caused_by: <bug-id> | none`; a unit with two or more prior
+  fixes is rebuilt, never patched a third time.
 - Prefer the deletion-shaped fix. A fix whose diff grows the touched feature is routed
   to the architecture lens before it lands.
 - Record the direction. Every resolution states `diff_direction`, and every review

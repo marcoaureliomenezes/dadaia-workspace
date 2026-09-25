@@ -1,6 +1,6 @@
-"""Intent: CONTRACT — T-047-82: the release workflow publishes the built skills
-repository and fails closed on the missing SKILLS_REPO_TOKEN secret, with the token
-never interpolated outside the push remote URL.
+"""Intent: CONTRACT — bug release-publishes-an-unordered-dadaia-skills-repository: the
+release publishes dadaia-workspace to PyPI and nothing else — no job, script or doc names
+a dadaia-skills repository.
 
 Intent: CONTRACT — T-047-87: release.yml is the one workflow minting the
 version, CHANGELOG and tag: push-to-main trigger, sha-pinned action, release type
@@ -12,6 +12,7 @@ release.yml behind the single `release_created` gate: no `release:` event, no
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 from pathlib import Path
@@ -24,8 +25,7 @@ pytestmark = pytest.mark.contract
 
 _WORKFLOWS = Path(__file__).resolve().parents[2] / ".github" / "workflows"
 _RELEASE_YML = _WORKFLOWS / "release.yml"
-_TOKEN = "SKILLS_REPO_TOKEN"
-_REMOTE_PREFIX = "https://x-access-token:"
+_REPO_ROOT = _WORKFLOWS.parents[1]
 
 
 def _workflows() -> dict[str, Any]:
@@ -39,57 +39,30 @@ def _jobs() -> dict[str, Any]:
     return dict(yaml.safe_load(_RELEASE_YML.read_text(encoding="utf-8"))["jobs"])
 
 
-def _skills_job() -> tuple[str, dict[str, Any]]:
-    candidates = [
-        (name, job)
-        for name, job in _jobs().items()
-        if any("build-skills-repo.py" in (step.get("run") or "") for step in job.get("steps") or [])
+_UNORDERED_SKILLS_REPO = re.compile(
+    r"dadaia-skills|SKILLS_REPO_TOKEN|build-skills-repo|npx skills add|skills-repository"
+)
+
+
+def test_the_release_publishes_no_skills_repository() -> None:
+    """The operator never ordered a standalone skills repository (grill Q14: later); a job
+    publishing one fails every release and README, docs and memory point at a repository
+    that does not exist. Delete this test when Q14's distribution is ordered."""
+    surfaces = [
+        *sorted(_WORKFLOWS.glob("*.yml")),
+        _REPO_ROOT / "README.md",
+        _REPO_ROOT / "llms.txt",
+        *sorted((_REPO_ROOT / "docs").rglob("*.md")),
+        *sorted((_REPO_ROOT / "specs" / "memory").rglob("*.md")),
     ]
-    assert len(candidates) == 1, (
-        f"expected exactly one release job building the skills repository, got {[n for n, _ in candidates]}"
-    )
-    return candidates[0]
-
-
-def test_skills_repo_job_runs_after_publish_and_builds_the_repository() -> None:
-    name, job = _skills_job()
-    needs = job.get("needs") or []
-    needs = [needs] if isinstance(needs, str) else list(needs)
-    assert "publish" in needs, f"job {name} must depend on the publish job, needs={needs}"
-    build = next(s for s in job["steps"] if "build-skills-repo.py" in (s.get("run") or ""))
-    assert "dadaia_workspace/public/scripts/build-skills-repo.py" in build["run"]
-    assert job.get("permissions") == {"contents": "read"}, (
-        f"job {name} must declare minimal permissions; got {job.get('permissions')}"
-    )
-
-
-def test_missing_skills_repo_token_fails_closed_with_one_error_annotation() -> None:
-    name, job = _skills_job()
-    assert (job.get("env") or {}).get(_TOKEN) == "${{ secrets." + _TOKEN + " }}"
-    guards = [s for s in job["steps"] if f"env.{_TOKEN} == ''" in str(s.get("if") or "")]
-    assert len(guards) == 1, (
-        f"job {name} must carry exactly one fail-closed guard, got {len(guards)}"
-    )
-    run = guards[0]["run"]
-    assert run.count("::error::") == 1, f"the guard must emit exactly one annotation: {run!r}"
-    assert _TOKEN in run and "exit 1" in run
-
-
-def test_the_token_is_interpolated_only_in_the_push_remote_url() -> None:
-    offenders: list[str] = []
-    for job_name, job in _jobs().items():
-        for step in job.get("steps") or []:
-            for line in (step.get("run") or "").splitlines():
-                if _TOKEN not in line:
-                    continue
-                guard = f"env.{_TOKEN} == ''" in str(step.get("if") or "")
-                if guard or f"{_REMOTE_PREFIX}${{{_TOKEN}}}" in line:
-                    continue
-                offenders.append(f"{job_name}: {line.strip()}")
-    assert offenders == [], (
-        f"{_TOKEN} may appear only inside the {_REMOTE_PREFIX} remote URL or the "
-        f"fail-closed guard — never echoed or logged: {offenders}"
-    )
+    offenders = [
+        f"{path.relative_to(_REPO_ROOT)}:{n}"
+        for path in surfaces
+        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
+        if _UNORDERED_SKILLS_REPO.search(line)
+    ]
+    assert offenders == [], offenders
+    assert not (_REPO_ROOT / "dadaia_workspace/public/scripts/build-skills-repo.py").exists()
 
 
 def _run_bodies() -> list[tuple[str, str, str | None, str]]:
@@ -275,7 +248,7 @@ def test_the_approve_job_keeps_the_release_gate_environment() -> None:
 
 def test_one_version_step_feeds_every_consumer_of_the_version() -> None:
     """One `id: version` step in `build` strips the tag's `v`; artifact name, approval
-    message, pip install line and skills-repo subject all read that one output."""
+    message, and pip install line all read that one output."""
     build = _jobs()["build"]
     assert build.get("outputs", {}).get("version") == "${{ steps.version.outputs.version }}"
     step = next(s for s in build["steps"] if s.get("id") == "version")
@@ -287,7 +260,7 @@ def test_one_version_step_feeds_every_consumer_of_the_version() -> None:
         for name, job in _jobs().items()
         if "needs.build.outputs.version" in yaml.safe_dump(job)
     ]
-    assert set(consumers) == {"approve", "publish", "smoke-test", "publish-skills-repo"}, consumers
+    assert set(consumers) == {"approve", "publish", "smoke-test"}, consumers
 
 
 _MODEL_API_TEXT = re.compile(
@@ -321,14 +294,17 @@ def test_no_workflow_calls_a_model_api() -> None:
     assert offenders == [], "a workflow calls a model API:\n" + "\n".join(offenders)
 
 
-def _guard_exit(head: str, base: str) -> int:
-    """Run pr-source-guard's shell step exactly as CI does, for one (head, base) pair."""
+def _guard_exit(head: str, base: str, cwd: Path = _REPO_ROOT) -> int:
+    """Run pr-source-guard's python step exactly as CI does, for one (head, base) pair,
+    reading the gitflow of the constitution under *cwd*."""
     import subprocess
 
     ci = yaml.safe_load((_WORKFLOWS / "ci.yml").read_text(encoding="utf-8"))
-    step = ci["jobs"]["pr-source-guard"]["steps"][0]
-    env = {"HEAD_REF": head, "BASE_REF": base, "PATH": "/usr/bin:/bin"}
-    return subprocess.run(["bash", "-c", step["run"]], env=env, capture_output=True).returncode
+    step = next(s for s in ci["jobs"]["pr-source-guard"]["steps"] if "HEAD_REF" in s.get("env", {}))
+    env = {"HEAD_REF": head, "BASE_REF": base, "PATH": os.pathsep.join([str(Path(sys.executable).parent), os.environ["PATH"]]),
+           "PYTHONPATH": str(_REPO_ROOT), "BASE_SPECS": str(cwd / "specs")}  # fmt: skip
+    run = subprocess.run(["bash", "-c", step["run"]], env=env, cwd=cwd, capture_output=True)
+    return run.returncode
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the guard is a bash step on ubuntu-latest")
@@ -341,14 +317,66 @@ def _guard_exit(head: str, base: str) -> int:
         ("release-please--branches--develop", "main", False),
         ("feature/0.4.7", "develop", True),
         ("develop", "develop", False),
+        ("dependabot/pip/ruff-0.16.8", "develop", True),
+        ("dependabot/github_actions/actions/checkout-7.1.0", "develop", True),
+        ("dependabot/pip/ruff-0.16.8", "main", False),
     ],
 )
 def test_pr_source_guard_admits_the_release_pr_into_main(
     head: str, base: str, allowed: bool
 ) -> None:
     """ADR 0021: promote is merging release-please's release PR, so main accepts exactly
-    develop and release-please's own branch; develop accepts only feature/{M.m.p}."""
+    develop and release-please's own branch; develop accepts feature/{M.m.p} and the
+    Dependabot update branches (bug dependabot-targets-main-and-every-update-pr-is-refused)."""
     assert (_guard_exit(head, base) == 0) is allowed
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the guard is a bash step on ubuntu-latest")
+@pytest.mark.parametrize(
+    ("head", "base", "allowed"),
+    [
+        ("next", "trunk", True),
+        ("develop", "trunk", False),
+        ("work/1.2.3", "next", True),
+        ("feature/1.2.3", "next", False),
+    ],
+)
+def test_pr_source_guard_reads_the_gitflow_by_role(
+    tmp_path: Path, head: str, base: str, allowed: bool
+) -> None:
+    """T-050-19 AC6.8: the guard names no branch; a renamed gitflow moves its rules."""
+    (tmp_path / "specs").mkdir()
+    (tmp_path / "specs" / "constitution.md").write_text(
+        "---\nspecs_pattern_version: 6\n"
+        "gitflow: {principal: trunk, integration: next, work: work/}\n---\n# C\n",
+        encoding="utf-8",
+    )
+    assert (_guard_exit(head, base, tmp_path) == 0) is allowed
+
+
+def test_the_ci_triggers_are_the_library_gitflow() -> None:
+    """T-050-19 AC6.9: GitHub reads no file, so ci.yml's triggers stay literal — pinned
+    here to the library constitution's gitflow; changing one without the other is red."""
+    from dadaia_workspace.core.specs_version import read_gitflow
+
+    flow, warning = read_gitflow(_REPO_ROOT / "specs")
+    assert warning is None
+    on = yaml.safe_load((_WORKFLOWS / "ci.yml").read_text(encoding="utf-8"))[True]
+    assert on["push"]["branches"] == [flow.principal, flow.integration, f"{flow.work_prefix}**"]
+    assert on["pull_request"]["branches"] == [flow.principal, flow.integration]
+    release = yaml.safe_load((_WORKFLOWS / "release.yml").read_text(encoding="utf-8"))[True]
+    assert release["push"]["branches"] == [flow.principal]
+    bot = yaml.safe_load((_WORKFLOWS.parent / "dependabot.yml").read_text(encoding="utf-8"))
+    assert {u["target-branch"] for u in bot["updates"]} == {flow.integration}
+
+
+def test_every_dependabot_update_targets_develop() -> None:
+    """Bug dependabot-targets-main-and-every-update-pr-is-refused: without `target-branch`
+    Dependabot opens its PRs against main, which accepts only develop and the release PR,
+    so every update stalls red and the open-PR limit fills."""
+    config = yaml.safe_load((_WORKFLOWS.parent / "dependabot.yml").read_text(encoding="utf-8"))
+    targets = {u["package-ecosystem"]: u.get("target-branch") for u in config["updates"]}
+    assert targets and set(targets.values()) == {"develop"}, targets
 
 
 def test_the_publish_workflow_is_release_yml_bound_to_the_pypi_publisher() -> None:
@@ -377,3 +405,42 @@ def test_a_dispatch_can_republish_an_existing_tag_through_the_same_chain() -> No
     assert existing and "inputs.tag" in existing[0]["if"]
     checkout = _jobs()["build"]["steps"][0]
     assert checkout["with"]["ref"] == "${{ needs.release-please.outputs.tag_name }}"
+
+
+def _step_texts(workflow: str, job: str) -> str:
+    document = yaml.safe_load((_WORKFLOWS / workflow).read_text(encoding="utf-8"))
+    steps = document["jobs"][job]["steps"]
+    return "\n".join(f"{s.get('run', '')}\n{s.get('env', '')}" for s in steps)
+
+
+@pytest.mark.parametrize(
+    ("workflow", "job"), [("ci.yml", "e2e-python"), ("release.yml", "e2e-python")]
+)
+def test_the_onboarding_journey_runs_with_uv_and_cannot_skip(workflow: str, job: str) -> None:
+    """Intent: CONTRACT — 0.4.8 AC8.3 (T-048-11). The e2e job installs uv, requires uvx
+    (an absent uvx fails instead of skipping) and selects the journey."""
+    steps = _step_texts(workflow, job)
+    assert "install uv==" in steps and "'DADAIA_REQUIRE_UVX': '1'" in steps, steps
+    assert re.search(r"tests/e2e(?:\s|$|/test_onboarding_journey\.py)", steps), steps
+
+
+def test_the_post_publish_smoke_walks_greenfield_from_pypi() -> None:
+    """Intent: CONTRACT — 0.4.8 AC8.3 (T-048-11): the smoke job runs the published version
+    through `init --repo` + `specs init` + `doctor`."""
+    steps = _step_texts("release.yml", "smoke-test")
+    for needle in (
+        'uvx "dadaia-workspace==$VERSION" init',
+        "--repo",
+        "specs init --context",
+        "doctor --context",
+    ):
+        assert needle in steps, needle
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the guard is a bash step on ubuntu-latest")
+def test_pr_source_guard_defaults_when_the_base_has_no_constitution(tmp_path: Path) -> None:
+    """A base branch predating the gitflow block (or any constitution) reads the default
+    gitflow — the guard never needs code the base does not carry."""
+    (tmp_path / "specs").mkdir()
+    assert _guard_exit("develop", "main", tmp_path) == 0
+    assert _guard_exit("feature/0.5.0", "main", tmp_path) != 0

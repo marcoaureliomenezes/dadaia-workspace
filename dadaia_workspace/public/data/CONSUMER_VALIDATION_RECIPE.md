@@ -217,7 +217,7 @@ an initialized workspace, create it:
 - Run: `$D memory product add <slug> --area <area> --specs-dir S`;
   `python3 .agents/skills/dd-spec-navigator/scripts/memory.py catalog generate --specs S`; then `$D doctor --specs-dir S` again.
 - **PASS if:** the verbs exist and exit 0; the atom is registered in the catalog; and the
-  supported "add a feature" path leaves `dadaia doctor` at **0 errors AND 0 warnings** —
+  supported "add a feature" path leaves `.dadaia/.venv/bin/dadaia doctor` at **0 errors AND 0 warnings** —
   the atom emitted by `memory product add` must lint clean out of the box (its template
   headings are allowlisted). A LINT-1 unknown-heading warning on a freshly added atom is a
   FAIL: the tool's own template must not violate its own linter.
@@ -236,7 +236,7 @@ an initialized workspace, create it:
 - Run: `$D migrate --help` then the relevant migrate verb (`migrate tree-v2 -y`);
   `$D doctor` after.
 - **PASS if:** the migrate verb upgrades losslessly (legacy content relocated under
-  `releases/legacy/`, nothing dropped) and `dadaia doctor` exits 0 with **0 errors**
+  `releases/legacy/`, nothing dropped) and `.dadaia/.venv/bin/dadaia doctor` exits 0 with **0 errors**
   afterwards; re-running the migrate verb is a no-op. A SPEC-DOC-027 **WARNING** on the
   sanctioned `releases/legacy/` holding dir is EXPECTED, not a FAIL — it is the migration's
   own destination, preserved-until-renamed by design (doctor exits 0 on warnings). Judge
@@ -330,7 +330,7 @@ never exercised the live backlog path was false confidence).
   ACTIVE subsection — SPEC v0.12.0 FR3, ADR #14), then `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py subjects
   --specs <ctx>/specs` — which lists the declared aliases and the bindings the live
   document already carries, not the derived code/doc/cli anchors.
-- **PASS if:** every emitted `intents[].ref` is accepted by `dadaia doctor` (a ref it
+- **PASS if:** every emitted `intents[].ref` is accepted by `.dadaia/.venv/bin/dadaia doctor` (a ref it
   cannot resolve is a `BL-SCHEMA` finding naming that ref) AND a release SPEC naming the
   item under `**Consumes:**` is accepted too, with the declared slug resolving to an
   `active[]` entry in `specs/backlog/BACKLOG.json`.
@@ -373,26 +373,27 @@ never exercised the live backlog path was false confidence).
   reason naming `.kimi-code/` among allowed entries); ctx-inject injects with
   `DADAIA_CONTEXT` exported at launch; the post-compact shim stamps `ctx-compact-<sid>` AND
   re-emits the bootstrap on stdout, and the next prompt re-injects exactly once;
-  `dadaia public doctor` is green (incl. `dadaia:scripts/*` on a kimi-only profile);
-  `dadaia public doctor` flags a tampered shim/block and `install` heals it.
+  `.dadaia/.venv/bin/dadaia public doctor` is green (incl. `dadaia:scripts/*` on a kimi-only profile);
+  `.dadaia/.venv/bin/dadaia public doctor` flags a tampered shim/block and `install` heals it.
 
 ### R-13 — Producers pass their own validators (scaffold / backlog / baseline)
 
 - Create a release — `$D release new 0.1.0` writes the Draft `SPEC.md` stub and a
   `_RELEASE.json` with `phase: "DEFINITION"` (shape: `release-state-v1`,
   `dd-release-implementation`'s `RELEASE-EVENTS.md`) in one transaction, and refuses a
-  second live release — then `dadaia doctor`;
-  `backlog new <slug>` then `dadaia doctor`; fresh context: `context create` → `alive` → `specs
-  init` → `context baseline`.
+  second live release — then `.dadaia/.venv/bin/dadaia doctor`;
+  `backlog new <slug>` then `.dadaia/.venv/bin/dadaia doctor`; fresh context: `context create` → `context bind` → `specs
+  init` → first pass → `context baseline` (no flags; invoking it is the consent).
 - **PASS if ALL of:** doctor reports 0 errors AND 0 warnings on the fresh
   scaffold (Draft + phase DEFINITION is the legitimate authoring state — bug
   fresh-release-scaffold-emits-spec-doctor-warnings-042); the freshly-created `active[]`
   entry in `specs/backlog/BACKLOG.json` (the single source, SPEC v0.12.0 FR3, ADR #14)
   is BL-SCHEMA-valid out of the box; and baseline COMPLETES after the official
-  scaffold follow-up while still refusing a tree carrying operator files (bug
+  scaffold follow-up while still refusing a born tree carrying operator files, its
+  printed fix line lossless and runnable (bug
   context-baseline-rejects-official-scaffold-followup).
 - **A GATE is a validator too** (bug r4g-backlog-surface-new-existing-accepted): take
-  what `backlog new` ACCEPTED and run `dadaia doctor` over the same tree. A tree that
+  what `backlog new` ACCEPTED and run `.dadaia/.venv/bin/dadaia doctor` over the same tree. A tree that
   passes one while the other rejects it is a FAIL — the two must never hold two
   opinions. Probe the degenerate inputs specifically: an item with NO `intents[]` at
   `candidate` status (must block; `idea` stays exempt), and an empty/absent field where
@@ -417,7 +418,7 @@ gates cannot catch, because they never call the model.
   API (`PUT /api/agent-model-policy`), re-install, and confirm BOTH surfaces moved
   together; `GET /api/agent-model-templates` offers every registry `claude_id` as a
   selectable model and the full effort vocabulary.
-- **Tier invariants:** `dadaia public doctor` reports `[ok] model-resolution`; each
+- **Tier invariants:** `.dadaia/.venv/bin/dadaia public doctor` reports `[ok] model-resolution`; each
   registry tier resolves to exactly ONE codex id, and no two tiers collapse to an
   identical `(codex_id, reasoning_effort)` pair.
 - **G-1 stands:** `claude-fable-5` is NEVER the resolved model for
@@ -464,20 +465,20 @@ Probe the boundary directly, not just the verbs you happen to know about:
 ### R-21 — An unrepairable environment limit is never reported as repairable drift
 
 A status carries a promised remedy. `[drift]`/`[missing]` mean "re-run
-`dadaia public install`"; if install cannot possibly repair the condition, that status is a
+`.dadaia/.venv/bin/dadaia public install`"; if install cannot possibly repair the condition, that status is a
 lie that sends the consumer into an infinite repair loop and fails `reconcile` with
 `rollback_required`. Two known limits, both real on hardened hosts:
 
 - **A `noexec` `KIMI_CODE_HOME`.** Point `KIMI_CODE_HOME` at a directory on a `noexec`
-  mount (a tmpfs `/tmp` is the common case), run `dadaia harness add kimi-code`,
-  then `dadaia public doctor`. **PASS if:** the four `kimi-code:hooks/*.sh` lines are
+  mount (a tmpfs `/tmp` is the common case), run `.dadaia/.venv/bin/dadaia harness add kimi-code`,
+  then `.dadaia/.venv/bin/dadaia public doctor`. **PASS if:** the four `kimi-code:hooks/*.sh` lines are
   `[unsupported]`, name the `noexec` mount as the cause and `KIMI_CODE_HOME` as the remedy,
-  `public doctor` exits 0, and `dadaia reconcile --expect-version <ver>` succeeds. **FAIL
+  `public doctor` exits 0, and `.dadaia/.venv/bin/dadaia reconcile --expect-version <ver>` succeeds. **FAIL
   if** any line reads `[drift]`/`[missing]`, or `reconcile` reports `rollback_required` —
   reinstalling cannot clear a mount flag, so the run would never converge.
 - **The repairable boundary must survive.** `chmod 0o644` one shim on a NORMAL filesystem
   and re-run the doctor. **PASS if** it reads `[drift] … (not executable)` and a plain
-  `dadaia harness add kimi-code` clears it. Turning every executability failure
+  `.dadaia/.venv/bin/dadaia harness add kimi-code` clears it. Turning every executability failure
   into `[unsupported]` is the opposite defect and also a FAIL.
 
 Generalize while you sweep: any doctor/gate line that prescribes a remedy must be a remedy

@@ -5,7 +5,7 @@ projects.
 
 ## The paradigm
 
-<!-- derived-from: product-vision sha256:164c4a8b0eca -->
+<!-- derived-from: product-vision sha256:16060412dc8a -->
 
 A workspace is one folder, and the agent session launches at its root, always.
 Projects live in repos inside it — `repos/<slug>/`. Governance lives outside every
@@ -21,13 +21,13 @@ single-repo context is the minimal case of the multi-repo one.
 
 ## The unit is the context
 
-<!-- derived-from: spec-context-project sha256:15dae861d543 -->
+<!-- derived-from: spec-context-project sha256:4984ba691799 -->
 
 A context — a Spec Context Project — is one canonical `specs/` tree owned by one main
 repository: the unit for memory, backlog, bugs, releases, reports and handoffs. A
 product spanning several repositories is still one project: the context carries
-associated repositories, added by `dadaia context repo add` and removed by
-`dadaia context repo remove`, which live and die with it.
+associated repositories, added by `.dadaia/.venv/bin/dadaia context repo add` and removed by
+`.dadaia/.venv/bin/dadaia context repo remove`, which live and die with it.
 
 The asymmetry is deliberate:
 
@@ -36,7 +36,7 @@ The asymmetry is deliberate:
 - specs, bind, memory, releases and backlog resolve from the main repo alone — an
   associated repo's own `specs/` is never read.
 
-`dadaia context bind <ctx>` selects a context and nothing else, changing only the
+`.dadaia/.venv/bin/dadaia context bind <ctx>` selects a context and nothing else, changing only the
 caller's own session record; a session without a harness-native id carries the binding
 in `DADAIA_CONTEXT`. The bind carries a scope — the main repo plus its associated
 repos — and a bound session's MUTATING write into a repo another context owns is
@@ -45,8 +45,8 @@ scope-judged.
 
 ## Ten repositories, one law
 
-<!-- derived-from: product-vision sha256:164c4a8b0eca -->
-<!-- derived-from: spec-context-project sha256:15dae861d543 -->
+<!-- derived-from: product-vision sha256:16060412dc8a -->
+<!-- derived-from: spec-context-project sha256:4984ba691799 -->
 
 A team with ten repositories does not maintain ten copies of anything:
 

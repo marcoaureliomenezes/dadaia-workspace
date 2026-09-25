@@ -19,7 +19,6 @@ from dadaia_workspace.core.doctor_rules import Rule
 from dadaia_workspace.core.kernel_tunables import (
     AUDIT_SCRIPT,
     BACKLOG_SCRIPT,
-    DADAIA_BIN,
     MEMORY_SCRIPT,
 )
 from dadaia_workspace.features.specs import doctor_adr
@@ -45,7 +44,7 @@ def _rule(
     codes: tuple[str, ...],
     run: Callable[[SpecsDoctor], list[SpecsDoctorIssue]],
     fix: Callable[[SpecsDoctor, SpecsDoctorIssue], None] | None = None,
-    fix_help: str | None = None,
+    fix_help: str | tuple[str, ...] | None = None,
 ) -> SpecsRule:
     """Bind ``section="specs"`` once instead of on every row."""
     return Rule(codes, SECTION, run, fix, fix_help)
@@ -66,7 +65,7 @@ RULES: tuple[SpecsRule, ...] = (
         ("MEM-PLACEHOLDER-1",),
         lambda d: d._memory.check_placeholder_atoms(),
         fix=lambda d, i: d._memory.fix_placeholder_atom(i),
-        fix_help=f"{DADAIA_BIN} doctor --fix",
+        fix_help=("doctor", "--fix"),
     ),
     _rule(
         ("AGENTS-PLACEHOLDER-1",),
@@ -112,7 +111,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("TREE-1",),
         lambda d: d._structural.check_tree1_foundation(),
-        fix_help=f"{DADAIA_BIN} specs upgrade --specs-dir <specs>",
+        # No fix line: no command migrates foundation/; operator consent. WARNING-only.
     ),
     _rule(
         ("TREE-2",),
@@ -129,13 +128,13 @@ RULES: tuple[SpecsRule, ...] = (
         ("TREE-4",),
         lambda d: d._structural.check_tree4_required_dirs(),
         fix=lambda d, i: d._structural.fix_tree4(i),
-        fix_help=f"{DADAIA_BIN} doctor --fix",
+        fix_help=("doctor", "--fix"),
     ),
     _rule(
         ("TREE-5",),
         lambda d: d._structural.check_tree5_agents_md(),
         fix=lambda d, i: d._structural.fix_tree5(i),
-        fix_help=f"{DADAIA_BIN} doctor --fix",
+        fix_help=("doctor", "--fix"),
     ),
     _rule(
         ("TREE-7",),
@@ -145,8 +144,9 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("TREE-8",),
         lambda d: d._structural.check_tree8_canon_root(),
-        fix=lambda d, i: d._structural.fix_tree8(i),
-        fix_help=f"{DADAIA_BIN} doctor --fix",
+        # Never auto-fixed (operator decision D8): content vs slop is the operator's call.
+        # Plain mv serves untracked files and paths with no canon home alike.
+        fix_help="mv <path> <canon path|outside specs/>",
     ),
     _rule(
         ("CAT-1",),
@@ -179,12 +179,18 @@ RULES: tuple[SpecsRule, ...] = (
         ("FIXED-1", "FIXED-2"),
         lambda d: d._memory.check_fixed_sections(d.public_dir),
         fix=lambda d, i: d._memory.fix_fixed_section(i, d.public_dir),
-        fix_help=f"{DADAIA_BIN} doctor --fix",
+        fix_help=("doctor", "--fix"),
     ),
     _rule(
         ("SPECS-VERSION",),
         lambda d: d._coherence.check_specs_pattern_version(),
-        fix_help=f"{DADAIA_BIN} specs upgrade --specs-dir <specs>",
+        fix_help=("specs", "upgrade", "--specs-dir", "<specs>"),
+    ),
+    _rule(
+        ("GITFLOW-1",),
+        lambda d: d._coherence.check_gitflow(),
+        # No flag: `specs init` keeps a valid block, else writes the detected gitflow.
+        fix_help=("specs", "init", "--specs-dir", "<specs>"),
     ),
     _rule(
         ("SPEC-DOC-024",),
@@ -220,7 +226,7 @@ RULES: tuple[SpecsRule, ...] = (
         ("SPEC-DOC-034",),
         lambda d: d._closure_audit.check_archive_dirs_exist(),
         fix=lambda d, i: d._closure_audit.fix_archive_dir(i),
-        fix_help=f"{DADAIA_BIN} doctor --fix",
+        fix_help=("doctor", "--fix"),
     ),
     _rule(
         ("SPEC-DOC-035",),
@@ -290,7 +296,7 @@ RULES: tuple[SpecsRule, ...] = (
         ("SPEC-DOC-046",),
         lambda d: d._release.check_release_state_filename(),
         fix=lambda d, i: d._release.fix_release_state_filename(i),
-        fix_help=f"{DADAIA_BIN} doctor --fix",
+        fix_help=("doctor", "--fix"),
     ),
 )
 

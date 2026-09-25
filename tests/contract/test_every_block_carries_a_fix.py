@@ -19,7 +19,7 @@ from __future__ import annotations
 import re
 import shlex
 import sys
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -27,16 +27,23 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core import doctor_rules
+from dadaia_workspace.core.cli_line import cli_path
+from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObject
+from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.chokepoints import push_gate_decision
-from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_refs
+from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_stdin
 from dadaia_workspace.features.specs.canon import canon_violations
 from dadaia_workspace.hooks import pre_gate
 
 _FIX_LINE_RE = re.compile(r"^fix: (\S.*)$", re.MULTILINE)
 
+#: The workspace CLI as a fix line spells it, relative to its root (``fix_line``).
+_CLI = str(cli_path(Path()))
+
 _SHA_A = "a" * 40
 _ZERO = "0" * 40
+_SHA_B = "b" * 40
 
 
 def _the_fix(message: str) -> str:
@@ -81,7 +88,11 @@ def _assert_one_command(command: str) -> None:
     the operator pastes. Prose ("author the missing document", "fix it and then push")
     does not: an agent cannot run it, so the BLOCK is a Stall with a friendly face.
     """
-    head = command.split()[0]
+    # Windows fix lines follow MSVCRT quoting (backslash paths), which POSIX shlex eats.
+    windows = bool(PLATFORM.venv_exe_suffix)
+    head = shlex.split(command, posix=not windows)[0].strip('"')
+    if head.endswith(_CLI):  # ``fix_line`` roots the CLI at the workspace it runs in
+        head = ".dadaia/.venv/bin/dadaia"
     assert head in _EXECUTABLE_TOKENS, (
         f"a fix line opens with an executable, not prose — got {head!r} in:\n{command}"
     )
@@ -152,14 +163,8 @@ class _FakeObjectSource:
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         return self.objects
 
-    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
-        return ()
-
-    def resolve_ref(self, repo: Path, ref: str) -> str | None:
-        return None
-
-    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]:
-        return set()
+    def publishes_nothing(self, repo: Path, sha: str) -> bool:
+        return False
 
 
 class _FailingObjectSource(_FakeObjectSource):
@@ -176,6 +181,7 @@ def _decide(
 ) -> str:
     decision = push_gate_decision(
         refs,
+        gitflow=DEFAULT,
         object_source=source or _FakeObjectSource(),
         repo=Path("/nonexistent-repo"),
         canon_violations_fn=canon_violations,
@@ -187,7 +193,7 @@ def _decide(
 
 
 def _refs(*lines: str) -> list[PushRef]:
-    return parse_push_refs("\n".join(lines))
+    return parse_push_stdin("\n".join(lines))[0]
 
 
 def test_push_gate_malformed_stdin_carries_a_runnable_fix() -> None:
@@ -197,8 +203,9 @@ def test_push_gate_malformed_stdin_carries_a_runnable_fix() -> None:
 @pytest.mark.parametrize(
     ("name", "line"),
     [
-        ("main", f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"),
-        ("develop", f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
+        ("main", f"refs/heads/main {_SHA_A} refs/heads/main {_SHA_B}"),
+        ("develop", f"refs/heads/develop {_SHA_A} refs/heads/develop {_SHA_B}"),
+        ("birth-with-content", f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
         ("invalid-name", f"refs/heads/wip/x {_SHA_A} refs/heads/wip/x {_ZERO}"),
         ("not-a-branch-head", f"refs/notes/x {_SHA_A} refs/notes/x {_ZERO}"),
         ("refspec", f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/develop {_ZERO}"),
@@ -282,7 +289,7 @@ def test_every_doctor_rule_renders_a_runnable_fix(
         message="synthetic finding",
         canonical=False,
         error=True,
-        fix=rule.fix_help,
+        fix=doctor_rules.rule_fix(rule, Path()),
     )
     assert_block_carries_a_runnable_fix(doctor_rules.render_finding(finding))
 
@@ -337,7 +344,11 @@ def _fix_lines() -> list[tuple[str, str]]:
     """Every doctor rule's fix line, plus the ledger scripts' own delegated fix."""
     from dadaia_workspace.infrastructure.ledger_scripts import LEDGER_SCRIPTS
 
-    lines = [(codes, rule.fix_help) for codes, rule in _DOCTOR_RULES if rule.fix_help]
+    lines = [
+        (codes, doctor_rules.rule_fix(rule, Path()))
+        for codes, rule in _DOCTOR_RULES
+        if rule.fix_help
+    ]
     lines.extend(
         (script.code, f"{script.invocation} check --specs specs") for script in LEDGER_SCRIPTS
     )
@@ -487,15 +498,13 @@ def test_every_fix_target_resolves_on_disk(codes: str, command: str) -> None:
     """
     import subprocess  # noqa: PLC0415 — a contract test executes the real script
 
-    from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
-
     unresolved = _unresolved_paths(command)
     assert unresolved == [], (
         f"{codes}: fix line names a path neither this repo nor the specs canon "
         f"carries: {unresolved} in {command!r}"
     )
 
-    if command.startswith(DADAIA_BIN) or command.startswith("dadaia "):
+    if command.startswith(_CLI) or command.startswith("dadaia "):
         tokens = command.split()[1:]
         assert _cli_tree_has(tokens), f"{codes}: no such verb: {command!r}"
         return

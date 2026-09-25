@@ -377,26 +377,18 @@ def certify(
         ),
     )
 
-    bare = run_root / "consumer.git"
+    bare = run_root / "certified-consumer.git"  # slug == context name
 
     def empty_remote() -> str:
         _git(process, run_root, "init", "--bare", str(bare))
-        cli(
-            "context",
-            "create",
-            "certified-consumer",
-            "--main-repo",
-            "certified-consumer",
-            "--url",
-            str(bare),
-        )
-        cli("context", "alive", "certified-consumer")
+        cli("context", "create", "certified-consumer", "--main-repo", str(bare))
         repo = target / "repos" / "certified-consumer"
         _git(process, repo, "config", "user.email", "certify@dadaia.invalid")
         _git(process, repo, "config", "user.name", "dadaia-certify")
-        cli("context", "baseline", "certified-consumer", "--yes", "--push")
+        cli("specs", "init", "--context", "certified-consumer")
+        cli("context", "baseline", "certified-consumer")
         _git(process, repo, "rev-parse", "--verify", "HEAD")
-        return "empty remote materialized, scaffolded, committed, and pushed"
+        return "empty remote cloned, specs initialized, baseline committed and pushed"
 
     check("context-empty-remote-baseline", empty_remote)
 

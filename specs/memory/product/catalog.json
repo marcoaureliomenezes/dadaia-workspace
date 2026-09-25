@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-23T03:22:58Z",
+  "generated_at": "2026-09-25T03:51:13Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -40,7 +40,7 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 536,
+      "token_estimate": 639,
       "depends_on": [
         "agentic-entities",
         "agent-comms",
@@ -72,12 +72,12 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 838,
+      "token_estimate": 892,
       "depends_on": [
         "agent-orchestration",
         "sdd-gate-v3",
-        "public-asset-distribution",
         "QUALITY",
+        "public-asset-distribution",
         "ARCHITECTURE"
       ],
       "sources": [
@@ -92,8 +92,8 @@
       "slug": "public-asset-distribution",
       "title": "public-asset-distribution",
       "area": "distribution",
-      "tldr": "Public assets staged once, projected into the root map, scoped AGENTS.md, .agents/ and each registered harness's files; doctor reports drift.",
-      "summary": "The stage, install and doctor chain that distributes the agentic surface into a workspace — hash-compared overwrite, rendered personas, whole-folder skills, per-harness hook and agent files derived from one registry, the specs scaffold, and a privacy gate; plus the dadaia-skills repository built from the same skills.",
+      "tldr": "Public assets staged once, projected into the root map, scoped AGENTS.md, .agents/ and each harness's files, with scaffold and scripts; doctor reports drift.",
+      "summary": "The stage, install and doctor chain that distributes the agentic surface into a workspace — hash-compared overwrite, rendered personas, whole-folder skills, per-harness hook and agent files derived from one registry, the specs scaffold, and a privacy gate.",
       "path": "specs/memory/product/distribution/public-asset-distribution.md",
       "tags": [
         "public",
@@ -102,13 +102,16 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 819,
+      "token_estimate": 959,
       "depends_on": [
         "harness-kimi-code",
         "agentic-entities",
         "workspace-init",
         "workspace-doctor",
+        "specs-migration",
         "context-management",
+        "sdd-gate-v3",
+        "consumer-agent-support",
         "pypi-distribution"
       ],
       "sources": [
@@ -125,7 +128,7 @@
         "dadaia_workspace/core/harness_registry.py",
         "dadaia_workspace/public/scaffold/**",
         "dadaia_workspace/public/templates/**",
-        "dadaia_workspace/public/scripts/build-skills-repo.py",
+        "dadaia_workspace/public/scripts/**",
         "dadaia_workspace/cli/commands/public.py"
       ]
     },
@@ -134,8 +137,8 @@
       "slug": "pypi-distribution",
       "title": "pypi-distribution",
       "area": "distribution",
-      "tldr": "The PyPI package on one version axis, two console-script names, the OIDC pipeline that also publishes the skills repo, the wheel contract and the docs site.",
-      "summary": "dadaia-workspace publishes to PyPI under OIDC trusted publishing from the release-please workflow; release-please owns the version, the CHANGELOG and the tag, pyproject carries the published floor, and the same release publishes the dadaia-skills repository.",
+      "tldr": "The PyPI package on one version axis, two console-script names, the OIDC pipeline, the wheel contract and the docs folder.",
+      "summary": "dadaia-workspace publishes to PyPI under OIDC trusted publishing from the release-please workflow; release-please owns the version, the CHANGELOG and the tag, and pyproject carries the published floor.",
       "path": "specs/memory/product/distribution/pypi-distribution.md",
       "tags": [
         "distribution",
@@ -143,7 +146,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 598,
+      "token_estimate": 761,
       "depends_on": [
         "release-lifecycle",
         "public-asset-distribution",
@@ -173,7 +176,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 433,
+      "token_estimate": 410,
       "depends_on": [
         "agent-orchestration",
         "agentic-entities",
@@ -202,12 +205,12 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 366,
+      "token_estimate": 339,
       "depends_on": [
         "agentic-entities",
-        "public-asset-distribution",
         "sdd-gate-v3",
-        "agent-orchestration"
+        "agent-orchestration",
+        "public-asset-distribution"
       ],
       "sources": [
         "dadaia_workspace/core/harness_registry.py",
@@ -312,12 +315,12 @@
         "hooks",
         "binding"
       ],
-      "token_estimate": 355,
+      "token_estimate": 329,
       "depends_on": [
         "agentic-entities",
-        "public-asset-distribution",
         "sdd-gate-v3",
         "context-management",
+        "public-asset-distribution",
         "workspace-init"
       ],
       "sources": [
@@ -339,7 +342,7 @@
         "paradigm",
         "pillars"
       ],
-      "token_estimate": 605,
+      "token_estimate": 679,
       "depends_on": [
         "spec-context-project",
         "context-management",
@@ -376,10 +379,11 @@
         "lifecycle",
         "concurrency"
       ],
-      "token_estimate": 316,
+      "token_estimate": 439,
       "depends_on": [
-        "sdd-gate-v3",
         "context-management",
+        "specs-migration",
+        "sdd-gate-v3",
         "ARCHITECTURE"
       ],
       "sources": [
@@ -455,7 +459,7 @@
         "release-gate",
         "sdd"
       ],
-      "token_estimate": 343,
+      "token_estimate": 370,
       "depends_on": [
         "pypi-distribution",
         "workspace-init",
@@ -477,8 +481,8 @@
       "slug": "context-management",
       "title": "context-management",
       "area": "platform",
-      "tldr": "ALIVE/DEAD registry of one main repo plus N associated repos; one resolution per call; a bind names the session's scope and drives memory injection.",
-      "summary": "Spec Context Projects and their repos through one registry and the context verbs; one resolution authority whose Bind carries the session's scope; bind-driven injection of the tech stack, catalog and help digests; redaction at the render boundary.",
+      "tldr": "ALIVE/DEAD registry of a main repo plus associated repos; create clones, hooks, ALIVEs and binds in one step; a bind names the session's scope.",
+      "summary": "Spec Context Projects and their repos through one registry and the context verbs — create as onboarding level 2, alive, dead, baseline, the repo set; one resolution authority whose Bind carries the session's scope; bind-driven injection of the tech stack, catalog and help digests; redaction at the render boundary.",
       "path": "specs/memory/product/platform/context-management.md",
       "tags": [
         "context",
@@ -486,14 +490,14 @@
         "session",
         "privacy"
       ],
-      "token_estimate": 861,
+      "token_estimate": 1440,
       "depends_on": [
         "specs-migration",
+        "workspace-init",
         "workspace-doctor",
         "sdd-gate-v3",
         "context-portability",
         "spec-context-project",
-        "workspace-init",
         "QUALITY"
       ],
       "sources": [
@@ -523,7 +527,7 @@
         "import",
         "portability"
       ],
-      "token_estimate": 310,
+      "token_estimate": 321,
       "depends_on": [
         "workspace-doctor",
         "context-management"
@@ -596,19 +600,21 @@
       "slug": "specs-migration",
       "title": "specs-migration",
       "area": "platform",
-      "tldr": "dadaia specs upgrade walks a specs/ tree from pattern 6 to the canonical 7 and repairs template leftovers; dadaia migrate lifts a v1 context registry to v2.",
-      "summary": "The two upgrade verbs for existing state — dadaia specs upgrade (one live hop, 6 to 7, folding memory/TECHSTACK.md into ARCHITECTURE.md, plus lossless template repairs; below 6 it refuses without writing) and dadaia migrate (spec_contexts.json v1 to v2, planned, confirmed, atomic).",
+      "tldr": "specs init brings specs/ to the canon (scaffold, upgrade, or specs-bkp on consent), never committing; specs upgrade walks 6 to 7; migrate lifts registry v1.",
+      "summary": "The verbs that bring persisted state up to what this installation reads — dadaia specs init (onboarding level 3; absent scaffolds, dadaia upgrades, foreign moves to specs-bkp/), dadaia specs upgrade (one live hop, 6 to 7, plus fixed law sections and lossless template repairs; below 6 it refuses without writing) and dadaia migrate (spec_contexts.json v1 to v2, planned, confirmed, atomic).",
       "path": "specs/memory/product/platform/specs-migration.md",
       "tags": [
         "migration",
         "upgrade",
         "specs",
-        "registry"
+        "registry",
+        "onboarding"
       ],
-      "token_estimate": 420,
+      "token_estimate": 806,
       "depends_on": [
-        "workspace-doctor",
+        "public-asset-distribution",
         "context-management",
+        "workspace-doctor",
         "spec-context-project"
       ],
       "sources": [
@@ -637,15 +643,15 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 1270,
+      "token_estimate": 1488,
       "depends_on": [
         "public-asset-distribution",
         "context-management",
+        "workspace-init",
         "QUALITY",
         "sdd-gate-v3",
         "release-lifecycle",
         "specs-migration",
-        "workspace-init",
         "audits-canon"
       ],
       "sources": [
@@ -666,21 +672,25 @@
       "slug": "workspace-init",
       "title": "workspace-init",
       "area": "platform",
-      "tldr": "Idempotent bootstrap — dadaia init <dir> --harness <name> [--repo <url>] — venv, zones, law, one harness; with --repo the first context ALIVE and bound.",
-      "summary": "dadaia init takes a required directory and one registered harness, provisions the venv, the registry's init/install zones, the shared skills root and that harness's projection, seeds the states and the harness profile, stages and installs public assets; with --repo it clones the first repo, makes it ALIVE, binds it and installs the pre-push hook. dadaia harness add extends the roster later.",
+      "tldr": "Level 1 — uvx dadaia-workspace init [DIR] provisions venv, zones, law, one harness; re-init upgrades; --repo adds level 2; next step derived from disk.",
+      "summary": "dadaia init fills one plan from flags or TTY prompts, provisions the venv, the registry's init/install zones, the shared skills root and one harness's projection, seeds the states and stages and installs public assets in at most twelve lines of output naming the absolute venv CLI; on an existing workspace it upgrades an older venv, reports an equal one and refuses a newer one; with --repo it delegates to context create; every onboarding caller prints the one derived next step.",
       "path": "specs/memory/product/platform/workspace-init.md",
       "tags": [
         "workspace",
         "init",
         "setup",
-        "idempotent"
+        "upgrade",
+        "onboarding"
       ],
-      "token_estimate": 471,
+      "token_estimate": 1247,
       "depends_on": [
+        "context-management",
+        "specs-migration",
+        "audits-canon",
         "workspace-doctor",
         "public-asset-distribution",
         "server-registry",
-        "context-management",
+        "harness-kimi-code",
         "cross-platform-portability"
       ],
       "sources": [
@@ -708,10 +718,11 @@
         "decisions",
         "governance"
       ],
-      "token_estimate": 728,
+      "token_estimate": 849,
       "depends_on": [
         "agent-orchestration",
         "sdd-gate-v3",
+        "workspace-init",
         "bug-ledger",
         "workspace-doctor",
         "release-lifecycle"
@@ -767,13 +778,13 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 864,
+      "token_estimate": 960,
       "depends_on": [
         "workspace-doctor",
         "agent-comms",
+        "release-lifecycle",
         "agent-orchestration",
-        "audits-canon",
-        "release-lifecycle"
+        "audits-canon"
       ],
       "sources": [
         "dadaia_workspace/public/skills/dd-bug-resolution/**",
@@ -788,17 +799,18 @@
       "slug": "release-lifecycle",
       "title": "release-lifecycle",
       "area": "sdd",
-      "tldr": "One live release grown by closed-scope candidates; release.py moves _RELEASE.json; closure is gated on a memory reconciliation; promote merges the release PR.",
-      "summary": "The release lifecycle — one live release directory whose _RELEASE.json state document is written by release.py (new, phase, memory, check), candidates that each define, implement and close a SPEC/PLAN/TASKS trio at the release root, the memory reconciliation gate at closure, and promotion by merging the release PR release-please opens.",
+      "tldr": "Closed-scope candidates grow one live release, each defined from an as-is review; release.py writes _RELEASE.json; memory gates closure; promote merges a PR.",
+      "summary": "The release lifecycle — one live release directory whose _RELEASE.json state document is written by release.py (new, phase, memory, check), candidates that each review the as-is units their demand touches, then define, implement and close a SPEC/PLAN/TASKS trio at the release root, the structural PLAN §1 check at IMPLEMENTATION, the memory reconciliation gate at closure, and promotion by merging the release PR release-please opens.",
       "path": "specs/memory/product/sdd/release-lifecycle.md",
       "tags": [
         "sdd",
         "release",
         "candidate",
         "lifecycle",
-        "memory"
+        "memory",
+        "as-is-review"
       ],
-      "token_estimate": 976,
+      "token_estimate": 1781,
       "depends_on": [
         "sdd-gate-v3",
         "backlog-ledger",
@@ -834,7 +846,7 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 960,
+      "token_estimate": 1118,
       "depends_on": [
         "workspace-doctor",
         "context-management",
@@ -842,6 +854,7 @@
         "ARCHITECTURE"
       ],
       "sources": [
+        ".github/dependabot.yml",
         ".github/workflows/ci.yml",
         "dadaia_workspace/hooks/__init__.py",
         "dadaia_workspace/hooks/pre_gate.py",

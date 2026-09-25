@@ -33,6 +33,7 @@ already pinned implicitly.
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -40,14 +41,20 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core import session_store
+from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.invocation import alive_context_trees
+from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.features.workspace.onboarding import next_step
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+
+_CLI = Path(".dadaia", ".venv", PLATFORM.venv_scripts_dir, f"dadaia{PLATFORM.venv_exe_suffix}")
 
 
 def _ws(tmp_path: Path, slug: str = "ctx", *, with_memory: bool = True) -> Path:
     states = tmp_path / ".dadaia" / "states"
     states.mkdir(parents=True)
     (states / "spec_contexts.json").write_text(
-        json.dumps({"contexts": [{"repo_slug": slug, "state": "alive"}]}),
+        json.dumps({"contexts": [{"name": slug, "repo_slug": slug, "state": "alive"}]}),
         encoding="utf-8",
     )
     specs = tmp_path / "repos" / slug / "specs"
@@ -67,7 +74,7 @@ def _add_context(tmp_path: Path, slug: str, *, with_memory: bool = True) -> None
     """Add a second ALIVE context + its memory to an already-built workspace."""
     states = tmp_path / ".dadaia" / "states"
     data = json.loads((states / "spec_contexts.json").read_text(encoding="utf-8"))
-    data["contexts"].append({"repo_slug": slug, "state": "alive"})
+    data["contexts"].append({"name": slug, "repo_slug": slug, "state": "alive"})
     (states / "spec_contexts.json").write_text(json.dumps(data), encoding="utf-8")
     specs = tmp_path / "repos" / slug / "specs"
     specs.mkdir(parents=True)
@@ -143,7 +150,7 @@ def _setup_unbound_session_lists_alive_contexts(tp: Path) -> None:
 def _setup_no_alive_context_still_generic(tp: Path) -> None:
     (tp / ".dadaia" / "states").mkdir(parents=True)
     (tp / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        json.dumps({"contexts": [{"repo_slug": "x", "state": "dead"}]}),
+        json.dumps({"contexts": [{"name": "x", "repo_slug": "x", "state": "dead"}]}),
         encoding="utf-8",
     )
 
@@ -162,7 +169,14 @@ def _assert_lists_alive_contexts(out: str) -> bool:
 
 
 def _assert_no_alive_context_still_generic(out: str) -> bool:
-    return "[no bound context]" in out and "end memory bootstrap" not in out
+    # 0.4.8 AC6.2: zero contexts is never `[no bound context]` alone — the doctor's step.
+    return (
+        "[no bound context]" in out
+        and "end memory bootstrap" not in out
+        and "\nNext (command step context): no ALIVE Spec Context" in out
+        and os.sep + fix_line(Path(), "context", "create", "<name>", "--main-repo", "<clone-url>")
+        in out
+    )
 
 
 def _setup_foreign_session_bind_never_leaks(tp: Path) -> None:
@@ -407,8 +421,8 @@ def test_env_context_beats_own_session_record(tmp_path: Path) -> None:
         json.dumps(
             {
                 "contexts": [
-                    {"repo_slug": "ctx", "state": "alive"},
-                    {"repo_slug": "other", "state": "alive"},
+                    {"name": "ctx", "repo_slug": "ctx", "state": "alive"},
+                    {"name": "other", "repo_slug": "other", "state": "alive"},
                 ]
             }
         ),
@@ -464,3 +478,17 @@ def test_emissions_attach_the_derived_help_digest(tmp_path: Path) -> None:
     )
     out = _run(tmp_path, "sess-digest")
     assert "# dadaia CLI digest" in out
+
+
+def test_bound_session_carries_the_onboarding_next_step(tmp_path: Path) -> None:
+    """AC1.5 + session-start-bound-session-omits-onboarding-next-step: the bound path
+    prints exactly the step text ``doctor`` reports (the one helper both paths call)."""
+    _ws(tmp_path)
+    _bind_session(tmp_path, "sb", "ctx")
+
+    out = _run(tmp_path, "sb")
+
+    assert out.startswith("[ctx]\n")
+    step = next_step(tmp_path, alive_context_trees(tmp_path), "ctx", "sb")
+    assert step is not None and step.id == "specs"
+    assert f"\n{step.text()}\n" in out

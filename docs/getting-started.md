@@ -5,31 +5,35 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
-<!-- derived-from: workspace-init sha256:ca5c835e94af -->
+<!-- derived-from: pypi-distribution sha256:618098346ed6 -->
+<!-- derived-from: workspace-init sha256:aa1f033df140 -->
 
 ```bash
-python -m venv .venv && .venv/bin/pip install dadaia-workspace
+uvx dadaia-workspace init <dir> --harness claude --repo <url>
 ```
 
-`pip install dadaia-workspace` installs the library and one CLI under two
-console-script names, `dadaia` and `dadaia-workspace`; `uvx dadaia-workspace init
-<dir> --harness <name> --repo <url>` runs the next step without an install. The wheel
-ships `dadaia_workspace/` with the full public asset tree, so the next step works
-offline from a bare install. The workspace you create keeps its own virtualenv at
-`.dadaia/.venv`, which `dadaia init` provisions.
+Onboarding has three levels — workspace, project, specs — and the first two are this
+one line (needs uv; `pip install dadaia-workspace` into any venv gives the same `init`,
+under two console-script names, `dadaia` and `dadaia-workspace`). The wheel ships
+`dadaia_workspace/` with the full public asset tree; `init` resolves the workspace
+venv's dependencies from PyPI, so it needs network access. From then on every command
+runs through the workspace's own CLI, `.dadaia/.venv/bin/dadaia`, which `init` prints
+by its absolute path.
 
-## Provision the workspace — `dadaia init`
+**Upgrade:** re-run the same `uvx dadaia-workspace init <dir> --harness <name>` line;
+it prints `upgraded A -> B`, or `already at A` when the workspace is current. The upgrade
+never writes a project repo: `.dadaia/.venv/bin/dadaia specs init --context <ctx>` then
+refreshes each project's specs law.
 
-<!-- derived-from: workspace-init sha256:ca5c835e94af -->
+## Level 1 — the workspace
 
-```bash
-dadaia init <dir> --harness claude|codex|kimi-code|cursor|devin|copilot [--repo <url>] [--skip-assets]
-```
+<!-- derived-from: workspace-init sha256:aa1f033df140 -->
 
-`init` is the only verb that works on an empty directory. `<dir>` is required —
-created if absent, refused with one `fix:` line if it holds a foreign tree, never
-resolved from the cwd — and a re-run is idempotent. It lays down:
+`uvx dadaia-workspace init <dir> --harness claude|codex|kimi-code|cursor|devin|copilot
+[--repo <url>] [--associated-repo <url>]… [--skip-assets]` is the only verb that works
+on an empty directory. `<dir>` is created if absent, refused with one `fix:` line if it
+holds a foreign tree, never resolved from the cwd; every `fix:` line repeats the
+invocation's `--repo` and `--associated-repo` flags. It lays down:
 
 - `.dadaia/.venv`, every `.dadaia/` zone whose creator is init or install, and
   `.agents/skills`; the harness's own directory comes from its projection. The tree is
@@ -40,49 +44,60 @@ resolved from the cwd — and a re-run is idempotent. It lays down:
   harness merges into it, never narrowing it.
 - Unless `--skip-assets`, the staged and installed public assets — the one writer of
   every hook wiring. With `--skip-assets` the output warns that the workspace is
-  ungated until `dadaia public install` runs.
+  ungated until `.dadaia/.venv/bin/dadaia public install` runs.
 
-With `--repo <url>`, `init` clones the repo into `repos/<slug>/` and composes the
-context verbs — `create --main-repo <slug>`, `alive`, the session bind, printing the
-`--print-env` line — then installs the pre-push hook. A re-run with the same URL reuses
-the context, and a failed clone prints the same command as its `fix:`. Without
-`--repo`, `init` closes with three lines: sessions launch at the root, the harness's
-law-loading note, and the `dadaia context create <name> --main-repo <slug>` that makes
-the first project. `init` deletes no projection; `dadaia harness add <name>` adds a
-harness later and `dadaia harness list` reads the roster.
+`init` deletes no projection; `.dadaia/.venv/bin/dadaia harness add <name>` adds a
+harness later and `.dadaia/.venv/bin/dadaia harness list` reads the roster.
 
-## Bind a context — `dadaia context bind`
+## Level 2 — the project
 
-<!-- derived-from: spec-context-project sha256:15dae861d543 -->
-<!-- derived-from: context-management sha256:0227a5e43894 -->
+<!-- derived-from: spec-context-project sha256:4984ba691799 -->
+<!-- derived-from: context-management sha256:3f48eef447f1 -->
 
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
 owned by one main repository, optionally spanning associated repositories that live and
 die with it. Specs, bind, memory, releases and backlog resolve only from the main repo.
+`init --repo <url>` creates the first one; every later one is one step:
 
 ```bash
-dadaia context create <ctx> --main-repo <slug> # registers it DEAD
-dadaia context alive <ctx>                     # clones the repos, folds the canon scaffold over specs/
-dadaia context bind <ctx>                      # this session's scope
-dadaia context show <ctx> --json               # the repo set
+.dadaia/.venv/bin/dadaia context create --main-repo <url> [--associated-repo <url>]
+.dadaia/.venv/bin/dadaia context show <ctx> --json   # the repo set
 ```
 
-`dadaia context alive` clones every missing repo; the main repo alone gets the canon
-scaffold folded over `specs/`, never overwriting a file. `bind` writes exactly one
-record, `.dadaia/sessions/<session-id>.json` (context, runtime, pid, `bound_at`), and
-acquires nothing; `--print-env` emits `DADAIA_CONTEXT` and `DADAIA_SESSION_ID` for an
-`eval $(…)` shell, and a session without a harness-native id carries the binding in
-`DADAIA_CONTEXT`. The bind's scope is the context's main repo plus its associated
-repos; a bound session's MUTATING write into a repo another context owns is refused
-with the bind that would allow it. After a bind, the ctx-inject hook injects the context
-header, `ARCHITECTURE.md`'s `## Tech Stack` section and the memory catalog digest once.
+`context create` clones (or adopts) every repo, installs the pre-push hook and makes
+the context ALIVE — it never binds; on failure nothing is left behind. The name
+defaults to the main repo's slug. `bind` writes exactly one record,
+`.dadaia/sessions/<session-id>.json` (context, runtime, pid, `bound_at`), and acquires
+nothing; `.dadaia/.venv/bin/dadaia context bind <ctx> --print-env` emits
+`DADAIA_CONTEXT` and `DADAIA_SESSION_ID` for an `eval $(…)` shell, and a session
+without a harness-native id carries the binding in `DADAIA_CONTEXT`. The bind's scope
+is the context's main repo plus its associated repos; a bound session's MUTATING write
+into a repo another context owns is refused with the bind that would allow it. After a
+bind, the ctx-inject hook injects the context header, `ARCHITECTURE.md`'s
+`## Tech Stack` section and the memory catalog digest once.
 
-## Check compliance — `dadaia doctor`
+## Level 3 — the specs
 
-<!-- derived-from: workspace-doctor sha256:ef9c81d0d181 -->
+<!-- derived-from: spec-context-project sha256:4984ba691799 -->
 
 ```bash
-dadaia doctor --context <ctx> [--json] [--fix] [--redact]
+.dadaia/.venv/bin/dadaia specs init --context <ctx> [--replace-foreign]
+```
+
+`specs init` (3a) brings the main repo's `specs/` to the canon and never commits: an
+absent tree is scaffolded, a dadaia tree is upgraded and its missing files filled, and a
+foreign `specs/` is moved to `specs-bkp/` (`git mv`, staged) after consent —
+`--replace-foreign` gives it without asking. The `dd-audit-project` first pass (3b) fills
+memory and is done when memory holds real content (`memory.py check` exit 0), never by a
+stamp. `context baseline <ctx>` (3c) publishes the principal, integration and work
+branches; a re-run is a no-op.
+
+## Check compliance — `doctor`
+
+<!-- derived-from: workspace-doctor sha256:3fa0c321c7b0 -->
+
+```bash
+.dadaia/.venv/bin/dadaia doctor --context <ctx> [--json] [--fix] [--redact]
 ```
 
 `doctor` is the one instance validator, and three sections run in fixed order:
@@ -92,8 +107,9 @@ backlog document, the ADR ledger and the ledger scripts' own `check`).
 
 The `specs` and `ledgers` tree resolves from `--context`, `--specs-dir` or the bound
 context; with none, those sections are empty and `workspace` still runs. With no
-instance around — CI over a checkout — `dadaia doctor --specs-dir specs --source-root .`
-runs the two tree sections.
+instance around — CI over a checkout — `.dadaia/.venv/bin/dadaia doctor --specs-dir specs --source-root .`
+runs the two tree sections; any other run outside a workspace exits 1 with one
+workspace-not-found error whose `fix:` is `cd <root>` of the running CLI's own workspace.
 
 Every printed finding is one `<CODE> <verdict> <message>` line, every error-class
 finding carries one `fix: <command>` line, and any error-class finding exits 1. There
@@ -104,9 +120,9 @@ a TTL expired.
 
 ## Run the first candidate
 
-<!-- derived-from: release-lifecycle sha256:09607348cc88 -->
+<!-- derived-from: release-lifecycle sha256:ebb8441fde08 -->
 <!-- derived-from: backlog-ledger sha256:46382434daf2 -->
-<!-- derived-from: bug-ledger sha256:9534ded07707 -->
+<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
 
 A candidate is one closed-scope cycle inside the live release. Nothing drives it: the
 documents are the state, the ledger scripts move the records, and the markers in
@@ -120,11 +136,16 @@ documents are the state, the ledger scripts move the records, and the markers in
    `python3 .agents/skills/dd-release-implementation/scripts/release.py new <M.m.p>`
    writes a `SPEC.md` stub and `_RELEASE.json` in `DEFINITION` under
    `specs/releases/<M.m.p>/`, all or nothing, refusing a second live release.
-3. **Define the candidate.** The picked set, the mandatory grill, then `SPEC.md`,
-   `PLAN.md` and `TASKS.md` at the release root, in one definition commit on
-   `feature/<M.m.p>`.
+3. **Define the candidate.** The picked set; the as-is review — one row per unit the
+   set touches, `unit | today | bugs | verdict | why`, the As-is verdict DELETE,
+   REBUILD, UPDATE or KEEP, then ADD only for what no unit can carry; the mandatory
+   grill; then `SPEC.md` (its `Replaces` naming what DELETE/REBUILD rows remove),
+   `PLAN.md` (opening with that table as §1) and `TASKS.md` at the release root, in one
+   definition commit on the work branch (`<work>M.m.p`; the names are the
+   `gitflow:` block of `specs/constitution.md`).
 4. **Open implementation.** `release.py phase IMPLEMENTATION --sha <sha>` requires all
-   three files `**Status:** Approved` and stamps `defined`.
+   three files `**Status:** Approved` and PLAN's As-is review table, and stamps
+   `defined`.
 5. **Implement one task at a time.** Reserve it `[-]` in its own commit, work
    test-first, run the local CI preflight, and mark `[x]` only after the reviewer's
    `APPROVED` on the same commit.
@@ -132,10 +153,10 @@ documents are the state, the ledger scripts move the records, and the markers in
    or `[-]` marker and stamps `implemented`. Then, in order: memory reconciliation, the
    closure `log` entries, the disposition sweep (`backlog.py exit`,
    `audit.py disposition`/`close`, `bugs.py archive`), artifact GC, and the
-   `feature -> develop` PR merged green.
+   work -> integration PR merged green.
 7. **Continue or promote.** Continue: `release.py new` with the same id stacks the next
-   candidate, reopening `DEFINITION`. Promote: merge `develop` into `main`, then merge
-   the release PR release-please opens there — it owns the version, the CHANGELOG
+   candidate, reopening `DEFINITION`. Promote: merge the integration branch into the
+   principal, then merge the release PR release-please opens there — it owns the version, the CHANGELOG
    section and the tag, and the publish jobs run on it.
 
 A bug needs none of this: register, lineage, RED test, root-cause fix, GREEN, `resolve`

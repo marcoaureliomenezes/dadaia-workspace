@@ -78,7 +78,7 @@ def _evaluate_target(
 
     # PROTECTED short-circuit (sole fail-CLOSED path): no context work needed.
     if cls == gate_policy.PathClass.PROTECTED:
-        return gate_policy.evaluate(rel_path)
+        return gate_policy.evaluate(rel_path, root=effective_workspace)
 
     ctx = inv.context_name or ""
 
@@ -102,6 +102,7 @@ def _evaluate_target(
     target_owner = ctx if target_slug in owner_repos else None
     return gate_policy.evaluate(
         rel_path,
+        root=effective_workspace,
         bound_context=inv.bind.context_name,
         bound_repos=inv.bind.repos,
         target_slug=target_slug,

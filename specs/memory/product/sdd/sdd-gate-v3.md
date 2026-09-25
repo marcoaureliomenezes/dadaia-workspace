@@ -5,6 +5,7 @@ tldr: No-lock enforcement — three gate blocks (root entry, non-venv command, P
 summary: The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one executable fix line; the pre-push chokepoint enforces the branch contract, the specs canon and the denylist scan over every pushed object, and no CI job calls a model API — the security review is the reviewer's lens before each pull request.
 tags: [sdd, gate, hooks, enforcement, no-locks, privacy]
 sources:
+  - .github/dependabot.yml
   - .github/workflows/ci.yml
   - dadaia_workspace/hooks/__init__.py
   - dadaia_workspace/hooks/pre_gate.py
@@ -41,15 +42,17 @@ sources:
 
 ## Git chokepoints
 
-- `dadaia ci install-hook` installs `.git/hooks/pre-push`, which delegates to `dadaia ci push-gate-check`; `dadaia doctor` byte-compares the installed hook per ALIVE repo (`HOOKS-DRIFT-1`).
+- `.git/hooks/pre-push` delegates to `dadaia ci push-gate-check`; `dadaia context create` and `context alive` install it in every repo of the set where no hook exists, and `dadaia ci install-hook [--repo <path>] [--force]` installs it into the cwd's repo or the named one, exiting 1 on an existing hook unless `--force` ([[context-management]]); `dadaia doctor` byte-compares the installed hook per ALIVE repo (`HOOKS-DRIFT-1`, one per-repo `fix:` line).
 - Policy order, first refusal wins: branch policy — only `refs/heads/feature/<M.m.p>` pushed to the same remote name, `develop` and `main` refused; the `specs/` canon over every `specs/` path the range touches; the denylist scan. An unparseable stdin line refuses, naming `git push --no-verify` as the one bypass; empty stdin allows.
 - The security review is the `dd-code-reviewer` security lens on the PR head, run by the main thread before each pull request; no workflow calls a model API. `secret-scan.yml` runs gitleaks on every PR to `develop` and `main`.
+- CI's `pr-source-guard` admits into `main` only `develop` and the release-please release PR, and into `develop` only `feature/{M.m.p}` and Dependabot update branches; `.github/dependabot.yml` targets `develop`, so dependency updates reach `main` with the next promote.
 
 ### Push-range denylist scan
 
 - The push is the publication boundary: every tracked path is scanned with the full layer set, no path is exempt, and a fixture needing a secret shape composes it at runtime (`tests/helpers/privacy_fixtures.py`).
 - It reads only the objects the push would publish (`git rev-list --objects <local> --not <remote>`, `--not --remotes` fallback), tags included, before any network I/O; working tree, history and author headers are out of scope.
-- Terms come from the operator denylist (`$DADAIA_PRIVACY_DENYLIST` or `.dadaia/states/privacy_denylist.json`, never committed), the packaged structural baseline (`dadaia_workspace/infrastructure/data/privacy_baseline.json`) and the foreign names — registry context names, repo slugs and `repos/` directory names, minus the pushed repository's own.
+- Terms come from the operator denylist (`$DADAIA_PRIVACY_DENYLIST` or `.dadaia/states/privacy_denylist.json`, never committed) and the packaged structural baseline (`dadaia_workspace/infrastructure/data/privacy_baseline.json`); no context name, repo slug or `repos/` directory name is a term source, and the scan reads neither the context registry nor `repos/` — a private name is protected only by listing it in the operator denylist.
+- Each run prints its scan mode on stderr; with no operator denylist it is `baseline only`, naming both denylist locations.
 - A hit is amnestied only when the range has a resolvable base and the exact value was already published at the same path; a new path, a multi-path object, an oversized object and the fallback range are never amnestied.
 - The gate never reports coverage it did not achieve: a git failure or an unresolvable prior side refuses; a non-UTF-8 blob is skipped and counted, a blob over 5 MB is scanned to the cap.
 - The refusal names ref, path and line, short object sha, the term masked to `first…last` and the source layer — never the matched line or the unmasked term.

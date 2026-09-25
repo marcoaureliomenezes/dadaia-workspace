@@ -18,6 +18,7 @@ from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+from tests.fakes import seed_dead_context
 
 _runner = CliRunner()
 
@@ -101,8 +102,7 @@ def _session_record_for(workspace: Path, output: str) -> dict:
 
 
 def test_context_create_show_list_happy_lifecycle(workspace: Path) -> None:
-    result = _runner.invoke(app, ["context", "create", "alpha", "--main-repo", "alpha"])
-    assert result.exit_code == 0, result.output
+    seed_dead_context(workspace, "alpha", "alpha", "https://x.test/alpha.git")
 
     show = _runner.invoke(app, ["context", "show", "alpha", "--json"])
     assert show.exit_code == 0, show.output
@@ -136,7 +136,7 @@ def test_context_create_show_list_happy_lifecycle(workspace: Path) -> None:
             "dead_since": None,
             "name": "alpha",
             "main_repo": "alpha",
-            "repo_url": "",
+            "repo_url": "https://x.test/alpha.git",
             "state": "dead",
             "stored_branch": None,
         }
@@ -173,9 +173,11 @@ def test_context_error_matrix(workspace: Path, invoke_args: list[str]) -> None:
 
 def test_context_create_duplicate_and_dead_requires_alive(workspace: Path) -> None:
     """A duplicate create fails, and (AC-T10d-2) dead <name> fails if the context is
-    not ALIVE — both against the same freshly-created DEAD context."""
-    _runner.invoke(app, ["context", "create", "alpha", "--main-repo", "alpha"])
-    result = _runner.invoke(app, ["context", "create", "alpha", "--main-repo", "alpha"])
+    not ALIVE — both against the same DEAD context."""
+    seed_dead_context(workspace, "alpha", "alpha", "https://x.test/alpha.git")
+    result = _runner.invoke(
+        app, ["context", "create", "alpha", "--main-repo", "https://x.test/alpha.git"]
+    )
     assert result.exit_code != 0
 
     result = _runner.invoke(app, ["context", "dead", "alpha"])
@@ -455,61 +457,52 @@ def test_push_uses_set_upstream_when_no_tracking(tmp_path: Path) -> None:
     )
 
 
-def test_context_baseline_creates_and_pushes_initial_history(
-    workspace: Path, tmp_path: Path
-) -> None:
+def test_context_baseline_is_consent_by_invocation(workspace: Path, tmp_path: Path) -> None:
+    """AC4.2/AC4.7: no --yes/--push; one invocation publishes, a re-run is a no-op."""
     bare = tmp_path / "baseline.git"
     subprocess.run(["git", "init", "--bare", str(bare)], capture_output=True, check=True)
     repo = workspace / "repos" / "baseline"
     subprocess.run(["git", "clone", str(bare), str(repo)], capture_output=True, check=True)
-    subprocess.run(
-        ["git", "config", "user.email", "test@example.com"],
-        cwd=repo,
-        capture_output=True,
-        check=True,
-    )
-    subprocess.run(
-        ["git", "config", "user.name", "Test"],
-        cwd=repo,
-        capture_output=True,
-        check=True,
-    )
+    for key, value in (("user.email", "t@example.com"), ("user.name", "T")):
+        subprocess.run(["git", "config", key, value], cwd=repo, check=True)
     (repo / "specs").mkdir()
     (repo / "specs" / "constitution.md").write_text(
-        "---\nspecs_pattern_version: 4\n---\n", encoding="utf-8"
+        "---\nspecs_pattern_version: 6\n---\n", encoding="utf-8"
     )
     _register_alive_ctx(workspace, "baseline")
 
-    no_consent = _runner.invoke(app, ["context", "baseline", "baseline"])
-    assert no_consent.exit_code != 0
-    assert "--yes" in no_consent.output
-
-    result = _runner.invoke(app, ["context", "baseline", "baseline", "--yes", "--push"])
+    assert _runner.invoke(app, ["context", "baseline", "baseline", "--yes"]).exit_code != 0
+    result = _runner.invoke(app, ["context", "baseline", "baseline"])
     assert result.exit_code == 0, result.output
-    assert GitSubprocessClient().has_commits(repo) is True
-    remote_head = subprocess.run(
-        ["git", "--git-dir", str(bare), "rev-parse", "--verify", "HEAD"],
-        capture_output=True,
-        text=True,
-    )
-    assert remote_head.returncode == 0, remote_head.stderr
+    assert "published on feature/0.1.0" in result.output
+    again = _runner.invoke(app, ["context", "baseline", "baseline"])
+    assert again.exit_code == 0 and "already published" in again.output
 
-    # Bug baseline-refuses-alive-scaffold-commit: baseline is CONVERGENT — a repo
-    # that already carries history with a clean tree is success (idempotent no-op),
-    # not a refusal. alive() commits its own scaffold, so the canonical
-    # create -> alive -> baseline flow always reaches this state.
-    repeated = _runner.invoke(app, ["context", "baseline", "baseline", "--yes"])
-    assert repeated.exit_code == 0, repeated.output
 
-    repushed = _runner.invoke(app, ["context", "baseline", "baseline", "--yes", "--push"])
-    assert repushed.exit_code == 0, repushed.output
+def test_context_dead_surfaces_the_refused_push_with_its_fix_line(
+    workspace: Path, tmp_path: Path
+) -> None:
+    """T-048-11: a push the pre-push hook refuses reaches the operator verbatim — its
+    one ``fix:`` line included — instead of a bare "resolve the issue and retry"."""
+    bare = tmp_path / "refused.git"
+    subprocess.run(["git", "init", "--bare", str(bare)], capture_output=True, check=True)
+    repo = workspace / "repos" / "refused"
+    subprocess.run(["git", "clone", str(bare), str(repo)], capture_output=True, check=True)
+    for key, value in (("user.email", "t@example.com"), ("user.name", "T")):
+        subprocess.run(["git", "config", key, value], cwd=repo, check=True)
+    (repo / "README.md").write_text("x\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-qm", "init"], cwd=repo, check=True)
+    hook = repo / ".git" / "hooks" / "pre-push"
+    hook.write_text("#!/bin/sh\necho 'fix: git checkout -b feature/0.1.0' >&2\nexit 1\n")
+    hook.chmod(0o755)
+    _register_alive_ctx(workspace, "refused")
 
-    # A dirty tree on top of existing history is NOT a baseline situation —
-    # operator content must never be swept into a "baseline" commit.
-    (repo / "operator-notes.md").write_text("do not auto-commit me", encoding="utf-8")
-    dirty = _runner.invoke(app, ["context", "baseline", "baseline", "--yes"])
-    assert dirty.exit_code != 0
-    assert "already has Git history" in dirty.output
+    result = _runner.invoke(app, ["context", "dead", "refused"])
+
+    assert result.exit_code != 0
+    assert "fix: git checkout -b feature/0.1.0" in " ".join(result.output.split())
+    assert repo.is_dir()
 
 
 # ---------------------------------------------------------------------------
@@ -642,8 +635,8 @@ def test_bind_with_no_live_release_exits_zero_and_the_next_write_is_allowed(
 
 
 def test_context_create_help_names_main_repo_and_associated_repos(workspace: Path) -> None:
-    """Intent: CONTRACT — AC5.1. The option surface names the paradigm's parts; the
-    retired `--repo`/`--associated` spellings are gone, with no alias and no shim."""
+    """Intent: CONTRACT — AC5.1, AC3.8. The option surface names the paradigm's parts;
+    the retired `--repo`/`--associated`/`--url`/`--associated-repos` spellings are gone."""
     result = _runner.invoke(
         app, ["context", "create", "--help"], env={"TERMINAL_WIDTH": "200", "NO_COLOR": "1"}
     )
@@ -652,7 +645,9 @@ def test_context_create_help_names_main_repo_and_associated_repos(workspace: Pat
     # plain text, never on the escaped stream.
     plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
     assert "--main-repo" in plain
-    assert "--associated-repos" in plain
+    assert "--associated-repo " in plain
+    assert "--associated-repos" not in plain
+    assert "--url" not in plain
     assert "--repo " not in plain
     assert "--associated " not in plain
 
@@ -660,20 +655,17 @@ def test_context_create_help_names_main_repo_and_associated_repos(workspace: Pat
 def test_context_show_and_list_json_emit_main_repo_key(workspace: Path) -> None:
     """Intent: CONTRACT — AC5.1. `show --json` / `list --json` carry `main_repo`;
     the retired output key `repo_slug` is absent (the state-file schema keeps it)."""
-    assert (
-        _runner.invoke(
-            app,
-            [
-                "context",
-                "create",
-                "alpha",
-                "--main-repo",
-                "alpha",
-                "--associated-repos",
-                "beta,gamma",
-            ],
-        ).exit_code
-        == 0
+    from dadaia_workspace.core.models.spec_context import AssociatedRepo
+
+    seed_dead_context(
+        workspace,
+        "alpha",
+        "alpha",
+        "https://x.test/alpha.git",
+        associated_repos=(
+            AssociatedRepo("beta", "https://x.test/beta.git"),
+            AssociatedRepo("gamma", "https://x.test/gamma.git"),
+        ),
     )
 
     show = json.loads(_runner.invoke(app, ["context", "show", "alpha", "--json"]).stdout)

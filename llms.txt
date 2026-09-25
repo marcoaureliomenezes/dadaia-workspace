@@ -4,44 +4,44 @@
 
 ## What it is
 
-<!-- derived-from: product-vision sha256:164c4a8b0eca -->
+<!-- derived-from: product-vision sha256:16060412dc8a -->
 
 - [README](README.md): one workspace folder, projects in repos inside it, governance outside every repo; the unit is the context (main repo + associated repos); documents are the lifecycle; boundaries are mechanical.
 
 ## Install
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
-<!-- derived-from: workspace-init sha256:ca5c835e94af -->
+<!-- derived-from: pypi-distribution sha256:618098346ed6 -->
+<!-- derived-from: workspace-init sha256:aa1f033df140 -->
 
-- [PyPI project](https://pypi.org/project/dadaia-workspace/): `pip install dadaia-workspace`, then `dadaia init <dir> --harness <name> [--repo <url>]`; `uvx dadaia-workspace init …` runs without an install.
+- [PyPI project](https://pypi.org/project/dadaia-workspace/): three levels — `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` (workspace + project: cloned, ALIVE, bound), then `.dadaia/.venv/bin/dadaia specs init --context <slug>` (specs on the canon) and `.dadaia/.venv/bin/dadaia doctor`; every later command runs through `.dadaia/.venv/bin/dadaia`; re-running the `uvx` init line upgrades the workspace, then `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes each project's specs law.
 - [Changelog](CHANGELOG.md): written by release-please, one section per released version.
 
 ## The law
 
-<!-- derived-from: agentic-entities sha256:98cb81d2e72c -->
-<!-- derived-from: sdd-gate-v3 sha256:ea8939698674 -->
+<!-- derived-from: agentic-entities sha256:63d2197ea839 -->
+<!-- derived-from: sdd-gate-v3 sha256:7a6e11d84264 -->
 
 - [AGENTS.md](dadaia_workspace/public/data/AGENTS.md): the always-on root map — flow, roles, gate invariants, where things live, the index of every scoped `AGENTS.md` and skill; projected once to the workspace root.
 
 ## Reference
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
+<!-- derived-from: pypi-distribution sha256:618098346ed6 -->
 
-- [CLI reference](docs/cli.md): the committed output of `dadaia help tree`.
+- [CLI reference](docs/cli.md): the committed output of `.dadaia/.venv/bin/dadaia help tree`.
 - [Concepts](docs/concepts.md): the vocabulary — context, release, candidate, gate, memory, ledgers, audits.
 - [Distribution](docs/distribution.md): the publication channels and what each carries.
 - [Getting started](docs/getting-started.md): the longer walkthrough behind the quickstart.
 - [Memory catalog](specs/memory/product/index.md): every product atom, its `tldr` and its path.
 - [Source repository](https://github.com/marcoaureliomenezes/dadaia-workspace): issues, releases and the full specs tree.
 
-## The site
+## The docs
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
-<!-- derived-from: product-vision sha256:164c4a8b0eca -->
+<!-- derived-from: pypi-distribution sha256:618098346ed6 -->
+<!-- derived-from: product-vision sha256:16060412dc8a -->
 
-- [Documentation site](https://marcoaureliomenezes.github.io/dadaia-workspace/): GitHub Pages serving `docs/` from `main`, every page derived under its markers.
+- [Documentation](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs): the repository's `docs/` folder on `main`, every page derived under its markers.
 - [Landing](docs/index.md): the tagline, the paradigm and the two ways in.
-- [Quickstart](docs/quickstart.md): install, init, bind, doctor, first backlog entry, first release.
+- [Quickstart](docs/quickstart.md): the three levels (workspace, project, specs) in one shell block, doctor, first backlog entry, first release, upgrade.
 - [Positioning](docs/positioning.md): product repos never carry agent config; one law governs many projects.
 - [The bug loop](docs/bug-loop.md): register, RED, fix, resolve with evidence and lineage.
 - [What the bug ledger taught](docs/bug-ledger-lessons.md): how to measure the ledger, and the fix-chain lesson — an additive fix breeds the next bug, a deletion-shaped fix ends the family.

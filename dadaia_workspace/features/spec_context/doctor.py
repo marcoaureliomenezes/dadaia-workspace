@@ -23,13 +23,13 @@ from functools import partial
 from pathlib import Path, PurePosixPath
 
 from dadaia_workspace.core import session_store, workspace_layout
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
 from dadaia_workspace.core.harness_registry import (
     HARNESS_PROJECTION_DIRS,
     L1_ENTRY_HARNESSES,
     PROJECTION_TARGETS,
 )
-from dadaia_workspace.core.kernel_tunables import DADAIA_BIN
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.platform import PLATFORM
@@ -101,6 +101,7 @@ class DoctorIssue:
     code: str
     description: str
     fixable: bool
+    fix: str = ""
 
 
 class DoctorService:
@@ -123,7 +124,7 @@ class DoctorService:
     # check() — the context invariants (unchanged by the zone walk)
     # ------------------------------------------------------------------
 
-    def check_installed_hooks(self) -> list[DoctorIssue]:
+    def check_installed_hooks(self, context: str | None = None) -> list[DoctorIssue]:
         """HOOKS-DRIFT-1: an ALIVE repo's installed git hook differs from the shipped one.
 
         The git chokepoints are the ONE mechanical backstop that runs outside every
@@ -132,10 +133,11 @@ class DoctorService:
         enforcing yesterday's contract, and nothing else in the workspace can notice.
         Compared BYTE-WISE against ``public/scripts/``: the installer copies verbatim, so
         any difference at all is drift. A repo that is not a git checkout has no
-        ``.git/hooks/`` to drift and is never a finding.
+        ``.git/hooks/`` to drift and is never a finding. A named *context* scopes the
+        check to its own repos (0.4.8 R5): another context's hooks are not this run's.
         """
         issues: list[DoctorIssue] = []
-        for top in self._alive_repo_tops():
+        for top in self._alive_repo_tops(context):
             hooks_dir = top / ".git" / "hooks"
             if not hooks_dir.is_dir():
                 continue
@@ -157,6 +159,9 @@ class DoctorService:
                                 "than what this release ships."
                             ),
                             fixable=False,
+                            fix=fix_line(
+                                self._workspace_root, "ci", "install-hook", "--force", "--repo", rel
+                            ),
                         )
                     )
         return issues
@@ -237,7 +242,7 @@ class DoctorService:
                             f"(un-portable). Re-run 'dadaia context alive {ctx.name}' "
                             "while the repo's origin remote is on disk to back-fill it; "
                             "with no such remote, 'dadaia context delete' and "
-                            "'dadaia context create --url <url>' re-register it."
+                            "'dadaia context create --main-repo <url>' re-registers it."
                         ),
                         fixable=False,
                     )
@@ -317,14 +322,14 @@ class DoctorService:
         except (KeyError, OSError, TypeError, ValueError):
             return []
 
-    def _alive_repo_tops(self) -> list[Path]:
+    def _alive_repo_tops(self, context: str | None = None) -> list[Path]:
         """Every ALIVE registered repo's top — main plus associated — that exists on disk.
         A DEAD context's repo is INV-5's business, not the tree walk's.
 
         Reads the registry through :meth:`_contexts`, which degrades to inaction."""
         tops: list[Path] = []
         for ctx in self._contexts():
-            if ctx.state is not ContextState.ALIVE:
+            if ctx.state is not ContextState.ALIVE or context not in (None, ctx.name):
                 continue
             slugs = (ctx.repo_slug, *(repo.slug for repo in ctx.associated_repos))
             for slug in slugs:
@@ -736,7 +741,7 @@ ERROR_VERDICTS = frozenset({FindingVerdict.SLOP, FindingVerdict.EXPIRED, Finding
 
 
 def workspace_rules(
-    *, expired_only: bool = False
+    *, expired_only: bool = False, context: str | None = None
 ) -> tuple[Rule[DoctorService, SectionFinding], ...]:
     """This section's contribution to the ONE rule registry.
 
@@ -776,8 +781,9 @@ def workspace_rules(
                 message=issue.description,
                 canonical=False,
                 error=True,
+                fix=issue.fix,
             )
-            for issue in service.check_installed_hooks()
+            for issue in service.check_installed_hooks(context)
         ]
 
     def entries(service: DoctorService) -> list[SectionFinding]:
@@ -800,18 +806,18 @@ def workspace_rules(
             ("WS-INVARIANT",),
             SECTION,
             invariants,
-            fix_help=f"{DADAIA_BIN} doctor --fix",
+            fix_help=("doctor", "--fix"),
         ),
         Rule(
             ("HOOKS-DRIFT-1",),
             SECTION,
             installed_hooks,
-            fix_help=f"{DADAIA_BIN} ci install-hook --force",
+            fix_help=("ci", "install-hook", "--force", "--repo", "<repo>"),
         ),
         Rule(
             ("WS-ENTRY",),
             SECTION,
             entries,
-            fix_help=f"{DADAIA_BIN} doctor --fix",
+            fix_help=("doctor", "--fix"),
         ),
     )

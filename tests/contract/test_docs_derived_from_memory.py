@@ -148,7 +148,7 @@ def test_the_derived_set_covers_the_readme_the_agent_index_and_every_authored_do
     }
 
 
-_PAGES_URL = "https://marcoaureliomenezes.github.io/dadaia-workspace/"
+_DOCS_URL = "https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs"
 
 
 def test_the_ledger_article_derives_from_the_quality_and_governance_atoms() -> None:
@@ -174,13 +174,23 @@ def test_the_agent_index_lists_every_page_of_the_site() -> None:
     assert missing == [], f"llms.txt names no entry for: {', '.join(missing)}"
 
 
-def test_the_readme_sends_a_reader_to_the_published_site() -> None:
-    """PyPI renders the README: the published site URL is the one link that survives
-    being read outside the checkout, where a relative `docs/` path is a dead end."""
+def test_the_readme_sends_a_reader_to_the_docs_folder() -> None:
+    """Intent: CONTRACT — docs-url-dead-and-readme-links-break-on-pypi. No Pages site
+    exists: the Documentation URL and the README both name the repository's docs folder."""
     readme = (_REPO_ROOT / "README.md").read_text("utf-8")
 
-    assert _PAGES_URL in readme
-    assert _pyproject_poetry()["urls"]["Documentation"] == _PAGES_URL  # type: ignore[index]
+    assert _DOCS_URL in readme
+    assert _pyproject_poetry()["urls"]["Documentation"] == _DOCS_URL  # type: ignore[index]
+    assert "github.io" not in readme
+
+
+def test_every_readme_link_is_absolute() -> None:
+    """Intent: CONTRACT — docs-url-dead-and-readme-links-break-on-pypi. PyPI renders the
+    README outside the checkout, where a relative link or image target is a dead end."""
+    readme = (_REPO_ROOT / "README.md").read_text("utf-8")
+    targets = re.findall(r"\]\(([^)\s]+)", readme) + re.findall(r'(?:src|href)="([^"]+)"', readme)
+    relative = [t for t in targets if not re.match(r"(?:https?:|mailto:|#)", t)]
+    assert relative == []
 
 
 @pytest.mark.parametrize(
@@ -302,3 +312,39 @@ def test_every_pypi_link_a_reader_needs_is_declared() -> None:
     assert isinstance(urls, dict)
     assert sorted(urls) == ["Changelog", "Documentation", "Homepage", "Issues", "Repository"]
     assert all(str(value).startswith("https://") for value in urls.values())
+
+
+_CONTEXT_CREATE_RE = re.compile(r"dadaia context create [^`\n]*")
+
+
+def _onboarding_texts() -> list[Path]:
+    """Every surface a newcomer copies a command from: the derived docs, the memory
+    atoms they derive from, and the public skills."""
+    skills = sorted((_REPO_ROOT / "dadaia_workspace" / "public" / "skills").glob("*/SKILL.md"))
+    return [*_derived_docs(), *sorted(_MEMORY_DIR.rglob("*.md")), *skills]
+
+
+def test_no_onboarding_text_claims_offline_operation() -> None:
+    """Intent: CONTRACT — bug `onboarding-docs-contradict-the-cli`, AC2.4. `init`
+    resolves its dependencies from PyPI, so no surface may call it offline."""
+    violations = [
+        f"{path.relative_to(_REPO_ROOT).as_posix()}:{number}: claims offline operation"
+        for path in _onboarding_texts()
+        for number, line in enumerate(path.read_text("utf-8").splitlines(), start=1)
+        if re.search(r"\boffline\b", line, re.IGNORECASE)
+    ]
+    assert violations == [], "\n".join(violations)
+
+
+def test_no_onboarding_text_cites_a_retired_create_flag() -> None:
+    """Intent: CONTRACT — AC3.8, bug `onboarding-docs-contradict-the-cli`. `context
+    create` takes `--main-repo <url>` and repeatable `--associated-repo <url>`; a cited
+    `--url` or `--associated-repos` exits 2."""
+    violations = [
+        f"{path.relative_to(_REPO_ROOT).as_posix()}:{number}: `{match.group(0).strip()}`"
+        for path in _onboarding_texts()
+        for number, line in enumerate(path.read_text("utf-8").splitlines(), start=1)
+        for match in _CONTEXT_CREATE_RE.finditer(line)
+        if re.search(r"--url\b|--associated-repos\b", match.group(0))
+    ]
+    assert violations == [], "\n".join(violations)

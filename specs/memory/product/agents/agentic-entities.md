@@ -41,7 +41,7 @@ The one enumeration; every harness atom links here.
 
 ## The behavior map
 
-- `dadaia_workspace/public/entities/behavior-map.json` declares which skill and which scoped rule file operate which section of the root map: `rows` of `{section, anchor, skill, scoped_agents_md[], hash_tuple, recorded_by, recorded_at}`, plus `skill_md_line_ceiling`, `declared_overlaps` and `standalone_skills` (the skills that stand without a workspace, read by the skills-repository build — [[public-asset-distribution]]).
+- `dadaia_workspace/public/entities/behavior-map.json` declares which skill and which scoped rule file operate which section of the root map: `rows` of `{section, anchor, skill, scoped_agents_md[], hash_tuple, recorded_by, recorded_at}`, plus `skill_md_line_ceiling`, `declared_overlaps` and `standalone_skills` (the skills that stand without a workspace, pinned by `tests/contract/test_standalone_skills.py`).
 - Every skill and scoped `AGENTS.md` source has exactly one row, every law section at least one owner; several skills may own one section.
 - The corpus is 18 `dd-*` skill directories, pinned with the total skill Markdown line count by the down-only ratchet in `tests/contract/test_slop_ratchets.py` ([[QUALITY]]).
 
@@ -49,6 +49,7 @@ The one enumeration; every harness atom links here.
 
 - `tests/contract/test_agentic_entities_derivation.py` pins the bijection, wired-hook coverage, harness coverage and the universal surface.
 - `tests/contract/test_behavior_map.py` is the map enforcer: red on a member without a row, a section without an owner, a row naming a missing member, a changed member without its new hash tuple, or an undeclared overlap; it also resolves every path and `dadaia` verb a public asset cites (`dadaia_workspace/features/specs/citations.py`), every `dd-*` body pointer, and requires `disable-model-invocation: true` on a skill no persona grants.
+- `tests/contract/test_onboarding_text.py` holds shipped text — `public/` Markdown and text, `docs/*.md`, `README.md`, `llms.txt`, `CONTEXT.md` — to zero backticked bare `dadaia` invocations (the venv path `.dadaia/.venv/bin/dadaia` only), and every flag the law or a skill cites beside a venv-path verb to one that verb accepts.
 - `dadaia public doctor`'s attesting `entities-derivation` check (`ENT-DERIVE-1`) inspects the installed package: a stub persona, an identity swap between filename and `name:`, or a behaviour naming a missing hook module each report drift.
 
 ## Dependencies

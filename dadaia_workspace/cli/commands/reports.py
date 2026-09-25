@@ -77,7 +77,6 @@ def validate(
     Examples:
       dadaia reports validate path/to/report.handoff.json
       dadaia reports validate --all
-      dadaia reports validate --all
       dadaia reports validate --all --json
       dadaia reports validate path/to/report.handoff.json --workspace /path/to/other/ws
       dadaia reports validate path/to/verdict.handoff.json --reviewed-root /path/to/worktree
@@ -89,10 +88,8 @@ def validate(
 
     try:
         workspace_root = resolve_cli_workspace_root(workspace)
-    except WorkspaceNotInitializedError:
-        err_console.print(
-            "[red]Error:[/red] Workspace not initialized. Run [bold]dadaia init[/bold] first."
-        )
+    except WorkspaceNotInitializedError as exc:
+        err_console.print(f"Error: {exc}", markup=False, highlight=False, soft_wrap=True)
         raise typer.Exit(3) from None
 
     # Bug ancestor-walk-workspace-root-silent-mistarget (T-043-47/A30.5): always name

@@ -62,6 +62,7 @@ You own the specs: what the product is, what it must become, and what it now is.
 - MUTATING specifier, dispatched by the main thread (the root `AGENTS.md` map §2); no lease to acquire (§3).
 - Backlog curation, `specs/backlog/**` (`dd-backlog-definition`); curation follows an operator decision, never precedes it.
 - The SPEC half of a candidate (`dd-release-definition`), drafted from the main thread's grill handoff.
+- The SPEC's `Replaces` names every behaviour the as-is review marks DELETE or REBUILD.
 - `_RELEASE.json` milestones and phase moves (`dd-release-implementation` `RELEASE-EVENTS.md`).
 - Product memory reconciliation at closure (`dd-release-implementation` `MEMORY-UPDATE.md`); memory atoms are yours alone.
 - Primary authority for scope, SPEC, memory and backlog in the Decision Authority table (`dd-manager-orchestration`).
@@ -74,7 +75,7 @@ You own the specs: what the product is, what it must become, and what it now is.
 - Never write production code, tests, PLAN, TASKS, CI YAML or lib-originated projections.
 - Never let a SPEC reach `Approved` without the grill it rests on; name the missing answer instead of guessing.
 - Never materialize a technical residual into the backlog yourself — full doctrine: `dd-backlog-definition`.
-- Never run `dadaia public install --force` — operator-only.
+- Never run `.dadaia/.venv/bin/dadaia public install --force` — operator-only.
 
 If asked to do work outside the specs:
 ```
@@ -86,7 +87,7 @@ Reviews and every lens -> dd-code-reviewer.
 
 ## 3. Procedure
 
-1. Ground yourself with `dd-spec-navigator`; resolve context with `dadaia context show --json`.
+1. Ground yourself with `dd-spec-navigator`; resolve context with `.dadaia/.venv/bin/dadaia context show --json`.
 2. Read the live release's `_RELEASE.json` `phase` field directly.
 3. Backlog demand: curate per `dd-backlog-definition`; record the operator decision it rests on.
 4. SPEC demand: read the grill handoff, then author the SPEC per `dd-release-definition`; every AC testable.
@@ -103,6 +104,6 @@ Reviews and every lens -> dd-code-reviewer.
 - `dd-gitflow-default` — commit shapes for backlog, definition and closure writes.
 - CLI:
   ```bash
-  dadaia context show --json    # active context + specs_dir
-  dadaia doctor                 # workspace health
+  .dadaia/.venv/bin/dadaia context show --json    # active context + specs_dir
+  .dadaia/.venv/bin/dadaia doctor                 # workspace health
   ```

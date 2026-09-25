@@ -9,8 +9,8 @@ candidates.
 | Boundary | Who validates | What unlocks |
 |---|---|---|
 | Per task | implementer discipline only (TDD, tests, local CI preflight, handoff); marker stays `[-]` | nothing; no per-task reviewer gate |
-| Candidate close | `dd-code-reviewer` `APPROVED` (three axes, six lenses) on the same commit | `[x]`; the candidate's `feature -> develop` PR |
-| Promote (ship) | pre-staged security verdict naming develop's tip | the `develop -> main` PR |
+| Candidate close | `dd-code-reviewer` `APPROVED` (three axes, six lenses) on the same commit | `[x]`; the candidate's work -> integration PR |
+| Promote (ship) | pre-staged security verdict naming the integration tip | the integration -> principal PR |
 
 - Any `REJECTED`, CRITICAL/HIGH finding, failed E2E, or missing evidence sends the work back to implementation.
 - Rework continues until every required validator approves the same commit, or the operator stops the candidate.
@@ -42,9 +42,9 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 - Done when: the verdict is `APPROVED` on that sha.
 
 **Step 5 — Memory update (`dd-product-engineer`).**
-- Memory is closure procedure, never a task: a TASKS.md task whose write set names `specs/memory` is refused by `dadaia doctor` (SPEC-DOC-047).
+- Memory is closure procedure, never a task: a TASKS.md task whose write set names `specs/memory` is refused by `.dadaia/.venv/bin/dadaia doctor` (SPEC-DOC-047).
 - Reconcile product atoms from the code diff — `memory.py drift`, per-atom `git diff`, DELETE → UPDATE → ADD, `catalog generate`, derived docs in the same commit, `release.py memory` — protocol: `MEMORY-UPDATE.md`.
-- Done when: one `kind: memory` log entry covers every worklist entry as reviewed or changed, `dadaia doctor` is clean and the derived-docs test is green.
+- Done when: one `kind: memory` log entry covers every worklist entry as reviewed or changed, `.dadaia/.venv/bin/dadaia doctor` is clean and the derived-docs test is green.
 
 **Step 6 — Record the candidate's closure narrative.**
 - Append the `log` entries `RELEASE-EVENTS.md` describes, each with its `kind`: `summary`, `size`, `drifts`, `artifact-gc`, `test-dispositions`, `dispositions`.
@@ -56,15 +56,15 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 - An audit finding moves by `python3 .agents/skills/dd-audit-project/scripts/audit.py disposition <dir> <finding> --disposition …`; when none is `open`, `python3 .agents/skills/dd-audit-project/scripts/audit.py close <dir> --sha <window-end>` appends the histo record and deletes the directory.
 - A bug is never silently dropped — `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve` already closed it, or a superseder covers it.
 - Age the ledger once the sweep is terminal: `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py archive` — a numbered step here, never a call another script makes (scripts never call each other).
-- Done when: `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats` and `dadaia doctor`'s `ledgers` section show zero non-terminal picked items.
+- Done when: `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats` and `.dadaia/.venv/bin/dadaia doctor`'s `ledgers` section show zero non-terminal picked items.
 
 **Step 8 — Artifact GC sweep.**
-- `dadaia doctor` dry: read every `WS-<zone>-<verdict>` line and the `compliance:` score line.
-- `dadaia doctor --fix` runs the reaper (slop MOVED to `.dadaia/reaped/`, 7-day hold) then the specs repairs; list what it held for the operator.
+- `.dadaia/.venv/bin/dadaia doctor` dry: read every `WS-<zone>-<verdict>` line and the `compliance:` score line.
+- `.dadaia/.venv/bin/dadaia doctor --fix` runs the reaper (slop MOVED to `.dadaia/reaped/`, 7-day hold) then the specs repairs; list what it held for the operator.
 - Done when: the `kind: artifact-gc` log entry records the `compliance(total)` line and it reads 100%, or names the slop the operator holds.
 
 **Step 9 — Candidate PR.**
-- Open the `feature/{M.m.p}` -> `develop` PR (security verdict covering the head, `dd-gitflow-default` §2a); watch CI to green; merge.
+- Open the work -> integration PR (branch names: the constitution's `gitflow:`) (security verdict covering the head, `dd-gitflow-default` §2a); watch CI to green; merge.
 - Done when: it merges green.
 
 The arc ends here. Gate -> promote -> record -> branch cut: `dd-gitflow-default` steps

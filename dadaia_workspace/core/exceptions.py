@@ -49,12 +49,16 @@ class PublicAssetError(DadaiaError):
     """Raised when installing public assets fails."""
 
 
-class RepoCatalogError(DadaiaError):
-    """Raised when reading the repos catalog fails."""
+class RepoUrlMissingError(DadaiaError):
+    """A repo slug is registered with neither a clone URL nor a ``repos/<slug>`` checkout."""
 
 
 class GitCloneError(DadaiaError):
-    """Raised when cloning a repository fails."""
+    """Raised when cloning *url* fails; the CLI names the failed URL from ``url``."""
+
+    def __init__(self, message: str, url: str) -> None:
+        self.url = url
+        super().__init__(message)
 
 
 class GitSyncError(DadaiaError):
@@ -85,45 +89,11 @@ class HandoffValidationError(DadaiaError):
         super().__init__(f"{field_path}: {message}")
 
 
-class NoActiveReleaseError(DadaiaError):
-    """Raised when ``reports next`` cannot resolve an active release.
-
-    Covers a live-release directory tree with no directory carrying a ``RELEASE.json``
-    (v0.5.0 FR4/T-050-21A: ``ACTIVE.md`` retired, no replacement file) in the active
-    context's specs dir. The CLI maps this to exit code 3 with an orienting message.
-    """
-
-
-class ReleaseNotFoundError(DadaiaError):
-    """Raised when a lifecycle verb targets a ``--release-id`` that has no release directory.
-
-    ``lifecycle audit`` runs against an EXISTING release; accepting an undefined id would
-    synthesize a bogus ``specs/releases/<id>/`` tree by writing its handoff there (bug
-    ``audit-accepts-undefined-release-and-creates-release-tree``). The CLI maps this to a
-    non-zero exit with an orienting message — never a traceback.
-    """
-
-
-class NoAgentSequenceError(DadaiaError):
-    """Raised when the active release's PLAN.md declares no identifiable agent owners.
-
-    The CLI maps this to exit code 3, instructing the operator to declare owners via
-    the ``(owner: <agent>)`` / ``**Owner:** <agent>`` / ``owner: <agent>`` patterns.
-    """
-
-
 class SchemaVersionError(DadaiaError):
     """Raised when spec_contexts.json uses an incompatible schema version (v1 or legacy values).
 
     The message always contains "dadaia migrate" so the user knows what to run.
     Callers must never silently correct v1 data — raise this instead.
-    """
-
-
-class ContextNotAliveError(DadaiaError):
-    """Raised when bind is attempted on a context whose state is DEAD.
-
-    AC-T11-5: bind on a DEAD context must raise this instead of proceeding.
     """
 
 
@@ -148,28 +118,6 @@ class PlatformSecurityError(DadaiaError):
         super().__init__(message)
 
 
-class PlatformCapabilityError(DadaiaError):
-    """Raised when an OS capability required by a feature is absent on the current platform.
-
-    Tier 2/3 — DEGRADE WITH LOG or UNSUPPORTED PLATFORM at construction.
-    This error signals that the platform lacks the OS primitive needed
-    (e.g. ``fcntl`` on Windows, ``msvcrt`` on non-Windows). Consumers should
-    either degrade gracefully (Tier 2: log INFO and return a safe default)
-    or propagate (Tier 3: unsupported-platform at construction time).
-
-    Attributes:
-        feature_name: Logical name of the capability that is absent
-                      (e.g. ``"fcntl_file_lock"``).
-        platform:     The ``sys.platform`` value at the point of failure
-                      (e.g. ``"win32"``).
-    """
-
-    def __init__(self, message: str, *, feature_name: str, platform: str) -> None:
-        self.feature_name = feature_name
-        self.platform = platform
-        super().__init__(message)
-
-
 class WorkspaceVenvBootstrapError(DadaiaError, RuntimeError):
     """Workspace venv bootstrap could not create the venv or install the distribution.
 
@@ -180,6 +128,21 @@ class WorkspaceVenvBootstrapError(DadaiaError, RuntimeError):
     reached the operator as a raw traceback. ``RuntimeError`` is kept in the bases so
     existing ``except RuntimeError`` call sites keep working.
     """
+
+
+class WorkspaceVenvNewerError(WorkspaceVenvBootstrapError):
+    """The workspace venv carries a NEWER dadaia-workspace than the running one (AC2.3).
+
+    A downgrade is refused before any write; *installed* names the version to run
+    ``init`` with instead.
+    """
+
+    def __init__(self, installed: str, running: str) -> None:
+        self.installed = installed
+        super().__init__(
+            f"the workspace venv carries dadaia-workspace {installed}, newer than the "
+            f"running {running}; init never downgrades."
+        )
 
 
 class BootstrapPackageError(DadaiaError, ValueError):
@@ -201,33 +164,12 @@ class BootstrapPackageError(DadaiaError, ValueError):
         )
 
 
-class ScopeNotConsumedError(DadaiaError):
-    """A release definition did not consume the backlog scope its own run declared.
-
-    The run injects an authoritative scope directive naming the items the definition MUST
-    pick; nothing verified the produced SPEC against it, so a definition that dropped every
-    item still reported success while picking nothing
-    (bug release-definition-consumes-nothing-while-scope-declares-items). Raised by the
-    producer post-step and surfaced as ``post_step_error`` — never a silent skip.
-    """
-
-
 class CiPreflightScopeError(DadaiaError):
     """``ci preflight`` was invoked outside the dadaia-workspace source tree.
 
     Its checks target the library's own paths, so anywhere else it could only report a
     lint failure for a path that does not exist
     (bug ci-preflight-unusable-outside-the-source-repo).
-    """
-
-
-class CodexConfigError(DadaiaError, ValueError):
-    """Invalid Codex adapter configuration (e.g. an unknown ``DADAIA_CODEX_SANDBOX`` value).
-
-    Inherits ``ValueError`` (back-compat: existing callers catch ValueError) AND
-    ``DadaiaError`` so the CLI entrypoint surfaces it as one concise line instead of a raw
-    traceback (bug doctor-uninitialized-workspace-traceback class). A stale dadaia that
-    predates a newer sandbox value must fail cleanly, not crash.
     """
 
 
@@ -239,24 +181,4 @@ class TasksMarkerStateError(DadaiaError, RuntimeError):
     traceback (bug implementation-reviews-tasks-marker-traceback, F-22 class): running
     ``lifecycle implementation-reviews`` against a release whose TASKS.md carries no
     recognizable task markers is an operator-facing condition, never a crash.
-    """
-
-
-class BlockedRunRestartError(DadaiaError):
-    """Re-invoking a BLOCKED lifecycle run id without ``--resume-from`` is refused.
-
-    Bug r10-release-resume-blocked-run-restarts-and-loses-remedy: the restart discarded
-    the run's block, findings and prescribed recovery and re-executed from step one —
-    losing exactly the information the operator needed, and on a live run re-spending on
-    accepted work. Starting over stays possible; it just needs a fresh ``--run-id``.
-    """
-
-
-class CompletedRunRerunError(DadaiaError):
-    """Re-invoking a COMPLETED lifecycle run id is refused (idempotency contract).
-
-    Bug completed-workflow-rerun-not-refused (Consumer 0.3.2 run-2): the pipeline
-    silently re-executed a completed run id while the fragment workflows only blocked
-    by accident of identical content. Every workflow engine now refuses explicitly and
-    cleanly — a completed run is immutable history; new work takes a fresh --run-id.
     """

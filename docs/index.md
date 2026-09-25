@@ -10,12 +10,11 @@ Start here:
 
 Reference: [concepts](concepts.md) · [getting started](getting-started.md) · [CLI](cli.md) · [distribution](distribution.md).
 
-Repository: <https://github.com/marcoaureliomenezes/dadaia-workspace> ·
-skills, packaged standalone: <https://github.com/marcoaureliomenezes/dadaia-skills>
+Repository: <https://github.com/marcoaureliomenezes/dadaia-workspace>
 
 ## What it is
 
-<!-- derived-from: product-vision sha256:164c4a8b0eca -->
+<!-- derived-from: product-vision sha256:16060412dc8a -->
 
 dadaia-workspace is the operating environment around repositories developed with AI
 agents, and its unit is the context.
@@ -46,13 +45,16 @@ What it rests on:
 
 ## Two ways in
 
-<!-- derived-from: product-vision sha256:164c4a8b0eca -->
+<!-- derived-from: product-vision sha256:16060412dc8a -->
 
-A human installs it from PyPI and drives it from a shell:
-`dadaia init <dir> --harness <name> --repo <url>` provisions a workspace with its first
-project ALIVE and bound, `dadaia context create`, `dadaia context alive` and
-`dadaia context bind` add the next ones, and `dadaia doctor` lists findings with a
-runnable fix under each.
+A human drives it from a shell in three levels:
+`uvx dadaia-workspace init <dir> --harness <name> --repo <url>` provisions the
+workspace and its first project ALIVE (`context bind` binds),
+`.dadaia/.venv/bin/dadaia specs init --context <slug>` brings the project's `specs/`
+to the canon, the first pass fills memory, `context baseline` publishes it, and
+`.dadaia/.venv/bin/dadaia doctor` prints the next step and every finding with a
+runnable fix; `.dadaia/.venv/bin/dadaia context create --main-repo <url>` adds the next
+project, and re-running the `uvx` init line upgrades the workspace.
 
 An agent reads the root `AGENTS.md` map — flow, roles, gate invariants, where things
 live, the index of every scoped law and skill — opens the scoped `AGENTS.md` of its

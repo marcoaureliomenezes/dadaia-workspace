@@ -122,6 +122,6 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 - `dd-gitflow-default` — branch/push mechanics.
 - CLI:
   ```bash
-  dadaia context show --json    # discover active context and specs_dir
+  .dadaia/.venv/bin/dadaia context show --json    # discover active context and specs_dir
   python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats             # bug-surface evidence for the bug-surface axis
   ```

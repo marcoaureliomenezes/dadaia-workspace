@@ -26,6 +26,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace import container
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.workspace_layout import provisioned_zones, zones_with_ttl
@@ -98,12 +99,19 @@ def test_lists_findings_and_exits_1(workspace: Path) -> None:
     assert not any(ln.startswith("compliance(") for ln in lines), lines
 
 
-def test_healthy_workspace_exits_0_and_prints_nothing(workspace: Path) -> None:
+def test_healthy_workspace_exits_0_and_prints_only_the_next_step(workspace: Path) -> None:
+    """0.4.8 R2: zero contexts is no longer silent — the one onboarding info finding."""
     result = CliRunner().invoke(app, ["doctor"])
     lines = result.output.splitlines()
 
     assert result.exit_code == 0, result.output
-    assert lines == [], lines
+    assert [line.split(" ", 2)[:2] for line in lines[:1]] == [["ONBOARDING", "info"]], lines
+    assert len(lines) == 2 and lines[1].startswith("fix: "), lines
+
+
+def _scan(findings: list[dict[str, str]]) -> list[dict[str, str]]:
+    """The zone-scan findings — the onboarding step is test_doctor_onboarding's business."""
+    return [f for f in findings if f["code"] != "ONBOARDING"]
 
 
 def test_json_carries_findings_and_fixed(workspace: Path) -> None:
@@ -115,12 +123,12 @@ def test_json_carries_findings_and_fixed(workspace: Path) -> None:
     assert result.exit_code == 1
     assert {"sections", "fixed"} <= set(payload) and "compliance" not in payload
     workspace_section = payload["sections"]["workspace"]
-    assert workspace_section["findings"] == [
+    assert _scan(workspace_section["findings"]) == [
         {
             "code": "WS-root-slop",
             "verdict": "slop",
             "message": "junk.txt  (not in the root law or the exceptions)",
-            "fix": ".dadaia/.venv/bin/dadaia doctor --fix",
+            "fix": fix_line(workspace, "doctor", "--fix"),
         }
     ]
     assert "compliance" not in workspace_section
@@ -221,6 +229,6 @@ def test_json_lists_a_held_entry_and_does_not_fail(workspace: Path) -> None:
     section = payload["sections"]["workspace"]
 
     assert result.exit_code == 0, result.output
-    (held,) = section["findings"]
+    (held,) = _scan(section["findings"])
     assert (held["code"], held["verdict"]) == ("WS-reaped-reaped", "reaped")
     assert held["message"] == "reaped/20260913/x  (7d left)"

@@ -50,25 +50,25 @@
     },
     {
       "code": "TREE-5",
-      "description": "specs/AGENTS.md is missing — expected SDD workflow contract. Create it from the canonical template (dadaia_workspace/public/templates/specs-AGENTS.md) or run `dadaia specs init` to scaffold it.",
+      "description": "specs/AGENTS.md is missing — expected the shipped law contract.",
       "path": "<SPECS>/AGENTS.md",
       "severity": "warning"
     },
     {
       "code": "TREE-8",
-      "description": "specs/audits/bad-audit-name/placeholder.md is not part of the v6 canon (specs/AGENTS.md) — either a stray root entry (not one of backlog/, bugs/, memory/, releases/, audits/, ADRs/, constitution.md, AGENTS.md) or a file nested inside a canon area whose shape does not match that area's canon (a dotfile, a loose per-entry file, a markdown ADR, an old reviews/ file, …) — a directory is kept by its AGENTS.md, never a placeholder. NOT auto-fixed — it may be real, unmigrated content; move/rename it into the canon shape (or delete it) by hand (TREE-8).",
+      "description": "specs/audits/bad-audit-name/placeholder.md is not part of the v6 canon (specs/AGENTS.md) — either a stray root entry (not one of backlog/, bugs/, memory/, releases/, audits/, ADRs/, constitution.md, AGENTS.md) or a file nested inside a canon area whose shape does not match that area's canon (a dotfile, a loose per-entry file, a markdown ADR, an old reviews/ file, …) — a directory is kept by its AGENTS.md, never a placeholder. Never auto-fixed — it may be real content; move/rename it into the canon shape, or delete it, by hand (TREE-8).",
       "path": "<SPECS>/audits/bad-audit-name/placeholder.md",
       "severity": "error"
     },
     {
       "code": "TREE-8",
-      "description": "specs/backlog/candidates.md is not part of the v6 canon (specs/AGENTS.md) — either a stray root entry (not one of backlog/, bugs/, memory/, releases/, audits/, ADRs/, constitution.md, AGENTS.md) or a file nested inside a canon area whose shape does not match that area's canon (a dotfile, a loose per-entry file, a markdown ADR, an old reviews/ file, …) — a directory is kept by its AGENTS.md, never a placeholder. NOT auto-fixed — it may be real, unmigrated content; move/rename it into the canon shape (or delete it) by hand (TREE-8).",
+      "description": "specs/backlog/candidates.md is not part of the v6 canon (specs/AGENTS.md) — either a stray root entry (not one of backlog/, bugs/, memory/, releases/, audits/, ADRs/, constitution.md, AGENTS.md) or a file nested inside a canon area whose shape does not match that area's canon (a dotfile, a loose per-entry file, a markdown ADR, an old reviews/ file, …) — a directory is kept by its AGENTS.md, never a placeholder. Never auto-fixed — it may be real content; move/rename it into the canon shape, or delete it, by hand (TREE-8).",
       "path": "<SPECS>/backlog/candidates.md",
       "severity": "error"
     },
     {
       "code": "TREE-8",
-      "description": "specs/releases/badname-release/SPEC.md is not part of the v6 canon (specs/AGENTS.md) — either a stray root entry (not one of backlog/, bugs/, memory/, releases/, audits/, ADRs/, constitution.md, AGENTS.md) or a file nested inside a canon area whose shape does not match that area's canon (a dotfile, a loose per-entry file, a markdown ADR, an old reviews/ file, …) — a directory is kept by its AGENTS.md, never a placeholder. NOT auto-fixed — it may be real, unmigrated content; move/rename it into the canon shape (or delete it) by hand (TREE-8).",
+      "description": "specs/releases/badname-release/SPEC.md is not part of the v6 canon (specs/AGENTS.md) — either a stray root entry (not one of backlog/, bugs/, memory/, releases/, audits/, ADRs/, constitution.md, AGENTS.md) or a file nested inside a canon area whose shape does not match that area's canon (a dotfile, a loose per-entry file, a markdown ADR, an old reviews/ file, …) — a directory is kept by its AGENTS.md, never a placeholder. Never auto-fixed — it may be real content; move/rename it into the canon shape, or delete it, by hand (TREE-8).",
       "path": "<SPECS>/releases/badname-release/SPEC.md",
       "severity": "error"
     },

@@ -1,0 +1,238 @@
+{
+  "schema": "release-state-v1",
+  "release": "0.5.0",
+  "phase": "IMPLEMENTATION",
+  "defined": {
+    "sha": "fa569482",
+    "ts": "2026-09-25T04:15:57Z"
+  },
+  "implemented": {
+    "sha": "864645f3",
+    "ts": "2026-09-25T03:55:33Z"
+  },
+  "shipped": null,
+  "log": [
+    {
+      "ts": "2026-09-24T05:07:01Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Release 0.4.8 born"
+    },
+    {
+      "ts": "2026-09-24T05:12:21Z",
+      "agent": "dd-product-engineer",
+      "kind": "note",
+      "text": "Candidate 1 'onboarding in three levels' SPEC Approved — Origin operator-demand (audit 2026-09-23, order 2026-09-24); grill D1-D13 accepted ('sigo recomendações'); FR1-FR9 cover levels 1-3, upgrade, guidance, docs, E2E and the shrink mandate; ADR candidates A1-A5 to append before implementation; PLAN/TASKS owed by dd-software-engineer."
+    },
+    {
+      "ts": "2026-09-24T05:16:14Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate defined at 1528a8e0469b4b24d4afea43db039d397e218073; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-09-24T07:39:47Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate implemented at e4b0e02f; phase CLOSURE."
+    },
+    {
+      "ts": "2026-09-24T07:39:47Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 1528a8e0469b4b24d4afea43db039d397e218073..09e75dd1a2aa: 2 reviewed, 12 changed.",
+      "since": "1528a8e0469b4b24d4afea43db039d397e218073",
+      "until": "09e75dd1a2aa70b7d0c950079e348d0b41eab90a",
+      "reviewed": [
+        "agentic-entities",
+        "ci-preflight"
+      ],
+      "changed": [
+        "workspace-init",
+        "context-management",
+        "spec-context-project",
+        "specs-migration",
+        "workspace-doctor",
+        "public-asset-distribution",
+        "pypi-distribution",
+        "sdd-gate-v3",
+        "release-lifecycle",
+        "audits-canon",
+        "consumer-agent-support",
+        "product-vision"
+      ]
+    },
+    {
+      "ts": "2026-09-24T07:45:00Z",
+      "agent": "main-thread",
+      "kind": "summary",
+      "text": "Candidate 1 \"onboarding in three levels\" (operator demand 2026-09-23/24; grill D1-D13; ADRs 0027-0031): init [DIR] interactive/direct, <=12 lines, re-init = upgrade; context create = clone+hook+ALIVE+bind transactional; alive writes nothing; specs init classifies absent/dadaia/foreign (specs-bkp, v6->v7 with fixed sections); doctor/init/create/SessionStart print one derived next step (focus context first); ghost context exits 1; doctor --fix never deletes; journey e2e over uvx runs in CI and release; live audit 24 -> 96/100 (.dadaia/tmp/onboarding-audit/)."
+    },
+    {
+      "ts": "2026-09-24T07:45:00Z",
+      "agent": "main-thread",
+      "kind": "size",
+      "text": "AC9.3: dadaia_workspace/**/*.py 9e7af82f..e4b0e02f +967/-1037 = -70; -91 is d089d9b4 (nine pre-existing dead exception classes), so the onboarding work alone is about +21. Deleted modules: features/workspace/bootstrap.py, features/specs/scaffolder.py, features/spec_context/scoped_law.py, core/specs_backup.py."
+    },
+    {
+      "ts": "2026-09-24T07:45:00Z",
+      "agent": "main-thread",
+      "kind": "reviews",
+      "text": "dd-code-reviewer: CHANGES REQUESTED 8391f860 (4 HIGH/4 MEDIUM, handoff 2026-09-24T065249Z); APPROVED d089d9b4 (1 MEDIUM, handoff 2026-09-24T073000Z); APPROVED e4b0e02f (handoff 2026-09-24T073918Z). CI green at e4b0e02f (run 35970473839)."
+    },
+    {
+      "ts": "2026-09-24T07:45:00Z",
+      "agent": "main-thread",
+      "kind": "test-dispositions",
+      "text": "RED evidence: T-048-01 journey 15/15 xfail before levels landed; T-048-02/03/05/08 RED-first; T-048-06 and T-048-07 tests written with the code, RED confirmed afterwards against the pre-change code (review #12). Deleted with reason: test_cli_specs_init_root_guard (cwd default retired), baseline scaffold follow-up and alive-born-tree tests (alive writes nothing), specs_backup tests (module deleted); symlink scoped-law contracts ported to test_scaffold_repo_law.py. Quickstart doc-as-test restored as TestQuickstartVerbatim."
+    },
+    {
+      "ts": "2026-09-24T07:45:00Z",
+      "agent": "main-thread",
+      "kind": "dispositions",
+      "text": "No backlog entry picked (origin operator-demand); 0 open bugs; follow-ups noted: 58 bare `dadaia` spans pinned by _BARE_RATCHET, bare dadaia in service.py:335/context.py:649 runtime messages, first-pass worklist lists root tooling files."
+    },
+    {
+      "ts": "2026-09-24T07:47:43Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 09e75dd1a2aa70b7d0c950079e348d0b41eab90a..475b6cace633: 2 reviewed, 1 changed.",
+      "since": "09e75dd1a2aa70b7d0c950079e348d0b41eab90a",
+      "until": "475b6cace633d8a03e5f0cafdb477d1fcb391750",
+      "reviewed": [
+        "workspace-doctor",
+        "pypi-distribution"
+      ],
+      "changed": [
+        "release-lifecycle"
+      ]
+    },
+    {
+      "ts": "2026-09-25T01:39:09Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 475b6cace633d8a03e5f0cafdb477d1fcb391750..0ba3f9c057f9: 14 reviewed, 10 changed.",
+      "since": "475b6cace633d8a03e5f0cafdb477d1fcb391750",
+      "until": "0ba3f9c057f9fb82e2a242236573623d0aff5d22",
+      "reviewed": [
+        "agent-comms",
+        "agent-orchestration",
+        "harness-codex",
+        "harness-copilot",
+        "harness-cursor",
+        "harness-devin",
+        "harness-kimi-code",
+        "product-vision",
+        "spec-context-project",
+        "ci-preflight",
+        "consumer-agent-support",
+        "context-portability",
+        "backlog-ledger",
+        "release-lifecycle"
+      ],
+      "changed": [
+        "workspace-init",
+        "pypi-distribution",
+        "public-asset-distribution",
+        "agentic-entities",
+        "harness-claude-code",
+        "sdd-gate-v3",
+        "audits-canon",
+        "workspace-doctor",
+        "specs-migration",
+        "context-management"
+      ]
+    },
+    {
+      "ts": "2026-09-25T03:00:00Z",
+      "agent": "main-thread",
+      "kind": "note",
+      "text": "Release renamed 0.4.8 -> 0.5.0 by operator order 2026-09-24 (grill Q11: one release carries candidate 1 plus the onboarding foundation and docs candidates; the library's 'last PyPI + 1 patch' rule is overridden by the operator). Branch feature/0.4.8 -> feature/0.5.0; PR #271 closed, tip tagged archive/feature-0.4.8. Candidate 1 stays closed as c1."
+    },
+    {
+      "ts": "2026-09-25T03:05:09Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (prior candidate closed at e4b0e02f)"
+    },
+    {
+      "ts": "2026-09-25T03:08:45Z",
+      "agent": "dd-product-engineer",
+      "kind": "note",
+      "text": "Candidate 2 'definition reviews the as-is before it adds' SPEC Approved — Origin operator-demand 2026-09-25; grill Q1-Q5 accepted (ADR 0041, operator concern: structure-only checks, judgement stays human); FR1-FR7: definition step 2 as-is review (PLAN §1 table unit|today|bugs|verdict|why, DELETE/REBUILD/UPDATE/KEEP then justified ADD), SPEC Replaces, release.py phase IMPLEMENTATION structural refusal, spec-axis review rule, Arm B rebuild at >=2 prior fixes, root map/releases law/personas; PLAN/TASKS owed by dd-software-engineer."
+    },
+    {
+      "ts": "2026-09-25T03:11:37Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate defined at 520655ee; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-09-25T03:55:33Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate implemented at 864645f3; phase CLOSURE."
+    },
+    {
+      "ts": "2026-09-25T03:55:33Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 0ba3f9c057f9fb82e2a242236573623d0aff5d22..864645f3509e: 4 reviewed, 3 changed.",
+      "since": "0ba3f9c057f9fb82e2a242236573623d0aff5d22",
+      "until": "864645f3509eaa7714c7b44777f4261040b72faa",
+      "reviewed": [
+        "agentic-entities",
+        "public-asset-distribution",
+        "product-vision",
+        "pypi-distribution"
+      ],
+      "changed": [
+        "release-lifecycle",
+        "agent-orchestration",
+        "bug-ledger"
+      ]
+    },
+    {
+      "ts": "2026-09-25T04:00:00Z",
+      "agent": "main-thread",
+      "kind": "summary",
+      "text": "Candidate 2 \"definition reviews the as-is before it adds\" (operator demand 2026-09-25; grill Q1-Q5; ADR 0041): dd-release-definition step 2 As-is review (dd-software-engineer read-only; PLAN section 1 table unit|today|bugs|verdict|why; DELETE/REBUILD/UPDATE/KEEP then justified ADD; four mandatory-REBUILD triggers judged, never computed); SPEC Replaces; TASKS DELETE/REBUILD before ADD; release.py phase IMPLEMENTATION refuses a PLAN without the table (structure only, absolute-path fix lines — the older sed fix lines replaced too); dd-code-review axis 2 checks verdicts against the diff; dd-bug-resolution rebuild rule (>=2 prior fixes on a unit); root map, personas, CONTEXT.md terms."
+    },
+    {
+      "ts": "2026-09-25T04:00:00Z",
+      "agent": "main-thread",
+      "kind": "size",
+      "text": "dadaia_workspace/**/*.py 520655ee^..cd5b5db4 +42/-39 = +3 (_release_phase.py +37/-30, _release_new.py +5/-9); refuse_unfinished inlined; skill-text corpus held at its V35 ceiling by deleting duplicated references."
+    },
+    {
+      "ts": "2026-09-25T04:00:00Z",
+      "agent": "main-thread",
+      "kind": "reviews",
+      "text": "dd-code-reviewer: APPROVED 4e7f3d82 with 2 MEDIUM/5 LOW (handoff 2026-09-25T060000Z); rework 790bfd45/4c04b861/c57def59 APPROVED on confirmation (handoff 2026-09-25T070000Z, false refusals 6 -> 1); last LOW fixed cd5b5db4 (RED on c57def59 verified by the main thread). CI green at cd5b5db4 (32 pass, 2 skipped)."
+    },
+    {
+      "ts": "2026-09-25T04:00:00Z",
+      "agent": "main-thread",
+      "kind": "test-dispositions",
+      "text": "RED evidence: tests/contract/test_release_script.py 7/11 failing on 520655ee, 7/8 new review cases failing on 4e7f3d82, header-line case failing on c57def59; all 20 green at cd5b5db4. Only change to an existing test: the release-script unit fixture now writes a valid PLAN section 1."
+    },
+    {
+      "ts": "2026-09-25T04:00:00Z",
+      "agent": "main-thread",
+      "kind": "dispositions",
+      "text": "No backlog entry picked (origin operator-demand). Arm B round 2 landed on the branch: e2e-upgrade-previous-version-equals-source-version, doctor-tests-walk-the-real-workspace-tmp-zone (0 production lines); M13/M16 mutation-gap tests. Backlog added: gitflow-trunk-based-model, consumer-gitflow-server-side-enforcement. Proposed bugs awaiting operator confirmation: memory.py check passes an over-long tldr that doctor LINT-1 rejects (MEDIUM); LINT-1 raw output lines break the doctor line format (LOW); a contract test reads ignored .pyc under public/ (INFO). Follow-up: release.py memory refusal fix line is bare, not absolute."
+    },
+    {
+      "ts": "2026-09-25T04:05:26Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (prior candidate closed at 864645f3)"
+    },
+    {
+      "ts": "2026-09-25T04:15:57Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate defined at fa569482; phase IMPLEMENTATION."
+    }
+  ]
+}

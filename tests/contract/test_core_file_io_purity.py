@@ -3,7 +3,7 @@
 Core file-I/O purity AST ratchet (release v0.1.54, FR7 / T-54-12).
 
 `architecture.md` names the `core/` modules that are *authorized* file-I/O exceptions —
-``specs_backup``, ``specs_version``, ``workspace_resolver``, ``atomic_write``,
+``specs_version``, ``workspace_resolver``, ``atomic_write``,
 ``invocation`` and ``session_store`` (release K1: the "One Invocation" deepening moved
 ``core.specs_resolver`` and ``features.spec_context.session_identity`` into this pair —
 same authorized-exception status, new names, no net growth). The two import-linter contracts
@@ -49,8 +49,7 @@ pytestmark = pytest.mark.contract
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _CORE_DIR = _REPO_ROOT / "dadaia_workspace" / "core"
 
-# Modules whose file I/O is architecture-authorized (specs_backup migrates consumer trees;
-# specs_version rewrites the pattern-version file; specs_repair removes unfilled
+# Modules whose file I/O is architecture-authorized (specs_version rewrites the pattern-version file; specs_repair removes unfilled
 # placeholder atoms from old-scaffold trees (v0.2.9 — the one home both repair surfaces,
 # features.specs and features.migrate, may import without a forbidden sibling edge);
 # specs_resolver + workspace_resolver walk
@@ -70,7 +69,6 @@ _CORE_DIR = _REPO_ROOT / "dadaia_workspace" / "core"
 # (seven) — out of this task's write scope (specs/** is off-limits here).
 _AUTHORIZED_STEMS: frozenset[str] = frozenset(
     {
-        "specs_backup",
         "specs_repair",
         "specs_version",
         "workspace_resolver",
@@ -78,6 +76,9 @@ _AUTHORIZED_STEMS: frozenset[str] = frozenset(
         "invocation",
         "session_store",
         "handoff_index",
+        # T-050-10 (AC3.2): reads the shipped-hashes history beside the templates; moved
+        # to core so onboarding (a feature) and the specs doctor share it.
+        "template_history",
     }
 )
 

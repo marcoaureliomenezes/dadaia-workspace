@@ -178,7 +178,7 @@ class MemoryValidator:
                         description=(
                             f"{path.relative_to(self.specs_dir)} is an unfilled placeholder "
                             "atom (template markers never replaced) — remove it or fill it "
-                            "with real content (`dadaia doctor --fix` removes it)"
+                            "with real content"
                         ),
                         path=str(path),
                         fixable=True,
@@ -258,10 +258,7 @@ class MemoryValidator:
                 SpecsDoctorIssue(
                     code="FIXED-1" if body is None else "FIXED-2",
                     severity=Severity.ERROR,
-                    description=(
-                        f"{rel}: fixed law section `{section_id}` {state} — "
-                        "`dadaia doctor --fix` inserts or refreshes it"
-                    ),
+                    description=(f"{rel}: fixed law section `{section_id}` {state}"),
                     path=str(path),
                     fixable=True,
                 )

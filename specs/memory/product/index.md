@@ -18,8 +18,8 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `public-asset-distribution` | public-asset-distribution | Public assets staged once, projected into the root map, scoped AGENTS.md, .agents/ and each registered harness's files; doctor reports drift. |
-| `pypi-distribution` | pypi-distribution | The PyPI package on one version axis, two console-script names, the OIDC pipeline that also publishes the skills repo, the wheel contract and the docs site. |
+| `public-asset-distribution` | public-asset-distribution | Public assets staged once, projected into the root map, scoped AGENTS.md, .agents/ and each harness's files, with scaffold and scripts; doctor reports drift. |
+| `pypi-distribution` | pypi-distribution | The PyPI package on one version axis, two console-script names, the OIDC pipeline, the wheel contract and the docs folder. |
 
 ### harness
 
@@ -46,13 +46,13 @@
 | `capabilities` | capabilities | dadaia capabilities [--json] prints the installed contract: distribution and specs pattern versions, status tokens, the live verbs and harnesses. |
 | `ci-preflight` | ci-preflight | dadaia ci preflight runs the library's CI checks locally — ruff format, ruff check, mypy --strict, lint-imports, pytest — and refuses outside the source repo. |
 | `consumer-agent-support` | Consumer validation gate | A consumer-side validation agent running the shipped recipe on a real workspace is the release gate; no wheel publishes until every statement reports PASS. |
-| `context-management` | context-management | ALIVE/DEAD registry of one main repo plus N associated repos; one resolution per call; a bind names the session's scope and drives memory injection. |
+| `context-management` | context-management | ALIVE/DEAD registry of a main repo plus associated repos; create clones, hooks, ALIVEs and binds in one step; a bind names the session's scope. |
 | `context-portability` | context-portability | dadaia export writes the workspace's context set to one file; dadaia import registers each unknown context DEAD elsewhere, ready for dadaia context alive. |
 | `cross-platform-portability` | cross-platform-portability | Linux, macOS and Windows through one platform capability seam, injected adapters, Python hooks and cross-OS CI legs. |
 | `server-registry` | server-registry | Dev-server port registry with TTL and PID tracking so parallel sessions never collide — one stdlib skill script over one JSON state file; no CLI verb. |
-| `specs-migration` | specs-migration | dadaia specs upgrade walks a specs/ tree from pattern 6 to the canonical 7 and repairs template leftovers; dadaia migrate lifts a v1 context registry to v2. |
+| `specs-migration` | specs-migration | specs init brings specs/ to the canon (scaffold, upgrade, or specs-bkp on consent), never committing; specs upgrade walks 6 to 7; migrate lifts registry v1. |
 | `workspace-doctor` | workspace-doctor | dadaia doctor is the one compliance check — workspace, specs and ledgers sections, one line per finding, exit 1 with a fix line; --fix moves slop, TTL deletes. |
-| `workspace-init` | workspace-init | Idempotent bootstrap — dadaia init <dir> --harness <name> [--repo <url>] — venv, zones, law, one harness; with --repo the first context ALIVE and bound. |
+| `workspace-init` | workspace-init | Level 1 — uvx dadaia-workspace init [DIR] provisions venv, zones, law, one harness; re-init upgrades; --repo adds level 2; next step derived from disk. |
 
 ### sdd
 
@@ -61,5 +61,5 @@
 | `audits-canon` | audits-canon | Audits are committed three-pillar reviews over a sha window, their findings moved by audit.py; decisions are decisions.jsonl records the operator accepts. |
 | `backlog-ledger` | backlog-ledger | The operator's demand queue: BACKLOG.json active[] plus one histo record per exit; backlog.py writes it, dadaia doctor judges bound subjects. |
 | `bug-ledger` | bug-ledger | One bug record per line in BUGS.jsonl, registered after operator confirmation, closed only by a transition carrying evidence; bugs.py writes it. |
-| `release-lifecycle` | release-lifecycle | One live release grown by closed-scope candidates; release.py moves _RELEASE.json; closure is gated on a memory reconciliation; promote merges the release PR. |
+| `release-lifecycle` | release-lifecycle | Closed-scope candidates grow one live release, each defined from an as-is review; release.py writes _RELEASE.json; memory gates closure; promote merges a PR. |
 | `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write), one fix line per BLOCK, chokepoints at the push. |

@@ -1,7 +1,7 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.7",
-  "phase": "CLOSURE",
+  "phase": "ARCHIVED",
   "defined": {
     "sha": "062332d4",
     "ts": "2026-09-23T01:01:47Z"
@@ -10,7 +10,11 @@
     "sha": "184e67a8",
     "ts": "2026-09-23T01:05:05Z"
   },
-  "shipped": null,
+  "shipped": {
+    "sha": "2d1f4351a46c8081f488a055d36c89abc20f6af9",
+    "ts": "2026-09-23T03:43:08Z",
+    "pr": 264
+  },
   "log": [
     {
       "ts": "2026-09-12T18:28:07Z",
@@ -752,6 +756,123 @@
       "changed": [
         "pypi-distribution"
       ]
+    },
+    {
+      "ts": "2026-09-24T01:17:51Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over e050eeb4a8861f0b3c9f0231df78ba740a53da7d..7b60b0e46c68: 0 reviewed, 1 changed.",
+      "since": "e050eeb4a8861f0b3c9f0231df78ba740a53da7d",
+      "until": "7b60b0e46c68ccff95c6cc4429666401f7e60adb",
+      "reviewed": [],
+      "changed": [
+        "pypi-distribution"
+      ]
+    },
+    {
+      "ts": "2026-09-24T01:42:20Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 7b60b0e46c68ccff95c6cc4429666401f7e60adb..c0f13acb2034: 2 reviewed, 1 changed.",
+      "since": "7b60b0e46c68ccff95c6cc4429666401f7e60adb",
+      "until": "c0f13acb20342d1c86148854a03df75a96bd644e",
+      "reviewed": [
+        "agentic-entities",
+        "pypi-distribution"
+      ],
+      "changed": [
+        "sdd-gate-v3"
+      ]
+    },
+    {
+      "ts": "2026-09-24T01:49:57Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over c0f13acb20342d1c86148854a03df75a96bd644e..3bcbb7e1574a: 1 reviewed, 0 changed.",
+      "since": "c0f13acb20342d1c86148854a03df75a96bd644e",
+      "until": "3bcbb7e1574a70576ab5a56f470cdc04bb556f41",
+      "reviewed": [
+        "agentic-entities"
+      ],
+      "changed": []
+    },
+    {
+      "ts": "2026-09-24T03:05:33Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 3bcbb7e1574a70576ab5a56f470cdc04bb556f41..0b0322677285: 2 reviewed, 1 changed.",
+      "since": "3bcbb7e1574a70576ab5a56f470cdc04bb556f41",
+      "until": "0b03226772857e42c3965b1ccd5209531b761034",
+      "reviewed": [
+        "specs-migration",
+        "pypi-distribution"
+      ],
+      "changed": [
+        "workspace-doctor"
+      ]
+    },
+    {
+      "ts": "2026-09-24T03:20:15Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 0b03226772857e42c3965b1ccd5209531b761034..6b93c665e5ad: 10 reviewed, 2 changed.",
+      "since": "0b03226772857e42c3965b1ccd5209531b761034",
+      "until": "6b93c665e5ada81d04683632880b0139cb177e3e",
+      "reviewed": [
+        "public-asset-distribution",
+        "pypi-distribution",
+        "harness-claude-code",
+        "harness-codex",
+        "harness-copilot",
+        "harness-cursor",
+        "harness-devin",
+        "harness-kimi-code",
+        "spec-context-project",
+        "workspace-init"
+      ],
+      "changed": [
+        "context-management",
+        "context-portability"
+      ]
+    },
+    {
+      "ts": "2026-09-24T03:26:47Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 6b93c665e5ada81d04683632880b0139cb177e3e..22b98f667f01: 1 reviewed, 2 changed.",
+      "since": "6b93c665e5ada81d04683632880b0139cb177e3e",
+      "until": "22b98f667f013decf14962b7a43a7c89b72bd88c",
+      "reviewed": [
+        "agentic-entities"
+      ],
+      "changed": [
+        "pypi-distribution",
+        "workspace-init"
+      ]
+    },
+    {
+      "ts": "2026-09-24T03:46:36Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 22b98f667f013decf14962b7a43a7c89b72bd88c..4bfcd67b9b20: 4 reviewed, 2 changed.",
+      "since": "22b98f667f013decf14962b7a43a7c89b72bd88c",
+      "until": "4bfcd67b9b20995d411189518ac243763cffda7a",
+      "reviewed": [
+        "agentic-entities",
+        "pypi-distribution",
+        "spec-context-project",
+        "workspace-doctor"
+      ],
+      "changed": [
+        "workspace-init",
+        "context-management"
+      ]
+    },
+    {
+      "ts": "2026-09-24T05:00:00Z",
+      "agent": "main-thread",
+      "kind": "merge",
+      "text": "SHIPPED + PUBLISHED: release PR #264 squash 2d1f4351 on main; PyPI 0.4.7 published by release.yml (ADR 0026), install from PyPI verified with uvx. Post-publish bug fixes on feature/0.4.7 (PR #270, 20 commits, reviewer APPROVED 22a9ff72) carried into feature/0.4.8 by merge 9e7af82f."
     }
   ]
 }

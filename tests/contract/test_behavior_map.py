@@ -926,7 +926,7 @@ _SPECS_AGENTS_SOURCE_TEMPLATE = "specs-AGENTS.md"
 def _projected_specs_agents_relpath(repo_root: Path) -> str | None:
     """Prove — by actually EXECUTING the real installer mapping, never a second
     hand-kept allowlist (D4/D10) — that ``specs/AGENTS.md`` is a projected INSTANCE
-    path: ``dadaia_workspace.features.specs.scaffolder.scaffold`` writes it from
+    path: ``dadaia_workspace.features.specs.canon.scaffold`` writes it from
     ``dadaia_workspace/public/templates/specs-AGENTS.md`` (the generating public asset)
     into any ``<specs_dir>/AGENTS.md`` — at the workspace root and inside every
     ``repos/<slug>/`` alike. It is deliberately never tracked in ANY checkout of this
@@ -942,18 +942,18 @@ def _projected_specs_agents_relpath(repo_root: Path) -> str | None:
     if not source.exists():
         return None
 
-    from dadaia_workspace.features.specs.scaffolder import scaffold
+    from dadaia_workspace.features.specs.canon import scaffold
 
     with tempfile.TemporaryDirectory() as scratch:
         scratch_specs_dir = Path(scratch) / "specs"
-        result = scaffold(
-            specs_dir=scratch_specs_dir,
+        created = scaffold(
+            scratch_specs_dir,
             project_name="citation-enforcer-projection-probe",
             force=True,
-            templates_dir=templates_dir,
+            public_dir=templates_dir.parent,
         )
         target = scratch_specs_dir / _PROJECTED_SPECS_TARGET_RELPATH
-        if result.errors or target not in result.created:
+        if target not in created:
             return None
         if target.read_text(encoding="utf-8") != source.read_text(encoding="utf-8"):
             return None
@@ -981,7 +981,7 @@ def test_projected_specs_agents_md_citation_survives_bare_checkout() -> None:
     """Regression — bug ``citation-enforcer-resolves-projected-instance-paths-
     against-the-checkout`` (HIGH). ``specs/AGENTS.md`` is cited by public docs; it is
     an INSTANCE reality that
-    ``dadaia_workspace.features.specs.scaffolder.scaffold`` projects from
+    ``dadaia_workspace.features.specs.canon.scaffold`` projects from
     ``dadaia_workspace/public/templates/specs-AGENTS.md``, which this repo's own
     ``.gitignore``/repo-hygiene job both forbid ever tracking — so a bare CI clone
     never has it on disk even though a locally-instantiated workspace does. This test
@@ -1203,3 +1203,49 @@ def test_every_self_invoked_dadaia_verb_exists() -> None:
         if not any(words[:n] in leaves for n in range(len(words), 0, -1))
     ]
     assert violations == [], "self-invoked dead verb(s):\n" + "\n".join(violations)
+
+
+#: `memory.py drift` — a verb inline after the script name, inside the backticks.
+_INLINE_VERB_RE = re.compile(r"\b([a-z]+)\.py ([a-z][a-z-]*)")
+#: `memory.py` — `catalog generate`, `check` — a verb list following the script name.
+_LISTED_VERBS_RE = re.compile(r"\b([a-z]+)\.py` — ((?:`[a-z][^`]*`(?:, )?)+)")
+_ADD_PARSER_RE = re.compile(r"add_parser\(\s*\"([a-z][a-z-]*)\"")
+
+
+def _skill_script_verbs() -> dict[str, set[str]]:
+    """Each public skill script's argparse verbs, read from the `add_parser` literals of
+    the script and its private `_*.py` siblings — one flat set per script name."""
+    verbs: dict[str, set[str]] = {}
+    for script in sorted(_PUBLIC.glob("skills/*/scripts/[a-z]*.py")):
+        found = verbs.setdefault(script.stem, set())
+        for source in [script, *script.parent.glob(f"_{script.stem}*.py")]:
+            found.update(_ADD_PARSER_RE.findall(source.read_text(encoding="utf-8")))
+    return {name: found for name, found in verbs.items() if found}
+
+
+def test_every_cited_skill_script_verb_exists() -> None:
+    """Intent: CONTRACT — bug `spec-navigator-cites-dead-memory-verb-and-false-binding-claim`.
+
+    `dead_verb_citations_in_tree` resolves `dadaia <verb>`; a skill script's verbs had no
+    reader, so `memory.py product add` stayed cited after the verb was gone. On a line
+    citing `<script>.py`, the verb after it — inline (`memory.py drift`) or as the
+    backticked list that follows (`memory.py` — `catalog generate`, …) — must be one of
+    the script's `add_parser` names."""
+    verbs = _skill_script_verbs()
+    assert "memory" in verbs and "catalog" in verbs["memory"], "script verb scan mis-rooted"
+    violations: list[str] = []
+    for md_path in sorted(_PUBLIC.rglob("*.md")):
+        rel = md_path.relative_to(_REPO_ROOT).as_posix()
+        for number, line in enumerate(md_path.read_text(encoding="utf-8").splitlines(), 1):
+            cited = [(m.group(1), m.group(2)) for m in _INLINE_VERB_RE.finditer(line)]
+            for listed in _LISTED_VERBS_RE.finditer(line):
+                cited += [
+                    (listed.group(1), v.split()[0])
+                    for v in re.findall(r"`([^`]+)`", listed.group(2))
+                ]
+            violations += [
+                f"{rel}:{number}: `{script}.py {verb}` is not a verb of the script"
+                for script, verb in cited
+                if script in verbs and verb not in verbs[script]
+            ]
+    assert violations == [], "\n".join(violations)

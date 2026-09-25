@@ -34,7 +34,7 @@ import pytest
 
 from dadaia_workspace.features.specs import SpecsDoctor
 from dadaia_workspace.features.specs import canon as canon_mod
-from dadaia_workspace.features.specs.scaffolder import scaffold
+from dadaia_workspace.features.specs.canon import scaffold
 
 pytestmark = pytest.mark.unit
 
@@ -57,10 +57,7 @@ def _assert_canon_and_doctor_clean(specs_dir: Path) -> None:
 def _fresh_root_specs(tmp_path: Path) -> Path:
     """Fresh root-level specs/ tree — the ``dadaia specs init`` shape."""
     specs_dir = tmp_path / "specs"
-    result = scaffold(
-        specs_dir=specs_dir, project_name="root-project", force=False, templates_dir=_TEMPLATES_DIR
-    )
-    assert result.errors == [], result.errors
+    scaffold(specs_dir, project_name="root-project", force=False, public_dir=_TEMPLATES_DIR.parent)
     return specs_dir
 
 
@@ -71,10 +68,7 @@ def _fresh_repo_specs(tmp_path: Path) -> Path:
     *specs_dir*) — this case proves the canon table's cleanliness property does not
     depend on being scaffolded at a workspace root."""
     specs_dir = tmp_path / "repos" / "my-repo" / "specs"
-    result = scaffold(
-        specs_dir=specs_dir, project_name="repo-project", force=False, templates_dir=_TEMPLATES_DIR
-    )
-    assert result.errors == [], result.errors
+    scaffold(specs_dir, project_name="repo-project", force=False, public_dir=_TEMPLATES_DIR.parent)
     return specs_dir
 
 
@@ -131,10 +125,9 @@ def test_scaffold_then_check_tree_and_doctor_are_both_clean(tmp_path, make_tree)
     _assert_canon_and_doctor_clean(specs_dir)
 
 
-def test_canon_scaffold_bare_call_matches_scaffolder_wrapper_output(tmp_path: Path) -> None:
-    """``canon.scaffold`` (the design-mandated ``scaffold(specs_dir) -> list[Path]``
-    shape) is clean on its own, with zero caller-supplied context — not merely through
-    the CLI-facing ``scaffolder.scaffold`` wrapper's richer signature."""
+def test_canon_scaffold_bare_call_is_clean(tmp_path: Path) -> None:
+    """``canon.scaffold(specs_dir) -> list[Path]`` is clean with zero caller-supplied
+    context (no project name, no force)."""
     specs_dir = tmp_path / "specs"
     created = canon_mod.scaffold(specs_dir, public_dir=_PUBLIC_DIR)
     assert created, "canon.scaffold must write at least the required_at_birth entries"

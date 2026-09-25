@@ -1636,100 +1636,53 @@ def test_resolvable_remote_sha_and_new_branch_fallback_agree_on_the_same_final_s
 
 
 # ---------------------------------------------------------------------------------------
-# list_tree_paths / parents (v0.5.0 specs-canon closure, operator ruling 2026-08-28)
+# publishes_nothing (0.5.0 AC5.1/AC5.2, ADR 0036): a branch birth publishes no new object
 # ---------------------------------------------------------------------------------------
 
 
-def test_parents_of_a_child_commit_is_the_base(tmp_path: Path) -> None:
+def _published_repo(tmp_path: Path) -> tuple[Path, str]:
+    """A repo whose one commit is already on a bare ``origin`` (tracked locally)."""
+    remote = tmp_path / "origin.git"
+    _git(["init", "--bare", str(remote)], tmp_path)
     repo = tmp_path / "repo"
     _init_repo(repo)
     (repo / "a.txt").write_text("first\n")
-    base_sha = _commit(repo, "c1")
+    sha = _commit(repo, "c1")
+    _git(["remote", "add", "origin", str(remote)], repo)
+    _git(["push", "-q", "origin", "HEAD:refs/heads/main"], repo)
+    return repo, sha
+
+
+def test_a_commit_already_on_the_remote_publishes_nothing(tmp_path: Path) -> None:
+    repo, sha = _published_repo(tmp_path)
+    assert GitSubprocessObjectReader().publishes_nothing(repo, sha)
+
+
+def test_a_new_commit_publishes_something(tmp_path: Path) -> None:
+    repo, _ = _published_repo(tmp_path)
     (repo / "a.txt").write_text("second\n")
-    tip_sha = _commit(repo, "c2")
-
-    reader = GitSubprocessObjectReader()
-    assert reader.parents(repo, tip_sha) == (base_sha,)
+    assert not GitSubprocessObjectReader().publishes_nothing(repo, _commit(repo, "c2"))
 
 
-def test_parents_of_a_root_commit_is_empty(tmp_path: Path) -> None:
+def test_an_empty_root_commit_publishes_nothing(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     _init_repo(repo)
-    (repo / "a.txt").write_text("first\n")
-    root_sha = _commit(repo, "c1")
-
-    reader = GitSubprocessObjectReader()
-    assert reader.parents(repo, root_sha) == ()
+    _git(["commit", "-q", "--allow-empty", "-m", "root"], repo)
+    sha = _git(["rev-parse", "HEAD"], repo).stdout.strip()
+    assert GitSubprocessObjectReader().publishes_nothing(repo, sha)
 
 
-def test_parents_of_an_unresolvable_sha_is_empty_never_raises(tmp_path: Path) -> None:
+def test_an_empty_commit_on_new_history_publishes_something(tmp_path: Path) -> None:
+    """Only a PARENTLESS empty commit is contentless; an empty child carries its parent."""
     repo = tmp_path / "repo"
     _init_repo(repo)
-    (repo / "a.txt").write_text("first\n")
-    _commit(repo, "seed")
-
-    reader = GitSubprocessObjectReader()
-    assert reader.parents(repo, "a" * 40) == ()
-
-
-def test_parents_of_an_option_shaped_sha_is_empty_never_raises(tmp_path: Path) -> None:
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    (repo / "a.txt").write_text("first\n")
-    _commit(repo, "seed")
-
-    reader = GitSubprocessObjectReader()
-    assert reader.parents(repo, "--upload-pack=evil") == ()
+    _git(["commit", "-q", "--allow-empty", "-m", "root"], repo)
+    _git(["commit", "-q", "--allow-empty", "-m", "child"], repo)
+    sha = _git(["rev-parse", "HEAD"], repo).stdout.strip()
+    assert not GitSubprocessObjectReader().publishes_nothing(repo, sha)
 
 
-def test_resolve_ref_of_head_is_the_tip(tmp_path: Path) -> None:
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    (repo / "a.txt").write_text("first\n")
-    tip_sha = _commit(repo, "c1")
-
-    reader = GitSubprocessObjectReader()
-    assert reader.resolve_ref(repo, "HEAD") == tip_sha
-
-
-def test_resolve_ref_of_an_absent_ref_is_none(tmp_path: Path) -> None:
-    """A fresh clone with no remote-tracking develop: ``None``, never a raise — the
-    liveness set simply shrinks (``live_verdict_shas``)."""
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    (repo / "a.txt").write_text("first\n")
-    _commit(repo, "c1")
-
-    reader = GitSubprocessObjectReader()
-    assert reader.resolve_ref(repo, "refs/remotes/origin/develop") is None
-
-
-def test_resolve_ref_rejects_an_option_shaped_ref(tmp_path: Path) -> None:
-    """CWE-88 — the same second-layer shape defence every other adapter call applies."""
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    (repo / "a.txt").write_text("first\n")
-    _commit(repo, "c1")
-
-    reader = GitSubprocessObjectReader()
-    assert reader.resolve_ref(repo, "--output=/tmp/x") is None
-
-
-def test_parents_of_a_merge_commit_lists_both_lines_first_parent_first(tmp_path: Path) -> None:
-    """The shape `live_verdict_shas` reads on develop right after a feature merge."""
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    (repo / "base.txt").write_text("base\n", encoding="utf-8")
-    base_sha = _commit(repo, "base")
-    subprocess.run(["git", "checkout", "-q", "-b", "feature/x"], cwd=repo, check=True)
-    (repo / "feature.txt").write_text("feature\n", encoding="utf-8")
-    feature_sha = _commit(repo, "feature")
-    subprocess.run(["git", "checkout", "-q", "-"], cwd=repo, check=True)
-    subprocess.run(
-        ["git", "merge", "-q", "--no-ff", "-m", "merge", "feature/x"], cwd=repo, check=True
-    )
-    merge_sha = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
-    ).stdout.strip()
-    reader = GitSubprocessObjectReader()
-    assert reader.parents(repo, merge_sha) == (base_sha, feature_sha)
+@pytest.mark.parametrize("sha", ["a" * 40, "--upload-pack=evil"])
+def test_an_unresolvable_or_option_shaped_sha_fails_closed(tmp_path: Path, sha: str) -> None:
+    repo, _ = _published_repo(tmp_path)
+    assert not GitSubprocessObjectReader().publishes_nothing(repo, sha)

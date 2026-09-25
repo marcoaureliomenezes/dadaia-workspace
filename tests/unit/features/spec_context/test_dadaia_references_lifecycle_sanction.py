@@ -10,7 +10,7 @@ consumer actually shares — never a rule bolted onto each verb (A10.3):
 2. A10.2 — a reference clone sits OUTSIDE the context lifecycle: no lifecycle verb can ever
    resolve, bind, alive, dead or GC it. This is proven twice: once at the ONE shared
    enumeration seam every lifecycle verb funnels context resolution through
-   (``core.invocation.resolve`` / ``_repo_slug_under_repos``, scoped to
+   (``core.invocation.resolve`` / ``repo_slug_under_repos``, scoped to
    ``<workspace_root>/repos/`` only — a reference clone under ``.dadaia/references/`` is
    structurally unreachable from it), and once on a REAL verb call path: the exact function
    backing ``dadaia context bind``/``show``'s no-arg resolution
@@ -104,7 +104,7 @@ def test_shared_resolution_seam_never_resolves_a_reference_clone(
 ) -> None:
     """The ONE seam every lifecycle verb (bind/alive/dead/show's default resolution)
     funnels context resolution through is ``core.invocation.resolve`` — its cwd rung
-    (``_repo_slug_under_repos``) is scoped to ``<workspace_root>/repos/`` only.
+    (``repo_slug_under_repos``) is scoped to ``<workspace_root>/repos/`` only.
     A cwd inside ``.dadaia/references/<clone>/`` sits entirely outside that tree, so the
     seam can never select the reference clone as an active context — proven directly,
     not inferred from the allowlist."""

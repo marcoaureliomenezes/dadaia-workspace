@@ -105,6 +105,9 @@ class FakeGitClient:
     def current_branch(self, path: Path) -> str:
         return self._branches.get(path, "main")
 
+    def create_branch(self, path: Path, branch: str) -> None:
+        self._branches[path] = branch
+
     def checkout(self, path: Path, branch: str) -> None:
         self.checked_out.append((path, branch))
         self._branches[path] = branch
@@ -244,6 +247,9 @@ class FakePythonEnvironmentManager:
         self.ensured.append(workspace_root)
         return f"{workspace_root}/.dadaia/.venv"
 
+    def version_change(self, workspace_root: str) -> tuple[str | None, str | None, str]:
+        return None, None, "install"
+
     def python_executable(self, workspace_root: str) -> str:
         from dadaia_workspace.core.platform import PLATFORM
 
@@ -269,3 +275,41 @@ class FakeProcessProbe:
 
     def is_pid_alive(self, pid: int) -> bool:
         return pid in self._alive_pids
+
+
+def register_dead(
+    service: Any,
+    name: str,
+    repo_slug: str,
+    repo_url: str,
+    *,
+    associated_repos: tuple[Any, ...] = (),
+) -> Any:
+    """Register a DEAD context record through the service's one validation seam —
+    the fixture shape ``dadaia import`` produces (``create`` now materializes)."""
+    from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
+
+    return service.register(
+        SpecContextProject(
+            name=name,
+            state=ContextState.DEAD,
+            repo_slug=repo_slug,
+            repo_url=repo_url,
+            created_at="2026-01-01T00:00:00+00:00",
+            alive_since=None,
+            dead_since=None,
+            associated_repos=associated_repos,
+        )
+    )
+
+
+def seed_dead_context(
+    workspace_root: Path, name: str, repo_slug: str, repo_url: str, **kw: Any
+) -> Any:
+    """``register_dead`` against the workspace's real on-disk registry — the fixture
+    for CLI tests about verbs other than ``create`` (which now clones)."""
+    from dadaia_workspace import container
+
+    return register_dead(
+        container.build_spec_context_service(workspace_root), name, repo_slug, repo_url, **kw
+    )

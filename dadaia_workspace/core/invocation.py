@@ -73,9 +73,10 @@ __all__ = [
     "Bind",
     "Invocation",
     "all_repos",
+    "alive_context_trees",
     "context_name_for_repo_slug",
-    "context_name_for_specs_dir",
     "repo_slug_for_context",
+    "repo_slug_under_repos",
     "resolve",
     "resolve_bind",
     "resolve_context_specs_dir",
@@ -187,18 +188,15 @@ def _registry_contexts(workspace_root: Path) -> list[dict[str, object]]:
     return [e for e in contexts if isinstance(e, dict)] if isinstance(contexts, list) else []
 
 
-def alive_context_slugs(workspace_root: Path) -> list[str]:
-    """The ``repos/<slug>`` dir of every ALIVE context, fail-soft to ``[]`` (F008:
-    the ONE fail-soft registry read family lives here — hooks import it, never a
-    private re-parse; ``JsonContextStore`` stays the schema-gated CRUD authority)."""
-    slugs: list[str] = []
-    for entry in _registry_contexts(workspace_root):
-        if str(entry.get("state", "")).lower() != "alive":
-            continue
-        slug = str(entry.get("repo_slug") or entry.get("name") or "")
-        if slug:
-            slugs.append(slug)
-    return slugs
+def alive_context_names(workspace_root: Path) -> list[str]:
+    """The NAME of every ALIVE context — what ``context bind`` accepts — fail-soft to
+    ``[]`` (F008: the ONE fail-soft registry read family lives here — hooks import it,
+    never a private re-parse; ``JsonContextStore`` stays the schema-gated CRUD authority)."""
+    return [
+        str(entry["name"])
+        for entry in _registry_contexts(workspace_root)
+        if str(entry.get("state", "")).lower() == "alive" and entry.get("name")
+    ]
 
 
 def _context_registered(workspace_root: Path, name: str) -> bool:
@@ -252,7 +250,7 @@ def context_name_for_repo_slug(workspace_root: Path, slug: str) -> str:
     return slug
 
 
-def _repo_slug_under_repos(workspace_root: Path, path: Path) -> str | None:
+def repo_slug_under_repos(workspace_root: Path, path: Path) -> str | None:
     """First path component of *path* under ``<workspace_root>/repos/``, sanitized
     (CWE-22/CWE-59), or ``None``. *path* need not exist."""
     repos_dir = workspace_root / "repos"
@@ -265,45 +263,6 @@ def _repo_slug_under_repos(workspace_root: Path, path: Path) -> str | None:
         return None
     slug = parts[0]
     return slug if CONTEXT_NAME_RE.fullmatch(slug) else None
-
-
-def context_name_for_specs_dir(specs_dir: Path) -> str:
-    """The context name a resolved ``specs/`` tree belongs to, or ``""``.
-
-    The inverse of :func:`resolve_context_specs_dir`, and the ONE way a caller that
-    already resolved WHERE it wrote names WHICH context it wrote for — instead of
-    reading ``$DADAIA_CONTEXT`` a second time, which says where the SESSION is bound,
-    not where the verb routed (``--context``/``--specs-dir`` both override the bind).
-    """
-    workspace_root = _root_from(specs_dir)
-    if workspace_root is None:
-        return ""
-    slug = _repo_slug_under_repos(workspace_root, specs_dir)
-    if slug is not None:
-        return context_name_for_repo_slug(workspace_root, slug)
-    if specs_dir.resolve() == (workspace_root / "specs").resolve():
-        return _self_hosting_context_name(workspace_root)
-    return ""
-
-
-def _self_hosting_context_name(workspace_root: Path) -> str:
-    """The one ALIVE context :func:`resolve_context_specs_dir` sends to the workspace-root
-    ``specs/`` tree — the inverse of its fallback rung, so the self-hosting library repo
-    names itself instead of leaving the caller to read ``$DADAIA_CONTEXT``.
-
-    The forward rule falls back whenever ``repos/<slug>/specs`` is absent, so the inverse
-    is the ALIVE context whose repo carries no ``specs/`` of its own. Two of those would
-    resolve to the SAME tree — an ambiguity no name can settle — so that returns ``""``,
-    the same silence a tree belonging to no context gets.
-    """
-    candidates = [
-        name
-        for entry in _registry_contexts(workspace_root)
-        if str(entry.get("state", "")).lower() == "alive"
-        and (name := str(entry.get("name") or entry.get("repo_slug") or ""))
-        and not (workspace_root / "repos" / str(entry.get("repo_slug") or name) / "specs").is_dir()
-    ]
-    return candidates[0] if len(candidates) == 1 else ""
 
 
 # ---------------------------------------------------------------------------
@@ -429,7 +388,7 @@ def resolve(
     if explicit:
         context_name, rung = explicit, "explicit"
     elif workspace_root is not None and target_path is not None:
-        slug = _repo_slug_under_repos(workspace_root, target_path)
+        slug = repo_slug_under_repos(workspace_root, target_path)
         if slug:
             context_name = context_name_for_repo_slug(workspace_root, slug)
             rung = "target_path"
@@ -445,7 +404,7 @@ def resolve(
             context_name, rung = session_context, "session"
 
     if context_name is None and workspace_root is not None:
-        slug = _repo_slug_under_repos(workspace_root, cwd)
+        slug = repo_slug_under_repos(workspace_root, cwd)
         if slug:
             context_name = context_name_for_repo_slug(workspace_root, slug)
             rung = "cwd"
@@ -507,15 +466,16 @@ def resolve_specs_dir(specs_dir: str | None) -> Path:
 
 
 def resolve_context_specs_dir(workspace_root: Path, context: str) -> Path:
-    """A context's ``specs/`` tree — the container-facing seam (v0.1.68 FR3 public
-    seam over the old ``_context_specs_dir``).
+    """A context's ``specs/`` tree: ``workspace_root/repos/<slug>/specs``, whether or not
+    it exists yet — a context with no tree is onboarding level 2, never a silent redirect
+    to another tree (0.4.8 R4). Derives from ``workspace_root``, never cwd."""
+    return workspace_root / "repos" / repo_slug_for_context(workspace_root, context) / "specs"
 
-    A consumer context resolves to ``workspace_root/repos/<slug>/specs``; the
-    self-hosting library repo (no ``repos/<ctx>/specs`` on disk — its specs live at the
-    workspace-root ``specs/`` tree, exactly like this very repo) falls back to
-    ``workspace_root/specs``. Both roots derive from ``workspace_root`` — never cwd.
-    """
-    specs_dir = workspace_root / "repos" / repo_slug_for_context(workspace_root, context) / "specs"
-    if not specs_dir.is_dir():
-        specs_dir = workspace_root / "specs"
-    return specs_dir
+
+def alive_context_trees(workspace_root: Path) -> dict[str, Path]:
+    """Every ALIVE context NAME -> its ``specs/`` tree, in registry order — the
+    onboarding derivation's input (0.4.8 FR6)."""
+    return {
+        name: resolve_context_specs_dir(workspace_root, name)
+        for name in alive_context_names(workspace_root)
+    }

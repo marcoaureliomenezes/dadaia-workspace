@@ -35,7 +35,7 @@ Current-doc corrections to keep active:
 - Keep the root file a global contract, not an encyclopedia — push specifics to the owning directory.
 - When the same mistake recurs twice, update the correctly-scoped AGENTS.md, not a one-off prompt.
 - `AGENTS.md` at the workspace root and every consumer repo is lib-originated (manifest-tracked); never hand-edit.
-- Author the source in `public/` and propagate via `dadaia public stage && dadaia public install`.
+- Author the source in `public/` and propagate via `.dadaia/.venv/bin/dadaia public stage && .dadaia/.venv/bin/dadaia public install`.
 - Never put long repeatable workflow into AGENTS.md — that is a skill's job.
 
 ---
@@ -88,7 +88,7 @@ prefix_rule(
 
 - Reach for a Codex Rule only for command policy, never to make the model "think" differently.
 - Candidate dadaia rules: `prompt` on `git push` (publishing follows QA/review).
-- Candidate dadaia rules: `prompt` on `dadaia context dead` and `dadaia public install` (they mutate canonical state).
+- Candidate dadaia rules: `prompt` on `.dadaia/.venv/bin/dadaia context dead` and `.dadaia/.venv/bin/dadaia public install` (they mutate canonical state).
 - Candidate dadaia rules: `forbidden` on destructive sweeps over `repos/` (user projects).
 - Projection invariant: `dadaia-command-policy.rules` must contain `prefix_rule(` and never `command_allowed(`.
 - Keep a focused test for that shape — it separates current Codex command policy from older compatibility assumptions.
@@ -205,7 +205,7 @@ prefix_rule(
 - From the payload fact: a gate's header parser must classify every `*** Add/Update/Delete File:` header.
 - Multi-file patch classification is most-restrictive-verdict-wins.
 - Whether hooks fire in interactive `codex` TUI vs headless `codex exec` is a version-qualified fact.
-- Consult the installed workspace's live probe (`dadaia public doctor`'s `codex:trust-boundary` line) instead of assuming.
+- Consult the installed workspace's live probe (`.dadaia/.venv/bin/dadaia public doctor`'s `codex:trust-boundary` line) instead of assuming.
 - Rerun the live contract after any Codex CLI upgrade.
 - The git chokepoints remain independent regardless of hook enforcement (pre-commit, pre-push).
 - Inject full context once per session on `SessionStart` (matcher `startup|resume`), keyed on `session_id`.

@@ -4,4 +4,4 @@
 - A concept takes a glossary name; a numbered code exists only where a mechanical index reads it (FR, AC, T-).
 - Every file has a canonical home and a GC path; summaries, backups, notes and scratch live in `.dadaia/tmp/` or do not exist.
 - A branch dies at merge; a candidate exists only with scope that changes behavior.
-- Measured by `dadaia doctor` (FIXED-1/2) and the slop ratchets; detection signals: `dd-code-review` SLOP.md.
+- Measured by `.dadaia/.venv/bin/dadaia doctor` (FIXED-1/2) and the slop ratchets; detection signals: `dd-code-review` SLOP.md.

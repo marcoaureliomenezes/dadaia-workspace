@@ -14,7 +14,7 @@
 ## 1. The flow
 
 - Classify every demand: Arm A (feature) or Arm B (bug); state the arm before acting.
-- Arm A: `demand -> backlog -> release candidate (SPEC/PLAN/TASKS) -> implementation + review -> memory -> closure -> promote by merging the release PR`.
+- Arm A: `demand -> backlog -> as-is review -> release candidate (SPEC/PLAN/TASKS) -> implementation + review -> memory -> closure -> promote by merging the release PR`.
 - Arm B: `propose -> operator confirms -> register -> RED test -> root-cause fix -> GREEN -> resolved`.
 - Test: does the tool break its own contract? Yes -> Arm B, fixed now. No -> Arm A, via a candidate.
 - A feature enters only through the backlog or an operator demand recorded in the SPEC `Origin`; a confirmed bug is fixed immediately.
@@ -26,7 +26,7 @@
 |---|---|
 | Intake, grill, dispatch, the review checkpoint, gates | the main thread (the operator's session) |
 | Backlog, SPEC, the product-memory pass at closure | `dd-product-engineer` |
-| PLAN, TASKS, production code and tests in any language | `dd-software-engineer` |
+| The as-is review, PLAN, TASKS, production code and tests in any language | `dd-software-engineer` |
 | Three-axis review + six lenses (architecture, security, QA, product, audit, AI surface) | `dd-code-reviewer` |
 
 - Three roles, no fourth; every retired role is a lens the reviewer applies and the engineer anticipates.
@@ -37,8 +37,8 @@
 - One PreToolUse gate blocks exactly three things: a new workspace-root entry (§4), a `dadaia`/`pip` run outside `.dadaia/.venv/bin/`, a PROTECTED or out-of-scope write.
 - Path classes: ADDITIVE (the append-only governance areas of `specs/AGENTS.md` and the runtime scratch zones of `.dadaia/AGENTS.md`) always writable; PROTECTED (session state, the projected law files) blocked; everything else MUTATING, scope-judged under `repos/<slug>/`.
 - Every BLOCK carries exactly one `fix: <command>` line; a BLOCK whose fix is itself blocked is a Stall, CRITICAL.
-- Git chokepoints: pre-push allows `feature/{M.m.p}` and refuses `develop`/`main`, a non-canon `specs/` path or a denylisted secret; both PRs need CI green and a `dd-code-reviewer` APPROVED verdict; no CI job calls a model API. Mechanics: `dd-gitflow-default`, `.dadaia/AGENTS.md`.
-- Races surface, never block; context binding: `dadaia context show --json`, `dadaia context bind <ctx>`.
+- Git chokepoints (branch names: `specs/constitution.md` `gitflow:`): pre-push allows the work branch and refuses the integration and principal branches, a non-canon `specs/` path or a denylisted secret; both PRs need CI green and a `dd-code-reviewer` APPROVED verdict; no CI job calls a model API. Mechanics: `dd-gitflow-default`, `.dadaia/AGENTS.md`.
+- Races surface, never block; context binding: `.dadaia/.venv/bin/dadaia context show --json`, `.dadaia/.venv/bin/dadaia context bind <ctx>`.
 - The gate reads no SDD artifact; procedure is skill-taught and audit-measured, never gated.
 
 ## 4. Where things are written
@@ -86,4 +86,12 @@
 | `dd-manager-orchestration` | dispatching the three roles |
 
 - Language: operator preference, default English. Tone: direct, concise, operational.
-- Instance state: `dadaia context show --json`, `dadaia doctor`, `dadaia public doctor`, `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`.
+- Instance state: `.dadaia/.venv/bin/dadaia context show --json`, `.dadaia/.venv/bin/dadaia doctor`, `.dadaia/.venv/bin/dadaia public doctor`, `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`.
+
+## 7. Onboarding — three levels
+
+- Level 1 workspace: `uvx dadaia-workspace init [DIR]`; re-running it on an existing workspace is the upgrade.
+- Level 2 context: `.dadaia/.venv/bin/dadaia context create <name> --main-repo <url> [--associated-repo <url>]...` clones, hooks and marks ALIVE; only `.dadaia/.venv/bin/dadaia context bind <ctx>` binds a session.
+- Level 3 specs: 3a `.dadaia/.venv/bin/dadaia specs init --context <ctx>` (`--replace-foreign` moves a foreign tree to `specs-bkp/`); 3b the `dd-audit-project` first pass, done when memory holds real content (never a stamp); 3c `.dadaia/.venv/bin/dadaia context baseline <ctx>` publishes.
+- A new project in an existing workspace is levels 2 + 3; procedure: `dd-cli-library` (1-2), `dd-audit-project` (3).
+- The next step is never guessed: `.dadaia/.venv/bin/dadaia doctor` (`ONBOARDING`) and SessionStart print it with its `fix:` line.

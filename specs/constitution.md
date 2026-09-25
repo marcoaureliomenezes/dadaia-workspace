@@ -1,6 +1,7 @@
 ---
 specs_pattern_version: 7
 constitution_version: 6.0.0
+gitflow: {principal: main, integration: develop, work: feature/}
 ---
 
 # Constitution — dadaia-workspace
@@ -64,5 +65,5 @@ amending release's `_RELEASE.json` `log`, never inline.
 - A concept takes a glossary name; a numbered code exists only where a mechanical index reads it (FR, AC, T-).
 - Every file has a canonical home and a GC path; summaries, backups, notes and scratch live in `.dadaia/tmp/` or do not exist.
 - A branch dies at merge; a candidate exists only with scope that changes behavior.
-- Measured by `dadaia doctor` (FIXED-1/2) and the slop ratchets; detection signals: `dd-code-review` SLOP.md.
+- Measured by `.dadaia/.venv/bin/dadaia doctor` (FIXED-1/2) and the slop ratchets; detection signals: `dd-code-review` SLOP.md.
 <!-- /dadaia:fixed slop-law -->

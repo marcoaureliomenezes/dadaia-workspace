@@ -18,8 +18,7 @@ from dadaia_workspace.core.exceptions import (
 )
 from dadaia_workspace.core.models.spec_context import ContextState
 from dadaia_workspace.features.spec_context.service import SpecContextService
-from dadaia_workspace.features.specs.canon import scaffold as canon_scaffold
-from tests.fakes import FakeContextStore, FakeGitClient
+from tests.fakes import FakeContextStore, FakeGitClient, register_dead
 from tests.helpers.privacy_fixtures import aws_key_shape, internal_host, private_ip
 
 
@@ -51,7 +50,7 @@ def service(
         context_store=store,
         git_client=git,
         workspace_root=workspace_root,
-        scaffold_specs=canon_scaffold,
+        install_hooks=lambda _repo: None,
     )
 
 
@@ -61,13 +60,13 @@ def service(
 def test_create_stores_context_and_rejects_duplicate(
     service: SpecContextService, store: FakeContextStore
 ) -> None:
-    ctx = service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    ctx = register_dead(service, "proj", "my-repo", "https://github.com/org/my-repo")
     assert store.get("proj") is not None
     assert ctx.state == ContextState.DEAD
     assert ctx.repo_slug == "my-repo"
 
     with pytest.raises(ContextAlreadyExistsError):
-        service.create("proj", "other", "https://github.com/org/other")
+        register_dead(service, "proj", "other", "https://github.com/org/other")
 
 
 # ------------------------------------------------------------------ alive (T-10b)
@@ -76,7 +75,7 @@ def test_create_stores_context_and_rejects_duplicate(
 def test_alive_clone_behavior_state_and_not_found(
     service: SpecContextService, git: FakeGitClient, workspace_root: Path
 ) -> None:
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    register_dead(service, "proj", "my-repo", "https://github.com/org/my-repo")
 
     # AC-T10b-1: alive() sets state=ALIVE, alive_since=<now>, dead_since=null; it
     # clones since the repo dir is absent.
@@ -96,7 +95,7 @@ def test_alive_clone_behavior_state_and_not_found(
     # No clone at all when the repo dir is already present before the first alive().
     other_svc = service
     (workspace_root / "repos" / "other-repo").mkdir(parents=True)
-    other_svc.create("other", "other-repo", "https://github.com/org/other-repo")
+    register_dead(other_svc, "other", "other-repo", "https://github.com/org/other-repo")
     other_svc.alive("other")
     assert len(git.cloned) == 1  # unchanged — no new clone for "other"
 
@@ -113,7 +112,7 @@ def test_dead_removes_repo_syncs_dirty_pushes_and_state_error(
     """AC-T10b-2: dead() sets state=DEAD, dead_since=<now>, syncs the dirty tracked
     tree, and pushes when a remote is present — the normal end-to-end flow, and its
     clean-tree-unchanged regression (no untracked ⇒ gate is a no-op)."""
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    register_dead(service, "proj", "my-repo", "https://github.com/org/my-repo")
     service.alive("proj")
     repo = workspace_root / "repos" / "my-repo"
     assert repo.exists()
@@ -140,7 +139,7 @@ def test_dead_ignores_residual_legacy_lock_record(
     service: SpecContextService, workspace_root: Path
 ) -> None:
     """A pre-doctrine lock file can never block a context transition."""
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    register_dead(service, "proj", "my-repo", "https://github.com/org/my-repo")
     service.alive("proj")
 
     lock_dir = workspace_root / ".dadaia" / "states" / "ctx_locks"
@@ -159,7 +158,7 @@ def test_dead_refuses_on_untracked_files_without_commit(
     """AC-R7-01: untracked files + no --commit ⇒ refuse, push nothing, repo untouched."""
     from dadaia_workspace.features.spec_context.service import DeadReviewRequiredError
 
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    register_dead(service, "proj", "my-repo", "https://github.com/org/my-repo")
     service.alive("proj")
     repo = workspace_root / "repos" / "my-repo"
     git._has_remote.add(repo)
@@ -185,7 +184,7 @@ def test_dead_with_commit_and_clean_untracked_passes(
     service: SpecContextService, git: FakeGitClient, workspace_root: Path
 ) -> None:
     """AC-R7-01: --commit + clean (secret-free) untracked files ⇒ proceeds + pushes."""
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    register_dead(service, "proj", "my-repo", "https://github.com/org/my-repo")
     service.alive("proj")
     repo = workspace_root / "repos" / "my-repo"
     git._has_remote.add(repo)
@@ -244,7 +243,7 @@ def test_dead_with_commit_blocks_on_redacted_findings(
 ) -> None:
     from dadaia_workspace.features.spec_context.service import DeadSecretFoundError
 
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    register_dead(service, "proj", "my-repo", "https://github.com/org/my-repo")
     service.alive("proj")
     repo = workspace_root / "repos" / "my-repo"
     git._has_remote.add(repo)
@@ -295,11 +294,11 @@ def test_delete_removes_dead_context_not_found_and_alive_raises(
     with pytest.raises(ContextNotFoundError):
         service.delete("ghost")
 
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    register_dead(service, "proj", "my-repo", "https://github.com/org/my-repo")
     service.alive("proj")
     with pytest.raises(ContextStateError):
         service.delete("proj")
 
-    service.create("proj2", "my-repo2", "https://github.com/org/my-repo2")
+    register_dead(service, "proj2", "my-repo2", "https://github.com/org/my-repo2")
     service.delete("proj2")
     assert store.get("proj2") is None

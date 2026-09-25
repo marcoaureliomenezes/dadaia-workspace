@@ -17,7 +17,6 @@ sources:
 - Codex is an entry harness — the `codex` TUI and headless `codex exec` — reading the root `AGENTS.md` map, the root->cwd `AGENTS.md` chain and `.agents/skills/` natively; scoped law outside that chain reaches it by skill procedure ([[agentic-entities]]).
 - `dadaia harness add codex` projects `.codex/config.toml`, `.codex/hooks.json`, `.codex/rules/dadaia-command-policy.rules` and `.codex/agents/dd-*.toml` — each persona transcoded from `.agents/agents/` with `sandbox_mode` `read-only` or `workspace-write` derived from its `activity_class`; every file is compared byte-wise against its renderer, stale persona files pruned.
 - Command policy is the Starlark `.rules` file — prefix rules over venv-form paths, the one rule dialect Codex executes.
-- Without a workspace, the standalone `dd-` skills reach a Codex user through the `dadaia-skills` repository installed into `.agents/skills` ([[public-asset-distribution]]).
 
 ## Hooks
 

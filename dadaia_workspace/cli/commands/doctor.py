@@ -25,12 +25,15 @@ import typer
 from dadaia_workspace import container
 from dadaia_workspace.cli._backlog_roots import resolve_backlog_roots
 from dadaia_workspace.cli._specs_resolution import (
+    alive_context_trees,
     resolve_context_for_cli,
     resolve_context_specs_dir_for_cli,
     resolve_specs_dir_for_cli,
 )
+from dadaia_workspace.cli.commands.context import resolve_own_session_id
 from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.cli.redact import ContextRedactor
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.doctor_rules import (
     Rule,
     SectionFinding,
@@ -39,7 +42,11 @@ from dadaia_workspace.core.doctor_rules import (
     render_finding,
     run_section,
 )
-from dadaia_workspace.core.exceptions import SchemaVersionError, WorkspaceNotInitializedError
+from dadaia_workspace.core.exceptions import (
+    ContextNotFoundError,
+    SchemaVersionError,
+    WorkspaceNotInitializedError,
+)
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.backlog import doctor as backlog_doctor
 from dadaia_workspace.features.spec_context.doctor import DoctorService, workspace_rules
@@ -47,6 +54,7 @@ from dadaia_workspace.features.specs import Severity, SpecsDoctor, doctor_adr
 from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
 from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 from dadaia_workspace.features.specs.rules import render_fix_help
+from dadaia_workspace.features.workspace import onboarding
 
 app = typer.Typer(help="Diagnose and repair workspace, specs and ledger compliance.")
 
@@ -94,7 +102,9 @@ def _build_redactor(workspace_root: Path) -> ContextRedactor:
 # ── the three sections ──────────────────────────────────────────────────────────
 
 
-def _workspace_section(service: DoctorService | None, *, expired_only: bool) -> SectionReport:
+def _workspace_section(
+    service: DoctorService | None, root: Path | None, scope: str | None, *, expired_only: bool
+) -> SectionReport:
     """`workspace`: the instance walk. Its findings already ARE the normalized record —
     the feature owns the translation of its own verdict vocabulary, so the adapter here
     is the identity and no mapping table exists anywhere. No instance around the run
@@ -103,9 +113,10 @@ def _workspace_section(service: DoctorService | None, *, expired_only: bool) -> 
         return _empty_section("workspace")
     return run_section(
         "workspace",
-        workspace_rules(expired_only=expired_only),
+        workspace_rules(expired_only=expired_only, context=scope),
         service,
         lambda _rule, finding: finding,
+        root,
     )
 
 
@@ -118,6 +129,7 @@ def _specs_render[C](rule: Rule[C, SpecsDoctorIssue], issue: SpecsDoctorIssue) -
         message=f"{issue.description}{location}",
         canonical=False,
         error=issue.severity is Severity.ERROR,
+        fix=issue.fix,
     )
 
 
@@ -126,7 +138,7 @@ def _empty_section(name: str) -> SectionReport:
     return SectionReport(name=name, findings=())
 
 
-def _specs_section(doctor: SpecsDoctor | None) -> SectionReport:
+def _specs_section(doctor: SpecsDoctor | None, root: Path | None) -> SectionReport:
     if doctor is None:
         return _empty_section("specs")
     return run_section(
@@ -134,6 +146,7 @@ def _specs_section(doctor: SpecsDoctor | None) -> SectionReport:
         SPECS_RULES,
         doctor,
         _specs_render,
+        root,
     )
 
 
@@ -153,6 +166,7 @@ def _ledgers_render(
 
 
 def _ledgers_section(
+    root: Path | None,
     specs_dir: Path | None,
     source_root: str | None,
     alias_map: str | None,
@@ -192,12 +206,14 @@ def _ledgers_section(
                 backlog_doctor.RULES,
                 context,
                 _ledgers_render,
+                root,
             ),
             run_section(
                 "ledgers",
                 doctor_adr.LEDGER_RULES,
                 specs_dir,
                 _specs_render,
+                root,
             ),
             SectionReport(name="ledgers", findings=tuple(script_findings(specs_dir))),
         ]
@@ -233,27 +249,68 @@ def _detect_public_dir(specs_dir: Path) -> Path | None:
 
 def _resolve_run(
     specs_dir: str | None, context: str | None
-) -> tuple[Path | None, DoctorService | None, Path | None]:
-    """What this run reads: ``(workspace_root, service, specs_dir)``. No instance around
-    the run (CI over a bare checkout, no ``.dadaia/states/`` above its cwd) leaves the
-    first two ``None`` — an explicit ``--specs-dir`` still gets its `specs` and `ledgers`
-    sections. Nothing to read at all is the one refusal; naming two trees is a usage
-    error, judged before any resolution."""
+) -> tuple[Path | None, DoctorService | None, str | None, Path | None]:
+    """What this run reads: ``(workspace_root, service, context, specs_dir)``. No instance
+    around the run (CI over a bare checkout, no ``.dadaia/states/`` above its cwd) leaves
+    the first three ``None`` — an explicit ``--specs-dir`` still gets its `specs` and
+    `ledgers` sections. Nothing to read at all is the one refusal; naming two trees is a
+    usage error, judged before any resolution."""
     if specs_dir is not None and context is not None:
         raise typer.BadParameter("Pass either --context or --specs-dir, not both.")
-    workspace_root: Path | None = None
-    service: DoctorService | None = None
-    target: Path | None = None
     try:
         workspace_root = resolve_workspace_root()
-        service = container.build_doctor_service(workspace_root)
-        target = _resolve_specs_dir(specs_dir, context)
-    except WorkspaceNotInitializedError:
-        target = _resolve_specs_dir(specs_dir, None) if context is None else None
-    if service is None and target is None:
-        typer.echo("Error: Workspace not initialized. Run 'dadaia init' first.", err=True)
-        raise typer.Exit(1)
-    return workspace_root, service, target
+    except WorkspaceNotInitializedError as exc:
+        if context is None and specs_dir is not None:
+            return None, None, None, resolve_specs_dir_for_cli(specs_dir)
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from None
+    service = container.build_doctor_service(workspace_root)
+    if specs_dir is not None:
+        return workspace_root, service, None, resolve_specs_dir_for_cli(specs_dir)
+    name = context or _bound_context()
+    if name is None:
+        return workspace_root, service, None, None
+    try:
+        container.build_spec_context_service(workspace_root).show(name)
+    except ContextNotFoundError as exc:
+        if context is None:  # a stale ambient bind is no bind — only a NAMED ghost refuses
+            return workspace_root, service, None, None
+        typer.echo(f"Error: {exc}", err=True)
+        typer.echo(f"fix: {fix_line(workspace_root, 'context', 'list')}", err=True)
+        raise typer.Exit(1) from None
+    target = resolve_context_specs_dir_for_cli(workspace_root, name)
+    # The ONE place a context's tree is resolved: a tree `specs init` has not stamped yet
+    # is onboarding level 2 — nothing for the specs/ledgers sections to judge (AC3.1).
+    return workspace_root, service, name, target if onboarding.specs_ready(target) else None
+
+
+def _bound_context() -> str | None:
+    try:
+        return resolve_context_for_cli(None)
+    except ValueError:
+        return None
+
+
+def _onboarding_section(
+    workspace_root: Path | None, scope: str | None, *, expired_only: bool
+) -> SectionReport:
+    """The derived next step (FR6 AC6.1) as one info finding — never an error."""
+    if workspace_root is None or expired_only:
+        return _empty_section("workspace")
+    trees = alive_context_trees(workspace_root)
+    step = onboarding.next_step(workspace_root, trees, scope, resolve_own_session_id())
+    if step is None:
+        return _empty_section("workspace")
+    finding = SectionFinding(
+        code=onboarding.CODE,
+        verdict="info",
+        message=step.text().split("\n")[0],
+        canonical=False,
+        error=False,
+        fix=step.command,
+        extra=(("step", step.id), ("kind", step.kind)),
+    )
+    return SectionReport(name="workspace", findings=(finding,))
 
 
 def _render_for(workspace_root: Path | None, *, redact: bool) -> Callable[[str], str]:
@@ -262,23 +319,6 @@ def _render_for(workspace_root: Path | None, *, redact: bool) -> Callable[[str],
     if redact and workspace_root is not None:
         return _build_redactor(workspace_root).text
     return _identity
-
-
-def _resolve_specs_dir(specs_dir: str | None, context: str | None) -> Path | None:
-    """The tree the `specs`/`ledgers` sections read, or ``None`` when this workspace has
-    none to read — an unbound session in a workspace with no specs tree still gets its
-    `workspace` section (the SessionStart reaper runs exactly there). An EXPLICIT
-    ``--specs-dir``/``--context`` that cannot be resolved still refuses: naming a tree
-    that is not there is an operator error, not an absent tree.
-    """
-    if context is not None:
-        return resolve_context_specs_dir_for_cli(resolve_workspace_root(), context)
-    if specs_dir is not None:
-        return resolve_specs_dir_for_cli(specs_dir)
-    try:
-        return resolve_specs_dir_for_cli(None)
-    except (ValueError, typer.BadParameter):
-        return None
 
 
 @app.callback(invoke_without_command=True)
@@ -332,21 +372,26 @@ def doctor(
         "--redact",
         help=(
             "Mask every Spec Context name and repo slug other than this caller's "
-            "resolved context (SPEC v0.9.0 FR8a). Default output is unchanged."
+            "resolved context. Default output is unchanged."
         ),
     ),
 ) -> None:
     """Report workspace, specs and ledger compliance; optionally repair."""
-    workspace_root, service, target = _resolve_run(specs_dir, context)
+    workspace_root, service, scope, target = _resolve_run(specs_dir, context)
     specs_doctor = _build_specs_doctor(target, public_dir)
 
     fixed = _apply_fixes(
         service, specs_doctor, target, source_root, alias_map, fix=fix, expired_only=expired_only
     )
     reports = [
-        _workspace_section(service, expired_only=expired_only),
-        _specs_section(specs_doctor),
-        _ledgers_section(target, source_root, alias_map),
+        merge_sections(
+            [
+                _workspace_section(service, workspace_root, scope, expired_only=expired_only),
+                _onboarding_section(workspace_root, scope, expired_only=expired_only),
+            ]
+        ),
+        _specs_section(specs_doctor, workspace_root),
+        _ledgers_section(workspace_root, target, source_root, alias_map),
     ]
     # Render boundary ONLY: no doctor ever sees the redactor; every finding and fix action
     # keeps carrying true names inside the sections themselves.
@@ -414,6 +459,7 @@ def _json_payload(
                             "verdict": f.verdict,
                             "message": render(f.message),
                             "fix": render(f.fix),
+                            **dict(f.extra),
                         }
                         for f in report.printable
                     ],

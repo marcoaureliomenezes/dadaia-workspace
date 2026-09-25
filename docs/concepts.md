@@ -7,8 +7,8 @@ is `dadaia_workspace/public/data/AGENTS.md`, and the walkthrough is
 
 ## Context
 
-<!-- derived-from: spec-context-project sha256:15dae861d543 -->
-<!-- derived-from: context-management sha256:0227a5e43894 -->
+<!-- derived-from: spec-context-project sha256:4984ba691799 -->
+<!-- derived-from: context-management sha256:3f48eef447f1 -->
 
 A *context* — a Spec Context Project — is one canonical `specs/` tree owned by one
 main repository, the unit for memory, backlog, bugs, releases, reports and handoffs.
@@ -28,7 +28,7 @@ memory injection into the session.
 
 ## Release and candidate
 
-<!-- derived-from: release-lifecycle sha256:09607348cc88 -->
+<!-- derived-from: release-lifecycle sha256:ebb8441fde08 -->
 
 Exactly one *release* is live, `specs/releases/<M.m.p>/`, with open scope; it grows by
 *candidates*, each a closed-scope cycle whose `SPEC.md`, `PLAN.md` and `TASKS.md` sit
@@ -41,23 +41,25 @@ is the last published one plus one patch and moves only at an operator-approved 
 
 ## The flow
 
-<!-- derived-from: release-lifecycle sha256:09607348cc88 -->
-<!-- derived-from: bug-ledger sha256:9534ded07707 -->
-<!-- derived-from: audits-canon sha256:5b000425c401 -->
+<!-- derived-from: release-lifecycle sha256:ebb8441fde08 -->
+<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
+<!-- derived-from: audits-canon sha256:80207896fd17 -->
 
 Every demand takes one of two arms. **Arm A**, a feature, leaves through a candidate:
-the picked backlog and bug set, the mandatory grill, the SPEC, PLAN and TASKS, one
-reserved task at a time, then closure — memory reconciliation, the closure `log`
+the picked backlog and bug set, the as-is review (one As-is verdict — DELETE, REBUILD,
+UPDATE, KEEP, then ADD — per touched unit, landing as PLAN §1), the mandatory grill, the
+SPEC with its `Replaces`, PLAN and TASKS, one reserved task at a time, then closure — memory reconciliation, the closure `log`
 entries, the disposition sweep (`backlog.py exit`, `audit.py disposition`/`close`,
-`bugs.py archive`), artifact GC, the `feature -> develop` merge and the operator's
-promote-or-continue choice. **Arm B**, a bug, is fixed on the live feature branch in
+`bugs.py archive`), artifact GC, the work -> integration merge (the constitution's `gitflow:`) and the operator's
+promote-or-continue choice. **Arm B**, a bug, is fixed on the live work branch in
 any phase with no SPEC, PLAN or TASKS: register, lineage, RED test, root-cause fix,
-GREEN, `resolve` with evidence, one commit. No engine drives either arm: the documents
+GREEN, `resolve` with evidence, one commit; a unit fixed twice before is rebuilt, not
+patched a third time. No engine drives either arm: the documents
 carry the ordered work, and the ledger scripts move the records.
 
 ## The gate
 
-<!-- derived-from: sdd-gate-v3 sha256:ea8939698674 -->
+<!-- derived-from: sdd-gate-v3 sha256:7a6e11d84264 -->
 
 The *gate* is one PreToolUse pre-gate evaluating root whitelist, venv guard and SDD
 gate in that order — first block wins, and a policy that raises is ALLOW. It blocks
@@ -74,26 +76,26 @@ gate — a refusal whose fix is itself refused (a Stall) cannot ship.
 
 ## Memory
 
-<!-- derived-from: context-management sha256:0227a5e43894 -->
-<!-- derived-from: workspace-doctor sha256:ef9c81d0d181 -->
-<!-- derived-from: release-lifecycle sha256:09607348cc88 -->
-<!-- derived-from: audits-canon sha256:5b000425c401 -->
+<!-- derived-from: context-management sha256:3f48eef447f1 -->
+<!-- derived-from: workspace-doctor sha256:3fa0c321c7b0 -->
+<!-- derived-from: release-lifecycle sha256:ebb8441fde08 -->
+<!-- derived-from: audits-canon sha256:80207896fd17 -->
 
 *Memory* is current product truth: the atoms under `specs/memory/product/**`, plus
 `ARCHITECTURE.md` (its `## Tech Stack` section included) and `QUALITY.md`, whose
 canonical statements change only in the commit carrying an accepted decision. A bound
-session receives the Tech Stack section and the catalog digest (`slug`, `title`,
-`tldr`, `path` per atom). At each candidate's closure, `memory.py drift` lists the
+session receives its onboarding next step while one remains, the Tech Stack section and
+the catalog digest (`slug`, `title`, `tldr`, `path` per atom). At each candidate's closure, `memory.py drift` lists the
 atoms whose sources changed, each is reconciled — delete, update, then add — and
 `RELEASE-TREE-MEMORY` keeps the release red until the reconciliation is logged.
-`dadaia doctor`'s `specs` section polices the tree: `CAT-1` (catalog equals atom
+`.dadaia/.venv/bin/dadaia doctor`'s `specs` section polices the tree: `CAT-1` (catalog equals atom
 files), `LINT-1` (frontmatter, headings, wikilinks, `sources` globs, history lines) and
 the warnings `MEM-DRIFT-1` (features package map vs the live tree) and `MEM-DRIFT-2`
 (a cited verb or path that does not exist).
 
 ## Bugs and backlog
 
-<!-- derived-from: bug-ledger sha256:9534ded07707 -->
+<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
 <!-- derived-from: backlog-ledger sha256:46382434daf2 -->
 
 Both are records with one shape and one writer script. `specs/bugs/BUGS.jsonl` holds
@@ -109,14 +111,14 @@ superseded deferred rejected`.
 
 ## Audits
 
-<!-- derived-from: audits-canon sha256:5b000425c401 -->
+<!-- derived-from: audits-canon sha256:80207896fd17 -->
 
 An *audit* is the only full-tree inspection lane, every other quality boundary being
 diff-scoped: a committed folder `specs/audits/<YYYYMMDD>-<slug>/` holding `AUDIT.md` —
 scope, the `[from-sha, HEAD]` window, method per pillar, the eight forensic metrics,
 summary — and `FINDINGS.jsonl`. Three pillars always run together over the window
 since the newest archived audit: bug history, spec compliance and memory drift. One
-audit is suggested every five releases, never mandatory, and generates exactly one
-remediation release: `audit.py disposition` rewrites a finding's disposition, release
+audit is suggested every five releases, never mandatory, and generates at most one
+remediation release (a zero-finding audit closes with none): `audit.py disposition` rewrites a finding's disposition, release
 and reason in place, and `audit.py close` refuses while any finding is undispositioned,
 appends the one `audits_histo.jsonl` record and deletes the folder.

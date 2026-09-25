@@ -4,19 +4,20 @@ Intent: CONTRACT — v0.9.0 A1.1, A1.2, A1.3, A1.4, A2.1, A2.2, A2.3, A2.4, A5.1
 A5.3, A5.4, A6.1; v0.11.0 A7.1, A7.2, A7.3, A4.5, A6.1, A6.2, A6.3, A6.6, A5.1
 
 Drives ``push_gate_decision`` with an injected fake :class:`GitObjectReader` — no real
-git, no filesystem (FR7/A7.2). Only synthetic terms/slugs ever appear here (TASKS
-standing rule): ``zz-``-prefixed values, never a real operator term or foreign slug.
+git, no filesystem (FR7/A7.2). Only synthetic terms ever appear here (TASKS
+standing rule): ``zz-``-prefixed values, never a real operator term.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObject
 from dadaia_workspace.features.chokepoints import push_gate_decision
-from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_refs
+from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_stdin
 from dadaia_workspace.features.specs.canon import canon_violations
 
 _SHA_A = "a" * 40
@@ -36,32 +37,14 @@ class _FakeObjectSource:
         self.calls.append((local_sha, remote_sha))
         return self.by_range.get((local_sha, remote_sha), [])
 
-    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
-        return ()
-
-    def resolve_ref(self, repo: Path, ref: str) -> str | None:
-        return None
-
-    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]:
-        return set()
-
 
 class _FailingObjectSource:
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         raise GitObjectReadError("simulated git rev-list failure")
 
-    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
-        return ()
-
-    def resolve_ref(self, repo: Path, ref: str) -> str | None:
-        return None
-
-    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]:
-        return set()
-
 
 def _refs(*lines: str) -> list[PushRef]:
-    return parse_push_refs("\n".join(lines))
+    return parse_push_stdin("\n".join(lines))[0]
 
 
 def _obj(path: str, text: str, *, sha: str = "cafef00d") -> ScannedObject:
@@ -93,6 +76,7 @@ def test_branch_push_with_denylisted_blob_in_range_is_refused(tmp_path: Path) ->
     )
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -113,6 +97,7 @@ def test_term_outside_the_range_does_not_refuse(tmp_path: Path) -> None:
     source = _FakeObjectSource(by_range={})
     decision = push_gate_decision(
         _refs(f"refs/tags/v9.9.9 {_SHA_A} refs/tags/v9.9.9 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -130,6 +115,7 @@ def test_deletion_ref_is_never_scanned(tmp_path: Path) -> None:
     source = _FakeObjectSource()
     decision = push_gate_decision(
         _refs(f"refs/heads/old {_ZERO} refs/heads/old {_SHA_A}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -157,6 +143,7 @@ def test_shared_blob_across_two_refs_is_deduped(tmp_path: Path) -> None:
             f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}",
             f"refs/tags/v2 {_SHA_B} refs/tags/v2 {_ZERO}",
         ),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -177,6 +164,7 @@ def test_tainted_tag_push_is_refused(tmp_path: Path) -> None:
     )
     decision = push_gate_decision(
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -194,6 +182,7 @@ def test_clean_tag_push_is_allowed_with_no_verdict_required(tmp_path: Path) -> N
     source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): [_obj("clean.md", "nothing here\n")]})
     decision = push_gate_decision(
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -211,7 +200,8 @@ def test_clean_tag_push_is_allowed_with_no_verdict_required(tmp_path: Path) -> N
 def test_branch_policy_refusal_precedes_the_scan(tmp_path: Path) -> None:
     source = _FailingObjectSource()  # would raise if ever called.
     decision = push_gate_decision(
-        _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"),
+        _refs(f"refs/heads/main {_SHA_A} refs/heads/main {'b' * 40}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -233,6 +223,7 @@ def test_refusal_message_shape_and_ten_item_cap(tmp_path: Path) -> None:
     source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -259,6 +250,7 @@ def test_refusal_message_shape_and_ten_item_cap(tmp_path: Path) -> None:
 def test_git_object_read_failure_refuses_naming_the_failure(tmp_path: Path) -> None:
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=_FailingObjectSource(),
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -291,6 +283,7 @@ def test_generator_denylist_terms_still_refuses_not_silently_emptied(tmp_path: P
 
     decision = push_gate_decision(
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -396,6 +389,7 @@ def test_oversized_note_appears_in_decision_warn_on_allow(tmp_path: Path) -> Non
     )
     decision = push_gate_decision(
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -418,6 +412,7 @@ def test_oversized_note_appears_in_decision_warn_on_refuse(tmp_path: Path) -> No
     )
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -430,66 +425,41 @@ def test_oversized_note_appears_in_decision_warn_on_refuse(tmp_path: Path) -> No
 
 
 # ---------------------------------------------------------------------------
-# FR5/A5.1 (v0.11.0, entry #22) — decision-layer wiring readiness: push_gate_decision
-# refuses when its injected foreign_slugs set carries a registry context's NAME and
-# its repo_slug both -- the exact shape T-110-13's widened _foreign_repo_slugs
-# (cli/commands/ci.py, tested at the integration tier over a real registry fixture in
-# tests/integration/test_push_gate_denylist.py) now supplies.
-# ---------------------------------------------------------------------------
-
-
-def test_foreign_slugs_carrying_a_registry_name_and_slug_both_refuse(tmp_path: Path) -> None:
-    dead_name = "zz-dead-context-name"
-    dead_slug = "zz-dead-context-slug"
-    source = _FakeObjectSource(
-        by_range={(_SHA_A, _ZERO): [_obj("notes.md", f"mentions {dead_name} here\n")]}
-    )
-    decision = push_gate_decision(
-        _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        foreign_slugs=(dead_name, dead_slug),
-    )
-    assert not decision.allowed
-    assert dead_name not in decision.message
-
-
-# ---------------------------------------------------------------------------
 # FR6(b)/A6.1-A6.3/A6.6 (v0.11.0, entry #23 resolution A) — the blob path itself is
 # masked at its offending segments in BOTH the denylist refusal and the FR4 oversized
 # note; a path matching nothing renders byte-identical (regression fixture).
 # ---------------------------------------------------------------------------
 
-_FOREIGN_SLUG = "zz-fake-private-owner"
+_PRIVATE_SEGMENT = "zz-fake-private-owner"
 
 
-def test_refusal_path_segment_matching_a_foreign_slug_is_masked(tmp_path: Path) -> None:
+def test_refusal_path_segment_matching_an_operator_term_is_masked(tmp_path: Path) -> None:
     objects = [
-        _obj(f"repos/{_FOREIGN_SLUG}/notes.md", f"{_SYNTHETIC_TERM} appears\n", sha="pathsha01")
+        _obj(f"repos/{_PRIVATE_SEGMENT}/notes.md", f"{_SYNTHETIC_TERM} appears\n", sha="pathsha01")
     ]
     source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
-        foreign_slugs=(_FOREIGN_SLUG,),
+        denylist_terms=((_SYNTHETIC_TERM, "synthetic"), (_PRIVATE_SEGMENT, "synthetic")),
     )
     assert not decision.allowed
-    assert _FOREIGN_SLUG not in decision.message  # A6.6: never unmasked, anywhere.
+    assert _PRIVATE_SEGMENT not in decision.message  # A6.6: never unmasked, anywhere.
     assert "repos/[REDACTED-PATH-1]/notes.md:1" in decision.message
     assert "pathsha01"[:12] in decision.message  # short sha untouched — still locatable.
 
 
 def test_refusal_path_with_no_matching_segment_is_byte_identical(tmp_path: Path) -> None:
-    """A6.2 regression fixture: a blob path matching none of the three term sources
+    """A6.2 regression fixture: a blob path matching no term source
     renders exactly as it did before FR6(b) — no placeholder ever appears."""
     objects = [_obj("notes/plain-file.md", f"{_SYNTHETIC_TERM} here\n", sha="cleanpath")]
     source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -503,18 +473,19 @@ def test_refusal_path_with_no_matching_segment_is_byte_identical(tmp_path: Path)
 def test_oversized_note_path_segment_is_masked_too(tmp_path: Path) -> None:
     """A6.3: the FR4 oversized note's path is masked by the SAME rule, asserted
     separately from the refusal-message case above."""
-    objects = [_oversized_obj(f"repos/{_FOREIGN_SLUG}/big.md", "clean content here\n")]
+    objects = [_oversized_obj(f"repos/{_PRIVATE_SEGMENT}/big.md", "clean content here\n")]
     source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
     decision = push_gate_decision(
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        foreign_slugs=(_FOREIGN_SLUG,),
+        denylist_terms=((_PRIVATE_SEGMENT, "synthetic"),),
     )
     assert decision.allowed
     assert decision.warn is not None
-    assert _FOREIGN_SLUG not in decision.warn  # A6.6.
+    assert _PRIVATE_SEGMENT not in decision.warn  # A6.6.
     assert "repos/[REDACTED-PATH-1]/big.md" in decision.warn
 
 
@@ -553,6 +524,7 @@ def test_refusal_path_segment_uppercase_hyphenated_variant_of_term_is_masked(
     source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -579,29 +551,21 @@ class _FailingObjectSourceWithPath:
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         raise GitObjectReadError(
             "git cat-file --batch stream desynchronised resolving prior content",
-            path=f"repos/{_FOREIGN_SLUG}/leak.md",
+            path=f"repos/{_PRIVATE_SEGMENT}/leak.md",
         )
-
-    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
-        return ()
-
-    def resolve_ref(self, repo: Path, ref: str) -> str | None:
-        return None
-
-    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]:
-        return set()
 
 
 def test_git_object_read_failure_at_a_denylisted_path_masks_the_path(tmp_path: Path) -> None:
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=_FailingObjectSourceWithPath(),
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        foreign_slugs=(_FOREIGN_SLUG,),
+        denylist_terms=((_PRIVATE_SEGMENT, "synthetic"),),
     )
     assert not decision.allowed
-    assert _FOREIGN_SLUG not in decision.message
+    assert _PRIVATE_SEGMENT not in decision.message
     assert "repos/[REDACTED-PATH-1]/leak.md" in decision.message
     assert "--no-verify" in decision.message
     # No raw repr(exception) — the standard repr shape is "GitObjectReadError(...)".
@@ -615,29 +579,29 @@ def test_same_offending_segment_gets_the_same_ordinal_across_hit_and_note(
     for both the denylist refusal AND the oversized note, so the SAME offending segment
     gets the SAME stable ordinal placeholder wherever it appears."""
     objects = [
-        _obj(f"repos/{_FOREIGN_SLUG}/leak.md", f"{_SYNTHETIC_TERM} here\n", sha="leaksha02"),
-        _oversized_obj(f"repos/{_FOREIGN_SLUG}/big.md", "clean content here\n"),
+        _obj(f"repos/{_PRIVATE_SEGMENT}/leak.md", f"{_SYNTHETIC_TERM} here\n", sha="leaksha02"),
+        _oversized_obj(f"repos/{_PRIVATE_SEGMENT}/big.md", "clean content here\n"),
     ]
     source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
-        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
-        foreign_slugs=(_FOREIGN_SLUG,),
+        denylist_terms=((_SYNTHETIC_TERM, "synthetic"), (_PRIVATE_SEGMENT, "synthetic")),
     )
     assert not decision.allowed
-    assert _FOREIGN_SLUG not in decision.message
+    assert _PRIVATE_SEGMENT not in decision.message
     assert decision.warn is not None
-    assert _FOREIGN_SLUG not in decision.warn
+    assert _PRIVATE_SEGMENT not in decision.warn
     assert "repos/[REDACTED-PATH-1]/leak.md" in decision.message
     assert "repos/[REDACTED-PATH-1]/big.md" in decision.warn
 
 
 # ═════════════════════════════════════════════════════════════════════════════════
 # v0.4.3 T-043-15/FR11 — a commit-body-shaped ScannedObject (kind="commit") is fed
-# through push_gate_decision EXACTLY like a blob — same three term layers, same
+# through push_gate_decision EXACTLY like a blob — same term layers, same
 # masked refusal shape. No service.py code changes were needed for this: scan_objects
 # is already generic over ScannedObject.kind. Intent: CONTRACT — v0.4.3 A11.1.
 # ═════════════════════════════════════════════════════════════════════════════════
@@ -661,6 +625,7 @@ def test_push_with_denylisted_term_only_in_a_commit_message_body_is_refused(
     )
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -670,78 +635,3 @@ def test_push_with_denylisted_term_only_in_a_commit_message_body_is_refused(
     assert _SYNTHETIC_TERM not in decision.message  # never unmasked
     assert "rewrite the offending commit" in decision.message  # reword/amend healing
     assert "--no-verify" in decision.message
-
-
-# ═════════════════════════════════════════════════════════════════════════════════
-# Operator ruling 2026-09-13 — a foreign slug the remote tip already publishes is not
-# a new disclosure (repository-wide amnesty over the v0.11.0 per-path one); an
-# unreadable baseline amnesties nothing (fail closed). Intent: CONTRACT.
-# ═════════════════════════════════════════════════════════════════════════════════
-
-
-@dataclass
-class _PublishedSlugObjectSource(_FakeObjectSource):
-    published: dict[str, set[str]] = field(default_factory=dict)
-    raise_on_grep: bool = False
-    grep_calls: list[tuple[str, str]] = field(default_factory=list)
-
-    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]:
-        self.grep_calls.append((sha, tuple(patterns)))
-        if self.raise_on_grep:
-            raise GitObjectReadError("simulated git grep failure")
-        return {text.lower() for text in self.published.get(sha, set())}
-
-
-def _sibling_ref() -> list[PushRef]:
-    return _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_SHA_B}")
-
-
-def test_a_foreign_slug_already_published_in_the_remote_tip_passes(tmp_path: Path) -> None:
-    source = _PublishedSlugObjectSource(
-        by_range={(_SHA_A, _SHA_B): [_obj("docs/design.md", "see zz-sibling-repo for raw\n")]},
-        published={_SHA_B: {"zz-sibling-repo"}},
-    )
-    decision = push_gate_decision(
-        _sibling_ref(),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        foreign_slugs=("zz-sibling-repo",),
-    )
-    assert decision.allowed, decision.message
-    assert source.grep_calls and source.grep_calls[0][0] == _SHA_B
-    # The baseline is searched with the detector's own whole-token pattern, never a bare term.
-    assert any(
-        "zz\\-sibling\\-repo" in p or "zz-sibling-repo" in p for p in source.grep_calls[0][1]
-    )
-
-
-def test_a_foreign_slug_not_yet_published_still_refuses(tmp_path: Path) -> None:
-    source = _PublishedSlugObjectSource(
-        by_range={(_SHA_A, _SHA_B): [_obj("docs/design.md", "see zz-sibling-repo\n")]},
-        published={_SHA_B: set()},
-    )
-    decision = push_gate_decision(
-        _sibling_ref(),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        foreign_slugs=("zz-sibling-repo",),
-    )
-    assert not decision.allowed
-    assert "foreign repo slug" in decision.message
-
-
-def test_an_unreadable_baseline_amnesties_nothing(tmp_path: Path) -> None:
-    source = _PublishedSlugObjectSource(
-        by_range={(_SHA_A, _SHA_B): [_obj("docs/design.md", "see zz-sibling-repo\n")]},
-        raise_on_grep=True,
-    )
-    decision = push_gate_decision(
-        _sibling_ref(),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        foreign_slugs=("zz-sibling-repo",),
-    )
-    assert not decision.allowed

@@ -37,7 +37,7 @@ Scope: this file governs only `specs/backlog/`.
 
 ## 4. Idea-stage freedom vs bound intents
 
-- `idea` — an unbound brainstorm; no `intents` array required; `dadaia doctor`-clean with no further edits.
+- `idea` — an unbound brainstorm; no `intents` array required; doctor-clean with no further edits.
 - `candidate` and beyond — the entry must carry a typed `intents[]` array; every subject must resolve to a canonical anchor.
 - A malformed `intents[]` or an invalid `status` is always `BL-SCHEMA`, at any status.
 
@@ -61,7 +61,7 @@ BACKLOG_PY subjects            # declared aliases + the document's own bindings
 BACKLOG_PY subjects --resolve <ref> --kind <kind>   # how one ref binds to those
 ```
 
-- It answers from those two; a `code`/`doc`/`cli` ref is judged by `dadaia doctor`, whose `BL-SCHEMA` finding names the ref it cannot resolve.
+- It answers from those two; a `code`/`doc`/`cli` ref is judged by the doctor's `BL-SCHEMA` finding, which names the ref it cannot resolve.
 - A repo with no Python sources has no `code` anchors — bind `catalog`, `doc` or `invariant`.
 
 ## 5. Relationship to releases

@@ -14,7 +14,6 @@ sources:
 
 - Kimi Code is an entry harness and an operator-installed external CLI (`kimi`), never a Python dependency.
 - It reads the root `AGENTS.md` map, the root->cwd `AGENTS.md` chain, `.agents/skills/` and `.agents/agents/` (Claude-style Markdown) natively, so its workspace projection is empty; scoped law outside the chain reaches it by skill procedure ([[agentic-entities]]).
-- Without a workspace, the standalone `dd-` skills reach a Kimi user through `npx skills add` into `.agents/skills` ([[public-asset-distribution]]).
 
 ## Hooks
 

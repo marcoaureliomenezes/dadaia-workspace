@@ -59,15 +59,20 @@ and a git tree listing (``git ls-tree``'s own native output) already produce.
 
 from __future__ import annotations
 
+import errno
 import json
-from collections.abc import Iterable
+import os
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 from typing import Literal
 
 from dadaia_workspace.core.specs_version import (
     CANONICAL_SPECS_VERSION,
+    OLDEST_UPGRADABLE_VERSION,
+    read_pattern_version,
 )
 from dadaia_workspace.core.workspace_layout import (
     CANON_ROOT_MEMBERS,
@@ -87,39 +92,45 @@ from dadaia_workspace.features.specs.memory_canon import (
 #: ``specs/AGENTS.md`` canon table). This module is their renderer and checker.
 CANON: tuple[CanonEntry, ...] = SPECS_CANON
 
+_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
+
 __all__ = [
     "CANON",
     "CANON_ROOT_MEMBERS",
+    "REPO_LAW",
     "REQUIRED_ROOT_DIRS",
     "TEMPLATES",
     "CanonEntry",
     "Violation",
     "canon_violations",
     "check_tree",
+    "classify",
     "is_canon_path",
     "scaffold",
     "scaffold_entry",
+    "scaffold_repo_law",
 ]
 
 _CONSTITUTION_STUB = """\
 ---
 specs_pattern_version: {specs_pattern_version}
+gitflow: {{principal: main, integration: develop, work: feature/}}
 ---
 # Constitution — {project_name}
 
 > **Created:** {today}
 
-## Propósito
+## Purpose
 
-Declaração atômica do propósito do projeto e suas invariantes fundamentais.
+One statement of what this project is for.
 
-## Invariantes
+## Invariants
 
-1. (Definir invariantes aqui)
+1. (State the invariants every release must keep.)
 
-## Exclusões canônicas
+## Exclusions
 
-- (Definir o que este projeto não é)
+- (State what this project is not.)
 """
 
 _BACKLOG_STUB = '{"schema": "backlog-v1", "active": []}\n'
@@ -161,6 +172,13 @@ TEMPLATES: dict[str, tuple[Kind, str]] = {
     "ADRs/AGENTS.md": ("copy", "scaffold/ADRs/AGENTS.md"),
     "ADRs/decisions.jsonl": ("static", ""),
 }
+
+
+#: The main repo's scoped law, beside ``specs/``: ``templates/<name>`` -> ``<repo>/<dest>``.
+REPO_LAW: tuple[tuple[str, str], ...] = (
+    ("repo-AGENTS.md", "AGENTS.md"),
+    ("tests-AGENTS.md", "tests/AGENTS.md"),
+)
 
 
 def is_canon_path(rel_posix: str) -> bool:
@@ -214,6 +232,16 @@ def check_tree(specs_dir: Path) -> list[Violation]:
     return violations
 
 
+TreeKind = Literal["absent", "dadaia", "foreign"]
+
+
+def classify(specs_dir: Path) -> TreeKind:
+    """``absent`` (no directory), ``dadaia`` (constitution stamped >= 6) or ``foreign``."""
+    if not specs_dir.exists():
+        return "absent"
+    return "dadaia" if read_pattern_version(specs_dir) >= OLDEST_UPGRADABLE_VERSION else "foreign"
+
+
 def default_public_dir() -> Path:
     """``dadaia_workspace/public/`` resolved relative to this installed module — the
     same module-relative idiom already used by ``features.spec_artifacts.memory``
@@ -264,11 +292,10 @@ def scaffold(
 ) -> list[Path]:
     """Write every ``required_at_birth`` CANON entry — scaffold is canon rendered.
 
-    An existing target is left untouched unless *force*. Returns the paths actually
+    An existing target is left untouched unless *force*; a symlinked target is never
+    written through. Returns the paths actually
     (re)written, in :data:`CANON` order; a skipped (already-present, not forced) entry
-    is omitted — the caller that also needs skip/error bookkeeping is
-    ``features.specs.scaffolder.scaffold`` (the CLI-facing wrapper, which pre-checks
-    existence to report ``ScaffoldResult.skipped`` without changing this fold).
+    is omitted.
     """
     resolved_public = public_dir if public_dir is not None else default_public_dir()
     context = {
@@ -277,21 +304,69 @@ def scaffold(
         "tree_name": specs_dir.resolve().parent.name,
         "specs_pattern_version": str(CANONICAL_SPECS_VERSION),
     }
-    created: list[Path] = []
-    for entry in CANON:
+    writes: list[tuple[Path, Callable[[], str], bool]] = [
         # Only "no destination" disqualifies an entry: a required_at_birth row always
         # has a renderer (``memory/product/catalog.json``'s is computed, not a template —
         # a prior guard skipped it for having no template string and silently dropped it
         # from every fresh scaffold: fresh-specs-scaffold-fails-specs-doctor's own class).
-        if not entry.required_at_birth or entry.dest is None:
-            continue
-        target = specs_dir / entry.dest
-        if target.exists() and not force:
+        (
+            specs_dir / entry.dest,
+            partial(_render, entry, public_dir=resolved_public, context=context),
+            force,
+        )
+        for entry in CANON
+        if entry.required_at_birth and entry.dest is not None
+    ]
+    return _write_absent(specs_dir, writes)
+
+
+def scaffold_repo_law(
+    repo: Path, *, project_name: str, public_dir: Path | None = None
+) -> list[Path]:
+    """Install the repo's scoped law (:data:`REPO_LAW`) where absent — never overwritten:
+    once written it is the operator's — and only beside a directory the repo already has
+    (the tests law governs an existing test tree). ``<repo-name>`` renders as
+    *project_name*. Returns the paths written."""
+    templates = (public_dir if public_dir is not None else default_public_dir()) / "templates"
+    return _write_absent(
+        repo,
+        [
+            (
+                repo / dest,
+                partial(_fill_repo_name, templates / template, project_name),
+                False,
+            )
+            for template, dest in REPO_LAW
+            if (repo / dest).parent.is_dir()
+        ],
+    )
+
+
+def _fill_repo_name(template: Path, project_name: str) -> str:
+    return template.read_text(encoding="utf-8").replace("<repo-name>", project_name)
+
+
+def _write_absent(root: Path, writes: list[tuple[Path, Callable[[], str], bool]]) -> list[Path]:
+    """The one scaffold write under *root*: each ``(target, render, overwrite)`` through one
+    ``O_CREAT|O_NOFOLLOW`` open (``O_EXCL`` unless *overwrite*): the final component is
+    created atomically and never through a symlink (CWE-59); intermediate directories are
+    checked for escape before ``mkdir``, not atomically. An existing file or a symlinked
+    destination (ELOOP; EMLINK on BSD) is skipped; any other ``OSError`` propagates."""
+    created: list[Path] = []
+    for target, render, overwrite in writes:
+        anchor = next(p for p in (target.parent, *target.parent.parents) if p.exists() or p == root)
+        if root.is_symlink() or anchor.resolve() != root.resolve() / anchor.relative_to(root):
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(
-            _render(entry, public_dir=resolved_public, context=context), encoding="utf-8"
-        )
+        flags = os.O_WRONLY | os.O_CREAT | _NOFOLLOW | (os.O_TRUNC if overwrite else os.O_EXCL)
+        try:
+            fd = os.open(target, flags, 0o644)
+        except OSError as exc:
+            if isinstance(exc, FileExistsError) or exc.errno in (errno.ELOOP, errno.EMLINK):
+                continue
+            raise
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(render())
         created.append(target)
     return created
 

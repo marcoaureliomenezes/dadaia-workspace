@@ -17,22 +17,13 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.features.specs.scaffolder import scaffold
+from dadaia_workspace.features.specs.canon import scaffold
 
 _runner = CliRunner()
 
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent
 _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 _PUBLIC_DIR = _REPO_ROOT / "dadaia_workspace" / "public"
-
-
-def _make_workspace(root: Path) -> None:
-    """The sentinel `resolve_workspace_root()` looks for — the one doctor also runs its
-    `workspace` section, so these tests scope it to a tmp instance instead of the real
-    one the runner happens to sit in."""
-    states = root / ".dadaia" / "states"
-    states.mkdir(parents=True, exist_ok=True)
-    (states / "spec_contexts.json").write_text('{"contexts": []}', encoding="utf-8")
 
 
 def _specs_findings(output: str) -> list[dict[str, str]]:
@@ -55,13 +46,12 @@ def _make_minimal_specs(root: Path) -> Path:
     needed anymore.
     """
     specs = root / "specs"
-    result = scaffold(
-        specs_dir=specs,
+    scaffold(
+        specs,
         project_name="test-project",
         force=False,
-        templates_dir=_TEMPLATES_DIR,
+        public_dir=_TEMPLATES_DIR.parent,
     )
-    assert result.errors == [], f"Scaffold errors: {result.errors}"
     return specs
 
 
@@ -79,8 +69,7 @@ def test_doctor_clean_tree_then_remove_backlog_then_fix_recreates_then_no_fix_ne
         app,
         ["doctor", "--json", "--specs-dir", str(specs), "--public-dir", str(_PUBLIC_DIR)],
     )
-    # The exit code is the WHOLE run's (the `workspace` section scans the instance the
-    # runner sits in); this test's subject is the `specs` section's own verdict.
+    # This test's subject is the `specs` section's own verdict, not the run's exit code.
     assert _specs_errors(clean_result.output) == [], clean_result.output
 
     import shutil
@@ -103,10 +92,10 @@ def test_doctor_clean_tree_then_remove_backlog_then_fix_recreates_then_no_fix_ne
     assert not arch.exists(), "Without --fix, missing files must NOT be created"
 
 
-def test_tree8_stray_root_folder_errors_and_fix_removes_it(tmp_path: Path) -> None:
-    """v0.5.0 specs-canon closure: TREE-8 compliance is ERROR + auto-fixable — a
-    stray, non-canon top-level folder under specs/ flips the exit code non-zero,
-    and ``--fix`` removes it, restoring the baseline exit code."""
+def test_tree8_stray_root_folder_errors_and_fix_keeps_it(tmp_path: Path) -> None:
+    """TREE-8 is ERROR and never auto-fixed (bug doctor-fix-tree8-deletes-operator-
+    content, decision D8): a non-canon top-level folder flips the exit code non-zero,
+    and ``--fix`` leaves it and its content on disk, still reported."""
     specs = _make_minimal_specs(tmp_path)
 
     baseline = _runner.invoke(
@@ -115,23 +104,15 @@ def test_tree8_stray_root_folder_errors_and_fix_removes_it(tmp_path: Path) -> No
     )
     assert _specs_errors(baseline.output) == [], baseline.output
 
-    stray = specs / "scratch-legacy-folder"
+    stray = specs / "features"
     stray.mkdir()
-
-    stray_result = _runner.invoke(
-        app,
-        ["doctor", "--json", "--specs-dir", str(specs), "--public-dir", str(_PUBLIC_DIR)],
-    )
-    codes = [f["code"] for f in _specs_findings(stray_result.output)]
-    assert "TREE-8" in codes, f"Expected TREE-8 to fire on the stray folder; got {codes}"
-    assert stray_result.exit_code != 0, (
-        "TREE-8 ERROR must flip the exit code non-zero — got "
-        f"{stray_result.exit_code}:\n{stray_result.output}"
-    )
+    (stray / "login.md").write_text("# Login\n", encoding="utf-8")
 
     fix_result = _runner.invoke(
         app,
         ["doctor", "--json", "--fix", "--specs-dir", str(specs), "--public-dir", str(_PUBLIC_DIR)],
     )
-    assert not stray.exists(), f"--fix must remove the stray folder; output:\n{fix_result.output}"
-    assert _specs_errors(fix_result.output) == [], fix_result.output
+    assert (stray / "login.md").read_text(encoding="utf-8") == "# Login\n", fix_result.output
+    codes = [f["code"] for f in _specs_findings(fix_result.output)]
+    assert "TREE-8" in codes, f"TREE-8 must still be reported after --fix; got {codes}"
+    assert fix_result.exit_code != 0, fix_result.output

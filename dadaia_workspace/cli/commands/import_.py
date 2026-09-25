@@ -16,15 +16,16 @@ err_console = Console(stderr=True)
 
 
 def import_workspace(
-    file: Annotated[Path, typer.Argument(help="A spec-contexts.json written by 'dadaia export'.")],
+    file: Annotated[Path, typer.Argument(help="A spec-contexts.json written by the export verb.")],
     workspace: Annotated[
         Path | None,
         typer.Option("--workspace", "-w", help="Workspace root (default: resolved from cwd)."),
     ] = None,
 ) -> None:
-    """Register every context of a `dadaia export` file this workspace does not know as DEAD.
+    """Register every context of an exported `spec-contexts.json` not known here as DEAD.
 
-    Known names are skipped; `dadaia context alive <name>` clones each registered context.
+    Known names are skipped; `.dadaia/.venv/bin/dadaia context alive <name>` clones each
+    registered context.
     """
     try:
         result = container.build_import_service(resolve_cli_workspace_root(workspace)).run(file)

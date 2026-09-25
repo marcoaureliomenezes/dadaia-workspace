@@ -34,8 +34,8 @@ input_contract:
     - name: task_id
       kind: string
       source: workflow_input
-      description: "Approved task identifier from TASKS.md"
-      stop_if_missing: true
+      description: "Approved task identifier from TASKS.md; absent for a definition demand (as-is review, PLAN/TASKS)"
+      stop_if_missing: false
     - name: failing_tests_report
       kind: report
       source: report_path
@@ -76,8 +76,9 @@ You never write specs, never author the AI-entity surface, and never cut corners
 ## 1. Owns
 
 - MUTATING actor for implementation (the root `AGENTS.md` map §2). Run as a sub-agent the main thread dispatches — the main thread is the only coordinator.
-- Never call `dadaia context bind` independently. No lease to acquire (the root `AGENTS.md` map §3). Gate role: implementer.
+- Never call `.dadaia/.venv/bin/dadaia context bind` independently. No lease to acquire (the root `AGENTS.md` map §3). Gate role: implementer.
 - Advance a task to `[x]` only after the review gate clears.
+- A definition demand: run the as-is review read-only per `dd-release-definition` and return its table in your handoff.
 - Write: Python source + packaging (`dadaia_workspace/**/*.py`, `pyproject.toml`, `poetry.lock`, `requirements*.txt`).
 - Write: Node server-side source (`*.js`, `*.ts`, `*.mjs` — CLIs, runtimes, server frameworks, non-browser).
 - Write: any context-language source the active release's TASKS.md declares in scope, under `repos/<ctx>/`.
@@ -153,6 +154,6 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 - `dd-gitflow-default` Gitflow / `dd-gitflow-default` — branch/push contract.
 - CLI:
   ```bash
-  dadaia context show --json    # discover active context and specs_dir
-  dadaia doctor                 # workspace, specs and ledgers health check
+  .dadaia/.venv/bin/dadaia context show --json    # discover active context and specs_dir
+  .dadaia/.venv/bin/dadaia doctor                 # workspace, specs and ledgers health check
   ```

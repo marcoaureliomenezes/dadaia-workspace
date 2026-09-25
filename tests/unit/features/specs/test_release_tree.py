@@ -150,3 +150,11 @@ def test_a_later_entry_opens_where_the_previous_one_closed(tmp_path: Path) -> No
 
     assert release_memory_issues(_specs(tmp_path / "a", "CLOSURE", [first, fresh])) == []
     assert release_memory_issues(_specs(tmp_path / "b", "CLOSURE", [first, stale])) != []
+
+
+def test_a_memory_entry_stamped_in_the_closure_second_counts(tmp_path: Path) -> None:
+    """Bug release-memory-entry-same-second-as-closure-read-as-missing: `phase CLOSURE`
+    then `release.py memory` inside one second stamps both with the same `ts`."""
+    specs = _specs(tmp_path, "CLOSURE", [_entry(_IMPLEMENTED, since="0000001")])
+
+    assert release_memory_issues(specs) == []

@@ -10,13 +10,10 @@ from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
 logger = logging.getLogger(__name__)
 
 
-def _run(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        args,
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-    )
+def _run(
+    args: list[str], cwd: Path | None = None, stdin: str | None = None
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(args, cwd=cwd, capture_output=True, text=True, input=stdin)
 
 
 def _has_embedded_git(directory: Path) -> bool:
@@ -162,10 +159,20 @@ class GitSubprocessClient:
         # by git as an option (argument injection). Legitimate https/ssh/git@ and
         # local-path / file:// clones are still allowed.
         if url.startswith("ext::") or url.startswith("-"):
-            raise GitCloneError(f"refusing to clone from unsafe URL: {url!r}")
+            raise GitCloneError(f"refusing to clone from unsafe URL: {url!r}", url)
         result = _run(["git", "clone", url, str(dest)])
         if result.returncode != 0:
-            raise GitCloneError(f"git clone failed for {url!r}: {result.stderr.strip()}")
+            raise GitCloneError(f"git clone failed for {url!r}: {result.stderr.strip()}", url)
+
+    def move(self, repo: Path, src: str, dst: str) -> None:
+        """Rename ``repo/src`` to ``repo/dst``, staging the rename of its tracked files —
+        never committing. A tree git does not track is renamed on disk alone."""
+        if not _run(["git", "ls-files", "--", src], cwd=repo).stdout.strip():
+            (repo / src).rename(repo / dst)
+            return
+        result = _run(["git", "mv", "--", src, dst], cwd=repo)
+        if result.returncode != 0:
+            raise GitSyncError(f"git mv {src} {dst} failed in {repo}: {result.stderr.strip()}")
 
     def is_dirty(self, path: Path) -> bool:
         result = _run(["git", "status", "--porcelain"], cwd=path)
@@ -245,9 +252,41 @@ class GitSubprocessClient:
         if result.returncode != 0:
             raise GitSyncError(f"git push failed in {path}: {result.stderr.strip()}")
 
+    def git(self, path: Path, *args: str, stdin: str | None = None) -> str:
+        """One git command in *path*: its stripped stdout, else ``GitSyncError``."""
+        result = _run(["git", *args], cwd=path, stdin=stdin)
+        if result.returncode != 0:
+            raise GitSyncError(f"git {args[0]} failed in {path}: {result.stderr.strip()}")
+        return result.stdout.strip()
+
+    def published(self, path: Path, integration: str) -> bool:
+        """Whether the project is published (local, offline): ``origin/<integration>``
+        exists and ``specs/constitution.md`` is reachable from a remote-tracking ref."""
+        born = _run(
+            ["git", "rev-parse", "-q", "--verify", f"refs/remotes/origin/{integration}"], cwd=path
+        )
+        rel = "specs/constitution.md"
+        result = _run(["git", "log", "--remotes", "-n1", "--format=%H", "--", rel], cwd=path)
+        return born.returncode == 0 and result.returncode == 0 and bool(result.stdout.strip())
+
+    def default_branch(self, path: Path) -> str:
+        """The remote's default branch from the local ``origin/HEAD``; ``main`` when unset."""
+        result = _run(
+            ["git", "-C", str(path), "symbolic-ref", "--short", "refs/remotes/origin/HEAD"]
+        )
+        name = result.stdout.strip().removeprefix("origin/")
+        return name if result.returncode == 0 and name else "main"
+
     def current_branch(self, path: Path) -> str:
         result = _run(["git", "branch", "--show-current"], cwd=path)
         return result.stdout.strip()
+
+    def create_branch(self, path: Path, branch: str) -> None:
+        result = _run(["git", "checkout", "-b", branch], cwd=path)
+        if result.returncode != 0:
+            raise GitSyncError(
+                f"git checkout -b {branch!r} failed in {path}: {result.stderr.strip()}"
+            )
 
     def checkout(self, path: Path, branch: str) -> None:
         result = _run(["git", "checkout", branch], cwd=path)

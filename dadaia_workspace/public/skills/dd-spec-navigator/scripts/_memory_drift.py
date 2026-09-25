@@ -20,8 +20,10 @@ from typing import Any
 
 from _memory_schema import CATALOG
 
-FEATURES = "dadaia_workspace/features"
-HOOKS = "dadaia_workspace/hooks"
+CODE = frozenset(
+    {".py", ".js", ".mjs", ".ts", ".tsx", ".jsx", ".go", ".rs", ".java", ".kt", ".rb", ".gd"}
+)
+NOT_CODE = frozenset({"specs", "tests", "test", "docs"})
 
 
 class Refusal(Exception):
@@ -52,15 +54,20 @@ def report(specs: Path, since: str, until: str = "HEAD") -> dict[str, Any]:
 
 
 def _units(tracked: list[str]) -> dict[str, list[str]]:
-    """Every tracked feature package and hook module, mapped to the files inside it."""
-    units: dict[str, list[str]] = {}
-    for path in tracked:
-        parts = path.split("/")
-        if path.startswith(f"{FEATURES}/") and len(parts) > 3:
-            units.setdefault("/".join(parts[:3]), []).append(path)
-        elif path.startswith(f"{HOOKS}/") and len(parts) == 3 and path.endswith(".py"):
-            units.setdefault(path, []).append(path)
-    return units
+    """Every directory directly holding a tracked code file, mapped to every file beneath it;
+    a root-level code file is its own unit.
+
+    Derived from the audited repo alone: `specs/`, `tests/`, `docs/` and dot-dirs hold no
+    unit, so a parent directory is covered as soon as any child is.
+    """
+    units = {
+        path.rpartition("/")[0] or path
+        for path in tracked
+        if Path(path).suffix in CODE
+        and not (top := path.split("/", 1)[0]).startswith(".")
+        and top not in NOT_CODE
+    }
+    return {u: [p for p in tracked if p == u or p.startswith(f"{u}/")] for u in units}
 
 
 def _matches(sources: list[str], paths: list[str]) -> list[str]:

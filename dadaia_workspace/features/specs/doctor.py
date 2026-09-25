@@ -7,7 +7,7 @@ single-responsibility validator siblings plus two shared leaf modules:
   * ``doctor_types``     — ``Severity`` / ``SpecsDoctorIssue`` / ``_MemoryMdSummary``
   * ``doctor_common``    — cross-validator pure helpers (``resolve_live_release_id`` + release-dir discovery)
   * ``doctor_structural``   — TREE-1..8 spec-tree invariants; ``fix_tree4``,
-                              ``fix_tree8``
+                              ``fix_tree5``
   * ``doctor_memory``       — memory files/atomicity, CAT-1, LINT-1
   * ``doctor_release``      — active release (RELEASE.json state document), release artifacts, SemVer + ledger invariants
   * ``doctor_closure_audit``— orphan specs, audit disposition; ``fix_archive_dir``
@@ -110,14 +110,15 @@ class SpecsDoctor:
         else:
             self._templates_dir = None
 
-        # Scaffold source dir (for TREE-4 README content).
-        if self.public_dir is not None:
-            scaffold_candidate = self.public_dir / "scaffold"
-            self._scaffold_dir: Path | None = (
-                scaffold_candidate if scaffold_candidate.is_dir() else None
-            )
-        else:
-            self._scaffold_dir = None
+        # Scaffold source dir (TREE-4/TREE-5 law files): the templates' sibling in the
+        # same shipped ``public/`` tree, so a consumer repo repairs from the package too.
+        source = self.public_dir or (self._templates_dir.parent if self._templates_dir else None)
+        scaffold_candidate = source / "scaffold" if source is not None else None
+        self._scaffold_dir: Path | None = (
+            scaffold_candidate
+            if scaffold_candidate is not None and scaffold_candidate.is_dir()
+            else None
+        )
 
         # Build the six validators (each independently testable). The coordinator owns the
         # config resolution; validators own their family LOGIC and family-local helpers.

@@ -17,8 +17,8 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.template_history import SHIPPED_HASHES_FILENAME, was_shipped
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
-from dadaia_workspace.features.specs.template_history import SHIPPED_HASHES_FILENAME, was_shipped
 
 pytestmark = pytest.mark.contract
 
@@ -79,7 +79,7 @@ def test_absence_is_still_a_finding(tmp_path: Path) -> None:
     issues = _memory_issues(tmp_path, None)
     assert len(issues) == 1, issues
     assert issues[0].startswith("TREE-5 warning"), issues[0]
-    assert "scaffold/memory/AGENTS.md" in issues[0]
+    assert "specs/memory/AGENTS.md is missing" in issues[0]
 
 
 def test_shipped_history_records_the_current_memory_scaffold() -> None:

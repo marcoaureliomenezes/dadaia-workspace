@@ -1,6 +1,5 @@
 """dadaia context subcommands."""
 
-import contextlib
 import json
 import os
 import sys
@@ -16,6 +15,7 @@ from rich.table import Table
 from dadaia_workspace import container
 from dadaia_workspace.cli._specs_resolution import (
     HARNESS_SESSION_ID_ENV_VARS,
+    alive_context_trees,
     sanitize_session_id,
 )
 from dadaia_workspace.cli._specs_resolution import (
@@ -23,19 +23,22 @@ from dadaia_workspace.cli._specs_resolution import (
 )
 from dadaia_workspace.cli.redact import ContextRedactor
 from dadaia_workspace.core import session_store
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import (
     AssociatedRepoConflictError,
     AssociatedRepoNotFoundError,
     ContextAlreadyExistsError,
     ContextNotFoundError,
     ContextStateError,
+    DadaiaError,
+    GitCloneError,
     GitSyncError,
     InvalidContextNameError,
+    RepoUrlMissingError,
     SchemaVersionError,
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.models.spec_context import (
-    AssociatedRepo,
     ContextState,
     SpecContextProject,
 )
@@ -45,6 +48,7 @@ from dadaia_workspace.features.spec_context.service import (
     DeadSecretFoundError,
     SpecContextService,
 )
+from dadaia_workspace.features.workspace import onboarding
 
 app = typer.Typer(help="Manage Spec Context Projects.")
 # FR17 (v0.4.4, T-044-28): associated-repo registry verbs, nested under `context repo`
@@ -58,10 +62,8 @@ err_console = Console(stderr=True)
 def _ctx_service() -> SpecContextService:
     try:
         return container.build_spec_context_service(resolve_workspace_root())
-    except WorkspaceNotInitializedError:
-        err_console.print(
-            "[red]Error:[/red] Workspace not initialized. Run [bold]dadaia init[/bold] first."
-        )
+    except WorkspaceNotInitializedError as exc:
+        err_console.print(f"Error: {exc}", markup=False, highlight=False, soft_wrap=True)
         raise typer.Exit(1) from None
     except SchemaVersionError as exc:
         # Use plain stderr so CliRunner captures it in result.output (mix_stderr=True default)
@@ -186,55 +188,62 @@ def resolve_own_session_id(*, explicit: str | None = None, mint: bool = False) -
     return None
 
 
-@app.command()
-def create(
-    name: str = typer.Argument(..., help="Context name"),
-    repo: str = typer.Option(
-        ...,
-        "--main-repo",
-        help="Main repo (the repo where specs/ lives) — the directory name under repos/",
-    ),
-    url: str | None = typer.Option(
-        None,
-        "--url",
-        help=(
-            "Repo clone URL. Overrides the repos-catalog lookup when given — use it "
-            "for a repo not in the catalog or to pin an explicit remote."
-        ),
-    ),
-    associated: list[str] = typer.Option(
-        [],
-        "--associated-repos",
-        help=(
-            "Associated repos (the other repos this context owns), comma-separated "
-            "and repeatable. Each value is SLUG or SLUG=URL — a bare slug registers "
-            "with an empty URL, settable later via 'context repo add' with --url."
-        ),
-    ),
-) -> None:
-    """Create a new Spec Context Project in state 'dead'."""
-    # Every check — allowlist, own-slug, duplicates, foreign owner — runs at
-    # SpecContextService.register before anything is written, so a refused --associated
-    # never leaves a half-created context behind.
-    associated_repos = tuple(
-        AssociatedRepo(slug=slug.strip(), url=assoc_url.strip())
-        for slug, _, assoc_url in (
-            raw.partition("=") for value in associated for raw in value.split(",") if raw.strip()
-        )
+def print_next_step(workspace_root: Path, focus: str | None = None) -> None:
+    """The derived onboarding next step (FR6 AC6.2) — the text ``doctor`` also reports."""
+    trees = alive_context_trees(workspace_root)
+    step = onboarding.next_step(workspace_root, trees, focus, resolve_own_session_id())
+    if step is not None:
+        console.print(step.text(), markup=False, highlight=False, soft_wrap=True)
+
+
+def create_fix(root: Path, error: Exception, name: str | None, urls: list[str]) -> str:
+    """The invocation, every ``--associated-repo`` kept (AC3.5), with what failed made a
+    placeholder — never the failing command repeated; an owned slug names its owner."""
+    if isinstance(error, AssociatedRepoConflictError):
+        return fix_line(root, "context", "list")
+    if isinstance(error, ContextAlreadyExistsError):
+        name = "<another-name>"
+    failed = error.url if isinstance(error, GitCloneError) else None
+    urls = [u if u != failed else "<clone-url>" for u in urls]
+    flags = [arg for u in urls[1:] for arg in ("--associated-repo", u)]
+    return fix_line(
+        root, "context", "create", *([name] if name else []), "--main-repo", urls[0], *flags
     )
 
-    repo_url = url or ""
 
+@app.command()
+def create(
+    name: str | None = typer.Argument(None, help="Context name (default: the main repo's slug)"),
+    main_repo: str = typer.Option(
+        ..., "--main-repo", help="Clone URL of the main repo (the repo where specs/ lives)"
+    ),
+    associated: list[str] = typer.Option(
+        [], "--associated-repo", help="Clone URL of an associated repo; repeatable"
+    ),
+) -> None:
+    """Clone (or adopt) every repo, install the pre-push hook, make the context ALIVE —
+    one step; on failure nothing is left behind."""
+    ws = resolve_workspace_root()
     try:
-        ctx = _ctx_service().create(name, repo, repo_url, associated_repos=associated_repos)
-        suffix = f", {len(associated_repos)} associated repo(s)" if associated_repos else ""
-        console.print(
-            f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' created "
-            f"(main repo: {ctx.repo_slug}, state: {ctx.state}{suffix})"
+        ctx = container.build_spec_context_service(ws).create(
+            main_repo, name=name, associated_urls=tuple(associated)
         )
-    except (ContextAlreadyExistsError, InvalidContextNameError, AssociatedRepoConflictError) as e:
-        err_console.print(f"[red]Error:[/red] {e}")
+    except (DadaiaError, OSError) as e:
+        err_console.print(f"Error: {e}", markup=False, soft_wrap=True)
+        err_console.print(
+            f"fix: {create_fix(ws, e, name, [main_repo, *associated])}",
+            markup=False,
+            soft_wrap=True,
+        )
         raise typer.Exit(1) from None
+    suffix = f", {len(ctx.associated_repos)} associated repo(s)" if ctx.associated_repos else ""
+    console.print(
+        f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' created and ALIVE "
+        f"(main repo: repos/{ctx.repo_slug}{suffix})",
+        highlight=False,
+        soft_wrap=True,
+    )
+    print_next_step(ws, ctx.name)
 
 
 @app.command(name="list")
@@ -245,7 +254,7 @@ def list_all(
         "--redact",
         help=(
             "Mask every context name and repo slug other than this caller's resolved "
-            "context (SPEC v0.9.0 FR8a). Default output is unchanged."
+            "context. Default output is unchanged."
         ),
     ),
 ) -> None:
@@ -270,7 +279,15 @@ def list_all(
         print(json.dumps(payload, sort_keys=True))
         return
     if not contexts:
-        console.print("[dim]No contexts found. Use 'dadaia context create' to create one.[/dim]")
+        console.print(
+            "No contexts found. Create one: "
+            + fix_line(
+                resolve_workspace_root(),
+                *["context", "create", "<name>", "--main-repo", "<clone-url>"],
+            ),
+            markup=False,
+            soft_wrap=True,
+        )
         return
 
     table = Table(title="Spec Context Projects")
@@ -325,7 +342,7 @@ def show(
         "--redact",
         help=(
             "Mask every context name and repo slug other than this caller's resolved "
-            "context (SPEC v0.9.0 FR8a). Default output is unchanged."
+            "context. Default output is unchanged."
         ),
     ),
 ) -> None:
@@ -415,22 +432,11 @@ def alive(name: str = typer.Argument(..., help="Context name to make ALIVE")) ->
         ws = resolve_workspace_root()
         ctx = container.build_spec_context_service(ws).alive(name)
         console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now ALIVE")
-        # FR-S05/S06: a pre-existing specs/ tree below the canonical pattern version is
-        # only safe-preserved + add-missing-merged — never silently upgraded. Offer the
-        # backup-protected upgrade explicitly so structural drift is the operator's choice.
-        with contextlib.suppress(Exception):
-            from dadaia_workspace.core import specs_version as _ver
-
-            specs_dir = ws / "repos" / ctx.repo_slug / "specs"
-            current = _ver.read_pattern_version(specs_dir)
-            if current < _ver.CANONICAL_SPECS_VERSION:
-                console.print(
-                    f"[yellow]![/yellow] specs pattern version {current} is below the "
-                    f"canonical {_ver.CANONICAL_SPECS_VERSION}. Run "
-                    f"[bold]dadaia specs upgrade[/bold] (backup-protected) to migrate."
-                )
     except SchemaVersionError as exc:
         print(str(exc), file=sys.stderr)
+        raise typer.Exit(1) from None
+    except RepoUrlMissingError as e:
+        err_console.print(f"Error: {e}", markup=False, soft_wrap=True)
         raise typer.Exit(1) from None
     except (ContextNotFoundError, ContextStateError) as e:
         err_console.print(f"[red]Error:[/red] {e}")
@@ -439,33 +445,20 @@ def alive(name: str = typer.Argument(..., help="Context name to make ALIVE")) ->
 
 @app.command()
 def baseline(
-    name: str = typer.Argument(..., help="ALIVE context with an unborn Git repository"),
-    yes: bool = typer.Option(
-        False, "--yes", "-y", help="Explicitly consent to creating the initial commit."
-    ),
-    push: bool = typer.Option(False, "--push", help="Also push and configure upstream."),
+    name: str = typer.Argument(..., help="ALIVE context whose onboarding is published"),
     message: str = typer.Option(
-        "chore: establish dadaia scaffold baseline",
-        "--message",
-        help="Initial commit message.",
+        "chore: publish the dadaia specs", "--message", help="Commit message."
     ),
 ) -> None:
-    """Create the explicit initial scaffold commit for an unborn repository."""
-    if not yes:
-        err_console.print(
-            "[red]Error:[/red] Baseline creates a Git commit. Re-run with --yes after "
-            "reviewing the scaffold; add --push only if remote publication is intended."
-        )
-        raise typer.Exit(1)
+    """Publish the onboarded project: principal + integration branches, then the work
+    branch carrying specs/. Running it is the consent; a re-run is a no-op."""
     try:
-        ctx = _ctx_service().baseline(name, message=message, push=push)
-        suffix = " and pushed" if push else ""
-        console.print(
-            f"[green]✓[/green] Initial baseline committed{suffix} for '[bold]{ctx.name}[/bold]'"
-        )
-    except (ContextNotFoundError, ContextStateError, DeadSecretFoundError, GitSyncError) as exc:
-        err_console.print(f"[red]Error:[/red] {exc}")
+        work = _ctx_service().baseline(name, message=message)
+    except (DadaiaError, OSError) as exc:
+        err_console.print(f"Error: {exc}", markup=False, soft_wrap=True)
         raise typer.Exit(1) from None
+    done = f"published on {work}" if work else "already published — nothing to do"
+    console.print(f"✓ '{name}' {done}", markup=False, highlight=False, soft_wrap=True)
 
 
 @app.command()
@@ -490,6 +483,9 @@ def dead(
         raise typer.Exit(1) from None
     except DeadSecretFoundError as e:
         err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    except RepoUrlMissingError as e:
+        err_console.print(f"Error: {e}", markup=False, soft_wrap=True)
         raise typer.Exit(1) from None
     except GitSyncError as e:
         # Residual git failures (network, refs) surface as a clean error, not a
@@ -534,13 +530,9 @@ def bind(
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
 
-    # Stable session identity (bug bind-session-id-divergence, 2026-07-15): reuse the
-    # SAME resolution order the gate/hooks use. Rebinds in one session therefore UPDATE
-    # one record instead of minting a divergent sess_* per invocation.
-    session_id = resolve_own_session_id(mint=True)
-    if session_id is None:  # pragma: no cover — mint=True always yields one
-        raise RuntimeError("session-id resolution returned None despite mint=True")
-
+    # Stable session identity (bug bind-session-id-divergence, 2026-07-15): the SAME
+    # resolution order the gate/hooks use, so rebinds UPDATE one record.
+    session_id = resolve_own_session_id(mint=True) or ""
     session_store.write_session(
         workspace_root,
         session_id,
@@ -586,7 +578,9 @@ def repo_add(
     slug: str = typer.Argument(
         ..., help="Associated repo to register — the directory name under repos/"
     ),
-    url: str = typer.Option("", "--url", help="Repo clone URL (optional; empty until set)"),
+    url: str = typer.Option(
+        "", "--url", help="Repo clone URL — required unless repos/<slug> is already a checkout"
+    ),
 ) -> None:
     """Register an associated repo on a context.
 
@@ -602,6 +596,20 @@ def repo_add(
         ctx, was_added = _ctx_service().add_repo(ctx_name, slug, url)
     except (ContextNotFoundError, InvalidContextNameError, AssociatedRepoConflictError) as e:
         err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    except RepoUrlMissingError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        err_console.print(
+            "fix: "
+            + fix_line(
+                resolve_workspace_root(),
+                *f"context repo add {ctx_name} {slug}".split(),
+                "--url",
+                "<clone-url>",
+            ),
+            markup=False,
+            soft_wrap=True,
+        )
         raise typer.Exit(1) from None
 
     if was_added:
@@ -625,7 +633,7 @@ def repo_remove(
 
     Run: dadaia context repo remove <ctx> <slug>
 
-    Registry-only (A17.2): this NEVER deletes the on-disk checkout at
+    Registry-only: this NEVER deletes the on-disk checkout at
     'repos/<slug>' — it only drops the registry entry, and always states
     explicitly what it leaves behind on disk. To also remove the checkout, delete
     it yourself, or run 'dadaia context dead <ctx>' first (which git-syncs and

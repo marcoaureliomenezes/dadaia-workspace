@@ -1,29 +1,23 @@
 """Push-range denylist scan over a REAL throwaway git repo (SPEC v0.9.0 FR4/FR6;
-SPEC v0.11.0 FR1/FR2/FR5).
+SPEC v0.11.0 FR1/FR2).
 
-Intent: CONTRACT — v0.9.0 A4.2, A6.1; v0.11.0 A1.6, A2.3, A10.2, A5.1, A5.2, A5.4
+Intent: CONTRACT — v0.9.0 A4.2, A6.1; v0.11.0 A1.6, A2.3, A10.2
 
 Exercises the real ``GitSubprocessObjectReader`` adapter (real ``git`` subprocess) wired
 into ``push_gate_decision`` — no CLI layer, so this stays a fast, direct integration
 proof of the FROZEN<->scan invariant (FR4), the fail-closed git-failure boundary
 (FR6 row 2), and — since v0.11.0 — the FR1 amnesty over a real range with a real
-remote. The FR5 registry-derived foreign-name tests below DO cross into the CLI/
-container layer (``container.load_registry_context_identities``,
-``cli.commands.ci._foreign_repo_slugs``) — the only way to exercise the real registry
-seam over a real fixture registry file, per this task's declared write set. Only
-synthetic terms ever appear here (TASKS standing rule).
+remote. Only synthetic terms ever appear here (TASKS standing rule).
 """
 
 from __future__ import annotations
 
-import json
 import subprocess
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace import container
-from dadaia_workspace.cli.commands import ci
+from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.core.models.git_scan import GitObjectReadError
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef
@@ -32,27 +26,6 @@ from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReade
 
 _SYNTHETIC_TERM = "zz-frozen-invariant-term"
 _ZERO = "0" * 40
-
-
-def _write_registry(workspace: Path, contexts: list[dict]) -> None:
-    states = workspace / ".dadaia" / "states"
-    states.mkdir(parents=True, exist_ok=True)
-    (states / "spec_contexts.json").write_text(
-        json.dumps({"schema_version": "2", "contexts": contexts})
-    )
-
-
-def _registry_ctx_row(name: str, *, repo_slug: str | None = None, state: str = "dead") -> dict:
-    return {
-        "name": name,
-        "state": state,
-        "repo_slug": repo_slug or name,
-        "repo_url": f"https://example.com/{repo_slug or name}.git",
-        "created_at": "2026-01-01T00:00:00Z",
-        "alive_since": "2026-01-01T00:00:00Z" if state == "alive" else None,
-        "dead_since": "2026-05-01T00:00:00Z" if state == "dead" else None,
-        "current_branch": None,
-    }
 
 
 def _git(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -106,6 +79,7 @@ def test_git_mv_into_archive_produces_no_new_blob_and_a_clean_scan(tmp_path: Pat
     reader = GitSubprocessObjectReader()
     decision = push_gate_decision(
         [_tag_push_ref(renamed_sha, remote_sha=already_published_sha)],
+        gitflow=DEFAULT,
         object_source=reader,
         repo=repo,
         canon_violations_fn=canon_violations,
@@ -134,6 +108,7 @@ def test_editing_a_path_that_already_published_the_value_no_longer_refuses(
     reader = GitSubprocessObjectReader()
     decision = push_gate_decision(
         [_tag_push_ref(edited_sha, remote_sha=already_published_sha)],
+        gitflow=DEFAULT,
         object_source=reader,
         repo=repo,
         canon_violations_fn=canon_violations,
@@ -163,6 +138,7 @@ def test_editing_a_tests_fixture_that_already_published_the_literal_no_longer_re
     reader = GitSubprocessObjectReader()
     decision = push_gate_decision(
         [_tag_push_ref(edited_sha, remote_sha=already_published_sha)],
+        gitflow=DEFAULT,
         object_source=reader,
         repo=repo,
         canon_violations_fn=canon_violations,
@@ -187,6 +163,7 @@ def test_same_value_introduced_into_a_new_path_still_refuses(tmp_path: Path) -> 
     reader = GitSubprocessObjectReader()
     decision = push_gate_decision(
         [_tag_push_ref(tip_sha, remote_sha=already_published_sha)],
+        gitflow=DEFAULT,
         object_source=reader,
         repo=repo,
         canon_violations_fn=canon_violations,
@@ -246,6 +223,7 @@ def test_new_branch_push_of_an_already_published_term_passes(tmp_path: Path) -> 
     reader = GitSubprocessObjectReader()
     decision = push_gate_decision(
         [_feature_push_ref(tip_sha)],
+        gitflow=DEFAULT,
         object_source=reader,
         repo=repo,
         canon_violations_fn=canon_violations,
@@ -271,6 +249,7 @@ def test_new_branch_push_of_a_novel_term_still_refuses(tmp_path: Path) -> None:
     reader = GitSubprocessObjectReader()
     decision = push_gate_decision(
         [_feature_push_ref(tip_sha)],
+        gitflow=DEFAULT,
         object_source=reader,
         repo=repo,
         canon_violations_fn=canon_violations,
@@ -313,6 +292,7 @@ def test_prior_side_lookup_failure_refuses_naming_the_failure_and_no_verify(
     reader = GitSubprocessObjectReader()
     decision = push_gate_decision(
         [_tag_push_ref(tip_sha, remote_sha=already_published_sha)],
+        gitflow=DEFAULT,
         object_source=reader,
         repo=repo,
         canon_violations_fn=canon_violations,
@@ -321,135 +301,6 @@ def test_prior_side_lookup_failure_refuses_naming_the_failure_and_no_verify(
     assert not decision.allowed
     assert "prior content" in decision.message
     assert "--no-verify" in decision.message
-
-
-# ---------------------------------------------------------------------------
-# FR5/A5.1-A5.4 (v0.11.0, entry #22) — the registry-derived foreign-name layer, over a
-# REAL registry fixture file and the REAL container/CLI seam functions.
-# ---------------------------------------------------------------------------
-
-
-def test_dead_registry_context_name_and_slug_both_refuse_a_push_introducing_them(
-    tmp_path: Path,
-) -> None:
-    """SPEC v0.11.0 A5.1: a DEAD registry context's name AND its repo_slug both refuse
-    a push that introduces them in new content — the registry-derived layer protects a
-    context whose repo directory is absent, which the v0.9.0 directory-derived-only
-    set silently forgot."""
-    workspace = tmp_path / "workspace"
-    repo = workspace / "repos" / "pushing-repo"
-    _init_repo(repo)
-    (repo / "notes.md").write_text("first\n")
-    tip_sha = _commit(repo, "c1")
-
-    dead_name = "zz-dead-context-name"
-    dead_slug = "zz-dead-context-slug"
-    _write_registry(
-        workspace,
-        [
-            _registry_ctx_row("pushing-repo", state="alive"),
-            _registry_ctx_row(dead_name, repo_slug=dead_slug, state="dead"),
-        ],
-    )
-
-    registry_result = container.load_registry_context_identities(workspace)
-    assert registry_result.degraded is False
-    foreign_slugs = ci._foreign_repo_slugs(workspace, "pushing-repo", registry_result.identities)
-    assert dead_name in foreign_slugs
-    assert dead_slug in foreign_slugs
-    assert "pushing-repo" not in foreign_slugs
-
-    reader = GitSubprocessObjectReader()
-
-    (repo / "notes.md").write_text(f"mentions {dead_name} now\n")
-    name_sha = _commit(repo, "introduce the dead context's name")
-    name_decision = push_gate_decision(
-        [_tag_push_ref(name_sha, remote_sha=tip_sha)],
-        object_source=reader,
-        repo=repo,
-        canon_violations_fn=canon_violations,
-        foreign_slugs=foreign_slugs,
-    )
-    assert not name_decision.allowed
-    assert dead_name not in name_decision.message
-
-    (repo / "notes.md").write_text(f"mentions {dead_slug} now\n")
-    slug_sha = _commit(repo, "introduce the dead context's slug")
-    slug_decision = push_gate_decision(
-        [_tag_push_ref(slug_sha, remote_sha=name_sha)],
-        object_source=reader,
-        repo=repo,
-        canon_violations_fn=canon_violations,
-        foreign_slugs=foreign_slugs,
-    )
-    assert not slug_decision.allowed
-    assert dead_slug not in slug_decision.message
-
-
-def test_own_context_with_differing_name_and_slug_never_contributes_either_identity(
-    tmp_path: Path,
-) -> None:
-    """SPEC v0.11.0 A5.2: when the PUSHING repo's own registry entry has a ``name``
-    that differs from its ``repo_slug``, NEITHER identity is contributed as a foreign
-    term — subtracting only the slug would re-open the A3.2 regression (the pushed
-    repo blocking every push of itself) through the new door the registry name opens."""
-    workspace = tmp_path / "workspace"
-    (workspace / "repos" / "own-repo-slug").mkdir(parents=True)
-    _write_registry(
-        workspace,
-        [_registry_ctx_row("own-context-name", repo_slug="own-repo-slug", state="alive")],
-    )
-
-    registry_result = container.load_registry_context_identities(workspace)
-    assert registry_result.degraded is False
-    foreign_slugs = ci._foreign_repo_slugs(workspace, "own-repo-slug", registry_result.identities)
-
-    assert "own-context-name" not in foreign_slugs
-    assert "own-repo-slug" not in foreign_slugs
-
-
-def test_missing_registry_yields_empty_and_never_crashes(tmp_path: Path) -> None:
-    """SPEC v0.11.0 A5.4 (missing case): no registry file at all yields an empty
-    result — the push hook never dies on registry state. SPEC v0.4.2 A8.3: a missing
-    registry is a LEGITIMATE absence, not a degradation — `degraded` stays False (only
-    a genuinely malformed/unreadable registry sets it)."""
-    workspace = tmp_path / "workspace-with-no-dadaia-dir"
-    result = container.load_registry_context_identities(workspace)
-    assert result.identities == ()
-    assert result.degraded is False
-
-
-def test_empty_registry_yields_empty_and_never_crashes(tmp_path: Path) -> None:
-    """SPEC v0.11.0 A5.4 (empty case). SPEC v0.4.2 A8.3: an empty registry is not a
-    degradation either."""
-    workspace = tmp_path / "workspace"
-    _write_registry(workspace, [])
-    result = container.load_registry_context_identities(workspace)
-    assert result.identities == ()
-    assert result.degraded is False
-
-
-def test_malformed_registry_yields_empty_and_never_crashes(tmp_path: Path) -> None:
-    """SPEC v0.11.0 A5.4 (malformed case): invalid JSON never raises — it degrades to
-    the empty result, and the widened foreign-slug set falls back to the
-    directory-derived-only set. SPEC v0.4.2 FR8(2)/A8.3: this IS a degradation —
-    `degraded` is True, unlike the missing/empty cases above — so the caller
-    (cli/commands/ci.py#push_gate_check) can surface exactly one stderr note naming it
-    (pinned at the CLI tier by
-    tests/contract/test_push_gate_wiring.py::test_malformed_registry_produces_exactly_one_stderr_note)."""
-    workspace = tmp_path / "workspace"
-    states = workspace / ".dadaia" / "states"
-    states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text("{not-json")
-
-    result = container.load_registry_context_identities(workspace)
-    assert result.identities == ()
-    assert result.degraded is True
-
-    (workspace / "repos" / "own-slug").mkdir(parents=True)
-    (workspace / "repos" / "sibling-dir").mkdir(parents=True)
-    foreign_slugs = ci._foreign_repo_slugs(workspace, "own-slug", result.identities)
-    assert foreign_slugs == ["sibling-dir"]
 
 
 def test_real_git_failure_refuses_naming_the_failure(tmp_path: Path) -> None:
@@ -461,6 +312,7 @@ def test_real_git_failure_refuses_naming_the_failure(tmp_path: Path) -> None:
 
     decision = push_gate_decision(
         [_tag_push_ref("a" * 40)],
+        gitflow=DEFAULT,
         object_source=reader,
         repo=not_a_repo,
         canon_violations_fn=canon_violations,
@@ -474,56 +326,3 @@ def test_git_object_read_error_is_importable_from_core_protocols() -> None:
     """Sentinel-level sanity: the typed failure the adapter raises stays importable
     from `core.protocols` without pulling in infrastructure (purity boundary)."""
     assert issubclass(GitObjectReadError, Exception)
-
-
-def test_foreign_slugs_cover_associated_repos_not_just_the_main_slug(
-    tmp_path: Path,
-) -> None:
-    """FR18/T-044-29: the registry-derived foreign-name layer routes through
-    `SpecContextProject.all_repos()` (main + FR15 associated repos), not the main
-    `repo_slug` alone — an associated repo is exactly as private as a main one, and
-    a push must be protected against leaking its name too."""
-    workspace = tmp_path / "workspace"
-    (workspace / "repos" / "pushing-repo").mkdir(parents=True)
-    row = _registry_ctx_row("other-context", repo_slug="other-main-slug", state="alive")
-    row["associated_repos"] = [{"slug": "zz-private-associated-repo", "url": ""}]
-    _write_registry(workspace, [_registry_ctx_row("pushing-repo", state="alive"), row])
-
-    registry_result = container.load_registry_context_identities(workspace)
-    assert registry_result.degraded is False
-    foreign_slugs = ci._foreign_repo_slugs(workspace, "pushing-repo", registry_result.identities)
-
-    assert "zz-private-associated-repo" in foreign_slugs
-    assert "other-main-slug" in foreign_slugs
-    assert "pushing-repo" not in foreign_slugs
-
-
-def test_published_slug_amnesty_is_never_broader_than_detection(tmp_path: Path) -> None:
-    """Operator ruling 2026-09-13 / ADR 0013 — the REAL adapter searches the baseline
-    with the detector's own whole-token pattern, so a slug glued into a longer
-    identifier (``zz-sibling-repo-x``, ``ZZ-SIBLING-REPO.md``) never amnesties the bare
-    slug — the 2026-08-27 substring bug must not recur on the fail-open side. A bare,
-    case-different occurrence does amnesty."""
-    from dadaia_workspace.features.chokepoints.denylist_scan import compile_slug_patterns
-
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    _git(["init", "-q"], repo)
-    _git(["config", "user.email", "t@example.com"], repo)
-    _git(["config", "user.name", "T"], repo)
-    (repo / "notes.md").write_text(
-        "assets: zz-sibling-repo-x and ZZ-SIBLING-REPO.md and pkg.zz-sibling-repo\n",
-        encoding="utf-8",
-    )
-    _git(["add", "-A"], repo)
-    _git(["commit", "-q", "-m", "substrings only"], repo)
-    substrings_sha = _git(["rev-parse", "HEAD"], repo).stdout.strip()
-    (repo / "notes.md").write_text("see the ZZ-Sibling-Repo repository\n", encoding="utf-8")
-    _git(["add", "-A"], repo)
-    _git(["commit", "-q", "-m", "whole token"], repo)
-    whole_sha = _git(["rev-parse", "HEAD"], repo).stdout.strip()
-
-    reader = GitSubprocessObjectReader()
-    patterns = [regex.pattern for _slug, regex in compile_slug_patterns(["zz-sibling-repo"])]
-    assert reader.tree_matches(repo, substrings_sha, patterns) == set()
-    assert reader.tree_matches(repo, whole_sha, patterns) == {"ZZ-Sibling-Repo"}

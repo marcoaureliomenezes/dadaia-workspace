@@ -5,7 +5,7 @@ in any phase, with no SPEC, PLAN or TASKS.
 
 ## 1. Register — ask first
 
-<!-- derived-from: bug-ledger sha256:9534ded07707 -->
+<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
 
 A bug is a tool breaking a contract it documents. Registration is ask-first: the agent
 proposes the violated contract line, one reproducing command already run, why it is not
@@ -35,12 +35,15 @@ validation, a law ambiguity, or a missing feature.
 
 ## 2. Lineage, then a RED test
 
-<!-- derived-from: bug-ledger sha256:9534ded07707 -->
+<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
 
 Resolution follows seven ordered phases — lineage, red loop, minimise, hypothesise,
 instrument, seam test, cleanup and resolve. Lineage comes first: read at most the 20
 most recent records sharing this bug's `surface` or `component` in the window since the
-newest archived audit, and end with `caused_by: <id> | none`.
+newest archived audit, and end with `caused_by: <id> | none`. Two or more prior fixes on
+the unit the bug lands in make this fix a rebuild of that unit, never a third patch: the
+commit body says `rebuild: <unit> — prior fixes <id>, <id>` (or `rebuild: none`), and
+the `--solution` opens with `REBUILD <unit>:`.
 
 ```bash
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status
@@ -51,7 +54,7 @@ Then the red loop: a test that fails for the real cause, before production code 
 
 ## 3. Fix, and let the diff shrink
 
-<!-- derived-from: bug-ledger sha256:9534ded07707 -->
+<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
 
 Fix the root cause and watch the test go green. The resolution records the fix's
 direction: `diff_direction` is derived from `--evidence-diff`'s `net-negative:`,
@@ -60,7 +63,7 @@ routed to the architecture lens before it lands.
 
 ## 4. Resolve with evidence and lineage
 
-<!-- derived-from: bug-ledger sha256:9534ded07707 -->
+<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
 
 ```bash
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> \
@@ -83,6 +86,6 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> \
 One commit holds the code, the regression test and the `BUGS.jsonl` line.
 
 `bugs.py archive` moves records whose `closed_at` is older than 90 days into
-`specs/bugs/_archive/bugs_histo.jsonl`. `dadaia doctor`'s `ledgers` section runs
+`specs/bugs/_archive/bugs_histo.jsonl`. `.dadaia/.venv/bin/dadaia doctor`'s `ledgers` section runs
 `bugs.py check` (`LEDGER-BUGS-SCHEMA`), and `SPEC-DOC-041` warns on a terminal record
 closed longer ago than the archive threshold.

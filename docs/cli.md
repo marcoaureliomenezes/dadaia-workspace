@@ -1,4 +1,4 @@
-<!-- derived-from: dadaia help tree — regenerate: `dadaia help tree > docs/cli.md` -->
+<!-- derived-from: dadaia help tree — regenerate: `.dadaia/.venv/bin/dadaia help tree > docs/cli.md` -->
 
 # dadaia CLI digest (derived from the live command tree; authoritative help: `dadaia <group> --help`)
 
@@ -9,13 +9,13 @@
 ## dadaia ci — Local CI-equivalent preflight gate + git-hook chokepoints.
 - ci install-hook — Install the pre-push CI/security gate.
 - ci preflight — Run the five local CI checks; exit non-zero if any fail.
-- ci push-gate-check — Pre-push gate: branch-name validation + the range-scoped denylist scan.
+- ci push-gate-check — Pre-push gate: branch policy by the project gitflow + the range-scoped denylist scan.
 
 ## dadaia context — Manage Spec Context Projects.
 - context alive — Transition a context to ALIVE; clone repo if absent. Idempotent if already ALIVE.
-- context baseline — Create the explicit initial scaffold commit for an unborn repository.
+- context baseline — Publish the onboarded project: principal + integration branches, then the work
 - context bind — Bind this shell session to a context.
-- context create — Create a new Spec Context Project in state 'dead'.
+- context create — Clone (or adopt) every repo, install the pre-push hook, make the context ALIVE —
 - context dead — Transition a context to DEAD; git sync + remove repo from disk.
 - context delete — Delete a context. Context must be dead.
 - context list — List all Spec Context Projects.
@@ -33,7 +33,7 @@
 ## dadaia help — Derived help surfaces (docker-style; generated, never transcribed).
 - help tree — Print the compact CLI digest derived from the live command tree.
 
-## dadaia import — Register every context of a `dadaia export` file this workspace does not know as DEAD.
+## dadaia import — Register every context of an exported `spec-contexts.json` not known here as DEAD.
 
 ## dadaia init — Bootstrap a dadaia workspace in DIR for one harness: .dadaia/, the law, and that harness's projection.
 
@@ -50,5 +50,5 @@
 - reports validate — Validate one or more agent handoff JSON files.
 
 ## dadaia specs — SDD release-lifecycle structural checks and helpers.
-- specs init — Bootstrap a SDD release-lifecycle specs/ directory structure.
+- specs init — Bring a repo's specs/ to the canon, never committing.
 - specs upgrade — Upgrade a specs/ tree to the canonical pattern version.

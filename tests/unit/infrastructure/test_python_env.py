@@ -29,6 +29,8 @@ class _Recorder:
     def __init__(self) -> None:
         self.venv_created: list[str] = []
         self.commands: list[list[str]] = []
+        # The fake venv's reported version; unknown (never probed) unless a test says.
+        self.installed: str | None = None
 
 
 @pytest.fixture()
@@ -60,11 +62,19 @@ def recorder(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _Recorder:
     monkeypatch.setattr(
         VenvPythonEnvironmentManager, "_verify_venv_provider", lambda self, ws, expected=None: None
     )
+    monkeypatch.setattr(
+        VenvPythonEnvironmentManager, "installed_version", lambda self, ws: rec.installed
+    )
     # Undo the suite-wide no-op backstop for these tests only.
     monkeypatch.setattr(
         VenvPythonEnvironmentManager, "ensure_workspace_venv", _REAL_ENSURE, raising=True
     )
     return rec
+
+
+@pytest.fixture()
+def running_100(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(python_env_module.metadata, "version", lambda name: "1.0.0")
 
 
 def _entrypoint(ws: Path) -> Path:
@@ -117,6 +127,65 @@ def test_healthy_venv_is_a_noop(tmp_path: Path, recorder: _Recorder) -> None:
 
     assert recorder.venv_created == []
     assert recorder.commands == []
+
+
+@pytest.mark.parametrize(
+    ("installed", "installs"),
+    [("0.4.7", True), ("1.0.0", False), ("1.0.0rc1", True), ("0.9.9+e2e", True)],
+)
+def test_reinit_reinstalls_only_an_older_venv(
+    tmp_path: Path, recorder: _Recorder, running_100: None, installed: str, installs: bool
+) -> None:
+    """Intent: CONTRACT — 0.4.8 AC2.1/AC2.2 (T-048-06): an older venv takes the one
+    bootstrap install path; an equal one is never written."""
+    entry = _entrypoint(tmp_path)
+    entry.parent.mkdir(parents=True)
+    entry.write_text("#!stub")
+    recorder.installed = installed
+
+    VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
+
+    assert recorder.venv_created == []
+    assert bool(recorder.commands) is installs
+    if installs:
+        assert recorder.commands[0][:3] == [
+            VenvPythonEnvironmentManager().pip_executable(str(tmp_path)),
+            "install",
+            "--quiet",
+        ]
+
+
+def test_reinit_refuses_a_newer_venv_before_any_write(
+    tmp_path: Path, recorder: _Recorder, running_100: None
+) -> None:
+    """Intent: CONTRACT — 0.4.8 AC2.3 (T-048-06): never downgrade; name the version."""
+    entry = _entrypoint(tmp_path)
+    entry.parent.mkdir(parents=True)
+    entry.write_text("#!stub")
+    recorder.installed = "1.0.0+e2e"
+
+    with pytest.raises(python_env_module.WorkspaceVenvNewerError) as exc:
+        VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
+
+    assert exc.value.installed == "1.0.0+e2e"
+    assert recorder.commands == []
+
+
+@pytest.mark.parametrize(
+    ("lower", "higher"),
+    [
+        ("0.4.7", "0.4.8"),
+        ("0.4.7", "0.4.7+e2e"),
+        ("0.4.8rc1", "0.4.8"),
+        ("0.4.9", "0.4.10"),
+        ("0.4.7+e2e", "0.4.7+e2e.1"),
+    ],
+)
+def test_version_key_orders_published_version_shapes(lower: str, higher: str) -> None:
+    """Intent: CONTRACT — 0.4.8 T-048-06: release tuple, then the local segment after its
+    base; an unpublished shape (``rc``) sorts lowest, so it is upgraded, never kept."""
+    assert python_env_module._version_key(lower) < python_env_module._version_key(higher)
+    assert python_env_module._version_key("0.4") == python_env_module._version_key("0.4.0")
 
 
 def test_install_spec_repacks_the_running_distribution_when_not_a_source_checkout(
@@ -849,3 +918,68 @@ def test_interpreter_version_probe_degrades_to_none_on_timeout(
     monkeypatch.setattr(python_env_module.subprocess, "run", hanging_run)
 
     assert python_env_module._interpreter_version("/usr/bin/python-that-hangs") is None
+
+
+def test_base_python_without_ensurepip_is_named_not_blamed_on_noexec(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Intent: CONTRACT — 0.4.8 AC1.6 (T-048-04).
+
+    Debian's base python3 without ``python3-venv`` fails ``-m venv`` with venv's own
+    "ensurepip is not available" line; the error names that, never a noexec mount.
+    """
+    monkeypatch.setattr(
+        VenvPythonEnvironmentManager, "ensure_workspace_venv", _REAL_ENSURE, raising=True
+    )
+    monkeypatch.setattr(
+        VenvPythonEnvironmentManager,
+        "_resolve_child_venv_interpreter",
+        lambda self: "/usr/bin/python3.12",
+    )
+
+    def no_ensurepip(cmd: list[str], check: bool = False, **_kwargs: object) -> None:
+        import subprocess as _subprocess
+
+        raise _subprocess.CalledProcessError(
+            1,
+            cmd,
+            output="The virtual environment was not created successfully because "
+            "ensurepip is not available.",
+            stderr="",
+        )
+
+    monkeypatch.setattr(python_env_module.subprocess, "run", no_ensurepip)
+
+    with pytest.raises(python_env_module.WorkspaceVenvBootstrapError) as excinfo:
+        VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
+
+    message = str(excinfo.value)
+    assert "ensurepip" in message
+    assert "noexec" not in message.lower()
+
+
+def test_repacked_wheel_is_not_left_behind(
+    tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Intent: CONTRACT — 0.4.8 AC1.6 (T-048-04): the re-packed wheel is scratch."""
+    site = tmp_path / "site-packages" / "dadaia_workspace"
+    site.mkdir(parents=True)
+    (site / "__init__.py").write_text("")
+    monkeypatch.setattr(python_env_module.dadaia_workspace, "__file__", str(site / "__init__.py"))
+    written: list[Path] = []
+
+    def repack(dest_dir: Path, dist: object = None) -> Path:
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        wheel = dest_dir / "dadaia_workspace-9.9.9-py3-none-any.whl"
+        wheel.write_bytes(b"fake-wheel")
+        written.append(wheel)
+        return wheel
+
+    monkeypatch.setattr(python_env_module, "repack_installed_wheel", repack)
+    ws = tmp_path / "ws"
+
+    VenvPythonEnvironmentManager().ensure_workspace_venv(str(ws))
+
+    assert written and recorder.commands[1][-1] == str(written[0])
+    assert not written[0].exists()
+    assert not (ws / ".dadaia" / "tmp").exists()

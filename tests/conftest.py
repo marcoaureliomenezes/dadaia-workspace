@@ -7,9 +7,10 @@ at the lib repo root BEFORE each test and asserts that no NEW entries have appea
 in those directories AFTER the test completes.
 
 The guard is intentionally scope=``function`` and autouse=True so it fires around
-every test in the suite.  It is implemented as a *root-write guard only* — it does
-NOT force-chdir tests to a temporary directory (that would break tests that rely on
-their own CWD assumptions).
+every test in the suite.  Every test also STARTS in an empty temporary directory
+(``_hermetic_cwd``): the checkout usually sits inside a live operator instance, and a
+cwd walk from it would resolve and scan that instance (bug
+``doctor-tests-walk-the-real-workspace-tmp-zone``).
 
 Protected paths (relative to the repo root, checked recursively):
   .claude/
@@ -303,6 +304,14 @@ def _no_real_venv_in_tests() -> Iterator[None]:
     mp.setattr(SubprocessProcessRunner, "run", _run_dadaia_init_in_process, raising=True)
     yield
     mp.undo()
+
+
+@pytest.fixture(autouse=True)
+def _hermetic_cwd(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Start every test in an empty directory, so no cwd walk reaches a real workspace."""
+    monkeypatch.chdir(tmp_path_factory.mktemp("cwd"))
 
 
 @pytest.fixture(autouse=True)

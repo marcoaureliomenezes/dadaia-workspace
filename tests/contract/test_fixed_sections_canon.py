@@ -11,9 +11,9 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.fixed_sections import extract_fixed_section
+from dadaia_workspace.features.specs.canon import scaffold
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.memory_canon import FIXED_SECTIONS, read_fixed_fragment
-from dadaia_workspace.features.specs.scaffolder import scaffold
 
 pytestmark = pytest.mark.contract
 
@@ -53,8 +53,7 @@ def test_fresh_scaffold_renders_every_block_byte_equal_and_doctor_reports_no_fix
     tmp_path: Path,
 ) -> None:
     specs = tmp_path / "specs"
-    result = scaffold(specs, "Proj", False, _PUBLIC_DIR / "templates")
-    assert not result.errors, result.errors
+    scaffold(specs, project_name="Proj", public_dir=_PUBLIC_DIR)
     for rel, section_id in FIXED_SECTIONS:
         text = (specs / rel).read_text(encoding="utf-8")
         assert extract_fixed_section(text, section_id) == read_fixed_fragment(

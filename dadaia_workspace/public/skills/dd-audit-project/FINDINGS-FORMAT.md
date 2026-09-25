@@ -32,7 +32,7 @@ Disclosed sibling of `SKILL.md`. Every claim any pillar makes becomes exactly on
 ## Appending
 
 1. Append with ordinary file tools: read the existing file, add one line, write.
-2. Before the S3-equivalent close of any audit, run the folder through the push-time detector (`dadaia ci push-gate-check` over the range).
+2. Before the S3-equivalent close of any audit, run the folder through the push-time detector (`.dadaia/.venv/bin/dadaia ci push-gate-check` over the range).
 3. Record a zero-hit result from that detector run.
 
 ## Disposition and close — by verb

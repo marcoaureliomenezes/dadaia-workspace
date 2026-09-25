@@ -46,3 +46,14 @@ def render_fixed_section(text: str, section_id: str, fragment: str) -> str:
     head = text.rstrip("\n")
     prefix = f"{head}\n\n" if head else ""
     return f"{prefix}{opening}\n{fragment}{closing}\n"
+
+
+_ANY_SECTION = re.compile(
+    r"\n*^<!-- dadaia:fixed (\S+) -->\n.*?^<!-- /dadaia:fixed \1 -->$\n?", re.MULTILINE | re.DOTALL
+)
+
+
+def strip_fixed_sections(text: str) -> str:
+    """*text* with every fixed section (markers and body) removed — what an operator
+    authored, independent of which fragment version ``doctor --fix`` rendered."""
+    return _ANY_SECTION.sub("", text).rstrip("\n") + "\n"

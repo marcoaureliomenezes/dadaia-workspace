@@ -14,13 +14,17 @@ is a CLI defect, never a bypass.
 
 from __future__ import annotations
 
+import shlex
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from dadaia_workspace.core.gitflow import Gitflow
 from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObject
 from dadaia_workspace.features.chokepoints.branch_policy import (
+    HEADS_PREFIX,
+    ZERO_SHA,
     Decision,
     PushRef,
     check_branch_policy,
@@ -30,15 +34,10 @@ from dadaia_workspace.features.chokepoints.denylist_scan import (
     Hit,
     OversizedNote,
     PathMasker,
-    compile_slug_patterns,
     scan_objects,
 )
 
 __all__ = ["push_gate_decision"]
-
-#: The integration branch's remote-tracking ref — the denylist baseline for a brand-new
-#: ref (nothing published yet) is its tip.
-INTEGRATION_TIP_REF = "refs/remotes/origin/develop"
 
 #: The law this scan enforces (SPEC v0.9.0 FR5) — quoted verbatim in every refusal.
 _DENYLIST_LAW = "dd-release-implementation §2a — private names never enter public/pushed material"
@@ -63,11 +62,7 @@ class ObjectSource(Protocol):
         self, repo: Path, local_sha: str, remote_sha: str
     ) -> Iterable[ScannedObject]: ...
 
-    def parents(self, repo: Path, sha: str) -> tuple[str, ...]: ...
-
-    def resolve_ref(self, repo: Path, ref: str) -> str | None: ...
-
-    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]: ...
+    def publishes_nothing(self, repo: Path, sha: str) -> bool: ...
 
 
 def _annotate_skip(
@@ -199,13 +194,17 @@ class _RangeScan:
     specs_paths_by_ref: dict[str, list[str]]
 
 
+def _push_again(gitflow: Gitflow) -> str:
+    return shlex.join(["git", "push", "origin", f"{gitflow.work_prefix}<M.m.p>"])
+
+
 def _run_denylist_scan(
     scan_refs: list[PushRef],
     object_source: ObjectSource,
     repo: Path,
     terms: Iterable[tuple[str, str]],
     patterns: Iterable[BaselinePatternLike],
-    slugs: Iterable[str],
+    gitflow: Gitflow,
 ) -> _RangeScan:
     """Run the FR1/FR2 scan over *scan_refs* — every non-deletion ref, tags included.
 
@@ -214,12 +213,12 @@ def _run_denylist_scan(
     built from ``scan_objects`` runs over :func:`_dedup_new_objects`, which shares
     ``seen_shas`` across every ref in this scan, so a blob reachable from two refs
     contributes at most one note (mirrors the existing hit/skip dedup). The returned
-    ``path_masker`` (v0.11.0 FR6(b)) is built from the SAME three term sources and is
+    ``path_masker`` (v0.11.0 FR6(b)) is built from the SAME term sources and is
     reused by the caller for every subsequently rendered oversized note, so a repeated
     offending path segment gets one stable ordinal across the whole invocation.
 
-    code-reviewer MEDIUM finding (v0.11.0 pre-PR review): *terms*, *patterns* and
-    *slugs* are each materialized EXACTLY ONCE, right here, before either the
+    code-reviewer MEDIUM finding (v0.11.0 pre-PR review): *terms* and *patterns* are
+    each materialized EXACTLY ONCE, right here, before either the
     :class:`PathMasker` or the scan loop below touches them. A one-shot Iterable
     (e.g. a generator) consumed a second time yields nothing — building the masker from
     the raw parameter and separately re-``list()``-ing it later silently emptied the
@@ -228,16 +227,10 @@ def _run_denylist_scan(
     """
     term_list = list(terms)
     pattern_list = list(patterns)
-    slug_list = list(slugs)
-    path_masker = PathMasker(term_list, pattern_list, slug_list)
+    path_masker = PathMasker(term_list, pattern_list)
     specs_paths_by_ref: dict[str, list[str]] = {}
     if not scan_refs:
         return _RangeScan(None, False, 0, (), path_masker, specs_paths_by_ref)
-    try:
-        published = _published_slugs(scan_refs, object_source, repo, slug_list)
-    except GitObjectReadError:
-        published = set()  # fail CLOSED: an unreadable baseline amnesties nothing
-    scan_slugs = [slug for slug in slug_list if slug not in published]
     seen_shas: set[str] = set()
     per_ref_hits: list[tuple[PushRef, Hit]] = []
     skipped_total = 0
@@ -248,7 +241,7 @@ def _run_denylist_scan(
                 _dedup_new_objects(object_source, repo, ref, seen_shas),
                 specs_paths_by_ref.setdefault(ref.local_sha, []),
             )
-            outcome = scan_objects(fresh, term_list, pattern_list, scan_slugs)
+            outcome = scan_objects(fresh, term_list, pattern_list)
             skipped_total += outcome.skipped_binary_count
             oversized_all.extend(outcome.oversized_notes)
             per_ref_hits.extend((ref, hit) for hit in outcome.hits)
@@ -262,8 +255,8 @@ def _run_denylist_scan(
                     "skips what it cannot evaluate (fail closed). The sanctioned, "
                     "traceable emergency bypass is `git push --no-verify` "
                     "(discouraged; leaves a reflog trace).\n"
-                    "fix: git fetch origin && git push origin feature/<M.m.p> (repair "
-                    "the object store first — git fsck)"
+                    "Repair the object store first (git fsck), then push again.\n"
+                    f"fix: git fetch origin && {_push_again(gitflow)}"
                 ),
             ),
             True,
@@ -332,8 +325,6 @@ def _record_specs_paths(
 def _run_specs_canon_scan(
     scan_refs: list[PushRef],
     specs_paths_by_ref: dict[str, list[str]],
-    object_source: ObjectSource,
-    repo: Path,
     canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
 ) -> Decision | None:
     """SPEC v0.5.0 specs-canon closure (operator ruling 2026-08-28), range-scoped since
@@ -354,62 +345,25 @@ def _run_specs_canon_scan(
     return Decision(allowed=False, message=_compose_specs_canon_refusal(violations))
 
 
-def _published_slugs(
-    scan_refs: list[PushRef],
-    object_source: ObjectSource,
-    repo: Path,
-    slugs: Sequence[str],
-) -> set[str]:
-    """The foreign slugs the pushed refs' remote tips (or, for a brand-new ref, the
-    integration tip) already publish — a sibling repository's name this repository's
-    published history already carries is not a new disclosure (operator ruling
-    2026-09-13; extends the v0.11.0 FR1 per-path amnesty to the repository).
-
-    Amnesty is a SUBSET of detection by construction: the baseline is searched with
-    the very :func:`compile_slug_patterns` regexes the scan matches with (whole-token,
-    case-insensitive), one ``git grep`` per baseline carrying every pattern — never a
-    substring test (the 2026-08-27 substring bug on this layer must not recur on the
-    fail-open side). Raises :class:`GitObjectReadError` through; the caller then
-    amnesties nothing.
-    """
-    compiled = compile_slug_patterns(slugs)
-    if not compiled:
-        return set()
-    baselines: set[str] = set()
-    for ref in scan_refs:
-        if ref.remote_sha and ref.remote_sha != "0" * 40:
-            baselines.add(ref.remote_sha)
-        else:
-            tip = object_source.resolve_ref(repo, INTEGRATION_TIP_REF)
-            if tip:
-                baselines.add(tip)
-    regexes = [regex.pattern for _slug, regex in compiled]
-    matched: set[str] = set()
-    for sha in baselines:
-        matched |= {m.lower() for m in object_source.tree_matches(repo, sha, regexes)}
-    return {slug for slug, _regex in compiled if slug.lower() in matched}
-
-
 def push_gate_decision(
     refs: list[PushRef],
     *,
     object_source: ObjectSource,
     repo: Path,
     canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
+    gitflow: Gitflow,
     malformed_lines: int = 0,
     denylist_terms: Iterable[tuple[str, str]] = (),
     baseline_patterns: Iterable[BaselinePatternLike] = (),
-    foreign_slugs: Iterable[str] = (),
 ) -> Decision:
-    """Decide whether a push may proceed (v0.4.4 FR3 — the gitflow v2 inversion).
+    """Decide whether a push may proceed.
 
     Policy order, first refusal wins:
 
-    1. **Branch policy** (dd-gitflow-default, :func:`~dadaia_workspace.features.chokepoints.
-       branch_policy.check_branch_policy`) — every non-deletion, non-tag ref must be
-       ``refs/heads/feature/{M.m.p}``, pushed to the SAME remote name: ``develop`` and
-       ``main`` are refused outright (they advance by PR only); names outside the three
-       permitted patterns are refused as invalid.
+    1. **Branch policy** (:func:`~dadaia_workspace.features.chokepoints.branch_policy.
+       check_branch_policy`, reading *gitflow*) — every non-deletion, non-tag ref must
+       be a work branch pushed to the SAME remote name; the principal and integration
+       branches advance by PR only.
     2. **specs/ canon scan** (v0.5.0 specs-canon closure, operator ruling 2026-08-28)
        — every ``specs/`` path the pushed range introduces or rewrites is checked
        against the canon (range-scoped: a path no commit in the range touches never
@@ -417,8 +371,8 @@ def push_gate_decision(
     3. **Range-scoped denylist scan** (v0.9.0 FR1/FR2) — every non-deletion ref, tags
        included, is scanned via *object_source* for new objects carrying a denylisted
        term. Steps 2 and 3 share ONE object walk (the walk runs once, after branch
-       policy; step 2's refusal is decided first) — under v2 this feature push is the
-       first publication to ``origin`` (A3.3).
+       policy; step 2's refusal is decided first) — a work-branch push is the
+       first publication to ``origin``.
 
     There is no fourth step: security review is the reviewer's lens before each PR,
     never a pre-push step.
@@ -426,9 +380,9 @@ def push_gate_decision(
     Deletions (zero sha) are never scanned. Tag pushes ARE scanned but were never
     branch-policy-gated (publishing depends on tag pushes). A malformed stdin line
     fails CLOSED (finding 1) and the REMOTE side of every branch-policy ref must
-    match its LOCAL branch name (finding 2: ``push feature/0.0.1:develop``).
+    match its LOCAL branch name (finding 2: a work branch aimed at the integration branch).
 
-    *object_source*, *repo* and *canon_violations_fn* are
+    *object_source*, *repo*, *canon_violations_fn* and *gitflow* are
     REQUIRED — FR7/A7.2 (extended at v0.5.1 K7 to the canon predicates): the decision
     function always takes every external capability it needs as a parameter; an
     unwired production call site is a CLI defect, never a bypass (FR6 row 4), so there
@@ -442,12 +396,20 @@ def push_gate_decision(
                 "line(s) — a policy gate never skips what it cannot parse (fail "
                 "closed). The sanctioned, traceable emergency bypass is "
                 "`git push --no-verify` (discouraged; leaves a reflog trace).\n"
-                "fix: git push origin feature/<M.m.p> (one explicit refspec)"
+                "Push one explicit refspec.\n"
+                f"fix: {_push_again(gitflow)}"
             ),
         )
 
     branch_policy_refs = [r for r in refs if not r.is_deletion and not r.is_tag]
-    branch_refusal = check_branch_policy(branch_policy_refs)
+    births = frozenset(
+        r.local_sha
+        for r in branch_policy_refs
+        if r.remote_sha == ZERO_SHA
+        and gitflow.role_of(r.local_ref.removeprefix(HEADS_PREFIX)) in ("principal", "integration")
+        and object_source.publishes_nothing(repo, r.local_sha)
+    )
+    branch_refusal = check_branch_policy(branch_policy_refs, gitflow, births)
     if branch_refusal is not None:
         return branch_refusal
 
@@ -461,7 +423,7 @@ def push_gate_decision(
     # range-scoped, operator ruling 2026-09-13) and step 3 (denylist); step 2's refusal
     # still takes precedence over step 3's.
     scan = _run_denylist_scan(
-        scan_refs, object_source, repo, denylist_terms, baseline_patterns, foreign_slugs
+        scan_refs, object_source, repo, denylist_terms, baseline_patterns, gitflow
     )
     if scan.read_failed and scan.refusal is not None:
         # Nothing was streamed, so the canon scan has no input either — fail closed
@@ -473,8 +435,6 @@ def push_gate_decision(
     canon_refusal = _run_specs_canon_scan(
         scan_refs,
         scan.specs_paths_by_ref,
-        object_source,
-        repo,
         canon_violations_fn,
     )
     if canon_refusal is not None:

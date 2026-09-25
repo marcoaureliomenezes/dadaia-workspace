@@ -23,9 +23,9 @@ sources:
 - Three sections run in fixed order: `workspace` (root, harness dirs, `.dadaia/` zones, ALIVE repo trees, installed git hook), `specs` (the rules over one `specs/` tree), `ledgers` (the backlog document, the ADR ledger and the skill-script ledgers).
 - One rule record, `dadaia_workspace/core/doctor_rules.py` (`Rule`: codes, section, run, fix, fix_help); `dadaia_workspace/cli/commands/doctor.py` is the only place the sections meet. A run is its findings and its exit code — there is no score.
 - A printed finding is one line `<CODE> <verdict> <message>`: `canon|operator|reaped|slop|expired|missing` for the walk, `error|warning|info` for `specs` and `ledgers`; canonical entries are not printed.
-- Every error-class finding carries one `fix: <command>` line; exit 1 on any error-class finding in any section.
+- Every error-class finding carries one `fix: <command>` line, and so does an `info` finding that is guidance; exit 1 on any error-class finding in any section.
 - `--json` emits `{"specs_dir", "sections": {<name>: {"findings": [...]}}, "fixed"}`; `--quiet` prints only what `--fix` did; `--redact` masks every foreign context name and repo slug ([[context-management]]).
-- The `specs`/`ledgers` tree resolves from `--context <name>`, `--specs-dir <path>`, else the bound context; with none, those sections are empty and `workspace` still runs. With no instance around (CI over a checkout) `workspace` is empty and an explicit tree still gets its two sections. `--public-dir` enables template drift checks; `--source-root`/`--alias-map` feed the backlog anchor derivation.
+- The `specs`/`ledgers` tree resolves from `--context <name>`, `--specs-dir <path>`, else the bound context; with none, those sections are empty and `workspace` still runs. A named context absent from the registry exits 1 with `Error: Context '<name>' not found.` and `fix: .dadaia/.venv/bin/dadaia context list`, running no check; a stale ambient bind counts as no bind. A context whose `specs/` is not stamped at the canonical version is onboarding level 2: its `specs`/`ledgers` sections are empty, and the `ONBOARDING` finding names `specs init`. With no instance around (CI over a checkout) `workspace` is empty and an explicit `--specs-dir` tree still gets its two sections; any other run outside a workspace exits 1 with the one workspace-not-found error ([[workspace-init]]). `--public-dir` enables template drift checks; `--source-root`/`--alias-map` feed the backlog anchor derivation.
 - The CI job runs `dadaia doctor --specs-dir specs --source-root .` over the checked-out tree ([[QUALITY]]).
 
 ## The `workspace` section
@@ -37,7 +37,8 @@ sources:
 - A repo tree: only a `REPO_TREE_EXCLUDED` name (`.dadaia` and tool caches) is a finding (`WS-repos-slop`); `.git`, `.venv` and `node_modules` end the descent, so source is never judged.
 - Instance exceptions live in `.dadaia/states/instance_exceptions.txt`, one glob per line; the root-whitelist hook reads the same file ([[sdd-gate-v3]]).
 - Codes are `WS-<zone>-<verdict>`. Context invariants ride the same section, error-class: `INV-4`/`INV-5`/`CTX-URL-1` (ALIVE/DEAD repo and URL coherence), `INV-6` (a repo slug owned by two contexts, report-only), `VENV-1` (venv entrypoint health, never auto-fixed).
-- `HOOKS-DRIFT-1`: an ALIVE repo's installed `.git/hooks/pre-push` differing from the shipped `dadaia_workspace/public/scripts/pre-push-ci-gate.sh`, `fix: dadaia ci install-hook --force`; a checkout without `.git/hooks/` is never a finding.
+- `HOOKS-DRIFT-1`: an ALIVE repo's installed `.git/hooks/pre-push` differing byte-wise from the shipped `dadaia_workspace/public/scripts/pre-push-ci-gate.sh`, one finding per repo with `fix: .dadaia/.venv/bin/dadaia ci install-hook --force --repo repos/<slug>`; a run scoped to a context (`--context` or the bound one) checks only that context's repos; a checkout without `.git/hooks/` is never a finding.
+- `ONBOARDING` (`info`): the derived next unmet onboarding level ([[workspace-init]]), the scoped context judged first, printed as `ONBOARDING info Next: <reason>` with its `fix:` line on every run except `--expired-only`, including at zero contexts; it never changes the exit code, and a fully onboarded workspace prints none.
 - `--expired-only` scopes the report to expired entries and keeps the specs repairs off `--fix`; it never narrows the reaper.
 
 ## The `specs` section
@@ -56,7 +57,7 @@ sources:
 
 ## The reaper
 
-- `--fix` runs one lane: marker GC, stale session records, the `root_exceptions.txt` to `instance_exceptions.txt` move, seed missing zones and the harness profile, move every `slop` entry, move a DEAD context's leftover repo (`INV-5`), delete expired; then, unless `--expired-only`, the specs fixes (`MEM-PLACEHOLDER-1`, `TREE-4`, `TREE-5`, `TREE-8`, `FIXED-1/2`, `SPEC-DOC-034`, `SPEC-DOC-046`).
+- `--fix` runs one lane: marker GC, stale session records, the `root_exceptions.txt` to `instance_exceptions.txt` move, seed missing zones and the harness profile, move every `slop` entry, move a DEAD context's leftover repo (`INV-5`), delete expired; then, unless `--expired-only`, the specs fixes (`MEM-PLACEHOLDER-1`, `TREE-4`, `TREE-5`, `FIXED-1/2`, `SPEC-DOC-034`, `SPEC-DOC-046`); a non-canon specs path (`TREE-8`) is reported, never removed.
 - Nothing is deleted directly: slop moves to `.dadaia/reaped/<YYYYMMDD>/<workspace-relative-path>` (7-day TTL from the move); deletion happens only when a TTL zone's entry expires.
 - The lane runs at SessionStart (`dadaia doctor --fix --expired-only --quiet` from each harness's runtime config) and on the PostToolUse hook's throttle; it judges by registry, never by liveness.
 - A fix invents no approval, completion, evidence or disposition, and every step reports what it did or skipped.

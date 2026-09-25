@@ -6,7 +6,7 @@ Root workspace behavior is in the workspace `AGENTS.md`; production-source behav
 ## 1. Canon and status
 
 - `Approved`, `In review`, `Draft` are the canonical status tokens — keep them as-is, in any language.
-- The tree holds only these members; `dadaia doctor` flags anything else, and no stray root archive directory or dotfile is canon.
+- The tree holds only these members; `.dadaia/.venv/bin/dadaia doctor` flags anything else, and no stray root archive directory or dotfile is canon.
 
 <!-- specs-canon -->
 
@@ -42,7 +42,7 @@ Root workspace behavior is in the workspace `AGENTS.md`; production-source behav
 
 ## 6. Bugs
 
-- A bug is fixed on the live `feature/{M.m.p}` branch, in any phase, with no release ceremony.
+- A bug is fixed on the live work branch (the constitution's `gitflow:`), in any phase, with no release ceremony.
 
 ## 7. Escalation
 
@@ -56,4 +56,4 @@ Needed decision: <one concrete question or action>
 ```
 
 Generated from `dadaia_workspace/public/templates/specs-AGENTS.md`.
-Project teams may customize this file; `dadaia doctor` reports drift instead of overwriting it.
+Project teams may customize this file; `.dadaia/.venv/bin/dadaia doctor` reports drift instead of overwriting it.

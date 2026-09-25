@@ -18,6 +18,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app as cli_app
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from tests.helpers.harness_profile import register_all
 from tests.helpers.scan_population import assert_populated
@@ -142,7 +143,6 @@ class TestStage:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
         assert manifest.get("schema_version") == "1", "schema_version must be '1'"
-        assert "generated_at" in manifest, "manifest missing generated_at"
         assert "assets" in manifest, "manifest missing assets list"
         for asset in manifest["assets"]:
             assert "path" in asset, f"asset missing 'path': {asset}"
@@ -524,7 +524,7 @@ class TestSymlinkTargetDoctor:
             f"symlink target '{foreign}' is not the canonical "
             f"'../../.agents/skills/{entry.name}'"
         ], "\n".join(report)
-        assert "[info] fix: .dadaia/.venv/bin/dadaia public install --force" in report
+        assert f"[info] fix: {fix_line(workspace, 'public', 'install', '--force')}" in report
 
     def test_symlink_replaced_by_a_drifted_copy_is_an_error(self, tmp_path: Path) -> None:
         workspace = tmp_path / "ws"

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.features.specs import SpecsDoctor
-from dadaia_workspace.features.specs.scaffolder import scaffold
+from dadaia_workspace.features.specs.canon import scaffold
 
 pytestmark = [
     pytest.mark.integration,
@@ -21,14 +21,12 @@ _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 
 def test_fresh_scaffold_passes_specs_doctor(tmp_path: Path) -> None:
     specs_dir = tmp_path / "specs"
-    result = scaffold(
-        specs_dir=specs_dir,
+    scaffold(
+        specs_dir,
         project_name="doctor-test",
         force=False,
-        templates_dir=_TEMPLATES_DIR,
+        public_dir=_TEMPLATES_DIR.parent,
     )
-
-    assert result.errors == [], f"Scaffold errors: {result.errors}"
 
     issues = SpecsDoctor(specs_dir).check()
     # v6 canon (T-050-05, FR1): backlog/AGENTS.md is a NEW, expected scaffold member

@@ -1,4 +1,6 @@
-"""Intent: CONTRACT — 0.4.7 FR2 (T-047-14): a doctor fix line CLEARS its own finding.
+"""Intent: CONTRACT — 0.4.7 FR2 (T-047-14), doctor-messages-cite-dead-verbs.
+
+A doctor fix line CLEARS its own finding.
 
 ``tests/contract/test_every_block_carries_a_fix.py`` proves the fix line is one
 executable command that the gate lets through. That grammar says nothing about what the
@@ -6,6 +8,9 @@ command DOES: ``rm -rf specs/audits/<audit>`` is one executable command, passes 
 gate, and destroys the record the finding exists to protect. This module closes the gap
 by EXECUTING each fix line against a tree where the finding was planted, and re-running
 the very rule that emitted it.
+
+Every planted finding's description also passes the dead-verb scanner
+(``features.specs.citations``) — bug doctor-messages-cite-dead-verbs.
 
 Two verdicts, one per rule class:
 
@@ -27,7 +32,6 @@ import json
 import os
 import re
 import subprocess
-import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -35,7 +39,10 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.core.doctor_rules import Rule
+from dadaia_workspace.cli.help_digest import command_paths
+from dadaia_workspace.core.doctor_rules import Rule, rule_fix
+from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
+from dadaia_workspace.features.specs.citations import dead_verb_citations
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
@@ -44,10 +51,6 @@ from tests.fixtures.harness_env import session_home
 from ..unit.features.specs.test_doctor import _make_clean_specs_tree
 
 _RELEASE = "1.2.3"
-_VENV_DADAIA = ".dadaia/.venv/bin/dadaia"
-#: The fix line names the venv binary by its workspace-relative path; the fixture tree is
-#: not a workspace, so it is resolved to the venv running this suite — the SAME binary.
-_THIS_VENV_DADAIA = str(Path(sys.executable).parent / "dadaia")
 
 
 @dataclass(frozen=True)
@@ -60,6 +63,16 @@ class Plant:
 
 def _plant_missing_memory_document(root: Path) -> None:
     (root / "specs" / "memory" / "QUALITY.md").unlink()
+
+
+def _plant_gitflow_gone(root: Path) -> None:
+    """A current dadaia tree whose constitution frontmatter has no gitflow block."""
+    constitution = root / "specs" / "constitution.md"
+    constitution.write_text(
+        f"---\nspecs_pattern_version: {CANONICAL_SPECS_VERSION}\n---\n"
+        + constitution.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
 
 
 def _plant_status_line_gone(root: Path) -> None:
@@ -96,6 +109,11 @@ def _plant_tests_agents_placeholder(root: Path) -> None:
     )
 
 
+def _plant_foundation(root: Path) -> None:
+    (root / "specs" / "foundation").mkdir()
+    (root / "specs" / "foundation" / "vision.md").write_text("# Vision\n", encoding="utf-8")
+
+
 def _plant_root_spec_md(root: Path) -> None:
     (root / "specs" / "SPEC.md").write_text("# Deprecated root spec\n", encoding="utf-8")
 
@@ -125,6 +143,12 @@ def _plant_dispositioned_audit(root: Path) -> None:
     )
 
 
+def _plant_stray_dotfile(root: Path) -> None:
+    # Untracked and with no canon home — the case a ``git mv`` fix line could not serve
+    # (bug tree8-fix-line-not-runnable-for-every-case).
+    (root / "specs" / ".DS_Store").write_bytes(b"\x00")
+
+
 #: code -> how to make it fire. The eight remedies the 0.4.7 candidate-2 review named,
 #: plus the memory-document pair they share a shape with.
 PLANTS: dict[str, Plant] = {
@@ -140,12 +164,18 @@ PLANTS: dict[str, Plant] = {
         },
     ),
     "SPEC-DOC-005": Plant(_plant_oversized_plan),
+    "GITFLOW-1": Plant(_plant_gitflow_gone, {"<specs>": "specs"}),
     "SPEC-DOC-048": Plant(_plant_origin_line_gone, {"<id>": _RELEASE}),
     "SPEC-DOC-010": Plant(_plant_changelog_heading),
     "AGENTS-PLACEHOLDER-1": Plant(_plant_tests_agents_placeholder),
+    "TREE-1": Plant(_plant_foundation),
     "TREE-2": Plant(_plant_root_spec_md),
     "TREE-3": Plant(
         _plant_missing_memory_document, {"<document>": "QUALITY", "<title>": "Quality"}
+    ),
+    "TREE-8": Plant(
+        _plant_stray_dotfile,
+        {"<path>": "specs/.DS_Store", "<canon path|outside specs/>": ".DS_Store"},
     ),
 }
 
@@ -158,13 +188,10 @@ _UNEXERCISED: dict[str, str] = {
     "layout no longer scaffolded anywhere",
     "SPEC-DOC-007": "the orphan path is operator content; removing it is the operator's "
     "own call, not a fixture assertion",
-    "TREE-1": "the fix is `specs upgrade`, a full scaffold run exercised by the specs "
-    "upgrade integration suite",
     "TREE-4": "auto-fixed rule (`fix_tree4`), covered by the structural doctor unit tests",
     "TREE-5": "auto-fixed rule (`fix_tree5`), covered by the structural doctor unit tests",
     "TREE-7": "the fix redacts a session id inside BUGS.jsonl; the value is per-record "
     "and redaction is covered by the redaction suite",
-    "TREE-8": "auto-fixed rule (`fix_tree8`), covered by the structural doctor unit tests",
     "RELEASE-TREE-MEMORY": "the fix runs `release.py memory` over the ledger-derived "
     "commit window; the rule's own cases are tests/unit/features/specs/test_release_tree.py",
     "CAT-1": "the fix is `memory.py catalog generate`, exercised by tests/unit/skills/test_spec_navigator_memory_script.py",
@@ -261,6 +288,13 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
 
     before = _run_rule(root, rule)
     assert before, f"{code}: the fixture did not make the rule fire"
+    dead = [
+        v
+        for issue in before
+        for line in issue.description.splitlines()
+        for v in dead_verb_citations(f"`{line}`", rel=code, command_paths=command_paths())
+    ]
+    assert not dead, f"{code}: the finding cites a verb that does not exist: {dead}"
 
     if rule.fix_help is None:
         assert all(issue.severity is Severity.WARNING for issue in before), (
@@ -269,7 +303,8 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
         )
         return
 
-    command = _resolve(rule.fix_help, plant).replace(_VENV_DADAIA, _THIS_VENV_DADAIA)
+    # The fixture is no workspace: the fix names the CLI of the venv running this suite.
+    command = _resolve(rule_fix(rule, None), plant)
     done = subprocess.run(
         ["bash", "-c", command],
         cwd=root,
@@ -305,7 +340,7 @@ def test_every_specs_rule_is_either_exercised_or_listed_with_a_reason() -> None:
 
 
 def _iter_fix_helps() -> list[tuple[str, Any]]:
-    return [("/".join(r.codes), r.fix_help) for r in SPECS_RULES]
+    return [("/".join(r.codes), rule_fix(r, Path()) or None) for r in SPECS_RULES]
 
 
 #: a bare ``rm`` invocation with a recursive flag, at the head of the line or of any
@@ -343,8 +378,60 @@ def test_a_judgment_only_rule_never_makes_the_run_exit_1(tmp_path: Path) -> None
     for code in ("SPEC-DOC-005", "SPEC-DOC-010", "TREE-2", "AGENTS-PLACEHOLDER-1"):
         PLANTS[code].plant(root)
 
-    report = _specs_section(SpecsDoctor(root / "specs"))
+    report = _specs_section(SpecsDoctor(root / "specs"), Path())
     fired = {f.code for f in report.printable}
     assert {"SPEC-DOC-005", "SPEC-DOC-008", "TREE-2", "AGENTS-PLACEHOLDER-1"} <= fired, fired
     errors = {f.code for f in report.findings if f.error}
     assert errors == {"LINT-1"}, errors
+
+
+# ── T-050-09: TREE-5 remedies are honest (AC2.3, AC2.4) ─────────────────────────
+
+
+def _doctor_json(specs: Path, *flags: str) -> list[dict[str, str]]:
+    from typer.testing import CliRunner
+
+    from dadaia_workspace.cli.main import app
+
+    result = CliRunner().invoke(app, ["doctor", "--json", *flags, "--specs-dir", str(specs)])
+    findings: list[dict[str, str]] = json.loads(result.output)["sections"]["specs"]["findings"]
+    return findings
+
+
+def test_doctor_fix_writes_a_missing_law_file_and_clears_its_finding(tmp_path: Path) -> None:
+    """A missing ``specs/AGENTS.md`` or ``specs/<area>/AGENTS.md`` is lossless to write:
+    ``doctor --fix`` writes the shipped template and the TREE-5 finding is gone."""
+    root = _repo(tmp_path)
+    specs = root / "specs"
+    before = [f for f in _doctor_json(specs) if f["code"] == "TREE-5"]
+    assert any(f["message"].startswith("specs/AGENTS.md is missing") for f in before), before
+    assert any(f["message"].startswith("specs/bugs/AGENTS.md is missing") for f in before)
+
+    _doctor_json(specs, "--fix")
+
+    public = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
+    assert (specs / "AGENTS.md").read_bytes() == (
+        public / "templates" / "specs-AGENTS.md"
+    ).read_bytes()
+    assert (specs / "bugs" / "AGENTS.md").read_bytes() == (
+        public / "scaffold" / "bugs" / "AGENTS.md"
+    ).read_bytes()
+    assert [f for f in _doctor_json(specs) if f["code"] == "TREE-5"] == []
+
+
+def test_a_tree5_case_fix_cannot_repair_advertises_no_doctor_fix(tmp_path: Path) -> None:
+    """Operator content (copy-drift) is never overwritten, so its finding must not hand
+    back ``doctor --fix``; no TREE/FIXED description embeds a bare CLI command."""
+    root = _repo(tmp_path)
+    specs = root / "specs"
+    _doctor_json(specs, "--fix")
+    (specs / "AGENTS.md").write_text("# operator law\n", encoding="utf-8")
+
+    findings = _doctor_json(specs, "--fix")
+
+    drift = [f for f in findings if f["code"] == "TREE-5"]
+    assert len(drift) == 1 and "copy-drift" in drift[0]["message"], drift
+    assert "doctor --fix" not in drift[0]["fix"]
+    assert (specs / "AGENTS.md").read_text(encoding="utf-8") == "# operator law\n"
+    for finding in findings:
+        assert not re.search(r"(?<![\w./-])dadaia\s", finding["message"]), finding

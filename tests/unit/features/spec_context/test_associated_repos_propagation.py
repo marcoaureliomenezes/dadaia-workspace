@@ -24,8 +24,7 @@ from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     SpecContextProject,
 )
 from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
-from dadaia_workspace.features.specs.canon import scaffold as canon_scaffold  # noqa: E402
-from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
+from tests.fakes import FakeContextStore, FakeGitClient, register_dead  # noqa: E402
 
 
 @pytest.fixture()
@@ -54,7 +53,7 @@ def service(
         context_store=store,
         git_client=git,
         workspace_root=workspace_root,
-        scaffold_specs=canon_scaffold,
+        install_hooks=lambda _repo: None,
     )
 
 
@@ -107,7 +106,7 @@ def test_alive_with_zero_associated_repos_behaves_exactly_as_today(
     service: SpecContextService, git: FakeGitClient, workspace_root: Path
 ) -> None:
     """A16.1 regression: N=0 — no behavior change to the single-repo path."""
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    register_dead(service, "proj", "my-repo", "https://github.com/org/my-repo")
 
     ctx = service.alive("proj")
     assert ctx.state == ContextState.ALIVE

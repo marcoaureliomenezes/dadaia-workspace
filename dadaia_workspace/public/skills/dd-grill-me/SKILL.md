@@ -16,7 +16,7 @@ Reach shared understanding by mapping every open branch of the demand as a desig
 ## 1. When
 
 - The operator's demand is ambiguous and needs intake refinement (the main thread).
-- A release is being defined and needs its mandatory pre-SPEC session (the main thread, `dd-release-definition` §2).
+- A release is being defined and needs its mandatory pre-SPEC session (the main thread, `dd-release-definition` §3).
 - A single spec or feature question needs a focused leaf answer.
 
 ## 2. Steps
@@ -48,10 +48,10 @@ Reach shared understanding by mapping every open branch of the demand as a desig
 
 - Every gap findable by inspection is resolved or promoted, not asked of the operator.
 - The frontier is empty and the operator has confirmed the shared understanding.
-- The handoff is emitted; inside a dadaia workspace it passes `dadaia reports validate`.
+- The handoff is emitted; inside a dadaia workspace it passes `.dadaia/.venv/bin/dadaia reports validate`.
 
 ## 4. References
 
 - `PROBLEM-TAXONOMY.md` — the problem-shape reference used at step 3.
 - `EMISSION-FORMAT.md` — the optional report's shape, report mode only.
-- `dd-release-definition` §2 — the mandatory pre-SPEC session rule.
+- `dd-release-definition` §3 — the mandatory pre-SPEC session rule.

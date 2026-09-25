@@ -4,8 +4,8 @@ Intent: SENTINEL — the shipped denylist scan over this repository's own tracke
 (SPEC v0.4.7 FR7; SPEC v0.4.2 FR9 A9.1-A9.3)
 
 This repository is PUBLIC (MIT, published to GitHub and PyPI), so every pushed blob is
-published and the full layer set — operator denylist, structural baseline, foreign
-slugs, secret shapes — applies to every tracked path without exception. That is the
+published and the full layer set — operator denylist, structural baseline, secret
+shapes — applies to every tracked path without exception. That is the
 one scope decision, and it lives in the production push gate.
 
 **v0.4.7 FR7 — the tolerated-pairs baseline is gone.** From v0.11.0 to v0.4.6 this
@@ -35,16 +35,8 @@ into the archive — is added BACK into scope. ``HEAD^`` unavailable (a shallow 
 the initial commit) degrades to no add-back, never a failure. See
 :func:`_archive_paths_new_at_head` and the three ``tmp_path`` fixtures below.
 
-**Foreign-slug layer, and why it always runs with an EMPTY slug set here.** The real
-CLI derives foreign slugs from ``<workspace>/repos/`` at push time — deliberately NOT
-reproduced here: doing so would make this test's outcome depend on which sibling repos
-happen to be checked out on whichever machine runs it. A test whose pass/fail depends
-on an uncontrolled environment fact is not deterministic (tests/AGENTS.md admission
-filter). The layer still runs — ``scan_objects`` still receives and processes
-``slugs`` — exactly as it would for this repo checked out standalone (a from-scratch
-clone or a bare CI checkout), the one deterministic case. Slug word-boundary matching
-is proven correct in ``test_denylist_scan.py`` (A3.2/A3.3). The operator's own private
-denylist is excluded for the same reason: it is operator-private and varies by machine.
+The operator's own private denylist is excluded: it is operator-private and varies by
+machine, so a test depending on it would not be deterministic.
 
 Measured: ~950 tracked files, well under 5 MB, read through ONE ``git ls-files``
 subprocess plus in-process file reads — far inside the integration tier's 60 s budget.
@@ -77,9 +69,6 @@ _SCAN_SCOPE = ("dadaia_workspace", "specs", "tests", ".github", "docs")
 _EXTRA_PATHS = ("pyproject.toml", "README.md", "CHANGELOG.md")
 _EXCLUDED_PREFIXES = ("specs/audits/_archive/",)
 _TIMEOUT_S = 60
-
-#: Deterministic by design — see the module docstring's "Foreign-slug layer" section.
-_NO_FOREIGN_SLUGS: tuple[str, ...] = ()
 
 
 def _tracked_paths(
@@ -159,7 +148,7 @@ def _scan_object_for(repo: Path, rel_path: str) -> ScannedObject:
 
 
 def test_no_denylist_hit_anywhere_in_the_tracked_tree() -> None:
-    """v0.4.7 FR7: the shipped baseline + foreign-slug layers, run over EVERY tracked
+    """v0.4.7 FR7: the shipped baseline layer, run over EVERY tracked
     path of this repository, report ZERO hits — no tolerated-pairs list, no per-path
     exception. A commit that publishes a matching literal anywhere (production,
     specs, tests, workflows, docs or the packaging metadata) fails HERE, before the
@@ -174,7 +163,7 @@ def test_no_denylist_hit_anywhere_in_the_tracked_tree() -> None:
     objects = [_scan_object_for(_REPO_ROOT, path) for path in paths]
     baseline_patterns = load_baseline_patterns()
 
-    outcome = scan_objects(objects, terms=(), patterns=baseline_patterns, slugs=_NO_FOREIGN_SLUGS)
+    outcome = scan_objects(objects, terms=(), patterns=baseline_patterns)
 
     if outcome.hits:
         offenders = "\n".join(
@@ -237,7 +226,7 @@ def test_archive_authored_blob_is_scanned_and_fails(tmp_path: Path) -> None:
 
     objects = [_scan_object_for(repo, path) for path in paths]
     baseline_patterns = load_baseline_patterns()
-    outcome = scan_objects(objects, terms=(), patterns=baseline_patterns, slugs=_NO_FOREIGN_SLUGS)
+    outcome = scan_objects(objects, terms=(), patterns=baseline_patterns)
     assert any(hit.path == "specs/audits/_archive/CLOSURE.md" for hit in outcome.hits), (
         "the archive-authored blob's baseline-matching literal must surface as a hit"
     )

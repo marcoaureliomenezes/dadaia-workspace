@@ -5,7 +5,7 @@ Intent: CONTRACT — 0.4.7 FR1 / AC1.1 (T-047-74). Size: MEDIUM (directory-tiere
 
 ``--repo`` makes ``init`` a CALLER of the context lifecycle: the repo is cloned into
 ``repos/<slug>/`` by the same ``SpecContextService.alive`` clone every other verb uses,
-the context is created with that slug as its main repo, alive'd, bound to this session,
+the context is created with that slug as its main repo, alive'd (never bound — ADR 0038),
 and the cloned repo gets the pre-push chokepoint. Network-free: the origin is a local
 bare repo, so the assertions below exercise the real git path with no remote.
 
@@ -26,6 +26,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.cli_line import fix_line
 
 _runner = CliRunner()
 
@@ -92,20 +93,16 @@ def test_init_with_repo_clones_creates_alives_binds_and_installs_the_hook(
     assert contexts["demo-project"]["repo_slug"] == "demo-project"
     assert contexts["demo-project"]["state"] == "alive"
 
-    # 3. this session is bound to it.
-    sessions = list((workspace / ".dadaia" / "sessions").glob("*.json"))
-    bindings = [json.loads(path.read_text(encoding="utf-8")) for path in sessions]
-    assert [record["context"] for record in bindings] == ["demo-project"]
+    # 3. AC7.1: init binds nothing — no session record, `context bind` is the one binder.
+    assert not list((workspace / ".dadaia" / "sessions").glob("*.json"))
 
     # 4. the pre-push chokepoint is installed in the cloned repo, executable.
     hook = repo / ".git" / "hooks" / "pre-push"
     assert hook.is_file()
     assert os.access(hook, os.X_OK)
 
-    # 5. the eval-ready binding is printed — the SAME two lines `context bind
-    #    --print-env` emits, so the operator's shell reaches the context it just made.
-    assert "export DADAIA_CONTEXT=demo-project" in result.stdout
-    assert "export DADAIA_SESSION_ID=" in result.stdout
+    # 5. no export line, no "bound" claim.
+    assert "export DADAIA_" not in result.stdout and "bound" not in result.stdout
 
     # 6. `create` is the only context verb init ever names (FR1: a single-repo
     #    workspace is the degenerate multi-repo case).
@@ -156,16 +153,20 @@ def test_init_with_repo_is_idempotent_on_re_run(tmp_path: Path, origin: Path) ->
     assert _snapshot() == before
 
 
-def test_the_printed_fix_line_succeeds_once_the_url_is_reachable(tmp_path: Path) -> None:
-    """The `fix:` line a failed `--repo` prints is the IDENTICAL command — it must be
-    runnable to success, never a stall that re-raises on the record the failed run left."""
+def test_the_printed_fix_line_succeeds_once_the_url_is_reachable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The `fix:` line a failed `--repo` prints (the venv's `context create`, the failing
+    URL a placeholder — AC2.6) runs to success once the URL is reachable, never a stall
+    that re-raises on the record the failed run left."""
     workspace = tmp_path / "ws"
     bare = tmp_path / "app.git"
     argv = ["init", str(workspace), "--harness", "claude", "--skip-assets", "--repo", str(bare)]
 
     failed = _runner.invoke(app, argv)
     assert failed.exit_code == 1
-    assert f"fix: dadaia init {workspace} --harness claude" in failed.output
+    fix = next(ln for ln in failed.output.splitlines() if ln.startswith("fix: "))
+    assert fix == "fix: " + fix_line(workspace, "context", "create", "--main-repo", "<clone-url>")
 
     # The operator makes the URL reachable and re-runs the very same command.
     _git("init", "--bare", "--initial-branch=main", str(bare), cwd=tmp_path)
@@ -178,7 +179,8 @@ def test_the_printed_fix_line_succeeds_once_the_url_is_reachable(tmp_path: Path)
     _git("remote", "add", "origin", str(bare), cwd=work)
     _git("push", "origin", "main", cwd=work)
 
-    retry = _runner.invoke(app, argv)
+    monkeypatch.chdir(workspace)
+    retry = _runner.invoke(app, ["context", "create", "--main-repo", str(bare)])
 
     assert retry.exit_code == 0, retry.output
     assert (workspace / "repos" / "app" / "README.md").read_text(encoding="utf-8") == "app\n"
@@ -188,16 +190,40 @@ def test_the_printed_fix_line_succeeds_once_the_url_is_reachable(tmp_path: Path)
     assert [ctx["state"] for ctx in registry["contexts"] if ctx["name"] == "app"] == ["alive"]
 
 
-def test_init_without_repo_closes_with_exactly_three_lines(tmp_path: Path) -> None:
-    result = _runner.invoke(app, ["init", str(tmp_path / "ws"), "--harness", "claude"])
+def test_init_without_repo_closes_with_the_law_and_the_next_step(
+    tmp_path: Path,
+) -> None:
+    """0.4.8 AC1.1 reshaped the 0.4.7 closing: the last line is the next step, run
+    through the workspace's own venv CLI by absolute path (D2)."""
+    ws = tmp_path / "ws"
+    result = _runner.invoke(app, ["init", str(ws), "--harness", "claude"])
 
     assert result.exit_code == 0, result.stdout
     lines = [line for line in result.stdout.splitlines() if line.strip()]
     closing = lines[-3:]
     assert closing[0] == _LAW
-    assert closing[1].startswith("Claude Code: set `instructionFiles:")
-    # The third line: where projects live, and the ONE command that makes the first.
-    assert "repos/" in closing[2]
-    assert "dadaia context create" in closing[2]
-    # Exactly three — nothing above them is a closing note.
+    assert closing[1].startswith("Next (")  # the onboarding step, AC6.2
+    assert closing[2].startswith(
+        f"fix: {ws / '.dadaia' / '.venv' / 'bin' / 'dadaia'} context create"
+    )
     assert _LAW not in "\n".join(lines[:-3])
+
+
+def test_re_init_with_the_same_slug_but_another_url_refuses(tmp_path: Path, origin: Path) -> None:
+    """Only a context holding THIS url is reused; the same slug from another origin is a
+    different project and the re-run refuses with its fix line, the record untouched."""
+    workspace = tmp_path / "ws"
+    base = ["init", str(workspace), "--harness", "claude", "--skip-assets", "--repo"]
+    assert _runner.invoke(app, [*base, str(origin)]).exit_code == 0
+    imposter = tmp_path / "elsewhere" / "demo-project.git"
+    imposter.parent.mkdir()
+    _git("clone", "--bare", "-q", str(origin), str(imposter), cwd=tmp_path)
+
+    rerun = _runner.invoke(app, [*base, str(imposter)])
+
+    assert rerun.exit_code == 1, rerun.output
+    assert len([line for line in rerun.output.splitlines() if line.startswith("fix: ")]) == 1
+    registry = json.loads(
+        (workspace / ".dadaia" / "states" / "spec_contexts.json").read_text(encoding="utf-8")
+    )
+    assert [ctx["repo_url"] for ctx in registry["contexts"]] == [str(origin)]

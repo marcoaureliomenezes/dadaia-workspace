@@ -21,9 +21,12 @@ DIGEST_REL = Path(".dadaia") / "agentic" / "help-digest.md"
 #: Hard budget for the rendered digest (~4k tokens; the full --help dump measures
 #: ~33.5k tokens and is unusable as an injection payload).
 _MAX_CHARS = 16_000
-#: Emitted by the generator itself, so `dadaia help tree > docs/cli.md` reproduces the
-#: committed file byte-for-byte — the regenerate line names a command that is true.
-_HEADER = "<!-- derived-from: dadaia help tree — regenerate: `dadaia help tree > docs/cli.md` -->"
+#: Emitted by the generator itself, so `.dadaia/.venv/bin/dadaia help tree > docs/cli.md`
+#: reproduces the committed file byte-for-byte — the regenerate line names a command that is true.
+_HEADER = (
+    "<!-- derived-from: dadaia help tree — regenerate: "
+    "`.dadaia/.venv/bin/dadaia help tree > docs/cli.md` -->"
+)
 
 
 def _first_line(text: str | None) -> str:

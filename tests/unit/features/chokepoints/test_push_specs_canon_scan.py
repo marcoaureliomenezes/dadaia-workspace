@@ -12,13 +12,14 @@ scan reaches every non-deletion ref (tags included), never a deletion.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.core.models.git_scan import ScannedObject
 from dadaia_workspace.features.chokepoints import push_gate_decision
-from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_refs
+from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_stdin
 from dadaia_workspace.features.specs.canon import canon_violations
 
 _SHA_A = "a" * 40
@@ -48,35 +49,14 @@ class _FakeCanonObjectSource:
             for i, path in enumerate(self.range_by_sha.get(local_sha, []))
         ]
 
-    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
-        self.parent_calls.append(sha)
-        parent = self.parent_by_sha.get(sha)
-        return (parent,) if parent else ()
-
-    def resolve_ref(self, repo: Path, ref: str) -> str | None:
-        self.ref_calls.append(ref)
-        return self.sha_by_ref.get(ref)
-
-    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]:
-        return set()
-
 
 class _FailingTreeObjectSource:
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         return ()
 
-    def parents(self, repo: Path, sha: str) -> tuple[str, ...]:
-        return ()
-
-    def resolve_ref(self, repo: Path, ref: str) -> str | None:
-        return None
-
-    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]:
-        return set()
-
 
 def _refs(*lines: str) -> list[PushRef]:
-    return parse_push_refs("\n".join(lines))
+    return parse_push_stdin("\n".join(lines))[0]
 
 
 def test_a_fully_canon_conformant_tree_passes(tmp_path: Path) -> None:
@@ -85,6 +65,7 @@ def test_a_fully_canon_conformant_tree_passes(tmp_path: Path) -> None:
     )
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -99,6 +80,7 @@ def test_a_non_canon_path_refuses_naming_the_fix_hint(tmp_path: Path) -> None:
     )
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -126,6 +108,7 @@ def test_a_non_canon_path_outside_the_pushed_range_never_blocks(tmp_path: Path) 
     )
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_SHA_B}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=lambda paths: [p for p in paths if p.startswith("_archive/")],
@@ -140,6 +123,7 @@ def test_a_non_canon_path_inside_the_pushed_range_still_blocks(tmp_path: Path) -
     )
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_SHA_B}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -154,6 +138,7 @@ def test_a_stray_dotfile_refuses(tmp_path: Path) -> None:
     )
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -166,6 +151,7 @@ def test_a_deletion_ref_is_never_scanned(tmp_path: Path) -> None:
     source = _FakeCanonObjectSource()
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_ZERO} refs/heads/feature/0.0.1 {_SHA_A}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -181,6 +167,7 @@ def test_a_tag_push_is_scanned_too(tmp_path: Path) -> None:
     )
     decision = push_gate_decision(
         _refs(f"refs/tags/v9.9.9 {_SHA_A} refs/tags/v9.9.9 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -197,6 +184,7 @@ def test_canon_scan_runs_before_the_denylist_scan(tmp_path: Path) -> None:
     )
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,

@@ -40,7 +40,9 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
+from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
@@ -56,7 +58,6 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:
         public_assets=FileSystemPublicAssetManager(),
         python_env=VenvPythonEnvironmentManager(),
     ).init(tmp_path, harnesses=L1_ENTRY_HARNESSES)
-    from dadaia_workspace.core.platform import PLATFORM
 
     venv_bin = tmp_path / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
     venv_bin.mkdir(parents=True, exist_ok=True)
@@ -130,10 +131,16 @@ def _register_dead_ctx_with_repo_on_disk(workspace: Path, name: str = "stale-ctx
 # ---------------------------------------------------------------------------
 
 
+def _next_step(workspace: Path) -> str:
+    """0.4.8 R2 deliberate golden change: zero ALIVE contexts prints the onboarding step."""
+    fix = fix_line(workspace, "context", "create", "<name>", "--main-repo", "<clone-url>")
+    return f"ONBOARDING info Next (command step context): no ALIVE Spec Context — create one\nfix: {fix}\n"
+
+
 def test_doctor_default_output_healthy_workspace_unchanged(workspace: Path) -> None:
     result = _runner.invoke(app, ["doctor"])
     assert result.exit_code == 0, result.output
-    assert result.output == ""
+    assert result.output == _next_step(workspace)
 
 
 def test_doctor_default_output_with_issue_unchanged(workspace: Path) -> None:
@@ -142,7 +149,7 @@ def test_doctor_default_output_with_issue_unchanged(workspace: Path) -> None:
     assert result.exit_code == 1, result.output
     assert result.output == (
         "INV-5 error Context 'stale-ctx' is dead but repo 'stale-ctx' is on disk\n"
-        "fix: .dadaia/.venv/bin/dadaia doctor --fix\n"
+        f"fix: {fix_line(workspace, 'doctor', '--fix')}\n" + _next_step(workspace)
     )
 
 
@@ -151,7 +158,7 @@ def test_doctor_default_fix_output_unchanged(workspace: Path) -> None:
     result = _runner.invoke(app, ["doctor", "--fix"])
     assert result.exit_code == 0, result.output
     day = datetime.now(tz=UTC).strftime("%Y%m%d")
-    assert result.output == (
+    assert result.output == _next_step(workspace) + (
         "\nApplied 1 repair(s):\n"
         "  - INV-5: moved 'repos/stale-ctx' (context stale-ctx) -> "
         f"'.dadaia/reaped/{day}/repos/stale-ctx'\n"

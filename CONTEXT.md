@@ -21,7 +21,7 @@ One harness process, identified by exactly one `session_id` — the harness's ow
 _Avoid_: sid ladder, CLI-minted session, thread id
 
 **Bind**:
-The session record that names the context a session works in, and nothing else — `dadaia context bind <ctx> [--print-env]` is one verb with no mode, release, force or reason. A context with at least one live bind is alive; a bind carries a Scope.
+The session record that names the context a session works in, and nothing else — `.dadaia/.venv/bin/dadaia context bind <ctx> [--print-env]` is one verb with no mode, release, force or reason. A context with at least one live bind is alive; a bind carries a Scope.
 _Avoid_: alive flag, lease, lock, bind mode, bind release
 
 **Presence**:
@@ -31,6 +31,50 @@ _Avoid_: heartbeat, marker, sentinel
 **Invocation**:
 The facts resolved once per process from environment, cwd and payload: workspace, session, context, repo, specs_dir and bind. Every policy receives an Invocation; none re-derives it, and none carries a release or a phase — the gate reads no SDD artifact.
 _Avoid_: resolution ladder, rung, resolve_context
+
+**Onboarding level**:
+One of three levels to a working project, derived from real state and never stored: 1 workspace (`init`), 2 context (onboarding steps `context`, `bind`), 3 specs (3a `specs`, 3b `first-pass`, 3c `publish`). A new project in an existing workspace is levels 2 + 3.
+_Avoid_: onboarding state, setup phase, wizard step
+
+**Next step**:
+The first pending Onboarding step, printed identically by `doctor`, `init`, `context create` and SessionStart (`ONBOARDING info Next: …` + its Fix line).
+_Avoid_: hint, suggestion, todo
+
+**Onboarding step**:
+One entry of the ordered step list: id, Step kind, a real-state predicate ("pending") and one Fix line. Ids in order: `context`, `bind`, `specs` (3a), `first-pass` (3b), `publish` (3c).
+_Avoid_: stage, wizard step, onboarding state
+
+**Step kind**:
+`command` (the Fix line is a shell command) or `agent` (the Fix line names a skill section and a pending list an agent works through).
+_Avoid_: type, mode
+
+**Fix line**:
+The one runnable line a finding, refusal or step prints after `fix:`; every one naming the workspace CLI is built by `fix_line`.
+_Avoid_: hint, remedy text
+
+**Project publication**:
+Level 3c: the first push of an onboarded project's specs, by `context baseline` — principal, integration and work branches; a re-run is a no-op.
+_Avoid_: publish step (the Publication boundary's _Avoid_), baseline (the pre-push published-history baseline)
+
+**Project gitflow**:
+The `gitflow:` block of `specs/constitution.md` frontmatter naming three fixed roles: **principal branch** (deployed; default detected from `origin/HEAD`, else `main`), **integration branch** (default `develop`), **work branch** (`<work prefix><M.m.p>`, prefix default `feature/`).
+_Avoid_: branch policy (the gate's check), branching model
+
+**Bootstrap birth**:
+A push creating the principal or integration branch that publishes no new object.
+_Avoid_: bootstrap push, first push
+
+**Foreign specs tree**:
+A repo's existing `specs/` that is not a dadaia tree at canon v6 or later; `specs init` never merges into it.
+_Avoid_: legacy specs, old specs, migration source
+
+**specs-bkp**:
+The repo-root directory a foreign specs tree is moved to (`git mv`, staged) by `specs init --replace-foreign`; read-only input to the first pass.
+_Avoid_: specs backup, specs.old, archive
+
+**First pass**:
+Level 3b: the `dd-audit-project` run on a fresh specs tree — the `memory.py drift` worklist drives `dd-product-engineer` to fill memory from code and `specs-bkp/`; done when memory holds real content (`memory.py check` exit 0), never by a stamp.
+_Avoid_: bootstrap audit, initial import, migration
 
 ## Enforcement
 
@@ -110,8 +154,24 @@ _Avoid_: update --set status, flip
 The open-scope publication unit, named last-published-PyPI + 1 patch — exactly one live, growing by stacked Candidates; its state is `_RELEASE.json`, its narrative is that file's `log`. The version increments only at operator-approved deploy (ADR 0021). _Avoid_: "release" for one closed scope — that is a Candidate.
 
 **Candidate**:
-One closed-scope SDD cycle inside the live Release (grill → SPEC/PLAN/TASKS `Aprovado` → implementation → memory → closure → develop merge → promote-or-continue gate). The live Candidate's trio sits at the release root and the next Candidate overwrites it in place — git is the archive, and no closed Candidate is ever copied into a folder of its own.
+One closed-scope SDD cycle inside the live Release (as-is review → grill → SPEC/PLAN/TASKS `Aprovado` → implementation → memory → closure → integration-branch merge → promote-or-continue gate). The live Candidate's trio sits at the release root and the next Candidate overwrites it in place — git is the archive, and no closed Candidate is ever copied into a folder of its own.
 _Avoid_: version (for the unit), sprint, "rc" as a branch name or a fixes-only round
+
+**As-is review**:
+Definition step 2: the read-only reading of every unit a picked set touches, its bug history included, ending in one As-is verdict per unit — PLAN §1.
+_Avoid_: audit (the three-pillar review), inventory, survey (`dd-architecture-survey`)
+
+**As-is verdict**:
+One of `DELETE REBUILD UPDATE KEEP ADD` on one row of PLAN §1; always written qualified.
+_Avoid_: verdict (bare — the PR approval record), finding verdict (the doctor's)
+
+**As-is unit**:
+The row subject of an As-is review: a module (`dd-codebase-design`) or a law/skill/doc section with a today-behaviour.
+_Avoid_: code unit (`memory.py drift`'s directory holding code files)
+
+**Replaces**:
+The SPEC section naming the current behaviours a Candidate removes — the prose mirror of its DELETE/REBUILD rows.
+_Avoid_: removed features, deprecations
 
 **Memory**:
 The current product truth under `specs/memory/`; never history. Two tiers: canonical memory and product memory.
@@ -140,7 +200,7 @@ _Avoid_: memory pass, apply the deltas, sync
 ## Governance verbs and hand edits
 
 **Governance verb**:
-The one CLI command authorized to change a governance record — `dadaia bugs append|update|resolve|supersede|defer|reject|archive`, `backlog new|exit`, `release new|phase|check`, `audit disposition|close`.
+The one CLI command authorized to change a governance record — `bugs.py append|update|resolve|supersede|defer|reject|archive`, `backlog new|exit`, `release new|phase|check`, `audit disposition|close`.
 _Avoid_: CLI command (generic), mutation, setter
 
 **Governance event**:
@@ -166,7 +226,7 @@ The HTML rendering of a handoff, written only for a human hop.
 _Avoid_: artifact (bare), page
 
 **Doctor**:
-`dadaia doctor` — the one validator and reaper over three Compliance sections (`workspace`, `specs`, `ledgers`), reporting one finding per line as `<CODE> <verdict> <message>`; `--fix` runs the reaper then the specs repairs, `--expired-only` scopes the report to the TTL lane; exit 1 on any error-class finding, each carrying one `fix:` line. `dadaia public doctor` (lib-vs-projection) is the only other one, always qualified.
+`.dadaia/.venv/bin/dadaia doctor` — the one validator and reaper over three Compliance sections (`workspace`, `specs`, `ledgers`), reporting one finding per line as `<CODE> <verdict> <message>`; `--fix` runs the reaper then the specs repairs, `--expired-only` scopes the report to the TTL lane; exit 1 on any error-class finding, each carrying one `fix:` line. `.dadaia/.venv/bin/dadaia public doctor` (lib-vs-projection) is the only other one, always qualified.
 _Avoid_: specs doctor, backlog doctor (both retired, not aliased), checker, linter (for doctors), audit (for doctors)
 
 **Compliance section**:

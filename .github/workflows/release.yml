@@ -125,7 +125,7 @@ jobs:
     if: needs.release-please.outputs.release_created == 'true'
     permissions:
       contents: read
-    timeout-minutes: 8
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -135,8 +135,15 @@ jobs:
           python-version: "3.12"
       - run: pipx install poetry==1.8.3
       - run: poetry install --no-interaction --no-ansi --with dev
+      - run: pipx install uv==0.11.16
+      # AC8.3: the onboarding journey and the one-line bootstrap run before publish.
       - name: pytest e2e python
-        run: poetry run pytest -q -m "e2e and not quarantine" tests/e2e/features --durations=30
+        env:
+          DADAIA_REQUIRE_UVX: "1"
+        run: >-
+          poetry run pytest -q -m "e2e and not quarantine" --durations=30
+          tests/e2e/features tests/e2e/test_one_line_bootstrap.py
+          tests/e2e/test_onboarding_journey.py
 
   build:
     name: Build sdist + wheel
@@ -240,48 +247,21 @@ jobs:
         run: pip install "dadaia-workspace==$VERSION"
       - name: dadaia --help
         run: dadaia --help
-      - name: dadaia init in tmpdir
-        # Use the runner temp dir (portable; no hardcoded /tmp — T-018-09).
-        # The directory is init's one positional argument and --harness its one required
-        # option; `--workspace` and the implied full harness set are retired.
+      - run: pipx install uv==0.11.16
+      - name: Greenfield from PyPI (init --repo + specs init + doctor)
+        # AC8.3: the published wheel walks the three levels over a file:// bare repo
+        # created here; the runner temp dir keeps it portable (no hardcoded /tmp).
         run: |
-          dadaia init "$RUNNER_TEMP/smoke-ws" --harness claude
-          test -f "$RUNNER_TEMP/smoke-ws/.dadaia/states/spec_contexts.json"
-
-  publish-skills-repo:
-    name: Publish the dadaia-skills repository
-    runs-on: ubuntu-latest
-    needs: [release-please, build, publish]
-    if: needs.release-please.outputs.release_created == 'true'
-    timeout-minutes: 5
-    # contents: read — the push targets the OTHER repository
-    # (marcoaureliomenezes/dadaia-skills) through SKILLS_REPO_TOKEN, never this one.
-    permissions:
-      contents: read
-    env:
-      SKILLS_REPO_TOKEN: ${{ secrets.SKILLS_REPO_TOKEN }}
-      VERSION: ${{ needs.build.outputs.version }}
-    steps:
-      - name: "Secret missing: fail closed (operator adds SKILLS_REPO_TOKEN)"
-        if: env.SKILLS_REPO_TOKEN == ''
-        run: |
-          echo "::error::SKILLS_REPO_TOKEN is not set; the skills repository cannot be published and this job fails closed. Add the secret (contents:write on marcoaureliomenezes/dadaia-skills)."
-          exit 1
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
-        with:
-          python-version: "3.12"
-      - name: Build the skills repository
-        run: python dadaia_workspace/public/scripts/build-skills-repo.py "$RUNNER_TEMP/skills-repo"
-      - name: Push the built tree to marcoaureliomenezes/dadaia-skills
-        # The generated out-dir is not this repository, so `git add -A` there is safe.
-        # The published repository is a build output whose history is this repository's
-        # tags: every release force-pushes the freshly rendered tree over main.
-        run: |
-          cd "$RUNNER_TEMP/skills-repo"
-          git init -b main
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "dadaia-skills $VERSION"
-          git push --force "https://x-access-token:${SKILLS_REPO_TOKEN}@github.com/marcoaureliomenezes/dadaia-skills.git" main
+          git config --global user.name smoke
+          git config --global user.email smoke@example.invalid
+          git config --global init.defaultBranch main
+          src="$RUNNER_TEMP/smoke-src"
+          mkdir -p "$src" && echo "# smoke" > "$src/README.md"
+          git -C "$src" init -q && git -C "$src" add -A && git -C "$src" commit -qm init
+          git clone -q --bare "$src" "$RUNNER_TEMP/smoke.git"
+          cd "$RUNNER_TEMP"
+          uvx "dadaia-workspace==$VERSION" init smoke-ws --harness claude \
+            --repo "file://$RUNNER_TEMP/smoke.git"
+          cd smoke-ws
+          .dadaia/.venv/bin/dadaia specs init --context smoke
+          .dadaia/.venv/bin/dadaia doctor --context smoke

@@ -8,7 +8,7 @@ Scope: this file governs only `specs/releases/`.
   which writes `SPEC.md` + `_RELEASE.json` (DEFINITION) in one transaction and refuses a second one.
 - The release has OPEN scope: it grows by stacked closed-scope CANDIDATES, each trio written at the release root.
 - A closed candidate's trio is overwritten in place by the next candidate's `RELEASE_PY new`; that trio lives in git at its CLOSURE commit, which is the whole archive.
-- Canonical release state: `_RELEASE.json` — one mutable document (`phase`/milestones) plus an append-only `log`; a legacy `RELEASE.json` is renamed by `dadaia doctor --fix` (SPEC-DOC-046, ADR 0007).
+- Canonical release state: `_RELEASE.json` — one mutable document (`phase`/milestones) plus an append-only `log`; a legacy `RELEASE.json` is renamed by `.dadaia/.venv/bin/dadaia doctor --fix` (SPEC-DOC-046, ADR 0007).
 - No `_RELEASE.jsonl` event stream, no `CLOSURE.md`, no `reviews/` directory, no `segment`/`audited` fields.
 
 ## 1. Structure
@@ -18,8 +18,8 @@ Scope: this file governs only `specs/releases/`.
 
 ## 2. Authoring rules
 
-- Three flows, one `**Origin:**` per SPEC (`SPEC-DOC-048`): Flow 1 `backlog:<ids>` is the default weight, full memory pass; Flow 2 `bugs:<ids>` composes bugs, memory pass surgical or none; Flow 3 `operator-demand` is the heaviest — grill first, full memory pass.
-- SDD lifecycle order PER CANDIDATE: grill -> `SPEC.md` (Draft) -> operator approval -> `PLAN.md` -> `TASKS.md` -> implementation -> closure -> develop merge -> promote-or-continue gate.
+- Three flows, one `**Origin:**` per SPEC (`SPEC-DOC-048`): Flow 1 `backlog:<ids>` is the default weight, full memory pass; Flow 2 `bugs:<ids>` composes bugs, memory pass surgical or none; Flow 3 `operator-demand` is the heaviest — as-is review and grill first, full memory pass.
+- SDD lifecycle order PER CANDIDATE: as-is review -> grill -> `SPEC.md` (Draft) -> operator approval -> `PLAN.md` -> `TASKS.md` -> implementation -> closure -> integration-branch merge -> promote-or-continue gate.
 - Candidate closure order: memory update -> closure narrative in `_RELEASE.json`'s `log` -> disposition sweep -> artifact GC -> merge -> gate (continue = the next candidate's `RELEASE_PY new`; promote = merging the release PR).
 - Full arc, gate cadence, the step-by-step ladder: `dd-release-implementation`'s `RC-FLOW.md`.
 - A candidate's SPEC.md fits 24 KB and TASKS.md 12 KB; measure with `wc -c` before the definition commit.
@@ -40,6 +40,6 @@ Scope: this file governs only `specs/releases/`.
 
 ## 5. Promote
 
-- Version, CHANGELOG and tag come from release-please over Conventional Commits, through one release PR on `main`.
+- Version, CHANGELOG and tag come from release-please over Conventional Commits, through one release PR on the principal branch (the constitution's `gitflow:`).
 - Promote is merging that PR; `RELEASE_PY phase CLOSURE --sha <sha> --pr <n>` records it in the candidate's note.
 - The publish jobs run in the same workflow, gated on `release_created`; no verb and no agent mints a version.

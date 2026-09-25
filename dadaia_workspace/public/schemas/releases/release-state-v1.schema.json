@@ -102,7 +102,7 @@
             "string",
             "null"
           ],
-          "description": "The develop->main merge commit sha."
+          "description": "The integration->principal merge commit sha."
         },
         "pr": {
           "type": [
@@ -116,7 +116,7 @@
           "description": "When this milestone was recorded."
         }
       },
-      "description": "Set once, at the develop->main ship merge. null before that point."
+      "description": "Set once, at the integration->principal ship merge. null before that point."
     },
     "log": {
       "type": "array",

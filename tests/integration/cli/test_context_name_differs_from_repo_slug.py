@@ -3,7 +3,7 @@
 Bugs a1-context-specs-resolution-ignores-repo-slug and a1-audit-completes-without-audit-report,
 both reported by the consumer-side validator against the re-architected workflows.
 
-``dadaia context create meu-projeto --main-repo repo-diferente`` is ordinary usage: a context has
+``dadaia context create meu-projeto --main-repo <url of repo-diferente>`` is ordinary usage: a context has
 two identities — the NAME every session record and handoff uses, and the SLUG that is the
 directory under ``repos/``. 28 call sites across 9 modules derived the directory by
 interpolating the NAME, so any context where they differed resolved to a path that does not
@@ -57,12 +57,10 @@ def workspace(tmp_path: Path) -> Path:
         public_assets=FileSystemPublicAssetManager(),
         python_env=VenvPythonEnvironmentManager(),
     ).init(root, harnesses=L1_ENTRY_HARNESSES)
-    remote = tmp_path / "remote.git"
+    remote = tmp_path / f"{_SLUG}.git"
     subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True, timeout=_TIMEOUT)
-    created = _dadaia(root, "context", "create", _NAME, "--main-repo", _SLUG, "--url", str(remote))
+    created = _dadaia(root, "context", "create", _NAME, "--main-repo", str(remote))
     assert created.returncode == 0, created.stdout + created.stderr
-    alive = _dadaia(root, "context", "alive", _NAME)
-    assert alive.returncode == 0, alive.stdout + alive.stderr
     return root
 
 
@@ -90,13 +88,8 @@ def test_create_refuses_a_name_no_other_verb_can_use(workspace: Path) -> None:
     opinion, so "created" and "usable" cannot drift apart.
     """
     for bad in ("meu projeto", "projeto-café", "../escape"):
-        proc = _dadaia(workspace, "context", "create", bad, "--main-repo", "r", "--url", "x")
+        proc = _dadaia(workspace, "context", "create", bad, "--main-repo", "x")
         combined = proc.stdout + proc.stderr
         assert proc.returncode != 0, f"create accepted the unusable name {bad!r}"
         assert "Traceback" not in combined
         assert "letters, digits" in combined, combined
-
-    ok = _dadaia(
-        workspace, "context", "create", "outro_valido-2", "--main-repo", "slug_ok", "--url", "x"
-    )
-    assert ok.returncode == 0, ok.stdout + ok.stderr
