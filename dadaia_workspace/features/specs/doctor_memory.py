@@ -481,41 +481,14 @@ class MemoryValidator:
                 )
             ]
 
-        results = memory_lint.lint_directory(mem_dir, schema)
-        if not results:
-            return []
-
-        error_lines: list[str] = []
-        warn_lines: list[str] = []
-        for result in results:
-            for err in result.errors:
-                error_lines.append(f"  [{result.path}] ERROR: {err}")
-            for warn in result.warnings:
-                warn_lines.append(f"  [{result.path}] WARN: {warn}")
-
-        issues: list[SpecsDoctorIssue] = []
-        if error_lines:
-            issues.append(
-                SpecsDoctorIssue(
-                    code="LINT-1",
-                    severity=Severity.ERROR,
-                    description=(
-                        "LINT-1: memory atom lint found frontmatter/schema violations "
-                        "or forbidden headings:\n" + "\n".join(error_lines)
-                    ),
-                    path=str(mem_dir),
-                )
+        # One issue per error, naming its atom: the doctor prints one line per finding.
+        return [
+            SpecsDoctorIssue(
+                code="LINT-1", severity=Severity.ERROR, description=err, path=str(result.path)
             )
-        elif warn_lines:
-            issues.append(
-                SpecsDoctorIssue(
-                    code="LINT-1",
-                    severity=Severity.WARNING,
-                    description=("LINT-1: memory atom lint warnings:\n" + "\n".join(warn_lines)),
-                    path=str(mem_dir),
-                )
-            )
-        return issues
+            for result in memory_lint.lint_directory(mem_dir, schema)
+            for err in result.errors
+        ]
 
     def check_mem_drift2_citations(
         self,
