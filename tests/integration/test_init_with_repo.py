@@ -205,3 +205,23 @@ def test_init_without_repo_closes_with_the_law_and_the_next_step(
         f"fix: {ws / '.dadaia' / '.venv' / 'bin' / 'dadaia'} context create"
     )
     assert _LAW not in "\n".join(lines[:-3])
+
+
+def test_re_init_with_the_same_slug_but_another_url_refuses(tmp_path: Path, origin: Path) -> None:
+    """Only a context holding THIS url is reused; the same slug from another origin is a
+    different project and the re-run refuses with its fix line, the record untouched."""
+    workspace = tmp_path / "ws"
+    base = ["init", str(workspace), "--harness", "claude", "--skip-assets", "--repo"]
+    assert _runner.invoke(app, [*base, str(origin)]).exit_code == 0
+    imposter = tmp_path / "elsewhere" / "demo-project.git"
+    imposter.parent.mkdir()
+    _git("clone", "--bare", "-q", str(origin), str(imposter), cwd=tmp_path)
+
+    rerun = _runner.invoke(app, [*base, str(imposter)])
+
+    assert rerun.exit_code == 1, rerun.output
+    assert len([line for line in rerun.output.splitlines() if line.startswith("fix: ")]) == 1
+    registry = json.loads(
+        (workspace / ".dadaia" / "states" / "spec_contexts.json").read_text(encoding="utf-8")
+    )
+    assert [ctx["repo_url"] for ctx in registry["contexts"]] == [str(origin)]

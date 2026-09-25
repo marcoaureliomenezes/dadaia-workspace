@@ -173,6 +173,24 @@ def test_an_existing_checkout_of_the_url_is_adopted_any_other_occupant_refused(
     assert (ws / "repos" / "adopt" / ".git" / "hooks" / "pre-push").is_file()
 
 
+def test_a_checkout_of_another_origin_under_the_slug_is_refused_not_adopted(
+    ws: Path, tmp_path: Path
+) -> None:
+    """AC3.3: a git root whose origin is NOT the URL is an occupant, never an adoption."""
+    other = _remote(tmp_path, "other")
+    _git("clone", "-q", str(other), str(ws / "repos" / "app"))
+    wanted = _remote(tmp_path, "app.git")
+
+    code, out = _create("--main-repo", str(wanted))
+
+    assert code == 1
+    assert f"repos/app exists but is not a checkout of {wanted}" in out.replace("\n", "")
+    assert "fix: " in out
+    assert _names(ws) == []
+    assert _git("remote", "get-url", "origin", cwd=ws / "repos" / "app") == str(other)
+    assert not (ws / "repos" / "app" / ".git" / "hooks" / "pre-push").exists()
+
+
 @pytest.mark.parametrize("flag", ["--url", "--associated-repos"])
 def test_retired_flags_exit_2(ws: Path, flag: str) -> None:
     """AC3.8."""
