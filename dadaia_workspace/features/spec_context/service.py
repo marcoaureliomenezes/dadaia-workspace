@@ -595,17 +595,18 @@ class SpecContextService:
             raise GitSyncError(
                 f"{exc}\nfix: {fix_line(self._workspace_root, 'context', 'baseline', name)}"
             ) from None
-        if self._git.published(repo, "specs/constitution.md"):
-            return ""
         flow, _ = read_gitflow(repo / "specs")
+        if self._git.published(repo, flow.integration):
+            return ""
         heads = git("for-each-ref", "--format=%(refname:lstrip=3)", "refs/remotes/origin").split()
-        base, births = f"origin/{flow.principal}", []
+        base = f"origin/{flow.principal}"
         if flow.principal not in heads:
             tree = git("hash-object", "-t", "tree", "--stdin", stdin="")
             base = git("commit-tree", tree, "-m", f"chore: birth of {flow.principal}")
-            births.append(f"{base}:refs/heads/{flow.principal}")
-        if flow.integration not in heads:
-            births.append(f"{base}:refs/heads/{flow.integration}")
+        # A birth is pushed as the same-named local head: the gate's one pushable shape.
+        births = [b for b in (flow.principal, flow.integration) if b not in heads]
+        for branch in births:
+            git("branch", "-f", "--no-track", branch, base)
         if births:
             git("push", "origin", *births)
         tags = (_TAG_RE.fullmatch(t) for t in git("tag", "--sort=-v:refname").split())

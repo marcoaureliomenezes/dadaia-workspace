@@ -1,6 +1,7 @@
 """The onboarding journey in three levels, driven through ``uvx`` over file:// bare repos.
 
-Intent: CONTRACT — 0.4.8 FR8 / AC8.1, AC8.2 (T-048-01).
+Intent: CONTRACT — 0.4.8 FR8 / AC8.1, AC8.2 (T-048-01); 0.5.0 FR10 / AC10.1–AC10.3
+(T-050-21: the autopilot loop executes only printed fix lines).
 
 Owner: dd-software-engineer (LARGE-tier e2e; tests/AGENTS.md "every file names an owner").
 
@@ -21,8 +22,9 @@ upgrade -> T-048-06, guidance -> T-048-07. After every level (AC8.2) doctor repo
 Real venvs are built here by CHILD processes (``uvx`` and ``init``);
 ``tests/conftest.py``'s ``_no_real_venv_in_tests`` backstop is an in-process monkeypatch
 and does not reach them — the same accommodation ``test_one_line_bootstrap`` documents.
-Needs ``uv`` on PATH (CI installs it, T-048-11) and network for uvx's dependency
-resolution; without ``uvx`` the module skips with that reason.
+Needs network for dependency resolution. CI puts ``uv`` on PATH and sets
+``DADAIA_REQUIRE_UVX`` (T-048-11); without uvx the launcher is a child-built venv holding
+the same wheel, and only the verbatim-quickstart test (a literal ``uvx`` line) skips.
 """
 
 from __future__ import annotations
@@ -30,6 +32,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -51,12 +54,11 @@ pytestmark = [
     # Justified over the e2e default: a first level provisions two real venvs (uvx's and
     # the workspace's) from the network; the memoized first test of a scenario pays it.
     pytest.mark.timeout(900),
-    # CI sets DADAIA_REQUIRE_UVX=1 so an absent uvx fails the journey instead of skipping it.
-    pytest.mark.skipif(
-        _UVX is None and not os.environ.get("DADAIA_REQUIRE_UVX"),
-        reason="uvx is not on PATH — the onboarding journey drives `uvx --from`",
-    ),
 ]
+# CI sets DADAIA_REQUIRE_UVX=1 so the journey drives `uvx --from` there and an absent uvx
+# fails; without it (a dev box with no uv) the launcher is a child-built venv holding the
+# same wheel, so the journey still runs locally.
+_REQUIRE_UVX = bool(os.environ.get("DADAIA_REQUIRE_UVX"))
 
 _TIMEOUT = 600.0
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -80,7 +82,10 @@ class Env:
         self.fixtures = root / "fixtures"
         self.home_dir.mkdir(parents=True)
         self.fixtures.mkdir()
-        self.env = {k: v for k, v in os.environ.items() if not k.startswith("DADAIA_")}
+        # No inherited session identity: a scenario that wants one sets DADAIA_SESSION_ID.
+        harness_ids = ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID")
+        self.env = {k: v for k, v in os.environ.items()
+                    if not k.startswith("DADAIA_") and k not in harness_ids}  # fmt: skip
         # The journey is a consumer: it must import the uvx-installed wheel, never this checkout.
         self.env.pop("PYTHONPATH", None)
         self.env.pop("VIRTUAL_ENV", None)
@@ -97,6 +102,10 @@ class Env:
             GIT_CONFIG_SYSTEM=os.devnull,
         )
         self.git("config", "--global", "init.defaultBranch", "main", cwd=root)
+        # An operator's identity lives in git config; `context baseline` reads it there.
+        self.git("config", "--global", "user.name", "t", cwd=root)
+        self.git("config", "--global", "user.email", "t@example.invalid", cwd=root)
+        self._launchers: dict[str, Path] = {}
 
     def run(self, *argv: str, cwd: Path) -> subprocess.CompletedProcess[str]:
         return subprocess.run(  # noqa: S603
@@ -109,10 +118,25 @@ class Env:
         return done.stdout.strip()
 
     def uvx(self, *argv: str, source: str | None = None) -> subprocess.CompletedProcess[str]:
-        assert _UVX is not None
-        return self.run(
-            _UVX, "--from", source or str(self.wheel), "dadaia-workspace", *argv, cwd=self.root
-        )
+        """``uvx --from <source> dadaia-workspace …`` — or, with no uvx and no CI demand
+        for it, the same *source* pip-installed once into a child-built launcher venv."""
+        spec = source or str(self.wheel)
+        if _UVX is not None or _REQUIRE_UVX:
+            assert _UVX is not None, "DADAIA_REQUIRE_UVX is set but uvx is not on PATH"
+            return self.run(_UVX, "--from", spec, "dadaia-workspace", *argv, cwd=self.root)
+        return self.run(str(self._launcher(spec)), *argv, cwd=self.root)
+
+    def _launcher(self, spec: str) -> Path:
+        if spec not in self._launchers:
+            venv = self.root / "launchers" / str(len(self._launchers))
+            self.run(sys.executable, "-m", "venv", str(venv), cwd=self.root).check_returncode()
+            bin_dir = venv / PLATFORM.venv_scripts_dir
+            pip = self.run(
+                str(bin_dir / "python"), "-m", "pip", "install", "-q", spec, cwd=self.root
+            )
+            assert pip.returncode == 0, pip.stderr
+            self._launchers[spec] = bin_dir / "dadaia-workspace"
+        return self._launchers[spec]
 
     def bare(self, name: str, specs: str = "none") -> str:
         """A file:// bare repo ``<name>.git`` with one commit; *specs* seeds its tree."""
@@ -514,6 +538,110 @@ class TestFailedCreateThenRetry:
 # ── scenario 6: re-init is the upgrade ───────────────────────────────────────────
 
 
+# ── FR10: the autopilot — an agent loops doctor -> printed fix until nothing is pending ──
+
+_AUTOPILOT_CAP = 10
+
+
+class Autopilot(Scenario):
+    """AC10.1: one ``init … --repo`` line, then ONLY the ONBOARDING fix lines doctor prints —
+    ``shlex.split`` and run; the ``agent`` step by a scripted stand-in filling memory."""
+
+    def __init__(self, env: Env, specs: str) -> None:
+        super().__init__(env)
+        self.slug = f"auto-{specs}"
+        self.url = env.bare(self.slug, specs)
+        self.ws = Workspace(env, f"ws-{specs}")
+        self.steps: list[str] = []
+        env.env["DADAIA_SESSION_ID"] = f"autopilot-{specs}"
+
+    def _next(self) -> dict[str, Any] | None:
+        done = self.ws.dadaia("doctor", "--json")
+        payload = json.loads(done.stdout)
+        found = [f for sec in payload["sections"].values() for f in sec["findings"]
+                 if f["code"] == "ONBOARDING"]  # fmt: skip
+        return found[0] if found else None
+
+    def _stand_in_first_pass(self) -> None:
+        """What `dd-product-engineer` does in the first pass, scripted: real memory content."""
+        specs = self.ws.path / "repos" / self.slug / "specs"
+        memory = specs / "memory"
+        for name in ("ARCHITECTURE.md", "QUALITY.md"):
+            path = memory / name
+            path.write_text(
+                path.read_text("utf-8") + "\n- `app/core.py` holds the one function `f`.\n",
+                encoding="utf-8",
+            )
+        atom = memory / "product" / "app" / "core.md"
+        atom.parent.mkdir(parents=True, exist_ok=True)
+        atom.write_text(
+            "---\nslug: core\ntitle: core\ntldr: The app's one function.\n"
+            "summary: app/core.py exposes f, returning 1.\ntags: [core]\n"
+            "sources:\n  - app/core.py\n---\n\n## The contract\n\n- `f()` returns 1.\n",
+            encoding="utf-8",
+        )
+        memory_py = (
+            self.ws.path / ".agents" / "skills" / "dd-spec-navigator" / "scripts" / "memory.py"
+        )
+        for verb in (("catalog", "generate"), ("check",)):
+            done = self.env.run(sys.executable, str(memory_py), *verb, "--specs", str(specs),
+                                cwd=self.ws.path)  # fmt: skip
+            assert done.returncode == 0, f"memory.py {verb}:\n{done.stdout}{done.stderr}"
+
+    def journey(self) -> None:
+        def step() -> None:
+            done = self.env.uvx(
+                "init", self.ws.path.name, "--harness", "claude", "--repo", self.url
+            )
+            _assert_init_quiet(self.ws, done)
+            for _ in range(_AUTOPILOT_CAP):
+                finding = self._next()
+                if finding is None:
+                    break
+                self.steps.append(finding["step"])
+                if finding["kind"] == "agent":
+                    self._stand_in_first_pass()
+                    continue
+                ran = self.env.run(*shlex.split(finding["fix"]), cwd=self.ws.path)
+                assert ran.returncode == 0, (
+                    f"fix of step {finding['step']} failed: {finding['fix']}\n"
+                    f"{ran.stdout}{ran.stderr}"
+                )
+            else:
+                pytest.fail(f"the autopilot hit the cap of {_AUTOPILOT_CAP}: {self.steps}")
+
+        self.once("journey", step)
+
+    def assert_published(self) -> None:
+        """AC10.2/AC10.3: principal, integration and <work>0.1.0 on the remote; the work
+        branch carries the gitflow block; doctor clean; HEAD == upstream."""
+        self.journey()
+        repo = self.ws.path / "repos" / self.slug
+        heads = self.env.git("ls-remote", "--heads", self.url, cwd=repo)
+        for branch in ("main", "develop", "feature/0.1.0"):
+            assert f"refs/heads/{branch}" in heads, heads
+        constitution = self.env.git("show", "origin/feature/0.1.0:specs/constitution.md", cwd=repo)
+        assert "gitflow:" in constitution, constitution
+        self.ws.doctor_json(self.slug)
+        head = self.env.git("rev-parse", "HEAD", cwd=repo)
+        assert head == self.env.git("rev-parse", "@{u}", cwd=repo)
+        assert self.steps[-1] == "publish" and "first-pass" in self.steps, self.steps
+
+
+@pytest.fixture(scope="class", params=["none", "dadaia6", "foreign"])
+def autopilot(request: pytest.FixtureRequest, env: Env) -> Autopilot:
+    return Autopilot(env, request.param)
+
+
+class TestAutopilot:
+    def test_the_printed_fix_lines_alone_publish_the_project(self, autopilot: Autopilot) -> None:
+        autopilot.assert_published()
+        if autopilot.slug == "auto-foreign":
+            repo = autopilot.ws.path / "repos" / autopilot.slug
+            tree = autopilot.env.git("ls-tree", "-r", "--name-only", "HEAD", cwd=repo)
+            assert "specs-bkp/features/login.md" in tree.splitlines(), tree
+
+
 class Upgrade(Scenario):
     """A workspace born on the previous PyPI release, re-inited with the ``+e2e`` wheel."""
 
@@ -563,6 +691,7 @@ class TestReinitUpgrade:
 # ── AC7.1: the quickstart block, verbatim ────────────────────────────────────────
 
 
+@pytest.mark.skipif(_UVX is None, reason="the quickstart block is a `uvx` line, run as printed")
 class TestQuickstartVerbatim:
     """AC7.1: docs/quickstart.md's first bash block runs as printed with only ``REPO_URL``
     set — the one other substitution points ``uvx`` at the built wheel instead of PyPI."""

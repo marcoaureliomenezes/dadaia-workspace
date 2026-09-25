@@ -8,6 +8,7 @@ Real git over ``file://`` bare remotes (MEDIUM): the contract is git's own branc
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -100,6 +101,25 @@ def test_unborn_remote_births_both_branches_from_one_empty_root(env) -> None:
     assert _git(bare, "rev-list", "--parents", "-n1", "main") == heads["main"]  # parentless
     assert _git(bare, "ls-tree", "main") == ""
     _assert_published(repo, bare, "feature/0.1.0", "develop")
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="a sh pre-push hook records the refs")
+@pytest.mark.parametrize("seeded", [(), ("main",)], ids=["unborn", "principal-only"])
+def test_every_birth_is_pushed_as_its_same_named_local_head(env, tmp_path: Path, seeded) -> None:
+    """T-050-21 RED: the pre-push gate admits a birth only as refs/heads/<b> -> refs/heads/<b>;
+    a `<sha>:` or `origin/<p>:` source reaches the hook as a non-head local ref and is refused."""
+    svc, repo, bare = env
+    if seeded:
+        _seed(bare, tmp_path / "seed", *seeded)
+    _clone_onboarded(bare, repo)
+    log = tmp_path / "pushed.txt"
+    hook = repo / ".git" / "hooks" / "pre-push"
+    hook.write_text(f"#!/bin/sh\ncat >> '{log.as_posix()}'\n", encoding="utf-8")
+    hook.chmod(0o755)
+    svc.baseline("proj")
+    for line in log.read_text(encoding="utf-8").splitlines():
+        local, _, remote, _ = line.split()
+        assert local == remote and local.startswith("refs/heads/"), line
 
 
 def test_principal_only_births_integration_at_its_tip(env, tmp_path: Path) -> None:

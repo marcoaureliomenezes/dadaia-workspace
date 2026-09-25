@@ -259,10 +259,15 @@ class GitSubprocessClient:
             raise GitSyncError(f"git {args[0]} failed in {path}: {result.stderr.strip()}")
         return result.stdout.strip()
 
-    def published(self, path: Path, rel: str) -> bool:
-        """Whether *rel* is reachable from a remote-tracking ref (local, offline)."""
+    def published(self, path: Path, integration: str) -> bool:
+        """Whether the project is published (local, offline): ``origin/<integration>``
+        exists and ``specs/constitution.md`` is reachable from a remote-tracking ref."""
+        born = _run(
+            ["git", "rev-parse", "-q", "--verify", f"refs/remotes/origin/{integration}"], cwd=path
+        )
+        rel = "specs/constitution.md"
         result = _run(["git", "log", "--remotes", "-n1", "--format=%H", "--", rel], cwd=path)
-        return result.returncode == 0 and bool(result.stdout.strip())
+        return born.returncode == 0 and result.returncode == 0 and bool(result.stdout.strip())
 
     def default_branch(self, path: Path) -> str:
         """The remote's default branch from the local ``origin/HEAD``; ``main`` when unset."""

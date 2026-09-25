@@ -73,6 +73,7 @@ def test_specs_fix_carries_the_detected_gitflow_flags(tmp_path: Path) -> None:
     assert step.command == fix_line(
         tmp_path, "specs", "init", "--context", "app",
         "--principal", "trunk", "--integration", "develop", "--work-prefix", "feature/",
+        "--replace-foreign",
     )  # fmt: skip
 
 
