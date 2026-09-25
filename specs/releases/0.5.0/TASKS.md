@@ -32,7 +32,7 @@ Paths under `dadaia_workspace/public/` abbreviated `pub/`. DELETE/REBUILD rows (
   `Write set:` `pub/skills/dd-release-implementation/scripts/_release_new.py`, `tests/contract/test_release_script.py`
   `blocked by:` T-050-02 · `delivers:` AC1.9 — a newborn SPEC asks for its Replaces
 
-- [-] **T-050-04 — Review and Arm B read the as-is.**
+- [x] **T-050-04 — Review and Arm B read the as-is.**
   `dd-code-review` Axis 2 gains two bullets (D7); `LINEAGE.md` states D8 with the `rebuild:` echo and
   `--solution` prefix; `dd-bug-resolution` Phase 0 clause + Done-when names `rebuild`/`none`. `bugs.py` untouched.
   `Write set:` `pub/skills/dd-code-review/SKILL.md`, `pub/skills/dd-bug-resolution/{SKILL,LINEAGE}.md`

@@ -24,10 +24,10 @@ compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install da
 ## 2. The method — seven phases, each gated
 
 **Phase 0 — Lineage.** Read the bug ledger for prior fixes to the same
-`surface`/`component` in the bounded window ([`LINEAGE.md`](LINEAGE.md)); carry the
-link to Phase 6, where `resolve --caused-by` is its one writer; echo the same
-`caused_by:`/`evidence:`/`prior diffs read:` block in the fix commit body.
-*Done when prior diffs were actually read and the link (or `none`) is decided.*
+`surface`/`component` in the bounded window ([`LINEAGE.md`](LINEAGE.md)); ≥ 2 prior fixes on the unit
+make this fix a REBUILD of it (LINEAGE.md); carry the link to Phase 6 (`resolve --caused-by`, its one writer);
+echo the `caused_by:`/`evidence:`/`prior diffs read:`/`rebuild:` block in the fix commit body.
+*Done when prior diffs were actually read and the link and the rebuild decision (`rebuild` or `none`) are decided.*
 
 **Phase 1 — Red loop.** This is the skill; everything after it is mechanical. Build a
 **tight** pass/fail signal that goes red on THIS bug — construction menu, tightening
@@ -91,7 +91,5 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --caus
 
 ## 4. References
 
-- [`LINEAGE.md`](LINEAGE.md) — the lineage window, filter, cap, diff-trust rule.
-- [`RED-LOOP.md`](RED-LOOP.md) — loop construction menu, tightening, non-deterministic bugs.
 - `dd-bug-registration` — classify-first registration; the record this skill requires.
 - `dd-gitflow-default` §3a — the exact commit shape.
