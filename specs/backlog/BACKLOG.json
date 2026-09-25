@@ -1,4 +1,21 @@
 {
   "schema": "backlog-v1",
-  "active": []
+  "active": [
+    {
+      "id": "gitflow-trunk-based-model",
+      "title": "Trunk-based gitflow model (no integration branch) as an option of the project gitflow block",
+      "opened": "2026-09-25",
+      "status": "idea",
+      "description": "Deferred by ADR 0037 (operator grill 2026-09-24): the constitution frontmatter gitflow block has fixed roles today (principal, integration, work) with free names. A trunk-based model would drop the integration role \u2014 work branches merge straight into principal \u2014 as an opt-in shape of the same block, read by the same pre-push gate. Pick only when an operator or consumer asks for it; until then the three-role model is the only one.",
+      "provenance": "operator grill 2026-09-24 (onboarding foundation, Q1-Q11), ADR 0037 consequences: 'Trunk-based (no integration branch) is a backlog item.'"
+    },
+    {
+      "id": "consumer-gitflow-server-side-enforcement",
+      "title": "Server-side gitflow enforcement for consumer repos (CI guard / rulesets reading the constitution gitflow)",
+      "opened": "2026-09-25",
+      "status": "idea",
+      "description": "Deferred by ADR 0040 (operator grill 2026-09-24): consumer enforcement is local only \u2014 the pre-push gate reading the constitution gitflow block; dd-gitflow-default/CICD-AUTOMATION.md is a reference document and the workspace writes no CI workflow into a consumer repo. A later evolution would add server-side enforcement (a CI guard job and/or branch rulesets) derived from the same gitflow block. Operator: 'no momento n\u00e3o devemos ter nada referente a jobs de CI no github... depois evoluiremos isso' \u2014 not before the operator reopens it.",
+      "provenance": "operator grill 2026-09-24 (onboarding foundation, Q10), ADR 0040 consequences: 'Server-side enforcement for consumers (CI guard, rulesets) enters through the backlog.'"
+    }
+  ]
 }
