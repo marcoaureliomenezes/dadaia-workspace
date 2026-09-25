@@ -147,12 +147,11 @@ def test_one_line_bootstrap_yields_a_doctor_clean_workspace(
     doctor = _dadaia("doctor", cwd=workspace, home=home)
     assert doctor.returncode == 0, f"doctor is not clean:\n{doctor.stdout}\n{doctor.stderr}"
 
-    # The operator's next act is `eval $(...)` on the printed export lines — the binding
-    # those lines carry is what makes `context show` answer about THIS workspace.
-    binding = dict(re.findall(r"export (DADAIA_[A-Z_]+)=(\S+)", init.stdout))
-    assert set(binding) == {"DADAIA_CONTEXT", "DADAIA_SESSION_ID"}, init.stdout
+    # ADR 0038: init binds nothing and prints no export line; `context show` names
+    # the context explicitly.
+    assert "export DADAIA_" not in init.stdout, init.stdout
 
-    show = _dadaia("context", "show", "--json", cwd=workspace, home=home, extra_env=binding)
+    show = _dadaia("context", "show", "demo-project", "--json", cwd=workspace, home=home)
     assert show.returncode == 0, f"context show failed:\n{show.stdout}\n{show.stderr}"
     record = json.loads(show.stdout)
     assert record["main_repo"] == "demo-project"
