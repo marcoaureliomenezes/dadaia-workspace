@@ -1,14 +1,14 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "IMPLEMENTATION",
+  "phase": "CLOSURE",
   "defined": {
     "sha": "520655ee",
     "ts": "2026-09-25T03:11:37Z"
   },
   "implemented": {
-    "sha": "e4b0e02f",
-    "ts": "2026-09-24T07:39:47Z"
+    "sha": "864645f3",
+    "ts": "2026-09-25T03:55:33Z"
   },
   "shipped": null,
   "log": [
@@ -166,6 +166,61 @@
       "agent": "release.py",
       "kind": "note",
       "text": "Candidate defined at 520655ee; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-09-25T03:55:33Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate implemented at 864645f3; phase CLOSURE."
+    },
+    {
+      "ts": "2026-09-25T03:55:33Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 0ba3f9c057f9fb82e2a242236573623d0aff5d22..864645f3509e: 4 reviewed, 3 changed.",
+      "since": "0ba3f9c057f9fb82e2a242236573623d0aff5d22",
+      "until": "864645f3509eaa7714c7b44777f4261040b72faa",
+      "reviewed": [
+        "agentic-entities",
+        "public-asset-distribution",
+        "product-vision",
+        "pypi-distribution"
+      ],
+      "changed": [
+        "release-lifecycle",
+        "agent-orchestration",
+        "bug-ledger"
+      ]
+    },
+    {
+      "ts": "2026-09-25T04:00:00Z",
+      "agent": "main-thread",
+      "kind": "summary",
+      "text": "Candidate 2 \"definition reviews the as-is before it adds\" (operator demand 2026-09-25; grill Q1-Q5; ADR 0041): dd-release-definition step 2 As-is review (dd-software-engineer read-only; PLAN section 1 table unit|today|bugs|verdict|why; DELETE/REBUILD/UPDATE/KEEP then justified ADD; four mandatory-REBUILD triggers judged, never computed); SPEC Replaces; TASKS DELETE/REBUILD before ADD; release.py phase IMPLEMENTATION refuses a PLAN without the table (structure only, absolute-path fix lines — the older sed fix lines replaced too); dd-code-review axis 2 checks verdicts against the diff; dd-bug-resolution rebuild rule (>=2 prior fixes on a unit); root map, personas, CONTEXT.md terms."
+    },
+    {
+      "ts": "2026-09-25T04:00:00Z",
+      "agent": "main-thread",
+      "kind": "size",
+      "text": "dadaia_workspace/**/*.py 520655ee^..cd5b5db4 +42/-39 = +3 (_release_phase.py +37/-30, _release_new.py +5/-9); refuse_unfinished inlined; skill-text corpus held at its V35 ceiling by deleting duplicated references."
+    },
+    {
+      "ts": "2026-09-25T04:00:00Z",
+      "agent": "main-thread",
+      "kind": "reviews",
+      "text": "dd-code-reviewer: APPROVED 4e7f3d82 with 2 MEDIUM/5 LOW (handoff 2026-09-25T060000Z); rework 790bfd45/4c04b861/c57def59 APPROVED on confirmation (handoff 2026-09-25T070000Z, false refusals 6 -> 1); last LOW fixed cd5b5db4 (RED on c57def59 verified by the main thread). CI green at cd5b5db4 (32 pass, 2 skipped)."
+    },
+    {
+      "ts": "2026-09-25T04:00:00Z",
+      "agent": "main-thread",
+      "kind": "test-dispositions",
+      "text": "RED evidence: tests/contract/test_release_script.py 7/11 failing on 520655ee, 7/8 new review cases failing on 4e7f3d82, header-line case failing on c57def59; all 20 green at cd5b5db4. Only change to an existing test: the release-script unit fixture now writes a valid PLAN section 1."
+    },
+    {
+      "ts": "2026-09-25T04:00:00Z",
+      "agent": "main-thread",
+      "kind": "dispositions",
+      "text": "No backlog entry picked (origin operator-demand). Arm B round 2 landed on the branch: e2e-upgrade-previous-version-equals-source-version, doctor-tests-walk-the-real-workspace-tmp-zone (0 production lines); M13/M16 mutation-gap tests. Backlog added: gitflow-trunk-based-model, consumer-gitflow-server-side-enforcement. Proposed bugs awaiting operator confirmation: memory.py check passes an over-long tldr that doctor LINT-1 rejects (MEDIUM); LINT-1 raw output lines break the doctor line format (LOW); a contract test reads ignored .pyc under public/ (INFO). Follow-up: release.py memory refusal fix line is bare, not absolute."
     }
   ]
 }
