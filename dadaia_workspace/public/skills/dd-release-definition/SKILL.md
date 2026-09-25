@@ -25,7 +25,7 @@ description: >
 
 - `dd-software-engineer` runs it read-only (no write to code, specs or tests), dispatched by the main thread after the pick and before the grill.
 - Read every unit the picked set touches and its ledger slice (`python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`/`stats`, `git log` on the unit); return the table in the handoff — the main thread carries it into the grill; it lands as PLAN §1.
-- One row per touched unit, columns `unit | today | bugs | verdict | why`; consider DELETE → REBUILD → UPDATE → KEEP, then ADD rows only for what no existing unit can carry (`today` `—`, `why` says why no unit can carry it).
+- One row per touched unit, columns `unit | today | bugs | verdict | why`; DELETE vs KEEP is `dd-codebase-design`'s deletion test; consider DELETE → REBUILD → UPDATE → KEEP, then ADD rows only for what no existing unit can carry (`today` `—`, `why` says why no unit can carry it).
 - REBUILD is mandatory when the unit carries ≥ 2 bugs, the demand changes its fundamental behaviour, the change would need a flag, branch, special case or second path, or its contract contradicts the demand; the engineer and the reviewer judge these triggers — no script counts bugs or reads code.
 - The PLAN §1 skeleton — `release.py phase IMPLEMENTATION` refuses a PLAN without it:
 

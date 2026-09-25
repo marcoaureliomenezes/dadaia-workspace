@@ -34,8 +34,8 @@ input_contract:
     - name: task_id
       kind: string
       source: workflow_input
-      description: "Approved task identifier from TASKS.md"
-      stop_if_missing: true
+      description: "Approved task identifier from TASKS.md; absent for a definition demand (as-is review, PLAN/TASKS)"
+      stop_if_missing: false
     - name: failing_tests_report
       kind: report
       source: report_path
