@@ -6,7 +6,7 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 ## Install
 
 <!-- derived-from: pypi-distribution sha256:618098346ed6 -->
-<!-- derived-from: workspace-init sha256:6f9ad6e670eb -->
+<!-- derived-from: workspace-init sha256:37ddb3b8b846 -->
 
 ```bash
 uvx dadaia-workspace init <dir> --harness claude --repo <url>
@@ -27,7 +27,7 @@ refreshes each project's specs law.
 
 ## Level 1 — the workspace
 
-<!-- derived-from: workspace-init sha256:6f9ad6e670eb -->
+<!-- derived-from: workspace-init sha256:37ddb3b8b846 -->
 
 `uvx dadaia-workspace init <dir> --harness claude|codex|kimi-code|cursor|devin|copilot
 [--repo <url>] [--associated-repo <url>]… [--skip-assets]` is the only verb that works
@@ -51,8 +51,8 @@ harness later and `.dadaia/.venv/bin/dadaia harness list` reads the roster.
 
 ## Level 2 — the project
 
-<!-- derived-from: spec-context-project sha256:4984ba691799 -->
-<!-- derived-from: context-management sha256:3f48eef447f1 -->
+<!-- derived-from: spec-context-project sha256:48e84f1a6370 -->
+<!-- derived-from: context-management sha256:2210e0422834 -->
 
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
 owned by one main repository, optionally spanning associated repositories that live and
@@ -78,7 +78,7 @@ bind, the ctx-inject hook injects the context header, `ARCHITECTURE.md`'s
 
 ## Level 3 — the specs
 
-<!-- derived-from: spec-context-project sha256:4984ba691799 -->
+<!-- derived-from: spec-context-project sha256:48e84f1a6370 -->
 
 ```bash
 .dadaia/.venv/bin/dadaia specs init --context <ctx> [--replace-foreign]

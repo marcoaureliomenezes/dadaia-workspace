@@ -1,7 +1,7 @@
 ---
 slug: context-management
 title: context-management
-tldr: ALIVE/DEAD registry of a main repo plus associated repos; create clones, hooks, ALIVEs and binds in one step; a bind names the session's scope.
+tldr: ALIVE/DEAD registry of a main repo plus associated repos; create clones, hooks and ALIVEs in one step; only context bind binds, naming the session's scope.
 summary: Spec Context Projects and their repos through one registry and the context verbs — create as onboarding level 2, alive, dead, baseline, the repo set; one resolution authority whose Bind carries the session's scope; bind-driven injection of the tech stack, catalog and help digests; redaction at the render boundary.
 tags: [context, lifecycle, session, privacy]
 sources:
@@ -21,7 +21,7 @@ sources:
 
 - `.dadaia/states/spec_contexts.json` stores per context its name, state, main repo slug and URL, ordered associated repos (slug + URL), branch and lifecycle timestamps; schema 2 and 3 files read alike, a schema 1 file is refused with `dadaia migrate` as the fix ([[specs-migration]]).
 - The main repo is where `specs/` lives and the only specs, bind, memory, release and backlog target; associated repos are working checkouts.
-- `dadaia context create [<name>] --main-repo <url> [--associated-repo <url>]...` is onboarding level 2 in one transactional step: clone every repo into `repos/<slug>/`, install the pre-push hook in each, register the context ALIVE with its branch, bind this session and print the `--print-env` lines and the derived next step ([[workspace-init]]).
+- `dadaia context create [<name>] --main-repo <url> [--associated-repo <url>]...` is onboarding level 2 in one transactional step: clone every repo into `repos/<slug>/`, install the pre-push hook in each, register the context ALIVE with its branch and print the derived next step; it binds no session — only `context bind` does ([[workspace-init]]).
 - One slug rule serves the context name and every repo slug: a URL's last path segment minus `.git`, every character outside `[A-Za-z0-9_-]` replaced by `-` (`my.repo.git` -> `my-repo`); the name defaults to the main repo's slug.
 - The record is validated before any clone; a `repos/<slug>` already holding a checkout whose `origin` is that URL is adopted without cloning, any other occupant exits 1 and registers nothing.
 - Any failure removes every directory the call created and writes no record, so the corrected command re-runs with the same slug; `create` writes nothing inside a repo but the hook, so the working tree stays clean and HEAD equals the remote's.

@@ -8,7 +8,7 @@ live. Terms are defined in [concepts](concepts.md); the long walkthrough is
 ## 1. The three levels in one block
 
 <!-- derived-from: pypi-distribution sha256:618098346ed6 -->
-<!-- derived-from: workspace-init sha256:6f9ad6e670eb -->
+<!-- derived-from: workspace-init sha256:37ddb3b8b846 -->
 
 Set `REPO_URL` to your repository's clone URL; everything else runs as printed (needs
 uv and network access):
@@ -44,7 +44,7 @@ Then `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes the project
 
 ## 2. What the init line provisioned
 
-<!-- derived-from: workspace-init sha256:6f9ad6e670eb -->
+<!-- derived-from: workspace-init sha256:37ddb3b8b846 -->
 
 `--harness` names one registered harness: `claude` | `codex` | `kimi-code` | `cursor` |
 `devin` | `copilot`. The directory is required and a directory holding a foreign tree
@@ -65,7 +65,7 @@ clones every repo, installs the hook and makes the context ALIVE; `context bind`
 
 ## 3. The bind
 
-<!-- derived-from: context-management sha256:3f48eef447f1 -->
+<!-- derived-from: context-management sha256:2210e0422834 -->
 
 ```bash
 eval "$(.dadaia/.venv/bin/dadaia context bind <your-repo> --print-env)"

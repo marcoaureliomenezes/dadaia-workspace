@@ -47,7 +47,7 @@ sources:
 
 ## First project
 
-- `--repo <url>` with repeatable `--associated-repo <url>` calls `context create` and produces exactly what it produces — cloned, hooked, ALIVE and bound, printing the `--print-env` lines ([[context-management]]).
+- `--repo <url>` with repeatable `--associated-repo <url>` calls `context create` and produces exactly what it produces — cloned, hooked and ALIVE, never bound: it writes no session record and prints no `--print-env` line; only `context bind` binds ([[context-management]]).
 - A re-run naming a context already holding that main-repo URL reuses it through `context alive`; any failure exits 1 with `fix: uvx dadaia-workspace init <dir> --harness <h> --repo <a reachable clone URL>`.
 
 ## Onboarding status

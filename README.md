@@ -13,7 +13,7 @@ its **associated repos** are the others it owns.
 
 ## What it is and principles
 
-<!-- derived-from: product-vision sha256:16060412dc8a -->
+<!-- derived-from: product-vision sha256:2e29564d7512 -->
 
 dadaia-workspace is the operating environment around repositories developed with AI
 agents. Its unit is the context: one main repo, where `specs/` lives, plus its
@@ -45,8 +45,8 @@ memory atom under its content hash.
 ## A human installs and uses it
 
 <!-- derived-from: pypi-distribution sha256:618098346ed6 -->
-<!-- derived-from: workspace-init sha256:6f9ad6e670eb -->
-<!-- derived-from: context-management sha256:3f48eef447f1 -->
+<!-- derived-from: workspace-init sha256:37ddb3b8b846 -->
+<!-- derived-from: context-management sha256:2210e0422834 -->
 <!-- derived-from: workspace-doctor sha256:3fa0c321c7b0 -->
 
 ```bash
