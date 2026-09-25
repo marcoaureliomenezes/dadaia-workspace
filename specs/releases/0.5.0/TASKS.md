@@ -40,7 +40,7 @@ DELETE/REBUILD rows (PLAN §1) land first. RED = the named test fails before the
 
 ### G2 — first pass by real state (FR3, part)
 
-- [ ] **T-050-10 — `template_history` to core; stripped memory-stub digests.**
+- [-] **T-050-10 — `template_history` to core; stripped memory-stub digests.**
   Move (no re-export), callers + 3 test importers updated; backfill stripped digests of every historical
   `scaffold/memory/{ARCHITECTURE,QUALITY}.md` from `git log`; append-only test covers them.
   `Write set:` `features/specs/template_history.py` (delete), `core/template_history.py`,
