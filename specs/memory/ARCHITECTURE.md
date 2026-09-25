@@ -106,10 +106,10 @@ Rationale: three closures touched every product atom and left fifteen contradict
 ## Tech Stack
 
 - Python `^3.12`, built by Poetry Core; console entrypoints `dadaia` and `dadaia-workspace` are one callable, and the version lives in `pyproject.toml` alone.
-- Runtime dependencies: Typer, Rich, PyYAML, Jinja2, jsonschema; `claude-sdk` is an optional extra.
+- Runtime dependencies: Typer, Rich, PyYAML, jsonschema; the package declares no optional extra.
 - Everything else is the standard library; there is no database — every state is a JSON or JSONL file.
 - Claude Code, Codex, Kimi Code, Cursor, Devin CLI and GitHub Copilot are operator-installed external CLIs, never Python dependencies; the workspace runs no agent-execution runtime.
-- Quality toolchain: pytest (`pytest-cov`, `pytest-xdist`, `pytest-randomly`, `pytest-timeout`, Hypothesis, Playwright), Ruff, mypy `--strict`, import-linter, gitleaks; `mutmut` sits in an optional group ([[QUALITY]]).
+- Quality toolchain: pytest (`pytest-cov`, `pytest-xdist`, `pytest-randomly`, `pytest-timeout`, Hypothesis), Ruff, mypy `--strict`, import-linter, gitleaks; `mutmut` sits in an optional group ([[QUALITY]]).
 - Packaging: wheel and sdist ship the `dadaia_workspace` package with `public/` inside it and no bytecode.
 - Canonical commands, from the workspace root:
 
@@ -135,7 +135,7 @@ flowchart TB
 ```
 
 - `container.py` is composition wiring only: every definition keeps a production consumer, and a single-consumer adapter is imported directly by its feature (P-08).
-- `core/protocols/` holds the two-adapter OS seams (`FilePermissionSetter`, `ShutdownHandler`) and the spec-context provider; every other adapter is imported by its one consumer.
+- No `core/protocols/` package exists: no seam carries two production adapters, so every adapter is imported by its one consumer; a `typing.Protocol` lives only as a structural type inside the module that consumes it.
 - `setup.cfg` carries seven import-linter contracts; `features-no-subprocess` has no suppressed edge, and the two suppressed edges (`reconcile.service` -> `capabilities`, `reconcile.service` -> `migrate.state_v2`) sit under `features-no-cross-feature` (P-10).
 - Hooks import `core.invocation` directly and build the `Invocation` once per process (P-12); `sdd_post_gate` touches `last_seen_at` and runs the reaper on one throttle and writes nothing else.
 - `features/migrate` stamps `specs_pattern_version: 7` or refuses; a tree below v6 upgrades to 0.4.x first.

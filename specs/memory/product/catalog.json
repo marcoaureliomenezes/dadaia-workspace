@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-25T03:51:13Z",
+  "generated_at": "2026-09-25T15:44:13Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -545,8 +545,8 @@
       "slug": "cross-platform-portability",
       "title": "cross-platform-portability",
       "area": "platform",
-      "tldr": "Linux, macOS and Windows through one platform capability seam, injected adapters, Python hooks and cross-OS CI legs.",
-      "summary": "dadaia_workspace/core/platform.py is the single capability source and the container selects adapters; security failures are loud, non-security features degrade explicitly, unsupported critical capabilities fail at construction.",
+      "tldr": "Linux, macOS and Windows through one platform capability seam carrying the venv layout, Python hooks and cross-OS CI legs.",
+      "summary": "dadaia_workspace/core/platform.py is the single capability source — two flags, the venv scripts directory and the executable suffix — read by the modules that build venv paths; no port, adapter pair or file lock exists for portability.",
       "path": "specs/memory/product/platform/cross-platform-portability.md",
       "tags": [
         "platform",
@@ -556,20 +556,16 @@
         "macos",
         "linux"
       ],
-      "token_estimate": 231,
+      "token_estimate": 254,
       "depends_on": [
-        "sdd-gate-v3",
-        "server-registry",
         "workspace-init",
         "ARCHITECTURE",
+        "sdd-gate-v3",
+        "server-registry",
         "public-asset-distribution"
       ],
       "sources": [
-        "dadaia_workspace/core/platform.py",
-        "dadaia_workspace/infrastructure/file_permission_*.py",
-        "dadaia_workspace/infrastructure/signal_shutdown_*.py",
-        "dadaia_workspace/infrastructure/process_probe_adapter.py",
-        "dadaia_workspace/core/protocols/**"
+        "dadaia_workspace/core/platform.py"
       ]
     },
     {
@@ -682,7 +678,7 @@
         "upgrade",
         "onboarding"
       ],
-      "token_estimate": 1247,
+      "token_estimate": 1288,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -718,7 +714,7 @@
         "decisions",
         "governance"
       ],
-      "token_estimate": 849,
+      "token_estimate": 882,
       "depends_on": [
         "agent-orchestration",
         "sdd-gate-v3",

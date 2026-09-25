@@ -52,7 +52,7 @@ sources:
 
 ## Onboarding status
 
-- `dadaia_workspace/features/workspace/onboarding.py` derives the next unmet level from disk, never from a state file: no ALIVE context -> `<cli> context create <name> --main-repo <clone-url>`; an ALIVE context whose main repo's `specs/` is not stamped at the canonical pattern version -> `<cli> specs init --context <name>`; a context with no record in `specs/audits/_archive/audits_histo.jsonl` -> the first-pass `memory.py drift --since <first commit>` worklist; else nothing.
+- `dadaia_workspace/features/workspace/onboarding.py` derives the next unmet step from real state (files, git, the session registry), never from a stamp: no ALIVE context -> `context` (`<cli> context create <name> --main-repo <clone-url>`); an unbound resolvable session -> `bind` (`<cli> context bind <name>`); a main repo whose `specs/` is not current -> `specs` (`<cli> specs init --context <name> --replace-foreign`); a memory whose `ARCHITECTURE.md` or `QUALITY.md` is still the shipped scaffold, or whose catalog holds no atom -> `first-pass` (the `dd-audit-project` first pass, [[audits-canon]]); specs on no remote branch -> `publish` (`<cli> context baseline <name>`); else nothing.
 - `<cli>` is the workspace's absolute venv CLI path (`Scripts\dadaia.exe` under Windows); the text is `Next: <reason>` plus one `fix: <command>` line.
 - A focus context (the one just created, doctored or bound) is judged first, then every ALIVE context in registry order.
 - Four callers print the same text: `init`, `context create`, [[workspace-doctor]]'s `ONBOARDING` finding and the SessionStart injection, unbound or bound (focused on the bound context) ([[context-management]]).
