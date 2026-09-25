@@ -1,5 +1,7 @@
-"""Intent: CONTRACT — T-048-08 (FR5 AC5.1, AC5.2): dd-audit-project carries the first-pass
-section, and `memory.py drift --since <root commit>` is a runnable worklist. Size: SMALL.
+"""Intent: CONTRACT — T-048-08 (FR5 AC5.1, AC5.2), T-050-20 (AC3.4): dd-audit-project carries
+the first-pass section — it applies while doctor's next step is `first-pass` and ends at
+`memory.py check`, never at a stamp — and `memory.py drift --since <root commit>` is a
+runnable worklist. Size: SMALL.
 """
 
 from __future__ import annotations
@@ -19,18 +21,28 @@ _SKILL = _SKILLS / "dd-audit-project" / "SKILL.md"
 _MEMORY = _SKILLS / "dd-spec-navigator" / "scripts" / "memory.py"
 
 
-def test_skill_carries_the_first_pass_statements() -> None:
+def _first_pass_section() -> str:
     text = _SKILL.read_text(encoding="utf-8")
-    section = text.split("## 3. First pass", 1)[1].split("\n## ", 1)[0]
+    return text.split("## 3. First pass", 1)[1].split("\n## ", 1)[0]
+
+
+def test_skill_carries_the_first_pass_statements() -> None:
+    section = _first_pass_section()
     for statement in (
-        "audits_histo.jsonl` holds no record",
-        "memory.py drift --since $(git -C repos/<slug> rev-list --max-parents=0 HEAD) --specs repos/<slug>/specs",
+        "next step is `first-pass`",
+        "memory.py drift --since <root commit> --specs repos/<slug>/specs",
         "`dd-product-engineer` fills `ARCHITECTURE.md`, `QUALITY.md` and the product atoms",
         "`specs-bkp/`",
         "`memory.py check` exit 0",
-        "audit.py close <YYYYMMDD>-first-pass --sha <HEAD sha>",
     ):
         assert statement in section, statement
+
+
+def test_the_first_pass_ends_at_the_memory_check_never_a_stamp() -> None:
+    """ADR 0034: done is real memory content; no window, no FINDINGS, no close."""
+    section = _first_pass_section()
+    for stamp in ("audit.py close", "FINDINGS.jsonl", "audits_histo"):
+        assert stamp not in section, stamp
 
 
 def _git(repo: Path, *argv: str) -> str:

@@ -33,12 +33,36 @@ The facts resolved once per process from environment, cwd and payload: workspace
 _Avoid_: resolution ladder, rung, resolve_context
 
 **Onboarding level**:
-One of three steps to a working project, derived from disk and never stored: 1 workspace (`init`), 2 context (`context create`), 3 specs (`specs init` + the first pass). A new project in an existing workspace is levels 2 + 3.
+One of three levels to a working project, derived from real state and never stored: 1 workspace (`init`), 2 context (onboarding steps `context`, `bind`), 3 specs (3a `specs`, 3b `first-pass`, 3c `publish`). A new project in an existing workspace is levels 2 + 3.
 _Avoid_: onboarding state, setup phase, wizard step
 
 **Next step**:
-The one command the derived onboarding level calls for, printed identically by `init`, `context create`, SessionStart and `doctor` (`ONBOARDING info Next: …` + `fix:`).
+The first pending Onboarding step, printed identically by `doctor`, `init`, `context create` and SessionStart (`ONBOARDING info Next: …` + its Fix line).
 _Avoid_: hint, suggestion, todo
+
+**Onboarding step**:
+One entry of the ordered step list: id, Step kind, a real-state predicate ("pending") and one Fix line. Ids in order: `context`, `bind`, `specs` (3a), `first-pass` (3b), `publish` (3c).
+_Avoid_: stage, wizard step, onboarding state
+
+**Step kind**:
+`command` (the Fix line is a shell command) or `agent` (the Fix line names a skill section and a pending list an agent works through).
+_Avoid_: type, mode
+
+**Fix line**:
+The one runnable line a finding, refusal or step prints after `fix:`; every one naming the workspace CLI is built by `fix_line`.
+_Avoid_: hint, remedy text
+
+**Project publication**:
+Level 3c: the first push of an onboarded project's specs, by `context baseline` — principal, integration and work branches; a re-run is a no-op.
+_Avoid_: publish step (the Publication boundary's _Avoid_), baseline (the pre-push published-history baseline)
+
+**Project gitflow**:
+The `gitflow:` block of `specs/constitution.md` frontmatter naming three fixed roles: **principal branch** (deployed; default detected from `origin/HEAD`, else `main`), **integration branch** (default `develop`), **work branch** (`<work prefix><M.m.p>`, prefix default `feature/`).
+_Avoid_: branch policy (the gate's check), branching model
+
+**Bootstrap birth**:
+A push creating the principal or integration branch that publishes no new object.
+_Avoid_: bootstrap push, first push
 
 **Foreign specs tree**:
 A repo's existing `specs/` that is not a dadaia tree at canon v6 or later; `specs init` never merges into it.
@@ -49,7 +73,7 @@ The repo-root directory a foreign specs tree is moved to (`git mv`, staged) by `
 _Avoid_: specs backup, specs.old, archive
 
 **First pass**:
-The level-3 `dd-audit-project` run on a fresh specs tree: the deterministic worklist (`memory.py drift` uncovered units) drives `dd-product-engineer` to fill memory from code and `specs-bkp/`.
+Level 3b: the `dd-audit-project` run on a fresh specs tree — the `memory.py drift` worklist drives `dd-product-engineer` to fill memory from code and `specs-bkp/`; done when memory holds real content (`memory.py check` exit 0), never by a stamp.
 _Avoid_: bootstrap audit, initial import, migration
 
 ## Enforcement

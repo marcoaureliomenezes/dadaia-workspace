@@ -49,10 +49,11 @@ What it rests on:
 
 A human drives it from a shell in three levels:
 `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` provisions the
-workspace and its first project ALIVE and bound,
+workspace and its first project ALIVE (`context bind` binds),
 `.dadaia/.venv/bin/dadaia specs init --context <slug>` brings the project's `specs/`
-to the canon, and `.dadaia/.venv/bin/dadaia doctor` lists findings with a runnable fix
-under each; `.dadaia/.venv/bin/dadaia context create --main-repo <url>` adds the next
+to the canon, the first pass fills memory, `context baseline` publishes it, and
+`.dadaia/.venv/bin/dadaia doctor` prints the next step and every finding with a
+runnable fix; `.dadaia/.venv/bin/dadaia context create --main-repo <url>` adds the next
 project, and re-running the `uvx` init line upgrades the workspace.
 
 An agent reads the root `AGENTS.md` map — flow, roles, gate invariants, where things

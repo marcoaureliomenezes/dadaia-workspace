@@ -382,14 +382,15 @@ never exercised the live backlog path was false confidence).
   `_RELEASE.json` with `phase: "DEFINITION"` (shape: `release-state-v1`,
   `dd-release-implementation`'s `RELEASE-EVENTS.md`) in one transaction, and refuses a
   second live release — then `.dadaia/.venv/bin/dadaia doctor`;
-  `backlog new <slug>` then `.dadaia/.venv/bin/dadaia doctor`; fresh context: `context create` → `alive` → `specs
-  init` → `context baseline`.
+  `backlog new <slug>` then `.dadaia/.venv/bin/dadaia doctor`; fresh context: `context create` → `context bind` → `specs
+  init` → first pass → `context baseline` (no flags; invoking it is the consent).
 - **PASS if ALL of:** doctor reports 0 errors AND 0 warnings on the fresh
   scaffold (Draft + phase DEFINITION is the legitimate authoring state — bug
   fresh-release-scaffold-emits-spec-doctor-warnings-042); the freshly-created `active[]`
   entry in `specs/backlog/BACKLOG.json` (the single source, SPEC v0.12.0 FR3, ADR #14)
   is BL-SCHEMA-valid out of the box; and baseline COMPLETES after the official
-  scaffold follow-up while still refusing a tree carrying operator files (bug
+  scaffold follow-up while still refusing a born tree carrying operator files, its
+  printed fix line lossless and runnable (bug
   context-baseline-rejects-official-scaffold-followup).
 - **A GATE is a validator too** (bug r4g-backlog-surface-new-existing-accepted): take
   what `backlog new` ACCEPTED and run `.dadaia/.venv/bin/dadaia doctor` over the same tree. A tree that

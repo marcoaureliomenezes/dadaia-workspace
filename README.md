@@ -66,10 +66,13 @@ the one writer of every hook wiring. The wheel ships the full public asset tree,
 access. Every later command runs through the workspace's own CLI,
 `.dadaia/.venv/bin/dadaia`. **Project:** `--repo <url>` (plus repeatable
 `--associated-repo <url>`) clones the repo into `repos/<slug>/`, installs the pre-push
-hook, makes the context ALIVE and binds it; a later project is
+hook and makes the context ALIVE (only `context bind` binds); a later project is
 `.dadaia/.venv/bin/dadaia context create --main-repo <url> [--associated-repo <url>]`.
 **Specs:** `.dadaia/.venv/bin/dadaia specs init --context <slug>` brings the repo's
-`specs/` to the canon, moving a foreign tree to `specs-bkp/` after consent.
+`specs/` to the canon, moving a foreign tree to `specs-bkp/` after consent; the
+`dd-audit-project` first pass fills memory (done by real content, never a stamp) and
+`.dadaia/.venv/bin/dadaia context baseline <slug>` publishes it. `doctor` prints each
+next step with its `fix:` line.
 
 **Upgrade:** re-run the `uvx dadaia-workspace init <dir> --harness <name>` line; it
 prints `upgraded A -> B`, or `already at A`; then

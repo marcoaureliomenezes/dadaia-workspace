@@ -33,10 +33,10 @@ three is not an audit. Append one `FINDINGS.jsonl` record per claim
 
 ## 3. First pass — a freshly onboarded context
 
-- Applies when `specs/audits/_archive/audits_histo.jsonl` holds no record: no window exists yet.
-- Worklist: `python3 .agents/skills/dd-spec-navigator/scripts/memory.py drift --since $(git -C repos/<slug> rev-list --max-parents=0 HEAD) --specs repos/<slug>/specs` — every uncovered unit from the first commit.
+- Applies while `.dadaia/.venv/bin/dadaia doctor`'s ONBOARDING next step is `first-pass`; its fix line lists the pending memory files.
+- Worklist: `python3 .agents/skills/dd-spec-navigator/scripts/memory.py drift --since <root commit> --specs repos/<slug>/specs` (root commit: `git -C repos/<slug> rev-list --max-parents=0 HEAD`) — every uncovered unit.
 - `dd-product-engineer` fills `ARCHITECTURE.md`, `QUALITY.md` and the product atoms from the code, and from `specs-bkp/` when present.
-- Done = every worklist line covered and `memory.py check` exit 0; then stamp the window: create an empty `specs/audits/<YYYYMMDD>-first-pass/FINDINGS.jsonl`, run `python3 .agents/skills/dd-audit-project/scripts/audit.py close <YYYYMMDD>-first-pass --sha <HEAD sha> --specs repos/<slug>/specs`.
+- Done = every worklist line covered and `memory.py check` exit 0 — the next step moves to `publish`; the first pass opens no audit window.
 
 ## 4. Done when
 

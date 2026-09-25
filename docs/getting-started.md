@@ -64,8 +64,8 @@ die with it. Specs, bind, memory, releases and backlog resolve only from the mai
 .dadaia/.venv/bin/dadaia context show <ctx> --json   # the repo set
 ```
 
-`context create` clones (or adopts) every repo, installs the pre-push hook, makes the
-context ALIVE and binds this session; on failure nothing is left behind. The name
+`context create` clones (or adopts) every repo, installs the pre-push hook and makes
+the context ALIVE — it never binds; on failure nothing is left behind. The name
 defaults to the main repo's slug. `bind` writes exactly one record,
 `.dadaia/sessions/<session-id>.json` (context, runtime, pid, `bound_at`), and acquires
 nothing; `.dadaia/.venv/bin/dadaia context bind <ctx> --print-env` emits
@@ -84,10 +84,13 @@ bind, the ctx-inject hook injects the context header, `ARCHITECTURE.md`'s
 .dadaia/.venv/bin/dadaia specs init --context <ctx> [--replace-foreign]
 ```
 
-`specs init` brings the main repo's `specs/` to the canon and never commits: an absent
-tree is scaffolded, a dadaia tree is upgraded and its missing files filled, and a
+`specs init` (3a) brings the main repo's `specs/` to the canon and never commits: an
+absent tree is scaffolded, a dadaia tree is upgraded and its missing files filled, and a
 foreign `specs/` is moved to `specs-bkp/` (`git mv`, staged) after consent —
-`--replace-foreign` gives it without asking.
+`--replace-foreign` gives it without asking. The `dd-audit-project` first pass (3b) fills
+memory and is done when memory holds real content (`memory.py check` exit 0), never by a
+stamp. `context baseline <ctx>` (3c) publishes the principal, integration and work
+branches; a re-run is a no-op.
 
 ## Check compliance — `doctor`
 

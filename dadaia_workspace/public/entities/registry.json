@@ -66,7 +66,7 @@
     },
     {
       "id": "git-chokepoints",
-      "mandate": "Harness-independent: pre-push allows only work-branch pushes (the constitution's gitflow) with a green CI preflight and refuses integration/principal direct pushes; the security APPROVED verdict is a CI PR gate keyed to the PR head sha, not a pre-push check (branch contract: `dd-gitflow-default`).",
+      "mandate": "Harness-independent: pre-push allows only work-branch pushes (the constitution's gitflow) and refuses integration/principal direct pushes; the security APPROVED verdict is a CI PR gate keyed to the PR head sha, not a pre-push check (branch contract: `dd-gitflow-default`).",
       "implementations": {
         "claude": ".dadaia git hook (pre-push-ci-gate.sh) — identical for every harness",
         "codex": "same git hooks (harness-independent)",

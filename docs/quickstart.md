@@ -30,9 +30,13 @@ python3 .agents/skills/dd-release-implementation/scripts/release.py new 0.1.0 \
   virtualenv; every later command runs through the workspace's CLI,
   `.dadaia/.venv/bin/dadaia`, which `init` prints by its absolute path.
 - **Level 2 — project.** `--repo` clones the repo into `repos/<slug>/`, installs the
-  pre-push hook, makes the context (named after the slug) ALIVE and binds it.
-- **Level 3 — specs.** `specs init` brings the repo's `specs/` to the canon; a foreign
+  pre-push hook and makes the context (named after the slug) ALIVE; only `context bind`
+  binds a session (§3).
+- **Level 3 — specs.** 3a `specs init` brings the repo's `specs/` to the canon; a foreign
   `specs/` is moved to `specs-bkp/` after consent (`--replace-foreign` skips the prompt).
+  3b the `dd-audit-project` first pass fills memory — done when it holds real content,
+  never by a stamp. 3c `context baseline <slug>` publishes the specs. `doctor` prints the
+  next pending step with its `fix:` line at every point.
 
 **Upgrade:** re-run the same `uvx dadaia-workspace init demo --harness claude` line
 from the parent directory; it prints `upgraded A -> B`, or `already at A` when current.
@@ -53,11 +57,11 @@ is refused with one `fix:` line.
   `--skip-assets` leaves the workspace ungated until
   `.dadaia/.venv/bin/dadaia public install` runs, and the output says so.
 - with `--repo <url>` (and any repeatable `--associated-repo <url>`), the project
-  cloned, ALIVE and bound, and the pre-push hook installed.
+  cloned and ALIVE, and the pre-push hook installed — never bound.
 
 Without `--repo`, a later project is one step:
 `.dadaia/.venv/bin/dadaia context create --main-repo <url> [--associated-repo <url>]`
-clones every repo, installs the hook, makes the context ALIVE and binds the session.
+clones every repo, installs the hook and makes the context ALIVE; `context bind` binds.
 
 ## 3. The bind
 
