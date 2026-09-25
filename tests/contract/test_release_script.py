@@ -140,3 +140,44 @@ def test_new_writes_a_spec_stub_carrying_replaces(script: Path, tmp_path: Path) 
     assert headings.index("Scope") + 1 == headings.index("Replaces")
     assert headings.index("Replaces") + 1 == headings.index("Out of scope")
     assert not (specs / "releases/0.9.0/PLAN.md").exists()
+
+
+@pytest.mark.parametrize(
+    "heading",
+    ["## 1 As-is review", "## 1) As is review:", "## As-is review (PLAN §1)", "## 2. AS-IS REVIEW"],
+)
+def test_any_level_2_heading_naming_the_review_passes(
+    script: Path, tmp_path: Path, heading: str
+) -> None:
+    _admits(script, tmp_path, f"{heading}\n\n" + _HEADER + _ROW.format(verdict="KEEP"))
+
+
+def test_rows_without_outer_pipes_and_escaped_pipes_pass(script: Path, tmp_path: Path) -> None:
+    table = (
+        "unit | today | bugs | verdict | why\n---|---|---|---|---\n\ta \\| b\t| x | 0 |\tKEEP | y\n"
+    )
+    _admits(script, tmp_path, "## As-is review\n\n" + table)
+
+
+def test_the_table_ends_at_its_first_blank_line(script: Path, tmp_path: Path) -> None:
+    later = "\n| other | table | 0 | SHRINK | ignored |\n"
+    _admits(script, tmp_path, _GOOD.split("\n## 2.")[0] + later)
+
+
+def test_the_refusal_says_heading_missing_or_table_malformed(script: Path, tmp_path: Path) -> None:
+    missing = _refuses(script, tmp_path / "a", "## Strategy\n", "heading")
+    malformed = _refuses(script, tmp_path / "b", "## 1. As-is review\n\n" + _HEADER, "header")
+    assert "not followed by a table" not in missing and "not followed by a table" in malformed
+
+
+def test_every_fix_names_an_existing_absolute_path(script: Path, tmp_path: Path) -> None:
+    """F1 — fix lines point at files, never at a cwd-relative or section-numbered command."""
+    sys.path.insert(0, str(_SCRIPTS))
+    try:
+        import _release_phase
+    finally:
+        sys.path.remove(str(_SCRIPTS))
+    assert _release_phase.SKILL.is_file() and str(_release_phase.SKILL) in _release_phase.AS_IS_FIX
+    fix = [ln for ln in _phase(script, _specs(tmp_path, "", plan_status="Draft")).stderr.splitlines()
+           if ln.lstrip().startswith("fix:")][0]  # fmt: skip
+    assert Path(fix.split(" in ", 1)[1].strip()).is_file()

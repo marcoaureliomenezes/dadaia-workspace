@@ -27,9 +27,11 @@ from _release_store import Live, Refusal, State, commit, live_release  # noqa: E
 SCRIPT = Path(__file__).parent / "release.py"
 #: DEFINITION is `new`'s; each later phase has one predecessor (out-of-order = re-run).
 PREDECESSOR = {"IMPLEMENTATION": "DEFINITION", "CLOSURE": "IMPLEMENTATION"}
-#: PLAN §1 — structure only (ADR 0041); the fix prints the skill section whose skeleton passes.
-AS_IS = re.compile(r"^##\s+(?:\d+\.\s*)?as-is review[ \t]*$", re.IGNORECASE | re.MULTILINE)
-AS_IS_FIX = "sed -n '/^## 2. As-is review/,/^## 3/p' .agents/skills/dd-release-definition/SKILL.md"
+#: PLAN §1 — structure only (ADR 0041): any level-2 heading naming the As-is review.
+AS_IS = re.compile(r"^##[ \t].*\bas[- ]is review", re.IGNORECASE | re.MULTILINE)
+SKILL = Path(__file__).resolve().parents[2] / "dd-release-definition" / "SKILL.md"
+AS_IS_FIX = f"copy the PLAN §1 skeleton under the As-is review section of {SKILL} into PLAN.md"
+COLUMNS = ["unit", "today", "bugs", "verdict", "why"]
 
 
 def note(state: State, ts: str, text: str) -> None:
@@ -50,23 +52,26 @@ def _refuse_unapproved_trio(live: Live) -> None:
         status = extract_status(document.read_text(encoding="utf-8"))
         if status != APPROVED:
             raise Refusal(
-                f"releases/{live.release_id}/{name} carries status {status!r} — a candidate "
-                f"enters IMPLEMENTATION only once SPEC, PLAN and TASKS are all "
-                f"'**Status:** {APPROVED}'",
-                f"sed -i 's/^\\*\\*Status:\\*\\* .*/**Status:** {APPROVED}/' "
-                f"specs/releases/{live.release_id}/{name}",
+                f"releases/{live.release_id}/{name} carries status {status!r} — SPEC, PLAN "
+                f"and TASKS must all be '**Status:** {APPROVED}' to enter IMPLEMENTATION",
+                f"set '**Status:** {APPROVED}' in {document.resolve()}",
             )
 
 
 def _refuse_missing_as_is_table(plan: str) -> None:
-    """PLAN.md opens with the As-is review table: the five columns, >= 1 row, known verdicts."""
     heading = AS_IS.search(plan)
-    section = plan[heading.end() :].split("\n## ")[0] if heading else ""
-    rows = [[c.strip(" `*") for c in line.strip().strip("|").split("|")]
-            for line in section.splitlines() if line.strip().startswith("|")]  # fmt: skip
-    if len(rows) < 3 or [c.lower() for c in rows[0]] != ["unit", "today", "bugs", "verdict", "why"]:
-        raise Refusal("PLAN.md has no As-is review table ('## As-is review' + 'unit | today | "
-                      "bugs | verdict | why' + >= 1 row)", AS_IS_FIX)  # fmt: skip
+    if heading is None:
+        raise Refusal("PLAN.md has no '## … As-is review' heading", AS_IS_FIX)
+    rows: list[list[str]] = []  # the first table under the heading, split on unescaped pipes
+    for line in plan[heading.end() :].split("\n## ")[0].splitlines()[1:]:
+        if "|" not in line and rows:
+            break
+        if "|" in line:
+            cells = re.split(r"(?<!\\)\|", line.strip().strip("|"))
+            rows.append([cell.strip(" \t`*") for cell in cells])
+    if len(rows) < 3 or [c.lower() for c in rows[0]] != COLUMNS:
+        raise Refusal("PLAN.md's As-is review heading is not followed by a table with header "
+                      "'unit | today | bugs | verdict | why' and >= 1 row", AS_IS_FIX)  # fmt: skip
     for row in (r + [""] * 4 for r in rows[2:]):
         if row[3].upper() not in {"DELETE", "REBUILD", "UPDATE", "KEEP", "ADD"}:
             raise Refusal(f"PLAN.md As-is review row {row[0]!r} carries verdict {row[3]!r} "
@@ -74,11 +79,7 @@ def _refuse_missing_as_is_table(plan: str) -> None:
 
 
 def set_phase(specs: Path, phase: str, sha: str, pr: int | None = None) -> tuple[str, str]:
-    """Move the live release to *phase* and stamp the milestone that phase records.
-
-    *pr* is the merged release PR number, recorded in the CLOSURE note: promoting a
-    release leaves a number in the log, not a moved directory.
-    """
+    """Move the live release to *phase*, stamp its milestone; *pr* (CLOSURE) enters the note."""
     if not SHA_RE.match(sha):
         raise Refusal(
             f"--sha {sha!r} is not a 7-40 character lowercase hex commit sha",
@@ -111,7 +112,7 @@ def set_phase(specs: Path, phase: str, sha: str, pr: int | None = None) -> tuple
         raise Refusal(
             f"TASKS.md still carries {len(unfinished)} open '[ ]'/reserved '[-]' marker(s) "
             f"— a candidate closes fully implemented: {unfinished[0]}",
-            f"sed -i 's/^- \\[-\\]/- [x]/' specs/releases/{live.release_id}/TASKS.md",
+            f"finish and mark every task '[x]' in {(live.release_dir / 'TASKS.md').resolve()}",
         )
 
     def apply(state: State) -> State:
