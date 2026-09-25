@@ -15,7 +15,7 @@ Paths under `dadaia_workspace/public/` abbreviated `pub/`. DELETE/REBUILD rows (
   `Write set:` `pub/skills/dd-release-definition/SKILL.md`, `pub/skills/dd-grill-me/SKILL.md`
   `blocked by:` none · `delivers:` FR1 AC1.1–AC1.8 — a definer reads the step and the skeleton
 
-- [-] **T-050-02 — `phase IMPLEMENTATION` refuses a PLAN without the as-is table.**
+- [x] **T-050-02 — `phase IMPLEMENTATION` refuses a PLAN without the as-is table.**
   RED first: `tests/contract/test_release_script.py` — pass case, missing heading, heading without table,
   wrong header, zero rows, unknown verdict (names unit + verdict), numbered/unnumbered heading, lowercase
   verdict, all-ADD, unapproved trio refuses first, and the skeleton extracted from the skill's source text

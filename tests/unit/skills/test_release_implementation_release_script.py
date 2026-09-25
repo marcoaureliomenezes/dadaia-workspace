@@ -27,6 +27,7 @@ _SCHEMAS = (
 )
 _TRIO = ("SPEC.md", "PLAN.md", "TASKS.md")
 _TS = "2026-09-22T00:00:00Z"
+_PLAN_AS_IS = "## 1. As-is review\n\n| unit | today | bugs | verdict | why |\n|---|---|---|---|---|\n| a | b | 0 | KEEP | c |\n"
 
 
 @pytest.fixture
@@ -75,7 +76,7 @@ def _release(
     release_dir = specs / "releases" / release_id
     release_dir.mkdir(parents=True, exist_ok=True)
     for name in _TRIO:
-        body = tasks if name == "TASKS.md" else ""
+        body = {"TASKS.md": tasks, "PLAN.md": _PLAN_AS_IS}.get(name, "")
         release_dir.joinpath(name).write_text(
             f"# {name}\n\n**Status:** Approved\n\n{body}", encoding="utf-8"
         )

@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """`release.py phase` — the two in-candidate transitions a release walks.
 
-`phase` is the ONE writer of `phase`, `defined` and `implemented` (0.4.7 FR5). Those
-three fields were Read-then-Edit, which is how `archive` came to refuse on a hand-set
-`implemented` it validated itself: the phase and its milestone now move in one act, so
-they cannot disagree.
+`phase` is the ONE writer of `phase`, `defined` and `implemented` (0.4.7 FR5): the phase
+and its milestone move in one act, so they cannot disagree.
 """
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -26,10 +25,11 @@ from _release_schema import (  # noqa: E402
 from _release_store import Live, Refusal, State, commit, live_release  # noqa: E402
 
 SCRIPT = Path(__file__).parent / "release.py"
-#: The one ordered lane a candidate walks. DEFINITION is written by `new` — this verb
-#: owns the two transitions after it, each from exactly one predecessor, so an
-#: out-of-order move and a re-run are the same check.
+#: DEFINITION is `new`'s; each later phase has one predecessor (out-of-order = re-run).
 PREDECESSOR = {"IMPLEMENTATION": "DEFINITION", "CLOSURE": "IMPLEMENTATION"}
+#: PLAN §1 — structure only (ADR 0041); the fix prints the skill section whose skeleton passes.
+AS_IS = re.compile(r"^##\s+(?:\d+\.\s*)?as-is review[ \t]*$", re.IGNORECASE | re.MULTILINE)
+AS_IS_FIX = "sed -n '/^## 2. As-is review/,/^## 3/p' .agents/skills/dd-release-definition/SKILL.md"
 
 
 def note(state: State, ts: str, text: str) -> None:
@@ -58,14 +58,19 @@ def _refuse_unapproved_trio(live: Live) -> None:
             )
 
 
-def refuse_unfinished(live: Live, what: str, fix: str) -> None:
-    unfinished = unfinished_tasks(live.release_dir)
-    if unfinished:
-        raise Refusal(
-            f"TASKS.md still carries {len(unfinished)} open '[ ]'/reserved '[-]' marker(s) "
-            f"— {what}: {unfinished[0]}",
-            fix,
-        )
+def _refuse_missing_as_is_table(plan: str) -> None:
+    """PLAN.md opens with the As-is review table: the five columns, >= 1 row, known verdicts."""
+    heading = AS_IS.search(plan)
+    section = plan[heading.end() :].split("\n## ")[0] if heading else ""
+    rows = [[c.strip(" `*") for c in line.strip().strip("|").split("|")]
+            for line in section.splitlines() if line.strip().startswith("|")]  # fmt: skip
+    if len(rows) < 3 or [c.lower() for c in rows[0]] != ["unit", "today", "bugs", "verdict", "why"]:
+        raise Refusal("PLAN.md has no As-is review table ('## As-is review' + 'unit | today | "
+                      "bugs | verdict | why' + >= 1 row)", AS_IS_FIX)  # fmt: skip
+    for row in (r + [""] * 4 for r in rows[2:]):
+        if row[3].upper() not in {"DELETE", "REBUILD", "UPDATE", "KEEP", "ADD"}:
+            raise Refusal(f"PLAN.md As-is review row {row[0]!r} carries verdict {row[3]!r} "
+                          "— one of DELETE REBUILD UPDATE KEEP ADD", AS_IS_FIX)  # fmt: skip
 
 
 def set_phase(specs: Path, phase: str, sha: str, pr: int | None = None) -> tuple[str, str]:
@@ -101,10 +106,11 @@ def set_phase(specs: Path, phase: str, sha: str, pr: int | None = None) -> tuple
     ts = utc_now()
     if phase == "IMPLEMENTATION":
         _refuse_unapproved_trio(live)
-    else:
-        refuse_unfinished(
-            live,
-            "a candidate closes fully implemented",
+        _refuse_missing_as_is_table((live.release_dir / "PLAN.md").read_text(encoding="utf-8"))
+    elif unfinished := unfinished_tasks(live.release_dir):
+        raise Refusal(
+            f"TASKS.md still carries {len(unfinished)} open '[ ]'/reserved '[-]' marker(s) "
+            f"— a candidate closes fully implemented: {unfinished[0]}",
             f"sed -i 's/^- \\[-\\]/- [x]/' specs/releases/{live.release_id}/TASKS.md",
         )
 
