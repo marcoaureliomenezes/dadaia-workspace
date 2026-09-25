@@ -1,7 +1,7 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "CLOSURE",
+  "phase": "DEFINITION",
   "defined": {
     "sha": "520655ee",
     "ts": "2026-09-25T03:11:37Z"
@@ -221,6 +221,12 @@
       "agent": "main-thread",
       "kind": "dispositions",
       "text": "No backlog entry picked (origin operator-demand). Arm B round 2 landed on the branch: e2e-upgrade-previous-version-equals-source-version, doctor-tests-walk-the-real-workspace-tmp-zone (0 production lines); M13/M16 mutation-gap tests. Backlog added: gitflow-trunk-based-model, consumer-gitflow-server-side-enforcement. Proposed bugs awaiting operator confirmation: memory.py check passes an over-long tldr that doctor LINT-1 rejects (MEDIUM); LINT-1 raw output lines break the doctor line format (LOW); a contract test reads ignored .pyc under public/ (INFO). Follow-up: release.py memory refusal fix line is bare, not absolute."
+    },
+    {
+      "ts": "2026-09-25T04:05:26Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (prior candidate closed at 864645f3)"
     }
   ]
 }
