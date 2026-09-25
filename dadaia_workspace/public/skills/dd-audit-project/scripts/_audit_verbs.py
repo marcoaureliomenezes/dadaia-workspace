@@ -89,7 +89,7 @@ def close(specs: Path, audit: str, sha: str) -> str:
     if len(releases) > 1:
         raise Refusal(
             f"audit {audit!r} names {len(releases)} remediation releases "
-            f"({', '.join(releases)}); an audit generates exactly one",
+            f"({', '.join(releases)}); an audit generates at most one",
             f"{SCRIPT} disposition {audit} <finding-id> --disposition resolved "
             f"--release {releases[0]}",
         )

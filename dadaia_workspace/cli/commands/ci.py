@@ -109,7 +109,7 @@ def push_gate_check() -> None:
 
     The object source, denylist terms and baseline patterns are all built here and
     injected; a call site that fails to wire the object reader is a defect, never a
-    bypass. No repo or context name is a term source (ADR 0032).
+    bypass. No repo or context name is a term source.
     """
     from dadaia_workspace.container import (
         build_git_object_reader,
@@ -146,7 +146,10 @@ def push_gate_check() -> None:
     baseline_patterns = load_denylist_baseline_patterns()
 
     mode = (
-        "operator denylist + baseline" if denylist_terms else "baseline only (no operator denylist)"
+        "operator denylist + baseline"
+        if denylist_terms
+        else "baseline only (no operator denylist; private names go in "
+        "$DADAIA_PRIVACY_DENYLIST or .dadaia/states/privacy_denylist.json)"
     )
     typer.echo(f"[pre-push] denylist scan mode: {mode}", err=True)
 

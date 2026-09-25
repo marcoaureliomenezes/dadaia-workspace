@@ -14,7 +14,7 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli.main import app
 
 _LEAK = re.compile(
-    r"\bFR\d|SPEC v\d|\bA\d+\.\d|T-\d{3}-\d|\bv\d+\.\d+\.\d+\b|container\.|cli-no-infrastructure"
+    r"\bFR\d|\bADR \d{4}|SPEC v\d|\bA\d+\.\d|T-\d{3}-\d|\bv\d+\.\d+\.\d+\b|container\.|cli-no-infrastructure"
 )
 
 
