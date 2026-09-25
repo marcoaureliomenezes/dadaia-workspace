@@ -99,13 +99,13 @@ def run_section[C, I](
     rules: Sequence[Rule[C, I]],
     context: C,
     render: Callable[[Rule[C, I], I], SectionFinding],
-    root: PurePath,
+    root: PurePath | None,
 ) -> SectionReport:
     """Run every rule of one section over its context.
 
     ``render`` is the section's adapter at the seam: it translates the feature's own
     issue type into a :class:`SectionFinding`. *root* is the workspace a CLI remedy runs
-    from (``Path()`` when no instance surrounds the run).
+    from (``None`` when no instance surrounds the run: the running CLI).
     """
     findings: list[SectionFinding] = []
     for rule in rules:
@@ -124,14 +124,16 @@ def merge_sections(reports: Sequence[SectionReport]) -> SectionReport:
     )
 
 
-def rule_fix[C, I](rule: Rule[C, I], root: PurePath) -> str:
+def rule_fix[C, I](rule: Rule[C, I], root: PurePath | None) -> str:
     """*rule*'s remedy as one runnable line — the ONE render site of a rule's fix."""
     if isinstance(rule.fix_help, tuple):
         return fix_line(root, *rule.fix_help)
     return rule.fix_help or ""
 
 
-def _with_fix[C, I](finding: SectionFinding, rule: Rule[C, I], root: PurePath) -> SectionFinding:
+def _with_fix[C, I](
+    finding: SectionFinding, rule: Rule[C, I], root: PurePath | None
+) -> SectionFinding:
     """Stamp the emitting rule's ``fix_help`` onto *finding*.
 
     0.4.7 FR2 — every BLOCK carries one executable fix. That every error-class rule

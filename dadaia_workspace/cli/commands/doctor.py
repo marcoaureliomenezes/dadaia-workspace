@@ -102,7 +102,7 @@ def _build_redactor(workspace_root: Path) -> ContextRedactor:
 
 
 def _workspace_section(
-    service: DoctorService | None, root: Path, scope: str | None, *, expired_only: bool
+    service: DoctorService | None, root: Path | None, scope: str | None, *, expired_only: bool
 ) -> SectionReport:
     """`workspace`: the instance walk. Its findings already ARE the normalized record —
     the feature owns the translation of its own verdict vocabulary, so the adapter here
@@ -137,7 +137,7 @@ def _empty_section(name: str) -> SectionReport:
     return SectionReport(name=name, findings=())
 
 
-def _specs_section(doctor: SpecsDoctor | None, root: Path) -> SectionReport:
+def _specs_section(doctor: SpecsDoctor | None, root: Path | None) -> SectionReport:
     if doctor is None:
         return _empty_section("specs")
     return run_section(
@@ -165,7 +165,7 @@ def _ledgers_render(
 
 
 def _ledgers_section(
-    root: Path,
+    root: Path | None,
     specs_dir: Path | None,
     source_root: str | None,
     alias_map: str | None,
@@ -376,7 +376,6 @@ def doctor(
     """Report workspace, specs and ledger compliance; optionally repair."""
     workspace_root, service, scope, target = _resolve_run(specs_dir, context)
     specs_doctor = _build_specs_doctor(target, public_dir)
-    fix_root = _fix_root(workspace_root)
 
     fixed = _apply_fixes(
         service, specs_doctor, target, source_root, alias_map, fix=fix, expired_only=expired_only
@@ -384,12 +383,12 @@ def doctor(
     reports = [
         merge_sections(
             [
-                _workspace_section(service, fix_root, scope, expired_only=expired_only),
+                _workspace_section(service, workspace_root, scope, expired_only=expired_only),
                 _onboarding_section(workspace_root, scope, expired_only=expired_only),
             ]
         ),
-        _specs_section(specs_doctor, fix_root),
-        _ledgers_section(fix_root, target, source_root, alias_map),
+        _specs_section(specs_doctor, workspace_root),
+        _ledgers_section(workspace_root, target, source_root, alias_map),
     ]
     # Render boundary ONLY: no doctor ever sees the redactor; every finding and fix action
     # keeps carrying true names inside the sections themselves.
@@ -405,12 +404,6 @@ def doctor(
 
     if any(report.failed for report in reports):
         raise typer.Exit(1)
-
-
-def _fix_root(workspace_root: Path | None) -> Path:
-    """Every CLI remedy is built from this root; no instance around the run (CI over a
-    bare checkout) renders it workspace-relative."""
-    return workspace_root or Path()
 
 
 def _identity(text: str) -> str:

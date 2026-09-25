@@ -32,7 +32,6 @@ import json
 import os
 import re
 import subprocess
-import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -52,9 +51,6 @@ from tests.fixtures.harness_env import session_home
 from ..unit.features.specs.test_doctor import _make_clean_specs_tree
 
 _RELEASE = "1.2.3"
-#: The fixture tree is not a workspace, so a CLI fix line is rendered from the workspace
-#: whose venv runs this suite (``<root>/.dadaia/.venv/bin/python``) — the SAME binary.
-_THIS_WORKSPACE = Path(sys.executable).parents[3]
 
 
 @dataclass(frozen=True)
@@ -307,7 +303,8 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
         )
         return
 
-    command = _resolve(rule_fix(rule, _THIS_WORKSPACE), plant)
+    # The fixture is no workspace: the fix names the CLI of the venv running this suite.
+    command = _resolve(rule_fix(rule, None), plant)
     done = subprocess.run(
         ["bash", "-c", command],
         cwd=root,

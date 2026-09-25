@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import shlex
 import subprocess
-from pathlib import PurePosixPath, PureWindowsPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 import pytest
 
@@ -39,3 +40,12 @@ def test_windows_quotes_like_list2cmdline(monkeypatch: pytest.MonkeyPatch) -> No
     root = PureWindowsPath(r"C:\ws")
     expected = subprocess.list2cmdline([str(cli_line.cli_path(root)), *argv])
     assert cli_line.fix_line(root, *argv) == expected
+
+
+def test_no_workspace_names_the_cli_of_the_running_venv(monkeypatch: pytest.MonkeyPatch) -> None:
+    """CI over a bare checkout runs the CLI from a venv outside any workspace: the fix
+    line names THAT executable, never a workspace-relative path that does not exist."""
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", detect("linux"))
+    monkeypatch.setattr("sys.prefix", "/cache/venvs/proj")
+    cli = str(Path("/cache/venvs/proj", "bin", "dadaia"))
+    assert cli_line.fix_line(None, "doctor", "--fix") == shlex.join([cli, "doctor", "--fix"])
