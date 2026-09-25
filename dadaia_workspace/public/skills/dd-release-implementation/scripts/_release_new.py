@@ -32,27 +32,23 @@ SPEC_STUB = """\
 
 (Describe the problem this release solves.)
 
----
-
 ## 2. Objective
 
 (State the release objective in one sentence.)
-
----
 
 ## 3. Scope
 
 {scope}
 
----
+## 4. Replaces
 
-## 4. Out of scope
+(One bullet per current behaviour an As-is DELETE/REBUILD row removes, or `none` and why.)
+
+## 5. Out of scope
 
 (Explicitly list what this release does NOT cover.)
 
----
-
-## 5. Dependencies and risks
+## 6. Dependencies and risks
 
 (Upstream blockers, sequencing constraints, risk table.)
 """

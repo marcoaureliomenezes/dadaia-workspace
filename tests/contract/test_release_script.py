@@ -127,3 +127,16 @@ def test_the_taught_skeleton_passes_the_check(script: Path, tmp_path: Path) -> N
     fence = re.search(r"```markdown\n(## 1\. As-is review\n.*?)```", skill, re.DOTALL)
     assert fence, "dd-release-definition lost its PLAN §1 skeleton"
     _admits(script, tmp_path, fence.group(1))
+
+
+def test_new_writes_a_spec_stub_carrying_replaces(script: Path, tmp_path: Path) -> None:
+    """AC1.9 — the stub asks for Replaces between Scope and Out of scope; no PLAN born."""
+    specs = tmp_path / "specs"
+    (specs / "releases").mkdir(parents=True)
+    argv = [sys.executable, str(script), "new", "0.9.0", "--specs", str(specs)]
+    assert subprocess.run(argv, capture_output=True, text=True).returncode == 0
+    stub = (specs / "releases/0.9.0/SPEC.md").read_text("utf-8")
+    headings = re.findall(r"^## \d+\. (.+)$", stub, re.MULTILINE)
+    assert headings.index("Scope") + 1 == headings.index("Replaces")
+    assert headings.index("Replaces") + 1 == headings.index("Out of scope")
+    assert not (specs / "releases/0.9.0/PLAN.md").exists()
