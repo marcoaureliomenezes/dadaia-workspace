@@ -126,6 +126,31 @@ gate read, the refuse-before-write baseline, the own-venv workspace resolution).
 | `cli/commands/context.py` | −48 | `bind` is the one binder; session id delegates to the one rule (FR7; ADRs 0038, 0044) |
 | `features/specs/doctor_structural.py`, `features/chokepoints/branch_policy.py`, `features/specs/canon.py`, `infrastructure/ledger_scripts.py`, `core/kernel_tunables.py`, `features/chokepoints/__init__.py`, `features/specs/doctor_memory.py`, `hooks/ctx_inject.py`, `cli/commands/init.py` | −80 | dead gate code and duplicated paths deleted (FR8, FR11) |
 
+**Final measure after review round 3 (operator Q3, 2026-09-26): +449 lines** — same method, `5364ba0d..3f08cbd8`:
++1721 / −1272. **Δ vs the re-approved +362: +87**, every file that moved since `14c534b6`:
+
+| file | Δ since +362 | why |
+|---|---|---|
+| `features/spec_context/service.py` | +76 | `project_gitflow`, the ONE gitflow reader gate and `dead` share (C1, ADR 0048); `_sync_failure`, one fix per git failure (the gate's when it refused); `dead` refuses a non-work branch before any commit (H, Q2); `baseline --republish` absorbs the rewrite the gate used to perform (Q1) |
+| `features/chokepoints/branch_policy.py` | +20 | `GateFixes` — the composition root hands every refusal a runnable, cwd-free fix (H1–H4) |
+| `cli/_fail.py` (new) | +16 | the ONE CLI refusal printer — a fix line never wraps without a TTY (H); `context.py` −37 pays for it |
+| `cli/commands/ci.py` | +8 | the gate reads through `project_gitflow`; `git push origin HEAD` names the checked-out branch. The gate-side republish (−30) is deleted (Q1) |
+| `infrastructure/git_subprocess.py` | +8 | `unpushed` (dead's branch check), `committed_text` limited to `origin` (M1) |
+| `core/cli_line.py` | +5 | `git_line`, the one `git -C <repo>` spelling — collapses nine refusal sites (net −14 with its callers) |
+| `cli/commands/context.py` / `features/chokepoints/push_gate.py` | −37 / −9 | error printing folded into `_fail`; rewrite fix now names `context baseline --republish` |
+
+Decisions recorded here (operator 2026-09-26): **Q1** the pre-push gate is read-only; its denylist/canon
+refusal prints `fix: <cli> context baseline <ctx> --republish <slug>` (the squash + push lives in the one
+publish verb). **Q2** `context dead` refuses a repo with changes to sync while it sits on the principal or
+integration branch, `fix: git -C <repo> checkout -b <work>` — accepted as-is. Open LOW items: the
+alive `&&` fix is closed (`git clone <clone-url> <repos/slug>`, adopted and back-filled); **deferred**
+— the `<context>` placeholder when no ALIVE context owns the pushing repo (a hooked repo without one
+exists only after an out-of-band registry edit; a resolvable fix needs an origin read plus an adopt
+path, i.e. growth), and `dead` treating the projected `repos/<slug>/AGENTS.md` of an unborn clone as
+user data (the provenance classifier lives in `infrastructure/workspace_guardrail.py`; `dead` would
+need it injected through the container and `data/AGENTS.md` has no shipped-hashes history — growth
+for a lossless, conservative refusal).
+
 ### 1.2 Survey drift corrected
 
 - `DADAIA_BIN` importers are **7**, not 9–10: `hooks/venv_guard.py` and `features/ci_preflight/service.py`
