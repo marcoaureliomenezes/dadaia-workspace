@@ -171,3 +171,8 @@ DELETE/REBUILD rows (PLAN §1) land first. RED = the named test fails before the
   `RED:` the loop reaches the cap on today's code.
 
 Closure (not tasks): AC9.3 memory pass (dd-product-engineer); AC11.3 net-lines measurement vs PLAN §1.1.
+
+- [-] **T-050-22 — R13 append-only publish (round 6).**
+  Adopt origin, publish an empty origin's local principal, no rewrite/delete/force; one fix per
+  git-failure cause; origin-scoped "published"; one identity probe (SA-H3-1/2/3/8/17).
+  `blocked by:` T-050-15 · `delivers:` AC4.2–AC4.6, AC11.3 — the publish never rewrites history
