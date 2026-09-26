@@ -7,6 +7,9 @@ entry, ``remove`` deletes it — all four behind ONE guard:
   act on the link itself);
 * an entry that vanished mid-walk is ABSENT, never an error;
 * a location outside the workspace is SKIPPED, source and destination alike;
+* a linked git worktree (or submodule) — a directory whose ``.git`` entry is a regular
+  file — is SKIPPED, and so is any path inside one or above one: it holds uncommitted
+  work and git's registration, which no hold in ``reaped/`` can give back;
 * every ``OSError`` becomes exactly one ``skipped`` action — a pass never aborts;
 * a cross-device move falls back to copy + remove HERE, so a failed move is never a
   partial delete;
@@ -33,6 +36,7 @@ from pathlib import Path
 __all__ = ["guarded", "move", "mtime", "remove", "rmtree", "walk"]
 
 _OUTSIDE = "skipped '{label}' (outside the workspace)"
+_WORKTREE = "skipped '{label}' (holds a linked git worktree)"
 
 
 def walk(directory: Path) -> list[Path]:
@@ -78,6 +82,25 @@ def _inside(workspace_root: Path, target: Path) -> bool:
     return True
 
 
+def _is_gitfile(entry: Path) -> bool:
+    return entry.name == ".git" and entry.is_file() and not entry.is_symlink()
+
+
+def _holds_worktree(workspace_root: Path, target: Path) -> bool:
+    """True when *target* sits inside a linked worktree or its subtree holds one — an
+    rmtree of ``tmp/<agent>/<day>/`` kills every worktree below it. Local and cheap: no
+    git call, symlinks never followed."""
+    root, here = workspace_root.resolve(), target.parent.resolve()
+    for ancestor in (here, *here.parents):
+        if ancestor == root:
+            break
+        if _is_gitfile(ancestor / ".git"):
+            return True
+    if target.is_symlink() or not target.is_dir():
+        return False
+    return any(".git" in files and _is_gitfile(Path(d) / ".git") for d, _, files in os.walk(target))
+
+
 def _exists(target: Path) -> bool:
     return target.is_symlink() or target.exists()
 
@@ -107,6 +130,8 @@ def remove(workspace_root: Path, target: Path, label: str) -> str | None:
         return None
     if not _inside(workspace_root, target):
         return _OUTSIDE.format(label=label)
+    if _holds_worktree(workspace_root, target):
+        return _WORKTREE.format(label=label)
     if target.is_symlink() or target.is_file():
         try:
             target.unlink()
@@ -144,6 +169,8 @@ def move(
         return None
     if not _inside(workspace_root, target) or not _inside(workspace_root, destination):
         return _OUTSIDE.format(label=label)
+    if _holds_worktree(workspace_root, target):
+        return _WORKTREE.format(label=label)
     destination.parent.mkdir(parents=True, exist_ok=True)
     remove(workspace_root, destination, label)
     try:
