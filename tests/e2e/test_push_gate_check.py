@@ -159,7 +159,7 @@ def test_a_custom_gitflow_governs_the_push(tmp_path: Path) -> None:
     assert _run_push_gate(repo, tmp_path, _push("work/0.0.1", sha)).returncode == 0
     refused = _run_push_gate(repo, tmp_path, _push("feature/0.0.1", sha))
     assert refused.returncode != 0
-    fix = shell_line("git", "-C", str(repo), "branch", "work/<M.m.p>", "feature/0.0.1")
+    fix = shell_line("git", "-C", str(repo), "switch", "-c", "work/0.1.0", sha)
     assert f"fix: {fix}" in refused.stderr, refused.stderr
 
 

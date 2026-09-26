@@ -88,6 +88,11 @@ class FakeGitClient:
     def committed_text(self, path: Path, rel: str) -> str | None:
         return None
 
+    def gitflow(self, repo: Path, main_repo: Path | None = None) -> tuple[Any, str | None]:
+        from dadaia_workspace.core.gitflow import DEFAULT
+
+        return DEFAULT, None
+
     def current_branch(self, path: Path) -> str:
         return self._branches.get(path, "main")
 
