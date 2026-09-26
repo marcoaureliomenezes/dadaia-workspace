@@ -77,11 +77,6 @@ def _run(
         raise GitObjectReadError(f"git command timed out: {' '.join(args)}") from exc
 
 
-#: ``git hash-object -t tree /dev/null`` in each object format.
-_EMPTY_TREE_SHA1 = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
-_EMPTY_TREE_SHA256 = "6ef19b41225c5369f1c104d45d8d85efa9b057b53b14b4b9b939dd74decc5321"
-
-
 def _decode(raw: bytes) -> str:
     return raw.decode("utf-8", errors="replace")
 
@@ -126,7 +121,7 @@ def _base_exclusions(repo: Path, remote_sha: str) -> list[str]:
     here: every call gets ``--remotes``, optionally extended by *remote_sha* — one
     exclusion set, asked for identically on every push.
     """
-    exclusions = ["--remotes"]
+    exclusions = ["--remotes=origin"]
     if _is_resolvable_commit(repo, remote_sha):
         exclusions.insert(0, remote_sha)
     return exclusions
@@ -871,9 +866,8 @@ def _read_blobs(
 
 
 def unpublished(repo: Path, rev: str) -> list[str]:
-    """The commits of *rev* no remote holds, newest first — the ONE "already published"
-    rule (:func:`_base_exclusions`) the push gate and ``context baseline --republish``
-    share."""
+    """The commits of *rev* origin does not hold, newest first — the ONE "already
+    published" rule (:func:`_base_exclusions`) the push gate and ``unpushed`` share."""
     return _range_commit_shas(repo, rev, _base_exclusions(repo, ZERO_SHA))
 
 
@@ -882,22 +876,12 @@ class GitSubprocessObjectReader:
     sole adapter — no ``GitObjectReader`` port)."""
 
     def publishes_nothing(self, repo: Path, sha: str) -> bool:
-        """ADR 0036: pushing *sha* adds no object the remote lacks — its range under the
-        ONE "already published" rule (:func:`_base_exclusions`) is empty, or is a single
-        parentless commit on the empty tree. Fails closed (``False``) on any read error."""
-        if not _SHA_SHAPE_RE.match(sha):
-            return False
+        """ADR 0036: pushing *sha* adds no commit origin lacks (:func:`unpublished`).
+        Fails closed (``False``) on any read error."""
         try:
-            commits = unpublished(repo, sha)
+            return _SHA_SHAPE_RE.match(sha) is not None and not unpublished(repo, sha)
         except GitObjectReadError:
             return False
-        if len(commits) != 1:
-            return not commits
-        shown = _run(["git", "show", "-s", "--format=%T %P", commits[0], "--"], repo)
-        return shown.returncode == 0 and _decode(shown.stdout).split() in (
-            [_EMPTY_TREE_SHA1],
-            [_EMPTY_TREE_SHA256],
-        )
 
     def remote_branch(self, repo: Path, branch: str) -> bool:
         """``refs/remotes/origin/<branch>`` exists locally (offline)."""

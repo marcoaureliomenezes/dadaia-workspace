@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.models.git_scan import ZERO_SHA, GitObjectReadError, ScannedObject
-from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
+from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader, unpublished
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
@@ -1664,12 +1664,17 @@ def test_a_new_commit_publishes_something(tmp_path: Path) -> None:
     assert not GitSubprocessObjectReader().publishes_nothing(repo, _commit(repo, "c2"))
 
 
-def test_an_empty_root_commit_publishes_nothing(tmp_path: Path) -> None:
+def test_a_commit_only_another_remote_holds_is_still_unpublished(tmp_path: Path) -> None:
+    """SA-H3-1: "published" means on origin — one rule for the gate and ``unpushed``."""
     repo = tmp_path / "repo"
     _init_repo(repo)
     _git(["commit", "-q", "--allow-empty", "-m", "root"], repo)
     sha = _git(["rev-parse", "HEAD"], repo).stdout.strip()
-    assert GitSubprocessObjectReader().publishes_nothing(repo, sha)
+    _git(["update-ref", "refs/remotes/fork/main", sha], repo)
+    assert unpublished(repo, sha) == [sha]
+    assert not GitSubprocessObjectReader().publishes_nothing(repo, sha)
+    _git(["update-ref", "refs/remotes/origin/main", sha], repo)
+    assert unpublished(repo, sha) == []
 
 
 def test_an_empty_commit_on_new_history_publishes_something(tmp_path: Path) -> None:

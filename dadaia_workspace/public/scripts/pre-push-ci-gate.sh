@@ -5,12 +5,10 @@
 # Branch model: this file states it nowhere — the project gitflow lives in the
 # `gitflow:` block of specs/constitution.md (`dd-gitflow-default`).
 #
-# What THIS script does — the publication boundary, and NOTHING else: branch policy by
-# that gitflow + the range-scoped denylist scan on the work-branch push (`ci
-# push-gate-check`) — the principal and integration branches refuse a direct push (their
-# contentless birth excepted) and name the PR path instead. The pre-push ref lines git feeds on STDIN are forwarded there. This hook
-# refuses exactly three things: an invalid branch name, a denylist hit, and an
-# unresolvable runner (below) — never a fourth reason (v0.5.0 A9.2).
+# What THIS script does — the publication boundary, and NOTHING else: it forwards the
+# pre-push ref lines git feeds on STDIN to `ci push-gate-check`, whose decision
+# (`push_gate_decision`'s docstring) is the one list of refusals; this script itself only
+# refuses an unresolvable runner (below).
 #
 # The CI-equivalent preflight (ruff format --check, ruff check, mypy --strict,
 # lint-imports, pytest) NO LONGER runs from this hook (v0.5.0 FR9/D9 — it moved OFF
@@ -110,5 +108,5 @@ if [ "$PROBE_ONLY" -eq 1 ]; then
     exit 0
 fi
 
-echo "[pre-push] branch policy + denylist gate (work branches; principal/integration by PR, or a contentless birth; gitflow: specs/constitution.md)…"
+echo "[pre-push] push gate (gitflow: specs/constitution.md)…"
 printf '%s' "$PUSH_REFS" | "${RUNNER_BIN[@]}" ci push-gate-check

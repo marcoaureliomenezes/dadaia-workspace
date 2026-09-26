@@ -133,7 +133,7 @@ def test_a_branch_outside_the_gitflow_is_refused_naming_the_work_branch(
         assert word in decision.message
     work = f"{flow.work_prefix}<M.m.p>"
     # One command, from any cwd, carrying the refused ref (review H-C): no `&&`.
-    assert _fix(decision) == ["git", "-C", "/repo", "checkout", "-b", work, branch]
+    assert _fix(decision) == ["git", "-C", "/repo", "branch", work, branch]
 
 
 def test_the_default_names_are_ordinary_branches_under_a_custom_gitflow(tmp_path: Path) -> None:
@@ -148,7 +148,8 @@ def test_a_contentless_birth_of_principal_or_integration_passes(
 ) -> None:
     """ADR 0036: an orphan empty root pushed as the principal, or `git branch <integration>
     <principal>` pushed, creates the remote branch and publishes nothing."""
-    source = _EmptyObjectSource(frozenset({_SHA_A}))
+    other = flow.integration if role == "principal" else flow.principal
+    source = _EmptyObjectSource(frozenset({_SHA_A}), remote=frozenset({other}))
     decision = _decide(_push(getattr(flow, role)), tmp_path, flow, object_source=source)
     assert decision.allowed, decision.message
     assert source.asked == [_SHA_A]
@@ -173,12 +174,12 @@ def test_a_birth_carrying_a_commit_is_refused_naming_a_birth_at_the_other_publis
 
 
 @_FLOWS
-def test_a_birth_fix_never_names_an_absent_remote_ref(tmp_path: Path, flow: Gitflow) -> None:
-    """ADR 0048: with no published other role the fix is the first publish (review H:
-    the old work-branch route named a branch no command had cut)."""
-    decision = _decide(_push(flow.principal), tmp_path, flow)
-    assert not decision.allowed
-    assert _fix(decision) == shlex.split(gate_fixes().publish)
+def test_an_empty_origin_admits_the_principal_as_it_is(tmp_path: Path, flow: Gitflow) -> None:
+    """R13 rule 2: origin holds no gitflow branch — the local principal is published with
+    its content (the scans still run); nothing contentless is required."""
+    source = _EmptyObjectSource()
+    assert _decide(_push(flow.principal), tmp_path, flow, object_source=source).allowed
+    assert source.asked == []
 
 
 def test_an_existing_principal_is_never_a_birth(tmp_path: Path) -> None:
@@ -236,7 +237,10 @@ def test_pushing_feature_branch_to_a_foreign_remote_ref_is_refused(tmp_path: Pat
     assert not decision.allowed
     assert "refs/heads/work/0.0.2" in decision.message
     assert _fix(decision) == ["git", "-C", "/repo", "branch", "-m", "work/0.0.1", "work/0.0.2"]
-    assert not _decide(_push("work/0.0.1", "next"), tmp_path, _CUSTOM).allowed
+    published = _EmptyObjectSource(remote=frozenset({"trunk"}))
+    assert not _decide(
+        _push("work/0.0.1", "next"), tmp_path, _CUSTOM, object_source=published
+    ).allowed
 
 
 def test_detached_head_ref_gets_a_pushable_branch_diagnosis(tmp_path: Path) -> None:
@@ -244,13 +248,14 @@ def test_detached_head_ref_gets_a_pushable_branch_diagnosis(tmp_path: Path) -> N
     outcome needs the right words."""
     decision = _decide(_refs(f"HEAD {_SHA_A} refs/heads/work/0.0.1 {_ZERO}"), tmp_path, _CUSTOM)
     assert not decision.allowed
-    assert _fix(decision) == ["git", "-C", "/repo", "checkout", "-b", "work/<M.m.p>", "HEAD"]
+    assert _fix(decision) == ["git", "-C", "/repo", "branch", "work/<M.m.p>", "HEAD"]
 
 
 def test_an_outside_ref_is_carried_onto_the_live_work_branch(tmp_path: Path) -> None:
-    """Review H-C: a live work branch exists — the fix names it and carries the ref."""
+    """Review H-C / R13 rule 3: a live work branch exists — the fix fast-forwards it to the
+    refused ref (append-only; git refuses a non-fast-forward), never a rebase."""
     decision = check_branch_policy(
         _push("topic"), _CUSTOM, replace(gate_fixes(), work="work/1.2.3")
     )
     assert decision is not None and "'work/1.2.3'" in decision.message
-    assert _fix(decision) == ["git", "-C", "/repo", "rebase", "topic", "work/1.2.3"]
+    assert _fix(decision) == ["git", "-C", "/repo", "fetch", ".", "topic:work/1.2.3"]

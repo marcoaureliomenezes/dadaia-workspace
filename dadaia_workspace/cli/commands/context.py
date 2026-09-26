@@ -399,24 +399,19 @@ def alive(name: str = typer.Argument(..., help="Context name to make ALIVE")) ->
 def baseline(
     name: str = typer.Argument(..., help="Context whose onboarding is published"),
     repo: str = typer.Argument(
-        "", help="A repo of the context: its slug or its path (default: the main repo)"
+        "", help="A repo of the context: its slug, or a path from the cwd (default: the main repo)"
     ),
     message: str = typer.Option(
         "chore: publish the dadaia specs", "--message", help="Commit message."
     ),
-    republish: bool = typer.Option(
-        False,
-        "--republish",
-        help="The pre-push gate's rewrite fix: squash the repo's unpublished range into "
-        "one commit and push it.",
-    ),
 ) -> None:
-    """Publish a repo of the project: principal + integration branches, then the work
-    branch (the main repo's carries specs/). Running it is the consent; a re-run is a no-op."""
+    """Publish a repo of the project, append-only: adopt what origin holds, or give an empty
+    origin the local principal; the work branch carries specs/. A re-run is a no-op."""
     ws = resolve_workspace_root()
-    target = (Path(repo) if Path(repo).is_absolute() else ws / "repos" / repo) if repo else None
+    slug = repo and Path(repo).name == repo and repo not in (".", "..")
+    target = (ws / "repos" / repo if slug else Path(repo).resolve()) if repo else None
     try:
-        work = _ctx_service().baseline(name, target, message=message, republish=republish)
+        work = _ctx_service().baseline(name, target, message=message)
     except (DadaiaError, OSError) as exc:
         fail(exc)
     done = f"published on {work}" if work else "already published — nothing to do"

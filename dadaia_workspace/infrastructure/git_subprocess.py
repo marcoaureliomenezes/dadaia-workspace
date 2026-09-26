@@ -6,7 +6,10 @@ import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 
+from dadaia_workspace.core.cli_line import git_line
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
+from dadaia_workspace.core.models.git_scan import GitObjectReadError
+from dadaia_workspace.infrastructure.git_objects import unpublished
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +105,8 @@ def _commit(path: Path, msg: str, pathspec: Sequence[str] | None = None) -> None
 
     Shared by ``commit_all`` (blanket staging) and ``commit_paths`` (explicit-path
     staging) — the staging strategy differs, the commit/identity-fallback/no-op
-    handling does not. When *pathspec* is given (``commit_paths``, v0.4.3
+    handling does not; git's own identity rule applies, never a fallback identity
+    (:meth:`GitSubprocessClient.identity_fix` is the one probe). When *pathspec* is given (``commit_paths``, v0.4.3
     T-043-14/FR10/A10.2), the commit itself is scoped with a trailing ``-- <pathspec>``
     — this is what makes it honest even when the index carries OTHER staged content
     (operator pre-staged, or a concurrent caller): ``git commit -- <pathspec>`` commits
@@ -126,21 +130,7 @@ def _commit(path: Path, msg: str, pathspec: Sequence[str] | None = None) -> None
     ``commit_all``'s — which commits exactly what its own ``git add`` calls in
     :func:`_stage_files_safe` just staged).
     """
-    # Tool-authored commits must not depend on an operator git identity being
-    # configured (validation-029 F-06: containers/CI runners without user.email made
-    # dead()'s auto-commit die with 'Please tell me who you are'). When no identity
-    # resolves, fall back to a deterministic tool identity via -c overrides; a
-    # configured identity always wins.
-    commit_cmd = ["git"]
-    identity = _run(["git", "config", "user.email"], cwd=path)
-    if identity.returncode != 0 or not identity.stdout.strip():
-        commit_cmd += [
-            "-c",
-            "user.name=dadaia-workspace",
-            "-c",
-            "user.email=dadaia@workspace.local",
-        ]
-    commit_cmd += ["commit", "-m", msg]
+    commit_cmd = ["git", "commit", "-m", msg]
     if pathspec:
         commit_cmd += ["--", *pathspec]
     result = _run(commit_cmd, cwd=path)
@@ -234,9 +224,21 @@ class GitSubprocessClient:
         return bool(result.stdout.strip())
 
     def unpushed(self, path: Path) -> bool:
-        """Whether HEAD carries a commit no ``origin`` remote-tracking ref holds."""
-        ahead = _run(["git", "rev-list", "--count", "HEAD", "--not", "--remotes=origin"], path)
-        return ahead.returncode != 0 or ahead.stdout.strip() != "0"
+        """Whether HEAD carries a commit origin lacks — the ONE rule, ``unpublished``."""
+        try:
+            return bool(unpublished(path, "HEAD"))
+        except GitObjectReadError:
+            return True
+
+    def identity_fix(self, path: Path) -> str:
+        """The ONE identity probe — git's own rule (env, config, auto-detection): ``""``
+        when git resolves an author and a committer, else the config line that sets one."""
+        for ident in ("GIT_AUTHOR_IDENT", "GIT_COMMITTER_IDENT"):
+            if _run(["git", "var", ident], cwd=path).returncode != 0:
+                named = _run(["git", "config", "user.name"], cwd=path).stdout.strip()
+                key = "user.email" if named else "user.name"
+                return git_line(path, "config", key, f"<{key}>")
+        return ""
 
     def push(self, path: Path) -> None:
         """Publish HEAD's unpushed commits: on its upstream by the explicit refspec
@@ -273,7 +275,7 @@ class GitSubprocessClient:
             ["git", "rev-parse", "-q", "--verify", f"refs/remotes/origin/{integration}"], cwd=path
         )
         rel = "specs/constitution.md"
-        result = _run(["git", "log", "--remotes", "-n1", "--format=%H", "--", rel], cwd=path)
+        result = _run(["git", "log", "--remotes=origin", "-n1", "--format=%H", "--", rel], cwd=path)
         return born.returncode == 0 and result.returncode == 0 and bool(result.stdout.strip())
 
     def committed_text(self, path: Path, rel: str) -> str | None:

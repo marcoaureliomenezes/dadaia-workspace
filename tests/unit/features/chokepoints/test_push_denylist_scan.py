@@ -31,6 +31,9 @@ _SYNTHETIC_TERM = "zz-secret-term"
 class _FakeObjectSource:
     """Maps an exact ``(local_sha, remote_sha)`` pair to a fixed object list."""
 
+    def remote_branch(self, repo: Path, branch: str) -> bool:
+        return True
+
     by_range: dict[tuple[str, str], list[ScannedObject]] = field(default_factory=dict)
     calls: list[tuple[str, str]] = field(default_factory=list)
 
@@ -40,6 +43,9 @@ class _FakeObjectSource:
 
 
 class _FailingObjectSource:
+    def remote_branch(self, repo: Path, branch: str) -> bool:
+        return True
+
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         raise GitObjectReadError("simulated git rev-list failure")
 
@@ -245,7 +251,7 @@ def test_refusal_message_shape_and_ten_item_cap(tmp_path: Path) -> None:
     assert "z…m" in message  # masked form of the synthetic term.
     assert "operator denylist" in message
     assert "dd-release-implementation §2a" in message
-    assert message.endswith(f"fix: {gate_fixes().republish}")
+    assert message.endswith("fix: git -C /repo reset --soft origin/develop")
     assert "already-published history never needs a rewrite" in message
     assert "2 more" in message or "and 2" in message  # 12 hits, 10 shown, 2 remainder.
     assert _SYNTHETIC_TERM not in message
@@ -566,6 +572,9 @@ class _FailingObjectSourceWithPath:
     """Simulates a git-read failure that names the offending blob's PATH structurally
     (GitObjectReadError.path, FR4) rather than embedding it in the message string."""
 
+    def remote_branch(self, repo: Path, branch: str) -> bool:
+        return True
+
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         raise GitObjectReadError(
             "git cat-file --batch stream desynchronised resolving prior content",
@@ -654,5 +663,5 @@ def test_push_with_denylisted_term_only_in_a_commit_message_body_is_refused(
     )
     assert not decision.allowed
     assert _SYNTHETIC_TERM not in decision.message  # never unmasked
-    assert "squash the unpublished range" in decision.message  # a fresh message heals it
+    assert "Uncommit the unpublished range" in decision.message  # a fresh message heals it
     assert "--no-verify" in decision.message

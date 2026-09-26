@@ -82,6 +82,9 @@ class FakeGitClient:
     def unpushed(self, path: Path) -> bool:
         return False
 
+    def identity_fix(self, path: Path) -> str:
+        return ""
+
     def committed_text(self, path: Path, rel: str) -> str | None:
         return None
 
@@ -205,12 +208,7 @@ def seed_dead_context(
 
 
 def gate_fixes() -> Any:
-    """The fix lines a pure push-gate test feeds the decision (the CLI builds the real ones)."""
-    from dadaia_workspace.core.cli_line import fix_line
+    """The fix inputs a pure push-gate test feeds the decision (the CLI builds the real ones)."""
     from dadaia_workspace.features.chokepoints.branch_policy import GateFixes
 
-    return GateFixes(
-        repo="/repo",
-        publish=fix_line(None, "context", "baseline", "proj"),
-        republish=fix_line(None, "context", "baseline", "proj", "--republish", "repo"),
-    )
+    return GateFixes(repo="/repo")

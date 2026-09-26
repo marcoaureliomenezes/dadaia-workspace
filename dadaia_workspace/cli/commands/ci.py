@@ -12,7 +12,6 @@ import typer
 
 from dadaia_workspace.cli._specs_resolution import repo_owner, resolve_workspace_root_for_cli
 from dadaia_workspace.container import is_source_repo_root as _is_source_repo_root
-from dadaia_workspace.core.cli_line import fix_line, git_line
 from dadaia_workspace.core.exceptions import CiPreflightScopeError
 from dadaia_workspace.core.gitflow import Gitflow
 from dadaia_workspace.features.chokepoints.branch_policy import GateFixes
@@ -101,8 +100,8 @@ def _no_canon_violations(paths: Iterable[str]) -> list[str]:
 
 def _gate_inputs(repo_root: Path) -> tuple[Gitflow, GateFixes]:
     """The gitflow through the ONE reader (ADR 0048: committed first, one warning on the
-    default) and the fix lines the gate's refusals name — the pushing repo mapped by the
-    ONE resolver; a repo no context owns is adopted first, from its own origin."""
+    default; an associated repo reads its owner's main repo) and the fix inputs: the repo
+    and its live local work branch."""
     from dadaia_workspace.container import build_git_client
 
     git = build_git_client()
@@ -112,21 +111,9 @@ def _gate_inputs(repo_root: Path) -> tuple[Gitflow, GateFixes]:
     gitflow, warning = project_gitflow(git, repo_root, main)
     if warning:
         typer.echo(f"[pre-push] WARNING: {warning}", err=True)
-    url = git.remote_url(repo_root)
-    publish = (
-        fix_line(workspace, "context", "baseline", owner[0], str(repo_root))
-        if owner
-        else fix_line(workspace, "context", "create", "--main-repo", url)
-        if url
-        else git_line(repo_root, "remote", "add", "origin", "<clone-url>")
-    )
     heads = git.git(repo_root, "for-each-ref", "--sort=-v:refname", "--format=%(refname:short)")
-    return gitflow, GateFixes(
-        repo=str(repo_root),
-        publish=publish,
-        republish=f"{publish} --republish" if owner else publish,
-        work=next((h for h in heads.split() if gitflow.role_of(h) == "work"), ""),
-    )
+    work = next((h for h in heads.split() if gitflow.role_of(h) == "work"), "")
+    return gitflow, GateFixes(repo=str(repo_root), work=work)
 
 
 @app.command("push-gate-check")

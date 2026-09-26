@@ -172,7 +172,7 @@ class _FakeObjectSource:
         return False
 
     def remote_branch(self, repo: Path, branch: str) -> bool:
-        return False
+        return True  # a published origin: a birth carrying content is a refusal
 
 
 class _FailingObjectSource(_FakeObjectSource):

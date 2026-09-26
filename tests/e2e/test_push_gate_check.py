@@ -109,9 +109,7 @@ def test_feature_branch_push_flows_with_no_verdict_anywhere(tmp_path: Path) -> N
 def test_develop_push_is_blocked_naming_the_pr_path(tmp_path: Path) -> None:
     workspace = tmp_path
     repo, sha = _init_repo(workspace, _SLUG)
-    result = _run_push_gate(
-        repo, workspace, f"refs/heads/develop {sha} refs/heads/develop {_ZERO}\n"
-    )
+    result = _run_push_gate(repo, workspace, f"refs/heads/develop {sha} refs/heads/develop {sha}\n")
     out = result.stdout + result.stderr
     assert result.returncode != 0, out
     assert "BLOCKED" in out, out
@@ -161,7 +159,7 @@ def test_a_custom_gitflow_governs_the_push(tmp_path: Path) -> None:
     assert _run_push_gate(repo, tmp_path, _push("work/0.0.1", sha)).returncode == 0
     refused = _run_push_gate(repo, tmp_path, _push("feature/0.0.1", sha))
     assert refused.returncode != 0
-    fix = shell_line("git", "-C", str(repo), "checkout", "-b", "work/<M.m.p>")
+    fix = shell_line("git", "-C", str(repo), "branch", "work/<M.m.p>", "feature/0.0.1")
     assert f"fix: {fix}" in refused.stderr, refused.stderr
 
 

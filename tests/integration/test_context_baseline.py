@@ -1,12 +1,14 @@
-"""Intent: CONTRACT — AC4.2-AC4.6 (T-050-15): `context baseline` publishes an onboarded
-project on any remote state, commits only the onboarding paths, and every refusal leaves
-the repo and the remote unchanged with one runnable fix line.
+"""Intent: CONTRACT — AC4.2-AC4.6 (T-050-15, T-050-40 R13 append-only model): `context
+baseline` adopts what origin holds, publishes the local principal as it is on an empty
+origin, never rewrites or deletes a branch, and every refusal leaves the repo and the
+remote unchanged with the fix for its own cause.
 
 Real git over ``file://`` bare remotes (MEDIUM): the contract is git's own branch/tag state.
 """
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import sys
@@ -18,7 +20,11 @@ from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.exceptions import ContextStateError, GitSyncError
 from dadaia_workspace.core.invocation import repo_owner
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
-from dadaia_workspace.features.spec_context.service import DeadSecretFoundError, SpecContextService
+from dadaia_workspace.features.spec_context.service import (
+    DeadSecretFoundError,
+    SpecContextService,
+    _sync_failure,
+)
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.helpers.privacy_fixtures import aws_key_shape
@@ -91,32 +97,54 @@ def _heads(bare: Path) -> dict[str, str]:
 
 
 def _assert_published(repo: Path, bare: Path, work: str, base: str) -> None:
+    """*work* is checked out, level with origin, and is *base* plus the onboarding commit."""
     heads = _heads(bare)
     assert work in heads and "main" in heads and "develop" in heads
-    assert _git(repo, "rev-parse", f"{work}^") == heads[base]
     assert _git(repo, "rev-parse", "HEAD") == _git(repo, "rev-parse", "@{u}") == heads[work]
+    assert _git(repo, "rev-parse", f"{work}^") == heads[base]
     files = _git(repo, "show", "--name-only", "--format=", "HEAD").splitlines()
     assert sorted(files) == ["AGENTS.md", "specs/constitution.md"]
 
 
-def test_unborn_remote_births_both_branches_from_one_empty_root(env) -> None:
+def _ancestor(repo: Path, old: str, new: str) -> bool:
+    done = subprocess.run(["git", "merge-base", "--is-ancestor", old, new], cwd=repo)
+    return done.returncode == 0
+
+
+def test_an_empty_origin_receives_the_local_principal_and_both_branches_cut_from_it(env) -> None:
+    """R13 rule 2: nothing contentless is born — the onboarding commit IS the principal."""
     svc, repo, bare = env
     _clone_onboarded(bare, repo)
     assert svc.baseline("proj") == "feature/0.1.0"
     heads = _heads(bare)
-    assert heads["main"] == heads["develop"]
-    assert _git(bare, "rev-list", "--parents", "-n1", "main") == heads["main"]  # parentless
-    assert _git(bare, "ls-tree", "main") == ""
-    _assert_published(repo, bare, "feature/0.1.0", "develop")
+    assert heads["main"] == heads["develop"] == heads["feature/0.1.0"]
+    assert _git(repo, "rev-parse", "HEAD") == _git(repo, "rev-parse", "@{u}") == heads["main"]
+    tree = _git(bare, "ls-tree", "-r", "--name-only", "main").splitlines()
+    assert sorted(tree) == ["AGENTS.md", "specs/constitution.md"]
+
+
+def test_operator_code_on_local_main_is_published_as_it_is(env) -> None:
+    """Review C2 (round 4): code committed before the first publish reaches origin on the
+    principal — never left on an unrelated root, never rewritten."""
+    svc, repo, bare = env
+    _clone_onboarded(bare, repo)
+    (repo / "app.py").write_text("x\n", encoding="utf-8")
+    _git(repo, "add", "app.py")
+    _git(repo, "commit", "-qm", "operator code")
+    tip = _git(repo, "rev-parse", "HEAD")
+    assert svc.baseline("proj") == "feature/0.1.0"
+    heads = _heads(bare)
+    assert _ancestor(repo, tip, heads["main"]) and _ancestor(repo, heads["main"], heads["develop"])
+    assert "app.py" in _git(bare, "ls-tree", "--name-only", "feature/0.1.0").splitlines()
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the shipped pre-push hook is bash")
-@pytest.mark.parametrize("seeded", [(), ("main",)], ids=["unborn", "principal-only"])
-def test_every_birth_passes_the_shipped_pre_push_gate(
+@pytest.mark.parametrize("seeded", [(), ("main",)], ids=["empty", "principal-only"])
+def test_every_publish_passes_the_shipped_pre_push_gate(
     env, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, seeded
 ) -> None:
-    """Review H4: births are pushed by `<sha>:refs/heads/<b>` refspec — the real shipped
-    pre-push gate (this interpreter's CLI) admits them without a same-named local head."""
+    """The real shipped pre-push gate (this interpreter's CLI) admits the first publish and
+    the integration birth at the published principal."""
     svc, repo, bare = env
     if seeded:
         _seed(bare, tmp_path / "seed", *seeded)
@@ -130,7 +158,7 @@ def test_every_birth_passes_the_shipped_pre_push_gate(
     shutil.copyfile(workspace_layout.public_scripts_dir() / "pre-push-ci-gate.sh", hook)
     hook.chmod(0o755)
     assert svc.baseline("proj") == "feature/0.1.0"
-    _assert_published(repo, bare, "feature/0.1.0", "develop")
+    assert {"main", "develop", "feature/0.1.0"} <= set(_heads(bare))
 
 
 def test_principal_only_births_integration_at_its_tip(env, tmp_path: Path) -> None:
@@ -139,7 +167,7 @@ def test_principal_only_births_integration_at_its_tip(env, tmp_path: Path) -> No
     _clone_onboarded(bare, repo)
     assert svc.baseline("proj") == "feature/0.1.0"
     heads = _heads(bare)
-    assert heads["develop"] == _git(tmp_path / "seed", "rev-parse", "main")
+    assert heads["develop"] == heads["main"] == _git(tmp_path / "seed", "rev-parse", "main")
     _assert_published(repo, bare, "feature/0.1.0", "develop")
 
 
@@ -155,6 +183,18 @@ def test_both_present_are_reused_and_work_is_cut_from_integration(env, tmp_path:
     _assert_published(repo, bare, "feature/0.1.0", "develop")
 
 
+def test_an_origin_work_branch_is_adopted_never_deleted(env, tmp_path: Path) -> None:
+    """R13 rule 1 / review H (round 4): the origin work branch is the live one — the publish
+    appends on it; its commits stay."""
+    svc, repo, bare = env
+    _seed(bare, tmp_path / "seed", "main", "develop", "feature/0.1.0")
+    theirs = _heads(bare)["feature/0.1.0"]
+    _clone_onboarded(bare, repo)
+    assert svc.baseline("proj") == "feature/0.1.0"
+    assert _heads(bare)["feature/0.1.0"] == _git(repo, "rev-parse", "HEAD")
+    assert _git(repo, "rev-parse", "HEAD^") == theirs
+
+
 def test_a_tag_makes_the_work_branch_its_next_patch(env, tmp_path: Path) -> None:
     svc, repo, bare = env
     _seed(bare, tmp_path / "seed", "main", tag="v0.3.1")
@@ -163,13 +203,30 @@ def test_a_tag_makes_the_work_branch_its_next_patch(env, tmp_path: Path) -> None
     _assert_published(repo, bare, "feature/0.3.2", "develop")
 
 
-def test_second_run_is_a_no_op(env) -> None:
+@pytest.mark.parametrize("seeded", [(), ("main", "develop")], ids=["empty", "adopted"])
+def test_second_run_is_a_no_op(env, tmp_path: Path, seeded) -> None:
     svc, repo, bare = env
+    if seeded:
+        _seed(bare, tmp_path / "seed", *seeded)
     _clone_onboarded(bare, repo)
     svc.baseline("proj")
     before, head = _heads(bare), _git(repo, "rev-parse", "HEAD")
     assert svc.baseline("proj") == ""
     assert _heads(bare) == before and _git(repo, "rev-parse", "HEAD") == head
+
+
+def test_an_origin_without_the_principal_refuses_before_any_write(env, tmp_path: Path) -> None:
+    """Review CRITICAL (round 4, N5): origin holds only another branch and the clone is
+    unborn — nothing is guessed, no untracked operator file is overwritten."""
+    svc, repo, bare = env
+    _seed(bare, tmp_path / "seed", "develop")
+    _clone_onboarded(bare, repo)
+    (repo / "README.md").write_text("OPERATOR\n", encoding="utf-8")
+    before = _heads(bare)
+    with pytest.raises(ContextStateError, match="'main'"):
+        svc.baseline("proj")
+    assert _heads(bare) == before
+    assert (repo / "README.md").read_text(encoding="utf-8") == "OPERATOR\n"
 
 
 def test_dirty_outside_the_paths_refuses_and_its_fix_lets_the_rerun_proceed(
@@ -190,15 +247,13 @@ def test_dirty_outside_the_paths_refuses_and_its_fix_lets_the_rerun_proceed(
     _assert_published(repo, bare, "feature/0.1.0", "develop")
 
 
-def test_an_unborn_dirty_clone_publishes_and_leaves_foreign_files_untouched(env) -> None:
-    """T-050-15 stall: `git stash` cannot run unborn; an unborn clone's foreign files are
-    untracked, never committed and never overwritten (the born branches are empty), so
-    baseline proceeds instead of printing a fix that cannot run."""
+def test_an_unborn_clone_keeps_its_untracked_foreign_files(env) -> None:
+    """Review CRITICAL (round 4): no forced checkout — an unborn clone's foreign files stay
+    untracked and byte-identical."""
     svc, repo, bare = env
     _clone_onboarded(bare, repo)
     (repo / "notes.md").write_text("operator\n", encoding="utf-8")
     assert svc.baseline("proj") == "feature/0.1.0"
-    _assert_published(repo, bare, "feature/0.1.0", "develop")
     assert (repo / "notes.md").read_text(encoding="utf-8") == "operator\n"
     assert "notes.md" not in _git(bare, "ls-tree", "-r", "--name-only", "feature/0.1.0")
 
@@ -217,6 +272,21 @@ def test_missing_identity_refuses_before_any_write(env, tmp_path: Path, monkeypa
     assert _heads(bare) == {}
 
 
+def test_a_tool_commit_never_falls_back_to_a_tool_identity(tmp_path: Path, monkeypatch) -> None:
+    """SA-H3-2: one identity rule (git's own) — no hard-coded fallback author."""
+    (tmp_path / "gitconfig").write_text("[user]\n\tuseConfigOnly = true\n", encoding="utf-8")
+    for var in ("NAME", "EMAIL"):
+        monkeypatch.delenv(f"GIT_AUTHOR_{var}", raising=False)
+        monkeypatch.delenv(f"GIT_COMMITTER_{var}", raising=False)
+    repo = tmp_path / "r"
+    _git(tmp_path, "init", "-q", str(repo))
+    (repo / "a.md").write_text("a\n", encoding="utf-8")
+    client = GitSubprocessClient()
+    assert client.identity_fix(repo).startswith("git -C")
+    with pytest.raises(GitSyncError):
+        client.commit_all(repo, "c")
+
+
 def test_an_env_identity_publishes_without_git_config(env, monkeypatch) -> None:
     """Bug baseline-identity-precheck-ignores-git-env-identity: git's identity is
     whatever git resolves — GIT_AUTHOR_*/GIT_COMMITTER_* included — never config alone."""
@@ -226,17 +296,47 @@ def test_an_env_identity_publishes_without_git_config(env, monkeypatch) -> None:
         monkeypatch.setenv(f"GIT_{role}_EMAIL", "t@example.invalid")
     _clone_onboarded(bare, repo, identity=False)
     assert svc.baseline("proj") == "feature/0.1.0"
-    _assert_published(repo, bare, "feature/0.1.0", "develop")
 
 
-def test_offline_refuses_with_the_same_baseline_line(env, tmp_path: Path) -> None:
+def test_a_wrong_origin_url_gets_the_set_url_fix(env, tmp_path: Path) -> None:
+    """Review HIGH (round 4): no "rerun the verb" class — a wrong URL gets set-url."""
     svc, repo, bare = env
     _clone_onboarded(bare, repo)
     _git(repo, "remote", "set-url", "origin", (tmp_path / "gone.git").as_uri())
     with pytest.raises(GitSyncError) as refused:
         svc.baseline("proj")
-    assert str(refused.value).splitlines()[-1].endswith("context baseline proj")
+    fix = str(refused.value).splitlines()[-1]
+    assert fix.startswith("fix: git -C") and "remote set-url origin" in fix
     assert _heads(bare) == {}
+
+
+@pytest.mark.parametrize(
+    ("stderr", "fix"),
+    [
+        ("! [rejected] feature/1.0.0 -> feature/1.0.0 (fetch first)", "pull --no-rebase"),
+        ("! [rejected] x -> x (non-fast-forward)", "pull --no-rebase"),
+        ("fatal: 'x' does not appear to be a git repository", "remote set-url origin"),
+        ("ERROR: Repository not found.", "remote set-url origin"),
+        ("git@h: Permission denied (publickey).\nfatal: Could not read from remote", "ls-remote"),
+        ("fatal: Authentication failed for 'https://h/x'", "ls-remote"),
+        (
+            "error: Your local changes to the following files would be overwritten by checkout",
+            "stash",
+        ),
+        ("[pre-push] BLOCKED: x\nfix: git -C r branch -m a b", None),
+        ("fatal: something new", None),
+    ],
+)
+def test_every_sync_failure_gets_the_fix_for_its_own_cause(tmp_path: Path, stderr, fix) -> None:
+    """R13 rule 4: one fix per cause; the gate's own fix passes through; an unknown cause
+    carries git's text and no invented fix — never a rebase, a delete, a force or a rerun."""
+    text = str(_sync_failure(GitSyncError(stderr), tmp_path))
+    fixes = [line for line in text.splitlines() if line.startswith("fix: ")]
+    if fix is None:
+        assert len(fixes) == (1 if "fix:" in stderr else 0)
+    else:
+        assert len(fixes) == 1 and fix in fixes[0]
+    assert not re.search(r"(?<!no-)rebase |--delete|--force|reset|context baseline", "".join(fixes))
 
 
 def test_a_non_ascii_foreign_file_refuses_with_a_fix_that_clears(env, tmp_path: Path) -> None:
@@ -260,7 +360,7 @@ def test_a_secret_under_a_non_ascii_name_refuses_before_any_write(
     env, tmp_path: Path, seeded
 ) -> None:
     """Review C1/M5: the secret scan reads the same real paths git commits, and refuses
-    before any birth or checkout, with a fix line."""
+    before any write, with a fix line."""
     svc, repo, bare = env
     if seeded:
         _seed(bare, tmp_path / "seed", *seeded)
@@ -271,23 +371,6 @@ def test_a_secret_under_a_non_ascii_name_refuses_before_any_write(
         svc.baseline("proj")
     assert "specs/memória.md" in str(refused.value) and "\nfix: " in str(refused.value)
     assert _heads(bare) == before and _git(repo, "branch", "--show-current") == branch
-
-
-@pytest.mark.parametrize("checked_out", [True, False], ids=["checked-out", "not-checked-out"])
-def test_a_local_principal_with_commits_is_never_reset(env, checked_out: bool) -> None:
-    """Review H4: births go by `<sha>:refs/heads/<b>` refspec; local heads stay as they are."""
-    svc, repo, bare = env
-    _clone_onboarded(bare, repo)
-    _git(repo, "checkout", "-q", "-b", "main")
-    (repo / "README.md").write_text("local\n", encoding="utf-8")
-    _git(repo, "add", "README.md")
-    _git(repo, "commit", "-qm", "local work")
-    tip = _git(repo, "rev-parse", "main")
-    if not checked_out:
-        _git(repo, "checkout", "-q", "-b", "side")
-    assert svc.baseline("proj") == "feature/0.1.0"
-    assert _git(repo, "rev-parse", "main") == tip
-    assert _git(bare, "ls-tree", "main") == ""
 
 
 def test_a_second_foreign_backup_is_published_inside_specs_bkp(env, tmp_path: Path) -> None:
@@ -315,29 +398,14 @@ def test_a_second_foreign_backup_is_published_inside_specs_bkp(env, tmp_path: Pa
     assert "specs/features/login.md" not in pushed and "specs-bkp/old.md" in pushed
 
 
-def test_the_birth_is_deterministic_so_a_rerun_rebuilds_it(
-    env, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Review C-B (round 5): the birth commit carries fixed dates and a fixed message —
-    two publishes of two empty remotes birth the same commit, so no rerun guesses."""
-    svc, repo, bare = env
-    for var in ("GIT_AUTHOR_DATE", "GIT_COMMITTER_DATE"):
-        monkeypatch.setenv(var, "2001-01-01T00:00:00Z")
-    _clone_onboarded(bare, repo)
-    svc.baseline("proj")
-    for var in ("GIT_AUTHOR_DATE", "GIT_COMMITTER_DATE"):
-        monkeypatch.setenv(var, "2002-02-02T00:00:00Z")
-    other = tmp_path / "other"
-    (other / "ws" / "repos").mkdir(parents=True)
-    (other / "ws" / ".dadaia" / "states").mkdir(parents=True)
-    bare2 = other / "proj.git"
-    _git(other, "init", "-q", "--bare", "-b", "main", str(bare2))
-    store = JsonContextStore(other / "ws" / ".dadaia" / "states")
-    store.save(SpecContextProject("proj", ContextState.ALIVE, "proj", bare2.as_uri(), "2026"))
-    svc2 = SpecContextService(
-        store, GitSubprocessClient(), other / "ws", lambda _r: None, repo_owner=repo_owner
-    )  # type: ignore[arg-type]
-    _clone_onboarded(bare2, other / "ws" / "repos" / "proj")
-    svc2.baseline("proj")
-    assert _heads(bare)["main"] == _heads(bare2)["main"]
-    assert _heads(bare)["feature/0.1.0"] == _heads(bare2)["feature/0.1.0"]
+def test_the_publish_code_never_rewrites_forces_or_deletes() -> None:
+    """R13 rule 3: no forced checkout, reset, rebase, force-push, remote delete or squash
+    in the publish, the gate or the sync-failure fixes."""
+    pkg = Path(__file__).resolve().parents[2] / "dadaia_workspace"
+    for rel in (
+        "features/spec_context/service.py",
+        "features/chokepoints/branch_policy.py",
+    ):
+        text = (pkg / rel).read_text(encoding="utf-8")
+        for verb in ('"-f"', '"reset"', '"rebase"', '"--force"', '"--delete"', "--republish"):
+            assert verb not in text, f"{rel} carries {verb}"

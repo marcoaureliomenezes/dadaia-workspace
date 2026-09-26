@@ -122,13 +122,10 @@ _LAW = "project gitflow: specs/constitution.md"
 @dataclass(frozen=True)
 class GateFixes:
     """What a refusal's fix line names beyond the gitflow — built by the composition
-    root, the one place that knows them: the repo (every git fix is ``git -C <repo>``,
-    so it runs from any cwd), the workspace-CLI lines to publish and republish, and the
+    root: the repo (every git fix is ``git -C <repo>``, so it runs from any cwd) and the
     live local work branch (``""``: none yet)."""
 
     repo: str
-    publish: str
-    republish: str
     work: str = ""
 
 
@@ -138,37 +135,27 @@ def _blocked(text: str, fix: str) -> Decision:
 
 
 def _refuse_branch(
-    ref: PushRef, branch: str | None, gitflow: Gitflow, published: frozenset[str], fixes: GateFixes
+    ref: PushRef, branch: str | None, gitflow: Gitflow, fixes: GateFixes
 ) -> Decision:
-    """Actionable refusal for a non-pushable ref (*branch* ``None``: not a branch head);
-    a fix names a remote-tracking ref only when it is in *published* (ADR 0048)."""
+    """Actionable refusal for a non-pushable ref (*branch* ``None``: not a branch head)."""
     role = gitflow.role_of(branch) if branch is not None else None
     work = gitflow.work_pattern
     if role is not None and ref.remote_sha == ZERO_SHA:
         other = gitflow.integration if role == "principal" else gitflow.principal
-        if other in published:
-            return _blocked(
-                f"creating the {role} branch '{branch}' would publish new objects — a birth "
-                f"carries only published history: birth it at the published '{other}' tip",
-                git_line(
-                    fixes.repo, "push", "origin", f"refs/remotes/origin/{other}:{ref.remote_ref}"
-                ),
-            )
         return _blocked(
-            f"creating the {role} branch '{branch}' would publish new objects — the first "
-            "publish births both gitflow branches contentless and carries the work on a "
-            "work branch",
-            fixes.publish,
+            f"creating the {role} branch '{branch}' on an origin that already holds "
+            f"'{other}' would publish new objects — birth it at the published '{other}' tip",
+            git_line(fixes.repo, "push", "origin", f"refs/remotes/origin/{other}:{ref.remote_ref}"),
         )
     if role is None:
         refused = ref.local_ref.removeprefix(HEADS_PREFIX)
         return _blocked(
             f"ref '{ref.local_ref}' is outside the gitflow — principal '{gitflow.principal}', "
             f"integration '{gitflow.integration}', work '{fixes.work or work}'; only a work "
-            "branch is pushable: carry this work on it, then push it",
-            git_line(fixes.repo, "rebase", refused, fixes.work)
+            "branch is pushable: fast-forward it to this work (never a rewrite), then push it",
+            git_line(fixes.repo, "fetch", ".", f"{refused}:{fixes.work}")
             if fixes.work
-            else git_line(fixes.repo, "checkout", "-b", work, refused),
+            else git_line(fixes.repo, "branch", work, refused),
         )
     head = gitflow.integration if role == "principal" else work
     return _blocked(
@@ -183,12 +170,11 @@ def check_branch_policy(
     gitflow: Gitflow,
     fixes: GateFixes,
     births: frozenset[str] = frozenset(),
-    published: frozenset[str] = frozenset(),
 ) -> Decision | None:
     """Every non-deletion, non-tag ref must land on a branch of *gitflow*: a work branch
     pushed from the SAME-named local head, or the birth of the principal/integration
-    branch (ADR 0036) — a local sha in *births* (the caller proved it creates the remote
-    branch and publishes nothing), from any source (``<sha>:refs/heads/<b>``). The
+    branch (ADR 0036; R13) — a local sha in *births* (the caller proved origin holds no
+    gitflow branch yet, or the birth publishes nothing), from any source. The
     principal and integration branches are otherwise PR-only; *fixes* feeds the refusals'
     fix lines. Returns the first
     refusal, or ``None`` when every ref clears (the caller has already excluded tags and
@@ -196,15 +182,15 @@ def check_branch_policy(
     """
     for ref in refs:
         if not ref.remote_ref.startswith(HEADS_PREFIX):
-            return _refuse_branch(ref, None, gitflow, published, fixes)
+            return _refuse_branch(ref, None, gitflow, fixes)
         branch = ref.remote_ref[len(HEADS_PREFIX) :]
         role = gitflow.role_of(branch)
         if role in ("principal", "integration") and ref.local_sha in births:
             continue
         if role != "work":
-            return _refuse_branch(ref, branch, gitflow, published, fixes)
+            return _refuse_branch(ref, branch, gitflow, fixes)
         if not ref.local_ref.startswith(HEADS_PREFIX):
-            return _refuse_branch(ref, None, gitflow, published, fixes)
+            return _refuse_branch(ref, None, gitflow, fixes)
         if ref.local_ref != ref.remote_ref:
             return _blocked(
                 f"refspec aims '{ref.local_ref}' at remote '{ref.remote_ref}' — only "

@@ -34,6 +34,9 @@ class _FakeCanonObjectSource:
     """Maps a sha to a fixed specs/-prefixed tree-path list and an optional first
     parent — no denylist content, this fixture only exercises the canon scan step."""
 
+    def remote_branch(self, repo: Path, branch: str) -> bool:
+        return True
+
     tree_by_sha: dict[str, list[str]] = field(default_factory=dict)
     #: The paths the pushed RANGE introduces or rewrites at a sha (bug
     #: ``pre-push-canon-scan-not-range-scoped``: the canon scan reads these, never the tree).
@@ -52,6 +55,9 @@ class _FakeCanonObjectSource:
 
 
 class _FailingTreeObjectSource:
+    def remote_branch(self, repo: Path, branch: str) -> bool:
+        return True
+
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         return ()
 
