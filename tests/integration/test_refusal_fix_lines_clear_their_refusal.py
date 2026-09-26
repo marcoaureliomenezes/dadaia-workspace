@@ -185,6 +185,7 @@ def _single_fix(done: subprocess.CompletedProcess[str]) -> str:
     output = done.stdout + done.stderr
     lines = [line[len("fix: ") :] for line in output.splitlines() if line.startswith("fix: ")]
     assert len(lines) == 1, f"exactly one fix line expected, got {len(lines)}:\n{output}"
+    assert "&&" not in lines[0], f"one command per fix line (PowerShell 5.1): {lines[0]}"
     return lines[0]
 
 
@@ -392,6 +393,19 @@ def _drop_draft_term(world: World) -> None:
     (world.repo / "AGENTS.md").write_text("a\n", encoding="utf-8")
 
 
+def _no_url_no_checkout(world: World) -> list[str]:
+    world.seed(_constitution())
+    store = JsonContextStore(world.ws / ".dadaia" / "states")
+    store.update(
+        SpecContextProject("proj", ContextState.DEAD, "proj", "", "2026-01-01T00:00:00+00:00")
+    )
+    return ["context", "alive", "proj"]
+
+
+def _cloned(world: World) -> None:
+    assert (world.repo / "README.md").is_file()
+
+
 # ── dead cases ───────────────────────────────────────────────────────────────────────
 
 
@@ -481,8 +495,6 @@ _MODULES = {
     "service": _PKG / "features" / "spec_context" / "service.py",
 }
 
-_OUT_OF_SCOPE = Skip("`context alive`/`repo add` — outside the three verbs this harness owns")
-
 SITES: dict[str, tuple[Case, ...] | Skip] = {
     "branch_policy._refuse_branch#0": (Case(_birth_published, _develop_at_main, replaces=True),),
     "branch_policy._refuse_branch#1": (Case(_birth_unpublished, _baseline_done, replaces=True),),
@@ -497,7 +509,7 @@ SITES: dict[str, tuple[Case, ...] | Skip] = {
     "push_gate._run_denylist_scan#0": Skip("needs a corrupted object store; `git fsck` names it"),
     "push_gate._compose_specs_canon_refusal#0": (Case(_non_canon, _no_junk, operator=_rm_junk),),
     "push_gate.push_gate_decision#0": (Case(_malformed, _work_pushed, replaces=True),),
-    "service.SpecContextService.alive#0": _OUT_OF_SCOPE,
+    "service.SpecContextService.alive#0": (Case(_no_url_no_checkout, _cloned),),
     "service.SpecContextService.baseline#0": (Case(_no_identity, _baseline_done),),
     "service.SpecContextService._require_publishable#0": (
         Case(_foreign_change, _baseline_done),
@@ -604,3 +616,12 @@ def test_every_fix_line_prints_on_one_line_without_a_tty(tmp_path: Path) -> None
     fix = _single_fix(world.cli("context", "dead", "proj"))
     assert fix.endswith("'<keep-dir>'") or fix.endswith("<keep-dir>"), fix
     assert re.search(re.escape(str(world.repo)), fix)
+
+
+def test_the_gate_is_read_only_and_its_rewrite_fix_is_the_publish_verb(tmp_path: Path) -> None:
+    """Operator Q1 (2026-09-26): the pre-push gate writes nothing — a denylist refusal's
+    fix names ``context baseline --republish``, the one verb that publishes."""
+    world = World(tmp_path)
+    fix = _single_fix(_hit(world, _denylisted(world)))
+    assert fix == fix_line(world.ws, "context", "baseline", "proj", "--republish", "proj")
+    assert "--republish" not in world.cli("ci", "push-gate-check", "--help").stdout
