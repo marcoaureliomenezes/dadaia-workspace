@@ -309,3 +309,28 @@ def test_a_second_foreign_backup_is_published_inside_specs_bkp(env, tmp_path: Pa
     pushed = _git(bare, "ls-tree", "-r", "--name-only", "feature/0.1.0").splitlines()
     assert "specs-bkp/20260101T000000Z/features/login.md" in pushed
     assert "specs/features/login.md" not in pushed and "specs-bkp/old.md" in pushed
+
+
+def test_the_birth_is_deterministic_so_a_rerun_rebuilds_it(
+    env, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review C-B (round 5): the birth commit carries fixed dates and a fixed message —
+    two publishes of two empty remotes birth the same commit, so no rerun guesses."""
+    svc, repo, bare = env
+    for var in ("GIT_AUTHOR_DATE", "GIT_COMMITTER_DATE"):
+        monkeypatch.setenv(var, "2001-01-01T00:00:00Z")
+    _clone_onboarded(bare, repo)
+    svc.baseline("proj")
+    for var in ("GIT_AUTHOR_DATE", "GIT_COMMITTER_DATE"):
+        monkeypatch.setenv(var, "2002-02-02T00:00:00Z")
+    other = tmp_path / "other"
+    (other / "ws" / "repos").mkdir(parents=True)
+    bare2 = other / "proj.git"
+    _git(other, "init", "-q", "--bare", "-b", "main", str(bare2))
+    store = FakeContextStore()
+    store.save(SpecContextProject("proj", ContextState.ALIVE, "proj", bare2.as_uri(), "2026"))
+    svc2 = SpecContextService(store, GitSubprocessClient(), other / "ws", lambda _r: None)  # type: ignore[arg-type]
+    _clone_onboarded(bare2, other / "ws" / "repos" / "proj")
+    svc2.baseline("proj")
+    assert _heads(bare)["main"] == _heads(bare2)["main"]
+    assert _heads(bare)["feature/0.1.0"] == _heads(bare2)["feature/0.1.0"]

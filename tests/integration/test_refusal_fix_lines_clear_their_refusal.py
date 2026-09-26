@@ -29,13 +29,17 @@ import subprocess
 import sys
 import sysconfig
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import pytest
 
 from dadaia_workspace.core.cli_line import cli_path, fix_line
-from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
+from dadaia_workspace.core.models.spec_context import (
+    AssociatedRepo,
+    ContextState,
+    SpecContextProject,
+)
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.spec_context.service import install_git_hooks
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
@@ -49,7 +53,12 @@ pytestmark = [
 
 _PKG = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 _TERM = "zorblaxquux"
-_FILLS = {"<M.m.p>": "1.0.0", "<user.name>": "T", "<user.email>": "t@example.invalid"}
+_FILLS = {
+    "<M.m.p>": "1.0.0",
+    "<user.name>": "T",
+    "<user.email>": "t@example.invalid",
+    "<other-name>": "kept",
+}
 
 
 def _constitution(
@@ -252,14 +261,37 @@ def _published(world: World) -> None:
 
 
 def _outside(world: World) -> str:
+    """Review H-C (P4): the refused ref is not the checked-out one."""
     _published(world)
     world.commit("notes.md", "n\n", branch="topic")
-    return "git push -q origin HEAD"
+    world.git(world.repo, "checkout", "-q", "main")
+    return "git push -q origin topic"
+
+
+def _outside_with_work(world: World) -> str:
+    """Review H-C: a live work branch exists — the fix carries the ref onto it."""
+    _published(world)
+    world.git(world.repo, "branch", "feature/1.0.0", "origin/develop")
+    return _outside_after(world)
+
+
+def _outside_after(world: World) -> str:
+    world.commit("notes.md", "n\n", branch="topic")
+    world.git(world.repo, "checkout", "-q", "main")
+    return "git push -q origin topic"
+
+
+def _outside_detached(world: World) -> str:
+    _published(world)
+    world.commit("notes.md", "n\n", branch="topic")
+    world.git(world.repo, "checkout", "-q", "--detach")
+    world.git(world.repo, "branch", "-q", "-D", "topic")
+    return "git push -q origin HEAD:refs/heads/topic"
 
 
 def _work_carries_topic(world: World) -> None:
-    heads = world.remote_heads()
-    assert heads.get("feature/1.0.0") == world.git(world.repo, "rev-parse", "HEAD")
+    tip = world.remote_heads()["feature/1.0.0"]
+    assert "notes.md" in world.git(world.repo, "ls-tree", "--name-only", tip).splitlines()
 
 
 def _mismatch(world: World) -> str:
@@ -341,6 +373,60 @@ def _no_junk(world: World) -> None:
     assert "specs/junk.md" not in world.git(world.repo, "ls-tree", "-r", "--name-only", tip)
 
 
+def _denylisted_in_a_worktree(world: World) -> str:
+    """Review H-B (P10): the pushing repo is a worktree under repos/<slug>/."""
+    _published(world)
+    world.deny()
+    wt = world.repo / ".claude" / "worktrees" / "agent-x"
+    world.git(world.repo, "worktree", "add", "-q", "-b", "feature/1.0.0", str(wt), "origin/develop")
+    (wt / "notes.md").write_text(f"a {_TERM} b\n", encoding="utf-8")
+    world.git(wt, "add", "notes.md")
+    world.git(wt, "commit", "-qm", "n")
+    return f"git -C {wt} push -q origin feature/1.0.0"
+
+
+def _drop_worktree_term(world: World) -> None:
+    (world.repo / ".claude" / "worktrees" / "agent-x" / "notes.md").write_text("a b\n")
+
+
+def _worktree_clean(world: World) -> None:
+    tip = world.remote_heads()["feature/1.0.0"]
+    assert _TERM not in world.git(world.repo, "log", "-p", tip, "--not", "origin/develop")
+    assert "notes.md" in world.git(world.repo, "ls-tree", "--name-only", tip).splitlines()
+
+
+def _denylisted_no_context(world: World) -> str:
+    """Review deferred LOW (P6): no context owns the pushing repo — the fix adopts it,
+    never a `<context>` placeholder."""
+    command = _denylisted(world)
+    JsonContextStore(world.ws / ".dadaia" / "states").delete("proj")
+    return command
+
+
+def _assoc_unpublished(world: World) -> str:
+    """Review C-A (P1): an associated repo with an empty remote births on its own."""
+    _published(world)
+    bare = world.tmp / "web.git"
+    world.git(world.tmp, "init", "-q", "--bare", "-b", "main", str(bare))
+    store = JsonContextStore(world.ws / ".dadaia" / "states")
+    ctx = store.get("proj")
+    assert ctx is not None
+    store.update(replace(ctx, associated_repos=(AssociatedRepo("web", bare.as_uri()),)))
+    web = world.ws / "repos" / "web"
+    world.git(world.tmp, "clone", "-q", bare.as_uri(), str(web))
+    install_git_hooks(web)
+    (web / "app.py").write_text("x\n", encoding="utf-8")
+    world.git(web, "add", "app.py")
+    world.git(web, "commit", "-qm", "code")
+    return f"git -C {web} push -q origin main"
+
+
+def _assoc_published(world: World) -> None:
+    out = world.git(world.tmp / "web.git", "for-each-ref", "--format=%(refname:lstrip=2)")
+    assert {"main", "develop", "feature/0.1.0"} <= set(out.split()), out
+    assert world.git(world.tmp / "web.git", "ls-tree", "main") == ""
+
+
 # ── baseline cases ───────────────────────────────────────────────────────────────────
 
 
@@ -404,6 +490,91 @@ def _no_url_no_checkout(world: World) -> list[str]:
 
 def _cloned(world: World) -> None:
     assert (world.repo / "README.md").is_file()
+
+
+def _work_name_taken_locally(world: World) -> list[str]:
+    """Review C-B (P9): the operator's own branch carries the minted work name."""
+    world.clone()
+    world.commit("app.py", "x\n", branch="feature/0.1.0")
+    world.onboard()
+    return ["context", "baseline", "proj"]
+
+
+def _work_name_taken_everywhere(world: World) -> list[str]:
+    """Review P3: the minted name exists locally and on origin with operator content."""
+    world.seed(None, "main")
+    world.clone()
+    world.commit("notes.md", "n\n", branch="feature/0.1.0")
+    world.git(world.repo, "push", "-q", "origin", "feature/0.1.0")
+    world.git(world.repo, "checkout", "-q", "main")
+    world.onboard()
+    return ["context", "baseline", "proj"]
+
+
+def _work_name_on_origin_only(world: World) -> list[str]:
+    """Review P3b: the minted name exists only on origin."""
+    command = _work_name_taken_everywhere(world)
+    world.git(world.repo, "branch", "-q", "-D", "feature/0.1.0")
+    return command
+
+
+def _republish_non_ff(world: World) -> list[str]:
+    """Review H-A: the republish push is rejected non-fast-forward."""
+    _on_work(world)
+    _advance_origin_work(world)
+    world.commit("notes.md", "n\n")
+    return ["context", "baseline", "proj", str(world.repo), "--republish"]
+
+
+def _advance_origin_work(world: World) -> None:
+    other = world.tmp / "other"
+    world.git(world.tmp, "clone", "-q", "-b", "feature/1.0.0", world.bare.as_uri(), str(other))
+    (other / "x.md").write_text("x\n", encoding="utf-8")
+    world.git(other, "add", "x.md")
+    world.git(other, "commit", "-qm", "x")
+    world.git(other, "push", "-q", "origin", "feature/1.0.0")
+
+
+def _both_on_work(world: World) -> None:
+    tip = world.remote_heads()["feature/1.0.0"]
+    names = world.git(world.bare, "ls-tree", "--name-only", tip).splitlines()
+    assert {"x.md"} <= set(names) and ("notes.md" in names or not world.repo.exists())
+
+
+def _no_checkout(world: World) -> list[str]:
+    """Review M-A (P7a)."""
+    world.seed(_constitution())
+    return ["context", "baseline", "proj"]
+
+
+def _unregistered_repo(world: World) -> list[str]:
+    """Review M-A (P7b): the named repo is no repo of the context."""
+    world.seed(_constitution())
+    world.clone()
+    return ["context", "baseline", "proj", "nope"]
+
+
+def _nope_cloned(world: World) -> None:
+    assert (world.ws / "repos" / "nope" / "README.md").is_file()
+
+
+def _unknown_context(world: World) -> list[str]:
+    """Review M-A (P7c)."""
+    world.seed(_constitution())
+    JsonContextStore(world.ws / ".dadaia" / "states").delete("proj")
+    return ["context", "baseline", "proj"]
+
+
+def _alive_remote_gone(world: World) -> list[str]:
+    world.seed(_constitution())
+    store = JsonContextStore(world.ws / ".dadaia" / "states")
+    store.update(
+        SpecContextProject(
+            "proj", ContextState.DEAD, "proj", world.bare.as_uri(), "2026-01-01T00:00:00+00:00"
+        )
+    )
+    world.bare.rename(world.tmp / "away.git")
+    return ["context", "alive", "proj"]
 
 
 # ── dead cases ───────────────────────────────────────────────────────────────────────
@@ -479,6 +650,21 @@ def _dead_denylisted(world: World) -> list[str]:
     _on_work(world)
     world.deny()
     (world.repo / "README.md").write_text(f"a {_TERM}\n", encoding="utf-8")
+    return ["context", "dead", "proj"]
+
+
+def _dead_non_ff(world: World) -> list[str]:
+    """Review H-A (P2): dead's push is rejected non-fast-forward."""
+    _on_work(world)
+    _advance_origin_work(world)
+    (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
+    return ["context", "dead", "proj"]
+
+
+def _dead_clean_detached(world: World) -> list[str]:
+    """Review LOW (P8): a clean published detached HEAD has nothing to push."""
+    _published(world)
+    world.git(world.repo, "checkout", "-q", "--detach", "origin/main")
     return ["context", "dead", "proj"]
 
 
@@ -579,6 +765,41 @@ _CASES = [
     if not isinstance(entry, Skip)
     for n, case in enumerate(entry)
 ]
+
+
+_ROUND5 = {
+    "outside": Case(_outside, _work_carries_topic, then="git push -q origin feature/1.0.0"),
+    "outside-work": Case(
+        _outside_with_work, _work_carries_topic, then="git push -q origin feature/1.0.0"
+    ),
+    "outside-detached": Case(
+        _outside_detached, _work_carries_topic, then="git push -q origin feature/1.0.0"
+    ),
+    "worktree": Case(_denylisted_in_a_worktree, _worktree_clean, operator=_drop_worktree_term),
+    "no-context": Case(_denylisted_no_context, _clean_publish, operator=_drop_term),
+    "assoc": Case(_assoc_unpublished, _assoc_published, replaces=True),
+    "work-local": Case(_work_name_taken_locally, _baseline_done),
+    "work-everywhere": Case(_work_name_taken_everywhere, _baseline_done),
+    "work-origin": Case(_work_name_on_origin_only, _baseline_done),
+    "republish-non-ff": Case(_republish_non_ff, _both_on_work),
+    "dead-non-ff": Case(_dead_non_ff, _dead_done),
+    "no-checkout": Case(_no_checkout, _cloned),
+    "unregistered": Case(_unregistered_repo, _nope_cloned),
+    "unknown-context": Case(_unknown_context, _cloned),
+    "alive-remote-gone": Case(_alive_remote_gone, _cloned, operator=_remote_back, replaces=True),
+}
+
+
+@pytest.mark.parametrize("key", sorted(_ROUND5))
+def test_round5(key: str, tmp_path: Path) -> None:
+    _drive(World(tmp_path), _ROUND5[key])
+
+
+def test_dead_leaves_a_clean_published_detached_head(tmp_path: Path) -> None:
+    world = World(tmp_path)
+    done = _hit(world, _dead_clean_detached(world))
+    assert done.returncode == 0, done.stdout + done.stderr
+    _dead_done(world)
 
 
 @pytest.mark.parametrize("case", _CASES)
