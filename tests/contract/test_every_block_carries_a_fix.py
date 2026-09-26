@@ -28,10 +28,9 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core import doctor_rules
-from dadaia_workspace.core.cli_line import cli_path
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObject
-from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_stdin
 from dadaia_workspace.features.specs.canon import canon_violations
@@ -40,7 +39,7 @@ from dadaia_workspace.hooks import pre_gate
 _FIX_LINE_RE = re.compile(r"^fix: (\S.*)$", re.MULTILINE)
 
 #: The workspace CLI as a fix line spells it, relative to its root (``fix_line``).
-_CLI = str(cli_path(Path()))
+_CLI = fix_line(Path())
 
 _SHA_A = "a" * 40
 _ZERO = "0" * 40
@@ -89,9 +88,7 @@ def _assert_one_command(command: str) -> None:
     the operator pastes. Prose ("author the missing document", "fix it and then push")
     does not: an agent cannot run it, so the BLOCK is a Stall with a friendly face.
     """
-    # Windows fix lines follow MSVCRT quoting (backslash paths), which POSIX shlex eats.
-    windows = bool(PLATFORM.venv_exe_suffix)
-    head = shlex.split(command, posix=not windows)[0].strip('"')
+    head = shlex.split(command)[0]  # every host spells paths with forward slashes
     if head.endswith(_CLI):  # ``fix_line`` roots the CLI at the workspace it runs in
         head = ".dadaia/.venv/bin/dadaia"
     assert head in _EXECUTABLE_TOKENS, (

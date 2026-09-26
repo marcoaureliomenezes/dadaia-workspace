@@ -1,8 +1,10 @@
 """The ONE spelling of the workspace CLI (ADR 0045): its absolute path and the fix lines
 that invoke it. Every ``fix:`` naming the CLI is built here, so it runs from any cwd:
 ``shlex`` on POSIX; on Windows forward slashes and double quotes only around a blank —
-the one form Git Bash, cmd and PowerShell all run (a quoted executable, i.e. a workspace
-path holding a blank, needs PowerShell's ``& `` prefix: the documented limitation).
+the one form Git Bash (Claude Code's Windows shell), cmd and PowerShell all run — proven
+by executing it in each (``tests/contract/test_fix_line_runs_in_every_shell.py``). A
+quoted executable, i.e. a workspace path holding a blank, needs PowerShell's ``& ``
+prefix: the documented limitation.
 """
 
 from __future__ import annotations
