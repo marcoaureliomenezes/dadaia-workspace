@@ -144,8 +144,12 @@ def _push(branch: str, sha: str) -> str:
 
 
 def _write_constitution(repo: Path, text: str) -> None:
+    """Committed: the gate reads HEAD's constitution, never the working tree (ADR 0048)."""
     (repo / "specs").mkdir()
     (repo / "specs" / "constitution.md").write_text(text, encoding="utf-8")
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@t.invalid"]
+    subprocess.run([*git, "add", "specs"], cwd=repo, check=True, capture_output=True)
+    subprocess.run([*git, "commit", "-qm", "c"], cwd=repo, check=True, capture_output=True)
 
 
 def test_a_custom_gitflow_governs_the_push(tmp_path: Path) -> None:
