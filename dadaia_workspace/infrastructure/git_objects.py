@@ -870,6 +870,13 @@ def _read_blobs(
         yield from _read_blob_chunk(repo, chunk, blob_info, prior_texts, multi_path_shas)
 
 
+def unpublished(repo: Path, rev: str) -> list[str]:
+    """The commits of *rev* no remote holds, newest first — the ONE "already published"
+    rule (:func:`_base_exclusions`) the push gate and ``context baseline --republish``
+    share."""
+    return _range_commit_shas(repo, rev, _base_exclusions(repo, ZERO_SHA))
+
+
 class GitSubprocessObjectReader:
     """Subprocess-backed push-range object reader (SPEC v0.9.0 FR1/FR7; ADR-0001: the
     sole adapter — no ``GitObjectReader`` port)."""
@@ -881,7 +888,7 @@ class GitSubprocessObjectReader:
         if not _SHA_SHAPE_RE.match(sha):
             return False
         try:
-            commits = _range_commit_shas(repo, sha, _base_exclusions(repo, ZERO_SHA))
+            commits = unpublished(repo, sha)
         except GitObjectReadError:
             return False
         if len(commits) != 1:

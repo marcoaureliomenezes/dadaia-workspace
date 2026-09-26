@@ -1,6 +1,7 @@
 """GitSubprocessClient — git operations via stdlib subprocess."""
 
 import logging
+import os
 import subprocess
 from collections.abc import Sequence
 from pathlib import Path
@@ -11,9 +12,13 @@ logger = logging.getLogger(__name__)
 
 
 def _run(
-    args: list[str], cwd: Path | None = None, stdin: str | None = None
+    args: list[str],
+    cwd: Path | None = None,
+    stdin: str | None = None,
+    env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(args, cwd=cwd, capture_output=True, text=True, input=stdin)
+    environ = {**os.environ, **env} if env else None
+    return subprocess.run(args, cwd=cwd, capture_output=True, text=True, input=stdin, env=environ)
 
 
 def _has_embedded_git(directory: Path) -> bool:
@@ -229,26 +234,21 @@ class GitSubprocessClient:
         return bool(result.stdout.strip())
 
     def unpushed(self, path: Path) -> bool:
-        """Whether :meth:`push` has anything to push: no upstream, or commits ahead of it."""
-        ahead = _run(["git", "rev-list", "--count", "@{u}..HEAD"], cwd=path)
+        """Whether HEAD carries a commit no ``origin`` remote-tracking ref holds."""
+        ahead = _run(["git", "rev-list", "--count", "HEAD", "--not", "--remotes=origin"], path)
         return ahead.returncode != 0 or ahead.stdout.strip() != "0"
 
     def push(self, path: Path) -> None:
-        # Bug 4 fix: detect whether an upstream tracking branch is configured.
-        # If not, use ``git push -u origin <branch>`` to set it on first push.
+        """Publish HEAD's unpushed commits: on its upstream by the explicit refspec
+        ``HEAD:<upstream-branch>`` (``push.default=simple`` refuses a differently named
+        upstream), else ``-u origin <branch>``; nothing unpushed, nothing run."""
+        if not self.unpushed(path):
+            return
         tracking = _run(["git", "rev-parse", "--abbrev-ref", "@{u}"], cwd=path)
         if tracking.returncode != 0:
-            # No upstream tracking branch — set it during push
             branch = self.current_branch(path)
             result = _run(["git", "push", "-u", "origin", branch], cwd=path)
         else:
-            # v0.1.50 FR3 (bug context-dead-plain-git-push-fails-mismatched-upstream):
-            # skip entirely when there is nothing to push, and push with an EXPLICIT
-            # refspec ``HEAD:<upstream-branch>`` — plain ``git push`` fails under
-            # ``push.default=simple`` whenever the upstream branch name differs from
-            # the local one.
-            if not self.unpushed(path):
-                return
             upstream = tracking.stdout.strip()  # e.g. "origin/main"
             remote, _, remote_branch = upstream.partition("/")
             result = _run(["git", "push", remote, f"HEAD:{remote_branch}"], cwd=path)
@@ -256,9 +256,12 @@ class GitSubprocessClient:
         if result.returncode != 0:
             raise GitSyncError(f"git push failed in {path}:\n{result.stderr.strip()}")
 
-    def git(self, path: Path, *args: str, stdin: str | None = None) -> str:
-        """One git command in *path*: its stripped stdout, else ``GitSyncError``."""
-        result = _run(["git", *args], cwd=path, stdin=stdin)
+    def git(
+        self, path: Path, *args: str, stdin: str | None = None, env: dict[str, str] | None = None
+    ) -> str:
+        """One git command in *path* (*env* over the process environment): its stripped
+        stdout, else ``GitSyncError``."""
+        result = _run(["git", *args], cwd=path, stdin=stdin, env=env)
         if result.returncode != 0:
             raise GitSyncError(f"git {args[0]} failed in {path}: {result.stderr.strip()}")
         return result.stdout.strip()
