@@ -212,5 +212,5 @@ def gate_fixes() -> Any:
     return GateFixes(
         repo="/repo",
         publish=fix_line(None, "context", "baseline", "proj"),
-        republish=fix_line(None, "ci", "push-gate-check", "--republish", "--repo", "/repo"),
+        republish=fix_line(None, "context", "baseline", "proj", "--republish", "repo"),
     )

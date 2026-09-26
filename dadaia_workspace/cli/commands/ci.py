@@ -6,7 +6,6 @@ import subprocess
 import sys
 from collections.abc import Iterable
 from dataclasses import replace
-from functools import partial
 from pathlib import Path
 
 import typer
@@ -115,41 +114,16 @@ def _gate_inputs(repo_root: Path) -> tuple[Gitflow, GateFixes]:
     gitflow, warning = project_gitflow(build_git_client(), repo_root, main)
     if warning:
         typer.echo(f"[pre-push] WARNING: {warning}", err=True)
+    publish = ("context", "baseline", context or "<context>")
     return gitflow, GateFixes(
         repo=str(repo_root),
-        publish=fix_line(workspace, "context", "baseline", context or "<context>"),
-        republish=fix_line(
-            workspace, "ci", "push-gate-check", "--republish", "--repo", str(repo_root)
-        ),
-    )
-
-
-def _republish(repo: Path) -> None:
-    """Squash the branch's unpublished commits and its tracked edits into ONE commit on
-    what the remotes already have — the fix a denylist or canon refusal names."""
-    from dadaia_workspace.container import build_git_client
-
-    git = partial(build_git_client().git, repo)
-    unpublished = git("rev-list", "--reverse", "HEAD", "--not", "--remotes").split()
-    if not unpublished:
-        typer.echo("Nothing unpublished on this branch.")
-        return
-    parent = git("rev-list", "--parents", "-n1", unpublished[0]).split()[1:2]
-    git("add", "-u")
-    tree = git("write-tree")
-    message = "chore: republish without the refused content"
-    squashed = git("commit-tree", tree, *(["-p", *parent] if parent else []), "-m", message)
-    git("reset", "--soft", squashed)
-    typer.echo(
-        f"{len(unpublished)} unpublished commit(s) squashed into {squashed[:12]}; push again."
+        publish=fix_line(workspace, *publish),
+        republish=fix_line(workspace, *publish, "--republish", repo_root.name),
     )
 
 
 @app.command("push-gate-check")
 def push_gate_check(
-    republish: bool = typer.Option(
-        False, "--republish", help="Squash the unpublished range (the refusal's fix) and exit."
-    ),
     repo: Path | None = typer.Option(None, "--repo", help="Target repo. Default: cwd's repo."),
 ) -> None:
     """Pre-push gate: branch policy by the project gitflow + the range-scoped denylist scan.
@@ -178,9 +152,6 @@ def push_gate_check(
     from dadaia_workspace.features.specs.canon import canon_violations
 
     repo_root = repo or _repo_root()
-    if republish:
-        _republish(repo_root)
-        return
 
     # Bug pre-push-canon-scan-not-range-scoped (operator ruling 2026-09-13): the v6
     # canon is a property of a v6 tree. A specs/ tree still stamped below

@@ -135,7 +135,7 @@ def _compose_denylist_refusal(
     )
     lines.append(
         "Remove the term from the listed file(s), then squash the unpublished range into "
-        f"one commit and push again:\nfix: {republish}"
+        f"one commit and push it:\nfix: {republish}"
     )
     return "\n".join(lines)
 
@@ -299,7 +299,7 @@ def _compose_specs_canon_refusal(violations: list[tuple[PushRef, str]], republis
     )
     lines.append(
         "git rm the listed specs/ path(s), then squash the unpublished range into one "
-        f"commit and push again:\nfix: {republish}"
+        f"commit and push it:\nfix: {republish}"
     )
     return "\n".join(lines)
 

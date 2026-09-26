@@ -401,11 +401,18 @@ def baseline(
     message: str = typer.Option(
         "chore: publish the dadaia specs", "--message", help="Commit message."
     ),
+    republish: str = typer.Option(
+        "",
+        "--republish",
+        metavar="SLUG",
+        help="The pre-push gate's rewrite fix: squash repo SLUG's unpublished range "
+        "into one commit and push it.",
+    ),
 ) -> None:
     """Publish the onboarded project: principal + integration branches, then the work
     branch carrying specs/. Running it is the consent; a re-run is a no-op."""
     try:
-        work = _ctx_service().baseline(name, message=message)
+        work = _ctx_service().baseline(name, message=message, republish=republish)
     except (DadaiaError, OSError) as exc:
         fail(exc)
     done = f"published on {work}" if work else "already published — nothing to do"

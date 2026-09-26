@@ -503,16 +503,8 @@ class SpecContextService:
         for repo in self._backfilled(ctx).all_repos():
             repo_dest = self._repo_path(repo.slug)
             if not repo_dest.exists():
-                if not repo.url:
-                    if repo.slug == ctx.repo_slug:
-                        steps = (f"delete {name}", f"create {name} --main-repo <clone-url>")
-                    else:
-                        steps = (
-                            f"repo remove {name} {repo.slug}",
-                            f"repo add {name} {repo.slug} --url <clone-url>",
-                        )
-                    ws = self._workspace_root
-                    fix = " && ".join(fix_line(ws, "context", *step.split()) for step in steps)
+                if not repo.url:  # a checkout there is adopted, its origin back-filled
+                    fix = shell_line("git", "clone", "<clone-url>", str(repo_dest))
                     raise RepoUrlMissingError(
                         f"'{repo.slug}' has no clone URL and no checkout at repos/{repo.slug} "
                         f"— 'context alive {name}' cannot obtain it.\nfix: {fix}"
@@ -567,13 +559,22 @@ class SpecContextService:
 
     # ------------------------------------------------------------------ baseline
 
-    def baseline(self, name: str, *, message: str = "chore: publish the dadaia specs") -> str:
+    def baseline(
+        self, name: str, *, message: str = "chore: publish the dadaia specs", republish: str = ""
+    ) -> str:
         """Publish an onboarded project (ADRs 0035, 0042) and return its work branch: the
         work commit (the integration tip plus the onboarding paths) is built and checked
         out BEFORE the pushes of the contentless births and of the work branch, so the
         gate reads, committed at HEAD, the very gitflow read here (ADR 0048). Invoking
-        it is the consent; a published project is a no-op (``""``)."""
-        repo = self._repo_path(self.show(name).repo_slug)
+        it is the consent; a published project is a no-op (``""``). *republish* (a repo
+        slug of the set) is the pre-push gate's rewrite fix instead: that repo's
+        unpublished commits and tracked edits squash into ONE commit on what the remotes
+        hold, pushed on its branch — the gate itself writes nothing (operator 2026-09-26)."""
+        ctx = self.show(name)
+        slug = republish or ctx.repo_slug
+        if slug not in {r.slug for r in ctx.all_repos()}:
+            raise AssociatedRepoNotFoundError(f"'{slug}' is not a repo of context '{name}'.")
+        repo = self._repo_path(slug)
         if not repo.is_dir() or not self._git.is_git_root(repo):
             raise ContextStateError(f"Context '{name}' has no Git repository at '{repo}'.")
         git = partial(self._git.git, repo)
@@ -585,8 +586,14 @@ class SpecContextService:
             key = "user.email" if named else "user.name"
             fix = shell_line("git", "-C", str(repo), "config", key, f"<{key}>")
             raise ContextStateError(f"Context '{name}': {exc}\nfix: {fix}") from None
-        self._require_publishable(name, repo)
+        rerun = ("--republish", slug) if republish else ()
         try:
+            if republish:
+                work = self._squash_unpublished(repo)
+                if work:
+                    git("push", "-u", "origin", work)
+                return work
+            self._require_publishable(name, repo)
             git("fetch", "--prune", "--tags", "origin")
             flow, _ = read_gitflow(repo / "specs")
             if self._git.published(repo, flow.integration):
@@ -597,10 +604,10 @@ class SpecContextService:
             tags = (_TAG_RE.fullmatch(t) for t in git("tag", "--sort=-v:refname").split())
             last = next((m for m in tags if m), None)
             work = f"{flow.work_prefix}{f'{last[1]}.{last[2]}.{int(last[3]) + 1}' if last else '0.1.0'}"
-            rerun = self._git.current_branch(repo) == work  # a failed push left it built
+            rebuilt = self._git.current_branch(repo) == work  # a failed push left it built
             if flow.principal in heads:
                 base = git("rev-parse", f"origin/{flow.principal}")
-            elif rerun:
+            elif rebuilt:
                 base = git("rev-list", "--max-parents=0", "HEAD").split()[-1]
             else:
                 tree = git("hash-object", "-t", "tree", "--stdin", stdin="")
@@ -611,7 +618,7 @@ class SpecContextService:
                 if branch not in heads
             ]
             paths = [p for p in _ONBOARDING if (repo / p).exists()]
-            if rerun:
+            if rebuilt:
                 self._git.commit_paths(repo, message, paths)
             else:
                 start = f"origin/{flow.integration}" if flow.integration in heads else base
@@ -624,9 +631,25 @@ class SpecContextService:
             git("push", "-u", "origin", work)
         except GitSyncError as exc:
             raise _sync_failure(
-                exc, fix_line(self._workspace_root, "context", "baseline", name)
+                exc, fix_line(self._workspace_root, "context", "baseline", name, *rerun)
             ) from None
         return work
+
+    def _squash_unpublished(self, repo: Path) -> str:
+        """Squash *repo*'s commits no remote holds, plus its tracked edits, into one
+        commit on their published parent; return the branch (``""``: nothing to squash)."""
+        git = partial(self._git.git, repo)
+        unpublished = git("rev-list", "--reverse", "HEAD", "--not", "--remotes").split()
+        if not unpublished:
+            return ""
+        parent = git("rev-list", "--parents", "-n1", unpublished[0]).split()[1:2]
+        git("add", "-u")
+        message = "chore: republish without the refused content"
+        squashed = git(
+            "commit-tree", git("write-tree"), *[a for p in parent for a in ("-p", p)], "-m", message
+        )
+        git("reset", "--soft", squashed)
+        return self._git.current_branch(repo) or "HEAD"
 
     def _require_publishable(self, name: str, repo: Path) -> None:
         """Refuse, before any write, a change outside the onboarding paths (born repos:
