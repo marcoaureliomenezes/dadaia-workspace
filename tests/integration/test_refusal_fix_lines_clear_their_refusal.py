@@ -71,7 +71,7 @@ class World:
         self.repo = self.ws / "repos" / "proj"
         self.bare = tmp / "proj.git"
         self.elsewhere = tmp / "elsewhere"
-        self.elsewhere.mkdir()
+        self.elsewhere.mkdir(parents=True)
         (self.ws / "repos").mkdir(parents=True)
         (self.ws / ".dadaia" / "states").mkdir(parents=True)
         self.env = {k: v for k, v in os.environ.items() if k not in ("COLUMNS", "LINES")}
@@ -230,8 +230,7 @@ def _drive(world: World, case: Case) -> None:
         for placeholder, value in world.fills.items():
             line = line.replace(placeholder, value)
         assert "<" not in line.replace("<<", ""), f"an undocumented placeholder: {line}"
-        cwd = world.repo if world.repo.is_dir() else world.elsewhere
-        ran = world.run(line, cwd)
+        ran = world.run(line, world.elsewhere)  # a fix line runs from any cwd
         assert ran.returncode == 0, f"the fix does not run:\n{line}\n{ran.stdout}{ran.stderr}"
         if case.replaces and step == 0:
             case.done(world)
@@ -362,8 +361,12 @@ def _foreign_change(world: World) -> list[str]:
 def _secret_draft(world: World) -> list[str]:
     world.clone()
     world.onboard()
-    (world.repo / "specs" / "notes.md").write_text(f"key {aws_key_shape()}\n", encoding="utf-8")
+    (world.repo / "AGENTS.md").write_text(f"key {aws_key_shape()}\n", encoding="utf-8")
     return ["context", "baseline", "proj"]
+
+
+def _drop_secret(world: World) -> None:
+    (world.repo / "AGENTS.md").write_text("key\n", encoding="utf-8")
 
 
 def _remote_gone(world: World) -> list[str]:
@@ -381,12 +384,12 @@ def _baseline_denylisted(world: World) -> list[str]:
     world.clone()
     world.onboard()
     world.deny()
-    (world.repo / "specs" / "notes.md").write_text(f"a {_TERM}\n", encoding="utf-8")
+    (world.repo / "AGENTS.md").write_text(f"a {_TERM}\n", encoding="utf-8")
     return ["context", "baseline", "proj"]
 
 
 def _drop_draft_term(world: World) -> None:
-    (world.repo / "specs" / "notes.md").write_text("a\n", encoding="utf-8")
+    (world.repo / "AGENTS.md").write_text("a\n", encoding="utf-8")
 
 
 # ── dead cases ───────────────────────────────────────────────────────────────────────
@@ -481,12 +484,10 @@ _MODULES = {
 _OUT_OF_SCOPE = Skip("`context alive`/`repo add` — outside the three verbs this harness owns")
 
 SITES: dict[str, tuple[Case, ...] | Skip] = {
-    "branch_policy._refuse_branch#0": (
-        Case(_birth_published, _develop_at_main, replaces=True),
-        Case(_birth_unpublished, _baseline_done, replaces=True),
-    ),
-    "branch_policy._refuse_branch#1": (Case(_outside, _work_carries_topic),),
-    "branch_policy._refuse_branch#2": Skip("`gh pr create` needs GitHub; the PR path is the fix"),
+    "branch_policy._refuse_branch#0": (Case(_birth_published, _develop_at_main, replaces=True),),
+    "branch_policy._refuse_branch#1": (Case(_birth_unpublished, _baseline_done, replaces=True),),
+    "branch_policy._refuse_branch#2": (Case(_outside, _work_carries_topic),),
+    "branch_policy._refuse_branch#3": Skip("`gh pr create` needs GitHub; the PR path is the fix"),
     "branch_policy.check_branch_policy#0": (
         Case(_mismatch, _work_pushed, then="git push -q origin feature/1.0.0"),
     ),
@@ -500,12 +501,12 @@ SITES: dict[str, tuple[Case, ...] | Skip] = {
     "service.SpecContextService.baseline#0": (Case(_no_identity, _baseline_done),),
     "service.SpecContextService._require_publishable#0": (
         Case(_foreign_change, _baseline_done),
-        Case(_secret_draft, _baseline_done),
+        Case(_secret_draft, _baseline_done, operator=_drop_secret),
     ),
     "service._sync_failure#0": (
-        Case(_remote_gone, _baseline_done, operator=_remote_back),
+        Case(_remote_gone, _baseline_done, operator=_remote_back, replaces=True),
         Case(_baseline_denylisted, _baseline_done, operator=_drop_draft_term),
-        Case(_dead_remote_gone, _dead_done, operator=_remote_back),
+        Case(_dead_remote_gone, _dead_done, operator=_remote_back, replaces=True),
         Case(_dead_denylisted, _dead_done, operator=_drop_readme_term),
     ),
     "service.SpecContextService._enforce_dead_review_gate#0": Skip(

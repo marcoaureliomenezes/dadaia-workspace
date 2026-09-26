@@ -94,7 +94,7 @@ def test_dead_refuses_to_delete_a_repo_it_could_never_clone_back(tmp_path: Path)
     _run(["git", "init", str(lib_path)])
     service.alive("proj")
 
-    with pytest.raises(RepoUrlMissingError, match=r"fix: git -C repos/lib remote add origin"):
+    with pytest.raises(RepoUrlMissingError, match=r"fix: git -C \S+/repos/lib remote add origin"):
         service.dead("proj", commit=True)
 
     assert lib_path.is_dir() and (ws / "repos" / "main").is_dir()

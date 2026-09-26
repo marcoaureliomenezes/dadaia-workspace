@@ -23,6 +23,7 @@ from dadaia_workspace.core.models.git_scan import ScannedObject
 from dadaia_workspace.features.chokepoints import Decision, push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_stdin
 from dadaia_workspace.features.specs.canon import canon_violations
+from tests.fakes import gate_fixes
 
 _SHA_A = "a" * 40
 _ZERO = "0" * 40
@@ -57,7 +58,7 @@ def _decide(refs: list[PushRef], root: Path, flow: Gitflow = DEFAULT, **kwargs: 
     kwargs.setdefault("object_source", _EmptyObjectSource())
     kwargs.setdefault("repo", root)
     kwargs.setdefault("canon_violations_fn", canon_violations)
-    return push_gate_decision(refs, gitflow=flow, **kwargs)
+    return push_gate_decision(refs, gitflow=flow, fixes=gate_fixes(), **kwargs)
 
 
 def _refs(*lines: str) -> list[PushRef]:
@@ -126,13 +127,8 @@ def test_a_branch_outside_the_gitflow_is_refused_naming_the_work_branch(
     for word in (flow.principal, flow.integration, flow.work_prefix):
         assert word in decision.message
     work = f"{flow.work_prefix}<M.m.p>"
-    assert _fix(decision) == [
-        "git",
-        "checkout",
-        "-b",
-        work,
-        flow.principal,
-    ]  # one command: no `&&` (Windows PowerShell 5.1)
+    # One command, from any cwd, carrying the current work (cut from HEAD): no `&&`.
+    assert _fix(decision) == ["git", "-C", "/repo", "checkout", "-b", work]
 
 
 def test_the_default_names_are_ordinary_branches_under_a_custom_gitflow(tmp_path: Path) -> None:
@@ -167,16 +163,17 @@ def test_a_birth_carrying_a_commit_is_refused_naming_a_birth_at_the_other_publis
     decision = _decide(_push(branch), tmp_path, flow, object_source=source)
     assert not decision.allowed
     assert _fix(decision) == [
-        "git", "push", "origin", f"refs/remotes/origin/{tip}:refs/heads/{branch}",
+        "git", "-C", "/repo", "push", "origin", f"refs/remotes/origin/{tip}:refs/heads/{branch}",
     ]  # fmt: skip
 
 
 @_FLOWS
 def test_a_birth_fix_never_names_an_absent_remote_ref(tmp_path: Path, flow: Gitflow) -> None:
-    """ADR 0048: with no published other role the fix is the work-branch route."""
+    """ADR 0048: with no published other role the fix is the first publish (review H:
+    the old work-branch route named a branch no command had cut)."""
     decision = _decide(_push(flow.principal), tmp_path, flow)
     assert not decision.allowed
-    assert _fix(decision) == ["git", "push", "origin", flow.work_pattern]
+    assert _fix(decision) == shlex.split(gate_fixes().publish)
 
 
 def test_an_existing_principal_is_never_a_birth(tmp_path: Path) -> None:
@@ -233,7 +230,7 @@ def test_pushing_feature_branch_to_a_foreign_remote_ref_is_refused(tmp_path: Pat
     decision = _decide(_push("work/0.0.1", "work/0.0.2"), tmp_path, _CUSTOM)
     assert not decision.allowed
     assert "refs/heads/work/0.0.2" in decision.message
-    assert _fix(decision) == ["git", "push", "origin", "work/0.0.2:work/0.0.2"]
+    assert _fix(decision) == ["git", "-C", "/repo", "branch", "-m", "work/0.0.1", "work/0.0.2"]
     assert not _decide(_push("work/0.0.1", "next"), tmp_path, _CUSTOM).allowed
 
 
@@ -242,17 +239,4 @@ def test_detached_head_ref_gets_a_pushable_branch_diagnosis(tmp_path: Path) -> N
     outcome needs the right words."""
     decision = _decide(_refs(f"HEAD {_SHA_A} refs/heads/work/0.0.1 {_ZERO}"), tmp_path, _CUSTOM)
     assert not decision.allowed
-    assert _fix(decision)[:4] == ["git", "checkout", "-b", "work/<M.m.p>"]
-
-
-@pytest.mark.parametrize("remote_sha", [_ZERO, _SHA_B], ids=["new-branch", "existing"])
-def test_a_rewrite_refusal_fix_is_non_interactive(tmp_path: Path, remote_sha: str) -> None:
-    """Review L1: the range-rewrite fix squashes the refused range onto what the remote
-    already has — no `git rebase -i`, which an agent cannot drive."""
-    from dadaia_workspace.features.chokepoints.push_gate import _rewrite_fix
-
-    ref = PushRef("refs/heads/work/0.0.1", _SHA_A, "refs/heads/work/0.0.1", remote_sha)
-    base = remote_sha if remote_sha != _ZERO else "refs/remotes/origin/next"
-    argv = shlex.split(_rewrite_fix(ref, _CUSTOM))
-    assert argv[:4] == ["git", "reset", "--soft", base] and "-i" not in argv
-    assert argv[4:7] == ["&&", "git", "commit"]
+    assert _fix(decision) == ["git", "-C", "/repo", "checkout", "-b", "work/<M.m.p>"]

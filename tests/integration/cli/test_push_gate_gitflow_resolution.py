@@ -51,14 +51,14 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def test_a_branch_without_specs_reads_the_newest_published_constitution(
     repo: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    assert ci._gitflow_for(repo) == Gitflow("trunk", "next", "work/")
+    assert ci._gate_inputs(repo)[0] == Gitflow("trunk", "next", "work/")
     assert "WARNING" not in capsys.readouterr().err
 
 
 def test_heads_constitution_wins_over_the_working_tree(repo: Path) -> None:
     _git(repo, "checkout", "-q", "trunk")
     (repo / "specs" / "constitution.md").write_text("# an uncommitted edit\n", encoding="utf-8")
-    assert ci._gitflow_for(repo) == Gitflow("trunk", "next", "work/")
+    assert ci._gate_inputs(repo)[0] == Gitflow("trunk", "next", "work/")
 
 
 def test_no_committed_constitution_is_the_default_with_one_warning(
@@ -69,5 +69,5 @@ def test_no_committed_constitution_is_the_default_with_one_warning(
     _git(tmp_path, "init", "-q", str(bare))
     (bare / "specs").mkdir()
     (bare / "specs" / "constitution.md").write_text(_CUSTOM, encoding="utf-8")  # untracked
-    assert ci._gitflow_for(bare) == DEFAULT
+    assert ci._gate_inputs(bare)[0] == DEFAULT
     assert capsys.readouterr().err.count("WARNING") == 1

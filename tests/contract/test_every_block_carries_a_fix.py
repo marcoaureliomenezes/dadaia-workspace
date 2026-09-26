@@ -35,6 +35,7 @@ from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_stdin
 from dadaia_workspace.features.specs.canon import canon_violations
 from dadaia_workspace.hooks import pre_gate
+from tests.fakes import gate_fixes
 
 _FIX_LINE_RE = re.compile(r"^fix: (\S.*)$", re.MULTILINE)
 
@@ -189,6 +190,7 @@ def _decide(
     decision = push_gate_decision(
         refs,
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source or _FakeObjectSource(),
         repo=Path("/nonexistent-repo"),
         canon_violations_fn=canon_violations,

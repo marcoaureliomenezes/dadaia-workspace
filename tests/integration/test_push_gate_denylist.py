@@ -23,6 +23,7 @@ from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef
 from dadaia_workspace.features.specs.canon import canon_violations
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
+from tests.fakes import gate_fixes
 
 _SYNTHETIC_TERM = "zz-frozen-invariant-term"
 _ZERO = "0" * 40
@@ -80,6 +81,7 @@ def test_git_mv_into_archive_produces_no_new_blob_and_a_clean_scan(tmp_path: Pat
     decision = push_gate_decision(
         [_tag_push_ref(renamed_sha, remote_sha=already_published_sha)],
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=reader,
         repo=repo,
         canon_violations_fn=canon_violations,
@@ -109,6 +111,7 @@ def test_editing_a_path_that_already_published_the_value_no_longer_refuses(
     decision = push_gate_decision(
         [_tag_push_ref(edited_sha, remote_sha=already_published_sha)],
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=reader,
         repo=repo,
         canon_violations_fn=canon_violations,
@@ -139,6 +142,7 @@ def test_editing_a_tests_fixture_that_already_published_the_literal_no_longer_re
     decision = push_gate_decision(
         [_tag_push_ref(edited_sha, remote_sha=already_published_sha)],
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=reader,
         repo=repo,
         canon_violations_fn=canon_violations,
@@ -164,6 +168,7 @@ def test_same_value_introduced_into_a_new_path_still_refuses(tmp_path: Path) -> 
     decision = push_gate_decision(
         [_tag_push_ref(tip_sha, remote_sha=already_published_sha)],
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=reader,
         repo=repo,
         canon_violations_fn=canon_violations,
@@ -224,6 +229,7 @@ def test_new_branch_push_of_an_already_published_term_passes(tmp_path: Path) -> 
     decision = push_gate_decision(
         [_feature_push_ref(tip_sha)],
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=reader,
         repo=repo,
         canon_violations_fn=canon_violations,
@@ -250,6 +256,7 @@ def test_new_branch_push_of_a_novel_term_still_refuses(tmp_path: Path) -> None:
     decision = push_gate_decision(
         [_feature_push_ref(tip_sha)],
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=reader,
         repo=repo,
         canon_violations_fn=canon_violations,
@@ -293,6 +300,7 @@ def test_prior_side_lookup_failure_refuses_naming_the_failure_and_no_verify(
     decision = push_gate_decision(
         [_tag_push_ref(tip_sha, remote_sha=already_published_sha)],
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=reader,
         repo=repo,
         canon_violations_fn=canon_violations,
@@ -313,6 +321,7 @@ def test_real_git_failure_refuses_naming_the_failure(tmp_path: Path) -> None:
     decision = push_gate_decision(
         [_tag_push_ref("a" * 40)],
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=reader,
         repo=not_a_repo,
         canon_violations_fn=canon_violations,

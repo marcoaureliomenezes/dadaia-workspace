@@ -14,13 +14,14 @@ into ``__init__.py`` (which itself re-exports from this module, never the revers
 from __future__ import annotations
 
 import re
-import shlex
 from dataclasses import dataclass
 
+from dadaia_workspace.core.cli_line import shell_line
 from dadaia_workspace.core.gitflow import Gitflow
 
 __all__ = [
     "Decision",
+    "GateFixes",
     "PushRef",
     "check_branch_policy",
     "parse_push_stdin",
@@ -118,15 +119,24 @@ HEADS_PREFIX = "refs/heads/"
 _LAW = "project gitflow: specs/constitution.md"
 
 
-def _blocked(text: str, fix: list[str]) -> Decision:
+@dataclass(frozen=True)
+class GateFixes:
+    """What a refusal's fix line names beyond the gitflow — built by the composition
+    root, the one place that knows them: the repo (every git fix is ``git -C <repo>``,
+    so it runs from any cwd) and the workspace-CLI lines to publish and republish."""
+
+    repo: str
+    publish: str
+    republish: str
+
+
+def _blocked(text: str, fix: str) -> Decision:
     """One refusal with one single-command fix (no ``&&``: Windows PowerShell 5.1)."""
-    return Decision(
-        allowed=False, message=f"[pre-push] BLOCKED: {text} ({_LAW}).\nfix: {shlex.join(fix)}"
-    )
+    return Decision(allowed=False, message=f"[pre-push] BLOCKED: {text} ({_LAW}).\nfix: {fix}")
 
 
 def _refuse_branch(
-    ref: PushRef, branch: str | None, gitflow: Gitflow, published: frozenset[str]
+    ref: PushRef, branch: str | None, gitflow: Gitflow, published: frozenset[str], fixes: GateFixes
 ) -> Decision:
     """Actionable refusal for a non-pushable ref (*branch* ``None``: not a branch head);
     a fix names a remote-tracking ref only when it is in *published* (ADR 0048)."""
@@ -134,31 +144,44 @@ def _refuse_branch(
     work = gitflow.work_pattern
     if role is not None and ref.remote_sha == ZERO_SHA:
         other = gitflow.integration if role == "principal" else gitflow.principal
-        source = f"refs/remotes/origin/{other}:{HEADS_PREFIX}{branch}"
+        if other in published:
+            return _blocked(
+                f"creating the {role} branch '{branch}' would publish new objects — a birth "
+                f"carries only published history: birth it at the published '{other}' tip",
+                shell_line(
+                    "git",
+                    "-C",
+                    fixes.repo,
+                    "push",
+                    "origin",
+                    f"refs/remotes/origin/{other}:{ref.remote_ref}",
+                ),  # fmt: skip
+            )
         return _blocked(
-            f"creating the {role} branch '{branch}' would publish new objects — a birth may "
-            "carry only already-published history; carry new work on a work branch "
-            + (f"and birth it at the published '{other}' tip" if other in published else ""),
-            ["git", "push", "origin", source if other in published else work],
+            f"creating the {role} branch '{branch}' would publish new objects — the first "
+            "publish births both gitflow branches contentless and carries the work on a "
+            "work branch",
+            fixes.publish,
         )
     if role is None:
         return _blocked(
             f"ref '{ref.local_ref}' is outside the gitflow — principal '{gitflow.principal}', "
             f"integration '{gitflow.integration}', work '{work}'; only a work branch is "
-            "pushable: cut one, then push it",
-            ["git", "checkout", "-b", work, gitflow.principal],
+            "pushable: carry this work on one, then push it",
+            shell_line("git", "-C", fixes.repo, "checkout", "-b", work),
         )
     head = gitflow.integration if role == "principal" else work
     return _blocked(
         f"the {role} branch '{branch}' is never pushed directly — it advances only via a PR "
         f"from '{head}'",
-        ["gh", "pr", "create", "--base", str(branch), "--head", head],
+        shell_line("gh", "pr", "create", "--base", str(branch), "--head", head),
     )
 
 
 def check_branch_policy(
     refs: list[PushRef],
     gitflow: Gitflow,
+    fixes: GateFixes,
     births: frozenset[str] = frozenset(),
     published: frozenset[str] = frozenset(),
 ) -> Decision | None:
@@ -166,25 +189,35 @@ def check_branch_policy(
     pushed from the SAME-named local head, or the birth of the principal/integration
     branch (ADR 0036) — a local sha in *births* (the caller proved it creates the remote
     branch and publishes nothing), from any source (``<sha>:refs/heads/<b>``). The
-    principal and integration branches are otherwise PR-only. Returns the first
+    principal and integration branches are otherwise PR-only; *fixes* feeds the refusals'
+    fix lines. Returns the first
     refusal, or ``None`` when every ref clears (the caller has already excluded tags and
     deletions from *refs*).
     """
     for ref in refs:
         if not ref.remote_ref.startswith(HEADS_PREFIX):
-            return _refuse_branch(ref, None, gitflow, published)
+            return _refuse_branch(ref, None, gitflow, published, fixes)
         branch = ref.remote_ref[len(HEADS_PREFIX) :]
         role = gitflow.role_of(branch)
         if role in ("principal", "integration") and ref.local_sha in births:
             continue
         if role != "work":
-            return _refuse_branch(ref, branch, gitflow, published)
+            return _refuse_branch(ref, branch, gitflow, published, fixes)
         if not ref.local_ref.startswith(HEADS_PREFIX):
-            return _refuse_branch(ref, None, gitflow, published)
+            return _refuse_branch(ref, None, gitflow, published, fixes)
         if ref.local_ref != ref.remote_ref:
             return _blocked(
                 f"refspec aims '{ref.local_ref}' at remote '{ref.remote_ref}' — only "
-                f"refs/heads/{branch} → refs/heads/{branch} is pushable",
-                ["git", "push", "origin", f"{branch}:{branch}"],
+                f"refs/heads/{branch} → refs/heads/{branch} is pushable: name the local "
+                "branch as the remote one, then push it",
+                shell_line(
+                    "git",
+                    "-C",
+                    fixes.repo,
+                    "branch",
+                    "-m",
+                    ref.local_ref[len(HEADS_PREFIX) :],
+                    branch,
+                ),  # fmt: skip
             )
     return None

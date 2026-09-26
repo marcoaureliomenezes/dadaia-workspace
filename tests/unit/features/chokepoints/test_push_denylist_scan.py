@@ -19,6 +19,7 @@ from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObj
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_stdin
 from dadaia_workspace.features.specs.canon import canon_violations
+from tests.fakes import gate_fixes
 
 _SHA_A = "a" * 40
 _SHA_B = "b" * 40
@@ -77,6 +78,7 @@ def test_branch_push_with_denylisted_blob_in_range_is_refused(tmp_path: Path) ->
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -98,6 +100,7 @@ def test_term_outside_the_range_does_not_refuse(tmp_path: Path) -> None:
     decision = push_gate_decision(
         _refs(f"refs/tags/v9.9.9 {_SHA_A} refs/tags/v9.9.9 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -116,6 +119,7 @@ def test_deletion_ref_is_never_scanned(tmp_path: Path) -> None:
     decision = push_gate_decision(
         _refs(f"refs/heads/old {_ZERO} refs/heads/old {_SHA_A}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -144,6 +148,7 @@ def test_shared_blob_across_two_refs_is_deduped(tmp_path: Path) -> None:
             f"refs/tags/v2 {_SHA_B} refs/tags/v2 {_ZERO}",
         ),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -165,6 +170,7 @@ def test_tainted_tag_push_is_refused(tmp_path: Path) -> None:
     decision = push_gate_decision(
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -183,6 +189,7 @@ def test_clean_tag_push_is_allowed_with_no_verdict_required(tmp_path: Path) -> N
     decision = push_gate_decision(
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -202,6 +209,7 @@ def test_branch_policy_refusal_precedes_the_scan(tmp_path: Path) -> None:
     decision = push_gate_decision(
         _refs(f"refs/heads/main {_SHA_A} refs/heads/main {'b' * 40}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -224,6 +232,7 @@ def test_refusal_message_shape_and_ten_item_cap(tmp_path: Path) -> None:
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -236,7 +245,7 @@ def test_refusal_message_shape_and_ten_item_cap(tmp_path: Path) -> None:
     assert "z…m" in message  # masked form of the synthetic term.
     assert "operator denylist" in message
     assert "dd-release-implementation §2a" in message
-    assert "git reset --soft" in message and "rebase -i" not in message
+    assert message.endswith(f"fix: {gate_fixes().republish}")
     assert "already-published history never needs a rewrite" in message
     assert "2 more" in message or "and 2" in message  # 12 hits, 10 shown, 2 remainder.
     assert _SYNTHETIC_TERM not in message
@@ -251,6 +260,7 @@ def test_git_object_read_failure_refuses_naming_the_failure(tmp_path: Path) -> N
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=_FailingObjectSource(),
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -285,6 +295,7 @@ def test_generator_denylist_terms_still_refuses_not_silently_emptied(tmp_path: P
     decision = push_gate_decision(
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -391,6 +402,7 @@ def test_oversized_note_appears_in_decision_warn_on_allow(tmp_path: Path) -> Non
     decision = push_gate_decision(
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -414,6 +426,7 @@ def test_oversized_note_appears_in_decision_warn_on_refuse(tmp_path: Path) -> No
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -442,6 +455,7 @@ def test_refusal_path_segment_matching_an_operator_term_is_masked(tmp_path: Path
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -461,6 +475,7 @@ def test_refusal_path_with_no_matching_segment_is_byte_identical(tmp_path: Path)
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -479,6 +494,7 @@ def test_oversized_note_path_segment_is_masked_too(tmp_path: Path) -> None:
     decision = push_gate_decision(
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -526,6 +542,7 @@ def test_refusal_path_segment_uppercase_hyphenated_variant_of_term_is_masked(
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -560,6 +577,7 @@ def test_git_object_read_failure_at_a_denylisted_path_masks_the_path(tmp_path: P
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=_FailingObjectSourceWithPath(),
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -587,6 +605,7 @@ def test_same_offending_segment_gets_the_same_ordinal_across_hit_and_note(
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -627,6 +646,7 @@ def test_push_with_denylisted_term_only_in_a_commit_message_body_is_refused(
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -634,5 +654,5 @@ def test_push_with_denylisted_term_only_in_a_commit_message_body_is_refused(
     )
     assert not decision.allowed
     assert _SYNTHETIC_TERM not in decision.message  # never unmasked
-    assert "squash the pushed range" in decision.message  # a fresh message heals it
+    assert "squash the unpublished range" in decision.message  # a fresh message heals it
     assert "--no-verify" in decision.message

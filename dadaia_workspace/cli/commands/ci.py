@@ -5,6 +5,8 @@ from __future__ import annotations
 import subprocess
 import sys
 from collections.abc import Iterable
+from dataclasses import replace
+from functools import partial
 from pathlib import Path
 
 import typer
@@ -18,7 +20,7 @@ from dadaia_workspace.container import is_source_repo_root as _is_source_repo_ro
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import CiPreflightScopeError
 from dadaia_workspace.core.gitflow import Gitflow
-from dadaia_workspace.core.specs_version import read_gitflow
+from dadaia_workspace.features.chokepoints.branch_policy import GateFixes
 from dadaia_workspace.features.ci_preflight import (
     all_passed,
     checks_for,
@@ -26,7 +28,7 @@ from dadaia_workspace.features.ci_preflight import (
     run_preflight,
     subprocess_runner,
 )
-from dadaia_workspace.features.spec_context.service import install_git_hooks
+from dadaia_workspace.features.spec_context.service import install_git_hooks, project_gitflow
 
 app = typer.Typer(help="Local CI-equivalent preflight gate + git-hook chokepoints.")
 
@@ -102,31 +104,54 @@ def _no_canon_violations(paths: Iterable[str]) -> list[str]:
     return []
 
 
-def _gitflow_for(repo_root: Path) -> Gitflow:
-    """ADR 0048, once per push: ``specs/constitution.md`` at HEAD, else the newest on a
-    remote-tracking ref, else the owning context's main-repo constitution (an associated
-    repo), else the default with one warning."""
+def _gate_inputs(repo_root: Path) -> tuple[Gitflow, GateFixes]:
+    """The gitflow through the ONE reader (ADR 0048: committed first, one warning on the
+    default) and the fix lines the gate's refusals name."""
     from dadaia_workspace.container import build_git_client
 
     workspace = resolve_workspace_root_for_cli(repo_root)
     context = alive_context_owning_repo(workspace, repo_root)
-    text = build_git_client().committed_text(repo_root, "specs/constitution.md")
-    specs_dir = repo_root / "specs"
-    if text is None and context:
-        specs_dir = resolve_context_specs_dir_for_cli(workspace, context)
-    gitflow, warning = read_gitflow(specs_dir, "" if text is None and not context else text)
+    main = resolve_context_specs_dir_for_cli(workspace, context).parent if context else None
+    gitflow, warning = project_gitflow(build_git_client(), repo_root, main)
     if warning:
-        fix = (
-            f"\nfix: {fix_line(workspace, 'specs', 'init', '--context', context)}"
-            if context
-            else ""
-        )
-        typer.echo(f"[pre-push] WARNING: {warning}{fix}", err=True)
-    return gitflow
+        typer.echo(f"[pre-push] WARNING: {warning}", err=True)
+    return gitflow, GateFixes(
+        repo=str(repo_root),
+        publish=fix_line(workspace, "context", "baseline", context or "<context>"),
+        republish=fix_line(
+            workspace, "ci", "push-gate-check", "--republish", "--repo", str(repo_root)
+        ),
+    )
+
+
+def _republish(repo: Path) -> None:
+    """Squash the branch's unpublished commits and its tracked edits into ONE commit on
+    what the remotes already have — the fix a denylist or canon refusal names."""
+    from dadaia_workspace.container import build_git_client
+
+    git = partial(build_git_client().git, repo)
+    unpublished = git("rev-list", "--reverse", "HEAD", "--not", "--remotes").split()
+    if not unpublished:
+        typer.echo("Nothing unpublished on this branch.")
+        return
+    parent = git("rev-list", "--parents", "-n1", unpublished[0]).split()[1:2]
+    git("add", "-u")
+    tree = git("write-tree")
+    message = "chore: republish without the refused content"
+    squashed = git("commit-tree", tree, *(["-p", *parent] if parent else []), "-m", message)
+    git("reset", "--soft", squashed)
+    typer.echo(
+        f"{len(unpublished)} unpublished commit(s) squashed into {squashed[:12]}; push again."
+    )
 
 
 @app.command("push-gate-check")
-def push_gate_check() -> None:
+def push_gate_check(
+    republish: bool = typer.Option(
+        False, "--republish", help="Squash the unpublished range (the refusal's fix) and exit."
+    ),
+    repo: Path | None = typer.Option(None, "--repo", help="Target repo. Default: cwd's repo."),
+) -> None:
     """Pre-push gate: branch policy by the project gitflow + the range-scoped denylist scan.
 
     Branch model: the constitution's gitflow block (`dd-gitflow-default`).
@@ -142,6 +167,7 @@ def push_gate_check() -> None:
     bypass. No repo or context name is a term source.
     """
     from dadaia_workspace.container import (
+        build_git_client,
         build_git_object_reader,
         load_denylist_baseline_patterns,
         load_denylist_terms,
@@ -151,7 +177,10 @@ def push_gate_check() -> None:
     from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
     from dadaia_workspace.features.specs.canon import canon_violations
 
-    repo_root = _repo_root()
+    repo_root = repo or _repo_root()
+    if republish:
+        _republish(repo_root)
+        return
 
     # Bug pre-push-canon-scan-not-range-scoped (operator ruling 2026-09-13): the v6
     # canon is a property of a v6 tree. A specs/ tree still stamped below
@@ -185,12 +214,20 @@ def push_gate_check() -> None:
 
     stdin_text = sys.stdin.read() if not sys.stdin.isatty() else ""
     refs, malformed = parse_push_stdin(stdin_text)
+    # `git push origin HEAD` names its source "HEAD": the branch checked out IS that ref.
+    branch = build_git_client().current_branch(repo_root)
+    refs = [
+        replace(r, local_ref=f"refs/heads/{branch}") if r.local_ref == "HEAD" and branch else r
+        for r in refs
+    ]
+    gitflow, fixes = _gate_inputs(repo_root)
     decision = push_gate_decision(
         refs,
         object_source=build_git_object_reader(),
         repo=repo_root,
         canon_violations_fn=canon_fn,
-        gitflow=_gitflow_for(repo_root),
+        gitflow=gitflow,
+        fixes=fixes,
         malformed_lines=malformed,
         denylist_terms=denylist_terms,
         baseline_patterns=baseline_patterns,

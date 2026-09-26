@@ -14,18 +14,19 @@ is a CLI defect, never a bypass.
 
 from __future__ import annotations
 
-import shlex
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from dadaia_workspace.core.cli_line import shell_line
 from dadaia_workspace.core.gitflow import Gitflow
 from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObject
 from dadaia_workspace.features.chokepoints.branch_policy import (
     HEADS_PREFIX,
     ZERO_SHA,
     Decision,
+    GateFixes,
     PushRef,
     check_branch_policy,
 )
@@ -103,21 +104,8 @@ def _annotate_skip(
     return Decision(allowed=decision.allowed, message=decision.message, warn=warn)
 
 
-def _rewrite_fix(ref: PushRef, gitflow: Gitflow) -> str:
-    """Squash the refused range onto what the remote already has — non-interactive."""
-    base = (
-        ref.remote_sha
-        if ref.remote_sha != ZERO_SHA
-        else f"refs/remotes/origin/{gitflow.integration}"
-    )
-    reset = shlex.join(["git", "reset", "--soft", base])
-    return f"{reset} && " + shlex.join(
-        ["git", "commit", "-m", "chore: republish without the refused content"]
-    )
-
-
 def _compose_denylist_refusal(
-    hits: list[tuple[PushRef, Hit]], path_masker: PathMasker, gitflow: Gitflow
+    hits: list[tuple[PushRef, Hit]], path_masker: PathMasker, republish: str
 ) -> str:
     """FR5: ref, path:line, short blob sha, masked term + source layer, the law, the
     edit + rewrite-before-push remediation, ``--no-verify``, capped at 10 hits.
@@ -146,8 +134,8 @@ def _compose_denylist_refusal(
         "`git push --no-verify` (discouraged; leaves a reflog trace)."
     )
     lines.append(
-        "Remove the term from the listed file(s), then squash the pushed range and push "
-        f"again:\nfix: {_rewrite_fix(hits[0][0], gitflow)}"
+        "Remove the term from the listed file(s), then squash the unpublished range into "
+        f"one commit and push again:\nfix: {republish}"
     )
     return "\n".join(lines)
 
@@ -216,7 +204,7 @@ def _run_denylist_scan(
     repo: Path,
     terms: Iterable[tuple[str, str]],
     patterns: Iterable[BaselinePatternLike],
-    gitflow: Gitflow,
+    republish: str,
 ) -> _RangeScan:
     """Run the FR1/FR2 scan over *scan_refs* — every non-deletion ref, tags included.
 
@@ -279,7 +267,7 @@ def _run_denylist_scan(
     oversized_notes = tuple(oversized_all)
     refusal = (
         Decision(
-            allowed=False, message=_compose_denylist_refusal(per_ref_hits, path_masker, gitflow)
+            allowed=False, message=_compose_denylist_refusal(per_ref_hits, path_masker, republish)
         )
         if per_ref_hits
         else None
@@ -289,7 +277,7 @@ def _run_denylist_scan(
     )
 
 
-def _compose_specs_canon_refusal(violations: list[tuple[PushRef, str]], gitflow: Gitflow) -> str:
+def _compose_specs_canon_refusal(violations: list[tuple[PushRef, str]], republish: str) -> str:
     """FR2 (v0.5.0 specs-canon closure): ref, the offending ``specs/``-relative path,
     the law, one fix hint per offending path, ``--no-verify``, capped at 10 hits —
     the SAME shape :func:`_compose_denylist_refusal` uses."""
@@ -310,8 +298,8 @@ def _compose_specs_canon_refusal(violations: list[tuple[PushRef, str]], gitflow:
         "`git push --no-verify` (discouraged; leaves a reflog trace)."
     )
     lines.append(
-        "git rm the listed specs/ path(s), then squash the pushed range and push again:\n"
-        f"fix: {_rewrite_fix(violations[0][0], gitflow)}"
+        "git rm the listed specs/ path(s), then squash the unpublished range into one "
+        f"commit and push again:\nfix: {republish}"
     )
     return "\n".join(lines)
 
@@ -338,7 +326,7 @@ def _run_specs_canon_scan(
     scan_refs: list[PushRef],
     specs_paths_by_ref: dict[str, list[str]],
     canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
-    gitflow: Gitflow,
+    republish: str,
 ) -> Decision | None:
     """SPEC v0.5.0 specs-canon closure (operator ruling 2026-08-28), range-scoped since
     2026-09-13: every ``specs/`` path the pushed range introduces or rewrites
@@ -355,7 +343,7 @@ def _run_specs_canon_scan(
         violations.extend((ref, path) for path in sorted(bad))
     if not violations:
         return None
-    return Decision(allowed=False, message=_compose_specs_canon_refusal(violations, gitflow))
+    return Decision(allowed=False, message=_compose_specs_canon_refusal(violations, republish))
 
 
 def push_gate_decision(
@@ -365,6 +353,7 @@ def push_gate_decision(
     repo: Path,
     canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
     gitflow: Gitflow,
+    fixes: GateFixes,
     malformed_lines: int = 0,
     denylist_terms: Iterable[tuple[str, str]] = (),
     baseline_patterns: Iterable[BaselinePatternLike] = (),
@@ -395,7 +384,9 @@ def push_gate_decision(
     fails CLOSED (finding 1) and the REMOTE side of every branch-policy ref must
     match its LOCAL branch name (finding 2: a work branch aimed at the integration branch).
 
-    *object_source*, *repo*, *canon_violations_fn* and *gitflow* are
+    *fixes* carries the workspace-CLI fix lines (first publish, republish).
+
+    *object_source*, *repo*, *canon_violations_fn*, *gitflow* and *fixes* are
     REQUIRED — FR7/A7.2 (extended at v0.5.1 K7 to the canon predicates): the decision
     function always takes every external capability it needs as a parameter; an
     unwired production call site is a CLI defect, never a bypass (FR6 row 4), so there
@@ -410,7 +401,7 @@ def push_gate_decision(
                 "closed). The sanctioned, traceable emergency bypass is "
                 "`git push --no-verify` (discouraged; leaves a reflog trace).\n"
                 "Push one explicit refspec.\n"
-                f"fix: {shlex.join(['git', 'push', 'origin', gitflow.work_pattern])}"
+                f"fix: {shell_line('git', '-C', fixes.repo, 'push', 'origin', gitflow.work_pattern)}"
             ),
         )
 
@@ -425,7 +416,7 @@ def push_gate_decision(
         r.local_sha for r in unborn if object_source.publishes_nothing(repo, r.local_sha)
     )
     published = frozenset(b for b in roles if unborn and object_source.remote_branch(repo, b))
-    branch_refusal = check_branch_policy(branch_policy_refs, gitflow, births, published)
+    branch_refusal = check_branch_policy(branch_policy_refs, gitflow, fixes, births, published)
     if branch_refusal is not None:
         return branch_refusal
 
@@ -439,7 +430,7 @@ def push_gate_decision(
     # range-scoped, operator ruling 2026-09-13) and step 3 (denylist); step 2's refusal
     # still takes precedence over step 3's.
     scan = _run_denylist_scan(
-        scan_refs, object_source, repo, denylist_terms, baseline_patterns, gitflow
+        scan_refs, object_source, repo, denylist_terms, baseline_patterns, fixes.republish
     )
     if scan.read_failed and scan.refusal is not None:
         # Nothing was streamed, so the canon scan has no input either — fail closed
@@ -452,7 +443,7 @@ def push_gate_decision(
         scan_refs,
         scan.specs_paths_by_ref,
         canon_violations_fn,
-        gitflow,
+        fixes.republish,
     )
     if canon_refusal is not None:
         return _annotate_skip(

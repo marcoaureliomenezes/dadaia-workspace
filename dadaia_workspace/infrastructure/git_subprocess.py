@@ -228,6 +228,11 @@ class GitSubprocessClient:
         result = _run(["git", "remote"], cwd=path)
         return bool(result.stdout.strip())
 
+    def unpushed(self, path: Path) -> bool:
+        """Whether :meth:`push` has anything to push: no upstream, or commits ahead of it."""
+        ahead = _run(["git", "rev-list", "--count", "@{u}..HEAD"], cwd=path)
+        return ahead.returncode != 0 or ahead.stdout.strip() != "0"
+
     def push(self, path: Path) -> None:
         # Bug 4 fix: detect whether an upstream tracking branch is configured.
         # If not, use ``git push -u origin <branch>`` to set it on first push.
@@ -242,15 +247,14 @@ class GitSubprocessClient:
             # refspec ``HEAD:<upstream-branch>`` — plain ``git push`` fails under
             # ``push.default=simple`` whenever the upstream branch name differs from
             # the local one.
-            ahead = _run(["git", "rev-list", "--count", "@{u}..HEAD"], cwd=path)
-            if ahead.returncode == 0 and ahead.stdout.strip() == "0":
+            if not self.unpushed(path):
                 return
             upstream = tracking.stdout.strip()  # e.g. "origin/main"
             remote, _, remote_branch = upstream.partition("/")
             result = _run(["git", "push", remote, f"HEAD:{remote_branch}"], cwd=path)
 
         if result.returncode != 0:
-            raise GitSyncError(f"git push failed in {path}: {result.stderr.strip()}")
+            raise GitSyncError(f"git push failed in {path}:\n{result.stderr.strip()}")
 
     def git(self, path: Path, *args: str, stdin: str | None = None) -> str:
         """One git command in *path*: its stripped stdout, else ``GitSyncError``."""
@@ -270,9 +274,13 @@ class GitSubprocessClient:
         return born.returncode == 0 and result.returncode == 0 and bool(result.stdout.strip())
 
     def committed_text(self, path: Path, rel: str) -> str | None:
-        """*rel* at HEAD, else at the newest commit touching it on a remote-tracking ref
-        (ADR 0048: local, offline); ``None`` when neither carries it."""
-        newest = _run(["git", "log", "--remotes", "-n1", "--format=%H", "--", rel], cwd=path)
+        """*rel* at HEAD, else at the newest commit touching it on a local branch or an
+        ``origin`` remote-tracking ref — never another remote's (ADR 0048: local,
+        offline); ``None`` when none carries it."""
+        newest = _run(
+            ["git", "log", "--branches", "--remotes=origin", "-n1", "--format=%H", "--", rel],
+            cwd=path,
+        )
         for rev in ("HEAD", newest.stdout.strip()):
             shown = _run(["git", "show", f"{rev}:{rel}"], cwd=path)
             if rev and shown.returncode == 0:
