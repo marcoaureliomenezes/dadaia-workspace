@@ -36,10 +36,13 @@ def _workspace(root: Path) -> Path:
 
 
 def _resolve_in_child(cwd: Path, fence: str | None) -> subprocess.CompletedProcess[str]:
+    """The child keeps the suite's own fence (the interpreter's venv may be an instance's,
+    its first rung) and adds *fence*."""
     env = dict(os.environ)
-    env.pop("DADAIA_FENCED_ROOTS", None)
     if fence is not None:
-        env["DADAIA_FENCED_ROOTS"] = fence
+        env["DADAIA_FENCED_ROOTS"] = os.pathsep.join(
+            filter(None, (env.get("DADAIA_FENCED_ROOTS"), fence))
+        )
     return subprocess.run(
         [sys.executable, "-c", _PROBE],
         cwd=cwd,

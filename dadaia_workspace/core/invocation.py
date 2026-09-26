@@ -62,6 +62,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from dadaia_workspace.core import workspace_resolver
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
 from dadaia_workspace.core.session_store import live_session
@@ -284,7 +285,8 @@ def _resolve_root(*, env: Mapping[str, str], cwd: Path, target_path: Path | None
     from the target's own location FIRST — the open-bug fix: a cwd that happens to sit
     inside a nested, independently sentinel-bearing sandbox workspace must never shadow
     the real root that actually owns the target. Falls back to a cwd-based walk when no
-    target is given or the target-based walk found nothing."""
+    target is given or the target-based walk found nothing — after the running CLI's own
+    workspace (:func:`~dadaia_workspace.core.workspace_resolver.own_workspace_root`)."""
     override = env.get("WORKSPACE_ROOT")
     if override:
         return Path(override)
@@ -293,7 +295,7 @@ def _resolve_root(*, env: Mapping[str, str], cwd: Path, target_path: Path | None
         root = _root_from(start)
         if root is not None:
             return root
-    return _root_from(cwd)
+    return workspace_resolver.own_workspace_root() or _root_from(cwd)
 
 
 # ---------------------------------------------------------------------------

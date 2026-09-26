@@ -67,6 +67,9 @@ def resolve_workspace_root(cwd: Path | None = None) -> Path:
     asset projections are deliberately ignored. Only a directory that also
     has ``states/spec_contexts.json`` is accepted as a workspace root.
     """
+    own = own_workspace_root() if cwd is None else None
+    if own is not None:
+        return own
     start: Path = (cwd or Path.cwd()).resolve()
     fenced = _fenced()
 
@@ -84,22 +87,30 @@ def resolve_workspace_root(cwd: Path | None = None) -> Path:
     raise not_initialized(start, skipped)
 
 
+def own_workspace_root() -> Path | None:
+    """The workspace owning the running CLI's venv (``<ws>/.dadaia/.venv``), else ``None``:
+    the first rung, so a fix line runs from any cwd — outside any workspace or inside
+    another one. A fenced root (:data:`FENCE_ENV`) is never its own."""
+    venv = Path(sys.prefix).resolve()
+    root = venv.parent.parent
+    owned = venv.parent.name == ".dadaia" and (root / _SENTINEL).is_file()
+    return root if owned and root not in _fenced() else None
+
+
 def not_initialized(
     searched: Path, skipped: list[Path] | None = None
 ) -> WorkspaceNotInitializedError:
     """THE workspace-not-found error: the searched directory, any skipped partial
-    ``.dadaia/``, and one runnable ``fix:`` — ``cd`` to the running CLI's own workspace
-    (its venv lives at ``<root>/.dadaia/.venv``) when that root is initialized, else
-    the uvx bootstrap."""
-    own = Path(sys.prefix).resolve().parent.parent
-    fix = f"cd {own}" if (own / _SENTINEL).is_file() else "uvx dadaia-workspace init <dir>"
+    ``.dadaia/``, and one ``fix:`` — the uvx bootstrap (a CLI owning a workspace never
+    gets here: :func:`own_workspace_root` is the walk's first rung)."""
     partial = (
         f" Skipped (partial .dadaia/, no states/): {', '.join(map(str, skipped))}."
         if skipped
         else ""
     )
     return WorkspaceNotInitializedError(
-        f"No initialized workspace found from '{searched}'.{partial}\nfix: {fix}"
+        f"No initialized workspace found from '{searched}'.{partial}\n"
+        "fix: uvx dadaia-workspace init <dir>"
     )
 
 
