@@ -140,7 +140,9 @@ def test_dead_refuses_untracked_then_commit_secret_free_pushes_and_planted_secre
     assert (repo / "forgotten.txt").exists()
     assert store.get("proj").state == ContextState.ALIVE  # type: ignore[union-attr]
     # Nothing was pushed to the remote (still only the initial commit).
-    log = subprocess.run(["git", "log", "--oneline", "--all"], cwd=remote, capture_output=True, text=True)
+    log = subprocess.run(
+        ["git", "log", "--oneline", "--all"], cwd=remote, capture_output=True, text=True
+    )
     assert "auto-sync before dead" not in log.stdout
 
     # Same repo/remote, secret-free untracked content + --commit: proceeds and pushes.
@@ -153,7 +155,9 @@ def test_dead_refuses_untracked_then_commit_secret_free_pushes_and_planted_secre
     assert ctx.state == ContextState.DEAD
     assert not repo.exists()
     # The remote received the auto-sync commit carrying the new file.
-    log2 = subprocess.run(["git", "log", "--oneline", "--all"], cwd=remote, capture_output=True, text=True)
+    log2 = subprocess.run(
+        ["git", "log", "--oneline", "--all"], cwd=remote, capture_output=True, text=True
+    )
     assert "auto-sync before dead" in log2.stdout
 
     # A planted secret blocks: own repo/remote/context ("proj2").
@@ -176,7 +180,9 @@ def test_dead_refuses_untracked_then_commit_secret_free_pushes_and_planted_secre
     # Push blocked: repo kept, remote unchanged, context still ALIVE.
     assert repo3.exists()
     assert store3.get("proj").state == ContextState.ALIVE  # type: ignore[union-attr]
-    log3 = subprocess.run(["git", "log", "--oneline", "--all"], cwd=remote3, capture_output=True, text=True)
+    log3 = subprocess.run(
+        ["git", "log", "--oneline", "--all"], cwd=remote3, capture_output=True, text=True
+    )
     assert "auto-sync before dead" not in log3.stdout
 
 
