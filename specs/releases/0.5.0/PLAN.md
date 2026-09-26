@@ -151,6 +151,27 @@ user data (the provenance classifier lives in `infrastructure/workspace_guardrai
 need it injected through the container and `data/AGENTS.md` has no shipped-hashes history — growth
 for a lossless, conservative refusal).
 
+### 1.3 Round 5 — as-is review of the three REBUILD units (ADR 0041 trigger, 2026-09-26)
+
+Third rejection (review `2026-09-26T200000Z`): every round found new stalls in the same three units.
+Evidence: `specs/bugs/BUGS.jsonl` + `git log -p 5364ba0d..25fcf64a` on each file.
+
+| unit | today | bugs (ledger + review rounds) | verdict | structural cause |
+|---|---|---|---|---|
+| repo resolution (`cli/commands/ci.py` `_gate_inputs`, `cli/_specs_resolution.alive_context_owning_repo`, `service.baseline` slug lookup) | the gate derives the context from `repo_slug_under_repos(toplevel)` but the republish slug from `repo_root.name`; publish always targets the main repo; no owner → `<context>` placeholder | `push-gate-own-repo-slug-not-excluded-from-a-git-worktree-outside-repos`, `pre-push-foreign-slug-flags-already-published-sibling-name`, `push-gate-foreign-slug-layer-blocks-onboarded-specs-push`, `push-gate-foreign-slug-layer-flags-library-asset-and-bug-id-substrings`; review H-B, C-A, deferred `<context>` LOW | REBUILD | two derivations of one fact (which repo is pushing); each fix patched one of them |
+| `service.baseline` publish | births guessed by `rebuilt = current_branch == work`; only the main repo; birth commit timestamped (a rerun builds a different commit); pushes births then work separately | `baseline-refuses-alive-scaffold-commit`, `context-baseline-rejects-official-scaffold-followup`, `baseline-identity-precheck-ignores-git-env-identity`; review rounds 7599d93d, 733b34a3, 93ab8656; C-B, P3/P3b/P3c/P9 loops, origin half-publish | REBUILD | a nondeterministic build forced a guess about "our earlier build"; the guess read operator branches as ours |
+| `_sync_failure` (dead + baseline) | any git failure without a gate `fix:` → "rerun the verb" | `context-dead-pushes-an-unborn-clone` (2 fixes), `context-dead-tries-to-sync-and-push-a-clone-with-no-commits`, bug `context-dead-plain-git-push-fails-mismatched-upstream`; review H-A (non-ff loops) | REBUILD | the fix ignored the cause; only an unreachable remote is cleared by a rerun |
+| `branch_policy._refuse_branch` outside-gitflow fix | `checkout -b <work>` from HEAD | review H-C (P4: content of the refused ref lost; existing work branch → `already exists`) | UPDATE | the fix did not carry the refused ref |
+| `git_subprocess.unpushed` / `push` | "no upstream" counted as unpushed; `push -u origin ''` on detached | review LOW (P8) | UPDATE | asked about the upstream instead of `HEAD --not --remotes=origin` |
+
+Rebuild rules: one resolver `SpecContextService.owner(path)` (git common dir → `repos/<slug>` →
+registry) used by the gate, publish, republish and the birth fix; `repo_root.name` and
+`alive_context_owning_repo` deleted; `context baseline <ctx> [<repo>] [--republish]`; the birth and work
+commits are deterministic (fixed dates), so "ours" = a commit on the same start with the fixed date, and
+any other same-named local/origin branch is refused before any write; births + work go in ONE
+`push --atomic`; `_sync_failure` classifies non-fast-forward / unreachable / gate / unrecognised; the
+census walks every `raise` reachable from `alive`, `baseline`, `dead`.
+
 ### 1.2 Survey drift corrected
 
 - `DADAIA_BIN` importers are **7**, not 9–10: `hooks/venv_guard.py` and `features/ci_preflight/service.py`
