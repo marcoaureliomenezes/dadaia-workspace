@@ -14,8 +14,6 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
-import pytest
-
 from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObject
 from dadaia_workspace.features.chokepoints import push_gate_decision
@@ -38,10 +36,10 @@ class _FakeObjectSource:
 
     by_range: dict[tuple[str, str], list[ScannedObject]] = field(default_factory=dict)
     calls: list[tuple[str, str]] = field(default_factory=list)
-    boundaries: dict[str, str] = field(default_factory=dict)
+    ranges: dict[str, list[str]] = field(default_factory=dict)
 
-    def boundary(self, repo: Path, sha: str) -> str | None:
-        return self.boundaries.get(sha)
+    def unpublished(self, repo: Path, sha: str) -> list[str]:
+        return self.ranges.get(sha, [sha])
 
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         self.calls.append((local_sha, remote_sha))
@@ -244,7 +242,7 @@ def test_refusal_message_shape_and_ten_item_cap(tmp_path: Path) -> None:
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
-        fixes=gate_fixes(),
+        fixes=replace(gate_fixes(), head="main"),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -697,43 +695,36 @@ def _refuse(tmp_path: Path, line: str, head: str, source: _FakeObjectSource) -> 
 def _dirty(local: str = _SHA_A) -> _FakeObjectSource:
     return _FakeObjectSource(
         by_range={(local, _ZERO): [_obj("n.md", f"{_SYNTHETIC_TERM}\n")]},
-        boundaries={local: _SHA_B},
+        ranges={local: [local, _SHA_B]},
     )
 
 
-def test_the_rewrite_fix_resets_to_the_refused_ranges_own_boundary(tmp_path: Path) -> None:
-    """H2/H3: the published commit this range rests on — not origin/<integration>."""
+def test_the_rewrite_fix_resets_to_the_oldest_unpublished_commit_and_amends(
+    tmp_path: Path,
+) -> None:
+    """N3: one formula for every range, a root-reaching one included — reset --soft to the
+    oldest unpublished commit, edit, amend; exactly one fix line."""
     message = _refuse(
         tmp_path, f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}",
         "feature/0.0.1", _dirty(),
     )  # fmt: skip
     assert message.endswith(f"fix: git -C /repo reset --soft {_SHA_B}")
+    assert "commit --amend" in message and message.count("\nfix: ") == 1
 
 
 def test_a_refused_branch_that_is_not_checked_out_is_switched_to_first(tmp_path: Path) -> None:
     """H1: HEAD is `main` — resetting HEAD would uncommit the wrong branch."""
-    source = _dirty()
     message = _refuse(
         tmp_path, f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}",
-        "main", source,
+        "main", _dirty(),
     )  # fmt: skip
     assert message.endswith("fix: git -C /repo switch feature/0.0.1")
 
 
-@pytest.mark.parametrize(
-    ("line", "boundaries"),
-    [
-        (f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}", {}),
-        (f"refs/tags/v0.0.1 {_SHA_A} refs/tags/v0.0.1 {_ZERO}", {_SHA_A: _SHA_B}),
-    ],
-    ids=["range-reaches-a-root", "tag"],
-)
-def test_no_boundary_or_a_tag_gets_operator_action_and_no_command(
-    tmp_path: Path, line: str, boundaries: dict[str, str]
-) -> None:
-    """C1: an empty origin (the range reaches a root commit) or a tag from a detached HEAD
-    — no command uncommits only unpublished work, so none is printed."""
-    source = _dirty()
-    source.boundaries = boundaries
-    message = _refuse(tmp_path, line, "feature/0.0.1", source)
+def test_a_tag_gets_operator_action_and_no_command(tmp_path: Path) -> None:
+    """N3: a tag (like a detached HEAD, which branch policy already refuses) has no
+    branch to reset — no command is printed."""
+    message = _refuse(
+        tmp_path, f"refs/tags/v0.0.1 {_SHA_A} refs/tags/v0.0.1 {_ZERO}", "feature/0.0.1", _dirty()
+    )
     assert "Operator action" in message and "\nfix: " not in message

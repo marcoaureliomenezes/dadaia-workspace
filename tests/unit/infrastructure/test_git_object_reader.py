@@ -1654,42 +1654,37 @@ def _published_repo(tmp_path: Path) -> tuple[Path, str]:
     return repo, sha
 
 
-def test_a_commit_already_on_origin_is_its_own_boundary(tmp_path: Path) -> None:
+def test_a_commit_already_on_origin_publishes_nothing(tmp_path: Path) -> None:
     repo, sha = _published_repo(tmp_path)
-    assert GitSubprocessObjectReader().boundary(repo, sha) == sha
+    assert GitSubprocessObjectReader().unpublished(repo, sha) == []
 
 
-def test_the_boundary_is_the_parent_of_the_oldest_unpublished_commit(tmp_path: Path) -> None:
-    """C1/H3: never HEAD, never a deleted ref — the published commit the range rests on."""
-    repo, published = _published_repo(tmp_path)
-    (repo / "a.txt").write_text("second\n")
-    _commit(repo, "c2")
-    (repo / "a.txt").write_text("third\n")
-    tip = _commit(repo, "c3")
-    assert GitSubprocessObjectReader().boundary(repo, tip) == published
-
-
-def test_the_boundary_ignores_an_advanced_origin_branch(tmp_path: Path) -> None:
-    """H2: origin's integration moved on — the boundary stays where THIS range starts."""
-    repo, published = _published_repo(tmp_path)
+def test_the_unpublished_range_is_newest_first_and_ignores_an_advanced_origin(
+    tmp_path: Path,
+) -> None:
+    """H2/N3: the oldest entry is where the rewrite fix resets — never origin's tip."""
+    repo, _ = _published_repo(tmp_path)
     _git(["checkout", "-q", "-b", "topic"], repo)
     (repo / "b.txt").write_text("mine\n")
-    tip = _commit(repo, "mine")
+    oldest = _commit(repo, "mine")
+    (repo / "b.txt").write_text("more\n")
+    tip = _commit(repo, "more")
     _git(["checkout", "-q", "main"], repo)
     (repo / "dep.txt").write_text("theirs\n")
     _commit(repo, "dep")
     _git(["push", "-q", "origin", "main"], repo)
-    assert GitSubprocessObjectReader().boundary(repo, tip) == published
+    assert GitSubprocessObjectReader().unpublished(repo, tip) == [tip, oldest]
 
 
-def test_a_range_reaching_a_root_commit_has_no_boundary(tmp_path: Path) -> None:
-    """C1: nothing below it is published — no command can uncommit only unpublished work."""
+def test_a_range_reaching_a_root_commit_ends_at_the_root(tmp_path: Path) -> None:
+    """N3: an empty origin is the same formula — the oldest commit is the root."""
     repo = tmp_path / "repo"
     _init_repo(repo)
     _git(["commit", "-q", "--allow-empty", "-m", "root"], repo)
+    root = _git(["rev-parse", "HEAD"], repo).stdout.strip()
     _git(["commit", "-q", "--allow-empty", "-m", "child"], repo)
     sha = _git(["rev-parse", "HEAD"], repo).stdout.strip()
-    assert GitSubprocessObjectReader().boundary(repo, sha) is None
+    assert GitSubprocessObjectReader().unpublished(repo, sha) == [sha, root]
 
 
 def test_a_commit_only_another_remote_holds_is_still_unpublished(tmp_path: Path) -> None:
@@ -1700,12 +1695,12 @@ def test_a_commit_only_another_remote_holds_is_still_unpublished(tmp_path: Path)
     sha = _git(["rev-parse", "HEAD"], repo).stdout.strip()
     _git(["update-ref", "refs/remotes/fork/main", sha], repo)
     assert unpublished(repo, sha) == [sha]
-    assert GitSubprocessObjectReader().boundary(repo, sha) is None
     _git(["update-ref", "refs/remotes/origin/main", sha], repo)
     assert unpublished(repo, sha) == []
 
 
 @pytest.mark.parametrize("sha", ["a" * 40, "--upload-pack=evil"])
 def test_an_unresolvable_or_option_shaped_sha_fails_closed(tmp_path: Path, sha: str) -> None:
+    """Unreadable counts as unpublished: never a birth, never an empty range."""
     repo, _ = _published_repo(tmp_path)
-    assert GitSubprocessObjectReader().boundary(repo, sha) is None
+    assert GitSubprocessObjectReader().unpublished(repo, sha) == [sha]

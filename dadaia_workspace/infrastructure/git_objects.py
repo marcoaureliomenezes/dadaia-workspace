@@ -875,20 +875,13 @@ class GitSubprocessObjectReader:
     """Subprocess-backed push-range object reader (SPEC v0.9.0 FR1/FR7; ADR-0001: the
     sole adapter — no ``GitObjectReader`` port)."""
 
-    def boundary(self, repo: Path, sha: str) -> str | None:
-        """Where *sha*'s own unpublished range rests on origin: *sha* itself when origin
-        holds it (ADR 0036: a birth publishing nothing), else the published commit its
-        oldest commit sits on; ``None`` when the range reaches a root commit or git
-        cannot be read (fail closed)."""
+    def unpublished(self, repo: Path, sha: str) -> list[str]:
+        """:func:`unpublished` for the gate, failing closed: an unreadable *sha* is
+        itself unpublished — never a birth, never an empty range."""
         try:
-            if _SHA_SHAPE_RE.match(sha) is None:
-                return None
-            exclusions = _base_exclusions(repo, ZERO_SHA)
-            if not _range_commit_shas(repo, sha, exclusions):
-                return sha
-            return next(iter(_publication_boundaries(repo, sha, exclusions)), None)
+            return unpublished(repo, sha) if _SHA_SHAPE_RE.match(sha) else [sha]
         except GitObjectReadError:
-            return None
+            return [sha]
 
     def remote_branch(self, repo: Path, branch: str) -> bool:
         """``refs/remotes/origin/<branch>`` exists locally (offline)."""

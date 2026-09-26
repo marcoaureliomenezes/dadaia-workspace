@@ -54,9 +54,9 @@ class _EmptyObjectSource:
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         return ()
 
-    def boundary(self, repo: Path, sha: str) -> str | None:
+    def unpublished(self, repo: Path, sha: str) -> list[str]:
         self.asked.append(sha)
-        return sha if sha in self.contentless else None
+        return [] if sha in self.contentless else [sha]
 
 
 def _decide(refs: list[PushRef], root: Path, flow: Gitflow = DEFAULT, **kwargs: Any) -> Decision:

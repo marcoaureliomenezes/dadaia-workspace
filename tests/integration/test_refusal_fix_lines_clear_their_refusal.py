@@ -346,7 +346,7 @@ def _drop_term(world: World) -> None:
 
 
 #: The refusal's documented steps after its fix: commit the edited work, push it again.
-_COMMIT_PUSH = "git commit -qam n && git push -q origin feature/1.0.0"
+_COMMIT_PUSH = "git commit -qa --amend --no-edit && git push -q origin feature/1.0.0"
 
 
 def _clean_publish(world: World) -> None:
@@ -399,6 +399,7 @@ def _nothing_reverted(world: World) -> None:
 def _non_canon(world: World) -> str:
     _published(world)
     world.commit("specs/junk.md", "j\n", branch="feature/1.0.0")
+    world.commit("notes.md", "n\n")  # real work rides the range: the amend keeps it
     return "git push -q origin feature/1.0.0"
 
 
@@ -487,6 +488,16 @@ def _baseline_denylisted(world: World) -> list[str]:
     world.deny()
     (world.repo / "AGENTS.md").write_text(f"a {_TERM}\n", encoding="utf-8")
     return ["context", "baseline", "proj"]
+
+
+def _drop_draft_term(world: World) -> None:
+    (world.repo / "AGENTS.md").write_text("a\n", encoding="utf-8")
+
+
+#: N3: the refusal's documented step after its reset — amend — then the publish again.
+_AMEND_BASELINE = (
+    "git commit -qa --amend --no-edit && ../../.dadaia/.venv/bin/dadaia context baseline proj"
+)
 
 
 def _no_url_no_checkout(world: World) -> list[str]:
@@ -688,7 +699,7 @@ SITES: dict[str, tuple[Case, ...] | Skip] = {
             _denylisted_in_a_worktree,
             _worktree_clean,
             operator=_drop_worktree_term,
-            then="git -C .claude/worktrees/agent-x commit -qam n && "
+            then="git -C .claude/worktrees/agent-x commit -qa --amend --no-edit && "
             "git -C .claude/worktrees/agent-x push -q origin feature/1.0.0",
         ),
         Case(_denylisted_no_context, _clean_publish, operator=_drop_term, then=_COMMIT_PUSH),
@@ -696,9 +707,9 @@ SITES: dict[str, tuple[Case, ...] | Skip] = {
             _denylisted_advanced_integration,
             _nothing_reverted,
             operator=_drop_term,
-            then="git commit -qam n && git push -q origin feature/1.0.1",
+            then="git commit -qa --amend --no-edit && git push -q origin feature/1.0.1",
         ),
-        Case(_non_canon, _no_junk, operator=_rm_junk, then="git push -q origin feature/1.0.0"),
+        Case(_non_canon, _no_junk, operator=_rm_junk, then=_COMMIT_PUSH),
     ),
     "push_gate._run_denylist_scan#0": Skip("needs a corrupted object store; `git fsck` names it"),
     "push_gate.push_gate_decision#0": (Case(_malformed, _work_pushed, replaces=True),),
@@ -716,6 +727,7 @@ SITES: dict[str, tuple[Case, ...] | Skip] = {
     ),
     "service.SpecContextService.baseline#3": (
         Case(_remote_gone, _baseline_done, operator=_remote_back),
+        Case(_baseline_denylisted, _baseline_done, operator=_drop_draft_term, then=_AMEND_BASELINE),
     ),
     "service.SpecContextService._owned_slug#0": (Case(_unregistered_repo, _nope_cloned),),
     "service.SpecContextService._require_publishable#0": (
@@ -739,7 +751,13 @@ SITES: dict[str, tuple[Case, ...] | Skip] = {
     "service.SpecContextService.dead#5": (Case(_dirty_on_integration, _dead_via_work),),
     "service.SpecContextService.dead#6": (
         Case(_dead_remote_gone, _dead_done, operator=_remote_back),
-        Case(_dead_denylisted, _dead_done, operator=_drop_readme_term),
+        Case(
+            _dead_denylisted,
+            _dead_done,
+            operator=_drop_readme_term,
+            then="git commit -qa --amend --no-edit && "
+            "../../.dadaia/.venv/bin/dadaia context dead proj",
+        ),
     ),
 }
 
@@ -880,13 +898,13 @@ def test_the_gate_is_read_only_and_its_rewrite_fix_uncommits_only_unpublished_wo
     tmp_path: Path,
 ) -> None:
     """R13 rule 3 / review 5 H2: the denylist refusal's fix uncommits the refused ref's own
-    unpublished range, down to the published commit it rests on — never a squash of
+    unpublished range, down to its oldest unpublished commit (N3) — never a squash of
     published history, never a publish verb that rewrites."""
     world = World(tmp_path)
     command = _denylisted(world)
-    rests_on = world.git(world.repo, "rev-parse", "origin/develop")
+    oldest = world.git(world.repo, "rev-parse", "HEAD~1")
     fix = _single_fix(_hit(world, command))
-    assert fix == shell_line("git", "-C", str(world.repo), "reset", "--soft", rests_on)
+    assert fix == shell_line("git", "-C", str(world.repo), "reset", "--soft", oldest)
     assert "--republish" not in world.cli("context", "baseline", "--help").stdout
 
 
@@ -938,15 +956,3 @@ def test_a_typo_repo_is_never_answered_with_another_repos_publish(tmp_path: Path
     fix = _single_fix(done)
     assert done.returncode != 0 and "repo add" in fix
     assert world.remote_heads().keys() == {"main", "develop"}
-
-
-def test_a_denylisted_first_publish_names_the_operator_action_and_pushes_nothing(
-    tmp_path: Path,
-) -> None:
-    """Review 5 C1/H3: on an empty origin the range reaches a root commit — no reset or
-    ref deletion is printed; nothing reaches origin."""
-    world = World(tmp_path)
-    done = world.cli(*_baseline_denylisted(world))
-    output = done.stdout + done.stderr
-    assert done.returncode != 0 and "Operator action" in output and "\nfix: " not in output
-    assert world.remote_heads() == {}
