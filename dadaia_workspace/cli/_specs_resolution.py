@@ -41,15 +41,15 @@ from dadaia_workspace.core.invocation import resolve as _resolve_invocation
 from dadaia_workspace.core.invocation import (
     resolve_context_specs_dir as _core_resolve_context_specs_dir,
 )
+from dadaia_workspace.core.invocation import resolve_session_id as _resolve_session_id
 from dadaia_workspace.core.invocation import resolve_specs_dir as _core_resolve_specs_dir
-from dadaia_workspace.core.invocation import sanitize_session_id as _sanitize_session_id
 
 #: Re-exports so a verb never reaches ``core.invocation`` directly (FR3,
 #: ``bind-resolution-seam-is-a-single-home``). The contract takes ZERO ignore_imports,
-#: so every consumer of the harness-session-id env-var list, the sid sanitizer, or the
+#: so every consumer of the harness-session-id env-var list, the session-id rule, or the
 #: name->repo-slug mapping routes through this seam.
 HARNESS_SESSION_ID_ENV_VARS = _HARNESS_SESSION_ID_ENV_VARS
-sanitize_session_id = _sanitize_session_id
+resolve_session_id = _resolve_session_id
 alive_context_trees = _alive_context_trees
 
 

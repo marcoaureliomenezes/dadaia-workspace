@@ -13,11 +13,7 @@ from rich.console import Console
 from rich.table import Table
 
 from dadaia_workspace import container
-from dadaia_workspace.cli._specs_resolution import (
-    HARNESS_SESSION_ID_ENV_VARS,
-    alive_context_trees,
-    sanitize_session_id,
-)
+from dadaia_workspace.cli._specs_resolution import alive_context_trees, resolve_session_id
 from dadaia_workspace.cli._specs_resolution import (
     resolve_context_for_cli as _resolve_context_for_cli,
 )
@@ -150,42 +146,12 @@ def _live_session(workspace_root: Path, session_id: str) -> dict[str, Any] | Non
     return None if record is None else dict(record)
 
 
-def _harness_session_id() -> str | None:
-    """Harness-native session id from the environment ONLY (no payload — this is a CLI
-    entrypoint, not a hook). Scans the single shared env-var list
-    (:data:`~dadaia_workspace.core.invocation.HARNESS_SESSION_ID_ENV_VARS`) so the
-    harness id never drifts from what the gate/hooks read (release K1)."""
-    for name in HARNESS_SESSION_ID_ENV_VARS:
-        sanitized = sanitize_session_id(os.environ.get(name))
-        if sanitized:
-            return sanitized
-    return None
-
-
 def resolve_own_session_id(*, explicit: str | None = None, mint: bool = False) -> str | None:
-    """Resolve THIS caller's own session identity (T-50-05: the single helper every verb
-    below used to duplicate as its own copy-pasted micro-ladder).
-
-    Order: *explicit* (a verb's own CLI override, e.g. ``release --session``) -> the
-    eval-flow ``DADAIA_SESSION_ID`` (sanitized, CWE-22 — every site now gets the same
-    defence ``bind`` already had) -> the harness-native session id
-    (:func:`_harness_session_id`) -> when *mint* is set, a freshly minted ``sess_*`` id
-    (``bind``'s own fallback when a record must be created but neither channel carries
-    an identity yet — a WRITE-side concern this CLI command owns for itself, never part
-    of the read-side session-id rule, release K1). Session IDENTITY only — never a
-    context-resolution rung.
-    """
-    if explicit:
-        return explicit
-    env_sid = sanitize_session_id(os.environ.get("DADAIA_SESSION_ID"))
-    if env_sid:
-        return env_sid
-    harness_id = _harness_session_id()
-    if harness_id:
-        return harness_id
-    if mint:
-        return f"sess_{uuid.uuid4().hex[:8]}"
-    return None
+    """THIS caller's session identity: *explicit* (a verb's own override), else the ONE
+    session-id rule (:func:`core.invocation.resolve_session_id`, no payload), else — when
+    *mint* is set — a fresh ``sess_*`` id, the write-side fallback ``bind`` owns."""
+    sid = explicit or resolve_session_id(None, os.environ)
+    return sid or (f"sess_{uuid.uuid4().hex[:8]}" if mint else None)
 
 
 def print_next_step(workspace_root: Path, focus: str | None = None) -> None:
@@ -549,9 +515,8 @@ def bind(
     # harness-native id and no DADAIA_CONTEXT gets a silent no-op. stderr only, so it
     # never corrupts `eval $(dadaia context bind ... --print-env)`.
     if (
-        not _harness_session_id()
+        not resolve_session_id(None, os.environ)
         and not os.environ.get("DADAIA_CONTEXT")
-        and not os.environ.get("DADAIA_SESSION_ID")
         and not print_env
     ):
         err_console.print(
