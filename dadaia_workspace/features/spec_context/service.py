@@ -647,8 +647,8 @@ class SpecContextService:
                 return
             raise DeadReviewRequiredError(
                 f"Context '{name}': could not verify the working tree of repo "
-                f"'{repo_slug}' at '{repo_path}'. Re-run with --commit to consent to "
-                "committing+pushing any changes, or clean the tree first."
+                f"'{repo_slug}' at '{repo_path}'; consent to committing its changes.\n"
+                f"fix: {fix_line(self._workspace_root, 'context', 'dead', name, '--commit')}"
             ) from None
 
         if not untracked:
@@ -662,28 +662,25 @@ class SpecContextService:
                 f"Context '{name}': repo '{repo_slug}' has {len(untracked)} untracked "
                 f"file(s) that dead() would otherwise commit and push WITHOUT review:\n"
                 f"{listing}{more}\n"
-                "Review them, then either delete/gitignore them, or re-run with "
-                "'dadaia context dead "
-                f"{name} --commit' to explicitly consent to committing and pushing them."
+                "Review them, then delete/gitignore them or consent to committing them.\n"
+                f"fix: {fix_line(self._workspace_root, 'context', 'dead', name, '--commit')}"
             )
 
         # commit=True: scan the content of the files we are about to newly commit.
-        flagged: list[str] = []
-        for rel in untracked:
-            file_path = repo_path / rel
-            if not file_path.is_file():
-                continue
-            hits = _scan_file_for_secrets(file_path)
-            if hits:
-                flagged.append(f"  {rel}: {', '.join(sorted(set(hits)))}")
+        flagged = {
+            rel: sorted(set(hits))
+            for rel in untracked
+            if (repo_path / rel).is_file() and (hits := _scan_file_for_secrets(repo_path / rel))
+        }
         if flagged:
-            report = "\n".join(flagged)
+            report = "\n".join(f"  {rel}: {', '.join(hits)}" for rel, hits in flagged.items())
+            fix = shell_line("git", "-C", str(repo_path), "stash", "push", "-u", "--", *flagged)
             raise DeadSecretFoundError(
                 f"Context '{name}': repo '{repo_slug}' secret scan blocked dead() "
                 f"--commit. {len(flagged)} untracked file(s) match a secret/identifier "
                 "rule (values redacted):\n"
                 f"{report}\n"
-                "Remove or redact the flagged content, then re-run. Nothing was pushed."
+                f"Nothing was pushed.\nfix: {fix}"
             )
 
     def dead(self, name: str, *, commit: bool = False) -> SpecContextProject:
@@ -738,7 +735,9 @@ class SpecContextService:
                         f"Context '{name}': repo '{slug}' at '{repo_path}' has local "
                         "commits and no remote configured to receive them. dead() "
                         "refuses to remove it — configure a remote and push first, "
-                        "then retry. Nothing was touched."
+                        "then retry. Nothing was touched.\nfix: "
+                        + shell_line("git", "-C", str(repo_path), "remote", "add", "origin")
+                        + " <clone-url>"
                     )
 
         # Phase 2 — git sync + rmtree for every repo. Races are accepted by the
@@ -750,23 +749,19 @@ class SpecContextService:
             if slug == ctx.repo_slug:
                 with contextlib.suppress(Exception):
                     branch_before_sync = self._git.current_branch(repo_path)
-            if self._git.is_git_root(repo_path):
-                if self._git.is_dirty(repo_path):
-                    try:
+            # An unborn clone has nothing published to sync; a born one has a remote
+            # (Phase 1) to receive its dirty tree.
+            if self._git.is_git_root(repo_path) and self._git.has_commits(repo_path):
+                try:
+                    if self._git.is_dirty(repo_path):
                         self._git.commit_all(repo_path, "chore: auto-sync before dead")
-                    except GitSyncError as exc:
-                        raise GitSyncError(
-                            f"Git sync failed for context '{name}' repo '{slug}' at "
-                            f"'{repo_path}'. Resolve the issue and retry dead()."
-                        ) from exc
-                if self._git.has_remote(repo_path):
-                    try:
-                        self._git.push(repo_path)
-                    except GitSyncError as exc:
-                        raise GitSyncError(
-                            f"Git push failed for context '{name}' repo '{slug}' at "
-                            f"'{repo_path}'; nothing was removed.\n{exc}"
-                        ) from exc
+                    self._git.push(repo_path)
+                except GitSyncError as exc:
+                    fix = shell_line("git", "-C", str(repo_path), "remote", "set-url", "origin")
+                    raise GitSyncError(
+                        f"Git sync failed for context '{name}' repo '{slug}'; nothing was "
+                        f"removed.\n{exc}\nfix: {fix} <clone-url>"
+                    ) from exc
             sweep.rmtree(repo_path)
 
         dead_ctx = SpecContextProject(

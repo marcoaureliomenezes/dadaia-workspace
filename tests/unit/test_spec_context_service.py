@@ -118,6 +118,7 @@ def test_dead_removes_repo_syncs_dirty_pushes_and_state_error(
     assert repo.exists()
     git._dirty.add(repo)
     git._has_remote.add(repo)
+    git._has_commits.add(repo)  # born: an unborn clone has nothing to sync
 
     ctx = service.dead("proj")
 
@@ -188,6 +189,7 @@ def test_dead_with_commit_and_clean_untracked_passes(
     service.alive("proj")
     repo = workspace_root / "repos" / "my-repo"
     git._has_remote.add(repo)
+    git._has_commits.add(repo)
     git._dirty.add(repo)
     (repo / "notes.md").write_text("# just some harmless notes\nnothing secret here\n")
     git._untracked[repo] = ["notes.md"]

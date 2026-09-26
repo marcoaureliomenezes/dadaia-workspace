@@ -23,7 +23,10 @@ from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     ContextState,
     SpecContextProject,
 )
-from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
+from dadaia_workspace.features.spec_context.service import (  # noqa: E402
+    DeadReviewRequiredError,
+    SpecContextService,
+)
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
 from tests.fakes import FakeContextStore  # noqa: E402
 
@@ -107,3 +110,26 @@ def test_alive_refuses_a_legacy_url_less_missing_repo_with_a_fix_line(tmp_path: 
         service.alive("proj")
 
     assert store.get("proj").state == ContextState.DEAD  # type: ignore[union-attr]
+
+
+def test_dead_retires_an_unborn_clone_without_pushing_it(tmp_path: Path) -> None:
+    """Intent: CONTRACT — context-dead-pushes-an-unborn-clone. An unborn clone has nothing
+    published: dead removes it with no sync, even when its origin has vanished; the
+    review-gate refusal before consent ends in a runnable fix line."""
+    vanished = tmp_path / "vanished.git"
+    service, store, ws = _setup(tmp_path, str(vanished))
+    lib_path = ws / "repos" / "lib"
+    _run(["git", "init", str(lib_path)])
+    _run(["git", "remote", "add", "origin", str(vanished)], cwd=lib_path)
+    service.alive("proj")
+    (lib_path / "AGENTS.md").write_text("scaffold\n")
+
+    with pytest.raises(
+        DeadReviewRequiredError, match=r"fix: \S*dadaia\S* context dead proj --commit"
+    ):
+        service.dead("proj")
+    dead = service.dead("proj", commit=True)
+
+    assert dead.state == ContextState.DEAD
+    assert not lib_path.exists()
+    assert dead.associated_repos == (AssociatedRepo(slug="lib", url=str(vanished)),)
