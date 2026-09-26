@@ -12,6 +12,7 @@ from within any sub-repo resolve to the workspace root correctly.
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -19,6 +20,17 @@ from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 
 #: The sentinel file whose presence marks a properly initialized workspace.
 _SENTINEL = Path(".dadaia") / "states" / "spec_contexts.json"
+
+#: ``os.pathsep``-separated roots this process must never resolve. The test suite fences
+#: the operator instance it runs inside, and every child it spawns inherits the fence
+#: (bug test-subprocesses-resolve-the-live-instance).
+FENCE_ENV = "DADAIA_FENCED_ROOTS"
+
+
+def _fenced() -> frozenset[Path]:
+    return frozenset(
+        Path(p).resolve() for p in os.environ.get(FENCE_ENV, "").split(os.pathsep) if p
+    )
 
 
 def resolve_workspace_root(cwd: Path | None = None) -> Path:
@@ -56,12 +68,13 @@ def resolve_workspace_root(cwd: Path | None = None) -> Path:
     has ``states/spec_contexts.json`` is accepted as a workspace root.
     """
     start: Path = (cwd or Path.cwd()).resolve()
+    fenced = _fenced()
 
     skipped: list[Path] = []
 
     for candidate in [start, *start.parents]:
         dadaia_dir = candidate / ".dadaia"
-        if dadaia_dir.exists():
+        if dadaia_dir.exists() and candidate not in fenced:
             sentinel = candidate / _SENTINEL
             if sentinel.exists():
                 return candidate.resolve()

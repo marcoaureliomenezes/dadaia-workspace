@@ -189,6 +189,9 @@ ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset(
         "DADAIA_KIMI_SESSION_INDEX",
         # Read by public/scripts/pre-push-ci-gate.sh BY DESIGN: the runner override.
         "DADAIA_BIN",
+        # Read by core/workspace_resolver BY DESIGN: roots no process may resolve; the
+        # suite fences the enclosing instance (bug test-subprocesses-resolve-the-live-instance).
+        "DADAIA_FENCED_ROOTS",
     }
 )
 

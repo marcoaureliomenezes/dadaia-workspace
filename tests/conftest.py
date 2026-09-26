@@ -53,6 +53,31 @@ os.environ["PYTHONPATH"] = os.pathsep.join(
     [str(_CHECKOUT_ROOT), *[p for p in os.environ.get("PYTHONPATH", "").split(os.pathsep) if p]]
 )
 
+# No process the suite runs or spawns may resolve the operator instance this checkout sits
+# in, nor the one owning the running venv (bug test-subprocesses-resolve-the-live-instance):
+# the fence is set once, in the environment every child inherits, and the one resolver
+# honours it. The instance's registry and repos/ are fingerprinted around the session.
+_INSTANCE_SENTINEL = Path(".dadaia") / "states" / "spec_contexts.json"
+_FENCED_ROOTS: tuple[Path, ...] = tuple(
+    p
+    for p in dict.fromkeys([*_CHECKOUT_ROOT.parents, Path(sys.prefix).resolve().parent.parent])
+    if (p / _INSTANCE_SENTINEL).is_file()
+)
+os.environ["DADAIA_FENCED_ROOTS"] = os.pathsep.join(map(str, _FENCED_ROOTS))
+
+
+def _instance_fingerprint() -> dict[str, object]:
+    """What a leaked CLI call mutates: the context registry bytes and the repos/ listing."""
+    return {
+        str(root): (
+            (root / _INSTANCE_SENTINEL).read_bytes(),
+            sorted(p.name for p in (root / "repos").iterdir()) if (root / "repos").is_dir() else [],
+        )
+        for root in _FENCED_ROOTS
+        if (root / _INSTANCE_SENTINEL).is_file()
+    }
+
+
 # Repo-cleanliness law: the test run must never materialize bytecode caches inside
 # the working tree. Import-time compilation happens BEFORE any in-script
 # ``sys.dont_write_bytecode`` guard can run (e.g. tests importing the
@@ -377,12 +402,15 @@ def _repo_root_write_guard() -> object:
 # ``tests/contract/test_source_repo_hygiene.py`` and CI repo-hygiene — not this
 # session guard, whose only job is to catch tests that pollute the root.
 _PREEXISTING_POLLUTION: set[str] = set()
+_INSTANCE_AT_START: dict[str, object] = {}
 
 
 def pytest_sessionstart(session: pytest.Session) -> None:
     """Record which pollution dirs already existed before any test ran."""
     _PREEXISTING_POLLUTION.clear()
     _PREEXISTING_POLLUTION.update(d for d in _POLLUTION_DIRS if (_REPO_ROOT / d).exists())
+    _INSTANCE_AT_START.clear()
+    _INSTANCE_AT_START.update(_instance_fingerprint())
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
@@ -399,6 +427,13 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     Offending directories:
       .dadaia  .venv  .pytest_cache  .mypy_cache  .hypothesis  .ruff_cache  test-results
     """
+    if _instance_fingerprint() != _INSTANCE_AT_START:
+        print(  # noqa: T201
+            "\n\n[INSTANCE MUTATED] the context registry or repos/ of a fenced instance "
+            f"changed during the session: {', '.join(_INSTANCE_AT_START)}. A test process "
+            "resolved the live instance (bug test-subprocesses-resolve-the-live-instance)."
+        )
+        session.exitstatus = 1
     offenders = [
         d for d in _POLLUTION_DIRS if (_REPO_ROOT / d).exists() and d not in _PREEXISTING_POLLUTION
     ]
