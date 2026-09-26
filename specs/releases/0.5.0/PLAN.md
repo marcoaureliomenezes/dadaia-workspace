@@ -151,6 +151,24 @@ user data (the provenance classifier lives in `infrastructure/workspace_guardrai
 need it injected through the container and `data/AGENTS.md` has no shipped-hashes history — growth
 for a lossless, conservative refusal).
 
+**Round 5 re-measure (REBUILD, 2026-09-26): +560 lines** — same method, `5364ba0d..HEAD`:
++1982 / −1422. **Δ vs the round-3 +449: +111** — the rebuild did NOT reduce; it traded the deleted
+`rebuilt` branch, `alive_context_owning_repo`, `repo_root.name`, the `--repo` option and the squash's
+second exclusion spelling for new capabilities the review demanded:
+
+| file | Δ | why |
+|---|---|---|
+| `features/spec_context/service.py` | +83 | publish of any repo of the set (C-A); deterministic private-index work commit + fixed-date birth (C-B); `_refuse_foreign_work` before any write, one atomic push (P3/P3b/P3c/P9); `_sync_failure` by cause (H-A); fix lines on show/dead/no-checkout/foreign-repo (M-A); alive clone failure refusal |
+| `core/invocation.py` | +12 | `repo_owner`, the ONE resolver; `context_name_for_repo_slug` now delegates to the same registry match |
+| `cli/commands/ci.py` | +5 | gate fixes from the resolver: owner publish/republish by path, adopt (`context create --main-repo <origin>`) when unowned, the live work branch |
+| `features/chokepoints/branch_policy.py` | +5 | `GateFixes.work`; the outside-gitflow fix carries the refused ref (H-C) |
+| `cli/commands/context.py` | +4 | `baseline <ctx> [<repo>] [--republish]` |
+| `infrastructure/git_objects.py` | +7 | `unpublished()` — the one "already published" rule, shared by the gate and republish |
+| `infrastructure/git_subprocess.py` | +3 | `env` for git (fixed dates, private index); `push` skips when nothing is unpushed |
+| `cli/_specs_resolution.py` | −8 | `alive_context_owning_repo` deleted |
+
+The ceiling is the operator's decision.
+
 ### 1.3 Round 5 — as-is review of the three REBUILD units (ADR 0041 trigger, 2026-09-26)
 
 Third rejection (review `2026-09-26T200000Z`): every round found new stalls in the same three units.
