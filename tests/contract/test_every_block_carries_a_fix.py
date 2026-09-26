@@ -89,7 +89,8 @@ def _assert_one_command(command: str) -> None:
     does not: an agent cannot run it, so the BLOCK is a Stall with a friendly face.
     """
     head = shlex.split(command)[0]  # every host spells paths with forward slashes
-    if head.endswith(_CLI):  # ``fix_line`` roots the CLI at the workspace it runs in
+    # ``fix_line`` roots the CLI at the workspace it runs in, else names the running CLI.
+    if head.endswith(_CLI) or head == shlex.split(fix_line(None))[0]:
         head = ".dadaia/.venv/bin/dadaia"
     assert head in _EXECUTABLE_TOKENS, (
         f"a fix line opens with an executable, not prose — got {head!r} in:\n{command}"
@@ -142,7 +143,12 @@ def test_gate_block_carries_a_runnable_fix(workspace: Path, name: str, rel: str)
     assert_block_carries_a_runnable_fix(block)
 
 
-def test_venv_guard_block_carries_a_runnable_fix(workspace: Path) -> None:
+def test_venv_guard_block_carries_a_runnable_fix(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The fix names the RUNNING CLI (ADR 0045); a host venv outside any workspace (CI's
+    poetry venv) proves no expectation pins the instance's own spelling."""
+    monkeypatch.setattr(sys, "prefix", str(workspace.parent / "host-venv"))
     block = pre_gate.evaluate_payload(
         {"tool_name": "Bash", "tool_input": {"command": "dadaia doctor --context x"}}
     )

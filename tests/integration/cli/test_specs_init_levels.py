@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -144,11 +145,17 @@ def test_replace_foreign_moves_to_specs_bkp_staged_then_scaffolds(repo: Path) ->
     assert _doctor_errors(repo / "specs") == []
 
 
-def test_no_context_resolved_exits_2_with_a_fix_line(repo: Path) -> None:
+def test_no_context_resolved_exits_2_with_a_fix_line(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The fix names the running CLI (ADR 0045); a host venv outside any workspace (CI)."""
+    from dadaia_workspace.core.cli_line import fix_line
+
+    monkeypatch.setattr(sys, "prefix", str(repo.parent / "host-venv"))
     result = _runner.invoke(app, ["specs", "init"])
 
     assert result.exit_code == 2, result.output
-    assert ".dadaia/.venv/bin/dadaia specs init --context '<name>'" in result.output
+    assert f"fix: {fix_line(None, 'specs', 'init', '--context', '<name>')}" in result.output
 
 
 def test_an_existing_specs_bkp_is_kept_and_the_tree_moves_to_a_stamped_child(
