@@ -153,12 +153,21 @@ def test_a_contentless_birth_of_principal_or_integration_passes(
 
 
 @_FLOWS
-def test_a_birth_carrying_a_commit_is_refused_naming_git_fetch(
-    tmp_path: Path, flow: Gitflow
+@pytest.mark.parametrize(
+    ("role", "other"), [("principal", "integration"), ("integration", "principal")]
+)
+def test_a_birth_carrying_a_commit_is_refused_naming_a_birth_at_the_other_published_tip(
+    tmp_path: Path, flow: Gitflow, role: str, other: str
 ) -> None:
-    decision = _decide(_push(flow.integration), tmp_path, flow)
+    """Review M2: stale tracking refs and real new objects get ONE fix that clears both —
+    refresh, then birth at the other role's published tip (publishes nothing)."""
+    branch, tip = getattr(flow, role), getattr(flow, other)
+    decision = _decide(_push(branch), tmp_path, flow)
     assert not decision.allowed
-    assert _fix(decision) == ["git", "fetch", "--all"]
+    assert _fix(decision) == [
+        "git", "fetch", "origin", "&&",
+        "git", "push", "origin", f"refs/remotes/origin/{tip}:refs/heads/{branch}",
+    ]  # fmt: skip
 
 
 def test_an_existing_principal_is_never_a_birth(tmp_path: Path) -> None:
@@ -169,9 +178,13 @@ def test_an_existing_principal_is_never_a_birth(tmp_path: Path) -> None:
     assert source.asked == []
 
 
-def test_a_birth_aimed_at_another_remote_name_is_refused(tmp_path: Path) -> None:
+def test_a_contentless_birth_passes_from_any_source(tmp_path: Path) -> None:
+    """Review H4: baseline pushes `<sha>:refs/heads/<b>` — the birth is judged by the
+    remote branch it creates and what it publishes, never by the local ref's name."""
     source = _EmptyObjectSource(frozenset({_SHA_A}))
-    assert not _decide(_push("main", "develop"), tmp_path, object_source=source).allowed
+    assert _decide(_push("main", "develop"), tmp_path, object_source=source).allowed
+    sha_birth = _refs(f"{_SHA_A} {_SHA_A} refs/heads/develop {_ZERO}")
+    assert _decide(sha_birth, tmp_path, object_source=source).allowed
 
 
 def test_tag_push_still_passes(tmp_path: Path) -> None:
@@ -208,10 +221,11 @@ def test_pushing_feature_branch_to_a_foreign_remote_ref_is_refused(tmp_path: Pat
     """Finding 2, carried forward: `git push origin feature/0.0.1:develop` — local
     feature branch, remote develop. The policy must key on BOTH sides: a valid local
     feature/{M.m.p} tip aimed at any remote ref other than its own name is a refusal."""
-    decision = _decide(_push("work/0.0.1", "next"), tmp_path, _CUSTOM)
+    decision = _decide(_push("work/0.0.1", "work/0.0.2"), tmp_path, _CUSTOM)
     assert not decision.allowed
-    assert "refs/heads/next" in decision.message
-    assert _fix(decision) == ["git", "push", "origin", "work/0.0.1:work/0.0.1"]
+    assert "refs/heads/work/0.0.2" in decision.message
+    assert _fix(decision) == ["git", "push", "origin", "work/0.0.2:work/0.0.2"]
+    assert not _decide(_push("work/0.0.1", "next"), tmp_path, _CUSTOM).allowed
 
 
 def test_detached_head_ref_gets_a_pushable_branch_diagnosis(tmp_path: Path) -> None:

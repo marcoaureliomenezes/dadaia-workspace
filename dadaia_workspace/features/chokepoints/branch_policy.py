@@ -128,11 +128,14 @@ def _refuse_branch(ref: PushRef, branch: str | None, gitflow: Gitflow) -> Decisi
     role = gitflow.role_of(branch) if branch is not None else None
     work = gitflow.work_pattern
     if role is not None and ref.remote_sha == ZERO_SHA:
+        other = gitflow.integration if role == "principal" else gitflow.principal
         return _blocked(
             f"creating the {role} branch '{branch}' would publish new objects — a birth may "
-            "carry only already-published history or one empty root commit; stale "
-            "remote-tracking refs look the same: refresh them, then push again",
-            ["git", "fetch", "--all"],
+            f"carry only already-published history; birth it at the published '{other}' "
+            "tip (stale remote-tracking refs are refreshed first) and carry new work on a "
+            "work branch through a PR",
+            ["git", "fetch", "origin"],
+            ["git", "push", "origin", f"refs/remotes/origin/{other}:{HEADS_PREFIX}{branch}"],
         )
     if role is None:
         return _blocked(
@@ -152,24 +155,28 @@ def _refuse_branch(ref: PushRef, branch: str | None, gitflow: Gitflow) -> Decisi
 def check_branch_policy(
     refs: list[PushRef], gitflow: Gitflow, births: frozenset[str] = frozenset()
 ) -> Decision | None:
-    """Every non-deletion, non-tag ref must be a work branch of *gitflow*, pushed to the
-    SAME remote name; the principal and integration branches are PR-only, except their
-    birth (ADR 0036): a local sha in *births* (the caller proved it creates the remote
-    branch and publishes nothing). Returns the
-    first refusal, or ``None`` when every ref clears (the caller has already excluded
-    tags and deletions from *refs*).
+    """Every non-deletion, non-tag ref must land on a branch of *gitflow*: a work branch
+    pushed from the SAME-named local head, or the birth of the principal/integration
+    branch (ADR 0036) — a local sha in *births* (the caller proved it creates the remote
+    branch and publishes nothing), from any source (``<sha>:refs/heads/<b>``). The
+    principal and integration branches are otherwise PR-only. Returns the first
+    refusal, or ``None`` when every ref clears (the caller has already excluded tags and
+    deletions from *refs*).
     """
     for ref in refs:
+        if not ref.remote_ref.startswith(HEADS_PREFIX):
+            return _refuse_branch(ref, None, gitflow)
+        branch = ref.remote_ref[len(HEADS_PREFIX) :]
+        role = gitflow.role_of(branch)
+        if role in ("principal", "integration") and ref.local_sha in births:
+            continue
+        if role != "work":
+            return _refuse_branch(ref, branch, gitflow)
         if not ref.local_ref.startswith(HEADS_PREFIX):
             return _refuse_branch(ref, None, gitflow)
-        branch = ref.local_ref[len(HEADS_PREFIX) :]
-        role = gitflow.role_of(branch)
-        born = role in ("principal", "integration") and ref.local_sha in births
-        if role != "work" and not born:
-            return _refuse_branch(ref, branch, gitflow)
-        if ref.remote_ref != f"{HEADS_PREFIX}{branch}":
+        if ref.local_ref != ref.remote_ref:
             return _blocked(
-                f"refspec aims local '{branch}' at remote '{ref.remote_ref}' — only "
+                f"refspec aims '{ref.local_ref}' at remote '{ref.remote_ref}' — only "
                 f"refs/heads/{branch} → refs/heads/{branch} is pushable",
                 ["git", "push", "origin", f"{branch}:{branch}"],
             )

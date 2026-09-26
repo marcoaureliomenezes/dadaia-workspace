@@ -7,17 +7,20 @@ Real git over ``file://`` bare remotes (MEDIUM): the contract is git's own branc
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.exceptions import ContextStateError, GitSyncError
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
-from dadaia_workspace.features.spec_context.service import SpecContextService
+from dadaia_workspace.features.spec_context.service import DeadSecretFoundError, SpecContextService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fakes import FakeContextStore
+from tests.helpers.privacy_fixtures import aws_key_shape
 
 _CONSTITUTION = (
     "---\nspecs_pattern_version: 6\n"
@@ -103,23 +106,27 @@ def test_unborn_remote_births_both_branches_from_one_empty_root(env) -> None:
     _assert_published(repo, bare, "feature/0.1.0", "develop")
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="a sh pre-push hook records the refs")
+@pytest.mark.skipif(sys.platform == "win32", reason="the shipped pre-push hook is bash")
 @pytest.mark.parametrize("seeded", [(), ("main",)], ids=["unborn", "principal-only"])
-def test_every_birth_is_pushed_as_its_same_named_local_head(env, tmp_path: Path, seeded) -> None:
-    """T-050-21 RED: the pre-push gate admits a birth only as refs/heads/<b> -> refs/heads/<b>;
-    a `<sha>:` or `origin/<p>:` source reaches the hook as a non-head local ref and is refused."""
+def test_every_birth_passes_the_shipped_pre_push_gate(
+    env, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, seeded
+) -> None:
+    """Review H4: births are pushed by `<sha>:refs/heads/<b>` refspec — the real shipped
+    pre-push gate (this interpreter's CLI) admits them without a same-named local head."""
     svc, repo, bare = env
     if seeded:
         _seed(bare, tmp_path / "seed", *seeded)
     _clone_onboarded(bare, repo)
-    log = tmp_path / "pushed.txt"
+    runner = tmp_path / "dadaia"
+    runner.write_text(f'#!/bin/sh\nexec "{sys.executable}" -m dadaia_workspace "$@"\n')
+    runner.chmod(0o755)
+    monkeypatch.setenv("DADAIA_BIN", str(runner))
+    monkeypatch.setenv("WORKSPACE_ROOT", str(repo.parent.parent))
     hook = repo / ".git" / "hooks" / "pre-push"
-    hook.write_text(f"#!/bin/sh\ncat >> '{log.as_posix()}'\n", encoding="utf-8")
+    shutil.copyfile(workspace_layout.public_scripts_dir() / "pre-push-ci-gate.sh", hook)
     hook.chmod(0o755)
-    svc.baseline("proj")
-    for line in log.read_text(encoding="utf-8").splitlines():
-        local, _, remote, _ = line.split()
-        assert local == remote and local.startswith("refs/heads/"), line
+    assert svc.baseline("proj") == "feature/0.1.0"
+    _assert_published(repo, bare, "feature/0.1.0", "develop")
 
 
 def test_principal_only_births_integration_at_its_tip(env, tmp_path: Path) -> None:
@@ -226,3 +233,79 @@ def test_offline_refuses_with_the_same_baseline_line(env, tmp_path: Path) -> Non
         svc.baseline("proj")
     assert str(refused.value).splitlines()[-1].endswith("context baseline proj")
     assert _heads(bare) == {}
+
+
+def test_a_non_ascii_foreign_file_refuses_with_a_fix_that_clears(env, tmp_path: Path) -> None:
+    """Review C1: core.quotePath quoted `memória.md`; the printed stash named a path that
+    does not exist, so the rerun refused forever."""
+    svc, repo, bare = env
+    _seed(bare, tmp_path / "seed", "main")
+    _clone_onboarded(bare, repo)
+    (repo / "memória.md").write_text("operator\n", encoding="utf-8")
+    with pytest.raises(ContextStateError) as refused:
+        svc.baseline("proj")
+    fix = str(refused.value).rsplit("fix: ", 1)[1]
+    ran = subprocess.run(fix, shell=True, capture_output=True, text=True)  # noqa: S602
+    assert ran.returncode == 0, ran.stderr + ran.stdout
+    svc.baseline("proj")
+    _assert_published(repo, bare, "feature/0.1.0", "develop")
+
+
+@pytest.mark.parametrize("seeded", [(), ("main",)], ids=["unborn", "born"])
+def test_a_secret_under_a_non_ascii_name_refuses_before_any_write(
+    env, tmp_path: Path, seeded
+) -> None:
+    """Review C1/M5: the secret scan reads the same real paths git commits, and refuses
+    before any birth or checkout, with a fix line."""
+    svc, repo, bare = env
+    if seeded:
+        _seed(bare, tmp_path / "seed", *seeded)
+    _clone_onboarded(bare, repo)
+    (repo / "specs" / "memória.md").write_text(f"k={aws_key_shape()}\n", encoding="utf-8")
+    before, branch = _heads(bare), _git(repo, "branch", "--show-current")
+    with pytest.raises(DeadSecretFoundError) as refused:
+        svc.baseline("proj")
+    assert "specs/memória.md" in str(refused.value) and "\nfix: " in str(refused.value)
+    assert _heads(bare) == before and _git(repo, "branch", "--show-current") == branch
+
+
+@pytest.mark.parametrize("checked_out", [True, False], ids=["checked-out", "not-checked-out"])
+def test_a_local_principal_with_commits_is_never_reset(env, checked_out: bool) -> None:
+    """Review H4: births go by `<sha>:refs/heads/<b>` refspec; local heads stay as they are."""
+    svc, repo, bare = env
+    _clone_onboarded(bare, repo)
+    _git(repo, "checkout", "-q", "-b", "main")
+    (repo / "README.md").write_text("local\n", encoding="utf-8")
+    _git(repo, "add", "README.md")
+    _git(repo, "commit", "-qm", "local work")
+    tip = _git(repo, "rev-parse", "main")
+    if not checked_out:
+        _git(repo, "checkout", "-q", "-b", "side")
+    assert svc.baseline("proj") == "feature/0.1.0"
+    assert _git(repo, "rev-parse", "main") == tip
+    assert _git(bare, "ls-tree", "main") == ""
+
+
+def test_a_second_foreign_backup_is_published_inside_specs_bkp(env, tmp_path: Path) -> None:
+    """Review H1: `specs init --replace-foreign` over an existing specs-bkp/ moves the tree to
+    specs-bkp/<UTC>/ — inside the paths baseline publishes, so the pushed tree carries it."""
+    svc, repo, bare = env
+    seed = tmp_path / "seed"
+    _git(tmp_path, "init", "-q", "-b", "main", str(seed))
+    _identity(seed)
+    for rel in ("specs/features/login.md", "specs-bkp/old.md"):
+        (seed / rel).parent.mkdir(parents=True, exist_ok=True)
+        (seed / rel).write_text(f"{rel}\n", encoding="utf-8")
+    _git(seed, "add", ".")
+    _git(seed, "commit", "-qm", "foreign")
+    _git(seed, "push", "-q", bare.as_uri(), "main")
+    _git(repo.parent, "clone", "-q", bare.as_uri(), str(repo))
+    _identity(repo)
+    GitSubprocessClient().move(repo, "specs", "specs-bkp/20260101T000000Z")
+    (repo / "specs").mkdir()
+    (repo / "specs" / "constitution.md").write_text(_CONSTITUTION, encoding="utf-8")
+    (repo / "AGENTS.md").write_text("# law\n", encoding="utf-8")
+    assert svc.baseline("proj") == "feature/0.1.0"
+    pushed = _git(bare, "ls-tree", "-r", "--name-only", "feature/0.1.0").splitlines()
+    assert "specs-bkp/20260101T000000Z/features/login.md" in pushed
+    assert "specs/features/login.md" not in pushed and "specs-bkp/old.md" in pushed

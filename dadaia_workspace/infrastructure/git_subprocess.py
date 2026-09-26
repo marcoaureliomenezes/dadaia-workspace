@@ -296,13 +296,11 @@ class GitSubprocessClient:
         Uses ``git ls-files --others --exclude-standard`` so that ``.gitignore``
         is honoured (gitignored files are NOT returned). The result drives the
         ``dead()`` review gate: an untracked file here is content that would be
-        newly committed and pushed, so it must be reviewed/scanned first.
+        newly committed and pushed, so it must be reviewed/scanned first. ``-z``: the
+        real names, never core.quotePath's quoting.
         """
-        result = _run(
-            ["git", "ls-files", "--others", "--exclude-standard"],
-            cwd=path,
-        )
-        return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        result = _run(["git", "ls-files", "-z", "--others", "--exclude-standard"], cwd=path)
+        return [rel for rel in result.stdout.split("\0") if rel]
 
     def remote_url(self, path: Path) -> str:
         """Return the URL of the ``origin`` remote, or ``""`` if none is configured.

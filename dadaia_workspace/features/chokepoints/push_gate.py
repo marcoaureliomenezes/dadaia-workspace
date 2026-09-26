@@ -402,7 +402,7 @@ def push_gate_decision(
         r.local_sha
         for r in branch_policy_refs
         if r.remote_sha == ZERO_SHA
-        and gitflow.role_of(r.local_ref.removeprefix(HEADS_PREFIX)) in ("principal", "integration")
+        and gitflow.role_of(r.remote_ref.removeprefix(HEADS_PREFIX)) in ("principal", "integration")
         and object_source.publishes_nothing(repo, r.local_sha)
     )
     branch_refusal = check_branch_policy(branch_policy_refs, gitflow, births)

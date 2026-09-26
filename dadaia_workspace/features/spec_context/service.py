@@ -578,62 +578,66 @@ class SpecContextService:
             key = "user.name" if "ident name" in str(exc) else "user.email"
             fix = shell_line("git", "-C", str(repo), "config", key, f"<{key}>")
             raise ContextStateError(f"Context '{name}': {exc}\nfix: {fix}") from None
-        changed = (  # unborn: everything is untracked, never committed
-            {*git("diff", "--name-only", "HEAD").split("\n"), *self._git.list_untracked(repo)}
-            if self._git.has_commits(repo)
-            else set()
-        )
-        foreign = sorted(p for p in changed if p and p.split("/")[0] not in _ONBOARDING)
-        if foreign:
-            raise ContextStateError(
-                f"Context '{name}': changes outside {', '.join(_ONBOARDING)} are not published.\n"
-                "fix: " + shell_line("git", "-C", str(repo), "stash", "push", "-u", "--", *foreign)
-            )
+        self._require_publishable(name, repo)
         try:
             git("fetch", "--prune", "--tags", "origin")
+            flow, _ = read_gitflow(repo / "specs")
+            if self._git.published(repo, flow.integration):
+                return ""
+            heads = git("for-each-ref", "--format=%(refname:lstrip=3)", "refs/remotes/origin")
+            base = f"origin/{flow.principal}"
+            if flow.principal not in heads.split():
+                tree = git("hash-object", "-t", "tree", "--stdin", stdin="")
+                base = git("commit-tree", tree, "-m", f"chore: birth of {flow.principal}")
+            births = [  # by refspec: a local head is the operator's, never reset
+                f"{git('rev-parse', base)}:refs/heads/{branch}"
+                for branch in (flow.principal, flow.integration)
+                if branch not in heads.split()
+            ]
+            if births:
+                git("push", "origin", *births)
+            tags = (_TAG_RE.fullmatch(t) for t in git("tag", "--sort=-v:refname").split())
+            last = next((m for m in tags if m), None)
+            patch = f"{last[1]}.{last[2]}.{int(last[3]) + 1}" if last else "0.1.0"
+            work = f"{flow.work_prefix}{patch}"
+            if self._git.current_branch(repo) != work:
+                git("checkout", "--no-track", "-b", work, f"origin/{flow.integration}")
+            paths = [p for p in _ONBOARDING if git("ls-files", "--", p) or (repo / p).exists()]
+            self._git.commit_paths(repo, message, paths)
+            self._git.push(repo)
         except GitSyncError as exc:
-            raise GitSyncError(
-                f"{exc}\nfix: {fix_line(self._workspace_root, 'context', 'baseline', name)}"
-            ) from None
-        flow, _ = read_gitflow(repo / "specs")
-        if self._git.published(repo, flow.integration):
-            return ""
-        heads = git("for-each-ref", "--format=%(refname:lstrip=3)", "refs/remotes/origin").split()
-        base = f"origin/{flow.principal}"
-        if flow.principal not in heads:
-            tree = git("hash-object", "-t", "tree", "--stdin", stdin="")
-            base = git("commit-tree", tree, "-m", f"chore: birth of {flow.principal}")
-        # A birth is pushed as the same-named local head: the gate's one pushable shape.
-        births = [b for b in (flow.principal, flow.integration) if b not in heads]
-        for branch in births:
-            git("branch", "-f", "--no-track", branch, base)
-        if births:
-            git("push", "origin", *births)
-        tags = (_TAG_RE.fullmatch(t) for t in git("tag", "--sort=-v:refname").split())
-        last = next((m for m in tags if m), None)
-        work = f"{flow.work_prefix}{f'{last[1]}.{last[2]}.{int(last[3]) + 1}' if last else '0.1.0'}"
-        if self._git.current_branch(repo) != work:
-            git("checkout", "--no-track", "-b", work, f"origin/{flow.integration}")
-        self._require_no_untracked_secrets(name, repo)
-        paths = [p for p in _ONBOARDING if git("ls-files", "--", p) or (repo / p).exists()]
-        self._git.commit_paths(repo, message, paths)
-        self._git.push(repo)
+            rerun = fix_line(self._workspace_root, "context", "baseline", name)
+            raise GitSyncError(f"{exc}\nfix: {rerun}") from None
         return work
 
-    def _require_no_untracked_secrets(self, name: str, repo_path: Path) -> None:
-        """Secret-scan every untracked file; raise before any baseline commit sweeps one."""
-        flagged: list[str] = []
-        for rel in self._git.list_untracked(repo_path):
-            path = repo_path / rel
-            if path.is_file():
-                hits = _scan_file_for_secrets(path)
-                if hits:
-                    flagged.append(f"  {rel}: {', '.join(sorted(set(hits)))}")
-        if flagged:
-            raise DeadSecretFoundError(
-                f"Context '{name}': secret scan blocked initial baseline (values redacted):\n"
-                + "\n".join(flagged)
+    def _require_publishable(self, name: str, repo: Path) -> None:
+        """Refuse, before any write, a change outside the onboarding paths (born repos:
+        an unborn clone's foreign files are never committed) or a secret in an untracked
+        file the publish would commit — each with a stash fix naming the real paths."""
+        untracked = self._git.list_untracked(repo)
+        changed = (
+            [*self._git.git(repo, "diff", "--name-only", "-z", "HEAD").split("\0"), *untracked]
+            if self._git.has_commits(repo)
+            else []
+        )
+        foreign = sorted({p for p in changed if p and p.split("/")[0] not in _ONBOARDING})
+        flagged = {
+            rel: sorted(set(hits))
+            for rel in untracked
+            if rel.split("/")[0] in _ONBOARDING and (hits := _scan_file_for_secrets(repo / rel))
+        }
+        refusal = (
+            f"changes outside {', '.join(_ONBOARDING)} are not published."
+            if foreign
+            else "secret scan blocked the publish (values redacted):\n"
+            + "\n".join(f"  {rel}: {', '.join(hits)}" for rel, hits in flagged.items())
+        )
+        if foreign or flagged:
+            fix = shell_line(
+                "git", "-C", str(repo), "stash", "push", "-u", "--", *foreign or flagged
             )
+            error = ContextStateError if foreign else DeadSecretFoundError
+            raise error(f"Context '{name}': {refusal}\nfix: {fix}")
 
     # ------------------------------------------------------------------ dead (T-10b / T-11)
 
