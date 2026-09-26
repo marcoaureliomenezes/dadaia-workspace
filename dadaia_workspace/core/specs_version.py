@@ -151,22 +151,6 @@ def classify(specs_dir: Path) -> Literal["absent", "malformed", "dadaia", "forei
     return "dadaia" if read_pattern_version(specs_dir) >= OLDEST_UPGRADABLE_VERSION else "foreign"
 
 
-_PLAIN_RE = re.compile(r"[A-Za-z0-9._/-]+")
-
-
-def _scalar(value: str) -> str:
-    return value if _PLAIN_RE.fullmatch(value) else json.dumps(value)
-
-
-def _render(value: int | Gitflow) -> str:
-    if isinstance(value, Gitflow):
-        return (
-            f"{{principal: {_scalar(value.principal)}, "
-            f"integration: {_scalar(value.integration)}, work: {_scalar(value.work_prefix)}}}"
-        )
-    return str(value)
-
-
 def merge_frontmatter(
     specs_dir: Path,
     *,
@@ -180,11 +164,12 @@ def merge_frontmatter(
     and every other line — plus the body — stays byte-identical. No block ⇒ one is
     prepended.
     """
-    updates = {
-        key: _render(value)
-        for key, value in (("specs_pattern_version", specs_pattern_version), ("gitflow", gitflow))
-        if value is not None
+    names = gitflow and (gitflow.principal, gitflow.integration, gitflow.work_prefix)
+    values = {
+        "specs_pattern_version": specs_pattern_version,
+        "gitflow": names and dict(zip(("principal", "integration", "work"), names, strict=True)),
     }
+    updates = {k: json.dumps(v) for k, v in values.items() if v is not None}  # JSON is YAML
     constitution = _constitution_path(specs_dir)
     text = constitution.read_text(encoding="utf-8") if constitution.exists() else ""
     match = FRONTMATTER_RE.match(text)
@@ -196,10 +181,7 @@ def merge_frontmatter(
             continue
         key = line.split(":", 1)[0]
         skipping = ":" in line and key in updates
-        if skipping:
-            kept.append(f"{key}: {updates.pop(key)}")
-        else:
-            kept.append(line)
+        kept.append(f"{key}: {updates.pop(key)}" if skipping else line)
     kept.extend(f"{key}: {value}" for key, value in updates.items())
     body = text[match.end() :] if match else text
     closing = text[match.start(0) : match.end()].rsplit("\n---", 1)[1] if match else "\n"

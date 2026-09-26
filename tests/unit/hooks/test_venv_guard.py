@@ -39,7 +39,7 @@ def _bash(command: str) -> dict[str, object]:
 def test_bare_dadaia_is_corrected_to_the_cli_fix_line(args: str) -> None:
     reason = venv_guard.evaluate_payload(_bash(f"dadaia {args}"))
     assert reason is not None
-    assert f"fix: {fix_line(venv_guard._workspace_root())} {args}" in reason
+    assert f"fix: {fix_line(None)} {args}" in reason
 
 
 @pytest.mark.parametrize(

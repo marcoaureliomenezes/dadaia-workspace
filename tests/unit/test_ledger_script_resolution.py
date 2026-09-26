@@ -34,11 +34,11 @@ def _tree_with_skills(root: Path) -> Path:
 
 
 def _launch_from(root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Pretend this process's interpreter is *root*'s venv Python."""
-    interpreter = root / ".dadaia" / ".venv" / "bin" / "python"
-    interpreter.parent.mkdir(parents=True, exist_ok=True)
-    interpreter.write_text("", encoding="utf-8")
-    monkeypatch.setattr(sys, "executable", str(interpreter))
+    """Pretend this process runs from *root*'s workspace venv (``own_workspace_root``)."""
+    states = root / ".dadaia" / "states"
+    states.mkdir(parents=True, exist_ok=True)
+    (states / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(sys, "prefix", str(root / ".dadaia" / ".venv"))
 
 
 def test_the_running_workspaces_installed_tree_is_used(

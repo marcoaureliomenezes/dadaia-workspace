@@ -25,6 +25,7 @@ from typing import Any, Protocol
 
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.doctor_rules import SectionFinding
+from dadaia_workspace.core.workspace_resolver import own_workspace_root
 from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner
 
 __all__ = [
@@ -79,16 +80,6 @@ class _Runner(Protocol):
     ) -> Any: ...
 
 
-def _running_workspace() -> Path | None:
-    """The workspace this process runs FROM: the root whose `.dadaia/.venv/` holds our
-    interpreter, or ``None`` when `dadaia` runs from anywhere else (a bare pip install).
-    """
-    for directory in Path(sys.executable).resolve().parents:
-        if directory.name == ".venv" and directory.parent.name == ".dadaia":
-            return directory.parent.parent
-    return None
-
-
 def _skill_roots(specs_dir: Path) -> Iterator[Path]:
     """The skills tree whose scripts this run may execute, most-trusted first.
 
@@ -98,7 +89,7 @@ def _skill_roots(specs_dir: Path) -> Iterator[Path]:
     workspace this process was launched from — the operator's own. Every other tree,
     including a bare `--specs-dir` checkout in CI, reads the packaged copy.
     """
-    workspace = _running_workspace()
+    workspace = own_workspace_root()
     here = specs_dir.resolve()
     if workspace is not None and (workspace == here or workspace in here.parents):
         installed = workspace / ".agents" / "skills"
@@ -124,7 +115,7 @@ def _unrunnable(script: LedgerScript, reason: str) -> SectionFinding:
         canonical=False,
         error=True,
         # The one remediation for a script that cannot run at all: re-project the skills.
-        fix=fix_line(_running_workspace() or Path(), "public", "install"),
+        fix=fix_line(None, "public", "install"),
     )
 
 

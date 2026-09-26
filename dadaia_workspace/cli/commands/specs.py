@@ -17,7 +17,6 @@ from dadaia_workspace.cli._specs_resolution import (
 )
 from dadaia_workspace.core import specs_version
 from dadaia_workspace.core.cli_line import fix_line
-from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, from_mapping
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.migrate import upgrade as upgrade_feature
@@ -81,12 +80,8 @@ def _echo_upgrade(specs: Path, result: UpgradeResult) -> None:
 
 
 def _init_fix(*argv: str) -> str:
-    """``fix:`` re-running ``specs init`` — workspace-relative when no instance is around."""
-    try:
-        root = resolve_workspace_root()
-    except WorkspaceNotInitializedError:
-        root = Path()
-    return f"fix: {fix_line(root, 'specs', 'init', *argv)}"
+    """``fix:`` re-running ``specs init`` with the running CLI (it resolves its own root)."""
+    return f"fix: {fix_line(None, 'specs', 'init', *argv)}"
 
 
 _BACKUP = "specs-bkp"
