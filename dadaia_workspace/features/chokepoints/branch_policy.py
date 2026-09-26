@@ -123,11 +123,13 @@ _LAW = "project gitflow: specs/constitution.md"
 class GateFixes:
     """What a refusal's fix line names beyond the gitflow — built by the composition
     root, the one place that knows them: the repo (every git fix is ``git -C <repo>``,
-    so it runs from any cwd) and the workspace-CLI lines to publish and republish."""
+    so it runs from any cwd), the workspace-CLI lines to publish and republish, and the
+    live local work branch (``""``: none yet)."""
 
     repo: str
     publish: str
     republish: str
+    work: str = ""
 
 
 def _blocked(text: str, fix: str) -> Decision:
@@ -159,11 +161,14 @@ def _refuse_branch(
             fixes.publish,
         )
     if role is None:
+        refused = ref.local_ref.removeprefix(HEADS_PREFIX)
         return _blocked(
             f"ref '{ref.local_ref}' is outside the gitflow — principal '{gitflow.principal}', "
-            f"integration '{gitflow.integration}', work '{work}'; only a work branch is "
-            "pushable: carry this work on one, then push it",
-            git_line(fixes.repo, "checkout", "-b", work),
+            f"integration '{gitflow.integration}', work '{fixes.work or work}'; only a work "
+            "branch is pushable: carry this work on it, then push it",
+            git_line(fixes.repo, "rebase", refused, fixes.work)
+            if fixes.work
+            else git_line(fixes.repo, "checkout", "-b", work, refused),
         )
     head = gitflow.integration if role == "principal" else work
     return _blocked(

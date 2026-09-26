@@ -76,6 +76,7 @@ __all__ = [
     "all_repos",
     "alive_context_trees",
     "context_name_for_repo_slug",
+    "repo_owner",
     "repo_slug_for_context",
     "repo_slug_under_repos",
     "resolve",
@@ -229,26 +230,37 @@ def repo_slug_for_context(workspace_root: Path, name: str) -> str:
 
 
 def context_name_for_repo_slug(workspace_root: Path, slug: str) -> str:
-    """Inverse of :func:`repo_slug_for_context`: the NAME whose repo is *slug*.
+    """Inverse of :func:`repo_slug_for_context`: the NAME whose repo is *slug*, else
+    *slug* itself. *slug* also matches an **associated** repo's slug (A16.4) — the walk
+    lands on the owning context, never on a second context of its own."""
+    owner = _owning_entry(workspace_root, slug)
+    return owner[0] if owner else slug
 
-    *slug* also matches an **associated** repo's slug (A16.4), resolving the same
-    OWNING context's name a match on the main ``repo_slug`` would — a resolution walk
-    starting inside ``repos/<associated-slug>/`` lands on the context, never treats the
-    associated repo as a second context of its own (an associated repo carries no
-    ``specs/`` bind).
-    """
+
+def repo_owner(workspace_root: Path, path: Path) -> tuple[str, str, str] | None:
+    """THE repo resolver: ``(context, repo slug, main repo slug)`` for *path* — a checkout
+    or any worktree under ``repos/<slug>/`` — or ``None`` when no registered context owns
+    it. The pre-push gate and ``context baseline`` both map a repo through here."""
+    slug = repo_slug_under_repos(workspace_root, path)
+    owner = _owning_entry(workspace_root, slug) if slug else None
+    return (owner[0], str(slug), owner[1]) if owner else None
+
+
+def _owning_entry(workspace_root: Path, slug: str) -> tuple[str, str] | None:
+    """``(name, main slug)`` of the registered context whose main or associated repo is
+    *slug*."""
     for entry in _registry_contexts(workspace_root):
-        entry_slug = entry.get("repo_slug") or entry.get("repo")
-        if entry_slug == slug:
-            name = entry.get("name")
-            return name if isinstance(name, str) and name else slug
+        main = entry.get("repo_slug") or entry.get("repo")
         associated = entry.get("associated_repos")
-        if isinstance(associated, list) and any(
-            isinstance(assoc, dict) and assoc.get("slug") == slug for assoc in associated
-        ):
-            name = entry.get("name")
-            return name if isinstance(name, str) and name else slug
-    return slug
+        slugs = (
+            [a.get("slug") for a in associated if isinstance(a, dict)]
+            if isinstance(associated, list)
+            else []
+        )
+        name = entry.get("name")
+        if slug in (main, *slugs) and isinstance(name, str) and name and isinstance(main, str):
+            return name, main
+    return None
 
 
 def repo_slug_under_repos(workspace_root: Path, path: Path) -> str | None:

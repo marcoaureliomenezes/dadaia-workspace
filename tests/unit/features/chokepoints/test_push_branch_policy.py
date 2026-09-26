@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import shlex
 from collections.abc import Iterable
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -21,7 +22,11 @@ import pytest
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow
 from dadaia_workspace.core.models.git_scan import ScannedObject
 from dadaia_workspace.features.chokepoints import Decision, push_gate_decision
-from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_stdin
+from dadaia_workspace.features.chokepoints.branch_policy import (
+    PushRef,
+    check_branch_policy,
+    parse_push_stdin,
+)
 from dadaia_workspace.features.specs.canon import canon_violations
 from tests.fakes import gate_fixes
 
@@ -127,8 +132,8 @@ def test_a_branch_outside_the_gitflow_is_refused_naming_the_work_branch(
     for word in (flow.principal, flow.integration, flow.work_prefix):
         assert word in decision.message
     work = f"{flow.work_prefix}<M.m.p>"
-    # One command, from any cwd, carrying the current work (cut from HEAD): no `&&`.
-    assert _fix(decision) == ["git", "-C", "/repo", "checkout", "-b", work]
+    # One command, from any cwd, carrying the refused ref (review H-C): no `&&`.
+    assert _fix(decision) == ["git", "-C", "/repo", "checkout", "-b", work, branch]
 
 
 def test_the_default_names_are_ordinary_branches_under_a_custom_gitflow(tmp_path: Path) -> None:
@@ -239,4 +244,13 @@ def test_detached_head_ref_gets_a_pushable_branch_diagnosis(tmp_path: Path) -> N
     outcome needs the right words."""
     decision = _decide(_refs(f"HEAD {_SHA_A} refs/heads/work/0.0.1 {_ZERO}"), tmp_path, _CUSTOM)
     assert not decision.allowed
-    assert _fix(decision) == ["git", "-C", "/repo", "checkout", "-b", "work/<M.m.p>"]
+    assert _fix(decision) == ["git", "-C", "/repo", "checkout", "-b", "work/<M.m.p>", "HEAD"]
+
+
+def test_an_outside_ref_is_carried_onto_the_live_work_branch(tmp_path: Path) -> None:
+    """Review H-C: a live work branch exists — the fix names it and carries the ref."""
+    decision = check_branch_policy(
+        _push("topic"), _CUSTOM, replace(gate_fixes(), work="work/1.2.3")
+    )
+    assert decision is not None and "'work/1.2.3'" in decision.message
+    assert _fix(decision) == ["git", "-C", "/repo", "rebase", "topic", "work/1.2.3"]

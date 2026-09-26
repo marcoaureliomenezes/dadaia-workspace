@@ -10,13 +10,9 @@ from pathlib import Path
 
 import typer
 
-from dadaia_workspace.cli._specs_resolution import (
-    alive_context_owning_repo,
-    resolve_context_specs_dir_for_cli,
-    resolve_workspace_root_for_cli,
-)
+from dadaia_workspace.cli._specs_resolution import repo_owner, resolve_workspace_root_for_cli
 from dadaia_workspace.container import is_source_repo_root as _is_source_repo_root
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import fix_line, git_line
 from dadaia_workspace.core.exceptions import CiPreflightScopeError
 from dadaia_workspace.core.gitflow import Gitflow
 from dadaia_workspace.features.chokepoints.branch_policy import GateFixes
@@ -105,27 +101,36 @@ def _no_canon_violations(paths: Iterable[str]) -> list[str]:
 
 def _gate_inputs(repo_root: Path) -> tuple[Gitflow, GateFixes]:
     """The gitflow through the ONE reader (ADR 0048: committed first, one warning on the
-    default) and the fix lines the gate's refusals name."""
+    default) and the fix lines the gate's refusals name — the pushing repo mapped by the
+    ONE resolver; a repo no context owns is adopted first, from its own origin."""
     from dadaia_workspace.container import build_git_client
 
+    git = build_git_client()
     workspace = resolve_workspace_root_for_cli(repo_root)
-    context = alive_context_owning_repo(workspace, repo_root)
-    main = resolve_context_specs_dir_for_cli(workspace, context).parent if context else None
-    gitflow, warning = project_gitflow(build_git_client(), repo_root, main)
+    owner = repo_owner(workspace, repo_root)
+    main = workspace / "repos" / owner[2] if owner else None
+    gitflow, warning = project_gitflow(git, repo_root, main)
     if warning:
         typer.echo(f"[pre-push] WARNING: {warning}", err=True)
-    publish = ("context", "baseline", context or "<context>")
+    url = git.remote_url(repo_root)
+    publish = (
+        fix_line(workspace, "context", "baseline", owner[0], str(repo_root))
+        if owner
+        else fix_line(workspace, "context", "create", "--main-repo", url)
+        if url
+        else git_line(repo_root, "remote", "add", "origin", "<clone-url>")
+    )
+    heads = git.git(repo_root, "for-each-ref", "--sort=-v:refname", "--format=%(refname:short)")
     return gitflow, GateFixes(
         repo=str(repo_root),
-        publish=fix_line(workspace, *publish),
-        republish=fix_line(workspace, *publish, "--republish", repo_root.name),
+        publish=publish,
+        republish=f"{publish} --republish" if owner else publish,
+        work=next((h for h in heads.split() if gitflow.role_of(h) == "work"), ""),
     )
 
 
 @app.command("push-gate-check")
-def push_gate_check(
-    repo: Path | None = typer.Option(None, "--repo", help="Target repo. Default: cwd's repo."),
-) -> None:
+def push_gate_check() -> None:
     """Pre-push gate: branch policy by the project gitflow + the range-scoped denylist scan.
 
     Branch model: the constitution's gitflow block (`dd-gitflow-default`).
@@ -151,7 +156,7 @@ def push_gate_check(
     from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
     from dadaia_workspace.features.specs.canon import canon_violations
 
-    repo_root = repo or _repo_root()
+    repo_root = _repo_root()
 
     # Bug pre-push-canon-scan-not-range-scoped (operator ruling 2026-09-13): the v6
     # canon is a property of a v6 tree. A specs/ tree still stamped below
