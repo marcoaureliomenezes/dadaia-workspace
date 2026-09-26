@@ -233,6 +233,12 @@
       "agent": "release.py",
       "kind": "note",
       "text": "Candidate defined at fa569482; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-09-26T23:02:09Z",
+      "agent": "main-thread",
+      "kind": "note",
+      "text": "Release 0.5.0 declared CRITICAL by operator order 2026-09-26 ('defina tudo isso como bugs, com release urgente ... declare a release de forma crítica, vendo o que precisará ser atualizado, deletado ... não adicione fix em cima do que tá quebrado ... criar mecanismos claros para jamais permitir isso novamente ... só aceito 80% pra mais com o restante permanecendo mapeados'). The systemic-ambiguity hunt (verified 2026-09-26) is registered as 49 open bugs (wave 0 1a8cbc1a, wave 1 a4e83877, wave 2 c47d0bc5, wave 3 83bcb621: CRITICAL 23, HIGH 10, MEDIUM 11, LOW 5). Candidate 3 closes by cuts only; candidate 4 is the critical remediation (Flow 2, bugs) plus the never-again mechanism; publish gate and deferred candidates are stated in candidate 4's SPEC."
     }
   ]
 }
