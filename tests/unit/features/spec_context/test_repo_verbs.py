@@ -19,6 +19,8 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.invocation import repo_owner
+
 pytest.importorskip("fcntl")
 
 from dadaia_workspace.core.exceptions import (  # noqa: E402
@@ -59,6 +61,7 @@ def service(
     store: FakeContextStore, git: FakeGitClient, workspace_root: Path
 ) -> SpecContextService:
     return SpecContextService(
+        repo_owner=repo_owner,
         context_store=store,
         git_client=git,
         workspace_root=workspace_root,

@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import pytest
 
+from dadaia_workspace.core.invocation import repo_owner
+
 pytest.importorskip("fcntl")
 
 import shutil  # noqa: E402
@@ -57,6 +59,7 @@ def store() -> FakeContextStore:
 @pytest.fixture()
 def fake_service(store: FakeContextStore, workspace_root: Path) -> SpecContextService:
     return SpecContextService(
+        repo_owner=repo_owner,
         context_store=store,
         git_client=FakeGitClient(),
         workspace_root=workspace_root,
@@ -131,6 +134,7 @@ def test_alive_backfills_repo_url_from_origin_remote(
     _git(["remote", "add", "origin", file_url], cwd=repo_path)
 
     service = SpecContextService(
+        repo_owner=repo_owner,
         context_store=store,
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
@@ -175,6 +179,7 @@ def test_dead_backfills_repo_url_before_rmtree(
     store.save(ctx0)
 
     service = SpecContextService(
+        repo_owner=repo_owner,
         context_store=store,
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,

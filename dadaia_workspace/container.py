@@ -4,6 +4,8 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from dadaia_workspace.core.invocation import repo_owner
+
 if TYPE_CHECKING:
     from dadaia_workspace.core.models.bugs import BugRecord
     from dadaia_workspace.features.certification import CertificationResult
@@ -49,6 +51,7 @@ def build_spec_context_service(workspace_root: Path) -> SpecContextService:
     states = _states_dir(workspace_root)
 
     return SpecContextService(
+        repo_owner=repo_owner,
         context_store=JsonContextStore(states),
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,

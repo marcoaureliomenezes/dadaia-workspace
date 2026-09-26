@@ -14,6 +14,8 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.invocation import repo_owner
+
 pytest.importorskip("fcntl")
 
 from dadaia_workspace.core.models.spec_context import (  # noqa: E402
@@ -70,6 +72,7 @@ def test_alive_on_dead_context_writes_no_specs_commits_nothing_and_hooks_every_r
         )
     )
     service = SpecContextService(
+        repo_owner=repo_owner,
         context_store=store,
         git_client=GitSubprocessClient(),
         workspace_root=workspace,

@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.invocation import repo_owner
 from dadaia_workspace.core.models.spec_context import (
     AssociatedRepo,
     ContextState,
@@ -60,6 +61,7 @@ _ALPHA = SpecContextProject(
 def _importer(tmp_path: Path, store: FakeContextStore) -> ImportService:
     (tmp_path / "repos").mkdir(exist_ok=True)
     contexts = SpecContextService(
+        repo_owner=repo_owner,
         context_store=store,
         git_client=FakeGitClient(),
         workspace_root=tmp_path,

@@ -16,6 +16,7 @@ from dadaia_workspace.core.exceptions import (
     ContextNotFoundError,
     ContextStateError,
 )
+from dadaia_workspace.core.invocation import repo_owner
 from dadaia_workspace.core.models.spec_context import ContextState
 from dadaia_workspace.features.spec_context.service import SpecContextService
 from tests.fakes import FakeContextStore, FakeGitClient, register_dead
@@ -47,6 +48,7 @@ def service(
     workspace_root: Path,
 ) -> SpecContextService:
     return SpecContextService(
+        repo_owner=repo_owner,
         context_store=store,
         git_client=git,
         workspace_root=workspace_root,

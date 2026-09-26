@@ -16,6 +16,7 @@ import pytest
 
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.exceptions import ContextStateError, GitSyncError
+from dadaia_workspace.core.invocation import repo_owner
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.spec_context.service import DeadSecretFoundError, SpecContextService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
@@ -69,7 +70,9 @@ def env(tmp_path: Path) -> tuple[SpecContextService, Path, Path]:
     _git(tmp_path, "init", "-q", "--bare", "-b", "main", str(bare))
     store = JsonContextStore(root / ".dadaia" / "states")
     store.save(SpecContextProject("proj", ContextState.ALIVE, "proj", bare.as_uri(), "2026-01-01"))
-    svc = SpecContextService(store, GitSubprocessClient(), root, lambda _repo: None)  # type: ignore[arg-type]
+    svc = SpecContextService(
+        store, GitSubprocessClient(), root, lambda _repo: None, repo_owner=repo_owner
+    )  # type: ignore[arg-type]
     return svc, root / "repos" / "proj", bare
 
 
@@ -331,7 +334,9 @@ def test_the_birth_is_deterministic_so_a_rerun_rebuilds_it(
     _git(other, "init", "-q", "--bare", "-b", "main", str(bare2))
     store = JsonContextStore(other / "ws" / ".dadaia" / "states")
     store.save(SpecContextProject("proj", ContextState.ALIVE, "proj", bare2.as_uri(), "2026"))
-    svc2 = SpecContextService(store, GitSubprocessClient(), other / "ws", lambda _r: None)  # type: ignore[arg-type]
+    svc2 = SpecContextService(
+        store, GitSubprocessClient(), other / "ws", lambda _r: None, repo_owner=repo_owner
+    )  # type: ignore[arg-type]
     _clone_onboarded(bare2, other / "ws" / "repos" / "proj")
     svc2.baseline("proj")
     assert _heads(bare)["main"] == _heads(bare2)["main"]

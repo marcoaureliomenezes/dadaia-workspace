@@ -12,8 +12,10 @@ data-loss guard this file exists to keep, alongside the non-writable-files dead(
 
 from __future__ import annotations
 
-# Guard: skip this entire module on platforms where fcntl is not available (e.g. Windows).
 import pytest
+
+# Guard: skip this entire module on platforms where fcntl is not available (e.g. Windows).
+from dadaia_workspace.core.invocation import repo_owner
 
 pytest.importorskip("fcntl")
 
@@ -50,6 +52,7 @@ def service(
     workspace_root: Path,
 ) -> SpecContextService:
     return SpecContextService(
+        repo_owner=repo_owner,
         context_store=store,
         git_client=git,
         workspace_root=workspace_root,
@@ -91,6 +94,7 @@ def test_alive_leaves_a_preexisting_specs_tree_untouched_and_hooks_the_repo(
     stays byte-identical, nothing is committed, and the hook installer runs on the repo."""
     hooked: list[Path] = []
     svc = SpecContextService(
+        repo_owner=repo_owner,
         context_store=store,
         git_client=git,
         workspace_root=workspace_root,

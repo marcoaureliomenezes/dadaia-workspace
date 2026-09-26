@@ -26,7 +26,6 @@ from dadaia_workspace.core.exceptions import (
     RepoUrlMissingError,
 )
 from dadaia_workspace.core.gitflow import Gitflow
-from dadaia_workspace.core.invocation import repo_owner
 from dadaia_workspace.core.models.spec_context import (
     CONTEXT_NAME_RE,
     AssociatedRepo,
@@ -59,6 +58,13 @@ _UNREACHABLE_RE = re.compile(
 #: recognises its own earlier work commit (first parent = the start, this date).
 _BUILD_DATE = "946684800 +0000"
 _BUILD_ENV = {"GIT_AUTHOR_DATE": _BUILD_DATE, "GIT_COMMITTER_DATE": _BUILD_DATE}
+
+
+class RepoOwner(Protocol):
+    """The ONE repo resolver (``core.invocation.repo_owner``), injected by the composition
+    root: ``(context, repo slug, main slug)`` owning a path, or ``None``."""
+
+    def __call__(self, workspace_root: Path, path: Path) -> tuple[str, str, str] | None: ...
 
 
 class InstallHooks(Protocol):
@@ -205,7 +211,10 @@ class SpecContextService:
         git_client: GitSubprocessClient,
         workspace_root: Path,
         install_hooks: InstallHooks,
+        *,
+        repo_owner: RepoOwner,
     ) -> None:
+        self._repo_owner = repo_owner
         self._store = context_store
         self._git = git_client
         self._workspace_root = workspace_root
@@ -654,7 +663,7 @@ class SpecContextService:
     def _owned_slug(self, name: str, repo: Path) -> str:
         """*repo*'s slug through the ONE resolver; a repo *name* does not own is refused —
         fix: its owner's publish, or the registration that makes it *name*'s."""
-        owner = repo_owner(self._workspace_root, repo)
+        owner = self._repo_owner(self._workspace_root, repo)
         if owner is not None and owner[0] == name:
             return owner[1]
         fix = (

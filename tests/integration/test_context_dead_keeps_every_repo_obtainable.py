@@ -15,6 +15,8 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.invocation import repo_owner
+
 pytest.importorskip("fcntl")
 
 from dadaia_workspace.core.cli_line import shell_line  # noqa: E402
@@ -68,6 +70,7 @@ def _setup(tmp_path: Path, lib_url: str) -> tuple[SpecContextService, FakeContex
         )
     )
     service = SpecContextService(
+        repo_owner=repo_owner,
         context_store=store,
         git_client=GitSubprocessClient(),
         workspace_root=ws,

@@ -22,6 +22,8 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.invocation import repo_owner
+
 pytest.importorskip("fcntl")
 
 from dadaia_workspace.core.models.spec_context import (  # noqa: E402
@@ -79,6 +81,7 @@ class _WritableObjectsGitClient(GitSubprocessClient):
 def _make_service(workspace_root: Path) -> tuple[SpecContextService, FakeContextStore]:
     store = FakeContextStore()
     service = SpecContextService(
+        repo_owner=repo_owner,
         context_store=store,
         git_client=_WritableObjectsGitClient(),
         workspace_root=workspace_root,
@@ -221,6 +224,7 @@ def test_dead_proceeds_gitignored_clean_tree_and_readonly_objects_real_git(
 
     store2 = FakeContextStore()
     service2 = SpecContextService(
+        repo_owner=repo_owner,
         context_store=store2,
         git_client=_WritableObjectsGitClient(),
         workspace_root=workspace_root,
@@ -242,6 +246,7 @@ def test_dead_proceeds_gitignored_clean_tree_and_readonly_objects_real_git(
 
     store3 = FakeContextStore()
     service3 = SpecContextService(
+        repo_owner=repo_owner,
         context_store=store3,
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
