@@ -185,8 +185,9 @@ def _gitflow(
 
 
 def _move_foreign(target: Path, rerun: tuple[str, ...], replace_foreign: bool) -> None:
-    """``specs/`` -> ``specs-bkp/`` (a UTC-stamped sibling when that exists) under
-    ``--replace-foreign``; exits on a refusal, writing nothing."""
+    """``specs/`` -> ``specs-bkp/`` (``specs-bkp/<UTC>/`` when that exists: the one
+    backup location baseline publishes) under ``--replace-foreign``; exits on a
+    refusal, writing nothing."""
     if not replace_foreign:
         typer.echo(
             f"[refused] {target} is a foreign specs tree; nothing written.\n"
@@ -196,6 +197,7 @@ def _move_foreign(target: Path, rerun: tuple[str, ...], replace_foreign: bool) -
         raise typer.Exit(2)
     backup = target.parent / _BACKUP
     if backup.exists():
-        backup = backup.with_name(f"{_BACKUP}-{datetime.now(UTC):%Y%m%dT%H%M%SZ}")
-    container.build_git_client().move(target.parent, target.name, backup.name)
+        backup = backup / f"{datetime.now(UTC):%Y%m%dT%H%M%SZ}"
+    rel = backup.relative_to(target.parent).as_posix()
+    container.build_git_client().move(target.parent, target.name, rel)
     typer.echo(f"[moved] {target} -> {backup} (staged, not committed)")

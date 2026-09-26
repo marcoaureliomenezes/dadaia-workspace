@@ -151,10 +151,11 @@ def test_no_context_resolved_exits_2_with_a_fix_line(repo: Path) -> None:
     assert ".dadaia/.venv/bin/dadaia specs init --context '<name>'" in result.output
 
 
-def test_an_existing_specs_bkp_is_kept_and_the_tree_moves_to_a_stamped_sibling(
+def test_an_existing_specs_bkp_is_kept_and_the_tree_moves_to_a_stamped_child(
     repo: Path,
 ) -> None:
-    """Review finding 8: a prior backup is never overwritten nor deleted."""
+    """Review finding 8: a prior backup is never overwritten nor deleted. Review H1: the
+    new one lands INSIDE specs-bkp/ — the one onboarding path baseline publishes."""
     _foreign(repo)
     (repo / "specs-bkp").mkdir()
     (repo / "specs-bkp" / "old.md").write_text("previous backup\n", encoding="utf-8")
@@ -163,7 +164,8 @@ def test_an_existing_specs_bkp_is_kept_and_the_tree_moves_to_a_stamped_sibling(
 
     assert result.exit_code == 0, result.output
     assert (repo / "specs-bkp" / "old.md").read_text(encoding="utf-8") == "previous backup\n"
-    assert [p.name for p in repo.glob("specs-bkp-*/features/login.md")] == ["login.md"]
+    assert [p.name for p in repo.glob("specs-bkp/*/features/login.md")] == ["login.md"]
+    assert list(repo.glob("specs-bkp-*")) == []
 
 
 def test_a_symlinked_context_specs_root_is_refused_and_nothing_written(
