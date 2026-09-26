@@ -43,5 +43,7 @@ def test_a_fix_line_runs_verbatim_in_the_host_shell(shell: list[str], tmp_path: 
         pytest.skip(f"Git Bash is not installed at {shell[0]}")
     _plant_cli(tmp_path)
     line = fix_line(tmp_path)
-    ran = subprocess.run([*shell, line], capture_output=True, text=True, timeout=25)
+    # The timeout only guards a hang: a PowerShell cold start on a loaded Windows runner
+    # exceeded 25 s (run 36269883321) while the line itself was fine.
+    ran = subprocess.run([*shell, line], capture_output=True, text=True, timeout=120)
     assert ran.returncode == 0, f"{line}\n{ran.stdout}{ran.stderr}"
