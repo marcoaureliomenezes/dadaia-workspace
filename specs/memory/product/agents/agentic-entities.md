@@ -49,7 +49,7 @@ The one enumeration; every harness atom links here.
 
 - `tests/contract/test_agentic_entities_derivation.py` pins the bijection, wired-hook coverage, harness coverage and the universal surface.
 - `tests/contract/test_behavior_map.py` is the map enforcer: red on a member without a row, a section without an owner, a row naming a missing member, a changed member without its new hash tuple, or an undeclared overlap; it also resolves every path and `dadaia` verb a public asset cites (`dadaia_workspace/features/specs/citations.py`), every `dd-*` body pointer, and requires `disable-model-invocation: true` on a skill no persona grants.
-- `tests/contract/test_onboarding_text.py` holds shipped text — `public/` Markdown and text, `docs/*.md`, `README.md`, `llms.txt`, `CONTEXT.md` — to zero backticked bare `dadaia` invocations (the venv path `.dadaia/.venv/bin/dadaia` only), and every flag the law or a skill cites beside a venv-path verb to one that verb accepts.
+- `tests/contract/test_fix_lines_use_the_builder.py` holds every fix position in production code — a `fix:` literal, a `fix=`/`fix_help=` argument, a `Step`/`Refusal` fix — to `core/cli_line.fix_line`: no venv-path literal and no bare `dadaia ` command; `tests/contract/test_onboarding_steps.py` pins the onboarding step list (ids, kinds, order). No test holds shipped Markdown to zero bare `dadaia` invocations or checks cited flags; only a cited verb is checked (`dead_verb_citations`).
 - `dadaia public doctor`'s attesting `entities-derivation` check (`ENT-DERIVE-1`) inspects the installed package: a stub persona, an identity swap between filename and `name:`, or a behaviour naming a missing hook module each report drift.
 
 ## Dependencies
