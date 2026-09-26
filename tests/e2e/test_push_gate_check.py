@@ -40,6 +40,8 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.cli_line import shell_line
+
 pytestmark = pytest.mark.e2e
 
 _SLUG = "demo-ctx"
@@ -159,7 +161,8 @@ def test_a_custom_gitflow_governs_the_push(tmp_path: Path) -> None:
     assert _run_push_gate(repo, tmp_path, _push("work/0.0.1", sha)).returncode == 0
     refused = _run_push_gate(repo, tmp_path, _push("feature/0.0.1", sha))
     assert refused.returncode != 0
-    assert "fix: git checkout -b 'work/<M.m.p>' trunk" in refused.stderr, refused.stderr
+    fix = shell_line("git", "-C", str(repo), "checkout", "-b", "work/<M.m.p>")
+    assert f"fix: {fix}" in refused.stderr, refused.stderr
 
 
 def test_an_absent_gitflow_block_warns_and_falls_back_to_the_default(tmp_path: Path) -> None:
