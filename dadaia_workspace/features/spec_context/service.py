@@ -20,11 +20,13 @@ from dadaia_workspace.core.exceptions import (
     ContextNotFoundError,
     ContextStateError,
     DadaiaError,
+    GitCloneError,
     GitSyncError,
     InvalidContextNameError,
     RepoUrlMissingError,
 )
 from dadaia_workspace.core.gitflow import Gitflow
+from dadaia_workspace.core.invocation import repo_owner
 from dadaia_workspace.core.models.spec_context import (
     CONTEXT_NAME_RE,
     AssociatedRepo,
@@ -35,6 +37,7 @@ from dadaia_workspace.core.models.spec_context import (
 from dadaia_workspace.core.specs_version import read_gitflow
 from dadaia_workspace.core.template_history import was_shipped
 from dadaia_workspace.features.spec_context import sweep
+from dadaia_workspace.infrastructure.git_objects import unpublished
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.privacy_check import (
@@ -47,6 +50,15 @@ _log = logging.getLogger(__name__)
 _ONBOARDING = ("specs", "specs-bkp", "AGENTS.md")
 _TAG_RE = re.compile(r"v?(\d+)\.(\d+)\.(\d+)")
 _FIX_RE = re.compile(r"^fix: ", re.MULTILINE)
+_REJECTED_RE = re.compile(r"\[rejected\]\s+\S+ -> (\S+) \((?:fetch first|non-fast-forward)\)")
+_UNREACHABLE_RE = re.compile(
+    r"Could not read from remote|does not appear to be a git repository|unable to access|"
+    r"Could not resolve host"
+)
+#: baseline's own commits carry this date, so every run rebuilds the identical birth and
+#: recognises its own earlier work commit (first parent = the start, this date).
+_BUILD_DATE = "946684800 +0000"
+_BUILD_ENV = {"GIT_AUTHOR_DATE": _BUILD_DATE, "GIT_COMMITTER_DATE": _BUILD_DATE}
 
 
 class InstallHooks(Protocol):
@@ -173,11 +185,17 @@ def project_gitflow(
     return read_gitflow(repo / "specs", text or "")
 
 
-def _sync_failure(exc: GitSyncError, rerun: str, lead: str = "") -> GitSyncError:
-    """A failed git step with ONE fix line: the pre-push gate's, riding in git's own output
-    when the gate refused, else re-running the verb once the remote answers."""
-    fix = "" if _FIX_RE.search(str(exc)) else f"\nfix: {rerun}"
-    return GitSyncError(f"{lead}{exc}{fix}")
+def _sync_failure(exc: GitSyncError, repo: Path, rerun: str, lead: str = "") -> GitSyncError:
+    """A failed git step, its fix from its cause: the pre-push gate's own (already in
+    git's output); a non-fast-forward rejection → rebase on the remote branch; an
+    unreachable remote → rerun the verb; anything else → git's stderr, no fix."""
+    text = str(exc)
+    rejected = _REJECTED_RE.search(text)
+    if rejected:
+        fix = "\nfix: " + git_line(repo, "pull", "--rebase", "origin", rejected[1])
+    else:
+        fix = f"\nfix: {rerun}" if _UNREACHABLE_RE.search(text) and not _FIX_RE.search(text) else ""
+    return GitSyncError(f"{lead}{text}{fix}")
 
 
 class SpecContextService:
@@ -445,7 +463,10 @@ class SpecContextService:
     def show(self, name: str) -> SpecContextProject:
         ctx = self._store.get(name)
         if ctx is None:
-            raise ContextNotFoundError(f"Context '{name}' not found.")
+            fix = fix_line(
+                self._workspace_root, "context", "create", name, "--main-repo", "<clone-url>"
+            )
+            raise ContextNotFoundError(f"Context '{name}' not found.\nfix: {fix}")
         return ctx
 
     # ------------------------------------------------------------------ branch resolution (FR18)
@@ -496,10 +517,7 @@ class SpecContextService:
         receives checkout and branch tracking. alive() writes no specs and commits
         nothing (0.4.8 AC3.7): the working tree is exactly what the remote holds.
         """
-        ctx = self._store.get(name)
-        if ctx is None:
-            raise ContextNotFoundError(f"Context '{name}' not found.")
-
+        ctx = self.show(name)
         for repo in self._backfilled(ctx).all_repos():
             repo_dest = self._repo_path(repo.slug)
             if not repo_dest.exists():
@@ -509,7 +527,11 @@ class SpecContextService:
                         f"'{repo.slug}' has no clone URL and no checkout at repos/{repo.slug} "
                         f"— 'context alive {name}' cannot obtain it.\nfix: {fix}"
                     )
-                self._git.clone(repo.url, repo_dest)
+                try:
+                    self._git.clone(repo.url, repo_dest)
+                except GitCloneError as exc:
+                    rerun = fix_line(self._workspace_root, "context", "alive", name)
+                    raise _sync_failure(GitSyncError(str(exc)), repo_dest, rerun) from None
             self._install_hooks(repo_dest)
 
         if ctx.state == ContextState.ALIVE:
@@ -534,9 +556,7 @@ class SpecContextService:
         except Exception:
             actual_branch = None
 
-        ctx_fresh = self._store.get(name)
-        if ctx_fresh is None:
-            raise ContextNotFoundError(f"Context '{name}' not found.")
+        ctx_fresh = self.show(name)
         if ctx_fresh.state == ContextState.ALIVE:
             return ctx_fresh
         alive_ctx = replace(
@@ -560,23 +580,30 @@ class SpecContextService:
     # ------------------------------------------------------------------ baseline
 
     def baseline(
-        self, name: str, *, message: str = "chore: publish the dadaia specs", republish: str = ""
+        self,
+        name: str,
+        target: Path | None = None,
+        *,
+        message: str = "chore: publish the dadaia specs",
+        republish: bool = False,
     ) -> str:
-        """Publish an onboarded project (ADRs 0035, 0042) and return its work branch: the
-        work commit (the integration tip plus the onboarding paths) is built and checked
-        out BEFORE the pushes of the contentless births and of the work branch, so the
-        gate reads, committed at HEAD, the very gitflow read here (ADR 0048). Invoking
-        it is the consent; a published project is a no-op (``""``). *republish* (a repo
-        slug of the set) is the pre-push gate's rewrite fix instead: that repo's
-        unpublished commits and tracked edits squash into ONE commit on what the remotes
-        hold, pushed on its branch — the gate itself writes nothing (operator 2026-09-26)."""
+        """Publish repo *target* (default: the main repo) of context *name*; return its work
+        branch (ADRs 0035, 0042). The missing principal/integration are born at the
+        published principal or a deterministic contentless commit; the work branch is the
+        integration tip plus, in the main repo, the onboarding paths — checked out, then
+        ONE atomic push. Every precondition refuses before any write; a published repo is
+        a no-op (``""``). *republish* is the pre-push gate's rewrite fix instead: *target*'s
+        unpublished commits and tracked edits squash into ONE commit, pushed on its branch."""
         ctx = self.show(name)
-        slug = republish or ctx.repo_slug
-        if slug not in {r.slug for r in ctx.all_repos()}:
-            raise AssociatedRepoNotFoundError(f"'{slug}' is not a repo of context '{name}'.")
-        repo = self._repo_path(slug)
+        repo = target or self._repo_path(ctx.repo_slug)
+        again = [*([str(target)] if target else []), *(["--republish"] if republish else [])]
+        rerun = fix_line(self._workspace_root, "context", "baseline", name, *again)
+        slug = self._owned_slug(name, repo)
         if not repo.is_dir() or not self._git.is_git_root(repo):
-            raise ContextStateError(f"Context '{name}' has no Git repository at '{repo}'.")
+            fix = fix_line(self._workspace_root, "context", "alive", name)
+            raise ContextStateError(
+                f"Context '{name}' has no Git repository at '{repo}'.\nfix: {fix}"
+            )
         git = partial(self._git.git, repo)
         try:  # git's own identity rule (env, config, auto-detection) — never a second one
             for ident in ("GIT_AUTHOR_IDENT", "GIT_COMMITTER_IDENT"):
@@ -586,63 +613,118 @@ class SpecContextService:
             key = "user.email" if named else "user.name"
             fix = git_line(repo, "config", key, f"<{key}>")
             raise ContextStateError(f"Context '{name}': {exc}\nfix: {fix}") from None
-        rerun = ("--republish", slug) if republish else ()
+        main = slug == ctx.repo_slug
+        onboarding = _ONBOARDING if main else ()
         try:
             if republish:
                 work = self._squash_unpublished(repo)
                 if work:
                     git("push", "-u", "origin", work)
                 return work
-            self._require_publishable(name, repo)
+            self._require_publishable(name, repo, onboarding)
             git("fetch", "--prune", "--tags", "origin")
-            flow, _ = read_gitflow(repo / "specs")
-            if self._git.published(repo, flow.integration):
+            flow, _ = read_gitflow(self._repo_path(ctx.repo_slug) / "specs")
+            heads = git("for-each-ref", "--format=%(refname:lstrip=3)", "refs/remotes/origin")
+            births = [b for b in (flow.principal, flow.integration) if b not in heads.split()]
+            if not births and (not main or self._git.published(repo, flow.integration)):
                 return ""
-            heads = git(
-                "for-each-ref", "--format=%(refname:lstrip=3)", "refs/remotes/origin"
-            ).split()
             tags = (_TAG_RE.fullmatch(t) for t in git("tag", "--sort=-v:refname").split())
             last = next((m for m in tags if m), None)
             work = f"{flow.work_prefix}{f'{last[1]}.{last[2]}.{int(last[3]) + 1}' if last else '0.1.0'}"
-            rebuilt = self._git.current_branch(repo) == work  # a failed push left it built
-            if flow.principal in heads:
+            if flow.principal in births:
+                empty = git("hash-object", "-t", "tree", "--stdin", stdin="")
+                birth = f"chore: birth of {flow.principal}"
+                base = git("commit-tree", empty, "-m", birth, env=_BUILD_ENV)
+            else:
                 base = git("rev-parse", f"origin/{flow.principal}")
-            elif rebuilt:
-                base = git("rev-list", "--max-parents=0", "HEAD").split()[-1]
-            else:
-                tree = git("hash-object", "-t", "tree", "--stdin", stdin="")
-                base = git("commit-tree", tree, "-m", f"chore: birth of {flow.principal}")
-            births = [  # by refspec: a local head is the operator's, never reset
-                f"{base}:refs/heads/{branch}"
-                for branch in (flow.principal, flow.integration)
-                if branch not in heads
-            ]
-            paths = [p for p in _ONBOARDING if (repo / p).exists()]
-            if rebuilt:
-                self._git.commit_paths(repo, message, paths)
-            else:
-                start = f"origin/{flow.integration}" if flow.integration in heads else base
-                git("read-tree", start)
-                git("add", "--", *paths)
-                commit = git("commit-tree", git("write-tree"), "-p", start, "-m", message)
-                git("checkout", "-f", "-b", work, commit)
-            if births:
-                git("push", "origin", *births)
-            git("push", "-u", "origin", work)
+            start = (
+                base
+                if flow.integration in births
+                else git("rev-parse", f"origin/{flow.integration}")
+            )
+            commit = self._work_commit(repo, start, message, onboarding)
+            self._refuse_foreign_work(repo, work, start, commit)
+            git("checkout", "-f", "-B", work, commit)
+            refspecs = [f"{base}:refs/heads/{branch}" for branch in births]
+            git("push", "--atomic", "-u", "origin", *refspecs, work)
         except GitSyncError as exc:
-            raise _sync_failure(
-                exc, fix_line(self._workspace_root, "context", "baseline", name, *rerun)
-            ) from None
+            raise _sync_failure(exc, repo, rerun) from None
         return work
+
+    def _owned_slug(self, name: str, repo: Path) -> str:
+        """*repo*'s slug through the ONE resolver; a repo *name* does not own is refused —
+        fix: its owner's publish, or the registration that makes it *name*'s."""
+        owner = repo_owner(self._workspace_root, repo)
+        if owner is not None and owner[0] == name:
+            return owner[1]
+        fix = (
+            fix_line(self._workspace_root, "context", "baseline", owner[0], str(repo))
+            if owner
+            else fix_line(
+                self._workspace_root,
+                "context",
+                "repo",
+                "add",
+                name,
+                repo.name,
+                "--url",
+                "<clone-url>",
+            )
+        )
+        raise AssociatedRepoNotFoundError(
+            f"'{repo}' is not a repo of context '{name}'.\nfix: {fix}"
+        )
+
+    def _work_commit(
+        self, repo: Path, start: str, message: str, onboarding: tuple[str, ...]
+    ) -> str:
+        """*start* plus *repo*'s onboarding paths, built in a private index at baseline's
+        fixed dates (no path: *start* itself) — the operator's index is never written."""
+        paths = [p for p in onboarding if (repo / p).exists()]
+        if not paths:
+            return start
+        git = partial(self._git.git, repo)
+        index = repo / git("rev-parse", "--git-path", "dadaia-baseline-index")
+        env = {**_BUILD_ENV, "GIT_INDEX_FILE": str(index)}
+        git("read-tree", start, env=env)
+        git("add", "--", *paths, env=env)
+        tree = git("write-tree", env=env)
+        index.unlink()
+        return git("commit-tree", tree, "-p", start, "-m", message, env=env)
+
+    def _refuse_foreign_work(self, repo: Path, work: str, start: str, commit: str) -> None:
+        """Refuse, before any write, a local or origin *work* branch baseline did not build
+        (baseline's own: *commit*, *start*, or a commit on *start* at the fixed date) —
+        rename the local one; keep a local copy of the origin one, then delete it there."""
+        git = partial(self._git.git, repo)
+        for ref in (f"refs/heads/{work}", f"refs/remotes/origin/{work}"):
+            sha = git("for-each-ref", "--format=%(objectname)", ref)
+            own = f"{start} {_BUILD_DATE}"
+            if (
+                not sha
+                or sha in (commit, start)
+                or git("show", "-s", "--format=%P %cd", "--date=raw", sha) == own
+            ):
+                continue
+            if ref.startswith("refs/heads/"):
+                fix = git_line(repo, "branch", "-m", work, "<other-name>")
+            elif git("for-each-ref", "--contains", sha, "--format=%(refname)", "refs/heads"):
+                fix = git_line(repo, "push", "origin", "--delete", work)
+            else:
+                fix = git_line(repo, "branch", "<other-name>", f"origin/{work}")
+            raise ContextStateError(
+                f"'{ref}' carries work baseline did not build, and the publish mints '{work}'. "
+                f"Nothing was touched.\nfix: {fix}"
+            )
 
     def _squash_unpublished(self, repo: Path) -> str:
         """Squash *repo*'s commits no remote holds, plus its tracked edits, into one
         commit on their published parent; return the branch (``""``: nothing to squash)."""
         git = partial(self._git.git, repo)
-        unpublished = git("rev-list", "--reverse", "HEAD", "--not", "--remotes").split()
-        if not unpublished:
+        commits = unpublished(repo, "HEAD")
+        if not commits:
             return ""
-        parent = git("rev-list", "--parents", "-n1", unpublished[0]).split()[1:2]
+        parent = git("rev-list", "--parents", "-n1", commits[-1]).split()[1:2]
         git("add", "-u")
         message = "chore: republish without the refused content"
         squashed = git(
@@ -651,7 +733,7 @@ class SpecContextService:
         git("reset", "--soft", squashed)
         return self._git.current_branch(repo) or "HEAD"
 
-    def _require_publishable(self, name: str, repo: Path) -> None:
+    def _require_publishable(self, name: str, repo: Path, allowed: tuple[str, ...]) -> None:
         """Refuse, before any write, a change outside the onboarding paths (born repos:
         an unborn clone's foreign files are never committed) or a secret in an untracked
         file the publish would commit — a stash fix naming the real paths, or (a secret the
@@ -662,14 +744,14 @@ class SpecContextService:
             if self._git.has_commits(repo)
             else []
         )
-        foreign = sorted({p for p in changed if p and p.split("/")[0] not in _ONBOARDING})
+        foreign = sorted({p for p in changed if p and p.split("/")[0] not in allowed})
         flagged = {
             rel: sorted(set(hits))
             for rel in untracked
-            if rel.split("/")[0] in _ONBOARDING and (hits := _scan_file_for_secrets(repo / rel))
+            if rel.split("/")[0] in allowed and (hits := _scan_file_for_secrets(repo / rel))
         }
         refusal = (
-            f"changes outside {', '.join(_ONBOARDING)} are not published."
+            f"changes outside {', '.join(allowed) or 'nothing'} are not published."
             if foreign
             else "secret scan blocked the publish (values redacted) — remove each value, then "
             "publish again:\n"
@@ -772,11 +854,12 @@ class SpecContextService:
         Concurrent races are accepted and surface through git; this operation
         never waits for or refuses another session.
         """
-        ctx = self._store.get(name)
-        if ctx is None:
-            raise ContextNotFoundError(f"Context '{name}' not found.")
+        ctx = self.show(name)
         if ctx.state != ContextState.ALIVE:
-            raise ContextStateError(f"Context '{name}' is not ALIVE. It cannot be made DEAD.")
+            raise ContextStateError(
+                f"Context '{name}' is not ALIVE. It cannot be made DEAD.\nfix: "
+                + fix_line(self._workspace_root, "context", "alive", name)
+            )
 
         # Back-fill every URL from the on-disk origin while the repos still exist
         # (FR-W2-03 b), BEFORE the rmtree below — a DEAD record stays re-obtainable.
@@ -844,7 +927,7 @@ class SpecContextService:
                     consent = ("--commit",) if commit else ()
                     rerun = fix_line(self._workspace_root, "context", "dead", name, *consent)
                     lead = f"Git sync failed for context '{name}' repo '{slug}'; nothing was removed.\n"
-                    raise _sync_failure(exc, rerun, lead) from exc
+                    raise _sync_failure(exc, repo_path, rerun, lead) from exc
             sweep.rmtree(repo_path)
 
         dead_ctx = SpecContextProject(

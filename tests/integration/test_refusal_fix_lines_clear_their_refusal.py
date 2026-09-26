@@ -661,6 +661,18 @@ def _dead_non_ff(world: World) -> list[str]:
     return ["context", "dead", "proj"]
 
 
+def _dead_twice(world: World) -> list[str]:
+    """Review M-A: dead on a DEAD context."""
+    world.seed(_constitution())
+    store = JsonContextStore(world.ws / ".dadaia" / "states")
+    store.update(
+        SpecContextProject(
+            "proj", ContextState.DEAD, "proj", world.bare.as_uri(), "2026-01-01T00:00:00+00:00"
+        )
+    )
+    return ["context", "dead", "proj"]
+
+
 def _dead_clean_detached(world: World) -> list[str]:
     """Review LOW (P8): a clean published detached HEAD has nothing to push."""
     _published(world)
@@ -674,38 +686,63 @@ def _drop_readme_term(world: World) -> None:
 
 # ── the census ───────────────────────────────────────────────────────────────────────
 
-_MODULES = {
+_CHOKEPOINTS = {
     "branch_policy": _PKG / "features" / "chokepoints" / "branch_policy.py",
     "push_gate": _PKG / "features" / "chokepoints" / "push_gate.py",
-    "ci": _PKG / "cli" / "commands" / "ci.py",
-    "service": _PKG / "features" / "spec_context" / "service.py",
+}
+#: Each module whose verbs raise, and the verbs — every ``raise`` reachable from them
+#: (``self.<method>()`` and module-level calls, transitively) is a site.
+_VERBS = {
+    "ci": (_PKG / "cli" / "commands" / "ci.py", ("push_gate_check",)),
+    "service": (_PKG / "features" / "spec_context" / "service.py", ("alive", "baseline", "dead")),
 }
 
 SITES: dict[str, tuple[Case, ...] | Skip] = {
     "branch_policy._refuse_branch#0": (Case(_birth_published, _develop_at_main, replaces=True),),
-    "branch_policy._refuse_branch#1": (Case(_birth_unpublished, _baseline_done, replaces=True),),
-    "branch_policy._refuse_branch#2": (Case(_outside, _work_carries_topic),),
+    "branch_policy._refuse_branch#1": (
+        Case(_birth_unpublished, _baseline_done, replaces=True),
+        Case(_assoc_unpublished, _assoc_published, replaces=True),
+    ),
+    "branch_policy._refuse_branch#2": (
+        Case(_outside, _work_carries_topic, then="git push -q origin feature/1.0.0"),
+        Case(_outside_with_work, _work_carries_topic, then="git push -q origin feature/1.0.0"),
+        Case(_outside_detached, _work_carries_topic, then="git push -q origin feature/1.0.0"),
+    ),
     "branch_policy._refuse_branch#3": Skip("`gh pr create` needs GitHub; the PR path is the fix"),
     "branch_policy.check_branch_policy#0": (
         Case(_mismatch, _work_pushed, then="git push -q origin feature/1.0.0"),
     ),
     "push_gate._compose_denylist_refusal#0": (
         Case(_denylisted, _clean_publish, operator=_drop_term),
+        Case(_denylisted_in_a_worktree, _worktree_clean, operator=_drop_worktree_term),
+        Case(_denylisted_no_context, _clean_publish, operator=_drop_term),
     ),
     "push_gate._run_denylist_scan#0": Skip("needs a corrupted object store; `git fsck` names it"),
     "push_gate._compose_specs_canon_refusal#0": (Case(_non_canon, _no_junk, operator=_rm_junk),),
     "push_gate.push_gate_decision#0": (Case(_malformed, _work_pushed, replaces=True),),
+    "ci._repo_root#0": Skip("the pre-push hook always runs inside the repo it pushes"),
+    "ci.push_gate_check#0": Skip("the gate's refusal: its fix is a branch_policy/push_gate site"),
+    "service.SpecContextService.show#0": (Case(_unknown_context, _cloned),),
     "service.SpecContextService.alive#0": (Case(_no_url_no_checkout, _cloned),),
-    "service.SpecContextService.baseline#0": (Case(_no_identity, _baseline_done),),
+    "service.SpecContextService.alive#1": (
+        Case(_alive_remote_gone, _cloned, operator=_remote_back, replaces=True),
+    ),
+    "service.SpecContextService.baseline#0": (Case(_no_checkout, _cloned),),
+    "service.SpecContextService.baseline#1": (Case(_no_identity, _baseline_done),),
+    "service.SpecContextService.baseline#2": (
+        Case(_remote_gone, _baseline_done, operator=_remote_back, replaces=True),
+        Case(_baseline_denylisted, _baseline_done, operator=_drop_draft_term),
+        Case(_republish_non_ff, _both_on_work),
+    ),
+    "service.SpecContextService._owned_slug#0": (Case(_unregistered_repo, _nope_cloned),),
+    "service.SpecContextService._refuse_foreign_work#0": (
+        Case(_work_name_taken_locally, _baseline_done),
+        Case(_work_name_taken_everywhere, _baseline_done),
+        Case(_work_name_on_origin_only, _baseline_done),
+    ),
     "service.SpecContextService._require_publishable#0": (
         Case(_foreign_change, _baseline_done),
         Case(_secret_draft, _baseline_done, operator=_drop_secret),
-    ),
-    "service._sync_failure#0": (
-        Case(_remote_gone, _baseline_done, operator=_remote_back, replaces=True),
-        Case(_baseline_denylisted, _baseline_done, operator=_drop_draft_term),
-        Case(_dead_remote_gone, _dead_done, operator=_remote_back, replaces=True),
-        Case(_dead_denylisted, _dead_done, operator=_drop_readme_term),
     ),
     "service.SpecContextService._enforce_dead_review_gate#0": Skip(
         "fires only when `git ls-files` itself fails on a git root"
@@ -716,42 +753,78 @@ SITES: dict[str, tuple[Case, ...] | Skip] = {
     "service.SpecContextService._enforce_dead_review_gate#2": (
         Case(_secret_untracked, _dead_done),
     ),
-    "service.SpecContextService.dead#0": (Case(_no_origin, _dead_done),),
-    "service.SpecContextService.dead#1": (Case(_unborn_dirty, _dead_done),),
-    "service.SpecContextService.dead#2": (Case(_commits_no_remote, _dead_done),),
-    "service.SpecContextService.dead#3": (Case(_dirty_on_integration, _dead_via_work),),
+    "service.SpecContextService.dead#0": (Case(_dead_twice, _dead_done),),
+    "service.SpecContextService.dead#1": (Case(_no_origin, _dead_done),),
+    "service.SpecContextService.dead#2": (Case(_unborn_dirty, _dead_done),),
+    "service.SpecContextService.dead#3": (Case(_commits_no_remote, _dead_done),),
+    "service.SpecContextService.dead#4": (Case(_dirty_on_integration, _dead_via_work),),
+    "service.SpecContextService.dead#5": (
+        Case(_dead_remote_gone, _dead_done, operator=_remote_back, replaces=True),
+        Case(_dead_denylisted, _dead_done, operator=_drop_readme_term),
+        Case(_dead_non_ff, _dead_done),
+    ),
 }
 
 
-def _fix_sites() -> list[str]:
-    """Every ``fix:`` producer, by enclosing function and order: a string constant
-    carrying ``fix:`` or a call to branch_policy's ``_blocked`` (whose own body is the
-    shared renderer, not a site)."""
-    sites: list[str] = []
-    for stem, path in _MODULES.items():
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-        scopes: list[tuple[str, ast.AST]] = []
-        for node in tree.body:
-            if isinstance(node, ast.ClassDef):
-                scopes += [
-                    (f"{node.name}.{f.name}", f)
-                    for f in node.body
-                    if isinstance(f, ast.FunctionDef)
-                ]
-            elif isinstance(node, ast.FunctionDef) and node.name != "_blocked":
-                scopes.append((node.name, node))
-        for name, fn in scopes:
-            hits = sorted(
-                n.lineno
-                for n in ast.walk(fn)
-                if (isinstance(n, ast.Constant) and isinstance(n.value, str) and "fix:" in n.value)
-                or (
-                    isinstance(n, ast.Call)
-                    and isinstance(n.func, ast.Name)
-                    and n.func.id == "_blocked"
-                )
+def _scopes(tree: ast.Module) -> dict[str, ast.FunctionDef]:
+    scopes: dict[str, ast.FunctionDef] = {}
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef):
+            scopes |= {
+                f"{node.name}.{f.name}": f for f in node.body if isinstance(f, ast.FunctionDef)
+            }
+        elif isinstance(node, ast.FunctionDef):
+            scopes[node.name] = node
+    return scopes
+
+
+def _reachable(scopes: dict[str, ast.FunctionDef], roots: tuple[str, ...]) -> list[str]:
+    """Every scope the *roots* reach through ``self.<m>()`` or a module-level call."""
+    by_name = {qual.rsplit(".", 1)[-1]: qual for qual in scopes}
+    todo, seen = [by_name[r] for r in roots], set()
+    while todo:
+        qual = todo.pop()
+        if qual in seen:
+            continue
+        seen.add(qual)
+        for node in ast.walk(scopes[qual]):
+            func = node.func if isinstance(node, ast.Call) else None
+            callee = (
+                func.attr
+                if isinstance(func, ast.Attribute)
+                and isinstance(func.value, ast.Name)
+                and func.value.id == "self"
+                else func.id
+                if isinstance(func, ast.Name)
+                else None
             )
+            if callee in by_name:
+                todo.append(by_name[callee])
+    return sorted(seen)
+
+
+def _fix_sites() -> list[str]:
+    """The chokepoints' refusals (a string constant carrying ``fix:`` or a call to
+    branch_policy's ``_blocked``, whose own body is the renderer) and every ``raise``
+    the verbs reach — by enclosing function and order."""
+    sites: list[str] = []
+    for stem, path in _CHOKEPOINTS.items():
+        for name, fn in _scopes(ast.parse(path.read_text(encoding="utf-8"))).items():
+            hits = [
+                n
+                for n in ast.walk(fn)
+                if name != "_blocked"
+                and (
+                    (isinstance(n, ast.Constant) and isinstance(n.value, str) and "fix:" in n.value)
+                    or (isinstance(n, ast.Call) and getattr(n.func, "id", "") == "_blocked")
+                )
+            ]
             sites += [f"{stem}.{name}#{i}" for i in range(len(hits))]
+    for stem, (path, roots) in _VERBS.items():
+        scopes = _scopes(ast.parse(path.read_text(encoding="utf-8")))
+        for name in _reachable(scopes, roots):
+            raises = [n for n in ast.walk(scopes[name]) if isinstance(n, ast.Raise) and n.exc]
+            sites += [f"{stem}.{name}#{i}" for i in range(len(raises))]
     return sites
 
 
@@ -765,34 +838,6 @@ _CASES = [
     if not isinstance(entry, Skip)
     for n, case in enumerate(entry)
 ]
-
-
-_ROUND5 = {
-    "outside": Case(_outside, _work_carries_topic, then="git push -q origin feature/1.0.0"),
-    "outside-work": Case(
-        _outside_with_work, _work_carries_topic, then="git push -q origin feature/1.0.0"
-    ),
-    "outside-detached": Case(
-        _outside_detached, _work_carries_topic, then="git push -q origin feature/1.0.0"
-    ),
-    "worktree": Case(_denylisted_in_a_worktree, _worktree_clean, operator=_drop_worktree_term),
-    "no-context": Case(_denylisted_no_context, _clean_publish, operator=_drop_term),
-    "assoc": Case(_assoc_unpublished, _assoc_published, replaces=True),
-    "work-local": Case(_work_name_taken_locally, _baseline_done),
-    "work-everywhere": Case(_work_name_taken_everywhere, _baseline_done),
-    "work-origin": Case(_work_name_on_origin_only, _baseline_done),
-    "republish-non-ff": Case(_republish_non_ff, _both_on_work),
-    "dead-non-ff": Case(_dead_non_ff, _dead_done),
-    "no-checkout": Case(_no_checkout, _cloned),
-    "unregistered": Case(_unregistered_repo, _nope_cloned),
-    "unknown-context": Case(_unknown_context, _cloned),
-    "alive-remote-gone": Case(_alive_remote_gone, _cloned, operator=_remote_back, replaces=True),
-}
-
-
-@pytest.mark.parametrize("key", sorted(_ROUND5))
-def test_round5(key: str, tmp_path: Path) -> None:
-    _drive(World(tmp_path), _ROUND5[key])
 
 
 def test_dead_leaves_a_clean_published_detached_head(tmp_path: Path) -> None:
@@ -844,5 +889,5 @@ def test_the_gate_is_read_only_and_its_rewrite_fix_is_the_publish_verb(tmp_path:
     fix names ``context baseline --republish``, the one verb that publishes."""
     world = World(tmp_path)
     fix = _single_fix(_hit(world, _denylisted(world)))
-    assert fix == fix_line(world.ws, "context", "baseline", "proj", "--republish", "proj")
+    assert fix == fix_line(world.ws, "context", "baseline", "proj", str(world.repo), "--republish")
     assert "--republish" not in world.cli("ci", "push-gate-check", "--help").stdout

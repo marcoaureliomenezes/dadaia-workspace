@@ -391,28 +391,32 @@ def alive(name: str = typer.Argument(..., help="Context name to make ALIVE")) ->
     except SchemaVersionError as exc:
         print(str(exc), file=sys.stderr)
         raise typer.Exit(1) from None
-    except (RepoUrlMissingError, ContextNotFoundError, ContextStateError) as e:
+    except DadaiaError as e:
         fail(e)
 
 
 @app.command()
 def baseline(
-    name: str = typer.Argument(..., help="ALIVE context whose onboarding is published"),
+    name: str = typer.Argument(..., help="Context whose onboarding is published"),
+    repo: str = typer.Argument(
+        "", help="A repo of the context: its slug or its path (default: the main repo)"
+    ),
     message: str = typer.Option(
         "chore: publish the dadaia specs", "--message", help="Commit message."
     ),
-    republish: str = typer.Option(
-        "",
+    republish: bool = typer.Option(
+        False,
         "--republish",
-        metavar="SLUG",
-        help="The pre-push gate's rewrite fix: squash repo SLUG's unpublished range "
-        "into one commit and push it.",
+        help="The pre-push gate's rewrite fix: squash the repo's unpublished range into "
+        "one commit and push it.",
     ),
 ) -> None:
-    """Publish the onboarded project: principal + integration branches, then the work
-    branch carrying specs/. Running it is the consent; a re-run is a no-op."""
+    """Publish a repo of the project: principal + integration branches, then the work
+    branch (the main repo's carries specs/). Running it is the consent; a re-run is a no-op."""
+    ws = resolve_workspace_root()
+    target = (Path(repo) if Path(repo).is_absolute() else ws / "repos" / repo) if repo else None
     try:
-        work = _ctx_service().baseline(name, message=message, republish=republish)
+        work = _ctx_service().baseline(name, target, message=message, republish=republish)
     except (DadaiaError, OSError) as exc:
         fail(exc)
     done = f"published on {work}" if work else "already published — nothing to do"

@@ -19,7 +19,7 @@ from dadaia_workspace.core.exceptions import ContextStateError, GitSyncError
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.spec_context.service import DeadSecretFoundError, SpecContextService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
-from tests.fakes import FakeContextStore
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.helpers.privacy_fixtures import aws_key_shape
 
 _CONSTITUTION = (
@@ -64,9 +64,10 @@ def _seed(bare: Path, work: Path, *branches: str, tag: str = "") -> None:
 def env(tmp_path: Path) -> tuple[SpecContextService, Path, Path]:
     root = tmp_path / "ws"
     (root / "repos").mkdir(parents=True)
+    (root / ".dadaia" / "states").mkdir(parents=True)
     bare = tmp_path / "proj.git"
     _git(tmp_path, "init", "-q", "--bare", "-b", "main", str(bare))
-    store = FakeContextStore()
+    store = JsonContextStore(root / ".dadaia" / "states")
     store.save(SpecContextProject("proj", ContextState.ALIVE, "proj", bare.as_uri(), "2026-01-01"))
     svc = SpecContextService(store, GitSubprocessClient(), root, lambda _repo: None)  # type: ignore[arg-type]
     return svc, root / "repos" / "proj", bare
@@ -325,9 +326,10 @@ def test_the_birth_is_deterministic_so_a_rerun_rebuilds_it(
         monkeypatch.setenv(var, "2002-02-02T00:00:00Z")
     other = tmp_path / "other"
     (other / "ws" / "repos").mkdir(parents=True)
+    (other / "ws" / ".dadaia" / "states").mkdir(parents=True)
     bare2 = other / "proj.git"
     _git(other, "init", "-q", "--bare", "-b", "main", str(bare2))
-    store = FakeContextStore()
+    store = JsonContextStore(other / "ws" / ".dadaia" / "states")
     store.save(SpecContextProject("proj", ContextState.ALIVE, "proj", bare2.as_uri(), "2026"))
     svc2 = SpecContextService(store, GitSubprocessClient(), other / "ws", lambda _r: None)  # type: ignore[arg-type]
     _clone_onboarded(bare2, other / "ws" / "repos" / "proj")
