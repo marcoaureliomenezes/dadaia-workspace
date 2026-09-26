@@ -236,7 +236,7 @@ def test_refusal_message_shape_and_ten_item_cap(tmp_path: Path) -> None:
     assert "z…m" in message  # masked form of the synthetic term.
     assert "operator denylist" in message
     assert "dd-release-implementation §2a" in message
-    assert "--amend" in message or "rebase" in message
+    assert "git reset --soft" in message and "rebase -i" not in message
     assert "already-published history never needs a rewrite" in message
     assert "2 more" in message or "and 2" in message  # 12 hits, 10 shown, 2 remainder.
     assert _SYNTHETIC_TERM not in message
@@ -633,5 +633,5 @@ def test_push_with_denylisted_term_only_in_a_commit_message_body_is_refused(
     )
     assert not decision.allowed
     assert _SYNTHETIC_TERM not in decision.message  # never unmasked
-    assert "rewrite the offending commit" in decision.message  # reword/amend healing
+    assert "squash the pushed range" in decision.message  # a fresh message heals it
     assert "--no-verify" in decision.message

@@ -234,3 +234,16 @@ def test_detached_head_ref_gets_a_pushable_branch_diagnosis(tmp_path: Path) -> N
     decision = _decide(_refs(f"HEAD {_SHA_A} refs/heads/work/0.0.1 {_ZERO}"), tmp_path, _CUSTOM)
     assert not decision.allowed
     assert _fix(decision)[:4] == ["git", "checkout", "-b", "work/<M.m.p>"]
+
+
+@pytest.mark.parametrize("remote_sha", [_ZERO, _SHA_B], ids=["new-branch", "existing"])
+def test_a_rewrite_refusal_fix_is_non_interactive(tmp_path: Path, remote_sha: str) -> None:
+    """Review L1: the range-rewrite fix squashes the refused range onto what the remote
+    already has — no `git rebase -i`, which an agent cannot drive."""
+    from dadaia_workspace.features.chokepoints.push_gate import _rewrite_fix
+
+    ref = PushRef("refs/heads/work/0.0.1", _SHA_A, "refs/heads/work/0.0.1", remote_sha)
+    base = remote_sha if remote_sha != _ZERO else "refs/remotes/origin/next"
+    argv = shlex.split(_rewrite_fix(ref, _CUSTOM))
+    assert argv[:4] == ["git", "reset", "--soft", base] and "-i" not in argv
+    assert argv[4:7] == ["&&", "git", "commit"]

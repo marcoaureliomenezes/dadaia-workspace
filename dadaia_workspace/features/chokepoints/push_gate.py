@@ -101,7 +101,22 @@ def _annotate_skip(
     return Decision(allowed=decision.allowed, message=decision.message, warn=warn)
 
 
-def _compose_denylist_refusal(hits: list[tuple[PushRef, Hit]], path_masker: PathMasker) -> str:
+def _rewrite_fix(ref: PushRef, gitflow: Gitflow) -> str:
+    """Squash the refused range onto what the remote already has — non-interactive."""
+    base = (
+        ref.remote_sha
+        if ref.remote_sha != ZERO_SHA
+        else f"refs/remotes/origin/{gitflow.integration}"
+    )
+    reset = shlex.join(["git", "reset", "--soft", base])
+    return f"{reset} && " + shlex.join(
+        ["git", "commit", "-m", "chore: republish without the refused content"]
+    )
+
+
+def _compose_denylist_refusal(
+    hits: list[tuple[PushRef, Hit]], path_masker: PathMasker, gitflow: Gitflow
+) -> str:
     """FR5: ref, path:line, short blob sha, masked term + source layer, the law, the
     edit + rewrite-before-push remediation, ``--no-verify``, capped at 10 hits.
 
@@ -129,9 +144,8 @@ def _compose_denylist_refusal(hits: list[tuple[PushRef, Hit]], path_masker: Path
         "`git push --no-verify` (discouraged; leaves a reflog trace)."
     )
     lines.append(
-        "Remove the term from the listed file(s), then rewrite the offending "
-        "commit(s) and push again:\n"
-        "fix: git rebase -i <first-offending-sha>^"
+        "Remove the term from the listed file(s), then squash the pushed range and push "
+        f"again:\nfix: {_rewrite_fix(hits[0][0], gitflow)}"
     )
     return "\n".join(lines)
 
@@ -263,7 +277,9 @@ def _run_denylist_scan(
         )
     oversized_notes = tuple(oversized_all)
     refusal = (
-        Decision(allowed=False, message=_compose_denylist_refusal(per_ref_hits, path_masker))
+        Decision(
+            allowed=False, message=_compose_denylist_refusal(per_ref_hits, path_masker, gitflow)
+        )
         if per_ref_hits
         else None
     )
@@ -272,7 +288,7 @@ def _run_denylist_scan(
     )
 
 
-def _compose_specs_canon_refusal(violations: list[tuple[PushRef, str]]) -> str:
+def _compose_specs_canon_refusal(violations: list[tuple[PushRef, str]], gitflow: Gitflow) -> str:
     """FR2 (v0.5.0 specs-canon closure): ref, the offending ``specs/``-relative path,
     the law, one fix hint per offending path, ``--no-verify``, capped at 10 hits —
     the SAME shape :func:`_compose_denylist_refusal` uses."""
@@ -293,9 +309,8 @@ def _compose_specs_canon_refusal(violations: list[tuple[PushRef, str]]) -> str:
         "`git push --no-verify` (discouraged; leaves a reflog trace)."
     )
     lines.append(
-        "git rm the listed specs/ path(s), then rewrite the offending commit(s) and "
-        "push again:\n"
-        "fix: git rebase -i <first-offending-sha>^"
+        "git rm the listed specs/ path(s), then squash the pushed range and push again:\n"
+        f"fix: {_rewrite_fix(violations[0][0], gitflow)}"
     )
     return "\n".join(lines)
 
@@ -322,6 +337,7 @@ def _run_specs_canon_scan(
     scan_refs: list[PushRef],
     specs_paths_by_ref: dict[str, list[str]],
     canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
+    gitflow: Gitflow,
 ) -> Decision | None:
     """SPEC v0.5.0 specs-canon closure (operator ruling 2026-08-28), range-scoped since
     2026-09-13: every ``specs/`` path the pushed range introduces or rewrites
@@ -338,7 +354,7 @@ def _run_specs_canon_scan(
         violations.extend((ref, path) for path in sorted(bad))
     if not violations:
         return None
-    return Decision(allowed=False, message=_compose_specs_canon_refusal(violations))
+    return Decision(allowed=False, message=_compose_specs_canon_refusal(violations, gitflow))
 
 
 def push_gate_decision(
@@ -432,6 +448,7 @@ def push_gate_decision(
         scan_refs,
         scan.specs_paths_by_ref,
         canon_violations_fn,
+        gitflow,
     )
     if canon_refusal is not None:
         return _annotate_skip(
