@@ -8,6 +8,7 @@ from rich.console import Console
 from rich.markup import escape
 
 from dadaia_workspace import container
+from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.workspace_resolver import resolve_cli_workspace_root
 
@@ -30,8 +31,7 @@ def import_workspace(
     try:
         result = container.build_import_service(resolve_cli_workspace_root(workspace)).run(file)
     except (DadaiaError, ValueError) as exc:
-        err_console.print(f"[red]Error:[/red] {exc}")
-        raise typer.Exit(1) from None
+        fail(exc)
     for name, reason in result.skipped:
         console.print(f"  [dim]skipped ({escape(reason)})[/dim]   {escape(name)}")
     for name in result.registered:

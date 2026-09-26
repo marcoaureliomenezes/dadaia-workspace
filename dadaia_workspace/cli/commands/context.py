@@ -13,6 +13,7 @@ from rich.console import Console
 from rich.table import Table
 
 from dadaia_workspace import container
+from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.cli._specs_resolution import alive_context_trees, resolve_session_id
 from dadaia_workspace.cli._specs_resolution import (
     resolve_context_for_cli as _resolve_context_for_cli,
@@ -28,7 +29,6 @@ from dadaia_workspace.core.exceptions import (
     ContextStateError,
     DadaiaError,
     GitCloneError,
-    GitSyncError,
     InvalidContextNameError,
     RepoUrlMissingError,
     SchemaVersionError,
@@ -40,8 +40,6 @@ from dadaia_workspace.core.models.spec_context import (
 )
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context.service import (
-    DeadReviewRequiredError,
-    DeadSecretFoundError,
     SpecContextService,
 )
 from dadaia_workspace.features.workspace import onboarding
@@ -59,8 +57,7 @@ def _ctx_service() -> SpecContextService:
     try:
         return container.build_spec_context_service(resolve_workspace_root())
     except WorkspaceNotInitializedError as exc:
-        err_console.print(f"Error: {exc}", markup=False, highlight=False, soft_wrap=True)
-        raise typer.Exit(1) from None
+        fail(exc)
     except SchemaVersionError as exc:
         # Use plain stderr so CliRunner captures it in result.output (mix_stderr=True default)
         print(str(exc), file=sys.stderr)
@@ -195,13 +192,7 @@ def create(
             main_repo, name=name, associated_urls=tuple(associated)
         )
     except (DadaiaError, OSError) as e:
-        err_console.print(f"Error: {e}", markup=False, soft_wrap=True)
-        err_console.print(
-            f"fix: {create_fix(ws, e, name, [main_repo, *associated])}",
-            markup=False,
-            soft_wrap=True,
-        )
-        raise typer.Exit(1) from None
+        fail(f"{e}\nfix: {create_fix(ws, e, name, [main_repo, *associated])}")
     suffix = f", {len(ctx.associated_repos)} associated repo(s)" if ctx.associated_repos else ""
     console.print(
         f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' created and ALIVE "
@@ -321,8 +312,7 @@ def show(
         try:
             ctx = svc.show(name)
         except ContextNotFoundError as e:
-            err_console.print(f"[red]Error:[/red] {e}")
-            raise typer.Exit(1) from None
+            fail(e)
 
     redactor: ContextRedactor | None = None
     if redact:
@@ -401,12 +391,8 @@ def alive(name: str = typer.Argument(..., help="Context name to make ALIVE")) ->
     except SchemaVersionError as exc:
         print(str(exc), file=sys.stderr)
         raise typer.Exit(1) from None
-    except RepoUrlMissingError as e:
-        err_console.print(f"Error: {e}", markup=False, soft_wrap=True)
-        raise typer.Exit(1) from None
-    except (ContextNotFoundError, ContextStateError) as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
+    except (RepoUrlMissingError, ContextNotFoundError, ContextStateError) as e:
+        fail(e)
 
 
 @app.command()
@@ -421,8 +407,7 @@ def baseline(
     try:
         work = _ctx_service().baseline(name, message=message)
     except (DadaiaError, OSError) as exc:
-        err_console.print(f"Error: {exc}", markup=False, soft_wrap=True)
-        raise typer.Exit(1) from None
+        fail(exc)
     done = f"published on {work}" if work else "already published — nothing to do"
     console.print(f"✓ '{name}' {done}", markup=False, highlight=False, soft_wrap=True)
 
@@ -444,23 +429,8 @@ def dead(
     try:
         ctx = _ctx_service().dead(name, commit=commit)
         console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now DEAD")
-    except DeadReviewRequiredError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
-    except DeadSecretFoundError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
-    except RepoUrlMissingError as e:
-        err_console.print(f"Error: {e}", markup=False, soft_wrap=True)
-        raise typer.Exit(1) from None
-    except GitSyncError as e:
-        # Residual git failures (network, refs) surface as a clean error, not a
-        # traceback (validation-029 F-06/F-22 no-traceback law).
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
-    except (ContextNotFoundError, ContextStateError) as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
+    except DadaiaError as e:
+        fail(e)
 
 
 @app.command(
@@ -493,8 +463,7 @@ def bind(
     try:
         svc.show(name)
     except ContextNotFoundError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
+        fail(e)
 
     # Stable session identity (bug bind-session-id-divergence, 2026-07-15): the SAME
     # resolution order the gate/hooks use, so rebinds UPDATE one record.
@@ -560,22 +529,12 @@ def repo_add(
     try:
         ctx, was_added = _ctx_service().add_repo(ctx_name, slug, url)
     except (ContextNotFoundError, InvalidContextNameError, AssociatedRepoConflictError) as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
+        fail(e)
     except RepoUrlMissingError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        err_console.print(
-            "fix: "
-            + fix_line(
-                resolve_workspace_root(),
-                *f"context repo add {ctx_name} {slug}".split(),
-                "--url",
-                "<clone-url>",
-            ),
-            markup=False,
-            soft_wrap=True,
+        ws = resolve_workspace_root()
+        fail(
+            f"{e}\nfix: {fix_line(ws, 'context', 'repo', 'add', ctx_name, slug, '--url', '<clone-url>')}"
         )
-        raise typer.Exit(1) from None
 
     if was_added:
         console.print(
@@ -607,11 +566,9 @@ def repo_remove(
     try:
         ctx = _ctx_service().remove_repo(ctx_name, slug)
     except ContextNotFoundError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
+        fail(e)
     except AssociatedRepoNotFoundError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
+        fail(e)
 
     console.print(
         f"[green]✓[/green] Associated repo '[bold]{slug}[/bold]' removed from context "
@@ -636,8 +593,7 @@ def delete(name: str = typer.Argument(..., help="Context name to delete")) -> No
         _ctx_service().delete(name)
         console.print(f"[green]✓[/green] Context '[bold]{name}[/bold]' deleted")
     except (ContextNotFoundError, ContextStateError) as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
+        fail(e)
 
 
 # v2 removals: activate/deactivate/promote/use removed in v0.1.7

@@ -7,6 +7,7 @@ import typer
 from rich.console import Console
 
 from dadaia_workspace import container
+from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.workspace_resolver import resolve_cli_workspace_root
 
@@ -28,6 +29,5 @@ def export(
     try:
         result = container.build_export_service(resolve_cli_workspace_root(workspace)).run()
     except DadaiaError as exc:
-        err_console.print(f"[red]Error:[/red] {exc}")
-        raise typer.Exit(1) from None
+        fail(exc)
     console.print(f"[green]✓[/green] {result.path}  ({result.contexts} contexts)", soft_wrap=True)
