@@ -572,17 +572,17 @@ def test_the_reaper_lane_seeds_moves_slop_and_deletes_only_what_expired(tmp_path
     assert _reaped(tmp_path, "junk.txt").exists()
 
 
-@pytest.mark.skipif(
-    os.name != "posix" or os.geteuid() == 0,
-    reason="chmod 0o555 denies unlink only for a non-root POSIX user",
-)
 def test_fix_skips_and_reports_an_undeletable_entry_and_finishes_the_pass(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Bug doctor-fix-aborts-whole-pass-on-first-undeletable-entry (same class as
     retention-sweep-crashes-on-permission-denied, 903f8b89): an entry the process cannot
     delete is skipped and reported with its errno, the pass reaches every other entry, the
-    returned actions name only what was actually deleted, and the entry stays a finding."""
+    returned actions name only what was actually deleted, and the entry stays a finding.
+
+    The refusal is planted at the filesystem boundary: a read-only tree is no longer
+    undeletable (bug doctor-reaper-cannot-delete-read-only-trees — the reaper makes what
+    it owns writable), so only a refusal that survives the chmod-retry models the case."""
     _init_workspace(tmp_path)
     zone = tmp_path / ".dadaia" / _TTL_ZONE.name
     locked = zone / "x" / "deps"
@@ -593,13 +593,18 @@ def test_fix_skips_and_reports_an_undeletable_entry_and_finishes_the_pass(
     other.write_text("", encoding="utf-8")
     for path in (undeletable, other, locked, locked.parent):
         _age(path)
-    locked.chmod(0o555)
-    try:
-        doctor = _make_doctor(tmp_path)
+    real_unlink = os.unlink
+
+    def refusing_unlink(path: object, *args: object, **kwargs: object) -> None:
+        if os.fspath(path) in (str(undeletable), undeletable.name):  # type: ignore[call-overload]
+            raise PermissionError(13, "Permission denied", str(path))
+        real_unlink(path, *args, **kwargs)  # type: ignore[arg-type]
+
+    doctor = _make_doctor(tmp_path)
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "unlink", refusing_unlink)
         actions = doctor.fix()
-        remaining = _by_path(doctor.scan())
-    finally:
-        locked.chmod(0o755)
+    remaining = _by_path(doctor.scan())
 
     assert not other.exists()
     assert undeletable.exists()

@@ -2,7 +2,6 @@
 
 import contextlib
 import logging
-import os
 import re
 import shutil
 import sys
@@ -34,6 +33,7 @@ from dadaia_workspace.core.models.spec_context import (
 )
 from dadaia_workspace.core.specs_version import read_gitflow
 from dadaia_workspace.core.template_history import was_shipped
+from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.privacy_check import (
@@ -98,23 +98,6 @@ class DeadUnpushedCommitsError(DadaiaError):
     (commits with no remote at all) refuses; a remote-backed repo is left to Phase 2's
     existing auto-push.
     """
-
-
-def _rmtree_chmod_retry(func: object, path: str, _exc: BaseException) -> None:
-    """`shutil.rmtree` onexc handler: chmod-and-retry (v0.1.50 FR3).
-
-    Git loose objects under ``.git/objects/`` are read-only (0444) by design;
-    grant owner write on the failing path (and its parent dir, where the unlink
-    permission actually lives) and retry the failed operation once.
-    """
-    import stat
-
-    target = Path(path)
-    with contextlib.suppress(OSError):
-        os.chmod(target.parent, target.parent.stat().st_mode | stat.S_IWUSR | stat.S_IXUSR)
-    with contextlib.suppress(OSError):
-        os.chmod(target, stat.S_IWUSR | stat.S_IRUSR)
-    func(path)  # type: ignore[operator]
 
 
 def _now() -> str:
@@ -240,7 +223,7 @@ class SpecContextService:
                 self._install_hooks(dest)
         except BaseException:
             for dest in created:
-                shutil.rmtree(dest, onexc=_rmtree_chmod_retry)
+                sweep.rmtree(dest)
             raise
         branch: str | None = None
         with contextlib.suppress(Exception):
@@ -784,7 +767,7 @@ class SpecContextService:
                             f"Git push failed for context '{name}' repo '{slug}' at "
                             f"'{repo_path}'; nothing was removed.\n{exc}"
                         ) from exc
-            shutil.rmtree(repo_path, onexc=_rmtree_chmod_retry)
+            sweep.rmtree(repo_path)
 
         dead_ctx = SpecContextProject(
             name=ctx.name,

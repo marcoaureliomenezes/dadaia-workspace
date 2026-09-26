@@ -9,7 +9,9 @@ entry, ``remove`` deletes it — all four behind ONE guard:
 * a location outside the workspace is SKIPPED, source and destination alike;
 * every ``OSError`` becomes exactly one ``skipped`` action — a pass never aborts;
 * a cross-device move falls back to copy + remove HERE, so a failed move is never a
-  partial delete.
+  partial delete;
+* a read-only entry is made owner-writable and retried — the reaper owns what it
+  reaps (a Go module cache is ``dr-xr-xr-x`` all the way down; loose VCS objects are 0444).
 
 Bug class this replaces: ``doctor.py`` carried five per-call-site guards
 (``_entries``/``_mtime``/``_remove``/``_guarded``/``_remove_dead_repo``), each
@@ -21,12 +23,14 @@ One guard, one home, and deletion reserved to TTL expiry (FR6b).
 
 from __future__ import annotations
 
+import contextlib
 import os
 import shutil
+import stat
 from collections.abc import Callable
 from pathlib import Path
 
-__all__ = ["guarded", "move", "mtime", "remove", "walk"]
+__all__ = ["guarded", "move", "mtime", "remove", "rmtree", "walk"]
 
 _OUTSIDE = "skipped '{label}' (outside the workspace)"
 
@@ -78,6 +82,24 @@ def _exists(target: Path) -> bool:
     return target.is_symlink() or target.exists()
 
 
+def _writable_retry(func: Callable[[str], object], path: str, _exc: BaseException) -> None:
+    """``shutil.rmtree`` ``onexc``: grant owner write on the failing entry's parent (where
+    unlink permission lives) and on the entry itself — never through a symlink, whose
+    chmod would reach its destination — then retry once."""
+    target = Path(path)
+    for entry in (target.parent, target):
+        if entry is target and target.is_symlink():
+            continue
+        with contextlib.suppress(OSError):
+            os.chmod(entry, entry.stat().st_mode | stat.S_IWUSR | stat.S_IRUSR | stat.S_IXUSR)
+    func(path)
+
+
+def rmtree(target: Path) -> None:
+    """Delete a directory tree, read-only entries included."""
+    shutil.rmtree(target, onexc=_writable_retry)
+
+
 def remove(workspace_root: Path, target: Path, label: str) -> str | None:
     """Delete *target* iff its own location resolves inside the workspace. A symlink is
     unlinked, never followed; an entry already gone is nothing to report."""
@@ -86,9 +108,12 @@ def remove(workspace_root: Path, target: Path, label: str) -> str | None:
     if not _inside(workspace_root, target):
         return _OUTSIDE.format(label=label)
     if target.is_symlink() or target.is_file():
-        target.unlink()
+        try:
+            target.unlink()
+        except PermissionError as exc:
+            _writable_retry(os.unlink, str(target), exc)
     elif target.is_dir():
-        shutil.rmtree(target)
+        rmtree(target)
     else:
         return None
     return f"deleted '{label}'"
