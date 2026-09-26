@@ -21,11 +21,9 @@ project, and the project gitflow". Operator demand 2026-09-24 (verbatim):
 > constitution é para isso... gates determinísticos customizáveis... não provoque locks ou stop sem
 > sentido fazendo agente parar de trabalhar e não ter para onde ir. Esse é o maior problema."
 
-Grill rounds 1–3 (handoffs `2026-09-25T031500Z-main-thread-onboarding-foundation-grill`,
-`2026-09-25T050500Z-main-thread-foundation-grill-r3`), every recommendation accepted. The law of this
-candidate is ADRs 0033–0038, 0040, 0042–0046 (0039 docs belongs to candidate 4). As-is review (definition
-step 2): `.dadaia/tmp/claude/20260925/inventory-c3-foundation-state-machine.md` and section A of
-`inventory-c3-gitflow-and-c4-docs.md`; they become PLAN §1.
+Grill rounds 1–3 (2026-09-25), every recommendation accepted. The law of this candidate is ADRs
+0033–0038, 0040, 0042–0049 (0039 docs belongs to candidate 4); the as-is review is PLAN §1. The c3 review
+round (REJECTED 40a24031, operator ruling 2026-09-26) amends ACs in place, marked `_Amended 2026-09-26:_`.
 
 As-is, with its bug evidence (555 records, 0 open):
 
@@ -98,15 +96,18 @@ by `public stage` + `public install`.
   and SessionStart print the same `Step.text()`, which names the kind. SessionStart calls one helper for
   bound and unbound sessions; the second `next_step` call in `hooks/ctx_inject.py` `_emit_bootstrap` is
   gone; a hook test asserts both paths print doctor's text.
-- AC1.6 The derivation issues no network call and reads no gitflow block (3c per FR4 is local).
+- AC1.6 The derivation issues no network call; only `publish` reads the gitflow block (the local
+  integration name, `onboarding.py:115`). _Amended 2026-09-26:_ was "reads no gitflow block" (d084172d).
 - AC1.7 A `tests/contract/` census of the step list (id, kind, order) replaces the regex census
   `tests/contract/test_onboarding_text.py`.
 
 ### FR2 — One fix-line builder (ADR 0045; absorbs round-2 items)
 
 - AC2.1 `core/cli_line.py` owns `cli_path(root)` (moved from `onboarding.py`) and
-  `fix_line(root, *argv)`, joining with `shlex.join` on POSIX and `subprocess.list2cmdline` on Windows;
-  a unit test pins both forms.
+  `fix_line(root, *argv)`, joining with `shlex.join` on POSIX; on Windows forward slashes, double quotes
+  only around a blank; a unit test pins both forms. _Amended 2026-09-26:_ (H5, was `list2cmdline`)
+  `tests/contract/test_fix_line_runs_in_every_shell.py` runs a printed line in Git Bash, cmd and
+  PowerShell on the Windows job; a workspace path holding a blank needs PowerShell's `& `.
 - AC2.2 `DADAIA_BIN` is deleted from `core/kernel_tunables.py`; every call site in the 9 importing
   modules (`features/specs/rules.py`, `features/spec_context/{service,doctor,gate_policy}.py`,
   `features/ci_preflight/service.py`, `cli/commands/{context,doctor}.py`,
@@ -141,21 +142,28 @@ by `public stage` + `public install`.
 
 ### FR4 — Level 3c and the one publish verb (ADRs 0035, 0042)
 
-- AC4.1 `publish` (kind `command`) is pending while `git log --remotes -n1 -- specs/constitution.md` in
-  the main repo is empty; its fix line is `CLI context baseline <ctx>`.
+- AC4.1 `publish` (kind `command`) is pending while `origin/<integration>` is absent or
+  `git log --remotes -n1 -- specs/constitution.md` in the main repo is empty (a v6 tree on the principal
+  alone is unpublished); its fix line is `CLI context baseline <ctx>`. _Amended 2026-09-26:_ added `origin/…`.
 - AC4.2 `context baseline <ctx>` takes no `--yes` and no `--push`: invoking it is the consent. In order it
   checks git identity, refuses a dirty tree outside the onboarding paths (`specs/`, `specs-bkp/`, the
   repo-root `AGENTS.md`), fetches, ensures the principal and integration branches on the remote, cuts
   `<work prefix><version>` from the integration branch, commits only the onboarding paths, pushes it
-  with upstream set, and leaves it checked out.
+  with upstream set, and leaves it checked out. _Amended 2026-09-26:_ (H1) a second foreign backup
+  lands in `specs-bkp/<UTC>/`, inside the committed paths.
 - AC4.3 Branch ensuring: unborn remote → both born from one empty root commit; principal present,
   integration absent → integration born at the principal's tip; both present → reused. Version: `0.1.0`
   with no tag, else last tag + 1 patch. Branch names come from the project gitflow (FR6).
+  _Amended 2026-09-26:_ (H4) births push by refspec `<sha>:refs/heads/<branch>`; no local head is
+  created or reset.
 - AC4.4 Idempotent: a second run on a published project exits 0, commits and pushes nothing.
 - AC4.5 Refusals exit non-zero with one fix line each: dirty outside the paths (a lossless command whose
   execution lets the next run proceed); missing `user.name`/`user.email` (the `git config` line); fetch
   failure/offline (the same baseline line). A refusal before the first write leaves branches, HEAD, index
   and remote unchanged; a push failure after the commit is completed by re-running the same line.
+  _Amended 2026-09-26:_ one preflight before fetch, births or checkout refuses a change outside the
+  paths or a secret in a file the publish would commit (M5), fix `git stash push -u -- <paths>` over real
+  paths read NUL-delimited, non-ASCII names included (C1); a later git failure re-prints the baseline line.
 - AC4.6 Integration tests, one per remote state: unborn; principal only; both; a tag present (+1 patch);
   dirty outside paths refused; second run no-op; only onboarding paths in the commit; offline; no identity.
 - AC4.7 `features/certification/service.py` invokes baseline without the deleted flags.
@@ -170,8 +178,9 @@ by `public stage` + `public install`.
 - AC5.2 `publishes_nothing` replaces `ObjectSource.parents` on the port and `GitSubprocessObjectReader`;
   the test fakes' `parents` stubs are deleted; no second "already published" rule exists.
 - AC5.3 `check_branch_policy(refs, gitflow, births)` stays pure; births are computed in
-  `push_gate_decision` only for principal/integration refs with a zero remote sha. Stale remote-tracking
-  refs make the range non-empty ⇒ refused with `fix: git fetch <remote>`.
+  `push_gate_decision` only for principal/integration refs with a zero remote sha. _Amended 2026-09-26:_
+  (H4) a ref is judged by the remote branch it lands on; a birth passes from any source. A birth carrying
+  new objects, stale refs included, gets one fix: fetch, then birth at the other role's published tip.
 - AC5.4 Tests: orphan empty root pushed as principal allowed; `git branch <integration> <principal>`
   pushed allowed; a birth carrying a new commit refused; an allowed birth publishes no object absent
   from the remote before the push.
@@ -189,18 +198,22 @@ by `public stage` + `public install`.
   and the body byte-for-byte; `_STAMP_RE` is deleted.
 - AC6.3 `specs init --context <ctx> [--principal] [--integration] [--work-prefix]`: principal defaults to
   `origin/HEAD` (`git symbolic-ref`, local) else `main`; writes the block on a fresh tree and merges it on
-  an existing dadaia tree; same flags twice is a no-op; stdout names the gitflow written. The
-  `specs` step's fix line carries the three flags with the detected values, so the agent shows them to
-  the operator before running it; no confirmation is stored.
-- AC6.4 Pre-push resolution in `cli/commands/ci.py`, once per push, working tree: (1)
-  `<toplevel>/specs/constitution.md`; (2) an associated repo → the owning context's main-repo
-  constitution via the existing `core/invocation.py` functions; (3) else `DEFAULT` with one stderr
-  warning carrying a fix line — never a block. `push_gate_decision` requires the gitflow (no default).
+  an existing dadaia tree; same flags twice is a no-op; stdout names the gitflow written.
+  _Amended 2026-09-26:_ (83b1535c, ADR 0047) the `specs` step's fix has no gitflow flag (`specs init`
+  keeps a valid block, else detects; prints `[gitflow] …`) and `--replace-foreign` only for a foreign
+  tree; a constitution whose frontmatter does not parse is its own doctor finding (agent fix: repair
+  its YAML), never foreign.
+- AC6.4 Pre-push resolution in `cli/commands/ci.py`, once per push, from committed data: (1)
+  `specs/constitution.md` at HEAD; (2) else the newest one reachable from a remote-tracking ref (local);
+  (3) else the owning context's main-repo constitution (`core/invocation.py`); (4) else `DEFAULT` with one
+  stderr warning — never a block. Refusal fixes name only refs that exist. `push_gate_decision` requires
+  the gitflow (no default). _Amended 2026-09-26:_ ADR 0048 replaces the working-tree rung.
 - AC6.5 Pushable: work branches; principal/integration only by FR5; refusal messages and their
   `gh pr create --base …` fix lines name the configured branches. Tests with the default and a custom
   gitflow (`trunk`/`next`/`work/`), an absent block (warning, default), an associated repo inheriting.
 - AC6.6 Doctor `GITFLOW-1` (specs section, beside SPECS-VERSION): WARN when the block is absent or
-  malformed; fix line = the `specs init` line with detected flags; executing it clears the finding.
+  malformed; fix line = `specs init --specs-dir <specs>` (no flags); executing it clears the finding and
+  never resets an operator's custom names. _Amended 2026-09-26:_ was "with detected flags" (ADR 0047).
 - AC6.7 The library's `specs/constitution.md` carries the block; `ci.yml` `pr-source-guard` reads it
   (`read_gitflow`) — integration PRs from work branches or Dependabot, principal PRs from the integration
   branch or `release-please--branches--<principal>`. Literal triggers (`ci.yml`, `release.yml`,
@@ -262,9 +275,10 @@ by `public stage` + `public install`.
   `core/specs_version.py` and `core/kernel_tunables.py` end with fewer lines than at the definition
   commit; growth is confined to the two new modules, the onboarding step list, the baseline rewrite and
   the new git reads.
-- AC11.3 PLAN §1 states a per-unit line estimate; the closure note reports the measured net production
-  Python lines (`dadaia_workspace/**/*.py` outside `public/`); exceeding the estimate is a HIGH review
-  finding.
+- AC11.3 The closure note reports the net production Python lines (`dadaia_workspace/**/*.py` outside
+  `public/`) of the candidate's own commits, 5364ba0d..closure, excluding the operator-ordered shrink
+  deletions of dead code (800c5e2d 009721d6 f38f7ff8 de4e3179 114be682) and Arm B fixes; above +230 net is
+  a HIGH review finding. _Amended 2026-09-26:_ was the PLAN §1 estimate over the whole range.
 
 ## 5. Replaces
 
@@ -301,9 +315,8 @@ by `public stage` + `public install`.
 
 ## 7. Dependencies and risks
 
-- Order (inventory R7): `core/cli_line.py` + `DADAIA_BIN` migration → `template_history` move →
-  `core/gitflow.py` → FR5 birth → FR4 baseline → FR1 steps → callers, law, docs. FR5 must land before
-  FR4 (the birth pushes pass through the hook).
+- Order: `core/cli_line.py` + `DADAIA_BIN` migration → `template_history` move → `core/gitflow.py` →
+  FR5 birth → FR4 baseline → FR1 steps → callers, law, docs; FR5 before FR4 (births pass the hook).
 - Stale remote-tracking refs give a false `publish` pending; `baseline` fetches first and is idempotent.
 - The property test (AC1.3) runs real git over `file://` — keep its example count bounded for CI time.
 - Placeholders in the `context` step fix line: only the operator supplies a clone URL; the E2E starts
@@ -314,16 +327,16 @@ by `public stage` + `public install`.
 
 ## 8. Traceability
 
-| FR | ADRs | Replaces | Surface |
-|---|---|---|---|
-| FR1 | 0033 | R1 R3 R4 | `onboarding.py`, `ctx_inject.py`, `doctor.py`, `context.py`, `init.py` |
-| FR2 | 0045 | R2 R4 R5 | `core/cli_line.py`, 9 importers, `doctor_memory.py`, `doctor_structural.py`, `rules.py` |
-| FR3 | 0034 0043 | R6 R7 | `core/template_history.py`, `shipped-hashes.json`, `dd-audit-project` |
-| FR4 | 0035 0042 | R8 | `spec_context/service.py`, `git_subprocess.py`, `context.py`, certification |
-| FR5 | 0036 | R9 R10 | `push_gate.py`, `branch_policy.py`, `git_objects.py` |
-| FR6 | 0037 0040 0046 | R11 R12 R13 | `core/gitflow.py`, `specs_version.py`, `specs.py`, `ci.py`, `rules.py`, `ci.yml`, shipped text |
-| FR7 | 0038 0044 | R14 | `init.py`, `context.py`, `onboarding.py` |
-| FR8 | — | R11 | chokepoints, `ci.yml` |
-| FR9 | 0033–0038 | R15 | law, docs, `CONTEXT.md`, atoms |
-| FR10 | 0033 0035 0036 | — | `tests/e2e/test_onboarding_journey.py` |
-| FR11 | standing rule | — | all |
+| FR | ADRs | Replaces |
+|---|---|---|
+| FR1 | 0033 | R1 R3 R4 |
+| FR2 | 0045 | R2 R4 R5 |
+| FR3 | 0034 0043 | R6 R7 |
+| FR4 | 0035 0042 | R8 |
+| FR5 | 0036 | R9 R10 |
+| FR6 | 0037 0040 0046–0048 | R11 R12 R13 |
+| FR7 | 0038 0044 | R14 |
+| FR8 | — | R11 |
+| FR9 | 0033–0038 | R15 |
+| FR10 | 0033 0035 0036 | — |
+| FR11 | standing rule | — |
