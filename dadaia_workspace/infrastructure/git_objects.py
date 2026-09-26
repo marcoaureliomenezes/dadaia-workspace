@@ -71,8 +71,8 @@ def _run(
         return subprocess.run(
             args, cwd=cwd, input=input_bytes, capture_output=True, timeout=_TIMEOUT_S
         )
-    except FileNotFoundError as exc:
-        raise GitObjectReadError(f"git is not available on PATH: {exc}") from exc
+    except OSError as exc:  # no git on PATH, or a cwd that is not a directory (WinError 267)
+        raise GitObjectReadError(f"git could not run in {cwd}: {exc}") from exc
     except subprocess.TimeoutExpired as exc:
         raise GitObjectReadError(f"git command timed out: {' '.join(args)}") from exc
 
@@ -741,8 +741,8 @@ def _read_oversized_blob_prefix(repo: Path, sha: str) -> bytes:
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
         )
-    except FileNotFoundError as exc:
-        raise GitObjectReadError(f"git is not available on PATH: {exc}") from exc
+    except OSError as exc:  # same conversion as ``_run``
+        raise GitObjectReadError(f"git could not run in {repo}: {exc}") from exc
 
     result_q: queue.Queue[bytes | Exception] = queue.Queue(maxsize=1)
 

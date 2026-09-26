@@ -81,6 +81,7 @@ def test_push_argv_contract_upstream_vs_explicit_refspec(monkeypatch: pytest.Mon
     """No tracking branch -> sets upstream (-u origin <branch>); tracking already
     set (v0.1.50 FR3) -> rev-list ahead-check then explicit push <remote> HEAD:<branch>,
     never re-running -u nor a bare `git push`."""
+    monkeypatch.setattr(git_subprocess, "unpublished", lambda path, rev: ["c0ffee"])
     upstream_calls: list[list[str]] = []
 
     def fake_run_no_upstream(
