@@ -43,11 +43,6 @@ Measured by: `lint-imports --config setup.cfg --no-cache` — contract `features
 ADR: none
 Rationale: a hand-kept `modules =` list hid three real sibling edges from the check.
 
-### P-08 · We keep a Protocol in `core/protocols` only where two production adapters exist; `container.py` composes platform seams and shared collaborators, nothing single-consumer.
-Measured by: `pytest tests/contract/test_protocols_have_two_adapters.py`.
-ADR: 0001 (accepted)
-Rationale: a Protocol with one implementer is interface text that hides a direct dependency.
-
 ### P-09 · We resolve the whole Invocation — workspace root, session, context, specs dir, the session's Bind — once per process in `core.invocation.resolve`, imported directly only by `cli._specs_resolution`, `container` and `hooks`.
 Measured by: `lint-imports --config setup.cfg --no-cache` — contract `bind-resolution-seam-is-a-single-home` (zero ignored imports, none ever accepted); `pytest tests/unit/core/test_invocation.py`.
 ADR: 0003 (accepted)
@@ -134,7 +129,7 @@ flowchart TB
     features --> core
 ```
 
-- `container.py` is composition wiring only: every definition keeps a production consumer, and a single-consumer adapter is imported directly by its feature (P-08).
+- `container.py` is composition wiring only: every definition keeps a production consumer, and a single-consumer adapter is imported directly by its feature.
 - No `core/protocols/` package exists: no seam carries two production adapters, so every adapter is imported by its one consumer; a `typing.Protocol` lives only as a structural type inside the module that consumes it.
 - `setup.cfg` carries seven import-linter contracts; `features-no-subprocess` has no suppressed edge, and the two suppressed edges (`reconcile.service` -> `capabilities`, `reconcile.service` -> `migrate.state_v2`) sit under `features-no-cross-feature` (P-10).
 - Hooks import `core.invocation` directly and build the `Invocation` once per process (P-12); `sdd_post_gate` touches `last_seen_at` and runs the reaper on one throttle and writes nothing else.
