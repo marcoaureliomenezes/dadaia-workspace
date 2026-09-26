@@ -216,6 +216,16 @@ the next refusal path. Round 6 deletes the invention, so nothing remains to gues
 
 
 
+**Round 7 (review 5, 2026-09-26) — as-is + measure.** Structural cause named by the review: fix
+lines came from HEAD and guesses, not from the refused ref. Deleted: `update-ref -d HEAD` and the
+`origin/<integration>` base (gate), `publishes_nothing` (replaced by `boundary`, one read for births
+and the rewrite fix), the ff-only `fetch .` outside fix, `_CAUSES` pull/ls-remote/stash rows, the
+baseline empty-origin/adopt split and its draft reader, ci's highest-local-head work rule,
+`_owned_slug`'s third arm. `project_gitflow` moved into `GitSubprocessClient.gitflow` (one reader for
+gate, baseline, dead, onboarding). Round-7 commit: +142 / −146 on production Python. **AC11.3: +487**
+(same method, `5364ba0d..HEAD`) — still +125 over +362; the gitflow/specs_version/specs.py/cli_line
+cuts are NOT done in this round (operator ruling needed on which FR6/FR2 capability to drop).
+
 - `DADAIA_BIN` importers are **7**, not 9–10: `hooks/venv_guard.py` and `features/ci_preflight/service.py`
   read the `$DADAIA_BIN` *environment variable* exported by the pre-push hook, not the constant (SPEC AC2.2
   inherits the error; see §6).
