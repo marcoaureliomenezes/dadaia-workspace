@@ -17,6 +17,7 @@ import pytest
 
 pytest.importorskip("fcntl")
 
+from dadaia_workspace.core.cli_line import shell_line  # noqa: E402
 from dadaia_workspace.core.exceptions import RepoUrlMissingError  # noqa: E402
 from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     AssociatedRepo,
@@ -104,10 +105,12 @@ def test_dead_refuses_to_delete_a_repo_it_could_never_clone_back(tmp_path: Path)
 def test_alive_refuses_a_legacy_url_less_missing_repo_with_a_fix_line(tmp_path: Path) -> None:
     service, store, ws = _setup(tmp_path, "")
 
-    with pytest.raises(
-        RepoUrlMissingError, match=r"fix: \S*/\.dadaia/\.venv/bin/dadaia context repo"
-    ):
+    with pytest.raises(RepoUrlMissingError) as refused:
         service.alive("proj")
+
+    # one command (no `&&`): the clone alive then adopts, its origin back-filled
+    clone = shell_line("git", "clone", "<clone-url>", str(ws / "repos" / "lib"))
+    assert str(refused.value).endswith(f"fix: {clone}")
 
     assert store.get("proj").state == ContextState.DEAD  # type: ignore[union-attr]
 
