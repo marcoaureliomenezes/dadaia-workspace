@@ -160,7 +160,7 @@ def install_git_hooks(repo_root: Path, *, force: bool = False) -> list[Path]:
     written = []
     for target, source in workspace_layout.INSTALLED_GIT_HOOKS:
         dest, shipped = hooks_dir / target, scripts / source
-        old = dest.read_text(encoding="utf-8") if dest.exists() else None
+        old = dest.read_text(encoding="utf-8", errors="replace") if dest.exists() else None
         if (
             force
             or old is None
