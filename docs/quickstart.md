@@ -1,7 +1,7 @@
 # Quickstart
 
-A bare machine to a workspace whose first project is cloned, ALIVE and bound, its
-`specs/` on the canon, compliance checked, one backlog entry filed and one release
+A bare machine to a workspace whose first project is cloned and ALIVE (a session binds
+it with `context bind`), its `specs/` on the canon, compliance checked, one backlog entry filed and one release
 live. Terms are defined in [concepts](concepts.md); the long walkthrough is
 [getting started](getting-started.md).
 
@@ -33,7 +33,8 @@ python3 .agents/skills/dd-release-implementation/scripts/release.py new 0.1.0 \
   pre-push hook and makes the context (named after the slug) ALIVE; only `context bind`
   binds a session (§3).
 - **Level 3 — specs.** 3a `specs init` brings the repo's `specs/` to the canon; a foreign
-  `specs/` is moved to `specs-bkp/` after consent (`--replace-foreign` skips the prompt).
+  `specs/` is refused until `--replace-foreign` moves it to `specs-bkp/` (to
+  `specs-bkp/<UTC>/` when a backup already exists).
   3b the `dd-audit-project` first pass fills memory — done when it holds real content,
   never by a stamp. 3c `context baseline <slug>` publishes the specs. `doctor` prints the
   next pending step with its `fix:` line at every point.

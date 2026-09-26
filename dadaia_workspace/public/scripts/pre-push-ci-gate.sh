@@ -7,8 +7,8 @@
 #
 # What THIS script does — the publication boundary, and NOTHING else: branch policy by
 # that gitflow + the range-scoped denylist scan on the work-branch push (`ci
-# push-gate-check`) — the principal and integration branches refuse a direct push and
-# name the PR path instead. The pre-push ref lines git feeds on STDIN are forwarded there. This hook
+# push-gate-check`) — the principal and integration branches refuse a direct push (their
+# contentless birth excepted) and name the PR path instead. The pre-push ref lines git feeds on STDIN are forwarded there. This hook
 # refuses exactly three things: an invalid branch name, a denylist hit, and an
 # unresolvable runner (below) — never a fourth reason (v0.5.0 A9.2).
 #
@@ -110,5 +110,5 @@ if [ "$PROBE_ONLY" -eq 1 ]; then
     exit 0
 fi
 
-echo "[pre-push] branch policy + denylist gate (work branch pushes; principal/integration refused — PR path; gitflow: specs/constitution.md)…"
+echo "[pre-push] branch policy + denylist gate (work branches; principal/integration by PR, or a contentless birth; gitflow: specs/constitution.md)…"
 printf '%s' "$PUSH_REFS" | "${RUNNER_BIN[@]}" ci push-gate-check
