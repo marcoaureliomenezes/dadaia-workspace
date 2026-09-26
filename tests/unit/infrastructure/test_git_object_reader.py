@@ -1636,7 +1636,8 @@ def test_resolvable_remote_sha_and_new_branch_fallback_agree_on_the_same_final_s
 
 
 # ---------------------------------------------------------------------------------------
-# publishes_nothing (0.5.0 AC5.1/AC5.2, ADR 0036): a branch birth publishes no new object
+# boundary (0.5.0 AC5.1/AC5.2, ADR 0036; c3 review 5 C1/H1-H3): where a ref's own
+# unpublished range rests on origin — the birth test and the gate's rewrite fix
 # ---------------------------------------------------------------------------------------
 
 
@@ -1653,15 +1654,42 @@ def _published_repo(tmp_path: Path) -> tuple[Path, str]:
     return repo, sha
 
 
-def test_a_commit_already_on_the_remote_publishes_nothing(tmp_path: Path) -> None:
+def test_a_commit_already_on_origin_is_its_own_boundary(tmp_path: Path) -> None:
     repo, sha = _published_repo(tmp_path)
-    assert GitSubprocessObjectReader().publishes_nothing(repo, sha)
+    assert GitSubprocessObjectReader().boundary(repo, sha) == sha
 
 
-def test_a_new_commit_publishes_something(tmp_path: Path) -> None:
-    repo, _ = _published_repo(tmp_path)
+def test_the_boundary_is_the_parent_of_the_oldest_unpublished_commit(tmp_path: Path) -> None:
+    """C1/H3: never HEAD, never a deleted ref — the published commit the range rests on."""
+    repo, published = _published_repo(tmp_path)
     (repo / "a.txt").write_text("second\n")
-    assert not GitSubprocessObjectReader().publishes_nothing(repo, _commit(repo, "c2"))
+    _commit(repo, "c2")
+    (repo / "a.txt").write_text("third\n")
+    tip = _commit(repo, "c3")
+    assert GitSubprocessObjectReader().boundary(repo, tip) == published
+
+
+def test_the_boundary_ignores_an_advanced_origin_branch(tmp_path: Path) -> None:
+    """H2: origin's integration moved on — the boundary stays where THIS range starts."""
+    repo, published = _published_repo(tmp_path)
+    _git(["checkout", "-q", "-b", "topic"], repo)
+    (repo / "b.txt").write_text("mine\n")
+    tip = _commit(repo, "mine")
+    _git(["checkout", "-q", "main"], repo)
+    (repo / "dep.txt").write_text("theirs\n")
+    _commit(repo, "dep")
+    _git(["push", "-q", "origin", "main"], repo)
+    assert GitSubprocessObjectReader().boundary(repo, tip) == published
+
+
+def test_a_range_reaching_a_root_commit_has_no_boundary(tmp_path: Path) -> None:
+    """C1: nothing below it is published — no command can uncommit only unpublished work."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    _git(["commit", "-q", "--allow-empty", "-m", "root"], repo)
+    _git(["commit", "-q", "--allow-empty", "-m", "child"], repo)
+    sha = _git(["rev-parse", "HEAD"], repo).stdout.strip()
+    assert GitSubprocessObjectReader().boundary(repo, sha) is None
 
 
 def test_a_commit_only_another_remote_holds_is_still_unpublished(tmp_path: Path) -> None:
@@ -1672,22 +1700,12 @@ def test_a_commit_only_another_remote_holds_is_still_unpublished(tmp_path: Path)
     sha = _git(["rev-parse", "HEAD"], repo).stdout.strip()
     _git(["update-ref", "refs/remotes/fork/main", sha], repo)
     assert unpublished(repo, sha) == [sha]
-    assert not GitSubprocessObjectReader().publishes_nothing(repo, sha)
+    assert GitSubprocessObjectReader().boundary(repo, sha) is None
     _git(["update-ref", "refs/remotes/origin/main", sha], repo)
     assert unpublished(repo, sha) == []
-
-
-def test_an_empty_commit_on_new_history_publishes_something(tmp_path: Path) -> None:
-    """Only a PARENTLESS empty commit is contentless; an empty child carries its parent."""
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    _git(["commit", "-q", "--allow-empty", "-m", "root"], repo)
-    _git(["commit", "-q", "--allow-empty", "-m", "child"], repo)
-    sha = _git(["rev-parse", "HEAD"], repo).stdout.strip()
-    assert not GitSubprocessObjectReader().publishes_nothing(repo, sha)
 
 
 @pytest.mark.parametrize("sha", ["a" * 40, "--upload-pack=evil"])
 def test_an_unresolvable_or_option_shaped_sha_fails_closed(tmp_path: Path, sha: str) -> None:
     repo, _ = _published_repo(tmp_path)
-    assert not GitSubprocessObjectReader().publishes_nothing(repo, sha)
+    assert GitSubprocessObjectReader().boundary(repo, sha) is None

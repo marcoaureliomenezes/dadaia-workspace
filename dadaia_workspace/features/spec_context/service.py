@@ -33,7 +33,6 @@ from dadaia_workspace.core.models.spec_context import (
     RepoLiveStatus,
     SpecContextProject,
 )
-from dadaia_workspace.core.specs_version import read_gitflow
 from dadaia_workspace.core.template_history import was_shipped
 from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
@@ -48,16 +47,8 @@ _log = logging.getLogger(__name__)
 _ONBOARDING = ("specs", "specs-bkp", "AGENTS.md")
 _TAG_RE = re.compile(r"v?(\d+)\.(\d+)\.(\d+)")
 _FIX_RE = re.compile(r"^fix: ", re.MULTILINE)
-#: A git failure's cause → its own fix (R13 rule 4): never a rebase, a delete or a rerun.
-_CAUSES: tuple[tuple[re.Pattern[str], tuple[str, ...]], ...] = (
-    (re.compile(r"\[rejected\]\s+\S+ -> (\S+) \((?:fetch first|non-fast-forward)\)"),
-     ("pull", "--no-rebase", "--no-edit", "origin", "{0}")),
-    (re.compile(r"does not appear to be a git repository|[Rr]epository not found"),
-     ("remote", "set-url", "origin", "<clone-url>")),
-    (re.compile(r"Could not read from remote|Authentication failed|Permission denied|"
-                r"could not read Username|unable to access"), ("ls-remote", "origin")),
-    (re.compile(r"would be overwritten by"), ("stash", "push", "--include-untracked")),
-)  # fmt: skip
+#: The one git failure whose cause git's own text does not already fix (R13 rule 4).
+_WRONG_URL = re.compile(r"does not appear to be a git repository|[Rr]epository not found")
 
 
 class RepoOwner(Protocol):
@@ -178,28 +169,21 @@ def install_git_hooks(repo_root: Path, *, force: bool = False) -> list[Path]:
     return written
 
 
-def project_gitflow(
-    git: GitSubprocessClient, repo: Path, main_repo: Path | None = None
-) -> tuple[Gitflow, str | None]:
-    """ADR 0048 — the ONE gitflow reader (the pre-push gate, ``dead``): the constitution
-    committed at HEAD, else the newest on a local branch or on origin, else — an
-    associated repo — its context's *main_repo*'s; never a working tree (``baseline``
-    commits its draft at HEAD before its first push); else DEFAULT plus the warning."""
-    text = git.committed_text(repo, "specs/constitution.md")
-    if text is None and main_repo is not None and main_repo.resolve() != repo.resolve():
-        return project_gitflow(git, main_repo)
-    return read_gitflow(repo / "specs", text or "")
-
-
 def _sync_failure(exc: GitSyncError, repo: Path, lead: str = "") -> GitSyncError:
-    """A failed git step with the fix for its own cause (:data:`_CAUSES`); the pre-push
-    gate's refusal keeps its own fix; an unknown cause carries git's text alone."""
+    """A failed git step: a wrong origin URL gets ``set-url``; any other cause — the
+    pre-push gate's refusal included — carries git's own text alone."""
     text = str(exc)
-    for pattern, argv in () if _FIX_RE.search(text) else _CAUSES:
-        if found := pattern.search(text):
-            fix = git_line(repo, *(a.format(*found.groups()) for a in argv))
-            return GitSyncError(f"{lead}{text}\nfix: {fix}")
+    if _WRONG_URL.search(text) and not _FIX_RE.search(text):
+        text += f"\nfix: {git_line(repo, 'remote', 'set-url', 'origin', '<clone-url>')}"
     return GitSyncError(f"{lead}{text}")
+
+
+def work_name(git: GitSubprocessClient, repo: Path, flow: Gitflow) -> str:
+    """The ONE live-work-branch rule (gate fixes, ``baseline``): the last tag + 1 patch,
+    else ``0.1.0``."""
+    tags = (_TAG_RE.fullmatch(t) for t in git.git(repo, "tag", "--sort=-v:refname").split())
+    last = next((m for m in tags if m), None)
+    return f"{flow.work_prefix}{f'{last[1]}.{last[2]}.{int(last[3]) + 1}' if last else '0.1.0'}"
 
 
 class SpecContextService:
@@ -595,10 +579,12 @@ class SpecContextService:
     ) -> str:
         """Publish repo *target* (default: the main repo) of context *name*, append-only
         (ADRs 0035, 0042; R13); return its work branch, ``""`` when nothing was pushed.
-        An origin holding branches is adopted: the work branch continues ``origin/<work>``,
-        else starts at ``origin/<integration>`` (born at the principal when missing). An
-        empty origin receives the local principal as it is, integration and work cut from
-        it. The onboarding paths are one ordinary commit; ONE atomic push. Never a forced
+        ONE path: the onboarding paths are one ordinary commit on the checked-out branch;
+        the gitflow is read once, from that commit. The work branch continues
+        ``origin/<work>``, else starts at ``origin/<integration>``/``<principal>``, else
+        (an empty origin) at that commit, and merges it — local commits under it are
+        carried, never stranded. A missing gitflow branch is born at the published
+        principal, else (an empty origin) at that commit; ONE atomic push. Never a forced
         checkout, a reset, a rebase, a force-push or a deletion."""
         ctx = self.show(name)
         repo = target or self._repo_path(ctx.repo_slug)
@@ -613,47 +599,34 @@ class SpecContextService:
         paths = _ONBOARDING if slug == ctx.repo_slug else ()
         self._require_publishable(name, repo, paths)
         git = partial(self._git.git, repo)
-        main_repo = self._repo_path(ctx.repo_slug)
         try:
             git("fetch", "--prune", "--tags", "origin")
-            heads = git("for-each-ref", "--format=%(refname:lstrip=3)", "refs/remotes/origin")
-            heads_on_origin = [h for h in heads.split() if h != "HEAD"]
-            if not heads_on_origin:  # an empty origin: the local principal, as it is
-                self._git.commit_paths(repo, message, [p for p in paths if (repo / p).exists()])
-                flow, _ = project_gitflow(self._git, repo, main_repo)
-                work = self._work_name(repo, flow)
-                births = [f"HEAD:refs/heads/{b}" for b in (flow.principal, flow.integration)]
-                if self._git.current_branch(repo) != work:
-                    git("switch", "-c", work)
-            else:
-                flow, _ = project_gitflow(self._git, repo, main_repo)
-                draft = read_gitflow(main_repo / "specs")[0] if paths else flow
-                if flow.principal not in heads_on_origin or draft != flow:
-                    raise ContextStateError(
-                        f"Context '{name}': origin holds {', '.join(heads_on_origin)}; the "
-                        f"gitflow names principal '{draft.principal}', integration "
-                        f"'{draft.integration}', work '{draft.work_pattern}' — origin publishes "
-                        "no such principal, or the draft gitflow differs from the committed "
-                        "one. Nothing is guessed and nothing was touched. Operator action: "
-                        "publish that principal on origin, or restore the committed gitflow "
-                        "block in specs/constitution.md."
-                    )
-                work = self._work_name(repo, flow)
-                births = [
-                    f"refs/remotes/origin/{flow.principal}:refs/heads/{b}"
-                    for b in (flow.integration,)
-                    if b not in heads_on_origin
-                ]
-                start = next(
-                    f"origin/{b}"
-                    for b in (work, flow.integration, flow.principal)
-                    if b in heads_on_origin
+            refs = git("for-each-ref", "--format=%(refname:lstrip=3)", "refs/remotes/origin")
+            heads = [h for h in refs.split() if h != "HEAD"]
+            self._git.commit_paths(repo, message, [p for p in paths if (repo / p).exists()])
+            flow, _ = self._git.gitflow(repo, self._repo_path(ctx.repo_slug))
+            if heads and flow.principal not in heads:
+                raise ContextStateError(
+                    f"Context '{name}': origin holds {', '.join(heads)}; the committed "
+                    f"gitflow names principal '{flow.principal}' — origin publishes no such "
+                    "branch. Nothing is guessed and nothing was pushed. Operator action: "
+                    "publish that principal on origin, or name origin's principal in the "
+                    "gitflow block of specs/constitution.md."
                 )
-                if self._git.current_branch(repo) != work:
-                    local = git("for-each-ref", "--format=%(refname)", f"refs/heads/{work}")
-                    git("switch", *((work,) if local else ("--no-track", "-c", work, start)))
-                git("merge", "--no-edit", start)
-                self._git.commit_paths(repo, message, [p for p in paths if (repo / p).exists()])
+            work, tip = work_name(self._git, repo, flow), git("rev-parse", "HEAD")
+            roles = (work, flow.integration, flow.principal)
+            start = next((f"origin/{b}" for b in roles if b in heads), tip)
+            if self._git.current_branch(repo) != work:
+                local = git("for-each-ref", "--format=%(refname)", f"refs/heads/{work}")
+                git("switch", *((work,) if local else ("--no-track", "-c", work, start)))
+            git("merge", "--no-edit", start)
+            git("merge", "--no-edit", tip)
+            born = f"refs/remotes/origin/{flow.principal}" if heads else tip
+            births = [
+                f"{born}:refs/heads/{b}"
+                for b in (flow.principal, flow.integration)
+                if b not in heads
+            ]
             if not births and not self._git.unpushed(repo):
                 return ""
             git("push", "--atomic", "-u", "origin", *births, work)
@@ -661,29 +634,20 @@ class SpecContextService:
             raise _sync_failure(exc, repo) from None
         return work
 
-    def _work_name(self, repo: Path, flow: Gitflow) -> str:
-        """The live work branch: the last tag + 1 patch, else ``0.1.0`` (unchanged rule)."""
-        tags = (
-            _TAG_RE.fullmatch(t) for t in self._git.git(repo, "tag", "--sort=-v:refname").split()
-        )
-        last = next((m for m in tags if m), None)
-        return f"{flow.work_prefix}{f'{last[1]}.{last[2]}.{int(last[3]) + 1}' if last else '0.1.0'}"
-
     def _owned_slug(self, ctx: SpecContextProject, repo: Path) -> str:
         """*repo*'s slug through the ONE resolver; a repo *ctx* does not own is refused —
-        fix: its owner's publish, the registration of an unregistered checkout under
-        ``repos/``, else the context's own publish (its repos listed)."""
+        fix: its owner's publish, else its registration (its repos listed; a typo is never
+        answered with another repo's publish)."""
         ws, name = self._workspace_root, ctx.name
         owner = self._repo_owner(ws, repo)
         if owner is not None and owner[0] == name:
             return owner[1]
         slugs = ", ".join(r.slug for r in ctx.all_repos())
-        if owner:
-            fix = fix_line(ws, "context", "baseline", owner[0], str(repo))
-        elif repo.parent == ws / "repos" and repo.is_dir():
-            fix = fix_line(ws, "context", "repo", "add", name, repo.name, "--url", "<clone-url>")
-        else:
-            fix = fix_line(ws, "context", "baseline", name)
+        fix = (
+            fix_line(ws, "context", "baseline", owner[0], str(repo))
+            if owner
+            else fix_line(ws, "context", "repo", "add", name, repo.name, "--url", "<clone-url>")
+        )
         raise AssociatedRepoNotFoundError(
             f"'{repo}' is not a repo of context '{name}' (its repos: {slugs}).\nfix: {fix}"
         )
@@ -799,7 +763,7 @@ class SpecContextService:
            ``DeadUnpushedCommitsError`` for why this check stays narrower than "any
            commit ahead of the last push"). Any refusal here leaves **every** repo in
            the set untouched (no partial dead). A repo with changes to sync must sit on a
-           work branch of its gitflow (:func:`project_gitflow`) — the only branch the
+           work branch of its gitflow (``GitSubprocessClient.gitflow``) — the only branch the
            pre-push gate lets it push — else it is refused before anything is committed.
         2. **Act** on every repo only once every repo has cleared the preflight:
            tracked-but-dirty modifications auto-sync (commit + push, FR-R7 — only
@@ -857,7 +821,7 @@ class SpecContextService:
                             f"Context '{name}': repo '{slug}' has changes to commit and git "
                             f"identity unknown. Nothing was touched.\nfix: {fix}"
                         )
-                    flow, _ = project_gitflow(self._git, repo_path, main_repo)
+                    flow, _ = self._git.gitflow(repo_path, main_repo)
                     branch = self._git.current_branch(repo_path)
                     if flow.role_of(branch) != "work":
                         raise DeadReviewRequiredError(

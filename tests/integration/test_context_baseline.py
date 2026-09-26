@@ -97,12 +97,13 @@ def _heads(bare: Path) -> dict[str, str]:
 
 
 def _assert_published(repo: Path, bare: Path, work: str, base: str) -> None:
-    """*work* is checked out, level with origin, and is *base* plus the onboarding commit."""
+    """*work* is checked out, level with origin, and is *base* (its first parent) plus the
+    onboarding commit — a fast-forward, or a merge of that commit into *base*."""
     heads = _heads(bare)
     assert work in heads and "main" in heads and "develop" in heads
     assert _git(repo, "rev-parse", "HEAD") == _git(repo, "rev-parse", "@{u}") == heads[work]
     assert _git(repo, "rev-parse", f"{work}^") == heads[base]
-    files = _git(repo, "show", "--name-only", "--format=", "HEAD").splitlines()
+    files = _git(repo, "diff", "--name-only", f"{work}^", work).splitlines()
     assert sorted(files) == ["AGENTS.md", "specs/constitution.md"]
 
 
@@ -215,9 +216,9 @@ def test_second_run_is_a_no_op(env, tmp_path: Path, seeded) -> None:
     assert _heads(bare) == before and _git(repo, "rev-parse", "HEAD") == head
 
 
-def test_an_origin_without_the_principal_refuses_before_any_write(env, tmp_path: Path) -> None:
+def test_an_origin_without_the_principal_refuses_and_publishes_nothing(env, tmp_path: Path) -> None:
     """Review CRITICAL (round 4, N5): origin holds only another branch and the clone is
-    unborn — nothing is guessed, no untracked operator file is overwritten."""
+    unborn — nothing is guessed or pushed, no untracked operator file is overwritten."""
     svc, repo, bare = env
     _seed(bare, tmp_path / "seed", "develop")
     _clone_onboarded(bare, repo)
@@ -227,6 +228,82 @@ def test_an_origin_without_the_principal_refuses_before_any_write(env, tmp_path:
         svc.baseline("proj")
     assert _heads(bare) == before
     assert (repo / "README.md").read_text(encoding="utf-8") == "OPERATOR\n"
+
+
+@pytest.mark.parametrize(
+    ("flow", "work"),
+    [
+        (("master", "develop", "feature/"), "feature/0.1.0"),
+        (("main", "develop", "release/"), "release/0.1.0"),
+    ],
+    ids=["master-principal", "release-prefix"],
+)
+def test_a_non_default_gitflow_is_adopted_from_the_committed_draft(
+    env, tmp_path: Path, flow: tuple[str, str, str], work: str
+) -> None:
+    """Review 5 H4 (P7/P7b): one baseline path — the onboarding is committed first and the
+    gitflow read once, from that commit; a non-default gitflow publishes under its names."""
+    svc, repo, bare = env
+    _seed(bare, tmp_path / "seed", *dict.fromkeys((flow[0], "develop")))
+    _git(bare, "symbolic-ref", "HEAD", f"refs/heads/{flow[0]}")
+    _clone_onboarded(bare, repo)
+    draft = _CONSTITUTION.replace(
+        "{principal: main, integration: develop, work: feature/}",
+        f"{{principal: {flow[0]}, integration: {flow[1]}, work: {flow[2]}}}",
+    )
+    (repo / "specs" / "constitution.md").write_text(draft, encoding="utf-8")
+    assert svc.baseline("proj") == work
+    heads = _heads(bare)
+    assert {flow[0], flow[1], work} <= set(heads)
+    assert "specs/constitution.md" in _git(bare, "ls-tree", "-r", "--name-only", work).split()
+
+
+def test_specs_the_operator_committed_on_the_principal_are_published(env, tmp_path: Path) -> None:
+    """Review 5 H4 (P7c): the committed onboarding reaches origin — never a false success
+    that leaves origin with the README alone and the specs gone from disk."""
+    svc, repo, bare = env
+    _seed(bare, tmp_path / "seed", "master")
+    _git(bare, "symbolic-ref", "HEAD", "refs/heads/master")
+    _clone_onboarded(bare, repo)
+    draft = _CONSTITUTION.replace("principal: main", "principal: master")
+    (repo / "specs" / "constitution.md").write_text(draft, encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "specs")
+    assert svc.baseline("proj") == "feature/0.1.0"
+    pushed = _git(bare, "ls-tree", "-r", "--name-only", "feature/0.1.0").split()
+    assert "specs/constitution.md" in pushed and (repo / "specs" / "constitution.md").is_file()
+
+
+def test_local_principal_commits_are_carried_onto_the_work_branch(env, tmp_path: Path) -> None:
+    """Review 5 M3 (P8): operator commits on the local principal are never stranded — the
+    published work branch carries them."""
+    svc, repo, bare = env
+    _seed(bare, tmp_path / "seed", "main", "develop")
+    _clone_onboarded(bare, repo)
+    (repo / "app.py").write_text("operator code\n", encoding="utf-8")
+    _git(repo, "add", "app.py")
+    _git(repo, "commit", "-qm", "operator code")
+    assert svc.baseline("proj") == "feature/0.1.0"
+    assert "app.py" in _git(bare, "ls-tree", "--name-only", "feature/0.1.0").split()
+
+
+def test_a_draft_origin_tracks_is_never_stashed_away(env, tmp_path: Path) -> None:
+    """Review 5 H5 (P9): origin's integration already tracks AGENTS.md — git's own text
+    stands alone; the drafts are never stashed into a false 'already published'."""
+    svc, repo, bare = env
+    seed = tmp_path / "seed"
+    _seed(bare, seed, "main")
+    _git(seed, "checkout", "-q", "-b", "develop")
+    (seed / "AGENTS.md").write_text("upstream agents\n", encoding="utf-8")
+    _git(seed, "add", "AGENTS.md")
+    _git(seed, "commit", "-qm", "a")
+    _git(seed, "push", "-q", bare.as_uri(), "develop")
+    _clone_onboarded(bare, repo)
+    with pytest.raises(GitSyncError) as refused:
+        svc.baseline("proj")
+    assert "stash" not in str(refused.value)
+    assert _git(repo, "stash", "list") == ""
+    assert (repo / "specs" / "constitution.md").is_file()
 
 
 def test_dirty_outside_the_paths_refuses_and_its_fix_lets_the_rerun_proceed(
@@ -313,16 +390,15 @@ def test_a_wrong_origin_url_gets_the_set_url_fix(env, tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("stderr", "fix"),
     [
-        ("! [rejected] feature/1.0.0 -> feature/1.0.0 (fetch first)", "pull --no-rebase"),
-        ("! [rejected] x -> x (non-fast-forward)", "pull --no-rebase"),
         ("fatal: 'x' does not appear to be a git repository", "remote set-url origin"),
         ("ERROR: Repository not found.", "remote set-url origin"),
-        ("git@h: Permission denied (publickey).\nfatal: Could not read from remote", "ls-remote"),
-        ("fatal: Authentication failed for 'https://h/x'", "ls-remote"),
-        (
-            "error: Your local changes to the following files would be overwritten by checkout",
-            "stash",
-        ),
+        # Review 5 H5/H6/M1: git's own text stands alone — a pull fix led dead into a
+        # conflicted merge, `ls-remote` cannot clear an auth failure, a stash hid drafts.
+        ("! [rejected] feature/1.0.0 -> feature/1.0.0 (fetch first)", None),
+        ("! [rejected] x -> x (non-fast-forward)", None),
+        ("git@h: Permission denied (publickey).\nfatal: Could not read from remote", None),
+        ("fatal: Authentication failed for 'https://h/x'", None),
+        ("error: Your local changes to the following files would be overwritten by checkout", None),
         ("[pre-push] BLOCKED: x\nfix: git -C r branch -m a b", None),
         ("fatal: something new", None),
     ],

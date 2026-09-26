@@ -23,7 +23,6 @@ from dadaia_workspace.core.specs_version import (
     CANONICAL_SPECS_VERSION,
     classify,
     constitution_error,
-    read_gitflow,
     read_pattern_version,
 )
 from dadaia_workspace.core.template_history import was_shipped
@@ -120,7 +119,7 @@ STEPS: tuple[tuple[str, Kind, _Pending, Callable[[_Ctx], str]], ...] = (
         "command",
         lambda c: (
             None
-            if GitSubprocessClient().published(c.specs.parent, read_gitflow(c.specs)[0].integration)
+            if GitSubprocessClient().published(c.specs.parent)
             else f"'{c.name}' specs are on no remote branch"
         ),
         lambda c: fix_line(c.root, "context", "baseline", c.name),

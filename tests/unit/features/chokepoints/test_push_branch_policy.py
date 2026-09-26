@@ -54,9 +54,9 @@ class _EmptyObjectSource:
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         return ()
 
-    def publishes_nothing(self, repo: Path, sha: str) -> bool:
+    def boundary(self, repo: Path, sha: str) -> str | None:
         self.asked.append(sha)
-        return sha in self.contentless
+        return sha if sha in self.contentless else None
 
 
 def _decide(refs: list[PushRef], root: Path, flow: Gitflow = DEFAULT, **kwargs: Any) -> Decision:
@@ -132,8 +132,8 @@ def test_a_branch_outside_the_gitflow_is_refused_naming_the_work_branch(
     for word in (flow.principal, flow.integration, flow.work_prefix):
         assert word in decision.message
     work = f"{flow.work_prefix}<M.m.p>"
-    # One command, from any cwd, carrying the refused ref (review H-C): no `&&`.
-    assert _fix(decision) == ["git", "-C", "/repo", "branch", work, branch]
+    # One command, from any cwd, carrying the refused commit (review H-C): no `&&`.
+    assert _fix(decision) == ["git", "-C", "/repo", "switch", "-c", work, _SHA_A]
 
 
 def test_the_default_names_are_ordinary_branches_under_a_custom_gitflow(tmp_path: Path) -> None:
@@ -244,18 +244,20 @@ def test_pushing_feature_branch_to_a_foreign_remote_ref_is_refused(tmp_path: Pat
 
 
 def test_detached_head_ref_gets_a_pushable_branch_diagnosis(tmp_path: Path) -> None:
-    """Finding 6, carried forward: `git push origin HEAD:feature/0.0.1` — right
-    outcome needs the right words."""
+    """Finding 6, carried forward: `git push origin HEAD:feature/0.0.1` — the fix cuts the
+    work branch at the refused commit (never a name that points elsewhere)."""
     decision = _decide(_refs(f"HEAD {_SHA_A} refs/heads/work/0.0.1 {_ZERO}"), tmp_path, _CUSTOM)
     assert not decision.allowed
-    assert _fix(decision) == ["git", "-C", "/repo", "branch", "work/<M.m.p>", "HEAD"]
+    assert _fix(decision) == ["git", "-C", "/repo", "switch", "-c", "work/<M.m.p>", _SHA_A]
 
 
 def test_an_outside_ref_is_carried_onto_the_live_work_branch(tmp_path: Path) -> None:
-    """Review H-C / R13 rule 3: a live work branch exists — the fix fast-forwards it to the
-    refused ref (append-only; git refuses a non-fast-forward), never a rebase."""
+    """Review 5 M2: the live work branch exists and may have diverged from the refused ref
+    — a fast-forward cannot carry it; the fix switches to the work branch and the text
+    names the merge (append-only, never a rebase)."""
     decision = check_branch_policy(
-        _push("topic"), _CUSTOM, replace(gate_fixes(), work="work/1.2.3")
+        _push("topic"), _CUSTOM, replace(gate_fixes(), work="work/1.2.3", cut=True)
     )
     assert decision is not None and "'work/1.2.3'" in decision.message
-    assert _fix(decision) == ["git", "-C", "/repo", "fetch", ".", "topic:work/1.2.3"]
+    assert f"merge {_SHA_A}" in decision.message
+    assert _fix(decision) == ["git", "-C", "/repo", "switch", "work/1.2.3"]

@@ -122,11 +122,13 @@ _LAW = "project gitflow: specs/constitution.md"
 @dataclass(frozen=True)
 class GateFixes:
     """What a refusal's fix line names beyond the gitflow — built by the composition
-    root: the repo (every git fix is ``git -C <repo>``, so it runs from any cwd) and the
-    live local work branch (``""``: none yet)."""
+    root: the repo (every git fix is ``git -C <repo>``, so it runs from any cwd), the
+    live work branch and whether it is cut locally, and HEAD's branch (``""``: detached)."""
 
     repo: str
     work: str = ""
+    cut: bool = False
+    head: str = ""
 
 
 def _blocked(text: str, fix: str) -> Decision:
@@ -148,14 +150,14 @@ def _refuse_branch(
             git_line(fixes.repo, "push", "origin", f"refs/remotes/origin/{other}:{ref.remote_ref}"),
         )
     if role is None:
-        refused = ref.local_ref.removeprefix(HEADS_PREFIX)
         return _blocked(
             f"ref '{ref.local_ref}' is outside the gitflow — principal '{gitflow.principal}', "
             f"integration '{gitflow.integration}', work '{fixes.work or work}'; only a work "
-            "branch is pushable: fast-forward it to this work (never a rewrite), then push it",
-            git_line(fixes.repo, "fetch", ".", f"{refused}:{fixes.work}")
-            if fixes.work
-            else git_line(fixes.repo, "branch", work, refused),
+            f"branch is pushable: switch to it, merge {ref.local_sha} into it (never a "
+            "rewrite), then push it",
+            git_line(fixes.repo, "switch", fixes.work)
+            if fixes.cut
+            else git_line(fixes.repo, "switch", "-c", fixes.work or work, ref.local_sha),
         )
     head = gitflow.integration if role == "principal" else work
     return _blocked(

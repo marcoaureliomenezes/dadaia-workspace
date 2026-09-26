@@ -7,9 +7,9 @@ so a timeout or a missing ``git`` executable always surfaces as
 :class:`GitObjectReadError`, never a raw exception at the push boundary.
 
 **One exclusion formula for every push.** :func:`_base_exclusions` returns ONE exclusion
-set for every call — ``--remotes`` unconditionally, plus ``remote_sha`` when it resolves
+set for every call — ``--remotes=origin`` unconditionally, plus ``remote_sha`` when it resolves
 — and every range/base derivation in this module consumes that SAME set. No branch
-chooses between "the old sha" and "``--remotes``"; a new branch's first push keeps the
+chooses between "the old sha" and "``--remotes=origin``"; a new branch's first push keeps the
 published baseline's amnesty because there is only one way to compute it.
 """
 
@@ -103,22 +103,22 @@ def _base_exclusions(repo: Path, remote_sha: str) -> list[str]:
     the ONE formula every push in :meth:`GitSubprocessObjectReader.new_objects` uses
     (bug new-branch-push-loses-prior-published-denylist-amnesty).
 
-    ``--remotes`` (everything reachable from any locally-known remote-tracking ref)
-    is ALWAYS present — the only honest meaning of "already published" (`dd-code-review`'s range scope). *remote_sha* is added too, but only when it resolves to a
+    ``--remotes=origin`` (everything reachable from a locally-known ``origin``
+    remote-tracking ref — never another remote's, SA-H3-1) is ALWAYS present — the only honest meaning of "already published" (`dd-code-review`'s range scope). *remote_sha* is added too, but only when it resolves to a
     real local commit (:func:`_is_resolvable_commit`) — the caller's claimed prior
     tip of the ref being pushed. In a real git-hook invocation this is normally
-    REDUNDANT with ``--remotes`` (the local ``refs/remotes/origin/<branch>`` already
+    REDUNDANT with ``--remotes=origin`` (the local ``refs/remotes/origin/<branch>`` already
     reflects it — see this module's own docstring for the "stale local view"
     limitation), but harmless to include, and it is the only anchor a repo with no
     configured remote at all (every pre-v0.4.4 unit fixture in this module's test
     file) has to offer.
 
     Pre-fix, the adapter BRANCHED: ``base = remote_sha if resolvable else None``,
-    and the ``None`` half silently dropped ``--remotes`` from the FR2 prior-text
+    and the ``None`` half silently dropped the remote exclusion from the FR2 prior-text
     anchor entirely (see :func:`_publication_boundaries`) — the exact defect a
     first ``feature/{M.m.p}`` push hits, since a brand-new ref's ``remote_sha`` is
     the all-zero sentinel and is therefore never resolvable. There is no branch
-    here: every call gets ``--remotes``, optionally extended by *remote_sha* — one
+    here: every call gets ``--remotes=origin``, optionally extended by *remote_sha* — one
     exclusion set, asked for identically on every push.
     """
     exclusions = ["--remotes=origin"]
@@ -190,7 +190,7 @@ def _publication_boundaries(repo: Path, local_sha: str, exclusions: list[str]) -
     old ``remote_sha if resolvable else None`` derivation dropped ALL prior-text
     amnesty the instant ``remote_sha`` stopped resolving, even though a perfectly
     good publication boundary (the commit the branch was cut from) was already
-    resolvable via the exact same ``--not --remotes`` the range walk uses.
+    resolvable via the exact same ``--not --remotes=origin`` the range walk uses.
 
     Ordinarily exactly one boundary exists — a ``feature/{M.m.p}`` branch is cut
     once, linear (``dd-gitflow-default``). When more than one exists (unusual
@@ -393,7 +393,7 @@ def _multi_path_shas(
     in the range (never per object), each proportional to that commit's tree size — see
     :func:`_range_commit_shas`'s docstring for why that count stays small for an
     ordinary push. A pathological range with very many commits (e.g. a first push of an
-    entire deep history in the ``--not --remotes`` fallback shape) pays proportionally
+    entire deep history in the ``--not --remotes=origin`` fallback shape) pays proportionally
     more calls; nothing here silently degrades to a partial scan in that case (a fail-
     open amnesty is a worse outcome than a slower push). If this ever becomes a
     measured bottleneck, the calls can be CHUNKED (batched in groups via a single
@@ -875,13 +875,20 @@ class GitSubprocessObjectReader:
     """Subprocess-backed push-range object reader (SPEC v0.9.0 FR1/FR7; ADR-0001: the
     sole adapter — no ``GitObjectReader`` port)."""
 
-    def publishes_nothing(self, repo: Path, sha: str) -> bool:
-        """ADR 0036: pushing *sha* adds no commit origin lacks (:func:`unpublished`).
-        Fails closed (``False``) on any read error."""
+    def boundary(self, repo: Path, sha: str) -> str | None:
+        """Where *sha*'s own unpublished range rests on origin: *sha* itself when origin
+        holds it (ADR 0036: a birth publishing nothing), else the published commit its
+        oldest commit sits on; ``None`` when the range reaches a root commit or git
+        cannot be read (fail closed)."""
         try:
-            return _SHA_SHAPE_RE.match(sha) is not None and not unpublished(repo, sha)
+            if _SHA_SHAPE_RE.match(sha) is None:
+                return None
+            exclusions = _base_exclusions(repo, ZERO_SHA)
+            if not _range_commit_shas(repo, sha, exclusions):
+                return sha
+            return next(iter(_publication_boundaries(repo, sha, exclusions)), None)
         except GitObjectReadError:
-            return False
+            return None
 
     def remote_branch(self, repo: Path, branch: str) -> bool:
         """``refs/remotes/origin/<branch>`` exists locally (offline)."""
@@ -900,7 +907,7 @@ class GitSubprocessObjectReader:
         if not _SHA_SHAPE_RE.match(local_sha):
             raise GitObjectReadError(f"local_sha is not a valid sha shape: {local_sha!r}")
         # bug new-branch-push-loses-prior-published-denylist-amnesty: exclusions
-        # resolved ONCE per call (_base_exclusions — ALWAYS `--remotes`, optionally
+        # resolved ONCE per call (_base_exclusions — ALWAYS `--remotes=origin`, optionally
         # widened by a resolvable remote_sha) — reused for the range walk
         # (_rev_list_candidates, _range_commit_shas, _multi_path_shas) AND the FR2
         # prior-text anchor set (_publication_boundaries, _read_blobs). One formula,

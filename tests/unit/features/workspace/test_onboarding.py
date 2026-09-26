@@ -23,7 +23,7 @@ _SCAFFOLD = workspace_layout.public_scripts_dir().parent / "scaffold"
 @pytest.fixture(autouse=True)
 def _git(monkeypatch: pytest.MonkeyPatch) -> dict[str, bool]:
     remote = {"published": False}
-    monkeypatch.setattr(GitSubprocessClient, "published", lambda _s, _p, _r: remote["published"])
+    monkeypatch.setattr(GitSubprocessClient, "published", lambda _s, _p: remote["published"])
     return remote
 
 

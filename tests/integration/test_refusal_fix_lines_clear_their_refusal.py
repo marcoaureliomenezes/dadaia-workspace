@@ -259,25 +259,22 @@ def _published(world: World) -> None:
     world.clone()
 
 
-def _outside(world: World) -> str:
+def _outside(world: World, published: bool = True) -> str:
     """Review H-C (P4): the refused ref is not the checked-out one."""
-    _published(world)
+    if published:
+        _published(world)
     world.commit("notes.md", "n\n", branch="topic")
     world.git(world.repo, "checkout", "-q", "main")
     return "git push -q origin topic"
 
 
 def _outside_with_work(world: World) -> str:
-    """Review H-C: a live work branch exists — the fix carries the ref onto it."""
+    """Review 5 M2: the live work branch exists and has DIVERGED from the refused ref — a
+    fast-forward cannot carry it; the switch + merge does."""
     _published(world)
-    world.git(world.repo, "branch", "feature/1.0.0", "origin/develop")
-    return _outside_after(world)
-
-
-def _outside_after(world: World) -> str:
-    world.commit("notes.md", "n\n", branch="topic")
+    world.commit("w.md", "w\n", branch="feature/0.1.0")
     world.git(world.repo, "checkout", "-q", "main")
-    return "git push -q origin topic"
+    return _outside(world, published=False)
 
 
 def _outside_detached(world: World) -> str:
@@ -288,8 +285,12 @@ def _outside_detached(world: World) -> str:
     return "git push -q origin HEAD:refs/heads/topic"
 
 
+#: The refusal's documented steps after its switch: merge the refused commit, push the work.
+_MERGE_TOPIC = "git merge -q --no-edit topic && git push -q origin feature/0.1.0"
+
+
 def _work_carries_topic(world: World) -> None:
-    tip = world.remote_heads()["feature/1.0.0"]
+    tip = world.remote_heads()["feature/0.1.0"]
     assert "notes.md" in world.git(world.repo, "ls-tree", "--name-only", tip).splitlines()
 
 
@@ -344,10 +345,55 @@ def _drop_term(world: World) -> None:
     (world.repo / "notes.md").write_text("a b\n", encoding="utf-8")
 
 
+#: The refusal's documented steps after its fix: commit the edited work, push it again.
+_COMMIT_PUSH = "git commit -qam n && git push -q origin feature/1.0.0"
+
+
 def _clean_publish(world: World) -> None:
+    """L3: the operator's work is PUBLISHED (not merely left on disk), without the term."""
     tip = world.remote_heads()["feature/1.0.0"]
     assert _TERM not in world.git(world.repo, "log", "-p", tip, "--not", "origin/develop")
-    assert (world.repo / "more.md").is_file()
+    assert {"notes.md", "more.md"} <= set(
+        world.git(world.bare, "ls-tree", "--name-only", tip).split()
+    )
+    assert not world.git(world.repo, "status", "--porcelain")
+
+
+def _denylisted_not_checked_out(world: World) -> str:
+    """Review 5 H1 (P2): HEAD is `main`; the refused branch must be switched to first."""
+    command = _denylisted(world)
+    world.git(world.repo, "checkout", "-q", "main")
+    return command
+
+
+#: H1: the operator's edit happens on the refused branch, after the switch.
+_CLEAN_COMMIT_PUSH = f"printf 'a b\\n' > notes.md && {_COMMIT_PUSH}"
+
+
+def _denylisted_advanced_integration(world: World) -> str:
+    """Review 5 H2 (P3): origin's integration moved on after this work was cut."""
+    _published(world)
+    world.deny()
+    world.commit("mine.md", "m\n", branch="feature/1.0.0")
+    world.git(world.repo, "push", "-q", "-u", "origin", "feature/1.0.0")
+    other = world.tmp / "other"
+    world.git(world.tmp, "clone", "-q", "-b", "develop", world.bare.as_uri(), str(other))
+    (other / "dep.txt").write_text("dependabot\n", encoding="utf-8")
+    world.git(other, "add", "dep.txt")
+    world.git(other, "commit", "-qm", "dep")
+    world.git(other, "push", "-q", "--no-verify", "origin", "develop")
+    world.git(world.repo, "fetch", "-q", "origin")
+    world.commit("notes.md", f"a {_TERM} b\n", branch="feature/1.0.1")
+    world.commit("more.md", "m\n")
+    return "git push -q origin feature/1.0.1"
+
+
+def _nothing_reverted(world: World) -> None:
+    tip = world.remote_heads()["feature/1.0.1"]
+    assert world.git(world.repo, "rev-parse", f"{tip}^") == world.remote_heads()["feature/1.0.0"]
+    deleted = world.git(world.repo, "log", "--format=", "--name-only", "--diff-filter=D", tip)
+    assert "dep.txt" not in deleted.split()
+    assert _TERM not in world.git(world.repo, "log", "-p", tip, "--not", "origin/feature/1.0.0")
 
 
 def _non_canon(world: World) -> str:
@@ -443,10 +489,6 @@ def _baseline_denylisted(world: World) -> list[str]:
     return ["context", "baseline", "proj"]
 
 
-def _drop_draft_term(world: World) -> None:
-    (world.repo / "AGENTS.md").write_text("a\n", encoding="utf-8")
-
-
 def _no_url_no_checkout(world: World) -> list[str]:
     world.seed(_constitution())
     store = JsonContextStore(world.ws / ".dadaia" / "states")
@@ -481,18 +523,6 @@ def _unregistered_repo(world: World) -> list[str]:
     world.clone()
     world.git(world.tmp, "clone", "-q", world.bare.as_uri(), str(world.ws / "repos" / "nope"))
     return ["context", "baseline", "proj", "nope"]
-
-
-def _typo_repo(world: World) -> list[str]:
-    """Review MEDIUM (round 4): a typo is never registered — the fix is the context's own
-    publish, its repos listed."""
-    world.seed(_constitution())
-    world.clone()
-    return ["context", "baseline", "proj", "prj"]
-
-
-def _nothing(world: World) -> None:
-    assert not (world.ws / "repos" / "prj").exists()
 
 
 def _nope_cloned(world: World) -> None:
@@ -594,14 +624,6 @@ def _dead_denylisted(world: World) -> list[str]:
     return ["context", "dead", "proj"]
 
 
-def _dead_non_ff(world: World) -> list[str]:
-    """Review H-A (P2): dead's push is rejected non-fast-forward."""
-    _on_work(world)
-    _advance_origin_work(world)
-    (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
-    return ["context", "dead", "proj"]
-
-
 def _dead_no_identity(world: World) -> list[str]:
     """SA-H3-2: dead's auto-sync commit needs git's identity — refused before any write."""
     _on_work(world)
@@ -649,16 +671,19 @@ _VERBS = {
 SITES: dict[str, tuple[Case, ...] | Skip] = {
     "branch_policy._refuse_branch#0": (Case(_birth_published, _develop_at_main, replaces=True),),
     "branch_policy._refuse_branch#1": (
-        Case(_outside, _work_carries_topic, then="git push -q origin feature/1.0.0"),
-        Case(_outside_with_work, _work_carries_topic, then="git push -q origin feature/1.0.0"),
-        Case(_outside_detached, _work_carries_topic, then="git push -q origin feature/1.0.0"),
+        Case(_outside, _work_carries_topic, then=_MERGE_TOPIC),
+        Case(_outside_with_work, _work_carries_topic, then=_MERGE_TOPIC),
+        Case(_outside_detached, _work_carries_topic, then="git push -q origin feature/0.1.0"),
     ),
     "branch_policy._refuse_branch#2": Skip("`gh pr create` needs GitHub; the PR path is the fix"),
     "branch_policy.check_branch_policy#0": (
         Case(_mismatch, _work_pushed, then="git push -q origin feature/1.0.0"),
     ),
-    "push_gate._compose_denylist_refusal#0": (
-        Case(_denylisted, _clean_publish, operator=_drop_term),
+    "push_gate._rewrite_fix#0": (
+        Case(_denylisted_not_checked_out, _clean_publish, then=_CLEAN_COMMIT_PUSH),
+    ),
+    "push_gate._rewrite_fix#1": (
+        Case(_denylisted, _clean_publish, operator=_drop_term, then=_COMMIT_PUSH),
         Case(
             _denylisted_in_a_worktree,
             _worktree_clean,
@@ -666,10 +691,16 @@ SITES: dict[str, tuple[Case, ...] | Skip] = {
             then="git -C .claude/worktrees/agent-x commit -qam n && "
             "git -C .claude/worktrees/agent-x push -q origin feature/1.0.0",
         ),
-        Case(_denylisted_no_context, _clean_publish, operator=_drop_term),
+        Case(_denylisted_no_context, _clean_publish, operator=_drop_term, then=_COMMIT_PUSH),
+        Case(
+            _denylisted_advanced_integration,
+            _nothing_reverted,
+            operator=_drop_term,
+            then="git commit -qam n && git push -q origin feature/1.0.1",
+        ),
+        Case(_non_canon, _no_junk, operator=_rm_junk, then="git push -q origin feature/1.0.0"),
     ),
     "push_gate._run_denylist_scan#0": Skip("needs a corrupted object store; `git fsck` names it"),
-    "push_gate._compose_specs_canon_refusal#0": (Case(_non_canon, _no_junk, operator=_rm_junk),),
     "push_gate.push_gate_decision#0": (Case(_malformed, _work_pushed, replaces=True),),
     "ci._repo_root#0": Skip("the pre-push hook always runs inside the repo it pushes"),
     "ci.push_gate_check#0": Skip("the gate's refusal: its fix is a branch_policy/push_gate site"),
@@ -685,12 +716,8 @@ SITES: dict[str, tuple[Case, ...] | Skip] = {
     ),
     "service.SpecContextService.baseline#3": (
         Case(_remote_gone, _baseline_done, operator=_remote_back),
-        Case(_baseline_denylisted, _baseline_done, operator=_drop_draft_term),
     ),
-    "service.SpecContextService._owned_slug#0": (
-        Case(_unregistered_repo, _nope_cloned),
-        Case(_typo_repo, _nothing, then=["context", "baseline", "proj"]),
-    ),
+    "service.SpecContextService._owned_slug#0": (Case(_unregistered_repo, _nope_cloned),),
     "service.SpecContextService._require_publishable#0": (
         Case(_foreign_change, _baseline_done),
         Case(_secret_draft, _baseline_done, operator=_drop_secret),
@@ -713,7 +740,6 @@ SITES: dict[str, tuple[Case, ...] | Skip] = {
     "service.SpecContextService.dead#6": (
         Case(_dead_remote_gone, _dead_done, operator=_remote_back),
         Case(_dead_denylisted, _dead_done, operator=_drop_readme_term),
-        Case(_dead_non_ff, _dead_done),
     ),
 }
 
@@ -853,9 +879,74 @@ def test_every_fix_line_prints_on_one_line_without_a_tty(tmp_path: Path) -> None
 def test_the_gate_is_read_only_and_its_rewrite_fix_uncommits_only_unpublished_work(
     tmp_path: Path,
 ) -> None:
-    """R13 rule 3: the denylist refusal's fix uncommits the unpublished range — never a
-    squash of published history, never a publish verb that rewrites."""
+    """R13 rule 3 / review 5 H2: the denylist refusal's fix uncommits the refused ref's own
+    unpublished range, down to the published commit it rests on — never a squash of
+    published history, never a publish verb that rewrites."""
     world = World(tmp_path)
-    fix = _single_fix(_hit(world, _denylisted(world)))
-    assert fix == shell_line("git", "-C", str(world.repo), "reset", "--soft", "origin/develop")
+    command = _denylisted(world)
+    rests_on = world.git(world.repo, "rev-parse", "origin/develop")
+    fix = _single_fix(_hit(world, command))
+    assert fix == shell_line("git", "-C", str(world.repo), "reset", "--soft", rests_on)
     assert "--republish" not in world.cli("context", "baseline", "--help").stdout
+
+
+def test_a_denylisted_tag_from_a_detached_head_on_an_empty_origin_prints_no_command(
+    tmp_path: Path,
+) -> None:
+    """Review 5 C1 (P1): the range reaches a root commit and the ref is a tag — the refusal
+    names the operator action, prints no command, and the repo stays a repo."""
+    world = World(tmp_path)
+    world.clone()
+    world.deny()
+    world.commit("README.md", "r\n")
+    world.commit("notes.md", f"a {_TERM}\n")
+    world.git(world.repo, "tag", "v0.0.1")
+    world.git(world.repo, "checkout", "-q", "--detach", "v0.0.1")
+    done = _hit(world, "git push -q origin v0.0.1")
+    output = done.stdout + done.stderr
+    assert done.returncode != 0 and "Operator action" in output
+    assert "\nfix: " not in output
+    assert world.git(world.repo, "rev-parse", "HEAD") == world.git(
+        world.repo, "rev-parse", "v0.0.1"
+    )
+    assert world.remote_heads() == {}
+
+
+def test_dead_on_a_non_fast_forward_carries_gits_own_text_and_removes_nothing(
+    tmp_path: Path,
+) -> None:
+    """Review 5 H6: no pull fix row leads dead into a conflicted merge it would commit and
+    push — git's own text stands alone; the checkout stays."""
+    world = World(tmp_path)
+    _on_work(world)
+    _advance_origin_work(world)
+    (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
+    done = world.cli("context", "dead", "proj")
+    output = done.stdout + done.stderr
+    assert done.returncode != 0 and "rejected" in output
+    assert "\nfix: " not in output
+    assert world.repo.is_dir() and not (world.repo / ".git" / "MERGE_HEAD").exists()
+
+
+def test_a_typo_repo_is_never_answered_with_another_repos_publish(tmp_path: Path) -> None:
+    """Review 5 L1: two arms — the owner's publish, or the registration; a typo's fix never
+    publishes the context's main repo instead."""
+    world = World(tmp_path)
+    world.seed(_constitution())
+    world.clone()
+    done = world.cli("context", "baseline", "proj", "prj")
+    fix = _single_fix(done)
+    assert done.returncode != 0 and "repo add" in fix
+    assert world.remote_heads().keys() == {"main", "develop"}
+
+
+def test_a_denylisted_first_publish_names_the_operator_action_and_pushes_nothing(
+    tmp_path: Path,
+) -> None:
+    """Review 5 C1/H3: on an empty origin the range reaches a root commit — no reset or
+    ref deletion is printed; nothing reaches origin."""
+    world = World(tmp_path)
+    done = world.cli(*_baseline_denylisted(world))
+    output = done.stdout + done.stderr
+    assert done.returncode != 0 and "Operator action" in output and "\nfix: " not in output
+    assert world.remote_heads() == {}

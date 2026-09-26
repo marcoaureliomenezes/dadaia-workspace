@@ -8,7 +8,9 @@ from pathlib import Path
 
 from dadaia_workspace.core.cli_line import git_line
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
+from dadaia_workspace.core.gitflow import Gitflow
 from dadaia_workspace.core.models.git_scan import GitObjectReadError
+from dadaia_workspace.core.specs_version import read_gitflow
 from dadaia_workspace.infrastructure.git_objects import unpublished
 
 logger = logging.getLogger(__name__)
@@ -268,15 +270,24 @@ class GitSubprocessClient:
             raise GitSyncError(f"git {args[0]} failed in {path}: {result.stderr.strip()}")
         return result.stdout.strip()
 
-    def published(self, path: Path, integration: str) -> bool:
-        """Whether the project is published (local, offline): ``origin/<integration>``
-        exists and ``specs/constitution.md`` is reachable from a remote-tracking ref."""
-        born = _run(
-            ["git", "rev-parse", "-q", "--verify", f"refs/remotes/origin/{integration}"], cwd=path
-        )
+    def gitflow(self, repo: Path, main_repo: Path | None = None) -> tuple[Gitflow, str | None]:
+        """ADR 0048 — the ONE gitflow reader (the gate, ``baseline``, ``dead``, onboarding):
+        the constitution committed at HEAD, else the newest on a local branch or on origin,
+        else — an associated repo — its *main_repo*'s; never a working tree; else DEFAULT
+        plus the warning."""
+        text = self.committed_text(repo, "specs/constitution.md")
+        if text is None and main_repo is not None and main_repo.resolve() != repo.resolve():
+            return self.gitflow(main_repo)
+        return read_gitflow(repo / "specs", text or "")
+
+    def published(self, path: Path) -> bool:
+        """Whether the project is published (local, offline, AC4.1): ``origin/<integration>``
+        of the committed gitflow exists and ``specs/constitution.md`` is on origin."""
+        ref = f"refs/remotes/origin/{self.gitflow(path)[0].integration}"
+        born = _run(["git", "rev-parse", "-q", "--verify", ref], cwd=path)
         rel = "specs/constitution.md"
         result = _run(["git", "log", "--remotes=origin", "-n1", "--format=%H", "--", rel], cwd=path)
-        return born.returncode == 0 and result.returncode == 0 and bool(result.stdout.strip())
+        return born.returncode == 0 and bool(result.stdout.strip())
 
     def committed_text(self, path: Path, rel: str) -> str | None:
         """*rel* at HEAD, else at the newest commit touching it on a local branch or an

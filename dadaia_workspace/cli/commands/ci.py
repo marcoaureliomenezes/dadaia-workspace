@@ -22,7 +22,10 @@ from dadaia_workspace.features.ci_preflight import (
     run_preflight,
     subprocess_runner,
 )
-from dadaia_workspace.features.spec_context.service import install_git_hooks, project_gitflow
+from dadaia_workspace.features.spec_context.service import (
+    install_git_hooks,
+    work_name,
+)
 
 app = typer.Typer(help="Local CI-equivalent preflight gate + git-hook chokepoints.")
 
@@ -98,22 +101,22 @@ def _no_canon_violations(paths: Iterable[str]) -> list[str]:
     return []
 
 
-def _gate_inputs(repo_root: Path) -> tuple[Gitflow, GateFixes]:
+def _gate_inputs(repo_root: Path, head: str) -> tuple[Gitflow, GateFixes]:
     """The gitflow through the ONE reader (ADR 0048: committed first, one warning on the
-    default; an associated repo reads its owner's main repo) and the fix inputs: the repo
-    and its live local work branch."""
+    default; an associated repo reads its owner's main repo) and the fix inputs: the repo,
+    the live work branch by the ONE rule (cut locally or not) and HEAD's branch."""
     from dadaia_workspace.container import build_git_client
 
     git = build_git_client()
     workspace = resolve_workspace_root_for_cli(repo_root)
     owner = repo_owner(workspace, repo_root)
     main = workspace / "repos" / owner[2] if owner else None
-    gitflow, warning = project_gitflow(git, repo_root, main)
+    gitflow, warning = git.gitflow(repo_root, main)
     if warning:
         typer.echo(f"[pre-push] WARNING: {warning}", err=True)
-    heads = git.git(repo_root, "for-each-ref", "--sort=-v:refname", "--format=%(refname:short)")
-    work = next((h for h in heads.split() if gitflow.role_of(h) == "work"), "")
-    return gitflow, GateFixes(repo=str(repo_root), work=work)
+    work = work_name(git, repo_root, gitflow)
+    cut = bool(git.git(repo_root, "for-each-ref", "--format=%(refname)", f"refs/heads/{work}"))
+    return gitflow, GateFixes(repo=str(repo_root), work=work, cut=cut, head=head)
 
 
 @app.command("push-gate-check")
@@ -183,7 +186,7 @@ def push_gate_check() -> None:
         replace(r, local_ref=f"refs/heads/{branch}") if r.local_ref == "HEAD" and branch else r
         for r in refs
     ]
-    gitflow, fixes = _gate_inputs(repo_root)
+    gitflow, fixes = _gate_inputs(repo_root, branch)
     decision = push_gate_decision(
         refs,
         object_source=build_git_object_reader(),

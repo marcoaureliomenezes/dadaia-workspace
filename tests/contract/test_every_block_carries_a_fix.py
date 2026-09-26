@@ -168,8 +168,8 @@ class _FakeObjectSource:
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         return self.objects
 
-    def publishes_nothing(self, repo: Path, sha: str) -> bool:
-        return False
+    def boundary(self, repo: Path, sha: str) -> str | None:
+        return None
 
     def remote_branch(self, repo: Path, branch: str) -> bool:
         return True  # a published origin: a birth carrying content is a refusal

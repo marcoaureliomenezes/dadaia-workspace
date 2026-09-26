@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import Protocol
 
@@ -63,7 +64,7 @@ class ObjectSource(Protocol):
         self, repo: Path, local_sha: str, remote_sha: str
     ) -> Iterable[ScannedObject]: ...
 
-    def publishes_nothing(self, repo: Path, sha: str) -> bool: ...
+    def boundary(self, repo: Path, sha: str) -> str | None: ...
 
     def remote_branch(self, repo: Path, branch: str) -> bool: ...
 
@@ -105,7 +106,7 @@ def _annotate_skip(
 
 
 def _compose_denylist_refusal(
-    hits: list[tuple[PushRef, Hit]], path_masker: PathMasker, rewrite: str
+    hits: list[tuple[PushRef, Hit]], path_masker: PathMasker, rewrite: Callable[[PushRef], str]
 ) -> str:
     """FR5: ref, path:line, short blob sha, masked term + source layer, the law, the
     edit + rewrite-before-push remediation, ``--no-verify``, capped at 10 hits.
@@ -135,9 +136,25 @@ def _compose_denylist_refusal(
     )
     lines.append(
         "Uncommit the unpublished range (origin's history is never rewritten), remove the "
-        f"term from the listed file(s), commit and push:\nfix: {rewrite}"
+        f"term from the listed file(s), commit and push:\n{rewrite(hits[0][0])}"
     )
     return "\n".join(lines)
+
+
+def _rewrite_fix(ref: PushRef, object_source: ObjectSource, repo: Path, fixes: GateFixes) -> str:
+    """The fix for *ref*'s own unpublished range (R13: origin is never rewritten): a branch
+    HEAD is not on is switched to first; HEAD's range is uncommitted down to the published
+    commit it rests on. A range reaching a root commit, or a tag, has no such command."""
+    branch = ref.local_ref.removeprefix(HEADS_PREFIX)
+    if branch != ref.local_ref and branch != fixes.head:
+        return f"fix: {git_line(fixes.repo, 'switch', branch)}"
+    base = object_source.boundary(repo, ref.local_sha) if branch == (fixes.head or "HEAD") else None
+    if base is None:
+        return (
+            "Operator action: nothing below this range is on origin, or the ref is a tag — "
+            "no command uncommits only unpublished work; edit that history by hand."
+        )
+    return f"fix: {git_line(fixes.repo, 'reset', '--soft', base)}"
 
 
 def _render_git_read_error(exc: GitObjectReadError, path_masker: PathMasker) -> str:
@@ -204,7 +221,7 @@ def _run_denylist_scan(
     repo: Path,
     terms: Iterable[tuple[str, str]],
     patterns: Iterable[BaselinePatternLike],
-    rewrite: str,
+    rewrite: Callable[[PushRef], str],
 ) -> _RangeScan:
     """Run the FR1/FR2 scan over *scan_refs* — every non-deletion ref, tags included.
 
@@ -277,7 +294,9 @@ def _run_denylist_scan(
     )
 
 
-def _compose_specs_canon_refusal(violations: list[tuple[PushRef, str]], rewrite: str) -> str:
+def _compose_specs_canon_refusal(
+    violations: list[tuple[PushRef, str]], rewrite: Callable[[PushRef], str]
+) -> str:
     """FR2 (v0.5.0 specs-canon closure): ref, the offending ``specs/``-relative path,
     the law, one fix hint per offending path, ``--no-verify``, capped at 10 hits —
     the SAME shape :func:`_compose_denylist_refusal` uses."""
@@ -299,7 +318,7 @@ def _compose_specs_canon_refusal(violations: list[tuple[PushRef, str]], rewrite:
     )
     lines.append(
         "Uncommit the unpublished range (origin's history is never rewritten), git rm the "
-        f"listed specs/ path(s), commit and push:\nfix: {rewrite}"
+        f"listed specs/ path(s), commit and push:\n{rewrite(violations[0][0])}"
     )
     return "\n".join(lines)
 
@@ -326,7 +345,7 @@ def _run_specs_canon_scan(
     scan_refs: list[PushRef],
     specs_paths_by_ref: dict[str, list[str]],
     canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
-    rewrite: str,
+    rewrite: Callable[[PushRef], str],
 ) -> Decision | None:
     """SPEC v0.5.0 specs-canon closure (operator ruling 2026-08-28), range-scoped since
     2026-09-13: every ``specs/`` path the pushed range introduces or rewrites
@@ -420,7 +439,7 @@ def push_gate_decision(
     births = frozenset(
         r.local_sha
         for r in unborn
-        if bootstrap or object_source.publishes_nothing(repo, r.local_sha)
+        if bootstrap or object_source.boundary(repo, r.local_sha) == r.local_sha
     )
     branch_refusal = check_branch_policy(branch_policy_refs, gitflow, fixes, births)
     if branch_refusal is not None:
@@ -431,14 +450,7 @@ def push_gate_decision(
     # pure, already checked above); shared by both the specs-canon scan (step 2) and
     # the denylist scan (step 3, A3.4).
     scan_refs = [r for r in refs if not r.is_deletion]
-    base = next((r.remote_sha for r in scan_refs if r.remote_sha != ZERO_SHA), "")
-    if not base and object_source.remote_branch(repo, gitflow.integration):
-        base = f"origin/{gitflow.integration}"
-    rewrite = (
-        git_line(fixes.repo, "reset", "--soft", base)
-        if base
-        else git_line(fixes.repo, "update-ref", "-d", "HEAD")  # nothing published yet
-    )
+    rewrite = partial(_rewrite_fix, object_source=object_source, repo=repo, fixes=fixes)
 
     # One streaming pass over the pushed-range objects feeds BOTH step 2 (specs canon,
     # range-scoped, operator ruling 2026-09-13) and step 3 (denylist); step 2's refusal
