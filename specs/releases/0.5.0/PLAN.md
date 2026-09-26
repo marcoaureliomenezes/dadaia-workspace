@@ -169,6 +169,13 @@ second exclusion spelling for new capabilities the review demanded:
 
 The ceiling is the operator's decision.
 
+**Round 6 measure (R13 append-only, 2026-09-26): +489 lines** — same method, `5364ba0d..HEAD`
+(round-6 commit: +183 / −266, **net −83** on `service.py` −51, `git_objects.py` −16,
+`branch_policy.py` −14, `ci.py` −13, `context.py` −5, `git_subprocess.py` +2, `push_gate.py` +14).
+Still **+127 over the +362 ceiling**: the rework deleted every guess/rewrite path but the ceiling
+needs further cuts outside the three units (onboarding, specs_version, specs CLI) — operator ruling.
+New lower ceiling recorded: **+489** (moves down only).
+
 ### 1.3 Round 5 — as-is review of the three REBUILD units (ADR 0041 trigger, 2026-09-26)
 
 Third rejection (review `2026-09-26T200000Z`): every round found new stalls in the same three units.
@@ -190,7 +197,24 @@ any other same-named local/origin branch is refused before any write; births + w
 `push --atomic`; `_sync_failure` classifies non-fast-forward / unreachable / gate / unrecognised; the
 census walks every `raise` reachable from `alive`, `baseline`, `dead`.
 
-### 1.2 Survey drift corrected
+### 1.4 Round 6 — the append-only publish (operator R13/Q11, 2026-09-26)
+
+Fourth rejection on the same three units. Bug history (`git log -p` on service.py, branch_policy.py,
+git_subprocess.py, git_objects.py; ledger `baseline-*`, `context-dead-*`): every round patched a
+symptom of ONE structural error — the publish **invented history** (contentless births, fixed-date
+commits) and then had to **guess** which remote work was its own, and repaired mis-guesses by
+**rewriting** (checkout -f, rebase fix, squash `--republish`, `push --delete`). Each guess fix bred
+the next refusal path. Round 6 deletes the invention, so nothing remains to guess.
+
+| unit | deleted | rebuilt as |
+|---|---|---|
+| `service.baseline` | contentless birth, `_BUILD_DATE` private-index `_work_commit`, `_refuse_foreign_work`, `_squash_unpublished`, `--republish`, `checkout -f -B` | empty origin → onboarding commit on the local principal, pushed as principal + integration + work; else adopt `origin/<work>`→`<integration>`→`<principal>`, `switch`/`merge --no-edit`, ordinary commit, one atomic push; origin without the principal, or a draft gitflow differing from the committed one → honest refusal before any write |
+| `_sync_failure` | the "rerun the verb" class, `pull --rebase` | one fix per cause: non-ff → `pull --no-rebase --no-edit`; wrong URL → `remote set-url`; auth → `ls-remote`; dirty → `stash push`; unknown → git's text |
+| `branch_policy` | `rebase` fix, contentless-birth refusal, `GateFixes.publish/republish` | outside-gitflow → `fetch . <ref>:<work>` (ff only) or `branch <work> <ref>`; births admitted on an origin with no gitflow branch |
+| gate rewrite fix | `context baseline --republish` | `reset --soft <remote tip or origin/<integration>>` (unpublished range only); `update-ref -d HEAD` when nothing is published |
+| git reads | `--remotes` (all), `_commit` fallback identity, empty-tree `publishes_nothing` | `--remotes=origin` everywhere; `identity_fix` the one probe (baseline + dead) |
+
+
 
 - `DADAIA_BIN` importers are **7**, not 9–10: `hooks/venv_guard.py` and `features/ci_preflight/service.py`
   read the `$DADAIA_BIN` *environment variable* exported by the pre-push hook, not the constant (SPEC AC2.2
