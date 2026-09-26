@@ -73,7 +73,7 @@ The repo-root directory a foreign specs tree is moved to (`git mv`, staged) by `
 _Avoid_: specs backup, specs.old, archive
 
 **First pass**:
-Level 3b: the `dd-audit-project` run on a fresh specs tree — the `memory.py drift` worklist drives `dd-product-engineer` to fill memory from code and `specs-bkp/`; done when memory holds real content (`dadaia doctor --context <ctx>` exit 0), never by a stamp.
+Level 3b: the `dd-audit-project` run on a fresh specs tree — the `memory.py drift` worklist drives `dd-product-engineer` to fill memory from code and `specs-bkp/`; done when memory holds real content (`.dadaia/.venv/bin/dadaia doctor --context <ctx>` exit 0), never by a stamp.
 _Avoid_: bootstrap audit, initial import, migration
 
 ## Enforcement

@@ -88,7 +88,7 @@ bind, the ctx-inject hook injects the context header, `ARCHITECTURE.md`'s
 absent tree is scaffolded, a dadaia tree is upgraded and its missing files filled, and a
 foreign `specs/` is moved to `specs-bkp/` (`git mv`, staged) after consent —
 `--replace-foreign` gives it without asking. The `dd-audit-project` first pass (3b) fills
-memory and is done when memory holds real content (`dadaia doctor --context <ctx>` exit 0), never by a
+memory and is done when memory holds real content (`.dadaia/.venv/bin/dadaia doctor --context <ctx>` exit 0), never by a
 stamp. `context baseline <ctx>` (3c) publishes the principal, integration and work
 branches; a re-run is a no-op.
 
