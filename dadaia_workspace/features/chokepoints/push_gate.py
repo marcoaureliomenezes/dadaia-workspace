@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from dadaia_workspace.core.cli_line import shell_line
+from dadaia_workspace.core.cli_line import git_line
 from dadaia_workspace.core.gitflow import Gitflow
 from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObject
 from dadaia_workspace.features.chokepoints.branch_policy import (
@@ -401,7 +401,7 @@ def push_gate_decision(
                 "closed). The sanctioned, traceable emergency bypass is "
                 "`git push --no-verify` (discouraged; leaves a reflog trace).\n"
                 "Push one explicit refspec.\n"
-                f"fix: {shell_line('git', '-C', fixes.repo, 'push', 'origin', gitflow.work_pattern)}"
+                f"fix: {git_line(fixes.repo, 'push', 'origin', gitflow.work_pattern)}"
             ),
         )
 

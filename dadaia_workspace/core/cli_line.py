@@ -34,6 +34,11 @@ def _venv_cli[P: PurePath](venv: P) -> P:
     return venv / caps.venv_scripts_dir / f"dadaia{caps.venv_exe_suffix}"
 
 
+def git_line(repo: str | PurePath, *argv: str) -> str:
+    """``git -C <repo> argv…`` — every git fix names its repo, so it runs from any cwd."""
+    return shell_line("git", "-C", str(repo), *argv)
+
+
 def shell_line(*parts: str) -> str:
     """*parts* joined into one command line quoted for the host shell."""
     if platform.PLATFORM.venv_exe_suffix:  # Windows

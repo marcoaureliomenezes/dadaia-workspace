@@ -16,7 +16,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from dadaia_workspace.core.cli_line import shell_line
+from dadaia_workspace.core.cli_line import git_line, shell_line
 from dadaia_workspace.core.gitflow import Gitflow
 
 __all__ = [
@@ -148,14 +148,9 @@ def _refuse_branch(
             return _blocked(
                 f"creating the {role} branch '{branch}' would publish new objects — a birth "
                 f"carries only published history: birth it at the published '{other}' tip",
-                shell_line(
-                    "git",
-                    "-C",
-                    fixes.repo,
-                    "push",
-                    "origin",
-                    f"refs/remotes/origin/{other}:{ref.remote_ref}",
-                ),  # fmt: skip
+                git_line(
+                    fixes.repo, "push", "origin", f"refs/remotes/origin/{other}:{ref.remote_ref}"
+                ),
             )
         return _blocked(
             f"creating the {role} branch '{branch}' would publish new objects — the first "
@@ -168,7 +163,7 @@ def _refuse_branch(
             f"ref '{ref.local_ref}' is outside the gitflow — principal '{gitflow.principal}', "
             f"integration '{gitflow.integration}', work '{work}'; only a work branch is "
             "pushable: carry this work on one, then push it",
-            shell_line("git", "-C", fixes.repo, "checkout", "-b", work),
+            git_line(fixes.repo, "checkout", "-b", work),
         )
     head = gitflow.integration if role == "principal" else work
     return _blocked(
@@ -210,14 +205,6 @@ def check_branch_policy(
                 f"refspec aims '{ref.local_ref}' at remote '{ref.remote_ref}' — only "
                 f"refs/heads/{branch} → refs/heads/{branch} is pushable: name the local "
                 "branch as the remote one, then push it",
-                shell_line(
-                    "git",
-                    "-C",
-                    fixes.repo,
-                    "branch",
-                    "-m",
-                    ref.local_ref[len(HEADS_PREFIX) :],
-                    branch,
-                ),  # fmt: skip
+                git_line(fixes.repo, "branch", "-m", ref.local_ref[len(HEADS_PREFIX) :], branch),
             )
     return None

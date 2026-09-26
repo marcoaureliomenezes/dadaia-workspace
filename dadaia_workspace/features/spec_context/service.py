@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Protocol
 
 from dadaia_workspace.core import workspace_layout
-from dadaia_workspace.core.cli_line import fix_line, shell_line
+from dadaia_workspace.core.cli_line import fix_line, git_line, shell_line
 from dadaia_workspace.core.exceptions import (
     AssociatedRepoConflictError,
     AssociatedRepoNotFoundError,
@@ -584,7 +584,7 @@ class SpecContextService:
         except GitSyncError as exc:
             named = git("config", "--default", "", "--get", "user.name")
             key = "user.email" if named else "user.name"
-            fix = shell_line("git", "-C", str(repo), "config", key, f"<{key}>")
+            fix = git_line(repo, "config", key, f"<{key}>")
             raise ContextStateError(f"Context '{name}': {exc}\nfix: {fix}") from None
         rerun = ("--republish", slug) if republish else ()
         try:
@@ -677,7 +677,7 @@ class SpecContextService:
         )
         if foreign or flagged:
             fix = (
-                shell_line("git", "-C", str(repo), "stash", "push", "-u", "--", *foreign)
+                git_line(repo, "stash", "push", "-u", "--", *foreign)
                 if foreign
                 else fix_line(self._workspace_root, "context", "baseline", name)
             )
@@ -736,7 +736,7 @@ class SpecContextService:
         }
         if flagged:
             report = "\n".join(f"  {rel}: {', '.join(hits)}" for rel, hits in flagged.items())
-            fix = shell_line("git", "-C", str(repo_path), "stash", "push", "-u", "--", *flagged)
+            fix = git_line(repo_path, "stash", "push", "-u", "--", *flagged)
             raise DeadSecretFoundError(
                 f"Context '{name}': repo '{repo_slug}' secret scan blocked dead() "
                 f"--commit. {len(flagged)} untracked file(s) match a secret/identifier "
@@ -792,9 +792,7 @@ class SpecContextService:
                     f"Context '{name}': repo '{slug}' has no clone URL (no origin remote) — "
                     "removing it would leave nothing 'context alive' could clone back. "
                     "Nothing was touched.\nfix: "
-                    + shell_line(
-                        "git", "-C", str(repo_path), "remote", "add", "origin", "<clone-url>"
-                    )
+                    + git_line(repo_path, "remote", "add", "origin", "<clone-url>")
                 )
             if repo_path.exists() and self._git.is_git_root(repo_path):
                 if not self._git.has_commits(repo_path) and self._git.is_dirty(repo_path):
@@ -811,9 +809,7 @@ class SpecContextService:
                         "commits and no remote configured to receive them. dead() "
                         "refuses to remove it — configure a remote and push first, "
                         "then retry. Nothing was touched.\nfix: "
-                        + shell_line(
-                            "git", "-C", str(repo_path), "remote", "add", "origin", "<clone-url>"
-                        )
+                        + git_line(repo_path, "remote", "add", "origin", "<clone-url>")
                     )
                 if self._git.has_commits(repo_path) and (
                     self._git.is_dirty(repo_path) or self._git.unpushed(repo_path)
@@ -825,9 +821,7 @@ class SpecContextService:
                             f"Context '{name}': repo '{slug}' is on '{branch or 'a detached HEAD'}'"
                             ", which the gitflow never pushes directly — dead() would commit and "
                             "push its changes there. Nothing was touched.\nfix: "
-                            + shell_line(
-                                "git", "-C", str(repo_path), "checkout", "-b", flow.work_pattern
-                            )
+                            + git_line(repo_path, "checkout", "-b", flow.work_pattern)
                         )
 
         # Phase 2 — git sync + rmtree for every repo. Races are accepted by the
