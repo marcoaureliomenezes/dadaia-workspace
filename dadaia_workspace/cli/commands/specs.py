@@ -135,9 +135,15 @@ def init(
         specs_dir = str(resolve_context_specs_dir_for_cli(resolve_workspace_root(), ctx))
         rerun = ("--context", ctx)
     target = resolve_specs_dir_for_cli(specs_dir)
+    kind = specs_version.classify(target)
+    if kind == "malformed":
+        typer.echo(
+            f"[refused] {specs_version.constitution_error(target)}; nothing written.\n"
+            f"fix: repair the YAML frontmatter of {target / 'constitution.md'}",
+            err=True,
+        )
+        raise typer.Exit(2)
     flow = _gitflow(target, principal, integration, work_prefix, rerun)
-
-    kind = canon.classify(target)
     if kind == "foreign":
         _move_foreign(target, rerun, replace_foreign)
     elif kind == "dadaia":
@@ -165,8 +171,8 @@ def _gitflow(
 ) -> Gitflow:
     """Flags over the tree's own valid block, over detection (``origin/HEAD``, else
     ``main``); an invalid result refuses before anything is written."""
-    kept, warning = specs_version.read_gitflow(target)
-    if warning is not None:
+    kept, absent = specs_version.read_gitflow(target)  # a malformed block refused upstream
+    if absent is not None:
         kept = replace(
             DEFAULT, principal=container.build_git_client().default_branch(target.parent)
         )

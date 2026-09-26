@@ -230,3 +230,24 @@ def test_an_invalid_flag_refuses_with_a_fix_and_writes_nothing(repo: Path) -> No
     assert result.exit_code == 2
     assert "fix: " in result.output
     assert not (repo / "specs").exists()
+
+
+@pytest.mark.parametrize(
+    "frontmatter",
+    [
+        "specs_pattern_version: 7\ngitflow: {principal: trunk\n",
+        "specs_pattern_version: 7\ngitflow: {principal: trunk, integration: trunk, work: work/}\n",
+    ],
+)
+def test_a_malformed_constitution_refuses_naming_the_file(repo: Path, frontmatter: str) -> None:
+    """ADR 0047: never a foreign move, never a reset of the operator's names."""
+    specs = repo / "specs"
+    specs.mkdir()
+    (specs / "constitution.md").write_text(f"---\n{frontmatter}---\n# C\n", encoding="utf-8")
+    before = _snapshot(repo)
+
+    result = _runner.invoke(app, ["specs", "init", "--context", "c", "--replace-foreign"])
+
+    assert result.exit_code == 2
+    assert f"fix: repair the YAML frontmatter of {specs / 'constitution.md'}" in result.output
+    assert _snapshot(repo) == before

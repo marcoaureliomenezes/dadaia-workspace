@@ -1,9 +1,9 @@
 """The onboarding step list (ADRs 0033, 0034, 0038, 0042-0044) — the ONE next-step derivation.
 
 ``STEPS`` is ordered: ``context`` (no ALIVE context), ``bind`` (a resolvable session is
-unbound), ``specs`` (3a), ``first-pass`` (3b), ``publish`` (3c). Every predicate reads
-real state — files, git, the session registry — never a stamp, and no network. The next
-step is the focus context's first pending one, else the first pending across *trees*
+unbound), ``constitution`` (frontmatter unparseable, ADR 0047), ``specs`` (3a),
+``first-pass`` (3b), ``publish`` (3c). Every predicate reads real state — files, git,
+the session registry — never a stamp, and no network. The next step is the focus context's first pending one, else the first pending across *trees*
 (every ALIVE context name -> its ``specs/`` dir; the registry read is the caller's).
 ``doctor``, ``init``, ``context create`` and SessionStart all print :meth:`Step.text`.
 """
@@ -21,6 +21,8 @@ from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.fixed_sections import strip_fixed_sections
 from dadaia_workspace.core.specs_version import (
     CANONICAL_SPECS_VERSION,
+    classify,
+    constitution_error,
     read_gitflow,
     read_pattern_version,
 )
@@ -85,9 +87,9 @@ def _first_pass(c: _Ctx) -> list[str]:
 
 
 def _specs_fix(c: _Ctx) -> str:
-    # Running the printed line is the consent: a foreign tree moves to specs-bkp/; specs
-    # init detects and prints the gitflow it writes.
-    return fix_line(c.root, "specs", "init", "--context", c.name, "--replace-foreign")
+    # Running the printed line is the consent: only a foreign tree moves to specs-bkp/.
+    consent = ("--replace-foreign",) if classify(c.specs) == "foreign" else ()
+    return fix_line(c.root, "specs", "init", "--context", c.name, *consent)
 
 
 _Pending = Callable[[_Ctx], str | None]
@@ -95,6 +97,12 @@ _Pending = Callable[[_Ctx], str | None]
 #: :func:`next_step` — it is the one step with no context to judge.
 STEPS: tuple[tuple[str, Kind, _Pending, Callable[[_Ctx], str]], ...] = (
     ("bind", "command", _unbound, lambda c: fix_line(c.root, "context", "bind", c.name)),
+    (
+        "constitution",
+        "agent",
+        lambda c: constitution_error(c.specs),
+        lambda c: f"repair the YAML frontmatter of {c.specs / 'constitution.md'}",
+    ),
     (
         "specs",
         "command",

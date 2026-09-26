@@ -95,7 +95,7 @@ def test_a_specless_context_is_level_two_not_an_error(workspace: Path) -> None:
     assert [f for f in findings if f["verdict"] == "error"] == [], result.output
     assert result.exit_code == 0, result.output
     info = [f["fix"] for f in findings if f["verdict"] == "info"]
-    assert any("specs init --context app --replace-foreign" in fix for fix in info), info
+    assert any(fix.endswith("specs init --context app") for fix in info), info  # ADR 0047
 
 
 def test_a_ghost_context_exits_one_with_no_specs_check(workspace: Path) -> None:

@@ -71,8 +71,6 @@ from typing import Literal
 
 from dadaia_workspace.core.specs_version import (
     CANONICAL_SPECS_VERSION,
-    OLDEST_UPGRADABLE_VERSION,
-    read_pattern_version,
 )
 from dadaia_workspace.core.workspace_layout import (
     CANON_ROOT_MEMBERS,
@@ -104,7 +102,6 @@ __all__ = [
     "Violation",
     "canon_violations",
     "check_tree",
-    "classify",
     "is_canon_path",
     "scaffold",
     "scaffold_entry",
@@ -230,16 +227,6 @@ def check_tree(specs_dir: Path) -> list[Violation]:
         if not (specs_dir / entry.dest).is_file():
             violations.append(Violation(entry.dest, "required_at_birth entry is missing"))
     return violations
-
-
-TreeKind = Literal["absent", "dadaia", "foreign"]
-
-
-def classify(specs_dir: Path) -> TreeKind:
-    """``absent`` (no directory), ``dadaia`` (constitution stamped >= 6) or ``foreign``."""
-    if not specs_dir.exists():
-        return "absent"
-    return "dadaia" if read_pattern_version(specs_dir) >= OLDEST_UPGRADABLE_VERSION else "foreign"
 
 
 def default_public_dir() -> Path:

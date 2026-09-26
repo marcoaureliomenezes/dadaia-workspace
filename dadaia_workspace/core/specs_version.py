@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import Literal
 
 from dadaia_workspace.core.frontmatter import (
     FRONTMATTER_RE,
@@ -107,22 +108,48 @@ def read_pattern_version(specs_dir: Path) -> int:
     return value if isinstance(value, int) and not isinstance(value, bool) else UNSTAMPED_VERSION
 
 
+def _gitflow_block(specs_dir: Path) -> tuple[Gitflow | None, str | None]:
+    """(valid block, None); (None, why the frontmatter or block is malformed); (None, None)
+    when the constitution, its frontmatter or the block is absent."""
+    fm = _frontmatter(specs_dir)
+    if isinstance(fm, FrontmatterError):
+        return None, None if fm.kind == "missing_delimiter" else fm.message
+    if "gitflow" not in fm.data:
+        return None, None
+    try:
+        return from_mapping(fm.data["gitflow"]), None
+    except ValueError as exc:
+        return None, str(exc)
+
+
+def constitution_error(specs_dir: Path) -> str | None:
+    """Why an existing constitution's frontmatter cannot be trusted (ADR 0047): its YAML
+    does not parse, or its ``gitflow:`` block does not validate; ``None`` otherwise."""
+    reason = _gitflow_block(specs_dir)[1]
+    return reason and f"{_constitution_path(specs_dir)}: {reason}"
+
+
 def read_gitflow(specs_dir: Path) -> tuple[Gitflow, str | None]:
     """The constitution's ``gitflow:`` block; absent or malformed ⇒ ``DEFAULT`` plus the
     warning to show (ADR 0037: never a block)."""
-    fm = _frontmatter(specs_dir)
-    if not isinstance(fm, Frontmatter) or "gitflow" not in fm.data:
-        reason = "no gitflow block"
-    else:
-        try:
-            return from_mapping(fm.data["gitflow"]), None
-        except ValueError as exc:
-            reason = str(exc)
+    flow, reason = _gitflow_block(specs_dir)
+    if flow is not None:
+        return flow, None
     return DEFAULT, (
-        f"{_constitution_path(specs_dir)}: {reason} — using the default gitflow "
-        f"(principal {DEFAULT.principal}, integration {DEFAULT.integration}, "
+        f"{_constitution_path(specs_dir)}: {reason or 'no gitflow block'} — using the default "
+        f"gitflow (principal {DEFAULT.principal}, integration {DEFAULT.integration}, "
         f"work {DEFAULT.work_prefix}<M.m.p>)"
     )
+
+
+def classify(specs_dir: Path) -> Literal["absent", "malformed", "dadaia", "foreign"]:
+    """``absent`` (no directory), ``malformed`` (:func:`constitution_error`), ``dadaia``
+    (stamped >= 6) or ``foreign`` — a tree without a dadaia constitution (ADR 0047)."""
+    if not specs_dir.exists():
+        return "absent"
+    if constitution_error(specs_dir):
+        return "malformed"
+    return "dadaia" if read_pattern_version(specs_dir) >= OLDEST_UPGRADABLE_VERSION else "foreign"
 
 
 _PLAIN_RE = re.compile(r"[A-Za-z0-9._/-]+")
