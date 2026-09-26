@@ -892,6 +892,11 @@ class GitSubprocessObjectReader:
             [_EMPTY_TREE_SHA256],
         )
 
+    def remote_branch(self, repo: Path, branch: str) -> bool:
+        """``refs/remotes/origin/<branch>`` exists locally (offline)."""
+        ref = f"refs/remotes/origin/{branch}"
+        return _run(["git", "rev-parse", "-q", "--verify", ref], repo).returncode == 0
+
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterator[ScannedObject]:
         if not local_sha or local_sha == ZERO_SHA:
             return

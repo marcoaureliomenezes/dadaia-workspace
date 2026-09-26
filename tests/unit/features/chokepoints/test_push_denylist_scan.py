@@ -258,6 +258,7 @@ def test_git_object_read_failure_refuses_naming_the_failure(tmp_path: Path) -> N
     assert not decision.allowed
     assert "simulated git rev-list failure" in decision.message
     assert "--no-verify" in decision.message
+    assert decision.message.endswith("\nfix: git fsck")  # one command, no `&&`
 
 
 # ---------------------------------------------------------------------------

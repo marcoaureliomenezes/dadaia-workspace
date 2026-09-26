@@ -269,6 +269,16 @@ class GitSubprocessClient:
         result = _run(["git", "log", "--remotes", "-n1", "--format=%H", "--", rel], cwd=path)
         return born.returncode == 0 and result.returncode == 0 and bool(result.stdout.strip())
 
+    def committed_text(self, path: Path, rel: str) -> str | None:
+        """*rel* at HEAD, else at the newest commit touching it on a remote-tracking ref
+        (ADR 0048: local, offline); ``None`` when neither carries it."""
+        newest = _run(["git", "log", "--remotes", "-n1", "--format=%H", "--", rel], cwd=path)
+        for rev in ("HEAD", newest.stdout.strip()):
+            shown = _run(["git", "show", f"{rev}:{rel}"], cwd=path)
+            if rev and shown.returncode == 0:
+                return shown.stdout
+        return None
+
     def default_branch(self, path: Path) -> str:
         """The remote's default branch from the local ``origin/HEAD``; ``main`` when unset
         (``-C``: *path* may not exist yet)."""

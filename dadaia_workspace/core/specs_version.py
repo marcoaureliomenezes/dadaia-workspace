@@ -93,25 +93,23 @@ def _constitution_path(specs_dir: Path) -> Path:
     return specs_dir / "constitution.md"
 
 
-def _frontmatter(specs_dir: Path) -> Frontmatter | FrontmatterError:
+def _text(specs_dir: Path) -> str:
     constitution = _constitution_path(specs_dir)
-    if not constitution.is_file():
-        return FrontmatterError(kind="missing_delimiter", message=f"{constitution} is absent")
-    return parse(constitution.read_text(encoding="utf-8"))
+    return constitution.read_text(encoding="utf-8") if constitution.is_file() else ""
 
 
 def read_pattern_version(specs_dir: Path) -> int:
     """The constitution's ``specs_pattern_version``; :data:`UNSTAMPED_VERSION` (0) when
     the constitution, its frontmatter or the key is absent or unreadable."""
-    fm = _frontmatter(specs_dir)
+    fm = parse(_text(specs_dir))
     value = fm.data.get("specs_pattern_version") if isinstance(fm, Frontmatter) else None
     return value if isinstance(value, int) and not isinstance(value, bool) else UNSTAMPED_VERSION
 
 
-def _gitflow_block(specs_dir: Path) -> tuple[Gitflow | None, str | None]:
+def _gitflow_block(text: str) -> tuple[Gitflow | None, str | None]:
     """(valid block, None); (None, why the frontmatter or block is malformed); (None, None)
     when the constitution, its frontmatter or the block is absent."""
-    fm = _frontmatter(specs_dir)
+    fm = parse(text)
     if isinstance(fm, FrontmatterError):
         return None, None if fm.kind == "missing_delimiter" else fm.message
     if "gitflow" not in fm.data:
@@ -125,14 +123,15 @@ def _gitflow_block(specs_dir: Path) -> tuple[Gitflow | None, str | None]:
 def constitution_error(specs_dir: Path) -> str | None:
     """Why an existing constitution's frontmatter cannot be trusted (ADR 0047): its YAML
     does not parse, or its ``gitflow:`` block does not validate; ``None`` otherwise."""
-    reason = _gitflow_block(specs_dir)[1]
+    reason = _gitflow_block(_text(specs_dir))[1]
     return reason and f"{_constitution_path(specs_dir)}: {reason}"
 
 
-def read_gitflow(specs_dir: Path) -> tuple[Gitflow, str | None]:
-    """The constitution's ``gitflow:`` block; absent or malformed ⇒ ``DEFAULT`` plus the
-    warning to show (ADR 0037: never a block)."""
-    flow, reason = _gitflow_block(specs_dir)
+def read_gitflow(specs_dir: Path, text: str | None = None) -> tuple[Gitflow, str | None]:
+    """The constitution's ``gitflow:`` block — of *text* when given (a committed copy,
+    ADR 0048), else of the file; absent or malformed ⇒ ``DEFAULT`` plus the warning to
+    show (ADR 0037: never a block)."""
+    flow, reason = _gitflow_block(_text(specs_dir) if text is None else text)
     if flow is not None:
         return flow, None
     return DEFAULT, (

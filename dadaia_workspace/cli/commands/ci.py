@@ -103,14 +103,18 @@ def _no_canon_violations(paths: Iterable[str]) -> list[str]:
 
 
 def _gitflow_for(repo_root: Path) -> Gitflow:
-    """ADR 0046, once per push: the repo's own constitution, else its owning context's
-    main-repo constitution (an associated repo), else the default with one warning."""
+    """ADR 0048, once per push: ``specs/constitution.md`` at HEAD, else the newest on a
+    remote-tracking ref, else the owning context's main-repo constitution (an associated
+    repo), else the default with one warning."""
+    from dadaia_workspace.container import build_git_client
+
     workspace = resolve_workspace_root_for_cli(repo_root)
     context = alive_context_owning_repo(workspace, repo_root)
+    text = build_git_client().committed_text(repo_root, "specs/constitution.md")
     specs_dir = repo_root / "specs"
-    if context and not (specs_dir / "constitution.md").is_file():
+    if text is None and context:
         specs_dir = resolve_context_specs_dir_for_cli(workspace, context)
-    gitflow, warning = read_gitflow(specs_dir)
+    gitflow, warning = read_gitflow(specs_dir, "" if text is None and not context else text)
     if warning:
         fix = (
             f"\nfix: {fix_line(workspace, 'specs', 'init', '--context', context)}"

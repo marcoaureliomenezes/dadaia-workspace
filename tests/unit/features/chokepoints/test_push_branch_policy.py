@@ -35,9 +35,15 @@ class _EmptyObjectSource:
     """No object is new: the denylist and canon scans are pure pass-throughs here.
     ``contentless`` names the shas whose push publishes nothing (a birth candidate)."""
 
-    def __init__(self, contentless: frozenset[str] = frozenset()) -> None:
+    def __init__(
+        self, contentless: frozenset[str] = frozenset(), remote: frozenset[str] = frozenset()
+    ) -> None:
         self.contentless = contentless
+        self.remote = remote
         self.asked: list[str] = []
+
+    def remote_branch(self, repo: Path, branch: str) -> bool:
+        return branch in self.remote
 
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         return ()
@@ -126,12 +132,7 @@ def test_a_branch_outside_the_gitflow_is_refused_naming_the_work_branch(
         "-b",
         work,
         flow.principal,
-        "&&",
-        "git",
-        "push",
-        "origin",
-        work,
-    ]
+    ]  # one command: no `&&` (Windows PowerShell 5.1)
 
 
 def test_the_default_names_are_ordinary_branches_under_a_custom_gitflow(tmp_path: Path) -> None:
@@ -159,15 +160,23 @@ def test_a_contentless_birth_of_principal_or_integration_passes(
 def test_a_birth_carrying_a_commit_is_refused_naming_a_birth_at_the_other_published_tip(
     tmp_path: Path, flow: Gitflow, role: str, other: str
 ) -> None:
-    """Review M2: stale tracking refs and real new objects get ONE fix that clears both —
-    refresh, then birth at the other role's published tip (publishes nothing)."""
+    """Review M2: birth at the other role's published tip (publishes nothing) — one
+    command, no `&&` (Windows PowerShell 5.1 has none)."""
     branch, tip = getattr(flow, role), getattr(flow, other)
-    decision = _decide(_push(branch), tmp_path, flow)
+    source = _EmptyObjectSource(remote=frozenset({tip}))
+    decision = _decide(_push(branch), tmp_path, flow, object_source=source)
     assert not decision.allowed
     assert _fix(decision) == [
-        "git", "fetch", "origin", "&&",
         "git", "push", "origin", f"refs/remotes/origin/{tip}:refs/heads/{branch}",
     ]  # fmt: skip
+
+
+@_FLOWS
+def test_a_birth_fix_never_names_an_absent_remote_ref(tmp_path: Path, flow: Gitflow) -> None:
+    """ADR 0048: with no published other role the fix is the work-branch route."""
+    decision = _decide(_push(flow.principal), tmp_path, flow)
+    assert not decision.allowed
+    assert _fix(decision) == ["git", "push", "origin", flow.work_pattern]
 
 
 def test_an_existing_principal_is_never_a_birth(tmp_path: Path) -> None:

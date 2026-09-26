@@ -64,6 +64,8 @@ class ObjectSource(Protocol):
 
     def publishes_nothing(self, repo: Path, sha: str) -> bool: ...
 
+    def remote_branch(self, repo: Path, branch: str) -> bool: ...
+
 
 def _annotate_skip(
     decision: Decision,
@@ -265,8 +267,7 @@ def _run_denylist_scan(
                     "skips what it cannot evaluate (fail closed). The sanctioned, "
                     "traceable emergency bypass is `git push --no-verify` "
                     "(discouraged; leaves a reflog trace).\n"
-                    "Repair the object store first (git fsck), then push again.\n"
-                    f"fix: git fetch origin && {shlex.join(['git', 'push', 'origin', gitflow.work_pattern])}"
+                    "Repair the object store, then push again.\nfix: git fsck"
                 ),
             ),
             True,
@@ -414,14 +415,17 @@ def push_gate_decision(
         )
 
     branch_policy_refs = [r for r in refs if not r.is_deletion and not r.is_tag]
-    births = frozenset(
-        r.local_sha
+    roles = (gitflow.principal, gitflow.integration)
+    unborn = [
+        r
         for r in branch_policy_refs
-        if r.remote_sha == ZERO_SHA
-        and gitflow.role_of(r.remote_ref.removeprefix(HEADS_PREFIX)) in ("principal", "integration")
-        and object_source.publishes_nothing(repo, r.local_sha)
+        if r.remote_sha == ZERO_SHA and r.remote_ref.removeprefix(HEADS_PREFIX) in roles
+    ]
+    births = frozenset(
+        r.local_sha for r in unborn if object_source.publishes_nothing(repo, r.local_sha)
     )
-    branch_refusal = check_branch_policy(branch_policy_refs, gitflow, births)
+    published = frozenset(b for b in roles if unborn and object_source.remote_branch(repo, b))
+    branch_refusal = check_branch_policy(branch_policy_refs, gitflow, births, published)
     if branch_refusal is not None:
         return branch_refusal
 

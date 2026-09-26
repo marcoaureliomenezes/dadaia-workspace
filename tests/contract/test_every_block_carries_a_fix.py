@@ -164,6 +164,9 @@ class _FakeObjectSource:
     def publishes_nothing(self, repo: Path, sha: str) -> bool:
         return False
 
+    def remote_branch(self, repo: Path, branch: str) -> bool:
+        return False
+
 
 class _FailingObjectSource(_FakeObjectSource):
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
