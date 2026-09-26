@@ -97,6 +97,35 @@ Verdict counts: DELETE 6 · REBUILD 14 · UPDATE 21 · KEEP 2 · ADD 2.
 Net ceiling **+230** lines. Growth sits only in the new modules, the step list, the baseline rewrite, the
 new git reads and the gitflow CLI/doctor surface. Every AC11.2 unit shrinks.
 
+**Re-approved ceiling (operator ruling 2026-09-26, option a): +362 lines**, measured after the last
+AC11.3 folds (`14c534b6`). Method: every non-merge commit in `5364ba0d..HEAD`, excluding the five shrink
+commits (`800c5e2d 009721d6 f38f7ff8 de4e3179 114be682`) and every `fix(bugs)` subject, `git show
+--numstat` over `dadaia_workspace/**/*.py` minus `dadaia_workspace/public/**`: +1372 / −1010 = **+362**.
+The +132 over the planned +230 is the review-round fixes (Windows-safe fix lines, the committed-gitflow
+gate read, the refuse-before-write baseline, the own-venv workspace resolution).
+
+| file | net | capability / ADR it carries |
+|---|---|---|
+| `core/gitflow.py` | +61 | the project gitflow model and its one frontmatter writer (FR6; ADRs 0037, 0040, 0046) |
+| `features/workspace/onboarding.py` | +58 | the one onboarding derivation — five real-state steps, each with a fix (FR1/FR3; ADRs 0033, 0034, 0043) |
+| `core/specs_version.py` | +57 | gitflow read from the committed constitution; unparseable block as its own step (FR6; ADRs 0046, 0048) |
+| `cli/commands/specs.py` | +54 | `specs init` gitflow flags, detection, foreign move to `specs-bkp/` (FR6/FR3; ADRs 0037, 0043) |
+| `core/cli_line.py` | +45 | the one fix-line builder, host-shell quoting, Windows paths, CLI outside a workspace (FR2; ADR 0045) |
+| `features/chokepoints/push_gate.py` | +32 | bootstrap birth, committed-gitflow branch names, non-interactive rewrite fixes (FR5; ADRs 0036, 0048) |
+| `cli/commands/ci.py` | +32 | the gitflow-aware preflight through the CLI resolution seam (FR6; ADR 0046) |
+| `features/spec_context/service.py` | +29 | the one publish verb `context baseline`, refuse-before-write (FR4; ADRs 0035, 0042) |
+| `core/doctor_rules.py` | +19 | doctor fix rendering through `fix_line` with a root (FR2; ADR 0045) |
+| `features/specs/doctor_coherence.py` | +18 | GITFLOW-1 coherence rule (FR6; ADR 0046) |
+| `infrastructure/git_objects.py` | +15 | `publishes_nothing` replaces `parents`; committed-file reads (FR5; ADRs 0036, 0048) |
+| `features/spec_context/gate_policy.py` | +11 | gate refusals through `fix_line` (FR2; ADR 0045) |
+| `core/workspace_resolver.py` | +11 | the CLI resolves its own venv's workspace before the cwd walk (FR2; ADR 0045) |
+| `cli/commands/doctor.py` | +10 | step/kind in `doctor --json`; honest FIXED/TREE remedies (FR1/FR2; ADRs 0033, 0045) |
+| `infrastructure/git_subprocess.py` | +9 | the git reads baseline and onboarding need (`published`, `committed_text`, `default_branch`) (FR4; ADRs 0035, 0048) |
+| `core/fixed_sections.py` | +7 | stripped memory-stub digest for the first-pass step (FR3; ADR 0034) |
+| `features/specs/rules.py`, `features/specs/doctor_types.py`, `core/invocation.py`, `cli/_specs_resolution.py`, `hooks/venv_guard.py`, `features/spec_context/doctor.py`, `infrastructure/public_assets.py`, `hooks/sdd_gate.py`, `features/specs/doctor.py` | +22 | migrations onto `fix_line` / the gitflow seam (FR2/FR6) |
+| `cli/commands/context.py` | −48 | `bind` is the one binder; session id delegates to the one rule (FR7; ADRs 0038, 0044) |
+| `features/specs/doctor_structural.py`, `features/chokepoints/branch_policy.py`, `features/specs/canon.py`, `infrastructure/ledger_scripts.py`, `core/kernel_tunables.py`, `features/chokepoints/__init__.py`, `features/specs/doctor_memory.py`, `hooks/ctx_inject.py`, `cli/commands/init.py` | −80 | dead gate code and duplicated paths deleted (FR8, FR11) |
+
 ### 1.2 Survey drift corrected
 
 - `DADAIA_BIN` importers are **7**, not 9–10: `hooks/venv_guard.py` and `features/ci_preflight/service.py`
