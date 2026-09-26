@@ -729,6 +729,13 @@ class SpecContextService:
                     f"Nothing was touched.\nfix: git -C repos/{slug} remote add origin <clone-url>"
                 )
             if repo_path.exists() and self._git.is_git_root(repo_path):
+                if not self._git.has_commits(repo_path) and self._git.is_dirty(repo_path):
+                    raise DeadReviewRequiredError(
+                        f"Context '{name}': repo '{slug}' has no commits yet holds files "
+                        "dead() would destroy — commit and push them to a reachable "
+                        "remote, or move the checkout out. Nothing was touched.\nfix: "
+                        + shell_line("mv", str(repo_path), "<keep-dir>")
+                    )
                 self._enforce_dead_review_gate(name, repo_path, commit=commit, repo_slug=slug)
                 if self._git.has_commits(repo_path) and not self._git.has_remote(repo_path):
                     raise DeadUnpushedCommitsError(
@@ -749,7 +756,7 @@ class SpecContextService:
             if slug == ctx.repo_slug:
                 with contextlib.suppress(Exception):
                     branch_before_sync = self._git.current_branch(repo_path)
-            # An unborn clone has nothing published to sync; a born one has a remote
+            # An unborn clone reaching here is empty (Phase 1); a born one has a remote
             # (Phase 1) to receive its dirty tree.
             if self._git.is_git_root(repo_path) and self._git.has_commits(repo_path):
                 try:
