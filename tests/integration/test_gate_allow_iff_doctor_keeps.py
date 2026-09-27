@@ -1,7 +1,9 @@
 """One table through the gate and the doctor: the gate ALLOWs a write iff the doctor
 does not judge the entry it creates SLOP.
 
-Intent: CONTRACT — sa-gate-allows-root-entries-the-reaper-moves#E1..#E9 (ADR 0058).
+Intent: CONTRACT — sa-gate-allows-root-entries-the-reaper-moves#E6 (every row), #E1
+(notes/ without a glob), #E2 (with one), #E3 (wrong type), #E4 (.dadaia non-zone and
+non-canon states), #E5 (root specs/), #E8 (law files) — ADR 0058.
 Size: MEDIUM (integration: the real ``pre_gate`` subprocess, then ``DoctorService.scan``).
 
 Structural cause pinned: the gate (``root_whitelist``: type-blind names, "an existing
@@ -30,6 +32,8 @@ _TABLE = [
     (".dadaia/scratch/x.txt", None, None, False),
     (".dadaia/states/mine.json", None, None, False),
     ("prompt.md", None, None, True),
+    ("specs/bugs/x.md", None, None, False),
+    (".dadaia/newzone/x.txt", None, None, False),
     ("repos/x/f.py", None, None, True),
     (".dadaia/tmp/agent/20260927/x.txt", None, None, True),
 ]
@@ -50,12 +54,16 @@ def test_gate_allows_iff_the_doctor_keeps_the_entry(
 
     gate = run_hook_subprocess("pre_gate", payload, claude_hook_env(tmp_path))
 
-    assert (gate.block_envelope() is None) is allows, gate.stdout
+    block = gate.block_envelope()
+    assert (block is None) is allows, gate.stdout
+    if block is not None:  # #E1, #E4: the one fix names the owning zone, never the globs
+        (fix,) = [ln for ln in block["reason"].splitlines() if ln.startswith("fix: ")]
+        assert fix == f"fix: mkdir -p {tmp_path.resolve()}/.dadaia/tmp"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("x", encoding="utf-8")
-    slop = [
-        f.path
-        for f in DoctorService(FakeContextStore(), FakeGitClient(), tmp_path).scan()
-        if f.verdict is FindingVerdict.SLOP
-    ]
+    findings = DoctorService(FakeContextStore(), FakeGitClient(), tmp_path).scan()
+    slop = [f.path for f in findings if f.verdict is FindingVerdict.SLOP]
     assert (slop == []) is allows, slop
+    if glob is not None:  # #E2
+        verdicts = {f.path: f.verdict for f in findings}
+        assert verdicts[glob] is FindingVerdict.OPERATOR

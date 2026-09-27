@@ -131,7 +131,6 @@ def _write(path: Path) -> dict[str, Any]:
 
 
 _GATE_BLOCKS: tuple[tuple[str, str], ...] = (
-    ("root-whitelist", "junk.txt"),
     ("protected-sessions", ".dadaia/sessions/some-session.json"),
     ("protected-law", "AGENTS.md"),
 )
@@ -142,6 +141,25 @@ def test_gate_block_carries_a_runnable_fix(workspace: Path, name: str, rel: str)
     block = pre_gate.evaluate_payload(_write(workspace / rel))
     assert block is not None, f"{name}: expected a BLOCK for {rel}"
     assert_block_carries_a_runnable_fix(block)
+
+
+def test_the_root_block_fix_runs_from_a_repo_cwd_and_never_writes_the_exceptions_file(
+    workspace: Path,
+) -> None:
+    """sa-gate-allows-root-entries-the-reaper-moves#E7: the root BLOCK's fix, executed
+    verbatim from ``repos/demo``, exits 0 and leaves the exceptions file unwritten."""
+    block = pre_gate.evaluate_payload(_write(workspace / "junk.txt"))
+    assert block is not None
+    assert_block_carries_a_runnable_fix(block)
+    (workspace / "repos" / "demo").mkdir(parents=True)
+
+    done = subprocess.run(
+        _the_fix(block), shell=True, cwd=workspace / "repos" / "demo", check=False
+    )
+
+    assert done.returncode == 0
+    assert (workspace / ".dadaia" / "tmp").is_dir()
+    assert not (workspace / ".dadaia" / "states" / "instance_exceptions.txt").exists()
 
 
 def test_venv_guard_block_carries_a_runnable_fix(
