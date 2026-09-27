@@ -127,7 +127,7 @@ def _finding(script: LedgerScript, record: dict[str, Any]) -> SectionFinding:
         message=f"{unit} {record.get('message', '')}".strip(),
         canonical=False,
         error=str(record.get("verdict") or "error") == "error",
-        fix=f"{script.invocation} check --specs specs",
+        fix=str(record.get("fix") or f"{script.invocation} check --specs specs"),
     )
 
 

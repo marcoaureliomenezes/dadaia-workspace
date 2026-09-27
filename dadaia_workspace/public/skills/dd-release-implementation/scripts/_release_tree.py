@@ -110,8 +110,8 @@ def _window_findings(specs: Path) -> list[dict[str, Any]]:
         errors = memory_errors(specs, "CLOSURE", entries[-1])
         errors += [f"atom {a['slug']!r} moved after the memory entry's until {until[:12]}: "
                    f"{', '.join(a['matched'])}" for a in drift.report(specs, until)["atoms"]]  # fmt: skip
-    except (drift.Refusal, OSError) as refusal:
-        errors = [str(refusal)]
+    except (drift.Refusal, OSError) as refusal:  # a Refusal carries the fix that clears it
+        return [{**finding(rel, 1, str(refusal)), "fix": getattr(refusal, "fix", "")}]
     return [finding(rel, 1, message) for message in errors]
 
 

@@ -37,11 +37,10 @@ class Refusal(Exception):
 def git(repo: Path, *argv: str) -> list[str]:
     """`git *argv` from *repo*, as non-empty lines; a git that refuses is a Refusal."""
     done = subprocess.run(["git", *argv], cwd=repo, capture_output=True, text=True, check=False)
-    if done.returncode != 0:
-        raise Refusal(
-            f"git {' '.join(argv)} failed in {repo}: {done.stderr.strip()}",
-            "run this verb from a checkout whose history holds --since",
-        )
+    if done.returncode != 0:  # the ONE history precondition: a shallow clone is named
+        shallow = subprocess.run(["git", "rev-parse", "--is-shallow-repository"], cwd=repo, capture_output=True, text=True).stdout == "true\n"  # fmt: skip
+        raise Refusal(f"git {' '.join(argv)} failed in {repo}: " + ("a shallow clone lacks the window's history" if shallow else done.stderr.strip()),
+                      f"git -C {repo} fetch --unshallow" if shallow else "run this verb from a checkout whose history holds --since")  # fmt: skip
     return [line for line in done.stdout.splitlines() if line]
 
 
