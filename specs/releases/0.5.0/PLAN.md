@@ -151,80 +151,53 @@ user data (the provenance classifier lives in `infrastructure/workspace_guardrai
 need it injected through the container and `data/AGENTS.md` has no shipped-hashes history — growth
 for a lossless, conservative refusal).
 
-**Round 5 re-measure (REBUILD, 2026-09-26): +560 lines** — same method, `5364ba0d..HEAD`:
-+1982 / −1422. **Δ vs the round-3 +449: +111** — the rebuild did NOT reduce; it traded the deleted
-`rebuilt` branch, `alive_context_owning_repo`, `repo_root.name`, the `--repo` option and the squash's
-second exclusion spelling for new capabilities the review demanded:
-
-| file | Δ | why |
-|---|---|---|
-| `features/spec_context/service.py` | +83 | publish of any repo of the set (C-A); deterministic private-index work commit + fixed-date birth (C-B); `_refuse_foreign_work` before any write, one atomic push (P3/P3b/P3c/P9); `_sync_failure` by cause (H-A); fix lines on show/dead/no-checkout/foreign-repo (M-A); alive clone failure refusal |
-| `core/invocation.py` | +12 | `repo_owner`, the ONE resolver; `context_name_for_repo_slug` now delegates to the same registry match |
-| `cli/commands/ci.py` | +5 | gate fixes from the resolver: owner publish/republish by path, adopt (`context create --main-repo <origin>`) when unowned, the live work branch |
-| `features/chokepoints/branch_policy.py` | +5 | `GateFixes.work`; the outside-gitflow fix carries the refused ref (H-C) |
-| `cli/commands/context.py` | +4 | `baseline <ctx> [<repo>] [--republish]` |
-| `infrastructure/git_objects.py` | +7 | `unpublished()` — the one "already published" rule, shared by the gate and republish |
-| `infrastructure/git_subprocess.py` | +3 | `env` for git (fixed dates, private index); `push` skips when nothing is unpushed |
-| `cli/_specs_resolution.py` | −8 | `alive_context_owning_repo` deleted |
+**Round 5 re-measure (REBUILD): +560** (per-file table in git, `04e0f2dd`).
 
 The ceiling is the operator's decision.
 
-**Round 6 measure (R13 append-only, 2026-09-26): +489 lines** — same method, `5364ba0d..HEAD`
-(round-6 commit: +183 / −266, **net −83** on `service.py` −51, `git_objects.py` −16,
-`branch_policy.py` −14, `ci.py` −13, `context.py` −5, `git_subprocess.py` +2, `push_gate.py` +14).
-Still **+127 over the +362 ceiling**: the rework deleted every guess/rewrite path but the ceiling
-needs further cuts outside the three units (onboarding, specs_version, specs CLI) — operator ruling.
-New lower ceiling recorded: **+489** (moves down only).
+Rounds 6–7 (R13 append-only, review 5): +489 → +487; the history is in git (`04e0f2dd`).
 
-### 1.3 Round 5 — as-is review of the three REBUILD units (ADR 0041 trigger, 2026-09-26)
+### 1.3 Round 5 — REBUILD of repo resolution, baseline and `_sync_failure` (ADR 0041, 2026-09-26)
 
-Third rejection (review `2026-09-26T200000Z`): every round found new stalls in the same three units.
-Evidence: `specs/bugs/BUGS.jsonl` + `git log -p 5364ba0d..25fcf64a` on each file.
+Third rejection on the same three units; the as-is table and rebuild rules are in git (`04e0f2dd`).
 
-| unit | today | bugs (ledger + review rounds) | verdict | structural cause |
-|---|---|---|---|---|
-| repo resolution (`cli/commands/ci.py` `_gate_inputs`, `cli/_specs_resolution.alive_context_owning_repo`, `service.baseline` slug lookup) | the gate derives the context from `repo_slug_under_repos(toplevel)` but the republish slug from `repo_root.name`; publish always targets the main repo; no owner → `<context>` placeholder | `push-gate-own-repo-slug-not-excluded-from-a-git-worktree-outside-repos`, `pre-push-foreign-slug-flags-already-published-sibling-name`, `push-gate-foreign-slug-layer-blocks-onboarded-specs-push`, `push-gate-foreign-slug-layer-flags-library-asset-and-bug-id-substrings`; review H-B, C-A, deferred `<context>` LOW | REBUILD | two derivations of one fact (which repo is pushing); each fix patched one of them |
-| `service.baseline` publish | births guessed by `rebuilt = current_branch == work`; only the main repo; birth commit timestamped (a rerun builds a different commit); pushes births then work separately | `baseline-refuses-alive-scaffold-commit`, `context-baseline-rejects-official-scaffold-followup`, `baseline-identity-precheck-ignores-git-env-identity`; review rounds 7599d93d, 733b34a3, 93ab8656; C-B, P3/P3b/P3c/P9 loops, origin half-publish | REBUILD | a nondeterministic build forced a guess about "our earlier build"; the guess read operator branches as ours |
-| `_sync_failure` (dead + baseline) | any git failure without a gate `fix:` → "rerun the verb" | `context-dead-pushes-an-unborn-clone` (2 fixes), `context-dead-tries-to-sync-and-push-a-clone-with-no-commits`, bug `context-dead-plain-git-push-fails-mismatched-upstream`; review H-A (non-ff loops) | REBUILD | the fix ignored the cause; only an unreachable remote is cleared by a rerun |
-| `branch_policy._refuse_branch` outside-gitflow fix | `checkout -b <work>` from HEAD | review H-C (P4: content of the refused ref lost; existing work branch → `already exists`) | UPDATE | the fix did not carry the refused ref |
-| `git_subprocess.unpushed` / `push` | "no upstream" counted as unpushed; `push -u origin ''` on detached | review LOW (P8) | UPDATE | asked about the upstream instead of `HEAD --not --remotes=origin` |
+### 1.4 Rounds 6–7 — the append-only publish (operator R13/Q11, review 5)
 
-Rebuild rules: one resolver `SpecContextService.owner(path)` (git common dir → `repos/<slug>` →
-registry) used by the gate, publish, republish and the birth fix; `repo_root.name` and
-`alive_context_owning_repo` deleted; `context baseline <ctx> [<repo>] [--republish]`; the birth and work
-commits are deterministic (fixed dates), so "ours" = a commit on the same start with the fixed date, and
-any other same-named local/origin branch is refused before any write; births + work go in ONE
-`push --atomic`; `_sync_failure` classifies non-fast-forward / unreachable / gate / unrecognised; the
-census walks every `raise` reachable from `alive`, `baseline`, `dead`.
+Every round patched one error: the publish invented history, then guessed which remote work was its
+own and repaired mis-guesses by rewriting. Rounds 6–7 deleted the invention (contentless births,
+fixed-date commits, `--republish`, `checkout -f`, `_refuse_foreign_work`), the guessed fix rows and
+`publishes_nothing`; `GitSubprocessClient.gitflow` is the one gitflow reader. Details: git log.
 
-### 1.4 Round 6 — the append-only publish (operator R13/Q11, 2026-09-26)
+### 1.5 Round 8 — anchor-first publish (design review C1–C9, Q1; cuts f, h; 2026-09-27)
 
-Fourth rejection on the same three units. Bug history (`git log -p` on service.py, branch_policy.py,
-git_subprocess.py, git_objects.py; ledger `baseline-*`, `context-dead-*`): every round patched a
-symptom of ONE structural error — the publish **invented history** (contentless births, fixed-date
-commits) and then had to **guess** which remote work was its own, and repaired mis-guesses by
-**rewriting** (checkout -f, rebase fix, squash `--republish`, `push --delete`). Each guess fix bred
-the next refusal path. Round 6 deletes the invention, so nothing remains to guess.
+Cause (review 6 N1/H4/N4): the publish committed where HEAD was, then moved HEAD. Fix: anchor first.
 
-| unit | deleted | rebuilt as |
-|---|---|---|
-| `service.baseline` | contentless birth, `_BUILD_DATE` private-index `_work_commit`, `_refuse_foreign_work`, `_squash_unpublished`, `--republish`, `checkout -f -B` | empty origin → onboarding commit on the local principal, pushed as principal + integration + work; else adopt `origin/<work>`→`<integration>`→`<principal>`, `switch`/`merge --no-edit`, ordinary commit, one atomic push; origin without the principal, or a draft gitflow differing from the committed one → honest refusal before any write |
-| `_sync_failure` | the "rerun the verb" class, `pull --rebase` | one fix per cause: non-ff → `pull --no-rebase --no-edit`; wrong URL → `remote set-url`; auth → `ls-remote`; dirty → `stash push`; unknown → git's text |
-| `branch_policy` | `rebase` fix, contentless-birth refusal, `GateFixes.publish/republish` | outside-gitflow → `fetch . <ref>:<work>` (ff only) or `branch <work> <ref>`; births admitted on an origin with no gitflow branch |
-| gate rewrite fix | `context baseline --republish` | `reset --soft <remote tip or origin/<integration>>` (unpublished range only); `update-ref -d HEAD` when nothing is published |
-| git reads | `--remotes` (all), `_commit` fallback identity, empty-tree `publishes_nothing` | `--remotes=origin` everywhere; `identity_fix` the one probe (baseline + dead) |
+| # | state (predicate) | action / refusal | HEAD after |
+|---|---|---|---|
+| S1 | no checkout | refuse, `context alive` | unchanged |
+| S2 | identity unknown | refuse, `git config` | unchanged |
+| S3 | no committable constitution (C1: on disk ∧ tracked-or-not-ignored) | refuse, `specs init --context` | unchanged |
+| S4 | secret in an untracked onboarding file | refuse, publish again | unchanged |
+| S5 | fetch fails | git's full text | unchanged |
+| S6 | born (any branch, detached) | `switch --detach`, commit paths = anchor | detached anchor |
+| S7/S8 | unborn clone (empty / non-empty origin) | root anchor on the unborn name, `branch -m <work>` | `<work>` |
+| S9 | born, paths clean | anchor = HEAD₀ | detached |
+| S12/S13 | local `<work>` exists (incl. HEAD on it; read after the anchor) | `merge <work>` into the anchor, `update-ref <work> HEAD <old>` (CAS), `switch <work>` (C2) | `<work>` |
+| S11 | origin ≠ ∅ ∧ principal ∉ origin | after step 7 (C3): one candidate → `--principal <h>`; else listed + `<principal>` (C6) | `<work>`, anchor named |
+| S14–S16 | origin start = first of work, integration, principal | `merge`; `--allow-unrelated-histories` only if every root of HEAD holds only onboarding paths (Q1) | `<work>` |
+| S17 | conflict (step 7 or 8): `CONFLICT …`; a re-run meets `fatal: cannot switch branch while merging` / MERGE_HEAD | git's text + the anchor sha + the publish line | in the merge |
+| S18 | births ∨ unpushed | one `push --atomic -u` (births first, N8) | `<work>` |
+| S19 | nothing to push | `""` — published() holds by C1 (no S10/S20) | `<work>` |
+| S22 | gate refuses the push | the gate's reset fix; the message names the anchor and `context baseline <ctx>` after the amend (C7; a hand push drops origin's merge parent) | `<work>` |
+| rows | step-4 failure (hook, gpgsign): detached at HEAD₀, git's text; `<work>` held by a worktree: CAS moves it, `switch` refuses; origin moved between fetch and push: git's rejection text, re-run merges it | — | — |
+| D1–D6 | dead: clean → rmtree; dirty on work → commit (never an unmerged entry, C5: `diff --diff-filter=U` refuses) + push; non-work branch refused (cut g kept); push failure → git's text, nothing removed; D6 open bug `sa-context-dead-removes-repos-outside-the-reaper` | — | — |
 
+Cut (f): baseline publishes the main repo only; associated repos by plain `git push` under the gate
+(`_owned_slug`, `repo_owner`, the CLI repo argument deleted). Cut (h): no foreign-change refusal;
+residual — foreign work rides along uncommitted; git refuses a colliding switch/merge. C9:
+`from_mapping` refuses a work prefix nested under a role name.
 
-
-**Round 7 (review 5, 2026-09-26) — as-is + measure.** Structural cause named by the review: fix
-lines came from HEAD and guesses, not from the refused ref. Deleted: `update-ref -d HEAD` and the
-`origin/<integration>` base (gate), `publishes_nothing` (replaced by `boundary`, one read for births
-and the rewrite fix), the ff-only `fetch .` outside fix, `_CAUSES` pull/ls-remote/stash rows, the
-baseline empty-origin/adopt split and its draft reader, ci's highest-local-head work rule,
-`_owned_slug`'s third arm. `project_gitflow` moved into `GitSubprocessClient.gitflow` (one reader for
-gate, baseline, dead, onboarding). Round-7 commit: +142 / −146 on production Python. **AC11.3: +487**
-(same method, `5364ba0d..HEAD`) — still +125 over +362; the gitflow/specs_version/specs.py/cli_line
-cuts are NOT done in this round (operator ruling needed on which FR6/FR2 capability to drop).
+**Measure (AC11.3 method, `5364ba0d..722f169e`): +388** — over +362 by 26; see the round-8 report.
 
 - `DADAIA_BIN` importers are **7**, not 9–10: `hooks/venv_guard.py` and `features/ci_preflight/service.py`
   read the `$DADAIA_BIN` *environment variable* exported by the pre-push hook, not the constant (SPEC AC2.2
