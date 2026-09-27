@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-27T03:11:21Z",
+  "generated_at": "2026-09-27T04:13:11Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -844,7 +844,7 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 1832,
+      "token_estimate": 1835,
       "depends_on": [
         "workspace-doctor",
         "context-management",
