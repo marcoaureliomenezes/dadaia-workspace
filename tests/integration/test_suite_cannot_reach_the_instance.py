@@ -35,7 +35,9 @@ def _workspace(root: Path) -> Path:
     return root
 
 
-def _resolve_in_child(cwd: Path, fence: str | None) -> subprocess.CompletedProcess[str]:
+def _resolve_in_child(
+    cwd: Path, fence: str | None, probe: str = _PROBE
+) -> subprocess.CompletedProcess[str]:
     """The child keeps the suite's own fence (the interpreter's venv may be an instance's,
     its first rung) and adds *fence*."""
     env = dict(os.environ)
@@ -44,7 +46,7 @@ def _resolve_in_child(cwd: Path, fence: str | None) -> subprocess.CompletedProce
             filter(None, (env.get("DADAIA_FENCED_ROOTS"), fence))
         )
     return subprocess.run(
-        [sys.executable, "-c", _PROBE],
+        [sys.executable, "-c", probe],
         cwd=cwd,
         env=env,
         capture_output=True,
@@ -54,6 +56,7 @@ def _resolve_in_child(cwd: Path, fence: str | None) -> subprocess.CompletedProce
 
 
 def test_a_child_inside_a_fenced_workspace_cannot_resolve_it(tmp_path: Path) -> None:
+    """sa-seven-workspace-root-rules#S11: no process acts on a fenced root, even named."""
     ws = _workspace(tmp_path / "instance")
 
     open_ = _resolve_in_child(ws / "repos" / "x", fence=None)
@@ -62,6 +65,10 @@ def test_a_child_inside_a_fenced_workspace_cannot_resolve_it(tmp_path: Path) -> 
     assert open_.returncode == 0 and Path(open_.stdout.strip()) == ws.resolve(), open_.stderr
     assert fenced.returncode != 0
     assert "No initialized workspace" in fenced.stderr
+    named = f"r(__import__('pathlib').Path({str(ws)!r}))"
+    probe = _PROBE.replace("resolve_workspace_root", "resolve_cli_workspace_root")
+    explicit = _resolve_in_child(tmp_path, str(ws), probe.replace("r()", named))
+    assert explicit.returncode != 0 and "No initialized workspace" in explicit.stderr
 
 
 def test_the_suite_fences_every_instance_enclosing_this_checkout() -> None:

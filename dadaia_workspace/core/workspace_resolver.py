@@ -21,9 +21,9 @@ from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 #: The sentinel file whose presence marks a properly initialized workspace.
 _SENTINEL = Path(".dadaia") / "states" / "spec_contexts.json"
 
-#: ``os.pathsep``-separated roots this process must never resolve. The test suite fences
-#: the operator instance it runs inside, and every child it spawns inherits the fence
-#: (bug test-subprocesses-resolve-the-live-instance).
+#: ``os.pathsep``-separated roots never resolved — by the walk, the CLI's own venv or an
+#: explicit ``--workspace`` — so no dadaia process nor child inheriting it acts on one
+#: (ADR 0088): the suite, the push preflight and every mutating probe set it.
 FENCE_ENV = "DADAIA_FENCED_ROOTS"
 
 
@@ -56,13 +56,6 @@ def resolve_workspace_root(cwd: Path | None = None) -> Path:
 
     Notes
     -----
-    **Backward-compat guarantee:** for any workspace where ``.dadaia/states/
-    spec_contexts.json`` exists at the true workspace root, the function
-    returns exactly the same path as the old ``_resolve_workspace()``
-    helper — because the old helper also walked up looking for ``.dadaia/``
-    and the real root is the first (and only) directory satisfying both
-    criteria.
-
     **Sub-repo behaviour:** sub-repos that ship ``.dadaia/`` for public
     asset projections are deliberately ignored. Only a directory that also
     has ``states/spec_contexts.json`` is accepted as a workspace root.
@@ -129,12 +122,12 @@ def resolve_cli_workspace_root(workspace: Path | None, cwd: Path | None = None) 
     Raises
     ------
     WorkspaceNotInitializedError
-        When *workspace* is given but holds no ``.dadaia/``, or when the walk
+        When *workspace* is given but holds no ``.dadaia/`` or is fenced, or when the walk
         finds no initialized workspace.
     """
     if workspace is None:
         return resolve_workspace_root(cwd)
     root = workspace.resolve()
-    if not (root / ".dadaia").is_dir():
+    if not (root / ".dadaia").is_dir() or root in _fenced():
         raise not_initialized(root)
     return root

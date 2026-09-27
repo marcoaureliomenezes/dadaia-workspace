@@ -58,6 +58,7 @@ def test_inside_another_workspace_the_cli_resolves_its_own(
 def test_a_fenced_own_workspace_falls_back_to_the_cwd_walk(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """sa-seven-workspace-root-rules#S11: a fenced root is never the CLI's own workspace."""
     own, other = _workspace(tmp_path / "a"), _workspace(tmp_path / "b")
     monkeypatch.setattr(sys, "prefix", str(own / ".dadaia" / ".venv"))
     monkeypatch.setenv(FENCE_ENV, str(own))
