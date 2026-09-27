@@ -261,14 +261,14 @@ def checks_for(
 
 
 def subprocess_runner(cwd: Path) -> Runner:
-    """Build a runner that executes each check as a subprocess under ``cwd``.
-
-    Delegates to ``dadaia_workspace.infrastructure.subprocess_runner.subprocess_runner_for_ci``
-    so that this module never imports ``subprocess`` directly.
-    """
+    """Run each check under ``cwd`` as CI does, in a bare checkout: every root above
+    ``cwd`` is fenced, so no check resolves the workspace enclosing the checkout."""
+    from dadaia_workspace.core.workspace_resolver import FENCE_ENV
     from dadaia_workspace.infrastructure.subprocess_runner import subprocess_runner_for_ci
 
-    return subprocess_runner_for_ci(cwd)
+    fence = [os.environ.get(FENCE_ENV, ""), *map(str, cwd.resolve().parents)]
+    env = {**os.environ, FENCE_ENV: os.pathsep.join(p for p in fence if p)}
+    return subprocess_runner_for_ci(cwd, env)
 
 
 def run_preflight(

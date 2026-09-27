@@ -20,6 +20,7 @@ Owner: dd-software-engineer
 
 from __future__ import annotations
 
+import shlex
 from pathlib import Path
 from typing import Any, cast
 
@@ -41,7 +42,6 @@ _LOCAL_MARKERS: dict[str, str] = {
     "lint-imports": "lint-imports",
     "pytest": "pytest",
     "coverage-floor": "--cov-fail-under=80",
-    "doctor": "doctor --specs-dir specs --source-root .",
     "repo-hygiene": "check_no_repo_local_claude.sh",
 }
 
@@ -55,7 +55,6 @@ _CI_MARKERS: dict[str, str] = {
     "lint-imports": "lint-imports",
     "pytest": "pytest",
     "coverage-floor": "--cov-fail-under=80",
-    "doctor": "dadaia doctor --specs-dir specs --source-root .",
     "repo-hygiene": "check_no_repo_local_claude.sh",
 }
 
@@ -132,3 +131,13 @@ def test_consumer_law_never_prescribes_the_library_preflight() -> None:
     ]
     offenders = [str(p) for p in law if "ci preflight" in p.read_text(encoding="utf-8")]
     assert offenders == []
+
+
+def test_the_preflight_doctor_step_is_ci_yml_doctor_job_verbatim() -> None:
+    """sa-doctor-job-not-a-required-check#B3: the doctor argv is derived from ci.yml's
+    `doctor` job, never restated — the local step runs exactly CI's command."""
+    runs = [str(s["run"]) for s in _load_ci_jobs()["doctor"]["steps"] if "run" in s]
+    ci_argv = next(shlex.split(r) for r in runs if r.startswith("dadaia doctor"))
+    local = next(c for c in checks_for(quick=True) if c.name == "dadaia doctor")
+    assert Path(local.argv[len(local.argv) - len(ci_argv)]).name == ci_argv[0]
+    assert list(local.argv[len(local.argv) - len(ci_argv) + 1 :]) == ci_argv[1:]

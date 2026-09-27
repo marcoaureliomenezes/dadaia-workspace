@@ -10,7 +10,7 @@ implementation) directly.
 from __future__ import annotations
 
 import subprocess
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import NamedTuple
 
@@ -56,26 +56,17 @@ class SubprocessProcessRunner:
 
 
 def subprocess_runner_for_ci(
-    cwd: Path,
+    cwd: Path, env: Mapping[str, str]
 ) -> Callable[[Sequence[str]], tuple[int, str]]:
-    """Build a ``ci_preflight.Runner`` backed by real subprocesses.
-
-    This factory lives in ``infrastructure/`` so that ``ci_preflight/service.py``
-    never needs to import ``subprocess`` directly.  The returned callable matches
-    the ``Runner = Callable[[Sequence[str]], tuple[int, str]]`` type alias used
-    by the preflight service.
-
-    Parameters
-    ----------
-    cwd:
-        Working directory for each check subprocess.
-    """
+    """A ``ci_preflight.Runner`` running each argv as a subprocess in *cwd* with *env* —
+    here so ``ci_preflight/service.py`` never imports ``subprocess``."""
 
     def _run(argv: Sequence[str]) -> tuple[int, str]:
         try:
             proc = subprocess.run(  # noqa: S603
                 list(argv),
                 cwd=cwd,
+                env=dict(env),
                 capture_output=True,
                 text=True,
             )
