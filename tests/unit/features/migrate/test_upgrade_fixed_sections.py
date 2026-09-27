@@ -1,6 +1,7 @@
 """Intent: CONTRACT — T-048-05 (SPEC 0.4.8 AC4.3, R6): ``specs upgrade`` on a v6 tree ends
 stamped v7 WITH its fixed law sections, so the specs doctor reports 0 errors — the S3 dead
-end (upgrade said "no-op", doctor said FIXED-1) is gone. Size: SMALL."""
+end (upgrade said "no-op", doctor said FIXED-1) is gone. 0.5.0 WP-14: the repair is the
+doctor's one writer, so the seam is the `specs upgrade` verb. Size: SMALL (CliRunner)."""
 
 from __future__ import annotations
 
@@ -8,11 +9,12 @@ import re
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
+from dadaia_workspace.cli.main import app
 from dadaia_workspace.core import specs_version
 from dadaia_workspace.core.fixed_sections import FIXED_SECTIONS
 from dadaia_workspace.core.gitflow import merge_frontmatter
-from dadaia_workspace.features.migrate.upgrade import upgrade
 from dadaia_workspace.features.specs import SpecsDoctor, canon
 
 pytestmark = pytest.mark.unit
@@ -37,13 +39,12 @@ def _v6_tree(tmp_path: Path) -> Path:
 def test_a_v6_tree_ends_v7_with_fixed_sections_and_a_clean_doctor(tmp_path: Path) -> None:
     specs = _v6_tree(tmp_path)
 
-    result = upgrade(specs)
+    result = CliRunner().invoke(app, ["specs", "upgrade", "--specs-dir", str(specs)])
 
+    assert result.exit_code == 0, result.output
     assert specs_version.read_pattern_version(specs) == 7
-    assert not result.no_op
-    assert sorted(p.relative_to(specs).as_posix() for p in result.fixed_restored) == sorted(
-        rel for rel, _ in FIXED_SECTIONS
-    )
+    for rel, _ in FIXED_SECTIONS:
+        assert f"fix FIXED-1 {specs / rel}" in result.output
     issues = SpecsDoctor(specs, public_dir=_PUBLIC, templates_dir=_PUBLIC / "templates").check()
     assert [i.to_dict() for i in issues if i.severity.value == "error"] == []
 
@@ -52,7 +53,8 @@ def test_dry_run_plans_the_fixed_sections_and_writes_nothing(tmp_path: Path) -> 
     specs = _v6_tree(tmp_path)
     before = {p: p.read_bytes() for p in specs.rglob("*") if p.is_file()}
 
-    result = upgrade(specs, dry_run=True)
+    result = CliRunner().invoke(app, ["specs", "upgrade", "--specs-dir", str(specs), "--dry-run"])
 
-    assert len(result.fixed_restored) == len(FIXED_SECTIONS)
+    assert result.exit_code == 0, result.output
+    assert result.output.count("would fix FIXED-1") == len(FIXED_SECTIONS)
     assert {p: p.read_bytes() for p in specs.rglob("*") if p.is_file()} == before

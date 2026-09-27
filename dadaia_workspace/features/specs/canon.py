@@ -59,9 +59,7 @@ and a git tree listing (``git ls-tree``'s own native output) already produce.
 
 from __future__ import annotations
 
-import errno
 import json
-import os
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -69,6 +67,7 @@ from functools import partial
 from pathlib import Path
 from typing import Literal
 
+from dadaia_workspace.core.atomic_write import SymlinkRefusedError, atomic_write
 from dadaia_workspace.core.specs_version import (
     CANONICAL_SPECS_VERSION,
 )
@@ -89,8 +88,6 @@ from dadaia_workspace.features.specs.memory_canon import (
 #: canonical names, shared with the root law, the zone table and the projected
 #: ``specs/AGENTS.md`` canon table). This module is their renderer and checker.
 CANON: tuple[CanonEntry, ...] = SPECS_CANON
-
-_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
 
 __all__ = [
     "CANON",
@@ -333,26 +330,22 @@ def _fill_repo_name(template: Path, project_name: str) -> str:
 
 
 def _write_absent(root: Path, writes: list[tuple[Path, Callable[[], str], bool]]) -> list[Path]:
-    """The one scaffold write under *root*: each ``(target, render, overwrite)`` through one
-    ``O_CREAT|O_NOFOLLOW`` open (``O_EXCL`` unless *overwrite*): the final component is
-    created atomically and never through a symlink (CWE-59); intermediate directories are
-    checked for escape before ``mkdir``, not atomically. An existing file or a symlinked
-    destination (ELOOP; EMLINK on BSD) is skipped; any other ``OSError`` propagates."""
+    """The one scaffold write under *root*: each ``(target, render, overwrite)`` through
+    :func:`atomic_write`, which refuses a symlinked destination (CWE-59); intermediate
+    directories are checked for escape before ``mkdir``. An existing file (unless
+    *overwrite*) or a symlinked destination, dangling or not, is skipped."""
     created: list[Path] = []
     for target, render, overwrite in writes:
         anchor = next(p for p in (target.parent, *target.parent.parents) if p.exists() or p == root)
         if root.is_symlink() or anchor.resolve() != root.resolve() / anchor.relative_to(root):
             continue
+        if target.exists() and not overwrite:
+            continue
         target.parent.mkdir(parents=True, exist_ok=True)
-        flags = os.O_WRONLY | os.O_CREAT | _NOFOLLOW | (os.O_TRUNC if overwrite else os.O_EXCL)
         try:
-            fd = os.open(target, flags, 0o644)
-        except OSError as exc:
-            if isinstance(exc, FileExistsError) or exc.errno in (errno.ELOOP, errno.EMLINK):
-                continue
-            raise
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(render())
+            atomic_write(target, render())
+        except SymlinkRefusedError:
+            continue
         created.append(target)
     return created
 
@@ -380,6 +373,5 @@ def scaffold_entry(specs_dir: Path, rel_path: str, /, **context: str) -> Path:
         public_dir=default_public_dir(),
         context={"today": _today(), **context},
     )
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(rendered, encoding="utf-8")
+    atomic_write(target, rendered, ensure_parent=True)
     return target

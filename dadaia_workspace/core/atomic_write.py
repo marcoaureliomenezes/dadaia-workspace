@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import shlex
 import shutil
 import uuid
 from pathlib import Path
@@ -87,6 +88,8 @@ def atomic_write(
     left behind. Cleanup itself is exception-suppressed so a cleanup-time error never
     masks the original one.
     """
+    if path.is_symlink():
+        raise SymlinkRefusedError(path)
     if ensure_parent:
         path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.parent / f".{path.name}.{uuid.uuid4().hex}.tmp"
@@ -116,4 +119,18 @@ def atomic_write(
                 tmp.unlink(missing_ok=True)
 
 
-__all__ = ["ConcurrentModificationError", "atomic_write"]
+def symlink_fix(path: Path) -> str:
+    """The ``fix:`` line for a refused symlinked destination: materialize the link."""
+    return shlex.join(["cp", "--remove-destination", "--", str(path.resolve()), str(path)])
+
+
+class SymlinkRefusedError(OSError):
+    """Raised by :func:`atomic_write` when *path* is a symlink: the one writer never
+    replaces an operator's link nor writes its target (CWE-59). Carries a ``fix:`` line."""
+
+    def __init__(self, path: Path) -> None:
+        super().__init__(f"{path} is a symlink; refusing to write it\nfix: {symlink_fix(path)}")
+        self.path = path
+
+
+__all__ = ["ConcurrentModificationError", "SymlinkRefusedError", "atomic_write", "symlink_fix"]

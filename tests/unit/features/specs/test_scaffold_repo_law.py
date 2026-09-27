@@ -85,28 +85,6 @@ def test_symlinked_destination_is_never_written_through(
     )
 
 
-def test_the_write_is_one_atomic_exclusive_nofollow_open(
-    tmp_path: Path, public: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """CWE-367: no probe-then-write window — the create itself refuses an existing or
-    symlinked destination."""
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    dst = str(repo / "AGENTS.md")
-    seen: list[int] = []
-    real_open = os.open
-
-    def spy(path: object, flags: int, *args: object, **kwargs: object) -> int:
-        if str(path) == dst:
-            seen.append(flags)
-        return real_open(path, flags, *args, **kwargs)  # type: ignore[arg-type]
-
-    monkeypatch.setattr(os, "open", spy)
-    canon.scaffold_repo_law(repo, project_name="p", public_dir=public)
-    assert seen, "the scoped-law write must go through os.open"
-    assert seen[0] & os.O_CREAT and seen[0] & os.O_EXCL and seen[0] & os.O_NOFOLLOW
-
-
 def test_scaffold_never_writes_through_a_symlinked_parent_dir(tmp_path: Path) -> None:
     outside = tmp_path / "outside-memory"
     outside.mkdir()

@@ -1,0 +1,104 @@
+"""Intent: CONTRACT — sa-specs-upgrade-writes-through-symlinks (0.5.0 WP-14, AC1.2).
+
+One writer answers "how a fixed section is written": ``core.atomic_write`` refuses a
+symlinked destination, and ``specs upgrade`` and ``doctor --fix`` both go through it.
+Size: SMALL (tmp_path, CliRunner in-process, no subprocess).
+"""
+
+from __future__ import annotations
+
+import hashlib
+from pathlib import Path
+
+import pytest
+from typer.testing import CliRunner
+
+from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.atomic_write import SymlinkRefusedError, atomic_write
+from dadaia_workspace.core.gitflow import merge_frontmatter
+from dadaia_workspace.features.migrate.upgrade import upgrade
+from dadaia_workspace.features.specs import SpecsDoctor, canon
+
+pytestmark = pytest.mark.unit
+
+_PUBLIC = Path(__file__).resolve().parents[4] / "dadaia_workspace" / "public"
+_OUTSIDE = "# Quality\n\noperator text, no fixed block\n"
+
+
+def _md5(path: Path) -> str:
+    return hashlib.md5(path.read_bytes()).hexdigest()  # noqa: S324 — identity, not security
+
+
+def _tree_with_linked_quality(tmp_path: Path) -> tuple[Path, Path]:
+    specs = tmp_path / "repo" / "specs"
+    canon.scaffold(specs, project_name="p")
+    outside = tmp_path / "outside.md"
+    outside.write_text(_OUTSIDE, encoding="utf-8")
+    quality = specs / "memory" / "QUALITY.md"
+    quality.unlink()
+    quality.symlink_to(outside)
+    return specs, outside
+
+
+def test_b1_atomic_write_refuses_a_symlinked_destination(tmp_path: Path) -> None:
+    """#B1: the one writer never replaces or writes through a link."""
+    outside = tmp_path / "outside.md"
+    outside.write_text("keep\n", encoding="utf-8")
+    link = tmp_path / "link.md"
+    link.symlink_to(outside)
+
+    with pytest.raises(SymlinkRefusedError) as info:
+        atomic_write(link, "new\n")
+
+    assert link.is_symlink()
+    assert outside.read_text(encoding="utf-8") == "keep\n"
+    assert "fix: " in str(info.value)
+    assert [p.name for p in tmp_path.iterdir() if p.name.endswith(".tmp")] == []
+
+
+def test_b2_specs_upgrade_leaves_a_symlinked_quality_md_and_its_target(tmp_path: Path) -> None:
+    """#B2: `specs upgrade` repairs through the doctor's writer: the link stays a link,
+    the outside md5 is unchanged, and the doctor names the link with a fix line."""
+    specs, outside = _tree_with_linked_quality(tmp_path)
+    before = _md5(outside)
+
+    result = CliRunner().invoke(app, ["specs", "upgrade", "--specs-dir", str(specs)])
+
+    assert result.exit_code == 0, result.output
+    assert _md5(outside) == before
+    assert (specs / "memory" / "QUALITY.md").is_symlink()
+    doctor = SpecsDoctor(specs, public_dir=_PUBLIC, templates_dir=_PUBLIC / "templates")
+    quality = [i for i in doctor.check() if i.code.startswith("FIXED")]
+    assert [(i.code, i.fixable, i.fix.startswith("cp --remove-destination")) for i in quality] == [
+        ("FIXED-1", False, True)
+    ]
+
+
+def test_b3_the_tech_stack_fold_refuses_a_symlinked_architecture_md(tmp_path: Path) -> None:
+    """#B3: the 6 -> 7 fold writes ARCHITECTURE.md through the same writer."""
+    specs = tmp_path / "repo" / "specs"
+    canon.scaffold(specs, project_name="p")
+    merge_frontmatter(specs, specs_pattern_version=6)
+    outside = tmp_path / "arch.md"
+    outside.write_text("# Architecture\n", encoding="utf-8")
+    arch = specs / "memory" / "ARCHITECTURE.md"
+    arch.unlink()
+    arch.symlink_to(outside)
+    (specs / "memory" / "TECHSTACK.md").write_text("# Tech\n\npython\n", encoding="utf-8")
+
+    with pytest.raises(SymlinkRefusedError):
+        upgrade(specs)
+
+    assert outside.read_text(encoding="utf-8") == "# Architecture\n"
+
+
+def test_b5_doctor_fix_leaves_a_symlinked_quality_md_a_link(tmp_path: Path) -> None:
+    """#B5: `doctor --fix` neither replaces the link nor writes its target."""
+    specs, outside = _tree_with_linked_quality(tmp_path)
+    before = _md5(outside)
+    doctor = SpecsDoctor(specs, public_dir=_PUBLIC, templates_dir=_PUBLIC / "templates")
+
+    doctor.fix(doctor.check())
+
+    assert (specs / "memory" / "QUALITY.md").is_symlink()
+    assert _md5(outside) == before

@@ -204,7 +204,7 @@ class StructuralValidator:
                 agents_content = src_agents.read_text(encoding="utf-8")
         agents_md = target / "AGENTS.md"
         if not agents_md.exists():
-            agents_md.write_text(agents_content, encoding="utf-8")
+            atomic_write(agents_md, agents_content)
 
     def check_tree5_agents_md(self) -> list[SpecsDoctorIssue]:
         """TREE-5: projected law files must match their canonical source.
@@ -354,7 +354,7 @@ class StructuralValidator:
         for dst, canonical_path, asset_name in targets:
             if issue_path is not None and dst.resolve() != issue_path:
                 continue
-            if dst.is_symlink() or not canonical_path.exists():
+            if not canonical_path.exists():
                 continue
             # Missing is lossless to write; present is refreshed only if we shipped it.
             if dst.exists() and not was_shipped(

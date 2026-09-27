@@ -112,8 +112,8 @@ def test_upgrade_refuses_below_floor_without_any_write(tmp_path: Path) -> None:
 def test_upgrade_at_or_above_floor_is_idempotent_and_repairs_placeholders(
     tmp_path: Path,
 ) -> None:
-    """A tree already at (or past) the canonical version is repaired in place (its
-    missing fixed law section inserted, T-048-05) and then a no-op; re-running is stable."""
+    """A tree already at (or past) the canonical version is a no-op; re-running is stable.
+    (Fixed law sections are the doctor's repair, pinned in test_upgrade_fixed_sections.)"""
     specs = tmp_path / "specs"
     stamp = _version.CANONICAL_SPECS_VERSION
     _write_constitution(specs, f"---\nspecs_pattern_version: {stamp}\n---\n# C\n")
@@ -121,7 +121,6 @@ def test_upgrade_at_or_above_floor_is_idempotent_and_repairs_placeholders(
     result = _upgrade.upgrade(specs)
     assert result.from_version == stamp
     assert result.to_version == stamp
-    assert result.fixed_restored == [specs / "constitution.md"]
     assert result.placeholder_removed == []
 
     # Dry-run at the floor plans nothing and writes nothing.

@@ -76,7 +76,10 @@ _DOCTOR_CEILING = 6
 # (`merge_frontmatter`); `write_pattern_version` is deleted. Call-site migration only.
 # Re-pinned at T-050-22 (AC11.2, review 7 N7): `merge_frontmatter` moved to core/gitflow;
 # the call site imports it from there. Import migration only.
-_UPGRADE_MODULE_SHA256 = "ad65f6a1f2468b0dcda931c3ef5a8dfd4a65687f812ee30ad4cf33507fbf9e60"
+# Re-pinned at 0.5.0 T-050-31 (WP-14, AC1.2): the fixed-section writer leaves this module
+# (the doctor's repair is the one writer) and the three remaining writes go through the
+# symlink-refusing `core.atomic_write`. Authorized, task-declared deletion.
+_UPGRADE_MODULE_SHA256 = "a0808e854ab1c3e4a3f2d08c1fd01acf194be8a5bf45336ace2f0fd9cb98f508"
 
 
 def _complexity_by_name(path: Path) -> dict[str, int]:

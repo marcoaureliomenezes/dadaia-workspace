@@ -16,13 +16,14 @@ from dadaia_workspace.cli._specs_resolution import (
     resolve_specs_dir_for_cli,
 )
 from dadaia_workspace.core import gitflow, specs_version
+from dadaia_workspace.core.atomic_write import SymlinkRefusedError
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, from_mapping
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.migrate import upgrade as upgrade_feature
 from dadaia_workspace.features.migrate.registry import UpgradeRefused
 from dadaia_workspace.features.migrate.upgrade import UpgradeResult
-from dadaia_workspace.features.specs import canon
+from dadaia_workspace.features.specs import SpecsDoctor, SpecsDoctorIssue, canon
 
 app = typer.Typer(help="SDD release-lifecycle structural checks and helpers.")
 
@@ -50,11 +51,19 @@ def upgrade(
     resolved = _resolve_specs_dir(specs_dir)
     try:
         result = upgrade_feature.upgrade(resolved, target=target, dry_run=dry_run)
-    except UpgradeRefused as exc:
+    except (UpgradeRefused, SymlinkRefusedError) as exc:
         typer.echo(f"[refused] {exc}", err=True)
         sys.exit(1)
     _echo_upgrade(resolved, result)
     sys.exit(0)
+
+
+def _repair(specs: Path, *, dry_run: bool) -> list[SpecsDoctorIssue]:
+    """The doctor's one repair set: `specs upgrade` keeps no second writer of its own."""
+    public = canon.default_public_dir()
+    doctor = SpecsDoctor(specs, public_dir=public, templates_dir=public / "templates")
+    fixable = [issue for issue in doctor.check() if issue.fixable]
+    return fixable if dry_run else doctor.fix(fixable)
 
 
 def _echo_upgrade(specs: Path, result: UpgradeResult) -> None:
@@ -65,8 +74,8 @@ def _echo_upgrade(specs: Path, result: UpgradeResult) -> None:
         typer.echo(f"[status-vocabulary] {will}rewrite {path}")
     for path in result.tech_stack_folded:
         typer.echo(f"[tech-stack] {will}fold {path} into memory/ARCHITECTURE.md")
-    for path in result.fixed_restored:
-        typer.echo(f"[fixed-section] {will}write {path}")
+    for issue in _repair(specs, dry_run=result.dry_run):
+        typer.echo(f"[repair] {will}fix {issue.code} {issue.path}")
     if result.from_version < result.to_version:
         typer.echo(
             f"[stamp] {will}stamp {specs / 'constitution.md'} "
@@ -142,7 +151,11 @@ def init(
     if kind == "foreign":
         _move_foreign(target, rerun, replace_foreign)
     elif kind == "dadaia":
-        _echo_upgrade(target, upgrade_feature.upgrade(target))
+        try:
+            _echo_upgrade(target, upgrade_feature.upgrade(target))
+        except SymlinkRefusedError as exc:
+            typer.echo(f"[refused] {exc}", err=True)
+            raise typer.Exit(1) from exc
 
     project = name or target.parent.name
     written = canon.scaffold(target, project_name=project)
