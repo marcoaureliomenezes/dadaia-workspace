@@ -339,6 +339,9 @@ def test_status_and_stats_read_the_ledger(script: Path, tmp_path: Path) -> None:
 
 
 def test_archive_moves_only_records_closed_past_the_threshold(script: Path, tmp_path: Path) -> None:
+    """sa-ledger-verbs-append-histo-before-validating-the-pair#J5: "Given a valid pair, when
+    `exit`/`archive` succeed, then the record leaves the document and appears exactly once
+    in the histo, written atomically as a pair." (`archive` half)"""
     old = {
         **_OPEN_RECORD, "id": "old-bug", "ts": "2025-12-01T00:00:00Z",
         "status": "resolved", "closed_at": "2026-01-01T00:00:00Z",
@@ -356,7 +359,7 @@ def test_archive_moves_only_records_closed_past_the_threshold(script: Path, tmp_
     assert done.stdout.strip() == "[ok] archived 1 record(s), 2 kept."
     assert {r["id"] for r in _records(specs)} == {"a-bug", "fresh-bug"}
     histo = (specs / "bugs" / "_archive" / "bugs_histo.jsonl").read_text(encoding="utf-8")
-    assert json.loads(histo.strip())["id"] == "old-bug"
+    assert [json.loads(line)["id"] for line in histo.splitlines()] == ["old-bug"]
 
 
 def test_archive_with_nothing_eligible_is_a_byte_identical_no_op(
@@ -427,9 +430,9 @@ def test_the_projection_rule_carries_the_exec_bit_for_an_executable_source(
 def test_a_refused_archive_leaves_both_ledger_files_byte_intact(
     script: Path, tmp_path: Path
 ) -> None:
-    """sa-ledger-verbs-append-histo-before-validating-the-pair#J2: with one invalid live
-    record, `archive` refuses and neither BUGS.jsonl nor bugs_histo.jsonl moves — a retry
-    included."""
+    """sa-ledger-verbs-append-histo-before-validating-the-pair#J2: "Given BUGS.jsonl
+    holding an invalid record, when `bugs.py archive` runs, then it exits non-zero and
+    BUGS.jsonl and bugs_histo.jsonl are byte-identical." Run twice: a retry included."""
     old = {
         **_OPEN_RECORD, "id": "old-bug", "ts": "2025-12-01T00:00:00Z",
         "status": "resolved", "closed_at": "2026-01-01T00:00:00Z",

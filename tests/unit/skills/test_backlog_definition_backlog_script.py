@@ -175,6 +175,9 @@ def test_new_records_typed_intents(script: Path, tmp_path: Path) -> None:
 
 
 def test_exit_moves_the_entry_to_the_histo_exactly_once(script: Path, tmp_path: Path) -> None:
+    """sa-ledger-verbs-append-histo-before-validating-the-pair#J5: "Given a valid pair, when
+    `exit`/`archive` succeed, then the record leaves the document and appears exactly once
+    in the histo, written atomically as a pair." (`exit` half)"""
     specs = _specs(tmp_path)
     _release(specs)
     assert _run(script, "new", "an-idea", "--specs", str(specs)).returncode == 0
@@ -209,7 +212,7 @@ def test_a_second_exit_exits_one_with_a_fix_naming_the_script(script: Path, tmp_
     assert again.returncode == 1
     fixes = _fix_lines(again)
     assert len(fixes) == 1
-    assert "backlog.py" in fixes[0] or "backlog_histo.jsonl" in fixes[0]
+    assert fixes == ["fix: grep an-idea specs/backlog/_archive/backlog_histo.jsonl"]
     assert len(_histo(specs)) == 1
 
 
@@ -472,8 +475,10 @@ def _exited(script: Path, tmp_path: Path) -> Path:
 
 
 def test_a_refused_exit_leaves_both_backlog_files_byte_intact(script: Path, tmp_path: Path) -> None:
-    """sa-ledger-verbs-append-histo-before-validating-the-pair#J1: one invalid live entry
-    makes `exit` refuse, and neither file moves — a retry included (#J4)."""
+    """sa-ledger-verbs-append-histo-before-validating-the-pair#J1: "Given BACKLOG.json
+    holding an invalid entry (an Idea without intents), when `backlog.py exit <other-slug>`
+    runs, then it exits 1 and BACKLOG.json and backlog_histo.jsonl are both
+    byte-identical." Run twice: a retry appends nothing either."""
     specs = _exited(script, tmp_path)
     document = json.loads((specs / "backlog" / "BACKLOG.json").read_text(encoding="utf-8"))
     document["active"].append({"id": "broken", "status": "Idea"})
@@ -492,14 +497,15 @@ def test_a_refused_exit_leaves_both_backlog_files_byte_intact(script: Path, tmp_
 def test_new_refuses_a_slug_that_already_exited_and_writes_nothing(
     script: Path, tmp_path: Path
 ) -> None:
-    """sa-ledger-verbs-append-histo-before-validating-the-pair#J3: the pair check the
-    `check` verb runs refuses re-admitting an exited slug before any write."""
+    """sa-ledger-verbs-append-histo-before-validating-the-pair#J3: "Given slug zz already
+    exited (a histo record exists), when `backlog.py new zz` runs, then it exits 1 citing
+    the earlier exit and writes nothing." The pair check refuses it."""
     specs = _exited(script, tmp_path)
     before = _pair(specs)
 
     done = _run(script, "new", "gone", "--specs", str(specs))
 
     assert done.returncode == 1, done.stdout
-    assert "gone" in done.stderr
+    assert "'gone' exited at this line" in done.stderr
     assert _pair(specs) == before
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
