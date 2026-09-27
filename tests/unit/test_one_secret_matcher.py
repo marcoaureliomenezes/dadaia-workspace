@@ -77,6 +77,15 @@ _MATRIX: list[tuple[str, str, str | bytes, bool]] = [
     ("secret-name", "t5.py", "secret" + '_name = "database-credentials"\n', False),
     ("json-template", "t6.json", '{"pass' + 'word": "${DB_PASSWORD}"}\n', False),
     ("dict-variable", "t7.py", "cfg = {'pass" + "word': password}\n", False),
+    # secret-token-value-classes-miss-literals-and-refuse-code: a literal is a run free
+    # of code syntax whatever the key's case style; a comparison or a name is not one.
+    ("camel-case-key", "c.js", "const dbPass" + 'word = "' + _V + '"\n', True),
+    ("bare-specials", ".env", "DB_PASS" + "WORD=" + _V + "!@%\n", True),
+    ("quoted-dollar", ".env", "DB_PASS" + 'WORD="' + _V + '$x"\n', True),
+    ("unspaced-eq-assert", "t8.py", "assert api" + "_key==expected_value\n", False),
+    ("unspaced-eq-return", "t9.py", "return pass" + "word==stored_password\n", False),
+    ("kebab-secret-name", "m.py", "SECRET" + '_KEY = "infura-api-key"\n', False),
+    ("masked-value", "m.env", "API" + "_KEY=********\n", False),
     # Behavior (retro 2026-09-27 item 1): private-key containers are refused on
     # presence (.pem .key .p12 .pfx .jks .keystore .der); public certs (.crt .cer) pass.
     ("der-private-key", "k.der", b"\x30\x82key\xff", True),
