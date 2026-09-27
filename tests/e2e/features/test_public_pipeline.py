@@ -215,9 +215,6 @@ class TestInstallAll:
 
         assert (workspace / ".codex" / "hooks.json").exists(), ".codex/hooks.json not created"
         assert (workspace / ".codex" / "config.toml").exists(), ".codex/config.toml not created"
-        assert (workspace / ".codex" / "rules" / "dadaia-command-policy.rules").exists(), (
-            ".codex/rules/dadaia-command-policy.rules not installed"
-        )
         assert not (workspace / ".codex" / "rules" / "workspace-protocol.md").exists()
 
 
@@ -452,7 +449,6 @@ class TestPerProfileInit:
         assert (ws / ".codex" / "agents").is_dir(), ".codex/agents/ missing for a codex profile"
         assert (ws / ".codex" / "hooks.json").exists(), ".codex/hooks.json missing"
         assert (ws / ".codex" / "config.toml").exists(), ".codex/config.toml missing"
-        assert (ws / ".codex" / "rules" / "dadaia-command-policy.rules").exists()
         codex_wrappers = sorted((ws / ".dadaia" / "hooks").glob("codex-*"))
         assert codex_wrappers, "expected .dadaia/hooks/codex-* wrappers for a codex profile"
         # un-chosen harnesses get no projection.

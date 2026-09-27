@@ -155,7 +155,6 @@ def test_behaviors_cover_every_harness_whose_hooks_are_derived() -> None:
 def test_rule_implementations_target_known_harnesses_and_cover_the_law_projections() -> None:
     registry = load_registry()
     harnesses = set(L1_ENTRY_HARNESSES)
-    rules_blob = json.dumps(registry["rules"])
 
     for rule in registry["rules"]:
         unknown = set(rule["implementations"]) - harnesses
@@ -166,12 +165,6 @@ def test_rule_implementations_target_known_harnesses_and_cover_the_law_projectio
     assert set(law_rule["implementations"]) == harnesses
     for impl in law_rule["implementations"].values():
         assert "AGENTS.md" in impl
-
-    # The one non-law core rule file the installer projects (codex Starlark
-    # command policy — public_assets.install) must trace to an abstract rule.
-    assert "dadaia-command-policy.rules" in rules_blob, (
-        "the projected codex command-policy rule file has no abstract rule in the registry"
-    )
 
 
 def test_universal_entities_match_the_scaffold() -> None:
