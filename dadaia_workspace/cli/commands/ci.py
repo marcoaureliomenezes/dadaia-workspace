@@ -12,6 +12,7 @@ import typer
 
 from dadaia_workspace.cli._specs_resolution import repo_owner, resolve_workspace_root_for_cli
 from dadaia_workspace.container import is_source_repo_root as _is_source_repo_root
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import CiPreflightScopeError
 from dadaia_workspace.core.gitflow import Gitflow
 from dadaia_workspace.features.chokepoints.branch_policy import GateFixes
@@ -212,12 +213,14 @@ def install_hook(
     repo: Path | None = typer.Option(None, "--repo", help="Target repo. Default: cwd's repo."),
 ) -> None:
     """Install the pre-push CI/security gate."""
+    repo = repo or _repo_root()
     try:
-        installed = install_git_hooks(repo or _repo_root(), force=force)
+        installed = install_git_hooks(repo, force=force)
     except FileNotFoundError as exc:
         raise typer.BadParameter(str(exc)) from None
     if not installed:
-        typer.secho("pre-push hook already exists; use --force to overwrite.", fg="yellow")
+        fix = fix_line(None, "ci", "install-hook", "--force", "--repo", str(repo))
+        typer.secho(f"pre-push hook already exists, not overwritten.\nfix: {fix}", fg="yellow")
         raise typer.Exit(1)
     for target in installed:
         typer.secho(f"Installed pre-push CI + security gate -> {target}", fg=typer.colors.GREEN)

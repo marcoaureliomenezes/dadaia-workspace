@@ -62,13 +62,17 @@ def test_preflight_pass_and_fail(monkeypatch, tmp_path: Path, all_pass: bool) ->
 def test_install_hook_writes_and_refuses_overwrite_without_force(
     monkeypatch, tmp_path: Path
 ) -> None:
+    """pre-push-gate-never-runs-under-core-hookspath#B1: under core.hooksPath the gate lands
+    where git runs hooks; a hook already there is refused non-zero with a fix: line."""
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "core.hooksPath", ".husky"], check=True)
     monkeypatch.setattr(ci, "_repo_root", lambda: tmp_path)
 
     result = _runner.invoke(app, ["ci", "install-hook"])
     assert result.exit_code == 0
 
-    pre_push = tmp_path / ".git" / "hooks" / "pre-push"
+    assert not (tmp_path / ".git" / "hooks" / "pre-push").exists()
+    pre_push = tmp_path / ".husky" / "pre-push"
     assert pre_push.exists()
     pre_push_text = pre_push.read_text()
     # v0.5.0 FR9/D9: the installed pre-push hook no longer INVOKES `ci preflight` — it
@@ -78,6 +82,9 @@ def test_install_hook_writes_and_refuses_overwrite_without_force(
     assert "ci push-gate-check" in pre_push_text
 
     # second call without --force is refused (pre-push already present).
-    assert _runner.invoke(app, ["ci", "install-hook"]).exit_code == 1
+    refused = _runner.invoke(app, ["ci", "install-hook"])
+    assert refused.exit_code == 1
+    assert f"ci install-hook --force --repo {tmp_path}" in refused.output
+    assert "fix: " in refused.output
     # --force overwrites both.
     assert _runner.invoke(app, ["ci", "install-hook", "--force"]).exit_code == 0

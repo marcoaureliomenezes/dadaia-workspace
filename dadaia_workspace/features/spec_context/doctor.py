@@ -122,16 +122,9 @@ class DoctorService:
     # ------------------------------------------------------------------
 
     def check_installed_hooks(self, context: str | None = None) -> list[DoctorIssue]:
-        """HOOKS-DRIFT-1: an ALIVE repo's installed git hook differs from the shipped one.
-
-        The git chokepoints are the ONE mechanical backstop that runs outside every
-        harness hook (`.dadaia/AGENTS.md`). An installed copy that has drifted — hand-edited,
-        never installed, or left behind by an older release — is a chokepoint silently
-        enforcing yesterday's contract, and nothing else in the workspace can notice.
-        Compared BYTE-WISE against ``public/scripts/``: the installer copies verbatim, so
-        any difference is drift, judged where git runs hooks; a non-git repo is never a
-        finding. A named *context* scopes the check to its own repos (0.4.8 R5).
-        """
+        """HOOKS-DRIFT-1: an ALIVE repo's hook where git runs hooks is not byte-for-byte the
+        shipped one (hand-edited, missing or stale) — the one backstop outside every harness
+        hook. A non-git repo is never a finding; *context* scopes the repos (0.4.8 R5)."""
         issues: list[DoctorIssue] = []
         for top in self._alive_repo_tops(context):
             hooks_dir = git_hooks_dir(top)

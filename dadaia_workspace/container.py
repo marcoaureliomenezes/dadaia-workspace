@@ -133,7 +133,7 @@ def load_denylist_baseline_patterns() -> tuple[BaselinePatternLike, ...]:
 
 def scan_publish_candidates(repo: Path, rels: list[str]) -> dict[str, str]:
     """AC5.6: the pre-push matcher, in-process, over the files baseline and ``dead
-    --commit`` are about to commit — a repo with ``core.hooksPath`` never runs the hook.
+    --commit`` are about to commit, before any hook could see them.
     Read as the object reader reads a blob: undecodable bytes are scanned by path only."""
     from dadaia_workspace.core.models.git_scan import ScannedObject
     from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
