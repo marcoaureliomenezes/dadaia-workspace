@@ -82,6 +82,10 @@ def constitution_path(specs_dir: Path) -> Path:
     return specs_dir / "constitution.md"
 
 
+def specs_tree_exists(specs_dir: Path) -> bool:
+    return specs_dir.exists()
+
+
 def constitution_text(specs_dir: Path) -> str:
     constitution = constitution_path(specs_dir)
     return constitution.read_text(encoding="utf-8") if constitution.is_file() else ""

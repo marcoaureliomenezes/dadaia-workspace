@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Literal
 
 from dadaia_workspace.core.frontmatter import Frontmatter, parse
-from dadaia_workspace.core.gitflow import constitution_error, constitution_text
+from dadaia_workspace.core.gitflow import constitution_error, constitution_text, specs_tree_exists
 
 #: Single source of truth for the current canonical specs-pattern version.
 #: Bump this when a new migration step is added to the registry (see ``registry.py``).
@@ -94,7 +94,7 @@ def read_pattern_version(specs_dir: Path) -> int:
 def classify(specs_dir: Path) -> Literal["absent", "malformed", "dadaia", "foreign"]:
     """``absent`` (no directory), ``malformed`` (:func:`constitution_error`), ``dadaia``
     (stamped >= 6) or ``foreign`` — a tree without a dadaia constitution (ADR 0047)."""
-    if not specs_dir.exists():
+    if not specs_tree_exists(specs_dir):
         return "absent"
     if constitution_error(specs_dir):
         return "malformed"

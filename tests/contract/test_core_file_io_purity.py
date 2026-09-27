@@ -70,7 +70,6 @@ _CORE_DIR = _REPO_ROOT / "dadaia_workspace" / "core"
 _AUTHORIZED_STEMS: frozenset[str] = frozenset(
     {
         "specs_repair",
-        "specs_version",
         "workspace_resolver",
         "atomic_write",
         "invocation",
@@ -79,9 +78,9 @@ _AUTHORIZED_STEMS: frozenset[str] = frozenset(
         # T-050-10 (AC3.2): reads the shipped-hashes history beside the templates; moved
         # to core so onboarding (a feature) and the specs doctor share it.
         "template_history",
-        # T-050-22 (AC11.2, review 7 N7): the constitution gitflow read and the one
-        # frontmatter writer moved here from specs_version, whose file I/O they were.
-        # Follow-up owed to product-engineer: ARCHITECTURE.md P-11's authorized count.
+        # T-050-22 (AC11.2, reviews 7-8): every specs-tree probe, the constitution read
+        # and the one frontmatter writer moved here from specs_version, which is now
+        # pure — a swap, so ARCHITECTURE.md P-11 stays at eight modules.
         "gitflow",
     }
 )
