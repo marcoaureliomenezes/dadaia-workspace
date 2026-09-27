@@ -46,7 +46,7 @@ description: >
 - A picked entry stays in `active[]` with `status: picked` —
   nothing is purged at pick time.
 - It exits exactly once, at closure, by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit <slug> --disposition
-  delivered|superseded|rejected [--release <id>] [--reason <text>]` — one histo
+  <disposition> [--release <id>] [--reason <text>]` — one histo
   record, refused on a second exit (`dd-release-implementation` RC-FLOW step 7).
 - `dd-release-definition` consumes the picked set with no further triage — the
   backlog it reads is already sanitized.

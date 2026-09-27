@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 import dadaia_workspace.infrastructure.python_env as python_env_module
-from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.core.platform import PLATFORM, detect
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
 # Captured at collection/import time — the conftest autouse monkeypatch only applies
@@ -573,14 +573,14 @@ def test_resolve_child_venv_interpreter_skips_degraded_base_and_uses_pyvenv_exec
     names one that does. Resolution must skip the degraded candidate and select the
     compliant one — never hand the degraded resolution to venv creation implicitly.
 
-    Pins the POSIX path flavor (``os.name``) explicitly, symmetric with the nt-flavor
+    Pins the POSIX path flavor (the ``PLATFORM`` flag) explicitly, symmetric with the nt-flavor
     FR9 tests below: ``_is_fully_qualified`` — which ``_resolve_child_venv_interpreter``
-    calls on every candidate — branches on the REAL host ``os.name``, so a POSIX-shaped
+    calls on every candidate — branches on the REAL host ``PLATFORM``, so a POSIX-shaped
     candidate like ``/usr/bin/python3.12`` is only fully-qualified when the fixture
     itself pins a POSIX host, never left to whatever OS happens to run the suite.
     """
     mgr = VenvPythonEnvironmentManager()
-    monkeypatch.setattr(python_env_module.os, "name", "posix")
+    monkeypatch.setattr(python_env_module, "PLATFORM", detect("linux"))
     monkeypatch.setattr(mgr, "_running_requires_python", lambda: ">=3.12,<4.0")
     monkeypatch.setattr(
         python_env_module.sys, "_base_executable", "/usr/bin/python3", raising=False
@@ -607,11 +607,11 @@ def test_resolve_child_venv_interpreter_falls_back_to_path_search(
     """Neither ``_base_executable`` nor the current ``pyvenv.cfg`` satisfy: PATH search
     for a version-pinned pythonX.Y is the last resolution strategy before giving up.
 
-    Pins the POSIX path flavor (``os.name``) explicitly — see the sibling
+    Pins the POSIX path flavor (the ``PLATFORM`` flag) explicitly — see the sibling
     ``..._skips_degraded_base_...`` test's docstring for why.
     """
     mgr = VenvPythonEnvironmentManager()
-    monkeypatch.setattr(python_env_module.os, "name", "posix")
+    monkeypatch.setattr(python_env_module, "PLATFORM", detect("linux"))
     monkeypatch.setattr(mgr, "_running_requires_python", lambda: ">=3.12,<4.0")
     monkeypatch.setattr(
         python_env_module.sys, "_base_executable", "/usr/bin/python3", raising=False
@@ -636,7 +636,7 @@ def test_resolve_child_venv_interpreter_raises_actionable_error_when_nothing_sat
     intended reason (version mismatch, not "relative path rejected" on an nt host) —
     same class as the sibling ``_resolve_child_venv_interpreter`` tests above."""
     mgr = VenvPythonEnvironmentManager()
-    monkeypatch.setattr(python_env_module.os, "name", "posix")
+    monkeypatch.setattr(python_env_module, "PLATFORM", detect("linux"))
     monkeypatch.setattr(mgr, "_running_requires_python", lambda: ">=3.12,<4.0")
     monkeypatch.setattr(
         python_env_module.sys, "_base_executable", "/usr/bin/python3", raising=False
@@ -812,7 +812,7 @@ def test_resolve_child_venv_interpreter_never_probes_a_relative_pyvenv_value(
 # leading separator, no drive letter, e.g. ``\tools\python.exe``) — it resolves
 # against the CURRENT DRIVE, not a fully qualified location. Routed through ``ntpath``
 # directly (never the host-bound ``os.path``) so the Windows-specific gap is provable
-# on any host OS by monkeypatching ``os.name``.
+# on any host OS by monkeypatching ``PLATFORM``.
 
 
 def test_is_fully_qualified_rejects_a_windows_drive_relative_path(
@@ -820,7 +820,7 @@ def test_is_fully_qualified_rejects_a_windows_drive_relative_path(
 ) -> None:
     """A drive-relative candidate (passes ``ntpath.isabs`` on 3.12, but resolves
     against whatever drive happens to be current) must be rejected."""
-    monkeypatch.setattr(python_env_module.os, "name", "nt")
+    monkeypatch.setattr(python_env_module, "PLATFORM", detect("win32"))
 
     assert python_env_module._is_fully_qualified("\\tools\\python.exe") is False
 
@@ -829,7 +829,7 @@ def test_is_fully_qualified_accepts_a_windows_drive_qualified_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A genuine drive-qualified Windows path is unaffected."""
-    monkeypatch.setattr(python_env_module.os, "name", "nt")
+    monkeypatch.setattr(python_env_module, "PLATFORM", detect("win32"))
 
     assert python_env_module._is_fully_qualified("C:\\tools\\python.exe") is True
 
@@ -838,9 +838,9 @@ def test_is_fully_qualified_accepts_a_posix_absolute_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Pins the POSIX path flavor explicitly — ``_is_fully_qualified`` branches on the
-    REAL host ``os.name``, so a leading-slash candidate is only unambiguous on a POSIX
+    REAL host ``PLATFORM``, so a leading-slash candidate is only unambiguous on a POSIX
     host; symmetric with the nt-flavor tests above."""
-    monkeypatch.setattr(python_env_module.os, "name", "posix")
+    monkeypatch.setattr(python_env_module, "PLATFORM", detect("linux"))
 
     assert python_env_module._is_fully_qualified("/usr/bin/python3.12") is True
 
@@ -848,7 +848,7 @@ def test_is_fully_qualified_accepts_a_posix_absolute_path(
 def test_is_fully_qualified_rejects_a_posix_relative_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(python_env_module.os, "name", "posix")
+    monkeypatch.setattr(python_env_module, "PLATFORM", detect("linux"))
 
     assert python_env_module._is_fully_qualified("python3.12") is False
 
@@ -862,7 +862,7 @@ def test_resolve_child_venv_interpreter_never_probes_a_windows_drive_relative_py
     mgr = VenvPythonEnvironmentManager()
     monkeypatch.setattr(mgr, "_running_requires_python", lambda: ">=3.12,<4.0")
     monkeypatch.setattr(python_env_module.sys, "_base_executable", "", raising=False)
-    monkeypatch.setattr(python_env_module.os, "name", "nt")
+    monkeypatch.setattr(python_env_module, "PLATFORM", detect("win32"))
     # A directly-malicious pyvenv.cfg value: drive-relative, not drive-qualified.
     monkeypatch.setattr(
         python_env_module, "_current_venv_pyvenv_executable", lambda: "\\tools\\python.exe"

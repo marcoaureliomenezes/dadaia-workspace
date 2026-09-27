@@ -286,13 +286,13 @@ def _is_fully_qualified(candidate: str) -> bool:
     ``python = \"^3.12\"``, so the probe cannot rely on that yet.)
 
     Routed through the ``ntpath`` module explicitly — never the host-bound ``os.path``
-    — when ``os.name == \"nt\"``: this makes the Windows-specific check provable on any
+    — on a Windows ``PLATFORM``: this makes the Windows-specific check provable on any
     host OS (``ntpath`` is a pure-Python module, always importable regardless of the
     running platform), and is exactly what real Windows already does (there,
-    ``os.path`` IS ``ntpath``). POSIX (``os.name != \"nt\"``) is unaffected — plain
+    ``os.path`` IS ``ntpath``). POSIX is unaffected — plain
     ``os.path.isabs`` has no such gap there.
     """
-    if os.name == "nt":
+    if PLATFORM.windows:
         return ntpath.isabs(candidate) and ntpath.splitdrive(candidate)[0] != ""
     return os.path.isabs(candidate)
 

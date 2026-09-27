@@ -34,10 +34,10 @@
 
 ## 3. What is enforced
 
-- One PreToolUse gate blocks exactly three things: a new workspace-root entry (§4), a `dadaia`/`pip` run outside `.dadaia/.venv/bin/`, a PROTECTED or out-of-scope write.
+- One PreToolUse gate blocks exactly three things: a new workspace-root entry (§4), a command whose first token is `dadaia`, `pip`/`pip3` or `python -m dadaia_workspace` outside `.dadaia/.venv/bin/`, a PROTECTED or out-of-scope write.
 - Path classes: ADDITIVE (the append-only governance areas of `specs/AGENTS.md` and the runtime scratch zones of `.dadaia/AGENTS.md`) always writable; PROTECTED (session state, the projected law files) blocked; everything else MUTATING, scope-judged under `repos/<slug>/`.
 - Every BLOCK carries exactly one `fix: <command>` line; a BLOCK whose fix is itself blocked is a Stall, CRITICAL.
-- Git chokepoints (branch names: `specs/constitution.md` `gitflow:`): pre-push allows the work branch and refuses the integration and principal branches, a non-canon `specs/` path or a denylisted secret; both PRs need CI green and a `dd-code-reviewer` APPROVED verdict; no CI job calls a model API. Mechanics: `dd-gitflow-default`, `.dadaia/AGENTS.md`.
+- Git chokepoints (branch names: `specs/constitution.md` `gitflow:`): pre-push allows only the work branch and refuses a non-canon `specs/` path or a denylisted secret; both PRs need CI green and a `dd-code-reviewer` APPROVED verdict; no CI job calls a model API. Mechanics: `dd-gitflow-default`, `.dadaia/AGENTS.md`.
 - Races surface, never block; context binding: `.dadaia/.venv/bin/dadaia context show --json`, `.dadaia/.venv/bin/dadaia context bind <ctx>`.
 - The gate reads no SDD artifact; procedure is skill-taught and audit-measured, never gated.
 
@@ -57,7 +57,7 @@
 | releases | `specs/releases/AGENTS.md` | candidates, phases, task markers, promote, commit shapes |
 | backlog | `specs/backlog/AGENTS.md` | demand queue, `exit`, dispositions |
 | bugs | `specs/bugs/AGENTS.md` | what a bug is, propose/confirm, records, resolution |
-| memory | `specs/memory/AGENTS.md` | product truth, atoms, Part 1/Part 2, ownership |
+| memory | `specs/memory/AGENTS.md` | product truth, atoms, ownership |
 | ADRs | `specs/ADRs/AGENTS.md` | decisions.jsonl, acceptance |
 | audits | `specs/audits/AGENTS.md` | three pillars, remediation release |
 | runtime | `.dadaia/AGENTS.md` | zones, doctor, reprojection, chokepoints, context freeze |

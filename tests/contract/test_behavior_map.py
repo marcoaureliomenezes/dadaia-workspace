@@ -973,6 +973,9 @@ def _real_dead_path_citations(repo_root: Path = _REPO_ROOT) -> list[str]:
 
 
 def test_every_cited_path_exists() -> None:
+    """sa-text-restates-rules-the-code-contradicts#49.6: every backticked path a law
+    sentence in public/** (data/*.md and scaffold/**/AGENTS.md included) cites resolves;
+    the verb half is test_every_cited_dadaia_verb_exists."""
     violations = _real_dead_path_citations()
     assert violations == [], "dead path citation(s):\n" + "\n".join(violations)
 

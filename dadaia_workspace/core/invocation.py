@@ -19,9 +19,7 @@ input, which the law has always allowed a verb to pass):
             (``target_path``) under ``<workspace_root>/repos/<slug>/``.
     rung 1  ``DADAIA_CONTEXT``.
     rung 2  this session's own LIVE session record, keyed by the harness-native
-            session id (:func:`resolve_session_id` — payload first, then env; never
-            ``DADAIA_SESSION_ID``, which is identity-override only, resolved
-            separately).
+            session id (:func:`resolve_session_id`, the one order).
     rung 3  the repo containing the current working directory.
 
 **The root-vs-target bug** (open bug

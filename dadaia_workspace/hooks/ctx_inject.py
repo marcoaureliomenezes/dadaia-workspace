@@ -44,9 +44,8 @@ Parity invariants preserved verbatim from the rc-4 shell hook:
   sentinel ``.dadaia/tmp/ctx-inject-fired-<sessionId>``. Its CONTENT now carries the last
   injected slug (or an empty marker for the generic-preflight case) so a re-bind is
   detectable; an empty file remains a valid "already fired generic" sentinel.
-- **Session id resolution**: ``DADAIA_SESSION_ID`` → ``CLAUDE_CODE_SESSION_ID`` →
-  ``CODEX_SESSION_ID`` → stdin ``session_id`` → ``"workspace"``,
-  sanitized to ``[A-Za-z0-9_-]``.
+- **Session id resolution**: ``core.invocation.resolve_session_id`` (the one order),
+  default ``"workspace"``.
 - **Output contract**: ``DADAIA_HOOK_OUTPUT`` in {``codex-json``, ``json``} emits the
   ``hookSpecificOutput.additionalContext`` envelope with ``hookEventName`` from
   ``DADAIA_HOOK_EVENT`` (default ``UserPromptSubmit``); otherwise raw payload to stdout.

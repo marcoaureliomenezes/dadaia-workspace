@@ -31,7 +31,7 @@ read or any output written.
 
 1. Read `<specs-dir>/releases/<release-id>/_RELEASE.json` — its `phase` field is the resolver; the live candidate's trio is always flat at the release root.
 2. No state-document-carrying release directory: stop before implementation and inform the operator.
-3. Read `SPEC.md`; add `PLAN.md` when planning or implementing; add `TASKS.md` when implementing; read `_RELEASE.json`'s `log` when `phase` is `CLOSURE`/`ARCHIVED`.
+3. Read the SPEC; add the PLAN when planning or implementing, the TASKS when implementing; read `_RELEASE.json`'s `log` when `phase` is `CLOSURE`/`ARCHIVED`.
 4. Verify every loaded SPEC/PLAN/TASKS carries `**Status:** Approved` before any implementation; stop and name the unapproved artifact otherwise.
 
 ## Done when
@@ -40,19 +40,6 @@ read or any output written.
 - Constitution, ARCHITECTURE.md, QUALITY.md and the 1-3 relevant atoms are read.
 - Every SPEC/PLAN/TASKS in scope carries `**Status:** Approved`, or the gap was
   reported first.
-
-## Glossary
-
-- **workspace** the root tree holding `.dadaia/`, `repos/` and the law · **instance** a live operator-run workspace · **library** the source repo that scaffolds one.
-- **context** the active Spec Context Project · **spec context** a `specs/` tree governed by the law · **main repo** where `specs/` lives · **associated repos** its other repos.
-- **release** the open-scope publication unit, exactly one live · **candidate** one closed-scope SDD cycle inside it, its closed trio left in git · **promote** merging the release PR.
-- **task marker** the `[ ] [-] [x]` trace in TASKS.md · **handoff** the JSON completion record · **verdict** a reviewer's `APPROVED`/`REJECTED` recommendation.
-- **gate** the deterministic PreToolUse chain · **path class** ADDITIVE / MUTATING / PROTECTED · **scope** the repo set a bind owns · **stall** a BLOCK whose own `fix:` is blocked.
-- **canon** the closed set of paths a `specs/` root may hold · **histo** an append-only JSONL history under an area's `_archive/` · **memory atom** one Markdown file of current truth.
-- **ADR** an accepted decision record · **backlog entry** one live item in `active[]`.
-- **disposition** the terminal verdict — `delivered resolved superseded deferred rejected` · **audit** the periodic three-pillar review · **finding** one recorded observation.
-- **zone** one top-level `.dadaia/` directory with a registry record · **reaped** an entry held in `.dadaia/reaped/` awaiting its TTL · **operator** the human who owns the workspace.
-- **slop** what passes the deletion test without loss · **ratchet** a contract test pinning a count that moves down only · **projection** a lib-originated copy of a `public/` asset.
 
 ## References
 

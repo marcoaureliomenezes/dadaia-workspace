@@ -28,7 +28,7 @@ Before editing production source:
 
 1. Resolve context with `.dadaia/.venv/bin/dadaia context show --json`.
 2. Read the active release under `specs/releases/<release-id>/`.
-3. Confirm `SPEC.md`, `PLAN.md`, and `TASKS.md` are approved.
+3. Confirm the release trio is approved.
 4. Confirm your task is marked `[-]`.
 5. Confirm every edited file is in the task write set.
 6. If any item fails, stop and report the exact missing artifact or task marker.

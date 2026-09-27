@@ -31,8 +31,7 @@ Scope: this file governs only `specs/backlog/`.
 
 ## 3. Terminal disposition tokens
 
-- One lowercase vocabulary across every histo (`core/models/histo.py`); a backlog entry exits as `delivered`, `superseded` or `rejected`.
-- `delivered`/`superseded` carry the release id in `release`; `rejected` carries a one-line `reason`.
+- An entry exits with one disposition of the vocabulary `BACKLOG_PY exit --help` lists; a delivery or supersession carries the release id in `release`, a rejection a one-line `reason`.
 - A `deferred` item returns to `active[]` — it never exits.
 
 ## 4. Idea-stage freedom vs bound intents

@@ -1,0 +1,96 @@
+"""Intent: CONTRACT — sa-text-restates-rules-the-code-contradicts: a law or docstring
+sentence that restates a rule states what the code does, or cites the code instead.
+Size: SMALL — text reads, one AST walk and in-process gate calls.
+"""
+
+from __future__ import annotations
+
+import ast
+import configparser
+import re
+from pathlib import Path
+
+import pytest
+
+from dadaia_workspace.hooks import venv_guard
+from tests.contract.test_slop_ratchets import _V34_CEILINGS
+
+pytestmark = pytest.mark.unit
+
+_REPO = Path(__file__).resolve().parents[2]
+_PKG = _REPO / "dadaia_workspace"
+_MAP = _PKG / "public" / "data" / "AGENTS.md"
+
+
+def _bash(command: str) -> dict[str, object]:
+    return {"tool_name": "Bash", "tool_input": {"command": command}}
+
+
+def test_the_map_states_the_venv_guard_first_token_rule() -> None:
+    """sa-text-restates-rules-the-code-contradicts#49.1: a command whose FIRST token is
+    dadaia/pip/pip3 or `python -m dadaia_workspace` outside .dadaia/.venv/bin/ BLOCKs;
+    any other shape passes; the map text states exactly this."""
+    for blocked in ("dadaia doctor", "pip install x", "pip3 install x",
+                    "python -m dadaia_workspace"):  # fmt: skip
+        assert venv_guard.evaluate_payload(_bash(blocked)) is not None, blocked
+    for passes in ("python -m pip install x", "uv pip install x", "cd x && pip install y",
+                   "/usr/bin/pip install x"):  # fmt: skip
+        assert venv_guard.evaluate_payload(_bash(passes)) is None, passes
+    line = next(ln for ln in _MAP.read_text("utf-8").splitlines() if "One PreToolUse gate" in ln)
+    assert "first token is `dadaia`, `pip`/`pip3` or `python -m dadaia_workspace`" in line
+
+
+_SESSION_NAMES = ("DADAIA_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID",
+                  "CODEX_THREAD_ID", "session_id")  # fmt: skip
+
+
+def test_no_docstring_restates_the_session_id_order() -> None:
+    """sa-text-restates-rules-the-code-contradicts#49.2: the precedence is
+    resolve_session_id's alone; no other module spells a session-id chain."""
+    chains = []
+    for path in sorted(_PKG.rglob("*.py")):
+        if path.name == "invocation.py" and path.parent.name == "core":
+            continue
+        for number, line in enumerate(path.read_text("utf-8").splitlines(), start=1):
+            if re.search(r"→|->", line) and sum(name in line for name in _SESSION_NAMES) >= 2:
+                chains.append(f"{path.relative_to(_REPO)}:{number}")
+    assert chains == []
+
+
+def test_the_release_law_states_the_trio_byte_ceilings() -> None:
+    """sa-text-restates-rules-the-code-contradicts#49.3: the law states KiB with the byte
+    counts the V34 ratchet enforces."""
+    law = (_PKG / "public" / "scaffold" / "releases" / "AGENTS.md").read_text("utf-8")
+    assert _V34_CEILINGS == {"SPEC.md": 24576, "TASKS.md": 12288}
+    assert "SPEC.md fits 24 KiB (24576 bytes) and TASKS.md 12 KiB (12288 bytes)" in law
+
+
+def test_the_bind_resolution_contract_covers_every_verb_module() -> None:
+    """sa-text-restates-rules-the-code-contradicts#49.4: every cli/commands/* module is a
+    source of the bind-resolution-seam contract, so a direct core.invocation import in any
+    verb (harness, reconcile, capabilities, certify included) breaks lint-imports."""
+    config = configparser.ConfigParser()
+    config.read(_REPO / "setup.cfg", encoding="utf-8")
+    sources = config["importlinter:contract:bind-resolution-seam-is-a-single-home"]
+    modules = sources["source_modules"].split()
+    verbs = sorted((_PKG / "cli" / "commands").glob("[!_]*.py"))
+    uncovered = [
+        v.stem for v in verbs
+        if not any(f"dadaia_workspace.cli.commands.{v.stem}".startswith(m) for m in modules)
+    ]  # fmt: skip
+    assert verbs and uncovered == []
+
+
+def test_os_name_is_read_only_through_the_platform_seam() -> None:
+    """sa-text-restates-rules-the-code-contradicts#49.5: no `os.name` read in the package
+    outside core/platform (python_env branches on PLATFORM). Stdlib skill scripts under
+    public/ cannot import core and are out of this ratchet."""
+    reads = [
+        f"{path.relative_to(_REPO)}:{node.lineno}"
+        for path in sorted(_PKG.rglob("*.py"))
+        if "public" not in path.relative_to(_PKG).parts
+        for node in ast.walk(ast.parse(path.read_text("utf-8")))
+        if isinstance(node, ast.Attribute) and node.attr == "name"
+        and isinstance(node.value, ast.Name) and node.value.id == "os"
+    ]  # fmt: skip
+    assert reads == []

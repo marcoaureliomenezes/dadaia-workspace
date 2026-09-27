@@ -11,7 +11,7 @@ Nothing here is product source or an approval artifact.
 - Prefer small text, JSON, screenshots, or logs that support a report.
 - Do not store secrets, credentials, tokens, private keys, or production dumps.
 - Do not import files from here as application/runtime dependencies.
-- Do not use this directory for `SPEC.md`, `PLAN.md`, `TASKS.md`, source code, committed tests, or persistent state.
+- Do not use this directory for a release trio, source code, committed tests, or persistent state.
 
 ## 2. Cleanup
 

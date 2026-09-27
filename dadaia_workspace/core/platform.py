@@ -36,10 +36,12 @@ class Capabilities:
                          Windows.
         venv_exe_suffix: File extension for the Python executable inside the
                          venv.  ``""`` on POSIX; ``".exe"`` on Windows.
+        windows: The host path flavor is Windows (``ntpath``).
     """
 
     venv_scripts_dir: str
     venv_exe_suffix: str
+    windows: bool
 
     @classmethod
     def detect(cls, platform: str | None = None) -> Capabilities:
@@ -49,6 +51,7 @@ class Capabilities:
         return cls(
             venv_scripts_dir="Scripts" if is_win else "bin",
             venv_exe_suffix=".exe" if is_win else "",
+            windows=is_win,
         )
 
 

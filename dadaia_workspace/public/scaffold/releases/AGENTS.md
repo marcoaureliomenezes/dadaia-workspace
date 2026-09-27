@@ -13,16 +13,16 @@ Scope: this file governs only `specs/releases/`.
 
 ## 1. Structure
 
-- `<release-id>/{SPEC.md, PLAN.md, TASKS.md, _RELEASE.json}` — the live release, its trio flat at the root.
+- `<release-id>/` — the live release: its trio and `_RELEASE.json`, flat at the root.
 - `_archive/**` and any candidate folder under a release are history: read, never written, never rewritten, never ranked.
 
 ## 2. Authoring rules
 
 - Three flows, one `**Origin:**` per SPEC (`SPEC-DOC-048`): Flow 1 `backlog:<ids>` is the default weight, full memory pass; Flow 2 `bugs:<ids>` composes bugs, memory pass surgical or none; Flow 3 `operator-demand` is the heaviest — as-is review and grill first, full memory pass.
-- SDD lifecycle order PER CANDIDATE: as-is review -> grill -> `SPEC.md` (Draft) -> operator approval -> `PLAN.md` -> `TASKS.md` -> implementation -> closure -> integration-branch merge -> promote-or-continue gate.
+- SDD lifecycle order PER CANDIDATE: as-is review -> grill -> SPEC (Draft) -> operator approval -> PLAN -> TASKS -> implementation -> closure -> integration-branch merge -> promote-or-continue gate.
 - Candidate closure order: memory update -> closure narrative in `_RELEASE.json`'s `log` -> disposition sweep -> artifact GC -> merge -> gate (continue = the next candidate's `RELEASE_PY new`; promote = merging the release PR).
 - Full arc, gate cadence, the step-by-step ladder: `dd-release-implementation`'s `RC-FLOW.md`.
-- A candidate's SPEC.md fits 24 KB and TASKS.md 12 KB; measure with `wc -c` before the definition commit.
+- A candidate's SPEC.md fits 24 KiB (24576 bytes) and TASKS.md 12 KiB (12288 bytes); measure with `wc -c` before the definition commit.
 - A `v`-prefixed id is minted nowhere — the bare axis (`^\d+\.\d+\.\d+$`) is the only current one.
 
 ## 3. Tasks — the auditable trace

@@ -9,7 +9,7 @@ Disclosed reference reached from `SKILL.md`/`RC-FLOW.md` wherever the arc says "
 
 - Fields, all seven required: `{schema, release, phase, defined, implemented, shipped, log[]}`.
 - An audit is not a release milestone; the audit window is read from `audits/_archive/audits_histo.jsonl`.
-- `phase` is one of `DEFINITION IMPLEMENTATION CLOSURE ARCHIVED` — nothing else validates.
+- `phase` holds one value of the schema's `phase` enum (`release.py check` validates it).
 - `phase` is rewritten in place on every transition — no history of prior values survives in the field.
 - A transition worth remembering becomes a `log` entry.
 - `defined`/`implemented`/`shipped` are the three sha-bearing milestone facts.

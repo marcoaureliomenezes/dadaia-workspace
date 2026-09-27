@@ -51,9 +51,8 @@ def decide_injection(
     """Decide the injection for one hook invocation.
 
     Inputs are plain values the transport resolves: *context* is the single-authority
-    resolution (self-keyed session record → DADAIA_CONTEXT → live harness record →
-    cwd repo); *recorded_slug* is the sentinel's last-injected slug; *compacted* is
-    "compact marker newer than sentinel"; *rebound* is "this session's own bound_at
+    resolution (``core.invocation.resolve``'s rungs); *recorded_slug* is the sentinel's
+    last-injected slug; *compacted* is "compact marker newer than sentinel"; *rebound* is "this session's own bound_at
     newer than the sentinel" (T-50-03 — covers a same-context re-bind); *has_specs*
     answers "does this context resolve to a specs tree" (the one I/O question,
     injected as a predicate so the table stays pure).

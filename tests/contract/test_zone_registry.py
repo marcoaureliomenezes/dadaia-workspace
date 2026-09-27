@@ -281,22 +281,7 @@ def test_a_planted_second_list_of_a_widened_set_trips() -> None:
 #: the open bug that makes them cite the authority instead.
 _RESTATED_LAW_BIRTH = 16
 _RESTATED_LAW_ALLOWANCE: dict[str, str] = {
-    "agents/dd-software-engineer.md:trio": _TEXT,
-    "data/AGENTS.md:gitflow-role": _TEXT,
-    "data/tmp-AGENTS.md:trio": _TEXT,
-    "scaffold/backlog/AGENTS.md:ledger-disposition": _TEXT,
-    "scaffold/releases/AGENTS.md:trio": _TEXT,
-    "skills/dd-audit-project/FINDINGS-FORMAT.md:ledger-disposition": _TEXT,
-    "skills/dd-backlog-definition/SKILL.md:ledger-disposition": _TEXT,
-    "skills/dd-cli-library/SKILL.md:gitflow-role": _TEXT,
-    "skills/dd-gitflow-default/CICD-AUTOMATION.md:gitflow-role": _TEXT,
     "skills/dd-gitflow-default/SKILL.md:gitflow-role": _TEXT,
-    "skills/dd-release-implementation/RELEASE-EVENTS.md:phase": _TEXT,
-    "skills/dd-spec-navigator/SKILL.md:ledger-disposition": _TEXT,
-    "skills/dd-spec-navigator/SKILL.md:trio": _TEXT,
-    "templates/repo-AGENTS.md:trio": _TEXT,
-    "templates/specs-AGENTS.md:specs-canon": _TEXT,
-    "templates/specs-AGENTS.md:trio": _TEXT,
 }
 
 

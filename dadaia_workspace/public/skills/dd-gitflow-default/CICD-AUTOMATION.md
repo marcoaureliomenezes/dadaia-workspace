@@ -7,9 +7,9 @@ Four checks turn the branch contract from a convention into a machine boundary. 
 
 | Suggested check | Where it runs | What it refuses |
 |---|---|---|
-| Branch-name guard | pre-push hook | any ref not the principal, the integration branch, or `<work>M.m.p` (numeric `M.m.p` — no `v`, no suffix) |
+| Branch-name guard | pre-push hook | any ref outside the `gitflow:` names (`<work>M.m.p`: numeric, no `v`, no suffix) |
 | Direct-push refusal | pre-push hook | any push to the integration or principal branch; message names the PR path instead |
-| `pr-source-guard` (1 job, 2 rules) | required CI check | PR to `principal` not from `integration` or the release-please release PR; PR to `integration` not from `<work>M.m.p` |
+| `pr-source-guard` (1 job, 2 rules) | required CI check | a PR whose source breaks the skill's §2a table |
 | Post-merge branch deletion | CI job on the integration merge following a deploy | a stale work branch left behind |
 
 ## Wiring notes
