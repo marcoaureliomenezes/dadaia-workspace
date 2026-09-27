@@ -54,3 +54,10 @@ def test_operator_files_in_harness_dirs_survive_public_install(tmp_path: Path) -
     ws, manager = _workspace_with_operator_files(tmp_path)
     manager.install(ws, force=True)
     _assert_intact(ws)
+
+
+def test_operator_files_in_harness_dirs_survive_doctor_fix(tmp_path: Path) -> None:
+    """sa-doctor-reaps-harness-owned-entries#H1..#H5."""
+    ws, _ = _workspace_with_operator_files(tmp_path)
+    DoctorService(FakeContextStore(), FakeGitClient(), ws).fix()
+    _assert_intact(ws)

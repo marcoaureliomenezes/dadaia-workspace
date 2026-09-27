@@ -20,15 +20,13 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from functools import partial
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 from dadaia_workspace.core import session_store, workspace_layout
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
 from dadaia_workspace.core.harness_registry import (
     HARNESS_PROJECTION_DIRS,
-    L1_ENTRY_HARNESSES,
-    PROJECTION_TARGETS,
 )
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
@@ -38,7 +36,6 @@ from dadaia_workspace.features.spec_context import markers, sweep
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
-from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
 
 
 class FindingVerdict(StrEnum):
@@ -299,7 +296,6 @@ class DoctorService:
         globs = self._exception_globs()
         findings: list[Finding] = []
         findings.extend(self._scan_root(globs))
-        findings.extend(self._scan_harness_dirs(globs))
         findings.extend(self._scan_dadaia_top())
         findings.extend(self._scan_repo_trees())
         for zone in workspace_layout.zones_with_canon():
@@ -422,59 +418,6 @@ class DoctorService:
             else:
                 verdict, detail = FindingVerdict.SLOP, "(not in the root law or the exceptions)"
             out.append(self._finding("root", self._workspace_root, entry, verdict, detail))
-        return out
-
-    def _active_harnesses(self) -> tuple[str, ...]:
-        """``agents`` always; the L1 harnesses of the persisted profile (absent ⇒ all)."""
-        profile = JsonHarnessProfileStore().read(self._states)
-        active = L1_ENTRY_HARNESSES if profile is None else profile.harnesses
-        return tuple(t for t in PROJECTION_TARGETS if t not in L1_ENTRY_HARNESSES or t in active)
-
-    def _scan_harness_dirs(self, globs: tuple[str, ...]) -> list[Finding]:
-        """An entry is canon iff it is a projection target (the install ledger — what
-        ``public install`` actually wrote); a directory holding a target is a path, not an
-        entry; anything else is operator (exception glob) or slop. No readable ledger ⇒ the
-        store's contract (degrade to inaction, never deletion) holds here too: ONE
-        non-fixable ``missing`` finding, and no harness-dir entry is classified."""
-        ledger = JsonInstallLedgerStore().read(self._states)
-        if ledger is None:
-            path = JsonInstallLedgerStore.path(self._states)
-            detail = "(run dadaia public install)"
-            return [
-                self._finding(
-                    self._states.name,
-                    self._dadaia,
-                    path,
-                    FindingVerdict.MISSING,
-                    detail,
-                    fixable=False,
-                )
-            ]
-        targets = frozenset(ledger.by_relpath())
-        owned_dirs = frozenset(
-            parent.as_posix() for rel in targets for parent in PurePosixPath(rel).parents
-        )
-        out: list[Finding] = []
-        for harness in self._active_harnesses():
-            root = self._workspace_root / f".{harness}"
-            if not root.is_dir():
-                continue
-            pending = [root]
-            while pending:
-                directory = pending.pop()
-                for entry in sweep.walk(directory):
-                    rel = entry.relative_to(self._workspace_root).as_posix()
-                    if rel in targets:
-                        verdict, detail = FindingVerdict.CANON, ""
-                    elif rel in owned_dirs and entry.is_dir() and not entry.is_symlink():
-                        pending.append(entry)
-                        continue
-                    elif self._excepted(entry, globs):
-                        verdict, detail = FindingVerdict.OPERATOR, "(instance exception)"
-                    else:
-                        verdict = FindingVerdict.SLOP
-                        detail = "(not a projection target or an exception)"
-                    out.append(self._finding(harness, self._workspace_root, entry, verdict, detail))
         return out
 
     def _scan_dadaia_top(self) -> list[Finding]:
