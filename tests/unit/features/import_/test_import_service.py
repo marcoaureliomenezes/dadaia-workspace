@@ -19,7 +19,9 @@ from dadaia_workspace.core.models.spec_context import (
 )
 from dadaia_workspace.features.import_.service import ImportService
 from dadaia_workspace.features.spec_context.service import SpecContextService
-from tests.fakes import FakeContextStore, FakeGitClient
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.fixtures.stores import context_store
 
 _EXPORT = {
     "schema_version": "spec-contexts-export-v1",
@@ -58,11 +60,11 @@ _ALPHA = SpecContextProject(
 )
 
 
-def _importer(tmp_path: Path, store: FakeContextStore) -> ImportService:
+def _importer(tmp_path: Path, store: JsonContextStore) -> ImportService:
     (tmp_path / "repos").mkdir(exist_ok=True)
     contexts = SpecContextService(
         context_store=store,
-        git_client=FakeGitClient(),
+        git_client=GitSubprocessClient(),
         workspace_root=tmp_path,
         install_hooks=lambda _repo: None,
         secret_scan=scan_publish_candidates,
@@ -92,7 +94,7 @@ def _record(name: str, slug: str, **overrides: object) -> dict[str, object]:
 def test_import_saves_unknown_names_dead_and_skips_known_names(tmp_path: Path) -> None:
     file = tmp_path / "spec-contexts.json"
     file.write_text(json.dumps(_EXPORT), encoding="utf-8")
-    store = FakeContextStore()
+    store = context_store(tmp_path / "states")
     store.save(_ALPHA)
 
     result = _importer(tmp_path, store).run(file)
@@ -146,7 +148,7 @@ def test_import_skips_and_never_writes_a_record_the_registry_guard_refuses(
 ) -> None:
     """The record is refused by the same seam `context create` uses — nothing is saved,
     and the action line names the reason instead of `registered (dead)`."""
-    store = FakeContextStore()
+    store = context_store(tmp_path / "states")
     store.save(_ALPHA)
     file = _export_file(tmp_path, record)
 
@@ -160,7 +162,7 @@ def test_import_skips_and_never_writes_a_record_the_registry_guard_refuses(
 
 
 def test_import_refusal_of_one_record_does_not_stop_the_others(tmp_path: Path) -> None:
-    store = FakeContextStore()
+    store = context_store(tmp_path / "states")
     file = _export_file(tmp_path, _record("bad", ".."), _record("good", "good-repo"))
 
     result = _importer(tmp_path, store).run(file)
@@ -185,7 +187,7 @@ def test_import_rejects_files_outside_the_contract(
     file = tmp_path / "spec-contexts.json"
     if content is not None:
         file.write_text(content, encoding="utf-8")
-    store = FakeContextStore()
+    store = context_store(tmp_path / "states")
 
     with pytest.raises(ValueError, match=reason):
         _importer(tmp_path, store).run(file)

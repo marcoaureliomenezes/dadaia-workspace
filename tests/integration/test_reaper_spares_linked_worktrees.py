@@ -21,7 +21,8 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.features.spec_context.doctor import DoctorService
-from tests.fakes import FakeContextStore, FakeGitClient
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from tests.fixtures.stores import context_store
 
 _TWO_DAYS_AGO = time.time() - 2 * 86_400
 
@@ -74,7 +75,9 @@ def _assert_intact(repo: Path, worktree: Path) -> None:
 
 
 def _fix(root: Path) -> list[str]:
-    return DoctorService(FakeContextStore(), FakeGitClient(), root).fix()
+    return DoctorService(
+        context_store(root / ".dadaia" / "states"), GitSubprocessClient(), root
+    ).fix()
 
 
 def test_ttl_reaper_never_deletes_an_expired_linked_worktree(tmp_path: Path) -> None:

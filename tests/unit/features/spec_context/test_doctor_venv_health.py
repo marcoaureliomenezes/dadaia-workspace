@@ -21,13 +21,18 @@ from pathlib import Path  # noqa: E402
 
 from dadaia_workspace.core.platform import PLATFORM  # noqa: E402
 from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
-from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from tests.fixtures.stores import context_store
 
 _WINDOWS = os.name == "nt"
 
 
 def _make_doctor(workspace_root: Path) -> DoctorService:
-    return DoctorService(FakeContextStore(), FakeGitClient(), workspace_root)
+    return DoctorService(
+        context_store(workspace_root / ".dadaia" / "states"),
+        GitSubprocessClient(),
+        workspace_root,
+    )
 
 
 def _init_workspace(root: Path) -> None:

@@ -35,7 +35,8 @@ from dadaia_workspace.features.spec_context.service import (  # noqa: E402
     SpecContextService,
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
-from tests.fakes import FakeContextStore  # noqa: E402
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.fixtures.stores import context_store
 from tests.helpers.privacy_fixtures import aws_key_shape  # noqa: E402
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
@@ -77,8 +78,8 @@ class _WritableObjectsGitClient(GitSubprocessClient):
         _make_tree_writable(path)
 
 
-def _make_service(workspace_root: Path) -> tuple[SpecContextService, FakeContextStore]:
-    store = FakeContextStore()
+def _make_service(workspace_root: Path) -> tuple[SpecContextService, JsonContextStore]:
+    store = context_store(workspace_root / ".dadaia" / "states")
     service = SpecContextService(
         context_store=store,
         git_client=_WritableObjectsGitClient(),
@@ -100,10 +101,10 @@ def _make_tree_writable(root: Path) -> None:
             path.chmod(path.stat().st_mode | stat.S_IWUSR)
 
 
-def _alive_ctx(store: FakeContextStore, repo_slug: str) -> None:
+def _alive_ctx(store: JsonContextStore, repo_slug: str, name: str = "proj") -> None:
     store.save(
         SpecContextProject(
-            name="proj",
+            name=name,
             state=ContextState.ALIVE,
             repo_slug=repo_slug,
             repo_url="https://example.invalid/proj.git",
@@ -172,16 +173,16 @@ def test_dead_refuses_untracked_then_commit_secret_free_pushes_and_planted_secre
     (repo3 / "creds.env").write_text(f"AWS_ACCESS_KEY_ID={planted}\n")
 
     service3, store3 = _make_service(workspace_root)
-    _alive_ctx(store3, "proj-repo-secret")
+    _alive_ctx(store3, "proj-repo-secret", name="proj2")
 
     with pytest.raises(DeadSecretFoundError) as exc:
-        service3.dead("proj", commit=True)
+        service3.dead("proj2", commit=True)
 
     assert "creds.env" in str(exc.value)
     assert planted not in str(exc.value)  # redacted
     # Push blocked: repo kept, remote unchanged, context still ALIVE.
     assert repo3.exists()
-    assert store3.get("proj").state == ContextState.ALIVE  # type: ignore[union-attr]
+    assert store3.get("proj2").state == ContextState.ALIVE  # type: ignore[union-attr]
     log3 = subprocess.run(
         ["git", "log", "--oneline", "--all"], cwd=remote3, capture_output=True, text=True
     )
@@ -221,7 +222,7 @@ def test_dead_holds_a_gitignored_and_a_clean_tree_real_git(
     repo2 = workspace_root / "repos" / "proj-repo-clean"
     _clone_with_initial_commit(remote2, repo2)
 
-    store2 = FakeContextStore()
+    store2 = context_store(tmp_path / "states2")
     service2 = SpecContextService(
         context_store=store2,
         git_client=_WritableObjectsGitClient(),

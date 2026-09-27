@@ -31,7 +31,8 @@ from dadaia_workspace.features.spec_context.service import (  # noqa: E402
     SpecContextService,
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
-from tests.fakes import FakeContextStore  # noqa: E402
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.fixtures.stores import context_store
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
@@ -77,8 +78,8 @@ def workspace_root(tmp_path: Path) -> Path:
     return root
 
 
-def _make_service(workspace_root: Path) -> tuple[SpecContextService, FakeContextStore]:
-    store = FakeContextStore()
+def _make_service(workspace_root: Path) -> tuple[SpecContextService, JsonContextStore]:
+    store = context_store(workspace_root / ".dadaia" / "states")
     service = SpecContextService(
         context_store=store,
         git_client=GitSubprocessClient(),

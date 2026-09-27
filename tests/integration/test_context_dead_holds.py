@@ -27,7 +27,8 @@ from dadaia_workspace.features.spec_context.service import (  # noqa: E402
     SpecContextService,
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
-from tests.fakes import FakeContextStore  # noqa: E402
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.fixtures.stores import context_store
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
@@ -53,12 +54,12 @@ def _published(tmp_path: Path, repo: Path) -> Path:
 
 def _alive(
     tmp_path: Path, *, lib: bool = False
-) -> tuple[SpecContextService, FakeContextStore, Path]:
+) -> tuple[SpecContextService, JsonContextStore, Path]:
     ws = tmp_path / "ws"
     repo = ws / "repos" / "main"
     bare = _published(tmp_path, repo)
     assoc = (AssociatedRepo("lib", str(_published(tmp_path, ws / "repos" / "lib"))),)
-    store = FakeContextStore()
+    store = context_store(ws / ".dadaia" / "states")
     store.save(
         SpecContextProject(
             name="proj",

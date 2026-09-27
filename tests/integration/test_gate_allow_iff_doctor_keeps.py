@@ -22,8 +22,9 @@ import pytest
 
 from dadaia_workspace.core.workspace_layout import INSTANCE_EXCEPTIONS
 from dadaia_workspace.features.spec_context.doctor import DoctorService, FindingVerdict
-from tests.fakes import FakeContextStore, FakeGitClient
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.fixtures.stores import context_store
 
 # (target, pre-existing dir or None, exception glob or None, gate allows)
 _TABLE = [
@@ -68,7 +69,9 @@ def test_gate_allows_iff_the_doctor_keeps_the_entry(
         ]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("x", encoding="utf-8")
-    findings = DoctorService(FakeContextStore(), FakeGitClient(), tmp_path).scan()
+    findings = DoctorService(
+        context_store(tmp_path / ".dadaia" / "states"), GitSubprocessClient(), tmp_path
+    ).scan()
     slop = [f.path for f in findings if f.verdict is FindingVerdict.SLOP]
     assert (slop == []) is allows, slop
     if glob is not None:  # #E2

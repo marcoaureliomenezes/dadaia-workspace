@@ -25,7 +25,10 @@ from dadaia_workspace.features.spec_context.service import (
     DeadSecretFoundError,
     SpecContextService,
 )
-from tests.fakes import FakeContextStore, FakeGitClient, register_dead
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from tests.fakes import register_dead
+from tests.fixtures.real_git import seeded_remote
+from tests.fixtures.stores import context_store
 
 _DASHES = "-" * 5
 _TERM = "zz" + "fixtureterm"
@@ -119,21 +122,20 @@ def _pre_push_refuses(name: str, content: str | bytes) -> bool:
 def _dead_commit_refuses(root: Path, name: str, content: str | bytes) -> bool:
     """The publish side: ``dead --commit`` over the same file, untracked in its repo."""
     (root / "repos").mkdir()
-    git = FakeGitClient()
+    git = GitSubprocessClient()
     service = SpecContextService(
-        context_store=FakeContextStore(),
+        context_store=context_store(root / ".dadaia" / "states"),
         git_client=git,
         workspace_root=root,
         install_hooks=lambda _repo: None,
         secret_scan=scan_publish_candidates,
     )
-    register_dead(service, "proj", "my-repo", "https://github.com/org/my-repo")
+    register_dead(
+        service, "proj", "my-repo", seeded_remote(root, "my-repo", branch="feature/0.1.0").as_uri()
+    )
     service.alive("proj")
-    repo = root / "repos" / "my-repo"
-    git._has_remote.add(repo)
-    target = repo / name
+    target = root / "repos" / "my-repo" / name
     target.write_bytes(content) if isinstance(content, bytes) else target.write_text(content)
-    git._untracked[repo] = [name]
     try:
         service.dead("proj", commit=True)
     except DeadSecretFoundError:

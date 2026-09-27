@@ -22,7 +22,9 @@ from datetime import UTC, datetime, timedelta  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
-from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.fixtures.stores import context_store
 
 
 def _make_workspace(tmp_path: Path) -> Path:
@@ -34,12 +36,12 @@ def _make_workspace(tmp_path: Path) -> Path:
     return ws
 
 
-def _make_doctor(ws: Path, store: FakeContextStore | None = None) -> DoctorService:
+def _make_doctor(ws: Path, store: JsonContextStore | None = None) -> DoctorService:
     if store is None:
-        store = FakeContextStore()
+        store = context_store(ws / ".dadaia" / "states")
     return DoctorService(
         context_store=store,
-        git_client=FakeGitClient(),
+        git_client=GitSubprocessClient(),
         workspace_root=ws,
     )
 

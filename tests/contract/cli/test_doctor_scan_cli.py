@@ -33,7 +33,8 @@ from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.workspace_layout import provisioned_zones, zones_with_ttl
 from dadaia_workspace.features.spec_context import doctor
 from dadaia_workspace.features.spec_context.doctor import DoctorService
-from tests.fakes import FakeContextStore, FakeGitClient
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from tests.fixtures.stores import context_store
 
 pytestmark = pytest.mark.contract
 
@@ -72,7 +73,9 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(
         container,
         "build_doctor_service",
-        lambda root: DoctorService(FakeContextStore(), FakeGitClient(), root),
+        lambda root: DoctorService(
+            context_store(root / ".dadaia" / "states"), GitSubprocessClient(), root
+        ),
     )
     return tmp_path
 

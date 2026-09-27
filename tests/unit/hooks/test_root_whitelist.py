@@ -25,7 +25,9 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core.workspace_layout import INSTANCE_EXCEPTIONS
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.fixtures.stores import context_store
 
 
 def _ws(tmp_path: Path) -> Path:
@@ -68,14 +70,15 @@ def test_law_declared_root_files_are_canon_for_the_hook_and_the_doctor(
     ``.gitignore``, yet ``ROOT_ALLOWED_FILES`` listed neither — the hook blocked the write
     and the doctor flagged the file. Both derive from that one set, so one row fixes both."""
     from dadaia_workspace.features.spec_context.doctor import DoctorService, FindingVerdict
-    from tests.fakes import FakeContextStore, FakeGitClient
 
     ws = _ws(tmp_path)
     out, block = _run(tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(ws / name)}})
     assert (out, block) == ("", None)
 
     (ws / name).write_text("", encoding="utf-8")
-    findings = DoctorService(FakeContextStore(), FakeGitClient(), ws).scan()
+    findings = DoctorService(
+        context_store(ws / ".dadaia" / "states"), GitSubprocessClient(), ws
+    ).scan()
     assert {f.path: f.verdict for f in findings if f.code.startswith("WS-root-")}[name] is (
         FindingVerdict.CANON
     )

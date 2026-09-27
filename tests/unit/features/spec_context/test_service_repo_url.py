@@ -28,7 +28,9 @@ from dadaia_workspace.core.models.spec_context import (  # noqa: E402
 )
 from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
-from tests.fakes import FakeContextStore, FakeGitClient, register_dead  # noqa: E402
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.fakes import register_dead  # noqa: E402
+from tests.fixtures.stores import context_store
 
 _HAS_GIT = shutil.which("git") is not None
 
@@ -51,15 +53,15 @@ def workspace_root(tmp_path: Path) -> Path:
 
 
 @pytest.fixture()
-def store() -> FakeContextStore:
-    return FakeContextStore()
+def store(workspace_root: Path) -> JsonContextStore:
+    return context_store(workspace_root / ".dadaia" / "states")
 
 
 @pytest.fixture()
-def fake_service(store: FakeContextStore, workspace_root: Path) -> SpecContextService:
+def fake_service(store: JsonContextStore, workspace_root: Path) -> SpecContextService:
     return SpecContextService(
         context_store=store,
-        git_client=FakeGitClient(),
+        git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
         install_hooks=lambda _repo: None,
         secret_scan=scan_publish_candidates,
@@ -90,7 +92,7 @@ def _git(args: list[str], cwd: Path) -> None:
 
 
 def test_create_persists_a_url_and_admits_an_empty_one_only_over_a_checkout(
-    fake_service: SpecContextService, store: FakeContextStore, workspace_root: Path
+    fake_service: SpecContextService, store: JsonContextStore, workspace_root: Path
 ) -> None:
     """Bug context-create-admits-uncloneable-empty-url: a repo with no URL and no
     ``repos/<slug>`` checkout is refused before any write — ``alive`` could only run
@@ -106,7 +108,7 @@ def test_create_persists_a_url_and_admits_an_empty_one_only_over_a_checkout(
     assert store.get("bar") is None
     assert store.get("foo").associated_repos == ()  # type: ignore[union-attr]
 
-    (workspace_root / "repos" / "bar").mkdir()
+    _git(["init", "-q", str(workspace_root / "repos" / "bar")], cwd=workspace_root)
     assert register_dead(fake_service, "bar", "bar", "").repo_url == ""
 
 
@@ -117,7 +119,7 @@ def test_create_persists_a_url_and_admits_an_empty_one_only_over_a_checkout(
 
 @pytest.mark.skipif(not _HAS_GIT, reason="git not available")
 def test_alive_backfills_repo_url_from_origin_remote(
-    store: FakeContextStore, workspace_root: Path, tmp_path: Path
+    store: JsonContextStore, workspace_root: Path, tmp_path: Path
 ) -> None:
     """alive() back-fills an empty repo_url from the on-disk origin remote.
 
@@ -149,7 +151,7 @@ def test_alive_backfills_repo_url_from_origin_remote(
 
 @pytest.mark.skipif(not _HAS_GIT, reason="git not available")
 def test_dead_backfills_repo_url_before_the_hold(
-    store: FakeContextStore, workspace_root: Path, tmp_path: Path
+    store: JsonContextStore, workspace_root: Path, tmp_path: Path
 ) -> None:
     upstream = tmp_path / "upstream.git"
     _git(["init", "--bare", str(upstream)], cwd=tmp_path)

@@ -40,8 +40,9 @@ from dadaia_workspace.features.spec_context.doctor import (
     Finding,
     FindingVerdict,
 )
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
-from tests.fakes import FakeContextStore, FakeGitClient
+from tests.fixtures.stores import context_store
 
 _TTL_ZONE = zones_with_ttl()[0]
 _STATE_ZONE = next(z for z in zones_with_canon() if z.creator is Creator.INIT)
@@ -51,7 +52,7 @@ _TWO_DAYS_AGO = time.time() - 2 * 86_400
 
 
 def _make_doctor(root: Path) -> DoctorService:
-    return DoctorService(FakeContextStore(), FakeGitClient(), root)
+    return DoctorService(context_store(root / ".dadaia" / "states"), GitSubprocessClient(), root)
 
 
 def _reaped(root: Path, rel: str) -> Path:

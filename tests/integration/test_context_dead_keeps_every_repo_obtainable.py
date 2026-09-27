@@ -29,7 +29,8 @@ from dadaia_workspace.features.spec_context.service import (  # noqa: E402
     SpecContextService,
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
-from tests.fakes import FakeContextStore  # noqa: E402
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.fixtures.stores import context_store
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
@@ -52,11 +53,11 @@ def _seeded_remote(tmp_path: Path, name: str) -> Path:
     return bare
 
 
-def _setup(tmp_path: Path, lib_url: str) -> tuple[SpecContextService, FakeContextStore, Path]:
+def _setup(tmp_path: Path, lib_url: str) -> tuple[SpecContextService, JsonContextStore, Path]:
     ws = tmp_path / "ws"
     (ws / "repos").mkdir(parents=True)
     main = _seeded_remote(tmp_path, "main")
-    store = FakeContextStore()
+    store = context_store(ws / ".dadaia" / "states")
     store.save(
         SpecContextProject(
             name="proj",
@@ -116,7 +117,7 @@ def test_alive_refuses_a_legacy_url_less_missing_repo_with_a_fix_line(tmp_path: 
     assert store.get("proj").state == ContextState.DEAD  # type: ignore[union-attr]
 
 
-def _unborn_lib(tmp_path: Path) -> tuple[SpecContextService, FakeContextStore, Path]:
+def _unborn_lib(tmp_path: Path) -> tuple[SpecContextService, JsonContextStore, Path]:
     vanished = tmp_path / "vanished.git"
     service, store, ws = _setup(tmp_path, str(vanished))
     lib_path = ws / "repos" / "lib"

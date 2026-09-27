@@ -39,8 +39,10 @@ from dadaia_workspace.cli._specs_resolution import (  # noqa: E402
 )
 from dadaia_workspace.core import invocation  # noqa: E402
 from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
-from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.fixtures.harness_env import scrub_context_resolution_env  # noqa: E402
+from tests.fixtures.stores import context_store
 
 
 @pytest.fixture(autouse=True)
@@ -69,10 +71,10 @@ def _plant_reference_clone(root: Path, clone: str = "mattpocock-skills") -> Path
     return clone_dir
 
 
-def _make_doctor(root: Path, store: FakeContextStore | None = None) -> DoctorService:
+def _make_doctor(root: Path, store: JsonContextStore | None = None) -> DoctorService:
     return DoctorService(
-        context_store=store or FakeContextStore(),
-        git_client=FakeGitClient(),
+        context_store=store or context_store(root / ".dadaia" / "states"),
+        git_client=GitSubprocessClient(),
         workspace_root=root,
     )
 

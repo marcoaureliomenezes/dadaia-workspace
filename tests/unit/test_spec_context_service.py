@@ -19,7 +19,11 @@ from dadaia_workspace.core.exceptions import (
 )
 from dadaia_workspace.core.models.spec_context import ContextState
 from dadaia_workspace.features.spec_context.service import SpecContextService
-from tests.fakes import FakeContextStore, FakeGitClient, register_dead
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.fakes import register_dead
+from tests.fixtures.real_git import git, seeded_remote
+from tests.fixtures.stores import context_store
 from tests.helpers.privacy_fixtures import aws_key_shape, internal_host, private_ip
 
 
@@ -32,24 +36,23 @@ def workspace_root(tmp_path: Path) -> Path:
 
 
 @pytest.fixture()
-def store() -> FakeContextStore:
-    return FakeContextStore()
+def store(workspace_root: Path) -> JsonContextStore:
+    return context_store(workspace_root / ".dadaia" / "states")
 
 
 @pytest.fixture()
-def git() -> FakeGitClient:
-    return FakeGitClient()
+def remote(tmp_path: Path) -> str:
+    return seeded_remote(tmp_path, "my-repo", branch="feature/0.1.0").as_uri()
 
 
 @pytest.fixture()
 def service(
-    store: FakeContextStore,
-    git: FakeGitClient,
+    store: JsonContextStore,
     workspace_root: Path,
 ) -> SpecContextService:
     return SpecContextService(
         context_store=store,
-        git_client=git,
+        git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
         install_hooks=lambda _repo: None,
         secret_scan=scan_publish_candidates,
@@ -60,7 +63,7 @@ def service(
 
 
 def test_create_stores_context_and_rejects_duplicate(
-    service: SpecContextService, store: FakeContextStore
+    service: SpecContextService, store: JsonContextStore
 ) -> None:
     ctx = register_dead(service, "proj", "my-repo", "https://github.com/org/my-repo")
     assert store.get("proj") is not None
@@ -75,9 +78,10 @@ def test_create_stores_context_and_rejects_duplicate(
 
 
 def test_alive_clone_behavior_state_and_not_found(
-    service: SpecContextService, git: FakeGitClient, workspace_root: Path
+    service: SpecContextService, remote: str, workspace_root: Path
 ) -> None:
-    register_dead(service, "proj", "my-repo", "https://github.com/org/my-repo")
+    register_dead(service, "proj", "my-repo", remote)
+    repo = workspace_root / "repos" / "my-repo"
 
     # AC-T10b-1: alive() sets state=ALIVE, alive_since=<now>, dead_since=null; it
     # clones since the repo dir is absent.
@@ -85,21 +89,20 @@ def test_alive_clone_behavior_state_and_not_found(
     assert ctx.state == ContextState.ALIVE
     assert ctx.alive_since is not None
     assert ctx.dead_since is None
-    assert len(git.cloned) == 1
-    assert git.cloned[0][0] == "https://github.com/org/my-repo"
+    assert git(repo, "remote", "get-url", "origin") == remote
 
     # AC-T10b-3: alive() on an already-ALIVE context is idempotent (no error, no
     # re-clone since the repo now exists).
+    (repo / "local.txt").write_text("kept\n", encoding="utf-8")
     ctx2 = service.alive("proj")
     assert ctx2.state == ContextState.ALIVE
-    assert len(git.cloned) == 1
+    assert (repo / "local.txt").read_text(encoding="utf-8") == "kept\n"
 
     # No clone at all when the repo dir is already present before the first alive().
-    other_svc = service
     (workspace_root / "repos" / "other-repo").mkdir(parents=True)
-    register_dead(other_svc, "other", "other-repo", "https://github.com/org/other-repo")
-    other_svc.alive("other")
-    assert len(git.cloned) == 1  # unchanged — no new clone for "other"
+    register_dead(service, "other", "other-repo", remote)
+    service.alive("other")
+    assert list((workspace_root / "repos" / "other-repo").iterdir()) == []
 
     with pytest.raises(ContextNotFoundError):
         service.alive("ghost")
@@ -142,7 +145,7 @@ def test_alive_clone_behavior_state_and_not_found(
 )
 def test_dead_with_commit_blocks_on_redacted_findings(
     service: SpecContextService,
-    git: FakeGitClient,
+    remote: str,
     workspace_root: Path,
     name: str,
     filename: str,
@@ -151,12 +154,11 @@ def test_dead_with_commit_blocks_on_redacted_findings(
 ) -> None:
     from dadaia_workspace.features.spec_context.service import DeadSecretFoundError
 
-    register_dead(service, "proj", "my-repo", "https://github.com/org/my-repo")
+    register_dead(service, "proj", "my-repo", remote)
     service.alive("proj")
     repo = workspace_root / "repos" / "my-repo"
-    git._has_remote.add(repo)
+    head = git(repo, "rev-parse", "HEAD")
     write_fn(repo)  # type: ignore[operator]
-    git._untracked[repo] = [filename]
 
     with pytest.raises(DeadSecretFoundError) as exc:
         service.dead("proj", commit=True)
@@ -165,8 +167,8 @@ def test_dead_with_commit_blocks_on_redacted_findings(
     if expect_secret_absent is not None:
         assert expect_secret_absent not in str(exc.value)
     # Nothing pushed/committed; repo untouched.
-    assert repo not in git.pushed
-    assert repo not in git.committed
+    assert git(repo, "rev-parse", "HEAD") == head
+    assert git(repo, "rev-parse", "origin/feature/0.1.0") == head
     assert repo.exists()
     assert service.show("proj").state == ContextState.ALIVE
 
@@ -175,12 +177,12 @@ def test_dead_with_commit_blocks_on_redacted_findings(
 
 
 def test_delete_removes_dead_context_not_found_and_alive_raises(
-    service: SpecContextService, store: FakeContextStore, workspace_root: Path
+    service: SpecContextService, store: JsonContextStore, remote: str
 ) -> None:
     with pytest.raises(ContextNotFoundError):
         service.delete("ghost")
 
-    register_dead(service, "proj", "my-repo", "https://github.com/org/my-repo")
+    register_dead(service, "proj", "my-repo", remote)
     service.alive("proj")
     with pytest.raises(ContextStateError):
         service.delete("proj")

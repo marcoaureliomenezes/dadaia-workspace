@@ -22,7 +22,12 @@ from pathlib import Path  # noqa: E402
 
 from dadaia_workspace.container import scan_publish_candidates
 from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
-from tests.fakes import FakeContextStore, FakeGitClient, register_dead  # noqa: E402
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.fakes import register_dead  # noqa: E402
+from tests.fixtures.real_git import clone, seeded_remote
+from tests.fixtures.real_git import git as run_git
+from tests.fixtures.stores import context_store
 
 
 @pytest.fixture()
@@ -34,19 +39,19 @@ def workspace_root(tmp_path: Path) -> Path:
 
 
 @pytest.fixture()
-def store() -> FakeContextStore:
-    return FakeContextStore()
+def store(workspace_root: Path) -> JsonContextStore:
+    return context_store(workspace_root / ".dadaia" / "states")
 
 
 @pytest.fixture()
-def git() -> FakeGitClient:
-    return FakeGitClient()
+def git() -> GitSubprocessClient:
+    return GitSubprocessClient()
 
 
 @pytest.fixture()
 def service(
-    store: FakeContextStore,
-    git: FakeGitClient,
+    store: JsonContextStore,
+    git: GitSubprocessClient,
     workspace_root: Path,
 ) -> SpecContextService:
     return SpecContextService(
@@ -59,8 +64,8 @@ def service(
 
 
 def test_alive_leaves_a_preexisting_specs_tree_untouched_and_hooks_the_repo(
-    store: FakeContextStore,
-    git: FakeGitClient,
+    store: JsonContextStore,
+    git: GitSubprocessClient,
     workspace_root: Path,
 ) -> None:
     """0.4.8 AC3.7: alive() never merges, backs up or commits specs — an operator tree
@@ -73,15 +78,16 @@ def test_alive_leaves_a_preexisting_specs_tree_untouched_and_hooks_the_repo(
         install_hooks=hooked.append,
         secret_scan=scan_publish_candidates,
     )
-    register_dead(svc, "proj", "my-repo", "https://github.com/org/my-repo")
-    repo = workspace_root / "repos" / "my-repo"
+    remote = seeded_remote(workspace_root.parent, "my-repo")
+    register_dead(svc, "proj", "my-repo", remote.as_uri())
+    repo = clone(remote, workspace_root / "repos" / "my-repo")
+    head = run_git(repo, "rev-parse", "HEAD")
     (repo / "specs").mkdir(parents=True)
     (repo / "specs" / "constitution.md").write_text("# operator\n", encoding="utf-8")
-    git._dirty.add(repo)
 
     svc.alive("proj")
 
     assert sorted(p.name for p in (repo / "specs").iterdir()) == ["constitution.md"]
     assert not (workspace_root / "repos" / "my-repo" / "specs_bkp").exists()
-    assert repo not in git.committed
+    assert run_git(repo, "rev-parse", "HEAD") == head
     assert hooked == [repo]

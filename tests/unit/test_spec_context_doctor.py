@@ -18,7 +18,9 @@ from dadaia_workspace.core.models.spec_context import (  # noqa: E402
 )
 from dadaia_workspace.core.platform import PLATFORM  # noqa: E402
 from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
-from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.fixtures.stores import context_store
 
 
 def _make_healthy_venv(root: Path) -> None:
@@ -54,11 +56,11 @@ def _ctx(
 def _make_doctor(
     workspace_root: Path,
     contexts: list[SpecContextProject] | None = None,
-) -> tuple[DoctorService, FakeContextStore]:
-    ctx_store = FakeContextStore()
+) -> tuple[DoctorService, JsonContextStore]:
+    ctx_store = context_store(workspace_root / ".dadaia" / "states")
     for c in contexts or []:
         ctx_store.save(c)
-    git_client = FakeGitClient()
+    git_client = GitSubprocessClient()
     svc = DoctorService(ctx_store, git_client, workspace_root)
     return svc, ctx_store
 

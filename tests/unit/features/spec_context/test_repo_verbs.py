@@ -7,7 +7,7 @@ main repo or an associated repo) and its `create`-seam mirror
 context-create-accepts-slug-owned-by-another-context (S5-FR23 Firing 5 finding: the
 same `_foreign_slug_owner` predicate applied at `create`'s own `--repo` slug, the
 second registry seam that writes into the shared `repos/<slug>` namespace).
-FakeContextStore-driven (SMALL/unit tier): a pure registry-mutation concern, no real
+JsonContextStore-driven (SMALL/unit tier): a pure registry-mutation concern, no real
 git/disk behavior under test — the CLI-level surface (argument parsing,
 on-disk-left-untouched messaging for A17.2) is proven in
 ``tests/integration/test_cli_context_repo_verbs.py``.
@@ -34,7 +34,11 @@ from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     SpecContextProject,
 )
 from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
-from tests.fakes import FakeContextStore, FakeGitClient, register_dead  # noqa: E402
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.fakes import register_dead  # noqa: E402
+from tests.fixtures.real_git import clone, git, seeded_remote
+from tests.fixtures.stores import context_store
 
 
 @pytest.fixture()
@@ -46,29 +50,22 @@ def workspace_root(tmp_path: Path) -> Path:
 
 
 @pytest.fixture()
-def store() -> FakeContextStore:
-    return FakeContextStore()
+def store(workspace_root: Path) -> JsonContextStore:
+    return context_store(workspace_root / ".dadaia" / "states")
 
 
 @pytest.fixture()
-def git() -> FakeGitClient:
-    return FakeGitClient()
-
-
-@pytest.fixture()
-def service(
-    store: FakeContextStore, git: FakeGitClient, workspace_root: Path
-) -> SpecContextService:
+def service(store: JsonContextStore, workspace_root: Path) -> SpecContextService:
     return SpecContextService(
         context_store=store,
-        git_client=git,
+        git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
         install_hooks=lambda _repo: None,
         secret_scan=scan_publish_candidates,
     )
 
 
-def _seed(store: FakeContextStore) -> None:
+def _seed(store: JsonContextStore) -> None:
     store.save(
         SpecContextProject(
             name="proj",
@@ -81,7 +78,7 @@ def _seed(store: FakeContextStore) -> None:
 
 
 def _seed_other(
-    store: FakeContextStore,
+    store: JsonContextStore,
     name: str,
     repo_slug: str,
     associated_repos: tuple[AssociatedRepo, ...] = (),
@@ -102,7 +99,7 @@ def _seed_other(
 
 
 def test_add_repo_registers_new_associated_repo(
-    service: SpecContextService, store: FakeContextStore
+    service: SpecContextService, store: JsonContextStore
 ) -> None:
     _seed(store)
     ctx, was_added = service.add_repo("proj", "assoc-repo", "https://github.com/org/assoc-repo")
@@ -117,7 +114,7 @@ def test_add_repo_registers_new_associated_repo(
 
 
 def test_add_repo_is_idempotent_same_slug_same_url(
-    service: SpecContextService, store: FakeContextStore
+    service: SpecContextService, store: JsonContextStore
 ) -> None:
     _seed(store)
     service.add_repo("proj", "assoc-repo", "https://github.com/org/assoc-repo")
@@ -127,7 +124,7 @@ def test_add_repo_is_idempotent_same_slug_same_url(
 
 
 def test_add_repo_refuses_same_slug_different_url(
-    service: SpecContextService, store: FakeContextStore
+    service: SpecContextService, store: JsonContextStore
 ) -> None:
     _seed(store)
     service.add_repo("proj", "assoc-repo", "https://github.com/org/assoc-repo")
@@ -142,7 +139,7 @@ def test_add_repo_refuses_same_slug_different_url(
 
 
 def test_add_repo_refuses_main_repo_slug(
-    service: SpecContextService, store: FakeContextStore
+    service: SpecContextService, store: JsonContextStore
 ) -> None:
     _seed(store)
     with pytest.raises(AssociatedRepoConflictError):
@@ -158,7 +155,7 @@ def test_add_repo_unknown_context_raises(service: SpecContextService) -> None:
 
 
 def test_add_repo_refuses_slug_owned_by_another_context_as_main_repo(
-    service: SpecContextService, store: FakeContextStore
+    service: SpecContextService, store: JsonContextStore
 ) -> None:
     """T-044-45 F-1 / bug context-repo-add-accepts-foreign-context-slug: `add_repo`
     refused only ``slug == ctx.repo_slug`` (this context's own main slug) — a slug
@@ -179,7 +176,7 @@ def test_add_repo_refuses_slug_owned_by_another_context_as_main_repo(
 
 
 def test_add_repo_refuses_slug_owned_by_another_context_as_associated_repo(
-    service: SpecContextService, store: FakeContextStore
+    service: SpecContextService, store: JsonContextStore
 ) -> None:
     """Same class (T-044-45 F-1), the other ownership shape: the slug is already
     registered as an ASSOCIATED repo of another context, not that context's main
@@ -204,7 +201,7 @@ def test_add_repo_refuses_slug_owned_by_another_context_as_associated_repo(
 
 
 def test_add_repo_same_slug_own_context_stays_idempotent_no_regression(
-    service: SpecContextService, store: FakeContextStore
+    service: SpecContextService, store: JsonContextStore
 ) -> None:
     """No regression on A17.1: the new cross-context predicate must never fire for
     THIS context's own already-registered slug — re-adding it stays the existing
@@ -225,7 +222,7 @@ def test_add_repo_same_slug_own_context_stays_idempotent_no_regression(
 
 
 def test_add_repo_unknown_slug_with_no_owner_is_still_accepted(
-    service: SpecContextService, store: FakeContextStore
+    service: SpecContextService, store: JsonContextStore
 ) -> None:
     """An entirely unowned slug — not this context's main slug, not any other
     context's main or associated slug — is still accepted (the predicate refuses
@@ -245,7 +242,7 @@ def test_add_repo_unknown_slug_with_no_owner_is_still_accepted(
 
 
 def test_create_refuses_slug_owned_by_another_context_as_main_repo(
-    service: SpecContextService, store: FakeContextStore
+    service: SpecContextService, store: JsonContextStore
 ) -> None:
     """context-create-accepts-slug-owned-by-another-context: `create` checked only
     context-name collision (`self._store.get(name)`), never slug ownership — a
@@ -264,7 +261,7 @@ def test_create_refuses_slug_owned_by_another_context_as_main_repo(
 
 
 def test_create_refuses_slug_owned_by_another_context_as_associated_repo(
-    service: SpecContextService, store: FakeContextStore
+    service: SpecContextService, store: JsonContextStore
 ) -> None:
     """Same class, the other ownership shape: the `--repo` slug is already
     registered as an ASSOCIATED repo of another context, not that context's main
@@ -285,7 +282,7 @@ def test_create_refuses_slug_owned_by_another_context_as_associated_repo(
 
 
 def test_create_unowned_slug_is_still_accepted_no_regression(
-    service: SpecContextService, store: FakeContextStore
+    service: SpecContextService, store: JsonContextStore
 ) -> None:
     """No regression: an entirely unowned slug — not any other context's main or
     associated slug — is still accepted at `create` (the predicate refuses
@@ -302,7 +299,7 @@ def test_create_unowned_slug_is_still_accepted_no_regression(
 
 
 def test_remove_repo_removes_registered_repo(
-    service: SpecContextService, store: FakeContextStore
+    service: SpecContextService, store: JsonContextStore
 ) -> None:
     _seed(store)
     service.add_repo("proj", "assoc-repo", "https://github.com/org/assoc-repo")
@@ -314,21 +311,22 @@ def test_remove_repo_removes_registered_repo(
 
 
 def test_remove_repo_never_touches_git(
-    service: SpecContextService, store: FakeContextStore, git: FakeGitClient
+    service: SpecContextService, store: JsonContextStore, workspace_root: Path
 ) -> None:
-    """A17.2 (service layer half): removing a registry entry never drives the git
-    port — the FakeGitClient records zero clone/commit/push/checkout activity."""
+    """A17.2 (service layer half): removing a registry entry leaves the repo's
+    checkout and history exactly as they were."""
     _seed(store)
-    service.add_repo("proj", "assoc-repo", "https://github.com/org/assoc-repo")
+    remote = seeded_remote(workspace_root.parent, "assoc-repo")
+    repo = clone(remote, workspace_root / "repos" / "assoc-repo")
+    head = git(repo, "rev-parse", "HEAD")
+    service.add_repo("proj", "assoc-repo", remote.as_uri())
     service.remove_repo("proj", "assoc-repo")
-    assert git.cloned == []
-    assert git.committed == []
-    assert git.pushed == []
-    assert git.checked_out == []
+    assert git(repo, "rev-parse", "HEAD") == head
+    assert git(repo, "status", "--porcelain") == ""
 
 
 def test_remove_repo_unknown_slug_raises(
-    service: SpecContextService, store: FakeContextStore
+    service: SpecContextService, store: JsonContextStore
 ) -> None:
     _seed(store)
     with pytest.raises(AssociatedRepoNotFoundError):
@@ -341,7 +339,7 @@ def test_remove_repo_unknown_context_raises(service: SpecContextService) -> None
 
 
 def test_remove_repo_second_call_on_same_slug_fails_loudly(
-    service: SpecContextService, store: FakeContextStore
+    service: SpecContextService, store: JsonContextStore
 ) -> None:
     """A17.1 idempotency for `remove`: the operation converges to "not registered" —
     calling it again on the now-absent slug fails loudly, it is not a silent no-op."""
@@ -360,7 +358,7 @@ def test_remove_repo_second_call_on_same_slug_fails_loudly(
     [("meu projeto", "ok"), ("ok", "../escape"), ("projeto-café", "ok"), ("ok", "a/b")],
 )
 def test_create_refuses_a_name_or_slug_outside_the_allowlist(
-    service: SpecContextService, store: FakeContextStore, name: str, slug: str
+    service: SpecContextService, store: JsonContextStore, name: str, slug: str
 ) -> None:
     """Bug import-registers-unvalidated-slugs-that-doctor-fix-inv5-rmtrees: the
     `CONTEXT_NAME_RE` allowlist lived only in the CLI, so the CLI was the one guarded
@@ -373,7 +371,7 @@ def test_create_refuses_a_name_or_slug_outside_the_allowlist(
 
 
 def test_create_refuses_an_associated_slug_that_collides_or_repeats(
-    service: SpecContextService, store: FakeContextStore
+    service: SpecContextService, store: JsonContextStore
 ) -> None:
     """A17.3 at the seam, not the CLI: an associated slug equal to the main slug, or
     given twice, is refused before anything is written."""
@@ -388,7 +386,7 @@ def test_create_refuses_an_associated_slug_that_collides_or_repeats(
 
 
 def test_create_registers_associated_repos_in_the_same_guarded_write(
-    service: SpecContextService, store: FakeContextStore
+    service: SpecContextService, store: JsonContextStore
 ) -> None:
     assoc = (AssociatedRepo(slug="infra", url="https://github.com/org/infra"),)
 
@@ -401,7 +399,7 @@ def test_create_registers_associated_repos_in_the_same_guarded_write(
 
 
 def test_add_repo_refuses_a_slug_outside_the_allowlist(
-    service: SpecContextService, store: FakeContextStore
+    service: SpecContextService, store: JsonContextStore
 ) -> None:
     _seed(store)
 

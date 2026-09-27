@@ -27,7 +27,7 @@ from dadaia_workspace.features.spec_context.service import (
     install_git_hooks,  # noqa: E402
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
-from tests.fakes import FakeContextStore  # noqa: E402
+from tests.fixtures.stores import context_store
 
 pytestmark = [pytest.mark.integration]
 
@@ -59,7 +59,7 @@ def test_alive_on_dead_context_writes_no_specs_commits_nothing_and_hooks_every_r
     (workspace / "repos").mkdir(parents=True)
     main_url, main_head = _seeded_remote(tmp_path, "app")
     assoc_url, assoc_head = _seeded_remote(tmp_path, "lib")
-    store = FakeContextStore()
+    store = context_store(workspace / ".dadaia" / "states")
     store.save(
         SpecContextProject(
             name="app",

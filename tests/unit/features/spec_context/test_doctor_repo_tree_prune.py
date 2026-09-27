@@ -14,7 +14,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.spec_context.doctor import DoctorService
-from tests.fakes import FakeGitClient
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 
 
 class _Store:
@@ -50,7 +50,7 @@ def _doctor(ws: Path) -> DoctorService:
     )
     return DoctorService(
         context_store=_Store([ctx]),
-        git_client=FakeGitClient(),
+        git_client=GitSubprocessClient(),
         workspace_root=ws,
     )
 
