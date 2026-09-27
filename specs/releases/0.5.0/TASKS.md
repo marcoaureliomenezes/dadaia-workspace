@@ -42,7 +42,7 @@ tests. `Δ` = prod/test lines; PLAN §2.7 ceilings stop a task, never rise.
 - [x] **T-050-34 — Authorities refusal + skills (FR5).** AUTHORING; re-project.
   `W:` `dd-release-impl/{_release_phase,_release_new}.py`, `pub/skills/{dd-release-definition,dd-code-review,dd-audit-project,dd-spec-navigator}/**`, `CONTEXT.md`
   `blocked by:` T-050-23..33 · `delivers:` a two-authority PLAN refused, one fix line (AC5.1–5.8) · `RED:` fixture PLAN pair.
-- [-] **T-050-35 — V37–V39, zone widening, `shutil` contract (FR6).** `W:` `tests/contract/{test_slop_ratchets,test_zone_registry,test_required_evidence_has_one_home}.py`, `setup.cfg`
+- [x] **T-050-35 — V37–V39, zone widening, `shutil` contract (FR6).** `W:` `tests/contract/{test_slop_ratchets,test_zone_registry,test_required_evidence_has_one_home}.py`, `setup.cfg`
   `blocked by:` T-050-34 · `delivers:` AC6.1–6.8 · `RED:` one fixture per ratchet.
 
 ### H — test harness (FR9)
