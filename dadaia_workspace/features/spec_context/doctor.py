@@ -444,34 +444,17 @@ class DoctorService:
 
     def _walk_ttl(
         self, zone: Zone, directory: Path, now: float, out: list[Finding], *, is_zone_root: bool
-    ) -> bool:
-        """Append one finding per file (by lstat mtime, symlinks never followed) and per
-        directory emptied by expiry; return whether *directory* is entirely expired."""
+    ) -> None:
+        """One finding per entry, judged once by its newest content (``sweep.newest``): an
+        expired entry is reaped whole; a live directory is walked for expired entries below
+        it. A directory mtime a deletion refreshed never counts (bug
+        reaper-needs-many-runs-for-a-nested-expired-tree)."""
         assert zone.ttl_seconds is not None
-        entries = sweep.walk(directory)
-        if not entries:
-            mtime = sweep.mtime(directory)
-            return not is_zone_root and mtime is not None and now - mtime > zone.ttl_seconds
-        all_expired = True
-        for entry in entries:
-            if entry.is_dir() and not entry.is_symlink():
-                if self._walk_ttl(zone, entry, now, out, is_zone_root=False):
-                    out.append(
-                        self._finding(
-                            zone.name,
-                            self._dadaia,
-                            entry,
-                            FindingVerdict.EXPIRED,
-                            "(emptied by expiry)",
-                        )
-                    )
-                else:
-                    all_expired = False
+        for entry in sweep.walk(directory):
+            newest = sweep.newest(entry)
+            if newest is None:
                 continue
-            mtime = sweep.mtime(entry)
-            if mtime is None:
-                continue
-            age = now - mtime
+            age = now - newest
             if is_zone_root and entry.name == "AGENTS.md":
                 # The zone's own law file is canon by projection, never a TTL candidate
                 # (bug public-install-restores-expired-zone-agents-reblocks-preflight).
@@ -480,20 +463,18 @@ class DoctorService:
                 verdict = FindingVerdict.EXPIRED
                 days = timedelta(seconds=age).days
                 detail = f"(mtime {days}d > ttl {timedelta(seconds=zone.ttl_seconds).days}d)"
+            elif entry.is_dir() and not entry.is_symlink():
+                self._walk_ttl(zone, entry, now, out, is_zone_root=False)
+                continue
             elif zone.name == sweep.REAPED_ZONE:
                 # Held, not slop and not expired: report where it came from and how long
-                # the operator still has to take it back.
+                # the operator still has to take it back. Days ROUNDED UP: a hold taken a
+                # minute ago has its whole window left, never "0d left" on a live entry.
                 verdict = FindingVerdict.REAPED
-                # Days ROUNDED UP: a hold taken a minute ago has its whole window left,
-                # and the last day reads "1d left", never "0d left" on a live entry.
-                left = -(-int(zone.ttl_seconds - age) // 86_400)
-                detail = f"({left}d left)"
+                detail = f"({-(-int(zone.ttl_seconds - age) // 86_400)}d left)"
             else:
                 verdict, detail = FindingVerdict.CANON, ""
-            if verdict is not FindingVerdict.EXPIRED:
-                all_expired = False
             out.append(self._finding(zone.name, self._dadaia, entry, verdict, detail))
-        return all_expired
 
     # ------------------------------------------------------------------
     # fix() — the one reaper, in the fixed FR4 order

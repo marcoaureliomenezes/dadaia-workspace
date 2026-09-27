@@ -61,6 +61,16 @@ def mtime(path: Path) -> float | None:
         return None
 
 
+def newest(path: Path) -> float | None:
+    """The newest ``lstat`` mtime of *path*'s content: itself when not a real directory,
+    else its newest non-directory entry (its own mtime when it holds none) — a directory
+    mtime a deletion refreshed is never content. ``None`` when it vanished."""
+    if path.is_symlink() or not path.is_dir():
+        return mtime(path)
+    stamps = [mtime(Path(d) / f) for d, _, files in os.walk(path) for f in files]
+    return max((t for t in stamps if t is not None), default=mtime(path))
+
+
 def guarded(code: str, label: str, step: Callable[[], str | None]) -> list[str]:
     """Run one step, yielding at most one action line: what the step reports, or
     ``skipped`` with the errno when the process cannot perform it. The pass never

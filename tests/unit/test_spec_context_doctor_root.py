@@ -239,7 +239,7 @@ def test_absent_harness_profile_is_missing_and_fix_seeds_it_from_present_dirs(
 # ---------------------------------------------------------------------------
 
 
-def test_ttl_zone_expires_by_mtime_and_the_emptied_directory(tmp_path: Path) -> None:
+def test_ttl_zone_expires_an_entry_whole_by_its_newest_content(tmp_path: Path) -> None:
     _init_workspace(tmp_path)
     zone_dir = tmp_path / ".dadaia" / _TTL_ZONE.name
     old_dir = zone_dir / "claude" / "20260801"
@@ -253,10 +253,11 @@ def test_ttl_zone_expires_by_mtime_and_the_emptied_directory(tmp_path: Path) -> 
     found = _by_path(_make_doctor(tmp_path).scan())
     code = f"WS-{_TTL_ZONE.name.lstrip('.')}-expired"
 
-    assert found[f"{_TTL_ZONE.name}/claude/20260801/x.png"].code == code
-    assert found[f"{_TTL_ZONE.name}/claude/20260801/x.png"].detail == "(mtime 2d > ttl 1d)"
+    # reaper-needs-many-runs-for-a-nested-expired-tree: the expired entry is ONE finding,
+    # judged by its newest content and reaped whole — never one finding per file.
     assert found[f"{_TTL_ZONE.name}/claude/20260801"].code == code
-    assert found[f"{_TTL_ZONE.name}/claude/20260801"].detail == "(emptied by expiry)"
+    assert found[f"{_TTL_ZONE.name}/claude/20260801"].detail == "(mtime 2d > ttl 1d)"
+    assert f"{_TTL_ZONE.name}/claude/20260801/x.png" not in found
     assert found[f"{_TTL_ZONE.name}/claude/today.txt"].verdict is FindingVerdict.CANON
     assert f"{_TTL_ZONE.name}/claude" not in found
 
@@ -428,7 +429,7 @@ def test_fix_skips_and_reports_an_undeletable_entry_and_finishes_the_pass(
     locked.mkdir(parents=True)
     undeletable = locked / "a.js"
     undeletable.write_text("", encoding="utf-8")
-    other = zone / "x" / "other.txt"
+    other = zone / "y.txt"
     other.write_text("", encoding="utf-8")
     for path in (undeletable, other, locked, locked.parent):
         _age(path)
@@ -445,14 +446,16 @@ def test_fix_skips_and_reports_an_undeletable_entry_and_finishes_the_pass(
         actions = doctor.fix()
     remaining = _by_path(doctor.scan())
 
+    # The expired entry `x` is reaped whole; its refused file skips the entry, reported
+    # with the errno, and the pass still reaches the next entry.
     assert not other.exists()
     assert undeletable.exists()
     deleted = [a for a in actions if ": deleted '" in a]
     skipped = [a for a in actions if ": skipped '" in a]
-    assert f"WS-{_TTL_ZONE.name}-expired: deleted '{_TTL_ZONE.name}/x/other.txt'" in deleted
-    assert not any("a.js" in a for a in deleted)
-    assert any(f"'{_TTL_ZONE.name}/x/deps/a.js' (errno 13" in a for a in skipped), actions
-    assert remaining[f"{_TTL_ZONE.name}/x/deps/a.js"].verdict is FindingVerdict.EXPIRED
+    assert f"WS-{_TTL_ZONE.name}-expired: deleted '{_TTL_ZONE.name}/y.txt'" in deleted
+    assert not any(f"'{_TTL_ZONE.name}/x'" in a for a in deleted)
+    assert any(f"skipped '{_TTL_ZONE.name}/x' (errno 13" in a for a in skipped), actions
+    assert remaining[f"{_TTL_ZONE.name}/x"].verdict is FindingVerdict.EXPIRED
 
 
 def test_fix_skips_and_reports_a_failing_seed_and_still_deletes_expired(

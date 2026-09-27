@@ -171,7 +171,8 @@ def test_fix_reports_an_undeletable_entry_exits_1_and_never_raises(
     assert not stale.exists()
     assert undeletable.exists()
     assert f"{_EXPIRED_CODE}: deleted '{_TTL_ZONE.name}/stale'" in result.output
-    assert f"{_EXPIRED_CODE}: skipped '{_TTL_ZONE.name}/locked/a.js' (errno 13" in result.output
+    # The expired entry `locked` is reaped whole, so its refusal names the entry.
+    assert f"{_EXPIRED_CODE}: skipped '{_TTL_ZONE.name}/locked' (errno 13" in result.output
 
 
 def test_fix_expired_only_quiet_is_the_reaper_lane(workspace: Path) -> None:
@@ -349,3 +350,39 @@ def test_fix_changes_nothing_in_a_harness_dir_without_a_readable_ledger(
 
     assert projected.read_text(encoding="utf-8") == "projected"
     assert sorted(p.name for p in (workspace / ".claude").rglob("*")) == ["agents", "pm.md"]
+
+
+_THREE_DAYS_AGO = time.time() - 3 * 86_400
+
+
+def _age(top: Path) -> None:
+    for dirpath, dirnames, filenames in os.walk(top, topdown=False):
+        for name in [*filenames, *dirnames]:
+            os.utime(Path(dirpath) / name, (_THREE_DAYS_AGO, _THREE_DAYS_AGO))
+    os.utime(top, (_THREE_DAYS_AGO, _THREE_DAYS_AGO))
+
+
+def _expired(workspace: Path) -> list[str]:
+    payload = json.loads(CliRunner().invoke(app, ["doctor", "--json"]).output)
+    findings = payload["sections"]["workspace"]["findings"]
+    return [f["message"] for f in findings if f["code"] == "WS-tmp-expired"]
+
+
+def test_a_nested_expired_tree_is_gone_after_one_expired_only_run(workspace: Path) -> None:
+    """Intent: CONTRACT — reaper-needs-many-runs-for-a-nested-expired-tree: the entry is judged by its newest
+    content (files), never by a directory mtime a deletion refreshed — one run, whole."""
+    day = workspace / ".dadaia" / "tmp" / "a" / "20260920"
+    for n in range(4):
+        deep = day / "tree" / f"d{n}" / "e" / "f"
+        deep.mkdir(parents=True)
+        (deep / "leaf.txt").write_text("x", encoding="utf-8")
+        (day / "tree" / f"d{n}" / "mid.txt").write_text("x", encoding="utf-8")
+    _age(workspace / ".dadaia" / "tmp" / "a")
+    # What an interrupted earlier pass leaves: a directory it emptied, its mtime fresh.
+    (day / "tree" / "emptied-today").mkdir()
+
+    result = CliRunner().invoke(app, ["doctor", "--fix", "--expired-only"])
+
+    assert result.exit_code == 0, result.output
+    assert not (workspace / ".dadaia" / "tmp" / "a").exists()
+    assert _expired(workspace) == []
