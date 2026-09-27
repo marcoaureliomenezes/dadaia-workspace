@@ -14,8 +14,8 @@ _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 # Expected canonical outputs (relative to specs_dir).
 # Since memory-markdown-source-v1 (T-MMS-10/11), scaffold emits ONLY .md born-markdown
 # files for memory atoms. Legacy .yaml stubs, .html files, and placeholder.html were
-# retired. The paths below are the complete scaffolded set, including scoped rules,
-# an empty generated catalog, and the v0.1.46
+# retired. The paths below are the complete scaffolded set, including scoped rules
+# and the v0.1.46
 # AC-4 per-artifact _archive dirs (FROZEN gate-class landing zone).
 #
 # v6 canon (T-050-05, FR1, specs_pattern_version 5 -> 6): root specs/_archive/ and
@@ -33,7 +33,6 @@ _EXPECTED_FILES = [
     "memory/ARCHITECTURE.md",
     "memory/QUALITY.md",
     "memory/product/index.md",
-    "memory/product/catalog.json",
     "releases/AGENTS.md",
     "backlog/AGENTS.md",
     "backlog/BACKLOG.json",

@@ -1,8 +1,8 @@
 """Audit-finding domain model — :class:`FindingRecord`, the one-record-per-finding model
 (v0.5.0 FR13, D5, D11).
 
-Pure domain module — no I/O, no internal imports beyond ``dataclasses``/``collections.abc``
-(stdlib only): ``core/models/findings.py`` is NOT in ``architecture.md``'s "Core file-I/O
+Pure domain module — no I/O; its one internal import is ``core.models.bugs``'s field
+introspection: ``core/models/findings.py`` is NOT in ``architecture.md``'s "Core file-I/O
 authorized set", so the model never reads a schema file itself. :class:`FindingRecord` is
 one line of ``specs/audits/<YYYYMMDDTHHMMSSZ>-<session_id_8chars>/FINDINGS.jsonl``,
 appended once (field set mirrors
@@ -28,30 +28,16 @@ call site, not here.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
-from dataclasses import fields as dc_fields
 from typing import Any
+
+from dadaia_workspace.core.models.bugs import dataclass_field_names
 
 __all__ = [
     "FindingRecord",
     "FindingRecordImmutableFieldError",
 ]
-
-
-def _dataclass_field_names(
-    dataclass_type: type, predicate: Callable[[Mapping[str, object]], bool]
-) -> tuple[str, ...]:
-    """Return the field names of *dataclass_type* whose ``metadata`` satisfies
-    *predicate* — pure ``dataclasses.fields()`` introspection, zero file I/O.
-
-    This is the ONE mechanism :class:`FindingRecord` uses to derive its immutable-core /
-    mutable-governance field sets: a per-field ``dataclasses.field(metadata={...})``
-    entry, colocated with each field's own declaration, never a second, separately-
-    maintained module-level tuple/list/set of names (A2.10/A13.1) — adding a field to
-    the dataclass is the only edit a new property ever needs.
-    """
-    return tuple(f.name for f in dc_fields(dataclass_type) if predicate(f.metadata))
 
 
 class FindingRecordImmutableFieldError(ValueError):
@@ -187,9 +173,9 @@ class FindingRecord:
 
 
 #: Derived (A2.10) — never hand-kept — from ``FindingRecord``'s own field metadata.
-_FINDING_RECORD_IMMUTABLE_CORE_FIELDS: tuple[str, ...] = _dataclass_field_names(
+_FINDING_RECORD_IMMUTABLE_CORE_FIELDS: tuple[str, ...] = dataclass_field_names(
     FindingRecord, lambda metadata: metadata.get("category") == "immutable-core"
 )
-_FINDING_RECORD_GOVERNANCE_FIELDS: tuple[str, ...] = _dataclass_field_names(
+_FINDING_RECORD_GOVERNANCE_FIELDS: tuple[str, ...] = dataclass_field_names(
     FindingRecord, lambda metadata: metadata.get("category") == "mutable-governance"
 )

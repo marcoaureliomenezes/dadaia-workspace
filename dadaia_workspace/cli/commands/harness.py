@@ -7,8 +7,6 @@ the single writer. `public install` then reads that roster instead of a flag —
 there is no `--target` and no second roster.
 """
 
-from pathlib import Path
-
 import typer
 from rich.console import Console
 
@@ -20,10 +18,6 @@ from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarne
 
 app = typer.Typer(help="Register and inspect the workspace's agent runtimes (harnesses).")
 console = Console()
-
-
-def _states_dir(workspace_root: Path) -> Path:
-    return workspace_root / ".dadaia" / "states"
 
 
 @app.command("add")
@@ -45,7 +39,7 @@ def add(name: str = typer.Argument(..., help=f"One of: {', '.join(L1_ENTRY_HARNE
     svc.stage(workspace_root)
     installed = svc.install(workspace_root, harness=name)
 
-    states_dir = _states_dir(workspace_root)
+    states_dir = container.states_dir(workspace_root)
     store = JsonHarnessProfileStore()
     registered = store.resolve(states_dir, workspace_root).harnesses
     store.write(states_dir, HarnessProfile.of(_with(registered, name)))
@@ -65,7 +59,9 @@ def list_harnesses(
     scope to exactly these names.
     """
     workspace_root = resolve_workspace_root()
-    harnesses = JsonHarnessProfileStore().resolve(_states_dir(workspace_root), workspace_root)
+    harnesses = JsonHarnessProfileStore().resolve(
+        container.states_dir(workspace_root), workspace_root
+    )
     if as_json:
         import json
 

@@ -11,7 +11,6 @@ filled atoms are never touched.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -122,15 +121,6 @@ def test_upgrade_dry_run_reports_without_deleting(tmp_path: Path) -> None:
 
     upgrade_feat.upgrade(specs, dry_run=True)
     assert atom.exists(), "dry-run must not delete"
-
-
-def test_catalog_stays_valid_json_after_repair(tmp_path: Path) -> None:
-    specs = _fresh_specs(tmp_path)
-    atom = specs / "memory" / "product" / "feature.md"
-    atom.write_text(_PLACEHOLDER_ATOM, encoding="utf-8")
-    remove_placeholder_atoms(specs)
-    catalog = json.loads((specs / "memory" / "product" / "catalog.json").read_text())
-    assert catalog["features"] == []
 
 
 # ---------------------------------------------------------------------------

@@ -19,6 +19,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.features.specs.canon import scaffold
+from dadaia_workspace.infrastructure.ledger_scripts import script_repairs
 
 pytestmark = pytest.mark.contract
 
@@ -38,6 +39,7 @@ def no_instance(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def test_explicit_specs_dir_is_read_with_no_instance_around(no_instance: Path) -> None:
     specs = no_instance / "specs"
     scaffold(specs, project_name="bare", force=False, public_dir=_TEMPLATES_DIR.parent)
+    script_repairs(specs)  # the catalog pair's one writer, as `specs init` runs it
 
     run = _runner.invoke(app, ["doctor", "--json", "--specs-dir", str(specs)])
 

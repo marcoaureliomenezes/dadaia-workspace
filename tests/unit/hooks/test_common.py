@@ -14,6 +14,7 @@ from typing import Any
 
 import pytest
 
+from dadaia_workspace.core import invocation
 from dadaia_workspace.hooks import _common
 
 
@@ -87,7 +88,8 @@ def test_target_paths_multi_file_all_headers() -> None:
 
 
 def test_sanitize_session_id_strips_traversal() -> None:
+    """The hooks strip session ids through the one rule in core.invocation."""
     # CWE-22: a session id with '/' or '..' must never survive as a path component.
-    assert _common.sanitize_session_id("../../etc/passwd") == "etcpasswd"
-    assert _common.sanitize_session_id("abc-123_XYZ") == "abc-123_XYZ"
-    assert _common.sanitize_session_id(None) == ""
+    assert invocation.sanitize_session_id("../../etc/passwd") == "etcpasswd"
+    assert invocation.sanitize_session_id("abc-123_XYZ") == "abc-123_XYZ"
+    assert invocation.sanitize_session_id(None) == ""

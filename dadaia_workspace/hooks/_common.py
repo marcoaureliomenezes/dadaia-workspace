@@ -19,7 +19,6 @@ from __future__ import annotations
 import contextlib
 import json
 import os
-import re
 import sys
 from typing import Any
 
@@ -44,8 +43,6 @@ _PATCH_PREFIXES: tuple[str, ...] = (
     "*** Add File: ",
     "*** Delete File: ",
 )
-
-_SESSION_ID_STRIP = re.compile(r"[^A-Za-z0-9_-]")
 
 
 def read_stdin_json() -> dict[str, Any]:
@@ -123,11 +120,6 @@ def target_path(payload: dict[str, Any]) -> str:
     """
     paths = target_paths(payload)
     return paths[0] if paths else ""
-
-
-def sanitize_session_id(raw: str | None) -> str:
-    """Strip a session id to ``[A-Za-z0-9_-]`` (CWE-22 path-traversal defense)."""
-    return _SESSION_ID_STRIP.sub("", raw or "")
 
 
 def resolve_session_id(payload: dict[str, Any], *, default: str = "") -> str:

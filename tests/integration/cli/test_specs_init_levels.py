@@ -92,6 +92,20 @@ def test_absent_specs_scaffolds_lists_paths_and_commits_nothing(repo: Path) -> N
     assert f"[created] {repo / 'AGENTS.md'}" in result.output
 
 
+def test_the_catalog_pair_is_written_by_its_one_generator(repo: Path) -> None:
+    """sa-package-defines-a-fact-twice: the scaffold writes no catalog; `specs init` runs
+    `memory.py catalog generate`, so the pair it leaves passes `memory.py check`."""
+    assert "memory/product/catalog.json" not in canon.TEMPLATES
+
+    result = _runner.invoke(app, ["specs", "init", "--context", "c"])
+
+    assert result.exit_code == 0, result.output
+    assert "[created] [ledgers] LEDGER-MEMORY-SCHEMA: catalog generate" in result.output
+    memory = _PUBLIC / "skills" / "dd-spec-navigator" / "scripts" / "memory.py"
+    check = [sys.executable, str(memory), "check", "--specs", str(repo / "specs")]
+    assert subprocess.run(check, capture_output=True, text=True).returncode == 0
+
+
 def test_an_existing_scoped_law_is_never_overwritten(repo: Path) -> None:
     (repo / "AGENTS.md").write_text("# ours\n", encoding="utf-8")
     (repo / "tests").mkdir()

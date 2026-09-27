@@ -74,7 +74,7 @@ TERMINAL_EVENTS: frozenset[str] = frozenset(BUGS_DISPOSITIONS)
 BUG_ARCHIVE_THRESHOLD_DAYS: int = 90
 
 
-def _dataclass_field_names(
+def dataclass_field_names(
     dataclass_type: type, predicate: Callable[[Mapping[str, object]], bool]
 ) -> tuple[str, ...]:
     """Return the field names of *dataclass_type* whose ``metadata`` satisfies
@@ -474,7 +474,7 @@ class BugRecord:
         The field set is every declared field EXCEPT the three identity fields
         (``id``/``ts``/``reported_by``, marked ``metadata={"identity": True}`` on
         their OWN declarations above) — derived from THIS dataclass's own fields via
-        :func:`_dataclass_field_names`, zero file I/O. A field added to
+        :func:`dataclass_field_names`, zero file I/O. A field added to
         :class:`BugRecord` is redacted by default with NO code edited here (A2.6/
         A2.10). The SAME set is documented, per property, by
         ``bug-record-v1.schema.json``'s ``x-redact`` keyword (``false`` on exactly
@@ -549,15 +549,15 @@ class BugRecord:
 
 
 #: Derived (A2.10) — never hand-kept — from ``BugRecord``'s own field metadata.
-_BUG_RECORD_IMMUTABLE_CORE_FIELDS: tuple[str, ...] = _dataclass_field_names(
+_BUG_RECORD_IMMUTABLE_CORE_FIELDS: tuple[str, ...] = dataclass_field_names(
     BugRecord, lambda metadata: metadata.get("category") == "immutable-core"
 )
-_BUG_RECORD_WRITE_ONCE_FIELDS: tuple[str, ...] = _dataclass_field_names(
+_BUG_RECORD_WRITE_ONCE_FIELDS: tuple[str, ...] = dataclass_field_names(
     BugRecord, lambda metadata: metadata.get("category") == "write-once"
 )
-_BUG_RECORD_GOVERNANCE_FIELDS: tuple[str, ...] = _dataclass_field_names(
+_BUG_RECORD_GOVERNANCE_FIELDS: tuple[str, ...] = dataclass_field_names(
     BugRecord, lambda metadata: metadata.get("category") == "mutable-governance"
 )
-_BUG_RECORD_REDACTABLE_FIELDS: tuple[str, ...] = _dataclass_field_names(
+_BUG_RECORD_REDACTABLE_FIELDS: tuple[str, ...] = dataclass_field_names(
     BugRecord, lambda metadata: not metadata.get("identity")
 )

@@ -21,10 +21,9 @@ from typing import Protocol
 
 from dadaia_workspace.core.cli_line import git_line
 from dadaia_workspace.core.gitflow import Gitflow
-from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObject
+from dadaia_workspace.core.models.git_scan import ZERO_SHA, GitObjectReadError, ScannedObject
 from dadaia_workspace.features.chokepoints.branch_policy import (
     HEADS_PREFIX,
-    ZERO_SHA,
     Decision,
     GateFixes,
     PushRef,

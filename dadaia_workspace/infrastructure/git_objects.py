@@ -17,13 +17,17 @@ from __future__ import annotations
 
 import contextlib
 import queue
-import re
 import subprocess
 import threading
 from collections.abc import Iterator
 from pathlib import Path
 
-from dadaia_workspace.core.models.git_scan import ZERO_SHA, GitObjectReadError, ScannedObject
+from dadaia_workspace.core.models.git_scan import (
+    SHA_SHAPE_RE,
+    ZERO_SHA,
+    GitObjectReadError,
+    ScannedObject,
+)
 
 _TIMEOUT_S = 30
 
@@ -32,7 +36,6 @@ _TIMEOUT_S = 30
 #: as a second, independent layer: this adapter must never interpolate an
 #: option-shaped string into a git argv, regardless of what already validated the
 #: caller's input (CWE-88).
-_SHA_SHAPE_RE = re.compile(r"^[0-9a-fA-F]{40}$|^[0-9a-fA-F]{64}$")
 
 #: SPEC v0.9.0 R3 — a per-blob size guard so one pathological blob cannot dominate the
 #: scan's wall clock or memory: a blob at or under this cap is read and decoded; a blob
@@ -84,7 +87,7 @@ def _decode(raw: bytes) -> str:
 def _is_resolvable_commit(repo: Path, sha: str) -> bool:
     """True when *sha* resolves to a commit object reachable locally.
 
-    v0.11.0 FR7/A7.4: *sha* is shape-checked against :data:`_SHA_SHAPE_RE` BEFORE it is
+    v0.11.0 FR7/A7.4: *sha* is shape-checked against :data:`SHA_SHAPE_RE` BEFORE it is
     ever interpolated into the ``git cat-file -e <sha>^{commit}`` argv — an
     option-shaped value (e.g. ``--upload-pack=...``) is rejected here, never
     interpolated (CWE-88). Used by :func:`_base_exclusions` to decide whether
@@ -92,7 +95,7 @@ def _is_resolvable_commit(repo: Path, sha: str) -> bool:
     choose between two different range shapes (bug
     new-branch-push-loses-prior-published-denylist-amnesty deleted that choice).
     """
-    if not sha or sha == ZERO_SHA or not _SHA_SHAPE_RE.match(sha):
+    if not sha or sha == ZERO_SHA or not SHA_SHAPE_RE.match(sha):
         return False
     result = _run(["git", "cat-file", "-e", f"{sha}^{{commit}}"], repo)
     return result.returncode == 0
@@ -217,7 +220,7 @@ def _is_annotated_tag(repo: Path, sha: str) -> bool:
     separate tag body exists to scan). Shape-checked BEFORE interpolation into the
     ``git cat-file -t`` argv, mirroring :func:`_is_resolvable_commit` (CWE-88).
     """
-    if not sha or sha == ZERO_SHA or not _SHA_SHAPE_RE.match(sha):
+    if not sha or sha == ZERO_SHA or not SHA_SHAPE_RE.match(sha):
         return False
     result = _run(["git", "cat-file", "-t", sha], repo)
     return result.returncode == 0 and _decode(result.stdout).strip() == "tag"
@@ -879,7 +882,7 @@ class GitSubprocessObjectReader:
         """:func:`unpublished` for the gate, failing closed: an unreadable *sha* is
         itself unpublished — never a birth, never an empty range."""
         try:
-            return unpublished(repo, sha) if _SHA_SHAPE_RE.match(sha) else [sha]
+            return unpublished(repo, sha) if SHA_SHAPE_RE.match(sha) else [sha]
         except GitObjectReadError:
             return [sha]
 
@@ -897,7 +900,7 @@ class GitSubprocessObjectReader:
         # `remote_sha`, here applied BEFORE `local_sha` ever reaches
         # `_rev_list_candidates`'s `git rev-list` argv (CWE-88). An option-shaped value
         # is rejected as a read failure rather than ever being interpolated.
-        if not _SHA_SHAPE_RE.match(local_sha):
+        if not SHA_SHAPE_RE.match(local_sha):
             raise GitObjectReadError(f"local_sha is not a valid sha shape: {local_sha!r}")
         # bug new-branch-push-loses-prior-published-denylist-amnesty: exclusions
         # resolved ONCE per call (_base_exclusions — ALWAYS `--remotes=origin`, optionally

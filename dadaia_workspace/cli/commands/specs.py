@@ -180,6 +180,8 @@ def init(
     written = canon.scaffold(target, project_name=project)
     for path in [*written, *canon.scaffold_repo_law(target.parent, project_name=project)]:
         typer.echo(f"[created] {path}")
+    for action in script_repairs(target):
+        typer.echo(f"[created] {action}")
     gitflow.merge_frontmatter(target, gitflow=flow)
     typer.echo(
         f"[gitflow] principal {flow.principal}, integration {flow.integration}, "

@@ -42,7 +42,7 @@ _DEFAULT_TEMPLATE_ID = "balanced"
 
 #: The agent that must NEVER receive a Fable-family model, in any template (G-1; the
 #: security lens runs on dd-code-reviewer since ADR 0016).
-_FABLE_FORBIDDEN_AGENT = "dd-code-reviewer"
+FABLE_FORBIDDEN_AGENT = "dd-code-reviewer"
 
 
 def _a(model: str, effort: str) -> AgentModelAssignment:
@@ -123,11 +123,11 @@ def _assert_templates_resolve(templates: tuple[AgentModelTemplate, ...] = _BUILT
                     f"{assignment.effort!r} to {agent!r}; "
                     f"valid: {', '.join(CLAUDE_EFFORTS)}"
                 )
-        forbidden = template.assignments[_FABLE_FORBIDDEN_AGENT].model
+        forbidden = template.assignments[FABLE_FORBIDDEN_AGENT].model
         if is_fable_model(forbidden):
             raise ValueError(
                 f"template {template.id!r} assigns {forbidden!r} to "
-                f"{_FABLE_FORBIDDEN_AGENT!r}; Fable is NEVER assigned to "
+                f"{FABLE_FORBIDDEN_AGENT!r}; Fable is NEVER assigned to "
                 "dd-code-reviewer (operator ruling G-1)"
             )
     defaults = [t.id for t in templates if t.default]

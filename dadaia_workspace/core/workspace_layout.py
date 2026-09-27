@@ -478,7 +478,7 @@ SPECS_CANON: tuple[CanonEntry, ...] = (
     CanonEntry("memory/AGENTS.md", "memory", True),
     *(CanonEntry(f"memory/{name}", "memory", True) for name in MEMORY_TOPLEVEL_FILES),
     CanonEntry("memory/product/index.md", "memory", True),
-    CanonEntry("memory/product/catalog.json", "memory", True),
+    CanonEntry("memory/product/catalog.json", "memory"),  # written by memory.py only
     CanonEntry("memory/product/<area>/<slug>.md", "memory"),
     CanonEntry("releases/AGENTS.md", "releases", True),
     CanonEntry("releases/_archive/releases_histo.jsonl", "releases", True),

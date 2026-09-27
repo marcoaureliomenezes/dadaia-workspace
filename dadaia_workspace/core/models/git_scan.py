@@ -11,12 +11,15 @@ importing ``subprocess`` (``infrastructure/git_objects.py`` does).
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 #: A zero sha marks a branch deletion (SPEC FR1 row 3) — never scanned, always an empty
 #: range. Shared here (rather than re-derived per module) so the adapter and its
 #: consumers agree on the sentinel without either importing the other's internals.
 ZERO_SHA = "0" * 40
+#: A git object sha: 40 (SHA-1) or 64 (SHA-256) hex characters; ZERO_SHA matches it.
+SHA_SHAPE_RE = re.compile(r"^[0-9a-fA-F]{40}$|^[0-9a-fA-F]{64}$")
 
 
 @dataclass(frozen=True)

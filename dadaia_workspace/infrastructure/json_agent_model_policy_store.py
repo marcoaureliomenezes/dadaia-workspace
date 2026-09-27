@@ -28,6 +28,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.agent_model_templates import (
     CORE_AGENTS,
+    FABLE_FORBIDDEN_AGENT,
     resolve_agent_model,
     template_by_id,
 )
@@ -60,7 +61,6 @@ _RETIRED_AGENT_NAMES: dict[str, str] = {
 }
 
 #: The agent that must never resolve to a Fable-family model (G-1/D-7).
-_FABLE_FORBIDDEN_AGENT = "dd-code-reviewer"
 
 
 class JsonAgentModelPolicyStore:
@@ -233,10 +233,10 @@ class JsonAgentModelPolicyStore:
         Uses the single resolver (FR4) so the check covers every combination
         (override model, template interplay), not just the literal override value.
         """
-        resolved = resolve_agent_model(_FABLE_FORBIDDEN_AGENT, overlay)
+        resolved = resolve_agent_model(FABLE_FORBIDDEN_AGENT, overlay)
         if is_fable_model(resolved.model):
             raise AgentModelPolicyStoreError(
-                f"policy resolves {resolved.model!r} onto {_FABLE_FORBIDDEN_AGENT!r}; "
+                f"policy resolves {resolved.model!r} onto {FABLE_FORBIDDEN_AGENT!r}; "
                 "Fable is never assigned to dd-code-reviewer (operator ruling G-1)",
                 path,
             )

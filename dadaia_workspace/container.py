@@ -27,12 +27,12 @@ from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentMana
 logger = logging.getLogger(__name__)
 
 
-def _states_dir(workspace_root: Path) -> Path:
+def states_dir(workspace_root: Path) -> Path:
     return workspace_root / ".dadaia" / "states"
 
 
 def _guard_initialized(workspace_root: Path) -> None:
-    marker = _states_dir(workspace_root) / "spec_contexts.json"
+    marker = states_dir(workspace_root) / "spec_contexts.json"
     if not marker.exists():
         raise not_initialized(workspace_root)
 
@@ -46,7 +46,7 @@ def build_workspace_service(workspace_root: Path) -> WorkspaceService:
 
 def build_spec_context_service(workspace_root: Path) -> SpecContextService:
     _guard_initialized(workspace_root)
-    states = _states_dir(workspace_root)
+    states = states_dir(workspace_root)
 
     return SpecContextService(
         context_store=JsonContextStore(states),
@@ -165,7 +165,7 @@ def is_source_repo_root(path: Path) -> bool:
 
 def build_doctor_service(workspace_root: Path) -> DoctorService:
     _guard_initialized(workspace_root)
-    states = _states_dir(workspace_root)
+    states = states_dir(workspace_root)
     return DoctorService(
         context_store=JsonContextStore(states),
         git_client=GitSubprocessClient(),
@@ -175,7 +175,7 @@ def build_doctor_service(workspace_root: Path) -> DoctorService:
 
 def build_export_service(workspace_root: Path) -> ExportService:
     _guard_initialized(workspace_root)
-    states = _states_dir(workspace_root)
+    states = states_dir(workspace_root)
     return ExportService(
         context_store=JsonContextStore(states),
         git_client=GitSubprocessClient(),

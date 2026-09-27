@@ -59,7 +59,6 @@ and a git tree listing (``git ls-tree``'s own native output) already produce.
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -141,12 +140,8 @@ _BACKLOG_STUB = '{"schema": "backlog-v1", "active": []}\n'
 #                       several static templates hold literal JSON braces).
 # * ``"format"``      — ``template.format(**context)``; used only where every brace in
 #                       the template is a deliberate placeholder.
-# * ``"json_catalog"`` — one dedicated renderer (``json.dumps``, correctly escaped) —
-#                       the ONE entry needing computed, safely-escaped JSON content;
-#                       folding it into ``"format"`` would risk JSON injection from an
-#                       arbitrary ``project_name``.
 # ---------------------------------------------------------------------------------
-Kind = Literal["copy", "static", "format", "json_catalog"]
+Kind = Literal["copy", "static", "format"]
 
 TEMPLATES: dict[str, tuple[Kind, str]] = {
     "AGENTS.md": ("copy", "templates/specs-AGENTS.md"),
@@ -154,7 +149,6 @@ TEMPLATES: dict[str, tuple[Kind, str]] = {
     "memory/AGENTS.md": ("copy", "scaffold/memory/AGENTS.md"),
     **{f"memory/{name}": ("copy", f"scaffold/memory/{name}") for name in MEMORY_TOPLEVEL_FILES},
     "memory/product/index.md": ("copy", "scaffold/memory/product/index.md"),
-    "memory/product/catalog.json": ("json_catalog", ""),
     "releases/AGENTS.md": ("copy", "scaffold/releases/AGENTS.md"),
     "releases/_archive/releases_histo.jsonl": ("static", ""),
     "backlog/AGENTS.md": ("copy", "scaffold/backlog/AGENTS.md"),
@@ -236,19 +230,8 @@ def _render(entry: CanonEntry, *, public_dir: Path, context: dict[str, str]) -> 
         text = (public_dir / template).read_text(encoding="utf-8")
     elif kind == "static":
         text = template
-    elif kind == "format":
-        text = template.format(**context)
     else:
-        text = (
-            json.dumps(
-                {
-                    "generated_at": f"{context['today']}T00:00:00Z",
-                    "features": [],
-                },
-                indent=2,
-            )
-            + "\n"
-        )
+        text = template.format(**context)
     section_id = FIXED_SECTION_BY_PATH.get(entry.dest or "")
     if section_id is None:
         return text
@@ -277,9 +260,7 @@ def scaffold(
     }
     writes: list[tuple[Path, Callable[[], str], bool]] = [
         # Only "no destination" disqualifies an entry: a required_at_birth row always
-        # has a renderer (``memory/product/catalog.json``'s is computed, not a template —
-        # a prior guard skipped it for having no template string and silently dropped it
-        # from every fresh scaffold: fresh-specs-scaffold-fails-specs-doctor's own class).
+        # has a renderer (a skipped row once dropped silently from every fresh scaffold).
         (
             specs_dir / entry.dest,
             partial(_render, entry, public_dir=resolved_public, context=context),

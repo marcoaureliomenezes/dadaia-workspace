@@ -13,11 +13,11 @@ into ``__init__.py`` (which itself re-exports from this module, never the revers
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 
 from dadaia_workspace.core.cli_line import git_line, shell_line
 from dadaia_workspace.core.gitflow import Gitflow
+from dadaia_workspace.core.models.git_scan import SHA_SHAPE_RE, ZERO_SHA
 
 __all__ = [
     "Decision",
@@ -42,18 +42,8 @@ class Decision:
     warn: str | None = None
 
 
-#: A pre-push sha is 40-char (SHA-1) or 64-char (SHA-256) hex (v0.11.0 FR7/A7.3) — an
-#: option-shaped value (``--glob=refs/nonexistent``) is malformed, never a silent no-op
-#: (CWE-88/CWE-20). The all-zero deletion sentinel is 40 hex characters and already
-#: matches — no special case needed.
-_SHA_SHAPE_RE = re.compile(r"^[0-9a-fA-F]{40}$|^[0-9a-fA-F]{64}$")
-
-#: git's zero-sha deletion sentinel (40 hex zeros) — imported by ``push_gate`` too.
-ZERO_SHA = "0" * 40
-
-
 def _is_sha_shaped(value: str) -> bool:
-    return bool(_SHA_SHAPE_RE.match(value))
+    return bool(SHA_SHAPE_RE.match(value))
 
 
 @dataclass(frozen=True)
@@ -90,7 +80,7 @@ def parse_push_stdin(stdin_text: str) -> tuple[list[PushRef], int]:
     disabled without a trace; ``git push --no-verify`` is the sanctioned bypass).
 
     v0.11.0 FR7/A7.1-A7.3: both shas are additionally validated against
-    :data:`_SHA_SHAPE_RE` — a violation reuses the SAME malformed-line counter and the
+    :data:`SHA_SHAPE_RE` — a violation reuses the SAME malformed-line counter and the
     SAME fail-closed message (no new branch), so an option-shaped ``local_sha`` (the
     measured silent-no-op class) refuses instead of producing a successful empty
     ``git rev-list``.
