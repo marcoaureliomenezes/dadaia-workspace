@@ -55,22 +55,17 @@ def audit_dir(specs: Path, audit: str, fix: str) -> Path:
 
 
 def read_findings(directory: Path) -> list[dict[str, Any]]:
-    """Every record of *directory*'s FINDINGS.jsonl, or a refusal naming the bad line."""
+    """Every record of *directory*'s FINDINGS.jsonl, refused unless the document passes
+    the same check every write runs — no verb writes the pair from an invalid document."""
     text = (directory / FINDINGS).read_text(encoding="utf-8")
-    records: list[dict[str, Any]] = []
-    for number, line in enumerate(text.split("\n"), start=1):
-        if not line.strip():
-            continue
-        try:
-            records.append(json.loads(line))
-        except json.JSONDecodeError as exc:
-            raise Refusal(
-                f"specs/{AUDITS}/{directory.name}/{FINDINGS} line {number} is not valid "
-                f"JSON ({exc.msg}) — refusing to rewrite a file this script cannot read "
-                "in full",
-                f"{SCRIPT} check --specs <specs>",
-            ) from exc
-    return records
+    problems = findings_findings(text, f"{AUDITS}/{directory.name}/{FINDINGS}")
+    if problems:
+        raise Refusal(
+            f"specs/{AUDITS}/{directory.name}/{FINDINGS} line {problems[0]['line']} does not "
+            f"pass check ({problems[0]['message']}) — nothing was written",
+            f"{SCRIPT} check --specs <specs>",
+        )
+    return [json.loads(line) for line in text.split("\n") if line.strip()]
 
 
 def serialize(records: list[dict[str, Any]]) -> str:
