@@ -94,7 +94,7 @@ and deletes only what a TTL expired.
 ## An agent reads AGENTS.md and uses it
 
 <!-- derived-from: agentic-entities sha256:6add03805476 -->
-<!-- derived-from: sdd-gate-v3 sha256:d5b8fcce9e9e -->
+<!-- derived-from: sdd-gate-v3 sha256:f870acc7c776 -->
 <!-- derived-from: release-lifecycle sha256:a31b50804ef1 -->
 <!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
 <!-- derived-from: harness-claude-code sha256:55ba15667a89 -->
