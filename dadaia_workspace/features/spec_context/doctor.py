@@ -151,7 +151,7 @@ class DoctorService:
                         DoctorIssue(
                             code="HOOKS-DRIFT-1",
                             description=(
-                                f"{os.path.relpath(installed, self._workspace_root)} differs from the shipped "
+                                f"{Path(os.path.relpath(installed, self._workspace_root)).as_posix()} differs from the shipped "
                                 f"{source} — the chokepoint is enforcing something other "
                                 "than what this release ships."
                             ),
