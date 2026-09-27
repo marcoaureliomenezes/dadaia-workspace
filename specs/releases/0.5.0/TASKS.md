@@ -19,7 +19,7 @@ tests. `Δ` = prod/test lines; PLAN §2.7 ceilings stop a task, never rise.
   `blocked by:` T-050-23 · `delivers:` operator files survive install and `doctor --fix` · `RED:` PLAN §2 WP-04, WP-06 · Δ −131/+7.
 - [x] **T-050-25 — `workspace_layout.verdict` (05).** Move, switch, delete. `W:` `core/workspace_layout.py`, `hooks/`, `f/spec_context/`, `pub/data/`
   `blocked by:` T-050-23 · `delivers:` gate ALLOW ⇔ doctor not SLOP · `RED:` PLAN §2 WP-05 · Δ −30/+75.
-- [ ] **T-050-26 — One `InstallPlan` (08).** `W:` `cli/commands/public.py`, `i/{projection_rules,public_assets}.py`
+- [-] **T-050-26 — One `InstallPlan` (08).** `W:` `cli/commands/public.py`, `i/{projection_rules,public_assets}.py`
   `blocked by:` T-050-24 · `delivers:` a scoped install is impossible · `RED:` PLAN §2 WP-08 · Δ −40/+14.
 - [ ] **T-050-27 — Repo law only via `specs init` (07 †).** `W:` `i/`, `cli/commands/public.py`, `f/specs/canon.py`, `f/spec_context/service.py`
   `blocked by:` T-050-26 · `delivers:` install-first leaves the repo template; edits survive · `RED:` PLAN §2 WP-07 · Δ −230/−119.
