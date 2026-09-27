@@ -17,6 +17,7 @@ its own adapter at the seam).
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable
 from pathlib import Path
 
@@ -284,8 +285,9 @@ def _render_for(workspace_root: Path | None, *, redact: bool) -> Callable[[str],
             contexts = container.build_spec_context_service(workspace_root).list_all()
         except (WorkspaceNotInitializedError, SchemaVersionError):
             contexts = []
-        redactor, root = build_context_redactor(contexts), f"{workspace_root}/"
-        return lambda text: redactor.text(text.replace(root, ""))  # paths: workspace-relative
+        redactor = build_context_redactor(contexts)  # paths print workspace-relative:
+        root = re.compile(re.escape(f"{workspace_root.as_posix()}/").replace("/", r"[\\/]"))
+        return lambda text: redactor.text(root.sub("", text))  # either separator matches
     return _identity
 
 

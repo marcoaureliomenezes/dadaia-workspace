@@ -306,11 +306,14 @@ def test_doctor_redact_json_prints_no_absolute_workspace_path(workspace: Path) -
     _write_contexts(workspace, [_ctx_row("zz-dead", state="dead")])
     (workspace / "repos" / "zz-dead").mkdir(parents=True)
 
+    from dadaia_workspace.core.platform import PLATFORM
+
     out = _runner.invoke(app, ["doctor", "--redact", "--json"]).stdout
 
+    cli = f".dadaia/.venv/{PLATFORM.venv_scripts_dir}/dadaia{PLATFORM.venv_exe_suffix}"
     assert "INV-5" in out
-    assert str(workspace) not in out
-    assert '"fix": ".dadaia/.venv/bin/dadaia doctor --fix"' in out
+    assert f'"fix": "{cli} doctor --fix"' in out
+    assert str(workspace) not in out and workspace.as_posix() not in out
 
 
 def test_the_redact_render_masks_a_home_path_outside_the_workspace(workspace: Path) -> None:
@@ -322,4 +325,6 @@ def test_the_redact_render_masks_a_home_path_outside_the_workspace(workspace: Pa
     home = "/home/" + "alice"  # composed at runtime: no home path is ever a tracked literal
 
     assert render(f"see {home}/.cache/x") == "see /home/[REDACTED]/.cache/x"
-    assert render(f"at {workspace}/repos/r") == "at repos/r"
+    assert render(f"at {workspace.as_posix()}/repos/r") == "at repos/r"
+    backslashed = workspace.as_posix().replace("/", "\\")  # the Windows separator form
+    assert render(f"at {backslashed}\\repos\\r") == "at repos\\r"
