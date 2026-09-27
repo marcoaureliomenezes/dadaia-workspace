@@ -2,7 +2,9 @@
 
 Intent: CONTRACT — T-047-03 (SPEC 0.4.7 FR7): `HistoRecord` round-trips the seven
 fields every `_histo.jsonl` line carries, and `TERMINAL_DISPOSITIONS` is the single
-lowercase vocabulary the per-ledger subsets are drawn from.
+lowercase vocabulary the per-ledger subsets are drawn from; `REQUIRED_EVIDENCE` covers
+every ledger vocabulary that validates an exit (moved from the retired
+`test_required_evidence_has_one_home.py`, T-050-35; its duplicate check folded into V37).
 Size: SMALL — pure in-memory dataclass round-trip, no I/O.
 """
 
@@ -15,7 +17,9 @@ from dadaia_workspace.core.models.histo import (
     AUDITS_HISTO_DISPOSITIONS,
     BACKLOG_HISTO_DISPOSITIONS,
     BUGS_DISPOSITIONS,
+    FINDINGS_DISPOSITIONS,
     RELEASES_HISTO_DISPOSITIONS,
+    REQUIRED_EVIDENCE,
     TERMINAL_DISPOSITIONS,
     HistoRecord,
 )
@@ -95,3 +99,15 @@ def test_every_per_ledger_subset_is_drawn_from_the_one_vocabulary(subset: tuple[
 def test_the_bugs_subset_is_the_bug_ledger_terminal_vocabulary() -> None:
     """One constant, not two: `core.models.bugs.TERMINAL_EVENTS` IS this subset."""
     assert frozenset(BUGS_DISPOSITIONS) == TERMINAL_EVENTS
+
+
+def test_the_table_covers_every_ledger_vocabulary_that_validates_an_exit() -> None:
+    for vocabulary in (BACKLOG_HISTO_DISPOSITIONS, FINDINGS_DISPOSITIONS):
+        for disposition in vocabulary:
+            assert REQUIRED_EVIDENCE[disposition] in {"release", "reason"}
+
+
+def test_a_shared_disposition_requires_the_same_evidence_in_both_ledgers() -> None:
+    shared = set(BACKLOG_HISTO_DISPOSITIONS) & set(FINDINGS_DISPOSITIONS)
+    assert shared == {"superseded", "rejected"}
+    assert [REQUIRED_EVIDENCE[word] for word in sorted(shared)] == ["reason", "release"]

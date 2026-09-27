@@ -1,15 +1,20 @@
-"""Intent: CONTRACT — V32, V33, V34, V35, V36; size: SMALL (contract).
+"""Intent: CONTRACT — V32, V33, V34, V35, V36; V37, V38, V39 (0.5.0 AC6.2–AC6.6); size: SMALL.
 
-Five repo-pure slop ratchets: measured at birth, pinned, ratcheting down only; every
+Repo-pure slop ratchets: measured at birth, pinned, ratcheting down only; every
 tree walk goes through the one tracked-files enumeration the other ratchets use.
+V37–V39 carry a keyed allowance (AC6.5): an unlisted hit fails, a vanished key fails
+stale, a value is an OPEN bug id (or ``parity:<test>`` / ``report-only`` where stated),
+and the allowance never outgrows its birth size (AC6.6).
 """
 
 from __future__ import annotations
 
 import ast
 import io
+import json
 import re
 import tokenize
+from collections import defaultdict
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -327,3 +332,332 @@ def test_v35_skill_corpus_is_pinned() -> None:
     # Mutation fixture — the counter reads real files, and an empty set counts 0.
     assert _skill_corpus_lines([]) == 0
     assert _skill_corpus_lines([_THIS_FILE]) > 0
+
+
+# ---------------------------------------------------------------------------
+# V37–V39 — one authority per fact, per deleter, per doctor fix (AC6.2–AC6.6)
+# ---------------------------------------------------------------------------
+
+_PACKAGE = _REPO_ROOT / "dadaia_workspace"
+_SWEEP = "features/spec_context/sweep.py"
+
+
+def _package_sources() -> dict[str, str]:
+    """Every tracked module, skill script and hook, keyed by its package-relative path."""
+    return {
+        path.relative_to(_PACKAGE).as_posix(): path.read_text(encoding="utf-8")
+        for path in tracked_test_files(_REPO_ROOT, "*.py", tree="dadaia_workspace")
+    }
+
+
+def _open_bug_ids() -> set[str]:
+    ledger = _REPO_ROOT / "specs" / "bugs" / "BUGS.jsonl"
+    records = (json.loads(line) for line in ledger.read_text(encoding="utf-8").splitlines())
+    return {record["id"] for record in records if record.get("status") == "open"}
+
+
+def _allowance_violations(
+    hits: set[str], allowance: dict[str, str], *, birth: int, also: frozenset[str] = frozenset()
+) -> list[str]:
+    """AC6.5/AC6.6: unlisted hits, stale keys, values that are no open bug id, and an
+    allowance grown past its birth size — each one line, empty when the ratchet holds."""
+    open_bugs = _open_bug_ids()
+    problems = [f"unlisted: {hit}" for hit in sorted(hits - allowance.keys())]
+    problems += [f"stale key (delete it): {key}" for key in sorted(allowance.keys() - hits)]
+    problems += [
+        f"{key} -> {value!r} is neither an open bug id nor an allowed value"
+        for key, value in sorted(allowance.items())
+        if value not in open_bugs and value not in also and not value.startswith("parity:")
+    ]
+    for key, value in sorted(allowance.items()):
+        if (
+            value.startswith("parity:")
+            and not (_REPO_ROOT / value.removeprefix("parity:")).is_file()
+        ):
+            problems.append(f"{key} -> {value!r} names no test file")
+    if len(allowance) > birth:
+        problems.append(f"allowance grew to {len(allowance)} (birth {birth}) — it only shrinks")
+    return problems
+
+
+def _definition(node: ast.stmt) -> tuple[str, str] | None:
+    """``(name, shape)`` of a top-level function (docstring dropped) or UPPER constant
+    whose value is not a bare scalar literal; ``None`` for anything else."""
+    if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+        body = node.body[1:] if ast.get_docstring(node) is not None else node.body
+        return node.name, ast.dump(node.args) + ast.dump(ast.Module(body=body, type_ignores=[]))
+    if isinstance(node, ast.Assign) and len(node.targets) == 1:
+        target: ast.expr | None = node.targets[0]
+    else:
+        target = node.target if isinstance(node, ast.AnnAssign) else None
+    value = getattr(node, "value", None)
+    if not isinstance(target, ast.Name) or value is None or isinstance(value, ast.Constant):
+        return None
+    return (target.id, ast.dump(value)) if target.id.lstrip("_").isupper() else None
+
+
+def _duplicate_definitions(sources: dict[str, str]) -> set[str]:
+    """``file:symbol`` for every top-level definition AST-identical in two or more files."""
+    homes: dict[tuple[str, str], set[str]] = defaultdict(set)
+    for rel, text in sources.items():
+        for node in ast.parse(text).body:
+            if (found := _definition(node)) is not None:
+                homes[found].add(rel)
+    return {f"{rel}:{name}" for (name, _), rels in homes.items() if len(rels) > 1 for rel in rels}
+
+
+#: V37 allowance, born 2026-09-27 at 65: each duplicate, keyed to the open bug deleting it.
+_V37_BIRTH = 65
+_V37_ALLOWANCE: dict[str, str] = {
+    "cli/commands/harness.py:_states_dir": "sa-package-defines-a-fact-twice",
+    "cli/commands/migrate.py:_resolve_specs_dir": "sa-specs-tree-state-read-five-ways",
+    "cli/commands/specs.py:_resolve_specs_dir": "sa-specs-tree-state-read-five-ways",
+    "container.py:_states_dir": "sa-package-defines-a-fact-twice",
+    "core/invocation.py:_SESSION_ID_STRIP": "sa-package-defines-a-fact-twice",
+    "core/invocation.py:sanitize_session_id": "sa-package-defines-a-fact-twice",
+    "core/models/bugs.py:_dataclass_field_names": "sa-package-defines-a-fact-twice",
+    "core/models/findings.py:_dataclass_field_names": "sa-package-defines-a-fact-twice",
+    "core/models/git_scan.py:ZERO_SHA": "sa-package-defines-a-fact-twice",
+    "core/redaction.py:_IPV4_RE": "sa-ledger-write-seam-redacts-less-than-push-refuses",
+    "core/redaction.py:_POSIX_HOME_RE": "sa-ledger-write-seam-redacts-less-than-push-refuses",
+    "core/redaction.py:_WIN_HOME_RE": "sa-ledger-write-seam-redacts-less-than-push-refuses",
+    "core/release_state.py:PHASES": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "features/backlog/document.py:_SLUG_RE": "sa-backlog-status-has-no-single-authority",
+    "features/chokepoints/branch_policy.py:ZERO_SHA": "sa-package-defines-a-fact-twice",
+    "features/chokepoints/branch_policy.py:_SHA_SHAPE_RE": "sa-package-defines-a-fact-twice",
+    "features/specs/memory_canon.py:WIKILINK_RE": "sa-memory-atom-has-two-grammars",
+    "hooks/_common.py:_SESSION_ID_STRIP": "sa-package-defines-a-fact-twice",
+    "hooks/_common.py:sanitize_session_id": "sa-package-defines-a-fact-twice",
+    "infrastructure/git_objects.py:_SHA_SHAPE_RE": "sa-package-defines-a-fact-twice",
+    "public/skills/dd-audit-project/scripts/_audit_schema.py:_JSON_TYPES": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-audit-project/scripts/_audit_schema.py:_SCHEMAS": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-audit-project/scripts/_audit_schema.py:_SHIPPED": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-audit-project/scripts/_audit_schema.py:find_specs": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-audit-project/scripts/_audit_schema.py:load_schema": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-audit-project/scripts/_audit_store.py:_replace": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-backlog-definition/scripts/_backlog_check.py:finding": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-backlog-definition/scripts/_backlog_schema.py:_JSON_TYPES": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-backlog-definition/scripts/_backlog_schema.py:_SCHEMAS": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-backlog-definition/scripts/_backlog_schema.py:_SHIPPED": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-backlog-definition/scripts/_backlog_schema.py:find_specs": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-backlog-definition/scripts/_backlog_schema.py:load_schema": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-backlog-definition/scripts/_backlog_schema.py:validate": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-backlog-definition/scripts/_backlog_store.py:_replace": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-backlog-definition/scripts/_backlog_store.py:_stamp": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-backlog-definition/scripts/_backlog_write.py:_IPV4_RE": "sa-ledger-write-seam-redacts-less-than-push-refuses",
+    "public/skills/dd-backlog-definition/scripts/_backlog_write.py:_POSIX_HOME_RE": "sa-ledger-write-seam-redacts-less-than-push-refuses",
+    "public/skills/dd-backlog-definition/scripts/_backlog_write.py:_SLUG_RE": "sa-backlog-status-has-no-single-authority",
+    "public/skills/dd-backlog-definition/scripts/_backlog_write.py:_UNSAFE_RE": "sa-ledger-write-seam-redacts-less-than-push-refuses",
+    "public/skills/dd-backlog-definition/scripts/_backlog_write.py:_WIN_HOME_RE": "sa-ledger-write-seam-redacts-less-than-push-refuses",
+    "public/skills/dd-bug-resolution/scripts/_bugs_check.py:_JSON_TYPES": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-bug-resolution/scripts/_bugs_check.py:_SCHEMAS": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-bug-resolution/scripts/_bugs_check.py:_SHIPPED": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-bug-resolution/scripts/_bugs_check.py:find_specs": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-bug-resolution/scripts/_bugs_store.py:_replace": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-bug-resolution/scripts/_bugs_store.py:_stamp": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-bug-resolution/scripts/_bugs_transition.py:_SCRIPT": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-bug-resolution/scripts/_bugs_write.py:_IPV4_RE": "sa-ledger-write-seam-redacts-less-than-push-refuses",
+    "public/skills/dd-bug-resolution/scripts/_bugs_write.py:_POSIX_HOME_RE": "sa-ledger-write-seam-redacts-less-than-push-refuses",
+    "public/skills/dd-bug-resolution/scripts/_bugs_write.py:_SCRIPT": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-bug-resolution/scripts/_bugs_write.py:_UNSAFE_RE": "sa-ledger-write-seam-redacts-less-than-push-refuses",
+    "public/skills/dd-bug-resolution/scripts/_bugs_write.py:_WIN_HOME_RE": "sa-ledger-write-seam-redacts-less-than-push-refuses",
+    "public/skills/dd-release-implementation/scripts/_release_check.py:finding": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-release-implementation/scripts/_release_new.py:SCRIPT": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-release-implementation/scripts/_release_phase.py:SCRIPT": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-release-implementation/scripts/_release_schema.py:PHASES": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-release-implementation/scripts/_release_schema.py:_JSON_TYPES": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-release-implementation/scripts/_release_schema.py:_SCHEMAS": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-release-implementation/scripts/_release_schema.py:_SHIPPED": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-release-implementation/scripts/_release_schema.py:find_specs": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-release-implementation/scripts/_release_schema.py:load_schema": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-release-implementation/scripts/_release_schema.py:validate": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-release-implementation/scripts/_release_store.py:SCRIPT": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "public/skills/dd-spec-navigator/scripts/_memory_schema.py:WIKILINK_RE": "sa-memory-atom-has-two-grammars",
+    "public/skills/dd-spec-navigator/scripts/_memory_schema.py:find_specs": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+}
+
+
+def test_v37_one_home_per_definition() -> None:
+    """V37 — a function or non-scalar UPPER constant defined identically in two modules,
+    skill scripts or hooks is a second authority (folds test_required_evidence_has_one_home)."""
+    problems = _allowance_violations(
+        _duplicate_definitions(_package_sources()), _V37_ALLOWANCE, birth=_V37_BIRTH
+    )
+    assert problems == [], "\n".join(problems)
+
+
+def test_v37_trips_on_a_planted_second_authority() -> None:
+    """RED fixture: a regex and a helper copied into a second module are flagged; a bare
+    scalar and a same-name different body are not."""
+    first = "import re\n_ID_RE = re.compile('x')\nKIND = 'a'\ndef load(p):\n    return p\n"
+    second = "import re\n_ID_RE = re.compile('x')\nKIND = 'a'\ndef load(p):\n    return 1\n"
+    assert _duplicate_definitions({"a.py": first, "b.py": second}) == {"a.py:_ID_RE", "b.py:_ID_RE"}
+
+
+_DELETES = frozenset({"rmtree", "unlink", "rmdir", "removedirs"})
+_OS_DELETES = frozenset({"remove", "move"})
+
+
+def _destructive_calls(sources: dict[str, str]) -> set[str]:
+    """``file:function`` for every delete call outside the one deleter (``sweep``)."""
+    hits: set[str] = set()
+    for rel, text in sources.items():
+        if rel == _SWEEP:
+            continue
+        tree = ast.parse(text)
+        owner: dict[int, str] = {}
+        functions = [
+            n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef | ast.AsyncFunctionDef)
+        ]
+        for function in sorted(functions, key=lambda f: f.lineno):
+            owner.update({id(node): function.name for node in ast.walk(function)})
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                base, attr = ast.unparse(node.func.value), node.func.attr
+                if (attr in _DELETES and base != "sweep") or (
+                    attr in _OS_DELETES and base in {"os", "shutil"}
+                ):
+                    hits.add(f"{rel}:{owner.get(id(node), '<module>')}")
+    return hits
+
+
+#: V38 allowance, born 2026-09-27 at 16. The install-ledger prune is PLAN §1.1's
+#: "who owns an entry under a harness dir" authority (`_reconcile_install_ledger`).
+_V38_BIRTH = 16
+_V38_ALLOWANCE: dict[str, str] = {
+    "core/atomic_write.py:atomic_write": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+    "core/session_store.py:reap_stale": "sa-bind-has-two-stores",
+    "core/specs_repair.py:remove_placeholder_atoms": "sa-deleters-outside-the-one-deleter",
+    "features/certification/service.py:certify": "sa-reconcile-certify-skip-the-workspace-walk",
+    "features/migrate/state_v2.py:execute_migration": "sa-registry-schema-version-has-three-grammars",
+    "features/migrate/upgrade.py:fold_tech_stack": "sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges",
+    "features/migrate/upgrade.py:remove_empty_ideas_dir": "sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges",
+    "features/reconcile/service.py:_restore_state": "sa-reconcile-certify-skip-the-workspace-walk",
+    "features/reconcile/service.py:reconcile_workspace": "sa-reconcile-certify-skip-the-workspace-walk",
+    "features/spec_context/markers.py:reap_markers": "sa-deleters-outside-the-one-deleter",
+    "features/specs/doctor_memory.py:fix_placeholder_atom": "sa-memory-atom-has-two-grammars",
+    "infrastructure/projection.py:_clear": "parity:tests/integration/test_install_ledger_reconciliation.py",
+    "infrastructure/public_assets.py:_prune_empty_dirs": "parity:tests/integration/test_install_ledger_reconciliation.py",
+    "infrastructure/public_assets.py:_reconcile_install_ledger": "parity:tests/integration/test_install_ledger_reconciliation.py",
+    "infrastructure/public_assets.py:stage": "sa-staged-assets-without-consumers",
+    "public/skills/dd-release-implementation/scripts/_release_new.py:new_release": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
+}
+
+
+def test_v38_deletes_live_in_the_one_deleter() -> None:
+    """V38 — a delete call (``rmtree unlink rmdir removedirs``, ``os.remove``,
+    ``shutil.move``) outside ``features/spec_context/sweep.py`` is a second deleter."""
+    problems = _allowance_violations(
+        _destructive_calls(_package_sources()), _V38_ALLOWANCE, birth=_V38_BIRTH
+    )
+    assert problems == [], "\n".join(problems)
+
+
+def test_v38_trips_on_a_planted_deleter() -> None:
+    """RED fixture: an unlink in a new module is flagged; sweep's own calls are not."""
+    stray = "from pathlib import Path\ndef tidy(p):\n    Path(p).unlink()\n"
+    sources = {
+        "features/x/tidy.py": stray,
+        _SWEEP: stray,
+        "ok.py": "import os\nos.replace('a', 'b')\n",
+    }
+    assert _destructive_calls(sources) == {"features/x/tidy.py:tidy"}
+
+
+def _doctor_codes() -> set[str]:
+    """Every code any doctor emits: the three rule tables, the ledger scripts, onboarding."""
+    from dadaia_workspace.features.backlog.doctor import RULES as BACKLOG_RULES
+    from dadaia_workspace.features.spec_context.doctor import workspace_rules
+    from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
+    from dadaia_workspace.features.workspace import onboarding
+    from dadaia_workspace.infrastructure.ledger_scripts import LEDGER_SCRIPTS
+
+    rules = [*SPECS_RULES, *BACKLOG_RULES, *workspace_rules(expired_only=False, context=None)]
+    return (
+        {code for rule in rules for code in rule.codes}
+        | {script.code for script in LEDGER_SCRIPTS}
+        | {onboarding.CODE}
+    )
+
+
+#: V39 allowance, born 2026-09-27 at 52: a code with no fix-clears case in
+#: tests/integration/test_doctor_fix_lines_clear_their_finding.py; a code carrying a fix
+#: is keyed to the bug that says its fix may not clear, one with none is `report-only`.
+_V39_BIRTH = 52
+_V39_ALLOWANCE: dict[str, str] = {
+    "ADR-SUPERSEDED-CITATION": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "BL-CONFLICT": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "BL-SCHEMA": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "BL-STALE": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "CAT-1": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "FIXED-1": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "FIXED-2": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "HOOKS-DRIFT-1": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "LEDGER-BACKLOG-SCHEMA": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "LEDGER-BUGS-SCHEMA": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "LEDGER-FINDINGS-SCHEMA": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "LEDGER-MEMORY-SCHEMA": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "LEDGER-RELEASE-SCHEMA": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "LINT-1": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "MEM-DRIFT-1": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "MEM-DRIFT-2": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "MEM-PLACEHOLDER-1": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "ONBOARDING": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "RELEASE-TREE-ARCHIVED": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "RELEASE-TREE-MEMORY": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "RELEASE-TREE-PARSE": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "RELEASE-TREE-PHASE": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "RELEASE-TREE-SCHEMA": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "RELEASE-TREE-STATE-MISSING": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "RELEASE-TREE-TRIO": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "RELEASE-TREE-TS-ORDER": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "SPEC-DOC-001": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "SPEC-DOC-002L": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "SPEC-DOC-003": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "SPEC-DOC-007": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "SPEC-DOC-008": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "SPEC-DOC-009": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "SPEC-DOC-024": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "SPEC-DOC-026": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "SPEC-DOC-027": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "SPEC-DOC-028": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "SPEC-DOC-030": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "SPEC-DOC-033": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "SPEC-DOC-034": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "SPEC-DOC-035": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "SPEC-DOC-036": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "SPEC-DOC-037": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "SPEC-DOC-038": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "SPEC-DOC-041": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "SPEC-DOC-046": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "SPEC-DOC-047": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "SPECS-VERSION": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "TREE-4": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "TREE-5": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "TREE-7": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "WS-ENTRY": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "WS-INVARIANT": "sa-unfixable-doctor-findings-say-doctor-fix",
+}
+
+
+def _uncovered(codes: set[str], planted: set[str]) -> set[str]:
+    return codes - planted
+
+
+def test_v39_every_doctor_code_has_a_fix_clears_case_or_a_key() -> None:
+    """V39 — every doctor code has a fix-clears case, or an allowance key."""
+    from tests.integration.test_doctor_fix_lines_clear_their_finding import PLANTS
+
+    problems = _allowance_violations(
+        _uncovered(_doctor_codes(), set(PLANTS)),
+        _V39_ALLOWANCE,
+        birth=_V39_BIRTH,
+        also=frozenset({"report-only"}),
+    )
+    assert problems == [], "\n".join(problems)
+
+
+def test_v39_trips_on_an_unlisted_code() -> None:
+    """RED fixture: a code with neither a plant nor a key is reported unlisted."""
+    problems = _allowance_violations(_uncovered({"ZZ-NEW-1", "ZZ-OK-1"}, {"ZZ-OK-1"}), {}, birth=0)
+    assert problems == ["unlisted: ZZ-NEW-1"]
