@@ -267,5 +267,9 @@ def test_a_declared_ungated_action_is_reported_as_one_warn_line(tmp_path: Path) 
     warns = [ln for ln in lines if ln.status is DoctorStatus.WARN]
     assert [ln.text for ln in warns] == [
         "entities-derivation: cursor: 'file-write' has no pre-action hook event — "
-        "cursor exposes none, so the gate cannot run before it (ENT-DERIVE-1)"
+        "cursor exposes none, so the gate cannot run before it (ENT-DERIVE-1)",
+        "entities-derivation: devin: 'shell' has no pre-action hook event — "
+        "devin exposes none, so the gate cannot run before it (ENT-DERIVE-1)",
+        "entities-derivation: devin: 'file-write' has no pre-action hook event — "
+        "devin exposes none, so the gate cannot run before it (ENT-DERIVE-1)",
     ]

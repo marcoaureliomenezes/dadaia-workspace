@@ -35,9 +35,6 @@ def test_read_stdin_json(
 
 def test_target_path_forms() -> None:
     # tool_name / is_write_tool.
-    assert _common.tool_name({"tool_name": "Write"}) == "Write"
-    assert _common.tool_name({"tool": "edit_file"}) == "edit_file"
-    assert _common.tool_name({}) == ""
     assert _common.is_write_tool("Write")
     assert _common.is_write_tool("apply_patch")
     assert not _common.is_write_tool("Read")

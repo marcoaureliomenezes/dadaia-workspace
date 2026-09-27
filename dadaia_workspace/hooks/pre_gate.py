@@ -69,7 +69,7 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
 
 def main() -> int:
     """Run the merged PreToolUse gate. Returns 0 always (block via the stdout envelope)."""
-    reason = evaluate_payload(_common.read_stdin_json())
+    reason = evaluate_payload(_common.claude_payload(_common.read_stdin_json()))
     if reason is not None:
         _common.emit_block(reason)
     else:

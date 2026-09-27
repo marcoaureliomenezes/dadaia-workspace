@@ -117,7 +117,7 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
     FR-W4-04: classify EVERY write target. A multi-file apply_patch surfaces every file
     header; the most restrictive verdict wins — the first BLOCK stops the whole patch.
     """
-    name = _common.tool_name(payload)
+    name = str(payload.get("tool_name") or "")
     if not _common.is_write_tool(name):
         return None
 

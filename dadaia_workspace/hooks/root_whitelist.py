@@ -61,7 +61,7 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
     FR-W4-04: a multi-file apply_patch surfaces every file header; ANY forbidden header
     blocks the whole patch (most restrictive wins).
     """
-    name = _common.tool_name(payload)
+    name = str(payload.get("tool_name") or "")
     # NotebookEdit is not root-relevant in the shell version; keep the same tool set.
     if name not in _common.WRITE_TOOLS - {"NotebookEdit"}:
         return None

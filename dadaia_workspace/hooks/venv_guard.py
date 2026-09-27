@@ -96,7 +96,7 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
     the Codex shell event share the ``tool_input.command`` shape). Any other tool, an
     empty/absent command, or an unparseable command fails open.
     """
-    name = str(payload.get("tool_name") or payload.get("tool") or "")
+    name = str(payload.get("tool_name") or "")
     if name != "Bash":
         return None
     inp = payload.get("tool_input")

@@ -111,6 +111,10 @@ def test_every_registered_hook_format_has_a_derivation() -> None:
     )
 
 
+def _declares_gate_not_enforced(record: HarnessRecord) -> bool:
+    return set(HOOK_DIALECTS[record.hooks].ungated) >= set(_GATED_ACTIONS)
+
+
 @pytest.mark.parametrize("record", _derived_records(), ids=_record_ids)
 def test_the_four_behaviours_reach_every_harness_with_a_hook_derivation(
     record: HarnessRecord, workspace: Path
@@ -119,7 +123,8 @@ def test_the_four_behaviours_reach_every_harness_with_a_hook_derivation(
     session-start reaper are derived into EVERY hook format. No behaviour may exist in
     only one harness."""
     blob = "\n".join(_rendered(_hook_rules(record, workspace)).values())
-    assert _PRE_GATE in blob, (
+    # ADR 0054: a harness declaring every gated action ungated states "gate not enforced".
+    assert _PRE_GATE in blob or _declares_gate_not_enforced(record), (
         f"{record.name}: the merged pre_gate entrypoint (root whitelist + venv guard + "
         "SDD gate) is not wired by its hook derivation"
     )
@@ -220,7 +225,7 @@ def test_every_gated_action_has_a_pre_action_event_or_a_declared_gap(
     shell execution leaves file writes ungated, and that gap must be DECLARED in its
     dialect (``HookDialect.ungated``) rather than implied by a passing string search."""
     events = _events_citing_the_gate(record, workspace)
-    assert events, f"{record.name}: no event registers the gate"
+    assert events or _declares_gate_not_enforced(record), f"{record.name}: no gate event"
     unclassified = events - set(_EVENT_COVERAGE)
     assert not unclassified, (
         f"{record.name}: unclassified pre-action event(s) {sorted(unclassified)} — "

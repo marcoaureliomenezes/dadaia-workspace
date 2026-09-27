@@ -16,6 +16,7 @@ Cross-platform notes:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -62,9 +63,20 @@ def read_stdin_json() -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
-def tool_name(payload: dict[str, Any]) -> str:
-    """Extract the tool name from a hook payload (handles both Claude and Codex keys)."""
-    return str(payload.get("tool_name") or payload.get("tool") or "")
+#: Native tool names -> the Claude name the policies read (Copilot, Devin, Cursor shell).
+_TOOL_ALIASES: dict[str, str] = {"bash": "Bash", "exec": "Bash", "write": "Write", "edit": "Edit"}
+
+
+def claude_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Every harness's pre-tool payload in Claude form, before any policy runs (ADR 0054)."""
+    name = payload.get("tool_name") or payload.get("toolName") or payload.get("tool")
+    args: Any = payload.get("toolArgs")
+    with contextlib.suppress(ValueError, TypeError):
+        args = json.loads(args)  # Copilot sends toolArgs as a JSON string
+    name = str(name or ("Bash" if "command" in payload else ""))
+    tool_input = payload.get("tool_input") or args
+    tool_input = tool_input if isinstance(tool_input, dict) else payload
+    return {**payload, "tool_name": _TOOL_ALIASES.get(name, name), "tool_input": tool_input}
 
 
 def is_write_tool(name: str) -> bool:

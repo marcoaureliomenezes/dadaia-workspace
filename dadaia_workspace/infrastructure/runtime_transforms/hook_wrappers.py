@@ -46,7 +46,6 @@ class HookAnswer:
 
     decision_key: str
     reason_key: str
-    allow: str
     deny: str
 
 
@@ -134,9 +133,9 @@ _EMPTY = HookDialect()
 #: dialect rather than falling through a missing key.
 #:
 #: Cursor decides only on the events it exposes *before* an action — its file-edit event
-#: fires after the write — so the gate rides ``beforeShellExecution``; Devin and Copilot
-#: expose a real pre-tool event and get full coverage. Devin reads the gate's native
-#: envelope (Claude-compatible), so it needs no answer translation.
+#: fires after the write — so the gate rides ``beforeShellExecution``; Copilot exposes a
+#: real pre-tool event and gets full coverage. Devin's blocking hook-file shape is not
+#: vendor-verified, so its gate is declared not enforced (ADR 0054), never guessed.
 HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
     HookFormat.NONE: _EMPTY,
     HookFormat.CLAUDE_SETTINGS: _EMPTY,
@@ -152,17 +151,18 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
         ),
         typed=False,
         version=1,
-        answer=HookAnswer("permission", "user_message", "allow", "deny"),
+        answer=HookAnswer("permission", "user_message", "deny"),
         ungated=("file-write",),
     ),
     HookFormat.DEVIN_HOOKS: HookDialect(
-        lanes=_FOUR_BEHAVIOURS,
+        lanes=(_REAPER,),
         files=(
             HookFileSpec(
                 "hooks.v1.json",
-                (("PreToolUse", _GATE.name), ("SessionStart", _REAPER.name)),
+                (("SessionStart", _REAPER.name),),
             ),
         ),
+        ungated=("shell", "file-write"),
     ),
     HookFormat.COPILOT_HOOKS: HookDialect(
         lanes=_FOUR_BEHAVIOURS,
@@ -172,7 +172,7 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
         ),
         entry_key="bash",
         version=1,
-        answer=HookAnswer("permissionDecision", "permissionDecisionReason", "allow", "deny"),
+        answer=HookAnswer("permissionDecision", "permissionDecisionReason", "deny"),
     ),
 }
 
@@ -205,8 +205,9 @@ def _translator(answer: HookAnswer) -> str:
     """The stdin-to-stdout remap from the gate's native envelope into *answer*'s shape.
 
     Run through the wrapper's already-verified interpreter, so the decision travels as
-    parsed JSON and never as a key-order-dependent text match. Fail-open by construction:
-    an unreadable envelope prints nothing, which every harness reads as "no opinion".
+    parsed JSON and never as a key-order-dependent text match. Only a deny is answered:
+    anything else prints nothing, "no opinion", so the harness's own approval prompt stays
+    in force (ADR 0054: no wrapper emits an explicit allow).
     Carries no single quote — it is embedded in a single-quoted ``sh`` word.
     """
     return (
@@ -218,8 +219,6 @@ def _translator(answer: HookAnswer) -> str:
         f'if out.get("permissionDecision") == "deny":\n'
         f'    print(json.dumps({{"{answer.decision_key}": "{answer.deny}", '
         f'"{answer.reason_key}": out.get("permissionDecisionReason", "")}}))\n'
-        "else:\n"
-        f'    print(json.dumps({{"{answer.decision_key}": "{answer.allow}"}}))\n'
     )
 
 
