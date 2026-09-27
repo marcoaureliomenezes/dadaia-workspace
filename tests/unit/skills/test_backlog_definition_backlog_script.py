@@ -451,3 +451,55 @@ def test_subjects_lists_the_subjects_the_live_document_already_binds(
     done = _run(script, "subjects", "--specs", str(specs), "--alias-map", str(tmp_path / "none"))
     assert done.returncode == 0, done.stdout + done.stderr
     assert "dadaia_workspace/container.py#build" in done.stdout
+
+
+def _pair(specs: Path) -> list[bytes]:
+    histo = specs / "backlog" / "_archive" / "backlog_histo.jsonl"
+    return [(specs / "backlog" / "BACKLOG.json").read_bytes(), histo.read_bytes()]
+
+
+def _exited(script: Path, tmp_path: Path) -> Path:
+    """A tree whose histo holds one exit of `gone` and whose active[] holds `an-idea`."""
+    specs = _specs(tmp_path)
+    for slug in ("gone", "an-idea"):
+        assert _run(script, "new", slug, "--specs", str(specs)).returncode == 0
+    done = _run(
+        script, "exit", "gone", "--specs", str(specs), "--disposition", "rejected",
+        "--reason", "r",
+    )  # fmt: skip
+    assert done.returncode == 0, done.stderr
+    return specs
+
+
+def test_a_refused_exit_leaves_both_backlog_files_byte_intact(script: Path, tmp_path: Path) -> None:
+    """sa-ledger-verbs-append-histo-before-validating-the-pair#J1: one invalid live entry
+    makes `exit` refuse, and neither file moves — a retry included (#J4)."""
+    specs = _exited(script, tmp_path)
+    document = json.loads((specs / "backlog" / "BACKLOG.json").read_text(encoding="utf-8"))
+    document["active"].append({"id": "broken", "status": "Idea"})
+    (specs / "backlog" / "BACKLOG.json").write_text(json.dumps(document), encoding="utf-8")
+    before = _pair(specs)
+
+    for _ in range(2):
+        done = _run(
+            script, "exit", "an-idea", "--specs", str(specs), "--disposition", "rejected",
+            "--reason", "r",
+        )  # fmt: skip
+        assert done.returncode == 1, done.stdout
+        assert _pair(specs) == before
+
+
+def test_new_refuses_a_slug_that_already_exited_and_writes_nothing(
+    script: Path, tmp_path: Path
+) -> None:
+    """sa-ledger-verbs-append-histo-before-validating-the-pair#J3: the pair check the
+    `check` verb runs refuses re-admitting an exited slug before any write."""
+    specs = _exited(script, tmp_path)
+    before = _pair(specs)
+
+    done = _run(script, "new", "gone", "--specs", str(specs))
+
+    assert done.returncode == 1, done.stdout
+    assert "gone" in done.stderr
+    assert _pair(specs) == before
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0

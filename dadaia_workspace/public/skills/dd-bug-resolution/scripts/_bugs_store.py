@@ -86,25 +86,33 @@ def _replace(path: Path, text: str) -> None:
     os.replace(tmp, path)
 
 
-def commit(path: Path, apply: Callable[[Records], Records], rel: str = LEDGER) -> Records:
-    """Apply *apply* to *path*'s records and replace the file atomically.
+def commit(
+    path: Path, apply: Callable[[Records], Records], rel: str = LEDGER, archive: Path | None = None
+) -> Records:
+    """Apply *apply* to *path*'s records and replace the file atomically; with *archive*,
+    the records *apply* dropped are appended there first.
 
-    The candidate bytes are validated BEFORE the replace, so a refused write leaves the
-    file byte-identical. When the file changed under the computation, the change is
+    The candidate bytes are validated BEFORE either write, so a refused write leaves both
+    files byte-identical. When the file changed under the computation, the change is
     re-read and re-applied ONCE; a second concurrent write refuses with a retry `fix:`.
     """
     before = _stamp(path)
-    written = apply(read_records(path))
+    records = read_records(path)
+    written = apply(records)
     text = _validated(written, rel)
     if _stamp(path) != before:
         before = _stamp(path)
-        written = apply(read_records(path))
+        records = read_records(path)
+        written = apply(records)
         text = _validated(written, rel)
         if _stamp(path) != before:
             raise Refusal(
                 f"{path.name} changed twice under this write — nothing was written",
                 "re-run this command",
             )
+    if archive is not None:  # pre-v6 lines live there: only the moved records are new
+        existing = archive.read_text(encoding="utf-8") if archive.is_file() else ""
+        _replace(archive, existing + serialize([r for r in records if r not in written]))
     _replace(path, text)
     return written
 
@@ -117,11 +125,3 @@ def by_id(records: Records, bug_id: str) -> dict[str, Any]:
         f"no bug record with id {bug_id!r} in this ledger",
         f"{Path(__file__).parent / 'bugs.py'} status --all --specs <specs>",
     )
-
-
-def append_raw(path: Path, records: Records) -> None:
-    """Append *records* to an archive file, unvalidated: `bugs_histo.jsonl` also holds
-    the pre-v6 collapsed lines, a shape bug-record-v1 does not describe, so validating
-    the whole file would refuse every archive run on a repo that has history."""
-    existing = path.read_text(encoding="utf-8") if path.is_file() else ""
-    _replace(path, existing + serialize(records))

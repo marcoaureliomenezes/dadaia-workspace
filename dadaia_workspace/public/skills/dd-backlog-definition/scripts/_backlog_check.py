@@ -106,24 +106,27 @@ def histo_findings(text: str) -> list[dict[str, Any]]:
 
 
 def check(specs: Path) -> list[dict[str, Any]]:
-    """Validate both committed files; a young specs tree with neither is not a finding.
+    """Validate both committed files; a young specs tree with neither is not a finding."""
+    document, histo = (p.read_text(encoding="utf-8") if p.is_file() else "" for p in (specs / LEDGER, specs / HISTO))  # fmt: skip
+    return pair_findings(document or None, histo)
 
-    The cross-file invariant is the point of running them together: a slug that already
+
+def pair_findings(document: str | None, histo: str) -> list[dict[str, Any]]:
+    """The pair's findings — the check every write runs over its candidate bytes first.
+
+    The cross-file invariant is the point of judging them together: a slug that already
     exited is not also live, and a live slug has not already exited.
     """
     findings: list[dict[str, Any]] = []
-    document, histo = specs / LEDGER, specs / HISTO
     live: dict[str, int] = {}
-    if document.is_file():
-        text = document.read_text(encoding="utf-8")
-        findings += document_findings(text)
+    if document is not None:
+        findings += document_findings(document)
         if not findings:
-            live = {str(i["id"]): n for n, i in enumerate(json.loads(text)["active"], start=1)}
-    if histo.is_file():
-        histo_text = histo.read_text(encoding="utf-8")
-        broken = histo_findings(histo_text)
+            live = {str(i["id"]): n for n, i in enumerate(json.loads(document)["active"], start=1)}
+    if histo:
+        broken = histo_findings(histo)
         findings += broken
-        for number, raw in enumerate([] if broken else histo_text.split("\n"), start=1):
+        for number, raw in enumerate([] if broken else histo.split("\n"), start=1):
             exited = json.loads(raw).get("id") if raw.strip() else None
             if isinstance(exited, str) and exited in live:
                 findings.append(

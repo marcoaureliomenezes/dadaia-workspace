@@ -30,7 +30,7 @@ import _backlog_subjects as sj  # noqa: E402
 import _backlog_write as wr  # noqa: E402
 from _backlog_check import check  # noqa: E402
 from _backlog_schema import CODE, DISPOSITIONS, HISTO, LEDGER, find_specs  # noqa: E402
-from _backlog_store import Refusal, append_histo, commit, read_active  # noqa: E402
+from _backlog_store import Refusal, commit, read_active  # noqa: E402
 
 _HELP = {
     "new": "append one brand-new active[] entry, born at status 'idea'",
@@ -75,20 +75,17 @@ def _values(args: argparse.Namespace, names: tuple[str, ...]) -> dict[str, Any]:
 
 def _new(args: argparse.Namespace, specs: Path) -> int:
     values = _values(args, ("title", "description", "provenance", "intent"))
-    commit(specs / LEDGER, lambda active: wr.new_entry(active, args.slug, values))
+    commit(specs, lambda active: wr.new_entry(active, args.slug, values))
     print(f"[ok] appended {args.slug!r} -> {specs / LEDGER}")
     return 0
 
 
 def _exit(args: argparse.Namespace, specs: Path) -> int:
-    """The atomic pair: the terminal record, then the removal. Every refusal has already
-    run, so the only ordering left is the one whose crash is recoverable — a record with
-    the entry still live is a re-runnable exit; a removal with no record is a lost item.
-    """
+    """The pair: the terminal record, then the removal, both checked before either write;
+    a crash between them leaves an exited-but-live slug `check` names, never a lost item."""
     values = _values(args, ("disposition", "release", "reason", "summary", "ts"))
     entry = ex.check_exit(specs, read_active(specs / LEDGER), args.slug, values)
-    append_histo(specs / HISTO, ex.histo_record(entry, values))
-    commit(specs / LEDGER, lambda active: [i for i in active if i.get("id") != args.slug])
+    commit(specs, lambda active: [i for i in active if i.get("id") != args.slug], ex.histo_record(entry, values))  # fmt: skip
     print(f"[ok] exited {args.slug!r} ({values['disposition']}) -> {specs / HISTO}")
     return 0
 

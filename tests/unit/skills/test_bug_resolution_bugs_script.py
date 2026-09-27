@@ -422,3 +422,28 @@ def test_the_projection_rule_carries_the_exec_bit_for_an_executable_source(
     assert modes, "the skills rule table produced no dd-bug-resolution script rules"
     assert modes["bugs.py"] == 0o755
     assert modes["_bugs_store.py"] == 0o755
+
+
+def test_a_refused_archive_leaves_both_ledger_files_byte_intact(
+    script: Path, tmp_path: Path
+) -> None:
+    """sa-ledger-verbs-append-histo-before-validating-the-pair#J2: with one invalid live
+    record, `archive` refuses and neither BUGS.jsonl nor bugs_histo.jsonl moves — a retry
+    included."""
+    old = {
+        **_OPEN_RECORD, "id": "old-bug", "ts": "2025-12-01T00:00:00Z",
+        "status": "resolved", "closed_at": "2026-01-01T00:00:00Z",
+    }  # fmt: skip
+    specs = _ledger(tmp_path, {**_OPEN_RECORD, "severity": "SEVERE"}, old)
+    histo = specs / "bugs" / "_archive" / "bugs_histo.jsonl"
+    histo.parent.mkdir(parents=True)
+    histo.write_text("", encoding="utf-8")
+    before = [(specs / "bugs" / "BUGS.jsonl").read_bytes(), histo.read_bytes()]
+
+    for _ in range(2):
+        done = _run(
+            script, "archive", "--specs", str(specs), "--now", "2026-09-20T00:00:00Z",
+            "--threshold-days", "90",
+        )  # fmt: skip
+        assert done.returncode == 1, done.stdout
+        assert [(specs / "bugs" / "BUGS.jsonl").read_bytes(), histo.read_bytes()] == before
