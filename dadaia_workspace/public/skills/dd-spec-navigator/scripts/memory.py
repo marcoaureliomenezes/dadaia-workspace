@@ -60,8 +60,6 @@ def _drift(args: argparse.Namespace, specs: Path) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    # Resolved: the catalog's `context` is the specs tree's parent directory name, so a
-    # relative `--specs specs` must name the same context an absolute path does.
     specs = args.specs.resolve() if args.specs is not None else find_specs(Path.cwd())
     if args.verb == "check":
         findings = check(specs)

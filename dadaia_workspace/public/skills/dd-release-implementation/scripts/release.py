@@ -30,6 +30,7 @@ from _release_tree import check, drift, memory_errors  # noqa: E402
 _HELP = {
     "new": "mint the one live release: its SPEC.md stub and _RELEASE.json, in one act",
     "phase": "move the live release to IMPLEMENTATION or CLOSURE, stamping its milestone",
+    "drift": "the closure worklist over the live release's memory window (memory.py drift)",
     "memory": "append the closure's one structured `kind: memory` entry to the live log",
     "check": "validate every _RELEASE.json under releases/ and the ship ledger",
 }
@@ -53,7 +54,7 @@ def _parser() -> argparse.ArgumentParser:
         if verb == "memory":
             for name in ("--reviewed", "--changed"):
                 command.add_argument(name, default="", help="comma-separated worklist entries")
-        if verb == "check":
+        if verb in ("check", "drift"):
             command.add_argument("--json", action="store_true", help="emit findings as JSON")
     return parser
 
@@ -69,6 +70,13 @@ def _phase(args: argparse.Namespace, specs: Path) -> int:
     release_id, ts = set_phase(specs, args.phase.upper(), args.sha, args.pr)
     print(f"[ok] release {release_id} -> phase {args.phase.upper()} ({ts})")
     return 0
+
+
+def _drift(args: argparse.Namespace, specs: Path) -> int:
+    """The worklist over the window `memory` records: last memory entry's until, else defined.sha."""
+    report = drift.report(specs, window_start(live_release(specs).state))
+    print(json.dumps(report, indent=2) if args.json else drift.render(report))
+    return 1 if report["atoms"] or report["uncovered"] else 0
 
 
 def _memory(args: argparse.Namespace, specs: Path) -> int:
@@ -97,7 +105,7 @@ def _memory(args: argparse.Namespace, specs: Path) -> int:
     return 0
 
 
-_VERBS = {"new": _new, "phase": _phase, "memory": _memory}
+_VERBS = {"new": _new, "phase": _phase, "drift": _drift, "memory": _memory}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -111,7 +119,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1 if findings else 0
     try:
         return _VERBS[args.verb](args, specs)
-    except Refusal as refusal:
+    except (Refusal, drift.Refusal) as refusal:
         print(f"[error] {refusal}", file=sys.stderr)
         print(f"fix: {refusal.fix}", file=sys.stderr)
         return 1
