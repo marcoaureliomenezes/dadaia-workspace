@@ -52,11 +52,11 @@ def preflight(
         True, "--fail-fast/--no-fail-fast", help="Stop at the first failing check."
     ),
 ) -> None:
-    """Run the five local CI checks; exit non-zero if any fail.
+    """Run the library's locally runnable ci.yml checks; exit non-zero if any fail.
 
-    The checks, in order: ruff format --check, ruff check, mypy --strict,
-    lint-imports, pytest. Run it before pushing — locally-solvable failures must
-    never reach a push.
+    In order: ruff format --check, ruff check, mypy --strict, repo hygiene, dadaia
+    doctor, lint-imports, pytest (coverage floor). Run it before pushing — locally-solvable
+    failures must never reach a push.
     """
     root = _repo_root()
     # The checks are structurally bound to this repo: they lint `dadaia_workspace/` and

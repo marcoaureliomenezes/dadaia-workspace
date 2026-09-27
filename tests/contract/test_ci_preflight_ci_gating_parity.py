@@ -1,28 +1,11 @@
 """Preflight-vs-CI gating parity contract (bug `prepush-gate-omits-import-boundary-
 contracts-ci-runs`, FR6/A6.2).
 
-The pre-push hook advertises `dadaia ci preflight` as "CI-equivalent" (module docstring,
-``dadaia_workspace/features/ci_preflight/service.py``; the hook's own echo line,
-``public/scripts/pre-push-ci-gate.sh``). That claim is a promise: every check the local
-preflight names is a check CI also gates on, and vice versa, over the SAME comparable
-set — CI additionally gates matrix/e2e/panel/backlog/hygiene jobs that have no local
-preflight equivalent at all (importability-smoke, e2e-panel, backlog-doctor,
-repo-hygiene, pr-title, pr-source-guard); those are
-OUT of the advertised equivalence claim by design and are never compared here.
-
-This test derives BOTH sides mechanically instead of hardcoding a list twice:
-  - LOCAL: ``checks_for()``'s returned ``Check.name`` values (the exact names the
-    pre-push hook prints as ``[PASS]/[FAIL] <name>`` — the tool's own advertisement of
-    what it just ran).
-  - CI: ``.github/workflows/ci.yml``'s ``lint``/``typecheck`` job step names, plus a scan
-    for a ``pytest`` invocation across the tiers that stand in for the local suite
-    (``unit-fast``, ``contract-coverage``, ``integration``, ``e2e-python``).
-
-Either side gaining or losing a check flips the set comparison and fails this test — this
-is the regression pin bug `prepush-gate-omits-import-boundary-contracts-ci-runs` asks for
-(A6.2), complementing the narrower unit-level pin in
-``test_ci_preflight_includes_lint_imports.py`` (which proves lint-imports' argv and
-fail-closed behaviour, not cross-source parity).
+`dadaia ci preflight` is the locally runnable subset of ci.yml (ADR 0078): every
+check it names is gated in some ci.yml job and every locally runnable ci.yml check
+(lint, types, import contracts, tests, the coverage floor, the doctor, repo hygiene) is
+in ``checks_for()``. Both sides are derived: LOCAL from each ``Check``'s name and argv,
+CI from the step names and ``run`` bodies of every ci.yml job.
 
 Mutation-sanity (verified by hand while authoring, not committed): commenting out the
 ``lint_imports`` line in ``checks_for()`` drops "lint-imports" from the LOCAL set and
@@ -30,7 +13,8 @@ makes the equality assertion below FAIL with an asymmetric-diff message naming t
 missing check; removing the ``lint-imports`` step from ci.yml's ``lint`` job does the
 same from the CI side.
 
-Intent: CONTRACT — A6.2 (bug `prepush-gate-omits-import-boundary-contracts-ci-runs`)
+Intent: CONTRACT — A6.2 (bug `prepush-gate-omits-import-boundary-contracts-ci-runs`);
+sa-doctor-job-not-a-required-check#B3
 Owner: dd-software-engineer
 """
 
@@ -49,21 +33,6 @@ pytestmark = pytest.mark.contract
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _CI_YML = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
 
-# The CI jobs that, together, stand in for what the local preflight advertises. Every
-# OTHER ci.yml job (importability-smoke, unit-fast-cross, contract-coverage-cross,
-# e2e-panel, pr-title, repo-hygiene, backlog-doctor, pr-source-guard) is CI-only scope the local gate never claimed
-# equivalence to (module docstring: "ruff format --check, ruff check, mypy --strict,
-# pytest" plus lint-imports — never the cross-platform matrix, panel E2E, or the
-# governance/PR jobs).
-_CI_EQUIVALENCE_JOBS = (
-    "lint",
-    "typecheck",
-    "unit-fast",
-    "contract-coverage",
-    "integration",
-    "e2e-python",
-)
-
 # canonical label -> substring that must appear in the LOCAL Check.name for that label.
 _LOCAL_MARKERS: dict[str, str] = {
     "ruff-format": "ruff format --check",
@@ -71,6 +40,9 @@ _LOCAL_MARKERS: dict[str, str] = {
     "mypy-strict": "mypy --strict",
     "lint-imports": "lint-imports",
     "pytest": "pytest",
+    "coverage-floor": "--cov-fail-under=80",
+    "doctor": "doctor --specs-dir specs --source-root .",
+    "repo-hygiene": "check_no_repo_local_claude.sh",
 }
 
 # canonical label -> substring that must appear in one of the CI job step run commands
@@ -82,6 +54,9 @@ _CI_MARKERS: dict[str, str] = {
     "mypy-strict": "mypy --strict",
     "lint-imports": "lint-imports",
     "pytest": "pytest",
+    "coverage-floor": "--cov-fail-under=80",
+    "doctor": "dadaia doctor --specs-dir specs --source-root .",
+    "repo-hygiene": "check_no_repo_local_claude.sh",
 }
 
 
@@ -111,29 +86,20 @@ def _local_canonical_set() -> set[str]:
     --quick``); ``Check.name`` is independent of tool resolution (argv differs by
     environment, the name string does not), so no venv/DI faking is needed here.
     """
-    names = " | ".join(c.name for c in checks_for(quick=True))
+    names = " | ".join(f"{c.name} {' '.join(c.argv)}" for c in checks_for(quick=True))
     return {label for label, marker in _LOCAL_MARKERS.items() if marker in names}
 
 
 def _ci_canonical_set() -> set[str]:
-    """The canonical label set derived from ci.yml's equivalence-scoped jobs."""
+    """The canonical label set derived from every ci.yml job."""
     jobs = _load_ci_jobs()
-    haystack = "\n".join(_ci_job_step_text(jobs, job_id) for job_id in _CI_EQUIVALENCE_JOBS)
+    haystack = "\n".join(_ci_job_step_text(jobs, job_id) for job_id in jobs)
     return {label for label, marker in _CI_MARKERS.items() if marker in haystack}
 
 
-def test_ci_equivalence_jobs_exist() -> None:
-    """Sanity: every job this test compares against actually exists in ci.yml — a
-    renamed/removed job silently emptying the CI-side haystack must be a loud failure,
-    never a false-pass equality on two empty sets."""
-    jobs = _load_ci_jobs()
-    missing = [job_id for job_id in _CI_EQUIVALENCE_JOBS if job_id not in jobs]
-    assert missing == [], f"ci.yml no longer defines job(s) {missing} — update _CI_EQUIVALENCE_JOBS"
-
-
 def test_preflight_advertised_set_matches_ci_gating_set() -> None:
-    """The preflight's advertised check list and CI's gating list are the same set
-    (A6.2) — asymmetric on either side is a real regression, never a coincidence."""
+    """sa-doctor-job-not-a-required-check#B3: checks_for() carries every locally runnable
+    ci.yml check — the coverage floor, the doctor and repo hygiene included (A6.2)."""
     local_set = _local_canonical_set()
     ci_set = _ci_canonical_set()
 
@@ -151,4 +117,18 @@ def test_preflight_advertised_set_matches_ci_gating_set() -> None:
     )
     # Both sides must be non-trivial — an empty intersection from a markers-vs-haystack
     # typo must not silently pass as "no diff".
-    assert local_set == {"ruff-format", "ruff-check", "mypy-strict", "lint-imports", "pytest"}
+    assert local_set == set(_LOCAL_MARKERS)
+
+
+def test_consumer_law_never_prescribes_the_library_preflight() -> None:
+    """sa-doctor-job-not-a-required-check#B5: `ci preflight` refuses outside the library, so
+    the consumer law (dd-gitflow-default, dd-release-implementation) sends an agent to its
+    own repo's checks, never to that verb."""
+    skills = _REPO_ROOT / "dadaia_workspace" / "public" / "skills"
+    law = [
+        p
+        for s in ("dd-gitflow-default", "dd-release-implementation")
+        for p in (skills / s).rglob("*.md")
+    ]
+    offenders = [str(p) for p in law if "ci preflight" in p.read_text(encoding="utf-8")]
+    assert offenders == []

@@ -231,6 +231,7 @@ def _pytest_check(
     # exists) and every gating invocation excludes the quarantine lane — a quarantined
     # test runs only under an explicit `-m quarantine` diagnosis session, never in a gate.
     base = (*pytest, "-q", "-p", "no:cacheprovider", "-m", "not quarantine", "-n", "auto")
+    base = (*base, "--cov=dadaia_workspace", "--cov-fail-under=80", "--cov-report=")
     if quick:
         return Check("pytest (no e2e)", (*base, "--ignore=tests/e2e"))
     return Check("pytest", base)
@@ -251,8 +252,12 @@ def checks_for(
     lint = _lint_type_checks(python_executable=python_executable, dadaia_bin=dadaia_bin)
     lint_imports = _lint_imports_check(python_executable=python_executable, dadaia_bin=dadaia_bin)
     pytest_check = _pytest_check(quick, python_executable=python_executable, dadaia_bin=dadaia_bin)
-    # Import-boundary contracts run with the other lint checks, before the slow pytest step.
-    return (*lint, lint_imports, pytest_check)
+    dadaia = _resolve_tool("dadaia", python_executable=python_executable, dadaia_bin=dadaia_bin)
+    doctor = Check(
+        "dadaia doctor", (*dadaia, "doctor", "--specs-dir", "specs", "--source-root", ".")
+    )
+    hygiene = Check("repo hygiene", ("bash", ".github/scripts/check_no_repo_local_claude.sh"))
+    return (*lint, hygiene, doctor, lint_imports, pytest_check)
 
 
 def subprocess_runner(cwd: Path) -> Runner:

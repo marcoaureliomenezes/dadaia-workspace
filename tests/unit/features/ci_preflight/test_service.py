@@ -50,7 +50,7 @@ def test_checks_for_lists(
 @pytest.mark.parametrize(
     ("runner", "fail_fast", "expected_len", "expected_failed"),
     [
-        pytest.param(_pass, False, 5, [], id="all-pass"),
+        pytest.param(_pass, False, 7, [], id="all-pass"),
         pytest.param(
             "fail-fast-second",
             True,
@@ -61,7 +61,7 @@ def test_checks_for_lists(
         pytest.param(
             "mypy-fails",
             False,
-            5,
+            7,
             ["mypy --strict"],
             id="no-fail-fast-runs-every-check",
         ),
@@ -93,7 +93,7 @@ def test_run_preflight_matrix(
     assert len(results) == expected_len
     assert all_passed(results) == (expected_failed == [])
     assert failed_names(results) == expected_failed
-    if expected_len == 5 and expected_failed == []:
+    if expected_failed == []:
         # all_passed is vacuously False for an empty result list, never true-by-default.
         assert all_passed([]) is False
 

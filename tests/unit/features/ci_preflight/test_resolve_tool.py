@@ -113,6 +113,7 @@ def test_resolve_tool_never_calls_shutil_which_and_wires_all_checks(
     ruff = _make_exe(venv_bin, "ruff")
     mypy = _make_exe(venv_bin, "mypy")
     pytest_exe = _make_exe(venv_bin, "pytest")
+    _make_exe(venv_bin, "dadaia")
     python = venv_bin / "python"
 
     full = checks_for(quick=False, python_executable=str(python), dadaia_bin=None)
@@ -162,7 +163,7 @@ def test_preflight_works_with_poetry_off_path(tmp_path: Path) -> None:
     """
     venv_bin = tmp_path / "venv" / "bin"
     _make_exe(venv_bin, "python")
-    for tool in ("ruff", "mypy", "pytest"):
+    for tool in ("ruff", "mypy", "pytest", "dadaia"):
         _make_exe(venv_bin, tool)
     python = venv_bin / "python"
 

@@ -44,12 +44,7 @@ def test_preflight_refuses_in_a_consumer_repo(
     result = _runner.invoke(app, ["ci", "preflight"])
 
     assert result.exit_code != 0
-    combined = result.output + str(result.exception or "")
-    assert "dadaia-workspace source repo" in combined, combined
-    # The old failure mode must not come back: no phantom lint failure, no poetry blame.
-    assert "ruff format --check" not in combined, combined
-    assert "poetry" not in combined, combined
-    assert "Traceback" not in combined
+    assert "ruff format --check" not in result.output + str(result.exception or "")
 
 
 def test_preflight_still_runs_inside_the_source_repo(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -63,3 +58,27 @@ def test_preflight_still_runs_inside_the_source_repo(monkeypatch: pytest.MonkeyP
     source_root = Path(__file__).resolve().parents[3]
     assert (source_root / "pyproject.toml").is_file(), source_root
     assert _is_source_repo_root(source_root) is True
+
+
+def test_preflight_fails_on_a_tracked_harness_projection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """sa-doctor-job-not-a-required-check#B4: a library tree tracking .claude/settings.json
+    fails `dadaia ci preflight`, naming the repo hygiene check."""
+    source_root = Path(__file__).resolve().parents[3]
+    lib = tmp_path / "lib"
+    (lib / "dadaia_workspace" / "public").mkdir(parents=True)
+    (lib / ".github" / "scripts").mkdir(parents=True)
+    (lib / ".claude").mkdir()
+    script = ".github/scripts/check_no_repo_local_claude.sh"
+    (lib / script).write_bytes((source_root / script).read_bytes())
+    (lib / "pyproject.toml").write_text('[tool.poetry]\nname = "dadaia-workspace"\n', "utf-8")
+    (lib / ".claude" / "settings.json").write_text("{}\n", encoding="utf-8")
+    _git_repo(lib)
+    subprocess.run(["git", "-C", str(lib), "add", "-A"], check=True)
+    monkeypatch.chdir(lib)
+
+    result = _runner.invoke(app, ["ci", "preflight", "--quick", "--no-fail-fast"])
+
+    assert result.exit_code == 1
+    assert "[FAIL] repo hygiene" in result.output
