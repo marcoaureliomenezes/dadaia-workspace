@@ -21,7 +21,7 @@ import shlex
 import subprocess
 import sys
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -190,7 +190,7 @@ def _decide(
     decision = push_gate_decision(
         refs,
         gitflow=DEFAULT,
-        fixes=gate_fixes(),
+        fixes=replace(gate_fixes(), head="feature/0.0.1"),
         object_source=source or _FakeObjectSource(),
         repo=Path("/nonexistent-repo"),
         canon_violations_fn=canon_violations,
