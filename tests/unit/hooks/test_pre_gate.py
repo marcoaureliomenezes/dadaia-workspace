@@ -76,7 +76,7 @@ def _run(tmp_path: Path, payload: dict[str, Any], *, session_id: str = "claude-s
         (
             "Write",
             "file_path",
-            lambda ws: ws / ".dadaia" / "sessions" / "runtime" / "a.ptr",
+            lambda ws: ws / ".dadaia" / "sessions" / "a.json",
             "SEC-01",
         ),
         (
@@ -112,7 +112,7 @@ def test_non_write_and_protected_matrix(
     [
         # First header in-repo (allowed), second header PROTECTED
         # (.dadaia/sessions/) → blocked.
-        (".dadaia/sessions/runtime/a.ptr", "+forge", "SEC-01"),
+        (".dadaia/sessions/a.json", "+forge", "SEC-01"),
     ],
 )
 def test_apply_patch_multi_file_most_restrictive_blocks_whole_patch(

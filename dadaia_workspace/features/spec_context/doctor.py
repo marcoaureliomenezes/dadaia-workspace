@@ -13,7 +13,6 @@ lists and disagreed with what init/install create. Nothing here spells a zone na
 allow set, TTL and canon is a view of the registry.
 """
 
-import fnmatch
 import os
 import time
 from dataclasses import dataclass
@@ -53,6 +52,11 @@ class FindingVerdict(StrEnum):
     REAPED = "reaped"
 
 
+_DETAIL = {
+    FindingVerdict.CANON: "",
+    FindingVerdict.OPERATOR: "(instance exception)",
+    FindingVerdict.SLOP: "(not in the root law or the exceptions)",
+}
 _CANONICAL = frozenset({FindingVerdict.CANON, FindingVerdict.OPERATOR, FindingVerdict.REAPED})
 
 #: The zone the reaper HOLDS what it takes off the working tree. Deletion is reserved to
@@ -296,10 +300,10 @@ class DoctorService:
         globs = self._exception_globs()
         findings: list[Finding] = []
         findings.extend(self._scan_root(globs))
-        findings.extend(self._scan_dadaia_top())
+        findings.extend(self._scan_dadaia_top(globs))
         findings.extend(self._scan_repo_trees())
         for zone in workspace_layout.zones_with_canon():
-            findings.extend(self._scan_canon_zone(zone))
+            findings.extend(self._scan_canon_zone(zone, globs))
         now = time.time()
         for zone in workspace_layout.zones_with_ttl():
             findings.extend(self._scan_ttl_zone(zone, now))
@@ -380,9 +384,11 @@ class DoctorService:
             return ()
         return workspace_layout.parse_exception_globs(text)
 
-    def _excepted(self, entry: Path, globs: tuple[str, ...]) -> bool:
+    def _judged(self, entry: Path, globs: tuple[str, ...]) -> tuple[FindingVerdict, str]:
+        """``workspace_layout.verdict`` — the gate's own answer — plus the report detail."""
         rel = entry.relative_to(self._workspace_root).as_posix()
-        return any(fnmatch.fnmatch(entry.name, g) or fnmatch.fnmatch(rel, g) for g in globs)
+        judged = FindingVerdict(workspace_layout.verdict(rel, entry.is_dir(), globs))
+        return judged, _DETAIL[judged]
 
     @staticmethod
     def _finding(
@@ -406,31 +412,17 @@ class DoctorService:
     def _scan_root(self, globs: tuple[str, ...]) -> list[Finding]:
         out: list[Finding] = []
         for entry in sweep.walk(self._workspace_root):
-            allowed = (
-                workspace_layout.ROOT_ALLOWED_DIRS
-                if entry.is_dir()
-                else workspace_layout.ROOT_ALLOWED_FILES
-            )
-            if entry.name in allowed:
-                verdict, detail = FindingVerdict.CANON, ""
-            elif self._excepted(entry, globs):
-                verdict, detail = FindingVerdict.OPERATOR, "(instance exception)"
-            else:
-                verdict, detail = FindingVerdict.SLOP, "(not in the root law or the exceptions)"
+            verdict, detail = self._judged(entry, globs)
             out.append(self._finding("root", self._workspace_root, entry, verdict, detail))
         return out
 
-    def _scan_dadaia_top(self) -> list[Finding]:
+    def _scan_dadaia_top(self, globs: tuple[str, ...]) -> list[Finding]:
         out: list[Finding] = []
         present: set[str] = set()
         for entry in sweep.walk(self._dadaia):
-            if entry.is_dir() and entry.name in workspace_layout.zone_names():
+            if entry.is_dir():
                 present.add(entry.name)
-                verdict, detail = FindingVerdict.CANON, ""
-            elif not entry.is_dir() and entry.name in workspace_layout.DADAIA_ROOT_FILES:
-                verdict, detail = FindingVerdict.CANON, ""
-            else:
-                verdict, detail = FindingVerdict.SLOP, "(not a zone)"
+            verdict, detail = self._judged(entry, globs)
             out.append(self._finding("dadaia", self._dadaia, entry, verdict, detail))
         for zone in workspace_layout.provisioned_zones():
             if zone.name not in present:
@@ -445,14 +437,10 @@ class DoctorService:
                 )
         return out
 
-    def _scan_canon_zone(self, zone: Zone) -> list[Finding]:
-        assert zone.canon is not None
+    def _scan_canon_zone(self, zone: Zone, globs: tuple[str, ...]) -> list[Finding]:
         out: list[Finding] = []
         for entry in sweep.walk(self._dadaia / zone.name):
-            if any(fnmatch.fnmatch(entry.name, g) for g in zone.canon):
-                verdict, detail = FindingVerdict.CANON, ""
-            else:
-                verdict, detail = FindingVerdict.SLOP, "(outside the closed canon)"
+            verdict, detail = self._judged(entry, globs)
             out.append(self._finding(zone.name, self._dadaia, entry, verdict, detail))
         profile = JsonHarnessProfileStore.path(self._states)
         if profile.parent == self._dadaia / zone.name and not profile.exists():

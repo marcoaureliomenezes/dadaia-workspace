@@ -13,8 +13,7 @@ pattern the harness-env contract bans). The workspace root the gate consults is 
 through ``WORKSPACE_ROOT`` — a real harness-provided var — set by ``claude_hook_env``.
 
 CRIT: root-whitelist is a deterministic enforcement policy — every current input survives
-below as a named parametrized row, including the W1-6 first-path-component block and the
-fail-open-for-existing-operator-dir decision.
+below as a named parametrized row, including the W1-6 first-path-component block.
 """
 
 from __future__ import annotations
@@ -118,17 +117,6 @@ def test_block_table(
         ("whitelisted_root_entry", None, lambda ws: ws / "AGENTS.md", "Write", "file_path"),
         ("subdir_write", None, lambda ws: ws / "repos" / "x" / "file.py", "Write", "file_path"),
         ("unparseable_path_fails_open", None, None, "Write", None),
-        (
-            # A nested write into an EXISTING (operator-created) top-level dir stays
-            # allowed. Only a not-yet-existing first component is blocked; an existing
-            # non-whitelisted top-level entry is presumed operator-created (fail-open per
-            # the Root Law).
-            "nested_write_under_existing_operator_dir",
-            lambda ws: (ws / "operator-tool").mkdir(),
-            lambda ws: ws / "operator-tool" / "sub" / "note.txt",
-            "Write",
-            "file_path",
-        ),
         (
             # A deep write under a whitelisted root entry (.dadaia/...) is allowed
             # regardless.

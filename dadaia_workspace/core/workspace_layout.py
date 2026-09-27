@@ -18,6 +18,7 @@ second name list exists anywhere in the package, every creator is a live module)
 
 from __future__ import annotations
 
+import fnmatch
 import re
 from dataclasses import dataclass
 from enum import StrEnum
@@ -224,6 +225,36 @@ def parse_exception_globs(text: str) -> tuple[str, ...]:
     dropped (``fnmatch`` never matches it); deduplicated, first kept, order kept."""
     lines = (line.strip().rstrip("/") for line in text.splitlines())
     return tuple(dict.fromkeys(line for line in lines if line and not line.startswith("#")))
+
+
+def verdict(rel: str, is_dir: bool, globs: tuple[str, ...]) -> Literal["canon", "operator", "slop"]:
+    """The ONE answer to "may this entry exist" (ADR 0058) for the gate and the doctor.
+
+    Judges each judged level of *rel* — the root, ``.dadaia/<zone>``, a closed-canon zone's
+    entry — type-aware (*is_dir* is the leaf's type; every ancestor is a directory). A level
+    outside its allow set is ``operator`` iff an exception glob matches its name or
+    workspace-relative path, else ``slop``; below an open level everything is ``canon``.
+    """
+    parts = rel.strip("/").split("/")
+    for depth, name in enumerate(parts):
+        directory = is_dir or depth < len(parts) - 1
+        if depth == 0:
+            allowed = ROOT_ALLOWED_DIRS if directory else ROOT_ALLOWED_FILES
+        elif depth == 1 and parts[0] == ".dadaia":
+            allowed = zone_names() if directory else DADAIA_ROOT_FILES
+        elif depth == 2 and parts[0] == ".dadaia":
+            zone = next((z for z in DADAIA_ZONES if z.name == parts[1]), None)
+            if zone is None or zone.canon is None:
+                return "canon"
+            allowed = zone.canon
+        else:
+            return "canon"
+        if any(fnmatch.fnmatch(name, a) for a in allowed):
+            continue
+        sub = "/".join(parts[: depth + 1])
+        excepted = any(fnmatch.fnmatch(name, g) or fnmatch.fnmatch(sub, g) for g in globs)
+        return "operator" if excepted else "slop"
+    return "canon"
 
 
 # Derived views — one per consumer, all pure; a consumer never spells the names itself.
