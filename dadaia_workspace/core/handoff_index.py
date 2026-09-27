@@ -3,15 +3,14 @@
 release 0.5.1 candidate K6. Before this module, ten independent readers each re-decided
 how to find a ``*.handoff.json`` file, which schema version it carried, and where its
 ``artifact.path`` pointed on disk — ``cli/commands/reports.py``, the three services of the
-since-deleted ``features/reports/`` package, ``features/panel/{reports_doctor.py,views/api_reports.py}``,
-``features/chokepoints/service.py``, ``features/specs/doctor_release.py``, plus the stdlib
+since-deleted ``features/reports/`` package, two since-deleted panel views, the since-deleted chokepoints service, ``features/specs/doctor_release.py``, plus the stdlib
 schema validator itself. A fix landing in one reader did not reach the next (7 bug-ledger
 records, one open — see the module-level docstring on :meth:`Handoff.validate` for the fix
 this module carries).
 
 Placement (core, not a features/* package): resolving "which handoff, what version, which
-artifact" needs the SAME answer in ``features.chokepoints``, ``features.specs``,
-``features.panel`` — three *different* feature packages under the
+artifact" needs the SAME answer in ``features.chokepoints`` and ``features.specs`` —
+*different* feature packages under the
 P-07 mutual-independence contract. A features/* home would need a new suppressed
 ``features-no-cross-feature`` ignore edge per consumer (the cap must never rise). ``core`` is
 outside that contract and already hosts the same shape of cross-cutting filesystem resolver
@@ -53,7 +52,6 @@ __all__ = [
 ]
 
 _TIMESTAMP_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{6}Z)")
-_SEVERITY_ORDER = ("CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO")
 _SELF_PULL_REQUIRED_FROM = "handoff-v1.2"
 
 # ---------------------------------------------------------------------------
@@ -354,11 +352,6 @@ class Handoff:
         return value if isinstance(value, dict) else {}
 
     @property
-    def artifact_type(self) -> str | None:
-        value = self.artifact.get("type")
-        return value if isinstance(value, str) else None
-
-    @property
     def artifact_path_raw(self) -> str | None:
         """The declared ``artifact.path`` string, unresolved — ``None`` if absent/empty."""
         value = self.artifact.get("path")
@@ -395,24 +388,6 @@ class Handoff:
         return tuple(ref for ref in refs if isinstance(ref, str))
 
     # -- derived helpers -------------------------------------------------
-
-    def findings_summary(self) -> dict[str, int]:
-        """Severity counts (``CRITICAL``/``HIGH``/``MEDIUM``/``LOW``) — ``INFO`` excluded,
-        matching every existing panel/reports reader's four-bucket shape."""
-        counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
-        for finding in self.findings:
-            sev = finding.severity.upper()
-            if sev in counts:
-                counts[sev] += 1
-        return counts
-
-    def severity_max(self) -> str | None:
-        """The highest-ranked severity present, or ``None`` when there are no findings."""
-        present = {finding.severity.upper() for finding in self.findings}
-        for sev in _SEVERITY_ORDER:
-            if sev in present:
-                return sev
-        return None
 
     def effective_timestamp(self) -> datetime:
         """``produced_at`` if parseable, else :func:`path_timestamp` of the file itself."""
@@ -713,7 +688,3 @@ class HandoffIndex:
             self.validate_file(path, reviewed_root=reviewed_root)
             for path in discover_handoff_paths(search_root, "**/*.handoff.json")
         ]
-
-    def check_hash(self, handoff_path: Path) -> str:
-        """``"match"``/``"mismatch"``/``"missing_artifact"`` for ``handoff_path``'s artifact."""
-        return Handoff.load(handoff_path).artifact_hash_status(self._workspace_root)

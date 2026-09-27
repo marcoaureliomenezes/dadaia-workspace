@@ -1,8 +1,8 @@
 ---
 slug: specs-migration
 title: specs-migration
-tldr: specs init brings specs/ to the canon (scaffold, upgrade, or specs-bkp on consent), never committing; specs upgrade walks 6 to 7; migrate lifts registry v1.
-summary: The verbs that bring persisted state up to what this installation reads — dadaia specs init (onboarding level 3; absent scaffolds, dadaia upgrades, foreign moves to specs-bkp/), dadaia specs upgrade (one live hop, 6 to 7, plus fixed law sections and lossless template repairs; below 6 it refuses without writing) and dadaia migrate (spec_contexts.json v1 to v2, planned, confirmed, atomic).
+tldr: specs init brings specs/ to the canon and writes the project gitflow, never committing; specs upgrade walks 6 to 7; migrate lifts registry v1.
+summary: The verbs that bring persisted state up to what this installation reads — dadaia specs init (onboarding level 3a; absent scaffolds, dadaia upgrades, foreign moves to specs-bkp/, the constitution's gitflow block written or kept), dadaia specs upgrade (one live hop, 6 to 7, plus fixed law sections and lossless template repairs; below 6 it refuses without writing) and dadaia migrate (spec_contexts.json v1 to v2, planned, confirmed, atomic).
 tags: [migration, upgrade, specs, registry, onboarding]
 sources:
   - dadaia_workspace/features/migrate/**
@@ -13,16 +13,19 @@ sources:
 
 ## Why one atom
 
-- Every verb here brings an older or foreign persisted state up to what this installation reads; the version logic lives in `dadaia_workspace/features/migrate/` and `dadaia_workspace/core/specs_version.py`.
+- Every verb here brings an older or foreign persisted state up to what this installation reads; the version logic lives in `dadaia_workspace/features/migrate/` and `dadaia_workspace/core/specs_version.py` (pure: the pattern-version canon and the tree classifier), and every constitution read and frontmatter write in `dadaia_workspace/core/gitflow.py`.
 
 ## `dadaia specs init`
 
-- `dadaia specs init [--context <ctx>] [--specs-dir <path>] [--name <project>] [--replace-foreign]` is onboarding level 3: it targets the context's main repo `specs/` (the bound context when `--context` is omitted); with no context resolvable it exits 2 with `fix: .dadaia/.venv/bin/dadaia specs init --context <name>`.
-- An absent `specs/` gets the canon scaffold ([[public-asset-distribution]]); a dadaia tree (stamped 6 or above) runs `specs upgrade`, then gains only its missing canon files; anything else is foreign.
-- A foreign tree is replaced only with consent: `--replace-foreign`, or a y/N confirm on a TTY; without it the run exits 2, writes nothing and prints `fix: … specs init --context <ctx> --replace-foreign`.
-- With consent, `specs/` is renamed to `specs-bkp/` in the same repo — tracked files through `git mv`, staged and uncommitted, every byte kept — then scaffolded; an existing `specs-bkp/` exits 1 with nothing written and a `fix:` that renames it aside.
+- `dadaia specs init [--context <ctx>] [--specs-dir <path>] [--name <project>] [--replace-foreign] [--principal <b>] [--integration <b>] [--work-prefix <p>]` is onboarding level 3a: it targets the context's main repo `specs/` (the bound context when `--context` is omitted); with no context resolvable it exits 2 with `fix: <cli> specs init --context <name>`.
+- An absent `specs/` gets the canon scaffold ([[public-asset-distribution]]); a dadaia tree (stamped 6 or above) runs `specs upgrade`, then gains only its missing canon files; a constitution whose frontmatter does not parse, or whose `gitflow:` block does not validate, is malformed and refused, exit 2, nothing written (fix: repair its YAML); anything else is foreign.
+- The project gitflow is the `gitflow: {principal: <name>, integration: <name>, work: <prefix>}` block of `specs/constitution.md` frontmatter ([[sdd-gate-v3]]); each flag wins over the tree's own valid block, which wins over detection — principal from the local `origin/HEAD`, else `main`; integration `develop`; work prefix `feature/`. The names must be valid branch names, principal and integration must differ, and the work prefix may not nest under a role name; an invalid result exits 2 before any write. The same flags twice is a no-op, an operator's custom names are never reset, and stdout names the gitflow written (`[gitflow] …`).
+- One frontmatter merge-writer serves both `specs_pattern_version` and `gitflow`: a written key's line is replaced in place, a new one appended, every other key and the body kept byte for byte.
+- A foreign tree is replaced only with consent, `--replace-foreign`; without it the run exits 2, writes nothing and prints `fix: <cli> specs init --context <ctx> --replace-foreign`.
+- With consent, `specs/` is renamed to `specs-bkp/` in the same repo — tracked files through `git mv`, staged and uncommitted, every byte kept — then scaffolded; when `specs-bkp/` already exists the second backup lands in `specs-bkp/<UTC timestamp>/`, the one backup location the publish commits.
 - It also installs the main repo's scoped law where absent, its `<repo-name>` rendered as the project (`--name`, else the main repo's directory name): `AGENTS.md` at the repo root, and `tests/AGENTS.md` only when `tests/` exists; an existing or symlinked target is never overwritten or written through.
-- Every written path is printed (`[created]`, `[moved]`, the upgrade's own lines); `specs init` never commits — the operator reviews the worktree, and an unborn repo's first commit is `context baseline` ([[context-management]]).
+- Every written path is printed (`[created]`, `[moved]`, the upgrade's own lines); `specs init` never commits — the project publication, `context baseline`, commits and pushes the onboarding paths ([[context-management]]).
+- [[workspace-doctor]]'s `GITFLOW-1` warns on an absent or malformed block (the gate then reads the default) with `fix: <cli> specs init --specs-dir <specs>` (no flags); on an absent block, executing it writes the detected gitflow and clears the finding.
 
 ## `dadaia specs upgrade`
 

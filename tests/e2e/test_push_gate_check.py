@@ -40,6 +40,8 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.cli_line import shell_line
+
 pytestmark = pytest.mark.e2e
 
 _SLUG = "demo-ctx"
@@ -107,9 +109,7 @@ def test_feature_branch_push_flows_with_no_verdict_anywhere(tmp_path: Path) -> N
 def test_develop_push_is_blocked_naming_the_pr_path(tmp_path: Path) -> None:
     workspace = tmp_path
     repo, sha = _init_repo(workspace, _SLUG)
-    result = _run_push_gate(
-        repo, workspace, f"refs/heads/develop {sha} refs/heads/develop {_ZERO}\n"
-    )
+    result = _run_push_gate(repo, workspace, f"refs/heads/develop {sha} refs/heads/develop {sha}\n")
     out = result.stdout + result.stderr
     assert result.returncode != 0, out
     assert "BLOCKED" in out, out
@@ -144,8 +144,12 @@ def _push(branch: str, sha: str) -> str:
 
 
 def _write_constitution(repo: Path, text: str) -> None:
+    """Committed: the gate reads HEAD's constitution, never the working tree (ADR 0048)."""
     (repo / "specs").mkdir()
     (repo / "specs" / "constitution.md").write_text(text, encoding="utf-8")
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@t.invalid"]
+    subprocess.run([*git, "add", "specs"], cwd=repo, check=True, capture_output=True)
+    subprocess.run([*git, "commit", "-qm", "c"], cwd=repo, check=True, capture_output=True)
 
 
 def test_a_custom_gitflow_governs_the_push(tmp_path: Path) -> None:
@@ -155,7 +159,8 @@ def test_a_custom_gitflow_governs_the_push(tmp_path: Path) -> None:
     assert _run_push_gate(repo, tmp_path, _push("work/0.0.1", sha)).returncode == 0
     refused = _run_push_gate(repo, tmp_path, _push("feature/0.0.1", sha))
     assert refused.returncode != 0
-    assert "fix: git checkout -b 'work/<M.m.p>' trunk" in refused.stderr, refused.stderr
+    fix = shell_line("git", "-C", str(repo), "switch", "-c", "work/0.1.0", sha)
+    assert f"fix: {fix}" in refused.stderr, refused.stderr
 
 
 def test_an_absent_gitflow_block_warns_and_falls_back_to_the_default(tmp_path: Path) -> None:

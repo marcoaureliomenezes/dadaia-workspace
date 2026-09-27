@@ -3,7 +3,7 @@
 Before this module, seven files each carried their own copy of a ``--- ... ---``
 delimiter regex plus a hand-rolled ``yaml.safe_load`` + dict-check loop:
 ``features/specs/{memory_lint,catalog,doctor_memory}.py``,
-``features/panel/views/memory.py``, ``features/migrate/bugs_jsonl.py`` (deleted with
+a since-deleted panel view, ``features/migrate/bugs_jsonl.py`` (deleted with
 its module, T-051-16), ``core/specs_version.py``, and the projected
 ``public/scripts/generate-memory-catalog.py`` (deleted, T-051-16). Six of those
 survive as consumers of THIS module; ``core/specs_version.py`` imports only
@@ -31,7 +31,7 @@ __all__ = ["Frontmatter", "FrontmatterError", "FRONTMATTER_RE", "missing_fields"
 #: The ONE compiled definition (A10.2 — ``rg '_FRONTMATTER_RE'`` names this line
 #: alone). Leading delimiter, DOTALL-captured block, closing delimiter with an
 #: OPTIONAL trailing newline (a frontmatter-only file, no body, still matches —
-#: the leniency ``features/panel/views/memory.py``'s copy already relied on).
+#: the leniency the retired copies relied on).
 FRONTMATTER_RE = re.compile(r"\A---[ \t]*\n(.*?)\n---[ \t]*\n?", re.DOTALL)
 
 

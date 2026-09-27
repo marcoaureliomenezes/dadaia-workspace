@@ -73,7 +73,7 @@ The repo-root directory a foreign specs tree is moved to (`git mv`, staged) by `
 _Avoid_: specs backup, specs.old, archive
 
 **First pass**:
-Level 3b: the `dd-audit-project` run on a fresh specs tree — the `memory.py drift` worklist drives `dd-product-engineer` to fill memory from code and `specs-bkp/`; done when memory holds real content (`memory.py check` exit 0), never by a stamp.
+Level 3b: the `dd-audit-project` run on a fresh specs tree — the `memory.py drift` worklist drives `dd-product-engineer` to fill memory from code and `specs-bkp/`; done when memory holds real content (`.dadaia/.venv/bin/dadaia doctor --context <ctx>` exit 0), never by a stamp.
 _Avoid_: bootstrap audit, initial import, migration
 
 ## Enforcement
@@ -202,10 +202,6 @@ _Avoid_: memory pass, apply the deltas, sync
 **Governance verb**:
 The one CLI command authorized to change a governance record — `bugs.py append|update|resolve|supersede|defer|reject|archive`, `backlog new|exit`, `release new|phase|check`, `audit disposition|close`.
 _Avoid_: CLI command (generic), mutation, setter
-
-**Governance event**:
-The row a governance verb writes into the telemetry store after its record write — `{event_id, ts, session_id, context, verb, ledger, record_id, record_hash}`. Observability, never a gate.
-_Avoid_: record, audit trail, log entry
 
 **Hand edit**:
 A governance record change with no matching governance event. Measured as a WARNING (`LEDGER-*-HANDEDIT`, `RELEASE-TREE-HANDEDIT`), never blocked.

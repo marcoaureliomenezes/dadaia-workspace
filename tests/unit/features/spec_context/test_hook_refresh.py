@@ -52,3 +52,11 @@ def test_an_operator_hook_is_kept(tmp_path: Path) -> None:
     hook = _hooks(tmp_path, "#!/bin/sh\necho mine\n")
     assert install_git_hooks(tmp_path) == []
     assert hook.read_text(encoding="utf-8") == "#!/bin/sh\necho mine\n"
+
+
+def test_an_undecodable_operator_hook_is_kept(tmp_path: Path) -> None:
+    """Review M3: a non-UTF-8 operator hook is operator-owned — never a crash."""
+    hook = _hooks(tmp_path, "")
+    hook.write_bytes(b"#!/bin/sh\necho caf\xe9\n")
+    assert install_git_hooks(tmp_path) == []
+    assert hook.read_bytes() == b"#!/bin/sh\necho caf\xe9\n"

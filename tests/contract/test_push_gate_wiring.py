@@ -34,6 +34,9 @@ class _SpyObjectSource:
     empty/None — this spy never publishes a specs/ tree, so the pre-push canon scan
     step this class also now reaches is a pure pass-through."""
 
+    def remote_branch(self, repo: Path, branch: str) -> bool:
+        return True
+
     def __init__(self) -> None:
         self.calls: list[tuple[Path, str, str]] = []
 
@@ -81,6 +84,9 @@ def test_push_gate_check_always_wires_a_real_object_source(monkeypatch, tmp_path
 
 class _StraySpecsObjectSource(_SpyObjectSource):
     """Yields one pushed-range object at a pattern-5 specs/ path (a Markdown backlog)."""
+
+    def remote_branch(self, repo: Path, branch: str) -> bool:
+        return True
 
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         self.calls.append((repo, local_sha, remote_sha))

@@ -112,3 +112,28 @@ def test_lint1_empty_memory_dir_is_a_noop(tmp_path: Path) -> None:
     issues = MemoryValidator(specs).check_lint1_memory_atoms()
 
     assert issues == []
+
+
+def test_lint1_emits_one_single_line_issue_per_atom_error(tmp_path: Path) -> None:
+    """Bug lint1-prints-raw-multiline-findings: the doctor prints one
+    `<CODE> <verdict> <message>` line per finding, so every lint error is its own issue
+    naming its own atom — never a multi-line block of `  [path] ERROR:` lines."""
+    specs = _make_specs_with_memory(tmp_path)
+    architecture = specs / "memory" / "architecture.md"
+    architecture.write_text(
+        _VALID_FRONTMATTER.format(slug="architecture") + "\n## History\n\nx\n## Changelog\n",
+        encoding="utf-8",
+    )
+    quality = specs / "memory" / "quality.md"
+    quality.write_text(
+        _VALID_FRONTMATTER.format(slug="quality") + "\n## History\n\nx\n", encoding="utf-8"
+    )
+
+    issues = MemoryValidator(specs).check_lint1_memory_atoms()
+
+    assert [(issue.code, issue.path) for issue in issues] == [
+        ("LINT-1", str(architecture)),
+        ("LINT-1", str(architecture)),
+        ("LINT-1", str(quality)),
+    ]
+    assert all("\n" not in issue.description for issue in issues)

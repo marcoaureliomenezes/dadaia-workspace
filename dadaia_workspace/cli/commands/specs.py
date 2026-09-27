@@ -15,9 +15,8 @@ from dadaia_workspace.cli._specs_resolution import (
     resolve_context_specs_dir_for_cli,
     resolve_specs_dir_for_cli,
 )
-from dadaia_workspace.core import specs_version
+from dadaia_workspace.core import gitflow, specs_version
 from dadaia_workspace.core.cli_line import fix_line
-from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, from_mapping
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.migrate import upgrade as upgrade_feature
@@ -81,12 +80,8 @@ def _echo_upgrade(specs: Path, result: UpgradeResult) -> None:
 
 
 def _init_fix(*argv: str) -> str:
-    """``fix:`` re-running ``specs init`` — workspace-relative when no instance is around."""
-    try:
-        root = resolve_workspace_root()
-    except WorkspaceNotInitializedError:
-        root = Path()
-    return f"fix: {fix_line(root, 'specs', 'init', *argv)}"
+    """``fix:`` re-running ``specs init`` with the running CLI (it resolves its own root)."""
+    return f"fix: {fix_line(None, 'specs', 'init', *argv)}"
 
 
 _BACKUP = "specs-bkp"
@@ -106,7 +101,7 @@ def init(
     replace_foreign: bool = typer.Option(
         False,
         "--replace-foreign",
-        help=f"Move a foreign specs/ to {_BACKUP}/ (git mv, staged) without asking.",
+        help=f"Consent to move a foreign specs/ to {_BACKUP}/ (git mv, staged).",
     ),
     principal: str | None = typer.Option(
         None, "--principal", help="Principal branch. Default: kept, else origin/HEAD, else main."
@@ -135,9 +130,15 @@ def init(
         specs_dir = str(resolve_context_specs_dir_for_cli(resolve_workspace_root(), ctx))
         rerun = ("--context", ctx)
     target = resolve_specs_dir_for_cli(specs_dir)
+    kind = specs_version.classify(target)
+    if kind == "malformed":
+        typer.echo(
+            f"[refused] {gitflow.constitution_error(target)}; nothing written.\n"
+            f"fix: repair the YAML frontmatter of {target / 'constitution.md'}",
+            err=True,
+        )
+        raise typer.Exit(2)
     flow = _gitflow(target, principal, integration, work_prefix, rerun)
-
-    kind = canon.classify(target)
     if kind == "foreign":
         _move_foreign(target, rerun, replace_foreign)
     elif kind == "dadaia":
@@ -147,10 +148,10 @@ def init(
     written = canon.scaffold(target, project_name=project)
     for path in [*written, *canon.scaffold_repo_law(target.parent, project_name=project)]:
         typer.echo(f"[created] {path}")
-    specs_version.merge_frontmatter(target, gitflow=flow)
+    gitflow.merge_frontmatter(target, gitflow=flow)
     typer.echo(
         f"[gitflow] principal {flow.principal}, integration {flow.integration}, "
-        f"work {flow.work_prefix}<M.m.p>"
+        f"work {flow.work_pattern}"
     )
     if kind != "dadaia":
         typer.echo(f"[ok] {target} at pattern version {specs_version.CANONICAL_SPECS_VERSION}")
@@ -165,8 +166,8 @@ def _gitflow(
 ) -> Gitflow:
     """Flags over the tree's own valid block, over detection (``origin/HEAD``, else
     ``main``); an invalid result refuses before anything is written."""
-    kept, warning = specs_version.read_gitflow(target)
-    if warning is not None:
+    kept, absent = gitflow.read_gitflow(target)  # a malformed block refused upstream
+    if absent is not None:
         kept = replace(
             DEFAULT, principal=container.build_git_client().default_branch(target.parent)
         )
@@ -185,23 +186,19 @@ def _gitflow(
 
 
 def _move_foreign(target: Path, rerun: tuple[str, ...], replace_foreign: bool) -> None:
-    """``specs/`` -> ``specs-bkp/`` after consent; exits on a refusal, writing nothing."""
-    backup = target.parent / _BACKUP
-    if backup.exists():
+    """``specs/`` -> ``specs-bkp/`` (``specs-bkp/<UTC>/`` when that exists: the one
+    backup location baseline publishes) under ``--replace-foreign``; exits on a
+    refusal, writing nothing."""
+    if not replace_foreign:
         typer.echo(
-            f"[error] {backup} already exists — move it aside first.\n"
-            f"fix: mv {backup} {backup}-{datetime.now(UTC):%Y%m%dT%H%M%SZ}",
+            f"[refused] {target} is a foreign specs tree; nothing written.\n"
+            f"{_init_fix(*rerun, '--replace-foreign')}",
             err=True,
         )
-        raise typer.Exit(1)
-    if not replace_foreign:
-        question = f"{target} is not a dadaia specs tree. Move it to {_BACKUP}/ and scaffold?"
-        if not (sys.stdin.isatty() and typer.confirm(question, default=False)):
-            typer.echo(
-                f"[refused] {target} is a foreign specs tree; nothing written.\n"
-                f"{_init_fix(*rerun, '--replace-foreign')}",
-                err=True,
-            )
-            raise typer.Exit(2)
-    container.build_git_client().move(target.parent, target.name, _BACKUP)
+        raise typer.Exit(2)
+    backup = target.parent / _BACKUP
+    if backup.exists():
+        backup = backup / f"{datetime.now(UTC):%Y%m%dT%H%M%SZ}"
+    rel = backup.relative_to(target.parent).as_posix()
+    container.build_git_client().move(target.parent, target.name, rel)
     typer.echo(f"[moved] {target} -> {backup} (staged, not committed)")

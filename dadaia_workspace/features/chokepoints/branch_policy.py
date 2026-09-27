@@ -7,20 +7,21 @@ before either specs-scan step). Branch names come from the injected
 :class:`~dadaia_workspace.core.gitflow.Gitflow`; none is spelled here.
 :class:`Decision` — the shared outcome shape every chokepoint gate returns — lives here
 too: this module has no internal-package dependency, so every sibling module (``pre_commit``,
-``push_gate``, ``verdict``) imports it from here rather than duplicating it or reaching
+``push_gate``) imports it from here rather than duplicating it or reaching
 into ``__init__.py`` (which itself re-exports from this module, never the reverse).
 """
 
 from __future__ import annotations
 
 import re
-import shlex
 from dataclasses import dataclass
 
+from dadaia_workspace.core.cli_line import git_line, shell_line
 from dadaia_workspace.core.gitflow import Gitflow
 
 __all__ = [
     "Decision",
+    "GateFixes",
     "PushRef",
     "check_branch_policy",
     "parse_push_stdin",
@@ -71,12 +72,12 @@ class PushRef:
 
     @property
     def is_deletion(self) -> bool:
-        """True when this ref is being deleted (zero local sha) — passes with no verdict."""
+        """True when this ref is being deleted (zero local sha) — passes the branch policy."""
         return self.local_sha == ZERO_SHA or not self.local_sha
 
     @property
     def is_tag(self) -> bool:
-        """True when this ref is a tag push — passes with no verdict (DP-5)."""
+        """True when this ref is a tag push — passes the branch policy (DP-5)."""
         return self.local_ref.startswith("refs/tags/")
 
 
@@ -118,83 +119,85 @@ HEADS_PREFIX = "refs/heads/"
 _LAW = "project gitflow: specs/constitution.md"
 
 
-def _work(gitflow: Gitflow) -> str:
-    return f"{gitflow.work_prefix}<M.m.p>"
+@dataclass(frozen=True)
+class GateFixes:
+    """What a refusal's fix line names beyond the gitflow — built by the composition
+    root: the repo (every git fix is ``git -C <repo>``, so it runs from any cwd), the
+    live work branch and whether it is cut locally, and HEAD's branch (``""``: detached)."""
+
+    repo: str
+    work: str = ""
+    cut: bool = False
+    head: str = ""
 
 
-def _refuse_branch(ref: PushRef, branch: str, gitflow: Gitflow) -> Decision:
-    """Actionable refusal for a non-pushable ref: rule + permitted names + one fix."""
-    role = gitflow.role_of(branch)
+def _blocked(text: str, fix: str) -> Decision:
+    """One refusal with one single-command fix (no ``&&``: Windows PowerShell 5.1)."""
+    return Decision(allowed=False, message=f"[pre-push] BLOCKED: {text} ({_LAW}).\nfix: {fix}")
+
+
+def _refuse_branch(
+    ref: PushRef, branch: str | None, gitflow: Gitflow, fixes: GateFixes
+) -> Decision:
+    """Actionable refusal for a non-pushable ref (*branch* ``None``: not a branch head)."""
+    role = gitflow.role_of(branch) if branch is not None else None
+    work = gitflow.work_pattern
     if role is not None and ref.remote_sha == ZERO_SHA:
-        return Decision(
-            allowed=False,
-            message=(
-                f"[pre-push] BLOCKED: creating the {role} branch '{branch}' would publish "
-                "new objects — a birth may carry only already-published history or one "
-                f"empty root commit ({_LAW}). Stale remote-tracking refs look the same: "
-                "refresh them, then push again.\nfix: git fetch --all"
-            ),
+        other = gitflow.integration if role == "principal" else gitflow.principal
+        return _blocked(
+            f"creating the {role} branch '{branch}' on an origin that already holds "
+            f"'{other}' would publish new objects — birth it at the published '{other}' tip",
+            git_line(fixes.repo, "push", "origin", f"refs/remotes/origin/{other}:{ref.remote_ref}"),
         )
-    if role == "principal":
-        why = f"advances only via a PR from the integration branch '{gitflow.integration}'"
-        fix = ["gh", "pr", "create", "--base", branch, "--head", gitflow.integration]
-    elif role == "integration":
-        why = f"advances only via a PR from a work branch '{_work(gitflow)}'"
-        fix = ["gh", "pr", "create", "--base", branch, "--head", _work(gitflow)]
-    else:
-        return Decision(
-            allowed=False,
-            message=(
-                f"[pre-push] BLOCKED: ref '{ref.local_ref}' is outside the gitflow — principal "
-                f"'{gitflow.principal}', integration '{gitflow.integration}', work "
-                f"'{_work(gitflow)}' ({_LAW}). Only a work branch is pushable.\n"
-                f"fix: {shlex.join(['git', 'checkout', '-b', _work(gitflow), gitflow.principal])}"
-                f" && {shlex.join(['git', 'push', 'origin', _work(gitflow)])}"
-            ),
+    if role is None:
+        return _blocked(
+            f"ref '{ref.local_ref}' is outside the gitflow — principal '{gitflow.principal}', "
+            f"integration '{gitflow.integration}', work '{fixes.work or work}'; only a work "
+            f"branch is pushable: switch to it, merge {ref.local_sha} into it (never a "
+            "rewrite), then push it",
+            git_line(fixes.repo, "switch", fixes.work)
+            if fixes.cut
+            else git_line(fixes.repo, "switch", "-c", fixes.work or work, ref.local_sha),
         )
-    return Decision(
-        allowed=False,
-        message=(
-            f"[pre-push] BLOCKED: the {role} branch '{branch}' is never pushed directly — "
-            f"it {why} ({_LAW}).\nfix: {shlex.join(fix)}"
-        ),
+    head = gitflow.integration if role == "principal" else work
+    return _blocked(
+        f"the {role} branch '{branch}' is never pushed directly — it advances only via a PR "
+        f"from '{head}'",
+        shell_line("gh", "pr", "create", "--base", str(branch), "--head", head),
     )
 
 
 def check_branch_policy(
-    refs: list[PushRef], gitflow: Gitflow, births: frozenset[str] = frozenset()
+    refs: list[PushRef],
+    gitflow: Gitflow,
+    fixes: GateFixes,
+    births: frozenset[str] = frozenset(),
 ) -> Decision | None:
-    """Every non-deletion, non-tag ref must be a work branch of *gitflow*, pushed to the
-    SAME remote name; the principal and integration branches are PR-only, except their
-    birth (ADR 0036): a local sha in *births* (the caller proved it creates the remote
-    branch and publishes nothing). Returns the
-    first refusal, or ``None`` when every ref clears (the caller has already excluded
-    tags and deletions from *refs*).
+    """Every non-deletion, non-tag ref must land on a branch of *gitflow*: a work branch
+    pushed from the SAME-named local head, or the birth of the principal/integration
+    branch (ADR 0036; R13) — a local sha in *births* (the caller proved origin holds no
+    gitflow branch yet, or the birth publishes nothing), from any source. The
+    principal and integration branches are otherwise PR-only; *fixes* feeds the refusals'
+    fix lines. Returns the first
+    refusal, or ``None`` when every ref clears (the caller has already excluded tags and
+    deletions from *refs*).
     """
     for ref in refs:
-        if not ref.local_ref.startswith(HEADS_PREFIX):
-            return Decision(
-                allowed=False,
-                message=(
-                    f"[pre-push] BLOCKED: local ref '{ref.local_ref}' is not a branch "
-                    f"head — only a work branch '{_work(gitflow)}' may be pushed ({_LAW}).\n"
-                    f"fix: {shlex.join(['git', 'checkout', _work(gitflow)])}"
-                    f" && {shlex.join(['git', 'push', 'origin', _work(gitflow)])}"
-                ),
-            )
-        branch = ref.local_ref[len(HEADS_PREFIX) :]
+        if not ref.remote_ref.startswith(HEADS_PREFIX):
+            return _refuse_branch(ref, None, gitflow, fixes)
+        branch = ref.remote_ref[len(HEADS_PREFIX) :]
         role = gitflow.role_of(branch)
-        born = role in ("principal", "integration") and ref.local_sha in births
-        if role != "work" and not born:
-            return _refuse_branch(ref, branch, gitflow)
-        if ref.remote_ref != f"{HEADS_PREFIX}{branch}":
-            return Decision(
-                allowed=False,
-                message=(
-                    f"[pre-push] BLOCKED: refspec aims local '{branch}' at remote "
-                    f"'{ref.remote_ref}' — only refs/heads/{branch} → refs/heads/{branch} "
-                    f"is pushable ({_LAW}).\n"
-                    f"fix: {shlex.join(['git', 'push', 'origin', f'{branch}:{branch}'])}"
-                ),
+        if role in ("principal", "integration") and ref.local_sha in births:
+            continue
+        if role != "work":
+            return _refuse_branch(ref, branch, gitflow, fixes)
+        if not ref.local_ref.startswith(HEADS_PREFIX):
+            return _refuse_branch(ref, None, gitflow, fixes)
+        if ref.local_ref != ref.remote_ref:
+            return _blocked(
+                f"refspec aims '{ref.local_ref}' at remote '{ref.remote_ref}' — only "
+                f"refs/heads/{branch} → refs/heads/{branch} is pushable: name the local "
+                "branch as the remote one, then push it",
+                git_line(fixes.repo, "branch", "-m", ref.local_ref[len(HEADS_PREFIX) :], branch),
             )
     return None

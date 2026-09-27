@@ -22,6 +22,7 @@ for every consumer and is staged/projected verbatim. Two failure modes must stay
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 import tomllib
@@ -100,6 +101,7 @@ _RETIRED_SURFACES: tuple[str, ...] = (
     "reports cleanup",
     "ROOT-4",
     "legacy-quarantine",
+    "repos catalog",
 )
 
 
@@ -157,3 +159,113 @@ def test_public_assets_carry_no_portuguese_control_vocabulary() -> None:
         "Portuguese control vocabulary under dadaia_workspace/public/ — "
         f"translate it (0.4.7 FR4): {offenders}"
     )
+
+
+# A bare `dadaia`/`dadaia-workspace` command word: not preceded by a path separator, a dot
+# or a word character (so `.venv/bin/dadaia` and `dadaia_workspace` pass). The one bare
+# spelling allowed is the `uvx dadaia-workspace init` bootstrap that creates the venv.
+_BARE_CLI_RE = re.compile(r"(?<![\w./-])dadaia(?:-workspace)?(?= [a-z-])")
+_UVX_INIT_RE = re.compile(r"uvx dadaia-workspace(?:@\S+)? init\b")
+_VENV_CALL_RE = re.compile(r"\.dadaia/\.venv/bin/dadaia((?: [a-z][\w-]*)+)([^`]*)")
+_FLAG_RE = re.compile(r"(?<![\w-])--[a-z][\w-]*")
+# The provenance banner is a fixed literal `infrastructure/workspace_guardrail.py` matches
+# byte-for-byte to recognise a projected AGENTS.md; rewording it orphans every projection.
+_BANNER_SPAN = ("dadaia_workspace/public/data/AGENTS.md", 2)
+
+
+def _code_spans(text: str) -> list[tuple[int, str]]:
+    """Lines inside fences and inline backtick spans — what a reader copies."""
+    spans: list[tuple[int, str]] = []
+    fenced = False
+    for number, line in enumerate(text.splitlines(), start=1):
+        if line.strip().startswith("```"):
+            fenced = not fenced
+        elif fenced:
+            spans.append((number, line))
+        else:
+            spans.extend((number, span) for span in re.findall(r"`([^`]+)`", line))
+    return spans
+
+
+def _bare_invocations(span: str) -> list[str]:
+    return _BARE_CLI_RE.findall(_UVX_INIT_RE.sub("", span))
+
+
+def _shipped_text() -> list[Path]:
+    return sorted(
+        {
+            *_PUBLIC_ROOT.rglob("*.md"),
+            *_PUBLIC_ROOT.rglob("*.txt"),
+            *(_REPO_ROOT / "docs").glob("*.md"),
+            *(_REPO_ROOT / name for name in ("README.md", "llms.txt", "CONTEXT.md")),
+        }
+    )
+
+
+def test_all_shipped_text_invokes_the_cli_by_its_venv_path() -> None:
+    """Intent: CONTRACT — shipped-text-cites-bare-dadaia-the-gate-blocks,
+    shipped-text-bare-cli-guard-deleted-with-its-test. The venv-guard gate blocks a bare
+    `dadaia`, so no copyable span in shipped text may spell one. Zero tolerance."""
+    paths = _shipped_text()
+    assert_populated([p.name for p in paths], "CONTEXT.md")
+    violations = [
+        f"{name}:{n}: `{span.strip()}`"
+        for path in paths
+        for name in [path.relative_to(_REPO_ROOT).as_posix()]
+        for n, span in _code_spans(path.read_text("utf-8"))
+        if _bare_invocations(span) and (name, n) != _BANNER_SPAN
+    ]
+    assert violations == [], "\n".join(violations)
+
+
+def test_the_bare_cli_detector_spares_the_venv_path_and_uvx_init() -> None:
+    assert _bare_invocations("dadaia doctor --fix") == ["dadaia"]
+    assert _bare_invocations("run dadaia-workspace init x") == ["dadaia-workspace"]
+    assert _bare_invocations("/w/.dadaia/.venv/bin/dadaia context list") == []
+    assert _bare_invocations("uvx dadaia-workspace@0.4.8 init demo") == []
+
+
+def _cli_tree() -> dict[str, set[str]]:
+    """Every command path (`context bind`) mapped to the long flags it accepts."""
+    from typer.main import get_command
+
+    from dadaia_workspace.cli.main import app
+
+    tree: dict[str, set[str]] = {}
+
+    def walk(cmd: object, path: str) -> None:
+        opts = {o for p in getattr(cmd, "params", []) for o in getattr(p, "opts", [])}
+        tree[path] = {o for o in opts if o.startswith("--")} | {"--help"}
+        for name, sub in (getattr(cmd, "commands", {}) or {}).items():
+            walk(sub, f"{path} {name}".strip())
+
+    walk(get_command(app), "")
+    return tree
+
+
+def _dead_flags(span: str, tree: dict[str, set[str]]) -> list[str]:
+    match = _VENV_CALL_RE.search(span)
+    if match is None:
+        return []
+    path = ""
+    for word in match.group(1).split():
+        if f"{path} {word}".strip() not in tree:
+            break
+        path = f"{path} {word}".strip()
+    return [f for f in _FLAG_RE.findall(match.group(0)) if f not in tree[path]]
+
+
+def test_every_flag_cited_beside_a_venv_call_exists_in_that_verbs_help() -> None:
+    """Intent: CONTRACT — dd-cli-library-cites-a-dead-flag-and-omits-level-3,
+    shipped-text-bare-cli-guard-deleted-with-its-test. A flag cited next to
+    `.dadaia/.venv/bin/dadaia <verb>` in shipped text is one that verb takes."""
+    tree = _cli_tree()
+    violations = [
+        f"{path.relative_to(_REPO_ROOT).as_posix()}:{n}: {dead}"
+        for path in _shipped_text()
+        for n, span in _code_spans(path.read_text("utf-8"))
+        for dead in _dead_flags(span, tree)
+    ]
+    assert violations == [], "\n".join(violations)
+    skill = (_PUBLIC_ROOT / "skills/dd-cli-library/SKILL.md").read_text("utf-8")
+    assert "Level 3: `.dadaia/.venv/bin/dadaia specs init --context <ctx>`" in skill

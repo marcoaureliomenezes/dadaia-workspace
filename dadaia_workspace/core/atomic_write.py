@@ -43,8 +43,7 @@ class ConcurrentModificationError(Exception):
     Checked as the LAST read this function performs, immediately before ``os.replace`` —
     the compare-then-swap gap holds nothing but the comparison itself. A pure ``core``
     type: no ``dadaia_workspace`` import (AR-1) — a caller with its own domain-specific
-    stale-write error (e.g. ``core.protocols.record_store.StaleRecordWriteError``)
-    catches this and re-raises its own.
+    stale-write error catches this and re-raises its own.
     """
 
     def __init__(self, path: Path) -> None:

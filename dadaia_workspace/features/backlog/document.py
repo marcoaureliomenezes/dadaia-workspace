@@ -66,10 +66,6 @@ _SLUG_RE = re.compile(r"^[a-z][a-z0-9-]+$")
 #: §2 — ``id`` is the JSON-native replacement for the retired ``### <slug>`` heading).
 _REQUIRED_KEYS: tuple[str, ...] = ("id", "title", "opened", "status", "description", "provenance")
 
-#: The document schema id this reader/writer speaks (``public/schemas/backlog/
-#: backlog-v1.schema.json``).
-_SCHEMA_ID = "backlog-v1"
-
 
 @dataclass(frozen=True)
 class DocumentError:
@@ -279,42 +275,3 @@ def load_document(backlog_dir: Path) -> BacklogDocument:
                 seen[item.slug] = index
 
     return BacklogDocument(active=tuple(items), errors=tuple(errors))
-
-
-def _serialize_item(item: ActiveItem) -> dict[str, Any]:
-    """Serialize an :class:`ActiveItem` back to its ``active[]`` JSON shape."""
-    from dadaia_workspace.core.models.backlog import serialize_intents
-
-    entry: dict[str, Any] = {
-        "id": item.slug,
-        "title": item.title,
-        "opened": item.opened,
-        "status": item.status,
-        "description": item.description,
-        "provenance": item.provenance,
-    }
-    if item.intents:
-        entry["intents"] = serialize_intents(item.intents)
-    return entry
-
-
-def _dump_document(active: list[dict[str, Any]]) -> str:
-    return json.dumps({"schema": _SCHEMA_ID, "active": active}, indent=2, ensure_ascii=False) + "\n"
-
-
-def _read_raw_document(target: Path) -> tuple[str, dict[str, Any]]:
-    """Read the current ``BACKLOG.json`` text plus its parsed-as-JSON ``active`` list
-    (``[]``/``""`` when absent). Malformed JSON is never expected here — callers only
-    reach this after :func:`load_document` has already reported the tree clean, so a
-    stray write between the two reads is the only way a decode could fail; that race is
-    exactly what ``atomic_write``'s ``expected_previous`` refuses at swap time."""
-    if not target.is_file():
-        return "", {"schema": _SCHEMA_ID, "active": []}
-    previous_text = target.read_text(encoding="utf-8")
-    try:
-        raw = json.loads(previous_text)
-    except json.JSONDecodeError:
-        raw = {"schema": _SCHEMA_ID, "active": []}
-    if not isinstance(raw, dict) or not isinstance(raw.get("active"), list):
-        raw = {"schema": _SCHEMA_ID, "active": []}
-    return previous_text, raw

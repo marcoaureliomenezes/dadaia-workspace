@@ -20,11 +20,9 @@ import json
 import os
 import re
 import sys
-from pathlib import Path
 from typing import Any
 
 from dadaia_workspace.core import invocation
-from dadaia_workspace.core.platform import PLATFORM
 
 #: Write-like tool names intercepted by the PreToolUse gates (Claude / Codex).
 WRITE_TOOLS: frozenset[str] = frozenset(
@@ -188,23 +186,3 @@ def emit_allow() -> None:
         "hookSpecificOutput": {"hookEventName": "PreToolUse"},
     }
     print(json.dumps(envelope))
-
-
-def default_python_bin(workspace: Path) -> str:
-    """Resolve the workspace venv Python, Windows-safe, with portable fallbacks.
-
-    ``.dadaia/.venv/<scripts>/python<suffix>`` (``Scripts/python.exe`` on Windows,
-    ``bin/python`` on POSIX) → ``sys.executable`` → bare ``python``. No bash dependency.
-    """
-    venv_python = (
-        workspace
-        / ".dadaia"
-        / ".venv"
-        / PLATFORM.venv_scripts_dir
-        / f"python{PLATFORM.venv_exe_suffix}"
-    )
-    if venv_python.is_file():
-        return str(venv_python)
-    if sys.executable:
-        return sys.executable
-    return "python"

@@ -173,25 +173,6 @@ def foreign_claude_hook_commands(
     return found
 
 
-def dadaia_owned_claude_settings(settings: dict[str, object]) -> dict[str, object]:
-    """Project *settings* down to the dadaia-owned hook wiring, for drift comparison.
-
-    The doctor must compare what dadaia owns, not the whole file — otherwise an operator
-    who legitimately adds ``permissions`` reads ``[drift]`` forever, and the documented
-    remedy for drift (re-run install) is exactly what used to destroy their config.
-    """
-    hooks_raw = settings.get("hooks")
-    hooks = hooks_raw if isinstance(hooks_raw, dict) else {}
-    owned: dict[str, object] = {}
-    for event, entries in hooks.items():
-        if not isinstance(entries, list):
-            continue
-        mine = [e for e in entries if _is_dadaia_hook_entry(e)]
-        if mine:
-            owned[event] = mine
-    return {"hooks": owned}
-
-
 def claude_settings(workspace_root: Path) -> dict[str, object]:
     """Return the Claude Code settings.json dict for *workspace_root*."""
     return {

@@ -37,7 +37,14 @@ import re
 from collections.abc import Iterable, Sequence
 from typing import Protocol
 
-__all__ = ["PatternLike", "Redactor", "compile_candidates", "first_privacy_hit", "redact_text"]
+__all__ = [
+    "UNSAFE_FORMAT_CHARS_RE",
+    "PatternLike",
+    "Redactor",
+    "compile_candidates",
+    "first_privacy_hit",
+    "redact_text",
+]
 
 # ============================================================================
 # redact_text — case-insensitive substring masking (SPEC v0.4.5 FR6/FR7, T-045-19).
@@ -73,7 +80,7 @@ _WIN_HOME_RE = re.compile(r"([A-Za-z]:\\Users\\)[^\\\s:]+")
 #: bytes must re-join into a contiguous substring for the masking pass immediately
 #: below to still catch it (A7.6) — an escape sequence (``"\\x1b"``) would leave the
 #: two halves apart.
-_UNSAFE_FORMAT_CHARS_RE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\x80-\x9f\u2028\u2029]")
+UNSAFE_FORMAT_CHARS_RE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\x80-\x9f\u2028\u2029]")
 
 
 def redact_text(text: str, denylist_terms: Sequence[tuple[str, str]] = ()) -> str:
@@ -81,7 +88,7 @@ def redact_text(text: str, denylist_terms: Sequence[tuple[str, str]] = ()) -> st
     operator-local home-path usernames, IPv4 addresses, and any operator denylist term
     masked.
 
-    The control/format strip (see :data:`_UNSAFE_FORMAT_CHARS_RE`) runs FIRST, before
+    The control/format strip (see :data:`UNSAFE_FORMAT_CHARS_RE`) runs FIRST, before
     every masking pass (v0.4.5 FR7/A7.6) — so a denylisted term an attacker split with
     an embedded ESC or Unicode line/paragraph separator still gets matched below, and
     no such byte ever survives into a persisted field.
@@ -97,7 +104,7 @@ def redact_text(text: str, denylist_terms: Sequence[tuple[str, str]] = ()) -> st
     ``()`` — a no-op for the denylist pass — so every pre-FR6 caller keeps masking
     IP/home paths; the control/format strip is unconditional and a no-op on clean text.
     """
-    out = _UNSAFE_FORMAT_CHARS_RE.sub("", text)
+    out = UNSAFE_FORMAT_CHARS_RE.sub("", text)
     out = _IPV4_RE.sub("[REDACTED-IP]", out)
     out = _POSIX_HOME_RE.sub(r"\1[REDACTED]", out)
     out = _WIN_HOME_RE.sub(r"\1[REDACTED]", out)

@@ -186,7 +186,7 @@
       "hash_tuple": {
         "section": "sha256:908e57fb907003c579fa7d0bf93551c01b4a0df3bba19a5b509cc123be6947e9",
         "skill": "sha256:e981e1c28f935e76b1660218d8f0340d74a580d774bacf28190775f87ec6a863",
-        "scripts": "sha256:96bd210f883e2f384bcd64dff14d4c8c8685bdb8e2a12538d4332ecaad98f017",
+        "scripts": "sha256:80d12dde79ada3912c1cdd56b2f06fe34da7c30ccfdf9bbfcb7a64a855ec4def",
         "scoped": [
           "sha256:2e47228a0c7e06a11dc14b72e170329a2963de2bd30fc6977dff6bfede7395fb"
         ]
@@ -203,7 +203,7 @@
       ],
       "hash_tuple": {
         "section": "sha256:b6f108d5e79b393084bfca7811b6762f62ddd2dcd3529bdb7b2b9fbaebb6442c",
-        "skill": "sha256:c3c4c3a640744e3ce30d9ba46ddbc468d1adb5dca8522bf142ce41906003cd57",
+        "skill": "sha256:35b3803817f4601ffeebc590ed1c98d5d779427ecb4e9de1034fab38e4958422",
         "scripts": "sha256:1918fa5c22e542c254a15be859df2abfa361afca010ce3533eeb0ef2f062a555",
         "scoped": [
           "sha256:ff9be359a36ec1aa15b5bcf473587c9dbde2c86fefd2aac74f436624b7d33265"
@@ -337,7 +337,7 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:886a589fc203d3e5f43ed7949f4d41c6896af8af904e07e885e5804c205d7ef7",
-        "skill": "sha256:d3bd1369d2cc3ab910f0df9cdccb39f47a393e9ac02c21cef42dfc9f8d080088",
+        "skill": "sha256:5dd2a2b72a9568a50184f70a1a846fefb00f3b888e8241f7e93db9e6211c310d",
         "scripts": "sha256:260c8583eb07bfef664749f5ab542f3121cbd2d07634cc10527eb643e656e4de",
         "scoped": []
       },

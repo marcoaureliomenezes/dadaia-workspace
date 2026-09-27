@@ -54,7 +54,7 @@ _TREE4_REQUIRED_DIRS = REQUIRED_ROOT_DIRS
 # nicety. Root-canon membership (:data:`CANON_ROOT_MEMBERS`, imported) plus a full-tree
 # nested-shape sweep, both driven by the ONE shared predicate in
 # ``features.specs.canon`` — the SAME module the pre-push gate uses
-# (``features.chokepoints.service.push_gate_decision``), never a second, hand-kept
+# (``features.chokepoints.push_gate.push_gate_decision``), never a second, hand-kept
 # member list (operator ruling 2026-08-28).
 _TREE8_CANON_ROOT: frozenset[str] = CANON_ROOT_MEMBERS
 
@@ -408,7 +408,7 @@ class StructuralValidator:
         """TREE-8: every path under specs/ must be v6-canon-conformant (FR1, v0.5.0
         specs-canon closure, operator ruling 2026-08-28) — driven by the ONE shared
         predicate in ``features.specs.canon``, the SAME module the pre-push
-        gate uses (``features.chokepoints.service.push_gate_decision``), never a
+        gate uses (``features.chokepoints.push_gate.push_gate_decision``), never a
         second, hand-kept member list.
 
         Two tiers, mirroring the pre-canon-closure two-loop shape (root membership,

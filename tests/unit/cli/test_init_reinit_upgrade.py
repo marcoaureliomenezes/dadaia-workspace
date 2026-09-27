@@ -88,7 +88,7 @@ def test_a_failed_reconcile_prints_the_windows_fix_line(
     workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """AC2.6 (T-050-08): the refusal's fix is built by ``fix_line`` — on Windows the CLI is
-    ``Scripts\\dadaia.exe``, quoted by the MSVCRT rules."""
+    ``Scripts/dadaia.exe``, spelled with forward slashes."""
     _versions(monkeypatch, workspace, "0.4.7", "0.4.8")
 
     def _reconcile(root: Path, *, expected_version: str, **_: object) -> object:
@@ -102,7 +102,7 @@ def test_a_failed_reconcile_prints_the_windows_fix_line(
 
     exe = workspace.resolve() / ".dadaia" / ".venv" / "Scripts" / "dadaia.exe"
     assert result.exit_code == 1
-    assert f"fix: {exe} reconcile --expect-version 0.4.8" in result.output
+    assert f"fix: {exe.as_posix()} reconcile --expect-version 0.4.8" in result.output
 
 
 def test_older_running_version_exits_1_with_the_pinned_fix(

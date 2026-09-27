@@ -11,7 +11,7 @@ standing rule): ``zz-``-prefixed values, never a real operator term.
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from dadaia_workspace.core.gitflow import DEFAULT
@@ -19,6 +19,7 @@ from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObj
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_stdin
 from dadaia_workspace.features.specs.canon import canon_violations
+from tests.fakes import gate_fixes
 
 _SHA_A = "a" * 40
 _SHA_B = "b" * 40
@@ -30,8 +31,15 @@ _SYNTHETIC_TERM = "zz-secret-term"
 class _FakeObjectSource:
     """Maps an exact ``(local_sha, remote_sha)`` pair to a fixed object list."""
 
+    def remote_branch(self, repo: Path, branch: str) -> bool:
+        return True
+
     by_range: dict[tuple[str, str], list[ScannedObject]] = field(default_factory=dict)
     calls: list[tuple[str, str]] = field(default_factory=list)
+    ranges: dict[str, list[str]] = field(default_factory=dict)
+
+    def unpublished(self, repo: Path, sha: str) -> list[str]:
+        return self.ranges.get(sha, [sha])
 
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         self.calls.append((local_sha, remote_sha))
@@ -39,6 +47,9 @@ class _FakeObjectSource:
 
 
 class _FailingObjectSource:
+    def remote_branch(self, repo: Path, branch: str) -> bool:
+        return True
+
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         raise GitObjectReadError("simulated git rev-list failure")
 
@@ -77,6 +88,7 @@ def test_branch_push_with_denylisted_blob_in_range_is_refused(tmp_path: Path) ->
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -98,6 +110,7 @@ def test_term_outside_the_range_does_not_refuse(tmp_path: Path) -> None:
     decision = push_gate_decision(
         _refs(f"refs/tags/v9.9.9 {_SHA_A} refs/tags/v9.9.9 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -116,6 +129,7 @@ def test_deletion_ref_is_never_scanned(tmp_path: Path) -> None:
     decision = push_gate_decision(
         _refs(f"refs/heads/old {_ZERO} refs/heads/old {_SHA_A}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -144,6 +158,7 @@ def test_shared_blob_across_two_refs_is_deduped(tmp_path: Path) -> None:
             f"refs/tags/v2 {_SHA_B} refs/tags/v2 {_ZERO}",
         ),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -165,6 +180,7 @@ def test_tainted_tag_push_is_refused(tmp_path: Path) -> None:
     decision = push_gate_decision(
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -183,6 +199,7 @@ def test_clean_tag_push_is_allowed_with_no_verdict_required(tmp_path: Path) -> N
     decision = push_gate_decision(
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -202,6 +219,7 @@ def test_branch_policy_refusal_precedes_the_scan(tmp_path: Path) -> None:
     decision = push_gate_decision(
         _refs(f"refs/heads/main {_SHA_A} refs/heads/main {'b' * 40}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -224,6 +242,7 @@ def test_refusal_message_shape_and_ten_item_cap(tmp_path: Path) -> None:
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=replace(gate_fixes(), head="main"),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -236,7 +255,7 @@ def test_refusal_message_shape_and_ten_item_cap(tmp_path: Path) -> None:
     assert "z…m" in message  # masked form of the synthetic term.
     assert "operator denylist" in message
     assert "dd-release-implementation §2a" in message
-    assert "--amend" in message or "rebase" in message
+    assert message.endswith("fix: git -C /repo switch feature/0.0.1")
     assert "already-published history never needs a rewrite" in message
     assert "2 more" in message or "and 2" in message  # 12 hits, 10 shown, 2 remainder.
     assert _SYNTHETIC_TERM not in message
@@ -251,6 +270,7 @@ def test_git_object_read_failure_refuses_naming_the_failure(tmp_path: Path) -> N
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=_FailingObjectSource(),
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -258,6 +278,7 @@ def test_git_object_read_failure_refuses_naming_the_failure(tmp_path: Path) -> N
     assert not decision.allowed
     assert "simulated git rev-list failure" in decision.message
     assert "--no-verify" in decision.message
+    assert decision.message.endswith("\nfix: git fsck")  # one command, no `&&`
 
 
 # ---------------------------------------------------------------------------
@@ -284,6 +305,7 @@ def test_generator_denylist_terms_still_refuses_not_silently_emptied(tmp_path: P
     decision = push_gate_decision(
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -390,6 +412,7 @@ def test_oversized_note_appears_in_decision_warn_on_allow(tmp_path: Path) -> Non
     decision = push_gate_decision(
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -413,6 +436,7 @@ def test_oversized_note_appears_in_decision_warn_on_refuse(tmp_path: Path) -> No
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -441,6 +465,7 @@ def test_refusal_path_segment_matching_an_operator_term_is_masked(tmp_path: Path
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -460,6 +485,7 @@ def test_refusal_path_with_no_matching_segment_is_byte_identical(tmp_path: Path)
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -478,6 +504,7 @@ def test_oversized_note_path_segment_is_masked_too(tmp_path: Path) -> None:
     decision = push_gate_decision(
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -525,6 +552,7 @@ def test_refusal_path_segment_uppercase_hyphenated_variant_of_term_is_masked(
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -548,6 +576,9 @@ class _FailingObjectSourceWithPath:
     """Simulates a git-read failure that names the offending blob's PATH structurally
     (GitObjectReadError.path, FR4) rather than embedding it in the message string."""
 
+    def remote_branch(self, repo: Path, branch: str) -> bool:
+        return True
+
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         raise GitObjectReadError(
             "git cat-file --batch stream desynchronised resolving prior content",
@@ -559,6 +590,7 @@ def test_git_object_read_failure_at_a_denylisted_path_masks_the_path(tmp_path: P
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=_FailingObjectSourceWithPath(),
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -586,6 +618,7 @@ def test_same_offending_segment_gets_the_same_ordinal_across_hit_and_note(
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -626,6 +659,7 @@ def test_push_with_denylisted_term_only_in_a_commit_message_body_is_refused(
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -633,5 +667,64 @@ def test_push_with_denylisted_term_only_in_a_commit_message_body_is_refused(
     )
     assert not decision.allowed
     assert _SYNTHETIC_TERM not in decision.message  # never unmasked
-    assert "rewrite the offending commit" in decision.message  # reword/amend healing
+    assert "Uncommit the unpublished range" in decision.message  # a fresh message heals it
     assert "--no-verify" in decision.message
+
+
+# ---------------------------------------------------------------------------
+# c3 review 5 (C1, H1-H3): the rewrite fix is computed from the REFUSED ref's own
+# unpublished range — never HEAD, never origin/<integration>, never a ref deletion.
+# ---------------------------------------------------------------------------
+
+
+def _refuse(tmp_path: Path, line: str, head: str, source: _FakeObjectSource) -> str:
+    decision = push_gate_decision(
+        _refs(line),
+        gitflow=DEFAULT,
+        fixes=replace(gate_fixes(), head=head),
+        object_source=source,
+        repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
+    )
+    assert not decision.allowed
+    assert "update-ref" not in decision.message
+    return decision.message
+
+
+def _dirty(local: str = _SHA_A) -> _FakeObjectSource:
+    return _FakeObjectSource(
+        by_range={(local, _ZERO): [_obj("n.md", f"{_SYNTHETIC_TERM}\n")]},
+        ranges={local: [local, _SHA_B]},
+    )
+
+
+def test_the_rewrite_fix_resets_to_the_oldest_unpublished_commit_and_amends(
+    tmp_path: Path,
+) -> None:
+    """N3: one formula for every range, a root-reaching one included — reset --soft to the
+    oldest unpublished commit, edit, amend; exactly one fix line."""
+    message = _refuse(
+        tmp_path, f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}",
+        "feature/0.0.1", _dirty(),
+    )  # fmt: skip
+    assert message.endswith(f"fix: git -C /repo reset --soft {_SHA_B}")
+    assert "commit --amend" in message and message.count("\nfix: ") == 1
+
+
+def test_a_refused_branch_that_is_not_checked_out_is_switched_to_first(tmp_path: Path) -> None:
+    """H1: HEAD is `main` — resetting HEAD would uncommit the wrong branch."""
+    message = _refuse(
+        tmp_path, f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}",
+        "main", _dirty(),
+    )  # fmt: skip
+    assert message.endswith("fix: git -C /repo switch feature/0.0.1")
+
+
+def test_a_tag_gets_operator_action_and_no_command(tmp_path: Path) -> None:
+    """N3: a tag (like a detached HEAD, which branch policy already refuses) has no
+    branch to reset — no command is printed."""
+    message = _refuse(
+        tmp_path, f"refs/tags/v0.0.1 {_SHA_A} refs/tags/v0.0.1 {_ZERO}", "feature/0.0.1", _dirty()
+    )
+    assert "Operator action" in message and "\nfix: " not in message

@@ -2,7 +2,7 @@
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from dadaia_workspace.core.models.bugs import BugRecord
@@ -25,34 +25,6 @@ from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetM
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
 logger = logging.getLogger(__name__)
-
-
-def build_shutdown_handler() -> Any:
-    """Return the appropriate ShutdownHandler for the current platform.
-
-    Reads ``PLATFORM.has_sigterm`` (the sole authorized platform capability flag)
-    and returns the POSIX adapter on platforms with effective SIGTERM support
-    (Linux, macOS), or the Windows adapter on platforms without it.  The import
-    is lazy so that importing ``container`` never triggers the Windows module's
-    guard on Linux/macOS.
-
-    Returns:
-        ``PosixSignalShutdownHandler`` on Linux / macOS (SIGTERM + SIGINT),
-        or ``WindowsSignalShutdownHandler`` on Windows (SIGINT only).
-    """
-    from dadaia_workspace.core.platform import PLATFORM
-
-    if not PLATFORM.has_sigterm:
-        from dadaia_workspace.infrastructure.signal_shutdown_windows import (
-            WindowsSignalShutdownHandler,
-        )
-
-        return WindowsSignalShutdownHandler()
-    from dadaia_workspace.infrastructure.signal_shutdown_posix import (
-        PosixSignalShutdownHandler,
-    )
-
-    return PosixSignalShutdownHandler()
 
 
 def _states_dir(workspace_root: Path) -> Path:
@@ -81,6 +53,7 @@ def build_spec_context_service(workspace_root: Path) -> SpecContextService:
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
         install_hooks=install_git_hooks,
+        secret_scan=scan_publish_candidates,
     )
 
 
@@ -103,9 +76,7 @@ def build_public_service() -> PublicAssetService:
 
 def build_git_object_reader() -> GitSubprocessObjectReader:
     """Composition-root seam for the push-range object reader (v0.9.0 FR1/FR7; ADR-0001:
-    the sole adapter, shared by two CLI verbs — ``ci.push_gate_check`` and
-    ``specs.doctor``'s live verdict-sha resolution — so it stays a container
-    seam rather than each verb constructing its own instance.
+    the sole adapter ``ci.push_gate_check`` reads the pushed range through).
 
     As of v0.4.3 T-043-15/FR11, the adapter this seam returns yields commit-object
     message bodies and (for a tag-ref push) annotated tag bodies IN ADDITION to blob
@@ -158,6 +129,25 @@ def load_denylist_baseline_patterns() -> tuple[BaselinePatternLike, ...]:
     from dadaia_workspace.infrastructure.privacy_check import load_baseline_patterns
 
     return load_baseline_patterns()
+
+
+def scan_publish_candidates(repo: Path, rels: list[str]) -> dict[str, str]:
+    """AC5.6: the pre-push matcher, in-process, over the files baseline and ``dead
+    --commit`` are about to commit — a repo with ``core.hooksPath`` never runs the hook.
+    Read as the object reader reads a blob: undecodable bytes are scanned by path only."""
+    from dadaia_workspace.core.models.git_scan import ScannedObject
+    from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
+
+    objects = []
+    for rel in rels:
+        if (repo / rel).is_file():
+            data = (repo / rel).read_bytes()
+            try:
+                objects.append(ScannedObject(rel, "", data.decode("utf-8"), decodable=True))
+            except UnicodeDecodeError:
+                objects.append(ScannedObject(rel, "", "", decodable=False))
+    outcome = scan_objects(objects, load_denylist_terms(), load_denylist_baseline_patterns())
+    return {h.path: f"{h.source_layer} '{h.masked_term}' (line {h.line})" for h in outcome.hits}
 
 
 def is_source_repo_root(path: Path) -> bool:

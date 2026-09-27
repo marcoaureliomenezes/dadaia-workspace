@@ -20,9 +20,7 @@ forbidden.
 from __future__ import annotations
 
 import sys
-import tempfile
 from dataclasses import dataclass
-from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -33,69 +31,24 @@ class Capabilities:
     rather than calling ``detect()`` directly.
 
     Attributes:
-        has_fcntl:       True on POSIX platforms that provide the ``fcntl``
-                         module (Linux, macOS).  False on Windows.
-        has_proc_fs:     True only on Linux (``/proc`` filesystem available).
-        has_posix_chmod: True on POSIX platforms where ``os.chmod`` has effect
-                         (Linux, macOS).  False on Windows (no-op — CWE-732).
-        has_sigterm:     True on platforms where ``signal.SIGTERM`` can be
-                         registered via ``signal.signal()`` (Linux, macOS).
-                         False on Windows (SIGTERM raises OSError).
-        has_os_kill_liveness:
-                         True where ``os.kill(pid, 0)`` is a safe, non-destructive
-                         liveness probe (POSIX).  False on Windows, where CPython
-                         implements ``os.kill`` as ``OpenProcess(PROCESS_ALL_ACCESS)``
-                         + ``TerminateProcess`` — calling it would *kill* the target,
-                         and it returns ERROR_INVALID_PARAMETER (not ESRCH) for a
-                         dead PID.  Windows must probe via read-only ``OpenProcess``.
         venv_scripts_dir: Subdirectory name inside a venv that holds Python
                          executables.  ``"bin"`` on POSIX; ``"Scripts"`` on
                          Windows.
         venv_exe_suffix: File extension for the Python executable inside the
                          venv.  ``""`` on POSIX; ``".exe"`` on Windows.
-        tmp_dir:         Platform-canonical temporary directory
-                         (``tempfile.gettempdir()``).  Prefer this over
-                         hardcoded ``/tmp`` paths for cross-platform safety.
     """
 
-    has_fcntl: bool
-    has_proc_fs: bool
-    has_posix_chmod: bool
-    has_sigterm: bool
-    has_os_kill_liveness: bool
     venv_scripts_dir: str
     venv_exe_suffix: str
-    tmp_dir: Path
 
     @classmethod
     def detect(cls, platform: str | None = None) -> Capabilities:
-        """Detect capabilities for *platform*.
-
-        This is the **sole authorized** ``sys.platform`` call site in the
-        entire codebase.  All other modules must read ``PLATFORM`` instead of
-        calling this directly.
-
-        Args:
-            platform: Override value for ``sys.platform`` (used in tests).
-                      When ``None``, reads ``sys.platform`` at call time.
-
-        Returns:
-            A frozen ``Capabilities`` snapshot for the given platform string.
-        """
-        plat = platform if platform is not None else sys.platform
-        is_win = plat == "win32"
-        is_linux = plat == "linux"
-        is_posix = not is_win  # macOS, Linux, *BSD, ...
-
+        """Detect capabilities for *platform* — the **sole authorized** ``sys.platform``
+        call site; *platform* overrides it (tests)."""
+        is_win = (platform if platform is not None else sys.platform) == "win32"
         return cls(
-            has_fcntl=is_posix,
-            has_proc_fs=is_linux,
-            has_posix_chmod=is_posix,
-            has_sigterm=is_posix,
-            has_os_kill_liveness=is_posix,
             venv_scripts_dir="Scripts" if is_win else "bin",
             venv_exe_suffix=".exe" if is_win else "",
-            tmp_dir=Path(tempfile.gettempdir()),
         )
 
 

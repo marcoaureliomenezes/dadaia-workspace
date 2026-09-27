@@ -11,23 +11,9 @@ class Workspace:
     claude_dir: Path  # root/.claude/
     repos_dir: Path  # root/repos/
 
-    # Durable subdirs
-    @property
-    def reports_dir(self) -> Path:
-        return self.dadaia_dir / "reports"
-
     @property
     def states_dir(self) -> Path:
         return self.dadaia_dir / "states"
-
-    # Ephemeral subdirs
-    @property
-    def tmp_python_dir(self) -> Path:
-        return self.dadaia_dir / "tmp" / "python"
-
-    @property
-    def tmp_json_dir(self) -> Path:
-        return self.dadaia_dir / "tmp" / "json"
 
     @classmethod
     def from_root(cls, root: Path) -> "Workspace":

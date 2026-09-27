@@ -208,7 +208,7 @@ def new_binding_record(
 
     0.4.7 FR4: ``mode`` and ``release`` are gone — nothing reads them since the gate's
     READ block and phase rule died. Readers stay TOLERANT by construction: every reader
-    in the codebase (``live_session``, ``is_live``, the Bind resolution, the panel)
+    in the codebase (``live_session``, ``is_live``, the Bind resolution)
     reaches for named keys with ``.get``, never iterates or validates the key set, so an
     OLD record still carrying ``mode``/``release`` parses exactly as before and its extra
     keys are simply never read. No migration, no version bump, no compatibility branch.

@@ -18,8 +18,7 @@ Two load paths, deliberately distinct (NFR-4, "missing != invalid"):
   effort outside the D-3 vocabulary, an empty override, and — D-7 — any combination
   that resolves a Fable-family model onto ``dd-code-reviewer``.
 
-:meth:`parse` is the shared no-I/O validation path (consumed by :meth:`load` and by the
-panel validate endpoint in Wave 4).
+:meth:`parse` is the shared no-I/O validation path (consumed by :meth:`load`).
 """
 
 from __future__ import annotations
@@ -102,8 +101,7 @@ class JsonAgentModelPolicyStore:
     def parse(self, raw: object) -> AgentModelPolicyOverlay:
         """Validate and parse an in-memory overlay document (no I/O).
 
-        Shared by :meth:`load` and callers validating a candidate before writing it
-        (the panel ``POST /api/agent-model-policy/validate`` route, Wave 4).
+        Shared by :meth:`load` and callers validating a candidate before writing it.
         """
         return self._parse(raw, path=None)
 

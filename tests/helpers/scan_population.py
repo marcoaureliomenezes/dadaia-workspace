@@ -44,12 +44,9 @@ Tree-/package-walking population scans (the convention applies at the call site 
 * ``tests/contract/test_core_file_io_purity.py`` ::
   test_core_file_io_purity_ratchet_and_authorized_set_grounded
 * ``tests/contract/test_release_semver_canon.py`` :: ``_find_semver_compile_sites()``
-* ``tests/contract/test_telemetry_connection_factory_allowlist.py`` :: ``_connect_sites()``
 * ``tests/contract/test_session_store_ownership.py`` ::
   test_pointer_and_record_namespace_residue_is_owner_or_allowlisted_only
 * ``tests/unit/public/test_no_gpt_only_claim.py`` :: test_no_surviving_gpt_only_claim
-* ``tests/unit/features/panel/test_no_bearer_in_url.py`` ::
-  test_no_credential_query_param_in_panel_or_cli_sources
 * ``tests/contract/test_behavior_map.py`` :: ``_skills_on_disk()``,
   ``_scoped_agents_md_sources()``
 * ``tests/contract/test_public_scripts_thin_wrapper.py`` ::
@@ -78,11 +75,6 @@ Deliberately EXCLUDED:
   test_no_allowlist_or_sanctioned_terms_constant_in_matcher_source — reads
   ``Path(module.__file__)`` after a successful ``import``; a broken path fails the
   import, not the scan.
-* ``tests/contract/test_telemetry_chmod_source_guard.py`` ::
-  test_every_os_chmod_is_posix_guarded_and_at_least_one_exists — reads one hardcoded
-  ``_SERVICE`` path directly (``.read_text()`` raises ``FileNotFoundError`` if
-  mis-rooted) and already asserts ``visitor.total >= 1`` (a non-empty check on the
-  found call sites, pre-existing).
 * ``tests/unit/core/test_kernel_tunables.py`` :: every case —
   ``importlib.import_module(dotted)`` on a fixed, parametrized dotted path; a
   mis-rooted/renamed module fails the import, never scans zero files silently.

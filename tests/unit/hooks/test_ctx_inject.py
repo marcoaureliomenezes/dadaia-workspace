@@ -33,7 +33,6 @@ already pinned implicitly.
 from __future__ import annotations
 
 import json
-import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -174,7 +173,7 @@ def _assert_no_alive_context_still_generic(out: str) -> bool:
         "[no bound context]" in out
         and "end memory bootstrap" not in out
         and "\nNext (command step context): no ALIVE Spec Context" in out
-        and os.sep + fix_line(Path(), "context", "create", "<name>", "--main-repo", "<clone-url>")
+        and "/" + fix_line(Path(), "context", "create", "<name>", "--main-repo", "<clone-url>")
         in out
     )
 

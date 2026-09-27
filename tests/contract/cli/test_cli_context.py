@@ -493,6 +493,7 @@ def test_context_dead_surfaces_the_refused_push_with_its_fix_line(
     (repo / "README.md").write_text("x\n", encoding="utf-8")
     subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
     subprocess.run(["git", "commit", "-qm", "init"], cwd=repo, check=True)
+    subprocess.run(["git", "checkout", "-qb", "feature/0.1.0"], cwd=repo, check=True)
     hook = repo / ".git" / "hooks" / "pre-push"
     hook.write_text("#!/bin/sh\necho 'fix: git checkout -b feature/0.1.0' >&2\nexit 1\n")
     hook.chmod(0o755)
@@ -502,6 +503,7 @@ def test_context_dead_surfaces_the_refused_push_with_its_fix_line(
 
     assert result.exit_code != 0
     assert "fix: git checkout -b feature/0.1.0" in " ".join(result.output.split())
+    assert result.output.count("fix: ") == 1  # the gate's fix is the one fix
     assert repo.is_dir()
 
 

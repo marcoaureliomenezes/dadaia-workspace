@@ -221,8 +221,7 @@ def memory_citation_violations(
     MEM-DRIFT-2 input, as ``(atom, violation)`` pairs.
 
     Silent (``[]``) with no command tree, no *repo_root* or no memory tree: a consumer
-    whose CLI tree could not be resolved is not a consumer with drift, exactly as
-    ``live_shas=None`` keeps SPEC-DOC-044 silent.
+    whose CLI tree could not be resolved is not a consumer with drift.
     """
     if repo_root is None or command_paths is None or not memory_dir.is_dir():
         return []

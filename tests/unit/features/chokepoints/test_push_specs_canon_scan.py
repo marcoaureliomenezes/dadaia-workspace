@@ -21,6 +21,7 @@ from dadaia_workspace.core.models.git_scan import ScannedObject
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_stdin
 from dadaia_workspace.features.specs.canon import canon_violations
+from tests.fakes import gate_fixes
 
 _SHA_A = "a" * 40
 _SHA_B = "b" * 40
@@ -32,6 +33,9 @@ _ZERO = "0" * 40
 class _FakeCanonObjectSource:
     """Maps a sha to a fixed specs/-prefixed tree-path list and an optional first
     parent — no denylist content, this fixture only exercises the canon scan step."""
+
+    def remote_branch(self, repo: Path, branch: str) -> bool:
+        return True
 
     tree_by_sha: dict[str, list[str]] = field(default_factory=dict)
     #: The paths the pushed RANGE introduces or rewrites at a sha (bug
@@ -51,6 +55,9 @@ class _FakeCanonObjectSource:
 
 
 class _FailingTreeObjectSource:
+    def remote_branch(self, repo: Path, branch: str) -> bool:
+        return True
+
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         return ()
 
@@ -66,6 +73,7 @@ def test_a_fully_canon_conformant_tree_passes(tmp_path: Path) -> None:
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -81,6 +89,7 @@ def test_a_non_canon_path_refuses_naming_the_fix_hint(tmp_path: Path) -> None:
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -109,6 +118,7 @@ def test_a_non_canon_path_outside_the_pushed_range_never_blocks(tmp_path: Path) 
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_SHA_B}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=lambda paths: [p for p in paths if p.startswith("_archive/")],
@@ -124,6 +134,7 @@ def test_a_non_canon_path_inside_the_pushed_range_still_blocks(tmp_path: Path) -
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_SHA_B}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -139,6 +150,7 @@ def test_a_stray_dotfile_refuses(tmp_path: Path) -> None:
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -152,6 +164,7 @@ def test_a_deletion_ref_is_never_scanned(tmp_path: Path) -> None:
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_ZERO} refs/heads/feature/0.0.1 {_SHA_A}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -168,6 +181,7 @@ def test_a_tag_push_is_scanned_too(tmp_path: Path) -> None:
     decision = push_gate_decision(
         _refs(f"refs/tags/v9.9.9 {_SHA_A} refs/tags/v9.9.9 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,
@@ -185,6 +199,7 @@ def test_canon_scan_runs_before_the_denylist_scan(tmp_path: Path) -> None:
     decision = push_gate_decision(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         gitflow=DEFAULT,
+        fixes=gate_fixes(),
         object_source=source,
         repo=tmp_path,
         canon_violations_fn=canon_violations,

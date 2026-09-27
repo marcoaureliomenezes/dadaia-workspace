@@ -514,7 +514,7 @@ def test_baseline_v7_header_and_single_line_patterns() -> None:
     A12.5 (version bump 6->7, single-line patterns, extended _header rationale);
     T-043-23 security-review rework (version bump 7->8, internal-hostname carve-out
     narrowed to the .home label class); 0.4.7 FR7 (version bump 9->10, the last
-    fixture-scoped home-abs-path carve-out deleted)."""
+    fixture-scoped home-abs-path carve-out deleted); T-050-22 (13->14, .der refused)."""
     import importlib.resources
     import json as _json
 
@@ -523,7 +523,7 @@ def test_baseline_v7_header_and_single_line_patterns() -> None:
     )
     raw = _json.loads(resource.read_text(encoding="utf-8"))
 
-    assert raw["_header"]["version"] == 10
+    assert raw["_header"]["version"] == 14
     excludes_text = " ".join(raw["_header"]["excludes"])
     assert "/root" in excludes_text
     assert "Users" in excludes_text

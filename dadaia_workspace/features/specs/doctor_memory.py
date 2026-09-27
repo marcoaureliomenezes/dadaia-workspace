@@ -80,11 +80,9 @@ def _parse_memory_md(path: Path) -> _MemoryMdSummary:
 # MEM-DRIFT-1: features package-map mermaid block vs the live tree
 # ---------------------------------------------------------------------------
 #
-# Relocated (v0.5.1 T-051-22 rework) from the deleted push-gated contract test
-# ``tests/contract/test_architecture_diagrams_current.py`` (removed at 5e0719af, bug
-# ``push-gate-test-pins-memory-package-count-that-only-closure-may-change``) per
-# qa-engineer's 2026-08-29 deletion-verdict handoff: the diagram-vs-code correspondence
-# guard is real and must survive, but never on a push-gated tier — every future package
+# Relocated (v0.5.1 T-051-22) from a push-gated contract test (bug
+# ``push-gate-test-pins-memory-package-count-that-only-closure-may-change``): the
+# diagram-vs-code correspondence guard is real, but never on a push-gated tier — every future package
 # add/delete during IMPLEMENTATION would go red before the next CLOSURE gets to update
 # memory. See ``check_mem_drift1_features_package_map`` below for the WARNING itself.
 
@@ -481,41 +479,14 @@ class MemoryValidator:
                 )
             ]
 
-        results = memory_lint.lint_directory(mem_dir, schema)
-        if not results:
-            return []
-
-        error_lines: list[str] = []
-        warn_lines: list[str] = []
-        for result in results:
-            for err in result.errors:
-                error_lines.append(f"  [{result.path}] ERROR: {err}")
-            for warn in result.warnings:
-                warn_lines.append(f"  [{result.path}] WARN: {warn}")
-
-        issues: list[SpecsDoctorIssue] = []
-        if error_lines:
-            issues.append(
-                SpecsDoctorIssue(
-                    code="LINT-1",
-                    severity=Severity.ERROR,
-                    description=(
-                        "LINT-1: memory atom lint found frontmatter/schema violations "
-                        "or forbidden headings:\n" + "\n".join(error_lines)
-                    ),
-                    path=str(mem_dir),
-                )
+        # One issue per error, naming its atom: the doctor prints one line per finding.
+        return [
+            SpecsDoctorIssue(
+                code="LINT-1", severity=Severity.ERROR, description=err, path=str(result.path)
             )
-        elif warn_lines:
-            issues.append(
-                SpecsDoctorIssue(
-                    code="LINT-1",
-                    severity=Severity.WARNING,
-                    description=("LINT-1: memory atom lint warnings:\n" + "\n".join(warn_lines)),
-                    path=str(mem_dir),
-                )
-            )
-        return issues
+            for result in memory_lint.lint_directory(mem_dir, schema)
+            for err in result.errors
+        ]
 
     def check_mem_drift2_citations(
         self,
@@ -528,7 +499,7 @@ class MemoryValidator:
         citation contract tests use, never a second rule. WARNING and unfixable, like
         MEM-DRIFT-1: memory drift is a closure finding (QUALITY.md), so a verb retired
         mid-implementation never reddens an unrelated task. *command_paths* is plain data
-        from the CLI root, exactly as ``live_shas`` travels.
+        from the CLI root.
         """
         return [
             SpecsDoctorIssue(

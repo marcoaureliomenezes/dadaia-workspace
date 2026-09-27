@@ -8,7 +8,10 @@ read from the config file rather than an input.
 
 Intent: CONTRACT — T-047-88: release.yml is gone and its publishing jobs live inside
 release.yml behind the single `release_created` gate: no `release:` event, no
-`push: tags`, no hand-rolled tag arithmetic. Size: SMALL."""
+`push: tags`, no hand-rolled tag arithmetic.
+
+Intent: CONTRACT — 0.5.0 c3 rework (regression of 114be682): every ci.yml job that runs
+`dadaia doctor` checks out full history. Size: SMALL."""
 
 from __future__ import annotations
 
@@ -357,7 +360,7 @@ def test_pr_source_guard_reads_the_gitflow_by_role(
 def test_the_ci_triggers_are_the_library_gitflow() -> None:
     """T-050-19 AC6.9: GitHub reads no file, so ci.yml's triggers stay literal — pinned
     here to the library constitution's gitflow; changing one without the other is red."""
-    from dadaia_workspace.core.specs_version import read_gitflow
+    from dadaia_workspace.core.gitflow import read_gitflow
 
     flow, warning = read_gitflow(_REPO_ROOT / "specs")
     assert warning is None
@@ -444,3 +447,26 @@ def test_pr_source_guard_defaults_when_the_base_has_no_constitution(tmp_path: Pa
     (tmp_path / "specs").mkdir()
     assert _guard_exit("develop", "main", tmp_path) == 0
     assert _guard_exit("feature/0.5.0", "main", tmp_path) != 0
+
+
+def test_every_ci_job_running_the_doctor_checks_out_full_history() -> None:
+    """Given a push or PR whose live release is in CLOSURE with a memory entry, the
+    Compliance job's doctor judges the memory window over real git history: it passes
+    when the window is reconciled and fails only on a real drift. The judgement
+    (`_release_tree._window_findings`) runs `git diff since..until`, which a depth-1
+    clone cannot resolve — so the job must fetch depth 0."""
+    ci = yaml.safe_load((_WORKFLOWS / "ci.yml").read_text(encoding="utf-8"))
+    doctor_jobs = {
+        name: job
+        for name, job in ci["jobs"].items()
+        if any("dadaia doctor" in str(step.get("run", "")) for step in job.get("steps", []))
+    }
+    assert doctor_jobs, "ci.yml runs no `dadaia doctor` step"
+    shallow = [
+        name
+        for name, job in doctor_jobs.items()
+        for step in job["steps"]
+        if str(step.get("uses", "")).startswith("actions/checkout@")
+        and (step.get("with") or {}).get("fetch-depth") != 0
+    ]
+    assert shallow == [], f"doctor jobs with a shallow checkout: {shallow}"

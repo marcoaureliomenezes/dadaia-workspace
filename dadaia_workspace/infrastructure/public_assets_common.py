@@ -9,12 +9,10 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import sys
 from collections.abc import Iterable
 from enum import StrEnum
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any
 
 from dadaia_workspace.infrastructure.privacy_check import (
     _PUBLIC_ASSET_IGNORED_DIRS,
@@ -149,19 +147,3 @@ def _toml_escape(value: object) -> str:
     s = s.replace("\\", "\\\\")
     s = s.replace('"', '\\"')
     return f'"{s}"'
-
-
-def _log_cleanup_error(
-    func: object,
-    path: object,
-    exc_info: tuple[type[BaseException], BaseException, Any] | tuple[None, None, None],
-) -> None:
-    """onerror= callback for shutil.rmtree — write a warning to stderr without re-raising.
-
-    Replaces the anti-pattern ``ignore_errors=True`` (which silences real
-    PermissionError / OSError) with a visible-but-non-fatal warning so that
-    operators can act on stale files while the install still succeeds.
-    """
-    exc_class = type(exc_info[1]).__name__ if exc_info and exc_info[1] else "UnknownError"
-    exc_msg = str(exc_info[1]) if exc_info and exc_info[1] else ""
-    sys.stderr.write(f"[cleanup-warning] {path}: {exc_class}: {exc_msg}\n")

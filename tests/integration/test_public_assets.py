@@ -9,7 +9,7 @@ Merged per plan-integration.md (39 -> ~8):
     overlay (no-overlay lockstep + overlay-change lockstep + invalid-overlay-loud +
     doctor rerender-drift/invalid-vs-missing) -> 2.
   - Delete -> unit (already covered by tests/unit/infrastructure/test_public_assets_*.py,
-    T-2's per-concern split): ``_render_agent_toml_block`` quoting/escaping,
+    T-2's per-concern split): quoting/escaping,
     ``_parse_agent_frontmatter`` param cases, ``_render_codex_agent_toml`` field/tier
     cases, command-policy prefix rules, and the
     skill-frontmatter static-lint fn (moved to unit/features/public).

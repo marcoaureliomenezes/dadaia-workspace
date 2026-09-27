@@ -4,7 +4,8 @@ branches are PR-only; every refusal and its fix line name the CONFIGURED branche
 Tag pushes keep their carve-out. Every case runs under the default gitflow and a custom
 one (``trunk``/``next``/``work/``) — no branch name is hard-coded in the gate.
 
-Name validation itself is ``Gitflow.role_of`` (``tests/unit/core/test_gitflow.py``).
+Name validation itself is ``Gitflow.role_of`` (``tests/unit/core/test_gitflow.py``); the
+refusal of role-less names under the default gitflow is pinned here, at the gate.
 
 Intent: CONTRACT — AC6.5, AC8.1 (T-050-12); v0.4.4 A3.1, A3.5
 """
@@ -13,6 +14,7 @@ from __future__ import annotations
 
 import shlex
 from collections.abc import Iterable
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -21,8 +23,13 @@ import pytest
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow
 from dadaia_workspace.core.models.git_scan import ScannedObject
 from dadaia_workspace.features.chokepoints import Decision, push_gate_decision
-from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_stdin
+from dadaia_workspace.features.chokepoints.branch_policy import (
+    PushRef,
+    check_branch_policy,
+    parse_push_stdin,
+)
 from dadaia_workspace.features.specs.canon import canon_violations
+from tests.fakes import gate_fixes
 
 _SHA_A = "a" * 40
 _ZERO = "0" * 40
@@ -35,23 +42,29 @@ class _EmptyObjectSource:
     """No object is new: the denylist and canon scans are pure pass-throughs here.
     ``contentless`` names the shas whose push publishes nothing (a birth candidate)."""
 
-    def __init__(self, contentless: frozenset[str] = frozenset()) -> None:
+    def __init__(
+        self, contentless: frozenset[str] = frozenset(), remote: frozenset[str] = frozenset()
+    ) -> None:
         self.contentless = contentless
+        self.remote = remote
         self.asked: list[str] = []
+
+    def remote_branch(self, repo: Path, branch: str) -> bool:
+        return branch in self.remote
 
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         return ()
 
-    def publishes_nothing(self, repo: Path, sha: str) -> bool:
+    def unpublished(self, repo: Path, sha: str) -> list[str]:
         self.asked.append(sha)
-        return sha in self.contentless
+        return [] if sha in self.contentless else [sha]
 
 
 def _decide(refs: list[PushRef], root: Path, flow: Gitflow = DEFAULT, **kwargs: Any) -> Decision:
     kwargs.setdefault("object_source", _EmptyObjectSource())
     kwargs.setdefault("repo", root)
     kwargs.setdefault("canon_violations_fn", canon_violations)
-    return push_gate_decision(refs, gitflow=flow, **kwargs)
+    return push_gate_decision(refs, gitflow=flow, fixes=gate_fixes(), **kwargs)
 
 
 def _refs(*lines: str) -> list[PushRef]:
@@ -120,18 +133,23 @@ def test_a_branch_outside_the_gitflow_is_refused_naming_the_work_branch(
     for word in (flow.principal, flow.integration, flow.work_prefix):
         assert word in decision.message
     work = f"{flow.work_prefix}<M.m.p>"
-    assert _fix(decision) == [
-        "git",
-        "checkout",
-        "-b",
-        work,
-        flow.principal,
-        "&&",
-        "git",
-        "push",
-        "origin",
-        work,
-    ]
+    # One command, from any cwd, carrying the refused commit (review H-C): no `&&`.
+    assert _fix(decision) == ["git", "-C", "/repo", "switch", "-c", work, _SHA_A]
+
+
+@pytest.mark.parametrize(
+    "branch", ["feature/0.6.0-rc1", "Main", "developp", "release/0.6.0", "chore/cleanup"]
+)
+def test_the_default_gitflow_refuses_a_name_that_is_no_role(tmp_path: Path, branch: str) -> None:
+    """Behavior (AC6.1, AC6.5, default gitflow main/develop/feature/<M.m.p>): only a work
+    branch is pushable; a name that is not exactly the principal, the integration or
+    ``feature/`` + an ``M.m.p`` version has no role and is refused. ``-rc1`` is a suffix on
+    the version, ``Main`` and ``developp`` are not the role names, ``release/`` and
+    ``chore/`` are not the work prefix. Restores coverage lost in c3 (retro 2026-09-27 W5).
+    """
+    decision = _decide(_push(branch), tmp_path, DEFAULT)
+    assert decision.allowed is False
+    assert "outside the gitflow" in decision.message
 
 
 def test_the_default_names_are_ordinary_branches_under_a_custom_gitflow(tmp_path: Path) -> None:
@@ -146,19 +164,38 @@ def test_a_contentless_birth_of_principal_or_integration_passes(
 ) -> None:
     """ADR 0036: an orphan empty root pushed as the principal, or `git branch <integration>
     <principal>` pushed, creates the remote branch and publishes nothing."""
-    source = _EmptyObjectSource(frozenset({_SHA_A}))
+    other = flow.integration if role == "principal" else flow.principal
+    source = _EmptyObjectSource(frozenset({_SHA_A}), remote=frozenset({other}))
     decision = _decide(_push(getattr(flow, role)), tmp_path, flow, object_source=source)
     assert decision.allowed, decision.message
     assert source.asked == [_SHA_A]
 
 
 @_FLOWS
-def test_a_birth_carrying_a_commit_is_refused_naming_git_fetch(
-    tmp_path: Path, flow: Gitflow
+@pytest.mark.parametrize(
+    ("role", "other"), [("principal", "integration"), ("integration", "principal")]
+)
+def test_a_birth_carrying_a_commit_is_refused_naming_a_birth_at_the_other_published_tip(
+    tmp_path: Path, flow: Gitflow, role: str, other: str
 ) -> None:
-    decision = _decide(_push(flow.integration), tmp_path, flow)
+    """Review M2: birth at the other role's published tip (publishes nothing) — one
+    command, no `&&` (Windows PowerShell 5.1 has none)."""
+    branch, tip = getattr(flow, role), getattr(flow, other)
+    source = _EmptyObjectSource(remote=frozenset({tip}))
+    decision = _decide(_push(branch), tmp_path, flow, object_source=source)
     assert not decision.allowed
-    assert _fix(decision) == ["git", "fetch", "--all"]
+    assert _fix(decision) == [
+        "git", "-C", "/repo", "push", "origin", f"refs/remotes/origin/{tip}:refs/heads/{branch}",
+    ]  # fmt: skip
+
+
+@_FLOWS
+def test_an_empty_origin_admits_the_principal_as_it_is(tmp_path: Path, flow: Gitflow) -> None:
+    """R13 rule 2: origin holds no gitflow branch — the local principal is published with
+    its content (the scans still run); nothing contentless is required."""
+    source = _EmptyObjectSource()
+    assert _decide(_push(flow.principal), tmp_path, flow, object_source=source).allowed
+    assert source.asked == []
 
 
 def test_an_existing_principal_is_never_a_birth(tmp_path: Path) -> None:
@@ -169,9 +206,13 @@ def test_an_existing_principal_is_never_a_birth(tmp_path: Path) -> None:
     assert source.asked == []
 
 
-def test_a_birth_aimed_at_another_remote_name_is_refused(tmp_path: Path) -> None:
+def test_a_contentless_birth_passes_from_any_source(tmp_path: Path) -> None:
+    """Review H4: baseline pushes `<sha>:refs/heads/<b>` — the birth is judged by the
+    remote branch it creates and what it publishes, never by the local ref's name."""
     source = _EmptyObjectSource(frozenset({_SHA_A}))
-    assert not _decide(_push("main", "develop"), tmp_path, object_source=source).allowed
+    assert _decide(_push("main", "develop"), tmp_path, object_source=source).allowed
+    sha_birth = _refs(f"{_SHA_A} {_SHA_A} refs/heads/develop {_ZERO}")
+    assert _decide(sha_birth, tmp_path, object_source=source).allowed
 
 
 def test_tag_push_still_passes(tmp_path: Path) -> None:
@@ -208,15 +249,31 @@ def test_pushing_feature_branch_to_a_foreign_remote_ref_is_refused(tmp_path: Pat
     """Finding 2, carried forward: `git push origin feature/0.0.1:develop` — local
     feature branch, remote develop. The policy must key on BOTH sides: a valid local
     feature/{M.m.p} tip aimed at any remote ref other than its own name is a refusal."""
-    decision = _decide(_push("work/0.0.1", "next"), tmp_path, _CUSTOM)
+    decision = _decide(_push("work/0.0.1", "work/0.0.2"), tmp_path, _CUSTOM)
     assert not decision.allowed
-    assert "refs/heads/next" in decision.message
-    assert _fix(decision) == ["git", "push", "origin", "work/0.0.1:work/0.0.1"]
+    assert "refs/heads/work/0.0.2" in decision.message
+    assert _fix(decision) == ["git", "-C", "/repo", "branch", "-m", "work/0.0.1", "work/0.0.2"]
+    published = _EmptyObjectSource(remote=frozenset({"trunk"}))
+    assert not _decide(
+        _push("work/0.0.1", "next"), tmp_path, _CUSTOM, object_source=published
+    ).allowed
 
 
 def test_detached_head_ref_gets_a_pushable_branch_diagnosis(tmp_path: Path) -> None:
-    """Finding 6, carried forward: `git push origin HEAD:feature/0.0.1` — right
-    outcome needs the right words."""
+    """Finding 6, carried forward: `git push origin HEAD:feature/0.0.1` — the fix cuts the
+    work branch at the refused commit (never a name that points elsewhere)."""
     decision = _decide(_refs(f"HEAD {_SHA_A} refs/heads/work/0.0.1 {_ZERO}"), tmp_path, _CUSTOM)
     assert not decision.allowed
-    assert _fix(decision)[:3] == ["git", "checkout", "work/<M.m.p>"]
+    assert _fix(decision) == ["git", "-C", "/repo", "switch", "-c", "work/<M.m.p>", _SHA_A]
+
+
+def test_an_outside_ref_is_carried_onto_the_live_work_branch(tmp_path: Path) -> None:
+    """Review 5 M2: the live work branch exists and may have diverged from the refused ref
+    — a fast-forward cannot carry it; the fix switches to the work branch and the text
+    names the merge (append-only, never a rebase)."""
+    decision = check_branch_policy(
+        _push("topic"), _CUSTOM, replace(gate_fixes(), work="work/1.2.3", cut=True)
+    )
+    assert decision is not None and "'work/1.2.3'" in decision.message
+    assert f"merge {_SHA_A}" in decision.message
+    assert _fix(decision) == ["git", "-C", "/repo", "switch", "work/1.2.3"]

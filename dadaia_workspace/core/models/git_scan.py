@@ -85,7 +85,7 @@ class GitObjectReadError(Exception):
     STRUCTURED field, never embedded in the message string: a raise site that knows
     which path it failed on (e.g. the prior-content resolution desync in
     ``infrastructure.git_objects._resolve_prior_texts``) passes it here, and the single
-    render boundary that catches this error (``features.chokepoints.service``) masks it
+    render boundary that catches this error (``features.chokepoints.push_gate``) masks it
     through the SAME ``_PathMasker`` every other channel uses before it ever reaches an
     operator-facing string — the message itself never carries a raw path.
     """

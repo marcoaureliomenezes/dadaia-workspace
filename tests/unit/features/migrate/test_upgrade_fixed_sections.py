@@ -11,6 +11,7 @@ import pytest
 
 from dadaia_workspace.core import specs_version
 from dadaia_workspace.core.fixed_sections import FIXED_SECTIONS
+from dadaia_workspace.core.gitflow import merge_frontmatter
 from dadaia_workspace.features.migrate.upgrade import upgrade
 from dadaia_workspace.features.specs import SpecsDoctor, canon
 
@@ -29,7 +30,7 @@ def _v6_tree(tmp_path: Path) -> Path:
     for rel, _ in FIXED_SECTIONS:
         path = specs / rel
         path.write_text(_FIXED_BLOCK.sub("\n", path.read_text(encoding="utf-8")), encoding="utf-8")
-    specs_version.merge_frontmatter(specs, specs_pattern_version=6)
+    merge_frontmatter(specs, specs_pattern_version=6)
     return specs
 
 

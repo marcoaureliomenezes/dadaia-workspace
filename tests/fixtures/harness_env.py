@@ -187,6 +187,14 @@ ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset(
         # features/telemetry/service.py (PI session-store ingest, WS-PI-6) — same
         # category as DADAIA_AGENTS_DIR above.
         "DADAIA_KIMI_SESSION_INDEX",
+        # Read by public/scripts/pre-push-ci-gate.sh BY DESIGN: the runner override.
+        "DADAIA_BIN",
+        # Read by core/workspace_resolver BY DESIGN: roots no process may resolve; the
+        # suite fences the enclosing instance (bug test-subprocesses-resolve-the-live-instance).
+        "DADAIA_FENCED_ROOTS",
+        # Read by infrastructure/privacy_check.load_privacy_terms BY DESIGN: the operator's
+        # denylist path override, source 1 of the one secret matcher (SPEC AC5.6).
+        "DADAIA_PRIVACY_DENYLIST",
     }
 )
 

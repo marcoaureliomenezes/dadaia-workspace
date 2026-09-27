@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -13,7 +14,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli._specs_resolution import HARNESS_SESSION_ID_ENV_VARS
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.core import specs_version
+from dadaia_workspace.core import gitflow, specs_version
 from dadaia_workspace.features.specs import SpecsDoctor, canon
 
 pytestmark = pytest.mark.integration
@@ -109,7 +110,7 @@ def test_a_v6_tree_ends_v7_with_a_clean_doctor(repo: Path) -> None:
     constitution.write_text(
         constitution.read_text(encoding="utf-8").split("<!-- dadaia:fixed")[0], encoding="utf-8"
     )
-    specs_version.merge_frontmatter(specs, specs_pattern_version=6)
+    gitflow.merge_frontmatter(specs, specs_pattern_version=6)
 
     result = _runner.invoke(app, ["specs", "init", "--context", "c"])
 
@@ -144,42 +145,34 @@ def test_replace_foreign_moves_to_specs_bkp_staged_then_scaffolds(repo: Path) ->
     assert _doctor_errors(repo / "specs") == []
 
 
-def test_an_existing_specs_bkp_exits_1_and_writes_nothing(repo: Path) -> None:
-    _foreign(repo)
-    (repo / "specs-bkp").mkdir()
-    before = _snapshot(repo)
+def test_no_context_resolved_exits_2_with_a_fix_line(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The fix names the running CLI (ADR 0045); a host venv outside any workspace (CI)."""
+    from dadaia_workspace.core.cli_line import fix_line
 
-    result = _runner.invoke(app, ["specs", "init", "--context", "c", "--replace-foreign"])
-
-    assert result.exit_code == 1, result.output
-    assert "fix:" in result.output
-    assert _snapshot(repo) == before
-
-
-def test_no_context_resolved_exits_2_with_a_fix_line(repo: Path) -> None:
+    monkeypatch.setattr(sys, "prefix", str(repo.parent / "host-venv"))
     result = _runner.invoke(app, ["specs", "init"])
 
     assert result.exit_code == 2, result.output
-    assert ".dadaia/.venv/bin/dadaia specs init --context '<name>'" in result.output
+    assert f"fix: {fix_line(None, 'specs', 'init', '--context', '<name>')}" in result.output
 
 
-def test_existing_specs_bkp_fix_line_is_non_destructive_and_clears_the_refusal(
+def test_an_existing_specs_bkp_is_kept_and_the_tree_moves_to_a_stamped_child(
     repo: Path,
 ) -> None:
-    """Review finding 8: the fix line keeps the prior backup instead of deleting it."""
+    """Review finding 8: a prior backup is never overwritten nor deleted. Review H1: the
+    new one lands INSIDE specs-bkp/ — the one onboarding path baseline publishes."""
     _foreign(repo)
     (repo / "specs-bkp").mkdir()
     (repo / "specs-bkp" / "old.md").write_text("previous backup\n", encoding="utf-8")
-    refused = _runner.invoke(app, ["specs", "init", "--context", "c", "--replace-foreign"])
-    fix = next(ln for ln in refused.output.splitlines() if ln.startswith("fix: "))[5:]
-    assert " rm " not in fix
 
-    subprocess.run(fix, shell=True, check=True, cwd=repo.parent.parent)
     result = _runner.invoke(app, ["specs", "init", "--context", "c", "--replace-foreign"])
 
     assert result.exit_code == 0, result.output
-    kept = [p for p in repo.glob("specs-bkp-*/old.md")]
-    assert [p.read_text(encoding="utf-8") for p in kept] == ["previous backup\n"]
+    assert (repo / "specs-bkp" / "old.md").read_text(encoding="utf-8") == "previous backup\n"
+    assert [p.name for p in repo.glob("specs-bkp/*/features/login.md")] == ["login.md"]
+    assert list(repo.glob("specs-bkp-*")) == []
 
 
 def test_a_symlinked_context_specs_root_is_refused_and_nothing_written(
@@ -188,7 +181,7 @@ def test_a_symlinked_context_specs_root_is_refused_and_nothing_written(
     """Review finding 7: ``--context`` routes through the one symlink-refusal seam."""
     real = tmp_path / "elsewhere-specs"
     canon.scaffold(real)
-    specs_version.merge_frontmatter(real, specs_pattern_version=6)
+    gitflow.merge_frontmatter(real, specs_pattern_version=6)
     (repo / "specs").symlink_to(real, target_is_directory=True)
     before, before_real = _snapshot(repo), _snapshot(real)
 
@@ -213,7 +206,7 @@ def test_fresh_tree_writes_the_detected_gitflow_and_names_it(repo: Path) -> None
     result = _runner.invoke(app, ["specs", "init", "--context", "c"])
 
     assert result.exit_code == 0, result.output
-    flow, warning = specs_version.read_gitflow(repo / "specs")
+    flow, warning = gitflow.read_gitflow(repo / "specs")
     assert (flow, warning) == (Gitflow("trunk", "develop", "feature/"), None)
     assert "[gitflow] principal trunk, integration develop, work feature/<M.m.p>" in result.output
 
@@ -234,7 +227,7 @@ def test_flags_merge_into_an_existing_tree_and_rerun_is_a_no_op(repo: Path) -> N
     second = _runner.invoke(app, ["specs", "init", "--context", "c", *flags])
 
     assert first.exit_code == 0 and second.exit_code == 0, first.output + second.output
-    assert specs_version.read_gitflow(repo / "specs")[0] == Gitflow("trunk", "next", "work/")
+    assert gitflow.read_gitflow(repo / "specs")[0] == Gitflow("trunk", "next", "work/")
     assert "owner: me" in constitution.read_text(encoding="utf-8")
     assert _snapshot(repo / "specs") == snapshot
 
@@ -244,3 +237,24 @@ def test_an_invalid_flag_refuses_with_a_fix_and_writes_nothing(repo: Path) -> No
     assert result.exit_code == 2
     assert "fix: " in result.output
     assert not (repo / "specs").exists()
+
+
+@pytest.mark.parametrize(
+    "frontmatter",
+    [
+        "specs_pattern_version: 7\ngitflow: {principal: trunk\n",
+        "specs_pattern_version: 7\ngitflow: {principal: trunk, integration: trunk, work: work/}\n",
+    ],
+)
+def test_a_malformed_constitution_refuses_naming_the_file(repo: Path, frontmatter: str) -> None:
+    """ADR 0047: never a foreign move, never a reset of the operator's names."""
+    specs = repo / "specs"
+    specs.mkdir()
+    (specs / "constitution.md").write_text(f"---\n{frontmatter}---\n# C\n", encoding="utf-8")
+    before = _snapshot(repo)
+
+    result = _runner.invoke(app, ["specs", "init", "--context", "c", "--replace-foreign"])
+
+    assert result.exit_code == 2
+    assert f"fix: repair the YAML frontmatter of {specs / 'constitution.md'}" in result.output
+    assert _snapshot(repo) == before

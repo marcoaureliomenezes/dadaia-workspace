@@ -17,13 +17,18 @@ import pytest
 
 pytest.importorskip("fcntl")
 
+from dadaia_workspace.container import scan_publish_candidates
+from dadaia_workspace.core.cli_line import shell_line  # noqa: E402
 from dadaia_workspace.core.exceptions import RepoUrlMissingError  # noqa: E402
 from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     AssociatedRepo,
     ContextState,
     SpecContextProject,
 )
-from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
+from dadaia_workspace.features.spec_context.service import (  # noqa: E402
+    DeadReviewRequiredError,
+    SpecContextService,
+)
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
 from tests.fakes import FakeContextStore  # noqa: E402
 
@@ -68,6 +73,7 @@ def _setup(tmp_path: Path, lib_url: str) -> tuple[SpecContextService, FakeContex
         git_client=GitSubprocessClient(),
         workspace_root=ws,
         install_hooks=lambda _repo: None,
+        secret_scan=scan_publish_candidates,
     )
     return service, store, ws
 
@@ -91,7 +97,7 @@ def test_dead_refuses_to_delete_a_repo_it_could_never_clone_back(tmp_path: Path)
     _run(["git", "init", str(lib_path)])
     service.alive("proj")
 
-    with pytest.raises(RepoUrlMissingError, match=r"fix: git -C repos/lib remote add origin"):
+    with pytest.raises(RepoUrlMissingError, match=r"fix: git -C \S+/repos/lib remote add origin"):
         service.dead("proj", commit=True)
 
     assert lib_path.is_dir() and (ws / "repos" / "main").is_dir()
@@ -101,9 +107,47 @@ def test_dead_refuses_to_delete_a_repo_it_could_never_clone_back(tmp_path: Path)
 def test_alive_refuses_a_legacy_url_less_missing_repo_with_a_fix_line(tmp_path: Path) -> None:
     service, store, ws = _setup(tmp_path, "")
 
-    with pytest.raises(
-        RepoUrlMissingError, match=r"fix: \S*/\.dadaia/\.venv/bin/dadaia context repo"
-    ):
+    with pytest.raises(RepoUrlMissingError) as refused:
         service.alive("proj")
 
+    # one command (no `&&`): the clone alive then adopts, its origin back-filled
+    clone = shell_line("git", "clone", "<clone-url>", str(ws / "repos" / "lib"))
+    assert str(refused.value).endswith(f"fix: {clone}")
+
     assert store.get("proj").state == ContextState.DEAD  # type: ignore[union-attr]
+
+
+def _unborn_lib(tmp_path: Path) -> tuple[SpecContextService, FakeContextStore, Path]:
+    vanished = tmp_path / "vanished.git"
+    service, store, ws = _setup(tmp_path, str(vanished))
+    lib_path = ws / "repos" / "lib"
+    _run(["git", "init", str(lib_path)])
+    _run(["git", "remote", "add", "origin", str(vanished)], cwd=lib_path)
+    service.alive("proj")
+    return service, store, lib_path
+
+
+def test_dead_retires_an_empty_unborn_clone_without_pushing_it(tmp_path: Path) -> None:
+    """Intent: CONTRACT — context-dead-pushes-an-unborn-clone. An empty unborn clone has
+    nothing to lose or publish: dead removes it with no sync, origin vanished or not."""
+    service, _store, lib_path = _unborn_lib(tmp_path)
+
+    dead = service.dead("proj")
+
+    assert dead.state == ContextState.DEAD
+    assert not lib_path.exists()
+
+
+@pytest.mark.parametrize("commit", [False, True])
+def test_dead_refuses_an_unborn_clone_holding_files(tmp_path: Path, commit: bool) -> None:
+    """Intent: CONTRACT — context-dead-pushes-an-unborn-clone (lossless). Files in an
+    unborn clone have no history to publish into: dead refuses, with or without
+    --commit, touching nothing, and names a runnable fix."""
+    service, store, lib_path = _unborn_lib(tmp_path)
+    (lib_path / "AGENTS.md").write_text("scaffold\n")
+
+    with pytest.raises(DeadReviewRequiredError, match=r"\nfix: mv \S*lib"):
+        service.dead("proj", commit=commit)
+
+    assert (lib_path / "AGENTS.md").read_text() == "scaffold\n"
+    assert store.get("proj").state == ContextState.ALIVE  # type: ignore[union-attr]

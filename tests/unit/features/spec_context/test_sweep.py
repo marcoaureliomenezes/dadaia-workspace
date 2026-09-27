@@ -278,3 +278,30 @@ def test_a_second_reap_of_the_same_origin_replaces_the_earlier_hold(
     assert (dest / "deep" / "b").read_text() == "second", "the newer content wins"
     assert not (dest / "deep" / "a").exists(), "the earlier hold is gone, not layered"
     assert dest.stat().st_mtime > 1.0, "the TTL clock restarts at the new move"
+
+
+def test_remove_deletes_a_read_only_tree(tmp_path: Path) -> None:
+    """Bug doctor-reaper-cannot-delete-read-only-trees: a Go module cache is
+    ``dr-xr-xr-x`` all the way down, so the printed fix ``doctor --fix --expired-only``
+    skipped every entry with errno 13 and the finding never cleared. The reaper owns
+    what it reaps: a read-only tree is made writable on the way down, then removed.
+    Windows-safe: ``chmod`` there toggles the read-only attribute on the file."""
+    tree = tmp_path / "cache" / "mod"
+    (tree / "pkg").mkdir(parents=True)
+    leaf = tree / "pkg" / "go.mod"
+    leaf.write_text("module x\n")
+    for path in (leaf, tree / "pkg", tree):
+        path.chmod(0o555 if path.is_dir() else 0o444)
+
+    assert sweep.remove(tmp_path, tree, "cache/mod") == "deleted 'cache/mod'"
+    assert not tree.exists()
+
+
+def test_remove_deletes_a_read_only_file(tmp_path: Path) -> None:
+    """The same rule for a lone file: Windows refuses to unlink a read-only file."""
+    leaf = tmp_path / "go.sum"
+    leaf.write_text("x")
+    leaf.chmod(0o444)
+
+    assert sweep.remove(tmp_path, leaf, "go.sum") == "deleted 'go.sum'"
+    assert not leaf.exists()

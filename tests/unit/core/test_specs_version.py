@@ -5,12 +5,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dadaia_workspace.core.gitflow import DEFAULT, Gitflow
-from dadaia_workspace.core.specs_version import (
-    merge_frontmatter,
-    read_gitflow,
-    read_pattern_version,
-)
+from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, merge_frontmatter, read_gitflow
+from dadaia_workspace.core.specs_version import read_pattern_version
 
 _CUSTOM = Gitflow(principal="trunk", integration="next", work_prefix="work/")
 

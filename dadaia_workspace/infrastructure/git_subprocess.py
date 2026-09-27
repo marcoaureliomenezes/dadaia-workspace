@@ -1,19 +1,28 @@
 """GitSubprocessClient — git operations via stdlib subprocess."""
 
 import logging
+import os
 import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 
+from dadaia_workspace.core.cli_line import git_line
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
+from dadaia_workspace.core.gitflow import Gitflow, read_gitflow
+from dadaia_workspace.core.models.git_scan import GitObjectReadError
+from dadaia_workspace.infrastructure.git_objects import unpublished
 
 logger = logging.getLogger(__name__)
 
 
 def _run(
-    args: list[str], cwd: Path | None = None, stdin: str | None = None
+    args: list[str],
+    cwd: Path | None = None,
+    stdin: str | None = None,
+    env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(args, cwd=cwd, capture_output=True, text=True, input=stdin)
+    environ = {**os.environ, **env} if env else None
+    return subprocess.run(args, cwd=cwd, capture_output=True, text=True, input=stdin, env=environ)
 
 
 def _has_embedded_git(directory: Path) -> bool:
@@ -51,7 +60,9 @@ def _stage_files_safe(path: Path) -> None:
     ``git commit -m <msg>`` (what `commit_all` issues) commits whatever the index
     holds at commit time, exactly what the two ``git add`` calls above just staged.
     """
-    # Stage tracked-file changes (modifications + deletions)
+    # Never stage an unmerged entry (review 6 H6): git's own unmerged listing refuses.
+    if unmerged := _run(["git", "diff", "--name-only", "--diff-filter=U"], cwd=path).stdout:
+        raise GitSyncError(f"git commit refused in {path}: unmerged paths\n{unmerged.strip()}")
     add_tracked = _run(["git", "add", "-u"], cwd=path)
     if add_tracked.returncode != 0:
         raise GitSyncError(f"git add -u failed in {path}: {add_tracked.stderr.strip()}")
@@ -97,7 +108,8 @@ def _commit(path: Path, msg: str, pathspec: Sequence[str] | None = None) -> None
 
     Shared by ``commit_all`` (blanket staging) and ``commit_paths`` (explicit-path
     staging) — the staging strategy differs, the commit/identity-fallback/no-op
-    handling does not. When *pathspec* is given (``commit_paths``, v0.4.3
+    handling does not; git's own identity rule applies, never a fallback identity
+    (:meth:`GitSubprocessClient.identity_fix` is the one probe). When *pathspec* is given (``commit_paths``, v0.4.3
     T-043-14/FR10/A10.2), the commit itself is scoped with a trailing ``-- <pathspec>``
     — this is what makes it honest even when the index carries OTHER staged content
     (operator pre-staged, or a concurrent caller): ``git commit -- <pathspec>`` commits
@@ -121,21 +133,7 @@ def _commit(path: Path, msg: str, pathspec: Sequence[str] | None = None) -> None
     ``commit_all``'s — which commits exactly what its own ``git add`` calls in
     :func:`_stage_files_safe` just staged).
     """
-    # Tool-authored commits must not depend on an operator git identity being
-    # configured (validation-029 F-06: containers/CI runners without user.email made
-    # dead()'s auto-commit die with 'Please tell me who you are'). When no identity
-    # resolves, fall back to a deterministic tool identity via -c overrides; a
-    # configured identity always wins.
-    commit_cmd = ["git"]
-    identity = _run(["git", "config", "user.email"], cwd=path)
-    if identity.returncode != 0 or not identity.stdout.strip():
-        commit_cmd += [
-            "-c",
-            "user.name=dadaia-workspace",
-            "-c",
-            "user.email=dadaia@workspace.local",
-        ]
-    commit_cmd += ["commit", "-m", msg]
+    commit_cmd = ["git", "commit", "-m", msg]
     if pathspec:
         commit_cmd += ["--", *pathspec]
     result = _run(commit_cmd, cwd=path)
@@ -228,65 +226,89 @@ class GitSubprocessClient:
         result = _run(["git", "remote"], cwd=path)
         return bool(result.stdout.strip())
 
+    def unpushed(self, path: Path) -> bool:
+        """Whether HEAD carries a commit origin lacks — the ONE rule, ``unpublished``."""
+        try:
+            return bool(unpublished(path, "HEAD"))
+        except GitObjectReadError:
+            return True
+
+    def identity_fix(self, path: Path) -> str:
+        """The ONE identity probe — git's own rule (env, config, auto-detection): ``""``
+        when git resolves an author and a committer, else the config line that sets one."""
+        for ident in ("GIT_AUTHOR_IDENT", "GIT_COMMITTER_IDENT"):
+            if _run(["git", "var", ident], cwd=path).returncode != 0:
+                named = _run(["git", "config", "user.name"], cwd=path).stdout.strip()
+                key = "user.email" if named else "user.name"
+                return git_line(path, "config", key, f"<{key}>")
+        return ""
+
     def push(self, path: Path) -> None:
-        # Bug 4 fix: detect whether an upstream tracking branch is configured.
-        # If not, use ``git push -u origin <branch>`` to set it on first push.
+        """Publish HEAD's unpushed commits: on its upstream by the explicit refspec
+        ``HEAD:<upstream-branch>`` (``push.default=simple`` refuses a differently named
+        upstream), else ``-u origin <branch>``; nothing unpushed, nothing run."""
+        if not self.unpushed(path):
+            return
         tracking = _run(["git", "rev-parse", "--abbrev-ref", "@{u}"], cwd=path)
         if tracking.returncode != 0:
-            # No upstream tracking branch — set it during push
-            branch = self.current_branch(path)
-            result = _run(["git", "push", "-u", "origin", branch], cwd=path)
+            self.git(path, "push", "-u", "origin", self.current_branch(path))
         else:
-            # v0.1.50 FR3 (bug context-dead-plain-git-push-fails-mismatched-upstream):
-            # skip entirely when there is nothing to push, and push with an EXPLICIT
-            # refspec ``HEAD:<upstream-branch>`` — plain ``git push`` fails under
-            # ``push.default=simple`` whenever the upstream branch name differs from
-            # the local one.
-            ahead = _run(["git", "rev-list", "--count", "@{u}..HEAD"], cwd=path)
-            if ahead.returncode == 0 and ahead.stdout.strip() == "0":
-                return
-            upstream = tracking.stdout.strip()  # e.g. "origin/main"
-            remote, _, remote_branch = upstream.partition("/")
-            result = _run(["git", "push", remote, f"HEAD:{remote_branch}"], cwd=path)
+            remote, _, remote_branch = tracking.stdout.strip().partition("/")
+            self.git(path, "push", remote, f"HEAD:{remote_branch}")
 
+    def git(
+        self, path: Path, *args: str, stdin: str | None = None, env: dict[str, str] | None = None
+    ) -> str:
+        """One git command in *path* (*env* over the process environment): its stripped
+        stdout, else ``GitSyncError`` carrying git's full output (CONFLICT is on stdout)."""
+        result = _run(["git", *args], cwd=path, stdin=stdin, env=env)
         if result.returncode != 0:
-            raise GitSyncError(f"git push failed in {path}: {result.stderr.strip()}")
-
-    def git(self, path: Path, *args: str, stdin: str | None = None) -> str:
-        """One git command in *path*: its stripped stdout, else ``GitSyncError``."""
-        result = _run(["git", *args], cwd=path, stdin=stdin)
-        if result.returncode != 0:
-            raise GitSyncError(f"git {args[0]} failed in {path}: {result.stderr.strip()}")
+            output = f"{result.stdout}\n{result.stderr}".strip()
+            raise GitSyncError(f"git {args[0]} failed in {path}:\n{output}")
         return result.stdout.strip()
 
-    def published(self, path: Path, integration: str) -> bool:
-        """Whether the project is published (local, offline): ``origin/<integration>``
-        exists and ``specs/constitution.md`` is reachable from a remote-tracking ref."""
-        born = _run(
-            ["git", "rev-parse", "-q", "--verify", f"refs/remotes/origin/{integration}"], cwd=path
-        )
+    def gitflow(self, repo: Path, main_repo: Path | None = None) -> tuple[Gitflow, str | None]:
+        """ADR 0048 — the ONE gitflow reader (the gate, ``baseline``, ``dead``, onboarding):
+        the constitution committed at HEAD, else the newest on a local branch or on origin,
+        else — an associated repo — its *main_repo*'s; never a working tree; else DEFAULT
+        plus the warning."""
+        text = self.committed_text(repo, "specs/constitution.md")
+        if text is None and main_repo is not None and main_repo.resolve() != repo.resolve():
+            return self.gitflow(main_repo)
+        return read_gitflow(repo / "specs", text or "")
+
+    def published(self, path: Path) -> bool:
+        """Whether the project is published (local, offline, AC4.1): ``origin/<integration>``
+        of the committed gitflow exists and ``specs/constitution.md`` is on origin."""
+        ref = f"refs/remotes/origin/{self.gitflow(path)[0].integration}"
+        born = _run(["git", "rev-parse", "-q", "--verify", ref], cwd=path)
         rel = "specs/constitution.md"
-        result = _run(["git", "log", "--remotes", "-n1", "--format=%H", "--", rel], cwd=path)
-        return born.returncode == 0 and result.returncode == 0 and bool(result.stdout.strip())
+        result = _run(["git", "log", "--remotes=origin", "-n1", "--format=%H", "--", rel], cwd=path)
+        return born.returncode == 0 and bool(result.stdout.strip())
+
+    def committed_text(self, path: Path, rel: str) -> str | None:
+        """*rel* at HEAD, else at the newest commit touching it on a local branch or an
+        ``origin`` remote-tracking ref — never another remote's (ADR 0048: local,
+        offline); ``None`` when none carries it."""
+        newest = _run(
+            ["git", "log", "--branches", "--remotes=origin", "-n1", "--format=%H", "--", rel],
+            cwd=path,
+        )
+        for rev in ("HEAD", newest.stdout.strip()):
+            shown = _run(["git", "show", f"{rev}:{rel}"], cwd=path)
+            if rev and shown.returncode == 0:
+                return shown.stdout
+        return None
 
     def default_branch(self, path: Path) -> str:
-        """The remote's default branch from the local ``origin/HEAD``; ``main`` when unset."""
-        result = _run(
-            ["git", "-C", str(path), "symbolic-ref", "--short", "refs/remotes/origin/HEAD"]
-        )
-        name = result.stdout.strip().removeprefix("origin/")
-        return name if result.returncode == 0 and name else "main"
+        """The remote's default branch from the local ``origin/HEAD``; ``main`` when unset
+        (``-C``: *path* may not exist yet)."""
+        ref = _run(["git", "-C", str(path), "symbolic-ref", "--short", "refs/remotes/origin/HEAD"])
+        return ref.stdout.strip().removeprefix("origin/") if ref.returncode == 0 else "main"
 
     def current_branch(self, path: Path) -> str:
         result = _run(["git", "branch", "--show-current"], cwd=path)
         return result.stdout.strip()
-
-    def create_branch(self, path: Path, branch: str) -> None:
-        result = _run(["git", "checkout", "-b", branch], cwd=path)
-        if result.returncode != 0:
-            raise GitSyncError(
-                f"git checkout -b {branch!r} failed in {path}: {result.stderr.strip()}"
-            )
 
     def checkout(self, path: Path, branch: str) -> None:
         result = _run(["git", "checkout", branch], cwd=path)
@@ -305,57 +327,11 @@ class GitSubprocessClient:
         Uses ``git ls-files --others --exclude-standard`` so that ``.gitignore``
         is honoured (gitignored files are NOT returned). The result drives the
         ``dead()`` review gate: an untracked file here is content that would be
-        newly committed and pushed, so it must be reviewed/scanned first.
+        newly committed and pushed, so it must be reviewed/scanned first. ``-z``: the
+        real names, never core.quotePath's quoting.
         """
-        result = _run(
-            ["git", "ls-files", "--others", "--exclude-standard"],
-            cwd=path,
-        )
-        return [line.strip() for line in result.stdout.splitlines() if line.strip()]
-
-    def diff_name_only(self, path: Path) -> tuple[str, ...]:
-        """Return the worker's net changed paths in *path*, model-independently.
-
-        Combines tracked modifications/deletions (``git diff --name-only``, plus
-        staged changes via ``--cached``) with untracked, non-gitignored files
-        (``git ls-files --others --exclude-standard``). The deduped, sorted tuple
-        is the trustworthy Ring-2 signal: it reflects what was actually written,
-        never a model self-report. Returns ``()`` on a clean tree or any failure.
-        """
-        changed: set[str] = set()
-        for extra in ([], ["--cached"]):
-            result = _run(["git", "diff", "--name-only", *extra], cwd=path)
-            if result.returncode == 0:
-                changed.update(line.strip() for line in result.stdout.splitlines() if line.strip())
-        untracked = _run(["git", "ls-files", "--others", "--exclude-standard"], cwd=path)
-        if untracked.returncode == 0:
-            changed.update(line.strip() for line in untracked.stdout.splitlines() if line.strip())
-        return tuple(sorted(changed))
-
-    def upstream_branch(self, path: Path) -> str | None:
-        """Return the configured upstream tracking branch (e.g. ``origin/main``), or ``None``.
-
-        v0.1.69 FR3: the lifecycle preflight git-state producer needs this to detect a
-        checkout with no upstream configured (``git push --set-upstream`` not yet run).
-        ``None`` when ``git rev-parse --abbrev-ref @{u}`` fails (no upstream, not a repo).
-        """
-        result = _run(["git", "rev-parse", "--abbrev-ref", "@{u}"], cwd=path)
-        if result.returncode != 0:
-            return None
-        return result.stdout.strip() or None
-
-    def unpushed_commit_count(self, path: Path) -> int:
-        """Return the count of local commits not yet on the upstream tracking branch.
-
-        v0.1.69 FR3: the lifecycle preflight git-state producer's "unpushed commits
-        pending" check. Returns ``0`` when there is no upstream (nothing to compare) or
-        the count cannot be parsed — never raises.
-        """
-        result = _run(["git", "rev-list", "--count", "@{u}..HEAD"], cwd=path)
-        if result.returncode != 0:
-            return 0
-        stripped = result.stdout.strip()
-        return int(stripped) if stripped.isdigit() else 0
+        result = _run(["git", "ls-files", "-z", "--others", "--exclude-standard"], cwd=path)
+        return [rel for rel in result.stdout.split("\0") if rel]
 
     def remote_url(self, path: Path) -> str:
         """Return the URL of the ``origin`` remote, or ``""`` if none is configured.

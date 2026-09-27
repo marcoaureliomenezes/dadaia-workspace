@@ -1,14 +1,14 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "IMPLEMENTATION",
+  "phase": "CLOSURE",
   "defined": {
     "sha": "fa569482",
     "ts": "2026-09-25T04:15:57Z"
   },
   "implemented": {
-    "sha": "864645f3",
-    "ts": "2026-09-25T03:55:33Z"
+    "sha": "8673b5c6",
+    "ts": "2026-09-27T02:48:46Z"
   },
   "shipped": null,
   "log": [
@@ -233,6 +233,131 @@
       "agent": "release.py",
       "kind": "note",
       "text": "Candidate defined at fa569482; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-09-26T23:02:09Z",
+      "agent": "main-thread",
+      "kind": "note",
+      "text": "Release 0.5.0 declared CRITICAL by operator order 2026-09-26 ('defina tudo isso como bugs, com release urgente ... declare a release de forma crítica, vendo o que precisará ser atualizado, deletado ... não adicione fix em cima do que tá quebrado ... criar mecanismos claros para jamais permitir isso novamente ... só aceito 80% pra mais com o restante permanecendo mapeados'). The systemic-ambiguity hunt (verified 2026-09-26) is registered as 49 open bugs (wave 0 1a8cbc1a, wave 1 a4e83877, wave 2 c47d0bc5, wave 3 83bcb621: CRITICAL 23, HIGH 10, MEDIUM 11, LOW 5). Candidate 3 closes by cuts only; candidate 4 is the critical remediation (Flow 2, bugs) plus the never-again mechanism; publish gate and deferred candidates are stated in candidate 4's SPEC."
+    },
+    {
+      "ts": "2026-09-27T02:48:46Z",
+      "agent": "release.py",
+      "kind": "note",
+      "text": "Candidate implemented at 8673b5c6; phase CLOSURE."
+    },
+    {
+      "ts": "2026-09-27T03:12:46Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 864645f3509eaa7714c7b44777f4261040b72faa..d2d98cf372e4: 14 reviewed, 12 changed.",
+      "since": "864645f3509eaa7714c7b44777f4261040b72faa",
+      "until": "d2d98cf372e4d7c63c2a2967a5ae6702a4d17512",
+      "reviewed": [
+        "agent-comms",
+        "agent-orchestration",
+        "pypi-distribution",
+        "harness-claude-code",
+        "harness-codex",
+        "harness-copilot",
+        "harness-cursor",
+        "harness-devin",
+        "harness-kimi-code",
+        "ci-preflight",
+        "consumer-agent-support",
+        "context-portability",
+        "backlog-ledger",
+        "bug-ledger"
+      ],
+      "changed": [
+        "context-management",
+        "workspace-init",
+        "workspace-doctor",
+        "specs-migration",
+        "sdd-gate-v3",
+        "cross-platform-portability",
+        "spec-context-project",
+        "product-vision",
+        "audits-canon",
+        "release-lifecycle",
+        "agentic-entities",
+        "public-asset-distribution"
+      ]
+    },
+    {
+      "ts": "2026-09-27T04:34:03Z",
+      "agent": "main-thread",
+      "kind": "summary",
+      "text": "Candidate 3 \"onboarding foundation: a derived state machine the agent loops on, a published first project, and the project gitflow\" (operator demand 2026-09-24; grill rounds 1-3; ADRs 0033-0038, 0040, 0042-0049): FR1 one onboarding derivation (ordered step list, real-state predicates, one fix line each); FR2 one fix-line builder (core/cli_line.py); FR3 level 3b first pass by real state; FR4 level 3c, one publish verb `context baseline`, anchor-first (detached anchor commit of the onboarding paths, gitflow read from that commit, work merged into the anchor, ff-only fetch, one atomic push); FR5 pre-push bootstrap birth; FR6 the project gitflow (core/gitflow.py role_of, GITFLOW-1); FR7 only `context bind` binds; FR8 dead gate code deleted; FR9 law, docs, glossary; FR10 autopilot E2E; FR11 shrink. T-050-22 left one secret matcher (privacy_baseline.json v14; the second engine in privacy_check deleted). Release declared CRITICAL mid-candidate (2026-09-26): rounds 7-11 were cuts and restorations only; operator Q6 took cuts (f) and (h), kept (g)."
+    },
+    {
+      "ts": "2026-09-27T04:34:03Z",
+      "agent": "main-thread",
+      "kind": "size",
+      "text": "AC11.3 (non-merge 5364ba0d..HEAD minus the five shrink commits and fix(bugs) subjects, dadaia_workspace/**/*.py outside public/): +2688/-2370 = +318 at 1f3d4525, under the +362 operator ceiling; round history +489 -> +487 -> +411 -> +388 -> +305 -> +314 -> +318. Whole range fa569482..HEAD: production -887 (shrink commits 800c5e2d -927, 009721d6 -283, 114be682 -17, f38f7ff8 and de4e3179 0), public/ +21, tests +4285/-3110 = +1175. Tests grew while production shrank; that imbalance is the tests retro's finding and candidate 4's input (grill decision 11: net test lines <= 0 when production shrinks)."
+    },
+    {
+      "ts": "2026-09-27T04:34:03Z",
+      "agent": "main-thread",
+      "kind": "reviews",
+      "text": "dd-code-reviewer, ten code reviews: REJECTED review 1 (2026-09-25T200000Z), 2 (rereview), 3, 4 (CRITICAL-1 checkout -f data loss), 5, 6 (N1 false success, H6 conflict markers committed); publish design review APPROVED (2026-09-26T235900Z, design on paper before code, which broke the loop); REJECTED 7 (B1 update-ref moved a worktree-held branch; B2 secret regex false positives), 8 (R9-1 regex false negatives; R9-2 file-I/O ratchet 8 -> 9); APPROVED 9 at 8673b5c6 (2026-09-27T024406Z); tests retro (2026-09-27T031636Z) over 82 modified pre-existing test files; APPROVED 10 over round 11 (2026-09-27T041020Z, 0 HIGH; M1 fixed 5738bdc5, L1 SPEC note 57ca4a3a, M2 + L1 tests 4f54052f; mutants run in a git-archive copy). CI green on b2d83b5d (run 36292105317)."
+    },
+    {
+      "ts": "2026-09-27T04:34:03Z",
+      "agent": "main-thread",
+      "kind": "test-dispositions",
+      "text": "Tests retro (5364ba0d..8673b5c6): FOLLOWS-AC 38, WEAKENED 8, REPINNED 7, FIXTURE-BENT 8, DELETED 25 files + 13 cases. Restored in round 11: W5 role-name cases (9ff9a052, each name caught by its own mutant), the .der row (406a82eb), dead's missing-identity refusal (b2d83b5d); review 10 M2: one literal matrix row per AC5.6 suffix (4f54052f). The SPEC had been amended to the code three times; 73b7a5d8 amended it to the tested behavior instead (AC3.4, AC4.9, AC5.6, AC6.1, AC9.3). Carried to candidate 4's test strategy, not fixed here: W1-W4, W6-W8, R1-R2, R5 (expected fix lines built by fix_line(), the code under test, in 12+ files), R6, F1-F2."
+    },
+    {
+      "ts": "2026-09-27T04:34:03Z",
+      "agent": "main-thread",
+      "kind": "dispositions",
+      "text": "No backlog entry picked (origin operator-demand). Arm B resolved on the branch (10 fix(bugs) commits): reaper-deletes-linked-git-worktrees, context-dead-pushes-an-unborn-clone, shipped-text-bare-cli-guard-deleted-with-its-test, test-subprocesses-resolve-the-live-instance, doctor-reaper-cannot-delete-read-only-trees, baseline-identity-precheck-ignores-git-env-identity, memory-done-criterion-names-a-script-that-never-validates-atoms, law-file-scan-reads-untracked-bytecode, lint1-prints-raw-multiline-findings; sa-pre-push-and-publish-scan-disagree-on-secret-shapes resolved by T-050-22. Registered: 49 systemic-ambiguity bugs (1a8cbc1a a4e83877 c47d0bc5 83bcb621) and pre-push-gate-never-runs-under-core-hookspath HIGH (2c1faf65); ledger 616 records, 49 open, all carried to candidate 4. Operator: candidates 5-7 leave 0.5.0; publish gate >= 80/100 first-run, >= 80% of the open set and every wave-0 bug. Proposed, awaiting operator confirmation: secret-token misses camelCase keys, special-character bare values and $ inside quoted values (R10-1); a==b at end of line refused (R10-2); the refusal text lacks the runtime-composition remedy (R10-3); false positive on dd-chain-explorer masking.py's secret name (R9-3); memory.py drift requires --since while MEMORY-UPDATE.md implies it infers the window."
+    },
+    {
+      "ts": "2026-09-27T04:34:03Z",
+      "agent": "main-thread",
+      "kind": "drifts",
+      "text": "T-050-22 was reopened after its [x] (0421799d) by the tests retro and review 10 (406a82eb, 9ff9a052, b2d83b5d, 4f54052f); the law has no reopen marker. AC4.9's dead work-branch refusal was born in review fix 733b34a3 and ratified by the SPEC later (8825b2f8); review M1's resolution precedence (the CLI's own workspace beats cwd) has no AC. Memory: sdd-gate-v3 missed .der after the d2d98cf3 pass (fixed 5738bdc5, memory entry below); audits-canon.md was already correct."
+    },
+    {
+      "ts": "2026-09-27T04:34:38Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over d2d98cf372e4d7c63c2a2967a5ae6702a4d17512..1f3d4525c573: 1 reviewed, 1 changed.",
+      "since": "d2d98cf372e4d7c63c2a2967a5ae6702a4d17512",
+      "until": "1f3d4525c573dd1b3fddce866255947e4620cf9d",
+      "reviewed": [
+        "pypi-distribution"
+      ],
+      "changed": [
+        "sdd-gate-v3"
+      ]
+    },
+    {
+      "ts": "2026-09-27T04:37:53Z",
+      "agent": "main-thread",
+      "kind": "artifact-gc",
+      "text": "dadaia doctor --context dadaia-workspace exit 0 at 1f3d4525 with nothing to fix in the repo (381 reaped/ entries held by their TTL, none from this candidate); --fix not needed. Scratch evidence the next candidate needs (the verified ambiguity hunt, as-is reviews, test audits, grill handoffs, tests retro) copied out of the one-day tmp and handoff zones into reports/main-thread/20260927-050-c4-evidence/ (59 files) before expiry; the c3 review handoffs expire by TTL."
+    },
+    {
+      "ts": "2026-09-27T05:12:23Z",
+      "agent": "main-thread",
+      "kind": "note",
+      "text": "PR #273 CI red on Compliance only: the shrink commit 114be682 dropped the doctor job's fetch-depth 0 with the verdict gate's reason, while the CLOSURE memory-window check (d07251a2) still diffs since..until; candidate 2's closure passed because depth 0 was still there. Restored in 61e39efc with a RED-first contract test (every CI job running the doctor checks out full history). pypi-distribution and sdd-gate-v3 source ci.yml and state nothing about checkout depth: reviewed, unchanged."
+    },
+    {
+      "ts": "2026-09-27T05:12:23Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 1f3d4525c573dd1b3fddce866255947e4620cf9d..61e39efc3fad: 2 reviewed, 0 changed.",
+      "since": "1f3d4525c573dd1b3fddce866255947e4620cf9d",
+      "until": "61e39efc3fadd3947b1c7c8ed72ed8a9c8df6468",
+      "reviewed": [
+        "pypi-distribution",
+        "sdd-gate-v3"
+      ],
+      "changed": []
     }
   ]
 }

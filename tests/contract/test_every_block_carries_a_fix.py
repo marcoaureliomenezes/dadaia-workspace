@@ -18,28 +18,29 @@ from __future__ import annotations
 
 import re
 import shlex
+import subprocess
 import sys
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 import pytest
 
 from dadaia_workspace.core import doctor_rules
-from dadaia_workspace.core.cli_line import cli_path
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObject
-from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_stdin
 from dadaia_workspace.features.specs.canon import canon_violations
 from dadaia_workspace.hooks import pre_gate
+from tests.fakes import gate_fixes
 
 _FIX_LINE_RE = re.compile(r"^fix: (\S.*)$", re.MULTILINE)
 
 #: The workspace CLI as a fix line spells it, relative to its root (``fix_line``).
-_CLI = str(cli_path(Path()))
+_CLI = fix_line(Path())
 
 _SHA_A = "a" * 40
 _ZERO = "0" * 40
@@ -88,10 +89,9 @@ def _assert_one_command(command: str) -> None:
     the operator pastes. Prose ("author the missing document", "fix it and then push")
     does not: an agent cannot run it, so the BLOCK is a Stall with a friendly face.
     """
-    # Windows fix lines follow MSVCRT quoting (backslash paths), which POSIX shlex eats.
-    windows = bool(PLATFORM.venv_exe_suffix)
-    head = shlex.split(command, posix=not windows)[0].strip('"')
-    if head.endswith(_CLI):  # ``fix_line`` roots the CLI at the workspace it runs in
+    head = shlex.split(command)[0]  # every host spells paths with forward slashes
+    # ``fix_line`` roots the CLI at the workspace it runs in, else names the running CLI.
+    if head.endswith(_CLI) or head == shlex.split(fix_line(None))[0]:
         head = ".dadaia/.venv/bin/dadaia"
     assert head in _EXECUTABLE_TOKENS, (
         f"a fix line opens with an executable, not prose — got {head!r} in:\n{command}"
@@ -144,7 +144,12 @@ def test_gate_block_carries_a_runnable_fix(workspace: Path, name: str, rel: str)
     assert_block_carries_a_runnable_fix(block)
 
 
-def test_venv_guard_block_carries_a_runnable_fix(workspace: Path) -> None:
+def test_venv_guard_block_carries_a_runnable_fix(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The fix names the RUNNING CLI (ADR 0045); a host venv outside any workspace (CI's
+    poetry venv) proves no expectation pins the instance's own spelling."""
+    monkeypatch.setattr(sys, "prefix", str(workspace.parent / "host-venv"))
     block = pre_gate.evaluate_payload(
         {"tool_name": "Bash", "tool_input": {"command": "dadaia doctor --context x"}}
     )
@@ -163,8 +168,11 @@ class _FakeObjectSource:
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         return self.objects
 
-    def publishes_nothing(self, repo: Path, sha: str) -> bool:
-        return False
+    def unpublished(self, repo: Path, sha: str) -> list[str]:
+        return [sha]
+
+    def remote_branch(self, repo: Path, branch: str) -> bool:
+        return True  # a published origin: a birth carrying content is a refusal
 
 
 class _FailingObjectSource(_FakeObjectSource):
@@ -182,6 +190,7 @@ def _decide(
     decision = push_gate_decision(
         refs,
         gitflow=DEFAULT,
+        fixes=replace(gate_fixes(), head="feature/0.0.1"),
         object_source=source or _FakeObjectSource(),
         repo=Path("/nonexistent-repo"),
         canon_violations_fn=canon_violations,
@@ -621,12 +630,11 @@ _LAW_FILES = (_REPO_ROOT / "CONTEXT.md",)
 
 
 def _law_files() -> list[Path]:
-    return [
-        path
-        for root in _LAW_ROOTS
-        for path in sorted(root.rglob("*"))
-        if path.is_file() and "_archive" not in path.parts
-    ] + [path for path in _LAW_FILES if path.is_file()]
+    # Tracked files only: ignored bytecode is not law, and decoding it is a crash.
+    roots = [str(root) for root in (*_LAW_ROOTS, *_LAW_FILES)]
+    listed = subprocess.run(["git", "ls-files", "-z", "--", *roots], cwd=_REPO_ROOT,
+                            capture_output=True, text=True, check=True).stdout  # fmt: skip
+    return [_REPO_ROOT / rel for rel in listed.split("\0") if rel and "_archive" not in rel]
 
 
 def test_no_law_file_names_a_retired_release_verb() -> None:
@@ -647,3 +655,27 @@ def test_no_law_file_names_a_retired_release_verb() -> None:
         "the law names a retired release verb — delete the prose, never the check:\n"
         + "\n".join(offenders)
     )
+
+
+#: `memory.py check` decides only the generated catalog pair; the atoms' schema (tldr
+#: length and the rest) is LINT-1's alone. A law line making that script's exit 0 the
+#: mark of a finished memory elects a validator that never reads the rule.
+_NON_AUTHORITY_DONE = re.compile(r"memory\.py check`? exit 0")
+
+
+def test_no_shipped_text_makes_memory_py_check_the_memory_done_criterion() -> None:
+    """Intent: CONTRACT — bug memory-done-criterion-names-a-script-that-never-validates-atoms.
+
+    The one authority for a valid memory tree is `dadaia doctor` (LINT-1 over the atoms,
+    LEDGER-MEMORY over the pair). Product memory is its owner's to re-derive, so this
+    scan covers what ships: `public/`, `CONTEXT.md` and `docs/`.
+    """
+    memory = _REPO_ROOT / "specs" / "memory"
+    shipped = [path for path in _law_files() if memory not in path.parents]
+    offenders = [
+        f"{path.relative_to(_REPO_ROOT)}:{number}"
+        for path in [*shipped, *sorted((_REPO_ROOT / "docs").glob("*.md"))]
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1)
+        if _NON_AUTHORITY_DONE.search(line)
+    ]
+    assert not offenders, "\n".join(offenders)

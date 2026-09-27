@@ -60,7 +60,7 @@ _CORE_DIR = _REPO_ROOT / "dadaia_workspace" / "core"
 #
 # handoff_index (release 0.5.1 K6, deepening candidate): the one handoff discovery +
 # artifact-path-resolution + version-routing module several MUTUALLY-INDEPENDENT feature
-# packages need (chokepoints, specs, panel, reports) — the P-07 cross-feature-independence
+# packages need (chokepoints, specs, reports) — the P-07 cross-feature-independence
 # contract's cap must never rise (GATE requirement), so this joins the SAME precedent as
 # specs_resolver/workspace_resolver (a filesystem-walking resolver several layers need,
 # placed in `core` rather than behind a new suppressed features-no-cross-feature edge per
@@ -70,7 +70,6 @@ _CORE_DIR = _REPO_ROOT / "dadaia_workspace" / "core"
 _AUTHORIZED_STEMS: frozenset[str] = frozenset(
     {
         "specs_repair",
-        "specs_version",
         "workspace_resolver",
         "atomic_write",
         "invocation",
@@ -79,6 +78,10 @@ _AUTHORIZED_STEMS: frozenset[str] = frozenset(
         # T-050-10 (AC3.2): reads the shipped-hashes history beside the templates; moved
         # to core so onboarding (a feature) and the specs doctor share it.
         "template_history",
+        # T-050-22 (AC11.2, reviews 7-8): every specs-tree probe, the constitution read
+        # and the one frontmatter writer moved here from specs_version, which is now
+        # pure — a swap, so ARCHITECTURE.md P-11 stays at eight modules.
+        "gitflow",
     }
 )
 

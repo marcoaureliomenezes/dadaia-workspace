@@ -43,11 +43,6 @@ Measured by: `lint-imports --config setup.cfg --no-cache` — contract `features
 ADR: none
 Rationale: a hand-kept `modules =` list hid three real sibling edges from the check.
 
-### P-08 · We keep a Protocol in `core/protocols` only where two production adapters exist; `container.py` composes platform seams and shared collaborators, nothing single-consumer.
-Measured by: `pytest tests/contract/test_protocols_have_two_adapters.py`.
-ADR: 0001 (accepted)
-Rationale: a Protocol with one implementer is interface text that hides a direct dependency.
-
 ### P-09 · We resolve the whole Invocation — workspace root, session, context, specs dir, the session's Bind — once per process in `core.invocation.resolve`, imported directly only by `cli._specs_resolution`, `container` and `hooks`.
 Measured by: `lint-imports --config setup.cfg --no-cache` — contract `bind-resolution-seam-is-a-single-home` (zero ignored imports, none ever accepted); `pytest tests/unit/core/test_invocation.py`.
 ADR: 0003 (accepted)
@@ -106,10 +101,10 @@ Rationale: three closures touched every product atom and left fifteen contradict
 ## Tech Stack
 
 - Python `^3.12`, built by Poetry Core; console entrypoints `dadaia` and `dadaia-workspace` are one callable, and the version lives in `pyproject.toml` alone.
-- Runtime dependencies: Typer, Rich, PyYAML, Jinja2, jsonschema; `claude-sdk` is an optional extra.
+- Runtime dependencies: Typer, Rich, PyYAML, jsonschema; the package declares no optional extra.
 - Everything else is the standard library; there is no database — every state is a JSON or JSONL file.
 - Claude Code, Codex, Kimi Code, Cursor, Devin CLI and GitHub Copilot are operator-installed external CLIs, never Python dependencies; the workspace runs no agent-execution runtime.
-- Quality toolchain: pytest (`pytest-cov`, `pytest-xdist`, `pytest-randomly`, `pytest-timeout`, Hypothesis, Playwright), Ruff, mypy `--strict`, import-linter, gitleaks; `mutmut` sits in an optional group ([[QUALITY]]).
+- Quality toolchain: pytest (`pytest-cov`, `pytest-xdist`, `pytest-randomly`, `pytest-timeout`, Hypothesis), Ruff, mypy `--strict`, import-linter, gitleaks; `mutmut` sits in an optional group ([[QUALITY]]).
 - Packaging: wheel and sdist ship the `dadaia_workspace` package with `public/` inside it and no bytecode.
 - Canonical commands, from the workspace root:
 
@@ -134,8 +129,8 @@ flowchart TB
     features --> core
 ```
 
-- `container.py` is composition wiring only: every definition keeps a production consumer, and a single-consumer adapter is imported directly by its feature (P-08).
-- `core/protocols/` holds the two-adapter OS seams (`FilePermissionSetter`, `ShutdownHandler`) and the spec-context provider; every other adapter is imported by its one consumer.
+- `container.py` is composition wiring only: every definition keeps a production consumer, and a single-consumer adapter is imported directly by its feature.
+- No `core/protocols/` package exists: no seam carries two production adapters, so every adapter is imported by its one consumer; a `typing.Protocol` lives only as a structural type inside the module that consumes it.
 - `setup.cfg` carries seven import-linter contracts; `features-no-subprocess` has no suppressed edge, and the two suppressed edges (`reconcile.service` -> `capabilities`, `reconcile.service` -> `migrate.state_v2`) sit under `features-no-cross-feature` (P-10).
 - Hooks import `core.invocation` directly and build the `Invocation` once per process (P-12); `sdd_post_gate` touches `last_seen_at` and runs the reaper on one throttle and writes nothing else.
 - `features/migrate` stamps `specs_pattern_version: 7` or refuses; a tree below v6 upgrades to 0.4.x first.
@@ -157,6 +152,6 @@ flowchart TB
 - A docstring states the contract in at most 3 lines; bug history lives in `BUGS.jsonl`.
 - Code is born with a real caller in the same change; without a caller it does not exist.
 - A fix replaces the old path; it never wraps it and never opens a second path.
-- A `core/protocols` port exists only with two production adapters; a parameter exists only when it is read.
-- Detection: `dd-code-review` SLOP.md S1, S2, S4, S5; measured by ratchet V32 and `test_protocols_have_two_adapters`.
+- A port exists only with two production adapters; a parameter exists only when it is read.
+- Detection: `dd-code-review` SLOP.md S1, S2, S4, S5; measured by ratchet V32.
 <!-- /dadaia:fixed slop-code -->

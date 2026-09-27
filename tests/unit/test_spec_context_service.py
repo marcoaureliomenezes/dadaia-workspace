@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.container import scan_publish_candidates
 from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
     ContextNotFoundError,
@@ -51,6 +52,7 @@ def service(
         git_client=git,
         workspace_root=workspace_root,
         install_hooks=lambda _repo: None,
+        secret_scan=scan_publish_candidates,
     )
 
 
@@ -118,6 +120,8 @@ def test_dead_removes_repo_syncs_dirty_pushes_and_state_error(
     assert repo.exists()
     git._dirty.add(repo)
     git._has_remote.add(repo)
+    git._branches[repo] = "feature/0.1.0"  # dead syncs only a work branch
+    git._has_commits.add(repo)  # born: an unborn clone has nothing to sync
 
     ctx = service.dead("proj")
 
@@ -188,7 +192,9 @@ def test_dead_with_commit_and_clean_untracked_passes(
     service.alive("proj")
     repo = workspace_root / "repos" / "my-repo"
     git._has_remote.add(repo)
+    git._has_commits.add(repo)
     git._dirty.add(repo)
+    git._branches[repo] = "feature/0.1.0"
     (repo / "notes.md").write_text("# just some harmless notes\nnothing secret here\n")
     git._untracked[repo] = ["notes.md"]
 
@@ -261,28 +267,6 @@ def test_dead_with_commit_blocks_on_redacted_findings(
     assert repo not in git.committed
     assert repo.exists()
     assert service.show("proj").state == ContextState.ALIVE
-
-
-def test_scan_flags_key_suffixes_and_skips_other_binary(tmp_path: Path) -> None:
-    """R-2: cert/key suffixes flag on presence; an unrelated binary suffix stays clean."""
-    from dadaia_workspace.features.spec_context.service import _scan_file_for_secrets
-
-    for suffix in (".pem", ".key", ".p12", ".pfx"):
-        f = tmp_path / f"material{suffix}"
-        f.write_bytes(b"\x00binary\xff")
-        assert _scan_file_for_secrets(f) == ["cert-key-file-suffix"], suffix
-
-    # A decodable PEM block triggers BOTH the suffix rule and the content rule.
-    pem = tmp_path / "real.pem"
-    pem.write_text("-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----\n")
-    hits = _scan_file_for_secrets(pem)
-    assert "cert-key-file-suffix" in hits
-    assert "private-key-block" in hits
-
-    # An unrelated binary suffix (not key material, not text-decodable) stays clean.
-    blob = tmp_path / "image.png"
-    blob.write_bytes(b"\x89PNG\r\n\x1a\n\x00\x01")
-    assert _scan_file_for_secrets(blob) == []
 
 
 # ------------------------------------------------------------------ delete

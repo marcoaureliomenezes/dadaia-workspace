@@ -2,24 +2,19 @@
 
 from __future__ import annotations
 
-import re
 import subprocess
 import sys
 from collections.abc import Iterable
+from dataclasses import replace
 from pathlib import Path
 
 import typer
 
-from dadaia_workspace.cli._specs_resolution import (
-    alive_context_owning_repo,
-    resolve_context_specs_dir_for_cli,
-    resolve_workspace_root_for_cli,
-)
+from dadaia_workspace.cli._specs_resolution import repo_owner, resolve_workspace_root_for_cli
 from dadaia_workspace.container import is_source_repo_root as _is_source_repo_root
-from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import CiPreflightScopeError
 from dadaia_workspace.core.gitflow import Gitflow
-from dadaia_workspace.core.specs_version import read_gitflow
+from dadaia_workspace.features.chokepoints.branch_policy import GateFixes
 from dadaia_workspace.features.ci_preflight import (
     all_passed,
     checks_for,
@@ -27,7 +22,10 @@ from dadaia_workspace.features.ci_preflight import (
     run_preflight,
     subprocess_runner,
 )
-from dadaia_workspace.features.spec_context.service import install_git_hooks
+from dadaia_workspace.features.spec_context.service import (
+    install_git_hooks,
+    work_name,
+)
 
 app = typer.Typer(help="Local CI-equivalent preflight gate + git-hook chokepoints.")
 
@@ -103,23 +101,22 @@ def _no_canon_violations(paths: Iterable[str]) -> list[str]:
     return []
 
 
-def _gitflow_for(repo_root: Path) -> Gitflow:
-    """ADR 0046, once per push: the repo's own constitution, else its owning context's
-    main-repo constitution (an associated repo), else the default with one warning."""
+def _gate_inputs(repo_root: Path, head: str) -> tuple[Gitflow, GateFixes]:
+    """The gitflow through the ONE reader (ADR 0048: committed first, one warning on the
+    default; an associated repo reads its owner's main repo) and the fix inputs: the repo,
+    the live work branch by the ONE rule (cut locally or not) and HEAD's branch."""
+    from dadaia_workspace.container import build_git_client
+
+    git = build_git_client()
     workspace = resolve_workspace_root_for_cli(repo_root)
-    context = alive_context_owning_repo(workspace, repo_root)
-    specs_dir = repo_root / "specs"
-    if context and not (specs_dir / "constitution.md").is_file():
-        specs_dir = resolve_context_specs_dir_for_cli(workspace, context)
-    gitflow, warning = read_gitflow(specs_dir)
+    owner = repo_owner(workspace, repo_root)
+    main = workspace / "repos" / owner[2] if owner else None
+    gitflow, warning = git.gitflow(repo_root, main)
     if warning:
-        fix = (
-            f"\nfix: {fix_line(workspace, 'specs', 'init', '--context', context)}"
-            if context
-            else ""
-        )
-        typer.echo(f"[pre-push] WARNING: {warning}{fix}", err=True)
-    return gitflow
+        typer.echo(f"[pre-push] WARNING: {warning}", err=True)
+    work = work_name(git, repo_root, gitflow)
+    cut = bool(git.git(repo_root, "for-each-ref", "--format=%(refname)", f"refs/heads/{work}"))
+    return gitflow, GateFixes(repo=str(repo_root), work=work, cut=cut, head=head)
 
 
 @app.command("push-gate-check")
@@ -139,6 +136,7 @@ def push_gate_check() -> None:
     bypass. No repo or context name is a term source.
     """
     from dadaia_workspace.container import (
+        build_git_client,
         build_git_object_reader,
         load_denylist_baseline_patterns,
         load_denylist_terms,
@@ -182,12 +180,20 @@ def push_gate_check() -> None:
 
     stdin_text = sys.stdin.read() if not sys.stdin.isatty() else ""
     refs, malformed = parse_push_stdin(stdin_text)
+    # `git push origin HEAD` names its source "HEAD": the branch checked out IS that ref.
+    branch = build_git_client().current_branch(repo_root)
+    refs = [
+        replace(r, local_ref=f"refs/heads/{branch}") if r.local_ref == "HEAD" and branch else r
+        for r in refs
+    ]
+    gitflow, fixes = _gate_inputs(repo_root, branch)
     decision = push_gate_decision(
         refs,
         object_source=build_git_object_reader(),
         repo=repo_root,
         canon_violations_fn=canon_fn,
-        gitflow=_gitflow_for(repo_root),
+        gitflow=gitflow,
+        fixes=fixes,
         malformed_lines=malformed,
         denylist_terms=denylist_terms,
         baseline_patterns=baseline_patterns,
@@ -198,9 +204,6 @@ def push_gate_check() -> None:
     if not decision.allowed:
         typer.secho(decision.message, fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
-
-
-_SHA40_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 
 
 @app.command("install-hook")

@@ -12,14 +12,16 @@ data-loss guard this file exists to keep, alongside the non-writable-files dead(
 
 from __future__ import annotations
 
-# Guard: skip this entire module on platforms where fcntl is not available (e.g. Windows).
 import pytest
+
+# Guard: skip this entire module on platforms where fcntl is not available (e.g. Windows).
 
 pytest.importorskip("fcntl")
 
 import stat  # noqa: E402
 from pathlib import Path  # noqa: E402
 
+from dadaia_workspace.container import scan_publish_candidates
 from dadaia_workspace.core.models.spec_context import ContextState  # noqa: E402
 from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
 from tests.fakes import FakeContextStore, FakeGitClient, register_dead  # noqa: E402
@@ -54,6 +56,7 @@ def service(
         git_client=git,
         workspace_root=workspace_root,
         install_hooks=lambda _repo: None,
+        secret_scan=scan_publish_candidates,
     )
 
 
@@ -95,6 +98,7 @@ def test_alive_leaves_a_preexisting_specs_tree_untouched_and_hooks_the_repo(
         git_client=git,
         workspace_root=workspace_root,
         install_hooks=hooked.append,
+        secret_scan=scan_publish_candidates,
     )
     register_dead(svc, "proj", "my-repo", "https://github.com/org/my-repo")
     repo = workspace_root / "repos" / "my-repo"

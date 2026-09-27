@@ -47,8 +47,10 @@ _CONSOLE_SCRIPT = Path(sys.executable).parent / f"dadaia{PLATFORM.venv_exe_suffi
 
 
 def _child_env(home: Path) -> dict[str, str]:
-    """A clean environment: no inherited ``DADAIA_*``, a tmp ``HOME``, a git identity."""
-    env = {k: v for k, v in os.environ.items() if not k.startswith("DADAIA_")}
+    """A clean environment: no inherited ``DADAIA_*`` but the suite's fence (the dev CLI's
+    own workspace is never this child's: M1's first rung), a tmp ``HOME``, a git identity."""
+    keep = "DADAIA_FENCED_ROOTS"
+    env = {k: v for k, v in os.environ.items() if not k.startswith("DADAIA_") or k == keep}
     env.update(
         HOME=str(home),
         XDG_CONFIG_HOME=str(home / ".config"),

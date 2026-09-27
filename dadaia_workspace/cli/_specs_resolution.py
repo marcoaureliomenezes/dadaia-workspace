@@ -32,26 +32,24 @@ from dadaia_workspace.core.invocation import CONTEXT_NAME_RE as _CONTEXT_NAME_RE
 from dadaia_workspace.core.invocation import (
     HARNESS_SESSION_ID_ENV_VARS as _HARNESS_SESSION_ID_ENV_VARS,
 )
-from dadaia_workspace.core.invocation import alive_context_names as _alive_context_names
 from dadaia_workspace.core.invocation import alive_context_trees as _alive_context_trees
-from dadaia_workspace.core.invocation import context_name_for_repo_slug as _context_for_slug
+from dadaia_workspace.core.invocation import repo_owner as _repo_owner
 from dadaia_workspace.core.invocation import repo_slug_for_context as _core_repo_slug
-from dadaia_workspace.core.invocation import repo_slug_under_repos as _repo_slug_under_repos
 from dadaia_workspace.core.invocation import resolve as _resolve_invocation
 from dadaia_workspace.core.invocation import (
     resolve_context_specs_dir as _core_resolve_context_specs_dir,
 )
-from dadaia_workspace.core.invocation import resolve_session_id as _core_resolve_session_id
+from dadaia_workspace.core.invocation import resolve_session_id as _resolve_session_id
 from dadaia_workspace.core.invocation import resolve_specs_dir as _core_resolve_specs_dir
-from dadaia_workspace.core.invocation import sanitize_session_id as _sanitize_session_id
 
 #: Re-exports so a verb never reaches ``core.invocation`` directly (FR3,
 #: ``bind-resolution-seam-is-a-single-home``). The contract takes ZERO ignore_imports,
-#: so every consumer of the harness-session-id env-var list, the sid sanitizer, or the
+#: so every consumer of the harness-session-id env-var list, the session-id rule, or the
 #: name->repo-slug mapping routes through this seam.
 HARNESS_SESSION_ID_ENV_VARS = _HARNESS_SESSION_ID_ENV_VARS
-sanitize_session_id = _sanitize_session_id
+resolve_session_id = _resolve_session_id
 alive_context_trees = _alive_context_trees
+repo_owner = _repo_owner
 
 
 def repo_slug_for_context(workspace_root: Path, name: str) -> str:
@@ -114,22 +112,9 @@ def resolve_context_specs_dir_for_cli(workspace_root: Path, context: str) -> Pat
     return _core_resolve_context_specs_dir(workspace_root, context)
 
 
-def alive_context_owning_repo(workspace_root: Path, repo: Path) -> str | None:
-    """The ALIVE context whose main or associated repo is ``repos/<slug>`` = *repo*."""
-    slug = _repo_slug_under_repos(workspace_root, repo)
-    name = _context_for_slug(workspace_root, slug) if slug else None
-    return name if name in _alive_context_names(workspace_root) else None
-
-
 def resolve_specs_dir_for_cli(specs_dir: str | None) -> Path:
     """Resolve the target specs/ dir (explicit flag, else the resolution authority)."""
     return _core_resolve_specs_dir(specs_dir)
-
-
-def resolve_session_id_for_cli() -> str:
-    """This process's own session id through the one rule over ``os.environ``
-    (no hook payload: a CLI entrypoint); ``""`` when no channel resolves."""
-    return _core_resolve_session_id(None, os.environ)
 
 
 def resolve_workspace_root_for_cli(target_path: Path) -> Path:

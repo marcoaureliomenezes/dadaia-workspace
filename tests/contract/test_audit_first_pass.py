@@ -1,6 +1,6 @@
 """Intent: CONTRACT — T-048-08 (FR5 AC5.1, AC5.2), T-050-20 (AC3.4): dd-audit-project carries
 the first-pass section — it applies while doctor's next step is `first-pass` and ends at
-`memory.py check`, never at a stamp — and `memory.py drift --since <root commit>` is a
+`dadaia doctor` exit 0, never at a stamp — and `memory.py drift --since <root commit>` is a
 runnable worklist. Size: SMALL.
 """
 
@@ -33,7 +33,7 @@ def test_skill_carries_the_first_pass_statements() -> None:
         "memory.py drift --since <root commit> --specs repos/<slug>/specs",
         "`dd-product-engineer` fills `ARCHITECTURE.md`, `QUALITY.md` and the product atoms",
         "`specs-bkp/`",
-        "`memory.py check` exit 0",
+        "`.dadaia/.venv/bin/dadaia doctor --context <ctx>` exit 0",
     ):
         assert statement in section, statement
 

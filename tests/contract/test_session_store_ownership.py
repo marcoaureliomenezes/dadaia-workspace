@@ -41,9 +41,9 @@ POINTER_IDIOMS: tuple[str, ...] = (
 #: record file from the sessions directory. Allowlisted consumers are enumerated below.
 #:
 #: T-011-05 (FR-W1-05 / ADR-12) extends this to also catch the SESSIONS-DIRECTORY
-#: construction idiom (``"sessions"`` joined onto ``.dadaia``) — the 3 legal sites
-#: (``cli/commands/context.py:76``, ``spec_context/doctor.py:124``,
-#: ``panel/views/kanban.py:85``) previously built the directory and appended ``<id>.json``
+#: construction idiom (``"sessions"`` joined onto ``.dadaia``) — the legal sites
+#: (``cli/commands/context.py``, ``spec_context/doctor.py``) previously built the
+#: directory and appended ``<id>.json``
 #: themselves, slipping past the ``f"{`` interpolation grep. They are now migrated to the
 #: ``session_store`` accessors; this guards against the pattern's return.
 RECORD_IDIOMS: tuple[str, ...] = (

@@ -46,11 +46,8 @@ so a malformed envelope can never deadlock the harness.
 from __future__ import annotations
 
 import shlex
-from pathlib import Path
 
 from dadaia_workspace.core.cli_line import fix_line
-from dadaia_workspace.core.exceptions import DadaiaError
-from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
 #: Bare entrypoint names that must run from the workspace venv.
 _DADAIA_ENTRYPOINT = "dadaia"
@@ -123,7 +120,7 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
 
     if token == _DADAIA_ENTRYPOINT:
         # The builder spells the CLI; the agent's own arguments follow verbatim.
-        corrected = fix_line(_workspace_root()) + (f" {rest}" if rest else "")
+        corrected = fix_line(None) + (f" {rest}" if rest else "")
         return _block_message(command.strip(), corrected)
 
     if token in _PIP_NAMES:
@@ -142,14 +139,6 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
         return None
 
     return None
-
-
-def _workspace_root() -> Path:
-    """The workspace the corrected CLI line runs from — relative when none resolves."""
-    try:
-        return resolve_workspace_root()
-    except DadaiaError:
-        return Path()
 
 
 def _is_dadaia_module(module: str) -> bool:

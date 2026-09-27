@@ -97,27 +97,6 @@ class SchemaVersionError(DadaiaError):
     """
 
 
-class PlatformSecurityError(DadaiaError):
-    """Raised when a security control cannot be enforced on the current platform.
-
-    Tier 1 — FAIL LOUD. This error signals a hard security violation: the
-    platform cannot satisfy the requested security guarantee (e.g. restricting
-    a file to owner-only). Silent no-ops or warnings are forbidden for Tier 1
-    controls. Callers must propagate this error without suppression.
-
-    Attributes:
-        feature_name: Logical name of the security feature that failed
-                      (e.g. ``"token_file_protection"``).
-        platform:     The ``sys.platform`` value at the point of failure
-                      (e.g. ``"win32"``).
-    """
-
-    def __init__(self, message: str, *, feature_name: str, platform: str) -> None:
-        self.feature_name = feature_name
-        self.platform = platform
-        super().__init__(message)
-
-
 class WorkspaceVenvBootstrapError(DadaiaError, RuntimeError):
     """Workspace venv bootstrap could not create the venv or install the distribution.
 
@@ -170,15 +149,4 @@ class CiPreflightScopeError(DadaiaError):
     Its checks target the library's own paths, so anywhere else it could only report a
     lint failure for a path that does not exist
     (bug ci-preflight-unusable-outside-the-source-repo).
-    """
-
-
-class TasksMarkerStateError(DadaiaError, RuntimeError):
-    """TASKS.md marker state does not match a pipeline boundary contract.
-
-    Inherits ``RuntimeError`` (back-compat: pre-existing callers catch RuntimeError) AND
-    ``DadaiaError`` so the CLI entrypoint surfaces it as one concise line instead of a raw
-    traceback (bug implementation-reviews-tasks-marker-traceback, F-22 class): running
-    ``lifecycle implementation-reviews`` against a release whose TASKS.md carries no
-    recognizable task markers is an operator-facing condition, never a crash.
     """

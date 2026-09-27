@@ -1,5 +1,6 @@
 """Intent: CONTRACT — T-048-05 (SPEC 0.4.8 D7, D9, AC4.2): a specs tree is dadaia when its
-constitution carries ``specs_pattern_version`` >= 6, foreign otherwise; the scaffolded
+constitution carries ``specs_pattern_version`` >= 6, malformed when its frontmatter does not
+parse (ADR 0047, AC6.3), foreign otherwise; the scaffolded
 stubs speak English and carry the fixed memory sections. Size: SMALL."""
 
 from __future__ import annotations
@@ -9,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.specs_version import classify
 from dadaia_workspace.features.specs import canon
 
 pytestmark = pytest.mark.unit
@@ -20,13 +22,13 @@ def _constitution(specs: Path, text: str) -> None:
 
 
 def test_a_missing_tree_is_absent(tmp_path: Path) -> None:
-    assert canon.classify(tmp_path / "specs") == "absent"
+    assert classify(tmp_path / "specs") == "absent"
 
 
 @pytest.mark.parametrize("version", [6, 7])
 def test_a_stamp_of_six_or_more_is_dadaia(tmp_path: Path, version: int) -> None:
     _constitution(tmp_path / "specs", f"---\nspecs_pattern_version: {version}\n---\n# C\n")
-    assert canon.classify(tmp_path / "specs") == "dadaia"
+    assert classify(tmp_path / "specs") == "dadaia"
 
 
 @pytest.mark.parametrize(
@@ -34,12 +36,24 @@ def test_a_stamp_of_six_or_more_is_dadaia(tmp_path: Path, version: int) -> None:
 )
 def test_a_stamp_below_six_or_no_stamp_is_foreign(tmp_path: Path, text: str) -> None:
     _constitution(tmp_path / "specs", text)
-    assert canon.classify(tmp_path / "specs") == "foreign"
+    assert classify(tmp_path / "specs") == "foreign"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "---\nspecs_pattern_version: 7\ngitflow: {principal: main\n---\n# C\n",
+        "---\nspecs_pattern_version: 7\ngitflow: {principal: a, integration: a, work: w/}\n---\n",
+    ],
+)
+def test_an_unparseable_constitution_is_malformed_never_foreign(tmp_path: Path, text: str) -> None:
+    _constitution(tmp_path / "specs", text)
+    assert classify(tmp_path / "specs") == "malformed"
 
 
 def test_a_tree_without_a_constitution_is_foreign(tmp_path: Path) -> None:
     (tmp_path / "specs" / "features").mkdir(parents=True)
-    assert canon.classify(tmp_path / "specs") == "foreign"
+    assert classify(tmp_path / "specs") == "foreign"
 
 
 def test_the_scaffolded_stubs_are_english_with_the_fixed_memory_sections(tmp_path: Path) -> None:

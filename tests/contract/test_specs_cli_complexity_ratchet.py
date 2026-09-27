@@ -74,7 +74,9 @@ _DOCTOR_CEILING = 6
 # longer reported as a no-op — the S3 dead end. Authorized, task-declared change.
 # Re-pinned at 0.5.0 T-050-11 (AC6.2): the stamp call moves to the one merge-writer
 # (`merge_frontmatter`); `write_pattern_version` is deleted. Call-site migration only.
-_UPGRADE_MODULE_SHA256 = "1de629c2ee0f40dcde408c5020e22b174c712bbf2ac7615bc7dc4ea5f8b243e1"
+# Re-pinned at T-050-22 (AC11.2, review 7 N7): `merge_frontmatter` moved to core/gitflow;
+# the call site imports it from there. Import migration only.
+_UPGRADE_MODULE_SHA256 = "ad65f6a1f2468b0dcda931c3ef5a8dfd4a65687f812ee30ad4cf33507fbf9e60"
 
 
 def _complexity_by_name(path: Path) -> dict[str, int]:

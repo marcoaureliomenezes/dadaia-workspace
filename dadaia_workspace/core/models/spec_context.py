@@ -46,7 +46,7 @@ class SpecContextProject:
         Main repo first (folded into the same slug/url shape as an associated repo),
         then every associated repo in registration order. Every consumer that needs
         "the context's repos" as a set — the ALIVE/DEAD lifecycle (FR16), show/list/
-        export/panel (FR18) — resolves through this method; no second
+        export (FR18) — resolves through this method; no second
         repo-resolution path is created for it. Specs/bind/memory/releases/backlog
         keep resolving the main repo directly via ``repo_slug``/``repo_url`` (FR19) —
         this accessor is additive to that single control point, never a replacement
@@ -62,7 +62,7 @@ class RepoLiveStatus:
     The ONE result shape every consumer of "is this repo on disk, and what branch
     is it actually on" reads — ``SpecContextService.repo_live_status``/
     ``repos_live_status`` is the single implementation that produces it; `context
-    show`, `context list --json`, the export branch refresh and the panel card all
+    show`, `context list --json`, and the export branch refresh all
     render from this shape rather than re-deriving it at a second seam.
     """
 

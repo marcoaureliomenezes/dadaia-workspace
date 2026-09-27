@@ -19,6 +19,7 @@ import pytest
 
 pytest.importorskip("fcntl")
 
+from dadaia_workspace.container import scan_publish_candidates
 from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     AssociatedRepo,
     ContextState,
@@ -83,6 +84,7 @@ def _make_service(workspace_root: Path) -> tuple[SpecContextService, FakeContext
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
         install_hooks=lambda _repo: None,
+        secret_scan=scan_publish_candidates,
     )
     return service, store
 

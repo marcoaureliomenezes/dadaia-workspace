@@ -27,6 +27,7 @@ from dadaia_workspace.core.fixed_sections import (
     render_fixed_section,
 )
 from dadaia_workspace.core.frontmatter import FRONTMATTER_RE
+from dadaia_workspace.core.gitflow import merge_frontmatter
 from dadaia_workspace.core.spec_status import APPROVED, DRAFT, IN_REVIEW
 from dadaia_workspace.core.specs_repair import remove_placeholder_atoms
 from dadaia_workspace.features.migrate import registry as _registry
@@ -83,7 +84,7 @@ def upgrade(
         folded = fold_tech_stack(specs_dir)
         fixed = restore_fixed_sections(specs_dir)
         if current < goal:
-            _version.merge_frontmatter(specs_dir, specs_pattern_version=goal)
+            merge_frontmatter(specs_dir, specs_pattern_version=goal)
     return UpgradeResult(
         from_version=current,
         to_version=goal,

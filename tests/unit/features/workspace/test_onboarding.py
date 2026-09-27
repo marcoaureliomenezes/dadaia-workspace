@@ -1,7 +1,7 @@
 """The derived onboarding step list — one fixture per step, plus I1.
 
 Intent: CONTRACT — AC1.1, AC1.2, AC3.1, AC4.1, AC7.2 (T-050-17). Size: SMALL (unit): the
-two git reads are patched at the adapter; the real-git behaviour is the property test's.
+one git read is patched at the adapter; the real-git behaviour is the property test's.
 """
 
 from __future__ import annotations
@@ -23,8 +23,7 @@ _SCAFFOLD = workspace_layout.public_scripts_dir().parent / "scaffold"
 @pytest.fixture(autouse=True)
 def _git(monkeypatch: pytest.MonkeyPatch) -> dict[str, bool]:
     remote = {"published": False}
-    monkeypatch.setattr(GitSubprocessClient, "default_branch", lambda _s, _p: "trunk")
-    monkeypatch.setattr(GitSubprocessClient, "published", lambda _s, _p, _r: remote["published"])
+    monkeypatch.setattr(GitSubprocessClient, "published", lambda _s, _p: remote["published"])
     return remote
 
 
@@ -67,14 +66,27 @@ def test_bind_only_for_a_resolvable_unbound_session(tmp_path: Path) -> None:
     assert next_step(tmp_path, trees, session="s1").id == "specs"  # type: ignore[union-attr]
 
 
-def test_specs_fix_carries_the_detected_gitflow_flags(tmp_path: Path) -> None:
-    step = next_step(tmp_path, {"app": tmp_path / "repos" / "app" / "specs"})
+def test_specs_fix_carries_replace_foreign_only_for_a_foreign_tree(tmp_path: Path) -> None:
+    specs = tmp_path / "repos" / "app" / "specs"
+    step = next_step(tmp_path, {"app": specs})
+    assert step is not None
+    assert step.command == fix_line(tmp_path, "specs", "init", "--context", "app")
+    (specs / "features").mkdir(parents=True)
+    step = next_step(tmp_path, {"app": specs})
     assert step is not None
     assert step.command == fix_line(
-        tmp_path, "specs", "init", "--context", "app",
-        "--principal", "trunk", "--integration", "develop", "--work-prefix", "feature/",
-        "--replace-foreign",
-    )  # fmt: skip
+        tmp_path, "specs", "init", "--context", "app", "--replace-foreign"
+    )
+
+
+def test_an_unparseable_constitution_is_an_agent_repair_never_a_move(tmp_path: Path) -> None:
+    """ADR 0047 (reviewer H2 repro): a one-character YAML typo."""
+    specs = _specs(tmp_path, audited=True)
+    constitution = specs / "constitution.md"
+    constitution.write_text("---\nspecs_pattern_version: 7\ngitflow: {principal: main\n---\n")
+    step = next_step(tmp_path, {"app": specs})
+    assert step is not None and (step.id, step.kind) == ("constitution", "agent")
+    assert str(constitution) in step.command and "--replace-foreign" not in step.command
 
 
 def test_shipped_stubs_are_the_agent_first_pass_step(tmp_path: Path) -> None:

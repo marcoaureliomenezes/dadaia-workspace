@@ -142,7 +142,7 @@ DELETE/REBUILD rows (PLAN §1) land first. RED = the named test fails before the
 
 ### G7 — text by role, law, docs (FR6, FR3, FR9)
 
-- [-] **T-050-19 — Shipped text by role; library `pr-source-guard` reads the gitflow.**
+- [x] **T-050-19 — Shipped text by role; library `pr-source-guard` reads the gitflow.**
   Rewrite the ~36 PLAN §1 literals by role with a pointer to the constitution; `dd-gitflow-default` table by
   role; `ci.yml` guard reads `read_gitflow`; triggers stay literal, pinned by contract test.
   `Write set:` the PLAN §1 shipped-text files, `.github/workflows/ci.yml`,
@@ -150,7 +150,7 @@ DELETE/REBUILD rows (PLAN §1) land first. RED = the named test fails before the
   `blocked by:` T-050-12 · `delivers:` AC6.7–AC6.9 — agents read the gitflow by role
   `RED:` trigger-equality contract test against a changed library gitflow.
 
-- [-] **T-050-20 — Law, docs, first-pass skill, glossary; reproject.**
+- [x] **T-050-20 — Law, docs, first-pass skill, glossary; reproject.**
   `dd-audit-project` first pass ends at `memory.py check` (no FINDINGS, no `audit.py close`); bind and
   level-3 claims rewritten; `CONTEXT.md` gets the §3 terms; `public stage/install/doctor` + `doctor` exit 0.
   `Write set:` `pub/skills/{dd-audit-project,dd-cli-library}/SKILL.md`, `pub/data/{AGENTS.md,
@@ -161,7 +161,7 @@ DELETE/REBUILD rows (PLAN §1) land first. RED = the named test fails before the
 
 ### G8 — autopilot (FR10)
 
-- [-] **T-050-21 — Autopilot E2E journey.**
+- [x] **T-050-21 — Autopilot E2E journey.**
   From an empty dir, `file://` remotes, `DADAIA_SESSION_ID` set, one `init … --repo`: loop `doctor --json` →
   run the ONBOARDING fix (`shlex.split`; agent step via scripted stand-in), cap 10; greenfield, v6 tree,
   foreign tree; HEAD == upstream; Upgrade scenario kept.
@@ -171,3 +171,8 @@ DELETE/REBUILD rows (PLAN §1) land first. RED = the named test fails before the
   `RED:` the loop reaches the cap on today's code.
 
 Closure (not tasks): AC9.3 memory pass (dd-product-engineer); AC11.3 net-lines measurement vs PLAN §1.1.
+
+- [x] **T-050-22 — R13 append-only publish (round 6).**
+  Adopt origin, publish an empty origin's local principal, no rewrite/delete/force; one fix per
+  git-failure cause; origin-scoped "published"; one identity probe (SA-H3-1/2/3/8/17).
+  `blocked by:` T-050-15 · `delivers:` AC4.2–AC4.6, AC11.3 — the publish never rewrites history

@@ -20,6 +20,7 @@ import shutil  # noqa: E402
 import subprocess  # noqa: E402
 from pathlib import Path  # noqa: E402
 
+from dadaia_workspace.container import scan_publish_candidates
 from dadaia_workspace.core.exceptions import RepoUrlMissingError  # noqa: E402
 from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     ContextState,
@@ -61,6 +62,7 @@ def fake_service(store: FakeContextStore, workspace_root: Path) -> SpecContextSe
         git_client=FakeGitClient(),
         workspace_root=workspace_root,
         install_hooks=lambda _repo: None,
+        secret_scan=scan_publish_candidates,
     )
 
 
@@ -135,6 +137,7 @@ def test_alive_backfills_repo_url_from_origin_remote(
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
         install_hooks=lambda _repo: None,
+        secret_scan=scan_publish_candidates,
     )
     register_dead(service, "foo", "foo", "")
 
@@ -179,6 +182,7 @@ def test_dead_backfills_repo_url_before_rmtree(
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
         install_hooks=lambda _repo: None,
+        secret_scan=scan_publish_candidates,
     )
 
     _make_writable(repo_path)

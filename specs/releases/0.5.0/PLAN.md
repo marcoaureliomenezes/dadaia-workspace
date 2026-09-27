@@ -97,7 +97,110 @@ Verdict counts: DELETE 6 · REBUILD 14 · UPDATE 21 · KEEP 2 · ADD 2.
 Net ceiling **+230** lines. Growth sits only in the new modules, the step list, the baseline rewrite, the
 new git reads and the gitflow CLI/doctor surface. Every AC11.2 unit shrinks.
 
-### 1.2 Survey drift corrected
+**Re-approved ceiling (operator ruling 2026-09-26, option a): +362 lines**, measured after the last
+AC11.3 folds (`14c534b6`). Method: every non-merge commit in `5364ba0d..HEAD`, excluding the five shrink
+commits (`800c5e2d 009721d6 f38f7ff8 de4e3179 114be682`) and every `fix(bugs)` subject, `git show
+--numstat` over `dadaia_workspace/**/*.py` minus `dadaia_workspace/public/**`: +1372 / −1010 = **+362**.
+The +132 over the planned +230 is the review-round fixes (Windows-safe fix lines, the committed-gitflow
+gate read, the refuse-before-write baseline, the own-venv workspace resolution).
+
+| file | net | capability / ADR it carries |
+|---|---|---|
+| `core/gitflow.py` | +61 | the project gitflow model and its one frontmatter writer (FR6; ADRs 0037, 0040, 0046) |
+| `features/workspace/onboarding.py` | +58 | the one onboarding derivation — five real-state steps, each with a fix (FR1/FR3; ADRs 0033, 0034, 0043) |
+| `core/specs_version.py` | +57 | gitflow read from the committed constitution; unparseable block as its own step (FR6; ADRs 0046, 0048) |
+| `cli/commands/specs.py` | +54 | `specs init` gitflow flags, detection, foreign move to `specs-bkp/` (FR6/FR3; ADRs 0037, 0043) |
+| `core/cli_line.py` | +45 | the one fix-line builder, host-shell quoting, Windows paths, CLI outside a workspace (FR2; ADR 0045) |
+| `features/chokepoints/push_gate.py` | +32 | bootstrap birth, committed-gitflow branch names, non-interactive rewrite fixes (FR5; ADRs 0036, 0048) |
+| `cli/commands/ci.py` | +32 | the gitflow-aware preflight through the CLI resolution seam (FR6; ADR 0046) |
+| `features/spec_context/service.py` | +29 | the one publish verb `context baseline`, refuse-before-write (FR4; ADRs 0035, 0042) |
+| `core/doctor_rules.py` | +19 | doctor fix rendering through `fix_line` with a root (FR2; ADR 0045) |
+| `features/specs/doctor_coherence.py` | +18 | GITFLOW-1 coherence rule (FR6; ADR 0046) |
+| `infrastructure/git_objects.py` | +15 | `publishes_nothing` replaces `parents`; committed-file reads (FR5; ADRs 0036, 0048) |
+| `features/spec_context/gate_policy.py` | +11 | gate refusals through `fix_line` (FR2; ADR 0045) |
+| `core/workspace_resolver.py` | +11 | the CLI resolves its own venv's workspace before the cwd walk (FR2; ADR 0045) |
+| `cli/commands/doctor.py` | +10 | step/kind in `doctor --json`; honest FIXED/TREE remedies (FR1/FR2; ADRs 0033, 0045) |
+| `infrastructure/git_subprocess.py` | +9 | the git reads baseline and onboarding need (`published`, `committed_text`, `default_branch`) (FR4; ADRs 0035, 0048) |
+| `core/fixed_sections.py` | +7 | stripped memory-stub digest for the first-pass step (FR3; ADR 0034) |
+| `features/specs/rules.py`, `features/specs/doctor_types.py`, `core/invocation.py`, `cli/_specs_resolution.py`, `hooks/venv_guard.py`, `features/spec_context/doctor.py`, `infrastructure/public_assets.py`, `hooks/sdd_gate.py`, `features/specs/doctor.py` | +22 | migrations onto `fix_line` / the gitflow seam (FR2/FR6) |
+| `cli/commands/context.py` | −48 | `bind` is the one binder; session id delegates to the one rule (FR7; ADRs 0038, 0044) |
+| `features/specs/doctor_structural.py`, `features/chokepoints/branch_policy.py`, `features/specs/canon.py`, `infrastructure/ledger_scripts.py`, `core/kernel_tunables.py`, `features/chokepoints/__init__.py`, `features/specs/doctor_memory.py`, `hooks/ctx_inject.py`, `cli/commands/init.py` | −80 | dead gate code and duplicated paths deleted (FR8, FR11) |
+
+**Final measure after review round 3 (operator Q3, 2026-09-26): +449 lines** — same method, `5364ba0d..3f08cbd8`:
++1721 / −1272. **Δ vs the re-approved +362: +87**, every file that moved since `14c534b6`:
+
+| file | Δ since +362 | why |
+|---|---|---|
+| `features/spec_context/service.py` | +76 | `project_gitflow`, the ONE gitflow reader gate and `dead` share (C1, ADR 0048); `_sync_failure`, one fix per git failure (the gate's when it refused); `dead` refuses a non-work branch before any commit (H, Q2); `baseline --republish` absorbs the rewrite the gate used to perform (Q1) |
+| `features/chokepoints/branch_policy.py` | +20 | `GateFixes` — the composition root hands every refusal a runnable, cwd-free fix (H1–H4) |
+| `cli/_fail.py` (new) | +16 | the ONE CLI refusal printer — a fix line never wraps without a TTY (H); `context.py` −37 pays for it |
+| `cli/commands/ci.py` | +8 | the gate reads through `project_gitflow`; `git push origin HEAD` names the checked-out branch. The gate-side republish (−30) is deleted (Q1) |
+| `infrastructure/git_subprocess.py` | +8 | `unpushed` (dead's branch check), `committed_text` limited to `origin` (M1) |
+| `core/cli_line.py` | +5 | `git_line`, the one `git -C <repo>` spelling — collapses nine refusal sites (net −14 with its callers) |
+| `cli/commands/context.py` / `features/chokepoints/push_gate.py` | −37 / −9 | error printing folded into `_fail`; rewrite fix now names `context baseline --republish` |
+
+Decisions recorded here (operator 2026-09-26): **Q1** the pre-push gate is read-only; its denylist/canon
+refusal prints `fix: <cli> context baseline <ctx> --republish <slug>` (the squash + push lives in the one
+publish verb). **Q2** `context dead` refuses a repo with changes to sync while it sits on the principal or
+integration branch, `fix: git -C <repo> checkout -b <work>` — accepted as-is. Open LOW items: the
+alive `&&` fix is closed (`git clone <clone-url> <repos/slug>`, adopted and back-filled); **deferred**
+— the `<context>` placeholder when no ALIVE context owns the pushing repo (a hooked repo without one
+exists only after an out-of-band registry edit; a resolvable fix needs an origin read plus an adopt
+path, i.e. growth), and `dead` treating the projected `repos/<slug>/AGENTS.md` of an unborn clone as
+user data (the provenance classifier lives in `infrastructure/workspace_guardrail.py`; `dead` would
+need it injected through the container and `data/AGENTS.md` has no shipped-hashes history — growth
+for a lossless, conservative refusal).
+
+**Round 5 re-measure (REBUILD): +560** (per-file table in git, `04e0f2dd`).
+
+The ceiling is the operator's decision.
+
+Rounds 6–7 (R13 append-only, review 5): +489 → +487; the history is in git (`04e0f2dd`).
+
+### 1.3 Round 5 — REBUILD of repo resolution, baseline and `_sync_failure` (ADR 0041, 2026-09-26)
+
+Third rejection on the same three units; the as-is table and rebuild rules are in git (`04e0f2dd`).
+
+### 1.4 Rounds 6–7 — the append-only publish (operator R13/Q11, review 5)
+
+Every round patched one error: the publish invented history, then guessed which remote work was its
+own and repaired mis-guesses by rewriting. Rounds 6–7 deleted the invention (contentless births,
+fixed-date commits, `--republish`, `checkout -f`, `_refuse_foreign_work`), the guessed fix rows and
+`publishes_nothing`; `GitSubprocessClient.gitflow` is the one gitflow reader. Details: git log.
+
+### 1.5 Round 8 — anchor-first publish (design review C1–C9, Q1; cuts f, h; 2026-09-27)
+
+Cause (review 6 N1/H4/N4): the publish committed where HEAD was, then moved HEAD. Fix: anchor first.
+
+| # | state (predicate) | action / refusal | HEAD after |
+|---|---|---|---|
+| S1 | no checkout | refuse, `context alive` | unchanged |
+| S2 | identity unknown | refuse, `git config` | unchanged |
+| S3 | no committable constitution (C1: on disk ∧ tracked-or-not-ignored) | refuse, `specs init --context` | unchanged |
+| S4 | secret in an untracked onboarding file | refuse, publish again | unchanged |
+| S5 | fetch fails | git's full text | unchanged |
+| S6 | born (any branch, detached) | `switch --detach`, commit paths = anchor | detached anchor |
+| S7/S8 | unborn clone (empty / non-empty origin) | root anchor on the unborn name, `branch -m <work>` | `<work>` |
+| S9 | born, paths clean | anchor = HEAD₀ | detached |
+| S12/S13 | local `<work>` exists (incl. HEAD on it; read after the anchor) | `merge <work>` into the anchor, `fetch . HEAD:refs/heads/<work>` (fast-forward only; refuses a branch checked out in another worktree; creates an absent one), `switch <work>` (C2, review 7 R8-1) | `<work>` |
+| S11 | origin ≠ ∅ ∧ principal ∉ origin | after step 7 (C3): one candidate → `--principal <h>`; else listed + `<principal>` (C6) | `<work>`, anchor named |
+| S14–S16 | origin start = first of work, integration, principal | `merge`; `--allow-unrelated-histories` only if every root of HEAD holds only onboarding paths (Q1) | `<work>` |
+| S17 | conflict (step 7 or 8): `CONFLICT …`; a re-run meets `fatal: cannot switch branch while merging` / MERGE_HEAD | git's text + the anchor sha + the publish line | in the merge |
+| S18 | births ∨ unpushed | one `push --atomic -u` (births first, N8) | `<work>` |
+| S19 | nothing to push | `""` — published() holds by C1 (no S10/S20) | `<work>` |
+| S22 | gate refuses the push | the gate's reset fix; the message names the anchor and `context baseline <ctx>` after the amend (C7; a hand push drops origin's merge parent) | `<work>` |
+| rows | step-4 failure (hook, gpgsign): detached at HEAD₀, git's text; `<work>` held by another worktree: `fetch .` refuses with git's text, that worktree and `<work>` untouched, nothing published (R8-1); a non-fast-forward `<work>` is unreachable (the merge precedes) and `fetch .` would refuse it; origin moved between fetch and push: git's rejection text, re-run merges it | — | — |
+| D1–D6 | dead: clean → rmtree; dirty on work → commit (never an unmerged entry, C5: `diff --diff-filter=U` refuses) + push; non-work branch refused (cut g kept); push failure → git's text, nothing removed; D6 open bug `sa-context-dead-removes-repos-outside-the-reaper` | — | — |
+
+Cut (f): baseline publishes the main repo only; associated repos by plain `git push` under the gate
+(`_owned_slug`, `repo_owner`, the CLI repo argument deleted). Cut (h): no foreign-change refusal;
+residual — foreign work rides along uncommitted; git refuses a colliding switch/merge. C9:
+`from_mapping` refuses a work prefix nested under a role name.
+
+**Measure (AC11.3 method, `5364ba0d..722f169e`): +388** — over +362 by 26. Round 8d (AC5.6, `eb4f4b02`: one
+secret matcher, the second engine deleted, 57 added / 140 deleted): **`5364ba0d..eb4f4b02` = +305**, under +362.
+Round 10 (review 8): R9-1 secret-token v13 edits the one regex (`(?<![A-Za-z0-9])`, optional key quote, quoted arm `[^'"\s${}<>]{8,}`, unquoted `=` + `# …`); the matrix holds both directions.
+R9-2 the absence probe moves to `core.gitflow`; `specs_version` leaves the I/O set (eight). **`5364ba0d..0fffd6bc` = +318**, under +362.
 
 - `DADAIA_BIN` importers are **7**, not 9–10: `hooks/venv_guard.py` and `features/ci_preflight/service.py`
   read the `$DADAIA_BIN` *environment variable* exported by the pre-push hook, not the constant (SPEC AC2.2
@@ -127,8 +230,8 @@ new git reads and the gitflow CLI/doctor surface. Every AC11.2 unit shrinks.
   backfill script output is committed into `shipped-hashes.json`, and the append-only test covers it. The
   `first-pass` predicate compares stripped digests and checks for an empty catalog.
 - **FR6** `core/gitflow.py`: `Gitflow`, `DEFAULT`, `from_mapping` and `role_of` hold all naming logic.
-  `core/specs_version.py` gains `read_gitflow` plus one `merge_frontmatter(specs_dir, **keys)` built on
-  `frontmatter.parse`; `_STAMP_RE` goes. `ci.py` resolves the gitflow once per push. `specs init` gets 3
+  `core/gitflow.py` also holds `read_gitflow`, `constitution_error` and the one `merge_frontmatter(specs_dir,
+  **keys)` built on `frontmatter.parse` (moved from `core/specs_version.py`, review 7 N7, AC11.2); `_STAMP_RE` goes. `ci.py` resolves the gitflow once per push. `specs init` gets 3
   flags plus `GitSubprocessClient.default_branch`. GITFLOW-1 lives in `doctor_coherence`.
 - **FR5** `ObjectSource.publishes_nothing(repo, sha)` = the `_range_commit_shas(…, _base_exclusions(repo, ZERO))`
   range is empty, or is one parentless commit on the empty tree (SHA-1 or SHA-256).

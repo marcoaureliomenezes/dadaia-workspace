@@ -13,11 +13,8 @@ from rich.console import Console
 from rich.table import Table
 
 from dadaia_workspace import container
-from dadaia_workspace.cli._specs_resolution import (
-    HARNESS_SESSION_ID_ENV_VARS,
-    alive_context_trees,
-    sanitize_session_id,
-)
+from dadaia_workspace.cli._fail import fail
+from dadaia_workspace.cli._specs_resolution import alive_context_trees, resolve_session_id
 from dadaia_workspace.cli._specs_resolution import (
     resolve_context_for_cli as _resolve_context_for_cli,
 )
@@ -32,7 +29,6 @@ from dadaia_workspace.core.exceptions import (
     ContextStateError,
     DadaiaError,
     GitCloneError,
-    GitSyncError,
     InvalidContextNameError,
     RepoUrlMissingError,
     SchemaVersionError,
@@ -44,8 +40,6 @@ from dadaia_workspace.core.models.spec_context import (
 )
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context.service import (
-    DeadReviewRequiredError,
-    DeadSecretFoundError,
     SpecContextService,
 )
 from dadaia_workspace.features.workspace import onboarding
@@ -63,8 +57,7 @@ def _ctx_service() -> SpecContextService:
     try:
         return container.build_spec_context_service(resolve_workspace_root())
     except WorkspaceNotInitializedError as exc:
-        err_console.print(f"Error: {exc}", markup=False, highlight=False, soft_wrap=True)
-        raise typer.Exit(1) from None
+        fail(exc)
     except SchemaVersionError as exc:
         # Use plain stderr so CliRunner captures it in result.output (mix_stderr=True default)
         print(str(exc), file=sys.stderr)
@@ -150,42 +143,12 @@ def _live_session(workspace_root: Path, session_id: str) -> dict[str, Any] | Non
     return None if record is None else dict(record)
 
 
-def _harness_session_id() -> str | None:
-    """Harness-native session id from the environment ONLY (no payload — this is a CLI
-    entrypoint, not a hook). Scans the single shared env-var list
-    (:data:`~dadaia_workspace.core.invocation.HARNESS_SESSION_ID_ENV_VARS`) so the
-    harness id never drifts from what the gate/hooks read (release K1)."""
-    for name in HARNESS_SESSION_ID_ENV_VARS:
-        sanitized = sanitize_session_id(os.environ.get(name))
-        if sanitized:
-            return sanitized
-    return None
-
-
 def resolve_own_session_id(*, explicit: str | None = None, mint: bool = False) -> str | None:
-    """Resolve THIS caller's own session identity (T-50-05: the single helper every verb
-    below used to duplicate as its own copy-pasted micro-ladder).
-
-    Order: *explicit* (a verb's own CLI override, e.g. ``release --session``) -> the
-    eval-flow ``DADAIA_SESSION_ID`` (sanitized, CWE-22 — every site now gets the same
-    defence ``bind`` already had) -> the harness-native session id
-    (:func:`_harness_session_id`) -> when *mint* is set, a freshly minted ``sess_*`` id
-    (``bind``'s own fallback when a record must be created but neither channel carries
-    an identity yet — a WRITE-side concern this CLI command owns for itself, never part
-    of the read-side session-id rule, release K1). Session IDENTITY only — never a
-    context-resolution rung.
-    """
-    if explicit:
-        return explicit
-    env_sid = sanitize_session_id(os.environ.get("DADAIA_SESSION_ID"))
-    if env_sid:
-        return env_sid
-    harness_id = _harness_session_id()
-    if harness_id:
-        return harness_id
-    if mint:
-        return f"sess_{uuid.uuid4().hex[:8]}"
-    return None
+    """THIS caller's session identity: *explicit* (a verb's own override), else the ONE
+    session-id rule (:func:`core.invocation.resolve_session_id`, no payload), else — when
+    *mint* is set — a fresh ``sess_*`` id, the write-side fallback ``bind`` owns."""
+    sid = explicit or resolve_session_id(None, os.environ)
+    return sid or (f"sess_{uuid.uuid4().hex[:8]}" if mint else None)
 
 
 def print_next_step(workspace_root: Path, focus: str | None = None) -> None:
@@ -229,13 +192,7 @@ def create(
             main_repo, name=name, associated_urls=tuple(associated)
         )
     except (DadaiaError, OSError) as e:
-        err_console.print(f"Error: {e}", markup=False, soft_wrap=True)
-        err_console.print(
-            f"fix: {create_fix(ws, e, name, [main_repo, *associated])}",
-            markup=False,
-            soft_wrap=True,
-        )
-        raise typer.Exit(1) from None
+        fail(f"{e}\nfix: {create_fix(ws, e, name, [main_repo, *associated])}")
     suffix = f", {len(ctx.associated_repos)} associated repo(s)" if ctx.associated_repos else ""
     console.print(
         f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' created and ALIVE "
@@ -355,8 +312,7 @@ def show(
         try:
             ctx = svc.show(name)
         except ContextNotFoundError as e:
-            err_console.print(f"[red]Error:[/red] {e}")
-            raise typer.Exit(1) from None
+            fail(e)
 
     redactor: ContextRedactor | None = None
     if redact:
@@ -435,28 +391,24 @@ def alive(name: str = typer.Argument(..., help="Context name to make ALIVE")) ->
     except SchemaVersionError as exc:
         print(str(exc), file=sys.stderr)
         raise typer.Exit(1) from None
-    except RepoUrlMissingError as e:
-        err_console.print(f"Error: {e}", markup=False, soft_wrap=True)
-        raise typer.Exit(1) from None
-    except (ContextNotFoundError, ContextStateError) as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
+    except DadaiaError as e:
+        fail(e)
 
 
 @app.command()
 def baseline(
-    name: str = typer.Argument(..., help="ALIVE context whose onboarding is published"),
+    name: str = typer.Argument(..., help="Context whose onboarding is published"),
     message: str = typer.Option(
         "chore: publish the dadaia specs", "--message", help="Commit message."
     ),
 ) -> None:
-    """Publish the onboarded project: principal + integration branches, then the work
-    branch carrying specs/. Running it is the consent; a re-run is a no-op."""
+    """Publish the project's main repo, append-only: adopt what origin holds, or give an
+    empty origin the local principal; the work branch carries specs/. A re-run is a no-op.
+    An associated repo publishes by plain `git push` under the pre-push gate."""
     try:
         work = _ctx_service().baseline(name, message=message)
     except (DadaiaError, OSError) as exc:
-        err_console.print(f"Error: {exc}", markup=False, soft_wrap=True)
-        raise typer.Exit(1) from None
+        fail(exc)
     done = f"published on {work}" if work else "already published — nothing to do"
     console.print(f"✓ '{name}' {done}", markup=False, highlight=False, soft_wrap=True)
 
@@ -478,23 +430,8 @@ def dead(
     try:
         ctx = _ctx_service().dead(name, commit=commit)
         console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now DEAD")
-    except DeadReviewRequiredError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
-    except DeadSecretFoundError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
-    except RepoUrlMissingError as e:
-        err_console.print(f"Error: {e}", markup=False, soft_wrap=True)
-        raise typer.Exit(1) from None
-    except GitSyncError as e:
-        # Residual git failures (network, refs) surface as a clean error, not a
-        # traceback (validation-029 F-06/F-22 no-traceback law).
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
-    except (ContextNotFoundError, ContextStateError) as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
+    except DadaiaError as e:
+        fail(e)
 
 
 @app.command(
@@ -527,8 +464,7 @@ def bind(
     try:
         svc.show(name)
     except ContextNotFoundError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
+        fail(e)
 
     # Stable session identity (bug bind-session-id-divergence, 2026-07-15): the SAME
     # resolution order the gate/hooks use, so rebinds UPDATE one record.
@@ -549,9 +485,8 @@ def bind(
     # harness-native id and no DADAIA_CONTEXT gets a silent no-op. stderr only, so it
     # never corrupts `eval $(dadaia context bind ... --print-env)`.
     if (
-        not _harness_session_id()
+        not resolve_session_id(None, os.environ)
         and not os.environ.get("DADAIA_CONTEXT")
-        and not os.environ.get("DADAIA_SESSION_ID")
         and not print_env
     ):
         err_console.print(
@@ -595,22 +530,12 @@ def repo_add(
     try:
         ctx, was_added = _ctx_service().add_repo(ctx_name, slug, url)
     except (ContextNotFoundError, InvalidContextNameError, AssociatedRepoConflictError) as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
+        fail(e)
     except RepoUrlMissingError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        err_console.print(
-            "fix: "
-            + fix_line(
-                resolve_workspace_root(),
-                *f"context repo add {ctx_name} {slug}".split(),
-                "--url",
-                "<clone-url>",
-            ),
-            markup=False,
-            soft_wrap=True,
+        ws = resolve_workspace_root()
+        fail(
+            f"{e}\nfix: {fix_line(ws, 'context', 'repo', 'add', ctx_name, slug, '--url', '<clone-url>')}"
         )
-        raise typer.Exit(1) from None
 
     if was_added:
         console.print(
@@ -642,11 +567,9 @@ def repo_remove(
     try:
         ctx = _ctx_service().remove_repo(ctx_name, slug)
     except ContextNotFoundError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
+        fail(e)
     except AssociatedRepoNotFoundError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
+        fail(e)
 
     console.print(
         f"[green]✓[/green] Associated repo '[bold]{slug}[/bold]' removed from context "
@@ -671,8 +594,7 @@ def delete(name: str = typer.Argument(..., help="Context name to delete")) -> No
         _ctx_service().delete(name)
         console.print(f"[green]✓[/green] Context '[bold]{name}[/bold]' deleted")
     except (ContextNotFoundError, ContextStateError) as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
+        fail(e)
 
 
 # v2 removals: activate/deactivate/promote/use removed in v0.1.7

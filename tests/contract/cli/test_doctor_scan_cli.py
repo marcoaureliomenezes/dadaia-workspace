@@ -135,14 +135,14 @@ def test_json_carries_findings_and_fixed(workspace: Path) -> None:
     assert payload["fixed"] == []
 
 
-@pytest.mark.skipif(
-    os.name != "posix" or os.geteuid() == 0,
-    reason="chmod 0o555 denies unlink only for a non-root POSIX user",
-)
-def test_fix_reports_an_undeletable_entry_exits_1_and_never_raises(workspace: Path) -> None:
+def test_fix_reports_an_undeletable_entry_exits_1_and_never_raises(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Bug doctor-fix-aborts-whole-pass-on-first-undeletable-entry: the live symptom was
     ``Error: unexpected PermissionError`` with 0 repairs reported although earlier repairs
-    had been applied — the pass must finish, report the skip, and exit 1 for what remains."""
+    had been applied — the pass must finish, report the skip, and exit 1 for what remains.
+    The refusal is planted at the unlink boundary: a read-only tree is reapable since bug
+    doctor-reaper-cannot-delete-read-only-trees."""
     stale = _plant_expired(workspace)
     locked = workspace / ".dadaia" / _TTL_ZONE.name / "locked"
     locked.mkdir()
@@ -150,11 +150,16 @@ def test_fix_reports_an_undeletable_entry_exits_1_and_never_raises(workspace: Pa
     undeletable.write_text("", encoding="utf-8")
     two_days_ago = time.time() - 2 * 86_400
     os.utime(undeletable, (two_days_ago, two_days_ago))
-    locked.chmod(0o555)
-    try:
+    real_unlink = os.unlink
+
+    def refusing_unlink(path: object, *args: object, **kwargs: object) -> None:
+        if os.fspath(path) in (str(undeletable), undeletable.name):  # type: ignore[call-overload]
+            raise PermissionError(13, "Permission denied", str(path))
+        real_unlink(path, *args, **kwargs)  # type: ignore[arg-type]
+
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "unlink", refusing_unlink)
         result = CliRunner().invoke(app, ["doctor", "--fix"])
-    finally:
-        locked.chmod(0o755)
 
     assert not isinstance(result.exception, OSError), repr(result.exception)
     assert result.exit_code == 1, result.output

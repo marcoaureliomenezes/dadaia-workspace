@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.models.git_scan import ZERO_SHA, GitObjectReadError, ScannedObject
-from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
+from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader, unpublished
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
@@ -305,7 +305,7 @@ def test_new_objects_batch_check_timeout_raises_typed_error(
     """dd-code-reviewer MEDIUM finding: the ``--batch-check`` call must route through the
     same typed-error wrapper as every other git invocation in this module — a subprocess
     timeout or a missing ``git`` executable must never escape as a raw exception
-    (``core/protocols/git_object_reader.py`` — 'Any git failure raises
+    (the reader's contract — 'Any git failure raises
     GitObjectReadError rather than returning a partial/empty result'). Forces the
     failure specifically on the batch-check call (the rev-list call that precedes it
     still runs for real) so this exercises the previously-untested gap distinctly from
@@ -1636,7 +1636,8 @@ def test_resolvable_remote_sha_and_new_branch_fallback_agree_on_the_same_final_s
 
 
 # ---------------------------------------------------------------------------------------
-# publishes_nothing (0.5.0 AC5.1/AC5.2, ADR 0036): a branch birth publishes no new object
+# boundary (0.5.0 AC5.1/AC5.2, ADR 0036; c3 review 5 C1/H1-H3): where a ref's own
+# unpublished range rests on origin — the birth test and the gate's rewrite fix
 # ---------------------------------------------------------------------------------------
 
 
@@ -1653,36 +1654,53 @@ def _published_repo(tmp_path: Path) -> tuple[Path, str]:
     return repo, sha
 
 
-def test_a_commit_already_on_the_remote_publishes_nothing(tmp_path: Path) -> None:
+def test_a_commit_already_on_origin_publishes_nothing(tmp_path: Path) -> None:
     repo, sha = _published_repo(tmp_path)
-    assert GitSubprocessObjectReader().publishes_nothing(repo, sha)
+    assert GitSubprocessObjectReader().unpublished(repo, sha) == []
 
 
-def test_a_new_commit_publishes_something(tmp_path: Path) -> None:
+def test_the_unpublished_range_is_newest_first_and_ignores_an_advanced_origin(
+    tmp_path: Path,
+) -> None:
+    """H2/N3: the oldest entry is where the rewrite fix resets — never origin's tip."""
     repo, _ = _published_repo(tmp_path)
-    (repo / "a.txt").write_text("second\n")
-    assert not GitSubprocessObjectReader().publishes_nothing(repo, _commit(repo, "c2"))
+    _git(["checkout", "-q", "-b", "topic"], repo)
+    (repo / "b.txt").write_text("mine\n")
+    oldest = _commit(repo, "mine")
+    (repo / "b.txt").write_text("more\n")
+    tip = _commit(repo, "more")
+    _git(["checkout", "-q", "main"], repo)
+    (repo / "dep.txt").write_text("theirs\n")
+    _commit(repo, "dep")
+    _git(["push", "-q", "origin", "main"], repo)
+    assert GitSubprocessObjectReader().unpublished(repo, tip) == [tip, oldest]
 
 
-def test_an_empty_root_commit_publishes_nothing(tmp_path: Path) -> None:
+def test_a_range_reaching_a_root_commit_ends_at_the_root(tmp_path: Path) -> None:
+    """N3: an empty origin is the same formula — the oldest commit is the root."""
     repo = tmp_path / "repo"
     _init_repo(repo)
     _git(["commit", "-q", "--allow-empty", "-m", "root"], repo)
-    sha = _git(["rev-parse", "HEAD"], repo).stdout.strip()
-    assert GitSubprocessObjectReader().publishes_nothing(repo, sha)
-
-
-def test_an_empty_commit_on_new_history_publishes_something(tmp_path: Path) -> None:
-    """Only a PARENTLESS empty commit is contentless; an empty child carries its parent."""
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    _git(["commit", "-q", "--allow-empty", "-m", "root"], repo)
+    root = _git(["rev-parse", "HEAD"], repo).stdout.strip()
     _git(["commit", "-q", "--allow-empty", "-m", "child"], repo)
     sha = _git(["rev-parse", "HEAD"], repo).stdout.strip()
-    assert not GitSubprocessObjectReader().publishes_nothing(repo, sha)
+    assert GitSubprocessObjectReader().unpublished(repo, sha) == [sha, root]
+
+
+def test_a_commit_only_another_remote_holds_is_still_unpublished(tmp_path: Path) -> None:
+    """SA-H3-1: "published" means on origin — one rule for the gate and ``unpushed``."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    _git(["commit", "-q", "--allow-empty", "-m", "root"], repo)
+    sha = _git(["rev-parse", "HEAD"], repo).stdout.strip()
+    _git(["update-ref", "refs/remotes/fork/main", sha], repo)
+    assert unpublished(repo, sha) == [sha]
+    _git(["update-ref", "refs/remotes/origin/main", sha], repo)
+    assert unpublished(repo, sha) == []
 
 
 @pytest.mark.parametrize("sha", ["a" * 40, "--upload-pack=evil"])
 def test_an_unresolvable_or_option_shaped_sha_fails_closed(tmp_path: Path, sha: str) -> None:
+    """Unreadable counts as unpublished: never a birth, never an empty range."""
     repo, _ = _published_repo(tmp_path)
-    assert not GitSubprocessObjectReader().publishes_nothing(repo, sha)
+    assert GitSubprocessObjectReader().unpublished(repo, sha) == [sha]

@@ -6,7 +6,7 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 ## Install
 
 <!-- derived-from: pypi-distribution sha256:618098346ed6 -->
-<!-- derived-from: workspace-init sha256:aa1f033df140 -->
+<!-- derived-from: workspace-init sha256:bc2612c3f80d -->
 
 ```bash
 uvx dadaia-workspace init <dir> --harness claude --repo <url>
@@ -27,7 +27,7 @@ refreshes each project's specs law.
 
 ## Level 1 — the workspace
 
-<!-- derived-from: workspace-init sha256:aa1f033df140 -->
+<!-- derived-from: workspace-init sha256:bc2612c3f80d -->
 
 `uvx dadaia-workspace init <dir> --harness claude|codex|kimi-code|cursor|devin|copilot
 [--repo <url>] [--associated-repo <url>]… [--skip-assets]` is the only verb that works
@@ -51,8 +51,8 @@ harness later and `.dadaia/.venv/bin/dadaia harness list` reads the roster.
 
 ## Level 2 — the project
 
-<!-- derived-from: spec-context-project sha256:4984ba691799 -->
-<!-- derived-from: context-management sha256:3f48eef447f1 -->
+<!-- derived-from: spec-context-project sha256:47c11b26b98f -->
+<!-- derived-from: context-management sha256:dc1a239f4970 -->
 
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
 owned by one main repository, optionally spanning associated repositories that live and
@@ -78,7 +78,7 @@ bind, the ctx-inject hook injects the context header, `ARCHITECTURE.md`'s
 
 ## Level 3 — the specs
 
-<!-- derived-from: spec-context-project sha256:4984ba691799 -->
+<!-- derived-from: spec-context-project sha256:47c11b26b98f -->
 
 ```bash
 .dadaia/.venv/bin/dadaia specs init --context <ctx> [--replace-foreign]
@@ -88,13 +88,13 @@ bind, the ctx-inject hook injects the context header, `ARCHITECTURE.md`'s
 absent tree is scaffolded, a dadaia tree is upgraded and its missing files filled, and a
 foreign `specs/` is moved to `specs-bkp/` (`git mv`, staged) after consent —
 `--replace-foreign` gives it without asking. The `dd-audit-project` first pass (3b) fills
-memory and is done when memory holds real content (`memory.py check` exit 0), never by a
+memory and is done when memory holds real content (`.dadaia/.venv/bin/dadaia doctor --context <ctx>` exit 0), never by a
 stamp. `context baseline <ctx>` (3c) publishes the principal, integration and work
 branches; a re-run is a no-op.
 
 ## Check compliance — `doctor`
 
-<!-- derived-from: workspace-doctor sha256:3fa0c321c7b0 -->
+<!-- derived-from: workspace-doctor sha256:8e52123b79e7 -->
 
 ```bash
 .dadaia/.venv/bin/dadaia doctor --context <ctx> [--json] [--fix] [--redact]
@@ -120,7 +120,7 @@ a TTL expired.
 
 ## Run the first candidate
 
-<!-- derived-from: release-lifecycle sha256:ebb8441fde08 -->
+<!-- derived-from: release-lifecycle sha256:a31b50804ef1 -->
 <!-- derived-from: backlog-ledger sha256:46382434daf2 -->
 <!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
 

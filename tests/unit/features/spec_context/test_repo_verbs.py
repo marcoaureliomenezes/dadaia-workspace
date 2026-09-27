@@ -21,6 +21,7 @@ import pytest
 
 pytest.importorskip("fcntl")
 
+from dadaia_workspace.container import scan_publish_candidates
 from dadaia_workspace.core.exceptions import (  # noqa: E402
     AssociatedRepoConflictError,
     AssociatedRepoNotFoundError,
@@ -63,6 +64,7 @@ def service(
         git_client=git,
         workspace_root=workspace_root,
         install_hooks=lambda _repo: None,
+        secret_scan=scan_publish_candidates,
     )
 
 

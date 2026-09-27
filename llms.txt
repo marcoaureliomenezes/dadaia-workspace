@@ -4,22 +4,22 @@
 
 ## What it is
 
-<!-- derived-from: product-vision sha256:16060412dc8a -->
+<!-- derived-from: product-vision sha256:cfd469d90787 -->
 
 - [README](README.md): one workspace folder, projects in repos inside it, governance outside every repo; the unit is the context (main repo + associated repos); documents are the lifecycle; boundaries are mechanical.
 
 ## Install
 
 <!-- derived-from: pypi-distribution sha256:618098346ed6 -->
-<!-- derived-from: workspace-init sha256:aa1f033df140 -->
+<!-- derived-from: workspace-init sha256:bc2612c3f80d -->
 
-- [PyPI project](https://pypi.org/project/dadaia-workspace/): three levels — `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` (workspace + project: cloned, ALIVE, bound), then `.dadaia/.venv/bin/dadaia specs init --context <slug>` (specs on the canon) and `.dadaia/.venv/bin/dadaia doctor`; every later command runs through `.dadaia/.venv/bin/dadaia`; re-running the `uvx` init line upgrades the workspace, then `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes each project's specs law.
+- [PyPI project](https://pypi.org/project/dadaia-workspace/): three levels — `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` (workspace + project: cloned and ALIVE; only `.dadaia/.venv/bin/dadaia context bind <slug>` binds a session), then `.dadaia/.venv/bin/dadaia specs init --context <slug>` (specs on the canon) and `.dadaia/.venv/bin/dadaia doctor`; every later command runs through `.dadaia/.venv/bin/dadaia`; re-running the `uvx` init line upgrades the workspace, then `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes each project's specs law.
 - [Changelog](CHANGELOG.md): written by release-please, one section per released version.
 
 ## The law
 
-<!-- derived-from: agentic-entities sha256:63d2197ea839 -->
-<!-- derived-from: sdd-gate-v3 sha256:7a6e11d84264 -->
+<!-- derived-from: agentic-entities sha256:6add03805476 -->
+<!-- derived-from: sdd-gate-v3 sha256:f870acc7c776 -->
 
 - [AGENTS.md](dadaia_workspace/public/data/AGENTS.md): the always-on root map — flow, roles, gate invariants, where things live, the index of every scoped `AGENTS.md` and skill; projected once to the workspace root.
 
@@ -37,7 +37,7 @@
 ## The docs
 
 <!-- derived-from: pypi-distribution sha256:618098346ed6 -->
-<!-- derived-from: product-vision sha256:16060412dc8a -->
+<!-- derived-from: product-vision sha256:cfd469d90787 -->
 
 - [Documentation](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs): the repository's `docs/` folder on `main`, every page derived under its markers.
 - [Landing](docs/index.md): the tagline, the paradigm and the two ways in.
