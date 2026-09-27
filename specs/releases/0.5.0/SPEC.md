@@ -21,10 +21,9 @@ project, and the project gitflow". Operator demand 2026-09-24 (verbatim):
 > constitution é para isso... gates determinísticos customizáveis... não provoque locks ou stop sem
 > sentido fazendo agente parar de trabalhar e não ter para onde ir. Esse é o maior problema."
 
-Grill rounds 1–3 (2026-09-25), every recommendation accepted. The law of this candidate is ADRs
-0033–0038, 0040, 0042–0049; the as-is review is PLAN §1. Review rounds amend ACs in place:
-`_Amended 2026-09-26:_` (REJECTED 40a24031, operator ruling); `_Amended 2026-09-27:_` (reviews 6 N6,
-7 B3; the approved anchor-first publish design, conditions C1–C9; the append-only rulings, PLAN §1.4).
+Grill rounds 1–3 (2026-09-25), all accepted. Law: ADRs 0033–0038, 0040, 0042–0049; as-is review: PLAN
+§1. Amended in place 2026-09-26 (REJECTED 40a24031) and 2026-09-27 (reviews 6–7, the anchor-first
+design, PLAN §1.4, the tests retro).
 
 ## 2. Objective
 
@@ -33,18 +32,18 @@ builder — that an agent loops on (run doctor, execute `fix:`, repeat) from an 
 published on its principal, integration and work branches under a gitflow the project declares in its
 constitution; no step can stall, and the touched features shrink.
 
-## 3. Terms (enter `CONTEXT.md` with the implementation)
+## 3. Terms
 
 - **Onboarding step** — one entry of the ordered list: id, kind, a real-state predicate ("pending"), one
   fix line. Ids in order: `context`, `bind`, `specs` (3a), `first-pass` (3b), `publish` (3c).
   _Avoid_: stage, wizard step, onboarding state.
 - **Step kind** — `command` (the fix line is a shell command) or `agent` (it names a skill section and a
   pending list). _Avoid_: type, mode.
-- **Onboarding level** (amended) — 1 workspace, 2 context (`context`, `bind`), 3 specs (3a `specs`,
+- **Onboarding level** — 1 workspace, 2 context (`context`, `bind`), 3 specs (3a `specs`,
   3b `first-pass`, 3c `publish`); derived, never stored.
-- **Next step** (amended) — the first pending onboarding step, printed identically by `doctor`, `init`,
+- **Next step** — the first pending onboarding step, printed identically by `doctor`, `init`,
   `context create` and SessionStart.
-- **First pass** (amended) — level 3b; done when memory holds real content, never by a stamp.
+- **First pass** — level 3b; done when memory holds real content, never by a stamp.
 - **Project publication** — level 3c: the first push of a main repo's specs, by `context baseline`.
   _Avoid_: publish step, baseline (the pre-push published-history baseline).
 - **Onboarding anchor** — the commit holding the onboarding paths, made on a detached HEAD (an unborn
@@ -79,8 +78,7 @@ by `public stage` + `public install`.
   `len(steps)` command executions plus the agent steps.
 - AC1.5 `doctor` (ONBOARDING info finding; `--json` carries `step` and `kind`), `init`, `context create`
   and SessionStart print the same `Step.text()`, which names the kind. SessionStart calls one helper for
-  bound and unbound sessions; the second `next_step` call in `hooks/ctx_inject.py` `_emit_bootstrap` is
-  gone; a hook test asserts both paths print doctor's text.
+  bound and unbound sessions; a hook test asserts both paths print doctor's text.
 - AC1.6 The derivation issues no network call; only `publish` reads the gitflow block (the local
   integration name). _Amended 2026-09-26._
 - AC1.7 A `tests/contract/` census of the step list (id, kind, order) replaces the regex census
@@ -95,7 +93,7 @@ by `public stage` + `public install`.
 - AC2.2 `DADAIA_BIN` is deleted from `core/kernel_tunables.py`; every call site in the importing
   modules (`features/specs/rules.py`, `features/spec_context/{service,doctor,gate_policy}.py`,
   `cli/commands/{context,doctor}.py`, `infrastructure/ledger_scripts.py`, `hooks/venv_guard.py`'s
-  suggested command) migrates in this candidate — no exception.
+  suggested command) migrates — no exception.
 - AC2.3 FIXED-1/FIXED-2 (`doctor_memory.py`) and TREE-4/TREE-5 carry their remedy as a `fix_line`-built
   line; no finding description embeds a bare `dadaia` command.
 - AC2.4 A missing scaffolded law file (`specs/AGENTS.md` or `specs/<area>/AGENTS.md`) is `fixable=True`:
@@ -119,8 +117,10 @@ by `public stage` + `public install`.
 - AC3.3 A unit test proves a stub rewritten by `doctor --fix` (FIXED-2) still reads pending, and an edited
   body reads done.
 - AC3.4 `dd-audit-project` SKILL.md's first-pass section applies while doctor's next step is
-  `first-pass`, ends at `memory.py check` exit 0, and no longer creates `FINDINGS.jsonl` or runs
-  `audit.py close`; `tests/contract/test_audit_first_pass.py` asserts it.
+  `first-pass`, ends at `dadaia doctor --context <ctx>` exit 0 (LINT-1 owns the atoms,
+  `memory.py check` only the catalog pair), and no longer creates `FINDINGS.jsonl` or runs
+  `audit.py close`; `tests/contract/test_audit_first_pass.py` asserts it; no shipped text makes
+  `memory.py check` the done criterion. _Amended 2026-09-27:_ bug fix 3886760e.
 
 ### FR4 — Level 3c and the one publish verb (ADRs 0035, 0042, 0048)
 
@@ -151,7 +151,7 @@ by `public stage` + `public install`.
     `<work>` at the anchor, every other branch untouched. One candidate head → `fix: CLI specs init
     --context <ctx> --principal <head>`; several → listed, fix with a `<principal>` placeholder, no guess.
   - A fetch, merge or push failure (offline, auth, wrong URL, non-fast-forward, conflict) carries git's
-    full output (operator ruling R13 rule 4); after the anchor it names the anchor sha; HEAD holds it.
+    full output (ruling R13); after the anchor it names the anchor sha; HEAD holds it.
   - Cut (h): work outside the onboarding paths is neither refused nor committed; git refuses a switch
     or merge it collides with ("commit … or stash").
 - AC4.6 Integration tests, one per state: empty origin; principal only; both; a tag; a non-default
@@ -161,11 +161,12 @@ by `public stage` + `public install`.
   pending and no "already published" prints.
 - AC4.7 `features/certification/service.py` invokes baseline without the deleted flags.
 - AC4.8 An associated repo publishes by plain `git push` under the pre-push gate; a refusal or doctor
-  finding about it names that one command. _Amended 2026-09-27:_ cut (f), operator choice under "Reduza
-  esse teto", recommended by the design review (the associated path could never clear).
+  finding about it names that one command. _Amended 2026-09-27:_ cut (f).
 - AC4.9 `context dead --commit` never stages an unmerged entry (consented untracked files still are): git
   refuses a conflicted commit, no conflict marker is published; a push failure carries git's full output
-  and removes nothing. Dead's work-branch refusal stays (cut (g) not taken). _Amended 2026-09-27._
+  and removes nothing. Dead's work-branch refusal stays. With no git identity it refuses before any
+  write, one fix line (`git -C <repo> config user.name '<user.name>'`); checkout, HEAD, origin and the
+  ALIVE state unchanged. _Amended 2026-09-27._
 
 ### FR5 — Pre-push bootstrap birth (ADR 0036)
 
@@ -188,16 +189,18 @@ by `public stage` + `public install`.
 - AC5.6 Baseline and `dead --commit` run the pre-push matcher in-process on what they commit. One
   registry (`privacy_baseline.json` + operator terms), control characters stripped, refuses a
   secret-named key assigned a whole literal (quoted 8+ chars, or unquoted to line end, optional `#`
-  comment); references, templates and code expressions pass; the `test_one_secret_matcher.py` matrix
-  is the contract. _Amended 2026-09-27:_ bug `sa-pre-push-and-publish-scan-disagree-on-secret-shapes`;
-  R10-4.
+  comment); references, templates and code expressions pass. A private-key container
+  (`.pem .key .p12 .pfx .jks .keystore .der`) is refused on presence alone; a public certificate
+  (`.crt .cer`) passes. The `test_one_secret_matcher.py` matrix is the contract. _Amended 2026-09-27:_
+  bug fix, R10-4, registry v14.
 
 ### FR6 — The project gitflow (ADRs 0037, 0040, 0046)
 
 - AC6.1 `core/gitflow.py`: a frozen `Gitflow(principal, integration, work_prefix)`, `DEFAULT`,
   validating `from_mapping` (valid ref names, principal ≠ integration, non-empty prefix not nested under
-  a role name), and `role_of(branch)` → principal | integration | work (`<prefix><M.m.p>`) | none. It
-  replaces the three branch regexes. _Amended 2026-09-27:_ nested prefix.
+  a role name), and `role_of(branch)` → principal | integration | work (`<prefix><M.m.p>`) | none. Role
+  names match exactly and case-sensitively (git's rule); a work name is the prefix plus a bare `M.m.p`,
+  no suffix. It replaces the three branch regexes. _Amended 2026-09-27:_ nested prefix; exact names.
 - AC6.2 The block is `gitflow: {principal: <name>, integration: <name>, work: <prefix>}` in
   `specs/constitution.md` frontmatter, read by `core/frontmatter.parse`; `read_gitflow(specs_dir)`
   returns `(Gitflow, warning | None)` — absent or malformed ⇒ `DEFAULT` plus a warning. One
@@ -206,20 +209,20 @@ by `public stage` + `public install`.
 - AC6.3 `specs init --context <ctx> [--principal] [--integration] [--work-prefix]`: principal defaults to
   `origin/HEAD` (`git symbolic-ref`, local) else `main`; writes the block on a fresh tree and merges it on
   an existing dadaia tree; same flags twice is a no-op; stdout names the gitflow written.
-  _Amended 2026-09-26:_ (ADR 0047) the `specs` step's fix carries no gitflow flag (a valid block is
+  _Amended 2026-09-26:_ the `specs` step's fix carries no gitflow flag (a valid block is
   kept, else detected) and `--replace-foreign` only for a foreign tree; an unparseable frontmatter is its
   own doctor finding.
 - AC6.4 Pre-push resolution in `cli/commands/ci.py`, once per push, from committed data:
   `specs/constitution.md` at HEAD; else the newest one reachable from a remote-tracking ref (local); else
   the owning context's main-repo constitution (`core/invocation.py`); else `DEFAULT` with one stderr
   warning — never a block. Refusal fixes name only refs that exist. `push_gate_decision` requires the
-  gitflow (no default). _Amended 2026-09-26:_ (ADR 0048).
+  gitflow (no default). _Amended 2026-09-26._
 - AC6.5 Pushable: work branches; principal/integration only by FR5; refusal messages and their
   `gh pr create --base …` fix lines name the configured branches. Tests with the default and a custom
   gitflow (`trunk`/`next`/`work/`), an absent block (warning, default), an associated repo inheriting.
 - AC6.6 Doctor `GITFLOW-1` (specs section, beside SPECS-VERSION): WARN when the block is absent or
   malformed; fix line = `specs init --specs-dir <specs>` (no flags); executing it clears the finding and
-  never resets an operator's custom names. _Amended 2026-09-26:_ (ADR 0047).
+  never resets an operator's custom names. _Amended 2026-09-26._
 - AC6.7 The library's `specs/constitution.md` carries the block; `ci.yml` `pr-source-guard` reads it
   (`read_gitflow`): integration PRs from work branches or Dependabot, principal PRs from the integration
   branch or `release-please--branches--<principal>`. Workflow triggers stay literal; a contract test pins
@@ -252,7 +255,7 @@ by `public stage` + `public install`.
 - AC9.2 `CONTEXT.md` carries §3's terms with their _Avoid_ lists.
 - AC9.3 The closure memory pass rewrites `context-management`, `workspace-init`, `audits-canon`,
   `spec-context-project`, `product-vision`, the product index and every atom `memory.py drift` lists;
-  `memory.py check` exit 0.
+  `dadaia doctor --context <ctx>` exit 0. _Amended 2026-09-27._
 - AC9.4 `public stage`, `public install`, `public doctor` and `dadaia doctor` exit 0 on the live instance.
 
 ### FR10 — Autopilot E2E
@@ -278,14 +281,13 @@ by `public stage` + `public install`.
 - AC11.3 The closure note reports the net production Python lines (`dadaia_workspace/**/*.py` outside
   `public/`) of the candidate's own commits, 5364ba0d..closure, excluding the operator-ordered shrink
   deletions (800c5e2d 009721d6 f38f7ff8 de4e3179 114be682) and Arm B fixes; above +362 net is a HIGH
-  review finding. _Amended 2026-09-27:_ the operator's re-approved ceiling (PLAN §1.1), never raised
-  ("Reduza esse teto").
+  review finding. _Amended 2026-09-27:_ operator ceiling (PLAN §1.1), never raised.
 
 ## 5. Replaces
 
-- `onboarding.py`'s if-chain `_lowest` (level 3 = the `audits_histo` stamp) → the FR1 step list.
+- `onboarding.py`'s if-chain `_lowest` (level 3 = the `audits_histo` stamp) → the FR1 step list;
+  `ctx_inject._emit_bootstrap`'s second `next_step` call → one helper (AC1.5).
 - `DADAIA_BIN`, `onboarding.cli_path` and per-site fix strings → FR2; the regex census → AC1.7, AC2.5.
-- The second `next_step` call site in `ctx_inject._emit_bootstrap` → one helper (AC1.5).
 - FIXED-2's bare `dadaia`; TREE-5's library-path prose and `fixable=False` → AC2.3, AC2.4.
 - First pass closed by a stamp; `features/specs/template_history.py`; raw-byte stub comparison → FR3.
 - Unborn-only `baseline`, its `has_commits` branch, `feature/0.1.0`, `--yes`/`--push` → FR4.
@@ -311,23 +313,12 @@ by `public stage` + `public install`.
 
 ## 7. Dependencies and risks
 
-- Order: FR2 → `template_history` move → `core/gitflow.py` → FR5 → FR4 → FR1 → law, docs.
+- Order: FR2 → FR3's move → `core/gitflow.py` → FR5 → FR4 → FR1 → FR9.
 - Stale remote-tracking refs give a false `publish` pending; `baseline` fetches first.
 - The property test (AC1.3) runs real git; its example count stays bounded.
 - The library's gitflow change reaches `pr-source-guard` on the PR carrying it; AC6.7 pins the triggers.
 
-## 8. Traceability
+## 8. Traceability (FR → ADRs)
 
-| FR | ADRs |
-|---|---|
-| FR1 | 0033 |
-| FR2 | 0045 |
-| FR3 | 0034 0043 |
-| FR4 | 0035 0042 0048 |
-| FR5 | 0036 |
-| FR6 | 0037 0040 0046–0048 |
-| FR7 | 0038 0044 |
-| FR8 | — |
-| FR9 | 0033–0038 |
-| FR10 | 0033 0035 0036 |
-| FR11 | standing rule |
+FR1 0033 · FR2 0045 · FR3 0034 0043 · FR4 0035 0042 0048 · FR5 0036 ·
+FR6 0037 0040 0046–0048 · FR7 0038 0044 · FR8 — · FR9 0033–0038 · FR10 0033 0035 0036 · FR11 standing rule
