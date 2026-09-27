@@ -61,10 +61,10 @@ def _stage_files_safe(path: Path) -> None:
     ``git commit -m <msg>`` (what `commit_all` issues) commits whatever the index
     holds at commit time, exactly what the two ``git add`` calls above just staged.
     """
-    # Tracked changes, never an unmerged entry: git then refuses the commit (review 6 H6).
-    unmerged = _run(["git", "ls-files", "-u", "-z"], cwd=path).stdout.split("\0")
-    keep = {f":(exclude,literal){entry.split('\t', 1)[1]}" for entry in unmerged if entry}
-    add_tracked = _run(["git", "add", "-u", "--", ".", *keep], cwd=path)
+    # Never stage an unmerged entry (review 6 H6): git's own unmerged listing refuses.
+    if unmerged := _run(["git", "diff", "--name-only", "--diff-filter=U"], cwd=path).stdout:
+        raise GitSyncError(f"git commit refused in {path}: unmerged paths\n{unmerged.strip()}")
+    add_tracked = _run(["git", "add", "-u"], cwd=path)
     if add_tracked.returncode != 0:
         raise GitSyncError(f"git add -u failed in {path}: {add_tracked.stderr.strip()}")
 
