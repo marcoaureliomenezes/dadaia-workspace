@@ -14,7 +14,8 @@ ALLOWed entries the reaper then moved.
 
 from __future__ import annotations
 
-import os
+import shlex
+import sys
 from pathlib import Path
 
 import pytest
@@ -59,9 +60,12 @@ def test_gate_allows_iff_the_doctor_keeps_the_entry(
     assert (block is None) is allows, gate.stdout
     if block is not None:  # #E1, #E4: the one fix names the owning zone, never the globs
         (fix,) = [ln for ln in block["reason"].splitlines() if ln.startswith("fix: ")]
-        zone = tmp_path.resolve() / ".dadaia" / "tmp"
-        posix, windows = f"fix: mkdir -p {zone}", f'fix: if not exist "{zone}" mkdir "{zone}"'
-        assert fix == (windows if os.name == "nt" else posix)
+        zone = (tmp_path.resolve() / ".dadaia" / "tmp").as_posix()
+        assert shlex.split(fix[len("fix: ") :]) == [
+            Path(sys.executable).as_posix(),
+            "-c",
+            f"import pathlib; pathlib.Path(r'{zone}').mkdir(parents=True, exist_ok=True)",
+        ]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("x", encoding="utf-8")
     findings = DoctorService(FakeContextStore(), FakeGitClient(), tmp_path).scan()

@@ -93,6 +93,9 @@ def _assert_one_command(command: str) -> None:
     # ``fix_line`` roots the CLI at the workspace it runs in, else names the running CLI.
     if head.endswith(_CLI) or head == shlex.split(fix_line(None))[0]:
         head = ".dadaia/.venv/bin/dadaia"
+    # A filesystem fix is one `-c` line run by the interpreter running now (core/cli_line).
+    if head == Path(sys.executable).as_posix():
+        head = "python3"
     assert head in _EXECUTABLE_TOKENS, (
         f"a fix line opens with an executable, not prose — got {head!r} in:\n{command}"
     )

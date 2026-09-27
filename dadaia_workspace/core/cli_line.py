@@ -47,13 +47,10 @@ def shell_line(*parts: str) -> str:
 
 
 def mkdir_line(directory: PurePath) -> str:
-    """Create *directory* and its parents, idempotent: POSIX ``mkdir -p``; cmd
-    ``if not exist "<P>" mkdir "<P>"`` (cmd's mkdir creates intermediates, fails on an
-    existing directory)."""
-    if platform.PLATFORM.venv_exe_suffix:  # Windows
-        native = PureWindowsPath(directory)
-        return f'if not exist "{native}" mkdir "{native}"'
-    return shlex.join(("mkdir", "-p", str(directory)))
+    """Create *directory* and its parents, idempotent — one interpreter line that runs
+    unchanged under sh, bash, cmd and PowerShell (no shell builtin differs per OS)."""
+    code = f"import pathlib; pathlib.Path(r'{directory}').mkdir(parents=True, exist_ok=True)"
+    return shell_line(sys.executable, "-c", code)
 
 
 def materialize_line(link: PurePath, target: PurePath) -> str:
