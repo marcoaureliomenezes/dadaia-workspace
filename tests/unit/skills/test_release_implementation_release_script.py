@@ -27,7 +27,10 @@ _SCHEMAS = (
 )
 _TRIO = ("SPEC.md", "PLAN.md", "TASKS.md")
 _TS = "2026-09-22T00:00:00Z"
-_PLAN_AS_IS = "## 1. As-is review\n\n| unit | today | bugs | verdict | why |\n|---|---|---|---|---|\n| a | b | 0 | KEEP | c |\n"
+_PLAN_AS_IS = (
+    "## 1. As-is review\n\n| unit | today | bugs | verdict | why |\n|---|---|---|---|---|\n| a | b | 0 | KEEP | c |\n"
+    + "\n### 1.1 Authorities\n\n| question | authority | consults | deleted |\n|---|---|---|---|\n| q | `a` |  |  |\n"
+)
 
 
 @pytest.fixture

@@ -49,7 +49,7 @@ read or any output written.
 - **task marker** the `[ ] [-] [x]` trace in TASKS.md · **handoff** the JSON completion record · **verdict** a reviewer's `APPROVED`/`REJECTED` recommendation.
 - **gate** the deterministic PreToolUse chain · **path class** ADDITIVE / MUTATING / PROTECTED · **scope** the repo set a bind owns · **stall** a BLOCK whose own `fix:` is blocked.
 - **canon** the closed set of paths a `specs/` root may hold · **histo** an append-only JSONL history under an area's `_archive/` · **memory atom** one Markdown file of current truth.
-- **Part 1/Part 2** a memory doc's ADR-gated Principles vs Implementation · **ADR** an accepted decision record · **backlog entry** one live item in `active[]`.
+- **ADR** an accepted decision record · **backlog entry** one live item in `active[]`.
 - **disposition** the terminal verdict — `delivered resolved superseded deferred rejected` · **audit** the periodic three-pillar review · **finding** one recorded observation.
 - **zone** one top-level `.dadaia/` directory with a registry record · **reaped** an entry held in `.dadaia/reaped/` awaiting its TTL · **operator** the human who owns the workspace.
 - **slop** what passes the deletion test without loss · **ratchet** a contract test pinning a count that moves down only · **projection** a lib-originated copy of a `public/` asset.

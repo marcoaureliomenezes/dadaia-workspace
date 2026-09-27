@@ -50,7 +50,8 @@ Input: the ratchet modules and the window `from-sha..HEAD`. Output: the "Slop re
 3. Read the density of every SPEC in the window: bytes, words, codes per 1,000 words, numbered families outside FR/AC/T-.
 4. Read the GC: each closure's recorded `.dadaia/.venv/bin/dadaia doctor` score line, `archive/` tags whose branch survives.
 5. Sample the ten commits with the most additions; apply `SLOP.md` S1-S5 to each diff — the audit proves the review worked, it never redoes it.
-6. One `FINDINGS-FORMAT.md` record per ratchet that rose or signal hit; ratchet rose HIGH, density over the ceiling MEDIUM, S4/S5 in a sample HIGH.
+6. Fixed hunt, every audit: for each question in the window's PLAN §1.1 tables, search code and law for a second answer — a restated rule, a second symbol; each is an S10 finding, HIGH.
+7. One `FINDINGS-FORMAT.md` record per ratchet that rose or signal hit; ratchet rose HIGH, density over the ceiling MEDIUM, S4/S5 in a sample HIGH, S10 HIGH.
 
 ## Findings
 

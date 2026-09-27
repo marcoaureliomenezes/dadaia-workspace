@@ -32,6 +32,8 @@ AS_IS = re.compile(r"^##[ \t].*\bas[- ]is review", re.IGNORECASE | re.MULTILINE)
 SKILL = Path(__file__).resolve().parents[2] / "dd-release-definition" / "SKILL.md"
 AS_IS_FIX = f"copy the PLAN §1 skeleton under the As-is review section of {SKILL} into PLAN.md"
 COLUMNS = ["unit", "today", "bugs", "verdict", "why"]
+AUTH_COLUMNS = ["question", "authority", "consults", "deleted"]
+AUTHORITIES = re.compile(r"^###[ \t].*\bAuthorities\b", re.IGNORECASE | re.MULTILINE)
 
 
 def note(state: State, ts: str, text: str) -> None:
@@ -58,24 +60,40 @@ def _refuse_unapproved_trio(live: Live) -> None:
             )
 
 
+def _table(text: str, columns: list[str]) -> list[list[str]]:
+    rows: list[list[str]] = []
+    for line in text.splitlines():
+        cells = [c.strip(" \t`*") for c in re.split(r"(?<!\\)\|", line.strip().strip("|"))]
+        if rows and "|" not in line:
+            break
+        if rows or [c.lower() for c in cells] == columns:
+            rows.append(cells + [""] * len(columns))
+    return rows[2:] if len(rows) >= 3 else []
+
+
 def _refuse_missing_as_is_table(plan: str) -> None:
     heading = AS_IS.search(plan)
     if heading is None:
         raise Refusal("PLAN.md has no '## … As-is review' heading", AS_IS_FIX)
-    rows: list[list[str]] = []  # from the first COLUMNS header line to the first non-row line
-    for line in plan[heading.end() :].split("\n## ")[0].splitlines()[1:]:
-        cells = [c.strip(" \t`*") for c in re.split(r"(?<!\\)\|", line.strip().strip("|"))]
-        if rows and "|" not in line:
-            break
-        if rows or [c.lower() for c in cells] == COLUMNS:
-            rows.append(cells)
-    if len(rows) < 3:
+    rows = _table(section := plan[heading.end() :].split("\n## ")[0], COLUMNS)
+    if not rows:
         raise Refusal("PLAN.md's As-is review heading is not followed by a table with header "
                       "'unit | today | bugs | verdict | why' and >= 1 row", AS_IS_FIX)  # fmt: skip
-    for row in (r + [""] * 4 for r in rows[2:]):
+    for row in rows:
         if row[3].upper() not in {"DELETE", "REBUILD", "UPDATE", "KEEP", "ADD"}:
             raise Refusal(f"PLAN.md As-is review row {row[0]!r} carries verdict {row[3]!r} "
                           "— one of DELETE REBUILD UPDATE KEEP ADD", AS_IS_FIX)  # fmt: skip
+    rows = _table(section[m.end() :], AUTH_COLUMNS) if (m := AUTHORITIES.search(section)) else []
+    if not rows:
+        raise Refusal("PLAN.md §1 has no '### … Authorities' table with header "
+                      "'question | authority | consults | deleted' and >= 1 row", AS_IS_FIX)  # fmt: skip
+    seen: dict[str, str] = {}
+    for question, authority, *_ in rows:
+        if not authority:
+            raise Refusal(f"PLAN.md Authorities row {question!r} has an empty authority", AS_IS_FIX)
+        if (first := seen.setdefault(question.lower(), authority)) != authority:
+            raise Refusal(f"PLAN.md Authorities question {question.lower()!r} names two "
+                          f"authorities: `{first}` and `{authority}` — keep one", AS_IS_FIX)  # fmt: skip
 
 
 def set_phase(specs: Path, phase: str, sha: str, pr: int | None = None) -> tuple[str, str]:

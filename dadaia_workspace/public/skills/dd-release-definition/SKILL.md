@@ -27,7 +27,8 @@ description: >
 - Read every unit the picked set touches and its ledger slice (`python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`/`stats`, `git log` on the unit); return the table in the handoff — the main thread carries it into the grill; it lands as PLAN §1.
 - One row per touched unit, columns `unit | today | bugs | verdict | why`; DELETE vs KEEP is `dd-codebase-design`'s deletion test; consider DELETE → REBUILD → UPDATE → KEEP, then ADD rows only for what no existing unit can carry (`today` `—`, `why` says why no unit can carry it).
 - REBUILD is mandatory when the unit carries ≥ 2 bugs, the demand changes its fundamental behaviour, the change would need a flag, branch, special case or second path, or its contract contradicts the demand; the engineer and the reviewer judge these triggers — no script counts bugs or reads code.
-- The PLAN §1 skeleton — `release.py phase IMPLEMENTATION` refuses a PLAN without it:
+- §1.1 Authorities: one row per touched question, one authority each; `consults` call it, `deleted` leave with the row's bug.
+- The PLAN §1 skeleton — `release.py phase IMPLEMENTATION` refuses a PLAN without either table, an empty authority or a question with two:
 
 ```markdown
 ## 1. As-is review
@@ -35,9 +36,15 @@ description: >
 | unit | today | bugs | verdict | why |
 |---|---|---|---|---|
 | `features/x/service.py` `run` | what it does today | 2 (`bug-a`, `bug-b`) | REBUILD | two prior fixes on this unit |
+
+### 1.1 Authorities
+
+| question | authority | consults | deleted |
+|---|---|---|---|
+| who runs x | `features/x/service.py` `run` | `cli/x.py` | `legacy_run` |
 ```
 
-**Done when** every touched unit has one row and one As-is verdict.
+**Done when** every touched unit has one As-is verdict and every touched question one authority.
 
 ## 3. The mandatory grill
 

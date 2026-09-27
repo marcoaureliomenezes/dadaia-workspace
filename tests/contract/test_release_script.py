@@ -1,4 +1,5 @@
-"""Intent: CONTRACT — AC2.1–AC2.6, AC1.9 (release 0.5.0 candidate 2, ADR 0041 `measured_by`).
+"""Intent: CONTRACT — AC2.1–AC2.6, AC1.9 (release 0.5.0 candidate 2, ADR 0041 `measured_by`);
+AC5.2, AC5.3 (release 0.5.0 candidate 4, the Authorities table).
 
 `release.py phase IMPLEMENTATION` admits a candidate only when PLAN.md carries the As-is
 review table — structure only — and the skeleton `dd-release-definition` teaches passes
@@ -24,7 +25,14 @@ _SCRIPTS = _PUBLIC / "skills" / "dd-release-implementation" / "scripts"
 _SCHEMA = _PUBLIC / "schemas" / "releases" / "release-state-v1.schema.json"
 _HEADER = "| unit | today | bugs | verdict | why |\n|---|---|---|---|---|\n"
 _ROW = "| `core/x.py` `run` | does x | 0 | {verdict} | reason |\n"
-_GOOD = "## 1. As-is review\n\n" + _HEADER + _ROW.format(verdict="UPDATE") + "\n## 2. Strategy\n"
+_AUTH_HEADER = "| question | authority | consults | deleted |\n|---|---|---|---|\n"
+_AUTHORITIES = (
+    "\n### 1.1 Authorities\n\n" + _AUTH_HEADER + "| who writes x | `core/x.run` | cli | `y` |\n"
+)
+_GOOD = (
+    "## 1. As-is review\n\n" + _HEADER + _ROW.format(verdict="UPDATE") + _AUTHORITIES
+    + "\n## 2. Strategy\n"
+)  # fmt: skip
 
 
 @pytest.fixture
@@ -57,8 +65,9 @@ def _phase(script: Path, specs: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run([*argv, "--specs", str(specs)], capture_output=True, text=True)
 
 
-def _admits(script: Path, tmp_path: Path, plan: str) -> None:
-    specs = _specs(tmp_path, plan)
+def _admits(script: Path, tmp_path: Path, plan: str, *, authorities: bool = True) -> None:
+    """*authorities*: append a valid §1.1 table to a PLAN whose case is the As-is table."""
+    specs = _specs(tmp_path, plan + (_AUTHORITIES if authorities else ""))
     result = _phase(script, specs)
     assert result.returncode == 0, result.stderr
     state = json.loads((specs / "releases/0.5.0/_RELEASE.json").read_text("utf-8"))
@@ -126,7 +135,7 @@ def test_the_taught_skeleton_passes_the_check(script: Path, tmp_path: Path) -> N
     skill = _SKILL.read_text("utf-8")
     fence = re.search(r"```markdown\n(## 1\. As-is review\n.*?)```", skill, re.DOTALL)
     assert fence, "dd-release-definition lost its PLAN §1 skeleton"
-    _admits(script, tmp_path, fence.group(1))
+    _admits(script, tmp_path, fence.group(1), authorities=False)
 
 
 def test_new_writes_a_spec_stub_carrying_replaces(script: Path, tmp_path: Path) -> None:
@@ -186,3 +195,57 @@ def test_every_fix_names_an_existing_absolute_path(script: Path, tmp_path: Path)
 def test_a_sentence_naming_the_columns_above_the_table_passes(script: Path, tmp_path: Path) -> None:
     prose = "## 1. As-is review\n\nColumns are `unit | today` and more.\n\n"
     _admits(script, tmp_path, prose + _HEADER + _ROW.format(verdict="KEEP"))
+
+
+def test_a_plan_giving_each_question_one_authority_enters_implementation(
+    script: Path, tmp_path: Path
+) -> None:
+    """AC5.2 fixture pair, good twin: one authority per question, a question repeated
+    with the SAME authority is still one authority."""
+    rows = "| who writes x | `a` | b |  |\n| who reads y | `c` |  | `d` |\n| who writes x | `a` | e |  |\n"
+    plan = "## 1. As-is review\n\n" + _HEADER + _ROW.format(verdict="KEEP")
+    _admits(
+        script,
+        tmp_path,
+        plan + "\n### 1.1 Authorities\n\n" + _AUTH_HEADER + rows,
+        authorities=False,
+    )
+
+
+def test_a_question_with_two_authorities_is_refused(script: Path, tmp_path: Path) -> None:
+    """AC5.2 fixture pair, refused twin: the same question names two authorities."""
+    rows = "| who writes x | `a` | b |  |\n| Who writes x | `z` |  |  |\n"
+    plan = "## 1. As-is review\n\n" + _HEADER + _ROW.format(verdict="KEEP")
+    stderr = _refuses(
+        script, tmp_path, plan + "\n### 1.1 Authorities\n\n" + _AUTH_HEADER + rows,
+        "'who writes x'", "two authorities",
+    )  # fmt: skip
+    assert "`a`" in stderr and "`z`" in stderr
+
+
+@pytest.mark.parametrize(
+    ("authorities", "needle"),
+    [
+        pytest.param("", "Authorities", id="no-table"),
+        pytest.param("\n### 1.1 Authorities\n\nprose\n", "question | authority", id="no-header"),
+        pytest.param("\n### 1.1 Authorities\n\n" + _AUTH_HEADER, "question | authority", id="zero-rows"),
+        pytest.param(
+            "\n### 1.1 Authorities\n\n" + _AUTH_HEADER + "| who writes x |  | b |  |\n",
+            "empty authority", id="empty-authority",
+        ),
+    ],
+)  # fmt: skip
+def test_a_plan_without_a_well_formed_authorities_table_is_refused(
+    script: Path, tmp_path: Path, authorities: str, needle: str
+) -> None:
+    """AC5.2: missing table, header or rows, or an empty authority — one fix line each."""
+    plan = "## 1. As-is review\n\n" + _HEADER + _ROW.format(verdict="KEEP") + authorities
+    _refuses(script, tmp_path, plan, needle)
+
+
+def test_an_authorities_table_outside_section_1_does_not_count(
+    script: Path, tmp_path: Path
+) -> None:
+    """AC5.2: the table belongs to §1; one under a later section is not the table."""
+    plan = "## 1. As-is review\n\n" + _HEADER + _ROW.format(verdict="KEEP") + "\n## 2. Strategy\n"
+    _refuses(script, tmp_path, plan + _AUTHORITIES, "Authorities")
