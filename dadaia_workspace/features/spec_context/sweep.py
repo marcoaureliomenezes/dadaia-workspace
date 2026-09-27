@@ -175,8 +175,7 @@ def move(
     workspace_root: Path, target: Path, destination: Path, label: str, *, note: str = ""
 ) -> str | None:
     """Relocate *target* to *destination*, creating its parents. Both ends must sit
-    inside the workspace. The moved entry's mtime is stamped at the move, so a TTL zone
-    clocks a held entry from when it was reaped, never from the origin's own age.
+    inside the workspace. All it moves is stamped: a hold counts from the move.
 
     N moves make N holds (ADR 0074): an occupied destination yields the first free
     ``<name>-N`` beside it, so no hold dies before its own TTL.
@@ -211,8 +210,10 @@ def move(
         else:
             shutil.copy2(target, destination)
         remove(workspace_root, target, label)
-    if not destination.is_symlink():
-        os.utime(destination)
+    below = os.walk(destination) if destination.is_dir() and not destination.is_symlink() else ()
+    for path in [destination, *(Path(d) / n for d, ds, fs in below for n in ds + fs)]:
+        if not path.is_symlink():  # a link is never followed to its target
+            os.utime(path)
     try:
         shown = destination.relative_to(workspace_root).as_posix()
     except ValueError:  # pragma: no cover — _inside already proved it is under the root

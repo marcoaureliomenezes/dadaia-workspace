@@ -286,6 +286,34 @@ def test_fix_deletes_a_hold_past_seven_days_and_keeps_a_younger_one(workspace: P
     assert young.read_text(encoding="utf-8") == "x"
 
 
+def test_a_hold_of_old_files_counts_from_the_move(workspace: Path) -> None:
+    """sa-reaper-destroys-its-own-hold-before-ttl#B3: slop whose files are 30 days old is
+    held from the MOVE — the next expired-only run keeps the hold and every file; once the
+    hold itself is 8 days old it is removed."""
+    stray = workspace / "stray"
+    (stray / "deep").mkdir(parents=True)
+    (stray / "a.md").write_text("a", encoding="utf-8")
+    (stray / "deep" / "b.md").write_text("b", encoding="utf-8")
+    month = time.time() - 30 * 86_400
+    for path in (stray / "deep" / "b.md", stray / "a.md", stray / "deep", stray):
+        os.utime(path, (month, month))
+
+    assert CliRunner().invoke(app, ["doctor", "--fix"]).exit_code == 0
+    (held,) = (workspace / ".dadaia" / "reaped").glob("*/stray")
+    again = CliRunner().invoke(app, ["doctor", "--fix", "--expired-only"])
+
+    assert again.exit_code == 0, again.output
+    assert (held / "a.md").read_text(encoding="utf-8") == "a"
+    assert (held / "deep" / "b.md").read_text(encoding="utf-8") == "b"
+
+    week = time.time() - 8 * 86_400
+    for path in (held / "deep" / "b.md", held / "a.md", held / "deep", held):
+        os.utime(path, (week, week))
+    CliRunner().invoke(app, ["doctor", "--fix"])
+
+    assert not held.exists()
+
+
 _OPERATOR_HARNESS_FILES = {
     ".claude/settings.local.json": b'{"permissions": {"allow": ["Bash(ls)"]}}\n',
     ".claude/skills/dm-x/SKILL.md": b"---\nname: dm-x\n---\n",
