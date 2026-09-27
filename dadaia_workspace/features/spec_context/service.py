@@ -46,9 +46,6 @@ _log = logging.getLogger(__name__)
 #: What onboarding writes into a main repo — the only paths ``baseline`` commits.
 _ONBOARDING = ("specs", "specs-bkp", "AGENTS.md")
 _TAG_RE = re.compile(r"v?(\d+)\.(\d+)\.(\d+)")
-_FIX_RE = re.compile(r"^fix: ", re.MULTILINE)
-#: The one git failure whose cause git's own text does not already fix (R13 rule 4).
-_WRONG_URL = re.compile(r"does not appear to be a git repository|[Rr]epository not found")
 
 
 class RepoOwner(Protocol):
@@ -167,15 +164,6 @@ def install_git_hooks(repo_root: Path, *, force: bool = False) -> list[Path]:
             dest.chmod(0o755)
             written.append(dest)
     return written
-
-
-def _sync_failure(exc: GitSyncError, repo: Path, lead: str = "") -> GitSyncError:
-    """A failed git step: a wrong origin URL gets ``set-url``; any other cause — the
-    pre-push gate's refusal included — carries git's own text alone."""
-    text = str(exc)
-    if _WRONG_URL.search(text) and not _FIX_RE.search(text):
-        text += f"\nfix: {git_line(repo, 'remote', 'set-url', 'origin', '<clone-url>')}"
-    return GitSyncError(f"{lead}{text}")
 
 
 def work_name(git: GitSubprocessClient, repo: Path, flow: Gitflow) -> str:
@@ -599,39 +587,34 @@ class SpecContextService:
         paths = _ONBOARDING if slug == ctx.repo_slug else ()
         self._require_publishable(name, repo, paths)
         git = partial(self._git.git, repo)
-        try:
-            git("fetch", "--prune", "--tags", "origin")
-            refs = git("for-each-ref", "--format=%(refname:lstrip=3)", "refs/remotes/origin")
-            heads = [h for h in refs.split() if h != "HEAD"]
-            self._git.commit_paths(repo, message, [p for p in paths if (repo / p).exists()])
-            flow, _ = self._git.gitflow(repo, self._repo_path(ctx.repo_slug))
-            if heads and flow.principal not in heads:
-                raise ContextStateError(
-                    f"Context '{name}': origin holds {', '.join(heads)}; the committed "
-                    f"gitflow names principal '{flow.principal}' — origin publishes no such "
-                    "branch. Nothing is guessed and nothing was pushed. Operator action: "
-                    "publish that principal on origin, or name origin's principal in the "
-                    "gitflow block of specs/constitution.md."
-                )
-            work, tip = work_name(self._git, repo, flow), git("rev-parse", "HEAD")
-            roles = (work, flow.integration, flow.principal)
-            start = next((f"origin/{b}" for b in roles if b in heads), tip)
-            if self._git.current_branch(repo) != work:
-                local = git("for-each-ref", "--format=%(refname)", f"refs/heads/{work}")
-                git("switch", *((work,) if local else ("--no-track", "-c", work, start)))
-            git("merge", "--no-edit", start)
-            git("merge", "--no-edit", tip)
-            born = f"refs/remotes/origin/{flow.principal}" if heads else tip
-            births = [
-                f"{born}:refs/heads/{b}"
-                for b in (flow.principal, flow.integration)
-                if b not in heads
-            ]
-            if not births and not self._git.unpushed(repo):
-                return ""
-            git("push", "--atomic", "-u", "origin", *births, work)
-        except GitSyncError as exc:
-            raise _sync_failure(exc, repo) from None
+        git("fetch", "--prune", "--tags", "origin")
+        refs = git("for-each-ref", "--format=%(refname:lstrip=3)", "refs/remotes/origin")
+        heads = [h for h in refs.split() if h != "HEAD"]
+        self._git.commit_paths(repo, message, [p for p in paths if (repo / p).exists()])
+        flow, _ = self._git.gitflow(repo, self._repo_path(ctx.repo_slug))
+        if heads and flow.principal not in heads:
+            raise ContextStateError(
+                f"Context '{name}': origin holds {', '.join(heads)}; the committed "
+                f"gitflow names principal '{flow.principal}' — origin publishes no such "
+                "branch. Nothing is guessed and nothing was pushed. Operator action: "
+                "publish that principal on origin, or name origin's principal in the "
+                "gitflow block of specs/constitution.md."
+            )
+        work, tip = work_name(self._git, repo, flow), git("rev-parse", "HEAD")
+        roles = (work, flow.integration, flow.principal)
+        start = next((f"origin/{b}" for b in roles if b in heads), tip)
+        if self._git.current_branch(repo) != work:
+            local = git("for-each-ref", "--format=%(refname)", f"refs/heads/{work}")
+            git("switch", *((work,) if local else ("--no-track", "-c", work, start)))
+        git("merge", "--no-edit", start)
+        git("merge", "--no-edit", tip)
+        born = f"refs/remotes/origin/{flow.principal}" if heads else tip
+        births = [
+            f"{born}:refs/heads/{b}" for b in (flow.principal, flow.integration) if b not in heads
+        ]
+        if not births and not self._git.unpushed(repo):
+            return ""
+        git("push", "--atomic", "-u", "origin", *births, work)
         return work
 
     def _owned_slug(self, ctx: SpecContextProject, repo: Path) -> str:
@@ -849,7 +832,7 @@ class SpecContextService:
                     self._git.push(repo_path)
                 except GitSyncError as exc:
                     lead = f"Git sync failed for context '{name}' repo '{slug}'; nothing was removed.\n"
-                    raise _sync_failure(exc, repo_path, lead) from exc
+                    raise GitSyncError(f"{lead}{exc}") from exc
             sweep.rmtree(repo_path)
 
         dead_ctx = SpecContextProject(

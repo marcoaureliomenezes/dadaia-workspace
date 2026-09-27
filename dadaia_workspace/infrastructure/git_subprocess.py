@@ -61,8 +61,10 @@ def _stage_files_safe(path: Path) -> None:
     ``git commit -m <msg>`` (what `commit_all` issues) commits whatever the index
     holds at commit time, exactly what the two ``git add`` calls above just staged.
     """
-    # Stage tracked-file changes (modifications + deletions)
-    add_tracked = _run(["git", "add", "-u"], cwd=path)
+    # Tracked changes, never an unmerged entry: git then refuses the commit (review 6 H6).
+    unmerged = _run(["git", "ls-files", "-u", "-z"], cwd=path).stdout.split("\0")
+    keep = {f":(exclude,literal){entry.split('\t', 1)[1]}" for entry in unmerged if entry}
+    add_tracked = _run(["git", "add", "-u", "--", ".", *keep], cwd=path)
     if add_tracked.returncode != 0:
         raise GitSyncError(f"git add -u failed in {path}: {add_tracked.stderr.strip()}")
 
@@ -250,24 +252,20 @@ class GitSubprocessClient:
             return
         tracking = _run(["git", "rev-parse", "--abbrev-ref", "@{u}"], cwd=path)
         if tracking.returncode != 0:
-            branch = self.current_branch(path)
-            result = _run(["git", "push", "-u", "origin", branch], cwd=path)
+            self.git(path, "push", "-u", "origin", self.current_branch(path))
         else:
-            upstream = tracking.stdout.strip()  # e.g. "origin/main"
-            remote, _, remote_branch = upstream.partition("/")
-            result = _run(["git", "push", remote, f"HEAD:{remote_branch}"], cwd=path)
-
-        if result.returncode != 0:
-            raise GitSyncError(f"git push failed in {path}:\n{result.stderr.strip()}")
+            remote, _, remote_branch = tracking.stdout.strip().partition("/")
+            self.git(path, "push", remote, f"HEAD:{remote_branch}")
 
     def git(
         self, path: Path, *args: str, stdin: str | None = None, env: dict[str, str] | None = None
     ) -> str:
         """One git command in *path* (*env* over the process environment): its stripped
-        stdout, else ``GitSyncError``."""
+        stdout, else ``GitSyncError`` carrying git's full output (CONFLICT is on stdout)."""
         result = _run(["git", *args], cwd=path, stdin=stdin, env=env)
         if result.returncode != 0:
-            raise GitSyncError(f"git {args[0]} failed in {path}: {result.stderr.strip()}")
+            output = f"{result.stdout}\n{result.stderr}".strip()
+            raise GitSyncError(f"git {args[0]} failed in {path}:\n{output}")
         return result.stdout.strip()
 
     def gitflow(self, repo: Path, main_repo: Path | None = None) -> tuple[Gitflow, str | None]:

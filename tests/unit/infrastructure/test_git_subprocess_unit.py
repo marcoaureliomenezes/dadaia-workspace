@@ -85,7 +85,7 @@ def test_push_argv_contract_upstream_vs_explicit_refspec(monkeypatch: pytest.Mon
     upstream_calls: list[list[str]] = []
 
     def fake_run_no_upstream(
-        args: list[str], cwd: Path | None = None
+        args: list[str], cwd: Path | None = None, **_: object
     ) -> subprocess.CompletedProcess[str]:
         upstream_calls.append(args)
         if args == ["git", "rev-parse", "--abbrev-ref", "@{u}"]:
@@ -101,7 +101,7 @@ def test_push_argv_contract_upstream_vs_explicit_refspec(monkeypatch: pytest.Mon
     refspec_calls: list[list[str]] = []
 
     def fake_run_with_upstream(
-        args: list[str], cwd: Path | None = None
+        args: list[str], cwd: Path | None = None, **_: object
     ) -> subprocess.CompletedProcess[str]:
         refspec_calls.append(args)
         if "--abbrev-ref" in args:
@@ -240,7 +240,7 @@ def test_stage_files_safe_raises_on_a_failed_git_add_dash_u(
 
     def fake_run(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
         calls.append(args)
-        if args == ["git", "add", "-u"]:
+        if args[:3] == ["git", "add", "-u"]:
             return _result(1, stderr="fatal: not a git repository")
         return _result()
 
@@ -260,7 +260,7 @@ def test_stage_files_safe_raises_on_a_failed_git_add_for_untracked_paths(
     — the second ``git add`` call gets the same A10.1 treatment as the first."""
 
     def fake_run(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
-        if args == ["git", "add", "-u"]:
+        if args[:3] == ["git", "add", "-u"]:
             return _result(0)
         if args[:3] == ["git", "ls-files", "--others"]:
             return _result(0, stdout="new-file.txt\n")
@@ -285,7 +285,7 @@ def test_stage_files_safe_applies_literal_pathspec_magic_to_untracked_paths(
 
     def fake_run(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
         calls.append(args)
-        if args == ["git", "add", "-u"]:
+        if args[:3] == ["git", "add", "-u"]:
             return _result(0)
         if args[:3] == ["git", "ls-files", "--others"]:
             return _result(0, stdout="normal.txt\n:(exclude)specs\n")
@@ -295,7 +295,7 @@ def test_stage_files_safe_applies_literal_pathspec_magic_to_untracked_paths(
 
     git_subprocess._stage_files_safe(Path("/repo"))
 
-    add_call = next(c for c in calls if c[:2] == ["git", "add"] and c != ["git", "add", "-u"])
+    add_call = next(c for c in calls if c[:2] == ["git", "add"] and c[:3] != ["git", "add", "-u"])
     assert add_call == [
         "git",
         "add",

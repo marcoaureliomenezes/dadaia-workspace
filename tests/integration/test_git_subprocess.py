@@ -90,3 +90,19 @@ def test_repo_lifecycle_clone_dirty_commit_remote_branch_checkout_and_error_path
 
     with pytest.raises(GitSyncError):
         client.checkout(dest, "no-such-branch")
+
+
+def test_a_failed_git_step_carries_gits_full_output(tmp_path: Path) -> None:
+    """Review 6 N2: git writes CONFLICT to stdout — the error carries it, never an empty
+    stderr alone."""
+    repo = tmp_path / "r"
+    _init_git_repo(repo)
+    client = GitSubprocessClient()
+    client.git(repo, "checkout", "-q", "-b", "b")
+    (repo / "README.md").write_text("b")
+    client.git(repo, "commit", "-qam", "b")
+    client.git(repo, "checkout", "-q", "-")
+    (repo / "README.md").write_text("c")
+    client.git(repo, "commit", "-qam", "c")
+    with pytest.raises(GitSyncError, match="CONFLICT"):
+        client.git(repo, "merge", "b")

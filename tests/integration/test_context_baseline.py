@@ -8,7 +8,6 @@ Real git over ``file://`` bare remotes (MEDIUM): the contract is git's own branc
 
 from __future__ import annotations
 
-import re
 import shutil
 import subprocess
 import sys
@@ -23,7 +22,6 @@ from dadaia_workspace.core.models.spec_context import ContextState, SpecContextP
 from dadaia_workspace.features.spec_context.service import (
     DeadSecretFoundError,
     SpecContextService,
-    _sync_failure,
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
@@ -373,46 +371,6 @@ def test_an_env_identity_publishes_without_git_config(env, monkeypatch) -> None:
         monkeypatch.setenv(f"GIT_{role}_EMAIL", "t@example.invalid")
     _clone_onboarded(bare, repo, identity=False)
     assert svc.baseline("proj") == "feature/0.1.0"
-
-
-def test_a_wrong_origin_url_gets_the_set_url_fix(env, tmp_path: Path) -> None:
-    """Review HIGH (round 4): no "rerun the verb" class — a wrong URL gets set-url."""
-    svc, repo, bare = env
-    _clone_onboarded(bare, repo)
-    _git(repo, "remote", "set-url", "origin", (tmp_path / "gone.git").as_uri())
-    with pytest.raises(GitSyncError) as refused:
-        svc.baseline("proj")
-    fix = str(refused.value).splitlines()[-1]
-    assert fix.startswith("fix: git -C") and "remote set-url origin" in fix
-    assert _heads(bare) == {}
-
-
-@pytest.mark.parametrize(
-    ("stderr", "fix"),
-    [
-        ("fatal: 'x' does not appear to be a git repository", "remote set-url origin"),
-        ("ERROR: Repository not found.", "remote set-url origin"),
-        # Review 5 H5/H6/M1: git's own text stands alone — a pull fix led dead into a
-        # conflicted merge, `ls-remote` cannot clear an auth failure, a stash hid drafts.
-        ("! [rejected] feature/1.0.0 -> feature/1.0.0 (fetch first)", None),
-        ("! [rejected] x -> x (non-fast-forward)", None),
-        ("git@h: Permission denied (publickey).\nfatal: Could not read from remote", None),
-        ("fatal: Authentication failed for 'https://h/x'", None),
-        ("error: Your local changes to the following files would be overwritten by checkout", None),
-        ("[pre-push] BLOCKED: x\nfix: git -C r branch -m a b", None),
-        ("fatal: something new", None),
-    ],
-)
-def test_every_sync_failure_gets_the_fix_for_its_own_cause(tmp_path: Path, stderr, fix) -> None:
-    """R13 rule 4: one fix per cause; the gate's own fix passes through; an unknown cause
-    carries git's text and no invented fix — never a rebase, a delete, a force or a rerun."""
-    text = str(_sync_failure(GitSyncError(stderr), tmp_path))
-    fixes = [line for line in text.splitlines() if line.startswith("fix: ")]
-    if fix is None:
-        assert len(fixes) == (1 if "fix:" in stderr else 0)
-    else:
-        assert len(fixes) == 1 and fix in fixes[0]
-    assert not re.search(r"(?<!no-)rebase |--delete|--force|reset|context baseline", "".join(fixes))
 
 
 def test_a_non_ascii_foreign_file_refuses_with_a_fix_that_clears(env, tmp_path: Path) -> None:

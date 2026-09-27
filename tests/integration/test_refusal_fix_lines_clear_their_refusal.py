@@ -471,13 +471,6 @@ def _drop_secret(world: World) -> None:
     (world.repo / "AGENTS.md").write_text("key\n", encoding="utf-8")
 
 
-def _remote_gone(world: World) -> list[str]:
-    world.clone()
-    world.onboard()
-    world.bare.rename(world.tmp / "away.git")
-    return ["context", "baseline", "proj"]
-
-
 def _remote_back(world: World) -> None:
     (world.tmp / "away.git").rename(world.bare)
 
@@ -621,13 +614,6 @@ def _dead_via_work(world: World) -> None:
     assert not world.repo.exists()
 
 
-def _dead_remote_gone(world: World) -> list[str]:
-    _on_work(world)
-    (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
-    world.bare.rename(world.tmp / "away.git")
-    return ["context", "dead", "proj"]
-
-
 def _dead_denylisted(world: World) -> list[str]:
     _on_work(world)
     world.deny()
@@ -725,10 +711,6 @@ SITES: dict[str, tuple[Case, ...] | Skip] = {
     "service.SpecContextService.baseline#2": Skip(
         "no deterministic command: the refusal names the operator action (R13 rule 4)"
     ),
-    "service.SpecContextService.baseline#3": (
-        Case(_remote_gone, _baseline_done, operator=_remote_back),
-        Case(_baseline_denylisted, _baseline_done, operator=_drop_draft_term, then=_AMEND_BASELINE),
-    ),
     "service.SpecContextService._owned_slug#0": (Case(_unregistered_repo, _nope_cloned),),
     "service.SpecContextService._require_publishable#0": (
         Case(_foreign_change, _baseline_done),
@@ -750,7 +732,6 @@ SITES: dict[str, tuple[Case, ...] | Skip] = {
     "service.SpecContextService.dead#4": (Case(_dead_no_identity, _dead_done),),
     "service.SpecContextService.dead#5": (Case(_dirty_on_integration, _dead_via_work),),
     "service.SpecContextService.dead#6": (
-        Case(_dead_remote_gone, _dead_done, operator=_remote_back),
         Case(
             _dead_denylisted,
             _dead_done,
@@ -944,6 +925,38 @@ def test_dead_on_a_non_fast_forward_carries_gits_own_text_and_removes_nothing(
     assert done.returncode != 0 and "rejected" in output
     assert "\nfix: " not in output
     assert world.repo.is_dir() and not (world.repo / ".git" / "MERGE_HEAD").exists()
+
+
+def test_a_denylisted_first_publish_is_driven_clean_by_its_own_fix(tmp_path: Path) -> None:
+    """Review 6 N3: the gate refusal carried through baseline — reset to the oldest
+    unpublished commit (the root, on an empty origin), edit, amend, publish."""
+    _drive(
+        World(tmp_path),
+        Case(_baseline_denylisted, _baseline_done, operator=_drop_draft_term, then=_AMEND_BASELINE),
+    )
+
+
+def test_dead_after_the_operator_pulls_into_a_conflict_publishes_no_markers(
+    tmp_path: Path,
+) -> None:
+    """Review 6 H6 (R7): the operator follows git's own `git pull` hint into a conflict;
+    dead stages no unmerged entry, so git refuses the commit — its text, nothing published,
+    the checkout kept."""
+    world = World(tmp_path)
+    _on_work(world)
+    _advance_origin_work(world)
+    other = world.tmp / "other"
+    (other / "README.md").write_text("theirs\n", encoding="utf-8")
+    world.git(other, "commit", "-qam", "t")
+    world.git(other, "push", "-q", "origin", "feature/1.0.0")
+    (world.repo / "README.md").write_text("mine\n", encoding="utf-8")
+    world.git(world.repo, "commit", "-qam", "mine")
+    world.run("git pull -q --no-rebase --no-edit origin feature/1.0.0", world.repo)
+    published = world.remote_heads()["feature/1.0.0"]
+    done = world.cli("context", "dead", "proj")
+    output = done.stdout + done.stderr
+    assert done.returncode != 0 and "unmerged" in output, output
+    assert world.repo.is_dir() and world.remote_heads()["feature/1.0.0"] == published
 
 
 def test_a_typo_repo_is_never_answered_with_another_repos_publish(tmp_path: Path) -> None:
