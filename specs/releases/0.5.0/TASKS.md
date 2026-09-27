@@ -87,7 +87,7 @@ tests. `Δ` = prod/test lines; PLAN §2.7 ceilings stop a task, never rise.
 - [ ] **T-050-58 — Audit close; script vocabulary + atomic write (43, 48).** `W:` `f/specs/`, `i/jsonl_record_store.py`, `core/models/`, ledger `scripts/`, `registry.py` · `blocked by:` T-050-43 · `delivers:` no invalid archive, no `.tmp` leak · `RED:` PLAN §2 WP-43, WP-48 · Δ −187/−295.
 - [ ] **T-050-59 — Unconsumed assets leave (44).** `W:` `i/` · `blocked by:` T-050-26 · `delivers:` clean without the index · `RED:` PLAN §2 WP-44 · Δ −151/−100.
 - [ ] **T-050-60 — Handoff v1.2; upgrade target (46, 47).** `W:` `pub/schemas/`, `core/handoff_index.py`, `cli/commands/specs.py`, `f/migrate/` · `blocked by:` T-050-31 · `delivers:` AC4.3 · `RED:` PLAN §2 WP-46, WP-47 · Δ −24/+15.
-- [ ] **T-050-61 — Restated rules; consumer law (49, FR-8).** `W:` `pub/{data,scaffold,schemas}/`, gitflow skill, `f/specs/canon.py`, `setup.cfg`, `CONTEXT.md` · `blocked by:` T-050-35 · `delivers:` AC4.3, AC4.4 · `RED:` PLAN §2 WP-49, FR-8 · Δ −60/+125.
+- [-] **T-050-61 — Restated rules; consumer law (49, FR-8).** `W:` `pub/{data,scaffold,schemas}/`, gitflow skill, `f/specs/canon.py`, `setup.cfg`, `CONTEXT.md` · `blocked by:` T-050-35 · `delivers:` AC4.3, AC4.4 · `RED:` PLAN §2 WP-49, FR-8 · Δ −60/+125.
 
 ### C — closure evidence (FR7, FR8, FR9)
 
