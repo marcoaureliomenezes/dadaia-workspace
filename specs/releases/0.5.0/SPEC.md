@@ -185,11 +185,12 @@ by `public stage` + `public install`.
   unpublished commit of the refused ref>`, then the term removed and the commit amended (a branch HEAD is
   not on: `git switch <branch>` first). Operator-action text only for a tag or a detached HEAD. Refusing
   baseline's own push names `CLI context baseline <ctx>` as the step after the amend. _Amended 2026-09-27._
-- AC5.6 Baseline and `dead --commit` run the pre-push matcher in-process over the files they are about
-  to commit; already-made unpushed commits are covered by the pre-push gate. One registry
-  (`privacy_baseline.json` plus operator terms) covers every shape of the deleted second engine
-  (`_SECRET_SCAN_RULES`), matched after control-character normalization. _Amended 2026-09-27:_ WP-10
-  folded in; resolves bug `sa-pre-push-and-publish-scan-disagree-on-secret-shapes`.
+- AC5.6 Baseline and `dead --commit` run the pre-push matcher in-process on what they commit. One
+  registry (`privacy_baseline.json` + operator terms), control characters stripped, refuses a
+  secret-named key assigned a whole literal (quoted 8+ chars, or unquoted to line end, optional `#`
+  comment); references, templates and code expressions pass; the `test_one_secret_matcher.py` matrix
+  is the contract. _Amended 2026-09-27:_ bug `sa-pre-push-and-publish-scan-disagree-on-secret-shapes`;
+  R10-4.
 
 ### FR6 — The project gitflow (ADRs 0037, 0040, 0046)
 
@@ -293,7 +294,7 @@ by `public stage` + `public install`.
   AC4.5, AC4.8.
 - Pre-push refusing every principal/integration push → FR5; `ObjectSource.parents`, the empty-tree
   `publishes_nothing` and the rewrite fix's no-fix root arm → `unpublished` (AC5.1, AC5.2, AC5.5).
-- `_SECRET_SCAN_RULES`/`scan_file_for_secrets`, the second secret engine → one registry (AC5.6).
+- `_SECRET_SCAN_RULES`/`scan_file_for_secrets` → one registry (AC5.6).
 - The three branch regexes, `branch_name_is_permitted`, `parse_push_refs`, unused
   `_run_specs_canon_scan` parameters → FR6, FR8; `_STAMP_RE` → one merge-writer (AC6.2).
 - Hard-coded branch names in `pr-source-guard`, hook text, shipped text → AC6.7, AC6.8.
