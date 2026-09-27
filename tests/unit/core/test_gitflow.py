@@ -59,3 +59,18 @@ def test_from_mapping_reads_the_block_keys() -> None:
 def test_from_mapping_refuses_invalid(mapping: object) -> None:
     with pytest.raises(ValueError):
         from_mapping(mapping)
+
+
+@pytest.mark.parametrize(
+    "mapping",
+    [
+        {"principal": "release", "integration": "develop", "work": "release/"},
+        {"principal": "main", "integration": "rel", "work": "rel/v"},
+    ],
+    ids=["under-principal", "under-integration"],
+)
+def test_from_mapping_refuses_a_work_prefix_nested_under_a_role(mapping: object) -> None:
+    """Design review (LOW, C9): git cannot hold both `release` and `release/0.1.0` — the block
+    is refused when read, never after the publish's anchor."""
+    with pytest.raises(ValueError, match="nests under"):
+        from_mapping(mapping)

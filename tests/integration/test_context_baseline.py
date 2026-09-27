@@ -17,7 +17,6 @@ import pytest
 
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.exceptions import ContextStateError, GitSyncError
-from dadaia_workspace.core.invocation import repo_owner
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.spec_context.service import (
     DeadSecretFoundError,
@@ -74,9 +73,7 @@ def env(tmp_path: Path) -> tuple[SpecContextService, Path, Path]:
     _git(tmp_path, "init", "-q", "--bare", "-b", "main", str(bare))
     store = JsonContextStore(root / ".dadaia" / "states")
     store.save(SpecContextProject("proj", ContextState.ALIVE, "proj", bare.as_uri(), "2026-01-01"))
-    svc = SpecContextService(
-        store, GitSubprocessClient(), root, lambda _repo: None, repo_owner=repo_owner
-    )  # type: ignore[arg-type]
+    svc = SpecContextService(store, GitSubprocessClient(), root, lambda _repo: None)  # type: ignore[arg-type]
     return svc, root / "repos" / "proj", bare
 
 
@@ -95,13 +92,13 @@ def _heads(bare: Path) -> dict[str, str]:
 
 
 def _assert_published(repo: Path, bare: Path, work: str, base: str) -> None:
-    """*work* is checked out, level with origin, and is *base* (its first parent) plus the
-    onboarding commit — a fast-forward, or a merge of that commit into *base*."""
+    """*work* is checked out, level with origin, holds *base*, and adds exactly the
+    onboarding paths to it (the anchor merged with origin's start)."""
     heads = _heads(bare)
     assert work in heads and "main" in heads and "develop" in heads
     assert _git(repo, "rev-parse", "HEAD") == _git(repo, "rev-parse", "@{u}") == heads[work]
-    assert _git(repo, "rev-parse", f"{work}^") == heads[base]
-    files = _git(repo, "diff", "--name-only", f"{work}^", work).splitlines()
+    assert _ancestor(repo, heads[base], work)
+    files = _git(repo, "diff", "--name-only", heads[base], work).splitlines()
     assert sorted(files) == ["AGENTS.md", "specs/constitution.md"]
 
 
@@ -191,7 +188,7 @@ def test_an_origin_work_branch_is_adopted_never_deleted(env, tmp_path: Path) -> 
     _clone_onboarded(bare, repo)
     assert svc.baseline("proj") == "feature/0.1.0"
     assert _heads(bare)["feature/0.1.0"] == _git(repo, "rev-parse", "HEAD")
-    assert _git(repo, "rev-parse", "HEAD^") == theirs
+    assert _ancestor(repo, theirs, "HEAD")
 
 
 def test_a_tag_makes_the_work_branch_its_next_patch(env, tmp_path: Path) -> None:
@@ -215,17 +212,143 @@ def test_second_run_is_a_no_op(env, tmp_path: Path, seeded) -> None:
 
 
 def test_an_origin_without_the_principal_refuses_and_publishes_nothing(env, tmp_path: Path) -> None:
-    """Review CRITICAL (round 4, N5): origin holds only another branch and the clone is
-    unborn — nothing is guessed or pushed, no untracked operator file is overwritten."""
+    """Review CRITICAL (round 4, N5) / design review C3, Q2: origin holds only another
+    branch and the clone is unborn — nothing is guessed or pushed, no untracked operator
+    file is overwritten, HEAD is on the work branch holding the anchor and the unborn
+    name leaves no stray branch."""
     svc, repo, bare = env
     _seed(bare, tmp_path / "seed", "develop")
     _clone_onboarded(bare, repo)
     (repo / "README.md").write_text("OPERATOR\n", encoding="utf-8")
     before = _heads(bare)
-    with pytest.raises(ContextStateError, match="'main'"):
+    with pytest.raises(ContextStateError, match="'main'") as refused:
         svc.baseline("proj")
     assert _heads(bare) == before
     assert (repo / "README.md").read_text(encoding="utf-8") == "OPERATOR\n"
+    assert _git(repo, "branch", "--show-current") == "feature/0.1.0"
+    assert _git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads") == "feature/0.1.0"
+    anchor = _git(repo, "rev-parse", "HEAD")
+    assert anchor in str(refused.value) and "--principal '<principal>'" in str(refused.value)
+
+
+def test_a_born_principal_absent_refusal_leaves_head_on_work_and_names_the_one_candidate(
+    env, tmp_path: Path
+) -> None:
+    """Design review C3/C6: origin publishes `trunk` only — the one candidate is named in
+    the fix; HEAD is on the work branch (never detached) and the local branch the operator
+    was on is untouched."""
+    svc, repo, bare = env
+    _seed(bare, tmp_path / "seed", "trunk")
+    _git(bare, "symbolic-ref", "HEAD", "refs/heads/trunk")
+    _clone_onboarded(bare, repo)
+    trunk = _git(repo, "rev-parse", "trunk")
+    with pytest.raises(ContextStateError) as refused:
+        svc.baseline("proj")
+    assert str(refused.value).endswith("specs init --context proj --principal trunk")
+    assert _git(repo, "branch", "--show-current") == "feature/0.1.0"
+    assert _git(repo, "rev-parse", "trunk") == trunk and _heads(bare).keys() == {"trunk"}
+
+
+def test_several_principal_candidates_are_listed_never_guessed(env, tmp_path: Path) -> None:
+    """Design review C6: two candidate heads — both listed, a `<principal>` placeholder."""
+    svc, repo, bare = env
+    _seed(bare, tmp_path / "seed", "trunk", "master")
+    _git(bare, "symbolic-ref", "HEAD", "refs/heads/trunk")
+    _clone_onboarded(bare, repo)
+    with pytest.raises(ContextStateError) as refused:
+        svc.baseline("proj")
+    message = str(refused.value)
+    assert "master, trunk" in message and message.endswith("--principal '<principal>'")
+
+
+def test_a_never_onboarded_repo_is_refused_with_the_specs_init_fix(env, tmp_path: Path) -> None:
+    """Design review C1 / AC4.5: a constitution git would not commit (here: ignored) is
+    refused before any write, so HEAD holds one after every anchor — never 'published'
+    without specs (the old S20 false success)."""
+    svc, repo, bare = env
+    _seed(bare, tmp_path / "seed", "main", "develop")
+    _git(repo.parent, "clone", "-q", bare.as_uri(), str(repo))
+    _identity(repo)
+    before, head = _heads(bare), _git(repo, "rev-parse", "HEAD")
+    (repo / ".gitignore").write_text("specs/\n", encoding="utf-8")
+    (repo / "specs").mkdir()
+    (repo / "specs" / "constitution.md").write_text(_CONSTITUTION, encoding="utf-8")
+    with pytest.raises(ContextStateError, match="no committable specs/constitution.md") as refused:
+        svc.baseline("proj")
+    assert str(refused.value).endswith("specs init --context proj")
+    assert _heads(bare) == before and _git(repo, "rev-parse", "HEAD") == head
+    assert _git(repo, "branch", "--show-current") == "main"
+
+
+def test_a_stale_local_work_branch_takes_the_anchor_and_main_never_holds_it(
+    env, tmp_path: Path
+) -> None:
+    """Design review C2 (D-E3) / review 6 N4: a local work branch from an earlier run, HEAD
+    on the principal — the anchor is made detached, <work> is fast-forwarded onto it, and
+    the local principal stays exactly where the operator left it."""
+    svc, repo, bare = env
+    _seed(bare, tmp_path / "seed", "main", "develop")
+    _clone_onboarded(bare, repo)
+    _git(repo, "branch", "feature/0.1.0", "origin/main")
+    main = _git(repo, "rev-parse", "main")
+    assert svc.baseline("proj") == "feature/0.1.0"
+    assert _git(repo, "rev-parse", "main") == main
+    _assert_published(repo, bare, "feature/0.1.0", "develop")
+
+
+def test_a_stale_work_draft_conflict_names_the_anchor_and_never_publishes_the_old_draft(
+    env, tmp_path: Path
+) -> None:
+    """Design review C2 (D-S13b): the stale <work> holds an older AGENTS.md — git's add/add
+    conflict text names the anchor; nothing reaches origin; HEAD holds the new draft."""
+    svc, repo, bare = env
+    _seed(bare, tmp_path / "seed", "main", "develop")
+    _clone_onboarded(bare, repo)
+    _git(repo, "switch", "-q", "-c", "feature/0.1.0")
+    (repo / "AGENTS.md").write_text("# old draft\n", encoding="utf-8")
+    _git(repo, "add", "AGENTS.md")
+    _git(repo, "commit", "-qm", "old draft")
+    _git(repo, "switch", "-q", "main")
+    (repo / "AGENTS.md").write_text("# new draft\n", encoding="utf-8")
+    before = _heads(bare)
+    with pytest.raises(GitSyncError, match="CONFLICT") as refused:
+        svc.baseline("proj")
+    anchor = _git(repo, "rev-parse", "HEAD")
+    assert f"onboarding commit {anchor}" in str(refused.value)
+    assert "context baseline proj" in str(refused.value)
+    assert _git(repo, "show", f"{anchor}:AGENTS.md") == "# new draft"
+    assert _heads(bare) == before
+
+
+def test_an_unborn_clone_of_a_non_empty_origin_merges_onto_the_tool_root(
+    env, tmp_path: Path
+) -> None:
+    """Q1 ruling (R10b): origin's HEAD dangles, so the clone is unborn — the root anchor the
+    tool made merges origin's start with --allow-unrelated-histories; published() agrees."""
+    svc, repo, bare = env
+    _seed(bare, tmp_path / "seed", "main", "develop")
+    _git(bare, "symbolic-ref", "HEAD", "refs/heads/nothing")
+    _clone_onboarded(bare, repo)
+    assert svc.baseline("proj") == "feature/0.1.0"
+    assert GitSubprocessClient().published(repo)
+    _assert_published(repo, bare, "feature/0.1.0", "develop")
+    assert svc.baseline("proj") == ""
+
+
+def test_unrelated_operator_history_keeps_gits_refusal(env, tmp_path: Path) -> None:
+    """Q1 ruling: HEAD's root carries operator content — git's own refusal stands."""
+    svc, repo, bare = env
+    _seed(bare, tmp_path / "seed", "main", "develop")
+    _git(repo.parent, "init", "-q", "-b", "main", str(repo))
+    _identity(repo)
+    _git(repo, "remote", "add", "origin", bare.as_uri())
+    (repo / "app.py").write_text("x\n", encoding="utf-8")
+    _git(repo, "add", "app.py")
+    _git(repo, "commit", "-qm", "operator root")
+    (repo / "specs").mkdir()
+    (repo / "specs" / "constitution.md").write_text(_CONSTITUTION, encoding="utf-8")
+    with pytest.raises(GitSyncError, match="unrelated histories"):
+        svc.baseline("proj")
 
 
 @pytest.mark.parametrize(
@@ -304,22 +427,17 @@ def test_a_draft_origin_tracks_is_never_stashed_away(env, tmp_path: Path) -> Non
     assert (repo / "specs" / "constitution.md").is_file()
 
 
-def test_dirty_outside_the_paths_refuses_and_its_fix_lets_the_rerun_proceed(
-    env, tmp_path: Path
-) -> None:
+def test_dirty_work_outside_the_paths_rides_along_uncommitted(env, tmp_path: Path) -> None:
+    """Cut (h): no preflight refusal — the pathspec commit never takes foreign work; it
+    stays modified in the tree and never reaches origin."""
     svc, repo, bare = env
     _seed(bare, tmp_path / "seed", "main")
     _clone_onboarded(bare, repo)
-    (repo / "notes.md").write_text("operator\n", encoding="utf-8")
-    before, branch = _heads(bare), _git(repo, "branch", "--show-current")
-    with pytest.raises(ContextStateError) as refused:
-        svc.baseline("proj")
-    assert _heads(bare) == before and _git(repo, "branch", "--show-current") == branch
-    fix = str(refused.value).rsplit("fix: ", 1)[1]
-    ran = subprocess.run(fix, shell=True, capture_output=True, text=True)  # noqa: S602
-    assert ran.returncode == 0, ran.stderr + ran.stdout
-    svc.baseline("proj")
+    (repo / "README.md").write_text("operator\n", encoding="utf-8")
+    assert svc.baseline("proj") == "feature/0.1.0"
     _assert_published(repo, bare, "feature/0.1.0", "develop")
+    assert (repo / "README.md").read_text(encoding="utf-8") == "operator\n"
+    assert _git(repo, "status", "--porcelain") == "M README.md"
 
 
 def test_an_unborn_clone_keeps_its_untracked_foreign_files(env) -> None:
@@ -371,22 +489,6 @@ def test_an_env_identity_publishes_without_git_config(env, monkeypatch) -> None:
         monkeypatch.setenv(f"GIT_{role}_EMAIL", "t@example.invalid")
     _clone_onboarded(bare, repo, identity=False)
     assert svc.baseline("proj") == "feature/0.1.0"
-
-
-def test_a_non_ascii_foreign_file_refuses_with_a_fix_that_clears(env, tmp_path: Path) -> None:
-    """Review C1: core.quotePath quoted `memória.md`; the printed stash named a path that
-    does not exist, so the rerun refused forever."""
-    svc, repo, bare = env
-    _seed(bare, tmp_path / "seed", "main")
-    _clone_onboarded(bare, repo)
-    (repo / "memória.md").write_text("operator\n", encoding="utf-8")
-    with pytest.raises(ContextStateError) as refused:
-        svc.baseline("proj")
-    fix = str(refused.value).rsplit("fix: ", 1)[1]
-    ran = subprocess.run(fix, shell=True, capture_output=True, text=True)  # noqa: S602
-    assert ran.returncode == 0, ran.stderr + ran.stdout
-    svc.baseline("proj")
-    _assert_published(repo, bare, "feature/0.1.0", "develop")
 
 
 @pytest.mark.parametrize("seeded", [(), ("main",)], ids=["unborn", "born"])

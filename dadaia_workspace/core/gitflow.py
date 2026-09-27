@@ -58,4 +58,6 @@ def from_mapping(block: object) -> Gitflow:
             raise ValueError(f"gitflow.{key} {name!r} is not a valid git branch name")
     if names["principal"] == names["integration"]:
         raise ValueError("gitflow.principal and gitflow.integration must differ")
+    if any(f"{names['work']}0".startswith(f"{names[k]}/") for k in ("principal", "integration")):
+        raise ValueError(f"gitflow.work {names['work']!r} nests under a role branch name")
     return Gitflow(str(names["principal"]), str(names["integration"]), str(names["work"]))

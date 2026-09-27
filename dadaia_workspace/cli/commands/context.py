@@ -398,20 +398,15 @@ def alive(name: str = typer.Argument(..., help="Context name to make ALIVE")) ->
 @app.command()
 def baseline(
     name: str = typer.Argument(..., help="Context whose onboarding is published"),
-    repo: str = typer.Argument(
-        "", help="A repo of the context: its slug, or a path from the cwd (default: the main repo)"
-    ),
     message: str = typer.Option(
         "chore: publish the dadaia specs", "--message", help="Commit message."
     ),
 ) -> None:
-    """Publish a repo of the project, append-only: adopt what origin holds, or give an empty
-    origin the local principal; the work branch carries specs/. A re-run is a no-op."""
-    ws = resolve_workspace_root()
-    slug = repo and Path(repo).name == repo and repo not in (".", "..")
-    target = (ws / "repos" / repo if slug else Path(repo).resolve()) if repo else None
+    """Publish the project's main repo, append-only: adopt what origin holds, or give an
+    empty origin the local principal; the work branch carries specs/. A re-run is a no-op.
+    An associated repo publishes by plain `git push` under the pre-push gate."""
     try:
-        work = _ctx_service().baseline(name, target, message=message)
+        work = _ctx_service().baseline(name, message=message)
     except (DadaiaError, OSError) as exc:
         fail(exc)
     done = f"published on {work}" if work else "already published — nothing to do"

@@ -48,13 +48,6 @@ _ONBOARDING = ("specs", "specs-bkp", "AGENTS.md")
 _TAG_RE = re.compile(r"v?(\d+)\.(\d+)\.(\d+)")
 
 
-class RepoOwner(Protocol):
-    """The ONE repo resolver (``core.invocation.repo_owner``), injected by the composition
-    root: ``(context, repo slug, main slug)`` owning a path, or ``None``."""
-
-    def __call__(self, workspace_root: Path, path: Path) -> tuple[str, str, str] | None: ...
-
-
 class InstallHooks(Protocol):
     """The one git-chokepoint installer ``alive()`` runs in every repo of the set —
     injected by the composition root (P-07: features compose through the container,
@@ -181,10 +174,7 @@ class SpecContextService:
         git_client: GitSubprocessClient,
         workspace_root: Path,
         install_hooks: InstallHooks,
-        *,
-        repo_owner: RepoOwner,
     ) -> None:
-        self._repo_owner = repo_owner
         self._store = context_store
         self._git = git_client
         self._workspace_root = workspace_root
@@ -558,25 +548,20 @@ class SpecContextService:
 
     # ------------------------------------------------------------------ baseline
 
-    def baseline(
-        self,
-        name: str,
-        target: Path | None = None,
-        *,
-        message: str = "chore: publish the dadaia specs",
-    ) -> str:
-        """Publish repo *target* (default: the main repo) of context *name*, append-only
-        (ADRs 0035, 0042; R13); return its work branch, ``""`` when nothing was pushed.
-        ONE path: the onboarding paths are one ordinary commit on the checked-out branch;
-        the gitflow is read once, from that commit. The work branch continues
-        ``origin/<work>``, else starts at ``origin/<integration>``/``<principal>``, else
-        (an empty origin) at that commit, and merges it — local commits under it are
-        carried, never stranded. A missing gitflow branch is born at the published
-        principal, else (an empty origin) at that commit; ONE atomic push. Never a forced
+    def baseline(self, name: str, *, message: str = "chore: publish the dadaia specs") -> str:
+        """Publish the main repo of context *name*, append-only and anchor-first (ADRs 0035,
+        0042; R13; PLAN §1.5); return its work branch, ``""`` when nothing was pushed.
+        The onboarding paths are committed off every branch — HEAD detached (born), or
+        on the unborn name renamed to ``<work>`` — so no existing branch ever holds that
+        anchor; ``<work>`` is merged into it and advanced to it by compare-and-swap, then
+        origin's start is merged (unrelated histories only onto a root the tool made) and
+        ONE atomic push publishes work and the missing gitflow branches. Every later
+        refusal leaves HEAD on ``<work>`` holding the anchor, and names it. Uncommitted
+        work outside the paths is never committed and git refuses a switch or merge that
+        would overwrite it (residual: it rides along onto ``<work>``). Never a forced
         checkout, a reset, a rebase, a force-push or a deletion."""
         ctx = self.show(name)
-        repo = target or self._repo_path(ctx.repo_slug)
-        slug = self._owned_slug(ctx, repo)
+        repo = self._repo_path(ctx.repo_slug)
         if not repo.is_dir() or not self._git.is_git_root(repo):
             fix = fix_line(self._workspace_root, "context", "alive", name)
             raise ContextStateError(
@@ -584,89 +569,87 @@ class SpecContextService:
             )
         if fix := self._git.identity_fix(repo):
             raise ContextStateError(f"Context '{name}': git identity unknown.\nfix: {fix}")
-        paths = _ONBOARDING if slug == ctx.repo_slug else ()
-        self._require_publishable(name, repo, paths)
         git = partial(self._git.git, repo)
+        rel = (
+            "specs/constitution.md"  # C1: on disk and committable ⇒ HEAD holds it after the anchor
+        )
+        if not (repo / rel).is_file() or not git("ls-files", "-co", "--exclude-standard", rel):
+            fix = fix_line(self._workspace_root, "specs", "init", "--context", name)
+            raise ContextStateError(f"Context '{name}': no committable {rel}.\nfix: {fix}")
+        self._require_publishable(name, repo)
         git("fetch", "--prune", "--tags", "origin")
         refs = git("for-each-ref", "--format=%(refname:lstrip=3)", "refs/remotes/origin")
         heads = [h for h in refs.split() if h != "HEAD"]
-        self._git.commit_paths(repo, message, [p for p in paths if (repo / p).exists()])
-        flow, _ = self._git.gitflow(repo, self._repo_path(ctx.repo_slug))
-        if heads and flow.principal not in heads:
-            raise ContextStateError(
-                f"Context '{name}': origin holds {', '.join(heads)}; the committed "
-                f"gitflow names principal '{flow.principal}' — origin publishes no such "
-                "branch. Nothing is guessed and nothing was pushed. Operator action: "
-                "publish that principal on origin, or name origin's principal in the "
-                "gitflow block of specs/constitution.md."
-            )
-        work, tip = work_name(self._git, repo, flow), git("rev-parse", "HEAD")
-        roles = (work, flow.integration, flow.principal)
-        start = next((f"origin/{b}" for b in roles if b in heads), tip)
-        if self._git.current_branch(repo) != work:
-            local = git("for-each-ref", "--format=%(refname)", f"refs/heads/{work}")
-            git("switch", *((work,) if local else ("--no-track", "-c", work, start)))
-        git("merge", "--no-edit", start)
-        git("merge", "--no-edit", tip)
-        born = f"refs/remotes/origin/{flow.principal}" if heads else tip
-        births = [
-            f"{born}:refs/heads/{b}" for b in (flow.principal, flow.integration) if b not in heads
-        ]
-        if not births and not self._git.unpushed(repo):
-            return ""
-        git("push", "--atomic", "-u", "origin", *births, work)
+        born = self._git.has_commits(repo)
+        if born:
+            git("switch", "--detach")
+        self._git.commit_paths(repo, message, [p for p in _ONBOARDING if (repo / p).exists()])
+        anchor = git("rev-parse", "HEAD")
+        flow, _ = self._git.gitflow(repo)
+        work = work_name(self._git, repo, flow)
+        try:
+            if born:
+                old = git("for-each-ref", "--format=%(objectname)", f"refs/heads/{work}")
+                if old:
+                    git("merge", "--no-edit", old)
+                git("update-ref", f"refs/heads/{work}", "HEAD", old)
+                git("switch", work)
+            else:
+                git("branch", "-m", work)
+            if heads and flow.principal not in heads:
+                self._refuse_principal_absent(name, flow, heads, anchor, work)
+            roles = (work, flow.integration, flow.principal)
+            if start := next((f"origin/{b}" for b in roles if b in heads), ""):
+                roots = git("rev-list", "--max-parents=0", "HEAD").split()
+                ours = all(
+                    {*git("ls-tree", "--name-only", r).split()} <= {*_ONBOARDING} for r in roots
+                )
+                git("merge", "--no-edit", *["--allow-unrelated-histories"] * ours, start)
+            at = f"refs/remotes/origin/{flow.principal}" if heads else anchor
+            births = [f"{at}:refs/heads/{b}" for b in roles[1:] if b not in heads]
+            if not births and not self._git.unpushed(repo):
+                return ""
+            git("push", "--atomic", "-u", "origin", *births, work)
+        except GitSyncError as exc:
+            again = fix_line(self._workspace_root, "context", "baseline", name)
+            raise GitSyncError(
+                f"{exc}\nHEAD holds the onboarding commit {anchor}; once the cause above is "
+                f"fixed (a refused push: after the amend), publish again: {again}"
+            ) from exc
         return work
 
-    def _owned_slug(self, ctx: SpecContextProject, repo: Path) -> str:
-        """*repo*'s slug through the ONE resolver; a repo *ctx* does not own is refused —
-        fix: its owner's publish, else its registration (its repos listed; a typo is never
-        answered with another repo's publish)."""
-        ws, name = self._workspace_root, ctx.name
-        owner = self._repo_owner(ws, repo)
-        if owner is not None and owner[0] == name:
-            return owner[1]
-        slugs = ", ".join(r.slug for r in ctx.all_repos())
-        fix = (
-            fix_line(ws, "context", "baseline", owner[0], str(repo))
-            if owner
-            else fix_line(ws, "context", "repo", "add", name, repo.name, "--url", "<clone-url>")
+    def _refuse_principal_absent(
+        self, name: str, flow: Gitflow, heads: list[str], anchor: str, work: str
+    ) -> None:
+        """S11, after the anchor (the gitflow exists only there): one ``specs init`` fix —
+        the one origin candidate, else a ``<principal>`` placeholder over the listed
+        candidates; never a guess."""
+        found = [h for h in heads if h != flow.integration and flow.role_of(h) != "work"]
+        pick = found[0] if len(found) == 1 else "<principal>"
+        fix = fix_line(
+            self._workspace_root, "specs", "init", "--context", name, "--principal", pick
         )
-        raise AssociatedRepoNotFoundError(
-            f"'{repo}' is not a repo of context '{name}' (its repos: {slugs}).\nfix: {fix}"
+        raise ContextStateError(
+            f"Context '{name}': origin holds no principal '{flow.principal}' (origin candidates: "
+            f"{', '.join(found) or 'none'}); nothing was pushed, HEAD is on '{work}' at the "
+            f"onboarding commit {anchor}.\nfix: {fix}"
         )
 
-    def _require_publishable(self, name: str, repo: Path, allowed: tuple[str, ...]) -> None:
-        """Refuse, before any write, a change outside the onboarding paths (born repos:
-        an unborn clone's foreign files are never committed) or a secret in an untracked
-        file the publish would commit — a stash fix naming the real paths, or (a secret the
-        operator removes by hand) the publish again."""
-        untracked = self._git.list_untracked(repo)
-        changed = (
-            [*self._git.git(repo, "diff", "--name-only", "-z", "HEAD").split("\0"), *untracked]
-            if self._git.has_commits(repo)
-            else []
-        )
-        foreign = sorted({p for p in changed if p and p.split("/")[0] not in allowed})
+    def _require_publishable(self, name: str, repo: Path) -> None:
+        """Refuse, before any write, a secret in an untracked onboarding file the publish
+        would commit — fix: the publish again, once the operator removed each value."""
         flagged = {
             rel: sorted(set(hits))
-            for rel in untracked
-            if rel.split("/")[0] in allowed and (hits := _scan_file_for_secrets(repo / rel))
+            for rel in self._git.list_untracked(repo)
+            if rel.split("/")[0] in _ONBOARDING and (hits := _scan_file_for_secrets(repo / rel))
         }
-        refusal = (
-            f"changes outside {', '.join(allowed) or 'nothing'} are not published."
-            if foreign
-            else "secret scan blocked the publish (values redacted) — remove each value, then "
-            "publish again:\n"
-            + "\n".join(f"  {rel}: {', '.join(hits)}" for rel, hits in flagged.items())
-        )
-        if foreign or flagged:
-            fix = (
-                git_line(repo, "stash", "push", "-u", "--", *foreign)
-                if foreign
-                else fix_line(self._workspace_root, "context", "baseline", name)
+        if flagged:
+            report = "\n".join(f"  {rel}: {', '.join(hits)}" for rel, hits in flagged.items())
+            fix = fix_line(self._workspace_root, "context", "baseline", name)
+            raise DeadSecretFoundError(
+                f"Context '{name}': secret scan blocked the publish (values redacted) — "
+                f"remove each value, then publish again:\n{report}\nfix: {fix}"
             )
-            error = ContextStateError if foreign else DeadSecretFoundError
-            raise error(f"Context '{name}': {refusal}\nfix: {fix}")
 
     # ------------------------------------------------------------------ dead (T-10b / T-11)
 

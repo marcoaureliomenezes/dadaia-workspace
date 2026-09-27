@@ -452,14 +452,6 @@ def _no_identity(world: World) -> list[str]:
     return ["context", "baseline", "proj"]
 
 
-def _foreign_change(world: World) -> list[str]:
-    world.seed(None, "main")
-    world.clone()
-    world.onboard()
-    (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
-    return ["context", "baseline", "proj"]
-
-
 def _secret_draft(world: World) -> list[str]:
     world.clone()
     world.onboard()
@@ -521,16 +513,20 @@ def _no_checkout(world: World) -> list[str]:
     return ["context", "baseline", "proj"]
 
 
-def _unregistered_repo(world: World) -> list[str]:
-    """Review M-A (P7b): an unregistered checkout under repos/ — the fix registers it."""
-    world.seed(_constitution())
+def _draft_principal_absent(world: World) -> list[str]:
+    """S11 (SA-H3-3, design review C3/C6): origin publishes `main` under a malformed block;
+    the draft names `trunk` — the one origin candidate is the fix's principal."""
+    world.seed("---\nspecs_pattern_version: 7\ngitflow: {principal: main\n---\n# c\n", "main")
     world.clone()
-    world.git(world.tmp, "clone", "-q", world.bare.as_uri(), str(world.ws / "repos" / "nope"))
-    return ["context", "baseline", "proj", "nope"]
+    world.onboard(_constitution("trunk", "stage", "rel/"))
+    return ["context", "baseline", "proj"]
 
 
-def _nope_cloned(world: World) -> None:
-    assert (world.ws / "repos" / "nope" / "README.md").is_file()
+def _never_onboarded(world: World) -> list[str]:
+    """Design review C1 / AC4.5: no constitution on disk — the fix is onboarding's specs step."""
+    world.seed(None)
+    world.clone()
+    return ["context", "baseline", "proj"]
 
 
 def _unknown_context(world: World) -> list[str]:
@@ -708,12 +704,14 @@ SITES: dict[str, tuple[Case, ...] | Skip] = {
     ),
     "service.SpecContextService.baseline#0": (Case(_no_checkout, _cloned),),
     "service.SpecContextService.baseline#1": (Case(_no_identity, _baseline_done),),
-    "service.SpecContextService.baseline#2": Skip(
-        "no deterministic command: the refusal names the operator action (R13 rule 4)"
+    "service.SpecContextService.baseline#2": (Case(_never_onboarded, _baseline_done),),
+    "service.SpecContextService.baseline#3": (
+        Case(_baseline_denylisted, _baseline_done, operator=_drop_draft_term, then=_AMEND_BASELINE),
     ),
-    "service.SpecContextService._owned_slug#0": (Case(_unregistered_repo, _nope_cloned),),
+    "service.SpecContextService._refuse_principal_absent#0": (
+        Case(_draft_principal_absent, lambda w: _baseline_done(w, "rel/0.1.0", ("main", "stage"))),
+    ),
     "service.SpecContextService._require_publishable#0": (
-        Case(_foreign_change, _baseline_done),
         Case(_secret_draft, _baseline_done, operator=_drop_secret),
     ),
     "service.SpecContextService._enforce_dead_review_gate#0": Skip(
@@ -840,22 +838,6 @@ def test_a_repaired_custom_gitflow_publishes_end_to_end(tmp_path: Path) -> None:
     _baseline_done(world, "rel/0.1.0", ("trunk", "stage"))
 
 
-def test_a_draft_gitflow_origin_does_not_publish_is_refused_before_any_write(
-    tmp_path: Path,
-) -> None:
-    """SA-H3-3 / R13 rule 1: origin publishes `main` under a malformed block; the draft
-    names `trunk` — nothing is guessed, no branch is minted the gate would refuse."""
-    world = World(tmp_path)
-    world.seed("---\nspecs_pattern_version: 7\ngitflow: {principal: main\n---\n# c\n", "main")
-    world.clone()
-    world.onboard(_constitution("trunk", "stage", "rel/"))
-    before, branch = world.remote_heads(), world.git(world.repo, "branch", "--show-current")
-    done = world.cli("context", "baseline", "proj")
-    assert done.returncode != 0 and "Operator action" in done.stdout + done.stderr
-    assert world.remote_heads() == before
-    assert world.git(world.repo, "branch", "--show-current") == branch
-
-
 def test_a_clone_on_the_integration_branch_is_never_auto_committed(tmp_path: Path) -> None:
     """H (dead on develop): the refusal comes before any commit — the local integration
     branch is exactly the remote's."""
@@ -927,13 +909,18 @@ def test_dead_on_a_non_fast_forward_carries_gits_own_text_and_removes_nothing(
     assert world.repo.is_dir() and not (world.repo / ".git" / "MERGE_HEAD").exists()
 
 
-def test_a_denylisted_first_publish_is_driven_clean_by_its_own_fix(tmp_path: Path) -> None:
-    """Review 6 N3: the gate refusal carried through baseline — reset to the oldest
-    unpublished commit (the root, on an empty origin), edit, amend, publish."""
-    _drive(
-        World(tmp_path),
-        Case(_baseline_denylisted, _baseline_done, operator=_drop_draft_term, then=_AMEND_BASELINE),
-    )
+def test_a_refused_baseline_push_names_the_anchor_and_the_publish_as_the_next_step(
+    tmp_path: Path,
+) -> None:
+    """Design review C7 / C2: the gate refuses baseline's push — the refusal keeps the gate's
+    one fix (reset to the oldest unpublished commit) and names the anchor and the publish
+    as the step after the amend (a hand push would drop origin's merge parent)."""
+    world = World(tmp_path)
+    done = _hit(world, _baseline_denylisted(world))
+    output = done.stdout + done.stderr
+    assert done.returncode != 0 and _single_fix(done).startswith("git -C")
+    assert f"onboarding commit {world.git(world.repo, 'rev-parse', 'HEAD')}" in output
+    assert fix_line(world.ws, "context", "baseline", "proj") in output.replace("\n", "")
 
 
 def test_dead_after_the_operator_pulls_into_a_conflict_publishes_no_markers(
@@ -957,15 +944,3 @@ def test_dead_after_the_operator_pulls_into_a_conflict_publishes_no_markers(
     output = done.stdout + done.stderr
     assert done.returncode != 0 and "unmerged" in output, output
     assert world.repo.is_dir() and world.remote_heads()["feature/1.0.0"] == published
-
-
-def test_a_typo_repo_is_never_answered_with_another_repos_publish(tmp_path: Path) -> None:
-    """Review 5 L1: two arms — the owner's publish, or the registration; a typo's fix never
-    publishes the context's main repo instead."""
-    world = World(tmp_path)
-    world.seed(_constitution())
-    world.clone()
-    done = world.cli("context", "baseline", "proj", "prj")
-    fix = _single_fix(done)
-    assert done.returncode != 0 and "repo add" in fix
-    assert world.remote_heads().keys() == {"main", "develop"}

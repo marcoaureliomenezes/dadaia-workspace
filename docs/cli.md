@@ -13,7 +13,7 @@
 
 ## dadaia context — Manage Spec Context Projects.
 - context alive — Transition a context to ALIVE; clone repo if absent. Idempotent if already ALIVE.
-- context baseline — Publish a repo of the project, append-only: adopt what origin holds, or give an empty
+- context baseline — Publish the project's main repo, append-only: adopt what origin holds, or give an
 - context bind — Bind this shell session to a context.
 - context create — Clone (or adopt) every repo, install the pre-push hook, make the context ALIVE —
 - context dead — Transition a context to DEAD; git sync + remove repo from disk.
