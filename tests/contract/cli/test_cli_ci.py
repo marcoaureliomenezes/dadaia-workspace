@@ -84,7 +84,7 @@ def test_install_hook_writes_and_refuses_overwrite_without_force(
     # second call without --force is refused (pre-push already present).
     refused = _runner.invoke(app, ["ci", "install-hook"])
     assert refused.exit_code == 1
-    assert f"ci install-hook --force --repo {tmp_path}" in refused.output
+    assert f"ci install-hook --force --repo {tmp_path.as_posix()}" in refused.output
     assert "fix: " in refused.output
     # --force overwrites both.
     assert _runner.invoke(app, ["ci", "install-hook", "--force"]).exit_code == 0
