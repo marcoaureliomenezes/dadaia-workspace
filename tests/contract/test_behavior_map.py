@@ -1015,6 +1015,58 @@ def test_every_cited_dadaia_verb_exists() -> None:
     assert violations == [], "dead dadaia verb citation(s):\n" + "\n".join(violations)
 
 
+#: The law files whose cited CLI invocations an agent runs verbatim.
+_LAW_ROOTS = ("dadaia_workspace/public/data", "dadaia_workspace/public/skills",
+              "dadaia_workspace/public/templates", "docs")  # fmt: skip
+_LAW_FILES = ("AGENTS.md", "README.md")
+_CITED_INVOCATION_RE = re.compile(
+    r"(?<![\w.-])dadaia(?![\w.-])((?:\s+[a-z][a-z0-9-]*)*)((?:\s+[^`]*)?)"
+)
+
+
+def _cited_invocations() -> list[tuple[str, int, str]]:
+    """Every backticked `dadaia …` invocation in the law files, as (rel, line, token)."""
+    files = [_REPO_ROOT / name for name in _LAW_FILES] + [
+        md for root in _LAW_ROOTS for md in sorted((_REPO_ROOT / root).rglob("*.md"))
+    ]
+    return [
+        (posix_relpath(md, _REPO_ROOT), number, token)
+        for md in files
+        if md.is_file() and not md.is_symlink()
+        for number, line in enumerate(md.read_text(encoding="utf-8").splitlines(), start=1)
+        for token in re.findall(r"`([^`\n]+)`", line)
+        if _CITED_INVOCATION_RE.search(token)
+    ]
+
+
+def test_every_cited_dadaia_invocation_names_a_real_verb_and_option() -> None:
+    """repo-law-prescribes-a-removed-install-option: every `dadaia <verb…> --option` the
+    law cites resolves in the live Click tree — the verb path by walking the app's own
+    commands, each `--option` among that command's declared parameters. A removed option
+    left in the law (`public install --target`, gone since 0.4.7) is red here."""
+    from typer.main import get_command
+
+    from dadaia_workspace.cli.main import app
+
+    root = get_command(app)
+    violations: list[str] = []
+    for rel, number, token in _cited_invocations():
+        for m in _CITED_INVOCATION_RE.finditer(token):
+            command: Any = root
+            for word in m.group(1).split():
+                sub = (getattr(command, "commands", None) or {}).get(word)
+                if sub is None:
+                    break  # a positional argument, not a verb: the path ends here
+                command = sub
+            declared = {opt for param in command.params for opt in param.opts} | {"--help"}
+            for option in re.findall(r"(?<![\w-])--[a-z][a-z0-9-]*", m.group(2)):
+                if option not in declared:
+                    violations.append(f"{rel}:{number}: `{token}` — {option} is not an option")
+    assert violations == [], "law cites a CLI option the tool does not have:\n" + "\n".join(
+        violations
+    )
+
+
 def test_mutation_fixture_9_dead_path_citation_turns_red(tmp_path: Path) -> None:
     """A27.20 mutation fixture — dead path. A fixture asset citing a `specs/`-prefixed
     path that does not exist under a fixture repo root must be flagged. Never touches a

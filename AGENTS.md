@@ -8,8 +8,7 @@ into the source tree it projects from, so nothing here is regenerated.
   **instance**, projected from `dadaia_workspace/public/`.
 - The always-on law is the workspace's root map, two levels up: read `../../AGENTS.md`.
 - Change law or any AI-entity file at its source under `dadaia_workspace/public/`,
-  then re-project: `dadaia public stage` -> `dadaia public install --target all` ->
-  `dadaia public doctor`.
+  then re-project: `dadaia public stage && dadaia public install && dadaia public doctor`.
 - A library change is unfinished until the instance reflects it; never hand-edit a
   projected instance file to fake the result.
 - Any failure of a workspace operation here is a product bug of this library:
