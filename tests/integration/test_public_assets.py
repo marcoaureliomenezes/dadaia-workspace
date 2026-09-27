@@ -201,6 +201,7 @@ def _seed_denylist_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 def test_public_privacy_gate_flags_identifiers_and_ignores_bytecode(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """sa-private-match-rendering-has-three-renderers#B1 (kept: also pins the privacy scan's bytecode skip, WP-08 KEEP)."""
     _seed_denylist_env(monkeypatch, tmp_path)
     repo_root = tmp_path / "repo"
     public_dir = repo_root / "dadaia_workspace" / "public"

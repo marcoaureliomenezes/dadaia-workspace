@@ -50,11 +50,13 @@ _runner = CliRunner()
 
 
 def test_compile_candidates_returns_none_for_no_candidates() -> None:
+    """sa-private-match-rendering-has-three-renderers#B6."""
     assert compile_candidates([]) is None
     assert compile_candidates(["", ""]) is None
 
 
 def test_compile_candidates_orders_longest_first() -> None:
+    """sa-private-match-rendering-has-three-renderers#B6."""
     pattern = compile_candidates(["ab", "abcdef", "abc"])
     assert pattern is not None
     match = pattern.match("abcdef")
@@ -63,19 +65,21 @@ def test_compile_candidates_orders_longest_first() -> None:
 
 
 def test_redactor_ordinal_by_first_appearance() -> None:
-    """The same property A8.3 pins through :class:`ContextRedactor`, asserted directly
+    """sa-private-match-rendering-has-three-renderers#B6: The same property A8.3 pins through :class:`ContextRedactor`, asserted directly
     against the extracted primitive."""
     redactor = Redactor(["foo", "bar"], placeholder_fmt="[X-{n}]")
     assert redactor.mask("bar foo bar") == "[X-1] [X-2] [X-1]"
 
 
 def test_redactor_inactive_with_no_candidates_returns_value_unchanged() -> None:
+    """sa-private-match-rendering-has-three-renderers#B6."""
     redactor = Redactor([], placeholder_fmt="[X-{n}]")
     assert redactor.active is False
     assert redactor.mask("nothing to mask here") == "nothing to mask here"
 
 
 def test_core_redactor_word_boundary_does_not_partially_match_longer_string() -> None:
+    """sa-private-match-rendering-has-three-renderers#B6."""
     redactor = Redactor(["dadaia"], placeholder_fmt="[X-{n}]")
     assert redactor.mask("dadaia-workspace lives at dadaia.") == (
         "dadaia-workspace lives at [X-1]."
@@ -83,7 +87,7 @@ def test_core_redactor_word_boundary_does_not_partially_match_longer_string() ->
 
 
 def test_redactor_placeholder_format_is_caller_controlled() -> None:
-    """Two independent :class:`Redactor` instances with different placeholder formats
+    """sa-private-match-rendering-has-three-renderers#B6: Two independent :class:`Redactor` instances with different placeholder formats
     (e.g. the CLI's ``[REDACTED-CONTEXT-n]`` vs a future gate-renderer format) never
     collide — the format string is entirely the caller's own."""
     redactor = Redactor(["term"], placeholder_fmt="<<masked-{n}>>")
@@ -96,29 +100,15 @@ def test_redactor_placeholder_format_is_caller_controlled() -> None:
 
 
 def test_redactor_ordinal_by_first_appearance_and_caller_exclusion() -> None:
-    """A8.3: ordinal is assigned by first appearance in the text actually scanned, is
+    """sa-private-match-rendering-has-three-renderers#B5: A8.3: ordinal is assigned by first appearance in the text actually scanned, is
     stable for repeat occurrences, and never touches the excluded caller context."""
     redactor = ContextRedactor(["foo-ctx", "bar-ctx", "own-ctx"], exclude=("own-ctx",))
     rendered = redactor.text("own-ctx bar-ctx foo-ctx bar-ctx")
     assert rendered == "own-ctx [REDACTED-CONTEXT-1] [REDACTED-CONTEXT-2] [REDACTED-CONTEXT-1]"
 
 
-def test_redactor_word_boundary_does_not_partially_match_longer_string() -> None:
-    """A short candidate that is a mere prefix of a longer, unrelated hyphenated
-    string is never partially redacted (hyphens count as word characters here)."""
-    redactor = ContextRedactor(["dadaia"])
-    rendered = redactor.text("dadaia-workspace lives at dadaia.")
-    assert rendered == "dadaia-workspace lives at [REDACTED-CONTEXT-1]."
-
-
-def test_redactor_no_candidates_is_inactive_and_returns_text_unchanged() -> None:
-    redactor = ContextRedactor([])
-    assert redactor.active is False
-    assert redactor.text("nothing to redact here") == "nothing to redact here"
-
-
 def test_redactor_json_value_preserves_key_set_and_non_string_leaves() -> None:
-    """A8.4: recursive redaction touches only string leaves; keys and every
+    """sa-private-match-rendering-has-three-renderers#B4: A8.4: recursive redaction touches only string leaves; keys and every
     non-string value pass through unchanged."""
     redactor = ContextRedactor(["foreign-ctx"])
     payload = {
@@ -202,7 +192,7 @@ def _ctx_row(
 def test_context_list_redact_json_same_key_set_and_masks_foreign(
     workspace: Path, monkeypatch
 ) -> None:
-    """A8.1/A8.4: `context list --redact --json` stays valid JSON with the same key
+    """sa-private-match-rendering-has-three-renderers#B4 sa-private-match-rendering-has-three-renderers#B5: A8.1/A8.4: `context list --redact --json` stays valid JSON with the same key
     set per row; only foreign name/repo_slug values are masked."""
     _write_contexts(
         workspace,
@@ -233,6 +223,7 @@ def test_context_list_redact_json_same_key_set_and_masks_foreign(
 
 
 def test_context_list_redact_table_masks_foreign_names(workspace: Path, monkeypatch) -> None:
+    """sa-private-match-rendering-has-three-renderers#B4 sa-private-match-rendering-has-three-renderers#B5."""
     _write_contexts(
         workspace,
         [
@@ -250,7 +241,7 @@ def test_context_list_redact_table_masks_foreign_names(workspace: Path, monkeypa
 
 
 def test_context_show_redact_masks_explicit_foreign_context(workspace: Path, monkeypatch) -> None:
-    """A8.1: showing a context OTHER than the caller's own, with --redact, masks
+    """sa-private-match-rendering-has-three-renderers#B4 sa-private-match-rendering-has-three-renderers#B5: A8.1: showing a context OTHER than the caller's own, with --redact, masks
     that context's own name/slug too (it is "other than the caller's resolved
     context" regardless of how it was reached)."""
     _write_contexts(
@@ -281,6 +272,7 @@ def test_context_show_redact_masks_explicit_foreign_context(workspace: Path, mon
 def test_context_show_redact_keeps_callers_own_context_visible(
     workspace: Path, monkeypatch
 ) -> None:
+    """sa-private-match-rendering-has-three-renderers#B5."""
     _write_contexts(
         workspace,
         [
@@ -297,7 +289,7 @@ def test_context_show_redact_keeps_callers_own_context_visible(
 
 
 def test_doctor_redact_masks_an_associated_slug_like_context_list(workspace: Path) -> None:
-    """sa-private-match-rendering-has-three-renderers#B3: one redactor builder."""
+    """sa-private-match-rendering-has-three-renderers#B4: doctor --redact masks an associated slug as context list --redact does."""
     from dadaia_workspace.cli.commands.doctor import _render_for
 
     row = _ctx_row("zz-foreign") | {"associated_repos": [{"slug": "zz-assoc", "url": "u"}]}

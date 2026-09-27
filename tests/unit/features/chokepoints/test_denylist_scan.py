@@ -52,6 +52,7 @@ def _obj_with_prior(
 
 
 def test_baseline_ipv4_literal_refused_with_no_operator_terms() -> None:
+    """sa-private-match-rendering-has-three-renderers#B3."""
     baseline = load_baseline_patterns()
     objects = [_obj("notes.md", f"server lives at {_POSITIVE_IPV4} for now\n")]
 
@@ -412,6 +413,7 @@ def test_first_match_short_circuits_at_the_first_hit_line() -> None:
 
 
 def test_unmasked_operator_term_absent_from_every_hit_field() -> None:
+    """sa-private-match-rendering-has-three-renderers#B3."""
     objects = [_obj("secret.md", f"the value is {_SYNTHETIC_TERM} right here\n")]
 
     outcome = scan_objects(objects, terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=())
