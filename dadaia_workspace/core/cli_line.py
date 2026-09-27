@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import shlex
 import sys
-from pathlib import Path, PurePath, PureWindowsPath
+from pathlib import Path, PurePath
 
 from dadaia_workspace.core import platform
 
@@ -54,13 +54,10 @@ def mkdir_line(directory: PurePath) -> str:
 
 
 def materialize_line(link: PurePath, target: PurePath) -> str:
-    """Replace the symlink *link* by a regular copy of *target*: POSIX
-    ``cp --remove-destination``; cmd ``del`` (removes the link, never its target) then
-    ``copy /Y``."""
-    if platform.PLATFORM.venv_exe_suffix:  # Windows
-        lnk, tgt = PureWindowsPath(link), PureWindowsPath(target)
-        return f'del "{lnk}" && copy /Y "{tgt}" "{lnk}"'
-    return shlex.join(("cp", "--remove-destination", "--", str(target), str(link)))
+    """Replace the symlink *link* by a regular copy of *target* (``os.remove`` drops the
+    link, never its target) — the same interpreter line on every OS."""
+    code = f"import os, shutil; os.remove(r'{link}'); shutil.copyfile(r'{target}', r'{link}')"
+    return shell_line(sys.executable, "-c", code)
 
 
 def _win_quote(arg: str) -> str:

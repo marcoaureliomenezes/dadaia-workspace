@@ -9,7 +9,8 @@ Size: SMALL (tmp_path, CliRunner in-process, no subprocess).
 from __future__ import annotations
 
 import hashlib
-import os
+import shlex
+import sys
 from pathlib import Path
 
 import pytest
@@ -28,10 +29,10 @@ _OUTSIDE = "# Quality\n\noperator text, no fixed block\n"
 
 
 def _materialize(link: Path, target: Path) -> str:
-    """The literal fix per host shell: POSIX sh, Windows cmd."""
-    if os.name == "nt":
-        return f'del "{link}" && copy /Y "{target}" "{link}"'
-    return f"cp --remove-destination -- {target} {link}"
+    """The literal fix: one interpreter line, the same on every OS (paths in ``/``)."""
+    lnk, tgt = link.as_posix(), target.as_posix()
+    code = f"import os, shutil; os.remove(r'{lnk}'); shutil.copyfile(r'{tgt}', r'{lnk}')"
+    return shlex.join([Path(sys.executable).as_posix(), "-c", code])
 
 
 def _md5(path: Path) -> str:
@@ -77,13 +78,14 @@ def test_b1_specs_upgrade_refuses_a_symlinked_quality_md_with_its_fix(tmp_path: 
     assert result.exit_code == 1, result.output
     link = specs / "memory" / "QUALITY.md"
     assert f"[refused] FIXED-1 {link}" in result.output
-    assert f"fix: {_materialize(link, outside)}" in result.output
+    (fix,) = [ln[len("fix: ") :] for ln in result.output.splitlines() if ln.startswith("fix: ")]
+    assert shlex.split(fix) == shlex.split(_materialize(link, outside))
     assert _md5(outside) == before
     assert (specs / "memory" / "QUALITY.md").is_symlink()
     doctor = SpecsDoctor(specs, public_dir=_PUBLIC, templates_dir=_PUBLIC / "templates")
     quality = [i for i in doctor.check() if i.code.startswith("FIXED")]
-    assert [(i.code, i.fixable, i.fix) for i in quality] == [
-        ("FIXED-1", False, _materialize(link, outside))
+    assert [(i.code, i.fixable, shlex.split(i.fix)) for i in quality] == [
+        ("FIXED-1", False, shlex.split(_materialize(link, outside)))
     ]
 
 
