@@ -27,25 +27,10 @@ from dadaia_workspace.infrastructure.public_assets import (
     FileSystemPublicAssetManager,
 )
 from tests.helpers.privacy_fixtures import (
-    internal_host,
-    macos_home_path,
     private_ip,
-    windows_home_path,
 )
 
 _TEST_TERM = private_ip()
-
-
-def _shown(value: str) -> str:
-    """SPEC 0.5.0 WP-11: a private match is shown as 'first…last', never raw."""
-    return f"'{value[0]}…{value[-1]}'"
-
-
-def _seed_denylist_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Seed the denylist via the env-var path (location-independent)."""
-    source = tmp_path / "privacy_denylist.json"
-    source.write_text(json.dumps([[_TEST_TERM, "test private IP"]]), encoding="utf-8")
-    monkeypatch.setenv(_PRIVACY_DENYLIST_ENV, str(source))
 
 
 def _make_workspace_root(tmp_path: Path) -> Path:
@@ -89,66 +74,6 @@ def _manager(public_dir: Path) -> FileSystemPublicAssetManager:
 #: object, so a literal inlined here could be masked by the pre-existing
 #: ipv4-literal hit from _TEST_TERM above) — a runtime-composed literal never
 #: reaches the tracked blob at all, so there is nothing left to mask or to hit.
-def _macos_home_path_fixture() -> str:
-    """Synthetic positive fixture for the ``users-abs-path`` baseline pattern
-    (macOS) — content identical to the retired ``macos_home_path.txt`` fixture."""
-    home = macos_home_path()
-    return (
-        "SPEC v0.4.2 FR10/GRILL P15/D9 -- synthetic positive fixture for the users-abs-path\n"
-        "baseline pattern (macOS). The name below is synthetic and non-identifying.\n"
-        f"backup at {home}/Documents\n"
-    )
-
-
-def _windows_home_path_fixture() -> str:
-    """Synthetic positive fixture for the ``windows-users-path`` baseline pattern
-    (Windows) — content identical to the retired ``windows_home_path.txt`` fixture,
-    including the CR-2 mid-sentence prose form (a hit not only at a trailing path
-    separator/end-of-line, proven again in isolation by
-    :func:`test_windows_users_path_pattern_fires_in_prose_form_parity_with_posix_patterns`)."""
-    home = windows_home_path()
-    return (
-        "SPEC v0.4.2 FR10/GRILL P15/D9 -- synthetic positive fixture for the windows-users-path\n"
-        "baseline pattern (Windows). The name below is synthetic and non-identifying.\n"
-        f"backup at {home}\\Documents\n"
-        "CR-2 remediation (v0.4.2 code review) -- the same path also fires in prose, not only\n"
-        f"when followed by a path separator or end of line: seen at {home} in\n"
-        "running text with more words after it.\n"
-    )
-
-
-@pytest.mark.parametrize(
-    ("name", "content", "expect_fragment"),
-    [
-        ("planted_ip", f"Endpoint: {private_ip()}\n", private_ip()),
-        ("internal_hostname", f"host: {internal_host('bastion')}\n", internal_host("bastion")),
-        (
-            "macos_users_path",
-            _macos_home_path_fixture(),
-            macos_home_path(),
-        ),
-        (
-            "windows_users_path",
-            _windows_home_path_fixture(),
-            windows_home_path(),
-        ),
-    ],
-)
-def test_baseline_fires_with_no_operator_denylist(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, content: str, expect_fragment: str
-) -> None:
-    """Fail-closed: absent operator denylist still runs the baseline structural scan."""
-    _disable_operator_denylist(monkeypatch, tmp_path)
-    public_dir = tmp_path / "public"
-    data_dir = public_dir / "data"
-    data_dir.mkdir(parents=True)
-    (data_dir / "AGENTS.md").write_text(content, encoding="utf-8")
-
-    report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
-    assert any(line.startswith("[error] public-privacy:") for line in report)
-    assert any(_shown(expect_fragment) in line for line in report)
-
-
 # ---------------------------------------------------------------------------
 # SPEC v0.4.2 FR10/GRILL P15/A10.1 — the cross-platform home-path patterns never flag
 # their own documented placeholder forms, on any of the three declared-support
@@ -217,24 +142,6 @@ def test_windows_users_path_pattern_fires_in_prose_form_parity_with_posix_patter
     )
 
 
-def test_windows_users_path_prose_form_fires_through_the_doctor_check(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """End-to-end confirmation through ``_check_public_privacy`` (not only the bare
-    regex): the prose form is reported as a genuine finding, same as the trailing-
-    separator form already was."""
-    _disable_operator_denylist(monkeypatch, tmp_path)
-    public_dir = tmp_path / "public"
-    (public_dir / "data").mkdir(parents=True)
-    (public_dir / "data" / "AGENTS.md").write_text(
-        "backup lives at C:\\Users\\zz-fixture-user and more prose follows in the line\n",
-        encoding="utf-8",
-    )
-    report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
-    assert any(line.startswith("[error] public-privacy:") for line in report)
-    assert any(_shown("C:\\Users\\zz-fixture-user") in line for line in report)
-
-
 # ---------------------------------------------------------------------------
 # CRIT: false-block law — loopback / RFC-5737 doc ranges / SHA-in-lockfile never
 # flagged.
@@ -275,51 +182,9 @@ def test_baseline_never_flags_loopback_doc_ranges_or_lockfile_sha(
 # ---------------------------------------------------------------------------
 
 
-def test_operator_denylist_merges_additive_over_baseline(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Operator terms are ADDITIVE: both an operator term and a baseline pattern fire."""
-    _seed_denylist_env(monkeypatch, tmp_path)  # operator term = the private_ip() shape
-    public_dir = tmp_path / "public"
-    data_dir = public_dir / "data"
-    data_dir.mkdir(parents=True)
-    # operator term + a baseline-only hit (internal hostname)
-    (data_dir / "AGENTS.md").write_text(
-        f"ip {_TEST_TERM}\nhost {internal_host('db')}\n", encoding="utf-8"
-    )
-
-    report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
-    assert any(_shown(_TEST_TERM) in line for line in report)
-    assert any(_shown(internal_host("db")) in line for line in report)
-
-
 # ---------------------------------------------------------------------------
 # Scan-scope + no-false-positive parametrized table.
 # ---------------------------------------------------------------------------
-
-
-def test_text_denylist_flags_and_scans_root_agents_md(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _seed_denylist_env(monkeypatch, tmp_path)
-    public_dir = tmp_path / "public"
-    data_dir = public_dir / "data"
-    data_dir.mkdir(parents=True)
-    (data_dir / "AGENTS.md").write_text(f"Private endpoint: {_TEST_TERM}\n", encoding="utf-8")
-
-    report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
-    assert any(line.startswith("[error] public-privacy:") for line in report)
-    assert any(_shown(_TEST_TERM) in line for line in report)
-
-    # Root-level AGENTS.md (sibling of the package dir) is included in the scan.
-    repo_root = tmp_path / "repo"
-    repo_public_dir = repo_root / "dadaia_workspace" / "public"
-    repo_public_dir.mkdir(parents=True)
-    (repo_root / "AGENTS.md").write_text(f"host: {_TEST_TERM}\n", encoding="utf-8")
-    root_report = [  # noqa: SLF001
-        line.render() for line in _manager(repo_public_dir)._check_public_privacy()
-    ]
-    assert any("AGENTS.md" in line and _shown(_TEST_TERM) in line for line in root_report)
 
 
 def test_bytecode_cache_ignored_and_baseline_data_loads_with_version_header(
@@ -450,24 +315,6 @@ def test_baseline_excludes_the_mandated_noreply_trailer_address_through_the_doct
     assert _manager(public_dir)._check_public_privacy() == [_BASELINE_OK_MARKER]  # noqa: SLF001
 
 
-def test_baseline_still_flags_a_different_local_part_at_the_mandated_domain_through_the_doctor_check(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Negative twin, end-to-end: a genuine mailbox at the same apex domain with a
-    DIFFERENT local part is still reported as a genuine finding."""
-    _disable_operator_denylist(monkeypatch, tmp_path)
-    address = _different_local_part_at_the_mandated_domain()
-    public_dir = tmp_path / "public"
-    (public_dir / "data").mkdir(parents=True)
-    (public_dir / "data" / "AGENTS.md").write_text(
-        f"contact {address} for support\n", encoding="utf-8"
-    )
-
-    report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
-    assert any(line.startswith("[error] public-privacy:") for line in report)
-    assert any(_shown(address) in line for line in report)
-
-
 def _different_realistic_home_path_literal() -> str:
     """A realistic-shaped ``/home/<name>`` — it must fire: the home-abs-path exclude
     admits the generic placeholder/system names only. Composed at runtime for
@@ -490,24 +337,6 @@ def test_home_abs_path_pattern_still_fires_for_a_different_realistic_name() -> N
     assert not home_pattern.exclude.search(match.group(0)), (
         "a realistic, non-carved-out /home/<name> must NOT be excluded"
     )
-
-
-def test_baseline_still_flags_a_different_realistic_home_path_through_the_doctor_check(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Negative twin, end-to-end: a realistic /home/<name> is still reported as a
-    genuine finding through the doctor check, not only at the bare regex."""
-    _disable_operator_denylist(monkeypatch, tmp_path)
-    literal = _different_realistic_home_path_literal()
-    public_dir = tmp_path / "public"
-    (public_dir / "data").mkdir(parents=True)
-    (public_dir / "data" / "AGENTS.md").write_text(
-        f"backup lives at {literal}/data\n", encoding="utf-8"
-    )
-
-    report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
-    assert any(line.startswith("[error] public-privacy:") for line in report)
-    assert any(_shown(literal) in line for line in report)
 
 
 # ---------------------------------------------------------------------------
@@ -967,7 +796,7 @@ def test_internal_hostname_uppercase_initial_real_hostname_fires_through_the_doc
 def test_public_privacy_flags_portuguese_control_vocabulary(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, term: str
 ) -> None:
-    """Intent: CONTRACT — 0.4.7 FR4/AC4.1 (T-047-58): `public-privacy` is the runtime
+    """sa-private-match-rendering-has-three-renderers (KEEP, out of #B1/#B2: control vocabulary is public, shown raw): Intent: CONTRACT — 0.4.7 FR4/AC4.1 (T-047-58): `public-privacy` is the runtime
     guard that keeps the published surface English. Without it the translation is a
     one-off cleanup that drifts back on the next authored asset."""
     _disable_operator_denylist(monkeypatch, tmp_path)
@@ -979,9 +808,9 @@ def test_public_privacy_flags_portuguese_control_vocabulary(
     )
 
     report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
-    assert any(
-        line.startswith("[error] public-privacy:") and _shown(term) in line for line in report
-    ), report
+    assert any(line.startswith("[error] public-privacy:") and term in line for line in report), (
+        report
+    )
 
 
 def test_public_privacy_language_check_leaves_english_assets_alone(

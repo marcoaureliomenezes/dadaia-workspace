@@ -317,7 +317,7 @@ def check_public_privacy(
                         findings.append(
                             DoctorLine(
                                 DoctorStatus.ERROR,
-                                f"public-privacy:{rel.as_posix()}: contains '{mask(term)}' ({reason})",
+                                f"public-privacy:{rel.as_posix()}: contains '{term}' ({reason})",
                             )
                         )
             for value, reason in _scan_text_for_baseline(text, baseline):
