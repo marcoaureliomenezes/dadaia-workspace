@@ -10,6 +10,7 @@ can notice.
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -42,8 +43,9 @@ def _ctx(name: str, state: ContextState = ContextState.ALIVE) -> SpecContextProj
 
 def _workspace(tmp_path: Path, *, drifted: bool = False, installed: bool = True) -> Path:
     repo = tmp_path / "repos" / "demo"
+    repo.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
     hooks = repo / ".git" / "hooks"
-    hooks.mkdir(parents=True)
     if installed:
         for target, source in workspace_layout.INSTALLED_GIT_HOOKS:
             shipped = (workspace_layout.public_scripts_dir() / source).read_bytes()
@@ -90,8 +92,6 @@ def test_the_fix_line_run_from_the_workspace_root_rehooks_the_named_repo(
 ) -> None:
     """Review finding 5 (T-048-02): the finding names its repo, and its fix line, run from
     the workspace root (itself a git checkout), re-hooks THAT repo — not the root's."""
-    import subprocess
-
     from typer.testing import CliRunner
 
     from dadaia_workspace.cli.main import app
@@ -121,3 +121,15 @@ def test_a_named_context_checks_only_its_own_repos(tmp_path: Path) -> None:
     service = DoctorService(_Store([_ctx("demo"), _ctx("other")]), None, root)  # type: ignore[arg-type]
     assert service.check_installed_hooks("other") == []
     assert [i.code for i in service.check_installed_hooks("demo")] == ["HOOKS-DRIFT-1"]
+
+
+def test_a_gate_git_never_runs_is_a_finding(tmp_path: Path) -> None:
+    """pre-push-gate-never-runs-under-core-hookspath#B3: the gate sits in .git/hooks but
+    core.hooksPath sends git elsewhere — never reported healthy."""
+    root = _workspace(tmp_path)
+    subprocess.run(
+        ["git", "-C", str(root / "repos" / "demo"), "config", "core.hooksPath", ".husky"]
+    )
+    [issue] = DoctorService(_Store([_ctx("demo")]), None, root).check_installed_hooks()  # type: ignore[arg-type]
+    assert issue.code == "HOOKS-DRIFT-1"
+    assert "repos/demo/.husky/pre-push" in issue.description

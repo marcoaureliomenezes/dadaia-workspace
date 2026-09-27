@@ -10,6 +10,7 @@ duplicate was removed; the ``metrics.commit_sha`` keying coverage lives wholly t
 
 from __future__ import annotations
 
+import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -61,7 +62,7 @@ def test_preflight_pass_and_fail(monkeypatch, tmp_path: Path, all_pass: bool) ->
 def test_install_hook_writes_and_refuses_overwrite_without_force(
     monkeypatch, tmp_path: Path
 ) -> None:
-    (tmp_path / ".git" / "hooks").mkdir(parents=True)
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     monkeypatch.setattr(ci, "_repo_root", lambda: tmp_path)
 
     result = _runner.invoke(app, ["ci", "install-hook"])

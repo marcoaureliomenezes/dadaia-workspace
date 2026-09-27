@@ -132,19 +132,23 @@ def slug_from_url(url: str) -> str:
     return slug
 
 
-def install_git_hooks(repo_root: Path, *, force: bool = False) -> list[Path]:
-    """Copy every ``workspace_layout.INSTALLED_GIT_HOOKS`` row into ``<repo>/.git/hooks``.
+def git_hooks_dir(repo_root: Path) -> Path | None:
+    """Where git runs *repo_root*'s hooks (``core.hooksPath`` honoured); None off a git top."""
+    git = GitSubprocessClient()
+    if not git.is_git_root(repo_root):
+        return None
+    return repo_root / git.git(repo_root, "rev-parse", "--git-path", "hooks")
 
-    The ONE git-chokepoint installer — `dadaia ci install-hook`, `context create` and
-    `context alive` are its callers. An installed hook is overwritten only when *force*
-    or when it is byte-identical to a version this library shipped (``shipped-hashes.json``
-    — an upgrade refreshes it); never the operator's own hook (HOOKS-DRIFT-1 names
-    it). Returns the hooks written; raises :class:`FileNotFoundError` when *repo_root* is
-    not a git repository.
-    """
-    hooks_dir = repo_root / ".git" / "hooks"
-    if not hooks_dir.is_dir():
-        raise FileNotFoundError(f"{hooks_dir} not found (is this a git repository?)")
+
+def install_git_hooks(repo_root: Path, *, force: bool = False) -> list[Path]:
+    """Copy every ``INSTALLED_GIT_HOOKS`` row into :func:`git_hooks_dir`; the ONE installer
+    (`ci install-hook`, `context create`, `context alive`). A hook is overwritten only when
+    *force* or byte-identical to a shipped version (``shipped-hashes.json``), never the
+    operator's own (HOOKS-DRIFT-1 names it); raises FileNotFoundError off a git repo."""
+    hooks_dir = git_hooks_dir(repo_root)
+    if hooks_dir is None:
+        raise FileNotFoundError(f"{repo_root} is not a git repository")
+    hooks_dir.mkdir(parents=True, exist_ok=True)
     scripts = workspace_layout.public_scripts_dir()
     written = []
     for target, source in workspace_layout.INSTALLED_GIT_HOOKS:

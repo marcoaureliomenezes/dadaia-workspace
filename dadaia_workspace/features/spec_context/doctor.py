@@ -33,6 +33,7 @@ from dadaia_workspace.core.models.spec_context import ContextState, SpecContextP
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.workspace_layout import Zone
 from dadaia_workspace.features.spec_context import markers, sweep
+from dadaia_workspace.features.spec_context.service import git_hooks_dir
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
@@ -129,14 +130,13 @@ class DoctorService:
         never installed, or left behind by an older release — is a chokepoint silently
         enforcing yesterday's contract, and nothing else in the workspace can notice.
         Compared BYTE-WISE against ``public/scripts/``: the installer copies verbatim, so
-        any difference at all is drift. A repo that is not a git checkout has no
-        ``.git/hooks/`` to drift and is never a finding. A named *context* scopes the
-        check to its own repos (0.4.8 R5): another context's hooks are not this run's.
+        any difference is drift, judged where git runs hooks; a non-git repo is never a
+        finding. A named *context* scopes the check to its own repos (0.4.8 R5).
         """
         issues: list[DoctorIssue] = []
         for top in self._alive_repo_tops(context):
-            hooks_dir = top / ".git" / "hooks"
-            if not hooks_dir.is_dir():
+            hooks_dir = git_hooks_dir(top)
+            if hooks_dir is None:
                 continue
             for target, source in workspace_layout.INSTALLED_GIT_HOOKS:
                 shipped = workspace_layout.public_scripts_dir() / source
@@ -151,7 +151,7 @@ class DoctorService:
                         DoctorIssue(
                             code="HOOKS-DRIFT-1",
                             description=(
-                                f"{rel}/.git/hooks/{target} differs from the shipped "
+                                f"{os.path.relpath(installed, self._workspace_root)} differs from the shipped "
                                 f"{source} — the chokepoint is enforcing something other "
                                 "than what this release ships."
                             ),

@@ -4,6 +4,7 @@ an operator's own hook stays untouched."""
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 from dadaia_workspace.core import workspace_layout
@@ -14,8 +15,8 @@ _SHIPPED = workspace_layout.public_scripts_dir() / "pre-push-ci-gate.sh"
 
 
 def _hooks(tmp_path: Path, text: str) -> Path:
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     hook = tmp_path / ".git" / "hooks" / "pre-push"
-    hook.parent.mkdir(parents=True)
     hook.write_text(text, encoding="utf-8")
     return hook
 

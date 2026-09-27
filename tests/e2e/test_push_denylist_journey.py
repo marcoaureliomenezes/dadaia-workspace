@@ -216,3 +216,30 @@ def test_planted_term_refused_then_clean_push_after_amend(tmp_path: Path) -> Non
     assert _PLANTED_TERM not in out2, out2
 
     assert _remote_branch_sha(bare) == amended_sha, out2
+
+
+def test_the_gate_runs_where_core_hookspath_points(tmp_path: Path) -> None:
+    """pre-push-gate-never-runs-under-core-hookspath#B1, #B4 (AC1.3): with ``core.hooksPath``
+    set, ``ci install-hook`` puts the gate where git runs hooks, and a push carrying an
+    AKIA-shaped key is refused. Composed at runtime — never a tracked secret literal."""
+    repo, bare = _init_repo_and_remote(tmp_path, _SLUG)
+    _git(["config", "core.hooksPath", ".husky"], repo)
+    (repo / "creds.txt").write_text("key " + "AKIA" + "Q" * 16 + "\n", encoding="utf-8")
+    _git(["add", "creds.txt"], repo)
+    _git(["commit", "-q", "-m", "seed"], repo)
+    result = subprocess.run(
+        [sys.executable, "-m", "dadaia_workspace.cli.main", "ci", "install-hook"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        timeout=_EXIT_DEADLINE,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (repo / ".husky" / "pre-push").is_file()
+
+    stub = _write_dadaia_stub(tmp_path, sys.executable)
+    env = _hook_env(tmp_path, stub=stub, denylist_file=_write_denylist_file(tmp_path))
+    refused = _push(repo, env)
+
+    assert refused.returncode != 0, refused.stdout + refused.stderr
+    assert _remote_branch_sha(bare) is None
