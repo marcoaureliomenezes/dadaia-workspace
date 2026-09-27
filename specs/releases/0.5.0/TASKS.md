@@ -3,176 +3,93 @@
 **Status:** Approved
 **Owner:** dd-software-engineer
 
-Paths are relative to `dadaia_workspace/` (abbreviated `pub/` for `dadaia_workspace/public/`) unless they
-start with `tests/`, `docs/`, `specs/`, `.github/`. Every group commits green (ruff, mypy --strict, pytest).
-DELETE/REBUILD rows (PLAN §1) land first. RED = the named test fails before the change.
+Paths as in PLAN (`f/` features, `i/` infrastructure, `pub/` public). Each bug = one shape-3 commit
+`fix(bugs): <id> — <cause>` (code + regression test + its `BUGS.jsonl` line; loser tests and fakes
+deleted in it); the task flip is its own `chore(tasks)` commit. `RED:` names the PLAN §2 row whose
+`<bug-id>#<id>` statements the tests cite and which fail before the change; each write set includes its
+tests. `Δ` = prod/test lines; PLAN §2.7 ceilings stop a task, never rise.
 
-## Candidate 3 — onboarding foundation
+## Candidate 4 — systemic ambiguity remediation
 
-### G1 — one fix-line builder (FR2)
+### W0 — data loss, leaks, gate holes (FR1)
 
-- [x] **T-050-07 — `core/cli_line.py`; `cli_path` leaves onboarding.**
-  Add `cli_path`/`fix_line`; onboarding and init import from core; delete `onboarding.cli_path` (no shim).
-  `Write set:` `core/cli_line.py`, `features/workspace/onboarding.py`, `cli/commands/init.py`,
-  `tests/unit/core/test_cli_line.py`, `tests/unit/cli/test_init_{reinit_upgrade,plan}.py`
-  `blocked by:` none · `delivers:` AC2.1 — POSIX + Windows forms pinned; today's fix lines unchanged
-  `RED:` `test_cli_line.py` (module absent).
+- [ ] **T-050-23 — Reaper keeps its holds + `release-as`.** `W:` `f/spec_context/{sweep,doctor}.py`, `cli/commands/doctor.py`, `pub/skills/dd-cli-library/SKILL.md`, `release-please-config.json`
+  `blocked by:` none · `delivers:` two same-second reaps leave two intact holds (AC1.2, AC1.6) · `RED:` PLAN §2 WP-02 · Δ −4/+40.
+- [ ] **T-050-24 — Install ledger owns harness dirs (04, 06).** `W:` `i/`, `f/spec_context/doctor.py`
+  `blocked by:` T-050-23 · `delivers:` operator files survive install and `doctor --fix` · `RED:` PLAN §2 WP-04, WP-06 · Δ −131/+7.
+- [ ] **T-050-25 — `workspace_layout.verdict` (05).** Move, switch, delete. `W:` `core/workspace_layout.py`, `hooks/`, `f/spec_context/`, `pub/data/`
+  `blocked by:` T-050-23 · `delivers:` gate ALLOW ⇔ doctor not SLOP · `RED:` PLAN §2 WP-05 · Δ −30/+75.
+- [ ] **T-050-26 — One `InstallPlan` (08).** `W:` `cli/commands/public.py`, `i/{projection_rules,public_assets}.py`
+  `blocked by:` T-050-24 · `delivers:` a scoped install is impossible · `RED:` PLAN §2 WP-08 · Δ −40/+14.
+- [ ] **T-050-27 — Repo law only via `specs init` (07 †).** `W:` `i/`, `cli/commands/public.py`, `f/specs/canon.py`, `f/spec_context/service.py`
+  `blocked by:` T-050-26 · `delivers:` install-first leaves the repo template; edits survive · `RED:` PLAN §2 WP-07 · Δ −230/−119.
+- [ ] **T-050-28 — Ledger pair checked first (09).** `W:` ledger `scripts/`
+  `blocked by:` none · `delivers:` a refusal leaves both files byte-intact · `RED:` PLAN §2 WP-09 · Δ −10/+80.
+- [ ] **T-050-29 — One mask, one redactor (11 †).** `W:` `core/redaction.py`, `cli/`, `f/chokepoints/`, `i/privacy_check.py`
+  `blocked by:` none · `delivers:` `z…x` from every surface · `RED:` PLAN §2 WP-11 · Δ −30/+25.
+- [ ] **T-050-30 — Gate judges every harness; Codex read-only (12, 13).** `W:` `i/runtime_*`, `hooks/`, `core/invocation.py`, `pub/entities/`
+  `blocked by:` none · `delivers:` AC1.4, AC1.5 · `RED:` PLAN §2 WP-12, WP-13 · Δ +7/+97.
+- [ ] **T-050-31 — One symlink-refusing writer (14).** `W:` `f/migrate/`, `core/atomic_write.py`, `f/specs/`, `cli/commands/specs.py`
+  `blocked by:` none · `delivers:` a symlink target is never written · `RED:` PLAN §2 WP-14 · Δ −30/+65.
+- [ ] **T-050-32 — Gate where git runs it; required checks (hooksPath, 32).** Two commits.
+  `W:` `f/spec_context/{service,doctor}.py`, `core/workspace_layout.py`, `.github/`, required-checks file, `f/ci_preflight/`
+  `blocked by:` none · `delivers:` AC1.3, AC1.7 · `RED:` PLAN §2 hooksPath, WP-32 · Δ −70/+141.
+- [ ] **T-050-33 — `context dead` holds (03 †).** `W:` `f/spec_context/`, `i/git_subprocess.py`
+  `blocked by:` T-050-23, T-050-28 · `delivers:` unpushed branch/worktree refused, else held · `RED:` PLAN §2 WP-03 · Δ +3/+78.
 
-- [x] **T-050-08 — Delete `DADAIA_BIN`; every CLI fix goes through `fix_line`.**
-  7 importers migrate; `Rule.fix_help` accepts an argv tuple rendered in `core/doctor_rules._with_fix`;
-  `gate_policy` messages built with the resolved root; `venv_guard` suggestion via `fix_line`; init and
-  create refusals via `fix_line`; constant deleted.
-  `Write set:` `core/{kernel_tunables,doctor_rules}.py`, `features/specs/rules.py`,
-  `features/spec_context/{service,doctor,gate_policy}.py`, `infrastructure/ledger_scripts.py`,
-  `cli/commands/{context,doctor,init}.py`, `hooks/venv_guard.py`, affected tests
-  `blocked by:` T-050-07 · `delivers:` AC2.2, AC2.6 — every doctor/gate/refusal fix is absolute and
-  runnable from any cwd; one init refusal asserted in Windows form
-  `RED:` `tests/contract/test_fix_lines_use_the_builder.py` (AST, fix positions per PLAN §2) lists the sites.
+### M — never-again mechanism (FR5, FR6)
 
-- [x] **T-050-09 — FIXED/TREE remedies honest; missing law file is fixable.**
-  FIXED-1/2 and TREE-4/5 drop their embedded commands; a missing `specs/AGENTS.md` or
-  `specs/<area>/AGENTS.md` is `fixable=True` (writes the shipped template); the copy-path prose is gone;
-  an unfixable TREE-5 case advertises no `doctor --fix`.
-  `Write set:` `features/specs/{doctor_memory,doctor_structural,rules}.py`,
-  `tests/integration/test_doctor_fix_lines_clear_their_finding.py`
-  `blocked by:` T-050-08 · `delivers:` AC2.3, AC2.4 — running the printed fix clears the finding
-  `RED:` the integration test (missing law file stays after `doctor --fix`).
+- [ ] **T-050-34 — Authorities refusal + skills (FR5).** AUTHORING; re-project.
+  `W:` `dd-release-impl/{_release_phase,_release_new}.py`, `pub/skills/{dd-release-definition,dd-code-review,dd-audit-project,dd-spec-navigator}/**`, `CONTEXT.md`
+  `blocked by:` T-050-23..33 · `delivers:` a two-authority PLAN refused, one fix line (AC5.1–5.6) · `RED:` fixture PLAN pair.
+- [ ] **T-050-35 — V37–V39, zone widening, `shutil` contract (FR6).** `W:` `tests/contract/{test_slop_ratchets,test_zone_registry,test_required_evidence_has_one_home}.py`, `setup.cfg`
+  `blocked by:` T-050-34 · `delivers:` AC6.1–6.8 · `RED:` one fixture per ratchet.
 
-### G2 — first pass by real state (FR3, part)
+### H — test harness (FR9)
 
-- [x] **T-050-10 — `template_history` to core; stripped memory-stub digests.**
-  Move (no re-export), callers + 3 test importers updated; backfill stripped digests of every historical
-  `scaffold/memory/{ARCHITECTURE,QUALITY}.md` from `git log`; append-only test covers them.
-  `Write set:` `features/specs/template_history.py` (delete), `core/template_history.py`,
-  `features/specs/doctor_structural.py`, `pub/templates/shipped-hashes.json`,
-  `tests/unit/core/test_template_history.py`, the 3 importing tests
-  `blocked by:` none · `delivers:` AC3.2, AC3.3 — a FIXED-2-rewritten stub still matches a shipped digest
-  `RED:` `test_template_history.py::test_fixed2_rewritten_stub_reads_shipped`.
+- [ ] **T-050-36 — Real-git fixture; fakes out (AC9.4).** `W:` `tests/fakes.py`, `tests/fixtures/**`, 22 user files
+  `blocked by:` T-050-35 · `delivers:` git questions tested against git · `RED:` `FakeContextStore` parity test · Δ 0/−500.
+- [ ] **T-050-37 — `DADAIA_FENCED_ROOTS`: declared feature, no dadaia process acts on a fenced root (0088).** `W:` `core/workspace_resolver.py`, `tests/conftest.py`, `tests/unit/cli/test_workspace_not_found_error.py`, `pub/data/dadaia-AGENTS.md`
+  `blocked by:` T-050-36 · `delivers:` PLAN §2 FR9 fence · `RED:` `sa-seven-workspace-root-rules#S11` (AC9.12, 0088) · Δ +3/+10.
+- [ ] **T-050-38 — Hooks spawn as production; `WORKSPACE_ROOT` gone (15 †, AC9.5).** `W:` `tests/fixtures/harness_env.py`, `core/`, `cli/commands/`, `f/migrate/`, `f/specs/memory_lint.py`, `registry.py`
+  `blocked by:` T-050-37 · `delivers:` one root rule, honest hook tests · `RED:` PLAN §2 WP-15 · Δ −25/+108.
 
-### G3 — the project gitflow (FR6, FR8)
+### W1 — stalls, loops, unclearing fixes (FR2)
 
-- [x] **T-050-11 — `core/gitflow.py` + frontmatter merge-writer.**
-  `Gitflow`, `DEFAULT`, `from_mapping`, `role_of`; `read_gitflow` and one `merge_frontmatter` on
-  `frontmatter.parse`; `_STAMP_RE` deleted; stub and library constitution carry the block.
-  `Write set:` `core/{gitflow,specs_version}.py`, `features/specs/canon.py`, `specs/constitution.md`,
-  `tests/unit/core/test_gitflow.py`, `tests/unit/core/test_specs_version.py`, core file-I/O allowlist test
-  `blocked by:` none · `delivers:` AC6.1, AC6.2 — a constitution's gitflow reads back; other keys and body
-  byte-identical after a merge
-  `RED:` `test_gitflow.py` (module absent), merge preserves an unknown key.
+- [ ] **T-050-39 — One bind (16 †).** `W:` `core/invocation.py`, `f/workspace/`, `hooks/`, `f/spec_context/`, `cli/`, `pub/data/`
+  `blocked by:` T-050-38 · `delivers:` four readers agree · `RED:` PLAN §2 WP-16 · Δ −5/+115.
+- [ ] **T-050-40 — Fix lines, one printer, unfixable fixes (17–19 †).** Three commits. `W:` `core/`, `hooks/`, `f/chokepoints/`, `f/spec_context/`, `cli/`
+  `blocked by:` T-050-39 · `delivers:` AC2.2, AC2.3 · `RED:` PLAN §2 WP-17, WP-18, WP-19 · Δ −48/+315.
+- [ ] **T-050-41 — TREE-8 alone (20).** `W:` `f/specs/` · `blocked by:` T-050-40 · `delivers:` one finding per stray path · `RED:` PLAN §2 WP-20 · Δ −115/−40.
+- [ ] **T-050-42 — One registry-version grammar (21 †).** `W:` `i/json_context_store.py`, `f/migrate/`, `core/`, `cli/commands/`, `f/spec_context/` · `blocked by:` T-050-40 · `delivers:` readable ⇔ no migration · `RED:` PLAN §2 WP-21 · Δ −18/+100.
+- [ ] **T-050-43 — Scripts own bug records and the seam (22, 23).** `W:` `core/`, `container.py`, `f/specs/`, `pub/skills/_shared/_privacy.py`, ledger `scripts/`, `pub/schemas/bugs/`, `i/public_assets.py`
+  `blocked by:` T-050-28, T-050-40 · `delivers:` doctor = `bugs.py check`; seam ⇔ push · `RED:` PLAN §2 WP-22, WP-23 · Δ −700/−660.
+- [ ] **T-050-44 — Backlog status and pick (24).** `W:` `f/backlog/`, backlog `scripts/`, `_release_new.py`, law · `blocked by:` T-050-43 · `delivers:` exit without hand edit · `RED:` PLAN §2 WP-24 · Δ −80/−40.
+- [ ] **T-050-45 — `release.py ship` (25).** `W:` `dd-release-impl/scripts/`, `f/specs/`, releases law, RC-FLOW, gitflow · `blocked by:` T-050-44 · `delivers:` AC2.5 · `RED:` PLAN §2 WP-25 · Δ −40/−70.
+- [ ] **T-050-46 — Status line; `measured_by` (26, 27).** `W:` `core/spec_status.py`, `f/specs/`, `pub/schemas/ADRs/`, `pub/scaffold/ADRs/` · `blocked by:` T-050-40 · `delivers:` one status token · `RED:` PLAN §2 WP-26, WP-27 · Δ −20/+50.
+- [ ] **T-050-47 — `specs_version.state` (28 †).** `W:` `core/specs_version.py`, `cli/commands/ci.py`, `f/{specs,migrate,workspace,chokepoints}/` · `blocked by:` T-050-40 · `delivers:` pre-push judges the pushed commit · `RED:` PLAN §2 WP-28 · Δ −34/+145.
+- [ ] **T-050-48 — One atom grammar (29).** `W:` navigator `scripts/`, `f/specs/`, `i/ledger_scripts.py`, `pub/scaffold/memory/` · `blocked by:` T-050-40 · `delivers:` one verdict per atom · `RED:` PLAN §2 WP-29 · Δ −155/−10.
 
-- [x] **T-050-12 — Branch policy reads the gitflow; dead gate code deleted.**
-  Delete the 3 regexes, `_PERMITTED_BRANCH_RES`, `branch_name_is_permitted`, `parse_push_refs`, their
-  exports, unused `_run_specs_canon_scan` params, stale comments; `check_branch_policy(refs, gitflow)`;
-  `push_gate_decision` requires `gitflow`; `ci.py` resolves main → associated (public
-  `repo_slug_under_repos`) → DEFAULT + warning; hook wording by role.
-  `Write set:` `features/chokepoints/{branch_policy,push_gate,__init__}.py`, `cli/commands/ci.py`,
-  `core/invocation.py`, `pub/scripts/pre-push-ci-gate.sh`,
-  `tests/unit/features/chokepoints/test_push_{branch_policy,denylist_scan,specs_canon_scan}.py`,
-  `tests/contract/test_every_block_carries_a_fix.py`, `tests/e2e/test_push_gate_check.py`
-  `blocked by:` T-050-11 · `delivers:` AC6.4, AC6.5, AC8.1 — a `trunk`/`next`/`work/` project pushes its
-  work branch; refusals name its branches; an associated repo inherits
-  `RED:` custom-gitflow cases in `test_push_branch_policy.py`.
+### W2 — consolidations (FR3)
 
-- [x] **T-050-13 — `specs init` gitflow flags + GITFLOW-1.**
-  `--principal/--integration/--work-prefix`; principal detected by `GitSubprocessClient.default_branch`
-  (local `symbolic-ref`, else `main`); written fresh or merged; idempotent; stdout names it; GITFLOW-1 WARN
-  with the `specs init` fix line carrying the detected flags.
-  `Write set:` `cli/commands/specs.py`, `infrastructure/git_subprocess.py`,
-  `features/specs/{doctor_coherence,rules}.py`, `tests/integration/cli/test_specs_init_levels.py`,
-  `tests/integration/test_doctor_fix_lines_clear_their_finding.py`
-  `blocked by:` T-050-08, T-050-11 · `delivers:` AC6.3, AC6.6 — the operator sees and sets the gitflow;
-  running GITFLOW-1's fix clears it
-  `RED:` flag cases in `test_specs_init_levels.py`.
+- [ ] **T-050-49 — `release.py check` (30).** `W:` `f/specs/`, `core/` · `blocked by:` T-050-45 · `delivers:` one live release · `RED:` PLAN §2 WP-30 · Δ −105/−100.
+- [ ] **T-050-50 — Certify walks the workspace (31).** `W:` `f/{certification,reconcile}/`, recipe · `blocked by:` T-050-40 · `delivers:` AC3.2 · `RED:` PLAN §2 WP-31 · Δ −126/+116.
+- [ ] **T-050-51 — Context repos; running version (33, 34).** `W:` `core/`, `i/`, `cli/`, `f/{capabilities,reconcile}/` · `blocked by:` T-050-39 · `delivers:` no name fallback; editable reports source · `RED:` PLAN §2 WP-33, WP-34 · Δ −18/+192.
+- [ ] **T-050-52 — Subjects in the doctor (35).** `W:` backlog `scripts/`, `f/backlog/`, `core/models/backlog.py` · `blocked by:` T-050-44 · `delivers:` no circular RESOLVED · `RED:` PLAN §2 WP-35 · Δ −25/+39.
+- [ ] **T-050-53 — Hook interpreter; reviewer persona (36, 37).** `W:` `i/`, `pub/agents/`, `pub/entities/` · `blocked by:` T-050-30 · `delivers:` AC3.3 · `RED:` PLAN §2 WP-36, WP-37 · Δ −27/+195.
+- [ ] **T-050-54 — Rendered canon law (38).** `W:` `i/public_assets.py`, `core/workspace_layout.py`, `f/specs/`, `pub/templates/` · `blocked by:` T-050-27 · `delivers:` rendered tables · `RED:` PLAN §2 WP-38 · Δ +4/+33.
 
-### G4 — bootstrap birth (FR5)
+### W3 — design debt (FR4)
 
-- [x] **T-050-14 — `publishes_nothing` replaces `parents`; births pass.**
-  Port and reader swap the method (reusing `_base_exclusions`); fake stubs deleted; births computed in
-  `push_gate_decision` for principal/integration refs with a zero remote sha; stale tracking refs refuse with
-  `fix: git fetch <remote>`.
-  `Write set:` `features/chokepoints/{push_gate,branch_policy}.py`, `infrastructure/git_objects.py`,
-  `tests/unit/infrastructure/test_git_object_reader.py`, `tests/contract/test_push_gate_wiring.py`,
-  chokepoint unit tests
-  `blocked by:` T-050-12 · `delivers:` AC5.1–AC5.4 — an empty-root principal and `git branch <integration>
-  <principal>` push; a birth carrying a commit is refused
-  `RED:` the orphan-empty-root case refused today.
+- [ ] **T-050-55 — One path classifier (39).** `W:` `f/spec_context/gate_policy.py`, `core/workspace_layout.py`, `f/specs/`, law · `blocked by:` T-050-25 · `delivers:` law = gate · `RED:` PLAN §2 WP-39 · Δ +5/−5.
+- [ ] **T-050-56 — Caches in `.dadaia/tmp`; one TTL (40, 45).** `W:` `pyproject.toml`, `i/runtime_config.py`, `f/spec_context/markers.py`, `core/`, law · `blocked by:` T-050-23 · `delivers:` one clock · `RED:` PLAN §2 WP-40, WP-45 · Δ −67/+40.
+- [ ] **T-050-57 — Work and principal branch (41, 42 †).** `W:` `f/spec_context/service.py`, `cli/commands/`, `f/specs/canon.py`, gitflow skill, repo `AGENTS.md` · `blocked by:` T-050-45 · `delivers:` AC4.2 · `RED:` PLAN §2 WP-41, WP-42 · Δ −1/+81.
+- [ ] **T-050-58 — Audit close; script vocabulary + atomic write (43, 48).** `W:` `f/specs/`, `i/jsonl_record_store.py`, `core/models/`, ledger `scripts/`, `registry.py` · `blocked by:` T-050-43 · `delivers:` no invalid archive, no `.tmp` leak · `RED:` PLAN §2 WP-43, WP-48 · Δ −187/−295.
+- [ ] **T-050-59 — Unconsumed assets leave (44).** `W:` `i/` · `blocked by:` T-050-26 · `delivers:` clean without the index · `RED:` PLAN §2 WP-44 · Δ −151/−100.
+- [ ] **T-050-60 — Handoff v1.2; upgrade target (46, 47).** `W:` `pub/schemas/`, `core/handoff_index.py`, `cli/commands/specs.py`, `f/migrate/` · `blocked by:` T-050-31 · `delivers:` AC4.3 · `RED:` PLAN §2 WP-46, WP-47 · Δ −24/+15.
+- [ ] **T-050-61 — Restated rules; consumer law (49, FR-8).** `W:` `pub/{data,scaffold,schemas}/`, gitflow skill, `f/specs/canon.py`, `setup.cfg`, `CONTEXT.md` · `blocked by:` T-050-35 · `delivers:` AC4.3, AC4.4 · `RED:` PLAN §2 WP-49, FR-8 · Δ −60/+125.
 
-### G5 — the one publish verb (FR4)
+### C — closure evidence (FR7, FR8, FR9)
 
-- [x] **T-050-15 — Rebuild `context baseline`.**
-  Delete the convergent `has_commits` branch, `feature/0.1.0`, `--yes`/`--push`; straight-line flow per
-  PLAN §2 with the new git reads; certification drops the flags.
-  `Write set:` `features/spec_context/service.py`, `infrastructure/git_subprocess.py`,
-  `cli/commands/context.py`, `features/certification/service.py`,
-  `tests/integration/test_context_baseline.py`, `tests/contract/cli/test_cli_context.py`
-  `blocked by:` T-050-11, T-050-14 · `delivers:` AC4.2–AC4.7 — one line publishes principal, integration
-  and `<prefix>0.1.0` on any remote state, a re-run is a no-op
-  `RED:` the 9 AC4.6 cases (unborn, principal only, both, tag, dirty, re-run, paths-only, offline, identity).
-
-### G6 — the derived step list (FR7, FR1, FR3)
-
-- [x] **T-050-16 — Only `context bind` binds.**
-  `init`/`create` write no session record, print no export, drop "and bound"; `bind_session` inlined into
-  `bind`.
-  `Write set:` `cli/commands/{init,context}.py`, `tests/integration/{test_init_with_repo,
-  test_context_create_transactional}.py`, `tests/contract/cli/test_cli_context.py`,
-  `tests/contract/test_cli_output_stability.py`
-  `blocked by:` T-050-08 · `delivers:` AC7.1 — init/create leave no session record
-  `RED:` `test_init_with_repo.py` asserts no session record.
-
-- [x] **T-050-17 — `STEPS`: context, bind, specs, first-pass, publish; one caller helper.**
-  Delete `_lowest`, `_first_pass_done`, `_AUDITS_HISTO`; `StepDef` tuple, `Step.kind`; first-pass via
-  stripped digests + catalog atoms, fix = installed SKILL path + pending list; publish via
-  `published(repo, "specs/constitution.md")`; bind only with a resolvable, unbound session id; doctor
-  `--json` `step`/`kind`; ctx_inject one helper for both paths; `test_onboarding_text.py` deleted, step
-  census added.
-  `Write set:` `features/workspace/onboarding.py`, `hooks/ctx_inject.py`, `cli/commands/{doctor,context,init}.py`,
-  `tests/unit/features/workspace/test_onboarding.py`, `tests/unit/hooks/test_ctx_inject.py`,
-  `tests/contract/test_onboarding_{text,steps}.py`
-  `blocked by:` T-050-10, T-050-13, T-050-15, T-050-16 · `delivers:` AC1.1, AC1.2, AC1.5–AC1.7, AC3.1,
-  AC4.1, AC7.2 — doctor, init, create and SessionStart print the same next step
-  `RED:` I1 (writing `audits_histo` changes a step today); bound SessionStart text ≠ doctor's.
-
-- [x] **T-050-18 — Property test: every command fix clears its step.**
-  Hypothesis over real-state prefixes (tmp dirs, `file://` remotes, `max_examples` ≤ 25): execute each
-  pending command step's fix (placeholders substituted), assert cleared and index strictly increasing.
-  `Write set:` `tests/integration/test_onboarding_steps_property.py`, `tests/unit/features/workspace/`
-  `blocked by:` T-050-17 · `delivers:` AC1.3, AC1.4, AC7.3 — no step can stall
-  `RED:` run against T-050-17 before its last fix; a non-clearing step fails.
-
-### G7 — text by role, law, docs (FR6, FR3, FR9)
-
-- [x] **T-050-19 — Shipped text by role; library `pr-source-guard` reads the gitflow.**
-  Rewrite the ~36 PLAN §1 literals by role with a pointer to the constitution; `dd-gitflow-default` table by
-  role; `ci.yml` guard reads `read_gitflow`; triggers stay literal, pinned by contract test.
-  `Write set:` the PLAN §1 shipped-text files, `.github/workflows/ci.yml`,
-  `tests/contract/{test_ci_workflow_hygiene,test_secret_scan_workflow_gitflow_triggers}.py`
-  `blocked by:` T-050-12 · `delivers:` AC6.7–AC6.9 — agents read the gitflow by role
-  `RED:` trigger-equality contract test against a changed library gitflow.
-
-- [x] **T-050-20 — Law, docs, first-pass skill, glossary; reproject.**
-  `dd-audit-project` first pass ends at `memory.py check` (no FINDINGS, no `audit.py close`); bind and
-  level-3 claims rewritten; `CONTEXT.md` gets the §3 terms; `public stage/install/doctor` + `doctor` exit 0.
-  `Write set:` `pub/skills/{dd-audit-project,dd-cli-library}/SKILL.md`, `pub/data/{AGENTS.md,
-  CONSUMER_VALIDATION_RECIPE.md}`, `docs/{quickstart,index,getting-started}.md`, `README.md`, `CONTEXT.md`,
-  `tests/contract/test_audit_first_pass.py`
-  `blocked by:` T-050-17 · `delivers:` AC3.4, AC9.1, AC9.2, AC9.4 — law and docs match the CLI
-  `RED:` `test_audit_first_pass.py` asserts no `audit.py close`.
-
-### G8 — autopilot (FR10)
-
-- [x] **T-050-21 — Autopilot E2E journey.**
-  From an empty dir, `file://` remotes, `DADAIA_SESSION_ID` set, one `init … --repo`: loop `doctor --json` →
-  run the ONBOARDING fix (`shlex.split`; agent step via scripted stand-in), cap 10; greenfield, v6 tree,
-  foreign tree; HEAD == upstream; Upgrade scenario kept.
-  `Write set:` `tests/e2e/test_onboarding_journey.py`
-  `blocked by:` T-050-18, T-050-20 · `delivers:` AC10.1–AC10.3 — an agent loops from nothing to a
-  published project
-  `RED:` the loop reaches the cap on today's code.
-
-Closure (not tasks): AC9.3 memory pass (dd-product-engineer); AC11.3 net-lines measurement vs PLAN §1.1.
-
-- [x] **T-050-22 — R13 append-only publish (round 6).**
-  Adopt origin, publish an empty origin's local principal, no rewrite/delete/force; one fix per
-  git-failure cause; origin-scoped "published"; one identity probe (SA-H3-1/2/3/8/17).
-  `blocked by:` T-050-15 · `delivers:` AC4.2–AC4.6, AC11.3 — the publish never rewrites history
+- [ ] **T-050-62 — Prune and measure.** Execute the QA-lens pruning verdict (≥ 522 test lines, AC9.9); AC8.1 deltas, allowance subset, mutmut, AC9.11 counts, fenced rubric.
+  `W:` tests, handoff · `blocked by:` T-050-23..61 · `delivers:` AC7.1–7.3, AC8.1, AC9.9–9.11 · `RED:` n/a.

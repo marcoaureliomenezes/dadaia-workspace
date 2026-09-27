@@ -4,290 +4,457 @@
 **Release ID:** 0.5.0
 **Owner:** dd-software-engineer
 
-Candidate 3 — "onboarding foundation". SPEC FR1–FR11; ADRs 0033–0038, 0040, 0042–0046; main-thread
-rulings 2026-09-25 (work key stores `feature/`; the `specs` fix line carries the three gitflow flags with
-detected values; agent-step fix = SKILL path + pending list; `context` step keeps placeholders; a baseline
-push failure after the local commit is finished by re-running; shrink = direction + per-unit estimate here,
-measured at closure; `python3 .agents/…` constants out of scope).
-Paths are relative to `dadaia_workspace/` unless they start with `tests/`, `docs/`, `specs/`, `.github/`.
+Candidate 4 — "systemic ambiguity remediation" (CRITICAL). SPEC FR1–FR9 (FR9 = test strategy); DEC-1..DEC-13 as recommended
+(DEC-11 deferred); the grill decisions of 2026-09-26/27, cited as ADR ids `(00NN)` as in the SPEC. Evidence: `reports/main-thread/20260927-050-c4-evidence/` (`EV/`).
+Paths are relative to `dadaia_workspace/` (`f/` = `features/`, `i/` = `infrastructure/`, skill scripts as
+`<skill>/<file>`) unless they start with `tests/`, `specs/`, `.github/`.
 
 ## 1. As-is review
 
-Surveys `inventory-c3-foundation-state-machine.md` and `inventory-c3-gitflow-and-c4-docs.md` §A were taken
-at 1fce38d6. They were checked against 78bf410f: no production module has changed since (c2 touched only
-release scripts and skills; Arm B touched only tests). The drift corrected here is listed in §1.2.
-Ledger: 557 records, 0 open (2 new since the SPEC, both tests-only: `e2e-upgrade-previous-version-equals-source-version`
-on the E2E journey, and the conftest cwd bug).
+Read-only at `38b51b4b` (`EV/c4/asis-{A,B}.json`), test audits at `2c1faf65`/`8ba986e7` (`EV/c4/tests-audit-*.json`); re-measured when
+`release.py new` opens the candidate after candidate 3 closes (every † unit). Ledger: 49 open —
+the 48 `sa-*` bugs below plus `pre-push-gate-never-runs-under-core-hookspath` (HIGH, 0057, 0085);
+`sa-pre-push-and-publish-scan-disagree-on-secret-shapes` was resolved in candidate 3 (T-050-22, `-83`
+lines) and leaves this table. Every authority unit carries ≥ 2 prior bugs → REBUILD, not patch.
+Rows are grouped per package and verdict; `″` = as the row above; the first row of each package names
+its bug and the count of ledger bugs on its units.
 
 | unit | today | bugs | verdict | why |
 |---|---|---|---|---|
-| `features/workspace/onboarding.py` `_lowest` + `_first_pass_done` + `_AUDITS_HISTO` | if-chain over 3 levels; level 3 = `audits_histo` stamp; POSIX `$(git rev-list …)` fix | 2 (`audit-close-refuses-a-clean-audit`, `session-start-bound-session-omits-onboarding-next-step`) | REBUILD | contract contradicts ADR 0033/0034; the stamp predicate is proven wrong |
-| `features/workspace/onboarding.py` `cli_path` | absolute CLI path, only onboarding + init use it | 9-bug fix-line family | DELETE | moves to `core/cli_line.py` (no shim) |
-| `features/workspace/onboarding.py` `Step` | `reason`, `command`; no kind | 0 | UPDATE | gains `kind`; `text()` names it |
-| `core/kernel_tunables.py` `DADAIA_BIN` | relative POSIX CLI spelling, 40 uses in 7 importers | 9-bug fix-line family | DELETE | second spelling; wrong on Windows and from `repos/<slug>` |
-| `features/specs/rules.py` fix_help strings | 7 `f"{DADAIA_BIN} …"`; TREE-5 advertises `doctor --fix` even where it is `fixable=False` | 1 (`tree8-fix-line-not-runnable-for-every-case`) | UPDATE | CLI remedies become argv, rendered once by `fix_line` |
-| `core/doctor_rules.py` `_with_fix` | stamps a static `fix_help` string | 0 | UPDATE | the one render site: an argv `fix_help` is built with `fix_line(root, …)` |
-| `features/spec_context/{service,doctor,gate_policy}.py`, `infrastructure/ledger_scripts.py`, `cli/commands/{context,doctor}.py` DADAIA_BIN sites | hand-built f-strings | 5 (gate_policy), 11 (context), 7 (service) | UPDATE | call-site migration only, no behaviour change |
-| `hooks/venv_guard.py` corrected command (:120) | suggests `.dadaia/.venv/bin/dadaia …` (POSIX) | 0 | UPDATE | the suggestion becomes a `fix_line`; `_VENV_BIN` matcher and the `$DADAIA_BIN` env allowance stay (a matcher, not a spelling) |
-| `features/ci_preflight/service.py` `$DADAIA_BIN` env read | resolves the hook-exported runner | 0 | KEEP | env var ≠ the constant; not a fix line |
-| `features/specs/doctor_memory.py` FIXED-1 (:181) / FIXED-2 (:263) | embed bare `dadaia doctor --fix` | 1 (`shipped-text-cites-bare-dadaia-the-gate-blocks`) | UPDATE | remedy lives in the fix line only |
-| `features/specs/doctor_structural.py` TREE-4/5 | bare `dadaia specs init` (:236); copy-a-library-path prose (:285-295); missing law file `fixable=False` | 3 (`doctor-messages-cite-dead-verbs`, `doctor-fix-tree8-deletes-operator-content`, `specs-doctor-segment-router-silent-skip`) | REBUILD | a stall: the advertised fix does not clear it; writing a missing template is lossless |
-| `features/specs/template_history.py` | stdlib-only history of shipped hashes; sole prod caller `doctor_structural` | 0 | DELETE | moved to `core/template_history.py` (3 test importers updated) |
-| `public/templates/shipped-hashes.json` | no memory-stub digests | 0 | UPDATE | + stripped digests of every historical scaffold ARCHITECTURE/QUALITY |
-| `cli/commands/init.py` bind + refusals | binds (session record, `export` lines), "and bound"; 3 hand-built refusal fixes | 5 (`init-foreign-tree-fix-line-unrunnable`, `init-missing-harness-fix-line-drops-repo-flags`, `init-root-dir-crashes-deriving-sibling-fix`, …) | REBUILD | ADR 0038: a second bind author; ≥2 fix-line bugs |
-| `cli/commands/context.py` `bind_session` + create bind + `_create_fix` | shared bind helper, create binds; baseline `--yes`/`--push` | 11 (`context-bind-session-id-mismatch`, `context-baseline-rejects-official-scaffold-followup`, …) | REBUILD | one bind author left (inline); consent = invoking the verb |
-| `features/spec_context/service.py` `baseline` | unborn-only, convergent `has_commits` branch (:566), hard-coded `feature/0.1.0` (:585), `push` flag | 2 (`baseline-refuses-alive-scaffold-commit`, `context-baseline-rejects-official-scaffold-followup`) | REBUILD | the convergent branch is a symptom patch; ADR 0035 changes the contract |
-| `features/spec_context/service.py` `_require_no_untracked_secrets` | secret scan before commit | 0 | KEEP | reused by the rebuild |
-| `infrastructure/git_subprocess.py` `GitSubprocessClient` | clone/commit/push/create_branch…; no fetch, ls-remote, tag, refspec push, symbolic-ref | 2 (history walk, shallow checkout) | UPDATE | the new git reads the baseline and `specs init` need; concrete adapter, no new Protocol |
-| `features/certification/service.py` baseline call (:389) | `--yes --push` | 10 on the file, 0 here | UPDATE | flags deleted |
-| `hooks/ctx_inject.py` `_generic_preflight` + `_emit_bootstrap` | two `next_step` call sites (:288, :313) | 7 (1 is the duplicate's origin) | REBUILD | the second call site was a symptom patch; one helper |
-| `cli/commands/doctor.py` `_onboarding_section` | ONBOARDING info from `next_step` | 0 | UPDATE | `--json` carries `step`, `kind` |
-| `features/chokepoints/branch_policy.py` `_MAIN_RE`/`_DEVELOP_RE`/`_FEATURE_RE`/`_PERMITTED_BRANCH_RES`, `branch_name_is_permitted`, `parse_push_refs` | hard-coded names; two test-only functions | 8 hard-coded-name bugs | REBUILD | one name source (`core/gitflow`); dead code deleted |
-| `features/chokepoints/__init__.py` exports of the two dead functions + stale comment | re-exports test-only API | 0 | DELETE | follows the deletion |
-| `features/chokepoints/push_gate.py` `ObjectSource.parents`, `_run_specs_canon_scan` params, `push_gate_decision` | `parents` has no prod caller; unused `object_source`/`repo`; refuses every principal/integration push | 3 + 6 "already published" | REBUILD | births need `publishes_nothing` reusing `_base_exclusions`, never a second rule |
-| `infrastructure/git_objects.py` `GitSubprocessObjectReader.parents` | dead | 0 | DELETE | replaced by `publishes_nothing` |
-| `core/specs_version.py` `_STAMP_RE` + `write_pattern_version` | regex frontmatter read/write, one key | 3 | REBUILD | `core/frontmatter.parse` + one merge-writer for both keys |
-| `features/specs/canon.py` `_CONSTITUTION_STUB` | only `specs_pattern_version` | 6 on the file | UPDATE | stub carries the default `gitflow:` block |
-| `cli/commands/specs.py` `init` | no gitflow flags; `canon.scaffold` writes only missing files | 2 | UPDATE | +3 flags; merge the block into an existing tree |
-| `features/specs/doctor_coherence.py` + `rules.py` | SPECS-VERSION beside SPEC-DOC | 0 | UPDATE | GITFLOW-1 (WARN) |
-| `cli/commands/ci.py` pre-push | reads working-tree constitution for the pattern version | 6 | UPDATE | also resolves the gitflow (main → associated → default+warning) |
-| `core/invocation.py` `_repo_slug_under_repos` | private | 0 | UPDATE | made public for `ci.py` (rename, no wrapper) |
-| `public/scripts/pre-push-ci-gate.sh` wording | names `feature/`/`develop`/`main` | 0 | UPDATE | by role |
-| `.github/workflows/ci.yml` `pr-source-guard` | literal branch names + a stale comment | 1 (`pr-source-guard-refuses-the-release-please-pr-to-main`) | REBUILD | reads the library gitflow; triggers pinned by contract test |
-| shipped text (~36 lines: `dd-gitflow-default`, `CICD-AUTOMATION.md`, release/bug/audit skills, `RC-FLOW.md`, scaffold/templates AGENTS, `data/AGENTS.md`, `registry.json`, `release-state-v1` schema, README, docs, `llms.txt`, `CONTEXT.md`) | hard-coded branch names | 8-bug family | UPDATE | by role + pointer to the constitution |
-| `public/skills/dd-audit-project/SKILL.md` first pass | condition = empty `audits_histo`; ends with `audit.py close` stamp | 1 | REBUILD | ADR 0034: done by real memory content |
-| law/docs claiming bind-by-init/create or level 3 = stamp (`data/AGENTS.md` §7, `dd-cli-library`, `docs/{quickstart,index,getting-started}.md`, README, `CONSUMER_VALIDATION_RECIPE.md`, `CONTEXT.md`) | contradict ADRs 0034/0035/0038 | 2 (`onboarding-docs-contradict-the-cli`, `dd-cli-library-cites-a-dead-flag-and-omits-level-3`) | UPDATE | rewritten in place |
-| `tests/contract/test_onboarding_text.py` | regex census of fix text | 0 | DELETE | replaced by the step census + the AST test (R4) |
-| `tests/unit/features/workspace/test_onboarding.py` | tests the if-chain and stamp | 0 | REBUILD | per-step predicates; I1 |
-| `tests/contract/test_audit_first_pass.py` | asserts the stamp flow | 0 | REBUILD | asserts memory-check end |
-| `tests/unit/features/chokepoints/test_push_{branch_policy,denylist_scan,specs_canon_scan}.py`, `tests/contract/{test_push_gate_wiring,test_every_block_carries_a_fix}.py` | `parents` stubs, `parse_push_refs`, `branch_name_is_permitted` | 0 | UPDATE | stubs deleted, `parse_push_stdin(...)[0]`; gitflow cases |
-| `tests/integration/{test_init_with_repo,test_context_create_transactional}.py`, `tests/contract/cli/test_cli_context.py`, `tests/contract/test_cli_output_stability.py` | assert bind output / session record | 0 | UPDATE | assert no binding; goldens regenerated |
-| `tests/e2e/test_onboarding_journey.py` | journey ends with HEAD == `ls-remote HEAD` | 1 (`e2e-upgrade-previous-version-equals-source-version`) | REBUILD | the autopilot loop (FR10); keep the Upgrade scenario |
-| `tests/e2e/test_push_gate_check.py`, `tests/contract/test_ci_workflow_hygiene.py`, `tests/contract/test_secret_scan_workflow_gitflow_triggers.py`, `tests/integration/cli/test_specs_init_levels.py` | literal gitflow | 0 | UPDATE | custom and absent gitflow cases |
-| `core/cli_line.py` | — | — | ADD | no core module owns the CLI spelling, and features may not import each other (setup.cfg independence contract) |
-| `core/gitflow.py` | — | — | ADD | a pure value both `chokepoints` and `specs` need; only `core` is importable by both |
+| `f/spec_context/sweep.py` move | A same-day re-reap of one origin deletes the earlier hold before its… | 4 (`sa-reaper-destroys-its-own-hold-before-ttl`) | REBUILD | Carries the destroy-before-TTL defect plus 3 prior reaper fixes;… |
+| `f/spec_context/doctor.py` _reaped_destination; `public/skills/dd-cli-library/SKILL.md` step-6; `cli/commands/doctor.py` expired_only option | ″ | ″ | UPDATE | Bucket becomes <YYYYMMDDTHHMMSSZ> (with -N on collision) so each reap… |
+| `f/spec_context/sweep.py` remove | ″ | ″ | KEEP | Still the EXDEV fallback's origin removal and the TTL delete… |
+| `f/spec_context/service.py` dead | context dead deletes a repo irreversibly with rmtree instead of… | 8 (`sa-context-dead-removes-repos-outside-the-reaper`) | REBUILD | 24 ledger bugs on service.py and 5 prior dead() fixes (unborn clone,… |
+| `f/spec_context/service.py` DeadUnpushedCommitsError; `i/git_subprocess.py` GitCli.unpushed; `f/spec_context/doctor.py` _reap_dead_repo +1 | ″ | ″ | UPDATE | Docstring shrinks to the real rule. |
+| `f/spec_context/service.py` create rollback… | ″ | ″ | KEEP | Removes only what the same call just cloned; the one legitimate raw… |
+| `i/projection_rules.py` prune_stale_codex_tomls; `i/install_helpers.py` remove_retired_core_rules; `i/install_helpers.py`… +2 | public install unlinks .codex/agents/*.toml not in the current… | 5 (`sa-public-install-unlinks-operator-files-outside-its-ledger`) | DELETE | Second prune path beside the ledger reconciler; judges by glob, not… |
+| `i/public_assets.py` install (prune calls) | ″ | ″ | UPDATE | Four call sites and imports removed. |
+| `hooks/root_whitelist.py` _operator_exception; `hooks/root_whitelist.py` main (back-compat wrapper); `f/spec_context/doctor.py` _excepted +1 | The gate ALLOWs an existing non-whitelisted root entry that the… | 10 (`sa-gate-allows-root-entries-the-reaper-moves`) | DELETE | Second glob matcher with a different rule than doctor._excepted. |
+| `hooks/root_whitelist.py` _root_block_reason; `f/spec_context/doctor.py` _scan_root | ″ | ″ | REBUILD | 4 fix commits and 4 ledger bugs (misses nested writes, message… |
+| `f/spec_context/gate_policy.py` classify (root arm); `f/spec_context/doctor.py` _scan_dadaia_top; `public/data/AGENTS.md` §4 root line +1 | ″ | ″ | UPDATE | Root specs/ arm deleted; .dadaia/<non-zone> and .dadaia/states/<new>… |
+| hooks/sdd_post_gate.py | ″ | ″ | KEEP | Calls doctor.reap; becomes correct once gate and doctor share verdict. |
+| `core/workspace_layout.py` verdict | — | ″ | ADD | No existing unit is shared by gate and doctor; the classifier bodies… |
+| `f/spec_context/doctor.py` _scan_harness_dirs; `f/spec_context/doctor.py` _active_harnesses | doctor --fix and the PostToolUse reaper move… | 4 (`sa-doctor-reaps-harness-owned-entries`) | DELETE | The walker judges entries a harness writes without passing the gate;… |
+| .dadaia/states/instance_exceptions.txt (instance) | ″ | ″ | UPDATE | Operator removes dm-chain-*, settings.local.json, worktrees globs… |
+| core/harness_registry.py; f/spec_context/gate_policy.py / hooks/sdd_gate.py | ″ | ″ | KEEP | DEC-2 (b) not taken; no per-harness native canon. |
+| `i/workspace_guardrail.py` _consumer_repos_for_root; `i/workspace_guardrail.py` _classify_consumer_agents; `i/workspace_guardrail.py` _doctor_consumer_pair_lines +2 | public install copies the root map into repos/<slug>/AGENTS.md and… | 8 (`sa-public-install-writes-the-root-map-into-product-repos`) | DELETE | Consumer fan-out discovery. |
+| `i/workspace_guardrail.py` _install_guardrail_pair… | ″ | ″ | REBUILD | 5 fix commits; a second writer of repo law. Shrinks to the… |
+| `i/workspace_guardrail.py` _agents_md_source; `i/public_assets.py` install (consumer fan-out + scope); `f/specs/canon.py` REPO_LAW +1 | ″ | ″ | UPDATE | templates/AGENTS.md precedence removed. |
+| `cli/commands/public.py` install --only; `i/projection_rules.py` InstallPlan.only + branches | `public install --only X` prunes every other family (settings.json… | 4 (`sa-scoped-public-install-prunes-the-gate-wiring`) | DELETE | Unused scoping flag (no doc or skill uses it). |
+| `i/public_assets.py` install (full= predicate); `i/public_assets.py` stage | ″ | ″ | UPDATE | full= collapses to `plan.harness is None` once only and scope (WP-07)… |
+| `i/public_assets_common.py` is_ignored_public_asset | ″ | ″ | KEEP | The one asset filter. |
+| `dd-bug-resolution/_bugs_store.py` append_raw | `backlog.py exit` and `bugs.py archive` say 'nothing was written'… | 5 (`sa-ledger-verbs-append-histo-before-validating-the-pair`) | DELETE | Unchecked writer. |
+| `dd-backlog-definition/_backlog_store.py` append_histo | ″ | ″ | REBUILD | Fragment check is the second validator; rebuilt as a pair write… |
+| `dd-backlog-definition/backlog.py` _exit; `dd-backlog-definition/_backlog_write.py` new; `dd-bug-resolution/bugs.py` _archive +1 | ″ | ″ | UPDATE | Builds candidate pair, checks, then writes. |
+| `cli/commands/doctor.py` _build_redactor +… | public doctor prints the raw private denylist term the pre-push masks. | 5 (`sa-private-match-rendering-has-three-renderers`) | DELETE | Third redactor builder. |
+| `f/chokepoints/denylist_scan.py` _mask; `i/privacy_check.py` public-privacy findings; `cli/commands/context.py` _build_context_redactor +2 | ″ | ″ | UPDATE | Moves to core/redaction.mask. |
+| `hooks/venv_guard.py` tool-name read | Cursor rides beforeShellExecution, so file writes are never judged. | 6 (`sa-gate-blind-on-cursor-copilot-devin`) | DELETE | Duplicate of _common.tool_name. |
+| `i/runtime_transforms/hook_wrappers.py` _translator; `i/runtime_transforms/hook_wrappers.py` HOOK_DIALECTS…; `hooks/_common.py` tool_name +4 | ″ | ″ | UPDATE | Deny-only output. |
+| `i/runtime_transforms/codex_assets.py`… | Codex runs `sed -i` and `find … -exec` unsandboxed and without a… | 4 (`sa-codex-policy-allows-write-capable-commands`) | REBUILD | 3 prior bugs on the same rules file (undocumented allowed command,… |
+| `public/entities/registry.json` codex-command-policy…; .codex/rules/dadaia-command-policy.rules (instance) | ″ | ″ | UPDATE | True statement. |
+| `f/migrate/upgrade.py`… | specs upgrade writes through symlinks outside the tree (CWE-59) while… | 6 (`sa-specs-upgrade-writes-through-symlinks`) | DELETE | Duplicate of the doctor's fixed-section repair. |
+| `f/migrate/upgrade.py` upgrade | ″ | ″ | REBUILD | 3 fix commits; becomes version hop + stamp + the repair set, called… |
+| `core/atomic_write.py` atomic_write; `f/specs/doctor_memory.py` fix_fixed_section; f/specs/doctor_structural.py (TREE-5 fix) +1 | ″ | ″ | UPDATE | Refuses a symlinked destination (the one policy). |
+| `core/invocation.py` _workspace_root (WORKSPACE_ROOT…; `cli/commands/migrate.py`…; `f/specs/memory_lint.py` main cwd default | WORKSPACE_ROOT in the environment turns the whole gate into ALLOW. | 8 (`sa-seven-workspace-root-rules`) | DELETE | Env override with a generic name. |
+| `f/migrate/state_v2.py` plan_migration; `dd-cli-library/registry.py` _default_registry; `core/workspace_resolver.py` resolve (--workspace) +2 | ″ | ″ | UPDATE | Missing registry is an error. |
+| `core/invocation.py` resolve_bind | With a native session id, DADAIA_CONTEXT overrides the registry and… | 11 (`sa-bind-has-two-stores`) | REBUILD | 12 prior bind bugs across heartbeat, ctx-inject, show, aliases — the… |
+| `f/workspace/onboarding.py` _unbound; `hooks/ctx_inject.py` main header/injection; f/spec_context/injection_policy.py +3 | ″ | ″ | UPDATE | Asks resolve_bind. |
+| `hooks/venv_guard.py` _VENV_BIN/fix | Fix lines cite a bare `dadaia` the gate blocks. | 10 (`sa-fix-lines-not-built-by-cli-line`) | REBUILD | 4 fix commits; fixes become absolute. |
+| core/cli_line.py; `f/chokepoints/push_gate.py` object-read refusal; `f/spec_context/gate_policy.py` projected-law deny fix +6 | ″ | ″ | UPDATE | Gains shell_line only if no existing builder covers pip/python. |
+| `cli/commands/init.py` _refuse; `cli/commands/reports.py` err_console + exit codes | Rich wraps fix lines at 80 columns in non-TTY output. | 7 (`sa-rich-printer-wraps-fix-lines`) | DELETE | Second printer. |
+| `cli/commands/public.py` doctor output | ″ | ″ | REBUILD | 6 fix commits; plain echo, exit semantics. |
+| `cli/main.py` _safe_app; cli/commands/specs.py + migrate.py refusals; cli/commands/context.py resolution errors +1 | ″ | ″ | UPDATE | Calls _fail. |
+| cli/_fail.py | ″ | ″ | KEEP | Already the intended authority; becomes the only one. |
+| `core/doctor_rules.py` with_fix; `f/spec_context/doctor.py` ContextDoctor.check…; `f/spec_context/doctor.py` WS-INVARIANT/WS-ENTRY rules +1 | CTX-URL-1, INV-4, INV-6, VENV-1 and the missing install ledger print… | 5 (`sa-unfixable-doctor-findings-say-doctor-fix`) | UPDATE | Default applies only when fixable. |
+| `f/specs/doctor_governance.py` SPEC-DOC-035; `f/specs/doctor_structural.py` TREE-7; `f/specs/doctor_memory.py` SPEC-DOC-002L | A legacy file yields TREE-8 plus a second placement rule whose fix… | 5 (`sa-placement-rules-contradict-tree8`) | DELETE | Second placement authority. |
+| f/specs/rules.py (rule rows) | ″ | ″ | UPDATE | Rows removed. |
+| `f/specs/canon.py` TREE-8 fix | ″ | ″ | KEEP | The authority. |
+| `f/migrate/state_v2.py` _detect_schema_version | An int 3 / '4' / '0' registry loops list→migrate→list or converts… | 4 (`sa-registry-schema-version-has-three-grammars`) | DELETE | Second grammar. |
+| `i/json_context_store.py` _load | ″ | ″ | REBUILD | 3 fix commits; gains the one parser. |
+| `f/migrate/state_v2.py` plan_migration/migrate rows; core/invocation.py / cli/commands/context.py /…; f/spec_context/doctor.py | ″ | ″ | UPDATE | Rewrites only ativo/inativo rows; preserves alive/dead rows whole. |
+| core/models/bugs.py; `container.py` bug store factory; `f/specs/doctor_governance.py` SPEC-DOC-033 +… +1 | The doctor validates bug records with its own model and prints an… | 7 (`sa-spec-doc-033-duplicates-bugs-check`) | DELETE | Second validator; its write methods have no caller. 8 fix commits on… |
+| `f/specs/doctor_governance.py` SPEC-DOC-041; `f/specs/doctor_release.py` SPEC-DOC-048; public/schemas/bugs/bug-record-v1.schema.json +2 | ″ | ″ | UPDATE | Reads raw JSON or becomes a bugs.py check warning. |
+| `dd-bug-resolution/_bugs_write.py` redact; `dd-backlog-definition/_backlog_write.py` redact; `core/models/histo.py` HistoRecord.redact +1 | bugs.py/backlog.py write private data verbatim that the push then… | 5 (`sa-ledger-write-seam-redacts-less-than-push-refuses`) | DELETE | Duplicate scrubber; replaced by refusal via _privacy. |
+| `i/public_assets.py` stage; public/scaffold/bugs/AGENTS.md:43 +… | ″ | ″ | UPDATE | Copies _privacy.py and privacy_baseline.json next to ledger scripts. |
+| public/skills/_shared/_privacy.py (stdlib, staged… | — | ″ | ADD | Stdlib scripts cannot import the package; one source copied by stage… |
+| `f/backlog/doctor.py` BL-SCHEMA status whitelist; `f/backlog/doctor.py` BL-STALE | Doctor and script disagree on live status tokens; the doctor fix is… | 10 (`sa-backlog-status-has-no-single-authority`) | DELETE | Second vocabulary; 7 fix commits on the file. |
+| dd-backlog-definition/_backlog_check.py; `dd-backlog-definition/_backlog_exit.py` check_exit; dd-release-implementation/_release_new.py +1 | ″ | ″ | UPDATE | Case decided once. |
+| `f/specs/release_tree.py` ARCHIVED rules; `dd-release-implementation/_release_check.py` archive…; `f/specs/doctor_release.py` _TASK_MARKER_RE +… | gitflow step 11 `phase CLOSURE --sha --pr` is refused; shipped is… | 8 (`sa-promote-has-no-verb`) | DELETE | Archive = histo line + git. |
+| dd-release-implementation/_release_phase.py | ″ | ″ | REBUILD | 10 ledger bugs on _release*; fixes stop pointing at refusing verbs;… |
+| `dd-release-implementation/_release_schema.py`…; public/scaffold/releases/AGENTS.md + RELEASE-EVENTS.md… | ″ | ″ | UPDATE | ARCHIVED removed; regex widened to [-*+]. |
+| `dd-release-implementation/release.py` ship | — | ″ | ADD | No verb records the promote; `phase` cannot carry it without a second… |
+| core/spec_status.py extract_status | The doctor stops reading **Status:** only inside the first 30 lines. | 5 (`sa-status-line-has-two-parsers`) | REBUILD | 4 prior bugs on status reading; two parsers disagree on… |
+| f/specs/rules.py SPEC-DOC-004 fix | appends a line | ″ | UPDATE | in-place replace; append creates the second status line that feeds… |
+| scripts/_release_schema.py _STATUS_RE | anchored, whole document | ″ | KEEP | already the anchored rule; becomes the parity target |
+| public/schemas/ADRs/decision-record-v1.schema.json…; tests/contract/test_adr_canon.py… | measured_by stops being refused by a prefix pattern; the audit judges… | 3 (`sa-adr-measured-by-pattern-refuses-real-checks`) | DELETE | DEC-8 (a); prose behind a prefix passes, real checks (npx vitest) fail |
+| f/specs/doctor_adr.py; public/scaffold/ADRs/AGENTS.md:11,38 | schema only | ″ | UPDATE | receives the numbering rule (moved, not added) |
+| f/specs/doctor_coherence.py SPECS-VERSION | The pre-push gate stops trusting the checked-out tree's stamp for the… | 6 (`sa-specs-tree-state-read-five-ways`) | DELETE | second reporter of the same fact |
+| core/specs_version.py read_pattern_version; cli/commands/ci.py push_gate_check stamp read | int, malformed collapses to 0 | ″ | REBUILD | 5 prior bugs; five readers, five fixes |
+| f/migrate/registry.py upgrade refusal; f/workspace/onboarding.py _specs_fix; f/chokepoints/push_gate.py | own messages | ″ | UPDATE | prints state().fix |
+| f/specs/doctor_memory.py check_cat1_catalog_sync; f/specs/doctor_memory.py check_memory_atomicity | The doctor stops re-checking catalog sync with its own logic (CAT-1). | 9 (`sa-memory-atom-has-two-grammars`) | DELETE | -89 lines; memory.py check is the authority |
+| scripts/_memory_schema.py parse; f/specs/memory_lint.py LINT-1 | accepts ambiguous inline lists | ″ | REBUILD | 8 prior bugs on the memory grammar; must refuse what it cannot… |
+| scripts/_memory_catalog.py:81; i/ledger_scripts.py:130 fix line; public/scaffold/memory/AGENTS.md:34 | writes directory name | ″ | UPDATE | worktree-unstable output |
+| f/specs/doctor_common.py resolve_live_release_id; core/workspace_layout.py rc-N rows | The doctor stops validating _RELEASE.json with its own rules. | 9 (`sa-release-json-validated-three-times`) | DELETE | doctor delegates |
+| f/specs/release_tree.py | third validator | ″ | REBUILD | 8 prior bugs; keep TRIO/MEMORY only if not duplicated |
+| core/specs_version.py RELEASE_SEMVER_RE; f/specs/rules.py SPEC-DOC-003/009 | accepts -suffix | ″ | UPDATE | remove group |
+| scripts/_release_check.py / _release_tree.py | authority | ″ | KEEP | gains live_ids as the one live-release rule |
+| f/certification/service.py _OWNED_DOCTOR_SECTIONS | certify stops skipping the workspace section. | 8 (`sa-reconcile-certify-skip-the-workspace-walk`) | DELETE | nobody judges the workspace section today |
+| public/data/CONSUMER_VALIDATION_RECIPE.md | transcribes commands | ″ | REBUILD | 7 prior recipe bugs; cite certify ids |
+| f/reconcile/service.py doctor step | context invariants | ″ | UPDATE | rename to context-invariants (DEC-13 a) |
+| .github/workflows/release.yml | release.yml stops redeclaring the test matrix. | 7 (`sa-doctor-job-not-a-required-check`) | REBUILD | 6 prior CI bugs; reuse ci.yml |
+| f/ci_preflight/service.py checks_for; branch protection (out of repo); tests/contract/test_ci_preflight_ci_gating_parity.py | subset without doctor/coverage/hygiene | ″ | UPDATE | +12; the one local list |
+| core/invocation.py… | A context name stops standing in for its repo slug. | 7 (`sa-context-repo-mapping-falls-back-to-the-name`) | REBUILD | 6 prior bugs on this mapping |
+| core/handoff_index.py:548 self_pull resolution; i/json_context_store.py _context_registered; cli/commands/specs.py init --context | repos/<context> | ″ | UPDATE | consult resolve_context_specs_dir |
+| cli/main.py, capabilities, reconcile, python_env,… | --version, capabilities, reconcile, export and the install ledger… | 6 (`sa-editable-install-reports-a-frozen-version`) | UPDATE | call provider_version |
+| `infrastructure/python_env.py` distribution-version read → `provider_version()` | six readers, dist-info only | ″ | REBUILD | AC8.2 admits three ADDs: the one reader is an existing read rebuilt in place (dist-info, editable → source pyproject), not a new unit |
+| scripts/_backlog_subjects.py --resolve; core/models/backlog.py SubjectKind.PANEL | The backlog script stops declaring a subject RESOLVED from the… | 7 (`sa-subjects-resolve-is-circular`) | DELETE | 6 prior bugs; resolves against itself |
+| f/backlog/subject_registry.py bind | no 'dadaia ' normalization | ″ | UPDATE | +2 |
+| i/runtime_config.py _python_bin | Claude hooks stop resolving a Python interpreter on their own. | 8 (`sa-hook-parity-claims-false-and-interpreter-rules-diverge`) | DELETE | 7 prior bugs on interpreter resolution |
+| i/runtime_transforms/hook_wrappers.py | wrappers per harness | ″ | REBUILD | one wrapper, one missing-venv posture |
+| specs/memory/product/agents/agentic-entities.md +… | parity claim | ″ | UPDATE | declare the gap per harness (DEC-9 b) |
+| i/install_helpers.py _ACTIVITY_CLASSES | ADDITIVE stops meaning two things (a path class and an actor class). | 5 (`sa-reviewer-persona-body-contradicts-its-tools`) | REBUILD | 4 prior bugs; rename to read_only |
+| public/agents/dd-code-reviewer.md; i/runtime_transforms/codex_assets.py:217; public/agents/dd-software-engineer.md,… | body contradicts tools | ″ | UPDATE | -10 |
+| i/public_assets.py render_registry_tables; f/specs/canon.py:154 copy; f/specs/doctor_structural.py:228 TREE-5 +1 | specs init stops writing law with unrendered placeholders. | 6 (`sa-specs-init-writes-unrendered-law`) | UPDATE | move to core/workspace_layout |
+| f/spec_context/gate_policy.py classify_path | PROTECTED stops being decided by a file basename. | 6 (`sa-gate-path-classes-diverge-from-the-law`) | REBUILD | 5 prior bugs on classification |
+| core/workspace_layout.py; f/specs/doctor_structural.py:210; public/data/AGENTS.md, dadaia-AGENTS.md,… | owns zones and canon | ″ | UPDATE | exposes protected/additive views |
+| pyproject.toml [tool.ruff]/[tool.mypy] cache; i/runtime_config.py harness env block; f/spec_context/markers.py:59,72 +1 | Tool caches stop resolving relative to the cwd (nested .dadaia/ from… | 6 (`sa-tool-caches-land-outside-the-cache-zone`) | UPDATE | 5 prior cache bugs; absolute via env |
+| public/skills/dd-gitflow-default/SKILL.md:45; AGENTS.md (repo) :17-18 | The work-branch name stops being computed from the last tag. | 7 (`sa-live-work-branch-named-three-ways`) | DELETE | contradicts P-30 |
+| f/spec_context/service.py _work_branch | tag+1 | ″ | REBUILD | c3-overlap; 6 prior version bugs |
+| cli/commands/ci.py branch naming; release-please-config.json | tag+1 | ″ | UPDATE | c3-overlap |
+| f/specs/canon.py:114 | specs init stops suggesting literal branch names. | 4 (`sa-principal-branch-defaults-to-main-and-cut-point-diverges`) | DELETE | always overwritten |
+| cli/commands/specs.py _gitflow | detection + literals | ″ | REBUILD | 3 prior bugs; one detector |
+| public/skills/dd-gitflow-default/SKILL.md §2a/§11; f/spec_context/service.py baseline | cut from principal | ″ | UPDATE | ADR 0035 |
+| f/specs/doctor_closure_audit.py SPEC-DOC-036/038; i/jsonl_record_store.py write half; f/specs/doctor.py findings_store_factory | The doctor stops recommending audit close on its own reading of… | 6 (`sa-audit-close-archives-without-validating`) | DELETE | 5 prior audit bugs |
+| scripts/_audit_verbs.py close | writes before checking | ″ | UPDATE | +3; check first, deferred/rejected when nothing resolved |
+| i/runtime_transforms/codex_assets.py build_agents_index; i/codex_doctor.py check_codex_rule_corpus_reachable; i/public_assets.py stage/doctor index lines | Stage stops writing agents.index.json. | 5 (`sa-staged-assets-without-consumers`) | DELETE | deletion test passes |
+| i/install_helpers.py model fallback | silent default | ″ | UPDATE | fail closed |
+| f/spec_context/markers.py reap_markers; core/kernel_tunables.py SENTINEL_GC_TTL_SECONDS; core/handoff_index.py timestamp family | Markers and handoffs stop having a second expiry clock beside the… | 4 (`sa-expiry-has-two-clocks`) | DELETE | 3 prior TTL bugs |
+| f/spec_context/sweep.py | the one chokepoint | ″ | KEEP | authority |
+| core/handoff_index.py:507 conditional | The validator stops branching on schema_version. | 5 (`sa-handoff-self-pull-requirement-diverges`) | DELETE | schema carries it |
+| public/schemas/handoff-v1.schema.json | three versions | ″ | UPDATE | 4 prior handoff bugs; one version |
+| cli/commands/specs.py --target; f/migrate/upgrade.py old-layout guard | specs upgrade stops accepting a target it cannot migrate to. | 4 (`sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges`) | DELETE | 3 prior upgrade bugs |
+| public/skills/dd-spec-navigator/SKILL.md:52,… | Part 1/Part 2 | ″ | UPDATE | CONTEXT.md:182 already forbids the term |
+| core/models/histo.py vocabularies | core stops holding ledger vocabularies no library code reads. | 6 (`sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts`) | DELETE | 5 prior ledger-write bugs |
+| tests/contract/test_required_evidence_has_one_home.py | pins core, exempts public/skills | ″ | REBUILD | its authority choice contradicts WP-48; must point at the script |
+| scripts/_*_store.py _replace x4; dd-cli-library/registry.py save; scripts/_bugs_check.py +1 | identical, leak tmp | ″ | UPDATE | +3 each; clone of one another by design (self-contained scripts) |
+| public/data/AGENTS.md:37 venv rule; core/invocation.py docstring, hooks/ctx_inject.py,…; setup.cfg importlinter +3 | Docstrings stop restating the resolution law. | 7 (`sa-text-restates-rules-the-code-contradicts`) | UPDATE | 'a Bash command that STARTS with' |
 
-Verdict counts: DELETE 6 · REBUILD 14 · UPDATE 21 · KEEP 2 · ADD 2.
+### 1.1 Authorities
 
-### 1.1 Size estimates (AC11.3) — production Python, net lines vs 78bf410f
+One row per question this candidate touches; one authority each; `consults` call it, `deleted` leave in
+the task that resolves the row's bug. The table is the input the architecture lens checks (AC5.4).
 
-| module | now | est. Δ |
-|---|---|---|
-| `core/cli_line.py` (new) | 0 | +35 |
-| `core/gitflow.py` (new) | 0 | +60 |
-| `core/template_history.py` (move) | 60 | 0 |
-| `core/kernel_tunables.py` | 62 | −5 |
-| `core/specs_version.py` | 131 | −6 |
-| `core/doctor_rules.py` / `core/invocation.py` | — | +5 / +0 |
-| `features/workspace/onboarding.py` | 88 | +60 |
-| `hooks/ctx_inject.py` | 401 | −10 |
-| `cli/commands/init.py` | 232 | −12 |
-| `cli/commands/context.py` | 691 | −45 |
-| `features/spec_context/service.py` | 791 | +40 |
-| `infrastructure/git_subprocess.py` | 350 | +70 |
-| `features/chokepoints/branch_policy.py` | 209 | −40 |
-| `features/chokepoints/push_gate.py` | 443 | −3 |
-| `features/chokepoints/__init__.py` | — | −4 |
-| `infrastructure/git_objects.py` | 923 | +7 |
-| `features/specs/doctor_structural.py` | 493 | −20 |
-| `features/specs/{rules,doctor_coherence,canon}.py` | — | +6 / +25 / +4 |
-| `cli/commands/specs.py` / `cli/commands/ci.py` | 150 / 192 | +35 / +23 |
-| migrations (gate_policy, ledger_scripts, spec_context/doctor, doctor_memory, cli doctor, venv_guard, certification) | — | ±0 |
-
-Net ceiling **+230** lines. Growth sits only in the new modules, the step list, the baseline rewrite, the
-new git reads and the gitflow CLI/doctor surface. Every AC11.2 unit shrinks.
-
-**Re-approved ceiling (operator ruling 2026-09-26, option a): +362 lines**, measured after the last
-AC11.3 folds (`14c534b6`). Method: every non-merge commit in `5364ba0d..HEAD`, excluding the five shrink
-commits (`800c5e2d 009721d6 f38f7ff8 de4e3179 114be682`) and every `fix(bugs)` subject, `git show
---numstat` over `dadaia_workspace/**/*.py` minus `dadaia_workspace/public/**`: +1372 / −1010 = **+362**.
-The +132 over the planned +230 is the review-round fixes (Windows-safe fix lines, the committed-gitflow
-gate read, the refuse-before-write baseline, the own-venv workspace resolution).
-
-| file | net | capability / ADR it carries |
-|---|---|---|
-| `core/gitflow.py` | +61 | the project gitflow model and its one frontmatter writer (FR6; ADRs 0037, 0040, 0046) |
-| `features/workspace/onboarding.py` | +58 | the one onboarding derivation — five real-state steps, each with a fix (FR1/FR3; ADRs 0033, 0034, 0043) |
-| `core/specs_version.py` | +57 | gitflow read from the committed constitution; unparseable block as its own step (FR6; ADRs 0046, 0048) |
-| `cli/commands/specs.py` | +54 | `specs init` gitflow flags, detection, foreign move to `specs-bkp/` (FR6/FR3; ADRs 0037, 0043) |
-| `core/cli_line.py` | +45 | the one fix-line builder, host-shell quoting, Windows paths, CLI outside a workspace (FR2; ADR 0045) |
-| `features/chokepoints/push_gate.py` | +32 | bootstrap birth, committed-gitflow branch names, non-interactive rewrite fixes (FR5; ADRs 0036, 0048) |
-| `cli/commands/ci.py` | +32 | the gitflow-aware preflight through the CLI resolution seam (FR6; ADR 0046) |
-| `features/spec_context/service.py` | +29 | the one publish verb `context baseline`, refuse-before-write (FR4; ADRs 0035, 0042) |
-| `core/doctor_rules.py` | +19 | doctor fix rendering through `fix_line` with a root (FR2; ADR 0045) |
-| `features/specs/doctor_coherence.py` | +18 | GITFLOW-1 coherence rule (FR6; ADR 0046) |
-| `infrastructure/git_objects.py` | +15 | `publishes_nothing` replaces `parents`; committed-file reads (FR5; ADRs 0036, 0048) |
-| `features/spec_context/gate_policy.py` | +11 | gate refusals through `fix_line` (FR2; ADR 0045) |
-| `core/workspace_resolver.py` | +11 | the CLI resolves its own venv's workspace before the cwd walk (FR2; ADR 0045) |
-| `cli/commands/doctor.py` | +10 | step/kind in `doctor --json`; honest FIXED/TREE remedies (FR1/FR2; ADRs 0033, 0045) |
-| `infrastructure/git_subprocess.py` | +9 | the git reads baseline and onboarding need (`published`, `committed_text`, `default_branch`) (FR4; ADRs 0035, 0048) |
-| `core/fixed_sections.py` | +7 | stripped memory-stub digest for the first-pass step (FR3; ADR 0034) |
-| `features/specs/rules.py`, `features/specs/doctor_types.py`, `core/invocation.py`, `cli/_specs_resolution.py`, `hooks/venv_guard.py`, `features/spec_context/doctor.py`, `infrastructure/public_assets.py`, `hooks/sdd_gate.py`, `features/specs/doctor.py` | +22 | migrations onto `fix_line` / the gitflow seam (FR2/FR6) |
-| `cli/commands/context.py` | −48 | `bind` is the one binder; session id delegates to the one rule (FR7; ADRs 0038, 0044) |
-| `features/specs/doctor_structural.py`, `features/chokepoints/branch_policy.py`, `features/specs/canon.py`, `infrastructure/ledger_scripts.py`, `core/kernel_tunables.py`, `features/chokepoints/__init__.py`, `features/specs/doctor_memory.py`, `hooks/ctx_inject.py`, `cli/commands/init.py` | −80 | dead gate code and duplicated paths deleted (FR8, FR11) |
-
-**Final measure after review round 3 (operator Q3, 2026-09-26): +449 lines** — same method, `5364ba0d..3f08cbd8`:
-+1721 / −1272. **Δ vs the re-approved +362: +87**, every file that moved since `14c534b6`:
-
-| file | Δ since +362 | why |
-|---|---|---|
-| `features/spec_context/service.py` | +76 | `project_gitflow`, the ONE gitflow reader gate and `dead` share (C1, ADR 0048); `_sync_failure`, one fix per git failure (the gate's when it refused); `dead` refuses a non-work branch before any commit (H, Q2); `baseline --republish` absorbs the rewrite the gate used to perform (Q1) |
-| `features/chokepoints/branch_policy.py` | +20 | `GateFixes` — the composition root hands every refusal a runnable, cwd-free fix (H1–H4) |
-| `cli/_fail.py` (new) | +16 | the ONE CLI refusal printer — a fix line never wraps without a TTY (H); `context.py` −37 pays for it |
-| `cli/commands/ci.py` | +8 | the gate reads through `project_gitflow`; `git push origin HEAD` names the checked-out branch. The gate-side republish (−30) is deleted (Q1) |
-| `infrastructure/git_subprocess.py` | +8 | `unpushed` (dead's branch check), `committed_text` limited to `origin` (M1) |
-| `core/cli_line.py` | +5 | `git_line`, the one `git -C <repo>` spelling — collapses nine refusal sites (net −14 with its callers) |
-| `cli/commands/context.py` / `features/chokepoints/push_gate.py` | −37 / −9 | error printing folded into `_fail`; rewrite fix now names `context baseline --republish` |
-
-Decisions recorded here (operator 2026-09-26): **Q1** the pre-push gate is read-only; its denylist/canon
-refusal prints `fix: <cli> context baseline <ctx> --republish <slug>` (the squash + push lives in the one
-publish verb). **Q2** `context dead` refuses a repo with changes to sync while it sits on the principal or
-integration branch, `fix: git -C <repo> checkout -b <work>` — accepted as-is. Open LOW items: the
-alive `&&` fix is closed (`git clone <clone-url> <repos/slug>`, adopted and back-filled); **deferred**
-— the `<context>` placeholder when no ALIVE context owns the pushing repo (a hooked repo without one
-exists only after an out-of-band registry edit; a resolvable fix needs an origin read plus an adopt
-path, i.e. growth), and `dead` treating the projected `repos/<slug>/AGENTS.md` of an unborn clone as
-user data (the provenance classifier lives in `infrastructure/workspace_guardrail.py`; `dead` would
-need it injected through the container and `data/AGENTS.md` has no shipped-hashes history — growth
-for a lossless, conservative refusal).
-
-**Round 5 re-measure (REBUILD): +560** (per-file table in git, `04e0f2dd`).
-
-The ceiling is the operator's decision.
-
-Rounds 6–7 (R13 append-only, review 5): +489 → +487; the history is in git (`04e0f2dd`).
-
-### 1.3 Round 5 — REBUILD of repo resolution, baseline and `_sync_failure` (ADR 0041, 2026-09-26)
-
-Third rejection on the same three units; the as-is table and rebuild rules are in git (`04e0f2dd`).
-
-### 1.4 Rounds 6–7 — the append-only publish (operator R13/Q11, review 5)
-
-Every round patched one error: the publish invented history, then guessed which remote work was its
-own and repaired mis-guesses by rewriting. Rounds 6–7 deleted the invention (contentless births,
-fixed-date commits, `--republish`, `checkout -f`, `_refuse_foreign_work`), the guessed fix rows and
-`publishes_nothing`; `GitSubprocessClient.gitflow` is the one gitflow reader. Details: git log.
-
-### 1.5 Round 8 — anchor-first publish (design review C1–C9, Q1; cuts f, h; 2026-09-27)
-
-Cause (review 6 N1/H4/N4): the publish committed where HEAD was, then moved HEAD. Fix: anchor first.
-
-| # | state (predicate) | action / refusal | HEAD after |
+| question | authority | consults | deleted |
 |---|---|---|---|
-| S1 | no checkout | refuse, `context alive` | unchanged |
-| S2 | identity unknown | refuse, `git config` | unchanged |
-| S3 | no committable constitution (C1: on disk ∧ tracked-or-not-ignored) | refuse, `specs init --context` | unchanged |
-| S4 | secret in an untracked onboarding file | refuse, publish again | unchanged |
-| S5 | fetch fails | git's full text | unchanged |
-| S6 | born (any branch, detached) | `switch --detach`, commit paths = anchor | detached anchor |
-| S7/S8 | unborn clone (empty / non-empty origin) | root anchor on the unborn name, `branch -m <work>` | `<work>` |
-| S9 | born, paths clean | anchor = HEAD₀ | detached |
-| S12/S13 | local `<work>` exists (incl. HEAD on it; read after the anchor) | `merge <work>` into the anchor, `fetch . HEAD:refs/heads/<work>` (fast-forward only; refuses a branch checked out in another worktree; creates an absent one), `switch <work>` (C2, review 7 R8-1) | `<work>` |
-| S11 | origin ≠ ∅ ∧ principal ∉ origin | after step 7 (C3): one candidate → `--principal <h>`; else listed + `<principal>` (C6) | `<work>`, anchor named |
-| S14–S16 | origin start = first of work, integration, principal | `merge`; `--allow-unrelated-histories` only if every root of HEAD holds only onboarding paths (Q1) | `<work>` |
-| S17 | conflict (step 7 or 8): `CONFLICT …`; a re-run meets `fatal: cannot switch branch while merging` / MERGE_HEAD | git's text + the anchor sha + the publish line | in the merge |
-| S18 | births ∨ unpushed | one `push --atomic -u` (births first, N8) | `<work>` |
-| S19 | nothing to push | `""` — published() holds by C1 (no S10/S20) | `<work>` |
-| S22 | gate refuses the push | the gate's reset fix; the message names the anchor and `context baseline <ctx>` after the amend (C7; a hand push drops origin's merge parent) | `<work>` |
-| rows | step-4 failure (hook, gpgsign): detached at HEAD₀, git's text; `<work>` held by another worktree: `fetch .` refuses with git's text, that worktree and `<work>` untouched, nothing published (R8-1); a non-fast-forward `<work>` is unreachable (the merge precedes) and `fetch .` would refuse it; origin moved between fetch and push: git's rejection text, re-run merges it | — | — |
-| D1–D6 | dead: clean → rmtree; dirty on work → commit (never an unmerged entry, C5: `diff --diff-filter=U` refuses) + push; non-work branch refused (cut g kept); push failure → git's text, nothing removed; D6 open bug `sa-context-dead-removes-repos-outside-the-reaper` | — | — |
+| does a reap keep every earlier hold until its TTL | `sweep.move` | doctor `_reaped_destination` (per-reap bucket, `-N` on collision) | `move`'s `remove()`; the one-hold docstring; SKILL `--expired-only` claim |
+| who may delete a workspace path | `f/spec_context/sweep.py` | every remover; V38; import-linter `shutil` contract | raw deleters named in the rows below |
+| how a dead context's repo leaves disk | `DoctorService._reap_dead_repo` | `SpecContextService.dead`, INV-4/5 | `dead`'s raw `rmtree` |
+| does a repo carry unpublished work | `git_objects.unpublished` over every local branch and linked worktree | `dead`, `DeadUnpushedCommitsError` | HEAD-only `GitCli.unpushed` rule |
+| who owns an entry under a harness dir | install ledger `_reconcile_install_ledger` | `public install`, the doctor walk | `prune_stale_codex_tomls`, 3 legacy removers, `_RETIRED_CORE_RULES`, `_scan_harness_dirs`, `_active_harnesses` |
+| may a root or `.dadaia/` top entry exist | `core/workspace_layout.verdict` | `root_whitelist._root_block_reason`, `gate_policy.classify` root arm, doctor `_scan_root`/`_scan_dadaia_top` | `_operator_exception`, `root_whitelist.main`, `_excepted`, `_migrate_exceptions`, root `specs/` ADDITIVE arm |
+| who writes a repo's `AGENTS.md` and `tests/AGENTS.md` | `canon.REPO_LAW` + `scaffold_repo_law` (`specs init`) | `context baseline` publish set | guardrail consumer fan-out (3 helpers + aliases), `--repos-only`/`--workspace-only` |
+| what one install writes | `InstallPlan` (no `only`) | rule table, `_reconcile_install_ledger`, `stage` | `--only`, `InstallPlan.only` branches |
+| did a refused ledger write touch disk | each script's check of both candidate files before any write | backlog/bugs/audit/release verbs | `_bugs_store.append_raw`; histo-first `append_histo` |
+| what is a secret or private term | `i/data/privacy_baseline.json` + operator denylist | pre-push matcher, `dead --commit`, `baseline`, `_shared/_privacy.py` at the ledger seam (byte parity) | `_bugs_write.redact`, `_backlog_write.redact`, `HistoRecord.redact`, `redact_text`, `first_privacy_hit` |
+| how a private match is shown | `core/redaction.mask` | `denylist_scan`, `privacy_check` findings (incl. `:318`; 0086), `ContextRedactor` | the `_mask` copy |
+| who builds the context redactor | `cli/redact.py` constructor (moved from `context._build_context_redactor`) | `doctor --redact`, `context list --redact` | doctor `_build_redactor`, `_resolve_caller_context_and_slug` |
+| is every tool call judged | `hooks/pre_gate` | every rendered wrapper | explicit-allow output, `venv_guard`'s own tool-name read |
+| how a harness wires and translates the gate | `HOOK_DIALECTS` | `_common.tool_name`, `resolve_session_id`, Kimi shim, `registry.json`, `agentic-entities.md` | per-wrapper parsing; hand-written parity claims |
+| which interpreter runs a hook | the self-locating wrapper | Kimi shim, Claude/Codex hooks | `runtime_config._python_bin` fallback |
+| which commands Codex runs unprompted | `_render_codex_command_policy_rules` | registry mandate, `.codex/rules` | `find`, bare `sed` allows |
+| how a fixed specs section is written | one symlink-refusing writer (`atomic_write`, `O_NOFOLLOW`) | `doctor --fix`, `specs upgrade` | `restore_fixed_sections`, `_fixed_renders`, `plan_fixed_sections` |
+| where the pre-push gate is installed | `git rev-parse --git-path hooks` (one resolver) | installer, doctor HOOKS | hard-coded `<repo>/.git/hooks` |
+| the workspace root | `resolve_workspace_root` | invocation, migrate, `state_v2`, `registry.py`, `memory_lint`, `context show` | `WORKSPACE_ROOT` step, `migrate._resolve_workspace_root`, cwd walks |
+| is the session bound, and to what | `invocation.resolve_bind` | gate, `ctx_inject`, onboarding, `context show`, `_specs_resolution` | env-first reads; 4 caller rules |
+| how a fix line is spelled | `core/cli_line` | `venv_guard`, `push_gate`, `gate_policy`, capabilities, stores | bare `dadaia`, `&&` lines, `_EXECUTABLE_TOKENS` |
+| who prints a refusal | `cli/_fail.fail` (exit 1; Click usage keeps 2; 0073) | every command | `init._refuse`, `reports.err_console`, Rich printers, exit 3 |
+| what fix an unfixable finding carries | the finding's own `fix_line` | `doctor_rules.with_fix` (fixable only) | `rule_fix`'s `doctor --fix` default |
+| where a stray specs file belongs | TREE-8 (`canon.py`) | the doctor | SPEC-DOC-035, TREE-7, SPEC-DOC-002L |
+| which registry version is readable | `json_context_store.parse_schema_version` | migrate, invocation, `context`, doctor | `state_v2._detect_schema_version` |
+| is a bug record valid | `_bugs_check.py` over `bug-record-v1.schema.json` | doctor LEDGER-BUGS-SCHEMA | `core/models/bugs.py`, SPEC-DOC-033, container bug store, `_resolve_derived_enums` |
+| a backlog entry's live status | `backlog.py check` (`_backlog_schema`) | the doctor | BL-SCHEMA whitelist, BL-STALE; `deferred` leaves TERMINAL (0076) |
+| what a release picks | the SPEC `**Origin:**` line | `release.py new`, `backlog.py exit` | `picked` requirement, `**Consumes:**` gating |
+| how a promote is recorded | `release.py ship` | RC-FLOW, gitflow §11 | ARCHIVED phase, `_archive/<v>/_RELEASE.json`, archive rules |
+| is a task open | `_release_schema.UNFINISHED_RE` | doctor SPEC-DOC-024 | `doctor_release._TASK_MARKER_RE` |
+| which `**Status:**` line counts | `core/spec_status.extract_status` (anchored, first, no window) | `_release_schema._STATUS_RE` (parity copy), SPEC-DOC-004 fix | 30-line window; append repair; blockquote form (0075) |
+| what `measured_by` may name | `doctor_adr` (free text) | the audit | schema pattern |
+| the specs-tree state | `core/specs_version.state` | pre-push (from the pushed commit), `specs upgrade`, onboarding, `push_gate` | SPECS-VERSION; malformed → 0 |
+| is a memory atom valid | `_memory_schema.parse` | LINT-1, `memory.py catalog generate` | CAT-1, `check_memory_atomicity`, SPEC-DOC-008 |
+| is `_RELEASE.json` valid; which release is live | `release.py check` (`live_ids`) | doctor LEDGER-RELEASE-SCHEMA, core phase read | `release_tree` rules, `resolve_live_release_id`, rc-N rows, SemVer suffix; `next/` never live (0077) |
+| is an upgraded workspace clean | `dadaia doctor` workspace rules | `certify`, reconcile, the recipe | `_OWNED_DOCTOR_SECTIONS`, transcribed recipe lines |
+| which checks gate a merge | `ci.yml` + the versioned required-checks file (0078) | `release.yml` (`workflow_call`), `ci_preflight.checks_for` | `release.yml`'s own matrix |
+| which repos belong to a context | the context registry (`repo_slug_for_context`) | handoff self-pull, store, `specs init --context` | name fallback |
+| the running version | `provider_version()` | `--version`, capabilities, reconcile, `python_env`, export | five other version reads |
+| does a subject ref resolve | doctor `SubjectRegistry` | backlog doctor | `_backlog_subjects --resolve`, `SubjectKind.PANEL` |
+| may the reviewer write | persona frontmatter `tools`/`read_only` | render, `codex_assets` | stale body text, `_ACTIVITY_CLASSES`, model fallback |
+| the canon table text | `render_registry_tables` (in `core/workspace_layout`) | `stage`, `specs init`, TREE-5 | the unrendered copy |
+| a path's class (PROTECTED/ADDITIVE/MUTATING) | `classify_path` in `core/workspace_layout` (literal hook-wiring floor; 0055) | gate, `doctor_structural` | basename `_is_law_path`, hand ADDITIVE prefixes, law duplicates |
+| where tool caches live | the zone registry: `.dadaia/tmp/<tool>-cache` (0080) | `pyproject.toml`, harness env block, markers | the `.dadaia/.cache` zone; relative `../../` paths |
+| when a zone entry expires | the zone TTL in `workspace_layout`, run by the doctor walk via `sweep` | markers, handoffs | `reap_markers`, `SENTINEL_GC_TTL_SECONDS`, `Handoff.expires_at` family |
+| what version a release publishes | release-please (`release-please-config.json`, `release-as`) | `baseline` | tag+1, PyPI+1 minters |
+| the live work branch name | `<work prefix>` + the live `_RELEASE.json` id | `baseline`, the gate | tag-derived naming |
+| the principal branch | the `specs init` `_gitflow` detector | `baseline` | `canon.py:114` literal default; cut-point stub |
+| is an audit closable | `audit.py close` | the doctor | SPEC-DOC-036/038, `JsonlRecordStore` write half, `findings_store_factory` |
+| which staged asset is consumed | its real consumer | `public doctor` | `build_agents_index`, `check_codex_rule_corpus_reachable` |
+| must a handoff carry `self_pull` | `handoff-v1` schema, v1.2 only | `Handoff.validate`, `reports validate` | v1/v1.1 routing, `handoff_index.py:507` |
+| the `specs upgrade` target | `CANONICAL_SPECS_VERSION` | `specs upgrade` (refuses two-tier; 0082) | `--target`, the old-layout guard |
+| a ledger's terminal vocabulary | the stdlib scripts' `_*_schema` | the doctor (exact compare; 0083) | `core/models/histo.py` vocabularies |
+| how a ledger script writes atomically | `_bugs_store._replace` (`newline=''`, tmp cleanup) | 3 script `_replace` copies (V37 `parity:` keys), `registry.py save` | leaking tmp writers |
+| where a rule lives | the code or its test | law text (points at it) | false docstrings, the restated venv rule |
+| what consumer law may say | the consumer's own tree | projected skills, templates | library facts; the `surface` library arm |
+| where a domain term is defined | `CONTEXT.md` | navigator glossary, maps | `Part 1/Part 2`, "PyPI + 1 patch" |
+| does a PLAN give each question one authority | `_release_phase._refuse_missing_as_is_table` | `release.py new` skeleton, S10, the architecture lens | — |
+| is a library fact defined twice | V37 in `test_slop_ratchets.py` | Axis 3 verdict | `test_required_evidence_has_one_home.py` |
+| does a doctor fix clear its finding | `test_doctor_fix_lines_clear_their_finding.py` cases | V39 (case or `report-only` key) | stale `_EXEMPT` entries |
+| which behaviour a test asserts | the statement `<bug-id>#<id>` in `EV/c4/tests-audit-*.json` (enters `QUALITY.md` `### Behavior rows` at closure) | `Intent:` docstrings, the AC9.2 contract test | uncited CONTRACT tests |
+| how a test runs a hook | the rendered wrapper spawned as production | every hook test | `WORKSPACE_ROOT` injection, `_POLICY_DRIVER` |
+| how a test gets git | the real-git tmp fixture | service/push tests | `FakeGitClient`, 4 `ObjectSource` fakes |
+| which roots may a dadaia process act on | `core/workspace_resolver` fence (`DADAIA_FENCED_ROOTS`; 0088) | the suite, every mutating probe, `.dadaia/AGENTS.md` law line | — |
 
-Cut (f): baseline publishes the main repo only; associated repos by plain `git push` under the gate
-(`_owned_slug`, `repo_owner`, the CLI repo argument deleted). Cut (h): no foreign-change refusal;
-residual — foreign work rides along uncommitted; git refuses a colliding switch/merge. C9:
-`from_mapping` refuses a work prefix nested under a role name.
+## 2. Strategy per FR
 
-**Measure (AC11.3 method, `5364ba0d..722f169e`): +388** — over +362 by 26. Round 8d (AC5.6, `eb4f4b02`: one
-secret matcher, the second engine deleted, 57 added / 140 deleted): **`5364ba0d..eb4f4b02` = +305**, under +362.
-Round 10 (review 8): R9-1 secret-token v13 edits the one regex (`(?<![A-Za-z0-9])`, optional key quote, quoted arm `[^'"\s${}<>]{8,}`, unquoted `=` + `# …`); the matrix holds both directions.
-R9-2 the absence probe moves to `core.gitflow`; `specs_version` leaves the I/O set (eight). **`5364ba0d..0fffd6bc` = +318**, under +362.
+Evidence (committed with the definition): `reports/main-thread/20260927-050-c4-evidence/` (below `EV/`):
+as-is `EV/c4/asis-{A,B}.json`, test audits `EV/c4/tests-audit-*.json`, strategy `EV/c4/TESTS-ARCHITECTURE.md`,
+the verified hunt `EV/verify/`, grill handoffs `EV/handoffs/`. Every package follows one contract (SPEC
+resolution contract; FR9):
 
-- `DADAIA_BIN` importers are **7**, not 9–10: `hooks/venv_guard.py` and `features/ci_preflight/service.py`
-  read the `$DADAIA_BIN` *environment variable* exported by the pre-push hook, not the constant (SPEC AC2.2
-  inherits the error; see §6).
-- `ObjectSource.parents` fake stubs also sit in `tests/unit/features/chokepoints/test_push_specs_canon_scan.py:51,61`;
-  `parse_push_refs` is also used there. `branch_name_is_permitted`/`parse_push_refs` are re-exported by
-  `features/chokepoints/__init__.py:29-39`.
-- `template_history` has 3 test importers (`test_copy_drift_scoped_law`, `test_migration_symlink_hardening`,
-  `test_tree5_shipped_history`), not zero.
-- FIXED-1 (`doctor_memory.py:181`) also embeds a bare `dadaia doctor --fix`; FIXED-2 is at :263.
-- Line shifts: baseline `has_commits` :566, `feature/0.1.0` :585; TREE-5 copy prose :285-295; bare
-  `specs init` :236.
-- `Rule.fix_help` is a static module-level registry (no root). `fix_line` needs a root, so the render
-  moves into `core/doctor_rules._with_fix` (§3).
-- Ledger size: 557 (not 555).
+1. **Behaviour first.** A package's statements are the only expected values. Their ids are
+   `<bug-id>#<id>` exactly as in `EV/c4/tests-audit-*.json`, listed under each wave table; a RED test
+   declares `Intent: CONTRACT — <bug-id>#<id>` (AC9.2). The rows enter `QUALITY.md` `## Test
+   architecture` → `### Behavior rows` for each RESOLVED bug at the closure memory pass
+   (dd-product-engineer), never ahead of the code.
+2. **RED at the public seam** (AC9.3) — CLI verb, script subprocess, or the rendered hook wrapper through
+   `pre_gate`; an in-process test asserts only the authority function. The RED fails at the definition
+   commit for the structural cause (two readers disagree, a deleter runs), never a symptom.
+3. **One commit, shape 3:** production + regression test + the `BUGS.jsonl` resolve line,
+   `fix(bugs): <id> — <cause>`. The same commit deletes the loser mechanism, its tests and its fakes
+   (`git grep -w <symbol> tests/` empty, AC9.6) and REWRITEs tests that reach the authority's answer
+   through a loser. The task flip is a separate `chore(tasks)` commit.
+4. **Forced-pass commits are undone** where the audit names one: the pre-fix assertion is restored when it
+   states the behaviour, deleted when it pinned a loser; a changed assertion cites a statement id (AC9.8).
+5. **Cross-check** only while two readers live; it dies in the commit that deletes the loser (AC9.6).
+6. **Goldens** (AC9.7): a deleted code's golden rows and `_EXEMPT`/`PLANTS` entries leave with it; a
+   surviving row never changes in a commit touching `dadaia_workspace/**`.
+7. **Net-positive ceilings** (AC1.1, AC2.1, AC3.1, AC4.1): `context dead` +3, the Cursor/Copilot/Devin
+   gate +12, the hooks-path install +5, unfixable findings +7, unrendered law +4, principal detection +2,
+   path classes +5. Every other package is net ≤ 0. A value is a ceiling: exceeding it stops the task for
+   the architecture lens; the ceiling is never raised.
+8. `Δprod` = as-is production + law text; `Δtest` = audit add − delete, before AC9.9's pruning.
 
-## 2. Strategy by FR
+### FR1 — wave 0 (data loss, leaks, gate holes; 14 bugs)
 
-- **FR2** `core/cli_line.py`: `cli_path(root)` and `fix_line(root, *argv)`. POSIX uses `shlex.join`;
-  Windows uses `list2cmdline`, chosen by `core.platform.PLATFORM`. Seven importers migrate. Static rule
-  remedies become `fix_help=("doctor","--fix")`, and `_with_fix` builds the line from the root the doctor
-  passes. Gate messages (`gate_policy`) get the root they already resolve. The AST contract test scans every
-  string in a fix position for the venv CLI path or a bare `dadaia `: an argument after `fix:`, a
-  `fix=`/`fix_help=` kwarg, or a `Refusal`/`Step` fix. TREE-5 on a missing law file becomes fixable: the
-  fixer writes the shipped template.
-- **FR3** `core/template_history.py` (move). The stripped digest is computed with `memory_canon` extract. The
-  backfill script output is committed into `shipped-hashes.json`, and the append-only test covers it. The
-  `first-pass` predicate compares stripped digests and checks for an empty catalog.
-- **FR6** `core/gitflow.py`: `Gitflow`, `DEFAULT`, `from_mapping` and `role_of` hold all naming logic.
-  `core/gitflow.py` also holds `read_gitflow`, `constitution_error` and the one `merge_frontmatter(specs_dir,
-  **keys)` built on `frontmatter.parse` (moved from `core/specs_version.py`, review 7 N7, AC11.2); `_STAMP_RE` goes. `ci.py` resolves the gitflow once per push. `specs init` gets 3
-  flags plus `GitSubprocessClient.default_branch`. GITFLOW-1 lives in `doctor_coherence`.
-- **FR5** `ObjectSource.publishes_nothing(repo, sha)` = the `_range_commit_shas(…, _base_exclusions(repo, ZERO))`
-  range is empty, or is one parentless commit on the empty tree (SHA-1 or SHA-256).
-  `push_gate_decision(…, gitflow)` computes the births. `check_branch_policy(refs, gitflow, births)` stays
-  pure.
-- **FR4** Rebuild `baseline(name)` as a straight line of steps:
-  identity → dirty check → fetch → ensure principal/integration → version → cut work → commit paths → push -u.
-  `GitSubprocessClient` gains `fetch`, `remote_heads`, `push_refspec`, `last_tag`, `config_value`, and
-  `published(repo, path)` (`git log --remotes -n1 -- path`). Each refusal raises the existing typed errors
-  carrying a `fix_line`.
-- **FR7** Delete the binders in `init`/`create`. Inline `bind_session` into `bind`.
-- **FR1** `STEPS: tuple[StepDef, ...]`. `StepDef` holds `id`, `kind`, `pending(state)` and `fix(state)`.
-  `state` is a frozen snapshot: root, name→specs, session id and bound context. Callers read it, and
-  predicates read the disk and git through `published`. `onboarding.lines(...)` is the one helper that
-  doctor, init, create and both SessionStart paths call.
-- **FR8/FR9/FR10** Delete the dead gate code alongside FR5/FR6. Rewrite law and docs by role. Build the
-  autopilot E2E last.
+Order: WP-02 first (every other deleter consults `sweep`), `release-as` with it (AC1.6); the install and
+ledger deleters; the gate; WP-32 and the hooks-path bug together (the gate must run where git runs it,
+and the checks that carry it must be required). WP-32 does not depend on FR5/FR6: it pins the `ci.yml`
+job list; the ratchets later land inside an already-listed job (AC6.7 → AC1.7). † = anchors re-measured.
+
+| row | RED seam | deletes: code · tests · fakes | Δprod | Δtest |
+|---|---|---|---|---|
+| WP-02 | `doctor --fix` twice, frozen clock: two byte-intact holds | `move`→`remove` · `test_a_second_reap…replaces_the_earlier_hold`, 2 HOLLOW, 1 DUP · undo `044d1d0b` | −4 | +40 |
+| WP-03 † | real-git `context dead`: refuses an unpushed non-HEAD branch and a linked worktree; else holds under `.dadaia/reaped/` | raw `rmtree` · `test_dead_succeeds_on_non_writable_files`, 2 DUP, 2 HOLLOW; 7 REWRITE · undo `934377e8` | +3 | +78 |
+| WP-04 | `public install` on a codex ws: `.codex/agents/my-agent.toml` byte-intact | 4 removers · 2 LOSER | −86 | +5 |
+| WP-05 | one table fed to `pre_gate` and the doctor: ALLOW ⇔ not SLOP | 4 matchers · 7 LOSER | −30 | +75 |
+| WP-06 | `doctor --fix` moves nothing under harness dirs; moved ⊆ ledger | `_scan_harness_dirs`, `_active_harnesses` · 3 LOSER | −45 | +2 |
+| WP-07 † | create → install → `specs init`: repo `AGENTS.md` = template; an operator edit survives | fan-out, scope flags · 6 LOSER | −230 | −119 |
+| WP-08 | `install --only` exit 2; every ledgered shipped path survives | `--only` · 2 LOSER | −40 | +14 |
+| WP-09 | 4 scripts × invalid line: a refusal leaves both sha256 unchanged | `append_raw` | −10 | +80 |
+| WP-11 † | `public doctor` with denylist `zorblax` prints `z…x`; `doctor --redact` = `context list --redact` | doctor redactor · 7 LOSER, 2 DUP | −30 | +25 |
+| WP-12 | vendor-documented payloads through each rendered wrapper get Claude's verdict; no explicit allow | explicit allow, own reads · 2 LOSER, 2 HOLLOW · undo `fb95c427` | +10 | +60 |
+| WP-13 | parsed `.rules`: no write/exec prefix allowed | `find`, bare `sed` · 1 DUP, 1 HOLLOW | −3 | +37 |
+| WP-14 | `specs upgrade` and `doctor --fix` refuse a symlinked QUALITY.md; outside md5 unchanged | upgrade's writers · 1 LOSER, 1 HOLLOW · undo `0fee8cdd` | −30 | +65 |
+| hooksPath | real `git init` + `core.hooksPath`: gate installed at `--git-path hooks`; foreign `pre-push` refused with its line; doctor never healthy; push with a denylisted term refused | `.git/hooks` literal · 2 HOLLOW, 2 REWRITE | +5 | +70 |
+| WP-32 | `ci.yml` job names = the in-repo required-checks file; `release.yml` consumes `ci.yml` | release matrix · 1 LOSER, 1 HOLLOW | −75 | +71 |
+| **wave 0** | | | **−565** | **+503** |
+
+Statement ids:
+- WP-02: `sa-reaper-destroys-its-own-hold-before-ttl#B1`, `sa-reaper-destroys-its-own-hold-before-ttl#B2`, `sa-reaper-destroys-its-own-hold-before-ttl#B3`, `sa-reaper-destroys-its-own-hold-before-ttl#B4`, `sa-reaper-destroys-its-own-hold-before-ttl#B5`, `sa-reaper-destroys-its-own-hold-before-ttl#B6`, `sa-reaper-destroys-its-own-hold-before-ttl#B7`, `sa-reaper-destroys-its-own-hold-before-ttl#B8`
+- WP-03: `sa-context-dead-removes-repos-outside-the-reaper#C1`, `sa-context-dead-removes-repos-outside-the-reaper#C2`, `sa-context-dead-removes-repos-outside-the-reaper#C3`, `sa-context-dead-removes-repos-outside-the-reaper#C4`, `sa-context-dead-removes-repos-outside-the-reaper#C5`, `sa-context-dead-removes-repos-outside-the-reaper#C6`, `sa-context-dead-removes-repos-outside-the-reaper#C7`, `sa-context-dead-removes-repos-outside-the-reaper#C8`
+- WP-04: `sa-public-install-unlinks-operator-files-outside-its-ledger#D1`, `sa-public-install-unlinks-operator-files-outside-its-ledger#D2`, `sa-public-install-unlinks-operator-files-outside-its-ledger#D3`, `sa-public-install-unlinks-operator-files-outside-its-ledger#D4`, `sa-public-install-unlinks-operator-files-outside-its-ledger#D5`, `sa-public-install-unlinks-operator-files-outside-its-ledger#D6`
+- WP-05: `sa-gate-allows-root-entries-the-reaper-moves#E1`, `sa-gate-allows-root-entries-the-reaper-moves#E2`, `sa-gate-allows-root-entries-the-reaper-moves#E3`, `sa-gate-allows-root-entries-the-reaper-moves#E4`, `sa-gate-allows-root-entries-the-reaper-moves#E5`, `sa-gate-allows-root-entries-the-reaper-moves#E6`, `sa-gate-allows-root-entries-the-reaper-moves#E7`, `sa-gate-allows-root-entries-the-reaper-moves#E8`, `sa-gate-allows-root-entries-the-reaper-moves#E9`
+- WP-06: `sa-doctor-reaps-harness-owned-entries#H1`, `sa-doctor-reaps-harness-owned-entries#H2`, `sa-doctor-reaps-harness-owned-entries#H3`, `sa-doctor-reaps-harness-owned-entries#H4`, `sa-doctor-reaps-harness-owned-entries#H5`
+- WP-07: `sa-public-install-writes-the-root-map-into-product-repos#K1`, `sa-public-install-writes-the-root-map-into-product-repos#K2`, `sa-public-install-writes-the-root-map-into-product-repos#K3`, `sa-public-install-writes-the-root-map-into-product-repos#K4`, `sa-public-install-writes-the-root-map-into-product-repos#K5`, `sa-public-install-writes-the-root-map-into-product-repos#K6`
+- WP-08: `sa-scoped-public-install-prunes-the-gate-wiring#L1`, `sa-scoped-public-install-prunes-the-gate-wiring#L2`, `sa-scoped-public-install-prunes-the-gate-wiring#L3`, `sa-scoped-public-install-prunes-the-gate-wiring#L4`
+- WP-09: `sa-ledger-verbs-append-histo-before-validating-the-pair#J1`, `sa-ledger-verbs-append-histo-before-validating-the-pair#J2`, `sa-ledger-verbs-append-histo-before-validating-the-pair#J3`, `sa-ledger-verbs-append-histo-before-validating-the-pair#J4`, `sa-ledger-verbs-append-histo-before-validating-the-pair#J5`
+- WP-11: `sa-private-match-rendering-has-three-renderers#B1`, `sa-private-match-rendering-has-three-renderers#B2`, `sa-private-match-rendering-has-three-renderers#B3`, `sa-private-match-rendering-has-three-renderers#B4`, `sa-private-match-rendering-has-three-renderers#B5`, `sa-private-match-rendering-has-three-renderers#B6`, `sa-private-match-rendering-has-three-renderers#B7`
+- WP-12: `sa-gate-blind-on-cursor-copilot-devin#B1`, `sa-gate-blind-on-cursor-copilot-devin#B2`, `sa-gate-blind-on-cursor-copilot-devin#B3`, `sa-gate-blind-on-cursor-copilot-devin#B4`, `sa-gate-blind-on-cursor-copilot-devin#B5`, `sa-gate-blind-on-cursor-copilot-devin#B6`, `sa-gate-blind-on-cursor-copilot-devin#B7`, `sa-gate-blind-on-cursor-copilot-devin#B8`
+- WP-13: `sa-codex-policy-allows-write-capable-commands#B1`, `sa-codex-policy-allows-write-capable-commands#B2`, `sa-codex-policy-allows-write-capable-commands#B3`, `sa-codex-policy-allows-write-capable-commands#B4`
+- WP-14: `sa-specs-upgrade-writes-through-symlinks#B1`, `sa-specs-upgrade-writes-through-symlinks#B2`, `sa-specs-upgrade-writes-through-symlinks#B3`, `sa-specs-upgrade-writes-through-symlinks#B4`, `sa-specs-upgrade-writes-through-symlinks#B5`
+- hooksPath: `pre-push-gate-never-runs-under-core-hookspath#B1`, `pre-push-gate-never-runs-under-core-hookspath#B2`, `pre-push-gate-never-runs-under-core-hookspath#B3`, `pre-push-gate-never-runs-under-core-hookspath#B4`
+- WP-32: `sa-doctor-job-not-a-required-check#B1`, `sa-doctor-job-not-a-required-check#B2`, `sa-doctor-job-not-a-required-check#B3`, `sa-doctor-job-not-a-required-check#B4`, `sa-doctor-job-not-a-required-check#B5`
+
+### FR5 + FR6 — the never-again mechanism (after wave 0)
+
+- **Generic (FR5, every consumer).** `_refuse_missing_as_is_table` also finds `### … Authorities`
+  under §1 and refuses, one `fix:` each: missing table; an empty `authority`; one `question` with two
+  authorities. Structure only (ADR 0041). The fix names the skeleton `_release_new.py` seeds. Fixture
+  pair: a two-authority PLAN is refused; its twin passes. Skills (`dd-release-definition` §2,
+  `dd-code-review` S10 HIGH + the architecture lens, `dd-audit-project` fixed hunt) change under
+  `dd-ai-eng-knowhow` AUTHORING and the AI-surface lens, then `public stage`/`install`/`doctor`.
+  `CONTEXT.md` gets the four terms. ~+18 production.
+- **Library (FR6, tests only, AC6.8).** V37 (AST over modules, skill scripts, hooks: duplicate top-level
+  UPPER constants and functions), V38 (destructive calls outside `sweep.py`) + import-linter `shutil`
+  contract, V39 (every doctor code has a fix-clears case or a `report-only` key), `test_zone_registry`
+  widening. One allowance shape: `{"file:symbol": "<open bug id>" | "parity:<test>"}`; an unlisted hit
+  fails, a vanished key fails stale, a value naming a closed bug fails. Born at today's counts, keyed to
+  the wave 1–3 bugs. `test_required_evidence_has_one_home.py` folds into V37 (deleted). ~+160 test lines.
+
+### FR9 — test harness (after FR5/FR6, before waves 1–3)
+
+- **Real-git fixture** (AC9.4) — one `tmp_git_repo` fixture (bare origin, branches, linked worktrees)
+  replaces `FakeGitClient` and the 4 `ObjectSource` fakes (22 users). `FakeContextStore` stays only
+  behind `_store_contract.py` plus a save/update parity test against `JsonContextStore`. ~−500 tests.
+- **Hook harness + WP-15** (AC9.5) — the `WORKSPACE_ROOT` injection and `_POLICY_DRIVER` exist to feed the
+  rung WP-15 deletes; they leave in WP-15's commit. Hooks spawn as `hook_wrappers.py` renders them, cwd
+  in the tmp workspace, through `pre_gate`. The ~60 tests that go red are adjudicated by §2.4.
+- **`DADAIA_FENCED_ROOTS` — declared product feature (operator decision (b), 0088)**: no dadaia process
+  acts on a fenced root. `core/workspace_resolver` `FENCE_ENV` + `_fenced()` stay; the suite (`tests/conftest.py`)
+  and every mutating probe set it (the 2026-09-26 probe incident). One law line in `.dadaia/AGENTS.md`
+  (source `pub/data/dadaia-AGENTS.md`, resolution order), one behaviour statement (AC9.12 `#S11`, 0088),
+  `test_workspace_not_found_error.py` cites it. Δprod ≈ +3 (law); Δtest ≈ +10.
+- **No shared cross-check helper**; each package's RED is its own table.
+
+### FR2 — wave 1 (stalls, loops, fixes that never clear)
+
+| row | RED seam | deletes: code · tests · fakes | Δprod | Δtest |
+|---|---|---|---|---|
+| WP-15 † | hook subprocess with `WORKSPACE_ROOT=<empty>`: a write to `.dadaia/sessions/x.json` BLOCKed; AST: one root walk | env step, 5 walks · 1 LOSER, 1 HOLLOW, 18 REWRITE (the harness) | −25 | +108 |
+| WP-16 † | native id × env × record × ghost: gate, `ctx_inject`, onboarding, `context show` agree; native id + no bind refused in `repos/<slug>/` | env-first · 2 LOSER, 1 HOLLOW | −5 | +115 |
+| WP-17 † | every BLOCK/refusal/finding fix runs verbatim from the root and `repos/alpha`, exit 0 | bare/`&&` lines · `_EXECUTABLE_TOKENS`, 2 LOSER · undo `75b92f25` | 0 | +140 |
+| WP-18 † | walk `_cli_tree`: `Error:` + `fix:`, exit 1 (Click usage 2), unwrapped at a 61-char root | `_refuse`, `err_console` · 3 LOSER, 1 DUP, 1 HOLLOW · undo `b50f0c97` | −50 | +75 |
+| WP-19 | run each printed fix, re-run the doctor: finding gone; no unfixable says `doctor --fix` | `rule_fix` default · 2 HOLLOW | +2 | +100 |
+| WP-20 | off-canon files: one finding each; its fix → zero | SPEC-DOC-035, TREE-7, -002L · 10 LOSER · undo `9ebefd5f` | −115 | −40 |
+| WP-21 † | version table: store readable ⇔ migrate no-op | `_detect_schema_version` · 1 DUP · undo `f9774c2d` | −18 | +100 |
+| WP-22 | doctor × `bugs.py check` parity; AST: no `core.models.bugs` | `core/models/bugs.py`, SPEC-DOC-033 · `test_bug_record.py` (23), 7 LOSER · undo `0fee8cdd` | −640 | −670 |
+| WP-23 | secret matrix: seam refuses ⇔ push refuses; `BUGS.jsonl` byte-intact | 3 `redact` copies (ADD `_shared/_privacy.py`) · 4 LOSER | −60 | +10 |
+| WP-24 | `postponed`/`Deferred` agree; `new --origin` → `exit delivered`, no hand edit | BL-STALE, whitelist · 4 LOSER, 2 HOLLOW, 1 DUP · undo `68658783` | −80 | −40 |
+| WP-25 | `new`→IMPLEMENTATION→CLOSURE→`ship`→`new` by verbs, doctor clean; `* [ ]` refuses CLOSURE | ARCHIVED, second regex (ADD `ship`) · 14 LOSER, 2 HOLLOW · undo `b50f0c97` | −40 | −70 |
+| WP-26 | parity table of both status readers; SPEC-DOC-004 fixed in place | window, append · 5 REWRITE · undo `b50f0c97` | −5 | +60 |
+| WP-27 | `measured_by: npx vitest run` clean; a duplicate `0049` flagged | the pattern · 2 LOSER, 4 DUP · undo `64e4885c` | −15 | −10 |
+| WP-28 † | pre-push reads the pushed commit: malformed + stray → BLOCKED; one fix everywhere | SPECS-VERSION · 3 LOSER | −34 | +145 |
+| WP-29 | generate, check, LINT-1 give one verdict; tags `["a, b", c]` refused | CAT-1, atomicity · 6 LOSER · undo `b50f0c97` | −155 | −10 |
+| **wave 1** | | | **−1240** | **+13** |
+
+Statement ids:
+- WP-15: `sa-seven-workspace-root-rules#S1`, `sa-seven-workspace-root-rules#S2`, `sa-seven-workspace-root-rules#S3`, `sa-seven-workspace-root-rules#S4`, `sa-seven-workspace-root-rules#S5`, `sa-seven-workspace-root-rules#S6`, `sa-seven-workspace-root-rules#S7`, `sa-seven-workspace-root-rules#S8`, `sa-seven-workspace-root-rules#S9`, `sa-seven-workspace-root-rules#S10`
+- WP-16: `sa-bind-has-two-stores#S1`, `sa-bind-has-two-stores#S2`, `sa-bind-has-two-stores#S3`, `sa-bind-has-two-stores#S4`, `sa-bind-has-two-stores#S5`, `sa-bind-has-two-stores#S6`, `sa-bind-has-two-stores#S7`, `sa-bind-has-two-stores#S8`, `sa-bind-has-two-stores#S9`, `sa-bind-has-two-stores#S10`, `sa-bind-has-two-stores#S11`
+- WP-17: `sa-fix-lines-not-built-by-cli-line#S1`, `sa-fix-lines-not-built-by-cli-line#S2`, `sa-fix-lines-not-built-by-cli-line#S3`, `sa-fix-lines-not-built-by-cli-line#S4`, `sa-fix-lines-not-built-by-cli-line#S5`, `sa-fix-lines-not-built-by-cli-line#S6`, `sa-fix-lines-not-built-by-cli-line#S7`, `sa-fix-lines-not-built-by-cli-line#S8`
+- WP-18: `sa-rich-printer-wraps-fix-lines#S1`, `sa-rich-printer-wraps-fix-lines#S2`, `sa-rich-printer-wraps-fix-lines#S3`, `sa-rich-printer-wraps-fix-lines#S4`, `sa-rich-printer-wraps-fix-lines#S5`, `sa-rich-printer-wraps-fix-lines#S6`
+- WP-19: `sa-unfixable-doctor-findings-say-doctor-fix#S1`, `sa-unfixable-doctor-findings-say-doctor-fix#S2`, `sa-unfixable-doctor-findings-say-doctor-fix#S3`, `sa-unfixable-doctor-findings-say-doctor-fix#S4`, `sa-unfixable-doctor-findings-say-doctor-fix#S5`, `sa-unfixable-doctor-findings-say-doctor-fix#S6`
+- WP-20: `sa-placement-rules-contradict-tree8#B1`, `sa-placement-rules-contradict-tree8#B2`, `sa-placement-rules-contradict-tree8#B3`, `sa-placement-rules-contradict-tree8#B4`, `sa-placement-rules-contradict-tree8#B5`, `sa-placement-rules-contradict-tree8#B6`
+- WP-21: `sa-registry-schema-version-has-three-grammars#B1`, `sa-registry-schema-version-has-three-grammars#B2`, `sa-registry-schema-version-has-three-grammars#B3`, `sa-registry-schema-version-has-three-grammars#B4`, `sa-registry-schema-version-has-three-grammars#B5`, `sa-registry-schema-version-has-three-grammars#B6`, `sa-registry-schema-version-has-three-grammars#B7`
+- WP-22: `sa-spec-doc-033-duplicates-bugs-check#B1`, `sa-spec-doc-033-duplicates-bugs-check#B2`, `sa-spec-doc-033-duplicates-bugs-check#B3`, `sa-spec-doc-033-duplicates-bugs-check#B4`, `sa-spec-doc-033-duplicates-bugs-check#B5`, `sa-spec-doc-033-duplicates-bugs-check#B6`, `sa-spec-doc-033-duplicates-bugs-check#B7`, `sa-spec-doc-033-duplicates-bugs-check#B8`
+- WP-23: `sa-ledger-write-seam-redacts-less-than-push-refuses#B1`, `sa-ledger-write-seam-redacts-less-than-push-refuses#B2`, `sa-ledger-write-seam-redacts-less-than-push-refuses#B3`, `sa-ledger-write-seam-redacts-less-than-push-refuses#B4`, `sa-ledger-write-seam-redacts-less-than-push-refuses#B5`, `sa-ledger-write-seam-redacts-less-than-push-refuses#B6`
+- WP-24: `sa-backlog-status-has-no-single-authority#B1`, `sa-backlog-status-has-no-single-authority#B2`, `sa-backlog-status-has-no-single-authority#B3`, `sa-backlog-status-has-no-single-authority#B4`, `sa-backlog-status-has-no-single-authority#B5`, `sa-backlog-status-has-no-single-authority#B6`, `sa-backlog-status-has-no-single-authority#B7`, `sa-backlog-status-has-no-single-authority#B8`
+- WP-25: `sa-promote-has-no-verb#B25-1`, `sa-promote-has-no-verb#B25-2`, `sa-promote-has-no-verb#B25-3`, `sa-promote-has-no-verb#B25-4`, `sa-promote-has-no-verb#B25-5`, `sa-promote-has-no-verb#B25-6`, `sa-promote-has-no-verb#B25-7`, `sa-promote-has-no-verb#B25-8`
+- WP-26: `sa-status-line-has-two-parsers#B26-1`, `sa-status-line-has-two-parsers#B26-2`, `sa-status-line-has-two-parsers#B26-3`, `sa-status-line-has-two-parsers#B26-4`
+- WP-27: `sa-adr-measured-by-pattern-refuses-real-checks#B27-1`, `sa-adr-measured-by-pattern-refuses-real-checks#B27-2`, `sa-adr-measured-by-pattern-refuses-real-checks#B27-3`, `sa-adr-measured-by-pattern-refuses-real-checks#B27-4`
+- WP-28: `sa-specs-tree-state-read-five-ways#B28-1`, `sa-specs-tree-state-read-five-ways#B28-2`, `sa-specs-tree-state-read-five-ways#B28-3`, `sa-specs-tree-state-read-five-ways#B28-4`, `sa-specs-tree-state-read-five-ways#B28-5`, `sa-specs-tree-state-read-five-ways#B28-6`, `sa-specs-tree-state-read-five-ways#B28-7`
+- WP-29: `sa-memory-atom-has-two-grammars#B29-1`, `sa-memory-atom-has-two-grammars#B29-2`, `sa-memory-atom-has-two-grammars#B29-3`, `sa-memory-atom-has-two-grammars#B29-4`, `sa-memory-atom-has-two-grammars#B29-5`, `sa-memory-atom-has-two-grammars#B29-6`
+
+### FR3 — wave 2 (consolidations)
+
+| row | RED seam | deletes | Δprod | Δtest |
+|---|---|---|---|---|
+| WP-30 | phase `closure`: one finding with a runnable fix; `next/` not live; `new` refuses while `check` is red | `release_tree` rules, rc-N · 14 LOSER, 4 DUP, 3 HOLLOW · undo `987e76d4` | −105 | −100 |
+| WP-31 | `certify` reports workspace slop; every recipe line passes the wheel's `--help` | `_OWNED_DOCTOR_SECTIONS` · 2 LOSER | −126 | +116 |
+| WP-33 | `specs init --context alpah` refused, nothing written; self-pull resolves via the registry | name fallback · 3 LOSER | −10 | +101 |
+| WP-34 | editable 0.4.7 over dist-info 0.1.4: three verbs say 0.4.7 | 5 readers · 1 DUP | −8 | +91 |
+| WP-35 | `cli:dadaia context bind` accepted; no surface says RESOLVED | `--resolve`, PANEL · 3 LOSER | −25 | +39 |
+| WP-36 | no venv: every wrapper exits 0 + one warning | `_python_bin` · 4 REWRITE | −20 | +147 |
+| WP-37 | a persona body never needs a missing tool | `_ACTIVITY_CLASSES` · 2 REWRITE | −7 | +48 |
+| WP-38 | `specs init`: `| Area | Members |` present, the marker absent | raw copy · 1 LOSER, 2 DUP | +4 | +33 |
+| **wave 2** | | | **−297** | **+475** |
+
+Statement ids:
+- WP-30: `sa-release-json-validated-three-times#B1`, `sa-release-json-validated-three-times#B2`, `sa-release-json-validated-three-times#B3`, `sa-release-json-validated-three-times#B4`, `sa-release-json-validated-three-times#B5`, `sa-release-json-validated-three-times#B6`, `sa-release-json-validated-three-times#B7`
+- WP-31: `sa-reconcile-certify-skip-the-workspace-walk#B1`, `sa-reconcile-certify-skip-the-workspace-walk#B2`, `sa-reconcile-certify-skip-the-workspace-walk#B3`, `sa-reconcile-certify-skip-the-workspace-walk#B4`, `sa-reconcile-certify-skip-the-workspace-walk#B5`
+- WP-33: `sa-context-repo-mapping-falls-back-to-the-name#B1`, `sa-context-repo-mapping-falls-back-to-the-name#B2`, `sa-context-repo-mapping-falls-back-to-the-name#B3`, `sa-context-repo-mapping-falls-back-to-the-name#B4`, `sa-context-repo-mapping-falls-back-to-the-name#B5`
+- WP-34: `sa-editable-install-reports-a-frozen-version#B1`, `sa-editable-install-reports-a-frozen-version#B2`, `sa-editable-install-reports-a-frozen-version#B3`, `sa-editable-install-reports-a-frozen-version#B4`
+- WP-35: `sa-subjects-resolve-is-circular#B1`, `sa-subjects-resolve-is-circular#B2`, `sa-subjects-resolve-is-circular#B3`, `sa-subjects-resolve-is-circular#B4`, `sa-subjects-resolve-is-circular#B5`
+- WP-36: `sa-hook-parity-claims-false-and-interpreter-rules-diverge#B1`, `sa-hook-parity-claims-false-and-interpreter-rules-diverge#B2`, `sa-hook-parity-claims-false-and-interpreter-rules-diverge#B3`, `sa-hook-parity-claims-false-and-interpreter-rules-diverge#B4`, `sa-hook-parity-claims-false-and-interpreter-rules-diverge#B5`, `sa-hook-parity-claims-false-and-interpreter-rules-diverge#B6`
+- WP-37: `sa-reviewer-persona-body-contradicts-its-tools#B1`, `sa-reviewer-persona-body-contradicts-its-tools#B2`, `sa-reviewer-persona-body-contradicts-its-tools#B3`, `sa-reviewer-persona-body-contradicts-its-tools#B4`
+- WP-38: `sa-specs-init-writes-unrendered-law#B38-1`, `sa-specs-init-writes-unrendered-law#B38-2`, `sa-specs-init-writes-unrendered-law#B38-3`, `sa-specs-init-writes-unrendered-law#B38-4`, `sa-specs-init-writes-unrendered-law#B38-5`
+
+### FR4 — wave 3 (design debt)
+
+| row | RED seam | deletes | Δprod | Δtest |
+|---|---|---|---|---|
+| WP-39 | hook: `.claude/settings.json` BLOCK; a tmp probe `AGENTS.md` ALLOW | basename rule, prefixes · 3 LOSER, 3 DUP | +5 | −5 |
+| WP-40 | ruff/mypy from a worktree and `repos/demo/pkg/sub`: no nested `.dadaia/`; caches in `.dadaia/tmp/<tool>-cache` (0080) | `.cache` zone, relative paths · 1 LOSER · undo `64e4885c` | 0 | +30 |
+| WP-41 † | tag v0.4.7 + live 0.5.0: baseline, gate and `work_name` say `feature/0.5.0` | tag+1 · 1 LOSER · undo `ffb30aa0` | −3 | +37 |
+| WP-42 † | origin/HEAD=develop, master present: principal master | literal default · 1 HOLLOW | +2 | +44 |
+| WP-43 | `BANANA`: `audit.py close` refuses, dir kept | SPEC-DOC-036/038, write half · 13 LOSER, 1 HOLLOW · undo `27ed26fb` | −182 | −340 |
+| WP-44 | no `agents.index.json`: `public doctor` exit 0 | index builder, corpus check · 5 LOSER, 1 DUP | −151 | −100 |
+| WP-45 | marker at 86401 s, handoff at 1 d + 1 s: reaped by the zone walk | `reap_markers`, `expires_at` · 4 LOSER | −67 | +10 |
+| WP-46 | a v1.1 handoff without `self_pull` is INVALID | v1/v1.1 · 4 LOSER | −4 | +5 |
+| WP-47 | `--target` gone; a two-tier tree refused unstamped | `--target`, old guard · 1 LOSER · undo `07eb6349` | −20 | +10 |
+| WP-48 | failing `os.replace` leaves no `.tmp`; a bad histo line flagged | `histo.py` sets · 3 LOSER | −5 | +45 |
+| WP-49 | `os.name` ratchet; import-linter flags `core.invocation` in `harness.py` | false text | −20 | +80 |
+| FR-8 | a consumer's own `--surface` accepted; no library fact projected | the `surface` library arm · 1 LOSER | −40 | +45 |
+| **wave 3** | | | **−485** | **−139** |
+
+Statement ids:
+- WP-39: `sa-gate-path-classes-diverge-from-the-law#B39-1`, `sa-gate-path-classes-diverge-from-the-law#B39-2`, `sa-gate-path-classes-diverge-from-the-law#B39-3`, `sa-gate-path-classes-diverge-from-the-law#B39-4`, `sa-gate-path-classes-diverge-from-the-law#B39-5`, `sa-gate-path-classes-diverge-from-the-law#B39-6`, `sa-gate-path-classes-diverge-from-the-law#B39-7`
+- WP-40: `sa-tool-caches-land-outside-the-cache-zone#B40-1`, `sa-tool-caches-land-outside-the-cache-zone#B40-2`, `sa-tool-caches-land-outside-the-cache-zone#B40-3`, `sa-tool-caches-land-outside-the-cache-zone#B40-4`
+- WP-41: `sa-live-work-branch-named-three-ways#B41-1`, `sa-live-work-branch-named-three-ways#B41-2`, `sa-live-work-branch-named-three-ways#B41-3`, `sa-live-work-branch-named-three-ways#B41-4`, `sa-live-work-branch-named-three-ways#B41-5`
+- WP-42: `sa-principal-branch-defaults-to-main-and-cut-point-diverges#B42-1`, `sa-principal-branch-defaults-to-main-and-cut-point-diverges#B42-2`, `sa-principal-branch-defaults-to-main-and-cut-point-diverges#B42-3`, `sa-principal-branch-defaults-to-main-and-cut-point-diverges#B42-4`, `sa-principal-branch-defaults-to-main-and-cut-point-diverges#B42-5`, `sa-principal-branch-defaults-to-main-and-cut-point-diverges#B42-6`
+- WP-43: `sa-audit-close-archives-without-validating#B43-1`, `sa-audit-close-archives-without-validating#B43-2`, `sa-audit-close-archives-without-validating#B43-3`, `sa-audit-close-archives-without-validating#B43-4`, `sa-audit-close-archives-without-validating#B43-5`, `sa-audit-close-archives-without-validating#B43-6`
+- WP-44: `sa-staged-assets-without-consumers#44.1`, `sa-staged-assets-without-consumers#44.2`, `sa-staged-assets-without-consumers#44.3`, `sa-staged-assets-without-consumers#44.4`, `sa-staged-assets-without-consumers#44.5`
+- WP-45: `sa-expiry-has-two-clocks#45.1`, `sa-expiry-has-two-clocks#45.2`, `sa-expiry-has-two-clocks#45.3`
+- WP-46: `sa-handoff-self-pull-requirement-diverges#46.1`, `sa-handoff-self-pull-requirement-diverges#46.2`, `sa-handoff-self-pull-requirement-diverges#46.3`, `sa-handoff-self-pull-requirement-diverges#46.4`
+- WP-47: `sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges#47.1`, `sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges#47.2`, `sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges#47.3`, `sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges#47.4`
+- WP-48: `sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts#48.1`, `sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts#48.2`, `sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts#48.3`, `sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts#48.4`, `sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts#48.5`, `sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts#48.6`
+- WP-49: `sa-text-restates-rules-the-code-contradicts#49.1`, `sa-text-restates-rules-the-code-contradicts#49.2`, `sa-text-restates-rules-the-code-contradicts#49.3`, `sa-text-restates-rules-the-code-contradicts#49.4`, `sa-text-restates-rules-the-code-contradicts#49.5`, `sa-text-restates-rules-the-code-contradicts#49.6`
+- FR-8: `sa-consumer-law-carries-library-facts#FR8.1`, `sa-consumer-law-carries-library-facts#FR8.2`, `sa-consumer-law-carries-library-facts#FR8.3`, `sa-consumer-law-carries-library-facts#FR8.4`
+
+### FR7, FR8, FR9 AC9.9–9.11 — gate, shrink, test budget
+
+- Closure evidence (engineer): the two AC8.1 measures over the candidate range; the allowance at birth ⊆
+  at closure; mutmut on the §1.1 authority functions (AC9.10); the mirrored and cross-checked counts of
+  resolved packages against the baseline (AC9.11); the fenced rubric D1–D10 on the wheel built from the
+  promote head. Dispositions and the 0.5.0-only override are the product engineer's closure log.
+- **Projection, production + law:** waves −2587, mechanism +18, `DADAIA_FENCED_ROOTS` +3 → **−2566**.
+- **Projection, tests:** audits +852, fakes and driver −500, mechanism +160, `DADAIA_FENCED_ROOTS` +10 → **+522**
+  before pruning. AC9.9 requires ≤ 0 at closure, so the suite-wide pruning pass (DELETE-HOLLOW,
+  DELETE-DUP, text pins outside law-file canon, the `WORKSPACE_ROOT`-rung tests) must remove ≥ 522
+  lines, run as a reviewer QA-lens verdict the engineer executes; a positive net is a HIGH finding.
 
 ## 3. Seams
 
-- `core/cli_line` is a deep module with a one-function interface; its only adapter axis is the platform,
-  hidden inside it.
-- `core/doctor_rules._with_fix` is the one render seam for rule remedies. No second render path exists.
-- `ObjectSource` (port) keeps two adapters: the git reader and the test fakes. `parents` is swapped for
-  `publishes_nothing`; no method is added net.
-- `GitSubprocessClient` stays concrete (ADR 0001): one adapter, so no Protocol.
-- Gitflow resolution sits in the composition root (`ci.py`); features receive a `Gitflow` value.
+- Refusal: CLI verb → `cli/_fail.fail`; fix text only from `core/cli_line`.
+- Gate: rendered wrapper → `pre_gate` → `classify_path`/`verdict` in `core/workspace_layout`.
+- Removal: every remover → `sweep`; the TTL only from `workspace_layout`.
+- Git hooks: installer and doctor → one `--git-path hooks` resolver.
+- Ledgers: the stdlib scripts are the authority; the doctor imports the packaged script modules (as
+  `_bugs_check` today), never a parallel model.
+- Secrets: one data file; the library matcher and `_shared/_privacy.py` pinned by byte parity (V37 key).
 
-## 4. Sequencing (inventory R7)
+## 4. Risks
 
-cli_line + DADAIA_BIN → template_history → gitflow + frontmatter → FR5 birth → FR4 baseline → FR7 →
-FR1 steps + callers → shipped text/law/docs → autopilot E2E. FR5 has to land before FR4, because the
-baseline's birth pushes go through the hook.
+- **Required checks are operator-owned.** WP-32's file is the list (AC1.7); AC6.7 blocks a merge only once GitHub
+  branch protection lists every `ci.yml` job, Compliance included (SPEC operator action).
+- **Candidate-3 overlap** (WP-03, 07, 11, 15, 16, 17, 18, 21, 28, 41, 42): each starts after candidate 3's
+  closure merge; anchors re-measured at `release.py new`; candidate 3's overshoot is reported against
+  these rows' ceilings.
+- **Load flakiness in the local preflight.** The real-git fixture and hook spawns raise wall time; a
+  timing failure under load is a flake → `quarantine` + a registered bug, never a raised timeout; no
+  `sleep`/barrier; an unregistered pass-on-retry is a failure.
+- **AC9.5 turns ~60 hook tests red** on the real root rung; they are adjudicated in WP-15's task, never
+  skipped.
+- **Gate-not-enforced harnesses** cap D8/D9; the ≥ 80 score is measured, not assumed.
+- **V35 skill-corpus ceiling (2863 lines, down-only).** FR5 grows four skills; the growth is paid by the
+  skill-text deletions of WP-02, WP-24, WP-25, WP-49 and FR-8 within the candidate, else V35 fails.
+- **Test budget** (AC9.9): +522 before pruning; the pruning pass is sized in §2 and measured at closure.
 
-## 5. Risks — no stall
+## 5. Contradictions routed to the main thread (planned as stated here)
 
-- Every refusal carries one runnable fix line; the property test (AC1.3) executes each command step's fix.
-- A stale tracking ref makes `publish` pending and fails the birth closed. Both carry fixes (`context
-  baseline`, `git fetch <remote>`).
-- A missing identity refuses before any write, with a `git config` line. An offline run refuses with the
-  same baseline line. A push failure after the commit is finished by re-running, which is idempotent.
-- An absent or malformed gitflow falls back to `DEFAULT` with a warning, never a block. GITFLOW-1 is WARN
-  only.
-- The library's own `pr-source-guard` change takes effect on the PR that carries it. The trigger contract
-  test prevents drift.
-- The hypothesis property runs real git over `file://`. It is bounded with `max_examples` ≤ 25 and
-  `deadline=None`, and marked integration.
-- AST test scope (§6 issue 2): scanning prose too would pull in ~115 help and docstring sites across ~50
-  modules, which is out of scope.
-
-## 6. SPEC issues found (routed to main thread, planned as stated)
-
-1. AC2.2 names `hooks/venv_guard.py` and `features/ci_preflight/service.py` as `DADAIA_BIN` importers. They
-   are not. PLAN: `venv_guard`'s suggested command migrates to `fix_line`; `ci_preflight` stays (it reads
-   the env var).
-2. AC2.5 "a literal … holding a bare `dadaia ` command" is scoped here to fix positions. A total ban would
-   reach ~115 prose, help and error sites in ~50 modules, e.g. `service.py` "Run 'dadaia context alive'".
-3. AC6.4 "existing `core/invocation.py` functions": `_repo_slug_under_repos` is private and gets renamed
-   public.
+1. SPEC AC9.1 lands behaviour rows in `QUALITY.md` "before the first fix"; ruling R1 lands them at the
+   closure memory pass for resolved bugs. Planned per R1.
+2. (Resolved in SPEC v2: waves 14/15/8/12.) SPEC's bug table kept `sa-doctor-job-not-a-required-check` in wave 2 (its wave-0 row reuses number
+   32 for the hooks-path bug); ruling R2 moves WP-32 to wave 0. Planned per R2; the SPEC wave counts
+   (13/15/9/12) need the move.
+3. As-is WP-48 REBUILDs `test_required_evidence_has_one_home.py`; AC6.2 folds it into V37. Planned as
+   delete.
+4. WP-39: as-is +5, audit +30; the SPEC cap is +5. Over it the task stops.
+5. WP-12 (+12) and WP-19 (+7) now equal their SPEC ceilings (AC1.1, AC2.1): no margin.
+6. As-is names WP-39..48 with pre-registration slugs; the registered ids are used.

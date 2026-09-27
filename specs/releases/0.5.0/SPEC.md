@@ -3,322 +3,293 @@
 **Status:** Approved
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
-**Opened:** 2026-09-25
-**Origin:** operator-demand
+**Opened:** 2026-09-27
+**Origin:** bugs:sa-reaper-destroys-its-own-hold-before-ttl,sa-context-dead-removes-repos-outside-the-reaper,sa-public-install-unlinks-operator-files-outside-its-ledger,sa-gate-allows-root-entries-the-reaper-moves,sa-doctor-reaps-harness-owned-entries,sa-public-install-writes-the-root-map-into-product-repos,sa-scoped-public-install-prunes-the-gate-wiring,sa-ledger-verbs-append-histo-before-validating-the-pair,sa-private-match-rendering-has-three-renderers,sa-gate-blind-on-cursor-copilot-devin,sa-codex-policy-allows-write-capable-commands,sa-specs-upgrade-writes-through-symlinks,pre-push-gate-never-runs-under-core-hookspath,sa-seven-workspace-root-rules,sa-bind-has-two-stores,sa-fix-lines-not-built-by-cli-line,sa-rich-printer-wraps-fix-lines,sa-unfixable-doctor-findings-say-doctor-fix,sa-placement-rules-contradict-tree8,sa-registry-schema-version-has-three-grammars,sa-spec-doc-033-duplicates-bugs-check,sa-ledger-write-seam-redacts-less-than-push-refuses,sa-backlog-status-has-no-single-authority,sa-promote-has-no-verb,sa-status-line-has-two-parsers,sa-adr-measured-by-pattern-refuses-real-checks,sa-specs-tree-state-read-five-ways,sa-memory-atom-has-two-grammars,sa-release-json-validated-three-times,sa-reconcile-certify-skip-the-workspace-walk,sa-doctor-job-not-a-required-check,sa-context-repo-mapping-falls-back-to-the-name,sa-editable-install-reports-a-frozen-version,sa-subjects-resolve-is-circular,sa-hook-parity-claims-false-and-interpreter-rules-diverge,sa-reviewer-persona-body-contradicts-its-tools,sa-specs-init-writes-unrendered-law,sa-gate-path-classes-diverge-from-the-law,sa-tool-caches-land-outside-the-cache-zone,sa-live-work-branch-named-three-ways,sa-principal-branch-defaults-to-main-and-cut-point-diverges,sa-audit-close-archives-without-validating,sa-staged-assets-without-consumers,sa-expiry-has-two-clocks,sa-handoff-self-pull-requirement-diverges,sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges,sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts,sa-text-restates-rules-the-code-contradicts,sa-consumer-law-carries-library-facts
 
 ---
 
-## 1. Problem and context
+## Problem and context
 
-Candidate 3 — "onboarding foundation: a derived state machine the agent loops on, a published first
-project, and the project gitflow". Operator demand 2026-09-24 (verbatim):
+Operator, 2026-09-26: "não adicione fix em cima do que ta quebrado ... agora so aceito 80% pra mais com
+o restante permanecendo mapeados". 2026-09-27: "se não resolvermos os testes é impossível resolver o problema na raiz".
 
-> "não quero gambiarras altamente suscetíveis a bugs, quero uma jornada robusta e resiliente, com
-> orientações claras ao agente para ele se auto-resolver... superfície de bugs deve ser minimizada...
-> auto-recovery pelo agente"
+- Ledger: 49 open (22 C, 11 H, 11 M, 5 L), exactly the Origin: 48 packages from 142 verified findings
+  plus the hooks-path bug (`2c1faf65`).
+- 0.4.7's first-run rubric D1–D10: **44/100** (Claude 50, non-Claude 40); 3 stalls.
+- As-is (PLAN §1): every authority unit carries ≥ 2 prior bugs, so REBUILD; net about −2569 lines.
+- Tests: 65k lines against 31k production; candidate 3 moved +4241/−3111 for +318; fakes and the hook
+  harness hard-code 5 questions.
 
-> "usuários devem conseguir ver nosso gitflow básico... ter um default... customiza se quiser...
-> constitution é para isso... gates determinísticos customizáveis... não provoque locks ou stop sem
-> sentido fazendo agente parar de trabalhar e não ter para onde ir. Esse é o maior problema."
+## Objective
 
-Grill rounds 1–3 (2026-09-25), all accepted. Law: ADRs 0033–0038, 0040, 0042–0049; as-is review: PLAN
-§1. Amended in place 2026-09-26 (REJECTED 40a24031) and 2026-09-27 (reviews 6–7, the anchor-first
-design, PLAN §1.4, the tests retro).
+Each question the 49 bugs name gets one authority, behavior row and public seam; every other mechanism,
+tests and fakes included, consults it or goes; definition, review, CI and closure refuse a second
+authority or an uncited assertion; code and tests shrink; 0.5.0 publishes per FR7.
 
-## 2. Objective
+## Terms (enter `CONTEXT.md`, AC5.6)
 
-One derived, ordered list of onboarding steps — each a real-state predicate and one fix line built by one
-builder — that an agent loops on (run doctor, execute `fix:`, repeat) from an empty directory to a project
-published on its principal, integration and work branches under a gitflow the project declares in its
-constitution; no step can stall, and the touched features shrink.
+- **Authority** — the one symbol, command or file answering a question; others **consult** (call) it.
+- **Systemic ambiguity** — two mechanisms (code, or law an agent executes) answering one question with
+  divergent rules. _Avoid_: drift, duplication.
+- **Behavior row** — a Given/When/Then statement `<bug-id>#<id>` naming its authority and seam.
+- **Cross-check test** — one input set fed to two live readers, asserting one verdict.
+- **Ratchet allowance** — violations a ratchet tolerates: `file:symbol` → the open bug id deleting it,
+  or `parity:<test>`. _Avoid_: baseline.
+- **Resolution contract** — a RED at the question's seam failing at definition; GREEN; losers gone with
+  their tests and fakes; `bugs.py resolve` with the evidence triple, net-negative unless an AC excepts it;
+  commit shape 3.
 
-## 3. Terms
+## Decisions
 
-- **Onboarding step** — one entry of the ordered list: id, kind, a real-state predicate ("pending"), one
-  fix line. Ids in order: `context`, `bind`, `specs` (3a), `first-pass` (3b), `publish` (3c).
-  _Avoid_: stage, wizard step, onboarding state.
-- **Step kind** — `command` (the fix line is a shell command) or `agent` (it names a skill section and a
-  pending list). _Avoid_: type, mode.
-- **Onboarding level** — 1 workspace, 2 context (`context`, `bind`), 3 specs (3a `specs`,
-  3b `first-pass`, 3c `publish`); derived, never stored.
-- **Next step** — the first pending onboarding step, printed identically by `doctor`, `init`,
-  `context create` and SessionStart.
-- **First pass** — level 3b; done when memory holds real content, never by a stamp.
-- **Project publication** — level 3c: the first push of a main repo's specs, by `context baseline`.
-  _Avoid_: publish step, baseline (the pre-push published-history baseline).
-- **Onboarding anchor** — the commit holding the onboarding paths, made on a detached HEAD (an unborn
-  clone's first commit); every later HEAD move keeps it as an ancestor. _Avoid_: baseline commit.
-- **Unpublished range** — the commits of a ref origin does not hold (`unpublished()`); empty = already
-  published. _Avoid_: publishes nothing, boundary.
-- **Fix line** — the one runnable line a finding, refusal or step prints after `fix:`; every one naming
-  the workspace CLI is built by `fix_line`. _Avoid_: hint, remedy text.
-- **Project gitflow** — the `gitflow:` block of `specs/constitution.md` frontmatter naming three roles:
-  **principal branch** (deployed; default from `origin/HEAD`, else `main`), **integration branch**
-  (default `develop`), **work branch** (`<work prefix><M.m.p>`, prefix default `feature/`).
-  _Avoid_: branch policy (the gate's check), branching model.
-- **Bootstrap birth** — a push creating the principal or integration branch whose unpublished range is
-  empty, or the first push to an origin holding neither. _Avoid_: bootstrap push, first push.
+A parenthesized `00NN` is an ADR: 0050–0088 hold the operator-accepted decisions, appended at
+definition (handoffs in `reports/main-thread/20260927-050-c4-evidence/`); per-bug ones sit in the
+table. Over the as-is, the grill wins.
 
-## 4. Functional requirements
+- 0.5.0 is CRITICAL (`_RELEASE.json` log 2026-09-26T23:02:09Z); every verified package is a bug; Flow 2
+  plus a never-again mechanism (0050): FR5 generic, FR6 library (0052).
+- DEC-1..13 as recommended, one ADR each (0058–0069 in order): 1a 2a 3b 4a 5a 6a 7a 8a 9b (+a on
+  Devin) 10a 12a 13a; DEC-11 deferred (0053).
+- Publish gate: FR7, overriding "0 open bugs before publish" for 0.5.0 only (0051).
+- Behavior first: the single behavior is stated before any test is touched; a failing old test is a
+  question, never an order (0070). Test strategy: FR9 (0071).
 
-`CLI` = the absolute workspace CLI path `cli_path` returns. Files are library source; projections follow
-by `public stage` + `public install`.
+## Bugs, their question and the one authority
 
-### FR1 — One onboarding derivation (ADR 0033)
+WP = plan package (HP: hooks-path bug); † = candidate-3 files; tests = audit net test lines before
+FR9's pruning; mirr = mirrored (each side pinned by its own tests) / all findings.
 
-- AC1.1 `features/workspace/onboarding.py` holds ONE ordered tuple of step definitions (id, kind,
-  pending(state), fix(state)) in the §3 order; `next_step` returns the focus context's first pending step,
-  else the first pending across ALIVE contexts, else `None`; `Step` carries `kind`.
-- AC1.2 Every predicate reads real state (files, git, the session registry); writing
-  `audits_histo.jsonl` changes no step (unit test).
-- AC1.3 A hypothesis property test over random real-state prefixes (tmp dirs, `file://` bare remotes)
-  executes each pending command step's fix line and asserts that step is no longer pending; operator
-  placeholders (`<clone-url>`, `<name>`) are the only tokens the test substitutes.
-- AC1.4 Along every property run the printed step's index strictly increases; the loop ends within
-  `len(steps)` command executions plus the agent steps.
-- AC1.5 `doctor` (ONBOARDING info finding; `--json` carries `step` and `kind`), `init`, `context create`
-  and SessionStart print the same `Step.text()`, which names the kind. SessionStart calls one helper for
-  bound and unbound sessions; a hook test asserts both paths print doctor's text.
-- AC1.6 The derivation issues no network call; only `publish` reads the gitflow block (the local
-  integration name). _Amended 2026-09-26._
-- AC1.7 A `tests/contract/` census of the step list (id, kind, order) replaces the regex census
-  `tests/contract/test_onboarding_text.py`.
+| WP | bug id | question | the one authority | tests | mirr |
+|---|---|---|---|---|---|
+| | **Wave 0 — data loss, leaks, gate holes (14)** | | forced-pass 8 | +503 | 17/37 |
+| 02 | sa-reaper-destroys-its-own-hold-before-ttl | may a hold die before its TTL | `sweep.move`; N moves = N holds; "one hold per origin per day" void (0074) | +40 | 1/2 |
+| 03 | sa-context-dead-removes-repos-outside-the-reaper † | how a dead repo leaves disk | `_reap_dead_repo` over `all_repos()`; unpublished = any branch | +78 | 2/3 |
+| 04 | sa-public-install-unlinks-operator-files-outside-its-ledger | who deletes in harness dirs | `_reconcile_install_ledger` | +5 | 1/1 |
+| 05 | sa-gate-allows-root-entries-the-reaper-moves | may a root entry exist | `workspace_layout.verdict` (0058) | +75 | 3/5 |
+| 06 | sa-doctor-reaps-harness-owned-entries | who judges harness dirs | the install ledger (0059) | +2 | 0/2 |
+| 07 | sa-public-install-writes-the-root-map-into-product-repos † | who writes a repo `AGENTS.md` | `canon.REPO_LAW` via `specs init` | -119 | 2/3 |
+| 08 | sa-scoped-public-install-prunes-the-gate-wiring | what a whole install is | one `InstallPlan` | +14 | 1/2 |
+| 09 | sa-ledger-verbs-append-histo-before-validating-the-pair | did a refusal write | the script checks both files, then writes the pair | +80 | 0/2 |
+| 11 | sa-private-match-rendering-has-three-renderers † | how a match is shown | `redaction.mask` everywhere, `privacy_check.py:318` too (0086) | +25 | 2/4 |
+| 12 | sa-gate-blind-on-cursor-copilot-devin | is every tool call judged | `pre_gate` + `HOOK_DIALECTS`; no blocking contract = "gate not enforced" (0054) | +60 | 2/6 |
+| 13 | sa-codex-policy-allows-write-capable-commands | unprompted Codex commands | the rendered `.rules`: `rg ls cat`, `sed -n` | +37 | 0/1 |
+| 14 | sa-specs-upgrade-writes-through-symlinks | how a fixed section is written | one symlink-refusing writer | +65 | 1/2 |
+| 32 | sa-doctor-job-not-a-required-check | which checks gate | `ci.yml`; `checks_for()`; an in-repo required-checks file (0078) | +71 | 1/3 |
+| HP | pre-push-gate-never-runs-under-core-hookspath | where git runs the gate | `git rev-parse --git-path hooks` for install and doctor; a foreign `pre-push` refused with its one line (0057, 0085) | +70 | 1/1 |
+| | **Wave 1 — stalls, loops, fixes that never clear (15)** | | forced-pass 20 | +13 | 27/49 |
+| 15 | sa-seven-workspace-root-rules † | the workspace root | `resolve_workspace_root` | +108 | 1/3 |
+| 15 | (fence) | which roots may a dadaia process act on | `core/workspace_resolver` fence (0088) | +10 | — |
+| 16 | sa-bind-has-two-stores † | is the session bound | `resolve_bind` (0060); a native id, no bind: `repos/<slug>/` writes refused, fix `context bind <owner>` (0072) | +115 | 1/3 |
+| 17 | sa-fix-lines-not-built-by-cli-line † | how a fix line is written | `core/cli_line` | +140 | 3/7 |
+| 18 | sa-rich-printer-wraps-fix-lines † | who prints a refusal | `cli/_fail.fail`, exit 1; Click usage errors keep 2 (0073) | +75 | 3/4 |
+| 19 | sa-unfixable-doctor-findings-say-doctor-fix | fix of an unfixable finding | the finding's own `fix_line` | +100 | 1/1 |
+| 20 | sa-placement-rules-contradict-tree8 | where a stray specs file goes | TREE-8 | -40 | 1/3 |
+| 21 | sa-registry-schema-version-has-three-grammars † | readable registry versions | `parse_schema_version` | +100 | 3/3 |
+| 22 | sa-spec-doc-033-duplicates-bugs-check | is a bug record valid | `bugs.py check` + schema | -670 | 3/4 |
+| 23 | sa-ledger-write-seam-redacts-less-than-push-refuses | what a ledger may store | the pre-push matcher, refusing at the write seam | +10 | 2/2 |
+| 24 | sa-backlog-status-has-no-single-authority | live status; the pick | `backlog.py`; SPEC `Origin` (0062, 0063); `deferred` is live (0076) | -40 | 3/4 |
+| 25 | sa-promote-has-no-verb | how a promote is recorded | `release.py ship` (0064) | -70 | 2/3 |
+| 26 | sa-status-line-has-two-parsers | which `**Status:**` counts | `extract_status` at line start; no blockquote form (0075) | +60 | 0/1 |
+| 27 | sa-adr-measured-by-pattern-refuses-real-checks | what `measured_by` names | free text; `doctor_adr` (0065) | -10 | 0/2 |
+| 28 | sa-specs-tree-state-read-five-ways † | the specs tree state | `specs_version.state()` | +145 | 2/4 |
+| 29 | sa-memory-atom-has-two-grammars | atom valid; catalog fresh | `_memory_schema.parse` | -10 | 2/5 |
+| | **Wave 2 — consolidations (8)** | | forced-pass 2 | +475 | 11/17 |
+| 30 | sa-release-json-validated-three-times | valid state; live release | `release.py check`; legacy `next/` not live; `new` refuses while `check` is red (0077) | -100 | 3/5 |
+| 31 | sa-reconcile-certify-skip-the-workspace-walk | is an upgrade clean | doctor; `certify` (0069) | +116 | 1/2 |
+| 33 | sa-context-repo-mapping-falls-back-to-the-name | a context's repo | the context registry | +101 | 1/2 |
+| 34 | sa-editable-install-reports-a-frozen-version | the running version | `provider_version()`, rebuilt in place | +91 | 0/1 |
+| 35 | sa-subjects-resolve-is-circular | does a subject ref resolve | doctor `SubjectRegistry` | +39 | 2/3 |
+| 36 | sa-hook-parity-claims-false-and-interpreter-rules-diverge | hooks; interpreter | `HOOK_DIALECTS`; the wrapper (0066, 0067); Devin gets `ctx_inject`, `pre_gate`, the reaper (0079) | +147 | 2/2 |
+| 37 | sa-reviewer-persona-body-contradicts-its-tools | may the reviewer write | persona `tools`, `read_only` | +48 | 1/1 |
+| 38 | sa-specs-init-writes-unrendered-law | the canon table text | `render_registry_tables` | +33 | 1/1 |
+| | **Wave 3 — design debt (12)** | | forced-pass 5 | -139 | 14/30 |
+| 39 | sa-gate-path-classes-diverge-from-the-law | PROTECTED/ADDITIVE paths | one classifier; the literal hook-wiring floor, never the manifest (0055) | -5 | 2/5 |
+| 40 | sa-tool-caches-land-outside-the-cache-zone | where caches live | absolute `.dadaia/tmp/<tool>-cache`; `.dadaia/.cache/` deleted (0080) | +30 | 1/1 |
+| 41 | sa-live-work-branch-named-three-ways † | version; work branch | release-please; `<work><live id>` from `_RELEASE.json` (0068) | +37 | 0/2 |
+| 42 | sa-principal-branch-defaults-to-main-and-cut-point-diverges † | an undeclared principal | the `specs init` detector | +44 | 1/2 |
+| 43 | sa-audit-close-archives-without-validating | is an audit closable | `audit.py`; mixed deferred/rejected closes `deferred`, none `none` (0081) | -340 | 2/3 |
+| 44 | sa-staged-assets-without-consumers | consumed assets | the real consumer | -100 | 2/3 |
+| 45 | sa-expiry-has-two-clocks | has a marker expired | zone TTL via `sweep` | +10 | 2/2 |
+| 46 | sa-handoff-self-pull-requirement-diverges | is `self_pull` required | handoff schema v1.2 | +5 | 1/1 |
+| 47 | sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges | the upgrade target | `CANONICAL_SPECS_VERSION`; a two-tier tree refused unstamped (0082) | +10 | 1/2 |
+| 48 | sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts | ledger vocabulary | the stdlib scripts; the doctor compares exactly (0083) | +45 | 1/3 |
+| 49 | sa-text-restates-rules-the-code-contradicts | a restated rule | the code or its test | +80 | 1/5 |
+| — | sa-consumer-law-carries-library-facts | projected law | the consumer's tree; free-text surfaces, only `unknown` refused (0084) | +45 | 0/1 |
 
-### FR2 — One fix-line builder (ADR 0045; absorbs round-2 items)
+## Functional requirements
 
-- AC2.1 `core/cli_line.py` owns `cli_path(root)` (moved from `onboarding.py`) and
-  `fix_line(root, *argv)`, joining with `shlex.join` on POSIX; on Windows forward slashes, double quotes
-  only around a blank; a unit test pins both forms; a contract test runs a printed line in Git Bash, cmd
-  and PowerShell on the Windows job (a path with a blank needs `& `). _Amended 2026-09-26._
-- AC2.2 `DADAIA_BIN` is deleted from `core/kernel_tunables.py`; every call site in the importing
-  modules (`features/specs/rules.py`, `features/spec_context/{service,doctor,gate_policy}.py`,
-  `cli/commands/{context,doctor}.py`, `infrastructure/ledger_scripts.py`, `hooks/venv_guard.py`'s
-  suggested command) migrates — no exception.
-- AC2.3 FIXED-1/FIXED-2 (`doctor_memory.py`) and TREE-4/TREE-5 carry their remedy as a `fix_line`-built
-  line; no finding description embeds a bare `dadaia` command.
-- AC2.4 A missing scaffolded law file (`specs/AGENTS.md` or `specs/<area>/AGENTS.md`) is `fixable=True`:
-  `CLI doctor --fix --context <ctx>` writes the shipped template (lossless); the copy-a-library-path prose
-  is gone; a TREE-5 case `--fix` does not repair advertises no `doctor --fix` line; an integration test
-  covers both.
-- AC2.5 An AST contract test fails when any module outside `core/cli_line.py` builds a fix line naming the
-  workspace CLI other than through `fix_line` (a literal or f-string holding the venv CLI path or a bare
-  `dadaia ` command).
-- AC2.6 `init` and `context create` refusals build their fix via `fix_line` (Windows form asserted once).
+### FR1 — Wave 0
 
-### FR3 — Level 3b, first pass by real state (ADRs 0034, 0043)
+- AC1.1 Every wave-0 bug meets the resolution contract; net-positive exceptions: `context dead` (+3),
+  the Cursor/Copilot/Devin gate (+12), the hooks-path install (+5).
+- AC1.2 A file outside the prior install ledger survives `public install`; two same-day reaps leave two
+  holds; `context dead` refuses an unpushed branch or a linked worktree, else holds the repo in
+  `.dadaia/reaped/`; `specs upgrade` and `doctor --fix` never write a symlink target.
+- AC1.3 With `core.hooksPath` set, a push carrying a denylisted term is refused; the doctor reports a
+  foreign `pre-push` at `git rev-parse --git-path hooks` with a runnable `fix:`.
+- AC1.4 Per harness, a vendor-documented native payload gets the Claude payload's verdict through the
+  rendered wrapper; no wrapper emits an explicit allow.
+- AC1.5 The rendered Codex policy allows no write- or exec-capable prefix.
+- AC1.6 `release-please-config.json` carries `"release-as": "0.5.0"` until the release PR merges; the
+  next commit drops it.
+- AC1.7 `release.yml` consumes `ci.yml`; a contract test pins every `ci.yml` job in the in-repo
+  required-checks file.
 
-- AC3.1 `first-pass` (kind `agent`) is pending while `specs/memory/ARCHITECTURE.md` or `QUALITY.md`, fixed
-  sections stripped (the `memory_canon` extract helpers), equals a stripped shipped digest, or
-  `specs/memory/product/catalog.json` holds no atom; its fix line names the absolute path of the installed
-  `dd-audit-project` SKILL.md first-pass section and the pending items.
-- AC3.2 `features/specs/template_history.py` moves to `core/template_history.py` (stdlib only, no
-  shim). `shipped-hashes.json` gains the stripped digests of every historical scaffold `ARCHITECTURE.md`
-  and `QUALITY.md`, backfilled from `git log`; the append-only contract test covers them.
-- AC3.3 A unit test proves a stub rewritten by `doctor --fix` (FIXED-2) still reads pending, and an edited
-  body reads done.
-- AC3.4 `dd-audit-project` SKILL.md's first-pass section applies while doctor's next step is
-  `first-pass`, ends at `dadaia doctor --context <ctx>` exit 0 (LINT-1 owns the atoms,
-  `memory.py check` only the catalog pair), and no longer creates `FINDINGS.jsonl` or runs
-  `audit.py close`; `tests/contract/test_audit_first_pass.py` asserts it; no shipped text makes
-  `memory.py check` the done criterion. _Amended 2026-09-27:_ bug fix 3886760e.
+### FR2 — Wave 1
 
-### FR4 — Level 3c and the one publish verb (ADRs 0035, 0042, 0048)
+- AC2.1 Every wave-1 bug meets the resolution contract; exception: unfixable findings (+7).
+- AC2.2 Every BLOCK, refusal and doctor finding prints one `fix:` that, run as printed from the root
+  and from `repos/<slug>`, clears it.
+- AC2.3 Every refusal prints via `cli/_fail.fail`: `Error:`, then `fix:`, exit 1, unwrapped at any width;
+  only a Click usage error exits 2.
+- AC2.4 Cross-checks give one verdict from every live reader of bind, registry version, status line,
+  specs-tree state, atom grammar, backlog status, bug record.
+- AC2.5 A release runs `new` → IMPLEMENTATION → CLOSURE → `ship` → `new` by verbs, doctor clean at each
+  step; a `* [ ]` task refuses CLOSURE.
 
-- AC4.1 `publish` (kind `command`) is pending while `origin/<integration>` is absent or
-  `git log --remotes=origin -n1 -- specs/constitution.md` in the main repo is empty (a v6 tree on the
-  principal alone is unpublished); its fix line is `CLI context baseline <ctx>`. _Amended 2026-09-26._
-- AC4.2 `context baseline <ctx>` takes no `--yes`, `--push` or repo argument (invoking it is consent)
-  and publishes the main repo only, anchor-first: git identity; fetch; commit the onboarding paths
-  (`specs/`, `specs-bkp/`, root `AGENTS.md`) on a detached HEAD, the anchor; read the gitflow from it
-  (ADR 0048, one reader); bring `<work prefix><version>` to the anchor; merge origin's start ref (first
-  held of work, integration, principal); one atomic push of births and `<work>`, upstream set. HEAD never
-  leaves the anchor line (an existing `<work>` is merged into the anchor, then fast-forwarded); the anchor
-  never lands on the principal or any other existing branch. Unrelated histories merge only when the
-  anchor's root holds only onboarding paths. A second foreign backup lands in `specs-bkp/<UTC>/`.
-  _Amended 2026-09-27._
-- AC4.3 Births: empty origin → principal and integration at the anchor commit, `<work>` carrying any
-  stale local work; principal only → integration at `origin/<principal>`; both → reused; pushed by refspec
-  `<sha>:refs/heads/<branch>`, no local head created, moved or reset. Version: `0.1.0`, else last tag + 1
-  patch. _Amended 2026-09-27._
-- AC4.4 One published answer (M4): the `publish` step and baseline's no-op read one predicate; "already
-  published" (exit 0, nothing committed or pushed) only when it holds and HEAD has no unpublished range,
-  never while the anchor is unpublished. _Amended 2026-09-27._
-- AC4.5 Refusals exit non-zero; no fix is a bare re-run. _Amended 2026-09-27._
-  - Before any write (HEAD, branches, index, remote unchanged), one fix line each: no checkout
-    (`CLI context alive <ctx>`); no git identity (`git config`); no `specs/constitution.md` on disk or at
-    HEAD (`CLI specs init --context <ctx>`).
-  - Origin lacks the principal: refused after the anchor (the gitflow exists only there), HEAD on
-    `<work>` at the anchor, every other branch untouched. One candidate head → `fix: CLI specs init
-    --context <ctx> --principal <head>`; several → listed, fix with a `<principal>` placeholder, no guess.
-  - A fetch, merge or push failure (offline, auth, wrong URL, non-fast-forward, conflict) carries git's
-    full output (ruling R13); after the anchor it names the anchor sha; HEAD holds it.
-  - Cut (h): work outside the onboarding paths is neither refused nor committed; git refuses a switch
-    or merge it collides with ("commit … or stash").
-- AC4.6 Integration tests, one per state: empty origin; principal only; both; a tag; a non-default
-  principal; an unborn clone of a non-empty origin; principal absent (one, several heads); a local
-  `<work>` with unrelated history; a conflict; offline; no identity; foreign work carried; only onboarding
-  paths in the anchor; local principal unchanged; second run no-op; after each failure `publish` stays
-  pending and no "already published" prints.
-- AC4.7 `features/certification/service.py` invokes baseline without the deleted flags.
-- AC4.8 An associated repo publishes by plain `git push` under the pre-push gate; a refusal or doctor
-  finding about it names that one command. _Amended 2026-09-27:_ cut (f).
-- AC4.9 `context dead --commit` never stages an unmerged entry (consented untracked files still are): git
-  refuses a conflicted commit, no conflict marker is published; a push failure carries git's full output
-  and removes nothing. Dead's work-branch refusal stays. With no git identity it refuses before any
-  write, one fix line (`git -C <repo> config user.name '<user.name>'`); checkout, HEAD, origin and the
-  ALIVE state unchanged. _Amended 2026-09-27:_ SA-H3-2 (75b92f25).
+### FR3 — Wave 2
 
-### FR5 — Pre-push bootstrap birth (ADR 0036)
+- AC3.1 Every wave-2 bug meets the resolution contract; exception: unrendered law (+4).
+- AC3.2 `certify` judges all three doctor sections; every recipe command passes the wheel's `--help`.
+- AC3.3 Without `.dadaia/.venv` every wrapper exits 0 with one stderr warning.
 
-- AC5.1 A push to the principal or integration branch passes the branch policy only as a bootstrap birth:
-  remote sha zero on pre-push stdin AND either origin holds neither role branch or the ref's unpublished
-  range is empty. Every other push to those branches is refused with its fix line. _Amended 2026-09-27._
-- AC5.2 `ObjectSource.parents` and its fake stubs are deleted; `unpublished` (origin-scoped) is the one
-  "already published" rule for births, the rewrite fix and `unpushed`. _Amended 2026-09-27._
-- AC5.3 `check_branch_policy(refs, gitflow, births)` stays pure; births are computed in
-  `push_gate_decision` only for principal/integration refs with a zero remote sha. A ref is judged by the
-  remote branch it lands on; a birth passes from any source. A birth carrying new objects to an origin
-  holding a role branch, stale refs included, gets one fix: birth at the other role's published tip.
-- AC5.4 Tests: an empty origin's three branches in one atomic push allowed; integration born at
-  `origin/<principal>` allowed; a birth carrying a new commit to a non-empty origin refused; the rewrite
-  fix, executed, clears a root-reaching and a mid-history range. _Amended 2026-09-27._
-- AC5.5 The gate's rewrite fix is one formula for every unpublished range: `reset --soft <oldest
-  unpublished commit of the refused ref>`, then the term removed and the commit amended (a branch HEAD is
-  not on: `git switch <branch>` first). Operator-action text only for a tag or a detached HEAD. Refusing
-  baseline's own push names `CLI context baseline <ctx>` as the step after the amend. _Amended 2026-09-27._
-- AC5.6 Baseline and `dead --commit` run the pre-push matcher in-process on what they commit. One
-  registry (`privacy_baseline.json` + operator terms), control characters stripped, refuses a
-  secret-named key assigned a whole literal (quoted 8+ chars, or unquoted to line end, optional `#`
-  comment); references, templates and code expressions pass. A private-key container
-  (`.pem .key .p12 .pfx .jks .keystore .der`) is refused on presence alone; a public certificate
-  (`.crt .cer`) passes. The `test_one_secret_matcher.py` matrix is the contract. _Amended 2026-09-27:_
-  bug fix, R10-4, registry v14.
+### FR4 — Wave 3
 
-### FR6 — The project gitflow (ADRs 0037, 0040, 0046)
+- AC4.1 Every wave-3 bug meets the resolution contract; exceptions: principal detection (+2), path
+  classes (capped at +5, else the task stops for the architecture lens).
+- AC4.2 Baseline, gate and `work_name` name the work branch `<work prefix><live release id>`; the last
+  tag + 1 rule is deleted.
+- AC4.3 `CONTEXT.md` is the one glossary; `Part 1/Part 2` and "PyPI + 1 patch" leave shipped text.
+- AC4.4 Consumer-projected law names no library layer, ratchet, test file or release tool.
+- AC4.5 No shipped law names `.dadaia/.cache/` (root map §4, the `DADAIA_ZONES` table); tool caches sit
+  at absolute `.dadaia/tmp/<tool>-cache`, `QUALITY.md`'s relative path too.
 
-- AC6.1 `core/gitflow.py`: a frozen `Gitflow(principal, integration, work_prefix)`, `DEFAULT`,
-  validating `from_mapping` (valid ref names, principal ≠ integration, non-empty prefix not nested under
-  a role name), and `role_of(branch)` → principal | integration | work (`<prefix><M.m.p>`) | none. Role
-  names match exactly and case-sensitively (git's rule); a work name is the prefix plus a bare `M.m.p`,
-  no suffix. It replaces the three branch regexes. _Amended 2026-09-27:_ nested prefix; exact names.
-- AC6.2 The block is `gitflow: {principal: <name>, integration: <name>, work: <prefix>}` in
-  `specs/constitution.md` frontmatter, read by `core/frontmatter.parse`; `read_gitflow(specs_dir)`
-  returns `(Gitflow, warning | None)` — absent or malformed ⇒ `DEFAULT` plus a warning. One
-  frontmatter merge-writer serves both `specs_pattern_version` and `gitflow`, preserving every other key
-  and the body byte-for-byte; `_STAMP_RE` is deleted.
-- AC6.3 `specs init --context <ctx> [--principal] [--integration] [--work-prefix]`: principal defaults to
-  `origin/HEAD` (`git symbolic-ref`, local) else `main`; writes the block on a fresh tree and merges it on
-  an existing dadaia tree; same flags twice is a no-op; stdout names the gitflow written.
-  _Amended 2026-09-26:_ the `specs` step's fix carries no gitflow flag (a valid block is
-  kept, else detected) and `--replace-foreign` only for a foreign tree; an unparseable frontmatter is its
-  own doctor finding.
-- AC6.4 Pre-push resolution in `cli/commands/ci.py`, once per push, from committed data:
-  `specs/constitution.md` at HEAD; else the newest one reachable from a remote-tracking ref (local); else
-  the owning context's main-repo constitution (`core/invocation.py`); else `DEFAULT` with one stderr
-  warning — never a block. Refusal fixes name only refs that exist. `push_gate_decision` requires the
-  gitflow (no default). _Amended 2026-09-26._
-- AC6.5 Pushable: work branches; principal/integration only by FR5; refusal messages and their
-  `gh pr create --base …` fix lines name the configured branches. Tests with the default and a custom
-  gitflow (`trunk`/`next`/`work/`), an absent block (warning, default), an associated repo inheriting.
-- AC6.6 Doctor `GITFLOW-1` (specs section, beside SPECS-VERSION): WARN when the block is absent or
-  malformed; fix line = `specs init --specs-dir <specs>` (no flags); executing it clears the finding and
-  never resets an operator's custom names. _Amended 2026-09-26._
-- AC6.7 The library's `specs/constitution.md` carries the block; `ci.yml` `pr-source-guard` reads it
-  (`read_gitflow`): integration PRs from work branches or Dependabot, principal PRs from the integration
-  branch or `release-please--branches--<principal>`. Workflow triggers stay literal; a contract test pins
-  them equal to the library gitflow.
-- AC6.8 Every shipped-text branch literal PLAN §1 lists (hook text, law, skills, scaffold, schema text,
-  README, `docs/`, `llms.txt`, `CONTEXT.md`) is rewritten by role with a pointer to the constitution
-  gitflow; `dd-gitflow-default`'s branch table reads by role; `CICD-AUTOMATION.md` names the block's keys.
-- AC6.9 No pre-commit hook enforces the gitflow; no CI workflow is written into a consumer repo.
+### FR5 — Never-again mechanism, generic layer
 
-### FR7 — Only `context bind` binds (ADRs 0038, 0044)
+- AC5.1 `dd-release-definition` §2: PLAN §1 carries the Authorities table (`question | authority |
+  consults | deleted`), a row per touched question.
+- AC5.2 `release.py phase IMPLEMENTATION` refuses, one fix line each, a §1 without the table, with an
+  empty authority, or with two authorities for one question — structure only (0041); a fixture pair
+  proves it.
+- AC5.3 The PLAN §1 skeleton the fix names carries the Authorities header.
+- AC5.4 SLOP S10 is "second authority", HIGH; Axis 3 says "increased" for a diff adding one or an
+  allowance key; the architecture lens checks `deleted` gone, `consults` calling.
+- AC5.5 `dd-audit-project` pillar 2 gains a fixed hunt for restatements and second authorities.
+- AC5.6 `CONTEXT.md` carries the Terms above and `wave`, a harm-ordered group of a candidate's bugs.
+- AC5.7 `dd-code-review`'s test lens: a test touching a question cites its statement id and no assertion
+  changes without one; a miss is HIGH and the verdict REJECTED.
+- AC5.8 V35 (2,863 skill lines, down-only) stays green: FR5's skill growth is paid by skill-text cuts.
 
-- AC7.1 `init` and `context create` write no session record, print no `export DADAIA_*` line and call no
-  bind; "and bound" leaves their output; the `bind_session` helper is inlined into `context bind`.
-- AC7.2 `bind` is pending only when the caller has a resolvable session id and that session is unbound;
-  no session identity ⇒ no bind step. Its fix line is `CLI context bind <ctx>`.
-- AC7.3 Tests: init/create leave no session record; the bind step appears with `DADAIA_SESSION_ID`
-  set and unbound, never without it, and clears after its fix runs.
+### FR6 — Never-again mechanism, library layer
 
-### FR8 — Dead gate code deleted
+- AC6.1 `test_zone_registry.py`'s `_CANONICAL_SETS` gains ledger vocabularies, phases, trio names,
+  gitflow keys; `_restated_law_lines` scans every `public/**/*.md` but archives.
+- AC6.2 V37 flags duplicate top-level definitions across modules, skill scripts and hooks (a fixture
+  trips it); `test_required_evidence_has_one_home.py` folds into it and is deleted.
+- AC6.3 V38 flags destructive calls outside `features/spec_context/sweep.py`; import-linter forbids
+  `shutil` elsewhere.
+- AC6.4 V39: every doctor code has a fix-clears case or a `report-only` key.
+- AC6.5 An unlisted hit fails, a vanished key fails stale; a value is an open bug id or `parity:<test>`.
+- AC6.6 The closure allowance is a subset of the birth allowance; the closure log records both sizes.
+- AC6.7 The ratchets and AC9.2's contract test run in a required CI job (AC1.7).
+- AC6.8 The mechanism adds no production Python line outside `public/` and no verb.
 
-- AC8.1 `branch_name_is_permitted` and `parse_push_refs` are deleted (tests use `parse_push_stdin`);
-  `_run_specs_canon_scan` loses its unused `object_source`/`repo` parameters; the stale comments in
-  `chokepoints/__init__.py`, `branch_policy.py` and `ci.yml` are removed or corrected.
+### FR7 — Publish gate
 
-### FR9 — Law, docs, glossary
+- AC7.1 The rubric D1–D10, run fenced on the wheel built from the promote head, scores ≥ 80/100 on the
+  first run; the three scores enter the closure log.
+- AC7.2 Of the 49 bug ids in this SPEC's **Origin** (the ledger's open set at definition), at least 40 (80%)
+  are `resolved`, all 14 wave-0 ids among them.
+- AC7.3 Every unresolved Origin id stays `open`, in the closure `dispositions` log entry with its reason
+  and next vehicle; the entry states the 0.5.0-only override of "0 open bugs before publish".
 
-- AC9.1 Every line claiming init/create binds or that level 3 ends at a stamp is rewritten: `data/AGENTS.md`
-  (§7), `dd-cli-library` SKILL.md (levels 2–3, baseline without flags), `docs/`, `README.md`,
-  `data/CONSUMER_VALIDATION_RECIPE.md`, `CONTEXT.md`. Hand edits only; generated docs are candidate 4.
-- AC9.2 `CONTEXT.md` carries §3's terms with their _Avoid_ lists.
-- AC9.3 The closure memory pass rewrites `context-management`, `workspace-init`, `audits-canon`,
-  `spec-context-project`, `product-vision`, the product index and every atom `memory.py drift` lists;
-  `dadaia doctor --context <ctx>` exit 0. _Amended 2026-09-27._
-- AC9.4 `public stage`, `public install`, `public doctor` and `dadaia doctor` exit 0 on the live instance.
+### FR8 — Shrink mandate
 
-### FR10 — Autopilot E2E
+- AC8.1 The candidate nets negative over `dadaia_workspace/**` minus tests (about −2569) and over
+  production Python outside `public/`; both logged at closure.
+- AC8.2 New units are the three as-is ADD rows: `workspace_layout.verdict` (a move), a stdlib
+  `_shared/_privacy.py` pinned by byte parity, `release.py ship`; WP-34's `provider_version()` is an
+  existing reader rebuilt in place. No new doctor code, state file or schema; flags only leave.
 
-- AC10.1 `tests/e2e/test_onboarding_journey.py`: from an empty directory, over `file://` bare remotes,
-  with `DADAIA_SESSION_ID` set, after one `init … --repo <url>` line, a loop runs `doctor --json`, takes
-  the ONBOARDING finding, executes its fix line (`shlex.split`) — the `agent` step by a scripted stand-in
-  that fills memory — and stops at no finding or a cap of 10 iterations (reaching the cap fails).
-- AC10.2 It ends with the remote holding the principal, integration and `<work prefix>0.1.0` branches,
-  the work branch carrying `specs/constitution.md` with the gitflow block, and `doctor` 0 errors.
-- AC10.3 Three parametrized remotes: greenfield (unborn), a v6 dadaia tree on the principal, a foreign
-  tree on the principal (ending with `specs-bkp/` committed). The HEAD assertion is HEAD == upstream.
+### FR9 — Test strategy
 
-### FR11 — Shrink mandate (operator standing rule)
+Baseline (the evidence's `c4/tests-audit-*.json`): 69/133 findings mirrored, 130/133 with no cross-check, 35
+forced-pass commits; 261 KEEP, 157 REWRITE, 152 DELETE-LOSER, 24 DELETE-DUP, 27 DELETE-HOLLOW, 239 MISSING.
 
-- AC11.1 New production modules: `core/cli_line.py` and `core/gitflow.py` only (`core/template_history.py`
-  is a move). No new CLI verb, schema or state file; one new doctor code (`GITFLOW-1`); flags +3
-  (`specs init`) and −2 (`context baseline`).
-- AC11.2 The touched features shrink: `branch_policy.py`, `push_gate.py`, `cli/commands/init.py`,
-  `cli/commands/context.py`, `hooks/ctx_inject.py`, `doctor_structural.py`, `core/specs_version.py` and
-  `core/kernel_tunables.py` end with fewer lines than at the definition commit; growth only in the two
-  new modules, the step list, the baseline and the new git reads.
-- AC11.3 The closure note reports the net production Python lines (`dadaia_workspace/**/*.py` outside
-  `public/`) of the candidate's own commits, 5364ba0d..closure, excluding the operator-ordered shrink
-  deletions (800c5e2d 009721d6 f38f7ff8 de4e3179 114be682) and Arm B fixes; above +362 net is a HIGH
-  review finding. _Amended 2026-09-27:_ operator ceiling (PLAN §1.1), never raised.
+- AC9.1 Statements are the audits' `<bug-id>#<id>` rows, from the authority, the law or a decision, never
+  a test. The closure memory pass adds each resolved bug's rows to `QUALITY.md` `## Test architecture` →
+  `### Behavior rows` (0071; the law has no "Part 2").
+- AC9.2 Every test module touching a question declares `Intent: CONTRACT — <bug-id>#<id>`; a contract
+  test fails on an id found in neither the audits nor the rows.
+- AC9.3 Each question has one public seam, a CLI verb subprocess or `pre_gate` via the rendered wrapper; an
+  in-process test asserts only the authority function.
+- AC9.4 `FakeGitClient` and the four `ObjectSource` fakes give way to one real-git tmp fixture;
+  `FakeContextStore` passes `_store_contract.py` and a save/update parity test, or is deleted.
+- AC9.5 The hook harness spawns the real rendered hook in production's environment (no `WORKSPACE_ROOT`,
+  no cwd from it), driving `pre_gate` only; `_POLICY_DRIVER` is gone.
+- AC9.6 Each second mechanism deleted here meets a cross-check while both readers live; the commit
+  deleting the loser deletes it and the loser's tests and fakes (`git grep -w <symbol> tests/` empty).
+- AC9.7 A deleted path's golden rows leave with it; a surviving row never changes in a commit touching
+  `dadaia_workspace/**`; no expected value comes from the code under test (`rule_fix(rule)`).
+- AC9.8 An assertion changed in the window cites a statement id; the review REJECTS one that does not.
+- AC9.9 Net test lines are ≤ 0 at closure: the audits sum +852 (about +530 after FR6, AC9.4–9.5), so a
+  suite-wide pruning pass removes DELETE-HOLLOW, DELETE-DUP, text pins outside law-file canon and the
+  `WORKSPACE_ROOT`-rung tests. A positive net is a HIGH review finding.
+- AC9.10 mutmut runs on each row's authority function: review evidence, never a push gate.
+- AC9.11 Closure re-measures the mirrored and cross-checked counts of resolved packages against the
+  baseline, logging both; a resolved package has 0 mirrored findings and 0 live cross-checks.
+- AC9.12 `sa-seven-workspace-root-rules#S11` (0088; excepts S1's env clause): no dadaia process, nor
+  a child inheriting it, acts on a root listed in `DADAIA_FENCED_ROOTS`; the suite and every mutating
+  probe set it; one `.dadaia/AGENTS.md` line states it; seam `test_suite_cannot_reach_the_instance.py`.
 
-## 5. Replaces
+## Replaces
 
-- `onboarding.py`'s if-chain `_lowest` (level 3 = the `audits_histo` stamp) → the FR1 step list;
-  `ctx_inject._emit_bootstrap`'s second `next_step` call → one helper (AC1.5).
-- `DADAIA_BIN`, `onboarding.cli_path` and per-site fix strings → FR2; the regex census → AC1.7, AC2.5.
-- FIXED-2's bare `dadaia`; TREE-5's library-path prose and `fixable=False` → AC2.3, AC2.4.
-- First pass closed by a stamp; `features/specs/template_history.py`; raw-byte stub comparison → FR3.
-- Unborn-only `baseline`, its `has_commits` branch, `feature/0.1.0`, `--yes`/`--push` → FR4.
-- The publish that commits where HEAD is, then switches; the foreign-change preflight and its stash
-  fix; `_sync_failure`'s rerun and by-cause fixes; associated-repo publish through baseline → AC4.2,
-  AC4.5, AC4.8.
-- Pre-push refusing every principal/integration push → FR5; `ObjectSource.parents`, the empty-tree
-  `publishes_nothing` and the rewrite fix's no-fix root arm → `unpublished` (AC5.1, AC5.2, AC5.5).
-- `_SECRET_SCAN_RULES`/`scan_file_for_secrets` → one registry (AC5.6).
-- The three branch regexes, `branch_name_is_permitted`, `parse_push_refs`, unused
-  `_run_specs_canon_scan` parameters → FR6, FR8; `_STAMP_RE` → one merge-writer (AC6.2).
-- Hard-coded branch names in `pr-source-guard`, hook text, shipped text → AC6.7, AC6.8.
-- `init`/`context create` binding and the `bind_session` helper → FR7; law and atoms saying so → FR9.
+- Extra deleters: `move`'s hold removal, `dead`'s `rmtree`, install glob prunes, legacy removers,
+  `reap_markers`, `Handoff.expires_at`.
+- Second classifiers: the gate's "exists ⇒ operator" and glob matcher, the root `specs/` ADDITIVE arm,
+  `_scan_harness_dirs`, basename `_is_law_path`, listed ADDITIVE prefixes.
+- Second writers and renderers: the guardrail fan-out, `--only`, scope flags, the unrendered canon copy,
+  `specs upgrade`'s writers, the `.git/hooks`-only install; `redact()` copies, `HistoRecord.redact`,
+  `redact_text`, the doctor's redactor.
+- Hooks answering allow: the explicit-allow translator, non-tool events, Kimi shim parsing, Codex
+  `find`/`sed`, `_python_bin`'s fallback, parity claims.
+- Extra resolution rules: `WORKSPACE_ROOT`, cwd walks, env-first binding, name fallbacks, six version
+  readers, `work_name`'s last tag + 1, PyPI + 1.
+- Hand-built fixes and printers: bare `dadaia`, `&&`, `doctor --fix` on unfixable findings, Rich
+  wrapping, exit 3, exit 2 outside Click usage errors.
+- Doctor ledger re-checks: `core/models/bugs.py`, SPEC-DOC-033/008/036/038, BL-SCHEMA's list, BL-STALE,
+  CAT-1, `release_tree` rules, `JsonlRecordStore`'s write half, the case-folded dispositions.
+- Extra grammars: SPEC-DOC-035, TREE-7, SPEC-DOC-002L, SPECS-VERSION, registry version ×3, the status
+  window and blockquote, malformed → 0, the SemVer suffix, handoff v1/v1.1, terminal `deferred`.
+- Hand-edit lifecycle: `picked`, `**Consumes:**`, ARCHIVED, `_archive/<v>/_RELEASE.json`, rc-N, a
+  second task regex, histo before validation, four tmp-leaking writers.
+- CI copies: `release.yml`'s matrix, certify's skipped section, transcribed recipe lines.
+- Restated law: the `surface` enum, release-please in consumer law, `Part 1/Part 2`, `measured_by`'s
+  pattern, `--target`, `setup.cfg`'s module list, false docstrings, `agents.index.json`, the `rules`
+  family, the persona model fallback, `activity_class`, the `.dadaia/.cache/` zone.
+- Tests as a third mechanism: `FakeGitClient`, the `ObjectSource` fakes, `_POLICY_DRIVER`, the injected
+  `WORKSPACE_ROOT`, `test_required_evidence_has_one_home.py`, re-pinned goldens, the DELETE-* tests.
 
-## 6. Out of scope (non-goals)
+## Candidate 3
 
-- Generated docs, CLI reference, step table page, docs site (candidate 4, ADR 0039).
-- Backlog ideas `gitflow-trunk-based-model`, `consumer-gitflow-server-side-enforcement`,
-  `associated-repo-gitflow-override`.
-- Skill-script command constants (`python3 .agents/…`) — not CLI spellings.
-- Any pre-commit hook, consumer CI job, confirmation stamp, state file, or network call in the derivation.
-- Retrofitting consumer trees beyond `GITFLOW-1` + `specs init`.
+- It resolved `sa-pre-push-and-publish-scan-disagree-on-secret-shapes` (`eb4f4b02`).
+- Its cuts (f) associated-repo publish and (h) uncommitted-work refusal are taken; (g) dead's work-branch
+  refusal stays (0056). Its AC6.1 matches role names exactly, case-sensitively (0087).
+- `ffb30aa0` answered WP-41 with the losing side (`work_name` = last tag + 1); AC4.2 corrects it.
 
-## 7. Dependencies and risks
+## Out of scope and deferred
 
-- Order: FR2 → FR3's move → `core/gitflow.py` → FR5 → FR4 → FR1 → FR9.
-- Stale remote-tracking refs give a false `publish` pending; `baseline` fetches first.
-- The property test (AC1.3) runs real git; its example count stays bounded.
-- The library's gitflow change reaches `pr-source-guard` on the PR carrying it; AC6.7 pins the triggers.
+- Candidates 5, 6, 7 (0039 included) → the next release, their bug parts (WP-05, 06, 39, 40) fixed
+  here on today's code; DEC-11 with candidate 5 (0053).
+- Operator actions: apply WP-32's required-checks file to branch protection, Compliance included;
+  prune obsolete harness globs from `instance_exceptions.txt`.
+- Clone detection.
 
-## 8. Traceability (FR → ADRs)
+## Dependencies, order and risks
 
-FR1 0033 · FR2 0045 · FR3 0034 0043 · FR4 0035 0042 0048 · FR5 0036 ·
-FR6 0037 0040 0046–0048 · FR7 0038 0044 · FR8 — · FR9 0033–0038 · FR10 0033 0035 0036 · FR11 standing rule
+- Order: wave 0 (WP-32 and `release-as` in it; the hold fix before other deleters); then FR5, FR6 (allowance born
+  at today's counts, keyed to these bugs) and FR9's fakes and hook harness, on which every later
+  wave's tests rest; then waves 1, 2, 3.
+- Candidate 3 overlaps WP-03, 07, 11, 15, 16, 17, 18, 21, 28, 41, 42: each starts after it closes.
+- Risk: AC9.5 turns about 60 hook tests red on the real root rung.
+- Decided (0088): the fence is a feature, not a test rung (AC9.12).
+- Risk: "gate not enforced" caps D8/D9; AC6.7 blocks merges only once protection lists the job.
