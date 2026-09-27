@@ -55,6 +55,18 @@ def _make_minimal_agentic(workspace_root: Path) -> Path:
     return agentic_dir
 
 
+def test_root_agents_md_is_projected_from_data(tmp_path: Path) -> None:
+    """sa-public-install-writes-the-root-map-into-product-repos#K6 (rewritten from the templates/repos-only case): the root map's one
+    source is data/AGENTS.md."""
+    agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
+    (agentic_dir / "data").mkdir()
+    (agentic_dir / "data" / "AGENTS.md").write_text("# DATA AGENTS\n", encoding="utf-8")
+
+    FileSystemPublicAssetManager().install(workspace_root, harness="claude", force=True)
+
+    assert (workspace_root / "AGENTS.md").read_text(encoding="utf-8") == "# DATA AGENTS\n"
+
+
 def test_invalid_target_raises(tmp_path: Path) -> None:
     _, workspace_root = _build_minimal_agentic_dir(tmp_path)
     with pytest.raises(PublicAssetError, match="Unsupported"):

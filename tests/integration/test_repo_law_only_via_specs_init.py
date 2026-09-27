@@ -4,10 +4,8 @@ never writes under ``repos/``.
 Intent: CONTRACT — sa-public-install-writes-the-root-map-into-product-repos (WP-07);
 size: MEDIUM (real public tree, real install).
 
-K1: install before specs init leaves repos/<slug>/ untouched; specs init then writes the
-    repo template, not the root map.
-K2: an operator line appended to the repo AGENTS.md survives the next install.
-K4: a repos/ path a former release ledgered is forgotten on upgrade, never pruned.
+Statements: sa-public-install-writes-the-root-map-into-product-repos#K1, #K2, #K4, #K6. The ledger-forget test is K6's upgrade
+safety: a single writer outside repos/ never prunes a repo file an older release wrote.
 """
 
 from __future__ import annotations
@@ -16,6 +14,10 @@ import hashlib
 import json
 from pathlib import Path
 
+import pytest
+from typer.testing import CliRunner
+
+from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.models.install_ledger import InstallLedger, LedgerEntry
 from dadaia_workspace.features.specs.canon import scaffold_repo_law
 from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
@@ -47,7 +49,7 @@ def _workspace(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def test_install_first_then_specs_init_leaves_the_repo_template(tmp_path: Path) -> None:
-    """K1."""
+    """sa-public-install-writes-the-root-map-into-product-repos#K1: install, then specs init, leaves the repo template."""
     ws, repo = _workspace(tmp_path)
     FileSystemPublicAssetManager().install(ws)
     assert not (repo / "AGENTS.md").exists()
@@ -61,22 +63,26 @@ def test_install_first_then_specs_init_leaves_the_repo_template(tmp_path: Path) 
     assert (repo / "tests" / "AGENTS.md").is_file()
 
 
-def test_an_operator_edit_to_repo_law_survives_install(tmp_path: Path) -> None:
-    """K2."""
+@pytest.mark.parametrize("banner", [False, True], ids=["plain", "bannered"])
+def test_an_operator_edit_to_repo_law_survives_install(tmp_path: Path, banner: bool) -> None:
+    """sa-public-install-writes-the-root-map-into-product-repos#K2: an operator-edited repo AGENTS.md (banner or not) stays byte-identical
+    across install and install --force, and public doctor reports nothing for it."""
     ws, repo = _workspace(tmp_path)
-    scaffold_repo_law(repo, project_name="zz-product")
     law = repo / "AGENTS.md"
-    law.write_text(law.read_text(encoding="utf-8") + "- zz operator rule\n", encoding="utf-8")
+    head = (_PUBLIC / "data" / "AGENTS.md").read_text(encoding="utf-8") if banner else "# law\n"
+    law.write_text(head + "- zz operator rule\n", encoding="utf-8")
     edited = law.read_bytes()
 
-    FileSystemPublicAssetManager().install(ws)
-    FileSystemPublicAssetManager().install(ws, force=True)
+    manager = FileSystemPublicAssetManager()
+    manager.install(ws)
+    manager.install(ws, force=True)
 
     assert law.read_bytes() == edited
+    assert [line.render() for line in manager.doctor(ws) if "zz-product" in line.render()] == []
 
 
 def test_a_formerly_ledgered_repo_copy_is_forgotten_never_pruned(tmp_path: Path) -> None:
-    """K4."""
+    """sa-public-install-writes-the-root-map-into-product-repos#K6: a repos/ path a former release ledgered is forgotten, never pruned."""
     ws, repo = _workspace(tmp_path)
     old = repo / "AGENTS.md"
     old.write_text("# former root-map copy\n", encoding="utf-8")
@@ -95,3 +101,26 @@ def test_a_formerly_ledgered_repo_copy_is_forgotten_never_pruned(tmp_path: Path)
     ledger = JsonInstallLedgerStore().read(states)
     assert ledger is not None
     assert "repos/zz-product/AGENTS.md" not in ledger.by_relpath()
+
+
+@pytest.mark.parametrize("flag", ["--repos-only", "--workspace-only"])
+def test_public_install_has_no_scope_flag(flag: str) -> None:
+    """sa-public-install-writes-the-root-map-into-product-repos#K4: Click rejects the retired scope flags (exit 2)."""
+    assert CliRunner().invoke(app, ["public", "install", flag]).exit_code == 2
+
+
+def test_repo_law_has_one_writer_and_the_root_map_one_source() -> None:
+    """sa-public-install-writes-the-root-map-into-product-repos#K6: no module outside canon.scaffold_repo_law writes a repo AGENTS.md; the
+    root map's one source is data/AGENTS.md; baseline's onboarding set is REPO_LAW's."""
+    from dadaia_workspace.features.spec_context import service
+
+    pkg = _PUBLIC.parent
+    install_side = [
+        *(pkg / "infrastructure").rglob("*.py"),
+        *(pkg / "features" / "public").rglob("*.py"),
+    ]
+    assert [p.name for p in install_side if '"repos"' in p.read_text(encoding="utf-8")] == []
+    rules = (pkg / "infrastructure" / "projection_rules.py").read_text(encoding="utf-8")
+    assert 'plan.agentic_dir / "data" / "AGENTS.md"' in rules
+    assert '"templates" / "AGENTS.md"' not in rules
+    assert service._ONBOARDING == ("specs", "specs-bkp", "AGENTS.md", "tests/AGENTS.md")

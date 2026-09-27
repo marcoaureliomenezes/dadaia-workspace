@@ -265,7 +265,7 @@ def test_several_principal_candidates_are_listed_never_guessed(env, tmp_path: Pa
 
 
 def test_a_never_onboarded_repo_is_refused_with_the_specs_init_fix(env, tmp_path: Path) -> None:
-    """Design review C1 / AC4.5: a constitution git would not commit (here: ignored) is
+    """sa-public-install-writes-the-root-map-into-product-repos#K3: Design review C1 / AC4.5: a constitution git would not commit (here: ignored) is
     refused before any write, so HEAD holds one after every anchor — never 'published'
     without specs (the old S20 false success)."""
     svc, repo, bare = env

@@ -48,3 +48,20 @@ def test_install_all_projects_no_dadaia_scripts(tmp_path: Path) -> None:
     assert (ws / ".dadaia" / "agentic" / "scripts").is_dir()
     manifest = (ws / ".dadaia" / "agentic" / "manifest.json").read_text(encoding="utf-8")
     assert ".dadaia/scripts" not in manifest
+
+
+def test_nested_operator_pair_untouched_and_root_map_projected(tmp_path: Path) -> None:
+    """sa-public-install-writes-the-root-map-into-product-repos#K1 sa-public-install-writes-the-root-map-into-product-repos#K2 (rewritten from the fan-out e2e): install projects
+    the root map byte-identical to data/AGENTS.md and leaves operator nested law alone."""
+    ws = tmp_path / "ws"
+    services = ws / "services"
+    services.mkdir(parents=True)
+    (services / "AGENTS.md").write_bytes(b"# Operator-authored AGENTS.md for services/\n")
+    (services / "CLAUDE.md").write_bytes(b"# Operator-authored CLAUDE.md for services/\n")
+
+    FileSystemPublicAssetManager().install(ws)
+
+    staged = ws / ".dadaia" / "agentic" / "data" / "AGENTS.md"
+    assert (ws / "AGENTS.md").read_bytes() == staged.read_bytes()
+    assert (services / "AGENTS.md").read_bytes() == b"# Operator-authored AGENTS.md for services/\n"
+    assert (services / "CLAUDE.md").read_bytes() == b"# Operator-authored CLAUDE.md for services/\n"
