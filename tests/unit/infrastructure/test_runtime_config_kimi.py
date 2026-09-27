@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.infrastructure.runtime_config import (
     KIMI_BLOCK_BEGIN,
     KIMI_BLOCK_END,
@@ -169,8 +170,10 @@ def test_pre_gate_shim_blocks_with_reason_on_stderr(tmp_path: Path) -> None:
     """sa-gate-blind-on-cursor-copilot-devin#B5: the real pre_gate's multi-line reason reaches stderr with real
     newlines and its `fix:` at a line start; exit 2."""
     workspace = tmp_path / "ws"
-    (workspace / ".dadaia" / ".venv" / "bin").mkdir(parents=True)
-    (workspace / ".dadaia" / ".venv" / "bin" / "python").symlink_to(sys.executable)
+    # The platform's own venv layout: bin/python, or Scripts/python.exe on Windows.
+    scripts = workspace / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
+    scripts.mkdir(parents=True)
+    (scripts / f"python{PLATFORM.venv_exe_suffix}").symlink_to(sys.executable)
     (workspace / ".dadaia" / "states").mkdir()
     (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": []}')
     shim = tmp_path / "pre-gate.sh"

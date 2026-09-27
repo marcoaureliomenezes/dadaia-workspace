@@ -410,7 +410,8 @@ _KIMI_HOOK_RULES: tuple[tuple[str, str, str | None, int], ...] = (
     ("dadaia-kimi-doctor-expired.sh", "SessionStart", None, 10),
 )
 
-#: Shared shim prologue: resolve the nearest dadaia workspace venv python by walking up
+#: Shared shim prologue: resolve the nearest dadaia workspace venv python (POSIX
+#: ``bin/python`` or Windows ``Scripts/python.exe``) by walking up
 #: from the hook cwd; exit 0 (fail-open) when no dadaia workspace is found.
 _KIMI_SHIM_PROLOGUE = """\
 #!/usr/bin/env sh
@@ -423,10 +424,9 @@ set -u
 _dir=$PWD
 PYTHON_BIN=""
 while [ "$_dir" != "/" ]; do
-  if [ -x "$_dir/.dadaia/.venv/bin/python" ]; then
-    PYTHON_BIN="$_dir/.dadaia/.venv/bin/python"
-    break
-  fi
+  for _py in "$_dir/.dadaia/.venv/bin/python" "$_dir/.dadaia/.venv/Scripts/python.exe"; do
+    [ -x "$_py" ] && PYTHON_BIN=$_py && break 2
+  done
   _dir=$(dirname "$_dir")
 done
 # Root itself may hold the venv (workspace mounted at /).
