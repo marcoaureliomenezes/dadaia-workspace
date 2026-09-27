@@ -37,7 +37,7 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:
 
 
 def test_doctor_detects_and_holds_a_dead_contexts_stale_repo(workspace: Path) -> None:
-    """INV-5 (WP-03 #C5): a DEAD context's stale repo dir is reported, then --fix HOLDS
+    """INV-5 (sa-context-dead-removes-repos-outside-the-reaper#C5): a DEAD context's stale repo dir is reported, then --fix HOLDS
     it under .dadaia/reaped/ — never deletes it."""
     states = workspace / ".dadaia" / "states"
     ctx_data = {

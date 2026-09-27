@@ -1,8 +1,8 @@
 """Intent: CONTRACT — sa-specs-upgrade-writes-through-symlinks (0.5.0 WP-14, AC1.2).
 
 One writer answers "how a fixed section is written": ``core.atomic_write`` refuses a
-symlinked destination (#B4), ``specs upgrade`` refuses the path with its fix line and
-leaves the outside file's bytes unchanged (#B1), ``doctor --fix`` refuses identically (#B2).
+symlinked destination (sa-specs-upgrade-writes-through-symlinks#B4), ``specs upgrade`` refuses the path with its fix line and
+leaves the outside file's bytes unchanged (sa-specs-upgrade-writes-through-symlinks#B1), ``doctor --fix`` refuses identically (sa-specs-upgrade-writes-through-symlinks#B2).
 Size: SMALL (tmp_path, CliRunner in-process, no subprocess).
 """
 

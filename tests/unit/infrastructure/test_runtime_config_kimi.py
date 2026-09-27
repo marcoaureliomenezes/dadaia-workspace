@@ -166,7 +166,7 @@ def _fake_workspace(tmp_path: Path, python_body: str) -> Path:
 
 @pytest.mark.skipif(shutil.which("sh") is None, reason="POSIX sh unavailable")
 def test_pre_gate_shim_blocks_with_reason_on_stderr(tmp_path: Path) -> None:
-    """WP-12 #B5: the real pre_gate's multi-line reason reaches stderr with real
+    """sa-gate-blind-on-cursor-copilot-devin#B5: the real pre_gate's multi-line reason reaches stderr with real
     newlines and its `fix:` at a line start; exit 2."""
     workspace = tmp_path / "ws"
     (workspace / ".dadaia" / ".venv" / "bin").mkdir(parents=True)

@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — sa-context-dead-removes-repos-outside-the-reaper (0.5.0 WP-03 #C8).
+"""Intent: CONTRACT — sa-context-dead-removes-repos-outside-the-reaper (0.5.0 WP-03, sa-context-dead-removes-repos-outside-the-reaper#C8).
 
 No raw ``rmtree`` may target ``repos/<slug>``: a repo leaves the working tree only
 through ``sweep.hold``. The one exception is ``create``'s rollback of the clones the same

@@ -242,7 +242,7 @@ class _FrozenClock(datetime):
 def test_two_same_second_reaps_of_one_origin_leave_two_intact_holds(
     workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """sa-reaper-destroys-its-own-hold-before-ttl#B1, #B2: the origin is reaped,
+    """sa-reaper-destroys-its-own-hold-before-ttl#B1, sa-reaper-destroys-its-own-hold-before-ttl#B2: the origin is reaped,
     re-created with new content and reaped again inside one frozen second; the first hold
     keeps every byte and a second, distinct hold carries the new content."""
     monkeypatch.setattr(doctor, "datetime", _FrozenClock)
@@ -306,7 +306,7 @@ def test_fix_leaves_operator_files_in_a_harness_dir_byte_identical(workspace: Pa
     "harness_dir", sorted({d for dirs in HARNESS_PROJECTION_DIRS.values() for d in dirs})
 )
 def test_no_harness_dir_entry_is_ever_slop_or_moved(workspace: Path, harness_dir: str) -> None:
-    """sa-doctor-reaps-harness-owned-entries#H2, #H3 (``.github`` carries
+    """sa-doctor-reaps-harness-owned-entries#H2, sa-doctor-reaps-harness-owned-entries#H3 (``.github`` carries
     ``hooks/stray.json`` and ``workflows/ci.yml``): a tree outside the ledger under any
     registered harness dir yields no finding for it and ``--fix`` moves nothing."""
     planted = {

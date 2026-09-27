@@ -144,7 +144,7 @@ def test_no_false_block(command: str) -> None:
         ({"tool_name": "Bash", "tool_input": {"command": ""}}, False),
         ({"tool_name": "Bash", "tool_input": {"command": "   "}}, False),
         ({"tool_name": "Bash", "tool_input": {}}, False),
-        # WP-12 #B6: every harness's shell alias, read through the one alias table.
+        # sa-gate-blind-on-cursor-copilot-devin#B6: every harness's shell alias, read through the one alias table.
         ({"tool_name": "Bash", "tool_input": {"command": "pip install foo"}}, True),
         ({"tool_name": "exec", "command": "pip install foo"}, True),
         ({"tool_name": "Shell", "tool_input": {"command": "pip install foo"}}, True),

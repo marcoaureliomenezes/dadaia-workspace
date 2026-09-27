@@ -128,7 +128,7 @@ def _unborn_lib(tmp_path: Path) -> tuple[SpecContextService, FakeContextStore, P
 
 def test_dead_retires_an_empty_unborn_clone_without_pushing_it(tmp_path: Path) -> None:
     """Intent: CONTRACT — context-dead-pushes-an-unborn-clone. An empty unborn clone has
-    nothing to publish: dead holds it with no sync, origin vanished or not (WP-03 #C1)."""
+    nothing to publish: dead holds it with no sync, origin vanished or not (sa-context-dead-removes-repos-outside-the-reaper#C1)."""
     service, _store, lib_path = _unborn_lib(tmp_path)
 
     dead = service.dead("proj")

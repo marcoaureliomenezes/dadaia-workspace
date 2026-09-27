@@ -1,13 +1,13 @@
 """Intent: CONTRACT — sa-gate-blind-on-cursor-copilot-devin (0.5.0 WP-12, AC1.4, ADR 0054).
 
-#B8: for every registry harness, a payload fixture in the harness's native shape
+sa-gate-blind-on-cursor-copilot-devin#B8: for every registry harness, a payload fixture in the harness's native shape
 (``tests/fixtures/hook_payloads/<harness>/``, shapes from the bug record's vendor-doc
 citations — authored, not recorded) through its rendered hook gets Claude's verdict for
 pip / a new root entry / a PROTECTED file / an unbound repo write (scope).
-#B1 Copilot's deny carries the venv guard's reason and fix line; #B2 Cursor's preToolUse
-deny reaches the model (agent_message) with a fix line; #B3 Devin's hooks.v1.json has the
-documented event -> [{matcher, hooks}] shape; #B4 an allowed call prints nothing on the
-translated harnesses; #B5 Kimi's shim prints the reason with real newlines, `fix:` at a
+sa-gate-blind-on-cursor-copilot-devin#B1 Copilot's deny carries the venv guard's reason and fix line; sa-gate-blind-on-cursor-copilot-devin#B2 Cursor's preToolUse
+deny reaches the model (agent_message) with a fix line; sa-gate-blind-on-cursor-copilot-devin#B3 Devin's hooks.v1.json has the
+documented event -> [{matcher, hooks}] shape; sa-gate-blind-on-cursor-copilot-devin#B4 an allowed call prints nothing on the
+translated harnesses; sa-gate-blind-on-cursor-copilot-devin#B5 Kimi's shim prints the reason with real newlines, `fix:` at a
 line start, exit 2.
 Size: MEDIUM — runs the real generated wrappers/shim over the real pre_gate.
 """

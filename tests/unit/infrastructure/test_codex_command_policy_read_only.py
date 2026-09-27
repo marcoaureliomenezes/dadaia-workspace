@@ -1,8 +1,8 @@
 """Intent: CONTRACT — sa-codex-policy-allows-write-capable-commands (0.5.0 WP-13, AC1.5).
 
-The rendered Codex ``.rules`` allows no write- or exec-capable prefix (#B1, #B2), keeps
-read-only inspection unprompted (#B3), and registry.json's mandate says what the file is
-(#B4). The allow set is SPEC row 13's: ``rg ls cat`` and ``sed -n``.
+The rendered Codex ``.rules`` allows no write- or exec-capable prefix (sa-codex-policy-allows-write-capable-commands#B1, sa-codex-policy-allows-write-capable-commands#B2), keeps
+read-only inspection unprompted (sa-codex-policy-allows-write-capable-commands#B3), and registry.json's mandate says what the file is
+(sa-codex-policy-allows-write-capable-commands#B4). The allow set is SPEC row 13's: ``rg ls cat`` and ``sed -n``.
 Size: SMALL (parses the rendered text); #B1 also asks the real ``codex execpolicy`` when
 the binary is on PATH.
 """

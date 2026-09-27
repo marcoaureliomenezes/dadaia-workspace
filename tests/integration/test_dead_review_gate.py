@@ -191,7 +191,7 @@ def test_dead_refuses_untracked_then_commit_secret_free_pushes_and_planted_secre
 def test_dead_holds_a_gitignored_and_a_clean_tree_real_git(
     tmp_path: Path, workspace_root: Path
 ) -> None:
-    """Two "dead() proceeds" scenarios (WP-03 #C1: each repo is HELD, not deleted):
+    """Two "dead() proceeds" scenarios (sa-context-dead-removes-repos-outside-the-reaper#C1: each repo is HELD, not deleted):
     (1) a gitignored file is NOT untracked-for-review, so the gate stays silent even
     without --commit; (2) a clean tree (only tracked content) proceeds without --commit."""
     # (1) gitignored file — gate stays silent.

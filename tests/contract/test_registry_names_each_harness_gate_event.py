@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — sa-gate-blind-on-cursor-copilot-devin (0.5.0 WP-12 #B7, ADR 0054).
+"""Intent: CONTRACT — sa-gate-blind-on-cursor-copilot-devin (0.5.0 WP-12, sa-gate-blind-on-cursor-copilot-devin#B7, ADR 0054).
 
 registry.json's sdd-gate implementation for each harness with a rendered hook file names
 the pre-action event that file registers for the gate; a dialect declaring an ungated

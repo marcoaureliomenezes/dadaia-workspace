@@ -85,7 +85,7 @@ def _with_lib(ctx: SpecContextProject) -> SpecContextProject:
 def test_inv4_names_a_missing_main_or_associated_repo_with_the_alive_fix(
     tmp_path: Path, missing: str
 ) -> None:
-    """Intent: CONTRACT — WP-03 #C6: INV-4 iterates all_repos(); its fix is `context alive`."""
+    """Intent: CONTRACT — sa-context-dead-removes-repos-outside-the-reaper#C6: INV-4 iterates all_repos(); its fix is `context alive`."""
     ctx = _with_lib(_ctx("missing", state=ContextState.ALIVE))
     present = {"missing", "lib"} - {missing}
     for slug in present:
@@ -158,7 +158,7 @@ def test_ctx_url_1_table(
 
 @pytest.mark.parametrize("slug", ["stale", "lib"])
 def test_inv5_holds_a_main_or_associated_repo_of_a_dead_context(tmp_path: Path, slug: str) -> None:
-    """Intent: CONTRACT — WP-03 #C5: INV-5 iterates all_repos(); --fix HOLDS, never deletes."""
+    """Intent: CONTRACT — sa-context-dead-removes-repos-outside-the-reaper#C5: INV-5 iterates all_repos(); --fix HOLDS, never deletes."""
     ctx = _with_lib(_ctx("stale", state=ContextState.DEAD))
     repo_dir = tmp_path / "repos" / slug
     repo_dir.mkdir(parents=True)

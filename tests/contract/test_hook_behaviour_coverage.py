@@ -4,7 +4,7 @@ A hook exists ONLY as the per-harness implementation of a deterministic behaviou
 workspace defines. This contract pins both halves of that sentence against the live
 projection table, not against a hand-listed set of harnesses. Coverage (the gate judges
 every harness's native payload) is proven by payload parity, not string search:
-``tests/integration/gate/test_gate_dialects_through_wrappers.py`` (WP-12 #B8).
+``tests/integration/gate/test_gate_dialects_through_wrappers.py`` (sa-gate-blind-on-cursor-copilot-devin#B8).
 
 - **No invention** — every ``dadaia_workspace`` entrypoint any projected hook artifact
   references must be named by some Deterministic Behavior in

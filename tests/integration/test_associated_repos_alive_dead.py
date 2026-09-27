@@ -255,7 +255,7 @@ def test_dead_refuses_on_associated_repo_with_local_commits_and_no_remote(
 
 
 def test_dead_removes_every_clean_repo_in_the_set(tmp_path: Path, workspace_root: Path) -> None:
-    """WP-03 #C1: main + 2 associated, all clean, dead() HOLDS all three under
+    """sa-context-dead-removes-repos-outside-the-reaper#C1: main + 2 associated, all clean, dead() HOLDS all three under
     .dadaia/reaped/ (never deletes) and transitions the context to DEAD."""
     main_remote = _bare_remote(tmp_path, "main-remote.git")
     assoc1_remote = _bare_remote(tmp_path, "assoc1-remote.git")

@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — sa-specs-upgrade-writes-through-symlinks (0.5.0 WP-14 #B4).
+"""Intent: CONTRACT — sa-specs-upgrade-writes-through-symlinks (0.5.0 WP-14, sa-specs-upgrade-writes-through-symlinks#B4).
 
 No file write in ``features/migrate`` or ``features/specs`` happens outside
 ``core.atomic_write`` (the one symlink-refusing writer): no ``write_text``/``write_bytes``,

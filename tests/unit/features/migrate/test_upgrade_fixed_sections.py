@@ -39,7 +39,7 @@ def _v6_tree(tmp_path: Path) -> Path:
 
 
 def test_a_v6_tree_ends_v7_with_fixed_sections_and_a_clean_doctor(tmp_path: Path) -> None:
-    """WP-14 #B3/#B4: the hop, then the doctor's repair set — a superseded shipped scoped
+    """sa-specs-upgrade-writes-through-symlinks#B3, sa-specs-upgrade-writes-through-symlinks#B4: the hop, then the doctor's repair set — a superseded shipped scoped
     law (a real published specs/bugs/AGENTS.md) is refreshed too: no TREE-5, no FIXED."""
     specs = _v6_tree(tmp_path)
     (specs / "bugs" / "AGENTS.md").write_bytes(_SHIPPED_BUGS_LAW.read_bytes())

@@ -630,7 +630,7 @@ def _dead_no_identity(world: World) -> list[str]:
 
 
 def _unpushed_side_branch(world: World) -> list[str]:
-    """WP-03 #C1: a local branch other than HEAD's carries a commit origin lacks."""
+    """sa-context-dead-removes-repos-outside-the-reaper#C3: a local branch other than HEAD's carries a commit origin lacks."""
     _published(world)
     world.git(world.repo, "checkout", "-q", "-b", "feature/1.0.0", "origin/develop")
     world.commit("notes.md", "n\n")

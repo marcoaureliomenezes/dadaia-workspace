@@ -1,9 +1,9 @@
 """Intent: CONTRACT — sa-context-dead-removes-repos-outside-the-reaper (0.5.0 WP-03, AC1.2).
 
 `context dead` refuses a repo whose loss is unrecoverable — a local branch carrying a
-commit neither origin nor HEAD holds (#C3), a linked worktree registered by the repo or
-nested inside it (#C2) — over every repo of the set (#C4), touching nothing and leaving
-the record ALIVE (#C7); otherwise it HOLDS each repo under `.dadaia/reaped/` (#C1).
+commit neither origin nor HEAD holds (sa-context-dead-removes-repos-outside-the-reaper#C3), a linked worktree registered by the repo or
+nested inside it (sa-context-dead-removes-repos-outside-the-reaper#C2) — over every repo of the set (sa-context-dead-removes-repos-outside-the-reaper#C4), touching nothing and leaving
+the record ALIVE (sa-context-dead-removes-repos-outside-the-reaper#C7); otherwise it HOLDS each repo under `.dadaia/reaped/` (sa-context-dead-removes-repos-outside-the-reaper#C1).
 Size: MEDIUM — real git and a bare origin in tmp_path (the question is a git question).
 """
 
