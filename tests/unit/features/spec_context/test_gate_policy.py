@@ -67,6 +67,9 @@ _IN_REPO_PRODUCTION_CASES: tuple[tuple[str, str], ...] = (
                 id=f"root-{row[0]}",
             )
             for row in _SPEC_RELATIVE_CASES
+            # sa-gate-allows-root-entries-the-reaper-moves#E5: root specs/ is not an entry,
+            # so no ADDITIVE verdict applies at the root (DELETE-LOSER root-additive_*).
+            if row[2] is not PathClass.ADDITIVE
         ],
         # In-repo classification for every spec-relative case, both slugs.
         *[

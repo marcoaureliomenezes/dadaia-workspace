@@ -138,7 +138,7 @@ def classify_path(rel_path: str) -> PathClass:
     A path under ``repos/<slug>/`` is classified by its **context-relative** remainder
     using the same ``specs/`` ADDITIVE prefixes that govern workspace-root paths; every
     other remainder is MUTATING. A workspace-root path is PROTECTED (session records,
-    projected law), ADDITIVE (the ``specs/`` and zone-registry prefixes), or MUTATING —
+    projected law), ADDITIVE (the zone-registry prefixes), or MUTATING —
     there is no UNGATED fall-through, so nothing at the root escapes classification.
     """
     p = rel_path.lstrip("/")
@@ -149,7 +149,7 @@ def classify_path(rel_path: str) -> PathClass:
     if ctx_rel is not None:
         return PathClass.ADDITIVE if _is_specs_additive(ctx_rel) else PathClass.MUTATING
 
-    if _is_specs_additive(p) or any(p.startswith(x) for x in _ADDITIVE_DADAIA_PREFIXES):
+    if any(p.startswith(x) for x in _ADDITIVE_DADAIA_PREFIXES):
         return PathClass.ADDITIVE
     return PathClass.MUTATING
 
