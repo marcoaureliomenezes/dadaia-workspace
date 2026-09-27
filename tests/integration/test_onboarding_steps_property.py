@@ -93,8 +93,9 @@ def _git_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     pairs = {"core.hooksPath": str(hooks), "user.name": "T", "user.email": "t@example.invalid"}
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(tmp_path / "gitconfig"))
     monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
-    monkeypatch.setenv("GIT_CONFIG_COUNT", str(len(pairs)))
-    for n, (key, value) in enumerate(pairs.items()):
+    base = int(os.environ.get("GIT_CONFIG_COUNT", "0"))  # keep conftest's pairs
+    monkeypatch.setenv("GIT_CONFIG_COUNT", str(base + len(pairs)))
+    for n, (key, value) in enumerate(pairs.items(), start=base):
         monkeypatch.setenv(f"GIT_CONFIG_KEY_{n}", key)
         monkeypatch.setenv(f"GIT_CONFIG_VALUE_{n}", value)
     for var in ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "DADAIA_CONTEXT"):

@@ -65,6 +65,17 @@ _FENCED_ROOTS: tuple[Path, ...] = tuple(
 )
 os.environ["DADAIA_FENCED_ROOTS"] = os.pathsep.join(map(str, _FENCED_ROOTS))
 
+# No git process the suite runs or spawns may start background maintenance: after a
+# commit git forks a detached `maintenance run --auto` that holds
+# .git/objects/maintenance.lock while a test snapshots the repo (a CI flake). One rule,
+# appended to any GIT_CONFIG_* pairs already in the environment, inherited by every child.
+_GIT_QUIET = {"maintenance.auto": "false", "gc.auto": "0"}
+_GIT_BASE = int(os.environ.get("GIT_CONFIG_COUNT", "0"))
+for _n, (_key, _value) in enumerate(_GIT_QUIET.items(), start=_GIT_BASE):
+    os.environ[f"GIT_CONFIG_KEY_{_n}"] = _key
+    os.environ[f"GIT_CONFIG_VALUE_{_n}"] = _value
+os.environ["GIT_CONFIG_COUNT"] = str(_GIT_BASE + len(_GIT_QUIET))
+
 
 def _instance_fingerprint() -> dict[str, object]:
     """What a leaked CLI call mutates: the context registry bytes and the repos/ listing."""
