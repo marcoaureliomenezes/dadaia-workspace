@@ -18,33 +18,23 @@ import pytest
 pytestmark = pytest.mark.contract
 
 
-def test_hook_whitelist_derives_from_core() -> None:
-    from dadaia_workspace.core import workspace_layout
-    from dadaia_workspace.hooks import root_whitelist
-
-    assert root_whitelist._WHITELIST == (
-        workspace_layout.ROOT_ALLOWED_DIRS | workspace_layout.ROOT_ALLOWED_FILES
-    )
-    assert root_whitelist._ROOT_FILES is workspace_layout.ROOT_ALLOWED_FILES
+_NAME_SETS = frozenset(
+    {"ROOT_ALLOWED_DIRS", "ROOT_ALLOWED_FILES", "DADAIA_ROOT_FILES", "STATES_CANON", "zone_names"}
+)
 
 
-def test_doctor_root_walk_derives_from_core(tmp_path: Path) -> None:
-    """The doctor holds no root list of its own (T-046-25): every name the law allows
-    reads canon straight off ``workspace_layout``, and the module re-exports nothing."""
-    from dadaia_workspace.core import workspace_layout
-    from dadaia_workspace.features.spec_context import doctor
-    from tests.fakes import FakeContextStore, FakeGitClient
+@pytest.mark.parametrize("module", ["hooks/root_whitelist.py", "features/spec_context/doctor.py"])
+def test_the_gate_and_the_doctor_ask_the_one_verdict(module: str) -> None:
+    """sa-gate-allows-root-entries-the-reaper-moves#E9: both call
+    ``workspace_layout.verdict`` and read none of the layout name sets themselves."""
+    import ast
 
-    assert not hasattr(doctor, "_ROOT_ALLOWED_DIRS")
-    (tmp_path / ".dadaia" / "states").mkdir(parents=True)
-    for name in workspace_layout.ROOT_ALLOWED_DIRS:
-        (tmp_path / name).mkdir(exist_ok=True)
-    for name in workspace_layout.ROOT_ALLOWED_FILES:
-        (tmp_path / name).write_text("", encoding="utf-8")
-    findings = doctor.DoctorService(FakeContextStore(), FakeGitClient(), tmp_path).scan()
-    root = {f.path: f.verdict.value for f in findings if f.code.startswith("WS-root-")}
-    assert set(root.values()) == {"canon"}
-    assert set(root) == workspace_layout.ROOT_ALLOWED_DIRS | workspace_layout.ROOT_ALLOWED_FILES
+    source = Path(__file__).resolve().parents[2] / "dadaia_workspace" / module
+    tree = ast.parse(source.read_text(encoding="utf-8"))
+    attrs = {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
+    names = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
+    assert "verdict" in attrs
+    assert (attrs | names) & _NAME_SETS == set()
 
 
 def test_gate_law_sets_are_the_same_objects() -> None:
