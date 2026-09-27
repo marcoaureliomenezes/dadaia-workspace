@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 import time
 from datetime import UTC, datetime, tzinfo
 from pathlib import Path
@@ -386,3 +387,42 @@ def test_a_nested_expired_tree_is_gone_after_one_expired_only_run(workspace: Pat
     assert result.exit_code == 0, result.output
     assert not (workspace / ".dadaia" / "tmp" / "a").exists()
     assert _expired(workspace) == []
+
+
+def _git(cwd: Path, *args: str) -> None:
+    env = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "t",
+        "GIT_AUTHOR_EMAIL": "t@example.invalid",
+        "GIT_COMMITTER_NAME": "t",
+        "GIT_COMMITTER_EMAIL": "t@example.invalid",
+    }
+    subprocess.run(["git", *args], cwd=cwd, env=env, check=True, capture_output=True)
+
+
+def test_an_expired_entry_holding_a_worktree_carries_a_fix_that_clears_it(
+    workspace: Path,
+) -> None:
+    """Intent: CONTRACT — tmp-expired-worktree-fix-line-never-clears: the reaper skips a linked worktree by
+    design, so the finding's fix names the worktree removal; run verbatim, the entry then
+    reaps and the next doctor run no longer reports it."""
+    day = workspace / ".dadaia" / "tmp" / "a" / "20260920"
+    repo = day / "r"
+    repo.mkdir(parents=True)
+    _git(repo, "init", "-q", "-b", "main")
+    (repo / "f.txt").write_text("f", encoding="utf-8")
+    _git(repo, "add", "f.txt")
+    _git(repo, "commit", "-q", "-m", "init")
+    _git(repo, "worktree", "add", "-q", "-b", "wt/a", str(day / "wt"))
+    _age(workspace / ".dadaia" / "tmp" / "a")
+
+    payload = json.loads(CliRunner().invoke(app, ["doctor", "--json"]).output)
+    (finding,) = [
+        f for f in payload["sections"]["workspace"]["findings"] if f["code"] == "WS-tmp-expired"
+    ]
+    done = subprocess.run(finding["fix"], shell=True, cwd=workspace, check=False)
+    CliRunner().invoke(app, ["doctor", "--fix", "--expired-only"])
+
+    assert done.returncode == 0
+    assert _expired(workspace) == []
+    assert not (workspace / ".dadaia" / "tmp" / "a").exists()

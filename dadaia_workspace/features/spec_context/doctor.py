@@ -15,14 +15,14 @@ allow set, TTL and canon is a view of the registry.
 
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from functools import partial
 from pathlib import Path
 
 from dadaia_workspace.core import session_store, workspace_layout
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import fix_line, git_line
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
 from dadaia_workspace.core.harness_registry import (
     HARNESS_PROJECTION_DIRS,
@@ -75,6 +75,8 @@ class Finding:
     fixable: bool
     detail: str
     target: Path
+    #: The clearing command when ``doctor --fix`` cannot clear this entry itself.
+    fix: str = ""
 
     @property
     def canonical(self) -> bool:
@@ -460,9 +462,17 @@ class DoctorService:
                 # (bug public-install-restores-expired-zone-agents-reblocks-preflight).
                 verdict, detail = FindingVerdict.CANON, ""
             elif age > zone.ttl_seconds:
-                verdict = FindingVerdict.EXPIRED
                 days = timedelta(seconds=age).days
                 detail = f"(mtime {days}d > ttl {timedelta(seconds=zone.ttl_seconds).days}d)"
+                finding = self._finding(
+                    zone.name, self._dadaia, entry, FindingVerdict.EXPIRED, detail
+                )
+                # The reaper never removes a linked worktree (tmp-expired-worktree-fix-line-
+                # never-clears): the fix is the worktree's removal, as context dead refuses.
+                if tree := sweep.linked_worktree(self._workspace_root, entry):
+                    finding = replace(finding, fix=git_line(tree, "worktree", "remove", str(tree)))
+                out.append(finding)
+                continue
             elif entry.is_dir() and not entry.is_symlink():
                 self._walk_ttl(zone, entry, now, out, is_zone_root=False)
                 continue
@@ -660,6 +670,7 @@ def workspace_rules(
                 message=f"{finding.path}  {finding.detail}",
                 canonical=finding.canonical and finding.scored,
                 error=finding.verdict in ERROR_VERDICTS,
+                fix=finding.fix,
             )
             for finding in findings
         ]
