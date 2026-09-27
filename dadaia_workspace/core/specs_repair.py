@@ -3,10 +3,8 @@
 The retired placeholder feature atom (bug
 scaffold-repair-cannot-remediate-invalid-placeholder-atom): old scaffolds shipped a raw
 ``memory/product/feature.md`` template whose ``*_PLACEHOLDER`` markers no verb could
-remediate. This module owns the exact-token detection and removal so BOTH repair
-surfaces — ``specs doctor --fix`` (features.specs) and ``specs upgrade``
-(features.migrate) — share one home without a forbidden sibling edge (import-linter:
-features never import features).
+remediate. This module owns the exact-token detection only; the doctor's MEM-PLACEHOLDER-1
+fix is the one remover.
 
 Layering: a pure ``core`` leaf — stdlib only, no upward import.
 """
@@ -68,23 +66,3 @@ def has_unfilled_angle_placeholders(path: Path) -> bool:
     except OSError:
         return False
     return bool(_ANGLE_PLACEHOLDER_RE.search(text))
-
-
-def remove_placeholder_atoms(specs_dir: Path, *, dry_run: bool = False) -> list[Path]:
-    """Remove every unfilled placeholder atom under ``specs_dir/memory/``; return removed paths.
-
-    Shared repair for the retired placeholder feature atom, consumed by
-    ``specs upgrade`` and by ``specs doctor --fix``'s issue-level fix. Exact-token
-    detection (:func:`is_placeholder_atom`) — filled atoms are never touched.
-    ``dry_run=True`` only reports what would be removed.
-    """
-    mem_dir = specs_dir / "memory"
-    removed: list[Path] = []
-    if not mem_dir.is_dir():
-        return removed
-    for path in sorted(mem_dir.rglob("*.md")):
-        if is_placeholder_atom(path):
-            removed.append(path)
-            if not dry_run:
-                path.unlink()
-    return removed

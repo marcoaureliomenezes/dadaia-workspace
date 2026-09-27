@@ -15,6 +15,7 @@ from pathlib import Path
 
 from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
+from dadaia_workspace.features.spec_context import sweep
 
 __all__ = ["MARKER_PREFIXES", "reap_markers", "stamp_throttle", "throttled"]
 
@@ -98,6 +99,6 @@ def reap_markers(workspace: Path, *, now: float) -> tuple[str, ...]:
         if (now - mtime) < _MARKER_GC_TTL_SECONDS:
             continue
         with contextlib.suppress(OSError):
-            path.unlink(missing_ok=True)
-            reaped.append(path.name)
+            if sweep.remove(workspace, path, path.name) is not None:
+                reaped.append(path.name)
     return tuple(reaped)

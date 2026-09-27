@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.specs_repair import is_placeholder_atom, remove_placeholder_atoms
+from dadaia_workspace.core.specs_repair import is_placeholder_atom
 from dadaia_workspace.features.migrate import upgrade as upgrade_feat
 from dadaia_workspace.features.specs.canon import scaffold
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
@@ -110,7 +110,6 @@ def test_filled_atom_is_never_flagged_or_removed(tmp_path: Path) -> None:
     assert is_placeholder_atom(atom) is False
     issues = _doctor(specs).check()
     assert [i for i in issues if i.code == "MEM-PLACEHOLDER-1"] == []
-    assert remove_placeholder_atoms(specs) == []
     assert atom.exists()
 
 

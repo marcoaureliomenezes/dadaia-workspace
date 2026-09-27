@@ -39,8 +39,6 @@ Census (file:line, T-044-03):
    ``None``), so it cannot touch ``specs/releases/**`` by construction — proven below by
    assertion on the function's signature/behaviour rather than a before/after fixture
    diff, since there is no longer a write to diff around.
-3. ``dadaia_workspace/core/specs_repair.py:73-90`` (``remove_placeholder_atoms``) is
-   scoped to ``specs_dir/memory/**`` only.
 """
 
 from __future__ import annotations
@@ -51,7 +49,6 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core import specs_repair
 from dadaia_workspace.features.migrate import registry as migrate_registry
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
@@ -228,15 +225,3 @@ def test_migration_registry_check_upgradable_performs_no_filesystem_io() -> None
 # ---------------------------------------------------------------------------------------
 # 3. CLI-verb scaffolders/repairers explicitly named in the task's census.
 # ---------------------------------------------------------------------------------------
-
-
-def test_specs_repair_placeholder_removal_never_touches_releases(tmp_path: Path) -> None:
-    specs_dir = tmp_path / "specs"
-    target = _seed_release_tasks_md(specs_dir)
-    before = target.read_text(encoding="utf-8")
-
-    removed = specs_repair.remove_placeholder_atoms(specs_dir, dry_run=False)
-
-    after = target.read_text(encoding="utf-8")
-    _assert_sdd_invariants_preserved(before, after)
-    assert target not in removed
