@@ -13,7 +13,6 @@ Intent: CONTRACT — AC6.5, AC8.1 (T-050-12); v0.4.4 A3.1, A3.5
 from __future__ import annotations
 
 import shlex
-from collections.abc import Iterable
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -21,7 +20,6 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow
-from dadaia_workspace.core.models.git_scan import ScannedObject
 from dadaia_workspace.features.chokepoints import Decision, push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import (
     PushRef,
@@ -29,7 +27,9 @@ from dadaia_workspace.features.chokepoints.branch_policy import (
     parse_push_stdin,
 )
 from dadaia_workspace.features.specs.canon import canon_violations
+from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from tests.fakes import gate_fixes
+from tests.fixtures.real_git import PushRepo
 
 _SHA_A = "a" * 40
 _ZERO = "0" * 40
@@ -38,41 +38,28 @@ _CUSTOM = Gitflow(principal="trunk", integration="next", work_prefix="work/")
 _FLOWS = pytest.mark.parametrize("flow", [DEFAULT, _CUSTOM], ids=["default", "custom"])
 
 
-class _EmptyObjectSource:
-    """No object is new: the denylist and canon scans are pure pass-throughs here.
-    ``contentless`` names the shas whose push publishes nothing (a birth candidate)."""
-
-    def __init__(
-        self, contentless: frozenset[str] = frozenset(), remote: frozenset[str] = frozenset()
-    ) -> None:
-        self.contentless = contentless
-        self.remote = remote
-        self.asked: list[str] = []
-
-    def remote_branch(self, repo: Path, branch: str) -> bool:
-        return branch in self.remote
-
-    def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
-        return ()
-
-    def unpublished(self, repo: Path, sha: str) -> list[str]:
-        self.asked.append(sha)
-        return [] if sha in self.contentless else [sha]
+@pytest.fixture()
+def repo(tmp_path: Path) -> PushRepo:
+    return PushRepo(tmp_path)
 
 
-def _decide(refs: list[PushRef], root: Path, flow: Gitflow = DEFAULT, **kwargs: Any) -> Decision:
-    kwargs.setdefault("object_source", _EmptyObjectSource())
-    kwargs.setdefault("repo", root)
-    kwargs.setdefault("canon_violations_fn", canon_violations)
-    return push_gate_decision(refs, gitflow=flow, fixes=gate_fixes(), **kwargs)
+def _decide(
+    refs: list[PushRef], repo: PushRepo, flow: Gitflow = DEFAULT, **kwargs: Any
+) -> Decision:
+    return push_gate_decision(
+        refs, gitflow=flow, fixes=gate_fixes(), object_source=GitSubprocessObjectReader(),
+        repo=repo.path, canon_violations_fn=canon_violations, **kwargs,
+    )  # fmt: skip
 
 
 def _refs(*lines: str) -> list[PushRef]:
     return parse_push_stdin("\n".join(lines))[0]
 
 
-def _push(local: str, remote: str | None = None, remote_sha: str = _ZERO) -> list[PushRef]:
-    return _refs(f"refs/heads/{local} {_SHA_A} refs/heads/{remote or local} {remote_sha}")
+def _push(
+    local: str, remote: str | None = None, remote_sha: str = _ZERO, sha: str = _SHA_A
+) -> list[PushRef]:
+    return _refs(f"refs/heads/{local} {sha} refs/heads/{remote or local} {remote_sha}")
 
 
 def _fix(decision: Decision) -> list[str]:
@@ -80,16 +67,17 @@ def _fix(decision: Decision) -> list[str]:
 
 
 @_FLOWS
-def test_work_branch_push_is_allowed(tmp_path: Path, flow: Gitflow) -> None:
-    decision = _decide(_push(f"{flow.work_prefix}0.0.0"), tmp_path, flow)
+def test_work_branch_push_is_allowed(repo: PushRepo, flow: Gitflow) -> None:
+    sha = repo.commit({"a.md": "a\n"})
+    decision = _decide(_push(f"{flow.work_prefix}0.0.0", sha=sha), repo, flow)
     assert decision.allowed, decision.message
 
 
 @_FLOWS
 def test_integration_push_is_refused_naming_the_pr_from_a_work_branch(
-    tmp_path: Path, flow: Gitflow
+    repo: PushRepo, flow: Gitflow
 ) -> None:
-    decision = _decide(_push(flow.integration, remote_sha=_SHA_B), tmp_path, flow)
+    decision = _decide(_push(flow.integration, remote_sha=_SHA_B), repo, flow)
     assert not decision.allowed
     assert f"'{flow.integration}'" in decision.message
     assert _fix(decision) == [
@@ -105,9 +93,9 @@ def test_integration_push_is_refused_naming_the_pr_from_a_work_branch(
 
 @_FLOWS
 def test_principal_push_is_refused_naming_the_pr_from_integration(
-    tmp_path: Path, flow: Gitflow
+    repo: PushRepo, flow: Gitflow
 ) -> None:
-    decision = _decide(_push(flow.principal, remote_sha=_SHA_B), tmp_path, flow)
+    decision = _decide(_push(flow.principal, remote_sha=_SHA_B), repo, flow)
     assert not decision.allowed
     assert f"'{flow.principal}'" in decision.message
     assert _fix(decision) == [
@@ -124,10 +112,10 @@ def test_principal_push_is_refused_naming_the_pr_from_integration(
 @_FLOWS
 @pytest.mark.parametrize("name", ["bugfix/x", "hotfix/0.6.1", "{prefix}v0.0.0", "{prefix}0.6"])
 def test_a_branch_outside_the_gitflow_is_refused_naming_the_work_branch(
-    tmp_path: Path, flow: Gitflow, name: str
+    repo: PushRepo, flow: Gitflow, name: str
 ) -> None:
     branch = name.format(prefix=flow.work_prefix)
-    decision = _decide(_push(branch), tmp_path, flow)
+    decision = _decide(_push(branch), repo, flow)
     assert not decision.allowed
     assert branch in decision.message
     for word in (flow.principal, flow.integration, flow.work_prefix):
@@ -140,35 +128,35 @@ def test_a_branch_outside_the_gitflow_is_refused_naming_the_work_branch(
 @pytest.mark.parametrize(
     "branch", ["feature/0.6.0-rc1", "Main", "developp", "release/0.6.0", "chore/cleanup"]
 )
-def test_the_default_gitflow_refuses_a_name_that_is_no_role(tmp_path: Path, branch: str) -> None:
+def test_the_default_gitflow_refuses_a_name_that_is_no_role(repo: PushRepo, branch: str) -> None:
     """Behavior (AC6.1, AC6.5, default gitflow main/develop/feature/<M.m.p>): only a work
     branch is pushable; a name that is not exactly the principal, the integration or
     ``feature/`` + an ``M.m.p`` version has no role and is refused. ``-rc1`` is a suffix on
     the version, ``Main`` and ``developp`` are not the role names, ``release/`` and
     ``chore/`` are not the work prefix. Restores coverage lost in c3 (retro 2026-09-27 W5).
     """
-    decision = _decide(_push(branch), tmp_path, DEFAULT)
+    decision = _decide(_push(branch), repo, DEFAULT)
     assert decision.allowed is False
     assert "outside the gitflow" in decision.message
 
 
-def test_the_default_names_are_ordinary_branches_under_a_custom_gitflow(tmp_path: Path) -> None:
-    assert not _decide(_push("feature/0.0.0"), tmp_path, _CUSTOM).allowed
-    assert "trunk" in _decide(_push("main"), tmp_path, _CUSTOM).message
+def test_the_default_names_are_ordinary_branches_under_a_custom_gitflow(repo: PushRepo) -> None:
+    assert not _decide(_push("feature/0.0.0"), repo, _CUSTOM).allowed
+    assert "trunk" in _decide(_push("main"), repo, _CUSTOM).message
 
 
 @_FLOWS
 @pytest.mark.parametrize("role", ["principal", "integration"])
 def test_a_contentless_birth_of_principal_or_integration_passes(
-    tmp_path: Path, flow: Gitflow, role: str
+    repo: PushRepo, flow: Gitflow, role: str
 ) -> None:
     """ADR 0036: an orphan empty root pushed as the principal, or `git branch <integration>
     <principal>` pushed, creates the remote branch and publishes nothing."""
     other = flow.integration if role == "principal" else flow.principal
-    source = _EmptyObjectSource(frozenset({_SHA_A}), remote=frozenset({other}))
-    decision = _decide(_push(getattr(flow, role)), tmp_path, flow, object_source=source)
+    repo.commit({"a.md": "a\n"})
+    sha = repo.publish(other)
+    decision = _decide(_push(getattr(flow, role), sha=sha), repo, flow)
     assert decision.allowed, decision.message
-    assert source.asked == [_SHA_A]
 
 
 @_FLOWS
@@ -176,13 +164,14 @@ def test_a_contentless_birth_of_principal_or_integration_passes(
     ("role", "other"), [("principal", "integration"), ("integration", "principal")]
 )
 def test_a_birth_carrying_a_commit_is_refused_naming_a_birth_at_the_other_published_tip(
-    tmp_path: Path, flow: Gitflow, role: str, other: str
+    repo: PushRepo, flow: Gitflow, role: str, other: str
 ) -> None:
     """Review M2: birth at the other role's published tip (publishes nothing) — one
     command, no `&&` (Windows PowerShell 5.1 has none)."""
     branch, tip = getattr(flow, role), getattr(flow, other)
-    source = _EmptyObjectSource(remote=frozenset({tip}))
-    decision = _decide(_push(branch), tmp_path, flow, object_source=source)
+    repo.commit({"a.md": "a\n"})
+    repo.publish(tip)
+    decision = _decide(_push(branch, sha=repo.commit({"b.md": "b\n"})), repo, flow)
     assert not decision.allowed
     assert _fix(decision) == [
         "git", "-C", "/repo", "push", "origin", f"refs/remotes/origin/{tip}:refs/heads/{branch}",
@@ -190,33 +179,32 @@ def test_a_birth_carrying_a_commit_is_refused_naming_a_birth_at_the_other_publis
 
 
 @_FLOWS
-def test_an_empty_origin_admits_the_principal_as_it_is(tmp_path: Path, flow: Gitflow) -> None:
+def test_an_empty_origin_admits_the_principal_as_it_is(repo: PushRepo, flow: Gitflow) -> None:
     """R13 rule 2: origin holds no gitflow branch — the local principal is published with
     its content (the scans still run); nothing contentless is required."""
-    source = _EmptyObjectSource()
-    assert _decide(_push(flow.principal), tmp_path, flow, object_source=source).allowed
-    assert source.asked == []
+    sha = repo.commit({"a.md": "a\n"})
+    assert _decide(_push(flow.principal, sha=sha), repo, flow).allowed
 
 
-def test_an_existing_principal_is_never_a_birth(tmp_path: Path) -> None:
-    source = _EmptyObjectSource(frozenset({_SHA_A}))
-    refs = _push("main", remote_sha=_SHA_B)
-    decision = _decide(refs, tmp_path, object_source=source)
+def test_an_existing_principal_is_never_a_birth(repo: PushRepo) -> None:
+    repo.commit({"a.md": "a\n"})
+    sha = repo.publish("main")
+    decision = _decide(_push("main", remote_sha=sha, sha=sha), repo)
     assert not decision.allowed
-    assert source.asked == []
 
 
-def test_a_contentless_birth_passes_from_any_source(tmp_path: Path) -> None:
+def test_a_contentless_birth_passes_from_any_source(repo: PushRepo) -> None:
     """Review H4: baseline pushes `<sha>:refs/heads/<b>` — the birth is judged by the
     remote branch it creates and what it publishes, never by the local ref's name."""
-    source = _EmptyObjectSource(frozenset({_SHA_A}))
-    assert _decide(_push("main", "develop"), tmp_path, object_source=source).allowed
-    sha_birth = _refs(f"{_SHA_A} {_SHA_A} refs/heads/develop {_ZERO}")
-    assert _decide(sha_birth, tmp_path, object_source=source).allowed
+    repo.commit({"a.md": "a\n"})
+    sha = repo.publish()
+    assert _decide(_push("main", "develop", sha=sha), repo).allowed
+    assert _decide(_refs(f"{sha} {sha} refs/heads/develop {_ZERO}"), repo).allowed
 
 
-def test_tag_push_still_passes(tmp_path: Path) -> None:
-    decision = _decide(_refs(f"refs/tags/v9.9.9 {_SHA_A} refs/tags/v9.9.9 {_ZERO}"), tmp_path)
+def test_tag_push_still_passes(repo: PushRepo) -> None:
+    sha = repo.commit({"a.md": "a\n"})
+    decision = _decide(_refs(f"refs/tags/v9.9.9 {sha} refs/tags/v9.9.9 {_ZERO}"), repo)
     assert decision.allowed
 
 
@@ -226,7 +214,7 @@ def test_tag_push_still_passes(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_malformed_stdin_fails_closed_naming_the_sanctioned_bypass(tmp_path: Path) -> None:
+def test_malformed_stdin_fails_closed_naming_the_sanctioned_bypass(repo: PushRepo) -> None:
     """Finding 1: present-but-unparseable stdin must refuse, never silently allow.
 
     Empty stdin (nothing to gate) still allows; stdin whose lines cannot be parsed
@@ -236,38 +224,37 @@ def test_malformed_stdin_fails_closed_naming_the_sanctioned_bypass(tmp_path: Pat
     refs, malformed = parse_push_stdin("this line has three fields\n")
     assert refs == []
     assert malformed == 1
-    decision = _decide(refs, tmp_path, malformed_lines=malformed)
+    decision = _decide(refs, repo, malformed_lines=malformed)
     assert not decision.allowed
     assert "--no-verify" in decision.message
 
     empty_refs, empty_malformed = parse_push_stdin("")
     assert empty_malformed == 0
-    assert _decide(empty_refs, tmp_path, malformed_lines=0).allowed
+    assert _decide(empty_refs, repo, malformed_lines=0).allowed
 
 
-def test_pushing_feature_branch_to_a_foreign_remote_ref_is_refused(tmp_path: Path) -> None:
+def test_pushing_feature_branch_to_a_foreign_remote_ref_is_refused(repo: PushRepo) -> None:
     """Finding 2, carried forward: `git push origin feature/0.0.1:develop` — local
     feature branch, remote develop. The policy must key on BOTH sides: a valid local
     feature/{M.m.p} tip aimed at any remote ref other than its own name is a refusal."""
-    decision = _decide(_push("work/0.0.1", "work/0.0.2"), tmp_path, _CUSTOM)
+    decision = _decide(_push("work/0.0.1", "work/0.0.2"), repo, _CUSTOM)
     assert not decision.allowed
     assert "refs/heads/work/0.0.2" in decision.message
     assert _fix(decision) == ["git", "-C", "/repo", "branch", "-m", "work/0.0.1", "work/0.0.2"]
-    published = _EmptyObjectSource(remote=frozenset({"trunk"}))
-    assert not _decide(
-        _push("work/0.0.1", "next"), tmp_path, _CUSTOM, object_source=published
-    ).allowed
+    repo.commit({"a.md": "a\n"})
+    repo.publish("trunk")
+    assert not _decide(_push("work/0.0.1", "next"), repo, _CUSTOM).allowed
 
 
-def test_detached_head_ref_gets_a_pushable_branch_diagnosis(tmp_path: Path) -> None:
+def test_detached_head_ref_gets_a_pushable_branch_diagnosis(repo: PushRepo) -> None:
     """Finding 6, carried forward: `git push origin HEAD:feature/0.0.1` — the fix cuts the
     work branch at the refused commit (never a name that points elsewhere)."""
-    decision = _decide(_refs(f"HEAD {_SHA_A} refs/heads/work/0.0.1 {_ZERO}"), tmp_path, _CUSTOM)
+    decision = _decide(_refs(f"HEAD {_SHA_A} refs/heads/work/0.0.1 {_ZERO}"), repo, _CUSTOM)
     assert not decision.allowed
     assert _fix(decision) == ["git", "-C", "/repo", "switch", "-c", "work/<M.m.p>", _SHA_A]
 
 
-def test_an_outside_ref_is_carried_onto_the_live_work_branch(tmp_path: Path) -> None:
+def test_an_outside_ref_is_carried_onto_the_live_work_branch(repo: PushRepo) -> None:
     """Review 5 M2: the live work branch exists and may have diverged from the refused ref
     — a fast-forward cannot carry it; the fix switches to the work branch and the text
     names the merge (append-only, never a rebase)."""

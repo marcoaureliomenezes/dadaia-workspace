@@ -21,7 +21,7 @@ import shlex
 import subprocess
 import sys
 from collections.abc import Iterable
-from dataclasses import dataclass, field, replace
+from dataclasses import replace
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -30,12 +30,13 @@ import pytest
 from dadaia_workspace.core import doctor_rules
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.gitflow import DEFAULT
-from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObject
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_stdin
 from dadaia_workspace.features.specs.canon import canon_violations
 from dadaia_workspace.hooks import pre_gate
+from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from tests.fakes import gate_fixes
+from tests.fixtures.real_git import PushRepo
 
 _FIX_LINE_RE = re.compile(r"^fix: (\S.*)$", re.MULTILINE)
 
@@ -186,30 +187,19 @@ def test_venv_guard_block_carries_a_runnable_fix(
 # ── ci push-gate-check ──────────────────────────────────────────────────────────
 
 
-@dataclass
-class _FakeObjectSource:
-    objects: list[ScannedObject] = field(default_factory=list)
-    tree_paths: list[str] = field(default_factory=list)
-
-    def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
-        return self.objects
-
-    def unpublished(self, repo: Path, sha: str) -> list[str]:
-        return [sha]
-
-    def remote_branch(self, repo: Path, branch: str) -> bool:
-        return True  # a published origin: a birth carrying content is a refusal
-
-
-class _FailingObjectSource(_FakeObjectSource):
-    def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
-        raise GitObjectReadError("simulated git rev-list failure")
+@pytest.fixture
+def pushed(tmp_path: Path) -> tuple[PushRepo, str]:
+    """A real work clone: ``main`` published on origin, one unpublished commit on HEAD."""
+    repo = PushRepo(tmp_path)
+    repo.commit({"README.md": "r\n"})
+    repo.publish("main")
+    return repo, repo.commit({"a.md": "a\n"})
 
 
 def _decide(
+    repo: PushRepo,
     refs: list[PushRef],
     *,
-    source: _FakeObjectSource | None = None,
     malformed_lines: int = 0,
     denylist_terms: Iterable[tuple[str, str]] = (),
 ) -> str:
@@ -217,8 +207,8 @@ def _decide(
         refs,
         gitflow=DEFAULT,
         fixes=replace(gate_fixes(), head="feature/0.0.1"),
-        object_source=source or _FakeObjectSource(),
-        repo=Path("/nonexistent-repo"),
+        object_source=GitSubprocessObjectReader(),
+        repo=repo.path,
         canon_violations_fn=canon_violations,
         malformed_lines=malformed_lines,
         denylist_terms=denylist_terms,
@@ -231,50 +221,51 @@ def _refs(*lines: str) -> list[PushRef]:
     return parse_push_stdin("\n".join(lines))[0]
 
 
-def test_push_gate_malformed_stdin_carries_a_runnable_fix() -> None:
-    assert_block_carries_a_runnable_fix(_decide([], malformed_lines=1))
+def test_push_gate_malformed_stdin_carries_a_runnable_fix(pushed: tuple[PushRepo, str]) -> None:
+    assert_block_carries_a_runnable_fix(_decide(pushed[0], [], malformed_lines=1))
 
 
 @pytest.mark.parametrize(
     ("name", "line"),
     [
-        ("main", f"refs/heads/main {_SHA_A} refs/heads/main {_SHA_B}"),
-        ("develop", f"refs/heads/develop {_SHA_A} refs/heads/develop {_SHA_B}"),
-        ("birth-with-content", f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
-        ("invalid-name", f"refs/heads/wip/x {_SHA_A} refs/heads/wip/x {_ZERO}"),
-        ("not-a-branch-head", f"refs/notes/x {_SHA_A} refs/notes/x {_ZERO}"),
-        ("refspec", f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/develop {_ZERO}"),
+        ("main", "refs/heads/main {sha} refs/heads/main {other}"),
+        ("develop", "refs/heads/develop {sha} refs/heads/develop {other}"),
+        ("birth-with-content", "refs/heads/develop {sha} refs/heads/develop {zero}"),
+        ("invalid-name", "refs/heads/wip/x {sha} refs/heads/wip/x {zero}"),
+        ("not-a-branch-head", "refs/notes/x {sha} refs/notes/x {zero}"),
+        ("refspec", "refs/heads/feature/0.0.1 {sha} refs/heads/develop {zero}"),
     ],
 )
-def test_push_gate_branch_policy_refusals_carry_a_runnable_fix(name: str, line: str) -> None:
-    assert_block_carries_a_runnable_fix(_decide(_refs(line)))
+def test_push_gate_branch_policy_refusals_carry_a_runnable_fix(
+    pushed: tuple[PushRepo, str], name: str, line: str
+) -> None:
+    repo, sha = pushed
+    ref = line.format(sha=sha, other=_SHA_B, zero=_ZERO)
+    assert_block_carries_a_runnable_fix(_decide(repo, _refs(ref)))
 
 
-def _feature_ref() -> list[PushRef]:
-    return _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}")
+def _feature_ref(sha: str) -> list[PushRef]:
+    return _refs(f"refs/heads/feature/0.0.1 {sha} refs/heads/feature/0.0.1 {_ZERO}")
 
 
-def test_push_gate_specs_canon_refusal_carries_a_runnable_fix() -> None:
-    stray = "specs/not-a-canon-entry.md"
-    source = _FakeObjectSource(
-        objects=[ScannedObject(path=stray, sha="blob0", text="", decodable=True)],
-        tree_paths=[stray],
-    )
-    assert_block_carries_a_runnable_fix(_decide(_feature_ref(), source=source))
+def test_push_gate_specs_canon_refusal_carries_a_runnable_fix(
+    pushed: tuple[PushRepo, str],
+) -> None:
+    repo, _ = pushed
+    sha = repo.commit({"specs/not-a-canon-entry.md": "x\n"})
+    assert_block_carries_a_runnable_fix(_decide(repo, _feature_ref(sha)))
 
 
-def test_push_gate_denylist_refusal_carries_a_runnable_fix() -> None:
-    source = _FakeObjectSource(
-        objects=[ScannedObject(path="a.md", sha="cafef00d", text="zz-secret-term", decodable=True)]
-    )
-    message = _decide(
-        _feature_ref(), source=source, denylist_terms=[("zz-secret-term", "synthetic")]
-    )
+def test_push_gate_denylist_refusal_carries_a_runnable_fix(pushed: tuple[PushRepo, str]) -> None:
+    repo, _ = pushed
+    sha = repo.commit({"b.md": "zz-secret-term\n"})
+    message = _decide(repo, _feature_ref(sha), denylist_terms=[("zz-secret-term", "synthetic")])
     assert_block_carries_a_runnable_fix(message)
 
 
-def test_push_gate_git_read_failure_carries_a_runnable_fix() -> None:
-    assert_block_carries_a_runnable_fix(_decide(_feature_ref(), source=_FailingObjectSource()))
+def test_push_gate_git_read_failure_carries_a_runnable_fix(pushed: tuple[PushRepo, str]) -> None:
+    """A sha the repo does not hold: the real object read fails and the gate fails closed."""
+    assert_block_carries_a_runnable_fix(_decide(pushed[0], _feature_ref(_SHA_A)))
 
 
 # ── context heartbeat (exit 1) ──────────────────────────────────────────────────

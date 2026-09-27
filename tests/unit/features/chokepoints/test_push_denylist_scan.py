@@ -3,250 +3,123 @@
 Intent: CONTRACT — v0.9.0 A1.1, A1.2, A1.3, A1.4, A2.1, A2.2, A2.3, A2.4, A5.1, A5.2,
 A5.3, A5.4, A6.1; v0.11.0 A7.1, A7.2, A7.3, A4.5, A6.1, A6.2, A6.3, A6.6, A5.1
 
-Drives ``push_gate_decision`` with an injected fake :class:`GitObjectReader` — no real
-git, no filesystem (FR7/A7.2). Only synthetic terms ever appear here (TASKS
+Every range is a real git range (``tests.fixtures.real_git.PushRepo``) read by the real
+``GitSubprocessObjectReader`` (AC9.4). Only synthetic terms ever appear here (TASKS
 standing rule): ``zz-``-prefixed values, never a real operator term.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass, field, replace
+from dataclasses import replace
 from pathlib import Path
+from typing import Any
+
+import pytest
 
 from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObject
 from dadaia_workspace.features.chokepoints import push_gate_decision
-from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_stdin
+from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
 from dadaia_workspace.features.specs.canon import canon_violations
+from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from tests.fakes import gate_fixes
+from tests.fixtures.real_git import ZERO, PushRepo, git
 
 _SHA_A = "a" * 40
-_SHA_B = "b" * 40
-_ZERO = "0" * 40
+_ZERO = ZERO
 _SYNTHETIC_TERM = "zz-secret-term"
+_TERMS = ((_SYNTHETIC_TERM, "synthetic"),)
+_BIG = "clean content here\n" * 320_000  # > the reader's 5 MB per-blob cap
 
 
-@dataclass
-class _FakeObjectSource:
-    """Maps an exact ``(local_sha, remote_sha)`` pair to a fixed object list."""
-
-    def remote_branch(self, repo: Path, branch: str) -> bool:
-        return True
-
-    by_range: dict[tuple[str, str], list[ScannedObject]] = field(default_factory=dict)
-    calls: list[tuple[str, str]] = field(default_factory=list)
-    ranges: dict[str, list[str]] = field(default_factory=dict)
-
-    def unpublished(self, repo: Path, sha: str) -> list[str]:
-        return self.ranges.get(sha, [sha])
-
-    def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
-        self.calls.append((local_sha, remote_sha))
-        return self.by_range.get((local_sha, remote_sha), [])
+@pytest.fixture()
+def repo(tmp_path: Path) -> PushRepo:
+    return PushRepo(tmp_path)
 
 
-class _FailingObjectSource:
-    def remote_branch(self, repo: Path, branch: str) -> bool:
-        return True
-
-    def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
-        raise GitObjectReadError("simulated git rev-list failure")
-
-
-def _refs(*lines: str) -> list[PushRef]:
-    return parse_push_stdin("\n".join(lines))[0]
-
-
-def _obj(path: str, text: str, *, sha: str = "cafef00d") -> ScannedObject:
-    return ScannedObject(path=path, sha=sha, text=text, decodable=True)
-
-
-def _oversized_obj(path: str, text: str, *, sha: str = "bigsha") -> ScannedObject:
-    return ScannedObject(
-        path=path,
-        sha=sha,
-        text=text,
-        decodable=True,
-        oversized=True,
-        size_bytes=6_000_000,
-        scanned_bytes=5_242_880,
-    )
-
-
-# ---------------------------------------------------------------------------
-# A1.1 — a branch ref whose range carries a denylist term is refused.
-# ---------------------------------------------------------------------------
-
-
-def test_branch_push_with_denylisted_blob_in_range_is_refused(tmp_path: Path) -> None:
-    source = _FakeObjectSource(
-        by_range={
-            (_SHA_A, _ZERO): [_obj("leak.md", f"contains {_SYNTHETIC_TERM} here\n")],
-        }
-    )
-    decision = push_gate_decision(
-        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+def _decide(repo: PushRepo, *lines: str, source: Any = None, **kw: Any) -> Any:
+    kw.setdefault("fixes", gate_fixes())
+    return push_gate_decision(
+        parse_push_stdin("\n".join(lines))[0],
         gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=source,
-        repo=tmp_path,
+        object_source=source or GitSubprocessObjectReader(),
+        repo=repo.path,
         canon_violations_fn=canon_violations,
-        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
+        **kw,
     )
+
+
+def _branch(sha: str, remote: str = _ZERO) -> str:
+    return f"refs/heads/feature/0.0.1 {sha} refs/heads/feature/0.0.1 {remote}"
+
+
+def _tag(sha: str, name: str = "v1") -> str:
+    return f"refs/tags/{name} {sha} refs/tags/{name} {_ZERO}"
+
+
+# A1.1 — a branch ref whose range carries a denylist term is refused.
+def test_branch_push_with_denylisted_blob_in_range_is_refused(repo: PushRepo) -> None:
+    sha = repo.commit({"leak.md": f"contains {_SYNTHETIC_TERM} here\n"})
+    decision = _decide(repo, _branch(sha), denylist_terms=_TERMS)
     assert not decision.allowed
     assert _SYNTHETIC_TERM not in decision.message  # A5.2: never unmasked.
 
 
-# ---------------------------------------------------------------------------
 # A1.2 — a term reachable only from remote_sha (excluded from the range) never refuses.
-# ---------------------------------------------------------------------------
+def test_term_outside_the_range_does_not_refuse(repo: PushRepo) -> None:
+    published = repo.commit({"leak.md": f"{_SYNTHETIC_TERM}\n"})
+    repo.publish()
+    sha = repo.commit({"clean.md": "nothing here\n"})
+    assert _decide(repo, _branch(sha, published), denylist_terms=_TERMS).allowed
 
 
-def test_term_outside_the_range_does_not_refuse(tmp_path: Path) -> None:
-    """The fake never surfaces an object for this (local, remote) pair — mirroring an
-    object that is reachable only from ``remote_sha`` and therefore out of range."""
-    source = _FakeObjectSource(by_range={})
-    decision = push_gate_decision(
-        _refs(f"refs/tags/v9.9.9 {_SHA_A} refs/tags/v9.9.9 {_ZERO}"),
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
-    )
-    assert decision.allowed
-
-
-# ---------------------------------------------------------------------------
 # A1.3 / A2.3 — a deletion ref is never scanned (and never verdict-checked).
-# ---------------------------------------------------------------------------
-
-
-def test_deletion_ref_is_never_scanned(tmp_path: Path) -> None:
-    source = _FakeObjectSource()
-    decision = push_gate_decision(
-        _refs(f"refs/heads/old {_ZERO} refs/heads/old {_SHA_A}"),
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
+def test_deletion_ref_is_never_scanned(repo: PushRepo) -> None:
+    decision = _decide(
+        repo, f"refs/heads/old {_ZERO} refs/heads/old {_SHA_A}", denylist_terms=_TERMS
     )
     assert decision.allowed
-    assert source.calls == []
 
 
-# ---------------------------------------------------------------------------
 # A1.4 — a blob reachable from two refs in the same push is deduped (one Hit, not two).
-# ---------------------------------------------------------------------------
-
-
-def test_shared_blob_across_two_refs_is_deduped(tmp_path: Path) -> None:
-    shared = _obj("shared.md", f"{_SYNTHETIC_TERM} shows up\n", sha="shared-sha")
-    source = _FakeObjectSource(
-        by_range={
-            (_SHA_A, _ZERO): [shared],
-            (_SHA_B, _ZERO): [shared],
-        }
-    )
-    decision = push_gate_decision(
-        _refs(
-            f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}",
-            f"refs/tags/v2 {_SHA_B} refs/tags/v2 {_ZERO}",
-        ),
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
-    )
+def test_shared_blob_across_two_refs_is_deduped(repo: PushRepo) -> None:
+    first = repo.commit({"shared.md": f"{_SYNTHETIC_TERM} shows up\n"})
+    second = repo.commit({"other.md": "clean\n"})
+    blob = git(repo.path, "rev-parse", f"{first}:shared.md")
+    decision = _decide(repo, _tag(first, "v1"), _tag(second, "v2"), denylist_terms=_TERMS)
     assert not decision.allowed
-    assert decision.message.count("shared-sha"[:12]) == 1
+    assert decision.message.count(blob[:12]) == 1
 
 
-# ---------------------------------------------------------------------------
 # A2.1 — a tainted tag push is refused.
-# ---------------------------------------------------------------------------
+def test_tainted_tag_push_is_refused(repo: PushRepo) -> None:
+    sha = repo.commit({"tag-blob.md": f"{_SYNTHETIC_TERM}\n"})
+    assert not _decide(repo, _tag(sha), denylist_terms=_TERMS).allowed
 
 
-def test_tainted_tag_push_is_refused(tmp_path: Path) -> None:
-    source = _FakeObjectSource(
-        by_range={(_SHA_A, _ZERO): [_obj("tag-blob.md", f"{_SYNTHETIC_TERM}\n")]}
-    )
-    decision = push_gate_decision(
-        _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
-    )
-    assert not decision.allowed
-
-
-# ---------------------------------------------------------------------------
 # A2.2 — a clean tag push is allowed with NO security-verdict lookup (DP-5 intact).
-# ---------------------------------------------------------------------------
+def test_clean_tag_push_is_allowed_with_no_verdict_required(repo: PushRepo) -> None:
+    sha = repo.commit({"clean.md": "nothing here\n"})
+    assert _decide(repo, _tag(sha), denylist_terms=_TERMS).allowed
 
 
-def test_clean_tag_push_is_allowed_with_no_verdict_required(tmp_path: Path) -> None:
-    source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): [_obj("clean.md", "nothing here\n")]})
-    decision = push_gate_decision(
-        _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
-    )
-    assert decision.allowed  # no handoff file exists anywhere under tmp_path.
-
-
-# ---------------------------------------------------------------------------
-# A2.4 — branch policy still runs BEFORE the scan (a bad branch name never
-# triggers a scan call); for a tag ref the scan is the only policy that runs.
-# ---------------------------------------------------------------------------
-
-
-def test_branch_policy_refusal_precedes_the_scan(tmp_path: Path) -> None:
-    source = _FailingObjectSource()  # would raise if ever called.
-    decision = push_gate_decision(
-        _refs(f"refs/heads/main {_SHA_A} refs/heads/main {'b' * 40}"),
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
+# A2.4 — branch policy still runs BEFORE the scan.
+def test_branch_policy_refusal_precedes_the_scan(repo: PushRepo) -> None:
+    sha = repo.commit({"leak.md": f"{_SYNTHETIC_TERM}\n"})
+    decision = _decide(
+        repo, f"refs/heads/main {sha} refs/heads/main {'b' * 40}", denylist_terms=_TERMS
     )
     assert not decision.allowed
     assert "main" in decision.message
+    assert "denylisted term" not in decision.message
 
 
-# ---------------------------------------------------------------------------
-# A5.1 / A5.3 / A5.4 — the refusal message shape: ref, path:line, short sha, masked
-# term + source layer, the law, edit+rewrite-before-push remediation, 10-item cap.
-# ---------------------------------------------------------------------------
-
-
-def test_refusal_message_shape_and_ten_item_cap(tmp_path: Path) -> None:
-    objects = [
-        _obj(f"file{i}.md", f"{_SYNTHETIC_TERM} number {i}\n", sha=f"{i:040x}") for i in range(12)
-    ]
-    source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
-    decision = push_gate_decision(
-        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
-        gitflow=DEFAULT,
-        fixes=replace(gate_fixes(), head="main"),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
+# A5.1 / A5.3 / A5.4 — the refusal message shape and the 10-item cap.
+def test_refusal_message_shape_and_ten_item_cap(repo: PushRepo) -> None:
+    sha = repo.commit({f"file{i}.md": f"{_SYNTHETIC_TERM} number {i}\n" for i in range(12)})
+    decision = _decide(
+        repo, _branch(sha), fixes=replace(gate_fixes(), head="main"), denylist_terms=_TERMS
     )
     assert not decision.allowed
     message = decision.message
@@ -261,74 +134,23 @@ def test_refusal_message_shape_and_ten_item_cap(tmp_path: Path) -> None:
     assert _SYNTHETIC_TERM not in message
 
 
-def test_refusal_names_runtime_composition_as_the_fixture_remedy(tmp_path: Path) -> None:
+def test_refusal_names_runtime_composition_as_the_fixture_remedy(repo: PushRepo) -> None:
     """denylist-refusal-omits-the-runtime-composition-remedy: the refusal names the edit."""
-    source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): [_obj("t.py", f"{_SYNTHETIC_TERM}\n")]})
-    decision = push_gate_decision(
-        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
-    )
+    sha = repo.commit({"t.py": f"{_SYNTHETIC_TERM}\n"})
     assert (
         "A test fixture that needs a secret shape composes it at runtime "
         "(string concatenation), never as a tracked literal."
-    ) in decision.message
+    ) in _decide(repo, _branch(sha), denylist_terms=_TERMS).message
 
 
-# ---------------------------------------------------------------------------
-# A6.1 — a simulated git failure refuses, naming the failure + --no-verify.
-# ---------------------------------------------------------------------------
-
-
-def test_git_object_read_failure_refuses_naming_the_failure(tmp_path: Path) -> None:
-    decision = push_gate_decision(
-        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=_FailingObjectSource(),
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-    )
-    assert not decision.allowed
-    assert "simulated git rev-list failure" in decision.message
-    assert "--no-verify" in decision.message
-    assert decision.message.endswith("\nfix: git fsck")  # one command, no `&&`
-
-
-# ---------------------------------------------------------------------------
-# dd-code-reviewer MEDIUM finding (v0.11.0 pre-PR review) — `_run_denylist_scan` must
-# consume each Iterable term source ONLY ONCE. A one-shot generator passed as
-# `denylist_terms` must still refuse a push carrying that term — consuming the same
-# generator twice (once to build the `_PathMasker`, again to build `term_list`) would
-# silently empty it on the second pass, producing a fail-open allow.
-# ---------------------------------------------------------------------------
-
-
-def test_generator_denylist_terms_still_refuses_not_silently_emptied(tmp_path: Path) -> None:
-    """Uses a TAG ref (scanned but never branch-policy-gated) so the only possible
-    refusal source is the denylist scan itself — isolating this from the branch-policy
-    refusal a ``refs/heads/develop`` push would now trigger outright (develop is never
-    pushable under v2; `dd-gitflow-default`)."""
-    source = _FakeObjectSource(
-        by_range={(_SHA_A, _ZERO): [_obj("leak.md", f"contains {_SYNTHETIC_TERM} here\n")]}
-    )
+# v0.11.0 review MEDIUM — a one-shot generator of terms is consumed once, still refuses.
+def test_generator_denylist_terms_still_refuses_not_silently_emptied(repo: PushRepo) -> None:
+    sha = repo.commit({"leak.md": f"contains {_SYNTHETIC_TERM} here\n"})
 
     def _term_generator() -> Iterable[tuple[str, str]]:
         yield (_SYNTHETIC_TERM, "synthetic")
 
-    decision = push_gate_decision(
-        _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        denylist_terms=_term_generator(),
-    )
+    decision = _decide(repo, _tag(sha), denylist_terms=_term_generator())
     assert not decision.allowed
     assert "denylisted term" in decision.message
     assert _SYNTHETIC_TERM not in decision.message
@@ -341,8 +163,6 @@ def test_generator_denylist_terms_still_refuses_not_silently_emptied(tmp_path: P
 
 
 def test_option_shaped_local_sha_glob_form_is_malformed() -> None:
-    from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
-
     refs, malformed = parse_push_stdin(
         f"refs/heads/develop --glob=refs/nonexistent refs/heads/develop {_ZERO}\n"
     )
@@ -351,8 +171,6 @@ def test_option_shaped_local_sha_glob_form_is_malformed() -> None:
 
 
 def test_option_shaped_local_sha_branches_form_is_malformed() -> None:
-    from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
-
     refs, malformed = parse_push_stdin(
         f"refs/heads/develop --branches=zzz refs/heads/develop {_ZERO}\n"
     )
@@ -362,8 +180,6 @@ def test_option_shaped_local_sha_branches_form_is_malformed() -> None:
 
 def test_option_shaped_remote_sha_is_also_malformed() -> None:
     """The same option-shaped hardening applies symmetrically to ``remote_sha``."""
-    from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
-
     refs, malformed = parse_push_stdin(
         f"refs/heads/develop {_SHA_A} refs/heads/develop --glob=refs/nonexistent\n"
     )
@@ -378,8 +194,6 @@ def test_option_shaped_remote_sha_is_also_malformed() -> None:
 
 
 def test_all_zero_deletion_sentinel_still_parses() -> None:
-    from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
-
     refs, malformed = parse_push_stdin(f"refs/heads/old {_ZERO} refs/heads/old {_SHA_A}\n")
     assert malformed == 0
     assert len(refs) == 1
@@ -392,8 +206,6 @@ def test_all_zero_deletion_sentinel_still_parses() -> None:
 
 
 def test_sha256_length_local_sha_parses() -> None:
-    from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
-
     sha256 = "f" * 64
     refs, malformed = parse_push_stdin(f"refs/heads/develop {sha256} refs/heads/develop {_ZERO}\n")
     assert malformed == 0
@@ -402,8 +214,6 @@ def test_sha256_length_local_sha_parses() -> None:
 
 
 def test_39_and_41_char_hex_shas_are_malformed() -> None:
-    from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
-
     too_short = "a" * 39
     too_long = "a" * 41
 
@@ -417,179 +227,84 @@ def test_39_and_41_char_hex_shas_are_malformed() -> None:
     assert malformed_long == 1
 
 
-# ---------------------------------------------------------------------------
-# FR4/A4.5 (v0.11.0) — `decision.warn` carries the oversized-blob note on BOTH an
-# allow decision and a refuse decision (QA-1 closure).
-# ---------------------------------------------------------------------------
-
-
-def test_oversized_note_appears_in_decision_warn_on_allow(tmp_path: Path) -> None:
-    source = _FakeObjectSource(
-        by_range={(_SHA_A, _ZERO): [_oversized_obj("big.md", "clean content here\n")]}
-    )
-    decision = push_gate_decision(
-        _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-    )
+# FR4/A4.5 (v0.11.0) — `decision.warn` carries the oversized-blob note on allow and refuse.
+def test_oversized_note_appears_in_decision_warn_on_allow(repo: PushRepo) -> None:
+    sha = repo.commit({"big.md": _BIG})
+    decision = _decide(repo, _tag(sha))
     assert decision.allowed
     assert decision.warn is not None
     assert "big.md" in decision.warn
-    assert "6000000" in decision.warn
+    assert str(len(_BIG)) in decision.warn
     assert "NOT scanned" in decision.warn
 
 
-def test_oversized_note_appears_in_decision_warn_on_refuse(tmp_path: Path) -> None:
-    source = _FakeObjectSource(
-        by_range={
-            (_SHA_A, _ZERO): [
-                _obj("leak.md", f"{_SYNTHETIC_TERM} shows up here\n", sha="leaksha"),
-                _oversized_obj("big.md", "clean content here\n"),
-            ]
-        }
-    )
-    decision = push_gate_decision(
-        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
-    )
+def test_oversized_note_appears_in_decision_warn_on_refuse(repo: PushRepo) -> None:
+    sha = repo.commit({"leak.md": f"{_SYNTHETIC_TERM} shows up here\n", "big.md": _BIG})
+    decision = _decide(repo, _branch(sha), denylist_terms=_TERMS)
     assert not decision.allowed
     assert decision.warn is not None
     assert "big.md" in decision.warn
     assert "NOT scanned" in decision.warn
 
 
-# ---------------------------------------------------------------------------
-# FR6(b)/A6.1-A6.3/A6.6 (v0.11.0, entry #23 resolution A) — the blob path itself is
-# masked at its offending segments in BOTH the denylist refusal and the FR4 oversized
-# note; a path matching nothing renders byte-identical (regression fixture).
-# ---------------------------------------------------------------------------
-
+# FR6(b)/A6.1-A6.3/A6.6 (v0.11.0) — the blob path is masked at its offending segments in
+# the refusal and the oversized note; a path matching nothing renders byte-identical.
 _PRIVATE_SEGMENT = "zz-fake-private-owner"
+_BOTH = (*_TERMS, (_PRIVATE_SEGMENT, "synthetic"))
 
 
-def test_refusal_path_segment_matching_an_operator_term_is_masked(tmp_path: Path) -> None:
-    objects = [
-        _obj(f"repos/{_PRIVATE_SEGMENT}/notes.md", f"{_SYNTHETIC_TERM} appears\n", sha="pathsha01")
-    ]
-    source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
-    decision = push_gate_decision(
-        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        denylist_terms=((_SYNTHETIC_TERM, "synthetic"), (_PRIVATE_SEGMENT, "synthetic")),
-    )
+def test_refusal_path_segment_matching_an_operator_term_is_masked(repo: PushRepo) -> None:
+    sha = repo.commit({f"repos/{_PRIVATE_SEGMENT}/notes.md": f"{_SYNTHETIC_TERM} appears\n"})
+    blob = git(repo.path, "rev-parse", f"{sha}:repos/{_PRIVATE_SEGMENT}/notes.md")
+    decision = _decide(repo, _branch(sha), denylist_terms=_BOTH)
     assert not decision.allowed
     assert _PRIVATE_SEGMENT not in decision.message  # A6.6: never unmasked, anywhere.
     assert "repos/[REDACTED-PATH-1]/notes.md:1" in decision.message
-    assert "pathsha01"[:12] in decision.message  # short sha untouched — still locatable.
+    assert blob[:12] in decision.message  # short sha untouched — still locatable.
 
 
-def test_refusal_path_with_no_matching_segment_is_byte_identical(tmp_path: Path) -> None:
-    """A6.2 regression fixture: a blob path matching no term source
-    renders exactly as it did before FR6(b) — no placeholder ever appears."""
-    objects = [_obj("notes/plain-file.md", f"{_SYNTHETIC_TERM} here\n", sha="cleanpath")]
-    source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
-    decision = push_gate_decision(
-        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
-    )
+def test_refusal_path_with_no_matching_segment_is_byte_identical(repo: PushRepo) -> None:
+    """A6.2 regression fixture: a path matching no term renders as-is."""
+    sha = repo.commit({"notes/plain-file.md": f"{_SYNTHETIC_TERM} here\n"})
+    decision = _decide(repo, _branch(sha), denylist_terms=_TERMS)
     assert not decision.allowed
     assert "notes/plain-file.md:1" in decision.message
     assert "[REDACTED-PATH-" not in decision.message
 
 
-def test_oversized_note_path_segment_is_masked_too(tmp_path: Path) -> None:
-    """A6.3: the FR4 oversized note's path is masked by the SAME rule, asserted
-    separately from the refusal-message case above."""
-    objects = [_oversized_obj(f"repos/{_PRIVATE_SEGMENT}/big.md", "clean content here\n")]
-    source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
-    decision = push_gate_decision(
-        _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        denylist_terms=((_PRIVATE_SEGMENT, "synthetic"),),
-    )
+def test_oversized_note_path_segment_is_masked_too(repo: PushRepo) -> None:
+    """A6.3: the FR4 oversized note's path is masked by the SAME rule."""
+    sha = repo.commit({f"repos/{_PRIVATE_SEGMENT}/big.md": _BIG})
+    decision = _decide(repo, _tag(sha), denylist_terms=((_PRIVATE_SEGMENT, "synthetic"),))
     assert decision.allowed
     assert decision.warn is not None
     assert _PRIVATE_SEGMENT not in decision.warn  # A6.6.
     assert "repos/[REDACTED-PATH-1]/big.md" in decision.warn
 
 
-# ═════════════════════════════════════════════════════════════════════════════════
-# FR4 (v0.4.2, GRILL P8/P9, D3) — the masker consumes the detector's OWN compiled
-# matchers, so case-insensitivity and word-boundary treatment become identical by
-# construction: detector-hit implies masker-hit.
-# ═════════════════════════════════════════════════════════════════════════════════
-
+# FR4 (v0.4.2) — the masker consumes the detector's own compiled matchers.
 _UPPERCASE_HYPHENATED_TERM = "zz-acme"
-
-# ── A4.1 — paired fixture: an upper-cased, hyphenated path-segment VARIANT of a
-# lowercase denylist term, which the detector's own case-insensitive substring
-# matching already flags inside file content, must ALSO be masked as a path segment.
-# Intent: CONTRACT — v0.4.2 A4.1 ─────────────────────────────────────────────────────
 
 
 def test_refusal_path_segment_uppercase_hyphenated_variant_of_term_is_masked(
-    tmp_path: Path,
+    repo: PushRepo,
 ) -> None:
-    """A4.1: pre-fix, the masker's own ``core.redaction.compile_candidates`` primitive
-    is case-SENSITIVE and treats ``-`` as a word character (so a candidate is only
-    matched as a whole hyphenated token) — it would never flag the path segment
-    'Zz-Acme-Corp' for the lowercase term 'zz-acme', even though the detector's own
-    operator-term layer (FR3(1): a literal, case-insensitive SUBSTRING — no
-    word-boundary restriction at all) already flags 'zz-acme' inside file content case-
-    insensitively. Detector-hit must imply masker-hit: the path segment must be masked
-    too, by construction, once the masker shares the detector's own matchers."""
-    objects = [
-        _obj(
-            "repos/Zz-Acme-Corp/notes.md",
-            f"contains {_UPPERCASE_HYPHENATED_TERM} here\n",
-            sha="acmesha01",
-        )
-    ]
-    source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
-    decision = push_gate_decision(
-        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        denylist_terms=((_UPPERCASE_HYPHENATED_TERM, "synthetic"),),
+    """A4.1: detector-hit implies masker-hit — an upper-cased, hyphenated path segment
+    variant of a lowercase term is masked, as the content detector already flags it."""
+    sha = repo.commit(
+        {"repos/Zz-Acme-Corp/notes.md": f"contains {_UPPERCASE_HYPHENATED_TERM} here\n"}
+    )
+    decision = _decide(
+        repo, _branch(sha), denylist_terms=((_UPPERCASE_HYPHENATED_TERM, "synthetic"),)
     )
     assert not decision.allowed
-    assert "Zz-Acme-Corp" not in decision.message, (
-        "the masker must flag this segment case-insensitively, exactly as the "
-        "detector's own operator-term layer already does"
-    )
-    assert "[REDACTED-PATH-1]" in decision.message
+    assert "Zz-Acme-Corp" not in decision.message
     assert "repos/[REDACTED-PATH-1]/notes.md:1" in decision.message
 
 
-# ── A4.2 — a GitObjectReadError raised while reading a blob at a denylisted path
-# produces a refusal in which that path is masked; no raw path, no raw repr(exception).
-# Intent: CONTRACT — v0.4.2 A4.2 ─────────────────────────────────────────────────────
-
-
+# A4.2 — a read failure naming a denylisted path is refused with that path masked. The
+# stub injects the one failure real git cannot be made to produce on demand (a desynced
+# cat-file stream); it answers no git question.
 class _FailingObjectSourceWithPath:
     """Simulates a git-read failure that names the offending blob's PATH structurally
     (GitObjectReadError.path, FR4) rather than embedding it in the message string."""
@@ -604,145 +319,77 @@ class _FailingObjectSourceWithPath:
         )
 
 
-def test_git_object_read_failure_at_a_denylisted_path_masks_the_path(tmp_path: Path) -> None:
-    decision = push_gate_decision(
-        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=_FailingObjectSourceWithPath(),
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
+def test_git_object_read_failure_at_a_denylisted_path_masks_the_path(repo: PushRepo) -> None:
+    sha = repo.commit({"x.md": "x\n"})
+    decision = _decide(
+        repo, _branch(sha), source=_FailingObjectSourceWithPath(),
         denylist_terms=((_PRIVATE_SEGMENT, "synthetic"),),
-    )
+    )  # fmt: skip
     assert not decision.allowed
     assert _PRIVATE_SEGMENT not in decision.message
     assert "repos/[REDACTED-PATH-1]/leak.md" in decision.message
     assert "--no-verify" in decision.message
-    # No raw repr(exception) — the standard repr shape is "GitObjectReadError(...)".
     assert "GitObjectReadError(" not in decision.message
 
 
-def test_same_offending_segment_gets_the_same_ordinal_across_hit_and_note(
-    tmp_path: Path,
-) -> None:
-    """The path masker is constructed ONCE per push_gate_decision invocation and reused
-    for both the denylist refusal AND the oversized note, so the SAME offending segment
-    gets the SAME stable ordinal placeholder wherever it appears."""
-    objects = [
-        _obj(f"repos/{_PRIVATE_SEGMENT}/leak.md", f"{_SYNTHETIC_TERM} here\n", sha="leaksha02"),
-        _oversized_obj(f"repos/{_PRIVATE_SEGMENT}/big.md", "clean content here\n"),
-    ]
-    source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
-    decision = push_gate_decision(
-        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        denylist_terms=((_SYNTHETIC_TERM, "synthetic"), (_PRIVATE_SEGMENT, "synthetic")),
-    )
+def test_same_offending_segment_gets_the_same_ordinal_across_hit_and_note(repo: PushRepo) -> None:
+    """One masker per decision: the same segment gets the same ordinal everywhere."""
+    sha = repo.commit({
+        f"repos/{_PRIVATE_SEGMENT}/leak.md": f"{_SYNTHETIC_TERM} here\n",
+        f"repos/{_PRIVATE_SEGMENT}/big.md": _BIG,
+    })  # fmt: skip
+    decision = _decide(repo, _branch(sha), denylist_terms=_BOTH)
     assert not decision.allowed
-    assert _PRIVATE_SEGMENT not in decision.message
     assert decision.warn is not None
-    assert _PRIVATE_SEGMENT not in decision.warn
+    assert _PRIVATE_SEGMENT not in decision.message + decision.warn
     assert "repos/[REDACTED-PATH-1]/leak.md" in decision.message
     assert "repos/[REDACTED-PATH-1]/big.md" in decision.warn
 
 
-# ═════════════════════════════════════════════════════════════════════════════════
-# v0.4.3 T-043-15/FR11 — a commit-body-shaped ScannedObject (kind="commit") is fed
-# through push_gate_decision EXACTLY like a blob — same term layers, same
-# masked refusal shape. No service.py code changes were needed for this: scan_objects
-# is already generic over ScannedObject.kind. Intent: CONTRACT — v0.4.3 A11.1.
-# ═════════════════════════════════════════════════════════════════════════════════
-
-
-def _commit_obj(text: str, *, sha: str = "c0mm17sha") -> ScannedObject:
-    """A commit-message-body-shaped object (v0.4.3 T-043-15/FR11): synthetic non-path
-    label, no prior_text — mirrors what ``GitSubprocessObjectReader`` now yields."""
-    return ScannedObject(path="(commit message)", sha=sha, text=text, decodable=True, kind="commit")
-
-
+# v0.4.3 A11.1 — a term only in a commit message body is refused like a blob.
 def test_push_with_denylisted_term_only_in_a_commit_message_body_is_refused(
-    tmp_path: Path,
+    repo: PushRepo,
 ) -> None:
-    """A11.1: a range whose ONLY private-term exposure is in a commit message (zero
-    blobs carry it) is refused — masked, with the reword/amend healing action."""
-    source = _FakeObjectSource(
-        by_range={
-            (_SHA_A, _ZERO): [_commit_obj(f"fixed a bug, mentions {_SYNTHETIC_TERM} here\n")],
-        }
+    sha = repo.commit(
+        {"clean.md": "clean\n"}, message=f"fixed a bug, mentions {_SYNTHETIC_TERM} here"
     )
-    decision = push_gate_decision(
-        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
-    )
+    decision = _decide(repo, _branch(sha), denylist_terms=_TERMS)
     assert not decision.allowed
     assert _SYNTHETIC_TERM not in decision.message  # never unmasked
-    assert "Uncommit the unpublished range" in decision.message  # a fresh message heals it
+    assert "Uncommit the unpublished range" in decision.message
     assert "--no-verify" in decision.message
 
 
-# ---------------------------------------------------------------------------
-# c3 review 5 (C1, H1-H3): the rewrite fix is computed from the REFUSED ref's own
-# unpublished range — never HEAD, never origin/<integration>, never a ref deletion.
-# ---------------------------------------------------------------------------
-
-
-def _refuse(tmp_path: Path, line: str, head: str, source: _FakeObjectSource) -> str:
-    decision = push_gate_decision(
-        _refs(line),
-        gitflow=DEFAULT,
-        fixes=replace(gate_fixes(), head=head),
-        object_source=source,
-        repo=tmp_path,
-        canon_violations_fn=canon_violations,
-        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
-    )
+# c3 review 5 (C1, H1-H3): the rewrite fix comes from the REFUSED ref's own unpublished
+# range — never HEAD, never origin/<integration>, never a ref deletion.
+def _refuse(repo: PushRepo, line: str, head: str) -> str:
+    decision = _decide(repo, line, fixes=replace(gate_fixes(), head=head), denylist_terms=_TERMS)
     assert not decision.allowed
     assert "update-ref" not in decision.message
     return decision.message
 
 
-def _dirty(local: str = _SHA_A) -> _FakeObjectSource:
-    return _FakeObjectSource(
-        by_range={(local, _ZERO): [_obj("n.md", f"{_SYNTHETIC_TERM}\n")]},
-        ranges={local: [local, _SHA_B]},
-    )
+def _two_unpublished(repo: PushRepo) -> tuple[str, str]:
+    oldest = repo.commit({"a.md": "clean\n"})
+    return oldest, repo.commit({"n.md": f"{_SYNTHETIC_TERM}\n"})
 
 
-def test_the_rewrite_fix_resets_to_the_oldest_unpublished_commit_and_amends(
-    tmp_path: Path,
-) -> None:
-    """N3: one formula for every range, a root-reaching one included — reset --soft to the
-    oldest unpublished commit, edit, amend; exactly one fix line."""
-    message = _refuse(
-        tmp_path, f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}",
-        "feature/0.0.1", _dirty(),
-    )  # fmt: skip
-    assert message.endswith(f"fix: git -C /repo reset --soft {_SHA_B}")
+def test_the_rewrite_fix_resets_to_the_oldest_unpublished_commit_and_amends(repo: PushRepo) -> None:
+    """N3: reset --soft to the oldest unpublished commit, edit, amend; one fix line."""
+    oldest, tip = _two_unpublished(repo)
+    message = _refuse(repo, _branch(tip), "feature/0.0.1")
+    assert message.endswith(f"fix: git -C /repo reset --soft {oldest}")
     assert "commit --amend" in message and message.count("\nfix: ") == 1
 
 
-def test_a_refused_branch_that_is_not_checked_out_is_switched_to_first(tmp_path: Path) -> None:
+def test_a_refused_branch_that_is_not_checked_out_is_switched_to_first(repo: PushRepo) -> None:
     """H1: HEAD is `main` — resetting HEAD would uncommit the wrong branch."""
-    message = _refuse(
-        tmp_path, f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}",
-        "main", _dirty(),
-    )  # fmt: skip
-    assert message.endswith("fix: git -C /repo switch feature/0.0.1")
+    _, tip = _two_unpublished(repo)
+    assert _refuse(repo, _branch(tip), "main").endswith("fix: git -C /repo switch feature/0.0.1")
 
 
-def test_a_tag_gets_operator_action_and_no_command(tmp_path: Path) -> None:
-    """N3: a tag (like a detached HEAD, which branch policy already refuses) has no
-    branch to reset — no command is printed."""
-    message = _refuse(
-        tmp_path, f"refs/tags/v0.0.1 {_SHA_A} refs/tags/v0.0.1 {_ZERO}", "feature/0.0.1", _dirty()
-    )
+def test_a_tag_gets_operator_action_and_no_command(repo: PushRepo) -> None:
+    """N3: a tag has no branch to reset — no command is printed."""
+    _, tip = _two_unpublished(repo)
+    message = _refuse(repo, _tag(tip, "v0.0.1"), "feature/0.0.1")
     assert "Operator action" in message and "\nfix: " not in message
