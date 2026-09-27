@@ -170,24 +170,35 @@ def test_pre_gate_shim_blocks_with_reason_on_stderr(tmp_path: Path) -> None:
     """sa-gate-blind-on-cursor-copilot-devin#B5: the real pre_gate's multi-line reason reaches stderr with real
     newlines and its `fix:` at a line start; exit 2."""
     workspace = tmp_path / "ws"
-    # The platform's own venv layout: bin/python, or Scripts/python.exe on Windows.
+    # An interpreter at the platform's own venv layout (bin/python, Scripts/python.exe):
+    # a regular sh wrapper, never a symlink (MSYS sh does not see a native link as -x).
     scripts = workspace / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
     scripts.mkdir(parents=True)
-    (scripts / f"python{PLATFORM.venv_exe_suffix}").symlink_to(sys.executable)
+    python = scripts / f"python{PLATFORM.venv_exe_suffix}"
+    python.write_text(f'#!/bin/sh\nexec "{Path(sys.executable).as_posix()}" "$@"\n', "utf-8")
+    python.chmod(0o755)
     (workspace / ".dadaia" / "states").mkdir()
     (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": []}')
     shim = tmp_path / "pre-gate.sh"
     shim.write_text(kimi_hook_shims()["dadaia-kimi-pre-gate.sh"], encoding="utf-8")
     payload = {"tool_name": "Write", "tool_input": {"file_path": str(workspace / "AGENTS.md")}}
-    proc = subprocess.run(
-        ["sh", str(shim)],
-        input=json.dumps(payload),
-        cwd=workspace,
-        env={"PATH": os.environ["PATH"], "PYTHONPATH": os.environ.get("PYTHONPATH", "")},
-        capture_output=True,
-        text=True,
-    )
-    assert proc.returncode == 2
+    env = {"PATH": os.environ["PATH"], "PYTHONPATH": os.environ.get("PYTHONPATH", "")}
+    env.update({k: os.environ[k] for k in ("SYSTEMROOT",) if k in os.environ})  # Windows
+
+    def run(*sh_flags: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["sh", *sh_flags, str(shim)],
+            input=json.dumps(payload),
+            cwd=workspace,
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+
+    proc = run()
+    if proc.returncode != 2:  # one CI round must say why: re-run traced
+        traced = run("-x")
+        pytest.fail(f"rc {proc.returncode}; traced shim stderr:\n{traced.stderr}")
     assert any(line.startswith("fix: ") for line in proc.stderr.splitlines()), proc.stderr
 
 
