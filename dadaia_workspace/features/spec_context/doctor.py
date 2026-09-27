@@ -536,8 +536,6 @@ class DoctorService:
         for sess_id in session_store.reap_stale(self._workspace_root):
             actions.append(f"GRAVEYARD-GC: deleted expired session file '{sess_id}.json'")
 
-        actions.extend(self._migrate_exceptions())
-
         findings = self.scan()
         for finding in findings:
             if finding.verdict is FindingVerdict.MISSING and finding.fixable:
@@ -581,22 +579,6 @@ class DoctorService:
             sweep.hold, self._workspace_root, repo_path, label, note=f" (context {ctx.name})"
         )
         return sweep.guarded("INV-5", label, step)
-
-    def _migrate_exceptions(self) -> list[str]:
-        """FR6: ``root_exceptions.txt`` -> ``INSTANCE_EXCEPTIONS`` through the one parser;
-        deleted in the release after every consumer has run it."""
-        old = self._states / "root_exceptions.txt"
-        new = self._workspace_root / workspace_layout.INSTANCE_EXCEPTIONS
-        if not old.is_file() or new.exists():
-            return []
-
-        def migrate() -> str:
-            globs = workspace_layout.parse_exception_globs(old.read_text(encoding="utf-8"))
-            new.write_text("".join(f"{g}\n" for g in globs), encoding="utf-8")
-            old.unlink()
-            return f"migrated '{old.name}' -> '{new.name}' ({len(globs)} globs)"
-
-        return sweep.guarded("EXCEPTIONS-MIGRATION", old.name, migrate)
 
     def _seed(self, finding: Finding) -> str:
         """A missing zone is a directory; the missing profile is written by the one store

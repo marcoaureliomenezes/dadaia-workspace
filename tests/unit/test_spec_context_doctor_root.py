@@ -116,6 +116,7 @@ def _write_ledger(root: Path, *relpaths: str) -> None:
 
 
 def test_root_walk_classifies_every_entry(tmp_path: Path) -> None:
+    """sa-gate-allows-root-entries-the-reaper-moves#E6, #E2: the doctor side of the parity — unlisted = slop, globbed = operator."""
     _init_workspace(tmp_path)
     (tmp_path / ".claude").mkdir()
     (tmp_path / ".git").mkdir()
@@ -137,57 +138,13 @@ def test_root_walk_classifies_every_entry(tmp_path: Path) -> None:
     assert "# comment" not in {f.detail for f in found.values()}
 
 
-def test_fix_migrates_root_exceptions_into_instance_exceptions(tmp_path: Path) -> None:
-    """FR6 / AC7: ``root_exceptions.txt`` present and ``INSTANCE_EXCEPTIONS`` absent ⇒ ``fix()``
-    writes the parsed globs (comments dropped, deduplicated, directory slash dropped, order
-    kept) to the new file and unlinks the old one. Before the migration the legacy file is
-    read by nobody: it is plain closed-canon slop and its globs suppress nothing."""
-    _init_workspace(tmp_path)
-    (tmp_path / "shot.png").write_bytes(b"PNG")
-    (tmp_path / "z_img").mkdir()
-    legacy = tmp_path / ".dadaia" / _STATE_ZONE.name / "root_exceptions.txt"
-    legacy.write_text(
-        "# operator files\n*.png\n\n.mcp.json\n# infra\n.mcp.json\nz_img/\n.mcp.json\nz_img\n",
-        encoding="utf-8",
-    )
-    new = tmp_path / INSTANCE_EXCEPTIONS
-
-    before = _by_path(_make_doctor(tmp_path).scan())
-    assert before["shot.png"].verdict is FindingVerdict.SLOP
-    assert before[f"{_STATE_ZONE.name}/root_exceptions.txt"].code == f"WS-{_STATE_ZONE.name}-slop"
-
-    actions = _make_doctor(tmp_path).fix()
-
-    assert not legacy.exists()
-    assert new.read_text(encoding="utf-8") == "*.png\n.mcp.json\nz_img\n"
-    assert [a for a in actions if "root_exceptions.txt" in a] == [
-        "EXCEPTIONS-MIGRATION: migrated 'root_exceptions.txt' -> 'instance_exceptions.txt' (3 globs)"
-    ]
-    after = _by_path(_make_doctor(tmp_path).scan())
-    assert after["shot.png"].verdict is FindingVerdict.OPERATOR
-    assert after["z_img"].verdict is FindingVerdict.OPERATOR
-    assert after[f"{_STATE_ZONE.name}/instance_exceptions.txt"].verdict is FindingVerdict.CANON
-
-
-def test_fix_never_overwrites_an_existing_instance_exceptions_file(tmp_path: Path) -> None:
-    _init_workspace(tmp_path)
-    legacy = tmp_path / ".dadaia" / _STATE_ZONE.name / "root_exceptions.txt"
-    legacy.write_text("*.png\n", encoding="utf-8")
-    new = tmp_path / INSTANCE_EXCEPTIONS
-    new.write_text("*.jpg\n", encoding="utf-8")
-
-    _make_doctor(tmp_path).fix()
-
-    assert new.read_text(encoding="utf-8") == "*.jpg\n"
-    assert not legacy.exists()
-
-
 # ---------------------------------------------------------------------------
 # Step 3 — the .dadaia/ top level
 # ---------------------------------------------------------------------------
 
 
 def test_dadaia_top_level_zone_or_root_file_else_slop(tmp_path: Path) -> None:
+    """sa-gate-allows-root-entries-the-reaper-moves#E4, #E6: a non-zone .dadaia/ entry is slop."""
     _init_workspace(tmp_path)
     dadaia = tmp_path / ".dadaia"
     for name in DADAIA_ROOT_FILES:
@@ -497,17 +454,16 @@ def test_fix_skips_and_reports_an_undeletable_entry_and_finishes_the_pass(
     assert remaining[f"{_TTL_ZONE.name}/x/deps/a.js"].verdict is FindingVerdict.EXPIRED
 
 
-def test_fix_skips_and_reports_a_failing_migration_or_seed_and_still_deletes_expired(
+def test_fix_skips_and_reports_a_failing_seed_and_still_deletes_expired(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Bug doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk (finding 2, same
     skip-and-report family as doctor-fix-aborts-whole-pass-on-first-undeletable-entry): a
-    migration or seed the process cannot write is skipped and reported with its errno in the
-    same ``<code>: skipped '<path>' (errno N: …)`` shape as a deletion, and the pass still
-    reaches 'delete expired'."""
+    seed the process cannot write is skipped and reported with its errno in the same
+    ``<code>: skipped '<path>' (errno N: …)`` shape as a deletion, and the pass still
+    reaches 'delete expired'. (The root_exceptions migration half left with the migration,
+    sa-gate-allows-root-entries-the-reaper-moves.)"""
     _init_workspace(tmp_path)
-    legacy = tmp_path / ".dadaia" / _STATE_ZONE.name / "root_exceptions.txt"
-    legacy.write_text("*.png\n", encoding="utf-8")
     _profile(tmp_path).unlink()
     zone_dir = tmp_path / ".dadaia" / _TTL_ZONE.name
     zone_dir.mkdir(exist_ok=True)
@@ -518,28 +474,17 @@ def test_fix_skips_and_reports_a_failing_migration_or_seed_and_still_deletes_exp
     def denied(*_: object, **__: object) -> None:
         raise PermissionError(13, "Permission denied")
 
-    monkeypatch.setattr(Path, "write_text", denied)
     monkeypatch.setattr(JsonHarnessProfileStore, "write", denied)
 
     actions = _make_doctor(tmp_path).fix()
 
-    # The migration was refused, so the legacy file is still what it always was —
-    # closed-canon slop — and the reaper HOLDS it rather than deleting it.
-    assert not legacy.exists()
-    assert _reaped(tmp_path, f".dadaia/{_STATE_ZONE.name}/root_exceptions.txt").exists()
-    assert not (tmp_path / INSTANCE_EXCEPTIONS).exists()
     assert not _profile(tmp_path).exists()
     assert not stale.exists()
-    assert [a.split(": ", 1)[1].split(" (")[0] for a in actions] == [
-        "skipped 'root_exceptions.txt'",
-        f"skipped '{_STATE_ZONE.name}/harness_profile.json'",
-        f"moved '{_STATE_ZONE.name}/root_exceptions.txt' -> "
-        f"'{_reaped(tmp_path, f'.dadaia/{_STATE_ZONE.name}/root_exceptions.txt').relative_to(tmp_path).as_posix()}'",
-        f"deleted '{_TTL_ZONE.name}/stale'",
+    assert actions == [
+        f"WS-{_STATE_ZONE.name}-missing: skipped '{_STATE_ZONE.name}/harness_profile.json'"
+        " (errno 13: Permission denied)",
+        f"WS-{_TTL_ZONE.name}-expired: deleted '{_TTL_ZONE.name}/stale'",
     ]
-    assert all("(errno 13: Permission denied)" in a for a in actions[:2]), actions
-    assert actions[1].startswith(f"WS-{_STATE_ZONE.name}-missing: ")
-    assert actions[3] == f"WS-{_TTL_ZONE.name}-expired: deleted '{_TTL_ZONE.name}/stale'"
 
 
 @pytest.mark.parametrize("target_inside_workspace", [True, False])
