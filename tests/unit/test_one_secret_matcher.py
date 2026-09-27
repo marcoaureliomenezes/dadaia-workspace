@@ -80,6 +80,11 @@ _MATRIX: list[tuple[str, str, str | bytes, bool]] = [
     # Behavior (retro 2026-09-27 item 1): private-key containers are refused on
     # presence (.pem .key .p12 .pfx .jks .keystore .der); public certs (.crt .cer) pass.
     ("der-private-key", "k.der", b"\x30\x82key\xff", True),
+    ("pem-private-key", "k.pem", b"\x00opaque\xff", True),
+    ("key-private-key", "server.key", b"\x00opaque\xff", True),
+    ("pfx-private-key", "bundle.pfx", b"\x00opaque\xff", True),
+    ("jks-private-key", "store.jks", b"\x00opaque\xff", True),
+    ("keystore-private-key", "app.keystore", b"\x00opaque\xff", True),
     ("public-cert-crt", "ca.crt", b"\x00cert\xff", False),
     ("public-cert-cer", "server.cer", b"\x00cert\xff", False),
 ]

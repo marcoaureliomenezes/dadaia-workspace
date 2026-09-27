@@ -951,7 +951,7 @@ def test_dead_after_the_operator_pulls_into_a_conflict_publishes_no_markers(
 
 
 def test_dead_commit_without_a_git_identity_refuses_and_removes_nothing(tmp_path: Path) -> None:
-    """Behavior (pending AC, retro 2026-09-27): with no git identity in env or config,
+    """Behavior (AC4.9, security finding SA-H3-2, commit 75b92f25): with no git identity in env or config,
     ``context dead --commit`` over a checkout holding changes refuses before any write —
     exit non-zero, one fix line setting ``user.name`` in that repo, the checkout, its
     change and the published branch all left as they were."""
