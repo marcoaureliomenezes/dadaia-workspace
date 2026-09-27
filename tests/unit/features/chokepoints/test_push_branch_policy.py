@@ -4,7 +4,8 @@ branches are PR-only; every refusal and its fix line name the CONFIGURED branche
 Tag pushes keep their carve-out. Every case runs under the default gitflow and a custom
 one (``trunk``/``next``/``work/``) — no branch name is hard-coded in the gate.
 
-Name validation itself is ``Gitflow.role_of`` (``tests/unit/core/test_gitflow.py``).
+Name validation itself is ``Gitflow.role_of`` (``tests/unit/core/test_gitflow.py``); the
+refusal of role-less names under the default gitflow is pinned here, at the gate.
 
 Intent: CONTRACT — AC6.5, AC8.1 (T-050-12); v0.4.4 A3.1, A3.5
 """
@@ -134,6 +135,21 @@ def test_a_branch_outside_the_gitflow_is_refused_naming_the_work_branch(
     work = f"{flow.work_prefix}<M.m.p>"
     # One command, from any cwd, carrying the refused commit (review H-C): no `&&`.
     assert _fix(decision) == ["git", "-C", "/repo", "switch", "-c", work, _SHA_A]
+
+
+@pytest.mark.parametrize(
+    "branch", ["feature/0.6.0-rc1", "Main", "developp", "release/0.6.0", "chore/cleanup"]
+)
+def test_the_default_gitflow_refuses_a_name_that_is_no_role(tmp_path: Path, branch: str) -> None:
+    """Behavior (AC6.1, AC6.5, default gitflow main/develop/feature/<M.m.p>): only a work
+    branch is pushable; a name that is not exactly the principal, the integration or
+    ``feature/`` + an ``M.m.p`` version has no role and is refused. ``-rc1`` is a suffix on
+    the version, ``Main`` and ``developp`` are not the role names, ``release/`` and
+    ``chore/`` are not the work prefix. Restores coverage lost in c3 (retro 2026-09-27 W5).
+    """
+    decision = _decide(_push(branch), tmp_path, DEFAULT)
+    assert decision.allowed is False
+    assert "outside the gitflow" in decision.message
 
 
 def test_the_default_names_are_ordinary_branches_under_a_custom_gitflow(tmp_path: Path) -> None:
