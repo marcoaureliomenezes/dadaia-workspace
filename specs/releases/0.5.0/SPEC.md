@@ -166,7 +166,7 @@ by `public stage` + `public install`.
   refuses a conflicted commit, no conflict marker is published; a push failure carries git's full output
   and removes nothing. Dead's work-branch refusal stays. With no git identity it refuses before any
   write, one fix line (`git -C <repo> config user.name '<user.name>'`); checkout, HEAD, origin and the
-  ALIVE state unchanged. _Amended 2026-09-27._
+  ALIVE state unchanged. _Amended 2026-09-27:_ SA-H3-2 (75b92f25).
 
 ### FR5 — Pre-push bootstrap birth (ADR 0036)
 
