@@ -22,10 +22,9 @@ project, and the project gitflow". Operator demand 2026-09-24 (verbatim):
 > sentido fazendo agente parar de trabalhar e não ter para onde ir. Esse é o maior problema."
 
 Grill rounds 1–3 (2026-09-25), every recommendation accepted. The law of this candidate is ADRs
-0033–0038, 0040, 0042–0049 (0039 docs belongs to candidate 4); the as-is review is PLAN §1. Review rounds
-amend ACs in place: `_Amended 2026-09-26:_` (REJECTED 40a24031, operator ruling); `_Amended 2026-09-27:_`
-(review 6 N6; the approved anchor-first publish design, conditions C1–C9; the append-only rulings, PLAN
-§1.4). The as-is state and its bug evidence are PLAN §1; §5 names what this candidate replaces.
+0033–0038, 0040, 0042–0049; the as-is review is PLAN §1. Review rounds amend ACs in place:
+`_Amended 2026-09-26:_` (REJECTED 40a24031, operator ruling); `_Amended 2026-09-27:_` (reviews 6 N6,
+7 B3; the approved anchor-first publish design, conditions C1–C9; the append-only rulings, PLAN §1.4).
 
 ## 2. Objective
 
@@ -137,9 +136,10 @@ by `public stage` + `public install`.
   never lands on the principal or any other existing branch. Unrelated histories merge only when the
   anchor's root holds only onboarding paths. A second foreign backup lands in `specs-bkp/<UTC>/`.
   _Amended 2026-09-27._
-- AC4.3 Births: empty origin → principal and integration at `<work>`'s tip; principal only → integration
-  at `origin/<principal>`; both → reused; pushed by refspec `<sha>:refs/heads/<branch>`, no local head
-  created, moved or reset. Version: `0.1.0`, else last tag + 1 patch. _Amended 2026-09-27._
+- AC4.3 Births: empty origin → principal and integration at the anchor commit, `<work>` carrying any
+  stale local work; principal only → integration at `origin/<principal>`; both → reused; pushed by refspec
+  `<sha>:refs/heads/<branch>`, no local head created, moved or reset. Version: `0.1.0`, else last tag + 1
+  patch. _Amended 2026-09-27._
 - AC4.4 One published answer (M4): the `publish` step and baseline's no-op read one predicate; "already
   published" (exit 0, nothing committed or pushed) only when it holds and HEAD has no unpublished range,
   never while the anchor is unpublished. _Amended 2026-09-27._
@@ -185,10 +185,11 @@ by `public stage` + `public install`.
   unpublished commit of the refused ref>`, then the term removed and the commit amended (a branch HEAD is
   not on: `git switch <branch>` first). Operator-action text only for a tag or a detached HEAD. Refusing
   baseline's own push names `CLI context baseline <ctx>` as the step after the amend. _Amended 2026-09-27._
-- AC5.6 Baseline and `dead --commit` call the pre-push matcher in-process over the range before pushing;
-  one registry (`privacy_baseline.json` plus operator terms) covers every shape of the deleted second
-  engine (`_SECRET_SCAN_RULES`), matched after control-character normalization. _Amended 2026-09-27:_
-  WP-10 folded in; resolves bug `sa-pre-push-and-publish-scan-disagree-on-secret-shapes` here.
+- AC5.6 Baseline and `dead --commit` run the pre-push matcher in-process over the files they are about
+  to commit; already-made unpushed commits are covered by the pre-push gate. One registry
+  (`privacy_baseline.json` plus operator terms) covers every shape of the deleted second engine
+  (`_SECRET_SCAN_RULES`), matched after control-character normalization. _Amended 2026-09-27:_ WP-10
+  folded in; resolves bug `sa-pre-push-and-publish-scan-disagree-on-secret-shapes`.
 
 ### FR6 — The project gitflow (ADRs 0037, 0040, 0046)
 
