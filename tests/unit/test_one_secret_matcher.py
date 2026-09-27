@@ -47,6 +47,18 @@ _MATRIX: list[tuple[str, str, str | bytes, bool]] = [
     ("product-identity", "w.txt", "dadaia" + "@" + "workspace.local\n", False),
     ("control-char-term", "c.txt", _TERM[:5] + "\x1b" + _TERM[5:] + "\n", True),
     ("clean", "n.txt", "nothing to see here\n", False),
+    ("quoted-literal", "q.txt", "pass" + "word = '" + "g" * 8 + "'\n", True),
+    # Review 7 R8-2: ordinary code names a secret without holding one — never refused.
+    ("kwarg-passthrough", "db.py", "driver.connect(user=user, pass" + "word=password)\n", False),
+    ("annotation", "cfg.py", "api" + "_key: Optional[str] = None\n", False),
+    ("call", "c1.py", "pass" + "word = get_password()\n", False),
+    ("attribute", "c2.py", "api" + "_key = settings.api_key\n", False),
+    ("call-arg", "c3.py", "private" + "_key = load_private_key(path)\n", False),
+    ("subscript", "c4.py", "access" + '_token = response.json()["t"]\n', False),
+    ("aws-runtime", "c5.py", "aws_secret" + '_access_key=runtime_value("x")\n', False),
+    ("terraform-attr", "m.tf", "CLIENT_" + "SECRET = some_resource.attr\n", False),
+    ("public-cert-crt", "ca.crt", b"\x00cert\xff", False),
+    ("public-cert-cer", "server.cer", b"\x00cert\xff", False),
 ]
 
 
