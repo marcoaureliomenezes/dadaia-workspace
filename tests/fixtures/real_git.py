@@ -10,11 +10,6 @@ def git(cwd: Path, *args: str) -> str:
     return done.stdout.strip()
 
 
-def identify(repo: Path) -> None:
-    git(repo, "config", "user.email", "t@example.invalid")
-    git(repo, "config", "user.name", "T")
-
-
 def seeded_remote(
     parent: Path, name: str, *, files: dict[str, str] | None = None, branch: str = "main"
 ) -> Path:
@@ -22,7 +17,6 @@ def seeded_remote(
     bare, seed = parent / f"{name}.git", parent / f"seed-{name}"
     git(parent, "init", "-q", "--bare", "-b", branch, str(bare))
     git(parent, "init", "-q", "-b", branch, str(seed))
-    identify(seed)
     for rel, text in (files or {"README.md": "init\n"}).items():
         (seed / rel).parent.mkdir(parents=True, exist_ok=True)
         (seed / rel).write_text(text, encoding="utf-8")
@@ -33,9 +27,8 @@ def seeded_remote(
 
 
 def clone(remote: Path, dest: Path) -> Path:
-    """A working clone of *remote* at *dest*, with a committer identity."""
+    """A working clone of *remote* at *dest*."""
     git(remote.parent, "clone", "-q", str(remote), str(dest))
-    identify(dest)
     return dest
 
 
@@ -50,7 +43,6 @@ class PushRepo:
         self.path = parent / "repo"
         git(parent, "init", "-q", "--bare", "-b", branch, str(self.remote))
         git(parent, "init", "-q", "-b", branch, str(self.path))
-        identify(self.path)
         git(self.path, "remote", "add", "origin", str(self.remote))
 
     def commit(self, files: dict[str, str | bytes], message: str = "change") -> str:

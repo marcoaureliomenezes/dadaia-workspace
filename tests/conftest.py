@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import os
 import sys
+import tempfile
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 
@@ -70,6 +71,12 @@ os.environ["DADAIA_FENCED_ROOTS"] = os.pathsep.join(map(str, _FENCED_ROOTS))
 # .git/objects/maintenance.lock while a test snapshots the repo (a CI flake). One rule,
 # appended to any GIT_CONFIG_* pairs already in the environment, inherited by every child.
 _GIT_QUIET = {"maintenance.auto": "false", "gc.auto": "0"}
+# Every git process sees one GLOBAL config carrying a committer identity, never the
+# developer's (CI runners have none): global scope, so a repo's own `user.*` and a
+# test's own GIT_CONFIG_GLOBAL still win — a test about a missing identity sets its own.
+_GIT_GLOBAL = Path(tempfile.gettempdir()) / "dadaia-tests.gitconfig"
+_GIT_GLOBAL.write_text("[user]\n\tname = T\n\temail = t@example.invalid\n", encoding="utf-8")
+os.environ["GIT_CONFIG_GLOBAL"] = str(_GIT_GLOBAL)
 _GIT_BASE = int(os.environ.get("GIT_CONFIG_COUNT", "0"))
 for _n, (_key, _value) in enumerate(_GIT_QUIET.items(), start=_GIT_BASE):
     os.environ[f"GIT_CONFIG_KEY_{_n}"] = _key
