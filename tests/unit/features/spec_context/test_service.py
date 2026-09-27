@@ -18,11 +18,9 @@ import pytest
 
 pytest.importorskip("fcntl")
 
-import stat  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 from dadaia_workspace.container import scan_publish_candidates
-from dadaia_workspace.core.models.spec_context import ContextState  # noqa: E402
 from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
 from tests.fakes import FakeContextStore, FakeGitClient, register_dead  # noqa: E402
 
@@ -58,31 +56,6 @@ def service(
         install_hooks=lambda _repo: None,
         secret_scan=scan_publish_candidates,
     )
-
-
-def test_dead_succeeds_on_non_writable_files(
-    service: SpecContextService,
-    store: FakeContextStore,
-    git: FakeGitClient,
-    workspace_root: Path,
-) -> None:
-    """v0.1.50 FR3 (bug context-dead-nonwritable-guard-rejects-standard-git-objects):
-    read-only files (git loose objects are 0444 BY DESIGN) no longer refuse dead() —
-    rmtree runs with a chmod-and-retry handler, replacing the old GitSyncError guard.
-    """
-    register_dead(service, "proj", "my-repo", "https://github.com/org/my-repo")
-    service.alive("proj")
-
-    repo = workspace_root / "repos" / "my-repo"
-    assert repo.exists()
-
-    locked_file = repo / "locked.txt"
-    locked_file.write_text("content")
-    locked_file.chmod(stat.S_IRUSR | stat.S_IRGRP)  # read-only, like a loose object
-
-    result = service.dead("proj")
-    assert result.state is ContextState.DEAD
-    assert not repo.exists()
 
 
 def test_alive_leaves_a_preexisting_specs_tree_untouched_and_hooks_the_repo(

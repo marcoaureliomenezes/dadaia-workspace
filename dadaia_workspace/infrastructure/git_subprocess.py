@@ -226,12 +226,32 @@ class GitSubprocessClient:
         result = _run(["git", "remote"], cwd=path)
         return bool(result.stdout.strip())
 
-    def unpushed(self, path: Path) -> bool:
-        """Whether HEAD carries a commit origin lacks — the ONE rule, ``unpublished``."""
+    def unpushed(self, path: Path, rev: str = "HEAD") -> bool:
+        """Whether *rev* carries a commit origin lacks — the ONE rule, ``unpublished``."""
         try:
-            return bool(unpublished(path, "HEAD"))
+            return bool(unpublished(path, rev))
         except GitObjectReadError:
             return True
+
+    def unrecoverable(self, path: Path) -> list[str]:
+        """One fix line per thing removing *path* loses: a linked worktree, or a local
+        branch carrying a commit neither origin nor HEAD holds; commits with no remote."""
+        if self.has_commits(path) and not self.has_remote(path):
+            return [git_line(path, "remote", "add", "origin", "<clone-url>")]
+        run = _run(["git", "worktree", "list", "--porcelain"], cwd=path).stdout.splitlines()
+        trees = [line[9:] for line in run if line.startswith("worktree ")][1:]
+        refs = ["git", "for-each-ref", "--format=%(refname:short)", "refs/heads"]
+        heads = _run(refs, cwd=path).stdout.splitlines()
+        in_head = ["git", "merge-base", "--is-ancestor"]  # HEAD itself is pushed by dead()
+        lost = [
+            b
+            for b in heads
+            if _run([*in_head, f"refs/heads/{b}", "HEAD"], cwd=path).returncode != 0
+            and self.unpushed(path, f"refs/heads/{b}")
+        ]
+        return [git_line(path, "worktree", "remove", t) for t in trees] + [
+            git_line(path, "push", "-u", "origin", b) for b in lost
+        ]
 
     def identity_fix(self, path: Path) -> str:
         """The ONE identity probe — git's own rule (env, config, auto-detection): ``""``

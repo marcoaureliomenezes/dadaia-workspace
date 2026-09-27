@@ -26,7 +26,6 @@ from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     SpecContextProject,
 )
 from dadaia_workspace.features.spec_context.service import (  # noqa: E402
-    DeadReviewRequiredError,
     SpecContextService,
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
@@ -129,25 +128,25 @@ def _unborn_lib(tmp_path: Path) -> tuple[SpecContextService, FakeContextStore, P
 
 def test_dead_retires_an_empty_unborn_clone_without_pushing_it(tmp_path: Path) -> None:
     """Intent: CONTRACT — context-dead-pushes-an-unborn-clone. An empty unborn clone has
-    nothing to lose or publish: dead removes it with no sync, origin vanished or not."""
+    nothing to publish: dead holds it with no sync, origin vanished or not (WP-03 #C1)."""
     service, _store, lib_path = _unborn_lib(tmp_path)
 
     dead = service.dead("proj")
 
     assert dead.state == ContextState.DEAD
     assert not lib_path.exists()
+    assert len(list(tmp_path.glob("ws/.dadaia/reaped/*/repos/lib/.git"))) == 1
 
 
-@pytest.mark.parametrize("commit", [False, True])
-def test_dead_refuses_an_unborn_clone_holding_files(tmp_path: Path, commit: bool) -> None:
-    """Intent: CONTRACT — context-dead-pushes-an-unborn-clone (lossless). Files in an
-    unborn clone have no history to publish into: dead refuses, with or without
-    --commit, touching nothing, and names a runnable fix."""
+def test_dead_holds_an_unborn_clone_holding_files(tmp_path: Path) -> None:
+    """Intent: CONTRACT — context-dead-pushes-an-unborn-clone, WP-03 (undo 934377e8's
+    refusal): files in an unborn clone have no history to publish; the hold keeps them
+    byte-intact, so dead needs no refusal and pushes nothing."""
     service, store, lib_path = _unborn_lib(tmp_path)
     (lib_path / "AGENTS.md").write_text("scaffold\n")
 
-    with pytest.raises(DeadReviewRequiredError, match=r"\nfix: mv \S*lib"):
-        service.dead("proj", commit=commit)
+    service.dead("proj", commit=True)  # consent: the review gate still guards untracked
 
-    assert (lib_path / "AGENTS.md").read_text() == "scaffold\n"
-    assert store.get("proj").state == ContextState.ALIVE  # type: ignore[union-attr]
+    held = list(tmp_path.glob("ws/.dadaia/reaped/*/repos/lib/AGENTS.md"))
+    assert [p.read_text() for p in held] == ["scaffold\n"]
+    assert store.get("proj").state == ContextState.DEAD  # type: ignore[union-attr]

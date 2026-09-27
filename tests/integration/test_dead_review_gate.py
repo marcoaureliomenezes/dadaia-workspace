@@ -188,16 +188,12 @@ def test_dead_refuses_untracked_then_commit_secret_free_pushes_and_planted_secre
     assert "auto-sync before dead" not in log3.stdout
 
 
-def test_dead_proceeds_gitignored_clean_tree_and_readonly_objects_real_git(
+def test_dead_holds_a_gitignored_and_a_clean_tree_real_git(
     tmp_path: Path, workspace_root: Path
 ) -> None:
-    """Three "dead() proceeds" scenarios, each with its own repo/remote fixture:
+    """Two "dead() proceeds" scenarios (WP-03 #C1: each repo is HELD, not deleted):
     (1) a gitignored file is NOT untracked-for-review, so the gate stays silent even
-    without --commit; (2) a clean tree (only tracked content) proceeds without
-    --commit; (3) v0.1.50 FR3 (bug
-    context-dead-nonwritable-guard-rejects-standard-git-objects): 0444 loose objects
-    are git-normal — dead() rmtree-chmod-retries with the PLAIN GitSubprocessClient
-    (no _WritableObjectsGitClient workaround needed)."""
+    without --commit; (2) a clean tree (only tracked content) proceeds without --commit."""
     # (1) gitignored file — gate stays silent.
     (tmp_path / "remote1").mkdir()
     remote1 = _bare_remote(tmp_path / "remote1")
@@ -214,6 +210,10 @@ def test_dead_proceeds_gitignored_clean_tree_and_readonly_objects_real_git(
     ctx1 = service1.dead("proj")
     assert ctx1.state == ContextState.DEAD
     assert not repo1.exists()
+    assert (
+        len(list(workspace_root.glob(".dadaia/reaped/*/repos/proj-repo-gitignored/ignored.txt")))
+        == 1
+    )
 
     # (2) clean tree — proceeds without --commit.
     (tmp_path / "remote2").mkdir()
@@ -234,32 +234,4 @@ def test_dead_proceeds_gitignored_clean_tree_and_readonly_objects_real_git(
     ctx2 = service2.dead("proj")
     assert ctx2.state == ContextState.DEAD
     assert not repo2.exists()
-
-    # (3) read-only git loose objects — rmtree-chmod-retry succeeds with the plain client.
-    import os
-
-    (tmp_path / "remote3").mkdir()
-    remote3 = _bare_remote(tmp_path / "remote3")
-    dest = workspace_root / "repos" / "proj-readonly"
-    _clone_with_initial_commit(remote3, dest)
-
-    store3 = FakeContextStore()
-    service3 = SpecContextService(
-        context_store=store3,
-        git_client=GitSubprocessClient(),
-        workspace_root=workspace_root,
-        install_hooks=lambda _repo: None,
-        secret_scan=scan_publish_candidates,
-    )
-    _alive_ctx(store3, "proj-readonly")
-
-    readonly = [
-        p
-        for p in (dest / ".git" / "objects").rglob("*")
-        if p.is_file() and not os.access(p, os.W_OK)
-    ]
-    assert readonly, "precondition: git wrote read-only loose objects"
-
-    result = service3.dead("proj", commit=False)
-    assert result.state is ContextState.DEAD
-    assert not dest.exists()
+    assert len(list(workspace_root.glob(".dadaia/reaped/*/repos/proj-repo-clean/.git"))) == 1

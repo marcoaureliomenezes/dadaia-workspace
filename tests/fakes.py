@@ -82,6 +82,9 @@ class FakeGitClient:
     def unpushed(self, path: Path) -> bool:
         return False
 
+    def unrecoverable(self, path: Path) -> list[str]:
+        return []
+
     def identity_fix(self, path: Path) -> str:
         return ""
 

@@ -8,6 +8,7 @@ import pytest
 pytest.importorskip("fcntl")
 
 import stat  # noqa: E402
+from dataclasses import replace  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 from dadaia_workspace.core.models.spec_context import (  # noqa: E402
@@ -76,15 +77,27 @@ def test_check_clean_state_no_issues(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_inv4_alive_repo_missing_detected_and_not_fixable(tmp_path: Path) -> None:
-    ctx = _ctx("missing", state=ContextState.ALIVE)
-    # do NOT create the repo dir
+def _with_lib(ctx: SpecContextProject) -> SpecContextProject:
+    return replace(ctx, associated_repos=(AssociatedRepo(slug="lib", url="https://x.test/lib"),))
+
+
+@pytest.mark.parametrize("missing", ["missing", "lib"])
+def test_inv4_names_a_missing_main_or_associated_repo_with_the_alive_fix(
+    tmp_path: Path, missing: str
+) -> None:
+    """Intent: CONTRACT — WP-03 #C6: INV-4 iterates all_repos(); its fix is `context alive`."""
+    ctx = _with_lib(_ctx("missing", state=ContextState.ALIVE))
+    present = {"missing", "lib"} - {missing}
+    for slug in present:
+        (tmp_path / "repos" / slug).mkdir(parents=True)
     svc, _ = _make_doctor(tmp_path, [ctx])
-    issues = svc.check()
-    codes = {i.code for i in issues}
-    assert "INV-4" in codes
-    inv4 = next(i for i in issues if i.code == "INV-4")
-    assert inv4.fixable is False
+
+    inv4 = [i for i in svc.check() if i.code == "INV-4"]
+
+    assert [(i.description, i.fixable) for i in inv4] == [
+        (f"Context 'missing' is alive but repo '{missing}' not on disk", False)
+    ]
+    assert inv4[0].fix.endswith("dadaia context alive missing")
 
 
 # ---------------------------------------------------------------------------
@@ -143,26 +156,26 @@ def test_ctx_url_1_table(
 # ---------------------------------------------------------------------------
 
 
-def test_inv5_detected_fixable_fix_removes_stale_repo_and_no_issues_returns_empty(
-    tmp_path: Path,
-) -> None:
-    ctx = _ctx("stale", state=ContextState.DEAD)
-    repo_dir = tmp_path / "repos" / "stale"
+@pytest.mark.parametrize("slug", ["stale", "lib"])
+def test_inv5_holds_a_main_or_associated_repo_of_a_dead_context(tmp_path: Path, slug: str) -> None:
+    """Intent: CONTRACT — WP-03 #C5: INV-5 iterates all_repos(); --fix HOLDS, never deletes."""
+    ctx = _with_lib(_ctx("stale", state=ContextState.DEAD))
+    repo_dir = tmp_path / "repos" / slug
     repo_dir.mkdir(parents=True)
+    (repo_dir / "work.txt").write_text("keep\n")
     svc, _ = _make_doctor(tmp_path, [ctx])
-    issues = svc.check()
-    codes = {i.code for i in issues}
-    assert "INV-5" in codes
-    inv5 = next(i for i in issues if i.code == "INV-5")
-    assert inv5.fixable is True
 
-    actions = svc.fix()
+    inv5 = [i for i in svc.check() if i.code == "INV-5"]
+    assert [(i.description, i.fixable) for i in inv5] == [
+        (f"Context 'stale' is dead but repo '{slug}' is on disk", True)
+    ]
+
+    svc.fix()
+
+    held = list(tmp_path.glob(f".dadaia/reaped/*/repos/{slug}/work.txt"))
+    assert [p.read_text() for p in held] == ["keep\n"]
     assert not repo_dir.exists()
-    assert any("stale" in a for a in actions)
-
-    # No issues left ⇒ a second fix() pass returns an empty action list.
-    second_actions = svc.fix()
-    assert second_actions == []
+    assert svc.fix() == []
 
 
 # ---------------------------------------------------------------------------

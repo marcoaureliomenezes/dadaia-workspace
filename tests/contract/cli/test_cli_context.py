@@ -171,19 +171,6 @@ def test_context_error_matrix(workspace: Path, invoke_args: list[str]) -> None:
     assert result.exit_code != 0
 
 
-def test_context_create_duplicate_and_dead_requires_alive(workspace: Path) -> None:
-    """A duplicate create fails, and (AC-T10d-2) dead <name> fails if the context is
-    not ALIVE — both against the same DEAD context."""
-    seed_dead_context(workspace, "alpha", "alpha", "https://x.test/alpha.git")
-    result = _runner.invoke(
-        app, ["context", "create", "alpha", "--main-repo", "https://x.test/alpha.git"]
-    )
-    assert result.exit_code != 0
-
-    result = _runner.invoke(app, ["context", "dead", "alpha"])
-    assert result.exit_code != 0
-
-
 def test_context_uninitialized_workspace_and_v1_workspace_exit_nonzero(
     tmp_path_factory: pytest.TempPathFactory, workspace: Path, monkeypatch
 ) -> None:

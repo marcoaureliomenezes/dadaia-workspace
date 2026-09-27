@@ -91,25 +91,9 @@ class DeadSecretFoundError(DadaiaError):
 
 
 class DeadUnpushedCommitsError(DadaiaError):
-    """Raised when a repo in the set has local commits and NO remote to receive them
-    (A16.2).
-
-    FR16: ``dead()`` refuses when **any** repo — main or associated — is dirty or
-    unpushed, naming which one, and checks every repo in the set BEFORE acting on any
-    (no partial dead: a later repo's refusal must never follow an earlier repo already
-    being synced and removed).
-
-    ``unpushed`` is deliberately narrow: ``has_commits() and not has_remote()`` —
-    commits that can genuinely never reach anywhere, not merely "ahead of the last
-    push". dead()'s own Phase 2 (below) already auto-syncs and pushes pending commits
-    whenever a remote exists — including the scaffold commit alive() itself just made
-    (always locally unpushed by design, on every fresh repo). Refusing on
-    "commits ahead of upstream" regardless of ``has_remote()`` would
-    therefore make dead() refuse right after every ordinary alive()-then-dead() call —
-    a false-positive landmine, not a safety net. Only the truly unrecoverable case
-    (commits with no remote at all) refuses; a remote-backed repo is left to Phase 2's
-    existing auto-push.
-    """
+    """Raised when removing a repo would lose work no remote holds: local commits with
+    no remote, a linked worktree, or a non-HEAD branch origin lacks (FR16, A16.2).
+    HEAD's own unpushed commits are not refused — Phase 2 pushes them."""
 
 
 def _now() -> str:
@@ -675,7 +659,7 @@ class SpecContextService:
         No untracked files ⇒ no-op (clean-tree / tracked-only path unchanged).
         Untracked files + not *commit* ⇒ raise DeadReviewRequiredError (refuse).
         Untracked files + *commit* ⇒ secret-scan their content; any match raises
-        DeadSecretFoundError. This runs before any commit/push/rmtree so a refusal
+        DeadSecretFoundError. This runs before any commit/push/hold so a refusal
         leaves every repo untouched (A16.2: called from dead()'s preflight sweep over
         the whole set — main and every associated repo alike — before any of them is
         acted on). *repo_slug* is folded into every raised message so a multi-repo
@@ -722,7 +706,7 @@ class SpecContextService:
             )
 
     def dead(self, name: str, *, commit: bool = False) -> SpecContextProject:
-        """Transition a context from ALIVE to DEAD; sets dead_since, removes every repo.
+        """Transition a context from ALIVE to DEAD; sets dead_since, holds every repo.
 
         FR16/A16.2: covers the whole set — the main repo, then every associated repo
         (``SpecContextProject.all_repos()``, the one accessor, A15.3) — in **two**
@@ -756,7 +740,7 @@ class SpecContextService:
             )
 
         # Back-fill every URL from the on-disk origin while the repos still exist
-        # (FR-W2-03 b), BEFORE the rmtree below — a DEAD record stays re-obtainable.
+        # (FR-W2-03 b), BEFORE the hold below — a DEAD record stays re-obtainable.
         ctx = self._backfilled(ctx)
         repo_paths = [(repo.slug, self._repo_path(repo.slug)) for repo in ctx.all_repos()]
 
@@ -772,21 +756,15 @@ class SpecContextService:
                     + git_line(repo_path, "remote", "add", "origin", "<clone-url>")
                 )
             if repo_path.exists() and self._git.is_git_root(repo_path):
-                if not self._git.has_commits(repo_path) and self._git.is_dirty(repo_path):
-                    raise DeadReviewRequiredError(
-                        f"Context '{name}': repo '{slug}' has no commits yet holds files "
-                        "dead() would destroy — commit and push them to a reachable "
-                        "remote, or move the checkout out. Nothing was touched.\nfix: "
-                        + shell_line("mv", str(repo_path), "<keep-dir>")
-                    )
                 self._enforce_dead_review_gate(name, repo_path, commit=commit, repo_slug=slug)
-                if self._git.has_commits(repo_path) and not self._git.has_remote(repo_path):
+                lost = self._git.unrecoverable(repo_path)
+                if tree := sweep.linked_worktree(self._workspace_root, repo_path):
+                    lost.append(git_line(tree, "worktree", "move", str(tree), "<keep-dir>"))
+                if lost:
                     raise DeadUnpushedCommitsError(
-                        f"Context '{name}': repo '{slug}' at '{repo_path}' has local "
-                        "commits and no remote configured to receive them. dead() "
-                        "refuses to remove it — configure a remote and push first, "
-                        "then retry. Nothing was touched.\nfix: "
-                        + git_line(repo_path, "remote", "add", "origin", "<clone-url>")
+                        f"Context '{name}': repo '{slug}' holds {len(lost)} linked worktree(s) "
+                        f"or unpushed branch(es) dead() would lose. Nothing was touched.\n"
+                        f"fix: {lost[0]}"
                     )
                 if self._git.has_commits(repo_path) and (
                     self._git.is_dirty(repo_path) or self._git.unpushed(repo_path)
@@ -806,7 +784,7 @@ class SpecContextService:
                             + git_line(repo_path, "checkout", "-b", flow.work_pattern)
                         )
 
-        # Phase 2 — git sync + rmtree for every repo. Races are accepted by the
+        # Phase 2 — git sync + hold for every repo. Races are accepted by the
         # NO-LOCKS doctrine.
         branch_before_sync: str | None = None
         for slug, repo_path in repo_paths:
@@ -825,7 +803,7 @@ class SpecContextService:
                 except GitSyncError as exc:
                     lead = f"Git sync failed for context '{name}' repo '{slug}'; nothing was removed.\n"
                     raise GitSyncError(f"{lead}{exc}") from exc
-            sweep.rmtree(repo_path)
+            sweep.hold(self._workspace_root, repo_path, f"repos/{slug}")
 
         dead_ctx = SpecContextProject(
             name=ctx.name,

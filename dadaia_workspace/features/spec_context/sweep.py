@@ -31,6 +31,7 @@ import os
 import shutil
 import stat
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 
 __all__ = ["guarded", "move", "mtime", "remove", "rmtree", "walk"]
@@ -86,19 +87,20 @@ def _is_gitfile(entry: Path) -> bool:
     return entry.name == ".git" and entry.is_file() and not entry.is_symlink()
 
 
-def _holds_worktree(workspace_root: Path, target: Path) -> bool:
-    """True when *target* sits inside a linked worktree or its subtree holds one — an
-    rmtree of ``tmp/<agent>/<day>/`` kills every worktree below it. Local and cheap: no
-    git call, symlinks never followed."""
+def linked_worktree(workspace_root: Path, target: Path) -> Path | None:
+    """The linked worktree *target* sits inside or whose subtree holds one — an rmtree
+    of ``tmp/<agent>/<day>/`` kills every worktree below it. Local and cheap: no git
+    call, symlinks never followed."""
     root, here = workspace_root.resolve(), target.parent.resolve()
     for ancestor in (here, *here.parents):
         if ancestor == root:
             break
         if _is_gitfile(ancestor / ".git"):
-            return True
+            return ancestor
     if target.is_symlink() or not target.is_dir():
-        return False
-    return any(".git" in files and _is_gitfile(Path(d) / ".git") for d, _, files in os.walk(target))
+        return None
+    trees = (Path(d) for d, _, files in os.walk(target) if ".git" in files)
+    return next((d for d in trees if _is_gitfile(d / ".git")), None)
 
 
 def _exists(target: Path) -> bool:
@@ -130,7 +132,7 @@ def remove(workspace_root: Path, target: Path, label: str) -> str | None:
         return None
     if not _inside(workspace_root, target):
         return _OUTSIDE.format(label=label)
-    if _holds_worktree(workspace_root, target):
+    if linked_worktree(workspace_root, target):
         return _WORKTREE.format(label=label)
     if target.is_symlink() or target.is_file():
         try:
@@ -142,6 +144,21 @@ def remove(workspace_root: Path, target: Path, label: str) -> str | None:
     else:
         return None
     return f"deleted '{label}'"
+
+
+#: The zone the reaper HOLDS what it takes off the working tree. Deletion is reserved to
+#: TTL expiry of this zone, so no scan verdict ever deletes anything directly — the shape
+#: behind the CRITICAL doctor-ptr-gc-deletes-valid-lock-free-bind.
+REAPED_ZONE = "reaped"
+
+
+def hold(workspace_root: Path, target: Path, label: str, *, note: str = "") -> str | None:
+    """:func:`move` *target* to ``.dadaia/reaped/<YYYYMMDD>/<workspace-relative path>``,
+    the one hold: the origin path is the record of where the entry came from."""
+    day = datetime.now(tz=UTC).strftime("%Y%m%d")
+    rel = target.relative_to(workspace_root)
+    held = workspace_root / ".dadaia" / REAPED_ZONE / day / rel
+    return move(workspace_root, target, held, label, note=note)
 
 
 def move(
@@ -165,7 +182,7 @@ def move(
         return None
     if not _inside(workspace_root, target) or not _inside(workspace_root, destination):
         return _OUTSIDE.format(label=label)
-    if _holds_worktree(workspace_root, target):
+    if linked_worktree(workspace_root, target):
         return _WORKTREE.format(label=label)
     destination.parent.mkdir(parents=True, exist_ok=True)
     stem, n = destination.name, 0

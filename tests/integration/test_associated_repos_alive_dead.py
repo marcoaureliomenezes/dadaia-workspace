@@ -255,8 +255,8 @@ def test_dead_refuses_on_associated_repo_with_local_commits_and_no_remote(
 
 
 def test_dead_removes_every_clean_repo_in_the_set(tmp_path: Path, workspace_root: Path) -> None:
-    """The full multi-repo happy path: main + 2 associated, all clean, dead() removes
-    all three and transitions the context to DEAD."""
+    """WP-03 #C1: main + 2 associated, all clean, dead() HOLDS all three under
+    .dadaia/reaped/ (never deletes) and transitions the context to DEAD."""
     main_remote = _bare_remote(tmp_path, "main-remote.git")
     assoc1_remote = _bare_remote(tmp_path, "assoc1-remote.git")
     assoc2_remote = _bare_remote(tmp_path, "assoc2-remote.git")
@@ -290,9 +290,10 @@ def test_dead_removes_every_clean_repo_in_the_set(tmp_path: Path, workspace_root
     ctx = service.dead("proj")
 
     assert ctx.state == ContextState.DEAD
-    assert not main_path.exists()
-    assert not assoc1_path.exists()
-    assert not assoc2_path.exists()
+    for path in (main_path, assoc1_path, assoc2_path):
+        assert not path.exists()
+        held = list(workspace_root.glob(f".dadaia/reaped/*/repos/{path.name}/README.md"))
+        assert len(held) == 1, path.name
     assert ctx.associated_repos == (
         AssociatedRepo(slug="assoc1-repo", url=str(assoc1_remote)),
         AssociatedRepo(slug="assoc2-repo", url=str(assoc2_remote)),

@@ -148,7 +148,7 @@ def test_alive_backfills_repo_url_from_origin_remote(
 
 
 @pytest.mark.skipif(not _HAS_GIT, reason="git not available")
-def test_dead_backfills_repo_url_before_rmtree(
+def test_dead_backfills_repo_url_before_the_hold(
     store: FakeContextStore, workspace_root: Path, tmp_path: Path
 ) -> None:
     upstream = tmp_path / "upstream.git"

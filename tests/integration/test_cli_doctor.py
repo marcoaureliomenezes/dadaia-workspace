@@ -36,14 +36,9 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:
     return tmp_path
 
 
-def test_doctor_detects_and_fixes_dead_context_stale_repo_clean_run_non_crash(
-    workspace: Path,
-) -> None:
-    """INV-5: a DEAD context's stale repo dir is detected (non-crashing clean run
-    folded in), then --fix removes it."""
-    result = _runner.invoke(app, ["doctor"])
-    assert result.exit_code in (0, 1)  # ok or some invariant flag, but not crash
-
+def test_doctor_detects_and_holds_a_dead_contexts_stale_repo(workspace: Path) -> None:
+    """INV-5 (WP-03 #C5): a DEAD context's stale repo dir is reported, then --fix HOLDS
+    it under .dadaia/reaped/ — never deletes it."""
     states = workspace / ".dadaia" / "states"
     ctx_data = {
         "schema_version": "2",
@@ -63,13 +58,18 @@ def test_doctor_detects_and_fixes_dead_context_stale_repo_clean_run_non_crash(
     (states / "spec_contexts.json").write_text(json.dumps(ctx_data))
     stale_repo = workspace / "repos" / "stale-ctx"
     stale_repo.mkdir(parents=True)
+    (stale_repo / "work.txt").write_text("keep\n")
 
     detect_result = _runner.invoke(app, ["doctor"])
     # Exit-code truthfulness (validation-029 F-04): issues found => non-zero.
     assert detect_result.exit_code == 1, detect_result.output
-    assert "stale-ctx" in detect_result.output or "INV-5" in detect_result.output
+    assert "Context 'stale-ctx' is dead but repo 'stale-ctx' is on disk" in " ".join(
+        detect_result.output.split()
+    )
 
     fix_result = _runner.invoke(app, ["doctor", "--fix"])
     # All issues repaired in the same run => healthy exit 0.
     assert fix_result.exit_code == 0, fix_result.output
     assert not stale_repo.exists()
+    held = list(workspace.glob(".dadaia/reaped/*/repos/stale-ctx/work.txt"))
+    assert [p.read_text() for p in held] == ["keep\n"]

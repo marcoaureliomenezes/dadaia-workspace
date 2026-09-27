@@ -59,11 +59,6 @@ _DETAIL = {
 }
 _CANONICAL = frozenset({FindingVerdict.CANON, FindingVerdict.OPERATOR, FindingVerdict.REAPED})
 
-#: The zone the reaper HOLDS what it takes off the working tree. Deletion is reserved to
-#: TTL expiry of this zone, so no scan verdict ever deletes anything directly — the shape
-#: behind the CRITICAL doctor-ptr-gc-deletes-valid-lock-free-bind.
-REAPED_ZONE = "reaped"
-
 #: Directory names that end the repo-tree walk: a nested VCS/venv/dependency tree is
 #: never ours to classify and is where the walk's cost would otherwise live.
 _REPO_WALK_PRUNED: frozenset[str] = frozenset({".git", ".venv", "node_modules"})
@@ -219,14 +214,14 @@ class DoctorService:
 
         # INV-4 (v2): ALIVE context must have repo on disk
         for ctx in contexts:
-            if ctx.state == ContextState.ALIVE:
-                repo_path = self._repos_dir() / ctx.repo_slug
-                if not repo_path.exists():
+            for repo in ctx.all_repos() if ctx.state == ContextState.ALIVE else ():
+                if not (self._repos_dir() / repo.slug).exists():
                     issues.append(
                         DoctorIssue(
                             code="INV-4",
-                            description=f"Context '{ctx.name}' is alive but repo '{ctx.repo_slug}' not on disk",
+                            description=f"Context '{ctx.name}' is alive but repo '{repo.slug}' not on disk",
                             fixable=False,
+                            fix=fix_line(self._workspace_root, "context", "alive", ctx.name),
                         )
                     )
 
@@ -251,13 +246,12 @@ class DoctorService:
 
         # INV-5 (v2): DEAD context must not have repo on disk
         for ctx in contexts:
-            if ctx.state == ContextState.DEAD:
-                repo_path = self._repos_dir() / ctx.repo_slug
-                if repo_path.exists():
+            for repo in ctx.all_repos() if ctx.state == ContextState.DEAD else ():
+                if (self._repos_dir() / repo.slug).exists():
                     issues.append(
                         DoctorIssue(
                             code="INV-5",
-                            description=f"Context '{ctx.name}' is dead but repo '{ctx.repo_slug}' is on disk",
+                            description=f"Context '{ctx.name}' is dead but repo '{repo.slug}' is on disk",
                             fixable=True,
                         )
                     )
@@ -493,7 +487,7 @@ class DoctorService:
                 verdict = FindingVerdict.EXPIRED
                 days = timedelta(seconds=age).days
                 detail = f"(mtime {days}d > ttl {timedelta(seconds=zone.ttl_seconds).days}d)"
-            elif zone.name == REAPED_ZONE:
+            elif zone.name == sweep.REAPED_ZONE:
                 # Held, not slop and not expired: report where it came from and how long
                 # the operator still has to take it back.
                 verdict = FindingVerdict.REAPED
@@ -552,18 +546,11 @@ class DoctorService:
                 )
         actions.extend(self._reap(findings))
         for ctx in self._contexts():
-            repo_path = self._repos_dir() / ctx.repo_slug
-            if ctx.state is ContextState.DEAD and repo_path.exists():
-                actions.extend(self._reap_dead_repo(ctx, repo_path))
+            for repo in ctx.all_repos() if ctx.state is ContextState.DEAD else ():
+                if (repo_path := self._repos_dir() / repo.slug).exists():
+                    actions.extend(self._reap_dead_repo(ctx, repo_path))
         actions.extend(self._delete(findings, FindingVerdict.EXPIRED))
         return actions
-
-    def _reaped_destination(self, target: Path) -> Path:
-        """``.dadaia/reaped/<YYYYMMDD>/<workspace-relative-path>`` — the origin path is the
-        record of where the entry came from, so nothing else has to be written down."""
-        day = datetime.now(tz=UTC).strftime("%Y%m%d")
-        rel = target.relative_to(self._workspace_root)
-        return self._dadaia / REAPED_ZONE / day / rel
 
     def _reap(self, findings: tuple[Finding, ...]) -> list[str]:
         """MOVE every slop entry into the reaped zone. Never deletes."""
@@ -571,13 +558,7 @@ class DoctorService:
         for finding in findings:
             if finding.verdict is not FindingVerdict.SLOP:
                 continue
-            step = partial(
-                sweep.move,
-                self._workspace_root,
-                finding.target,
-                self._reaped_destination(finding.target),
-                finding.path,
-            )
+            step = partial(sweep.hold, self._workspace_root, finding.target, finding.path)
             actions.extend(sweep.guarded(finding.code, finding.path, step))
         return actions
 
@@ -590,19 +571,14 @@ class DoctorService:
 
         The leftover is MOVED, like every other reaped entry: a DEAD context whose repo is
         still on disk is exactly the case where an rmtree used to be irreversible."""
-        label = f"repos/{ctx.repo_slug}"
+        label = f"repos/{repo_path.name}"
         if repo_path.resolve().parent != self._repos_dir().resolve():
             return [f"INV-5: skipped '{label}' (outside repos/)"]
         current = self._store.get(ctx.name)
         if current is None or current.state is not ContextState.DEAD:
             return []
         step = partial(
-            sweep.move,
-            self._workspace_root,
-            repo_path,
-            self._reaped_destination(repo_path),
-            label,
-            note=f" (context {ctx.name})",
+            sweep.hold, self._workspace_root, repo_path, label, note=f" (context {ctx.name})"
         )
         return sweep.guarded("INV-5", label, step)
 

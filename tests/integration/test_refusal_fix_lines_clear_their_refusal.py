@@ -629,6 +629,15 @@ def _dead_no_identity(world: World) -> list[str]:
     return ["context", "dead", "proj"]
 
 
+def _unpushed_side_branch(world: World) -> list[str]:
+    """WP-03 #C1: a local branch other than HEAD's carries a commit origin lacks."""
+    _published(world)
+    world.git(world.repo, "checkout", "-q", "-b", "feature/1.0.0", "origin/develop")
+    world.commit("notes.md", "n\n")
+    world.git(world.repo, "checkout", "-q", "--detach", "origin/main")
+    return ["context", "dead", "proj"]
+
+
 def _dead_twice(world: World) -> list[str]:
     """Review M-A: dead on a DEAD context."""
     world.seed(_constitution())
@@ -729,11 +738,13 @@ SITES: dict[str, tuple[Case, ...] | Skip] = {
     ),
     "service.SpecContextService.dead#0": (Case(_dead_twice, _dead_done),),
     "service.SpecContextService.dead#1": (Case(_no_origin, _dead_done),),
-    "service.SpecContextService.dead#2": (Case(_unborn_dirty, _dead_done),),
-    "service.SpecContextService.dead#3": (Case(_commits_no_remote, _dead_done),),
-    "service.SpecContextService.dead#4": (Case(_dead_no_identity, _dead_done),),
-    "service.SpecContextService.dead#5": (Case(_dirty_on_integration, _dead_via_work),),
-    "service.SpecContextService.dead#6": (
+    "service.SpecContextService.dead#2": (
+        Case(_unpushed_side_branch, _dead_done),
+        Case(_commits_no_remote, _dead_done),
+    ),
+    "service.SpecContextService.dead#3": (Case(_dead_no_identity, _dead_done),),
+    "service.SpecContextService.dead#4": (Case(_dirty_on_integration, _dead_via_work),),
+    "service.SpecContextService.dead#5": (
         Case(
             _dead_denylisted,
             _dead_done,
@@ -857,8 +868,8 @@ def test_every_fix_line_prints_on_one_line_without_a_tty(tmp_path: Path) -> None
     world = World(tmp_path / ("d" * 90))
     _unborn_dirty(world)
     fix = _single_fix(world.cli("context", "dead", "proj"))
-    assert fix.endswith("'<keep-dir>'") or fix.endswith("<keep-dir>"), fix
-    assert re.search(re.escape(str(world.repo)), fix)
+    assert fix.endswith("context dead proj --commit"), fix
+    assert re.search(re.escape(str(world.ws)), fix)
 
 
 def test_the_gate_is_read_only_and_its_rewrite_fix_uncommits_only_unpublished_work(
