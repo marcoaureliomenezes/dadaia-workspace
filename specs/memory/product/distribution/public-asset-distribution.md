@@ -36,7 +36,7 @@ sources:
 ## Doctor
 
 - `dadaia public doctor` compares source against staging, then staging against each projection, printing `[ok]`, `[missing]`, `[drift]` or `[foreign]` per file and exiting non-zero on any mismatch; a persona compares against its rendered form, so an applied policy reads `[ok]` and a hand-edit `[drift]`.
-- `SYMLINK-TARGET-1` attests every ledgered link: a symlink resolving to its `.agents/` path or a hash-equal copy, anything else one finding with `fix: .dadaia/.venv/bin/dadaia public install --force`.
+- `SYMLINK-TARGET-1` attests every ledgered link: a symlink resolving to its `.agents/` path or a hash-equal copy, anything else one finding with `fix: <cli> public install --force` (the absolute venv CLI, [[sdd-gate-v3]]).
 - The privacy gate runs over source and staged assets and reports `[ok] public-privacy` only on a clean surface; CI treats it as a release gate.
 - `install` and `doctor` cover the harnesses in `.dadaia/states/harness_profile.json` plus the shared authored set; `dadaia harness add <name>` is the one way a harness joins ([[workspace-init]]); an unledgered entry inside a harness directory is `dadaia doctor`'s `WS-<harness>-slop` ([[workspace-doctor]]).
 

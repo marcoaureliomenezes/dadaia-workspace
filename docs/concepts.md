@@ -7,8 +7,8 @@ is `dadaia_workspace/public/data/AGENTS.md`, and the walkthrough is
 
 ## Context
 
-<!-- derived-from: spec-context-project sha256:48e84f1a6370 -->
-<!-- derived-from: context-management sha256:2210e0422834 -->
+<!-- derived-from: spec-context-project sha256:47c11b26b98f -->
+<!-- derived-from: context-management sha256:dc1a239f4970 -->
 
 A *context* — a Spec Context Project — is one canonical `specs/` tree owned by one
 main repository, the unit for memory, backlog, bugs, releases, reports and handoffs.
@@ -28,7 +28,7 @@ memory injection into the session.
 
 ## Release and candidate
 
-<!-- derived-from: release-lifecycle sha256:ebb8441fde08 -->
+<!-- derived-from: release-lifecycle sha256:a31b50804ef1 -->
 
 Exactly one *release* is live, `specs/releases/<M.m.p>/`, with open scope; it grows by
 *candidates*, each a closed-scope cycle whose `SPEC.md`, `PLAN.md` and `TASKS.md` sit
@@ -41,9 +41,9 @@ is the last published one plus one patch and moves only at an operator-approved 
 
 ## The flow
 
-<!-- derived-from: release-lifecycle sha256:ebb8441fde08 -->
+<!-- derived-from: release-lifecycle sha256:a31b50804ef1 -->
 <!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
-<!-- derived-from: audits-canon sha256:20bf48c21012 -->
+<!-- derived-from: audits-canon sha256:87599de34ac0 -->
 
 Every demand takes one of two arms. **Arm A**, a feature, leaves through a candidate:
 the picked backlog and bug set, the as-is review (one As-is verdict — DELETE, REBUILD,
@@ -59,7 +59,7 @@ carry the ordered work, and the ledger scripts move the records.
 
 ## The gate
 
-<!-- derived-from: sdd-gate-v3 sha256:7a6e11d84264 -->
+<!-- derived-from: sdd-gate-v3 sha256:d5b8fcce9e9e -->
 
 The *gate* is one PreToolUse pre-gate evaluating root whitelist, venv guard and SDD
 gate in that order — first block wins, and a policy that raises is ALLOW. It blocks
@@ -76,10 +76,10 @@ gate — a refusal whose fix is itself refused (a Stall) cannot ship.
 
 ## Memory
 
-<!-- derived-from: context-management sha256:2210e0422834 -->
-<!-- derived-from: workspace-doctor sha256:3fa0c321c7b0 -->
-<!-- derived-from: release-lifecycle sha256:ebb8441fde08 -->
-<!-- derived-from: audits-canon sha256:20bf48c21012 -->
+<!-- derived-from: context-management sha256:dc1a239f4970 -->
+<!-- derived-from: workspace-doctor sha256:8e52123b79e7 -->
+<!-- derived-from: release-lifecycle sha256:a31b50804ef1 -->
+<!-- derived-from: audits-canon sha256:87599de34ac0 -->
 
 *Memory* is current product truth: the atoms under `specs/memory/product/**`, plus
 `ARCHITECTURE.md` (its `## Tech Stack` section included) and `QUALITY.md`, whose
@@ -111,7 +111,7 @@ superseded deferred rejected`.
 
 ## Audits
 
-<!-- derived-from: audits-canon sha256:20bf48c21012 -->
+<!-- derived-from: audits-canon sha256:87599de34ac0 -->
 
 An *audit* is the only full-tree inspection lane, every other quality boundary being
 diff-scoped: a committed folder `specs/audits/<YYYYMMDD>-<slug>/` holding `AUDIT.md` —

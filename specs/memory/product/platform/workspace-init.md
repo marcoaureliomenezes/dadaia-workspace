@@ -1,8 +1,8 @@
 ---
 slug: workspace-init
 title: workspace-init
-tldr: Level 1 — uvx dadaia-workspace init [DIR] provisions venv, zones, law, one harness; re-init upgrades; --repo adds level 2; next step derived from disk.
-summary: dadaia init fills one plan from flags or TTY prompts, provisions the venv, the registry's init/install zones, the shared skills root and one harness's projection, seeds the states and stages and installs public assets in at most twelve lines of output naming the absolute venv CLI; on an existing workspace it upgrades an older venv, reports an equal one and refuses a newer one; with --repo it delegates to context create; every onboarding caller prints the one derived next step.
+tldr: Level 1 — uvx dadaia-workspace init [DIR] provisions venv, zones, law, one harness; re-init upgrades; --repo adds level 2; next step from one ordered step list.
+summary: dadaia init fills one plan from flags or TTY prompts, provisions the venv, the registry's init/install zones, the shared skills root and one harness's projection, seeds the states and stages and installs public assets in at most twelve lines of output naming the absolute venv CLI; on an existing workspace it upgrades an older venv, reports an equal one and refuses a newer one; with --repo it delegates to context create; one ordered onboarding step list, each step a real-state predicate plus one built fix line, gives the next step every onboarding caller prints.
 tags: [workspace, init, setup, upgrade, onboarding]
 sources:
   - dadaia_workspace/cli/commands/init.py
@@ -15,8 +15,8 @@ sources:
 
 ## Onboarding levels
 
-- Level 1 is the workspace (`init`), level 2 a Spec Context Project (`context create`, [[context-management]]), level 3 its canonical specs plus the first-pass audit (`specs init`, [[specs-migration]]; first pass, [[audits-canon]]).
-- A new project in an existing workspace is levels 2 and 3; nothing records the level reached — it is derived from disk on every read.
+- Level 1 is the workspace (`init`); level 2 a Spec Context Project (`context create`, [[context-management]]) and the session's bind; level 3 its specs — 3a canonical specs (`specs init`, [[specs-migration]]), 3b the first pass ([[audits-canon]]), 3c the project publication (`context baseline`, [[context-management]]).
+- A new project in an existing workspace is levels 2 and 3; nothing records the level reached — it is derived from real state on every read.
 
 ## Bootstrap
 
@@ -39,27 +39,30 @@ sources:
 ## Upgrade
 
 - Re-running `init` on an existing workspace is the upgrade; the venv's installed version is compared with the running distribution by one decider.
-- An older venv is reinstalled from the running distribution and reconciled, printing `upgraded A -> B`; a failed reconcile exits 1 with `fix: <venv cli> reconcile --expect-version B`.
+- An older venv is reinstalled from the running distribution and reconciled, printing `upgraded A -> B`; a failed reconcile exits 1 with `fix: <cli> reconcile --expect-version B`.
+- Every init also refreshes the pre-push hook of every ALIVE repo whose installed hook is byte-identical to one the library shipped; an operator's own hook is kept ([[context-management]]).
 - An equal venv prints `already at A` and writes no file under the workspace.
-- A newer venv is refused before any write, exit 1, `fix: uvx dadaia-workspace@A init <ws>`.
+- A newer venv is refused before any write, exit 1, `fix: <cli> init <ws>` — the workspace's own newer CLI.
 - Versions order as `M.m.p` with an optional local segment sorting after its base.
 - The upgrade never writes a project repo; `<cli> specs init --context <ctx>`, re-run per project, then refreshes that project's specs law ([[specs-migration]]).
 
 ## First project
 
 - `--repo <url>` with repeatable `--associated-repo <url>` calls `context create` and produces exactly what it produces — cloned, hooked and ALIVE, never bound: it writes no session record and prints no `--print-env` line; only `context bind` binds ([[context-management]]).
-- A re-run naming a context already holding that main-repo URL reuses it through `context alive`; any failure exits 1 with `fix: uvx dadaia-workspace init <dir> --harness <h> --repo <a reachable clone URL>`.
+- A re-run naming a context already holding that main-repo URL reuses it through `context alive`; any failure exits 1 with the same `fix:` line `context create` prints — the create invocation, every `--associated-repo` kept, the failed URL a `<clone-url>` placeholder.
 
 ## Onboarding status
 
-- `dadaia_workspace/features/workspace/onboarding.py` derives the next unmet step from real state (files, git, the session registry), never from a stamp: no ALIVE context -> `context` (`<cli> context create <name> --main-repo <clone-url>`); an unbound resolvable session -> `bind` (`<cli> context bind <name>`); a main repo whose `specs/` is not current -> `specs` (`<cli> specs init --context <name> --replace-foreign`); a memory whose `ARCHITECTURE.md` or `QUALITY.md` is still the shipped scaffold, or whose catalog holds no atom -> `first-pass` (the `dd-audit-project` first pass, [[audits-canon]]); specs on no remote branch -> `publish` (`<cli> context baseline <name>`); else nothing.
-- `<cli>` is the workspace's absolute venv CLI path (`Scripts\dadaia.exe` under Windows); the text is `Next: <reason>` plus one `fix: <command>` line.
-- A focus context (the one just created, doctored or bound) is judged first, then every ALIVE context in registry order.
-- Four callers print the same text: `init`, `context create`, [[workspace-doctor]]'s `ONBOARDING` finding and the SessionStart injection, unbound or bound (focused on the bound context) ([[context-management]]).
+- `dadaia_workspace/features/workspace/onboarding.py` holds the one ordered step list; each step is an id, a kind — `command` (the fix line is a shell command) or `agent` (it names a skill section and what is pending) — a real-state predicate (files, git, the session registry; never a stamp, never the network) and one fix line.
+- In order: `context` — no ALIVE context (`<cli> context create <name> --main-repo <clone-url>`); `bind` — the caller has a resolvable session id and that session is unbound (`<cli> context bind <name>`), never shown without a session identity; `constitution` (agent) — the `specs/constitution.md` frontmatter does not parse (repair its YAML); `specs` — the main repo's `specs/` is not at the canonical pattern version (`<cli> specs init --context <name>`, plus `--replace-foreign` only for a foreign tree); `first-pass` (agent) — `ARCHITECTURE.md` or `QUALITY.md`, fixed sections stripped, is still a shipped scaffold digest, or the catalog holds no atom (the absolute path of the installed `dd-audit-project` SKILL.md first-pass section plus the pending items, [[audits-canon]]); `publish` — the project is not published: `origin/<integration>` is absent or `specs/constitution.md` is on no `origin` ref (`<cli> context baseline <name>`, [[context-management]]).
+- The next step is the focus context's (the one just created, doctored or bound) first pending step, else the first pending across every ALIVE context in registry order, else none.
+- Its text is `Next (<kind> step <id>): <reason>` plus one `fix: <command>` line; `<cli>` is the absolute venv CLI path built by `fix_line` ([[sdd-gate-v3]]).
+- Four callers print the same text: `init`, `context create`, [[workspace-doctor]]'s `ONBOARDING` finding (its `--json` carrying `step` and `kind`) and the SessionStart injection through one helper, unbound or bound (focused on the bound context) ([[context-management]]).
+- An agent loops on it — run `doctor`, execute the `fix:` line, repeat — from an empty directory to a published project; an end-to-end test drives that loop over local bare remotes.
 
 ## Workspace not found
 
-- A command that needs a workspace and finds none fails with one error: the searched directory, any skipped partial `.dadaia/`, and one `fix:` — `cd <root>` of the running CLI's own workspace when that root is initialized, else `uvx dadaia-workspace init <dir>`.
+- The running CLI's own workspace (the one owning its venv) is resolved first, so a CLI that owns one never fails here; a command that needs a workspace and finds none fails with one error: the searched directory, any skipped partial `.dadaia/`, and `fix: uvx dadaia-workspace init <dir>`.
 
 ## Dependencies
 

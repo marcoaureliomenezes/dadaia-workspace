@@ -32,10 +32,10 @@ sources:
 
 ## The candidate arc
 
-- Definition: the picked backlog and bug set, the as-is review, the mandatory grill, the SPEC by `dd-product-engineer`, PLAN and TASKS by `dd-software-engineer`, one definition commit on `feature/<M.m.p>` ([[agent-orchestration]]).
+- Definition: the picked backlog and bug set, the as-is review, the mandatory grill, the SPEC by `dd-product-engineer`, PLAN and TASKS by `dd-software-engineer`, one definition commit on the work branch (`<work prefix><M.m.p>`, the constitution's `gitflow:`) ([[agent-orchestration]]).
 - The SPEC's `Replaces` names one current behaviour per DELETE or REBUILD row, or `none` with its reason; tasks realizing DELETE/REBUILD rows precede tasks realizing ADD rows, each expand–contract (add the new path, switch consumers, delete the old), each independently green.
 - Implementation: one task reserved `[-]` at a time in its own commit, TDD, local CI preflight, `[x]` only after the reviewer's `APPROVED` on the same commit.
-- Closure, in order: `phase CLOSURE`, memory reconciliation, closure `log` entries, disposition sweep (`backlog.py exit`, `audit.py disposition`/`close`, `bugs.py archive`), artifact GC, the `feature -> develop` PR merged green, then the operator's promote-or-continue choice ([[audits-canon]]).
+- Closure, in order: `phase CLOSURE`, memory reconciliation, closure `log` entries, disposition sweep (`backlog.py exit`, `audit.py disposition`/`close`, `bugs.py archive`), artifact GC, the work -> integration PR merged green, then the operator's promote-or-continue choice ([[audits-canon]]).
 - `SPEC-DOC-047` refuses a task whose write set names `specs/memory`: memory is closure procedure, never a task.
 
 ## The as-is review
@@ -59,7 +59,7 @@ sources:
 
 ## Promote
 
-- Promote is merging `develop` into `main`, then merging the release PR release-please opens there; that PR owns the version, the CHANGELOG section and the tag, and the publish jobs run on it ([[pypi-distribution]]).
+- Promote is merging the integration branch into the principal, then merging the release PR release-please opens there; that PR owns the version, the CHANGELOG section and the tag, and the publish jobs run on it ([[pypi-distribution]]).
 - Release ids are bare SemVer; a context's live version is the first release id when its repo has no tag, else the last tag plus one patch, minted at birth, and moves only at an operator-approved deploy; a repo's own `AGENTS.md` may override the rule (`dd-gitflow-default`).
 
 ## Runtime state

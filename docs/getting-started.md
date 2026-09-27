@@ -6,7 +6,7 @@ the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEX
 ## Install
 
 <!-- derived-from: pypi-distribution sha256:618098346ed6 -->
-<!-- derived-from: workspace-init sha256:37ddb3b8b846 -->
+<!-- derived-from: workspace-init sha256:bc2612c3f80d -->
 
 ```bash
 uvx dadaia-workspace init <dir> --harness claude --repo <url>
@@ -27,7 +27,7 @@ refreshes each project's specs law.
 
 ## Level 1 — the workspace
 
-<!-- derived-from: workspace-init sha256:37ddb3b8b846 -->
+<!-- derived-from: workspace-init sha256:bc2612c3f80d -->
 
 `uvx dadaia-workspace init <dir> --harness claude|codex|kimi-code|cursor|devin|copilot
 [--repo <url>] [--associated-repo <url>]… [--skip-assets]` is the only verb that works
@@ -51,8 +51,8 @@ harness later and `.dadaia/.venv/bin/dadaia harness list` reads the roster.
 
 ## Level 2 — the project
 
-<!-- derived-from: spec-context-project sha256:48e84f1a6370 -->
-<!-- derived-from: context-management sha256:2210e0422834 -->
+<!-- derived-from: spec-context-project sha256:47c11b26b98f -->
+<!-- derived-from: context-management sha256:dc1a239f4970 -->
 
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
 owned by one main repository, optionally spanning associated repositories that live and
@@ -78,7 +78,7 @@ bind, the ctx-inject hook injects the context header, `ARCHITECTURE.md`'s
 
 ## Level 3 — the specs
 
-<!-- derived-from: spec-context-project sha256:48e84f1a6370 -->
+<!-- derived-from: spec-context-project sha256:47c11b26b98f -->
 
 ```bash
 .dadaia/.venv/bin/dadaia specs init --context <ctx> [--replace-foreign]
@@ -94,7 +94,7 @@ branches; a re-run is a no-op.
 
 ## Check compliance — `doctor`
 
-<!-- derived-from: workspace-doctor sha256:3fa0c321c7b0 -->
+<!-- derived-from: workspace-doctor sha256:8e52123b79e7 -->
 
 ```bash
 .dadaia/.venv/bin/dadaia doctor --context <ctx> [--json] [--fix] [--redact]
@@ -120,7 +120,7 @@ a TTL expired.
 
 ## Run the first candidate
 
-<!-- derived-from: release-lifecycle sha256:ebb8441fde08 -->
+<!-- derived-from: release-lifecycle sha256:a31b50804ef1 -->
 <!-- derived-from: backlog-ledger sha256:46382434daf2 -->
 <!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
 

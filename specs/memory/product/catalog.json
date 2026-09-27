@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-26T04:30:52Z",
+  "generated_at": "2026-09-27T03:11:21Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -72,7 +72,7 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 915,
+      "token_estimate": 937,
       "depends_on": [
         "agent-orchestration",
         "sdd-gate-v3",
@@ -102,15 +102,15 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 959,
+      "token_estimate": 965,
       "depends_on": [
         "harness-kimi-code",
         "agentic-entities",
+        "sdd-gate-v3",
         "workspace-init",
         "workspace-doctor",
         "specs-migration",
         "context-management",
-        "sdd-gate-v3",
         "consumer-agent-support",
         "pypi-distribution"
       ],
@@ -342,7 +342,7 @@
         "paradigm",
         "pillars"
       ],
-      "token_estimate": 688,
+      "token_estimate": 755,
       "depends_on": [
         "spec-context-project",
         "context-management",
@@ -379,7 +379,7 @@
         "lifecycle",
         "concurrency"
       ],
-      "token_estimate": 446,
+      "token_estimate": 535,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -482,7 +482,7 @@
       "title": "context-management",
       "area": "platform",
       "tldr": "ALIVE/DEAD registry of a main repo plus associated repos; create clones, hooks and ALIVEs in one step; only context bind binds, naming the session's scope.",
-      "summary": "Spec Context Projects and their repos through one registry and the context verbs — create as onboarding level 2, alive, dead, baseline, the repo set; one resolution authority whose Bind carries the session's scope; bind-driven injection of the tech stack, catalog and help digests; redaction at the render boundary.",
+      "summary": "Spec Context Projects and their repos through one registry and the context verbs — create as onboarding level 2, alive, dead, the anchor-first append-only publish of the main repo (baseline), the repo set; one resolution authority whose Bind carries the session's scope; bind-driven injection of the tech stack, catalog and help digests; redaction at the render boundary.",
       "path": "specs/memory/product/platform/context-management.md",
       "tags": [
         "context",
@@ -490,7 +490,7 @@
         "session",
         "privacy"
       ],
-      "token_estimate": 1443,
+      "token_estimate": 2057,
       "depends_on": [
         "specs-migration",
         "workspace-init",
@@ -556,11 +556,11 @@
         "macos",
         "linux"
       ],
-      "token_estimate": 254,
+      "token_estimate": 339,
       "depends_on": [
         "workspace-init",
-        "ARCHITECTURE",
         "sdd-gate-v3",
+        "ARCHITECTURE",
         "server-registry",
         "public-asset-distribution"
       ],
@@ -596,8 +596,8 @@
       "slug": "specs-migration",
       "title": "specs-migration",
       "area": "platform",
-      "tldr": "specs init brings specs/ to the canon (scaffold, upgrade, or specs-bkp on consent), never committing; specs upgrade walks 6 to 7; migrate lifts registry v1.",
-      "summary": "The verbs that bring persisted state up to what this installation reads — dadaia specs init (onboarding level 3; absent scaffolds, dadaia upgrades, foreign moves to specs-bkp/), dadaia specs upgrade (one live hop, 6 to 7, plus fixed law sections and lossless template repairs; below 6 it refuses without writing) and dadaia migrate (spec_contexts.json v1 to v2, planned, confirmed, atomic).",
+      "tldr": "specs init brings specs/ to the canon and writes the project gitflow, never committing; specs upgrade walks 6 to 7; migrate lifts registry v1.",
+      "summary": "The verbs that bring persisted state up to what this installation reads — dadaia specs init (onboarding level 3a; absent scaffolds, dadaia upgrades, foreign moves to specs-bkp/, the constitution's gitflow block written or kept), dadaia specs upgrade (one live hop, 6 to 7, plus fixed law sections and lossless template repairs; below 6 it refuses without writing) and dadaia migrate (spec_contexts.json v1 to v2, planned, confirmed, atomic).",
       "path": "specs/memory/product/platform/specs-migration.md",
       "tags": [
         "migration",
@@ -606,9 +606,10 @@
         "registry",
         "onboarding"
       ],
-      "token_estimate": 806,
+      "token_estimate": 1088,
       "depends_on": [
         "public-asset-distribution",
+        "sdd-gate-v3",
         "context-management",
         "workspace-doctor",
         "spec-context-project"
@@ -639,13 +640,13 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 1488,
+      "token_estimate": 1706,
       "depends_on": [
         "public-asset-distribution",
+        "sdd-gate-v3",
         "context-management",
         "workspace-init",
         "QUALITY",
-        "sdd-gate-v3",
         "release-lifecycle",
         "specs-migration",
         "audits-canon"
@@ -668,8 +669,8 @@
       "slug": "workspace-init",
       "title": "workspace-init",
       "area": "platform",
-      "tldr": "Level 1 — uvx dadaia-workspace init [DIR] provisions venv, zones, law, one harness; re-init upgrades; --repo adds level 2; next step derived from disk.",
-      "summary": "dadaia init fills one plan from flags or TTY prompts, provisions the venv, the registry's init/install zones, the shared skills root and one harness's projection, seeds the states and stages and installs public assets in at most twelve lines of output naming the absolute venv CLI; on an existing workspace it upgrades an older venv, reports an equal one and refuses a newer one; with --repo it delegates to context create; every onboarding caller prints the one derived next step.",
+      "tldr": "Level 1 — uvx dadaia-workspace init [DIR] provisions venv, zones, law, one harness; re-init upgrades; --repo adds level 2; next step from one ordered step list.",
+      "summary": "dadaia init fills one plan from flags or TTY prompts, provisions the venv, the registry's init/install zones, the shared skills root and one harness's projection, seeds the states and stages and installs public assets in at most twelve lines of output naming the absolute venv CLI; on an existing workspace it upgrades an older venv, reports an equal one and refuses a newer one; with --repo it delegates to context create; one ordered onboarding step list, each step a real-state predicate plus one built fix line, gives the next step every onboarding caller prints.",
       "path": "specs/memory/product/platform/workspace-init.md",
       "tags": [
         "workspace",
@@ -678,7 +679,7 @@
         "upgrade",
         "onboarding"
       ],
-      "token_estimate": 1303,
+      "token_estimate": 1585,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -687,6 +688,7 @@
         "public-asset-distribution",
         "server-registry",
         "harness-kimi-code",
+        "sdd-gate-v3",
         "cross-platform-portability"
       ],
       "sources": [
@@ -714,7 +716,7 @@
         "decisions",
         "governance"
       ],
-      "token_estimate": 882,
+      "token_estimate": 927,
       "depends_on": [
         "agent-orchestration",
         "sdd-gate-v3",
@@ -806,7 +808,7 @@
         "memory",
         "as-is-review"
       ],
-      "token_estimate": 1781,
+      "token_estimate": 1794,
       "depends_on": [
         "sdd-gate-v3",
         "backlog-ledger",
@@ -831,8 +833,8 @@
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "area": "sdd",
-      "tldr": "No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write), one fix line per BLOCK, chokepoints at the push.",
-      "summary": "The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one executable fix line; the pre-push chokepoint enforces the branch contract, the specs canon and the denylist scan over every pushed object, and no CI job calls a model API — the security review is the reviewer's lens before each pull request.",
+      "tldr": "No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write), one fix line each, a gitflow push chokepoint.",
+      "summary": "The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one executable fix line; the pre-push chokepoint enforces the branch contract read from the project gitflow, the specs canon and one secret registry over every pushed object, with one rewrite formula as its fix, and no CI job calls a model API — the security review is the reviewer's lens before each pull request.",
       "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
         "sdd",
@@ -842,10 +844,11 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 1118,
+      "token_estimate": 1832,
       "depends_on": [
         "workspace-doctor",
         "context-management",
+        "specs-migration",
         "release-lifecycle",
         "ARCHITECTURE"
       ],
