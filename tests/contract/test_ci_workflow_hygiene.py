@@ -10,8 +10,8 @@ Intent: CONTRACT — T-047-88: release.yml is gone and its publishing jobs live 
 release.yml behind the single `release_created` gate: no `release:` event, no
 `push: tags`, no hand-rolled tag arithmetic.
 
-Intent: CONTRACT — 0.5.0 c3 rework (regression of 114be682): every ci.yml job that runs
-`dadaia doctor` checks out full history. Size: SMALL.
+Intent: CONTRACT — ci-history-depth-is-decided-per-job: every ci.yml checkout carries
+full history. Size: SMALL.
 
 Intent: CONTRACT — sa-doctor-job-not-a-required-check (AC1.7, ADR 0078): the in-repo
 required-checks file lists every check a PR runs; release.yml reuses ci.yml."""
@@ -450,27 +450,19 @@ def test_pr_source_guard_defaults_when_the_base_has_no_constitution(tmp_path: Pa
     assert _guard_exit("feature/0.5.0", "main", tmp_path) != 0
 
 
-def test_every_ci_job_running_the_doctor_checks_out_full_history() -> None:
-    """Given a push or PR whose live release is in CLOSURE with a memory entry, the
-    Compliance job's doctor judges the memory window over real git history: it passes
-    when the window is reconciled and fails only on a real drift. The judgement
-    (`_release_tree._window_findings`) runs `git diff since..until`, which a depth-1
-    clone cannot resolve — so the job must fetch depth 0."""
+def test_every_ci_checkout_carries_full_history() -> None:
+    """ci-history-depth-is-decided-per-job: one rule, not a per-job choice — every ci.yml
+    checkout fetches depth 0, so no edit to one job can strip the history a suite reads
+    (the Compliance doctor's `git diff since..until` lost it three times)."""
     ci = yaml.safe_load((_WORKFLOWS / "ci.yml").read_text(encoding="utf-8"))
-    doctor_jobs = {
-        name: job
+    checkouts = [
+        (name, (step.get("with") or {}).get("fetch-depth"))
         for name, job in ci["jobs"].items()
-        if any("dadaia doctor" in str(step.get("run", "")) for step in job.get("steps", []))
-    }
-    assert doctor_jobs, "ci.yml runs no `dadaia doctor` step"
-    shallow = [
-        name
-        for name, job in doctor_jobs.items()
-        for step in job["steps"]
+        for step in job.get("steps", [])
         if str(step.get("uses", "")).startswith("actions/checkout@")
-        and (step.get("with") or {}).get("fetch-depth") != 0
     ]
-    assert shallow == [], f"doctor jobs with a shallow checkout: {shallow}"
+    assert len(checkouts) == 13
+    assert [name for name, depth in checkouts if depth != 0] == []
 
 
 def _pr_check_contexts() -> set[str]:
