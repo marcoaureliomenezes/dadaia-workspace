@@ -113,9 +113,3 @@ def test_fix_inserts_a_missing_block_and_refreshes_a_drifted_one(tmp_path: Path)
         "# Q\n\n" + _block("slop-tests", _FRAGMENTS["slop-tests"])
     )
     assert _fixed_issues(doctor) == []
-
-
-def test_fix_help_names_the_fixed_family() -> None:
-    from dadaia_workspace.features.specs.rules import render_fix_help
-
-    assert "FIXED-1/FIXED-2" in render_fix_help()

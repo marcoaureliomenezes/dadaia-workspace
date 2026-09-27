@@ -20,6 +20,8 @@ from dadaia_workspace.features.specs import SpecsDoctor, canon
 pytestmark = pytest.mark.unit
 
 _PUBLIC = Path(__file__).resolve().parents[4] / "dadaia_workspace" / "public"
+#: specs/bugs/AGENTS.md as published at 570af642 (its sha256 is in shipped-hashes.json).
+_SHIPPED_BUGS_LAW = Path(__file__).resolve().parents[3] / "fixtures/shipped/bugs-AGENTS.570af642.md"
 _FIXED_BLOCK = re.compile(
     r"\n*<!-- dadaia:fixed [\w-]+ -->\n.*?<!-- /dadaia:fixed [\w-]+ -->\n", re.S
 )
@@ -37,7 +39,10 @@ def _v6_tree(tmp_path: Path) -> Path:
 
 
 def test_a_v6_tree_ends_v7_with_fixed_sections_and_a_clean_doctor(tmp_path: Path) -> None:
+    """WP-14 #B3/#B4: the hop, then the doctor's repair set — a superseded shipped scoped
+    law (a real published specs/bugs/AGENTS.md) is refreshed too: no TREE-5, no FIXED."""
     specs = _v6_tree(tmp_path)
+    (specs / "bugs" / "AGENTS.md").write_bytes(_SHIPPED_BUGS_LAW.read_bytes())
 
     result = CliRunner().invoke(app, ["specs", "upgrade", "--specs-dir", str(specs)])
 
@@ -46,6 +51,7 @@ def test_a_v6_tree_ends_v7_with_fixed_sections_and_a_clean_doctor(tmp_path: Path
     for rel, _ in FIXED_SECTIONS:
         assert f"fix FIXED-1 {specs / rel}" in result.output
     issues = SpecsDoctor(specs, public_dir=_PUBLIC, templates_dir=_PUBLIC / "templates").check()
+    assert [i.code for i in issues if i.code == "TREE-5" or i.code.startswith("FIXED")] == []
     assert [i.to_dict() for i in issues if i.severity.value == "error"] == []
 
 

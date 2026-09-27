@@ -15,7 +15,7 @@ entry points the bug named, proving the fix is not duplicated per write site (th
 puxadinho this bug forbids): ``specs upgrade`` and ``dadaia doctor --fix``.
 
 Intent: CONTRACT (bug ``symlinked-specs-root-is-followed-by-migration-and-repair``,
-T-044-40).
+T-044-40; sa-specs-upgrade-writes-through-symlinks #B5).
 Size: MEDIUM (CliRunner over the real ``app``, real tmp filesystem).
 Owner: dd-software-engineer
 """
