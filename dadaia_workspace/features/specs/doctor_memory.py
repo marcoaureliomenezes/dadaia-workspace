@@ -16,7 +16,8 @@ from collections.abc import Collection
 from pathlib import Path
 
 from dadaia_workspace.core import frontmatter as _fm
-from dadaia_workspace.core.atomic_write import atomic_write, symlink_fix
+from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.cli_line import materialize_line
 from dadaia_workspace.core.kernel_tunables import MEMORY_SCRIPT
 from dadaia_workspace.core.specs_repair import has_unfilled_angle_placeholders, is_placeholder_atom
 from dadaia_workspace.features.specs import citations, memory_canon, memory_lint
@@ -261,7 +262,7 @@ class MemoryValidator:
                     # The one writer refuses a link (CWE-59), so a link is never advertised
                     # as fixable (CWE-393); its fix materializes the link first.
                     fixable=not path.is_symlink(),
-                    fix=symlink_fix(path) if path.is_symlink() else "",
+                    fix=materialize_line(path, path.resolve()) if path.is_symlink() else "",
                 )
             )
         return issues

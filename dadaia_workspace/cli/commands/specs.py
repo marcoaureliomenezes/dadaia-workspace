@@ -6,6 +6,7 @@ import sys
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import NoReturn
 
 import typer
 
@@ -17,7 +18,7 @@ from dadaia_workspace.cli._specs_resolution import (
 )
 from dadaia_workspace.core import gitflow, specs_version
 from dadaia_workspace.core.atomic_write import SymlinkRefusedError
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import fix_line, materialize_line
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, from_mapping
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.migrate import upgrade as upgrade_feature
@@ -52,10 +53,17 @@ def upgrade(
     resolved = _resolve_specs_dir(specs_dir)
     try:
         result = upgrade_feature.upgrade(resolved, target=target, dry_run=dry_run)
-    except (UpgradeRefused, SymlinkRefusedError) as exc:
+    except SymlinkRefusedError as exc:
+        _refuse_symlink(exc)
+    except UpgradeRefused as exc:
         typer.echo(f"[refused] {exc}", err=True)
         sys.exit(1)
     sys.exit(1 if _echo_upgrade(resolved, result) else 0)
+
+
+def _refuse_symlink(exc: SymlinkRefusedError) -> NoReturn:
+    typer.echo(f"[refused] {exc}\nfix: {materialize_line(exc.path, exc.path.resolve())}", err=True)
+    sys.exit(1)
 
 
 def _repair(specs: Path, *, dry_run: bool) -> tuple[list[SpecsDoctorIssue], list[SpecsDoctorIssue]]:
@@ -166,8 +174,7 @@ def init(
             if _echo_upgrade(target, upgrade_feature.upgrade(target)):
                 raise typer.Exit(1)
         except SymlinkRefusedError as exc:
-            typer.echo(f"[refused] {exc}", err=True)
-            raise typer.Exit(1) from exc
+            _refuse_symlink(exc)
 
     project = name or target.parent.name
     written = canon.scaffold(target, project_name=project)

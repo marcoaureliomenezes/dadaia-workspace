@@ -31,7 +31,6 @@ from __future__ import annotations
 
 import contextlib
 import os
-import shlex
 import shutil
 import uuid
 from pathlib import Path
@@ -119,18 +118,14 @@ def atomic_write(
                 tmp.unlink(missing_ok=True)
 
 
-def symlink_fix(path: Path) -> str:
-    """The ``fix:`` line for a refused symlinked destination: materialize the link."""
-    return shlex.join(["cp", "--remove-destination", "--", str(path.resolve()), str(path)])
-
-
 class SymlinkRefusedError(OSError):
     """Raised by :func:`atomic_write` when *path* is a symlink: the one writer never
-    replaces an operator's link nor writes its target (CWE-59). Carries a ``fix:`` line."""
+    replaces an operator's link nor writes its target (CWE-59). The verb that reports it
+    adds the fix (``core.cli_line.materialize_line``): AR-1 keeps this module import-free."""
 
     def __init__(self, path: Path) -> None:
-        super().__init__(f"{path} is a symlink; refusing to write it\nfix: {symlink_fix(path)}")
+        super().__init__(f"{path} is a symlink; refusing to write it")
         self.path = path
 
 
-__all__ = ["ConcurrentModificationError", "SymlinkRefusedError", "atomic_write", "symlink_fix"]
+__all__ = ["ConcurrentModificationError", "SymlinkRefusedError", "atomic_write"]

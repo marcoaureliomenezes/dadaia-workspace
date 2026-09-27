@@ -9,6 +9,7 @@ Size: SMALL (tmp_path, CliRunner in-process, no subprocess).
 from __future__ import annotations
 
 import hashlib
+import os
 from pathlib import Path
 
 import pytest
@@ -24,6 +25,13 @@ pytestmark = pytest.mark.unit
 
 _PUBLIC = Path(__file__).resolve().parents[4] / "dadaia_workspace" / "public"
 _OUTSIDE = "# Quality\n\noperator text, no fixed block\n"
+
+
+def _materialize(link: Path, target: Path) -> str:
+    """The literal fix per host shell: POSIX sh, Windows cmd."""
+    if os.name == "nt":
+        return f'del "{link}" && copy /Y "{target}" "{link}"'
+    return f"cp --remove-destination -- {target} {link}"
 
 
 def _md5(path: Path) -> str:
@@ -53,7 +61,7 @@ def test_b4_the_one_writer_refuses_a_symlinked_destination(tmp_path: Path) -> No
 
     assert link.is_symlink()
     assert outside.read_text(encoding="utf-8") == "keep\n"
-    assert "fix: " in str(info.value)
+    assert str(info.value) == f"{link} is a symlink; refusing to write it"
     assert [p.name for p in tmp_path.iterdir() if p.name.endswith(".tmp")] == []
 
 
@@ -69,13 +77,13 @@ def test_b1_specs_upgrade_refuses_a_symlinked_quality_md_with_its_fix(tmp_path: 
     assert result.exit_code == 1, result.output
     link = specs / "memory" / "QUALITY.md"
     assert f"[refused] FIXED-1 {link}" in result.output
-    assert f"fix: cp --remove-destination -- {outside} {link}" in result.output
+    assert f"fix: {_materialize(link, outside)}" in result.output
     assert _md5(outside) == before
     assert (specs / "memory" / "QUALITY.md").is_symlink()
     doctor = SpecsDoctor(specs, public_dir=_PUBLIC, templates_dir=_PUBLIC / "templates")
     quality = [i for i in doctor.check() if i.code.startswith("FIXED")]
-    assert [(i.code, i.fixable, i.fix.startswith("cp --remove-destination")) for i in quality] == [
-        ("FIXED-1", False, True)
+    assert [(i.code, i.fixable, i.fix) for i in quality] == [
+        ("FIXED-1", False, _materialize(link, outside))
     ]
 
 

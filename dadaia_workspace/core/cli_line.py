@@ -56,5 +56,15 @@ def mkdir_line(directory: PurePath) -> str:
     return shlex.join(("mkdir", "-p", str(directory)))
 
 
+def materialize_line(link: PurePath, target: PurePath) -> str:
+    """Replace the symlink *link* by a regular copy of *target*: POSIX
+    ``cp --remove-destination``; cmd ``del`` (removes the link, never its target) then
+    ``copy /Y``."""
+    if platform.PLATFORM.venv_exe_suffix:  # Windows
+        lnk, tgt = PureWindowsPath(link), PureWindowsPath(target)
+        return f'del "{lnk}" && copy /Y "{tgt}" "{lnk}"'
+    return shlex.join(("cp", "--remove-destination", "--", str(target), str(link)))
+
+
 def _win_quote(arg: str) -> str:
     return arg if arg and not any(c in arg for c in ' \t"') else f'"{arg}"'
