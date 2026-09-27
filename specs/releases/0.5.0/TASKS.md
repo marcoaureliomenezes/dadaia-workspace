@@ -31,7 +31,7 @@ tests. `Δ` = prod/test lines; PLAN §2.7 ceilings stop a task, never rise.
   `blocked by:` none · `delivers:` AC1.4, AC1.5 · `RED:` PLAN §2 WP-12, WP-13 · Δ +7/+97.
 - [ ] **T-050-31 — One symlink-refusing writer (14).** `W:` `f/migrate/`, `core/atomic_write.py`, `f/specs/`, `cli/commands/specs.py`
   `blocked by:` none · `delivers:` a symlink target is never written · `RED:` PLAN §2 WP-14 · Δ −30/+65.
-- [-] **T-050-32 — Gate where git runs it; required checks (hooksPath, 32).** Two commits.
+- [x] **T-050-32 — Gate where git runs it; required checks (hooksPath, 32).** Two commits.
   `W:` `f/spec_context/{service,doctor}.py`, `core/workspace_layout.py`, `.github/`, required-checks file, `f/ci_preflight/`
   `blocked by:` none · `delivers:` AC1.3, AC1.7 · `RED:` PLAN §2 hooksPath, WP-32 · Δ −70/+141.
 - [ ] **T-050-33 — `context dead` holds (03 †).** `W:` `f/spec_context/`, `i/git_subprocess.py`
