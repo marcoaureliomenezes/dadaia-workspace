@@ -11,7 +11,10 @@ release.yml behind the single `release_created` gate: no `release:` event, no
 `push: tags`, no hand-rolled tag arithmetic.
 
 Intent: CONTRACT — 0.5.0 c3 rework (regression of 114be682): every ci.yml job that runs
-`dadaia doctor` checks out full history. Size: SMALL."""
+`dadaia doctor` checks out full history. Size: SMALL.
+
+Intent: CONTRACT — sa-doctor-job-not-a-required-check (AC1.7, ADR 0078): the in-repo
+required-checks file lists every check a PR runs; release.yml reuses ci.yml."""
 
 from __future__ import annotations
 
@@ -416,9 +419,7 @@ def _step_texts(workflow: str, job: str) -> str:
     return "\n".join(f"{s.get('run', '')}\n{s.get('env', '')}" for s in steps)
 
 
-@pytest.mark.parametrize(
-    ("workflow", "job"), [("ci.yml", "e2e-python"), ("release.yml", "e2e-python")]
-)
+@pytest.mark.parametrize(("workflow", "job"), [("ci.yml", "e2e-python")])
 def test_the_onboarding_journey_runs_with_uv_and_cannot_skip(workflow: str, job: str) -> None:
     """Intent: CONTRACT — 0.4.8 AC8.3 (T-048-11). The e2e job installs uv, requires uvx
     (an absent uvx fails instead of skipping) and selects the journey."""
@@ -470,3 +471,34 @@ def test_every_ci_job_running_the_doctor_checks_out_full_history() -> None:
         and (step.get("with") or {}).get("fetch-depth") != 0
     ]
     assert shallow == [], f"doctor jobs with a shallow checkout: {shallow}"
+
+
+def _pr_check_contexts() -> set[str]:
+    """Every status-check context a PR produces: a job's `name:`, one per matrix value."""
+    contexts: set[str] = set()
+    for document in _workflows().values():
+        if "pull_request" not in (document.get("on", document.get(True)) or {}):
+            continue
+        for job in document["jobs"].values():
+            matrix = ((job.get("strategy") or {}).get("matrix") or {}).get("os")
+            contexts |= {f"{job['name']} ({v})" for v in matrix} if matrix else {job["name"]}
+    return contexts
+
+
+def test_the_required_checks_file_lists_every_check_a_pr_runs() -> None:
+    """sa-doctor-job-not-a-required-check#B1, #B2: a PR check absent from the file is
+    red-but-mergeable (the Compliance job was); a stale entry blocks every merge."""
+    import json
+
+    required = json.loads((_WORKFLOWS.parent / "required-checks.json").read_text("utf-8"))
+    assert "Compliance (workspace/specs/ledgers sections)" in required
+    assert sorted(required) == sorted(_pr_check_contexts())
+
+
+def test_release_publishes_only_after_ci_yml_itself() -> None:
+    """sa-doctor-job-not-a-required-check#B3: release.yml redeclares no test matrix; it
+    calls ci.yml and the build waits for it."""
+    jobs = _jobs()
+    assert jobs["ci"]["uses"] == "./.github/workflows/ci.yml"
+    assert "ci" in jobs["build"]["needs"]
+    assert not any("pytest" in yaml.safe_dump(job) for job in jobs.values())

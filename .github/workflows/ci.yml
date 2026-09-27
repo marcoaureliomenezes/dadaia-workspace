@@ -15,6 +15,8 @@ on:
   pull_request:
     branches: [main, develop]
   workflow_dispatch:
+  # release.yml reuses this one check set before it publishes (ADR 0078).
+  workflow_call:
 
 permissions:
   contents: read

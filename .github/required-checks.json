@@ -1,0 +1,19 @@
+[
+  "Importability smoke (Windows/macOS) (windows-latest)",
+  "Importability smoke (Windows/macOS) (macos-latest)",
+  "Lint (ruff)",
+  "Typecheck (mypy --strict)",
+  "Unit fast (pytest)",
+  "Contract coverage (pytest)",
+  "Unit fast (Windows/macOS) (windows-latest)",
+  "Unit fast (Windows/macOS) (macos-latest)",
+  "Contract coverage (Windows/macOS) (windows-latest)",
+  "Contract coverage (Windows/macOS) (macos-latest)",
+  "Integration (pytest)",
+  "E2E Python (pytest)",
+  "PR title (conventional commits)",
+  "Repo hygiene (no tracked projection files)",
+  "Compliance (workspace/specs/ledgers sections)",
+  "PR source guard (both gitflow edges, one job)",
+  "gitleaks"
+]

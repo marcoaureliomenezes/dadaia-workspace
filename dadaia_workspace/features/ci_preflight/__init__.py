@@ -1,7 +1,7 @@
 """Local CI-equivalent preflight gate (T-GATE-01).
 
-Runs the same checks CI enforces — ruff format, ruff check, mypy --strict,
-pytest — so locally-solvable failures never reach a push.
+Runs the locally runnable subset of ci.yml — ruff format, ruff check, mypy --strict,
+lint-imports, pytest; `.github/required-checks.json` lists what gates a merge.
 """
 
 from dadaia_workspace.features.ci_preflight.service import (
