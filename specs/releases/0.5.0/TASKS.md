@@ -23,7 +23,7 @@ tests. `Δ` = prod/test lines; PLAN §2.7 ceilings stop a task, never rise.
   `blocked by:` T-050-24 · `delivers:` a scoped install is impossible · `RED:` PLAN §2 WP-08 · Δ −40/+14.
 - [x] **T-050-27 — Repo law only via `specs init` (07 †).** `W:` `i/`, `cli/commands/public.py`, `f/specs/canon.py`, `f/spec_context/service.py`
   `blocked by:` T-050-26 · `delivers:` install-first leaves the repo template; edits survive · `RED:` PLAN §2 WP-07 · Δ −230/−119.
-- [x] **T-050-28 — Ledger pair checked first (09).** `W:` ledger `scripts/`
+- [-] **T-050-28 — Ledger pair checked first (09).** `W:` ledger `scripts/`
   `blocked by:` none · `delivers:` a refusal leaves both files byte-intact · `RED:` PLAN §2 WP-09 · Δ −10/+80.
 - [x] **T-050-29 — One mask, one redactor (11 †).** `W:` `core/redaction.py`, `cli/`, `f/chokepoints/`, `i/privacy_check.py`
   `blocked by:` none · `delivers:` `z…x` from every surface · `RED:` PLAN §2 WP-11 · Δ −30/+25.
