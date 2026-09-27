@@ -13,7 +13,7 @@ from typing import Any
 
 from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
 from dadaia_workspace.core.models.spec_context import SpecContextProject
-from dadaia_workspace.core.redaction import Redactor
+from dadaia_workspace.core.redaction import Redactor, redact_text
 
 #: SPEC FR8 placeholder shape.
 _PLACEHOLDER_FMT = "[REDACTED-CONTEXT-{n}]"
@@ -41,8 +41,8 @@ class ContextRedactor:
         return self._redactor.active
 
     def text(self, value: str) -> str:
-        """Redact every foreign candidate substring found inside ``value``."""
-        return self._redactor.mask(value)
+        """Redact every foreign candidate substring and home-path user inside ``value``."""
+        return self._redactor.mask(redact_text(value))
 
     def json_value(self, value: Any) -> Any:
         """Recursively redact string leaves of a JSON-shaped value.

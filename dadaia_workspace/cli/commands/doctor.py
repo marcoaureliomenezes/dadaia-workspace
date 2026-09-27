@@ -277,14 +277,15 @@ def _onboarding_section(
 
 
 def _render_for(workspace_root: Path | None, *, redact: bool) -> Callable[[str], str]:
-    """The render boundary: the redactor over the instance's known names, or the
-    identity — no instance holds no names to mask."""
+    """The render boundary: the redactor over the instance's known names and paths, or
+    the identity — no instance holds no names to mask."""
     if redact and workspace_root is not None:
         try:
             contexts = container.build_spec_context_service(workspace_root).list_all()
         except (WorkspaceNotInitializedError, SchemaVersionError):
             contexts = []
-        return build_context_redactor(contexts).text
+        redactor, root = build_context_redactor(contexts), f"{workspace_root}/"
+        return lambda text: redactor.text(text.replace(root, ""))  # paths: workspace-relative
     return _identity
 
 
@@ -417,7 +418,7 @@ def _json_payload(
             # `specs_dir` names the tree this run resolved — the one piece of run
             # identity a machine consumer cannot derive, and the seam two resolution
             # contract tests assert against (`bind-resolution-seam-is-a-single-home`).
-            "specs_dir": str(specs_dir) if specs_dir else None,
+            "specs_dir": render(str(specs_dir)) if specs_dir else None,
             "sections": {
                 report.name: {
                     "findings": [
@@ -426,7 +427,7 @@ def _json_payload(
                             "verdict": f.verdict,
                             "message": render(f.message),
                             "fix": render(f.fix),
-                            **dict(f.extra),
+                            **{key: render(value) for key, value in f.extra},
                         }
                         for f in report.printable
                     ],

@@ -297,3 +297,29 @@ def test_doctor_redact_masks_an_associated_slug_like_context_list(workspace: Pat
     listed = _runner.invoke(app, ["context", "list", "--redact", "--json"])
     assert "zz-assoc" not in listed.stdout
     assert _render_for(workspace, redact=True)("in zz-assoc") == "in [REDACTED-CONTEXT-1]"
+
+
+def test_doctor_redact_json_prints_no_absolute_workspace_path(workspace: Path) -> None:
+    """doctor-redact-json-prints-absolute-home-paths: every leaf of `doctor --redact
+    --json` (findings' extras and specs_dir included) goes through the one render
+    boundary; the workspace root never survives — paths print workspace-relative."""
+    _write_contexts(workspace, [_ctx_row("zz-dead", state="dead")])
+    (workspace / "repos" / "zz-dead").mkdir(parents=True)
+
+    out = _runner.invoke(app, ["doctor", "--redact", "--json"]).stdout
+
+    assert "INV-5" in out
+    assert str(workspace) not in out
+    assert '"fix": ".dadaia/.venv/bin/dadaia doctor --fix"' in out
+
+
+def test_the_redact_render_masks_a_home_path_outside_the_workspace(workspace: Path) -> None:
+    """doctor-redact-json-prints-absolute-home-paths: a home path the workspace does not
+    contain keeps no user name under --redact (the one home-path scrub, core.redaction)."""
+    from dadaia_workspace.cli.commands.doctor import _render_for
+
+    render = _render_for(workspace, redact=True)
+    home = "/home/" + "alice"  # composed at runtime: no home path is ever a tracked literal
+
+    assert render(f"see {home}/.cache/x") == "see /home/[REDACTED]/.cache/x"
+    assert render(f"at {workspace}/repos/r") == "at repos/r"
