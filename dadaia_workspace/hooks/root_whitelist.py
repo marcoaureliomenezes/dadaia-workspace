@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 
 from dadaia_workspace.core import invocation, workspace_layout
-from dadaia_workspace.core.cli_line import shell_line
+from dadaia_workspace.core.cli_line import mkdir_line
 from dadaia_workspace.hooks import _common
 
 
@@ -76,5 +76,5 @@ def _root_violation(workspace: Path, raw_path: str) -> str | None:
         f"does not admit. The workspace root may only contain: {workspace_layout.root_entries_display()}; "
         ".dadaia/ only its zones; a closed-canon zone only its canon. Temp files belong in "
         f"{ws / '.dadaia' / 'tmp'}/<agent>/<YYYYMMDD>/.\n"
-        f"fix: {shell_line('mkdir', '-p', str(ws / '.dadaia' / 'tmp'))}"
+        f"fix: {mkdir_line(ws / '.dadaia' / 'tmp')}"
     )

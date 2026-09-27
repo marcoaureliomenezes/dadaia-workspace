@@ -157,7 +157,12 @@ def test_the_root_block_fix_runs_from_a_repo_cwd_and_never_writes_the_exceptions
         _the_fix(block), shell=True, cwd=workspace / "repos" / "demo", check=False
     )
 
+    again = subprocess.run(  # the usual case: the zone already exists
+        _the_fix(block), shell=True, cwd=workspace / "repos" / "demo", check=False
+    )
+
     assert done.returncode == 0
+    assert again.returncode == 0
     assert (workspace / ".dadaia" / "tmp").is_dir()
     assert not (workspace / ".dadaia" / "states" / "instance_exceptions.txt").exists()
 

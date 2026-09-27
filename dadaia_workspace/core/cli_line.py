@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import shlex
 import sys
-from pathlib import Path, PurePath
+from pathlib import Path, PurePath, PureWindowsPath
 
 from dadaia_workspace.core import platform
 
@@ -44,6 +44,16 @@ def shell_line(*parts: str) -> str:
     if platform.PLATFORM.venv_exe_suffix:  # Windows
         return " ".join(_win_quote(part.replace("\\", "/")) for part in parts)
     return shlex.join(parts)
+
+
+def mkdir_line(directory: PurePath) -> str:
+    """Create *directory* and its parents, idempotent: POSIX ``mkdir -p``; cmd
+    ``if not exist "<P>" mkdir "<P>"`` (cmd's mkdir creates intermediates, fails on an
+    existing directory)."""
+    if platform.PLATFORM.venv_exe_suffix:  # Windows
+        native = PureWindowsPath(directory)
+        return f'if not exist "{native}" mkdir "{native}"'
+    return shlex.join(("mkdir", "-p", str(directory)))
 
 
 def _win_quote(arg: str) -> str:
