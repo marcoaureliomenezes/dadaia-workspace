@@ -51,7 +51,7 @@ tests. `Δ` = prod/test lines; PLAN §2.7 ceilings stop a task, never rise.
   `blocked by:` T-050-35 · `delivers:` git questions tested against git · `RED:` `FakeContextStore` parity test · Δ 0/−500.
 - [x] **T-050-37 — `DADAIA_FENCED_ROOTS`: declared feature, no dadaia process acts on a fenced root (0088).** `W:` `core/workspace_resolver.py`, `tests/conftest.py`, `tests/unit/cli/test_workspace_not_found_error.py`, `pub/data/dadaia-AGENTS.md`
   `blocked by:` T-050-36 · `delivers:` PLAN §2 FR9 fence · `RED:` `sa-seven-workspace-root-rules#S11` (AC9.12, 0088) · Δ +3/+10.
-- [-] **T-050-38 — Hooks spawn as production; `WORKSPACE_ROOT` gone (15 †, AC9.5).** `W:` `tests/fixtures/harness_env.py`, `core/`, `cli/commands/`, `f/migrate/`, `f/specs/memory_lint.py`, `registry.py`
+- [x] **T-050-38 — Hooks spawn as production; `WORKSPACE_ROOT` gone (15 †, AC9.5).** `W:` `tests/fixtures/harness_env.py`, `core/`, `cli/commands/`, `f/migrate/`, `f/specs/memory_lint.py`, `registry.py`
   `blocked by:` T-050-37 · `delivers:` one root rule, honest hook tests · `RED:` PLAN §2 WP-15 · Δ −25/+108.
 
 ### W1 — stalls, loops, unclearing fixes (FR2)
