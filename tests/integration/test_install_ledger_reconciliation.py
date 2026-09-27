@@ -28,7 +28,7 @@ def _install_all(ws: Path) -> FileSystemPublicAssetManager:
 
 
 def test_retired_family_is_pruned_on_next_install(tmp_path: Path) -> None:
-    """Retire an ENTIRE staged family ⇒ the next install removes its projections."""
+    """sa-public-install-unlinks-operator-files-outside-its-ledger#D3; sa-doctor-reaps-harness-owned-entries#H4. Retire an ENTIRE staged family ⇒ the next install removes its projections."""
     ws = tmp_path / "ws"
     ws.mkdir()
     mgr = _install_all(ws)
@@ -51,6 +51,7 @@ def test_retired_family_is_pruned_on_next_install(tmp_path: Path) -> None:
 
 
 def test_operator_modified_orphan_is_retained_and_surfaced(tmp_path: Path) -> None:
+    """sa-public-install-unlinks-operator-files-outside-its-ledger#D4."""
     ws = tmp_path / "ws"
     ws.mkdir()
     mgr = _install_all(ws)
@@ -70,7 +71,7 @@ def test_operator_modified_orphan_is_retained_and_surfaced(tmp_path: Path) -> No
 
 
 def test_no_ledger_bootstrap_prunes_nothing(tmp_path: Path) -> None:
-    """First ledgered install over a pre-ledger workspace: adopt, never delete."""
+    """sa-public-install-unlinks-operator-files-outside-its-ledger#D5. First ledgered install over a pre-ledger workspace: adopt, never delete."""
     ws = tmp_path / "ws"
     ws.mkdir()
     mgr = _install_all(ws)
@@ -91,7 +92,9 @@ def test_no_ledger_bootstrap_prunes_nothing(tmp_path: Path) -> None:
 
 
 def test_scoped_install_never_prunes_other_scopes(tmp_path: Path) -> None:
-    """sa-scoped-public-install-prunes-the-gate-wiring#L2: a per-harness install must not treat other harnesses' entries as stale."""
+    """sa-scoped-public-install-prunes-the-gate-wiring#L2,
+    sa-public-install-unlinks-operator-files-outside-its-ledger#D3: a per-harness install must
+    not treat other harnesses' entries as stale."""
     ws = tmp_path / "ws"
     ws.mkdir()
     mgr = _install_all(ws)

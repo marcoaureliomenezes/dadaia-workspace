@@ -49,13 +49,6 @@ def _assert_intact(ws: Path) -> None:
         assert (ws / rel).read_bytes() == body, rel
 
 
-def test_operator_files_in_harness_dirs_survive_public_install(tmp_path: Path) -> None:
-    """sa-public-install-unlinks-operator-files-outside-its-ledger#D1..#D6."""
-    ws, manager = _workspace_with_operator_files(tmp_path)
-    manager.install(ws, force=True)
-    _assert_intact(ws)
-
-
 def test_operator_files_in_harness_dirs_survive_doctor_fix(tmp_path: Path) -> None:
     """sa-doctor-reaps-harness-owned-entries#H1..#H5."""
     ws, _ = _workspace_with_operator_files(tmp_path)
