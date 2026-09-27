@@ -5,14 +5,8 @@ one surviving rule (:func:`~dadaia_workspace.features.migrate.registry.check_upg
 -- a tree below the one live hop raises
 :class:`~dadaia_workspace.features.migrate.registry.UpgradeRefused` without touching the
 filesystem; a tree at 6 walks the 6 -> 7 hop (:func:`fold_tech_stack`) and is re-stamped;
-a tree already at canonical is a no-op except for the
-unconditional template-artifact repair (bug
-scaffold-repair-cannot-remediate-invalid-placeholder-atom), which runs regardless of
-version since it is unrelated to the retired migration chain.
-
-No backup is taken on either path: refusal never writes, and the no-op path's only
-possible write (placeholder removal) was never backed up before this simplification
-either.
+a tree already at canonical is a no-op except for the empty ``_ideas/`` removal.
+Every other repair is the doctor's (``specs upgrade`` runs its repair set, WP-14).
 """
 
 from __future__ import annotations
@@ -25,7 +19,6 @@ from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.frontmatter import FRONTMATTER_RE
 from dadaia_workspace.core.gitflow import merge_frontmatter
 from dadaia_workspace.core.spec_status import APPROVED, DRAFT, IN_REVIEW
-from dadaia_workspace.core.specs_repair import remove_placeholder_atoms
 from dadaia_workspace.features.migrate import registry as _registry
 
 
@@ -37,9 +30,8 @@ class UpgradeResult:
     to_version: int
     dry_run: bool
     no_op: bool = False
-    #: Placeholder atoms removed by the unconditional template-artifact repair
-    #: (planned-only when ``dry_run``).
-    placeholder_removed: list[Path] = field(default_factory=list)
+    #: Empty ``releases/_ideas/`` dirs removed (planned-only when ``dry_run``).
+    ideas_removed: list[Path] = field(default_factory=list)
     #: Live-release trio documents whose retired Portuguese status token was rewritten
     #: to the English vocabulary (planned-only when ``dry_run``).
     status_rewritten: list[Path] = field(default_factory=list)
@@ -65,13 +57,11 @@ def upgrade(
     _registry.check_upgradable(current, goal)
 
     if dry_run:
-        removed = remove_placeholder_atoms(specs_dir, dry_run=True) + plan_empty_ideas_dir(
-            specs_dir
-        )
+        removed = plan_empty_ideas_dir(specs_dir)
         restated = plan_status_token_rewrites(specs_dir)
         folded = plan_tech_stack_fold(specs_dir)
     else:
-        removed = remove_placeholder_atoms(specs_dir) + remove_empty_ideas_dir(specs_dir)
+        removed = remove_empty_ideas_dir(specs_dir)
         restated = rewrite_status_tokens(specs_dir)
         folded = fold_tech_stack(specs_dir)
         if current < goal:
@@ -81,7 +71,7 @@ def upgrade(
         to_version=goal,
         dry_run=dry_run,
         no_op=current >= goal and not (removed or restated or folded),
-        placeholder_removed=removed,
+        ideas_removed=removed,
         status_rewritten=restated,
         tech_stack_folded=folded,
     )

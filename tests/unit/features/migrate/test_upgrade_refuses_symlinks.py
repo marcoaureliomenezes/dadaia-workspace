@@ -1,7 +1,8 @@
 """Intent: CONTRACT — sa-specs-upgrade-writes-through-symlinks (0.5.0 WP-14, AC1.2).
 
 One writer answers "how a fixed section is written": ``core.atomic_write`` refuses a
-symlinked destination, and ``specs upgrade`` and ``doctor --fix`` both go through it.
+symlinked destination (#B4), ``specs upgrade`` refuses the path with its fix line and
+leaves the outside file's bytes unchanged (#B1), ``doctor --fix`` refuses identically (#B2).
 Size: SMALL (tmp_path, CliRunner in-process, no subprocess).
 """
 
@@ -40,8 +41,8 @@ def _tree_with_linked_quality(tmp_path: Path) -> tuple[Path, Path]:
     return specs, outside
 
 
-def test_b1_atomic_write_refuses_a_symlinked_destination(tmp_path: Path) -> None:
-    """#B1: the one writer never replaces or writes through a link."""
+def test_b4_the_one_writer_refuses_a_symlinked_destination(tmp_path: Path) -> None:
+    """#B4: the one writer never replaces or writes through a link."""
     outside = tmp_path / "outside.md"
     outside.write_text("keep\n", encoding="utf-8")
     link = tmp_path / "link.md"
@@ -56,15 +57,19 @@ def test_b1_atomic_write_refuses_a_symlinked_destination(tmp_path: Path) -> None
     assert [p.name for p in tmp_path.iterdir() if p.name.endswith(".tmp")] == []
 
 
-def test_b2_specs_upgrade_leaves_a_symlinked_quality_md_and_its_target(tmp_path: Path) -> None:
-    """#B2: `specs upgrade` repairs through the doctor's writer: the link stays a link,
-    the outside md5 is unchanged, and the doctor names the link with a fix line."""
+def test_b1_specs_upgrade_refuses_a_symlinked_quality_md_with_its_fix(tmp_path: Path) -> None:
+    """#B1: `specs upgrade` repairs through the doctor's writer, which refuses the link:
+    the verb exits non-zero naming the path with its fix line; the outside md5 is
+    unchanged and the link stays a link."""
     specs, outside = _tree_with_linked_quality(tmp_path)
     before = _md5(outside)
 
     result = CliRunner().invoke(app, ["specs", "upgrade", "--specs-dir", str(specs)])
 
-    assert result.exit_code == 0, result.output
+    assert result.exit_code == 1, result.output
+    link = specs / "memory" / "QUALITY.md"
+    assert f"[refused] FIXED-1 {link}" in result.output
+    assert f"fix: cp --remove-destination -- {outside} {link}" in result.output
     assert _md5(outside) == before
     assert (specs / "memory" / "QUALITY.md").is_symlink()
     doctor = SpecsDoctor(specs, public_dir=_PUBLIC, templates_dir=_PUBLIC / "templates")
@@ -74,8 +79,8 @@ def test_b2_specs_upgrade_leaves_a_symlinked_quality_md_and_its_target(tmp_path:
     ]
 
 
-def test_b3_the_tech_stack_fold_refuses_a_symlinked_architecture_md(tmp_path: Path) -> None:
-    """#B3: the 6 -> 7 fold writes ARCHITECTURE.md through the same writer."""
+def test_b1_the_tech_stack_fold_refuses_a_symlinked_architecture_md(tmp_path: Path) -> None:
+    """#B1: the 6 -> 7 fold writes ARCHITECTURE.md through the same writer."""
     specs = tmp_path / "repo" / "specs"
     canon.scaffold(specs, project_name="p")
     merge_frontmatter(specs, specs_pattern_version=6)
@@ -92,8 +97,8 @@ def test_b3_the_tech_stack_fold_refuses_a_symlinked_architecture_md(tmp_path: Pa
     assert outside.read_text(encoding="utf-8") == "# Architecture\n"
 
 
-def test_b5_doctor_fix_leaves_a_symlinked_quality_md_a_link(tmp_path: Path) -> None:
-    """#B5: `doctor --fix` neither replaces the link nor writes its target."""
+def test_b2_doctor_fix_leaves_a_symlinked_quality_md_a_link(tmp_path: Path) -> None:
+    """#B2: `doctor --fix` neither replaces the link nor writes its target."""
     specs, outside = _tree_with_linked_quality(tmp_path)
     before = _md5(outside)
     doctor = SpecsDoctor(specs, public_dir=_PUBLIC, templates_dir=_PUBLIC / "templates")

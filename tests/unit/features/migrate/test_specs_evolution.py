@@ -121,7 +121,7 @@ def test_upgrade_at_or_above_floor_is_idempotent_and_repairs_placeholders(
     result = _upgrade.upgrade(specs)
     assert result.from_version == stamp
     assert result.to_version == stamp
-    assert result.placeholder_removed == []
+    assert result.ideas_removed == []
 
     # Dry-run at the floor plans nothing and writes nothing.
     dry = _upgrade.upgrade(specs, dry_run=True)

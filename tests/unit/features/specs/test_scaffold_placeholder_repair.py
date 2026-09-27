@@ -115,27 +115,12 @@ def test_filled_atom_is_never_flagged_or_removed(tmp_path: Path) -> None:
     assert atom.exists()
 
 
-def test_upgrade_repairs_current_version_tree(tmp_path: Path) -> None:
-    """Consumer' exact case: tree already at canonical version + placeholder → repaired."""
-    specs = _fresh_specs(tmp_path)
-    atom = specs / "memory" / "product" / "feature.md"
-    atom.write_text(_PLACEHOLDER_ATOM, encoding="utf-8")
-
-    result = upgrade_feat.upgrade(specs)
-    assert result.no_op is False
-    assert result.placeholder_removed == [atom]
-    assert not atom.exists()
-    errors = [i for i in _doctor(specs).check() if i.severity.value == "error"]
-    assert errors == [], [f"{i.code}: {i.description}" for i in errors]
-
-
 def test_upgrade_dry_run_reports_without_deleting(tmp_path: Path) -> None:
     specs = _fresh_specs(tmp_path)
     atom = specs / "memory" / "product" / "feature.md"
     atom.write_text(_PLACEHOLDER_ATOM, encoding="utf-8")
 
-    result = upgrade_feat.upgrade(specs, dry_run=True)
-    assert result.placeholder_removed == [atom]
+    upgrade_feat.upgrade(specs, dry_run=True)
     assert atom.exists(), "dry-run must not delete"
 
 

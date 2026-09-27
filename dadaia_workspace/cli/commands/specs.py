@@ -23,7 +23,7 @@ from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.migrate import upgrade as upgrade_feature
 from dadaia_workspace.features.migrate.registry import UpgradeRefused
 from dadaia_workspace.features.migrate.upgrade import UpgradeResult
-from dadaia_workspace.features.specs import SpecsDoctor, SpecsDoctorIssue, canon
+from dadaia_workspace.features.specs import Severity, SpecsDoctor, SpecsDoctorIssue, canon
 from dadaia_workspace.infrastructure.ledger_scripts import script_repairs
 
 app = typer.Typer(help="SDD release-lifecycle structural checks and helpers.")
@@ -55,28 +55,35 @@ def upgrade(
     except (UpgradeRefused, SymlinkRefusedError) as exc:
         typer.echo(f"[refused] {exc}", err=True)
         sys.exit(1)
-    _echo_upgrade(resolved, result)
-    sys.exit(0)
+    sys.exit(1 if _echo_upgrade(resolved, result) else 0)
 
 
-def _repair(specs: Path, *, dry_run: bool) -> list[SpecsDoctorIssue]:
-    """The doctor's one repair set: `specs upgrade` keeps no second writer of its own."""
+def _repair(specs: Path, *, dry_run: bool) -> tuple[list[SpecsDoctorIssue], list[SpecsDoctorIssue]]:
+    """The doctor's one repair set: `specs upgrade` keeps no second writer of its own.
+    Returns what it repaired and every error left carrying a fix (the promise: clean)."""
     public = canon.default_public_dir()
     doctor = SpecsDoctor(specs, public_dir=public, templates_dir=public / "templates")
     fixable = [issue for issue in doctor.check() if issue.fixable]
-    return fixable if dry_run else doctor.fix(fixable)
+    if dry_run:
+        return fixable, []
+    fixed = doctor.fix(fixable)
+    return fixed, [i for i in doctor.check() if i.severity is Severity.ERROR and i.fix]
 
 
-def _echo_upgrade(specs: Path, result: UpgradeResult) -> None:
+def _echo_upgrade(specs: Path, result: UpgradeResult) -> bool:
+    """Echo the upgrade; True when an error the repair could not clear remains."""
     will = "would " if result.dry_run else ""
-    for path in result.placeholder_removed:
-        typer.echo(f"[placeholder-repair] {will}remove {path}")
+    for path in result.ideas_removed:
+        typer.echo(f"[ideas-repair] {will}remove {path}")
     for path in result.status_rewritten:
         typer.echo(f"[status-vocabulary] {will}rewrite {path}")
     for path in result.tech_stack_folded:
         typer.echo(f"[tech-stack] {will}fold {path} into memory/ARCHITECTURE.md")
-    for issue in _repair(specs, dry_run=result.dry_run):
+    fixed, refused = _repair(specs, dry_run=result.dry_run)
+    for issue in fixed:
         typer.echo(f"[repair] {will}fix {issue.code} {issue.path}")
+    for issue in refused:
+        typer.echo(f"[refused] {issue.code} {issue.path}: {issue.description}\nfix: {issue.fix}")
     for action in [] if result.dry_run else script_repairs(specs):
         typer.echo(f"[repair] {action}")
     if result.from_version < result.to_version:
@@ -89,6 +96,7 @@ def _echo_upgrade(specs: Path, result: UpgradeResult) -> None:
             f"[ok] {specs} already at pattern version {result.from_version} "
             f"(target {result.to_version}) — no-op."
         )
+    return bool(refused)
 
 
 def _init_fix(*argv: str) -> str:
@@ -155,7 +163,8 @@ def init(
         _move_foreign(target, rerun, replace_foreign)
     elif kind == "dadaia":
         try:
-            _echo_upgrade(target, upgrade_feature.upgrade(target))
+            if _echo_upgrade(target, upgrade_feature.upgrade(target)):
+                raise typer.Exit(1)
         except SymlinkRefusedError as exc:
             typer.echo(f"[refused] {exc}", err=True)
             raise typer.Exit(1) from exc

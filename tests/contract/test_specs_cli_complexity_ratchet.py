@@ -79,7 +79,9 @@ _DOCTOR_CEILING = 6
 # Re-pinned at 0.5.0 T-050-31 (WP-14, AC1.2): the fixed-section writer leaves this module
 # (the doctor's repair is the one writer) and the three remaining writes go through the
 # symlink-refusing `core.atomic_write`. Authorized, task-declared deletion.
-_UPGRADE_MODULE_SHA256 = "a0808e854ab1c3e4a3f2d08c1fd01acf194be8a5bf45336ace2f0fd9cb98f508"
+# Re-pinned at 0.5.0 T-050-31 completion (WP-14 #B4): upgrade's placeholder writer is
+# deleted (the doctor's repair set owns it); the field left is ideas_removed. Deletion only.
+_UPGRADE_MODULE_SHA256 = "4c6bb43055175c7ab1f0f3a0bc7c111296fe7d6c3ca6b39acba03579c990f104"
 
 
 def _complexity_by_name(path: Path) -> dict[str, int]:
