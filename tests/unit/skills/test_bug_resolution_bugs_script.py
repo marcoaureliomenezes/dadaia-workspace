@@ -212,6 +212,25 @@ def test_append_registers_one_open_record(script: Path, tmp_path: Path) -> None:
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
+def test_append_accepts_a_consumer_surface_and_refuses_unknown(
+    script: Path, tmp_path: Path
+) -> None:
+    """sa-consumer-law-carries-library-facts#FR8.1: a consumer names its own unit as the
+    surface (`billing-api` is no library layer or package) and it is accepted; the
+    `unknown` sentinel is refused."""
+    specs = _ledger(tmp_path)
+    argv = ["append", "--specs", str(specs), "--title", "t", "--severity", "LOW",
+            "--component", "c", "--context", "ctx", "--symptom", "s", "--repro", "r",
+            "--expected", "e"]  # fmt: skip
+    ok = _run(script, *argv, "--bug-id", "consumer-bug", "--surface", "billing-api")
+    refused = _run(script, *argv, "--bug-id", "vague-bug", "--surface", "unknown")
+
+    assert ok.returncode == 0, ok.stderr
+    assert refused.returncode == 1
+    assert [r["surface"] for r in _records(specs)] == ["billing-api"]
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
 def test_append_refuses_a_duplicate_id_and_writes_nothing(script: Path, tmp_path: Path) -> None:
     specs = _ledger(tmp_path, _OPEN_RECORD)
     before = (specs / "bugs" / "BUGS.jsonl").read_bytes()

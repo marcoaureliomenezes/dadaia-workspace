@@ -59,9 +59,7 @@ def _field_errors(key: str, value: object, spec: dict[str, Any]) -> Iterator[str
     if not isinstance(value, str):
         return
     enum = spec.get("enum")
-    # `x-enum-append` marks an enum whose arm is derived from the library's packages on
-    # disk (`surface`): the closed list here is not the whole truth, so it is not closed.
-    if enum and "x-enum-append" not in spec and value not in enum:
+    if enum and value not in enum:
         yield f"field {key!r} must be one of {sorted(enum)}, got {value!r}"
     pattern = spec.get("pattern")
     if pattern is not None and re.search(pattern, value) is None:

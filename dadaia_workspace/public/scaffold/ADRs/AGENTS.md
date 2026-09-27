@@ -35,7 +35,7 @@ Scope: this file governs only `specs/ADRs/`.
 ## 4. Discovery
 
 - `decisions.jsonl` is the complete, authored inventory — proposed, accepted, rejected and superseded alike.
-- No hand-kept index table — `tests/contract/test_adr_canon.py` enforces monotonic, gap-free, duplicate-free numbering.
+- No hand-kept index table; the records are the index.
 - The file may be legitimately empty.
 
 ## 5. Relationship to memory and audits

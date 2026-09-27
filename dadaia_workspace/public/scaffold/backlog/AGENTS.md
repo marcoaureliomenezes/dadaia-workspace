@@ -41,7 +41,7 @@ Scope: this file governs only `specs/backlog/`.
 - A malformed `intents[]` or an invalid `status` is always `BL-SCHEMA`, at any status.
 
 ```json
-{"subject": {"kind": "code", "ref": "dadaia_workspace/core/models/lifecycle.py#AgentRuntimeKind"},
+{"subject": {"kind": "code", "ref": "src/billing/models.py#Invoice"},
  "change": "what changes about this subject"}
 ```
 

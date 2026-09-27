@@ -67,7 +67,7 @@ def append(records: Records, values: dict[str, Any]) -> Records:
     if values.get("surface") == "unknown":
         raise Refusal(
             "surface 'unknown' is a legacy sentinel, valid only on records that already carry it",
-            f"{_SCRIPT} append --surface <feature-package-or-layer> --specs <specs>",
+            f"{_SCRIPT} append --surface <the-unit-that-broke> --specs <specs>",
         )
     record = {key: values.get(key) for key in CORE}
     record.update({key: None for key in GOVERNANCE})

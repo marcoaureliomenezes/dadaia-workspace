@@ -80,4 +80,4 @@ The arc ends here. Gate -> promote -> record -> branch cut: `dd-gitflow-default`
 - Writing source code, tests, or pipelines (other agents) — the closer records test dispositions, never authors a test.
 - Modifying `specs/constitution.md` (requires explicit operator approval).
 - Memory updates outside CLOSURE phase (or DEFINITION under its own authorization) — gate-blocked for any other agent/phase.
-- Minting a version, writing a CHANGELOG section or moving a closed trio on disk — release-please owns the first two, git owns the third.
+- Minting a version, writing a CHANGELOG section or moving a closed trio on disk — the project's release pipeline owns the first two, git owns the third.

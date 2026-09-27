@@ -83,7 +83,7 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:33a9b7ae20b552c6f5d778ae6dfda73132bf4340e410e1743d1a08d25b6a906f",
-        "skill": "sha256:58702185badc06baa0b0b4058b8264fd39f7d9e4288a90cb19d31b9ccb5796ae",
+        "skill": "sha256:4547cb68559257459a0c74b136bf9d5a4db7c21be4e0f6ee142fd8e8d73ee6ff",
         "scripts": null,
         "scoped": []
       },
@@ -156,7 +156,7 @@
         "skill": "sha256:bc970c0eab8dad4738a69ba327b45dd94f371abc3dd7ad1ec0d9eb1c8d252b77",
         "scripts": "sha256:7b9e62af0b4f003879b112513e78d047ad09cdef7b0eb0f8d5f008969d11ae72",
         "scoped": [
-          "sha256:c7aad5e0c52c5926f234895d9bc00b0a8c8663e651c8ba849f071746bb1e3d6a"
+          "sha256:0691a32bf63bead5ab5216116d172d82d3e567e545a0a1df204deee03c6f4bde"
         ]
       },
       "recorded_by": "dd-software-engineer",
@@ -188,7 +188,7 @@
         "skill": "sha256:e3b87e39544f8d194535ea8e7df7c12e357d6b71f3a3bc905e54331fb3641987",
         "scripts": "sha256:e12e9951bdc5c22c2a9d8e5e7aed902deff7ab26737f4ebb99d5c14fddd0b4fd",
         "scoped": [
-          "sha256:7faaff3836ea7fa32da0c383fc5e1b922d94aa6db482d2fd54842bedce4cedfa"
+          "sha256:2113ab24f6474cbd9f409a23e777dae123505523528d73ff611977fc3fd2da29"
         ]
       },
       "recorded_by": "dd-software-engineer",
@@ -224,7 +224,7 @@
         "skill": null,
         "scripts": null,
         "scoped": [
-          "sha256:197764fabe341699e841bf83a4630a9b3eae51f4727570b4260c7854a53e29d6"
+          "sha256:1c535101bb5625f45317f56d5a21c0e1a13a408ddc21dcf6c6ffc317aa7f5fee"
         ]
       },
       "recorded_by": "dd-software-engineer",
@@ -270,7 +270,7 @@
       "hash_tuple": {
         "section": "sha256:908e57fb907003c579fa7d0bf93551c01b4a0df3bba19a5b509cc123be6947e9",
         "skill": "sha256:b2d2b11732fb2a30e2e2f54175b368eb4f4f88e4474c37d47a8a81aa056ca9a2",
-        "scripts": "sha256:3bd02a6f780ff9d229d34a1c0cebe84138127b6f2d29741a5e10377675ad5e0d",
+        "scripts": "sha256:748ced63888aac1cc2711cf9259d6ec8f414262494516911c12782565cfe63f4",
         "scoped": []
       },
       "recorded_by": "dd-software-engineer",

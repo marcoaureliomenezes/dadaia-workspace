@@ -280,9 +280,7 @@ def test_a_planted_second_list_of_a_widened_set_trips() -> None:
 #: AC6.1 allowance (born 2026-09-27 at 16): law files restating a set, ``path:set`` ->
 #: the open bug that makes them cite the authority instead.
 _RESTATED_LAW_BIRTH = 16
-_RESTATED_LAW_ALLOWANCE: dict[str, str] = {
-    "skills/dd-gitflow-default/SKILL.md:gitflow-role": _TEXT,
-}
+_RESTATED_LAW_ALLOWANCE: dict[str, str] = {}
 
 
 def _restating_law_files() -> set[str]:

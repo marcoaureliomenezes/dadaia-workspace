@@ -65,18 +65,9 @@
     },
     "surface": {
       "type": "string",
-      "enum": [
-        "cli",
-        "core",
-        "hooks",
-        "infrastructure",
-        "public-assets",
-        "tests",
-        "unknown"
-      ],
+      "minLength": 1,
       "x-mutability": "immutable-core",
-      "description": "Closed enum with a DERIVED arm (0.4.7 FR1): the six non-feature layers and the `unknown` legacy sentinel are listed here; the feature arm is appended at load time from the `dadaia_workspace/features/<name>/` packages on disk (`x-enum-append: feature-packages`, resolved by the validator) — one source, never a hand-kept second copy of the package list. `unknown` stays valid on the records already carrying it; `bugs.py append --surface unknown` is refused.",
-      "x-enum-append": "feature-packages"
+      "description": "The unit of the context's own tree whose tooling broke — a module, package or area name the context chooses. `unknown` is a legacy sentinel: valid on records already carrying it, refused by `bugs.py append`."
     },
     "component": {
       "type": "string",

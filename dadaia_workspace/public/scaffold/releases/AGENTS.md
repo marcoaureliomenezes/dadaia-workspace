@@ -40,6 +40,5 @@ Scope: this file governs only `specs/releases/`.
 
 ## 5. Promote
 
-- Version, CHANGELOG and tag come from release-please over Conventional Commits, through one release PR on the principal branch (the constitution's `gitflow:`).
-- Promote is merging that PR; `RELEASE_PY phase CLOSURE --sha <sha> --pr <n>` records it in the candidate's note.
-- The publish jobs run in the same workflow, gated on `release_created`; no verb and no agent mints a version.
+- Promote is merging the PR into the principal branch (the constitution's `gitflow:`); `RELEASE_PY phase CLOSURE --sha <sha> --pr <n>` records it in the candidate's note.
+- Version, CHANGELOG and tag belong to the project's own release pipeline; no verb and no agent mints a version.

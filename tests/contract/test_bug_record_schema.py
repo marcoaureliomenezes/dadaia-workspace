@@ -24,7 +24,6 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from dadaia_workspace.core.models import bugs as _bugs_module
-from dadaia_workspace.features.specs.schemas import RETIRED_FEATURE_PACKAGES, load_schema
 
 pytestmark = pytest.mark.contract
 
@@ -149,44 +148,14 @@ def test_bug_record_schema_rejects_an_unknown_property_and_a_bad_status() -> Non
 # --- 0.4.7 FR1 — the surface enum's feature arm is DERIVED, never restated -----------
 
 
-def test_the_packaged_schema_restates_no_feature_package_name() -> None:
-    """The 24-name list the schema used to carry was a hand-kept copy of a directory
-    listing, policed by a test that went stale the moment a package was added or
-    removed. The file now carries the six non-feature layers and the `unknown` sentinel
-    only — a list that cannot drift from the disk because it does not describe it."""
+def test_the_surface_names_no_library_fact() -> None:
+    """sa-consumer-law-carries-library-facts#FR8.1: the schema projected beside every
+    consumer's bugs.py carries no library layer or package list — a surface is the
+    unit of the context's own tree that broke (REWRITE of the "restates no feature
+    package name" test; its "is the layers plus the feature packages" sibling pinned the
+    library arm and is deleted as the losing side)."""
     surface = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))["properties"]["surface"]
 
-    assert surface["enum"] == [
-        "cli",
-        "core",
-        "hooks",
-        "infrastructure",
-        "public-assets",
-        "tests",
-        "unknown",
-    ]
-    assert surface["x-enum-append"] == "feature-packages"
-
-
-def test_the_loaded_surface_enum_is_the_layers_plus_every_on_disk_feature_package() -> None:
-    """What a record is VALIDATED against (0.4.7 FR1): the derivation resolves at load
-    time, so adding a feature package is the only edit a new surface value ever needs."""
-    features_dir = _REPO_ROOT / "dadaia_workspace" / "features"
-    on_disk = {
-        child.name
-        for child in features_dir.iterdir()
-        if (child / "__init__.py").is_file() and not child.name.startswith("_")
-    }
-    assert "chokepoints" in on_disk and "__pycache__" not in on_disk
-
-    enum_values = set(load_schema("bugs/bug-record-v1")["properties"]["surface"]["enum"])
-
-    assert enum_values == on_disk | set(RETIRED_FEATURE_PACKAGES) | {
-        "cli",
-        "core",
-        "hooks",
-        "infrastructure",
-        "public-assets",
-        "tests",
-        "unknown",
-    }
+    assert "enum" not in surface and "x-enum-append" not in surface
+    assert surface["type"] == "string" and surface["minLength"] == 1
+    assert "dadaia_workspace" not in surface["description"]
