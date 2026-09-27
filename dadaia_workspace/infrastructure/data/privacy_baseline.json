@@ -1,7 +1,7 @@
 {
   "_header": {
     "name": "public-privacy baseline structural denylist",
-    "version": 13,
+    "version": 14,
     "description": "Versioned, fail-closed baseline of STRUCTURAL regex patterns scanned against public/ assets when no operator denylist is present. Operator terms (DADAIA_PRIVACY_DENYLIST / .dadaia/states/privacy_denylist.json) are ADDITIVE and merge on top of this baseline. Patterns are conservative to avoid false positives on SHA hashes in lockfiles, doc/loopback IP ranges, and example hostnames. Edit only via an approved release task; bump 'version' on change. Every pattern carrying an 'exclude_regex' carve-out MUST also carry an 'exclude_rationale' string (v0.4.3 FR12/A12.1) — a doctor/CI check (privacy_check._check_baseline_exclude_rationale) flags any carve-out missing one, on every 'dadaia public doctor' run. Since v11 (0.5.0 AC5.6) this file plus the operator terms is the ONE secret registry: the pre-push matcher applies it, and baseline / dead --commit call that same matcher in-process; every pattern also runs against each pushed path, and key-file-path (anchored to a whole path segment at the end of its input) is the one pattern written for paths.",
     "released_in": "v0.1.10",
     "excludes": [
@@ -80,8 +80,8 @@
     },
     {
       "id": "key-file-path",
-      "regex": "(?:\\A|/)[\\w.-]+\\.(?:pem|key|p12|pfx|keystore|jks)\\Z",
-      "reason": "cryptographic private-key or keystore file (flagged by its suffix, binary or not); public certificates (.crt/.cer/.der) are not secrets",
+      "regex": "(?:\\A|/)[\\w.-]+\\.(?:pem|key|p12|pfx|keystore|jks|der)\\Z",
+      "reason": "cryptographic private-key or keystore file (flagged by its suffix, binary or not); a .der may hold a private key; public certificates (.crt/.cer) are not secrets",
       "exclude_regex": null
     },
     {

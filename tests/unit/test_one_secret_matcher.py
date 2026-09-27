@@ -77,6 +77,9 @@ _MATRIX: list[tuple[str, str, str | bytes, bool]] = [
     ("secret-name", "t5.py", "secret" + '_name = "database-credentials"\n', False),
     ("json-template", "t6.json", '{"pass' + 'word": "${DB_PASSWORD}"}\n', False),
     ("dict-variable", "t7.py", "cfg = {'pass" + "word': password}\n", False),
+    # Behavior (retro 2026-09-27 item 1): private-key containers are refused on
+    # presence (.pem .key .p12 .pfx .jks .keystore .der); public certs (.crt .cer) pass.
+    ("der-private-key", "k.der", b"\x30\x82key\xff", True),
     ("public-cert-crt", "ca.crt", b"\x00cert\xff", False),
     ("public-cert-cer", "server.cer", b"\x00cert\xff", False),
 ]
