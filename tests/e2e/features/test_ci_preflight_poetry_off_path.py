@@ -23,6 +23,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.features.ci_preflight import (
+    Check,
     all_passed,
     checks_for,
     run_preflight,
@@ -45,9 +46,16 @@ def _fake_venv(tmp_path: Path, exit_code: int = 0) -> Path:
     venv_bin = tmp_path / "fakevenv" / "bin"
     _stub_exe(venv_bin, "python")
     # lint-imports (FR4) resolves through the same venv-sibling seam as the other tools.
-    for tool in ("ruff", "mypy", "pytest", "lint-imports"):
+    for tool in ("ruff", "mypy", "pytest", "lint-imports", "dadaia"):
         _stub_exe(venv_bin, tool, exit_code=exit_code)
     return venv_bin
+
+
+def _resolved_checks(python: Path) -> list[Check]:
+    """Every tool-resolved check; `repo hygiene` runs the repo's own bash script (system
+    shell + git), outside the tool-resolution contract pinned here."""
+    checks = checks_for(quick=True, python_executable=str(python), dadaia_bin=None)
+    return [c for c in checks if c.name != "repo hygiene"]
 
 
 @pytest.mark.parametrize(
@@ -69,11 +77,7 @@ def test_preflight_resolved_tool_pass_and_failure_report_with_poetry_off_path(
         venv_bin = tmp_path / "barevenv" / "bin"
         _stub_exe(venv_bin, "python")  # python only; no ruff/mypy/pytest siblings
 
-        checks = checks_for(
-            quick=True,
-            python_executable=str(venv_bin / "python"),
-            dadaia_bin=None,
-        )
+        checks = _resolved_checks(venv_bin / "python")
         # ruff/mypy/pytest fall back to ("poetry", "run", ...) since no sibling exists.
         # lint-imports (FR4) is a REQUIRED tool: instead of a poetry fallback it FAILS
         # CLOSED to an actionable command naming the missing binary + poetry group
@@ -93,11 +97,7 @@ def test_preflight_resolved_tool_pass_and_failure_report_with_poetry_off_path(
 
     venv_bin = _fake_venv(tmp_path, exit_code=stub_exit_code)
 
-    checks = checks_for(
-        quick=True,
-        python_executable=str(venv_bin / "python"),
-        dadaia_bin=None,
-    )
+    checks = _resolved_checks(venv_bin / "python")
 
     if stub_exit_code == 0:
         # No argv references poetry — every tool resolved to the fake-venv sibling.
