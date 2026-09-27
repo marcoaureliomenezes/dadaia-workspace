@@ -34,7 +34,7 @@ tests. `Δ` = prod/test lines; PLAN §2.7 ceilings stop a task, never rise.
 - [x] **T-050-32 — Gate where git runs it; required checks (hooksPath, 32).** Two commits.
   `W:` `f/spec_context/{service,doctor}.py`, `core/workspace_layout.py`, `.github/`, required-checks file, `f/ci_preflight/`
   `blocked by:` none · `delivers:` AC1.3, AC1.7 · `RED:` PLAN §2 hooksPath, WP-32 · Δ −70/+141.
-- [ ] **T-050-33 — `context dead` holds (03 †).** `W:` `f/spec_context/`, `i/git_subprocess.py`
+- [-] **T-050-33 — `context dead` holds (03 †).** `W:` `f/spec_context/`, `i/git_subprocess.py`
   `blocked by:` T-050-23, T-050-28 · `delivers:` unpushed branch/worktree refused, else held · `RED:` PLAN §2 WP-03 · Δ +3/+78.
 
 ### M — never-again mechanism (FR5, FR6)
