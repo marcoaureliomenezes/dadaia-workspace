@@ -523,7 +523,7 @@ def test_baseline_v7_header_and_single_line_patterns() -> None:
     )
     raw = _json.loads(resource.read_text(encoding="utf-8"))
 
-    assert raw["_header"]["version"] == 12
+    assert raw["_header"]["version"] == 13
     excludes_text = " ".join(raw["_header"]["excludes"])
     assert "/root" in excludes_text
     assert "Users" in excludes_text

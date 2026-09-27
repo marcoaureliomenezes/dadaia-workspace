@@ -29,6 +29,7 @@ from tests.fakes import FakeContextStore, FakeGitClient, register_dead
 
 _DASHES = "-" * 5
 _TERM = "zz" + "fixtureterm"
+_V = "hunter2" + "Xq9zL"
 
 #: (case, file name, content, expected verdict: True = refused). The expectation is
 #: the SPEC's (AC5.6 and the bug's expected line), never either engine's output.
@@ -57,6 +58,25 @@ _MATRIX: list[tuple[str, str, str | bytes, bool]] = [
     ("subscript", "c4.py", "access" + '_token = response.json()["t"]\n', False),
     ("aws-runtime", "c5.py", "aws_secret" + '_access_key=runtime_value("x")\n', False),
     ("terraform-attr", "m.tf", "CLIENT_" + "SECRET = some_resource.attr\n", False),
+    # Review 8 R9-1: prefixed names, env/compose, base64, dotted and commented values.
+    ("env-prefixed", ".env", "DB_PASS" + "WORD=" + _V + "\n", True),
+    ("jwt-secret", ".env", "JWT_SEC" + "RET=" + _V + "\n", True),
+    ("openai-key", ".env", "OPENAI_API" + "_KEY=" + _V + "\n", True),
+    ("compose-map", "dc.yml", "      POSTGRES_PASS" + "WORD: " + _V + "\n", True),
+    ("compose-list", "dc2.yml", "  - POSTGRES_PASS" + "WORD=" + _V + "\n", True),
+    ("client-secret", "cs.py", "client_sec" + 'ret = "' + _V + '"\n', True),
+    ("base64-padded", "b.py", "sec" + 'ret = "' + _V + 'AAAA=="\n', True),
+    ("dotted-token", "t.py", "access" + '_token = "eyJhbGc.eyJzdWI.' + _V + '"\n', True),
+    ("trailing-comment", "y.yml", "pass" + "word: " + _V + "  # prod\n", True),
+    ("json-key", "j.json", '{"pass' + 'word": "' + _V + '"}\n', True),
+    ("dict-literal", "d.py", "cfg = {'pass" + "word': '" + _V + "'}\n", True),
+    ("env-template-quoted", "t1.yml", "pass" + 'word: "${DB_PASSWORD}"\n', False),
+    ("env-template-bare", "t2.yml", "pass" + "word: ${DB_PASSWORD}\n", False),
+    ("jinja-template", "t3.py", "api" + '_key = "{{ vault_key }}"\n', False),
+    ("angle-placeholder", "t4.env", "API" + "_KEY=<your-key-here>\n", False),
+    ("secret-name", "t5.py", "secret" + '_name = "database-credentials"\n', False),
+    ("json-template", "t6.json", '{"pass' + 'word": "${DB_PASSWORD}"}\n', False),
+    ("dict-variable", "t7.py", "cfg = {'pass" + "word': password}\n", False),
     ("public-cert-crt", "ca.crt", b"\x00cert\xff", False),
     ("public-cert-cer", "server.cer", b"\x00cert\xff", False),
 ]
