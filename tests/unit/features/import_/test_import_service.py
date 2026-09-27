@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.container import scan_publish_candidates
 from dadaia_workspace.core.models.spec_context import (
     AssociatedRepo,
     ContextState,
@@ -64,6 +65,7 @@ def _importer(tmp_path: Path, store: FakeContextStore) -> ImportService:
         git_client=FakeGitClient(),
         workspace_root=tmp_path,
         install_hooks=lambda _repo: None,
+        secret_scan=scan_publish_candidates,
     )
     return ImportService(contexts)
 

@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.container import scan_publish_candidates
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.exceptions import ContextStateError, GitSyncError
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
@@ -73,7 +74,9 @@ def env(tmp_path: Path) -> tuple[SpecContextService, Path, Path]:
     _git(tmp_path, "init", "-q", "--bare", "-b", "main", str(bare))
     store = JsonContextStore(root / ".dadaia" / "states")
     store.save(SpecContextProject("proj", ContextState.ALIVE, "proj", bare.as_uri(), "2026-01-01"))
-    svc = SpecContextService(store, GitSubprocessClient(), root, lambda _repo: None)  # type: ignore[arg-type]
+    svc = SpecContextService(
+        store, GitSubprocessClient(), root, lambda _repo: None, scan_publish_candidates
+    )  # type: ignore[arg-type]
     return svc, root / "repos" / "proj", bare
 
 

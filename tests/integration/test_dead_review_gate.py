@@ -24,6 +24,7 @@ import pytest
 
 pytest.importorskip("fcntl")
 
+from dadaia_workspace.container import scan_publish_candidates
 from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     ContextState,
     SpecContextProject,
@@ -83,6 +84,7 @@ def _make_service(workspace_root: Path) -> tuple[SpecContextService, FakeContext
         git_client=_WritableObjectsGitClient(),
         workspace_root=workspace_root,
         install_hooks=lambda _repo: None,
+        secret_scan=scan_publish_candidates,
     )
     return service, store
 
@@ -166,8 +168,8 @@ def test_dead_refuses_untracked_then_commit_secret_free_pushes_and_planted_secre
     remote3 = _bare_remote(secret_remote_root)
     repo3 = workspace_root / "repos" / "proj-repo-secret"
     _clone_with_initial_commit(remote3, repo3)
-    secret = aws_key_shape()
-    (repo3 / "creds.env").write_text(f"AWS_ACCESS_KEY_ID={secret}\n")
+    planted = aws_key_shape()
+    (repo3 / "creds.env").write_text(f"AWS_ACCESS_KEY_ID={planted}\n")
 
     service3, store3 = _make_service(workspace_root)
     _alive_ctx(store3, "proj-repo-secret")
@@ -176,7 +178,7 @@ def test_dead_refuses_untracked_then_commit_secret_free_pushes_and_planted_secre
         service3.dead("proj", commit=True)
 
     assert "creds.env" in str(exc.value)
-    assert secret not in str(exc.value)  # redacted
+    assert planted not in str(exc.value)  # redacted
     # Push blocked: repo kept, remote unchanged, context still ALIVE.
     assert repo3.exists()
     assert store3.get("proj").state == ContextState.ALIVE  # type: ignore[union-attr]
@@ -225,6 +227,7 @@ def test_dead_proceeds_gitignored_clean_tree_and_readonly_objects_real_git(
         git_client=_WritableObjectsGitClient(),
         workspace_root=workspace_root,
         install_hooks=lambda _repo: None,
+        secret_scan=scan_publish_candidates,
     )
     _alive_ctx(store2, "proj-repo-clean")
     _make_tree_writable(repo2)
@@ -246,6 +249,7 @@ def test_dead_proceeds_gitignored_clean_tree_and_readonly_objects_real_git(
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
         install_hooks=lambda _repo: None,
+        secret_scan=scan_publish_candidates,
     )
     _alive_ctx(store3, "proj-readonly")
 

@@ -53,6 +53,7 @@ def build_spec_context_service(workspace_root: Path) -> SpecContextService:
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
         install_hooks=install_git_hooks,
+        secret_scan=scan_publish_candidates,
     )
 
 
@@ -128,6 +129,25 @@ def load_denylist_baseline_patterns() -> tuple[BaselinePatternLike, ...]:
     from dadaia_workspace.infrastructure.privacy_check import load_baseline_patterns
 
     return load_baseline_patterns()
+
+
+def scan_publish_candidates(repo: Path, rels: list[str]) -> dict[str, str]:
+    """AC5.6: the pre-push matcher, in-process, over the files baseline and ``dead
+    --commit`` are about to commit — a repo with ``core.hooksPath`` never runs the hook.
+    Read as the object reader reads a blob: undecodable bytes are scanned by path only."""
+    from dadaia_workspace.core.models.git_scan import ScannedObject
+    from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
+
+    objects = []
+    for rel in rels:
+        if (repo / rel).is_file():
+            data = (repo / rel).read_bytes()
+            try:
+                objects.append(ScannedObject(rel, "", data.decode("utf-8"), decodable=True))
+            except UnicodeDecodeError:
+                objects.append(ScannedObject(rel, "", "", decodable=False))
+    outcome = scan_objects(objects, load_denylist_terms(), load_denylist_baseline_patterns())
+    return {h.path: f"{h.source_layer} '{h.masked_term}' (line {h.line})" for h in outcome.hits}
 
 
 def is_source_repo_root(path: Path) -> bool:

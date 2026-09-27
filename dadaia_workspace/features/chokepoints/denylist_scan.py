@@ -26,10 +26,11 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Protocol
 
 from dadaia_workspace.core.models.git_scan import ScannedObject
+from dadaia_workspace.core.redaction import UNSAFE_FORMAT_CHARS_RE
 
 __all__ = [
     "BaselinePatternLike",
@@ -161,7 +162,8 @@ def _first_match(
     (A5.2 unaffected). Suppression is per-CANDIDATE, so a line whose every candidate is
     suppressed simply continues to the next line — the short-circuit property above is
     unchanged."""
-    prior_text = obj.prior_text
+    # AC5.6: a control character never splits a term out of reach — stripped first.
+    prior_text = None if obj.prior_text is None else UNSAFE_FORMAT_CHARS_RE.sub("", obj.prior_text)
     prior_lower = prior_text.lower() if prior_text is not None else None
 
     def _term_suppressed(term: str) -> bool:
@@ -182,7 +184,7 @@ def _first_match(
             match.group(0).lower() == value_lower for match in pattern.regex.finditer(prior_text)
         )
 
-    for lineno, line_text in enumerate(obj.text.splitlines(), start=1):
+    for lineno, line_text in enumerate(UNSAFE_FORMAT_CHARS_RE.sub("", obj.text).splitlines(), 1):
         line_candidates: list[Hit] = []
         lowered = line_text.lower()
         for term, _reason in terms:
@@ -239,6 +241,12 @@ def scan_objects(
     oversized_notes: list[OversizedNote] = []
     skipped = 0
     for obj in objects:
+        # AC5.6: a structural shape in the path refuses (a key file by its suffix, binary
+        # or not), line 0; an operator term there is masked by PathMasker, not refused.
+        path_hit = _first_match(replace(obj, text=obj.path, prior_text=None), [], pattern_list)
+        if path_hit is not None:
+            hits.append(replace(path_hit, line=0))
+            continue
         if not obj.decodable:
             skipped += 1
             continue

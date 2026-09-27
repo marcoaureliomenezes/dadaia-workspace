@@ -17,6 +17,7 @@ import pytest
 
 pytest.importorskip("fcntl")
 
+from dadaia_workspace.container import scan_publish_candidates
 from dadaia_workspace.core.cli_line import shell_line  # noqa: E402
 from dadaia_workspace.core.exceptions import RepoUrlMissingError  # noqa: E402
 from dadaia_workspace.core.models.spec_context import (  # noqa: E402
@@ -72,6 +73,7 @@ def _setup(tmp_path: Path, lib_url: str) -> tuple[SpecContextService, FakeContex
         git_client=GitSubprocessClient(),
         workspace_root=ws,
         install_hooks=lambda _repo: None,
+        secret_scan=scan_publish_candidates,
     )
     return service, store, ws
 

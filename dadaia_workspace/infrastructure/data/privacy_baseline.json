@@ -1,8 +1,8 @@
 {
   "_header": {
     "name": "public-privacy baseline structural denylist",
-    "version": 10,
-    "description": "Versioned, fail-closed baseline of STRUCTURAL regex patterns scanned against public/ assets when no operator denylist is present. Operator terms (DADAIA_PRIVACY_DENYLIST / .dadaia/states/privacy_denylist.json) are ADDITIVE and merge on top of this baseline. Patterns are conservative to avoid false positives on SHA hashes in lockfiles, doc/loopback IP ranges, and example hostnames. Edit only via an approved release task; bump 'version' on change. Every pattern carrying an 'exclude_regex' carve-out MUST also carry an 'exclude_rationale' string (v0.4.3 FR12/A12.1) — a doctor/CI check (privacy_check._check_baseline_exclude_rationale) flags any carve-out missing one, on every 'dadaia public doctor' run.",
+    "version": 11,
+    "description": "Versioned, fail-closed baseline of STRUCTURAL regex patterns scanned against public/ assets when no operator denylist is present. Operator terms (DADAIA_PRIVACY_DENYLIST / .dadaia/states/privacy_denylist.json) are ADDITIVE and merge on top of this baseline. Patterns are conservative to avoid false positives on SHA hashes in lockfiles, doc/loopback IP ranges, and example hostnames. Edit only via an approved release task; bump 'version' on change. Every pattern carrying an 'exclude_regex' carve-out MUST also carry an 'exclude_rationale' string (v0.4.3 FR12/A12.1) — a doctor/CI check (privacy_check._check_baseline_exclude_rationale) flags any carve-out missing one, on every 'dadaia public doctor' run. Since v11 (0.5.0 AC5.6) this file plus the operator terms is the ONE secret registry: the pre-push matcher applies it, and baseline / dead --commit call that same matcher in-process; every pattern also runs against each pushed path, and key-file-path (anchored to a whole path segment at the end of its input) is the one pattern written for paths.",
     "released_in": "v0.1.10",
     "excludes": [
       "127.0.0.0/8 (loopback)",
@@ -73,9 +73,21 @@
       "exclude_rationale": "example.com/.org/.net, *.example, RFC-2606 reserved TLDs (.invalid/.test/.example/.localhost), workspace.local, GitHub's users.noreply.github.com, and the law-mandated noreply@anthropic.com Co-Authored-By trailer address (local-part-anchored, exact literal only) — all conventional non-identifying addresses, never a real operator mailbox."
     },
     {
+      "id": "private-key-block",
+      "regex": "-----BEGIN[ A-Z]*PRIVATE KEY-----",
+      "reason": "PEM private-key block",
+      "exclude_regex": null
+    },
+    {
+      "id": "key-file-path",
+      "regex": "(?:\\A|/)[\\w.-]+\\.(?:pem|key|p12|pfx|crt|cer|der|keystore|jks)\\Z",
+      "reason": "cryptographic key or certificate file (flagged by its suffix, binary or not)",
+      "exclude_regex": null
+    },
+    {
       "id": "secret-token",
-      "regex": "(?:(?:aws_secret_access_key|api[_-]?key|secret[_-]?key|access[_-]?token|bearer)\\s*[:=]\\s*['\"]?)(?:[A-Za-z0-9_\\-]{24,})|(?:AKIA[0-9A-Z]{16})|(?:ghp_[A-Za-z0-9]{36})|(?:sk-[A-Za-z0-9]{32,})|(?:xox[baprs]-[A-Za-z0-9-]{10,})",
-      "reason": "high-entropy secret-looking credential token",
+      "regex": "(?i:(?:password|passwd|secret|aws_secret_access_key|api[_-]?key|secret[_-]?key|access[_-]?token|private[_-]?key|bearer)\\s*[:=]\\s*['\"]?[A-Za-z0-9/+_\\-]{8,})|(?:AKIA|ASIA)[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|glpat-[A-Za-z0-9_\\-]{20,}|(?:sk|rk)_live_[A-Za-z0-9]{16,}|sk-[A-Za-z0-9]{32,}|xox[baprs]-[A-Za-z0-9-]{10,}",
+      "reason": "secret-looking credential token or assignment",
       "exclude_regex": null
     }
   ]

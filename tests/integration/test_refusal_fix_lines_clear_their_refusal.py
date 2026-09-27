@@ -472,6 +472,10 @@ def _baseline_denylisted(world: World) -> list[str]:
     world.onboard()
     world.deny()
     (world.repo / "AGENTS.md").write_text(f"a {_TERM}\n", encoding="utf-8")
+    # Committed before the publish, so only the gate sees it: the in-process preflight
+    # (AC5.6) refuses an untracked onboarding file first (_require_publishable#0).
+    world.git(world.repo, "add", "AGENTS.md")
+    world.git(world.repo, "commit", "-qm", "draft")
     return ["context", "baseline", "proj"]
 
 

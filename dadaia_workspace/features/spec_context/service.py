@@ -37,9 +37,6 @@ from dadaia_workspace.core.template_history import was_shipped
 from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
-from dadaia_workspace.infrastructure.privacy_check import (
-    scan_file_for_secrets as _scan_file_for_secrets,
-)
 
 _log = logging.getLogger(__name__)
 
@@ -56,6 +53,14 @@ class InstallHooks(Protocol):
     """
 
     def __call__(self, repo_root: Path) -> object: ...
+
+
+class SecretScan(Protocol):
+    """The pre-push matcher, run in-process by the composition root over the files a
+    publish is about to commit (AC5.6: one registry, one engine); returns one masked
+    finding per offending repo-relative path — empty when clean."""
+
+    def __call__(self, repo: Path, rels: list[str]) -> dict[str, str]: ...
 
 
 class DeadReviewRequiredError(DadaiaError):
@@ -174,11 +179,13 @@ class SpecContextService:
         git_client: GitSubprocessClient,
         workspace_root: Path,
         install_hooks: InstallHooks,
+        secret_scan: SecretScan,
     ) -> None:
         self._store = context_store
         self._git = git_client
         self._workspace_root = workspace_root
         self._install_hooks = install_hooks
+        self._secret_scan = secret_scan
 
     def _repos_dir(self) -> Path:
         return self._workspace_root / "repos"
@@ -638,13 +645,9 @@ class SpecContextService:
     def _require_publishable(self, name: str, repo: Path) -> None:
         """Refuse, before any write, a secret in an untracked onboarding file the publish
         would commit — fix: the publish again, once the operator removed each value."""
-        flagged = {
-            rel: sorted(set(hits))
-            for rel in self._git.list_untracked(repo)
-            if rel.split("/")[0] in _ONBOARDING and (hits := _scan_file_for_secrets(repo / rel))
-        }
-        if flagged:
-            report = "\n".join(f"  {rel}: {', '.join(hits)}" for rel, hits in flagged.items())
+        rels = [r for r in self._git.list_untracked(repo) if r.split("/")[0] in _ONBOARDING]
+        if flagged := self._secret_scan(repo, rels):
+            report = "\n".join(f"  {rel}: {hit}" for rel, hit in flagged.items())
             fix = fix_line(self._workspace_root, "context", "baseline", name)
             raise DeadSecretFoundError(
                 f"Context '{name}': secret scan blocked the publish (values redacted) — "
@@ -696,13 +699,8 @@ class SpecContextService:
             )
 
         # commit=True: scan the content of the files we are about to newly commit.
-        flagged = {
-            rel: sorted(set(hits))
-            for rel in untracked
-            if (repo_path / rel).is_file() and (hits := _scan_file_for_secrets(repo_path / rel))
-        }
-        if flagged:
-            report = "\n".join(f"  {rel}: {', '.join(hits)}" for rel, hits in flagged.items())
+        if flagged := self._secret_scan(repo_path, untracked):
+            report = "\n".join(f"  {rel}: {hit}" for rel, hit in flagged.items())
             fix = git_line(repo_path, "stash", "push", "-u", "--", *flagged)
             raise DeadSecretFoundError(
                 f"Context '{name}': repo '{repo_slug}' secret scan blocked dead() "

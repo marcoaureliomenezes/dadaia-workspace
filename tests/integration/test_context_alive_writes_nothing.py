@@ -16,6 +16,7 @@ import pytest
 
 pytest.importorskip("fcntl")
 
+from dadaia_workspace.container import scan_publish_candidates
 from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     AssociatedRepo,
     ContextState,
@@ -74,6 +75,7 @@ def test_alive_on_dead_context_writes_no_specs_commits_nothing_and_hooks_every_r
         git_client=GitSubprocessClient(),
         workspace_root=workspace,
         install_hooks=lambda repo: install_git_hooks(repo, force=True),
+        secret_scan=scan_publish_candidates,
     )
 
     ctx = service.alive("app")
