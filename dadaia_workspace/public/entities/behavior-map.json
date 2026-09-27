@@ -337,7 +337,7 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:886a589fc203d3e5f43ed7949f4d41c6896af8af904e07e885e5804c205d7ef7",
-        "skill": "sha256:5dd2a2b72a9568a50184f70a1a846fefb00f3b888e8241f7e93db9e6211c310d",
+        "skill": "sha256:a285b2650edd938d45ea64bd74d84e2625cee772b2b696572dbaaa779647ab86",
         "scripts": "sha256:260c8583eb07bfef664749f5ab542f3121cbd2d07634cc10527eb643e656e4de",
         "scoped": []
       },
