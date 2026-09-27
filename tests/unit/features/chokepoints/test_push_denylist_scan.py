@@ -261,6 +261,24 @@ def test_refusal_message_shape_and_ten_item_cap(tmp_path: Path) -> None:
     assert _SYNTHETIC_TERM not in message
 
 
+def test_refusal_names_runtime_composition_as_the_fixture_remedy(tmp_path: Path) -> None:
+    """denylist-refusal-omits-the-runtime-composition-remedy: the refusal names the edit."""
+    source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): [_obj("t.py", f"{_SYNTHETIC_TERM}\n")]})
+    decision = push_gate_decision(
+        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
+        gitflow=DEFAULT,
+        fixes=gate_fixes(),
+        object_source=source,
+        repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
+    )
+    assert (
+        "A test fixture that needs a secret shape composes it at runtime "
+        "(string concatenation), never as a tracked literal."
+    ) in decision.message
+
+
 # ---------------------------------------------------------------------------
 # A6.1 — a simulated git failure refuses, naming the failure + --no-verify.
 # ---------------------------------------------------------------------------

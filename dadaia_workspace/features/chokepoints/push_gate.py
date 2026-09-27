@@ -135,7 +135,9 @@ def _compose_denylist_refusal(hits: list[tuple[PushRef, Hit]], path_masker: Path
     if remainder > 0:
         lines.append(f"  ... and {remainder} more offending object(s).")
     lines.append(
-        "  The range scope means already-published history never needs a rewrite. If "
+        "  A test fixture that needs a secret shape composes it at runtime (string "
+        "concatenation), never as a tracked literal. "
+        "The range scope means already-published history never needs a rewrite. If "
         "this push is a genuine emergency, git's sanctioned, traceable bypass is "
         "`git push --no-verify` (discouraged; leaves a reflog trace)."
     )
