@@ -41,7 +41,13 @@ from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 _log = logging.getLogger(__name__)
 
 #: What onboarding writes into a main repo — the only paths ``baseline`` commits.
-_ONBOARDING = ("specs", "specs-bkp", "AGENTS.md")
+_ONBOARDING = ("specs", "specs-bkp", *(dest for _, dest in workspace_layout.REPO_LAW))
+
+
+def _onboarded(rel: str) -> bool:
+    return any(rel == p or rel.startswith(f"{p}/") for p in _ONBOARDING)
+
+
 _TAG_RE = re.compile(r"v?(\d+)\.(\d+)\.(\d+)")
 
 
@@ -613,7 +619,8 @@ class SpecContextService:
             if start := next((f"origin/{b}" for b in roles if b in heads), ""):
                 roots = git("rev-list", "--max-parents=0", "HEAD").split()
                 ours = all(
-                    {*git("ls-tree", "--name-only", r).split()} <= {*_ONBOARDING} for r in roots
+                    all(map(_onboarded, git("ls-tree", "-r", "--name-only", r).split()))
+                    for r in roots
                 )
                 git("merge", "--no-edit", *["--allow-unrelated-histories"] * ours, start)
             at = f"refs/remotes/origin/{flow.principal}" if heads else anchor
@@ -649,7 +656,7 @@ class SpecContextService:
     def _require_publishable(self, name: str, repo: Path) -> None:
         """Refuse, before any write, a secret in an untracked onboarding file the publish
         would commit — fix: the publish again, once the operator removed each value."""
-        rels = [r for r in self._git.list_untracked(repo) if r.split("/")[0] in _ONBOARDING]
+        rels = [r for r in self._git.list_untracked(repo) if _onboarded(r)]
         if flagged := self._secret_scan(repo, rels):
             report = "\n".join(f"  {rel}: {hit}" for rel, hit in flagged.items())
             fix = fix_line(self._workspace_root, "context", "baseline", name)

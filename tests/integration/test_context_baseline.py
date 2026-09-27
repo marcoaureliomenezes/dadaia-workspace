@@ -572,3 +572,15 @@ def test_the_publish_code_never_rewrites_forces_or_deletes() -> None:
         text = (pkg / rel).read_text(encoding="utf-8")
         for verb in ('"-f"', '"reset"', '"rebase"', '"--force"', '"--delete"', "--republish"):
             assert verb not in text, f"{rel} carries {verb}"
+
+
+def test_the_tests_law_specs_init_writes_is_published(env) -> None:
+    """sa-public-install-writes-the-root-map-into-product-repos#K3: the publishable paths
+    are REPO_LAW's full relative paths, so ``tests/AGENTS.md`` is published too."""
+    svc, repo, bare = env
+    _clone_onboarded(bare, repo)
+    (repo / "tests").mkdir()
+    (repo / "tests" / "AGENTS.md").write_text("# tests law\n", encoding="utf-8")
+    svc.baseline("proj")
+    tree = _git(bare, "ls-tree", "-r", "--name-only", "main").splitlines()
+    assert sorted(tree) == ["AGENTS.md", "specs/constitution.md", "tests/AGENTS.md"]

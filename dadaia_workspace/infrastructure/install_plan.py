@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
 
 from dadaia_workspace.core.models.agent_model_policy import (
     AgentModelPolicyOverlay,
@@ -21,9 +20,9 @@ from dadaia_workspace.infrastructure.public_assets_common import OverwritePolicy
 @dataclass(frozen=True)
 class InstallPlan:
     """``install()`` builds exactly one ``InstallPlan`` from its
-    ``(workspace_root, harness, force, scope)`` parameters, THEN runs the rule
+    ``(workspace_root, harness, force)`` parameters, THEN runs the rule
     table over it — the flags never travel any further than this dataclass. ``force``
-    is resolved to an :class:`OverwritePolicy`; ``harness``/``scope`` are resolved to
+    is resolved to an :class:`OverwritePolicy`; ``harness`` is resolved to
     the concrete harness targets and active-harness set the rule builders select on;
     the agent-model overlay and the resolved core-agent roster are loaded once and
     carried alongside so no rule builder re-reads them.
@@ -32,10 +31,7 @@ class InstallPlan:
     workspace_root: Path
     agentic_dir: Path
     harness: str | None
-    scope: Literal["all", "repos-only", "workspace-only"]
     overwrite: OverwritePolicy
-    #: Which guardrail projections the scope selects: subset of {"workspace", "repos"}.
-    guardrail_targets: frozenset[str]
     harness_targets: tuple[str, ...]
     active_harnesses: frozenset[str]
     overlay: AgentModelPolicyOverlay | None

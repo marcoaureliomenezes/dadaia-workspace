@@ -9,15 +9,10 @@ strictly more faithful test than calling a bespoke doctor helper directly.
 
 Verifies that ``FileSystemPublicAssetManager.doctor()`` emits:
   - ``root:AGENTS.md`` — always present, drift-detecting.
-  - ``repos/<slug>:AGENTS.md`` — per registry-listed
-    consumer (v0.1.58 FR4), provenance-gated ``[foreign]`` for a bannerless/
-    hand-authored source (Ruling 16).
-  - Nothing at all for a consumer repo absent from the registry (Ruling G).
 """
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
@@ -34,7 +29,6 @@ def _rendered(result: object) -> list[str]:
 
 
 _SOURCE_CONTENT = b"# AGENTS\n\nLib-general guardrail content for testing.\n"
-_CONSUMER_VERSION = "0.0.0"
 
 
 def _make_minimal_public(tmp_path: Path) -> Path:
@@ -45,43 +39,6 @@ def _make_minimal_public(tmp_path: Path) -> Path:
     data_dir.mkdir()
     (data_dir / "AGENTS.md").write_bytes(_SOURCE_CONTENT)
     return public_dir
-
-
-def _register_context(workspace_root: Path, slug: str) -> None:
-    """Register a consumer repo in ``spec_contexts.json`` (v0.1.58 FR4 registry detection)."""
-    states_dir = workspace_root / ".dadaia" / "states"
-    states_dir.mkdir(parents=True, exist_ok=True)
-    registry = states_dir / "spec_contexts.json"
-    data = (
-        json.loads(registry.read_text(encoding="utf-8"))
-        if registry.exists()
-        else {"schema_version": "2", "contexts": []}
-    )
-    data["contexts"].append(
-        {
-            "name": slug,
-            "state": "alive",
-            "repo_slug": slug,
-            "repo_url": f"https://example.test/{slug}.git",
-            "created_at": "2026-07-04T00:00:00Z",
-            "alive_since": "2026-07-04T00:00:00Z",
-            "dead_since": None,
-            "current_branch": "main",
-        }
-    )
-    registry.write_text(json.dumps(data, indent=2), encoding="utf-8")
-
-
-def _add_consumer(workspace_root: Path, slug: str) -> Path:
-    """Register a marker-less consumer repo via the workspace registry (v0.1.58 FR4)."""
-    consumer = workspace_root / "repos" / slug
-    (consumer / ".dadaia" / "agentic").mkdir(parents=True)
-    manifest = {"schema_version": "1", "package_version": _CONSUMER_VERSION}
-    (consumer / ".dadaia" / "agentic" / "manifest.json").write_text(
-        json.dumps(manifest), encoding="utf-8"
-    )
-    _register_context(workspace_root, slug)
-    return consumer
 
 
 def _mgr(public_dir: Path) -> FileSystemPublicAssetManager:
@@ -113,63 +70,3 @@ def test_root_agents_md_detects_drift_when_tampered(tmp_path: Path) -> None:
     lines = _rendered(manager.doctor(ws))
     assert "[drift] root:AGENTS.md" in lines, lines
     assert not any("CLAUDE.md" in ln for ln in lines), lines
-
-
-def test_consumer_pair_foreign_for_bannerless_source(tmp_path: Path) -> None:
-    """A staged AGENTS.md with no canonical banner classifies the CONSUMER pair
-    [foreign] (never [drift]/[missing]) while the lib-owned root pair stays [ok]
-    (Ruling 16, v0.1.60 FR9)."""
-    public_dir = _make_minimal_public(tmp_path)
-    ws = tmp_path / "ws"
-    ws.mkdir()
-    slug = "sample-consumer"
-    _add_consumer(ws, slug)
-    manager = _mgr(public_dir)
-    manager.stage(ws)
-    manager.install(ws, force=True)
-    lines = _rendered(manager.doctor(ws))
-    assert "[ok] root:AGENTS.md" in lines, lines
-    assert f"[foreign] repos/{slug}:AGENTS.md" in lines, lines
-    assert not any("CLAUDE.md" in ln for ln in lines), lines
-
-
-def test_consumer_pair_foreign_for_hand_authored_agents_md(tmp_path: Path) -> None:
-    """The consumer pair is [foreign] only — no legacy [drift]/[missing] — and the
-    hand-authored file survives byte-identical with no CLAUDE.md orphan."""
-    public_dir = _make_minimal_public(tmp_path)
-    ws = tmp_path / "ws"
-    ws.mkdir()
-    slug = "game"
-    consumer = _add_consumer(ws, slug)
-    hand_authored = "# My Game Repo\n\nHand-authored, repo-owned rules. NOT lib-originated.\n"
-    (consumer / "AGENTS.md").write_text(hand_authored, encoding="utf-8")
-
-    manager = _mgr(public_dir)
-    manager.stage(ws)
-    manager.install(ws, force=True)
-
-    assert (consumer / "AGENTS.md").read_text(encoding="utf-8") == hand_authored
-    assert not (consumer / "CLAUDE.md").exists()
-
-    lines = _rendered(manager.doctor(ws))
-    assert f"[foreign] repos/{slug}:AGENTS.md" in lines, lines
-    consumer_lines = [ln for ln in lines if f"repos/{slug}" in ln]
-    assert consumer_lines and all(ln.startswith("[foreign]") for ln in consumer_lines), (
-        f"the consumer pair must be [foreign] only — no legacy [drift]/[missing].\n  {consumer_lines}"
-    )
-
-
-def test_unregistered_consumer_is_invisible_to_doctor(tmp_path: Path) -> None:
-    """A repo NOT registered in spec_contexts.json contributes zero doctor lines
-    (registry-based detection, v0.1.58 FR4, Ruling G) — only the root pair remains."""
-    public_dir = _make_minimal_public(tmp_path)
-    ws = tmp_path / "ws"
-    ws.mkdir()
-    no_marker = ws / "repos" / "no-marker-repo"
-    no_marker.mkdir(parents=True)
-    manager = _mgr(public_dir)
-    manager.stage(ws)
-    manager.install(ws, force=True)
-    lines = _rendered(manager.doctor(ws))
-    assert not any("no-marker-repo" in ln for ln in lines), lines
-    assert "[ok] root:AGENTS.md" in lines, lines

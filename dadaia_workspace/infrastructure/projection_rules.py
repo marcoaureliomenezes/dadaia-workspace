@@ -61,9 +61,6 @@ from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
     hook_file_payloads,
     hook_wrapper_contents,
 )
-from dadaia_workspace.infrastructure.workspace_guardrail import (
-    _agents_md_source,
-)
 
 # ---------------------------------------------------------------------------
 # Harness-independent rules: guardrail pair (root), law, dadaia-family AGENTS.md
@@ -71,19 +68,10 @@ from dadaia_workspace.infrastructure.workspace_guardrail import (
 
 
 def _guardrail_pair_rules(plan: InstallPlan) -> tuple[ProjectionRule, ...]:
-    """The root ``AGENTS.md`` map — one rule, one destination (collapsed the
-    pair: the Claude bridge stub is retired, Claude Code reads ``AGENTS.md`` natively).
-
-    Consumer-repo fan-out (``repos/<slug>:AGENTS.md``) is provenance-gated, N-target
-    discovery-based writing with foreign-authorship detection — a fundamentally
-    different mechanism from "one rule, one destination" — and stays the bespoke
-    ``workspace_guardrail._install_guardrail_pair`` path, invoked directly by the
-    manager.
-    """
-    if "workspace" not in plan.guardrail_targets:
-        return ()
-    src = _agents_md_source(plan.agentic_dir)
-    if src is None:
+    """The root ``AGENTS.md`` map — one source (``data/AGENTS.md``), one destination;
+    ``public install`` never writes under ``repos/`` (repo law is ``specs init``'s)."""
+    src = plan.agentic_dir / "data" / "AGENTS.md"
+    if not src.is_file():
         return ()
     return (
         bytes_rule("root:AGENTS.md", "agents", plan.workspace_root / "AGENTS.md", src.read_bytes()),

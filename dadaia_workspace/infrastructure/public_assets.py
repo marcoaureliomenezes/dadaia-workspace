@@ -3,8 +3,7 @@
 K3 (v0.5.1): install/doctor are now two folds over one ``ProjectionRule`` table
 (``infrastructure/projection_rules.py``) — ``install`` writes ``render``, ``doctor``
 compares against it. What remains here is genuinely bespoke: staging, plan
-resolution, the consumer-repo guardrail fan-out (N-target, provenance-gated — not a
-fixed-destination rule), install-ledger reconciliation, and the harness-independent
+resolution, install-ledger reconciliation, and the harness-independent
 doctor checks (privacy, entities-derivation, memory-phase, rule-corpus, symlink-target,
 git-dirty).
 """
@@ -16,7 +15,6 @@ import os
 import subprocess
 from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Literal
 
 from dadaia_workspace.core.agent_model_templates import CORE_AGENTS, resolve_agent_model
 from dadaia_workspace.core.atomic_write import atomic_write
@@ -76,13 +74,7 @@ from dadaia_workspace.infrastructure.public_assets_common import (
     iter_public_files,
 )
 from dadaia_workspace.infrastructure.runtime_config import codex_config as _build_codex_config
-from dadaia_workspace.infrastructure.workspace_guardrail import (
-    _agents_md_source,
-    _consumer_repos_for_root,
-    _doctor_consumer_pair_lines,
-    _install_guardrail_pair,
-    _is_source_repo_root,
-)
+from dadaia_workspace.infrastructure.workspace_guardrail import _is_source_repo_root
 
 __all__ = [
     "FileSystemPublicAssetManager",
@@ -292,7 +284,6 @@ class FileSystemPublicAssetManager:
         workspace_root: Path,
         harness: str | None = None,
         force: bool = False,
-        scope: Literal["all", "repos-only", "workspace-only"] = "all",
     ) -> list[str]:
         self._validate_install_harness(harness)
         self._guard_source_root_install(workspace_root)
@@ -303,37 +294,19 @@ class FileSystemPublicAssetManager:
             installed.extend(self.stage(workspace_root))
 
         plan = self._resolve_install_plan(
-            workspace_root, agentic_dir, harness, OverwritePolicy.of(force), scope
+            workspace_root, agentic_dir, harness, OverwritePolicy.of(force)
         )
         rules = projection_rules(plan)
         transcript = install_rules(rules, force=plan.overwrite.force)
         installed.extend(transcript.render())
 
-        # Consumer-repo guardrail fan-out (bespoke: N-target discovery + provenance
-        # gating, never a fixed-destination rule).
-        guardrail_managed: list[Path] = []
-        if "repos" in plan.guardrail_targets:
-            data_agents_md = agentic_dir / "data" / "AGENTS.md"
-            if data_agents_md.is_file():
-                guardrail_managed = _install_guardrail_pair(
-                    data_agents_md,
-                    workspace_root,
-                    plan.overwrite.force,
-                    installed,
-                    targets={"repos"},
-                )
-
         # LEDGER RECONCILIATION (bug retired-lib-asset-leaves-orphan-projection): the
         # desired state is diffed against the RECORD of what a prior install wrote —
         # never against whatever the current source happens to carry, which is blind to
-        # a retired family. Full reconciliation (prune) runs only on an all-target,
-        # all-scope install; a scoped install merges its entries and never prunes.
+        # a retired family. Full reconciliation (prune) runs on every whole install;
+        # `harness add`'s one-harness install merges its entries and never prunes.
         self._reconcile_install_ledger(
-            workspace_root,
-            transcript,
-            guardrail_managed,
-            installed,
-            full=(plan.harness is None and plan.scope == "all"),
+            workspace_root, transcript, installed, full=plan.harness is None
         )
 
         return installed
@@ -365,7 +338,6 @@ class FileSystemPublicAssetManager:
         agentic_dir: Path,
         harness: str | None,
         overwrite: OverwritePolicy,
-        scope: Literal["all", "repos-only", "workspace-only"],
     ) -> InstallPlan:
         """Resolve ``install()``'s arguments ONCE (FR6): the single translation point.
 
@@ -395,15 +367,7 @@ class FileSystemPublicAssetManager:
             workspace_root=workspace_root,
             agentic_dir=agentic_dir,
             harness=harness,
-            scope=scope,
             overwrite=overwrite,
-            guardrail_targets=frozenset(
-                {
-                    "all": ("workspace", "repos"),
-                    "workspace-only": ("workspace",),
-                    "repos-only": ("repos",),
-                }[scope]
-            ),
             harness_targets=harness_targets,
             active_harnesses=active_harnesses,
             overlay=overlay,
@@ -455,7 +419,6 @@ class FileSystemPublicAssetManager:
         self,
         workspace_root: Path,
         transcript: Transcript,
-        extra_managed: list[Path],
         installed: list[str],
         *,
         full: bool,
@@ -469,11 +432,8 @@ class FileSystemPublicAssetManager:
         surfaced with a ``[warn]``; a missing/corrupt previous ledger bootstraps —
         record everything, prune nothing.
 
-        Paths arrive TYPED only: the rule table via ``transcript.paths()``, the bespoke
-        consumer-repo guardrail fan-out via *extra_managed* (its return value). The
-        historical two-prefix string re-parse of *installed* is deleted (F006): it
-        silently dropped ``[updated]`` restores — a restored consumer AGENTS.md never
-        reached the ledger.
+        Paths arrive TYPED only, from the rule table. A path under ``repos/`` a former
+        release ledgered is forgotten, never pruned: install owns nothing in a repo.
         """
         states_dir = workspace_root / ".dadaia" / "states"
         ws = workspace_root.resolve()
@@ -502,16 +462,16 @@ class FileSystemPublicAssetManager:
         for line in transcript.lines:
             _record(line.path, line.kind)
 
-        for path in extra_managed:
-            _record(path, "file")
-
         previous = self._install_ledger_store.read(states_dir)
-        merged: dict[str, LedgerEntry] = {}
-        if previous is not None:
-            merged.update(previous.by_relpath())
+        owned = {
+            rel: entry
+            for rel, entry in (previous.by_relpath() if previous is not None else {}).items()
+            if not rel.startswith("repos/")
+        }
+        merged: dict[str, LedgerEntry] = dict(owned)
 
         if full and previous is not None:
-            for rel_posix, entry in previous.by_relpath().items():
+            for rel_posix, entry in owned.items():
                 if rel_posix in current:
                     continue
                 path = ws / entry.relpath
@@ -585,7 +545,7 @@ class FileSystemPublicAssetManager:
             reports.append(DoctorLine(DoctorStatus.DRIFT, f"agent-model-policy ERROR: {exc}"))
         resolved_models = self._resolved_core_models(overlay)
 
-        # The doctor plan is "install(scope=all)" over the roster, scoped to the PERSISTED
+        # The doctor plan is a whole install over the roster, scoped to the PERSISTED
         # profile — never an operator's scoped --target selection. It is never executed
         # (install_rules is never called against it); it exists only to build the SAME
         # rule table doctor_rules() compares.
@@ -593,9 +553,7 @@ class FileSystemPublicAssetManager:
             workspace_root=workspace_root,
             agentic_dir=agentic_dir,
             harness=None,
-            scope="all",
             overwrite=OverwritePolicy.PRESERVE,
-            guardrail_targets=frozenset({"workspace", "repos"}),
             harness_targets=("agents", *(h for h in L1_ENTRY_HARNESSES if h in active)),
             active_harnesses=frozenset(active),
             overlay=overlay,
@@ -611,16 +569,6 @@ class FileSystemPublicAssetManager:
         for name, rel_dirs in HARNESS_PROJECTION_DIRS.items():
             if name not in active and any((workspace_root / d).exists() for d in rel_dirs):
                 reports.append(_out_of_profile_warn(name))
-
-        # Consumer-repo guardrail AGENTS.md (FR9, bug public-doctor-flags-hand-authored-
-        # consumer-agents-md): the `repos/<slug>:AGENTS.md` line flows through the SINGLE
-        # provenance-aware authority — a hand-authored (no-banner) consumer reads [foreign]
-        # (never [drift]/[missing]), so `public doctor` exits 0 (Ruling 16).
-        consumer_source = self._agents_md_source(agentic_dir)
-        if consumer_source is not None:
-            reports.extend(
-                _doctor_consumer_pair_lines(consumer_source, workspace_root, emit_stderr=False)
-            )
 
         # Harness-independent checks stay unconditional. The rule-corpus check
         # early-returns on an absent .codex/agents; skill/memory/privacy checks read the
@@ -675,12 +623,6 @@ class FileSystemPublicAssetManager:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
-
-    def _agents_md_source(self, agentic_dir: Path) -> Path | None:
-        return _agents_md_source(agentic_dir)
-
-    def _consumer_repos(self, workspace_root: Path) -> list[Path]:
-        return _consumer_repos_for_root(workspace_root)
 
     def _iter_files(self, root: Path) -> Iterable[Path]:
         return iter_public_files(root)

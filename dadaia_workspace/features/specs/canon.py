@@ -74,6 +74,7 @@ from dadaia_workspace.core.specs_version import (
 from dadaia_workspace.core.workspace_layout import (
     CANON_ROOT_MEMBERS,
     MEMORY_TOPLEVEL_FILES,
+    REPO_LAW,
     REQUIRED_ROOT_DIRS,
     SPECS_CANON,
     CanonEntry,
@@ -166,13 +167,6 @@ TEMPLATES: dict[str, tuple[Kind, str]] = {
     "ADRs/AGENTS.md": ("copy", "scaffold/ADRs/AGENTS.md"),
     "ADRs/decisions.jsonl": ("static", ""),
 }
-
-
-#: The main repo's scoped law, beside ``specs/``: ``templates/<name>`` -> ``<repo>/<dest>``.
-REPO_LAW: tuple[tuple[str, str], ...] = (
-    ("repo-AGENTS.md", "AGENTS.md"),
-    ("tests-AGENTS.md", "tests/AGENTS.md"),
-)
 
 
 def is_canon_path(rel_posix: str) -> bool:

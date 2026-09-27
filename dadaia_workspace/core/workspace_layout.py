@@ -39,6 +39,7 @@ __all__ = [
     "INSTANCE_EXCEPTIONS",
     "LAW_BASENAMES",
     "MEMORY_TOPLEVEL_FILES",
+    "REPO_LAW",
     "REPO_TREE_ARTIFACTS",
     "INSTALLED_GIT_HOOKS",
     "REPO_TREE_EXCLUDED",
@@ -67,6 +68,12 @@ __all__ = [
     "zones_with_canon",
     "zones_with_ttl",
 ]
+
+#: The main repo's scoped law, beside ``specs/``: ``templates/<name>`` -> ``<repo>/<dest>``.
+REPO_LAW: tuple[tuple[str, str], ...] = (
+    ("repo-AGENTS.md", "AGENTS.md"),
+    ("tests-AGENTS.md", "tests/AGENTS.md"),
+)
 
 #: SPEC-DOC-030 (`specs/audits/AGENTS.md`, v6 canon): every new ``specs/audits/`` directory must
 #: be named ``<YYYYMMDD>-<slug>`` — the SAME shape ``features.specs.canon``'s own

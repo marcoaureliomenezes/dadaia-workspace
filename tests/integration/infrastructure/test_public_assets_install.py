@@ -55,29 +55,6 @@ def _make_minimal_agentic(workspace_root: Path) -> Path:
     return agentic_dir
 
 
-def test_legacy_agents_md_install_and_repos_only_skip(tmp_path: Path) -> None:
-    """Legacy AGENTS.md install from templates + repos-only scope skips it."""
-    agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
-    templates_dir = agentic_dir / "templates"
-    templates_dir.mkdir()
-    (templates_dir / "AGENTS.md").write_text("# TEMPLATES AGENTS\n", encoding="utf-8")
-
-    FileSystemPublicAssetManager().install(workspace_root, harness="claude", force=True)
-    assert (workspace_root / "AGENTS.md").exists()
-
-    repos_only_case = tmp_path / "repos-only-case"
-    repos_only_case.mkdir()
-    agentic_dir2, workspace_root2 = _build_minimal_agentic_dir(repos_only_case)
-    templates_dir2 = agentic_dir2 / "templates"
-    templates_dir2.mkdir()
-    (templates_dir2 / "AGENTS.md").write_text("# TEMPLATES AGENTS\n", encoding="utf-8")
-
-    FileSystemPublicAssetManager().install(
-        workspace_root2, harness="claude", force=True, scope="repos-only"
-    )
-    assert not (workspace_root2 / "AGENTS.md").exists()
-
-
 def test_invalid_target_raises(tmp_path: Path) -> None:
     _, workspace_root = _build_minimal_agentic_dir(tmp_path)
     with pytest.raises(PublicAssetError, match="Unsupported"):

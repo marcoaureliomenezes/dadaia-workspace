@@ -2,7 +2,6 @@
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Literal
 
 from dadaia_workspace.core.models.agent_model_policy import (
     AgentModelPolicyOverlay,
@@ -35,11 +34,8 @@ class PublicAssetService:
         workspace_root: Path,
         harness: str | None = None,
         force: bool = False,
-        scope: Literal["all", "repos-only", "workspace-only"] = "all",
     ) -> list[str]:
-        return self._public_assets.install(
-            workspace_root, harness=harness, force=force, scope=scope
-        )
+        return self._public_assets.install(workspace_root, harness=harness, force=force)
 
     def list_all(self) -> dict[str, list[str]]:
         return self._public_assets.list_all()
