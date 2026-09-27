@@ -92,7 +92,7 @@
     },
     {
       "id": "codex-command-policy",
-      "mandate": "Codex-native executable command policy derived from the venv-guard behavior (Starlark, the only rule dialect Codex executes).",
+      "mandate": "Codex-native executable command policy (Starlark, the only rule dialect Codex executes): allows only read-only rg, ls, cat and sed -n; destructive commands and publishing prompt.",
       "implementations": {
         "codex": ".codex/rules/dadaia-command-policy.rules"
       }
