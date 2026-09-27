@@ -1,27 +1,9 @@
-"""Shared ``--redact`` rendering helper (SPEC v0.9.0 FR8a, T-090-07).
+"""The ``--redact`` render boundary for ``doctor`` and ``context list|show``.
 
-Applied ONLY at the CLI render boundary — ``dadaia doctor``, ``dadaia context list``
-and ``dadaia context show`` build a :class:`ContextRedactor` from the true names their
-underlying services already returned, then use it to mask text right before printing
-or JSON-serializing. Services (``DoctorService``, ``SpecContextService``) are never modified by this module and always keep
-returning true names — redaction is a pure display-time concern, never a business-logic
-one.
-
-Placeholder shape: ``[REDACTED-CONTEXT-<n>]``, ordinal assigned by FIRST APPEARANCE
-within one invocation (SPEC A8.3). Callers get this "first appearance" property for
-free by constructing ONE :class:`ContextRedactor` per invocation and feeding it every
-string/JSON value in the exact order they render it — the ordinal map grows lazily as
-new foreign terms are encountered, so it always matches the actual order of the
-rendered output.
-
-v0.11.0 FR6/ADR D1-a: the masking primitive itself (word-boundary alternation,
-longest-first ordering, stable first-appearance ordinal placeholders) now lives in
-``core/redaction.py`` — a stdlib-pure module the push-range denylist gate's own render
-boundary (``features/chokepoints/service.py``) can ALSO import, since
-``features/chokepoints/**`` may import ``core`` but never ``cli``. This module is a
-THIN CONSUMER of that primitive: its public behaviour is byte-identical to before the
-extraction (the regression proof is ``tests/unit/cli/test_redact_output.py`` passing
-with no change to its assertions).
+Services keep returning true names; :func:`build_context_redactor` is the one builder,
+:class:`ContextRedactor` masks each rendered string or JSON leaf as
+``[REDACTED-CONTEXT-<n>]``, ordinal by first appearance in one invocation (SPEC A8.3),
+on top of ``core/redaction.Redactor``.
 """
 
 from __future__ import annotations
@@ -29,6 +11,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
+from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
+from dadaia_workspace.core.models.spec_context import SpecContextProject
 from dadaia_workspace.core.redaction import Redactor
 
 #: SPEC FR8 placeholder shape.
@@ -73,3 +57,20 @@ class ContextRedactor:
         if isinstance(value, list):
             return [self.json_value(item) for item in value]
         return value
+
+
+def build_context_redactor(contexts: Iterable[SpecContextProject]) -> ContextRedactor:
+    """The one redactor builder for ``doctor --redact``, ``context list|show --redact``:
+    candidates = every context name and every repo slug (main + associated); the
+    caller's own resolved context and its whole repo set stay visible."""
+    contexts = list(contexts)
+    try:
+        caller_name: str | None = resolve_context_for_cli(None)
+    except ValueError:
+        caller_name = None
+    caller = next((ctx for ctx in contexts if ctx.name == caller_name), None)
+    own = {r.slug for r in caller.all_repos()} if caller is not None else set()
+    candidates = [
+        term for ctx in contexts for term in (ctx.name, *(r.slug for r in ctx.all_repos()))
+    ]
+    return ContextRedactor(candidates, exclude=(caller_name, *own))

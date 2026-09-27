@@ -25,6 +25,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
+from dadaia_workspace.core.redaction import mask
 from dadaia_workspace.core.workspace_layout import REPO_TREE_ARTIFACTS
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
@@ -307,7 +308,7 @@ def check_public_privacy(
                     findings.append(
                         DoctorLine(
                             DoctorStatus.ERROR,
-                            f"public-privacy:{rel.as_posix()}: contains '{term}' ({reason})",
+                            f"public-privacy:{rel.as_posix()}: contains '{mask(term)}' ({reason})",
                         )
                     )
             if path.is_relative_to(public_dir):
@@ -316,14 +317,14 @@ def check_public_privacy(
                         findings.append(
                             DoctorLine(
                                 DoctorStatus.ERROR,
-                                f"public-privacy:{rel.as_posix()}: contains '{term}' ({reason})",
+                                f"public-privacy:{rel.as_posix()}: contains '{mask(term)}' ({reason})",
                             )
                         )
             for value, reason in _scan_text_for_baseline(text, baseline):
                 findings.append(
                     DoctorLine(
                         DoctorStatus.ERROR,
-                        f"public-privacy:{rel.as_posix()}: baseline match '{value}' ({reason})",
+                        f"public-privacy:{rel.as_posix()}: baseline match '{mask(value)}' ({reason})",
                     )
                 )
     if findings:

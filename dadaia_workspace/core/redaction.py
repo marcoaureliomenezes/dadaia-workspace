@@ -1,34 +1,12 @@
-"""Stdlib-pure masking primitives (SPEC v0.11.0 FR6/ADR D1-a; :func:`redact_text`
-relocated here at the bug ``backlog-histo-writer-skips-write-time-denylist-redaction``
-fix — see below).
+"""Stdlib-pure masking primitives; zero I/O.
 
-Extracted mechanically from ``cli/redact.py#ContextRedactor`` (v0.9.0 FR8a) so the SAME
-masking primitive can be consumed both by the CLI's ``--redact`` rendering
-(``cli/redact.py``) AND by the push-range denylist gate's own render boundary
-(``features/chokepoints/service.py``'s ``_compose_denylist_refusal`` /
-``_annotate_skip``), which may import ``core`` but never ``cli``
-(``architecture.md`` ring purity) — the extension entry #23's resolution A requires
-would otherwise be unimplementable in either direction (grill P4).
-
-Word-boundary alternation, longest-first ordering, and stable first-appearance ordinal
-placeholders are the whole of the :class:`Redactor` primitive; everything
-caller-specific (which candidates to mask, what to exclude, JSON-tree recursion) stays
-in the consumer. :func:`redact_text` is a SEPARATE, older primitive (SPEC v0.4.5 FR6/
-FR7, T-045-19) with different semantics — plain case-insensitive substring masking (no
-word-boundary restriction, mirroring ``features.chokepoints.denylist_scan``'s own
-``operator_terms_match`` exactly, A6.3) plus unconditional control/format-character
-stripping and IP/home-path scrubbing. It lived only in ``core/models/bugs.py`` until
-the bug above: a SECOND write-time record model (``core.models.backlog
-.BacklogHistoRecord``) needed the identical seam, and duplicating ~40 lines of
-denylist-masking regex logic per domain model is exactly the hand-kept-copy defect
-class A2.10 forbids for field lists — so the primitive itself moves to this shared,
-domain-agnostic module (neither ``core/models/bugs.py`` nor ``core/models/backlog.py``
-imports the other; both import this one, stdlib-pure sibling). ``core/models/bugs.py``
-re-exports :func:`redact_text` unchanged for every existing caller.
-
-Zero I/O — ``core/`` stays stdlib-pure; the file-I/O authorized set
-(``specs_repair``/``specs_version``/``workspace_resolver``/
-``atomic_write``/``invocation``/``session_store``) is unaffected.
+- :func:`mask` — the one ``first…last`` rendering of a private match; used by
+  ``features/chokepoints/denylist_scan`` (the hits ``push_gate._compose_denylist_refusal``
+  renders) and ``infrastructure/privacy_check`` (``public doctor``).
+- :class:`Redactor` — word-boundary, longest-first, ordinal-placeholder masking; used by
+  ``cli/redact`` (``--redact``) and ``features/certification``.
+- :func:`redact_text` / :func:`first_privacy_hit` — write-time scrubbing and the
+  baseline check for ledger free text (re-exported by ``core/models/bugs``).
 """
 
 from __future__ import annotations
@@ -43,8 +21,15 @@ __all__ = [
     "Redactor",
     "compile_candidates",
     "first_privacy_hit",
+    "mask",
     "redact_text",
 ]
+
+
+def mask(term: str) -> str:
+    """The one way a private match is shown: ``first…last``, never the term itself."""
+    return f"{term[0]}…{term[-1]}" if term else term
+
 
 # ============================================================================
 # redact_text — case-insensitive substring masking (SPEC v0.4.5 FR6/FR7, T-045-19).

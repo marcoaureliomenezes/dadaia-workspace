@@ -15,10 +15,7 @@ from rich.table import Table
 from dadaia_workspace import container
 from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.cli._specs_resolution import alive_context_trees, resolve_session_id
-from dadaia_workspace.cli._specs_resolution import (
-    resolve_context_for_cli as _resolve_context_for_cli,
-)
-from dadaia_workspace.cli.redact import ContextRedactor
+from dadaia_workspace.cli.redact import ContextRedactor, build_context_redactor
 from dadaia_workspace.core import session_store
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import (
@@ -94,36 +91,6 @@ def _ctx_to_dict(svc: SpecContextService, ctx: SpecContextProject) -> dict:  # t
             for status in associated_statuses
         ],
     }
-
-
-def _resolve_caller_context_name() -> str | None:
-    """Best-effort resolution of the caller's own context name (SPEC v0.9.0 FR8a:
-    "other than the caller's resolved context"). Never raises — an unresolved caller
-    means nothing is excluded, so `--redact` masks every context/slug it encounters."""
-    try:
-        return _resolve_context_for_cli(None)
-    except ValueError:
-        return None
-
-
-def _build_context_redactor(contexts: list[SpecContextProject]) -> ContextRedactor:
-    """Candidates = every known context's name and every repo slug (main + FR15
-    associated repos, via `all_repos()`); excludes the caller's own resolved context
-    name and its own full repo set (render boundary ONLY — `contexts` is data the
-    service already returned with true names). FR18 widened this from "main slug
-    only" — an associated repo can be exactly as private as a main one, so it must
-    redact the same way."""
-    caller_name = _resolve_caller_context_name()
-    caller_ctx = next((ctx for ctx in contexts if ctx.name == caller_name), None)
-    caller_repo_slugs = (
-        {r.slug for r in caller_ctx.all_repos()} if caller_ctx is not None else set()
-    )
-    candidates: list[str] = []
-    for ctx in contexts:
-        candidates.append(ctx.name)
-        for repo in ctx.all_repos():
-            candidates.append(repo.slug)
-    return ContextRedactor(candidates, exclude=(caller_name, *caller_repo_slugs))
 
 
 def _now_iso() -> str:
@@ -223,7 +190,7 @@ def list_all(
         print(str(exc), file=sys.stderr)
         raise typer.Exit(1) from None
 
-    redactor = _build_context_redactor(contexts) if redact else None
+    redactor = build_context_redactor(contexts) if redact else None
 
     if json_output:
         payload = []
@@ -320,7 +287,7 @@ def show(
             all_contexts = svc.list_all()
         except SchemaVersionError:
             all_contexts = [ctx] if ctx is not None else []
-        redactor = _build_context_redactor(all_contexts)
+        redactor = build_context_redactor(all_contexts)
 
     if json_output:
         if ctx is None:

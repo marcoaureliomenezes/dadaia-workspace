@@ -294,3 +294,14 @@ def test_context_show_redact_keeps_callers_own_context_visible(
     assert result.exit_code == 0, result.output
     assert "caller-ctx" in result.output
     assert "[REDACTED-CONTEXT-" not in result.output
+
+
+def test_doctor_redact_masks_an_associated_slug_like_context_list(workspace: Path) -> None:
+    """sa-private-match-rendering-has-three-renderers#B3: one redactor builder."""
+    from dadaia_workspace.cli.commands.doctor import _render_for
+
+    row = _ctx_row("zz-foreign") | {"associated_repos": [{"slug": "zz-assoc", "url": "u"}]}
+    _write_contexts(workspace, [row])
+    listed = _runner.invoke(app, ["context", "list", "--redact", "--json"])
+    assert "zz-assoc" not in listed.stdout
+    assert _render_for(workspace, redact=True)("in zz-assoc") == "in [REDACTED-CONTEXT-1]"

@@ -36,6 +36,11 @@ from tests.helpers.privacy_fixtures import (
 _TEST_TERM = private_ip()
 
 
+def _shown(value: str) -> str:
+    """SPEC 0.5.0 WP-11: a private match is shown as 'first…last', never raw."""
+    return f"'{value[0]}…{value[-1]}'"
+
+
 def _seed_denylist_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Seed the denylist via the env-var path (location-independent)."""
     source = tmp_path / "privacy_denylist.json"
@@ -141,7 +146,7 @@ def test_baseline_fires_with_no_operator_denylist(
 
     report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
     assert any(line.startswith("[error] public-privacy:") for line in report)
-    assert any(expect_fragment in line for line in report)
+    assert any(_shown(expect_fragment) in line for line in report)
 
 
 # ---------------------------------------------------------------------------
@@ -227,7 +232,7 @@ def test_windows_users_path_prose_form_fires_through_the_doctor_check(
     )
     report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
     assert any(line.startswith("[error] public-privacy:") for line in report)
-    assert any("C:\\Users\\zz-fixture-user" in line for line in report)
+    assert any(_shown("C:\\Users\\zz-fixture-user") in line for line in report)
 
 
 # ---------------------------------------------------------------------------
@@ -284,8 +289,8 @@ def test_operator_denylist_merges_additive_over_baseline(
     )
 
     report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
-    assert any(_TEST_TERM in line for line in report)
-    assert any(internal_host("db") in line for line in report)
+    assert any(_shown(_TEST_TERM) in line for line in report)
+    assert any(_shown(internal_host("db")) in line for line in report)
 
 
 # ---------------------------------------------------------------------------
@@ -304,7 +309,7 @@ def test_text_denylist_flags_and_scans_root_agents_md(
 
     report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
     assert any(line.startswith("[error] public-privacy:") for line in report)
-    assert any(_TEST_TERM in line.lower() for line in report)
+    assert any(_shown(_TEST_TERM) in line for line in report)
 
     # Root-level AGENTS.md (sibling of the package dir) is included in the scan.
     repo_root = tmp_path / "repo"
@@ -314,7 +319,7 @@ def test_text_denylist_flags_and_scans_root_agents_md(
     root_report = [  # noqa: SLF001
         line.render() for line in _manager(repo_public_dir)._check_public_privacy()
     ]
-    assert any("AGENTS.md" in line and _TEST_TERM in line.lower() for line in root_report)
+    assert any("AGENTS.md" in line and _shown(_TEST_TERM) in line for line in root_report)
 
 
 def test_bytecode_cache_ignored_and_baseline_data_loads_with_version_header(
@@ -457,7 +462,7 @@ def test_baseline_still_flags_a_different_local_part_at_the_mandated_domain_thro
 
     report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
     assert any(line.startswith("[error] public-privacy:") for line in report)
-    assert any(address in line for line in report)
+    assert any(_shown(address) in line for line in report)
 
 
 def _different_realistic_home_path_literal() -> str:
@@ -499,7 +504,7 @@ def test_baseline_still_flags_a_different_realistic_home_path_through_the_doctor
 
     report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
     assert any(line.startswith("[error] public-privacy:") for line in report)
-    assert any(literal in line for line in report)
+    assert any(_shown(literal) in line for line in report)
 
 
 # ---------------------------------------------------------------------------
@@ -971,9 +976,9 @@ def test_public_privacy_flags_portuguese_control_vocabulary(
     )
 
     report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
-    assert any(line.startswith("[error] public-privacy:") and term in line for line in report), (
-        report
-    )
+    assert any(
+        line.startswith("[error] public-privacy:") and _shown(term) in line for line in report
+    ), report
 
 
 def test_public_privacy_language_check_leaves_english_assets_alone(

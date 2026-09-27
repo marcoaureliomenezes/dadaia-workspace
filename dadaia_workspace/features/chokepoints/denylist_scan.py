@@ -30,7 +30,7 @@ from dataclasses import dataclass, replace
 from typing import Protocol
 
 from dadaia_workspace.core.models.git_scan import ScannedObject
-from dadaia_workspace.core.redaction import UNSAFE_FORMAT_CHARS_RE
+from dadaia_workspace.core.redaction import UNSAFE_FORMAT_CHARS_RE, mask
 
 __all__ = [
     "BaselinePatternLike",
@@ -102,13 +102,6 @@ class ScanOutcome:
     hits: tuple[Hit, ...]
     skipped_binary_count: int
     oversized_notes: tuple[OversizedNote, ...] = ()
-
-
-def _mask(term: str) -> str:
-    """``first…last`` masking (FR5) — never returns the term unmasked."""
-    if not term:
-        return term
-    return f"{term[0]}…{term[-1]}"
 
 
 def _term_occurs(term: str, lowered_text: str) -> bool:
@@ -189,9 +182,7 @@ def _first_match(
         lowered = line_text.lower()
         for term, _reason in terms:
             if _term_occurs(term, lowered) and not _term_suppressed(term):
-                line_candidates.append(
-                    Hit(obj.path, lineno, obj.sha, _mask(term), _SOURCE_OPERATOR)
-                )
+                line_candidates.append(Hit(obj.path, lineno, obj.sha, mask(term), _SOURCE_OPERATOR))
         for pattern in patterns:
             for match in pattern.regex.finditer(line_text):
                 value = match.group(0)
@@ -204,7 +195,7 @@ def _first_match(
                         obj.path,
                         lineno,
                         obj.sha,
-                        _mask(value),
+                        mask(value),
                         f"baseline pattern '{pattern.id}'",
                     )
                 )
@@ -266,11 +257,8 @@ def scan_objects(
     )
 
 
-#: v0.11.0 FR6(b)/entry #23 resolution A — the path-segment masking placeholder shape.
-#: Deliberately distinct from the CLI's ``[REDACTED-CONTEXT-n]`` (``cli/redact.py``):
-#: this is a different channel (a blob PATH segment in a gate refusal/note, not a Spec
-#: Context name in a CLI render), even though both are built on the SAME
-#: ``core/redaction.py`` primitive.
+#: v0.11.0 FR6(b) — a masked blob-path segment in a gate refusal/note; distinct from the
+#: CLI's ``[REDACTED-CONTEXT-n]`` (``cli/redact.py``), a different channel.
 _PATH_PLACEHOLDER_FMT = "[REDACTED-PATH-{n}]"
 
 

@@ -32,7 +32,7 @@ from dadaia_workspace.cli._specs_resolution import (
 )
 from dadaia_workspace.cli.commands.context import resolve_own_session_id
 from dadaia_workspace.cli.help_digest import command_paths
-from dadaia_workspace.cli.redact import ContextRedactor
+from dadaia_workspace.cli.redact import build_context_redactor
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.doctor_rules import (
     Rule,
@@ -60,43 +60,6 @@ app = typer.Typer(help="Diagnose and repair workspace, specs and ledger complian
 
 #: Canonical templates directory — inside the installed package.
 _TEMPLATES_DIR = Path(__file__).parent.parent.parent / "public" / "templates"
-
-
-# ── redaction (unchanged: a render-boundary concern, never seen by a doctor) ─────
-
-
-def _resolve_caller_context_and_slug(workspace_root: Path) -> tuple[str | None, str | None]:
-    """Best-effort resolution of the caller's own context name + repo slug (SPEC v0.9.0
-    FR8a: "other than the caller's resolved context"). Never raises — an unresolved
-    caller (no bind, no DADAIA_CONTEXT, cwd outside any repo) simply means nothing is
-    excluded, so `--redact` masks every context/slug it encounters."""
-    try:
-        name = resolve_context_for_cli(None)
-    except ValueError:
-        return None, None
-    slug: str | None = None
-    try:
-        for ctx in container.build_spec_context_service(workspace_root).list_all():
-            if ctx.name == name:
-                slug = ctx.repo_slug
-                break
-    except (WorkspaceNotInitializedError, SchemaVersionError):
-        pass
-    return name, slug
-
-
-def _build_redactor(workspace_root: Path) -> ContextRedactor:
-    """Candidates = every known registered context name/repo slug."""
-    caller_name, caller_slug = _resolve_caller_context_and_slug(workspace_root)
-    try:
-        contexts = container.build_spec_context_service(workspace_root).list_all()
-    except (WorkspaceNotInitializedError, SchemaVersionError):
-        contexts = []
-    candidates: list[str] = []
-    for ctx in contexts:
-        candidates.append(ctx.name)
-        candidates.append(ctx.repo_slug)
-    return ContextRedactor(candidates, exclude=(caller_name, caller_slug))
 
 
 # ── the three sections ──────────────────────────────────────────────────────────
@@ -317,7 +280,11 @@ def _render_for(workspace_root: Path | None, *, redact: bool) -> Callable[[str],
     """The render boundary: the redactor over the instance's known names, or the
     identity — no instance holds no names to mask."""
     if redact and workspace_root is not None:
-        return _build_redactor(workspace_root).text
+        try:
+            contexts = container.build_spec_context_service(workspace_root).list_all()
+        except (WorkspaceNotInitializedError, SchemaVersionError):
+            contexts = []
+        return build_context_redactor(contexts).text
     return _identity
 
 

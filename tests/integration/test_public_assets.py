@@ -217,7 +217,8 @@ def test_public_privacy_gate_flags_identifiers_and_ignores_bytecode(
 
     rendered = [line.render() for line in report]
     assert any(line.startswith("[error] public-privacy:") for line in rendered)
-    assert any(_PRIVACY_TEST_TERM in line.lower() for line in rendered)
+    shown = f"'{_PRIVACY_TEST_TERM[0]}…{_PRIVACY_TEST_TERM[-1]}'"  # WP-11: first…last
+    assert any(shown in line.lower() for line in rendered)
 
     # A denylisted term inside a __pycache__/*.pyc is ignored (bytecode is not scanned).
     clean_repo_root = tmp_path / "repo-clean"
