@@ -52,7 +52,6 @@ __all__ = [
 ]
 
 _TIMESTAMP_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{6}Z)")
-_SELF_PULL_REQUIRED_FROM = "handoff-v1.2"
 
 # ---------------------------------------------------------------------------
 # stdlib-only JSON-schema walker (folded from the former
@@ -118,7 +117,7 @@ def _validate_node(
     The version-routing fix (bug ``reports-sidecar-version-detection-misroutes-future-tokens``)
     lives HERE, structurally, not as a second special-cased function: ``schema_version``
     already carries an ``enum`` in the real schema, so any token outside
-    ``{handoff-v1, handoff-v1.1, handoff-v1.2}`` — including a future ``handoff-v1.3`` —
+    ``{handoff-v1.2}`` — including a retired v1/v1.1 or a future ``handoff-v1.3`` —
     fails this ordinary enum check with an explicit, actionable message. There is no
     catch-all fallback path to silently downgrade into.
     """
@@ -456,7 +455,7 @@ class Handoff:
         reviewed_root: Path | None = None,
     ) -> ValidationResult:
         """Full validation: schema shape (incl. version routing via the schema's own
-        ``schema_version`` enum), the v1.2 ``self_pull`` conditional, and the artifact hash.
+        ``schema_version`` enum), the existence of every ``self_pull`` ref, and the artifact hash.
 
         ``reviewed_root`` (bug ``reports-validate-resolves-self-pull-refs-against-the-
         checked-out-branch-not-the-reviewed-tree``, FIX): when given, ``self_pull.refs``
@@ -504,20 +503,8 @@ class Handoff:
     def _check_self_pull(
         self, *, workspace_root: Path, reviewed_root: Path | None
     ) -> list[HandoffValidationError]:
-        if self.schema_version != _SELF_PULL_REQUIRED_FROM:
-            return []
         errors: list[HandoffValidationError] = []
         refs = self.self_pull_refs
-        if not refs:
-            errors.append(
-                HandoffValidationError(
-                    "self_pull",
-                    "handoff-v1.2 requires self_pull with a non-empty refs array "
-                    "(the Layer-1 self-pull audit line)",
-                )
-            )
-            return errors
-
         context = self.context
         for idx, ref in enumerate(refs):
             if not self._self_pull_ref_exists(

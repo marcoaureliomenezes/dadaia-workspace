@@ -4,19 +4,19 @@
   "title": "Handoff Document v1.2",
   "description": "Structured handoff emitted by an agent at the end of any task (handoff-first; an HTML report artifact is optional). Validates the handoff contract between pipeline stages.",
   "type": "object",
-  "required": ["schema_version", "agent", "context", "produced_at", "artifact", "scope", "metrics"],
+  "required": ["schema_version", "self_pull", "agent", "context", "produced_at", "artifact", "scope", "metrics"],
   "additionalProperties": false,
   "properties": {
     "schema_version": {
       "type": "string",
-      "enum": ["handoff-v1", "handoff-v1.1", "handoff-v1.2"],
-      "description": "Schema version identifier. Use 'handoff-v1.2' for new handoffs. Historical v1/v1.1 documents stay valid (transition posture)."
+      "enum": ["handoff-v1.2"],
+      "description": "Schema version identifier: 'handoff-v1.2', the only version (v1/v1.1 retired in 0.5.0; re-emit an old handoff as v1.2 with self_pull)."
     },
     "self_pull": {
       "type": "object",
       "required": ["refs"],
       "additionalProperties": false,
-      "description": "Layer-1 self-pull audit line (v1.2). Records the memory atoms the emitting session actually read, in InjectedContext ref style (context-relative, specs/-prefixed). Optional at schema level; REQUIRED for schema_version handoff-v1.2 by the service-layer conditional (the stdlib validator has no if/then).",
+      "description": "Layer-1 self-pull audit line, always required. Records the memory atoms the emitting session actually read, in InjectedContext ref style (context-relative, specs/-prefixed).",
       "properties": {
         "refs": {
           "type": "array",

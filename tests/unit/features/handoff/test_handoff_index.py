@@ -21,10 +21,13 @@ remaining reports/panel/CLI test files (``test_next_service.py``,
 — they assert BEHAVIOR through their own public surface (CLI exit codes, service
 results), which this refactor does not change.
 
-Two real, in-tree fixture handoffs (``tests/fixtures/handoffs/*.json``, no absolute
-paths, nothing redacted) anchor the table against genuine production shapes: a
-handoff-v1.1 QA-gate verdict with no ``self_pull`` (pre-v1.2), and a handoff-v1.2
+A real, in-tree fixture handoff (``tests/fixtures/handoffs/*.json``, no absolute paths,
+nothing redacted) anchors the table against a genuine production shape: a handoff-v1.2
 deepening-audit handoff carrying real ``self_pull.refs``.
+
+sa-handoff-self-pull-requirement-diverges (0.5.0 WP-46): the schema admits only
+handoff-v1.2 (sa-handoff-self-pull-requirement-diverges#46.1) and self_pull is always required
+(sa-handoff-self-pull-requirement-diverges#46.2).
 """
 
 from __future__ import annotations
@@ -63,9 +66,20 @@ def _write(path: Path, doc: dict[str, object]) -> Path:
     return path
 
 
+#: The atom every default fixture self-pulls; :func:`_atom` makes it exist under a root.
+_REF = "specs/memory/ARCHITECTURE.md"
+
+
+def _atom(root: Path) -> Path:
+    (root / _REF).parent.mkdir(parents=True, exist_ok=True)
+    (root / _REF).write_text("# Architecture\n", encoding="utf-8")
+    return root
+
+
 def _base_doc(**overrides: object) -> dict[str, object]:
     doc: dict[str, object] = {
-        "schema_version": "handoff-v1.1",
+        "schema_version": "handoff-v1.2",
+        "self_pull": {"refs": [_REF]},
         "agent": "dd-software-engineer",
         "context": "dadaia-workspace",
         "produced_at": "2026-08-28T12:00:00Z",
@@ -160,8 +174,9 @@ def test_malformed_sibling_is_skipped_by_discovery_a_good_handoff_still_found(
 @pytest.mark.parametrize(
     ("schema_version", "expect_valid"),
     [
-        pytest.param("handoff-v1", True, id="v1-legacy-still-valid"),
-        pytest.param("handoff-v1.1", True, id="v1.1-valid"),
+        pytest.param("handoff-v1", False, id="v1-refused"),
+        pytest.param("handoff-v1.1", False, id="v1.1-refused"),
+        pytest.param("handoff-v1.2", True, id="v1.2-valid"),
         pytest.param("handoff-v1.2-with-self-pull", False, id="v1.2-malformed-token-invalid"),
         pytest.param("handoff-v1.3", False, id="future-token-explicitly-refused"),
         pytest.param("handoff-v0.9", False, id="pre-v1-token-refused"),
@@ -171,38 +186,28 @@ def test_malformed_sibling_is_skipped_by_discovery_a_good_handoff_still_found(
 def test_schema_version_routing_matrix(
     tmp_path: Path, schema_version: str, expect_valid: bool
 ) -> None:
+    """sa-handoff-self-pull-requirement-diverges#46.1: only handoff-v1.2 is valid."""
     doc = _base_doc(schema_version=schema_version)
     path = _write(tmp_path / "h.handoff.json", doc)
     handoff = Handoff.load(path)
 
-    result = handoff.validate(workspace_root=tmp_path, schema=_SCHEMA)
+    result = handoff.validate(workspace_root=_atom(tmp_path), schema=_SCHEMA)
 
     assert result.valid is expect_valid, result.errors
     if not expect_valid:
         assert any("schema_version" in e.field_path for e in result.errors)
 
 
-def test_v12_requires_self_pull_v11_does_not(tmp_path: Path) -> None:
-    v11 = Handoff.load(_write(tmp_path / "v11.handoff.json", _base_doc()))
-    assert v11.validate(workspace_root=tmp_path, schema=_SCHEMA).valid is True
-
-    v12_no_refs = Handoff.load(
-        _write(tmp_path / "v12.handoff.json", _base_doc(schema_version="handoff-v1.2"))
+def test_v12_requires_self_pull(tmp_path: Path) -> None:
+    """sa-handoff-self-pull-requirement-diverges#46.2: a v1.2 without self_pull is
+    INVALID, naming the field."""
+    doc = _base_doc()
+    del doc["self_pull"]
+    result = Handoff.load(_write(tmp_path / "v12.handoff.json", doc)).validate(
+        workspace_root=tmp_path, schema=_SCHEMA
     )
-    result = v12_no_refs.validate(workspace_root=tmp_path, schema=_SCHEMA)
     assert result.valid is False
     assert any(e.field_path == "self_pull" for e in result.errors)
-
-
-def test_backcompat_fixture_v11_qa_gate_validates_clean() -> None:
-    """Real fixture, transition posture: a pre-v1.2 verdict handoff keeps validating."""
-    path = _FIXTURES / "v1.1-qa-gate-no-self-pull.handoff.json"
-    handoff = Handoff.load(path)
-
-    result = handoff.validate(workspace_root=path.parent, schema=_SCHEMA)
-
-    assert result.valid is True, result.errors
-    assert handoff.verdict == "APPROVED"
 
 
 def test_real_fixture_v12_deepening_audit_self_pull_refs_and_hash_pass_schema_shape() -> None:
@@ -359,7 +364,7 @@ def test_artifact_hash_status_matrix(
 
     assert handoff.artifact_hash_status(tmp_path) == expected_status
 
-    result = handoff.validate(workspace_root=tmp_path, schema=_SCHEMA)
+    result = handoff.validate(workspace_root=_atom(tmp_path), schema=_SCHEMA)
     assert result.valid is (expected_status == "match")
     if expected_status != "match":
         assert result.hash_status == expected_status
@@ -499,7 +504,7 @@ def test_handoff_index_validate_file_raises_handoff_schema_error_when_unstaged(
 def test_handoff_index_validate_all_scoped_by_context_and_caches_the_schema(
     tmp_path: Path,
 ) -> None:
-    _stage_schema(tmp_path)
+    _stage_schema(_atom(tmp_path))
     index = HandoffIndex(tmp_path)
     _write(tmp_path / ".dadaia" / "handoff" / "ctx-a" / "h1.handoff.json", _base_doc())
     _write(tmp_path / ".dadaia" / "handoff" / "ctx-b" / "h2.handoff.json", _base_doc())

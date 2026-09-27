@@ -40,7 +40,7 @@ contract over public assets). An undocumented asymmetric path is a gap, not cove
 | `test_public_source_hygiene.py` | No bytecode under `public/` (at rest, on script runs, in builds); the SINGLE explicit ship assertion that `pre-push-ci-gate.sh` is in the `public/scripts/` listing (v0.1.51 FR3 — execution-based tests are behavior tests, not ship assertions) |
 | `test_session_store_ownership.py` | Session-store ownership residue (retired multi-store model) |
 | `test_source_repo_hygiene.py` | Source-repo files stay visible to review/CI (no stray ignores) |
-| `test_handoff_schema_contract.py` | Public handoff sidecar schema (`handoff-v1.1`) |
+| `test_handoff_schema_contract.py` | Public handoff sidecar schema (`handoff-v1.2`) |
 | `test_platform_classifier.py` | `pyproject.toml` OS classifiers |
 | `test_install_skip_idempotent.py` | `write_generated` idempotent across newline conventions |
 | `test_codex_reference_only_wording.py` | Codex orchestration wording (agents vs workflow docs) |

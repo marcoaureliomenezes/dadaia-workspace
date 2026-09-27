@@ -187,15 +187,11 @@ an initialized workspace, create it:
 - Setup: run inside an INITIALIZED workspace (`reports validate` resolves workspace state);
   write a minimal VALID `handoff-v1.2` JSON to a file. Minimal valid = these keys:
   `schema_version:"handoff-v1.2"`, `agent`, `context`, `produced_at` (UTC ISO),
-  `scope`, `metrics:{}`, `self_pull:{"refs":[<the agent's ROLE-MAPPED memory atom>, ...]}`,
+  `scope`, `metrics:{}`, `self_pull:{"refs":[<a memory atom the agent read>, ...]}`,
   `artifact:{"type":"other"}`, `findings:[]`, `verdict:"APPROVED"`,
   `next_handoff:{"agent":"human","context":<ctx>,"expected_artifact_type":"other"}`.
-  `self_pull.refs` MUST list the memory atom the agent's role maps to, or the validator
-  rejects it — correctly: an agent's handoff has to show it read its own memory. For
-  `agent:"dd-code-reviewer"` that is `specs/memory/QUALITY.md` (context-relative, and
-  it exists in any scaffolded context). A ref like `AGENTS.md` alone is NOT enough
-  (bug recipe-f12-minimal-valid-handoff-is-invalid: the earlier wording prescribed exactly
-  that, so following the recipe verbatim produced a FAIL against a healthy product).
+  Every `self_pull.refs` entry must exist — e.g. `specs/memory/QUALITY.md`
+  (context-relative, present in any scaffolded context).
   Also write a tampered copy (e.g. `schema_version:"handoff-BOGUS"` and drop `agent`).
 - Run: `$D reports validate <good>.handoff.json`; `$D reports validate <bad>.handoff.json`.
 - **PASS if:** the valid file validates (exit 0) and the tampered one is rejected
