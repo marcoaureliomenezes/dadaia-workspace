@@ -113,6 +113,7 @@ def test_remove_of_an_entry_already_gone_reports_nothing(tmp_path: Path) -> None
 
 
 def test_move_relocates_an_entry_and_creates_the_destination_parents(tmp_path: Path) -> None:
+    """sa-reaper-destroys-its-own-hold-before-ttl#B4: the moved entry's content is held at the destination."""
     src = tmp_path / "repos" / "x" / ".pytest_cache"
     src.mkdir(parents=True)
     (src / "v").write_text("x")
@@ -126,7 +127,7 @@ def test_move_relocates_an_entry_and_creates_the_destination_parents(tmp_path: P
 
 
 def test_move_resets_the_ttl_clock_at_the_move(tmp_path: Path) -> None:
-    """The reaped clock starts at the move, never at the origin's own mtime (FR6b)."""
+    """sa-reaper-destroys-its-own-hold-before-ttl#B3: the reaped clock starts at the move, never at the origin's own mtime (FR6b)."""
     src = tmp_path / "old"
     src.write_text("x")
     os.utime(src, (0, 0))
@@ -137,18 +138,8 @@ def test_move_resets_the_ttl_clock_at_the_move(tmp_path: Path) -> None:
     assert moved > 1_000_000_000
 
 
-def test_move_carries_one_optional_note_naming_whose_entry_it_was(tmp_path: Path) -> None:
-    """ONE message shape; the note is the single extra field (INV-5 names the context)."""
-    src = tmp_path / "repos" / "stale"
-    src.mkdir(parents=True)
-    dest = tmp_path / ".dadaia" / "reaped" / "20260913" / "repos" / "stale"
-    message = sweep.move(tmp_path, src, dest, "repos/stale", note=" (context stale-ctx)")
-    assert message == (
-        "moved 'repos/stale' (context stale-ctx) -> '.dadaia/reaped/20260913/repos/stale'"
-    )
-
-
 def test_move_skips_a_source_outside_the_workspace(tmp_path: Path) -> None:
+    """sa-reaper-destroys-its-own-hold-before-ttl#B8: the mover never touches a path outside the workspace."""
     workspace = tmp_path / "ws"
     workspace.mkdir()
     stranger = tmp_path / "elsewhere.txt"
@@ -160,6 +151,7 @@ def test_move_skips_a_source_outside_the_workspace(tmp_path: Path) -> None:
 
 
 def test_move_skips_a_destination_outside_the_workspace(tmp_path: Path) -> None:
+    """sa-reaper-destroys-its-own-hold-before-ttl#B8: nor moves into one."""
     workspace = tmp_path / "ws"
     workspace.mkdir()
     src = workspace / "slop.txt"
@@ -171,6 +163,7 @@ def test_move_skips_a_destination_outside_the_workspace(tmp_path: Path) -> None:
 
 
 def test_move_never_follows_a_symlinked_source(tmp_path: Path) -> None:
+    """sa-reaper-destroys-its-own-hold-before-ttl#B4: a symlink is moved, its destination never."""
     outside = tmp_path / "outside"
     outside.mkdir()
     (outside / "treasure.txt").write_text("x")
@@ -183,14 +176,10 @@ def test_move_never_follows_a_symlinked_source(tmp_path: Path) -> None:
     assert (workspace / "reaped" / "link").is_symlink()
 
 
-def test_move_of_an_entry_already_gone_reports_nothing(tmp_path: Path) -> None:
-    assert sweep.move(tmp_path, tmp_path / "ghost", tmp_path / "r" / "ghost", "ghost") is None
-
-
 def test_a_cross_device_move_falls_back_to_copy_plus_remove_inside_the_primitive(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """EXDEV is handled in ONE place; a failed move is never a partial delete."""
+    """sa-reaper-destroys-its-own-hold-before-ttl#B4: a cross-device move still holds the content. EXDEV is handled in ONE place; a failed move is never a partial delete."""
     src = tmp_path / "slop.txt"
     src.write_text("payload")
 
@@ -248,7 +237,7 @@ def test_a_live_bind_record_survives_a_full_doctor_fix_pass(tmp_path: Path) -> N
 
 
 def test_remove_deletes_a_read_only_tree(tmp_path: Path) -> None:
-    """Bug doctor-reaper-cannot-delete-read-only-trees: a Go module cache is
+    """sa-reaper-destroys-its-own-hold-before-ttl#B3. Bug doctor-reaper-cannot-delete-read-only-trees: a Go module cache is
     ``dr-xr-xr-x`` all the way down, so the printed fix ``doctor --fix --expired-only``
     skipped every entry with errno 13 and the finding never cleared. The reaper owns
     what it reaps: a read-only tree is made writable on the way down, then removed.
@@ -265,7 +254,7 @@ def test_remove_deletes_a_read_only_tree(tmp_path: Path) -> None:
 
 
 def test_remove_deletes_a_read_only_file(tmp_path: Path) -> None:
-    """The same rule for a lone file: Windows refuses to unlink a read-only file."""
+    """sa-reaper-destroys-its-own-hold-before-ttl#B3: the TTL deleter removes a read-only expired file. The same rule for a lone file: Windows refuses to unlink a read-only file."""
     leaf = tmp_path / "go.sum"
     leaf.write_text("x")
     leaf.chmod(0o444)

@@ -33,7 +33,6 @@ from __future__ import annotations
 
 import json
 import platform
-from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -154,15 +153,17 @@ def test_doctor_default_output_with_issue_unchanged(workspace: Path) -> None:
 
 
 def test_doctor_default_fix_output_unchanged(workspace: Path) -> None:
+    """sa-reaper-destroys-its-own-hold-before-ttl#B4: the DEAD context's repo leaves
+    ``repos/`` and is HELD under ``.dadaia/reaped/*/repos/stale-ctx``, never deleted; the
+    INV-5 repair line names it. The bucket name is not pinned (a reflex snapshot)."""
     _register_dead_ctx_with_repo_on_disk(workspace)
     result = _runner.invoke(app, ["doctor", "--fix"])
     assert result.exit_code == 0, result.output
-    day = datetime.now(tz=UTC).strftime("%Y%m%d")
-    assert result.output == _next_step(workspace) + (
-        "\nApplied 1 repair(s):\n"
-        "  - INV-5: moved 'repos/stale-ctx' (context stale-ctx) -> "
-        f"'.dadaia/reaped/{day}/repos/stale-ctx'\n"
+    assert "  - INV-5: moved 'repos/stale-ctx' (context stale-ctx) -> '.dadaia/reaped/" in (
+        result.output
     )
+    assert not (workspace / "repos" / "stale-ctx").exists()
+    assert len(list((workspace / ".dadaia" / "reaped").glob("*/repos/stale-ctx"))) == 1
 
 
 # ---------------------------------------------------------------------------

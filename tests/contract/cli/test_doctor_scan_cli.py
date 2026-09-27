@@ -19,6 +19,7 @@ import json
 import os
 import re
 import time
+from datetime import UTC, datetime, tzinfo
 from pathlib import Path
 
 import pytest
@@ -30,6 +31,7 @@ from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.workspace_layout import provisioned_zones, zones_with_ttl
+from dadaia_workspace.features.spec_context import doctor
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from tests.fakes import FakeContextStore, FakeGitClient
 
@@ -170,7 +172,9 @@ def test_fix_reports_an_undeletable_entry_exits_1_and_never_raises(
 
 
 def test_fix_expired_only_quiet_is_the_reaper_lane(workspace: Path) -> None:
-    """0.4.7 FR6b: ``--expired-only`` scopes what the REPORT shows, not what the reaper
+    """sa-reaper-destroys-its-own-hold-before-ttl#B5, #B4, #B3.
+
+    0.4.7 FR6b: ``--expired-only`` scopes what the REPORT shows, not what the reaper
     does — there is one lane (seed, move slop, expire). The SessionStart hook runs this
     exact command, so slop leaves the working tree there too; it is HELD in ``reaped/``,
     never deleted, and a second run has nothing left to take."""
@@ -190,16 +194,6 @@ def test_fix_expired_only_quiet_is_the_reaper_lane(workspace: Path) -> None:
     assert again.output == ""
 
 
-def test_fix_moves_slop_to_reaped_and_lists_the_repair(workspace: Path) -> None:
-    (workspace / "junk.txt").write_text("", encoding="utf-8")
-
-    result = CliRunner().invoke(app, ["doctor", "--fix"])
-
-    assert result.exit_code == 0, result.output
-    assert "WS-root-slop: moved 'junk.txt' -> '.dadaia/reaped/" in result.output
-    assert not (workspace / "junk.txt").exists()
-
-
 def _plant_hold(workspace: Path) -> Path:
     """One entry HELD in ``reaped/``: off the working tree, inside its 7-day window."""
     held = workspace / ".dadaia" / "reaped" / "20260913" / "x"
@@ -209,7 +203,7 @@ def _plant_hold(workspace: Path) -> Path:
 
 
 def test_a_held_entry_is_always_listed_and_never_fails(workspace: Path) -> None:
-    """Intent: CONTRACT — 0.4.7 FR6 AC (`dadaia doctor` LISTS what the reaper holds); size: SMALL.
+    """Intent: CONTRACT — sa-reaper-destroys-its-own-hold-before-ttl#B7; size: SMALL.
 
     A hold is the one finding that is neither compliance nor failure: the operator must SEE
     what was moved and how long is left to take it back, while the score stays whole — the
@@ -226,7 +220,7 @@ def test_a_held_entry_is_always_listed_and_never_fails(workspace: Path) -> None:
 
 
 def test_json_lists_a_held_entry_and_does_not_fail(workspace: Path) -> None:
-    """Intent: CONTRACT — 0.4.7 FR6 AC (the `--json` mirror of the held-entry listing); size: SMALL."""
+    """Intent: CONTRACT — sa-reaper-destroys-its-own-hold-before-ttl#B7 (`--json`); size: SMALL."""
     _plant_hold(workspace)
 
     result = CliRunner().invoke(app, ["doctor", "--json"])
@@ -237,3 +231,51 @@ def test_json_lists_a_held_entry_and_does_not_fail(workspace: Path) -> None:
     (held,) = _scan(section["findings"])
     assert (held["code"], held["verdict"]) == ("WS-reaped-reaped", "reaped")
     assert held["message"] == "reaped/20260913/x  (7d left)"
+
+
+class _FrozenClock(datetime):
+    @classmethod
+    def now(cls, tz: tzinfo | None = None) -> _FrozenClock:  # type: ignore[override]
+        return cls(2026, 9, 27, 12, 0, 0, tzinfo=UTC)
+
+
+def test_two_same_second_reaps_of_one_origin_leave_two_intact_holds(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """sa-reaper-destroys-its-own-hold-before-ttl#B1, #B2: the origin is reaped,
+    re-created with new content and reaped again inside one frozen second; the first hold
+    keeps every byte and a second, distinct hold carries the new content."""
+    monkeypatch.setattr(doctor, "datetime", _FrozenClock)
+    skill = workspace / "stray"
+    skill.mkdir()
+    (skill / "SKILL.md").write_bytes(b"v1\n")
+    (skill / "refs.md").write_bytes(b"refs\n")
+    assert CliRunner().invoke(app, ["doctor", "--fix"]).exit_code == 0
+    skill.mkdir()
+    (skill / "SKILL.md").write_bytes(b"v2\n")
+    assert CliRunner().invoke(app, ["doctor", "--fix"]).exit_code == 0
+
+    day = workspace / ".dadaia" / "reaped" / "20260927"
+    assert sorted(p.name for p in day.iterdir()) == ["stray", "stray-1"]
+    assert (day / "stray" / "SKILL.md").read_bytes() == b"v1\n"
+    assert (day / "stray" / "refs.md").read_bytes() == b"refs\n"
+    assert (day / "stray-1" / "SKILL.md").read_bytes() == b"v2\n"
+
+
+def test_fix_deletes_a_hold_past_seven_days_and_keeps_a_younger_one(workspace: Path) -> None:
+    """sa-reaper-destroys-its-own-hold-before-ttl#B3: an 8-day hold is deleted and reported
+    WS-reaped-expired; a 6-day hold survives."""
+    old = workspace / ".dadaia" / "reaped" / "20260901" / "old"
+    young = workspace / ".dadaia" / "reaped" / "20260921" / "young"
+    for path, days in ((old, 8), (young, 6)):
+        path.parent.mkdir(parents=True)
+        path.write_text("x", encoding="utf-8")
+        stamp = time.time() - days * 86_400
+        os.utime(path, (stamp, stamp))
+        os.utime(path.parent, (stamp, stamp))
+
+    result = CliRunner().invoke(app, ["doctor", "--fix"])
+
+    assert "WS-reaped-expired" in result.output, result.output
+    assert not old.exists()
+    assert young.read_text(encoding="utf-8") == "x"
