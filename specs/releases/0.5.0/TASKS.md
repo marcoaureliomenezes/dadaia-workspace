@@ -25,7 +25,7 @@ tests. `Δ` = prod/test lines; PLAN §2.7 ceilings stop a task, never rise.
   `blocked by:` T-050-26 · `delivers:` install-first leaves the repo template; edits survive · `RED:` PLAN §2 WP-07 · Δ −230/−119.
 - [x] **T-050-28 — Ledger pair checked first (09).** `W:` ledger `scripts/`
   `blocked by:` none · `delivers:` a refusal leaves both files byte-intact · `RED:` PLAN §2 WP-09 · Δ −10/+80.
-- [-] **T-050-29 — One mask, one redactor (11 †).** `W:` `core/redaction.py`, `cli/`, `f/chokepoints/`, `i/privacy_check.py`
+- [x] **T-050-29 — One mask, one redactor (11 †).** `W:` `core/redaction.py`, `cli/`, `f/chokepoints/`, `i/privacy_check.py`
   `blocked by:` none · `delivers:` `z…x` from every surface · `RED:` PLAN §2 WP-11 · Δ −30/+25.
 - [x] **T-050-30 — Gate judges every harness; Codex read-only (12, 13).** `W:` `i/runtime_*`, `hooks/`, `core/invocation.py`, `pub/entities/`
   `blocked by:` none · `delivers:` AC1.4, AC1.5 · `RED:` PLAN §2 WP-12, WP-13 · Δ +7/+97.
