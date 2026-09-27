@@ -599,7 +599,7 @@ class SpecContextService:
                 old = git("for-each-ref", "--format=%(objectname)", f"refs/heads/{work}")
                 if old:
                     git("merge", "--no-edit", old)
-                git("update-ref", f"refs/heads/{work}", "HEAD", old)
+                git("fetch", ".", f"HEAD:refs/heads/{work}")
                 git("switch", work)
             else:
                 git("branch", "-m", work)

@@ -299,6 +299,30 @@ def test_a_stale_local_work_branch_takes_the_anchor_and_main_never_holds_it(
     _assert_published(repo, bare, "feature/0.1.0", "develop")
 
 
+def test_a_work_branch_checked_out_in_another_worktree_is_refused_and_left_untouched(
+    env, tmp_path: Path
+) -> None:
+    """Review 7 R8-1: <work> is checked out in a second worktree holding staged work — git
+    refuses to move it (its text), the worktree's branch, index and files stay as they
+    were, and nothing reaches origin."""
+    svc, repo, bare = env
+    _seed(bare, tmp_path / "seed", "main", "develop")
+    _clone_onboarded(bare, repo)
+    _git(repo, "branch", "feature/0.1.0", "origin/main")
+    wt = tmp_path / "wt"
+    _git(repo, "worktree", "add", "-q", str(wt), "feature/0.1.0")
+    (wt / "new.py").write_text("operator staged work\n", encoding="utf-8")
+    _git(wt, "add", "new.py")
+    tip, before = _git(repo, "rev-parse", "feature/0.1.0"), _heads(bare)
+    with pytest.raises(GitSyncError, match="refusing to fetch into branch") as refused:
+        svc.baseline("proj")
+    assert "context baseline proj" in str(refused.value)
+    assert _git(repo, "rev-parse", "feature/0.1.0") == tip
+    assert _git(wt, "status", "--porcelain") == "A  new.py"
+    assert not (wt / "specs").exists()
+    assert _heads(bare) == before
+
+
 def test_a_stale_work_draft_conflict_names_the_anchor_and_never_publishes_the_old_draft(
     env, tmp_path: Path
 ) -> None:

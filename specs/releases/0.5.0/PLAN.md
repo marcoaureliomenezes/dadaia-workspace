@@ -182,14 +182,14 @@ Cause (review 6 N1/H4/N4): the publish committed where HEAD was, then moved HEAD
 | S6 | born (any branch, detached) | `switch --detach`, commit paths = anchor | detached anchor |
 | S7/S8 | unborn clone (empty / non-empty origin) | root anchor on the unborn name, `branch -m <work>` | `<work>` |
 | S9 | born, paths clean | anchor = HEAD₀ | detached |
-| S12/S13 | local `<work>` exists (incl. HEAD on it; read after the anchor) | `merge <work>` into the anchor, `update-ref <work> HEAD <old>` (CAS), `switch <work>` (C2) | `<work>` |
+| S12/S13 | local `<work>` exists (incl. HEAD on it; read after the anchor) | `merge <work>` into the anchor, `fetch . HEAD:refs/heads/<work>` (fast-forward only; refuses a branch checked out in another worktree; creates an absent one), `switch <work>` (C2, review 7 R8-1) | `<work>` |
 | S11 | origin ≠ ∅ ∧ principal ∉ origin | after step 7 (C3): one candidate → `--principal <h>`; else listed + `<principal>` (C6) | `<work>`, anchor named |
 | S14–S16 | origin start = first of work, integration, principal | `merge`; `--allow-unrelated-histories` only if every root of HEAD holds only onboarding paths (Q1) | `<work>` |
 | S17 | conflict (step 7 or 8): `CONFLICT …`; a re-run meets `fatal: cannot switch branch while merging` / MERGE_HEAD | git's text + the anchor sha + the publish line | in the merge |
 | S18 | births ∨ unpushed | one `push --atomic -u` (births first, N8) | `<work>` |
 | S19 | nothing to push | `""` — published() holds by C1 (no S10/S20) | `<work>` |
 | S22 | gate refuses the push | the gate's reset fix; the message names the anchor and `context baseline <ctx>` after the amend (C7; a hand push drops origin's merge parent) | `<work>` |
-| rows | step-4 failure (hook, gpgsign): detached at HEAD₀, git's text; `<work>` held by a worktree: CAS moves it, `switch` refuses; origin moved between fetch and push: git's rejection text, re-run merges it | — | — |
+| rows | step-4 failure (hook, gpgsign): detached at HEAD₀, git's text; `<work>` held by another worktree: `fetch .` refuses with git's text, that worktree and `<work>` untouched, nothing published (R8-1); a non-fast-forward `<work>` is unreachable (the merge precedes) and `fetch .` would refuse it; origin moved between fetch and push: git's rejection text, re-run merges it | — | — |
 | D1–D6 | dead: clean → rmtree; dirty on work → commit (never an unmerged entry, C5: `diff --diff-filter=U` refuses) + push; non-work branch refused (cut g kept); push failure → git's text, nothing removed; D6 open bug `sa-context-dead-removes-repos-outside-the-reaper` | — | — |
 
 Cut (f): baseline publishes the main repo only; associated repos by plain `git push` under the gate
