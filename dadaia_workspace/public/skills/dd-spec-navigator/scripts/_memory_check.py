@@ -20,6 +20,7 @@ import _memory_catalog as cat  # noqa: E402
 from _memory_schema import CATALOG, CODE, INDEX  # noqa: E402
 
 Finding = dict[str, Any]
+FIX_PREFIX = "python3 .agents/skills/dd-spec-navigator/scripts/memory.py"
 
 
 def check(specs: Path) -> list[Finding]:
@@ -38,6 +39,6 @@ def check(specs: Path) -> list[Finding]:
                 "path": name, "line": 0,
                 "message": f"{path.name} does not match the atoms it is generated from",
             })  # fmt: skip
-    for finding in out:
-        finding["code"] = CODE
+    for finding in out:  # the pair is regenerated, never hand-fixed: the fix line clears it
+        finding |= {"code": CODE, "fix": f"{FIX_PREFIX} catalog generate --specs specs"}
     return out

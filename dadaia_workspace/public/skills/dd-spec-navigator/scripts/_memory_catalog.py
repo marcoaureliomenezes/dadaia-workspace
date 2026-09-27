@@ -78,7 +78,7 @@ def generate(specs: Path) -> Catalog:
     """The catalog dict for *specs*, `generated_at` carried over when nothing changed."""
     features = [feature(path, specs, rank) for rank, path in enumerate(atoms(specs), start=1)]
     stamp = _stamp(specs, features)
-    return {"generated_at": stamp, "context": specs.parent.name, "features": features}
+    return {"generated_at": stamp, "features": features}
 
 
 def _stamp(specs: Path, features: list[dict[str, Any]]) -> str:
@@ -99,7 +99,7 @@ def serialize(catalog: Catalog) -> str:
 #: like `memory/product/index.md#feature-catalog` — regeneration never renames it.
 HEADING = "## Feature catalog"
 _TEMPLATE = """\
-# Memory Catalog — {context}
+# Memory Catalog
 
 > Generated automatically from `specs/memory/product/<area>/*.md` frontmatter.
 > The catalog section below is refreshed by `memory.py catalog generate`; other
@@ -144,7 +144,5 @@ def render(specs: Path, catalog: Catalog) -> str:
         )
         text = "".join([*lines[:start], f"{HEADING}\n\n{rendered}\n\n", *lines[end:]])
     else:
-        text = _TEMPLATE.format(
-            context=str(catalog.get("context", "")), heading=HEADING, tables=rendered
-        )
+        text = _TEMPLATE.format(heading=HEADING, tables=rendered)
     return text.rstrip("\n") + "\n"

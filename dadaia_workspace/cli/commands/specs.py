@@ -24,6 +24,7 @@ from dadaia_workspace.features.migrate import upgrade as upgrade_feature
 from dadaia_workspace.features.migrate.registry import UpgradeRefused
 from dadaia_workspace.features.migrate.upgrade import UpgradeResult
 from dadaia_workspace.features.specs import SpecsDoctor, SpecsDoctorIssue, canon
+from dadaia_workspace.infrastructure.ledger_scripts import script_repairs
 
 app = typer.Typer(help="SDD release-lifecycle structural checks and helpers.")
 
@@ -76,6 +77,8 @@ def _echo_upgrade(specs: Path, result: UpgradeResult) -> None:
         typer.echo(f"[tech-stack] {will}fold {path} into memory/ARCHITECTURE.md")
     for issue in _repair(specs, dry_run=result.dry_run):
         typer.echo(f"[repair] {will}fix {issue.code} {issue.path}")
+    for action in [] if result.dry_run else script_repairs(specs):
+        typer.echo(f"[repair] {action}")
     if result.from_version < result.to_version:
         typer.echo(
             f"[stamp] {will}stamp {specs / 'constitution.md'} "

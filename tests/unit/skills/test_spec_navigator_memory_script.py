@@ -40,9 +40,9 @@ def script(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def specs(tmp_path: Path) -> Path:
-    """A copy of this repo's committed memory tree, under a same-named parent so the
-    catalog's `context` (the specs dir's parent name) reproduces too."""
-    tree = tmp_path / _REPO.name / "specs"
+    """A copy of this repo's committed memory tree under a checkout folder NOT named after
+    the repo: the catalog is a pure function of the atoms, never of the folder name."""
+    tree = tmp_path / "any-checkout-name" / "specs"
     shutil.copytree(_REPO / "specs" / "memory", tree / "memory")
     return tree
 
@@ -88,7 +88,6 @@ def test_catalog_generate_rebuilds_the_committed_content_from_the_atoms_alone(
 
     rebuilt = json.loads((product / "catalog.json").read_text("utf-8"))
     assert rebuilt["features"] == committed["features"]
-    assert rebuilt["context"] == committed["context"]
     assert rebuilt["generated_at"] != committed["generated_at"]
     catalog_section = committed_index.split("## Feature catalog\n\n", 1)[1]
     assert catalog_section.rstrip("\n") in (product / "index.md").read_text("utf-8")
@@ -105,6 +104,19 @@ def test_catalog_generate_preserves_non_catalog_sections_verbatim(
 
     assert _run(script, "catalog", "generate", "--specs", str(specs)).returncode == 0
     assert index.read_text(encoding="utf-8").endswith("## Operator notes\n\nkept verbatim.\n")
+
+
+def test_check_passes_in_a_checkout_folder_not_named_after_the_repo(
+    script: Path, specs: Path
+) -> None:
+    """memory-catalog-context-is-the-checkout-folder-name: the committed pair checked from
+    a folder named anything but the repo is in sync (exit 0), and carries no folder name."""
+    result = _run(script, "check", "--specs", str(specs))
+
+    assert result.returncode == 0, result.stdout
+    assert "any-checkout-name" not in (specs / "memory" / "product" / "catalog.json").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_product_add_is_not_a_verb(script: Path, specs: Path) -> None:
@@ -163,3 +175,20 @@ def test_check_flags_an_index_that_drifted_from_the_atoms(script: Path, specs: P
 
     assert result.returncode == 1
     assert "index.md" in result.stdout
+
+
+def test_a_drifted_pair_names_the_generator_as_its_fix(script: Path, specs: Path) -> None:
+    """memory-catalog-context-is-the-checkout-folder-name#fix: a catalog written by an
+    older generator (it carried `context`) is drift whose fix regenerates the pair."""
+    catalog = specs / "memory" / "product" / "catalog.json"
+    document = {"context": "old-folder", **json.loads(catalog.read_text(encoding="utf-8"))}
+    catalog.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", "utf-8")
+
+    (finding,) = json.loads(_run(script, "check", "--specs", str(specs), "--json").stdout)
+
+    fix = (
+        "python3 .agents/skills/dd-spec-navigator/scripts/memory.py catalog generate --specs specs"
+    )
+    assert finding["fix"] == fix
+    assert _run(script, "catalog", "generate", "--specs", str(specs)).returncode == 0
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0

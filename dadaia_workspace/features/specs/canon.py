@@ -243,11 +243,6 @@ def _render(entry: CanonEntry, *, public_dir: Path, context: dict[str, str]) -> 
             json.dumps(
                 {
                     "generated_at": f"{context['today']}T00:00:00Z",
-                    # The catalog's ONE writer is `memory.py catalog generate`, which
-                    # derives `context` from the tree's own directory name; a scaffold
-                    # writing the project label instead was invalid the moment it was
-                    # born (`memory.py check` regenerates and compares).
-                    "context": context["tree_name"],
                     "features": [],
                 },
                 indent=2,
@@ -278,7 +273,6 @@ def scaffold(
     context = {
         "today": _today(),
         "project_name": project_name,
-        "tree_name": specs_dir.resolve().parent.name,
         "specs_pattern_version": str(CANONICAL_SPECS_VERSION),
     }
     writes: list[tuple[Path, Callable[[], str], bool]] = [

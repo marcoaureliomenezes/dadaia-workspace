@@ -33,6 +33,7 @@ __all__ = [
     "LedgerScript",
     "resolve_script",
     "script_findings",
+    "script_repairs",
 ]
 
 #: The package's own copy of the skills — the fallback when the doctored tree is a bare
@@ -53,6 +54,9 @@ class LedgerScript:
     name: str
     skill: str
     filename: str
+    #: The script's own verb that re-derives a DERIVED ledger from its source — empty
+    #: for a ledger of record, which no repair may rewrite.
+    regenerate: tuple[str, ...] = ()
 
     @property
     def code(self) -> str:
@@ -70,7 +74,7 @@ LEDGER_SCRIPTS: tuple[LedgerScript, ...] = (
     LedgerScript("BACKLOG", "dd-backlog-definition", "backlog.py"),
     LedgerScript("RELEASE", "dd-release-implementation", "release.py"),
     LedgerScript("FINDINGS", "dd-audit-project", "audit.py"),
-    LedgerScript("MEMORY", "dd-spec-navigator", "memory.py"),
+    LedgerScript("MEMORY", "dd-spec-navigator", "memory.py", ("catalog", "generate")),
 )
 
 
@@ -152,6 +156,28 @@ def script_findings(specs_dir: Path, runner: _Runner | None = None) -> list[Sect
             continue
         findings.extend(_finding(script, record) for record in records)
     return findings
+
+
+def script_repairs(specs_dir: Path, runner: _Runner | None = None) -> list[str]:
+    """Re-derive every derived ledger whose check has findings, through its ONE writer —
+    the repair never writes a ledger itself."""
+    process = runner if runner is not None else SubprocessProcessRunner()
+    repaired: list[str] = []
+    for script in LEDGER_SCRIPTS:
+        path = resolve_script(script, specs_dir) if script.regenerate else None
+        if path is None:
+            continue
+        run = [sys.executable, str(path)]
+        tail = ["--specs", str(specs_dir)]
+        checked = process.run(
+            [*run, "check", *tail], cwd=specs_dir.parent, timeout=_TIMEOUT_SECONDS
+        )
+        if checked.returncode == 1:
+            process.run(
+                [*run, *script.regenerate, *tail], cwd=specs_dir.parent, timeout=_TIMEOUT_SECONDS
+            )
+            repaired.append(f"[ledgers] {script.code}: {' '.join(script.regenerate)}")
+    return repaired
 
 
 def _parse(result: Any) -> list[dict[str, Any]] | None:
