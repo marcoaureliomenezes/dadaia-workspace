@@ -323,19 +323,22 @@ def test_text_denylist_flags_and_scans_root_agents_md(
 
 
 def test_bytecode_cache_ignored_and_baseline_data_loads_with_version_header(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
 ) -> None:
-    _seed_denylist_env(monkeypatch, tmp_path)
+    """sa-scoped-public-install-prunes-the-gate-wiring#L3: stage copies no __pycache__."""
     public_dir = tmp_path / "public"
-    cache_dir = public_dir / "skills" / "sample" / "__pycache__"
-    cache_dir.mkdir(parents=True)
-    (cache_dir / "leak.pyc").write_bytes(_TEST_TERM.encode())
-    (public_dir / "data").mkdir()
-    (public_dir / "data" / "AGENTS.md").write_text("# clean\n", encoding="utf-8")
+    scripts = public_dir / "skills" / "sample" / "scripts"
+    (scripts / "__pycache__").mkdir(parents=True)
+    (scripts / "run.py").write_text("print(1)\n", encoding="utf-8")
+    (scripts / "__pycache__" / "run.cpython-312.pyc").write_bytes(b"\x00")
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
 
-    assert [  # noqa: SLF001
-        line.render() for line in _manager(public_dir)._check_public_privacy()
-    ] == ["[ok] public-privacy"]
+    _manager(public_dir).stage(workspace)
+
+    staged = workspace / ".dadaia" / "agentic" / "skills" / "sample" / "scripts"
+    assert (staged / "run.py").is_file()
+    assert not (staged / "__pycache__").exists()
 
     # Packaged baseline data ships with a versioned, documented header.
     patterns = _load_privacy_baseline()

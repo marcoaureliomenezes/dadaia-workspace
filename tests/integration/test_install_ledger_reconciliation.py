@@ -91,7 +91,7 @@ def test_no_ledger_bootstrap_prunes_nothing(tmp_path: Path) -> None:
 
 
 def test_scoped_install_never_prunes_other_scopes(tmp_path: Path) -> None:
-    """A per-harness install must not treat other harnesses' entries as stale."""
+    """sa-scoped-public-install-prunes-the-gate-wiring#L2: a per-harness install must not treat other harnesses' entries as stale."""
     ws = tmp_path / "ws"
     ws.mkdir()
     mgr = _install_all(ws)
@@ -103,3 +103,24 @@ def test_scoped_install_never_prunes_other_scopes(tmp_path: Path) -> None:
     assert any(codex_agents.glob("*.toml")), (
         "a claude-scoped install must never prune codex projections via the ledger"
     )
+
+
+def test_every_install_keeps_every_ledgered_path_the_library_still_ships(tmp_path: Path) -> None:
+    """sa-scoped-public-install-prunes-the-gate-wiring#L2: after any completed install
+    every path of the previous ledger is still on disk (nothing shipped is pruned)."""
+    from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    mgr = _install_all(ws)
+    states = ws / ".dadaia" / "states"
+    before = JsonInstallLedgerStore().read(states)
+    assert before is not None
+    for variant in ({}, {"force": True}, {"harness": "claude"}):
+        mgr.install(ws, **variant)  # type: ignore[arg-type]
+        missing = [
+            rel
+            for rel in before.by_relpath()
+            if not (ws / rel).is_symlink() and not (ws / rel).exists()
+        ]
+        assert missing == [], variant
