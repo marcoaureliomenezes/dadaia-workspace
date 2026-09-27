@@ -57,7 +57,6 @@ def _plan(workspace_root: Path) -> InstallPlan:
         agentic_dir=_PUBLIC,
         harness=None,
         scope="all",
-        only=None,
         overwrite=OverwritePolicy.PRESERVE,
         guardrail_targets=frozenset({"workspace"}),
         harness_targets=("agents", *HARNESS_RECORDS),

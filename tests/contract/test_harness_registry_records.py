@@ -48,7 +48,6 @@ def render_table(workspace_root: Path, kimi_home: Path) -> list[dict[str, object
         agentic_dir=_PUBLIC,
         harness=None,
         scope="all",
-        only=None,
         overwrite=OverwritePolicy.PRESERVE,
         guardrail_targets=frozenset({"workspace"}),
         harness_targets=("agents", *L1_ENTRY_HARNESSES),

@@ -63,9 +63,8 @@ def md_symlink_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Projecti
     authored = plan.workspace_root / ".agents"
     src_agents = plan.agentic_dir / "agents"
     src_skills = plan.agentic_dir / "skills"
-    dirs = _CLAUDE_DIRS if plan.only is None else tuple(d for d in _CLAUDE_DIRS if d == plan.only)
     rules: list[ProjectionRule] = []
-    for name in dirs:
+    for name in _CLAUDE_DIRS:
         if name == "agents":
             rules.extend(_agent_link_rules(record, harness_dir / "agents", authored, src_agents))
         elif name == "skills":
@@ -110,8 +109,6 @@ def _agent_link_rules(
 def cursor_md_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
     """Cursor reads Markdown personas from its own directory — one link per authored
     file, the same hash-verified copy fallback, no second rendered copy."""
-    if plan.only is not None and plan.only != "agents":
-        return ()
     return _agent_link_rules(
         record,
         plan.workspace_root / str(record.directory) / "agents",
@@ -145,8 +142,6 @@ def copilot_agent_md_bytes(md_path: Path) -> bytes:
 def copilot_agent_md_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
     """``<dir>/agents/<name>.agent.md`` per authored persona — and nothing else under
     the harness directory, which the repository's own workflows already share."""
-    if plan.only is not None and plan.only != "agents":
-        return ()
     dst_dir = plan.workspace_root / str(record.directory) / "agents"
     rules: list[ProjectionRule] = []
     for md_file in sorted((plan.agentic_dir / "agents").glob("*.md")):
@@ -207,48 +202,46 @@ def toml_transcode_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Proj
     byte-wise. The shared ``.agents/skills`` tree is read natively."""
     harness_dir = plan.workspace_root / str(record.directory)
     rules: list[ProjectionRule] = []
-    if plan.only is None or plan.only == "rules":
+    rules.append(
+        bytes_rule(
+            f"{record.name}:rules/dadaia-command-policy.rules",
+            record.name,
+            harness_dir / "rules" / "dadaia-command-policy.rules",
+            _render_codex_command_policy_rules().encode("utf-8"),
+        )
+    )
+    agents_src = plan.agentic_dir / "agents"
+    for md_file in sorted(agents_src.glob("*.md")):
+        fm = _parse_agent_frontmatter(md_file.read_text(encoding="utf-8"))
+        agent_name = str(fm.get("name", "")) if fm else ""
+        if not agent_name:
+            continue
+        resolved = plan.resolved_models.get(agent_name)
+
+        def _render(
+            _current: bytes | None,
+            _md_file: Path = md_file,
+            _agent_name: str = agent_name,
+            _resolved: ResolvedAgentModel | None = resolved,
+        ) -> bytes:
+            return codex_agent_toml_bytes(_md_file, _agent_name, _resolved)
+
         rules.append(
-            bytes_rule(
-                f"{record.name}:rules/dadaia-command-policy.rules",
-                record.name,
-                harness_dir / "rules" / "dadaia-command-policy.rules",
-                _render_codex_command_policy_rules().encode("utf-8"),
+            ProjectionRule(
+                label=f"{record.name}:agents/{agent_name}.toml",
+                harness=record.name,
+                dst=harness_dir / "agents" / f"{agent_name}.toml",
+                render=_render,
             )
         )
-    if plan.only is None or plan.only == "agents":
-        agents_src = plan.agentic_dir / "agents"
-        for md_file in sorted(agents_src.glob("*.md")):
-            fm = _parse_agent_frontmatter(md_file.read_text(encoding="utf-8"))
-            agent_name = str(fm.get("name", "")) if fm else ""
-            if not agent_name:
-                continue
-            resolved = plan.resolved_models.get(agent_name)
-
-            def _render(
-                _current: bytes | None,
-                _md_file: Path = md_file,
-                _agent_name: str = agent_name,
-                _resolved: ResolvedAgentModel | None = resolved,
-            ) -> bytes:
-                return codex_agent_toml_bytes(_md_file, _agent_name, _resolved)
-
-            rules.append(
-                ProjectionRule(
-                    label=f"{record.name}:agents/{agent_name}.toml",
-                    harness=record.name,
-                    dst=harness_dir / "agents" / f"{agent_name}.toml",
-                    render=_render,
-                )
-            )
-        rules.append(
-            bytes_rule(
-                f"{record.name}:config.toml",
-                record.name,
-                harness_dir / "config.toml",
-                codex_config(plan.agentic_dir).encode("utf-8"),
-            )
+    rules.append(
+        bytes_rule(
+            f"{record.name}:config.toml",
+            record.name,
+            harness_dir / "config.toml",
+            codex_config(plan.agentic_dir).encode("utf-8"),
         )
+    )
     return tuple(rules)
 
 

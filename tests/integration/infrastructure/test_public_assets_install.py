@@ -78,33 +78,10 @@ def test_legacy_agents_md_install_and_repos_only_skip(tmp_path: Path) -> None:
     assert not (workspace_root2 / "AGENTS.md").exists()
 
 
-def test_invalid_target_raises_and_only_rules_agents_filters(tmp_path: Path) -> None:
-    """Invalid target raises + only=rules / only=agents each filter out the other."""
+def test_invalid_target_raises(tmp_path: Path) -> None:
     _, workspace_root = _build_minimal_agentic_dir(tmp_path)
     with pytest.raises(PublicAssetError, match="Unsupported"):
         FileSystemPublicAssetManager().install(workspace_root, harness="invalid-target")
-
-    public_dir = tmp_path / "public"
-    public_dir.mkdir()
-    ws_rules = tmp_path / "workspace-rules"
-    ws_rules.mkdir()
-    _make_minimal_agentic(ws_rules)
-    manager = _make_manager(public_dir)
-
-    installed = manager.install(ws_rules, harness="claude", force=True, only="rules")
-    installed_paths = " ".join(installed)
-    assert "rules" in installed_paths or len(installed) == 0
-    agents_dir = ws_rules / ".claude" / "agents"
-    assert not agents_dir.exists() or list(agents_dir.iterdir()) == []
-
-    ws_agents = tmp_path / "workspace-agents"
-    ws_agents.mkdir()
-    _make_minimal_agentic(ws_agents)
-    manager2 = _make_manager(public_dir)
-
-    manager2.install(ws_agents, harness="claude", force=True, only="agents")
-    rules_dir = ws_agents / ".claude" / "rules"
-    assert not rules_dir.exists() or list(rules_dir.iterdir()) == []
 
 
 def test_install_leaves_only_ledger_owned_entries_under_claude(tmp_path: Path) -> None:

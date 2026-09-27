@@ -25,16 +25,6 @@ _STYLE_BY_STATUS: dict[DoctorStatus, str] = {
 
 app = typer.Typer(help="Manage distributed public agent assets.")
 console = Console()
-_ONLY_CHOICES = (
-    "agents",
-    "skills",
-    "rules",
-    "schemas",
-    "scripts",
-    "runtime",
-    "templates",
-    "data",
-)
 
 
 @app.command()
@@ -71,11 +61,6 @@ def install(
     workspace_only: bool = typer.Option(
         False, "--workspace-only", help="Install only workspace-root guardrail pair."
     ),
-    only: str = typer.Option(
-        "",
-        "--only",
-        help=f"Install only one asset category: {', '.join(_ONLY_CHOICES)}",
-    ),
 ) -> None:
     """Install staged public assets into runtime projections.
 
@@ -85,14 +70,6 @@ def install(
     """
     if repos_only and workspace_only:
         typer.echo("Error: --repos-only and --workspace-only are mutually exclusive.", err=True)
-        raise typer.Exit(1)
-
-    only_value: str | None = only if only else None
-    if only_value is not None and only_value not in _ONLY_CHOICES:
-        typer.echo(
-            f"Error: --only '{only_value}' is not valid. Choose from: {', '.join(_ONLY_CHOICES)}",
-            err=True,
-        )
         raise typer.Exit(1)
 
     scope: Literal["all", "repos-only", "workspace-only"]
@@ -105,7 +82,7 @@ def install(
 
     workspace_root = resolve_workspace_root()
     svc = container.build_public_service()
-    installed = svc.install(workspace_root, force=force, scope=scope, only=only_value)
+    installed = svc.install(workspace_root, force=force, scope=scope)
 
     if installed:
         console.print(f"[green]✓[/green] {len(installed)} asset(s) processed:")

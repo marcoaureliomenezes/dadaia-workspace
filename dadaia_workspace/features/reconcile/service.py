@@ -112,7 +112,6 @@ def reconcile_workspace(
             workspace_root,
             force=True,
             scope="all",
-            only=None,
         )
         steps.append("public-install")
 

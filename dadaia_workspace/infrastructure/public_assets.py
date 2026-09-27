@@ -229,7 +229,13 @@ class FileSystemPublicAssetManager:
                 continue
             dst = agentic_dir / name
             if src.is_dir():
-                shutil.copytree(src, dst)
+                shutil.copytree(
+                    src,
+                    dst,
+                    ignore=lambda d, names: [
+                        n for n in names if is_ignored_public_asset(Path(d) / n)
+                    ],
+                )
             else:
                 shutil.copy2(src, dst)
             staged.append(f"[stage] {dst}")
@@ -287,7 +293,6 @@ class FileSystemPublicAssetManager:
         harness: str | None = None,
         force: bool = False,
         scope: Literal["all", "repos-only", "workspace-only"] = "all",
-        only: str | None = None,
     ) -> list[str]:
         self._validate_install_harness(harness)
         self._guard_source_root_install(workspace_root)
@@ -298,7 +303,7 @@ class FileSystemPublicAssetManager:
             installed.extend(self.stage(workspace_root))
 
         plan = self._resolve_install_plan(
-            workspace_root, agentic_dir, harness, OverwritePolicy.of(force), scope, only
+            workspace_root, agentic_dir, harness, OverwritePolicy.of(force), scope
         )
         rules = projection_rules(plan)
         transcript = install_rules(rules, force=plan.overwrite.force)
@@ -361,7 +366,6 @@ class FileSystemPublicAssetManager:
         harness: str | None,
         overwrite: OverwritePolicy,
         scope: Literal["all", "repos-only", "workspace-only"],
-        only: str | None,
     ) -> InstallPlan:
         """Resolve ``install()``'s arguments ONCE (FR6): the single translation point.
 
@@ -392,7 +396,6 @@ class FileSystemPublicAssetManager:
             agentic_dir=agentic_dir,
             harness=harness,
             scope=scope,
-            only=only,
             overwrite=overwrite,
             guardrail_targets=frozenset(
                 {
@@ -591,7 +594,6 @@ class FileSystemPublicAssetManager:
             agentic_dir=agentic_dir,
             harness=None,
             scope="all",
-            only=None,
             overwrite=OverwritePolicy.PRESERVE,
             guardrail_targets=frozenset({"workspace", "repos"}),
             harness_targets=("agents", *(h for h in L1_ENTRY_HARNESSES if h in active)),

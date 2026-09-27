@@ -36,10 +36,9 @@ class PublicAssetService:
         harness: str | None = None,
         force: bool = False,
         scope: Literal["all", "repos-only", "workspace-only"] = "all",
-        only: str | None = None,
     ) -> list[str]:
         return self._public_assets.install(
-            workspace_root, harness=harness, force=force, scope=scope, only=only
+            workspace_root, harness=harness, force=force, scope=scope
         )
 
     def list_all(self) -> dict[str, list[str]]:

@@ -37,7 +37,6 @@ def _agent_rules(workspace_root: Path, harness: str) -> tuple[ProjectionRule, ..
         agentic_dir=_PUBLIC,
         harness=harness,
         scope="all",
-        only=None,
         overwrite=OverwritePolicy.PRESERVE,
         guardrail_targets=frozenset(),
         harness_targets=(harness,),

@@ -167,8 +167,6 @@ def _settings_merge_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Pro
     file, folding in only the dadaia hook wiring and leaving every other top-level key and
     non-dadaia hook entry untouched. Still one algorithm, because the merge is a fixed
     point on already-canonical content."""
-    if plan.only is not None:
-        return ()
     workspace_root = plan.workspace_root
     dst = workspace_root / str(record.directory) / "settings.json"
 
@@ -224,8 +222,6 @@ def _settings_merge_checks(record: HarnessRecord, workspace_root: Path) -> list[
 def _hooks_json_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
     """``codex-hooks``: a project-level ``hooks.json`` plus the shared wrapper scripts the
     harness shells out to."""
-    if plan.only is not None:
-        return ()
     workspace_root = plan.workspace_root
     rules = [
         bytes_rule(
@@ -268,8 +264,6 @@ def _hook_files_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Project
     The files are data (``HOOK_DIALECTS``) and the behaviours are the wrappers', so a
     harness joining this builder cannot invent a fifth behaviour nor drop one of the four.
     """
-    if plan.only is not None:
-        return ()
     workspace_root = plan.workspace_root
     directory = workspace_root / str(record.directory)
     rules = [
@@ -302,8 +296,6 @@ def _user_home_hook_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Pro
     """``kimi-hooks``: no project-level config file — hook registration is a managed block
     folded into the user-level ``$KIMI_CODE_HOME/config.toml``, the same fixed-point
     algorithm as every other rule."""
-    if plan.only is not None:
-        return ()
     home = kimi_code_home()
     rules = [
         bytes_rule(
@@ -431,12 +423,10 @@ def projection_rules(plan: InstallPlan) -> tuple[ProjectionRule, ...]:
     rules.extend(_guardrail_pair_rules(plan))
     rules.extend(_dadaia_family_agents_md_rules(plan))
     if _AUTHORED_SET_TARGETS & set(plan.harness_targets):
-        if plan.only is None or plan.only == "skills":
-            rules.extend(_skills_tree_rules(plan))
-        if plan.only is None or plan.only == "agents":
-            rules.extend(
-                _agents_agent_rules(plan.agentic_dir, plan.workspace_root, plan.resolved_models)
-            )
+        rules.extend(_skills_tree_rules(plan))
+        rules.extend(
+            _agents_agent_rules(plan.agentic_dir, plan.workspace_root, plan.resolved_models)
+        )
     for name, record in HARNESS_RECORDS.items():
         if name not in plan.harness_targets:
             continue

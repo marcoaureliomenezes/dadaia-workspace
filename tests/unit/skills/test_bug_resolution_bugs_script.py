@@ -409,7 +409,6 @@ def test_the_projection_rule_carries_the_exec_bit_for_an_executable_source(
         agentic_dir=_PUBLIC,
         harness=None,
         scope="workspace-only",
-        only="skills",
         overwrite=OverwritePolicy.PRESERVE,
         guardrail_targets=frozenset(),
         harness_targets=("agents",),

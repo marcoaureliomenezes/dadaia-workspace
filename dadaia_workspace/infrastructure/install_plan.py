@@ -21,7 +21,7 @@ from dadaia_workspace.infrastructure.public_assets_common import OverwritePolicy
 @dataclass(frozen=True)
 class InstallPlan:
     """``install()`` builds exactly one ``InstallPlan`` from its
-    ``(workspace_root, harness, force, scope, only)`` parameters, THEN runs the rule
+    ``(workspace_root, harness, force, scope)`` parameters, THEN runs the rule
     table over it — the flags never travel any further than this dataclass. ``force``
     is resolved to an :class:`OverwritePolicy`; ``harness``/``scope`` are resolved to
     the concrete harness targets and active-harness set the rule builders select on;
@@ -33,7 +33,6 @@ class InstallPlan:
     agentic_dir: Path
     harness: str | None
     scope: Literal["all", "repos-only", "workspace-only"]
-    only: str | None
     overwrite: OverwritePolicy
     #: Which guardrail projections the scope selects: subset of {"workspace", "repos"}.
     guardrail_targets: frozenset[str]
