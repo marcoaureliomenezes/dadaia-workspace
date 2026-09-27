@@ -948,3 +948,24 @@ def test_dead_after_the_operator_pulls_into_a_conflict_publishes_no_markers(
     output = done.stdout + done.stderr
     assert done.returncode != 0 and "unmerged" in output, output
     assert world.repo.is_dir() and world.remote_heads()["feature/1.0.0"] == published
+
+
+def test_dead_commit_without_a_git_identity_refuses_and_removes_nothing(tmp_path: Path) -> None:
+    """Behavior (pending AC, retro 2026-09-27): with no git identity in env or config,
+    ``context dead --commit`` over a checkout holding changes refuses before any write —
+    exit non-zero, one fix line setting ``user.name`` in that repo, the checkout, its
+    change and the published branch all left as they were."""
+    world = World(tmp_path)
+    _on_work(world)
+    (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
+    head = world.git(world.repo, "rev-parse", "HEAD")
+    published = world.remote_heads()["feature/1.0.0"]
+    (world.tmp / "gitconfig").write_text("[user]\n\tuseConfigOnly = true\n", encoding="utf-8")
+    done = world.cli("context", "dead", "proj", "--commit")
+    assert done.returncode != 0
+    assert _single_fix(done) == f"git -C {world.repo} config user.name '<user.name>'"
+    assert (world.repo / "README.md").read_text(encoding="utf-8") == "edited\n"
+    assert world.git(world.repo, "rev-parse", "HEAD") == head
+    assert world.remote_heads()["feature/1.0.0"] == published
+    ctx = JsonContextStore(world.ws / ".dadaia" / "states").get("proj")
+    assert ctx is not None and ctx.state == ContextState.ALIVE
