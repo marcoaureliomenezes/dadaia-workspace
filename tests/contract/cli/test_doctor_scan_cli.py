@@ -28,7 +28,7 @@ from typer.testing import CliRunner
 from dadaia_workspace import container
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import fix_line
-from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
+from dadaia_workspace.core.harness_registry import HARNESS_PROJECTION_DIRS, L1_ENTRY_HARNESSES
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.workspace_layout import provisioned_zones, zones_with_ttl
 from dadaia_workspace.features.spec_context import doctor
@@ -279,3 +279,70 @@ def test_fix_deletes_a_hold_past_seven_days_and_keeps_a_younger_one(workspace: P
     assert "WS-reaped-expired" in result.output, result.output
     assert not old.exists()
     assert young.read_text(encoding="utf-8") == "x"
+
+
+_OPERATOR_HARNESS_FILES = {
+    ".claude/settings.local.json": b'{"permissions": {"allow": ["Bash(ls)"]}}\n',
+    ".claude/skills/dm-x/SKILL.md": b"---\nname: dm-x\n---\n",
+}
+
+
+def test_fix_leaves_operator_files_in_a_harness_dir_byte_identical(workspace: Path) -> None:
+    """sa-doctor-reaps-harness-owned-entries#H1: files outside the ledger and every glob
+    are byte-identical after ``doctor --fix``, which exits 0 with no WS-claude-slop."""
+    for rel, body in _OPERATOR_HARNESS_FILES.items():
+        (workspace / rel).parent.mkdir(parents=True, exist_ok=True)
+        (workspace / rel).write_bytes(body)
+
+    result = CliRunner().invoke(app, ["doctor", "--fix"])
+
+    assert result.exit_code == 0, result.output
+    assert "WS-claude-slop" not in result.output
+    for rel, body in _OPERATOR_HARNESS_FILES.items():
+        assert (workspace / rel).read_bytes() == body, rel
+
+
+@pytest.mark.parametrize(
+    "harness_dir", sorted({d for dirs in HARNESS_PROJECTION_DIRS.values() for d in dirs})
+)
+def test_no_harness_dir_entry_is_ever_slop_or_moved(workspace: Path, harness_dir: str) -> None:
+    """sa-doctor-reaps-harness-owned-entries#H2, #H3 (``.github`` carries
+    ``hooks/stray.json`` and ``workflows/ci.yml``): a tree outside the ledger under any
+    registered harness dir yields no finding for it and ``--fix`` moves nothing."""
+    planted = {
+        f"{harness_dir}/hooks/stray.json": b"{}\n",
+        f"{harness_dir}/workflows/ci.yml": b"on: push\n",
+        f"{harness_dir}/deep/a/b/notes.md": b"mine\n",
+    }
+    for rel, body in planted.items():
+        (workspace / rel).parent.mkdir(parents=True, exist_ok=True)
+        (workspace / rel).write_bytes(body)
+
+    scan = json.loads(CliRunner().invoke(app, ["doctor", "--json"]).output)
+    fix = CliRunner().invoke(app, ["doctor", "--fix"])
+
+    messages = [f["message"] for f in scan["sections"]["workspace"]["findings"]]
+    assert not [m for m in messages if m.startswith(harness_dir)], messages
+    assert fix.exit_code == 0, fix.output
+    for rel, body in planted.items():
+        assert (workspace / rel).read_bytes() == body, rel
+
+
+@pytest.mark.parametrize("ledger_state", ["absent", "corrupt"])
+def test_fix_changes_nothing_in_a_harness_dir_without_a_readable_ledger(
+    workspace: Path, ledger_state: str
+) -> None:
+    """sa-doctor-reaps-harness-owned-entries#H5."""
+    ledger = workspace / ".dadaia" / "states" / "install_ledger.json"
+    if ledger_state == "corrupt":
+        ledger.write_text("{not json", encoding="utf-8")
+    else:
+        ledger.unlink()
+    projected = workspace / ".claude" / "agents" / "pm.md"
+    projected.parent.mkdir(parents=True)
+    projected.write_text("projected", encoding="utf-8")
+
+    CliRunner().invoke(app, ["doctor", "--fix"])
+
+    assert projected.read_text(encoding="utf-8") == "projected"
+    assert sorted(p.name for p in (workspace / ".claude").rglob("*")) == ["agents", "pm.md"]
