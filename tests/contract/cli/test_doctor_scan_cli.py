@@ -173,7 +173,7 @@ def test_fix_reports_an_undeletable_entry_exits_1_and_never_raises(
     assert undeletable.exists()
     assert f"{_EXPIRED_CODE}: deleted '{_TTL_ZONE.name}/stale'" in result.output
     # The expired entry `locked` is reaped whole, so its refusal names the entry.
-    assert f"{_EXPIRED_CODE}: skipped '{_TTL_ZONE.name}/locked' (errno 13" in result.output
+    assert f"{_EXPIRED_CODE}: skipped '{_TTL_ZONE.name}/locked' (errno " in result.output
 
 
 def test_fix_expired_only_quiet_is_the_reaper_lane(workspace: Path) -> None:

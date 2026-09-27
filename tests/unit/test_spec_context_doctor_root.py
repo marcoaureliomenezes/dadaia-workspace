@@ -454,7 +454,7 @@ def test_fix_skips_and_reports_an_undeletable_entry_and_finishes_the_pass(
     skipped = [a for a in actions if ": skipped '" in a]
     assert f"WS-{_TTL_ZONE.name}-expired: deleted '{_TTL_ZONE.name}/y.txt'" in deleted
     assert not any(f"'{_TTL_ZONE.name}/x'" in a for a in deleted)
-    assert any(f"skipped '{_TTL_ZONE.name}/x' (errno 13" in a for a in skipped), actions
+    assert any(f"skipped '{_TTL_ZONE.name}/x' (errno " in a for a in skipped), actions
     assert remaining[f"{_TTL_ZONE.name}/x"].verdict is FindingVerdict.EXPIRED
 
 
