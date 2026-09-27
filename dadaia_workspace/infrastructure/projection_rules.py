@@ -157,24 +157,6 @@ def _agents_agent_rules(
     return tuple(rules)
 
 
-def prune_stale_codex_tomls(
-    codex_dir: Path, expected: frozenset[str], installed: list[str]
-) -> None:
-    """Remove a ``.codex/agents/*.toml`` whose agent no longer exists in source.
-
-    Unconditional (rc-4 / T-017-32): an agent removed from source must not leave an
-    orphan projection, regardless of ``--force``. *expected* is the set of TOML
-    filenames the current rule table just projected.
-    """
-    agents_dst = codex_dir / "agents"
-    if not agents_dst.is_dir():
-        return
-    for stale in sorted(agents_dst.glob("*.toml")):
-        if stale.name not in expected:
-            stale.unlink()
-            installed.append(f"[rm]   {stale}")
-
-
 # ---------------------------------------------------------------------------
 # hooks builders — one per enum value, plus the checks a byte-compare cannot express
 # ---------------------------------------------------------------------------

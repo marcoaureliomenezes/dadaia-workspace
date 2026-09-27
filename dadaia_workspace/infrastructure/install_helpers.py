@@ -7,7 +7,6 @@ the class delegates to; they take explicit Path arguments instead of ``self``.
 
 from __future__ import annotations
 
-import contextlib
 from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 
@@ -17,7 +16,6 @@ from dadaia_workspace.core.models.agent_model_policy import (
     ResolvedAgentModel,
     codex_effort_for_claude_effort,
 )
-from dadaia_workspace.core.workspace_layout import HARNESS_DIRS
 from dadaia_workspace.infrastructure.public_assets_common import (
     _SCHEMA_VERSION,
     _package_version,
@@ -81,78 +79,6 @@ def build_manifest(
         "package_version": _package_version(),
         "assets": assets,
     }
-
-
-def remove_legacy_workflow_projections(
-    workspace_root: Path,
-    installed: list[str],
-) -> None:
-    """Remove retired Markdown workflow projections without touching operator files."""
-    for harness_dir in sorted(HARNESS_DIRS):
-        legacy_dir = workspace_root / harness_dir / "workflows"
-        if not legacy_dir.is_dir():
-            continue
-        for path in sorted(legacy_dir.glob("*.workflow.md")):
-            path.unlink()
-            installed.append(f"[rm] {path}")
-        # Preserve a non-empty directory: non-workflow/operator files are outside
-        # this migration's ownership.
-        with contextlib.suppress(OSError):
-            legacy_dir.rmdir()
-
-
-#: The nine always-on rule files the library published before the root `AGENTS.md` map. Their law is
-#: carried in full by the single system-prompt file; the projections are removed by name.
-#: A blanket prune of the rules directory is NOT correct — it also hosts operator-authored
-#: rules, which this migration does not own.
-_RETIRED_CORE_RULES: tuple[str, ...] = (
-    "backlog-ownership.md",
-    "bug-hotfix-doctrine.md",
-    "bug-registration-guardrail.md",
-    "dadaia-workspace-dev-guardrail.md",
-    "harness-skill-scope.md",
-    "plugin-scope.md",
-    "release-governance.md",
-    "tmp-file-guardrail.md",
-    "workspace-protocol.md",
-)
-
-
-def remove_legacy_bind_epoch_state(workspace_root: Path, installed: list[str]) -> None:
-    """Remove the retired bind-epoch marker state dir (v0.5.0 FR1, F-09).
-
-    The marker subsystem was deleted in v0.5.0 — nothing reads or writes
-    ``.dadaia/states/bind_epoch/`` anymore, so markers left by earlier releases are
-    orphan state in every upgraded workspace. Markers are single-line pid-chain files
-    the bind CLI wrote; the directory holds nothing else, so a full sweep is safe.
-    Named migration, kept one release (same regime as the other ``remove_*`` steps).
-    """
-    epoch_dir = workspace_root / ".dadaia" / "states" / "bind_epoch"
-    if not epoch_dir.is_dir():
-        return
-    for path in sorted(p for p in epoch_dir.iterdir() if p.is_file()):
-        path.unlink()
-        installed.append(f"[rm] {path}")
-    with contextlib.suppress(OSError):
-        epoch_dir.rmdir()
-
-
-def remove_retired_core_rules(workspace_root: Path, installed: list[str]) -> None:
-    """Remove the pre-the root `AGENTS.md` map core rule projections, by name, without touching others.
-
-    Bug ``retired-lib-asset-leaves-orphan-projection``: ``copy_tree`` returns before its
-    orphan-prune loop when the source directory no longer exists, so retiring a whole
-    asset family never propagates to the instance. Until that is fixed generically, this
-    named migration keeps the instance honest — the law must live in exactly one file.
-    """
-    rules_dir = workspace_root / ".claude" / "rules"
-    if not rules_dir.is_dir():
-        return
-    for name in _RETIRED_CORE_RULES:
-        path = rules_dir / name
-        if path.is_file():
-            path.unlink()
-            installed.append(f"[rm] {path}")
 
 
 # ---------------------------------------------------------------------------

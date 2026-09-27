@@ -48,11 +48,6 @@ from dadaia_workspace.infrastructure.entity_doctor import (
     check_entities_derivation,
     check_memory_phase_single_source,
 )
-from dadaia_workspace.infrastructure.install_helpers import (
-    remove_legacy_bind_epoch_state,
-    remove_legacy_workflow_projections,
-    remove_retired_core_rules,
-)
 from dadaia_workspace.infrastructure.install_plan import InstallPlan
 from dadaia_workspace.infrastructure.json_agent_model_policy_store import (
     JsonAgentModelPolicyStore,
@@ -71,7 +66,6 @@ from dadaia_workspace.infrastructure.projection import (
 from dadaia_workspace.infrastructure.projection_rules import (
     harness_checks,
     projection_rules,
-    prune_stale_codex_tomls,
 )
 from dadaia_workspace.infrastructure.public_assets_common import (
     _COPY_DIRS,
@@ -309,22 +303,6 @@ class FileSystemPublicAssetManager:
         rules = projection_rules(plan)
         transcript = install_rules(rules, force=plan.overwrite.force)
         installed.extend(transcript.render())
-
-        # Codex per-agent TOML pruning is independent of the rule table (a rule
-        # exists only for what SHOULD be there — pruning what should NOT is a
-        # separate, unconditional migration, unchanged from the historical
-        # `install_codex_agents` behavior).
-        if "codex" in plan.harness_targets and plan.only in (None, "agents"):
-            expected = frozenset(
-                r.dst.name for r in rules if r.harness == "codex" and r.dst.parent.name == "agents"
-            )
-            prune_stale_codex_tomls(workspace_root / ".codex", expected, installed)
-
-        # the root `AGENTS.md` map lands via the rule table above; the remaining harness-independent
-        # migrations are unconditional cleanup, unchanged.
-        remove_retired_core_rules(workspace_root, installed)
-        remove_legacy_workflow_projections(workspace_root, installed)
-        remove_legacy_bind_epoch_state(workspace_root, installed)
 
         # Consumer-repo guardrail fan-out (bespoke: N-target discovery + provenance
         # gating, never a fixed-destination rule).

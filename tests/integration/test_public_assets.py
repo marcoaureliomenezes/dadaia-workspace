@@ -279,19 +279,6 @@ def test_codex_projection_config_legacy_cleanup_and_native_rules(tmp_path: Path)
     manager.install(workspace_root, harness="codex", force=True)
     assert not (workspace_root / ".codex" / "workflows").exists()
 
-    # Installation removes only retired workflow files and preserves unrelated
-    # operator-owned content in the directory.
-    legacy_manager, legacy_ws = _make_codex_install_manager(tmp_path / "legacy-case")
-    legacy_workflows_dir = legacy_ws / ".codex" / "workflows"
-    legacy_workflows_dir.mkdir(parents=True)
-    (legacy_workflows_dir / "hotfix-release.workflow.md").write_text(
-        "stale content\n", encoding="utf-8"
-    )
-    (legacy_workflows_dir / "operator-note.txt").write_text("keep\n", encoding="utf-8")
-    legacy_manager.install(legacy_ws, harness="codex", force=True)
-    assert not (legacy_workflows_dir / "hotfix-release.workflow.md").exists()
-    assert (legacy_workflows_dir / "operator-note.txt").read_text(encoding="utf-8") == "keep\n"
-
     # Markdown behavioral protocols are not projected as Codex Rules — only the
     # native .rules command policy is.
     rules_manager, rules_ws = _make_codex_install_manager(tmp_path / "rules-case")
