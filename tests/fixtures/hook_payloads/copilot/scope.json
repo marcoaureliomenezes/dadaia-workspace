@@ -1,0 +1,4 @@
+{
+  "toolName": "create",
+  "toolArgs": "{\"path\": \"{ws}/repos/demo/x.md\", \"file_text\": \"x\"}"
+}

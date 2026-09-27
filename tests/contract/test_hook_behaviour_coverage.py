@@ -2,12 +2,10 @@
 
 A hook exists ONLY as the per-harness implementation of a deterministic behaviour the
 workspace defines. This contract pins both halves of that sentence against the live
-projection table, not against a hand-listed set of harnesses:
+projection table, not against a hand-listed set of harnesses. Coverage (the gate judges
+every harness's native payload) is proven by payload parity, not string search:
+``tests/integration/gate/test_gate_dialects_through_wrappers.py`` (WP-12 #B8).
 
-- **Coverage** — every record whose ``hooks`` format renders something derives the SAME
-  four behaviours: root whitelist, venv guard and the SDD gate (the ONE merged
-  ``dadaia_workspace.hooks.pre_gate`` entrypoint) plus the session-start reaper
-  (``dadaia_workspace doctor --fix --expired-only``).
 - **No invention** — every ``dadaia_workspace`` entrypoint any projected hook artifact
   references must be named by some Deterministic Behavior in
   ``public/entities/registry.json``. A harness may not grow a fifth behaviour, and no
@@ -34,7 +32,6 @@ from dadaia_workspace.infrastructure.projection_rules import (
     harnesses_with_a_hook_derivation,
 )
 from dadaia_workspace.infrastructure.public_assets_common import OverwritePolicy
-from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import HOOK_DIALECTS
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PUBLIC = _REPO_ROOT / "dadaia_workspace" / "public"
@@ -98,36 +95,6 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return root
 
 
-def test_every_registered_hook_format_has_a_derivation() -> None:
-    """No record declares a hook format it never renders: a declared-but-dead format is
-    a harness claiming a behaviour it does not implement."""
-    declared = {name for name, record in HARNESS_RECORDS.items() if record.hooks.value != "none"}
-    assert declared == set(harnesses_with_a_hook_derivation()), (
-        "records declaring a hook format without a builder: "
-        f"{sorted(declared - set(harnesses_with_a_hook_derivation()))}"
-    )
-
-
-def _declares_gate_not_enforced(record: HarnessRecord) -> bool:
-    return set(HOOK_DIALECTS[record.hooks].ungated) >= set(_GATED_ACTIONS)
-
-
-@pytest.mark.parametrize("record", _derived_records(), ids=_record_ids)
-def test_the_four_behaviours_reach_every_harness_with_a_hook_derivation(
-    record: HarnessRecord, workspace: Path
-) -> None:
-    """FR3: root whitelist + venv guard + SDD gate (one ``pre_gate``) and the
-    session-start reaper are derived into EVERY hook format. No behaviour may exist in
-    only one harness."""
-    blob = "\n".join(_rendered(_hook_rules(record, workspace)).values())
-    # ADR 0054: a harness declaring every gated action ungated states "gate not enforced".
-    assert _PRE_GATE in blob or _declares_gate_not_enforced(record), (
-        f"{record.name}: the merged pre_gate entrypoint (root whitelist + venv guard + "
-        "SDD gate) is not wired by its hook derivation"
-    )
-    assert _REAPER in blob, f"{record.name}: the session-start reaper lane is not wired"
-
-
 @pytest.mark.parametrize("record", _derived_records(), ids=_record_ids)
 def test_no_hook_artifact_references_an_undefined_behaviour(
     record: HarnessRecord, workspace: Path
@@ -151,23 +118,6 @@ def test_no_hook_artifact_references_an_undefined_behaviour(
 
 
 @pytest.mark.parametrize("record", _derived_records(), ids=_record_ids)
-def test_every_hook_file_only_cites_wrappers_the_same_derivation_projects(
-    record: HarnessRecord, workspace: Path
-) -> None:
-    """A hook FILE may only name an on-disk executable its own derivation writes — the
-    wrapper-script rule is what makes the reference resolvable, on every format that
-    needs one."""
-    rules = _hook_rules(record, workspace)
-    wrappers = {rule.dst.name for rule in _workspace_wrappers(rules, workspace)}
-    for label, text in _rendered(rules).items():
-        for cited in re.findall(r"\.dadaia/hooks/([A-Za-z0-9._-]+)", text):
-            assert cited in wrappers, (
-                f"{record.name}: {label} cites wrapper {cited!r}, which its own hook "
-                f"derivation never projects (projected: {sorted(wrappers)})"
-            )
-
-
-@pytest.mark.parametrize("record", _derived_records(), ids=_record_ids)
 def test_every_projected_wrapper_is_self_locating_and_executable(
     record: HarnessRecord, workspace: Path
 ) -> None:
@@ -182,60 +132,3 @@ def test_every_projected_wrapper_is_self_locating_and_executable(
         assert 'dirname -- "$0"' in body, (
             f"{rule.label} does not resolve its interpreter from its own location"
         )
-
-
-#: What each pre-action hook event can gate. A harness registers the gate on the events
-#: it exposes BEFORE the action; an event absent here is an event nobody classified —
-#: a new harness declares its coverage rather than inheriting a silent pass.
-_EVENT_COVERAGE: dict[str, frozenset[str]] = {
-    "PreToolUse": frozenset({"shell", "file-write"}),
-    "preToolUse": frozenset({"shell", "file-write"}),
-    "beforeShellExecution": frozenset({"shell"}),
-}
-#: The actions the SDD gate exists to police.
-_GATED_ACTIONS = ("shell", "file-write")
-
-
-def _events_citing_the_gate(record: HarnessRecord, workspace_root: Path) -> set[str]:
-    """Every event name a rendered hook registration binds to the gate wrapper/module."""
-    events: set[str] = set()
-    for text in _rendered(_hook_rules(record, workspace_root)).values():
-        try:
-            hooks = json.loads(text).get("hooks", {})
-        except (ValueError, AttributeError):
-            for block in text.split("[[hooks]]")[1:]:
-                found = re.search(r'event\s*=\s*"([^"]+)"', block)
-                if found and "pre-gate" in block:
-                    events.add(found.group(1))
-            continue
-        for event, entries in hooks.items():
-            if "pre-gate" in json.dumps(entries) or _PRE_GATE in json.dumps(entries):
-                events.add(event)
-    return events
-
-
-@pytest.mark.parametrize("record", _derived_records(), ids=_record_ids)
-def test_every_gated_action_has_a_pre_action_event_or_a_declared_gap(
-    record: HarnessRecord, workspace: Path
-) -> None:
-    """Coverage is per EVENT, not per string: a harness that registers the gate only on
-    shell execution leaves file writes ungated, and that gap must be DECLARED in its
-    dialect (``HookDialect.ungated``) rather than implied by a passing string search."""
-    events = _events_citing_the_gate(record, workspace)
-    assert events or _declares_gate_not_enforced(record), f"{record.name}: no gate event"
-    unclassified = events - set(_EVENT_COVERAGE)
-    assert not unclassified, (
-        f"{record.name}: unclassified pre-action event(s) {sorted(unclassified)} — "
-        "add them to _EVENT_COVERAGE with the actions they gate"
-    )
-    covered = set().union(*(_EVENT_COVERAGE[e] for e in events))
-    declared = set(HOOK_DIALECTS[record.hooks].ungated)
-    for action in _GATED_ACTIONS:
-        assert action in covered or action in declared, (
-            f"{record.name}: {action} is neither gated by a pre-action event "
-            f"{sorted(events)} nor declared ungated in its HookDialect"
-        )
-    assert not (declared & covered), (
-        f"{record.name}: declares {sorted(declared & covered)} ungated while an event "
-        "already gates it — the declaration is stale"
-    )

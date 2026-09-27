@@ -471,14 +471,10 @@ def kimi_hook_shims() -> dict[str, str]:
         + """
 export DADAIA_RUNTIME="kimi-code"
 out=$(printf '%s' "$payload" | "$PYTHON_BIN" -B -m dadaia_workspace.hooks.pre_gate 2>/dev/null) || exit 0
-case $out in
-  *'"decision": "block"'*)
-    reason=$(printf '%s' "$out" | sed -n 's/.*"reason": "\\(.*\\)".*/\\1/p' | head -n 1)
-    [ -n "$reason" ] || reason="blocked by the dadaia SDD gate"
-    printf '%s\\n' "$reason" >&2
-    exit 2
-    ;;
-esac
+printf '%s' "$out" | "$PYTHON_BIN" -B -c 'import json, sys  # JSON, never sed: real newlines
+d = json.load(sys.stdin)
+sys.exit(2 if d.get("decision") == "block" and sys.stderr.write(d["reason"] + "\\n") else 0)'
+[ $? -eq 2 ] && exit 2
 exit 0
 """
     )

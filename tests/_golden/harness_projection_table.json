@@ -847,6 +847,13 @@
     "link_to": null
   },
   {
+    "label": "dadaia:hooks/devin-pre-gate",
+    "harness": "devin",
+    "dst": "ws:.dadaia/hooks/devin-pre-gate",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
     "label": "dadaia:states/AGENTS.md",
     "harness": "agents",
     "dst": "ws:.dadaia/states/AGENTS.md",

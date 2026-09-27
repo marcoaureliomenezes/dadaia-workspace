@@ -63,8 +63,9 @@ def read_stdin_json() -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
-#: Native tool names -> the Claude name the policies read (Copilot, Devin, Cursor shell).
-_TOOL_ALIASES: dict[str, str] = {"bash": "Bash", "exec": "Bash", "write": "Write", "edit": "Edit"}
+#: Native tool names (lower-cased) -> the Claude name every policy reads (ADR 0054).
+_TOOL_ALIASES = {"bash": "Bash", "exec": "Bash", "shell": "Bash", "edit": "Edit"}
+_TOOL_ALIASES |= {"write": "Write", "create": "Write"}
 
 
 def claude_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -76,7 +77,7 @@ def claude_payload(payload: dict[str, Any]) -> dict[str, Any]:
     name = str(name or ("Bash" if "command" in payload else ""))
     tool_input = payload.get("tool_input") or args
     tool_input = tool_input if isinstance(tool_input, dict) else payload
-    return {**payload, "tool_name": _TOOL_ALIASES.get(name, name), "tool_input": tool_input}
+    return {**payload, "tool_name": _TOOL_ALIASES.get(name.lower(), name), "tool_input": tool_input}
 
 
 def is_write_tool(name: str) -> bool:

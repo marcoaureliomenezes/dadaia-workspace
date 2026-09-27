@@ -22,7 +22,7 @@ from __future__ import annotations
 import pytest
 
 from dadaia_workspace.core.cli_line import fix_line
-from dadaia_workspace.hooks import venv_guard
+from dadaia_workspace.hooks import _common, venv_guard
 
 
 def _bash(command: str) -> dict[str, object]:
@@ -144,12 +144,18 @@ def test_no_false_block(command: str) -> None:
         ({"tool_name": "Bash", "tool_input": {"command": ""}}, False),
         ({"tool_name": "Bash", "tool_input": {"command": "   "}}, False),
         ({"tool_name": "Bash", "tool_input": {}}, False),
-        # Codex shell event carries the same tool_input.command shape.
+        # WP-12 #B6: every harness's shell alias, read through the one alias table.
         ({"tool_name": "Bash", "tool_input": {"command": "pip install foo"}}, True),
+        ({"tool_name": "exec", "command": "pip install foo"}, True),
+        ({"tool_name": "Shell", "tool_input": {"command": "pip install foo"}}, True),
+        ({"toolName": "bash", "toolArgs": '{"command": "pip install foo"}'}, True),
+        ({"command": "pip install foo"}, True),
     ],
 )
-def test_fail_open_and_codex_shape(payload: dict[str, object], expect_block: bool) -> None:
-    reason = venv_guard.evaluate_payload(payload)
+def test_every_shell_alias_is_judged_like_bash(
+    payload: dict[str, object], expect_block: bool
+) -> None:
+    reason = venv_guard.evaluate_payload(_common.claude_payload(payload))
     if expect_block:
         assert reason is not None
     else:

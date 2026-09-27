@@ -1,0 +1,4 @@
+{
+  "toolName": "create",
+  "toolArgs": "{\"path\": \"{ws}/AGENTS.md\", \"file_text\": \"x\"}"
+}

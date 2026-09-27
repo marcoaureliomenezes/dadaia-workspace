@@ -89,6 +89,7 @@ class HookDialect:
         typed: the entry carries ``"type": "command"``.
         version: a top-level ``"version"`` field, when the format declares one.
         answer: the flat permission shape, or ``None`` for a native-envelope reader.
+        nested: Claude's file shape — ``event -> [{matcher, hooks: [entry]}]``, no wrapper.
         ungated: the actions this harness exposes NO pre-action event for, declared so
             the gap is a stated fact (one ``public doctor`` WARN) instead of a silent
             hole a string-search coverage test would pass.
@@ -100,6 +101,7 @@ class HookDialect:
     typed: bool = True
     version: int | None = None
     answer: HookAnswer | None = None
+    nested: bool = False
     ungated: tuple[str, ...] = ()
 
 
@@ -132,10 +134,8 @@ _EMPTY = HookDialect()
 #: its own (Claude's merged settings file, Kimi's user-level shims) states an empty
 #: dialect rather than falling through a missing key.
 #:
-#: Cursor decides only on the events it exposes *before* an action — its file-edit event
-#: fires after the write — so the gate rides ``beforeShellExecution``; Copilot exposes a
-#: real pre-tool event and gets full coverage. Devin's blocking hook-file shape is not
-#: vendor-verified, so its gate is declared not enforced (ADR 0054), never guessed.
+#: Cursor, Devin and Copilot each expose a real pre-tool event, so the gate judges every
+#: tool call (ADR 0054); a format with no blocking contract declares ``ungated``.
 HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
     HookFormat.NONE: _EMPTY,
     HookFormat.CLAUDE_SETTINGS: _EMPTY,
@@ -146,23 +146,22 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
         files=(
             HookFileSpec(
                 "hooks.json",
-                (("beforeShellExecution", _GATE.name), ("sessionStart", _REAPER.name)),
+                (("preToolUse", _GATE.name), ("sessionStart", _REAPER.name)),
             ),
         ),
         typed=False,
         version=1,
-        answer=HookAnswer("permission", "user_message", "deny"),
-        ungated=("file-write",),
+        answer=HookAnswer("permission", "agent_message", "deny"),
     ),
     HookFormat.DEVIN_HOOKS: HookDialect(
-        lanes=(_REAPER,),
+        lanes=_FOUR_BEHAVIOURS,
         files=(
             HookFileSpec(
                 "hooks.v1.json",
-                (("SessionStart", _REAPER.name),),
+                (("PreToolUse", _GATE.name), ("SessionStart", _REAPER.name)),
             ),
         ),
-        ungated=("shell", "file-write"),
+        nested=True,
     ),
     HookFormat.COPILOT_HOOKS: HookDialect(
         lanes=_FOUR_BEHAVIOURS,
@@ -268,10 +267,9 @@ def hook_file_payloads(record: HarnessRecord) -> dict[str, str]:
             if dialect.typed:
                 entry["type"] = "command"
             entry[dialect.entry_key] = hook_wrapper_command(_wrapper_name(record, lanes[lane_name]))
-            hooks[event] = [entry]
-        document: dict[str, object] = {}
+            hooks[event] = [{"matcher": "", "hooks": [entry]}] if dialect.nested else [entry]
+        document: dict[str, object] = hooks if dialect.nested else {"hooks": hooks}
         if dialect.version is not None:
             document["version"] = dialect.version
-        document["hooks"] = hooks
         payloads[spec.relpath] = json.dumps(document, indent=2, sort_keys=True) + "\n"
     return payloads

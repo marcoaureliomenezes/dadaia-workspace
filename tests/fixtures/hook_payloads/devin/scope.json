@@ -1,0 +1,6 @@
+{
+  "hook_event_name": "PreToolUse",
+  "tool_name": "write",
+  "file_path": "{ws}/repos/demo/x.md",
+  "content": "x"
+}

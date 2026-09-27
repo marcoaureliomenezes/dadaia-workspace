@@ -164,7 +164,10 @@ def resolve_session_id(
     in a plain shell) is a distinct, write-side concern the CLI bind command owns for
     itself; it is never something a READER of session state should invent.
     """
-    candidate = env.get("DADAIA_SESSION_ID") or str((payload or {}).get("session_id") or "")
+    fields = (payload or {}).get  # every harness's payload key for its session (ADR 0054)
+    candidate = env.get("DADAIA_SESSION_ID") or str(
+        fields("session_id") or fields("conversation_id") or fields("sessionId") or ""
+    )
     if not candidate:
         for name in HARNESS_SESSION_ID_ENV_VARS:
             candidate = env.get(name) or ""

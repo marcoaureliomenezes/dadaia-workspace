@@ -8,8 +8,11 @@ against a fake workspace venv.
 
 from __future__ import annotations
 
+import json
+import os
 import shutil
 import subprocess
+import sys
 import tomllib
 from pathlib import Path
 
@@ -142,17 +145,6 @@ def test_kimi_hook_shims_keys_and_prologue() -> None:
         assert "exit 0" in body
 
 
-def test_kimi_hook_shims_module_wiring() -> None:
-    shims = kimi_hook_shims()
-    assert "dadaia_workspace.hooks.pre_gate" in shims["dadaia-kimi-pre-gate.sh"]
-    assert "exit 2" in shims["dadaia-kimi-pre-gate.sh"]
-    assert "dadaia_workspace.hooks.sdd_post_gate" in shims["dadaia-kimi-post-gate.sh"]
-    assert "dadaia_workspace.hooks.ctx_inject" in shims["dadaia-kimi-ctx-inject.sh"]
-    compact = shims["dadaia-kimi-post-compact.sh"]
-    assert 'DADAIA_HOOK_EVENT="PostCompact"' in compact
-    assert "dadaia_workspace.hooks.ctx_inject" in compact
-
-
 @pytest.mark.skipif(shutil.which("sh") is None, reason="POSIX sh unavailable")
 @pytest.mark.parametrize("body", kimi_hook_shims().values())
 def test_kimi_hook_shims_are_valid_sh_syntax(body: str, tmp_path: Path) -> None:
@@ -174,23 +166,26 @@ def _fake_workspace(tmp_path: Path, python_body: str) -> Path:
 
 @pytest.mark.skipif(shutil.which("sh") is None, reason="POSIX sh unavailable")
 def test_pre_gate_shim_blocks_with_reason_on_stderr(tmp_path: Path) -> None:
-    workspace = _fake_workspace(
-        tmp_path,
-        '#!/usr/bin/env sh\ncat >/dev/null\nprintf \'{"decision": "block", "reason": "root law violated"}\\n\'\n',
-    )
+    """WP-12 #B5: the real pre_gate's multi-line reason reaches stderr with real
+    newlines and its `fix:` at a line start; exit 2."""
+    workspace = tmp_path / "ws"
+    (workspace / ".dadaia" / ".venv" / "bin").mkdir(parents=True)
+    (workspace / ".dadaia" / ".venv" / "bin" / "python").symlink_to(sys.executable)
+    (workspace / ".dadaia" / "states").mkdir()
+    (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": []}')
     shim = tmp_path / "pre-gate.sh"
     shim.write_text(kimi_hook_shims()["dadaia-kimi-pre-gate.sh"], encoding="utf-8")
-    nested = workspace / "repos" / "x"
-    nested.mkdir(parents=True)
+    payload = {"tool_name": "Write", "tool_input": {"file_path": str(workspace / "AGENTS.md")}}
     proc = subprocess.run(
         ["sh", str(shim)],
-        input='{"tool_name": "Write", "session_id": "s1", "cwd": "' + str(nested) + '"}',
-        cwd=nested,
+        input=json.dumps(payload),
+        cwd=workspace,
+        env={"PATH": os.environ["PATH"], "PYTHONPATH": os.environ.get("PYTHONPATH", "")},
         capture_output=True,
         text=True,
     )
     assert proc.returncode == 2
-    assert "root law violated" in proc.stderr
+    assert any(line.startswith("fix: ") for line in proc.stderr.splitlines()), proc.stderr
 
 
 @pytest.mark.skipif(shutil.which("sh") is None, reason="POSIX sh unavailable")

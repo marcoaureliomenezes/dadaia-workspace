@@ -1,19 +1,21 @@
 """Intent: CONTRACT — sa-gate-blind-on-cursor-copilot-devin (0.5.0 WP-12, AC1.4, ADR 0054).
 
-#B1: per harness, the native pre-tool payload for ``pip install requests`` gets the Claude
-payload's verdict (deny) through the rendered wrapper. #B2: an allowed call prints no
-explicit allow — the harness's own approval prompt stays in force.
-Payload shapes are the vendor-documented ones cited in the bug record: Cursor
-``beforeShellExecution`` ``{command}``, Copilot ``preToolUse`` ``{toolName, toolArgs}``
-(toolArgs a JSON string). #B3: Devin, whose blocking file shape is not vendor-verified,
-registers no gate event and declares every gated action ungated (ADR 0054).
-Size: MEDIUM — runs the real generated ``sh`` wrapper (justified: the translation lives
-in the wrapper, the seam the bug names).
+#B8: for every registry harness, a payload fixture in the harness's native shape
+(``tests/fixtures/hook_payloads/<harness>/``, shapes from the bug record's vendor-doc
+citations — authored, not recorded) through its rendered hook gets Claude's verdict for
+pip / a new root entry / a PROTECTED file / an unbound repo write (scope).
+#B1 Copilot's deny carries the venv guard's reason and fix line; #B2 Cursor's preToolUse
+deny reaches the model (agent_message) with a fix line; #B3 Devin's hooks.v1.json has the
+documented event -> [{matcher, hooks}] shape; #B4 an allowed call prints nothing on the
+translated harnesses; #B5 Kimi's shim prints the reason with real newlines, `fix:` at a
+line start, exit 2.
+Size: MEDIUM — runs the real generated wrappers/shim over the real pre_gate.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -21,62 +23,105 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
+from dadaia_workspace.infrastructure.runtime_config import kimi_hook_shims
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
-    HOOK_DIALECTS,
+    hook_file_payloads,
     hook_wrapper_contents,
 )
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
-_PIP = "pip install requests"
-_CASES = {
-    "cursor": (
-        {"hook_event_name": "beforeShellExecution", "command": _PIP, "cwd": "."},
-        {"hook_event_name": "beforeShellExecution", "command": "ls -la", "cwd": "."},
-        lambda out: out["permission"],
-    ),
-    "copilot": (
-        {"toolName": "bash", "toolArgs": json.dumps({"command": _PIP})},
-        {"toolName": "bash", "toolArgs": json.dumps({"command": "ls -la"})},
-        lambda out: out["permissionDecision"],
-    ),
-}
+_FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "hook_payloads"
+#: Claude's verdict per case — the reference side of the parity (literal, not computed).
+_CLAUDE = {"pip": "deny", "new-root": "deny", "protected": "deny", "scope": "allow"}
 
 
-def _gate(tmp_path: Path, harness: str, payload: dict[str, object]) -> str:
-    bin_dir = tmp_path / ".dadaia" / ".venv" / "bin"
-    hooks = tmp_path / ".dadaia" / "hooks"
-    if not bin_dir.exists():
-        bin_dir.mkdir(parents=True)
-        (bin_dir / "python").symlink_to(sys.executable)
-        hooks.mkdir(parents=True)
-    wrapper = hooks / f"{harness}-pre-gate"
-    wrapper.write_text(hook_wrapper_contents(HARNESS_RECORDS[harness])[wrapper.name])
-    proc = subprocess.run(
-        ["sh", str(wrapper)],
-        input=json.dumps(payload),
-        capture_output=True,
-        text=True,
-        cwd=tmp_path,
-        timeout=60,
-        check=True,
+@pytest.fixture
+def ws(tmp_path: Path) -> Path:
+    (tmp_path / ".dadaia" / ".venv" / "bin").mkdir(parents=True)
+    (tmp_path / ".dadaia" / ".venv" / "bin" / "python").symlink_to(sys.executable)
+    (tmp_path / ".dadaia" / "states").mkdir()
+    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        '{"schema_version": "2", "contexts": []}'
     )
-    return proc.stdout.strip()
+    (tmp_path / ".dadaia" / "hooks").mkdir()
+    (tmp_path / "repos").mkdir()
+    return tmp_path
 
 
-@pytest.mark.parametrize("harness", sorted(_CASES))
-def test_b1_native_payload_gets_the_claude_verdict(tmp_path: Path, harness: str) -> None:
-    deny_payload, _, decision = _CASES[harness]
-    assert decision(json.loads(_gate(tmp_path, harness, deny_payload))) == "deny"
+def _run(ws: Path, harness: str, case: str) -> subprocess.CompletedProcess[str]:
+    payload = (_FIXTURES / harness / f"{case}.json").read_text().replace("{ws}", str(ws))
+    if harness == "claude":
+        argv = [str(ws / ".dadaia/.venv/bin/python"), "-B", "-m", "dadaia_workspace.hooks.pre_gate"]
+    else:
+        name = "dadaia-kimi-pre-gate.sh" if harness == "kimi-code" else f"{harness}-pre-gate"
+        body = (
+            kimi_hook_shims()
+            if harness == "kimi-code"
+            else hook_wrapper_contents(HARNESS_RECORDS[harness])
+        )[name]
+        (ws / ".dadaia" / "hooks" / name).write_text(body)
+        argv = ["sh", str(ws / ".dadaia" / "hooks" / name)]
+    env = {"PATH": os.environ["PATH"], "PYTHONPATH": os.environ.get("PYTHONPATH", "")}
+    return subprocess.run(
+        argv, input=payload, capture_output=True, text=True, cwd=ws, env=env, timeout=60
+    )
+
+
+def _verdict(harness: str, proc: subprocess.CompletedProcess[str]) -> str:
+    if harness == "kimi-code":
+        return "deny" if proc.returncode == 2 else "allow"
+    out = json.loads(proc.stdout) if proc.stdout.strip() else {}
+    key = {"cursor": "permission", "copilot": "permissionDecision"}.get(harness)
+    decision = out.get(key) if key else out.get("hookSpecificOutput", {}).get("permissionDecision")
+    return "deny" if decision == "deny" else "allow"
+
+
+@pytest.mark.parametrize("case", sorted(_CLAUDE))
+@pytest.mark.parametrize("harness", sorted(HARNESS_RECORDS))
+def test_b8_every_harness_gets_claudes_verdict(ws: Path, harness: str, case: str) -> None:
+    assert _verdict(harness, _run(ws, harness, case)) == _CLAUDE[case]
+
+
+def test_b1_copilot_denies_pip_with_the_venv_guard_reason_and_fix(ws: Path) -> None:
+    out = json.loads(_run(ws, "copilot", "pip").stdout)
+    assert out["permissionDecision"] == "deny"
+    assert "[VENV GUARD]" in out["permissionDecisionReason"]
+    assert "\nfix: " in out["permissionDecisionReason"]
+
+
+def test_b2_cursor_denies_a_new_root_entry_to_the_agent_with_a_fix(ws: Path) -> None:
+    out = json.loads(_run(ws, "cursor", "new-root").stdout)
+    assert out["permission"] == "deny"
+    assert "\nfix: " in out["agent_message"]
+
+
+def test_b3_devin_hook_file_has_the_documented_shape_and_denies(ws: Path) -> None:
+    document = json.loads(hook_file_payloads(HARNESS_RECORDS["devin"])["hooks.v1.json"])
+    assert document == {
+        "PreToolUse": [
+            {
+                "matcher": "",
+                "hooks": [{"type": "command", "command": ".dadaia/hooks/devin-pre-gate"}],
+            }
+        ],
+        "SessionStart": [
+            {
+                "matcher": "",
+                "hooks": [{"type": "command", "command": ".dadaia/hooks/devin-doctor-expired"}],
+            }
+        ],
+    }
+    assert _verdict("devin", _run(ws, "devin", "pip")) == "deny"
 
 
 @pytest.mark.parametrize("harness", ["cursor", "copilot"])
-def test_b2_an_allowed_call_prints_no_explicit_allow(tmp_path: Path, harness: str) -> None:
-    _, allow_payload, _ = _CASES[harness]
-    assert _gate(tmp_path, harness, allow_payload) == ""
+def test_b4_an_allowed_call_prints_nothing(ws: Path, harness: str) -> None:
+    assert _run(ws, harness, "scope").stdout == ""
 
 
-def test_b3_devin_declares_its_gate_not_enforced() -> None:
-    dialect = HOOK_DIALECTS[HARNESS_RECORDS["devin"].hooks]
-    assert dialect.ungated == ("shell", "file-write")
-    assert "devin-pre-gate" not in hook_wrapper_contents(HARNESS_RECORDS["devin"])
+def test_b5_kimi_prints_the_reason_with_real_newlines_and_exits_2(ws: Path) -> None:
+    proc = _run(ws, "kimi-code", "protected")
+    assert proc.returncode == 2
+    assert any(line.startswith("fix: ") for line in proc.stderr.splitlines())
+    assert "\\n" not in proc.stderr
