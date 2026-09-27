@@ -48,6 +48,7 @@ def test_gate_allows_iff_the_doctor_keeps_the_entry(
 ) -> None:
     for zone in ("tmp", "states", "sessions", "reaped"):
         (tmp_path / ".dadaia" / zone).mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
     if existing is not None:
         (tmp_path / existing).mkdir()
     if glob is not None:

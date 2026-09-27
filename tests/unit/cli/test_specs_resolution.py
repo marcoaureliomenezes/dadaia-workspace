@@ -60,9 +60,8 @@ def _mk_workspace(root: Path, contexts: list[str]) -> None:
 
 @pytest.fixture
 def _clean_session_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Bug ``specs-resolver-context-tests-flaky-under-xdist-full-suite``: also scrubs
-    ``WORKSPACE_ROOT``, which ``resolve_context_for_cli`` -> the resolution authority
-    honours ahead of every ``monkeypatch.chdir()`` these tests perform."""
+    """Bug ``specs-resolver-context-tests-flaky-under-xdist-full-suite``: no ambient
+    session or context var leaks into these cwd-driven scenarios."""
     scrub_context_resolution_env(monkeypatch)
 
 

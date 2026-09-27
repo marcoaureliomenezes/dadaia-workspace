@@ -163,7 +163,6 @@ def test_main_is_subprocess_free(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, payload: dict[str, Any]
 ) -> None:
     _no_subprocess(monkeypatch)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
     # Fault-inject the production stdin reader (NOT sys.stdin) so the entrypoint runs fully
     # in-process per the harness-env contract carve-out: reads the payload once, dispatches
     # to pure policy functions, returns 0 — no child spawned.
@@ -253,7 +252,6 @@ def test_main_emits_explicit_allow_envelope(
     non-empty (observable-allow doctrine, bug projected-pre-gate-silent-allow); codex
     and the kimi shim treat any non-block envelope as allow.
     """
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
     payload = {
         "tool_name": "Write",
         "tool_input": {"file_path": "repos/valproj/specs/bugs/x.md", "content": "x"},
@@ -276,7 +274,6 @@ def test_allow_envelope_has_no_kimi_block_marker(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     """The kimi shim greps the literal ``"decision": "block"`` — allow must not carry it."""
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
     payload = {
         "tool_name": "Write",
         "tool_input": {"file_path": "repos/valproj/specs/bugs/x.md", "content": "x"},
@@ -299,7 +296,7 @@ def test_main_block_envelope_carries_claude_permission_deny(
     (legacy for codex hooks + the kimi shim, modern for Claude Code) with one identical
     reason string.
     """
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
+    monkeypatch.chdir(_mk_workspace(tmp_path))  # the session cwd, as the harness spawns it
     payload = {
         "tool_name": "Write",
         "tool_input": {"file_path": ".dadaia/sessions/x.json", "content": "x"},
@@ -326,7 +323,7 @@ def test_block_envelope_raw_string_keeps_kimi_shim_markers(
     top-level ``reason`` is the LAST key in the envelope. Both anchors must survive the
     Claude-contract merge byte-exactly.
     """
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
+    monkeypatch.chdir(_mk_workspace(tmp_path))  # the session cwd, as the harness spawns it
     payload = {
         "tool_name": "Write",
         "tool_input": {"file_path": ".dadaia/sessions/x.json", "content": "x"},

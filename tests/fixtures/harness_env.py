@@ -32,7 +32,7 @@ Verification source: ``dadaia_workspace/hooks/{sdd_gate,sdd_post_gate,ctx_inject
 existing real-harness subprocess test ``tests/integration/gate/test_path_scope.py`` (which
 already strips ``DADAIA_SESSION_ID`` / ``*_AGENT_PERSONA`` before invoking the gate). The
 env returned here is **pinned-minimal**: a clean base (operator shell *without* any leaked
-``DADAIA_*``/persona/mode vars) plus ``WORKSPACE_ROOT`` and the one native session-id var
+``DADAIA_*``/persona/mode vars) plus ``PWD`` (the session cwd) and the one native session-id var
 the named harness provides.
 
 Usage
@@ -112,28 +112,13 @@ def scrub_entry_signal_env(monkeypatch: Any) -> None:
         monkeypatch.delenv(name, raising=False)
 
 
-#: Every ambient var ``core.specs_resolver.resolve_context()`` (and therefore
-#: ``cli._specs_resolution.resolve_context_for_cli`` / ``container.resolve_context``)
-#: consults, directly or via :func:`~dadaia_workspace.core.session_env.harness_session_id`.
-#: Bug ``specs-resolver-context-tests-flaky-under-xdist-full-suite``:
-#: ``core.specs_resolver._authority_workspace_root()`` honours ``WORKSPACE_ROOT``
-#: UNCONDITIONALLY (by design -- the hook-transport channel; see its docstring) --
-#: ahead of, and regardless of, any ``monkeypatch.chdir()`` a test performs. A
-#: context/session-resolution unit test whose isolation fixture scrubs only the
-#: harness session-id vars (:data:`ENTRY_SIGNAL_ENV_VARS`) is therefore NOT actually
-#: isolated: an ambient ``WORKSPACE_ROOT`` inherited from the shell that launched
-#: pytest, or leaked from a concurrent ``dadaia context bind``/``context show``
-#: invocation sharing the same real ``.dadaia/sessions/`` tree, silently overrides the
-#: test's own synthetic ``tmp_path`` workspace -- confirmed by direct reproduction:
-#: with ``WORKSPACE_ROOT`` pointing at an unrelated real workspace, a cwd-only (rung 3)
-#: resolution scenario mis-resolves to ``None``/the ambient context instead of the
-#: test's own. ``DADAIA_CONTEXT``/``DADAIA_SESSION_ID`` are included too so a single
-#: helper is the one place a context-resolution test needs to isolate itself.
+#: Every ambient var context resolution consults — the harness session ids plus the
+#: operator's ``DADAIA_CONTEXT``/``DADAIA_SESSION_ID``; the one place a context-resolution
+#: test isolates itself (bug ``specs-resolver-context-tests-flaky-under-xdist-full-suite``).
 CONTEXT_RESOLUTION_ENV_VARS: Final[tuple[str, ...]] = (
     *ENTRY_SIGNAL_ENV_VARS,
     "DADAIA_CONTEXT",
     "DADAIA_SESSION_ID",
-    "WORKSPACE_ROOT",
 )
 
 
@@ -143,9 +128,7 @@ def scrub_context_resolution_env(monkeypatch: Any) -> None:
     Use this (instead of, or in addition to, :func:`scrub_entry_signal_env`) in any
     fixture that isolates a ``core.specs_resolver.resolve_context`` /
     ``cli._specs_resolution.resolve_context_for_cli`` / ``container.resolve_context``
-    scenario -- a test that clears only the harness session-id vars is still exposed
-    to an ambient ``WORKSPACE_ROOT`` (bug
-    ``specs-resolver-context-tests-flaky-under-xdist-full-suite``).
+    scenario.
     """
     for name in CONTEXT_RESOLUTION_ENV_VARS:
         monkeypatch.delenv(name, raising=False)
@@ -289,7 +272,7 @@ def _harness_env(
     extra: dict[str, str] | None = None,
 ) -> dict[str, str]:
     env = _base_env()
-    env["WORKSPACE_ROOT"] = str(workspace)
+    env["PWD"] = str(workspace)  # the harness spawns the hook in its session cwd
     env[session_env_var] = session_id
     if extra:
         for key, value in extra.items():
@@ -316,7 +299,7 @@ def claude_hook_env(
 ) -> dict[str, str]:
     """Pinned-minimal env a real Claude Code hook subprocess receives.
 
-    Contains the operator shell (scrubbed of harness-never-set vars), ``WORKSPACE_ROOT``,
+    Contains the operator shell (scrubbed of harness-never-set vars), ``PWD``,
     and ``CLAUDE_CODE_SESSION_ID``. ``extra`` may add operator-shell vars (e.g.
     ``DADAIA_CONTEXT``); a non-allowlisted ``DADAIA_*`` in ``extra`` raises ``ValueError``.
     """
@@ -336,7 +319,7 @@ def codex_hook_env(
 ) -> dict[str, str]:
     """Pinned-minimal env a real Codex hook subprocess receives.
 
-    Contains the operator shell (scrubbed of harness-never-set vars), ``WORKSPACE_ROOT``,
+    Contains the operator shell (scrubbed of harness-never-set vars), ``PWD``,
     and ``CODEX_SESSION_ID``. ``extra`` may add operator-shell vars (e.g.
     ``DADAIA_CONTEXT``); a non-allowlisted ``DADAIA_*`` in ``extra`` raises ``ValueError``.
     """
@@ -358,12 +341,12 @@ def kimi_hook_env(
     Kimi Code delivers **no native session-id env var** to a hook process — the session
     id travels exclusively in the stdin JSON payload (``session_id`` field), exactly what
     ``hooks/_common.resolve_session_id`` reads second. The env is therefore the scrubbed
-    operator shell plus ``WORKSPACE_ROOT`` only; ``extra`` may add the shim-exported
+    operator shell plus ``PWD`` only; ``extra`` may add the shim-exported
     wiring vars (``DADAIA_RUNTIME``/``DADAIA_HOOK_EVENT``) or operator-shell vars — a
     non-allowlisted ``DADAIA_*`` raises ``ValueError``.
     """
     env = _base_env()
-    env["WORKSPACE_ROOT"] = str(workspace)
+    env["PWD"] = str(workspace)
     if extra:
         for key, value in extra.items():
             if (
@@ -465,9 +448,8 @@ def run_hook_subprocess(
     that leaves it unset inherits the PYTEST PROCESS's own cwd instead — which, in this
     self-hosting checkout, is itself nested under a REAL, registered dadaia-workspace
     instance, and would leak that real context into an "isolated" ``tmp_path`` fixture.
-    Defaults to ``env["WORKSPACE_ROOT"]`` when present (the harness-realistic stand-in: a
-    hook invoked from the workspace root itself) so every existing caller stays hermetic
-    for free; pass an explicit ``cwd`` to simulate a session working from a specific
+    Defaults to ``env["PWD"]`` — the harness's session cwd, the workspace root itself —
+    so the hook resolves its root exactly as in production; pass an explicit ``cwd`` to simulate a session working from a specific
     ``repos/<slug>/`` subdirectory (rung 3).
 
     This is the single sanctioned channel for hook *behavior* tests in
@@ -489,7 +471,7 @@ def run_hook_subprocess(
         cmd = [sys.executable, "-c", _POLICY_DRIVER.format(module=hook_module)]
     else:
         cmd = [sys.executable, "-m", f"dadaia_workspace.hooks.{hook_module}"]
-    effective_cwd = cwd if cwd is not None else env.get("WORKSPACE_ROOT")
+    effective_cwd = cwd if cwd is not None else env.get("PWD")
     # PYTHONPATH pins the checkout for every test subprocess — one rule in tests/conftest.py.
     env = {**env, "PYTHONPATH": os.environ.get("PYTHONPATH", "")}
     proc = subprocess.run(

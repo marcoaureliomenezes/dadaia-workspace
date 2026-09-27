@@ -130,7 +130,6 @@ def _hook_env(workspace: Path, *, stub: Path, denylist_file: Path) -> dict[str, 
     env = dict(os.environ)
     for bad in ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "DADAIA_MODE"):
         env.pop(bad, None)
-    env["WORKSPACE_ROOT"] = str(workspace)
     env["DADAIA_BIN"] = str(stub)
     env["DADAIA_PRIVACY_DENYLIST"] = str(denylist_file)
     return env

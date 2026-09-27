@@ -119,7 +119,8 @@ def test_resolve_workspace_root_failure_table(tmp_path: Path) -> None:
 
 
 def test_explicit_workspace_is_authoritative_and_must_be_initialized(tmp_path: Path) -> None:
-    """Intent: CONTRACT — bug import-export-workspace-flag-re-resolves-through-ancestor-walk.
+    """Intent: CONTRACT — bug import-export-workspace-flag-re-resolves-through-ancestor-walk;
+    sa-seven-workspace-root-rules#S7.
 
     Size: SMALL — filesystem only."""
     existing_ws = _make_full_workspace(tmp_path / "existing_ws")
@@ -137,10 +138,11 @@ def test_explicit_workspace_is_authoritative_and_must_be_initialized(tmp_path: P
     other = _make_full_workspace(tmp_path / "other_ws")
     assert resolve_cli_workspace_root(other) == other.resolve()
 
-    # A partial .dadaia/ (sub-repo shape) counts as explicit-target-initialized:
-    # the flag names the root, no walk is performed.
+    # A partial .dadaia/ (sub-repo shape, no sentinel) is refused naming the dir (#S7).
     sub_repo = _make_partial_dadaia(existing_ws / "repos", "my-service")
-    assert resolve_cli_workspace_root(sub_repo) == sub_repo.resolve()
+    with pytest.raises(WorkspaceNotInitializedError) as partial:
+        resolve_cli_workspace_root(sub_repo)
+    assert str(sub_repo.resolve()) in str(partial.value)
 
     # None keeps the cwd ancestor walk.
     deep = sub_repo / "src"

@@ -144,7 +144,6 @@ def _hook_env(workspace: Path, *, dadaia_bin: Path | None = None) -> dict[str, s
     env = dict(os.environ)
     for bad in ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "DADAIA_MODE"):
         env.pop(bad, None)
-    env["WORKSPACE_ROOT"] = str(workspace)
     env.pop("DADAIA_SESSION_ID", None)
     if dadaia_bin is not None:
         env["DADAIA_BIN"] = str(dadaia_bin)

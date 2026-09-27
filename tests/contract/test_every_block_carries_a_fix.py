@@ -124,8 +124,8 @@ def assert_block_carries_a_runnable_fix(message: str) -> None:
 @pytest.fixture
 def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
+    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
     (tmp_path / ".dadaia" / "sessions").mkdir(parents=True)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
     monkeypatch.chdir(tmp_path)
     return tmp_path
 

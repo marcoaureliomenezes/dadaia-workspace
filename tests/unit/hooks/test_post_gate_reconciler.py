@@ -91,7 +91,6 @@ def test_dirty_mutating_path_spawns_no_git_child_and_writes_nothing(
     # outrank the fixture's own session record.
     monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
     ws = _make_workspace(tmp_path)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
     _bind_session(ws)
     dirty = ws / "repos" / _CTX / "dadaia_workspace" / "x.py"
     dirty.parent.mkdir(parents=True)
@@ -118,7 +117,6 @@ def test_reaper_error_fails_open_exit_zero(monkeypatch: pytest.MonkeyPatch, tmp_
     """
     ws = _make_workspace(tmp_path)
     _bind_session(ws)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
 
     def _boom(workspace: Path) -> list[str]:
         raise RuntimeError("reaper blew up mid-pass")
@@ -138,7 +136,6 @@ def test_throttle_skips_the_reaper_inside_the_window_and_runs_after_it(
     call ``doctor.reap`` once; a third pass after the window calls it again.
     """
     ws = _make_workspace(tmp_path)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
     _bind_session(ws)
     calls = {"n": 0}
     real_reap = doctor.reap

@@ -18,6 +18,8 @@ from pathlib import Path
 import typer
 
 from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
+from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.migrate.state_v2 import (
     MigrationPlan,
     execute_migration,
@@ -28,17 +30,6 @@ app = typer.Typer(
     help="Migration helpers for dadaia workspace and spec trees.",
     invoke_without_command=True,
 )
-
-
-def _resolve_workspace_root() -> Path:
-    """The workspace root above cwd (core's one sentinel walk); cwd when uninitialized."""
-    from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
-    from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-
-    try:
-        return resolve_workspace_root(Path.cwd())
-    except WorkspaceNotInitializedError:
-        return Path.cwd()
 
 
 def _resolve_specs_dir(specs_dir: str | None) -> Path:
@@ -101,13 +92,11 @@ def migrate_state(
     if ctx.invoked_subcommand is not None:
         return
 
-    workspace_root = _resolve_workspace_root()
-    states_dir = workspace_root / ".dadaia" / "states"
-
-    # Compute plan
     try:
+        workspace_root = resolve_workspace_root()
+        states_dir = workspace_root / ".dadaia" / "states"
         plan = plan_migration(states_dir)
-    except ValueError as exc:
+    except (ValueError, WorkspaceNotInitializedError) as exc:
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
 

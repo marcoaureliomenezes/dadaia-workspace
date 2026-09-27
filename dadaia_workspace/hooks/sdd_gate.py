@@ -44,7 +44,7 @@ def _target_slug(workspace: Path, fpath: Path) -> str | None:
 
 
 def _evaluate_target(
-    payload: dict[str, object], workspace: Path, raw_path: str
+    payload: dict[str, object], workspace: Path | None, raw_path: str
 ) -> tuple[gate_policy.Decision, str]:
     """Evaluate ONE write-target path through the gate policy.
 
@@ -58,7 +58,7 @@ def _evaluate_target(
     """
     fpath = Path(raw_path)
     if not fpath.is_absolute():
-        fpath = workspace / fpath
+        fpath = (workspace or Path.cwd()) / fpath
 
     # The Invocation's OWN workspace root is target-path-first (the K1 open-bug fix:
     # a cwd sitting inside a nested, independently sentinel-bearing sandbox must never
@@ -67,6 +67,8 @@ def _evaluate_target(
     # target itself resolves no root at all (an unparseable/relative-path edge case).
     inv = invocation.resolve(target_path=fpath, payload=payload, env=os.environ, cwd=Path.cwd())
     effective_workspace = inv.workspace_root or workspace
+    if effective_workspace is None:
+        return gate_policy.Decision.ALLOW, ""  # fail-open: no root owns the target
 
     # Workspace-relative path for the policy classifier (POSIX-style separators).
     try:
@@ -126,12 +128,8 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
         # Fail-safe: unparseable target → ALLOW (never deadlock on a parse miss).
         return None
 
-    try:
-        workspace = invocation.resolve(env=os.environ, cwd=Path.cwd()).workspace_root
-        if workspace is None:
-            raise RuntimeError("workspace not resolved")
-    except Exception:  # noqa: BLE001 — fail-open: unresolved workspace must not block
-        return None
+    # The cwd root only anchors a relative target; each target walks its own root first.
+    workspace = invocation.resolve(env=os.environ, cwd=Path.cwd()).workspace_root
 
     for raw_path in raw_paths:
         decision, reason = _evaluate_target(payload, workspace, raw_path)

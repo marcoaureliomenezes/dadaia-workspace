@@ -291,18 +291,10 @@ def _root_from(start: Path) -> Path | None:
         return None
 
 
-def _resolve_root(*, env: Mapping[str, str], cwd: Path, target_path: Path | None) -> Path | None:
-    """``WORKSPACE_ROOT`` env wins unconditionally (hook transport, never a resolution
-    rung — kept byte-identical to the five prior copies: no ``.resolve()`` applied to
-    an explicit override). Otherwise, when a write TARGET is known, the root is walked
-    from the target's own location FIRST — the open-bug fix: a cwd that happens to sit
-    inside a nested, independently sentinel-bearing sandbox workspace must never shadow
-    the real root that actually owns the target. Falls back to a cwd-based walk when no
-    target is given or the target-based walk found nothing — after the running CLI's own
-    workspace (:func:`~dadaia_workspace.core.workspace_resolver.own_workspace_root`)."""
-    override = env.get("WORKSPACE_ROOT")
-    if override:
-        return Path(override)
+def _resolve_root(*, cwd: Path, target_path: Path | None) -> Path | None:
+    """The write TARGET's own location is walked FIRST (a cwd inside a nested sandbox
+    workspace never shadows the root owning the target), then the one resolver: the
+    running CLI's own workspace, else the cwd walk. No environment variable is a rung."""
     if target_path is not None:
         start = target_path if target_path.is_dir() else target_path.parent
         root = _root_from(start)
@@ -394,7 +386,7 @@ def resolve(
     """
     del clock  # reserved for a future injectable clock; is_stale defaults to utcnow.
 
-    workspace_root = _resolve_root(env=env, cwd=cwd, target_path=target_path)
+    workspace_root = _resolve_root(cwd=cwd, target_path=target_path)
     session_id = resolve_session_id(payload, env) or None
 
     context_name: str | None = None

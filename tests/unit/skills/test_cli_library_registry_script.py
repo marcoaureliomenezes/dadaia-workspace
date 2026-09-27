@@ -135,25 +135,28 @@ def _run_in(cwd: Path, *argv: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def test_registry_resolves_by_walking_up_to_the_nearest_dadaia_dir(tmp_path: Path) -> None:
-    """The ancestor walk lands on the workspace that owns the cwd (review 0.4.7 c5 F4)."""
+def test_registry_resolves_the_workspace_sentinel_never_a_partial_dadaia(tmp_path: Path) -> None:
+    """sa-seven-workspace-root-rules#S6: from repos/<slug> holding a partial .dadaia/ (no
+    sentinel), the registry lands in the workspace owning the sentinel."""
     workspace = tmp_path / "ws"
-    nested = workspace / "repos" / "app" / "src"
-    nested.mkdir(parents=True)
-    (workspace / ".dadaia").mkdir()
-    assert _run_in(nested, "register", "--port", "3100", "--project", "demo").returncode == 0
+    repo = workspace / "repos" / "yb"
+    (repo / ".dadaia").mkdir(parents=True)
+    (workspace / ".dadaia" / "states").mkdir(parents=True)
+    (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    assert _run_in(repo, "register", "--port", "3100", "--project", "demo").returncode == 0
     reg = workspace / ".dadaia" / "states" / "server_registry.json"
     assert [e["port"] for e in _entries(reg)] == [3100]
-    assert not (nested / ".dadaia").exists()
+    assert not (repo / ".dadaia" / "states").exists()
 
 
 def test_registry_refuses_when_no_dadaia_dir_is_above_the_cwd(tmp_path: Path) -> None:
-    """Never a silent registry in a foreign tree: no ``.dadaia/`` above → exit non-zero."""
+    """sa-seven-workspace-root-rules#S6: no workspace sentinel above (a bare .dadaia/ is
+    not one) → exit non-zero, no registry written."""
     lonely = tmp_path / "lonely"
-    lonely.mkdir()
+    (lonely / ".dadaia").mkdir(parents=True)
     result = _run_in(lonely, "list")
     assert result.returncode != 0
-    assert "no .dadaia/ above the current directory" in result.stderr
+    assert "no workspace sentinel above the cwd" in result.stderr
     assert not any(tmp_path.rglob("server_registry.json"))
 
 

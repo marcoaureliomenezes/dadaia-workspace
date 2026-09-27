@@ -39,7 +39,7 @@ line here and `--help` disagree, `--help` wins.
 
 - The registry (`.dadaia/states/server_registry.json`) is the one record of who holds
   which local port; every verb is `python3 <skill-dir>/scripts/registry.py <verb>` (the
-  script walks up from cwd to the nearest `.dadaia/`; `--registry <path>` overrides).
+  script walks up from cwd to the nearest `.dadaia/states/spec_contexts.json`; `--registry <path>` overrides).
 - Open a port in this order: `list` → `next --project <name> --json` → start the server on
   loopback → `register --port N --project <name> [--pid <pid>] [--ttl <hours>]` — idempotent
   for the same project; a port held by another project exits 1 naming the owner.

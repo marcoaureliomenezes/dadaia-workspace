@@ -10,6 +10,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from dadaia_workspace.features.migrate.state_v2 import execute_migration, plan_migration
 
 
@@ -88,8 +90,9 @@ def test_plan_migration_detection_matrix(tmp_path: Path) -> None:
     assert plan_v2.contexts_to_migrate == []
 
     _, states_none = _workspace(tmp_path / "none")
-    plan_none = plan_migration(states_none)
-    assert plan_none.already_v2 is True
+    with pytest.raises(ValueError, match="fix: ") as refused:  # sa-seven-workspace-root-rules#S5
+        plan_migration(states_none)
+    assert "No initialized workspace" in str(refused.value)
 
 
 # ---------------------------------------------------------------------------

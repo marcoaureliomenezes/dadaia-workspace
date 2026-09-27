@@ -122,12 +122,12 @@ def resolve_cli_workspace_root(workspace: Path | None, cwd: Path | None = None) 
     Raises
     ------
     WorkspaceNotInitializedError
-        When *workspace* is given but holds no ``.dadaia/`` or is fenced, or when the walk
+        When *workspace* is given but holds no sentinel or is fenced, or when the walk
         finds no initialized workspace.
     """
     if workspace is None:
         return resolve_workspace_root(cwd)
     root = workspace.resolve()
-    if not (root / ".dadaia").is_dir() or root in _fenced():
+    if not (root / _SENTINEL).is_file() or root in _fenced():
         raise not_initialized(root)
     return root

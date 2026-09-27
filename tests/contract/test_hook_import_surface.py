@@ -15,6 +15,7 @@ only if executed, so the gate/inject paths are exercised too).
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 
@@ -71,6 +72,6 @@ def test_gate_resolution_path_never_imports_the_container(tmp_path) -> None:  # 
         text=True,
         timeout=120,
         cwd=ws,
-        env={"WORKSPACE_ROOT": str(ws), "PATH": "/usr/bin:/bin"},
+        env={"PATH": "/usr/bin:/bin", "DADAIA_FENCED_ROOTS": os.environ["DADAIA_FENCED_ROOTS"]},
     )
     assert result.returncode == 0, result.stderr

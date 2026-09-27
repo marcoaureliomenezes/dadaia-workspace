@@ -23,8 +23,8 @@ required for ``develop`` to flow, and the "keys on the stdin sha, never HEAD" re
 which only had meaning while a verdict lookup existed on this path) — deleted per A3.4,
 not disabled.
 
-The CLI is invoked harness-free (no PreToolUse/PostToolUse payload), with only
-``WORKSPACE_ROOT`` set, so this also covers the headless runtime the chokepoint protects.
+The CLI is invoked harness-free (no PreToolUse/PostToolUse payload) from the workspace,
+so this also covers the headless runtime the chokepoint protects.
 
 Intent: CONTRACT — v0.4.4 A3.1; 0.5.0 AC6.4, AC6.5 (T-050-12)
 Owner: dd-software-engineer
@@ -73,11 +73,10 @@ def _init_repo(workspace: Path, slug: str) -> tuple[Path, str]:
 
 
 def _hook_env(workspace: Path) -> dict[str, str]:
-    """A harness-FREE env: only WORKSPACE_ROOT (mirrors the installed pre-push hook child)."""
+    """A harness-FREE env (mirrors the installed pre-push hook child)."""
     env = dict(os.environ)
     for bad in ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "DADAIA_MODE"):
         env.pop(bad, None)
-    env["WORKSPACE_ROOT"] = str(workspace)
     return env
 
 

@@ -152,7 +152,6 @@ def test_every_publish_passes_the_shipped_pre_push_gate(
     runner.write_text(f'#!/bin/sh\nexec "{sys.executable}" -m dadaia_workspace "$@"\n')
     runner.chmod(0o755)
     monkeypatch.setenv("DADAIA_BIN", str(runner))
-    monkeypatch.setenv("WORKSPACE_ROOT", str(repo.parent.parent))
     hook = repo / ".git" / "hooks" / "pre-push"
     shutil.copyfile(workspace_layout.public_scripts_dir() / "pre-push-ci-gate.sh", hook)
     hook.chmod(0o755)

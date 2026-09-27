@@ -120,7 +120,7 @@ def resolve_specs_dir_for_cli(specs_dir: str | None) -> Path:
 def resolve_workspace_root_for_cli(target_path: Path) -> Path:
     """The workspace root above *target_path* — the single root walk
     (:func:`dadaia_workspace.core.invocation.resolve`'s ``target_path``-first rung,
-    ``WORKSPACE_ROOT`` env included, cwd fallback). Falls back to *target_path* itself
+    then the CLI's own workspace, else the cwd walk). Falls back to *target_path* itself
     when nothing is found (an uninitialized/consumer tree). The seam a git-hook-spawned
     ``dadaia ci`` verb (a harness-FREE child, no session, no ``DADAIA_CONTEXT``) uses to
     resolve its workspace without importing ``core.invocation`` directly

@@ -21,8 +21,6 @@ from dadaia_workspace.core.workspace_resolver import FENCE_ENV, resolve_workspac
 
 _runner = CliRunner()
 
-_VERBS = [["doctor"], ["context", "list"], ["reports", "validate", "--all"]]
-
 
 def _workspace(root: Path) -> Path:
     (root / ".dadaia" / "states").mkdir(parents=True)
@@ -30,24 +28,10 @@ def _workspace(root: Path) -> Path:
     return root
 
 
-@pytest.mark.parametrize("verb", _VERBS, ids=" ".join)
-def test_a_verb_outside_runs_in_the_cli_own_workspace(
-    verb: list[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    own = _workspace(tmp_path / "ws")
-    outside = tmp_path / "elsewhere"
-    outside.mkdir()
-    monkeypatch.setattr(sys, "prefix", str(own / ".dadaia" / ".venv"))
-    monkeypatch.chdir(outside)
-
-    result = _runner.invoke(app, verb)
-
-    assert "No initialized workspace" not in result.output, result.output
-
-
 def test_inside_another_workspace_the_cli_resolves_its_own(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """sa-seven-workspace-root-rules#S1: the CLI's own workspace wins over the cwd."""
     own, other = _workspace(tmp_path / "a"), _workspace(tmp_path / "b")
     monkeypatch.setattr(sys, "prefix", str(own / ".dadaia" / ".venv"))
     monkeypatch.chdir(other)

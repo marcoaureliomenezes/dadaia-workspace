@@ -31,7 +31,6 @@ _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 @pytest.fixture
 def no_instance(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("WORKSPACE_ROOT", raising=False)
     monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
     return tmp_path
 

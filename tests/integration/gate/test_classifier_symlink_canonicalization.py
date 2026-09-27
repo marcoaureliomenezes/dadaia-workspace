@@ -29,6 +29,7 @@ pytestmark = pytest.mark.integration
 def _make_workspace(tmp_path: Path, slug: str = "dadaia-workspace") -> Path:
     (tmp_path / "repos" / slug / "specs").mkdir(parents=True)
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
+    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
     (tmp_path / ".dadaia" / "sessions").mkdir(parents=True)
     return tmp_path
 

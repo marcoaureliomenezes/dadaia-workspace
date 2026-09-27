@@ -9,8 +9,8 @@ with empty stdout and BLOCK with a ``{"decision":"block",...}`` envelope; both a
 on the subprocess result, never by importing ``main()`` in-process.
 
 Rewritten from the old in-process ``root_whitelist.main()`` + ``sys.stdin`` simulation (the
-pattern the harness-env contract bans). The workspace root the gate consults is delivered
-through ``WORKSPACE_ROOT`` — a real harness-provided var — set by ``claude_hook_env``.
+pattern the harness-env contract bans). The gate resolves the workspace root from the
+write target and the session cwd, as in production (sa-seven-workspace-root-rules#S3).
 
 CRIT: root-whitelist is a deterministic enforcement policy — every current input survives
 below as a named parametrized row, including the W1-6 first-path-component block.
@@ -32,6 +32,7 @@ from tests.fixtures.stores import context_store
 
 def _ws(tmp_path: Path) -> Path:
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
+    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
     return tmp_path
 
 
@@ -48,7 +49,8 @@ def test_block_message_lists_every_whitelisted_entry(tmp_path: Path) -> None:
     entry the law admits, and neither its text nor its fix points the agent at the
     operator's exceptions file (DEC-1 (a))."""
     _out, block = _run(
-        tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(tmp_path / "junk.txt")}}
+        _ws(tmp_path),
+        {"tool_name": "Write", "tool_input": {"file_path": str(tmp_path / "junk.txt")}},
     )
     assert block is not None
     reason = block["reason"]

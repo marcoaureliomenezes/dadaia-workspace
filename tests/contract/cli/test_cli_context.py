@@ -608,7 +608,6 @@ def test_bind_with_no_live_release_exits_zero_and_the_next_write_is_allowed(
     assert result.exit_code == 0, result.output
 
     record = _session_record_for(workspace, result.output)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(workspace))
     monkeypatch.setenv("DADAIA_SESSION_ID", str(record["session_id"]))
     monkeypatch.setenv("DADAIA_CONTEXT", "myctx")
     target = workspace / "repos" / "myctx" / "specs" / "releases" / "0.0.1" / "SPEC.md"

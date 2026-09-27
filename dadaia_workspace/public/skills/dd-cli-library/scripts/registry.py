@@ -33,9 +33,9 @@ def _now() -> datetime:
 
 def find_registry(start: Path) -> Path:
     for candidate in (start, *start.parents):
-        if (candidate / ".dadaia").is_dir():
+        if (candidate / ".dadaia" / "states" / "spec_contexts.json").is_file():
             return candidate / ".dadaia" / "states" / "server_registry.json"
-    raise SystemExit("error: no .dadaia/ above the current directory; pass --registry <path>")
+    raise SystemExit("error: no workspace sentinel above the cwd; pass --registry <path>")
 
 
 def load(path: Path) -> dict[str, Any]:
@@ -289,7 +289,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--registry",
         type=Path,
-        help="registry JSON path (default: nearest .dadaia/states/server_registry.json)",
+        help="registry JSON path (default: <workspace>/.dadaia/states/server_registry.json)",
     )
     sub = p.add_subparsers(dest="verb", required=True)
     s = sub.add_parser("list")

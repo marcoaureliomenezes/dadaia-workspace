@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.workspace_resolver import not_initialized
 
 
 @dataclass
@@ -55,13 +56,7 @@ def plan_migration(states_dir: Path) -> MigrationPlan:
     primary_file = states_dir / "primary_context.json"
 
     if not ctx_file.exists():
-        # Nothing to migrate
-        return MigrationPlan(
-            schema_version_before="2",
-            contexts_to_migrate=[],
-            primary_context_exists=primary_file.exists(),
-            already_v2=True,
-        )
+        raise ValueError(str(not_initialized(states_dir.parent.parent)))
 
     raw = json.loads(ctx_file.read_text(encoding="utf-8"))
     schema_ver = _detect_schema_version(raw)

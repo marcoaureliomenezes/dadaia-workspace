@@ -48,7 +48,7 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (main / "README.md").write_text("hi\n", encoding="utf-8")
     _git(main, "add", "README.md")
     _git(main, "commit", "-q", "-m", "init")
-    for var in (*HARNESS_SESSION_ID_ENV_VARS, "DADAIA_CONTEXT", "WORKSPACE_ROOT"):
+    for var in (*HARNESS_SESSION_ID_ENV_VARS, "DADAIA_CONTEXT"):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.chdir(tmp_path)
     return main

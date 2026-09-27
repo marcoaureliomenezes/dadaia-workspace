@@ -48,7 +48,7 @@ from tests.fixtures.stores import context_store
 @pytest.fixture(autouse=True)
 def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Every rung-0/1/2 env var neutralized — see ``test_specs_resolver_resolve_context.py``
-    for why (ambient ``WORKSPACE_ROOT``/session leaks make this suite flaky otherwise)."""
+    for why (ambient session leaks make this suite flaky otherwise)."""
     scrub_context_resolution_env(monkeypatch)
 
 
@@ -112,7 +112,6 @@ def test_shared_resolution_seam_never_resolves_a_reference_clone(
     not inferred from the allowlist."""
     _init_workspace(tmp_path)
     clone_dir = _plant_reference_clone(tmp_path)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
     monkeypatch.chdir(clone_dir)
 
     inv = invocation.resolve(env=os.environ, cwd=Path.cwd())
@@ -128,7 +127,6 @@ def test_bind_and_show_resolution_path_refuses_to_select_a_reference_clone(
     never silently resolve to (or "invent") the reference clone as a bindable context."""
     _init_workspace(tmp_path)
     clone_dir = _plant_reference_clone(tmp_path)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
     monkeypatch.chdir(clone_dir)
 
     with pytest.raises(ValueError, match="No caller-owned Spec Context is selected"):

@@ -31,6 +31,7 @@ def _make_workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
     ws.mkdir()
     (ws / ".dadaia" / "states").mkdir(parents=True)
+    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
     (ws / ".dadaia" / "sessions").mkdir(parents=True)
     (ws / "repos").mkdir()
     return ws
@@ -214,18 +215,15 @@ def _post_gate_heartbeat(ws: Path, sess_id: str) -> None:
         "CODEX_THREAD_ID",
     )
     saved_env = {k: os.environ.pop(k, None) for k in override_vars}
-    saved_ws = os.environ.get("WORKSPACE_ROOT")
+    saved_cwd = Path.cwd()
     old_stdin = sys.stdin
     sys.stdin = io.StringIO(json.dumps({"session_id": sess_id}))
-    os.environ["WORKSPACE_ROOT"] = str(ws)
+    os.chdir(ws)
     try:
         assert sdd_post_gate.main() == 0
     finally:
         sys.stdin = old_stdin
-        if saved_ws is None:
-            os.environ.pop("WORKSPACE_ROOT", None)
-        else:
-            os.environ["WORKSPACE_ROOT"] = saved_ws
+        os.chdir(saved_cwd)
         for k, v in saved_env.items():
             if v is not None:
                 os.environ[k] = v

@@ -87,7 +87,6 @@ class World:
             "DADAIA_CONTEXT",
             "DADAIA_SESSION_ID",
             "DADAIA_BIN",
-            "WORKSPACE_ROOT",
             "GIT_AUTHOR_NAME",
             "GIT_AUTHOR_EMAIL",
             "GIT_COMMITTER_NAME",

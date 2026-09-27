@@ -347,19 +347,6 @@ def _exit_code(results: list[AtomResult]) -> int:
     return 0
 
 
-def _resolve_default_memory_dir() -> Path:
-    """Walk up from CWD to find specs/memory under a workspace root."""
-    cwd = Path.cwd().resolve()
-    for parent in [cwd, *cwd.parents]:
-        candidate = parent / "specs" / "memory"
-        if candidate.is_dir():
-            return candidate
-    raise FileNotFoundError(
-        "Could not auto-resolve specs/memory directory. "
-        "Run from inside a dadaia workspace or pass --memory-dir explicitly."
-    )
-
-
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point — identical shape to the pre-v0.4.3 standalone script."""
     parser = argparse.ArgumentParser(
@@ -368,20 +355,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--memory-dir",
         type=Path,
-        default=None,
-        help="Path to specs/memory directory. Defaults to auto-resolve from CWD.",
+        required=True,
+        help="Path to the specs/memory directory to lint.",
     )
     args = parser.parse_args(argv)
 
-    memory_dir: Path
-    if args.memory_dir is not None:
-        memory_dir = args.memory_dir.resolve()
-    else:
-        try:
-            memory_dir = _resolve_default_memory_dir()
-        except FileNotFoundError as exc:
-            print(f"ERROR: {exc}", file=sys.stderr)
-            return 1
+    memory_dir: Path = args.memory_dir.resolve()
 
     if not memory_dir.is_dir():
         print(f"ERROR: --memory-dir '{memory_dir}' is not a directory.", file=sys.stderr)

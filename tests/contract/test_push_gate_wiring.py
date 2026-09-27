@@ -50,7 +50,6 @@ def test_push_gate_check_always_wires_a_real_object_source(monkeypatch, tmp_path
     tip_sha = _git(repo, "rev-parse", "HEAD")
 
     monkeypatch.setattr(ci, "_repo_root", lambda: repo)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
     monkeypatch.setattr(container, "load_denylist_terms", lambda: (("zz-synthetic-term", "t"),))
 
     result = _runner.invoke(
@@ -83,7 +82,6 @@ def test_canon_scan_does_not_apply_to_a_tree_stamped_below_the_canon(
     subprocess.run(["git", "commit", "-q", "-m", "backlog"], cwd=repo, check=True)
     tip_sha = _git(repo, "rev-parse", "HEAD")
     monkeypatch.setattr(ci, "_repo_root", lambda: repo)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
     stdin = f"refs/heads/feature/0.0.1 {tip_sha} refs/heads/feature/0.0.1 {_ZERO}\n"
 
     _stamped_specs(repo, 5)
@@ -107,7 +105,7 @@ def test_mode_line_distinguishes_operator_denylist_from_baseline_only(
     relying on ``DADAIA_PRIVACY_DENYLIST``/filesystem discovery — this sandbox's own
     real workspace carries an operator denylist file, and
     ``infrastructure.privacy_check``'s workspace-root walk resolves from ``cwd``
-    (unaffected by the ``WORKSPACE_ROOT`` env override this test also sets), so a
+    (the test's own tmp workspace is its cwd), so a
     file/env-based test would spuriously observe the ambient real denylist. The mode
     line's OWN branching logic — reacting to whatever term-loading returns — is what
     A3.5 actually pins.
@@ -116,7 +114,6 @@ def test_mode_line_distinguishes_operator_denylist_from_baseline_only(
     tip_sha = _init_repo(repo)
 
     monkeypatch.setattr(ci, "_repo_root", lambda: repo)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
 
     monkeypatch.setattr(container, "load_denylist_terms", lambda: ())
     baseline_only = _runner.invoke(
@@ -157,7 +154,6 @@ def test_a_sibling_repo_name_that_is_an_english_word_does_not_block_the_push(
     ).stdout.strip()
 
     monkeypatch.setattr(ci, "_repo_root", lambda: repo)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
     monkeypatch.setattr(container, "load_denylist_terms", lambda: ())
 
     result = _runner.invoke(
@@ -189,7 +185,6 @@ def _remote_objects(remote: Path) -> set[str]:
 
 def _gate(monkeypatch, tmp_path: Path, repo: Path, line: str) -> int:
     monkeypatch.setattr(ci, "_repo_root", lambda: repo)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
     return _runner.invoke(app, ["ci", "push-gate-check"], input=line).exit_code
 
 

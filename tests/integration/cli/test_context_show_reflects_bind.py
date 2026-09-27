@@ -45,9 +45,8 @@ def _make_workspace(root: Path) -> Path:
 
 @pytest.fixture(autouse=True)
 def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Bug ``specs-resolver-context-tests-flaky-under-xdist-full-suite``: also scrubs
-    ``WORKSPACE_ROOT``, honoured unconditionally by the resolution authority ahead of
-    every ``monkeypatch.chdir()`` this module performs."""
+    """Bug ``specs-resolver-context-tests-flaky-under-xdist-full-suite``: no ambient
+    session or context var leaks into this module's cwd-driven scenarios."""
     scrub_context_resolution_env(monkeypatch)
 
 

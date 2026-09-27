@@ -12,11 +12,7 @@ interpreter — that imports the package's ``main()`` and forwards its exit code
 CLI surface (the ``--memory-dir`` flag, exit codes 0/1/2) stays exactly what it was.
 
 Usage:
-    lint-memory-atoms.py [--memory-dir <path>]
-
-    Default --memory-dir resolves to specs/memory relative to the workspace root
-    found by walking up from CWD until a directory containing specs/memory is found
-    (see ``memory_lint._resolve_default_memory_dir``).
+    lint-memory-atoms.py --memory-dir <path>
 
 Exit codes:
     0  — all atoms valid (no ERRORs, no WARNINGs)

@@ -32,7 +32,6 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """ws13: trunk (contentless root) is published, then trunk gains the custom
     constitution on origin; ``work/0.1.1`` is cut from the contentless root."""
     monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("WORKSPACE_ROOT", raising=False)
     origin, repo = tmp_path / "origin.git", tmp_path / "app"
     _git(tmp_path, "init", "-q", "--bare", "-b", "trunk", str(origin))
     _git(tmp_path, "init", "-q", "-b", "trunk", str(repo))
