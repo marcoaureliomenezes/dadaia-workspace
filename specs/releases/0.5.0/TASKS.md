@@ -47,7 +47,7 @@ tests. `Δ` = prod/test lines; PLAN §2.7 ceilings stop a task, never rise.
 
 ### H — test harness (FR9)
 
-- [ ] **T-050-36 — Real-git fixture; fakes out (AC9.4).** `W:` `tests/fakes.py`, `tests/fixtures/**`, 22 user files
+- [-] **T-050-36 — Real-git fixture; fakes out (AC9.4).** `W:` `tests/fakes.py`, `tests/fixtures/**`, 22 user files
   `blocked by:` T-050-35 · `delivers:` git questions tested against git · `RED:` `FakeContextStore` parity test · Δ 0/−500.
 - [ ] **T-050-37 — `DADAIA_FENCED_ROOTS`: declared feature, no dadaia process acts on a fenced root (0088).** `W:` `core/workspace_resolver.py`, `tests/conftest.py`, `tests/unit/cli/test_workspace_not_found_error.py`, `pub/data/dadaia-AGENTS.md`
   `blocked by:` T-050-36 · `delivers:` PLAN §2 FR9 fence · `RED:` `sa-seven-workspace-root-rules#S11` (AC9.12, 0088) · Δ +3/+10.
