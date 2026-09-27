@@ -339,6 +339,25 @@
       "agent": "main-thread",
       "kind": "artifact-gc",
       "text": "dadaia doctor --context dadaia-workspace exit 0 at 1f3d4525 with nothing to fix in the repo (381 reaped/ entries held by their TTL, none from this candidate); --fix not needed. Scratch evidence the next candidate needs (the verified ambiguity hunt, as-is reviews, test audits, grill handoffs, tests retro) copied out of the one-day tmp and handoff zones into reports/main-thread/20260927-050-c4-evidence/ (59 files) before expiry; the c3 review handoffs expire by TTL."
+    },
+    {
+      "ts": "2026-09-27T05:12:23Z",
+      "agent": "main-thread",
+      "kind": "note",
+      "text": "PR #273 CI red on Compliance only: the shrink commit 114be682 dropped the doctor job's fetch-depth 0 with the verdict gate's reason, while the CLOSURE memory-window check (d07251a2) still diffs since..until; candidate 2's closure passed because depth 0 was still there. Restored in 61e39efc with a RED-first contract test (every CI job running the doctor checks out full history). pypi-distribution and sdd-gate-v3 source ci.yml and state nothing about checkout depth: reviewed, unchanged."
+    },
+    {
+      "ts": "2026-09-27T05:12:23Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 1f3d4525c573dd1b3fddce866255947e4620cf9d..61e39efc3fad: 2 reviewed, 0 changed.",
+      "since": "1f3d4525c573dd1b3fddce866255947e4620cf9d",
+      "until": "61e39efc3fadd3947b1c7c8ed72ed8a9c8df6468",
+      "reviewed": [
+        "pypi-distribution",
+        "sdd-gate-v3"
+      ],
+      "changed": []
     }
   ]
 }
