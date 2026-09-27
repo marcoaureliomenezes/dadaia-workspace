@@ -15,7 +15,7 @@ tests. `Δ` = prod/test lines; PLAN §2.7 ceilings stop a task, never rise.
 
 - [x] **T-050-23 — Reaper keeps its holds + `release-as`.** `W:` `f/spec_context/{sweep,doctor}.py`, `cli/commands/doctor.py`, `pub/skills/dd-cli-library/SKILL.md`, `release-please-config.json`
   `blocked by:` none · `delivers:` two same-second reaps leave two intact holds (AC1.2, AC1.6) · `RED:` PLAN §2 WP-02 · Δ −4/+40.
-- [-] **T-050-24 — Install ledger owns harness dirs (04, 06).** `W:` `i/`, `f/spec_context/doctor.py`
+- [x] **T-050-24 — Install ledger owns harness dirs (04, 06).** `W:` `i/`, `f/spec_context/doctor.py`
   `blocked by:` T-050-23 · `delivers:` operator files survive install and `doctor --fix` · `RED:` PLAN §2 WP-04, WP-06 · Δ −131/+7.
 - [-] **T-050-25 — `workspace_layout.verdict` (05).** Move, switch, delete. `W:` `core/workspace_layout.py`, `hooks/`, `f/spec_context/`, `pub/data/`
   `blocked by:` T-050-23 · `delivers:` gate ALLOW ⇔ doctor not SLOP · `RED:` PLAN §2 WP-05 · Δ −30/+75.
