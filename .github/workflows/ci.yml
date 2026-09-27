@@ -349,7 +349,7 @@ jobs:
           python - <<'PY'
           import os, sys
           from pathlib import Path
-          from dadaia_workspace.core.specs_version import read_gitflow
+          from dadaia_workspace.core.gitflow import read_gitflow
 
           flow, warning = read_gitflow(Path(os.environ["BASE_SPECS"]))
           if warning:

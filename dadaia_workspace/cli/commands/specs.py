@@ -15,7 +15,7 @@ from dadaia_workspace.cli._specs_resolution import (
     resolve_context_specs_dir_for_cli,
     resolve_specs_dir_for_cli,
 )
-from dadaia_workspace.core import specs_version
+from dadaia_workspace.core import gitflow, specs_version
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, from_mapping
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
@@ -133,7 +133,7 @@ def init(
     kind = specs_version.classify(target)
     if kind == "malformed":
         typer.echo(
-            f"[refused] {specs_version.constitution_error(target)}; nothing written.\n"
+            f"[refused] {gitflow.constitution_error(target)}; nothing written.\n"
             f"fix: repair the YAML frontmatter of {target / 'constitution.md'}",
             err=True,
         )
@@ -148,7 +148,7 @@ def init(
     written = canon.scaffold(target, project_name=project)
     for path in [*written, *canon.scaffold_repo_law(target.parent, project_name=project)]:
         typer.echo(f"[created] {path}")
-    specs_version.merge_frontmatter(target, gitflow=flow)
+    gitflow.merge_frontmatter(target, gitflow=flow)
     typer.echo(
         f"[gitflow] principal {flow.principal}, integration {flow.integration}, "
         f"work {flow.work_pattern}"
@@ -166,7 +166,7 @@ def _gitflow(
 ) -> Gitflow:
     """Flags over the tree's own valid block, over detection (``origin/HEAD``, else
     ``main``); an invalid result refuses before anything is written."""
-    kept, absent = specs_version.read_gitflow(target)  # a malformed block refused upstream
+    kept, absent = gitflow.read_gitflow(target)  # a malformed block refused upstream
     if absent is not None:
         kept = replace(
             DEFAULT, principal=container.build_git_client().default_branch(target.parent)

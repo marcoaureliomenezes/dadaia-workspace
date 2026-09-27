@@ -14,18 +14,12 @@ layout that predates the tree-v2 migration. Doctor warns and recommends
 
 from __future__ import annotations
 
-import json
 import re
 from pathlib import Path
 from typing import Literal
 
-from dadaia_workspace.core.frontmatter import (
-    FRONTMATTER_RE,
-    Frontmatter,
-    FrontmatterError,
-    parse,
-)
-from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, from_mapping
+from dadaia_workspace.core.frontmatter import Frontmatter, parse
+from dadaia_workspace.core.gitflow import constitution_error, constitution_text
 
 #: Single source of truth for the current canonical specs-pattern version.
 #: Bump this when a new migration step is added to the registry (see ``registry.py``).
@@ -89,56 +83,12 @@ def is_release_semver(value: str) -> bool:
     return RELEASE_SEMVER_RE.match(value) is not None and not value.startswith("v")
 
 
-def _constitution_path(specs_dir: Path) -> Path:
-    return specs_dir / "constitution.md"
-
-
-def _text(specs_dir: Path) -> str:
-    constitution = _constitution_path(specs_dir)
-    return constitution.read_text(encoding="utf-8") if constitution.is_file() else ""
-
-
 def read_pattern_version(specs_dir: Path) -> int:
     """The constitution's ``specs_pattern_version``; :data:`UNSTAMPED_VERSION` (0) when
     the constitution, its frontmatter or the key is absent or unreadable."""
-    fm = parse(_text(specs_dir))
+    fm = parse(constitution_text(specs_dir))
     value = fm.data.get("specs_pattern_version") if isinstance(fm, Frontmatter) else None
     return value if isinstance(value, int) and not isinstance(value, bool) else UNSTAMPED_VERSION
-
-
-def _gitflow_block(text: str) -> tuple[Gitflow | None, str | None]:
-    """(valid block, None); (None, why the frontmatter or block is malformed); (None, None)
-    when the constitution, its frontmatter or the block is absent."""
-    fm = parse(text)
-    if isinstance(fm, FrontmatterError):
-        return None, None if fm.kind == "missing_delimiter" else fm.message
-    if "gitflow" not in fm.data:
-        return None, None
-    try:
-        return from_mapping(fm.data["gitflow"]), None
-    except ValueError as exc:
-        return None, str(exc)
-
-
-def constitution_error(specs_dir: Path) -> str | None:
-    """Why an existing constitution's frontmatter cannot be trusted (ADR 0047): its YAML
-    does not parse, or its ``gitflow:`` block does not validate; ``None`` otherwise."""
-    reason = _gitflow_block(_text(specs_dir))[1]
-    return reason and f"{_constitution_path(specs_dir)}: {reason}"
-
-
-def read_gitflow(specs_dir: Path, text: str | None = None) -> tuple[Gitflow, str | None]:
-    """The constitution's ``gitflow:`` block — of *text* when given (a committed copy,
-    ADR 0048), else of the file; absent or malformed ⇒ ``DEFAULT`` plus the warning to
-    show (ADR 0037: never a block)."""
-    flow, reason = _gitflow_block(_text(specs_dir) if text is None else text)
-    if flow is not None:
-        return flow, None
-    return DEFAULT, (
-        f"{_constitution_path(specs_dir)}: {reason or 'no gitflow block'} — using the default "
-        f"gitflow (principal {DEFAULT.principal}, integration {DEFAULT.integration}, "
-        f"work {DEFAULT.work_prefix}<M.m.p>)"
-    )
 
 
 def classify(specs_dir: Path) -> Literal["absent", "malformed", "dadaia", "foreign"]:
@@ -149,40 +99,3 @@ def classify(specs_dir: Path) -> Literal["absent", "malformed", "dadaia", "forei
     if constitution_error(specs_dir):
         return "malformed"
     return "dadaia" if read_pattern_version(specs_dir) >= OLDEST_UPGRADABLE_VERSION else "foreign"
-
-
-def merge_frontmatter(
-    specs_dir: Path,
-    *,
-    specs_pattern_version: int | None = None,
-    gitflow: Gitflow | None = None,
-) -> None:
-    """Write the given keys into the constitution frontmatter, one line each.
-
-    The one writer for both keys: a written key's top-level line (and its indented or
-    ``-`` continuation lines) is replaced in place, a new key is appended to the block,
-    and every other line — plus the body — stays byte-identical. No block ⇒ one is
-    prepended.
-    """
-    names = gitflow and (gitflow.principal, gitflow.integration, gitflow.work_prefix)
-    values = {
-        "specs_pattern_version": specs_pattern_version,
-        "gitflow": names and dict(zip(("principal", "integration", "work"), names, strict=True)),
-    }
-    updates = {k: json.dumps(v) for k, v in values.items() if v is not None}  # JSON is YAML
-    constitution = _constitution_path(specs_dir)
-    text = constitution.read_text(encoding="utf-8") if constitution.exists() else ""
-    match = FRONTMATTER_RE.match(text)
-    lines = match.group(1).split("\n") if match else []
-    kept: list[str] = []
-    skipping = False
-    for line in lines:
-        if skipping and (line[:1] in (" ", "\t", "-") or not line.strip()):
-            continue
-        key = line.split(":", 1)[0]
-        skipping = ":" in line and key in updates
-        kept.append(f"{key}: {updates.pop(key)}" if skipping else line)
-    kept.extend(f"{key}: {value}" for key, value in updates.items())
-    body = text[match.end() :] if match else text
-    closing = text[match.start(0) : match.end()].rsplit("\n---", 1)[1] if match else "\n"
-    constitution.write_text("---\n" + "\n".join(kept) + "\n---" + closing + body, encoding="utf-8")

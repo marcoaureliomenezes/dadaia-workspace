@@ -357,7 +357,7 @@ def test_pr_source_guard_reads_the_gitflow_by_role(
 def test_the_ci_triggers_are_the_library_gitflow() -> None:
     """T-050-19 AC6.9: GitHub reads no file, so ci.yml's triggers stay literal — pinned
     here to the library constitution's gitflow; changing one without the other is red."""
-    from dadaia_workspace.core.specs_version import read_gitflow
+    from dadaia_workspace.core.gitflow import read_gitflow
 
     flow, warning = read_gitflow(_REPO_ROOT / "specs")
     assert warning is None

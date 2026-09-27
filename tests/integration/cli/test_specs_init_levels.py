@@ -14,7 +14,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli._specs_resolution import HARNESS_SESSION_ID_ENV_VARS
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.core import specs_version
+from dadaia_workspace.core import gitflow, specs_version
 from dadaia_workspace.features.specs import SpecsDoctor, canon
 
 pytestmark = pytest.mark.integration
@@ -110,7 +110,7 @@ def test_a_v6_tree_ends_v7_with_a_clean_doctor(repo: Path) -> None:
     constitution.write_text(
         constitution.read_text(encoding="utf-8").split("<!-- dadaia:fixed")[0], encoding="utf-8"
     )
-    specs_version.merge_frontmatter(specs, specs_pattern_version=6)
+    gitflow.merge_frontmatter(specs, specs_pattern_version=6)
 
     result = _runner.invoke(app, ["specs", "init", "--context", "c"])
 
@@ -181,7 +181,7 @@ def test_a_symlinked_context_specs_root_is_refused_and_nothing_written(
     """Review finding 7: ``--context`` routes through the one symlink-refusal seam."""
     real = tmp_path / "elsewhere-specs"
     canon.scaffold(real)
-    specs_version.merge_frontmatter(real, specs_pattern_version=6)
+    gitflow.merge_frontmatter(real, specs_pattern_version=6)
     (repo / "specs").symlink_to(real, target_is_directory=True)
     before, before_real = _snapshot(repo), _snapshot(real)
 
@@ -206,7 +206,7 @@ def test_fresh_tree_writes_the_detected_gitflow_and_names_it(repo: Path) -> None
     result = _runner.invoke(app, ["specs", "init", "--context", "c"])
 
     assert result.exit_code == 0, result.output
-    flow, warning = specs_version.read_gitflow(repo / "specs")
+    flow, warning = gitflow.read_gitflow(repo / "specs")
     assert (flow, warning) == (Gitflow("trunk", "develop", "feature/"), None)
     assert "[gitflow] principal trunk, integration develop, work feature/<M.m.p>" in result.output
 
@@ -227,7 +227,7 @@ def test_flags_merge_into_an_existing_tree_and_rerun_is_a_no_op(repo: Path) -> N
     second = _runner.invoke(app, ["specs", "init", "--context", "c", *flags])
 
     assert first.exit_code == 0 and second.exit_code == 0, first.output + second.output
-    assert specs_version.read_gitflow(repo / "specs")[0] == Gitflow("trunk", "next", "work/")
+    assert gitflow.read_gitflow(repo / "specs")[0] == Gitflow("trunk", "next", "work/")
     assert "owner: me" in constitution.read_text(encoding="utf-8")
     assert _snapshot(repo / "specs") == snapshot
 

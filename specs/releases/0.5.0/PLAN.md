@@ -228,8 +228,8 @@ secret matcher, the second engine deleted, 57 added / 140 deleted): **`5364ba0d.
   backfill script output is committed into `shipped-hashes.json`, and the append-only test covers it. The
   `first-pass` predicate compares stripped digests and checks for an empty catalog.
 - **FR6** `core/gitflow.py`: `Gitflow`, `DEFAULT`, `from_mapping` and `role_of` hold all naming logic.
-  `core/specs_version.py` gains `read_gitflow` plus one `merge_frontmatter(specs_dir, **keys)` built on
-  `frontmatter.parse`; `_STAMP_RE` goes. `ci.py` resolves the gitflow once per push. `specs init` gets 3
+  `core/gitflow.py` also holds `read_gitflow`, `constitution_error` and the one `merge_frontmatter(specs_dir,
+  **keys)` built on `frontmatter.parse` (moved from `core/specs_version.py`, review 7 N7, AC11.2); `_STAMP_RE` goes. `ci.py` resolves the gitflow once per push. `specs init` gets 3
   flags plus `GitSubprocessClient.default_branch`. GITFLOW-1 lives in `doctor_coherence`.
 - **FR5** `ObjectSource.publishes_nothing(repo, sha)` = the `_range_commit_shas(…, _base_exclusions(repo, ZERO))`
   range is empty, or is one parentless commit on the empty tree (SHA-1 or SHA-256).

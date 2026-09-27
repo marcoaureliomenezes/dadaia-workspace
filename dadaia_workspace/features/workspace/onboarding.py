@@ -19,10 +19,10 @@ from typing import Literal
 from dadaia_workspace.core import session_store, workspace_layout
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.fixed_sections import strip_fixed_sections
+from dadaia_workspace.core.gitflow import constitution_error
 from dadaia_workspace.core.specs_version import (
     CANONICAL_SPECS_VERSION,
     classify,
-    constitution_error,
     read_pattern_version,
 )
 from dadaia_workspace.core.template_history import was_shipped

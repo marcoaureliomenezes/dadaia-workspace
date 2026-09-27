@@ -8,9 +8,8 @@ from pathlib import Path
 
 from dadaia_workspace.core.cli_line import git_line
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
-from dadaia_workspace.core.gitflow import Gitflow
+from dadaia_workspace.core.gitflow import Gitflow, read_gitflow
 from dadaia_workspace.core.models.git_scan import GitObjectReadError
-from dadaia_workspace.core.specs_version import read_gitflow
 from dadaia_workspace.infrastructure.git_objects import unpublished
 
 logger = logging.getLogger(__name__)
