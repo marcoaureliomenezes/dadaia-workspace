@@ -478,7 +478,7 @@ def _pr_check_contexts() -> set[str]:
 
 
 def test_the_required_checks_file_lists_every_check_a_pr_runs() -> None:
-    """sa-doctor-job-not-a-required-check#B1, #B2: a PR check absent from the file is
+    """sa-doctor-job-not-a-required-check#B1: a PR check absent from the file is
     red-but-mergeable (the Compliance job was); a stale entry blocks every merge."""
     import json
 
@@ -488,7 +488,7 @@ def test_the_required_checks_file_lists_every_check_a_pr_runs() -> None:
 
 
 def test_release_publishes_only_after_ci_yml_itself() -> None:
-    """sa-doctor-job-not-a-required-check#B3: release.yml redeclares no test matrix; it
+    """sa-doctor-job-not-a-required-check#B2: release.yml redeclares no test matrix; it
     calls ci.yml and the build waits for it."""
     jobs = _jobs()
     assert jobs["ci"]["uses"] == "./.github/workflows/ci.yml"

@@ -219,7 +219,7 @@ def test_planted_term_refused_then_clean_push_after_amend(tmp_path: Path) -> Non
 
 
 def test_the_gate_runs_where_core_hookspath_points(tmp_path: Path) -> None:
-    """pre-push-gate-never-runs-under-core-hookspath#B1, #B4 (AC1.3): with ``core.hooksPath``
+    """pre-push-gate-never-runs-under-core-hookspath#B1, #B3 (AC1.3): with ``core.hooksPath``
     set, ``ci install-hook`` puts the gate where git runs hooks, and a push carrying an
     AKIA-shaped key is refused. Composed at runtime — never a tracked secret literal."""
     repo, bare = _init_repo_and_remote(tmp_path, _SLUG)

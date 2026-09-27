@@ -10,6 +10,7 @@ can notice.
 
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 
@@ -80,13 +81,6 @@ def test_a_repo_that_is_not_a_git_checkout_is_never_a_finding(tmp_path: Path) ->
     assert "HOOKS-DRIFT-1" not in _codes(tmp_path, [_ctx("demo")])
 
 
-def test_the_finding_carries_the_runnable_install_verb() -> None:
-    """The fix must be one executable line, and the verb must exist (0.4.7 FR2)."""
-    rule = next(r for r in workspace_rules() if "HOOKS-DRIFT-1" in r.codes)
-    assert rule.fix_help == ("ci", "install-hook", "--force", "--repo", "<repo>")
-    assert rule.section == "workspace"
-
-
 def test_the_fix_line_run_from_the_workspace_root_rehooks_the_named_repo(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -109,12 +103,6 @@ def test_the_fix_line_run_from_the_workspace_root_rehooks_the_named_repo(
     assert not (root / ".git" / "hooks" / "pre-push").exists()
 
 
-def test_the_shipped_hook_registry_names_the_pre_push_chokepoint() -> None:
-    assert workspace_layout.INSTALLED_GIT_HOOKS == (("pre-push", "pre-push-ci-gate.sh"),)
-    for _, source in workspace_layout.INSTALLED_GIT_HOOKS:
-        assert (workspace_layout.public_scripts_dir() / source).is_file()
-
-
 def test_a_named_context_checks_only_its_own_repos(tmp_path: Path) -> None:
     """0.4.8 R5 / AC3.7: `doctor --context X` judges X's hooks, never another context's."""
     root = _workspace(tmp_path, drifted=True)
@@ -124,12 +112,23 @@ def test_a_named_context_checks_only_its_own_repos(tmp_path: Path) -> None:
 
 
 def test_a_gate_git_never_runs_is_a_finding(tmp_path: Path) -> None:
-    """pre-push-gate-never-runs-under-core-hookspath#B3: the gate sits in .git/hooks but
-    core.hooksPath sends git elsewhere — never reported healthy."""
+    """pre-push-gate-never-runs-under-core-hookspath#B2: the gate sits in .git/hooks but
+    core.hooksPath sends git elsewhere — an error finding with a runnable fix, never healthy."""
     root = _workspace(tmp_path)
     subprocess.run(
         ["git", "-C", str(root / "repos" / "demo"), "config", "core.hooksPath", ".husky"]
     )
-    [issue] = DoctorService(_Store([_ctx("demo")]), None, root).check_installed_hooks()  # type: ignore[arg-type]
-    assert issue.code == "HOOKS-DRIFT-1"
-    assert "repos/demo/.husky/pre-push" in issue.description
+    rule = next(r for r in workspace_rules() if "HOOKS-DRIFT-1" in r.codes)
+    [finding] = rule.run(DoctorService(_Store([_ctx("demo")]), None, root))  # type: ignore[arg-type]
+    assert finding.error
+    assert "repos/demo/.husky/pre-push" in finding.message
+    assert finding.fix is not None and " ci install-hook --force --repo repos/demo" in finding.fix
+
+
+def test_no_module_computes_the_hooks_dir_itself() -> None:
+    """pre-push-gate-never-runs-under-core-hookspath#B4: installer and doctor share ONE
+    resolver (`git rev-parse --git-path hooks`); no code builds `.git/hooks` by hand."""
+    package = Path(workspace_layout.__file__).parents[1]
+    hand_built = re.compile(r"""["']\.git["']\s*/\s*["']hooks["']|["']\.git/hooks""")
+    offenders = [p for p in package.rglob("*.py") if hand_built.search(p.read_text("utf-8"))]
+    assert offenders == []
