@@ -199,6 +199,8 @@ residual — foreign work rides along uncommitted; git refuses a colliding switc
 
 **Measure (AC11.3 method, `5364ba0d..722f169e`): +388** — over +362 by 26. Round 8d (AC5.6, `eb4f4b02`: one
 secret matcher, the second engine deleted, 57 added / 140 deleted): **`5364ba0d..eb4f4b02` = +305**, under +362.
+Round 10 (review 8): R9-1 secret-token v13 edits the one regex (`(?<![A-Za-z0-9])`, optional key quote, quoted arm `[^'"\s${}<>]{8,}`, unquoted `=` + `# …`); the matrix holds both directions.
+R9-2 the absence probe moves to `core.gitflow`; `specs_version` leaves the I/O set (eight). **`5364ba0d..0fffd6bc` = +318**, under +362.
 
 - `DADAIA_BIN` importers are **7**, not 9–10: `hooks/venv_guard.py` and `features/ci_preflight/service.py`
   read the `$DADAIA_BIN` *environment variable* exported by the pre-push hook, not the constant (SPEC AC2.2
