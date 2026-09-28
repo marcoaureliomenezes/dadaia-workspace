@@ -13,9 +13,8 @@ followed the same way — at most four steps, never a repeated line. A fix that 
 the publish (``git push …``, ``context baseline``) replaces the refused command: its
 success is the clearance.
 
-The census pins that every ``fix:`` producer in the four modules is accounted for — a
-new refusal without a case (or a written reason it cannot run here) fails
-:func:`test_every_fix_site_has_a_case`.
+The census counts every ``fix:`` producer in the four modules per enclosing function: a new
+refusal without a case (or a ``Skip`` reason) fails :func:`test_every_fix_site_has_a_case`.
 
 size: MEDIUM — real git and real CLI child processes, no network.
 """
@@ -28,6 +27,7 @@ import re
 import subprocess
 import sys
 import sysconfig
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -673,77 +673,72 @@ _VERBS = {
     "service": (_PKG / "features" / "spec_context" / "service.py", ("alive", "baseline", "dead")),
 }
 
-SITES: dict[str, tuple[Case, ...] | Skip] = {
-    "branch_policy._refuse_branch#0": (Case(_birth_published, _develop_at_main, replaces=True),),
-    "branch_policy._refuse_branch#1": (
-        Case(_outside, _work_carries_topic, then=_MERGE_TOPIC),
-        Case(_outside_with_work, _work_carries_topic, then=_MERGE_TOPIC),
-        Case(_outside_detached, _work_carries_topic, then="git push -q origin feature/0.1.0"),
+SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
+    "branch_policy._refuse_branch": (
+        Case(_birth_published, _develop_at_main, replaces=True),
+        (
+            Case(_outside, _work_carries_topic, then=_MERGE_TOPIC),
+            Case(_outside_with_work, _work_carries_topic, then=_MERGE_TOPIC),
+            Case(_outside_detached, _work_carries_topic, then="git push -q origin feature/0.1.0"),
+        ),
+        Skip("`gh pr create` needs GitHub; the PR path is the fix"),
     ),
-    "branch_policy._refuse_branch#2": Skip("`gh pr create` needs GitHub; the PR path is the fix"),
-    "branch_policy.check_branch_policy#0": (
+    "branch_policy.check_branch_policy": (
         Case(_mismatch, _work_pushed, then="git push -q origin feature/1.0.0"),
     ),
-    "push_gate._rewrite_fix#0": (
+    "push_gate._rewrite_fix": (
         Case(_denylisted_not_checked_out, _clean_publish, then=_CLEAN_COMMIT_PUSH),
-    ),
-    "push_gate._rewrite_fix#1": (
-        Case(_denylisted, _clean_publish, operator=_drop_term, then=_COMMIT_PUSH),
-        Case(
-            _denylisted_in_a_worktree,
-            _worktree_clean,
-            operator=_drop_worktree_term,
-            then="git -C .claude/worktrees/agent-x commit -qa --amend --no-edit && "
-            "git -C .claude/worktrees/agent-x push -q origin feature/1.0.0",
+        (
+            Case(_denylisted, _clean_publish, operator=_drop_term, then=_COMMIT_PUSH),
+            Case(
+                _denylisted_in_a_worktree,
+                _worktree_clean,
+                operator=_drop_worktree_term,
+                then="git -C .claude/worktrees/agent-x commit -qa --amend --no-edit && "
+                "git -C .claude/worktrees/agent-x push -q origin feature/1.0.0",
+            ),
+            Case(_denylisted_no_context, _clean_publish, operator=_drop_term, then=_COMMIT_PUSH),
+            Case(
+                _denylisted_advanced_integration,
+                _nothing_reverted,
+                operator=_drop_term,
+                then="git commit -qa --amend --no-edit && git push -q origin feature/1.0.1",
+            ),
+            Case(_non_canon, _no_junk, operator=_rm_junk, then=_COMMIT_PUSH),
         ),
-        Case(_denylisted_no_context, _clean_publish, operator=_drop_term, then=_COMMIT_PUSH),
-        Case(
-            _denylisted_advanced_integration,
-            _nothing_reverted,
-            operator=_drop_term,
-            then="git commit -qa --amend --no-edit && git push -q origin feature/1.0.1",
-        ),
-        Case(_non_canon, _no_junk, operator=_rm_junk, then=_COMMIT_PUSH),
     ),
-    "push_gate._run_denylist_scan#0": Skip("needs a corrupted object store; `git fsck` names it"),
-    "push_gate.push_gate_decision#0": (Case(_malformed, _work_pushed, replaces=True),),
-    "ci._repo_root#0": Skip("the pre-push hook always runs inside the repo it pushes"),
-    "ci.push_gate_check#0": Skip("the gate's refusal: its fix is a branch_policy/push_gate site"),
-    "service.SpecContextService.show#0": (Case(_unknown_context, _cloned),),
-    "service.SpecContextService.alive#0": (Case(_no_url_no_checkout, _cloned),),
-    "service.SpecContextService.alive#1": (
+    "push_gate._run_denylist_scan": (Skip("needs a corrupted object store; `git fsck` names it"),),
+    "push_gate.push_gate_decision": (Case(_malformed, _work_pushed, replaces=True),),
+    "ci._repo_root": (Skip("the pre-push hook always runs inside the repo it pushes"),),
+    "ci.push_gate_check": (Skip("the gate's refusal: its fix is a branch_policy/push_gate site"),),
+    "service.SpecContextService.show": (Case(_unknown_context, _cloned),),
+    "service.SpecContextService.alive": (
+        Case(_no_url_no_checkout, _cloned),
         Case(_alive_remote_gone, _cloned, operator=_remote_back),
     ),
-    "service.SpecContextService.baseline#0": (Case(_no_checkout, _cloned),),
-    "service.SpecContextService.baseline#1": (Case(_no_identity, _baseline_done),),
-    "service.SpecContextService.baseline#2": (Case(_never_onboarded, _baseline_done),),
-    "service.SpecContextService.baseline#3": (
+    "service.SpecContextService.baseline": (
+        Case(_no_checkout, _cloned),
+        Case(_no_identity, _baseline_done),
+        Case(_never_onboarded, _baseline_done),
         Case(_baseline_denylisted, _baseline_done, operator=_drop_draft_term, then=_AMEND_BASELINE),
     ),
-    "service.SpecContextService._refuse_principal_absent#0": (
+    "service.SpecContextService._refuse_principal_absent": (
         Case(_draft_principal_absent, lambda w: _baseline_done(w, "rel/0.1.0", ("main", "stage"))),
     ),
-    "service.SpecContextService._require_publishable#0": (
+    "service.SpecContextService._require_publishable": (
         Case(_secret_draft, _baseline_done, operator=_drop_secret),
     ),
-    "service.SpecContextService._enforce_dead_review_gate#0": Skip(
-        "fires only when `git ls-files` itself fails on a git root"
-    ),
-    "service.SpecContextService._enforce_dead_review_gate#1": (
+    "service.SpecContextService._enforce_dead_review_gate": (
+        Skip("fires only when `git ls-files` itself fails on a git root"),
         Case(_untracked, _dead_done, replaces=True),
-    ),
-    "service.SpecContextService._enforce_dead_review_gate#2": (
         Case(_secret_untracked, _dead_done),
     ),
-    "service.SpecContextService.dead#0": (Case(_dead_twice, _dead_done),),
-    "service.SpecContextService.dead#1": (Case(_no_origin, _dead_done),),
-    "service.SpecContextService.dead#2": (
-        Case(_unpushed_side_branch, _dead_done),
-        Case(_commits_no_remote, _dead_done),
-    ),
-    "service.SpecContextService.dead#3": (Case(_dead_no_identity, _dead_done),),
-    "service.SpecContextService.dead#4": (Case(_dirty_on_integration, _dead_via_work),),
-    "service.SpecContextService.dead#5": (
+    "service.SpecContextService.dead": (
+        Case(_dead_twice, _dead_done),
+        Case(_no_origin, _dead_done),
+        (Case(_unpushed_side_branch, _dead_done), Case(_commits_no_remote, _dead_done)),
+        Case(_dead_no_identity, _dead_done),
+        Case(_dirty_on_integration, _dead_via_work),
         Case(
             _dead_denylisted,
             _dead_done,
@@ -795,7 +790,7 @@ def _reachable(scopes: dict[str, ast.FunctionDef], roots: tuple[str, ...]) -> li
 def _fix_sites() -> list[str]:
     """The chokepoints' refusals (a string constant carrying ``fix:`` or a call to
     branch_policy's ``_blocked``, whose own body is the renderer) and every ``raise``
-    the verbs reach — by enclosing function and order."""
+    the verbs reach — one entry per refusal, keyed by its enclosing function."""
     sites: list[str] = []
     for stem, path in _CHOKEPOINTS.items():
         for name, fn in _scopes(ast.parse(path.read_text(encoding="utf-8"))).items():
@@ -808,7 +803,7 @@ def _fix_sites() -> list[str]:
                     or (isinstance(n, ast.Call) and getattr(n.func, "id", "") == "_blocked")
                 )
             ]
-            sites += [f"{stem}.{name}#{i}" for i in range(len(hits))]
+            sites += [f"{stem}.{name}"] * len(hits)
     for stem, (path, roots) in _VERBS.items():
         scopes = _scopes(ast.parse(path.read_text(encoding="utf-8")))
         for name in _reachable(scopes, roots):
@@ -818,19 +813,20 @@ def _fix_sites() -> list[str]:
                 if (isinstance(n, ast.Raise) and n.exc)
                 or (isinstance(n, ast.Call) and getattr(n.func, "id", "") == "fail")
             ]
-            sites += [f"{stem}.{name}#{i}" for i in range(len(raises))]
+            sites += [f"{stem}.{name}"] * len(raises)
     return sites
 
 
 def test_every_fix_site_has_a_case() -> None:
-    assert sorted(_fix_sites()) == sorted(SITES)
+    assert Counter(_fix_sites()) == {site: len(refusals) for site, refusals in SITES.items()}
 
 
 _CASES = [
-    pytest.param(case, id=f"{site}-{n}")
-    for site, entry in SITES.items()
+    pytest.param(case, id=case.build.__name__.strip("_"))
+    for refusals in SITES.values()
+    for entry in refusals
     if not isinstance(entry, Skip)
-    for n, case in enumerate(entry)
+    for case in (entry if isinstance(entry, tuple) else (entry,))
 ]
 
 
