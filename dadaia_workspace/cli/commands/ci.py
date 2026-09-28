@@ -15,7 +15,7 @@ from dadaia_workspace.cli._specs_resolution import repo_owner, resolve_workspace
 from dadaia_workspace.container import is_source_repo_root as _is_source_repo_root
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import CiPreflightScopeError
-from dadaia_workspace.core.gitflow import Gitflow
+from dadaia_workspace.core.gitflow import Gitflow, work_branch
 from dadaia_workspace.features.chokepoints.branch_policy import GateFixes
 from dadaia_workspace.features.ci_preflight import (
     all_passed,
@@ -24,10 +24,7 @@ from dadaia_workspace.features.ci_preflight import (
     run_preflight,
     subprocess_runner,
 )
-from dadaia_workspace.features.spec_context.service import (
-    install_git_hooks,
-    work_name,
-)
+from dadaia_workspace.features.spec_context.service import install_git_hooks
 
 app = typer.Typer(help="Local CI-equivalent preflight gate + git-hook chokepoints.")
 
@@ -112,7 +109,7 @@ def _gate_inputs(repo_root: Path, head: str) -> tuple[Gitflow, GateFixes]:
     gitflow, warning = git.gitflow(repo_root, main)
     if warning:
         typer.echo(f"[pre-push] WARNING: {warning}", err=True)
-    work = work_name(git, repo_root, gitflow)
+    work = work_branch(repo_root / "specs", gitflow)
     cut = bool(git.git(repo_root, "for-each-ref", "--format=%(refname)", f"refs/heads/{work}"))
     return gitflow, GateFixes(repo=str(repo_root), work=work, cut=cut, head=head)
 

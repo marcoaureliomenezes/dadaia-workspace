@@ -24,6 +24,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from dadaia_workspace.core.gitflow import resolve_live_release_id
 from dadaia_workspace.core.release_state import (
     ReleaseState,
     parse_release_state,
@@ -44,40 +45,6 @@ _RELEASE_ARTIFACTS = RELEASE_ARTIFACTS
 # Segment dirs (ADR-1/ADR-5) live *inside* a release dir and are not themselves releases:
 # alpha-N, rc-N, plus the historical `integration` segment container.
 _SEGMENT_NAME_RE = re.compile(r"^(?:alpha|rc)-\d+$|^integration$")
-
-
-def resolve_live_release_id(specs_dir: Path) -> tuple[str | None, str | None]:
-    """Resolve which release under ``releases/`` is live (v0.5.x, successor to the
-    RELEASE.jsonl fold; v0.5.0 FR4/T-050-21A, A4.1).
-
-    The live release is the ONE directory directly under ``specs_dir/releases/`` —
-    excluding ``_archive`` — that carries a ``RELEASE.json`` file
-    (T-050-11 back-fills it the moment a release reaches DEFINITION). This directory
-    scan is the sole replacement for ``ACTIVE.md``'s ``release:`` field; no file
-    stands in its place.
-
-    Returns ``(release_id, error)``. Zero matches is ``(None, None)`` — not an
-    error, the honest "no active release" state and the successor of the old
-    scaffold default ``release: none`` (there is no longer a placeholder file to
-    write that value into). More than one match is a genuine structural anomaly
-    (two live releases at once) and is reported as ``error`` rather than guessed at
-    — the caller decides severity, this leaf only detects the shape.
-    """
-    releases_root = specs_dir / "releases"
-    if not releases_root.is_dir():
-        return None, None
-    candidates = sorted(
-        d.name
-        for d in releases_root.iterdir()
-        if d.is_dir() and d.name != "_archive" and release_state_file(d) is not None
-    )
-    if not candidates:
-        return None, None
-    if len(candidates) > 1:
-        return None, (
-            "multiple live release directories carry RELEASE.json: " + ", ".join(candidates)
-        )
-    return candidates[0], None
 
 
 def _read_and_parse_release_json(
@@ -120,7 +87,7 @@ def resolve_active_release(specs_dir: Path) -> tuple[str | None, str | None, str
     lane, ADR 0006). Downstream consumers (``doctor_release``, ``doctor_structural``)
     keep their existing branching (``if err: ...``, ``if release is None: ...``).
 
-    :func:`resolve_live_release_id` (above) answers "which directory" (pure stdlib);
+    core.gitflow's :func:`resolve_live_release_id` answers "which directory" (pure stdlib);
     this function answers the content question — the phase, read straight off disk by
     :func:`_read_and_parse_release_json`. There is no fold anymore: the document
     already IS the current phase.

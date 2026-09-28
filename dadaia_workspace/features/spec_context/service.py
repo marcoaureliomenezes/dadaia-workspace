@@ -25,7 +25,7 @@ from dadaia_workspace.core.exceptions import (
     InvalidContextNameError,
     RepoUrlMissingError,
 )
-from dadaia_workspace.core.gitflow import Gitflow
+from dadaia_workspace.core.gitflow import Gitflow, work_branch
 from dadaia_workspace.core.models.spec_context import (
     CONTEXT_NAME_RE,
     AssociatedRepo,
@@ -46,9 +46,6 @@ _ONBOARDING = ("specs", "specs-bkp", *(dest for _, dest in workspace_layout.REPO
 
 def _onboarded(rel: str) -> bool:
     return any(rel == p or rel.startswith(f"{p}/") for p in _ONBOARDING)
-
-
-_TAG_RE = re.compile(r"v?(\d+)\.(\d+)\.(\d+)")
 
 
 class InstallHooks(Protocol):
@@ -156,14 +153,6 @@ def install_git_hooks(repo_root: Path, *, force: bool = False) -> list[Path]:
             dest.chmod(0o755)
             written.append(dest)
     return written
-
-
-def work_name(git: GitSubprocessClient, repo: Path, flow: Gitflow) -> str:
-    """The ONE live-work-branch rule (gate fixes, ``baseline``): the last tag + 1 patch,
-    else ``0.1.0``."""
-    tags = (_TAG_RE.fullmatch(t) for t in git.git(repo, "tag", "--sort=-v:refname").split())
-    last = next((m for m in tags if m), None)
-    return f"{flow.work_prefix}{f'{last[1]}.{last[2]}.{int(last[3]) + 1}' if last else '0.1.0'}"
 
 
 class SpecContextService:
@@ -591,7 +580,7 @@ class SpecContextService:
         self._git.commit_paths(repo, message, [p for p in _ONBOARDING if (repo / p).exists()])
         anchor = git("rev-parse", "HEAD")
         flow, _ = self._git.gitflow(repo)
-        work = work_name(self._git, repo, flow)
+        work = work_branch(repo / "specs", flow)
         try:
             if born:
                 old = git("for-each-ref", "--format=%(objectname)", f"refs/heads/{work}")

@@ -5,7 +5,7 @@ coordinator (this file) that **owns check()/fix() ORDER** and delegates all LOGI
 single-responsibility validator siblings plus two shared leaf modules:
 
   * ``doctor_types``     — ``Severity`` / ``SpecsDoctorIssue``
-  * ``doctor_common``    — cross-validator pure helpers (``resolve_live_release_id`` + release-dir discovery)
+  * ``doctor_common``    — cross-validator pure helpers (``resolve_active_release`` + release-dir discovery)
   * ``doctor_structural``   — TREE-2..8 spec-tree invariants; ``fix_tree4``,
                               ``fix_tree5``
   * ``doctor_memory``       — memory files, LINT-1

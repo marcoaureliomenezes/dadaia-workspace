@@ -193,12 +193,14 @@ def test_an_origin_work_branch_is_adopted_never_deleted(env, tmp_path: Path) -> 
     assert _ancestor(repo, theirs, "HEAD")
 
 
-def test_a_tag_makes_the_work_branch_its_next_patch(env, tmp_path: Path) -> None:
+def test_the_live_release_names_the_work_branch_never_a_tag(env, tmp_path: Path) -> None:
+    """sa-live-work-branch-named-three-ways#B41-1: tag v0.4.7 + live release 0.5.0 -> feature/0.5.0."""
     svc, repo, bare = env
-    _seed(bare, tmp_path / "seed", "main", tag="v0.3.1")
+    _seed(bare, tmp_path / "seed", "main", tag="v0.4.7")
     _clone_onboarded(bare, repo)
-    assert svc.baseline("proj") == "feature/0.3.2"
-    _assert_published(repo, bare, "feature/0.3.2", "develop")
+    (repo / "specs/releases/0.5.0").mkdir(parents=True)
+    (repo / "specs/releases/0.5.0/_RELEASE.json").write_text("{}", encoding="utf-8")
+    assert svc.baseline("proj") == "feature/0.5.0" and "feature/0.5.0" in _heads(bare)
 
 
 @pytest.mark.parametrize("seeded", [(), ("main", "develop")], ids=["empty", "adopted"])

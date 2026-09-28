@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Literal
 
 from dadaia_workspace.core.frontmatter import FRONTMATTER_RE, FrontmatterError, parse
+from dadaia_workspace.core.release_state import release_state_file
 
 __all__ = [
     "DEFAULT",
@@ -27,6 +28,8 @@ __all__ = [
     "from_mapping",
     "merge_frontmatter",
     "read_gitflow",
+    "resolve_live_release_id",
+    "work_branch",
 ]
 
 Role = Literal["principal", "integration", "work"]
@@ -59,6 +62,22 @@ class Gitflow:
 
 
 DEFAULT = Gitflow(principal="main", integration="develop", work_prefix="feature/")
+
+
+def resolve_live_release_id(specs_dir: Path) -> tuple[str | None, str | None]:
+    """The ONE live-release reader: the one ``releases/<id>/`` (never ``_archive``) holding a
+    release-state document; none ``(None, None)``, several ``(None, error)``."""
+    root = specs_dir / "releases"
+    live = [d.name for d in sorted(root.iterdir()) if d.is_dir() and d.name != "_archive"
+            and release_state_file(d)] if root.is_dir() else []  # fmt: skip
+    if len(live) > 1:
+        return None, "multiple live release directories carry RELEASE.json: " + ", ".join(live)
+    return (live[0] if live else None), None
+
+
+def work_branch(specs_dir: Path, flow: Gitflow) -> str:
+    """The ONE live work branch (gate, baseline): ``<work><live release id>``, else ``0.1.0``."""
+    return f"{flow.work_prefix}{resolve_live_release_id(specs_dir)[0] or '0.1.0'}"
 
 
 def from_mapping(block: object) -> Gitflow:
