@@ -17,14 +17,8 @@ __all__ = [
     "MEMORY_SCRIPT",
     "RELEASE_SCRIPT",
     "RECONCILER_THROTTLE_TTL_SECONDS",
-    "SENTINEL_GC_TTL_SECONDS",
     "SESSION_GC_TTL_SECONDS",
 ]
-
-#: Age after which a once-per-session ctx-inject sentinel (``ctx-inject-fired-<sid>``) is
-#: considered stale and GC'd at inject time. Generous (24 h) so a long-running live session
-#: is never disturbed; the worst case is one redundant bootstrap re-injection.
-SENTINEL_GC_TTL_SECONDS: int = 24 * 60 * 60
 
 #: Default TTL (seconds) for a session record's graveyard GC when the record itself carries
 #: no explicit ``ttl_seconds`` field (pre-heartbeat / legacy records). The doctor decays

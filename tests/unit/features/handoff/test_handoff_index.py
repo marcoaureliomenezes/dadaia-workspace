@@ -34,7 +34,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -460,24 +459,6 @@ def test_self_pull_falls_back_to_workspace_when_reviewed_root_lacks_the_ref(tmp_
 # ---------------------------------------------------------------------------
 # 7. Findings summary / severity / expiry derivation
 # ---------------------------------------------------------------------------
-
-
-def test_expires_at_uses_produced_at_then_filename_then_mtime(tmp_path: Path) -> None:
-    ttl = timedelta(hours=48)
-
-    with_produced_at = Handoff.load(
-        _write(tmp_path / "a.handoff.json", _base_doc(produced_at="2026-01-01T00:00:00Z"))
-    )
-    assert with_produced_at.expires_at(ttl) == datetime(2026, 1, 3, 0, 0, tzinfo=UTC)
-
-    doc_no_produced_at = _base_doc()
-    del doc_no_produced_at["produced_at"]
-    named = _write(
-        tmp_path / "2026-02-01T090000Z-agent-slug.handoff.json",
-        doc_no_produced_at,
-    )
-    from_name = Handoff.load(named)
-    assert from_name.expires_at(ttl) == datetime(2026, 2, 3, 9, 0, tzinfo=UTC)
 
 
 # ---------------------------------------------------------------------------

@@ -1,50 +1,21 @@
 """Advisory throttle/sentinel markers under ``.dadaia/tmp/`` — the ONE mtime-throttle
-idiom and the ONE reaper of the markers it leaves behind.
-
-Writers: ``hooks.sdd_post_gate`` (reconciler throttle), ``hooks.ctx_inject``
-(sentinel/compact markers). Every marker is a spent throttle stamp: no session
-cross-reference exists to get wrong, so :func:`reap_markers` reaps by mtime alone.
-Owned by the reaper lane (``spec_context.doctor.reap``).
+idiom. Writers: ``hooks.sdd_post_gate`` (reconciler throttle), ``hooks.ctx_inject``
+(sentinel/compact markers). A spent marker is an ordinary tmp entry: the doctor's one
+zone walk expires it at the tmp TTL (sa-expiry-has-two-clocks).
 """
 
 from __future__ import annotations
 
-import contextlib
 from datetime import UTC, datetime
 from pathlib import Path
 
-from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
-from dadaia_workspace.features.spec_context import sweep
 
-__all__ = ["MARKER_PREFIXES", "reap_markers", "stamp_throttle", "throttled"]
-
-#: The marker-name prefixes the reaper owns. A prefix listed here is never "reaped by
-#: nobody"; a prefix not listed here is not a throttle marker.
-MARKER_PREFIXES: tuple[str, ...] = (
-    "reconciler-last-",
-    "ctx-inject-fired-",
-    "ctx-compact-",
-)
-
-#: GC TTL (mtime-only) for every marker :func:`reap_markers` owns — one generous floor.
-_MARKER_GC_TTL_SECONDS = kernel_tunables.SENTINEL_GC_TTL_SECONDS
+__all__ = ["stamp_throttle", "throttled"]
 
 
 def _valid_name(name: str) -> bool:
     return bool(CONTEXT_NAME_RE.fullmatch(name))
-
-
-def _within_dadaia(path: Path, workspace: Path) -> bool:
-    """True iff *path*, fully resolved (symlinks included), falls under
-    ``<workspace>/.dadaia`` — resolve then ``relative_to``, never a string-prefix check
-    (CWE-22 class)."""
-    boundary = (workspace / ".dadaia").resolve()
-    try:
-        path.resolve().relative_to(boundary)
-    except (ValueError, OSError):
-        return False
-    return True
 
 
 def throttled(workspace: Path, marker_name: str, *, window_seconds: float, now: float) -> bool:
@@ -76,29 +47,3 @@ def stamp_throttle(workspace: Path, marker_name: str) -> None:
         marker.write_text(datetime.now(UTC).isoformat(), encoding="utf-8")
     except OSError:
         return
-
-
-def reap_markers(workspace: Path, *, now: float) -> tuple[str, ...]:
-    """Delete markers under ``.dadaia/tmp/`` matching :data:`MARKER_PREFIXES` whose mtime
-    is older than the GC TTL. Never raises; returns the reaped names, sorted."""
-    tmp_dir = workspace / ".dadaia" / "tmp"
-    try:
-        entries = sorted(tmp_dir.iterdir())
-    except OSError:
-        return ()
-    reaped: list[str] = []
-    for path in entries:
-        if not path.name.startswith(MARKER_PREFIXES):
-            continue
-        if not _within_dadaia(path, workspace):
-            continue
-        try:
-            mtime = path.stat().st_mtime
-        except OSError:
-            continue
-        if (now - mtime) < _MARKER_GC_TTL_SECONDS:
-            continue
-        with contextlib.suppress(OSError):
-            if sweep.remove(workspace, path, path.name) is not None:
-                reaped.append(path.name)
-    return tuple(reaped)

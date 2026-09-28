@@ -3,12 +3,10 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.features.spec_context import markers
 
 pytestmark = pytest.mark.unit
@@ -38,24 +36,3 @@ def test_throttled_rejects_traversal_shaped_marker_name(tmp_path: Path) -> None:
 
     assert not escape_probe.exists()
     assert markers.throttled(tmp_path, hostile, window_seconds=300, now=0.0) is False
-
-
-def test_reap_markers_deletes_only_expired_owned_prefixes(tmp_path: Path) -> None:
-    tmp = tmp_path / ".dadaia" / "tmp"
-    tmp.mkdir(parents=True)
-    old = kernel_tunables.SENTINEL_GC_TTL_SECONDS + 10
-    for name in ("reconciler-last-a", "ctx-inject-fired-b", "ctx-compact-c", "unrelated-d"):
-        (tmp / name).write_text("x", encoding="utf-8")
-        os.utime(tmp / name, (1_000, 1_000))
-    (tmp / "reconciler-last-fresh").write_text("x", encoding="utf-8")
-    os.utime(tmp / "reconciler-last-fresh", (1_000 + old, 1_000 + old))
-
-    reaped = markers.reap_markers(tmp_path, now=1_000 + old)
-
-    assert reaped == ("ctx-compact-c", "ctx-inject-fired-b", "reconciler-last-a")
-    assert (tmp / "unrelated-d").exists()
-    assert (tmp / "reconciler-last-fresh").exists()
-
-
-def test_reap_markers_never_raises_without_tmp_dir(tmp_path: Path) -> None:
-    assert markers.reap_markers(tmp_path, now=0.0) == ()

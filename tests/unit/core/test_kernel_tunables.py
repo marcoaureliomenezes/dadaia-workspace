@@ -27,49 +27,12 @@ def _module_source(dotted: str) -> str:
     return Path(mod.__file__).read_text(encoding="utf-8")
 
 
-def _imports_name_from_kernel_tunables(source: str, name: str) -> bool:
-    """True iff *source* imports *name* from ``...core.kernel_tunables`` (any alias form).
-
-    Accepts ``from dadaia_workspace.core import kernel_tunables`` followed by attribute
-    access (``kernel_tunables.<name>``) OR a direct
-    ``from dadaia_workspace.core.kernel_tunables import <name>``.
-    """
-    tree = ast.parse(source)
-    # Direct name import.
-    for node in ast.walk(tree):
-        if (
-            isinstance(node, ast.ImportFrom)
-            and node.module == "dadaia_workspace.core.kernel_tunables"
-        ):
-            for alias in node.names:
-                if alias.name == name:
-                    return True
-    # Module import + attribute access.
-    module_imported = any(
-        isinstance(node, ast.ImportFrom)
-        and node.module == "dadaia_workspace.core"
-        and any(a.name == "kernel_tunables" for a in node.names)
-        for node in ast.walk(tree)
-    )
-    if module_imported:
-        for node in ast.walk(tree):
-            if (
-                isinstance(node, ast.Attribute)
-                and node.attr == name
-                and isinstance(node.value, ast.Name)
-                and node.value.id == "kernel_tunables"
-            ):
-                return True
-    return False
-
-
 # --------------------------------------------------------------------------- #
 # 1. Module shape: pure constants, zero I/O.
 # --------------------------------------------------------------------------- #
 
 
 def test_tunables_are_pure_constants_with_no_io_imports() -> None:
-    assert isinstance(kernel_tunables.SENTINEL_GC_TTL_SECONDS, int)
     assert isinstance(kernel_tunables.SESSION_GC_TTL_SECONDS, int)
     assert isinstance(kernel_tunables.RECONCILER_THROTTLE_TTL_SECONDS, int)
 
@@ -83,22 +46,6 @@ def test_tunables_are_pure_constants_with_no_io_imports() -> None:
                 assert alias.name.split(".")[0] not in banned, alias.name
         if isinstance(node, ast.ImportFrom) and node.module:
             assert node.module.split(".")[0] not in banned, node.module
-
-
-# --------------------------------------------------------------------------- #
-# 2. Single-home: kernel modules import from kernel_tunables (AST edge, not digit grep).
-# --------------------------------------------------------------------------- #
-
-
-@pytest.mark.parametrize(
-    ("module", "name"),
-    [
-        ("dadaia_workspace.features.spec_context.markers", "SENTINEL_GC_TTL_SECONDS"),
-    ],
-)
-def test_kernel_module_imports_tunable_from_single_home(module: str, name: str) -> None:
-    src = _module_source(module)
-    assert _imports_name_from_kernel_tunables(src, name)
 
 
 # --------------------------------------------------------------------------- #

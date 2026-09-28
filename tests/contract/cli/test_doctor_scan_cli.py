@@ -32,7 +32,7 @@ from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import HARNESS_PROJECTION_DIRS, L1_ENTRY_HARNESSES
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.workspace_layout import provisioned_zones, zones_with_ttl
-from dadaia_workspace.features.spec_context import doctor, sweep
+from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.stores import context_store
@@ -250,7 +250,6 @@ def test_two_same_second_reaps_of_one_origin_leave_two_intact_holds(
     """sa-reaper-destroys-its-own-hold-before-ttl#B1, sa-reaper-destroys-its-own-hold-before-ttl#B2: the origin is reaped,
     re-created with new content and reaped again inside one frozen second; the first hold
     keeps every byte and a second, distinct hold carries the new content."""
-    monkeypatch.setattr(doctor, "datetime", _FrozenClock)
     monkeypatch.setattr(sweep, "datetime", _FrozenClock)  # sweep.hold names the hold's day
     skill = workspace / "stray"
     skill.mkdir()
@@ -455,3 +454,36 @@ def test_an_expired_entry_holding_a_worktree_carries_a_fix_that_clears_it(
     assert done.returncode == 0
     assert _expired(workspace) == []
     assert not (workspace / ".dadaia" / "tmp" / "a").exists()
+
+
+def test_an_expired_marker_is_reaped_by_the_zone_walk(workspace: Path) -> None:
+    """sa-expiry-has-two-clocks#45.1: a throttle marker past the tmp TTL (86401 s) is a
+    WS-tmp-expired entry the one zone walk removes — no second reaper."""
+    marker = workspace / ".dadaia" / "tmp" / "reconciler-last-x"
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text("2026-09-26T00:00:00+00:00", encoding="utf-8")
+    stamp = time.time() - 86_401
+    os.utime(marker, (stamp, stamp))
+
+    result = CliRunner().invoke(app, ["doctor", "--fix", "--expired-only"])
+
+    assert "WS-tmp-expired: deleted 'tmp/reconciler-last-x'" in result.output, result.output
+    assert not marker.exists()
+
+
+def test_a_handoff_expires_by_its_mtime_alone(workspace: Path) -> None:
+    """sa-expiry-has-two-clocks#45.2: one day after its mtime a handoff is expired whatever
+    its produced_at says; a fresh file with a 3-day-old produced_at is kept."""
+    ctx = workspace / ".dadaia" / "handoff" / "ctx"
+    ctx.mkdir(parents=True)
+    old, fresh = ctx / "old.handoff.json", ctx / "fresh.handoff.json"
+    old.write_text('{"produced_at": "2099-01-01T00:00:00Z"}', encoding="utf-8")
+    fresh.write_text('{"produced_at": "2026-09-24T00:00:00Z"}', encoding="utf-8")
+    stamp = time.time() - 86_401
+    os.utime(old, (stamp, stamp))
+
+    result = CliRunner().invoke(app, ["doctor", "--fix", "--expired-only"])
+
+    assert "WS-handoff-expired: deleted 'handoff/ctx/old.handoff.json'" in result.output
+    assert not old.exists()
+    assert fresh.exists()

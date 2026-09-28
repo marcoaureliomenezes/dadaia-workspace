@@ -16,7 +16,7 @@ allow set, TTL and canon is a view of the registry.
 import os
 import time
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from enum import StrEnum
 from functools import partial
 from pathlib import Path
@@ -31,7 +31,7 @@ from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.workspace_layout import Zone
-from dadaia_workspace.features.spec_context import markers, sweep
+from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.features.spec_context.service import git_hooks_dir
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
@@ -508,12 +508,6 @@ class DoctorService:
         through the ONE sweep guard: it reports what it did or that it skipped, never
         aborts, and never touches a location outside the workspace."""
         actions: list[str] = []
-
-        # markers.reap_markers is the ONE reaper of spent throttle/sentinel markers.
-        for name in markers.reap_markers(
-            self._workspace_root, now=datetime.now(tz=UTC).timestamp()
-        ):
-            actions.append(f"MARKER-GC: deleted stale marker '{name}'")
 
         # The session-record owner's ONE reaper (core.session_store.reap_stale, F002).
         for sess_id in session_store.reap_stale(self._workspace_root):

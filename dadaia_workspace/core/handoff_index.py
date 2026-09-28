@@ -33,7 +33,7 @@ import json
 import re
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -46,12 +46,9 @@ __all__ = [
     "ValidationResult",
     "discover_handoff_paths",
     "load_schema",
-    "path_timestamp",
     "scan_handoffs",
     "validate_schema_shape",
 ]
-
-_TIMESTAMP_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{6}Z)")
 
 # ---------------------------------------------------------------------------
 # stdlib-only JSON-schema walker (folded from the former
@@ -386,21 +383,6 @@ class Handoff:
             return ()
         return tuple(ref for ref in refs if isinstance(ref, str))
 
-    # -- derived helpers -------------------------------------------------
-
-    def effective_timestamp(self) -> datetime:
-        """``produced_at`` if parseable, else :func:`path_timestamp` of the file itself."""
-        produced_at = self.produced_at
-        if produced_at:
-            parsed = _parse_datetime(produced_at)
-            if parsed is not None:
-                return parsed
-        return path_timestamp(self.path)
-
-    def expires_at(self, ttl: timedelta) -> datetime:
-        """``effective_timestamp() + ttl`` — the one TTL-expiry rule."""
-        return self.effective_timestamp() + ttl
-
     # -- the one artifact-path resolution rule -------------------------------
 
     def artifact_path(self, workspace_root: Path) -> Path | None:
@@ -549,40 +531,6 @@ def _within_root(path: Path, root: Path) -> Path | None:
     except (OSError, ValueError):
         return None
     return resolved
-
-
-def _parse_datetime(value: str) -> datetime | None:
-    normalized = value.replace("Z", "+00:00")
-    try:
-        parsed = datetime.fromisoformat(normalized)
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=UTC)
-    return parsed.astimezone(UTC)
-
-
-def _parse_datetime_from_name(name: str) -> datetime | None:
-    match = _TIMESTAMP_RE.match(name)
-    if not match:
-        return None
-    raw = match.group(1)
-    return _parse_datetime(f"{raw[:13]}:{raw[13:15]}:{raw[15:]}")
-
-
-def path_timestamp(path: Path) -> datetime:
-    """The filename's leading UTC stamp (``<YYYY-MM-DDTHHMMSSZ>-…``), else mtime, else now.
-
-    The one age rule for a runtime artifact that carries no ``produced_at`` of its own —
-    a report under ``.dadaia/reports/`` or a handoff whose document is unreadable.
-    """
-    parsed = _parse_datetime_from_name(path.name)
-    if parsed is not None:
-        return parsed
-    try:
-        return datetime.fromtimestamp(path.stat().st_mtime, tz=UTC)
-    except OSError:
-        return datetime.now(tz=UTC)
 
 
 # ---------------------------------------------------------------------------
