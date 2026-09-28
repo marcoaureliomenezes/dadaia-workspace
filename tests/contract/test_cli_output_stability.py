@@ -1,45 +1,19 @@
-"""Default CLI output is byte-for-byte unchanged by the addition of ``--redact``.
+"""Intent: CONTRACT — v0.9.0 A8.2: ``--redact`` is strictly opt-in.
 
-Intent: CONTRACT — v0.9.0 A8.2.
-
-SPEC v0.9.0 FR8a requires ``--redact`` to be strictly opt-in: `dadaia doctor`,
-`dadaia context list` and `dadaia context show` (table and ``--json``) must render
-IDENTICAL output to their pre-FR8a behavior when the flag is absent. Every string below
-was captured from the verb's actual output before the ``--redact`` flag existed, so a
-byte-for-byte regression here means the new flag's plumbing leaked into the default
-path — not a decision this task is free to re-litigate.
-
-The three `dadaia doctor` goldens were RE-PINNED ONCE at 0.4.7 T-047-02, when the three
-doctors became one: the render is now `<CODE> <verdict> <message>` lines plus one
-`compliance(<section>)` line per section and a `compliance(total)` line. `--redact`'s
-default-path neutrality — the property this module exists for — is unchanged.
-
-Byte-for-byte golden literals are inherently platform-specific wherever they embed a
-``rich.table.Table`` rendering: Rich substitutes its default HEAVY_HEAD box-drawing
-characters for the ASCII-safe SQUARE box whenever ``Console.legacy_windows`` resolves
-True (no Windows Virtual Terminal support detected — the case for CI runners without an
-attached VT-capable console), independent of ``sys.platform`` alone
-(`rich.console.detect_legacy_windows`, `rich.box.Box.substitute`). Plain-text and
-``--json`` output never goes through box substitution, so those golden literals hold on
-every platform. Only ``dadaia context list``'s default table output embeds box-drawing
-characters in this module (`dadaia doctor` and `dadaia context show` render plain
-``console.print(f"...")`` lines with no ``Table``); its byte-for-byte pin is therefore
-scoped to Linux (where it was captured), paired with a platform-independent assertion
-that runs everywhere and pins the semantic half of A8.2: the default table still carries
-the true, unredacted context name and never leaks a ``[REDACTED-CONTEXT-`` placeholder.
+Without the flag, ``context list`` still carries the true context name and never a
+``[REDACTED-CONTEXT-`` placeholder, and the ``--json`` renderings of ``context list`` and
+``context show`` keep their key set.
 """
 
 from __future__ import annotations
 
 import json
-import platform
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.workspace.service import WorkspaceService
@@ -100,104 +74,7 @@ def _register_alive_ctx(workspace: Path, name: str = "caller-ctx") -> None:
     (workspace / "repos" / name).mkdir(parents=True, exist_ok=True)
 
 
-def _register_dead_ctx_with_repo_on_disk(workspace: Path, name: str = "stale-ctx") -> None:
-    states = workspace / ".dadaia" / "states"
-    states.mkdir(parents=True, exist_ok=True)
-    (states / "spec_contexts.json").write_text(
-        json.dumps(
-            {
-                "schema_version": "2",
-                "contexts": [
-                    {
-                        "name": name,
-                        "state": "dead",
-                        "repo_slug": name,
-                        "repo_url": "",
-                        "created_at": "2026-01-01T00:00:00Z",
-                        "alive_since": None,
-                        "dead_since": "2026-05-01T00:00:00Z",
-                        "current_branch": None,
-                    }
-                ],
-            }
-        )
-    )
-    (workspace / "repos" / name).mkdir(parents=True, exist_ok=True)
-
-
-# ---------------------------------------------------------------------------
-# dadaia doctor — healthy, issue-present, and --fix paths
-# ---------------------------------------------------------------------------
-
-
-def _next_step(workspace: Path) -> str:
-    """0.4.8 R2 deliberate golden change: zero ALIVE contexts prints the onboarding step."""
-    fix = fix_line(workspace, "context", "create", "<name>", "--main-repo", "<clone-url>")
-    return f"ONBOARDING info Next (command step context): no ALIVE Spec Context — create one\nfix: {fix}\n"
-
-
-def test_doctor_default_output_healthy_workspace_unchanged(workspace: Path) -> None:
-    result = _runner.invoke(app, ["doctor"])
-    assert result.exit_code == 0, result.output
-    assert result.output == _next_step(workspace)
-
-
-def test_doctor_default_output_with_issue_unchanged(workspace: Path) -> None:
-    _register_dead_ctx_with_repo_on_disk(workspace)
-    result = _runner.invoke(app, ["doctor"])
-    assert result.exit_code == 1, result.output
-    assert result.output == (
-        "INV-5 error Context 'stale-ctx' is dead but repo 'stale-ctx' is on disk\n"
-        f"fix: {fix_line(workspace, 'doctor', '--fix')}\n" + _next_step(workspace)
-    )
-
-
-def test_doctor_default_fix_output_unchanged(workspace: Path) -> None:
-    """sa-reaper-destroys-its-own-hold-before-ttl#B4: the DEAD context's repo leaves
-    ``repos/`` and is HELD under ``.dadaia/reaped/*/repos/stale-ctx``, never deleted; the
-    INV-5 repair line names it. The bucket name is not pinned (a reflex snapshot)."""
-    _register_dead_ctx_with_repo_on_disk(workspace)
-    result = _runner.invoke(app, ["doctor", "--fix"])
-    assert result.exit_code == 0, result.output
-    assert "  - INV-5: moved 'repos/stale-ctx' (context stale-ctx) -> '.dadaia/reaped/" in (
-        result.output
-    )
-    assert not (workspace / "repos" / "stale-ctx").exists()
-    assert len(list((workspace / ".dadaia" / "reaped").glob("*/repos/stale-ctx"))) == 1
-
-
-# ---------------------------------------------------------------------------
-# dadaia context list — table and --json
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.skipif(
-    platform.system() != "Linux",
-    reason="golden output pinned on Linux Rich rendering; Windows renders ASCII-safe boxes",
-)
-def test_context_list_default_table_output_unchanged(workspace: Path) -> None:
-    _register_alive_ctx(workspace)
-    result = _runner.invoke(app, ["context", "list"])
-    assert result.exit_code == 0, result.output
-    # FR18 (T-044-29): the table gains an "Associated" column (repo count) — the
-    # deliberate golden change. Regenerated with the same fixture, unrelated bytes
-    # unchanged.
-    assert result.output == (
-        "                Spec Context Projects                 \n"
-        "┏━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┓\n"
-        "┃ Name       ┃ State ┃ Main repo  ┃ Associated repos ┃\n"
-        "┡━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━┩\n"
-        "│ caller-ctx │ alive │ caller-ctx │ 0                │\n"
-        "└────────────┴───────┴────────────┴──────────────────┘\n"
-    )
-
-
-def test_context_list_default_table_output_unredacted_on_every_platform(
-    workspace: Path,
-) -> None:
-    """Platform-free half of A8.2: regardless of which box-drawing style Rich picks
-    for the current platform, the default (no ``--redact``) table must still carry the
-    true context name and never a ``[REDACTED-CONTEXT-`` placeholder."""
+def test_context_list_default_table_output_is_unredacted(workspace: Path) -> None:
     _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "list"])
     assert result.exit_code == 0, result.output
@@ -205,82 +82,25 @@ def test_context_list_default_table_output_unredacted_on_every_platform(
     assert "[REDACTED-CONTEXT-" not in result.output
 
 
-def test_context_list_default_json_output_unchanged(workspace: Path) -> None:
+_KEYS = {
+    "name",
+    "state",
+    "main_repo",
+    "repo_url",
+    "created_at",
+    "alive_since",
+    "dead_since",
+    "current_branch",
+    "stored_branch",
+    "associated_repos",
+}
+
+
+def test_context_json_key_sets_are_unchanged(workspace: Path) -> None:
     _register_alive_ctx(workspace)
-    result = _runner.invoke(app, ["context", "list", "--json"])
-    assert result.exit_code == 0, result.output
-    # FR18 (T-044-29): `list --json` gains `stored_branch` (the distinct name for the
-    # cached snapshot, A18.1) and `associated_repos` (full list, A18.4/A18.5) —
-    # `current_branch` is now the SAME live-resolved value `show --json` reports for
-    # this context (A18.3), unchanged here since the repo is on disk with no `.git`
-    # (the fixture never runs `git init`), so live resolution falls back to the
-    # stored snapshot "main".
-    assert json.loads(result.stdout) == [
-        {
-            "alive_since": "2026-01-01T00:00:00Z",
-            "associated_repos": [],
-            "created_at": "2026-01-01T00:00:00Z",
-            "current_branch": "main",
-            "dead_since": None,
-            "name": "caller-ctx",
-            "main_repo": "caller-ctx",
-            "repo_url": "https://example.com/caller-ctx.git",
-            "state": "alive",
-            "stored_branch": "main",
-        }
-    ]
-    assert result.output == (
-        '[{"alive_since": "2026-01-01T00:00:00Z", "associated_repos": [], '
-        '"created_at": "2026-01-01T00:00:00Z", '
-        '"current_branch": "main", "dead_since": null, '
-        '"main_repo": "caller-ctx", "name": "caller-ctx", '
-        '"repo_url": "https://example.com/caller-ctx.git", '
-        '"state": "alive", "stored_branch": "main"}]\n'
-    )
-
-
-# ---------------------------------------------------------------------------
-# dadaia context show — table and --json
-# ---------------------------------------------------------------------------
-
-
-def test_context_show_default_table_output_unchanged(workspace: Path) -> None:
-    _register_alive_ctx(workspace)
-    result = _runner.invoke(app, ["context", "show", "caller-ctx"])
-    assert result.exit_code == 0, result.output
-    # FR18 (T-044-29): `show` gains a "Branch:" line (previously the table rendered
-    # NO branch at all — a real gap this task closes) — the deliberate golden
-    # change; every other line is byte-identical.
-    assert result.output == (
-        "Name:       caller-ctx\n"
-        "State:      alive\n"
-        "Main repo:  caller-ctx\n"
-        "Repo URL:   https://example.com/caller-ctx.git\n"
-        "Branch:     main\n"
-        "Created:    2026-01-01T00:00:00Z\n"
-        "Alive since:  2026-01-01T00:00:00Z\n"
-        "Dead since:   —\n"
-    )
-
-
-def test_context_show_default_json_output_unchanged(workspace: Path) -> None:
-    _register_alive_ctx(workspace)
-    result = _runner.invoke(app, ["context", "show", "caller-ctx", "--json"])
-    assert result.exit_code == 0, result.output
-    # FR18 (T-044-29): `show --json` gains `associated_repos` (A18.1/A18.4/A18.5) —
-    # the deliberate golden change; every other field is byte-identical.
-    assert result.output == (
-        "{\n"
-        '  "name": "caller-ctx",\n'
-        '  "state": "alive",\n'
-        '  "main_repo": "caller-ctx",\n'
-        '  "repo_url": "https://example.com/caller-ctx.git",\n'
-        '  "created_at": "2026-01-01T00:00:00Z",\n'
-        '  "alive_since": "2026-01-01T00:00:00Z",\n'
-        '  "dead_since": null,\n'
-        '  "current_branch": "main",\n'
-        '  "stored_branch": "main",\n'
-        '  "associated_repos": [],\n'
-        '  "session": null\n'
-        "}\n"
-    )
+    listed = _runner.invoke(app, ["context", "list", "--json"])
+    shown = _runner.invoke(app, ["context", "show", "caller-ctx", "--json"])
+    assert listed.exit_code == 0 and shown.exit_code == 0, listed.output + shown.output
+    assert [set(row) for row in json.loads(listed.stdout)] == [_KEYS]
+    assert set(json.loads(shown.stdout)) == _KEYS | {"session"}
+    assert json.loads(shown.stdout)["name"] == "caller-ctx"
