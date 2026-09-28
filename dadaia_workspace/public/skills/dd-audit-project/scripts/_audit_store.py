@@ -34,13 +34,13 @@ def audit_dir(specs: Path, audit: str, fix: str) -> Path:
     """Resolve one live audit directory, or refuse naming the ones that exist.
 
     *audit* is operator input naming a directory `close` DELETES, so it is CONFINED
-    before it is read: the fully resolved target must sit strictly inside the resolved
-    ``specs/audits/``. One containment rule covers every escape shape — ``..``
+    before it is read: the fully resolved target must be a direct child of the resolved
+    ``specs/audits/`` other than ``_archive``. One containment rule covers every escape shape — ``..``
     traversal, an absolute path, and a symlink out of the tree (CWE-22/CWE-59).
     """
     audits = (specs / AUDITS).resolve()
     target = (audits / audit).resolve()
-    if target != audits and target.is_relative_to(audits) and (target / FINDINGS).is_file():
+    if target.parent == audits and target.name != "_archive" and (target / FINDINGS).is_file():
         return target
     live = sorted(
         child.name

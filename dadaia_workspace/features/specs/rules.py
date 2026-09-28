@@ -20,7 +20,6 @@ from dadaia_workspace.features.specs.release_tree import (
     release_tree_issues,
 )
 from dadaia_workspace.infrastructure.ledger_scripts import (
-    AUDIT_SCRIPT,
     BACKLOG_SCRIPT,
     BUGS_SCRIPT,
     RELEASE_SCRIPT,
@@ -185,19 +184,6 @@ RULES: tuple[SpecsRule, ...] = (
         fix_help=(
             f"{BACKLOG_SCRIPT.invocation} exit <slug> --disposition <disposition> <--release id|--reason why>"
         ),
-    ),
-    _rule(
-        ("SPEC-DOC-036",),
-        lambda d: d._closure_audit.check_audit_disposition(),
-        fix_help=(
-            f"{AUDIT_SCRIPT.invocation} disposition <audit> <finding-id> "
-            "--disposition resolved --release <release>"
-        ),
-    ),
-    _rule(
-        ("SPEC-DOC-038",),
-        lambda d: d._closure_audit.check_loose_undisposed_audits(),
-        fix_help=f"{AUDIT_SCRIPT.invocation} close <audit> --sha <sha>",
     ),
     _rule(
         ("SPEC-DOC-041",),

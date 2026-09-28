@@ -596,8 +596,6 @@ _V39_ALLOWANCE: dict[str, str] = {
     "RELEASE-TREE-TS-ORDER": "sa-release-json-validated-three-times",
     "SPEC-DOC-002L": "sa-placement-rules-contradict-tree8",
     "SPEC-DOC-035": "sa-placement-rules-contradict-tree8",
-    "SPEC-DOC-036": "sa-audit-close-archives-without-validating",
-    "SPEC-DOC-038": "sa-audit-close-archives-without-validating",
     "TREE-7": "sa-placement-rules-contradict-tree8",
     "WS-INVARIANT": "parity:tests/integration/test_unfixable_findings_carry_their_own_fix.py",
 }

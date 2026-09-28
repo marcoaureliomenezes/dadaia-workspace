@@ -161,7 +161,6 @@ def _ledgers_section(
         cli_anchors=frozenset(" ".join(p) for p in command_paths() if p),
         histo_store=JsonlRecordStore(
             specs_dir / "backlog" / "_archive" / "backlog_histo.jsonl",
-            to_dict=HistoRecord.to_dict,
             from_dict=HistoRecord.from_dict,
         ),
     )

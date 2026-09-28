@@ -1,27 +1,14 @@
 """Unit tests for SpecsDoctor taxonomy + disposition invariants (T-46-13, AC-4).
 
-Four invariants:
+Two invariants:
   SPEC-DOC-034 — the three ``_archive`` dirs exist (WARN + auto-fix);
   SPEC-DOC-035 — the single-source invariant (re-targeted, SPEC v0.12.0 FR5/T-120-08): a
                  loose per-entry ``*.md`` directly under ``specs/backlog/`` — other than
                  ``BACKLOG.md``/``README.md`` — warns, regardless of any status it carries;
-  SPEC-DOC-036 — audit-without-disposition (archived audit naming its release → clean) —
-                 the audit-disposition law's own doctor invariant, kept as a named pair;
-  SPEC-DOC-038 — loose (unarchived) audit directories.
-
-v0.5.0 T-050-25A (fold 3, `qa-engineer` amendment 3): the DOC-036/DOC-038 fixtures below
-were rewritten off ``**Disposition:** vX.Y.Z`` prose (T-050-25 already deleted that regex
-— these rows had been silently passing/failing for the wrong reason since) onto
-``FINDINGS.jsonl`` records, the SAME shape ``doctor_closure_audit.py`` actually folds.
-Verdict: two rows genuinely rewritten as new coverage (the "+2" tests FR15 extended
-scope names) — an archived audit with a still-``open`` finding record (DOC-036 sad
-path), and a live audit whose finding records are ALL terminal-and-release-named
-(DOC-038 sad path, single + multiple) — never a reflex re-baseline.
 """
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -44,54 +31,9 @@ def _backlog_entry(specs: Path, name: str, status: str, *, archived: bool = Fals
     (parent / name).write_text(f"# {name}\n\n**Status:** {status}\n", encoding="utf-8")
 
 
-def _archived_audit(specs: Path, name: str, body: str) -> None:
-    audit_dir = specs / "audits" / "_archive" / name
-    audit_dir.mkdir(parents=True)
-    (audit_dir / "audit.md").write_text(body, encoding="utf-8")
-
-
-def _finding_record(
-    finding_id: str, *, disposition: str = "open", release: str | None = None
-) -> dict[str, object]:
-    """A minimal well-formed ``FindingRecord`` JSONL row (schema:
-    ``public/schemas/audits/finding-record-v1.schema.json``)."""
-    return {
-        "id": finding_id,
-        "pillar": "coverage",
-        "severity": "medium",
-        "refs": ["dadaia_workspace/features/specs/doctor_closure_audit.py"],
-        "claim": "fixture claim",
-        "evidence": "fixture evidence",
-        "disposition": disposition,
-        "release": release,
-        "reason": None,
-    }
-
-
-def _write_findings(audit_dir: Path, records: list[dict[str, object]]) -> None:
-    audit_dir.mkdir(parents=True, exist_ok=True)
-    lines = "\n".join(json.dumps(record) for record in records)
-    (audit_dir / "FINDINGS.jsonl").write_text(lines + "\n", encoding="utf-8")
-
-
-def _archived_audit_findings(specs: Path, name: str, records: list[dict[str, object]]) -> None:
-    _write_findings(specs / "audits" / "_archive" / name, records)
-
-
-def _loose_audit(specs: Path, name: str) -> None:
-    audit_dir = specs / "audits" / name
-    audit_dir.mkdir(parents=True)
-    (audit_dir / "report.md").write_text("# Audit\n\nFindings.\n", encoding="utf-8")
-
-
-def _loose_audit_findings(specs: Path, name: str, records: list[dict[str, object]]) -> None:
-    _write_findings(specs / "audits" / name, records)
-
-
 # ---------------------------------------------------------------------------
 # Sad-path + fix-behavior matrix (DOC-034 missing dir + auto-fix, DOC-035 loose
-# terminal backlog, DOC-036 archived audit without disposition, DOC-038 loose
-# audit dirs — single and multiple) — merged into one parametrized matrix
+# terminal backlog) — merged into one parametrized matrix
 # ---------------------------------------------------------------------------
 
 
@@ -106,40 +48,6 @@ def _setup_doc035(specs) -> None:  # type: ignore[no-untyped-def]
     single-source model (SPEC v0.12.0 FR5/T-120-08), regardless of its Status content."""
     _seed_archives(specs)
     _backlog_entry(specs, "shipped-item.md", "DELIVERED — v0.1.30")
-
-
-def _setup_doc036(specs) -> None:  # type: ignore[no-untyped-def]
-    """An archived audit whose FINDINGS.jsonl still carries an ``open`` record — an
-    audit archives only once every finding is terminal (SPEC-DOC-036 ERROR)."""
-    _seed_archives(specs)
-    _archived_audit_findings(
-        specs,
-        "20260612T001813Z-deadbeef",
-        [_finding_record("F-1", disposition="open")],
-    )
-
-
-def _setup_doc038_single(specs) -> None:  # type: ignore[no-untyped-def]
-    """A live audit whose FINDINGS.jsonl records are ALL terminal-and-release-named —
-    archive due (SPEC-DOC-038 WARNING)."""
-    _loose_audit_findings(
-        specs,
-        "20260701T201136Z-0bcd6c19",
-        [_finding_record("F-1", disposition="resolved", release="v0.1.47")],
-    )
-
-
-def _setup_doc038_multiple(specs) -> None:  # type: ignore[no-untyped-def]
-    _loose_audit_findings(
-        specs,
-        "20260701T201136Z-0bcd6c19",
-        [_finding_record("F-1", disposition="resolved", release="v0.1.47")],
-    )
-    _loose_audit_findings(
-        specs,
-        "20260612T001813Z-deadbeef",
-        [_finding_record("F-1", disposition="deferred", release="v0.1.48")],
-    )
 
 
 @pytest.mark.parametrize(
@@ -160,33 +68,6 @@ def _setup_doc038_multiple(specs) -> None:  # type: ignore[no-untyped-def]
             "shipped-item.md",
             Severity.WARNING,
             id="doc035-loose-per-entry-file",
-        ),
-        pytest.param(
-            "SPEC-DOC-036",
-            _setup_doc036,
-            1,
-            "20260612T001813Z-deadbeef",
-            # A finding still 'open' inside an archived audit is an ERROR (D5/D7) —
-            # never a WARNING; distinct from SPEC-DOC-036's OTHER, WARNING-severity
-            # aggregate ("N archived audit(s) predate the FINDINGS.jsonl canon").
-            Severity.ERROR,
-            id="doc036-archived-audit-with-open-finding",
-        ),
-        pytest.param(
-            "SPEC-DOC-038",
-            _setup_doc038_single,
-            1,
-            "20260701T201136Z-0bcd6c19",
-            Severity.WARNING,
-            id="doc038-single-loose-audit",
-        ),
-        pytest.param(
-            "SPEC-DOC-038",
-            _setup_doc038_multiple,
-            2,
-            None,
-            Severity.WARNING,
-            id="doc038-multiple-loose-audits",
         ),
     ],
 )
@@ -248,21 +129,6 @@ def _silent_doc035_only_single_source_files(specs: Path) -> None:
     (specs / "backlog" / "AGENTS.md").write_text("# Backlog\n", encoding="utf-8")
 
 
-def _silent_doc036_with_disposition(specs: Path) -> None:
-    """An archived audit whose FINDINGS.jsonl records are ALL terminal — clean, no
-    ``open`` record survives into the archive (SPEC-DOC-036 stays silent)."""
-    _seed_archives(specs)
-    _archived_audit_findings(
-        specs,
-        "20260701T135346Z-6145b869",
-        [_finding_record("F-1", disposition="resolved", release="v0.1.46")],
-    )
-
-
-def _silent_doc036_empty_archive(specs: Path) -> None:
-    _seed_archives(specs)
-
-
 @pytest.mark.parametrize(
     ("code", "setup"),
     [
@@ -283,28 +149,6 @@ def _silent_doc036_empty_archive(specs: Path) -> None:
             "SPEC-DOC-035",
             _silent_doc035_only_single_source_files,
             id="doc035-backlog-and-readme-only-clean",
-        ),
-        pytest.param(
-            "SPEC-DOC-036",
-            _silent_doc036_with_disposition,
-            id="doc036-with-disposition-clean",
-        ),
-        pytest.param(
-            "SPEC-DOC-036",
-            _silent_doc036_empty_archive,
-            id="doc036-empty-audit-archive-clean",
-        ),
-        pytest.param(
-            "SPEC-DOC-038",
-            lambda specs: _archived_audit(
-                specs, "20260701T135346Z-6145b869", "# Audit\n\n**Disposition:** v0.1.47\n"
-            ),
-            id="doc038-archived-only-audits-clean",
-        ),
-        pytest.param(
-            "SPEC-DOC-038",
-            lambda specs: specs.mkdir(parents=True),
-            id="doc038-absent-audits-dir-clean",
         ),
     ],
 )

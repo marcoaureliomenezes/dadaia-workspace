@@ -10,7 +10,7 @@ single-responsibility validator siblings plus two shared leaf modules:
                               ``fix_tree5``
   * ``doctor_memory``       — memory files, LINT-1
   * ``doctor_release``      — active release (RELEASE.json state document), release artifacts, SemVer + ledger invariants
-  * ``doctor_closure_audit``— orphan specs, audit disposition; ``fix_archive_dir``
+  * ``doctor_closure_audit``— audit naming, archive dirs; ``fix_archive_dir``
   * ``doctor_governance``   — single-source backlog invariants, bug status/JSONL
   * ``doctor_coherence``    — constitution and pattern-version coherence
 
@@ -28,10 +28,9 @@ Pure module — no I/O outside the supplied specs_dir / public_dir. No external 
 
 from __future__ import annotations
 
-from collections.abc import Callable, Collection
+from collections.abc import Collection
 from pathlib import Path
 
-from dadaia_workspace.core.models.findings import FindingRecord
 from dadaia_workspace.features.specs.doctor_closure_audit import ClosureAuditValidator
 from dadaia_workspace.features.specs.doctor_coherence import CoherenceValidator
 from dadaia_workspace.features.specs.doctor_governance import GovernanceValidator
@@ -41,7 +40,6 @@ from dadaia_workspace.features.specs.doctor_structural import StructuralValidato
 from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
 from dadaia_workspace.features.specs.rules import FIX_BY_CODE, RULES
 from dadaia_workspace.features.specs.specs_tree import SpecsTree
-from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 
 class SpecsDoctor:
@@ -59,11 +57,6 @@ class SpecsDoctor:
             (templates loaded from ``public_dir/templates/``).
             When *not* provided the TREE checks still run but TREE-3 fix and TREE-5
             hash comparison are skipped (issue is still emitted, fix is no-op).
-        findings_store_factory: Optional DI seam for SPEC-DOC-036/038's
-            ``FINDINGS.jsonl`` fold (v0.5.0 T-050-25A, A13.4) — no composition root
-            wires this today (release 0.5.1 K9 deleted the never-called
-            ``container.build_findings_store`` seam as dead code); ``None`` keeps
-            ``ClosureAuditValidator``'s zero-dependency fallback reader (same model).
         command_paths: Optional live command-path set
             (``cli.help_digest.command_paths()``), walked ONCE by the CLI composition
             root and passed in as plain data — feeds
@@ -77,7 +70,6 @@ class SpecsDoctor:
         public_dir: Path | None = None,
         templates_dir: Path | None = None,
         repo_root: Path | None = None,
-        findings_store_factory: Callable[[Path], JsonlRecordStore[FindingRecord]] | None = None,
         command_paths: Collection[tuple[str, ...]] | None = None,
     ) -> None:
         self.specs_dir: Path = Path(specs_dir)
@@ -114,12 +106,8 @@ class SpecsDoctor:
         )
         self._memory: MemoryValidator = MemoryValidator(self.specs_dir)
         self._release: ReleaseValidator = ReleaseValidator(self.specs_dir)
-        self._closure_audit: ClosureAuditValidator = ClosureAuditValidator(
-            self.specs_dir, findings_store_factory
-        )
-        self._governance: GovernanceValidator = GovernanceValidator(
-            self.specs_dir, self.public_dir
-        )
+        self._closure_audit: ClosureAuditValidator = ClosureAuditValidator(self.specs_dir)
+        self._governance: GovernanceValidator = GovernanceValidator(self.specs_dir, self.public_dir)
         self._coherence: CoherenceValidator = CoherenceValidator(
             self.specs_dir,
             self.public_dir,
