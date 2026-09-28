@@ -246,7 +246,12 @@ def test_session_record_binds_context_over_first_alive(tmp_path: Path) -> None:
     session_store.write_session(
         tmp_path,
         sid,
-        {"id": sid, "context": "alpha", "bound_at": (t := datetime.now(tz=UTC).isoformat()), "last_seen_at": t},
+        {
+            "id": sid,
+            "context": "alpha",
+            "bound_at": (t := datetime.now(tz=UTC).isoformat()),
+            "last_seen_at": t,
+        },
     )
     out = _run(tmp_path, sid)
     assert "[alpha]" in out
