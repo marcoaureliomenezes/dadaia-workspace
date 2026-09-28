@@ -146,6 +146,9 @@ def test_c2_a_nested_foreign_worktree_is_refused_and_its_fix_clears_it(tmp_path:
     assert (nested / "uncommitted.txt").read_text() == "keep\n"
     assert store.get("proj").state is ContextState.ALIVE  # type: ignore[union-attr]
     fix = str(refused.value).rsplit("fix: ", 1)[1].replace("<keep-dir>", str(tmp_path / "kept"))
+    # Git runs from the common git dir, never inside the tree it moves: Windows refuses
+    # to rename a process's cwd (sa-context-dead-removes-repos-outside-the-reaper).
+    assert Path(fix.split()[2]).samefile(other / ".git"), fix
     subprocess.run(fix, shell=True, check=True, capture_output=True)  # noqa: S602
     service.dead("proj")
     assert (tmp_path / "kept" / "uncommitted.txt").read_text() == "keep\n"

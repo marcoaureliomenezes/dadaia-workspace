@@ -113,6 +113,13 @@ def linked_worktree(workspace_root: Path, target: Path) -> Path | None:
     return next((d for d in trees if _is_gitfile(d / ".git")), None)
 
 
+def worktree_git_dir(tree: Path) -> Path:
+    """The common git dir a move or remove of linked worktree *tree* runs from — Windows
+    refuses to delete or rename a process's cwd, so never *tree* itself."""
+    gitdir = (tree / ".git").read_text(encoding="utf-8").removeprefix("gitdir:").strip()
+    return (tree / gitdir).parents[1]
+
+
 def _exists(target: Path) -> bool:
     return target.is_symlink() or target.exists()
 

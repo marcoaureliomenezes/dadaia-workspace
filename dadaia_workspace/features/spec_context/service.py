@@ -759,7 +759,8 @@ class SpecContextService:
                 self._enforce_dead_review_gate(name, repo_path, commit=commit, repo_slug=slug)
                 lost = self._git.unrecoverable(repo_path)
                 if tree := sweep.linked_worktree(self._workspace_root, repo_path):
-                    lost.append(git_line(tree, "worktree", "move", str(tree), "<keep-dir>"))
+                    gdir = sweep.worktree_git_dir(tree)
+                    lost.append(git_line(gdir, "worktree", "move", str(tree), "<keep-dir>"))
                 if lost:
                     raise DeadUnpushedCommitsError(
                         f"Context '{name}': repo '{slug}' holds {len(lost)} linked worktree(s) "
