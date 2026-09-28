@@ -93,11 +93,6 @@ RULES: tuple[SpecsRule, ...] = (
         # deletes the plan's tail. WARNING-only (see check_plan_line_limit).
     ),
     _rule(
-        ("SPEC-DOC-007",),
-        lambda d: d._closure_audit.check_no_orphan_specs(),
-        fix_help="git rm <orphan path>",
-    ),
-    _rule(
         ("SPEC-DOC-010",),
         lambda d: d._memory.check_memory_atomicity(),
         # No fix line: where an atom's history belongs is judgment, and truncating at
@@ -199,11 +194,6 @@ RULES: tuple[SpecsRule, ...] = (
         fix_help="git mv <release-dir> <release-dir-parent>/<M.m.p>",
     ),
     _rule(
-        ("SPEC-DOC-028",),
-        lambda d: d._coherence.check_constitution_file_refs(),
-        fix_help="sed -i '\\|<dangling reference>|d' specs/constitution.md",
-    ),
-    _rule(
         ("SPEC-DOC-030",),
         lambda d: d._closure_audit.check_audits_naming_canon(),
         fix_help="git mv specs/audits/<name> specs/audits/<YYYYMMDD>-<slug>",
@@ -233,11 +223,6 @@ RULES: tuple[SpecsRule, ...] = (
             f"{script_line(AUDIT_SCRIPT)} disposition <audit> <finding-id> "
             "--disposition resolved --release <release>"
         ),
-    ),
-    _rule(
-        ("SPEC-DOC-037",),
-        lambda d: d._coherence.check_constitution_no_runtime_enum(),
-        fix_help="sed -i '\\|<enum line>|d' specs/constitution.md",
     ),
     _rule(
         ("SPEC-DOC-038",),
@@ -279,12 +264,6 @@ RULES: tuple[SpecsRule, ...] = (
         ("RELEASE-TREE-MEMORY",),
         lambda d: release_memory_issues(d.specs_dir),
         fix_help=(f"{script_line(RELEASE_SCRIPT)} memory --reviewed <slugs> --changed <slugs>"),
-    ),
-    _rule(
-        ("SPEC-DOC-046",),
-        lambda d: d._release.check_release_state_filename(),
-        fix=lambda d, i: d._release.fix_release_state_filename(i),
-        fix_help=("doctor", "--fix"),
     ),
 )
 

@@ -196,7 +196,7 @@ def _build_specs_doctor(specs_dir: Path | None, public_dir: str | None) -> Specs
         specs_dir,
         public_dir=resolved_public,
         templates_dir=_TEMPLATES_DIR,
-        # repo_root: specs/ sits directly at the repo root; feeds SPEC-DOC-028 and SPEC-DOC-045.
+        # repo_root: specs/ sits directly at the repo root; feeds MEM-DRIFT-2.
         repo_root=specs_dir.parent,
         # The ONE Typer walk (0.4.7 FR2), done here and handed in as plain data;
         # `features` never imports `cli`.

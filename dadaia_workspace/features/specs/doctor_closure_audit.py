@@ -1,9 +1,9 @@
-"""Closure/audit validator (v0.1.55 FR1): orphan specs, audit disposition.
+"""Closure/audit validator (v0.1.55 FR1): audit naming, archives, disposition.
 
-Single-responsibility sibling of the SpecsDoctor coordinator. Owns orphan-spec detection
-(SPEC-DOC-007), audit naming canon (SPEC-DOC-030), the per-artifact ``_archive`` landing
-zones (SPEC-DOC-034 + ``fix_archive_dir``), archived-audit disposition (SPEC-DOC-036), and
-archive-due detection (SPEC-DOC-038). Leaf-only: imports the shared leaves, never a sibling
+Single-responsibility sibling of the SpecsDoctor coordinator. Owns audit naming canon
+(SPEC-DOC-030), the per-artifact ``_archive`` landing zones (SPEC-DOC-034 +
+``fix_archive_dir``), archived-audit disposition (SPEC-DOC-036), and archive-due detection
+(SPEC-DOC-038). Leaf-only: imports the shared leaves, never a sibling
 validator.
 
 v0.5.0 FR15 (T-050-25, ``audit-canon-v1`` D5/D7): SPEC-DOC-036/038 no longer regex audit
@@ -120,28 +120,6 @@ class ClosureAuditValidator:
             yield from self._findings_store_factory(findings_path).iter_records()
             return
         yield from _default_iter_findings(findings_path)
-
-    def check_no_orphan_specs(self) -> list[SpecsDoctorIssue]:
-        issues: list[SpecsDoctorIssue] = []
-        for name in ("SPEC.md", "PLAN.md", "TASKS.md"):
-            for p in self.specs_dir.rglob(name):
-                rel = p.relative_to(self.specs_dir).as_posix()
-                if rel.startswith("releases/"):
-                    continue
-                # Top-level SPEC.md/PLAN.md/TASKS.md are legacy roots
-                # features/<x>/SPEC.md is legacy too
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="SPEC-DOC-007",
-                        severity=Severity.WARNING,
-                        description=(
-                            f"Legacy {name} outside releases/ or releases/_archive/: {rel}. "
-                            "Migrate to a release or archive as a legacy-feature."
-                        ),
-                        path=str(p),
-                    )
-                )
-        return issues
 
     def check_audits_naming_canon(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-030 (specs/audits/AGENTS.md, v6 canon): WARN on any non-conforming

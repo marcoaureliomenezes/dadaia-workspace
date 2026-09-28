@@ -357,17 +357,6 @@ def test_scaffold_copytree_source_tree_carries_agents_md_per_area(tmp_path: Path
         # parses a file which no longer exists is dead code behind a dead artifact.
         # Verdict: criterion (a) feature removed, dadaia_workspace/features/specs/
         # doctor_closure_audit.py (this task's commit deletes check_archive_closures).
-        pytest.param(
-            "orphan-legacy-feature",
-            lambda specs: (
-                (specs / "features" / "old-feature").mkdir(parents=True),
-                (specs / "features" / "old-feature" / "SPEC.md").write_text(
-                    "# legacy", encoding="utf-8"
-                ),
-            ),
-            "SPEC-DOC-007",
-            id="doc007-orphan-legacy-feature",
-        ),
         # doc009-release-id-without-dir RETIRED (v0.5.0 T-050-21A): SPEC-DOC-009 fired
         # when ACTIVE.md's `release:` field named a directory that did not exist.
         # `resolve_active_release`/`resolve_live_release_id` only ever return a

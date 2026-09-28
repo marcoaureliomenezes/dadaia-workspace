@@ -8,7 +8,6 @@ following the SPEC-DOC-NNN convention:
 - SPEC-DOC-026 — unique release ids across releases/ u releases/_archive/ (recursive).
 - SPEC-DOC-027 — the ONE release-dir naming canon (bare MAJOR.MINOR.PATCH), legacy WARN,
   forward-enforced.
-- SPEC-DOC-028 — constitution file-ref resolution (WARN on a missing repo file).
 - SPEC-DOC-029 — RETIRED (v0.1.76 T-4, FR7, NO-LOCKS DOCTRINE). Formerly the
   lease<->session coherence backstop; retired along with the lease acquisition/CAS
   authority it diagnosed forgery against. See the retirement tests below.
@@ -250,14 +249,6 @@ def test_sad_matrix(tmp_path: Path) -> None:
     doc027 = _by_code(SpecsDoctor(specs_e).check(), "SPEC-DOC-027")
     assert any(i.severity == Severity.ERROR for i in doc027)
 
-    # DOC-028: dangling constitution file ref -> WARNING.
-    specs_f = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-028"))
-    (specs_f / "constitution.md").write_text(
-        "# Constitution\n\nSee `does/not/exist.py` for details.\n", encoding="utf-8"
-    )
-    doc028 = _by_code(SpecsDoctor(specs_f, repo_root=specs_f.parent).check(), "SPEC-DOC-028")
-    assert doc028 and all(i.severity == Severity.WARNING for i in doc028)
-
     # DOC-030: non-conforming new audit dir -> WARNING.
     specs_g = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-030"))
     (specs_g / "audits" / "2026-07-01T000000Z").mkdir(parents=True)
@@ -297,19 +288,6 @@ def test_silent_matrix(tmp_path: Path) -> None:
     arch_e = specs_e / "releases" / "_archive" / "v0.1.9"
     _write_minimal_spec(arch_e)
     assert "SPEC-DOC-027" not in _codes(SpecsDoctor(specs_e).check())
-
-    # DOC-028: resolvable ref + no-repo-root no-op -> silent.
-    specs_f1 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-028ok"))
-    (specs_f1.parent / "real_file.py").write_text("# ok\n", encoding="utf-8")
-    (specs_f1 / "constitution.md").write_text(
-        "# Constitution\n\nSee `real_file.py` for details.\n", encoding="utf-8"
-    )
-    assert "SPEC-DOC-028" not in _codes(SpecsDoctor(specs_f1, repo_root=specs_f1.parent).check())
-    specs_f2 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-028noop"))
-    (specs_f2 / "constitution.md").write_text(
-        "# Constitution\n\nSee `does/not/exist.py`.\n", encoding="utf-8"
-    )
-    assert "SPEC-DOC-028" not in _codes(SpecsDoctor(specs_f2).check())  # no repo_root
 
     # DOC-030: canonical (`specs/audits/AGENTS.md` <YYYYMMDD>-<slug>)/grandfathered dirs + absent
     # audits/ -> silent.

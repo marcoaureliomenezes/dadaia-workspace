@@ -487,8 +487,7 @@ SPECS_CANON: tuple[CanonEntry, ...] = (
     CanonEntry("releases/_archive/releases_histo.jsonl", "releases", True),
     CanonEntry("releases/_archive/<M.m.p>/**", "releases"),
     CanonEntry("releases/<M.m.p>/_RELEASE.json", "releases"),
-    # Legacy state-file name (pre-0.4.6) — admitted ONLY as the rename-lane input:
-    # SPEC-DOC-046 offers the doctor-fixable rename to _RELEASE.json (ADR 0007).
+    # Legacy state-file name (pre-0.4.6): core.release_state still reads it (ADR 0007).
     CanonEntry("releases/<M.m.p>/RELEASE.json", "releases"),
     CanonEntry("releases/<M.m.p>/SPEC.md", "releases"),
     CanonEntry("releases/<M.m.p>/PLAN.md", "releases"),

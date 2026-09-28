@@ -19,10 +19,6 @@ from collections.abc import Callable, Collection
 from datetime import date
 from pathlib import Path
 
-from dadaia_workspace.core.release_state import (
-    LEGACY_RELEASE_STATE_FILENAME,
-    RELEASE_STATE_FILENAME,
-)
 from dadaia_workspace.core.release_state import PHASES as _PHASES
 from dadaia_workspace.core.spec_status import APPROVED, extract_status
 from dadaia_workspace.core.spec_status import CANONICAL_STATUS as _CANONICAL_STATUS
@@ -30,7 +26,6 @@ from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
 from dadaia_workspace.features.specs.doctor_common import (
     _read_and_parse_release_json,
     iter_all_release_dirs,
-    resolve_live_release_id,
 )
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 from dadaia_workspace.features.specs.specs_tree import SpecsTree
@@ -531,38 +526,3 @@ class ReleaseValidator:
                 )
             )
         return issues
-
-    def check_release_state_filename(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-046 (release 0.4.6 FR3, ADR 0007): the live release's state
-        document carries the legacy ``RELEASE.json`` name — WARNING with a doctor
-        ``--fix`` rename to the canonical ``_RELEASE.json``. Read-side both names
-        already work (``core.release_state.release_state_file``); this rule is the
-        migration lane that retires the legacy name from a consumer instance."""
-        release_id, err = resolve_live_release_id(self.specs_dir)
-        if err or release_id is None:
-            return []
-        release_dir = self.specs_dir / "releases" / release_id
-        legacy = release_dir / LEGACY_RELEASE_STATE_FILENAME
-        if not legacy.is_file() or (release_dir / RELEASE_STATE_FILENAME).is_file():
-            return []
-        return [
-            SpecsDoctorIssue(
-                code="SPEC-DOC-046",
-                severity=Severity.WARNING,
-                description=(
-                    f"releases/{release_id}/{LEGACY_RELEASE_STATE_FILENAME} carries the "
-                    f"legacy state-file name — canonical is {RELEASE_STATE_FILENAME} "
-                    "(release-candidates model, ADR 0007). Auto-fix available (run "
-                    "doctor --fix) to rename it."
-                ),
-                path=str(legacy),
-                fixable=True,
-            )
-        ]
-
-    def fix_release_state_filename(self, issue: SpecsDoctorIssue) -> None:
-        """Rename the legacy state file to the canonical name (SPEC-DOC-046 auto-fix)."""
-        assert issue.code == "SPEC-DOC-046"
-        legacy = Path(issue.path)  # type: ignore[arg-type]
-        if legacy.is_file():
-            legacy.rename(legacy.with_name(RELEASE_STATE_FILENAME))

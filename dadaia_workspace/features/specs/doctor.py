@@ -92,10 +92,7 @@ class SpecsDoctor:
     ) -> None:
         self.specs_dir: Path = Path(specs_dir)
         self.public_dir: Path | None = Path(public_dir) if public_dir is not None else None
-        # repo_root: when supplied, the constitution file-ref invariant (SPEC-DOC-028)
-        # resolves path-like references against it, and the pyproject-version-vs-
-        # release-id invariant (SPEC-DOC-045) reads pyproject.toml from it. None ->
-        # both checks are a no-op.
+        # repo_root: MEM-DRIFT-2 resolves memory citations against it; None -> no-op.
         self.repo_root: Path | None = Path(repo_root) if repo_root is not None else None
         # command_paths (0.4.7 FR2): MEM-DRIFT-2's plain-data input — the ONE Typer walk
         # (`cli.help_digest.command_paths`), done by the CLI. None -> that check is a
@@ -138,7 +135,6 @@ class SpecsDoctor:
         self._coherence: CoherenceValidator = CoherenceValidator(
             self.specs_dir,
             self.public_dir,
-            self.repo_root,
         )
 
     def check(self) -> list[SpecsDoctorIssue]:

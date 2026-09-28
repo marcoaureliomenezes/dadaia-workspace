@@ -180,8 +180,6 @@ _UNEXERCISED: dict[str, str] = {
     "tests/unit/features/specs/test_doctor.py placeholder-atom cases",
     "SPEC-DOC-003": "the fix is `git rm specs/ACTIVE.md` — a deprecated "
     "layout no longer scaffolded anywhere",
-    "SPEC-DOC-007": "the orphan path is operator content; removing it is the operator's "
-    "own call, not a fixture assertion",
     "TREE-4": "auto-fixed rule (`fix_tree4`), covered by the structural doctor unit tests",
     "TREE-5": "auto-fixed rule (`fix_tree5`), covered by the structural doctor unit tests",
     "TREE-7": "the fix redacts a session id inside BUGS.jsonl; the value is per-record "
@@ -208,8 +206,6 @@ _UNEXERCISED: dict[str, str] = {
     "operator's call",
     "SPEC-DOC-027": "the fix renames a non-canon release dir to its M.m.p form; the "
     "target name is judgment",
-    "SPEC-DOC-028": "the fix deletes a dangling constitution reference line; the tmp "
-    "constitution carries none of the public fragments",
     "SPEC-DOC-030": "the fix renames an audit dir to <YYYYMMDD>-<slug>; the date is judgment",
     "SPEC-DOC-033": "the fix is `bugs update`, exercised by the bugs CLI suite",
     "SPEC-DOC-034": "auto-fixed rule (`fix_archive_dir`), covered by the closure-audit "
@@ -218,8 +214,6 @@ _UNEXERCISED: dict[str, str] = {
     "SPEC-DOC-036": "the fix dispositions a finding inside an ARCHIVED audit dir; "
     "`dadaia audit disposition` acts on live audits only, and `dadaia audit close` is "
     "what stops an audit reaching _archive/ with an open finding at all",
-    "SPEC-DOC-037": "the fix deletes a runtime-enum line from the constitution; the line "
-    "is operator content",
     "SPEC-DOC-041": "the fix is `bugs archive`, exercised by the bugs CLI suite",
     "SPEC-DOC-047": "the fix deletes a memory task line from TASKS.md; the line is "
     "operator content",
@@ -228,8 +222,6 @@ _UNEXERCISED: dict[str, str] = {
     "rewrites one _RELEASE.json value; which value depends on which of the seven "
     "conformance codes fired; the two archive codes name `dadaia release fold`, "
     "exercised by tests/unit/features/specs/test_candidate_fold.py",
-    "SPEC-DOC-046": "auto-fixed rule (`fix_release_state_filename`), covered by the "
-    "release doctor unit tests",
 }
 
 

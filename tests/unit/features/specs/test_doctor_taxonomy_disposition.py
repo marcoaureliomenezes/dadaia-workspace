@@ -7,7 +7,6 @@ Four invariants:
                  ``BACKLOG.md``/``README.md`` — warns, regardless of any status it carries;
   SPEC-DOC-036 — audit-without-disposition (archived audit naming its release → clean) —
                  the audit-disposition law's own doctor invariant, kept as a named pair;
-  SPEC-DOC-037 — constitution must not enumerate AgentRuntimeKind members;
   SPEC-DOC-038 — loose (unarchived) audit directories.
 
 v0.5.0 T-050-25A (fold 3, `qa-engineer` amendment 3): the DOC-036/DOC-038 fixtures below
@@ -87,11 +86,6 @@ def _loose_audit(specs: Path, name: str) -> None:
 
 def _loose_audit_findings(specs: Path, name: str, records: list[dict[str, object]]) -> None:
     _write_findings(specs / "audits" / name, records)
-
-
-def _write_constitution(specs: Path, body: str) -> None:
-    specs.mkdir(parents=True, exist_ok=True)
-    (specs / "constitution.md").write_text(body, encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -318,43 +312,3 @@ def test_silent_and_exempt_matrix(tmp_path: Path, code: str, setup) -> None:  # 
     specs = tmp_path / "specs"
     setup(specs)
     assert _codes(specs, code) == []
-
-
-# ---------------------------------------------------------------------------
-# DOC-037: constitution must not enumerate AgentRuntimeKind members — trio merged
-# ---------------------------------------------------------------------------
-
-
-def test_doc037_constitution_enum_prohibition(tmp_path) -> None:  # type: ignore[no-untyped-def]
-    specs_clean = tmp_path / "clean" / "specs"
-    _write_constitution(
-        specs_clean,
-        "# Constitution\n\n"
-        "Runtime kinds are the roster single-source in [[tech-stack]]; the constitution "
-        "states only the invariant. Layer 1 = {claude, codex, pi}; Layer 2 = {pi, codex}.\n"
-        "The word fake in lowercase prose is fine.\n",
-    )
-    assert _codes(specs_clean, "SPEC-DOC-037") == []
-
-    specs_bad = tmp_path / "bad" / "specs"
-    _write_constitution(
-        specs_bad,
-        "# Constitution\n\n"
-        "§8: the AgentRuntimeKind enum members are FAKE, CODEX_EXEC, CLAUDE_SDK, "
-        "PI_HEADLESS, OPENCODE_RUN.\n",
-    )
-    errs = _codes(specs_bad, "SPEC-DOC-037")
-    assert len(errs) == 1
-    assert errs[0].severity is Severity.ERROR
-    for tok in ("FAKE", "CODEX_EXEC", "CLAUDE_SDK", "PI_HEADLESS", "OPENCODE_RUN"):
-        assert tok in errs[0].description
-
-    specs_single = tmp_path / "single" / "specs"
-    _write_constitution(specs_single, "# Constitution\n\nWorkers default to CODEX_EXEC today.\n")
-    errs_single = _codes(specs_single, "SPEC-DOC-037")
-    assert len(errs_single) == 1 and errs_single[0].severity is Severity.ERROR
-
-    specs_absent = tmp_path / "absent" / "specs"
-    specs_absent.mkdir(parents=True)
-    # No constitution.md — SPEC-DOC-001 owns absence; SPEC-DOC-037 stays silent.
-    assert _codes(specs_absent, "SPEC-DOC-037") == []
