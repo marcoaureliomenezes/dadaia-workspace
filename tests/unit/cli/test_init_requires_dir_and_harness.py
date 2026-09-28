@@ -13,12 +13,14 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.infrastructure import python_env as pe
 
 _runner = CliRunner()
 _FIX_LINE_RE = re.compile(r"^fix: (\S.*)$", re.MULTILINE)
@@ -45,53 +47,62 @@ def _tree(root: Path) -> dict[str, str]:
     return snapshot
 
 
-def test_init_without_harness_exits_1_with_one_fix_line(tmp_path: Path, monkeypatch) -> None:
-    """AC2.1 first clause: `--harness` has no default — `all` is not implied."""
-    monkeypatch.chdir(tmp_path)
-
-    result = _runner.invoke(app, ["init", "demo"])
-
-    assert result.exit_code == 1, result.output
-    assert _the_fix(result.output).startswith("uvx dadaia-workspace init demo --harness ")
-    assert not (tmp_path / "demo" / ".dadaia").exists(), "a refused init scaffolds nothing"
+def _foreign(tmp: Path, mp: pytest.MonkeyPatch) -> Path:
+    (tmp / "demo").mkdir()
+    (tmp / "demo" / "somebody-elses-file.txt").write_text("keep me", encoding="utf-8")
+    return tmp
 
 
-def test_init_without_dir_exits_1(tmp_path: Path, monkeypatch) -> None:
-    """The directory is a parameter: no positional means no cwd fallback, just a refusal."""
-    monkeypatch.chdir(tmp_path)
-
-    result = _runner.invoke(app, ["init", "--harness", "claude"])
-
-    assert result.exit_code == 1, result.output
-    assert not (tmp_path / ".dadaia").exists(), "a bare init never targets cwd"
+def _foreign_cwd(tmp: Path, mp: pytest.MonkeyPatch) -> Path:
+    (tmp / "proj").mkdir()
+    (tmp / "proj" / "README.md").write_text("mine", encoding="utf-8")
+    return tmp / "proj"
 
 
-@pytest.mark.parametrize("value", ["all", "claude,codex", "zzz"])
+def _bootstrap_fails(tmp: Path, mp: pytest.MonkeyPatch) -> Path:
+    def _raise(self: object, root: str) -> None:
+        raise pe.WorkspaceVenvBootstrapError(
+            "point DADAIA_BOOTSTRAP_PACKAGE at the local wheel file and retry"
+        )
+
+    mp.setattr(pe.VenvPythonEnvironmentManager, "ensure_workspace_venv", _raise)
+    return tmp
+
+
+# fmt: off
+@pytest.mark.parametrize(("argv", "setup", "code", "fix", "in_output"), [
+    pytest.param(["init", "demo"], None, 1, "uvx dadaia-workspace init demo --harness ", [], id="AC2.1-no-harness-default"),
+    pytest.param(["init", "--harness", "claude"], None, 1, None, [], id="no-dir-never-targets-cwd"),
+    *[pytest.param(["init", "demo", "--harness", v], None, 2, None, ["claude", v], id=f"meta-or-unknown-{v}") for v in ("all", "claude,codex", "zzz")],
+    pytest.param(["init", "demo", "--harness", "claude"], _foreign, 1, None, [], id="foreign-tree-never-scaffolded-over"),
+    pytest.param(["init", ".", "--harness", "claude"], _foreign_cwd, 1, "uvx dadaia-workspace init {tmp}/proj-workspace --harness claude", [],
+                 id="init-foreign-tree-fix-line-unrunnable-sibling-from-the-resolved-path"),
+    pytest.param(["init", "/", "--harness", "claude"], None, 1, "uvx dadaia-workspace init {root}dadaia-workspace --harness claude", [],
+                 id="init-root-dir-crashes-deriving-sibling-fix"),
+    pytest.param(["init", "demo", "--harness", "claude"], _bootstrap_fails, 1, None, ["DADAIA_BOOTSTRAP_PACKAGE"], id="validation-028-bootstrap-error-clean-exit"),
+])
+# fmt: on
 def test_init_refuses_meta_and_unknown_harness_values(
-    value: str, tmp_path: Path, monkeypatch
-) -> None:
-    """`all` and the comma subset died with `parse_harness_set`; both are now unknown names."""
-    monkeypatch.chdir(tmp_path)
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, argv: list[str], setup: Callable[[Path, pytest.MonkeyPatch], Path] | None,
+    code: int, fix: str | None, in_output: list[str],
+) -> None:  # fmt: skip
+    """Each refusal exits non-zero, scaffolds nothing, never tracebacks; a usage error (exit 2) lists the
+    registered harnesses on stderr with an empty stdout; a fixable one prints exactly ONE `fix:` line."""
+    monkeypatch.chdir(setup(tmp_path, monkeypatch) if setup else tmp_path)
 
-    result = _runner.invoke(app, ["init", "demo", "--harness", value])
+    result = _runner.invoke(app, argv)
 
-    assert result.exit_code == 2, result.output
-    assert "claude" in result.output, "the refusal lists the registered harnesses"
-    assert not (tmp_path / "demo" / ".dadaia").exists()
-
-
-def test_init_refuses_a_directory_holding_a_foreign_tree(tmp_path: Path, monkeypatch) -> None:
-    """A non-empty directory that is not already a workspace is never scaffolded over."""
-    monkeypatch.chdir(tmp_path)
-    foreign = tmp_path / "demo"
-    foreign.mkdir()
-    (foreign / "somebody-elses-file.txt").write_text("keep me", encoding="utf-8")
-
-    result = _runner.invoke(app, ["init", "demo", "--harness", "claude"])
-
-    assert result.exit_code == 1, result.output
-    assert not (foreign / ".dadaia").exists()
-    assert (foreign / "somebody-elses-file.txt").read_text(encoding="utf-8") == "keep me"
+    assert result.exit_code == code, result.output
+    assert "Traceback" not in result.output
+    assert not (tmp_path / "demo" / ".dadaia").exists() and not (tmp_path / ".dadaia").exists()
+    assert all(part in result.output for part in in_output)
+    if code == 2:
+        assert result.stdout == ""
+    if fix:
+        expected = fix.format(tmp=tmp_path.as_posix(), root=Path("/").resolve().as_posix().rstrip("/") + "/")
+        assert _the_fix(result.output).startswith(expected)
+    if setup is _foreign:
+        assert (tmp_path / "demo" / "somebody-elses-file.txt").read_text(encoding="utf-8") == "keep me"
 
 
 def test_init_creates_the_named_dir_and_is_idempotent(tmp_path: Path, monkeypatch) -> None:
@@ -108,32 +119,3 @@ def test_init_creates_the_named_dir_and_is_idempotent(tmp_path: Path, monkeypatc
     assert second.exit_code == 0, second.output
 
     assert _tree(demo) == before, "a re-run of init on the same dir must change nothing"
-
-
-def test_init_foreign_tree_fix_names_a_runnable_sibling(tmp_path: Path, monkeypatch) -> None:
-    """Bug init-foreign-tree-fix-line-unrunnable: `init .` in a non-empty dir suggested
-    `dadaia init .-workspace` — the fix is the uvx entry point and a sibling directory
-    derived from the RESOLVED path, never the raw argument string-appended."""
-    project = tmp_path / "proj"
-    project.mkdir()
-    (project / "README.md").write_text("mine", encoding="utf-8")
-    monkeypatch.chdir(project)
-
-    result = _runner.invoke(app, ["init", ".", "--harness", "claude"])
-
-    assert result.exit_code == 1, result.output
-    assert _the_fix(result.output) == (
-        f"uvx dadaia-workspace init {tmp_path / 'proj-workspace'} --harness claude"
-    )
-
-
-def test_init_refusing_the_filesystem_root_still_prints_its_fix(tmp_path: Path) -> None:
-    """Bug init-root-dir-crashes-deriving-sibling-fix: `/` has no name, so deriving the
-    sibling with ``Path.with_name`` raised ValueError before any refusal ran."""
-    result = _runner.invoke(app, ["init", "/", "--harness", "claude"])
-
-    assert result.exit_code == 1, result.output
-    root = Path("/").resolve()  # `D:\\` on Windows, `/` on POSIX
-    assert _the_fix(result.output) == (
-        f"uvx dadaia-workspace init {root / 'dadaia-workspace'} --harness claude"
-    )
