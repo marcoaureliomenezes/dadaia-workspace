@@ -1,16 +1,14 @@
-"""v0.1.72 FR4 — ``context show`` reports the LIVE branch for an ALIVE repo (bug
-``context-current-branch-stale-for-alive-repo``).
-
-The registry stores ``current_branch`` only at alive()/dead() transitions; the reporter's
-remote had the repo on ``feature/v0.1.1`` while the store (and ``show``) said ``main`` —
-and alive() restores from the stored value, so a stale snapshot can revive a context on
-the wrong branch. Fix: for an ALIVE context whose repo exists on disk, ``show`` reports
-the actual checked-out branch and exposes the stored snapshot as ``stored_branch``.
+"""Intent: CONTRACT — v0.1.72 FR4 (bug context-current-branch-stale-for-alive-repo) and
+v0.4.4 FR18 A18.1-A18.3 (bug context-list-current-branch-stale-for-alive-repo): for an
+ALIVE context whose repo is on disk, `context list` and `context show` both report the
+LIVE checked-out branch (one resolver, `repo_live_status`) and expose the stored snapshot
+as `stored_branch`; with no repo on disk the snapshot is reported.
 """
 
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -62,33 +60,18 @@ def _make_workspace_with_repo(root: Path) -> Path:
     return ws
 
 
-def test_show_reports_live_branch_for_alive_repo(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(("on_disk", "branch"), [(True, "feature/v9.9.9"), (False, "main")])
+def test_list_and_show_report_the_live_branch_else_the_stored_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, on_disk: bool, branch: str
 ) -> None:
-    """Stored snapshot says ``main``; the repo is actually on ``feature/v9.9.9`` — show
-    must report the live branch (and keep the snapshot as ``stored_branch``)."""
     ws = _make_workspace_with_repo(tmp_path)
+    if not on_disk:
+        shutil.rmtree(ws / "repos" / _CTX)
     monkeypatch.chdir(ws)
 
-    result = _runner.invoke(app, ["context", "show", _CTX, "--json"])
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
-    assert payload["current_branch"] == "feature/v9.9.9", payload
-    assert payload["stored_branch"] == "main"
+    shown = json.loads(_runner.invoke(app, ["context", "show", _CTX, "--json"]).stdout)
+    listed = json.loads(_runner.invoke(app, ["context", "list", "--json"]).stdout)
+    row = next(r for r in listed if r["name"] == _CTX)
 
-
-def test_show_falls_back_to_stored_branch_when_repo_absent(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """No repo on disk (e.g. DEAD or not yet cloned) ⇒ stored snapshot is reported."""
-    ws = _make_workspace_with_repo(tmp_path)
-    import shutil
-
-    shutil.rmtree(ws / "repos" / _CTX)
-    monkeypatch.chdir(ws)
-
-    result = _runner.invoke(app, ["context", "show", _CTX, "--json"])
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
-    assert payload["current_branch"] == "main"
-    assert payload["stored_branch"] == "main"
+    for payload in (shown, row):
+        assert (payload["current_branch"], payload["stored_branch"]) == (branch, "main"), payload
