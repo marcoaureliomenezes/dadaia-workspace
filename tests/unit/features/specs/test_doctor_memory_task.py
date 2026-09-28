@@ -16,7 +16,7 @@ import pytest
 
 from dadaia_workspace.features.specs import SpecsDoctor
 
-from .test_doctor_ledger_invariants import _by_code, _make_clean_specs_tree, _write_tasks
+from .test_doctor import _by_code, _make_clean_specs_tree, _write_tasks
 
 _RELEASE = "0.9.9"
 

@@ -17,7 +17,7 @@ import pytest
 
 from dadaia_workspace.features.specs import SpecsDoctor
 
-from .test_doctor_ledger_invariants import _by_code, _make_clean_specs_tree
+from .test_doctor import _by_code, _make_clean_specs_tree
 
 _RELEASE = "0.9.9"
 _REPO_ROOT = Path(__file__).resolve().parents[4]
