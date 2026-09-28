@@ -132,7 +132,7 @@ def _seed_associated_repo(repo: Path) -> None:
                         "id": _ASSOC_BACKLOG_SLUG,
                         "title": "Broken on purpose",
                         "opened": "2026-08-23",
-                        "description": "missing status and provenance — a BL-SCHEMA violation.",
+                        "description": "missing status and provenance — a LEDGER-BACKLOG-SCHEMA violation.",
                     }
                 ],
             }
@@ -208,10 +208,7 @@ def test_doctor_specs_section_from_inside_associated_repo_resolves_main_specs_tr
     assert _ASSOC_MEMORY_MARKER not in result.output
 
 
-# --------------------------------------------------------------------------- #
-# the `ledgers` section — same seam, same resolution; the assoc repo's BL-SCHEMA violation
-# must never be evaluated, let alone reported.
-# --------------------------------------------------------------------------- #
+# the `ledgers` section: the assoc repo's LEDGER-BACKLOG-SCHEMA violation is never evaluated.
 
 
 def test_doctor_ledgers_section_from_inside_associated_repo_never_sees_the_assoc_backlog(
@@ -221,9 +218,7 @@ def test_doctor_ledgers_section_from_inside_associated_repo_never_sees_the_assoc
 
     result = _runner.invoke(app, ["doctor", "--json"])
 
-    # The MAIN repo's backlog/ has no BACKLOG.json at all (A2.8: absent -> clean).
-    # If this had instead resolved to the associated repo's own (broken) BACKLOG.json, the
-    # BL-SCHEMA violation would be a ledgers finding naming the broken slug.
+    # The main repo has no BACKLOG.json (absent -> clean); resolving to the assoc repo's would name its slug.
     payload = json.loads(result.output)
     assert payload["sections"]["ledgers"]["findings"] == []
     assert _ASSOC_BACKLOG_SLUG not in result.output
