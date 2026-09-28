@@ -24,15 +24,10 @@ Scope: this file governs only `specs/bugs/`.
 
 ## 3. Field classes (D11)
 
-| Class | Meaning |
-|---|---|
-| `immutable-core` | Never rewritten once appended |
-| `write-once` | Absent at registration; settable once, then immutable |
-| `mutable-governance` | Rewritten in place, atomic refuse-stale |
-
-- `immutable-core` fields: `id`, `ts`, `title`, `severity`, `surface`, `component`, `symptom`, `repro`, `expected`.
-- `write-once` fields: `solution`, `evidence_loop`, `evidence_seam`, `evidence_diff`, `diff_direction` (derived from `evidence_diff`'s `net-*:` prefix).
-- `mutable-governance` fields: `status`, `closed_at`, `cause`, `caused_by`, `resolved_release`, `audited`.
+- Each field's class is its `x-mutability` in `bug-record-v1`; this law lists no fields.
+- `immutable-core`: never rewritten once appended.
+- `write-once`: absent at registration; settable once, then immutable.
+- `mutable-governance`: rewritten in place, atomic refuse-stale.
 
 ## 4. Authoring rules
 
@@ -40,9 +35,8 @@ Scope: this file governs only `specs/bugs/`.
 - Full command reference: `dd-bug-registration`.
 - Never hand-edit `BUGS.jsonl` to keep every entry schema-valid.
 - Every record change is one governance verb: `bugs.py append|update|resolve|supersede|defer|reject|archive`.
-- That seam is atomic, refuse-stale, redacted, and refuses any `immutable-core` field or a differing re-set of a `write-once` field.
+- That seam is atomic, refuse-stale, refuses a value the push would refuse, and refuses any `immutable-core` field or a differing re-set of a `write-once` field.
 - `status` and `closed_at` change only through the four terminal transitions, never through `--set`; `bugs.py archive` ages by `closed_at`.
-- `status` has no `picked` value — a pick is the bundled release-definition commit, never a ledger write.
 - Bug reports are not specs — they do not authorize implementation changes on their own.
 - Never hand-delete a record once appended — `bugs.py archive` is the only retiring path, and it is idempotent.
 

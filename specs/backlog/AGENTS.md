@@ -24,16 +24,15 @@ Scope: this file governs only `specs/backlog/`.
 - Create and append entries with `BACKLOG_PY new <slug>` — never hand-edit `BACKLOG.json`.
 - `<slug>` matches `^[a-z][a-z0-9-]+$`.
 - Every `active[]` entry carries five required fields: `title`, `opened` (`YYYY-MM-DD`), `status`, `description`, `provenance`.
-- `status` is `idea`, `candidate`, `picked`, or another live (non-terminal) token.
+- `status` is `idea`, `candidate`, or another lowercase live (non-terminal) token.
 - Plus one optional field: `intents` (see §4).
-- An entry must be picked into a release (`python3 .agents/skills/dd-release-implementation/scripts/release.py new`, naming the slug under `**Consumes:**`) to enter SDD.
+- An entry enters SDD when a release picks it: `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id> --origin backlog:<slug>`.
 - Never delete an entry — `BACKLOG_PY exit <slug> --disposition …` removes the `active[]` object and appends its one histo record.
 
 ## 3. Terminal disposition tokens
 
-- One lowercase vocabulary across every histo (`core/models/histo.py`); a backlog entry exits as `delivered`, `superseded` or `rejected`.
-- `delivered`/`superseded` carry the release id in `release`; `rejected` carries a one-line `reason`.
-- A `deferred` item returns to `active[]` — it never exits.
+- An entry exits with one disposition of the vocabulary `BACKLOG_PY exit --help` lists; a delivery or supersession carries the release id in `release`, a rejection a one-line `reason`.
+- A postponed item stays in `active[]` with its status unchanged — it never exits.
 
 ## 4. Idea-stage freedom vs bound intents
 
@@ -42,11 +41,11 @@ Scope: this file governs only `specs/backlog/`.
 - A malformed `intents[]` or an invalid `status` is always `BL-SCHEMA`, at any status.
 
 ```json
-{"subject": {"kind": "code", "ref": "dadaia_workspace/core/models/lifecycle.py#AgentRuntimeKind"},
+{"subject": {"kind": "code", "ref": "src/billing/models.py#Invoice"},
  "change": "what changes about this subject"}
 ```
 
-### 4.1 The five subject kinds
+### 4.1 The subject kinds
 
 | kind | ref shape | derived from |
 |---|---|---|
@@ -55,17 +54,13 @@ Scope: this file governs only `specs/backlog/`.
 | `catalog` | a `catalog.json` feature slug | `specs/memory/product/catalog.json` |
 | `doc` | a SPEC-DOC id or memory heading | `specs/memory/**/*.md` |
 | `invariant` | an `INV-*` identifier | invariant declarations |
+| `api` | an alias-map synonym | the operator alias map only |
 
-```bash
-BACKLOG_PY subjects            # declared aliases + the document's own bindings
-BACKLOG_PY subjects --resolve <ref> --kind <kind>   # how one ref binds to those
-```
-
-- It answers from those two; a `code`/`doc`/`cli` ref is judged by the doctor's `BL-SCHEMA` finding, which names the ref it cannot resolve.
+- `BACKLOG_PY subjects` lists the alias map; every ref is judged only by the doctor's `BL-SCHEMA`, which names the ref it cannot resolve.
 - A repo with no Python sources has no `code` anchors — bind `catalog`, `doc` or `invariant`.
 
 ## 5. Relationship to releases
 
-- A release SPEC names a picked entry's slug under `**Consumes:**`.
-- A picked entry stays in `active[]` with `status: picked` — nothing is purged at pick time.
+- The pick is the SPEC's `**Origin:** backlog:<ids>` line; no status is written at pick time.
+- `exit --disposition delivered --release <id>` is refused unless that SPEC's Origin names the slug.
 - It exits once, at closure's disposition sweep, into `_archive/backlog_histo.jsonl`.
