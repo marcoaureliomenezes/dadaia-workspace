@@ -98,7 +98,7 @@ and deletes only what a TTL expired.
 <!-- derived-from: release-lifecycle sha256:57d8b542e879 -->
 <!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
 <!-- derived-from: harness-claude-code sha256:4d0f86f6e93f -->
-<!-- derived-from: harness-codex sha256:3419ecb0e1aa -->
+<!-- derived-from: harness-codex sha256:9218e747c24f -->
 <!-- derived-from: harness-kimi-code sha256:4300d3a1724d -->
 <!-- derived-from: harness-cursor sha256:1cae6128564d -->
 <!-- derived-from: harness-devin sha256:ab4a32c4a53d -->

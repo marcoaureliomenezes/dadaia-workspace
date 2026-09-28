@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-28T19:55:15Z",
+  "generated_at": "2026-09-28T22:26:56Z",
   "features": [
     {
       "rank": 1,
@@ -203,7 +203,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 356,
+      "token_estimate": 339,
       "depends_on": [
         "agentic-entities",
         "sdd-gate-v3",

@@ -27,7 +27,7 @@ sources:
 ## Models and doctor
 
 - Codex tier identity is native `(model id × model_reasoning_effort)`, derived from the model registry; two tiers collapsing to one pair fail loudly. The effort comes from one resolver: the D-3 clamp of the policy effort, else `medium`.
-- `dadaia public doctor` keeps the structural checks byte comparison cannot express: `D-CX-7` (every `dd-` token a persona cites resolves to a skill or persona), `D-CX-8` (a Markdown file in `.codex/rules/` is flagged; the `.rules` file itself is a byte-compared rule) and `D-CX-9` (`hooks.json` names every wrapper command, and each wrapper exists and is executable).
+- `dadaia public doctor` keeps the structural checks byte comparison cannot express: `D-CX-7` (every `dd-` token a persona cites resolves to a skill or persona) and `D-CX-8` (a Markdown file in `.codex/rules/` is flagged; the `.rules` file itself is a byte-compared rule).
 
 ## Dependencies
 
