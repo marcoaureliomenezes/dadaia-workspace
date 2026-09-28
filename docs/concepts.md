@@ -7,7 +7,7 @@ is `dadaia_workspace/public/data/AGENTS.md`, and the walkthrough is
 
 ## Context
 
-<!-- derived-from: spec-context-project sha256:47c11b26b98f -->
+<!-- derived-from: spec-context-project sha256:b1fa1ed3b027 -->
 <!-- derived-from: context-management sha256:44be26055b2d -->
 
 A *context* — a Spec Context Project — is one canonical `specs/` tree owned by one
@@ -59,14 +59,16 @@ carry the ordered work, and the ledger scripts move the records.
 
 ## The gate
 
-<!-- derived-from: sdd-gate-v3 sha256:8cc77479943b -->
+<!-- derived-from: sdd-gate-v3 sha256:f1b24b48ec93 -->
 
 The *gate* is one PreToolUse pre-gate evaluating root whitelist, venv guard and SDD
 gate in that order — first block wins, and a policy that raises is ALLOW. It blocks
-exactly three things: a new workspace-root entry outside the root law and
+exactly three things: a file-tool write (`Write`, `Edit`, `MultiEdit`, `NotebookEdit`,
+`apply_patch`) creating a new workspace-root entry outside the root law and
 `.dadaia/states/instance_exceptions.txt`; a leading `dadaia`, `pip` or
-`python -m dadaia_workspace` outside `.dadaia/.venv/bin/`; a PROTECTED write, or a
-bound session's MUTATING write into a `repos/<slug>/` outside its scope. Paths fall in
+`python -m dadaia_workspace` outside `.dadaia/.venv/bin/` (Bash only); a file-tool write
+that is PROTECTED, or a bound session's MUTATING one into a `repos/<slug>/` outside its
+scope. A Bash write (`sed -i`, `rm`, `mkdir`, a redirect) is never judged. Paths fall in
 three classes: ADDITIVE (`specs/bugs/`, `specs/backlog/`, `specs/audits/` and the
 `.dadaia/` scratch zones, always writable), PROTECTED (`.dadaia/sessions/` and the
 projected law) and MUTATING (everything else). No lease, lock or wait path exists and

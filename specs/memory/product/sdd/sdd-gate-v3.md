@@ -1,7 +1,7 @@
 ---
 slug: sdd-gate-v3
 title: sdd-gate-v3
-tldr: No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write), one fix line each, a gitflow push chokepoint.
+tldr: No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope file-tool write), one fix line each, a gitflow push chokepoint.
 summary: The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one executable fix line; the pre-push chokepoint enforces the branch contract read from the project gitflow, the specs canon and one secret registry over every pushed object, with one rewrite formula as its fix, and no CI job calls a model API — the security review is the reviewer's lens before each pull request.
 tags: [sdd, gate, hooks, enforcement, no-locks, privacy]
 sources:
@@ -23,7 +23,7 @@ sources:
 
 - No lease, lock file or wait path exists; the gate knows no session mode and reads no `_RELEASE.json`.
 - One pre-gate reads each payload once and evaluates root whitelist, venv guard and SDD gate in that order, first block wins; a policy that raises is ALLOW.
-- It blocks exactly three things: a new workspace-root entry outside the root law and `.dadaia/states/instance_exceptions.txt` ([[workspace-doctor]]); a leading `dadaia`, `pip` or `python -m dadaia_workspace` outside `.dadaia/.venv/bin/` (Bash only); a PROTECTED write, or a bound session's MUTATING write into a `repos/<slug>/` outside its scope.
+- It blocks exactly three things: a file-tool write (`Write`, `Edit`, `MultiEdit`, `NotebookEdit`, `apply_patch`) creating a new workspace-root entry outside the root law and `.dadaia/states/instance_exceptions.txt` ([[workspace-doctor]]); a leading `dadaia`, `pip` or `python -m dadaia_workspace` outside `.dadaia/.venv/bin/` (Bash only); a file-tool write that is PROTECTED, or a bound session's MUTATING one into a `repos/<slug>/` outside its scope; a Bash write (`sed -i`, `rm`, `mkdir`, a redirect) is never judged.
 
 | Class | Behavior |
 |---|---|

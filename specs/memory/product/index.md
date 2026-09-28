@@ -62,4 +62,4 @@
 | `backlog-ledger` | backlog-ledger | The operator's demand queue: BACKLOG.json active[] plus one histo record per exit; backlog.py writes it, dadaia doctor judges bound subjects. |
 | `bug-ledger` | bug-ledger | One bug record per line in BUGS.jsonl, registered after operator confirmation, closed only by a transition carrying evidence; bugs.py writes it. |
 | `release-lifecycle` | release-lifecycle | Closed-scope candidates grow one live release, each defined from an as-is review; release.py writes _RELEASE.json; memory gates closure; promote merges a PR. |
-| `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write), one fix line each, a gitflow push chokepoint. |
+| `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope file-tool write), one fix line each, a gitflow push chokepoint. |

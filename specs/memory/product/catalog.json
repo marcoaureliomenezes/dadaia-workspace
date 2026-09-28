@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-28T22:34:03Z",
+  "generated_at": "2026-09-28T23:33:30Z",
   "features": [
     {
       "rank": 1,
@@ -377,7 +377,7 @@
         "lifecycle",
         "concurrency"
       ],
-      "token_estimate": 535,
+      "token_estimate": 536,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -827,7 +827,7 @@
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "area": "sdd",
-      "tldr": "No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope write), one fix line each, a gitflow push chokepoint.",
+      "tldr": "No-lock enforcement — three gate blocks (root entry, non-venv command, PROTECTED or out-of-scope file-tool write), one fix line each, a gitflow push chokepoint.",
       "summary": "The merged PreToolUse gate blocks exactly three things and reads no SDD artifact; every refusal anywhere carries one executable fix line; the pre-push chokepoint enforces the branch contract read from the project gitflow, the specs canon and one secret registry over every pushed object, with one rewrite formula as its fix, and no CI job calls a model API — the security review is the reviewer's lens before each pull request.",
       "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
@@ -838,7 +838,7 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 1827,
+      "token_estimate": 1859,
       "depends_on": [
         "workspace-doctor",
         "context-management",

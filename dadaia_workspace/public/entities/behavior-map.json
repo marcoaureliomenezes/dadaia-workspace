@@ -69,7 +69,7 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:0c3b6c3c620a370b174a4887bab1d505b5a051dc77de03d13377970b9d59389e",
-        "skill": "sha256:0548116c5e1175a3980d426058960a88e3ba3ce2d884452912e85d5d514d7826",
+        "skill": "sha256:e2b296a3ff462d70160aa74fe22f8cbd5c8f7ad38fed65ebbfdcdcbcf1408616",
         "scripts": null,
         "scoped": []
       },
@@ -82,7 +82,7 @@
       "skill": "dd-gitflow-default",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:270e11d764961a22228e8b91d7d314336d9d86bf0e348f89b71dfa06acd883e6",
+        "section": "sha256:e252f561334f61c96522c875534c9ff122f15b47c84f14963be31af3fe4bf7a8",
         "skill": "sha256:759485df844eca45ba0283331b31153fd920ed19fe4fc2ed54171ded9004a468",
         "scripts": null,
         "scoped": []
@@ -120,7 +120,7 @@
         "skill": null,
         "scripts": null,
         "scoped": [
-          "sha256:17a1484df97774938d5a8c9c13129414a310bcf8585004885effb96c7d2ac196"
+          "sha256:8d9c729db24c00adcca97781e85e1f0999b6ddab8568b1e45be2bedca971e5e9"
         ]
       },
       "recorded_by": "dd-software-engineer",

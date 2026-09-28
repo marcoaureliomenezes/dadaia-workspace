@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.hooks import venv_guard
+from dadaia_workspace.hooks import _common
 from tests.contract.test_slop_ratchets import _V34_CEILINGS
 
 pytestmark = pytest.mark.unit
@@ -22,22 +22,16 @@ _PKG = _REPO / "dadaia_workspace"
 _MAP = _PKG / "public" / "data" / "AGENTS.md"
 
 
-def _bash(command: str) -> dict[str, object]:
-    return {"tool_name": "Bash", "tool_input": {"command": command}}
-
-
-def test_the_map_states_the_venv_guard_first_token_rule() -> None:
-    """sa-text-restates-rules-the-code-contradicts#49.1: a command whose FIRST token is
-    dadaia/pip/pip3 or `python -m dadaia_workspace` outside .dadaia/.venv/bin/ BLOCKs;
-    any other shape passes; the map text states exactly this."""
-    for blocked in ("dadaia doctor", "pip install x", "pip3 install x",
-                    "python -m dadaia_workspace"):  # fmt: skip
-        assert venv_guard.evaluate_payload(_bash(blocked)) is not None, blocked
-    for passes in ("python -m pip install x", "uv pip install x", "cd x && pip install y",
-                   "/usr/bin/pip install x"):  # fmt: skip
-        assert venv_guard.evaluate_payload(_bash(passes)) is None, passes
+def test_the_map_states_what_the_gate_judges() -> None:
+    """sa-text-restates-rules-the-code-contradicts#49.1 (first-token rows: unit test_venv_guard)
+    and bug gate-law-claims-out-of-scope-writes-blocked-but-bash-is-never-judged: only file
+    tools are judged as writes, never Bash; the map states exactly this."""
+    tools = ("Write", "Edit", "MultiEdit", "NotebookEdit", "apply_patch")
+    assert {*tools, "write_file", "edit_file"} == _common.WRITE_TOOLS
     line = next(ln for ln in _MAP.read_text("utf-8").splitlines() if "One PreToolUse gate" in ln)
     assert "first token is `dadaia`, `pip`/`pip3` or `python -m dadaia_workspace`" in line
+    assert "file-tool write (`" + "`, `".join(tools) + "`)" in line
+    assert "a Bash write (`sed -i`, `rm`, `mkdir`, a redirect) is never judged" in line
 
 
 _SESSION_NAMES = ("DADAIA_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID",

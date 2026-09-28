@@ -51,7 +51,7 @@ harness later and `.dadaia/.venv/bin/dadaia harness list` reads the roster.
 
 ## Level 2 — the project
 
-<!-- derived-from: spec-context-project sha256:47c11b26b98f -->
+<!-- derived-from: spec-context-project sha256:b1fa1ed3b027 -->
 <!-- derived-from: context-management sha256:44be26055b2d -->
 
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
@@ -78,7 +78,7 @@ bind, the ctx-inject hook injects the context header, `ARCHITECTURE.md`'s
 
 ## Level 3 — the specs
 
-<!-- derived-from: spec-context-project sha256:47c11b26b98f -->
+<!-- derived-from: spec-context-project sha256:b1fa1ed3b027 -->
 
 ```bash
 .dadaia/.venv/bin/dadaia specs init --context <ctx> [--replace-foreign]

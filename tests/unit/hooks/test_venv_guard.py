@@ -130,6 +130,11 @@ def test_allows_venv_rooted_overridden_or_unmatched(command: str) -> None:
         # A path that merely has 'pip' or 'dadaia' as a substring.
         "./scripts/pip-helper.sh",
         "./dadaia-wrapper.sh doctor",
+        # sa-text-restates-rules-the-code-contradicts#49.1: only the FIRST token counts.
+        "python -m pip install x",
+        "uv pip install x",
+        "cd x && pip install y",
+        "/usr/bin/pip install x",
     ],
 )
 def test_no_false_block(command: str) -> None:

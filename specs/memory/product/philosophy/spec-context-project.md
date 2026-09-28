@@ -20,7 +20,7 @@ sources:
 - The project declares its gitflow — principal, integration and work-branch prefix — in the `gitflow:` block of its `specs/constitution.md`, the default customized there; the pre-push gate and CI read it from committed data, and an associated repo follows its main repo's ([[sdd-gate-v3]]).
 - A dadaia specs tree is a `specs/` whose `constitution.md` carries `specs_pattern_version` 6 or above; any other `specs/` is foreign, and only after the operator's consent is it renamed to `specs-bkp/` inside the main repo (a second backup under `specs-bkp/<UTC timestamp>/`), the one backup location, before a canonical tree replaces it.
 - `dadaia context bind <ctx>` selects a context and nothing else, changing only the caller's own session record; a session without a harness-native id carries the binding in `DADAIA_CONTEXT`.
-- A bind carries a scope — the context's main repo plus its associated repos — and a bound session's MUTATING write into a repo another context owns is refused with the bind that would allow it; an unbound session is never scope-judged ([[sdd-gate-v3]]).
+- A bind carries a scope — the context's main repo plus its associated repos — and a bound session's MUTATING file-tool write into a repo another context owns is refused with the bind that would allow it; an unbound session is never scope-judged ([[sdd-gate-v3]]).
 - Context injection fires when the session record's `bound_at` is newer than that session's injection sentinel ([[context-management]]).
 - No phase and no mode is enforced; concurrent sessions never block each other, and overlap surfaces through git.
 
