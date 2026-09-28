@@ -38,8 +38,3 @@ def test_a_persona_body_never_requires_a_missing_tool(persona: Path) -> None:
     codex = codex_agent_toml_bytes(persona, persona.stem, _RESOLVED).decode("utf-8")
     for rendered in (claude, codex):
         assert _NEEDS_WRITE.findall(rendered) == []
-
-
-def test_no_persona_uses_the_word_additive() -> None:
-    """sa-reviewer-persona-body-contradicts-its-tools#B4."""
-    assert [p.name for p in _PERSONAS if "ADDITIVE" in p.read_text(encoding="utf-8")] == []

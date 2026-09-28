@@ -254,3 +254,9 @@ def test_the_surface_names_no_library_fact() -> None:
     assert "enum" not in surface and "x-enum-append" not in surface
     assert surface["type"] == "string" and surface["minLength"] == 1
     assert "dadaia_workspace" not in surface["description"]
+
+
+def test_handoff_schema_verdict_enum_is_the_two_tokens() -> None:
+    """verdict-vocabulary-persona-schema-mismatch: the one verdict vocabulary (the public text
+    rows live in test_public_source_hygiene)."""
+    assert _schema("handoff")["properties"]["verdict"]["enum"] == ["APPROVED", "REJECTED"]
