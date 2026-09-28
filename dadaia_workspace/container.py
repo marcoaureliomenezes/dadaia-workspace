@@ -9,7 +9,6 @@ if TYPE_CHECKING:
     from dadaia_workspace.features.certification import CertificationResult
     from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
-from dadaia_workspace.core.handoff_index import HandoffIndex
 from dadaia_workspace.core.workspace_resolver import not_initialized
 from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
 from dadaia_workspace.features.export.service import ExportService
@@ -195,16 +194,3 @@ def run_certification(workspace_root: Path, *, keep: bool = False) -> "Certifica
     )
 
     return certify(workspace_root, SubprocessCertificationProcess(), keep=keep)
-
-
-def build_handoff_index(workspace_root: Path) -> HandoffIndex:
-    """Compose the workspace-rooted :class:`HandoffIndex` (release 0.5.1 K6).
-
-    Construction is cheap (no schema load) — schema loading happens lazily, once, on
-    the first ``validate_file``/``validate_all`` call, from
-    ``workspace_root/.dadaia/agentic/schemas/handoff-v1.schema.json``.
-
-    Args:
-        workspace_root: Root directory of the initialized dadaia workspace.
-    """
-    return HandoffIndex(workspace_root)

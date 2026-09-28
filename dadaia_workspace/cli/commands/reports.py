@@ -8,11 +8,10 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from dadaia_workspace import container
 from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import HandoffSchemaError, WorkspaceNotInitializedError
-from dadaia_workspace.core.handoff_index import Handoff, ValidationResult
+from dadaia_workspace.core.handoff_index import Handoff, HandoffIndex, ValidationResult
 from dadaia_workspace.core.workspace_resolver import (
     resolve_cli_workspace_root,
 )
@@ -99,7 +98,7 @@ def validate(
     # diagnostic covers every invocation, including the cwd-default path.
     print(f"Resolved workspace root: {workspace_root}", file=sys.stderr)
 
-    index = container.build_handoff_index(workspace_root)
+    index = HandoffIndex(workspace_root)
 
     # Collect paths to validate
     target_paths: list[Path] = []
