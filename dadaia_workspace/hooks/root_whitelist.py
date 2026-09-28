@@ -22,43 +22,26 @@ def _exception_globs(workspace: Path) -> tuple[str, ...]:
 
 
 def evaluate_payload(payload: dict[str, object]) -> str | None:
-    """Pure root-whitelist policy over an ALREADY-PARSED hook payload.
-
-    Returns a block reason when ANY write target lands a forbidden new entry at the
-    workspace root, else ``None`` (ALLOW). This is the reusable policy surface the merged
-    ``pre_gate`` entrypoint drives; ``main`` is a thin back-compat wrapper kept one release.
-
-    FR-W4-04: a multi-file apply_patch surfaces every file header; ANY forbidden header
-    blocks the whole patch (most restrictive wins).
-    """
+    """The block reason when ANY write target lands a slop entry, else ``None``."""
     name = str(payload.get("tool_name") or "")
-    # NotebookEdit is not root-relevant in the shell version; keep the same tool set.
     if name not in _common.WRITE_TOOLS - {"NotebookEdit"}:
         return None
 
     raw_paths = _common.target_paths(payload)
     if not raw_paths:
-        return None  # fail open
-
+        return None
     try:
         workspace = invocation.resolve(env=os.environ, cwd=Path.cwd()).workspace_root
-        if workspace is None:
-            raise RuntimeError("workspace not resolved")
     except Exception:  # noqa: BLE001 — fail-open
         return None
-
-    for raw_path in raw_paths:
-        block = _root_violation(workspace, raw_path)
-        if block is not None:
-            return block
-    return None
+    if workspace is None:
+        return None
+    return next(filter(None, (_root_violation(workspace, p) for p in raw_paths)), None)
 
 
 def _root_violation(workspace: Path, raw_path: str) -> str | None:
-    """A block reason when the entry *raw_path* would create is not ``canon`` or
-    ``operator`` by ``workspace_layout.verdict`` — the doctor's own answer, so the gate
-    never ALLOWs what the reaper moves (ADR 0058: an existing entry is not presumed the
-    operator's). Fail-open on an unresolvable path or a target outside the workspace."""
+    """A block reason when ``workspace_layout.verdict`` judges *raw_path*'s entry slop — the
+    doctor's own answer; ``None`` for a path outside the workspace."""
     fpath = Path(raw_path)
     if not fpath.is_absolute():
         fpath = workspace / fpath
@@ -67,9 +50,10 @@ def _root_violation(workspace: Path, raw_path: str) -> str | None:
         rel = fpath.resolve().relative_to(ws)
     except (OSError, ValueError):
         return None
-    if not rel.parts:
-        return None
-    if workspace_layout.verdict(rel.as_posix(), False, _exception_globs(ws)) != "slop":
+    if (
+        not rel.parts
+        or workspace_layout.verdict(rel.as_posix(), False, _exception_globs(ws)) != "slop"
+    ):
         return None
     return (
         f"[ROOT WHITELIST GATE] Writing '{rel.as_posix()}' creates an entry the layout law "
