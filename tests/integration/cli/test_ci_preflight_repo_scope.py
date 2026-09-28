@@ -1,15 +1,7 @@
-"""``ci preflight`` refuses outside the dadaia-workspace source tree.
-
-Bug ci-preflight-unusable-outside-the-source-repo. The gate's checks are structurally
-bound to THIS repo — it lints ``dadaia_workspace/`` and ``tests/``, type-checks
-``dadaia_workspace/``, and reads this repo's ``setup.cfg`` for the import-linter. None of
-those exist in a consumer Spec Context repo, and the generated consumer venv carries only
-``pytest``, so tool resolution fell through to the ``poetry`` fallback and the operator saw
-``[FAIL] ruff format --check`` / ``command not found: poetry`` — a lint failure for a path
-that does not exist, blaming a dev tool that would not have helped.
-
-The projected ``pre-push-ci-gate.sh`` calls this same verb, so a consumer following the
-never-push-red law installed a push gate that could never pass.
+"""Intent: CONTRACT — bug ci-preflight-unusable-outside-the-source-repo: `ci preflight` is
+bound to the source tree (it lints `dadaia_workspace/`, reads `setup.cfg`); a consumer repo
+gets one refusal, never a fake lint failure, and the source repo is still recognized.
+sa-doctor-job-not-a-required-check#B4: a tracked `.claude/settings.json` fails it.
 """
 
 from __future__ import annotations

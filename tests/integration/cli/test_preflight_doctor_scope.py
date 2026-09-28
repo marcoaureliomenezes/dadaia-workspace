@@ -10,6 +10,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+import pytest
+
 from dadaia_workspace.features.ci_preflight import checks_for, subprocess_runner
 from dadaia_workspace.features.specs.canon import scaffold
 from dadaia_workspace.infrastructure.ledger_scripts import script_repairs
@@ -36,18 +38,17 @@ def _doctor_step(checkout: Path) -> tuple[int, str]:
     return subprocess_runner(checkout)(doctor.argv)
 
 
-def test_an_expired_entry_of_the_enclosing_workspace_never_fails_the_doctor_step(
-    tmp_path: Path,
+@pytest.mark.parametrize(
+    ("break_specs", "code"), [(False, 0), (True, 1)], ids=["clean-repo", "specs-error"]
+)
+def test_the_doctor_step_judges_the_repo_never_the_enclosing_workspace(
+    tmp_path: Path, break_specs: bool, code: int
 ) -> None:
-    """RED: the step used to resolve the enclosing workspace and fail on its WS-* hygiene."""
-    code, output = _doctor_step(_checkout_inside_a_stale_workspace(tmp_path))
-    assert code == 0, output
-    assert "WS-" not in output
-
-
-def test_a_specs_error_in_the_repo_still_fails_the_doctor_step(tmp_path: Path) -> None:
+    """RED: the step used to resolve the enclosing workspace and fail on its WS-* hygiene;
+    a specs error in the repo itself still fails it."""
     checkout = _checkout_inside_a_stale_workspace(tmp_path)
-    (checkout / "specs" / "constitution.md").unlink()
-    code, output = _doctor_step(checkout)
-    assert code == 1, output
-    assert "constitution.md" in output
+    if break_specs:
+        (checkout / "specs" / "constitution.md").unlink()
+    exit_code, output = _doctor_step(checkout)
+    assert exit_code == code and "WS-" not in output, output
+    assert break_specs is ("constitution.md" in output)
