@@ -159,7 +159,7 @@ def test_a_candidate_folder_is_not_ranked_and_is_off_canon(tmp_path: Path) -> No
 
     assert _issues(specs) == []
     tree8 = [i for i in SpecsDoctor(specs).check() if i.code == "TREE-8"]
-    assert any("rc-1/SPEC.md" in str(i.path) for i in tree8), tree8
+    assert any("rc-1/SPEC.md" in Path(str(i.path)).as_posix() for i in tree8), tree8
 
 
 def test_this_repos_live_and_candidate_specs_all_pass() -> None:

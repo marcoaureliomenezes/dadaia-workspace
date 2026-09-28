@@ -20,27 +20,19 @@ sys.path.insert(1, str(Path(__file__).resolve().parents[2] / "dd-spec-navigator"
 
 import _memory_drift as drift  # noqa: E402
 from _release_check import finding, histo_findings, state_findings  # noqa: E402
-from _release_schema import HISTO, PHASES, SEMVER_RE, STATE, TRIO, TRIO_PHASES  # noqa: E402
+from _release_schema import HISTO, SEMVER_RE, STATE, TRIO, TRIO_PHASES  # noqa: E402
 from _release_store import SCRIPT, Refusal, live_ids, live_release, window_start  # noqa: E402
 
 __all__ = ["check", "drift", "memory_errors", "tree_findings"]
 
 
 def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
-    """One live directory: its state document, then its trio in IMPLEMENTATION/CLOSURE. A
-    mis-cased phase carries the one `sed` that fixes it."""
+    """One live directory: its state document, then its trio in IMPLEMENTATION/CLOSURE."""
     dir_rel, path = release_dir.relative_to(specs).as_posix(), release_dir / STATE
     if not path.is_file():
         return [finding(dir_rel, 1, f"release directory carries no {STATE}")]
     text = path.read_text(encoding="utf-8")
     if findings := state_findings(text, f"{dir_rel}/{STATE}"):
-        try:
-            phase = str(json.loads(text).get("phase"))
-        except (ValueError, AttributeError):
-            phase = ""
-        if phase.upper() in PHASES and phase != phase.upper():
-            fix = f'sed -i \'s/"phase": "{phase}"/"phase": "{phase.upper()}"/\' {path}'
-            findings = [{**f, "fix": fix} for f in findings]
         return findings
     phase = json.loads(text)["phase"]
     missing = [n for n in TRIO if not (release_dir / n).is_file()] if phase in TRIO_PHASES else []
