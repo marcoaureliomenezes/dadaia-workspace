@@ -566,11 +566,12 @@ def test_every_ledger_fix_runs_its_script_by_absolute_path(codes: str, command: 
     assert Path(script).is_absolute() and Path(script).is_file(), script
 
 
-def test_the_bug_script_is_one_kernel_constant() -> None:
-    """Intent: sa-fix-lines-not-built-by-cli-line#S8 — bugs.py is named via BUGS_SCRIPT."""
-    from dadaia_workspace.core.kernel_tunables import BUGS_SCRIPT
+def test_the_bug_script_is_one_ledger_row() -> None:
+    """Intent: sa-fix-lines-not-built-by-cli-line#S8, sa-ledger-script-paths-in-two-tables —
+    bugs.py is named by its one LEDGER_SCRIPTS row."""
+    from dadaia_workspace.infrastructure.ledger_scripts import BUGS_SCRIPT, LEDGER_SCRIPTS
 
-    assert BUGS_SCRIPT == ".agents/skills/dd-bug-resolution/scripts/bugs.py"
+    assert BUGS_SCRIPT in LEDGER_SCRIPTS
     bugs = f"{_SKILLS}dd-bug-resolution/scripts/bugs.py"
     assert dict(_FIX_LINES)["SPEC-DOC-041"] == f"{_VENV_PYTHON} {bugs} archive"
 

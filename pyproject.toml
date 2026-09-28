@@ -214,8 +214,8 @@ exclude_lines = [
 # Scope is `core/models/` (the verdict's own already-validated smoke-trial sub-slice),
 # not the wider `core/` the verdict recommended for the first baseline: mutmut's
 # `mutants/` sandbox mirrors ONLY `source_paths` on disk, and `tests/unit/core/` (flat)
-# contains real cross-layer architecture tests (e.g. test_kernel_tunables.py imports
-# `dadaia_workspace.hooks.*`) that cannot run inside any sandbox narrower than the whole
+# contains real cross-layer architecture tests (e.g. tests reading
+# `dadaia_workspace/features/**` by path) that cannot run inside any sandbox narrower than the whole
 # package. Widening this scope is real follow-up work, not done here — see the runner
 # script's header for the full narrowing rationale.
 [tool.mutmut]

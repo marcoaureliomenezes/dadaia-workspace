@@ -7,8 +7,8 @@ contract, drifting apart by construction.
 
 This module runs each script's `check --specs <dir> --json` and re-emits its findings.
 It lives in `infrastructure/` because running a subprocess is an infrastructure act
-(`features` may not import `subprocess` — setup.cfg), and the CLI composition root is
-the only caller.
+(`features` may not import `subprocess` — setup.cfg). Its rows are the one table of
+the scripts' paths: every `fix:` naming a ledger script spells it by `<ROW>.invocation`.
 
 The interpreter is always `sys.executable`: the installed script may have no exec bit
 (Windows), and the venv's Python is the one that must read the tree.
@@ -29,7 +29,12 @@ from dadaia_workspace.core.workspace_resolver import own_workspace_root
 from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner
 
 __all__ = [
+    "AUDIT_SCRIPT",
+    "BACKLOG_SCRIPT",
+    "BUGS_SCRIPT",
     "LEDGER_SCRIPTS",
+    "MEMORY_SCRIPT",
+    "RELEASE_SCRIPT",
     "LedgerScript",
     "resolve_script",
     "script_findings",
@@ -69,13 +74,12 @@ class LedgerScript:
 
 
 #: One row per ledger script (0.4.7 FR2's table). A new ledger is a row, never a branch.
-LEDGER_SCRIPTS: tuple[LedgerScript, ...] = (
-    LedgerScript("BUGS", "dd-bug-resolution", "bugs.py"),
-    LedgerScript("BACKLOG", "dd-backlog-definition", "backlog.py"),
-    LedgerScript("RELEASE", "dd-release-implementation", "release.py"),
-    LedgerScript("FINDINGS", "dd-audit-project", "audit.py"),
-    LedgerScript("MEMORY", "dd-spec-navigator", "memory.py", ("catalog", "generate")),
-)
+BUGS_SCRIPT = LedgerScript("BUGS", "dd-bug-resolution", "bugs.py")
+BACKLOG_SCRIPT = LedgerScript("BACKLOG", "dd-backlog-definition", "backlog.py")
+RELEASE_SCRIPT = LedgerScript("RELEASE", "dd-release-implementation", "release.py")
+AUDIT_SCRIPT = LedgerScript("FINDINGS", "dd-audit-project", "audit.py")
+MEMORY_SCRIPT = LedgerScript("MEMORY", "dd-spec-navigator", "memory.py", ("catalog", "generate"))
+LEDGER_SCRIPTS = (BUGS_SCRIPT, BACKLOG_SCRIPT, RELEASE_SCRIPT, AUDIT_SCRIPT, MEMORY_SCRIPT)
 
 
 class _Runner(Protocol):

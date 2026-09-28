@@ -23,8 +23,6 @@
 # cross-layer architecture/consistency tests by design, not test-isolation bugs:
 #   - test_harness_registry.py::test_roster_literal_absent_and_registry_consumed reads
 #     `dadaia_workspace/features/**` source by path (a repo-wide grep-style check).
-#   - test_kernel_tunables.py's parametrized cases `importlib.import_module(...)` real
-#     `dadaia_workspace.hooks.*` / other-layer modules (a single-source-of-truth check).
 # Excluding one file at a time is whack-a-mole against tests that are correctly placed
 # for the NORMAL gating suite but structurally incompatible with ANY mutmut sandbox
 # scoped narrower than the whole package. Widening this script's scope back to the full

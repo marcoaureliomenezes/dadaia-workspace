@@ -182,7 +182,7 @@ _RECORDED_PER_FAMILY_CAP: dict[str, int] = {
 # authored alongside it (FR18/A18.1) — not attempted in this task (T-050-29's
 # mechanical half writes zero new contracts).
 # ADR-0001: features-no-infrastructure and cli-no-infrastructure DELETED. 9 -> 7.
-_RECORDED_CONTRACT_COUNT = 7
+_RECORDED_CONTRACT_COUNT = 6
 
 
 def _ignore_edges_by_contract() -> dict[str, list[str]]:

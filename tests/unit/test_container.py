@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace import container
-from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+from dadaia_workspace.core.session_store import SESSION_GC_TTL_SECONDS
 
 
 def _init_states(tmp_path: Path) -> Path:
@@ -89,9 +89,7 @@ def _seed_stale_lock(tmp_path: Path, *, pid: int | None) -> Path:
     """Plant a TTL-expired lease record under ctx_locks/. Returns its path."""
     ctx_locks = tmp_path / ".dadaia" / "states" / "ctx_locks"
     ctx_locks.mkdir(parents=True, exist_ok=True)
-    hb = (
-        datetime.now(tz=UTC) - timedelta(seconds=kernel_tunables.SESSION_GC_TTL_SECONDS + 600)
-    ).isoformat()
+    hb = (datetime.now(tz=UTC) - timedelta(seconds=SESSION_GC_TTL_SECONDS + 600)).isoformat()
     rec: dict[str, object] = {
         "context": _GC_CTX,
         "release": "v0.1.11",
@@ -99,7 +97,7 @@ def _seed_stale_lock(tmp_path: Path, *, pid: int | None) -> Path:
         "mode": "IMPLEMENTATION",
         "acquired_at": hb,
         "heartbeat": hb,
-        "ttl": kernel_tunables.SESSION_GC_TTL_SECONDS,
+        "ttl": SESSION_GC_TTL_SECONDS,
     }
     if pid is not None:
         rec["pid"] = pid

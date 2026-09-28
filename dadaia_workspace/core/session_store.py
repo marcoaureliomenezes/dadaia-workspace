@@ -31,7 +31,6 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
-from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.core.atomic_write import atomic_write
 
 __all__ = [
@@ -53,6 +52,8 @@ _NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
 #: hook and the doctor consume the canonical names from their single owner (no duplication).
 SESSION_HEARTBEAT_FIELD = "last_seen_at"
 SESSION_GC_TTL_FIELD = "ttl_seconds"
+#: The TTL a record carries from bind, and the one a record without it is judged by.
+SESSION_GC_TTL_SECONDS = 300
 
 
 def _validate(name: str, *, field: str) -> str:
@@ -179,7 +180,7 @@ def new_binding_record(
         "pid": pid,
         "bound_at": now,
         SESSION_HEARTBEAT_FIELD: now,
-        SESSION_GC_TTL_FIELD: kernel_tunables.SESSION_GC_TTL_SECONDS,
+        SESSION_GC_TTL_FIELD: SESSION_GC_TTL_SECONDS,
     }
 
 
@@ -202,7 +203,7 @@ def is_live(
     A missing or unparsable clock or TTL is not live."""
     try:
         seen = datetime.fromisoformat(str(record.get(SESSION_HEARTBEAT_FIELD)))
-        ttl = int(str(record.get(SESSION_GC_TTL_FIELD, kernel_tunables.SESSION_GC_TTL_SECONDS)))
+        ttl = int(str(record.get(SESSION_GC_TTL_FIELD, SESSION_GC_TTL_SECONDS)))
     except (TypeError, ValueError):
         return False
     now = clock() if clock is not None else datetime.now(tz=UTC)

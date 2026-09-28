@@ -73,9 +73,6 @@ Deliberately EXCLUDED:
   test_no_allowlist_or_sanctioned_terms_constant_in_matcher_source — reads
   ``Path(module.__file__)`` after a successful ``import``; a broken path fails the
   import, not the scan.
-* ``tests/unit/core/test_kernel_tunables.py`` :: every case —
-  ``importlib.import_module(dotted)`` on a fixed, parametrized dotted path; a
-  mis-rooted/renamed module fails the import, never scans zero files silently.
 """
 
 from __future__ import annotations

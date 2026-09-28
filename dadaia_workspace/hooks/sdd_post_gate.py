@@ -33,9 +33,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from dadaia_workspace.core import invocation, session_store
-from dadaia_workspace.core.kernel_tunables import RECONCILER_THROTTLE_TTL_SECONDS
 from dadaia_workspace.features.spec_context import markers
 from dadaia_workspace.hooks import _common
+
+#: A second PostToolUse inside this window runs no GC reaper and spawns no git child.
+RECONCILER_THROTTLE_TTL_SECONDS = 30
 
 
 def _refresh_session_record(workspace: Path, sess_id: str) -> dict[str, object] | None:

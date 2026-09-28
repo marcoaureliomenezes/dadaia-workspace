@@ -30,14 +30,13 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from dadaia_workspace.core.cli_line import script_line
-from dadaia_workspace.core.kernel_tunables import BUGS_SCRIPT
 from dadaia_workspace.core.models.bugs import (
     BUG_ARCHIVE_THRESHOLD_DAYS,
     BugRecord,
 )
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore, MalformedLine
+from dadaia_workspace.infrastructure.ledger_scripts import BUGS_SCRIPT
 
 # SPEC-DOC-035 (SPEC v0.12.0 FR5, ADR D5/D9): the single-source invariant — the only two
 # filenames permitted loose directly under ``specs/backlog/``. Anything else (a per-entry
@@ -155,7 +154,7 @@ class GovernanceValidator:
                             f"bugs/BUGS.jsonl record {record.id!r} has been terminal "
                             f"({record.status!r}) since {record.closed_at} — past the "
                             f"{BUG_ARCHIVE_THRESHOLD_DAYS}-day archive threshold; run "
-                            f"'{script_line(BUGS_SCRIPT, 'archive')}' (SPEC-DOC-041, WARNING — never a "
+                            f"'{BUGS_SCRIPT.invocation} archive' (SPEC-DOC-041, WARNING — never a "
                             "block, D15)."
                         ),
                         path=str(ledger_path),

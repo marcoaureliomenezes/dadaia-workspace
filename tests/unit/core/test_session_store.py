@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core import kernel_tunables, session_store
+from dadaia_workspace.core import session_store
 from dadaia_workspace.core import session_store as si
 
 CTX = "myctx"
@@ -118,7 +118,7 @@ def test_new_binding_record_authors_the_schema() -> None:
         "pid": 1234,
         "bound_at": "2026-08-31T12:00:00+00:00",
         "last_seen_at": "2026-08-31T12:00:00+00:00",
-        "ttl_seconds": kernel_tunables.SESSION_GC_TTL_SECONDS,
+        "ttl_seconds": 300,
     }
     # The dead `is_stale: False` field (written by the old inline author, read by
     # nothing) does not survive the fold.

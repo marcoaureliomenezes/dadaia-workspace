@@ -20,9 +20,9 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core import session_store
-from dadaia_workspace.core.kernel_tunables import RECONCILER_THROTTLE_TTL_SECONDS
 from dadaia_workspace.features.spec_context import doctor
 from dadaia_workspace.hooks import _common, sdd_post_gate
+from dadaia_workspace.hooks.sdd_post_gate import RECONCILER_THROTTLE_TTL_SECONDS
 
 _SID = "session-recon"
 _CTX = "demo-ctx"

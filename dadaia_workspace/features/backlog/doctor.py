@@ -50,9 +50,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
-from dadaia_workspace.core.cli_line import script_line
 from dadaia_workspace.core.doctor_rules import Rule
-from dadaia_workspace.core.kernel_tunables import BACKLOG_SCRIPT
 from dadaia_workspace.core.models.backlog import (
     is_intents_exempt,
 )
@@ -61,6 +59,7 @@ from dadaia_workspace.features.backlog.classifier import BoundItem, Verdict, cla
 from dadaia_workspace.features.backlog.document import ActiveItem, DocumentError, load_document
 from dadaia_workspace.features.backlog.subject_registry import BindStatus, Registry, build_registry
 from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
+from dadaia_workspace.infrastructure.ledger_scripts import BACKLOG_SCRIPT
 
 __all__ = [
     "RULES",
@@ -303,14 +302,14 @@ RULES: tuple[LedgerRule, ...] = (
         (BacklogDoctorCode.BL_CONFLICT.value,),
         SECTION,
         _check_conflict,
-        fix_help=f"{script_line(BACKLOG_SCRIPT)} exit <slug> --disposition rejected --reason <the-twin-slug>",
+        fix_help=f"{BACKLOG_SCRIPT.invocation} exit <slug> --disposition rejected --reason <the-twin-slug>",
     ),
     Rule(
         (BacklogDoctorCode.BL_STALE.value,),
         SECTION,
         _check_stale,
         fix_help=(
-            f"{script_line(BACKLOG_SCRIPT)} exit <slug> --disposition <disposition> <--release id|--reason why>"
+            f"{BACKLOG_SCRIPT.invocation} exit <slug> --disposition <disposition> <--release id|--reason why>"
         ),
     ),
 )

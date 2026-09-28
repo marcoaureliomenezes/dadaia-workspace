@@ -16,8 +16,7 @@ from pathlib import Path
 
 from dadaia_workspace.core import frontmatter as _fm
 from dadaia_workspace.core.atomic_write import atomic_write
-from dadaia_workspace.core.cli_line import materialize_line, script_line
-from dadaia_workspace.core.kernel_tunables import MEMORY_SCRIPT
+from dadaia_workspace.core.cli_line import materialize_line
 from dadaia_workspace.core.specs_repair import has_unfilled_angle_placeholders, is_placeholder_atom
 from dadaia_workspace.features.specs import citations, memory_canon, memory_lint
 from dadaia_workspace.features.specs.canon import default_public_dir
@@ -26,6 +25,7 @@ from dadaia_workspace.features.specs.doctor_types import (
     SpecsDoctorIssue,
     _MemoryMdSummary,
 )
+from dadaia_workspace.infrastructure.ledger_scripts import MEMORY_SCRIPT
 
 # ONE home for memory-canon facts (F011): features.specs.memory_canon.
 FORBIDDEN_MEMORY_H2_RE = memory_canon.FORBIDDEN_MEMORY_HEADING_RE
@@ -608,7 +608,7 @@ class MemoryValidator:
                         severity=Severity.WARNING,
                         description=f"catalog.json absent; {len(md_slugs)} feature .md "
                         f"atom{'s' if len(md_slugs) != 1 else ''} present; run "
-                        f"`{script_line(MEMORY_SCRIPT)} catalog generate` to create it.",
+                        f"`{MEMORY_SCRIPT.invocation} catalog generate` to create it.",
                         path=str(catalog_path),
                     )
                 )
@@ -642,7 +642,7 @@ class MemoryValidator:
                     description=(
                         f"catalog.json lists slug '{slug}' but no corresponding "
                         f"'{slug}.md' exists in memory/product/. "
-                        f"Run `{script_line(MEMORY_SCRIPT)} catalog generate` to resync."
+                        f"Run `{MEMORY_SCRIPT.invocation} catalog generate` to resync."
                     ),
                     path=str(product_dir / f"{slug}.md"),
                 )
@@ -657,7 +657,7 @@ class MemoryValidator:
                     description=(
                         f"'{slug}.md' exists in memory/product/ but is not listed in "
                         "catalog.json. "
-                        f"Run `{script_line(MEMORY_SCRIPT)} catalog generate` to resync."
+                        f"Run `{MEMORY_SCRIPT.invocation} catalog generate` to resync."
                     ),
                     path=str(product_dir / f"{slug}.md"),
                 )

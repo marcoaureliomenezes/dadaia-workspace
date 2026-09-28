@@ -14,8 +14,6 @@ import shlex
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
-from dadaia_workspace.core.cli_line import script_line
-from dadaia_workspace.core.kernel_tunables import MEMORY_SCRIPT
 from dadaia_workspace.core.template_history import was_shipped
 from dadaia_workspace.core.workspace_layout import SCOPED_LAW_AREAS, render_registry_tables
 from dadaia_workspace.features.specs import memory_canon
@@ -25,6 +23,7 @@ from dadaia_workspace.features.specs.canon import (
     is_canon_path,
 )
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
+from dadaia_workspace.infrastructure.ledger_scripts import MEMORY_SCRIPT
 
 # TREE-3: memory .md files that must exist.  No Jinja templates — .md is canonical source.
 # v7 canon: the top-level pair is ARCHITECTURE.md and QUALITY.md. A tree still carrying
@@ -121,7 +120,7 @@ class StructuralValidator:
                     description=(
                         f"memory/{rel_path} is missing — required memory .md atom. "
                         f"Author it, then regenerate the pair with "
-                        f"`{script_line(MEMORY_SCRIPT)} catalog generate`."
+                        f"`{MEMORY_SCRIPT.invocation} catalog generate`."
                     ),
                     path=str(target),
                     fixable=False,

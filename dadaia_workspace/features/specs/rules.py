@@ -12,20 +12,19 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from dadaia_workspace.core.cli_line import script_line
 from dadaia_workspace.core.doctor_rules import Rule
-from dadaia_workspace.core.kernel_tunables import (
-    AUDIT_SCRIPT,
-    BACKLOG_SCRIPT,
-    BUGS_SCRIPT,
-    MEMORY_SCRIPT,
-    RELEASE_SCRIPT,
-)
 from dadaia_workspace.features.specs import doctor_adr
 from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
 from dadaia_workspace.features.specs.release_tree import (
     release_memory_issues,
     release_tree_issues,
+)
+from dadaia_workspace.infrastructure.ledger_scripts import (
+    AUDIT_SCRIPT,
+    BACKLOG_SCRIPT,
+    BUGS_SCRIPT,
+    MEMORY_SCRIPT,
+    RELEASE_SCRIPT,
 )
 
 if TYPE_CHECKING:
@@ -137,7 +136,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("CAT-1",),
         lambda d: d._memory.check_cat1_catalog_sync(),
-        fix_help=f"{script_line(MEMORY_SCRIPT)} catalog generate --specs <specs>",
+        fix_help=f"{MEMORY_SCRIPT.invocation} catalog generate --specs <specs>",
     ),
     _rule(
         ("LINT-1",),
@@ -201,7 +200,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-033",),
         lambda d: d._governance.check_bugs_jsonl_invariant(),
-        fix_help=f"{script_line(BUGS_SCRIPT)} update <bug-id> --set <field>=<value>",
+        fix_help=f"{BUGS_SCRIPT.invocation} update <bug-id> --set <field>=<value>",
     ),
     _rule(
         ("SPEC-DOC-034",),
@@ -213,26 +212,26 @@ RULES: tuple[SpecsRule, ...] = (
         ("SPEC-DOC-035",),
         lambda d: d._governance.check_unarchived_terminal_backlog(),
         fix_help=(
-            f"{script_line(BACKLOG_SCRIPT)} exit <slug> --disposition <disposition> <--release id|--reason why>"
+            f"{BACKLOG_SCRIPT.invocation} exit <slug> --disposition <disposition> <--release id|--reason why>"
         ),
     ),
     _rule(
         ("SPEC-DOC-036",),
         lambda d: d._closure_audit.check_audit_disposition(),
         fix_help=(
-            f"{script_line(AUDIT_SCRIPT)} disposition <audit> <finding-id> "
+            f"{AUDIT_SCRIPT.invocation} disposition <audit> <finding-id> "
             "--disposition resolved --release <release>"
         ),
     ),
     _rule(
         ("SPEC-DOC-038",),
         lambda d: d._closure_audit.check_loose_undisposed_audits(),
-        fix_help=f"{script_line(AUDIT_SCRIPT)} close <audit> --sha <sha>",
+        fix_help=f"{AUDIT_SCRIPT.invocation} close <audit> --sha <sha>",
     ),
     _rule(
         ("SPEC-DOC-041",),
         lambda d: d._governance.check_bug_archive_overdue(),
-        fix_help=script_line(BUGS_SCRIPT, "archive"),
+        fix_help=f"{BUGS_SCRIPT.invocation} archive",
     ),
     _rule(
         ("SPEC-DOC-047",),
@@ -263,7 +262,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("RELEASE-TREE-MEMORY",),
         lambda d: release_memory_issues(d.specs_dir),
-        fix_help=(f"{script_line(RELEASE_SCRIPT)} memory --reviewed <slugs> --changed <slugs>"),
+        fix_help=(f"{RELEASE_SCRIPT.invocation} memory --reviewed <slugs> --changed <slugs>"),
     ),
 )
 
