@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -81,7 +82,8 @@ def test_absent_specs_scaffolds_lists_paths_and_commits_nothing(repo: Path) -> N
 
     assert result.exit_code == 0, result.output
     assert "constitution.md" in result.output and "memory/ARCHITECTURE.md" in result.output
-    assert _doctor_errors(repo / "specs") == []
+    # sa-placement-rules-contradict-tree8#B5: a fresh scaffold is doctor-clean — no issue at all.
+    assert [i.to_dict() for i in SpecsDoctor(repo / "specs").check()] == []
     assert _git(repo, "rev-parse", "HEAD") == head
     assert repo.name in (repo / "AGENTS.md").read_text(encoding="utf-8")
     # T-048-11: the tests law governs an existing test tree; init never invents one
@@ -132,16 +134,6 @@ def test_a_v6_tree_ends_v7_with_a_clean_doctor(repo: Path) -> None:
     assert not (repo / "specs-bkp").exists()
 
 
-def test_foreign_tree_non_tty_refusal_leaves_the_tree_byte_identical(repo: Path) -> None:
-    _foreign(repo)
-    before = _snapshot(repo)
-
-    result = _runner.invoke(app, ["specs", "init", "--context", "c"])
-
-    assert result.exit_code == 1, result.output
-    assert _snapshot(repo) == before
-
-
 def test_replace_foreign_moves_to_specs_bkp_staged_then_scaffolds(repo: Path) -> None:
     old = _foreign(repo)
     head = _git(repo, "rev-parse", "HEAD")
@@ -155,19 +147,6 @@ def test_replace_foreign_moves_to_specs_bkp_staged_then_scaffolds(repo: Path) ->
     assert "R100\tspecs/README.md\tspecs-bkp/README.md" in staged
     assert "R100\tspecs/features/login.md\tspecs-bkp/features/login.md" in staged
     assert _doctor_errors(repo / "specs") == []
-
-
-def test_no_context_resolved_exits_1_with_a_fix_line(
-    repo: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The fix names the running CLI (ADR 0045); a host venv outside any workspace (CI)."""
-    from dadaia_workspace.core.cli_line import fix_line
-
-    monkeypatch.setattr(sys, "prefix", str(repo.parent / "host-venv"))
-    result = _runner.invoke(app, ["specs", "init"])
-
-    assert result.exit_code == 1, result.output
-    assert f"fix: {fix_line(None, 'specs', 'init', '--context', '<name>')}" in result.output
 
 
 def test_an_existing_specs_bkp_is_kept_and_the_tree_moves_to_a_stamped_child(
@@ -185,23 +164,6 @@ def test_an_existing_specs_bkp_is_kept_and_the_tree_moves_to_a_stamped_child(
     assert (repo / "specs-bkp" / "old.md").read_text(encoding="utf-8") == "previous backup\n"
     assert [p.name for p in repo.glob("specs-bkp/*/features/login.md")] == ["login.md"]
     assert list(repo.glob("specs-bkp-*")) == []
-
-
-def test_a_symlinked_context_specs_root_is_refused_and_nothing_written(
-    repo: Path, tmp_path: Path
-) -> None:
-    """Review finding 7: ``--context`` routes through the one symlink-refusal seam."""
-    real = tmp_path / "elsewhere-specs"
-    canon.scaffold(real)
-    gitflow.merge_frontmatter(real, specs_pattern_version=6)
-    (repo / "specs").symlink_to(real, target_is_directory=True)
-    before, before_real = _snapshot(repo), _snapshot(real)
-
-    result = _runner.invoke(app, ["specs", "init", "--context", "c"])
-
-    assert result.exit_code != 0, result.output
-    assert "symlink" in result.output.lower()
-    assert (_snapshot(repo), _snapshot(real)) == (before, before_real)
 
 
 # ── T-050-13 (AC6.3): the gitflow flags ──────────────────────────────────────────────
@@ -265,21 +227,54 @@ _PLACEHOLDERS = (
 )
 
 
-def test_specs_init_writes_the_rendered_canon_table(repo: Path) -> None:
+def _symlinked(repo: Path) -> None:
+    real = repo.parents[1] / "elsewhere-specs"
+    canon.scaffold(real)
+    gitflow.merge_frontmatter(real, specs_pattern_version=6)
+    (real / "memory" / "atom.md").write_text("---\nslug: x\nagent_tier: self-pull\n---\n")
+    (repo / "specs").symlink_to(real, target_is_directory=True)
+
+
+_SPECS = "repos/c/specs"
+_REFUSALS = [
+    pytest.param(_foreign, ["specs", "init", "--context", "c"], "--replace-foreign", id="AC4.4-foreign-tree-non-tty"),
+    pytest.param(_symlinked, ["specs", "init", "--context", "c"], "symlink", id="finding-7-symlinked-context-root"),
+    # bug symlinked-specs-root-is-followed-by-migration-and-repair (T-044-40, CWE-59),
+    # sa-specs-upgrade-writes-through-symlinks#B5: every verb refuses at the one seam.
+    pytest.param(_symlinked, ["specs", "upgrade", "--specs-dir", _SPECS], "symlink", id="B5-upgrade-symlinked-root"),
+    pytest.param(_symlinked, ["doctor", "--specs-dir", _SPECS, "--fix"], "symlink", id="B5-doctor-fix-symlinked-root"),
+    # sa-context-repo-mapping-falls-back-to-the-name#B2: a typo never becomes repos/alpah/.
+    pytest.param(lambda r: None, ["specs", "init", "--context", "alpah"], "context list", id="B2-unregistered-context"),
+    pytest.param(lambda r: None, ["specs", "init"], "specs init --context '<name>'", id="ADR-0045-no-context-resolved"),
+]  # fmt: skip
+
+
+@pytest.mark.parametrize(("plant", "argv", "text"), _REFUSALS)
+def test_a_refusal_names_its_fix_and_writes_nothing(
+    repo: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    plant: Callable[[Path], object],
+    argv: list[str],
+    text: str,
+) -> None:
+    monkeypatch.setattr(sys, "prefix", str(repo.parent / "host-venv"))  # no workspace CLI
+    plant(repo)
+    workspace = repo.parents[1]
+    before = _snapshot(workspace)
+
+    result = _runner.invoke(app, argv)
+
+    assert result.exit_code != 0 and text in result.output, result.output
+    assert _snapshot(workspace) == before
+
+
+def test_specs_init_writes_every_law_rendered(repo: Path) -> None:
     """sa-specs-init-writes-unrendered-law#B38-1: specs/AGENTS.md carries the canon
-    table, never the raw placeholder."""
+    table; sa-specs-init-writes-unrendered-law#B38-2: no law file `specs init` writes
+    (specs tree and repo law) keeps a registry placeholder."""
     assert _runner.invoke(app, ["specs", "init", "--context", "c"]).exit_code == 0
 
-    law = (repo / "specs" / "AGENTS.md").read_text(encoding="utf-8")
-    assert "| Area | Members |" in law
-    assert "<!-- specs-canon -->" not in law
-
-
-def test_no_law_writer_leaves_a_registry_placeholder(repo: Path) -> None:
-    """sa-specs-init-writes-unrendered-law#B38-2: every law file `specs init` writes (the
-    specs tree and the repo law) is rendered through the one renderer."""
-    assert _runner.invoke(app, ["specs", "init", "--context", "c"]).exit_code == 0
-
+    assert "| Area | Members |" in (repo / "specs" / "AGENTS.md").read_text(encoding="utf-8")
     raw = [
         f"{path.relative_to(repo)}: {marker}"
         for path in sorted(repo.rglob("*.md"))
@@ -288,15 +283,3 @@ def test_no_law_writer_leaves_a_registry_placeholder(repo: Path) -> None:
         if marker in path.read_text(encoding="utf-8")
     ]
     assert raw == []
-
-
-def test_specs_init_refuses_an_unregistered_context_and_writes_nothing(repo: Path) -> None:
-    """sa-context-repo-mapping-falls-back-to-the-name#B2: `specs init --context alpah` (a
-    typo, no such context) exits non-zero with a `context list` fix and creates no
-    repos/alpah/ — the name never becomes a directory."""
-    workspace = repo.parents[1]
-    result = _runner.invoke(app, ["specs", "init", "--context", "alpah"])
-
-    assert result.exit_code != 0, result.output
-    assert "context list" in result.output
-    assert not (workspace / "repos" / "alpah").exists()
