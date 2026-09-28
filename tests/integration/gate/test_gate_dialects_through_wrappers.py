@@ -82,17 +82,20 @@ def test_b8_every_harness_gets_claudes_verdict(ws: Path, harness: str, case: str
     assert _verdict(harness, _run(ws, harness, case)) == _CLAUDE[case]
 
 
-def test_b1_copilot_denies_pip_with_the_venv_guard_reason_and_fix(ws: Path) -> None:
-    out = json.loads(_run(ws, "copilot", "pip").stdout)
-    assert out["permissionDecision"] == "deny"
-    assert "[VENV GUARD]" in out["permissionDecisionReason"]
-    assert "\nfix: " in out["permissionDecisionReason"]
-
-
-def test_b2_cursor_denies_a_new_root_entry_to_the_agent_with_a_fix(ws: Path) -> None:
-    out = json.loads(_run(ws, "cursor", "new-root").stdout)
-    assert out["permission"] == "deny"
-    assert "\nfix: " in out["agent_message"]
+@pytest.mark.parametrize(
+    ("harness", "case", "decision", "reason", "text"),
+    [
+        ("copilot", "pip", "permissionDecision", "permissionDecisionReason", "[VENV GUARD]"),  # B1
+        ("cursor", "new-root", "permission", "agent_message", "\nfix: "),  # B2
+    ],
+    ids=["b1-copilot-pip", "b2-cursor-new-root"],
+)
+def test_b1_b2_the_deny_reaches_the_agent_with_its_reason_and_fix(
+    ws: Path, harness: str, case: str, decision: str, reason: str, text: str
+) -> None:
+    out = json.loads(_run(ws, harness, case).stdout)
+    assert out[decision] == "deny"
+    assert text in out[reason] and "\nfix: " in out[reason]
 
 
 def test_b3_devin_hook_file_has_the_documented_shape_and_denies(ws: Path) -> None:
