@@ -644,139 +644,80 @@ class SpecContextService:
 
     # ------------------------------------------------------------------ dead (T-10b / T-11)
 
-    def _enforce_dead_review_gate(
-        self, name: str, repo_path: Path, *, commit: bool, repo_slug: str
-    ) -> None:
-        """Gate dead() on untracked content (F-5 / AC-R7-01), one repo of the set.
-
-        No untracked files ⇒ no-op (clean-tree / tracked-only path unchanged).
-        Untracked files + not *commit* ⇒ raise DeadReviewRequiredError (refuse).
-        Untracked files + *commit* ⇒ secret-scan their content; any match raises
-        DeadSecretFoundError. This runs before any commit/push/hold so a refusal
-        leaves every repo untouched (A16.2: called from dead()'s preflight sweep over
-        the whole set — main and every associated repo alike — before any of them is
-        acted on). *repo_slug* is folded into every raised message so a multi-repo
-        refusal names which repo of the set it is (A16.2).
-        """
-        try:
-            untracked = self._git.list_untracked(repo_path)
-        except Exception:
-            # Fail-closed for the gate: if we cannot enumerate untracked files we
-            # cannot prove the tree is clean. Without consent, refuse.
-            if commit:
-                return
-            raise DeadReviewRequiredError(
-                f"Context '{name}': could not verify the working tree of repo "
-                f"'{repo_slug}' at '{repo_path}'; consent to committing its changes.\n"
-                f"fix: {fix_line(self._workspace_root, 'context', 'dead', name, '--commit')}"
-            ) from None
-
-        if not untracked:
-            return  # clean tree (no untracked files) — behave exactly as before
-
-        if not commit:
-            shown = untracked[:20]
-            more = "" if len(untracked) <= 20 else f"\n  ... and {len(untracked) - 20} more"
-            listing = "\n".join(f"  {f}" for f in shown)
-            raise DeadReviewRequiredError(
-                f"Context '{name}': repo '{repo_slug}' has {len(untracked)} untracked "
-                f"file(s) that dead() would otherwise commit and push WITHOUT review:\n"
-                f"{listing}{more}\n"
-                "Review them, then delete/gitignore them or consent to committing them.\n"
-                f"fix: {fix_line(self._workspace_root, 'context', 'dead', name, '--commit')}"
-            )
-
-        # commit=True: scan the content of the files we are about to newly commit.
-        if flagged := self._secret_scan(repo_path, untracked):
-            report = "\n".join(f"  {rel}: {hit}" for rel, hit in flagged.items())
-            fix = git_line(repo_path, "stash", "push", "-u", "--", *flagged)
-            raise DeadSecretFoundError(
-                f"Context '{name}': repo '{repo_slug}' secret scan blocked dead() "
-                f"--commit. {len(flagged)} untracked file(s) match a secret/identifier "
-                "rule (values redacted):\n"
-                f"{report}\n"
-                f"Nothing was pushed.\nfix: {fix}"
-            )
+    def _dead_preflight(self, name: str, ctx: SpecContextProject, *, commit: bool) -> None:
+        """Refuse, before any repo of the set is touched (A16.2), what dead() would lose or
+        push unreviewed: no origin URL, untracked files without *commit* (F-5) or holding a
+        secret, unpushed branches or a linked worktree, a dirty tree without git identity,
+        changes to sync off a work branch. Every refusal names its repo."""
+        main_repo = self._repo_path(ctx.repo_slug)
+        for repo in ctx.all_repos():
+            slug, path = repo.slug, self._repo_path(repo.slug)
+            lead = f"Context '{name}': repo '{slug}'"
+            if path.exists() and not repo.url:
+                raise RepoUrlMissingError(
+                    f"{lead} has no clone URL (no origin remote) — removing it would leave "
+                    "nothing 'context alive' could clone back. Nothing was touched.\nfix: "
+                    + git_line(path, "remote", "add", "origin", "<clone-url>")
+                )
+            if not (path.exists() and self._git.is_git_root(path)):
+                continue
+            if (untracked := self._git.list_untracked(path)) and not commit:
+                more = f"\n  ... and {len(untracked) - 20} more" if len(untracked) > 20 else ""
+                listing = "\n".join(f"  {f}" for f in untracked[:20])
+                raise DeadReviewRequiredError(
+                    f"{lead} has {len(untracked)} untracked file(s) that dead() would otherwise "
+                    f"commit and push WITHOUT review:\n{listing}{more}\n"
+                    "Review them, then delete/gitignore them or consent to committing them.\n"
+                    f"fix: {fix_line(self._workspace_root, 'context', 'dead', name, '--commit')}"
+                )
+            if flagged := self._secret_scan(path, untracked):
+                report = "\n".join(f"  {rel}: {hit}" for rel, hit in flagged.items())
+                raise DeadSecretFoundError(
+                    f"{lead} secret scan blocked dead() --commit. {len(flagged)} untracked "
+                    f"file(s) match a secret/identifier rule (values redacted):\n{report}\n"
+                    "Nothing was pushed.\nfix: "
+                    + git_line(path, "stash", "push", "-u", "--", *flagged)
+                )
+            lost = self._git.unrecoverable(path)
+            if tree := sweep.linked_worktree(self._workspace_root, path):
+                gdir = sweep.worktree_git_dir(tree)
+                lost.append(git_line(gdir, "worktree", "move", str(tree), "<keep-dir>"))
+            if lost:
+                raise DeadUnpushedCommitsError(
+                    f"{lead} holds {len(lost)} linked worktree(s) or unpushed branch(es) "
+                    f"dead() would lose. Nothing was touched.\nfix: {lost[0]}"
+                )
+            dirty = self._git.is_dirty(path)
+            if not (self._git.has_commits(path) and (dirty or self._git.unpushed(path))):
+                continue
+            if dirty and (fix := self._git.identity_fix(path)):
+                raise ContextStateError(
+                    f"{lead} has changes to commit and git identity unknown. "
+                    f"Nothing was touched.\nfix: {fix}"
+                )
+            flow, _ = self._git.gitflow(path, main_repo)
+            branch = self._git.current_branch(path)
+            if flow.role_of(branch) != "work":
+                raise DeadReviewRequiredError(
+                    f"{lead} is on '{branch or 'a detached HEAD'}', which the gitflow never "
+                    "pushes directly — dead() would commit and push its changes there. "
+                    "Nothing was touched.\nfix: "
+                    + git_line(path, "checkout", "-b", flow.work_pattern)
+                )
 
     def dead(self, name: str, *, commit: bool = False) -> SpecContextProject:
-        """Transition a context from ALIVE to DEAD; sets dead_since, holds every repo.
-
-        FR16/A16.2: covers the whole set — the main repo, then every associated repo
-        (``SpecContextProject.all_repos()``, the one accessor, A15.3) — in **two**
-        passes over the same loop, never a second resolution path:
-
-        1. **Preflight** every repo in the set, mutating nothing. Untracked
-           non-gitignored files and *commit* is False ⇒ ``DeadReviewRequiredError``,
-           naming the repo (F-5 / AC-R7-01). ``commit=True`` runs the secret scan over
-           those files' content; any match ⇒ ``DeadSecretFoundError``, naming the repo.
-           A repo carrying local commits with **no remote at all** to receive them
-           (``has_commits() and not has_remote()``) ⇒ ``DeadUnpushedCommitsError``,
-           naming the repo — removing it would destroy those commits irrecoverably (see
-           ``DeadUnpushedCommitsError`` for why this check stays narrower than "any
-           commit ahead of the last push"). Any refusal here leaves **every** repo in
-           the set untouched (no partial dead). A repo with changes to sync must sit on a
-           work branch of its gitflow (``GitSubprocessClient.gitflow``) — the only branch the
-           pre-push gate lets it push — else it is refused before anything is committed.
-        2. **Act** on every repo only once every repo has cleared the preflight:
-           tracked-but-dirty modifications auto-sync (commit + push, FR-R7 — only
-           untracked content is gated), then the repo is removed. A clean tree behaves
-           exactly as before.
-
-        Concurrent races are accepted and surface through git; this operation
-        never waits for or refuses another session.
-        """
+        """ALIVE -> DEAD over the whole set (FR16/A16.2): back-fill every URL from origin
+        (FR-W2-03 b), preflight every repo mutating nothing, then auto-sync (commit + push,
+        FR-R7) and hold each repo. Races surface through git (NO-LOCKS)."""
         ctx = self.show(name)
         if ctx.state != ContextState.ALIVE:
             raise ContextStateError(
                 f"Context '{name}' is not ALIVE. It cannot be made DEAD.\nfix: "
                 + fix_line(self._workspace_root, "context", "alive", name)
             )
-
-        # Back-fill every URL from the on-disk origin while the repos still exist
-        # (FR-W2-03 b), BEFORE the hold below — a DEAD record stays re-obtainable.
         ctx = self._backfilled(ctx)
         repo_paths = [(repo.slug, self._repo_path(repo.slug)) for repo in ctx.all_repos()]
-
-        # Phase 1 — preflight EVERY repo before mutating ANY (A16.2: no partial dead).
-        main_repo = self._repo_path(ctx.repo_slug)
-        for repo in ctx.all_repos():
-            slug, repo_path = repo.slug, self._repo_path(repo.slug)
-            if repo_path.exists() and not repo.url:
-                raise RepoUrlMissingError(
-                    f"Context '{name}': repo '{slug}' has no clone URL (no origin remote) — "
-                    "removing it would leave nothing 'context alive' could clone back. "
-                    "Nothing was touched.\nfix: "
-                    + git_line(repo_path, "remote", "add", "origin", "<clone-url>")
-                )
-            if repo_path.exists() and self._git.is_git_root(repo_path):
-                self._enforce_dead_review_gate(name, repo_path, commit=commit, repo_slug=slug)
-                lost = self._git.unrecoverable(repo_path)
-                if tree := sweep.linked_worktree(self._workspace_root, repo_path):
-                    gdir = sweep.worktree_git_dir(tree)
-                    lost.append(git_line(gdir, "worktree", "move", str(tree), "<keep-dir>"))
-                if lost:
-                    raise DeadUnpushedCommitsError(
-                        f"Context '{name}': repo '{slug}' holds {len(lost)} linked worktree(s) "
-                        f"or unpushed branch(es) dead() would lose. Nothing was touched.\n"
-                        f"fix: {lost[0]}"
-                    )
-                if self._git.has_commits(repo_path) and (
-                    self._git.is_dirty(repo_path) or self._git.unpushed(repo_path)
-                ):
-                    if self._git.is_dirty(repo_path) and (fix := self._git.identity_fix(repo_path)):
-                        raise ContextStateError(
-                            f"Context '{name}': repo '{slug}' has changes to commit and git "
-                            f"identity unknown. Nothing was touched.\nfix: {fix}"
-                        )
-                    flow, _ = self._git.gitflow(repo_path, main_repo)
-                    branch = self._git.current_branch(repo_path)
-                    if flow.role_of(branch) != "work":
-                        raise DeadReviewRequiredError(
-                            f"Context '{name}': repo '{slug}' is on '{branch or 'a detached HEAD'}'"
-                            ", which the gitflow never pushes directly — dead() would commit and "
-                            "push its changes there. Nothing was touched.\nfix: "
-                            + git_line(repo_path, "checkout", "-b", flow.work_pattern)
-                        )
+        self._dead_preflight(name, ctx, commit=commit)
 
         # Phase 2 — git sync + hold for every repo. Races are accepted by the
         # NO-LOCKS doctrine.

@@ -728,17 +728,16 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
     "service.SpecContextService._require_publishable": (
         Case(_secret_draft, _baseline_done, operator=_drop_secret),
     ),
-    "service.SpecContextService._enforce_dead_review_gate": (
-        Skip("fires only when `git ls-files` itself fails on a git root"),
+    "service.SpecContextService._dead_preflight": (
         Case(_untracked, _dead_done, replaces=True),
         Case(_secret_untracked, _dead_done),
-    ),
-    "service.SpecContextService.dead": (
-        Case(_dead_twice, _dead_done),
         Case(_no_origin, _dead_done),
         (Case(_unpushed_side_branch, _dead_done), Case(_commits_no_remote, _dead_done)),
         Case(_dead_no_identity, _dead_done),
         Case(_dirty_on_integration, _dead_via_work),
+    ),
+    "service.SpecContextService.dead": (
+        Case(_dead_twice, _dead_done),
         Case(
             _dead_denylisted,
             _dead_done,
