@@ -58,92 +58,41 @@ def test_codex_effort_clamp_map(claude_effort: str, codex_effort: str) -> None:
     assert codex_effort_for_claude_effort(claude_effort) == codex_effort  # type: ignore[arg-type]
 
 
-@pytest.mark.parametrize(
-    ("name", "agent", "overlay_fn", "expected"),
-    [
-        (
-            "no_overlay_resolves_balanced_default",
-            "dd-software-engineer",
-            lambda: None,
-            ("claude-opus-5-5", "low", "default"),
-        ),
-        (
-            "applied_template_resolves_source_template",
-            "dd-product-engineer",
-            lambda: AgentModelPolicyOverlay(applied_template="max-quality", overrides={}),
-            ("claude-fable-5-1", "high", "template"),
-        ),
-        (
-            # AC-3: template max-quality + override {SE: model=opus-4-8} →
-            # SE = opus-4-8 (override model) / medium (template effort), source=override.
-            "per_field_override_merges_with_applied_template",
-            "dd-software-engineer",
-            lambda: AgentModelPolicyOverlay(
-                applied_template="max-quality",
-                overrides={"dd-software-engineer": AgentModelOverride(model="claude-opus-4-8")},
-            ),
-            ("claude-opus-4-8", "medium", "override"),
-        ),
-        (
-            "effort_only_override_keeps_template_model",
-            "dd-software-engineer",
-            lambda: AgentModelPolicyOverlay(
-                applied_template=None,
-                overrides={"dd-software-engineer": AgentModelOverride(effort="max")},
-            ),
-            ("claude-opus-5-5", "max", "override"),
-        ),
-        (
-            "full_override_beats_template",
-            "dd-product-engineer",
-            lambda: AgentModelPolicyOverlay(
-                applied_template="max-quality",
-                overrides={
-                    "dd-product-engineer": AgentModelOverride(
-                        model="claude-haiku-4-5-20251001", effort="low"
-                    )
-                },
-            ),
-            ("claude-haiku-4-5-20251001", "low", "override"),
-        ),
-        (
-            # AC-3: an unrelated agent keeps the applied template when only ONE
-            # other agent in the overlay is overridden.
-            "ac3_other_agents_keep_applied_template_when_only_one_overridden",
-            "dd-product-engineer",
-            lambda: AgentModelPolicyOverlay(
-                applied_template="max-quality",
-                overrides={"dd-software-engineer": AgentModelOverride(model="claude-opus-4-8")},
-            ),
-            ("claude-fable-5-1", "high", "template"),
-        ),
-    ],
+SE, PE = "dd-software-engineer", "dd-product-engineer"
+MAXQ_SE_OPUS48 = AgentModelPolicyOverlay(
+    applied_template="max-quality", overrides={SE: AgentModelOverride(model="claude-opus-4-8")}
 )
+
+
+@pytest.mark.parametrize(
+    ("agent", "overlay", "expected"),
+    [
+        pytest.param(SE, None, ("claude-opus-5-5", "low", "default"), id="no_overlay_resolves_balanced_default"),
+        pytest.param(PE, AgentModelPolicyOverlay(applied_template="max-quality", overrides={}), ("claude-fable-5-1", "high", "template"), id="applied_template_resolves_source_template"),
+        pytest.param(SE, MAXQ_SE_OPUS48, ("claude-opus-4-8", "medium", "override"), id="ac3_per_field_override_merges_with_applied_template"),
+        pytest.param(SE, AgentModelPolicyOverlay(applied_template=None, overrides={SE: AgentModelOverride(effort="max")}), ("claude-opus-5-5", "max", "override"), id="effort_only_override_keeps_template_model"),
+        pytest.param(PE, AgentModelPolicyOverlay(applied_template="max-quality", overrides={PE: AgentModelOverride(model="claude-haiku-4-5-20251001", effort="low")}), ("claude-haiku-4-5-20251001", "low", "override"), id="full_override_beats_template"),
+        pytest.param(PE, MAXQ_SE_OPUS48, ("claude-fable-5-1", "high", "template"), id="ac3_other_agents_keep_applied_template_when_only_one_overridden"),
+    ],
+)  # fmt: skip
 def test_resolve_agent_model_precedence_table(
-    name: str,
-    agent: str,
-    overlay_fn: object,
-    expected: tuple[str, str | None, str],
+    agent: str, overlay: AgentModelPolicyOverlay | None, expected: tuple[str, str | None, str]
 ) -> None:
-    overlay = overlay_fn()  # type: ignore[operator]
+    """FR4: override (per field) > applied template > ``balanced`` default."""
     resolved = resolve_agent_model(agent, overlay)
     assert (resolved.model, resolved.effort, resolved.source) == expected
 
 
 @pytest.mark.parametrize(
-    ("name", "agent", "overlay_fn", "match"),
+    ("agent", "overlay", "match"),
     [
-        ("unknown_agent", "not-an-agent", lambda: None, "unknown agent"),
-        (
-            "unknown_applied_template",
-            "dd-software-engineer",
-            lambda: AgentModelPolicyOverlay(applied_template="nope", overrides={}),
-            "nope",
-        ),
+        pytest.param("not-an-agent", None, "unknown agent", id="unknown_agent"),
+        pytest.param(SE, AgentModelPolicyOverlay(applied_template="nope", overrides={}), "nope", id="unknown_applied_template"),
     ],
-)
+)  # fmt: skip
 def test_resolve_agent_model_rejects_unknown(
-    name: str, agent: str, overlay_fn: object, match: str
+    agent: str, overlay: AgentModelPolicyOverlay | None, match: str
 ) -> None:
+    """An unknown agent or template is refused by name."""
     with pytest.raises(ValueError, match=match):
-        resolve_agent_model(agent, overlay_fn())  # type: ignore[operator]
+        resolve_agent_model(agent, overlay)
