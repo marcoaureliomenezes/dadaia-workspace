@@ -135,7 +135,7 @@ with a RED test. Completed work leaves as a `handoff-v1` record, validated by
 ## Documentation
 
 <!-- derived-from: pypi-distribution sha256:618098346ed6 -->
-<!-- derived-from: public-asset-distribution sha256:21ece44530ea -->
+<!-- derived-from: public-asset-distribution sha256:897b1897c2bb -->
 
 The documentation is the repository's [docs folder](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs):
 
