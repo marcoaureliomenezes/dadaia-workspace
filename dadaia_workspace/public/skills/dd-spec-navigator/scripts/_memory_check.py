@@ -20,7 +20,7 @@ import _memory_catalog as cat  # noqa: E402
 from _memory_schema import CATALOG, CODE, INDEX  # noqa: E402
 
 Finding = dict[str, Any]
-FIX_PREFIX = "python3 .agents/skills/dd-spec-navigator/scripts/memory.py"
+FIX_PREFIX = f"{Path(sys.executable).as_posix()} {Path(__file__).resolve().with_name('memory.py')}"
 
 
 def check(specs: Path) -> list[Finding]:

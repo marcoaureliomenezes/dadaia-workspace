@@ -127,7 +127,7 @@ def _unrunnable(script: LedgerScript, reason: str) -> SectionFinding:
     )
 
 
-def _finding(script: LedgerScript, record: dict[str, Any]) -> SectionFinding:
+def _finding(script: LedgerScript, record: dict[str, Any], specs_dir: Path) -> SectionFinding:
     unit = f"{record.get('path', '')}:{record.get('line', 0)}".strip(":")
     return SectionFinding(
         code=str(record.get("code") or script.code),
@@ -135,7 +135,11 @@ def _finding(script: LedgerScript, record: dict[str, Any]) -> SectionFinding:
         message=f"{unit} {record.get('message', '')}".strip(),
         canonical=False,
         error=str(record.get("verdict") or "error") == "error",
-        fix=str(record.get("fix") or f"{script.invocation} check --specs specs"),
+        fix=str(
+            record.get("fix")
+            or f"Operator action: {specs_dir.resolve() / record['path']} line "
+            f"{record.get('line', 0)} is invalid; repair that line by hand, then commit."
+        ),
     )
 
 
@@ -158,7 +162,7 @@ def script_findings(specs_dir: Path, runner: _Runner | None = None) -> list[Sect
         if records is None:
             findings.append(_unrunnable(script, f"check exited {result.returncode} with no JSON"))
             continue
-        findings.extend(_finding(script, record) for record in records)
+        findings.extend(_finding(script, record, specs_dir) for record in records)
     return findings
 
 

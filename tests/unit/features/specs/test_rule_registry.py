@@ -49,6 +49,7 @@ def test_active_release_is_parsed_once_per_check_run(tmp_path: Path, monkeypatch
 def test_fix_dispatch_and_help_derive_from_the_registry() -> None:
     fixable = set(rules_mod.FIX_BY_CODE)
     assert fixable == {
+        "TREE-3",  # sa-unfixable-doctor-findings-say-doctor-fix: seeds a missing atom
         "TREE-4",
         "TREE-5",
         "SPEC-DOC-034",
@@ -59,7 +60,6 @@ def test_fix_dispatch_and_help_derive_from_the_registry() -> None:
     help_text = rules_mod.render_fix_help()
     for code in fixable:
         assert code in help_text, code
-    assert "TREE-3" not in help_text, "--fix help claimed TREE-3 fixable; it is not"
     assert "TREE-8" not in help_text, "TREE-8 is never auto-fixed (decision D8)"
 
 

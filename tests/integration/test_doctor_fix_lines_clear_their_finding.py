@@ -39,8 +39,14 @@ from typing import Any
 
 import pytest
 
+from dadaia_workspace.cli.commands.doctor import (
+    _build_specs_doctor,
+    _ledgers_section,
+    _specs_render,
+    _specs_section,
+)
 from dadaia_workspace.cli.help_digest import command_paths
-from dadaia_workspace.core.doctor_rules import Rule, rule_fix
+from dadaia_workspace.core.doctor_rules import Rule, rule_fix, run_section
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.specs.citations import dead_verb_citations
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
@@ -48,7 +54,9 @@ from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIs
 from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 from tests.fixtures.harness_env import session_home
 
-from ..unit.features.specs.test_doctor import _make_clean_specs_tree
+from ..unit.features.specs.test_doctor import _make_clean_specs_tree, _write_release_jsonl
+from ..unit.features.specs.test_doctor_bugs_jsonl import _record
+from .test_backlog_doctor import _SOURCE, _active_entry
 
 _RELEASE = "1.2.3"
 
@@ -63,6 +71,52 @@ class Plant:
 
 def _plant_missing_memory_document(root: Path) -> None:
     (root / "specs" / "memory" / "QUALITY.md").unlink()
+
+
+def _plant_headingless_memory_document(root: Path) -> None:
+    quality = root / "specs" / "memory" / "QUALITY.md"
+    quality.write_text("---\nslug: quality\n---\n\nno heading here\n", encoding="utf-8")
+
+
+def _plant_nothing(root: Path) -> None:
+    """The fixture already carries it (no audits/, bugs/ dirs; no backlog/_archive/;
+    the legacy RELEASE.json name)."""
+
+
+def _plant_placeholder_atom(root: Path) -> None:
+    atom = root / "specs" / "memory" / "product" / "testarea" / "raw.md"
+    atom.write_text("---\nslug: SLUG_PLACEHOLDER\n---\n# TITLE_PLACEHOLDER\n", encoding="utf-8")
+
+
+def _plant_missing_root_agents(root: Path) -> None:
+    (root / "specs" / "AGENTS.md").unlink(missing_ok=True)
+
+
+def _plant_old_pattern_version(root: Path) -> None:
+    constitution = root / "specs" / "constitution.md"
+    constitution.write_text(
+        "---\nspecs_pattern_version: 6\n---\n" + constitution.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+
+
+def _plant_fixed_block_gone(root: Path) -> None:
+    """A memory document whose fixed law block was deleted by hand."""
+    quality = root / "specs" / "memory" / "QUALITY.md"
+    text = quality.read_text(encoding="utf-8")
+    head, _, rest = text.partition("<!-- dadaia:fixed slop-tests -->")
+    quality.write_text(head + rest.partition("<!-- /dadaia:fixed slop-tests -->\n")[2])
+
+
+def _plant_fixed_block_drifted(root: Path) -> None:
+    """A memory document whose fixed law block was edited by hand."""
+    quality = root / "specs" / "memory" / "QUALITY.md"
+    text = quality.read_text(encoding="utf-8")
+    quality.write_text(
+        text.replace(
+            "<!-- dadaia:fixed slop-tests -->\n", "<!-- dadaia:fixed slop-tests -->\n- edited\n"
+        )
+    )
 
 
 def _plant_gitflow_gone(root: Path) -> None:
@@ -147,79 +201,34 @@ def _plant_stray_dotfile(root: Path) -> None:
 #: code -> how to make it fire. The eight remedies the 0.4.7 candidate-2 review named,
 #: plus the memory-document pair they share a shape with.
 PLANTS: dict[str, Plant] = {
-    "SPEC-DOC-002": Plant(
-        _plant_missing_memory_document, {"<document>": "QUALITY", "<title>": "Quality"}
-    ),
-    "SPEC-DOC-004": Plant(
-        _plant_status_line_gone,
-        {
-            "<id>": _RELEASE,
-            "<document>": "SPEC",
-            "<Approved|In review|Draft>": "Approved",
-        },
-    ),
+    # sa-unfixable-doctor-findings-say-doctor-fix#S2 — the doctor's own repairs, run as
+    # printed (`doctor --fix --specs-dir <specs>`).
+    "TREE-4": Plant(_plant_nothing),
+    "TREE-5": Plant(_plant_missing_root_agents),
+    "SPEC-DOC-034": Plant(_plant_nothing),
+    "MEM-PLACEHOLDER-1": Plant(_plant_placeholder_atom),
+    "FIXED-1": Plant(_plant_fixed_block_gone),
+    "FIXED-2": Plant(_plant_fixed_block_drifted),
+    "SPECS-VERSION": Plant(_plant_old_pattern_version),
     "SPEC-DOC-005": Plant(_plant_oversized_plan),
     "GITFLOW-1": Plant(_plant_gitflow_gone, {"<specs>": "specs"}),
-    "SPEC-DOC-048": Plant(_plant_origin_line_gone, {"<id>": _RELEASE}),
     "AGENTS-PLACEHOLDER-1": Plant(_plant_tests_agents_placeholder),
     "TREE-2": Plant(_plant_root_spec_md),
-    "TREE-3": Plant(
-        _plant_missing_memory_document, {"<document>": "QUALITY", "<title>": "Quality"}
-    ),
-    "TREE-8": Plant(
-        _plant_stray_dotfile,
-        {"<path>": "specs/.DS_Store", "<canon path|outside specs/>": ".DS_Store"},
-    ),
-}
-
-_UNEXERCISED: dict[str, str] = {
-    "SPEC-DOC-001": "the fix appends a constitution section header; the check reads the "
-    "public fixed-section fragments, which a tmp tree does not carry",
-    "MEM-PLACEHOLDER-1": "auto-fixed rule: `doctor --fix` runs its own fixer, covered by "
-    "tests/unit/features/specs/test_doctor.py placeholder-atom cases",
-    "SPEC-DOC-003": "the fix is `git rm specs/ACTIVE.md` — a deprecated "
-    "layout no longer scaffolded anywhere",
-    "TREE-4": "auto-fixed rule (`fix_tree4`), covered by the structural doctor unit tests",
-    "TREE-5": "auto-fixed rule (`fix_tree5`), covered by the structural doctor unit tests",
-    "TREE-7": "the fix redacts a session id inside BUGS.jsonl; the value is per-record "
-    "and redaction is covered by the redaction suite",
-    "RELEASE-TREE-MEMORY": "the fix runs `release.py memory` over the ledger-derived "
-    "commit window; the rule's own cases are tests/unit/features/specs/test_release_tree.py",
-    "SPEC-DOC-038": "the fix is `audit.py close`, exercised by tests/unit/skills/test_audit_project_audit_script.py",
-    "LINT-1": "the fix inserts one missing frontmatter field; which field is per-atom",
-    "ADR-SUPERSEDED-CITATION": "no auto-fix by design (the successor is a judgment); covered "
-    "by tests/unit/features/specs/test_doctor_adr_citations.py",
-    "MEM-DRIFT-1": "the fix rewrites one ARCHITECTURE.md package line against the real "
-    "package tree, which a tmp specs tree has none of",
-    "MEM-DRIFT-2": "the fix rewrites one dead citation inside one memory atom against "
-    "the live command tree and repo; both are the real repo's, which a tmp specs tree "
-    "has none of (the rule itself: tests/unit/features/specs/test_doctor_memory_"
-    "citations.py)",
-    "FIXED-1/FIXED-2": "auto-fixed rule (`fix_fixed_section`), covered by "
-    "tests/contract/test_fixed_sections_canon.py",
-    "SPECS-VERSION": "the fix is `specs upgrade`, exercised by the specs upgrade suite",
-    "SPEC-DOC-024": "the fix rewrites a phase marker to the _RELEASE.json phase; the "
-    "value is per-document",
-    "SPEC-DOC-026": "the fix renames one of two duplicate release dirs; which one is the "
-    "operator's call",
-    "SPEC-DOC-027": "the fix renames a non-canon release dir to its M.m.p form; the "
-    "target name is judgment",
-    "SPEC-DOC-030": "the fix renames an audit dir to <YYYYMMDD>-<slug>; the date is judgment",
-    "SPEC-DOC-033": "the fix is `bugs update`, exercised by the bugs CLI suite",
-    "SPEC-DOC-034": "auto-fixed rule (`fix_archive_dir`), covered by the closure-audit "
-    "doctor unit tests",
-    "SPEC-DOC-035": "the fix is `backlog archive`, exercised by the backlog CLI suite",
-    "SPEC-DOC-036": "the fix dispositions a finding inside an ARCHIVED audit dir; "
-    "`dadaia audit disposition` acts on live audits only, and `dadaia audit close` is "
-    "what stops an audit reaching _archive/ with an open finding at all",
-    "SPEC-DOC-041": "the fix is `bugs archive`, exercised by the bugs CLI suite",
-    "SPEC-DOC-047": "the fix deletes a memory task line from TASKS.md; the line is "
-    "operator content",
-    "RELEASE-TREE-SCHEMA/RELEASE-TREE-PARSE/RELEASE-TREE-TS-ORDER/RELEASE-TREE-PHASE/"
-    "RELEASE-TREE-ARCHIVED/RELEASE-TREE-TRIO/RELEASE-TREE-STATE-MISSING": "the fix "
-    "rewrites one _RELEASE.json value; which value depends on which of the seven "
-    "conformance codes fired; the two archive codes name `dadaia release fold`, "
-    "exercised by tests/unit/features/specs/test_candidate_fold.py",
+    "SPEC-DOC-041": Plant(
+        lambda r: _write(
+            r / "specs/bugs/BUGS.jsonl",
+            json.dumps(
+                _record(
+                    "old",
+                    status="resolved",
+                    ts="2020-01-01T00:00:00Z",
+                    closed_at="2020-01-02T00:00:00Z",
+                )
+            )
+            + "\n",
+        )
+    ),  # fmt: skip
+    "TREE-3": Plant(_plant_missing_memory_document),
 }
 
 
@@ -242,8 +251,15 @@ def _repo(tmp_path: Path) -> Path:
     return tmp_path
 
 
+def _doctor(root: Path) -> SpecsDoctor:
+    """The specs doctor the CLI builds for *root* (templates, public tree, repo root)."""
+    doctor = _build_specs_doctor(root / "specs", None)
+    assert doctor is not None
+    return doctor
+
+
 def _run_rule(root: Path, rule: Rule[SpecsDoctor, SpecsDoctorIssue]) -> list[SpecsDoctorIssue]:
-    return rule.run(SpecsDoctor(root / "specs"))
+    return rule.run(_doctor(root))
 
 
 def _resolve(fix: str, plant: Plant) -> str:
@@ -272,6 +288,9 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
 
     before = _run_rule(root, rule)
     assert before, f"{code}: the fixture did not make the rule fire"
+    whole_before = _whole(root)
+    if code == "TREE-3":  # sa-missing-memory-file-reported-twice: one finding for one fact
+        assert [f[0] for f in whole_before if "memory/QUALITY.md" in f[1]] == ["TREE-3"]
     dead = [
         v
         for issue in before
@@ -287,8 +306,15 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
         )
         return
 
+    # sa-unfixable-doctor-findings-say-doctor-fix#S2: run the fix PRINTED on the finding
+    # (its own, or the rule's default stamped by the doctor), never the rule default blind.
     # The fixture is no workspace: the fix names the CLI of the venv running this suite.
-    command = _resolve(rule_fix(rule, None), plant)
+    (printed, *_) = run_section(
+        "specs", [rule], _doctor(root), _specs_render, None, root / "specs"
+    ).findings
+    # sa-unfixable-doctor-findings-say-doctor-fix#S1: no `<…>` survives into a printed fix.
+    assert not re.search(r"<[^<>]+>", printed.fix), f"{code}: placeholder in {printed.fix}"
+    command = _resolve(printed.fix, plant)
     done = subprocess.run(
         ["bash", "-c", command],
         cwd=root,
@@ -297,30 +323,21 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
         text=True,
         check=False,
     )
-    assert done.returncode == 0, f"{code}: the fix line failed:\n{command}\n{done.stderr}"
-    after = _run_rule(root, rule)
-    assert not after, (
-        f"{code}: the fix line ran but the finding survives — "
-        f"{[i.description for i in after]}\n{command}"
+    # `doctor --fix` exits 1 while the fixture's unrelated findings remain; the judge is
+    # sa-unfixable-doctor-findings-say-doctor-fix#S2: re-run the WHOLE doctor — this
+    # finding (its message) is gone and the fix created no new error elsewhere.
+    after = _whole(root)
+    assert (code, printed.message, printed.error) not in after, (
+        f"{code}: survives\n{command}\n{done.stderr}"
     )
+    new_errors = {f for f in after - whole_before if f[2]}
+    assert not new_errors, f"{code}: the fix created {new_errors}"
 
 
-def test_every_specs_rule_is_either_exercised_or_listed_with_a_reason() -> None:
-    """The census: no rule falls out of this module silently."""
-    accounted: set[str] = set()
-    missing: list[str] = []
-    for rule in SPECS_RULES:
-        key = "/".join(rule.codes)
-        if any(code in PLANTS for code in rule.codes):
-            accounted.add(key)
-            continue
-        if key in _UNEXERCISED:
-            accounted.add(key)
-            continue
-        missing.append(key)
-    assert not missing, f"doctor rules with neither a plant nor a skip reason: {missing}"
-    stale = set(_UNEXERCISED) - accounted
-    assert not stale, f"skip reasons for rules that no longer exist: {stale}"
+def _whole(root: Path) -> set[tuple[str, str, bool]]:
+    """Every finding of the whole specs section: (code, message, error-class)."""
+    report = _specs_section(_doctor(root), None)
+    return {(f.code, f.message, f.error) for f in report.findings}
 
 
 def _iter_fix_helps() -> list[tuple[str, Any]]:
@@ -349,24 +366,92 @@ def test_no_fix_line_deletes_a_record_without_recording_it(codes: str, fix: str 
     )
 
 
-def test_a_judgment_only_rule_never_makes_the_run_exit_1(tmp_path: Path) -> None:
-    """The exit-code half of the contract: the three judgment-only rules fire at once and
-    contribute NO error-class finding. sa-memory-atom-has-two-grammars#B29-6: a history
-    heading planted beside them is reported once, by LINT-1 — CAT-1 and SPEC-DOC-008
-    do not exist."""
-    from dadaia_workspace.cli.commands.doctor import _specs_section
+#: sa-unfixable-doctor-findings-say-doctor-fix#S1 — `report-only` codes: WARNING-only by
+#: construction, and no fix line (their remedy is the operator's judgment).
+REPORT_ONLY: dict[str, Callable[[Path], None]] = {
+    "SPEC-DOC-030": lambda r: (r / "specs" / "audits" / "Bad_Name").mkdir(parents=True),
+    "MEM-DRIFT-1": lambda r: _append(
+        r / "specs" / "memory" / "ARCHITECTURE.md",
+        "\n### `dadaia_workspace/features` — package map (1 packages)\n\n"
+        '```mermaid\nflowchart LR\n  pkgs["ghostpkg"]\n```\n',
+    ),
+    "MEM-DRIFT-2": lambda r: _append(
+        r / "specs" / "memory" / "QUALITY.md", "\nRun `dadaia no-such-verb`.\n"
+    ),
+}
 
+
+def _write(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def _append(path: Path, text: str) -> None:
+    path.write_text(path.read_text(encoding="utf-8") + text, encoding="utf-8")
+
+
+#: sa-unfixable-doctor-findings-say-doctor-fix#S1 — error findings no command can repair
+#: (the remedy is the operator's content): each carries an `Operator action:` naming its file.
+OPERATOR_ACTION: dict[str, Callable[[Path], None]] = {
+    "SPEC-DOC-002": _plant_headingless_memory_document,
+    "SPEC-DOC-004": _plant_status_line_gone,
+    "SPEC-DOC-048": _plant_origin_line_gone,
+    "TREE-8": _plant_stray_dotfile,
+    "LINT-1": lambda r: _write(r / "specs" / "memory" / "product" / "testarea" / "x.md", "# X\n"),
+    "SPEC-DOC-001": lambda r: (r / "specs" / "constitution.md").unlink(),
+    "SPEC-DOC-003": lambda r: _write_release_jsonl(r / "specs", _RELEASE, "BOGUS"),
+    "SPEC-DOC-024": lambda r: _write(r / f"specs/releases/{_RELEASE}/TASKS.md", "# Tasks\n\n> **Status:** Draft\n"),
+    "SPEC-DOC-026": lambda r: _write(r / f"specs/releases/_archive/{_RELEASE}/SPEC.md", "# S\n"),
+    "SPEC-DOC-027": lambda r: _write(r / "specs/releases/bad-name/SPEC.md", "# S\n"),
+    "SPEC-DOC-047": lambda r: _append(r / f"specs/releases/{_RELEASE}/TASKS.md", "- [ ] T2 x\n  Write set: specs/memory/QUALITY.md\n"),
+    "ADR-SUPERSEDED-CITATION": lambda r: (
+        _write(r / "specs/ADRs/decisions.jsonl", '{"id": "0001", "status": "superseded"}\n'),
+        _append(r / "specs/memory/QUALITY.md", "\nADR: 0001\n"),
+    ),
+    "BL-SCHEMA": lambda r: _write(r / "specs/backlog/BACKLOG.json", '{"schema": "backlog-v1", "active": [{"id": "x"}]}'),
+    "BL-CONFLICT": lambda r: (
+        _write(r / "pkg/m.py", _SOURCE),
+        _write(r / "specs/backlog/BACKLOG.json", json.dumps({"schema": "backlog-v1", "active": [
+            _active_entry(t, t, "candidate", ref="pkg/m.py#Widget", change=t) for t in ("d", "e")]})),
+    ),
+}  # fmt: skip
+
+
+@pytest.mark.parametrize("code", sorted(OPERATOR_ACTION))
+def test_an_operator_action_names_the_file_to_change(code: str, tmp_path: Path) -> None:
+    """sa-unfixable-doctor-findings-say-doctor-fix#S1: an unfixable error's fix is one
+    `Operator action:` line naming the finding's own file — never a placeholder."""
+    root = _repo(tmp_path)
+    OPERATOR_ACTION[code](root)
+    ledgers = _ledgers_section(None, root / "specs", str(root), None)
+    found = [f for f in (*_specs_section(_doctor(root), None).findings, *ledgers.findings) if f.code == code]  # fmt: skip
+    assert found, f"{code}: the fixture did not make the rule fire"
+    for finding in found:
+        assert finding.fix.startswith("Operator action: "), finding.fix
+        assert str(tmp_path) in finding.fix and not re.search(r"<[^<>]+>", finding.fix)
+
+
+def test_a_judgment_only_rule_never_makes_the_run_exit_1(tmp_path: Path) -> None:
+    """The exit-code half of the contract: every judgment-only rule fires at once and
+    contributes NO error-class finding and NO fix line, so it stalls nobody
+    (sa-unfixable-doctor-findings-say-doctor-fix#S1 — the `report-only` proof).
+    sa-memory-atom-has-two-grammars#B29-6: a history heading planted beside them is
+    reported once, by LINT-1 — CAT-1 and SPEC-DOC-008 do not exist."""
     root = _repo(tmp_path)
     for code in ("SPEC-DOC-005", "TREE-2", "AGENTS-PLACEHOLDER-1"):
         PLANTS[code].plant(root)
     _plant_changelog_heading(root)
+    for plant in REPORT_ONLY.values():
+        plant(root)
 
-    report = _specs_section(SpecsDoctor(root / "specs"), Path())
+    report = _specs_section(_doctor(root), Path())
     fired = {f.code for f in report.printable}
-    assert {"SPEC-DOC-005", "TREE-2", "AGENTS-PLACEHOLDER-1"} <= fired, fired
+    assert {"SPEC-DOC-005", "TREE-2", "AGENTS-PLACEHOLDER-1", *REPORT_ONLY} <= fired, fired
     assert not {"CAT-1", "SPEC-DOC-008", "SPEC-DOC-010"} & fired, fired
     history = [f for f in report.findings if "Changelog" in f.message]
     assert [(f.code, f.error) for f in history] == [("LINT-1", True)], history
+    judged = [f for f in report.findings if f.code in REPORT_ONLY]
+    assert [(f.code, f.error, f.fix) for f in judged if f.error or f.fix] == []
 
 
 # ── T-050-09: TREE-5 remedies are honest (AC2.3, AC2.4) ─────────────────────────
@@ -416,42 +501,3 @@ def test_doctor_fix_renders_a_raw_law_copy_and_clears_its_finding(tmp_path: Path
     assert _AREA_HEADER in text and _ROOT_ROW in text
     assert not [p for p in _PLACEHOLDERS if p in text]
     assert root_law_findings() == []
-
-
-def test_doctor_fix_writes_a_missing_law_file_and_clears_its_finding(tmp_path: Path) -> None:
-    """A missing ``specs/AGENTS.md`` or ``specs/<area>/AGENTS.md`` is lossless to write:
-    ``doctor --fix`` writes the shipped template and the TREE-5 finding is gone."""
-    root = _repo(tmp_path)
-    specs = root / "specs"
-    before = [f for f in _doctor_json(specs) if f["code"] == "TREE-5"]
-    assert any(f["message"].startswith("specs/AGENTS.md is missing") for f in before), before
-    assert any(f["message"].startswith("specs/bugs/AGENTS.md is missing") for f in before)
-
-    _doctor_json(specs, "--fix")
-
-    public = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
-    law = (specs / "AGENTS.md").read_text(encoding="utf-8")
-    assert _AREA_HEADER in law and _ROOT_ROW in law  # the rendered canon table (WP-38)
-    assert not [p for p in _PLACEHOLDERS if p in law]
-    assert (specs / "bugs" / "AGENTS.md").read_bytes() == (
-        public / "scaffold" / "bugs" / "AGENTS.md"
-    ).read_bytes()
-    assert [f for f in _doctor_json(specs) if f["code"] == "TREE-5"] == []
-
-
-def test_a_tree5_case_fix_cannot_repair_advertises_no_doctor_fix(tmp_path: Path) -> None:
-    """Operator content (copy-drift) is never overwritten, so its finding must not hand
-    back ``doctor --fix``; no TREE/FIXED description embeds a bare CLI command."""
-    root = _repo(tmp_path)
-    specs = root / "specs"
-    _doctor_json(specs, "--fix")
-    (specs / "AGENTS.md").write_text("# operator law\n", encoding="utf-8")
-
-    findings = _doctor_json(specs, "--fix")
-
-    drift = [f for f in findings if f["code"] == "TREE-5"]
-    assert len(drift) == 1 and "copy-drift" in drift[0]["message"], drift
-    assert "doctor --fix" not in drift[0]["fix"]
-    assert (specs / "AGENTS.md").read_text(encoding="utf-8") == "# operator law\n"
-    for finding in findings:
-        assert not re.search(r"(?<![\w./-])dadaia\s", finding["message"]), finding

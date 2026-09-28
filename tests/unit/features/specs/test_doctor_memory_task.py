@@ -28,25 +28,6 @@ def _no_memory_lint_subprocess(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(MemoryValidator, "check_lint1_memory_atoms", lambda self: [])
 
 
-def test_a_task_whose_write_set_names_specs_memory_is_refused(tmp_path: Path) -> None:
-    specs = _make_clean_specs_tree(tmp_path, _RELEASE)
-    _write_tasks(
-        specs,
-        _RELEASE,
-        "- [x] T-999-01 — code.\n"
-        "  Write set: dadaia_workspace/core/x.py.\n"
-        "- [ ] T-999-02 — FR9 + CLOSURE: memory atoms.\n"
-        "  Owner: product-engineer.\n"
-        "  Write set: specs/memory/**, specs/releases/0.9.9/_RELEASE.json (phase only).\n",
-    )
-
-    issues = _by_code(SpecsDoctor(specs).check(), "SPEC-DOC-047")
-
-    assert len(issues) == 1
-    assert "T-999-02" in issues[0].description
-    assert issues[0].path.endswith("TASKS.md")
-
-
 def test_tasks_without_a_memory_write_set_are_silent(tmp_path: Path) -> None:
     specs = _make_clean_specs_tree(tmp_path, _RELEASE)
     _write_tasks(

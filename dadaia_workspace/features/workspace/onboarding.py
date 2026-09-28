@@ -79,7 +79,7 @@ def _first_pass(c: _Ctx) -> list[str]:
         atoms = bool(catalog.get("features"))
     except (OSError, ValueError, AttributeError):
         atoms = False
-    return pending if atoms else [*pending, "specs/memory/product/ (no atom)"]
+    return pending if atoms else [*pending, f"{c.specs / 'memory' / 'product'} (no atom)"]
 
 
 def _specs_fix(c: _Ctx) -> str:
@@ -97,7 +97,7 @@ STEPS: tuple[tuple[str, Kind, _Pending, Callable[[_Ctx], str]], ...] = (
         "constitution",
         "agent",
         lambda c: constitution_error(c.specs),
-        lambda c: f"repair the YAML frontmatter of {c.specs / 'constitution.md'}",
+        lambda c: f"Operator action: repair the YAML frontmatter of {c.specs / 'constitution.md'}",
     ),
     (
         "specs",
@@ -109,7 +109,7 @@ STEPS: tuple[tuple[str, Kind, _Pending, Callable[[_Ctx], str]], ...] = (
         "first-pass",
         "agent",
         lambda c: f"'{c.name}' memory holds no audited content" if _first_pass(c) else None,
-        lambda c: f"{c.root / _SKILL} §first pass — pending: {', '.join(_first_pass(c))}",
+        lambda c: f"Operator action: {c.root / _SKILL} §first pass — {', '.join(_first_pass(c))}",
     ),
     (
         "publish",

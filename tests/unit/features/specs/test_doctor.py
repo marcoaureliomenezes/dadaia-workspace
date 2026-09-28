@@ -208,14 +208,14 @@ def test_scaffold_copytree_source_tree_carries_agents_md_per_area(tmp_path: Path
         pytest.param(
             "missing-product-index",
             lambda specs: (specs / "memory" / "product" / "index.md").unlink(),
-            "SPEC-DOC-002",
-            id="doc002-missing-product-index",
+            "TREE-3",
+            id="tree3-missing-product-index",
         ),
         pytest.param(
             "missing-architecture",
             lambda specs: (specs / "memory" / "ARCHITECTURE.md").unlink(),
-            "SPEC-DOC-002",
-            id="doc002-missing-architecture",
+            "TREE-3",
+            id="tree3-missing-architecture",
         ),
         pytest.param(
             "product-feature-no-heading",
@@ -374,79 +374,10 @@ def test_silent_matrix(tmp_path: Path, case: str, mutate, code: str | None) -> N
 # ---------------------------------------------------------------------------
 
 
-def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> None:
-    import shutil
-
-    # TREE-4 fix creates backlog/, bugs/ (and audits/) with AGENTS.md
-    # (v6 canon, T-050-05, FR1: README.md retired; a directory is kept by its
-    # AGENTS.md, no separate .gitkeep placeholder).
-    specs = _make_clean_specs_tree(tmp_path)
-    for dirname in ("backlog", "bugs", "audits"):
-        d = specs / dirname
-        if d.exists():
-            shutil.rmtree(d)
-    doctor = SpecsDoctor(specs, public_dir=_PUBLIC_DIR)
-    issues = doctor.check()
-    tree4 = [i for i in issues if i.code == "TREE-4"]
-    assert tree4, "Pre-condition: TREE-4 issues must exist"
-    fixed = doctor.fix(issues)
-    assert len(fixed) >= 2
-    for dirname in ("backlog", "bugs", "audits"):
-        d = specs / dirname
-        assert d.exists(), f"specs/{dirname}/ must be created by fix()"
-        assert (d / "AGENTS.md").exists()
-    residual = [i for i in doctor.check() if i.code == "TREE-4"]
-    assert residual == [], f"Residual TREE-4 after fix: {[i.description for i in residual]}"
-
-    # TREE-2: root SPEC.md is never auto-moved.
-    specs2 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree2"))
-    root_spec = specs2 / "SPEC.md"
-    root_spec.write_text("# Spec\n\n> **Status:** Approved\n", encoding="utf-8")
-    doctor2 = SpecsDoctor(specs2, templates_dir=_TEMPLATES_DIR)
-    issues2 = doctor2.check()
-    tree2 = [i for i in issues2 if i.code == "TREE-2"]
-    assert tree2 and not tree2[0].fixable
-    doctor2.fix(issues2)
-    assert root_spec.exists()
-
-    # TREE-3: missing ARCHITECTURE.md never auto-created; missing QUALITY.md
-    # trips both TREE-3 (WARNING, no autofix) and SPEC-DOC-002.
-    specs3 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree3"))
-    arch_md = specs3 / "memory" / "ARCHITECTURE.md"
-    arch_md.unlink()
-    doctor3 = SpecsDoctor(specs3, templates_dir=_TEMPLATES_DIR)
-    issues3 = doctor3.check()
-    tree3 = [i for i in issues3 if i.code == "TREE-3"]
-    assert tree3 and not tree3[0].fixable
-    fixed3 = doctor3.fix(issues3)
-    assert [i for i in fixed3 if i.code == "TREE-3"] == []
-    assert not arch_md.exists()
-
-    specs3b = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree3-qa"))
-    qa_md = specs3b / "memory" / "QUALITY.md"
-    qa_md.unlink()
-    issues3b = SpecsDoctor(specs3b).check()
-    tree3_qa = [i for i in issues3b if i.code == "TREE-3" and "QUALITY.md" in (i.description or "")]
-    assert tree3_qa and tree3_qa[0].severity == Severity.WARNING and not tree3_qa[0].fixable
-    spec_doc_002_qa = [
-        i for i in issues3b if i.code == "SPEC-DOC-002" and "QUALITY.md" in (i.description or "")
-    ]
-    assert spec_doc_002_qa
-
-    # TREE-5: missing / drifted / canonical AGENTS.md.
-    specs_missing = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree5-missing"))
-    agents_md = specs_missing / "AGENTS.md"
-    if agents_md.exists():
-        agents_md.unlink()
-    doctor_missing = SpecsDoctor(specs_missing, templates_dir=_TEMPLATES_DIR)
-    tree5_missing = [i for i in doctor_missing.check() if i.code == "TREE-5"]
-    assert tree5_missing and tree5_missing[0].severity == Severity.WARNING
-    # T-050-09 (AC2.4): writing the shipped template is lossless, so --fix writes it.
-    assert tree5_missing[0].fixable
-    doctor_missing.fix(tree5_missing)
-    written = agents_md.read_text(encoding="utf-8")  # the rendered law (WP-38)
-    assert "| Area | Members |" in written and "<!-- specs-canon -->" not in written
-
+def test_tree5_drift_and_tree7_are_never_auto_repaired(tmp_path: Path) -> None:
+    # TREE-3/4/5 repairs and TREE-2 judgment: the fix-clears PLANTS and REPORT tables of
+    # tests/integration/test_doctor_fix_lines_clear_their_finding.py (sa-unfixable-doctor-
+    # findings-say-doctor-fix; the per-rule copies here were deleted as duplicates).
     specs_drift = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree5-drift"))
     (specs_drift / "AGENTS.md").write_text(
         "# AGENTS\n\nCustomised content that differs from the canonical template.\n",
@@ -464,18 +395,6 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
     root_law = str(specs_ok / "AGENTS.md")  # the scoped law files are not planted here
     tree5_ok = [i for i in doctor_ok.check() if i.code == "TREE-5" and i.path == root_law]
     assert tree5_ok == []
-
-    # TREE-5, memory area (0.4.7 FR6): absence emits WARNING (never ERROR); since
-    # T-050-09 it is fixable — `doctor --fix` writes the shipped scaffold.
-    specs_mem_absent = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-mem-absent"))
-    memory_agents = specs_mem_absent / "memory" / "AGENTS.md"
-    if memory_agents.exists():
-        memory_agents.unlink()
-    issues_mem = SpecsDoctor(specs_mem_absent, public_dir=_PUBLIC_DIR).check()
-    tree5_mem = [i for i in issues_mem if i.code == "TREE-5" and "memory" in (i.path or "")]
-    assert tree5_mem and tree5_mem[0].severity == Severity.WARNING and tree5_mem[0].fixable
-    assert "dadaia" not in tree5_mem[0].description
-    assert [i for i in issues_mem if i.severity == Severity.ERROR] == []
 
     # TREE-6 retired (0.5.3 T-053-04, F005): missing-artifact coverage lives in
     # RELEASE-TREE-TRIO — see test_one_defect_one_code_missing_active_artifact.

@@ -14,6 +14,7 @@ import shlex
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.cli_line import mkdir_line
 from dadaia_workspace.core.template_history import was_shipped
 from dadaia_workspace.core.workspace_layout import SCOPED_LAW_AREAS, render_registry_tables
 from dadaia_workspace.features.specs import memory_canon
@@ -21,9 +22,9 @@ from dadaia_workspace.features.specs.canon import (
     CANON_ROOT_MEMBERS,
     REQUIRED_ROOT_DIRS,
     is_canon_path,
+    scaffold_entry,
 )
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
-from dadaia_workspace.infrastructure.ledger_scripts import MEMORY_SCRIPT
 
 # TREE-3: memory .md files that must exist.  No Jinja templates — .md is canonical source.
 # v7 canon: the top-level pair is ARCHITECTURE.md and QUALITY.md. A tree still carrying
@@ -104,8 +105,8 @@ class StructuralValidator:
         Checks: memory/ARCHITECTURE.md, memory/QUALITY.md,
         memory/product/index.md.
 
-        .md is the canonical source (memory-markdown-source-v1 / D-4).
-        No auto-fix: .md atoms are operator-authored, not generated from templates.
+        .md is the canonical source (memory-markdown-source-v1 / D-4). ``doctor --fix``
+        seeds a missing one from its canon template (then the operator authors it).
         """
         issues: list[SpecsDoctorIssue] = []
         mem_dir = self.specs_dir / "memory"
@@ -116,17 +117,16 @@ class StructuralValidator:
             issues.append(
                 SpecsDoctorIssue(
                     code="TREE-3",
-                    severity=Severity.WARNING,
-                    description=(
-                        f"memory/{rel_path} is missing — required memory .md atom. "
-                        f"Author it, then regenerate the pair with "
-                        f"`{MEMORY_SCRIPT.invocation} catalog generate`."
-                    ),
+                    severity=Severity.ERROR,
+                    description=f"memory/{rel_path} is missing — required memory .md atom.",
                     path=str(target),
-                    fixable=False,
+                    fixable=True,
                 )
             )
         return issues
+
+    def fix_tree3(self, issue: SpecsDoctorIssue) -> None:
+        scaffold_entry(self.specs_dir, Path(str(issue.path)).relative_to(self.specs_dir).as_posix())
 
     def check_tree4_required_dirs(self) -> list[SpecsDoctorIssue]:
         """TREE-4: every area in ``REQUIRED_ROOT_DIRS`` (audits/, backlog/, bugs/,
@@ -162,6 +162,7 @@ class StructuralValidator:
                     ),
                     path=str(target),
                     fixable=fixable,
+                    fix="" if fixable else mkdir_line(target),
                 )
             )
         return issues
@@ -448,4 +449,5 @@ class StructuralValidator:
             ),
             path=str(entry),
             fixable=False,
+            fix=f"Operator action: move {entry} into its canon shape, or out of specs/",
         )

@@ -568,51 +568,22 @@ def _doctor_codes() -> set[str]:
 #: is keyed to the bug that says its fix may not clear, one with none is `report-only`.
 _V39_BIRTH = 52
 _V39_ALLOWANCE: dict[str, str] = {
-    "ADR-SUPERSEDED-CITATION": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "BL-CONFLICT": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "BL-SCHEMA": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "BL-STALE": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "FIXED-1": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "FIXED-2": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "HOOKS-DRIFT-1": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "LEDGER-BACKLOG-SCHEMA": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "LEDGER-BUGS-SCHEMA": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "LEDGER-FINDINGS-SCHEMA": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "LEDGER-MEMORY-SCHEMA": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "LEDGER-RELEASE-SCHEMA": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "LINT-1": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "MEM-DRIFT-1": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "MEM-DRIFT-2": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "MEM-PLACEHOLDER-1": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "ONBOARDING": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "RELEASE-TREE-ARCHIVED": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "RELEASE-TREE-MEMORY": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "RELEASE-TREE-PARSE": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "RELEASE-TREE-PHASE": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "RELEASE-TREE-SCHEMA": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "RELEASE-TREE-STATE-MISSING": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "RELEASE-TREE-TRIO": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "RELEASE-TREE-TS-ORDER": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "SPEC-DOC-001": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "SPEC-DOC-002L": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "SPEC-DOC-003": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "SPEC-DOC-024": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "SPEC-DOC-026": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "SPEC-DOC-027": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "SPEC-DOC-030": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "SPEC-DOC-033": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "SPEC-DOC-034": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "SPEC-DOC-035": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "SPEC-DOC-036": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "SPEC-DOC-038": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "SPEC-DOC-041": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "SPEC-DOC-047": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "SPECS-VERSION": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "TREE-4": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "TREE-5": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "TREE-7": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "WS-ENTRY": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "WS-INVARIANT": "sa-unfixable-doctor-findings-say-doctor-fix",
+    "ONBOARDING": "parity:tests/integration/test_onboarding_steps_property.py",
+    "RELEASE-TREE-ARCHIVED": "sa-release-json-validated-three-times",
+    "RELEASE-TREE-MEMORY": "sa-release-json-validated-three-times",
+    "RELEASE-TREE-PARSE": "sa-release-json-validated-three-times",
+    "RELEASE-TREE-PHASE": "sa-release-json-validated-three-times",
+    "RELEASE-TREE-SCHEMA": "sa-release-json-validated-three-times",
+    "RELEASE-TREE-STATE-MISSING": "sa-release-json-validated-three-times",
+    "RELEASE-TREE-TRIO": "sa-release-json-validated-three-times",
+    "RELEASE-TREE-TS-ORDER": "sa-release-json-validated-three-times",
+    "SPEC-DOC-002L": "sa-placement-rules-contradict-tree8",
+    "SPEC-DOC-033": "sa-spec-doc-033-duplicates-bugs-check",
+    "SPEC-DOC-035": "sa-placement-rules-contradict-tree8",
+    "SPEC-DOC-036": "sa-audit-close-archives-without-validating",
+    "SPEC-DOC-038": "sa-audit-close-archives-without-validating",
+    "TREE-7": "sa-placement-rules-contradict-tree8",
+    "WS-INVARIANT": "parity:tests/integration/test_unfixable_findings_carry_their_own_fix.py",
 }
 
 
@@ -622,10 +593,17 @@ def _uncovered(codes: set[str], planted: set[str]) -> set[str]:
 
 def test_v39_every_doctor_code_has_a_fix_clears_case_or_a_key() -> None:
     """V39 — every doctor code has a fix-clears case, or an allowance key."""
-    from tests.integration.test_doctor_fix_lines_clear_their_finding import PLANTS
+    from tests.integration.test_doctor_fix_lines_clear_their_finding import (
+        OPERATOR_ACTION,
+        PLANTS,
+        REPORT_ONLY,
+    )
+    from tests.integration.test_workspace_fix_lines_clear_their_finding import WORKSPACE_PLANTS
 
+    # A code is covered by its fix-clears plant, or by the proof test of its table.
+    covered = set(PLANTS) | set(REPORT_ONLY) | set(OPERATOR_ACTION) | set(WORKSPACE_PLANTS)
     problems = _allowance_violations(
-        _uncovered(_doctor_codes(), set(PLANTS)),
+        _uncovered(_doctor_codes(), covered),
         _V39_ALLOWANCE,
         birth=_V39_BIRTH,
         also=frozenset({"report-only"}),

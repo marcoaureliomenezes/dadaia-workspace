@@ -151,7 +151,10 @@ def test_the_real_doctor_prints_every_fix_as_one_whole_runnable_line(tmp_path: P
     assert {"WS-tmp-expired", "FIXED-1", "LEDGER-BACKLOG-SCHEMA"} <= codes, run.stdout
     fixes = [line.removeprefix("fix: ") for line in lines if line.startswith("fix: ")]
     assert fixes, run.stdout
-    for fix in fixes:
+    for fix in fixes:  # two shapes, no third (sa-unfixable-doctor-findings-say-doctor-fix#S1)
+        if fix.startswith("Operator action: "):
+            assert re.search(r"(^|\s)/\S", fix) and not re.search(r"<[^<>]+>", fix), fix
+            continue
         argv0 = shlex.split(fix)[0]
         assert Path(argv0).is_file() or shutil.which(argv0), f"not an executable: {fix}"
     # Whole lines: a wrapped fix would leave a continuation line that is neither a finding
@@ -335,32 +338,6 @@ def _every_doctor_rule() -> list[tuple[str, doctor_rules.Rule[Any, Any]]]:
 _DOCTOR_RULES = _every_doctor_rule()
 
 
-@pytest.mark.parametrize(
-    ("codes", "rule"), _DOCTOR_RULES, ids=[codes for codes, _ in _DOCTOR_RULES]
-)
-def test_every_doctor_rule_renders_a_runnable_fix(
-    codes: str, rule: doctor_rules.Rule[Any, Any]
-) -> None:
-    """An error-class doctor finding exits 1 — the operator gets one command back.
-
-    A rule with NO ``fix_help`` is judgment-only: it emits WARNING findings, which never
-    exit 1, so there is nothing to hand back and nothing to prove here. That its findings
-    really are WARNING is proven by executing each rule in
-    ``tests/integration/test_doctor_fix_lines_clear_their_finding.py``.
-    """
-    if rule.fix_help is None:
-        pytest.skip(f"{codes} is judgment-only: WARNING findings, no fix line")
-    finding = doctor_rules.SectionFinding(
-        code=rule.codes[0],
-        verdict="error",
-        message="synthetic finding",
-        canonical=False,
-        error=True,
-        fix=doctor_rules.rule_fix(rule, Path()),
-    )
-    assert_block_carries_a_runnable_fix(doctor_rules.render_finding(finding))
-
-
 # ── the live CLI tree, shared by the one fix-line rule below ───────────────────
 #
 # `test_every_doctor_fix_names_a_verb_the_cli_has` DELETED (0.4.7 c8 review F7). It
@@ -408,18 +385,13 @@ def _script_target(command: str) -> tuple[Path, str] | None:
 
 
 def _fix_lines() -> list[tuple[str, str]]:
-    """Every doctor rule's fix line, plus the ledger scripts' own delegated fix."""
-    from dadaia_workspace.infrastructure.ledger_scripts import LEDGER_SCRIPTS
-
-    lines = [
+    """Every doctor rule's fix line (a ledger's operator action is proven in
+    test_workspace_fix_lines_clear_their_finding)."""
+    return [
         (codes, doctor_rules.rule_fix(rule, Path()))
         for codes, rule in _DOCTOR_RULES
         if rule.fix_help
     ]
-    lines.extend(
-        (script.code, f"{script.invocation} check --specs specs") for script in LEDGER_SCRIPTS
-    )
-    return lines
 
 
 _FIX_LINES = _fix_lines()
@@ -573,7 +545,7 @@ def test_the_bug_script_is_one_ledger_row() -> None:
 
     assert BUGS_SCRIPT in LEDGER_SCRIPTS
     bugs = f"{_SKILLS}dd-bug-resolution/scripts/bugs.py"
-    assert dict(_FIX_LINES)["SPEC-DOC-041"] == f"{_VENV_PYTHON} {bugs} archive"
+    assert dict(_FIX_LINES)["SPEC-DOC-041"] == f"{_VENV_PYTHON} {bugs} archive --specs <specs>"
 
 
 @pytest.mark.parametrize(("codes", "command"), _FIX_LINES, ids=[c for c, _ in _FIX_LINES])

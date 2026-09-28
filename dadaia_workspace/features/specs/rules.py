@@ -52,12 +52,11 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-001",),
         lambda d: d._coherence.check_constitution(),
-        fix_help="printf '%s\\n' '## <missing section>' >> specs/constitution.md",
+        fix_help="Operator action: restore <specs>/constitution.md, then commit.",
     ),
     _rule(
         ("SPEC-DOC-002", "SPEC-DOC-002L"),
         lambda d: d._memory.check_memory_files(),
-        fix_help="printf '%s\\n' '# <title>' >> specs/memory/<document>.md",
     ),
     _rule(
         ("MEM-PLACEHOLDER-1",),
@@ -74,15 +73,11 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-003",),
         lambda d: d._release.check_active_md(),
-        fix_help="git rm specs/ACTIVE.md",
+        fix_help="Operator action: correct the live _RELEASE.json under <specs>/releases, then commit.",
     ),
     _rule(
         ("SPEC-DOC-004",),
         lambda d: d._release.check_active_release_artifacts(),
-        fix_help=(
-            "sed -i -e '\\|\\*\\*Status:\\*\\*|d' -e '$a **Status:** <Approved|In review|Draft>' "
-            "specs/releases/<id>/<document>.md"
-        ),
     ),
     _rule(
         ("SPEC-DOC-005",),
@@ -99,7 +94,8 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("TREE-3",),
         lambda d: d._structural.check_tree3_memory_md(),
-        fix_help="printf '%s\\n' '# <title>' >> specs/memory/<document>.md",
+        fix=lambda d, i: d._structural.fix_tree3(i),
+        fix_help=("doctor", "--fix"),
     ),
     _rule(
         ("TREE-4",),
@@ -121,31 +117,25 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("TREE-8",),
         lambda d: d._structural.check_tree8_canon_root(),
-        # Never auto-fixed (operator decision D8): content vs slop is the operator's call.
-        # Plain mv serves untracked files and paths with no canon home alike.
-        fix_help="mv <path> <canon path|outside specs/>",
     ),
     _rule(
         ("LINT-1",),
         lambda d: d._memory.check_lint1_memory_atoms(),
-        fix_help="sed -i '2i <field>: <value>' <atom>",
     ),
     _rule(
         ("MEM-DRIFT-1",),
         lambda d: d._memory.check_mem_drift1_features_package_map(),
-        fix_help="sed -i 's|<stale package line>|<package on disk>|' specs/memory/ARCHITECTURE.md",
     ),
     _rule(
         ("ADR-SUPERSEDED-CITATION",),
         lambda d: doctor_adr.superseded_adr_citations(d.specs_dir, d.public_dir),
-        fix_help="sed -i 's|ADR: <superseded id>|ADR: <successor id>|' <citing file>",
+        fix_help="Operator action: cite the successor recorded in <specs>/ADRs/decisions.jsonl instead, then commit.",
     ),
     _rule(
         ("MEM-DRIFT-2",),
         lambda d: d._memory.check_mem_drift2_citations(
             repo_root=d.repo_root, command_paths=d.command_paths
         ),
-        fix_help="sed -i 's|<dead citation>|<what exists today>|' <memory atom>",
     ),
     _rule(
         ("FIXED-1", "FIXED-2"),
@@ -167,22 +157,21 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-024",),
         lambda d: d._release.check_phase_markers_coherence(),
-        fix_help="sed -i 's/<stale phase marker>/<_RELEASE.json phase>/' <document>",
+        fix_help="Operator action: reconcile the live phase with its TASKS.md under <specs>/releases, then commit.",
     ),
     _rule(
         ("SPEC-DOC-026",),
         lambda d: d._release.check_unique_release_ids(),
-        fix_help="git mv specs/releases/<duplicated> specs/releases/<id>",
+        fix_help="Operator action: rename one of the duplicated dirs under <specs>/releases, then commit.",
     ),
     _rule(
         ("SPEC-DOC-027",),
         lambda d: d._release.check_release_naming_canon(),
-        fix_help="git mv <release-dir> <release-dir-parent>/<M.m.p>",
+        fix_help="Operator action: rename the release dir under <specs>/releases to its M.m.p id, then commit.",
     ),
     _rule(
         ("SPEC-DOC-030",),
         lambda d: d._closure_audit.check_audits_naming_canon(),
-        fix_help="git mv specs/audits/<name> specs/audits/<YYYYMMDD>-<slug>",
     ),
     _rule(
         ("SPEC-DOC-033",),
@@ -218,20 +207,16 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-041",),
         lambda d: d._governance.check_bug_archive_overdue(),
-        fix_help=f"{BUGS_SCRIPT.invocation} archive",
+        fix_help=f"{BUGS_SCRIPT.invocation} archive --specs <specs>",
     ),
     _rule(
         ("SPEC-DOC-047",),
         lambda d: d._release.check_no_memory_task(),
-        fix_help="sed -i '\\|<memory task line>|d' specs/releases/<id>/TASKS.md",
+        fix_help="Operator action: drop the memory task from the live TASKS.md under <specs>/releases, then commit.",
     ),
     _rule(
         ("SPEC-DOC-048",),
         lambda d: d._release.check_spec_origin(d._governance.known_bug_ids),
-        fix_help=(
-            "sed -i '\\|^\\*\\*Opened:\\*\\*|a **Origin:** operator-demand' "
-            "specs/releases/<id>/SPEC.md"
-        ),
     ),
     _rule(
         (

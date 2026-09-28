@@ -94,6 +94,7 @@ def _specs_render[C](rule: Rule[C, SpecsDoctorIssue], issue: SpecsDoctorIssue) -
         canonical=False,
         error=issue.severity is Severity.ERROR,
         fix=issue.fix,
+        fixable=issue.fixable,
     )
 
 
@@ -111,6 +112,7 @@ def _specs_section(doctor: SpecsDoctor | None, root: Path | None) -> SectionRepo
         doctor,
         _specs_render,
         root,
+        doctor.specs_dir,
     )
 
 
@@ -165,13 +167,7 @@ def _ledgers_section(
     )
     return merge_sections(
         [
-            run_section(
-                "ledgers",
-                backlog_doctor.RULES,
-                context,
-                _ledgers_render,
-                root,
-            ),
+            run_section("ledgers", backlog_doctor.RULES, context, _ledgers_render, root, specs_dir),
             run_section(
                 "ledgers",
                 doctor_adr.LEDGER_RULES,

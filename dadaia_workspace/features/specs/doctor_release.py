@@ -206,6 +206,7 @@ class ReleaseValidator:
                         severity=Severity.ERROR,
                         description=f"{path.relative_to(self.specs_dir)} {problem}",
                         path=str(path),
+                        fix=f"Operator action: name the work's origin under **Opened:** in {path}",
                     )
                 )
         return issues
@@ -265,6 +266,7 @@ class ReleaseValidator:
                         severity=Severity.ERROR,
                         description=f"{fname} has no `**Status:**` line",
                         path=str(fpath),
+                        fix=f"Operator action: add the `**Status:**` line to {fpath}",
                     )
                 )
             elif status not in CANONICAL_STATUS:
@@ -277,6 +279,7 @@ class ReleaseValidator:
                             f"Valid: {sorted(CANONICAL_STATUS)}"
                         ),
                         path=str(fpath),
+                        fix=f"Operator action: set a canonical `**Status:**` in {fpath}",
                     )
                 )
             elif status != APPROVED and phase in ("IMPLEMENTATION", "CLOSURE"):

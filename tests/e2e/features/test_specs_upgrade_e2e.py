@@ -121,7 +121,10 @@ def test_upgrade_at_the_canonical_version_is_a_byte_identical_no_op(tmp_path: Pa
 
 # ----------------------------------------------------------------- the 6 -> 7 hop (FR1)
 
-_V6_ARCHITECTURE = "# Architecture\n\n## Principles\n\nThe ring holds.\n"
+_V6_ARCHITECTURE = (
+    "---\nslug: ARCHITECTURE\ntitle: Architecture\ntldr: Architecture.\nsummary: Architecture.\n"
+    "tags:\n  - architecture\n---\n\n# Architecture\n\n## Principles\n\nThe ring holds.\n"
+)
 _V6_TECHSTACK = (
     "---\nslug: TECHSTACK\ntitle: Tech Stack\n---\n\n"
     "# Tech Stack\n\n## Languages\n\nCONSUMER_STACK_SENTINEL\n"

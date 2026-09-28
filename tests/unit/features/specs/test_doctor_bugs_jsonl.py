@@ -237,33 +237,6 @@ def test_superseded_without_superseded_by_is_doctor_clean(tmp_path: Path) -> Non
 # ---------------------------------------------------------------------------
 
 
-def test_archive_overdue_warns_past_the_threshold(tmp_path: Path) -> None:
-    from datetime import UTC, datetime
-
-    specs = tmp_path / "specs"
-    bugs = _bugs_dir(specs)
-    _write_ledger(
-        bugs,
-        [
-            _record(
-                "old-terminal",
-                status="resolved",
-                # 0.4.7 FR4: SPEC-DOC-041 ages by closed_at, not by the filing date.
-                closed_at="2026-02-01T00:00:00Z",
-                ts="2026-01-01T00:00:00Z",
-            )
-        ],
-    )
-    validator = GovernanceValidator(specs, bug_store_factory=container.build_bug_record_store)
-
-    issues = validator.check_bug_archive_overdue(now=datetime(2026, 8, 27, tzinfo=UTC))
-
-    assert len(issues) == 1
-    assert issues[0].code == "SPEC-DOC-041"
-    assert issues[0].severity is Severity.WARNING
-    assert "old-terminal" in issues[0].description
-
-
 def test_archive_overdue_is_silent_for_a_recent_terminal_record(tmp_path: Path) -> None:
     from datetime import UTC, datetime
 

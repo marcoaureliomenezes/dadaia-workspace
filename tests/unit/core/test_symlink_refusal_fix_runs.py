@@ -16,7 +16,10 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.features.specs import canon
 
-_OUTSIDE = "# Quality\n\noperator text, no fixed block\n"
+_OUTSIDE = (  # a valid atom: the only error left is the refused symlink
+    "---\nslug: QUALITY\ntitle: Quality\ntldr: Quality.\nsummary: Quality.\ntags:\n  - quality\n---\n"
+    "# Quality\n\noperator text, no fixed block\n"
+)
 
 
 def test_the_symlink_refusal_fix_runs_verbatim_and_the_upgrade_then_lands(

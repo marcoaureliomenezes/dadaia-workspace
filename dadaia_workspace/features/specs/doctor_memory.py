@@ -11,11 +11,12 @@ Leaf-only: imports the shared leaves + core, never a sibling validator.
 from __future__ import annotations
 
 import re
+import sys
 from collections.abc import Collection
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
-from dadaia_workspace.core.cli_line import materialize_line
+from dadaia_workspace.core.cli_line import materialize_line, shell_line
 from dadaia_workspace.features.specs import citations, memory_canon, memory_lint
 from dadaia_workspace.features.specs.canon import default_public_dir
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
@@ -24,6 +25,7 @@ from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIs
 TOPLEVEL_MEMORY_FILES = memory_canon.MEMORY_TOPLEVEL_FILES
 # Product memory is a folder catalog: index.md is required + 0..N feature .md atoms.
 PRODUCT_INDEX_REL = "product/index.md"
+_PKG = "dadaia-workspace"  # a missing library fragment is repaired by reinstalling it
 
 #: Template tokens of the retired placeholder feature atom: an atom carrying one was never
 #: filled (bug scaffold-repair-cannot-remediate-invalid-placeholder-atom); MEM-PLACEHOLDER-1
@@ -211,11 +213,11 @@ class MemoryValidator:
                         code="FIXED-1",
                         severity=Severity.ERROR,
                         description=(
-                            f"{rel}: library fragment `{section_id}` is missing under "
-                            f"{fragments_dir} — reinstall the library"
+                            f"{rel}: library fragment `{section_id}` is missing: {fragments_dir}"
                         ),
                         path=str(path),
                         fixable=False,
+                        fix=shell_line(sys.executable, "-m", "pip", "install", "-U", _PKG),
                     )
                 )
                 continue
@@ -275,15 +277,7 @@ class MemoryValidator:
             ]
 
         for rel, p in required + feature_files:
-            if not p.exists():
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="SPEC-DOC-002",
-                        severity=Severity.ERROR,
-                        description=f"memory/{rel} is missing — memory must be Markdown (.md)",
-                        path=str(p),
-                    )
-                )
+            if not p.exists():  # TREE-3 owns a missing atom (and seeds it)
                 continue
             try:
                 has_heading = _has_heading(p)
@@ -294,6 +288,7 @@ class MemoryValidator:
                         severity=Severity.ERROR,
                         description=f"memory/{rel} is not parseable: {e}",
                         path=str(p),
+                        fix=f"Operator action: repair {p}",
                     )
                 )
                 continue
@@ -304,6 +299,7 @@ class MemoryValidator:
                         severity=Severity.ERROR,
                         description=f"memory/{rel} has no non-empty heading",
                         path=str(p),
+                        fix=f"Operator action: give {p} a `#` heading",
                     )
                 )
 
@@ -418,7 +414,11 @@ class MemoryValidator:
         # One issue per error, naming its atom: the doctor prints one line per finding.
         return [
             SpecsDoctorIssue(
-                code="LINT-1", severity=Severity.ERROR, description=err, path=str(result.path)
+                code="LINT-1",
+                severity=Severity.ERROR,
+                description=err,
+                path=str(result.path),
+                fix=f"Operator action: correct {result.path} ({err})",
             )
             for result in memory_lint.lint_directory(mem_dir, schema)
             for err in result.errors

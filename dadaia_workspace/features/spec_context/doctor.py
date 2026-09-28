@@ -22,7 +22,7 @@ from functools import partial
 from pathlib import Path
 
 from dadaia_workspace.core import session_store, workspace_layout
-from dadaia_workspace.core.cli_line import fix_line, git_line
+from dadaia_workspace.core.cli_line import fix_line, git_line, shell_line
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
 from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.core.harness_registry import (
@@ -141,7 +141,7 @@ class DoctorService:
                 except OSError:
                     drifted = True
                 if drifted:
-                    rel = top.relative_to(self._workspace_root).as_posix()
+                    rel = str(top)  # absolute: the fix runs from any cwd
                     issues.append(
                         DoctorIssue(
                             code="HOOKS-DRIFT-1",
@@ -170,13 +170,9 @@ class DoctorService:
             return [
                 DoctorIssue(
                     code="VENV-1",
-                    description=(
-                        f"Workspace venv missing: '{venv_bin}' does not exist. Workspace "
-                        "tooling (dadaia/pip/python -m dadaia_workspace) must run from this "
-                        "venv. Re-bootstrap it (`uvx dadaia-workspace init <dir>` re-runs on "
-                        "an existing workspace)."
-                    ),
+                    description=f"Workspace venv missing: '{venv_bin}' does not exist.",
                     fixable=False,
+                    fix=shell_line("uvx", "dadaia-workspace", "init", str(self._workspace_root)),
                 )
             ]
         entry = venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}"
@@ -184,22 +180,18 @@ class DoctorService:
             return [
                 DoctorIssue(
                     code="VENV-1",
-                    description=(
-                        f"Workspace venv entrypoint missing: '{entry}' not found. "
-                        "Re-bootstrap the workspace venv."
-                    ),
+                    description=f"Workspace venv entrypoint missing: '{entry}' not found.",
                     fixable=False,
+                    fix=shell_line("uvx", "dadaia-workspace", "init", str(self._workspace_root)),
                 )
             ]
         if not os.access(entry, os.X_OK):
             return [
                 DoctorIssue(
                     code="VENV-1",
-                    description=(
-                        f"Workspace venv entrypoint not executable: '{entry}'. "
-                        "Restore the exec bit (chmod +x) or re-bootstrap the venv."
-                    ),
+                    description=f"Workspace venv entrypoint not executable: '{entry}'.",
                     fixable=False,
+                    fix=shell_line("chmod", "+x", str(entry)),
                 )
             ]
         return []
@@ -232,14 +224,9 @@ class DoctorService:
                 issues.append(
                     DoctorIssue(
                         code="CTX-URL-1",
-                        description=(
-                            f"Context '{ctx.name}' is alive but has an empty repo_url "
-                            f"(un-portable). Re-run '{fix_line(self._workspace_root, 'context', 'alive', ctx.name)}' "
-                            "while the repo's origin remote is on disk to back-fill it; "
-                            f"with no such remote, '{fix_line(self._workspace_root, 'context', 'delete', ctx.name)}' "
-                            f"and '{fix_line(self._workspace_root, 'context', 'create', '--main-repo', '<url>')}'."
-                        ),
+                        description=f"Context '{ctx.name}' is alive with an empty repo_url.",
                         fixable=False,
+                        fix=fix_line(self._workspace_root, "context", "alive", ctx.name),
                     )
                 )
 
@@ -262,22 +249,25 @@ class DoctorService:
             owners.setdefault(ctx.repo_slug, []).append(ctx.name)
             for r in ctx.associated_repos:
                 owners.setdefault(r.slug, []).append(ctx.name)
+        dead = {c.name for c in contexts if c.state is ContextState.DEAD}
         for slug in sorted(owners):
             names = owners[slug]
-            if len(names) > 1:
+            if len(names) > 1:  # the fix retires one owner: delete a dead one, else dead it
+                owner = min(names, key=lambda n: (n not in dead, n))
                 issues.append(
                     DoctorIssue(
                         code="INV-6",
                         fixable=False,
                         description=(
                             f"Repo slug '{slug}' is owned by more than one context "
-                            f"({', '.join(sorted(names))}). 'repos/<slug>' is a "
-                            f"namespace every context shares — '{fix_line(self._workspace_root, 'context', 'dead')}' "
-                            "on any owner would commit, push and delete the others' "
-                            "working tree. Remove it from all but one owner "
-                            f"('{fix_line(self._workspace_root, 'context', 'repo', 'remove')}') "
-                            "or re-create the context "
-                            "with a different slug."
+                            f"({', '.join(sorted(names))}): 'repos/<slug>' is shared, so "
+                            "a dead() on one owner would take the others' working tree."
+                        ),
+                        fix=fix_line(
+                            self._workspace_root,
+                            "context",
+                            "delete" if owner in dead else "dead",
+                            owner,
                         ),
                     )
                 )
@@ -639,6 +629,7 @@ def workspace_rules(
                 canonical=False,
                 error=True,
                 fix=issue.fix,
+                fixable=issue.fixable,
             )
             for issue in service.check()
         ]
@@ -671,6 +662,7 @@ def workspace_rules(
                 canonical=finding.canonical and finding.scored,
                 error=finding.verdict in ERROR_VERDICTS,
                 fix=finding.fix,
+                fixable=finding.fixable,
             )
             for finding in findings
         ]

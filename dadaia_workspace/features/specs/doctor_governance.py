@@ -36,7 +36,6 @@ from dadaia_workspace.core.models.bugs import (
 )
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore, MalformedLine
-from dadaia_workspace.infrastructure.ledger_scripts import BUGS_SCRIPT
 
 # SPEC-DOC-035 (SPEC v0.12.0 FR5, ADR D5/D9): the single-source invariant — the only two
 # filenames permitted loose directly under ``specs/backlog/``. Anything else (a per-entry
@@ -153,9 +152,7 @@ class GovernanceValidator:
                         description=(
                             f"bugs/BUGS.jsonl record {record.id!r} has been terminal "
                             f"({record.status!r}) since {record.closed_at} — past the "
-                            f"{BUG_ARCHIVE_THRESHOLD_DAYS}-day archive threshold; run "
-                            f"'{BUGS_SCRIPT.invocation} archive' (SPEC-DOC-041, WARNING — never a "
-                            "block, D15)."
+                            f"{BUG_ARCHIVE_THRESHOLD_DAYS}-day archive threshold."
                         ),
                         path=str(ledger_path),
                     )

@@ -490,7 +490,8 @@ class SpecContextService:
         nothing (0.4.8 AC3.7): the working tree is exactly what the remote holds.
         """
         ctx = self.show(name)
-        for repo in self._backfilled(ctx).all_repos():
+        filled = self._backfilled(ctx)
+        for repo in filled.all_repos():
             repo_dest = self._repo_path(repo.slug)
             if not repo_dest.exists():
                 if not repo.url:  # a checkout there is adopted, its origin back-filled
@@ -506,8 +507,9 @@ class SpecContextService:
                     raise GitSyncError(f"{exc}\nfix: {fix}") from None
             self._install_hooks(repo_dest)
 
-        if ctx.state == ContextState.ALIVE:
-            return ctx
+        if ctx.state == ContextState.ALIVE:  # re-confirm, and keep a back-filled URL (CTX-URL-1)
+            self._store.update(filled)
+            return filled
 
         repo_slug = ctx.repo_slug
         repo_path = self._repo_path(repo_slug)

@@ -89,7 +89,7 @@ def test_shipped_stubs_are_the_agent_first_pass_step(tmp_path: Path) -> None:
     step = next_step(tmp_path, {"app": specs})
     assert step is not None and (step.id, step.kind) == ("first-pass", "agent")
     skill = tmp_path / ".agents" / "skills" / "dd-audit-project" / "SKILL.md"
-    assert step.command.startswith(f"{skill} §first pass")
+    assert step.command.startswith(f"Operator action: {skill} §first pass")
     assert str(specs / "memory" / "QUALITY.md") in step.command
     assert "no atom" in step.command
 

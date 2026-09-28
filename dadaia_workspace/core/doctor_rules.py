@@ -62,6 +62,7 @@ class SectionFinding:
     #: an exit-1 finding with nothing to run is a Stall. Stamped from the emitting
     #: rule's ``fix_help`` by :func:`run_section` when the section left it empty.
     fix: str = ""
+    fixable: bool = True  # False: never stamped with the rule's `doctor --fix` (carries its own)
     #: Machine-readable keys ``--json`` adds verbatim (the onboarding ``step``/``kind``).
     extra: tuple[tuple[str, str], ...] = ()
 
@@ -102,6 +103,7 @@ def run_section[C, I](
     context: C,
     render: Callable[[Rule[C, I], I], SectionFinding],
     root: PurePath | None,
+    specs: PurePath | None = None,
 ) -> SectionReport:
     """Run every rule of one section over its context.
 
@@ -112,7 +114,7 @@ def run_section[C, I](
     findings: list[SectionFinding] = []
     for rule in rules:
         for issue in rule.run(context):
-            findings.append(_with_fix(render(rule, issue), rule, root))
+            findings.append(_with_fix(render(rule, issue), rule, root, specs))
     return SectionReport(name=name, findings=tuple(findings))
 
 
@@ -126,15 +128,20 @@ def merge_sections(reports: Sequence[SectionReport]) -> SectionReport:
     )
 
 
-def rule_fix[C, I](rule: Rule[C, I], root: PurePath | None) -> str:
-    """*rule*'s remedy as one runnable line — the ONE render site of a rule's fix."""
-    if isinstance(rule.fix_help, tuple):
-        return fix_line(root, *rule.fix_help)
-    return rule.fix_help or ""
+def rule_fix[C, I](rule: Rule[C, I], root: PurePath | None, specs: PurePath | None = None) -> str:
+    """*rule*'s remedy as one runnable line, on the doctored *specs* tree: the doctor's own
+    repair names it, and a ``<specs>`` placeholder is filled here, and only here."""
+    fix_help = rule.fix_help
+    if fix_help == ("doctor", "--fix") and specs is not None:
+        fix_help = ("doctor", "--fix", "--specs-dir", "<specs>")
+    fill = str(specs) if specs is not None else "<specs>"
+    if isinstance(fix_help, tuple):
+        return fix_line(root, *(fill if a == "<specs>" else a for a in fix_help))
+    return (fix_help or "").replace("<specs>", fill)
 
 
 def _with_fix[C, I](
-    finding: SectionFinding, rule: Rule[C, I], root: PurePath | None
+    finding: SectionFinding, rule: Rule[C, I], root: PurePath | None, specs: PurePath | None
 ) -> SectionFinding:
     """Stamp the emitting rule's ``fix_help`` onto *finding*.
 
@@ -144,7 +151,8 @@ def _with_fix[C, I](
     turn a rule-authoring defect into a traceback, which is a refusal with no message
     at all.
     """
-    return replace(finding, fix=finding.fix or rule_fix(rule, root))
+    repair = finding.fixable or rule.fix_help != ("doctor", "--fix")
+    return replace(finding, fix=finding.fix or (rule_fix(rule, root, specs) if repair else ""))
 
 
 def render_finding(finding: SectionFinding) -> str:

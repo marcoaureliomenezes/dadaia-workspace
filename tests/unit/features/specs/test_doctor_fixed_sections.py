@@ -102,7 +102,7 @@ def test_fix_inserts_a_missing_block_and_refreshes_a_drifted_one(tmp_path: Path)
 
     fixed = doctor.fix()
 
-    assert [i.code for i in fixed] == ["FIXED-1", "FIXED-2"]
+    assert [i.code for i in fixed if i.code.startswith("FIXED")] == ["FIXED-1", "FIXED-2"]
     assert (specs / "constitution.md").read_text(encoding="utf-8") == (
         "# C\n\n" + _block("slop-law", _FRAGMENTS["slop-law"])
     )

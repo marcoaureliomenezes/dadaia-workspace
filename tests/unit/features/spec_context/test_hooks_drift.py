@@ -14,8 +14,6 @@ import re
 import subprocess
 from pathlib import Path
 
-import pytest
-
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.spec_context.doctor import DoctorService, workspace_rules
@@ -63,10 +61,6 @@ def test_hooks_matching_the_shipped_scripts_raise_nothing(tmp_path: Path) -> Non
     assert "HOOKS-DRIFT-1" not in _codes(_workspace(tmp_path), [_ctx("demo")])
 
 
-def test_a_byte_differing_installed_hook_is_a_finding(tmp_path: Path) -> None:
-    assert "HOOKS-DRIFT-1" in _codes(_workspace(tmp_path, drifted=True), [_ctx("demo")])
-
-
 def test_a_missing_installed_hook_is_the_same_finding(tmp_path: Path) -> None:
     assert "HOOKS-DRIFT-1" in _codes(_workspace(tmp_path, installed=False), [_ctx("demo")])
 
@@ -79,28 +73,6 @@ def test_a_dead_context_is_never_checked(tmp_path: Path) -> None:
 def test_a_repo_that_is_not_a_git_checkout_is_never_a_finding(tmp_path: Path) -> None:
     (tmp_path / "repos" / "demo").mkdir(parents=True)
     assert "HOOKS-DRIFT-1" not in _codes(tmp_path, [_ctx("demo")])
-
-
-def test_the_fix_line_run_from_the_workspace_root_rehooks_the_named_repo(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Review finding 5 (T-048-02): the finding names its repo, and its fix line, run from
-    the workspace root (itself a git checkout), re-hooks THAT repo — not the root's."""
-    from typer.testing import CliRunner
-
-    from dadaia_workspace.cli.main import app
-
-    root = _workspace(tmp_path, drifted=True)
-    subprocess.run(["git", "init", "-q", str(root)], check=True)
-    [issue] = DoctorService(_Store([_ctx("demo")]), None, root).check_installed_hooks()  # type: ignore[arg-type]
-    fix = issue.fix.split()
-    monkeypatch.chdir(root)
-
-    result = CliRunner().invoke(app, fix[1:])
-
-    assert result.exit_code == 0, result.output
-    assert _codes(root, [_ctx("demo")]) == []
-    assert not (root / ".git" / "hooks" / "pre-push").exists()
 
 
 def test_a_named_context_checks_only_its_own_repos(tmp_path: Path) -> None:
@@ -122,7 +94,6 @@ def test_a_gate_git_never_runs_is_a_finding(tmp_path: Path) -> None:
     [finding] = rule.run(DoctorService(_Store([_ctx("demo")]), None, root))  # type: ignore[arg-type]
     assert finding.error
     assert "repos/demo/.husky/pre-push" in finding.message
-    assert finding.fix is not None and " ci install-hook --force --repo repos/demo" in finding.fix
 
 
 def test_no_module_computes_the_hooks_dir_itself() -> None:

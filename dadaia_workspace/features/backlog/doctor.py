@@ -296,13 +296,13 @@ RULES: tuple[LedgerRule, ...] = (
         (BacklogDoctorCode.BL_SCHEMA.value,),
         SECTION,
         _check_schema,
-        fix_help="sed -i '<line>s|.*|<the corrected entry line>|' specs/backlog/BACKLOG.json",
+        fix_help="Operator action: correct the entry this finding names in <specs>/backlog/BACKLOG.json, then commit.",
     ),
     Rule(
         (BacklogDoctorCode.BL_CONFLICT.value,),
         SECTION,
         _check_conflict,
-        fix_help=f"{BACKLOG_SCRIPT.invocation} exit <slug> --disposition rejected --reason <the-twin-slug>",
+        fix_help="Operator action: exit one of the twins this finding names from <specs>/backlog/BACKLOG.json, then commit.",
     ),
     Rule(
         (BacklogDoctorCode.BL_STALE.value,),

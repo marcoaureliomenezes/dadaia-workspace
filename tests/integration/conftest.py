@@ -18,41 +18,13 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
-from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
 
 def _copy_template(template: Path, dest: Path) -> Path:
     """Copy *template* into *dest* (which must not yet exist) and return *dest*."""
     shutil.copytree(template, dest)
     return dest
-
-
-@pytest.fixture(scope="session")
-def _workspace_init_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """A single ``WorkspaceService.init()`` result, built once per session."""
-    template_root = tmp_path_factory.mktemp("workspace-init-template")
-    WorkspaceService(
-        public_assets=FileSystemPublicAssetManager(),
-        python_env=VenvPythonEnvironmentManager(),
-    ).init(template_root)
-    return template_root
-
-
-@pytest.fixture()
-def initialized_workspace(
-    _workspace_init_template: Path,
-    tmp_path: Path,
-) -> Path:
-    """Per-test copy of the session-scoped ``WorkspaceService.init()`` template.
-
-    Equivalent in observable state to calling ``WorkspaceService.init(tmp_path, harnesses=L1_ENTRY_HARNESSES)``
-    directly, but the expensive full public stage+install underneath ``init()``
-    runs once per test session rather than once per test.
-    """
-    dest = tmp_path / "workspace"
-    return _copy_template(_workspace_init_template, dest)
 
 
 @pytest.fixture(scope="session")

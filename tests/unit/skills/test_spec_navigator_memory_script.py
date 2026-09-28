@@ -183,7 +183,7 @@ def test_a_drifted_pair_names_the_generator_as_its_fix(
 
     (finding,) = json.loads(_run(script, "check", "--specs", str(specs), "--json").stdout)
 
-    prefix = "python3 .agents/skills/dd-spec-navigator/scripts/memory.py catalog generate --specs"
+    prefix = f"{Path(sys.executable).as_posix()} {script.resolve()} catalog generate --specs"
     assert finding["fix"] == f"{prefix} {shlex.quote(str(specs.resolve()))}"
     argv = [sys.executable, str(script), *shlex.split(finding["fix"])[2:]]
     assert subprocess.run(argv, cwd=tmp_path, check=False).returncode == 0

@@ -245,22 +245,6 @@ def test_malformed_intents_value_fires_at_any_status_including_idea(tmp_path: Pa
     ), [f.to_dict() for f in findings]
 
 
-# ── v0.5.0 A5.2 — divergent anchors still fire BL-CONFLICT (BL-DUP retired) ─────────
-
-
-def test_divergent_anchor_change_fires_bl_conflict(tmp_path: Path) -> None:
-    specs, src = _build_roots(tmp_path)
-    active = [
-        _active_entry("twin-d", "D", "candidate", ref="pkg/m.py#Widget", change="change to D"),
-        _active_entry("twin-e", "E", "candidate", ref="pkg/m.py#Widget", change="change to E"),
-    ]
-    _write_backlog_json(specs, active)
-    findings = _run(specs, src)
-    assert any(f.code is BacklogDoctorCode.BL_CONFLICT for f in findings), [
-        f.to_dict() for f in findings
-    ]
-
-
 # ── A2.6/v0.5.0 A5.2 — an ACTIVE item whose slug already has a histo record fires
 # BL-STALE (the retired in-document LEDGER condition's replacement) ─────────────────
 

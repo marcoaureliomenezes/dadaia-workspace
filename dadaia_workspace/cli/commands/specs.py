@@ -66,14 +66,14 @@ def _refuse_symlink(exc: SymlinkRefusedError) -> NoReturn:
 
 def _repair(specs: Path, *, dry_run: bool) -> tuple[list[SpecsDoctorIssue], list[SpecsDoctorIssue]]:
     """The doctor's one repair set: `specs upgrade` keeps no second writer of its own.
-    Returns what it repaired and every error left carrying a fix (the promise: clean)."""
+    Returns what it repaired and every error left (the promise: clean)."""
     public = canon.default_public_dir()
     doctor = SpecsDoctor(specs, public_dir=public, templates_dir=public / "templates")
     fixable = [issue for issue in doctor.check() if issue.fixable]
     if dry_run:
         return fixable, []
     fixed = doctor.fix(fixable)
-    return fixed, [i for i in doctor.check() if i.severity is Severity.ERROR and i.fix]
+    return fixed, [i for i in doctor.check() if i.severity is Severity.ERROR]
 
 
 def _deleter(specs: Path) -> Callable[[Path], object]:
@@ -166,16 +166,18 @@ def init(
     kind = specs_version.classify(target)
     if kind == "malformed":
         fail(
-            f"{gitflow.constitution_error(target)}; nothing written — repair the YAML "
-            f"frontmatter of {target / 'constitution.md'}."
+            f"{gitflow.constitution_error(target)}; nothing written\nOperator action: "
+            f"repair the YAML frontmatter of {target.resolve() / 'constitution.md'}."
         )
     flow = _gitflow(target, principal, integration, work_prefix, rerun)
+    refused = False  # an unrelated error the repair left never blocks the gitflow write
     if kind == "foreign":
         _move_foreign(target, rerun, replace_foreign)
     elif kind == "dadaia":
         try:
-            if _echo_upgrade(target, upgrade_feature.upgrade(target, remove=_deleter(target))):
-                raise typer.Exit(1)
+            refused = _echo_upgrade(
+                target, upgrade_feature.upgrade(target, remove=_deleter(target))
+            )
         except SymlinkRefusedError as exc:
             _refuse_symlink(exc)
 
@@ -190,6 +192,8 @@ def init(
         f"[gitflow] principal {flow.principal}, integration {flow.integration}, "
         f"work {flow.work_pattern}"
     )
+    if refused:
+        raise typer.Exit(1)
     if kind != "dadaia":
         typer.echo(f"[ok] {target} at pattern version {specs_version.CANONICAL_SPECS_VERSION}")
 

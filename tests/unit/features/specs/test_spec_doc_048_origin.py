@@ -17,7 +17,6 @@ import pytest
 
 from dadaia_workspace.container import build_bug_record_store
 from dadaia_workspace.features.specs import SpecsDoctor
-from dadaia_workspace.features.specs.rules import RULES
 
 from .test_doctor_ledger_invariants import _by_code, _make_clean_specs_tree
 
@@ -92,14 +91,6 @@ def test_a_spec_without_an_origin_line_is_an_error(tmp_path: Path) -> None:
 
     assert len(issues) == 1
     assert "Origin" in issues[0]
-
-
-def test_the_rule_carries_one_fix_naming_the_line() -> None:
-    rule = next(r for r in RULES if "SPEC-DOC-048" in r.codes)
-
-    assert rule.fix_help is not None
-    assert "**Origin:**" in rule.fix_help
-    assert rule.fix_help.split()[0] == "sed"
 
 
 def test_an_unknown_backlog_id_is_an_error(tmp_path: Path) -> None:
