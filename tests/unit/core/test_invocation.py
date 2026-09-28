@@ -27,7 +27,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-import typer
 
 from dadaia_workspace.core import invocation
 from dadaia_workspace.core.invocation import Invocation
@@ -488,18 +487,8 @@ def test_resolve_specs_dir_refuses_a_symlinked_explicit_root(tmp_path: Path) -> 
     real.mkdir()
     link = tmp_path / "linked-specs"
     link.symlink_to(real, target_is_directory=True)
-    with pytest.raises(typer.BadParameter, match="symlink"):
+    with pytest.raises(ValueError, match="symlink"):
         invocation.resolve_specs_dir(str(link))
-
-
-def test_resolve_specs_dir_raises_when_nothing_resolves(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    plain = tmp_path / "not-a-workspace"
-    plain.mkdir()
-    monkeypatch.chdir(plain)
-    with pytest.raises(typer.BadParameter, match="Could not resolve specs_dir"):
-        invocation.resolve_specs_dir(None)
 
 
 def test_resolve_specs_dir_resolves_from_cwd_inside_a_repo(

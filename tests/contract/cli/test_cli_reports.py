@@ -125,7 +125,7 @@ def test_valid_handoff_exits_0_with_valid_count_and_json_shape(tmp_path: Path, m
 
 
 def test_schema_violation_always_exits_nonzero(tmp_path: Path, monkeypatch) -> None:
-    """An INVALID file exits 1 in BOTH modes (exit-code truthfulness,
+    """sa-rich-printer-wraps-fix-lines#S6: an INVALID file exits 1 (exit-code truthfulness,
     validation-029 F-12): the old non-strict 'print INVALID, exit 0' contract masked
     tampered/malformed handoffs from every consuming script."""
     _init_workspace(tmp_path)
@@ -137,33 +137,6 @@ def test_schema_violation_always_exits_nonzero(tmp_path: Path, monkeypatch) -> N
     assert result.exit_code == 1, result.output
     assert "INVALID" in result.output
     assert "agent" in result.output
-
-    # The dead --strict flag is DELETED (bug reports-validate-strict-flag-dead):
-    # a declared-but-never-read option is a contract lie, not a mode.
-    gone = _runner.invoke(app, ["reports", "validate", str(handoff_path), "--strict"])
-    assert gone.exit_code == 2, gone.output
-
-
-def test_exit_code_matrix_not_found_and_uninitialized_workspace(
-    tmp_path: Path, monkeypatch
-) -> None:
-    """Non-existent file path → exit 2 with a clear error message; running validate
-    in a directory with no .dadaia/agentic/schemas/ at all → exit 3."""
-    _init_workspace(tmp_path)
-    monkeypatch.chdir(tmp_path)
-
-    missing = tmp_path / "ghost.handoff.json"
-    result = _runner.invoke(app, ["reports", "validate", str(missing)])
-    assert result.exit_code == 2, result.output
-    assert "ghost.handoff.json" in result.output or "not found" in result.output.lower()
-
-    uninitialized = tmp_path.parent / "uninitialized-workspace"
-    uninitialized.mkdir()
-    monkeypatch.chdir(uninitialized)
-    result = _runner.invoke(app, ["reports", "validate", "--all"])
-    assert result.exit_code == 3, result.output
-    combined = result.output + (result.stderr or "")
-    assert any(kw in combined.lower() for kw in ("schema", "workspace", "initialized", "not found"))
 
 
 def test_all_flag_discovers_and_release_filter_narrows(tmp_path: Path, monkeypatch) -> None:

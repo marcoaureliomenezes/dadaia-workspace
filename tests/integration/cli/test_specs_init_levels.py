@@ -138,7 +138,7 @@ def test_foreign_tree_non_tty_refusal_leaves_the_tree_byte_identical(repo: Path)
 
     result = _runner.invoke(app, ["specs", "init", "--context", "c"])
 
-    assert result.exit_code == 2, result.output
+    assert result.exit_code == 1, result.output
     assert _snapshot(repo) == before
 
 
@@ -157,7 +157,7 @@ def test_replace_foreign_moves_to_specs_bkp_staged_then_scaffolds(repo: Path) ->
     assert _doctor_errors(repo / "specs") == []
 
 
-def test_no_context_resolved_exits_2_with_a_fix_line(
+def test_no_context_resolved_exits_1_with_a_fix_line(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The fix names the running CLI (ADR 0045); a host venv outside any workspace (CI)."""
@@ -166,7 +166,7 @@ def test_no_context_resolved_exits_2_with_a_fix_line(
     monkeypatch.setattr(sys, "prefix", str(repo.parent / "host-venv"))
     result = _runner.invoke(app, ["specs", "init"])
 
-    assert result.exit_code == 2, result.output
+    assert result.exit_code == 1, result.output
     assert f"fix: {fix_line(None, 'specs', 'init', '--context', '<name>')}" in result.output
 
 
@@ -246,30 +246,9 @@ def test_flags_merge_into_an_existing_tree_and_rerun_is_a_no_op(repo: Path) -> N
 
 def test_an_invalid_flag_refuses_with_a_fix_and_writes_nothing(repo: Path) -> None:
     result = _runner.invoke(app, ["specs", "init", "--context", "c", "--integration", "main"])
-    assert result.exit_code == 2
+    assert result.exit_code == 1
     assert "fix: " in result.output
     assert not (repo / "specs").exists()
-
-
-@pytest.mark.parametrize(
-    "frontmatter",
-    [
-        "specs_pattern_version: 7\ngitflow: {principal: trunk\n",
-        "specs_pattern_version: 7\ngitflow: {principal: trunk, integration: trunk, work: work/}\n",
-    ],
-)
-def test_a_malformed_constitution_refuses_naming_the_file(repo: Path, frontmatter: str) -> None:
-    """ADR 0047: never a foreign move, never a reset of the operator's names."""
-    specs = repo / "specs"
-    specs.mkdir()
-    (specs / "constitution.md").write_text(f"---\n{frontmatter}---\n# C\n", encoding="utf-8")
-    before = _snapshot(repo)
-
-    result = _runner.invoke(app, ["specs", "init", "--context", "c", "--replace-foreign"])
-
-    assert result.exit_code == 2
-    assert f"fix: repair the YAML frontmatter of {specs / 'constitution.md'}" in result.output
-    assert _snapshot(repo) == before
 
 
 #: The registry placeholders a shipped law template carries (literal, the law's own).

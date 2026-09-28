@@ -74,6 +74,83 @@ def assert_block_carries_a_runnable_fix(message: str) -> None:
     _assert_runnable(command)
 
 
+# ── the real `dadaia doctor` output (undo of b50f0c97: the printer is exercised) ──
+
+
+def _isolated_workspace(tmp_path: Path) -> Path:
+    """A workspace at a >=61-char root whose OWN venv runs the CLI: a pyvenv.cfg and a
+    symlinked base interpreter (no install), so the doctor never resolves another root."""
+    ws = tmp_path / ("w" * max(1, 61 - len(str(tmp_path))))
+    venv = ws / ".dadaia" / ".venv"
+    (venv / "bin").mkdir(parents=True)
+    base = Path(sys.executable).resolve()
+    (venv / "bin" / "python").symlink_to(base)
+    (venv / "bin" / "dadaia").write_text("#!/bin/sh\n", encoding="utf-8")
+    (venv / "bin" / "dadaia").chmod(0o755)
+    (venv / "pyvenv.cfg").write_text(f"home = {base.parent}\n", encoding="utf-8")
+    (ws / ".dadaia" / "states").mkdir()
+    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": []}')
+    return ws
+
+
+def test_the_real_doctor_prints_every_fix_as_one_whole_runnable_line(tmp_path: Path) -> None:
+    """The printer, not a synthetic render: a workspace finding (an expired tmp entry), an
+    error-class specs finding (FIXED-1 on a symlinked QUALITY.md) and a ledger finding
+    (a malformed BACKLOG.json), through a `dadaia doctor` subprocess at a 61-char root with
+    COLUMNS unset: exit 1, and every `fix:` line is one line opening with an executable."""
+    import os
+    import shutil
+    import site
+
+    from dadaia_workspace.features.specs import canon
+
+    ws = _isolated_workspace(tmp_path)
+    expired = ws / ".dadaia" / "tmp" / "agent" / "20200101"
+    expired.mkdir(parents=True)
+    os.utime(expired, (0, 0))
+    specs = ws / "repos" / "demo" / "specs"
+    canon.scaffold(specs, project_name="demo")
+    outside = tmp_path / "outside.md"
+    outside.write_text("# Quality\n", encoding="utf-8")
+    (specs / "memory" / "QUALITY.md").unlink()
+    (specs / "memory" / "QUALITY.md").symlink_to(outside)
+    (specs / "backlog" / "BACKLOG.json").write_text("{}\n", encoding="utf-8")
+    env = {k: v for k, v in os.environ.items() if k != "COLUMNS"}
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(Path(__file__).resolve().parents[2]), *site.getsitepackages()]
+    )
+
+    run = subprocess.run(
+        [
+            str(ws / ".dadaia" / ".venv" / "bin" / "python"),
+            "-m",
+            "dadaia_workspace",
+            "doctor",
+            "--specs-dir",
+            str(specs),
+        ],
+        cwd=ws,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+
+    assert run.returncode == 1, run.stdout + run.stderr
+    lines = run.stdout.splitlines()
+    codes = {line.split(" ", 1)[0] for line in lines}
+    assert {"WS-tmp-expired", "FIXED-1", "LEDGER-BACKLOG-SCHEMA"} <= codes, run.stdout
+    fixes = [line.removeprefix("fix: ") for line in lines if line.startswith("fix: ")]
+    assert fixes, run.stdout
+    for fix in fixes:
+        argv0 = shlex.split(fix)[0]
+        assert Path(argv0).is_file() or shutil.which(argv0), f"not an executable: {fix}"
+    # Whole lines: a wrapped fix would leave a continuation line that is neither a finding
+    # (`CODE verdict …`) nor a `fix:` line.
+    assert [ln for ln in lines if ln and not re.match(r"(fix: |[A-Z][A-Za-z0-9-]+ )", ln)] == []
+
+
 # ── the PreToolUse gate ─────────────────────────────────────────────────────────
 
 

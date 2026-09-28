@@ -13,7 +13,6 @@ from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.workspace_resolver import resolve_cli_workspace_root
 
 console = Console()
-err_console = Console(stderr=True)
 
 
 def import_workspace(

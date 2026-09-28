@@ -69,7 +69,7 @@ def test_help_shows_dir_and_harness_optional() -> None:
 
 
 @pytest.mark.parametrize("argv", [["init", "--harness", "claude"], ["init", "demo"]])
-def test_non_tty_missing_field_exits_2_with_one_fix(
+def test_non_tty_missing_field_exits_1_with_one_fix(
     argv: list[str], tmp_path: Path, monkeypatch
 ) -> None:
     """AC1.2: no prompt off a TTY — exit 2 with the uvx fix; nothing scaffolded."""
@@ -77,7 +77,7 @@ def test_non_tty_missing_field_exits_2_with_one_fix(
 
     result = _runner.invoke(app, argv)
 
-    assert result.exit_code == 2, result.output
+    assert result.exit_code == 1, result.output
     fixes = [ln for ln in result.output.splitlines() if ln.startswith("fix: ")]
     assert len(fixes) == 1, result.output
     assert fixes[0].startswith("fix: uvx dadaia-workspace init "), fixes
@@ -94,7 +94,7 @@ def test_non_tty_fix_line_repeats_the_repo_flags(tmp_path: Path, monkeypatch) ->
 
     result = _runner.invoke(app, argv)
 
-    assert result.exit_code == 2, result.output
+    assert result.exit_code == 1, result.output
     [fix] = [ln for ln in result.output.splitlines() if ln.startswith("fix: ")]
     assert fix == (
         "fix: uvx dadaia-workspace init myws --harness claude --repo https://h/m.git "

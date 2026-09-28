@@ -45,24 +45,24 @@ def _tree(root: Path) -> dict[str, str]:
     return snapshot
 
 
-def test_init_without_harness_exits_2_with_one_fix_line(tmp_path: Path, monkeypatch) -> None:
+def test_init_without_harness_exits_1_with_one_fix_line(tmp_path: Path, monkeypatch) -> None:
     """AC2.1 first clause: `--harness` has no default — `all` is not implied."""
     monkeypatch.chdir(tmp_path)
 
     result = _runner.invoke(app, ["init", "demo"])
 
-    assert result.exit_code == 2, result.output
+    assert result.exit_code == 1, result.output
     assert _the_fix(result.output).startswith("uvx dadaia-workspace init demo --harness ")
     assert not (tmp_path / "demo" / ".dadaia").exists(), "a refused init scaffolds nothing"
 
 
-def test_init_without_dir_exits_2(tmp_path: Path, monkeypatch) -> None:
+def test_init_without_dir_exits_1(tmp_path: Path, monkeypatch) -> None:
     """The directory is a parameter: no positional means no cwd fallback, just a refusal."""
     monkeypatch.chdir(tmp_path)
 
     result = _runner.invoke(app, ["init", "--harness", "claude"])
 
-    assert result.exit_code == 2, result.output
+    assert result.exit_code == 1, result.output
     assert not (tmp_path / ".dadaia").exists(), "a bare init never targets cwd"
 
 
@@ -89,7 +89,7 @@ def test_init_refuses_a_directory_holding_a_foreign_tree(tmp_path: Path, monkeyp
 
     result = _runner.invoke(app, ["init", "demo", "--harness", "claude"])
 
-    assert result.exit_code == 2, result.output
+    assert result.exit_code == 1, result.output
     assert not (foreign / ".dadaia").exists()
     assert (foreign / "somebody-elses-file.txt").read_text(encoding="utf-8") == "keep me"
 
@@ -121,7 +121,7 @@ def test_init_foreign_tree_fix_names_a_runnable_sibling(tmp_path: Path, monkeypa
 
     result = _runner.invoke(app, ["init", ".", "--harness", "claude"])
 
-    assert result.exit_code == 2, result.output
+    assert result.exit_code == 1, result.output
     assert _the_fix(result.output) == (
         f"uvx dadaia-workspace init {tmp_path / 'proj-workspace'} --harness claude"
     )
@@ -132,7 +132,7 @@ def test_init_refusing_the_filesystem_root_still_prints_its_fix(tmp_path: Path) 
     sibling with ``Path.with_name`` raised ValueError before any refusal ran."""
     result = _runner.invoke(app, ["init", "/", "--harness", "claude"])
 
-    assert result.exit_code == 2, result.output
+    assert result.exit_code == 1, result.output
     root = Path("/").resolve()  # `D:\\` on Windows, `/` on POSIX
     assert _the_fix(result.output) == (
         f"uvx dadaia-workspace init {root / 'dadaia-workspace'} --harness claude"

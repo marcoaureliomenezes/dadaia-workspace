@@ -12,6 +12,7 @@ from typing import NoReturn
 import typer
 
 from dadaia_workspace import container
+from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.cli._specs_resolution import (
     resolve_context_for_cli,
     resolve_context_specs_dir_for_cli,
@@ -55,14 +56,12 @@ def upgrade(
     except SymlinkRefusedError as exc:
         _refuse_symlink(exc)
     except UpgradeRefused as exc:
-        typer.echo(f"[refused] {exc}", err=True)
-        sys.exit(1)
+        fail(exc)
     sys.exit(1 if _echo_upgrade(resolved, result) else 0)
 
 
 def _refuse_symlink(exc: SymlinkRefusedError) -> NoReturn:
-    typer.echo(f"[refused] {exc}\nfix: {materialize_line(exc.path, exc.path.resolve())}", err=True)
-    sys.exit(1)
+    fail(f"{exc}\nfix: {materialize_line(exc.path, exc.path.resolve())}")
 
 
 def _repair(specs: Path, *, dry_run: bool) -> tuple[list[SpecsDoctorIssue], list[SpecsDoctorIssue]]:
@@ -157,26 +156,19 @@ def init(
         try:
             ctx = resolve_context_for_cli(context)
         except ValueError as exc:
-            typer.echo(f"[error] {exc}\n{_init_fix('--context', '<name>')}", err=True)
-            raise typer.Exit(2) from exc
+            fail(f"{exc}\n{_init_fix('--context', '<name>')}")
         tree = resolve_context_specs_dir_for_cli(workspace := resolve_workspace_root(), ctx)
         if tree is None:  # a name the registry does not know owns no tree to write
-            typer.echo(
-                f"[error] no registered context {ctx!r}\nfix: {fix_line(workspace, 'context', 'list')}",
-                err=True,
-            )
-            raise typer.Exit(1)
+            fail(f"no registered context {ctx!r}\nfix: {fix_line(workspace, 'context', 'list')}")
         specs_dir = str(tree)
         rerun = ("--context", ctx)
     target = resolve_specs_dir_for_cli(specs_dir)
     kind = specs_version.classify(target)
     if kind == "malformed":
-        typer.echo(
-            f"[refused] {gitflow.constitution_error(target)}; nothing written.\n"
-            f"fix: repair the YAML frontmatter of {target / 'constitution.md'}",
-            err=True,
+        fail(
+            f"{gitflow.constitution_error(target)}; nothing written — repair the YAML "
+            f"frontmatter of {target / 'constitution.md'}."
         )
-        raise typer.Exit(2)
     flow = _gitflow(target, principal, integration, work_prefix, rerun)
     if kind == "foreign":
         _move_foreign(target, rerun, replace_foreign)
@@ -226,8 +218,7 @@ def _gitflow(
         )
     except ValueError as exc:
         fixed = ("--principal", "main", "--integration", "develop", "--work-prefix", "feature/")
-        typer.echo(f"[error] {exc}\n{_init_fix(*rerun, *fixed)}", err=True)
-        raise typer.Exit(2) from exc
+        fail(f"{exc}\n{_init_fix(*rerun, *fixed)}")
 
 
 def _move_foreign(target: Path, rerun: tuple[str, ...], replace_foreign: bool) -> None:
@@ -235,12 +226,10 @@ def _move_foreign(target: Path, rerun: tuple[str, ...], replace_foreign: bool) -
     backup location baseline publishes) under ``--replace-foreign``; exits on a
     refusal, writing nothing."""
     if not replace_foreign:
-        typer.echo(
-            f"[refused] {target} is a foreign specs tree; nothing written.\n"
-            f"{_init_fix(*rerun, '--replace-foreign')}",
-            err=True,
+        fail(
+            f"{target} is a foreign specs tree; nothing written.\n"
+            f"{_init_fix(*rerun, '--replace-foreign')}"
         )
-        raise typer.Exit(2)
     backup = target.parent / _BACKUP
     if backup.exists():
         backup = backup / f"{datetime.now(UTC):%Y%m%dT%H%M%SZ}"

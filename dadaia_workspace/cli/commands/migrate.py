@@ -17,6 +17,7 @@ from pathlib import Path
 
 import typer
 
+from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
@@ -97,8 +98,7 @@ def migrate_state(
         states_dir = workspace_root / ".dadaia" / "states"
         plan = plan_migration(states_dir)
     except (ValueError, WorkspaceNotInitializedError) as exc:
-        typer.echo(f"[error] {exc}", err=True)
-        sys.exit(1)
+        fail(exc)
 
     if plan.already_v2:
         typer.echo("[ok] spec_contexts.json is already at schema_version 2 — nothing to do.")
@@ -122,7 +122,6 @@ def migrate_state(
     try:
         execute_migration(states_dir, workspace_root)
     except ValueError as exc:
-        typer.echo(f"[error] {exc}", err=True)
-        sys.exit(1)
+        fail(exc)
 
     typer.echo("[ok] Migration complete. spec_contexts.json is now at schema_version 2.")

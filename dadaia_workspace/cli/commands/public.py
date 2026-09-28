@@ -90,7 +90,7 @@ def doctor() -> None:
     report = container.build_public_service().doctor(workspace_root)
     lines: list[DoctorLine] = list(report.lines)
     for line in lines:
-        console.print(line.render(), style=_STYLE_BY_STATUS.get(line.status), markup=False)
+        print(line.render())  # plain: a fix line is never wrapped at the terminal width
     # The verdict is the typed report's — fail-closed: EVERY blocking status exits 1,
     # including ones this CLI never special-cased (bug public-doctor-exits-zero-
     # despite-error: [error] used to fall into a decorative else and exit 0).

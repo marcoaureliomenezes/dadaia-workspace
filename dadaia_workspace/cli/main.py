@@ -5,6 +5,7 @@ import sys
 
 import typer
 
+from dadaia_workspace.cli._fail import print_error
 from dadaia_workspace.cli.commands import (
     capabilities,
     certify,
@@ -119,7 +120,7 @@ def _safe_app() -> None:
     except DadaiaError as exc:
         if _traceback_requested():
             raise
-        print(f"Error: {exc}", file=sys.stderr)
+        print_error(exc)
         raise SystemExit(1) from None
     except Exception as exc:
         if _traceback_requested():

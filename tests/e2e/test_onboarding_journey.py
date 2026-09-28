@@ -440,7 +440,7 @@ class Foreign(ThreeLevels):
                 if p.is_file()
             }
             refused = self.ws.dadaia("specs", "init", "--context", self.slug)
-            assert refused.returncode == 2, refused.stdout + refused.stderr  # AC4.4
+            assert refused.returncode == 1, refused.stdout + refused.stderr  # AC4.4
             assert "--replace-foreign" in refused.stdout + refused.stderr
             done = self.ws.dadaia("specs", "init", "--context", self.slug, "--replace-foreign")
             assert done.returncode == 0, f"{done.stdout}\n{done.stderr}"

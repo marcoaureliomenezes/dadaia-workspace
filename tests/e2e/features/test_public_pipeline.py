@@ -511,8 +511,12 @@ class TestSymlinkTargetDoctor:
         assert entry is not None, "install produced no .claude/skills symlink to break"
         return entry
 
-    def test_retargeted_symlink_is_one_error_with_a_fix_line(self, tmp_path: Path) -> None:
-        workspace = tmp_path / "ws"
+    def test_retargeted_symlink_is_one_error_with_a_fix_line(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """sa-rich-printer-wraps-fix-lines#S3: through the CLI `public doctor` on a
+        non-TTY with a 61-character root, the error and its fix line are whole lines."""
+        workspace = tmp_path / ("w" * max(1, 61 - len(str(tmp_path)) - 1))
         mgr = _manager()
         register_all(workspace)
         mgr.install(workspace, force=True)
@@ -522,7 +526,12 @@ class TestSymlinkTargetDoctor:
         entry.unlink()
         entry.symlink_to(foreign, target_is_directory=True)
 
-        report = [line.render() for line in mgr.doctor(workspace)]
+        sentinel = workspace / ".dadaia" / "states" / "spec_contexts.json"
+        sentinel.write_text('{"schema_version": "2", "contexts": []}', encoding="utf-8")
+        monkeypatch.chdir(workspace)
+        monkeypatch.delenv("COLUMNS", raising=False)
+        assert len(str(workspace)) >= 61
+        report = _runner.invoke(cli_app, ["public", "doctor"]).output.splitlines()
 
         findings = [line for line in report if "SYMLINK-TARGET-1" in line]
         assert findings == [

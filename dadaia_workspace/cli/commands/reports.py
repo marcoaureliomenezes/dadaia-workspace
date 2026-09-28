@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import typer
 from rich.console import Console
 
 from dadaia_workspace import container
+from dadaia_workspace.cli._fail import fail
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import HandoffSchemaError, WorkspaceNotInitializedError
 from dadaia_workspace.core.handoff_index import Handoff, ValidationResult
 from dadaia_workspace.core.workspace_resolver import (
@@ -16,7 +19,6 @@ from dadaia_workspace.core.workspace_resolver import (
 
 app = typer.Typer(help="Validate agent handoff reports.")
 console = Console()
-err_console = Console(stderr=True)
 
 
 # ---------------------------------------------------------------------------
@@ -83,21 +85,19 @@ def validate(
     """
     # Invocation guard: must have paths or --all
     if not paths and not all_:
-        err_console.print("[red]Error:[/red] provide one or more PATHS or use [bold]--all[/bold].")
-        raise typer.Exit(3)
+        fail("provide one or more PATHS or use --all.")
 
     try:
         workspace_root = resolve_cli_workspace_root(workspace)
     except WorkspaceNotInitializedError as exc:
-        err_console.print(f"Error: {exc}", markup=False, highlight=False, soft_wrap=True)
-        raise typer.Exit(3) from None
+        fail(exc)
 
     # Bug ancestor-walk-workspace-root-silent-mistarget (T-043-47/A30.5): always name
     # the resolved workspace root (stderr — never pollutes --json's stdout list shape)
     # so a false INVALID/missing_artifact caused by resolving against the wrong
     # ancestor is never silently misread. --workspace above is the primary fix; this
     # diagnostic covers every invocation, including the cwd-default path.
-    err_console.print(f"[dim]Resolved workspace root: {workspace_root}[/dim]")
+    print(f"Resolved workspace root: {workspace_root}", file=sys.stderr)
 
     index = container.build_handoff_index(workspace_root)
 
@@ -109,9 +109,7 @@ def validate(
     elif paths:
         missing = [p for p in paths if not p.exists()]
         if missing:
-            for m in missing:
-                err_console.print(f"[red]Error:[/red] File not found: {m}")
-            raise typer.Exit(2)
+            fail("File not found: " + ", ".join(str(m) for m in missing))
         target_paths = list(paths)
 
     # Version routing (v1/v1.1/v1.2, and refusal of any future/unknown token) lives in
@@ -122,11 +120,8 @@ def validate(
             index.validate_file(p, reviewed_root=reviewed_root) for p in target_paths
         ]
     except HandoffSchemaError as exc:
-        err_console.print(
-            f"[red]Error:[/red] Could not load handoff schema: {exc}\n"
-            "Run [bold]dadaia public stage && dadaia public install[/bold] first."
-        )
-        raise typer.Exit(3) from None
+        fix = fix_line(workspace_root, "public", "install")
+        fail(f"Could not load handoff schema: {exc}\nfix: {fix}")
 
     # Apply release filter if requested
     if release:

@@ -812,7 +812,12 @@ def _fix_sites() -> list[str]:
     for stem, (path, roots) in _VERBS.items():
         scopes = _scopes(ast.parse(path.read_text(encoding="utf-8")))
         for name in _reachable(scopes, roots):
-            raises = [n for n in ast.walk(scopes[name]) if isinstance(n, ast.Raise) and n.exc]
+            raises = [
+                n
+                for n in ast.walk(scopes[name])
+                if (isinstance(n, ast.Raise) and n.exc)
+                or (isinstance(n, ast.Call) and getattr(n.func, "id", "") == "fail")
+            ]
             sites += [f"{stem}.{name}#{i}" for i in range(len(raises))]
     return sites
 

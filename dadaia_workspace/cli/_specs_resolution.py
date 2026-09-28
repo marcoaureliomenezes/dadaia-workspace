@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.invocation import CONTEXT_NAME_RE as _CONTEXT_NAME_RE
 from dadaia_workspace.core.invocation import (
@@ -80,8 +81,12 @@ def resolve_context_specs_dir_for_cli(workspace_root: Path, context: str) -> Pat
 
 
 def resolve_specs_dir_for_cli(specs_dir: str | None) -> Path:
-    """Resolve the target specs/ dir (explicit flag, else the resolution authority)."""
-    return _core_resolve_specs_dir(specs_dir)
+    """Resolve the target specs/ dir (explicit flag, else the resolution authority); an
+    unresolvable one is a refusal through the one printer."""
+    try:
+        return _core_resolve_specs_dir(specs_dir)
+    except ValueError as exc:
+        fail(exc)
 
 
 def resolve_workspace_root_for_cli(target_path: Path) -> Path:

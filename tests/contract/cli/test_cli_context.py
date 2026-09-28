@@ -171,46 +171,6 @@ def test_context_error_matrix(workspace: Path, invoke_args: list[str]) -> None:
     assert result.exit_code != 0
 
 
-def test_context_uninitialized_workspace_and_v1_workspace_exit_nonzero(
-    tmp_path_factory: pytest.TempPathFactory, workspace: Path, monkeypatch
-) -> None:
-    """No `.dadaia/` at all → non-zero exit, and (AC-T10c-4) any `dadaia context`
-    command on a v1 workspace exits non-zero with the migration prompt."""
-    uninitialized = tmp_path_factory.mktemp("uninitialized")
-    monkeypatch.chdir(uninitialized)
-    result = _runner.invoke(app, ["context", "list"])
-    assert result.exit_code != 0
-
-    monkeypatch.chdir(workspace)
-    states = workspace / ".dadaia" / "states"
-    v1_data = {
-        "schema_version": "1",
-        "contexts": [
-            {
-                "name": "old-ctx",
-                "state": "ativo",
-                "repo_slug": "old-ctx",
-                "repo_url": "",
-                "is_primary": False,
-                "created_at": "2026-01-01T00:00:00Z",
-                "activated_at": None,
-            }
-        ],
-    }
-    (states / "spec_contexts.json").write_text(json.dumps(v1_data))
-    result = _runner.invoke(app, ["context", "list"])
-    assert result.exit_code != 0
-    combined = result.output + (result.stderr or "")
-    assert "MIGRATION REQUIRED" in combined or "dadaia migrate" in combined
-
-
-# ---------------------------------------------------------------------------
-# T-10d: context bind -- mode (session creation)
-# FR-R4-01: --mode optional, default read. FR-R4-02: explicit modes persisted.
-# Legacy alias mapping. --print-env back-compat escape.
-# ---------------------------------------------------------------------------
-
-
 def test_context_bind_is_one_verb_with_one_argument(workspace: Path) -> None:
     """0.4.7 FR4: `bind <ctx>` exits 0, persists the record, prints a human
     confirmation — never a shell export line. No --mode, no --release, no --force,

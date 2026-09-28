@@ -118,5 +118,5 @@ def test_codex_thread_id_bind_persists_resolver_attributes_and_negative_control(
     unbound_thread_record_path = unbound_ws / ".dadaia" / "sessions" / f"{_THREAD_ID}.json"
     assert not unbound_thread_record_path.exists()
 
-    with pytest.raises(typer.BadParameter):  # no bind, no cwd/specs fallback
+    with pytest.raises(typer.Exit):  # no bind, no cwd/specs fallback: the printer refuses
         resolve_specs_dir_for_cli(None)

@@ -432,10 +432,7 @@ def resolve_specs_dir(specs_dir: str | None) -> Path:
     if specs_dir:
         path = Path(specs_dir)
         if path.is_symlink():
-            # Deferred import — see the terminal error below for why.
-            import typer
-
-            raise typer.BadParameter(
+            raise ValueError(
                 f"Refusing a symlinked specs root: {path} is a symlink. Point "
                 "--specs-dir at the real directory instead of a link to it."
             )
@@ -445,11 +442,7 @@ def resolve_specs_dir(specs_dir: str | None) -> Path:
     if inv.specs_dir is not None:
         return inv.specs_dir
 
-    # Deferred import: hooks import this module on their hot path (F-01, v0.5.0 code
-    # review) and must not pay typer's import cost for a CLI-only error type.
-    import typer
-
-    raise typer.BadParameter(
+    raise ValueError(
         "Could not resolve specs_dir. Pass --specs-dir or bind a context with "
         f"`{fix_line(None, 'context', 'bind', '<name>')}`."
     )

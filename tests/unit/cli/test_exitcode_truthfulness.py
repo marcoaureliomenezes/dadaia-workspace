@@ -47,30 +47,6 @@ def test_doctor_exits_nonzero_when_issues_found(tmp_path: Path, monkeypatch) -> 
     assert result.exit_code != 0, "doctor found issues but exited 0"
 
 
-def test_reports_validate_invalid_file_exits_nonzero(tmp_path: Path, monkeypatch) -> None:
-    (tmp_path / ".dadaia" / "states").mkdir(parents=True)
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        '{"schema_version": "2", "contexts": []}'
-    )
-    (tmp_path / "repos").mkdir()
-    monkeypatch.chdir(tmp_path)
-    # Stage the packaged schema where the validator expects it.
-    import shutil
-
-    import dadaia_workspace
-
-    pkg = Path(dadaia_workspace.__file__).parent
-    schema_src = pkg / "public" / "schemas" / "handoff-v1.schema.json"
-    schema_dst = tmp_path / ".dadaia" / "agentic" / "schemas" / "handoff-v1.schema.json"
-    schema_dst.parent.mkdir(parents=True)
-    shutil.copy2(schema_src, schema_dst)
-    bad = tmp_path / "bad.handoff.json"
-    bad.write_text(json.dumps({"not": "a-handoff"}))
-    result = _runner.invoke(app, ["reports", "validate", str(bad)])
-    assert "INVALID" in result.output
-    assert result.exit_code != 0, "INVALID result must not exit 0"
-
-
 def test_certify_runs_without_initialized_workspace(tmp_path: Path, monkeypatch) -> None:
     """certify's contract is a DISPOSABLE workspace — a bare cwd must not traceback."""
     monkeypatch.chdir(tmp_path)

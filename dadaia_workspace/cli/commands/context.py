@@ -51,7 +51,6 @@ app = typer.Typer(help="Manage Spec Context Projects.")
 repo_app = typer.Typer(help="Manage a context's associated repos (main repo excluded).")
 app.add_typer(repo_app, name="repo")
 console = Console()
-err_console = Console(stderr=True)
 
 
 def _ctx_service() -> SpecContextService:
@@ -60,9 +59,7 @@ def _ctx_service() -> SpecContextService:
     except WorkspaceNotInitializedError as exc:
         fail(exc)
     except SchemaVersionError as exc:
-        # Use plain stderr so CliRunner captures it in result.output (mix_stderr=True default)
-        print(str(exc), file=sys.stderr)
-        raise typer.Exit(1) from None
+        fail(exc)
 
 
 def _ctx_to_dict(svc: SpecContextService, ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]
@@ -441,9 +438,10 @@ def bind(
                 print(line)
             return
         if os.environ.get("DADAIA_CONTEXT") != name:
-            err_console.print(
-                f"[yellow]![/yellow] No session id in this shell — this binding is reachable only "
-                f"where DADAIA_CONTEXT={name} is exported (`eval $(... --print-env)`)."
+            print(
+                f"! No session id in this shell — this binding is reachable only where "
+                f"DADAIA_CONTEXT={name} is exported (`eval $(... --print-env)`).",
+                file=sys.stderr,
             )
 
     console.print(f"[green]✓[/green] Bound to '[bold]{name}[/bold]' (session id: {session_id})")
