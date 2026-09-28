@@ -1,9 +1,5 @@
-"""Unit tests for SpecContextService current ALIVE/DEAD behavior.
-
-The suite proves lock-free context transitions plus the untracked-review and
-secret/private-IP/.pem redaction gates. Secret values must never be echoed back in a
-``DeadSecretFoundError`` message.
-"""
+"""Intent: CONTRACT — SpecContextService ALIVE/DEAD transitions (lock-free) and the
+``dead --commit`` redaction gate: a finding blocks the push and never echoes the secret."""
 
 from __future__ import annotations
 
@@ -59,27 +55,10 @@ def service(
     )
 
 
-# ------------------------------------------------------------------ create
-
-
-def test_create_stores_context_and_rejects_duplicate(
-    service: SpecContextService, store: JsonContextStore
-) -> None:
-    ctx = register_dead(service, "proj", "my-repo", "https://github.com/org/my-repo")
-    assert store.get("proj") is not None
-    assert ctx.state == ContextState.DEAD
-    assert ctx.repo_slug == "my-repo"
-
-    with pytest.raises(ContextAlreadyExistsError):
-        register_dead(service, "proj", "other", "https://github.com/org/other")
-
-
-# ------------------------------------------------------------------ alive (T-10b)
-
-
 def test_alive_clone_behavior_state_and_not_found(
     service: SpecContextService, remote: str, workspace_root: Path
 ) -> None:
+    """AC-T10b-1/3: alive() clones an absent repo, is idempotent, never clones over a present dir."""
     register_dead(service, "proj", "my-repo", remote)
     repo = workspace_root / "repos" / "my-repo"
 
@@ -108,50 +87,24 @@ def test_alive_clone_behavior_state_and_not_found(
         service.alive("ghost")
 
 
-# ------------------------------------------------------------------ dead (T-10b)
-
-
 @pytest.mark.parametrize(
-    ("name", "filename", "write_fn", "expect_secret_absent"),
+    ("filename", "write_fn", "expect_secret_absent"),
     [
-        (
-            # AC-R7-01: --commit + a planted secret in an untracked file ⇒ block the
-            # push. The value is never echoed back in the exception message.
-            "planted_secret",
-            "config.env",
-            lambda repo: (repo / "config.env").write_text(f"AWS_ACCESS_KEY_ID={aws_key_shape()}\n"),
-            aws_key_shape(),
-        ),
-        (
-            # A planted private IP / internal hostname also blocks --commit push.
-            "planted_private_ip",
-            "hosts.txt",
-            lambda repo: (repo / "hosts.txt").write_text(
-                f"db host: {private_ip()} ({internal_host('db-primary')})\n"
-            ),
-            None,
-        ),
-        (
-            # R-2 (v0.1.10 rc-2 sec LOW): a private-key file (.pem) in the untracked
-            # push set is a finding by its *suffix alone* — the binary-suffix family
-            # was skipped by the old text-only scan. dead() --commit must block
-            # regardless of byte content.
-            "pem_suffix_binary",
-            "server.pem",
-            lambda repo: (repo / "server.pem").write_bytes(b"\x00\x01\x02opaque-key-bytes\xff\xfe"),
-            None,
-        ),
+        pytest.param("config.env", lambda repo: (repo / "config.env").write_text(f"AWS_ACCESS_KEY_ID={aws_key_shape()}\n"), aws_key_shape(), id="planted_secret"),
+        pytest.param("hosts.txt", lambda repo: (repo / "hosts.txt").write_text(f"db host: {private_ip()} ({internal_host('db-primary')})\n"), None, id="planted_private_ip"),
+        pytest.param("server.pem", lambda repo: (repo / "server.pem").write_bytes(b"\x00\x01opaque-key-bytes\xff"), None, id="pem_suffix_binary"),
     ],
-)
+)  # fmt: skip
 def test_dead_with_commit_blocks_on_redacted_findings(
     service: SpecContextService,
     remote: str,
     workspace_root: Path,
-    name: str,
     filename: str,
     write_fn: object,
     expect_secret_absent: str | None,
 ) -> None:
+    """AC-R7-01, R-2: an untracked secret, private host or .pem (by suffix alone) blocks the
+    push; nothing is committed and the secret value is never in the message."""
     from dadaia_workspace.features.spec_context.service import DeadSecretFoundError
 
     register_dead(service, "proj", "my-repo", remote)
@@ -173,20 +126,21 @@ def test_dead_with_commit_blocks_on_redacted_findings(
     assert service.show("proj").state == ContextState.ALIVE
 
 
-# ------------------------------------------------------------------ delete
-
-
 def test_delete_removes_dead_context_not_found_and_alive_raises(
     service: SpecContextService, store: JsonContextStore, remote: str
 ) -> None:
+    """create registers DEAD and refuses a duplicate; delete removes only a DEAD context."""
     with pytest.raises(ContextNotFoundError):
         service.delete("ghost")
+    ctx = register_dead(service, "proj2", "my-repo2", "https://github.com/org/my-repo2")
+    assert (ctx.state, ctx.repo_slug) == (ContextState.DEAD, "my-repo2")
+    with pytest.raises(ContextAlreadyExistsError):
+        register_dead(service, "proj2", "other", "https://github.com/org/other")
 
     register_dead(service, "proj", "my-repo", remote)
     service.alive("proj")
     with pytest.raises(ContextStateError):
         service.delete("proj")
 
-    register_dead(service, "proj2", "my-repo2", "https://github.com/org/my-repo2")
     service.delete("proj2")
     assert store.get("proj2") is None
