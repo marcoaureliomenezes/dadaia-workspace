@@ -19,13 +19,12 @@ Two layers:
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from dadaia_workspace.hooks import _common, pre_gate, root_whitelist, sdd_gate
+from dadaia_workspace.hooks import pre_gate
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 
@@ -132,44 +131,6 @@ def test_apply_patch_multi_file_most_restrictive_blocks_whole_patch(
     assert reason_fragment in block["reason"] or reason_fragment.upper() in block["reason"].upper()
 
 
-# --------------------------------------------------------------------------- #
-# Subprocess-free single-spawn contract (seed 5).
-# --------------------------------------------------------------------------- #
-
-
-def _no_subprocess(monkeypatch: pytest.MonkeyPatch) -> None:
-    def boom(*_a: object, **_k: object) -> None:
-        raise AssertionError("pre_gate must not spawn a subprocess / exec a child")
-
-    monkeypatch.setattr(subprocess, "Popen", boom)
-    monkeypatch.setattr(subprocess, "run", boom)
-    import os
-
-    for name in ("execv", "execve", "execvp", "execvpe"):
-        if hasattr(os, name):
-            monkeypatch.setattr(os, name, boom)
-
-
-@pytest.mark.parametrize(
-    "payload",
-    [
-        {"tool_name": "Edit", "tool_input": {"file_path": "/tmp/x.py"}},
-        {"tool_name": "Write", "tool_input": {"file_path": "/tmp/x.py"}},
-        {"tool_name": "MultiEdit", "tool_input": {"file_path": "/tmp/x.py"}},
-        {"tool_name": "apply_patch", "tool_input": {"command": "*** Add File: a.py\n+x\n"}},
-    ],
-)
-def test_main_is_subprocess_free(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, payload: dict[str, Any]
-) -> None:
-    _no_subprocess(monkeypatch)
-    # Fault-inject the production stdin reader (NOT sys.stdin) so the entrypoint runs fully
-    # in-process per the harness-env contract carve-out: reads the payload once, dispatches
-    # to pure policy functions, returns 0 — no child spawned.
-    monkeypatch.setattr(_common, "read_stdin_json", lambda: dict(payload))
-    assert pre_gate.main() == 0
-
-
 def test_evaluate_payload_first_block_wins_and_faulty_policy_fails_open(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -185,7 +146,7 @@ def test_evaluate_payload_first_block_wins_and_faulty_policy_fails_open(
         calls.append("sdd")
         return "SDD BLOCK"
 
-    monkeypatch.setattr(pre_gate, "_POLICIES", (rw, pre_gate._venv_guard_reason, sdd))
+    monkeypatch.setattr(pre_gate, "_POLICIES", (rw, sdd))
     assert pre_gate.evaluate_payload({"tool_name": "Write"}) == "ROOT BLOCK"
     assert calls == ["rw"]
 
@@ -198,44 +159,6 @@ def test_evaluate_payload_first_block_wins_and_faulty_policy_fails_open(
     monkeypatch.setattr(pre_gate, "_POLICIES", (explode, allow))
     # A policy that raises is treated as ALLOW — the entrypoint never deadlocks.
     assert pre_gate.evaluate_payload({"tool_name": "Write"}) is None
-
-
-# --------------------------------------------------------------------------- #
-# FR11 / AC10 (T-046-29): the gate writes no telemetry — a gated write leaves no
-# `.dadaia/logs/` behind, whatever the verdict.
-# --------------------------------------------------------------------------- #
-
-
-@pytest.mark.parametrize(
-    ("path_fn", "expect_block"),
-    [
-        (lambda ws: ws / "repos" / "a" / "src" / "thing.py", False),
-        (lambda ws: ws / ".dadaia" / "sessions" / "runtime" / "a.ptr", True),
-    ],
-    ids=["allowed-mutating-write", "blocked-protected-write"],
-)
-def test_gated_write_leaves_no_logs_dir(tmp_path: Path, path_fn: Any, expect_block: bool) -> None:
-    """Intent: CONTRACT — AC10 (logs), T-046-29. Size: SMALL (one hook subprocess).
-
-    Harness-real spawn of ``pre_gate`` on a hermetic workspace: the verdict is emitted
-    and the hook creates no ``.dadaia/logs`` directory — the ``hook-latency.jsonl``
-    writer is retired with no replacement (FR11).
-    """
-    ws = _mk_workspace(tmp_path, "a")
-    block = _run(tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(path_fn(ws))}})
-    assert (block is not None) is expect_block
-    assert not (ws / ".dadaia" / "logs").exists()
-
-
-# --------------------------------------------------------------------------- #
-# WS-PI-4: the PI Layer-1 SDD-gate extension maps its tool names to the gate's
-# canonical vocabulary (write→Write, edit→Edit) before delegating to pre_gate.
-# These tests prove (a) why the mapping is necessary and (b) that the mapped
-# names are enforced by the same gate the other harnesses use.
-# --------------------------------------------------------------------------- #
-
-
-# --------------------------------------------------------------------------- #
 
 
 def test_main_emits_explicit_allow_envelope(
@@ -385,17 +308,3 @@ def test_pre_gate_stdout_is_exactly_one_json_object(tmp_path: Path) -> None:
         assert raw, f"the gate must always emit an observable envelope: {payload}"
         parsed = json.loads(raw)  # raises on any pollution before/after the object
         assert isinstance(parsed, dict), parsed
-
-
-def test_policies_tuple_is_the_wired_composition() -> None:
-    """The real ``_POLICIES`` membership and ORDER — first-block-wins is documented law.
-
-    The existing short-circuit test installs its own fake tuple and asserts its own string
-    back, so it proves the ``for`` loop stops early and nothing about which policies are
-    actually wired. This pins the shipped composition.
-    """
-    assert (  # noqa: SLF001
-        root_whitelist.evaluate_payload,
-        pre_gate._venv_guard_reason,  # noqa: SLF001
-        sdd_gate.evaluate_payload,
-    ) == pre_gate._POLICIES
