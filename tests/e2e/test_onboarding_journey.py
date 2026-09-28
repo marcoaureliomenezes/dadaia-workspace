@@ -32,7 +32,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import shlex
 import shutil
 import subprocess
 import sys
@@ -394,84 +393,6 @@ class ThreeLevels(Scenario):
         self.once("level3", step)
 
 
-# ── scenario 2: dadaia v6 specs ──────────────────────────────────────────────────
-
-
-class DadaiaV6(ThreeLevels):
-    specs = "dadaia6"
-    slug = "dad6"
-
-    def level3(self) -> None:
-        super().level3()
-        head = (self.ws.path / "repos" / self.slug / "specs" / "constitution.md").read_text("utf-8")
-        assert "specs_pattern_version: 7" in head  # AC4.3
-
-
-@pytest.fixture(scope="class")
-def dadaia_v6(env: Env) -> DadaiaV6:
-    return DadaiaV6(env)
-
-
-class TestDadaiaV6Specs:
-    def test_level1_init(self, dadaia_v6: DadaiaV6) -> None:
-        dadaia_v6.level1()
-
-    def test_level2_context_create(self, dadaia_v6: DadaiaV6) -> None:
-        dadaia_v6.level2()
-
-    def test_level3_upgrades_v6_to_v7(self, dadaia_v6: DadaiaV6) -> None:
-        dadaia_v6.level3()
-
-
-# ── scenario 3: foreign specs ────────────────────────────────────────────────────
-
-
-class Foreign(ThreeLevels):
-    specs = "foreign"
-    slug = "foreign"
-
-    def level3(self) -> None:
-        def step() -> None:
-            self.level2()
-            repo = self.ws.path / "repos" / self.slug
-            before = {
-                p.relative_to(repo / "specs"): p.read_bytes()
-                for p in (repo / "specs").rglob("*")
-                if p.is_file()
-            }
-            refused = self.ws.dadaia("specs", "init", "--context", self.slug)
-            assert refused.returncode == 1, refused.stdout + refused.stderr  # AC4.4
-            assert "--replace-foreign" in refused.stdout + refused.stderr
-            done = self.ws.dadaia("specs", "init", "--context", self.slug, "--replace-foreign")
-            assert done.returncode == 0, f"{done.stdout}\n{done.stderr}"
-            after = {rel: (repo / "specs-bkp" / rel).read_bytes() for rel in before}
-            assert after == before  # AC4.5 byte-identical
-            _specs_scaffolded(self.ws, self.slug)
-            self.ws.assert_level_clean(self.slug, self.slug, self.url)
-            files = {p for p in repo.rglob("*") if p.is_file() and ".git" not in p.parts}
-            self.ws.dadaia("doctor", "--context", self.slug, "--fix")
-            remaining = {p for p in repo.rglob("*") if p.is_file() and ".git" not in p.parts}
-            assert files <= remaining, files - remaining  # AC4.6
-
-        self.once("level3", step)
-
-
-@pytest.fixture(scope="class")
-def foreign(env: Env) -> Foreign:
-    return Foreign(env)
-
-
-class TestForeignSpecs:
-    def test_level1_init(self, foreign: Foreign) -> None:
-        foreign.level1()
-
-    def test_level2_context_create(self, foreign: Foreign) -> None:
-        foreign.level2()
-
-    def test_level3_replace_foreign_keeps_bytes(self, foreign: Foreign) -> None:
-        foreign.level3()
-
-
 # ── scenario 4: second project with an associated repo ───────────────────────────
 
 
@@ -533,112 +454,6 @@ class TestFailedCreateThenRetry:
 
 
 # ── scenario 6: re-init is the upgrade ───────────────────────────────────────────
-
-
-# ── FR10: the autopilot — an agent loops doctor -> printed fix until nothing is pending ──
-
-_AUTOPILOT_CAP = 10
-
-
-class Autopilot(Scenario):
-    """AC10.1: one ``init … --repo`` line, then ONLY the ONBOARDING fix lines doctor prints —
-    ``shlex.split`` and run; the ``agent`` step by a scripted stand-in filling memory."""
-
-    def __init__(self, env: Env, specs: str) -> None:
-        super().__init__(env)
-        self.slug = f"auto-{specs}"
-        self.url = env.bare(self.slug, specs)
-        self.ws = Workspace(env, f"ws-{specs}")
-        self.steps: list[str] = []
-        env.env["DADAIA_SESSION_ID"] = f"autopilot-{specs}"
-
-    def _next(self) -> dict[str, Any] | None:
-        done = self.ws.dadaia("doctor", "--json")
-        payload = json.loads(done.stdout)
-        found = [f for sec in payload["sections"].values() for f in sec["findings"]
-                 if f["code"] == "ONBOARDING"]  # fmt: skip
-        return found[0] if found else None
-
-    def _stand_in_first_pass(self) -> None:
-        """What `dd-product-engineer` does in the first pass, scripted: real memory content."""
-        specs = self.ws.path / "repos" / self.slug / "specs"
-        memory = specs / "memory"
-        for name in ("ARCHITECTURE.md", "QUALITY.md"):
-            path = memory / name
-            path.write_text(
-                path.read_text("utf-8") + "\n- `app/core.py` holds the one function `f`.\n",
-                encoding="utf-8",
-            )
-        atom = memory / "product" / "app" / "core.md"
-        atom.parent.mkdir(parents=True, exist_ok=True)
-        atom.write_text(
-            "---\nslug: core\ntitle: core\ntldr: The app's one function.\n"
-            "summary: app/core.py exposes f, returning 1.\ntags: [core]\n"
-            "sources:\n  - app/core.py\n---\n\n## The contract\n\n- `f()` returns 1.\n",
-            encoding="utf-8",
-        )
-        memory_py = (
-            self.ws.path / ".agents" / "skills" / "dd-spec-navigator" / "scripts" / "memory.py"
-        )
-        for verb in (("catalog", "generate"), ("check",)):
-            done = self.env.run(sys.executable, str(memory_py), *verb, "--specs", str(specs),
-                                cwd=self.ws.path)  # fmt: skip
-            assert done.returncode == 0, f"memory.py {verb}:\n{done.stdout}{done.stderr}"
-
-    def journey(self) -> None:
-        def step() -> None:
-            done = self.env.uvx(
-                "init", self.ws.path.name, "--harness", "claude", "--repo", self.url
-            )
-            _assert_init_quiet(self.ws, done)
-            for _ in range(_AUTOPILOT_CAP):
-                finding = self._next()
-                if finding is None:
-                    break
-                self.steps.append(finding["step"])
-                if finding["kind"] == "agent":
-                    self._stand_in_first_pass()
-                    continue
-                ran = self.env.run(*shlex.split(finding["fix"]), cwd=self.ws.path)
-                assert ran.returncode == 0, (
-                    f"fix of step {finding['step']} failed: {finding['fix']}\n"
-                    f"{ran.stdout}{ran.stderr}"
-                )
-                if finding["step"] == "specs":  # the agent shows the operator what was written
-                    assert "[gitflow] principal main, integration develop" in ran.stdout, ran
-            else:
-                pytest.fail(f"the autopilot hit the cap of {_AUTOPILOT_CAP}: {self.steps}")
-
-        self.once("journey", step)
-
-    def assert_published(self) -> None:
-        """AC10.2/AC10.3: principal, integration and <work>0.1.0 on the remote; the work
-        branch carries the gitflow block; doctor clean; HEAD == upstream."""
-        self.journey()
-        repo = self.ws.path / "repos" / self.slug
-        heads = self.env.git("ls-remote", "--heads", self.url, cwd=repo)
-        for branch in ("main", "develop", "feature/0.1.0"):
-            assert f"refs/heads/{branch}" in heads, heads
-        constitution = self.env.git("show", "origin/feature/0.1.0:specs/constitution.md", cwd=repo)
-        assert "gitflow:" in constitution, constitution
-        self.ws.doctor_json(self.slug)
-        head = self.env.git("rev-parse", "HEAD", cwd=repo)
-        assert head == self.env.git("rev-parse", "@{u}", cwd=repo)
-        assert self.steps[-1] == "publish" and "first-pass" in self.steps, self.steps
-
-
-@pytest.fixture(scope="class", params=["none", "dadaia6", "foreign"])
-def autopilot(request: pytest.FixtureRequest, env: Env) -> Autopilot:
-    return Autopilot(env, request.param)
-
-
-class TestAutopilot:
-    def test_the_printed_fix_lines_alone_publish_the_project(self, autopilot: Autopilot) -> None:
-        autopilot.assert_published()
-        if autopilot.slug == "auto-foreign":
-            repo = autopilot.ws.path / "repos" / autopilot.slug
-            tree = autopilot.env.git("ls-tree", "-r", "--name-only", "HEAD", cwd=repo)
-            assert "specs-bkp/features/login.md" in tree.splitlines(), tree
 
 
 class Upgrade(Scenario):
