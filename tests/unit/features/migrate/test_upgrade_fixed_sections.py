@@ -47,7 +47,7 @@ def test_a_v6_tree_ends_v7_with_fixed_sections_and_a_clean_doctor(tmp_path: Path
     result = CliRunner().invoke(app, ["specs", "upgrade", "--specs-dir", str(specs)])
 
     assert result.exit_code == 0, result.output
-    assert specs_version.read_pattern_version(specs) == 7
+    assert specs_version.state(specs)[0] == "canonical"
     for rel, _ in FIXED_SECTIONS:
         assert f"fix FIXED-1 {specs / rel}" in result.output
     issues = SpecsDoctor(specs, public_dir=_PUBLIC, templates_dir=_PUBLIC / "templates").check()

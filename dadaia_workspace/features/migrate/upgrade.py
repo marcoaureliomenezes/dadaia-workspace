@@ -1,10 +1,8 @@
 """``dadaia specs upgrade`` orchestration (FR-S04 / FR-S05; simplified v0.5.1 T-051-16).
 
-Sequence (v0.5.1 K10): resolve the current pattern version, then apply the registry's
-one surviving rule (:func:`~dadaia_workspace.features.migrate.registry.check_upgradable`)
--- a tree below the one live hop raises
-:class:`~dadaia_workspace.features.migrate.registry.UpgradeRefused` without touching the
-filesystem; a tree at 6 walks the 6 -> 7 hop (:func:`fold_tech_stack`) and is re-stamped;
+Sequence: read the tree through ``specs_version.state`` -- an absent, malformed or
+foreign tree raises :class:`UpgradeRefused` carrying that state's fix, without touching
+the filesystem; a tree at 6 walks the 6 -> 7 hop (:func:`fold_tech_stack`) and is re-stamped;
 a tree already at canonical is a no-op except for the empty ``_ideas/`` removal.
 Every other repair is the doctor's (``specs upgrade`` runs its repair set, WP-14).
 """
@@ -20,7 +18,10 @@ from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.frontmatter import FRONTMATTER_RE
 from dadaia_workspace.core.gitflow import merge_frontmatter
 from dadaia_workspace.core.spec_status import APPROVED, DRAFT, IN_REVIEW
-from dadaia_workspace.features.migrate import registry as _registry
+
+
+class UpgradeRefused(Exception):
+    """The tree cannot be upgraded; nothing was written."""
 
 
 @dataclass
@@ -47,15 +48,17 @@ def upgrade(
     """Upgrade ``specs/`` to :data:`CANONICAL_SPECS_VERSION`, the one target. Every
     delete goes through *remove* — the caller's one guarded deleter (``sweep.remove``).
 
-    Raises :class:`~dadaia_workspace.features.migrate.registry.UpgradeRefused`, before
-    any write, for a tree below the floor or still organised two-tier (ADR 0082).
+    Raises :class:`UpgradeRefused`, before any write, for a tree ``state`` does not call
+    upgradable or canonical, or one still organised two-tier (ADR 0082).
     """
-    current = _version.read_pattern_version(specs_dir)
+    kind, fix = _version.state(specs_dir)
+    if kind not in ("upgradable", "canonical"):
+        raise UpgradeRefused(f"specs tree {specs_dir} is {kind}; nothing written.\nfix: {fix}")
     goal = _version.CANONICAL_SPECS_VERSION
-    _registry.check_upgradable(current)
+    current = goal if kind == "canonical" else _version.OLDEST_UPGRADABLE_VERSION
     architecture = specs_dir / "memory" / "ARCHITECTURE.md"
     if architecture.is_file() and _RETIRED_PART_HEADING in architecture.read_text("utf-8"):
-        raise _registry.UpgradeRefused(
+        raise UpgradeRefused(
             f"{architecture} is two-tier ({_RETIRED_PART_HEADING!r}): nowhere safe to fold "
             "into. Rewrite it as ## Principles / ## Tech Stack / ## Structure, then re-run."
         )

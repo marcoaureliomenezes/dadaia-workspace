@@ -24,17 +24,12 @@ from dadaia_workspace.core.cli_line import fix_line, materialize_line
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, from_mapping
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.migrate import upgrade as upgrade_feature
-from dadaia_workspace.features.migrate.registry import UpgradeRefused
-from dadaia_workspace.features.migrate.upgrade import UpgradeResult
+from dadaia_workspace.features.migrate.upgrade import UpgradeRefused, UpgradeResult
 from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.features.specs import Severity, SpecsDoctor, SpecsDoctorIssue, canon
 from dadaia_workspace.infrastructure.ledger_scripts import script_repairs
 
 app = typer.Typer(help="SDD release-lifecycle structural checks and helpers.")
-
-
-def _resolve_specs_dir(specs_dir: str | None) -> Path:
-    return resolve_specs_dir_for_cli(specs_dir)
 
 
 @app.command("upgrade")
@@ -46,11 +41,11 @@ def upgrade(
 ) -> None:
     """Upgrade a specs/ tree to the canonical pattern version.
 
-    A tree below the one live hop (v6) refuses, no filesystem write, naming the
-    dadaia-workspace 0.4.x prerequisite. A tree at v6 walks to v7; every tree gets its
+    An absent, malformed or foreign tree refuses, writing nothing, with the one state
+    fix (``specs_version.state``). A tree at v6 walks to v7; every tree gets its
     fixed law sections and template-artifact repairs, so the doctor ends clean.
     """
-    resolved = _resolve_specs_dir(specs_dir)
+    resolved = resolve_specs_dir_for_cli(specs_dir)
     try:
         result = upgrade_feature.upgrade(resolved, remove=_deleter(resolved), dry_run=dry_run)
     except SymlinkRefusedError as exc:
@@ -148,7 +143,7 @@ def init(
 ) -> None:
     """Bring a repo's specs/ to the canon, never committing.
 
-    Absent: scaffold. Dadaia (stamped >= 6): upgrade, then fill missing files. Foreign:
+    Absent: scaffold. Upgradable or canonical: upgrade, then fill missing files. Foreign:
     after consent, `git mv specs specs-bkp` (staged) and scaffold.
     """
     rerun: tuple[str, ...] = ("--specs-dir", str(specs_dir))
@@ -163,17 +158,14 @@ def init(
         specs_dir = str(tree)
         rerun = ("--context", ctx)
     target = resolve_specs_dir_for_cli(specs_dir)
-    kind = specs_version.classify(target)
+    kind, fix = specs_version.state(target)
     if kind == "malformed":
-        fail(
-            f"{gitflow.constitution_error(target)}; nothing written\nOperator action: "
-            f"repair the YAML frontmatter of {target.resolve() / 'constitution.md'}."
-        )
+        fail(f"nothing written\n{fix}")
     flow = _gitflow(target, principal, integration, work_prefix, rerun)
     refused = False  # an unrelated error the repair left never blocks the gitflow write
     if kind == "foreign":
         _move_foreign(target, rerun, replace_foreign)
-    elif kind == "dadaia":
+    elif kind in ("upgradable", "canonical"):
         try:
             refused = _echo_upgrade(
                 target, upgrade_feature.upgrade(target, remove=_deleter(target))
@@ -194,7 +186,7 @@ def init(
     )
     if refused:
         raise typer.Exit(1)
-    if kind != "dadaia":
+    if kind in ("absent", "foreign"):
         typer.echo(f"[ok] {target} at pattern version {specs_version.CANONICAL_SPECS_VERSION}")
 
 

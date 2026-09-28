@@ -127,7 +127,7 @@ def test_a_v6_tree_ends_v7_with_a_clean_doctor(repo: Path) -> None:
     result = _runner.invoke(app, ["specs", "init", "--context", "c"])
 
     assert result.exit_code == 0, result.output
-    assert specs_version.read_pattern_version(specs) == 7
+    assert specs_version.state(specs)[0] == "canonical"
     assert _doctor_errors(specs) == []
     assert not (repo / "specs-bkp").exists()
 

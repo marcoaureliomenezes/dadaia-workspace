@@ -20,11 +20,7 @@ from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.fixed_sections import strip_fixed_sections
 from dadaia_workspace.core.gitflow import constitution_error
-from dadaia_workspace.core.specs_version import (
-    CANONICAL_SPECS_VERSION,
-    classify,
-    read_pattern_version,
-)
+from dadaia_workspace.core.specs_version import state
 from dadaia_workspace.core.template_history import was_shipped
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 
@@ -56,8 +52,7 @@ class _Ctx:
 
 
 def specs_ready(specs_dir: Path) -> bool:
-    """True once ``specs init`` has run: the tree is stamped at the canonical version."""
-    return specs_dir.is_dir() and read_pattern_version(specs_dir) >= CANONICAL_SPECS_VERSION
+    return state(specs_dir)[0] == "canonical"
 
 
 def _unbound(c: _Ctx) -> str | None:
@@ -82,12 +77,6 @@ def _first_pass(c: _Ctx) -> list[str]:
     return pending if atoms else [*pending, f"{c.specs / 'memory' / 'product'} (no atom)"]
 
 
-def _specs_fix(c: _Ctx) -> str:
-    # Running the printed line is the consent: only a foreign tree moves to specs-bkp/.
-    consent = ("--replace-foreign",) if classify(c.specs) == "foreign" else ()
-    return fix_line(c.root, "specs", "init", "--context", c.name, *consent)
-
-
 _Pending = Callable[[_Ctx], str | None]
 #: (id, kind, pending -> reason | None, fix). The ``context`` step is derived in
 #: :func:`next_step` — it is the one step with no context to judge.
@@ -102,8 +91,8 @@ STEPS: tuple[tuple[str, Kind, _Pending, Callable[[_Ctx], str]], ...] = (
     (
         "specs",
         "command",
-        lambda c: None if specs_ready(c.specs) else f"'{c.name}' carries no current specs tree",
-        _specs_fix,
+        lambda c: None if specs_ready(c.specs) else f"'{c.name}' specs tree is {state(c.specs)[0]}",
+        lambda c: str(state(c.specs, root=c.root, context=c.name)[1]),
     ),
     (
         "first-pass",

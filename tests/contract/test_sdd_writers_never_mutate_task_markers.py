@@ -31,14 +31,6 @@ Census (file:line, T-044-03):
    - ``dadaia_workspace/hooks/ctx_inject.py`` (SessionStart/UserPromptSubmit) — writes
      only sentinel/compact markers under ``.dadaia/tmp/`` (``ctx_inject.py:378,435``); it
      reads memory atoms, never writes release artifacts.
-2. ``dadaia_workspace/features/migrate/registry.py`` (``check_upgradable``) — v0.5.1
-   T-051-16 (K10) retired the versioned migration chain this item used to census (six
-   step modules scoped to ``specs/foundation``/``specs/SPEC.md``, ``specs/bugs/**``, and
-   ``specs/memory/**`` frontmatter — never ``specs/releases/**``). The registry's one
-   surviving function performs NO filesystem I/O at all (it only raises or returns
-   ``None``), so it cannot touch ``specs/releases/**`` by construction — proven below by
-   assertion on the function's signature/behaviour rather than a before/after fixture
-   diff, since there is no longer a write to diff around.
 """
 
 from __future__ import annotations
@@ -47,10 +39,7 @@ import json
 import re
 from pathlib import Path
 
-import pytest
-
 from dadaia_workspace.core.spec_status import STATUS_LINE
-from dadaia_workspace.features.migrate import registry as migrate_registry
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 _MARKER_RE = re.compile(r"^- \[([ xX-])\]", re.MULTILINE)
@@ -199,27 +188,6 @@ def test_ctx_inject_hook_never_mutates_tasks_md_content(tmp_path: Path) -> None:
 
     after = target.read_text(encoding="utf-8")
     _assert_sdd_invariants_preserved(before, after)
-
-
-# ---------------------------------------------------------------------------------------
-# 2. The migration registry — v0.5.1 T-051-16 (K10) retired the versioned chain; the
-#    one surviving rule (`check_upgradable`) writes nothing, so it cannot touch
-#    `specs/releases/**` by construction. Filesystem-level "nothing was written" proof
-#    for `upgrade()`'s refuse path lives in
-#    `tests/unit/features/migrate/test_specs_evolution.py::
-#    test_upgrade_refuses_below_floor_without_any_write` — not duplicated here.
-# ---------------------------------------------------------------------------------------
-
-
-def test_migration_registry_check_upgradable_performs_no_filesystem_io() -> None:
-    """`check_upgradable` is a pure predicate over one int — it cannot mutate
-    `specs/releases/**` (or anything else) because it never opens a path at all."""
-    # Silent (no exception) at or above the floor: no write, nothing to assert against.
-    migrate_registry.check_upgradable(current=6)
-
-    # Below the floor: raises, still no write.
-    with pytest.raises(migrate_registry.UpgradeRefused):
-        migrate_registry.check_upgradable(current=0)
 
 
 # ---------------------------------------------------------------------------------------

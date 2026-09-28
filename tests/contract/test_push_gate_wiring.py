@@ -61,39 +61,35 @@ def test_push_gate_check_always_wires_a_real_object_source(monkeypatch, tmp_path
     assert "leak.md:1" in result.output
 
 
-def _stamped_specs(repo: Path, version: int) -> None:
-    (repo / "specs").mkdir(exist_ok=True)
+def _stamped_specs(repo: Path, version: int) -> str:
+    """Commit the stamp: the gate reads the pushed commit, never the checkout."""
     (repo / "specs" / "constitution.md").write_text(
         f"---\nspecs_pattern_version: {version}\n---\n# constitution\n", encoding="utf-8"
     )
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "stamp"], cwd=repo, check=True)
+    return f"refs/heads/feature/0.0.1 {_git(repo, 'rev-parse', 'HEAD')} refs/heads/feature/0.0.1 {_ZERO}\n"
 
 
 def test_canon_scan_does_not_apply_to_a_tree_stamped_below_the_canon(
     monkeypatch, tmp_path: Path
 ) -> None:
-    """Bug pre-push-canon-scan-not-range-scoped (operator ruling 2026-09-13): a specs/
-    tree stamped pattern 5 has nothing for the current canon scan to enforce — the push
-    proceeds with one stderr note naming the migration; the same range is refused
-    once the tree is stamped at the canonical version."""
+    """Bug pre-push-canon-scan-not-range-scoped: a pushed tree stamped 5 is foreign — the
+    push proceeds printing state()'s fix; stamped canonical, the same path is refused."""
     repo = tmp_path / "repo"
     _init_repo(repo)
     (repo / "specs" / "backlog").mkdir(parents=True)
     (repo / "specs" / "backlog" / "candidates.md").write_text("x\n", encoding="utf-8")
-    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
-    subprocess.run(["git", "commit", "-q", "-m", "backlog"], cwd=repo, check=True)
-    tip_sha = _git(repo, "rev-parse", "HEAD")
     monkeypatch.setattr(ci, "_repo_root", lambda: repo)
-    stdin = f"refs/heads/feature/0.0.1 {tip_sha} refs/heads/feature/0.0.1 {_ZERO}\n"
 
-    _stamped_specs(repo, 5)
-    result = _runner.invoke(app, ["ci", "push-gate-check"], input=stdin)
+    result = _runner.invoke(app, ["ci", "push-gate-check"], input=_stamped_specs(repo, 5))
     assert result.exit_code == 0, result.output
-    assert "stamped pattern 5" in result.output
-    # sa-fix-lines-not-built-by-cli-line#S1: the upgrade verb is named through the builder.
-    assert fix_line(None, "specs", "upgrade") in result.output
+    # sa-fix-lines-not-built-by-cli-line#S1: the fix is named through the builder.
+    assert (
+        fix_line(None, "specs", "init", "--context", "<ctx>", "--replace-foreign") in result.output
+    )
 
-    _stamped_specs(repo, 7)
-    result = _runner.invoke(app, ["ci", "push-gate-check"], input=stdin)
+    result = _runner.invoke(app, ["ci", "push-gate-check"], input=_stamped_specs(repo, 7))
     assert result.exit_code == 1
     assert "specs/backlog/candidates.md" in result.output
 

@@ -14,6 +14,8 @@ import pytest
 
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.specs_version import state
+from dadaia_workspace.features.specs.rules import RULES
 from dadaia_workspace.features.workspace.onboarding import next_step
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 
@@ -62,6 +64,9 @@ def test_bind_only_for_a_resolvable_unbound_session(tmp_path: Path) -> None:
 
 
 def test_specs_fix_carries_replace_foreign_only_for_a_foreign_tree(tmp_path: Path) -> None:
+    """sa-specs-tree-state-read-five-ways#B28-4 the fix is state()'s, which pre-push, upgrade
+    and onboarding print; sa-specs-tree-state-read-five-ways#B28-6 ONBOARDING reports the
+    state and the doctor has no SPECS-VERSION code."""
     specs = tmp_path / "repos" / "app" / "specs"
     step = next_step(tmp_path, {"app": specs})
     assert step is not None
@@ -72,6 +77,9 @@ def test_specs_fix_carries_replace_foreign_only_for_a_foreign_tree(tmp_path: Pat
     assert step.command == fix_line(
         tmp_path, "specs", "init", "--context", "app", "--replace-foreign"
     )
+    assert step.command == state(specs, root=tmp_path, context="app")[1]
+    assert "specs tree is foreign" in step.reason
+    assert not any("SPECS-VERSION" in rule.codes for rule in RULES)
 
 
 def test_an_unparseable_constitution_is_an_agent_repair_never_a_move(tmp_path: Path) -> None:

@@ -1,19 +1,4 @@
-"""Unit tests for the specs-evolution framework (WS-SPECS-EVOLUTION; simplified
-v0.5.1 T-051-16, K10).
-
-Covers FR-S02 (version stamp), the registry's surviving "stamp v6 or refuse" rule
-(FR-S03, replacing the retired versioned migration chain — see
-``features/migrate/registry.py``'s docstring), and FR-S05 (upgrade
-orchestration).
-
-The versioned-chain tests this file used to carry (``test_registry_plan_...``,
-``test_upgrade_dry_run_writes_nothing``, ``test_upgrade_backup_first_chain_restamp``)
-are DELETED with their subject (the six migration modules + ``MigrationStep``/
-``plan``/``run_chain``) — replaced below by ``test_check_upgradable_refuses_below_
-floor_and_is_silent_at_or_above_it`` and
-``test_upgrade_refuses_below_floor_without_any_write`` /
-``test_upgrade_at_or_above_floor_is_idempotent_and_repairs_placeholders``.
-"""
+"""Unit tests for the specs stamp writer and ``upgrade`` orchestration (FR-S02, FR-S05)."""
 
 from __future__ import annotations
 
@@ -23,7 +8,6 @@ import pytest
 
 from dadaia_workspace.core import specs_version as _version
 from dadaia_workspace.core.gitflow import merge_frontmatter
-from dadaia_workspace.features.migrate import registry as _registry
 from dadaia_workspace.features.migrate import upgrade as _upgrade
 from dadaia_workspace.features.spec_context import sweep
 
@@ -35,37 +19,12 @@ def _write_constitution(specs_dir: Path, body: str) -> Path:
     return path
 
 
-# ───────────────────────────── version (FR-S02) — 1 param ─────────────────────
-
-
-@pytest.mark.parametrize(
-    ("body", "expected_version", "assert_extra"),
-    [
-        pytest.param(None, 0, None, id="absent-constitution-is-version-zero"),
-        pytest.param("# Constitution\n\nbody\n", 0, None, id="no-frontmatter-is-version-zero"),
-        pytest.param(
-            "---\nspecs_pattern_version: 1\n---\n# Constitution\n",
-            1,
-            None,
-            id="read-stamped-version",
-        ),
-    ],
-)
-def test_version_read_matrix(
-    tmp_path: Path, body: str | None, expected_version: int, assert_extra: object
-) -> None:
-    specs = tmp_path / "specs"
-    if body is not None:
-        _write_constitution(specs, body)
-    assert _version.read_pattern_version(specs) == expected_version
-
-
 def test_write_version_creates_and_updates_stamp(tmp_path: Path) -> None:
     # Creates frontmatter on a bare file, preserving the body.
     specs = tmp_path / "specs"
     _write_constitution(specs, "# Constitution\n\nbody\n")
     merge_frontmatter(specs, specs_pattern_version=1)
-    assert _version.read_pattern_version(specs) == 1
+    assert "specs_pattern_version: 1\n" in (specs / "constitution.md").read_text(encoding="utf-8")
     assert "# Constitution" in (specs / "constitution.md").read_text(encoding="utf-8")
 
     # Updates an existing stamp, preserving sibling frontmatter keys.
@@ -73,24 +32,8 @@ def test_write_version_creates_and_updates_stamp(tmp_path: Path) -> None:
     _write_constitution(specs2, "---\nspecs_pattern_version: 0\nother: keep\n---\n# C\n")
     merge_frontmatter(specs2, specs_pattern_version=1)
     text = (specs2 / "constitution.md").read_text(encoding="utf-8")
-    assert _version.read_pattern_version(specs2) == 1
+    assert "specs_pattern_version: 1\n" in text
     assert "other: keep" in text
-
-
-# ───────────────────────────── registry (FR-S03) — 1 param ────────────────────
-
-
-def test_check_upgradable_refuses_below_floor_and_is_silent_at_or_above_it() -> None:
-    """A-10.1: "the registry refuses <6 with the upgrade instruction"; sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges#47.1 /
-    sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges#47.2: the rule takes the tree's version only — no caller-supplied goal."""
-    with pytest.raises(_registry.UpgradeRefused, match="0.4.x"):
-        _registry.check_upgradable(current=0)
-    with pytest.raises(_registry.UpgradeRefused, match="0.4.x"):
-        _registry.check_upgradable(current=5)
-
-    # At, or past, the floor: no exception (the caller treats it as "nothing to do").
-    _registry.check_upgradable(current=6)
-    _registry.check_upgradable(current=7)
 
 
 # ───────────────────────────── upgrade (FR-S05) ────────────────────────────────
@@ -102,13 +45,13 @@ def test_upgrade_refuses_below_floor_without_any_write(tmp_path: Path) -> None:
     specs = tmp_path / "specs"
     _write_constitution(specs, "# C\n")  # version 0, below the canonical floor
 
-    with pytest.raises(_registry.UpgradeRefused):
+    with pytest.raises(_upgrade.UpgradeRefused):
         _upgrade.upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name), dry_run=True)
-    with pytest.raises(_registry.UpgradeRefused):
+    with pytest.raises(_upgrade.UpgradeRefused):
         _upgrade.upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name), dry_run=False)
 
     assert not (tmp_path / "specs_bkp").exists()
-    assert _version.read_pattern_version(specs) == 0
+    assert _version.state(specs)[0] == "foreign"
 
 
 def test_upgrade_at_or_above_floor_is_idempotent_and_repairs_placeholders(

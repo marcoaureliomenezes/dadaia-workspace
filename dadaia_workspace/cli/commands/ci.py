@@ -136,32 +136,12 @@ def push_gate_check() -> None:
         load_denylist_baseline_patterns,
         load_denylist_terms,
     )
-    from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, read_pattern_version
+    from dadaia_workspace.core.specs_version import state
     from dadaia_workspace.features.chokepoints import push_gate_decision
     from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
     from dadaia_workspace.features.specs.canon import canon_violations
 
     repo_root = _repo_root()
-
-    # Bug pre-push-canon-scan-not-range-scoped (operator ruling 2026-09-13): the v6
-    # canon is a property of a v6 tree. A specs/ tree still stamped below
-    # CANONICAL_SPECS_VERSION (pattern 5: Markdown backlog, `v`-prefixed release dirs,
-    # lowercase memory files) has NOTHING for the canon scan to enforce until
-    # `dadaia specs upgrade` migrates it — the doctor already reports that drift;
-    # the push gate must not lock every specs edit behind the migration.
-    specs_dir = repo_root / "specs"
-    specs_version = read_pattern_version(specs_dir)
-    canon_fn = canon_violations
-    if specs_dir.is_dir() and specs_version < CANONICAL_SPECS_VERSION:
-        # An unstamped (pre-framework) tree counts as below the canon too — ADR 0013.
-        typer.echo(
-            f"[pre-push] specs/ tree is stamped pattern {specs_version} "
-            f"(< {CANONICAL_SPECS_VERSION}): the v6 canon scan does not apply until "
-            f"`{fix_line(None, 'specs', 'upgrade')}` migrates it; the denylist scan still runs.",
-            err=True,
-        )
-        canon_fn = _no_canon_violations
-
     denylist_terms = load_denylist_terms()
     baseline_patterns = load_denylist_baseline_patterns()
 
@@ -176,12 +156,24 @@ def push_gate_check() -> None:
     stdin_text = sys.stdin.read() if not sys.stdin.isatty() else ""
     refs, malformed = parse_push_stdin(stdin_text)
     # `git push origin HEAD` names its source "HEAD": the branch checked out IS that ref.
-    branch = build_git_client().current_branch(repo_root)
+    git = build_git_client()
+    branch = git.current_branch(repo_root)
     refs = [
         replace(r, local_ref=f"refs/heads/{branch}") if r.local_ref == "HEAD" and branch else r
         for r in refs
     ]
     gitflow, fixes = _gate_inputs(repo_root, branch)
+    # The pushed commit's tree state, never the checkout's; foreign/v6 carry no v6 canon.
+    sha = next((r.local_sha for r in refs if not r.is_deletion), "HEAD")
+    canon_fn = canon_violations
+    if git.git(repo_root, "ls-tree", sha, "specs"):
+        shown = git.git(repo_root, "ls-tree", "--name-only", sha, "specs/constitution.md")
+        text = git.git(repo_root, "show", f"{sha}:{shown}") if shown else ""
+        kind, fix = state(repo_root / "specs", text)
+        if kind in ("foreign", "upgradable"):
+            canon_fn = _no_canon_violations
+        if fix:
+            typer.echo(f"[pre-push] the pushed specs/ tree is {kind}\nfix: {fix}", err=True)
     decision = push_gate_decision(
         refs,
         object_source=build_git_object_reader(),

@@ -124,10 +124,10 @@ def _gitflow_block(text: str) -> tuple[Gitflow | None, str | None]:
         return None, str(exc)
 
 
-def constitution_error(specs_dir: Path) -> str | None:
-    """Why an existing constitution's frontmatter cannot be trusted (ADR 0047): its YAML
-    does not parse, or its ``gitflow:`` block does not validate; ``None`` otherwise."""
-    reason = _gitflow_block(constitution_text(specs_dir))[1]
+def constitution_error(specs_dir: Path, text: str | None = None) -> str | None:
+    """Why an existing constitution's frontmatter (of *text* when given) cannot be trusted
+    (ADR 0047): its YAML does not parse, or its ``gitflow:`` block does not validate."""
+    reason = _gitflow_block(constitution_text(specs_dir) if text is None else text)[1]
     return reason and f"{constitution_path(specs_dir)}: {reason}"
 
 

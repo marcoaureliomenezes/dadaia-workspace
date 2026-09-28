@@ -144,7 +144,7 @@ def _push(branch: str, sha: str) -> str:
 
 def _write_constitution(repo: Path, text: str) -> None:
     """Committed: the gate reads HEAD's constitution, never the working tree (ADR 0048)."""
-    (repo / "specs").mkdir()
+    (repo / "specs").mkdir(exist_ok=True)
     (repo / "specs" / "constitution.md").write_text(text, encoding="utf-8")
     git = ["git", "-c", "user.name=t", "-c", "user.email=t@t.invalid"]
     subprocess.run([*git, "add", "specs"], cwd=repo, check=True, capture_output=True)
@@ -196,3 +196,17 @@ def test_an_associated_repo_inherits_its_context_gitflow(tmp_path: Path) -> None
     assert result.returncode == 0, result.stderr
     assert "WARNING" not in result.stderr
     assert _run_push_gate(infra, tmp_path, _push("feature/0.0.1", sha)).returncode != 0
+
+
+@pytest.mark.parametrize("stamp", ["7", "7\ngitflow: {principal: main"])
+def test_the_pushed_commits_tree_state_governs_the_canon_scan(tmp_path: Path, stamp: str) -> None:
+    """sa-specs-tree-state-read-five-ways#B28-2: the pushed commit's stamp, not a checkout
+    stamped 6; sa-specs-tree-state-read-five-ways#B28-3: a malformed one still scans."""
+    repo, _ = _init_repo(tmp_path, _SLUG)
+    (repo / "specs").mkdir()
+    (repo / "specs" / "stray-notes.txt").write_text("x\n", encoding="utf-8")
+    _write_constitution(repo, f"---\nspecs_pattern_version: {stamp}\n---\n# C\n")
+    (repo / "specs" / "constitution.md").write_text("---\nspecs_pattern_version: 6\n---\n")
+    sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True)
+    result = _run_push_gate(repo, tmp_path, _push("feature/0.0.1", sha.stdout.strip()))
+    assert result.returncode != 0 and "BLOCKED" in result.stderr, result.stderr

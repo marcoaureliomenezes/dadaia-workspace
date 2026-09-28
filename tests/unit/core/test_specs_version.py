@@ -6,7 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, merge_frontmatter, read_gitflow
-from dadaia_workspace.core.specs_version import read_pattern_version
+from dadaia_workspace.core.specs_version import state
 
 _CUSTOM = Gitflow(principal="trunk", integration="next", work_prefix="work/")
 
@@ -20,7 +20,7 @@ def test_gitflow_round_trips(tmp_path: Path) -> None:
     specs = _write(tmp_path, "---\nspecs_pattern_version: 7\n---\n# C\n")
     merge_frontmatter(specs, gitflow=_CUSTOM)
     assert read_gitflow(specs) == (_CUSTOM, None)
-    assert read_pattern_version(specs) == 7
+    assert state(specs)[0] == "canonical"
 
 
 def test_merge_preserves_unknown_keys_and_body(tmp_path: Path) -> None:
@@ -34,7 +34,7 @@ def test_merge_preserves_unknown_keys_and_body(tmp_path: Path) -> None:
     text = (specs / "constitution.md").read_text(encoding="utf-8")
     assert text.endswith("---" + body)
     assert "constitution_version: 6.0.0  # note\nowner:\n  - a\n  - b\n" in text
-    assert read_pattern_version(specs) == 7
+    assert state(specs)[0] == "canonical"
     assert read_gitflow(specs) == (DEFAULT, None)
 
 

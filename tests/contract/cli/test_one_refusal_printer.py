@@ -82,7 +82,7 @@ def test_s5_specs_upgrade_below_the_floor_is_error_exit_1(tmp_path: Path) -> Non
     result = _runner.invoke(app, ["specs", "upgrade", "--specs-dir", str(specs)])
 
     assert result.exit_code == 1, result.output
-    assert result.output.startswith("Error: specs pattern version 0")
+    assert result.output.startswith("Error: specs tree ")
 
 
 def test_s6_reports_validate_refusals_exit_1(tmp_path: Path, monkeypatch) -> None:

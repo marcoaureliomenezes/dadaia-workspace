@@ -90,14 +90,6 @@ def _plant_missing_root_agents(root: Path) -> None:
     (root / "specs" / "AGENTS.md").unlink(missing_ok=True)
 
 
-def _plant_old_pattern_version(root: Path) -> None:
-    constitution = root / "specs" / "constitution.md"
-    constitution.write_text(
-        "---\nspecs_pattern_version: 6\n---\n" + constitution.read_text(encoding="utf-8"),
-        encoding="utf-8",
-    )
-
-
 def _plant_fixed_block_gone(root: Path) -> None:
     """A memory document whose fixed law block was deleted by hand."""
     quality = root / "specs" / "memory" / "QUALITY.md"
@@ -210,7 +202,6 @@ PLANTS: dict[str, Plant] = {
     "MEM-PLACEHOLDER-1": Plant(_plant_placeholder_atom),
     "FIXED-1": Plant(_plant_fixed_block_gone),
     "FIXED-2": Plant(_plant_fixed_block_drifted),
-    "SPECS-VERSION": Plant(_plant_old_pattern_version),
     "SPEC-DOC-005": Plant(_plant_oversized_plan),
     "GITFLOW-1": Plant(_plant_gitflow_gone, {"<specs>": "specs"}),
     "AGENTS-PLACEHOLDER-1": Plant(_plant_tests_agents_placeholder),

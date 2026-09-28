@@ -5,20 +5,17 @@ Bare ``dadaia migrate`` performs the state-file migration (spec_contexts.json v1
 Note: ``dadaia migrate memory-yaml`` was removed in memory-markdown-source-v1.
       HTML → YAML migration is no longer needed (.md is the canonical source).
 Note: ``dadaia migrate tree-v2`` (specs/ directory tree layout, from R1) is RETIRED
-      (v0.5.1 T-051-16, K10) — it was the v0 -> v1 leg of the migration chain
-      ``features/migrate/registry.py`` deleted (see that module's docstring for why).
+      (v0.5.1 T-051-16, K10) — the v0 -> v1 leg of the deleted migration chain.
       A tree still below canonical uses dadaia-workspace 0.4.x's ``migrate tree-v2``.
 """
 
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 
 import typer
 
 from dadaia_workspace.cli._fail import fail
-from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.core.exceptions import SchemaVersionError, WorkspaceNotInitializedError
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.migrate.state_v2 import (
@@ -31,17 +28,6 @@ app = typer.Typer(
     help="Migration helpers for dadaia workspace and spec trees.",
     invoke_without_command=True,
 )
-
-
-def _resolve_specs_dir(specs_dir: str | None) -> Path:
-    """Resolve the target specs/ directory.
-
-    Priority:
-    1. Explicit ``--specs-dir`` argument.
-    2. Bound context session (``DADAIA_CONTEXT`` or ``DADAIA_SESSION_ID``).
-    3. ``<cwd>/specs`` fallback.
-    """
-    return resolve_specs_dir_for_cli(specs_dir)
 
 
 def _print_plan(plan: MigrationPlan) -> None:

@@ -6,10 +6,7 @@ source of truth (:data:`CANONICAL_SPECS_VERSION`); each project records its own
 version in the ``specs_pattern_version`` field of ``specs/constitution.md``'s YAML
 frontmatter.
 
-Absent-stamp semantics: a constitution with no frontmatter (or no
-``specs_pattern_version`` key) is treated as **version 0** — pre-framework, the flat
-layout that predates the tree-v2 migration. Doctor warns and recommends
-``dadaia specs upgrade``.
+A tree with no stamp is ``foreign``; :func:`state` is the one reader of all of it.
 """
 
 from __future__ import annotations
@@ -17,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.frontmatter import Frontmatter, parse
 from dadaia_workspace.core.gitflow import constitution_error, constitution_text, specs_tree_exists
 
@@ -33,24 +31,25 @@ CANONICAL_SPECS_VERSION = 7
 #: The oldest stamp the one live upgrade hop starts from — and so the oldest a tree may
 #: carry and still be a dadaia tree (SPEC 0.4.8 D7, D9); anything older is foreign.
 OLDEST_UPGRADABLE_VERSION = 6
-
-#: Version assigned to a tree with no stamp (pre-framework flat layout).
-UNSTAMPED_VERSION = 0
+State = Literal["absent", "malformed", "foreign", "upgradable", "canonical"]
 
 
-def read_pattern_version(specs_dir: Path) -> int:
-    """The constitution's ``specs_pattern_version``; :data:`UNSTAMPED_VERSION` (0) when
-    the constitution, its frontmatter or the key is absent or unreadable."""
-    fm = parse(constitution_text(specs_dir))
-    value = fm.data.get("specs_pattern_version") if isinstance(fm, Frontmatter) else None
-    return value if isinstance(value, int) and not isinstance(value, bool) else UNSTAMPED_VERSION
-
-
-def classify(specs_dir: Path) -> Literal["absent", "malformed", "dadaia", "foreign"]:
-    """``absent`` (no directory), ``malformed`` (:func:`constitution_error`), ``dadaia``
-    (stamped >= 6) or ``foreign`` — a tree without a dadaia constitution (ADR 0047)."""
-    if not specs_tree_exists(specs_dir):
-        return "absent"
-    if constitution_error(specs_dir):
-        return "malformed"
-    return "dadaia" if read_pattern_version(specs_dir) >= OLDEST_UPGRADABLE_VERSION else "foreign"
+def state(
+    specs_dir: Path, text: str | None = None, *, root: Path | None = None, context: str = "<ctx>"
+) -> tuple[State, str | None]:
+    """The ONE reader of a specs tree's state and its one fix (``None`` when canonical) — of
+    *text* when given (a pushed commit's constitution, ``""`` when it carries none), else
+    of the tree on disk. A constitution whose YAML or gitflow block fails is ``malformed``."""
+    if text is None and not specs_tree_exists(specs_dir):
+        kind: State = "absent"
+    elif reason := constitution_error(specs_dir, text):
+        return "malformed", f"Operator action: repair the YAML frontmatter of {reason}"
+    else:
+        fm = parse(constitution_text(specs_dir) if text is None else text)
+        stamp = fm.data.get("specs_pattern_version") if isinstance(fm, Frontmatter) else None
+        stamp = stamp if isinstance(stamp, int) and not isinstance(stamp, bool) else 0
+        if stamp >= CANONICAL_SPECS_VERSION:
+            return "canonical", None
+        kind = "upgradable" if stamp >= OLDEST_UPGRADABLE_VERSION else "foreign"
+    consent = ("--replace-foreign",) if kind == "foreign" else ()
+    return kind, fix_line(root, "specs", "init", "--context", context, *consent)

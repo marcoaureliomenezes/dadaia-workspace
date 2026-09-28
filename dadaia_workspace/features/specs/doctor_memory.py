@@ -458,7 +458,7 @@ class MemoryValidator:
         One WARNING per stale node (a package the diagram names that no longer exists)
         and one WARNING per missing node (a live package the diagram never names).
         Severity is always WARNING — never ERROR, never blocking push/CI (same class as
-        SPECS-VERSION/SPEC-DOC-030) — this is a continuous memory-drift signal, not a
+        SPEC-DOC-030) — this is a continuous memory-drift signal, not a
         structural invariant. See the module-level docstring above
         ``_FEATURES_PKG_MAP_HEADING_RE`` for the relocation history.
 
