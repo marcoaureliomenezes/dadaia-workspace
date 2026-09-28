@@ -45,7 +45,7 @@ Scope: this file governs only `specs/backlog/`.
  "change": "what changes about this subject"}
 ```
 
-### 4.1 The five subject kinds
+### 4.1 The subject kinds
 
 | kind | ref shape | derived from |
 |---|---|---|
@@ -54,13 +54,9 @@ Scope: this file governs only `specs/backlog/`.
 | `catalog` | a `catalog.json` feature slug | `specs/memory/product/catalog.json` |
 | `doc` | a SPEC-DOC id or memory heading | `specs/memory/**/*.md` |
 | `invariant` | an `INV-*` identifier | invariant declarations |
+| `api` | an alias-map synonym | the operator alias map only |
 
-```bash
-BACKLOG_PY subjects            # declared aliases + the document's own bindings
-BACKLOG_PY subjects --resolve <ref> --kind <kind>   # how one ref binds to those
-```
-
-- It answers from those two; a `code`/`doc`/`cli` ref is judged by the doctor's `BL-SCHEMA` finding, which names the ref it cannot resolve.
+- `BACKLOG_PY subjects` lists the alias map; every ref is judged only by the doctor's `BL-SCHEMA`, which names the ref it cannot resolve.
 - A repo with no Python sources has no `code` anchors — bind `catalog`, `doc` or `invariant`.
 
 ## 5. Relationship to releases

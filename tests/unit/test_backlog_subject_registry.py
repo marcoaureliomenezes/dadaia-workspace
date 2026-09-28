@@ -56,7 +56,7 @@ MINIMAL_CATALOG = {
 
 MINIMAL_ALIAS_MAP = """
 # fixture alias map
-the panel API -> panel:/api/widgets
+the widgets API -> api:/v1/widgets
 widget factory -> pkg/sample.py#WidgetFactory
 """
 
@@ -161,13 +161,10 @@ def test_doc_kind_table(fixture_tree: dict[str, Path]) -> None:
     )
     assert reg.bind("SPEC-DOC-12345", SubjectKind.DOC).status is BindStatus.UNRESOLVED
 
-    # panel/api — alias-map ONLY in R1.
-    # The alias map maps "the panel API" -> panel:/api/widgets.
-    result = reg.bind("the panel API", SubjectKind.PANEL)
-    assert result.status is BindStatus.RESOLVED
-    assert result.anchor is not None and result.anchor.id == "panel:/api/widgets"
-    # No auto-derivation for panel in R1; an unaliased panel ref must HALT.
-    assert reg.bind("panel:/api/never-aliased", SubjectKind.PANEL).status is BindStatus.UNRESOLVED
+    # api binds through the alias map only; an unaliased api ref HALTs.
+    result = reg.bind("the widgets API", SubjectKind.API)
+    assert result.anchor is not None and result.anchor.id == "api:/v1/widgets"
+    assert reg.bind("api:/v1/never-aliased", SubjectKind.API).status is BindStatus.UNRESOLVED
 
 
 # ── invariant kind ──────────────────────────────────────────────────────────────
@@ -233,25 +230,6 @@ def test_alias_collapses_synonym_and_absent_alias_map_tolerated(
         absent_reg.bind("pkg/sample.py#make_widget", SubjectKind.CODE).status is BindStatus.RESOLVED
     )
     assert absent_reg.bind("widget factory", SubjectKind.CODE).status is BindStatus.UNRESOLVED
-
-
-# ── list_anchors (preview surface feed) ─────────────────────────────────────────
-
-
-def test_list_anchors_filters_by_kind_and_all_kinds(fixture_tree: dict[str, Path]) -> None:
-    reg = _build(fixture_tree)
-    code_anchors = reg.list_anchors(SubjectKind.CODE)
-    ids = {a.id for a in code_anchors}
-    assert "pkg/sample.py#WidgetFactory" in ids
-    assert "pkg/sample.py#make_widget" in ids
-    # No catalog anchors leak into a code listing.
-    assert all(a.kind is SubjectKind.CODE for a in code_anchors)
-
-    all_anchors = reg.list_anchors()
-    kinds = {a.kind for a in all_anchors}
-    assert SubjectKind.CODE in kinds
-    assert SubjectKind.CLI in kinds
-    assert SubjectKind.CATALOG in kinds
 
 
 # ── scoped LIVE-derivation test (creates/deletes its own source file) ────────────

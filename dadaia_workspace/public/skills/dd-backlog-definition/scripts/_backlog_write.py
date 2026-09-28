@@ -15,7 +15,7 @@ from _backlog_store import SCRIPT, Items, Refusal  # noqa: E402
 
 _SLUG_RE = re.compile(r"^[a-z][a-z0-9-]+$")
 _INTENT_RE = re.compile(r"^(?P<kind>[a-z]+):(?P<ref>[^=]+)=(?P<change>.+)$", re.DOTALL)
-_KINDS = ("code", "api", "cli", "panel", "doc", "invariant", "catalog")
+_KINDS = ("code", "api", "cli", "doc", "invariant", "catalog")
 
 
 def today() -> str:

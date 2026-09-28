@@ -370,48 +370,18 @@ def _aliases(root: Path, *lines: str) -> Path:
     return path
 
 
-def test_subjects_lists_the_alias_map_anchors(script: Path, tmp_path: Path) -> None:
+def test_subjects_lists_the_alias_map_and_never_resolves(script: Path, tmp_path: Path) -> None:
+    """sa-subjects-resolve-is-circular#B3: `subjects --resolve` no longer exists (argparse
+    error). sa-subjects-resolve-is-circular#B4: `new` refuses the 'panel' kind, nothing written."""
     specs = _specs(tmp_path)
-    aliases = _aliases(tmp_path, "panel:/api/thing -> panel:/api/thing")
+    aliases = _aliases(tmp_path, "the widgets -> api:/v1/widgets")
     done = _run(script, "subjects", "--specs", str(specs), "--alias-map", str(aliases))
     assert done.returncode == 0, done.stdout + done.stderr
-    assert "panel:/api/thing" in done.stdout
-
-
-def test_subjects_resolves_a_bound_subject(script: Path, tmp_path: Path) -> None:
-    specs = _specs(tmp_path)
-    aliases = _aliases(tmp_path, "the-thing -> panel:/api/thing")
-    done = _run(
-        script, "subjects", "--specs", str(specs), "--alias-map", str(aliases),
-        "--resolve", "the-thing", "--kind", "panel",
-    )  # fmt: skip
-    assert done.returncode == 0, done.stdout + done.stderr
-    assert "RESOLVED" in done.stdout
-    assert "panel:/api/thing" in done.stdout
-
-
-def test_subjects_refuses_an_unresolved_subject(script: Path, tmp_path: Path) -> None:
-    specs = _specs(tmp_path)
-    aliases = _aliases(tmp_path, "the-thing -> panel:/api/thing")
-    done = _run(
-        script, "subjects", "--specs", str(specs), "--alias-map", str(aliases),
-        "--resolve", "nothing-like-it", "--kind", "panel",
-    )  # fmt: skip
-    assert done.returncode == 1
-    assert "UNRESOLVED" in done.stdout + done.stderr
-
-
-def test_subjects_lists_the_subjects_the_live_document_already_binds(
-    script: Path, tmp_path: Path
-) -> None:
-    specs = _specs(tmp_path)
-    _run(
-        script, "new", "an-idea", "--specs", str(specs),
-        "--intent", "code:dadaia_workspace/container.py#build=wire it",
-    )  # fmt: skip
-    done = _run(script, "subjects", "--specs", str(specs), "--alias-map", str(tmp_path / "none"))
-    assert done.returncode == 0, done.stdout + done.stderr
-    assert "dadaia_workspace/container.py#build" in done.stdout
+    assert "api:/v1/widgets" in done.stdout
+    resolve = _run(script, "subjects", "--specs", str(specs), "--resolve", "INV-DOES-NOT-EXIST")
+    assert resolve.returncode == 2 and "unrecognized arguments: --resolve" in resolve.stderr
+    panel = _run(script, "new", "x-item", "--specs", str(specs), "--intent", "panel:kanban-board=x")
+    assert panel.returncode == 1 and _active(specs) == []
 
 
 def _pair(specs: Path) -> list[bytes]:

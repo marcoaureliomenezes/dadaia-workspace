@@ -6,10 +6,7 @@ append-only exit ledger, stdlib only.
 `check` over them, and only then replaces the file atomically — so this script's writer
 and its validator cannot disagree about what a valid backlog is.
 
-``subjects`` lists what this script can see bound: the operator alias map and the
-subjects the live document already carries. Deriving the ~5k code/doc/cli anchors from
-the source tree stays where its reader lives — the doctor's `BL-SCHEMA` registry — so
-there is one derivation, not a second copy of it inside a skill script.
+``subjects`` lists the operator alias map; resolving a subject is the doctor's alone.
 """
 
 from __future__ import annotations
@@ -38,7 +35,7 @@ from _ledger import find_specs  # noqa: E402
 _HELP = {
     "new": "append one brand-new active[] entry, born at status 'idea'",
     "exit": "retire one live entry and append its one terminal histo record",
-    "subjects": "list the bindable canonical subjects, or resolve one",
+    "subjects": "list the operator alias map's anchors",
     "check": "validate BACKLOG.json and backlog_histo.jsonl",
 }
 _ALIAS_DEFAULT = ".dadaia/states/backlog_subject_aliases.txt"
@@ -66,7 +63,6 @@ def _parser() -> argparse.ArgumentParser:
             command.add_argument("--alias-map", type=Path, default=None,
                                  help=f"alias map (default: <workspace>/{_ALIAS_DEFAULT})")  # fmt: skip
             command.add_argument("--kind", help="filter to one subject kind")
-            command.add_argument("--resolve", help="resolve one proposed subject ref and exit")
         if verb == "check":
             command.add_argument("--json", action="store_true", help="emit findings as JSON")
     return parser

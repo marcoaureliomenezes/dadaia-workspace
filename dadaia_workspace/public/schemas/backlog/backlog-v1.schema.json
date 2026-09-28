@@ -72,7 +72,7 @@
           "properties": {
             "kind": {
               "type": "string",
-              "enum": ["code", "api", "cli", "panel", "doc", "invariant", "catalog"],
+              "enum": ["code", "api", "cli", "doc", "invariant", "catalog"],
               "description": "The registry source class this subject ref resolves against (dadaia_workspace.core.models.backlog.SubjectKind)."
             },
             "ref": {

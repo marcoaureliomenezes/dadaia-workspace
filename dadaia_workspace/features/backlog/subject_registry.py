@@ -13,8 +13,7 @@ live tree:
 4. ``doc`` — spec-doc ids (``SPEC-DOC-NNN``) + memory heading anchors (``file.md#heading``);
 5. ``invariant`` — named invariants (``INV-*``).
 
-``panel``/``api`` ids are NOT auto-derivable in R1 (no route registry exists) — they bind via
-the **operator alias map only**. The alias map path is injected, never a cwd lookup
+``api`` ids bind via the **operator alias map only** (no route registry exists). The alias map path is injected, never a cwd lookup
 (SPEC §3.8 #6).
 
 **Binding contract:** the model *proposes* a subject string; Python *normalizes + binds* it to
@@ -275,15 +274,6 @@ class Registry:
             for anchor_id in ids:
                 self._by_id.setdefault(anchor_id, set()).add(kind)
 
-    def list_anchors(self, kind: SubjectKind | None = None) -> list[Anchor]:
-        """All anchors, optionally filtered to one ``kind``. Stable sort by id."""
-        out: list[Anchor] = []
-        for anchor_kind, ids in self._anchors.items():
-            if kind is not None and anchor_kind is not kind:
-                continue
-            out.extend(Anchor(kind=anchor_kind, id=anchor_id) for anchor_id in ids)
-        return sorted(out, key=lambda a: (a.kind.value, a.id))
-
     def _resolve_in_kind(self, raw_ref: str, kind: SubjectKind) -> BindResult:
         """Resolve ``raw_ref`` as a direct (non-alias) anchor of ``kind``.
 
@@ -325,8 +315,7 @@ class Registry:
         Resolution order:
 
         1. **alias map** — a ``synonym -> canonical-anchor`` entry collapses the proposed ref
-           to its canonical anchor (case-insensitive). This is the **sole** binding path for
-           ``panel``/``api`` in R1.
+           to its canonical anchor (case-insensitive) — the only path for ``api``.
         2. **direct anchor** — the ref is itself a derived anchor of ``kind`` (auto-derived
            kinds only: code/cli/catalog/doc/invariant).
 
@@ -349,23 +338,18 @@ class Registry:
                     status=BindStatus.RESOLVED,
                     anchor=Anchor(kind=resolved_kind, id=alias_target),
                 )
-            # An alias to an opaque target (e.g. a panel/api id with no auto-derivation):
-            # bind to the requested kind. This is the R1 panel/api path.
+            # An alias to an opaque target (an api id): bind to the requested kind.
             return BindResult(status=BindStatus.RESOLVED, anchor=Anchor(kind=kind, id=alias_target))
 
-        # (2) panel/api are alias-ONLY in R1 — no direct/auto resolution.
-        if kind in {SubjectKind.PANEL, SubjectKind.API}:
+        if kind is SubjectKind.API:
             return BindResult(
                 status=BindStatus.UNRESOLVED,
-                message=(
-                    f"subject ref {ref!r} (kind={kind.value}) has no alias-map entry; "
-                    f"panel/api subjects bind via the operator alias map only in R1 "
-                    f"(no auto-derivation). Add a 'synonym -> canonical-anchor' alias."
-                ),
+                message=f"subject ref {ref!r} (kind=api) has no alias-map entry; api subjects bind via the alias map only.",
             )
-
-        # (2') direct auto-derived anchor.
-        return self._resolve_in_kind(ref, kind)
+        # The law spells a cli ref `dadaia <command>`; the command tree carries the bare id.
+        return self._resolve_in_kind(
+            ref.removeprefix("dadaia ") if kind is SubjectKind.CLI else ref, kind
+        )
 
 
 def build_registry(

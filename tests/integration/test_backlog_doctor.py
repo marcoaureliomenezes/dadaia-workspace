@@ -45,6 +45,10 @@ _ROWS = {  # the live entries (status, ref, change) -> the backlog findings the 
         [("candidate", "pkg/m.py#Widget", "a"), ("candidate", "pkg/m.py#Widget", "b")],
         ["BL-CONFLICT"],
     ),
+    "cli-ref-in-the-law-shape": ([("candidate", "cli:dadaia context bind", "x")], []),
+    "cli-ref-bare": ([("candidate", "cli:context bind", "x")], []),
+    "self-bound-invariant": ([("candidate", "invariant:INV-DOES-NOT-EXIST", "x")], ["BL-SCHEMA"]),
+    "api-without-alias": ([("candidate", "api:GET /v1/x", "x")], ["BL-SCHEMA"]),
 }
 
 
@@ -53,14 +57,25 @@ def test_the_doctor_judges_a_live_entry_as_backlog_py_check_does(row: str, tmp_p
     """sa-backlog-status-has-no-single-authority#B1: doctor ≡ `backlog.py check` on any
     status. sa-backlog-status-has-no-single-authority#B2: "Deferred" is refused, with a fix that is not sed. sa-backlog-status-has-no-single-authority#B3: a terminal token
     on a live entry gives one ERROR; "postponed" is accepted by both. sa-backlog-status-has-no-single-authority#B8: BL-CONFLICT
-    stays in the doctor."""
+    stays in the doctor.
+    sa-subjects-resolve-is-circular#B1: 'cli:dadaia context bind' resolves; sa-subjects-resolve-is-circular#B2: the bare
+    'cli:context bind' gets B1's verdict; sa-subjects-resolve-is-circular#B3: a self-bound invariant is unresolved; sa-subjects-resolve-is-circular#B5: an
+    api subject with no alias is refused with the alias-only message."""
     entries, expected = _ROWS[row]
     specs = tmp_path / "specs"
     (specs / "backlog").mkdir(parents=True)
     (tmp_path / "pkg").mkdir()
     (tmp_path / "pkg" / "m.py").write_text(_SOURCE, encoding="utf-8")
     active = [
-        _active_entry(f"e{n}", "t", s, ref=r, change=c) for n, (s, r, c) in enumerate(entries)
+        _active_entry(
+            f"e{n}",
+            "t",
+            s,
+            ref=r.split(":", 1)[-1],
+            change=c,
+            kind=r.split(":", 1)[0] if ":" in r else "code",
+        )  # fmt: skip
+        for n, (s, r, c) in enumerate(entries)
     ]
     (specs / "backlog" / "BACKLOG.json").write_text(
         json.dumps({"schema": "backlog-v1", "active": active}), encoding="utf-8"
@@ -68,4 +83,5 @@ def test_the_doctor_judges_a_live_entry_as_backlog_py_check_does(row: str, tmp_p
     section = _ledgers_section(None, specs, str(tmp_path), None)
     found = [f for f in section.findings if f.code.startswith(("BL-", _LEDGER))]
     assert [f.code for f in found] == expected, [f.message for f in found]
+    assert all("alias map only" in f.message for f in found if "api" in row)
     assert all(f.error and not f.fix.startswith("sed") for f in found)

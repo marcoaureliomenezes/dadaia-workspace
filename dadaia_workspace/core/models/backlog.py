@@ -35,15 +35,13 @@ INTENTS_EXEMPT_STATUS = "idea"
 class SubjectKind(StrEnum):
     """The registry source classes a subject ref may belong to (SPEC §3.1/§3.2).
 
-    ``code``/``cli``/``catalog``/``doc``/``invariant`` are auto-derived by the registry in
-    R1; ``panel``/``api`` bind via the operator alias map only (no auto-derivation in R1 —
-    ADR-A). The schema accepts all seven so the shape is forward-compatible with R2.
+    ``code``/``cli``/``catalog``/``doc``/``invariant`` are derived from live truth; ``api``
+    binds through the operator alias map only.
     """
 
     CODE = "code"
     API = "api"
     CLI = "cli"
-    PANEL = "panel"
     DOC = "doc"
     INVARIANT = "invariant"
     CATALOG = "catalog"
