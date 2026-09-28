@@ -7,7 +7,7 @@ that had gained associated repos would silently lose them on its very next alive
 dead() call. GitSubprocessClient-driven (SMALL/unit tier): this is a pure
 reconstruction/propagation concern, no real git behavior under test — the real-git
 clone/commit/push/removal behavior for the associated set is proven in
-``tests/integration/test_associated_repos_alive_dead.py``.
+``tests/integration/test_context_dead_holds.py``.
 """
 
 from __future__ import annotations

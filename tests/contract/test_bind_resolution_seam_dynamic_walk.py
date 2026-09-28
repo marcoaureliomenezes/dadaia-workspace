@@ -46,7 +46,7 @@ fixed centrally — each fix patched one command surface and the family kept rec
 RED against HEAD (v0.1.77 T-1): part (a) below fails today because 15 lifecycle verbs
 default ``--context`` to the literal ``"dadaia-workspace"``. Part (b) (the seam-boundary
 assertion) is checked as a structural stand-in for the executed-path probe in
-``tests/integration/cli/test_bind_resolution_seam_executed_path.py`` — that companion
+``tests/integration/test_one_bind.py`` — that companion
 module runs the REAL bind + verb invocation end-to-end for the resolver-driven command
 modules (bugs, specs, and context).
 """
@@ -388,7 +388,7 @@ def test_every_resolver_driven_verb_reaches_the_seam_family() -> None:
     pinned honest against source drift, not just today's headline assertion.
 
     This is the seam-boundary stand-in for the executed-path probe (companion module
-    ``tests/integration/cli/test_bind_resolution_seam_executed_path.py`` runs the real
+    ``tests/integration/test_one_bind.py`` runs the real
     CliRunner + bind flow for a representative verb per command module)."""
     seam_reaching: list[str] = []
     not_seam_reaching: list[str] = []
