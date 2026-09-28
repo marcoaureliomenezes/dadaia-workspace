@@ -409,8 +409,6 @@ def _duplicate_definitions(sources: dict[str, str]) -> set[str]:
 #: V37 allowance, born 2026-09-27 at 65: each duplicate, keyed to the open bug deleting it.
 _V37_BIRTH = 65
 _V37_ALLOWANCE: dict[str, str] = {
-    "features/backlog/document.py:_SLUG_RE": "sa-backlog-status-has-no-single-authority",
-    "public/skills/dd-backlog-definition/scripts/_backlog_write.py:_SLUG_RE": "sa-backlog-status-has-no-single-authority",
 }
 
 

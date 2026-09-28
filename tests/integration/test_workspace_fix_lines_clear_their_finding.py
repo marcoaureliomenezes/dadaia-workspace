@@ -50,14 +50,7 @@ def _plant_memory(root: Path) -> dict[str, str]:
     return {}
 
 
-def _plant_stale(root: Path) -> dict[str, str]:
-    item = {"id": "stale-item", "title": "t", "opened": "2026-09-25", "status": "rejected", "description": "d"}  # fmt: skip
-    (root / "specs/backlog").mkdir(parents=True)
-    (root / "specs/backlog/BACKLOG.json").write_text(json.dumps({"schema": "backlog-v1", "active": [item]}))  # fmt: skip
-    return {"<slug>": "stale-item", "<disposition>": "rejected", "<--release id|--reason why>": "--reason dup"}  # fmt: skip
-
-
-_SPECS_PLANTS = {"LEDGER-MEMORY-SCHEMA": _plant_memory, "BL-STALE": _plant_stale}
+_SPECS_PLANTS = {"LEDGER-MEMORY-SCHEMA": _plant_memory}
 
 
 @pytest.mark.parametrize("code", sorted(_SPECS_PLANTS))

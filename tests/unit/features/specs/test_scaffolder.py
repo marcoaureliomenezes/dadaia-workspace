@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
-from dadaia_workspace.features.backlog.document import load_document
 from dadaia_workspace.features.specs.canon import scaffold
 
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
@@ -116,25 +115,6 @@ def test_scaffold_emits_exact_v6_canon_root_zero_readme_zero_assets(tmp_path: Pa
 
     for area in ("backlog", "bugs", "releases", "audits", "ADRs"):
         assert (specs_dir / area / "AGENTS.md").exists(), f"{area}/AGENTS.md must exist"
-
-
-def test_scaffolded_backlog_skeleton_pins_writer_and_round_trips_load_document(
-    tmp_path: Path,
-) -> None:
-    """A fresh ``specs init`` scaffold's ``BACKLOG.json`` round-trips through
-    ``document.load_document`` with zero errors — an empty ``active`` array is a
-    legitimate empty model."""
-    specs_dir = tmp_path / "specs"
-    scaffold(
-        specs_dir,
-        project_name="pin-project",
-        force=False,
-        public_dir=_TEMPLATES_DIR.parent,
-    )
-
-    doc = load_document(specs_dir / "backlog")
-    assert doc.errors == ()
-    assert doc.active == ()
 
 
 def test_scaffold_idempotent_force_and_template_render(tmp_path: Path) -> None:

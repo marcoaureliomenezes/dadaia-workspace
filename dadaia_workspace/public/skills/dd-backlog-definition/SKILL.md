@@ -43,8 +43,7 @@ description: >
 
 ## Pick and dispositions
 
-- A picked entry stays in `active[]` with `status: picked` —
-  nothing is purged at pick time.
+- The pick is the SPEC's `**Origin:** backlog:<ids>` line; the entry keeps its status.
 - It exits exactly once, at closure, by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit <slug> --disposition
   <disposition> [--release <id>] [--reason <text>]` — one histo
   record, refused on a second exit (`dd-release-implementation` RC-FLOW step 7).
@@ -56,7 +55,6 @@ description: >
 - Every live candidate is in `active[]` with a live token; every closed one has
   exactly one histo record.
 - No entry was created outside the operator-gated intake path.
-- A picked entry's SPEC exists in the same commit its `active[]` entry turned `picked`.
 
 ## References
 

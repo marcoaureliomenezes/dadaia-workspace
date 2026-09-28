@@ -121,13 +121,12 @@ def _ledgers_render(
     finding: backlog_doctor.Finding,
 ) -> SectionFinding:
     """Render one backlog finding as a section finding."""
-    slug = f" [{finding.slug}]" if finding.slug else ""
     return SectionFinding(
-        code=finding.code.value,
-        verdict=finding.severity.value,
-        message=f"{slug.strip()} {finding.message}".strip(),
+        code=finding.code,
+        verdict="error",
+        message=f"[{finding.slug}] {finding.message}",
         canonical=False,
-        error=finding.severity is backlog_doctor.Severity.ERROR,
+        error=True,
     )
 
 
@@ -145,8 +144,6 @@ def _ledgers_section(
     ledger schema — this is the one delegation point.
     """
     from dadaia_workspace.cli.help_digest import command_paths
-    from dadaia_workspace.core.models.histo import HistoRecord
-    from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
     from dadaia_workspace.infrastructure.ledger_scripts import script_findings
 
     if specs_dir is None:
@@ -159,10 +156,6 @@ def _ledgers_section(
         catalog_path=catalog_path,
         alias_map_path=alias_map_path,
         cli_anchors=frozenset(" ".join(p) for p in command_paths() if p),
-        histo_store=JsonlRecordStore(
-            specs_dir / "backlog" / "_archive" / "backlog_histo.jsonl",
-            from_dict=HistoRecord.from_dict,
-        ),
     )
     return merge_sections(
         [

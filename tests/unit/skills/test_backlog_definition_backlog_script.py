@@ -66,19 +66,11 @@ def _histo(specs: Path) -> list[dict[str, object]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
 
 
-def _picked(specs: Path, slug: str) -> None:
-    """Mature an entry to the one status a release-lane exit accepts."""
-    document = json.loads((specs / "backlog" / "BACKLOG.json").read_text(encoding="utf-8"))
-    for item in document["active"]:
-        if item["id"] == slug:
-            item["status"] = "picked"
-    (specs / "backlog" / "BACKLOG.json").write_text(
-        json.dumps(document, indent=2) + "\n", encoding="utf-8"
-    )
-
-
-def _release(specs: Path, release_id: str = "0.4.7") -> None:
-    (specs / "releases" / release_id).mkdir(parents=True, exist_ok=True)
+def _pick(specs: Path, origin: str = "backlog:an-idea") -> None:
+    """The pick: `release.py new 0.4.7 --origin <origin>`, no hand edit of BACKLOG.json."""
+    release = _PUBLIC / "skills" / "dd-release-implementation" / "scripts" / "release.py"
+    done = _run(release, "new", "0.4.7", "--origin", origin, "--specs", str(specs))
+    assert done.returncode == 0, done.stdout + done.stderr
 
 
 def _fix_lines(done: subprocess.CompletedProcess[str]) -> list[str]:
@@ -170,11 +162,14 @@ def test_new_records_typed_intents(script: Path, tmp_path: Path) -> None:
 def test_exit_moves_the_entry_to_the_histo_exactly_once(script: Path, tmp_path: Path) -> None:
     """sa-ledger-verbs-append-histo-before-validating-the-pair#J5: "Given a valid pair, when
     `exit`/`archive` succeed, then the record leaves the document and appears exactly once
-    in the histo, written atomically as a pair." (`exit` half)"""
+    in the histo, written atomically as a pair." (`exit` half)
+    sa-backlog-status-has-no-single-authority#B4: `release.py new --origin backlog:<slug>`,
+    then `exit --disposition delivered`, exits 0 with no hand edit. sa-backlog-status-has-no-single-authority#B6: until then the
+    picked item stays live with its status unchanged."""
     specs = _specs(tmp_path)
-    _release(specs)
     assert _run(script, "new", "an-idea", "--specs", str(specs)).returncode == 0
-    _picked(specs, "an-idea")
+    _pick(specs)
+    assert [e["status"] for e in _active(specs)] == ["idea"]
     done = _run(
         script, "exit", "an-idea", "--specs", str(specs),
         "--disposition", "delivered", "--release", "0.4.7",
@@ -191,9 +186,8 @@ def test_exit_moves_the_entry_to_the_histo_exactly_once(script: Path, tmp_path: 
 
 def test_a_second_exit_exits_one_with_a_fix_naming_the_script(script: Path, tmp_path: Path) -> None:
     specs = _specs(tmp_path)
-    _release(specs)
     _run(script, "new", "an-idea", "--specs", str(specs))
-    _picked(specs, "an-idea")
+    _pick(specs)
     _run(
         script, "exit", "an-idea", "--specs", str(specs),
         "--disposition", "delivered", "--release", "0.4.7",
@@ -209,30 +203,23 @@ def test_a_second_exit_exits_one_with_a_fix_naming_the_script(script: Path, tmp_
     assert len(_histo(specs)) == 1
 
 
-def test_delivered_on_a_non_picked_entry_is_refused(script: Path, tmp_path: Path) -> None:
+@pytest.mark.parametrize("release", ["0.4.7", "9.9.9"])
+def test_delivered_outside_the_release_origin_is_refused(
+    script: Path, tmp_path: Path, release: str
+) -> None:
+    """sa-backlog-status-has-no-single-authority#B5: delivered on a slug outside Origin
+    is refused, and the fix never suggests rejected."""
     specs = _specs(tmp_path)
-    _release(specs)
     _run(script, "new", "an-idea", "--specs", str(specs))
+    _pick(specs, "operator-demand")
     done = _run(
         script, "exit", "an-idea", "--specs", str(specs),
-        "--disposition", "delivered", "--release", "0.4.7",
+        "--disposition", "delivered", "--release", release,
     )  # fmt: skip
     assert done.returncode == 1
-    assert "picked" in done.stdout + done.stderr
+    assert len(_fix_lines(done)) == 1 and "rejected" not in _fix_lines(done)[0]
     assert len(_active(specs)) == 1
     assert _histo(specs) == []
-
-
-def test_delivered_without_a_known_release_is_refused(script: Path, tmp_path: Path) -> None:
-    specs = _specs(tmp_path)
-    _run(script, "new", "an-idea", "--specs", str(specs))
-    _picked(specs, "an-idea")
-    done = _run(
-        script, "exit", "an-idea", "--specs", str(specs),
-        "--disposition", "delivered", "--release", "9.9.9",
-    )  # fmt: skip
-    assert done.returncode == 1
-    assert len(_active(specs)) == 1
 
 
 def test_rejected_requires_a_reason(script: Path, tmp_path: Path) -> None:

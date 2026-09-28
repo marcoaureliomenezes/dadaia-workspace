@@ -387,7 +387,8 @@ OPERATOR_ACTION: dict[str, Callable[[Path], None]] = {
         _write(r / "specs/ADRs/decisions.jsonl", '{"id": "0001", "status": "superseded"}\n'),
         _append(r / "specs/memory/QUALITY.md", "\nADR: 0001\n"),
     ),
-    "BL-SCHEMA": lambda r: _write(r / "specs/backlog/BACKLOG.json", '{"schema": "backlog-v1", "active": [{"id": "x"}]}'),
+    "BL-SCHEMA": lambda r: _write(r / "specs/backlog/BACKLOG.json", json.dumps({"schema": "backlog-v1", "active": [
+        _active_entry("x", "x", "candidate", ref="pkg/m.py#Ghost", change="x")]})),
     "BL-CONFLICT": lambda r: (
         _write(r / "pkg/m.py", _SOURCE),
         _write(r / "specs/backlog/BACKLOG.json", json.dumps({"schema": "backlog-v1", "active": [

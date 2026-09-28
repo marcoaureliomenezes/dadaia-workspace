@@ -11,11 +11,6 @@ Privacy invariant (SPEC §3.8 finding #7): a ``code`` ref stored in a committed 
 paths (``/home/...``, ``~/...``), parent-directory traversal (``../``), and Windows drive
 prefixes are rejected at construction so no operator-local path can ever land in a committed
 backlog file.
-
-A backlog item's EXIT record is not declared here: it is the one
-:class:`~dadaia_workspace.core.models.histo.HistoRecord` shape every ``_histo.jsonl``
-uses (0.4.7 FR7), carrying the removed ``active[]`` object itself in ``entry``, its
-disposition drawn from ``backlog.py``'s ``DISPOSITIONS``.
 """
 
 from __future__ import annotations
@@ -30,26 +25,11 @@ __all__ = [
     "Intent",
     "Subject",
     "SubjectKind",
-    "is_intents_exempt",
     "parse_intents",
 ]
 
 #: The one backlog stage exempt from the resolvable-typed-intents requirement.
 INTENTS_EXEMPT_STATUS = "idea"
-
-
-def is_intents_exempt(status: str | None) -> bool:
-    """True iff ``status`` is the intents-exempt ``idea`` stage (v0.1.55 FR5).
-
-    An ``idea`` is an unbound brainstorm — exempt from the resolvable-typed-intents
-    requirement. Every other status (candidate and beyond, or a missing status) must
-    carry bound, resolvable intents.
-
-    Lives in ``core`` so every backlog validator shares ONE predicate — validators
-    previously diverged on whether a pre-existing ``candidate`` with no intents was
-    acceptable (bug ``r5c-backlog-gate-accepts-preexisting-candidate-without-intents``).
-    """
-    return status is not None and status.strip().lower() == INTENTS_EXEMPT_STATUS
 
 
 class SubjectKind(StrEnum):

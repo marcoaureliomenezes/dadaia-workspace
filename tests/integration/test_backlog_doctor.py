@@ -1,59 +1,22 @@
-"""Integration tests for the BL-SCHEMA/CONFLICT/STALE checks over the single-source
-``BACKLOG.json`` document model (SPEC v0.12.0 FR2, ADR D8, PLAN §6, §8; v0.5.0 FR5,
-A5.2; operator ruling 2026-08-28 — ``BACKLOG.md`` -> ``BACKLOG.json``).
-
-Intent: CONTRACT — v0.12.0 A2.1-A2.4, A2.6-A2.8, A3.5, A5.6; v0.5.0 A5.2, A5.5
-
-**BL-DUP is DELETED (v0.5.0 A5.2), not disabled** — see ``dadaia_workspace.features.
-backlog.doctor``'s module docstring for the structural argument (a duplicate exit is
-impossible once the document holds only a live ``active[]`` array and every exit lands
-as one append-only, slug-keyed ``backlog_histo.jsonl`` record; migrating the live
-document from Markdown to JSON does not reopen this — ``backlog_histo.jsonl`` stays
-untouched, out of this task's write set). The two BL-DUP-subject tests this file used to
-carry are deleted with their subject, replaced by BL-STALE's histo-backed condition
-(``test_active_slug_with_histo_record_fires_bl_stale``) and a BL-SCHEMA-only
-version of the duplicate-heading regression (now a duplicate-``id``-in-``active``
-regression, since JSON has no "heading" concept to duplicate).
-
-The three BL-* checks are exercised by a **single parameterized** test (one fixture
-matrix) — NOT four copy-pasted functions (SPEC §3.8 #8). A planted violation per check
-ERRORs; a clean tree passes (no findings). Roots injected over a ``tmp_path`` fixture.
-
-Most tests below drive :func:`document.load_document` + :func:`doctor.run_checks`
-DIRECTLY over inline ``BACKLOG.json`` fixtures — fine-grained control over the check
-engine, independent of the CLI wiring. ``_CHECKS``, ``Finding``, ``Severity`` and the
-message texts are the SAME symbols the CLI-facing :func:`doctor.run_backlog_doctor`
-uses — this is the same engine, fed the same (fixture-built) item source by hand. The
-final section proves the wiring itself: :func:`run_backlog_doctor` (wired to
-:func:`document.load_document`) and ``specs doctor``'s backlog-surface checks agree on
-the same tree (A5.6), and a freshly authored ``backlog_new`` entry passes both out of
-the box (A3.5).
+"""Intent: CONTRACT — sa-backlog-status-has-no-single-authority#B1, #B2, #B3, #B8: the
+`ledgers` section judges a live entry through `backlog.py check` alone (it carries no
+status list); the doctor keeps only anchor resolution (BL-SCHEMA) and BL-CONFLICT.
+Size: MEDIUM — the real section, each ledger script a child process.
 """
 
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.models.histo import HistoRecord
-from dadaia_workspace.features.backlog.doctor import (
-    BacklogDoctorCode,
-    DoctorContext,
-    Finding,
-    Severity,
-    bound_anchor_changes,
-    run_checks,
-)
-from dadaia_workspace.features.backlog.document import load_document
-from dadaia_workspace.features.backlog.subject_registry import build_registry
+from dadaia_workspace.cli.commands.doctor import _ledgers_section
 
 pytestmark = pytest.mark.integration
 
-# A minimal source root the registry scans for code anchors.
-_SOURCE = "class Widget:\n    pass\n\n\nclass Gadget:\n    pass\n"
+_SOURCE = "class Widget:\n    pass\n"
+_LEDGER = "LEDGER-BACKLOG-SCHEMA"
 
 
 def _active_entry(
@@ -63,414 +26,46 @@ def _active_entry(
     *,
     ref: str | None = None,
     change: str | None = None,
-    **overrides: object,
+    kind: str = "code",
 ) -> dict[str, object]:
     entry: dict[str, object] = {
-        "id": slug,
-        "title": title,
-        "opened": "2026-08-10",
-        "status": status,
-        "description": f"{slug} needs a change.",
-        "provenance": "operator request",
-    }
+        "id": slug, "title": title, "opened": "2026-08-10", "status": status,
+        "description": f"{slug} needs a change.", "provenance": "operator request",
+    }  # fmt: skip
     if ref is not None:
-        entry["intents"] = [{"subject": {"kind": "code", "ref": ref}, "change": change}]
-    entry.update(overrides)
+        entry["intents"] = [{"subject": {"kind": kind, "ref": ref}, "change": change}]
     return entry
 
 
-class _FakeHistoStore:
-    """A minimal in-memory double satisfying
-    :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` for
-    :class:`HistoRecord` — a fake, not a mock, per this workspace's own
-    test-authoring convention (internal Protocol dependency)."""
-
-    def __init__(self, records: list[HistoRecord] | None = None) -> None:
-        self._records = list(records or [])
-
-    @property
-    def path(self) -> Path:
-        return Path("fake-backlog-histo.jsonl")
-
-    def append(self, record: HistoRecord) -> None:
-        self._records.append(record)
-
-    def iter_records(self) -> Iterator[HistoRecord]:
-        return iter(self._records)
-
-    def update(self, record_id: str, mutate: Callable[[HistoRecord], HistoRecord]) -> HistoRecord:
-        raise NotImplementedError
+_ROWS = {  # the live entries (status, ref, change) -> the backlog findings the doctor prints
+    "postponed-is-live-for-both": ([("postponed", "pkg/m.py#Widget", "a")], []),
+    "uppercase-status-refused": ([("Deferred", "pkg/m.py#Widget", "a")], [_LEDGER]),
+    "terminal-status-one-error": ([("delivered", "pkg/m.py#Widget", "a")], [_LEDGER]),
+    "divergent-twins-conflict": (
+        [("candidate", "pkg/m.py#Widget", "a"), ("candidate", "pkg/m.py#Widget", "b")],
+        ["BL-CONFLICT"],
+    ),
+}
 
 
-def _histo_record(slug: str, *, disposition: str = "delivered") -> HistoRecord:
-    return HistoRecord(
-        id=slug,
-        ts="2026-08-01",
-        disposition=disposition,
-        release="v0.11.0",
-        reason=None,
-        summary=None,
-        entry=None,
-    )
-
-
-def _build_roots(tmp_path: Path) -> tuple[Path, Path]:
+@pytest.mark.parametrize("row", sorted(_ROWS))
+def test_the_doctor_judges_a_live_entry_as_backlog_py_check_does(row: str, tmp_path: Path) -> None:
+    """sa-backlog-status-has-no-single-authority#B1: doctor ≡ `backlog.py check` on any
+    status. sa-backlog-status-has-no-single-authority#B2: "Deferred" is refused, with a fix that is not sed. sa-backlog-status-has-no-single-authority#B3: a terminal token
+    on a live entry gives one ERROR; "postponed" is accepted by both. sa-backlog-status-has-no-single-authority#B8: BL-CONFLICT
+    stays in the doctor."""
+    entries, expected = _ROWS[row]
     specs = tmp_path / "specs"
     (specs / "backlog").mkdir(parents=True)
-    (specs / "memory" / "product").mkdir(parents=True)
-    (specs / "memory" / "product" / "catalog.json").write_text(
-        json.dumps({"features": [{"slug": "alpha-feature"}]}), encoding="utf-8"
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "m.py").write_text(_SOURCE, encoding="utf-8")
+    active = [
+        _active_entry(f"e{n}", "t", s, ref=r, change=c) for n, (s, r, c) in enumerate(entries)
+    ]
+    (specs / "backlog" / "BACKLOG.json").write_text(
+        json.dumps({"schema": "backlog-v1", "active": active}), encoding="utf-8"
     )
-    src = tmp_path / "src"
-    (src / "pkg").mkdir(parents=True)
-    (src / "pkg" / "m.py").write_text(_SOURCE, encoding="utf-8")
-    return specs, src
-
-
-def _write_backlog_json(specs: Path, active: list[dict[str, object]]) -> None:
-    text = json.dumps({"schema": "backlog-v1", "active": active})
-    (specs / "backlog" / "BACKLOG.json").write_text(text, encoding="utf-8")
-
-
-def _run(
-    specs: Path,
-    src: Path,
-    histo_store: _FakeHistoStore | None = None,
-) -> list[Finding]:
-    document = load_document(specs / "backlog")
-    registry = build_registry(
-        source_root=src,
-        catalog_path=specs / "memory" / "product" / "catalog.json",
-        alias_map_path=specs / "no-aliases.txt",
-        specs_dir=specs,
-        cli_anchors=frozenset(),
-    )
-    histo_slugs = (
-        frozenset(record.id for record in histo_store.iter_records())
-        if histo_store is not None
-        else frozenset()
-    )
-    ctx = DoctorContext(
-        items=list(document.active),
-        registry=registry,
-        histo_slugs=histo_slugs,
-        document_errors=document.errors,
-    )
-    for item in document.active:
-        ctx.bound[item.slug] = bound_anchor_changes(item, registry)
-    return run_checks(ctx)
-
-
-# ── A2.1 — a clean consolidated BACKLOG.json yields zero findings, exit 0 ───────────
-
-
-def test_clean_document_yields_zero_findings(tmp_path: Path) -> None:
-    specs, src = _build_roots(tmp_path)
-    active = [
-        _active_entry("clean-one", "Clean one", "idea"),
-        _active_entry(
-            "clean-two", "Clean two", "candidate", ref="pkg/m.py#Widget", change="tweak Widget"
-        ),
-    ]
-    _write_backlog_json(specs, active)
-    findings = _run(specs, src)
-    assert findings == [], [f.to_dict() for f in findings]
-
-
-# ── A2.2 — an entry missing a required key fires exactly one BL-SCHEMA ERROR ────────
-
-
-def test_missing_required_key_fires_exactly_one_bl_schema_naming_slug(tmp_path: Path) -> None:
-    specs, src = _build_roots(tmp_path)
-    active = [
-        {
-            "id": "broken-item",
-            "title": "Broken",
-            "opened": "2026-08-10",
-            "description": "Missing status and provenance.",
-        }
-    ]
-    _write_backlog_json(specs, active)
-    findings = _run(specs, src)
-    schema_findings = [f for f in findings if f.slug == "broken-item"]
-    assert len(schema_findings) == 1, [f.to_dict() for f in findings]
-    assert schema_findings[0].code is BacklogDoctorCode.BL_SCHEMA
-    assert schema_findings[0].severity is Severity.ERROR
-    assert "status" in schema_findings[0].message
-    assert "provenance" in schema_findings[0].message
-
-
-# ── A2.3 — candidate with no Intents fires BL-SCHEMA; idea does not (FR5 preserved) ──
-
-
-def test_candidate_with_no_intents_fires_but_idea_does_not(tmp_path: Path) -> None:
-    specs, src = _build_roots(tmp_path)
-    active = [_active_entry("candidate-no-intents", "Cand", "candidate")]
-    _write_backlog_json(specs, active)
-    findings = _run(specs, src)
-    assert any(
-        f.code is BacklogDoctorCode.BL_SCHEMA and "no intents[] declared" in f.message
-        for f in findings
-    ), [f.to_dict() for f in findings]
-
-    specs2, src2 = _build_roots(tmp_path / "idea-case")
-    active2 = [_active_entry("idea-no-intents", "Idea", "idea")]
-    _write_backlog_json(specs2, active2)
-    findings2 = _run(specs2, src2)
-    assert findings2 == [], [f.to_dict() for f in findings2]
-
-
-# ── A2.4 — a structurally invalid intents value fires BL-SCHEMA at ANY status ───────
-
-
-def test_malformed_intents_value_fires_at_any_status_including_idea(tmp_path: Path) -> None:
-    specs, src = _build_roots(tmp_path)
-    active = [
-        {
-            "id": "bad-intents",
-            "title": "Bad",
-            "opened": "2026-08-10",
-            "status": "idea",
-            "description": "malformed intents value.",
-            "provenance": "operator request",
-            "intents": "just_a_string",
-        }
-    ]
-    _write_backlog_json(specs, active)
-    findings = _run(specs, src)
-    assert any(
-        f.code is BacklogDoctorCode.BL_SCHEMA
-        and f.message.startswith("malformed intents[] frontmatter: ")
-        for f in findings
-    ), [f.to_dict() for f in findings]
-
-
-# ── A2.6/v0.5.0 A5.2 — an ACTIVE item whose slug already has a histo record fires
-# BL-STALE (the retired in-document LEDGER condition's replacement) ─────────────────
-
-
-def test_active_slug_with_histo_record_fires_bl_stale(tmp_path: Path) -> None:
-    specs, src = _build_roots(tmp_path)
-    active = [
-        _active_entry(
-            "shipped-but-still-active",
-            "Shipped",
-            "candidate",
-            ref="pkg/m.py#Widget",
-            change="already shipped",
-        )
-    ]
-    _write_backlog_json(specs, active)
-    store = _FakeHistoStore([_histo_record("shipped-but-still-active")])
-    findings = _run(specs, src, histo_store=store)
-    stale = [f for f in findings if f.code is BacklogDoctorCode.BL_STALE]
-    assert any(f.slug == "shipped-but-still-active" for f in stale), [f.to_dict() for f in findings]
-    assert any("backlog_histo.jsonl" in f.message for f in stale)
-
-
-def test_no_histo_store_supplied_is_a_noop_for_that_condition(tmp_path: Path) -> None:
-    """No ``histo_store`` (``run_backlog_doctor``'s own default) degrades to a no-op —
-    mirrors the absent-ledger no-op, never a false ERROR."""
-    specs, src = _build_roots(tmp_path)
-    active = [
-        _active_entry(
-            "live-feature", "Live", "candidate", ref="pkg/m.py#Widget", change="still live"
-        )
-    ]
-    _write_backlog_json(specs, active)
-    findings = _run(specs, src)
-    assert not any(f.code is BacklogDoctorCode.BL_STALE for f in findings), [
-        f.to_dict() for f in findings
-    ]
-
-
-def test_active_item_with_own_terminal_status_fires_bl_stale(tmp_path: Path) -> None:
-    """The third BL-STALE ORed condition (ADR D8): an ACTIVE item's own ``Status`` is
-    itself one of the six canonical terminal disposition tokens."""
-    specs, src = _build_roots(tmp_path)
-    active = [
-        _active_entry(
-            "mis-statused",
-            "Mis-statused",
-            "DELIVERED",
-            ref="pkg/m.py#Widget",
-            change="already shipped",
-        )
-    ]
-    _write_backlog_json(specs, active)
-    findings = _run(specs, src)
-    stale = [f for f in findings if f.code is BacklogDoctorCode.BL_STALE]
-    assert any(f.slug == "mis-statused" for f in stale), [f.to_dict() for f in findings]
-
-
-def test_deferred_active_status_fires_bl_stale(tmp_path: Path) -> None:
-    """Bug ``backlog-doctor-rejects-deferred-status-documented-by-skill`` (T-044-34) —
-    the literal repro from the report: an ACTIVE entry with ``Status: deferred``.
-    ``deferred`` IS one of the canonical terminal dispositions
-    (``core.models.histo.TERMINAL_DISPOSITIONS``), so BL-STALE firing here is the
-    correct, decided behaviour."""
-    specs, src = _build_roots(tmp_path)
-    active = [
-        _active_entry(
-            "prematurely-deferred",
-            "Prematurely deferred",
-            "deferred",
-            ref="pkg/m.py#Widget",
-            change="still needs a home",
-        )
-    ]
-    _write_backlog_json(specs, active)
-    findings = _run(specs, src)
-    stale = [f for f in findings if f.code is BacklogDoctorCode.BL_STALE]
-    assert any(f.slug == "prematurely-deferred" for f in stale), [f.to_dict() for f in findings]
-
-
-# ── A2.8 — an absent BACKLOG.json yields zero findings and exit 0 ───────────────────
-
-
-def test_absent_backlog_json_yields_zero_findings(tmp_path: Path) -> None:
-    specs, src = _build_roots(tmp_path)
-    # No BACKLOG.json written at all.
-    findings = _run(specs, src)
-    assert findings == [], [f.to_dict() for f in findings]
-
-
-# ── the JSON-native replacement for bug backlog-doctor-silent-on-duplicate-top-level-
-# sections: a duplicate ``id`` in ``active[]`` fires BL-SCHEMA and is never clean ────
-
-
-def test_duplicate_id_in_active_fires_bl_schema_and_is_never_clean(tmp_path: Path) -> None:
-    specs, src = _build_roots(tmp_path)
-    active = [
-        _active_entry("dup-item", "First", "idea"),
-        _active_entry("dup-item", "Second", "idea"),
-    ]
-    _write_backlog_json(specs, active)
-    findings = _run(specs, src)
-    errors = [f for f in findings if f.severity is Severity.ERROR]
-    assert errors, "a duplicated-id BACKLOG.json must never report clean"
-    schema_findings = [
-        f for f in findings if f.code is BacklogDoctorCode.BL_SCHEMA and "duplicate id" in f.message
-    ]
-    assert len(schema_findings) == 1, [f.to_dict() for f in findings]
-    assert "'dup-item'" in schema_findings[0].message
-
-
-# ── the wired CLI-facing entry point (run_backlog_doctor) ───────────────────────────
-
-
-def _run_wired(
-    specs: Path,
-    src: Path,
-    *,
-    histo_store: _FakeHistoStore | None = None,
-) -> list[Finding]:
-    """Drive the CLI-facing :func:`run_backlog_doctor` directly — the live wiring
-    proven end to end, not the hand-built ``_run`` helper above."""
-    from dadaia_workspace.features.backlog.doctor import run_backlog_doctor
-
-    return run_backlog_doctor(
-        specs_dir=specs,
-        source_root=src,
-        catalog_path=specs / "memory" / "product" / "catalog.json",
-        alias_map_path=specs / "no-aliases.txt",
-        cli_anchors=frozenset(),
-        histo_store=histo_store,
-    )
-
-
-def test_run_backlog_doctor_reads_the_single_source_document(tmp_path: Path) -> None:
-    """The CLI-facing ``run_backlog_doctor`` reads ``specs/backlog/BACKLOG.json``
-    through :func:`document.load_document` — a clean document yields zero findings
-    through the wired entry point."""
-    specs, src = _build_roots(tmp_path)
-    active = [_active_entry("wired-clean", "Wired", "idea")]
-    _write_backlog_json(specs, active)
-    findings = _run_wired(specs, src)
-    assert findings == [], [f.to_dict() for f in findings]
-
-
-def test_run_backlog_doctor_absent_document_is_a_clean_noop(tmp_path: Path) -> None:
-    """A2.8 over the wired entry point: no BACKLOG.json ⇒ zero findings, not an error."""
-    specs, src = _build_roots(tmp_path)
-    findings = _run_wired(specs, src)
-    assert findings == [], [f.to_dict() for f in findings]
-
-
-def test_run_backlog_doctor_default_histo_store_is_a_noop(tmp_path: Path) -> None:
-    """``run_backlog_doctor``'s ``histo_store`` parameter defaults to ``None`` — a
-    caller that supplies none (e.g. a fixture like this one) stays a clean no-op for
-    BL-STALE condition (a). This fixture proves the library function's own default."""
-    specs, src = _build_roots(tmp_path)
-    active = [
-        _active_entry(
-            "terminal-status-only",
-            "Terminal by its own Status",
-            "DELIVERED",
-            ref="pkg/m.py#Widget",
-            change="shipped",
-        )
-    ]
-    _write_backlog_json(specs, active)
-    findings = _run_wired(specs, src)
-    # Condition (b) — own terminal Status — still fires with no histo_store at all.
-    stale = [f for f in findings if f.code is BacklogDoctorCode.BL_STALE]
-    assert any(f.slug == "terminal-status-only" for f in stale), [f.to_dict() for f in findings]
-
-
-def test_duplicated_id_fires_bl_schema_through_the_wired_entry_point(
-    tmp_path: Path,
-) -> None:
-    """The JSON-native replacement for bug
-    ``backlog-doctor-silent-on-duplicate-top-level-sections``, proven end-to-end through
-    the wired, CLI-facing entry point: one BL-SCHEMA error for the duplicated ``id`` —
-    never a clean report."""
-    specs, src = _build_roots(tmp_path)
-    active = [
-        _active_entry("dup-item", "First", "idea"),
-        _active_entry("dup-item", "Second", "idea"),
-    ]
-    _write_backlog_json(specs, active)
-
-    findings = _run_wired(specs, src)
-    errors = [f for f in findings if f.severity is Severity.ERROR]
-    assert errors, "a duplicated-id BACKLOG.json must never report clean"
-
-    schema_findings = [
-        f for f in findings if f.code is BacklogDoctorCode.BL_SCHEMA and "duplicate id" in f.message
-    ]
-    assert len(schema_findings) == 1, [f.to_dict() for f in findings]
-    assert "'dup-item'" in schema_findings[0].message
-
-
-# ── A3.5 — a freshly authored entry is clean under BOTH doctors ─────────────────────
-
-
-def test_freshly_authored_entry_is_clean_under_both_doctors(tmp_path: Path) -> None:
-    """A3.5 (R-13, the producer-passes-its-own-validator rule): the entry the ONE writer
-    appends — `dd-backlog-definition/scripts/backlog.py new` (0.4.7 c7, T-047-65) — is
-    ``backlog doctor``-clean AND ``specs doctor``-clean out of the box, proven over the
-    real writer run as the script (staged with its schemas, exactly as `public stage`
-    installs it) plus both live doctors."""
-    import subprocess
-    import sys
-
-    from dadaia_workspace.features.specs import SpecsDoctor
-    from tests.helpers.skill_scripts import stage_skill_scripts
-
-    staged = stage_skill_scripts("dd-backlog-definition", tmp_path / "staged" / "scripts")
-
-    specs, src = _build_roots(tmp_path)
-    done = subprocess.run(
-        [sys.executable, str(staged / "backlog.py"), "new", "fresh-entry", "--specs", str(specs)],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert done.returncode == 0, done.stdout + done.stderr
-
-    findings = _run_wired(specs, src)
-    assert findings == [], [f.to_dict() for f in findings]
-
-    stray = [i for i in SpecsDoctor(specs).check() if i.code == "TREE-8"]
-    assert stray == [], [i.to_dict() for i in stray]
+    section = _ledgers_section(None, specs, str(tmp_path), None)
+    found = [f for f in section.findings if f.code.startswith(("BL-", _LEDGER))]
+    assert [f.code for f in found] == expected, [f.message for f in found]
+    assert all(f.error and not f.fix.startswith("sed") for f in found)

@@ -35,10 +35,9 @@ Also input: `.dadaia/.venv/bin/dadaia doctor` against every release the window t
 
 ## SPEC provenance and the one exit
 
-1. For each release's SPEC in the window, confirm `**Consumes:**` names the backlog entry/entries it picked.
-2. Confirm the release-definition commit (shape 5) flipped those entries to `status: picked` in `BACKLOG.json`.
-3. Confirm each picked entry left `active[]` exactly once, at that release's closure, as one `backlog_histo.jsonl` record.
-4. Flag a consumed entry with no histo record, or with two — the one-exit contract is unmet.
+1. For each release's SPEC in the window, confirm `**Origin:** backlog:` names the backlog entry/entries it picked.
+2. Confirm each picked entry left `active[]` exactly once, at that release's closure, as one `backlog_histo.jsonl` record.
+3. Flag a consumed entry with no histo record, or with two — the one-exit contract is unmet.
 
 ## Slop readout
 

@@ -57,8 +57,7 @@ a fuzzy term in the demand becomes a canonical term before it reaches the SPEC.
 1. Author the SPEC (Draft) only after the grill: the picked bug+backlog set, their
    acceptance, every `superseded_by` link.
 2. Definition runs on the work branch (`<work>M.m.p`, the constitution's `gitflow:`); the trio's place is the releases law's.
-3. Commit shape 5 (`dd-gitflow-default` §3a): SPEC + PLAN + TASKS + the picked entries
-   flipped to `status: picked` + picked bugs, one commit; set the `defined` milestone in `_RELEASE.json`
+3. Commit shape 5 (`dd-gitflow-default` §3a): SPEC + PLAN + TASKS + picked bugs, one commit; set the `defined` milestone in `_RELEASE.json`
    (`dd-release-implementation`'s `RELEASE-EVENTS.md`).
 4. PLAN opens with §1 As-is review (§2); SPEC carries `Replaces` — one bullet per current behaviour a
    DELETE/REBUILD row removes, or `none` with its reason.
@@ -79,15 +78,13 @@ a fuzzy term in the demand becomes a canonical term before it reaches the SPEC.
 
 ## 6. Declaring consumption
 
-- Declare a backlog slug in the SPEC (`**Consumes:** slug-a, slug-b`) only when fully consumed (all its bound anchors shipped); omit the line when none; an unknown slug is fixed before it lands.
-- `**Consumes:**` is SPEC provenance only — no library/CLI verb reads it.
-- A picked entry stays in `active[]` as `status: picked`; it exits once, at closure,
+- The pick is the SPEC's `**Origin:** backlog:<ids>` line (`release.py new --origin`); the entry keeps its status and exits once, at closure,
   by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit` (`dd-release-implementation` RC-FLOW step 7).
 
 ## 7. Done when
 
 - Picked set recorded; the `dd-grill-me` session completed and emitted.
-- PLAN §1 names every unit the picked set touches; SPEC authored from the refined set, `Replaces` present, `**Consumes:**` declared or omitted.
+- PLAN §1 names every unit the picked set touches; SPEC authored from the refined set, `Replaces` present, `**Origin:**` declared.
 - Traceability: every approved requirement maps into PLAN strategy and >=1 TASKS entry.
 - Every unresolved gap routed to the main thread's operator-gated intake report — never a
   direct backlog append.

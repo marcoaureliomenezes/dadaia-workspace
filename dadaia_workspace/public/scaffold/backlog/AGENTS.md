@@ -24,15 +24,15 @@ Scope: this file governs only `specs/backlog/`.
 - Create and append entries with `BACKLOG_PY new <slug>` — never hand-edit `BACKLOG.json`.
 - `<slug>` matches `^[a-z][a-z0-9-]+$`.
 - Every `active[]` entry carries five required fields: `title`, `opened` (`YYYY-MM-DD`), `status`, `description`, `provenance`.
-- `status` is `idea`, `candidate`, `picked`, or another live (non-terminal) token.
+- `status` is `idea`, `candidate`, or another lowercase live (non-terminal) token.
 - Plus one optional field: `intents` (see §4).
-- An entry must be picked into a release (`python3 .agents/skills/dd-release-implementation/scripts/release.py new`, naming the slug under `**Consumes:**`) to enter SDD.
+- An entry enters SDD when a release picks it: `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id> --origin backlog:<slug>`.
 - Never delete an entry — `BACKLOG_PY exit <slug> --disposition …` removes the `active[]` object and appends its one histo record.
 
 ## 3. Terminal disposition tokens
 
 - An entry exits with one disposition of the vocabulary `BACKLOG_PY exit --help` lists; a delivery or supersession carries the release id in `release`, a rejection a one-line `reason`.
-- A `deferred` item returns to `active[]` — it never exits.
+- A postponed item stays in `active[]` with its status unchanged — it never exits.
 
 ## 4. Idea-stage freedom vs bound intents
 
@@ -65,6 +65,6 @@ BACKLOG_PY subjects --resolve <ref> --kind <kind>   # how one ref binds to those
 
 ## 5. Relationship to releases
 
-- A release SPEC names a picked entry's slug under `**Consumes:**`.
-- A picked entry stays in `active[]` with `status: picked` — nothing is purged at pick time.
+- The pick is the SPEC's `**Origin:** backlog:<ids>` line; no status is written at pick time.
+- `exit --disposition delivered --release <id>` is refused unless that SPEC's Origin names the slug.
 - It exits once, at closure's disposition sweep, into `_archive/backlog_histo.jsonl`.

@@ -32,7 +32,6 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.gitflow import Role
-from dadaia_workspace.core.models.histo import TERMINAL_DISPOSITIONS
 from dadaia_workspace.core.workspace_layout import (
     CANON_ROOT_MEMBERS,
     DADAIA_ZONES,
@@ -101,7 +100,11 @@ _CANONICAL_SETS: dict[str, frozenset[str]] = {
             "properties"
         ]["phase"]["enum"]
     ),
-    "ledger-disposition": frozenset(TERMINAL_DISPOSITIONS),
+    "ledger-disposition": frozenset(
+        json.loads((_SCHEMAS / "histo/histo-record-v1.schema.json").read_text("utf-8"))[
+            "properties"
+        ]["disposition"]["enum"]
+    ),
     "trio": frozenset(RELEASE_ARTIFACTS),
     "gitflow-role": frozenset(typing.get_args(Role)),
 }
@@ -109,7 +112,7 @@ _CANONICAL_SETS: dict[str, frozenset[str]] = {
 #: Each set's own defining module — the one place its names are spelled in bulk.
 _SET_HOME: dict[str, str] = {
     "phase": "dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_schema.py",
-    "ledger-disposition": "dadaia_workspace/core/models/histo.py",
+    "ledger-disposition": "dadaia_workspace/public/schemas/histo/histo-record-v1.schema.json",
     "trio": "dadaia_workspace/features/specs/doctor_common.py",
     "gitflow-role": "dadaia_workspace/core/gitflow.py",
 }
@@ -118,7 +121,6 @@ _SET_HOME: dict[str, str] = {
 #: keyed ``file`` -> the open bug that deletes it.
 _SECOND_LIST_BIRTH = 8
 _SECOND_LIST_ALLOWANCE: dict[str, str] = {
-    "dadaia_workspace/features/backlog/doctor.py": "sa-backlog-status-has-no-single-authority",
     "dadaia_workspace/public/skills/dd-audit-project/scripts/_audit_check.py": _PARITY,
     "dadaia_workspace/public/skills/dd-backlog-definition/scripts/_backlog_schema.py": _PARITY,
     "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_bugs_check.py": _PARITY,

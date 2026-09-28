@@ -19,13 +19,13 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.core.models import histo
-from dadaia_workspace.core.models.histo import TERMINAL_DISPOSITIONS
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 pytestmark = pytest.mark.unit
 
 _PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
+_HISTO_SCHEMA = json.loads((_PUBLIC / "schemas/histo/histo-record-v1.schema.json").read_text())
+TERMINAL_DISPOSITIONS = tuple(_HISTO_SCHEMA["properties"]["disposition"]["enum"])
 _HISTO = (
     '{"disposition": "rejected", "entry": {}, "id": "old", "reason": "r", "ts": "2026-01-01"}\n'
 )
@@ -160,7 +160,3 @@ def test_a_shared_disposition_requires_the_same_evidence_in_both_ledgers() -> No
     audit = _script_table("dd-audit-project/scripts/_audit_check.py")
     shared = {w: (backlog[w], audit[w]) for w in backlog.keys() & audit.keys()}
     assert shared == {"superseded": ("release",) * 2, "rejected": ("reason",) * 2}
-    assert not {"REQUIRED_EVIDENCE", "AUDIT_PILLARS"} & set(vars(histo))
-    assert [name for name in vars(histo) if name.endswith("_DISPOSITIONS")] == [
-        "TERMINAL_DISPOSITIONS"
-    ]
