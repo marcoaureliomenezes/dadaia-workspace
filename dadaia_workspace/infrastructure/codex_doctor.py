@@ -16,6 +16,7 @@ import tomllib
 from collections.abc import Callable
 from pathlib import Path
 
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
@@ -319,7 +320,7 @@ def codex_trust_boundary_info(
             f"codex:trust-boundary — installed {raw_version} has not been "
             "live-certified for hook-fire behavior (last certified: "
             f"{_CODEX_HOOKS_LIVE_CERTIFIED_VERSION}); the interactive-vs-headless "
-            "claim is UNVERIFIED for this version — rerun `dadaia certify`'s "
+            f"claim is UNVERIFIED for this version — rerun `{fix_line(None, 'certify')}`'s "
             "codex-live-probe check to reconfirm before relying on it (the git "
             "chokepoints remain independent defense-in-depth regardless). "
             "(WS-CDX-HYGIENE)",

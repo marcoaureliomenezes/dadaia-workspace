@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.core.models.spec_context import (
     AssociatedRepo,
@@ -41,7 +42,7 @@ def _load(path: Path) -> dict:  # type: ignore[type-arg]
     if schema_ver == "1":
         raise SchemaVersionError(
             "[MIGRATION REQUIRED] This workspace uses spec_contexts.json v1.\n"
-            "Run: dadaia migrate\n"
+            f"Run: {fix_line(None, 'migrate')}\n"
             "After migration, all v2 commands will work normally."
         )
 
@@ -50,7 +51,7 @@ def _load(path: Path) -> dict:  # type: ignore[type-arg]
         if ctx.get("state") in _LEGACY_STATES:
             raise SchemaVersionError(
                 "[MIGRATION REQUIRED] This workspace uses spec_contexts.json v1.\n"
-                "Run: dadaia migrate\n"
+                f"Run: {fix_line(None, 'migrate')}\n"
                 "After migration, all v2 commands will work normally."
             )
 
@@ -58,7 +59,7 @@ def _load(path: Path) -> dict:  # type: ignore[type-arg]
     if schema_ver not in (None, *_READABLE_VERSIONS):
         raise SchemaVersionError(
             f"[MIGRATION REQUIRED] Unknown schema_version '{schema_ver}' in spec_contexts.json.\n"
-            "Run: dadaia migrate\n"
+            f"Run: {fix_line(None, 'migrate')}\n"
             "After migration, all v2 commands will work normally."
         )
 

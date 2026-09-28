@@ -28,7 +28,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core import doctor_rules
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import fix_line, venv_line
 from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_stdin
@@ -56,54 +56,10 @@ def _the_fix(message: str) -> str:
     return fixes[0]
 
 
-#: The executable tokens a ``fix:`` line may open with. ``dadaia`` bare is admitted only
-#: where the venv-rooted path cannot be spelled (a message rendered outside the
-#: workspace); everything else is a real binary the operator already has.
-_EXECUTABLE_TOKENS: frozenset[str] = frozenset(
-    {
-        ".dadaia/.venv/bin/dadaia",
-        "dadaia",
-        "git",
-        "gh",
-        "rm",
-        "mv",
-        "mkdir",
-        "printf",
-        "grep",
-        "sed",
-        "cp",
-        "bash",
-        # 0.4.7 FR2: a ledger fix names its skill script, run through the interpreter
-        # (Windows has no exec bit), never a retired CLI verb.
-        "python3",
-    }
-)
-
-#: Words that betray prose or a second alternative inside one fix line.
-_PROSE_MARKERS: tuple[str, ...] = (" or ", ", then ", " then ", " and then ")
-
-
 def _assert_one_command(command: str) -> None:
-    """FR2's grammar: the fix is ONE executable command, not an instruction.
-
-    A ``&&`` chain of the same tool counts as one command — it is still a single line
-    the operator pastes. Prose ("author the missing document", "fix it and then push")
-    does not: an agent cannot run it, so the BLOCK is a Stall with a friendly face.
-    """
-    head = shlex.split(command)[0]  # every host spells paths with forward slashes
-    # ``fix_line`` roots the CLI at the workspace it runs in, else names the running CLI.
-    if head.endswith(_CLI) or head == shlex.split(fix_line(None))[0]:
-        head = ".dadaia/.venv/bin/dadaia"
-    # A filesystem fix is one `-c` line run by the interpreter running now (core/cli_line).
-    if head == Path(sys.executable).as_posix():
-        head = "python3"
-    assert head in _EXECUTABLE_TOKENS, (
-        f"a fix line opens with an executable, not prose — got {head!r} in:\n{command}"
-    )
-    for marker in _PROSE_MARKERS:
-        assert marker not in command, (
-            f"a fix line is ONE command — {marker!r} makes it two:\n{command}"
-        )
+    """sa-fix-lines-not-built-by-cli-line#S3: a fix is ONE command — no ``&&`` chain, no prose."""
+    for marker in ("&&", " or ", " then "):
+        assert marker not in command, f"a fix line is ONE command — {marker!r}:\n{command}"
 
 
 def _assert_runnable(command: str) -> None:
@@ -359,7 +315,7 @@ _INSTALLED_PREFIX = ".agents/skills/"
 def _script_target(command: str) -> tuple[Path, str] | None:
     """The (shipped script, subcommand) a ``python3 …/scripts/x.py <verb>`` fix names."""
     tokens = command.split()
-    if tokens[0] != "python3" or _INSTALLED_PREFIX not in tokens[1]:
+    if tokens[0] != _VENV_PYTHON or _INSTALLED_PREFIX not in tokens[1]:
         return None
     relative = tokens[1].split(_INSTALLED_PREFIX, 1)[1]
     verb = next((token for token in tokens[2:] if not token.startswith(("-", "<"))), "")
@@ -389,6 +345,9 @@ _FIX_LINES = _fix_lines()
 #: CLI arm below, never as a file.
 _INSTALLED_SKILL_PREFIX = ".agents/skills/"
 _VENV_BINARY_PREFIX = ".dadaia/"
+#: ``script_line``'s two absolute heads: the venv interpreter and the workspace root.
+_VENV_PYTHON = shlex.split(venv_line(None, "python"))[0]
+_WORKSPACE = Path(sys.prefix).parents[1].as_posix() + "/"
 
 _PLACEHOLDER_RE = re.compile(r"<[^>]*>")
 _FLAG_VALUE_RE = re.compile(r"^--[\w-]+=")
@@ -495,6 +454,7 @@ def _unresolved_paths(command: str) -> list[str]:
     a directory the specs canon guarantees."""
     unresolved: list[str] = []
     for raw in _command_tokens(command):
+        raw = raw.removeprefix(_WORKSPACE)
         if raw.startswith(_VENV_BINARY_PREFIX):
             continue  # the venv-rooted binary is resolved by the CLI arm, not as a file
         token = _path_token(raw)
@@ -504,6 +464,26 @@ def _unresolved_paths(command: str) -> list[str]:
         if target not in _TRACKED_DIRS and target not in _CANON_DIRS:
             unresolved.append(token)
     return unresolved
+
+
+_SCRIPT_FIXES = [(c, cmd) for c, cmd in _FIX_LINES if "/scripts/" in cmd]
+
+
+@pytest.mark.parametrize(("codes", "command"), _SCRIPT_FIXES, ids=[c for c, _ in _SCRIPT_FIXES])
+def test_every_ledger_fix_runs_its_script_by_absolute_path(codes: str, command: str) -> None:
+    """Intent: sa-fix-lines-not-built-by-cli-line#S8 — a ledger/rules fix names the venv
+    interpreter and the script by absolute path (``script_line``), so it runs from any cwd."""
+    interpreter, script = shlex.split(command)[:2]
+    assert interpreter == _VENV_PYTHON
+    assert Path(script).is_absolute() and Path(script).is_file(), script
+
+
+def test_the_bug_script_is_one_kernel_constant() -> None:
+    """Intent: sa-fix-lines-not-built-by-cli-line#S8 — bugs.py is named via BUGS_SCRIPT."""
+    from dadaia_workspace.core.kernel_tunables import BUGS_SCRIPT
+
+    assert BUGS_SCRIPT == ".agents/skills/dd-bug-resolution/scripts/bugs.py"
+    assert dict(_FIX_LINES)["SPEC-DOC-041"] == f"{_VENV_PYTHON} {_WORKSPACE}{BUGS_SCRIPT} archive"
 
 
 @pytest.mark.parametrize(("codes", "command"), _FIX_LINES, ids=[c for c, _ in _FIX_LINES])

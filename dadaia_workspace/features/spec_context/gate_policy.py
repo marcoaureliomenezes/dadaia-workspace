@@ -184,10 +184,8 @@ def evaluate(
     # PROTECTED is the sole fail-closed path and is evaluated before fail-open branches.
     if cls == PathClass.PROTECTED:
         if not rel_path.lstrip("/").startswith(_PROTECTED_PREFIX):
-            restage = " && ".join(
-                (fix_line(root, "public", "stage"), fix_line(root, "public", "install"))
-            )
-            return Decision.BLOCK, _LAW_MESSAGE.format(path=rel_path) + f"fix: {restage}"
+            restore = fix_line(root, "public", "install")  # re-projects the law from staging
+            return Decision.BLOCK, _LAW_MESSAGE.format(path=rel_path) + f"fix: {restore}"
         return (
             Decision.BLOCK,
             _PROTECTED_MESSAGE + f"fix: {fix_line(root, 'context', 'bind', '<ctx>')}",

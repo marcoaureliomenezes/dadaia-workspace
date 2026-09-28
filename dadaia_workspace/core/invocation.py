@@ -60,6 +60,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dadaia_workspace.core import workspace_resolver
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
 from dadaia_workspace.core.session_store import live_session
@@ -450,7 +451,7 @@ def resolve_specs_dir(specs_dir: str | None) -> Path:
 
     raise typer.BadParameter(
         "Could not resolve specs_dir. Pass --specs-dir or bind a context with "
-        "`eval $(dadaia context bind <name> --print-env)`."
+        f"`{fix_line(None, 'context', 'bind', '<name>')}`."
     )
 
 

@@ -386,7 +386,7 @@ def dead(
 
 
 @app.command(
-    epilog="Examples: dadaia context bind my-ctx | eval $(dadaia context bind my-ctx --print-env)"
+    epilog="Examples: .dadaia/.venv/bin/dadaia context bind my-ctx | eval $(.dadaia/.venv/bin/dadaia context bind my-ctx --print-env)"
 )
 def bind(
     name: str = typer.Argument(..., help="Context name to bind to"),
@@ -395,7 +395,7 @@ def bind(
         "--print-env",
         help=(
             "Emit eval-compatible 'export DADAIA_CONTEXT/DADAIA_SESSION_ID' lines for "
-            "`eval $(dadaia context bind ... --print-env)`. Default off — the binding is "
+            "`eval $(.dadaia/.venv/bin/dadaia context bind ... --print-env)`. Default off — the binding is "
             "persisted in the session record either way."
         ),
     ),

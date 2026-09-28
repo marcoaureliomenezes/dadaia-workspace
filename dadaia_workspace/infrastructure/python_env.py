@@ -587,8 +587,8 @@ class VenvPythonEnvironmentManager:
                 f"'{self._venv_path(workspace_root)}' carries Python "
                 f"{'.'.join(map(str, version))}, but dadaia-workspace requires Python "
                 f"{required}. Recreate the venv with an interpreter that satisfies "
-                "this requirement (delete the venv directory and re-run 'dadaia "
-                "init', or point DADAIA_BOOTSTRAP_PACKAGE at a matching build) and "
+                "this requirement (delete the venv directory and re-run 'uvx "
+                "dadaia-workspace init <dir>', or point DADAIA_BOOTSTRAP_PACKAGE at a matching build) and "
                 "retry."
             )
 

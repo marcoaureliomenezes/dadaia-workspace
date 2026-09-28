@@ -68,7 +68,7 @@ def preflight(
     # source-repo test is the existing one, not a second definition.
     if not _is_source_repo_root(root):
         raise CiPreflightScopeError(
-            f"`dadaia ci preflight` targets the dadaia-workspace source repo; "
+            f"`{fix_line(None, 'ci', 'preflight')}` targets the dadaia-workspace source repo; "
             f"{str(root)!r} is not it. The gate lints and type-checks the library's own "
             "paths, which do not exist here. Run your repo's own CI checks instead."
         )
@@ -163,7 +163,7 @@ def push_gate_check() -> None:
         typer.echo(
             f"[pre-push] specs/ tree is stamped pattern {specs_version} "
             f"(< {CANONICAL_SPECS_VERSION}): the v6 canon scan does not apply until "
-            "`dadaia specs upgrade` migrates it; the denylist scan still runs.",
+            f"`{fix_line(None, 'specs', 'upgrade')}` migrates it; the denylist scan still runs.",
             err=True,
         )
         canon_fn = _no_canon_violations

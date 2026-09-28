@@ -336,3 +336,11 @@ def test_retired_harness_law_mirrors_are_no_longer_protected() -> None:
         ".claude/rules/AGENTS.md",
     ):
         assert classify_path(retired) == PathClass.MUTATING, retired
+
+
+def test_a_projected_law_write_is_blocked_with_one_restore_command() -> None:
+    """Intent: sa-fix-lines-not-built-by-cli-line#S6 — the law deny fix is ONE command."""
+    decision, message = evaluate("AGENTS.md", root=_ROOT, projected=frozenset({"AGENTS.md"}))
+    assert decision == Decision.BLOCK
+    assert message.splitlines()[-1] == f"fix: {fix_line(_ROOT, 'public', 'install')}"
+    assert "&&" not in message

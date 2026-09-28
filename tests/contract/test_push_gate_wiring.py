@@ -20,6 +20,7 @@ from typer.testing import CliRunner
 from dadaia_workspace import container
 from dadaia_workspace.cli.commands import ci
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.cli_line import fix_line
 
 _runner = CliRunner()
 _ZERO = "0" * 40
@@ -88,7 +89,8 @@ def test_canon_scan_does_not_apply_to_a_tree_stamped_below_the_canon(
     result = _runner.invoke(app, ["ci", "push-gate-check"], input=stdin)
     assert result.exit_code == 0, result.output
     assert "stamped pattern 5" in result.output
-    assert "dadaia specs upgrade" in result.output
+    # sa-fix-lines-not-built-by-cli-line#S1: the upgrade verb is named through the builder.
+    assert fix_line(None, "specs", "upgrade") in result.output
 
     _stamped_specs(repo, 7)
     result = _runner.invoke(app, ["ci", "push-gate-check"], input=stdin)

@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.invocation import CONTEXT_NAME_RE as _CONTEXT_NAME_RE
 from dadaia_workspace.core.invocation import (
     HARNESS_SESSION_ID_ENV_VARS as _HARNESS_SESSION_ID_ENV_VARS,
@@ -59,9 +60,9 @@ def resolve_context_for_cli(explicit: str | None) -> str:
         return resolved
     raise ValueError(
         "No caller-owned Spec Context is selected. Run "
-        "'dadaia context bind <name>' in this session or pass "
-        "'--context <name>' explicitly. Use 'dadaia context list --json' to discover "
-        "available contexts."
+        f"'{fix_line(None, 'context', 'bind', '<name>')}' in this session or pass "
+        f"'--context <name>' explicitly. Use '{fix_line(None, 'context', 'list', '--json')}' "
+        "to discover available contexts."
     )
 
 

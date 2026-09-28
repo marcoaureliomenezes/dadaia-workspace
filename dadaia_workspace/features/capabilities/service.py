@@ -41,7 +41,7 @@ def build_capabilities(command_paths: Collection[tuple[str, ...]]) -> dict[str, 
             "pattern_version": CANONICAL_SPECS_VERSION,
             # Derived from the doctor's own canon, never a second copy.
             "status_tokens": sorted(CANONICAL_STATUS),
-            "commands": [f"dadaia specs {verb}" for verb in groups.get("specs", [])],
+            "commands": groups.get("specs", []),
         },
         "contexts": {
             "states": ["alive", "dead"],
@@ -57,8 +57,5 @@ def build_capabilities(command_paths: Collection[tuple[str, ...]]) -> dict[str, 
             "preserve_complete_diagnostics": True,
             "credentials_location": "workspace-root-.env-only",
         },
-        "certification": {
-            "command": "dadaia certify --json",
-            "schema_version": "dadaia-certification-v1",
-        },
+        "certification": {"schema_version": "dadaia-certification-v1"},
     }

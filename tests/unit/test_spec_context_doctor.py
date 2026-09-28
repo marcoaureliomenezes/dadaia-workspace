@@ -103,57 +103,6 @@ def test_inv4_names_a_missing_main_or_associated_repo_with_the_alive_fix(
 
 
 # ---------------------------------------------------------------------------
-# CTX-URL-1: ALIVE context must not have an empty repo_url (T-011-08 / FR-W2-03 d)
-# ---------------------------------------------------------------------------
-
-
-def _ctx_empty_url(name: str, state: ContextState = ContextState.ALIVE) -> SpecContextProject:
-    return SpecContextProject(
-        name=name,
-        state=state,
-        repo_slug=name,
-        repo_url="",
-        created_at="2026-01-01T00:00:00",
-        alive_since="2026-06-01T00:00:00Z" if state == ContextState.ALIVE else None,
-        dead_since=None,
-        current_branch="main" if state == ContextState.ALIVE else None,
-    )
-
-
-@pytest.mark.parametrize(
-    ("name", "ctx_fn", "make_repo", "expect_code"),
-    [
-        ("alive_empty_url_flagged", lambda: _ctx_empty_url("foo", ContextState.ALIVE), True, True),
-        ("url_present_silent", lambda: _ctx("foo", ContextState.ALIVE), True, False),
-        (
-            # A DEAD context with an empty URL is not flagged (only ALIVE is
-            # un-portable now).
-            "dead_empty_url_silent",
-            lambda: _ctx_empty_url("foo", ContextState.DEAD),
-            False,
-            False,
-        ),
-    ],
-)
-def test_ctx_url_1_table(
-    tmp_path: Path, name: str, ctx_fn: object, make_repo: bool, expect_code: bool
-) -> None:
-    ctx = ctx_fn()  # type: ignore[operator]
-    if make_repo:
-        (tmp_path / "repos" / "foo").mkdir(parents=True)
-    svc, _ = _make_doctor(tmp_path, [ctx])
-    issues = svc.check()
-    codes = {i.code for i in issues}
-    if expect_code:
-        assert "CTX-URL-1" in codes
-        ctx_url = next(i for i in issues if i.code == "CTX-URL-1")
-        assert ctx_url.fixable is False
-        assert "dadaia context alive" in ctx_url.description
-    else:
-        assert "CTX-URL-1" not in codes
-
-
-# ---------------------------------------------------------------------------
 # INV-5: DEAD context must not have repo on disk — detected, fixable, fix() removes
 # ---------------------------------------------------------------------------
 

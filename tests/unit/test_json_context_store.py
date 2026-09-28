@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.core.models.spec_context import (
     AssociatedRepo,
@@ -234,7 +235,8 @@ def test_legacy_schema_or_state_raises_schema_version_error(
     store = JsonContextStore(tmp_path)
     with pytest.raises(SchemaVersionError) as exc_info:
         store.list_all()
-    assert "dadaia migrate" in str(exc_info.value)
+    # sa-fix-lines-not-built-by-cli-line#S1: the remedy is spelled by the builder.
+    assert f"Run: {fix_line(None, 'migrate')}" in str(exc_info.value)
 
     # AC-T10a-7: spec_contexts.json written by the store (fresh v3 store, separate
     # workspace) has no legacy fields — is_primary / activated_at never round-trip.

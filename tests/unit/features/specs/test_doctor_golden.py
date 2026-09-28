@@ -34,11 +34,14 @@ import importlib
 import json
 import os
 import re
+import shlex
+import sys
 from datetime import date, datetime, tzinfo
 from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.cli_line import venv_line
 from dadaia_workspace.features.specs import SpecsDoctor, SpecsDoctorIssue
 
 pytestmark = pytest.mark.unit
@@ -163,6 +166,9 @@ def _capture() -> tuple[list[SpecsDoctorIssue], str]:
         # (e.g. a regex pattern's \d): "\d" and "\dir" are byte-identical
         # shapes at this level, so anchoring is the only safe disambiguation.
         value = value.replace(str(_FIXTURE), "<SPECS>").replace(_FIXTURE.as_posix(), "<SPECS>")
+        # A script fix is absolute (script_line): the machine's venv and root are not behavior.
+        value = value.replace(shlex.split(venv_line(None, "python"))[0], "<PYTHON>")
+        value = value.replace(Path(sys.prefix).parents[1].as_posix(), "<WORKSPACE>")
         return re.sub(
             r"(?<=<SPECS>)(?:\\[^\s\"\\]+)+",
             lambda m: m.group(0).replace("\\", "/"),

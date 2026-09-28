@@ -26,6 +26,7 @@ from dadaia_workspace.core.models.git_scan import (
     SHA_SHAPE_RE,
     ZERO_SHA,
     GitObjectReadError,
+    GitRunError,
     ScannedObject,
 )
 
@@ -75,9 +76,9 @@ def _run(
             args, cwd=cwd, input=input_bytes, capture_output=True, timeout=_TIMEOUT_S
         )
     except OSError as exc:  # no git on PATH, or a cwd that is not a directory (WinError 267)
-        raise GitObjectReadError(f"git could not run in {cwd}: {exc}") from exc
+        raise GitRunError(f"git could not run in {cwd}: {exc}") from exc
     except subprocess.TimeoutExpired as exc:
-        raise GitObjectReadError(f"git command timed out: {' '.join(args)}") from exc
+        raise GitRunError(f"git command timed out: {' '.join(args)}") from exc
 
 
 def _decode(raw: bytes) -> str:

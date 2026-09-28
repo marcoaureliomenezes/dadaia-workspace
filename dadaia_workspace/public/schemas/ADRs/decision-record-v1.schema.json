@@ -63,7 +63,7 @@
         "string",
         "null"
       ],
-      "description": "The existing mechanical check that proves this decision holds. Free text while `proposed`; once `accepted` it must match the resolvable pattern in this schema's allOf — a pytest invocation, a lint-imports invocation, or a code a reader greps for (SPEC-DOC-nnn, WS-*, BL-*, RELEASE-TREE-*, LEDGER-*), or `dadaia doctor`/`dadaia bugs status`."
+      "description": "The existing mechanical check that proves this decision holds. Free text while `proposed`; once `accepted` it must match the resolvable pattern in this schema's allOf — a pytest invocation, a lint-imports invocation, or a code a reader greps for (SPEC-DOC-nnn, WS-*, BL-*, RELEASE-TREE-*, LEDGER-*), or `.dadaia/.venv/bin/dadaia doctor`/`bugs.py status`."
     },
     "supersedes": {
       "type": [

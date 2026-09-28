@@ -26,19 +26,19 @@
     },
     {
       "code": "TREE-3",
-      "description": "memory/ARCHITECTURE.md is missing — required memory .md atom. Author it, then regenerate the pair with `python3 .agents/skills/dd-spec-navigator/scripts/memory.py catalog generate`.",
+      "description": "memory/ARCHITECTURE.md is missing — required memory .md atom. Author it, then regenerate the pair with `<PYTHON> <WORKSPACE>/.agents/skills/dd-spec-navigator/scripts/memory.py catalog generate`.",
       "path": "<SPECS>/memory/ARCHITECTURE.md",
       "severity": "warning"
     },
     {
       "code": "TREE-3",
-      "description": "memory/QUALITY.md is missing — required memory .md atom. Author it, then regenerate the pair with `python3 .agents/skills/dd-spec-navigator/scripts/memory.py catalog generate`.",
+      "description": "memory/QUALITY.md is missing — required memory .md atom. Author it, then regenerate the pair with `<PYTHON> <WORKSPACE>/.agents/skills/dd-spec-navigator/scripts/memory.py catalog generate`.",
       "path": "<SPECS>/memory/QUALITY.md",
       "severity": "warning"
     },
     {
       "code": "TREE-3",
-      "description": "memory/product/index.md is missing — required memory .md atom. Author it, then regenerate the pair with `python3 .agents/skills/dd-spec-navigator/scripts/memory.py catalog generate`.",
+      "description": "memory/product/index.md is missing — required memory .md atom. Author it, then regenerate the pair with `<PYTHON> <WORKSPACE>/.agents/skills/dd-spec-navigator/scripts/memory.py catalog generate`.",
       "path": "<SPECS>/memory/product/index.md",
       "severity": "warning"
     },

@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import fix_line, script_line
 from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.core.workspace_resolver import own_workspace_root
 from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner
@@ -65,7 +65,7 @@ class LedgerScript:
     @property
     def invocation(self) -> str:
         """The `fix:` spelling — the installed path, run through the interpreter."""
-        return f"python3 .agents/skills/{self.skill}/scripts/{self.filename}"
+        return script_line(None, f".agents/skills/{self.skill}/scripts/{self.filename}")
 
 
 #: One row per ledger script (0.4.7 FR2's table). A new ledger is a row, never a branch.

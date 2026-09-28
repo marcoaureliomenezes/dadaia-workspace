@@ -50,6 +50,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
+from dadaia_workspace.core.cli_line import script_line
 from dadaia_workspace.core.doctor_rules import Rule
 from dadaia_workspace.core.kernel_tunables import BACKLOG_SCRIPT
 from dadaia_workspace.core.models.backlog import (
@@ -303,14 +304,14 @@ RULES: tuple[LedgerRule, ...] = (
         (BacklogDoctorCode.BL_CONFLICT.value,),
         SECTION,
         _check_conflict,
-        fix_help=f"{BACKLOG_SCRIPT} exit <slug> --disposition rejected --reason <the-twin-slug>",
+        fix_help=f"{script_line(None, BACKLOG_SCRIPT)} exit <slug> --disposition rejected --reason <the-twin-slug>",
     ),
     Rule(
         (BacklogDoctorCode.BL_STALE.value,),
         SECTION,
         _check_stale,
         fix_help=(
-            f"{BACKLOG_SCRIPT} exit <slug> --disposition <disposition> <--release id|--reason why>"
+            f"{script_line(None, BACKLOG_SCRIPT)} exit <slug> --disposition <disposition> <--release id|--reason why>"
         ),
     ),
 )

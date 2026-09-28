@@ -56,6 +56,6 @@ def check_upgradable(current: int) -> None:
         raise UpgradeRefused(
             f"specs pattern version {current} is below {UPGRADABLE_FROM}, and this release "
             "no longer carries the migration chain that reaches it. Upgrade this specs/ "
-            "tree with dadaia-workspace 0.4.x first (its `dadaia specs upgrade` still "
+            "tree with dadaia-workspace 0.4.x first (its `specs upgrade` verb still "
             "carries the retired chain), then upgrade again to this release."
         )

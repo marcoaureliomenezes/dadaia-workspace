@@ -1,60 +1,32 @@
-"""Venv-determinism — one narrow Bash PreToolUse policy, one rule.
+"""Venv-determinism — one narrow Bash PreToolUse policy, one rule (ADR-G4).
 
-(FR-W3-01, ADR-G4, T-014-12.)
+The workspace law requires ``dadaia`` / ``pip`` / ``python -m dadaia_workspace`` to run
+from the workspace venv, never a system interpreter. Narrow on purpose:
 
-The cache guard (0.4.7 FR3) is DELETED: a cache is not born because a flag was typed,
-it is born because the tool was configured to write one. `pyproject.toml` now redirects
-ruff's and mypy's caches and pytest's `addopts` carries `-p no:cacheprovider`, so a BARE
-`pytest`/`ruff check`/`mypy --strict` from the repo root leaves the tree clean — and a
-guard that blocked well-formed commands for a condition configuration already prevents
-was pure false-block surface.
+- **First command token only** — no shell parsing; a token inside a quoted string or
+  after ``&&`` is never the leading token and never blocks (ADR-G1 zero-false-block).
+- **Three families**: a bare ``dadaia``, a bare ``pip``/``pip3``, ``python[3] -m
+  dadaia_workspace``. ``pytest``/``ruff``/``mypy`` are never matched (their caches are
+  configured away in ``pyproject.toml``).
+- **ALLOW**: an already venv-rooted token, a ``$DADAIA_BIN`` override, a foreign path
+  that merely ends in ``pip``/``dadaia``.
 
-**The rule — venv-rooting (ADR-G4).** The workspace law (root ``AGENTS.md``)
-requires ``dadaia`` / ``pip`` / ``python -m dadaia_workspace`` to run from the workspace
-venv (``.dadaia/.venv/bin/``), never from a system interpreter.
-
-ADR-G4 narrowness is deliberate and load-bearing:
-
-- **First command token only.** We inspect the leading whitespace-delimited token of the
-  command string. There is NO general shell parsing: we do not split on ``&&``, strip
-  ``cd … &&`` prefixes, expand env vars, or descend into quoted sub-commands. A token
-  buried inside a quoted string (``echo "pip install"``) is therefore never the leading
-  token and never blocks (ADR-G1 zero-false-block).
-- **Fixed pattern set.** Only three families match: a bare ``dadaia`` entrypoint, a bare
-  ``pip``/``pip3``, and ``python``/``python3 -m dadaia_workspace``. Everything else flows.
-- **Explicit exclusions.** ``pytest``, ``ruff``, and ``mypy`` are NOT matched by THIS
-  rule (ADR-G4): they are run directly by agents and reviewers and venv-rooting is out
-  of scope for this rule — see Rule 2 below for what IS in scope for them.
-
-A matched-but-not-venv-rooted invocation is BLOCKED with a message that contains the
-corrected, venv-rooted command so the agent can copy-paste the fix.
-
-False-block guards (ADR-G1):
-
-- An already-venv-rooted leading token (``.dadaia/.venv/bin/dadaia`` or a
-  workspace-absolute ``…/.dadaia/.venv/bin/…``) → ALLOW.
-- A ``$DADAIA_BIN`` / ``${DADAIA_BIN}`` override leading token → ALLOW.
-- A *foreign* explicit bin path that happens to end in ``pip``/``dadaia`` (another venv,
-  an in-repo ``repos/x/pip.py``, a ``./pip-helper.sh``) → ALLOW. We only match the bare
-  command names and the ``python -m dadaia_workspace`` form, never an arbitrary path that
-  merely contains the substring.
-
-The policy is pure and fail-open: any unexpected payload shape returns ``None`` (ALLOW),
-so a malformed envelope can never deadlock the harness.
+A match is BLOCKED with one ``fix:`` — the absolute venv command (``core.cli_line``) —
+and any unexpected payload shape is ALLOW (fail-open).
 """
 
 from __future__ import annotations
 
 import shlex
 
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import fix_line, venv_line
 
 #: Bare entrypoint names that must run from the workspace venv.
 _DADAIA_ENTRYPOINT = "dadaia"
 _PIP_NAMES: frozenset[str] = frozenset({"pip", "pip3"})
 _PYTHON_NAMES: frozenset[str] = frozenset({"python", "python3"})
 
-#: The canonical venv bin prefix (relative form printed in the corrected command).
+#: The venv bin prefix the message names.
 _VENV_BIN = ".dadaia/.venv/bin/"
 
 #: Leading-token forms that are already venv-rooted or operator-overridden → ALLOW.
@@ -124,7 +96,7 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
         return _block_message(command.strip(), corrected)
 
     if token in _PIP_NAMES:
-        corrected = f"{_VENV_BIN}{token}" + (f" {rest}" if rest else "")
+        corrected = venv_line(None, token) + (f" {rest}" if rest else "")
         return _block_message(command.strip(), corrected)
 
     if token in _PYTHON_NAMES:
@@ -134,7 +106,7 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
         except ValueError:
             return None
         if len(args) >= 3 and args[1] == "-m" and _is_dadaia_module(args[2]):
-            corrected = f"{_VENV_BIN}python " + " ".join(args[1:])
+            corrected = venv_line(None, "python", *args[1:])
             return _block_message(command.strip(), corrected)
         return None
 

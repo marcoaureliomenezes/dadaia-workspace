@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import (
     AssociatedRepoConflictError,
     ContextAlreadyExistsError,
@@ -30,7 +31,9 @@ class ContextRegistry(Protocol):
 
 def _read(file: Path) -> list[dict[str, object]]:
     if not file.is_file():
-        raise ValueError(f"Export file not found: '{file}'. Generate it with 'dadaia export'.")
+        raise ValueError(
+            f"Export file not found: '{file}'. Generate it with '{fix_line(None, 'export')}'."
+        )
     try:
         payload = json.loads(file.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
@@ -38,7 +41,7 @@ def _read(file: Path) -> list[dict[str, object]]:
     if not isinstance(payload, dict) or payload.get("schema_version") != SCHEMA_VERSION:
         raise ValueError(
             f"'{file.name}' does not carry schema_version {SCHEMA_VERSION!r}; "
-            "only 'dadaia export' output is supported."
+            f"only '{fix_line(None, 'export')}' output is supported."
         )
     contexts = payload.get("contexts")
     if not isinstance(contexts, list) or not all(isinstance(c, dict) for c in contexts):

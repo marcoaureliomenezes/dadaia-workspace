@@ -14,6 +14,7 @@ import shlex
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.cli_line import script_line
 from dadaia_workspace.core.kernel_tunables import MEMORY_SCRIPT
 from dadaia_workspace.core.template_history import was_shipped
 from dadaia_workspace.core.workspace_layout import SCOPED_LAW_AREAS, render_registry_tables
@@ -143,7 +144,7 @@ class StructuralValidator:
                     description=(
                         f"memory/{rel_path} is missing — required memory .md atom. "
                         f"Author it, then regenerate the pair with "
-                        f"`{MEMORY_SCRIPT} catalog generate`."
+                        f"`{script_line(None, MEMORY_SCRIPT)} catalog generate`."
                     ),
                     path=str(target),
                     fixable=False,

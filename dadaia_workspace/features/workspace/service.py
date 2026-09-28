@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.core.models.workspace import Workspace
@@ -88,7 +89,7 @@ class WorkspaceService:
         else:
             installed.append(
                 "[warn] assets skipped — no hooks configured; the workspace is ungated "
-                "until 'dadaia public install' runs"
+                f"until '{fix_line(workspace_root, 'public', 'install')}' runs"
             )
 
         return workspace, installed

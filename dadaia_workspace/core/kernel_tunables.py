@@ -14,6 +14,7 @@ from __future__ import annotations
 __all__ = [
     "AUDIT_SCRIPT",
     "BACKLOG_SCRIPT",
+    "BUGS_SCRIPT",
     "MEMORY_SCRIPT",
     "RELEASE_SCRIPT",
     "RECONCILER_THROTTLE_TTL_SECONDS",
@@ -34,17 +35,21 @@ RECONCILER_THROTTLE_TTL_SECONDS: int = 30
 
 #: The backlog ledger's ONE writer since 0.4.7 c7 — every `fix:` naming a backlog
 #: repair names the script that can perform it, never a retired CLI verb.
-BACKLOG_SCRIPT: str = "python3 .agents/skills/dd-backlog-definition/scripts/backlog.py"
+BACKLOG_SCRIPT: str = ".agents/skills/dd-backlog-definition/scripts/backlog.py"
+
+#: The bug ledger's ONE writer; every script path here is workspace-relative, run by
+#: ``core.cli_line.script_line``.
+BUGS_SCRIPT: str = ".agents/skills/dd-bug-resolution/scripts/bugs.py"
 
 #: The release ledger's ONE writer (0.4.7 FR2, T-047-66): `_RELEASE.json`, the candidate
 #: trio and `releases_histo.jsonl`. Every `RELEASE-TREE-*` `fix:` that named a retired
 #: `dadaia release` verb names this script instead.
-RELEASE_SCRIPT: str = "python3 .agents/skills/dd-release-implementation/scripts/release.py"
+RELEASE_SCRIPT: str = ".agents/skills/dd-release-implementation/scripts/release.py"
 
 #: The audit ledger's ONE writer (0.4.7 FR2, T-047-67): a finding's governance triple
 #: and the all-or-nothing close that archives the audit.
-AUDIT_SCRIPT: str = "python3 .agents/skills/dd-audit-project/scripts/audit.py"
+AUDIT_SCRIPT: str = ".agents/skills/dd-audit-project/scripts/audit.py"
 
 #: The memory catalog's ONE writer (0.4.7 FR2, T-047-67): `catalog.json` and `index.md`
 #: are regenerated together from the atoms, and one new atom is born by `product add`.
-MEMORY_SCRIPT: str = "python3 .agents/skills/dd-spec-navigator/scripts/memory.py"
+MEMORY_SCRIPT: str = ".agents/skills/dd-spec-navigator/scripts/memory.py"

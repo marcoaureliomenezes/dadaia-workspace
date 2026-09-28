@@ -21,7 +21,12 @@ from typing import Protocol
 
 from dadaia_workspace.core.cli_line import git_line
 from dadaia_workspace.core.gitflow import Gitflow
-from dadaia_workspace.core.models.git_scan import ZERO_SHA, GitObjectReadError, ScannedObject
+from dadaia_workspace.core.models.git_scan import (
+    ZERO_SHA,
+    GitObjectReadError,
+    GitRunError,
+    ScannedObject,
+)
 from dadaia_workspace.features.chokepoints.branch_policy import (
     HEADS_PREFIX,
     Decision,
@@ -255,8 +260,12 @@ def _run_denylist_scan(
                     f"({_render_git_read_error(exc, path_masker)}) — a policy gate never "
                     "skips what it cannot evaluate (fail closed). The sanctioned, "
                     "traceable emergency bypass is `git push --no-verify` "
-                    "(discouraged; leaves a reflog trace).\n"
-                    "Repair the object store, then push again.\nfix: git fsck"
+                    "(discouraged; leaves a reflog trace).\nfix: "
+                    + (  # a run failure is not corruption: no fsck for it
+                        "Operator action: make git runnable here, then push again"
+                        if isinstance(exc, GitRunError)
+                        else git_line(repo, "fsck")
+                    )
                 ),
             ),
             [],

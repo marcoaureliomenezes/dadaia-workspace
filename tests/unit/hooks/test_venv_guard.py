@@ -19,9 +19,12 @@ separate fns) — never dropped. False-block law rows are untouched — never we
 
 from __future__ import annotations
 
+import shlex
+from pathlib import Path
+
 import pytest
 
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import fix_line, venv_line
 from dadaia_workspace.hooks import _common, venv_guard
 
 
@@ -43,24 +46,26 @@ def test_bare_dadaia_is_corrected_to_the_cli_fix_line(args: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ("command", "expected_correction"),
+    ("command", "tool", "args"),
     [
-        ("pip install foo", ".dadaia/.venv/bin/pip install foo"),
-        ("pip3 install foo", ".dadaia/.venv/bin/pip3 install foo"),
-        ("python -m dadaia_workspace", ".dadaia/.venv/bin/python -m dadaia_workspace"),
-        ("python3 -m dadaia_workspace", ".dadaia/.venv/bin/python -m dadaia_workspace"),
+        ("pip install foo", "pip", "install foo"),
+        ("pip3 install foo", "pip3", "install foo"),
+        ("python -m dadaia_workspace", "python", "-m dadaia_workspace"),
+        ("python3 -m dadaia_workspace", "python", "-m dadaia_workspace"),
         (
             "python -m dadaia_workspace.cli.main doctor",
-            ".dadaia/.venv/bin/python -m dadaia_workspace.cli.main doctor",
+            "python",
+            "-m dadaia_workspace.cli.main doctor",
         ),
     ],
 )
-def test_blocks_bare_workspace_invocation(command: str, expected_correction: str) -> None:
+def test_blocks_bare_workspace_invocation(command: str, tool: str, args: str) -> None:
+    """Intent: sa-fix-lines-not-built-by-cli-line#S4 — the pip/python fix is the absolute venv tool."""
     reason = venv_guard.evaluate_payload(_bash(command))
     assert reason is not None, f"expected block for {command!r}"
-    # Block message must contain the corrected, venv-rooted invocation.
-    assert ".dadaia/.venv/bin/" in reason
-    assert expected_correction in reason
+    fix = reason.splitlines()[-1]
+    assert fix == f"fix: {venv_line(None, tool)} {args}"
+    assert Path(shlex.split(fix[len("fix: ") :])[0]).is_absolute()
 
 
 # ----------------------------------------------------------------------------
@@ -160,3 +165,16 @@ def test_every_shell_alias_is_judged_like_bash(
         assert reason is not None
     else:
         assert reason is None
+
+
+def test_the_block_fix_runs_verbatim_from_a_repo_subdirectory(tmp_path: Path) -> None:
+    """Intent: sa-fix-lines-not-built-by-cli-line#S2 — the fix runs as printed from repos/alpha."""
+    import subprocess
+
+    cwd = tmp_path / "repos" / "alpha"
+    cwd.mkdir(parents=True)
+    reason = venv_guard.evaluate_payload(_bash("python -m dadaia_workspace --version"))
+    assert reason is not None
+    fix = reason.splitlines()[-1].removeprefix("fix: ")
+    done = subprocess.run(shlex.split(fix), cwd=cwd, capture_output=True, text=True, check=False)
+    assert done.returncode == 0, done.stderr

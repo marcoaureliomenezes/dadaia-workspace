@@ -61,7 +61,7 @@ _REQUIRED_TOOL_HINT: dict[str, str] = {
     "lint-imports": (
         "lint-imports (import-linter) is not installed in the resolved environment. "
         "It enforces the import-boundary contracts (setup.cfg) in the CI 'Lint (ruff)' "
-        "job and in `dadaia ci preflight`. Install it with: poetry install --with dev"
+        "job and in this preflight. Install it with: poetry install --with dev"
     ),
 }
 

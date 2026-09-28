@@ -196,6 +196,7 @@ def _shipped_text() -> list[Path]:
         {
             *_PUBLIC_ROOT.rglob("*.md"),
             *_PUBLIC_ROOT.rglob("*.txt"),
+            *_PUBLIC_ROOT.rglob("*.json"),
             *(_REPO_ROOT / "docs").glob("*.md"),
             *(_REPO_ROOT / name for name in ("README.md", "llms.txt", "CONTEXT.md")),
         }

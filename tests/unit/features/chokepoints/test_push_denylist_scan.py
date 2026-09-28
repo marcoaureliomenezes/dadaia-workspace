@@ -18,7 +18,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core.gitflow import DEFAULT
-from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObject
+from dadaia_workspace.core.models.git_scan import GitObjectReadError, GitRunError, ScannedObject
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
 from dadaia_workspace.features.specs.canon import canon_violations
@@ -330,6 +330,38 @@ def test_git_object_read_failure_at_a_denylisted_path_masks_the_path(repo: PushR
     assert "repos/[REDACTED-PATH-1]/leak.md" in decision.message
     assert "--no-verify" in decision.message
     assert "GitObjectReadError(" not in decision.message
+
+
+class _Raising:
+    def __init__(self, exc: GitObjectReadError) -> None:
+        self._exc = exc
+
+    def remote_branch(self, repo: Path, branch: str) -> bool:
+        return True
+
+    def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
+        raise self._exc
+
+
+def test_a_corrupt_object_read_names_git_fsck_on_the_repo(repo: PushRepo) -> None:
+    """Intent: sa-fix-lines-not-built-by-cli-line#S5 — corruption's fix is `git -C <repo> fsck`."""
+    sha = repo.commit({"x.md": "x\n"})
+    decision = _decide(
+        repo, _branch(sha), source=_Raising(GitObjectReadError("stream desynchronised"))
+    )
+    assert not decision.allowed
+    assert decision.message.splitlines()[-1] == f"fix: git -C {repo.path.as_posix()} fsck"
+
+
+def test_git_that_cannot_run_gets_no_fsck_fix(repo: PushRepo) -> None:
+    """Intent: sa-fix-lines-not-built-by-cli-line#S5 — a timeout or missing git is no corruption."""
+    sha = repo.commit({"x.md": "x\n"})
+    decision = _decide(repo, _branch(sha), source=_Raising(GitRunError("git timed out")))
+    assert not decision.allowed
+    assert "fsck" not in decision.message
+    assert decision.message.splitlines()[-1] == (
+        "fix: Operator action: make git runnable here, then push again"
+    )
 
 
 def test_same_offending_segment_gets_the_same_ordinal_across_hit_and_note(repo: PushRepo) -> None:

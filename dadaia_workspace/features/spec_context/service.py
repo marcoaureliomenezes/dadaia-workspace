@@ -296,8 +296,9 @@ class SpecContextService:
                 raise AssociatedRepoConflictError(
                     f"'{slug}' is already owned by context '{other.name}' (as its own main "
                     "repo or one of its associated repos). 'repos/<slug>' is a namespace every "
-                    f"context shares — registering it on '{name}' too would let 'dadaia "
-                    f"context dead {name}' commit, push and delete '{other.name}''s working "
+                    f"context shares — registering it on '{name}' too would let "
+                    f"'{fix_line(self._workspace_root, 'context', 'dead', name)}' commit, push "
+                    f"and delete '{other.name}''s working "
                     "tree. Choose a different slug, or coordinate with the owning context first."
                 )
 
@@ -340,7 +341,8 @@ class SpecContextService:
                 f"Associated repo '{slug}' is already registered on context "
                 f"'{name}' with a different URL ({existing.url!r} != "
                 f"{repo_url!r}). 'repo add' never overwrites a URL silently — "
-                f"run 'dadaia context repo remove {name} {slug}' first, then "
+                f"run '{fix_line(self._workspace_root, 'context', 'repo', 'remove', name, slug)}' "
+                "first, then "
                 "re-add with the intended URL."
             )
         updated = SpecContextProject(
@@ -829,7 +831,8 @@ class SpecContextService:
             raise ContextNotFoundError(f"Context '{name}' not found.")
         if ctx.state == ContextState.ALIVE:
             raise ContextStateError(
-                f"Context '{name}' is active. Run 'dadaia context dead {name}' before deleting."
+                f"Context '{name}' is active. Run "
+                f"'{fix_line(self._workspace_root, 'context', 'dead', name)}' before deleting."
             )
         self._store.delete(name)
         # Bug context-delete-leaves-stale-session-bind: a session record pointing at a

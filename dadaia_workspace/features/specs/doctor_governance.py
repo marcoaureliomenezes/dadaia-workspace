@@ -30,6 +30,8 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from dadaia_workspace.core.cli_line import script_line
+from dadaia_workspace.core.kernel_tunables import BUGS_SCRIPT
 from dadaia_workspace.core.models.bugs import (
     BUG_ARCHIVE_THRESHOLD_DAYS,
     BugRecord,
@@ -153,7 +155,7 @@ class GovernanceValidator:
                             f"bugs/BUGS.jsonl record {record.id!r} has been terminal "
                             f"({record.status!r}) since {record.closed_at} — past the "
                             f"{BUG_ARCHIVE_THRESHOLD_DAYS}-day archive threshold; run "
-                            "'python3 .agents/skills/dd-bug-resolution/scripts/bugs.py archive' (SPEC-DOC-041, WARNING — never a "
+                            f"'{script_line(None, BUGS_SCRIPT, 'archive')}' (SPEC-DOC-041, WARNING — never a "
                             "block, D15)."
                         ),
                         path=str(ledger_path),

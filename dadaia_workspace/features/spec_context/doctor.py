@@ -172,8 +172,8 @@ class DoctorService:
                     description=(
                         f"Workspace venv missing: '{venv_bin}' does not exist. Workspace "
                         "tooling (dadaia/pip/python -m dadaia_workspace) must run from this "
-                        "venv. Re-bootstrap it (e.g. 'dadaia init' or the documented "
-                        "venv setup)."
+                        "venv. Re-bootstrap it (`uvx dadaia-workspace init <dir>` re-runs on "
+                        "an existing workspace)."
                     ),
                     fixable=False,
                 )
@@ -230,10 +230,10 @@ class DoctorService:
                         code="CTX-URL-1",
                         description=(
                             f"Context '{ctx.name}' is alive but has an empty repo_url "
-                            f"(un-portable). Re-run 'dadaia context alive {ctx.name}' "
+                            f"(un-portable). Re-run '{fix_line(self._workspace_root, 'context', 'alive', ctx.name)}' "
                             "while the repo's origin remote is on disk to back-fill it; "
-                            "with no such remote, 'dadaia context delete' and "
-                            "'dadaia context create --main-repo <url>' re-registers it."
+                            f"with no such remote, '{fix_line(self._workspace_root, 'context', 'delete', ctx.name)}' "
+                            f"and '{fix_line(self._workspace_root, 'context', 'create', '--main-repo', '<url>')}'."
                         ),
                         fixable=False,
                     )
@@ -268,10 +268,11 @@ class DoctorService:
                         description=(
                             f"Repo slug '{slug}' is owned by more than one context "
                             f"({', '.join(sorted(names))}). 'repos/<slug>' is a "
-                            "namespace every context shares — 'dadaia context dead' "
+                            f"namespace every context shares — '{fix_line(self._workspace_root, 'context', 'dead')}' "
                             "on any owner would commit, push and delete the others' "
                             "working tree. Remove it from all but one owner "
-                            "('dadaia context repo remove') or re-create the context "
+                            f"('{fix_line(self._workspace_root, 'context', 'repo', 'remove')}') "
+                            "or re-create the context "
                             "with a different slug."
                         ),
                     )
