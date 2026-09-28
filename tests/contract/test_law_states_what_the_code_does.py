@@ -94,3 +94,12 @@ def test_os_name_is_read_only_through_the_platform_seam() -> None:
         and isinstance(node.value, ast.Name) and node.value.id == "os"
     ]  # fmt: skip
     assert reads == []
+
+
+def test_the_work_order_has_one_home_the_map() -> None:
+    """sa-implementation-adds-before-it-deletes: the map §1 states the order once; no skill."""
+    rule = "Every change minimizes code and tests: DELETE → REBUILD → UPDATE → KEEP → ADD last;"
+    skills = [p.read_text("utf-8") for p in (_PKG / "public" / "skills").rglob("*.md")]
+    assert _MAP.read_text("utf-8").count(rule) == 1 and not [
+        t for t in skills if "REBUILD → UPDATE" in t
+    ]

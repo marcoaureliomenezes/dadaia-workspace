@@ -53,8 +53,8 @@ unique prefix (e.g. `[DEBUG-a4f2]`) so cleanup is a single grep. For performance
 regressions: measure a baseline, then bisect — logs mislead.
 *Done when one hypothesis survives by observation, not by reading code.*
 
-**Phase 5 — Seam test.** Write the regression test at the correct seam BEFORE the
-fix, intent and size declared at birth (`dd-test-stewardship`, intent and admission); watch it fail,
+**Phase 5 — Seam test.** The regression test at the correct seam, BEFORE the fix, is
+an existing test rewritten when one exists (the root map §1 work order), intent and size declared at birth (`dd-test-stewardship`, intent and admission); watch it fail,
 fix the cause, watch it pass, re-run the Phase 1 loop on the original scenario. A
 correct seam exercises the real bug pattern at its call site (`dd-codebase-design`
 owns the seam vocabulary and the deletion test the fix must pass); when none exists, that
@@ -63,14 +63,12 @@ the architecture lens before fixing.
 *Done when the test fails for the real reason and passes with the fix (or the seam
 gap is registered first).*
 
-**Phase 6 — Cleanup + resolve.** Grep the probe prefix to zero; the diff leaves the
-touched feature smaller or equal — a fix that grows it routes to
-the architecture lens first (net-positive rule). Then close the
-record:
+**Phase 6 — Cleanup + resolve.** Grep the probe prefix to zero; production AND tests net
+≤ 0 — a fix growing either routes to the architecture lens first (net-positive rule):
 
 ```
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --cause … --caused-by … --resolved-release …
-  --solution … --evidence-loop … --evidence-seam … --evidence-diff net-negative:…
+  --solution … --evidence-loop … --evidence-seam … --evidence-diff 'net-negative: prod +a/-b, tests +c/-d'
 ```
 
 - `diff_direction` is derived from `--evidence-diff`'s `net-*:` prefix — there is no `--diff-direction` flag.
@@ -85,7 +83,7 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --caus
   load-bearing.
 - The surviving hypothesis was confirmed by instrumentation.
 - The regression test sits at the correct seam, or the seam gap was registered first.
-- Probes are gone; the diff is smaller or equal; the resolve record carries the
+- Probes are gone; production and tests net ≤ 0; the resolve record carries the
   evidence triple, `caused_by`, `resolved_release` and `closed_at`; one isolated
   commit; worktree clean.
 

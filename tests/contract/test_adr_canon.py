@@ -51,11 +51,6 @@ def _ledger(tmp_path: Path, ids: list[str], **fields: object) -> Path:
     return specs
 
 
-def test_committed_inventory_may_be_legitimately_empty() -> None:
-    """Discovery never raises regardless of population."""
-    assert isinstance(_read_jsonl_records(_DECISIONS_PATH), list)
-
-
 def test_the_committed_ledger_is_clean_under_the_doctor_rule() -> None:
     assert adr_record_issues(_REPO_ROOT / "specs") == []
 

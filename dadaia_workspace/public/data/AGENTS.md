@@ -18,6 +18,7 @@
 - Arm B: `propose -> operator confirms -> register -> RED test -> root-cause fix -> GREEN -> resolved`.
 - Test: does the tool break its own contract? Yes -> Arm B, fixed now. No -> Arm A, via a candidate.
 - A feature enters only through the backlog or an operator demand recorded in the SPEC `Origin`; a confirmed bug is fixed immediately.
+- Every change minimizes code and tests: DELETE → REBUILD → UPDATE → KEEP → ADD last; verbose code, comments or tests that could be shorter are defects; every documented behavior keeps working.
 - No workflow engine: the SDD documents (`specs/releases/AGENTS.md`) are the record of progress.
 
 ## 2. Who does what

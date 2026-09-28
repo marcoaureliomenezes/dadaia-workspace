@@ -41,7 +41,7 @@ path or entity as it appears in an installed workspace.
 
 | Surface | Purpose | Belongs | Ceiling | Measured |
 |---|---|---|---|---|
-| `AGENTS.md` | the root map: the flow, the roles, the gate invariants, the root, credentials, and one line per scoped file | statements; the index of every other surface | 8192 | 7539 |
+| `AGENTS.md` | the root map: the flow, the roles, the gate invariants, the root, credentials, and one line per scoped file | statements; the index of every other surface | 8192 | 7741 |
 | `specs/AGENTS.md` | the canon of a specs tree and its status tokens | canon table, status tokens, doctor codes | 4096 | 3665 |
 | `specs/releases/AGENTS.md` | candidates, phases, task markers, promote | release procedure and commit shapes | 4096 | 3293 |
 | `specs/backlog/AGENTS.md` | the operator's demand queue and its exits | `BACKLOG.json` shape, intake gate, dispositions | 4096 | 3997 |
@@ -67,7 +67,7 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 | `dd-audit-project` | the three-pillar audit and its window | `specs/audits/AGENTS.md` | 6144 | 2834 |
 | `dd-backlog-definition` | backlog curation, the intake gate, dispositions | `specs/backlog/AGENTS.md` | 6144 | 3249 |
 | `dd-bug-registration` | classify-first bug proposal and its record | `specs/bugs/AGENTS.md` | 6144 | 2782 |
-| `dd-bug-resolution` | the seven-phase diagnosing method and the resolve record | `specs/bugs/AGENTS.md` | 6144 | 5306 |
+| `dd-bug-resolution` | the seven-phase diagnosing method and the resolve record | `specs/bugs/AGENTS.md` | 6144 | 5359 |
 | `dd-cli-library` | CLI idioms, CLI-owned state, the dev-server registry | `.dadaia/AGENTS.md` | 6144 | 5143 |
 | `dd-code-review` | the three review axes and the six lenses | `specs/memory/AGENTS.md` | 6144 | 5094 |
 | `dd-codebase-design` | the deep-module vocabulary and the deletion test | — | 6144 | 5540 |
@@ -76,10 +76,10 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 | `dd-grill-me` | the operator grill that precedes a candidate | — | 6144 | 3256 |
 | `dd-handoff-emitter` | handoff-first emission and ack-on-consume | `.dadaia/handoff/AGENTS.md` | 6144 | 2188 |
 | `dd-manager-orchestration` | intake, dispatch and the closure pass | — | 6144 | 3661 |
-| `dd-release-definition` | picking the set and authoring the trio | `specs/releases/AGENTS.md` | 6144 | 5740 |
+| `dd-release-definition` | picking the set and authoring the trio | `specs/releases/AGENTS.md` | 6144 | 5726 |
 | `dd-release-implementation` | the candidate arc from reservation to the gate | `specs/releases/AGENTS.md` | 6144 | 3559 |
 | `dd-spec-navigator` | the three-phase session grounding protocol | `specs/AGENTS.md` | 6144 | 3404 |
-| `dd-test-stewardship` | test intent, admission, demotion, quarantine | — | 6144 | 4178 |
+| `dd-test-stewardship` | test intent, admission, demotion, quarantine | — | 6144 | 4241 |
 
 ## 4. Personas — `.agents/agents/*.md`
 

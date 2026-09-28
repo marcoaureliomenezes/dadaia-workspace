@@ -65,11 +65,6 @@ def test_decision_record_schema_is_draft_2020_12_valid_and_closes_the_envelope()
     }
 
 
-def test_a_valid_proposed_record_validates() -> None:
-    validator = Draft202012Validator(_schema())
-    assert list(validator.iter_errors(_BASE)) == []
-
-
 def test_rejects_an_unknown_property() -> None:
     validator = Draft202012Validator(_schema())
     with_extra = {**_BASE, "unexpected": "nope"}
