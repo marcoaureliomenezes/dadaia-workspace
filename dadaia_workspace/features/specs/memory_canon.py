@@ -10,7 +10,6 @@ chains grew from.
 
 from __future__ import annotations
 
-import importlib.util
 import re
 from collections.abc import Callable
 from pathlib import Path
@@ -45,12 +44,11 @@ FORBIDDEN_MEMORY_HEADING_RE = re.compile(
 
 def _atom_grammar() -> ModuleType:
     """The ONE atom grammar: the stdlib reader ``memory.py`` ships (sa-memory-atom-has-two-
-    grammars) — loaded from the packaged script, so LINT-1 and the catalog parse alike."""
+    grammars) — executed from the packaged script's source, so LINT-1 and the catalog parse alike
+    and no bytecode lands in ``public/``."""
     path = Path(__file__).parents[2] / "public/skills/dd-spec-navigator/scripts/_memory_schema.py"
-    spec = importlib.util.spec_from_file_location("_memory_schema", path)
-    assert spec is not None and spec.loader is not None, path
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    module = ModuleType("_memory_schema")
+    exec(compile(path.read_text(encoding="utf-8"), path, "exec"), module.__dict__)
     return module
 
 
