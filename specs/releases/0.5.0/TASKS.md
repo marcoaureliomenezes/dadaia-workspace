@@ -53,11 +53,11 @@ Lanes: PLAN §2 FR10; files and lines: `AGGREGATE.md` §6.
 - [x] **T-050-73 — L1.5 cli/core items (§4a 12, 13, 18–20).** `W:` `cli/commands/migrate.py`, `f/{migrate,chokepoints,reconcile}/`, `core/session_store.py`, tests · `blocked by:` T-050-70 · `delivers:` `sa-path-segment-judged-by-two-matchers` · Δ −351/−238.
 - [x] **T-050-74 — L1.6 test-only items (§4a 21–29; `TestAutopilot` kept).** `W:` tests · `blocked by:` T-050-69 · `delivers:` §6 W1 · Δ 0/−540.
 - [x] **T-050-75 — L2.9 hook dialects, one verifier.** `W:` `i/` · `blocked by:` T-050-41, -44, -52 · `delivers:` `sa-hook-files-written-by-table-and-by-hand`, `sa-projected-file-judged-by-four-verifiers` · Δ −360.
-- [ ] **T-050-76 — L2.10 codex fold.** `W:` `i/`, `f/public/` · `blocked by:` T-050-41, -44, -52 · `delivers:` `sa-codex-effort-set-by-policy-and-by-tier`, `sa-frontmatter-split-five-ways` · Δ −160.
+- [x] **T-050-76 — L2.10 codex fold.** `W:` `i/`, `f/public/` · `blocked by:` T-050-41, -44, -52 · `delivers:` `sa-codex-effort-set-by-policy-and-by-tier`, `sa-frontmatter-split-five-ways` · Δ −160.
 - [x] **T-050-77 — L2.11 infra small.** `W:` `i/` · `blocked by:` T-050-41, -44, -52 · `delivers:` §6 W2c · Δ −235.
 - [x] **T-050-78 — L2.12 core.** `W:` `core/` · `blocked by:` T-050-41, -44, -52 · `delivers:` `sa-json-schema-validated-by-two-engines`, `sa-agent-model-resolved-by-two-modules` · Δ −620.
-- [ ] **T-050-79 — L2.13 cli-features.** `W:` `f/{spec_context,chokepoints,ci_preflight}/`, `cli/commands/context.py` · `blocked by:` T-050-41, -44, -52 · `delivers:` §6 W2c · Δ −420.
-- [ ] **T-050-80 — L2.14 hooks.** `W:` `hooks/ctx_inject.py` · `blocked by:` T-050-41, -44, -52 · `delivers:` §6 W2c · Δ −50.
+- [x] **T-050-79 — L2.13 cli-features.** `W:` `f/{spec_context,chokepoints,ci_preflight}/`, `cli/commands/context.py` · `blocked by:` T-050-41, -44, -52 · `delivers:` §6 W2c · Δ −420.
+- [x] **T-050-80 — L2.14 hooks.** `W:` `hooks/ctx_inject.py` · `blocked by:` T-050-41, -44, -52 · `delivers:` §6 W2c · Δ −50.
 - [ ] **T-050-81 — L3.1 table merges.** `W:` `tests/*/infrastructure/**`, git trio · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−2301.
 - [ ] **T-050-82 — L3.2 table merges.** `W:` `tests/unit/core/**`, `tests/unit/test_*.py` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−1798.
 - [ ] **T-050-83 — L3.3 table merges.** `W:` `tests/unit/features/{specs,backlog}/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−1097.
