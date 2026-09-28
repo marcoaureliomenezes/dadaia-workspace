@@ -10,14 +10,14 @@
 
 ## 2. Context, scope and races
 
-- Resolution order: `DADAIA_CONTEXT` -> session binding -> the repo of the cwd (`.dadaia/.venv/bin/dadaia context show --json`); none -> bind, never borrow one.
+- Resolution order: the bind (a session with an id: its own record; none: a registered `DADAIA_CONTEXT`) -> the cwd repo (`.dadaia/.venv/bin/dadaia context show --json`); none -> bind, never borrow one.
 - A root in `DADAIA_FENCED_ROOTS` is never resolved: no dadaia process or child acts on it; the suite, the preflight and every mutating probe set it.
-- `.dadaia/.venv/bin/dadaia context bind <ctx> [--print-env]` is one verb — no mode, no release, no session state beyond the context; the sole memory-injection trigger. An exported `DADAIA_CONTEXT` IS the binding.
+- `.dadaia/.venv/bin/dadaia context bind <ctx> [--print-env]` is one verb — no mode, no release, no session state beyond the context; the sole memory-injection trigger.
 - Binding is optional; ADDITIVE writes need none. Scope = the bound context's main repo plus its associated repos; only `repos/<slug>/` is scope-judged.
 - An out-of-scope write is BLOCKed with `fix: .dadaia/.venv/bin/dadaia context bind <owner>`; an unbound session, an unregistered slug and a root path never are.
 - Races surface, never block — no locks or leases; zero ALIVE -> alert the operator.
-- One harness session per checked-out tree; a parallel session's worktree is created before launch.
-- Frozen context surface (ADR 0027): `context create` absorbs clone, hook, ALIVE, bind; no new state file or session field.
+- One harness session per checked-out tree; a parallel session gets its worktree before launch.
+- Frozen context surface (ADR 0027): `context create` absorbs clone, hook, ALIVE, never binds; no new state file or session field.
 
 ## 3. Git chokepoints
 

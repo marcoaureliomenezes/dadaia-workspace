@@ -122,6 +122,7 @@ def _scope_block(
     bound_repos: frozenset[str],
     target_slug: str | None,
     target_owner: str | None,
+    bound_by_env: bool = False,
 ) -> str | None:
     """The scope refusal for a MUTATING write, or ``None`` when the write is in scope.
 
@@ -142,7 +143,12 @@ def _scope_block(
             bound=bound_context,
             scope=", ".join(sorted(bound_repos)) or "no registered repo",
         )
-        + f"fix: {fix_line(root, 'context', 'bind', target_owner)}"
+        + "fix: "
+        + (  # an id-less session's bind is its env: only the operator can change it
+            f"Operator action: relaunch this session with DADAIA_CONTEXT={target_owner}"
+            if bound_by_env
+            else fix_line(root, "context", "bind", target_owner)
+        )
     )
 
 
@@ -155,6 +161,7 @@ def evaluate(
     bound_repos: frozenset[str] = frozenset(),
     target_slug: str | None = None,
     target_owner: str | None = None,
+    bound_by_env: bool = False,
 ) -> tuple[Decision, str]:
     """Return the gate decision and its message for one write target. *root* is the
     workspace every ``fix:`` line's CLI path is built from.
@@ -190,7 +197,7 @@ def evaluate(
         return Decision.ALLOW, ""
 
     scope_block = _scope_block(
-        root, rel_path, bound_context, bound_repos, target_slug, target_owner
+        root, rel_path, bound_context, bound_repos, target_slug, target_owner, bound_by_env
     )
     if scope_block is not None:
         return Decision.BLOCK, scope_block

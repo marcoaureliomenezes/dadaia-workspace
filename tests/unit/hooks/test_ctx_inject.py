@@ -44,7 +44,7 @@ from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.invocation import alive_context_trees
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.workspace.onboarding import next_step
-from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.fixtures.harness_env import claude_hook_env, kimi_hook_env, run_hook_subprocess
 
 _CLI = Path(".dadaia", ".venv", PLATFORM.venv_scripts_dir, f"dadaia{PLATFORM.venv_exe_suffix}")
 
@@ -259,10 +259,11 @@ def test_session_record_binds_context_over_first_alive(tmp_path: Path) -> None:
 
 
 def test_env_override_injects_context_memory(tmp_path: Path) -> None:
+    """sa-bind-has-two-stores#S2: a session with no id (a Kimi shell, no payload id) is
+    bound by DADAIA_CONTEXT."""
     _ws(tmp_path)
-    env = claude_hook_env(tmp_path, extra={"DADAIA_CONTEXT": "ctx"})
-    env.pop("CLAUDE_CODE_SESSION_ID", None)
-    result = run_hook_subprocess("ctx_inject", {"session_id": "envsid"}, env)
+    env = kimi_hook_env(tmp_path, extra={"DADAIA_CONTEXT": "ctx"})
+    result = run_hook_subprocess("ctx_inject", {}, env)
     assert result.returncode == 0, result.stderr
     assert "[ctx]" in result.stdout
     assert "end memory bootstrap" in result.stdout
@@ -367,8 +368,6 @@ def test_output_contract_envelopes(
     out = _run(tmp_path, session_id, extra=extra)
     env = json.loads(out)
     assert env["hookSpecificOutput"]["hookEventName"] == expect_event
-    if name == "codex_json_envelope":
-        assert "[no bound context]" in env["hookSpecificOutput"]["additionalContext"]
 
 
 # --- FR30 (T-044-60, A30.1): dispatcher preflight restatement is deleted ------
@@ -405,35 +404,6 @@ def test_unbound_session_still_lists_alive_contexts_no_dispatcher_preflight(
     assert "- alpha" in out
     assert "- beta" in out
     assert "dispatcher preflight" not in out
-
-
-def test_env_context_beats_own_session_record(tmp_path: Path) -> None:
-    """F-03 (v0.5.0 six-axis review): rung 1 ``DADAIA_CONTEXT`` beats rung 2 (the
-    session binding) in EVERY consumer — the gate already resolves env-first, so an
-    inject that preferred its own record would attribute one context and inject
-    another on the same prompt."""
-    _ws(tmp_path)
-    # Register a second ALIVE context so the record's binding survives the
-    # deleted-context guard and the env override is proven against a LIVE alternative.
-    states = tmp_path / ".dadaia" / "states" / "spec_contexts.json"
-    states.write_text(
-        json.dumps(
-            {
-                "contexts": [
-                    {"name": "ctx", "repo_slug": "ctx", "state": "alive"},
-                    {"name": "other", "repo_slug": "other", "state": "alive"},
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
-    (tmp_path / "repos" / "other" / "specs").mkdir(parents=True)
-    _bind_session(tmp_path, "ordersid", "other")
-    env = claude_hook_env(tmp_path, extra={"DADAIA_CONTEXT": "ctx"})
-    env.pop("CLAUDE_CODE_SESSION_ID", None)
-    result = run_hook_subprocess("ctx_inject", {"session_id": "ordersid"}, env)
-    assert result.returncode == 0, result.stderr
-    assert "[ctx]" in result.stdout, "rung 1 env must win over the bound record"
 
 
 def test_bound_context_name_maps_to_registry_repo_slug(tmp_path: Path) -> None:

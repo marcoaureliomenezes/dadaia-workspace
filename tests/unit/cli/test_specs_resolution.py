@@ -83,12 +83,17 @@ def test_unbound_consumer_never_selects_first_alive(
 def test_explicit_and_env_resolve_without_fallback(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """sa-bind-has-two-stores#S1, #S2: with no session id the registered DADAIA_CONTEXT is
+    the bind; a native session id with no record ignores it."""
     ws = tmp_path / "ws"
-    _mk_workspace(ws, ["alive-ctx"])
+    _mk_workspace(ws, ["alive-ctx", "env-ctx"])
     monkeypatch.chdir(ws)
     assert resolve_context_for_cli("explicit-ctx") == "explicit-ctx"
     monkeypatch.setenv("DADAIA_CONTEXT", "env-ctx")
     assert resolve_context_for_cli(None) == "env-ctx"
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "native-no-record")
+    with pytest.raises(ValueError, match="context bind"):
+        resolve_context_for_cli(None)
 
 
 @pytest.mark.usefixtures("_clean_session_env")
@@ -150,21 +155,15 @@ def test_traversal_shaped_explicit_raises_actionable_error(
 def test_traversal_shaped_env_never_echoes_through_even_with_rung3_available(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """T-50-05: the pop/restore env mutation this seam used to need (to stop the
-    delegated authority call from re-reading and echoing back the SAME rejected
-    ``DADAIA_CONTEXT``) is deleted; the replacement is validating whatever the authority
-    returns against the SAME allowlist. A traversal-shaped ``DADAIA_CONTEXT`` still never
-    reaches the caller — even from a cwd that WOULD otherwise resolve via rung 3 —
-    because the authority's own rung 1 short-circuits on any truthy env var before rung
-    3 is ever consulted, and the echoed-back invalid value fails the allowlist check."""
+    """sa-bind-has-two-stores#S3: a traversal-shaped (unregistered) ``DADAIA_CONTEXT`` is
+    no bind — it never reaches the caller, and resolution goes on to the cwd repo."""
     ws = tmp_path / "ws"
     _mk_workspace(ws, ["alive-ctx"])
     repo_dir = ws / "repos" / "alive-ctx"
     repo_dir.mkdir(parents=True)
     monkeypatch.chdir(repo_dir)
     monkeypatch.setenv("DADAIA_CONTEXT", "../escape")
-    with pytest.raises(ValueError, match="context bind"):
-        resolve_context_for_cli(None)
+    assert resolve_context_for_cli(None) == "alive-ctx"
 
 
 @pytest.mark.usefixtures("_clean_session_env")
@@ -216,7 +215,7 @@ def test_valid_names_unchanged_at_explicit_and_env_rungs(
     """The allowlist guard must not regress any name matching ``[A-Za-z0-9_-]+`` — the
     exact behavior at HEAD (no exception, value passed through) is preserved."""
     ws = tmp_path / "ws"
-    _mk_workspace(ws, ["alive-ctx"])
+    _mk_workspace(ws, ["alive-ctx", name])  # an env bind names a registered context (#S2)
     monkeypatch.chdir(ws)
     assert resolve_context_for_cli(name) == name
     monkeypatch.setenv("DADAIA_CONTEXT", name)

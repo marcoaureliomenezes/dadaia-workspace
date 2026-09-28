@@ -514,7 +514,6 @@ def _destructive_calls(sources: dict[str, str]) -> set[str]:
 _V38_BIRTH = 16
 _V38_ALLOWANCE: dict[str, str] = {
     "core/atomic_write.py:atomic_write": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
-    "core/session_store.py:reap_stale": "sa-bind-has-two-stores",
     "features/certification/service.py:certify": "sa-reconcile-certify-skip-the-workspace-walk",
     "features/migrate/state_v2.py:execute_migration": "sa-registry-schema-version-has-three-grammars",
     "features/reconcile/service.py:_restore_state": "sa-reconcile-certify-skip-the-workspace-walk",

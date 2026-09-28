@@ -139,23 +139,3 @@ def test_bind_to_context_with_associated_repo_injects_main_memory_only(tmp_path:
     assert "Python 3.12" in out
     assert _ASSOC_MARKER not in out
     assert "assoc-only-feature" not in out
-
-
-def test_cwd_inside_associated_repo_resolves_owning_context_injects_main_memory_only(
-    tmp_path: Path,
-) -> None:
-    """A16.4's rung-3 walk, proven at the injection seam: cwd inside
-    ``repos/assoc-repo/`` with NO bind and NO ``DADAIA_CONTEXT`` still resolves the
-    OWNING context (never a second context named after the associated repo, per
-    ``core.specs_resolver.context_name_for_repo_slug``) and injects ONLY the main
-    repo's memory."""
-    ws = _mk_workspace_with_associated_repo(tmp_path)
-    sid = "a19-1-cwd"
-
-    out = _inject(ws, sid, cwd=ws / "repos" / _ASSOC_SLUG)
-
-    assert f"[{_MAIN_SLUG}]" in out
-    assert "end memory bootstrap" in out
-    assert "Python 3.12" in out
-    assert _ASSOC_MARKER not in out
-    assert "assoc-only-feature" not in out

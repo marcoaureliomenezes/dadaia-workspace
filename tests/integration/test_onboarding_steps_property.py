@@ -27,7 +27,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
-from dadaia_workspace.core.invocation import alive_context_trees
+from dadaia_workspace.core.invocation import alive_context_trees, resolve_bind
 from dadaia_workspace.features.workspace.onboarding import STEP_IDS, Step, next_step
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
@@ -102,6 +102,15 @@ def _git_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         monkeypatch.delenv(var, raising=False)
 
 
+def _bound(root: Path, session: str | None) -> bool | None:
+    """The caller's Bind as the CLI reads it (sa-bind-has-two-stores#S1)."""
+    return (
+        None
+        if session is None
+        else resolve_bind(root, session, os.environ).context_name is not None
+    )
+
+
 @settings(
     max_examples=12, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture]
 )
@@ -130,14 +139,14 @@ def test_every_command_fix_clears_its_step_and_the_loop_advances(
         try:
             seen: list[int] = []
             for _ in range(len(STEP_IDS) + 1):
-                step = next_step(root, alive_context_trees(root), None, session)
+                step = next_step(root, alive_context_trees(root), None, _bound(root, session))
                 if step is None:
                     break
                 index = STEP_IDS.index(step.id)
                 assert not seen or index > seen[-1], f"I4: {step.id} after {STEP_IDS[seen[-1]]}"
                 seen.append(index)
                 _run_fix(step, root, bare)
-                after = next_step(root, alive_context_trees(root), None, session)
+                after = next_step(root, alive_context_trees(root), None, _bound(root, session))
                 assert after is None or after.id != step.id, f"I3: {step.id} still pending"
             else:
                 pytest.fail(f"I4: the loop did not end within {len(STEP_IDS)} steps")

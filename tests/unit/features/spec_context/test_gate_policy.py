@@ -247,7 +247,7 @@ def test_write_into_a_repo_outside_the_bind_scope_is_blocked_with_a_runnable_fix
     tmp_path: Path,
 ) -> None:
     """AC: bound to A, a write into repos/B/src/x.py is refused and names the bind that
-    clears it."""
+    clears it (sa-bind-has-two-stores#S4 runs that fix end to end in test_one_bind.py)."""
     decision, message = _evaluate_scope(
         tmp_path, "repos/ctx-b/src/x.py", **_BOUND_A, target_slug="ctx-b", target_owner="ctx-b"
     )

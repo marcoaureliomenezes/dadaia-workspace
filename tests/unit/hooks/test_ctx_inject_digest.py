@@ -20,7 +20,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from dadaia_workspace.core import session_store
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+
+_NOW = "2999-01-01T00:00:00+00:00"
 
 # A realistic catalog fragment: each feature carries the heavy ``summary`` plus the lean
 # fields the digest must preserve. Two entries so the size delta is unmistakable.
@@ -79,15 +82,17 @@ def _ws_with_catalog(tmp_path: Path, slug: str = "ctx") -> Path:
 
 
 def _run(tmp_path: Path, session_id: str, *, context: str | None = "ctx") -> str:
-    """Invoke ctx_inject. ``context`` binds via the ``DADAIA_CONTEXT`` env leg so the
+    """Invoke ctx_inject. ``context`` binds the session through its own record so the
     catalog digest is injected (FR-W2-01: an UNBOUND session injects no memory). Pass
     ``context=None`` to exercise the unbound generic-preflight path.
     """
-    extra = {"DADAIA_CONTEXT": context} if context else None
-    env = claude_hook_env(tmp_path, extra=extra)
-    env.pop("CLAUDE_CODE_SESSION_ID", None)
-    if context is None:
-        env.pop("DADAIA_CONTEXT", None)
+    env = claude_hook_env(tmp_path, session_id=session_id)
+    env.pop("DADAIA_CONTEXT", None)
+    if context is not None:
+        record = session_store.new_binding_record(
+            session_id=session_id, context=context, runtime="t", pid=1, now=_NOW
+        )
+        session_store.write_session(tmp_path, session_id, record)
     result = run_hook_subprocess("ctx_inject", {"session_id": session_id}, env)
     assert result.returncode == 0, result.stderr
     return result.stdout

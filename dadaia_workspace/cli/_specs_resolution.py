@@ -7,20 +7,9 @@ authority (release K1, the "One Invocation" deepening, 2026-08-28 audit):
 :mod:`dadaia_workspace.core.invocation`. This module's OWN job is the CLI-specific
 allowlist validation FR3 documents below — resolution itself has exactly one home now.
 
-v0.1.80 FR3 (backlog ``20260711-context-name-allowlist-at-resolution-rungs``, P4,
-defense-in-depth per v0.1.77 security review INFO): the *explicit* and ``DADAIA_CONTEXT``
-env rungs both feed a ``repos/<name>/specs`` path join further downstream (this module's
-own :func:`resolve_specs_dir_for_cli`, and every ``container.build_*`` factory keyed by
-context name), unvalidated. Both rungs are gated by the SAME ``[A-Za-z0-9_-]+`` allowlist
-the resolution authority already enforces on every repo-slug path component
-(:data:`~dadaia_workspace.core.invocation.CONTEXT_NAME_RE`) BEFORE either value is used — an
-operator-controlled input has no privilege elevation here (the operator can already touch
-any path directly), so this is defense-in-depth, not a privilege boundary. The two rungs
-get DIFFERENT dispositions on a traversal-shaped value: *explicit* is deliberate call-site
-input, so it raises a clear, actionable :class:`ValueError`; ``DADAIA_CONTEXT`` is ambient
-shell state (inherited/stale environment an operator may not have set deliberately for
-THIS invocation), so an invalid value is treated as unset and resolution continues to the
-next rung — never a crash over environment the operator didn't knowingly provide.
+An *explicit* context name is gated by :data:`~dadaia_workspace.core.invocation.CONTEXT_NAME_RE`
+before any ``repos/<name>/specs`` join; an ambient ``DADAIA_CONTEXT`` is judged by the
+authority's bind rule (a name the registry does not hold is no bind).
 """
 
 from __future__ import annotations
@@ -63,25 +52,10 @@ def repo_slug_for_context(workspace_root: Path, name: str) -> str:
 
 
 def resolve_context_for_cli(explicit: str | None) -> str:
-    """Resolve the target Spec Context NAME (SPEC FR1 canonical order, v0.1.77; delegates
-    to :func:`dadaia_workspace.core.invocation.resolve` for the rung ladder itself).
-
-    Order: *explicit* -> ``DADAIA_CONTEXT`` env -> the single authority's rung 2 (this
-    session's own LIVE record, keyed by the harness-native session id) -> the repo
-    containing the current working directory. A consumer workspace without caller-owned
-    selection raises an actionable error; it never borrows the first ALIVE context.
-
-    v0.1.80 FR3: both the *explicit* and ``DADAIA_CONTEXT`` env rungs are validated
-    against the ``[A-Za-z0-9_-]+`` context-name allowlist before use (defense-in-depth
-    against a traversal-shaped name reaching the downstream ``repos/<name>/specs`` path
-    join). A traversal-shaped *explicit* value raises :class:`ValueError` (deliberate
-    call-site input — reject loudly). A traversal-shaped ``DADAIA_CONTEXT`` value never
-    crashes the CLI with a traceback — but it does ABORT resolution with the terminal
-    :class:`ValueError` (pinned by test): the authority's own rung 1 re-reads the SAME
-    env var and echoes the invalid value back, the allowlist check on ``resolved``
-    rejects the echo, and rungs 2-3 are deliberately NOT reachable past a set-but-invalid
-    env var — silently ignoring an operator's explicit (mistyped) selection would resolve
-    a context they did not choose.
+    """Resolve the target Spec Context NAME: *explicit*, else the single authority
+    (:func:`dadaia_workspace.core.invocation.resolve`) — the session's bind, else the repo
+    containing the cwd. Never borrows the first ALIVE context. A traversal-shaped
+    *explicit* raises :class:`ValueError` (defense-in-depth before the path join).
     """
     if explicit:
         if not _CONTEXT_NAME_RE.fullmatch(explicit):
@@ -91,9 +65,6 @@ def resolve_context_for_cli(explicit: str | None) -> str:
                 "Pass a valid Spec Context Project name."
             )
         return explicit
-    env_context = os.environ.get("DADAIA_CONTEXT")
-    if env_context and _CONTEXT_NAME_RE.fullmatch(env_context):
-        return env_context
     resolved = _resolve_invocation(env=os.environ, cwd=Path.cwd()).context_name
     if resolved and _CONTEXT_NAME_RE.fullmatch(resolved):
         return resolved
@@ -103,6 +74,12 @@ def resolve_context_for_cli(explicit: str | None) -> str:
         "'--context <name>' explicitly. Use 'dadaia context list --json' to discover "
         "available contexts."
     )
+
+
+def own_bind_for_cli() -> tuple[str | None, str | None]:
+    """THIS caller's ``(bound context, session id)`` — the one Bind every reader shares."""
+    inv = _resolve_invocation(env=os.environ, cwd=Path.cwd())
+    return inv.bind.context_name, inv.session_id
 
 
 def resolve_context_specs_dir_for_cli(workspace_root: Path, context: str) -> Path:

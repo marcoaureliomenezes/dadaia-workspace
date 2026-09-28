@@ -509,9 +509,10 @@ class DoctorService:
         aborts, and never touches a location outside the workspace."""
         actions: list[str] = []
 
-        # The session-record owner's ONE reaper (core.session_store.reap_stale, F002).
-        for sess_id in session_store.reap_stale(self._workspace_root):
-            actions.append(f"GRAVEYARD-GC: deleted expired session file '{sess_id}.json'")
+        # The record owner selects the expired records (F002); the one deleter removes them.
+        for record in session_store.stale_records(self._workspace_root):
+            if sweep.remove(self._workspace_root, record, record.name) is not None:
+                actions.append(f"GRAVEYARD-GC: deleted expired session file '{record.name}'")
 
         findings = self.scan()
         for finding in findings:

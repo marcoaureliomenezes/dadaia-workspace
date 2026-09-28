@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from dadaia_workspace.core import session_store, workspace_layout
+from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.fixed_sections import strip_fixed_sections
 from dadaia_workspace.core.gitflow import constitution_error
@@ -52,7 +52,7 @@ class _Ctx:
     root: Path
     name: str
     specs: Path
-    session: str | None
+    bound: bool | None
 
 
 def specs_ready(specs_dir: Path) -> bool:
@@ -61,10 +61,7 @@ def specs_ready(specs_dir: Path) -> bool:
 
 
 def _unbound(c: _Ctx) -> str | None:
-    record = session_store.live_session(c.root, c.session) if c.session else None
-    if c.session is None or (record is not None and record.get("context")):
-        return None
-    return "this session has no context binding"
+    return "this session has no context binding" if c.bound is False else None
 
 
 def _first_pass(c: _Ctx) -> list[str]:
@@ -129,16 +126,16 @@ STEP_IDS = ("context", *(step[0] for step in STEPS))
 
 
 def next_step(
-    root: Path, trees: Mapping[str, Path], focus: str | None = None, session: str | None = None
+    root: Path, trees: Mapping[str, Path], focus: str | None = None, bound: bool | None = None
 ) -> Step | None:
-    """The first pending step — *focus* first, then every context in *trees*; *session* is
-    the caller's resolvable session id (``None``: no identity, so no ``bind`` step)."""
+    """The first pending step — *focus* first, then every context in *trees*; *bound* is
+    whether the caller's session is bound (``None``: no identity, so no ``bind`` step)."""
     if not trees:
         create = fix_line(root, "context", "create", "<name>", "--main-repo", "<clone-url>")
         return Step("context", "command", "no ALIVE Spec Context — create one", create)
     names = [focus] if focus is not None and focus in trees else []
     for name in [*names, *trees]:
-        c = _Ctx(root, name, trees[name], session)
+        c = _Ctx(root, name, trees[name], bound)
         for step_id, kind, pending, fix in STEPS:
             if (reason := pending(c)) is not None:
                 return Step(step_id, kind, reason, fix(c))

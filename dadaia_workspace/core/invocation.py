@@ -17,10 +17,9 @@ input, which the law has always allowed a verb to pass):
 
     rung 0  ``explicit``, or the context derived from an explicit write TARGET
             (``target_path``) under ``<workspace_root>/repos/<slug>/``.
-    rung 1  ``DADAIA_CONTEXT``.
-    rung 2  this session's own LIVE session record, keyed by the harness-native
-            session id (:func:`resolve_session_id`, the one order).
-    rung 3  the repo containing the current working directory.
+    rung 1  the bind (:func:`resolve_bind`): the session's own LIVE record when it has
+            an id, else ``DADAIA_CONTEXT``.
+    rung 2  the repo containing the current working directory.
 
 **The root-vs-target bug** (open bug
 ``sdd-gate-memory-phase-resolves-empty-when-cwd-is-a-linked-worktree-outside-repos``):
@@ -348,13 +347,14 @@ def all_repos(workspace_root: Path, context_name: str) -> frozenset[str]:
 def resolve_bind(
     workspace_root: Path | None, session_id: str | None, env: Mapping[str, str]
 ) -> Bind:
-    """Resolve the SESSION's own binding — ``DADAIA_CONTEXT`` then this session's live
-    record, and nothing else. Deliberately NOT cwd-derived: sitting inside a repo is
-    not a bind, and a session that never bound must never be scope-blocked."""
-    name = env.get("DADAIA_CONTEXT") or None
-    if name is None and workspace_root is not None:
-        name = _live_session_context(workspace_root, session_id)
-    if not name or workspace_root is None:
+    """THE bind (DEC-3 b): a session with an id (:func:`resolve_session_id`) is bound only by
+    its own live record — ``DADAIA_CONTEXT`` is ignored; with none, ``DADAIA_CONTEXT`` is the
+    bind. An unregistered name is no bind. Never cwd-derived: sitting in a repo is not one."""
+    if workspace_root is None:
+        return Bind()
+    env_name = env.get("DADAIA_CONTEXT")
+    name = _live_session_context(workspace_root, session_id) if session_id else env_name
+    if not name or not _context_registered(workspace_root, name):
         return Bind()
     return Bind(context_name=name, repos=all_repos(workspace_root, name))
 
@@ -400,15 +400,9 @@ def resolve(
             context_name = context_name_for_repo_slug(workspace_root, slug)
             rung = "target_path"
 
-    if context_name is None:
-        env_context = env.get("DADAIA_CONTEXT")
-        if env_context:
-            context_name, rung = env_context, "env"
-
-    if context_name is None and workspace_root is not None:
-        session_context = _live_session_context(workspace_root, session_id)
-        if session_context:
-            context_name, rung = session_context, "session"
+    bind = resolve_bind(workspace_root, session_id, env)
+    if context_name is None and bind.context_name:
+        context_name, rung = bind.context_name, "bind"
 
     if context_name is None and workspace_root is not None:
         slug = repo_slug_under_repos(workspace_root, cwd)
@@ -428,7 +422,7 @@ def resolve(
         context_name=context_name,
         repo_slug=repo_slug,
         specs_dir=specs_dir,
-        bind=resolve_bind(workspace_root, session_id, env),
+        bind=bind,
         rung=rung,
     )
 

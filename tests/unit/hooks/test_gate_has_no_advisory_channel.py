@@ -24,6 +24,7 @@ def test_evaluate_takes_only_the_target_and_the_scope() -> None:
         "bound_repos",
         "target_slug",
         "target_owner",
+        "bound_by_env",  # where the bind lives: its scope fix (sa-bind-has-two-stores#S5)
     ]
 
 

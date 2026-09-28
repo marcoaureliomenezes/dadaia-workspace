@@ -17,10 +17,6 @@ from dadaia_workspace.features.spec_context.injection_policy import (
 )
 
 
-def _has_specs(name: str) -> bool:
-    return name in {"alpha", "beta"}
-
-
 def test_prompt_fresh_session_bound_context_bootstraps_and_stamps() -> None:
     d = decide_injection(
         event="prompt",
@@ -29,7 +25,6 @@ def test_prompt_fresh_session_bound_context_bootstraps_and_stamps() -> None:
         sentinel_exists=False,
         compacted=False,
         rebound=False,
-        has_specs=_has_specs,
     )
     assert d == InjectionDecision("bootstrap", "alpha", "alpha")
 
@@ -42,7 +37,6 @@ def test_prompt_repeat_same_slug_is_silent() -> None:
         sentinel_exists=True,
         compacted=False,
         rebound=False,
-        has_specs=_has_specs,
     )
     assert d == InjectionDecision("none")
 
@@ -55,7 +49,6 @@ def test_prompt_rebind_to_other_context_reinjects() -> None:
         sentinel_exists=True,
         compacted=False,
         rebound=False,
-        has_specs=_has_specs,
     )
     assert d == InjectionDecision("bootstrap", "beta", "beta")
 
@@ -69,7 +62,6 @@ def test_prompt_same_context_rebind_reinjects() -> None:
         sentinel_exists=True,
         compacted=False,
         rebound=True,
-        has_specs=_has_specs,
     )
     assert d == InjectionDecision("bootstrap", "alpha", "alpha")
 
@@ -82,7 +74,6 @@ def test_prompt_compacted_reinjects_recorded_slug_when_unresolved() -> None:
         sentinel_exists=True,
         compacted=True,
         rebound=False,
-        has_specs=_has_specs,
     )
     assert d == InjectionDecision("bootstrap", "alpha", "alpha")
 
@@ -95,7 +86,6 @@ def test_prompt_unbound_fresh_session_gets_preflight_once() -> None:
         sentinel_exists=False,
         compacted=False,
         rebound=False,
-        has_specs=_has_specs,
     )
     assert d == InjectionDecision("preflight", "", "")
     d2 = decide_injection(
@@ -105,12 +95,13 @@ def test_prompt_unbound_fresh_session_gets_preflight_once() -> None:
         sentinel_exists=True,
         compacted=False,
         rebound=False,
-        has_specs=_has_specs,
     )
     assert d2 == InjectionDecision("none")
 
 
-def test_prompt_context_without_specs_degrades_to_preflight() -> None:
+def test_prompt_bound_context_without_specs_bootstraps_its_next_step() -> None:
+    """sa-bind-has-two-stores#S7: a bound context with no specs tree yet gets its header
+    and next step (the bootstrap), never "[no bound context]"."""
     d = decide_injection(
         event="prompt",
         context="ghost",
@@ -118,9 +109,8 @@ def test_prompt_context_without_specs_degrades_to_preflight() -> None:
         sentinel_exists=False,
         compacted=False,
         rebound=False,
-        has_specs=_has_specs,
     )
-    assert d == InjectionDecision("preflight", "", "")
+    assert d == InjectionDecision("bootstrap", "ghost", "ghost")
 
 
 def test_postcompact_emits_bootstrap_but_never_stamps() -> None:
@@ -131,7 +121,6 @@ def test_postcompact_emits_bootstrap_but_never_stamps() -> None:
         sentinel_exists=True,
         compacted=False,
         rebound=False,
-        has_specs=_has_specs,
     )
     assert d == InjectionDecision("bootstrap", "alpha", None)
 
@@ -144,7 +133,6 @@ def test_postcompact_unbound_emits_preflight_without_stamp() -> None:
         sentinel_exists=False,
         compacted=False,
         rebound=False,
-        has_specs=_has_specs,
     )
     assert d == InjectionDecision("preflight", "", None)
 
@@ -159,7 +147,6 @@ def test_session_restart_bootstraps_and_restamps() -> None:
         sentinel_exists=True,
         compacted=False,
         rebound=False,
-        has_specs=_has_specs,
     )
     assert d == InjectionDecision("bootstrap", "alpha", "alpha")
 
@@ -172,6 +159,5 @@ def test_session_restart_unbound_preflights_and_stamps_empty() -> None:
         sentinel_exists=False,
         compacted=False,
         rebound=False,
-        has_specs=_has_specs,
     )
     assert d == InjectionDecision("preflight", "", "")

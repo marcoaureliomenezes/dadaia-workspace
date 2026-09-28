@@ -248,22 +248,22 @@ SCENARIOS: tuple[Scenario, ...] = (
     Scenario(
         "rung0_target_outside_repo_falls_through_to_env",
         _target_path_outside_repo_falls_to_env,
-        lambda inv: inv.context_name == "y" and inv.rung == "env",
+        lambda inv: inv.context_name == "y" and inv.rung == "bind",
     ),
     Scenario(
         "rung_env_dadaia_context_alone",
         _env_alone_resolves,
-        lambda inv: inv.context_name == "proj" and inv.rung == "env",
+        lambda inv: inv.context_name == "proj" and inv.rung == "bind",
     ),
     Scenario(
-        "rung_env_wins_over_live_session_record",
+        "sa-bind-has-two-stores#S1 record wins over env for a session with an id",
         _env_wins_over_session,
-        lambda inv: inv.context_name == "proj" and inv.rung == "env",
+        lambda inv: inv.context_name == "other" and inv.bind.context_name == "other",
     ),
     Scenario(
         "rung_session_wins_over_cwd",
         _session_wins_over_cwd,
-        lambda inv: inv.context_name == "proj" and inv.rung == "session",
+        lambda inv: inv.context_name == "proj" and inv.rung == "bind",
     ),
     Scenario(
         "rung_session_stale_falls_through_to_cwd",

@@ -14,7 +14,11 @@ from rich.table import Table
 
 from dadaia_workspace import container
 from dadaia_workspace.cli._fail import fail
-from dadaia_workspace.cli._specs_resolution import alive_context_trees, resolve_session_id
+from dadaia_workspace.cli._specs_resolution import (
+    alive_context_trees,
+    own_bind_for_cli,
+    resolve_session_id,
+)
 from dadaia_workspace.cli.redact import ContextRedactor, build_context_redactor
 from dadaia_workspace.core import session_store
 from dadaia_workspace.core.cli_line import fix_line
@@ -121,7 +125,10 @@ def resolve_own_session_id(*, explicit: str | None = None, mint: bool = False) -
 def print_next_step(workspace_root: Path, focus: str | None = None) -> None:
     """The derived onboarding next step (FR6 AC6.2) — the text ``doctor`` also reports."""
     trees = alive_context_trees(workspace_root)
-    step = onboarding.next_step(workspace_root, trees, focus, resolve_own_session_id())
+    bind, session = own_bind_for_cli()
+    step = onboarding.next_step(
+        workspace_root, trees, focus, None if session is None else bool(bind)
+    )
     if step is not None:
         console.print(step.text(), markup=False, highlight=False, soft_wrap=True)
 
@@ -237,26 +244,6 @@ def list_all(
     console.print(table)
 
 
-def _resolve_default_context(svc: Any, workspace_root: Path) -> Any | None:
-    """Resolve no-arg ``context show`` through the caller-owned resolution seam."""
-    from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
-
-    _ = workspace_root  # kept for signature stability; resolution no longer needs it directly.
-    try:
-        resolved_name = resolve_context_for_cli(None)
-    except ValueError:
-        # ``show`` is a query verb: "nothing is selected" is a valid ANSWER here, not an
-        # error — the resolver's ValueError is for verbs that REQUIRE a context (bug
-        # context-show-json-traceback-unbound, consumer validation 2026-07-15).
-        return None
-    if not resolved_name:
-        return None
-    try:
-        return svc.show(resolved_name)
-    except ContextNotFoundError:
-        return None
-
-
 @app.command()
 def show(
     name: str | None = typer.Argument(None, help="Context name"),
@@ -272,14 +259,12 @@ def show(
 ) -> None:
     """Show details of a context."""
     svc = _ctx_service()
-    if name is None:
-        # No name: use only explicit/caller-owned/cwd resolution.
-        ctx = _resolve_default_context(svc, resolve_workspace_root())
-    else:
-        try:
-            ctx = svc.show(name)
-        except ContextNotFoundError as e:
-            fail(e)
+    bound, session_id = own_bind_for_cli()  # name and session from ONE Bind
+    ctx, target = None, name or bound
+    try:
+        ctx = svc.show(target) if target else None
+    except ContextNotFoundError as e:
+        fail(e)
 
     redactor: ContextRedactor | None = None
     if redact:
@@ -297,7 +282,6 @@ def show(
             # Show only this caller's session. A context-wide "last binder" fallback would
             # expose foreign state as the caller's own and can never be authoritative.
             workspace_root = resolve_workspace_root()
-            session_id = resolve_own_session_id()
             session_obj = _live_session(workspace_root, session_id) if session_id else None
             data["session"] = session_obj
             if redactor is not None:
@@ -429,7 +413,9 @@ def bind(
 
     svc = _ctx_service()
     try:
-        svc.show(name)
+        if svc.show(name).state == ContextState.DEAD:
+            fix = fix_line(workspace_root, "context", "alive", name)
+            fail(f"Context '{name}' is DEAD — bring it back first.\nfix: {fix}")
     except ContextNotFoundError as e:
         fail(e)
 
@@ -448,25 +434,17 @@ def bind(
         ),
     )
 
-    # T-50-05 (SPEC v0.5.0 FR1): without this loud warning, a caller with no
-    # harness-native id and no DADAIA_CONTEXT gets a silent no-op. stderr only, so it
-    # never corrupts `eval $(dadaia context bind ... --print-env)`.
-    if (
-        not resolve_session_id(None, os.environ)
-        and not os.environ.get("DADAIA_CONTEXT")
-        and not print_env
-    ):
-        err_console.print(
-            f"[yellow]![/yellow] No harness-native session id and DADAIA_CONTEXT is "
-            f"unset in this shell — this binding is reachable only if DADAIA_CONTEXT="
-            f"{name} is exported here (e.g. `eval $(dadaia context bind {name} "
-            "--print-env)`)."
-        )
-
-    if print_env:
-        for line in session_store.binding_env_lines(name, session_id):
-            print(line)
-        return
+    # An id-less shell's bind lives in its env: the eval epilogue is its only path (#S11).
+    if not resolve_session_id(None, os.environ):
+        if print_env:
+            for line in session_store.binding_env_lines(name, session_id):
+                print(line)
+            return
+        if os.environ.get("DADAIA_CONTEXT") != name:
+            err_console.print(
+                f"[yellow]![/yellow] No session id in this shell — this binding is reachable only "
+                f"where DADAIA_CONTEXT={name} is exported (`eval $(... --print-env)`)."
+            )
 
     console.print(f"[green]✓[/green] Bound to '[bold]{name}[/bold]' (session id: {session_id})")
 

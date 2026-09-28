@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core import session_store, workspace_layout
+from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.features.workspace.onboarding import next_step
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
@@ -51,19 +51,14 @@ def test_zero_contexts_is_the_context_step(tmp_path: Path) -> None:
 
 
 def test_bind_only_for_a_resolvable_unbound_session(tmp_path: Path) -> None:
+    """The ``bind`` step judges the caller's Bind (sa-bind-has-two-stores#S1): no
+    identity, no step; unbound, the step; bound, past it."""
     trees = {"app": tmp_path / "repos" / "app" / "specs"}
     assert next_step(tmp_path, trees).id == "specs"  # type: ignore[union-attr]
-    step = next_step(tmp_path, trees, session="s1")
+    step = next_step(tmp_path, trees, bound=False)
     assert step is not None and step.id == "bind"
     assert step.command == fix_line(tmp_path, "context", "bind", "app")
-    session_store.write_session(
-        tmp_path,
-        "s1",
-        session_store.new_binding_record(
-            session_id="s1", context="app", runtime="t", pid=1, now="2999-01-01T00:00:00+00:00"
-        ),
-    )
-    assert next_step(tmp_path, trees, session="s1").id == "specs"  # type: ignore[union-attr]
+    assert next_step(tmp_path, trees, bound=True).id == "specs"  # type: ignore[union-attr]
 
 
 def test_specs_fix_carries_replace_foreign_only_for_a_foreign_tree(tmp_path: Path) -> None:

@@ -117,19 +117,11 @@ def _session_bound_at(workspace: Path, session_id: str) -> float | None:
 
 
 def _resolve_context(payload: dict[str, object]) -> str:
-    """Resolve the context to inject, in the root `AGENTS.md` map §3 law order (F-03).
-
-    ONE call into the single resolution authority (:mod:`dadaia_workspace.core.invocation`
-    — hooks are sanctioned DIRECT importers per the seam contract; the container is
-    never imported on a hook path, F-01). Rung 1 ``DADAIA_CONTEXT`` beats rung 2 (this
-    session's own live record — resolved through the payload's ``session_id`` field
-    just as readily as an env var, collapsing what used to be two separate reads of the
-    same record store into one), rung 2 beats rung 3 (the repo containing cwd). The
-    bind-epoch marker subsystem (deleted, T-50-04) is NOT consulted — a session bound
-    ONLY via a marker (no harness id, no ``DADAIA_CONTEXT``) no longer resolves a
-    context.
-    """
-    return invocation.resolve(payload=payload, env=os.environ, cwd=Path.cwd()).context_name or ""
+    """The session's bind (:func:`dadaia_workspace.core.invocation.resolve_bind`) — never
+    the repo the cwd sits in: an unbound session injects no context memory."""
+    return (
+        invocation.resolve(payload=payload, env=os.environ, cwd=Path.cwd()).bind.context_name or ""
+    )
 
 
 def _emit(payload: str) -> None:
@@ -279,18 +271,20 @@ def _read_help_digest(workspace: Path) -> str:
         return ""
 
 
-def _head(workspace: Path, header: str, focus: str | None, session: str | None) -> list[str]:
+def _head(workspace: Path, header: str, focus: str | None, bound: bool | None) -> list[str]:
     """The ONE onboarding call site of SessionStart, bound or not: the header and the
     derived next step — the text ``doctor`` reports."""
     trees = invocation.alive_context_trees(workspace)
-    step = onboarding.next_step(workspace, trees, focus, session)
+    step = onboarding.next_step(workspace, trees, focus, bound)
     return [header] if step is None else [header, step.text()]
 
 
 def _generic_preflight(workspace: Path, session: str | None = None) -> str:
     """Generic preflight payload for an unbound session: ``[no bound context]``, the
     next step and the ALIVE-context list. NEVER any context memory (FR-W2-01)."""
-    sections = _head(workspace, "[no bound context]", None, session)
+    sections = _head(workspace, "[no bound context]", None, False if session else None)
+    if ghost := os.environ.get("DADAIA_CONTEXT"):  # a stale export is surfaced, never obeyed
+        sections.append(f"! DADAIA_CONTEXT={ghost} is not this session's bind — ignored")
     alive = invocation.alive_context_names(workspace)
     if alive:
         sections.append("")
@@ -304,10 +298,10 @@ def _generic_preflight(workspace: Path, session: str | None = None) -> str:
     return "\n".join(sections) + "\n"
 
 
-def _emit_bootstrap(workspace: Path, context: str, session: str | None = None) -> None:
+def _emit_bootstrap(workspace: Path, context: str) -> None:
     """Emit the bound context's bootstrap: the header and next step (:func:`_head`) + the
     lean memory prefix."""
-    sections = _head(workspace, f"[{context}]", context, session)
+    sections = _head(workspace, f"[{context}]", context, True)
     memory = _build_memory(invocation.resolve_context_specs_dir(workspace, context))
     if memory:
         sections.append(memory)
@@ -380,12 +374,11 @@ def main() -> int:
         sentinel_exists=sentinel_mtime is not None,
         compacted=compacted,
         rebound=rebound,
-        has_specs=lambda name: invocation.resolve_context_specs_dir(workspace, name).is_dir(),
     )
 
     own = _common.resolve_session_id(payload) or None
     if decision.emit == "bootstrap":
-        _emit_bootstrap(workspace, decision.context, own)
+        _emit_bootstrap(workspace, decision.context)
     elif decision.emit == "preflight":
         _emit(_generic_preflight(workspace, own))
     if decision.stamp_slug is not None:

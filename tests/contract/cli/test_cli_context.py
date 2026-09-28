@@ -232,8 +232,9 @@ def test_context_bind_is_one_verb_with_one_argument(workspace: Path) -> None:
 
 
 def test_context_bind_print_env_read_and_implementation_shapes(workspace: Path) -> None:
-    """--print-env emits exactly two eval-compatible export lines (DADAIA_CONTEXT and
-    DADAIA_SESSION_ID) and still persists the session record."""
+    """sa-bind-has-two-stores#S11: in a shell with no session id, --print-env emits exactly
+    two eval-compatible export lines and persists the record; a shell with a native id
+    gets no eval epilogue (its record is the bind)."""
     _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "bind", "myctx", "--print-env"])
     assert result.exit_code == 0, result.output
@@ -242,6 +243,9 @@ def test_context_bind_print_env_read_and_implementation_shapes(workspace: Path) 
     assert "export DADAIA_MODE" not in result.output, "0.4.7 FR4: two variables, no mode"
     record = _session_record_for(workspace, result.output)
     assert record["context"] == "myctx"
+    native = {**os.environ, "CLAUDE_CODE_SESSION_ID": "native-1"}
+    bound = _runner.invoke(app, ["context", "bind", "myctx", "--print-env"], env=native)
+    assert bound.exit_code == 0 and "export " not in bound.output, bound.output
 
 
 # --- caller-scoped harness binding -----------------------------------------
@@ -304,16 +308,6 @@ def test_bind_silent_when_harness_native_id_present(
     assert "reachable only" not in result.output
 
 
-def test_bind_silent_when_dadaia_context_present(
-    workspace: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("DADAIA_CONTEXT", "myctx")
-    _register_alive_ctx(workspace)
-    result = _runner.invoke(app, ["context", "bind", "myctx"])
-    assert result.exit_code == 0, result.output
-    assert "reachable only" not in result.output
-
-
 # ---------------------------------------------------------------------------
 # T-50-05 (SPEC v0.5.0 FR1 deletion item 5): the sole surviving runtime source is
 # DADAIA_RUNTIME (which the kimi-code shims actually export). The dead alias this site
@@ -368,10 +362,11 @@ def test_context_show_json_session_null_then_populated_when_bound(workspace: Pat
     session_id = session_line.split("=")[1].strip()
 
     env = {**os.environ, "DADAIA_SESSION_ID": session_id}
-    show_result = _runner.invoke(app, ["context", "show", "myctx", "--json"], env=env)
+    show_result = _runner.invoke(app, ["context", "show", "--json"], env=env)
     assert show_result.exit_code == 0, show_result.output
     data = json.loads(show_result.stdout)
-    assert data["session"] is not None
+    # sa-bind-has-two-stores#S8: name and session come from the one Bind.
+    assert data["name"] == "myctx" == data["session"]["context"]
     assert data["session"]["session_id"] == session_id
 
 
@@ -607,9 +602,9 @@ def test_bind_with_no_live_release_exits_zero_and_the_next_write_is_allowed(
     result = _runner.invoke(app, ["context", "bind", "myctx"])
     assert result.exit_code == 0, result.output
 
+    # sa-bind-has-two-stores#S4: the record the bind wrote is the bind — no env by hand.
     record = _session_record_for(workspace, result.output)
     monkeypatch.setenv("DADAIA_SESSION_ID", str(record["session_id"]))
-    monkeypatch.setenv("DADAIA_CONTEXT", "myctx")
     target = workspace / "repos" / "myctx" / "specs" / "releases" / "0.0.1" / "SPEC.md"
     block = pre_gate.evaluate_payload(
         {"tool_name": "Write", "tool_input": {"file_path": str(target)}}

@@ -137,7 +137,7 @@ def write_session(
     """Write the session record atomically. Raises on validation/OS error.
 
     This module owns the record schema (:func:`new_binding_record`), the liveness
-    predicate (:func:`is_live`/:func:`live_session`), the reaper (:func:`reap_stale`)
+    predicate (:func:`is_live`/:func:`live_session`), the stale selection (:func:`stale_records`)
     and where/how records persist (F002, 20260830 audit — the record finally has an
     owning module; callers stop hand-assembling schema dicts and TTL checks).
     """
@@ -257,24 +257,15 @@ def live_session(workspace: Path, session_id: str) -> dict[str, object] | None:
     return record
 
 
-def reap_stale(workspace: Path) -> list[str]:
-    """Delete every TTL-expired session record; return the reaped session ids.
-
-    Non-``.json`` entries and subdirectories are untouched. Fail-soft per file: an
-    unreadable record is skipped (never deleted on a read error).
-    """
+def stale_records(workspace: Path) -> list[Path]:
+    """Every TTL-expired session record file — the deleter (``sweep``) removes them.
+    Non-``.json`` entries are skipped; an unreadable record is never stale."""
     directory = _sessions_dir(workspace)
-    if not directory.is_dir():
-        return []
-    reaped: list[str] = []
-    for entry in sorted(directory.iterdir()):
-        if not entry.is_file() or not entry.name.endswith(".json"):
-            continue
-        sess_id = entry.name[: -len(".json")]
-        record = read_session(workspace, sess_id)
-        if record is None:
-            continue
-        if not is_live(record):
-            entry.unlink(missing_ok=True)
-            reaped.append(sess_id)
-    return reaped
+    entries = sorted(directory.glob("*.json")) if directory.is_dir() else []
+    return [
+        entry
+        for entry in entries
+        if entry.is_file()
+        and (record := read_session(workspace, entry.stem)) is not None
+        and not is_live(record)
+    ]

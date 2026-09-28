@@ -287,10 +287,9 @@ def _write_live_harness_record(ws: Path, harness_id: str, context: str) -> None:
 
 
 def test_gate_attributes_repo_target_over_dadaia_context_env(tmp_path: Path) -> None:
-    """(a) A write into ``repos/x/...`` attributes ``x`` even while
-    ``DADAIA_CONTEXT=y`` names a DIFFERENT registered context — rung 0 (the write
-    target) is consulted before rung 1 (the env var). This is the release's single
-    named inversion risk: a wrong re-point would let the env var win."""
+    """sa-bind-has-two-stores#S1: a session with a native id and no record is UNBOUND even
+    while ``DADAIA_CONTEXT=y`` names a registered context — the env is ignored, so a
+    write into ``repos/x/...`` is never scope-blocked."""
     ws = _mk_workspace(tmp_path, "x", "y")
     target = ws / "repos" / "x" / "specs" / "releases" / "rel-1" / "TASKS.md"
     target.parent.mkdir(parents=True, exist_ok=True)

@@ -11,7 +11,6 @@ returned :class:`InjectionDecision` — policy never touches a file, stdin or en
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal
 
@@ -46,16 +45,14 @@ def decide_injection(
     sentinel_exists: bool,
     compacted: bool,
     rebound: bool,
-    has_specs: Callable[[str], bool],
 ) -> InjectionDecision:
     """Decide the injection for one hook invocation.
 
-    Inputs are plain values the transport resolves: *context* is the single-authority
-    resolution (``core.invocation.resolve``'s rungs); *recorded_slug* is the sentinel's
-    last-injected slug; *compacted* is "compact marker newer than sentinel"; *rebound* is "this session's own bound_at
-    newer than the sentinel" (T-50-03 — covers a same-context re-bind); *has_specs*
-    answers "does this context resolve to a specs tree" (the one I/O question,
-    injected as a predicate so the table stays pure).
+    Inputs are plain values the transport resolves: *context* is the session's bind
+    (``core.invocation.resolve_bind``); *recorded_slug* is the sentinel's last-injected
+    slug; *compacted* is "compact marker newer than sentinel"; *rebound* is "this
+    session's own bound_at newer than the sentinel" (covers a same-context re-bind). A
+    bound context without a specs tree still gets its header and next step.
     """
     if event in ("postcompact", "session_restart"):
         # Recorded-slug fallback: a bind with no prior prompt leaves no sentinel, but
@@ -63,7 +60,7 @@ def decide_injection(
         # kimi-postcompact-omits-bound-context-bootstrap).
         ctx = context or recorded_slug
         stamps = event == "session_restart"
-        if ctx and has_specs(ctx):
+        if ctx:
             return InjectionDecision("bootstrap", ctx, ctx if stamps else None)
         return InjectionDecision("preflight", "", "" if stamps else None)
 
@@ -73,9 +70,9 @@ def decide_injection(
         # compaction just occurred — the sentinel's recorded slug is the session's
         # bound truth.
         context = recorded_slug
-    if not context or not has_specs(context):
-        # Unbound (or bound to a context with no specs tree): generic preflight, once
-        # per session — silent on repeat prompts unless a compaction wiped context.
+    if not context:
+        # Unbound: generic preflight, once per session — silent on repeat prompts unless
+        # a compaction wiped context.
         if sentinel_exists and not compacted:
             return InjectionDecision("none")
         return InjectionDecision("preflight", "", "")

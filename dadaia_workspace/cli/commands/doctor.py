@@ -27,11 +27,11 @@ from dadaia_workspace import container
 from dadaia_workspace.cli._backlog_roots import resolve_backlog_roots
 from dadaia_workspace.cli._specs_resolution import (
     alive_context_trees,
+    own_bind_for_cli,
     resolve_context_for_cli,
     resolve_context_specs_dir_for_cli,
     resolve_specs_dir_for_cli,
 )
-from dadaia_workspace.cli.commands.context import resolve_own_session_id
 from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.cli.redact import build_context_redactor
 from dadaia_workspace.core.cli_line import fix_line
@@ -262,7 +262,10 @@ def _onboarding_section(
     if workspace_root is None or expired_only:
         return _empty_section("workspace")
     trees = alive_context_trees(workspace_root)
-    step = onboarding.next_step(workspace_root, trees, scope, resolve_own_session_id())
+    bind, session = own_bind_for_cli()
+    step = onboarding.next_step(
+        workspace_root, trees, scope, None if session is None else bool(bind)
+    )
     if step is None:
         return _empty_section("workspace")
     finding = SectionFinding(

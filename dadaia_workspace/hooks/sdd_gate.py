@@ -114,6 +114,7 @@ def _evaluate_target(
         bound_repos=inv.bind.repos,
         target_slug=target_slug,
         target_owner=target_owner,
+        bound_by_env=inv.session_id is None,
     )
 
 

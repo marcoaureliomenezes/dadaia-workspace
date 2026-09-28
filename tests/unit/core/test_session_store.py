@@ -115,7 +115,7 @@ def test_last_seen_at_and_liveness_timestamp_matrix(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # F002 (20260830-design-bug-surface-audit): the session-binding record gets an OWNING
 # module. session_store authors the schema (new_binding_record), owns the liveness
-# predicate (is_live/live_session) and the reaper (reap_stale) — the CLI, invocation
+# predicate (is_live/live_session) and the stale selection (stale_records) — the CLI, invocation
 # and the spec-context doctor stop hand-assembling gc_check dicts.
 # ---------------------------------------------------------------------------
 
@@ -182,7 +182,7 @@ def test_is_live_and_live_session(tmp_path: Path) -> None:
     assert session_store.live_session(tmp_path, "sess-absent") is None
 
 
-def test_reap_stale_deletes_only_expired_records(tmp_path: Path) -> None:
+def test_stale_records_selects_only_expired_records(tmp_path: Path) -> None:
     now = datetime.now(tz=UTC)
     live = session_store.new_binding_record(
         session_id="live-1",
@@ -198,11 +198,9 @@ def test_reap_stale_deletes_only_expired_records(tmp_path: Path) -> None:
     session_store.write_session(tmp_path, "dead-1", dead)
     (session_store.sessions_dir(tmp_path) / "not-a-record.txt").write_text("", encoding="utf-8")
 
-    reaped = session_store.reap_stale(tmp_path)
-
-    assert reaped == ["dead-1"]
-    assert session_store.read_session(tmp_path, "live-1") is not None
-    assert session_store.read_session(tmp_path, "dead-1") is None
+    assert session_store.stale_records(tmp_path) == [
+        session_store.sessions_dir(tmp_path) / "dead-1.json"
+    ]
 
 
 def test_gc_check_assembly_has_one_home() -> None:
