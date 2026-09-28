@@ -49,11 +49,11 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.spec_status import STATUS_LINE
 from dadaia_workspace.features.migrate import registry as migrate_registry
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 _MARKER_RE = re.compile(r"^- \[([ xX-])\]", re.MULTILINE)
-_STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+)$", re.MULTILINE)
 
 _FIXTURE_TASKS_MD = """\
 # TASKS — Release v1.0.0 — fixture
@@ -77,7 +77,7 @@ def _markers(text: str) -> list[str]:
 
 
 def _status_tokens(text: str) -> list[str]:
-    return [m.strip() for m in _STATUS_RE.findall(text)]
+    return [m.strip() for m in STATUS_LINE.findall(text)]
 
 
 def _paragraph_count(text: str) -> int:

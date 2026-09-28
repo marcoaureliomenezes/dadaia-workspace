@@ -128,14 +128,17 @@ def _plant_gitflow_gone(root: Path) -> None:
 
 
 def _plant_status_line_gone(root: Path) -> None:
-    spec = root / "specs" / "releases" / _RELEASE / "SPEC.md"
-    spec.write_text("# Spec\n\n> **Created:** 2026-04-01\n\nContent.\n", encoding="utf-8")
+    """sa-status-line-has-two-parsers#B26-3 a 173-line TASKS.md, lowercase token on line 3;
+    sa-status-line-has-two-parsers#B26-4 a SPEC.md with no status line — both fire."""
+    release = root / "specs" / "releases" / _RELEASE
+    (release / "SPEC.md").write_text("# Spec\n\nContent.\n", encoding="utf-8")
+    (release / "TASKS.md").write_text("# Tasks\n\n**Status:** approved\n" + "- t\n" * 170)
 
 
 def _plant_origin_line_gone(root: Path) -> None:
     spec = root / "specs" / "releases" / _RELEASE / "SPEC.md"
     spec.write_text(
-        "# Spec\n\n> **Status:** Approved\n**Opened:** 2026-09-21\n\nContent.\n",
+        "# Spec\n\n**Status:** Approved\n**Opened:** 2026-09-21\n\nContent.\n",
         encoding="utf-8",
     )
 
@@ -143,7 +146,7 @@ def _plant_origin_line_gone(root: Path) -> None:
 def _plant_oversized_plan(root: Path) -> None:
     plan = root / "specs" / "releases" / _RELEASE / "PLAN.md"
     body = "\n".join(f"- line {i}" for i in range(400))
-    plan.write_text(f"# Plan\n\n> **Status:** Approved\n\n{body}\n", encoding="utf-8")
+    plan.write_text(f"# Plan\n\n**Status:** Approved\n\n{body}\n", encoding="utf-8")
 
 
 def _plant_changelog_heading(root: Path) -> None:
@@ -390,7 +393,7 @@ OPERATOR_ACTION: dict[str, Callable[[Path], None]] = {
     "TREE-8": _plant_stray_dotfile,
     "LINT-1": lambda r: _write(r / "specs" / "memory" / "product" / "testarea" / "x.md", "# X\n"),
     "SPEC-DOC-001": lambda r: (r / "specs" / "constitution.md").unlink(),
-    "SPEC-DOC-024": lambda r: _write(r / f"specs/releases/{_RELEASE}/TASKS.md", "# Tasks\n\n> **Status:** Draft\n"),
+    "SPEC-DOC-024": lambda r: _write(r / f"specs/releases/{_RELEASE}/TASKS.md", "# Tasks\n\n**Status:** Draft\n"),
     "SPEC-DOC-026": lambda r: _write(r / f"specs/releases/_archive/{_RELEASE}/SPEC.md", "# S\n"),
     "SPEC-DOC-027": lambda r: _write(r / "specs/releases/bad-name/SPEC.md", "# S\n"),
     "SPEC-DOC-047": lambda r: _append(r / f"specs/releases/{_RELEASE}/TASKS.md", "- [ ] T2 x\n  Write set: specs/memory/QUALITY.md\n"),

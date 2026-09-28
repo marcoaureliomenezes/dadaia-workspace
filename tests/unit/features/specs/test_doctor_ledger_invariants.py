@@ -121,11 +121,11 @@ def _make_clean_specs_tree(root: Path, release_id: str = "0.1.10") -> Path:
 
     _set_active(specs, release_id, "IMPLEMENTATION")
     spec_md = (
-        "# Spec\n\n> **Status:** Approved\n> **Created:** 2026-06-09\n"
+        "# Spec\n\n**Status:** Approved\n> **Created:** 2026-06-09\n"
         "**Origin:** operator-demand\n\nContent.\n"
     )
-    plan_md = "# Plan\n\n> **Status:** Approved\n\nShort.\n"
-    tasks_md = "# Tasks\n\n> **Status:** Approved\n\n- [-] T1 something\n- [ ] T2 other\n"
+    plan_md = "# Plan\n\n**Status:** Approved\n\nShort.\n"
+    tasks_md = "# Tasks\n\n**Status:** Approved\n\n- [-] T1 something\n- [ ] T2 other\n"
     (specs / "releases" / release_id / "SPEC.md").write_text(spec_md, encoding="utf-8")
     (specs / "releases" / release_id / "PLAN.md").write_text(plan_md, encoding="utf-8")
     (specs / "releases" / release_id / "TASKS.md").write_text(tasks_md, encoding="utf-8")
@@ -154,7 +154,7 @@ def _set_active(specs: Path, release_id: str, phase: str) -> None:
 
 def _write_tasks(specs: Path, release_id: str, body: str) -> None:
     (specs / "releases" / release_id / "TASKS.md").write_text(
-        f"# Tasks\n\n> **Status:** Approved\n\n{body}\n", encoding="utf-8"
+        f"# Tasks\n\n**Status:** Approved\n\n{body}\n", encoding="utf-8"
     )
 
 
@@ -166,7 +166,7 @@ def _by_code(issues: list[SpecsDoctorIssue], code: str) -> list[SpecsDoctorIssue
     return [i for i in issues if i.code == code]
 
 
-_MINIMAL_SPEC_MD = "# Spec\n\n> **Status:** Approved\n"
+_MINIMAL_SPEC_MD = "# Spec\n\n**Status:** Approved\n"
 
 
 def _write_minimal_spec(rel: Path) -> None:
