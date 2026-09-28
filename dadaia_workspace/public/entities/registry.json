@@ -45,8 +45,8 @@
       "mandate": "Three path classes on every write: ADDITIVE always writable, PROTECTED blocked, MUTATING writable but scope-judged under repos/<slug>/ when the session is bound; no phase, no mode; every block carries one fix: line; races surfaced, never prevented.",
       "implementations": {
         "claude": "PreToolUse hook via dadaia_workspace.hooks.pre_gate (single merged entrypoint) + PostToolUse session heartbeat and the throttled workspace reaper via dadaia_workspace.hooks.sdd_post_gate",
-        "codex": ".codex/hooks.json wrapper → the same Python gate (pre + post)",
-        "kimi-code": "managed hook block → the same Python gate (pre + post)",
+        "codex": ".codex/hooks.json PreToolUse wrapper → the same Python gate (pre + post)",
+        "kimi-code": "managed hook block PreToolUse → the same Python gate (pre + post)",
         "cursor": ".cursor/hooks.json preToolUse → dadaia_workspace.hooks.pre_gate (single merged entrypoint)",
         "devin": ".devin/hooks.v1.json PreToolUse → dadaia_workspace.hooks.pre_gate (single merged entrypoint)",
         "copilot": ".github/hooks/pre-tool-use.json preToolUse → dadaia_workspace.hooks.pre_gate (single merged entrypoint)"

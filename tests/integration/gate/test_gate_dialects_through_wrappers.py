@@ -23,9 +23,8 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
-from dadaia_workspace.infrastructure.runtime_config import kimi_hook_shims
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
-    hook_file_payloads,
+    hook_documents,
     hook_wrapper_contents,
 )
 
@@ -59,11 +58,7 @@ def _run(ws: Path, harness: str, case: str) -> subprocess.CompletedProcess[str]:
         argv = [str(ws / ".dadaia/.venv/bin/python"), "-B", "-m", "dadaia_workspace.hooks.pre_gate"]
     else:
         name = "dadaia-kimi-pre-gate.sh" if harness == "kimi-code" else f"{harness}-pre-gate"
-        body = (
-            kimi_hook_shims()
-            if harness == "kimi-code"
-            else hook_wrapper_contents(HARNESS_RECORDS[harness])
-        )[name]
+        body = hook_wrapper_contents(HARNESS_RECORDS[harness])[name]
         (ws / ".dadaia" / "hooks" / name).write_text(body)
         argv = ["sh", str(ws / ".dadaia" / "hooks" / name)]
     env = {"PATH": os.environ["PATH"], "PYTHONPATH": os.environ.get("PYTHONPATH", "")}
@@ -101,7 +96,7 @@ def test_b2_cursor_denies_a_new_root_entry_to_the_agent_with_a_fix(ws: Path) -> 
 
 
 def test_b3_devin_hook_file_has_the_documented_shape_and_denies(ws: Path) -> None:
-    document = json.loads(hook_file_payloads(HARNESS_RECORDS["devin"])["hooks.v1.json"])
+    document = hook_documents(HARNESS_RECORDS["devin"])["hooks.v1.json"]
     assert document == {
         "PreToolUse": [
             {

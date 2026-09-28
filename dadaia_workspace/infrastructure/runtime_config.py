@@ -1,17 +1,6 @@
-"""Runtime configuration generators for Claude, Codex and Kimi Code projections.
+"""Claude settings merge, Codex config and the Kimi user-level hook block.
 
-Extracted from ``FileSystemPublicAssetManager`` in ``public_assets.py`` to keep
-that module under 600 lines.  Each function takes explicit arguments instead of
-``self``, so there are no circular imports.
-
-Claude's hook commands cite the workspace's own self-locating wrappers through
-``$CLAUDE_PROJECT_DIR`` — no interpreter is baked at render time.
-
-v0.2.8 (kimi-code): Kimi Code has no project-level config file — hooks register only in
-the user-level ``$KIMI_CODE_HOME/config.toml``. The kimi generators therefore emit a
-managed, marker-delimited ``[[hooks]]`` TOML block plus workspace-agnostic POSIX shims
-that resolve the nearest workspace (its ``spec_contexts.json`` sentinel) from the hook cwd
-at runtime and delegate to the same shared Python hook modules the other harnesses use.
+The hook wiring itself is ``hook_wrappers.HOOK_DIALECTS``; these serialize and merge it.
 """
 
 from __future__ import annotations
@@ -21,32 +10,15 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from dadaia_workspace.core import workspace_layout
+from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _render_agents_config_file_blocks,
 )
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
-    REAPER_ARGS,
-    VENV_PYTHON,
-    hook_wrapper_command,
+    HOOK_DIALECTS,
+    hook_documents,
+    wrapper_name,
 )
-
-
-def _claude_cmd(lane: str) -> str:
-    """The Claude hook command: the workspace's own wrapper, wherever the project now is."""
-    return f'"$CLAUDE_PROJECT_DIR"/{hook_wrapper_command(f"claude-{lane}")}'
-
-
-# T-010-18 (R6c, AC-R6-05, ai C-12): Claude Code PreToolUse gate matcher.
-# The SDD gate and root-whitelist gate police filesystem writes (the write tools); the
-# W3 venv guard (T-014-12) additionally polices Bash invocations of `dadaia`/`pip`/
-# `python -m dadaia_workspace`. The merged pre_gate entrypoint therefore fires on the
-# write tools AND Bash — still a scoped explicit matcher, never the forbidden empty
-# (match-all) form the ai audit flagged.
-_CLAUDE_WRITE_TOOLS = "Edit|Write|MultiEdit|NotebookEdit|Bash"
-# Claude Code's canonical explicit match-all for tool-matching events. Used on
-# PostToolUse so session heartbeat fires after every tool, including Bash.
-_CLAUDE_MATCH_ALL = "*"
-
 
 #: The markers that identify a hook entry as dadaia-owned: every command this module
 #: generates cites a ``.dadaia/hooks/claude-*`` wrapper; an install predating the wrappers
@@ -68,6 +40,11 @@ def _is_dadaia_hook_entry(entry: object) -> bool:
     )
 
 
+def claude_hooks() -> dict[str, object]:
+    """Claude's ``settings.json`` hook slice, rendered from ``HOOK_DIALECTS``."""
+    return hook_documents(HARNESS_RECORDS["claude"])["settings.json"]
+
+
 def merge_claude_settings(existing: dict[str, object] | None, root: Path) -> dict[str, object]:
     """Fold dadaia's hook wiring into an operator's ``.claude/settings.json``.
 
@@ -85,7 +62,7 @@ def merge_claude_settings(existing: dict[str, object] | None, root: Path) -> dic
     This is the same ownership discipline :func:`upsert_kimi_hooks_block` applies to the
     kimi config; the claude path had a naive whole-file writer instead.
     """
-    canonical = claude_settings()
+    canonical = claude_hooks()
     canonical_hooks = canonical["hooks"]
     assert isinstance(canonical_hooks, dict)
     env = workspace_layout.tool_cache_env(root)  # absolute caches (ADR 0080)
@@ -148,105 +125,6 @@ def foreign_claude_hook_commands(
     return found
 
 
-def claude_settings() -> dict[str, object]:
-    """Return the Claude Code settings.json hook wiring (workspace-relative)."""
-    return {
-        "hooks": {
-            # FR-W4-01 (T-014-05): a SINGLE merged PreToolUse entrypoint (pre_gate) reads
-            # stdin once and runs root-whitelist → venv-guard → SDD gate in order. The old
-            # dual sdd_gate + root_whitelist wiring is gone (one interpreter spawn per write).
-            "PreToolUse": [
-                {
-                    "hooks": [
-                        {
-                            "command": _claude_cmd("pre-gate"),
-                            "type": "command",
-                        }
-                    ],
-                    "matcher": _CLAUDE_WRITE_TOOLS,
-                },
-            ],
-            "PostToolUse": [
-                {
-                    "hooks": [
-                        {
-                            "command": _claude_cmd("post-gate"),
-                            "type": "command",
-                        }
-                    ],
-                    # Heartbeat must fire on ALL tools (T-010-04) — explicit match-all.
-                    "matcher": _CLAUDE_MATCH_ALL,
-                }
-            ],
-            # UserPromptSubmit has no tool to match; matcher unchanged (empty).
-            "UserPromptSubmit": [
-                {
-                    "hooks": [
-                        {
-                            "command": _claude_cmd("ctx-inject"),
-                            "type": "command",
-                        }
-                    ],
-                    "matcher": "",
-                }
-            ],
-            # Bug claude-compact-reinjection-missing: a compact erases the injected
-            # bootstrap and /clear wipes the context; ctx_inject re-emits it at the event
-            # (Claude Code adds SessionStart stdout back to context) and restamps the
-            # sentinel. Matchers are the exact documented source names; fork stays on
-            # the bind-driven UserPromptSubmit path (FR-W2). Parity with the
-            # kimi-code PostCompact shim (v0.2.8) and the codex SessionStart wrapper.
-            "SessionStart": [
-                {
-                    "hooks": [
-                        {
-                            "command": _claude_cmd("ctx-inject"),
-                            "type": "command",
-                        }
-                    ],
-                    "matcher": "compact",
-                },
-                {
-                    "hooks": [
-                        {
-                            "command": _claude_cmd("ctx-inject"),
-                            "type": "command",
-                        }
-                    ],
-                    "matcher": "clear",
-                },
-                # Backlog cli-help-architecture: a NEW session received zero context
-                # until its first prompt — startup/resume now inject at the event
-                # itself (parity with the codex SessionStart wrapper). They flow the
-                # normal prompt path in the policy: fresh session -> bootstrap or
-                # preflight + sentinel stamp; the next prompt stays silent.
-                {
-                    "hooks": [
-                        {
-                            "command": _claude_cmd("ctx-inject"),
-                            "type": "command",
-                        }
-                    ],
-                    "matcher": "startup",
-                },
-                {
-                    "hooks": [
-                        {
-                            "command": _claude_cmd("ctx-inject"),
-                            "type": "command",
-                        }
-                    ],
-                    "matcher": "resume",
-                },
-                {
-                    "hooks": [{"command": _claude_cmd("doctor-expired"), "type": "command"}],
-                    "matcher": "startup|resume",
-                },
-            ],
-        },
-    }
-
-
 def codex_config(agentic_dir: Path, workspace_root: Path) -> str:
     """The .codex/config.toml: the absolute tool-cache env every shell command inherits
     (ADR 0080) and one ``[agents."<name>"]`` block per canonical agent (command policy
@@ -261,137 +139,12 @@ def codex_config(agentic_dir: Path, workspace_root: Path) -> str:
     return "".join(lines)
 
 
-def codex_hooks(workspace_root: Path) -> dict[str, object]:
-    """Return the .codex/hooks.json dict for *workspace_root*."""
-    # PreToolUse gate fires on the write tools (filesystem writes) AND Bash — the W3 venv
-    # guard (T-014-12) polices `dadaia`/`pip`/`python -m dadaia_workspace` Bash invocations.
-    # Read-only tools are still excluded.
-    write_matcher = "^(apply_patch|Edit|Write|Bash)$"
-    return {
-        "hooks": {
-            # FR-W4-01 (T-014-05): single merged PreToolUse entrypoint (pre_gate) — one
-            # interpreter spawn runs root-whitelist → venv-guard → SDD gate. The old dual
-            # sdd_gate + root_whitelist wiring is removed.
-            "PreToolUse": [
-                {
-                    "matcher": write_matcher,
-                    "hooks": [
-                        {
-                            "type": "command",
-                            "command": hook_wrapper_command("codex-pre-gate"),
-                            "statusMessage": "Checking dadaia PreToolUse gate",
-                        }
-                    ],
-                },
-            ],
-            # Session heartbeat fires after every tool. Codex's canonical
-            # match-all is an omitted matcher, mirroring Claude's explicit "*".
-            "PostToolUse": [
-                {
-                    "hooks": [
-                        {
-                            "type": "command",
-                            "command": hook_wrapper_command("codex-post-gate"),
-                            "statusMessage": "Refreshing SDD session heartbeat",
-                        }
-                    ],
-                }
-            ],
-            # SessionStart carries the full workspace context ONCE per logical
-            # session (matcher startup|resume). ctx-inject keys idempotence on the
-            # session_id Codex passes on stdin, so the per-prompt UserPromptSubmit
-            # path below stays silent after the first injection (T-016-C01).
-            "SessionStart": [
-                {
-                    "matcher": "startup|resume",
-                    "hooks": [
-                        {
-                            "type": "command",
-                            "command": hook_wrapper_command("codex-ctx-inject-session-start"),
-                            "statusMessage": "Loading dadaia context",
-                        },
-                        {
-                            "type": "command",
-                            "command": hook_wrapper_command("codex-doctor-expired"),
-                            "statusMessage": "Reaping expired workspace files",
-                        },
-                    ],
-                }
-            ],
-            "UserPromptSubmit": [
-                {
-                    "hooks": [
-                        {
-                            "type": "command",
-                            "command": hook_wrapper_command("codex-ctx-inject"),
-                            "statusMessage": "Loading dadaia context",
-                        }
-                    ],
-                }
-            ],
-        }
-    }
-
-
-# ---------------------------------------------------------------------------
-# Kimi Code (v0.2.8) — managed user-level hook block + workspace-agnostic shims.
-#
-# Kimi Code has no project-level config file: ``[[hooks]]`` rules live only in
-# ``$KIMI_CODE_HOME/config.toml`` (default ``~/.kimi-code/config.toml``). The installer
-# therefore upserts a marker-delimited block there and writes four shims under
-# ``$KIMI_CODE_HOME/hooks/``. The shims carry no workspace-absolute paths — they resolve
-# the nearest ``.dadaia/.venv/bin/python`` by walking up from the hook cwd (Kimi runs
-# hooks with the session project dir as cwd), so one global block serves every dadaia
-# workspace and stays inert (fail-open, exit 0) outside them.
-# ---------------------------------------------------------------------------
-
-#: Managed-block markers in ``config.toml``. Content outside them is never touched.
+#: Kimi Code has no project-level config: its hooks are a managed block in the user-level
+#: ``$KIMI_CODE_HOME/config.toml``; content outside these markers is never touched.
 KIMI_BLOCK_BEGIN = (
     "# >>> dadaia-workspace kimi-code hooks (managed by dadaia public install — do not edit) >>>"
 )
 KIMI_BLOCK_END = "# <<< dadaia-workspace kimi-code hooks (managed) <<<"
-
-#: PreToolUse matcher: the SDD gate and root-whitelist police filesystem writes (Edit,
-#: Write); the venv-guard polices Bash `dadaia`/`pip`/`python -m dadaia_workspace` calls.
-#: Kimi has no MultiEdit/NotebookEdit/apply_patch tools, so the matcher stays minimal.
-_KIMI_WRITE_MATCHER = "^(Edit|Write|Bash)$"
-#: PostCompact fires for both manual (``/compact``) and automatic compaction.
-_KIMI_COMPACT_MATCHER = "manual|auto"
-
-#: The five kimi hook rules: (shim filename, event, matcher-or-None, timeout seconds).
-#: SessionStart carries no matcher: Kimi's ``source`` vocabulary is undocumented, and the
-#: reaper is idempotent and silent on a compliant workspace.
-_KIMI_HOOK_RULES: tuple[tuple[str, str, str | None, int], ...] = (
-    ("dadaia-kimi-pre-gate.sh", "PreToolUse", _KIMI_WRITE_MATCHER, 10),
-    ("dadaia-kimi-post-gate.sh", "PostToolUse", None, 10),
-    ("dadaia-kimi-ctx-inject.sh", "UserPromptSubmit", None, 10),
-    ("dadaia-kimi-post-compact.sh", "PostCompact", _KIMI_COMPACT_MATCHER, 10),
-    ("dadaia-kimi-doctor-expired.sh", "SessionStart", None, 10),
-)
-
-#: Shared shim prologue: walk up from the hook cwd to the nearest workspace sentinel
-#: (``.dadaia/states/spec_contexts.json``); none -> silent exit 0 (not a workspace); a
-#: workspace without its venv -> the wrappers' one warning and exit 0.
-_KIMI_SHIM_PROLOGUE = (
-    """\
-#!/usr/bin/env sh
-# Generated by "dadaia harness add kimi-code" — do not edit in place.
-# dadaia-workspace kimi-code hook shim: resolve the nearest dadaia workspace from the
-# hook cwd and delegate to the shared Python hook module. Fail-open: any resolution or
-# runtime error exits 0, a missing venv with one warning, so a hook never blocks.
-set -u
-
-ROOT=$PWD
-while [ ! -f "$ROOT/.dadaia/states/spec_contexts.json" ]; do
-  [ "$ROOT" = / ] && exit 0
-  ROOT=$(dirname "$ROOT")
-done
-"""
-    + VENV_PYTHON
-    + """
-payload=$(cat)
-"""
-)
 
 
 def kimi_code_home(env: Mapping[str, str] | None = None) -> Path:
@@ -403,75 +156,6 @@ def kimi_code_home(env: Mapping[str, str] | None = None) -> Path:
     return Path.home() / ".kimi-code"
 
 
-def kimi_hook_shims() -> dict[str, str]:
-    """Return the five kimi hook shim bodies as ``{filename: POSIX sh content}``.
-
-    - pre-gate: forwards the payload to ``hooks.pre_gate`` and translates the dadaia
-      envelope to the Kimi protocol — ``"decision": "block"`` ⇒ reason on stderr +
-      exit 2; anything else ⇒ exit 0.
-    - post-gate: session heartbeat via ``hooks.sdd_post_gate``; output discarded.
-    - ctx-inject: ``hooks.ctx_inject``; stdout passes through (Kimi appends
-      ``UserPromptSubmit`` stdout to the context).
-    - post-compact: ``hooks.ctx_inject`` with ``DADAIA_HOOK_EVENT=PostCompact`` — writes
-      the compact-epoch marker consumed by the next ``UserPromptSubmit`` AND re-emits
-      the bootstrap on stdout (observable-contract posture; Kimi discards PostCompact
-      stdout, so the deterministic re-injection still lands at the next prompt).
-    - doctor-expired: the SessionStart reaper as a CLI process — the same
-      ``REAPER_ARGS`` the Claude and Codex entries run.
-    """
-    pre_gate = (
-        _KIMI_SHIM_PROLOGUE
-        + """
-export DADAIA_RUNTIME="kimi-code"
-out=$(printf '%s' "$payload" | "$PYTHON_BIN" -B -m dadaia_workspace.hooks.pre_gate 2>/dev/null) || exit 0
-printf '%s' "$out" | "$PYTHON_BIN" -B -c 'import json, sys  # JSON, never sed: real newlines
-d = json.load(sys.stdin)
-sys.exit(2 if d.get("decision") == "block" and sys.stderr.write(d["reason"] + "\\n") else 0)'
-[ $? -eq 2 ] && exit 2
-exit 0
-"""
-    )
-    post_gate = (
-        _KIMI_SHIM_PROLOGUE
-        + """
-export DADAIA_RUNTIME="kimi-code"
-printf '%s' "$payload" | "$PYTHON_BIN" -B -m dadaia_workspace.hooks.sdd_post_gate >/dev/null 2>&1 || true
-exit 0
-"""
-    )
-    ctx_inject = (
-        _KIMI_SHIM_PROLOGUE
-        + """
-export DADAIA_RUNTIME="kimi-code"
-printf '%s' "$payload" | "$PYTHON_BIN" -B -m dadaia_workspace.hooks.ctx_inject 2>/dev/null || true
-exit 0
-"""
-    )
-    post_compact = (
-        _KIMI_SHIM_PROLOGUE
-        + """
-export DADAIA_HOOK_EVENT="PostCompact"
-export DADAIA_RUNTIME="kimi-code"
-printf '%s' "$payload" | "$PYTHON_BIN" -B -m dadaia_workspace.hooks.ctx_inject 2>/dev/null || true
-exit 0
-"""
-    )
-    doctor_expired = (
-        _KIMI_SHIM_PROLOGUE
-        + f"""
-"$PYTHON_BIN" -B -m dadaia_workspace {REAPER_ARGS} 2>/dev/null || true
-exit 0
-"""
-    )
-    return {
-        "dadaia-kimi-pre-gate.sh": pre_gate,
-        "dadaia-kimi-post-gate.sh": post_gate,
-        "dadaia-kimi-ctx-inject.sh": ctx_inject,
-        "dadaia-kimi-post-compact.sh": post_compact,
-        "dadaia-kimi-doctor-expired.sh": doctor_expired,
-    }
-
-
 def kimi_hooks_block(home: Path) -> str:
     """Return the managed ``[[hooks]]`` TOML block for ``<home>/config.toml``.
 
@@ -479,14 +163,14 @@ def kimi_hooks_block(home: Path) -> str:
     :data:`KIMI_BLOCK_END` markers so the installer can replace-or-append it
     idempotently. Commands point at the shims under ``<home>/hooks/`` (POSIX paths).
     """
-    hooks_dir = (home / "hooks").as_posix()
+    record = HARNESS_RECORDS["kimi-code"]
     rules: list[str] = []
-    for shim, event, matcher, timeout in _KIMI_HOOK_RULES:
+    for event, lane, matcher in HOOK_DIALECTS[record.hooks].files[0].events:
         lines = ["[[hooks]]", f'event = "{event}"']
         if matcher is not None:
             lines.append(f'matcher = "{matcher}"')
-        lines.append(f'command = "{hooks_dir}/{shim}"')
-        lines.append(f"timeout = {timeout}")
+        lines.append(f'command = "{(home / "hooks").as_posix()}/{wrapper_name(record, lane)}"')
+        lines.append("timeout = 10")
         rules.append("\n".join(lines))
     return f"{KIMI_BLOCK_BEGIN}\n" + "\n\n".join(rules) + f"\n{KIMI_BLOCK_END}\n"
 

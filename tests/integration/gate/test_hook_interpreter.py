@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
-from dadaia_workspace.infrastructure.runtime_config import claude_settings, kimi_hook_shims
+from dadaia_workspace.infrastructure.runtime_config import claude_hooks
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
     hook_wrapper_contents,
 )
@@ -49,12 +49,12 @@ def _workspace(root: Path, *, venv: bool) -> Path:
 
 
 def _claude_pre_gate() -> str:
-    return str(claude_settings()["hooks"]["PreToolUse"][0]["hooks"][0]["command"])  # type: ignore[index]
+    return str(claude_hooks()["hooks"]["PreToolUse"][0]["hooks"][0]["command"])  # type: ignore[index]
 
 
 def _kimi_shim(where: Path) -> Path:
     shim = where / "dadaia-kimi-pre-gate.sh"
-    shim.write_text(kimi_hook_shims()["dadaia-kimi-pre-gate.sh"], encoding="utf-8")
+    shim.write_text(hook_wrapper_contents(HARNESS_RECORDS["kimi-code"])[shim.name])
     return shim
 
 

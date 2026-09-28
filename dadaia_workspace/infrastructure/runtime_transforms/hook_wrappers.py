@@ -1,31 +1,14 @@
-"""The hook derivation as DATA: lanes, wrapper scripts and hook-file payloads.
+"""The ONE authority for every harness's hook wiring, as data (``HOOK_DIALECTS``).
 
-The behaviour lanes are the merged pre-tool gate (``dadaia_workspace.hooks.pre_gate``),
-the post-tool gate, context injection and the session-start reaper; which lanes a harness
-gets, and how it serializes them, is its row here, keyed by
-:class:`~dadaia_workspace.core.harness_registry.HookFormat` (a lane a harness has no event
-for is a stated gap, never a claimed parity):
-
-- :class:`HookLane` — one behaviour lane: the argv a wrapper execs, the env it exports,
-  and whether it answers a permission question.
-- :class:`HookAnswer` — the harness's *answer shape*. Claude, Codex and Devin read the
-  gate's own ``hookSpecificOutput`` envelope natively; Cursor and GitHub Copilot expect a
-  flat object with their own key names. That translation is the WRAPPER's job, never a
-  fifth behaviour: the same Python entrypoint runs everywhere and the adapter sits at the
-  seam, where the foreign shape belongs.
-- :class:`HookFileSpec` — which events of which file cite which lane's wrapper.
-
-The wrapper is generated, not authored, and is **self-locating**: it resolves the venv
-interpreter from its own path and never from ``PATH``, so moving or importing a workspace
-never leaves a stale absolute interpreter behind; a missing venv warns and exits 0. The
-translation runs through that same verified interpreter rather than through ``sed``
-(the key-order-fragile shape the kimi shim documents), so an envelope key moving cannot
-silently turn a block into an allow.
+A row per :class:`~dadaia_workspace.core.harness_registry.HookFormat` names the behaviour
+lanes (gate, post-gate, context injection, reaper), the files that register them and how
+the harness reads a deny. Each lane is a generated, self-locating wrapper: it resolves the
+venv interpreter from its own path (a user-level shim: from the hook cwd), never ``PATH``;
+a missing venv warns and exits 0.
 """
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 
 from dadaia_workspace.core.harness_registry import HarnessRecord, HookFormat
@@ -38,29 +21,18 @@ REAPER_ARGS = "doctor --fix --expired-only --quiet"
 
 @dataclass(frozen=True)
 class HookAnswer:
-    """The flat permission object a harness reads off the wrapper's stdout.
+    """How a harness reads a deny: a flat object on stdout, or (``exit_code``) the reason
+    on stderr and that exit code. ``None`` on a dialect: it reads the native envelope."""
 
-    ``None`` on a format means the harness reads the gate's native envelope and the
-    wrapper needs no translation at all.
-    """
-
-    decision_key: str
-    reason_key: str
-    deny: str
+    decision_key: str = ""
+    reason_key: str = ""
+    exit_code: int = 0
 
 
 @dataclass(frozen=True)
 class HookLane:
-    """One behaviour lane rendered as one on-disk executable.
-
-    Args:
-        name: the wrapper's suffix — its filename is ``<harness>-<name>``.
-        argv: everything after ``python -B -m``; hook modules forward the harness payload
-            (``"$@"``), the reaper is a fixed CLI invocation.
-        env: exported before the exec, e.g. the harness's output dialect.
-        decides: the lane answers a permission question, so a format with a
-            :class:`HookAnswer` translates its stdout.
-    """
+    """One behaviour lane rendered as one executable: ``python -B -m <argv>`` after the
+    ``env`` exports; ``decides`` marks the lane whose stdout a :class:`HookAnswer` remaps."""
 
     name: str
     argv: str
@@ -70,29 +42,33 @@ class HookLane:
 
 @dataclass(frozen=True)
 class HookFileSpec:
-    """One hook registration file: its path under the record's own directory, and the
-    ``(event, lane name)`` pairs it registers."""
+    """One hook registration file and its ``(event, lane name, matcher)`` rows; a ``None``
+    matcher omits the key."""
 
     relpath: str
-    events: tuple[tuple[str, str], ...]
+    events: tuple[tuple[str, str, str | None], ...]
+
+
+#: Resolve the workspace from the wrapper's OWN location — never a ``PATH`` lookup.
+_SELF_ROOT = 'ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)\n'
+#: A user-level shim serves every workspace: walk up from the hook cwd to the nearest
+#: sentinel; none -> not a workspace, exit 0.
+_CWD_ROOT = (
+    "ROOT=$PWD\n"
+    'while [ ! -f "$ROOT/.dadaia/states/spec_contexts.json" ]; do\n'
+    '  [ "$ROOT" = / ] && exit 0\n'
+    '  ROOT=$(dirname "$ROOT")\n'
+    "done\n"
+)
 
 
 @dataclass(frozen=True)
 class HookDialect:
     """Everything one :class:`HookFormat` serializes differently.
 
-    Args:
-        lanes: the behaviour lanes this format wires.
-        files: the hook registration files it renders (empty when the format renders its
-            own richer file elsewhere, e.g. matcher-carrying Codex hooks).
-        entry_key: the key holding the command path inside one hook entry.
-        typed: the entry carries ``"type": "command"``.
-        version: a top-level ``"version"`` field, when the format declares one.
-        answer: the flat permission shape, or ``None`` for a native-envelope reader.
-        nested: Claude's file shape — ``event -> [{matcher, hooks: [entry]}]``, no wrapper.
-        ungated: the actions this harness exposes NO pre-action event for, declared so
-            the gap is a stated fact (one ``public doctor`` WARN) instead of a silent
-            hole a string-search coverage test would pass.
+    ``files`` are rendered by :func:`hook_documents`; ``nested`` groups each entry as
+    ``{matcher, hooks: [entry]}``; ``bare`` drops the top-level ``hooks`` key; ``prefix``
+    precedes every command; ``ungated`` states the actions with no pre-action event.
     """
 
     lanes: tuple[HookLane, ...] = ()
@@ -102,58 +78,106 @@ class HookDialect:
     version: int | None = None
     answer: HookAnswer | None = None
     nested: bool = False
+    bare: bool = False
+    prefix: str = ""
+    wrapper: str = "{harness}-{lane}"
+    root: str = _SELF_ROOT
     ungated: tuple[str, ...] = ()
 
 
-#: The gate lane: one entrypoint, three behaviours (root whitelist, venv guard, SDD gate).
 _GATE = HookLane("pre-gate", 'dadaia_workspace.hooks.pre_gate "$@"', decides=True)
-#: The session-start reaper.
 _REAPER = HookLane("doctor-expired", f"dadaia_workspace {REAPER_ARGS}")
 _POST = HookLane("post-gate", 'dadaia_workspace.hooks.sdd_post_gate "$@"')
 _CTX = HookLane("ctx-inject", 'dadaia_workspace.hooks.ctx_inject "$@"')
-#: The gate and the reaper: a harness with no prompt or post-tool event.
-_GATE_REAPER: tuple[HookLane, ...] = (_GATE, _REAPER)
+_CODEX_OUT = ("DADAIA_HOOK_OUTPUT", "codex-json")
+_KIMI = ("DADAIA_RUNTIME", "kimi-code")
+_REAP = ("SessionStart", "doctor-expired", "startup|resume")
 
-_CODEX_LANES: tuple[HookLane, ...] = (
-    _GATE,
-    _POST,
-    HookLane(
-        "ctx-inject",
-        'dadaia_workspace.hooks.ctx_inject "$@"',
-        env=(("DADAIA_HOOK_OUTPUT", "codex-json"),),
-    ),
-    HookLane(
-        "ctx-inject-session-start",
-        'dadaia_workspace.hooks.ctx_inject "$@"',
-        env=(("DADAIA_HOOK_OUTPUT", "codex-json"), ("DADAIA_HOOK_EVENT", "SessionStart")),
-    ),
-    _REAPER,
-)
-
-_EMPTY = HookDialect()
-
-#: One row per :class:`HookFormat`. Total by construction: a format with no wrappers of
-#: its own (Kimi's user-level shims) states an empty dialect rather than falling through
-#: a missing key; Claude's settings file cites its wrappers, so it renders no file here.
-#:
-#: Cursor, Devin and Copilot each expose a real pre-tool event, so the gate judges every
-#: tool call (ADR 0054); a format with no blocking contract declares ``ungated``.
+#: One row per :class:`HookFormat`, total by construction (ADR 0054: every pre-tool event
+#: is gated; a format with no blocking contract declares ``ungated``).
 HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
-    HookFormat.NONE: _EMPTY,
-    HookFormat.CLAUDE_SETTINGS: HookDialect(lanes=(_GATE, _POST, _CTX, _REAPER)),
-    HookFormat.KIMI_HOOKS: _EMPTY,
-    HookFormat.CODEX_HOOKS: HookDialect(lanes=_CODEX_LANES),
-    HookFormat.CURSOR_HOOKS: HookDialect(
-        lanes=_GATE_REAPER,
+    HookFormat.NONE: HookDialect(),
+    HookFormat.CLAUDE_SETTINGS: HookDialect(
+        lanes=(_GATE, _POST, _CTX, _REAPER),
+        files=(
+            HookFileSpec(
+                "settings.json",
+                (
+                    ("PreToolUse", "pre-gate", "Edit|Write|MultiEdit|NotebookEdit|Bash"),
+                    ("PostToolUse", "post-gate", "*"),
+                    ("UserPromptSubmit", "ctx-inject", ""),
+                    *(
+                        ("SessionStart", "ctx-inject", m)
+                        for m in ("compact", "clear", "startup", "resume")
+                    ),
+                    _REAP,
+                ),
+            ),
+        ),
+        nested=True,
+        prefix='"$CLAUDE_PROJECT_DIR"/',
+    ),
+    HookFormat.KIMI_HOOKS: HookDialect(
+        lanes=(
+            HookLane(_GATE.name, _GATE.argv, (_KIMI,), decides=True),
+            HookLane(_POST.name, _POST.argv, (_KIMI,)),
+            HookLane(_CTX.name, _CTX.argv, (_KIMI,)),
+            HookLane("post-compact", _CTX.argv, (("DADAIA_HOOK_EVENT", "PostCompact"), _KIMI)),
+            _REAPER,
+        ),
+        files=(
+            HookFileSpec(
+                "config.toml",
+                (
+                    ("PreToolUse", "pre-gate", "^(Edit|Write|Bash)$"),
+                    ("PostToolUse", "post-gate", None),
+                    ("UserPromptSubmit", "ctx-inject", None),
+                    ("PostCompact", "post-compact", "manual|auto"),
+                    ("SessionStart", "doctor-expired", None),
+                ),
+            ),
+        ),
+        answer=HookAnswer(exit_code=2),
+        wrapper="dadaia-kimi-{lane}.sh",
+        root=_CWD_ROOT,
+    ),
+    HookFormat.CODEX_HOOKS: HookDialect(
+        lanes=(
+            _GATE,
+            _POST,
+            HookLane("ctx-inject", _CTX.argv, (_CODEX_OUT,)),
+            HookLane(
+                "ctx-inject-session-start",
+                _CTX.argv,
+                (_CODEX_OUT, ("DADAIA_HOOK_EVENT", "SessionStart")),
+            ),
+            _REAPER,
+        ),
         files=(
             HookFileSpec(
                 "hooks.json",
-                (("preToolUse", _GATE.name), ("sessionStart", _REAPER.name)),
+                (
+                    ("PreToolUse", "pre-gate", "^(apply_patch|Edit|Write|Bash)$"),
+                    ("PostToolUse", "post-gate", None),
+                    ("SessionStart", "ctx-inject-session-start", "startup|resume"),
+                    _REAP,
+                    ("UserPromptSubmit", "ctx-inject", None),
+                ),
+            ),
+        ),
+        nested=True,
+    ),
+    HookFormat.CURSOR_HOOKS: HookDialect(
+        lanes=(_GATE, _REAPER),
+        files=(
+            HookFileSpec(
+                "hooks.json",
+                (("preToolUse", "pre-gate", None), ("sessionStart", "doctor-expired", None)),
             ),
         ),
         typed=False,
         version=1,
-        answer=HookAnswer("permission", "agent_message", "deny"),
+        answer=HookAnswer("permission", "agent_message"),
     ),
     HookFormat.DEVIN_HOOKS: HookDialect(
         lanes=(_GATE, _CTX, _REAPER),
@@ -161,24 +185,25 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
             HookFileSpec(
                 "hooks.v1.json",
                 (
-                    ("PreToolUse", _GATE.name),
-                    ("UserPromptSubmit", _CTX.name),
-                    ("SessionStart", _CTX.name),
-                    ("SessionStart", _REAPER.name),
+                    ("PreToolUse", "pre-gate", ""),
+                    ("UserPromptSubmit", "ctx-inject", ""),
+                    ("SessionStart", "ctx-inject", ""),
+                    ("SessionStart", "doctor-expired", ""),
                 ),
             ),
         ),
         nested=True,
+        bare=True,
     ),
     HookFormat.COPILOT_HOOKS: HookDialect(
-        lanes=_GATE_REAPER,
+        lanes=(_GATE, _REAPER),
         files=(
-            HookFileSpec("hooks/pre-tool-use.json", (("preToolUse", _GATE.name),)),
-            HookFileSpec("hooks/session-start.json", (("sessionStart", _REAPER.name),)),
+            HookFileSpec("hooks/pre-tool-use.json", (("preToolUse", "pre-gate", None),)),
+            HookFileSpec("hooks/session-start.json", (("sessionStart", "doctor-expired", None),)),
         ),
         entry_key="bash",
         version=1,
-        answer=HookAnswer("permissionDecision", "permissionDecisionReason", "deny"),
+        answer=HookAnswer("permissionDecision", "permissionDecisionReason"),
     ),
 }
 
@@ -188,8 +213,9 @@ def hook_wrapper_command(name: str) -> str:
     return f".dadaia/hooks/{name}"
 
 
-def _wrapper_name(record: HarnessRecord, lane: HookLane) -> str:
-    return f"{record.name}-{lane.name}"
+def wrapper_name(record: HarnessRecord, lane: str) -> str:
+    """The wrapper filename of *record*'s *lane*."""
+    return HOOK_DIALECTS[record.hooks].wrapper.format(harness=record.name, lane=lane)
 
 
 #: The ONE missing-venv posture (DEC-10): warn on stderr naming the venv, exit 0.
@@ -203,86 +229,70 @@ VENV_PYTHON = (
     "  exit 0\n"
     "fi\n"
 )
-#: Resolve the workspace from the wrapper's OWN location — never a ``PATH`` lookup.
-_PROLOGUE = (
-    "#!/usr/bin/env sh\n"
-    "set -eu\n"
-    'ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)\n' + VENV_PYTHON
-)
 
 
 def _translator(answer: HookAnswer) -> str:
-    """The stdin-to-stdout remap from the gate's native envelope into *answer*'s shape.
-
-    Run through the wrapper's already-verified interpreter, so the decision travels as
-    parsed JSON and never as a key-order-dependent text match. Only a deny is answered:
-    anything else prints nothing, "no opinion", so the harness's own approval prompt stays
-    in force (ADR 0054: no wrapper emits an explicit allow).
-    Carries no single quote — it is embedded in a single-quoted ``sh`` word.
-    """
+    """Remap the gate's native envelope into *answer*'s shape, as parsed JSON (never a
+    key-order text match). Only a deny is answered — no wrapper emits an explicit allow
+    (ADR 0054). No single quote: it is embedded in a single-quoted ``sh`` word."""
+    say = (
+        f'sys.stderr.write(reason + "\\n")\n    raise SystemExit({answer.exit_code})\n'
+        if answer.exit_code
+        else f'print(json.dumps({{"{answer.decision_key}": "deny", "{answer.reason_key}": reason}}))\n'
+    )
     return (
         "import json,sys\n"
         "try:\n"
         '    out = json.load(sys.stdin).get("hookSpecificOutput", {})\n'
         "except Exception:\n"
         "    raise SystemExit(0)\n"
-        f'if out.get("permissionDecision") == "deny":\n'
-        f'    print(json.dumps({{"{answer.decision_key}": "{answer.deny}", '
-        f'"{answer.reason_key}": out.get("permissionDecisionReason", "")}}))\n'
+        'if out.get("permissionDecision") == "deny":\n'
+        '    reason = out.get("permissionDecisionReason", "")\n'
+        f"    {say}"
     )
 
 
 def hook_wrapper_contents(record: HarnessRecord) -> dict[str, str]:
-    """Return ``{wrapper filename: script}`` for every lane *record*'s format wires.
-
-    Harness command execution differs across surfaces: some paths shell-parse command
-    strings, others direct-exec the string as an executable. The wrappers make the hook
-    contract ONE executable path with no arguments or env-prefix syntax in the
-    registration file, on every format that needs an on-disk executable.
-    """
+    """Return ``{wrapper filename: script}``: one argument-free executable per lane, so
+    every harness registers a plain path whether it shell-parses or direct-execs it."""
     dialect = HOOK_DIALECTS[record.hooks]
+    answer = dialect.answer
+    prologue = f"#!/usr/bin/env sh\nset -eu\n{dialect.root}{VENV_PYTHON}"
     wrappers: dict[str, str] = {}
     for lane in dialect.lanes:
         exports = "".join(f'{key}="{value}"\nexport {key}\n' for key, value in lane.env)
-        answer = dialect.answer
-        if answer is None:
-            body = f'exec "$PYTHON_BIN" -B -m {lane.argv}\n'
-        elif lane.decides:
+        run = f'"$PYTHON_BIN" -B -m {lane.argv}'
+        if answer is not None and lane.decides:
             body = (
-                f'_envelope=$("$PYTHON_BIN" -B -m {lane.argv}) || exit 0\n'
-                'printf \'%s\' "$_envelope" | "$PYTHON_BIN" -B -c \''
-                # The gate answers on stdout; the harness wants its own flat shape.
-                f"{_translator(answer)}'\n"
+                f"_envelope=$({run}) || exit 0\n"
+                f"printf '%s' \"$_envelope\" | \"$PYTHON_BIN\" -B -c '{_translator(answer)}'\n"
             )
+        elif answer is not None and not answer.exit_code:
+            body = f"exec {run} >&2\n"  # stdout is this harness's decision channel
         else:
-            # A non-deciding lane on a stdout-reading harness must not pollute the
-            # decision channel: its output belongs on stderr.
-            body = f'exec "$PYTHON_BIN" -B -m {lane.argv} >&2\n'
-        wrappers[_wrapper_name(record, lane)] = f"{_PROLOGUE}{exports}{body}"
+            body = f"exec {run}\n"
+        wrappers[wrapper_name(record, lane.name)] = f"{prologue}{exports}{body}"
     return wrappers
 
 
-def hook_file_payloads(record: HarnessRecord) -> dict[str, str]:
-    """Return ``{path relative to the record's directory: serialized JSON}``.
-
-    Every event cites the wrapper of the lane implementing its behaviour — the file is a
-    registration, never a second copy of the behaviour.
-    """
+def hook_documents(record: HarnessRecord) -> dict[str, dict[str, object]]:
+    """Return ``{path relative to the record's directory: hook registration document}``;
+    every event cites its lane's wrapper — a registration, never a copy of the behaviour."""
     dialect = HOOK_DIALECTS[record.hooks]
-    lanes = {lane.name: lane for lane in dialect.lanes}
-    payloads: dict[str, str] = {}
+    documents: dict[str, dict[str, object]] = {}
     for spec in dialect.files:
         hooks: dict[str, list[object]] = {}
-        for event, lane_name in spec.events:
-            entry: dict[str, str] = {}
-            if dialect.typed:
-                entry["type"] = "command"
-            entry[dialect.entry_key] = hook_wrapper_command(_wrapper_name(record, lanes[lane_name]))
-            hooks.setdefault(event, []).append(
-                {"matcher": "", "hooks": [entry]} if dialect.nested else entry
+        for event, lane, matcher in spec.events:
+            entry: dict[str, str] = {"type": "command"} if dialect.typed else {}
+            entry[dialect.entry_key] = dialect.prefix + hook_wrapper_command(
+                wrapper_name(record, lane)
             )
-        document: dict[str, object] = dict(hooks) if dialect.nested else {"hooks": hooks}
+            group: dict[str, object] = {"hooks": [entry]}
+            if matcher is not None:
+                group["matcher"] = matcher
+            hooks.setdefault(event, []).append(group if dialect.nested else entry)
+        document: dict[str, object] = dict(hooks) if dialect.bare else {"hooks": hooks}
         if dialect.version is not None:
             document["version"] = dialect.version
-        payloads[spec.relpath] = json.dumps(document, indent=2, sort_keys=True) + "\n"
-    return payloads
+        documents[spec.relpath] = document
+    return documents

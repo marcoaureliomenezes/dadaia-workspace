@@ -119,10 +119,8 @@ def test_every_core_subagent_derives_from_a_persona_and_vice_versa() -> None:
 def test_every_wired_core_hook_derives_from_a_deterministic_behavior() -> None:
     """Every ``dadaia_workspace.hooks.*`` entrypoint the installer wires must be
     named by some Deterministic Behavior's implementations."""
-    runtime_config = (_PKG_ROOT / "infrastructure" / "runtime_config.py").read_text(
-        encoding="utf-8"
-    )
-    wired = set(re.findall(r"dadaia_workspace\.hooks\.([a-z_]+)", runtime_config))
+    dialects = (_PKG_ROOT / "infrastructure/runtime_transforms/hook_wrappers.py").read_text()
+    wired = set(re.findall(r"dadaia_workspace\.hooks\.([a-z_]+)", dialects))
     assert wired, "no wired hook entrypoints found — the extraction regex broke"
     behaviors_blob = json.dumps(load_registry()["behaviors"])
     underived = {

@@ -50,18 +50,16 @@ from dadaia_workspace.infrastructure.projection import (
 )
 from dadaia_workspace.infrastructure.public_assets_common import iter_public_files
 from dadaia_workspace.infrastructure.runtime_config import (
-    claude_settings,
-    codex_hooks,
+    claude_hooks,
     foreign_claude_hook_commands,
     kimi_code_home,
-    kimi_hook_shims,
     kimi_hooks_block,
     merge_claude_settings,
     upsert_kimi_hooks_block,
 )
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import _parse_agent_frontmatter
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
-    hook_file_payloads,
+    hook_documents,
     hook_wrapper_contents,
 )
 
@@ -202,7 +200,7 @@ def _settings_merge_checks(record: HarnessRecord, workspace_root: Path) -> list[
         return []
     if not isinstance(loaded, dict):
         return []
-    foreign = foreign_claude_hook_commands(loaded, claude_settings())
+    foreign = foreign_claude_hook_commands(loaded, claude_hooks())
     if not foreign:
         return []
     return [
@@ -212,24 +210,6 @@ def _settings_merge_checks(record: HarnessRecord, workspace_root: Path) -> list[
             + ", ".join(foreign),
         )
     ]
-
-
-def _hooks_json_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
-    """``codex-hooks``: a project-level ``hooks.json`` plus the shared wrapper scripts the
-    harness shells out to."""
-    workspace_root = plan.workspace_root
-    rules = [
-        bytes_rule(
-            f"{record.name}:hooks.json",
-            record.name,
-            workspace_root / str(record.directory) / "hooks.json",
-            (json.dumps(codex_hooks(workspace_root), indent=2, sort_keys=True) + "\n").encode(
-                "utf-8"
-            ),
-        )
-    ]
-    rules.extend(_wrapper_rules(record, workspace_root))
-    return tuple(rules)
 
 
 def _wrapper_rules(record: HarnessRecord, workspace_root: Path) -> tuple[ProjectionRule, ...]:
@@ -254,11 +234,7 @@ def _wrapper_rules(record: HarnessRecord, workspace_root: Path) -> tuple[Project
 
 
 def _hook_files_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
-    """A format whose whole registration is one or more plain JSON files citing wrappers.
-
-    The files are data (``HOOK_DIALECTS``) and the behaviours are the wrappers', so a
-    harness joining this builder cannot invent a fifth behaviour nor drop one of the four.
-    """
+    """A format whose whole registration is one or more JSON files citing wrappers."""
     workspace_root = plan.workspace_root
     directory = workspace_root / str(record.directory)
     rules = [
@@ -266,9 +242,9 @@ def _hook_files_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Project
             f"{record.name}:{relpath}",
             record.name,
             directory / relpath,
-            payload.encode("utf-8"),
+            (json.dumps(document, indent=2, sort_keys=True) + "\n").encode("utf-8"),
         )
-        for relpath, payload in hook_file_payloads(record).items()
+        for relpath, document in hook_documents(record).items()
     ]
     rules.extend(_wrapper_rules(record, workspace_root))
     return tuple(rules)
@@ -296,7 +272,7 @@ def _user_home_hook_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Pro
             content.encode("utf-8"),
             mode=0o755,
         )
-        for name, content in kimi_hook_shims().items()
+        for name, content in hook_wrapper_contents(record).items()
     ]
 
     def _render(current: bytes | None) -> bytes:
@@ -321,7 +297,7 @@ def _user_home_hook_checks(record: HarnessRecord, workspace_root: Path) -> list[
     del workspace_root  # these hooks live at the user-level home, not the workspace
     home = kimi_code_home()
     out: list[DoctorLine] = []
-    for name in kimi_hook_shims():
+    for name in hook_wrapper_contents(record):
         dst = home / "hooks" / name
         label = f"{record.name}:hooks/{name}"
         if not dst.is_file() or os.access(dst, os.X_OK):
@@ -354,7 +330,7 @@ HOOK_RULE_BUILDERS: dict[
 ] = {
     HookFormat.NONE: no_rules,
     HookFormat.CLAUDE_SETTINGS: _settings_merge_rules,
-    HookFormat.CODEX_HOOKS: _hooks_json_rules,
+    HookFormat.CODEX_HOOKS: _hook_files_rules,
     HookFormat.KIMI_HOOKS: _user_home_hook_rules,
     HookFormat.CURSOR_HOOKS: _hook_files_rules,
     HookFormat.DEVIN_HOOKS: _hook_files_rules,

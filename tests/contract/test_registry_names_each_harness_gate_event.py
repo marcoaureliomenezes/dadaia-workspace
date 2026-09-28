@@ -26,7 +26,7 @@ def test_b7_the_registry_states_what_each_rendered_gate_is() -> None:
     claims = next(r for r in rules if r["id"] == "sdd-gate")["implementations"]
     for name, record in HARNESS_RECORDS.items():
         dialect = HOOK_DIALECTS[record.hooks]
-        gate_events = {e for f in dialect.files for e, lane in f.events if lane == "pre-gate"}
+        gate_events = {e for f in dialect.files for e, lane, _ in f.events if lane == "pre-gate"}
         for event in gate_events:
             assert event in claims[name], (name, event)
         assert ("gate not enforced" in claims[name]) is bool(dialect.ungated), name
