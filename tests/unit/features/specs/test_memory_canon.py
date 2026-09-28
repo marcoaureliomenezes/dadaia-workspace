@@ -21,19 +21,13 @@ from dadaia_workspace.features.specs import (
 )
 
 
-def test_memory_file_lists_are_the_one_home() -> None:
+def test_memory_canon_facts_are_one_object_everywhere() -> None:
+    from dadaia_workspace.core import fixed_sections
+
     assert doctor_memory.TOPLEVEL_MEMORY_FILES is memory_canon.MEMORY_TOPLEVEL_FILES
     assert doctor_structural._TREE3_MEMORY_FILES is memory_canon.MEMORY_REQUIRED_FILES
     assert set(memory_canon.MEMORY_TOPLEVEL_FILES) < set(memory_canon.MEMORY_REQUIRED_FILES)
-
-
-def test_wikilink_regex_is_compiled_once() -> None:
     assert memory_lint._WIKILINK_RE is memory_canon.WIKILINK_RE
-
-
-def test_fixed_section_facts_are_the_core_leaf_re_exported() -> None:
-    from dadaia_workspace.core import fixed_sections
-
     assert memory_canon.FIXED_SECTIONS is fixed_sections.FIXED_SECTIONS
     assert memory_canon.render_fixed_section is fixed_sections.render_fixed_section
     assert memory_canon.extract_fixed_section is fixed_sections.extract_fixed_section
@@ -53,15 +47,8 @@ def test_lint_flags_the_headings_the_doctor_flags(tmp_path: Path) -> None:
     (memory_dir / "product" / "area").mkdir(parents=True)
     atom = memory_dir / "product" / "area" / "sample.md"
     atom.write_text(
-        "---\n"
-        "slug: sample\n"
-        "title: Sample\n"
-        "category: support\n"
-        "tldr: One line.\n"
-        "summary: Summary line.\n"
-        "tags: [x]\n"
-        "---\n"
-        "# Sample\n\n## Version\n\nbody\n\n## Historico\n\nbody\n",
+        "---\nslug: sample\ntitle: Sample\ncategory: support\ntldr: One line.\n"
+        "summary: Summary line.\ntags: [x]\n---\n# Sample\n\n## Version\n\nbody\n\n## Historico\n\nbody\n",
         encoding="utf-8",
     )
     schema = memory_lint.load_frontmatter_schema()
