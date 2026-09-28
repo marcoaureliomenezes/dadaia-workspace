@@ -137,7 +137,7 @@ def _hook_env(workspace: Path, *, stub: Path, denylist_file: Path) -> dict[str, 
 
 def _write_denylist_file(workspace: Path) -> Path:
     path = workspace / "privacy_denylist.json"
-    path.write_text(json.dumps([[_PLANTED_TERM, "planted e2e term (synthetic)"]]), encoding="utf-8")
+    path.write_text(json.dumps({_PLANTED_TERM: "planted e2e term (synthetic)"}), encoding="utf-8")
     return path
 
 

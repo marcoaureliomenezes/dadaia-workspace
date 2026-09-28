@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+from dadaia_workspace.core.exceptions import DadaiaError, WorkspaceNotInitializedError
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.core.redaction import mask
 from dadaia_workspace.core.workspace_layout import REPO_TREE_ARTIFACTS
@@ -158,7 +158,8 @@ def _load_privacy_denylist() -> tuple[tuple[str, str], ...]:
        *workspace_root* is resolved by walking up from ``cwd`` looking for the
        ``.dadaia/states/spec_contexts.json`` sentinel. Returns ``()`` when no
        workspace root is found (e.g. pip-installed in site-packages without an
-       active workspace) or the file is absent / unreadable / malformed.
+       active workspace) or the file is absent / unreadable / malformed; any JSON
+       value but one ``{"<term>": "<reason>"}`` object is refused.
     """
     candidates: list[Path] = []
     env_path = os.environ.get(_PRIVACY_DENYLIST_ENV)
@@ -175,15 +176,13 @@ def _load_privacy_denylist() -> tuple[tuple[str, str], ...]:
             raw = json.loads(source.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        terms: list[tuple[str, str]] = []
-        if isinstance(raw, dict):
-            terms = [(str(key), str(value)) for key, value in raw.items()]
-        elif isinstance(raw, list):
-            for item in raw:
-                if isinstance(item, (list, tuple)) and len(item) >= 2:
-                    terms.append((str(item[0]), str(item[1])))
-                elif isinstance(item, str):
-                    terms.append((item, "private identifier"))
+        if not isinstance(raw, dict):
+            raise DadaiaError(
+                f"privacy denylist {source.absolute()} is not a JSON object\n"
+                f"fix: Operator action: rewrite {source.absolute()} as one JSON object "
+                '{"<term>": "<reason>"}'
+            )
+        terms = [(str(key), str(value)) for key, value in raw.items()]
         if terms:
             return tuple(terms)
     return ()

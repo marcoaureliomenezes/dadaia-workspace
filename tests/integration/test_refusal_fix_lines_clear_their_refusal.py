@@ -184,7 +184,7 @@ class World:
 
     def deny(self) -> None:
         (self.ws / ".dadaia" / "states" / "privacy_denylist.json").write_text(
-            f'["{_TERM}"]', encoding="utf-8"
+            f'{{"{_TERM}": "t"}}', encoding="utf-8"
         )
 
 

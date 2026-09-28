@@ -194,7 +194,7 @@ _PRIVACY_TEST_TERM = private_ip()
 def _seed_denylist_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Seed the denylist via env var (location-independent; avoids .dadaia/ in lib repo)."""
     source = tmp_path / "privacy_denylist.json"
-    source.write_text(json.dumps([[_PRIVACY_TEST_TERM, "test private IP"]]), encoding="utf-8")
+    source.write_text(json.dumps({_PRIVACY_TEST_TERM: "test private IP"}), encoding="utf-8")
     monkeypatch.setenv(_PRIVACY_DENYLIST_ENV, str(source))
 
 

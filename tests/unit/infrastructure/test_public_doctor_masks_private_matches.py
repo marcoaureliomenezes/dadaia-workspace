@@ -38,7 +38,7 @@ def test_an_operator_term_is_shown_first_last(
     and in the library's root AGENTS.md alike."""
     term = "zorb" + "lax"
     denylist = tmp_path / "denylist.json"
-    denylist.write_text(json.dumps([[term, "zz fixture term"]]), encoding="utf-8")
+    denylist.write_text(json.dumps({term: "zz fixture term"}), encoding="utf-8")
     monkeypatch.setenv(_PRIVACY_DENYLIST_ENV, str(denylist))
 
     lines = _lines(tmp_path, "made by Zorb" + "lax-Corp\n")

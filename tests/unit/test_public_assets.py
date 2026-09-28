@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.infrastructure.privacy_check import (
     _BASELINE_OK_MARKER,
     _PRIVACY_DENYLIST_ENV,
@@ -385,27 +386,25 @@ def test_baseline_v7_header_and_single_line_patterns() -> None:
 
 
 @pytest.mark.parametrize(
-    ("name", "payload", "expected"),
-    [
-        (
-            "dict_format",
-            {"foo": "reason-a", "bar": "reason-b"},
-            (("foo", "reason-a"), ("bar", "reason-b")),
-        ),
-        (
-            "list_of_strings",
-            ["alpha", "beta"],
-            (("alpha", "private identifier"), ("beta", "private identifier")),
-        ),
-    ],
+    ("name", "payload"),
+    [("dict_format", {"foo": "reason-a", "bar": "reason-b"}), ("list_of_strings", ["alpha"])],
 )
 def test_load_denylist_source_formats(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, payload: object, expected: tuple
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, payload: object
 ) -> None:
+    """sa-denylist-file-has-three-shapes: the dict is the one grammar; any other shape
+    is refused with an Operator action naming the absolute file."""
     source = tmp_path / "d.json"
     source.write_text(json.dumps(payload), encoding="utf-8")
     monkeypatch.setenv(_PRIVACY_DENYLIST_ENV, str(source))
-    assert _load_privacy_denylist() == expected
+    if name != "dict_format":
+        with pytest.raises(DadaiaError) as refused:
+            _load_privacy_denylist()
+        assert str(refused.value).splitlines()[-1] == (
+            f'fix: Operator action: rewrite {source} as one JSON object {{"<term>": "<reason>"}}'
+        )
+        return
+    assert _load_privacy_denylist() == (("foo", "reason-a"), ("bar", "reason-b"))
 
     if name == "dict_format":
         # Malformed JSON, a missing source path, and neither env nor workspace present
@@ -436,11 +435,11 @@ def test_load_denylist_env_precedence_and_workspace_fallback(
     workspace = _make_workspace_root(tmp_path / "ws")
     states = workspace / ".dadaia" / "states"
     (states / "privacy_denylist.json").write_text(
-        json.dumps([["from-file", "file"]]), encoding="utf-8"
+        json.dumps({"from-file": "file"}), encoding="utf-8"
     )
 
     env_src = tmp_path / "env.json"
-    env_src.write_text(json.dumps([["from-env", "env"]]), encoding="utf-8")
+    env_src.write_text(json.dumps({"from-env": "env"}), encoding="utf-8")
     monkeypatch.setenv(_PRIVACY_DENYLIST_ENV, str(env_src))
     monkeypatch.chdir(workspace)
     assert _load_privacy_denylist() == (("from-env", "env"),)
