@@ -1,7 +1,7 @@
-"""Structural validator (v0.1.55 FR1): TREE-1..8 spec-tree invariants.
+"""Structural validator (v0.1.55 FR1): TREE-2..8 spec-tree invariants.
 
 Single-responsibility sibling of the SpecsDoctor coordinator. Owns the ``spec-context-tree-v2``
-structural invariants (foundation/root-spec deprecation, required memory atoms, required dirs,
+structural invariants (root-spec deprecation, required memory atoms, required dirs,
 AGENTS.md drift, active-release artifacts, bug session_id) and the TREE-4 auto-fix. Leaf-only:
 imports the shared leaves, never a sibling validator.
 """
@@ -59,14 +59,13 @@ _TREE4_REQUIRED_DIRS = REQUIRED_ROOT_DIRS
 # member list (operator ruling 2026-08-28).
 _TREE8_CANON_ROOT: frozenset[str] = CANON_ROOT_MEMBERS
 
-#: Deprecated-layout root entries TREE-1/TREE-2 already own (loud migration hint,
-#: fixable=False by explicit design: auto-moving may destroy SDD-approved content
-#: pending operator consent). TREE-8 never flags either a second time.
-_TREE8_DEFERRED_TO_SIBLING_CHECKS: frozenset[str] = frozenset({"foundation", "SPEC.md"})
+#: The deprecated root SPEC.md TREE-2 already owns (fixable=False: operator consent).
+#: TREE-8 never flags it a second time.
+_TREE8_DEFERRED_TO_SIBLING_CHECKS: frozenset[str] = frozenset({"SPEC.md"})
 
 
 class StructuralValidator:
-    """TREE-1..8 structural invariants for the spec tree."""
+    """TREE-2..8 structural invariants for the spec tree."""
 
     def __init__(
         self,
@@ -77,28 +76,6 @@ class StructuralValidator:
         self.specs_dir = specs_dir
         self._scaffold_dir = scaffold_dir
         self._templates_dir = templates_dir
-
-    def check_tree1_foundation(self) -> list[SpecsDoctorIssue]:
-        """TREE-1: specs/foundation/ must NOT exist (deprecated layout).
-
-        Warn-only (fixable=False): foundation/ may hold SDD-approved content and
-        reclassifying it is the operator's call — no migrator exists.
-        """
-        foundation = self.specs_dir / "foundation"
-        if not foundation.exists():
-            return []
-        return [
-            SpecsDoctorIssue(
-                code="TREE-1",
-                severity=Severity.WARNING,
-                description=(
-                    "specs/foundation/ exists — this is the deprecated layout. Move "
-                    "its content into releases/<id>/ or memory/ by hand (TREE-1)."
-                ),
-                path=str(foundation),
-                fixable=False,
-            )
-        ]
 
     def check_tree2_root_spec_md(self) -> list[SpecsDoctorIssue]:
         """TREE-2: specs/SPEC.md at the tree root must NOT exist (deprecated).
@@ -444,7 +421,7 @@ class StructuralValidator:
             # Root-level entries are already covered by the loop above (whether
             # canon-named or not); this second pass reaches every FILE nested inside
             # an otherwise-conformant root member. Never descend into a deprecated
-            # root TREE-1/TREE-2 owns (its own content is exempt from removal), nor
+            # root TREE-2 owns (its own content is exempt from removal), nor
             # into a root entry the first loop already flagged as a stray whole
             # subtree (that finding already covers everything inside it).
             root_name = entry.relative_to(self.specs_dir).parts[0]

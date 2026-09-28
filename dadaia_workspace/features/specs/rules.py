@@ -5,9 +5,6 @@ Before this table, ``SpecsDoctor.check()`` was a hand-wired 40-line call list,
 ``fix()`` a hand-kept if/elif over seven code literals, and the CLI help text a third
 hand-written copy that was wrong at HEAD (it claimed TREE-3 fixable — it is not — and
 omitted six codes that are). One registry; the three projections cannot drift again.
-
-The order is the pre-decomposition interleaved order 1:1 — the golden lock
-(``test_doctor_golden``) pins the rendered output byte-identically.
 """
 
 from __future__ import annotations
@@ -77,10 +74,7 @@ RULES: tuple[SpecsRule, ...] = (
         # overwrite the operator's file. WARNING-only, so the run never exits 1 on it.
     ),
     _rule(
-        (
-            "SPEC-DOC-003",
-            "SPEC-DOC-009",
-        ),
+        ("SPEC-DOC-003",),
         lambda d: d._release.check_active_md(),
         fix_help="git rm specs/ACTIVE.md",
     ),
@@ -109,11 +103,6 @@ RULES: tuple[SpecsRule, ...] = (
         # No fix line: where an atom's history belongs is judgment, and truncating at
         # the heading deletes it. WARNING-only here; LINT-1 still errors on the same
         # atom, so the invariant keeps its exit-1 home.
-    ),
-    _rule(
-        ("TREE-1",),
-        lambda d: d._structural.check_tree1_foundation(),
-        # No fix line: no command migrates foundation/; operator consent. WARNING-only.
     ),
     _rule(
         ("TREE-2",),

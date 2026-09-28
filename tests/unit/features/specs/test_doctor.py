@@ -1,7 +1,6 @@
 """Unit tests for SpecsDoctor structural checks and tree invariants.
 
-CRITICAL doctor: every invariant code keeps exactly one sad + one silent row here; the
-doctor golden (test_doctor_golden.py) pins ordering/wording across the full family set.
+CRITICAL doctor: every invariant code keeps exactly one sad + one silent row here.
 The two negative anchors (clean-tree-no-errors, fresh-scaffold-passes-all-TREE) are kept
 as named tests — they are the only assertions that the WHOLE checker set stays silent on
 a genuinely valid tree, a property no single-code row can prove.
@@ -455,7 +454,7 @@ def test_silent_matrix(tmp_path: Path, case: str, mutate, code: str | None) -> N
 
 
 # ---------------------------------------------------------------------------
-# (c) TREE fix-behavior: TREE-4 creates dirs; TREE-1/2/3/5/5M/6/7 have NO auto-fix
+# (c) TREE fix-behavior: TREE-4 creates dirs; TREE-2/3/5/5M/6/7 have NO auto-fix
 # ---------------------------------------------------------------------------
 
 
@@ -482,18 +481,6 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
         assert (d / "AGENTS.md").exists()
     residual = [i for i in doctor.check() if i.code == "TREE-4"]
     assert residual == [], f"Residual TREE-4 after fix: {[i.description for i in residual]}"
-
-    # TREE-1: foundation/ is never auto-removed.
-    specs1 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree1"))
-    foundation = specs1 / "foundation"
-    foundation.mkdir()
-    (foundation / "content.md").write_text("# Protected", encoding="utf-8")
-    doctor1 = SpecsDoctor(specs1, templates_dir=_TEMPLATES_DIR)
-    issues1 = doctor1.check()
-    tree1 = [i for i in issues1 if i.code == "TREE-1"]
-    assert tree1 and not tree1[0].fixable
-    doctor1.fix(issues1)
-    assert foundation.exists()
 
     # TREE-2: root SPEC.md is never auto-moved.
     specs2 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree2"))

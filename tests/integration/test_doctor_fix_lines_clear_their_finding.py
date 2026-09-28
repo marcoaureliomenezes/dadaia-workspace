@@ -109,11 +109,6 @@ def _plant_tests_agents_placeholder(root: Path) -> None:
     )
 
 
-def _plant_foundation(root: Path) -> None:
-    (root / "specs" / "foundation").mkdir()
-    (root / "specs" / "foundation" / "vision.md").write_text("# Vision\n", encoding="utf-8")
-
-
 def _plant_root_spec_md(root: Path) -> None:
     (root / "specs" / "SPEC.md").write_text("# Deprecated root spec\n", encoding="utf-8")
 
@@ -168,7 +163,6 @@ PLANTS: dict[str, Plant] = {
     "SPEC-DOC-048": Plant(_plant_origin_line_gone, {"<id>": _RELEASE}),
     "SPEC-DOC-010": Plant(_plant_changelog_heading),
     "AGENTS-PLACEHOLDER-1": Plant(_plant_tests_agents_placeholder),
-    "TREE-1": Plant(_plant_foundation),
     "TREE-2": Plant(_plant_root_spec_md),
     "TREE-3": Plant(
         _plant_missing_memory_document, {"<document>": "QUALITY", "<title>": "Quality"}
@@ -184,7 +178,7 @@ _UNEXERCISED: dict[str, str] = {
     "public fixed-section fragments, which a tmp tree does not carry",
     "MEM-PLACEHOLDER-1": "auto-fixed rule: `doctor --fix` runs its own fixer, covered by "
     "tests/unit/features/specs/test_doctor.py placeholder-atom cases",
-    "SPEC-DOC-003/SPEC-DOC-009": "the fix is `git rm specs/ACTIVE.md` — a deprecated "
+    "SPEC-DOC-003": "the fix is `git rm specs/ACTIVE.md` — a deprecated "
     "layout no longer scaffolded anywhere",
     "SPEC-DOC-007": "the orphan path is operator content; removing it is the operator's "
     "own call, not a fixture assertion",

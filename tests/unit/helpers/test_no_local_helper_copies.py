@@ -35,15 +35,6 @@ _DEF_RE = re.compile(r"^def _?(?:" + "|".join(_CONSOLIDATED_NAMES) + r")\(", re.
 
 _CROSS_IMPORT = "from tests.unit.infrastructure.test_install_target_goldens import"
 
-# SPEC v0.1.64 FR2: the bespoke normalizers are NOT force-migrated — each carries
-# test-specific scrubs. Explicit, cited exemptions only; any NEW file re-declaring a
-# consolidated helper still fails this contract.
-_BESPOKE_EXEMPT = frozenset(
-    {
-        "unit/features/specs/test_doctor_golden.py",
-    }
-)
-
 
 def _test_files() -> list[Path]:
     files = [p for p in tracked_test_files(_TESTS_ROOT.parent) if "_golden" not in p.parts]
@@ -57,8 +48,7 @@ def _test_files() -> list[Path]:
 def test_no_test_file_redeclares_a_consolidated_helper() -> None:
     offenders: list[str] = []
     for path in _test_files():
-        rel = path.relative_to(_TESTS_ROOT).as_posix()
-        if path == _CANONICAL_MODULE or rel in _BESPOKE_EXEMPT:
+        if path == _CANONICAL_MODULE:
             continue
         for match in _DEF_RE.finditer(path.read_text(encoding="utf-8")):
             offenders.append(f"{path.relative_to(_TESTS_ROOT)}: {match.group(0)}...)")

@@ -600,7 +600,6 @@ _V39_ALLOWANCE: dict[str, str] = {
     "SPEC-DOC-003": "sa-unfixable-doctor-findings-say-doctor-fix",
     "SPEC-DOC-007": "sa-unfixable-doctor-findings-say-doctor-fix",
     "SPEC-DOC-008": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "SPEC-DOC-009": "sa-unfixable-doctor-findings-say-doctor-fix",
     "SPEC-DOC-024": "sa-unfixable-doctor-findings-say-doctor-fix",
     "SPEC-DOC-026": "sa-unfixable-doctor-findings-say-doctor-fix",
     "SPEC-DOC-027": "sa-unfixable-doctor-findings-say-doctor-fix",

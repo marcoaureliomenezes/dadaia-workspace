@@ -1,7 +1,7 @@
 """Release validator: the active release, its artifacts, SemVer + ledger invariants.
 
 Single-responsibility sibling of the SpecsDoctor coordinator. Owns the active-release
-lifecycle checks (SPEC-DOC-003/004/005/009), the release ledger invariants (phase<->markers
+lifecycle checks (SPEC-DOC-003/004/005), the release ledger invariants (phase<->markers
 SPEC-DOC-024, unique ids SPEC-DOC-026, naming canon SPEC-DOC-027), plus the family-local
 status/created-date extractors.
 Leaf-only: imports the shared leaves + core, never a sibling validator.
@@ -149,14 +149,8 @@ class ReleaseValidator:
         self.tree: SpecsTree = SpecsTree(specs_dir)
 
     def check_active_md(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-003/009 (v0.5.x, successor to the RELEASE.jsonl fold; v0.5.0
-        FR4/T-050-21A): the active release, resolved by reading ``RELEASE.json``
-        directly (:func:`resolve_active_release`) — ``ACTIVE.md`` is
-        retired, no file stands in its place. SPEC-DOC-009 (a resolved release_id
-        naming a directory that does not exist) is now unreachable in practice:
-        :func:`resolve_live_release_id` only ever returns a release_id it found BY
-        locating that exact directory — kept as a defensive assertion, never dead
-        code behind a docstring, in case a future resolver relaxes that guarantee.
+        """SPEC-DOC-003 (v0.5.0 FR4/T-050-21A): the active release, resolved by reading
+        ``RELEASE.json`` directly (:func:`resolve_active_release`).
         """
         issues: list[SpecsDoctorIssue] = []
         path = self.specs_dir / "releases"
@@ -188,19 +182,6 @@ class ReleaseValidator:
                     path=str(path),
                 )
             )
-        if release:
-            release_dir = self.specs_dir / "releases" / release
-            if not release_dir.exists():
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="SPEC-DOC-009",
-                        severity=Severity.ERROR,
-                        description=(
-                            f"Active release='{release}' but no directory at {release_dir}"
-                        ),
-                        path=str(release_dir),
-                    )
-                )
         return issues
 
     def check_spec_origin(
@@ -409,7 +390,7 @@ class ReleaseValidator:
             return issues
         rdir = self.specs_dir / "releases" / release
         if not rdir.exists():
-            return issues  # release dir issues already reported by SPEC-DOC-009/004
+            return issues  # release dir issues already reported by SPEC-DOC-004
 
         markers = self._active_tasks_markers(release)
 

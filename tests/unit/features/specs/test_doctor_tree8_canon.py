@@ -3,11 +3,8 @@
 v0.5.0 specs-canon closure: TREE-8 tightens from WARN-only/dotfile-exempt to
 ERROR, and its dotfile sweep now reaches the WHOLE specs/ tree, not
 just the root — a directory is kept by its AGENTS.md, never a placeholder file
-(the retired .gitkeep landing-zone mechanism). TREE-1/TREE-2's own deprecated-layout
-paths (specs/foundation/, specs/SPEC.md) stay exempt: those checks already own
-reporting them, fixable=False by explicit design (auto-moving may destroy
-SDD-approved content pending operator consent) — TREE-8 must never additionally
-flag-and-auto-remove either.
+(the retired .gitkeep landing-zone mechanism). TREE-2's deprecated root SPEC.md
+stays exempt: TREE-2 owns it, fixable=False.
 
 TREE-8 is never auto-fixed: ``doctor --fix`` deletes nothing (operator decision D8).
 
@@ -76,13 +73,9 @@ def test_tree8_reports_a_non_canon_path_and_fix_never_deletes_it(tmp_path: Path,
     assert [i for i in doctor.check() if i.code == "TREE-8" and i.path == str(flagged)]
 
 
-def test_tree8_never_flags_the_deprecated_foundation_or_root_spec_md(tmp_path: Path) -> None:
-    """specs/foundation/ and specs/SPEC.md are TREE-1/TREE-2's own deprecated-layout
-    concerns — fixable=False by explicit design (auto-moving may destroy
-    SDD-approved content pending operator consent). TREE-8 must never
-    additionally flag-and-auto-remove either, even though neither is a v6 canon
-    root member (regression seam for a real bug this task's own TDD pass caught:
-    an earlier TREE-8 draft auto-deleted specs/foundation/ under --fix)."""
+def test_tree8_never_removes_foundation_and_defers_root_spec_md(tmp_path: Path) -> None:
+    """--fix never removes specs/foundation/ (an earlier TREE-8 draft auto-deleted it);
+    specs/SPEC.md is TREE-2's, fixable=False."""
     specs_dir = _make_v6_tree(tmp_path)
     foundation = specs_dir / "foundation"
     foundation.mkdir()
@@ -92,13 +85,9 @@ def test_tree8_never_flags_the_deprecated_foundation_or_root_spec_md(tmp_path: P
     doctor = SpecsDoctor(specs_dir)
     issues = doctor.check()
     tree8_paths = {i.path for i in issues if i.code == "TREE-8"}
-    assert str(foundation) not in tree8_paths
     assert str(specs_dir / "SPEC.md") not in tree8_paths
 
-    # TREE-1/TREE-2 still report them, at their own documented fixable=False.
-    tree1 = [i for i in issues if i.code == "TREE-1"]
     tree2 = [i for i in issues if i.code == "TREE-2"]
-    assert tree1 and tree1[0].fixable is False
     assert tree2 and tree2[0].fixable is False
 
     doctor.fix(issues)
