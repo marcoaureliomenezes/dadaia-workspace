@@ -19,12 +19,14 @@ from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import cli_path, fix_line
 from dadaia_workspace.core.platform import detect
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+from tests.fixtures.provider_dist import install_fake_dist
 
 _runner = CliRunner()
 
 
 @pytest.fixture()
-def workspace(tmp_path: Path) -> Path:
+def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    install_fake_dist(monkeypatch, "0.4.8")  # born by the running version the tests pin
     ws = tmp_path / "ws"
     born = _runner.invoke(app, ["init", str(ws), "--harness", "claude"])
     assert born.exit_code == 0, born.output
@@ -39,9 +41,7 @@ def _versions(monkeypatch: pytest.MonkeyPatch, ws: Path, venv: str, running: str
     cli_path(ws).parent.mkdir(parents=True, exist_ok=True)
     cli_path(ws).write_text("#!stub")
     monkeypatch.setattr(VenvPythonEnvironmentManager, "installed_version", lambda self, ws: venv)
-    monkeypatch.setattr(
-        VenvPythonEnvironmentManager, "_running_version", staticmethod(lambda: running)
-    )
+    install_fake_dist(monkeypatch, running)  # the running version, at its one boundary
 
 
 def test_equal_version_reports_already_at_without_harness(
@@ -118,3 +118,32 @@ def test_older_running_version_exits_1_with_the_pinned_fix(
     root = workspace.resolve()
     assert f"fix: {fix_line(root, 'init', str(root))}" in result.output
     assert sorted(p for p in workspace.rglob("*")) == before
+
+
+def test_reinit_sees_an_editable_source_bump(
+    workspace: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """sa-editable-install-reports-a-frozen-version#B3: an editable venv whose dist-info
+    is frozen at 0.1.4 over a 0.4.7 source, against a workspace at 0.1.4, is an upgrade
+    0.1.4 -> 0.4.7 — never 'already at'."""
+    source = tmp_path / "src"
+    source.mkdir()
+    (source / "pyproject.toml").write_text('[tool.poetry]\nversion = "0.4.7"\n')
+    _versions(monkeypatch, workspace, "0.1.4", "0.1.4")
+    install_fake_dist(monkeypatch, "0.1.4", editable_source=source)
+    reconciled: list[str] = []
+    monkeypatch.setattr(
+        init_module, "reconcile_workspace",
+        lambda root, *, expected_version, **_: reconciled.append(expected_version)
+        or type("R", (), {"ok": True, "error": None})(),
+    )  # fmt: skip
+    monkeypatch.setattr(
+        init_module.container, "build_spec_context_service",
+        lambda root: type("S", (), {"refresh_hooks": lambda _s: None})(),
+    )  # fmt: skip
+
+    result = _runner.invoke(app, ["init", str(workspace)])
+
+    assert "upgraded 0.1.4 -> 0.4.7" in result.output, result.output
+    assert reconciled == ["0.4.7"]
+    assert "already at" not in result.output

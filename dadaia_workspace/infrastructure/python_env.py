@@ -25,6 +25,7 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceVenvNewerError,
 )
 from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.infrastructure.provider_version import provider_version
 
 __all__ = [
     "VenvPythonEnvironmentManager",
@@ -348,7 +349,7 @@ class VenvPythonEnvironmentManager:
         if repacked is None:
             raise WorkspaceVenvBootstrapError(
                 "workspace venv bootstrap cannot mirror the running distribution: "
-                f"dadaia-workspace {metadata.version('dadaia-workspace')} is neither a "
+                f"dadaia-workspace {provider_version()} is neither a "
                 "source checkout nor a re-packable installed distribution. Point "
                 "DADAIA_BOOTSTRAP_PACKAGE at a local wheel and retry, e.g. "
                 "DADAIA_BOOTSTRAP_PACKAGE=/path/to/dadaia_workspace-X.Y.Z-py3-none-any.whl "
@@ -614,12 +615,7 @@ class VenvPythonEnvironmentManager:
                 "test validation (ci preflight, closure gate) will report it missing"
             )
 
-    @staticmethod
-    def _running_version() -> str | None:
-        try:
-            return metadata.version("dadaia-workspace")
-        except metadata.PackageNotFoundError:
-            return None
+    _running_version = staticmethod(provider_version)
 
     @staticmethod
     def _running_requires_python() -> str | None:

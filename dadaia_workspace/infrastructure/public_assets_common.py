@@ -11,13 +11,13 @@ import json
 import os
 from collections.abc import Iterable
 from enum import StrEnum
-from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from dadaia_workspace.infrastructure.privacy_check import (
     _PUBLIC_ASSET_IGNORED_DIRS,
     _PUBLIC_ASSET_IGNORED_SUFFIXES,
 )
+from dadaia_workspace.infrastructure.provider_version import provider_version
 
 _SCHEMA_VERSION = "1"
 
@@ -106,10 +106,7 @@ def _entry_digest(path: Path) -> str | None:
 
 
 def _package_version() -> str:
-    try:
-        return version("dadaia-workspace")
-    except PackageNotFoundError:
-        return "editable"
+    return provider_version() or "editable"
 
 
 def _json_dump(data: object) -> str:

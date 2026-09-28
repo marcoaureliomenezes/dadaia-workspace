@@ -3,7 +3,6 @@
 import json
 from dataclasses import replace
 from datetime import UTC, datetime
-from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
@@ -11,13 +10,11 @@ from dadaia_workspace.core.models.export import SCHEMA_VERSION, ExportResult
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from dadaia_workspace.infrastructure.provider_version import provider_version
 
 
 def _dadaia_version() -> str:
-    try:
-        return version("dadaia-workspace")
-    except PackageNotFoundError:
-        return "editable"
+    return provider_version() or "editable"
 
 
 def _record(ctx: SpecContextProject, last_sync_at: str | None) -> dict[str, object]:

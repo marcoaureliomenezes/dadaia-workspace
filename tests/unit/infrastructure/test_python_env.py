@@ -19,6 +19,7 @@ import pytest
 import dadaia_workspace.infrastructure.python_env as python_env_module
 from dadaia_workspace.core.platform import PLATFORM, detect
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+from tests.fixtures.provider_dist import install_fake_dist
 
 # Captured at collection/import time — the conftest autouse monkeypatch only applies
 # while a test runs, so this is the unpatched production method.
@@ -74,7 +75,7 @@ def recorder(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _Recorder:
 
 @pytest.fixture()
 def running_100(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(python_env_module.metadata, "version", lambda name: "1.0.0")
+    install_fake_dist(monkeypatch, "1.0.0")  # the running version, at its one boundary
 
 
 def _entrypoint(ws: Path) -> Path:

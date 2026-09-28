@@ -5,7 +5,6 @@ from __future__ import annotations
 import shutil
 import uuid
 from dataclasses import asdict, dataclass
-from importlib import metadata
 from pathlib import Path
 from typing import Any
 
@@ -24,13 +23,6 @@ class ReconcileResult:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
-
-
-def _distribution_version() -> str:
-    try:
-        return metadata.version("dadaia-workspace")
-    except metadata.PackageNotFoundError:
-        return "0+source"
 
 
 def _snapshot_state(workspace_root: Path) -> tuple[Path, dict[Path, Path | None]]:
@@ -69,7 +61,7 @@ def reconcile_workspace(
     actual_version: str | None = None,
 ) -> ReconcileResult:
     """Converge a workspace after an exact candidate wheel has been installed."""
-    actual = actual_version or _distribution_version()
+    actual = actual_version or distribution_version()
     if actual != expected_version:
         return ReconcileResult(
             ok=False,
