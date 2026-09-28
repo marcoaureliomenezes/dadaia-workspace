@@ -14,9 +14,11 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
+
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import best_match
 
 from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
@@ -126,10 +128,7 @@ def _behavior_content_drift(behavior: dict[str, Any], package_root: Path) -> lis
     implementation descriptions must still resolve to a real source file.
     """
     out: list[DoctorLine] = []
-    implementations = behavior.get("implementations", {})
-    if not isinstance(implementations, Mapping):
-        return out
-    for harness_name, impl_text in implementations.items():
+    for harness_name, impl_text in behavior.get("implementations", {}).items():
         if not isinstance(impl_text, str):
             continue
         for match in _ENT_DERIVE_MODULE_REF_RE.finditer(impl_text):
@@ -187,35 +186,19 @@ def _persona_content_drift(agent_id: str, agents_dir: Path) -> list[DoctorLine]:
     return []
 
 
-def _entities_registry_shape_problem(raw: Any) -> str | None:
-    """The single shape-tolerance seam for ``check_entities_derivation`` (ENT-DERIVE-1).
-
-    Returns a human-readable description of the first shape violation found, or
-    ``None`` when ``raw`` is safe for every ``.get``/iteration the caller performs
-    downstream. Deliberately does not validate ``rules``/``universal`` — this check
-    never reads those sections (only ``schema_version``, ``personas`` and
-    ``behaviors[*].implementations``), so nothing beyond that is shape-checked here.
-    """
-    if not isinstance(raw, dict):
-        return f"registry top level is a JSON {type(raw).__name__}, expected an object"
-
-    personas = raw.get("personas", [])
-    if not isinstance(personas, list) or not all(isinstance(p, dict) for p in personas):
-        return "'personas' is not a list of JSON objects"
-
-    behaviors = raw.get("behaviors", [])
-    if not isinstance(behaviors, list) or not all(isinstance(b, dict) for b in behaviors):
-        return "'behaviors' is not a list of JSON objects"
-
-    for behavior in behaviors:
-        implementations = behavior.get("implementations", {})
-        if not isinstance(implementations, Mapping):
-            return (
-                f"behavior '{behavior.get('id')}' implementations is a "
-                f"{type(implementations).__name__}, expected a JSON object"
-            )
-
-    return None
+#: The registry shape check_entities_derivation reads; ``rules``/``universal`` are never read.
+_REGISTRY_SCHEMA = {
+    "type": "object",
+    "required": ["schema_version"],
+    "properties": {
+        "schema_version": {"const": "agentic-entities-v1"},
+        "personas": {"type": "array", "items": {"type": "object"}},
+        "behaviors": {
+            "type": "array",
+            "items": {"type": "object", "properties": {"implementations": {"type": "object"}}},
+        },
+    },
+}
 
 
 def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
@@ -224,7 +207,7 @@ def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
     Independent verifier read — deliberately shares no loader with the scaffold, so a
     loader bug cannot vouch for itself. Attests:
 
-    1. ``public/entities/registry.json`` exists, parses, and carries the expected schema.
+    1. ``public/entities/registry.json`` exists, parses, and validates :data:`_REGISTRY_SCHEMA`.
     2. Persona ↔ core sub-agent bijection: every ``public/agents/*.md`` derives from a
        Persona and every Persona has its derived sub-agent — BY NAME, plus, for every
        correctly-bijected pair, the sub-agent's own frontmatter is parseable and its
@@ -253,30 +236,16 @@ def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
             )
         ]
 
-    # Shape-validate the parsed JSON HERE, once, so every line below this seam may
-    # assume the shape it needs — no isinstance scattered downstream. A malformed-but
-    # -valid-JSON registry (wrong top-level type, non-dict entries, a string standing
-    # in for a mapping) must never reach ``.get``/``set(...)`` and raise
-    # AttributeError/TypeError, and must never be silently misread into a wrong DRIFT
-    # line (e.g. ``set("codex")`` iterating characters as if they were harness ids).
-    shape_problem = _entities_registry_shape_problem(raw_registry)
-    if shape_problem is not None:
+    problem = best_match(Draft202012Validator(_REGISTRY_SCHEMA).iter_errors(raw_registry))
+    if problem is not None:
+        where = "/".join(map(str, problem.absolute_path)) or "registry"
         return [
             DoctorLine(
                 DoctorStatus.ERROR,
-                f"entities-derivation: {shape_problem} (ENT-DERIVE-1)",
+                f"entities-derivation: {where}: {problem.message} (ENT-DERIVE-1)",
             )
         ]
     registry: dict[str, Any] = raw_registry
-
-    if registry.get("schema_version") != "agentic-entities-v1":
-        return [
-            DoctorLine(
-                DoctorStatus.ERROR,
-                "entities-derivation: registry schema_version is not "
-                "'agentic-entities-v1' (ENT-DERIVE-1)",
-            )
-        ]
 
     out: list[DoctorLine] = []
     personas = {str(p.get("id")) for p in registry.get("personas", [])}
