@@ -17,6 +17,7 @@ import pytest
 
 from dadaia_workspace.core.specs_repair import is_placeholder_atom
 from dadaia_workspace.features.migrate import upgrade as upgrade_feat
+from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.features.specs.canon import scaffold
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 
@@ -118,7 +119,7 @@ def test_upgrade_dry_run_reports_without_deleting(tmp_path: Path) -> None:
     atom = specs / "memory" / "product" / "feature.md"
     atom.write_text(_PLACEHOLDER_ATOM, encoding="utf-8")
 
-    upgrade_feat.upgrade(specs, dry_run=True)
+    upgrade_feat.upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name), dry_run=True)
     assert atom.exists(), "dry-run must not delete"
 
 

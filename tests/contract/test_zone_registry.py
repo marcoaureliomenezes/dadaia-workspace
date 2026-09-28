@@ -112,9 +112,6 @@ _SET_HOME: dict[str, str] = {
 _SECOND_LIST_BIRTH = 8
 _SECOND_LIST_ALLOWANCE: dict[str, str] = {
     "dadaia_workspace/features/backlog/doctor.py": "sa-backlog-status-has-no-single-authority",
-    "dadaia_workspace/features/migrate/upgrade.py": (
-        "sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges"
-    ),
     "dadaia_workspace/features/specs/doctor_closure_audit.py": "sa-release-json-validated-three-times",
     "dadaia_workspace/features/specs/doctor_release.py": "sa-release-json-validated-three-times",
     "dadaia_workspace/public/skills/dd-audit-project/scripts/_audit_schema.py": _LEDGER,

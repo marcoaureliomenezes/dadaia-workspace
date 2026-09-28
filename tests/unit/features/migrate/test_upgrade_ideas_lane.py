@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.features.migrate.upgrade import plan_empty_ideas_dir, remove_empty_ideas_dir
+from dadaia_workspace.features.spec_context import sweep
 
 pytestmark = pytest.mark.unit
 
@@ -17,7 +18,7 @@ def test_an_ideas_dir_with_only_agents_md_is_removed(tmp_path: Path) -> None:
     ideas.mkdir(parents=True)
     (ideas / "AGENTS.md").write_text("# ideas\n", encoding="utf-8")
     assert plan_empty_ideas_dir(tmp_path) == [ideas]
-    assert remove_empty_ideas_dir(tmp_path) == [ideas]
+    assert remove_empty_ideas_dir(tmp_path, lambda p: sweep.remove(tmp_path, p, p.name)) == [ideas]
     assert not ideas.exists()
 
 
@@ -26,9 +27,9 @@ def test_an_ideas_dir_holding_a_draft_is_left_alone(tmp_path: Path) -> None:
     ideas.mkdir(parents=True)
     (ideas / "SPEC.md").write_text("draft\n", encoding="utf-8")
     assert plan_empty_ideas_dir(tmp_path) == []
-    assert remove_empty_ideas_dir(tmp_path) == []
+    assert remove_empty_ideas_dir(tmp_path, lambda p: sweep.remove(tmp_path, p, p.name)) == []
     assert ideas.exists()
 
 
 def test_no_ideas_dir_is_a_no_op(tmp_path: Path) -> None:
-    assert remove_empty_ideas_dir(tmp_path) == []
+    assert remove_empty_ideas_dir(tmp_path, lambda p: sweep.remove(tmp_path, p, p.name)) == []

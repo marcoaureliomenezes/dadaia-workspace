@@ -17,7 +17,6 @@ import sys
 from pathlib import Path
 
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
-from dadaia_workspace.features.specs.doctor_structural import StructuralValidator
 
 _MARKER = "specs_pattern_version"
 
@@ -142,6 +141,7 @@ def _seed_v6_tree(root: Path, architecture: str) -> Path:
 
 
 def test_upgrade_folds_techstack_into_architecture_and_deletes_it(tmp_path: Path) -> None:
+    """sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges#47.2: the stamp written is exactly CANONICAL_SPECS_VERSION."""
     specs = _seed_v6_tree(tmp_path, _V6_ARCHITECTURE)
 
     upgrade = _cli(tmp_path, "specs", "upgrade", "--specs-dir", str(specs))
@@ -164,25 +164,29 @@ def test_upgrade_folds_techstack_into_architecture_and_deletes_it(tmp_path: Path
     )
 
 
-def test_upgrade_leaves_a_two_tier_tree_alone_and_the_doctor_names_it(tmp_path: Path) -> None:
-    """A tree still organised as Part 1 / Part 2 has nowhere safe to append a section:
-    the hop declines to corrupt it, and the doctor is what tells the operator."""
+def test_upgrade_refuses_a_two_tier_tree_without_stamping_or_writing(tmp_path: Path) -> None:
+    """sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges#47.3 (ADR 0082):
+    a v6 tree organised as Part 1 / Part 2 has nowhere safe to fold into — the upgrade
+    refuses, non-zero, stamp still 6, the tree byte-identical."""
     two_tier = "# Architecture\n\n## Part 1 — Principles\n\nx\n\n## Part 2 — Implementation\n\ny\n"
     specs = _seed_v6_tree(tmp_path, two_tier)
+    before = _snapshot(specs)
 
     upgrade = _cli(tmp_path, "specs", "upgrade", "--specs-dir", str(specs))
 
-    assert upgrade.returncode == 0, upgrade.stderr or upgrade.stdout
-    assert (specs / "memory" / "TECHSTACK.md").read_text(encoding="utf-8") == _V6_TECHSTACK
-    # The fold declined: the authored body is untouched and gains no `## Tech Stack`;
-    # only the library-owned fixed law block is appended, as `doctor --fix` would (T-048-05).
-    architecture = (specs / "memory" / "ARCHITECTURE.md").read_text(encoding="utf-8")
-    assert architecture.startswith(two_tier)
-    assert "## Tech Stack" not in architecture
+    assert upgrade.returncode != 0, upgrade.stdout
+    assert "two-tier" in (upgrade.stderr + upgrade.stdout)
+    assert _snapshot(specs) == before
+    assert f"{_MARKER}: 6" in (specs / "constitution.md").read_text(encoding="utf-8")
 
-    findings = StructuralValidator(specs, None, None).check_tree8_canon_root()
 
-    assert any("TECHSTACK.md" in issue.path for issue in findings), (
-        "the doctor's canon sweep names the file the hop declined to fold; "
-        f"found {[issue.path for issue in findings]!r}"
-    )
+def test_upgrade_has_no_target_option(tmp_path: Path) -> None:
+    """sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges#47.1: `--target` is gone — a usage error (exit 2), nothing written."""
+    specs = _seed_v6_tree(tmp_path, _V6_ARCHITECTURE)
+    before = _snapshot(specs)
+
+    upgrade = _cli(tmp_path, "specs", "upgrade", "--specs-dir", str(specs), "--target", "99")
+
+    assert upgrade.returncode == 2
+    assert "No such option" in upgrade.stderr
+    assert _snapshot(specs) == before

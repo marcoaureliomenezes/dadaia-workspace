@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -24,6 +25,7 @@ from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.migrate import upgrade as upgrade_feature
 from dadaia_workspace.features.migrate.registry import UpgradeRefused
 from dadaia_workspace.features.migrate.upgrade import UpgradeResult
+from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.features.specs import Severity, SpecsDoctor, SpecsDoctorIssue, canon
 from dadaia_workspace.infrastructure.ledger_scripts import script_repairs
 
@@ -39,9 +41,6 @@ def upgrade(
     specs_dir: str | None = typer.Option(
         None, "--specs-dir", help="Path to specs/ directory. Default: bound context."
     ),
-    target: int | None = typer.Option(
-        None, "--target", help="Target pattern version. Default: the canonical version."
-    ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Plan only — no writes."),
 ) -> None:
     """Upgrade a specs/ tree to the canonical pattern version.
@@ -52,7 +51,7 @@ def upgrade(
     """
     resolved = _resolve_specs_dir(specs_dir)
     try:
-        result = upgrade_feature.upgrade(resolved, target=target, dry_run=dry_run)
+        result = upgrade_feature.upgrade(resolved, remove=_deleter(resolved), dry_run=dry_run)
     except SymlinkRefusedError as exc:
         _refuse_symlink(exc)
     except UpgradeRefused as exc:
@@ -76,6 +75,11 @@ def _repair(specs: Path, *, dry_run: bool) -> tuple[list[SpecsDoctorIssue], list
         return fixable, []
     fixed = doctor.fix(fixable)
     return fixed, [i for i in doctor.check() if i.severity is Severity.ERROR and i.fix]
+
+
+def _deleter(specs: Path) -> Callable[[Path], object]:
+    """The one guarded deleter (``sweep.remove``) scoped to the specs tree."""
+    return lambda path: sweep.remove(specs, path, path.name)
 
 
 def _echo_upgrade(specs: Path, result: UpgradeResult) -> bool:
@@ -171,7 +175,7 @@ def init(
         _move_foreign(target, rerun, replace_foreign)
     elif kind == "dadaia":
         try:
-            if _echo_upgrade(target, upgrade_feature.upgrade(target)):
+            if _echo_upgrade(target, upgrade_feature.upgrade(target, remove=_deleter(target))):
                 raise typer.Exit(1)
         except SymlinkRefusedError as exc:
             _refuse_symlink(exc)

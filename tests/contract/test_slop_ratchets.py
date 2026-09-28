@@ -517,8 +517,6 @@ _V38_ALLOWANCE: dict[str, str] = {
     "core/session_store.py:reap_stale": "sa-bind-has-two-stores",
     "features/certification/service.py:certify": "sa-reconcile-certify-skip-the-workspace-walk",
     "features/migrate/state_v2.py:execute_migration": "sa-registry-schema-version-has-three-grammars",
-    "features/migrate/upgrade.py:fold_tech_stack": "sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges",
-    "features/migrate/upgrade.py:remove_empty_ideas_dir": "sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges",
     "features/reconcile/service.py:_restore_state": "sa-reconcile-certify-skip-the-workspace-walk",
     "features/reconcile/service.py:reconcile_workspace": "sa-reconcile-certify-skip-the-workspace-walk",
     "features/specs/doctor_memory.py:fix_placeholder_atom": "sa-memory-atom-has-two-grammars",

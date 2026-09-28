@@ -81,7 +81,11 @@ _DOCTOR_CEILING = 6
 # symlink-refusing `core.atomic_write`. Authorized, task-declared deletion.
 # Re-pinned at 0.5.0 T-050-31 completion (WP-14 #B4): upgrade's placeholder writer is
 # deleted (the doctor's repair set owns it); the field left is ideas_removed. Deletion only.
-_UPGRADE_MODULE_SHA256 = "4c6bb43055175c7ab1f0f3a0bc7c111296fe7d6c3ca6b39acba03579c990f104"
+# Re-pinned at 0.5.0 T-050-60 (WP-47, ADR 0082): `target` is deleted (the one target is
+# CANONICAL_SPECS_VERSION) and a two-tier tree is refused before any write. Authorized.
+# Re-pinned at T-050-60 drain: the hop's deletes go through the injected one deleter
+# (sweep.remove) and the trio name list is gone. Authorized, task-declared change.
+_UPGRADE_MODULE_SHA256 = "9bcb9fb49d1d455d36af17e17c9b5ae5eb0594057593576296f5ebb1cd4daacc"
 
 
 def _complexity_by_name(path: Path) -> dict[str, int]:

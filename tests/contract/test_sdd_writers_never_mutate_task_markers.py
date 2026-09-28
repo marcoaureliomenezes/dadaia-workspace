@@ -212,14 +212,14 @@ def test_ctx_inject_hook_never_mutates_tasks_md_content(tmp_path: Path) -> None:
 
 
 def test_migration_registry_check_upgradable_performs_no_filesystem_io() -> None:
-    """`check_upgradable` is a pure predicate over two ints — it cannot mutate
+    """`check_upgradable` is a pure predicate over one int — it cannot mutate
     `specs/releases/**` (or anything else) because it never opens a path at all."""
     # Silent (no exception) at or above the floor: no write, nothing to assert against.
-    migrate_registry.check_upgradable(current=6, goal=6)
+    migrate_registry.check_upgradable(current=6)
 
     # Below the floor: raises, still no write.
     with pytest.raises(migrate_registry.UpgradeRefused):
-        migrate_registry.check_upgradable(current=0, goal=6)
+        migrate_registry.check_upgradable(current=0)
 
 
 # ---------------------------------------------------------------------------------------

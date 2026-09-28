@@ -20,6 +20,7 @@ from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.atomic_write import SymlinkRefusedError, atomic_write
 from dadaia_workspace.core.gitflow import merge_frontmatter
 from dadaia_workspace.features.migrate.upgrade import upgrade
+from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.features.specs import SpecsDoctor, canon
 
 pytestmark = pytest.mark.unit
@@ -102,7 +103,7 @@ def test_b1_the_tech_stack_fold_refuses_a_symlinked_architecture_md(tmp_path: Pa
     (specs / "memory" / "TECHSTACK.md").write_text("# Tech\n\npython\n", encoding="utf-8")
 
     with pytest.raises(SymlinkRefusedError):
-        upgrade(specs)
+        upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name))
 
     assert outside.read_text(encoding="utf-8") == "# Architecture\n"
 

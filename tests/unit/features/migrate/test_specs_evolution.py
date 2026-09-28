@@ -25,6 +25,7 @@ from dadaia_workspace.core import specs_version as _version
 from dadaia_workspace.core.gitflow import merge_frontmatter
 from dadaia_workspace.features.migrate import registry as _registry
 from dadaia_workspace.features.migrate import upgrade as _upgrade
+from dadaia_workspace.features.spec_context import sweep
 
 
 def _write_constitution(specs_dir: Path, body: str) -> Path:
@@ -80,15 +81,16 @@ def test_write_version_creates_and_updates_stamp(tmp_path: Path) -> None:
 
 
 def test_check_upgradable_refuses_below_floor_and_is_silent_at_or_above_it() -> None:
-    """A-10.1: "the registry refuses <6 with the upgrade instruction"."""
+    """A-10.1: "the registry refuses <6 with the upgrade instruction"; sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges#47.1 /
+    sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges#47.2: the rule takes the tree's version only — no caller-supplied goal."""
     with pytest.raises(_registry.UpgradeRefused, match="0.4.x"):
-        _registry.check_upgradable(current=0, goal=6)
+        _registry.check_upgradable(current=0)
     with pytest.raises(_registry.UpgradeRefused, match="0.4.x"):
-        _registry.check_upgradable(current=5, goal=6)
+        _registry.check_upgradable(current=5)
 
     # At, or past, the floor: no exception (the caller treats it as "nothing to do").
-    _registry.check_upgradable(current=6, goal=6)
-    _registry.check_upgradable(current=7, goal=6)
+    _registry.check_upgradable(current=6)
+    _registry.check_upgradable(current=7)
 
 
 # ───────────────────────────── upgrade (FR-S05) ────────────────────────────────
@@ -101,9 +103,9 @@ def test_upgrade_refuses_below_floor_without_any_write(tmp_path: Path) -> None:
     _write_constitution(specs, "# C\n")  # version 0, below the canonical floor
 
     with pytest.raises(_registry.UpgradeRefused):
-        _upgrade.upgrade(specs, dry_run=True)
+        _upgrade.upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name), dry_run=True)
     with pytest.raises(_registry.UpgradeRefused):
-        _upgrade.upgrade(specs, dry_run=False)
+        _upgrade.upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name), dry_run=False)
 
     assert not (tmp_path / "specs_bkp").exists()
     assert _version.read_pattern_version(specs) == 0
@@ -118,16 +120,16 @@ def test_upgrade_at_or_above_floor_is_idempotent_and_repairs_placeholders(
     stamp = _version.CANONICAL_SPECS_VERSION
     _write_constitution(specs, f"---\nspecs_pattern_version: {stamp}\n---\n# C\n")
 
-    result = _upgrade.upgrade(specs)
+    result = _upgrade.upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name))
     assert result.from_version == stamp
     assert result.to_version == stamp
     assert result.ideas_removed == []
 
     # Dry-run at the floor plans nothing and writes nothing.
-    dry = _upgrade.upgrade(specs, dry_run=True)
+    dry = _upgrade.upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name), dry_run=True)
     assert dry.dry_run is True
     assert dry.no_op is True
 
     # Re-running is stable (idempotent).
-    second = _upgrade.upgrade(specs)
+    second = _upgrade.upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name))
     assert second.no_op is True

@@ -49,17 +49,13 @@ class UpgradeRefused(Exception):
 UPGRADABLE_FROM = OLDEST_UPGRADABLE_VERSION
 
 
-def check_upgradable(current: int, goal: int) -> None:
-    """Raise :class:`UpgradeRefused` when the tree sits below what this release walks.
-
-    ``current >= goal`` (already at, or somehow past, the floor) is deliberately
-    NOT an error here — the caller (:mod:`features.migrate.upgrade`) treats it as
-    "nothing to migrate." ``UPGRADABLE_FROM <= current < goal`` is the one live hop.
-    """
-    if current < min(goal, UPGRADABLE_FROM):
+def check_upgradable(current: int) -> None:
+    """Raise :class:`UpgradeRefused` when the tree sits below what this release walks;
+    at or above :data:`UPGRADABLE_FROM` the caller walks the hop or finds nothing to do."""
+    if current < UPGRADABLE_FROM:
         raise UpgradeRefused(
-            f"specs pattern version {current} is below {goal}, and this release no "
-            "longer carries the migration chain that reaches it. Upgrade this specs/ "
+            f"specs pattern version {current} is below {UPGRADABLE_FROM}, and this release "
+            "no longer carries the migration chain that reaches it. Upgrade this specs/ "
             "tree with dadaia-workspace 0.4.x first (its `dadaia specs upgrade` still "
             "carries the retired chain), then upgrade again to this release."
         )
