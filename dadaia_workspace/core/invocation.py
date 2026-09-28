@@ -1,53 +1,8 @@
 """One Invocation — the single session/context/root/mode resolution authority.
 
-Release 0.5.1 candidate K1 (2026-08-28 deepening audit): "which session, which
-context, which root, which mode" used to be answered by eight deciders reading the
-same files with four different staleness rules (``core.specs_resolver.resolve_context``,
-``cli._specs_resolution`` re-adding two rungs, ``container.resolve_context`` (0
-callers), ``container._context_specs_dir`` (a fifth rung), ``hooks.ctx_inject``'s own
-two-step resolution, ``hooks.sdd_post_gate._bound_context``, ``hooks.sdd_gate``'s
-``_context_slug``/``_resolve_mode``, and ``cli.commands.context``'s own session
-loader+staleness check) — and the session record was keyed by one session id and read
-back by another. This module is the replacement, not a ninth layer on top: everything
-above now calls :func:`resolve` once and reads the fields it needs off the returned
-:class:`Invocation`.
-
-the root `AGENTS.md` map §3 context-resolution law, verbatim, plus rung 0 (a caller's own explicit
-input, which the law has always allowed a verb to pass):
-
-    rung 0  ``explicit``, or the context derived from an explicit write TARGET
-            (``target_path``) under ``<workspace_root>/repos/<slug>/``.
-    rung 1  the bind (:func:`resolve_bind`): the session's own LIVE record when it has
-            an id, else ``DADAIA_CONTEXT``.
-    rung 2  the repo containing the current working directory.
-
-**The root-vs-target bug** (open bug
-``sdd-gate-memory-phase-resolves-empty-when-cwd-is-a-linked-worktree-outside-repos``):
-every rung above is only as correct as the ``workspace_root`` they all share, and the
-OLD ladder derived that root from ``cwd`` alone — even when a ``target_path`` was
-already known (the gate's own write target). A cwd sitting inside a nested, ALSO
-sentinel-bearing sandbox workspace (a scratch worktree with its own
-``.dadaia/states/spec_contexts.json``, e.g. a throwaway workspace built for a test or a
-sub-agent) walks UP from that cwd and stops at the nested sandbox root — the wrong one
-— even though the actual write target lives under a different, real, outer root
-entirely. :func:`resolve` fixes this structurally: when a ``target_path`` is given, the
-workspace root is walked from the TARGET's own location first (which structurally can
-only land on the root that actually owns it), and only falls back to a cwd-based walk
-when no target is given or the target-based walk fails. One root, resolved once,
-consistently, for every rung in the same call — not "root from cwd, context from
-target" as two independently-wrong answers that happen to usually agree.
-
-Session records (bind/read/touch — GC lives in ``features.spec_context.doctor``, out of
-K1 scope) are owned by :mod:`dadaia_workspace.core.session_store`, moved here from
-``features.spec_context.session_identity`` in the same release: this module needs to
-read a session record directly, and ``core`` cannot import ``features``.
-
-Layering: a pure ``core`` leaf. It performs file I/O (the workspace/session/registry/
-release-state reads every rung needs) — an authorized exception in
-``tests/contract/test_core_file_io_purity.py`` (architect A9), same precedent as
-``specs_resolver``/``workspace_resolver`` before it. No upward import (constitution
-§6): hooks (P-12) and the CLI seam (``cli._specs_resolution``) are its sanctioned
-direct importers (``bind-resolution-seam-is-a-single-home``, ZERO ``ignore_imports``).
+Rungs (the root map §3): 0 ``explicit`` or the context owning an explicit write target under
+``repos/<slug>/``; 1 the session's bind; 2 the repo containing the cwd. The workspace root is
+walked from the target first, so a cwd inside a nested sandbox never shadows the real root.
 """
 
 from __future__ import annotations
@@ -85,10 +40,8 @@ __all__ = [
     "sanitize_session_id",
 ]
 
-#: Harness-native session-id env vars, in resolution order — Claude before Codex.
-#: ``CODEX_THREAD_ID`` is ordered AFTER ``CODEX_SESSION_ID`` deliberately: a modern
-#: Codex tool subprocess exposes ``CODEX_THREAD_ID`` *instead of* ``CODEX_SESSION_ID``,
-#: but when both happen to be present ``CODEX_SESSION_ID`` remains preferred.
+#: Harness-native session-id env vars, in resolution order (a modern Codex subprocess
+#: exposes ``CODEX_THREAD_ID`` instead of ``CODEX_SESSION_ID``).
 HARNESS_SESSION_ID_ENV_VARS: tuple[str, ...] = (
     "CLAUDE_CODE_SESSION_ID",
     "CODEX_SESSION_ID",
@@ -100,12 +53,8 @@ _SESSION_ID_STRIP = re.compile(r"[^A-Za-z0-9_-]")
 
 @dataclass(frozen=True)
 class Bind:
-    """The SESSION's own binding: the context it named, and every repo slug that
-    context owns (its main repo plus its associated repos — ``all_repos()``).
-
-    Unbound is ``context_name=None`` with an empty ``repos``: an unbound session is
-    never scope-blocked, because the gate cannot attribute its writes to any context.
-    """
+    """The session's own binding: its context and every repo slug that context owns.
+    Unbound (``None``, empty ``repos``) is never scope-blocked."""
 
     context_name: str | None = None
     repos: frozenset[str] = frozenset()
@@ -113,18 +62,9 @@ class Bind:
 
 @dataclass(frozen=True)
 class Invocation:
-    """One resolved answer to "which session, which context, which root, which mode".
-
-    ``workspace_root``/``context_name``/``specs_dir`` are ``None`` when unresolvable
-    (every rung fails soft — matches the prior ladders' contract). ``repo_slug`` is the
-    ``repos/<slug>`` on-disk directory for ``context_name`` (identical to
-    ``context_name`` unless the registry names a different one). ``bind`` is the
-    SESSION's OWN binding — a
-    different question from ``context_name``, which the write TARGET may decide: the
-    gate's scope rule compares the two. ``rung`` names which rung
-    supplied ``context_name`` (``"explicit"``, ``"target_path"``, ``"env"``,
-    ``"session"``, ``"cwd"``, or ``"none"``) — diagnostic, never consulted for policy.
-    """
+    """One resolved answer to "which session, which context, which root"; unresolvable fields
+    are ``None``. ``bind`` is the session's own binding, which the gate compares with the
+    target-decided ``context_name``; ``rung`` is diagnostic only."""
 
     workspace_root: Path | None
     session_id: str | None
@@ -133,11 +73,6 @@ class Invocation:
     specs_dir: Path | None
     bind: Bind
     rung: str
-
-
-# ---------------------------------------------------------------------------
-# Session id — the ONE rule (payload first, then env; DADAIA_SESSION_ID overrides both).
-# ---------------------------------------------------------------------------
 
 
 def sanitize_session_id(raw: str | None) -> str:
@@ -151,33 +86,14 @@ def resolve_session_id(
     *,
     default: str = "",
 ) -> str:
-    """Resolve the harness-native session id, sanitized — the ONE session-id rule.
-
-    Order: the explicit ``DADAIA_SESSION_ID`` override (eval-flow contract, always
-    first) -> the hook payload's ``session_id`` field (the harness's live truth for
-    THIS invocation) -> :data:`HARNESS_SESSION_ID_ENV_VARS` (which may be INHERITED
-    from a parent shell and stale) -> *default*. A CLI-minted ``sess_*`` id is never a
-    member of this rule — minting (when a caller has no resolvable identity at all and
-    still needs one to persist a record under, e.g. ``dadaia context bind --print-env``
-    in a plain shell) is a distinct, write-side concern the CLI bind command owns for
-    itself; it is never something a READER of session state should invent.
-    """
-    fields = (payload or {}).get  # every harness's payload key for its session (ADR 0054)
+    """The one session-id rule, sanitized: ``DADAIA_SESSION_ID``, then the hook payload's id,
+    then :data:`HARNESS_SESSION_ID_ENV_VARS` (possibly inherited and stale), then *default*."""
+    fields = (payload or {}).get  # every harness's payload key for its session
     candidate = env.get("DADAIA_SESSION_ID") or str(
         fields("session_id") or fields("conversation_id") or fields("sessionId") or ""
     )
-    if not candidate:
-        for name in HARNESS_SESSION_ID_ENV_VARS:
-            candidate = env.get(name) or ""
-            if candidate:
-                break
-    sanitized = sanitize_session_id(candidate)
-    return sanitized or default
-
-
-# ---------------------------------------------------------------------------
-# Registry — context NAME <-> repo SLUG (single home, replaces the mirrored lookups).
-# ---------------------------------------------------------------------------
+    candidate = candidate or next(filter(None, map(env.get, HARNESS_SESSION_ID_ENV_VARS)), "")
+    return sanitize_session_id(candidate) or default
 
 
 def _registry_contexts(workspace_root: Path) -> list[dict[str, object]]:
@@ -192,9 +108,7 @@ def _registry_contexts(workspace_root: Path) -> list[dict[str, object]]:
 
 
 def alive_context_names(workspace_root: Path) -> list[str]:
-    """The NAME of every ALIVE context — what ``context bind`` accepts — fail-soft to
-    ``[]`` (F008: the ONE fail-soft registry read family lives here — hooks import it,
-    never a private re-parse; ``JsonContextStore`` stays the schema-gated CRUD authority)."""
+    """The name of every ALIVE context (what ``context bind`` accepts), fail-soft to ``[]``."""
     return [
         str(entry["name"])
         for entry in _registry_contexts(workspace_root)
@@ -220,24 +134,20 @@ def repo_slug_for_context(workspace_root: Path, name: str) -> str | None:
 
 
 def context_name_for_repo_slug(workspace_root: Path, slug: str) -> str | None:
-    """Inverse of :func:`repo_slug_for_context`: the NAME whose main or associated repo
-    is *slug* (A16.4), or ``None`` when no registered context owns it."""
+    """The context whose main or associated repo is *slug*, or ``None``."""
     owner = _owning_entry(workspace_root, slug)
     return owner[0] if owner else None
 
 
 def repo_owner(workspace_root: Path, path: Path) -> tuple[str, str, str] | None:
-    """THE repo resolver: ``(context, repo slug, main repo slug)`` for *path* — a checkout
-    or any worktree under ``repos/<slug>/`` — or ``None`` when no registered context owns
-    it. The pre-push gate and ``context baseline`` both map a repo through here."""
+    """``(context, repo slug, main repo slug)`` for any path under ``repos/<slug>/``, or
+    ``None`` when no registered context owns it."""
     slug = repo_slug_under_repos(workspace_root, path)
     owner = _owning_entry(workspace_root, slug) if slug else None
     return (owner[0], str(slug), owner[1]) if owner else None
 
 
 def _owning_entry(workspace_root: Path, slug: str) -> tuple[str, str] | None:
-    """``(name, main slug)`` of the registered context whose main or associated repo is
-    *slug*."""
     for entry in _registry_contexts(workspace_root):
         main = entry.get("repo_slug") or entry.get("repo")
         associated = entry.get("associated_repos")
@@ -267,11 +177,6 @@ def repo_slug_under_repos(workspace_root: Path, path: Path) -> str | None:
     return slug if CONTEXT_NAME_RE.fullmatch(slug) else None
 
 
-# ---------------------------------------------------------------------------
-# Workspace root — ONE resolver, target-path-first (the open-bug fix).
-# ---------------------------------------------------------------------------
-
-
 def _root_from(start: Path) -> Path | None:
     try:
         return resolve_workspace_root(start)
@@ -280,9 +185,7 @@ def _root_from(start: Path) -> Path | None:
 
 
 def _resolve_root(*, cwd: Path, target_path: Path | None) -> Path | None:
-    """The write TARGET's own location is walked FIRST (a cwd inside a nested sandbox
-    workspace never shadows the root owning the target), then the one resolver: the
-    running CLI's own workspace, else the cwd walk. No environment variable is a rung."""
+    """The target's own location first, then the running CLI's own workspace, then cwd."""
     if target_path is not None:
         start = target_path if target_path.is_dir() else target_path.parent
         root = _root_from(start)
@@ -291,33 +194,14 @@ def _resolve_root(*, cwd: Path, target_path: Path | None) -> Path | None:
     return workspace_resolver.own_workspace_root() or _root_from(cwd)
 
 
-# ---------------------------------------------------------------------------
-# Session record liveness — rung 2.
-# ---------------------------------------------------------------------------
-
-
 def _live_session_context(workspace_root: Path, session_id: str | None) -> str | None:
-    """Rung 2: this session's own LIVE record, keyed by *session_id*. Fails soft on
-    missing/stale/deleted-context."""
-    if not session_id:
-        return None
-    record = live_session(workspace_root, session_id)
-    if record is None:
-        return None
-    context = record.get("context")
-    context = str(context) if context else None
-    if context and not _context_registered(workspace_root, context):
-        return None
-    return context
+    record = live_session(workspace_root, session_id) if session_id else None
+    context = record.get("context") if record else None
+    return str(context) if context else None
 
 
 def all_repos(workspace_root: Path, context_name: str) -> frozenset[str]:
-    """Every repo slug *context_name* owns: its main repo plus its associated repos.
-
-    The Bind's SCOPE. An unknown context owns nothing; an unreadable registry owns
-    nothing either — and an empty scope never blocks, because the scope rule only
-    fires for a slug some OTHER context demonstrably owns.
-    """
+    """Every repo slug *context_name* owns (main plus associated); unknown owns nothing."""
     for entry in _registry_contexts(workspace_root):
         if entry.get("name") != context_name:
             continue
@@ -336,21 +220,18 @@ def all_repos(workspace_root: Path, context_name: str) -> frozenset[str]:
 def resolve_bind(
     workspace_root: Path | None, session_id: str | None, env: Mapping[str, str]
 ) -> Bind:
-    """THE bind (DEC-3 b): a session with an id (:func:`resolve_session_id`) is bound only by
-    its own live record — ``DADAIA_CONTEXT`` is ignored; with none, ``DADAIA_CONTEXT`` is the
-    bind. An unregistered name is no bind. Never cwd-derived: sitting in a repo is not one."""
+    """A session with an id is bound only by its own live record; without one,
+    ``DADAIA_CONTEXT`` is the bind. An unregistered name is no bind; never cwd-derived."""
     if workspace_root is None:
         return Bind()
-    env_name = env.get("DADAIA_CONTEXT")
-    name = _live_session_context(workspace_root, session_id) if session_id else env_name
+    name = (
+        _live_session_context(workspace_root, session_id)
+        if session_id
+        else env.get("DADAIA_CONTEXT")
+    )
     if not name or not _context_registered(workspace_root, name):
         return Bind()
     return Bind(context_name=name, repos=all_repos(workspace_root, name))
-
-
-# ---------------------------------------------------------------------------
-# The one entry point.
-# ---------------------------------------------------------------------------
 
 
 def resolve(
@@ -361,69 +242,32 @@ def resolve(
     env: Mapping[str, str],
     cwd: Path,
 ) -> Invocation:
-    """Resolve session, context, root and Bind ONCE — the single decider.
-
-    *explicit*/*target_path* are rung 0 (a caller-supplied context name, or the context
-    implied by an explicit write TARGET under ``repos/<slug>/`` — a repo write IS
-    explicit input, so ``repos/x/...`` resolves ``x`` even while ``DADAIA_CONTEXT=y``).
-    *payload* is a hook's already-parsed stdin envelope (``None`` for a CLI caller — the
-    session id then resolves from *env* alone).
-    """
-
-    workspace_root = _resolve_root(cwd=cwd, target_path=target_path)
+    """Resolve session, context, root and bind once. *explicit*/*target_path* are rung 0 (a
+    write under ``repos/x/`` resolves ``x`` even while bound to ``y``); *payload* is a hook's
+    parsed stdin (``None`` for the CLI)."""
+    root = _resolve_root(cwd=cwd, target_path=target_path)
     session_id = resolve_session_id(payload, env) or None
+    bind = resolve_bind(root, session_id, env)
 
-    context_name: str | None = None
-    rung = "none"
+    def owner(path: Path | None) -> str | None:
+        slug = repo_slug_under_repos(root, path) if root and path else None
+        return context_name_for_repo_slug(root, slug) if root and slug else None
 
-    if explicit:
-        context_name, rung = explicit, "explicit"
-    elif workspace_root is not None and target_path is not None:
-        slug = repo_slug_under_repos(workspace_root, target_path)
-        context_name = context_name_for_repo_slug(workspace_root, slug) if slug else None
-        rung = "target_path" if context_name else rung
-
-    bind = resolve_bind(workspace_root, session_id, env)
-    if context_name is None and bind.context_name:
-        context_name, rung = bind.context_name, "bind"
-
-    if context_name is None and workspace_root is not None:
-        slug = repo_slug_under_repos(workspace_root, cwd)
-        context_name = context_name_for_repo_slug(workspace_root, slug) if slug else None
-        rung = "cwd" if context_name else rung
-
-    repo_slug: str | None = None
-    specs_dir: Path | None = None
-    if workspace_root is not None and context_name:
-        repo_slug = repo_slug_for_context(workspace_root, context_name)
-        specs_dir = (
-            (workspace_root / "repos" / repo_slug / "specs").resolve() if repo_slug else None
-        )
-
-    return Invocation(
-        workspace_root=workspace_root,
-        session_id=session_id,
-        context_name=context_name,
-        repo_slug=repo_slug,
-        specs_dir=specs_dir,
-        bind=bind,
-        rung=rung,
+    rungs = (
+        ("explicit", explicit),
+        ("target_path", owner(target_path)),
+        ("bind", bind.context_name),
+        ("cwd", owner(cwd)),
     )
-
-
-# ---------------------------------------------------------------------------
-# CLI-facing helpers — thin wrappers over resolve(), the process-ambient callers.
-# ---------------------------------------------------------------------------
+    rung, name = next(((r, n) for r, n in rungs if n), ("none", None))
+    slug = repo_slug_for_context(root, name) if root and name else None
+    specs_dir = (root / "repos" / slug / "specs").resolve() if root and slug else None
+    return Invocation(root, session_id, name, slug, specs_dir, bind, rung)
 
 
 def resolve_specs_dir(specs_dir: str | None) -> Path:
-    """Resolve a specs/ dir: explicit input, else :func:`resolve` (no ``cwd/specs``
-    fallback — the root `AGENTS.md` map §3 grants no such rung); unresolved reaches the error below.
-
-    T-044-40 (bug ``symlinked-specs-root-is-followed-by-migration-and-repair``): a
-    symlinked *explicit* root is refused HERE, once, at the one seam every
-    resolver-driven verb shares — never re-decided per write site.
-    """
+    """Explicit input (a symlinked root refused, once, here), else :func:`resolve`; never
+    a ``cwd/specs`` fallback."""
     if specs_dir:
         path = Path(specs_dir)
         if path.is_symlink():
@@ -444,15 +288,13 @@ def resolve_specs_dir(specs_dir: str | None) -> Path:
 
 
 def resolve_context_specs_dir(workspace_root: Path, context: str) -> Path | None:
-    """A registered context's ``specs/`` tree, whether or not it exists yet (0.4.8 R4);
-    ``None`` for a name the registry does not know — never a tree named after it."""
+    """A registered context's ``specs/`` tree, existing or not; ``None`` when unregistered."""
     slug = repo_slug_for_context(workspace_root, context)
     return workspace_root / "repos" / slug / "specs" if slug else None
 
 
 def alive_context_trees(workspace_root: Path) -> dict[str, Path]:
-    """Every ALIVE context NAME -> its ``specs/`` tree, in registry order — the
-    onboarding derivation's input (0.4.8 FR6)."""
+    """Every ALIVE context name -> its ``specs/`` tree, in registry order."""
     trees = {
         n: resolve_context_specs_dir(workspace_root, n) for n in alive_context_names(workspace_root)
     }
