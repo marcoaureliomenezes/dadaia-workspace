@@ -38,7 +38,7 @@ Scope: this file governs only `specs/backlog/`.
 
 - `idea` — an unbound brainstorm; no `intents` array required; doctor-clean with no further edits.
 - `candidate` and beyond — the entry must carry a typed `intents[]` array; every subject must resolve to a canonical anchor.
-- A malformed `intents[]` or an invalid `status` is always `BL-SCHEMA`, at any status.
+- `BACKLOG_PY check` (`LEDGER-BACKLOG-SCHEMA`) refuses a malformed `intents[]`, an invalid `status` or an entry past `idea` with no `intents[]`.
 
 ```json
 {"subject": {"kind": "code", "ref": "src/billing/models.py#Invoice"},
