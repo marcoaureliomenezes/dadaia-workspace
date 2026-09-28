@@ -30,22 +30,12 @@ _HOME = Path("/tmp/kimi-home-test")
 _SHIMS = hook_wrapper_contents(HARNESS_RECORDS["kimi-code"])
 
 
-# ---------------------------------------------------------------------------
-# kimi_code_home
-# ---------------------------------------------------------------------------
-
-
-def test_kimi_code_home_defaults_to_user_dot_dir() -> None:
-    assert kimi_code_home({}) == Path.home() / ".kimi-code"
-
-
-def test_kimi_code_home_honours_env_override() -> None:
-    assert kimi_code_home({"KIMI_CODE_HOME": "/srv/kimi"}) == Path("/srv/kimi")
-
-
-# ---------------------------------------------------------------------------
-# kimi_hooks_block — exact managed TOML shape
-# ---------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    ("env", "home"),
+    [({}, Path.home() / ".kimi-code"), ({"KIMI_CODE_HOME": "/srv/kimi"}, Path("/srv/kimi"))],
+)
+def test_kimi_code_home(env: dict[str, str], home: Path) -> None:
+    assert kimi_code_home(env) == home
 
 
 def test_kimi_hooks_block_parses_as_toml_and_pins_rules() -> None:
@@ -75,22 +65,15 @@ def test_kimi_hooks_block_parses_as_toml_and_pins_rules() -> None:
     assert all(h["timeout"] == 10 for h in hooks)
 
 
-# ---------------------------------------------------------------------------
-# upsert_kimi_hooks_block — replace-or-append, foreign content preserved
-# ---------------------------------------------------------------------------
-
-
-def test_upsert_appends_to_empty_file() -> None:
-    block = kimi_hooks_block(_HOME)
-    assert upsert_kimi_hooks_block("", block) == block
-
-
-def test_upsert_appends_after_foreign_config_untouched() -> None:
-    foreign = 'default_model = "kimi-code/k3"\n\n[thinking]\nenabled = true\n'
+@pytest.mark.parametrize(
+    "foreign", ["", 'default_model = "kimi-code/k3"\n\n[thinking]\nenabled = true\n']
+)
+def test_upsert_appends_once_after_foreign_config_as_valid_toml(foreign: str) -> None:
     block = kimi_hooks_block(_HOME)
     out = upsert_kimi_hooks_block(foreign, block)
-    assert out.startswith(foreign)
-    assert out.endswith(block)
+    assert out.startswith(foreign) and out.endswith(block)
+    assert upsert_kimi_hooks_block(out, block) == out
+    assert len(tomllib.loads(out)["hooks"]) == 5
 
 
 def test_upsert_replaces_between_markers_and_preserves_surroundings() -> None:
@@ -107,25 +90,6 @@ def test_upsert_replaces_between_markers_and_preserves_surroundings() -> None:
     assert out.count(KIMI_BLOCK_BEGIN) == 1
     assert out.endswith("\n\n[thinking]\nenabled = true\n")
     assert out.startswith('default_model = "k3"\n')
-
-
-def test_upsert_is_idempotent() -> None:
-    block = kimi_hooks_block(_HOME)
-    once = upsert_kimi_hooks_block('default_model = "k3"\n', block)
-    assert upsert_kimi_hooks_block(once, block) == once
-
-
-def test_upsert_full_result_stays_valid_toml() -> None:
-    foreign = 'default_model = "kimi-code/k3"\n'
-    out = upsert_kimi_hooks_block(foreign, kimi_hooks_block(_HOME))
-    parsed = tomllib.loads(out)
-    assert parsed["default_model"] == "kimi-code/k3"
-    assert len(parsed["hooks"]) == 5
-
-
-# ---------------------------------------------------------------------------
-# kimi_hook_shims — bodies and live sh contract
-# ---------------------------------------------------------------------------
 
 
 def test_kimi_hook_shims_keys_and_prologue() -> None:
