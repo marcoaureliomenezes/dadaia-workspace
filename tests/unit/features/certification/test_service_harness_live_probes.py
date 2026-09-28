@@ -78,28 +78,25 @@ def test_the_probe_leaves_the_claim_unverified_when_the_binary_is_absent(
     assert fake.calls == [], "an absent binary must not be executed"
 
 
-def test_the_probe_reports_the_version_without_imposing_a_floor(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("result", "outcome"),
+    [
+        pytest.param(_result(stdout="cursor-agent 0.0.1-alpha\n"), "cursor-agent 0.0.1-alpha", id="answers-passes-with-no-version-floor"),
+        pytest.param(_result(returncode=3, stderr="cursor: panic"), RuntimeError("cursor: panic"), id="present-but-broken-is-a-genuine-failure"),
+    ],
+)  # fmt: skip
+def test_an_installed_binary_passes_by_answering_and_fails_only_if_it_cannot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    result: CertificationProcessResult,
+    outcome: str | Exception,
 ) -> None:
-    """An installed binary passes on the strength of answering at all — the version is
-    reported as evidence, never compared against a floor."""
+    """Only ABSENCE is an honest degrade; the version is reported as evidence, never compared to a floor."""
     monkeypatch.setattr(service.shutil, "which", lambda name: f"/opt/bin/{name}")
-    fake = _FakeProcess(_result(stdout="cursor-agent 0.0.1-alpha\n"))
-
-    detail = _version_probe_detail(fake, tmp_path, "cursor", "cursor-agent")
-
+    fake = _FakeProcess(result)
+    if isinstance(outcome, Exception):
+        with pytest.raises(RuntimeError, match=str(outcome)):
+            _version_probe_detail(fake, tmp_path, "cursor", "cursor-agent")
+    else:
+        assert outcome in _version_probe_detail(fake, tmp_path, "cursor", "cursor-agent")
     assert fake.calls == [["/opt/bin/cursor-agent", "--version"]]
-    assert "cursor-agent 0.0.1-alpha" in detail
-
-
-def test_an_installed_binary_that_cannot_answer_is_a_genuine_failure(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Present-but-broken is not a degrade: only ABSENCE is honest."""
-    monkeypatch.setattr(service.shutil, "which", lambda name: f"/opt/bin/{name}")
-    fake = _FakeProcess(_result(returncode=3, stderr="devin: panic"))
-
-    with pytest.raises(RuntimeError) as excinfo:
-        _version_probe_detail(fake, tmp_path, "devin", "devin")
-
-    assert "devin: panic" in str(excinfo.value)
