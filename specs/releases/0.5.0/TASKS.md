@@ -74,7 +74,7 @@ tests. `Δ` = prod/test lines; PLAN §2.7 ceilings stop a task, never rise.
 
 - [ ] **T-050-49 — `release.py check` (30).** `W:` `f/specs/`, `core/` · `blocked by:` T-050-45 · `delivers:` one live release · `RED:` PLAN §2 WP-30 · Δ −105/−100.
 - [ ] **T-050-50 — Certify walks the workspace (31).** `W:` `f/{certification,reconcile}/`, recipe · `blocked by:` T-050-40 · `delivers:` AC3.2 · `RED:` PLAN §2 WP-31 · Δ −126/+116.
-- [-] **T-050-51 — Context repos; running version (33, 34).** `W:` `core/`, `i/`, `cli/`, `f/{capabilities,reconcile}/` · `blocked by:` T-050-39 · `delivers:` no name fallback; editable reports source · `RED:` PLAN §2 WP-33, WP-34 · Δ −18/+192.
+- [x] **T-050-51 — Context repos; running version (33, 34).** `W:` `core/`, `i/`, `cli/`, `f/{capabilities,reconcile}/` · `blocked by:` T-050-39 · `delivers:` no name fallback; editable reports source · `RED:` PLAN §2 WP-33, WP-34 · Δ −18/+192.
 - [ ] **T-050-52 — Subjects in the doctor (35).** `W:` backlog `scripts/`, `f/backlog/`, `core/models/backlog.py` · `blocked by:` T-050-44 · `delivers:` no circular RESOLVED · `RED:` PLAN §2 WP-35 · Δ −25/+39.
 - [x] **T-050-53 — Hook interpreter; reviewer persona (36, 37).** `W:` `i/`, `pub/agents/`, `pub/entities/` · `blocked by:` T-050-30 · `delivers:` AC3.3 · `RED:` PLAN §2 WP-36, WP-37 · Δ −27/+195.
 - [x] **T-050-54 — Rendered canon law (38).** `W:` `i/public_assets.py`, `core/workspace_layout.py`, `f/specs/`, `pub/templates/` · `blocked by:` T-050-27 · `delivers:` rendered tables · `RED:` PLAN §2 WP-38 · Δ +4/+33.
