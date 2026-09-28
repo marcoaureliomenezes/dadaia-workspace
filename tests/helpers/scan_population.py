@@ -46,7 +46,6 @@ Tree-/package-walking population scans (the convention applies at the call site 
 * ``tests/contract/test_release_semver_canon.py`` :: ``_find_semver_compile_sites()``
 * ``tests/contract/test_session_store_ownership.py`` ::
   test_pointer_and_record_namespace_residue_is_owner_or_allowlisted_only
-* ``tests/unit/public/test_no_gpt_only_claim.py`` :: test_no_surviving_gpt_only_claim
 * ``tests/contract/test_behavior_map.py`` :: ``_skills_on_disk()``,
   ``_scoped_agents_md_sources()``
 * ``tests/contract/test_public_scripts_thin_wrapper.py`` ::

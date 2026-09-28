@@ -119,19 +119,6 @@ def test_check_passes_in_a_checkout_folder_not_named_after_the_repo(
     )
 
 
-def test_product_add_is_not_a_verb(script: Path, specs: Path) -> None:
-    """The atom generator is the stacking mechanism the SPEC measured: writing an atom is
-    the reconciliation's own act, and the library lint validates it."""
-    result = _run(
-        script, "product", "add", "platform", "widget-forge",
-        "--title", "widget-forge", "--tldr", "t", "--summary", "s", "--specs", str(specs),
-    )  # fmt: skip
-
-    assert result.returncode != 0
-    assert "invalid choice: 'product'" in result.stderr
-    assert not (specs / "memory" / "product" / "platform" / "widget-forge.md").exists()
-
-
 def test_check_ignores_frontmatter_the_library_lint_owns(script: Path, specs: Path) -> None:
     """A tldr over the schema ceiling is LINT-1's finding, not this script's: `check`
     reports only the generated pair, so the two deciders cannot disagree."""

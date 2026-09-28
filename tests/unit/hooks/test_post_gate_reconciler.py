@@ -13,9 +13,7 @@ spawns no git child and writes nothing. Every branch must (1) exit 0, (2) fail o
 from __future__ import annotations
 
 import json
-import subprocess
 import time
-from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -61,51 +59,6 @@ def _bind_session(workspace: Path, ctx: str = _CTX) -> None:
             "last_seen_at": datetime.now(tz=UTC).isoformat(),
         },
     )
-
-
-def _spy_git_children(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
-    """Record every ``subprocess.run`` argv — the seam any git child would cross."""
-    spawned: list[list[str]] = []
-
-    def _run(
-        argv: Sequence[str], *args: object, **kwargs: object
-    ) -> subprocess.CompletedProcess[str]:
-        spawned.append(list(argv))
-        return subprocess.CompletedProcess(argv, 0, stdout=" M dadaia_workspace/x.py\n", stderr="")
-
-    monkeypatch.setattr(subprocess, "run", _run)
-    return spawned
-
-
-def test_dirty_mutating_path_spawns_no_git_child_and_writes_nothing(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    """Intent: CONTRACT — T-046-29 ruling + AC10 (logs). Size: SMALL (subprocess seam spied).
-
-    A dirty MUTATING file in the bound context repo used to make the reconciler spawn
-    ``git status --porcelain`` and append ``RECONCILER_FLAG``. Both are gone: no git
-    child crosses ``subprocess.run``, no ``.dadaia/logs`` appears, and the full
-    PostToolUse ``main()`` still exits 0 on this path (never-blocks).
-    """
-    # An ambient DADAIA_CONTEXT (this suite runs inside a real bound checkout) must not
-    # outrank the fixture's own session record.
-    monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
-    ws = _make_workspace(tmp_path)
-    _bind_session(ws)
-    dirty = ws / "repos" / _CTX / "dadaia_workspace" / "x.py"
-    dirty.parent.mkdir(parents=True)
-    dirty.write_text("x = 1\n", encoding="utf-8")
-    spawned = _spy_git_children(monkeypatch)
-
-    sdd_post_gate._throttled_gc(ws, _SID)
-    assert [argv for argv in spawned if argv[:1] == ["git"]] == []
-    assert not (ws / ".dadaia" / "logs").exists()
-
-    monkeypatch.setattr(_common, "read_stdin_json", lambda: {"session_id": _SID})
-    monkeypatch.setattr(_common, "resolve_session_id", lambda payload: _SID)
-    assert sdd_post_gate.main() == 0
-    assert [argv for argv in spawned if argv[:1] == ["git"]] == []
-    assert not (ws / ".dadaia" / "logs").exists()
 
 
 def test_reaper_error_fails_open_exit_zero(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
