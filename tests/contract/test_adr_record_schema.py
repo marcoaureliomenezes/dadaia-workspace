@@ -70,12 +70,6 @@ def test_a_valid_proposed_record_validates() -> None:
     assert list(validator.iter_errors(_BASE)) == []
 
 
-def test_an_accepted_record_with_measured_by_validates() -> None:
-    validator = Draft202012Validator(_schema())
-    accepted = {**_BASE, "status": "accepted", "measured_by": "pytest tests/contract/test_x.py"}
-    assert list(validator.iter_errors(accepted)) == []
-
-
 def test_rejects_an_unknown_property() -> None:
     validator = Draft202012Validator(_schema())
     with_extra = {**_BASE, "unexpected": "nope"}

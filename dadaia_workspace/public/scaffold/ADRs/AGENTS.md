@@ -8,7 +8,7 @@ Scope: this file governs only `specs/ADRs/`.
 - Fields: `id` (NNNN, zero-padded, monotonic, gap-free, never reused), `ts`, `title`, `status`.
 - Fields (continued): `context`, `decision`, `consequences`, `measured_by`, `supersedes`, `amends`.
 - `status` values: `proposed` | `accepted` | `rejected` | `superseded`.
-- `accepted` requires a resolvable `measured_by` — a `pytest`/`lint-imports` invocation or a grep-able code (`SPEC-DOC-nnn`, `WS-*`, `BL-*`, `RELEASE-TREE-*`, `LEDGER-*`), never prose.
+- `accepted` requires a non-empty `measured_by` naming the check; `.dadaia/.venv/bin/dadaia doctor` (`LEDGER-ADR-SCHEMA`) validates every record and the numbering.
 - Schema: `public/schemas/ADRs/decision-record-v1.schema.json`.
 
 ## 2. Acceptance law (operator-only)

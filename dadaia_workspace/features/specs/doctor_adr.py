@@ -1,10 +1,7 @@
 """The `specs/ADRs/decisions.jsonl` reader — the ONE module that opens the ADR ledger.
 
 Two rules live here because both read that one file: ADR-SUPERSEDED-CITATION over the
-tree that cites decisions, and LEDGER-ADR-SCHEMA over the records themselves. The ADR
-ledger has no writer script (agents append it with file tools), so when
-`features/specs/ledgers.py` was deleted in favour of the scripts its ADR row
-moved HERE, to the reader that was already open on the file — not into a second walker.
+tree that cites decisions, and LEDGER-ADR-SCHEMA over the records and their numbering.
 
 ADR-SUPERSEDED-CITATION: a memory atom, rule file or skill that cites
 an ADR id whose record is ``superseded`` — ERROR. A rule pointing at a dead decision is
@@ -76,16 +73,16 @@ def superseded_adr_citations(specs_dir: Path, public_dir: Path | None) -> list[S
 
 
 def adr_record_issues(specs_dir: Path) -> list[SpecsDoctorIssue]:
-    """Every committed decision record that does not validate against its schema.
+    """Every record failing its schema, and the first id breaking 0001..N (file order).
 
-    One issue per (line, schema error), located `path:line` and relative to the specs
-    tree — a doctor finding is pasted into a report, so it never carries a local
-    absolute path.
+    Located `path:line` relative to the specs tree: a finding pasted into a report never
+    carries a local absolute path.
     """
     ledger = specs_dir / LEDGER
     if not ledger.is_file():
         return []
     issues: list[SpecsDoctorIssue] = []
+    ids: list[tuple[int, object]] = []
     for number, raw in enumerate(ledger.read_text(encoding="utf-8").split("\n"), start=1):
         if not raw.strip():
             continue
@@ -94,8 +91,13 @@ def adr_record_issues(specs_dir: Path) -> list[SpecsDoctorIssue]:
         except ValueError as exc:
             issues.append(_record_issue(number, f"line is not valid JSON: {exc}"))
             continue
+        ids.append((number, record.get("id") if isinstance(record, dict) else None))
         for message in schema_errors(record, "ADRs/decision-record-v1"):
             issues.append(_record_issue(number, message))
+    for position, (number, adr_id) in enumerate(ids, start=1):
+        if adr_id != (want := f"{position:04d}"):
+            issues.append(_record_issue(number, f"id {adr_id!r} breaks 0001..N: expected {want}"))
+            break
     return issues
 
 
@@ -108,9 +110,6 @@ def _record_issue(line: int, message: str) -> SpecsDoctorIssue:
     )
 
 
-#: The ADR ledger's contribution to the doctor's `ledgers` section — the one rule the
-#: script delegation (`infrastructure/ledger_scripts.py`) cannot carry, because this
-#: ledger has no script.
 LEDGER_RULES: tuple[Rule[Path, SpecsDoctorIssue], ...] = (
     Rule(
         ("LEDGER-ADR-SCHEMA",),
