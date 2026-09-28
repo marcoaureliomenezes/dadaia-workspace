@@ -36,6 +36,7 @@ sources:
 ## Doctor
 
 - `dadaia public doctor` compares source against staging, then staging against each projection, printing `[ok]`, `[missing]`, `[drift]` or `[foreign]` per file and exiting non-zero on any mismatch; a persona compares against its rendered form, so an applied policy reads `[ok]` and a hand-edit `[drift]`.
+- A projected executable (hook wrapper or shim) with its exec bit cleared is a `[drift]` line ending `(not executable)`; with the bit set on a `noexec` mount it is `[unsupported]` (`filesystem mounted noexec`), which does not fail the run.
 - One predicate (`link_entry_defect`) judges every harness view of the authored set: a retargeted or dangling link, or a diverged fallback copy, is one `[drift]` line.
 - The privacy gate runs over source and staged assets and reports `[ok] public-privacy` only on a clean surface; CI treats it as a release gate.
 - `install` and `doctor` cover the harnesses in `.dadaia/states/harness_profile.json` plus the shared authored set; `dadaia harness add <name>` is the one way a harness joins ([[workspace-init]]); the install ledger judges only the library's own projections, and `dadaia doctor` never classifies or moves any other entry in a harness directory — it is the harness's or the operator's ([[workspace-doctor]]).
