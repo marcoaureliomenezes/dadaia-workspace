@@ -22,6 +22,7 @@ from dadaia_workspace.infrastructure.public_assets_common import (
 )
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _parse_agent_frontmatter,
+    _split_frontmatter,
 )
 
 
@@ -80,22 +81,8 @@ def render_claude_agent(staged_text: str, resolved: ResolvedAgentModel) -> str:
     lines of the frontmatter block. ``effort:`` is OMITTED entirely when unresolved
     (F-6 — never empty or placeholder), keeping render output
     deterministic for the doctor render-compare.
-
-    Raises:
-        PublicAssetError: when *staged_text* carries no closed YAML frontmatter
-            block (a canonical agent body always does).
     """
-    if not staged_text.startswith("---\n"):
-        raise PublicAssetError(
-            "cannot render agent projection: staged body has no YAML frontmatter block"
-        )
-    end_idx = staged_text.find("\n---\n", 4)
-    if end_idx == -1:
-        raise PublicAssetError(
-            "cannot render agent projection: staged frontmatter block is not closed"
-        )
-    frontmatter = staged_text[4 : end_idx + 1]
-    rest = staged_text[end_idx + 5 :]
+    frontmatter, rest = _split_frontmatter(staged_text)
     derived = ("model:", "effort:", "permissionMode:", "disallowedTools:")
     kept = [line for line in frontmatter.splitlines() if not line.startswith(derived)]
     if persona_read_only(_parse_agent_frontmatter(staged_text)):

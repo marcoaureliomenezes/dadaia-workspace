@@ -16,31 +16,13 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.infrastructure.runtime_transforms.codex import transform_for_codex
+from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import _split_frontmatter
 
 _AGENTS_DIR = Path(__file__).parents[4] / "dadaia_workspace" / "public" / "agents"
 
-_FRONTMATTER_DELIM = "---"
-
-
-def _strip_frontmatter(text: str) -> str:
-    """Remove the YAML frontmatter block (between ``---`` delimiters) from *text*.
-
-    If no frontmatter is present the full text is returned unchanged.
-    """
-    lines = text.splitlines(keepends=True)
-    if not lines or lines[0].strip() != _FRONTMATTER_DELIM:
-        return text
-    for i, line in enumerate(lines[1:], start=1):
-        if line.strip() == _FRONTMATTER_DELIM:
-            return "".join(lines[i + 1 :])
-    return text
-
 
 def _load_body(agent_id: str) -> str:
-    """Load the body (frontmatter-stripped) of *agent_id*."""
-    path = _AGENTS_DIR / f"{agent_id}.md"
-    raw = path.read_text(encoding="utf-8")
-    return _strip_frontmatter(raw)
+    return _split_frontmatter((_AGENTS_DIR / f"{agent_id}.md").read_text(encoding="utf-8"))[1]
 
 
 # The three canonical core agent IDs (ADR 0016).

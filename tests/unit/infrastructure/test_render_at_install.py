@@ -34,7 +34,10 @@ import pytest
 
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.model_registry import ResolvedAgentModel
-from dadaia_workspace.infrastructure.agent_transcodes import codex_agent_toml_bytes
+from dadaia_workspace.infrastructure.agent_transcodes import (
+    codex_agent_toml_bytes,
+    copilot_agent_md_bytes,
+)
 from dadaia_workspace.infrastructure.install_helpers import (
     render_claude_agent,
     resolve_codex_agent_model,
@@ -88,7 +91,7 @@ def _staged_agent_md(tmp_path: Path, name: str, text: str) -> Path:
         "rejects-body-without-frontmatter",
     ],
 )
-def test_render_claude_agent_seam(case: str) -> None:
+def test_render_claude_agent_seam(case: str, tmp_path: Path) -> None:
     if case == "injects-model-then-effort-as-last-lines-deterministic":
         resolved = ResolvedAgentModel(model="claude-sonnet-5", effort="xhigh", source="default")
         rendered = render_claude_agent(_GENERIC_BODY, resolved)
@@ -116,9 +119,18 @@ def test_render_claude_agent_seam(case: str) -> None:
         assert "claude-sonnet-5" not in rendered
 
     else:  # rejects-body-without-frontmatter
+        """sa-frontmatter-split-five-ways: one splitter, so the Claude render, the
+        Copilot view and the Codex TOML all refuse the same unclosed block."""
         resolved = ResolvedAgentModel(model="claude-sonnet-5", effort="high", source="default")
-        with pytest.raises(PublicAssetError):
-            render_claude_agent("# no frontmatter\n", resolved)
+        unclosed = "---\nname: x\nread_only: false\n\n# Body\n"
+        md = _staged_agent_md(tmp_path, "x", unclosed)
+        for render in (
+            lambda: render_claude_agent(unclosed, resolved),
+            lambda: copilot_agent_md_bytes(md),
+            lambda: codex_agent_toml_bytes(md, "x", resolved),
+        ):
+            with pytest.raises(PublicAssetError, match="no closed YAML frontmatter"):
+                render()
 
 
 @pytest.mark.parametrize(

@@ -12,7 +12,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.harness_registry import AgentTranscode, HarnessRecord
 from dadaia_workspace.core.model_registry import ResolvedAgentModel
 from dadaia_workspace.infrastructure.install_helpers import (
@@ -36,6 +35,7 @@ from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _parse_agent_frontmatter,
     _render_codex_agent_toml,
     _render_codex_command_policy_rules,
+    _split_frontmatter,
 )
 from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import map_model
 
@@ -44,16 +44,6 @@ def no_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, 
     """The harness reads the authored tree natively — it projects no view of its own."""
     del record, plan
     return ()
-
-
-def _split_frontmatter(text: str) -> tuple[str, str]:
-    """(frontmatter body without its fences, the rest) of a canonical agent file."""
-    if not text.startswith("---\n"):
-        raise PublicAssetError("cannot transcode agent: staged body has no YAML frontmatter block")
-    end_idx = text.find("\n---\n", 4)
-    if end_idx == -1:
-        raise PublicAssetError("cannot transcode agent: staged frontmatter block is not closed")
-    return text[4 : end_idx + 1], text[end_idx + 5 :]
 
 
 def md_symlink_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
@@ -172,13 +162,8 @@ def codex_agent_toml_bytes(
     through the :class:`ProjectionRule` seam.
     """
     text = md_path.read_text(encoding="utf-8")
+    body = transform_for_codex(_split_frontmatter(text)[1], agent_name)
     fm = _parse_agent_frontmatter(text)
-    if text.startswith("---\n"):
-        end_idx = text.find("\n---\n", 4)
-        body = text[end_idx + 5 :] if end_idx != -1 else text
-    else:
-        body = text
-    body = transform_for_codex(body, agent_name)
     claude_model, reasoning_effort = resolve_codex_agent_model(
         agent_name, fm.get("model") if fm else None, resolved
     )

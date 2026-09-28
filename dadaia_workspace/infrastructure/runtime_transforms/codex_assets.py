@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.infrastructure.public_assets_common import _toml_escape
 
 # ---------------------------------------------------------------------------
@@ -301,6 +302,14 @@ def _render_agents_config_file_blocks(agents_dir: Path) -> str:
     return "".join(blocks)
 
 
+def _split_frontmatter(text: str) -> tuple[str, str]:
+    """(frontmatter without its fences, body) of a persona file — the one splitter."""
+    end = text.find("\n---\n", 4)
+    if not text.startswith("---\n") or end == -1:
+        raise PublicAssetError("persona has no closed YAML frontmatter block")
+    return text[4 : end + 1], text[end + 5 :]
+
+
 def _parse_agent_frontmatter(text: str) -> dict[str, object]:
     """Parse YAML frontmatter from an agent .md file using stdlib regex only.
 
@@ -312,12 +321,10 @@ def _parse_agent_frontmatter(text: str) -> dict[str, object]:
     Unknown fields (outside ``_TOML_SAFE_AGENT_FIELDS``) are silently dropped.
     Returns an empty dict if ``name`` is missing or frontmatter is absent.
     """
-    if not text.startswith("---\n"):
+    try:
+        frontmatter = _split_frontmatter(text)[0]
+    except PublicAssetError:
         return {}
-    end_idx = text.find("\n---\n", 4)
-    if end_idx == -1:
-        return {}
-    frontmatter = text[4 : end_idx + 1]
 
     result: dict[str, object] = {}
     lines = frontmatter.splitlines()
@@ -376,13 +383,10 @@ def _parse_skills_from_frontmatter(text: str) -> list[str]:
     end of the frontmatter block.  Returns an empty list when frontmatter is
     absent or contains no ``skills:`` key.
     """
-    if not text.startswith("---\n"):
+    try:
+        frontmatter = _split_frontmatter(text)[0]
+    except PublicAssetError:
         return []
-    end_idx = text.find("\n---\n", 4)
-    if end_idx == -1:
-        return []
-    frontmatter = text[4 : end_idx + 1]
-
     skills: list[str] = []
     in_skills = False
     for line in frontmatter.splitlines():
