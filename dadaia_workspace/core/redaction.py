@@ -1,24 +1,33 @@
-"""Stdlib-pure masking primitives; zero I/O.
+"""Stdlib-pure privacy matching and masking primitives; zero I/O, zero internal import.
+
+- :func:`privacy_matches` — THE matcher of a private term in text: the push gate
+  (``denylist_scan``), the public doctor (``privacy_check``) and the ledger seam run it.
+  ``public stage`` copies this file beside every ledger script as ``_privacy.py``, so the
+  seam refuses exactly what the push refuses (sa-ledger-write-seam-redacts-less-than-push-refuses).
 
 - :func:`mask` — the one ``first…last`` rendering of a private match; used by
   ``features/chokepoints/denylist_scan`` (the hits ``push_gate._compose_denylist_refusal``
   renders) and ``infrastructure/privacy_check`` (``public doctor``).
 - :class:`Redactor` — word-boundary, longest-first, ordinal-placeholder masking; used by
   ``cli/redact`` (``--redact``) and ``features/certification``.
-- :func:`redact_text` — control-character stripping and home-path/IP scrubbing; used
-  by ``cli/redact``.
+- :func:`redact_text` — control-character stripping and home-path/IP scrubbing for
+  ``--redact`` display (``cli/redact``); never a ledger write.
 """
 
 from __future__ import annotations
 
+import json
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Mapping
+from typing import Any
 
 __all__ = [
     "UNSAFE_FORMAT_CHARS_RE",
     "Redactor",
     "compile_candidates",
+    "first_private",
     "mask",
+    "privacy_matches",
     "redact_text",
 ]
 
@@ -28,8 +37,40 @@ def mask(term: str) -> str:
     return f"{term[0]}…{term[-1]}" if term else term
 
 
+def privacy_matches(
+    text: str, terms: Iterable[tuple[str, str]], patterns: Iterable[Any]
+) -> Iterator[tuple[str, str, str]]:
+    """``(value, source, reason)`` for every private match in *text*: operator terms (a
+    case-insensitive substring) first, then each baseline pattern (``id``, ``regex``,
+    ``exclude``, ``reason``) whose match its ``exclude`` does not carve out."""
+    text = UNSAFE_FORMAT_CHARS_RE.sub("", text)
+    lowered = text.lower()
+    for term, reason in terms:
+        if term and term.lower() in lowered:
+            yield term, "operator denylist", reason
+    for pattern in patterns:
+        for match in pattern.regex.finditer(text):
+            value = match.group(0)
+            if pattern.exclude is None or not pattern.exclude.search(value):
+                yield value, f"baseline pattern '{pattern.id}'", pattern.reason
+
+
+def first_private(
+    record: Mapping[str, Any], terms: Iterable[tuple[str, str]], patterns: Iterable[Any]
+) -> tuple[str, str] | None:
+    """``(field, masked match)`` of the first field whose serialized value the push would
+    refuse, or ``None`` — a ledger line is scanned as the bytes it is written as."""
+    terms, patterns = list(terms), list(patterns)
+    for key, value in record.items():
+        for found, _source, _reason in privacy_matches(
+            json.dumps(value, ensure_ascii=False), terms, patterns
+        ):
+            return key, mask(found)
+    return None
+
+
 # ============================================================================
-# redact_text — case-insensitive substring masking (SPEC v0.4.5 FR6/FR7, T-045-19).
+# redact_text — display scrubbing (SPEC v0.4.5 FR7).
 # ============================================================================
 
 # Redaction patterns (privacy rules): operator-local home paths + IPs never land in a
@@ -65,34 +106,14 @@ _WIN_HOME_RE = re.compile(r"([A-Za-z]:\\Users\\)[^\\\s:]+")
 UNSAFE_FORMAT_CHARS_RE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\x80-\x9f\u2028\u2029]")
 
 
-def redact_text(text: str, denylist_terms: Sequence[tuple[str, str]] = ()) -> str:
-    """Return ``text`` with unsafe control/format characters stripped, then
-    operator-local home-path usernames, IPv4 addresses, and any operator denylist term
-    masked.
-
-    The control/format strip (see :data:`UNSAFE_FORMAT_CHARS_RE`) runs FIRST, before
-    every masking pass (v0.4.5 FR7/A7.6) — so a denylisted term an attacker split with
-    an embedded ESC or Unicode line/paragraph separator still gets matched below, and
-    no such byte ever survives into a persisted field.
-
-    ``denylist_terms`` is ``(term, reason)`` pairs from the SAME operator-term source
-    the push-time scan already refuses on
-    (``infrastructure.privacy_check.load_privacy_terms``) — threaded in by the
-    caller since this module is pure core and must never import ``infrastructure``
-    (v0.4.5 FR6/T-045-19, `core-no-upper-layers`). Matched case-insensitively as a
-    literal substring, mirroring the push-time scan's own semantics exactly (A6.3), so
-    a term that would refuse a push is masked before it is ever committed. Defaults to
-    ``()`` — a no-op for the denylist pass — so every pre-FR6 caller keeps masking
-    IP/home paths; the control/format strip is unconditional and a no-op on clean text.
-    """
+def redact_text(text: str) -> str:
+    """Return ``text`` with unsafe control/format characters stripped (FIRST, see
+    :data:`UNSAFE_FORMAT_CHARS_RE`), then operator-local home-path usernames and IPv4
+    addresses masked."""
     out = UNSAFE_FORMAT_CHARS_RE.sub("", text)
     out = _IPV4_RE.sub("[REDACTED-IP]", out)
     out = _POSIX_HOME_RE.sub(r"\1[REDACTED]", out)
-    out = _WIN_HOME_RE.sub(r"\1[REDACTED]", out)
-    for term, _reason in denylist_terms:
-        if term:
-            out = re.sub(re.escape(term), "[REDACTED-TERM]", out, flags=re.IGNORECASE)
-    return out
+    return _WIN_HOME_RE.sub(r"\1[REDACTED]", out)
 
 
 # ============================================================================

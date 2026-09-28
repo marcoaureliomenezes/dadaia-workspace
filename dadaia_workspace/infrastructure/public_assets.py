@@ -90,6 +90,27 @@ _SKILL_SCRIPT_SCHEMAS: tuple[tuple[str, str], ...] = (
 )
 
 
+#: The shared ledger modules each ledger script runs from its OWN copy beside it, the
+#: same way (``_ledger.py`` imports ``_privacy.py``, a copy of ``core/redaction.py``,
+#: the push gate's own matcher). (package-relative source, ``public/``-relative target).
+_SKILL_SCRIPT_SHARED: tuple[tuple[str, str], ...] = tuple(
+    (src, f"skills/{skill}/scripts/{name}")
+    for skill in (
+        "dd-bug-resolution",
+        "dd-backlog-definition",
+        "dd-audit-project",
+        "dd-cli-library",
+        "dd-spec-navigator",
+    )
+    for src, name in (
+        ("core/redaction.py", "_privacy.py"),
+        ("infrastructure/data/privacy_baseline.json", "privacy_baseline.json"),
+        ("public/skills/dd-bug-resolution/scripts/_ledger.py", "_ledger.py"),
+    )
+    if not src.endswith(f"{skill}/scripts/{name}")
+)
+
+
 def _staged_bytes(src: Path) -> bytes:
     """What ``stage`` writes for the public asset *src* and what ``doctor`` compares the
     staged copy against: every Markdown rule asset with its registry tables rendered,
@@ -181,6 +202,13 @@ class FileSystemPublicAssetManager:
             dst = agentic_dir / scripts_rel / Path(schema_rel).name
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(schema_src, dst)
+            staged.append(f"[stage] {dst}")
+
+        for src_rel, dst_rel in _SKILL_SCRIPT_SHARED:
+            if not (self._public_dir.parent / src_rel).exists():
+                continue
+            dst = agentic_dir / dst_rel
+            shutil.copy2(self._public_dir.parent / src_rel, dst)
             staged.append(f"[stage] {dst}")
 
         for src in self._staged_sources():

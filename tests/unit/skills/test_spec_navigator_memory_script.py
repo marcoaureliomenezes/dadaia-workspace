@@ -21,6 +21,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.features.specs.memory_lint import lint_atom, load_frontmatter_schema
+from tests.helpers.skill_scripts import stage_skill_scripts
 
 pytestmark = pytest.mark.unit
 
@@ -33,13 +34,10 @@ _SCRIPTS = _PUBLIC / "skills" / "dd-spec-navigator" / "scripts"
 def script(tmp_path: Path) -> Path:
     """The staged shape: the sibling modules copied beside memory.py, and the release
     skill projected beside this one (the live-release reader `drift` imports)."""
-    staged = tmp_path / "skills" / "dd-spec-navigator" / "scripts"
-    staged.mkdir(parents=True)
     shutil.copytree(_SCRIPTS.parents[1] / "dd-release-implementation" / "scripts",
                     tmp_path / "skills" / "dd-release-implementation" / "scripts")  # fmt: skip
-    for module in sorted(_SCRIPTS.glob("*.py")):
-        shutil.copy2(module, staged / module.name)
-    return staged / "memory.py"
+    staged = tmp_path / "skills" / "dd-spec-navigator" / "scripts"
+    return stage_skill_scripts("dd-spec-navigator", staged) / "memory.py"
 
 
 @pytest.fixture

@@ -9,15 +9,20 @@ candidate bytes, run the SAME `check` they will be validated by, then `os.replac
 from __future__ import annotations
 
 import json
-import os
 import sys
 from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _audit_check import findings_findings, histo_findings  # noqa: E402
-from _audit_schema import AUDITS, FINDINGS, HISTO  # noqa: E402
+from _audit_check import (  # noqa: E402
+    AUDITS,
+    FINDINGS,
+    HISTO,
+    findings_findings,
+    histo_findings,
+)
+from _ledger import replace  # noqa: E402
 
 SCRIPT = Path(__file__).parent / "audit.py"
 
@@ -72,13 +77,6 @@ def serialize(records: list[dict[str, Any]]) -> str:
     return "".join(json.dumps(r, sort_keys=True, ensure_ascii=False) + "\n" for r in records)
 
 
-def _replace(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    tmp.write_text(text, encoding="utf-8")
-    os.replace(tmp, path)
-
-
 def write_findings(directory: Path, records: list[dict[str, Any]]) -> None:
     """Replace *directory*'s FINDINGS.jsonl with *records*, validated first."""
     text = serialize(records)
@@ -89,7 +87,7 @@ def write_findings(directory: Path, records: list[dict[str, Any]]) -> None:
             f"({problems[0]['message']})",
             f"{SCRIPT} check --specs <specs>",
         )
-    _replace(directory / FINDINGS, text)
+    replace(directory / FINDINGS, text)
 
 
 def append_histo(specs: Path, record: dict[str, Any]) -> None:
@@ -106,4 +104,4 @@ def append_histo(specs: Path, record: dict[str, Any]) -> None:
         )
     path = specs / HISTO
     existing = path.read_text(encoding="utf-8") if path.is_file() else ""
-    _replace(path, existing + line)
+    replace(path, existing + line)

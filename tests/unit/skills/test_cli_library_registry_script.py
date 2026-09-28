@@ -3,12 +3,14 @@ c5 T-047-45: the `dadaia server` group retired into one stdlib script). Size: SM
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import subprocess
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -97,18 +99,21 @@ def test_clean_removes_expired_entries_only(tmp_path: Path) -> None:
     assert [e["port"] for e in _entries(reg)] == [3200]
 
 
+def _load_module() -> Any:
+    spec = importlib.util.spec_from_file_location("registry", _SCRIPT)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_release_without_selector_is_refused(tmp_path: Path) -> None:
     result = _run(tmp_path / "r.json", "release")
     assert result.returncode == 1 and "--port" in result.stderr
 
 
 def test_scan_parses_ss_lines_and_skips_registered_and_privileged_ports() -> None:
-    import importlib.util
-
-    spec = importlib.util.spec_from_file_location("registry", _SCRIPT)
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(module)
+    module = _load_module()
     raw = "\n".join(
         [
             "State Recv-Q Send-Q Local Address:Port Peer Address:Port Process",
@@ -176,3 +181,19 @@ def test_entry_with_a_dead_pid_is_stale_before_its_ttl(tmp_path: Path) -> None:
     assert alive.returncode == 0
     listed = json.loads(_run(reg, "list", "--json", "--status", "all").stdout)
     assert {e["port"]: e["status"] for e in listed} == {3200: "active"}
+
+
+def test_a_concurrent_load_never_reads_a_half_written_registry(tmp_path: Path) -> None:
+    """sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts#48.4: interleaved save
+    and load never raise JSONDecodeError (a load raising it fails the reader thread)."""
+    import threading
+
+    module = _load_module()
+    registry = tmp_path / "server_registry.json"
+    doc = json.dumps({"entries": [{"port": p} for p in range(2000)]}) + "\n"
+    module.replace(registry, doc)
+    reader = threading.Thread(target=lambda: [module.load(registry) for _ in range(300)])
+    reader.start()
+    for _ in range(300):
+        module.replace(registry, doc)
+    reader.join()

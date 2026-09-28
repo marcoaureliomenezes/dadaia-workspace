@@ -30,7 +30,7 @@ from dataclasses import dataclass, replace
 from typing import Protocol
 
 from dadaia_workspace.core.models.git_scan import ScannedObject
-from dadaia_workspace.core.redaction import UNSAFE_FORMAT_CHARS_RE, mask
+from dadaia_workspace.core.redaction import UNSAFE_FORMAT_CHARS_RE, mask, privacy_matches
 
 __all__ = [
     "BaselinePatternLike",
@@ -40,8 +40,6 @@ __all__ = [
     "ScanOutcome",
     "scan_objects",
 ]
-
-_SOURCE_OPERATOR = "operator denylist"
 
 
 class BaselinePatternLike(Protocol):
@@ -103,88 +101,29 @@ class ScanOutcome:
     oversized_notes: tuple[OversizedNote, ...] = ()
 
 
-def _term_occurs(term: str, lowered_text: str) -> bool:
-    """FR3(1)'s definition of "occurs": a literal, case-insensitive substring — no
-    word-boundary restriction."""
-    return bool(term) and term.lower() in lowered_text
-
-
 def _first_match(
     obj: ScannedObject,
     terms: list[tuple[str, str]],
     patterns: list[BaselinePatternLike],
 ) -> Hit | None:
-    """The earliest-line match across both term sources, or ``None``.
+    """The earliest-line match of :func:`~dadaia_workspace.core.redaction.privacy_matches`
+    (the one matcher: operator terms, then baseline patterns), or ``None``.
 
-    Short-circuits at the first line that produces any candidate: lines are already
-    iterated in ascending order, so that line's own first candidate (insertion order —
-    operator terms, then baseline patterns) is the answer. Neither
-    the rest of the blob nor a global sort is needed to find it (code-reviewer LOW
-    performance finding: the previous version paid the full-blob cost plus an
-    O(n log n) sort for a result already known at the first hit).
-
-    SPEC v0.11.0 FR1 amnesty: a candidate is suppressed IFF the SAME layer's matcher,
-    RE-RUN against ``obj.prior_text`` (the SAME path's published prior content; ``None``
-    -> no base, nothing is ever suppressed, ADR D7), produces a matched occurrence whose
-    value EQUALS (case-normalized) the current matched value. Keying on the value (not
-    the source) is what stops the amnesty from becoming a smuggling path: a prior email
-    address must NOT amnesty a brand-new one of the same baseline pattern id (grill
-    R1/A1.3). Re-running the layer's own anchored matcher — rather than testing raw
-    substring containment — is what stops a DIFFERENT, longer prior-published home-path
-    value from amnestying an unrelated new value that merely happens to be one of its
-    substrings, or a prior superstring like ``acmecorp`` from amnestying a new
-    standalone ``acme`` that was never actually published at a word boundary
-    (code-reviewer MEDIUM finding, v0.11.0 pre-PR review). The matched value is used
-    for this predicate and then discarded — only ``masked_term`` leaves this module
-    (A5.2 unaffected). Suppression is per-CANDIDATE, so a line whose every candidate is
-    suppressed simply continues to the next line — the short-circuit property above is
-    unchanged."""
+    SPEC v0.11.0 FR1 amnesty: a candidate is suppressed IFF the SAME matcher, re-run over
+    ``obj.prior_text`` (the same path's published content; ``None`` -> nothing is
+    suppressed, ADR D7), yields the same value (case-normalized) from the same source —
+    keyed on the value, so a prior email never amnesties a brand-new one (grill R1/A1.3).
+    Only ``masked_term`` leaves this module (A5.2)."""
+    prior = (
+        None
+        if obj.prior_text is None
+        else {(v.lower(), src) for v, src, _ in privacy_matches(obj.prior_text, terms, patterns)}
+    )
     # AC5.6: a control character never splits a term out of reach — stripped first.
-    prior_text = None if obj.prior_text is None else UNSAFE_FORMAT_CHARS_RE.sub("", obj.prior_text)
-    prior_lower = prior_text.lower() if prior_text is not None else None
-
-    def _term_suppressed(term: str) -> bool:
-        """Operator-term layer: FR3(1) defines "occurs" as a literal, case-insensitive
-        substring — the SAME notion detection itself uses (``term.lower() in
-        lowered``), so re-using it against the prior text is not an anchoring mismatch;
-        it is the layer's own defined semantics, applied identically on both sides."""
-        return prior_lower is not None and term.lower() in prior_lower
-
-    def _pattern_suppressed(value: str, pattern: BaselinePatternLike) -> bool:
-        """Baseline-pattern layer: suppressed only when the SAME anchored regex,
-        re-run against the prior text, matches an occurrence whose value equals
-        *value* case-insensitively — never a raw substring test."""
-        if prior_text is None:
-            return False
-        value_lower = value.lower()
-        return any(
-            match.group(0).lower() == value_lower for match in pattern.regex.finditer(prior_text)
-        )
-
     for lineno, line_text in enumerate(UNSAFE_FORMAT_CHARS_RE.sub("", obj.text).splitlines(), 1):
-        line_candidates: list[Hit] = []
-        lowered = line_text.lower()
-        for term, _reason in terms:
-            if _term_occurs(term, lowered) and not _term_suppressed(term):
-                line_candidates.append(Hit(obj.path, lineno, obj.sha, mask(term), _SOURCE_OPERATOR))
-        for pattern in patterns:
-            for match in pattern.regex.finditer(line_text):
-                value = match.group(0)
-                if pattern.exclude is not None and pattern.exclude.search(value):
-                    continue
-                if _pattern_suppressed(value, pattern):
-                    continue
-                line_candidates.append(
-                    Hit(
-                        obj.path,
-                        lineno,
-                        obj.sha,
-                        mask(value),
-                        f"baseline pattern '{pattern.id}'",
-                    )
-                )
-        if line_candidates:
-            return line_candidates[0]
+        for value, source, _reason in privacy_matches(line_text, terms, patterns):
+            if prior is None or (value.lower(), source) not in prior:
+                return Hit(obj.path, lineno, obj.sha, mask(value), source)
     return None
 
 

@@ -25,7 +25,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.exceptions import DadaiaError, WorkspaceNotInitializedError
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
-from dadaia_workspace.core.redaction import mask
+from dadaia_workspace.core.redaction import mask, privacy_matches
 from dadaia_workspace.core.workspace_layout import REPO_TREE_ARTIFACTS
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
@@ -242,25 +242,6 @@ def _check_baseline_exclude_rationale(
     return findings
 
 
-def _scan_text_for_baseline(
-    text: str, patterns: Iterable[_BaselinePattern]
-) -> list[tuple[str, str]]:
-    """Return ``(matched_text, reason)`` pairs for baseline structural hits.
-
-    Each match is filtered through the pattern's optional ``exclude`` regex so
-    loopback / documentation IP ranges, example hostnames, and SHA-like tokens
-    do not produce false positives.
-    """
-    hits: list[tuple[str, str]] = []
-    for pattern in patterns:
-        for match in pattern.regex.finditer(text):
-            value = match.group(0)
-            if pattern.exclude is not None and pattern.exclude.search(value):
-                continue
-            hits.append((value, pattern.reason))
-    return hits
-
-
 def check_public_privacy(
     public_dir: Path,
     iter_files_fn: Callable[[Path], Iterable[Path]],
@@ -302,14 +283,6 @@ def check_public_privacy(
                 continue
             rel = path.relative_to(lib_root) if path.is_relative_to(lib_root) else path
             lowered = text.lower()
-            for term, reason in denylist:
-                if term.lower() in lowered:
-                    findings.append(
-                        DoctorLine(
-                            DoctorStatus.ERROR,
-                            f"public-privacy:{rel.as_posix()}: contains '{mask(term)}' ({reason})",
-                        )
-                    )
             if path.is_relative_to(public_dir):
                 for term, reason in PORTUGUESE_CONTROL_TERMS:
                     if term.lower() in lowered:
@@ -319,11 +292,12 @@ def check_public_privacy(
                                 f"public-privacy:{rel.as_posix()}: contains '{term}' ({reason})",
                             )
                         )
-            for value, reason in _scan_text_for_baseline(text, baseline):
+            for value, source, reason in privacy_matches(text, denylist, baseline):
+                kind = "contains" if source == "operator denylist" else "baseline match"
                 findings.append(
                     DoctorLine(
                         DoctorStatus.ERROR,
-                        f"public-privacy:{rel.as_posix()}: baseline match '{mask(value)}' ({reason})",
+                        f"public-privacy:{rel.as_posix()}: {kind} '{mask(value)}' ({reason})",
                     )
                 )
     if findings:

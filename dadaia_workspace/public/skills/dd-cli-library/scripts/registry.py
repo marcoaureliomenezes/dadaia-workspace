@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Dev-server port registry — stdlib only, one JSON file.
 
-Verbs: list | next | register | release | clean | scan. The registry lives at
-``<workspace>/.dadaia/states/server_registry.json`` (found by walking up from cwd,
-or given with ``--registry``). Exit 0 on success, 1 on a refused verb.
+Verbs: list | next | register | release | clean | scan. The registry is
+``<workspace>/.dadaia/states/server_registry.json`` (walked up from cwd, or
+``--registry``), written atomically by `_ledger.replace`. Exit 1 on a refused verb.
 """
 
 from __future__ import annotations
@@ -18,6 +18,9 @@ import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
+
+sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
+from _ledger import replace  # noqa: E402
 
 DEFAULT_MIN_PORT = 3000
 DEFAULT_MAX_PORT = 3999
@@ -47,11 +50,6 @@ def load(path: Path) -> dict[str, Any]:
         }
     doc: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
     return doc
-
-
-def save(path: Path, doc: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
 
 
 def pid_alive(pid: int) -> bool:
@@ -136,7 +134,7 @@ def cmd_register(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> i
         if e["port"] == args.port:
             if e["project"] == args.project:
                 print(f"port {args.port} already registered for '{args.project}' -> {e['url']}")
-                save(path, doc)
+                replace(path, json.dumps(doc, indent=2) + "\n")
                 return 0
             print(
                 f"error: port {args.port} is registered by project '{e['project']}' ({e['url']})",
@@ -155,7 +153,7 @@ def cmd_register(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> i
         "description": args.description,
     }
     doc["entries"].append(entry)
-    save(path, doc)
+    replace(path, json.dumps(doc, indent=2) + "\n")
     print(f"port {args.port} registered for '{args.project}' -> {entry['url']}")
     return 0
 
@@ -182,7 +180,7 @@ def cmd_release(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> in
             )
         return 1
     doc["entries"] = keep
-    save(path, doc)
+    replace(path, json.dumps(doc, indent=2) + "\n")
     for e in released:
         print(f"released port {e['port']} ('{e['project']}')")
     if not released:
@@ -194,7 +192,7 @@ def cmd_clean(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> int:
     stale = [e for e in doc["entries"] if is_stale(e)]
     if not args.dry_run:
         doc["entries"] = [e for e in doc["entries"] if not is_stale(e)]
-        save(path, doc)
+        replace(path, json.dumps(doc, indent=2) + "\n")
     verb = "would remove" if args.dry_run else "removed"
     for e in stale:
         print(f"{verb}: port {e['port']} ('{e['project']}')")

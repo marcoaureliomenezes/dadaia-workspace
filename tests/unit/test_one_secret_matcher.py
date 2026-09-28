@@ -1,7 +1,9 @@
 """One secret matcher: the pre-push scan and the baseline / ``dead --commit`` preflight
 give the same verdict on every fixture, because both run ONE engine over ONE registry.
 
-Intent: CONTRACT — AC5.6 / sa-pre-push-and-publish-scan-disagree-on-secret-shapes
+Intent: CONTRACT — AC5.6 / sa-pre-push-and-publish-scan-disagree-on-secret-shapes;
+sa-privacy-match-has-two-matchers: the public doctor's text scan says the same, because it
+calls the pre-push matcher (``core.redaction.privacy_matches``).
 
 Every secret-shaped value is composed at run time (``tests/helpers/privacy_fixtures``
 doctrine): no tracked literal carries a shape the push scan or gitleaks matches.
@@ -19,6 +21,7 @@ from dadaia_workspace.container import (
     load_denylist_terms,
     scan_publish_candidates,
 )
+from dadaia_workspace.core.models.doctor_report import DoctorStatus
 from dadaia_workspace.core.models.git_scan import ScannedObject
 from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
 from dadaia_workspace.features.spec_context.service import (
@@ -26,6 +29,10 @@ from dadaia_workspace.features.spec_context.service import (
     SpecContextService,
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from dadaia_workspace.infrastructure.privacy_check import (
+    _PUBLIC_PRIVACY_TEXT_SUFFIXES,  # allow-private-import: which suffixes the doctor reads
+    check_public_privacy,
+)
 from tests.fakes import register_dead
 from tests.fixtures.real_git import seeded_remote
 from tests.fixtures.stores import context_store
@@ -151,3 +158,9 @@ def test_pre_push_and_publish_preflight_agree(
 ) -> None:
     verdicts = (_pre_push_refuses(name, content), _dead_commit_refuses(tmp_path, name, content))
     assert verdicts == (refused, refused), case
+    if isinstance(content, str) and Path(name).suffix in _PUBLIC_PRIVACY_TEXT_SUFFIXES:
+        public = tmp_path / "lib" / "dadaia_workspace" / "public"
+        public.mkdir(parents=True)
+        (public / name).write_text(content)
+        lines = check_public_privacy(public, lambda d: d.iterdir(), lambda _p: False)
+        assert any(line.status is DoctorStatus.ERROR for line in lines) is refused, case

@@ -12,7 +12,6 @@ written and the removal lands last, so a crash leaves the entry live rather than
 from __future__ import annotations
 
 import json
-import os
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -22,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _backlog_check import pair_findings  # noqa: E402
 from _backlog_schema import HISTO, LEDGER  # noqa: E402
+from _ledger import private_refusal, replace, stamp  # noqa: E402
 
 Items = list[dict[str, Any]]
 SCRIPT = Path(__file__).parent / "backlog.py"
@@ -33,14 +33,6 @@ class Refusal(Exception):
     def __init__(self, message: str, fix: str = "") -> None:
         super().__init__(message)
         self.fix = fix
-
-
-def _stamp(path: Path) -> tuple[int, int] | None:
-    try:
-        info = path.stat()
-    except FileNotFoundError:
-        return None
-    return (info.st_size, info.st_mtime_ns)
 
 
 def read_active(path: Path) -> Items:
@@ -69,7 +61,11 @@ def serialize(active: Items) -> str:
     return json.dumps({"schema": "backlog-v1", "active": active}, indent=2) + "\n"
 
 
-def _validated(active: Items, histo: str) -> str:
+def _validated(active: Items, histo: str, before: Items, record: dict[str, Any] | None) -> str:
+    for item in [*(i for i in active if i not in before), *([record] if record else [])]:
+        why = private_refusal(item)
+        if why is not None:
+            raise Refusal(*why)
     text = serialize(active)
     findings = pair_findings(text, histo)
     if findings:
@@ -80,13 +76,6 @@ def _validated(active: Items, histo: str) -> str:
             f"{SCRIPT} check --specs <specs>",
         )
     return text
-
-
-def _replace(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    tmp.write_text(text, encoding="utf-8")
-    os.replace(tmp, path)
 
 
 def commit(
@@ -101,19 +90,21 @@ def commit(
     path, histo = specs / LEDGER, specs / HISTO
     line = json.dumps(record, sort_keys=True, ensure_ascii=False) + "\n" if record else ""
     candidate = (histo.read_text(encoding="utf-8") if histo.is_file() else "") + line
-    before = _stamp(path)
-    written = apply(read_active(path))
-    text = _validated(written, candidate)
-    if _stamp(path) != before:
-        before = _stamp(path)
-        written = apply(read_active(path))
-        text = _validated(written, candidate)
-        if _stamp(path) != before:
+    before = stamp(path)
+    active = read_active(path)
+    written = apply(active)
+    text = _validated(written, candidate, active, record)
+    if stamp(path) != before:
+        before = stamp(path)
+        active = read_active(path)
+        written = apply(active)
+        text = _validated(written, candidate, active, record)
+        if stamp(path) != before:
             raise Refusal(
                 f"{path.name} changed twice under this write — nothing was written",
                 "re-run this command",
             )
     if line:
-        _replace(histo, candidate)
-    _replace(path, text)
+        replace(histo, candidate)
+    replace(path, text)
     return written

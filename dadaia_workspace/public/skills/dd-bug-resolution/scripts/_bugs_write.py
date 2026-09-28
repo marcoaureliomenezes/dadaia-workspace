@@ -10,7 +10,6 @@ refuses a differing second write, and a field a verb owns is never `update`'s.
 from __future__ import annotations
 
 import datetime as _dt
-import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -29,32 +28,11 @@ _TRANSITIONS = ("resolve|supersede|defer|reject", "")
 _VERB_OWNED = {"status": _TRANSITIONS, "closed_at": _TRANSITIONS,
                "caused_by": ("resolve", "--caused-by <bug-id|none> "),
                "superseded_by": ("supersede", "--by <slug> ")}  # fmt: skip
-_IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
-_POSIX_HOME_RE = re.compile(r"(/home/|/Users/)[^/\s:]+")
-_WIN_HOME_RE = re.compile(r"([A-Za-z]:\\Users\\)[^\\\s:]+")
-_UNSAFE_RE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\x80-\x9f\u2028\u2029]")
 _SCRIPT = Path(__file__).parent / "bugs.py"
 
 
 def now_iso() -> str:
     return _dt.datetime.now(tz=_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def redact(value: Any) -> Any:
-    """Strip control/format characters, then mask operator-local home paths and IPv4
-    addresses — the same three passes the CLI's write seam ran before committing."""
-    if not isinstance(value, str):
-        return value
-    out = _UNSAFE_RE.sub("", value)
-    out = _IPV4_RE.sub("[REDACTED-IP]", out)
-    out = _POSIX_HOME_RE.sub(r"\1[REDACTED]", out)
-    return _WIN_HOME_RE.sub(r"\1[REDACTED]", out)
-
-
-def _redacted(record: dict[str, Any]) -> dict[str, Any]:
-    """Every field but the three identity fields (`id`/`ts`/`reported_by`)."""
-    keep = ("id", "ts", "reported_by")
-    return {k: (v if k in keep else redact(v)) for k, v in record.items()}
 
 
 def append(records: Records, values: dict[str, Any]) -> Records:
@@ -75,7 +53,7 @@ def append(records: Records, values: dict[str, Any]) -> Records:
     record = {key: values.get(key) for key in CORE}
     record.update({key: None for key in GOVERNANCE})
     record["status"] = "open"
-    return [*records, _redacted(record)]
+    return [*records, record]
 
 
 def _set(record: dict[str, Any], key: str, value: Any) -> None:
@@ -109,7 +87,7 @@ def apply_update(records: Records, bug_id: str, changes: dict[str, str]) -> Reco
     updated = dict(record)
     for key, value in changes.items():
         _set(updated, key, value)
-    return [_redacted(updated) if r is record else r for r in records]
+    return [updated if r is record else r for r in records]
 
 
 def archivable(records: Records, cutoff: str) -> set[str]:

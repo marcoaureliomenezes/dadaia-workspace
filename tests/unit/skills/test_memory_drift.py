@@ -16,6 +16,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.helpers.skill_scripts import stage_skill_scripts
+
 pytestmark = [pytest.mark.unit, pytest.mark.slow(reason="runs git over a tmp repository")]
 
 _REPO = Path(__file__).resolve().parents[3]
@@ -45,10 +47,7 @@ def _git(cwd: Path, *argv: str) -> str:
 def script(tmp_path: Path) -> Path:
     """memory.py staged alone: the navigator imports nothing from any other skill."""
     staged = tmp_path / "skills" / "dd-spec-navigator" / "scripts"
-    staged.mkdir(parents=True)
-    for module in sorted(_SCRIPTS.glob("*.py")):
-        shutil.copy2(module, staged / module.name)
-    return staged / "memory.py"
+    return stage_skill_scripts("dd-spec-navigator", staged) / "memory.py"
 
 
 @pytest.fixture

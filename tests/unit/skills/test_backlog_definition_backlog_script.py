@@ -10,34 +10,27 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
+from tests.helpers.skill_scripts import stage_skill_scripts
+
 pytestmark = pytest.mark.unit
 
 _PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
 _SCRIPTS = _PUBLIC / "skills" / "dd-backlog-definition" / "scripts"
 _SOURCE = _SCRIPTS / "backlog.py"
-_SCHEMAS = (
-    _PUBLIC / "schemas" / "backlog" / "backlog-v1.schema.json",
-    _PUBLIC / "schemas" / "histo" / "histo-record-v1.schema.json",
-)
 
 
 @pytest.fixture
 def script(tmp_path: Path) -> Path:
     """The staged shape: backlog.py with both schema copies beside it."""
-    staged = tmp_path / "staged" / "scripts"
-    (staged / "schemas").mkdir(parents=True)
-    for module in sorted(_SCRIPTS.glob("*.py")):
-        shutil.copy2(module, staged / module.name)
-    for schema in _SCHEMAS:
-        shutil.copy2(schema, staged / "schemas" / schema.name)
-    return staged / "backlog.py"
+    return (
+        stage_skill_scripts("dd-backlog-definition", tmp_path / "staged" / "scripts") / "backlog.py"
+    )
 
 
 def _specs(root: Path, *active: dict[str, object]) -> Path:
@@ -269,20 +262,24 @@ def test_exit_refuses_a_disposition_outside_the_backlog_vocabulary(
     assert len(_active(specs)) == 1
 
 
-def test_exit_redacts_an_operator_local_path_from_the_histo_record(
-    script: Path, tmp_path: Path
-) -> None:
+def test_new_and_exit_refuse_a_value_the_push_refuses(script: Path, tmp_path: Path) -> None:
+    """sa-ledger-write-seam-redacts-less-than-push-refuses#B2: backlog.py new/exit refuse
+    a push-matched value, naming the field and the masked term; both files unchanged."""
     specs = _specs(tmp_path)
     home = "/".join(("", "home", "someone", "work"))
-    _run(script, "new", "an-idea", "--specs", str(specs), "--description", f"seen at {home}")
-    done = _run(
+    refused_new = _run(script, "new", "leaky", "--specs", str(specs), "--description", home)
+    assert _run(script, "new", "an-idea", "--specs", str(specs)).returncode == 0
+    before = (specs / "backlog" / "BACKLOG.json").read_bytes()
+    refused_exit = _run(
         script, "exit", "an-idea", "--specs", str(specs),
         "--disposition", "rejected", "--reason", f"found under {home}",
     )  # fmt: skip
-    assert done.returncode == 0, done.stdout + done.stderr
-    line = (specs / "backlog" / "_archive" / "backlog_histo.jsonl").read_text(encoding="utf-8")
-    assert "someone" not in line
-    assert "[REDACTED]" in line
+    for done, field in ((refused_new, "description"), (refused_exit, "reason")):
+        assert done.returncode == 1
+        assert f"field {field!r} carries '/…e'" in done.stderr
+    assert [e["id"] for e in _active(specs)] == ["an-idea"]
+    assert (specs / "backlog" / "BACKLOG.json").read_bytes() == before
+    assert _histo(specs) == []
 
 
 # --- check: the invariants that need only the two files ------------------------------

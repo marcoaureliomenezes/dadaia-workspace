@@ -24,13 +24,16 @@ from typing import Any
 # import without leaving a `__pycache__` beside them.
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+#: Source-tree fallback: before `public stage` copies `_ledger.py` in beside this file.
+sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
 import _backlog_exit as ex  # noqa: E402
 import _backlog_subjects as sj  # noqa: E402
 import _backlog_write as wr  # noqa: E402
 from _backlog_check import check  # noqa: E402
-from _backlog_schema import CODE, DISPOSITIONS, HISTO, LEDGER, find_specs  # noqa: E402
+from _backlog_schema import CODE, DISPOSITIONS, HISTO, LEDGER  # noqa: E402
 from _backlog_store import Refusal, commit, read_active  # noqa: E402
+from _ledger import find_specs  # noqa: E402
 
 _HELP = {
     "new": "append one brand-new active[] entry, born at status 'idea'",

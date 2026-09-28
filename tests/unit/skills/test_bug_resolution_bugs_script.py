@@ -10,12 +10,13 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+
+from tests.helpers.skill_scripts import stage_skill_scripts
 
 pytestmark = pytest.mark.unit
 
@@ -26,7 +27,6 @@ _SOURCE = _SCRIPTS / "bugs.py"
 _LOCAL_IP = ".".join(("10", "1", "2", "3"))
 #: Same reason: an absolute home path is composed, never written as a tracked literal.
 _HOME_PATH = "/".join(("", "home", "someone", "work"))
-_SCHEMA = _PUBLIC / "schemas" / "bugs" / "bug-record-v1.schema.json"
 
 _OPEN_RECORD: dict[str, object] = {
     "id": "a-bug",
@@ -52,12 +52,7 @@ _OPEN_RECORD: dict[str, object] = {
 @pytest.fixture
 def script(tmp_path: Path) -> Path:
     """The staged shape: bugs.py with its schema copy beside it."""
-    staged = tmp_path / "staged" / "scripts"
-    (staged / "schemas").mkdir(parents=True)
-    for module in sorted(_SCRIPTS.glob("*.py")):
-        shutil.copy2(module, staged / module.name)
-    shutil.copy2(_SCHEMA, staged / "schemas" / _SCHEMA.name)
-    return staged / "bugs.py"
+    return stage_skill_scripts("dd-bug-resolution", tmp_path / "staged" / "scripts") / "bugs.py"
 
 
 def _ledger(root: Path, *records: dict[str, object]) -> Path:
@@ -168,6 +163,23 @@ def test_specs_default_resolves_the_nearest_git_rooted_specs_tree(
     deep = root / "a" / "b"
     deep.mkdir(parents=True)
     assert _run(script, "check", cwd=deep).returncode == 0
+
+
+def test_a_bad_archive_line_is_a_finding(script: Path, tmp_path: Path) -> None:
+    """sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts#48.5: a non-JSON or
+    non-bug-record-v1 line in bugs_histo.jsonl is a finding and check exits non-zero; a
+    pre-v6 `event` line is history."""
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    (specs / "bugs" / "_archive").mkdir()
+    (specs / "bugs" / "_archive" / "bugs_histo.jsonl").write_text(
+        '{"event": "archived", "data": {}}\nnot json\n{"id": "x"}\n', encoding="utf-8"
+    )
+    done = _run(script, "check", "--specs", str(specs), "--json")
+    assert done.returncode == 1
+    assert [(f["path"], f["line"]) for f in json.loads(done.stdout)][:2] == [
+        ("bugs/_archive/bugs_histo.jsonl", 2),
+        ("bugs/_archive/bugs_histo.jsonl", 3),
+    ]
 
 
 def test_absent_ledger_is_not_a_finding(script: Path, tmp_path: Path) -> None:
@@ -285,18 +297,60 @@ def test_append_refuses_a_duplicate_id_and_writes_nothing(script: Path, tmp_path
     assert (specs / "bugs" / "BUGS.jsonl").read_bytes() == before
 
 
-def test_append_redacts_a_local_home_path_and_an_ip(script: Path, tmp_path: Path) -> None:
-    specs = _ledger(tmp_path)
-    done = _run(
+_SHA = "0123456789abcdef" * 2 + "01234567"
+
+
+@pytest.mark.parametrize(
+    ("value", "pushed"),
+    [(f"seen at {_HOME_PATH}", True), (f"seen at {_LOCAL_IP}", True), (_SHA, False)],
+)
+def test_the_seam_refuses_exactly_what_the_push_refuses(
+    script: Path, tmp_path: Path, value: str, pushed: bool
+) -> None:
+    """sa-ledger-write-seam-redacts-less-than-push-refuses#B1: append refuses a
+    push-matched value, naming the field and the masked term, ledger unchanged.
+    sa-ledger-write-seam-redacts-less-than-push-refuses#B3: resolve refuses it too and the
+    record stays open. sa-ledger-write-seam-redacts-less-than-push-refuses#B4: on the same
+    matrix the seam refuses iff the push matcher does.
+    sa-ledger-write-seam-redacts-less-than-push-refuses#B5: a bare sha is not refused."""
+    from dadaia_workspace.core.models.git_scan import ScannedObject
+    from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
+    from dadaia_workspace.infrastructure.privacy_check import load_baseline_patterns
+
+    blob = ScannedObject(path="BUGS.jsonl", sha="", text=value, decodable=True)
+    assert bool(scan_objects([blob], [], load_baseline_patterns()).hits) is pushed
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    before = (specs / "bugs" / "BUGS.jsonl").read_bytes()
+    argv = _resolve_argv()
+    argv[argv.index("--evidence-loop") + 1] = value
+    appended = _run(
         script, "append", "--specs", str(specs), "--bug-id", "leaky", "--title", "t",
         "--severity", "LOW", "--surface", "cli", "--component", "c", "--context", "ctx",
-        "--symptom", f"seen at {_HOME_PATH} and {_LOCAL_IP}", "--repro", "r",
-        "--expected", "e",
+        "--symptom", value, "--repro", "r", "--expected", "e",
     )  # fmt: skip
-    assert done.returncode == 0, done.stderr
-    [record] = _records(specs)
-    expected = "/".join(("", "home", "[REDACTED]", "work"))
-    assert record["symptom"] == f"seen at {expected} and [REDACTED-IP]"
+    resolved = _run(script, *argv, "--specs", str(specs))
+    for done, field in ((appended, "symptom"), (resolved, "evidence_loop")):
+        assert (done.returncode == 1) is pushed, done.stderr
+        assert (f"field {field!r} carries" in done.stderr) is pushed
+    if pushed:
+        assert (specs / "bugs" / "BUGS.jsonl").read_bytes() == before
+
+
+def test_every_ledger_skill_stages_a_byte_identical_privacy_pair(tmp_path: Path) -> None:
+    """sa-ledger-write-seam-redacts-less-than-push-refuses#B6: every ledger skill carries a
+    byte-identical _privacy.py (the push matcher's module) and baseline copy."""
+    from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+
+    FileSystemPublicAssetManager().stage(tmp_path)
+    package = _PUBLIC.parent
+    for skill in ("dd-bug-resolution", "dd-backlog-definition"):
+        scripts = tmp_path / ".dadaia" / "agentic" / "skills" / skill / "scripts"
+        assert (scripts / "_privacy.py").read_bytes() == (
+            package / "core" / "redaction.py"
+        ).read_bytes()
+        assert (scripts / "privacy_baseline.json").read_bytes() == (
+            package / "infrastructure" / "data" / "privacy_baseline.json"
+        ).read_bytes()
 
 
 def test_resolve_closes_the_record_and_derives_diff_direction(script: Path, tmp_path: Path) -> None:

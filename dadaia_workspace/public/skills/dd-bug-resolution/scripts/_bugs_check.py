@@ -15,45 +15,25 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import _ledger  # noqa: E402
+from _ledger import JSON_TYPES  # noqa: E402
+
 CODE = "LEDGER-BUGS-SCHEMA"
 LEDGER = "bugs/BUGS.jsonl"
 HISTO = "bugs/_archive/bugs_histo.jsonl"
 TERMINAL = ("resolved", "superseded", "deferred", "rejected")
-_JSON_TYPES: dict[str, Any] = {
-    "string": str, "object": dict, "array": list, "boolean": bool,
-    "null": type(None), "integer": int, "number": (int, float),
-}  # fmt: skip
-
-
-_SCHEMAS = Path(__file__).resolve().parent / "schemas"
-#: Source-tree fallback: before `public stage` copies a schema in beside the script.
-_SHIPPED = Path(__file__).resolve().parents[3] / "schemas"
-
-
-def _schema_file() -> Path:
-    own = _SCHEMAS / "bug-record-v1.schema.json"
-    return own if own.is_file() else next(_SHIPPED.rglob(own.name), own)
 
 
 def load_schema() -> dict[str, Any]:
-    schema: dict[str, Any] = json.loads(_schema_file().read_text(encoding="utf-8"))
-    return schema
-
-
-def find_specs(start: Path) -> Path:
-    """The nearest ``specs/`` at or above *start* whose parent holds ``.git``."""
-    for candidate in (start, *start.parents):
-        if (candidate / "specs").is_dir() and (candidate / ".git").exists():
-            return candidate / "specs"
-    print(f"error: no git-rooted specs/ at or above {start}", file=sys.stderr)
-    print("fix: run this script again with --specs <path-to-specs>", file=sys.stderr)
-    raise SystemExit(1)
+    return _ledger.load_schema("bug-record-v1")
 
 
 def _field_errors(key: str, value: object, spec: dict[str, Any]) -> Iterator[str]:
     declared = spec.get("type")
     allowed: list[str] = declared if isinstance(declared, list) else [declared] if declared else []
-    if allowed and not any(isinstance(value, _JSON_TYPES[name]) for name in allowed):
+    if allowed and not any(isinstance(value, JSON_TYPES[name]) for name in allowed):
         yield f"field {key!r} must be of type {declared}"
         return
     if not isinstance(value, str):
@@ -137,9 +117,27 @@ def findings_for(text: str, rel: str = LEDGER) -> list[dict[str, Any]]:
     return findings
 
 
+def histo_findings(text: str) -> list[dict[str, Any]]:
+    """The archive's lines: each a bug-record-v1 record, or a pre-v6 ``event`` line that
+    predates the record shape and is history, never rewritten."""
+    schema = load_schema()
+    out: list[dict[str, Any]] = []
+    for number, raw in enumerate(text.split("\n"), start=1):
+        try:
+            record = json.loads(raw) if raw.strip() else None
+        except json.JSONDecodeError as exc:
+            record, messages = None, [f"line is not valid JSON: {exc.msg}"]
+        else:
+            legacy = isinstance(record, dict) and "event" in record
+            messages = [] if record is None or legacy else list(schema_errors(record, schema))
+        out += [{"code": CODE, "verdict": "error", "path": HISTO, "line": number,
+                 "message": m} for m in messages]  # fmt: skip
+    return out
+
+
 def check(specs: Path) -> list[dict[str, Any]]:
-    """Validate the committed ledger; a young specs tree with no ledger is not a finding."""
-    path = specs / LEDGER
-    if not path.is_file():
-        return []
-    return findings_for(path.read_text(encoding="utf-8"))
+    """Validate the committed ledger and its archive; a young specs tree with neither is
+    not a finding."""
+    ledger, histo = specs / LEDGER, specs / HISTO
+    out = findings_for(ledger.read_text(encoding="utf-8")) if ledger.is_file() else []
+    return out + (histo_findings(histo.read_text(encoding="utf-8")) if histo.is_file() else [])

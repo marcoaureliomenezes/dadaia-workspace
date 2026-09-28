@@ -17,6 +17,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.helpers.skill_scripts import stage_skill_scripts
+
 pytestmark = pytest.mark.unit
 
 _PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
@@ -39,8 +41,7 @@ def script(tmp_path: Path) -> Path:
     navigator's scripts projected as its sibling skill (the drift decider it imports)."""
     staged = tmp_path / "skills" / "dd-release-implementation" / "scripts"
     (staged / "schemas").mkdir(parents=True)
-    shutil.copytree(_PUBLIC / "skills" / "dd-spec-navigator" / "scripts",
-                    tmp_path / "skills" / "dd-spec-navigator" / "scripts")  # fmt: skip
+    stage_skill_scripts("dd-spec-navigator", tmp_path / "skills" / "dd-spec-navigator" / "scripts")
     for module in sorted(_SCRIPTS.glob("*.py")):
         shutil.copy2(module, staged / module.name)
     for schema in _SCHEMAS:

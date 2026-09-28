@@ -452,22 +452,13 @@ def test_freshly_authored_entry_is_clean_under_both_doctors(tmp_path: Path) -> N
     ``backlog doctor``-clean AND ``specs doctor``-clean out of the box, proven over the
     real writer run as the script (staged with its schemas, exactly as `public stage`
     installs it) plus both live doctors."""
-    import shutil
     import subprocess
     import sys
 
     from dadaia_workspace.features.specs import SpecsDoctor
+    from tests.helpers.skill_scripts import stage_skill_scripts
 
-    public = Path(__file__).resolve().parents[1].parent / "dadaia_workspace" / "public"
-    staged = tmp_path / "staged" / "scripts"
-    (staged / "schemas").mkdir(parents=True)
-    for module in sorted((public / "skills" / "dd-backlog-definition" / "scripts").glob("*.py")):
-        shutil.copy2(module, staged / module.name)
-    for schema in (
-        public / "schemas" / "backlog" / "backlog-v1.schema.json",
-        public / "schemas" / "histo" / "histo-record-v1.schema.json",
-    ):
-        shutil.copy2(schema, staged / "schemas" / schema.name)
+    staged = stage_skill_scripts("dd-backlog-definition", tmp_path / "staged" / "scripts")
 
     specs, src = _build_roots(tmp_path)
     done = subprocess.run(

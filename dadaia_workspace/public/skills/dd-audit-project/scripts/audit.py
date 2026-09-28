@@ -20,11 +20,13 @@ from pathlib import Path
 # import without leaving a `__pycache__` beside them.
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+#: Source-tree fallback: before `public stage` copies `_ledger.py` in beside this file.
+sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
 import _audit_verbs as vb  # noqa: E402
-from _audit_check import check  # noqa: E402
-from _audit_schema import DISPOSITIONS, find_specs  # noqa: E402
+from _audit_check import DISPOSITIONS, check  # noqa: E402
 from _audit_store import Refusal  # noqa: E402
+from _ledger import find_specs  # noqa: E402
 
 _HELP = {
     "disposition": "rewrite one finding's disposition, release and reason, in place",

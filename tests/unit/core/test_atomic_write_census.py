@@ -37,10 +37,15 @@ from tests.helpers.scan_population import assert_populated
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _PACKAGE_ROOT = _REPO_ROOT / "dadaia_workspace"
 
-#: Every writer this census forbids from re-appearing — the SOLE surviving definition
-#: site, exactly one entry, proven by scan rather than declared by name (the assertion
-#: below fails loudly the moment a second one exists, for ANY def, named anything).
-_EXPECTED_SOLE_DEFINITION = "dadaia_workspace/core/atomic_write.py:27:atomic_write"
+#: The two homes, proven by scan: the package's writer, and the stdlib ledger scripts'
+#: one writer, staged beside each script (a skill script cannot import the package).
+_EXPECTED_DEFINITIONS = [
+    "dadaia_workspace/core/atomic_write.py:atomic_write",
+    "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_ledger.py:replace",
+    # Leaves when lane w2-release switches `_release_store` to `_ledger.replace`
+    # (sa-release-json-validated-three-times).
+    "dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_store.py:replace",
+]
 
 
 def _writes_then_replaces(func: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
@@ -81,26 +86,18 @@ def _writes_then_replaces(func: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     return False
 
 
-def _is_skill_script(path: Path) -> bool:
-    """A `public/skills/*/scripts/` owner script runs from a projected skill folder with
-    no library on `sys.path` (0.4.7 FR1), so it cannot import `core.atomic_write` and
-    owns its own temp-then-replace — the one exemption, structural, not a name list."""
-    parts = path.parts
-    return "skills" in parts and "scripts" in parts and "public" in parts
-
-
 def _temp_then_replace_writer_defs(package_root: Path) -> list[str]:
     """Every module- or class-level ``def`` anywhere under *package_root* matching the
-    temp-then-replace content-write idiom, as ``<relative-path>:<line>:<name>``."""
+    temp-then-replace content-write idiom, as ``<relative-path>:<name>``."""
     files = sorted(package_root.rglob("*.py"))
     # v0.4.5 FR5 (scan-test-vacuity-guard): belt-and-suspenders — the sole-definition
     # assertion below is already non-vacuous (an empty scan yields `hits == []`, which
-    # fails the `== [_EXPECTED_SOLE_DEFINITION]` check), but this guard keeps the
+    # fails the `== _EXPECTED_DEFINITIONS` check), but this guard keeps the
     # convention uniform and catches the mis-root loudly, at the walk itself.
     assert_populated(files, sentinel=package_root / "core" / "atomic_write.py")
     hits: list[str] = []
     for path in files:
-        if "__pycache__" in path.parts or _is_skill_script(path):
+        if "__pycache__" in path.parts:
             continue
         try:
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
@@ -111,17 +108,19 @@ def _temp_then_replace_writer_defs(package_root: Path) -> list[str]:
                 node
             ):
                 rel = path.relative_to(package_root.parent).as_posix()
-                hits.append(f"{rel}:{node.lineno}:{node.name}")
+                hits.append(f"{rel}:{node.name}")
     return hits
 
 
 def test_only_core_atomic_write_defines_the_temp_then_replace_idiom() -> None:
     """A2.2: the census is DERIVED by scan. The next accidental reintroduction of a raw
     tmp-write-then-swap idiom anywhere under ``dadaia_workspace/`` — named anything —
-    fails this test loudly instead of silently escaping a hand-kept list."""
+    fails this test loudly instead of silently escaping a hand-kept list.
+    sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts#48.6: the ledger scripts
+    carry no `_replace` copy of their own; one staged source is the scripts' writer."""
     hits = _temp_then_replace_writer_defs(_PACKAGE_ROOT)
 
-    assert hits == [_EXPECTED_SOLE_DEFINITION], (
+    assert hits == _EXPECTED_DEFINITIONS, (
         "a temp-then-replace content writer exists outside core/atomic_write.py — "
         f"route it through core.atomic_write.atomic_write instead (A2.2): {hits}"
     )
@@ -160,6 +159,6 @@ def test_no_named_shim_or_inline_tmp_writer_survives_by_name() -> None:
                 and node.name in retired_names
             ):
                 rel = path.relative_to(_PACKAGE_ROOT.parent).as_posix()
-                hits.append(f"{rel}:{node.lineno}:{node.name}")
+                hits.append(f"{rel}:{node.name}")
 
     assert hits == [], f"a retired atomic-writer name was redefined: {hits}"

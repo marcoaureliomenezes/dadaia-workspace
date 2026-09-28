@@ -9,8 +9,6 @@ the JSON schema to the dict this returns.
 from __future__ import annotations
 
 import re
-import sys
-from pathlib import Path
 from typing import Any
 
 CODE = "LEDGER-MEMORY-SCHEMA"
@@ -20,16 +18,6 @@ INDEX = "memory/product/index.md"
 _DELIMITER = "---"
 _KEY_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):\s?(.*)$")
 WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
-
-
-def find_specs(start: Path) -> Path:
-    """The nearest ``specs/`` at or above *start* whose parent holds ``.git``."""
-    for candidate in (start, *start.parents):
-        if (candidate / "specs").is_dir() and (candidate / ".git").exists():
-            return candidate / "specs"
-    print(f"error: no git-rooted specs/ at or above {start}", file=sys.stderr)
-    print("fix: run this script again with --specs <path-to-specs>", file=sys.stderr)
-    raise SystemExit(1)
 
 
 def _scalar(raw: str) -> str | list[str] | None:

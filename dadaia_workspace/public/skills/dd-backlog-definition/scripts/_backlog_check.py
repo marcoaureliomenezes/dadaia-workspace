@@ -25,9 +25,8 @@ from _backlog_schema import (  # noqa: E402
     IDEA,
     LEDGER,
     TERMINAL,
-    load_schema,
-    validate,
 )
+from _ledger import load_schema, validate  # noqa: E402
 
 
 def finding(path: str, line: int, message: str) -> dict[str, Any]:

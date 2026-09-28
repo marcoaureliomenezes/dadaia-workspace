@@ -18,11 +18,13 @@ from pathlib import Path
 # import without leaving a `__pycache__` beside them.
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 
 import _memory_catalog as cat  # noqa: E402
 import _memory_drift as dft  # noqa: E402
+from _ledger import find_specs  # noqa: E402
 from _memory_check import check  # noqa: E402
-from _memory_schema import CATALOG, INDEX, find_specs  # noqa: E402
+from _memory_schema import CATALOG, INDEX  # noqa: E402
 
 
 def _parser() -> argparse.ArgumentParser:

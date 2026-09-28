@@ -23,8 +23,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import _bugs_transition as tr  # noqa: E402
 import _bugs_write as wr  # noqa: E402
-from _bugs_check import CODE, HISTO, LEDGER, check, find_specs  # noqa: E402
+from _bugs_check import CODE, HISTO, LEDGER, check  # noqa: E402
 from _bugs_store import Refusal, commit, read_records  # noqa: E402
+from _ledger import find_specs  # noqa: E402
 
 _OPTIONS: dict[str, tuple[str, ...]] = {
     "append": ("--bug-id", "--reported-by", "--ts", "--title", "--severity", "--surface",

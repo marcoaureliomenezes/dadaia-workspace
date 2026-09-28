@@ -15,8 +15,7 @@ backlog file.
 A backlog item's EXIT record is not declared here: it is the one
 :class:`~dadaia_workspace.core.models.histo.HistoRecord` shape every ``_histo.jsonl``
 uses (0.4.7 FR7), carrying the removed ``active[]`` object itself in ``entry``, its
-disposition drawn from ``BACKLOG_HISTO_DISPOSITIONS``, and its own write-time
-denylist redaction.
+disposition drawn from ``backlog.py``'s ``DISPOSITIONS``.
 """
 
 from __future__ import annotations

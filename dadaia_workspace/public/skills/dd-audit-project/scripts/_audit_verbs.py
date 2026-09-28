@@ -18,7 +18,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _audit_schema import AUDITS, DISPOSITIONS, FINDINGS, PILLARS, REQUIRED_EVIDENCE  # noqa: E402
+from _audit_check import AUDITS, DISPOSITIONS, FINDINGS, PILLARS, REQUIRED_EVIDENCE  # noqa: E402
 from _audit_store import (  # noqa: E402
     SCRIPT,
     Refusal,

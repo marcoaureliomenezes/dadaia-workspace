@@ -35,7 +35,7 @@ Scope: this file governs only `specs/bugs/`.
 - Full command reference: `dd-bug-registration`.
 - Never hand-edit `BUGS.jsonl` to keep every entry schema-valid.
 - Every record change is one governance verb: `bugs.py append|update|resolve|supersede|defer|reject|archive`.
-- That seam is atomic, refuse-stale, redacted, and refuses any `immutable-core` field or a differing re-set of a `write-once` field.
+- That seam is atomic, refuse-stale, refuses a value the push would refuse, and refuses any `immutable-core` field or a differing re-set of a `write-once` field.
 - `status` and `closed_at` change only through the four terminal transitions, never through `--set`; `bugs.py archive` ages by `closed_at`.
 - `status` has no `picked` value — a pick is the bundled release-definition commit, never a ledger write.
 - Bug reports are not specs — they do not authorize implementation changes on their own.

@@ -82,7 +82,9 @@ def _package_sources() -> list[Path]:
     return files
 
 
-_LEDGER = "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts"
+#: A stdlib ledger script owns its subset (it cannot import core); the parity test
+#: pins every subset to the one vocabulary.
+_PARITY = "parity:tests/unit/skills/test_ledger_write_verbs_refuse_with_the_pair_intact.py"
 _TEXT = "sa-text-restates-rules-the-code-contradicts"
 
 #: Every closed set of canonical names the registry owns (0.4.7 FR5 widened ratchet 2
@@ -113,10 +115,12 @@ _SECOND_LIST_BIRTH = 8
 _SECOND_LIST_ALLOWANCE: dict[str, str] = {
     "dadaia_workspace/features/backlog/doctor.py": "sa-backlog-status-has-no-single-authority",
     "dadaia_workspace/features/specs/doctor_release.py": "sa-release-json-validated-three-times",
-    "dadaia_workspace/public/skills/dd-audit-project/scripts/_audit_schema.py": _LEDGER,
-    "dadaia_workspace/public/skills/dd-backlog-definition/scripts/_backlog_schema.py": _LEDGER,
-    "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_bugs_check.py": _LEDGER,
-    "dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_schema.py": _LEDGER,
+    "dadaia_workspace/public/skills/dd-audit-project/scripts/_audit_check.py": _PARITY,
+    "dadaia_workspace/public/skills/dd-backlog-definition/scripts/_backlog_schema.py": _PARITY,
+    "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_bugs_check.py": _PARITY,
+    "dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_schema.py": (
+        "sa-release-json-validated-three-times"
+    ),
 }
 
 #: Literals whose names coincide with a canonical set by accident, not by restatement,

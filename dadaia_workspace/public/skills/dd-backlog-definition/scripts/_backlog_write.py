@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""The birth of one ``active[]`` entry, and the redaction every backlog write runs.
-
-Redaction is a WRITE-time seam, not a reporting one: an operator-local path or IP that
-reaches the file is already published to every later reader.
-"""
+"""The birth of one ``active[]`` entry."""
 
 from __future__ import annotations
 
@@ -20,29 +16,10 @@ from _backlog_store import SCRIPT, Items, Refusal  # noqa: E402
 _SLUG_RE = re.compile(r"^[a-z][a-z0-9-]+$")
 _INTENT_RE = re.compile(r"^(?P<kind>[a-z]+):(?P<ref>[^=]+)=(?P<change>.+)$", re.DOTALL)
 _KINDS = ("code", "api", "cli", "panel", "doc", "invariant", "catalog")
-_UNSAFE_RE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\x80-\x9f\u2028\u2029]")
-_IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
-_POSIX_HOME_RE = re.compile(r"(/home/|/Users/)[^/\s:]+")
-_WIN_HOME_RE = re.compile(r"([A-Za-z]:\\Users\\)[^\\\s:]+")
 
 
 def today() -> str:
     return _dt.datetime.now(tz=_dt.UTC).strftime("%Y-%m-%d")
-
-
-def redact(value: Any) -> Any:
-    """Strip control/format characters, then mask operator-local home paths and IPv4
-    addresses — the same three passes the retired CLI write seam ran."""
-    if isinstance(value, dict):
-        return {key: redact(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [redact(item) for item in value]
-    if not isinstance(value, str):
-        return value
-    out = _UNSAFE_RE.sub("", value)
-    out = _IPV4_RE.sub("[REDACTED-IP]", out)
-    out = _POSIX_HOME_RE.sub(r"\1[REDACTED]", out)
-    return _WIN_HOME_RE.sub(r"\1[REDACTED]", out)
 
 
 def parse_intents(raw: list[str] | None) -> list[dict[str, Any]]:
@@ -91,4 +68,4 @@ def new_entry(active: Items, slug: str, values: dict[str, Any]) -> Items:
     }
     if intents:
         entry["intents"] = intents
-    return [*active, redact(entry)]
+    return [*active, entry]

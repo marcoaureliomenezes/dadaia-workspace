@@ -14,6 +14,9 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.infrastructure.public_assets import (
+    _SKILL_SCRIPT_SHARED,  # allow-private-import: the staged siblings of a ledger script
+)
 from tests.helpers.scan_population import assert_populated
 
 pytestmark = pytest.mark.contract
@@ -26,7 +29,7 @@ _OWNER_SCRIPT_MAX_LINES = 150
 #: Ratchet: a script measured ABOVE the ceiling when the contract landed keeps its
 #: measured count until it is split — `registry.py` (0.4.7 c5) predates FR1's 150-line
 #: rule. Lowering an entry is welcome; raising one defeats the contract.
-_OWNER_SCRIPT_CEILINGS: dict[str, int] = {"registry.py": 339}
+_OWNER_SCRIPT_CEILINGS: dict[str, int] = {"registry.py": 337}
 
 #: Owner scripts whose verb set includes `check` (the ledger scripts of FR2). A
 #: script listed here must expose `check`; `registry.py` owns ports, not a ledger.
@@ -80,6 +83,8 @@ def test_skill_owner_script_meets_the_contract(script: Path) -> None:
         "belongs behind a narrower interface, not a raised ceiling."
     )
     siblings = {module.stem for module in script.parent.glob("*.py")}
+    skill = script.parent.parent.name
+    siblings |= {Path(d).stem for _, d in _SKILL_SCRIPT_SHARED if d.startswith(f"skills/{skill}/")}
     if script.parent.parent.name == "dd-release-implementation":
         siblings |= _CROSS_SKILL_EDGE  # SPEC D6: the one drift decider, one way only
     foreign = _imported_roots(script) - set(sys.stdlib_module_names) - siblings

@@ -9,34 +9,25 @@ The script reads its two schemas from ``scripts/schemas/`` BESIDE itself — cop
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
+from tests.helpers.skill_scripts import stage_skill_scripts
+
 pytestmark = pytest.mark.unit
 
 _PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
 _SCRIPTS = _PUBLIC / "skills" / "dd-audit-project" / "scripts"
-_SCHEMAS = (
-    _PUBLIC / "schemas" / "audits" / "finding-record-v1.schema.json",
-    _PUBLIC / "schemas" / "histo" / "histo-record-v1.schema.json",
-)
 _AUDIT = "20260101-window"
 
 
 @pytest.fixture
 def script(tmp_path: Path) -> Path:
     """The staged shape: audit.py with both schema copies beside it."""
-    staged = tmp_path / "staged" / "scripts"
-    (staged / "schemas").mkdir(parents=True)
-    for module in sorted(_SCRIPTS.glob("*.py")):
-        shutil.copy2(module, staged / module.name)
-    for schema in _SCHEMAS:
-        shutil.copy2(schema, staged / "schemas" / schema.name)
-    return staged / "audit.py"
+    return stage_skill_scripts("dd-audit-project", tmp_path / "staged" / "scripts") / "audit.py"
 
 
 def _finding(index: int, **over: object) -> dict[str, object]:

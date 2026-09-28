@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _backlog_schema import DISPOSITIONS  # noqa: E402
 from _backlog_store import SCRIPT, Items, Refusal  # noqa: E402
-from _backlog_write import redact, today  # noqa: E402
+from _backlog_write import today  # noqa: E402
 
 #: The status a release-lane exit requires: an item a release closed is an item a
 #: release picked. Exiting an 'idea' as delivered launders unworked scope as shipped.
@@ -81,16 +81,13 @@ def _check_release_lane(
 
 
 def histo_record(entry: dict[str, Any], values: dict[str, Any]) -> dict[str, Any]:
-    """The one histo-record-v1 shape: ``entry`` IS the removed object, redacted."""
-    record: dict[str, Any] = redact(
-        {
-            "id": entry["id"],
-            "ts": values.get("ts") or today(),
-            "disposition": values["disposition"],
-            "release": values["release"],
-            "reason": values["reason"],
-            "summary": values.get("summary"),
-            "entry": entry,
-        }
-    )
-    return record
+    """The one histo-record-v1 shape: ``entry`` IS the removed object."""
+    return {
+        "id": entry["id"],
+        "ts": values.get("ts") or today(),
+        "disposition": values["disposition"],
+        "release": values["release"],
+        "reason": values["reason"],
+        "summary": values.get("summary"),
+        "entry": entry,
+    }

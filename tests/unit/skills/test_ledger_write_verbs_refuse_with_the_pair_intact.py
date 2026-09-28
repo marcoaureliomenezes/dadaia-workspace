@@ -9,16 +9,19 @@ from the pair check the verb runs over its candidate bytes before writing.
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
-import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from dadaia_workspace.infrastructure.public_assets import _SKILL_SCRIPT_SCHEMAS
+from dadaia_workspace.core.models import histo
+from dadaia_workspace.core.models.histo import TERMINAL_DISPOSITIONS
+from tests.helpers.skill_scripts import stage_skill_scripts
 
 pytestmark = pytest.mark.unit
 
@@ -68,10 +71,7 @@ def _stage(root: Path) -> Path:
     skills = root / "skills"
     for skill in ("dd-bug-resolution", "dd-backlog-definition", "dd-audit-project",
                   "dd-release-implementation", "dd-spec-navigator"):  # fmt: skip
-        shutil.copytree(_PUBLIC / "skills" / skill / "scripts", skills / skill / "scripts")
-    for schema_rel, scripts_rel in _SKILL_SCRIPT_SCHEMAS:
-        (root / scripts_rel).mkdir(parents=True, exist_ok=True)
-        shutil.copy2(_PUBLIC / schema_rel, root / scripts_rel / Path(schema_rel).name)
+        stage_skill_scripts(skill, skills / skill / "scripts")
     return skills
 
 
@@ -102,3 +102,65 @@ def test_a_write_verb_over_an_invalid_document_refuses_with_the_pair_intact(
 
     assert done.returncode != 0, done.stdout
     assert _hashes(specs) == before, done.stderr
+
+
+def test_the_one_ledger_writer_leaves_no_temp_and_writes_lf(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts#48.2: a failing
+    os.replace leaves no temp sibling and the original byte-unchanged.
+    sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts#48.3: a write is LF."""
+    import importlib.util
+
+    source = _PUBLIC / "skills" / "dd-bug-resolution" / "scripts" / "_ledger.py"
+    spec = importlib.util.spec_from_file_location("_ledger_under_test", source)
+    assert spec is not None and spec.loader is not None
+    ledger = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ledger)
+    target = tmp_path / "BUGS.jsonl"
+    target.write_bytes(b"original\n")
+    with monkeypatch.context() as patch:
+        patch.setattr("os.replace", lambda *_: (_ for _ in ()).throw(OSError("injected")))
+        with pytest.raises(OSError, match="injected"):
+            ledger.replace(target, "new\n")
+    assert [p.name for p in tmp_path.iterdir()] == ["BUGS.jsonl"]
+    assert target.read_bytes() == b"original\n"
+    ledger.replace(target, "a\nb\n")
+    assert target.read_bytes() == b"a\nb\n"
+
+
+def _script_table(rel: str, name: str = "REQUIRED_EVIDENCE") -> Any:
+    tree = ast.parse((_PUBLIC / "skills" / rel).read_text(encoding="utf-8"))
+    [value] = [
+        n.value for n in tree.body
+        if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == name
+    ]  # fmt: skip
+    return ast.literal_eval(value)
+
+
+@pytest.mark.parametrize(
+    ("rel", "name"),
+    [
+        ("dd-bug-resolution/scripts/_bugs_check.py", "TERMINAL"),
+        ("dd-backlog-definition/scripts/_backlog_schema.py", "DISPOSITIONS"),
+        ("dd-backlog-definition/scripts/_backlog_schema.py", "TERMINAL"),
+        ("dd-audit-project/scripts/_audit_check.py", "DISPOSITIONS"),
+    ],
+)
+def test_every_script_subset_is_drawn_from_the_one_vocabulary(rel: str, name: str) -> None:
+    subset = _script_table(rel, name)
+    assert subset == tuple(w for w in TERMINAL_DISPOSITIONS if w in subset)
+
+
+def test_a_shared_disposition_requires_the_same_evidence_in_both_ledgers() -> None:
+    """sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts#48.1: the scripts' own
+    tables are the only definition, core carries none, and a word both ledgers use
+    requires the same evidence in each."""
+    backlog = _script_table("dd-backlog-definition/scripts/_backlog_exit.py")
+    audit = _script_table("dd-audit-project/scripts/_audit_check.py")
+    shared = {w: (backlog[w], audit[w]) for w in backlog.keys() & audit.keys()}
+    assert shared == {"superseded": ("release",) * 2, "rejected": ("reason",) * 2}
+    assert not {"REQUIRED_EVIDENCE", "AUDIT_PILLARS"} & set(vars(histo))
+    assert [name for name in vars(histo) if name.endswith("_DISPOSITIONS")] == [
+        "TERMINAL_DISPOSITIONS"
+    ]
