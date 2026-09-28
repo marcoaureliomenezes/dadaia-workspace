@@ -67,7 +67,7 @@ def test_init_skip_assets_writes_no_settings_and_says_ungated(
     (UserPromptSubmit only — no gate, no venv guard, no root whitelist), silently. The
     canonical writer is ``public install`` (runtime_config); init writes NO settings.
     Under ``--skip-assets`` the ungated state is loud instead of silently half-wired."""
-    _, installed = service.init(workspace_root, harnesses=("claude", "codex"), skip_assets=True)
+    installed = service.init(workspace_root, harnesses=("claude", "codex"), skip_assets=True)
     assert not (workspace_root / ".claude" / "settings.json").exists()
     from dadaia_workspace.core.platform import PLATFORM
 
@@ -80,6 +80,6 @@ def test_init_with_assets_never_writes_settings_itself(
 ) -> None:
     """On the normal path the full settings projection is ``public install``'s output —
     the service itself must not touch the file (one writer, one format)."""
-    _, installed = service.init(workspace_root, harnesses=("claude", "codex"), skip_assets=False)
+    installed = service.init(workspace_root, harnesses=("claude", "codex"), skip_assets=False)
     assert not any("ungated" in line for line in installed)
     assert not (workspace_root / ".claude" / "settings.json").exists()

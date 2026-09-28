@@ -6,7 +6,6 @@ from pathlib import Path
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
-from dadaia_workspace.core.models.workspace import Workspace
 from dadaia_workspace.core.workspace_layout import provisioned_zones
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
@@ -34,8 +33,8 @@ class WorkspaceService:
         workspace_root: Path,
         harnesses: tuple[str, ...],
         skip_assets: bool = False,
-    ) -> tuple[Workspace, list[str]]:
-        """Bootstrap .dadaia/ template. Idempotent. Returns (workspace, installed_assets).
+    ) -> list[str]:
+        """Bootstrap .dadaia/ template. Idempotent. Returns the installed assets.
 
         *harnesses* names the Layer-1 entry harnesses to scaffold (their projection
         directories plus per-harness hook registration) and is REQUIRED — there is no
@@ -48,7 +47,7 @@ class WorkspaceService:
         never un-manage one — a re-init with a harness subset MERGES into the persisted
         profile (canonical L1 order, unknown names appended sorted).
         """
-        workspace = Workspace.from_root(workspace_root)
+        states_dir = workspace_root / ".dadaia" / "states"
         chosen = tuple(harnesses)
         chosen_set = set(chosen)
 
@@ -56,23 +55,23 @@ class WorkspaceService:
         # pre-made `.venv` would read to it as an already-built venv.
         self._python_env.ensure_workspace_venv(str(workspace_root))
         for zone in provisioned_zones():
-            (workspace.dadaia_dir / zone.name).mkdir(parents=True, exist_ok=True)
+            (workspace_root / ".dadaia" / zone.name).mkdir(parents=True, exist_ok=True)
         # The shared skills root is harness-independent — always created.
-        (workspace.root / ".agents" / "skills").mkdir(parents=True, exist_ok=True)
+        (workspace_root / ".agents" / "skills").mkdir(parents=True, exist_ok=True)
         # Every harness directory is created by its own projection (the record's
         # `directory`), never by a branch here.
 
         # Initialize JSON state files (idempotent — never overwrite existing data)
-        self._init_json_file(workspace.states_dir / "spec_contexts.json", _EMPTY_CONTEXTS)
-        self._init_json_file(workspace.states_dir / "server_registry.json", _EMPTY_SERVER_REGISTRY)
+        self._init_json_file(states_dir / "spec_contexts.json", _EMPTY_CONTEXTS)
+        self._init_json_file(states_dir / "server_registry.json", _EMPTY_SERVER_REGISTRY)
 
         store = JsonHarnessProfileStore()
-        persisted = store.read(workspace.states_dir)
+        persisted = store.read(states_dir)
         merged = chosen_set | (set(persisted.harnesses) if persisted is not None else set())
         ordered = tuple(h for h in L1_ENTRY_HARNESSES if h in merged) + tuple(
             sorted(merged - set(L1_ENTRY_HARNESSES))
         )
-        store.write(workspace.states_dir, HarnessProfile.of(ordered))
+        store.write(states_dir, HarnessProfile.of(ordered))
 
         # Install public assets — only the chosen harness projections. Every hook wiring
         # (.claude/settings.json, .codex/hooks.json, kimi user hooks) is install's output:
@@ -92,7 +91,7 @@ class WorkspaceService:
                 f"until '{fix_line(workspace_root, 'public', 'install')}' runs"
             )
 
-        return workspace, installed
+        return installed
 
     def venv_change(self, workspace_root: Path) -> tuple[str | None, str | None, str]:
         """``(before, after, action)`` of the venv against the running distribution."""
@@ -100,7 +99,7 @@ class WorkspaceService:
 
     def harnesses(self, workspace_root: Path) -> tuple[str, ...]:
         """The workspace's persisted harness profile — a re-init needs no ``--harness``."""
-        states_dir = Workspace.from_root(workspace_root).states_dir
+        states_dir = workspace_root / ".dadaia" / "states"
         return JsonHarnessProfileStore().resolve(states_dir, workspace_root).harnesses
 
     def _init_json_file(self, path: Path, empty: dict) -> None:  # type: ignore[type-arg]

@@ -1,16 +1,25 @@
 """`dadaia export` — one record per spec context, written to `.dadaia/dist/spec-contexts.json`."""
 
 import json
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
-from dadaia_workspace.core.models.export import SCHEMA_VERSION, ExportResult
-from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
+from dadaia_workspace.core.models.spec_context import (
+    EXPORT_SCHEMA_VERSION,
+    ContextState,
+    SpecContextProject,
+)
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.provider_version import provider_version
+
+
+@dataclass(frozen=True)
+class ExportResult:
+    path: Path
+    contexts: int
 
 
 def _dadaia_version() -> str:
@@ -57,7 +66,7 @@ class ExportService:
         now = datetime.now(tz=UTC).isoformat()
         rows = self._refresh_branches(now)
         payload = {
-            "schema_version": SCHEMA_VERSION,
+            "schema_version": EXPORT_SCHEMA_VERSION,
             "exported_at": now,
             "dadaia_version": _dadaia_version(),
             "contexts": [_record(ctx, synced_at) for ctx, synced_at in rows],

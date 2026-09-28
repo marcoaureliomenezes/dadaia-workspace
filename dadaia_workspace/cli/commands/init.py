@@ -145,7 +145,7 @@ def init(
     svc = container.build_workspace_service(root)
     try:
         before, after, action = svc.venv_change(root)
-        _, installed = svc.init(root, skip_assets=skip_assets, harnesses=(chosen,))
+        installed = svc.init(root, skip_assets=skip_assets, harnesses=(chosen,))
     except WorkspaceVenvNewerError as exc:
         fail(f"{exc}\nfix: {fix_line(root, 'init', str(root))}")
     except WorkspaceVenvBootstrapError as exc:

@@ -1,6 +1,7 @@
 """`dadaia import` — registers every unknown context of a `spec-contexts.json` as DEAD (FR13)."""
 
 import json
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
@@ -12,13 +13,19 @@ from dadaia_workspace.core.exceptions import (
     InvalidContextNameError,
     RepoUrlMissingError,
 )
-from dadaia_workspace.core.models.export import SCHEMA_VERSION
-from dadaia_workspace.core.models.import_ import ImportResult
 from dadaia_workspace.core.models.spec_context import (
+    EXPORT_SCHEMA_VERSION,
     AssociatedRepo,
     ContextState,
     SpecContextProject,
 )
+
+
+@dataclass(frozen=True)
+class ImportResult:
+    registered: tuple[str, ...]
+    #: ``(name, reason)`` — ``"exists"`` for a known name, else the registry guard's refusal.
+    skipped: tuple[tuple[str, str], ...]
 
 
 class ContextRegistry(Protocol):
@@ -38,9 +45,9 @@ def _read(file: Path) -> list[dict[str, object]]:
         payload = json.loads(file.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         raise ValueError(f"'{file.name}' is not valid JSON: {exc}") from exc
-    if not isinstance(payload, dict) or payload.get("schema_version") != SCHEMA_VERSION:
+    if not isinstance(payload, dict) or payload.get("schema_version") != EXPORT_SCHEMA_VERSION:
         raise ValueError(
-            f"'{file.name}' does not carry schema_version {SCHEMA_VERSION!r}; "
+            f"'{file.name}' does not carry schema_version {EXPORT_SCHEMA_VERSION!r}; "
             f"only '{fix_line(None, 'export')}' output is supported."
         )
     contexts = payload.get("contexts")
