@@ -467,10 +467,9 @@ class DoctorService:
                 finding = self._finding(
                     zone.name, self._dadaia, entry, FindingVerdict.EXPIRED, detail
                 )
-                # The reaper never removes a linked worktree (tmp-expired-worktree-fix-line-
-                # never-clears): the fix is the worktree's removal, as context dead refuses.
                 if tree := sweep.linked_worktree(self._workspace_root, entry):
-                    finding = replace(finding, fix=git_line(tree, "worktree", "remove", str(tree)))
+                    gdir = sweep.worktree_git_dir(tree)
+                    finding = replace(finding, fix=git_line(gdir, "worktree", "remove", str(tree)))
                 out.append(finding)
                 continue
             elif entry.is_dir() and not entry.is_symlink():
