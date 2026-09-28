@@ -23,18 +23,18 @@ sources:
 
 ## The writer — `audit.py`
 
-- `python3 .agents/skills/dd-audit-project/scripts/audit.py <verb> [--specs <path>]` is the findings ledger's one writer and validator; `<audit>` is confined to `specs/audits/`, and every refusal carries one `fix:` line.
+- `python3 .agents/skills/dd-audit-project/scripts/audit.py <verb> [--specs <path>]` is the findings ledger's one writer and validator; `<audit>` is confined to a live folder directly under `specs/audits/`, never `_archive/`, and every refusal carries one `fix:` line.
 - `disposition <audit> <finding-id> --disposition resolved|superseded|deferred|rejected [--release <id>] [--reason <text>]` rewrites one finding's governance triple in place, every other field unchanged; `resolved`/`superseded` need `--release`, `deferred`/`rejected` need `--reason`; an unknown finding is refused naming the known ids.
-- `close <audit> --sha <window-end>` refuses an audit with any undispositioned finding (naming it), or whose findings name more than one release; otherwise, a zero-finding audit included, it appends one `histo-record-v1` to `audits_histo.jsonl` — `disposition: resolved`, the one remediation release or null, the per-pillar counts as `summary`, `entry = {sha, pillars, dispositions}` — and deletes the folder, the histo append last.
-- `check [--json]` validates every live `FINDINGS.jsonl` and `audits_histo.jsonl`; `dadaia doctor`'s `ledgers` section runs it (`LEDGER-FINDINGS-SCHEMA`), and `SPEC-DOC-036` (an open finding in an archived audit) and `SPEC-DOC-038` (a live audit whose findings are all terminal) police both directions ([[workspace-doctor]]).
+- `close <audit> --sha <window-end>` refuses an audit with any undispositioned finding (naming it), or whose findings name more than one release; otherwise, a zero-finding audit included, it appends one `histo-record-v1` to `audits_histo.jsonl` — `disposition: resolved` with the one remediation release, else `deferred` when a finding is deferred, else `rejected`, its `reason` naming the counts, the per-pillar counts as `summary`, `entry = {sha, pillars, dispositions}` — and deletes the folder, the histo append last.
+- `check [--json]` validates every live `FINDINGS.jsonl` and `audits_histo.jsonl`; `dadaia doctor`'s `ledgers` section runs it (`LEDGER-FINDINGS-SCHEMA`) ([[workspace-doctor]]).
 - One audit generates at most one remediation release (none for a zero-finding audit), which dispositions every finding at its closure sweep before the audit closes ([[release-lifecycle]]).
 
 ## Decisions
 
 - `specs/ADRs/decisions.jsonl` (`decision-record-v1`) is the decision ledger: one line per decision, fields `id ts title status context decision consequences measured_by supersedes amends`, `status` one of `proposed accepted rejected superseded`; it has no writer script — agents append with file tools.
-- Any agent appends a `proposed` record; only the operator flips it to `accepted`, and an `accepted` record names a `measured_by` the schema can resolve — a `pytest` or `lint-imports` invocation or a doctor code (`SPEC-DOC-nnn`, `WS-*`, `BL-*`, `RELEASE-TREE-*`, `LEDGER-*`).
+- Any agent appends a `proposed` record; only the operator flips it to `accepted`, and an `accepted` record carries a non-empty `measured_by`, free text naming the check.
 - A canonical memory statement in `ARCHITECTURE.md` or `QUALITY.md` changes only in the commit carrying its accepted decision; a reversal is a new record naming the old one in `supersedes` or `amends`, the superseded line staying in place.
-- `dadaia doctor` runs `LEDGER-ADR-SCHEMA` over every committed line and `ADR-SUPERSEDED-CITATION` over memory atoms, skills, data and scaffold that cite a superseded decision ([[workspace-doctor]]).
+- `dadaia doctor` runs `LEDGER-ADR-SCHEMA` over every committed line and the `0001..N` numbering, and `ADR-SUPERSEDED-CITATION` over memory atoms, skills, data and scaffold that cite a superseded decision ([[workspace-doctor]]).
 
 ## Runtime state
 

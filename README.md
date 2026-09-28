@@ -47,7 +47,7 @@ memory atom under its content hash.
 <!-- derived-from: pypi-distribution sha256:618098346ed6 -->
 <!-- derived-from: workspace-init sha256:acb8bc28e783 -->
 <!-- derived-from: context-management sha256:44be26055b2d -->
-<!-- derived-from: workspace-doctor sha256:7ec6f57cb5fe -->
+<!-- derived-from: workspace-doctor sha256:ef3665bc1f1c -->
 
 ```bash
 uvx dadaia-workspace init demo --harness claude --repo <clone url>   # level 1 + 2
@@ -95,7 +95,7 @@ and deletes only what a TTL expired.
 
 <!-- derived-from: agentic-entities sha256:6add03805476 -->
 <!-- derived-from: sdd-gate-v3 sha256:8cc77479943b -->
-<!-- derived-from: release-lifecycle sha256:daf0f07a01d3 -->
+<!-- derived-from: release-lifecycle sha256:57d8b542e879 -->
 <!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
 <!-- derived-from: harness-claude-code sha256:4d0f86f6e93f -->
 <!-- derived-from: harness-codex sha256:3419ecb0e1aa -->
@@ -103,7 +103,7 @@ and deletes only what a TTL expired.
 <!-- derived-from: harness-cursor sha256:1cae6128564d -->
 <!-- derived-from: harness-devin sha256:ab4a32c4a53d -->
 <!-- derived-from: harness-copilot sha256:b93cef868a6f -->
-<!-- derived-from: agent-comms sha256:c485c616b2df -->
+<!-- derived-from: agent-comms sha256:9125b23de81e -->
 
 The always-on law is the root `AGENTS.md` map; every governed area carries its own
 scoped `AGENTS.md`, and every `dd-` skill touching an area opens that file first. The

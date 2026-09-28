@@ -82,7 +82,7 @@ record, never the cwd: sitting inside a repository is not a binding.
 
 ## 4. Compliance
 
-<!-- derived-from: workspace-doctor sha256:7ec6f57cb5fe -->
+<!-- derived-from: workspace-doctor sha256:ef3665bc1f1c -->
 
 `doctor` is the one instance validator; three sections run in fixed order —
 `workspace`, `specs`, `ledgers`. Every finding prints as one `<CODE> <verdict>
@@ -102,7 +102,7 @@ commit. Only the operator creates demand.
 
 ## 6. The first release
 
-<!-- derived-from: release-lifecycle sha256:daf0f07a01d3 -->
+<!-- derived-from: release-lifecycle sha256:57d8b542e879 -->
 
 `release.py new` is one birth act, all or nothing: a `SPEC.md` stub plus
 `_RELEASE.json` in `DEFINITION` under `specs/releases/<id>/`, refusing a second live

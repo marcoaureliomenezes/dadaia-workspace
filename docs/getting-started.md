@@ -94,7 +94,7 @@ branches; a re-run is a no-op.
 
 ## Check compliance — `doctor`
 
-<!-- derived-from: workspace-doctor sha256:7ec6f57cb5fe -->
+<!-- derived-from: workspace-doctor sha256:ef3665bc1f1c -->
 
 ```bash
 .dadaia/.venv/bin/dadaia doctor --context <ctx> [--json] [--fix] [--redact]
@@ -120,7 +120,7 @@ a TTL expired.
 
 ## Run the first candidate
 
-<!-- derived-from: release-lifecycle sha256:daf0f07a01d3 -->
+<!-- derived-from: release-lifecycle sha256:57d8b542e879 -->
 <!-- derived-from: backlog-ledger sha256:46382434daf2 -->
 <!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
 
@@ -157,7 +157,8 @@ documents are the state, the ledger scripts move the records, and the markers in
 7. **Continue or promote.** Continue: `release.py new` with the same id stacks the next
    candidate, reopening `DEFINITION`. Promote: merge the integration branch into the
    principal, then merge the release PR release-please opens there — it owns the version, the CHANGELOG
-   section and the tag, and the publish jobs run on it.
+   section and the tag, and the publish jobs run on it; `release.py ship --sha <sha> --pr <n>`
+   then records the merged promote PR.
 
 A bug needs none of this: register, lineage, RED test, root-cause fix, GREEN, `resolve`
 with evidence, one commit — on the live feature branch, in any phase.

@@ -28,22 +28,22 @@ memory injection into the session.
 
 ## Release and candidate
 
-<!-- derived-from: release-lifecycle sha256:daf0f07a01d3 -->
+<!-- derived-from: release-lifecycle sha256:57d8b542e879 -->
 
 Exactly one *release* is live, `specs/releases/<M.m.p>/`, with open scope; it grows by
 *candidates*, each a closed-scope cycle whose `SPEC.md`, `PLAN.md` and `TASKS.md` sit
 flat at the release root and are replaced by the next candidate's, the closed trio
 staying in git. `_RELEASE.json` is the one mutable state document: `phase` is
-`DEFINITION`, `IMPLEMENTATION`, `CLOSURE` or `ARCHIVED`, the `phase` verbs stamp the
-`defined` and `implemented` milestones, and `log` is the append-only closure narrative.
+`DEFINITION`, `IMPLEMENTATION` or `CLOSURE`, the `phase` verbs stamp the `defined` and
+`implemented` milestones, `ship` records the merged promote PR, and `log` is the append-only closure narrative.
 Every SPEC carries an `**Origin:**` line. Release ids are bare SemVer; the live version
 moves only at an operator-approved deploy.
 
 ## The flow
 
-<!-- derived-from: release-lifecycle sha256:daf0f07a01d3 -->
+<!-- derived-from: release-lifecycle sha256:57d8b542e879 -->
 <!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
-<!-- derived-from: audits-canon sha256:87599de34ac0 -->
+<!-- derived-from: audits-canon sha256:55ce6e25db49 -->
 
 Every demand takes one of two arms. **Arm A**, a feature, leaves through a candidate:
 the picked backlog and bug set, the as-is review (one As-is verdict — DELETE, REBUILD,
@@ -77,9 +77,9 @@ gate — a refusal whose fix is itself refused (a Stall) cannot ship.
 ## Memory
 
 <!-- derived-from: context-management sha256:44be26055b2d -->
-<!-- derived-from: workspace-doctor sha256:7ec6f57cb5fe -->
-<!-- derived-from: release-lifecycle sha256:daf0f07a01d3 -->
-<!-- derived-from: audits-canon sha256:87599de34ac0 -->
+<!-- derived-from: workspace-doctor sha256:ef3665bc1f1c -->
+<!-- derived-from: release-lifecycle sha256:57d8b542e879 -->
+<!-- derived-from: audits-canon sha256:55ce6e25db49 -->
 
 *Memory* is current product truth: the atoms under `specs/memory/product/**`, plus
 `ARCHITECTURE.md` (its `## Tech Stack` section included) and `QUALITY.md`, whose
@@ -87,7 +87,7 @@ canonical statements change only in the commit carrying an accepted decision. A 
 session receives its onboarding next step while one remains, the Tech Stack section and
 the catalog digest (`slug`, `title`, `tldr`, `path` per atom). At each candidate's closure, `memory.py drift` lists the
 atoms whose sources changed, each is reconciled — delete, update, then add — and
-`RELEASE-TREE-MEMORY` keeps the release red until the reconciliation is logged.
+`release.py check` (`LEDGER-RELEASE-SCHEMA`) keeps the release red until the reconciliation is logged.
 `.dadaia/.venv/bin/dadaia doctor`'s `specs` section polices the tree: `LEDGER-MEMORY-SCHEMA` (the generated pair equals the atom
 files), `LINT-1` (frontmatter, headings, wikilinks, `sources` globs, history lines) and
 the warnings `MEM-DRIFT-1` (features package map vs the live tree) and `MEM-DRIFT-2`
@@ -111,7 +111,7 @@ superseded deferred rejected`.
 
 ## Audits
 
-<!-- derived-from: audits-canon sha256:87599de34ac0 -->
+<!-- derived-from: audits-canon sha256:55ce6e25db49 -->
 
 An *audit* is the only full-tree inspection lane, every other quality boundary being
 diff-scoped: a committed folder `specs/audits/<YYYYMMDD>-<slug>/` holding `AUDIT.md` —
