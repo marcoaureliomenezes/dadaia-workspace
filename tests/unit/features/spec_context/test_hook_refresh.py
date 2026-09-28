@@ -1,63 +1,46 @@
 """Intent: CONTRACT — T-050 CI defect (HOOKS-DRIFT-1 after re-init upgrade): an installed
 hook byte-identical to a previously shipped pre-push-ci-gate.sh is ours and is refreshed;
-an operator's own hook stays untouched."""
+an operator's own hook (review M3: undecodable included) stays untouched."""
 
 from __future__ import annotations
 
+import hashlib
 import subprocess
 from pathlib import Path
+
+import pytest
 
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.template_history import load_shipped_hashes
 from dadaia_workspace.features.spec_context.service import install_git_hooks
 
 _SHIPPED = workspace_layout.public_scripts_dir() / "pre-push-ci-gate.sh"
-
-
-def _hooks(tmp_path: Path, text: str) -> Path:
-    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
-    hook = tmp_path / ".git" / "hooks" / "pre-push"
-    hook.write_text(text, encoding="utf-8")
-    return hook
-
-
-def _history() -> set[str]:
-    return load_shipped_hashes(workspace_layout.public_scripts_dir().parent / "templates")[
-        "scripts/pre-push-ci-gate.sh"
-    ]
+_OLD = b"#!/bin/sh\n# an older shipped gate\n"
 
 
 def test_the_current_hook_is_recorded_as_shipped() -> None:
-    import hashlib
+    history = load_shipped_hashes(workspace_layout.public_scripts_dir().parent / "templates")
+    assert (
+        hashlib.sha256(_SHIPPED.read_bytes()).hexdigest() in history["scripts/pre-push-ci-gate.sh"]
+    )
 
-    text = _SHIPPED.read_text(encoding="utf-8")
-    assert hashlib.sha256(text.encode("utf-8")).hexdigest() in _history()
 
-
-def test_a_previously_shipped_hook_is_refreshed(tmp_path: Path, monkeypatch) -> None:
-    """A CRLF checkout (Windows) of a shipped hook is still recognised as shipped."""
-    old = "#!/bin/sh\n# an older shipped gate\n"
-    import hashlib
-
+# fmt: off
+@pytest.mark.parametrize(("installed", "refreshed"), [
+    pytest.param(_OLD.replace(b"\n", b"\r\n"), True, id="previously-shipped-crlf-checkout-refreshed"),
+    pytest.param(b"#!/bin/sh\necho mine\n", False, id="operator-hook-kept"),
+    pytest.param(b"#!/bin/sh\necho caf\xe9\n", False, id="M3-undecodable-operator-hook-kept"),
+])
+# fmt: on
+def test_install_refreshes_only_a_hook_we_shipped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, installed: bytes, refreshed: bool
+) -> None:
     monkeypatch.setattr(
         "dadaia_workspace.core.template_history.load_shipped_hashes",
-        lambda _d: {"scripts/pre-push-ci-gate.sh": {hashlib.sha256(old.encode()).hexdigest()}},
+        lambda _d: {"scripts/pre-push-ci-gate.sh": {hashlib.sha256(_OLD).hexdigest()}},
     )
-    hook = _hooks(tmp_path, "")
-    hook.write_bytes(old.replace("\n", "\r\n").encode("utf-8"))
-    assert install_git_hooks(tmp_path) == [hook]
-    assert hook.read_bytes() == _SHIPPED.read_bytes()
-
-
-def test_an_operator_hook_is_kept(tmp_path: Path) -> None:
-    hook = _hooks(tmp_path, "#!/bin/sh\necho mine\n")
-    assert install_git_hooks(tmp_path) == []
-    assert hook.read_text(encoding="utf-8") == "#!/bin/sh\necho mine\n"
-
-
-def test_an_undecodable_operator_hook_is_kept(tmp_path: Path) -> None:
-    """Review M3: a non-UTF-8 operator hook is operator-owned — never a crash."""
-    hook = _hooks(tmp_path, "")
-    hook.write_bytes(b"#!/bin/sh\necho caf\xe9\n")
-    assert install_git_hooks(tmp_path) == []
-    assert hook.read_bytes() == b"#!/bin/sh\necho caf\xe9\n"
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    hook = tmp_path / ".git" / "hooks" / "pre-push"
+    hook.write_bytes(installed)
+    assert install_git_hooks(tmp_path) == ([hook] if refreshed else [])
+    assert hook.read_bytes() == (_SHIPPED.read_bytes() if refreshed else installed)
