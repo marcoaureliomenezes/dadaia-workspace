@@ -21,44 +21,22 @@ def _trio(root: Path, status: str) -> None:
         (root / name).write_text(f"# doc\n\n> **Status:** {status}\n", encoding="utf-8")
 
 
-def test_live_release_root_and_rc_folders_are_rewritten_to_english(tmp_path: Path) -> None:
-    live = tmp_path / "releases" / "0.4.7"
-    _trio(live, "Aprovado")
-    _trio(live / "rc-1", "Em revisão")
-    _trio(live / "rc-2", "Rascunho")
+# fmt: off
+@pytest.mark.parametrize(("dirs", "expected"), [
+    pytest.param({"0.4.7": "Aprovado", "0.4.7/rc-1": "Em revisão", "0.4.7/rc-2": "Rascunho"},
+                 {"0.4.7": "Approved", "0.4.7/rc-1": "In review", "0.4.7/rc-2": "Draft"}, id="live-root-and-rc-folders"),
+    pytest.param({"0.9.9": "Em revisao"}, {"0.9.9": "In review"}, id="accent-stripped-worker-spelling"),
+    pytest.param({"_archive/0.4.6": "Aprovado", "_archive/0.4.6/rc-1": "Aprovado"}, {}, id="published-archive-never-rewritten"),
+    pytest.param({"0.4.7": "Approved"}, {}, id="already-english-no-op"),
+])
+# fmt: on
+def test_upgrade_rewrites_retired_status_tokens_only_in_the_live_trio(tmp_path: Path, dirs: dict[str, str], expected: dict[str, str]) -> None:
+    for rel, status in dirs.items():
+        _trio(tmp_path / "releases" / rel, status)
+    touched = {tmp_path / "releases" / rel / n for rel in expected for n in ("SPEC.md", "PLAN.md", "TASKS.md")}
 
-    planned = plan_status_token_rewrites(tmp_path)
-    assert set(planned) == {live / name for name in ("SPEC.md", "PLAN.md", "TASKS.md")} | {
-        live / f"rc-{n}" / name for n in (1, 2) for name in ("SPEC.md", "PLAN.md", "TASKS.md")
-    }
-
-    assert set(rewrite_status_tokens(tmp_path)) == set(planned)
-    assert (live / "SPEC.md").read_text(encoding="utf-8").splitlines()[2] == (
-        "> **Status:** Approved"
-    )
-    assert "In review" in (live / "rc-1" / "PLAN.md").read_text(encoding="utf-8")
-    assert "Draft" in (live / "rc-2" / "TASKS.md").read_text(encoding="utf-8")
-
-
-def test_the_accent_stripped_worker_spelling_is_rewritten_too(tmp_path: Path) -> None:
-    live = tmp_path / "releases" / "0.9.9"
-    _trio(live, "Em revisao")
-    assert plan_status_token_rewrites(tmp_path) == sorted(live.glob("*.md"))
-    rewrite_status_tokens(tmp_path)
-    assert "In review" in (live / "SPEC.md").read_text(encoding="utf-8")
-
-
-def test_published_history_under_archive_is_never_rewritten(tmp_path: Path) -> None:
-    archived = tmp_path / "releases" / "_archive" / "0.4.6"
-    _trio(archived, "Aprovado")
-    _trio(archived / "rc-1", "Aprovado")
-
-    assert plan_status_token_rewrites(tmp_path) == []
-    assert rewrite_status_tokens(tmp_path) == []
-    assert "Aprovado" in (archived / "SPEC.md").read_text(encoding="utf-8")
-
-
-def test_an_already_english_tree_is_a_no_op(tmp_path: Path) -> None:
-    _trio(tmp_path / "releases" / "0.4.7", "Approved")
-    assert plan_status_token_rewrites(tmp_path) == []
-    assert rewrite_status_tokens(tmp_path) == []
+    assert set(plan_status_token_rewrites(tmp_path)) == touched
+    assert set(rewrite_status_tokens(tmp_path)) == touched
+    for rel, status in dirs.items():
+        text = (tmp_path / "releases" / rel / "PLAN.md").read_text(encoding="utf-8")
+        assert text.splitlines()[2] == f"> **Status:** {expected.get(rel, status)}"
