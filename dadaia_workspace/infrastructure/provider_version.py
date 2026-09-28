@@ -6,7 +6,7 @@ import json
 import re
 from importlib import metadata
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.request import url2pathname
 
 
 def provider_version() -> str | None:
@@ -20,9 +20,9 @@ def provider_version() -> str | None:
         direct = json.loads(dist.read_text("direct_url.json") or "{}")
     except ValueError:
         direct = {}
-    url = urlparse(str(direct.get("url", "")))
-    if (direct.get("dir_info") or {}).get("editable") and url.scheme == "file":
-        pyproject = Path(unquote(url.path)) / "pyproject.toml"
+    url = str(direct.get("url", ""))
+    if (direct.get("dir_info") or {}).get("editable") and url.startswith("file://"):
+        pyproject = Path(url2pathname(url.removeprefix("file://"))) / "pyproject.toml"
         text = pyproject.read_text("utf-8") if pyproject.is_file() else ""
         if found := re.search(r'^version\s*=\s*"([^"]+)"', text, re.M):
             return found.group(1)
