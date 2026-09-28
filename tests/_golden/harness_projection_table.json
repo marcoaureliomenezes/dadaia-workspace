@@ -777,6 +777,34 @@
     "link_to": null
   },
   {
+    "label": "dadaia:hooks/claude-ctx-inject",
+    "harness": "claude",
+    "dst": "ws:.dadaia/hooks/claude-ctx-inject",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "dadaia:hooks/claude-doctor-expired",
+    "harness": "claude",
+    "dst": "ws:.dadaia/hooks/claude-doctor-expired",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "dadaia:hooks/claude-post-gate",
+    "harness": "claude",
+    "dst": "ws:.dadaia/hooks/claude-post-gate",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "dadaia:hooks/claude-pre-gate",
+    "harness": "claude",
+    "dst": "ws:.dadaia/hooks/claude-pre-gate",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
     "label": "dadaia:hooks/codex-ctx-inject",
     "harness": "codex",
     "dst": "ws:.dadaia/hooks/codex-ctx-inject",
@@ -836,6 +864,13 @@
     "label": "dadaia:hooks/cursor-pre-gate",
     "harness": "cursor",
     "dst": "ws:.dadaia/hooks/cursor-pre-gate",
+    "compare": "bytes",
+    "link_to": null
+  },
+  {
+    "label": "dadaia:hooks/devin-ctx-inject",
+    "harness": "devin",
+    "dst": "ws:.dadaia/hooks/devin-ctx-inject",
     "compare": "bytes",
     "link_to": null
   },

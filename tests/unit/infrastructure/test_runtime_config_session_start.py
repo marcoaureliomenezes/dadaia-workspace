@@ -42,20 +42,20 @@ def _commands(entries: object) -> list[tuple[str, str]]:
     return found
 
 
-def test_claude_session_start_runs_the_reaper_once(tmp_path: Path) -> None:
-    hooks = claude_settings(tmp_path)["hooks"]
+def test_claude_session_start_runs_the_reaper_once() -> None:
+    hooks = claude_settings()["hooks"]
     assert isinstance(hooks, dict)
+    wrappers = hook_wrapper_contents(HARNESS_RECORDS["claude"])
+    body = {cmd: wrappers[Path(cmd).name] for e in hooks.values() for _, cmd in _commands(e)}
     session_start = _commands(hooks["SessionStart"])
-    reapers = [(m, c) for m, c in session_start if c.endswith(_REAPER_TAIL)]
+    reapers = [(m, c) for m, c in session_start if _REAPER_TAIL in body[c]]
     assert len(reapers) == 1, session_start
     matcher, command = reapers[0]
     assert matcher == "startup|resume"
-    assert " -m dadaia_workspace " in command, "the reaper is the CLI, not a hook module"
-    others = [c for _, c in session_start if not c.endswith(_REAPER_TAIL)]
-    assert others and all("dadaia_workspace.hooks.ctx_inject" in c for c in others)
-    for event, entries in hooks.items():
-        for _, command in _commands(entries):
-            assert "--fix" not in command or command.endswith(_REAPER_TAIL), (event, command)
+    assert " -m dadaia_workspace doctor" in body[command], "the reaper is the CLI, not a hook"
+    others = [c for _, c in session_start if c != command]
+    assert others and all("dadaia_workspace.hooks.ctx_inject" in body[c] for c in others)
+    assert sum(_REAPER_TAIL in text for text in body.values()) == 1
 
 
 def test_codex_session_start_runs_the_reaper_once(tmp_path: Path) -> None:
@@ -92,6 +92,6 @@ def test_kimi_session_start_runs_the_reaper_once(tmp_path: Path) -> None:
     assert others and all("--fix" not in body for body in others)
 
 
-def test_reaper_entry_is_dadaia_owned_so_merge_is_idempotent(tmp_path: Path) -> None:
-    canonical = claude_settings(tmp_path)
-    assert merge_claude_settings(canonical, tmp_path) == canonical
+def test_reaper_entry_is_dadaia_owned_so_merge_is_idempotent() -> None:
+    canonical = claude_settings()
+    assert merge_claude_settings(canonical) == canonical

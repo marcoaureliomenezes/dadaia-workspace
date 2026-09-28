@@ -380,7 +380,10 @@ def _ctx_inject_registered(claude_dir: Path) -> bool:
         for entry in settings.get("hooks", {}).get("UserPromptSubmit", [])
         for h in entry.get("hooks", [])
     ]
-    return any("dadaia_workspace.hooks.ctx_inject" in c for c in commands)
+    wrapper = claude_dir.parent / ".dadaia" / "hooks" / "claude-ctx-inject"
+    return any(c.endswith("/.dadaia/hooks/claude-ctx-inject") for c in commands) and (
+        "dadaia_workspace.hooks.ctx_inject" in wrapper.read_text(encoding="utf-8")
+    )
 
 
 def _doctor_blockers(report: list[str]) -> list[str]:

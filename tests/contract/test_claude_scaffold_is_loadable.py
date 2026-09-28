@@ -190,7 +190,7 @@ def test_pretooluse_matcher_covers_every_gated_write_tool(projected: Path) -> No
     """
     from dadaia_workspace.hooks import _common
 
-    settings = claude_settings(projected)
+    settings = claude_settings()
     hooks = settings["hooks"]
     assert isinstance(hooks, dict)
     pre = hooks["PreToolUse"]

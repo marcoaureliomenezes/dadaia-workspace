@@ -132,6 +132,8 @@ def test_upsert_full_result_stays_valid_toml() -> None:
 
 
 def test_kimi_hook_shims_keys_and_prologue() -> None:
+    """Which workspace a shim judges, and its missing-venv posture, are executed in
+    tests/integration/gate/test_hook_interpreter.py (#B3, #B4)."""
     shims = kimi_hook_shims()
     assert set(shims) == {
         "dadaia-kimi-pre-gate.sh",
@@ -140,10 +142,7 @@ def test_kimi_hook_shims_keys_and_prologue() -> None:
         "dadaia-kimi-post-compact.sh",
         "dadaia-kimi-doctor-expired.sh",
     }
-    for body in shims.values():
-        assert body.startswith("#!/usr/bin/env sh\n")
-        assert ".dadaia/.venv/bin/python" in body
-        assert "exit 0" in body
+    assert all(body.startswith("#!/usr/bin/env sh\n") for body in shims.values())
 
 
 @pytest.mark.skipif(shutil.which("sh") is None, reason="POSIX sh unavailable")

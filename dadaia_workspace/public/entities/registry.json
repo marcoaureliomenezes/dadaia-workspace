@@ -57,10 +57,10 @@
       "mandate": "The session's own bind selects which product memory is injected at prompt time; never another session's bind.",
       "implementations": {
         "claude": "UserPromptSubmit + SessionStart hooks via dadaia_workspace.hooks.ctx_inject; SessionStart also runs dadaia doctor --fix --expired-only --quiet (the reaper lane)",
-        "codex": "session bootstrap via the projected wrapper (headless sessions read AGENTS.md natively)",
+        "codex": "SessionStart + UserPromptSubmit wrappers → dadaia_workspace.hooks.ctx_inject; SessionStart also runs the reaper lane",
         "kimi-code": "managed hook block → the same ctx_inject module",
         "cursor": ".cursor/hooks.json sessionStart runs dadaia doctor --fix --expired-only --quiet (the reaper lane); the root AGENTS.md map is read natively",
-        "devin": ".devin/hooks.v1.json SessionStart runs the same reaper lane; the root AGENTS.md map is read natively",
+        "devin": ".devin/hooks.v1.json UserPromptSubmit + SessionStart → dadaia_workspace.hooks.ctx_inject; SessionStart also runs the same reaper lane",
         "copilot": ".github/hooks/session-start.json sessionStart runs the same reaper lane; the root AGENTS.md map is read natively"
       }
     },

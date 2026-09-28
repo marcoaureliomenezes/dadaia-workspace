@@ -135,8 +135,9 @@ def test_every_wired_core_hook_derives_from_a_deterministic_behavior() -> None:
 
 
 def test_behaviors_cover_every_harness_whose_hooks_are_derived() -> None:
-    """A Deterministic Behavior is workspace law — it must be derived for every
-    harness that has a hook derivation, and never for an unknown one.
+    """Every Deterministic Behavior row names every harness with a hook derivation —
+    its implementation or its declared gap — and never an unknown one (which lanes each
+    harness really gets is test_hook_behaviour_coverage's derived table).
 
     The expected set is READ from the projection builder table, never listed here: the
     day a declared-but-underived hook format grows a builder, this test demands its

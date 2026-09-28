@@ -4,21 +4,19 @@ Extracted from ``FileSystemPublicAssetManager`` in ``public_assets.py`` to keep
 that module under 600 lines.  Each function takes explicit arguments instead of
 ``self``, so there are no circular imports.
 
-T-018-17: hook commands are emitted as ``<python> -B -m dadaia_workspace.hooks.<name>``
-using the venv-aware ``_python_bin()`` helper (Windows-safe fallbacks: Scripts/python.exe
-→ sys.executable → bare python). The ``.sh`` scripts are superseded, not appended.
+Claude's hook commands cite the workspace's own self-locating wrappers through
+``$CLAUDE_PROJECT_DIR`` — no interpreter is baked at render time.
 
 v0.2.8 (kimi-code): Kimi Code has no project-level config file — hooks register only in
 the user-level ``$KIMI_CODE_HOME/config.toml``. The kimi generators therefore emit a
 managed, marker-delimited ``[[hooks]]`` TOML block plus workspace-agnostic POSIX shims
-that resolve the nearest ``.dadaia/.venv/bin/python`` from the hook cwd at runtime and
-delegate to the same shared Python hook modules the other harnesses use.
+that resolve the nearest workspace (its ``spec_contexts.json`` sentinel) from the hook cwd
+at runtime and delegate to the same shared Python hook modules the other harnesses use.
 """
 
 from __future__ import annotations
 
 import os
-import sys
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -27,39 +25,14 @@ from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
 )
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
     REAPER_ARGS,
+    VENV_PYTHON,
     hook_wrapper_command,
 )
 
 
-def _python_bin(workspace_root: Path) -> str:
-    """Resolve the workspace venv Python binary, Windows-safe.
-
-    Priority: ``.dadaia/.venv/bin/python`` (POSIX) or
-    ``.dadaia/.venv/Scripts/python.exe`` (Windows) → ``sys.executable`` → bare ``python``.
-    """
-    from dadaia_workspace.core.platform import PLATFORM
-
-    venv_python = (
-        workspace_root
-        / ".dadaia"
-        / ".venv"
-        / PLATFORM.venv_scripts_dir
-        / f"python{PLATFORM.venv_exe_suffix}"
-    )
-    if venv_python.is_file():
-        return str(venv_python)
-    if sys.executable:
-        return sys.executable
-    return "python"
-
-
-def _hook_cmd(workspace_root: Path, module: str) -> str:
-    """Return a bytecode-suppressed Python module command for *workspace_root*."""
-    return f"{_python_bin(workspace_root)} -B -m {module}"
-
-
-def _reaper_cmd(workspace_root: Path) -> str:
-    return f"{_hook_cmd(workspace_root, 'dadaia_workspace')} {REAPER_ARGS}"
+def _claude_cmd(lane: str) -> str:
+    """The Claude hook command: the workspace's own wrapper, wherever the project now is."""
+    return f'"$CLAUDE_PROJECT_DIR"/{hook_wrapper_command(f"claude-{lane}")}'
 
 
 # T-010-18 (R6c, AC-R6-05, ai C-12): Claude Code PreToolUse gate matcher.
@@ -74,12 +47,11 @@ _CLAUDE_WRITE_TOOLS = "Edit|Write|MultiEdit|NotebookEdit|Bash"
 _CLAUDE_MATCH_ALL = "*"
 
 
-#: The marker that identifies a hook entry as dadaia-owned. Every command this module
-#: generates runs the venv interpreter as ``-m dadaia_workspace...`` (a ``hooks.*`` module
-#: or the ``doctor`` reaper), so ownership is decidable from the emitted content alone —
-#: no side-car state, and an operator's own entry in the SAME event is never mistaken for
-#: ours.
-_DADAIA_HOOK_MARKER = "-m dadaia_workspace"
+#: The markers that identify a hook entry as dadaia-owned: every command this module
+#: generates cites a ``.dadaia/hooks/claude-*`` wrapper; an install predating the wrappers
+#: ran ``-m dadaia_workspace`` directly and is replaced on upgrade. Ownership is decidable
+#: from the emitted content alone — an operator's entry in the SAME event is never ours.
+_DADAIA_HOOK_MARKERS = (".dadaia/hooks/claude-", "-m dadaia_workspace")
 
 
 def _is_dadaia_hook_entry(entry: object) -> bool:
@@ -90,20 +62,19 @@ def _is_dadaia_hook_entry(entry: object) -> bool:
     if not isinstance(hooks, list):
         return False
     return any(
-        isinstance(h, dict) and _DADAIA_HOOK_MARKER in str(h.get("command", "")) for h in hooks
+        isinstance(h, dict) and any(m in str(h.get("command", "")) for m in _DADAIA_HOOK_MARKERS)
+        for h in hooks
     )
 
 
-def merge_claude_settings(
-    existing: dict[str, object] | None, workspace_root: Path
-) -> dict[str, object]:
+def merge_claude_settings(existing: dict[str, object] | None) -> dict[str, object]:
     """Fold dadaia's hook wiring into an operator's ``.claude/settings.json``.
 
     ``settings.json`` is the file Claude Code documents for the operator's own
     ``permissions``, ``model``, ``env``, ``statusLine`` and custom hooks — it is NOT a
     dadaia-owned artifact. Writing it wholesale erased all of that silently, printing
     ``[ok]`` (bug ``claude-install-destroys-operator-settings``). dadaia owns exactly the
-    hook entries whose command runs ``-m dadaia_workspace...`` (:data:`_DADAIA_HOOK_MARKER`):
+    hook entries whose command is one of its own (:data:`_DADAIA_HOOK_MARKERS`):
 
     * top-level keys other than ``hooks`` are preserved untouched;
     * hook EVENTS dadaia does not wire are preserved untouched;
@@ -113,7 +84,7 @@ def merge_claude_settings(
     This is the same ownership discipline :func:`upsert_kimi_hooks_block` applies to the
     kimi config; the claude path had a naive whole-file writer instead.
     """
-    canonical = claude_settings(workspace_root)
+    canonical = claude_settings()
     canonical_hooks = canonical["hooks"]
     assert isinstance(canonical_hooks, dict)
     if not existing:
@@ -173,8 +144,8 @@ def foreign_claude_hook_commands(
     return found
 
 
-def claude_settings(workspace_root: Path) -> dict[str, object]:
-    """Return the Claude Code settings.json dict for *workspace_root*."""
+def claude_settings() -> dict[str, object]:
+    """Return the Claude Code settings.json hook wiring (workspace-relative)."""
     return {
         "hooks": {
             # FR-W4-01 (T-014-05): a SINGLE merged PreToolUse entrypoint (pre_gate) reads
@@ -184,7 +155,7 @@ def claude_settings(workspace_root: Path) -> dict[str, object]:
                 {
                     "hooks": [
                         {
-                            "command": _hook_cmd(workspace_root, "dadaia_workspace.hooks.pre_gate"),
+                            "command": _claude_cmd("pre-gate"),
                             "type": "command",
                         }
                     ],
@@ -195,9 +166,7 @@ def claude_settings(workspace_root: Path) -> dict[str, object]:
                 {
                     "hooks": [
                         {
-                            "command": _hook_cmd(
-                                workspace_root, "dadaia_workspace.hooks.sdd_post_gate"
-                            ),
+                            "command": _claude_cmd("post-gate"),
                             "type": "command",
                         }
                     ],
@@ -210,9 +179,7 @@ def claude_settings(workspace_root: Path) -> dict[str, object]:
                 {
                     "hooks": [
                         {
-                            "command": _hook_cmd(
-                                workspace_root, "dadaia_workspace.hooks.ctx_inject"
-                            ),
+                            "command": _claude_cmd("ctx-inject"),
                             "type": "command",
                         }
                     ],
@@ -229,9 +196,7 @@ def claude_settings(workspace_root: Path) -> dict[str, object]:
                 {
                     "hooks": [
                         {
-                            "command": _hook_cmd(
-                                workspace_root, "dadaia_workspace.hooks.ctx_inject"
-                            ),
+                            "command": _claude_cmd("ctx-inject"),
                             "type": "command",
                         }
                     ],
@@ -240,9 +205,7 @@ def claude_settings(workspace_root: Path) -> dict[str, object]:
                 {
                     "hooks": [
                         {
-                            "command": _hook_cmd(
-                                workspace_root, "dadaia_workspace.hooks.ctx_inject"
-                            ),
+                            "command": _claude_cmd("ctx-inject"),
                             "type": "command",
                         }
                     ],
@@ -256,9 +219,7 @@ def claude_settings(workspace_root: Path) -> dict[str, object]:
                 {
                     "hooks": [
                         {
-                            "command": _hook_cmd(
-                                workspace_root, "dadaia_workspace.hooks.ctx_inject"
-                            ),
+                            "command": _claude_cmd("ctx-inject"),
                             "type": "command",
                         }
                     ],
@@ -267,16 +228,14 @@ def claude_settings(workspace_root: Path) -> dict[str, object]:
                 {
                     "hooks": [
                         {
-                            "command": _hook_cmd(
-                                workspace_root, "dadaia_workspace.hooks.ctx_inject"
-                            ),
+                            "command": _claude_cmd("ctx-inject"),
                             "type": "command",
                         }
                     ],
                     "matcher": "resume",
                 },
                 {
-                    "hooks": [{"command": _reaper_cmd(workspace_root), "type": "command"}],
+                    "hooks": [{"command": _claude_cmd("doctor-expired"), "type": "command"}],
                     "matcher": "startup|resume",
                 },
             ],
@@ -410,35 +369,29 @@ _KIMI_HOOK_RULES: tuple[tuple[str, str, str | None, int], ...] = (
     ("dadaia-kimi-doctor-expired.sh", "SessionStart", None, 10),
 )
 
-#: Shared shim prologue: resolve the nearest dadaia workspace venv python (POSIX
-#: ``bin/python`` or Windows ``Scripts/python.exe``) by walking up
-#: from the hook cwd; exit 0 (fail-open) when no dadaia workspace is found.
-_KIMI_SHIM_PROLOGUE = """\
+#: Shared shim prologue: walk up from the hook cwd to the nearest workspace sentinel
+#: (``.dadaia/states/spec_contexts.json``); none -> silent exit 0 (not a workspace); a
+#: workspace without its venv -> the wrappers' one warning and exit 0.
+_KIMI_SHIM_PROLOGUE = (
+    """\
 #!/usr/bin/env sh
 # Generated by "dadaia harness add kimi-code" — do not edit in place.
 # dadaia-workspace kimi-code hook shim: resolve the nearest dadaia workspace from the
-# hook cwd and delegate to the shared Python hook module. Fail-open everywhere: any
-# resolution or runtime error exits 0 so a hook problem never blocks the operator.
+# hook cwd and delegate to the shared Python hook module. Fail-open: any resolution or
+# runtime error exits 0, a missing venv with one warning, so a hook never blocks.
 set -u
 
-_dir=$PWD
-PYTHON_BIN=""
-while [ "$_dir" != "/" ]; do
-  for _py in "$_dir/.dadaia/.venv/bin/python" "$_dir/.dadaia/.venv/Scripts/python.exe"; do
-    [ -x "$_py" ] && PYTHON_BIN=$_py && break 2
-  done
-  _dir=$(dirname "$_dir")
+ROOT=$PWD
+while [ ! -f "$ROOT/.dadaia/states/spec_contexts.json" ]; do
+  [ "$ROOT" = / ] && exit 0
+  ROOT=$(dirname "$ROOT")
 done
-# Root itself may hold the venv (workspace mounted at /).
-if [ -z "$PYTHON_BIN" ] && [ -x "/.dadaia/.venv/bin/python" ]; then
-  PYTHON_BIN="/.dadaia/.venv/bin/python"
-fi
-if [ -z "$PYTHON_BIN" ]; then
-  exit 0
-fi
-
+"""
+    + VENV_PYTHON
+    + """
 payload=$(cat)
 """
+)
 
 
 def kimi_code_home(env: Mapping[str, str] | None = None) -> Path:

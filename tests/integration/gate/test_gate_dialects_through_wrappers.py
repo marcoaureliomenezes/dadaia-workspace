@@ -105,11 +105,21 @@ def test_b3_devin_hook_file_has_the_documented_shape_and_denies(ws: Path) -> Non
                 "hooks": [{"type": "command", "command": ".dadaia/hooks/devin-pre-gate"}],
             }
         ],
+        "UserPromptSubmit": [
+            {
+                "matcher": "",
+                "hooks": [{"type": "command", "command": ".dadaia/hooks/devin-ctx-inject"}],
+            }
+        ],
         "SessionStart": [
             {
                 "matcher": "",
+                "hooks": [{"type": "command", "command": ".dadaia/hooks/devin-ctx-inject"}],
+            },
+            {
+                "matcher": "",
                 "hooks": [{"type": "command", "command": ".dadaia/hooks/devin-doctor-expired"}],
-            }
+            },
         ],
     }
     assert _verdict("devin", _run(ws, "devin", "pip")) == "deny"

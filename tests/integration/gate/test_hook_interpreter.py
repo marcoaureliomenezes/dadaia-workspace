@@ -1,0 +1,117 @@
+"""Intent: CONTRACT — sa-hook-parity-claims-false-and-interpreter-rules-diverge (WP-36, AC3.3).
+
+One interpreter rule for every hook: the workspace's own self-locating wrapper (Kimi's
+user-level shim: the nearest `.dadaia/states/spec_contexts.json` sentinel), and one
+missing-venv posture — a loud stderr warning and exit 0 (DEC-10 (a)).
+Size: MEDIUM — executes the rendered hook commands as the harness would.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
+from dadaia_workspace.infrastructure.runtime_config import claude_settings, kimi_hook_shims
+from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
+    hook_wrapper_contents,
+)
+
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(os.name == "nt", reason="hook commands are POSIX sh"),
+]
+
+_WRITE = json.dumps({"tool_name": "Write", "tool_input": {"file_path": "x.md"}})
+
+
+def _workspace(root: Path, *, venv: bool) -> Path:
+    (root / ".dadaia" / "states").mkdir(parents=True)
+    (root / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        '{"schema_version": "2", "contexts": []}', encoding="utf-8"
+    )
+    hooks = root / ".dadaia" / "hooks"
+    hooks.mkdir()
+    for name in ("claude", "codex", "cursor", "devin", "copilot"):
+        for wrapper, body in hook_wrapper_contents(HARNESS_RECORDS[name]).items():
+            (hooks / wrapper).write_text(body, encoding="utf-8")
+            (hooks / wrapper).chmod(0o755)
+    if venv:
+        (root / ".dadaia" / ".venv" / "bin").mkdir(parents=True)
+        (root / ".dadaia" / ".venv" / "bin" / "python").symlink_to(sys.executable)
+    return root
+
+
+def _claude_pre_gate() -> str:
+    return str(claude_settings()["hooks"]["PreToolUse"][0]["hooks"][0]["command"])  # type: ignore[index]
+
+
+def _kimi_shim(where: Path) -> Path:
+    shim = where / "dadaia-kimi-pre-gate.sh"
+    shim.write_text(kimi_hook_shims()["dadaia-kimi-pre-gate.sh"], encoding="utf-8")
+    return shim
+
+
+def _run(command: str, cwd: Path, **env: str) -> subprocess.CompletedProcess[str]:
+    base = {"PATH": os.environ["PATH"], "PYTHONPATH": os.environ.get("PYTHONPATH", "")}
+    return subprocess.run(
+        ["sh", "-c", command], input=_WRITE, capture_output=True, text=True, cwd=cwd,
+        env={**base, **env}, timeout=60,
+    )  # fmt: skip
+
+
+@pytest.mark.parametrize("harness", ["claude", "codex", "cursor", "devin", "copilot", "kimi-code"])
+def test_missing_venv_is_loud_and_fails_open_on_every_harness(tmp_path: Path, harness: str) -> None:
+    """sa-hook-parity-claims-false-and-interpreter-rules-diverge#B3: no `.dadaia/.venv` —
+    the pre-gate hook exits 0 (never 127) and names the missing venv on stderr."""
+    ws = _workspace(tmp_path / "ws", venv=False)
+    if harness == "claude":
+        command = _claude_pre_gate()
+    elif harness == "kimi-code":
+        command = f"sh {_kimi_shim(tmp_path)}"
+    else:
+        command = str(ws / ".dadaia" / "hooks" / f"{harness}-pre-gate")
+    done = _run(command, ws, CLAUDE_PROJECT_DIR=str(ws))
+    assert done.returncode == 0, done.stderr
+    assert ".dadaia/.venv" in done.stderr
+
+
+def test_kimi_shim_judges_the_nearest_sentinel_workspace(tmp_path: Path) -> None:
+    """sa-hook-parity-claims-false-and-interpreter-rules-diverge#B4: the shim run inside a
+    venv-less inner workspace nested in an outer one warns about INNER and exits 0 —
+    it never runs the outer workspace's interpreter."""
+    outer = _workspace(tmp_path / "ws-outer", venv=True)
+    (outer / "sandbox").mkdir()
+    inner = _workspace(outer / "sandbox" / "inner", venv=False)
+    done = _run(f"sh {_kimi_shim(tmp_path)}", inner)
+    assert done.returncode == 0
+    assert f"{inner}/.dadaia/.venv" in done.stderr
+    assert str(outer / ".dadaia" / ".venv") + "/" not in done.stderr.replace(str(inner), "")
+
+
+def test_the_claude_hook_survives_a_moved_workspace(tmp_path: Path) -> None:
+    """sa-hook-parity-claims-false-and-interpreter-rules-diverge#B5: the registered command
+    resolves through $CLAUDE_PROJECT_DIR, so a workspace moved after install still gates:
+    a new root entry is refused."""
+    _workspace(tmp_path / "before", venv=True)
+    moved = tmp_path / "after"
+    shutil.move(str(tmp_path / "before"), moved)
+    (moved / ".dadaia" / ".venv" / "bin" / "python").unlink()
+    (moved / ".dadaia" / ".venv" / "bin" / "python").symlink_to(sys.executable)
+    payload_dir = moved / "stray.md"
+    done = subprocess.run(
+        ["sh", "-c", _claude_pre_gate()],
+        input=json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(payload_dir)},
+                          "cwd": str(moved)}),
+        capture_output=True, text=True, cwd=moved, timeout=60,
+        env={"PATH": os.environ["PATH"], "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
+             "CLAUDE_PROJECT_DIR": str(moved)},
+    )  # fmt: skip
+    assert done.returncode == 0, done.stderr
+    assert json.loads(done.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"

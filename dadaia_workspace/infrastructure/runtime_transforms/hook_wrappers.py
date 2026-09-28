@@ -1,10 +1,10 @@
 """The hook derivation as DATA: lanes, wrapper scripts and hook-file payloads.
 
-The workspace defines four deterministic behaviours — root whitelist, venv
-guard, SDD gate (the ONE merged ``dadaia_workspace.hooks.pre_gate`` entrypoint) and the
-session-start reaper — and every harness gets the SAME four. What differs per harness is
-only *serialization*, so everything that differs lives here as a row keyed by
-:class:`~dadaia_workspace.core.harness_registry.HookFormat`:
+The behaviour lanes are the merged pre-tool gate (``dadaia_workspace.hooks.pre_gate``),
+the post-tool gate, context injection and the session-start reaper; which lanes a harness
+gets, and how it serializes them, is its row here, keyed by
+:class:`~dadaia_workspace.core.harness_registry.HookFormat` (a lane a harness has no event
+for is a stated gap, never a claimed parity):
 
 - :class:`HookLane` — one behaviour lane: the argv a wrapper execs, the env it exports,
   and whether it answers a permission question.
@@ -16,8 +16,8 @@ only *serialization*, so everything that differs lives here as a row keyed by
 - :class:`HookFileSpec` — which events of which file cite which lane's wrapper.
 
 The wrapper is generated, not authored, and is **self-locating**: it resolves the venv
-interpreter from its own path and never from ``PATH`` (the exit-127 bug family), so
-moving or importing a workspace never leaves a stale absolute interpreter behind. The
+interpreter from its own path and never from ``PATH``, so moving or importing a workspace
+never leaves a stale absolute interpreter behind; a missing venv warns and exits 0. The
 translation runs through that same verified interpreter rather than through ``sed``
 (the key-order-fragile shape the kimi shim documents), so an envelope key moving cannot
 silently turn a block into an allow.
@@ -107,14 +107,16 @@ class HookDialect:
 
 #: The gate lane: one entrypoint, three behaviours (root whitelist, venv guard, SDD gate).
 _GATE = HookLane("pre-gate", 'dadaia_workspace.hooks.pre_gate "$@"', decides=True)
-#: The fourth behaviour: the session-start reaper.
+#: The session-start reaper.
 _REAPER = HookLane("doctor-expired", f"dadaia_workspace {REAPER_ARGS}")
-#: The four behaviours, in every format that has nothing richer to say.
-_FOUR_BEHAVIOURS: tuple[HookLane, ...] = (_GATE, _REAPER)
+_POST = HookLane("post-gate", 'dadaia_workspace.hooks.sdd_post_gate "$@"')
+_CTX = HookLane("ctx-inject", 'dadaia_workspace.hooks.ctx_inject "$@"')
+#: The gate and the reaper: a harness with no prompt or post-tool event.
+_GATE_REAPER: tuple[HookLane, ...] = (_GATE, _REAPER)
 
 _CODEX_LANES: tuple[HookLane, ...] = (
     _GATE,
-    HookLane("post-gate", 'dadaia_workspace.hooks.sdd_post_gate "$@"'),
+    _POST,
     HookLane(
         "ctx-inject",
         'dadaia_workspace.hooks.ctx_inject "$@"',
@@ -131,18 +133,18 @@ _CODEX_LANES: tuple[HookLane, ...] = (
 _EMPTY = HookDialect()
 
 #: One row per :class:`HookFormat`. Total by construction: a format with no wrappers of
-#: its own (Claude's merged settings file, Kimi's user-level shims) states an empty
-#: dialect rather than falling through a missing key.
+#: its own (Kimi's user-level shims) states an empty dialect rather than falling through
+#: a missing key; Claude's settings file cites its wrappers, so it renders no file here.
 #:
 #: Cursor, Devin and Copilot each expose a real pre-tool event, so the gate judges every
 #: tool call (ADR 0054); a format with no blocking contract declares ``ungated``.
 HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
     HookFormat.NONE: _EMPTY,
-    HookFormat.CLAUDE_SETTINGS: _EMPTY,
+    HookFormat.CLAUDE_SETTINGS: HookDialect(lanes=(_GATE, _POST, _CTX, _REAPER)),
     HookFormat.KIMI_HOOKS: _EMPTY,
     HookFormat.CODEX_HOOKS: HookDialect(lanes=_CODEX_LANES),
     HookFormat.CURSOR_HOOKS: HookDialect(
-        lanes=_FOUR_BEHAVIOURS,
+        lanes=_GATE_REAPER,
         files=(
             HookFileSpec(
                 "hooks.json",
@@ -154,17 +156,22 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
         answer=HookAnswer("permission", "agent_message", "deny"),
     ),
     HookFormat.DEVIN_HOOKS: HookDialect(
-        lanes=_FOUR_BEHAVIOURS,
+        lanes=(_GATE, _CTX, _REAPER),
         files=(
             HookFileSpec(
                 "hooks.v1.json",
-                (("PreToolUse", _GATE.name), ("SessionStart", _REAPER.name)),
+                (
+                    ("PreToolUse", _GATE.name),
+                    ("UserPromptSubmit", _CTX.name),
+                    ("SessionStart", _CTX.name),
+                    ("SessionStart", _REAPER.name),
+                ),
             ),
         ),
         nested=True,
     ),
     HookFormat.COPILOT_HOOKS: HookDialect(
-        lanes=_FOUR_BEHAVIOURS,
+        lanes=_GATE_REAPER,
         files=(
             HookFileSpec("hooks/pre-tool-use.json", (("preToolUse", _GATE.name),)),
             HookFileSpec("hooks/session-start.json", (("sessionStart", _REAPER.name),)),
@@ -185,18 +192,22 @@ def _wrapper_name(record: HarnessRecord, lane: HookLane) -> str:
     return f"{record.name}-{lane.name}"
 
 
-#: Resolve the venv interpreter from the wrapper's OWN location and refuse loudly when it
-#: is missing — never a ``PATH`` lookup (the exit-127 bug family), never a silent success.
+#: The ONE missing-venv posture (DEC-10): warn on stderr naming the venv, exit 0.
+#: ``$ROOT`` is the workspace; POSIX ``bin/python`` or Windows ``Scripts/python.exe``.
+VENV_PYTHON = (
+    'for PYTHON_BIN in "$ROOT/.dadaia/.venv/bin/python" "$ROOT/.dadaia/.venv/Scripts/python.exe"; do\n'
+    '  [ -x "$PYTHON_BIN" ] && break\n'
+    "done\n"
+    'if [ ! -x "$PYTHON_BIN" ]; then\n'
+    '  echo "dadaia hook: no workspace venv at $ROOT/.dadaia/.venv — hook skipped" >&2\n'
+    "  exit 0\n"
+    "fi\n"
+)
+#: Resolve the workspace from the wrapper's OWN location — never a ``PATH`` lookup.
 _PROLOGUE = (
     "#!/usr/bin/env sh\n"
     "set -eu\n"
-    'SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\n'
-    'WORKSPACE_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)\n'
-    'PYTHON_BIN="$WORKSPACE_ROOT/.dadaia/.venv/bin/python"\n'
-    'if [ ! -x "$PYTHON_BIN" ]; then\n'
-    '  echo "dadaia hook wrapper: missing executable $PYTHON_BIN" >&2\n'
-    "  exit 127\n"
-    "fi\n"
+    'ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)\n' + VENV_PYTHON
 )
 
 
@@ -261,14 +272,16 @@ def hook_file_payloads(record: HarnessRecord) -> dict[str, str]:
     lanes = {lane.name: lane for lane in dialect.lanes}
     payloads: dict[str, str] = {}
     for spec in dialect.files:
-        hooks: dict[str, object] = {}
+        hooks: dict[str, list[object]] = {}
         for event, lane_name in spec.events:
             entry: dict[str, str] = {}
             if dialect.typed:
                 entry["type"] = "command"
             entry[dialect.entry_key] = hook_wrapper_command(_wrapper_name(record, lanes[lane_name]))
-            hooks[event] = [{"matcher": "", "hooks": [entry]}] if dialect.nested else [entry]
-        document: dict[str, object] = hooks if dialect.nested else {"hooks": hooks}
+            hooks.setdefault(event, []).append(
+                {"matcher": "", "hooks": [entry]} if dialect.nested else entry
+            )
+        document: dict[str, object] = dict(hooks) if dialect.nested else {"hooks": hooks}
         if dialect.version is not None:
             document["version"] = dialect.version
         payloads[spec.relpath] = json.dumps(document, indent=2, sort_keys=True) + "\n"

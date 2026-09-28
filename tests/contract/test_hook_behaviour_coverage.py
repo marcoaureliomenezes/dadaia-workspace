@@ -118,17 +118,64 @@ def test_no_hook_artifact_references_an_undefined_behaviour(
 
 
 @pytest.mark.parametrize("record", _derived_records(), ids=_record_ids)
-def test_every_projected_wrapper_is_self_locating_and_executable(
+def test_every_projected_wrapper_is_projected_executable(
     record: HarnessRecord, workspace: Path
 ) -> None:
-    """The exit-127 bug family: a workspace wrapper resolves its interpreter from its
-    OWN path, never from ``PATH``, and is projected with the exec bit. (User-level
-    shims are workspace-agnostic by construction and resolve upward from the hook cwd
-    instead — a different, separately tested contract.)"""
+    """A wrapper is projected with the exec bit; what it runs, and how it answers a
+    missing venv, is executed in tests/integration/gate/test_hook_interpreter.py."""
     for rule in _workspace_wrappers(_hook_rules(record, workspace), workspace):
-        body = rule.render(None).decode("utf-8")
         assert rule.mode == 0o755, f"{rule.label} is not projected executable"
-        assert body.startswith("#!/usr/bin/env sh\n"), rule.label
-        assert 'dirname -- "$0"' in body, (
-            f"{rule.label} does not resolve its interpreter from its own location"
+
+
+#: sa-hook-parity-claims-false-and-interpreter-rules-diverge#B1 — the table, literally.
+_BEHAVIOUR_TABLE = {
+    "claude": {"ctx_inject", "pre_gate", "reaper", "sdd_post_gate"},
+    "codex": {"ctx_inject", "pre_gate", "reaper", "sdd_post_gate"},
+    "kimi-code": {"ctx_inject", "pre_gate", "reaper", "sdd_post_gate"},
+    "devin": {"ctx_inject", "pre_gate", "reaper"},
+    "cursor": {"pre_gate", "reaper"},
+    "copilot": {"pre_gate", "reaper"},
+}
+_BEHAVIOUR_RE = re.compile(r"-m dadaia_workspace(?:\.hooks\.([a-z_]+)| doctor)")
+
+
+def _behaviours(text: str) -> set[str]:
+    return {m.group(1) or "reaper" for m in _BEHAVIOUR_RE.finditer(text)}
+
+
+def test_the_behaviour_table_is_derived_and_the_registry_declares_it(workspace: Path) -> None:
+    """sa-hook-parity-claims-false-and-interpreter-rules-diverge#B1: rendering every
+    harness's hooks yields the declared table; the registry names ctx_inject/the post gate
+    exactly where they are wired."""
+    derived = {
+        record.name: _behaviours("\n".join(_rendered(_hook_rules(record, workspace)).values()))
+        for record in _derived_records()
+    }
+    assert derived == _BEHAVIOUR_TABLE
+    behaviors = {
+        b["id"]: b["implementations"] for b in json.loads(_REGISTRY.read_text("utf-8"))["behaviors"]
+    }
+    for harness, wired in _BEHAVIOUR_TABLE.items():
+        assert ("ctx_inject" in behaviors["context-memory-injection"][harness]) is (
+            "ctx_inject" in wired
         )
+        assert ("post" in behaviors["sdd-gate"][harness]) is ("sdd_post_gate" in wired)
+
+
+def test_no_text_claims_behaviour_parity() -> None:
+    """sa-hook-parity-claims-false-and-interpreter-rules-diverge#B2: the hook derivation
+    never claims "only serialization" differs nor that "no harness adds a behaviour".
+    (The memory atom's copy is reconciled at the closure memory pass — dd-product-engineer.)"""
+    hooks_py = _REPO_ROOT / "dadaia_workspace/infrastructure/runtime_transforms/hook_wrappers.py"
+    text = " ".join(hooks_py.read_text("utf-8").split()).replace("*", "").lower()
+    assert "only serialization" not in text
+    assert "no harness adds a behaviour" not in text
+    assert "same four" not in text
+
+
+def test_runtime_config_bakes_no_interpreter() -> None:
+    """sa-hook-parity-claims-false-and-interpreter-rules-diverge#B6: no render-time
+    interpreter: runtime_config never reads sys.executable or builds a venv path."""
+    source = (_REPO_ROOT / "dadaia_workspace/infrastructure/runtime_config.py").read_text("utf-8")
+    assert "sys.executable" not in source
+    assert "venv_scripts_dir" not in source

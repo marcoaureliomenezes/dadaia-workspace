@@ -69,7 +69,9 @@ def test_harness_scopes_scaffold(
 
     if "claude" in expect_present:
         commands = _ctx_inject_commands(tmp_path / ".claude")
-        assert any("dadaia_workspace.hooks.ctx_inject" in c for c in commands), commands
+        wrapper = tmp_path / ".dadaia" / "hooks" / "claude-ctx-inject"
+        assert any(c.endswith("/.dadaia/hooks/claude-ctx-inject") for c in commands), commands
+        assert "dadaia_workspace.hooks.ctx_inject" in wrapper.read_text(encoding="utf-8")
     if "codex" in expect_present:
         codex_wrappers = sorted((tmp_path / ".dadaia" / "hooks").glob("codex-*"))
         assert codex_wrappers, "expected .dadaia/hooks/codex-* wrappers for a codex profile"

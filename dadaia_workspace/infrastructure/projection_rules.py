@@ -169,7 +169,7 @@ def _settings_merge_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Pro
                     "dadaia will not overwrite it. Fix or move the file, then re-run install."
                 ) from None
             existing = loaded if isinstance(loaded, dict) else None
-        merged = merge_claude_settings(existing, workspace_root)
+        merged = merge_claude_settings(existing)
         return (json.dumps(merged, indent=2, sort_keys=True) + "\n").encode("utf-8")
 
     return (
@@ -180,6 +180,7 @@ def _settings_merge_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Pro
             render=_render,
             compare="owned-slice",
         ),
+        *_wrapper_rules(record, workspace_root),
     )
 
 
@@ -195,7 +196,7 @@ def _settings_merge_checks(record: HarnessRecord, workspace_root: Path) -> list[
         return []
     if not isinstance(loaded, dict):
         return []
-    foreign = foreign_claude_hook_commands(loaded, claude_settings(workspace_root))
+    foreign = foreign_claude_hook_commands(loaded, claude_settings())
     if not foreign:
         return []
     return [
