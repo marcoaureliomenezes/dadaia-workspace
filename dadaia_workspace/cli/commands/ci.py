@@ -82,7 +82,7 @@ def preflight(
         typer.echo(f"\nPre-push gate FAILED: {', '.join(failed_names(results))}", err=True)
         for result in results:
             if not result.passed:
-                tail = "\n".join(result.output.strip().splitlines()[-20:])
+                tail = "\n".join(result.output.strip().split("\n")[-20:])
                 if tail:
                     typer.echo(f"\n--- {result.name} ---\n{tail}", err=True)
         raise typer.Exit(1)

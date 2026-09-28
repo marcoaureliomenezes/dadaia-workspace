@@ -100,7 +100,7 @@ def _codex_probe_outcome(output: str, cwd: Path) -> tuple[bool, str]:
     lowered = output.lower()
     for phrase in _CODEX_ENV_UNAVAILABLE_PHRASES:
         if phrase in lowered:
-            line = next((ln for ln in output.splitlines() if phrase in ln.lower()), phrase)
+            line = next((ln for ln in output.split("\n") if phrase in ln.lower()), phrase)
             return True, _codex_capped_detail(line, cwd)
     for match in re.finditer(r"\{.*?\}\}", output):
         try:

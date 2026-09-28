@@ -263,7 +263,7 @@ def test_stage_files_safe_raises_on_a_failed_git_add_for_untracked_paths(
         if args[:3] == ["git", "add", "-u"]:
             return _result(0)
         if args[:3] == ["git", "ls-files", "--others"]:
-            return _result(0, stdout="new-file.txt\n")
+            return _result(0, stdout="new-file.txt\0")
         if args[:2] == ["git", "add"]:
             return _result(1, stderr="fatal: pathspec did not match any files")
         return _result()
@@ -288,7 +288,7 @@ def test_stage_files_safe_applies_literal_pathspec_magic_to_untracked_paths(
         if args[:3] == ["git", "add", "-u"]:
             return _result(0)
         if args[:3] == ["git", "ls-files", "--others"]:
-            return _result(0, stdout="normal.txt\n:(exclude)specs\n")
+            return _result(0, stdout="normal.txt\0:(exclude)specs\0")
         return _result(0)
 
     monkeypatch.setattr(git_subprocess, "_run", fake_run)

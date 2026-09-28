@@ -69,10 +69,10 @@ def _stage_files_safe(path: Path) -> None:
 
     # Discover untracked items (files and dirs)
     result = _run(
-        ["git", "ls-files", "--others", "--exclude-standard"],
+        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
         cwd=path,
     )
-    untracked: list[str] = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    untracked: list[str] = [item for item in result.stdout.split("\0") if item]
 
     safe: list[str] = []
     skipped: list[str] = []
@@ -238,10 +238,10 @@ class GitSubprocessClient:
         branch carrying a commit neither origin nor HEAD holds; commits with no remote."""
         if self.has_commits(path) and not self.has_remote(path):
             return [git_line(path, "remote", "add", "origin", "<clone-url>")]
-        run = _run(["git", "worktree", "list", "--porcelain"], cwd=path).stdout.splitlines()
+        run = _run(["git", "worktree", "list", "--porcelain"], cwd=path).stdout.split("\n")
         trees = [line[9:] for line in run if line.startswith("worktree ")][1:]
         refs = ["git", "for-each-ref", "--format=%(refname:short)", "refs/heads"]
-        heads = _run(refs, cwd=path).stdout.splitlines()
+        heads = [b for b in _run(refs, cwd=path).stdout.split("\n") if b]
         in_head = ["git", "merge-base", "--is-ancestor"]  # HEAD itself is pushed by dead()
         lost = [
             b
@@ -353,7 +353,7 @@ class GitSubprocessClient:
         newly committed and pushed, so it must be reviewed/scanned first. ``-z``: the
         real names, never core.quotePath's quoting.
         """
-        result = _run(["git", "ls-files", "-z", "--others", "--exclude-standard"], cwd=path)
+        result = _run(["git", "ls-files", "--others", "--exclude-standard", "-z"], cwd=path)
         return [rel for rel in result.stdout.split("\0") if rel]
 
     def remote_url(self, path: Path) -> str:

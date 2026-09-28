@@ -286,19 +286,19 @@ def test_oversized_note_path_segment_is_masked_too(repo: PushRepo) -> None:
 _UPPERCASE_HYPHENATED_TERM = "zz-acme"
 
 
+@pytest.mark.parametrize("sep", ["\x9b", "\u2028"])
 def test_refusal_path_segment_uppercase_hyphenated_variant_of_term_is_masked(
-    repo: PushRepo,
+    repo: PushRepo, sep: str
 ) -> None:
-    """Intent: sa-path-segment-judged-by-two-matchers — the masker IS _first_match:
-    an upper-cased, hyphenated, CSI-split segment variant (U+009B: a stripped C1 control, legal in a filename on every OS) of a term is masked (A4.1)."""
+    """Intent: sa-path-segment-judged-by-two-matchers, sa-git-output-split-by-unicode-line-breaks — a segment split by U+009B or U+2028 is read whole (git output split on \\n only) and masked (A4.1)."""
     sha = repo.commit(
-        {"repos/Zz-A\x9bcme-Corp/notes.md": f"contains {_UPPERCASE_HYPHENATED_TERM} here\n"}
+        {f"repos/Zz-A{sep}cme-Corp/notes.md": f"contains {_UPPERCASE_HYPHENATED_TERM} here\n"}
     )
     decision = _decide(
         repo, _branch(sha), denylist_terms=((_UPPERCASE_HYPHENATED_TERM, "synthetic"),)
     )
     assert not decision.allowed
-    assert "Zz-A\x9bcme-Corp" not in decision.message
+    assert f"Zz-A{sep}cme-Corp" not in decision.message
     assert "repos/[REDACTED-PATH-1]/notes.md:1" in decision.message
 
 

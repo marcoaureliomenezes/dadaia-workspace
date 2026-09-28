@@ -41,7 +41,7 @@ def git(repo: Path, *argv: str) -> list[str]:
         shallow = subprocess.run(["git", "rev-parse", "--is-shallow-repository"], cwd=repo, capture_output=True, text=True).stdout == "true\n"  # fmt: skip
         raise Refusal(f"git {' '.join(argv)} failed in {repo}: " + ("a shallow clone lacks the window's history" if shallow else done.stderr.strip()),
                       f"git -C {repo} fetch --unshallow" if shallow else "run this verb from a checkout whose history holds --since")  # fmt: skip
-    return [line for line in done.stdout.splitlines() if line]
+    return [line for line in done.stdout.split("\n") if line]
 
 
 def report(specs: Path, since: str, until: str = "HEAD") -> dict[str, Any]:

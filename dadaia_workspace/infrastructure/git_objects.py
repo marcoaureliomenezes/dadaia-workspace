@@ -85,6 +85,11 @@ def _decode(raw: bytes) -> str:
     return raw.decode("utf-8", errors="replace")
 
 
+def _lines(raw: bytes) -> list[str]:
+    """Non-empty lines of git output, split on ``\n`` only (a path may hold U+2028)."""
+    return [line for line in _decode(raw).split("\n") if line]
+
+
 def _is_resolvable_commit(repo: Path, sha: str) -> bool:
     """True when *sha* resolves to a commit object reachable locally.
 
@@ -149,9 +154,7 @@ def _rev_list_candidates(
     if result.returncode != 0:
         raise GitObjectReadError(f"git rev-list --objects failed: {_decode(result.stderr).strip()}")
     entries: list[tuple[str, str]] = []
-    for raw_line in _decode(result.stdout).splitlines():
-        if not raw_line:
-            continue
+    for raw_line in _lines(result.stdout):
         sha, _, path = raw_line.partition(" ")
         if path:
             entries.append((sha, path))
@@ -162,19 +165,12 @@ def _range_commit_shas(repo: Path, local_sha: str, exclusions: list[str]) -> lis
     """Return every COMMIT sha in the range (never ``--objects`` — commits only), the
     SAME range shape :func:`_rev_list_candidates` walks (the SAME *exclusions*,
     :func:`_base_exclusions`), reused here so the two callers agree on what "the
-    range" means without either re-deriving it.
-
-    Commit count is bounded by the number of commits actually being pushed (an
-    ordinary push is a handful; this module's own ``commits_in_range`` metric on this
-    repository's v0.4.2 delta was 34) — orders of magnitude fewer than the object count
-    the SAME range's ``--objects`` walk produces, which is what keeps
-    :func:`_multi_path_shas`'s per-commit ``git ls-tree`` loop below affordable.
-    """
+    range" means without either re-deriving it."""
     args = ["git", "rev-list", local_sha, "--not", *exclusions, "--"]
     result = _run(args, repo)
     if result.returncode != 0:
         raise GitObjectReadError(f"git rev-list failed: {_decode(result.stderr).strip()}")
-    return [line for line in _decode(result.stdout).splitlines() if line]
+    return _lines(result.stdout)
 
 
 def _publication_boundaries(repo: Path, local_sha: str, exclusions: list[str]) -> tuple[str, ...]:
@@ -210,7 +206,7 @@ def _publication_boundaries(repo: Path, local_sha: str, exclusions: list[str]) -
         raise GitObjectReadError(
             f"git rev-list --boundary failed: {_decode(result.stderr).strip()}"
         )
-    return tuple(line[1:] for line in _decode(result.stdout).splitlines() if line.startswith("-"))
+    return tuple(line[1:] for line in _lines(result.stdout) if line.startswith("-"))
 
 
 def _is_annotated_tag(repo: Path, sha: str) -> bool:
@@ -416,7 +412,7 @@ def _multi_path_shas(
         result = _run(["git", "ls-tree", "-r", "--full-tree", commit_sha, "--"], repo)
         if result.returncode != 0:
             raise GitObjectReadError(f"git ls-tree -r failed: {_decode(result.stderr).strip()}")
-        for line in _decode(result.stdout).splitlines():
+        for line in _lines(result.stdout):
             meta, _, path = line.partition("\t")
             parts = meta.split()
             if len(parts) != 3 or parts[1] != "blob":
@@ -460,7 +456,7 @@ def _blob_info(repo: Path, candidates: list[tuple[str, str]]) -> dict[str, tuple
             f"git cat-file --batch-check failed: {_decode(result.stderr).strip()}"
         )
     blob_sizes: dict[str, int] = {}
-    for line in _decode(result.stdout).splitlines():
+    for line in _lines(result.stdout):
         parts = line.split()
         if len(parts) != 3:
             raise GitObjectReadError(f"git cat-file --batch-check: unexpected row shape {line!r}")
@@ -536,7 +532,7 @@ def _resolve_prior_texts_at_base(repo: Path, base: str, paths: list[str]) -> dic
             "git cat-file --batch-check failed resolving prior content: "
             f"{_decode(check_result.stderr).strip()}"
         )
-    check_lines = _decode(check_result.stdout).splitlines()
+    check_lines = _lines(check_result.stdout)
     if len(check_lines) != len(unique_paths):
         raise GitObjectReadError(
             "git cat-file --batch-check desynchronised resolving prior content "

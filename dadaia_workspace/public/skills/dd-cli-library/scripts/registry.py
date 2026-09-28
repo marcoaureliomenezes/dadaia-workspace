@@ -236,7 +236,7 @@ def scan(doc: dict[str, Any], raw: str | None) -> list[dict[str, Any]]:
         return []
     registered = {e["port"] for e in doc["entries"]}
     findings: list[dict[str, Any]] = []
-    for line in raw.splitlines():
+    for line in raw.split("\n"):
         parsed = parse_ss_line(line)
         if parsed is None:
             continue

@@ -87,11 +87,11 @@ def parse_push_stdin(stdin_text: str) -> tuple[list[PushRef], int]:
     """
     refs: list[PushRef] = []
     malformed = 0
-    for raw in stdin_text.splitlines():
+    for raw in stdin_text.split("\n"):
         line = raw.strip()
         if not line:
             continue
-        parts = line.split()
+        parts = line.split(" ")
         if len(parts) != 4:
             malformed += 1
             continue

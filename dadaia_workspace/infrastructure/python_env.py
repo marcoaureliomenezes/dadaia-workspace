@@ -123,7 +123,7 @@ _VERSION_RE = re.compile(r"^(?P<release>\d+(?:\.\d+)*)(?:\+(?P<local>[a-z0-9.]+)
 
 def _tail_lines(exc: subprocess.CalledProcessError, count: int = 5) -> str:
     """The last *count* whole lines of a failed installer's output — never cut mid-line."""
-    return "\n".join((exc.stderr or exc.output or "").strip().splitlines()[-count:])
+    return "\n".join((exc.stderr or exc.output or "").strip().split("\n")[-count:])
 
 
 def _version_key(version: str) -> tuple[tuple[int, ...], tuple[str, ...]]:
