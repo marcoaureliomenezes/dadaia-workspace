@@ -26,10 +26,8 @@ Scope is deliberately narrow — do NOT read "every script under public/scripts/
   catalog.py`` is now the only catalog generator, and the contract test that used to
   police the pair's byte-identity (``test_memory_catalog_render_contract.py``) is
   deleted with its subject.
-* ``lint-dadaia-cli-reachability.py`` — standalone by design (its own ``--self-test``);
-  it has no package canonical to mirror at all, so it is outside this contract's scope
-  entirely, not merely excluded. ``lint-skill-collisions.py`` was the same shape and is
-  RETIRED (FR9/T-044-15, v0.4.4): its logic is ported into
+* ``lint-dadaia-cli-reachability.py`` — DELETED (0.5.0 T-050-63, FR10): no invoker.
+  ``lint-skill-collisions.py`` is RETIRED (FR9/T-044-15, v0.4.4): its logic is ported into
   ``tests/contract/test_behavior_map.py``, the one deterministic enforcer that
   replaces it — no projected script mirrors it any more.
 """
@@ -80,11 +78,7 @@ _THIN_WRAPPER_SCRIPTS: dict[str, int] = {
 #: Scripts intentionally excluded from the registry, with the reason each stays out —
 #: read by the exclusion test below so the exclusion itself is data-driven and
 #: verified against the real directory listing, not just asserted in prose.
-_STANDALONE_BY_DESIGN: frozenset[str] = frozenset(
-    {
-        "lint-dadaia-cli-reachability.py",
-    }
-)
+_STANDALONE_BY_DESIGN: frozenset[str] = frozenset()
 #: v0.5.1 T-051-16: generate-memory-catalog.py (the only member of this set) is
 #: DELETED — the set stays declared, empty, so the exclusion test below still proves
 #: (by construction) that nothing is silently re-added to it without review.
