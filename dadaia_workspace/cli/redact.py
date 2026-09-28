@@ -11,9 +11,10 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
+from dadaia_workspace import container
 from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
 from dadaia_workspace.core.models.spec_context import SpecContextProject
-from dadaia_workspace.core.redaction import Redactor, redact_text
+from dadaia_workspace.core.redaction import UNSAFE_FORMAT_CHARS_RE, Redactor, mask, privacy_matches
 
 #: SPEC FR8 placeholder shape.
 _PLACEHOLDER_FMT = "[REDACTED-CONTEXT-{n}]"
@@ -34,6 +35,10 @@ class ContextRedactor:
         excluded = {name for name in exclude if name}
         terms = [c for c in candidates if c and c not in excluded]
         self._redactor = Redactor(terms, placeholder_fmt=_PLACEHOLDER_FMT)
+        self._private = (
+            container.load_denylist_terms(),
+            container.load_denylist_baseline_patterns(),
+        )
 
     @property
     def active(self) -> bool:
@@ -41,8 +46,12 @@ class ContextRedactor:
         return self._redactor.active
 
     def text(self, value: str) -> str:
-        """Redact every foreign candidate substring and home-path user inside ``value``."""
-        return self._redactor.mask(redact_text(value))
+        """Mask what the push refuses (``privacy_matches``, the one ``mask``), then every
+        foreign candidate inside ``value``."""
+        value = UNSAFE_FORMAT_CHARS_RE.sub("", value)
+        for found, _source, _reason in privacy_matches(value, *self._private):
+            value = value.replace(found, mask(found))
+        return self._redactor.mask(value)
 
     def json_value(self, value: Any) -> Any:
         """Recursively redact string leaves of a JSON-shaped value.

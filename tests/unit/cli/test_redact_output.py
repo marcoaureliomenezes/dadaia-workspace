@@ -51,16 +51,14 @@ def test_compile_candidates_orders_longest_first_and_drops_empties() -> None:
 
 
 def test_redactor_ordinal_by_first_appearance_and_caller_exclusion() -> None:
-    """sa-private-match-rendering-has-three-renderers#B5: A8.3: ordinal is assigned by first appearance in the text actually scanned, is
-    stable for repeat occurrences, and never touches the excluded caller context."""
+    """sa-private-match-rendering-has-three-renderers#B5: A8.3 first-appearance ordinals; the caller stays visible."""
     redactor = ContextRedactor(["foo-ctx", "bar-ctx", "own-ctx"], exclude=("own-ctx",))
     rendered = redactor.text("own-ctx bar-ctx foo-ctx bar-ctx")
     assert rendered == "own-ctx [REDACTED-CONTEXT-1] [REDACTED-CONTEXT-2] [REDACTED-CONTEXT-1]"
 
 
 def test_redactor_json_value_preserves_key_set_and_non_string_leaves() -> None:
-    """sa-private-match-rendering-has-three-renderers#B4: A8.4: recursive redaction touches only string leaves; keys and every
-    non-string value pass through unchanged."""
+    """sa-private-match-rendering-has-three-renderers#B4: A8.4 only string leaves change; keys and the rest pass through."""
     redactor = ContextRedactor(["foreign-ctx"])
     payload = {
         "name": "foreign-ctx",
@@ -80,7 +78,6 @@ def test_redactor_json_value_preserves_key_set_and_non_string_leaves() -> None:
     assert redacted["active"] is True
     assert redacted["parent"] is None
     assert redacted["list"] == ["[REDACTED-CONTEXT-1]", 1, None]
-    # Round-trips through json.dumps/json.loads without error (still valid JSON).
     assert json.loads(json.dumps(redacted)) == redacted
 
 
@@ -191,15 +188,18 @@ def test_doctor_redact_json_prints_no_absolute_workspace_path(workspace: Path) -
     assert str(workspace) not in out and workspace.as_posix() not in out
 
 
-def test_the_redact_render_masks_a_home_path_outside_the_workspace(workspace: Path) -> None:
-    """doctor-redact-json-prints-absolute-home-paths: a home path the workspace does not
-    contain keeps no user name under --redact (the one home-path scrub, core.redaction)."""
+# fmt: off
+@pytest.mark.parametrize(("text", "expected"), [  # composed at runtime: no private literal is tracked
+    pytest.param("see /home/" + "alice/.cache/x", "see /…e/.cache/x", id="home-path"),
+    pytest.param("see /home/" + "Alice/x", "see /home/" + "Alice/x", id="capitalised-home-not-matched"),
+    pytest.param("at " + ".".join(["999", "1", "1", "1"]), "at " + ".".join(["999", "1", "1", "1"]), id="invalid-quad"),
+    pytest.param("mail " + "bob" + "@" + "corp.io", "mail b…o", id="email"),
+    pytest.param("at {wsb}\\repos\\r", "at repos\\r", id="workspace-relative-windows-separator"),
+])
+# fmt: on
+def test_the_redact_render_masks_exactly_what_the_push_refuses(workspace: Path, text: str, expected: str) -> None:
+    """sa-redact-text-keeps-a-second-privacy-grammar: --redact masks what privacy_matches finds, with mask()."""
     from dadaia_workspace.cli.commands.doctor import _render_for
 
-    render = _render_for(workspace, redact=True)
-    home = "/home/" + "alice"  # composed at runtime: no home path is ever a tracked literal
-
-    assert render(f"see {home}/.cache/x") == "see /home/[REDACTED]/.cache/x"
-    assert render(f"at {workspace.as_posix()}/repos/r") == "at repos/r"
-    backslashed = workspace.as_posix().replace("/", "\\")  # the Windows separator form
-    assert render(f"at {backslashed}\\repos\\r") == "at repos\\r"
+    rendered = text.format(ws=(ws := workspace.as_posix()), wsb=ws.replace("/", "\\"))
+    assert _render_for(workspace, redact=True)(rendered) == expected

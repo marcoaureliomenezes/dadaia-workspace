@@ -18,7 +18,6 @@ __all__ = [
     "first_private",
     "mask",
     "privacy_matches",
-    "redact_text",
 ]
 
 
@@ -59,21 +58,9 @@ def first_private(
     return None
 
 
-_IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
-_POSIX_HOME_RE = re.compile(r"(/home/|/Users/)[^/\s:]+")
-_WIN_HOME_RE = re.compile(r"([A-Za-z]:\\Users\\)[^\\\s:]+")
-
 #: C0/C1/DEL minus TAB/LF/CR, plus U+2028/U+2029: line-fragmenting or terminal-forging
 #: bytes. Deleted, never escaped, so a denylisted term split by one re-joins for the mask.
 UNSAFE_FORMAT_CHARS_RE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\x80-\x9f\u2028\u2029]")
-
-
-def redact_text(text: str) -> str:
-    """*text* with unsafe characters stripped first, then home-path usernames and IPv4 masked."""
-    out = UNSAFE_FORMAT_CHARS_RE.sub("", text)
-    out = _IPV4_RE.sub("[REDACTED-IP]", out)
-    out = _POSIX_HOME_RE.sub(r"\1[REDACTED]", out)
-    return _WIN_HOME_RE.sub(r"\1[REDACTED]", out)
 
 
 #: Word characters; hyphens included so a candidate never matches inside a hyphenated name.
