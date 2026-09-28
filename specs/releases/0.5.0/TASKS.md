@@ -51,7 +51,7 @@ Lanes: PLAN §2 FR10; files and lines: `AGGREGATE.md` §6.
 - [ ] **T-050-71 — L1.3 infra items (§4a 1–11).** `W:` `i/`, tests · `blocked by:` T-050-64 · `delivers:` `sa-privacy-match-has-two-matchers`, `sa-denylist-file-has-three-shapes` · Δ −343/−100.
 - [x] **T-050-72 — L1.4 specs items (§4a 14–17).** `W:` `f/specs/`, tests · `blocked by:` T-050-66 · `delivers:` SPEC-DOC-046/028/037/007 gone · Δ −141/−135.
 - [ ] **T-050-73 — L1.5 cli/core items (§4a 12, 13, 18–20).** `W:` `cli/commands/migrate.py`, `f/{migrate,chokepoints,reconcile}/`, `core/session_store.py`, tests · `blocked by:` T-050-70 · `delivers:` `sa-path-segment-judged-by-two-matchers` · Δ −351/−238.
-- [ ] **T-050-74 — L1.6 test-only items (§4a 21–29; `TestAutopilot` kept).** `W:` tests · `blocked by:` T-050-69 · `delivers:` §6 W1 · Δ 0/−540.
+- [x] **T-050-74 — L1.6 test-only items (§4a 21–29; `TestAutopilot` kept).** `W:` tests · `blocked by:` T-050-69 · `delivers:` §6 W1 · Δ 0/−540.
 - [ ] **T-050-75 — L2.9 hook dialects, one verifier.** `W:` `i/` · `blocked by:` T-050-41, -44, -52 · `delivers:` `sa-hook-files-written-by-table-and-by-hand`, `sa-projected-file-judged-by-four-verifiers` · Δ −360.
 - [ ] **T-050-76 — L2.10 codex fold.** `W:` `i/`, `f/public/` · `blocked by:` T-050-41, -44, -52 · `delivers:` `sa-codex-effort-set-by-policy-and-by-tier`, `sa-frontmatter-split-five-ways` · Δ −160.
 - [ ] **T-050-77 — L2.11 infra small.** `W:` `i/` · `blocked by:` T-050-41, -44, -52 · `delivers:` §6 W2c · Δ −235.
