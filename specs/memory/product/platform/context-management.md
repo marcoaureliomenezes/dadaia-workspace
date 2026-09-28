@@ -9,7 +9,6 @@ sources:
   - dadaia_workspace/hooks/_common.py
   - dadaia_workspace/core/invocation.py
   - dadaia_workspace/core/session_store.py
-  - dadaia_workspace/core/record_liveness.py
   - dadaia_workspace/features/spec_context/injection_policy.py
   - dadaia_workspace/features/spec_context/markers.py
   - dadaia_workspace/features/spec_context/service.py
@@ -49,7 +48,7 @@ sources:
 - `repo_owner` maps any path under `repos/<slug>/` — a checkout or a worktree — to its owning context, repo slug and main repo slug; the pre-push gate reads an associated repo's gitflow through it ([[sdd-gate-v3]]).
 - A context's specs tree is `repos/<main-slug>/specs` whether or not it exists; a context without one has its `specs` onboarding step pending, never redirected to another tree.
 - `Bind` is the named context plus every repo slug it owns (main plus associated); `resolve_bind` reads `DADAIA_CONTEXT` then the session record, never the cwd, and an unbound `Bind` owns nothing.
-- `dadaia_workspace/core/session_store.py` alone reads and writes `.dadaia/sessions/`; `is_stale` in `dadaia_workspace/core/record_liveness.py` is the one staleness predicate.
+- `dadaia_workspace/core/session_store.py` alone reads and writes `.dadaia/sessions/`; its `is_live` is the one liveness rule: `last_seen_at` against `ttl_seconds`, no creation fallback.
 - One harness session runs per checked-out tree; a parallel session uses its own linked worktree.
 
 ## Binding and injection

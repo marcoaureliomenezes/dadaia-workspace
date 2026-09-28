@@ -13,7 +13,7 @@ sources:
 ## Surface
 
 - Cursor (IDE and `cursor-agent` CLI) is an entry harness reading the root `AGENTS.md` map, the `AGENTS.md` of any file's subtree and `.agents/skills/` natively ([[agentic-entities]]).
-- `dadaia harness add cursor` projects `.cursor/agents/dd-*.md` as relative symlinks onto `.agents/agents/dd-*.md` (hash-verified copy fallback, attested by `SYMLINK-TARGET-1`) and `.cursor/hooks.json` (`version: 1`).
+- `dadaia harness add cursor` projects `.cursor/agents/dd-*.md` as relative symlinks onto `.agents/agents/dd-*.md` (hash-verified copy fallback) and `.cursor/hooks.json` (`version: 1`).
 
 ## Hooks
 

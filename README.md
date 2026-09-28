@@ -46,8 +46,8 @@ memory atom under its content hash.
 
 <!-- derived-from: pypi-distribution sha256:618098346ed6 -->
 <!-- derived-from: workspace-init sha256:acb8bc28e783 -->
-<!-- derived-from: context-management sha256:3b1b76336431 -->
-<!-- derived-from: workspace-doctor sha256:eb7b1e19b277 -->
+<!-- derived-from: context-management sha256:44be26055b2d -->
+<!-- derived-from: workspace-doctor sha256:7ec6f57cb5fe -->
 
 ```bash
 uvx dadaia-workspace init demo --harness claude --repo <clone url>   # level 1 + 2
@@ -97,10 +97,10 @@ and deletes only what a TTL expired.
 <!-- derived-from: sdd-gate-v3 sha256:8cc77479943b -->
 <!-- derived-from: release-lifecycle sha256:16af688b63c6 -->
 <!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
-<!-- derived-from: harness-claude-code sha256:55ba15667a89 -->
-<!-- derived-from: harness-codex sha256:b907c260a862 -->
+<!-- derived-from: harness-claude-code sha256:4d0f86f6e93f -->
+<!-- derived-from: harness-codex sha256:3419ecb0e1aa -->
 <!-- derived-from: harness-kimi-code sha256:4300d3a1724d -->
-<!-- derived-from: harness-cursor sha256:480b18aa9b61 -->
+<!-- derived-from: harness-cursor sha256:1cae6128564d -->
 <!-- derived-from: harness-devin sha256:ab4a32c4a53d -->
 <!-- derived-from: harness-copilot sha256:b93cef868a6f -->
 <!-- derived-from: agent-comms sha256:c485c616b2df -->
@@ -135,7 +135,7 @@ with a RED test. Completed work leaves as a `handoff-v1` record, validated by
 ## Documentation
 
 <!-- derived-from: pypi-distribution sha256:618098346ed6 -->
-<!-- derived-from: public-asset-distribution sha256:6a1fa0e2d023 -->
+<!-- derived-from: public-asset-distribution sha256:56c4531d4702 -->
 
 The documentation is the repository's [docs folder](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs):
 
