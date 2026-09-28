@@ -116,7 +116,7 @@ def reconcile_workspace(
         # `dadaia doctor` judge the whole workspace (DEC-13 a).
         broken = doctor_service.check()
         if broken:
-            summary = "; ".join(f"{issue.code}: {issue.description}" for issue in broken[:8])
+            summary = "; ".join(f"{issue.code}: {issue.message}" for issue in broken[:8])
             raise RuntimeError("context invariants failed: " + summary)
         steps.append("context-invariants")
 

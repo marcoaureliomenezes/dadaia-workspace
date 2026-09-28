@@ -96,12 +96,9 @@ class Finding:
         return self.verdict is not FindingVerdict.REAPED
 
 
-@dataclass(frozen=True)
-class DoctorIssue:
-    code: str
-    description: str
-    fixable: bool
-    fix: str = ""
+def _invariant(code: str, message: str, fix: str = "", *, fixable: bool = False) -> SectionFinding:
+    """A context invariant: always error-class, outside the scored entry set."""
+    return SectionFinding(code, "error", message, False, True, fix, fixable)
 
 
 class DoctorService:
@@ -124,11 +121,11 @@ class DoctorService:
     # check() — the context invariants (unchanged by the zone walk)
     # ------------------------------------------------------------------
 
-    def check_installed_hooks(self, context: str | None = None) -> list[DoctorIssue]:
+    def check_installed_hooks(self, context: str | None = None) -> list[SectionFinding]:
         """HOOKS-DRIFT-1: an ALIVE repo's hook where git runs hooks is not byte-for-byte the
         shipped one (hand-edited, missing or stale) — the one backstop outside every harness
         hook. A non-git repo is never a finding; *context* scopes the repos (0.4.8 R5)."""
-        issues: list[DoctorIssue] = []
+        issues: list[SectionFinding] = []
         for top in self._alive_repo_tops(context):
             hooks_dir = git_hooks_dir(top)
             if hooks_dir is None:
@@ -143,22 +140,19 @@ class DoctorService:
                 if drifted:
                     rel = str(top)  # absolute: the fix runs from any cwd
                     issues.append(
-                        DoctorIssue(
-                            code="HOOKS-DRIFT-1",
-                            description=(
-                                f"{Path(os.path.relpath(installed, self._workspace_root)).as_posix()} differs from the shipped "
-                                f"{source} — the chokepoint is enforcing something other "
-                                "than what this release ships."
-                            ),
-                            fixable=False,
-                            fix=fix_line(
+                        _invariant(
+                            "HOOKS-DRIFT-1",
+                            f"{Path(os.path.relpath(installed, self._workspace_root)).as_posix()} differs from the shipped "
+                            f"{source} — the chokepoint is enforcing something other "
+                            "than what this release ships.",
+                            fix_line(
                                 self._workspace_root, "ci", "install-hook", "--force", "--repo", rel
                             ),
                         )
                     )
         return issues
 
-    def _check_venv_health(self) -> list[DoctorIssue]:
+    def _check_venv_health(self) -> list[SectionFinding]:
         """VENV-1 — the workspace venv exists with an executable ``dadaia`` entrypoint.
 
         FR-W3-02 (ADR-G4). Windows-safe — the scripts dir / exe suffix come from ``PLATFORM``
@@ -168,51 +162,47 @@ class DoctorService:
         venv_bin = self._dadaia / ".venv" / PLATFORM.venv_scripts_dir
         if not venv_bin.is_dir():
             return [
-                DoctorIssue(
-                    code="VENV-1",
-                    description=f"Workspace venv missing: '{venv_bin}' does not exist.",
-                    fixable=False,
-                    fix=shell_line("uvx", "dadaia-workspace", "init", str(self._workspace_root)),
+                _invariant(
+                    "VENV-1",
+                    f"Workspace venv missing: '{venv_bin}' does not exist.",
+                    shell_line("uvx", "dadaia-workspace", "init", str(self._workspace_root)),
                 )
             ]
         entry = venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}"
         if not entry.is_file():
             return [
-                DoctorIssue(
-                    code="VENV-1",
-                    description=f"Workspace venv entrypoint missing: '{entry}' not found.",
-                    fixable=False,
-                    fix=shell_line("uvx", "dadaia-workspace", "init", str(self._workspace_root)),
+                _invariant(
+                    "VENV-1",
+                    f"Workspace venv entrypoint missing: '{entry}' not found.",
+                    shell_line("uvx", "dadaia-workspace", "init", str(self._workspace_root)),
                 )
             ]
         if not os.access(entry, os.X_OK):
             return [
-                DoctorIssue(
-                    code="VENV-1",
-                    description=f"Workspace venv entrypoint not executable: '{entry}'.",
-                    fixable=False,
-                    fix=shell_line("chmod", "+x", str(entry)),
+                _invariant(
+                    "VENV-1",
+                    f"Workspace venv entrypoint not executable: '{entry}'.",
+                    shell_line("chmod", "+x", str(entry)),
                 )
             ]
         return []
 
-    def check(self) -> list[DoctorIssue]:
-        issues: list[DoctorIssue] = []
+    def check(self) -> list[SectionFinding]:
+        issues: list[SectionFinding] = []
         try:
             contexts = self._store.list_all()
         except SchemaVersionError as refused:  # the registry's one grammar refused it
-            return [DoctorIssue("REG-SCHEMA", refused.problem, False, refused.fix)]
+            return [_invariant("REG-SCHEMA", refused.problem, refused.fix)]
 
         # INV-4 (v2): ALIVE context must have repo on disk
         for ctx in contexts:
             for repo in ctx.all_repos() if ctx.state == ContextState.ALIVE else ():
                 if not (self._repos_dir() / repo.slug).exists():
                     issues.append(
-                        DoctorIssue(
-                            code="INV-4",
-                            description=f"Context '{ctx.name}' is alive but repo '{repo.slug}' not on disk",
-                            fixable=False,
-                            fix=fix_line(self._workspace_root, "context", "alive", ctx.name),
+                        _invariant(
+                            "INV-4",
+                            f"Context '{ctx.name}' is alive but repo '{repo.slug}' not on disk",
+                            fix_line(self._workspace_root, "context", "alive", ctx.name),
                         )
                     )
 
@@ -222,11 +212,10 @@ class DoctorService:
         for ctx in contexts:
             if ctx.state == ContextState.ALIVE and not ctx.repo_url:
                 issues.append(
-                    DoctorIssue(
-                        code="CTX-URL-1",
-                        description=f"Context '{ctx.name}' is alive with an empty repo_url.",
-                        fixable=False,
-                        fix=fix_line(self._workspace_root, "context", "alive", ctx.name),
+                    _invariant(
+                        "CTX-URL-1",
+                        f"Context '{ctx.name}' is alive with an empty repo_url.",
+                        fix_line(self._workspace_root, "context", "alive", ctx.name),
                     )
                 )
 
@@ -235,9 +224,9 @@ class DoctorService:
             for repo in ctx.all_repos() if ctx.state == ContextState.DEAD else ():
                 if (self._repos_dir() / repo.slug).exists():
                     issues.append(
-                        DoctorIssue(
-                            code="INV-5",
-                            description=f"Context '{ctx.name}' is dead but repo '{repo.slug}' is on disk",
+                        _invariant(
+                            "INV-5",
+                            f"Context '{ctx.name}' is dead but repo '{repo.slug}' is on disk",
                             fixable=True,
                         )
                     )
@@ -255,15 +244,12 @@ class DoctorService:
             if len(names) > 1:  # the fix retires one owner: delete a dead one, else dead it
                 owner = min(names, key=lambda n: (n not in dead, n))
                 issues.append(
-                    DoctorIssue(
-                        code="INV-6",
-                        fixable=False,
-                        description=(
-                            f"Repo slug '{slug}' is owned by more than one context "
-                            f"({', '.join(sorted(names))}): 'repos/<slug>' is shared, so "
-                            "a dead() on one owner would take the others' working tree."
-                        ),
-                        fix=fix_line(
+                    _invariant(
+                        "INV-6",
+                        f"Repo slug '{slug}' is owned by more than one context "
+                        f"({', '.join(sorted(names))}): 'repos/<slug>' is shared, so "
+                        "a dead() on one owner would take the others' working tree.",
+                        fix_line(
                             self._workspace_root,
                             "context",
                             "delete" if owner in dead else "dead",
@@ -619,36 +605,11 @@ def workspace_rules(
     """
 
     def invariants(service: DoctorService) -> list[SectionFinding]:
-        if expired_only:
-            return []
-        return [
-            SectionFinding(
-                code=issue.code,
-                verdict="error",
-                message=issue.description,
-                canonical=False,
-                error=True,
-                fix=issue.fix,
-                fixable=issue.fixable,
-            )
-            for issue in service.check()
-        ]
+        return [] if expired_only else service.check()
 
     def installed_hooks(service: DoctorService) -> list[SectionFinding]:
         """HOOKS-DRIFT-1 — its own rule because its fix is its own runnable line."""
-        if expired_only:
-            return []
-        return [
-            SectionFinding(
-                code=issue.code,
-                verdict="error",
-                message=issue.description,
-                canonical=False,
-                error=True,
-                fix=issue.fix,
-            )
-            for issue in service.check_installed_hooks(context)
-        ]
+        return [] if expired_only else service.check_installed_hooks(context)
 
     def entries(service: DoctorService) -> list[SectionFinding]:
         findings = service.scan()

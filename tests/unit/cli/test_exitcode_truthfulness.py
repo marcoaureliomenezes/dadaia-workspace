@@ -13,19 +13,19 @@ from typer.testing import CliRunner
 
 from dadaia_workspace import container
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.doctor_rules import SectionFinding
 
 _runner = CliRunner()
 
 
-class _Issue:
-    code = "ROOT-4"
-    description = "Unknown top-level subdirectory/ies inside .dadaia/: 'nonsense'."
-    fixable, fix = False, "rm -r .dadaia/nonsense"
+_ISSUE = SectionFinding(
+    "ROOT-4", "error", ".dadaia/nonsense", False, True, "rm -r .dadaia/nonsense"
+)
 
 
 class _StubDoctor:
     def check(self):
-        return [_Issue()]
+        return [_ISSUE]
 
     def check_installed_hooks(self, context=None):
         return []

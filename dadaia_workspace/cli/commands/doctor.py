@@ -79,9 +79,14 @@ def _workspace_section(
         "workspace",
         workspace_rules(expired_only=expired_only, context=scope),
         service,
-        lambda _rule, finding: finding,
+        _as_is,
         root,
     )
+
+
+def _as_is[C](_rule: Rule[C, SectionFinding], finding: SectionFinding) -> SectionFinding:
+    """A rule that emits a :class:`SectionFinding` needs no translation at the seam."""
+    return finding
 
 
 def _specs_render[C](rule: Rule[C, SpecsDoctorIssue], issue: SpecsDoctorIssue) -> SectionFinding:
@@ -116,20 +121,6 @@ def _specs_section(doctor: SpecsDoctor | None, root: Path | None) -> SectionRepo
     )
 
 
-def _ledgers_render(
-    _rule: Rule[backlog_doctor.DoctorContext, backlog_doctor.Finding],
-    finding: backlog_doctor.Finding,
-) -> SectionFinding:
-    """Render one backlog finding as a section finding."""
-    return SectionFinding(
-        code=finding.code,
-        verdict="error",
-        message=f"[{finding.slug}] {finding.message}",
-        canonical=False,
-        error=True,
-    )
-
-
 def _ledgers_section(
     root: Path | None,
     specs_dir: Path | None,
@@ -159,7 +150,7 @@ def _ledgers_section(
     )
     return merge_sections(
         [
-            run_section("ledgers", backlog_doctor.RULES, context, _ledgers_render, root, specs_dir),
+            run_section("ledgers", backlog_doctor.RULES, context, _as_is, root, specs_dir),
             run_section(
                 "ledgers",
                 doctor_adr.LEDGER_RULES,

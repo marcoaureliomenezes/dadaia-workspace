@@ -13,20 +13,11 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from dadaia_workspace.core.doctor_rules import Rule
+from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
 from dadaia_workspace.core.models.backlog import INTENTS_EXEMPT_STATUS, Intent, parse_intents
 from dadaia_workspace.features.backlog.subject_registry import BindStatus, Registry, build_registry
 
-__all__ = ["RULES", "DoctorContext", "Finding", "build_context"]
-
-
-@dataclass(frozen=True)
-class Finding:
-    """One backlog-doctor finding, always an error."""
-
-    code: str
-    message: str
-    slug: str
+__all__ = ["RULES", "DoctorContext", "build_context"]
 
 
 @dataclass(frozen=True)
@@ -36,27 +27,32 @@ class DoctorContext:
     bound: dict[str, tuple[dict[str, str], list[str]]]
 
 
-def _check_schema(ctx: DoctorContext) -> list[Finding]:
+def _finding(code: str, message: str, slug: str) -> SectionFinding:
+    """One backlog-doctor finding, always an error."""
+    return SectionFinding(code, "error", f"[{slug}] {message}", False, True)
+
+
+def _check_schema(ctx: DoctorContext) -> list[SectionFinding]:
     return [
-        Finding("BL-SCHEMA", message, slug)
+        _finding("BL-SCHEMA", message, slug)
         for slug, (_, unresolved) in ctx.bound.items()
         for message in unresolved
     ]
 
 
-def _check_conflict(ctx: DoctorContext) -> list[Finding]:
+def _check_conflict(ctx: DoctorContext) -> list[SectionFinding]:
     items = [(slug, changes) for slug, (changes, unresolved) in ctx.bound.items() if not unresolved]
-    findings: list[Finding] = []
+    findings: list[SectionFinding] = []
     for i, (slug, changes) in enumerate(items):
         for other, theirs in items[:i]:
             shared = sorted(changes.keys() & theirs.keys())
             if any(changes[a] != theirs[a] for a in shared):
                 message = f"divergent conflict with backlog item {other!r} (shared anchors: {', '.join(shared)})"  # fmt: skip
-                findings.append(Finding("BL-CONFLICT", message, slug))
+                findings.append(_finding("BL-CONFLICT", message, slug))
     return findings
 
 
-type LedgerRule = Rule[DoctorContext, Finding]
+type LedgerRule = Rule[DoctorContext, SectionFinding]
 
 SECTION = "ledgers"
 

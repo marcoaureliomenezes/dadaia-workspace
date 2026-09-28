@@ -11,6 +11,7 @@ import stat  # noqa: E402
 from dataclasses import replace  # noqa: E402
 from pathlib import Path  # noqa: E402
 
+from dadaia_workspace.core.doctor_rules import SectionFinding  # noqa: E402
 from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     AssociatedRepo,
     ContextState,
@@ -96,7 +97,7 @@ def test_inv4_names_a_missing_main_or_associated_repo_with_the_alive_fix(
 
     inv4 = [i for i in svc.check() if i.code == "INV-4"]
 
-    assert [(i.description, i.fixable) for i in inv4] == [
+    assert [(i.message, i.fixable) for i in inv4] == [
         (f"Context 'missing' is alive but repo '{missing}' not on disk", False)
     ]
     assert inv4[0].fix.endswith("dadaia context alive missing")
@@ -109,16 +110,16 @@ def test_inv4_names_a_missing_main_or_associated_repo_with_the_alive_fix(
 
 @pytest.mark.parametrize("slug", ["stale", "lib"])
 def test_inv5_holds_a_main_or_associated_repo_of_a_dead_context(tmp_path: Path, slug: str) -> None:
-    """Intent: CONTRACT — sa-context-dead-removes-repos-outside-the-reaper#C5: INV-5 iterates all_repos(); --fix HOLDS, never deletes."""
+    """Intent: CONTRACT — sa-context-dead-removes-repos-outside-the-reaper#C5: INV-5 iterates all_repos(); --fix HOLDS, never deletes. sa-doctor-finding-has-four-shapes: the invariant is a SectionFinding, emitted directly."""
     ctx = _with_lib(_ctx("stale", state=ContextState.DEAD))
     repo_dir = tmp_path / "repos" / slug
     repo_dir.mkdir(parents=True)
     (repo_dir / "work.txt").write_text("keep\n")
     svc, _ = _make_doctor(tmp_path, [ctx])
 
-    inv5 = [i for i in svc.check() if i.code == "INV-5"]
-    assert [(i.description, i.fixable) for i in inv5] == [
-        (f"Context 'stale' is dead but repo '{slug}' is on disk", True)
+    msg = f"Context 'stale' is dead but repo '{slug}' is on disk"
+    assert [i for i in svc.check() if i.code == "INV-5"] == [
+        SectionFinding("INV-5", "error", msg, False, True, "", True)
     ]
 
     svc.fix()
@@ -140,9 +141,8 @@ def test_inv6_main_repo_slug_collision_reported_not_fixable(tmp_path: Path) -> N
     b = _ctx("b", repo_slug="x")
     svc, _ = _make_doctor(tmp_path, [a, b])
     inv6 = [i for i in svc.check() if i.code == "INV-6"]
-    assert len(inv6) == 1
-    assert inv6[0].fixable is False
-    assert "a" in inv6[0].description and "b" in inv6[0].description
+    assert [i.fixable for i in inv6] == [False]
+    assert "a" in inv6[0].message and "b" in inv6[0].message
 
 
 def test_inv6_main_vs_associated_slug_collision_reported(tmp_path: Path) -> None:
@@ -158,9 +158,8 @@ def test_inv6_main_vs_associated_slug_collision_reported(tmp_path: Path) -> None
     )
     svc, _ = _make_doctor(tmp_path, [a, b])
     inv6 = [i for i in svc.check() if i.code == "INV-6"]
-    assert len(inv6) == 1
-    assert inv6[0].fixable is False
-    assert "a" in inv6[0].description and "b" in inv6[0].description
+    assert [i.fixable for i in inv6] == [False]
+    assert "a" in inv6[0].message and "b" in inv6[0].message
 
 
 def test_inv5_fix_refuses_a_dead_slug_that_resolves_outside_repos(tmp_path: Path) -> None:
