@@ -1,28 +1,23 @@
-"""The branch contract, read from the project gitflow (ADRs 0037, 0046; SPEC 0.5.0 AC6.5,
+"""The branch contract, read from the project gitflow (ADRs 0036, 0037, 0046; SPEC 0.5.0 AC6.5,
 AC8.1): work branches ``<prefix><M.m.p>`` are pushable; the principal and integration
 branches are PR-only; every refusal and its fix line name the CONFIGURED branches.
-Tag pushes keep their carve-out. Every case runs under the default gitflow and a custom
-one (``trunk``/``next``/``work/``) — no branch name is hard-coded in the gate.
+Every row runs under the default gitflow or a custom one (``trunk``/``next``/``work/``).
 
-Name validation itself is ``Gitflow.role_of`` (``tests/unit/core/test_gitflow.py``); the
-refusal of role-less names under the default gitflow is pinned here, at the gate.
-
-Intent: CONTRACT — AC6.5, AC8.1 (T-050-12); v0.4.4 A3.1, A3.5
+Intent: CONTRACT — AC6.5, AC8.1 (T-050-12); v0.4.4 A3.1, A3.5; T-060-07 findings 1, 2, 6
 """
 
 from __future__ import annotations
 
 import shlex
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
 
 import pytest
 
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow
 from dadaia_workspace.features.chokepoints import Decision, push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import (
-    PushRef,
     check_branch_policy,
     parse_push_stdin,
 )
@@ -31,11 +26,11 @@ from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReade
 from tests.fakes import gate_fixes
 from tests.fixtures.real_git import PushRepo
 
-_SHA_A = "a" * 40
+_A = "a" * 40
+_B = "b" * 40
 _ZERO = "0" * 40
-_SHA_B = "b" * 40
 _CUSTOM = Gitflow(principal="trunk", integration="next", work_prefix="work/")
-_FLOWS = pytest.mark.parametrize("flow", [DEFAULT, _CUSTOM], ids=["default", "custom"])
+Scenario = Callable[[PushRepo, Gitflow], str]
 
 
 @pytest.fixture()
@@ -43,224 +38,152 @@ def repo(tmp_path: Path) -> PushRepo:
     return PushRepo(tmp_path)
 
 
-def _decide(
-    refs: list[PushRef], repo: PushRepo, flow: Gitflow = DEFAULT, **kwargs: Any
-) -> Decision:
+def _decide(stdin: str, repo: PushRepo, flow: Gitflow) -> Decision:
+    refs, malformed = parse_push_stdin(stdin)
     return push_gate_decision(
         refs, gitflow=flow, fixes=gate_fixes(), object_source=GitSubprocessObjectReader(),
-        repo=repo.path, canon_violations_fn=canon_violations, **kwargs,
+        repo=repo.path, canon_violations_fn=canon_violations, malformed_lines=malformed,
     )  # fmt: skip
 
 
-def _refs(*lines: str) -> list[PushRef]:
-    return parse_push_stdin("\n".join(lines))[0]
-
-
-def _push(
-    local: str, remote: str | None = None, remote_sha: str = _ZERO, sha: str = _SHA_A
-) -> list[PushRef]:
-    return _refs(f"refs/heads/{local} {sha} refs/heads/{remote or local} {remote_sha}")
+def _line(local: str, remote: str | None = None, remote_sha: str = _ZERO, sha: str = _A) -> str:
+    return f"refs/heads/{local} {sha} refs/heads/{remote or local} {remote_sha}"
 
 
 def _fix(decision: Decision) -> list[str]:
     return shlex.split(decision.message.rsplit("fix: ", 1)[1])
 
 
-@_FLOWS
-def test_work_branch_push_is_allowed(repo: PushRepo, flow: Gitflow) -> None:
-    sha = repo.commit({"a.md": "a\n"})
-    decision = _decide(_push(f"{flow.work_prefix}0.0.0", sha=sha), repo, flow)
-    assert decision.allowed, decision.message
+def _birth(role: str) -> Scenario:
+    def run(repo: PushRepo, flow: Gitflow) -> str:
+        repo.commit({"a.md": "a\n"})
+        sha = repo.publish(flow.integration if role == "principal" else flow.principal)
+        return _line(getattr(flow, role), sha=sha)
+
+    return run
 
 
-@_FLOWS
-def test_integration_push_is_refused_naming_the_pr_from_a_work_branch(
-    repo: PushRepo, flow: Gitflow
-) -> None:
-    decision = _decide(_push(flow.integration, remote_sha=_SHA_B), repo, flow)
-    assert not decision.allowed
-    assert f"'{flow.integration}'" in decision.message
-    assert _fix(decision) == [
-        "gh",
-        "pr",
-        "create",
-        "--base",
-        flow.integration,
-        "--head",
-        f"{flow.work_prefix}<M.m.p>",
-    ]
+def _birth_with_commit(role: str, other: str) -> Scenario:
+    def run(repo: PushRepo, flow: Gitflow) -> str:
+        repo.commit({"a.md": "a\n"})
+        repo.publish(getattr(flow, other))
+        return _line(getattr(flow, role), sha=repo.commit({"b.md": "b\n"}))
+
+    return run
 
 
-@_FLOWS
-def test_principal_push_is_refused_naming_the_pr_from_integration(
-    repo: PushRepo, flow: Gitflow
-) -> None:
-    decision = _decide(_push(flow.principal, remote_sha=_SHA_B), repo, flow)
-    assert not decision.allowed
-    assert f"'{flow.principal}'" in decision.message
-    assert _fix(decision) == [
-        "gh",
-        "pr",
-        "create",
-        "--base",
-        flow.principal,
-        "--head",
-        flow.integration,
-    ]
-
-
-@_FLOWS
-@pytest.mark.parametrize("name", ["bugfix/x", "hotfix/0.6.1", "{prefix}v0.0.0", "{prefix}0.6"])
-def test_a_branch_outside_the_gitflow_is_refused_naming_the_work_branch(
-    repo: PushRepo, flow: Gitflow, name: str
-) -> None:
-    branch = name.format(prefix=flow.work_prefix)
-    decision = _decide(_push(branch), repo, flow)
-    assert not decision.allowed
-    assert branch in decision.message
-    for word in (flow.principal, flow.integration, flow.work_prefix):
-        assert word in decision.message
-    work = f"{flow.work_prefix}<M.m.p>"
-    # One command, from any cwd, carrying the refused commit (review H-C): no `&&`.
-    assert _fix(decision) == ["git", "-C", "/repo", "switch", "-c", work, _SHA_A]
-
-
-@pytest.mark.parametrize(
-    "branch", ["feature/0.6.0-rc1", "Main", "developp", "release/0.6.0", "chore/cleanup"]
-)
-def test_the_default_gitflow_refuses_a_name_that_is_no_role(repo: PushRepo, branch: str) -> None:
-    """Behavior (AC6.1, AC6.5, default gitflow main/develop/feature/<M.m.p>): only a work
-    branch is pushable; a name that is not exactly the principal, the integration or
-    ``feature/`` + an ``M.m.p`` version has no role and is refused. ``-rc1`` is a suffix on
-    the version, ``Main`` and ``developp`` are not the role names, ``release/`` and
-    ``chore/`` are not the work prefix. Restores coverage lost in c3 (retro 2026-09-27 W5).
-    """
-    decision = _decide(_push(branch), repo, DEFAULT)
-    assert decision.allowed is False
-    assert "outside the gitflow" in decision.message
-
-
-def test_the_default_names_are_ordinary_branches_under_a_custom_gitflow(repo: PushRepo) -> None:
-    assert not _decide(_push("feature/0.0.0"), repo, _CUSTOM).allowed
-    assert "trunk" in _decide(_push("main"), repo, _CUSTOM).message
-
-
-@_FLOWS
-@pytest.mark.parametrize("role", ["principal", "integration"])
-def test_a_contentless_birth_of_principal_or_integration_passes(
-    repo: PushRepo, flow: Gitflow, role: str
-) -> None:
-    """ADR 0036: an orphan empty root pushed as the principal, or `git branch <integration>
-    <principal>` pushed, creates the remote branch and publishes nothing."""
-    other = flow.integration if role == "principal" else flow.principal
+def _existing_principal(repo: PushRepo, flow: Gitflow) -> str:
     repo.commit({"a.md": "a\n"})
-    sha = repo.publish(other)
-    decision = _decide(_push(getattr(flow, role), sha=sha), repo, flow)
-    assert decision.allowed, decision.message
+    sha = repo.publish(flow.principal)
+    return _line(flow.principal, remote_sha=sha, sha=sha)
 
 
-@_FLOWS
-@pytest.mark.parametrize(
-    ("role", "other"), [("principal", "integration"), ("integration", "principal")]
-)
-def test_a_birth_carrying_a_commit_is_refused_naming_a_birth_at_the_other_published_tip(
-    repo: PushRepo, flow: Gitflow, role: str, other: str
-) -> None:
-    """Review M2: birth at the other role's published tip (publishes nothing) — one
-    command, no `&&` (Windows PowerShell 5.1 has none)."""
-    branch, tip = getattr(flow, role), getattr(flow, other)
-    repo.commit({"a.md": "a\n"})
-    repo.publish(tip)
-    decision = _decide(_push(branch, sha=repo.commit({"b.md": "b\n"})), repo, flow)
-    assert not decision.allowed
-    assert _fix(decision) == [
-        "git", "-C", "/repo", "push", "origin", f"refs/remotes/origin/{tip}:refs/heads/{branch}",
-    ]  # fmt: skip
-
-
-@_FLOWS
-def test_an_empty_origin_admits_the_principal_as_it_is(repo: PushRepo, flow: Gitflow) -> None:
-    """R13 rule 2: origin holds no gitflow branch — the local principal is published with
-    its content (the scans still run); nothing contentless is required."""
-    sha = repo.commit({"a.md": "a\n"})
-    assert _decide(_push(flow.principal, sha=sha), repo, flow).allowed
-
-
-def test_an_existing_principal_is_never_a_birth(repo: PushRepo) -> None:
-    repo.commit({"a.md": "a\n"})
-    sha = repo.publish("main")
-    decision = _decide(_push("main", remote_sha=sha, sha=sha), repo)
-    assert not decision.allowed
-
-
-def test_a_contentless_birth_passes_from_any_source(repo: PushRepo) -> None:
-    """Review H4: baseline pushes `<sha>:refs/heads/<b>` — the birth is judged by the
-    remote branch it creates and what it publishes, never by the local ref's name."""
+def _birth_from_any_source(repo: PushRepo, flow: Gitflow) -> str:
+    """Review H4: judged by the remote branch it creates and what it publishes, never the local name."""
     repo.commit({"a.md": "a\n"})
     sha = repo.publish()
-    assert _decide(_push("main", "develop", sha=sha), repo).allowed
-    assert _decide(_refs(f"{sha} {sha} refs/heads/develop {_ZERO}"), repo).allowed
+    return f"{_line('main', 'develop', sha=sha)}\n{sha} {sha} refs/heads/develop {_ZERO}"
 
 
-def test_tag_push_still_passes(repo: PushRepo) -> None:
-    sha = repo.commit({"a.md": "a\n"})
-    decision = _decide(_refs(f"refs/tags/v9.9.9 {sha} refs/tags/v9.9.9 {_ZERO}"), repo)
-    assert decision.allowed
-
-
-# ---------------------------------------------------------------------------
-# T-060-07 review findings, carried forward unchanged in spirit — the gate fails
-# CLOSED and polices the REMOTE ref, now against the v2 pushable branch.
-# ---------------------------------------------------------------------------
-
-
-def test_malformed_stdin_fails_closed_naming_the_sanctioned_bypass(repo: PushRepo) -> None:
-    """Finding 1: present-but-unparseable stdin must refuse, never silently allow.
-
-    Empty stdin (nothing to gate) still allows; stdin whose lines cannot be parsed
-    is a different case — the gate must fail CLOSED and name git's sanctioned,
-    traceable bypass (--no-verify) instead of silently disabling the whole law.
-    """
-    refs, malformed = parse_push_stdin("this line has three fields\n")
-    assert refs == []
-    assert malformed == 1
-    decision = _decide(refs, repo, malformed_lines=malformed)
-    assert not decision.allowed
-    assert "--no-verify" in decision.message
-
-    empty_refs, empty_malformed = parse_push_stdin("")
-    assert empty_malformed == 0
-    assert _decide(empty_refs, repo, malformed_lines=0).allowed
-
-
-def test_pushing_feature_branch_to_a_foreign_remote_ref_is_refused(repo: PushRepo) -> None:
-    """Finding 2, carried forward: `git push origin feature/0.0.1:develop` — local
-    feature branch, remote develop. The policy must key on BOTH sides: a valid local
-    feature/{M.m.p} tip aimed at any remote ref other than its own name is a refusal."""
-    decision = _decide(_push("work/0.0.1", "work/0.0.2"), repo, _CUSTOM)
-    assert not decision.allowed
-    assert "refs/heads/work/0.0.2" in decision.message
-    assert _fix(decision) == ["git", "-C", "/repo", "branch", "-m", "work/0.0.1", "work/0.0.2"]
+def _feature_to_published_integration(repo: PushRepo, flow: Gitflow) -> str:
     repo.commit({"a.md": "a\n"})
     repo.publish("trunk")
-    assert not _decide(_push("work/0.0.1", "next"), repo, _CUSTOM).allowed
+    return _line("work/0.0.1", "next")
 
 
-def test_detached_head_ref_gets_a_pushable_branch_diagnosis(repo: PushRepo) -> None:
-    """Finding 6, carried forward: `git push origin HEAD:feature/0.0.1` — the fix cuts the
-    work branch at the refused commit (never a name that points elsewhere)."""
-    decision = _decide(_refs(f"HEAD {_SHA_A} refs/heads/work/0.0.1 {_ZERO}"), repo, _CUSTOM)
+def _commit_then(line: Callable[[str, Gitflow], str]) -> Scenario:
+    return lambda repo, flow: line(repo.commit({"a.md": "a\n"}), flow)
+
+
+_D, _C = DEFAULT, _CUSTOM
+
+
+# fmt: off
+@pytest.mark.parametrize(("flow", "scenario"), [
+    pytest.param(_D, _commit_then(lambda s, f: _line(f"{f.work_prefix}0.0.0", sha=s)), id="default-work-branch"),
+    pytest.param(_C, _commit_then(lambda s, f: _line(f"{f.work_prefix}0.0.0", sha=s)), id="custom-work-branch"),
+    pytest.param(_D, _commit_then(lambda s, f: _line(f.principal, sha=s)), id="default-R13-empty-origin-admits-principal"),
+    pytest.param(_C, _commit_then(lambda s, f: _line(f.principal, sha=s)), id="custom-R13-empty-origin-admits-principal"),
+    pytest.param(_D, _birth("principal"), id="default-ADR0036-contentless-principal-birth"),
+    pytest.param(_C, _birth("principal"), id="custom-ADR0036-contentless-principal-birth"),
+    pytest.param(_D, _birth("integration"), id="default-ADR0036-contentless-integration-birth"),
+    pytest.param(_C, _birth("integration"), id="custom-ADR0036-contentless-integration-birth"),
+    pytest.param(_D, _birth_from_any_source, id="H4-contentless-birth-from-any-source"),
+    pytest.param(_D, _commit_then(lambda s, f: f"refs/tags/v9.9.9 {s} refs/tags/v9.9.9 {_ZERO}"), id="tag-carve-out"),
+    pytest.param(_D, lambda repo, flow: "", id="finding-1-empty-stdin-has-nothing-to-gate"),
+])
+# fmt: on
+def test_the_gate_allows(repo: PushRepo, flow: Gitflow, scenario: Scenario) -> None:
+    decision = _decide(scenario(repo, flow), repo, flow)
+    assert decision.allowed, decision.message
+
+
+_WORK = "{prefix}<M.m.p>"
+_PR_TO_INTEGRATION = ["gh", "pr", "create", "--base", "{integration}", "--head", _WORK]
+_PR_TO_PRINCIPAL = ["gh", "pr", "create", "--base", "{principal}", "--head", "{integration}"]
+
+
+def _birth_fix(tip: str, role: str) -> list[str]:
+    return ["git", "-C", "/repo", "push", "origin", f"refs/remotes/origin/{{{tip}}}:refs/heads/{{{role}}}"]
+
+
+# fmt: off
+@pytest.mark.parametrize(("flow", "scenario", "named", "fix"), [
+    pytest.param(_D, lambda r, f: _line(f.integration, remote_sha=_B), "'{integration}'", _PR_TO_INTEGRATION, id="default-integration-is-PR-only"),
+    pytest.param(_C, lambda r, f: _line(f.integration, remote_sha=_B), "'{integration}'", _PR_TO_INTEGRATION, id="custom-integration-is-PR-only"),
+    pytest.param(_D, lambda r, f: _line(f.principal, remote_sha=_B), "'{principal}'", _PR_TO_PRINCIPAL, id="default-principal-is-PR-only"),
+    pytest.param(_C, lambda r, f: _line(f.principal, remote_sha=_B), "'{principal}'", _PR_TO_PRINCIPAL, id="custom-principal-is-PR-only"),
+    pytest.param(_D, _birth_with_commit("principal", "integration"), "", _birth_fix("integration", "principal"), id="default-M2-principal-birth-carrying-a-commit"),
+    pytest.param(_C, _birth_with_commit("principal", "integration"), "", _birth_fix("integration", "principal"), id="custom-M2-principal-birth-carrying-a-commit"),
+    pytest.param(_D, _birth_with_commit("integration", "principal"), "", _birth_fix("principal", "integration"), id="default-M2-integration-birth-carrying-a-commit"),
+    pytest.param(_C, _birth_with_commit("integration", "principal"), "", _birth_fix("principal", "integration"), id="custom-M2-integration-birth-carrying-a-commit"),
+    pytest.param(_D, _existing_principal, "", None, id="an-existing-principal-is-never-a-birth"),
+    pytest.param(_C, lambda r, f: _line("work/0.0.1", "work/0.0.2"), "refs/heads/work/0.0.2",
+                 ["git", "-C", "/repo", "branch", "-m", "work/0.0.1", "work/0.0.2"], id="finding-2-work-branch-to-a-foreign-remote-ref"),
+    pytest.param(_C, _feature_to_published_integration, "", None, id="finding-2-work-branch-to-the-integration-ref"),
+    pytest.param(_C, lambda r, f: f"HEAD {_A} refs/heads/work/0.0.1 {_ZERO}", "",
+                 ["git", "-C", "/repo", "switch", "-c", "work/<M.m.p>", _A], id="finding-6-detached-head-cuts-the-work-branch"),
+    pytest.param(_D, lambda r, f: "this line has three fields", "--no-verify", None, id="finding-1-malformed-stdin-fails-closed"),
+])
+# fmt: on
+def test_the_gate_refuses_with_the_configured_fix(
+    repo: PushRepo, flow: Gitflow, scenario: Scenario, named: str, fix: list[str] | None
+) -> None:
+    """Each refusal names the configured branches; its fix is one command, no `&&` (PowerShell 5.1 has none)."""
+    names = {"principal": flow.principal, "integration": flow.integration, "prefix": flow.work_prefix}
+    decision = _decide(scenario(repo, flow), repo, flow)
     assert not decision.allowed
-    assert _fix(decision) == ["git", "-C", "/repo", "switch", "-c", "work/<M.m.p>", _SHA_A]
+    assert named.format(**names) in decision.message
+    assert fix is None or _fix(decision) == [part.format(**names) for part in fix]
 
 
-def test_an_outside_ref_is_carried_onto_the_live_work_branch(repo: PushRepo) -> None:
-    """Review 5 M2: the live work branch exists and may have diverged from the refused ref
-    — a fast-forward cannot carry it; the fix switches to the work branch and the text
-    names the merge (append-only, never a rebase)."""
-    decision = check_branch_policy(
-        _push("topic"), _CUSTOM, replace(gate_fixes(), work="work/1.2.3", cut=True)
-    )
+# fmt: off
+@pytest.mark.parametrize(("flow", "branch"), [
+    *[pytest.param(f, n, id=f"{i}-{n}") for f, i in ((_D, "default"), (_C, "custom"))
+      for n in ("bugfix/x", "hotfix/0.6.1", f"{f.work_prefix}v0.0.0", f"{f.work_prefix}0.6")],
+    *[pytest.param(_D, n, id=f"default-no-role-{n}") for n in ("feature/0.6.0-rc1", "Main", "developp", "release/0.6.0", "chore/cleanup")],
+    pytest.param(_C, "feature/0.0.0", id="custom-default-work-name-is-ordinary"),
+    pytest.param(_C, "main", id="custom-default-principal-name-is-ordinary"),
+])
+# fmt: on
+def test_a_branch_outside_the_gitflow_is_refused_naming_the_work_branch(
+    repo: PushRepo, flow: Gitflow, branch: str
+) -> None:
+    """AC6.1/AC6.5: a name that is not exactly the principal, the integration or prefix + M.m.p has no role.
+
+    The fix is one command from any cwd carrying the refused commit (review H-C).
+    """
+    decision = _decide(_line(branch), repo, flow)
+    assert not decision.allowed
+    assert "outside the gitflow" in decision.message
+    assert all(word in decision.message for word in (branch, flow.principal, flow.integration, flow.work_prefix))
+    assert _fix(decision) == ["git", "-C", "/repo", "switch", "-c", f"{flow.work_prefix}<M.m.p>", _A]
+
+
+def test_an_outside_ref_is_carried_onto_the_live_work_branch() -> None:
+    """Review 5 M2: the live work branch may have diverged — switch to it and merge (append-only, never a rebase)."""
+    refs = parse_push_stdin(_line("topic"))[0]
+    decision = check_branch_policy(refs, _CUSTOM, replace(gate_fixes(), work="work/1.2.3", cut=True))
     assert decision is not None and "'work/1.2.3'" in decision.message
-    assert f"merge {_SHA_A}" in decision.message
+    assert f"merge {_A}" in decision.message
     assert _fix(decision) == ["git", "-C", "/repo", "switch", "work/1.2.3"]
