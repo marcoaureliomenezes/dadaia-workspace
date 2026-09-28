@@ -1,26 +1,11 @@
 """``--redact`` output mode (SPEC v0.9.0 FR8a, T-090-07).
 
-Intent: CONTRACT — v0.9.0 A8.1, A8.3, A8.4; v0.11.0 A6.4, A6.5.
+Intent: CONTRACT — v0.9.0 A8.1, A8.3, A8.4; v0.11.0 A6.4, A6.5;
+sa-private-match-rendering-has-three-renderers#B4, #B5, #B6.
 
-Three layers are pinned here:
-
-0. ``dadaia_workspace.core.redaction`` — the stdlib-pure masking primitive extracted
-   from :class:`ContextRedactor` at v0.11.0 (FR6/ADR D1-a): word-boundary alternation,
-   longest-first ordering, stable first-appearance ordinal placeholders. Pinned
-   directly (not only through the CLI wrapper) since this is now the SAME primitive the
-   push-range denylist gate's own render boundary consumes.
-1. :class:`dadaia_workspace.cli.redact.ContextRedactor` in pure isolation (ordinal
-   assignment by first appearance, exclusion of the caller's own context, word-boundary
-   matching, JSON key-set preservation). Its assertions are UNCHANGED by the v0.11.0
-   extraction (A6.4) — the regression proof that the extraction was mechanical.
-2. The three operator-facing verbs (``dadaia doctor``, ``dadaia context list``,
-   ``dadaia context show``) wired to it, over a real ``CliRunner`` workspace: no foreign
-   Spec Context name or repo slug survives ``--redact`` in either table or ``--json``
-   rendering, including the doctor lines the SPEC calls out by name
-   (``PRESENCE-GC``/``[stale-presence]``, ``INV-4``, ``INV-5``).
-
-``tests/contract/test_cli_output_stability.py`` pins the companion property (A8.2):
-default output — no ``--redact`` flag — is unchanged.
+Three layers: ``core.redaction`` (the primitive the push gate's render boundary also consumes),
+:class:`ContextRedactor` in isolation, and the ``doctor``/``context list``/``context show`` verbs
+over a real workspace. ``tests/contract/test_cli_output_stability.py`` pins A8.2 (no flag, no change).
 """
 
 from __future__ import annotations
@@ -43,60 +28,26 @@ pytestmark = pytest.mark.unit
 _runner = CliRunner()
 
 
-# ---------------------------------------------------------------------------
-# Layer 0 — core/redaction.py, the extracted primitive (v0.11.0 A6.4/A6.5), in pure
-# isolation: no CLI, no filesystem, no I/O of any kind.
-# ---------------------------------------------------------------------------
-
-
-def test_compile_candidates_returns_none_for_no_candidates() -> None:
+# fmt: off
+@pytest.mark.parametrize(("candidates", "fmt", "text", "expected"), [
+    pytest.param(["foo", "bar"], "[X-{n}]", "bar foo bar", "[X-1] [X-2] [X-1]", id="ordinal-by-first-appearance"),
+    pytest.param(["dadaia"], "[X-{n}]", "dadaia-workspace lives at dadaia.", "dadaia-workspace lives at [X-1].", id="word-boundary"),
+    pytest.param(["term"], "<<masked-{n}>>", "term appears", "<<masked-1>> appears", id="placeholder-is-the-callers"),
+    pytest.param([], "[X-{n}]", "nothing to mask", "nothing to mask", id="inactive-with-no-candidates"),
+])
+# fmt: on
+def test_core_redactor_masks_by_word_with_stable_ordinals(candidates: list[str], fmt: str, text: str, expected: str) -> None:
     """sa-private-match-rendering-has-three-renderers#B6."""
-    assert compile_candidates([]) is None
+    redactor = Redactor(candidates, placeholder_fmt=fmt)
+    assert redactor.mask(text) == expected
+    assert redactor.active is bool(candidates)
+
+
+def test_compile_candidates_orders_longest_first_and_drops_empties() -> None:
+    """sa-private-match-rendering-has-three-renderers#B6."""
     assert compile_candidates(["", ""]) is None
-
-
-def test_compile_candidates_orders_longest_first() -> None:
-    """sa-private-match-rendering-has-three-renderers#B6."""
     pattern = compile_candidates(["ab", "abcdef", "abc"])
-    assert pattern is not None
-    match = pattern.match("abcdef")
-    assert match is not None
-    assert match.group(0) == "abcdef"
-
-
-def test_redactor_ordinal_by_first_appearance() -> None:
-    """sa-private-match-rendering-has-three-renderers#B6: The same property A8.3 pins through :class:`ContextRedactor`, asserted directly
-    against the extracted primitive."""
-    redactor = Redactor(["foo", "bar"], placeholder_fmt="[X-{n}]")
-    assert redactor.mask("bar foo bar") == "[X-1] [X-2] [X-1]"
-
-
-def test_redactor_inactive_with_no_candidates_returns_value_unchanged() -> None:
-    """sa-private-match-rendering-has-three-renderers#B6."""
-    redactor = Redactor([], placeholder_fmt="[X-{n}]")
-    assert redactor.active is False
-    assert redactor.mask("nothing to mask here") == "nothing to mask here"
-
-
-def test_core_redactor_word_boundary_does_not_partially_match_longer_string() -> None:
-    """sa-private-match-rendering-has-three-renderers#B6."""
-    redactor = Redactor(["dadaia"], placeholder_fmt="[X-{n}]")
-    assert redactor.mask("dadaia-workspace lives at dadaia.") == (
-        "dadaia-workspace lives at [X-1]."
-    )
-
-
-def test_redactor_placeholder_format_is_caller_controlled() -> None:
-    """sa-private-match-rendering-has-three-renderers#B6: Two independent :class:`Redactor` instances with different placeholder formats
-    (e.g. the CLI's ``[REDACTED-CONTEXT-n]`` vs a future gate-renderer format) never
-    collide — the format string is entirely the caller's own."""
-    redactor = Redactor(["term"], placeholder_fmt="<<masked-{n}>>")
-    assert redactor.mask("term appears") == "<<masked-1>> appears"
-
-
-# ---------------------------------------------------------------------------
-# Layer 1 — ContextRedactor, pure unit tests (no CLI, no filesystem).
-# ---------------------------------------------------------------------------
+    assert pattern is not None and pattern.match("abcdef").group(0) == "abcdef"  # type: ignore[union-attr]
 
 
 def test_redactor_ordinal_by_first_appearance_and_caller_exclusion() -> None:
@@ -131,11 +82,6 @@ def test_redactor_json_value_preserves_key_set_and_non_string_leaves() -> None:
     assert redacted["list"] == ["[REDACTED-CONTEXT-1]", 1, None]
     # Round-trips through json.dumps/json.loads without error (still valid JSON).
     assert json.loads(json.dumps(redacted)) == redacted
-
-
-# ---------------------------------------------------------------------------
-# Layer 2 — CLI wiring, real workspace via CliRunner.
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture
@@ -189,103 +135,32 @@ def _ctx_row(
     }
 
 
-def test_context_list_redact_json_same_key_set_and_masks_foreign(
-    workspace: Path, monkeypatch
+# fmt: off
+@pytest.mark.parametrize(("args", "hidden", "shown"), [
+    pytest.param(["context", "list", "--json"], ["foreign-one", "foreign-two"], ["caller-ctx", "[REDACTED-CONTEXT-"], id="A8.1-list-json"),
+    pytest.param(["context", "list"], ["foreign-one", "foreign-two"], ["caller-ctx", "[REDACTED-CONTEXT-"], id="A8.1-list-table"),
+    pytest.param(["context", "show", "foreign-one", "--json"], ["foreign-one"], ['"name": "[REDACTED-CONTEXT-1]"', '"main_repo": "[REDACTED-CONTEXT-1]"'], id="A8.1-show-foreign-json"),
+    pytest.param(["context", "show", "foreign-one"], ["foreign-one"], ["[REDACTED-CONTEXT-"], id="A8.1-show-foreign-table"),
+    pytest.param(["context", "show", "caller-ctx"], ["[REDACTED-CONTEXT-"], ["caller-ctx"], id="show-own-stays-visible"),
+])
+# fmt: on
+def test_context_verbs_redact_every_foreign_name_and_keep_the_callers(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch, args: list[str], hidden: list[str], shown: list[str]
 ) -> None:
-    """sa-private-match-rendering-has-three-renderers#B4 sa-private-match-rendering-has-three-renderers#B5: A8.1/A8.4: `context list --redact --json` stays valid JSON with the same key
-    set per row; only foreign name/repo_slug values are masked."""
-    _write_contexts(
-        workspace,
-        [
-            _ctx_row("caller-ctx"),
-            _ctx_row("foreign-one"),
-            _ctx_row("foreign-two"),
-        ],
-    )
+    """sa-private-match-rendering-has-three-renderers#B4 #B5: A8.1 a context other than the caller's is masked
+    however it is reached; A8.4 `--json` keeps each row's key set and stays valid JSON."""
+    _write_contexts(workspace, [_ctx_row("caller-ctx"), _ctx_row("foreign-one"), _ctx_row("foreign-two")])
     monkeypatch.setenv("DADAIA_CONTEXT", "caller-ctx")
 
-    plain = _runner.invoke(app, ["context", "list", "--json"])
-    assert plain.exit_code == 0, plain.output
-    plain_rows = json.loads(plain.stdout)
+    result = _runner.invoke(app, [*args, "--redact"])
 
-    result = _runner.invoke(app, ["context", "list", "--redact", "--json"])
     assert result.exit_code == 0, result.output
-    rows = json.loads(result.stdout)
-
-    assert len(rows) == len(plain_rows) == 3
-    for row in rows:
-        assert set(row.keys()) == set(plain_rows[0].keys())
-    names = {row["name"] for row in rows}
-    assert "caller-ctx" in names
-    assert "foreign-one" not in names
-    assert "foreign-two" not in names
-    assert any(n.startswith("[REDACTED-CONTEXT-") for n in names)
-
-
-def test_context_list_redact_table_masks_foreign_names(workspace: Path, monkeypatch) -> None:
-    """sa-private-match-rendering-has-three-renderers#B4 sa-private-match-rendering-has-three-renderers#B5."""
-    _write_contexts(
-        workspace,
-        [
-            _ctx_row("caller-ctx"),
-            _ctx_row("foreign-one"),
-        ],
-    )
-    monkeypatch.setenv("DADAIA_CONTEXT", "caller-ctx")
-
-    result = _runner.invoke(app, ["context", "list", "--redact"])
-    assert result.exit_code == 0, result.output
-    assert "foreign-one" not in result.output
-    assert "caller-ctx" in result.output
-    assert "[REDACTED-CONTEXT-" in result.output
-
-
-def test_context_show_redact_masks_explicit_foreign_context(workspace: Path, monkeypatch) -> None:
-    """sa-private-match-rendering-has-three-renderers#B4 sa-private-match-rendering-has-three-renderers#B5: A8.1: showing a context OTHER than the caller's own, with --redact, masks
-    that context's own name/slug too (it is "other than the caller's resolved
-    context" regardless of how it was reached)."""
-    _write_contexts(
-        workspace,
-        [
-            _ctx_row("caller-ctx"),
-            _ctx_row("foreign-target"),
-        ],
-    )
-    monkeypatch.setenv("DADAIA_CONTEXT", "caller-ctx")
-
-    result = _runner.invoke(app, ["context", "show", "foreign-target", "--redact"])
-    assert result.exit_code == 0, result.output
-    assert "foreign-target" not in result.output
-    assert "[REDACTED-CONTEXT-" in result.output
-
-    json_result = _runner.invoke(app, ["context", "show", "foreign-target", "--redact", "--json"])
-    assert json_result.exit_code == 0, json_result.output
-    data = json.loads(json_result.stdout)
-    plain_json = json.loads(
-        _runner.invoke(app, ["context", "show", "foreign-target", "--json"]).stdout
-    )
-    assert set(data.keys()) == set(plain_json.keys())
-    assert data["name"] == "[REDACTED-CONTEXT-1]"
-    assert data["main_repo"] == "[REDACTED-CONTEXT-1]"
-
-
-def test_context_show_redact_keeps_callers_own_context_visible(
-    workspace: Path, monkeypatch
-) -> None:
-    """sa-private-match-rendering-has-three-renderers#B5."""
-    _write_contexts(
-        workspace,
-        [
-            _ctx_row("caller-ctx"),
-            _ctx_row("foreign-other"),
-        ],
-    )
-    monkeypatch.setenv("DADAIA_CONTEXT", "caller-ctx")
-
-    result = _runner.invoke(app, ["context", "show", "caller-ctx", "--redact"])
-    assert result.exit_code == 0, result.output
-    assert "caller-ctx" in result.output
-    assert "[REDACTED-CONTEXT-" not in result.output
+    assert not [h for h in hidden if h in result.stdout]
+    assert all(s in result.stdout for s in shown)
+    if "--json" in args:
+        plain, masked = json.loads(_runner.invoke(app, args).stdout), json.loads(result.stdout)
+        keys = lambda v: [sorted(r) for r in v] if isinstance(v, list) else sorted(v)  # noqa: E731
+        assert keys(masked) == keys(plain)
 
 
 def test_doctor_redact_masks_an_associated_slug_like_context_list(workspace: Path) -> None:
