@@ -29,7 +29,7 @@ tests. `Δ` = prod/test lines; PLAN §2.7 ceilings stop a task, never rise.
 ### W2 — consolidations (FR3)
 
 - [x] **T-050-49 — `release.py check` (30).** `W:` `f/specs/`, `core/` · `blocked by:` T-050-45, T-050-58 · `delivers:` one live release; one release-id grammar (`sa-release-id-has-three-grammars`) · `RED:` PLAN §2 WP-30 · Δ −105/−100.
-- [x] **T-050-50 — Certify walks the workspace (31).** `W:` `f/{certification,reconcile}/`, recipe · `blocked by:` T-050-40, T-050-70..74 · `delivers:` AC3.2; certify children fenced (`sa-certify-children-resolve-the-live-workspace`); one finding shape (`sa-doctor-finding-has-four-shapes`) · `RED:` PLAN §2 WP-31 · Δ −126/+116.
+- [-] **T-050-50 — Certify walks the workspace (31).** `W:` `f/{certification,reconcile}/`, recipe · `blocked by:` T-050-40, T-050-70..74 · `delivers:` AC3.2; certify children fenced (`sa-certify-children-resolve-the-live-workspace`); one finding shape (`sa-doctor-finding-has-four-shapes`) · `RED:` PLAN §2 WP-31 · Δ −126/+116.
 - [ ] **T-050-52 — Subjects in the doctor (35).** `W:` backlog `scripts/`, `f/backlog/`, `core/models/backlog.py` · `blocked by:` T-050-44 · `delivers:` no circular RESOLVED · `RED:` PLAN §2 WP-35 · Δ −25/+39.
 
 ### W3 — design debt (FR4)
