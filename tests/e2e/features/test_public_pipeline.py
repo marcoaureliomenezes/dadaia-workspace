@@ -18,7 +18,6 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app as cli_app
-from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from tests.helpers.harness_profile import register_all
 from tests.helpers.scan_population import assert_populated
@@ -495,11 +494,11 @@ class TestPerProfileInit:
         _assert_profile_doctor_green(ws, monkeypatch)
 
 
-class TestSymlinkTargetDoctor:
-    """SYMLINK-TARGET-1 — the ledger-driven replacement for the retired per-harness
-    byte-drift classes.
+class TestLinkViewDoctor:
+    """A broken harness view of the authored set is one ``[drift]`` line of the rule table.
 
-    Intent: CONTRACT — 0.4.7 AC3.1/AC3.2 (T-047-57). Size: LARGE (real projection I/O).
+    Intent: CONTRACT — 0.4.7 AC3.1/AC3.2 (T-047-57); §4a-7 (the rule table's
+    ``_doctor_link`` is the one judge). Size: LARGE (real projection I/O).
     """
 
     @staticmethod
@@ -511,11 +510,10 @@ class TestSymlinkTargetDoctor:
         assert entry is not None, "install produced no .claude/skills symlink to break"
         return entry
 
-    def test_retargeted_symlink_is_one_error_with_a_fix_line(
+    def test_retargeted_symlink_is_one_whole_drift_line_and_exit_1(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """sa-rich-printer-wraps-fix-lines#S3: through the CLI `public doctor` on a
-        non-TTY with a 61-character root, the error and its fix line are whole lines."""
+        """Through the CLI `public doctor` on a non-TTY with a 61-character root."""
         workspace = tmp_path / ("w" * max(1, 61 - len(str(tmp_path)) - 1))
         mgr = _manager()
         register_all(workspace)
@@ -531,17 +529,15 @@ class TestSymlinkTargetDoctor:
         monkeypatch.chdir(workspace)
         monkeypatch.delenv("COLUMNS", raising=False)
         assert len(str(workspace)) >= 61
-        report = _runner.invoke(cli_app, ["public", "doctor"]).output.splitlines()
+        result = _runner.invoke(cli_app, ["public", "doctor"])
 
-        findings = [line for line in report if "SYMLINK-TARGET-1" in line]
-        assert findings == [
-            f"[error] SYMLINK-TARGET-1 .claude/skills/{entry.name}: "
-            f"symlink target '{foreign}' is not the canonical "
-            f"'../../.agents/skills/{entry.name}'"
-        ], "\n".join(report)
-        assert f"[info] fix: {fix_line(workspace, 'public', 'install', '--force')}" in report
+        assert result.exit_code == 1
+        assert [line for line in result.output.splitlines() if "[drift]" in line] == [
+            f"[drift] claude:skills/{entry.name} (symlink target '{foreign}' is not the "
+            f"canonical '../../.agents/skills/{entry.name}')"
+        ], result.output
 
-    def test_symlink_replaced_by_a_drifted_copy_is_an_error(self, tmp_path: Path) -> None:
+    def test_symlink_replaced_by_a_drifted_copy_is_drift(self, tmp_path: Path) -> None:
         workspace = tmp_path / "ws"
         mgr = _manager()
         register_all(workspace)
@@ -560,18 +556,6 @@ class TestSymlinkTargetDoctor:
 
         report = [line.render() for line in mgr.doctor(workspace)]
 
-        assert [line for line in report if "SYMLINK-TARGET-1" in line] == [
-            f"[error] SYMLINK-TARGET-1 .claude/skills/{entry.name}: copy diverged at SKILL.md"
+        assert [line for line in report if line.startswith("[drift]")] == [
+            f"[drift] claude:skills/{entry.name} (copy diverged at SKILL.md)"
         ], "\n".join(report)
-
-    def test_clean_install_attests_the_class(self, tmp_path: Path) -> None:
-        workspace = tmp_path / "ws"
-        mgr = _manager()
-        register_all(workspace)
-        mgr.install(workspace, force=True)
-
-        report = [line.render() for line in mgr.doctor(workspace)]
-
-        attestation = [line for line in report if "symlink-target:" in line]
-        assert len(attestation) == 1 and attestation[0].startswith("[ok] ")
-        assert not [line for line in report if "SYMLINK-TARGET-1" in line]

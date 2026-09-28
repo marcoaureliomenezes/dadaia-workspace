@@ -4,7 +4,7 @@ K3 (v0.5.1): install/doctor are now two folds over one ``ProjectionRule`` table
 (``infrastructure/projection_rules.py``) — ``install`` writes ``render``, ``doctor``
 compares against it. What remains here is genuinely bespoke: staging, plan
 resolution, install-ledger reconciliation, and the harness-independent
-doctor checks (privacy, entities-derivation, memory-phase, symlink-target).
+doctor checks (privacy, entities-derivation, memory-phase).
 """
 
 from __future__ import annotations
@@ -15,7 +15,6 @@ from pathlib import Path
 
 from dadaia_workspace.core.agent_model_templates import CORE_AGENTS, resolve_agent_model
 from dadaia_workspace.core.atomic_write import atomic_write
-from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.harness_registry import (
     HARNESS_PROJECTION_DIRS,
@@ -48,7 +47,6 @@ from dadaia_workspace.infrastructure.projection import (
     Transcript,
     doctor_rules,
     install_rules,
-    link_entry_defect,
 )
 from dadaia_workspace.infrastructure.projection_rules import (
     harness_checks,
@@ -494,7 +492,6 @@ class FileSystemPublicAssetManager:
         # dir, not a runtime projection.
         reports.extend(check_agent_skill_refs(self._public_dir))
         reports.extend(check_memory_phase_single_source(self._public_dir))
-        reports.extend(attest("symlink-target", self._check_symlink_targets(workspace_root)))
         reports.extend(attest("public-privacy", self._check_public_privacy()))
         reports.extend(attest("entities-derivation", check_entities_derivation(self._public_dir)))
 
@@ -523,46 +520,6 @@ class FileSystemPublicAssetManager:
         if _staged_bytes(src) != dst.read_bytes():
             return DoctorLine(DoctorStatus.DRIFT, f"{label}")
         return DoctorLine(DoctorStatus.OK, f"{label}")
-
-    def _check_symlink_targets(self, workspace_root: Path) -> list[DoctorLine]:
-        """SYMLINK-TARGET-1 — every ledgered harness view still points at the authored set.
-
-        One authored set (``.agents/skills/``, ``.agents/agents/``) with N harness
-        views replaced the per-harness byte-drift classes that used to compare a copy
-        of the law per harness dir. The install ledger is what makes the replacement
-        checkable: it records each entry's KIND, so a view that was installed as a
-        symlink and is now a plain file — or a dangling link, or a link retargeted at
-        a foreign path, or a fallback copy that drifted — is nameable without
-        re-deriving the projection plan. ``file`` entries are ordinary projections,
-        already compared byte-wise by the rule table.
-        """
-        states_dir = workspace_root / ".dadaia" / "states"
-        ledger = self._install_ledger_store.read(states_dir)
-        if ledger is None:
-            return []
-        linked = [entry for entry in ledger.entries if entry.kind != "file"]
-        if not linked:
-            return []
-        out: list[DoctorLine] = []
-        for entry in sorted(linked, key=lambda e: e.relpath):
-            canonical = workspace_root / ".agents" / entry.relpath.partition("/")[2]
-            defect = link_entry_defect(workspace_root / entry.relpath, canonical)
-            if defect is not None:
-                out.append(
-                    DoctorLine(DoctorStatus.ERROR, f"SYMLINK-TARGET-1 {entry.relpath}: {defect}")
-                )
-        if out:
-            # The one repair for every SYMLINK-TARGET-1 finding: re-project the harness
-            # views onto the authored set.
-            repair = fix_line(workspace_root, "public", "install", "--force")
-            out.append(DoctorLine(DoctorStatus.INFO, f"fix: {repair}"))
-            return out
-        return [
-            DoctorLine(
-                DoctorStatus.OK,
-                f"symlink-target: {len(linked)} projected views resolve to the authored set",
-            )
-        ]
 
     def _check_public_privacy(self) -> list[DoctorLine]:
         """Fail doctor if public distributed assets contain known private identifiers."""

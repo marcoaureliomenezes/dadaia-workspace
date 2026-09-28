@@ -262,10 +262,7 @@ def link_entry_defect(entry: Path, canonical: Path) -> str | None:
 
     The ONE definition of "a correct view of the authored set": a symlink carrying the
     relative target of *canonical* and resolving to something that exists, or — on a
-    platform that refused the link — a copy equal to it byte for byte. The rule-table
-    compare (:func:`_doctor_link`) and the ledger-driven ``SYMLINK-TARGET-1`` sweep in
-    ``infrastructure/public_assets.py`` both read this, so a link entry cannot be
-    judged correct by one surface and broken by the other.
+    platform that refused the link — a copy equal to it byte for byte.
     """
     expected = _posix_relpath(canonical, entry.parent)
     if entry.is_symlink():
