@@ -60,7 +60,7 @@ Lanes: PLAN §2 FR10; files and lines: `AGGREGATE.md` §6.
 - [x] **T-050-80 — L2.14 hooks.** `W:` `hooks/ctx_inject.py` · `blocked by:` T-050-41, -44, -52 · `delivers:` §6 W2c · Δ −50.
 - [x] **T-050-81 — L3.1 table merges.** `W:` `tests/*/infrastructure/**`, git trio · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−2301.
 - [x] **T-050-82 — L3.2 table merges.** `W:` `tests/unit/core/**`, `tests/unit/test_*.py` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−1798.
-- [ ] **T-050-83 — L3.3 table merges.** `W:` `tests/unit/features/{specs,backlog}/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−1097.
+- [x] **T-050-83 — L3.3 table merges.** `W:` `tests/unit/features/{specs,backlog}/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−1097.
 - [x] **T-050-84 — L3.4 table merges.** `W:` `tests/unit/{hooks,skills,public}/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−1086.
 - [ ] **T-050-85 — L3.5 table merges.** `W:` other `tests/unit/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−3325.
 - [ ] **T-050-86 — L3.6 table merges.** `W:` `tests/contract/**` · `blocked by:` T-050-75..80 · `delivers:` §6 W3 · Δ 0/−4190.
