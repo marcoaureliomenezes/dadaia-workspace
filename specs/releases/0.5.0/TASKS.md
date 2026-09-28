@@ -21,14 +21,14 @@ tests. `Δ` = prod/test lines; PLAN §2.7 ceilings stop a task, never rise.
 - [x] **T-050-43 — Scripts own bug records and the seam (22, 23).** `W:` `core/`, `container.py`, `f/specs/`, `pub/skills/_shared/_privacy.py`, ledger `scripts/`, `pub/schemas/bugs/`, `i/public_assets.py`
   `blocked by:` T-050-40, T-050-70..74 · `delivers:` doctor = `bugs.py check`; seam ⇔ push · `RED:` PLAN §2 WP-22, WP-23 · Δ −700/−660.
 - [ ] **T-050-44 — Backlog status and pick (24).** `W:` `f/backlog/`, backlog `scripts/`, `_release_new.py`, law · `blocked by:` T-050-43, T-050-48, T-050-58 · `delivers:` exit without hand edit · `RED:` PLAN §2 WP-24 · Δ −80/−40.
-- [ ] **T-050-45 — `release.py ship` (25).** `W:` `dd-release-impl/scripts/`, `f/specs/`, releases law, RC-FLOW, gitflow · `blocked by:` T-050-70..74 · `delivers:` AC2.5 · `RED:` PLAN §2 WP-25 · Δ −40/−70.
+- [x] **T-050-45 — `release.py ship` (25).** `W:` `dd-release-impl/scripts/`, `f/specs/`, releases law, RC-FLOW, gitflow · `blocked by:` T-050-70..74 · `delivers:` AC2.5 · `RED:` PLAN §2 WP-25 · Δ −40/−70.
 - [ ] **T-050-46 — Status line; `measured_by` (26, 27).** `W:` `core/spec_status.py`, `f/specs/`, `pub/schemas/ADRs/`, `pub/scaffold/ADRs/` · `blocked by:` T-050-40, T-050-70..74 · `delivers:` one status token · `RED:` PLAN §2 WP-26, WP-27 · Δ −20/+50.
 - [ ] **T-050-47 — `specs_version.state` (28 †).** `W:` `core/specs_version.py`, `cli/commands/ci.py`, `f/{specs,migrate,workspace,chokepoints}/` · `blocked by:` T-050-40, T-050-70..74 · `delivers:` pre-push judges the pushed commit · `RED:` PLAN §2 WP-28 · Δ −34/+145.
 - [x] **T-050-48 — One atom grammar (29).** `W:` navigator `scripts/`, `f/specs/`, `i/ledger_scripts.py`, `pub/scaffold/memory/` · `blocked by:` T-050-40, T-050-70..74 · `delivers:` one verdict per atom · `RED:` PLAN §2 WP-29 · Δ −155/−10.
 
 ### W2 — consolidations (FR3)
 
-- [ ] **T-050-49 — `release.py check` (30).** `W:` `f/specs/`, `core/` · `blocked by:` T-050-45, T-050-58 · `delivers:` one live release; one release-id grammar (`sa-release-id-has-three-grammars`) · `RED:` PLAN §2 WP-30 · Δ −105/−100.
+- [x] **T-050-49 — `release.py check` (30).** `W:` `f/specs/`, `core/` · `blocked by:` T-050-45, T-050-58 · `delivers:` one live release; one release-id grammar (`sa-release-id-has-three-grammars`) · `RED:` PLAN §2 WP-30 · Δ −105/−100.
 - [x] **T-050-50 — Certify walks the workspace (31).** `W:` `f/{certification,reconcile}/`, recipe · `blocked by:` T-050-40, T-050-70..74 · `delivers:` AC3.2; certify children fenced (`sa-certify-children-resolve-the-live-workspace`); one finding shape (`sa-doctor-finding-has-four-shapes`) · `RED:` PLAN §2 WP-31 · Δ −126/+116.
 - [ ] **T-050-52 — Subjects in the doctor (35).** `W:` backlog `scripts/`, `f/backlog/`, `core/models/backlog.py` · `blocked by:` T-050-44 · `delivers:` no circular RESOLVED · `RED:` PLAN §2 WP-35 · Δ −25/+39.
 
