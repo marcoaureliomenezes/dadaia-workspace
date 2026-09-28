@@ -6,10 +6,7 @@ from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import PublicAssetError
-from dadaia_workspace.core.model_registry import (
-    ResolvedAgentModel,
-    codex_effort_for_claude_effort,
-)
+from dadaia_workspace.core.model_registry import ResolvedAgentModel, codex_effort_for_claude_effort
 from dadaia_workspace.infrastructure.public_assets_common import (
     _SCHEMA_VERSION,
     _package_version,
@@ -22,13 +19,7 @@ from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
 
 
 def persona_read_only(frontmatter: Mapping[str, object]) -> bool:
-    """Least privilege is the persona's ``read_only`` field (ADR 0016) — the ONE
-    derivation shared by the Claude render and the Codex TOML transcode.
-
-    Raises:
-        PublicAssetError: fail-closed — a persona declaring no ``read_only: true|false``
-            never renders on a silent privilege default.
-    """
+    """The persona's ``read_only`` field; fail-closed when not ``true``/``false``."""
     declared = frontmatter.get("read_only")
     if declared not in ("true", "false"):
         raise PublicAssetError(
@@ -42,13 +33,15 @@ def build_manifest(
     agentic_dir: Path,
     iter_files_fn: Callable[[Path], Iterable[Path]],
 ) -> dict[str, object]:
-    """Build the staging manifest dict from all files under *agentic_dir*."""
-    assets: list[dict[str, str]] = []
-    for path in iter_files_fn(agentic_dir):
-        if path.name == "manifest.json":
-            continue
-        rel = path.relative_to(agentic_dir).as_posix()
-        assets.append({"path": rel, "sha256": _sha256(path), "type": rel.split("/", 1)[0]})
+    """The staging manifest of every file under *agentic_dir*."""
+    rels = {
+        p: p.relative_to(agentic_dir).as_posix()
+        for p in iter_files_fn(agentic_dir)
+        if p.name != "manifest.json"
+    }
+    assets = [
+        {"path": r, "sha256": _sha256(p), "type": r.split("/", 1)[0]} for p, r in rels.items()
+    ]
     return {
         "schema_version": _SCHEMA_VERSION,
         "package_version": _package_version(),
@@ -57,22 +50,15 @@ def build_manifest(
 
 
 def render_claude_agent(staged_text: str, resolved: ResolvedAgentModel) -> str:
-    """Compose a staged generic agent body + its resolved policy (the D-6 seam).
+    """A staged agent with derived frontmatter lines replaced by its resolved policy, last.
 
-    The SINGLE injection point shared by install-write and doctor-compare
-    Apply: any pre-existing top-level ``model:``/``effort:`` frontmatter lines are
-    stripped (pack bodies author ``model:`` as their pack default — D-5), then the
-    resolved ``model:`` and ``effort:`` are appended deterministically as the LAST
-    lines of the frontmatter block. ``effort:`` is OMITTED entirely when unresolved
-    (F-6 — never empty or placeholder), keeping render output
-    deterministic for the doctor render-compare.
+    ``effort:`` is omitted when unresolved — never empty.
     """
     frontmatter, rest = _split_frontmatter(staged_text)
     derived = ("model:", "effort:", "permissionMode:", "disallowedTools:")
     kept = [line for line in frontmatter.splitlines() if not line.startswith(derived)]
     if persona_read_only(_parse_agent_frontmatter(staged_text)):
-        kept.append("permissionMode: default")
-        kept.append("disallowedTools: [Edit, Write, NotebookEdit]")
+        kept += ["permissionMode: default", "disallowedTools: [Edit, Write, NotebookEdit]"]
     else:
         kept.append("permissionMode: acceptEdits")
     kept.append(f"model: {resolved.model}")
@@ -86,15 +72,9 @@ def resolve_codex_agent_model(
     staged_model: object,
     resolved: ResolvedAgentModel | None,
 ) -> tuple[str, str]:
-    """Resolve the ``(claude_model, reasoning_effort)`` of one persona render (Codex's
-    TOML; Claude's refusal of a persona with no model) — the one effort authority.
+    """``(model, reasoning_effort)``: resolved policy, else the authored ``model:``, else refuse.
 
-    Precedence: resolved policy (core agents + installed pack agents) > staged
-    authored ``model:``; neither refuses — for every persona, core or not. The effort
-    is the D-3 clamp of the policy effort, else ``medium``.
-
-    Raises:
-        PublicAssetError: fail-closed — no persona renders on a silent default model.
+    The effort is the clamped policy effort, else ``medium``.
     """
     effort = resolved.effort if resolved is not None else None
     codex_effort = codex_effort_for_claude_effort(effort) if effort is not None else "medium"
