@@ -408,8 +408,7 @@ def _duplicate_definitions(sources: dict[str, str]) -> set[str]:
 
 #: V37 allowance, born 2026-09-27 at 65: each duplicate, keyed to the open bug deleting it.
 _V37_BIRTH = 65
-_V37_ALLOWANCE: dict[str, str] = {
-}
+_V37_ALLOWANCE: dict[str, str] = {}
 
 
 def test_v37_one_home_per_definition() -> None:
