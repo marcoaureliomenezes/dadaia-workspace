@@ -65,7 +65,7 @@ class LedgerScript:
     @property
     def invocation(self) -> str:
         """The `fix:` spelling — the installed path, run through the interpreter."""
-        return script_line(None, f".agents/skills/{self.skill}/scripts/{self.filename}")
+        return script_line(f".agents/skills/{self.skill}/scripts/{self.filename}")
 
 
 #: One row per ledger script (0.4.7 FR2's table). A new ledger is a row, never a branch.

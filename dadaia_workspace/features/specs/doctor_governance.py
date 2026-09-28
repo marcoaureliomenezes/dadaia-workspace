@@ -155,7 +155,7 @@ class GovernanceValidator:
                             f"bugs/BUGS.jsonl record {record.id!r} has been terminal "
                             f"({record.status!r}) since {record.closed_at} — past the "
                             f"{BUG_ARCHIVE_THRESHOLD_DAYS}-day archive threshold; run "
-                            f"'{script_line(None, BUGS_SCRIPT, 'archive')}' (SPEC-DOC-041, WARNING — never a "
+                            f"'{script_line(BUGS_SCRIPT, 'archive')}' (SPEC-DOC-041, WARNING — never a "
                             "block, D15)."
                         ),
                         path=str(ledger_path),

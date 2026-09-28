@@ -22,10 +22,15 @@ def fix_line(root: PurePath | None, *argv: str) -> str:
     return venv_line(root, "dadaia", *argv)
 
 
-def script_line(root: PurePath | None, script: str, *argv: str) -> str:
-    """A workspace skill script run by the venv interpreter, both paths absolute."""
-    base = root if root is not None else Path(sys.prefix).parents[1]
-    return venv_line(base, "python", str(base / script), *argv)
+#: The skills this package ships — present wherever the running CLI is installed.
+_SHIPPED_SKILLS = Path(__file__).resolve().parents[1] / "public" / "skills"
+
+
+def script_line(script: str, *argv: str) -> str:
+    """A skill script (its ``.agents/skills/…`` path) run from the copy the running CLI
+    ships, by the running interpreter — both absolute, true in any venv (pipx, poetry)."""
+    shipped = _SHIPPED_SKILLS / PurePath(script).relative_to(".agents/skills")
+    return venv_line(None, "python", str(shipped), *argv)
 
 
 def venv_line(root: PurePath | None, tool: str, *argv: str) -> str:

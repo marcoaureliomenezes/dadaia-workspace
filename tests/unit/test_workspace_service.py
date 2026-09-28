@@ -69,7 +69,10 @@ def test_init_skip_assets_writes_no_settings_and_says_ungated(
     Under ``--skip-assets`` the ungated state is loud instead of silently half-wired."""
     _, installed = service.init(workspace_root, harnesses=("claude", "codex"), skip_assets=True)
     assert not (workspace_root / ".claude" / "settings.json").exists()
-    assert any("ungated" in line and "dadaia public install" in line for line in installed)
+    from dadaia_workspace.core.platform import PLATFORM
+
+    cli = f".dadaia/.venv/{PLATFORM.venv_scripts_dir}/dadaia{PLATFORM.venv_exe_suffix}"
+    assert any("ungated" in ln and f"{cli} public install" in ln for ln in installed), installed
 
 
 def test_init_with_assets_never_writes_settings_itself(

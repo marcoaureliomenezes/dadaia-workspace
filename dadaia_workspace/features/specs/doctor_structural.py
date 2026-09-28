@@ -144,7 +144,7 @@ class StructuralValidator:
                     description=(
                         f"memory/{rel_path} is missing — required memory .md atom. "
                         f"Author it, then regenerate the pair with "
-                        f"`{script_line(None, MEMORY_SCRIPT)} catalog generate`."
+                        f"`{script_line(MEMORY_SCRIPT)} catalog generate`."
                     ),
                     path=str(target),
                     fixable=False,

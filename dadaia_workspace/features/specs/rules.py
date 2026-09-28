@@ -153,7 +153,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("CAT-1",),
         lambda d: d._memory.check_cat1_catalog_sync(),
-        fix_help=f"{script_line(None, MEMORY_SCRIPT)} catalog generate --specs <specs>",
+        fix_help=f"{script_line(MEMORY_SCRIPT)} catalog generate --specs <specs>",
     ),
     _rule(
         ("LINT-1",),
@@ -222,7 +222,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-033",),
         lambda d: d._governance.check_bugs_jsonl_invariant(),
-        fix_help=f"{script_line(None, BUGS_SCRIPT)} update <bug-id> --set <field>=<value>",
+        fix_help=f"{script_line(BUGS_SCRIPT)} update <bug-id> --set <field>=<value>",
     ),
     _rule(
         ("SPEC-DOC-034",),
@@ -234,14 +234,14 @@ RULES: tuple[SpecsRule, ...] = (
         ("SPEC-DOC-035",),
         lambda d: d._governance.check_unarchived_terminal_backlog(),
         fix_help=(
-            f"{script_line(None, BACKLOG_SCRIPT)} exit <slug> --disposition <disposition> <--release id|--reason why>"
+            f"{script_line(BACKLOG_SCRIPT)} exit <slug> --disposition <disposition> <--release id|--reason why>"
         ),
     ),
     _rule(
         ("SPEC-DOC-036",),
         lambda d: d._closure_audit.check_audit_disposition(),
         fix_help=(
-            f"{script_line(None, AUDIT_SCRIPT)} disposition <audit> <finding-id> "
+            f"{script_line(AUDIT_SCRIPT)} disposition <audit> <finding-id> "
             "--disposition resolved --release <release>"
         ),
     ),
@@ -253,12 +253,12 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-038",),
         lambda d: d._closure_audit.check_loose_undisposed_audits(),
-        fix_help=f"{script_line(None, AUDIT_SCRIPT)} close <audit> --sha <sha>",
+        fix_help=f"{script_line(AUDIT_SCRIPT)} close <audit> --sha <sha>",
     ),
     _rule(
         ("SPEC-DOC-041",),
         lambda d: d._governance.check_bug_archive_overdue(),
-        fix_help=script_line(None, BUGS_SCRIPT, "archive"),
+        fix_help=script_line(BUGS_SCRIPT, "archive"),
     ),
     _rule(
         ("SPEC-DOC-047",),
@@ -289,9 +289,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("RELEASE-TREE-MEMORY",),
         lambda d: release_memory_issues(d.specs_dir),
-        fix_help=(
-            f"{script_line(None, RELEASE_SCRIPT)} memory --reviewed <slugs> --changed <slugs>"
-        ),
+        fix_help=(f"{script_line(RELEASE_SCRIPT)} memory --reviewed <slugs> --changed <slugs>"),
     ),
     _rule(
         ("SPEC-DOC-046",),

@@ -28,7 +28,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core import doctor_rules
-from dadaia_workspace.core.cli_line import fix_line, venv_line
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_stdin
@@ -392,9 +392,9 @@ _INSTALLED_PREFIX = ".agents/skills/"
 def _script_target(command: str) -> tuple[Path, str] | None:
     """The (shipped script, subcommand) a ``python3 …/scripts/x.py <verb>`` fix names."""
     tokens = command.split()
-    if tokens[0] != _VENV_PYTHON or _INSTALLED_PREFIX not in tokens[1]:
+    if tokens[0] != _VENV_PYTHON or not tokens[1].startswith(_SKILLS):
         return None
-    relative = tokens[1].split(_INSTALLED_PREFIX, 1)[1]
+    relative = tokens[1].removeprefix(_SKILLS)
     verb = next((token for token in tokens[2:] if not token.startswith(("-", "<"))), "")
     return _PUBLIC_SKILLS / relative, verb
 
@@ -422,9 +422,10 @@ _FIX_LINES = _fix_lines()
 #: CLI arm below, never as a file.
 _INSTALLED_SKILL_PREFIX = ".agents/skills/"
 _VENV_BINARY_PREFIX = ".dadaia/"
-#: ``script_line``'s two absolute heads: the venv interpreter and the workspace root.
-_VENV_PYTHON = shlex.split(venv_line(None, "python"))[0]
-_WORKSPACE = Path(sys.prefix).parents[1].as_posix() + "/"
+#: ``script_line``'s two absolute heads, as literals of the running environment: the
+#: interpreter running now and the skills this package ships (never a derived workspace).
+_VENV_PYTHON = Path(sys.executable).as_posix()
+_SKILLS = _PUBLIC_SKILLS.as_posix() + "/"
 
 _PLACEHOLDER_RE = re.compile(r"<[^>]*>")
 _FLAG_VALUE_RE = re.compile(r"^--[\w-]+=")
@@ -531,7 +532,9 @@ def _unresolved_paths(command: str) -> list[str]:
     a directory the specs canon guarantees."""
     unresolved: list[str] = []
     for raw in _command_tokens(command):
-        raw = raw.removeprefix(_WORKSPACE)
+        if raw == _VENV_PYTHON:
+            continue  # the running interpreter: an executable, not a repo path
+        raw = raw.removeprefix(_REPO_ROOT.as_posix() + "/")
         if raw.startswith(_VENV_BINARY_PREFIX):
             continue  # the venv-rooted binary is resolved by the CLI arm, not as a file
         token = _path_token(raw)
@@ -560,7 +563,8 @@ def test_the_bug_script_is_one_kernel_constant() -> None:
     from dadaia_workspace.core.kernel_tunables import BUGS_SCRIPT
 
     assert BUGS_SCRIPT == ".agents/skills/dd-bug-resolution/scripts/bugs.py"
-    assert dict(_FIX_LINES)["SPEC-DOC-041"] == f"{_VENV_PYTHON} {_WORKSPACE}{BUGS_SCRIPT} archive"
+    bugs = f"{_SKILLS}dd-bug-resolution/scripts/bugs.py"
+    assert dict(_FIX_LINES)["SPEC-DOC-041"] == f"{_VENV_PYTHON} {bugs} archive"
 
 
 @pytest.mark.parametrize(("codes", "command"), _FIX_LINES, ids=[c for c, _ in _FIX_LINES])

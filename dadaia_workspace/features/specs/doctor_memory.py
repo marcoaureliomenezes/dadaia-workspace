@@ -613,7 +613,7 @@ class MemoryValidator:
                         severity=Severity.WARNING,
                         description=f"catalog.json absent; {len(md_slugs)} feature .md "
                         f"atom{'s' if len(md_slugs) != 1 else ''} present; run "
-                        f"`{script_line(None, MEMORY_SCRIPT)} catalog generate` to create it.",
+                        f"`{script_line(MEMORY_SCRIPT)} catalog generate` to create it.",
                         path=str(catalog_path),
                     )
                 )
@@ -647,7 +647,7 @@ class MemoryValidator:
                     description=(
                         f"catalog.json lists slug '{slug}' but no corresponding "
                         f"'{slug}.md' exists in memory/product/. "
-                        f"Run `{script_line(None, MEMORY_SCRIPT)} catalog generate` to resync."
+                        f"Run `{script_line(MEMORY_SCRIPT)} catalog generate` to resync."
                     ),
                     path=str(product_dir / f"{slug}.md"),
                 )
@@ -662,7 +662,7 @@ class MemoryValidator:
                     description=(
                         f"'{slug}.md' exists in memory/product/ but is not listed in "
                         "catalog.json. "
-                        f"Run `{script_line(None, MEMORY_SCRIPT)} catalog generate` to resync."
+                        f"Run `{script_line(MEMORY_SCRIPT)} catalog generate` to resync."
                     ),
                     path=str(product_dir / f"{slug}.md"),
                 )

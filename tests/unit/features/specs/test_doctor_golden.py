@@ -34,14 +34,12 @@ import importlib
 import json
 import os
 import re
-import shlex
 import sys
 from datetime import date, datetime, tzinfo
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.cli_line import venv_line
 from dadaia_workspace.features.specs import SpecsDoctor, SpecsDoctorIssue
 
 pytestmark = pytest.mark.unit
@@ -128,6 +126,10 @@ class _FrozenDateTime(datetime):
         return _FROZEN_DATETIME.replace(tzinfo=tz)
 
 
+#: The skills the package ships: where script_line points on every machine.
+_SHIPPED_SKILLS = Path(__file__).resolve().parents[4] / "dadaia_workspace" / "public" / "skills"
+
+
 @pytest.fixture(autouse=True)
 def _frozen_clock(monkeypatch: pytest.MonkeyPatch) -> None:
     """Freeze ``date.today`` + ``datetime.now`` across every specs module that binds them."""
@@ -167,8 +169,8 @@ def _capture() -> tuple[list[SpecsDoctorIssue], str]:
         # shapes at this level, so anchoring is the only safe disambiguation.
         value = value.replace(str(_FIXTURE), "<SPECS>").replace(_FIXTURE.as_posix(), "<SPECS>")
         # A script fix is absolute (script_line): the machine's venv and root are not behavior.
-        value = value.replace(shlex.split(venv_line(None, "python"))[0], "<PYTHON>")
-        value = value.replace(Path(sys.prefix).parents[1].as_posix(), "<WORKSPACE>")
+        value = value.replace(Path(sys.executable).as_posix(), "<PYTHON>")
+        value = value.replace(_SHIPPED_SKILLS.as_posix(), "<SKILLS>")
         return re.sub(
             r"(?<=<SPECS>)(?:\\[^\s\"\\]+)+",
             lambda m: m.group(0).replace("\\", "/"),
