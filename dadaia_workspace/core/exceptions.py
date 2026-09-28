@@ -66,12 +66,7 @@ class GitSyncError(DadaiaError):
 
 
 class HandoffSchemaError(DadaiaError):
-    """Raised when the schema file itself is invalid or contains unsupported keywords.
-
-    Example: ``core.handoff_index._load_schema`` encounters 'oneOf' which is outside
-    the supported keyword subset. This forces conscious schema evolution decisions
-    rather than silent misses.
-    """
+    """Raised when the projected handoff schema file is missing or not valid JSON."""
 
 
 class HandoffValidationError(DadaiaError):

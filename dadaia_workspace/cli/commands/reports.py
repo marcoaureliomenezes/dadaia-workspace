@@ -127,7 +127,7 @@ def validate(
         filtered: list[ValidationResult] = []
         for r in results:
             if r.valid:
-                if Handoff.load(r.path).release_id == release:
+                if Handoff.load(r.path).raw.get("release_id") == release:
                     filtered.append(r)
             else:
                 filtered.append(r)
