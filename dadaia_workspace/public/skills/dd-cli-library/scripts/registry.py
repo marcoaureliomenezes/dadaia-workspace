@@ -60,7 +60,7 @@ def pid_alive(pid: int) -> bool:
     except ProcessLookupError:
         return False
     except PermissionError:
-        return True
+        pass
     return True
 
 
@@ -83,7 +83,11 @@ def base_port(project: str, lo: int, hi: int) -> int:
     return lo + int.from_bytes(digest[:2], "big") % (hi - lo + 1)
 
 
-def cmd_list(doc: dict[str, Any], args: argparse.Namespace) -> int:
+def save(path: Path, doc: dict[str, Any]) -> None:
+    replace(path, json.dumps(doc, indent=2) + "\n")
+
+
+def cmd_list(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> int:
     rows = [dict(e, status=status_of(e)) for e in doc["entries"]]
     if args.project:
         rows = [r for r in rows if r["project"] == args.project]
@@ -101,7 +105,7 @@ def cmd_list(doc: dict[str, Any], args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_next(doc: dict[str, Any], args: argparse.Namespace) -> int:
+def cmd_next(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> int:
     live = [e for e in doc["entries"] if not is_stale(e)]
     mine = [e for e in live if e["project"] == args.project]
     if mine:
@@ -134,7 +138,7 @@ def cmd_register(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> i
         if e["port"] == args.port:
             if e["project"] == args.project:
                 print(f"port {args.port} already registered for '{args.project}' -> {e['url']}")
-                replace(path, json.dumps(doc, indent=2) + "\n")
+                save(path, doc)
                 return 0
             print(
                 f"error: port {args.port} is registered by project '{e['project']}' ({e['url']})",
@@ -153,7 +157,7 @@ def cmd_register(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> i
         "description": args.description,
     }
     doc["entries"].append(entry)
-    replace(path, json.dumps(doc, indent=2) + "\n")
+    save(path, doc)
     print(f"port {args.port} registered for '{args.project}' -> {entry['url']}")
     return 0
 
@@ -171,16 +175,15 @@ def cmd_release(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> in
         (released if hit else keep).append(e)
     if args.port is not None and not released:
         owner = next((e["project"] for e in doc["entries"] if e["port"] == args.port), None)
-        if owner is None:
-            print(f"error: port {args.port} is not registered", file=sys.stderr)
-        else:
-            print(
-                f"error: port {args.port} belongs to project '{owner}', not '{args.project}'",
-                file=sys.stderr,
-            )
+        why = (
+            "is not registered"
+            if owner is None
+            else f"belongs to project '{owner}', not '{args.project}'"
+        )
+        print(f"error: port {args.port} {why}", file=sys.stderr)
         return 1
     doc["entries"] = keep
-    replace(path, json.dumps(doc, indent=2) + "\n")
+    save(path, doc)
     for e in released:
         print(f"released port {e['port']} ('{e['project']}')")
     if not released:
@@ -192,7 +195,7 @@ def cmd_clean(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> int:
     stale = [e for e in doc["entries"] if is_stale(e)]
     if not args.dry_run:
         doc["entries"] = [e for e in doc["entries"] if not is_stale(e)]
-        replace(path, json.dumps(doc, indent=2) + "\n")
+        save(path, doc)
     verb = "would remove" if args.dry_run else "removed"
     for e in stale:
         print(f"{verb}: port {e['port']} ('{e['project']}')")
@@ -245,30 +248,19 @@ def scan(doc: dict[str, Any], raw: str | None) -> list[dict[str, Any]]:
             continue
         cmdline, cwd = "", ""
         try:
-            cmdline = (
-                Path(f"/proc/{pid}/cmdline")
-                .read_bytes()
-                .replace(b"\0", b" ")
-                .decode(errors="replace")
-                .strip()[:200]
-            )
+            raw_cmd = Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\0", b" ")
+            cmdline = raw_cmd.decode(errors="replace").strip()[:200]
             cwd = os.readlink(f"/proc/{pid}/cwd")
         except OSError:
             pass
+        lan = bind in {"0.0.0.0", "::"}
         findings.append(
-            {
-                "port": port,
-                "bind": bind,
-                "pid": pid,
-                "cmdline": cmdline,
-                "cwd": cwd,
-                "lan_exposed": bind in {"0.0.0.0", "::"},
-            }
+            dict(port=port, bind=bind, pid=pid, cmdline=cmdline, cwd=cwd, lan_exposed=lan)
         )
     return sorted(findings, key=lambda f: f["port"])
 
 
-def cmd_scan(doc: dict[str, Any], args: argparse.Namespace) -> int:
+def cmd_scan(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> int:
     findings = scan(doc, _ss_output())
     if args.json:
         print(json.dumps(findings, indent=2))
@@ -319,18 +311,9 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     path = args.registry or find_registry(Path.cwd())
-    doc = load(path)
-    if args.verb == "list":
-        return cmd_list(doc, args)
-    if args.verb == "next":
-        return cmd_next(doc, args)
-    if args.verb == "register":
-        return cmd_register(doc, args, path)
-    if args.verb == "release":
-        return cmd_release(doc, args, path)
-    if args.verb == "clean":
-        return cmd_clean(doc, args, path)
-    return cmd_scan(doc, args)
+    verbs = {"list": cmd_list, "next": cmd_next, "register": cmd_register}
+    verbs |= {"release": cmd_release, "clean": cmd_clean, "scan": cmd_scan}
+    return verbs[args.verb](load(path), args, path)
 
 
 if __name__ == "__main__":
