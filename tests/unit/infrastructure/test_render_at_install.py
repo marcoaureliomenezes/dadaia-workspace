@@ -190,11 +190,11 @@ def test_resolve_codex_agent_model_prefers_resolved_over_staged() -> None:
 
 
 def test_resolve_codex_agent_model_falls_back_to_staged_when_no_resolved_policy() -> None:
-    """sa-staged-assets-without-consumers#44.4: an authored ``model:`` is the persona's
-    model when no policy resolves it."""
+    """sa-staged-assets-without-consumers#44.4 + sa-codex-effort-set-by-policy-and-by-tier:
+    no policy -> the authored ``model:`` and the resolver's own ``medium`` effort."""
     model, effort = resolve_codex_agent_model("frontend-engineer", "claude-sonnet-5", None)
     assert model == "claude-sonnet-5"
-    assert effort is None
+    assert effort == "medium"
 
 
 def test_resolve_codex_agent_model_uses_d3_clamp_of_resolved_effort() -> None:

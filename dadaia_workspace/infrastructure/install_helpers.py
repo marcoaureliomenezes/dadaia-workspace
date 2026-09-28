@@ -113,23 +113,23 @@ def resolve_codex_agent_model(
     agent_name: str,
     staged_model: object,
     resolved: ResolvedAgentModel | None,
-) -> tuple[str, str | None]:
+) -> tuple[str, str]:
     """Resolve the ``(claude_model, reasoning_effort)`` of one persona render (Codex's
-    TOML; Claude's refusal of a persona with no model).
+    TOML; Claude's refusal of a persona with no model) — the one effort authority.
 
     Precedence: resolved policy (core agents + installed pack agents) > staged
-    authored ``model:``; neither refuses — for every persona, core or not.
+    authored ``model:``; neither refuses — for every persona, core or not. The effort
+    is the D-3 clamp of the policy effort, else ``medium``.
 
     Raises:
         PublicAssetError: fail-closed — no persona renders on a silent default model.
     """
+    effort = resolved.effort if resolved is not None else None
+    codex_effort = codex_effort_for_claude_effort(effort) if effort is not None else "medium"
     if resolved is not None:
-        effort = (
-            codex_effort_for_claude_effort(resolved.effort) if resolved.effort is not None else None
-        )
-        return resolved.model, effort
+        return resolved.model, codex_effort
     if staged_model:
-        return str(staged_model), None
+        return str(staged_model), codex_effort
     raise PublicAssetError(
         f"cannot render agent '{agent_name}': it has neither an authored 'model:' nor a "
         "resolved agent-model policy model (fail-closed: no default model)"

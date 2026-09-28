@@ -190,7 +190,6 @@ def codex_agent_toml_bytes(
         codex_model,
         body,
         description=codex_description,
-        claude_model=claude_model,
         reasoning_effort=reasoning_effort,
         read_only=persona_read_only(fm),
     )

@@ -10,20 +10,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from dadaia_workspace.core.model_registry import (
-    codex_effort_for_tier,
-    codex_tier_views,
-    registry_by_claude_id,
-)
 from dadaia_workspace.infrastructure.public_assets_common import _toml_escape
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-# Fallback reasoning effort when an agent's ``model:`` is unknown to the registry
-# (defensive only — every canonical agent's model id is registry-backed).
-_CODEX_DEFAULT_EFFORT = "medium"
 # Every name/prefix here gates which backtick-quoted skill references
 # ``dcx7_codex_skill_refs`` (D-CX-7) even bothers checking for existence, resolved
 # against the shared ``.agents/skills/`` tree Codex reads natively (codex_doctor.py).
@@ -140,37 +132,13 @@ def _compact_codex_developer_instructions(body: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _codex_reasoning_effort_for_model(claude_model: str | None) -> str:
-    """Resolve the Codex ``model_reasoning_effort`` from an agent's ``model:``.
-
-    The effort is derived from the registry tier view (the single source of
-    truth) rather than a hand-maintained per-agent table: the frontmatter
-    ``model:`` (a Claude id) resolves to its registry tier, which the
-    per-runtime view maps to a Codex reasoning effort (``deep`` -> ``high``,
-    everything else -> ``medium``). This call also exercises
-    :func:`codex_tier_views`, so a tier collapse (two distinct tiers resolving
-    to one (model, effort) pair) fails loudly at projection time.
-
-    Returns ``_CODEX_DEFAULT_EFFORT`` when *claude_model* is ``None`` or not in
-    the registry (defensive — never breaks install).
-    """
-    # Invariant guard: raises loudly if the live registry collapses two tiers.
-    codex_tier_views()
-    if not claude_model:
-        return _CODEX_DEFAULT_EFFORT
-    entry = registry_by_claude_id().get(claude_model)
-    if entry is None:
-        return _CODEX_DEFAULT_EFFORT
-    return codex_effort_for_tier(entry.tier)
-
-
 def _render_codex_agent_toml(
     name: str,
     model: str,
     developer_instructions: str,
+    *,
+    reasoning_effort: str,
     description: str | None = None,
-    claude_model: str | None = None,
-    reasoning_effort: str | None = None,
     read_only: bool = False,
 ) -> str:
     """Serialize an agent as a TOML file for the Codex runtime.
@@ -182,11 +150,8 @@ def _render_codex_agent_toml(
     - ``sandbox_mode`` — ``read-only`` when *read_only* (the persona's
       ``read_only: true``, the same source the Claude render uses), else
       ``workspace-write``
-    - ``model_reasoning_effort`` — explicit reasoning profile: *reasoning_effort*
-      when supplied (the D-3 clamp of the RESOLVED agent-model-policy effort,
-      v0.1.65 FR5); otherwise derived from the registry tier of *claude_model*
-      via the per-runtime tier view (legacy path — staged bodies without a
-      resolved policy)
+    - ``model_reasoning_effort`` — *reasoning_effort*, as named by
+      ``install_helpers.resolve_codex_agent_model`` (the one effort authority)
     - ``developer_instructions`` — triple-quoted multiline basic string
 
     The function avoids external TOML serialiser dependencies; it builds the
@@ -215,8 +180,6 @@ def _render_codex_agent_toml(
     if description:
         lines.append(f"description = {_toml_escape(description)}\n")
     sandbox_mode = "read-only" if read_only else "workspace-write"
-    if reasoning_effort is None:
-        reasoning_effort = _codex_reasoning_effort_for_model(claude_model)
     lines.extend(
         [
             f"model = {_toml_escape(model)}\n",
