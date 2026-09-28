@@ -1,8 +1,7 @@
-"""Governance validator: backlog single-source invariants, bug archive age.
+"""Governance validator: bug archive age, known bug ids.
 
 Single-responsibility sibling of the SpecsDoctor coordinator: the archive-overdue signal
-(SPEC-DOC-041), the bug ids SPEC-DOC-048 cites, and the single-source loose-file
-invariant (SPEC-DOC-035). Leaf-only: imports the shared leaves + core, never a sibling
+(SPEC-DOC-041) and the bug ids SPEC-DOC-048 cites. Leaf-only: imports the shared leaves + core, never a sibling
 validator.
 
 **Whether a bug record is valid is not asked here.** `bugs.py check` is the one
@@ -20,12 +19,6 @@ from typing import Any
 
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 
-# SPEC-DOC-035 (SPEC v0.12.0 FR5, ADR D5/D9): the single-source invariant — the only two
-# filenames permitted loose directly under ``specs/backlog/``. Anything else (a per-entry
-# item that survived the v0.12.0 consolidation, or was hand-authored outside `dadaia
-# backlog new`) is drift.
-_BACKLOG_SINGLE_SOURCE_FILES: frozenset[str] = frozenset({"BACKLOG.json", "AGENTS.md"})
-
 #: `bugs.py archive`'s own default ``--threshold-days``.
 _ARCHIVE_THRESHOLD_DAYS = 90
 
@@ -40,7 +33,7 @@ def _parse_ts(value: str) -> datetime | None:
 
 
 class GovernanceValidator:
-    """Bug/backlog governance: single-source backlog invariants, bug archive age."""
+    """Bug governance: bug archive age, known bug ids."""
 
     def __init__(self, specs_dir: Path, public_dir: Path | None = None) -> None:
         self.specs_dir = specs_dir
@@ -85,39 +78,4 @@ class GovernanceValidator:
                         path=str(self._ledger),
                     )
                 )
-        return issues
-
-    def check_unarchived_terminal_backlog(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-035 (re-targeted, SPEC v0.12.0 FR5/ADR D5/D9): the single-source
-        invariant — any ``*.md`` loose directly under ``specs/backlog/`` other than
-        ``BACKLOG.md`` and ``README.md`` is drift → WARN.
-
-        The physical model changed from "one file per backlog item" to "one document,
-        ``BACKLOG.md``, with ``## ACTIVE`` + ``## LEDGER``" (ADR #14); a loose per-entry
-        file is now itself the drift signal, regardless of any status text it carries —
-        either a stray survivor of the v0.12.0 consolidation, or a file hand-authored
-        outside ``dadaia backlog new``. ``specs/backlog/_archive/`` is excluded
-        (non-recursive glob already skips it — it is a subdirectory, not a
-        ``*.md`` sibling).
-        """
-        backlog_dir = self.specs_dir / "backlog"
-        if not backlog_dir.is_dir():
-            return []
-        issues: list[SpecsDoctorIssue] = []
-        for entry in sorted(backlog_dir.glob("*.md")):
-            if entry.name in _BACKLOG_SINGLE_SOURCE_FILES:
-                continue
-            issues.append(
-                SpecsDoctorIssue(
-                    code="SPEC-DOC-035",
-                    severity=Severity.WARNING,
-                    description=(
-                        f"backlog/{entry.name} is a loose per-entry file directly under "
-                        "specs/backlog/ — the single source is BACKLOG.json (## ACTIVE + "
-                        "## LEDGER); fold it into BACKLOG.json and move the superseded "
-                        "file into specs/backlog/_archive/ (SPEC-DOC-035, WARNING)."
-                    ),
-                    path=str(entry),
-                )
-            )
         return issues

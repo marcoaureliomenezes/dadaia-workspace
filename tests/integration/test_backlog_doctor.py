@@ -472,47 +472,5 @@ def test_freshly_authored_entry_is_clean_under_both_doctors(tmp_path: Path) -> N
     findings = _run_wired(specs, src)
     assert findings == [], [f.to_dict() for f in findings]
 
-    issues = SpecsDoctor(specs).check()
-    backlog_issues = [i for i in issues if i.code in {"SPEC-DOC-035"}]
-    assert backlog_issues == [], [i.to_dict() for i in backlog_issues]
-
-
-# ── A5.6 — the two doctors agree: never contradict on the same tree (R-13) ─────────
-
-
-def test_two_doctors_agree_on_clean_and_violation_trees(tmp_path: Path) -> None:
-    """A5.6: ``backlog doctor`` and ``specs doctor`` never contradict on the same tree.
-    (a) a clean ``BACKLOG.json`` is accepted by both. (b) a planted ACTIVE-schema
-    violation is rejected by ``backlog doctor`` (BL-SCHEMA ERROR) while ``specs
-    doctor``'s backlog-surface check (SPEC-DOC-035) stays silent on it — nothing
-    consumed, no loose file — so neither doctor contradicts the other."""
-    from dadaia_workspace.features.specs import SpecsDoctor
-
-    def _backlog_surface_issues(specs: Path) -> list[object]:
-        return [i for i in SpecsDoctor(specs).check() if i.code in {"SPEC-DOC-035"}]
-
-    # (a) clean tree — both doctors accept.
-    specs_a, src_a = _build_roots(tmp_path / "clean")
-    active = [_active_entry("agree-clean", "Clean", "idea")]
-    _write_backlog_json(specs_a, active)
-    assert _run_wired(specs_a, src_a) == []
-    assert _backlog_surface_issues(specs_a) == []
-
-    # (b) a planted ACTIVE-schema violation — backlog doctor rejects (ERROR); specs
-    # doctor's backlog-surface checks stay silent.
-    specs_b, src_b = _build_roots(tmp_path / "violation")
-    _write_backlog_json(
-        specs_b,
-        [
-            {
-                "id": "broken",
-                "title": "Broken",
-                "opened": "2026-08-10",
-                "description": "missing status and provenance.",
-            }
-        ],
-    )
-    findings_b = _run_wired(specs_b, src_b)
-    errors = [f for f in findings_b if f.severity is Severity.ERROR]
-    assert errors and errors[0].code is BacklogDoctorCode.BL_SCHEMA
-    assert _backlog_surface_issues(specs_b) == []
+    stray = [i for i in SpecsDoctor(specs).check() if i.code == "TREE-8"]
+    assert stray == [], [i.to_dict() for i in stray]

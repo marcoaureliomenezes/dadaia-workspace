@@ -1,15 +1,14 @@
-"""Structural validator (v0.1.55 FR1): TREE-2..8 spec-tree invariants.
+"""Structural validator (v0.1.55 FR1): TREE-3..8 spec-tree invariants.
 
 Single-responsibility sibling of the SpecsDoctor coordinator. Owns the ``spec-context-tree-v2``
-structural invariants (root-spec deprecation, required memory atoms, required dirs,
-AGENTS.md drift, active-release artifacts, bug session_id) and the TREE-4 auto-fix. Leaf-only:
+structural invariants (required memory atoms, required dirs, AGENTS.md drift, canon
+placement) and the TREE-4 auto-fix. Leaf-only:
 imports the shared leaves, never a sibling validator.
 """
 
 from __future__ import annotations
 
 import hashlib
-import re
 import shlex
 from pathlib import Path
 
@@ -59,13 +58,9 @@ _TREE4_REQUIRED_DIRS = REQUIRED_ROOT_DIRS
 # member list (operator ruling 2026-08-28).
 _TREE8_CANON_ROOT: frozenset[str] = CANON_ROOT_MEMBERS
 
-#: The deprecated root SPEC.md TREE-2 already owns (fixable=False: operator consent).
-#: TREE-8 never flags it a second time.
-_TREE8_DEFERRED_TO_SIBLING_CHECKS: frozenset[str] = frozenset({"SPEC.md"})
-
 
 class StructuralValidator:
-    """TREE-2..8 structural invariants for the spec tree."""
+    """TREE-3..8 structural invariants for the spec tree."""
 
     def __init__(
         self,
@@ -76,28 +71,6 @@ class StructuralValidator:
         self.specs_dir = specs_dir
         self._scaffold_dir = scaffold_dir
         self._templates_dir = templates_dir
-
-    def check_tree2_root_spec_md(self) -> list[SpecsDoctorIssue]:
-        """TREE-2: specs/SPEC.md at the tree root must NOT exist (deprecated).
-
-        Warn-only (fixable=False): root SPEC.md may hold SDD-approved content and
-        reclassifying it is the operator's call — no migrator exists.
-        """
-        root_spec = self.specs_dir / "SPEC.md"
-        if not root_spec.exists():
-            return []
-        return [
-            SpecsDoctorIssue(
-                code="TREE-2",
-                severity=Severity.WARNING,
-                description=(
-                    "specs/SPEC.md exists at the tree root — this is the deprecated "
-                    "layout. Move it into releases/<id>/ by hand (TREE-2)."
-                ),
-                path=str(root_spec),
-                fixable=False,
-            )
-        ]
 
     def check_tree3_memory_md(self) -> list[SpecsDoctorIssue]:
         """TREE-3: required memory .md atom files must exist.
@@ -344,45 +317,6 @@ class StructuralValidator:
             atomic_write(dst, law, preserve_mode=True)
             return
 
-    def check_tree7_bug_session_id(self) -> list[SpecsDoctorIssue]:
-        """TREE-7: every bugs/<slug>.md must have a session_id frontmatter field.
-
-        Expected frontmatter format (YAML-like leading lines):
-            session_id: <value>   OR   session_id: null
-
-        Missing field → ERROR (no auto-fix — injecting a session_id would
-        falsify authorship; human review is required).
-
-        If bugs/ does not exist, this check is a no-op.
-        """
-        issues: list[SpecsDoctorIssue] = []
-        bugs_dir = self.specs_dir / "bugs"
-        if not bugs_dir.exists():
-            return issues
-        for bug_file in sorted(bugs_dir.glob("*.md")):
-            # Skip README.md (legacy) and AGENTS.md (v6 canon, FR1) and other
-            # non-bug files
-            if bug_file.name in ("README.md", "AGENTS.md"):
-                continue
-            text = bug_file.read_text(encoding="utf-8")
-            has_session_id = bool(re.search(r"^session_id\s*:", text, re.MULTILINE))
-            if not has_session_id:
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="TREE-7",
-                        severity=Severity.ERROR,
-                        description=(
-                            f"bugs/{bug_file.name} is missing the required 'session_id:' "
-                            "frontmatter field. "
-                            "Add 'session_id: null' if the session is unknown. "
-                            "Do NOT inject a fabricated session ID."
-                        ),
-                        path=str(bug_file),
-                        fixable=False,
-                    )
-                )
-        return issues
-
     def check_tree8_canon_root(self) -> list[SpecsDoctorIssue]:
         """TREE-8: every path under specs/ must be v6-canon-conformant (FR1, v0.5.0
         specs-canon closure, operator ruling 2026-08-28) — driven by the ONE shared
@@ -412,20 +346,12 @@ class StructuralValidator:
         for entry in sorted(self.specs_dir.iterdir()):
             if entry.name in _TREE8_CANON_ROOT:
                 continue
-            if entry.name in _TREE8_DEFERRED_TO_SIBLING_CHECKS:
-                continue
             issues.append(self._tree8_issue(entry))
         for entry in sorted(self.specs_dir.rglob("*")):
             if entry.is_dir():
                 continue
-            # Root-level entries are already covered by the loop above (whether
-            # canon-named or not); this second pass reaches every FILE nested inside
-            # an otherwise-conformant root member. Never descend into a deprecated
-            # root TREE-2 owns (its own content is exempt from removal), nor
-            # into a root entry the first loop already flagged as a stray whole
-            # subtree (that finding already covers everything inside it).
-            root_name = entry.relative_to(self.specs_dir).parts[0]
-            if root_name in _TREE8_DEFERRED_TO_SIBLING_CHECKS or root_name not in _TREE8_CANON_ROOT:
+            # A stray root entry was flagged whole by the loop above.
+            if entry.relative_to(self.specs_dir).parts[0] not in _TREE8_CANON_ROOT:
                 continue
             rel_posix = entry.relative_to(self.specs_dir).as_posix()
             if not is_canon_path(rel_posix):

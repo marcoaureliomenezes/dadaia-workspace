@@ -227,22 +227,6 @@ def test_scaffold_copytree_source_tree_carries_agents_md_per_area(tmp_path: Path
             id="doc002-feature-without-heading",
         ),
         pytest.param(
-            "legacy-md-at-memory-root",
-            lambda specs: (specs / "memory" / "legacy-notes.md").write_text(
-                "# legacy", encoding="utf-8"
-            ),
-            "SPEC-DOC-002L",
-            id="doc002l-legacy-markdown",
-        ),
-        pytest.param(
-            "legacy-html-at-memory-root",
-            lambda specs: (specs / "memory" / "product.html").write_text(
-                "<html><body><h1>x</h1></body></html>", encoding="utf-8"
-            ),
-            "SPEC-DOC-002L",
-            id="doc002l-legacy-html",
-        ),
-        pytest.param(
             "non-canonical-status",
             lambda specs: (specs / "releases" / "1.2.3" / "SPEC.md").write_text(
                 "# Spec\n\n**Status:** Accepted\n", encoding="utf-8"
@@ -278,31 +262,6 @@ def test_sad_matrix(tmp_path: Path, case: str, mutate, expected_code: str) -> No
     ("case", "mutate", "code"),
     [
         pytest.param(
-            "agents-md-exempt-from-doc002l",
-            lambda specs: (specs / "memory" / "AGENTS.md").write_text(
-                "# Memory contract\n", encoding="utf-8"
-            ),
-            "SPEC-DOC-002L",
-            id="agents-md-exempt-doc002l",
-        ),
-        pytest.param(
-            "quality-assurance-not-legacy",
-            lambda specs: None,  # already present in the clean tree
-            "SPEC-DOC-002L",
-            id="quality-assurance-not-legacy",
-        ),
-        pytest.param(
-            "agents-md-present-does-not-suppress-other-legacy-md",
-            lambda specs: (
-                (specs / "memory" / "AGENTS.md").write_text(
-                    "# Memory contract\n", encoding="utf-8"
-                ),
-                (specs / "memory" / "old-note.md").write_text("# legacy note\n", encoding="utf-8"),
-            ),
-            None,  # positive-side assertion handled below, not a silent row
-            id="agents-md-does-not-blanket-exempt",
-        ),
-        pytest.param(
             "subdir-atom-parses-cleanly",
             lambda specs: (
                 (specs / "memory" / "product" / "sdd").mkdir(parents=True, exist_ok=True),
@@ -319,27 +278,21 @@ def test_sad_matrix(tmp_path: Path, case: str, mutate, expected_code: str) -> No
         ),
     ],
 )
-def test_silent_matrix(tmp_path: Path, case: str, mutate, code: str | None) -> None:  # type: ignore[no-untyped-def]
+def test_silent_matrix(tmp_path: Path, case: str, mutate, code: str) -> None:  # type: ignore[no-untyped-def]
     specs = _make_clean_specs_tree(tmp_path)
     mutate(specs)
     issues = SpecsDoctor(specs).check()
-    if case == "agents-md-does-not-blanket-exempt":
-        doc_002l = [
-            i for i in issues if i.code == "SPEC-DOC-002L" and "old-note.md" in (i.path or "")
-        ]
-        assert doc_002l, "Expected SPEC-DOC-002L for old-note.md but got none"
-        return
     matching = [i for i in issues if i.code == code]
     assert matching == [], f"{case}: unexpected {code}: {[m.description for m in matching]}"
 
 
 # ---------------------------------------------------------------------------
-# (c) TREE fix-behavior: TREE-4 creates dirs; TREE-2/3/5/5M/6/7 have NO auto-fix
+# (c) TREE fix-behavior: TREE-5 drift has NO auto-fix
 # ---------------------------------------------------------------------------
 
 
-def test_tree5_drift_and_tree7_are_never_auto_repaired(tmp_path: Path) -> None:
-    # TREE-3/4/5 repairs and TREE-2 judgment: the fix-clears PLANTS and REPORT tables of
+def test_tree5_drift_is_never_auto_repaired(tmp_path: Path) -> None:
+    # TREE-3/4/5 repairs: the fix-clears PLANTS and REPORT tables of
     # tests/integration/test_doctor_fix_lines_clear_their_finding.py (sa-unfixable-doctor-
     # findings-say-doctor-fix; the per-rule copies here were deleted as duplicates).
     specs_drift = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree5-drift"))
@@ -359,35 +312,6 @@ def test_tree5_drift_and_tree7_are_never_auto_repaired(tmp_path: Path) -> None:
     root_law = str(specs_ok / "AGENTS.md")  # the scoped law files are not planted here
     tree5_ok = [i for i in doctor_ok.check() if i.code == "TREE-5" and i.path == root_law]
     assert tree5_ok == []
-
-    # TREE-6 retired (0.5.3 T-053-04, F005): missing-artifact coverage lives in
-    # `release.py check` — see test_one_defect_one_code_missing_active_artifact.
-
-    # TREE-7: bug missing session_id is never auto-repaired; session_id: null passes.
-    specs7 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree7"))
-    bugs_dir7 = specs7 / "bugs"
-    bugs_dir7.mkdir(exist_ok=True)
-    bug_path = bugs_dir7 / "missing-session.md"
-    original = "title: test\nseverity: low\nopened: 2026-05-30\n"
-    bug_path.write_text(original, encoding="utf-8")
-    doctor7 = SpecsDoctor(specs7, templates_dir=_TEMPLATES_DIR)
-    issues7 = doctor7.check()
-    tree7 = [i for i in issues7 if i.code == "TREE-7"]
-    assert tree7 and tree7[0].severity == Severity.ERROR and not tree7[0].fixable
-    # Fix only the TREE-7 finding itself (fixable=False, so this is a no-op for it).
-    doctor7.fix(tree7)
-    assert bug_path.read_text(encoding="utf-8") == original
-
-    specs7b = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree7-ok"))
-    bugs_dir7b = specs7b / "bugs"
-    bugs_dir7b.mkdir(exist_ok=True)
-    (bugs_dir7b / "some-bug.md").write_text(
-        "title: Something broke\nseverity: high\nopened: 2026-05-30\nsession_id: null\n\n"
-        "## Description\n\nBroken.",
-        encoding="utf-8",
-    )
-    tree7b = [i for i in SpecsDoctor(specs7b).check() if i.code == "TREE-7"]
-    assert tree7b == [], f"Unexpected TREE-7: {[i.description for i in tree7b]}"
 
 
 # ---------------------------------------------------------------------------
@@ -411,25 +335,6 @@ def test_doc005_oversized_plan_warns_whatever_the_spec_creation_date(
     issues = SpecsDoctor(specs).check()
     doc5 = [i for i in issues if i.code == "SPEC-DOC-005"]
     assert doc5 and doc5[0].severity is Severity.WARNING
-
-
-def test_doc012_retired_never_fires_on_a_planted_candidates_md(tmp_path: Path) -> None:
-    """SPEC v0.12.0 T-120-08 (ADR D10): SPEC-DOC-012 (candidates.md bullet-format check)
-    is retired with candidates.md itself. A malformed candidates.md left on disk (e.g. a
-    stray, not-yet-archived leftover) never fires SPEC-DOC-012 again — the archived-only
-    single-source doctor has no check left that reads that file's bullet grammar. It is
-    still flagged, but as SPEC-DOC-035 (the loose-file single-source invariant): a
-    recorded supersession, replacing the deleted `test_doc012_bullet_format_matrix`
-    (11 parametrized cases; subject retired, TASKS T-120-08, A5.4)."""
-    specs = _make_clean_specs_tree(tmp_path)
-    (specs / "backlog" / "candidates.md").write_text(
-        "# Backlog\n\n## Candidatas ativas\n\n- bad-feature — Missing the owner field\n",
-        encoding="utf-8",
-    )
-    issues = SpecsDoctor(specs).check()
-    assert "SPEC-DOC-012" not in {i.code for i in issues}
-    doc035 = [i for i in issues if i.code == "SPEC-DOC-035"]
-    assert any("candidates.md" in (i.path or "") for i in doc035)
 
 
 @pytest.mark.parametrize(

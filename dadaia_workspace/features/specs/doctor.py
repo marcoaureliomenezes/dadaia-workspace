@@ -6,12 +6,12 @@ single-responsibility validator siblings plus two shared leaf modules:
 
   * ``doctor_types``     — ``Severity`` / ``SpecsDoctorIssue``
   * ``doctor_common``    — cross-validator pure helpers (``resolve_active_release`` + release-dir discovery)
-  * ``doctor_structural``   — TREE-2..8 spec-tree invariants; ``fix_tree4``,
+  * ``doctor_structural``   — TREE-3..8 spec-tree invariants; ``fix_tree4``,
                               ``fix_tree5``
   * ``doctor_memory``       — memory files, LINT-1
   * ``doctor_release``      — active release (RELEASE.json state document), release artifacts, SemVer + ledger invariants
   * ``doctor_closure_audit``— audit naming, archive dirs; ``fix_archive_dir``
-  * ``doctor_governance``   — single-source backlog invariants, bug status/JSONL
+  * ``doctor_governance``   — bug archive age, known bug ids
   * ``doctor_coherence``    — constitution and pattern-version coherence
 
 The coordinator owns ORDER: ``check()`` invokes the validators' public methods in the exact

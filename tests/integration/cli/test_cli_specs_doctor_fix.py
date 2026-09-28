@@ -5,7 +5,6 @@ Tests use Typer's CliRunner on a real tmp_path filesystem.
 Covers:
 - Memory atoms are .md (no HTML rendering); --fix creates missing dirs/files
 - TREE-4 auto-fix via --fix flag creates missing directories
-- TREE-2 warn-only invariant is NOT auto-fixed
 - --fix re-checks and reports residual issues
 """
 

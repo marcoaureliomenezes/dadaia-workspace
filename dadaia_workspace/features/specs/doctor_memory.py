@@ -1,6 +1,6 @@
 """Memory validator: atom files, LINT-1, MEM-DRIFT-1, MEM-DRIFT-2.
 Single-responsibility sibling of the SpecsDoctor coordinator. Owns the memory-markdown-source
-invariants: required atoms present with a heading (SPEC-DOC-002/002L), the LINT-1 memory-atom
+invariants: required atoms present with a heading (SPEC-DOC-002), the LINT-1 memory-atom
 lint (the one home of the forbidden-heading rule; the generated pair is LEDGER-MEMORY's), and (v0.5.1
 T-051-22 rework) MEM-DRIFT-1's features-package-map-vs-live-tree WARNING and (0.4.7 FR2)
 MEM-DRIFT-2's memory-citation WARNING (finders: ``features.specs.citations``). LINT-1 imports
@@ -18,7 +18,7 @@ from pathlib import Path
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.cli_line import materialize_line, shell_line
 from dadaia_workspace.features.specs import citations, memory_canon, memory_lint
-from dadaia_workspace.features.specs.canon import default_public_dir
+from dadaia_workspace.features.specs.canon import default_public_dir, is_canon_path
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 
 # ONE home for memory-canon facts (F011): features.specs.memory_canon.
@@ -255,10 +255,7 @@ class MemoryValidator:
     def check_memory_files(self) -> list[SpecsDoctorIssue]:
         """Check #2: required memory .md atoms exist with non-empty heading.
 
-        Canonical source format is .md (memory-markdown-source-v1).
-        Stray .html files are flagged as legacy (SPEC-DOC-002L).
-        The product.html-at-root legacy error is retained for historical compat.
-        """
+        A stray or legacy file is TREE-8's."""
         issues: list[SpecsDoctorIssue] = []
         mem_dir = self.specs_dir / "memory"
 
@@ -303,89 +300,6 @@ class MemoryValidator:
                     )
                 )
 
-        # Legacy product.html at memory/ root (pre-folder-catalog) is still an error
-        legacy_product = mem_dir / "product.html"
-        if legacy_product.exists():
-            issues.append(
-                SpecsDoctorIssue(
-                    code="SPEC-DOC-002L",
-                    severity=Severity.ERROR,
-                    description=(
-                        "memory/product.html is legacy — product memory is now a folder "
-                        "catalog. Move to _archive/legacy-memory/<timestamp>/ and create "
-                        "memory/product/index.md + memory/product/<feature>.md files."
-                    ),
-                    path=str(legacy_product),
-                )
-            )
-
-        # Flag any stray .html files in memory/ root or product/ as legacy.
-        # AGENTS.md is a directory contract, not a memory atom — exempt it.
-        # .html files are never written at runtime (D-4); any that appear are stale.
-        if mem_dir.exists():
-            for stray in mem_dir.glob("*.html"):
-                if stray.name == "product.html":
-                    continue
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="SPEC-DOC-002L",
-                        severity=Severity.ERROR,
-                        description=(
-                            f"memory/{stray.name} is a stray HTML file — "
-                            "memory atoms must be .md (memory-markdown-source-v1, D-4). "
-                            "Remove the .html file; the canonical source is the .md atom."
-                        ),
-                        path=str(stray),
-                    )
-                )
-            if product_dir.is_dir():
-                for stray in product_dir.glob("*.html"):
-                    issues.append(
-                        SpecsDoctorIssue(
-                            code="SPEC-DOC-002L",
-                            severity=Severity.ERROR,
-                            description=(
-                                f"memory/product/{stray.name} is a stray HTML file — "
-                                "memory atoms must be .md (D-4). Remove the .html file."
-                            ),
-                            path=str(stray),
-                        )
-                    )
-
-            # Orphaned .md files at root (no known canonical role) — flag as legacy.
-            # AGENTS.md is exempt. TOPLEVEL_MEMORY_FILES (.md) are canonical. index.md in
-            # product/ is the generated TOC.  Everything else is flagged.
-            #
-            # v6 canon (FR1/A1.5/A1.6, T-050-06): the top-level trio's PRE-migration
-            # lowercase names (architecture.md, tech-stack.md, quality-assurance.md) are
-            # recognized here too, so a consumer tree `specs upgrade` has not yet
-            # hand-renamed (the rename is a by-hand recipe step, never automated) is not
-            # mistaken for a genuinely stray/orphaned file — SPEC-DOC-002/TREE-3 already
-            # correctly report the RENAMED file as missing; SPEC-DOC-002L's job is orphan
-            # detection, not a second "please rename" signal.
-            _RETIRED_TOPLEVEL_MEMORY_NAMES = frozenset(
-                {"architecture.md", "tech-stack.md", "quality-assurance.md"}
-            )
-            _canonical_root_md = {Path(f).name for f in TOPLEVEL_MEMORY_FILES}
-            for legacy in mem_dir.glob("*.md"):
-                if legacy.name == "AGENTS.md":
-                    continue
-                if legacy.name in _canonical_root_md:
-                    continue
-                if legacy.name in _RETIRED_TOPLEVEL_MEMORY_NAMES:
-                    continue
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="SPEC-DOC-002L",
-                        severity=Severity.ERROR,
-                        description=(
-                            f"memory/{legacy.name} is not a canonical memory atom. "
-                            "Move to _archive/legacy-memory/<timestamp>/ if historical."
-                        ),
-                        path=str(legacy),
-                    )
-                )
-
         return issues
 
     def check_lint1_memory_atoms(self) -> list[SpecsDoctorIssue]:
@@ -422,6 +336,7 @@ class MemoryValidator:
             )
             for result in memory_lint.lint_directory(mem_dir, schema)
             for err in result.errors
+            if is_canon_path(result.path.relative_to(self.specs_dir).as_posix())
         ]
 
     def check_mem_drift2_citations(

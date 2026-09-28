@@ -156,10 +156,6 @@ def _plant_tests_agents_placeholder(root: Path) -> None:
     )
 
 
-def _plant_root_spec_md(root: Path) -> None:
-    (root / "specs" / "SPEC.md").write_text("# Deprecated root spec\n", encoding="utf-8")
-
-
 def _plant_dispositioned_audit(root: Path) -> None:
     audit = root / "specs" / "audits" / "20260101-lifecycle"
     audit.mkdir(parents=True)
@@ -205,7 +201,6 @@ PLANTS: dict[str, Plant] = {
     "SPEC-DOC-005": Plant(_plant_oversized_plan),
     "GITFLOW-1": Plant(_plant_gitflow_gone, {"<specs>": "specs"}),
     "AGENTS-PLACEHOLDER-1": Plant(_plant_tests_agents_placeholder),
-    "TREE-2": Plant(_plant_root_spec_md),
     "SPEC-DOC-041": Plant(
         lambda r: _write(
             r / "specs/bugs/BUGS.jsonl",
@@ -422,7 +417,7 @@ def test_a_judgment_only_rule_never_makes_the_run_exit_1(tmp_path: Path) -> None
     sa-memory-atom-has-two-grammars#B29-6: a history heading planted beside them is
     reported once, by LINT-1 — CAT-1 and SPEC-DOC-008 do not exist."""
     root = _repo(tmp_path)
-    for code in ("SPEC-DOC-005", "TREE-2", "AGENTS-PLACEHOLDER-1"):
+    for code in ("SPEC-DOC-005", "AGENTS-PLACEHOLDER-1"):
         PLANTS[code].plant(root)
     _plant_changelog_heading(root)
     for plant in REPORT_ONLY.values():
@@ -430,7 +425,7 @@ def test_a_judgment_only_rule_never_makes_the_run_exit_1(tmp_path: Path) -> None
 
     report = _specs_section(_doctor(root), Path())
     fired = {f.code for f in report.printable}
-    assert {"SPEC-DOC-005", "TREE-2", "AGENTS-PLACEHOLDER-1", *REPORT_ONLY} <= fired, fired
+    assert {"SPEC-DOC-005", "AGENTS-PLACEHOLDER-1", *REPORT_ONLY} <= fired, fired
     assert not {"CAT-1", "SPEC-DOC-008", "SPEC-DOC-010"} & fired, fired
     history = [f for f in report.findings if "Changelog" in f.message]
     assert [(f.code, f.error) for f in history] == [("LINT-1", True)], history

@@ -16,7 +16,6 @@ from dadaia_workspace.core.doctor_rules import Rule
 from dadaia_workspace.features.specs import doctor_adr
 from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
 from dadaia_workspace.infrastructure.ledger_scripts import (
-    BACKLOG_SCRIPT,
     BUGS_SCRIPT,
 )
 
@@ -49,7 +48,7 @@ RULES: tuple[SpecsRule, ...] = (
         fix_help="Operator action: restore <specs>/constitution.md, then commit.",
     ),
     _rule(
-        ("SPEC-DOC-002", "SPEC-DOC-002L"),
+        ("SPEC-DOC-002",),
         lambda d: d._memory.check_memory_files(),
     ),
     _rule(
@@ -75,12 +74,6 @@ RULES: tuple[SpecsRule, ...] = (
         # deletes the plan's tail. WARNING-only (see check_plan_line_limit).
     ),
     _rule(
-        ("TREE-2",),
-        lambda d: d._structural.check_tree2_root_spec_md(),
-        # No fix line: reclassifying a root SPEC.md needs operator consent (the check's
-        # own docstring). WARNING-only.
-    ),
-    _rule(
         ("TREE-3",),
         lambda d: d._structural.check_tree3_memory_md(),
         fix=lambda d, i: d._structural.fix_tree3(i),
@@ -97,11 +90,6 @@ RULES: tuple[SpecsRule, ...] = (
         lambda d: d._structural.check_tree5_agents_md(),
         fix=lambda d, i: d._structural.fix_tree5(i),
         fix_help=("doctor", "--fix"),
-    ),
-    _rule(
-        ("TREE-7",),
-        lambda d: d._structural.check_tree7_bug_session_id(),
-        fix_help="sed -i 's/<session id>/<redacted>/g' specs/bugs/BUGS.jsonl",
     ),
     _rule(
         ("TREE-8",),
@@ -162,13 +150,6 @@ RULES: tuple[SpecsRule, ...] = (
         lambda d: d._closure_audit.check_archive_dirs_exist(),
         fix=lambda d, i: d._closure_audit.fix_archive_dir(i),
         fix_help=("doctor", "--fix"),
-    ),
-    _rule(
-        ("SPEC-DOC-035",),
-        lambda d: d._governance.check_unarchived_terminal_backlog(),
-        fix_help=(
-            f"{BACKLOG_SCRIPT.invocation} exit <slug> --disposition <disposition> <--release id|--reason why>"
-        ),
     ),
     _rule(
         ("SPEC-DOC-041",),

@@ -542,9 +542,6 @@ def _doctor_codes() -> set[str]:
 _V39_BIRTH = 52
 _V39_ALLOWANCE: dict[str, str] = {
     "ONBOARDING": "parity:tests/integration/test_onboarding_steps_property.py",
-    "SPEC-DOC-002L": "sa-placement-rules-contradict-tree8",
-    "SPEC-DOC-035": "sa-placement-rules-contradict-tree8",
-    "TREE-7": "sa-placement-rules-contradict-tree8",
     "WS-INVARIANT": "parity:tests/integration/test_unfixable_findings_carry_their_own_fix.py",
 }
 
