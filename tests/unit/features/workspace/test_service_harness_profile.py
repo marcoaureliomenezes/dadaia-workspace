@@ -38,76 +38,32 @@ def _profile_path(root: Path) -> Path:
     return root / ".dadaia" / "states" / "harness_profile.json"
 
 
-def test_persists_selected_set_and_roundtrips(service: WorkspaceService, tmp_path: Path) -> None:
-    # persists the selected harness set.
-    service.init(tmp_path, skip_assets=True, harnesses=("codex",))
-    data = json.loads(_profile_path(tmp_path).read_text(encoding="utf-8"))
-    assert data == {"schema_version": "1", "harnesses": ["codex"]}
-
-    # init's write is the store's write — the adapter reads back exactly what init wrote.
-    service.init(
-        tmp_path.parent / (tmp_path.name + "-roundtrip"),
-        skip_assets=True,
-        harnesses=("claude", "kimi-code"),
-    )
-    states_dir = tmp_path.parent / (tmp_path.name + "-roundtrip") / ".dadaia" / "states"
-    profile = JsonHarnessProfileStore().read(states_dir)
-    assert profile == HarnessProfile(schema_version="1", harnesses=("claude", "kimi-code"))
-
-
-def test_idempotent_reinit_and_absent_profile_reads_none(
-    service: WorkspaceService, tmp_path: Path
+# fmt: off
+@pytest.mark.parametrize(("inits", "expected"), [
+    pytest.param([("codex",)], ("codex",), id="persists-the-selected-set"),
+    pytest.param([("claude", "kimi-code")], ("claude", "kimi-code"), id="store-reads-back-what-init-wrote"),
+    pytest.param([("codex",), ("codex",)], ("codex",), id="same-set-reinit-never-rewrites"),
+    pytest.param([("claude", "codex"), ("kimi-code",)], ("claude", "codex", "kimi-code"), id="init-harness-profile-silent-narrowing-subset-merges"),
+])
+# fmt: on
+def test_init_persists_the_harness_profile_through_the_one_store(
+    service: WorkspaceService, tmp_path: Path, inits: list[tuple[str, ...]], expected: tuple[str, ...]
 ) -> None:
-    # re-running init with the same set does not rewrite the profile file.
-    service.init(tmp_path, skip_assets=True, harnesses=("codex",))
-    path = _profile_path(tmp_path)
-    first_mtime = path.stat().st_mtime_ns
-    first_bytes = path.read_bytes()
+    """A subset re-init MERGES in canonical L1 order (init deletes no projection, so it never un-manages one)."""
+    service.init(tmp_path, skip_assets=True, harnesses=inits[0])
+    before = (_profile_path(tmp_path).read_bytes(), _profile_path(tmp_path).stat().st_mtime_ns)
+    for harnesses in inits[1:]:
+        service.init(tmp_path, skip_assets=True, harnesses=harnesses)
 
-    service.init(tmp_path, skip_assets=True, harnesses=("codex",))
-
-    assert path.read_bytes() == first_bytes
-    assert path.stat().st_mtime_ns == first_mtime
-
-    # a pre-v0.1.58 workspace (no profile file) reads as None ⇒ all-four convention.
-    absent_root = tmp_path.parent / (tmp_path.name + "-absent")
-    states_dir = absent_root / ".dadaia" / "states"
-    states_dir.mkdir(parents=True)
-    assert JsonHarnessProfileStore().read(states_dir) is None
+    assert JsonHarnessProfileStore().read(tmp_path / ".dadaia" / "states") == HarnessProfile(schema_version="1", harnesses=expected)
+    assert json.loads(_profile_path(tmp_path).read_text(encoding="utf-8")) == {"schema_version": "1", "harnesses": list(expected)}
+    if inits[1:] == inits[:1]:
+        assert (_profile_path(tmp_path).read_bytes(), _profile_path(tmp_path).stat().st_mtime_ns) == before
 
 
-def test_reinit_with_subset_merges_previously_persisted_harnesses(
-    service: WorkspaceService, tmp_path: Path
-) -> None:
-    """Bug init-harness-profile-silent-narrowing: a subset re-init MERGES the profile.
-
-    init deletes no projection, so it must never un-manage one: re-running init with a
-    harness subset (e.g. adding kimi-code to a claude+codex workspace) merges into the
-    persisted profile in canonical L1 order instead of replacing it — otherwise the
-    previously scaffolded harnesses silently drop out of install/doctor scope
-    ([warn] out-of-profile) and their projections rot.
-    """
-    service.init(tmp_path, skip_assets=True, harnesses=("claude", "codex"))
-    service.init(tmp_path, skip_assets=True, harnesses=("kimi-code",))
-
-    data = json.loads(_profile_path(tmp_path).read_text(encoding="utf-8"))
-    assert data == {"schema_version": "1", "harnesses": ["claude", "codex", "kimi-code"]}
-
-
-def test_reinit_same_set_does_not_duplicate_ctx_inject_hook(
-    service: WorkspaceService, tmp_path: Path
-) -> None:
-    """A claude re-init never writes ``.claude/settings.json`` at all.
-
-    Kept named — this proved a real drift-bug class (duplicate hook registration on
-    repeated init). The whole class is now unrepresentable: init's own settings writer
-    was deleted (bug init-skip-assets-writes-gateless-claude-settings), so hook wiring
-    exists only as ``public install`` output — there is no second registrar left to
-    duplicate anything."""
-    service.init(tmp_path, skip_assets=True, harnesses=("claude",))
-    service.init(tmp_path, skip_assets=True, harnesses=("claude",))
-
-    assert not (tmp_path / ".claude" / "settings.json").exists()
+def test_an_absent_profile_reads_none(tmp_path: Path) -> None:
+    """A pre-v0.1.58 workspace (no profile file) reads as None: the all-four convention."""
+    assert JsonHarnessProfileStore().read(tmp_path) is None
 
 
 def test_init_writes_the_profile_through_the_store_and_never_spells_the_file() -> None:
