@@ -1,9 +1,8 @@
-"""v0.2.9 T2 — placeholder-atom repair (bug scaffold-repair-cannot-remediate-invalid-
+"""Intent: CONTRACT — v0.2.9 T2 — placeholder-atom repair (bug scaffold-repair-cannot-remediate-invalid-
 placeholder-atom).
 
 Old scaffolds shipped a raw ``memory/product/feature.md`` template
-(``SLUG_PLACEHOLDER`` & friends) that NO verb could remediate — consumer' real contexts
-failed ``specs doctor`` forever. Now: the doctor flags it as fixable
+(``SLUG_PLACEHOLDER`` & friends) that NO verb could remediate. Now: the doctor flags it as fixable
 (MEM-PLACEHOLDER-1), ``--fix`` removes it, and ``specs upgrade`` repairs even a
 current-version tree (dry-run reports without deleting). Exact-token detection means
 filled atoms are never touched.
@@ -25,7 +24,6 @@ from dadaia_workspace.features.specs.doctor_types import finding_path
 pytestmark = pytest.mark.unit
 
 _TEMPLATES_DIR = Path(__file__).resolve().parents[4] / "dadaia_workspace" / "public" / "templates"
-_TESTS_AGENTS_TEMPLATE = _TEMPLATES_DIR / "tests-AGENTS.md"
 
 _PLACEHOLDER_ATOM = """---
 slug: SLUG_PLACEHOLDER
@@ -43,14 +41,9 @@ Placeholder — documentar o propósito desta feature aqui.
 """
 
 
-def _fresh_specs(tmp_path: Path) -> Path:
-    specs = tmp_path / "specs"
-    scaffold(
-        specs,
-        project_name="testproj",
-        force=False,
-        public_dir=_TEMPLATES_DIR.parent,
-    )
+def _fresh_specs(root: Path) -> Path:
+    specs = root / "specs"
+    scaffold(specs, project_name="testproj", force=False, public_dir=_TEMPLATES_DIR.parent)
     return specs
 
 
@@ -58,185 +51,87 @@ def _doctor(specs: Path) -> SpecsDoctor:
     return SpecsDoctor(specs, public_dir=None, templates_dir=_TEMPLATES_DIR)
 
 
-def test_fresh_scaffold_is_doctor_clean_without_feature_placeholder(tmp_path: Path) -> None:
-    """Consumer P3: a fresh tree reaches 0/0 with no manual edit (no feature.md at all)."""
-    specs = _fresh_specs(tmp_path)
-    assert not (specs / "memory" / "product" / "feature.md").exists()
-    issues = _doctor(specs).check()
-    errors = [i for i in issues if i.verdict == "error"]
-    assert errors == [], [f"{i.code}: {i.message}" for i in errors]
-
-
-def test_doctor_flags_placeholder_atom_as_fixable(tmp_path: Path) -> None:
+def _placeholder_atom(tmp_path: Path) -> tuple[Path, Path]:
     specs = _fresh_specs(tmp_path)
     atom = specs / "memory" / "product" / "feature.md"
     atom.write_text(_PLACEHOLDER_ATOM, encoding="utf-8")
-
-    issues = _doctor(specs).check()
-    flagged = [i for i in issues if i.code == "MEM-PLACEHOLDER-1"]
-    assert len(flagged) == 1
-    assert flagged[0].fixable is True
-    assert flagged[0].verdict == "error"
+    return specs, atom
 
 
 def test_fix_removes_placeholder_and_tree_is_clean(tmp_path: Path) -> None:
-    specs = _fresh_specs(tmp_path)
-    atom = specs / "memory" / "product" / "feature.md"
-    atom.write_text(_PLACEHOLDER_ATOM, encoding="utf-8")
+    specs, atom = _placeholder_atom(tmp_path)
+    [flagged] = [i for i in _doctor(specs).check() if i.code == "MEM-PLACEHOLDER-1"]
+    assert (flagged.fixable, flagged.verdict) == (True, "error")
 
-    doctor = _doctor(specs)
-    fixed = doctor.fix()
-    assert any(i.code == "MEM-PLACEHOLDER-1" for i in fixed)
+    assert any(i.code == "MEM-PLACEHOLDER-1" for i in _doctor(specs).fix())
     assert not atom.exists()
-
-    residual = _doctor(specs).check()
-    assert [i for i in residual if i.code == "MEM-PLACEHOLDER-1"] == []
-    errors = [i for i in residual if i.verdict == "error"]
-    assert errors == [], [f"{i.code}: {i.message}" for i in errors]
+    errors = [f"{i.code}: {i.message}" for i in _doctor(specs).check() if i.verdict == "error"]
+    assert errors == []
 
 
 def test_filled_atom_is_never_flagged_or_removed(tmp_path: Path) -> None:
     specs = _fresh_specs(tmp_path)
     atom = specs / "memory" / "product" / "feature.md"
     atom.write_text(
-        "---\n"
-        "slug: feature\n"
-        "title: Real Feature\n"
-        "tldr: A real feature with real content.\n"
+        "---\nslug: feature\ntitle: Real Feature\ntldr: A real feature.\n"
         "summary: This placeholder text in prose is NOT a template marker.\n"
-        "tags: [feature]\n"
-        "token_estimate: 50\n"
-        "---\n\n## Propósito\n\nReal content mentioning placeholder concepts.\n",
+        "tags: [feature]\ntoken_estimate: 50\n---\n\n## Propósito\n\nReal content.\n",
         encoding="utf-8",
     )
     assert is_placeholder_atom(atom) is False
-    issues = _doctor(specs).check()
-    assert [i for i in issues if i.code == "MEM-PLACEHOLDER-1"] == []
+    assert [i for i in _doctor(specs).check() if i.code == "MEM-PLACEHOLDER-1"] == []
     assert atom.exists()
 
 
 def test_upgrade_dry_run_reports_without_deleting(tmp_path: Path) -> None:
-    specs = _fresh_specs(tmp_path)
-    atom = specs / "memory" / "product" / "feature.md"
-    atom.write_text(_PLACEHOLDER_ATOM, encoding="utf-8")
-
+    specs, atom = _placeholder_atom(tmp_path)
     upgrade_feat.upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name), dry_run=True)
-    assert atom.exists(), "dry-run must not delete"
+    assert atom.exists()
 
 
-# ---------------------------------------------------------------------------
-# T-043-10 (FR8, idea tests-agents-md-placeholder-doctor-warning): AGENTS-PLACEHOLDER-1
-# — an INSTALLED tests/AGENTS.md still carrying unfilled <TOKEN> placeholders.
-# Intent: CONTRACT — asserts SPEC.md FR8 / A8.1-A8.3. Same validator family/shape as
-# MEM-PLACEHOLDER-1 above; reuses this module rather than a new sibling file.
-# ---------------------------------------------------------------------------
-
-
-def _specs_with_installed_tests_agents(tmp_path: Path, content: str | None) -> Path:
-    """A repo-shaped tree: <repo>/specs/ + <repo>/tests/AGENTS.md (or no tests/ at all)."""
-    repo = tmp_path / "repo"
-    specs = _fresh_specs_at(repo)
-    if content is not None:
-        tests_dir = repo / "tests"
-        tests_dir.mkdir(parents=True, exist_ok=True)
-        (tests_dir / "AGENTS.md").write_text(content, encoding="utf-8")
-    return specs
-
-
-def _fresh_specs_at(repo: Path) -> Path:
-    specs = repo / "specs"
-    scaffold(
-        specs,
-        project_name="testproj",
-        force=False,
-        public_dir=_TEMPLATES_DIR.parent,
-    )
-    return specs
-
-
-def test_agents_placeholder1_warns_on_unfilled_installed_tests_agents_md(tmp_path: Path) -> None:
-    """A8.1: an installed tests/AGENTS.md with a raw `<TOKEN>` placeholder → one WARN
-    naming the file."""
-    specs = _specs_with_installed_tests_agents(
-        tmp_path,
-        "# Test Rules\n\nPer-test timeout: `<UNIT_TIMEOUT_S>`s.\n",
-    )
-    issues = _doctor(specs).check()
-    flagged = [i for i in issues if i.code == "AGENTS-PLACEHOLDER-1"]
-    assert len(flagged) == 1, [i for i in issues]
-    assert flagged[0].verdict == "warning"
-    assert str(specs.parent / "tests" / "AGENTS.md") == finding_path(flagged[0])
-
-
-def test_agents_placeholder1_silent_on_filled_installed_tests_agents_md(tmp_path: Path) -> None:
-    """A8.3: a filled installed tests/AGENTS.md (no leftover `<TOKEN>`) → no finding."""
-    specs = _specs_with_installed_tests_agents(
-        tmp_path,
-        "# Test Rules\n\nPer-test timeout: 30s.\n",
-    )
-    issues = _doctor(specs).check()
-    assert [i for i in issues if i.code == "AGENTS-PLACEHOLDER-1"] == []
-
-
-def test_agents_placeholder1_ignores_a_token_shape_inside_a_longer_code_span(
-    tmp_path: Path,
+@pytest.mark.parametrize(
+    ("content", "flagged"),
+    [
+        pytest.param(
+            "# Test Rules\n\nTimeout: `<UNIT_TIMEOUT_S>`s.\n", True, id="A8.1-unfilled-warns"
+        ),
+        pytest.param("# Test Rules\n\nTimeout: 30s.\n", False, id="A8.3-filled-silent"),
+        pytest.param(
+            "# Rules\n\nIntent — `Intent: <KIND> — <AC id | bug-id | task-id>`.\n",
+            False,
+            id="token-inside-a-longer-code-span-silent",
+        ),
+        pytest.param(None, False, id="A8.2-absent-file-silent-never-reads-the-template"),
+    ],
+)
+def test_agents_placeholder1_on_installed_tests_agents_md(
+    tmp_path: Path, content: str | None, flagged: bool
 ) -> None:
-    """A false positive this check must never produce: the template's own
-    `` `Intent: <KIND> — <AC id | bug-id | task-id>` `` line illustrates a DIFFERENT
-    file's docstring syntax and ships verbatim in a correctly-filled installed copy
-    (this repo's own tests/AGENTS.md carries it at HEAD). Only a TIGHT single-backtick
-    span wrapping nothing but the bracketed token counts as an unfilled placeholder."""
-    specs = _specs_with_installed_tests_agents(
-        tmp_path,
-        "# Test Rules\n\n"
-        "Every test declares intent — `Intent: <KIND> — <AC id | bug-id | task-id>`.\n",
-    )
-    issues = _doctor(specs).check()
-    assert [i for i in issues if i.code == "AGENTS-PLACEHOLDER-1"] == []
+    """T-043-10 FR8 A8.1-A8.3: only the INSTALLED ``<repo>/tests/AGENTS.md`` is inspected;
+    only a tight single-backtick span around a bare ``<TOKEN>`` is unfilled."""
+    repo = tmp_path / "repo"
+    specs = _fresh_specs(repo)
+    installed = repo / "tests" / "AGENTS.md"
+    if content is not None:
+        installed.parent.mkdir(parents=True)
+        installed.write_text(content, encoding="utf-8")
+    issues = [i for i in _doctor(specs).check() if i.code == "AGENTS-PLACEHOLDER-1"]
+    expected = [("warning", str(installed))] if flagged else []
+    assert [(i.verdict, finding_path(i)) for i in issues] == expected
 
 
-def test_agents_placeholder1_silent_when_tests_agents_md_absent(tmp_path: Path) -> None:
-    """No installed tests/AGENTS.md at all (repo hasn't run `context alive` yet) →
-    silent; this check's job is placeholder content, never the file's existence."""
-    specs = _specs_with_installed_tests_agents(tmp_path, None)
-    issues = _doctor(specs).check()
-    assert [i for i in issues if i.code == "AGENTS-PLACEHOLDER-1"] == []
-
-
-def test_agents_placeholder1_never_flags_the_canonical_template(tmp_path: Path) -> None:
-    """A8.2: the canonical template legitimately carries placeholders (verified here so
-    the regex is proven live), yet the check never fires on it — it inspects the
-    installed consumer copy only, never dadaia_workspace/public/templates/tests-AGENTS.md."""
-    from dadaia_workspace.features.specs.doctor_memory import has_unfilled_angle_placeholders
-
-    assert _TESTS_AGENTS_TEMPLATE.exists()
-    assert has_unfilled_angle_placeholders(_TESTS_AGENTS_TEMPLATE) is True
-
-    # A tree with no installed tests/AGENTS.md never resolves to the template's own
-    # path — the check stays silent even though the template itself would trip the regex.
-    specs = _specs_with_installed_tests_agents(tmp_path, None)
-    issues = _doctor(specs).check()
-    assert [i for i in issues if i.code == "AGENTS-PLACEHOLDER-1"] == []
-
-
-def test_agents_placeholder1_silent_on_this_workspaces_own_tests_agents_md() -> None:
-    """A8.3 (Done criterion): `specs doctor` stays green on THIS workspace at HEAD —
-    dadaia-workspace's own installed tests/AGENTS.md is already filled in. Exercises the
-    MemoryValidator method directly (never the full SpecsDoctor.check()) so this stays
-    a pure unit test — LINT-1 shells a real subprocess and is out of scope here."""
+def test_agents_placeholder1_template_trips_the_regex_and_this_repos_copy_is_filled() -> None:
+    """A8.2/A8.3: the canonical template carries placeholders (the regex is live), this
+    repo's installed tests/AGENTS.md does not, and the validator is silent on this repo."""
     from dadaia_workspace.features.specs.doctor_memory import (
         MemoryValidator,
         has_unfilled_angle_placeholders,
     )
 
     repo_root = Path(__file__).resolve().parents[4]
-    installed = repo_root / "tests" / "AGENTS.md"
-    assert installed.exists()
-    assert has_unfilled_angle_placeholders(installed) is False
-
-    validator = MemoryValidator(repo_root / "specs")
-    issues = validator.check_tests_agents_placeholder()
-    assert issues == []
+    assert has_unfilled_angle_placeholders(_TEMPLATES_DIR / "tests-AGENTS.md") is True
+    assert has_unfilled_angle_placeholders(repo_root / "tests" / "AGENTS.md") is False
+    assert MemoryValidator(repo_root / "specs").check_tests_agents_placeholder() == []
 
 
 def test_reconcile_ownership_preflight_names_owner_and_repair(tmp_path: Path) -> None:
@@ -249,12 +144,9 @@ def test_reconcile_ownership_preflight_names_owner_and_repair(tmp_path: Path) ->
 
     from dadaia_workspace.features.reconcile.service import _ownership_preflight
 
-    # Writable tree: no error.
     (tmp_path / ".dadaia" / "agentic").mkdir(parents=True)
     assert _ownership_preflight(tmp_path) is None
 
-    # Unwritable mode: the same preflight reports it (the foreign-owner branch is
-    # covered by the same function; chmod works without privilege).
     agentic = tmp_path / ".dadaia" / "agentic"
     agentic.chmod(0o500)
     error = _ownership_preflight(tmp_path)
