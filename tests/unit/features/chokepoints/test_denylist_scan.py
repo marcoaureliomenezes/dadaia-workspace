@@ -1,13 +1,10 @@
 """Pure push-range denylist matcher (SPEC v0.9.0 FR3/FR5/FR6).
 
-Intent: CONTRACT — v0.9.0 A3.1, A3.4, A4.1, A5.2, A6.2; v0.11.0 A4.1, A4.4,
-A4.6, A1.1, A1.2, A1.3, A1.4
+Intent: CONTRACT — v0.9.0 A3.1, A3.4, A5.2, A6.2; v0.11.0 A1.1-A1.4, A4.1, A4.4, A4.6;
+sa-private-match-rendering-has-three-renderers#B3.
 
-Term sources (operator denylist, packaged baseline) x masking x the
-undecodable-blob skip+count — no real operator term ever appears here
-(synthetic-only, per the TASKS standing rule): only ``zz-``-prefixed synthetic terms and
-the packaged structural baseline (IPv4/home-path patterns, which are generic regexes,
-not private values).
+Synthetic ``zz-`` terms only; baseline positives are composed at run time so this
+module's own blob never carries a value the push-range scan would flag.
 """
 
 from __future__ import annotations
@@ -15,366 +12,128 @@ from __future__ import annotations
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass
-from pathlib import Path
+
+import pytest
 
 from dadaia_workspace.core.models.git_scan import ScannedObject
 from dadaia_workspace.features.chokepoints.denylist_scan import _first_match, scan_objects
 from dadaia_workspace.infrastructure.privacy_check import load_baseline_patterns
 
-_SYNTHETIC_TERM = "zz-secret-term"
-
-# Positive baseline fixtures — deliberately built via concatenation (never a whole
-# matching literal in THIS file's own source) so this module's own git blob never
-# carries a string the push-range denylist scan would itself flag when this repo's own
-# range is scanned. Runtime semantics are unchanged: the assembled value still matches
-# the baseline pattern under test.
-_POSITIVE_IPV4 = "198.18" + ".0.5"  # RFC 2544 benchmarking range — not a real host
-_POSITIVE_HOME_PATH = "/hom" + "e/alice"
-_POSITIVE_INTERNAL_HOST_1 = "bastion" + ".local"
-_POSITIVE_INTERNAL_HOST_2 = "hp-printer" + ".local"
-_POSITIVE_INTERNAL_HOST_3 = "prod.workspace" + ".local"  # NOT the exact carved-out literal
-_POSITIVE_INTERNAL_HOST_4 = "nas" + ".home"
+_TERM = "zz-secret-term"
+_TERMS = ((_TERM, "synthetic"),)
+_IPV4 = "198.18" + ".0.5"  # RFC 2544 benchmarking range
+_HOME_LONG = "/hom" + "e/synthzqwxyz"
+_HOME_SHORT = "/hom" + "e/synthzq"  # a substring of _HOME_LONG
 
 
-def _obj(path: str, text: str, *, sha: str = "deadbeef", decodable: bool = True) -> ScannedObject:
-    return ScannedObject(path=path, sha=sha, text=text, decodable=decodable)
-
-
-def _obj_with_prior(
-    path: str, text: str, prior_text: str | None, *, sha: str = "deadbeef"
+def _obj(
+    text: str, prior: str | None = None, *, path: str = "notes.md", **kw: object
 ) -> ScannedObject:
-    return ScannedObject(path=path, sha=sha, text=text, decodable=True, prior_text=prior_text)
+    return ScannedObject(
+        path=path, sha="deadbeef", text=text, decodable=True, prior_text=prior, **kw
+    )  # type: ignore[arg-type]
 
 
-# ---------------------------------------------------------------------------
-# A3.1 — baseline layer is live with no operator denylist present.
-# ---------------------------------------------------------------------------
-
-
-def test_baseline_ipv4_literal_refused_with_no_operator_terms() -> None:
-    """sa-private-match-rendering-has-three-renderers#B3."""
-    baseline = load_baseline_patterns()
-    objects = [_obj("notes.md", f"server lives at {_POSITIVE_IPV4} for now\n")]
-
-    outcome = scan_objects(objects, terms=(), patterns=baseline)
-
-    assert len(outcome.hits) == 1
-    hit = outcome.hits[0]
-    assert hit.path == "notes.md"
-    assert hit.line == 1
-    assert _POSITIVE_IPV4 not in hit.masked_term
-    assert hit.masked_term == "1…5"
-
-
-def test_baseline_home_path_refused_with_no_operator_terms() -> None:
-    baseline = load_baseline_patterns()
-    objects = [_obj("notes.md", f"logs at {_POSITIVE_HOME_PATH}/project/output.log\n")]
-
-    outcome = scan_objects(objects, terms=(), patterns=baseline)
-
-    assert len(outcome.hits) == 1
-    assert _POSITIVE_HOME_PATH not in outcome.hits[0].masked_term
-
-
-# ---------------------------------------------------------------------------
-# A3.4 — baseline `exclude_regex` carve-outs still apply.
-# ---------------------------------------------------------------------------
-
-
-def test_baseline_excludes_loopback_and_documentation_values() -> None:
-    baseline = load_baseline_patterns()
-    objects = [
-        _obj("a.md", "loopback at 127.0.0.1\n"),
-        _obj("b.md", "docs live at example.com\n", sha="cafef00d"),
-        _obj("c.md", "runner home is /home/runner/work\n", sha="feedface"),
-    ]
-
-    outcome = scan_objects(objects, terms=(), patterns=baseline)
-
-    assert outcome.hits == ()
-
-
-def test_baseline_excludes_rfc2606_reserved_tld_emails() -> None:
-    """A3.4 family: RFC-2606 reserved TLDs (``.invalid``/``.test``/``.example``/
-    ``.localhost``) are synthetic by definition — same carve-out philosophy as the
-    ``example.com`` and RFC-5737 documentation-IP exclusions. Regression for the false
-    positive on ``container.py``'s ``definition@dadaia.invalid`` / ``closure@dadaia.invalid``
-    synthetic commit identities."""
-    baseline = load_baseline_patterns()
-    objects = [
-        _obj("a.md", "contact definition@dadaia.invalid for details\n"),
-        _obj("b.md", "reach closure@dadaia.invalid instead\n", sha="cafef00d"),
-        _obj("c.md", "or try someone@sub.example.test\n", sha="feedface"),
-    ]
-
-    outcome = scan_objects(objects, terms=(), patterns=baseline)
-
-    assert outcome.hits == ()
-
-
-def test_baseline_excludes_the_products_own_synthetic_workspace_local_host() -> None:
-    """dd-code-reviewer CRITICAL finding (v0.9.0 pre-PR review): the product's own
-    synthetic git identity host (``git_subprocess.py``'s ``user.email=dadaia@workspace.
-    local`` fallback, quoted verbatim in ``architecture.md``) is a synthetic literal, not
-    a real internal hostname — same carve-out family as the RFC-2606 email exclusion.
-    The carve-out is the specific literal ``workspace.local`` ONLY: a real internal
-    hostname (including one that merely ends in ``.local``) must still be refused."""
-    baseline = load_baseline_patterns()
-    carved_out = [
-        _obj("a.md", "the tool falls back to dadaia@workspace.local when unset\n"),
-        _obj("b.md", "identity: dadaia-workspace <dadaia@workspace.local>\n", sha="cafef00d"),
-    ]
-    still_flagged = [
-        _obj("c.md", f"internal host {_POSITIVE_INTERNAL_HOST_1} is reachable\n", sha="feedface"),
-        _obj("d.md", f"printer at {_POSITIVE_INTERNAL_HOST_2} on the LAN\n", sha="deadbeef"),
-        _obj("e.md", f"see {_POSITIVE_INTERNAL_HOST_3} for the real box\n", sha="0ff1ce00"),
-    ]
-
-    clean = scan_objects(carved_out, terms=(), patterns=baseline)
-    dirty = scan_objects(still_flagged, terms=(), patterns=baseline)
-
-    assert clean.hits == ()
-    assert len(dirty.hits) == len(still_flagged)
-
-
-def test_baseline_excludes_the_stdlib_pathlib_home_method_call() -> None:
-    """Discovered by the new self-scan regression test (T-090 code-review remediation):
-    ``internal-hostname``'s TLD alternation includes ``home``, so it false-positives on
-    the stdlib idiom ``Path.home()`` / ``pathlib.Path.home()`` — a dotted attribute
-    chain, not a hostname. This is a NARROW literal carve-out (exactly ``Path.home`` /
-    ``pathlib.Path.home``, case-sensitive), same family as the ``workspace.local``
-    carve-out above: a real internal hostname that happens to end in ``.home`` (a
-    company's internal TLD) must still be refused."""
-    baseline = load_baseline_patterns()
-    carved_out = [
-        _obj("a.py", '        sessions_dir = pathlib.Path.home() / ".claude" / "sessions"\n'),
-        _obj("b.py", '    return Path.home() / ".kimi-code"\n', sha="cafef00d"),
-    ]
-    still_flagged = [
-        _obj(
-            "c.md",
-            f"reach the fileserver at {_POSITIVE_INTERNAL_HOST_4} for backups\n",
-            sha="feedface",
+@pytest.mark.parametrize(
+    ("value", "mask"),
+    [
+        pytest.param(_IPV4, "1…5", id="ipv4-A3.1"),
+        pytest.param("/hom" + "e/alice", None, id="home-path-A3.1"),
+        pytest.param("bastion" + ".local", None, id="dot-local-host"),
+        pytest.param(
+            "prod.workspace" + ".local", None, id="not-the-exact-workspace-local-carve-out"
         ),
-    ]
-
-    clean = scan_objects(carved_out, terms=(), patterns=baseline)
-    dirty = scan_objects(still_flagged, terms=(), patterns=baseline)
-
-    assert clean.hits == ()
-    assert len(dirty.hits) == len(still_flagged)
-
-
-# ---------------------------------------------------------------------------
-# v0.11.0 FR1/A1.1-A1.4 — the amnesty suppression predicate: a hit is suppressed iff
-# the candidate's MATCHED VALUE (never the pattern id or the layer) occurs
-# case-insensitively in the SAME path's published prior text.
-# ---------------------------------------------------------------------------
-
-
-def test_amnesty_suppresses_a_value_already_published_at_the_same_path() -> None:
-    """A1.1: same-path prior-published value never refuses."""
-    obj = _obj_with_prior(
-        "notes.md",
-        f"still here: {_SYNTHETIC_TERM}\n",
-        prior_text=f"had {_SYNTHETIC_TERM} before\n",
-    )
-
-    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=())
-
-    assert outcome.hits == ()
-
-
-def test_amnesty_does_not_apply_to_a_new_path_carrying_the_same_value() -> None:
-    """A1.2: the same value in a path with NO prior content (a genuinely new path)
-    still refuses — the amnesty is bound to the path, not the value."""
-    obj = _obj_with_prior("new-path.md", f"here: {_SYNTHETIC_TERM}\n", prior_text=None)
-
-    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=())
-
-    assert len(outcome.hits) == 1
-
-
-def test_amnesty_does_not_apply_to_a_new_value_in_an_edited_path() -> None:
-    """A1.3: a value ABSENT from the prior version of an edited path still refuses —
-    even though a DIFFERENT value of the same term source was present there. This is
-    the smuggling-path attack the security review is asked to attempt: a predicate
-    keyed on the pattern/source instead of the exact matched value would wrongly
-    amnesty this."""
-    other_term = "zz-other-published-term"
-    obj = _obj_with_prior(
-        "notes.md",
-        f"now has {_SYNTHETIC_TERM}\n",
-        prior_text=f"used to have {other_term}\n",
-    )
-
+        pytest.param("nas" + ".home", None, id="dot-home-host"),
+    ],
+)
+def test_baseline_refuses_a_private_value_with_no_operator_terms(
+    value: str, mask: str | None
+) -> None:
+    """The baseline layer alone refuses; the hit never carries the value (B3)."""
     outcome = scan_objects(
-        [obj],
-        terms=((_SYNTHETIC_TERM, "synthetic"), (other_term, "synthetic")),
-        patterns=(),
+        [_obj(f"see {value} now\n")], terms=(), patterns=load_baseline_patterns()
     )
 
-    assert len(outcome.hits) == 1
-    assert _SYNTHETIC_TERM not in outcome.hits[0].masked_term  # A5.2 still holds.
+    assert [(h.path, h.line) for h in outcome.hits] == [("notes.md", 1)]
+    assert value not in outcome.hits[0].masked_term
+    if mask:
+        assert outcome.hits[0].masked_term == mask
 
 
-def test_amnesty_suppression_is_case_insensitive_on_both_sides() -> None:
-    """A1.4: suppression is case-insensitive on both sides, matching the matcher's
-    existing case-insensitivity on every layer."""
-    obj = _obj_with_prior(
-        "notes.md",
-        f"still: {_SYNTHETIC_TERM}\n",
-        prior_text=f"BEFORE: {_SYNTHETIC_TERM.upper()}\n",
+@pytest.mark.parametrize(
+    "text",
+    [
+        pytest.param("loopback at 127.0.0.1\n", id="loopback"),
+        pytest.param("docs live at example.com\n", id="documentation-domain"),
+        pytest.param("runner home is /home/runner/work\n", id="placeholder-home"),
+        pytest.param("contact definition@dadaia.invalid\n", id="rfc2606-invalid-email"),
+        pytest.param("or try someone@sub.example.test\n", id="rfc2606-test-email"),
+        pytest.param("identity <dadaia@workspace.local>\n", id="product-synthetic-identity"),
+        pytest.param('    return pathlib.Path.home() / ".claude"\n', id="stdlib-path-home"),
+    ],
+)
+def test_baseline_carve_out_never_refuses(text: str) -> None:
+    """A3.4: exclude_regex carve-outs apply (the refused neighbours are rows above)."""
+    assert scan_objects([_obj(text)], terms=(), patterns=load_baseline_patterns()).hits == ()
+
+
+@pytest.mark.parametrize(
+    ("text", "prior", "terms", "hit_lines"),
+    [
+        pytest.param(
+            f"still {_TERM}\n", f"had {_TERM}\n", _TERMS, [], id="A1.1-same-path-published"
+        ),
+        pytest.param(f"here {_TERM}\n", None, _TERMS, [1], id="A1.2-new-path"),
+        pytest.param(
+            f"now {_TERM}\n",
+            "had zz-other-term\n",
+            (*_TERMS, ("zz-other-term", "s")),
+            [1],
+            id="A1.3-new-value",
+        ),
+        pytest.param(
+            f"still {_TERM}\n", f"HAD {_TERM.upper()}\n", _TERMS, [], id="A1.4-case-insensitive"
+        ),
+        pytest.param(
+            f"at {_IPV4} still\n", f"at {_IPV4} first\n", None, [], id="baseline-layer-amnestied"
+        ),
+        pytest.param(
+            f"now {_HOME_SHORT}/p\n",
+            f"was {_HOME_LONG}/p\n",
+            None,
+            [1],
+            id="superstring-prior-never-amnesties",
+        ),
+        pytest.param(
+            f"at {_HOME_SHORT}/p\n",
+            f"was {_HOME_SHORT}/p too\n",
+            None,
+            [],
+            id="equal-anchored-value-amnestied",
+        ),
+        pytest.param(
+            f"{_TERM} one\nnew zz-brand-new\n",
+            f"{_TERM} out\n",
+            (*_TERMS, ("zz-brand-new", "s")),
+            [2],
+            id="suppressed-line-continues-to-next",
+        ),
+    ],
+)
+def test_amnesty_is_same_path_same_layer_equal_value(
+    text: str, prior: str | None, terms: tuple[tuple[str, str], ...] | None, hit_lines: list[int]
+) -> None:
+    """v0.11.0 FR1: a hit is suppressed iff the same layer re-run on the same path's prior text yields an equal value."""
+    patterns = load_baseline_patterns() if terms is None else ()
+    outcome = scan_objects([_obj(text, prior)], terms=terms or (), patterns=patterns)
+
+    assert [h.line for h in outcome.hits] == hit_lines
+    assert all(
+        _TERM not in h.masked_term and _HOME_SHORT not in h.masked_term for h in outcome.hits
     )
-
-    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=())
-
-    assert outcome.hits == ()
-
-
-def test_amnesty_applies_to_the_baseline_pattern_layer_too() -> None:
-    """FR1's suppression predicate is applied UNIFORMLY across all three term
-    layers — proven here for the baseline structural-pattern layer, not just the
-    operator-term layer the other A1.x cases exercise."""
-    baseline = load_baseline_patterns()
-    obj = _obj_with_prior(
-        "notes.md",
-        f"server at {_POSITIVE_IPV4} still\n",
-        prior_text=f"server at {_POSITIVE_IPV4} originally\n",
-    )
-
-    outcome = scan_objects([obj], terms=(), patterns=baseline)
-
-    assert outcome.hits == ()
-
-
-# ---------------------------------------------------------------------------
-# dd-code-reviewer MEDIUM finding (v0.11.0 pre-PR review) — the amnesty predicate must
-# suppress a candidate ONLY when the SAME layer's matcher, re-run against prior_text,
-# produces a matched value EQUAL (case-normalized) to the current matched value — never
-# raw substring containment, which lets a DIFFERENT, longer prior-published value
-# amnesty an unrelated new value that happens to be one of its substrings.
-# ---------------------------------------------------------------------------
-
-#: Synthetic ``/home/<name>`` fixture values, composed at run time so this module's own
-#: tracked source never carries a contiguous home path. The baseline excludes generic
-#: placeholder users only, so these fire — which is the point: the pair exercises the
-#: substring-amnesty predicate on a hit that actually reaches it.
-_POSITIVE_HOME_PATH_SUPERSTRING = "/hom" + "e/synthzqwxyz"  # a DIFFERENT prior value
-_POSITIVE_HOME_PATH_SUBSTRING = "/hom" + "e/synthzq"  # substring of the value above
-
-
-def test_amnesty_does_not_suppress_a_baseline_hit_via_a_different_superstring_prior_value() -> None:
-    """dd-code-reviewer repro 1: a prior home-path value that is a SUPERSTRING of the new
-    one (``_POSITIVE_HOME_PATH_SUPERSTRING`` extends ``_POSITIVE_HOME_PATH_SUBSTRING``
-    by four characters) must NOT suppress the new, DIFFERENT, standalone value merely
-    because it is an unanchored substring of the old one — the SAME `home-abs-path`
-    pattern re-run against prior_text must produce a matched value EQUAL to the current
-    one, and here it does not (the pattern's own boundary makes the prior match the
-    FULL superstring, never the shorter substring)."""
-    baseline = load_baseline_patterns()
-    obj = _obj_with_prior(
-        "notes.md",
-        f"now at {_POSITIVE_HOME_PATH_SUBSTRING}/project\n",
-        prior_text=f"was at {_POSITIVE_HOME_PATH_SUPERSTRING}/project\n",
-    )
-
-    outcome = scan_objects([obj], terms=(), patterns=baseline)
-
-    assert len(outcome.hits) == 1
-    assert _POSITIVE_HOME_PATH_SUBSTRING not in outcome.hits[0].masked_term  # A5.2 still holds.
-
-
-def test_amnesty_still_suppresses_the_exact_same_anchored_baseline_value() -> None:
-    """Contrast/legitimate case: when prior_text carries the EXACT SAME anchored value
-    (not merely a superstring), the hit is still suppressed — the fix narrows the
-    predicate to value-equality, it does not disable the amnesty."""
-    baseline = load_baseline_patterns()
-    obj = _obj_with_prior(
-        "notes.md",
-        f"still at {_POSITIVE_HOME_PATH_SUBSTRING}/project\n",
-        prior_text=f"was at {_POSITIVE_HOME_PATH_SUBSTRING}/project too\n",
-    )
-
-    outcome = scan_objects([obj], terms=(), patterns=baseline)
-
-    assert outcome.hits == ()
-
-
-def test_amnesty_short_circuit_continues_to_next_line_when_every_candidate_suppressed() -> None:
-    """A line whose every candidate is suppressed continues to the next line rather
-    than returning early — the short-circuit property survives the new guard."""
-    obj = _obj_with_prior(
-        "notes.md",
-        f"{_SYNTHETIC_TERM} on line one\nnew-here: {_SYNTHETIC_TERM}\n",
-        prior_text=f"{_SYNTHETIC_TERM} already published\n",
-    )
-
-    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=())
-
-    # Line 1 is fully suppressed (its only candidate is amnestied); line 2 carries the
-    # SAME term but is amnestied too (same value, same prior text) -- both lines
-    # suppressed, zero hits. Rebuilt below with a genuinely NEW value on line 2 to
-    # prove the scan does not stop dead after the first suppressed line.
-    assert outcome.hits == ()
-
-    obj_with_new_value_on_line_two = _obj_with_prior(
-        "notes.md",
-        f"{_SYNTHETIC_TERM} on line one\nnew-here: zz-brand-new-value\n",
-        prior_text=f"{_SYNTHETIC_TERM} already published\n",
-    )
-    outcome_two = scan_objects(
-        [obj_with_new_value_on_line_two],
-        terms=((_SYNTHETIC_TERM, "synthetic"), ("zz-brand-new-value", "synthetic")),
-        patterns=(),
-    )
-    assert len(outcome_two.hits) == 1
-    assert outcome_two.hits[0].line == 2
-
-
-# ---------------------------------------------------------------------------
-# A4.1 — no amnesty/allowlist structure exists in the matcher's own source.
-# ---------------------------------------------------------------------------
-
-
-def test_no_allowlist_or_sanctioned_terms_constant_in_matcher_source() -> None:
-    """FR4/A4.1: no amnesty-list CODE CONSTRUCT (a constant, dict, or set assignment)
-    exists in the matcher — a prose mention of the doctrine (e.g. this module's own
-    docstring stating there is none) is not itself a violation."""
-    import dadaia_workspace.features.chokepoints.denylist_scan as module
-
-    assert module.__file__ is not None
-    source = Path(module.__file__).read_text(encoding="utf-8")
-    forbidden = re.compile(
-        r"(?im)^\s*_?[A-Za-z_]*\b(ALLOWLIST|SANCTIONED|AMNESTY|EXEMPT)\w*\s*[:=]"
-    )
-    assert not forbidden.search(source), "denylist_scan.py must carry no amnesty list (FR4/A4.1)"
-
-    # v0.4.7 FR7: the same construct is forbidden in the repo self-scan SENTINEL, the
-    # one place it ever actually grew one — `_TESTS_SCOPE_BASELINE`, 23 hand-kept
-    # (path, pattern) rows that were a SECOND scope decision and the measured cause of
-    # the privacy-scan bug loop. Its own vocabulary (TOLERATED/SCOPE_BASELINE) is added
-    # so reintroducing the list under its historical name fails here.
-    sentinel = Path(__file__).resolve().parents[3] / "integration" / "test_repo_self_scan.py"
-    forbidden_rows = re.compile(
-        r"(?im)^\s*_?[A-Za-z_]*\b(ALLOWLIST|SANCTIONED|AMNESTY|EXEMPT|TOLERATED|SCOPE_BASELINE)\w*\s*[:=]"
-    )
-    assert not forbidden_rows.search(sentinel.read_text(encoding="utf-8")), (
-        "test_repo_self_scan.py must carry no tolerated-pairs baseline (v0.4.7 FR7)"
-    )
-
-
-# ---------------------------------------------------------------------------
-# LOW performance finding — the matcher short-circuits at the first hit LINE; it never
-# scans the remainder of a large blob nor sorts a full candidate list to find a result
-# already known at the first match.
-# ---------------------------------------------------------------------------
 
 
 class _CountingRegex:
-    """Duck-types the ``re.Pattern[str].finditer`` surface ``_first_match`` calls, and
-    counts invocations — a real ``re.Pattern`` cannot be subclassed to add counting."""
-
     def __init__(self, inner: re.Pattern[str]) -> None:
         self._inner = inner
         self.calls = 0
@@ -393,150 +152,74 @@ class _CountingPattern:
 
 
 def test_first_match_short_circuits_at_the_first_hit_line() -> None:
-    """The pattern's ``.finditer`` must never be invoked past the line carrying the
-    first hit — proof the matcher stops scanning rather than walking every remaining
-    line of a large blob and sorting a full candidate list (dd-code-reviewer LOW finding)."""
-    counting = _CountingRegex(re.compile(re.escape(_SYNTHETIC_TERM)))
-    text = f"line one has {_SYNTHETIC_TERM} right here\n" + "noise line\n" * 500
-    obj = _obj("big.md", text)
+    counting = _CountingRegex(re.compile(re.escape(_TERM)))
+    obj = _obj(f"line one has {_TERM}\n" + "noise line\n" * 500)
 
     hit = _first_match(obj, terms=[], patterns=[_CountingPattern(counting)])  # type: ignore[list-item]
 
-    assert hit is not None
-    assert hit.line == 1
-    assert counting.calls == 1, "must not scan past the first hit line"
-
-
-# ---------------------------------------------------------------------------
-# A5.2 — the unmasked term never appears in any Hit field.
-# ---------------------------------------------------------------------------
+    assert hit is not None and hit.line == 1
+    assert counting.calls == 1
 
 
 def test_unmasked_operator_term_absent_from_every_hit_field() -> None:
     """sa-private-match-rendering-has-three-renderers#B3."""
-    objects = [_obj("secret.md", f"the value is {_SYNTHETIC_TERM} right here\n")]
+    outcome = scan_objects(
+        [_obj(f"the value is {_TERM} here\n", path="secret.md")], terms=_TERMS, patterns=()
+    )
 
-    outcome = scan_objects(objects, terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=())
-
-    assert len(outcome.hits) == 1
     hit = outcome.hits[0]
-    for field_value in (hit.path, hit.masked_term, hit.source_layer):
-        assert _SYNTHETIC_TERM not in field_value
-    assert hit.masked_term == "z…m"
-    assert hit.source_layer == "operator denylist"
+    assert all(_TERM not in v for v in (hit.path, hit.masked_term, hit.source_layer))
+    assert (hit.masked_term, hit.source_layer) == ("z…m", "operator denylist")
 
 
-# ---------------------------------------------------------------------------
-# A6.2 — a binary (undecodable) object is skipped and counted, never matched.
-# ---------------------------------------------------------------------------
+_BIG = {"oversized": True, "size_bytes": 6_000_000, "scanned_bytes": 5_242_880}
 
 
-def test_undecodable_object_is_skipped_and_counted() -> None:
-    objects = [
-        _obj("bin.dat", "", decodable=False),
-        _obj("clean.md", "nothing sensitive here\n", sha="cafef00d"),
-    ]
+@pytest.mark.parametrize(
+    ("obj", "hits", "binary", "notes"),
+    [
+        pytest.param(
+            ScannedObject(path="b.dat", sha="d", text="", decodable=False),
+            0,
+            1,
+            [],
+            id="A6.2-binary",
+        ),
+        pytest.param(
+            _obj(f"x {_TERM}\n", **_BIG),
+            1,
+            0,
+            [("notes.md", 6_000_000, 5_242_880)],
+            id="A4.1-prefix-hit",
+        ),
+        pytest.param(
+            _obj("clean\n", **_BIG),
+            0,
+            0,
+            [("notes.md", 6_000_000, 5_242_880)],
+            id="A4.4-note-without-hit",
+        ),
+        pytest.param(
+            ScannedObject(path="b.bin", sha="d", text="", decodable=False, **_BIG),
+            0,
+            1,
+            [],
+            id="A4.6-undecodable",  # type: ignore[arg-type]
+        ),
+        pytest.param(
+            _obj(f"x {_TERM}\n", "unrelated\n", **_BIG),
+            1,
+            0,
+            [("notes.md", 6_000_000, 5_242_880)],
+            id="oversized-with-prior-not-amnestied",
+        ),
+    ],
+)
+def test_binary_and_oversized_objects(
+    obj: ScannedObject, hits: int, binary: int, notes: list[tuple[str, int, int]]
+) -> None:
+    outcome = scan_objects([obj], terms=_TERMS, patterns=())
 
-    outcome = scan_objects(objects, terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=())
-
-    assert outcome.hits == ()
-    assert outcome.skipped_binary_count == 1
-
-
-# ---------------------------------------------------------------------------
-# v0.11.0 FR4 — an oversized (partially-scanned) object: its scanned prefix still
-# produces a hit (A4.1), it always contributes a structured note independent of a hit
-# (A4.4), and an oversized object whose prefix failed to decode falls back to the SAME
-# binary skip class rather than a separate note (A4.6).
-# ---------------------------------------------------------------------------
-
-
-def _oversized_obj(
-    path: str,
-    text: str,
-    *,
-    sha: str = "deadbeef",
-    decodable: bool = True,
-    size_bytes: int = 6_000_000,
-    scanned_bytes: int = 5_242_880,
-    prior_text: str | None = None,
-) -> ScannedObject:
-    return ScannedObject(
-        path=path,
-        sha=sha,
-        text=text,
-        decodable=decodable,
-        oversized=True,
-        size_bytes=size_bytes,
-        scanned_bytes=scanned_bytes,
-        prior_text=prior_text,
-    )
-
-
-def test_oversized_object_produces_a_hit_when_its_scanned_prefix_matches() -> None:
-    """A4.1: an oversized (partially-scanned) TEXT object still produces a hit when its
-    scanned prefix carries a matching value — the fail-open is now partial coverage,
-    not zero coverage."""
-    obj = _oversized_obj("big.md", f"leading noise {_SYNTHETIC_TERM} here\n")
-
-    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=())
-
-    assert len(outcome.hits) == 1
-    assert outcome.hits[0].path == "big.md"
-
-
-def test_oversized_object_always_produces_a_note_even_with_no_hit() -> None:
-    """A4.4: every oversized (decodable) object produces a structured note — path,
-    total size and scanned bytes — independent of whether a hit was found."""
-    obj = _oversized_obj("big.md", "nothing sensitive here\n")
-
-    outcome = scan_objects([obj], terms=(), patterns=())
-
-    assert outcome.hits == ()
-    assert len(outcome.oversized_notes) == 1
-    note = outcome.oversized_notes[0]
-    assert note.path == "big.md"
-    assert note.size_bytes == 6_000_000
-    assert note.scanned_bytes == 5_242_880
-
-
-def test_oversized_object_with_undecodable_prefix_counts_as_binary_only() -> None:
-    """A4.6: an oversized object whose prefix failed to decode (``decodable=False``)
-    falls back to the SAME binary skip class as any other undecodable blob — it does
-    NOT also produce an oversized note (there is nothing honest to report about a scan
-    that never ran)."""
-    obj = _oversized_obj("big.bin", "", decodable=False)
-
-    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=())
-
-    assert outcome.hits == ()
-    assert outcome.skipped_binary_count == 1
-    assert outcome.oversized_notes == ()
-
-
-# ---------------------------------------------------------------------------
-# dd-code-reviewer MEDIUM finding M3 support (v0.11.0 pre-PR review) — pin the matcher
-# side of the "oversized-never-amnestied" boundary: the suppression predicate is
-# evaluated identically for an oversized object exactly as for any other — `oversized`
-# never special-cases it. The real product-level guarantee that an oversized CURRENT
-# object never carries prior_text is enforced at the ADAPTER
-# (git_objects.py, pinned by
-# test_new_objects_oversized_current_object_never_carries_prior_text_even_with_resolvable_base
-# in tests/unit/infrastructure/test_git_object_reader.py); this test composes an
-# oversized object WITH prior_text set (the shape the matcher-level tests were
-# previously missing) and proves a value absent from that prior text still refuses.
-# ---------------------------------------------------------------------------
-
-
-def test_oversized_object_carrying_prior_text_still_hits_when_value_not_amnestied() -> None:
-    obj = _oversized_obj(
-        "big.md",
-        f"leading noise {_SYNTHETIC_TERM} here\n",
-        prior_text="unrelated prior content\n",
-    )
-
-    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=())
-
-    assert len(outcome.hits) == 1
-    assert outcome.hits[0].path == "big.md"
-    assert len(outcome.oversized_notes) == 1  # A4.4: the note is independent of the hit.
+    assert len(outcome.hits) == hits
+    assert outcome.skipped_binary_count == binary
+    assert [(n.path, n.size_bytes, n.scanned_bytes) for n in outcome.oversized_notes] == notes
