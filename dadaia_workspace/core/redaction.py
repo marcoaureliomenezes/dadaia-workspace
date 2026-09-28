@@ -5,22 +5,19 @@
   renders) and ``infrastructure/privacy_check`` (``public doctor``).
 - :class:`Redactor` — word-boundary, longest-first, ordinal-placeholder masking; used by
   ``cli/redact`` (``--redact``) and ``features/certification``.
-- :func:`redact_text` / :func:`first_privacy_hit` — write-time scrubbing and the
-  baseline check for ledger free text (re-exported by ``core/models/bugs``).
+- :func:`redact_text` — control-character stripping and home-path/IP scrubbing; used
+  by ``cli/redact``.
 """
 
 from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Sequence
-from typing import Protocol
 
 __all__ = [
     "UNSAFE_FORMAT_CHARS_RE",
-    "PatternLike",
     "Redactor",
     "compile_candidates",
-    "first_privacy_hit",
     "mask",
     "redact_text",
 ]
@@ -96,49 +93,6 @@ def redact_text(text: str, denylist_terms: Sequence[tuple[str, str]] = ()) -> st
         if term:
             out = re.sub(re.escape(term), "[REDACTED-TERM]", out, flags=re.IGNORECASE)
     return out
-
-
-# ============================================================================
-# first_privacy_hit — the one place a write-once free-text field is checked against
-# the operator's own baseline privacy patterns (v0.5.1 K5 deepening, D5).
-# ============================================================================
-
-
-class PatternLike(Protocol):
-    """Structural shape a compiled privacy pattern must satisfy — the same shape
-    ``infrastructure.privacy_check.load_baseline_patterns()`` / ``container
-    .load_denylist_baseline_patterns()`` already returns (and
-    ``features.chokepoints.denylist_scan.BaselinePatternLike`` already names for the
-    push-range scan). Declared locally rather than imported: ``core`` never imports
-    ``infrastructure`` or ``features`` (ring purity) — a caller threads real pattern
-    instances in as data; this Protocol only pins the two attributes
-    :func:`first_privacy_hit` reads."""
-
-    @property
-    def regex(self) -> re.Pattern[str]: ...
-
-    @property
-    def exclude(self) -> re.Pattern[str] | None: ...
-
-    @property
-    def reason(self) -> str: ...
-
-
-def first_privacy_hit(text: str, patterns: Sequence[PatternLike]) -> str | None:
-    """Return the ``reason`` of the FIRST *patterns* entry that matches *text* (honoring
-    each pattern's own ``exclude`` carve-out), or ``None`` when nothing matches.
-
-    The ONE privacy check a write-once free-text field is refused against — the SAME
-    baseline the push-range denylist scan already refuses on (operator carve-outs like
-    ``/home/runner``/``noreply@anthropic.com`` included), never a stricter or narrower
-    copy: a value this function refuses would already refuse the push that committed it.
-    """
-    for pattern in patterns:
-        for match in pattern.regex.finditer(text):
-            if pattern.exclude is not None and pattern.exclude.search(match.group(0)):
-                continue
-            return pattern.reason
-    return None
 
 
 # ============================================================================

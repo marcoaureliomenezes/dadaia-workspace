@@ -5,9 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from dadaia_workspace.core.models.bugs import BugRecord
     from dadaia_workspace.features.certification import CertificationResult
-    from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 from dadaia_workspace.core.workspace_resolver import not_initialized
 from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
@@ -83,32 +81,6 @@ def build_git_object_reader() -> GitSubprocessObjectReader:
     contract.
     """
     return GitSubprocessObjectReader()
-
-
-def build_bug_record_store(specs_dir: Path) -> "JsonlRecordStore[BugRecord]":
-    """Composition-root seam for the generic bug-record JSONL store.
-
-    Stays a container seam because the doctor reads the ledger through it
-    (``bug_store_factory`` -> ``features.specs.doctor_governance.GovernanceValidator``);
-    the ledger's ONE WRITER is the skill script ``dd-bug-resolution/scripts/bugs.py``
-    which shares no code with this reader.
-
-    Takes *specs_dir* directly — the SAME resolved directory the doctor's
-    ``--specs-dir``/bind-resolution seam already produces (never a
-    ``workspace_root``, which would silently assume ``<root>/specs`` and break every
-    ``--specs-dir <tmp>`` test fixture and remote-context routing). The ledger's
-    physical filename is ``BUGS.jsonl`` (T-050-10 physically migrated the ledger
-    from the retired v5-event-shaped ``bugs.jsonl`` — the record model FR3
-    produced, one line per bug id, commit provenance derived from git).
-    """
-    from dadaia_workspace.core.models.bugs import BugRecord
-    from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
-
-    return JsonlRecordStore(
-        Path(specs_dir) / "bugs" / "BUGS.jsonl",
-        to_dict=BugRecord.to_dict,
-        from_dict=BugRecord.from_dict,
-    )
 
 
 def load_denylist_terms() -> tuple[tuple[str, str], ...]:

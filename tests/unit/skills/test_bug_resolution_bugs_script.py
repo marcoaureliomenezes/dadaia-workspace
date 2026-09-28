@@ -177,6 +177,39 @@ def test_absent_ledger_is_not_a_finding(script: Path, tmp_path: Path) -> None:
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "{not a record",
+        "[1, 2]",
+        json.dumps({**_OPEN_RECORD, "severity": "BLOCKER"}),
+        json.dumps({**_OPEN_RECORD, "context": ""}),
+        json.dumps({**_OPEN_RECORD, "root_cause": "a retired key"}),
+        json.dumps({k: v for k, v in _OPEN_RECORD.items() if k != "title"}),
+    ],
+)
+def test_a_bad_bug_line_is_one_finding_and_the_doctor_says_what_the_script_says(
+    script: Path, tmp_path: Path, bad: str
+) -> None:
+    """sa-spec-doc-033-duplicates-bugs-check#B1: bug-record validity is reported only as
+    LEDGER-BUGS-SCHEMA, and doctor = `bugs.py check` on every row.
+    sa-spec-doc-033-duplicates-bugs-check#B3: severity BLOCKER gives exactly one finding."""
+    from dadaia_workspace.features.specs import SpecsDoctor
+    from dadaia_workspace.infrastructure.ledger_scripts import script_findings
+
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    ledger = specs / "bugs" / "BUGS.jsonl"
+    ledger.write_text(ledger.read_text(encoding="utf-8") + bad + "\n", encoding="utf-8")
+    checked = json.loads(_run(script, "check", "--specs", str(specs), "--json").stdout)
+    expected = [f"{f['path']}:{f['line']} {f['message']}" for f in checked]
+
+    own = [i.code for i in SpecsDoctor(specs).check() if i.path == str(ledger)]
+    bugs = [f for f in script_findings(specs) if f.code == "LEDGER-BUGS-SCHEMA"]
+
+    assert len(expected) == 1 and own == []
+    assert [f.message for f in bugs] == expected
+
+
 def test_script_is_executable_and_has_a_shebang() -> None:
     assert os.access(_SOURCE, os.X_OK)
     assert _SOURCE.read_text(encoding="utf-8").startswith("#!/usr/bin/env python3\n")
@@ -217,7 +250,9 @@ def test_append_accepts_a_consumer_surface_and_refuses_unknown(
 ) -> None:
     """sa-consumer-law-carries-library-facts#FR8.1: a consumer names its own unit as the
     surface (`billing-api` is no library layer or package) and it is accepted; the
-    `unknown` sentinel is refused."""
+    `unknown` sentinel is refused. sa-spec-doc-033-duplicates-bugs-check#B5: surface is
+    free text with minLength 1. sa-spec-doc-033-duplicates-bugs-check#B2: an empty context or component is refused and the
+    ledger is untouched."""
     specs = _ledger(tmp_path)
     argv = ["append", "--specs", str(specs), "--title", "t", "--severity", "LOW",
             "--component", "c", "--context", "ctx", "--symptom", "s", "--repro", "r",
@@ -227,6 +262,12 @@ def test_append_accepts_a_consumer_surface_and_refuses_unknown(
 
     assert ok.returncode == 0, ok.stderr
     assert refused.returncode == 1
+    for empty in ("surface", "context", "component"):
+        blank = [*argv, "--bug-id", "blank-bug", "--surface", "cli"]
+        blank[blank.index(f"--{empty}") + 1] = ""
+        done = _run(script, *blank)
+        assert done.returncode == 1
+        assert f"field '{empty}' is shorter than its minLength of 1" in done.stderr
     assert [r["surface"] for r in _records(specs)] == ["billing-api"]
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
@@ -315,30 +356,53 @@ def test_update_writes_a_governance_field(script: Path, tmp_path: Path) -> None:
     assert _records(specs)[0]["audited"] == "20260920-sweep"
 
 
-def test_update_refuses_status_and_names_the_transition_subcommand(
-    script: Path, tmp_path: Path
+@pytest.mark.parametrize(
+    ("change", "owner"),
+    [
+        ("status=resolved", "resolve|supersede|defer|reject"),
+        ("closed_at=2026-09-21T00:00:00Z", "resolve|supersede|defer|reject"),
+        ("caused_by=a-bug", "--caused-by"),
+        ("superseded_by=other", "supersede"),
+        ("title=rewritten", "immutable-core"),
+        ("reported_by=other", "immutable-core"),
+        ("context=other", "immutable-core"),
+    ],
+)
+def test_update_refuses_a_field_it_does_not_own(
+    script: Path, tmp_path: Path, change: str, owner: str
 ) -> None:
+    """sa-spec-doc-033-duplicates-bugs-check#B6: update refuses x-mutability
+    immutable-core (reported_by and context included) and refuses superseded_by; the
+    refusal names the owner and the ledger is untouched."""
     specs = _ledger(tmp_path, _OPEN_RECORD)
-    done = _run(script, "update", "a-bug", "--set", "status=resolved", "--specs", str(specs))
+    before = (specs / "bugs" / "BUGS.jsonl").read_bytes()
+    done = _run(script, "update", "a-bug", "--set", change, "--specs", str(specs))
     assert done.returncode == 1
-    assert "resolve|supersede|defer|reject" in done.stderr
+    assert owner in done.stderr
+    assert (specs / "bugs" / "BUGS.jsonl").read_bytes() == before
+
+
+def test_a_write_once_field_refuses_a_differing_second_write(script: Path, tmp_path: Path) -> None:
+    """`solution` is write-once: a differing second value is refused."""
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    first = _run(script, "update", "a-bug", "--set", "solution=one", "--specs", str(specs))
+    second = _run(script, "update", "a-bug", "--set", "solution=two", "--specs", str(specs))
+    assert first.returncode == 0, first.stderr
+    assert second.returncode == 1
+    assert "write-once" in second.stderr
+    assert _records(specs)[0]["solution"] == "one"
+
+
+@pytest.mark.parametrize("bad", ["smaller", "net-sideways: x", "net-negative:"])
+def test_resolve_refuses_a_malformed_evidence_diff(script: Path, tmp_path: Path, bad: str) -> None:
+    """`evidence_diff` must open with a `net-*:` direction and carry a rationale."""
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    argv = _resolve_argv()
+    argv[argv.index("--evidence-diff") + 1] = bad
+    done = _run(script, *argv, "--specs", str(specs))
+    assert done.returncode == 1
+    assert "evidence_diff" in done.stderr
     assert _records(specs)[0]["status"] == "open"
-
-
-def test_update_refuses_caused_by_and_names_resolve(script: Path, tmp_path: Path) -> None:
-    specs = _ledger(tmp_path, _OPEN_RECORD)
-    done = _run(script, "update", "a-bug", "--set", "caused_by=a-bug", "--specs", str(specs))
-    assert done.returncode == 1
-    assert "--caused-by" in done.stderr
-    assert _records(specs)[0]["caused_by"] is None
-
-
-def test_update_refuses_an_immutable_core_change(script: Path, tmp_path: Path) -> None:
-    specs = _ledger(tmp_path, _OPEN_RECORD)
-    done = _run(script, "update", "a-bug", "--set", "title=rewritten", "--specs", str(specs))
-    assert done.returncode == 1
-    assert "immutable-core" in done.stderr
-    assert _records(specs)[0]["title"] == "t"
 
 
 def test_status_and_stats_read_the_ledger(script: Path, tmp_path: Path) -> None:

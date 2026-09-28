@@ -197,7 +197,6 @@ def _build_specs_doctor(specs_dir: Path | None, public_dir: str | None) -> Specs
         # The ONE Typer walk (0.4.7 FR2), done here and handed in as plain data;
         # `features` never imports `cli`.
         command_paths=command_paths(),
-        bug_store_factory=container.build_bug_record_store,
     )
 
 

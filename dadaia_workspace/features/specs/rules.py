@@ -174,11 +174,6 @@ RULES: tuple[SpecsRule, ...] = (
         lambda d: d._closure_audit.check_audits_naming_canon(),
     ),
     _rule(
-        ("SPEC-DOC-033",),
-        lambda d: d._governance.check_bugs_jsonl_invariant(),
-        fix_help=f"{BUGS_SCRIPT.invocation} update <bug-id> --set <field>=<value>",
-    ),
-    _rule(
         ("SPEC-DOC-034",),
         lambda d: d._closure_audit.check_archive_dirs_exist(),
         fix=lambda d, i: d._closure_audit.fix_archive_dir(i),

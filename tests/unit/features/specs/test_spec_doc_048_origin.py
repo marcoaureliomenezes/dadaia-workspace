@@ -15,7 +15,6 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.container import build_bug_record_store
 from dadaia_workspace.features.specs import SpecsDoctor
 
 from .test_doctor_ledger_invariants import _by_code, _make_clean_specs_tree
@@ -41,7 +40,7 @@ def _write_spec(specs: Path, origin_line: str) -> Path:
 
 
 def _issues(specs: Path) -> list[str]:
-    doctor = SpecsDoctor(specs, bug_store_factory=build_bug_record_store)
+    doctor = SpecsDoctor(specs)
     return [i.description for i in _by_code(doctor.check(), "SPEC-DOC-048")]
 
 
@@ -122,11 +121,14 @@ def test_a_bug_id_passes_whatever_its_status_and_an_unknown_one_errors(tmp_path:
     """Resolving the cited bug is the flow's purpose — it must not turn the SPEC
     that fixed it into a permanent doctor ERROR. Membership in the ledger is the
     judgement, exactly as `backlog:` judges membership in BACKLOG.json or the histo.
+    sa-spec-doc-033-duplicates-bugs-check#B4: SPEC-DOC-048 reads raw ids — an id whose
+    record fails the schema still exists.
     """
     specs = _make_clean_specs_tree(tmp_path, _RELEASE)
-    _write_bugs(specs, [_bug("still-broken", "open"), _bug("already-fixed", "resolved")])
+    malformed = {**_bug("half-written", "open"), "context": "", "severity": "BLOCKER"}
+    _write_bugs(specs, [_bug("still-broken", "open"), _bug("already-fixed", "resolved"), malformed])
 
-    _write_spec(specs, "**Origin:** bugs:still-broken,already-fixed")
+    _write_spec(specs, "**Origin:** bugs:still-broken,already-fixed,half-written")
     assert _issues(specs) == []
 
     _write_spec(specs, "**Origin:** bugs:still-broken,a-ghost")
@@ -160,7 +162,7 @@ def test_an_archived_candidate_spec_under_the_live_release_is_in_scope(tmp_path:
 
 
 def test_this_repos_live_and_candidate_specs_all_pass() -> None:
-    doctor = SpecsDoctor(_REPO_ROOT / "specs", bug_store_factory=build_bug_record_store)
+    doctor = SpecsDoctor(_REPO_ROOT / "specs")
 
     issues = doctor._release.check_spec_origin(doctor._governance.known_bug_ids)
 

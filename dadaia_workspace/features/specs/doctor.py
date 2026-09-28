@@ -31,7 +31,6 @@ from __future__ import annotations
 from collections.abc import Callable, Collection
 from pathlib import Path
 
-from dadaia_workspace.core.models.bugs import BugRecord
 from dadaia_workspace.core.models.findings import FindingRecord
 from dadaia_workspace.features.specs.doctor_closure_audit import ClosureAuditValidator
 from dadaia_workspace.features.specs.doctor_coherence import CoherenceValidator
@@ -65,14 +64,6 @@ class SpecsDoctor:
             wires this today (release 0.5.1 K9 deleted the never-called
             ``container.build_findings_store`` seam as dead code); ``None`` keeps
             ``ClosureAuditValidator``'s zero-dependency fallback reader (same model).
-        bug_store_factory: Optional DI seam for SPEC-DOC-033/041's ``BUGS.jsonl``
-            read (v0.5.1 K5 deepening, same ``strict``/malformed-line shape as
-            ``findings_store_factory`` — but takes ``specs_dir``, not a file path:
-            a bug ledger is ONE-per-``specs_dir``, unlike the unbounded per-audit-dir
-            ``FINDINGS.jsonl`` set) — a composition root wires
-            ``container.build_bug_record_store`` (the SAME factory ``cli.commands
-            .bugs`` already calls); ``None`` keeps ``GovernanceValidator``'s
-            zero-dependency fallback reader (same model).
         command_paths: Optional live command-path set
             (``cli.help_digest.command_paths()``), walked ONCE by the CLI composition
             root and passed in as plain data — feeds
@@ -87,7 +78,6 @@ class SpecsDoctor:
         templates_dir: Path | None = None,
         repo_root: Path | None = None,
         findings_store_factory: Callable[[Path], JsonlRecordStore[FindingRecord]] | None = None,
-        bug_store_factory: Callable[[Path], JsonlRecordStore[BugRecord]] | None = None,
         command_paths: Collection[tuple[str, ...]] | None = None,
     ) -> None:
         self.specs_dir: Path = Path(specs_dir)
@@ -128,9 +118,7 @@ class SpecsDoctor:
             self.specs_dir, findings_store_factory
         )
         self._governance: GovernanceValidator = GovernanceValidator(
-            self.specs_dir,
-            self.public_dir,
-            bug_store_factory,
+            self.specs_dir, self.public_dir
         )
         self._coherence: CoherenceValidator = CoherenceValidator(
             self.specs_dir,

@@ -1,8 +1,7 @@
 """Audit-finding domain model — :class:`FindingRecord`, the one-record-per-finding model
 (v0.5.0 FR13, D5, D11).
 
-Pure domain module — no I/O; its one internal import is ``core.models.bugs``'s field
-introspection: ``core/models/findings.py`` is NOT in ``architecture.md``'s "Core file-I/O
+Pure domain module — no I/O: ``core/models/findings.py`` is NOT in ``architecture.md``'s "Core file-I/O
 authorized set", so the model never reads a schema file itself. :class:`FindingRecord` is
 one line of ``specs/audits/<YYYYMMDDTHHMMSSZ>-<session_id_8chars>/FINDINGS.jsonl``,
 appended once (field set mirrors
@@ -11,8 +10,7 @@ appended once (field set mirrors
 mirrors A2.1). It derives its category field sets from its OWN
 ``dataclasses.field(metadata=...)`` declarations (per-field, colocated, zero I/O) rather
 than a second, separately-maintained module-level tuple — the exact hand-kept mirror
-A2.10 forbids (the shape that twice missed a newly added free-text field on
-:class:`~dadaia_workspace.core.models.bugs.BugRecord`, T-043-23 -> T-044-62).
+A2.10 forbids.
 
 **No store instance is registered for this model in ``container.py`` at this fold
 (A13.4).** ``specs/audits/**`` has no CLI writer (D15/A14.5) — ``project-auditor`` and the
@@ -30,9 +28,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
+from dataclasses import fields as dc_fields
 from typing import Any
-
-from dadaia_workspace.core.models.bugs import dataclass_field_names
 
 __all__ = [
     "FindingRecord",
@@ -42,8 +39,7 @@ __all__ = [
 
 class FindingRecordImmutableFieldError(ValueError):
     """Raised by :meth:`FindingRecord.apply_governance_update` when a change would
-    alter an immutable-core field's value (mirrors ``BugRecordImmutableFieldError``,
-    A2.2a).
+    alter an immutable-core field's value (A2.2a).
 
     Seam-level enforcement only: any agent's file tool can still hand-edit any field
     directly on disk — that is what a future doctor check would DETECT, never prevent.
@@ -97,7 +93,7 @@ class FindingRecord:
     the categorization lives in Python: nothing here re-collects it into a second,
     independently-maintained module-level tuple/list/set of names (A2.10).
 
-    Unlike :class:`~dadaia_workspace.core.models.bugs.BugRecord`, there is no
+    There is no
     write-once category: a finding's evidence is authored complete at append time
     (A13.5) and only its three governance fields are ever rewritten, in place, by the
     remediation release that dispositions it.
@@ -173,9 +169,9 @@ class FindingRecord:
 
 
 #: Derived (A2.10) — never hand-kept — from ``FindingRecord``'s own field metadata.
-_FINDING_RECORD_IMMUTABLE_CORE_FIELDS: tuple[str, ...] = dataclass_field_names(
-    FindingRecord, lambda metadata: metadata.get("category") == "immutable-core"
+_FINDING_RECORD_IMMUTABLE_CORE_FIELDS: tuple[str, ...] = tuple(
+    f.name for f in dc_fields(FindingRecord) if f.metadata.get("category") == "immutable-core"
 )
-_FINDING_RECORD_GOVERNANCE_FIELDS: tuple[str, ...] = dataclass_field_names(
-    FindingRecord, lambda metadata: metadata.get("category") == "mutable-governance"
+_FINDING_RECORD_GOVERNANCE_FIELDS: tuple[str, ...] = tuple(
+    f.name for f in dc_fields(FindingRecord) if f.metadata.get("category") == "mutable-governance"
 )

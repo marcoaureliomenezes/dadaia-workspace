@@ -1,41 +1,24 @@
-"""Governance validator: backlog single-source invariants, bug status/JSONL.
+"""Governance validator: backlog single-source invariants, bug archive age.
 
-Single-responsibility sibling of the SpecsDoctor coordinator. Owns the bug/backlog governance
-invariants: the bug-ledger
-invariant (SPEC-DOC-033), the archive-overdue signal (SPEC-DOC-041), and the
-single-source loose-file invariant (SPEC-DOC-035). Leaf-only: imports the shared leaves
-+ core, plus one documented cross-feature leaf edge (``features.backlog.document`` —
-``setup.cfg``'s ``features-no-cross-feature`` ``ignore_imports``), never a sibling
+Single-responsibility sibling of the SpecsDoctor coordinator: the archive-overdue signal
+(SPEC-DOC-041), the bug ids SPEC-DOC-048 cites, and the single-source loose-file
+invariant (SPEC-DOC-035). Leaf-only: imports the shared leaves + core, never a sibling
 validator.
 
-**The doctor reads ``BUGS.jsonl`` through the ONE store, never a second hand-kept
-parser.** ``check_bugs_jsonl_invariant``/``check_bug_archive_overdue`` call
-``self._bug_store_factory(self.specs_dir)`` — the SAME factory
-``container.build_bug_record_store`` the CLI composition root wires everywhere else a
-bug record is read or written (``cli/commands/specs.py``'s ``doctor`` command, mirroring
-``cli/commands/bugs.py``). ``scan()``/``iter_records()`` are the store's own two read
-methods (``infrastructure.jsonl_record_store.JsonlRecordStore``); the record-level
-parsing is ``BugRecord.from_dict``, never a second, hand-rolled field check.
-
-**Governance completeness is not diagnosed here.** Completeness is enforced
-prospectively, at the WRITE seam (``core.models.bugs.BugRecord.resolve``/``supersede``/
-``defer``/``reject``: status is unreachable without its own required fields), never
-re-diagnosed against history — a historical record that reached an incomplete terminal
-status before this seam existed is simply never re-checked.
+**Whether a bug record is valid is not asked here.** `bugs.py check` is the one
+validator (the doctor re-emits it as LEDGER-BUGS-SCHEMA); this module reads raw JSON
+lines and skips any it cannot read.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import json
+from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
-from dadaia_workspace.core.models.bugs import (
-    BUG_ARCHIVE_THRESHOLD_DAYS,
-    BugRecord,
-)
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
-from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore, MalformedLine
 
 # SPEC-DOC-035 (SPEC v0.12.0 FR5, ADR D5/D9): the single-source invariant — the only two
 # filenames permitted loose directly under ``specs/backlog/``. Anything else (a per-entry
@@ -43,10 +26,12 @@ from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore,
 # backlog new`) is drift.
 _BACKLOG_SINGLE_SOURCE_FILES: frozenset[str] = frozenset({"BACKLOG.json", "AGENTS.md"})
 
+#: `bugs.py archive`'s own default ``--threshold-days``.
+_ARCHIVE_THRESHOLD_DAYS = 90
 
-def _parse_bug_record_ts(value: str) -> datetime | None:
-    """Parse a ``BugRecord.ts`` ISO-8601 UTC value; ``None`` on anything unparseable
-    (an unparseable timestamp is never treated as overdue — A2.8's own no-guess rule)."""
+
+def _parse_ts(value: str) -> datetime | None:
+    """An ISO-8601 UTC value, or ``None`` when unparseable (never treated as overdue)."""
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
@@ -55,106 +40,49 @@ def _parse_bug_record_ts(value: str) -> datetime | None:
 
 
 class GovernanceValidator:
-    """Bug/backlog governance: single-source backlog invariants, bug status/JSONL."""
+    """Bug/backlog governance: single-source backlog invariants, bug archive age."""
 
-    def __init__(
-        self,
-        specs_dir: Path,
-        public_dir: Path | None = None,
-        bug_store_factory: Callable[[Path], JsonlRecordStore[BugRecord]] | None = None,
-    ) -> None:
+    def __init__(self, specs_dir: Path, public_dir: Path | None = None) -> None:
         self.specs_dir = specs_dir
         self.public_dir = public_dir
-        # DI seam: the composition root wires container.build_bug_record_store — the
-        # SAME factory `cli.commands.bugs` already calls (`cli/commands/specs.py`'s
-        # `doctor` command). Required whenever a bugs/BUGS.jsonl ledger is actually
-        # read (`_bug_store` below); a construction site whose fixture never writes
-        # one (most non-bugs doctor tests) never needs it.
-        self._bug_store_factory = bug_store_factory
+        self._ledger = specs_dir / "bugs" / "BUGS.jsonl"
 
-    def _bug_store(self) -> JsonlRecordStore[BugRecord]:
-        if self._bug_store_factory is None:
-            raise ValueError(
-                "GovernanceValidator requires bug_store_factory to read "
-                "bugs/BUGS.jsonl — wire container.build_bug_record_store "
-                "(SpecsDoctor(bug_store_factory=...))"
-            )
-        return self._bug_store_factory(self.specs_dir)
+    def _bug_lines(self) -> Iterator[dict[str, Any]]:
+        """Every ledger line that is a JSON object; the rest is `bugs.py check`'s."""
+        if not self._ledger.is_file():
+            return
+        for raw in self._ledger.read_text(encoding="utf-8").split("\n"):
+            try:
+                record = json.loads(raw)
+            except ValueError:
+                continue
+            if isinstance(record, dict):
+                yield record
 
     def known_bug_ids(self) -> frozenset[str]:
-        """The ids of every record, whatever its status — the ONE bug reader, lent to
-        SPEC-DOC-048, which judges membership in the ledger, never liveness."""
-        if not (self.specs_dir / "bugs" / "BUGS.jsonl").is_file():
-            return frozenset()
-        return frozenset(r.id for r in self._bug_store().iter_records())
-
-    def check_bugs_jsonl_invariant(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-033: the single canonical ``specs/bugs/BUGS.jsonl`` ledger
-        invariant. **Line validity** (ERROR) — each non-blank line must parse as a
-        :class:`~dadaia_workspace.core.models.bugs.BugRecord` through
-        :meth:`~dadaia_workspace.core.models.bugs.BugRecord.from_dict`, the model's
-        OWN parser — never a hand-rolled field check. Every line
-        :meth:`~dadaia_workspace.infrastructure.jsonl_record_store.JsonlRecordStore.scan` cannot
-        parse surfaces as exactly ONE
-        :class:`~dadaia_workspace.infrastructure.jsonl_record_store.MalformedLine` -> ONE ERROR here.
-
-        **Governance completeness is not diagnosed here.** A well-formed record —
-        however incomplete for its own status — is not re-checked: completeness is
-        enforced prospectively, at the
-        :meth:`~dadaia_workspace.core.models.bugs.BugRecord.resolve`/``supersede``/
-        ``defer``/``reject`` write seam, never retroactively against history.
-
-        Absent ``bugs/`` dir -> no-op.
-        """
-        ledger_path = self.specs_dir / "bugs" / "BUGS.jsonl"
-        if not ledger_path.is_file():
-            return []
-
-        issues: list[SpecsDoctorIssue] = []
-        for parsed in self._bug_store().scan():
-            if not isinstance(parsed, MalformedLine):
-                continue
-            issues.append(
-                SpecsDoctorIssue(
-                    code="SPEC-DOC-033",
-                    severity=Severity.ERROR,
-                    description=(
-                        f"bugs/BUGS.jsonl line {parsed.lineno}: {parsed.reason} — "
-                        "every JSONL row must be one bug-record object "
-                        "(SPEC-DOC-033, ERROR)."
-                    ),
-                    path=str(ledger_path),
-                )
-            )
-        return issues
+        """The id of every line, whatever its status or validity — SPEC-DOC-048 judges
+        membership in the ledger, never liveness."""
+        return frozenset(str(r["id"]) for r in self._bug_lines() if "id" in r)
 
     def check_bug_archive_overdue(self, *, now: datetime | None = None) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-041 — WARN when a terminal :class:`BugRecord` CLOSED (``closed_at``,
-        0.4.7 FR4 — never ``ts``, the filing date) longer ago than
-        :data:`~dadaia_workspace.core.models.bugs.BUG_ARCHIVE_THRESHOLD_DAYS` and is
-        still live (not yet moved by ``python3 .agents/skills/dd-bug-resolution/scripts/bugs.py archive``). Never a block; the
-        exit code is unchanged. Absent ``bugs/`` dir -> no-op.
-        """
-        ledger_path = self.specs_dir / "bugs" / "BUGS.jsonl"
-        if not ledger_path.is_file():
-            return []
-        cutoff = (now or datetime.now(tz=UTC)) - timedelta(days=BUG_ARCHIVE_THRESHOLD_DAYS)
+        """SPEC-DOC-041 — WARN when a record closed (``closed_at``, never the filing date
+        ``ts``) longer ago than the archive threshold is still live. Never a block."""
+        cutoff = (now or datetime.now(tz=UTC)) - timedelta(days=_ARCHIVE_THRESHOLD_DAYS)
         issues: list[SpecsDoctorIssue] = []
-        for record in self._bug_store().iter_records():
-            if record.closed_at is None:
-                continue
-            closed_at = _parse_bug_record_ts(record.closed_at)
-            if closed_at is not None and closed_at < cutoff:
+        for record in self._bug_lines():
+            closed_at = record.get("closed_at")
+            moment = _parse_ts(closed_at) if isinstance(closed_at, str) else None
+            if moment is not None and moment < cutoff:
                 issues.append(
                     SpecsDoctorIssue(
                         code="SPEC-DOC-041",
                         severity=Severity.WARNING,
                         description=(
-                            f"bugs/BUGS.jsonl record {record.id!r} has been terminal "
-                            f"({record.status!r}) since {record.closed_at} — past the "
-                            f"{BUG_ARCHIVE_THRESHOLD_DAYS}-day archive threshold."
+                            f"bugs/BUGS.jsonl record {record.get('id')!r} has been terminal "
+                            f"({record.get('status')!r}) since {closed_at} — past the "
+                            f"{_ARCHIVE_THRESHOLD_DAYS}-day archive threshold."
                         ),
-                        path=str(ledger_path),
+                        path=str(self._ledger),
                     )
                 )
         return issues

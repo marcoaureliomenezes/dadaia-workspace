@@ -24,15 +24,10 @@ Scope: this file governs only `specs/bugs/`.
 
 ## 3. Field classes (D11)
 
-| Class | Meaning |
-|---|---|
-| `immutable-core` | Never rewritten once appended |
-| `write-once` | Absent at registration; settable once, then immutable |
-| `mutable-governance` | Rewritten in place, atomic refuse-stale |
-
-- `immutable-core` fields: `id`, `ts`, `title`, `severity`, `surface`, `component`, `symptom`, `repro`, `expected`.
-- `write-once` fields: `solution`, `evidence_loop`, `evidence_seam`, `evidence_diff`, `diff_direction` (derived from `evidence_diff`'s `net-*:` prefix).
-- `mutable-governance` fields: `status`, `closed_at`, `cause`, `caused_by`, `resolved_release`, `audited`.
+- Each field's class is its `x-mutability` in `bug-record-v1`; this law lists no fields.
+- `immutable-core`: never rewritten once appended.
+- `write-once`: absent at registration; settable once, then immutable.
+- `mutable-governance`: rewritten in place, atomic refuse-stale.
 
 ## 4. Authoring rules
 

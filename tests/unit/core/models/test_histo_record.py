@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import pytest
 
-from dadaia_workspace.core.models.bugs import TERMINAL_EVENTS
 from dadaia_workspace.core.models.histo import (
     AUDITS_HISTO_DISPOSITIONS,
     BACKLOG_HISTO_DISPOSITIONS,
@@ -94,11 +93,6 @@ def test_terminal_vocabulary_is_five_lowercase_words() -> None:
 def test_every_per_ledger_subset_is_drawn_from_the_one_vocabulary(subset: tuple[str, ...]) -> None:
     assert set(subset) <= set(TERMINAL_DISPOSITIONS)
     assert subset == tuple(w for w in TERMINAL_DISPOSITIONS if w in set(subset))
-
-
-def test_the_bugs_subset_is_the_bug_ledger_terminal_vocabulary() -> None:
-    """One constant, not two: `core.models.bugs.TERMINAL_EVENTS` IS this subset."""
-    assert frozenset(BUGS_DISPOSITIONS) == TERMINAL_EVENTS
 
 
 def test_the_table_covers_every_ledger_vocabulary_that_validates_an_exit() -> None:

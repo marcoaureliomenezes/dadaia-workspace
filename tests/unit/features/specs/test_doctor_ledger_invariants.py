@@ -26,6 +26,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.features.specs import Severity, SpecsDoctor, SpecsDoctorIssue
+from dadaia_workspace.features.specs.rules import RULES
 
 MINIMAL_MEMORY_PRODUCT_INDEX_MD = """\
 ---
@@ -218,6 +219,8 @@ def _seed_lock_record(
 
 
 def test_sad_matrix(tmp_path: Path) -> None:
+    """sa-spec-doc-033-duplicates-bugs-check#B8: archive-overdue stays one WARNING with
+    fix `bugs.py archive`."""
     # DOC-024: phase=SPEC but TASKS are an [x]-majority (the live audit incident).
     specs_a = _make_clean_specs_tree(tmp_path)
     _set_active(specs_a, "v0.1.10", "SPEC")
@@ -255,10 +258,14 @@ def test_sad_matrix(tmp_path: Path) -> None:
     doc030 = _by_code(SpecsDoctor(specs_g).check(), "SPEC-DOC-030")
     assert doc030 and all(i.severity == Severity.WARNING for i in doc030)
 
-    # DOC-032 (bug status-token canon over a per-bug specs/bugs/<slug>.md frontmatter
-    # file) is RETIRED at v0.5.1 K5 — see test_bug_record.py and
-    # test_doctor_governance.py for the replacement coverage over the single-JSONL
-    # ledger this doctor now reads exclusively.
+    # DOC-041: a record closed past the threshold, beside a malformed line -> one WARNING.
+    specs_h = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-041"))
+    closed = {"id": "old", "status": "resolved", "closed_at": "2026-01-01T00:00:00Z"}
+    (specs_h / "bugs").mkdir(exist_ok=True)
+    (specs_h / "bugs" / "BUGS.jsonl").write_text(json.dumps(closed) + "\nnot json {\n")
+    [doc041] = _by_code(SpecsDoctor(specs_h).check(), "SPEC-DOC-041")
+    [rule] = [r for r in RULES if "SPEC-DOC-041" in r.codes]
+    assert doc041.severity == Severity.WARNING and "bugs.py archive" in str(rule.fix_help)
 
 
 # ---------------------------------------------------------------------------

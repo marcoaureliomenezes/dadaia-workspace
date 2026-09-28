@@ -23,8 +23,6 @@ from typing import Any
 import pytest
 from jsonschema import Draft202012Validator
 
-from dadaia_workspace.core.models import bugs as _bugs_module
-
 pytestmark = pytest.mark.contract
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -62,7 +60,8 @@ def test_bug_record_schema_is_valid_draft_2020_12_and_closes_the_envelope() -> N
     ``x-mutability`` in the closed set {immutable-core, write-once, mutable-governance},
     and ``required`` covers exactly the immutable-core + mutable-governance fields —
     the write-once fields (absent until a fix lands, A2.2b) are deliberately excluded
-    from ``required``, never silently."""
+    from ``required``, never silently. sa-spec-doc-033-duplicates-bugs-check#B7: the law
+    points to the schema's x-mutability and lists no fields itself."""
     schema = _schema()
     Draft202012Validator.check_schema(schema)
     assert schema["additionalProperties"] is False
@@ -73,6 +72,9 @@ def test_bug_record_schema_is_valid_draft_2020_12_and_closes_the_envelope() -> N
 
     mutability = {name: spec["x-mutability"] for name, spec in properties.items()}
     assert set(mutability.values()) == {"immutable-core", "write-once", "mutable-governance"}
+    law = (_SCHEMA_PATH.parents[2] / "scaffold" / "bugs" / "AGENTS.md").read_text()
+    assert "x-mutability" in law
+    assert not [ln for ln in law.splitlines() if len(set(properties) & set(ln.split("`"))) >= 3]
 
 
 def test_bug_record_schema_example_validates_as_appended_and_after_resolution() -> None:
@@ -109,24 +111,6 @@ def test_bug_record_schema_example_validates_as_appended_and_after_resolution() 
     }
     for name in immutable_names:
         assert _AS_APPENDED[name] == after_resolution[name], name
-
-
-def test_bug_record_module_constants_are_pinned_to_the_schema() -> None:
-    """K5 residual D9: core/models/bugs.py restates the schema's evidence_diff
-    pattern, diff_direction enum, and status enum as its own zero-I/O runtime
-    mirror (the model may never read the schema file itself — it is not in
-    architecture.md's Core file-I/O authorized set, and BugRecord.resolve()'s
-    format checks are directly unit-tested as a PURE function with no DI'd
-    validator — see tests/unit/core/models/test_bug_record.py). This is the
-    ONE decider that keeps the restatement from silently drifting: it fails
-    the moment the model's constants stop matching the schema's declared
-    values, byte for byte, rather than the docstring's claim going unchecked."""
-    schema = _schema()
-    props = schema["properties"]
-
-    assert _bugs_module._EVIDENCE_DIFF_PATTERN_RE.pattern == props["evidence_diff"]["pattern"]
-    assert frozenset(props["diff_direction"]["enum"]) == _bugs_module._DIFF_DIRECTIONS
-    assert frozenset(props["status"]["enum"]) == _bugs_module._STATUS_VALUES
 
 
 def test_bug_record_schema_rejects_an_unknown_property_and_a_bad_status() -> None:

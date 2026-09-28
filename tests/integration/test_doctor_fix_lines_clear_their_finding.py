@@ -55,7 +55,6 @@ from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 from tests.fixtures.harness_env import session_home
 
 from ..unit.features.specs.test_doctor import _make_clean_specs_tree, _write_release_jsonl
-from ..unit.features.specs.test_doctor_bugs_jsonl import _record
 from .test_backlog_doctor import _SOURCE, _active_entry
 
 _RELEASE = "1.2.3"
@@ -217,17 +216,10 @@ PLANTS: dict[str, Plant] = {
     "SPEC-DOC-041": Plant(
         lambda r: _write(
             r / "specs/bugs/BUGS.jsonl",
-            json.dumps(
-                _record(
-                    "old",
-                    status="resolved",
-                    ts="2020-01-01T00:00:00Z",
-                    closed_at="2020-01-02T00:00:00Z",
-                )
-            )
+            json.dumps({"id": "old", "status": "resolved", "closed_at": "2020-01-02T00:00:00Z"})
             + "\n",
         )
-    ),  # fmt: skip
+    ),
     "TREE-3": Plant(_plant_missing_memory_document),
 }
 
@@ -346,7 +338,7 @@ def _iter_fix_helps() -> list[tuple[str, Any]]:
 
 #: a bare ``rm`` invocation with a recursive flag, at the head of the line or of any
 #: segment of a chain. ``git rm -r`` is deliberately NOT matched: it stages a removal
-#: that git history still holds, which is why SPEC-DOC-038 may end with one.
+#: that git history still holds.
 _BARE_RECURSIVE_RM = re.compile(r"(?:^|&&|;|\|)\s*rm\s+-[a-zA-Z]*r")
 
 
