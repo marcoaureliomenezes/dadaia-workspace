@@ -5,7 +5,7 @@ in any phase, with no SPEC, PLAN or TASKS.
 
 ## 1. Register — ask first
 
-<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
+<!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
 
 A bug is a tool breaking a contract it documents. Registration is ask-first: the agent
 proposes the violated contract line, one reproducing command already run, why it is not
@@ -35,7 +35,7 @@ validation, a law ambiguity, or a missing feature.
 
 ## 2. Lineage, then a RED test
 
-<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
+<!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
 
 Resolution follows seven ordered phases — lineage, red loop, minimise, hypothesise,
 instrument, seam test, cleanup and resolve. Lineage comes first: read at most the 20
@@ -54,7 +54,7 @@ Then the red loop: a test that fails for the real cause, before production code 
 
 ## 3. Fix, and let the diff shrink
 
-<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
+<!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
 
 Fix the root cause and watch the test go green. The resolution records the fix's
 direction: `diff_direction` is derived from `--evidence-diff`'s `net-negative:`,
@@ -63,7 +63,7 @@ routed to the architecture lens before it lands.
 
 ## 4. Resolve with evidence and lineage
 
-<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
+<!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
 
 ```bash
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> \

@@ -13,7 +13,7 @@ the price of the previous fix.
 
 ## Measuring the ledger
 
-<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
+<!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
 
 The numbers are never copied into a page; the ledger's own verbs measure them.
 
@@ -31,7 +31,7 @@ agreement.
 ## Lesson 1 — a per-caller fix breeds the next caller's bug
 
 <!-- derived-from: context-management sha256:44be26055b2d -->
-<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
+<!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
 
 When a guard lives at the caller that was just caught, the next caller without it is
 the next bug in the family, and each such fix is `net-positive`: it grows the feature.
@@ -53,7 +53,7 @@ construction, not by a list somebody has to remember to extend.
 
 ## Lesson 3 — a derived cache breeds a bug per environment that derives it
 
-<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
+<!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
 <!-- derived-from: QUALITY sha256:157785c72527 -->
 
 A record that caches a fact git already knows is wrong in every environment that
@@ -64,7 +64,7 @@ history is that line's change log. No CI job fetches history for a bug record's 
 ## The standing order the lessons produced
 
 <!-- derived-from: QUALITY sha256:157785c72527 -->
-<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
+<!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
 
 The workspace is in a permanent state of architecture review, oriented by its bug
 history:

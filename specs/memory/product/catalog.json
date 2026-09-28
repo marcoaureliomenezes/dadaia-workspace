@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-28T15:44:14Z",
+  "generated_at": "2026-09-28T18:20:51Z",
   "features": [
     {
       "rank": 1,
@@ -785,7 +785,6 @@
         "dadaia_workspace/public/skills/dd-bug-resolution/**",
         "dadaia_workspace/public/skills/dd-bug-registration/**",
         "dadaia_workspace/public/schemas/bugs/**",
-        "dadaia_workspace/core/models/bugs.py",
         "dadaia_workspace/features/specs/doctor_governance.py"
       ]
     },

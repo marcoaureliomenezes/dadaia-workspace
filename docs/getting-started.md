@@ -122,7 +122,7 @@ a TTL expired.
 
 <!-- derived-from: release-lifecycle sha256:16af688b63c6 -->
 <!-- derived-from: backlog-ledger sha256:46382434daf2 -->
-<!-- derived-from: bug-ledger sha256:eeebe84481a4 -->
+<!-- derived-from: bug-ledger sha256:9392c1f406a4 -->
 
 A candidate is one closed-scope cycle inside the live release. Nothing drives it: the
 documents are the state, the ledger scripts move the records, and the markers in
