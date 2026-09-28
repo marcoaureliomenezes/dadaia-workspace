@@ -78,7 +78,7 @@ def _run(tmp_path: Path, session_id: str, *, event: str | None = None) -> str:
 
 
 def _compact_marker(tmp_path: Path, session_id: str) -> Path:
-    return tmp_path / ".dadaia" / "tmp" / f"ctx-compact-{session_id}"
+    return tmp_path / ".dadaia" / "tmp" / "hooks" / f"ctx-compact-{session_id}"
 
 
 def test_post_compact_stamps_marker_and_reemits_observably(tmp_path: Path) -> None:

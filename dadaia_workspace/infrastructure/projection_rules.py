@@ -176,7 +176,7 @@ def _settings_merge_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Pro
                     "dadaia will not overwrite it. Fix or move the file, then re-run install."
                 ) from None
             existing = loaded if isinstance(loaded, dict) else None
-        merged = merge_claude_settings(existing)
+        merged = merge_claude_settings(existing, workspace_root)
         return (json.dumps(merged, indent=2, sort_keys=True) + "\n").encode("utf-8")
 
     return (

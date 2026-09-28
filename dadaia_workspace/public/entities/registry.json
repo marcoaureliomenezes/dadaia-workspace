@@ -75,6 +75,18 @@
         "devin": "same git hooks (harness-independent)",
         "copilot": "same git hooks (harness-independent)"
       }
+    },
+    {
+      "id": "tool-cache-env",
+      "mandate": "ruff and mypy caches land in absolute .dadaia/tmp/<tool>-cache (workspace_layout.tool_cache_env); a harness that cannot carry an env declares the gap, and a run there leaves an in-tree cache the doctor holds in reaped/ (fix: dadaia doctor --fix).",
+      "implementations": {
+        "claude": ".claude/settings.json env (RUFF_CACHE_DIR, MYPY_CACHE_DIR)",
+        "codex": ".codex/config.toml [shell_environment_policy.set]",
+        "kimi-code": "gap: no project-level env in the managed hook block",
+        "cursor": "gap: .cursor/hooks.json carries no env",
+        "devin": "gap: .devin/hooks.v1.json carries no env",
+        "copilot": "gap: .github/hooks carry no env"
+      }
     }
   ],
   "rules": [

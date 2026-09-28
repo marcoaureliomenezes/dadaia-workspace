@@ -239,7 +239,7 @@ def toml_transcode_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Proj
             f"{record.name}:config.toml",
             record.name,
             harness_dir / "config.toml",
-            codex_config(plan.agentic_dir).encode("utf-8"),
+            codex_config(plan.agentic_dir, plan.workspace_root).encode("utf-8"),
         )
     )
     return tuple(rules)

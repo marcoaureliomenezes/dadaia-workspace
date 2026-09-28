@@ -93,5 +93,5 @@ def test_kimi_session_start_runs_the_reaper_once(tmp_path: Path) -> None:
 
 
 def test_reaper_entry_is_dadaia_owned_so_merge_is_idempotent() -> None:
-    canonical = claude_settings()
-    assert merge_claude_settings(canonical) == canonical
+    canonical = merge_claude_settings(None, Path("/ws"))
+    assert merge_claude_settings(canonical, Path("/ws")) == canonical

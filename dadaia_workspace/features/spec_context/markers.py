@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
 
 __all__ = ["stamp_throttle", "throttled"]
@@ -28,7 +29,7 @@ def throttled(workspace: Path, marker_name: str, *, window_seconds: float, now: 
     """
     if not _valid_name(marker_name):
         return False
-    marker = workspace / ".dadaia" / "tmp" / marker_name
+    marker = workspace / workspace_layout.MARKER_DIR / marker_name
     try:
         last = marker.stat().st_mtime
     except OSError:
@@ -41,7 +42,7 @@ def stamp_throttle(workspace: Path, marker_name: str) -> None:
     ``marker_name`` is rejected outright — never written outside ``.dadaia/tmp/``."""
     if not _valid_name(marker_name):
         return
-    marker = workspace / ".dadaia" / "tmp" / marker_name
+    marker = workspace / workspace_layout.MARKER_DIR / marker_name
     try:
         marker.parent.mkdir(parents=True, exist_ok=True)
         marker.write_text(datetime.now(UTC).isoformat(), encoding="utf-8")

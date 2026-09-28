@@ -157,8 +157,8 @@ def _lint_type_checks(
 ) -> tuple[Check, ...]:
     """Build the lint/type checks — bare commands, no cache flags.
 
-    0.4.7 FR3: cache redirection is `pyproject.toml`'s job (`[tool.ruff] cache-dir`,
-    `[tool.mypy] cache_dir`), so preflight runs exactly what an agent types by hand.
+    Caches follow the caller's env (ADR 0080): a harness session exports the absolute
+    tool-cache env, which the runner passes on; a bare CI checkout keeps its own cache.
     Ordered cheapest → most expensive so fail-fast surfaces quick problems first.
     Each tool prefix is resolved via ``_resolve_tool`` (runner-derived, not
     ``poetry``-hardcoded — bug B2).

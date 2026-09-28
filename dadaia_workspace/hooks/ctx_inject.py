@@ -70,7 +70,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from dadaia_workspace.core import invocation, session_store
+from dadaia_workspace.core import invocation, session_store, workspace_layout
 from dadaia_workspace.features.spec_context import injection_policy
 from dadaia_workspace.features.workspace import onboarding
 from dadaia_workspace.hooks import _common
@@ -337,7 +337,7 @@ def main() -> int:
     # Sentinel — path BYTE-IDENTICAL to the shell sentinel: .dadaia/tmp/ctx-inject-fired-<id>.
     # Its content records the last injected slug so a re-bind is detectable. Sentinel
     # GC (0.4.7 FR6b) is owned by doctor.reap(), never inject-time.
-    tmp_dir = workspace / ".dadaia" / "tmp"
+    tmp_dir = workspace / workspace_layout.MARKER_DIR
     sentinel = tmp_dir / f"{_SENTINEL_PREFIX}{session_id}"
     sentinel_mtime, recorded_slug = _read_sentinel(sentinel)
 

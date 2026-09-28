@@ -111,12 +111,6 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
 line-length = 100
-# 0.4.7 FR3: the cache is redirected by CONFIGURATION, not by a flag on every command
-# (the venv guard's cache rule is deleted). The path is RELATIVE — resolved the same way
-# on every OS, and from a `repos/<slug>/` checkout it lands in the workspace's own
-# `.dadaia/tmp/` zone. From a standalone CI checkout it lands in the checkout's
-# grandparent, which is writable on every runner. Either way the repo tree stays clean.
-cache-dir = "../../.dadaia/tmp/ruff-cache"
 target-version = "py312"
 
 # Complexity/size governance (FR21a, R8): a MEASURED RATCHET. `C90` and `PLR1702` are
@@ -165,12 +159,6 @@ python_version = "3.12"
 strict = true
 ignore_missing_imports = true
 incremental = false
-# 0.4.7 FR3: same relative redirect as `[tool.ruff] cache-dir` — one rule, both tools,
-# every OS. mypy writes `.mypy_cache/` even with `incremental = false` (bug
-# mypy-strict-cache-dir-created-without-cache-dir-env-override), so the destination must
-# be named; a relative path is the only portable value (an absolute one is
-# machine-specific and `/dev/null` is POSIX-only — ruff cannot even open it).
-cache_dir = "../../.dadaia/tmp/mypy-cache"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

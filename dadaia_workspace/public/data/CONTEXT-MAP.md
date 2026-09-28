@@ -41,7 +41,7 @@ path or entity as it appears in an installed workspace.
 
 | Surface | Purpose | Belongs | Ceiling | Measured |
 |---|---|---|---|---|
-| `AGENTS.md` | the root map: the flow, the roles, the gate invariants, the root, credentials, and one line per scoped file | statements; the index of every other surface | 8192 | 7497 |
+| `AGENTS.md` | the root map: the flow, the roles, the gate invariants, the root, credentials, and one line per scoped file | statements; the index of every other surface | 8192 | 7539 |
 | `specs/AGENTS.md` | the canon of a specs tree and its status tokens | canon table, status tokens, doctor codes | 4096 | 3665 |
 | `specs/releases/AGENTS.md` | candidates, phases, task markers, promote | release procedure and commit shapes | 4096 | 3397 |
 | `specs/backlog/AGENTS.md` | the operator's demand queue and its exits | `BACKLOG.json` shape, intake gate, dispositions | 4096 | 3997 |
@@ -49,11 +49,11 @@ path or entity as it appears in an installed workspace.
 | `specs/memory/AGENTS.md` | current product truth and who writes it | atoms, ownership | 4096 | 3760 |
 | `specs/ADRs/AGENTS.md` | the decision record | `decisions.jsonl` shape, acceptance | 4096 | 3409 |
 | `specs/audits/AGENTS.md` | the periodic three-pillar review | audit procedure, findings, closure | 4096 | 1813 |
-| `.dadaia/AGENTS.md` | the runtime tree: zones, doctor, reprojection, context | zone registry rules, chokepoints | 4096 | 4094 |
+| `.dadaia/AGENTS.md` | the runtime tree: zones, doctor, reprojection, context | zone registry rules, chokepoints | 4096 | 4000 |
 | `.dadaia/handoff/AGENTS.md` | the handoff lane | emission, schema, ack-on-consume | 4096 | 1635 |
 | `.dadaia/tmp/AGENTS.md` | the TTL scratch lane | what may be written there and for how long | 4096 | 1117 |
 | `.dadaia/states/AGENTS.md` | CLI-owned state files | who writes them and by which verb | 4096 | 1427 |
-| `repos/<slug>/AGENTS.md` | a repo working tree | clean-tree rule, cache redirection | 4096 | 3170 |
+| `repos/<slug>/AGENTS.md` | a repo working tree | clean-tree rule, cache redirection | 4096 | 3331 |
 | `tests/AGENTS.md` | a repo's test tree | admission, intent, size tiers | 4096 | 2694 |
 
 ## 3. Skills — `.agents/skills/dd-*/SKILL.md`

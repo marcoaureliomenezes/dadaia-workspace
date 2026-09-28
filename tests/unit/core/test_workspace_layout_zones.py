@@ -22,7 +22,6 @@ _SPEC_ZONE_ORDER = [
     "tmp",
     "reaped",
     "mcps",
-    ".cache",
     "dist",
     "references",
     ".venv",
@@ -46,7 +45,8 @@ def _zone(name: str) -> wl.Zone:
     return next(z for z in wl.DADAIA_ZONES if z.name == name)
 
 
-def test_registry_holds_the_twelve_spec_zones_in_order() -> None:
+def test_registry_holds_the_eleven_spec_zones_in_order() -> None:
+    """sa-tool-caches-land-outside-the-cache-zone#B40-2: no .cache zone (ADR 0080)."""
     assert [z.name for z in wl.DADAIA_ZONES] == _SPEC_ZONE_ORDER
     assert wl.zone_names() == frozenset(_SPEC_ZONE_ORDER)
 
@@ -65,7 +65,6 @@ def test_ttl_zones_are_the_four_fr5_zones_at_one_day_plus_the_reaper_hold_at_sev
         "tmp": 86_400,
         "reaped": 604_800,
         "mcps": 86_400,
-        ".cache": 86_400,
     }
     assert all(z.ttl_seconds is None for z in wl.DADAIA_ZONES if z.name not in ttl)
 
@@ -91,7 +90,6 @@ def test_zone_classes_match_architect_table() -> None:
         "tmp": wl.ZoneClass.EPHEMERAL,
         "reaped": wl.ZoneClass.EPHEMERAL,
         "mcps": wl.ZoneClass.EPHEMERAL,
-        ".cache": wl.ZoneClass.EPHEMERAL,
         "dist": wl.ZoneClass.STATE,
         "references": wl.ZoneClass.OPERATOR,
         ".venv": wl.ZoneClass.MANAGED,
@@ -103,13 +101,13 @@ def test_creator_views_partition_the_registry() -> None:
     assert by_creator == {
         wl.Creator.INIT: ["states", ".venv"],
         wl.Creator.INSTALL: ["agentic", "hooks"],
-        wl.Creator.RUNTIME: ["sessions", "handoff", "tmp", "reaped", "mcps", ".cache", "dist"],
+        wl.Creator.RUNTIME: ["sessions", "handoff", "tmp", "reaped", "mcps", "dist"],
         wl.Creator.OPERATOR: ["references"],
     }
 
 
 def test_walked_zones_exclude_operator_and_managed() -> None:
-    assert [z.name for z in wl.walked_zones()] == _SPEC_ZONE_ORDER[:10]
+    assert [z.name for z in wl.walked_zones()] == _SPEC_ZONE_ORDER[:9]
 
 
 def test_additive_prefixes_are_output_and_ephemeral_zones_in_registry_order() -> None:
@@ -118,7 +116,6 @@ def test_additive_prefixes_are_output_and_ephemeral_zones_in_registry_order() ->
         ".dadaia/tmp/",
         ".dadaia/reaped/",
         ".dadaia/mcps/",
-        ".dadaia/.cache/",
     )
 
 

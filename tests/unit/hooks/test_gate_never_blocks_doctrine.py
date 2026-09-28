@@ -125,6 +125,6 @@ def test_throttle_marker_rejects_traversal_shaped_identity_components(tmp_path: 
     assert markers.throttled(ws, hostile_marker, window_seconds=300, now=0.0) is False
 
     markers.stamp_throttle(ws, "presence-warn-session-ok-dadaia-workspace")
-    marker = ws / ".dadaia" / "tmp" / "presence-warn-session-ok-dadaia-workspace"
+    marker = ws / ".dadaia" / "tmp" / "hooks" / "presence-warn-session-ok-dadaia-workspace"
     assert marker.is_file()
-    assert marker.parent == ws / ".dadaia" / "tmp"
+    assert marker.parent == ws / ".dadaia" / "tmp" / "hooks"

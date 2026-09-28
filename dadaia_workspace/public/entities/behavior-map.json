@@ -98,7 +98,7 @@
         "dadaia_workspace/public/data/handoff-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:010f342194f1ff2db036efc90b27bef62ee1ba76dd2cac6025a646f84a841c29",
+        "section": "sha256:ab298fedc376e303bec75603f7117d43b4a2633124daee44af8c62b1dd1a5c8b",
         "skill": "sha256:b3f512408582f13b913ee74a119615ae9287e842e10c49f6ff9b53d3f6345cf6",
         "scripts": null,
         "scoped": [
@@ -134,7 +134,7 @@
         "dadaia_workspace/public/data/tmp-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:010f342194f1ff2db036efc90b27bef62ee1ba76dd2cac6025a646f84a841c29",
+        "section": "sha256:ab298fedc376e303bec75603f7117d43b4a2633124daee44af8c62b1dd1a5c8b",
         "skill": null,
         "scripts": null,
         "scoped": [
@@ -352,11 +352,11 @@
         "dadaia_workspace/public/templates/repo-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:010f342194f1ff2db036efc90b27bef62ee1ba76dd2cac6025a646f84a841c29",
+        "section": "sha256:ab298fedc376e303bec75603f7117d43b4a2633124daee44af8c62b1dd1a5c8b",
         "skill": null,
         "scripts": null,
         "scoped": [
-          "sha256:a5649197319a1df3199a63f89f958d8249a4dca890f98ec64c5ac32da9115c95"
+          "sha256:727bfaa442df58a79c2cafc595f050a4464ac12a6dd0db285075957a7521914b"
         ]
       },
       "recorded_by": "dd-software-engineer",

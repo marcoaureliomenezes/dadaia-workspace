@@ -71,7 +71,6 @@ from dadaia_workspace.infrastructure.public_assets_common import (
     is_ignored_public_asset,
     iter_public_files,
 )
-from dadaia_workspace.infrastructure.runtime_config import codex_config as _build_codex_config
 from dadaia_workspace.infrastructure.workspace_guardrail import _is_source_repo_root
 
 __all__ = [
@@ -398,9 +397,6 @@ class FileSystemPublicAssetManager:
     ) -> dict[str, ResolvedAgentModel]:
         """Resolve the full core roster through the single resolver (FR4)."""
         return {agent: resolve_agent_model(agent, overlay) for agent in CORE_AGENTS}
-
-    def _codex_config(self, agentic_dir: Path) -> str:
-        return _build_codex_config(agentic_dir)
 
     # ------------------------------------------------------------------
     # Ledger reconciliation

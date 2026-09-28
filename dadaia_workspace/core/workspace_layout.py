@@ -193,14 +193,6 @@ DADAIA_ZONES: tuple[Zone, ...] = (
     ),
     Zone("mcps", ZoneClass.EPHEMERAL, Creator.RUNTIME, _ONE_DAY, None, "MCP working dirs"),
     Zone(
-        ".cache",
-        ZoneClass.EPHEMERAL,
-        Creator.RUNTIME,
-        _ONE_DAY,
-        None,
-        "redirected tool caches (repos/<slug>/AGENTS.md)",
-    ),
-    Zone(
         "dist",
         ZoneClass.STATE,
         Creator.RUNTIME,
@@ -225,6 +217,10 @@ DADAIA_ROOT_FILES: frozenset[str] = frozenset({"AGENTS.md", ".gitignore"})
 #: Workspace-relative path of the operator's exception globs: matches
 #: at the root and inside the harness dirs; outside the manifest and outside these = slop.
 INSTANCE_EXCEPTIONS: str = ".dadaia/states/instance_exceptions.txt"
+
+#: ADR 0080: absolute tool caches in tmp (exported by the harness env); markers per owner.
+TOOL_CACHE_ENV: dict[str, str] = {"MYPY_CACHE_DIR": "mypy-cache", "RUFF_CACHE_DIR": "ruff-cache"}
+MARKER_DIR: Path = Path(".dadaia") / "tmp" / "hooks"
 
 
 def parse_exception_globs(text: str) -> tuple[str, ...]:
@@ -301,6 +297,10 @@ def walked_zones() -> tuple[Zone, ...]:
     return tuple(
         zone for zone in DADAIA_ZONES if zone.cls not in (ZoneClass.OPERATOR, ZoneClass.MANAGED)
     )
+
+
+def tool_cache_env(workspace_root: Path) -> dict[str, str]:
+    return {var: str(workspace_root / ".dadaia" / "tmp" / d) for var, d in TOOL_CACHE_ENV.items()}
 
 
 def additive_prefixes() -> tuple[str, ...]:

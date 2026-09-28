@@ -487,3 +487,21 @@ def test_a_handoff_expires_by_its_mtime_alone(workspace: Path) -> None:
     assert "WS-handoff-expired: deleted 'handoff/ctx/old.handoff.json'" in result.output
     assert not old.exists()
     assert fresh.exists()
+
+
+def test_a_retired_cache_zone_is_held_by_the_reaper_never_orphaned(workspace: Path) -> None:
+    """sa-tool-caches-land-outside-the-cache-zone#B40-3 (upgrade path): an instance's
+    pre-0.5.0 .dadaia/.cache/ is no zone any more — the doctor reports it with its fix
+    and --fix holds it in reaped/ (7 days), never a silent orphan."""
+    cache = workspace / ".dadaia" / ".cache" / "ruff" / "x"
+    cache.parent.mkdir(parents=True)
+    cache.write_text("x", encoding="utf-8")
+
+    scan = CliRunner().invoke(app, ["doctor"])
+    fixed = CliRunner().invoke(app, ["doctor", "--fix"])
+
+    assert "WS-dadaia-slop slop .cache  (not in the root law or the exceptions)" in scan.output
+    assert not (workspace / ".dadaia" / ".cache").exists(), fixed.output
+    assert [
+        p.read_text(encoding="utf-8") for p in (workspace / ".dadaia" / "reaped").rglob("x")
+    ] == ["x"]
