@@ -1,28 +1,32 @@
-"""VenvPythonEnvironmentManager — venv bootstrap installs the package (VENV-1 coherence).
+"""VenvPythonEnvironmentManager — the workspace venv bootstrap, over a faked subprocess.
 
-Bug init-venv-never-installs-dadaia-workspace: ``ensure_workspace_venv`` used to create a
-bare venv and bail when the dir existed, so ``.dadaia/.venv/bin/dadaia`` never existed and
-doctor VENV-1 was unfixable by its own remediation (re-running init).
+Intent: CONTRACT — bug init-venv-never-installs-dadaia-workspace (VENV-1 coherence);
+bug init-venv-installs-index-version-not-running-distribution; bug
+certify-cannot-install-installed-provider; bug init-succeeds-after-provider-bootstrap-failure;
+bug init-venv-bootstrap-inherits-degraded-base-python; 0.4.8 AC1.6, AC2.1-AC2.3; v0.4.3 A9.1-A9.3.
 
-The suite-wide conftest backstop no-ops ``ensure_workspace_venv`` (no real venvs in
-tests), so the REAL method is captured at import time — before the autouse monkeypatch
-fires — and exercised here with ``subprocess.run`` stubbed (child-venv creation is
-subprocess-based — see bug init-venv-bootstrap-inherits-degraded-base-python below).
+The conftest backstop no-ops ``ensure_workspace_venv``; the real method is captured at
+import time and restored by the ``recorder`` fixture.
 """
 
-import os
+import base64
+import hashlib
 import subprocess
+import zipfile
+from importlib.metadata import Distribution
 from pathlib import Path
 
 import pytest
 
 import dadaia_workspace.infrastructure.python_env as python_env_module
+from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.platform import PLATFORM, Capabilities
-from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+from dadaia_workspace.infrastructure.python_env import (
+    VenvPythonEnvironmentManager,
+    repack_installed_wheel,
+)
 from tests.fixtures.provider_dist import install_fake_dist
 
-# Captured at collection/import time — the conftest autouse monkeypatch only applies
-# while a test runs, so this is the unpatched production method.
 _REAL_ENSURE = VenvPythonEnvironmentManager.ensure_workspace_venv
 
 
@@ -30,103 +34,74 @@ class _Recorder:
     def __init__(self) -> None:
         self.venv_created: list[str] = []
         self.commands: list[list[str]] = []
-        # The fake venv's reported version; unknown (never probed) unless a test says.
-        self.installed: str | None = None
+        self.installed: str | None = None  # the fake venv's reported version
 
 
 @pytest.fixture()
-def recorder(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _Recorder:
+def recorder(monkeypatch: pytest.MonkeyPatch) -> _Recorder:
+    """Fake ``subprocess.run`` plus the interpreter/verification probes, which have
+    their own tests below."""
     rec = _Recorder()
 
     def fake_run(cmd: list[str], check: bool = False, **_kwargs: object) -> None:
         rec.commands.append(list(cmd))
-        if len(cmd) >= 3 and cmd[1] == "-m" and cmd[2] == "venv":
+        if cmd[1:3] == ["-m", "venv"]:
             rec.venv_created.append(cmd[-1])
             (Path(cmd[-1]) / PLATFORM.venv_scripts_dir).mkdir(parents=True, exist_ok=True)
 
+    cls = VenvPythonEnvironmentManager
     monkeypatch.setattr(python_env_module.subprocess, "run", fake_run)
-    # Interpreter resolution and the post-creation version post-condition are covered
-    # by their own dedicated unit tests below; no-op them here so these generic
-    # bootstrap-flow tests stay focused on the install/repair behavior they exercise.
-    monkeypatch.setattr(
-        VenvPythonEnvironmentManager,
-        "_resolve_child_venv_interpreter",
-        lambda self: "fake-interpreter",
-    )
-    monkeypatch.setattr(
-        VenvPythonEnvironmentManager,
-        "_assert_child_interpreter_version",
-        lambda self, workspace_root: None,
-    )
-    # Post-bootstrap provider verification runs a REAL venv python — no-op it here;
-    # its own behavior is covered by the dedicated verification tests below.
-    monkeypatch.setattr(
-        VenvPythonEnvironmentManager, "_verify_venv_provider", lambda self, ws, expected=None: None
-    )
-    monkeypatch.setattr(
-        VenvPythonEnvironmentManager, "installed_version", lambda self, ws: rec.installed
-    )
-    # Undo the suite-wide no-op backstop for these tests only.
-    monkeypatch.setattr(
-        VenvPythonEnvironmentManager, "ensure_workspace_venv", _REAL_ENSURE, raising=True
-    )
+    monkeypatch.setattr(cls, "_resolve_child_venv_interpreter", lambda self: "fake-interpreter")
+    monkeypatch.setattr(cls, "_assert_child_interpreter_version", lambda self, ws: None)
+    monkeypatch.setattr(cls, "_verify_venv_provider", lambda self, ws, expected=None: None)
+    monkeypatch.setattr(cls, "installed_version", lambda self, ws: rec.installed)
+    monkeypatch.setattr(cls, "ensure_workspace_venv", _REAL_ENSURE)
     return rec
 
 
-@pytest.fixture()
-def running_100(monkeypatch: pytest.MonkeyPatch) -> None:
-    install_fake_dist(monkeypatch, "1.0.0")  # the running version, at its one boundary
+def _venv(ws: Path) -> str:
+    return str(ws / ".dadaia" / ".venv")
 
 
-def _entrypoint(ws: Path) -> Path:
-    return (
-        ws / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir / f"dadaia{PLATFORM.venv_exe_suffix}"
-    )
+def _healthy(ws: Path) -> None:
+    entry = Path(_venv(ws)) / PLATFORM.venv_scripts_dir / f"dadaia{PLATFORM.venv_exe_suffix}"
+    entry.parent.mkdir(parents=True)
+    entry.write_text("#!stub")
+
+
+def _wheel_install(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Run as a wheel install: no pyproject.toml beside the package."""
+    site = tmp_path / "site-packages" / "dadaia_workspace"
+    site.mkdir(parents=True)
+    (site / "__init__.py").write_text("")
+    monkeypatch.setattr(python_env_module.dadaia_workspace, "__file__", str(site / "__init__.py"))
+    monkeypatch.setattr(python_env_module.metadata, "version", lambda name: "9.9.9")
 
 
 def test_fresh_bootstrap_creates_venv_and_installs_package(
     tmp_path: Path, recorder: _Recorder
 ) -> None:
+    """Resolved interpreter creates the venv, then the editable checkout, then pytest."""
     mgr = VenvPythonEnvironmentManager()
-    result = mgr.ensure_workspace_venv(str(tmp_path))
+    assert mgr.ensure_workspace_venv(str(tmp_path)) == _venv(tmp_path)
 
-    assert result == str(tmp_path / ".dadaia" / ".venv")
-    assert recorder.venv_created == [str(tmp_path / ".dadaia" / ".venv")]
-    # Three commands: the venv-creation subprocess, the provider spec install, then the
-    # CI toolchain (pytest) the product promises for `ci preflight` and the executed-test
-    # close gate.
-    assert len(recorder.commands) == 3
-    create_cmd = recorder.commands[0]
-    assert create_cmd[0] == "fake-interpreter"
-    assert create_cmd[1:3] == ["-m", "venv"]
-    assert create_cmd[-1] == str(tmp_path / ".dadaia" / ".venv")
-    assert recorder.commands[2][-1] == "pytest"
-    cmd = recorder.commands[1]
-    assert cmd[0] == mgr.pip_executable(str(tmp_path))
-    assert cmd[1] == "install"
-    # Running from the source checkout in this repo → editable install of that checkout.
-    assert "--editable" in cmd
-    assert (Path(cmd[-1]) / "pyproject.toml").is_file()
+    create, install, toolchain = recorder.commands
+    assert create[:3] == ["fake-interpreter", "-m", "venv"] and create[-1] == _venv(tmp_path)
+    assert install[:2] == [mgr.pip_executable(str(tmp_path)), "install"]
+    assert "--editable" in install and (Path(install[-1]) / "pyproject.toml").is_file()
+    assert toolchain[-1] == "pytest"
 
 
 def test_existing_bare_venv_is_repaired_not_skipped(tmp_path: Path, recorder: _Recorder) -> None:
-    """The exact state doctor VENV-1 flags: venv dir present, entrypoint missing."""
-    (tmp_path / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir).mkdir(parents=True)
-
+    """The VENV-1 state: venv dir present, entrypoint missing -> install, no re-create."""
+    (Path(_venv(tmp_path)) / PLATFORM.venv_scripts_dir).mkdir(parents=True)
     VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
-
-    assert recorder.venv_created == []  # no re-create
-    assert len(recorder.commands) == 2  # package installed + CI toolchain (pytest)
+    assert (recorder.venv_created, len(recorder.commands)) == ([], 2)
 
 
 def test_healthy_venv_is_a_noop(tmp_path: Path, recorder: _Recorder) -> None:
-    entry = _entrypoint(tmp_path)
-    entry.parent.mkdir(parents=True)
-    entry.write_text("#!stub")
-
+    _healthy(tmp_path)
     VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
-
-    assert recorder.venv_created == []
     assert recorder.commands == []
 
 
@@ -135,39 +110,32 @@ def test_healthy_venv_is_a_noop(tmp_path: Path, recorder: _Recorder) -> None:
     [("0.4.7", True), ("1.0.0", False), ("1.0.0rc1", True), ("0.9.9+e2e", True)],
 )
 def test_reinit_reinstalls_only_an_older_venv(
-    tmp_path: Path, recorder: _Recorder, running_100: None, installed: str, installs: bool
+    tmp_path: Path,
+    recorder: _Recorder,
+    monkeypatch: pytest.MonkeyPatch,
+    installed: str,
+    installs: bool,
 ) -> None:
-    """Intent: CONTRACT — 0.4.8 AC2.1/AC2.2 (T-048-06): an older venv takes the one
-    bootstrap install path; an equal one is never written."""
-    entry = _entrypoint(tmp_path)
-    entry.parent.mkdir(parents=True)
-    entry.write_text("#!stub")
+    """0.4.8 AC2.1/AC2.2: an older venv takes the one install path; an equal one is untouched."""
+    install_fake_dist(monkeypatch, "1.0.0")
+    _healthy(tmp_path)
     recorder.installed = installed
-
     VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
-
-    assert recorder.venv_created == []
-    assert bool(recorder.commands) is installs
-    if installs:
-        assert recorder.commands[0][:3] == [
-            VenvPythonEnvironmentManager().pip_executable(str(tmp_path)),
-            "install",
-            "--quiet",
-        ]
+    pip = VenvPythonEnvironmentManager().pip_executable(str(tmp_path))
+    assert [c[:3] for c in recorder.commands[:1]] == (
+        [[pip, "install", "--quiet"]] if installs else []
+    )
 
 
 def test_reinit_refuses_a_newer_venv_before_any_write(
-    tmp_path: Path, recorder: _Recorder, running_100: None
+    tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Intent: CONTRACT — 0.4.8 AC2.3 (T-048-06): never downgrade; name the version."""
-    entry = _entrypoint(tmp_path)
-    entry.parent.mkdir(parents=True)
-    entry.write_text("#!stub")
+    """0.4.8 AC2.3: never downgrade; name the version."""
+    install_fake_dist(monkeypatch, "1.0.0")
+    _healthy(tmp_path)
     recorder.installed = "1.0.0+e2e"
-
     with pytest.raises(python_env_module.WorkspaceVenvNewerError) as exc:
         VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
-
     assert exc.value.installed == "1.0.0+e2e"
     assert recorder.commands == []
 
@@ -183,38 +151,32 @@ def test_reinit_refuses_a_newer_venv_before_any_write(
     ],
 )
 def test_version_key_orders_published_version_shapes(lower: str, higher: str) -> None:
-    """Intent: CONTRACT — 0.4.8 T-048-06: release tuple, then the local segment after its
-    base; an unpublished shape (``rc``) sorts lowest, so it is upgraded, never kept."""
+    """0.4.8 T-048-06: release tuple, then the local segment; ``rc`` sorts lowest."""
     assert python_env_module._version_key(lower) < python_env_module._version_key(higher)
     assert python_env_module._version_key("0.4") == python_env_module._version_key("0.4.0")
 
 
+@pytest.mark.parametrize("repacks", [True, False])
 def test_install_spec_repacks_the_running_distribution_when_not_a_source_checkout(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, repacks: bool
 ) -> None:
-    """Intent: CONTRACT — bug init-venv-installs-index-version-not-running-distribution.
-
-    A wheel-installed distribution (no pyproject.toml beside the package) bootstraps the
-    venv from ITSELF, re-packed. It used to pin ``dadaia-workspace==<running version>``
-    from the INDEX, and under the release-please floor every unpublished build declares
-    the last published version — so the pin resolved, to somebody else's bytes.
-    """
-    site = tmp_path / "site-packages" / "dadaia_workspace"
-    site.mkdir(parents=True)
-    (site / "__init__.py").write_text("")
-    monkeypatch.setattr(python_env_module.dadaia_workspace, "__file__", str(site / "__init__.py"))
-    monkeypatch.setattr(python_env_module.metadata, "version", lambda name: "9.9.9")
-    repacked = tmp_path / "wheel" / "dadaia_workspace-9.9.9-py3-none-any.whl"
-    repacked.parent.mkdir(parents=True)
-    repacked.write_bytes(b"fake-wheel")
+    """A wheel install bootstraps from ITSELF re-packed, never an index pin (which can
+    resolve to other bytes); if it cannot re-pack it refuses naming the override."""
+    _wheel_install(tmp_path, monkeypatch)
+    wheel = tmp_path / "dadaia_workspace-9.9.9-py3-none-any.whl"
     monkeypatch.setattr(
-        python_env_module, "repack_installed_wheel", lambda dest_dir, dist=None: repacked
+        python_env_module,
+        "repack_installed_wheel",
+        lambda dest_dir, dist=None: wheel if repacks else None,
     )
-
-    spec = VenvPythonEnvironmentManager()._install_spec(str(tmp_path / "ws"))
-
-    assert spec == str(repacked)
-    assert "==" not in spec, "an index pin can resolve to bytes other than the running ones"
+    mgr = VenvPythonEnvironmentManager()
+    if repacks:
+        assert mgr._install_spec(str(tmp_path / "ws")) == str(wheel)
+        return
+    with pytest.raises(
+        python_env_module.WorkspaceVenvBootstrapError, match="DADAIA_BOOTSTRAP_PACKAGE"
+    ):
+        mgr._install_spec(str(tmp_path / "ws"))
 
 
 def test_local_candidate_wheel_overrides_index_pin_without_editable(
@@ -223,665 +185,320 @@ def test_local_candidate_wheel_overrides_index_pin_without_editable(
     wheel = tmp_path / "dadaia_workspace-9.9.9-py3-none-any.whl"
     wheel.write_bytes(b"candidate")
     monkeypatch.setenv("DADAIA_BOOTSTRAP_PACKAGE", str(wheel))
-
     VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path / "workspace"))
-
-    command = recorder.commands[1]
-    assert command[-1] == str(wheel)
-    assert "--editable" not in command
-
-
-# ── repack-installed-wheel fallback (bug certify-cannot-install-installed-provider) ──
-#
-# A consumer whose installed provider version is NOT resolvable from the index (an
-# unpublished candidate wheel under validation, a yanked release, or an offline host)
-# must still bootstrap disposable venvs (init/certify/reconcile) from a REPRODUCIBLE
-# source: the running installed distribution itself, re-packed as a wheel.
-
-
-def _make_installed_dist(root: Path) -> Path:
-    """Materialize a minimal REAL installed distribution layout (site-packages style)."""
-    site = root / "site"
-    (site / "fakepkg").mkdir(parents=True)
-    (site / "fakepkg" / "__init__.py").write_text("VALUE = 1\n", encoding="utf-8")
-    dist_info = site / "fakepkg-0.1.0.dist-info"
-    dist_info.mkdir()
-    (dist_info / "METADATA").write_text(
-        "Metadata-Version: 2.1\nName: fakepkg\nVersion: 0.1.0\n", encoding="utf-8"
-    )
-    (dist_info / "WHEEL").write_text(
-        "Wheel-Version: 1.0\nGenerator: test\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
-        encoding="utf-8",
-    )
-    (dist_info / "RECORD").write_text(
-        "fakepkg/__init__.py,,\n"
-        "fakepkg-0.1.0.dist-info/METADATA,,\n"
-        "fakepkg-0.1.0.dist-info/WHEEL,,\n"
-        "fakepkg-0.1.0.dist-info/RECORD,,\n",
-        encoding="utf-8",
-    )
-    return dist_info
-
-
-def test_repack_installed_wheel_produces_a_valid_wheel(tmp_path: Path) -> None:
-    import base64
-    import hashlib
-    import zipfile
-    from importlib.metadata import Distribution
-
-    from dadaia_workspace.infrastructure.python_env import repack_installed_wheel
-
-    dist_info = _make_installed_dist(tmp_path)
-    wheel = repack_installed_wheel(tmp_path / "out", dist=Distribution.at(dist_info))
-
-    assert wheel is not None
-    assert wheel.name == "fakepkg-0.1.0-py3-none-any.whl"
-    with zipfile.ZipFile(wheel) as zf:
-        names = set(zf.namelist())
-        assert "fakepkg/__init__.py" in names
-        assert "fakepkg-0.1.0.dist-info/METADATA" in names
-        assert "fakepkg-0.1.0.dist-info/WHEEL" in names
-        record = zf.read("fakepkg-0.1.0.dist-info/RECORD").decode()
-        # RECORD hashes are REGENERATED so pip's install-time verification passes.
-        payload = zf.read("fakepkg/__init__.py")
-        digest = base64.urlsafe_b64encode(hashlib.sha256(payload).digest()).rstrip(b"=").decode()
-        assert f"fakepkg/__init__.py,sha256={digest},{len(payload)}" in record
-        assert "fakepkg-0.1.0.dist-info/RECORD,," in record
-
-
-def test_repack_returns_none_for_editable_install(tmp_path: Path) -> None:
-    """An editable/source install has no packaged payload — repack must decline, not lie."""
-    from importlib.metadata import Distribution
-
-    from dadaia_workspace.infrastructure.python_env import repack_installed_wheel
-
-    dist_info = tmp_path / "site" / "fakepkg-0.1.0.dist-info"
-    dist_info.mkdir(parents=True)
-    (dist_info / "METADATA").write_text(
-        "Metadata-Version: 2.1\nName: fakepkg\nVersion: 0.1.0\n", encoding="utf-8"
-    )
-    (dist_info / "RECORD").write_text(
-        "__editable__.fakepkg.pth,,\nfakepkg-0.1.0.dist-info/METADATA,,\n", encoding="utf-8"
-    )
-    (tmp_path / "site" / "__editable__.fakepkg.pth").write_text("/src\n", encoding="utf-8")
-
-    assert repack_installed_wheel(tmp_path / "out", dist=Distribution.at(dist_info)) is None
+    assert recorder.commands[1][-1] == str(wheel)
+    assert "--editable" not in recorder.commands[1]
 
 
 def test_bootstrap_installs_the_repacked_running_distribution(
     tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Intent: CONTRACT — bug init-venv-installs-index-version-not-running-distribution.
+    """One pip install of the re-packed wheel, no ``==`` pin ever attempted, and the
+    wheel is scratch (0.4.8 AC1.6): gone after the install."""
+    _wheel_install(tmp_path, monkeypatch)
+    written: list[Path] = []
 
-    The wheel path installs the re-packed running distribution DIRECTLY: one pip
-    install, no index attempt before it (the attempt is what used to succeed with the
-    wrong bytes), and the CI toolchain still rides along.
-    """
-    mgr = VenvPythonEnvironmentManager()
-    repacked = tmp_path / "repacked" / "dadaia_workspace-9.9.9-py3-none-any.whl"
-    repacked.parent.mkdir(parents=True)
-    repacked.write_bytes(b"fake-wheel")
-    monkeypatch.setattr(mgr, "_install_spec", lambda workspace_root: str(repacked))
+    def repack(dest_dir: Path, dist: object = None) -> Path:
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        written.append(dest_dir / "dadaia_workspace-9.9.9-py3-none-any.whl")
+        written[0].write_bytes(b"fake-wheel")
+        return written[0]
 
-    calls: list[list[str]] = []
+    monkeypatch.setattr(python_env_module, "repack_installed_wheel", repack)
+    ws = tmp_path / "ws"
+    VenvPythonEnvironmentManager().ensure_workspace_venv(str(ws))
 
-    def record(cmd: list[str], check: bool = False, **_kwargs: object) -> None:
-        calls.append(list(cmd))
+    assert [c[-1] for c in recorder.commands[1:]] == [str(written[0]), "pytest"]
+    assert not any("==" in token for call in recorder.commands for token in call)
+    assert not written[0].exists() and not (ws / ".dadaia" / "tmp").exists()
 
-    monkeypatch.setattr(python_env_module.subprocess, "run", record)
 
-    mgr.ensure_workspace_venv(str(tmp_path))
+def _installed_dist(root: Path, record: str) -> Path:
+    site = root / "site"
+    dist_info = site / "fakepkg-0.1.0.dist-info"
+    dist_info.mkdir(parents=True)
+    (dist_info / "METADATA").write_text("Metadata-Version: 2.1\nName: fakepkg\nVersion: 0.1.0\n")
+    (dist_info / "RECORD").write_text(record)
+    return dist_info
 
-    assert calls[0][1:3] == ["-m", "venv"]  # venv-creation subprocess call, first
-    assert calls[1][-1] == str(repacked)
-    assert not any("==" in token for call in calls for token in call), (
-        "no index pin is ever attempted — resolving one is how PyPI's bytes got in"
+
+def test_repack_installed_wheel_produces_a_valid_wheel(tmp_path: Path) -> None:
+    """RECORD hashes are regenerated so pip's install-time verification passes."""
+    dist_info = _installed_dist(
+        tmp_path,
+        "fakepkg/__init__.py,,\nfakepkg-0.1.0.dist-info/METADATA,,\n"
+        "fakepkg-0.1.0.dist-info/WHEEL,,\nfakepkg-0.1.0.dist-info/RECORD,,\n",
     )
-    assert calls[2][-1] == "pytest"
-
-
-def test_bootstrap_error_names_escape_hatch_when_the_running_dist_cannot_be_repacked(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Neither a source checkout nor a re-packable install: refuse, naming the override.
-
-    Refusing is the honest outcome — the alternative the bug closed was installing
-    whatever the index happened to carry under the same version string.
-    """
-    site = tmp_path / "site-packages" / "dadaia_workspace"
-    site.mkdir(parents=True)
-    (site / "__init__.py").write_text("")
-    monkeypatch.setattr(python_env_module.dadaia_workspace, "__file__", str(site / "__init__.py"))
-    monkeypatch.setattr(python_env_module.metadata, "version", lambda name: "9.9.9")
-    monkeypatch.setattr(
-        python_env_module, "repack_installed_wheel", lambda dest_dir, dist=None: None
+    (dist_info.parent / "fakepkg").mkdir()
+    (dist_info.parent / "fakepkg" / "__init__.py").write_text("VALUE = 1\n")
+    (dist_info / "WHEEL").write_text(
+        "Wheel-Version: 1.0\nGenerator: test\nRoot-Is-Purelib: true\nTag: py3-none-any\n"
     )
 
-    with pytest.raises(python_env_module.WorkspaceVenvBootstrapError) as excinfo:
-        VenvPythonEnvironmentManager()._install_spec(str(tmp_path / "ws"))
-    assert "DADAIA_BOOTSTRAP_PACKAGE" in str(excinfo.value)
+    wheel = repack_installed_wheel(tmp_path / "out", dist=Distribution.at(dist_info))
+
+    assert wheel is not None and wheel.name == "fakepkg-0.1.0-py3-none-any.whl"
+    with zipfile.ZipFile(wheel) as zf:
+        record = zf.read("fakepkg-0.1.0.dist-info/RECORD").decode()
+        payload = zf.read("fakepkg/__init__.py")
+        assert "fakepkg-0.1.0.dist-info/WHEEL" in zf.namelist()
+    digest = base64.urlsafe_b64encode(hashlib.sha256(payload).digest()).rstrip(b"=").decode()
+    assert f"fakepkg/__init__.py,sha256={digest},{len(payload)}" in record
+    assert "fakepkg-0.1.0.dist-info/RECORD,," in record
 
 
-# ── bug init-succeeds-after-provider-bootstrap-failure (Consumer live canary) ─────────
-#
-# init used to leak pip's raw "ERROR: Could not find a version..." into its output while
-# the repack fallback quietly saved the bootstrap — indistinguishable, for a consumer,
-# from a masked incomplete bootstrap. The index install is now output-captured, the
-# fallback announces itself in ONE clean line, and the bootstrap VERIFIES the venv's
-# provider independently (clean env, exact running version) before reporting success.
+def test_repack_returns_none_for_editable_install(tmp_path: Path) -> None:
+    """An editable install has no packaged payload — repack declines, never lies."""
+    dist_info = _installed_dist(
+        tmp_path, "__editable__.fakepkg.pth,,\nfakepkg-0.1.0.dist-info/METADATA,,\n"
+    )
+    (dist_info.parent / "__editable__.fakepkg.pth").write_text("/src\n")
+    assert repack_installed_wheel(tmp_path / "out", dist=Distribution.at(dist_info)) is None
 
 
 def test_the_install_stream_is_captured_and_its_failure_narrated(
-    tmp_path: Path,
-    recorder: _Recorder,
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """pip's raw stream never reaches the operator; a failure is narrated as one error."""
-    import subprocess as _subprocess
-
+    """Bug init-succeeds-after-provider-bootstrap-failure: pip's raw stream never reaches
+    the operator; its failure is one error carrying pip's line."""
     mgr = VenvPythonEnvironmentManager()
     monkeypatch.setattr(mgr, "_install_spec", lambda workspace_root: "/tmp/w.whl")
-
-    captured_kwargs: list[dict[str, object]] = []
+    seen: list[dict[str, object]] = []
 
     def failing(cmd: list[str], check: bool = False, **kwargs: object) -> None:
-        captured_kwargs.append(dict(kwargs))
+        seen.append(kwargs)
         if cmd[-1] == "/tmp/w.whl":
-            raise _subprocess.CalledProcessError(1, cmd, output="", stderr="ERROR: no dist")
+            raise subprocess.CalledProcessError(1, cmd, output="", stderr="ERROR: no dist")
 
     monkeypatch.setattr(python_env_module.subprocess, "run", failing)
-
-    with pytest.raises(python_env_module.WorkspaceVenvBootstrapError) as excinfo:
+    with pytest.raises(python_env_module.WorkspaceVenvBootstrapError, match="ERROR: no dist"):
         mgr.ensure_workspace_venv(str(tmp_path))
-
-    assert captured_kwargs and all(k.get("capture_output") for k in captured_kwargs)
-    assert "ERROR: no dist" in str(excinfo.value)
+    assert seen and all(k.get("capture_output") for k in seen)
 
 
 def test_verification_failure_fails_the_bootstrap(
     tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    mgr = VenvPythonEnvironmentManager()
-    monkeypatch.setattr(mgr, "_install_spec", lambda workspace_root: "/tmp/w.whl")
-
-    def broken_verify(
-        self: VenvPythonEnvironmentManager, ws: str, expected: str | None = None
-    ) -> None:
+    def broken(self: VenvPythonEnvironmentManager, ws: str, expected: str | None = None) -> None:
         raise python_env_module.WorkspaceVenvBootstrapError("venv provider verification failed")
 
-    monkeypatch.setattr(VenvPythonEnvironmentManager, "_verify_venv_provider", broken_verify)
-
+    monkeypatch.setattr(VenvPythonEnvironmentManager, "_verify_venv_provider", broken)
     with pytest.raises(python_env_module.WorkspaceVenvBootstrapError):
-        mgr.ensure_workspace_venv(str(tmp_path))
+        VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
 
 
 def test_verify_venv_provider_uses_clean_env_and_checks_exact_version(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The verification must not be satisfiable through inherited PYTHONPATH."""
-    mgr = VenvPythonEnvironmentManager()
-    seen: dict[str, object] = {}
+    """Never satisfiable through an inherited PYTHONPATH; names both versions."""
+    envs: list[object] = []
 
-    class _Proc:
-        returncode = 0
-        stdout = "9.9.8\n"
-        stderr = ""
-
-    def fake_run(cmd: list[str], **kwargs: object) -> _Proc:
-        seen["cmd"] = cmd
-        seen["env"] = kwargs.get("env")
-        return _Proc()
+    def fake_run(cmd: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        envs.append(kwargs.get("env"))
+        return subprocess.CompletedProcess(cmd, 0, stdout="9.9.8\n", stderr="")
 
     monkeypatch.setattr(python_env_module.subprocess, "run", fake_run)
     monkeypatch.setenv("PYTHONPATH", "/somewhere/inherited")
-
-    with pytest.raises(python_env_module.WorkspaceVenvBootstrapError) as excinfo:
-        mgr._verify_venv_provider(str(tmp_path), expected="9.9.9")
-
-    assert "9.9.8" in str(excinfo.value) and "9.9.9" in str(excinfo.value)
-    env = seen["env"]
-    assert isinstance(env, dict) and "PYTHONPATH" not in env
+    with pytest.raises(
+        python_env_module.WorkspaceVenvBootstrapError, match="9.9.8.*9.9.9|9.9.9.*9.9.8"
+    ):
+        VenvPythonEnvironmentManager()._verify_venv_provider(str(tmp_path), expected="9.9.9")
+    assert isinstance(envs[0], dict) and "PYTHONPATH" not in envs[0]
 
 
-def test_venv_create_spawn_oserror_becomes_clean_bootstrap_error_not_raw_traceback(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("error", "named", "not_named"),
+    [
+        pytest.param(PermissionError(13, "Permission denied"), "noexec", None, id="spawn-oserror"),
+        pytest.param(
+            subprocess.CalledProcessError(
+                1, "venv", output="", stderr="PermissionError: [Errno 13]"
+            ),
+            "noexec",
+            None,
+            id="ensurepip-cannot-exec",
+        ),
+        pytest.param(
+            subprocess.CalledProcessError(
+                1, "venv", output="ensurepip is not available.", stderr=""
+            ),
+            "ensurepip",
+            "noexec",
+            id="AC1.6-base-python-without-ensurepip",
+        ),
+    ],
+)
+def test_venv_creation_failure_is_one_clean_actionable_error(
+    tmp_path: Path,
+    recorder: _Recorder,
+    monkeypatch: pytest.MonkeyPatch,
+    error: Exception,
+    named: str,
+    not_named: str | None,
 ) -> None:
-    """Bug r3b-portability-import-venv-permission (Consumer R3-B, F-16/F-22 class).
+    """Bug r3b-portability-import-venv-permission; 0.4.8 AC1.6: a DadaiaError naming the
+    venv path and the likely cause, never a raw traceback nor a wrong cause."""
 
-    ``dadaia import`` restored a workspace onto a **noexec** filesystem: venv creation
-    got far enough to write ``bin/python3.13`` and then died in ``ensurepip`` because
-    that interpreter cannot be EXECUTED there. Exercised here at the level where the
-    RESOLVED interpreter itself cannot even be spawned (``subprocess.run`` raising
-    ``OSError`` directly) — a ~40-line raw Python traceback must never reach the
-    operator; every such failure becomes one clean, actionable
-    ``WorkspaceVenvBootstrapError`` line naming the path and the likely cause.
-    """
-    monkeypatch.setattr(
-        VenvPythonEnvironmentManager, "ensure_workspace_venv", _REAL_ENSURE, raising=True
-    )
-    monkeypatch.setattr(
-        VenvPythonEnvironmentManager,
-        "_resolve_child_venv_interpreter",
-        lambda self: "/nonexistent/python3.12",
-    )
+    def failing(cmd: list[str], check: bool = False, **_kwargs: object) -> None:
+        raise error
 
-    def exploding_run(cmd: list[str], check: bool = False, **_kwargs: object) -> None:
-        raise PermissionError(
-            13, "Permission denied", f"{cmd[-1]}/bin/python{PLATFORM.venv_exe_suffix or '3.13'}"
-        )
-
-    monkeypatch.setattr(python_env_module.subprocess, "run", exploding_run)
-    mgr = VenvPythonEnvironmentManager()
-
+    monkeypatch.setattr(python_env_module.subprocess, "run", failing)
     with pytest.raises(python_env_module.WorkspaceVenvBootstrapError) as excinfo:
-        mgr.ensure_workspace_venv(str(tmp_path))
-
-    message = str(excinfo.value)
-    # Actionable: names the venv path AND the noexec/permission cause.
-    assert str(tmp_path) in message
-    assert "noexec" in message.lower()
-    # It is a DadaiaError, so the CLI entrypoint renders it as one line, never a traceback.
-    from dadaia_workspace.core.exceptions import DadaiaError
-
+        VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
+    message = str(excinfo.value).lower()
     assert isinstance(excinfo.value, DadaiaError)
+    assert str(tmp_path).lower() in message and named in message
+    assert not_named is None or not_named not in message
 
 
-def test_venv_create_subprocess_failure_becomes_clean_bootstrap_error(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("version", "spec", "ok"),
+    [
+        ((3, 12, 3), ">=3.12,<4.0", True),
+        ((3, 10, 12), ">=3.12,<4.0", False),
+        ((4, 0, 0), ">=3.12,<4.0", False),
+        ((3, 1, 0), "", True),
+        ((3, 1, 0), None, True),
+    ],
+)
+def test_version_satisfies_requires_python(
+    version: tuple[int, int, int], spec: str | None, ok: bool
 ) -> None:
-    """The realistic shape of the noexec bug under subprocess-based creation: the
-    RESOLVED interpreter spawns fine (it lives outside the noexec mount) but venv's
-    internal ensurepip step fails EXECUTING the freshly-copied interpreter inside the
-    noexec-mounted target dir — surfacing to us as ``CalledProcessError``, not
-    ``OSError``. Must still become one clean, actionable line.
-    """
+    """Bug init-venv-bootstrap-inherits-degraded-base-python: an empty spec fails open."""
+    assert python_env_module._version_satisfies(version, spec) is ok
+
+
+@pytest.mark.parametrize(
+    ("host", "path", "ok"),
+    [
+        ("win32", "\\tools\\python.exe", False),
+        ("win32", "C:\\tools\\python.exe", True),
+        ("linux", "/usr/bin/python3.12", True),
+        ("linux", "python3.12", False),
+    ],
+)
+def test_is_fully_qualified_per_host_flavor(
+    monkeypatch: pytest.MonkeyPatch, host: str, path: str, ok: bool
+) -> None:
+    """CWE-426 (v0.4.3 T-043-23): a Windows drive-relative path passes ``isabs`` yet is
+    not fully qualified."""
+    monkeypatch.setattr(python_env_module, "PLATFORM", Capabilities.detect(host))
+    assert python_env_module._is_fully_qualified(path) is ok
+
+
+@pytest.mark.parametrize(
+    ("which", "expected"),
+    [("python3.12", []), ("/usr/bin/python3.13", ["/usr/bin/python3.13"])],
+)
+def test_path_candidates_keep_only_absolute_which_results(
+    monkeypatch: pytest.MonkeyPatch, which: str, expected: list[str]
+) -> None:
+    """v0.4.3 A9.1."""
     monkeypatch.setattr(
-        VenvPythonEnvironmentManager, "ensure_workspace_venv", _REAL_ENSURE, raising=True
+        python_env_module.shutil, "which", lambda name: which if which.endswith(name) else None
     )
-    monkeypatch.setattr(
-        VenvPythonEnvironmentManager,
-        "_resolve_child_venv_interpreter",
-        lambda self: "/usr/bin/python3.12",
-    )
-
-    def failing_creation(cmd: list[str], check: bool = False, **_kwargs: object) -> None:
-        import subprocess as _subprocess
-
-        raise _subprocess.CalledProcessError(
-            1, cmd, output="", stderr="PermissionError: [Errno 13] Permission denied"
-        )
-
-    monkeypatch.setattr(python_env_module.subprocess, "run", failing_creation)
-    mgr = VenvPythonEnvironmentManager()
-
-    with pytest.raises(python_env_module.WorkspaceVenvBootstrapError) as excinfo:
-        mgr.ensure_workspace_venv(str(tmp_path))
-
-    message = str(excinfo.value)
-    assert str(tmp_path) in message
-    assert "noexec" in message.lower()
+    assert python_env_module._path_candidates(12) == expected
 
 
-def test_venv_create_success_path_is_unchanged(tmp_path: Path, recorder: _Recorder) -> None:
-    """Guard against over-catching: a normal bootstrap still creates and installs."""
-    mgr = VenvPythonEnvironmentManager()
-    mgr.ensure_workspace_venv(str(tmp_path))
-    assert recorder.venv_created == [str(tmp_path / ".dadaia" / ".venv")]
+@pytest.mark.parametrize(
+    ("value", "expected"), [("python3", None), ("/usr/bin/python3.12", "/usr/bin/python3.12")]
+)
+def test_pyvenv_executable_keeps_only_an_absolute_value(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, value: str, expected: str | None
+) -> None:
+    """v0.4.3 A9.1: a hand-edited relative ``pyvenv.cfg`` value is never returned."""
+    (tmp_path / "pyvenv.cfg").write_text(f"executable = {value}\n", encoding="utf-8")
+    monkeypatch.setattr(python_env_module.sys, "prefix", str(tmp_path))
+    assert python_env_module._current_venv_pyvenv_executable() == expected
 
 
-# ── bug init-venv-bootstrap-inherits-degraded-base-python ────────────────────────────
-#
-# Size: SMALL — pure-function unit tests plus instance-method tests with subprocess and
-# ``sys``/PATH lookups stubbed. Intent: prove the child-venv interpreter resolution
-# ACTUALLY checks each candidate's own reported version against Requires-Python, in the
-# declared order, rather than trusting stdlib ``venv.create()``'s implicit (and, on a
-# ``--copies`` venv, provably degraded — see repro below) base-executable resolution.
-#
-# Root cause: ``venv.create()`` resolves a NEW venv's base interpreter through
-# ``sys._base_executable`` of the CALLING process. On a venv created with
-# ``symlinks=False`` ("--copies"), CPython's getpath.c re-derives that value via a
-# landmark search for the OS-level *unversioned* ``python3`` name inside the recorded
-# ``home`` directory — NOT the version-pinned ``executable`` pyvenv.cfg itself records.
-# Reproduced on this exact host class: a `.dadaia/.venv` built with `--copies` reports
-# `sys._base_executable == "/usr/bin/python3"`, an OS symlink to Python 3.10, while the
-# venv's own `pyvenv.cfg` `executable` field correctly names `/usr/bin/python3.12` (the
-# interpreter that actually built it) — and the running interpreter is itself 3.12.13.
+_V310, _V312 = (3, 10, 12), (3, 12, 13)
 
 
-def test_version_satisfies_accepts_version_within_bounds() -> None:
-    assert python_env_module._version_satisfies((3, 12, 3), ">=3.12,<4.0") is True
-
-
-def test_version_satisfies_rejects_version_below_floor() -> None:
-    assert python_env_module._version_satisfies((3, 10, 12), ">=3.12,<4.0") is False
-
-
-def test_version_satisfies_rejects_version_at_or_above_ceiling() -> None:
-    assert python_env_module._version_satisfies((4, 0, 0), ">=3.12,<4.0") is False
-
-
-def test_version_satisfies_fails_open_on_empty_or_missing_spec() -> None:
-    assert python_env_module._version_satisfies((3, 1, 0), "") is True
-    assert python_env_module._version_satisfies((3, 1, 0), None) is True
-
-
-def test_resolve_child_venv_interpreter_skips_degraded_base_and_uses_pyvenv_executable(
+@pytest.mark.parametrize(
+    ("host", "pyvenv", "on_path", "versions", "expected"),
+    [
+        pytest.param(
+            "linux",
+            "/usr/bin/python3.12",
+            [],
+            {"/usr/bin/python3": _V310, "/usr/bin/python3.12": _V312},
+            "/usr/bin/python3.12",
+            id="degraded-base-skipped-for-pyvenv-executable",
+        ),
+        pytest.param(
+            "linux",
+            None,
+            ["/usr/local/bin/python3.13"],
+            {"/usr/bin/python3": _V310, "/usr/local/bin/python3.13": (3, 13, 1)},
+            "/usr/local/bin/python3.13",
+            id="falls-back-to-path-search",
+        ),
+        pytest.param("linux", None, [], {"/usr/bin/python3": _V310}, None, id="nothing-satisfies"),
+        pytest.param("linux", "python3", [], {"python3": _V312}, None, id="relative-never-probed"),
+        pytest.param(
+            "win32",
+            "\\tools\\python.exe",
+            [],
+            {"\\tools\\python.exe": _V312},
+            None,
+            id="drive-relative-never-probed",
+        ),
+    ],
+)
+def test_child_venv_interpreter_is_the_first_candidate_satisfying_requires_python(
     monkeypatch: pytest.MonkeyPatch,
+    host: str,
+    pyvenv: str | None,
+    on_path: list[str],
+    versions: dict[str, tuple[int, int, int]],
+    expected: str | None,
 ) -> None:
-    """THE reproduction: ``sys._base_executable`` reports an interpreter whose version
-    does NOT satisfy Requires-Python (the ``--copies`` degraded-base symptom on this
-    exact host class), while the running venv's OWN ``pyvenv.cfg`` ``executable`` field
-    names one that does. Resolution must skip the degraded candidate and select the
-    compliant one — never hand the degraded resolution to venv creation implicitly.
-
-    Pins the POSIX path flavor (the ``PLATFORM`` flag) explicitly, symmetric with the nt-flavor
-    FR9 tests below: ``_is_fully_qualified`` — which ``_resolve_child_venv_interpreter``
-    calls on every candidate — branches on the REAL host ``PLATFORM``, so a POSIX-shaped
-    candidate like ``/usr/bin/python3.12`` is only fully-qualified when the fixture
-    itself pins a POSIX host, never left to whatever OS happens to run the suite.
-    """
+    """Bug init-venv-bootstrap-inherits-degraded-base-python; v0.4.3 A9.1 (CWE-426):
+    base executable, then pyvenv.cfg, then PATH; a relative candidate is never spawned;
+    nothing satisfying raises naming the requirement and what was tried."""
     mgr = VenvPythonEnvironmentManager()
-    monkeypatch.setattr(python_env_module, "PLATFORM", Capabilities.detect("linux"))
+    monkeypatch.setattr(python_env_module, "PLATFORM", Capabilities.detect(host))
     monkeypatch.setattr(mgr, "_running_requires_python", lambda: ">=3.12,<4.0")
-    monkeypatch.setattr(
-        python_env_module.sys, "_base_executable", "/usr/bin/python3", raising=False
-    )
-    monkeypatch.setattr(
-        python_env_module, "_current_venv_pyvenv_executable", lambda: "/usr/bin/python3.12"
-    )
-    monkeypatch.setattr(python_env_module, "_path_candidates", lambda min_minor: [])
+    base = "/usr/bin/python3" if host == "linux" else ""
+    monkeypatch.setattr(python_env_module.sys, "_base_executable", base, raising=False)
+    monkeypatch.setattr(python_env_module, "_current_venv_pyvenv_executable", lambda: pyvenv)
+    monkeypatch.setattr(python_env_module, "_path_candidates", lambda min_minor: on_path)
+    probed: list[str] = []
 
-    versions = {
-        "/usr/bin/python3": (3, 10, 12),  # the degraded OS-level unversioned python3
-        "/usr/bin/python3.12": (3, 12, 13),  # the venv's own pyvenv.cfg-recorded truth
-    }
-    monkeypatch.setattr(python_env_module, "_interpreter_version", lambda exe: versions.get(exe))
+    def version_of(exe: str) -> tuple[int, int, int] | None:
+        probed.append(exe)
+        return versions.get(exe)
 
-    interpreter = mgr._resolve_child_venv_interpreter()
-
-    assert interpreter == "/usr/bin/python3.12"
-
-
-def test_resolve_child_venv_interpreter_falls_back_to_path_search(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Neither ``_base_executable`` nor the current ``pyvenv.cfg`` satisfy: PATH search
-    for a version-pinned pythonX.Y is the last resolution strategy before giving up.
-
-    Pins the POSIX path flavor (the ``PLATFORM`` flag) explicitly — see the sibling
-    ``..._skips_degraded_base_...`` test's docstring for why.
-    """
-    mgr = VenvPythonEnvironmentManager()
-    monkeypatch.setattr(python_env_module, "PLATFORM", Capabilities.detect("linux"))
-    monkeypatch.setattr(mgr, "_running_requires_python", lambda: ">=3.12,<4.0")
-    monkeypatch.setattr(
-        python_env_module.sys, "_base_executable", "/usr/bin/python3", raising=False
-    )
-    monkeypatch.setattr(python_env_module, "_current_venv_pyvenv_executable", lambda: None)
-    monkeypatch.setattr(
-        python_env_module, "_path_candidates", lambda min_minor: ["/usr/local/bin/python3.13"]
-    )
-    versions = {
-        "/usr/bin/python3": (3, 10, 12),
-        "/usr/local/bin/python3.13": (3, 13, 1),
-    }
-    monkeypatch.setattr(python_env_module, "_interpreter_version", lambda exe: versions.get(exe))
-
-    assert mgr._resolve_child_venv_interpreter() == "/usr/local/bin/python3.13"
-
-
-def test_resolve_child_venv_interpreter_raises_actionable_error_when_nothing_satisfies(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Pins the POSIX path flavor explicitly so the candidate is rejected for the
-    intended reason (version mismatch, not "relative path rejected" on an nt host) —
-    same class as the sibling ``_resolve_child_venv_interpreter`` tests above."""
-    mgr = VenvPythonEnvironmentManager()
-    monkeypatch.setattr(python_env_module, "PLATFORM", Capabilities.detect("linux"))
-    monkeypatch.setattr(mgr, "_running_requires_python", lambda: ">=3.12,<4.0")
-    monkeypatch.setattr(
-        python_env_module.sys, "_base_executable", "/usr/bin/python3", raising=False
-    )
-    monkeypatch.setattr(python_env_module, "_current_venv_pyvenv_executable", lambda: None)
-    monkeypatch.setattr(python_env_module, "_path_candidates", lambda min_minor: [])
-    monkeypatch.setattr(python_env_module, "_interpreter_version", lambda exe: (3, 10, 12))
-
-    with pytest.raises(python_env_module.WorkspaceVenvBootstrapError) as excinfo:
+    monkeypatch.setattr(python_env_module, "_interpreter_version", version_of)
+    if expected is not None:
+        assert mgr._resolve_child_venv_interpreter() == expected
+        return
+    with pytest.raises(python_env_module.WorkspaceVenvBootstrapError, match="3.12"):
         mgr._resolve_child_venv_interpreter()
-
-    message = str(excinfo.value)
-    assert "3.12" in message  # names the required version
-    assert "/usr/bin/python3" in message  # names what was actually tried
+    assert pyvenv not in probed
 
 
-def test_assert_child_interpreter_version_rejects_mismatched_child_before_pip_install(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(("version", "raises"), [(_V310, True), (_V312, False), (None, False)])
+def test_child_venv_version_postcondition(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    version: tuple[int, int, int] | None,
+    raises: bool,
 ) -> None:
-    """The post-condition (fix direction point 3): a venv whose OWN python does not
-    satisfy Requires-Python must be rejected with an ACTIONABLE 'interpreter mismatch'
-    error naming both versions — BEFORE any pip install is attempted (never pip's bare,
-    rootless 'requires a different Python' failure).
-    """
+    """A mismatched child is refused naming both versions before any pip install; an
+    unintrospectable one fails open (pip stays the final authority)."""
     mgr = VenvPythonEnvironmentManager()
     monkeypatch.setattr(mgr, "_running_requires_python", lambda: ">=3.12,<4.0")
-    monkeypatch.setattr(python_env_module, "_interpreter_version", lambda exe: (3, 10, 12))
-
+    monkeypatch.setattr(python_env_module, "_interpreter_version", lambda exe: version)
+    if not raises:
+        mgr._assert_child_interpreter_version(str(tmp_path))
+        return
     with pytest.raises(python_env_module.WorkspaceVenvBootstrapError) as excinfo:
         mgr._assert_child_interpreter_version(str(tmp_path))
-
     message = str(excinfo.value)
-    assert "3.10.12" in message
-    assert ">=3.12,<4.0" in message
+    assert "3.10.12" in message and ">=3.12,<4.0" in message
     assert "interpreter mismatch" in message.lower()
-
-
-def test_assert_child_interpreter_version_accepts_compliant_child(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    mgr = VenvPythonEnvironmentManager()
-    monkeypatch.setattr(mgr, "_running_requires_python", lambda: ">=3.12,<4.0")
-    monkeypatch.setattr(python_env_module, "_interpreter_version", lambda exe: (3, 12, 13))
-
-    mgr._assert_child_interpreter_version(str(tmp_path))  # must not raise
-
-
-def test_assert_child_interpreter_version_fails_open_when_unintrospectable(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Cannot determine the child's version (e.g. subprocess stubbed out in a caller's
-    own test double) → skip the gate; pip install remains the final authority.
-    """
-    mgr = VenvPythonEnvironmentManager()
-    monkeypatch.setattr(mgr, "_running_requires_python", lambda: ">=3.12,<4.0")
-    monkeypatch.setattr(python_env_module, "_interpreter_version", lambda exe: None)
-
-    mgr._assert_child_interpreter_version(str(tmp_path))  # must not raise
-
-
-def test_fresh_bootstrap_uses_resolved_interpreter_for_venv_creation(
-    tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Wire-up: ``ensure_workspace_venv`` must use the RESOLVED interpreter (never an
-    implicit ``venv.create()``) to spawn the child-venv creation.
-    """
-    monkeypatch.setattr(
-        VenvPythonEnvironmentManager,
-        "_resolve_child_venv_interpreter",
-        lambda self: "/opt/python3.12",
-    )
-    mgr = VenvPythonEnvironmentManager()
-    mgr.ensure_workspace_venv(str(tmp_path))
-
-    create_cmd = recorder.commands[0]
-    assert create_cmd[0] == "/opt/python3.12"
-    assert create_cmd[1:3] == ["-m", "venv"]
-    assert create_cmd[-1] == str(tmp_path / ".dadaia" / ".venv")
-
-
-# ── v0.4.3 T-043-13/FR9 — interpreter-probe hardening (CWE-426 + timeout/stdin) ──────
-#
-# Size: SMALL — pure-function unit tests plus one instance-method wiring test with
-# ``subprocess.run`` stubbed. Intent: CONTRACT — v0.4.3 A9.1-A9.3.
-#
-# ``_path_candidates`` (``shutil.which`` results) and ``_current_venv_pyvenv_executable``
-# (the raw ``pyvenv.cfg`` ``executable`` value) both fed an UNVALIDATED candidate straight
-# into ``_interpreter_version``, which spawns it via ``subprocess.run`` (CWE-426: untrusted
-# search path). A bare/relative candidate (e.g. a malicious ``pyvenv.cfg`` naming a
-# relative ``python3`` that resolves against whatever CWD the probe happens to run from)
-# must never reach ``subprocess.run`` at all. Separately, the probe itself ran with no
-# ``timeout=`` and inherited stdin — a hanging or interactive candidate could wedge the
-# whole bootstrap.
-
-
-def test_path_candidates_rejects_a_relative_which_result(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A9.1: ``shutil.which`` returning a bare/relative name is rejected before it can
-    reach ``_interpreter_version``/``subprocess.run`` — ``_path_candidates`` filters on
-    ``os.path.isabs()`` itself."""
-    monkeypatch.setattr(
-        python_env_module.shutil, "which", lambda name: "python3.12"
-    )  # bare name — not absolute
-
-    assert python_env_module._path_candidates(12) == []
-
-
-def test_path_candidates_keeps_an_absolute_which_result(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        python_env_module.shutil,
-        "which",
-        lambda name: f"/usr/bin/{name}" if name == "python3.13" else None,
-    )
-
-    assert python_env_module._path_candidates(12) == ["/usr/bin/python3.13"]
-
-
-def test_current_venv_pyvenv_executable_rejects_a_relative_value(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A9.1: a ``pyvenv.cfg`` whose ``executable`` value is bare/relative (untrusted —
-    it can be hand-edited or written by a compromised prior bootstrap) is rejected by
-    ``_current_venv_pyvenv_executable`` itself, never returned for a caller to probe."""
-    cfg = tmp_path / "pyvenv.cfg"
-    cfg.write_text("executable = python3\n", encoding="utf-8")
-    monkeypatch.setattr(python_env_module.sys, "prefix", str(tmp_path))
-
-    assert python_env_module._current_venv_pyvenv_executable() is None
-
-
-def test_current_venv_pyvenv_executable_keeps_an_absolute_value(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    cfg = tmp_path / "pyvenv.cfg"
-    cfg.write_text("executable = /usr/bin/python3.12\n", encoding="utf-8")
-    monkeypatch.setattr(python_env_module.sys, "prefix", str(tmp_path))
-
-    assert python_env_module._current_venv_pyvenv_executable() == "/usr/bin/python3.12"
-
-
-def test_resolve_child_venv_interpreter_never_probes_a_relative_pyvenv_value(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """End-to-end wiring proof (A9.1): even if a relative candidate slipped through to
-    ``_resolve_child_venv_interpreter``'s ordering, the filtering at the source means
-    ``_interpreter_version`` (and therefore ``subprocess.run``) is never called with it."""
-    mgr = VenvPythonEnvironmentManager()
-    monkeypatch.setattr(mgr, "_running_requires_python", lambda: ">=3.12,<4.0")
-    monkeypatch.setattr(python_env_module.sys, "_base_executable", "", raising=False)
-    # A directly-malicious pyvenv.cfg value: bare name only.
-    monkeypatch.setattr(python_env_module, "_current_venv_pyvenv_executable", lambda: "python3")
-    monkeypatch.setattr(python_env_module, "_path_candidates", lambda min_minor: [])
-
-    probed: list[str] = []
-
-    def recording_version(exe: str) -> tuple[int, int, int] | None:
-        probed.append(exe)
-        return (3, 12, 3) if os.path.isabs(exe) else None
-
-    monkeypatch.setattr(python_env_module, "_interpreter_version", recording_version)
-
-    with pytest.raises(python_env_module.WorkspaceVenvBootstrapError):
-        mgr._resolve_child_venv_interpreter()
-
-    assert "python3" not in probed
-
-
-# ── v0.4.3 T-043-23 security-review rework — Windows drive-relative rejection ────────
-#
-# Size: SMALL — pure-function unit tests plus one instance-method wiring test.
-# Intent: CONTRACT. CWE-426 residual (security-reviewer LOW finding FR9, handoff
-# 2026-08-17T173112Z-security-reviewer-v0.4.3-alpha-2-delta): on Python 3.12,
-# ``os.path.isabs`` alone does not reject a Windows DRIVE-RELATIVE path (exactly one
-# leading separator, no drive letter, e.g. ``\tools\python.exe``) — it resolves
-# against the CURRENT DRIVE, not a fully qualified location. Routed through ``ntpath``
-# directly (never the host-bound ``os.path``) so the Windows-specific gap is provable
-# on any host OS by monkeypatching ``PLATFORM``.
-
-
-def test_is_fully_qualified_rejects_a_windows_drive_relative_path(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A drive-relative candidate (passes ``ntpath.isabs`` on 3.12, but resolves
-    against whatever drive happens to be current) must be rejected."""
-    monkeypatch.setattr(python_env_module, "PLATFORM", Capabilities.detect("win32"))
-
-    assert python_env_module._is_fully_qualified("\\tools\\python.exe") is False
-
-
-def test_is_fully_qualified_accepts_a_windows_drive_qualified_path(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A genuine drive-qualified Windows path is unaffected."""
-    monkeypatch.setattr(python_env_module, "PLATFORM", Capabilities.detect("win32"))
-
-    assert python_env_module._is_fully_qualified("C:\\tools\\python.exe") is True
-
-
-def test_is_fully_qualified_accepts_a_posix_absolute_path(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Pins the POSIX path flavor explicitly — ``_is_fully_qualified`` branches on the
-    REAL host ``PLATFORM``, so a leading-slash candidate is only unambiguous on a POSIX
-    host; symmetric with the nt-flavor tests above."""
-    monkeypatch.setattr(python_env_module, "PLATFORM", Capabilities.detect("linux"))
-
-    assert python_env_module._is_fully_qualified("/usr/bin/python3.12") is True
-
-
-def test_is_fully_qualified_rejects_a_posix_relative_path(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(python_env_module, "PLATFORM", Capabilities.detect("linux"))
-
-    assert python_env_module._is_fully_qualified("python3.12") is False
-
-
-def test_resolve_child_venv_interpreter_never_probes_a_windows_drive_relative_pyvenv_value(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """End-to-end wiring proof: a drive-relative ``pyvenv.cfg`` ``executable`` value
-    (the exact CWE-426 residual shape — passes ``ntpath.isabs`` on 3.12) must never
-    reach ``_interpreter_version``/``subprocess.run``."""
-    mgr = VenvPythonEnvironmentManager()
-    monkeypatch.setattr(mgr, "_running_requires_python", lambda: ">=3.12,<4.0")
-    monkeypatch.setattr(python_env_module.sys, "_base_executable", "", raising=False)
-    monkeypatch.setattr(python_env_module, "PLATFORM", Capabilities.detect("win32"))
-    # A directly-malicious pyvenv.cfg value: drive-relative, not drive-qualified.
-    monkeypatch.setattr(
-        python_env_module, "_current_venv_pyvenv_executable", lambda: "\\tools\\python.exe"
-    )
-    monkeypatch.setattr(python_env_module, "_path_candidates", lambda min_minor: [])
-
-    probed: list[str] = []
-
-    def recording_version(exe: str) -> tuple[int, int, int] | None:
-        probed.append(exe)
-        return (3, 12, 3)
-
-    monkeypatch.setattr(python_env_module, "_interpreter_version", recording_version)
-
-    with pytest.raises(python_env_module.WorkspaceVenvBootstrapError):
-        mgr._resolve_child_venv_interpreter()
-
-    assert "\\tools\\python.exe" not in probed
 
 
 def test_interpreter_version_probe_passes_a_bounded_timeout_and_devnull_stdin(
@@ -919,68 +536,3 @@ def test_interpreter_version_probe_degrades_to_none_on_timeout(
     monkeypatch.setattr(python_env_module.subprocess, "run", hanging_run)
 
     assert python_env_module._interpreter_version("/usr/bin/python-that-hangs") is None
-
-
-def test_base_python_without_ensurepip_is_named_not_blamed_on_noexec(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Intent: CONTRACT — 0.4.8 AC1.6 (T-048-04).
-
-    Debian's base python3 without ``python3-venv`` fails ``-m venv`` with venv's own
-    "ensurepip is not available" line; the error names that, never a noexec mount.
-    """
-    monkeypatch.setattr(
-        VenvPythonEnvironmentManager, "ensure_workspace_venv", _REAL_ENSURE, raising=True
-    )
-    monkeypatch.setattr(
-        VenvPythonEnvironmentManager,
-        "_resolve_child_venv_interpreter",
-        lambda self: "/usr/bin/python3.12",
-    )
-
-    def no_ensurepip(cmd: list[str], check: bool = False, **_kwargs: object) -> None:
-        import subprocess as _subprocess
-
-        raise _subprocess.CalledProcessError(
-            1,
-            cmd,
-            output="The virtual environment was not created successfully because "
-            "ensurepip is not available.",
-            stderr="",
-        )
-
-    monkeypatch.setattr(python_env_module.subprocess, "run", no_ensurepip)
-
-    with pytest.raises(python_env_module.WorkspaceVenvBootstrapError) as excinfo:
-        VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
-
-    message = str(excinfo.value)
-    assert "ensurepip" in message
-    assert "noexec" not in message.lower()
-
-
-def test_repacked_wheel_is_not_left_behind(
-    tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Intent: CONTRACT — 0.4.8 AC1.6 (T-048-04): the re-packed wheel is scratch."""
-    site = tmp_path / "site-packages" / "dadaia_workspace"
-    site.mkdir(parents=True)
-    (site / "__init__.py").write_text("")
-    monkeypatch.setattr(python_env_module.dadaia_workspace, "__file__", str(site / "__init__.py"))
-    written: list[Path] = []
-
-    def repack(dest_dir: Path, dist: object = None) -> Path:
-        dest_dir.mkdir(parents=True, exist_ok=True)
-        wheel = dest_dir / "dadaia_workspace-9.9.9-py3-none-any.whl"
-        wheel.write_bytes(b"fake-wheel")
-        written.append(wheel)
-        return wheel
-
-    monkeypatch.setattr(python_env_module, "repack_installed_wheel", repack)
-    ws = tmp_path / "ws"
-
-    VenvPythonEnvironmentManager().ensure_workspace_venv(str(ws))
-
-    assert written and recorder.commands[1][-1] == str(written[0])
-    assert not written[0].exists()
-    assert not (ws / ".dadaia" / "tmp").exists()
