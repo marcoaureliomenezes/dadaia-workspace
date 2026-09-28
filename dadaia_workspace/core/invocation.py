@@ -55,7 +55,7 @@ from __future__ import annotations
 import json
 import os
 import re
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -360,7 +360,6 @@ def resolve(
     payload: Mapping[str, object] | None = None,
     env: Mapping[str, str],
     cwd: Path,
-    clock: Callable[[], float] | None = None,
 ) -> Invocation:
     """Resolve session, context, root and Bind ONCE — the single decider.
 
@@ -368,12 +367,8 @@ def resolve(
     implied by an explicit write TARGET under ``repos/<slug>/`` — a repo write IS
     explicit input, so ``repos/x/...`` resolves ``x`` even while ``DADAIA_CONTEXT=y``).
     *payload* is a hook's already-parsed stdin envelope (``None`` for a CLI caller — the
-    session id then resolves from *env* alone). *clock* is accepted for interface
-    symmetry with the record-liveness predicate it threads through; unused directly
-    here (:func:`~dadaia_workspace.core.record_liveness.is_stale` defaults to
-    ``datetime.now``).
+    session id then resolves from *env* alone).
     """
-    del clock  # reserved for a future injectable clock; is_stale defaults to utcnow.
 
     workspace_root = _resolve_root(cwd=cwd, target_path=target_path)
     session_id = resolve_session_id(payload, env) or None

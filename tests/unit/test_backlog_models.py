@@ -17,7 +17,6 @@ from dadaia_workspace.core.models.backlog import (
     Subject,
     SubjectKind,
     parse_intents,
-    serialize_intents,
 )
 
 pytestmark = pytest.mark.unit
@@ -131,7 +130,6 @@ def test_parse_intents_round_trip_and_none_is_empty() -> None:
     assert len(intents) == 2
     assert intents[0].subject.kind is SubjectKind.CODE
     assert intents[0].change == "remove OPENCODE_RUN"
-    assert serialize_intents(intents) == raw
 
     assert parse_intents(None) == []
 
@@ -157,8 +155,6 @@ def test_subject_surface_new_round_trip_and_default() -> None:
     intents = parse_intents(raw)
     assert intents[0].subject.surface == "new"
     assert intents[1].subject.surface == "existing"
-    # Round trip: `surface` is emitted only when new — existing items stay byte-stable.
-    assert serialize_intents(intents) == raw
 
     with pytest.raises(ValueError, match="surface"):
         parse_intents([{"subject": {"kind": "cli", "ref": "x", "surface": "bogus"}, "change": "c"}])

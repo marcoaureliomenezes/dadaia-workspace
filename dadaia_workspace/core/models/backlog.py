@@ -33,7 +33,6 @@ __all__ = [
     "SubjectKind",
     "is_intents_exempt",
     "parse_intents",
-    "serialize_intents",
 ]
 
 #: The one backlog stage exempt from the resolvable-typed-intents requirement.
@@ -197,21 +196,3 @@ def parse_intents(raw: object) -> list[Intent]:
             Intent(subject=Subject(kind=kind, ref=ref_raw, surface=surface_raw), change=change_raw)
         )
     return intents
-
-
-def serialize_intents(intents: Sequence[Intent]) -> list[dict[str, object]]:
-    """Serialize :class:`Intent` objects back to the frontmatter-mapping shape.
-
-    ``surface`` is emitted only when ``new`` so every existing item round-trips
-    byte-stable.
-    """
-    out: list[dict[str, object]] = []
-    for intent in intents:
-        subject: dict[str, object] = {
-            "kind": intent.subject.kind.value,
-            "ref": intent.subject.ref,
-        }
-        if intent.subject.surface != "existing":
-            subject["surface"] = intent.subject.surface
-        out.append({"subject": subject, "change": intent.change})
-    return out
