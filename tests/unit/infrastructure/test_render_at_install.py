@@ -48,7 +48,7 @@ _GENERIC_BODY = (
     "---\n"
     "name: dd-software-engineer\n"
     "description: generic implementer\n"
-    "activity_class: MUTATING\n"
+    "read_only: false\n"
     "dispatch_band: 3\n"
     "---\n"
     "\n"
@@ -59,7 +59,7 @@ _PACK_BODY = (
     "---\n"
     "name: frontend-engineer\n"
     "description: pack body\n"
-    "activity_class: MUTATING\n"
+    "read_only: false\n"
     "dispatch_band: 3\n"
     "model: claude-sonnet-5\n"
     "gate_role: implementer\n"
@@ -123,35 +123,50 @@ def test_render_claude_agent_seam(case: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ("declared", "expected"),
+    ("declared", "claude", "sandbox"),
     [
-        ("ADDITIVE", ("permissionMode: default", "disallowedTools: [Edit, Write, NotebookEdit]")),
-        ("MUTATING", ("permissionMode: acceptEdits",)),
+        (
+            "true",
+            ("permissionMode: default", "disallowedTools: [Edit, Write, NotebookEdit]"),
+            "read-only",
+        ),
+        ("false", ("permissionMode: acceptEdits",), "workspace-write"),
     ],
 )
-def test_render_claude_agent_derives_privilege_from_parsed_activity_class(
-    declared: str, expected: tuple[str, ...]
+def test_privilege_derives_from_read_only_on_both_harnesses(
+    tmp_path: Path, declared: str, claude: tuple[str, ...], sandbox: str
 ) -> None:
-    body = _GENERIC_BODY.replace("activity_class: MUTATING", f"activity_class: {declared}")
+    """sa-reviewer-persona-body-contradicts-its-tools#B2: read_only is the one privilege
+    field — Claude's permission mode and Codex's sandbox both derive from it."""
+    body = _GENERIC_BODY.replace("read_only: false", f"read_only: {declared}")
     resolved = ResolvedAgentModel(model="claude-sonnet-5", effort="high", source="default")
     fm = render_claude_agent(body, resolved).split("---\n", 2)[1].splitlines()
-    for line in expected:
+    for line in claude:
         assert line in fm
-    assert ("disallowedTools" in "\n".join(fm)) == (declared == "ADDITIVE")
+    assert ("disallowedTools" in "\n".join(fm)) == (declared == "true")
+    md = tmp_path / "dd-software-engineer.md"
+    md.write_text(body, encoding="utf-8")
+    toml = codex_agent_toml_bytes(md, "dd-software-engineer", resolved).decode("utf-8")
+    assert f'sandbox_mode = "{sandbox}"' in toml
 
 
 @pytest.mark.parametrize(
     "body",
     [
-        _GENERIC_BODY.replace("activity_class: MUTATING\n", ""),
-        _GENERIC_BODY.replace("activity_class: MUTATING", "activity_class: additive"),
+        _GENERIC_BODY.replace("read_only: false\n", ""),
+        _GENERIC_BODY.replace("read_only: false", "read_only: ADDITIVE"),
     ],
 )
-def test_render_claude_agent_refuses_undeclared_activity_class(body: str) -> None:
-    """Privilege never falls back to a silent default (review 0.4.7 c5 F2)."""
+def test_a_persona_without_read_only_never_renders(tmp_path: Path, body: str) -> None:
+    """sa-reviewer-persona-body-contradicts-its-tools#B3: privilege never falls back to
+    a silent default (review 0.4.7 c5 F2) — on either harness."""
     resolved = ResolvedAgentModel(model="claude-sonnet-5", effort="high", source="default")
-    with pytest.raises(PublicAssetError, match="activity_class"):
+    with pytest.raises(PublicAssetError, match="read_only"):
         render_claude_agent(body, resolved)
+    md = tmp_path / "dd-software-engineer.md"
+    md.write_text(body, encoding="utf-8")
+    with pytest.raises(PublicAssetError, match="read_only"):
+        codex_agent_toml_bytes(md, "dd-software-engineer", resolved)
 
 
 # ---------------------------------------------------------------------------

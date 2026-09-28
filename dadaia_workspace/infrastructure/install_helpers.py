@@ -26,25 +26,22 @@ from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _parse_write_allowlist,
 )
 
-_ACTIVITY_CLASSES: frozenset[str] = frozenset({"ADDITIVE", "MUTATING"})
 
-
-def activity_read_only(frontmatter: Mapping[str, object]) -> bool:
-    """Least privilege derives from the persona's ``activity_class`` (ADR 0016): ADDITIVE
-    (the reviewer) never edits; MUTATING accepts its own edits. The ONE derivation shared
-    by the Claude render and the Codex TOML transcode.
+def persona_read_only(frontmatter: Mapping[str, object]) -> bool:
+    """Least privilege is the persona's ``read_only`` field (ADR 0016) — the ONE
+    derivation shared by the Claude render and the Codex TOML transcode.
 
     Raises:
-        PublicAssetError: fail-closed — a persona declaring no class, or an unknown one,
+        PublicAssetError: fail-closed — a persona declaring no ``read_only: true|false``
             never renders on a silent privilege default.
     """
-    declared = frontmatter.get("activity_class")
-    if declared not in _ACTIVITY_CLASSES:
+    declared = frontmatter.get("read_only")
+    if declared not in ("true", "false"):
         raise PublicAssetError(
             "cannot render agent projection: frontmatter must declare "
-            f"activity_class as one of {sorted(_ACTIVITY_CLASSES)}, got {declared!r}"
+            f"read_only as true or false, got {declared!r}"
         )
-    return declared == "ADDITIVE"
+    return declared == "true"
 
 
 # ---------------------------------------------------------------------------
@@ -114,7 +111,7 @@ def render_claude_agent(staged_text: str, resolved: ResolvedAgentModel) -> str:
     rest = staged_text[end_idx + 5 :]
     derived = ("model:", "effort:", "permissionMode:", "disallowedTools:")
     kept = [line for line in frontmatter.splitlines() if not line.startswith(derived)]
-    if activity_read_only(_parse_agent_frontmatter(staged_text)):
+    if persona_read_only(_parse_agent_frontmatter(staged_text)):
         kept.append("permissionMode: default")
         kept.append("disallowedTools: [Edit, Write, NotebookEdit]")
     else:

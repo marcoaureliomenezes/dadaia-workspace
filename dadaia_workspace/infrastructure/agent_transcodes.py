@@ -16,7 +16,7 @@ from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.harness_registry import AgentTranscode, HarnessRecord
 from dadaia_workspace.core.models.agent_model_policy import ResolvedAgentModel
 from dadaia_workspace.infrastructure.install_helpers import (
-    activity_read_only,
+    persona_read_only,
     resolve_codex_agent_model,
 )
 from dadaia_workspace.infrastructure.install_plan import InstallPlan
@@ -192,7 +192,7 @@ def codex_agent_toml_bytes(
         description=codex_description,
         claude_model=claude_model,
         reasoning_effort=reasoning_effort,
-        read_only=activity_read_only(fm),
+        read_only=persona_read_only(fm),
     )
     return toml_content.encode("utf-8")
 

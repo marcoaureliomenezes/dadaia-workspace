@@ -2,7 +2,7 @@
 name: dd-software-engineer
 description: Generic implementer. Python + Node + browser frontend + CI YAML + any context-language production code & tests. TDD-first, conventional commits, architecture-conformant, tests assert real behavior. Main-thread sub-agent; owns PLAN and TASKS as technical planning; SPEC and memory stay with dd-product-engineer.
 dispatch_band: 3
-activity_class: MUTATING
+read_only: false
 concurrency_relationship: "caller-scoped bind; no lock"
 gate_role: implementer
 tools:

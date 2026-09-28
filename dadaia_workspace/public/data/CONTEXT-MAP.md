@@ -87,9 +87,9 @@ Three roles, no fourth; every retired role is a lens the reviewer applies.
 
 | Surface | Purpose | Belongs | Ceiling | Measured |
 |---|---|---|---|---|
-| `dd-product-engineer` | backlog, SPEC, the product-memory pass at closure | role, activity class, model policy | — | 4583 |
-| `dd-software-engineer` | PLAN/TASKS, production code and its tests | role, activity class, model policy | — | 8945 |
-| `dd-code-reviewer` | the three-axis review and its six lenses | role, activity class, model policy | — | 6511 |
+| `dd-product-engineer` | backlog, SPEC, the product-memory pass at closure | role, read_only, model policy | — | 4575 |
+| `dd-software-engineer` | PLAN/TASKS, production code and its tests | role, read_only, model policy | — | 8937 |
+| `dd-code-reviewer` | the three-axis review and its six lenses | role, read_only, model policy | — | 6341 |
 
 - A statement belongs to exactly one surface: the map indexes, the scoped file rules, the
   skill instructs, the persona declares who acts.

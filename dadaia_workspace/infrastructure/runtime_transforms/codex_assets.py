@@ -36,7 +36,7 @@ _CODEX_SKILL_REF_PREFIXES = ("dd-",)
 
 # Whitelist of agent frontmatter fields that may be emitted to codex config.toml.
 _TOML_SAFE_AGENT_FIELDS: frozenset[str] = frozenset(
-    {"name", "description", "model", "tools", "activity_class"}
+    {"name", "description", "model", "tools", "read_only"}
 )
 
 # Matches a YAML list item under `tools:` (e.g. "  - Read")
@@ -180,7 +180,7 @@ def _render_codex_agent_toml(
     - ``description`` — basic string when available
     - ``model`` — basic string
     - ``sandbox_mode`` — ``read-only`` when *read_only* (the persona's
-      ``activity_class: ADDITIVE``, the same source the Claude render uses), else
+      ``read_only: true``, the same source the Claude render uses), else
       ``workspace-write``
     - ``model_reasoning_effort`` — explicit reasoning profile: *reasoning_effort*
       when supplied (the D-3 clamp of the RESOLVED agent-model-policy effort,

@@ -2,7 +2,7 @@
 name: dd-product-engineer
 description: Owner of the specs. Curates the backlog, authors the SPEC of a candidate (from the main thread's grill handoff), and reconciles product memory at closure. Dispatched by the main thread; never dispatches, never writes code, tests, PLAN or TASKS.
 dispatch_band: 3
-activity_class: MUTATING
+read_only: false
 concurrency_relationship: "main-thread sub-agent; no lock"
 gate_role: specifier
 tools:
