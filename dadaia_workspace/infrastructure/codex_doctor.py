@@ -81,41 +81,13 @@ def dcx7_codex_skill_refs(workspace_root: Path) -> list[DoctorLine]:
 
 
 def dcx8_codex_rules_shape(codex_dir: Path) -> list[DoctorLine]:
-    """D-CX-8: Codex Rules must be Starlark ``.rules``, not Markdown protocols."""
-    rules_dir = codex_dir / "rules"
-    out: list[DoctorLine] = []
-    if not rules_dir.exists():
-        out.append(DoctorLine(DoctorStatus.MISSING, "codex:rules/ (D-CX-8)"))
-        return out
-    if not any(rules_dir.glob("*.rules")):
-        out.append(DoctorLine(DoctorStatus.MISSING, "codex:rules/*.rules (D-CX-8)"))
-    for rules_file in sorted(rules_dir.glob("*.rules")):
-        try:
-            text = rules_file.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        if "command_allowed(" in text:
-            out.append(
-                DoctorLine(
-                    DoctorStatus.ERROR,
-                    f"codex:rules/{rules_file.name}: undocumented command_allowed policy (D-CX-8)",
-                )
-            )
-        if "prefix_rule(" not in text:
-            out.append(
-                DoctorLine(
-                    DoctorStatus.ERROR,
-                    f"codex:rules/{rules_file.name}: missing prefix_rule declarations (D-CX-8)",
-                )
-            )
-    for md_file in sorted(rules_dir.glob("*.md")):
-        out.append(
-            DoctorLine(
-                DoctorStatus.EXTRA,
-                f"codex:rules/{md_file.name}: markdown is not Codex Rules (D-CX-8)",
-            )
+    """D-CX-8: a Markdown file in ``rules/`` is not Codex Rules (the ``.rules`` bytes are a rule)."""
+    return [
+        DoctorLine(
+            DoctorStatus.EXTRA, f"codex:rules/{md.name}: markdown is not Codex Rules (D-CX-8)"
         )
-    return out
+        for md in sorted((codex_dir / "rules").glob("*.md"))
+    ]
 
 
 def dcx9_codex_hook_shape(workspace_root: Path) -> list[DoctorLine]:

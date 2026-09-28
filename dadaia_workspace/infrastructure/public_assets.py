@@ -4,7 +4,7 @@ K3 (v0.5.1): install/doctor are now two folds over one ``ProjectionRule`` table
 (``infrastructure/projection_rules.py``) — ``install`` writes ``render``, ``doctor``
 compares against it. What remains here is genuinely bespoke: staging, plan
 resolution, install-ledger reconciliation, and the harness-independent
-doctor checks (privacy, entities-derivation, memory-phase).
+doctor checks (privacy, entities-derivation).
 """
 
 from __future__ import annotations
@@ -32,7 +32,6 @@ from dadaia_workspace.core.workspace_layout import render_registry_tables
 from dadaia_workspace.infrastructure.entity_doctor import (
     check_agent_skill_refs,
     check_entities_derivation,
-    check_memory_phase_single_source,
 )
 from dadaia_workspace.infrastructure.install_plan import InstallPlan
 from dadaia_workspace.infrastructure.json_agent_model_policy_store import (
@@ -491,7 +490,6 @@ class FileSystemPublicAssetManager:
         # Harness-independent checks stay unconditional: they read the package public
         # dir, not a runtime projection.
         reports.extend(check_agent_skill_refs(self._public_dir))
-        reports.extend(check_memory_phase_single_source(self._public_dir))
         reports.extend(attest("public-privacy", self._check_public_privacy()))
         reports.extend(attest("entities-derivation", check_entities_derivation(self._public_dir)))
 

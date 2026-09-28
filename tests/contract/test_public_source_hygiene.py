@@ -125,6 +125,24 @@ def test_public_assets_carry_no_portuguese_control_vocabulary() -> None:
     )
 
 
+def test_public_law_never_grants_memory_writes_to_closure_alone() -> None:
+    """Intent: CONTRACT — constitution-persona-single-source-drift (SINGLE-SRC-1, §4a-6).
+
+    The memory-write phase is DEFINITION+CLOSURE; no persona/skill line grants it to
+    CLOSURE alone. A library lint of its own law, never a consumer doctor check."""
+    markers = ("write-locked", "only allows memory", "block writes to", "writes in this phase")
+    markers += ("during the closure phase", "may edit memory", "may write memory")
+    files = sorted({*_PUBLIC_ROOT.glob("agents/**/*.md"), *_PUBLIC_ROOT.glob("skills/**/*.md")})
+    assert_populated([p.name for p in files], "SKILL.md")
+    hits = [
+        f"{path.relative_to(_REPO_ROOT)}:{n}"
+        for path in files
+        for n, line in enumerate(path.read_text("utf-8").lower().splitlines(), start=1)
+        if "closure" in line and "definition" not in line and any(m in line for m in markers)
+    ]
+    assert hits == []
+
+
 # A bare `dadaia`/`dadaia-workspace` command word: not preceded by a path separator, a dot
 # or a word character (so `.venv/bin/dadaia` and `dadaia_workspace` pass). The one bare
 # spelling allowed is the `uvx dadaia-workspace init` bootstrap that creates the venv.

@@ -88,51 +88,6 @@ def check_agent_skill_refs(public_dir: Path) -> list[DoctorLine]:
     return out
 
 
-_MEMORY_PHASE_CLAIM_MARKERS = (
-    "write-locked",
-    "only allows memory",
-    "block writes to",
-    "writes in this phase",
-    "during the closure phase",
-    "may edit memory",
-    "may write memory",
-)
-
-
-def check_memory_phase_single_source(public_dir: Path) -> list[DoctorLine]:
-    """SINGLE-SRC-1: the memory-write phase is DEFINITION+CLOSURE (constitution §13).
-
-    Flags any public agent/skill line that asserts the memory-write *phase* permission but
-    cites only CLOSURE (omitting DEFINITION) — the single-source drift behind
-    `constitution-persona-single-source-drift`. Incidental "release closure"/"memory update"
-    mentions are NOT flagged (they carry no phase-permission marker).
-    """
-    out: list[DoctorLine] = []
-    for sub in ("agents", "skills"):
-        base = public_dir / sub
-        if not base.exists():
-            continue
-        for md_file in sorted(base.rglob("*.md")):
-            try:
-                text = md_file.read_text(encoding="utf-8")
-            except OSError:
-                continue
-            for n, raw in enumerate(text.splitlines(), start=1):
-                line = raw.lower()
-                if "closure" not in line or "definition" in line:
-                    continue
-                if any(marker in line for marker in _MEMORY_PHASE_CLAIM_MARKERS):
-                    rel = md_file.relative_to(public_dir)
-                    out.append(
-                        DoctorLine(
-                            DoctorStatus.DRIFT,
-                            f"{rel}:{n}: memory-write phase cites CLOSURE only — the "
-                            f"canonical rule is DEFINITION+CLOSURE (constitution §13). (SINGLE-SRC-1)",
-                        )
-                    )
-    return out
-
-
 # By-name rule citation in a Codex-projected artifact, e.g. "`workspace-protocol` rule".
 # The corpus is reachable iff each cited name resolves to .claude/rules/<name>.md on disk
 # (the single source-of-truth law surface, identical across harnesses — WS-CDX-PROTOCOL).

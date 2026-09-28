@@ -22,7 +22,7 @@ module that must be guarded against a hand-edit). ``features -> core`` is
 permitted (``core`` is the bottom layer).
 
 ERROR lines use the ``[drift]`` prefix — the same prefix ``check_agent_skill_refs``
-and ``check_memory_phase_single_source`` use for hard failures — because the
+uses for hard failures — because the
 ``dadaia public doctor`` CLI already treats ``[drift]`` as a nonzero-exit condition
 and the doctor finding-persistence layer already captures it. A clean check emits
 ``[ok] model-resolution``.
