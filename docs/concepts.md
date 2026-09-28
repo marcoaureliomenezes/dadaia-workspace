@@ -88,8 +88,8 @@ session receives its onboarding next step while one remains, the Tech Stack sect
 the catalog digest (`slug`, `title`, `tldr`, `path` per atom). At each candidate's closure, `memory.py drift` lists the
 atoms whose sources changed, each is reconciled — delete, update, then add — and
 `release.py check` (`LEDGER-RELEASE-SCHEMA`) keeps the release red until the reconciliation is logged.
-`.dadaia/.venv/bin/dadaia doctor`'s `specs` section polices the tree: `LEDGER-MEMORY-SCHEMA` (the generated pair equals the atom
-files), `LINT-1` (frontmatter, headings, wikilinks, `sources` globs, history lines) and
+`.dadaia/.venv/bin/dadaia doctor`'s `ledgers` section runs `LEDGER-MEMORY-SCHEMA` (the generated pair equals the atom
+files); its `specs` section runs `LINT-1` (frontmatter, headings, wikilinks, `sources` globs, history lines) and
 the warnings `MEM-DRIFT-1` (features package map vs the live tree) and `MEM-DRIFT-2`
 (a cited verb or path that does not exist).
 
