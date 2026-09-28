@@ -47,9 +47,11 @@ def test_doctor_exits_nonzero_when_issues_found(tmp_path: Path, monkeypatch) -> 
     assert result.exit_code != 0, "doctor found issues but exited 0"
 
 
-def test_certify_runs_without_initialized_workspace(tmp_path: Path, monkeypatch) -> None:
-    """certify's contract is a DISPOSABLE workspace — a bare cwd must not traceback."""
+def test_certify_runs_without_a_workspace_and_prints_pure_json(tmp_path: Path, monkeypatch) -> None:
+    """F-03: certify's contract is a DISPOSABLE workspace — a bare cwd runs it on a fallback root;
+    bug certify-json-stdout-polluted-info-line: diagnostics go to stderr, stdout is the JSON alone."""
     monkeypatch.chdir(tmp_path)
+    seen: list[Path] = []
 
     class _Ok:
         ok = True
@@ -58,36 +60,12 @@ def test_certify_runs_without_initialized_workspace(tmp_path: Path, monkeypatch)
         def to_dict(self):
             return {"ok": True, "checks": []}
 
-    seen: dict[str, Path] = {}
-
     def _spy(root: Path, *, keep: bool = False):
-        seen["root"] = root
+        seen.append(root)
         return _Ok()
 
     monkeypatch.setattr(container, "run_certification", _spy)
     result = _runner.invoke(app, ["certify", "--json"])
     assert result.exit_code == 0, result.output
-    assert "Traceback" not in result.output
-    assert seen, "certification must still run, on a fallback disposable root"
-
-
-def test_certify_json_stdout_is_pure_json(tmp_path: Path, monkeypatch) -> None:
-    """Bug certify-json-stdout-polluted-info-line: diagnostics belong on stderr.
-
-    With no initialized workspace the disposable-anchor info line must not precede
-    the JSON document on stdout — consumers pipe stdout straight into json.loads.
-    """
-    monkeypatch.chdir(tmp_path)
-
-    class _Ok:
-        ok = True
-        checks: list = []
-
-        def to_dict(self):
-            return {"ok": True, "checks": []}
-
-    monkeypatch.setattr(container, "run_certification", lambda root, *, keep=False: _Ok())
-    result = _runner.invoke(app, ["certify", "--json"])
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.stdout)
-    assert payload["ok"] is True
+    assert json.loads(result.stdout) == {"ok": True, "checks": []}
+    assert len(seen) == 1
