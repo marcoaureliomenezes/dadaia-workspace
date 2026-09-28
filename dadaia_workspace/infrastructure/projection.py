@@ -333,8 +333,9 @@ def doctor_rules(rules: Sequence[ProjectionRule]) -> list[DoctorLine]:
 
     The renderer is the only verifier: a rule's line is ``[missing]`` when its
     destination is absent, ``[drift]`` when the destination's bytes differ from
-    ``render(current)`` (or when ``render`` itself refuses the current content),
-    ``[ok]`` otherwise.
+    ``render(current)`` (or when ``render`` itself refuses the current content) or when
+    an executable rule's file lost its exec bit — ``[unsupported]`` when the bit is set
+    but the mount is ``noexec`` (no reinstall fixes a mount option) — ``[ok]`` otherwise.
     """
     out: list[DoctorLine] = []
     for rule in rules:
@@ -350,6 +351,13 @@ def doctor_rules(rules: Sequence[ProjectionRule]) -> list[DoctorLine]:
         except PublicAssetError as exc:
             out.append(DoctorLine(DoctorStatus.DRIFT, f"{rule.label} ({exc})"))
             continue
-        status = DoctorStatus.OK if current == desired else DoctorStatus.DRIFT
-        out.append(DoctorLine(status, rule.label))
+        if current != desired:
+            out.append(DoctorLine(DoctorStatus.DRIFT, rule.label))
+        elif (rule.mode or 0) & 0o100 and not os.access(rule.dst, os.X_OK):
+            noexec = rule.dst.stat().st_mode & 0o100
+            status = DoctorStatus.UNSUPPORTED if noexec else DoctorStatus.DRIFT
+            why = "filesystem mounted noexec" if noexec else "not executable"
+            out.append(DoctorLine(status, f"{rule.label} ({why})"))
+        else:
+            out.append(DoctorLine(DoctorStatus.OK, rule.label))
     return out

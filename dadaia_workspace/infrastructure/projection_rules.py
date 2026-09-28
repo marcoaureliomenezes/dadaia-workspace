@@ -18,8 +18,6 @@ lives in ``core/harness_registry.py`` or nowhere.
 from __future__ import annotations
 
 import json
-import os
-import stat as stat_module
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
@@ -36,7 +34,6 @@ from dadaia_workspace.infrastructure.agent_transcodes import AGENT_RULE_BUILDERS
 from dadaia_workspace.infrastructure.codex_doctor import (
     dcx7_codex_skill_refs,
     dcx8_codex_rules_shape,
-    dcx9_codex_hook_shape,
 )
 from dadaia_workspace.infrastructure.install_helpers import (
     render_claude_agent,
@@ -250,13 +247,10 @@ def _hook_files_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Project
     return tuple(rules)
 
 
-def _hooks_json_checks(record: HarnessRecord, workspace_root: Path) -> list[DoctorLine]:
-    """D-CX-7/8/9 — gated on the harness being in profile."""
-    out: list[DoctorLine] = []
-    out.extend(dcx7_codex_skill_refs(workspace_root))
-    out.extend(dcx8_codex_rules_shape(workspace_root / str(record.directory)))
-    out.extend(dcx9_codex_hook_shape(workspace_root))
-    return out
+def _codex_checks(record: HarnessRecord, workspace_root: Path) -> list[DoctorLine]:
+    """D-CX-7/8 — gated on the harness being in profile."""
+    codex_dir = workspace_root / str(record.directory)
+    return [*dcx7_codex_skill_refs(workspace_root), *dcx8_codex_rules_shape(codex_dir)]
 
 
 def _user_home_hook_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[ProjectionRule, ...]:
@@ -291,36 +285,6 @@ def _user_home_hook_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Pro
     return tuple(rules)
 
 
-def _user_home_hook_checks(record: HarnessRecord, workspace_root: Path) -> list[DoctorLine]:
-    """Executability is not a byte-compare claim: a cleared exec bit is repairable DRIFT,
-    but a noexec mount is UNSUPPORTED — reinstalling can never fix a mount option."""
-    del workspace_root  # these hooks live at the user-level home, not the workspace
-    home = kimi_code_home()
-    out: list[DoctorLine] = []
-    for name in hook_wrapper_contents(record):
-        dst = home / "hooks" / name
-        label = f"{record.name}:hooks/{name}"
-        if not dst.is_file() or os.access(dst, os.X_OK):
-            continue
-        if dst.stat().st_mode & stat_module.S_IXUSR:
-            out.append(
-                DoctorLine(
-                    DoctorStatus.UNSUPPORTED,
-                    f"{label} (filesystem mounted noexec — the exec bits are set "
-                    "but the mount forbids execution; point KIMI_CODE_HOME at a path "
-                    "on an executable filesystem)",
-                )
-            )
-        else:
-            out.append(DoctorLine(DoctorStatus.DRIFT, f"{label} (not executable)"))
-    return out
-
-
-def _no_checks(record: HarnessRecord, workspace_root: Path) -> list[DoctorLine]:
-    del record, workspace_root
-    return []
-
-
 #: One builder per :class:`HookFormat` value — total, so no harness can fall through a
 #: missing key. ``no_rules`` remains reachable for a format that genuinely registers
 #: nothing; every format that registers a plain JSON file shares ``_hook_files_rules``,
@@ -352,18 +316,10 @@ def harnesses_with_a_hook_derivation() -> frozenset[str]:
     )
 
 
-#: The doctor residue per :class:`HookFormat` value — a structural/semantic claim a
-#: single rendered file cannot express.
+#: The doctor residue a byte-compare cannot express, per :class:`HookFormat`.
 _HOOK_CHECKS: dict[HookFormat, Callable[[HarnessRecord, Path], list[DoctorLine]]] = {
-    HookFormat.NONE: _no_checks,
     HookFormat.CLAUDE_SETTINGS: _settings_merge_checks,
-    HookFormat.CODEX_HOOKS: _hooks_json_checks,
-    HookFormat.KIMI_HOOKS: _user_home_hook_checks,
-    # The rendered files and the wrappers are byte-compared, and the exec bit rides the
-    # rule's own mode — these formats leave no residue a byte-compare cannot express.
-    HookFormat.CURSOR_HOOKS: _no_checks,
-    HookFormat.DEVIN_HOOKS: _no_checks,
-    HookFormat.COPILOT_HOOKS: _no_checks,
+    HookFormat.CODEX_HOOKS: _codex_checks,
 }
 
 #: Which targets pull in the authored ``.agents/`` persona + skills set: the shared
@@ -381,7 +337,8 @@ _AUTHORED_SET_TARGETS: frozenset[str] = frozenset(
 def harness_checks(name: str, workspace_root: Path) -> list[DoctorLine]:
     """The doctor lines for harness *name* that its rule table cannot express."""
     record = HARNESS_RECORDS[name]
-    return _HOOK_CHECKS[record.hooks](record, workspace_root)
+    check = _HOOK_CHECKS.get(record.hooks)
+    return check(record, workspace_root) if check else []
 
 
 def projection_rules(plan: InstallPlan) -> tuple[ProjectionRule, ...]:

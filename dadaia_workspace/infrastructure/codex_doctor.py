@@ -7,20 +7,13 @@ explicit arguments instead of ``self``, so there are no circular imports.
 
 from __future__ import annotations
 
-import json
-import os
 import re
 import tomllib
 from pathlib import Path
 
-from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _CODEX_SKILL_REF_PREFIXES,
-)
-from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
-    hook_wrapper_command,
-    hook_wrapper_contents,
 )
 
 # ---------------------------------------------------------------------------
@@ -39,7 +32,7 @@ from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
 # (``infrastructure/projection_rules.py``), an incorrect byte IS the drift signal —
 # a missing file is `[missing]`, any content difference is `[drift]` — and the
 # renderer itself (never patched by a hand-edit) is what a dev-time test proves
-# correct. The remaining structural/semantic checks below (D-CX-6/7/8/9) stay: none
+# correct. The remaining structural/semantic checks below (D-CX-7/8) stay: none
 # of them is expressible as "does this one rendered file's bytes match".
 # ---------------------------------------------------------------------------
 
@@ -88,58 +81,3 @@ def dcx8_codex_rules_shape(codex_dir: Path) -> list[DoctorLine]:
         )
         for md in sorted((codex_dir / "rules").glob("*.md"))
     ]
-
-
-def dcx9_codex_hook_shape(workspace_root: Path) -> list[DoctorLine]:
-    """D-CX-9: generated Codex hooks must invoke executable wrapper commands."""
-    hooks_path = workspace_root / ".codex" / "hooks.json"
-    out: list[DoctorLine] = []
-    try:
-        hooks = json.loads(hooks_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return [DoctorLine(DoctorStatus.ERROR, "codex:hooks.json missing or invalid (D-CX-9)")]
-
-    wrappers = hook_wrapper_contents(HARNESS_RECORDS["codex"])
-    expected = {hook_wrapper_command(name) for name in wrappers}
-    commands = set(_codex_hook_commands(hooks))
-    missing = expected - commands
-    for command in sorted(missing):
-        out.append(DoctorLine(DoctorStatus.MISSING, f"codex:hooks.json command {command} (D-CX-9)"))
-
-    stale = commands - expected
-    for command in sorted(stale):
-        out.append(
-            DoctorLine(
-                DoctorStatus.ERROR,
-                f"codex:hooks.json command must use .dadaia/hooks wrapper, got "
-                f"{command!r} (D-CX-9)",
-            )
-        )
-
-    for command in sorted(commands & expected):
-        wrapper = workspace_root / command
-        if not wrapper.is_file():
-            out.append(DoctorLine(DoctorStatus.MISSING, f"codex hook wrapper {command} (D-CX-9)"))
-            continue
-        if not os.access(wrapper, os.X_OK):
-            out.append(
-                DoctorLine(
-                    DoctorStatus.ERROR, f"codex hook wrapper not executable {command} (D-CX-9)"
-                )
-            )
-    return out
-
-
-def _codex_hook_commands(value: object) -> list[str]:
-    """Collect command strings from a Codex hooks.json structure."""
-    commands: list[str] = []
-    if isinstance(value, dict):
-        command = value.get("command")
-        if isinstance(command, str):
-            commands.append(command)
-        for child in value.values():
-            commands.extend(_codex_hook_commands(child))
-    elif isinstance(value, list):
-        for item in value:
-            commands.extend(_codex_hook_commands(item))
-    return commands
