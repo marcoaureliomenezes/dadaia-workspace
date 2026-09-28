@@ -24,6 +24,102 @@
       "status": "idea",
       "description": "Deferred by ADR 0046 (operator grill round 3, 2026-09-25): the pre-push gate resolves the gitflow from the pushed repo's own specs/constitution.md, else the owning context's main-repo constitution, else the default with a warning. An associated repo carries no specs/, so it inherits the main repo's gitflow block {principal, integration, work}. When an associated repo's principal (or integration) branch has a different name than the main repo's, the inherited block names the wrong branches and its pushes are judged against them. A later evolution would let the gitflow block (or a per-repo entry beside it) name an override for one associated repo, read by the same resolution at push time. Not before the operator reopens it.",
       "provenance": "operator grill 2026-09-25 (onboarding foundation, round 3, Q5), ADR 0046 consequences: 'A per-repo override for an associated repo whose principal differs is backlog.'; grill handoff 2026-09-25T050500Z-main-thread-foundation-grill-r3: 'Backlog to add: per-repo gitflow override for associated repos.'"
+    },
+    {
+      "id": "gate-judges-bash-writes",
+      "title": "The PreToolUse gate judges Bash writes as it judges file-tool writes",
+      "opened": "2026-09-28",
+      "status": "idea",
+      "description": "A Bash write (sed -i, rm, mkdir, >, python3 -m pip, uv pip) is never judged, so a root, PROTECTED or out-of-scope path blocked through Write is allowed through Bash, and rm .claude/settings.json disarms the gate. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) J5 table, Top 5 #1; the root map \u00a73 is corrected by bug gate-law-claims-out-of-scope-writes-blocked-but-bash-is-never-judged.",
+      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
+    },
+    {
+      "id": "bind-scope-durable-on-every-harness",
+      "title": "A bind is reachable by the hooks and stays live on every harness",
+      "opened": "2026-09-28",
+      "status": "idea",
+      "description": "On Cursor/Copilot/Devin/Kimi an in-session context bind carries no session id the hooks match; Devin/Cursor/Copilot have no PostToolUse heartbeat; after the 300 s TTL lapses (any harness) an out-of-scope Write is allowed. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) J5 bind lapse, J9 gaps, N3, Top 5 #5; core/session_store.py ttl_seconds.",
+      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
+    },
+    {
+      "id": "ctx-inject-on-cursor-copilot",
+      "title": "Cursor and Copilot sessions receive the ctx-inject memory and bind prompt",
+      "opened": "2026-09-28",
+      "status": "idea",
+      "description": "Cursor and Copilot project only the preToolUse gate and the sessionStart doctor, so they get no ctx-inject: no memory bootstrap, no bind prompt. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) J9 projections, N3.",
+      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
+    },
+    {
+      "id": "doctor-context-ignores-other-contexts",
+      "title": "doctor --context X judges only X's repos",
+      "opened": "2026-09-28",
+      "status": "idea",
+      "description": "dadaia doctor --context invoicer exits 1 on slop in another context's repo (repos/payroll/.pytest_cache). Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) J8 S6; 0.4.7 blockers table, still OPEN.",
+      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
+    },
+    {
+      "id": "release-memory-idempotent",
+      "title": "release.py memory appends the closure's one kind: memory entry once",
+      "opened": "2026-09-28",
+      "status": "idea",
+      "description": "A second release.py memory call appends a second kind: memory log entry. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) J6, N5; the memory verb of dd-release-implementation/scripts/release.py.",
+      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
+    },
+    {
+      "id": "guidance-messages-name-the-right-target",
+      "title": "Guidance messages name the bound context and the real target",
+      "opened": "2026-09-28",
+      "status": "idea",
+      "description": "SessionStart shows a session bound to invoicer the next step of payroll; the root-whitelist fix line proposes mkdir .dadaia/tmp instead of where the file belongs; HOOKS-DRIFT-1 says differs for an absent hook. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) N6, J8 S1; hooks/root_whitelist.py, features/spec_context/doctor.py HOOKS-DRIFT-1.",
+      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
+    },
+    {
+      "id": "consumer-guidance-names-no-library-toolchain",
+      "title": "Consumer-facing guidance names no library-only tool",
+      "opened": "2026-09-28",
+      "status": "idea",
+      "description": "The installed pre-push hook comment still says run dadaia ci preflight, which refuses consumer repos; docs/getting-started.md step 7 names release-please; the develop/main push refusal's fix is gh pr create. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) J7; 0.4.7 blockers table, ci preflight and gitflow rows PARTIAL; public/scripts/pre-push-ci-gate.sh, features/chokepoints/branch_policy.py.",
+      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
+    },
+    {
+      "id": "init-announces-codex-trust",
+      "title": "init --harness codex announces the Codex project-trust step",
+      "opened": "2026-09-28",
+      "status": "idea",
+      "description": "init is silent on Codex project trust; only dd-ai-eng-knowhow/CODEX.md mentions it. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) J9; 0.4.7 blockers table, NEW-FR-12 PARTIAL.",
+      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
+    },
+    {
+      "id": "tests-agents-scaffold-without-placeholders",
+      "title": "specs init renders tests/AGENTS.md without placeholders",
+      "opened": "2026-09-28",
+      "status": "idea",
+      "description": "The scaffolded tests/AGENTS.md keeps <UNIT_TIMEOUT_S>, <PACKAGE>, <COVERAGE_FLOOR>; doctor warns AGENTS-PLACEHOLDER-1. Evidence: rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md) J3; 0.4.7 blockers table, OPEN (surfaced); public/templates/tests-AGENTS.md.",
+      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source rubric 0.5.0 at a5e9a2ee (.dadaia/tmp/general-purpose/20260928/rubric-050/RUBRIC.md)"
+    },
+    {
+      "id": "task-line-grammar-one-reader",
+      "title": "One task-line grammar reads TASKS.md",
+      "opened": "2026-09-28",
+      "status": "idea",
+      "description": "_release_schema.UNFINISHED_RE accepts a + bullet before a task marker; doctor_release._TASK_BLOCK_RE accepts only - or *. Evidence: public/skills/dd-release-implementation/scripts/_release_schema.py UNFINISHED_RE, features/specs/doctor_release.py _TASK_BLOCK_RE.",
+      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source the 0.5.0 closure review"
+    },
+    {
+      "id": "ledger-schema-one-engine",
+      "title": "Ledger schemas are validated by one JSON-Schema engine",
+      "opened": "2026-09-28",
+      "status": "idea",
+      "description": "The shipped ledger scripts validate with _ledger.validate, a stdlib JSON-Schema subset walker, while the doctor validates with jsonschema Draft202012Validator; the residue of resolved bug sa-json-schema-validated-by-two-engines. Evidence: public/skills/dd-bug-resolution/scripts/_ledger.py validate, features/specs/schemas.py validator_for.",
+      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source the 0.5.0 closure review"
+    },
+    {
+      "id": "preflight-ci-parity-derived",
+      "title": "The preflight/CI parity test derives both sides from their sources",
+      "opened": "2026-09-28",
+      "status": "idea",
+      "description": "The parity test matches checks_for() and ci.yml against two identical hand-kept marker dicts, so a check named in neither (the doctor its docstring claims) is never compared. Evidence: tests/contract/test_ci_preflight_ci_gating_parity.py _LOCAL_MARKERS, _CI_MARKERS.",
+      "provenance": "operator closure ruling 2026-09-28: the rest is mapped to the backlog; source the 0.5.0 closure review"
     }
   ]
 }
