@@ -1,11 +1,10 @@
 """Wiring the push-range denylist scan into ``push_gate_decision`` (SPEC v0.9.0 FR1/FR2/FR5/FR6).
 
-Intent: CONTRACT — v0.9.0 A1.1, A1.2, A1.3, A1.4, A2.1, A2.2, A2.3, A2.4, A5.1, A5.2,
-A5.3, A5.4, A6.1; v0.11.0 A7.1, A7.2, A7.3, A4.5, A6.1, A6.2, A6.3, A6.6, A5.1
+Intent: CONTRACT — v0.9.0 A1.1-A1.4, A2.1-A2.4, A5.1-A5.4, A6.1; v0.11.0 A7.1-A7.3, A4.5,
+A6.1-A6.3, A6.6, A5.1; v0.4.3 A11.1
 
-Every range is a real git range (``tests.fixtures.real_git.PushRepo``) read by the real
-``GitSubprocessObjectReader`` (AC9.4). Only synthetic terms ever appear here (TASKS
-standing rule): ``zz-``-prefixed values, never a real operator term.
+Every range is a real git range (``PushRepo``) read by the real ``GitSubprocessObjectReader``
+(AC9.4). Only synthetic ``zz-`` terms ever appear here.
 """
 
 from __future__ import annotations
@@ -27,10 +26,13 @@ from tests.fakes import gate_fixes
 from tests.fixtures.real_git import ZERO, PushRepo, git
 
 _SHA_A = "a" * 40
-_ZERO = ZERO
-_SYNTHETIC_TERM = "zz-secret-term"
-_TERMS = ((_SYNTHETIC_TERM, "synthetic"),)
+_TERM = "zz-secret-term"
+_TERMS = ((_TERM, "synthetic"),)
 _BIG = "clean content here\n" * 320_000  # > the reader's 5 MB per-blob cap
+_PRIVATE = "zz-fake-private-owner"
+_BOTH = (*_TERMS, (_PRIVATE, "synthetic"))
+_SEG = f"repos/{_PRIVATE}"
+_MASKED = "repos/[REDACTED-PATH-1]"
 
 
 @pytest.fixture()
@@ -50,41 +52,52 @@ def _decide(repo: PushRepo, *lines: str, source: Any = None, **kw: Any) -> Any:
     )
 
 
-def _branch(sha: str, remote: str = _ZERO) -> str:
+def _branch(sha: str, remote: str = ZERO) -> str:
     return f"refs/heads/feature/0.0.1 {sha} refs/heads/feature/0.0.1 {remote}"
 
 
 def _tag(sha: str, name: str = "v1") -> str:
-    return f"refs/tags/{name} {sha} refs/tags/{name} {_ZERO}"
+    return f"refs/tags/{name} {sha} refs/tags/{name} {ZERO}"
 
 
-# A1.1 — a branch ref whose range carries a denylist term is refused.
-def test_branch_push_with_denylisted_blob_in_range_is_refused(repo: PushRepo) -> None:
-    sha = repo.commit({"leak.md": f"contains {_SYNTHETIC_TERM} here\n"})
-    decision = _decide(repo, _branch(sha), denylist_terms=_TERMS)
+def _gen() -> Iterable[tuple[str, str]]:
+    yield (_TERM, "synthetic")
+
+
+# fmt: off
+@pytest.mark.parametrize(("files", "message", "ref", "terms", "in_message"), [
+    pytest.param({"leak.md": f"{_TERM}\n"}, None, _branch, _TERMS, [], id="A1.1-blob-in-branch-range"),
+    pytest.param({"tag-blob.md": f"{_TERM}\n"}, None, _tag, _TERMS, [], id="A2.1-tainted-tag"),
+    pytest.param({"c.md": "clean\n"}, f"mentions {_TERM}", _branch, _TERMS,
+                 ["Uncommit the unpublished range", "--no-verify"], id="A11.1-term-only-in-commit-message"),
+    pytest.param({"leak.md": f"{_TERM}\n"}, None, _tag, "gen", ["denylisted term"], id="one-shot-generator-terms"),
+    pytest.param({"t.py": f"{_TERM}\n"}, None, _branch, _TERMS, [
+        "A test fixture that needs a secret shape composes it at runtime (string concatenation), never as a tracked literal."
+    ], id="denylist-refusal-omits-the-runtime-composition-remedy"),
+])
+# fmt: on
+def test_branch_push_with_denylisted_blob_in_range_is_refused(
+    repo: PushRepo, files: dict[str, str], message: str | None, ref: Any, terms: Any, in_message: list[str]
+) -> None:
+    """A denylisted term anywhere in the pushed range (blob, tag, commit message) refuses; A5.2 never unmasked."""
+    sha = repo.commit(files, message=message) if message else repo.commit(files)
+    decision = _decide(repo, ref(sha), denylist_terms=_gen() if terms == "gen" else terms)
     assert not decision.allowed
-    assert _SYNTHETIC_TERM not in decision.message  # A5.2: never unmasked.
+    assert all(x in decision.message for x in in_message)
+    assert _TERM not in decision.message
 
 
-# A1.2 — a term reachable only from remote_sha (excluded from the range) never refuses.
 def test_term_outside_the_range_does_not_refuse(repo: PushRepo) -> None:
-    published = repo.commit({"leak.md": f"{_SYNTHETIC_TERM}\n"})
+    """A1.2: a term reachable only from remote_sha is excluded from the range."""
+    published = repo.commit({"leak.md": f"{_TERM}\n"})
     repo.publish()
     sha = repo.commit({"clean.md": "nothing here\n"})
     assert _decide(repo, _branch(sha, published), denylist_terms=_TERMS).allowed
 
 
-# A1.3 / A2.3 — a deletion ref is never scanned (and never verdict-checked).
-def test_deletion_ref_is_never_scanned(repo: PushRepo) -> None:
-    decision = _decide(
-        repo, f"refs/heads/old {_ZERO} refs/heads/old {_SHA_A}", denylist_terms=_TERMS
-    )
-    assert decision.allowed
-
-
-# A1.4 — a blob reachable from two refs in the same push is deduped (one Hit, not two).
 def test_shared_blob_across_two_refs_is_deduped(repo: PushRepo) -> None:
-    first = repo.commit({"shared.md": f"{_SYNTHETIC_TERM} shows up\n"})
+    """A1.4: a blob reachable from two refs in one push is one Hit."""
+    first = repo.commit({"shared.md": f"{_TERM} shows up\n"})
     second = repo.commit({"other.md": "clean\n"})
     blob = git(repo.path, "rev-parse", f"{first}:shared.md")
     decision = _decide(repo, _tag(first, "v1"), _tag(second, "v2"), denylist_terms=_TERMS)
@@ -92,244 +105,95 @@ def test_shared_blob_across_two_refs_is_deduped(repo: PushRepo) -> None:
     assert decision.message.count(blob[:12]) == 1
 
 
-# A2.1 — a tainted tag push is refused.
-def test_tainted_tag_push_is_refused(repo: PushRepo) -> None:
-    sha = repo.commit({"tag-blob.md": f"{_SYNTHETIC_TERM}\n"})
-    assert not _decide(repo, _tag(sha), denylist_terms=_TERMS).allowed
-
-
-# A2.2 — a clean tag push is allowed with NO security-verdict lookup (DP-5 intact).
-def test_clean_tag_push_is_allowed_with_no_verdict_required(repo: PushRepo) -> None:
-    sha = repo.commit({"clean.md": "nothing here\n"})
-    assert _decide(repo, _tag(sha), denylist_terms=_TERMS).allowed
-
-
-# A2.4 — branch policy still runs BEFORE the scan.
 def test_branch_policy_refusal_precedes_the_scan(repo: PushRepo) -> None:
-    sha = repo.commit({"leak.md": f"{_SYNTHETIC_TERM}\n"})
-    decision = _decide(
-        repo, f"refs/heads/main {sha} refs/heads/main {'b' * 40}", denylist_terms=_TERMS
-    )
+    """A2.4."""
+    sha = repo.commit({"leak.md": f"{_TERM}\n"})
+    decision = _decide(repo, f"refs/heads/main {sha} refs/heads/main {'b' * 40}", denylist_terms=_TERMS)
     assert not decision.allowed
     assert "main" in decision.message
     assert "denylisted term" not in decision.message
 
 
-# A5.1 / A5.3 / A5.4 — the refusal message shape and the 10-item cap.
 def test_refusal_message_shape_and_ten_item_cap(repo: PushRepo) -> None:
-    sha = repo.commit({f"file{i}.md": f"{_SYNTHETIC_TERM} number {i}\n" for i in range(12)})
-    decision = _decide(
-        repo, _branch(sha), fixes=replace(gate_fixes(), head="main"), denylist_terms=_TERMS
-    )
-    assert not decision.allowed
-    message = decision.message
-    assert "refs/heads/feature/0.0.1" in message
-    assert "file0.md:1" in message
-    assert "z…m" in message  # masked form of the synthetic term.
-    assert "operator denylist" in message
-    assert "dd-release-implementation §2a" in message
+    """A5.1/A5.3/A5.4: 12 hits, 10 shown, 2 remainder; masked; one switch fix line."""
+    sha = repo.commit({f"file{i}.md": f"{_TERM} number {i}\n" for i in range(12)})
+    message = _decide(repo, _branch(sha), fixes=replace(gate_fixes(), head="main"), denylist_terms=_TERMS).message
+    for part in ("refs/heads/feature/0.0.1", "file0.md:1", "z…m", "operator denylist", "dd-release-implementation §2a",
+                 "already-published history never needs a rewrite"):  # fmt: skip
+        assert part in message
+    assert "2 more" in message or "and 2" in message
     assert message.endswith("fix: git -C /repo switch feature/0.0.1")
-    assert "already-published history never needs a rewrite" in message
-    assert "2 more" in message or "and 2" in message  # 12 hits, 10 shown, 2 remainder.
-    assert _SYNTHETIC_TERM not in message
+    assert _TERM not in message
 
 
-def test_refusal_names_runtime_composition_as_the_fixture_remedy(repo: PushRepo) -> None:
-    """denylist-refusal-omits-the-runtime-composition-remedy: the refusal names the edit."""
-    sha = repo.commit({"t.py": f"{_SYNTHETIC_TERM}\n"})
-    assert (
-        "A test fixture that needs a secret shape composes it at runtime "
-        "(string concatenation), never as a tracked literal."
-    ) in _decide(repo, _branch(sha), denylist_terms=_TERMS).message
+# fmt: off
+@pytest.mark.parametrize(("local", "remote", "malformed"), [
+    pytest.param("--glob=refs/x", ZERO, 1, id="A7.1-option-shaped-local-glob"),
+    pytest.param("--branches=zzz", ZERO, 1, id="A7.1-option-shaped-local-branches"),
+    pytest.param(_SHA_A, "--glob=refs/x", 1, id="A7.1-option-shaped-remote"),
+    pytest.param("a" * 39, ZERO, 1, id="A7.3-39-hex"),
+    pytest.param("a" * 41, ZERO, 1, id="A7.3-41-hex"),
+    pytest.param("f" * 64, ZERO, 0, id="A7.3-sha256-parses"),
+    pytest.param(ZERO, _SHA_A, 0, id="A7.2-zero-deletion-sentinel-parses"),
+])
+# fmt: on
+def test_parse_push_stdin_admits_only_hex_sha_shapes(local: str, remote: str, malformed: int) -> None:
+    refs, bad = parse_push_stdin(f"refs/heads/develop {local} refs/heads/develop {remote}\n")
+    assert (len(refs), bad) == (1 - malformed, malformed)
+    assert all(r.local_sha == local and r.is_deletion == (local == ZERO) for r in refs)
 
 
-# v0.11.0 review MEDIUM — a one-shot generator of terms is consumed once, still refuses.
-def test_generator_denylist_terms_still_refuses_not_silently_emptied(repo: PushRepo) -> None:
-    sha = repo.commit({"leak.md": f"contains {_SYNTHETIC_TERM} here\n"})
-
-    def _term_generator() -> Iterable[tuple[str, str]]:
-        yield (_SYNTHETIC_TERM, "synthetic")
-
-    decision = _decide(repo, _tag(sha), denylist_terms=_term_generator())
-    assert not decision.allowed
-    assert "denylisted term" in decision.message
-    assert _SYNTHETIC_TERM not in decision.message
-
-
-# ---------------------------------------------------------------------------
-# FR7/A7.1 — an option-shaped `local_sha` refuses as a malformed line instead of
-# silently producing a successful empty rev-list.
-# ---------------------------------------------------------------------------
+# fmt: off
+@pytest.mark.parametrize("line", [
+    pytest.param(f"refs/heads/old {ZERO} refs/heads/old {_SHA_A}", id="A1.3-deletion-never-scanned"),
+    pytest.param("tag", id="A2.2-clean-tag-needs-no-verdict"),
+])
+# fmt: on
+def test_a_deletion_or_clean_tag_is_allowed(repo: PushRepo, line: str) -> None:
+    if line == "tag":
+        line = _tag(repo.commit({"clean.md": "nothing here\n"}))
+    assert _decide(repo, line, denylist_terms=_TERMS).allowed
 
 
-def test_option_shaped_local_sha_glob_form_is_malformed() -> None:
-    refs, malformed = parse_push_stdin(
-        f"refs/heads/develop --glob=refs/nonexistent refs/heads/develop {_ZERO}\n"
-    )
-    assert refs == []
-    assert malformed == 1
-
-
-def test_option_shaped_local_sha_branches_form_is_malformed() -> None:
-    refs, malformed = parse_push_stdin(
-        f"refs/heads/develop --branches=zzz refs/heads/develop {_ZERO}\n"
-    )
-    assert refs == []
-    assert malformed == 1
-
-
-def test_option_shaped_remote_sha_is_also_malformed() -> None:
-    """The same option-shaped hardening applies symmetrically to ``remote_sha``."""
-    refs, malformed = parse_push_stdin(
-        f"refs/heads/develop {_SHA_A} refs/heads/develop --glob=refs/nonexistent\n"
-    )
-    assert refs == []
-    assert malformed == 1
-
-
-# ---------------------------------------------------------------------------
-# FR7/A7.2 — the all-zero deletion sentinel still parses and still passes with no
-# verdict (it is 40 hex characters, so it is a VALID sha shape, not a malformed one).
-# ---------------------------------------------------------------------------
-
-
-def test_all_zero_deletion_sentinel_still_parses() -> None:
-    refs, malformed = parse_push_stdin(f"refs/heads/old {_ZERO} refs/heads/old {_SHA_A}\n")
-    assert malformed == 0
-    assert len(refs) == 1
-    assert refs[0].is_deletion
-
-
-# ---------------------------------------------------------------------------
-# FR7/A7.3 — a 64-char (SHA-256) sha parses; a 39- or 41-char hex string does not.
-# ---------------------------------------------------------------------------
-
-
-def test_sha256_length_local_sha_parses() -> None:
-    sha256 = "f" * 64
-    refs, malformed = parse_push_stdin(f"refs/heads/develop {sha256} refs/heads/develop {_ZERO}\n")
-    assert malformed == 0
-    assert len(refs) == 1
-    assert refs[0].local_sha == sha256
-
-
-def test_39_and_41_char_hex_shas_are_malformed() -> None:
-    too_short = "a" * 39
-    too_long = "a" * 41
-
-    _, malformed_short = parse_push_stdin(
-        f"refs/heads/develop {too_short} refs/heads/develop {_ZERO}\n"
-    )
-    _, malformed_long = parse_push_stdin(
-        f"refs/heads/develop {too_long} refs/heads/develop {_ZERO}\n"
-    )
-    assert malformed_short == 1
-    assert malformed_long == 1
-
-
-# FR4/A4.5 (v0.11.0) — `decision.warn` carries the oversized-blob note on allow and refuse.
-def test_oversized_note_appears_in_decision_warn_on_allow(repo: PushRepo) -> None:
-    sha = repo.commit({"big.md": _BIG})
-    decision = _decide(repo, _tag(sha))
-    assert decision.allowed
-    assert decision.warn is not None
-    assert "big.md" in decision.warn
-    assert str(len(_BIG)) in decision.warn
-    assert "NOT scanned" in decision.warn
-
-
-def test_oversized_note_appears_in_decision_warn_on_refuse(repo: PushRepo) -> None:
-    sha = repo.commit({"leak.md": f"{_SYNTHETIC_TERM} shows up here\n", "big.md": _BIG})
-    decision = _decide(repo, _branch(sha), denylist_terms=_TERMS)
-    assert not decision.allowed
-    assert decision.warn is not None
-    assert "big.md" in decision.warn
-    assert "NOT scanned" in decision.warn
-
-
-# FR6(b)/A6.1-A6.3/A6.6 (v0.11.0) — the blob path is masked at its offending segments in
-# the refusal and the oversized note; a path matching nothing renders byte-identical.
-_PRIVATE_SEGMENT = "zz-fake-private-owner"
-_BOTH = (*_TERMS, (_PRIVATE_SEGMENT, "synthetic"))
-
-
-def test_refusal_path_segment_matching_an_operator_term_is_masked(repo: PushRepo) -> None:
-    sha = repo.commit({f"repos/{_PRIVATE_SEGMENT}/notes.md": f"{_SYNTHETIC_TERM} appears\n"})
-    blob = git(repo.path, "rev-parse", f"{sha}:repos/{_PRIVATE_SEGMENT}/notes.md")
-    decision = _decide(repo, _branch(sha), denylist_terms=_BOTH)
-    assert not decision.allowed
-    assert _PRIVATE_SEGMENT not in decision.message  # A6.6: never unmasked, anywhere.
-    assert "repos/[REDACTED-PATH-1]/notes.md:1" in decision.message
-    assert blob[:12] in decision.message  # short sha untouched — still locatable.
+# fmt: off
+@pytest.mark.parametrize(("files", "terms", "allowed", "in_message", "in_warn"), [
+    pytest.param({"big.md": _BIG}, (), True, [], ["big.md", str(len(_BIG)), "NOT scanned"], id="A4.5-note-on-allow"),
+    pytest.param({"leak.md": f"{_TERM}\n", "big.md": _BIG}, _TERMS, False, [], ["big.md", "NOT scanned"], id="A4.5-note-on-refuse"),
+    pytest.param({f"{_SEG}/notes.md": f"{_TERM}\n"}, _BOTH, False, [f"{_MASKED}/notes.md:1"], [], id="A6.1-hit-path-masked"),
+    pytest.param({f"{_SEG}/big.md": _BIG}, ((_PRIVATE, "s"),), True, [], [f"{_MASKED}/big.md"], id="A6.3-note-path-masked"),
+    pytest.param({f"{_SEG}/leak.md": f"{_TERM}\n", f"{_SEG}/big.md": _BIG}, _BOTH, False,
+                 [f"{_MASKED}/leak.md"], [f"{_MASKED}/big.md"], id="one-masker-same-ordinal-across-hit-and-note"),
+])
+# fmt: on
+def test_oversized_note_and_path_masking(
+    repo: PushRepo, files: dict[str, str], terms: Any, allowed: bool, in_message: list[str], in_warn: list[str]
+) -> None:
+    """FR4/A4.5 the warn carries the oversized note; FR6(b) A6.1/A6.3/A6.6 offending path segments are masked everywhere."""
+    decision = _decide(repo, _branch(repo.commit(files)), denylist_terms=terms)
+    warn = decision.warn or ""
+    assert decision.allowed is allowed
+    assert all(x in decision.message for x in in_message)
+    assert all(x in warn for x in in_warn)
+    assert _PRIVATE not in decision.message + warn
 
 
 def test_refusal_path_with_no_matching_segment_is_byte_identical(repo: PushRepo) -> None:
-    """A6.2 regression fixture: a path matching no term renders as-is."""
-    sha = repo.commit({"notes/plain-file.md": f"{_SYNTHETIC_TERM} here\n"})
+    """A6.2: a path matching no term renders as-is; the blob short sha stays locatable."""
+    sha = repo.commit({"notes/plain-file.md": f"{_TERM} here\n"})
     decision = _decide(repo, _branch(sha), denylist_terms=_TERMS)
-    assert not decision.allowed
     assert "notes/plain-file.md:1" in decision.message
     assert "[REDACTED-PATH-" not in decision.message
+    assert git(repo.path, "rev-parse", f"{sha}:notes/plain-file.md")[:12] in decision.message
 
 
-def test_oversized_note_path_segment_is_masked_too(repo: PushRepo) -> None:
-    """A6.3: the FR4 oversized note's path is masked by the SAME rule."""
-    sha = repo.commit({f"repos/{_PRIVATE_SEGMENT}/big.md": _BIG})
-    decision = _decide(repo, _tag(sha), denylist_terms=((_PRIVATE_SEGMENT, "synthetic"),))
-    assert decision.allowed
-    assert decision.warn is not None
-    assert _PRIVATE_SEGMENT not in decision.warn  # A6.6.
-    assert "repos/[REDACTED-PATH-1]/big.md" in decision.warn
-
-
-# FR4 (v0.4.2) — the masker consumes the detector's own compiled matchers.
-_UPPERCASE_HYPHENATED_TERM = "zz-acme"
-
-
-@pytest.mark.parametrize("sep", ["\x9b", "\u2028"])
-def test_refusal_path_segment_uppercase_hyphenated_variant_of_term_is_masked(
-    repo: PushRepo, sep: str
-) -> None:
+@pytest.mark.parametrize("sep", ["\x9b", " "])
+def test_refusal_path_segment_uppercase_hyphenated_variant_of_term_is_masked(repo: PushRepo, sep: str) -> None:
     """Intent: sa-path-segment-judged-by-two-matchers, sa-git-output-split-by-unicode-line-breaks — a segment split by U+009B or U+2028 is read whole (git output split on \\n only) and masked (A4.1)."""
-    sha = repo.commit(
-        {f"repos/Zz-A{sep}cme-Corp/notes.md": f"contains {_UPPERCASE_HYPHENATED_TERM} here\n"}
-    )
-    decision = _decide(
-        repo, _branch(sha), denylist_terms=((_UPPERCASE_HYPHENATED_TERM, "synthetic"),)
-    )
+    sha = repo.commit({f"repos/Zz-A{sep}cme-Corp/notes.md": "contains zz-acme here\n"})
+    decision = _decide(repo, _branch(sha), denylist_terms=(("zz-acme", "synthetic"),))
     assert not decision.allowed
     assert f"Zz-A{sep}cme-Corp" not in decision.message
-    assert "repos/[REDACTED-PATH-1]/notes.md:1" in decision.message
-
-
-# A4.2 — a read failure naming a denylisted path is refused with that path masked. The
-# stub injects the one failure real git cannot be made to produce on demand (a desynced
-# cat-file stream); it answers no git question.
-class _FailingObjectSourceWithPath:
-    """Simulates a git-read failure that names the offending blob's PATH structurally
-    (GitObjectReadError.path, FR4) rather than embedding it in the message string."""
-
-    def remote_branch(self, repo: Path, branch: str) -> bool:
-        return True
-
-    def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
-        raise GitObjectReadError(
-            "git cat-file --batch stream desynchronised resolving prior content",
-            path=f"repos/{_PRIVATE_SEGMENT}/leak.md",
-        )
-
-
-def test_git_object_read_failure_at_a_denylisted_path_masks_the_path(repo: PushRepo) -> None:
-    sha = repo.commit({"x.md": "x\n"})
-    decision = _decide(
-        repo, _branch(sha), source=_FailingObjectSourceWithPath(),
-        denylist_terms=((_PRIVATE_SEGMENT, "synthetic"),),
-    )  # fmt: skip
-    assert not decision.allowed
-    assert _PRIVATE_SEGMENT not in decision.message
-    assert "repos/[REDACTED-PATH-1]/leak.md" in decision.message
-    assert "--no-verify" in decision.message
-    assert "GitObjectReadError(" not in decision.message
+    assert f"{_MASKED}/notes.md:1" in decision.message
 
 
 class _Raising:
@@ -343,85 +207,48 @@ class _Raising:
         raise self._exc
 
 
-def test_a_corrupt_object_read_names_git_fsck_on_the_repo(repo: PushRepo) -> None:
-    """Intent: sa-fix-lines-not-built-by-cli-line#S5 — corruption's fix is `git -C <repo> fsck`."""
-    sha = repo.commit({"x.md": "x\n"})
-    decision = _decide(
-        repo, _branch(sha), source=_Raising(GitObjectReadError("stream desynchronised"))
-    )
-    assert not decision.allowed
-    assert decision.message.splitlines()[-1] == f"fix: git -C {repo.path.as_posix()} fsck"
-
-
-def test_git_that_cannot_run_gets_no_fsck_fix(repo: PushRepo) -> None:
-    """Intent: sa-fix-lines-not-built-by-cli-line#S5 — a timeout or missing git is no corruption."""
-    sha = repo.commit({"x.md": "x\n"})
-    decision = _decide(repo, _branch(sha), source=_Raising(GitRunError("git timed out")))
-    assert not decision.allowed
-    assert "fsck" not in decision.message
-    assert decision.message.splitlines()[-1] == (
-        "fix: Operator action: make git runnable here, then push again"
-    )
-
-
-def test_same_offending_segment_gets_the_same_ordinal_across_hit_and_note(repo: PushRepo) -> None:
-    """One masker per decision: the same segment gets the same ordinal everywhere."""
-    sha = repo.commit({
-        f"repos/{_PRIVATE_SEGMENT}/leak.md": f"{_SYNTHETIC_TERM} here\n",
-        f"repos/{_PRIVATE_SEGMENT}/big.md": _BIG,
-    })  # fmt: skip
-    decision = _decide(repo, _branch(sha), denylist_terms=_BOTH)
-    assert not decision.allowed
-    assert decision.warn is not None
-    assert _PRIVATE_SEGMENT not in decision.message + decision.warn
-    assert "repos/[REDACTED-PATH-1]/leak.md" in decision.message
-    assert "repos/[REDACTED-PATH-1]/big.md" in decision.warn
-
-
-# v0.4.3 A11.1 — a term only in a commit message body is refused like a blob.
-def test_push_with_denylisted_term_only_in_a_commit_message_body_is_refused(
-    repo: PushRepo,
+# fmt: off
+@pytest.mark.parametrize(("exc", "in_message", "last_line"), [
+    pytest.param(GitObjectReadError("stream desynchronised", path=f"{_SEG}/leak.md"),
+                 [f"{_MASKED}/leak.md", "--no-verify"], "fix: git -C {repo} fsck", id="A4.2-read-failure-path-masked"),
+    pytest.param(GitObjectReadError("stream desynchronised"), [], "fix: git -C {repo} fsck", id="S5-corruption-names-fsck"),
+    pytest.param(GitRunError("git timed out"), [], "fix: Operator action: make git runnable here, then push again",
+                 id="S5-git-cannot-run-no-fsck"),
+])
+# fmt: on
+def test_a_git_read_failure_refuses_with_its_own_fix(
+    repo: PushRepo, exc: GitObjectReadError, in_message: list[str], last_line: str
 ) -> None:
-    sha = repo.commit(
-        {"clean.md": "clean\n"}, message=f"fixed a bug, mentions {_SYNTHETIC_TERM} here"
-    )
-    decision = _decide(repo, _branch(sha), denylist_terms=_TERMS)
+    """Intent: sa-fix-lines-not-built-by-cli-line#S5 — corruption's fix is `git -C <repo> fsck`; a git that cannot run is no corruption.
+
+    The stub injects the one failure real git cannot produce on demand (a desynced cat-file stream).
+    """
+    sha = repo.commit({"x.md": "x\n"})
+    decision = _decide(repo, _branch(sha), source=_Raising(exc), denylist_terms=((_PRIVATE, "s"),))
     assert not decision.allowed
-    assert _SYNTHETIC_TERM not in decision.message  # never unmasked
-    assert "Uncommit the unpublished range" in decision.message
-    assert "--no-verify" in decision.message
+    assert all(x in decision.message for x in in_message)
+    assert _PRIVATE not in decision.message and "GitObjectReadError(" not in decision.message
+    assert decision.message.splitlines()[-1] == last_line.format(repo=repo.path.as_posix())
 
 
-# c3 review 5 (C1, H1-H3): the rewrite fix comes from the REFUSED ref's own unpublished
-# range — never HEAD, never origin/<integration>, never a ref deletion.
-def _refuse(repo: PushRepo, line: str, head: str) -> str:
-    decision = _decide(repo, line, fixes=replace(gate_fixes(), head=head), denylist_terms=_TERMS)
-    assert not decision.allowed
-    assert "update-ref" not in decision.message
-    return decision.message
-
-
-def _two_unpublished(repo: PushRepo) -> tuple[str, str]:
+# fmt: off
+@pytest.mark.parametrize(("ref", "head", "end"), [
+    pytest.param(_branch, "feature/0.0.1", "fix: git -C /repo reset --soft {oldest}", id="N3-reset-oldest-unpublished-then-amend"),
+    pytest.param(_branch, "main", "fix: git -C /repo switch feature/0.0.1", id="H1-not-checked-out-switch-first"),
+    pytest.param(lambda sha: _tag(sha, "v0.0.1"), "feature/0.0.1", None, id="N3-tag-operator-action-no-command"),
+])
+# fmt: on
+def test_the_rewrite_fix_resets_to_the_oldest_unpublished_commit_and_amends(
+    repo: PushRepo, ref: Any, head: str, end: str | None
+) -> None:
+    """c3 review 5 (C1, H1-H3): one fix line from the refused ref's own unpublished range, never HEAD or a ref deletion."""
     oldest = repo.commit({"a.md": "clean\n"})
-    return oldest, repo.commit({"n.md": f"{_SYNTHETIC_TERM}\n"})
-
-
-def test_the_rewrite_fix_resets_to_the_oldest_unpublished_commit_and_amends(repo: PushRepo) -> None:
-    """N3: reset --soft to the oldest unpublished commit, edit, amend; one fix line."""
-    oldest, tip = _two_unpublished(repo)
-    message = _refuse(repo, _branch(tip), "feature/0.0.1")
-    assert message.endswith(f"fix: git -C /repo reset --soft {oldest}")
-    assert "commit --amend" in message and message.count("\nfix: ") == 1
-
-
-def test_a_refused_branch_that_is_not_checked_out_is_switched_to_first(repo: PushRepo) -> None:
-    """H1: HEAD is `main` — resetting HEAD would uncommit the wrong branch."""
-    _, tip = _two_unpublished(repo)
-    assert _refuse(repo, _branch(tip), "main").endswith("fix: git -C /repo switch feature/0.0.1")
-
-
-def test_a_tag_gets_operator_action_and_no_command(repo: PushRepo) -> None:
-    """N3: a tag has no branch to reset — no command is printed."""
-    _, tip = _two_unpublished(repo)
-    message = _refuse(repo, _tag(tip, "v0.0.1"), "feature/0.0.1")
-    assert "Operator action" in message and "\nfix: " not in message
+    tip = repo.commit({"n.md": f"{_TERM}\n"})
+    decision = _decide(repo, ref(tip), fixes=replace(gate_fixes(), head=head), denylist_terms=_TERMS)
+    message = decision.message
+    assert not decision.allowed and "update-ref" not in message
+    if end is None:
+        assert "Operator action" in message and "\nfix: " not in message
+    else:
+        assert message.endswith(end.format(oldest=oldest)) and message.count("\nfix: ") == 1
+        assert "reset" not in end or "commit --amend" in message

@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass
+from typing import Any
 
 import pytest
 
@@ -24,113 +25,77 @@ _TERMS = ((_TERM, "synthetic"),)
 _IPV4 = "198.18" + ".0.5"  # RFC 2544 benchmarking range
 _HOME_LONG = "/hom" + "e/synthzqwxyz"
 _HOME_SHORT = "/hom" + "e/synthzq"  # a substring of _HOME_LONG
+_BIG: dict[str, Any] = {"oversized": True, "size_bytes": 6_000_000, "scanned_bytes": 5_242_880}
+_NOTE = [("notes.md", 6_000_000, 5_242_880)]
 
 
 def _obj(
-    text: str, prior: str | None = None, *, path: str = "notes.md", **kw: object
+    text: str, prior: str | None = None, *, path: str = "notes.md", **kw: Any
 ) -> ScannedObject:
     return ScannedObject(
         path=path, sha="deadbeef", text=text, decodable=True, prior_text=prior, **kw
-    )  # type: ignore[arg-type]
-
-
-@pytest.mark.parametrize(
-    ("value", "mask"),
-    [
-        pytest.param(_IPV4, "1…5", id="ipv4-A3.1"),
-        pytest.param("/hom" + "e/alice", None, id="home-path-A3.1"),
-        pytest.param("bastion" + ".local", None, id="dot-local-host"),
-        pytest.param(
-            "prod.workspace" + ".local", None, id="not-the-exact-workspace-local-carve-out"
-        ),
-        pytest.param("nas" + ".home", None, id="dot-home-host"),
-    ],
-)
-def test_baseline_refuses_a_private_value_with_no_operator_terms(
-    value: str, mask: str | None
-) -> None:
-    """The baseline layer alone refuses; the hit never carries the value (B3)."""
-    outcome = scan_objects(
-        [_obj(f"see {value} now\n")], terms=(), patterns=load_baseline_patterns()
     )
+
+
+def _binary(**kw: Any) -> ScannedObject:
+    return ScannedObject(path="b.bin", sha="d", text="", decodable=False, **kw)
+
+
+# fmt: off
+@pytest.mark.parametrize(("value", "mask"), [
+    pytest.param(_IPV4, "1…5", id="ipv4-A3.1"),
+    pytest.param("/hom" + "e/alice", None, id="home-path-A3.1"),
+    pytest.param("bastion" + ".local", None, id="dot-local-host"),
+    pytest.param("prod.workspace" + ".local", None, id="not-the-exact-workspace-local-carve-out"),
+    pytest.param("nas" + ".home", None, id="dot-home-host"),
+])
+# fmt: on
+def test_baseline_refuses_a_private_value_with_no_operator_terms(value: str, mask: str | None) -> None:
+    """The baseline layer alone refuses; the hit never carries the value (B3)."""
+    outcome = scan_objects([_obj(f"see {value} now\n")], terms=(), patterns=load_baseline_patterns())
 
     assert [(h.path, h.line) for h in outcome.hits] == [("notes.md", 1)]
     assert value not in outcome.hits[0].masked_term
-    if mask:
-        assert outcome.hits[0].masked_term == mask
+    assert mask in (None, outcome.hits[0].masked_term)
 
 
-@pytest.mark.parametrize(
-    "text",
-    [
-        pytest.param("loopback at 127.0.0.1\n", id="loopback"),
-        pytest.param("docs live at example.com\n", id="documentation-domain"),
-        pytest.param("runner home is /home/runner/work\n", id="placeholder-home"),
-        pytest.param("contact definition@dadaia.invalid\n", id="rfc2606-invalid-email"),
-        pytest.param("or try someone@sub.example.test\n", id="rfc2606-test-email"),
-        pytest.param("identity <dadaia@workspace.local>\n", id="product-synthetic-identity"),
-        pytest.param('    return pathlib.Path.home() / ".claude"\n', id="stdlib-path-home"),
-    ],
-)
+# fmt: off
+@pytest.mark.parametrize("text", [
+    pytest.param("loopback at 127.0.0.1\n", id="loopback"),
+    pytest.param("docs live at example.com\n", id="documentation-domain"),
+    pytest.param("runner home is /home/runner/work\n", id="placeholder-home"),
+    pytest.param("contact definition@dadaia.invalid\n", id="rfc2606-invalid-email"),
+    pytest.param("or try someone@sub.example.test\n", id="rfc2606-test-email"),
+    pytest.param("identity <dadaia@workspace.local>\n", id="product-synthetic-identity"),
+    pytest.param('    return pathlib.Path.home() / ".claude"\n', id="stdlib-path-home"),
+])
+# fmt: on
 def test_baseline_carve_out_never_refuses(text: str) -> None:
-    """A3.4: exclude_regex carve-outs apply (the refused neighbours are rows above)."""
+    """A3.4: exclude_regex carve-outs apply (the refused neighbours are rows of the table above)."""
     assert scan_objects([_obj(text)], terms=(), patterns=load_baseline_patterns()).hits == ()
 
 
-@pytest.mark.parametrize(
-    ("text", "prior", "terms", "hit_lines"),
-    [
-        pytest.param(
-            f"still {_TERM}\n", f"had {_TERM}\n", _TERMS, [], id="A1.1-same-path-published"
-        ),
-        pytest.param(f"here {_TERM}\n", None, _TERMS, [1], id="A1.2-new-path"),
-        pytest.param(
-            f"now {_TERM}\n",
-            "had zz-other-term\n",
-            (*_TERMS, ("zz-other-term", "s")),
-            [1],
-            id="A1.3-new-value",
-        ),
-        pytest.param(
-            f"still {_TERM}\n", f"HAD {_TERM.upper()}\n", _TERMS, [], id="A1.4-case-insensitive"
-        ),
-        pytest.param(
-            f"at {_IPV4} still\n", f"at {_IPV4} first\n", None, [], id="baseline-layer-amnestied"
-        ),
-        pytest.param(
-            f"now {_HOME_SHORT}/p\n",
-            f"was {_HOME_LONG}/p\n",
-            None,
-            [1],
-            id="superstring-prior-never-amnesties",
-        ),
-        pytest.param(
-            f"at {_HOME_SHORT}/p\n",
-            f"was {_HOME_SHORT}/p too\n",
-            None,
-            [],
-            id="equal-anchored-value-amnestied",
-        ),
-        pytest.param(
-            f"{_TERM} one\nnew zz-brand-new\n",
-            f"{_TERM} out\n",
-            (*_TERMS, ("zz-brand-new", "s")),
-            [2],
-            id="suppressed-line-continues-to-next",
-        ),
-    ],
-)
+# fmt: off
+@pytest.mark.parametrize(("text", "prior", "terms", "hit_lines"), [
+    pytest.param(f"still {_TERM}\n", f"had {_TERM}\n", _TERMS, [], id="A1.1-same-path-published"),
+    pytest.param(f"here {_TERM}\n", None, _TERMS, [1], id="A1.2-new-path"),
+    pytest.param(f"now {_TERM}\n", "had zz-other\n", (*_TERMS, ("zz-other", "s")), [1], id="A1.3-new-value"),
+    pytest.param(f"still {_TERM}\n", f"HAD {_TERM.upper()}\n", _TERMS, [], id="A1.4-case-insensitive"),
+    pytest.param(f"at {_IPV4} still\n", f"at {_IPV4} first\n", None, [], id="baseline-layer-amnestied"),
+    pytest.param(f"now {_HOME_SHORT}/p\n", f"was {_HOME_LONG}/p\n", None, [1], id="superstring-prior-never-amnesties"),
+    pytest.param(f"at {_HOME_SHORT}/p\n", f"was {_HOME_SHORT}/p\n", None, [], id="equal-anchored-value-amnestied"),
+    pytest.param(f"{_TERM} one\nnew zz-brand\n", f"{_TERM}\n", (*_TERMS, ("zz-brand", "s")), [2], id="suppressed-line-continues"),
+])
+# fmt: on
 def test_amnesty_is_same_path_same_layer_equal_value(
     text: str, prior: str | None, terms: tuple[tuple[str, str], ...] | None, hit_lines: list[int]
 ) -> None:
-    """v0.11.0 FR1: a hit is suppressed iff the same layer re-run on the same path's prior text yields an equal value."""
+    """v0.11.0 FR1: suppressed iff the same layer re-run on the same path's prior text yields an equal value."""
     patterns = load_baseline_patterns() if terms is None else ()
     outcome = scan_objects([_obj(text, prior)], terms=terms or (), patterns=patterns)
 
     assert [h.line for h in outcome.hits] == hit_lines
-    assert all(
-        _TERM not in h.masked_term and _HOME_SHORT not in h.masked_term for h in outcome.hits
-    )
+    assert all(_TERM not in h.masked_term and _HOME_SHORT not in h.masked_term for h in outcome.hits)
 
 
 class _CountingRegex:
@@ -163,61 +128,23 @@ def test_first_match_short_circuits_at_the_first_hit_line() -> None:
 
 def test_unmasked_operator_term_absent_from_every_hit_field() -> None:
     """sa-private-match-rendering-has-three-renderers#B3."""
-    outcome = scan_objects(
-        [_obj(f"the value is {_TERM} here\n", path="secret.md")], terms=_TERMS, patterns=()
-    )
+    outcome = scan_objects([_obj(f"the value is {_TERM} here\n", path="secret.md")], terms=_TERMS, patterns=())
 
     hit = outcome.hits[0]
     assert all(_TERM not in v for v in (hit.path, hit.masked_term, hit.source_layer))
     assert (hit.masked_term, hit.source_layer) == ("z…m", "operator denylist")
 
 
-_BIG = {"oversized": True, "size_bytes": 6_000_000, "scanned_bytes": 5_242_880}
-
-
-@pytest.mark.parametrize(
-    ("obj", "hits", "binary", "notes"),
-    [
-        pytest.param(
-            ScannedObject(path="b.dat", sha="d", text="", decodable=False),
-            0,
-            1,
-            [],
-            id="A6.2-binary",
-        ),
-        pytest.param(
-            _obj(f"x {_TERM}\n", **_BIG),
-            1,
-            0,
-            [("notes.md", 6_000_000, 5_242_880)],
-            id="A4.1-prefix-hit",
-        ),
-        pytest.param(
-            _obj("clean\n", **_BIG),
-            0,
-            0,
-            [("notes.md", 6_000_000, 5_242_880)],
-            id="A4.4-note-without-hit",
-        ),
-        pytest.param(
-            ScannedObject(path="b.bin", sha="d", text="", decodable=False, **_BIG),
-            0,
-            1,
-            [],
-            id="A4.6-undecodable",  # type: ignore[arg-type]
-        ),
-        pytest.param(
-            _obj(f"x {_TERM}\n", "unrelated\n", **_BIG),
-            1,
-            0,
-            [("notes.md", 6_000_000, 5_242_880)],
-            id="oversized-with-prior-not-amnestied",
-        ),
-    ],
-)
-def test_binary_and_oversized_objects(
-    obj: ScannedObject, hits: int, binary: int, notes: list[tuple[str, int, int]]
-) -> None:
+# fmt: off
+@pytest.mark.parametrize(("obj", "hits", "binary", "notes"), [
+    pytest.param(_binary(), 0, 1, [], id="A6.2-binary-skipped-and-counted"),
+    pytest.param(_obj(f"x {_TERM}\n", **_BIG), 1, 0, _NOTE, id="A4.1-oversized-prefix-hit"),
+    pytest.param(_obj("clean\n", **_BIG), 0, 0, _NOTE, id="A4.4-note-without-hit"),
+    pytest.param(_binary(**_BIG), 0, 1, [], id="A4.6-undecodable-oversized-is-binary-only"),
+    pytest.param(_obj(f"x {_TERM}\n", "unrelated\n", **_BIG), 1, 0, _NOTE, id="oversized-with-prior-not-amnestied"),
+])
+# fmt: on
+def test_binary_and_oversized_objects(obj: ScannedObject, hits: int, binary: int, notes: list[tuple[str, int, int]]) -> None:
     outcome = scan_objects([obj], terms=_TERMS, patterns=())
 
     assert len(outcome.hits) == hits
