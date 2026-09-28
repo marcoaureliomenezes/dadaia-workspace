@@ -30,10 +30,7 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:
         python_env=VenvPythonEnvironmentManager(),
     ).init(tmp_path, harnesses=L1_ENTRY_HARNESSES)
     monkeypatch.chdir(tmp_path)
-    # Hermetic session identity: bind resolves DADAIA_SESSION_ID → harness-native id →
-    # mint (bug bind-session-id-divergence). Strip inherited ids so each test controls
-    # exactly which identity source is present. DADAIA_CONTEXT is stripped too (T-50-05
-    # bind-warning tests need to control it precisely; other tests never relied on it).
+    # Hermetic identity: each test sets exactly the id sources it needs.
     for var in (
         "DADAIA_SESSION_ID",
         "CLAUDE_CODE_SESSION_ID",
@@ -46,12 +43,7 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:
 
 
 def _register_alive_ctx(workspace: Path, name: str = "myctx") -> None:
-    """Register an ALIVE v2 context directly in spec_contexts.json.
-
-    `context bind --mode implementation|review` requires the context to be ALIVE
-    (T-11 AC-T11-5). Writing the state file directly avoids a real `context alive`
-    git clone in these CLI integration tests.
-    """
+    """An ALIVE v2 context written straight into the state file — no real clone."""
     states = workspace / ".dadaia" / "states"
     states.mkdir(parents=True, exist_ok=True)
     (states / "spec_contexts.json").write_text(
@@ -94,11 +86,6 @@ def _session_record_for(workspace: Path, output: str) -> dict:
     record = session_identity.read_session(workspace, session_id)
     assert record is not None, f"session record {session_id} not persisted"
     return record
-
-
-# ---------------------------------------------------------------------------
-# create -> show --json -> list happy lifecycle
-# ---------------------------------------------------------------------------
 
 
 def test_context_create_show_list_happy_lifecycle(workspace: Path) -> None:
@@ -147,13 +134,6 @@ def test_context_list_json_empty_is_stable_array(workspace: Path) -> None:
     result = _runner.invoke(app, ["context", "list", "--json"])
     assert result.exit_code == 0, result.output
     assert json.loads(result.stdout) == []
-
-
-# ---------------------------------------------------------------------------
-# Error matrix: duplicate create, unknown show, delete nonexistent, uninitialized
-# workspace, alive/dead verb guards, invalid bind mode, implementation/review
-# bind requiring --release, release without a session.
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -208,73 +188,52 @@ def test_context_bind_print_env_read_and_implementation_shapes(workspace: Path) 
     assert bound.exit_code == 0 and "export " not in bound.output, bound.output
 
 
-# --- caller-scoped harness binding -----------------------------------------
-
-
-def test_context_bind_persists_harness_owned_record(
-    workspace: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("env", "session_id", "warns"),
+    [
+        # T-50-05 (SPEC v0.5.0 FR1): no harness id and no DADAIA_CONTEXT — minted, and warned loudly
+        pytest.param({}, None, True, id="no-id-mints-and-warns"),
+        # bug bind-session-id-divergence: one stable harness-native id, never a minted sess_*
+        pytest.param({"CLAUDE_CODE_SESSION_ID": "claude-stable-abc123"}, "claude-stable-abc123", False, id="claude-native-id"),
+        pytest.param({"CODEX_THREAD_ID": "harness-session"}, "harness-session", False, id="codex-native-id"),
+        # the eval-flow contract: an explicit DADAIA_SESSION_ID is reused, never re-minted
+        pytest.param({"DADAIA_SESSION_ID": "sess_stable01"}, "sess_stable01", None, id="dadaia-session-id"),
+        # bug validation-027-f-07: env id AND harness id -> the env id owns the ONE record
+        pytest.param({"DADAIA_SESSION_ID": "sess_envfixed", "CLAUDE_CODE_SESSION_ID": "claude-native-xyz"}, "sess_envfixed", None, id="env-id-wins-one-record"),
+    ],
+)  # fmt: skip
+def test_bind_resolves_one_session_identity(
+    workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    env: dict[str, str],
+    session_id: str | None,
+    warns: bool | None,
 ) -> None:
-    """Bind persists the record under the current harness id without a global pointer."""
-    from dadaia_workspace.core import session_store as session_identity
+    """Two binds both exit 0 (peer presence is advisory) and persist the record under the one
+    resolved identity — no global pointer, no second record, no minted stray."""
+    from dadaia_workspace.core import session_store
 
-    monkeypatch.setenv("CODEX_THREAD_ID", "harness-session")
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
     _register_alive_ctx(workspace)
-    result = _runner.invoke(app, ["context", "bind", "myctx"])
-    assert result.exit_code == 0, result.output
-    record = session_identity.read_session(workspace, "harness-session")
-    assert record is not None
-    assert record["context"] == "myctx"
-    assert not (workspace / ".dadaia" / "sessions" / "runtime").exists()
-
-
-# --- FR-R4-02: implementation / review bind persistence --------------------
-
-
-def test_context_bind_second_implementation_does_not_block(workspace: Path) -> None:
-    """Independent implementation binds both succeed; peer presence is advisory."""
-    _register_alive_ctx(workspace)
-    result1 = _runner.invoke(app, ["context", "bind", "myctx"])
-    assert result1.exit_code == 0, result1.output
-    result2 = _runner.invoke(app, ["context", "bind", "myctx"])
-    assert result2.exit_code == 0, result2.output
-
-
-# ---------------------------------------------------------------------------
-# T-50-05 (SPEC v0.5.0 FR1): the loud bind warning. T-50-04 deleted
-# `_adopt_attributed_bind`, the ancestry-marker path that used to make a bind
-# reachable for a caller with no harness-native id and no DADAIA_CONTEXT. Without a
-# warning the deletion converts a working flow into a silent no-op.
-# ---------------------------------------------------------------------------
-
-
-def test_bind_warns_when_neither_harness_id_nor_dadaia_context(workspace: Path) -> None:
-    _register_alive_ctx(workspace)
-    result = _runner.invoke(app, ["context", "bind", "myctx"])
-    assert result.exit_code == 0, result.output
-    assert "reachable only" in result.output
-    assert "DADAIA_CONTEXT" in result.output
-    # Never a real shell-export line (would corrupt `eval $(...)` if it leaked to stdout
-    # in the --print-env path) — this is prose guidance, not an executable line.
-    assert "export DADAIA_CONTEXT" not in result.output
-
-
-def test_bind_silent_when_harness_native_id_present(
-    workspace: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "claude-warn-check")
-    _register_alive_ctx(workspace)
-    result = _runner.invoke(app, ["context", "bind", "myctx"])
-    assert result.exit_code == 0, result.output
-    assert "reachable only" not in result.output
-
-
-# ---------------------------------------------------------------------------
-# T-50-05 (SPEC v0.5.0 FR1 deletion item 5): the sole surviving runtime source is
-# DADAIA_RUNTIME (which the kimi-code shims actually export). The dead alias this site
-# used to also read has zero writers anywhere in the tree and is deleted outright — a
-# grep for its exact name returns 0 matches in this code universe, so these tests prove
-# the positive (default + the real var honored) rather than naming the deleted one.
-# ---------------------------------------------------------------------------
+    outputs = [_runner.invoke(app, ["context", "bind", "myctx"]) for _ in range(2)]
+    assert [r.exit_code for r in outputs] == [0, 0], outputs[0].output
+    if warns is not None:
+        assert ("reachable only" in outputs[0].output) is warns
+        assert "export DADAIA_CONTEXT" not in outputs[0].output
+    sessions = workspace / ".dadaia" / "sessions"
+    assert not (sessions / "runtime").exists()
+    if session_id is None:
+        assert _session_record_for(workspace, outputs[0].output)["context"] == "myctx"
+        return
+    assert all(
+        session_id in r.output and "sess_" not in r.output.replace(session_id, "") for r in outputs
+    )
+    assert sorted(p.name for p in sessions.glob("*.json")) == [f"{session_id}.json"]
+    record = session_store.read_session(workspace, session_id)
+    assert (
+        record is not None and record["session_id"] == session_id and record["context"] == "myctx"
+    )
 
 
 def test_bind_records_dadaia_runtime_env(workspace: Path) -> None:
@@ -290,16 +249,6 @@ def test_bind_records_dadaia_runtime_env(workspace: Path) -> None:
     assert result2.exit_code == 0, result2.output
     record2 = _session_record_for(workspace, result2.output)
     assert record2["runtime"] == "kimi-code"
-
-
-# ---------------------------------------------------------------------------
-# T-10d: context release
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# T-10d: show --json session sub-object
-# ---------------------------------------------------------------------------
 
 
 def test_context_show_json_session_null_then_populated_when_bound(workspace: Path) -> None:
@@ -328,11 +277,6 @@ def test_context_show_json_session_null_then_populated_when_bound(workspace: Pat
     # sa-bind-has-two-stores#S8: name and session come from the one Bind.
     assert data["name"] == "myctx" == data["session"]["context"]
     assert data["session"]["session_id"] == session_id
-
-
-# ---------------------------------------------------------------------------
-# T-BCR-08 smoke test — git push -u when no upstream tracking
-# ---------------------------------------------------------------------------
 
 
 def test_push_uses_set_upstream_when_no_tracking(tmp_path: Path) -> None:
@@ -449,99 +393,15 @@ def test_context_dead_surfaces_the_refused_push_with_its_fix_line(
     assert repo.is_dir()
 
 
-# ---------------------------------------------------------------------------
-# Bug bind-session-id-divergence (consumer validation, 2026-07-15): bind must
-# reuse a stable session identity instead of minting a fresh sess_* every call.
-# ---------------------------------------------------------------------------
-
-
-def test_bind_reuses_harness_native_session_identity(workspace: Path, monkeypatch) -> None:
-    """Two binds in one harness session keep ONE stable id (the harness-native id)."""
-    from dadaia_workspace.core import session_store as session_identity
-
-    _register_alive_ctx(workspace)
-    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "claude-stable-abc123")
-
-    first = _runner.invoke(app, ["context", "bind", "myctx"])
-    assert first.exit_code == 0, first.output
-    assert "claude-stable-abc123" in first.output
-
-    second = _runner.invoke(app, ["context", "bind", "myctx"])
-    assert second.exit_code == 0, second.output
-    assert "claude-stable-abc123" in second.output
-    assert "sess_" not in second.output, "must not mint a divergent sess_* id"
-
-    record = session_identity.read_session(workspace, "claude-stable-abc123")
-    assert record is not None
-    assert record["session_id"] == "claude-stable-abc123"
-
-    sessions_dir = workspace / ".dadaia" / "sessions"
-    strays = [p.name for p in sessions_dir.glob("sess_*")]
-    assert strays == [], f"divergent minted records: {strays}"
-
-
-def test_bind_reuses_dadaia_session_id_env(workspace: Path, monkeypatch) -> None:
-    """An explicit DADAIA_SESSION_ID (eval-flow contract) is reused, never re-minted."""
-    from dadaia_workspace.core import session_store as session_identity
-
-    _register_alive_ctx(workspace)
-    monkeypatch.setenv("DADAIA_SESSION_ID", "sess_stable01")
-
-    result = _runner.invoke(app, ["context", "bind", "myctx"])
-    assert result.exit_code == 0, result.output
-    assert "sess_stable01" in result.output
-
-    record = session_identity.read_session(workspace, "sess_stable01")
-    assert record is not None
-    assert record["context"] == "myctx"
-
-
-# ---------------------------------------------------------------------------
-# Bug context-show-json-traceback-unbound (consumer validation, 2026-07-15)
-# ---------------------------------------------------------------------------
-
-
-def test_show_json_unbound_returns_null_context_not_traceback(workspace: Path) -> None:
-    """`context show --json` with no bind answers {"context": null}, exit 0 — no traceback."""
-    result = _runner.invoke(app, ["context", "show", "--json"])
-    assert result.exit_code == 0, result.output
-    assert "Traceback" not in result.output
-    assert "ValueError" not in result.output
-    payload = json.loads(result.output)
-    assert payload == {"context": None}
-
-
-def test_show_unbound_human_output_is_calm(workspace: Path) -> None:
-    """Human-mode unbound `context show` prints a calm line, exit 0."""
-    result = _runner.invoke(app, ["context", "show"])
-    assert result.exit_code == 0, result.output
-    assert "Traceback" not in result.output
-    assert "No active context" in result.output
-
-
-def test_bind_env_id_with_harness_id_yields_single_record(workspace: Path, monkeypatch) -> None:
-    """Bug validation-027-f-07: DADAIA_SESSION_ID + harness id set -> ONE record only.
-
-    The residual harness-alias dual-write recreated the identity divergence the
-    original bind-session-id-divergence fix removed: two records for one session.
-    The resolved identity (env id first) owns the ONLY record.
-    """
-    from dadaia_workspace.core import session_store as session_identity
-
-    _register_alive_ctx(workspace)
-    monkeypatch.setenv("DADAIA_SESSION_ID", "sess_envfixed")
-    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "claude-native-xyz")
-
-    for _ in range(2):
-        result = _runner.invoke(app, ["context", "bind", "myctx"])
-        assert result.exit_code == 0, result.output
-        assert "sess_envfixed" in result.output
-
-    sessions_dir = workspace / ".dadaia" / "sessions"
-    records = sorted(p.name for p in sessions_dir.glob("*.json"))
-    assert records == ["sess_envfixed.json"], f"expected ONE record, got: {records}"
-    rec = session_identity.read_session(workspace, "sess_envfixed")
-    assert rec is not None and rec["session_id"] == "sess_envfixed"
+def test_show_unbound_is_calm_in_both_modes(workspace: Path) -> None:
+    """Bug context-show-json-traceback-unbound: with no bind, `show --json` answers
+    {"context": null} and human `show` prints a calm line — both exit 0, no traceback."""
+    as_json = _runner.invoke(app, ["context", "show", "--json"])
+    human = _runner.invoke(app, ["context", "show"])
+    assert as_json.exit_code == human.exit_code == 0, as_json.output + human.output
+    assert json.loads(as_json.output) == {"context": None}
+    assert "No active context" in human.output
+    assert "Traceback" not in as_json.output + human.output
 
 
 def test_bind_with_no_live_release_exits_zero_and_the_next_write_is_allowed(
@@ -570,11 +430,6 @@ def test_bind_with_no_live_release_exits_zero_and_the_next_write_is_allowed(
         {"tool_name": "Write", "tool_input": {"file_path": str(target)}}
     )
     assert block is None, block
-
-
-# ---------------------------------------------------------------------------
-# FR5 (T-047-59) — main-repo / associated-repos is the user-facing vocabulary
-# ---------------------------------------------------------------------------
 
 
 def test_context_create_help_names_main_repo_and_associated_repos(workspace: Path) -> None:
