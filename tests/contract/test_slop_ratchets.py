@@ -508,15 +508,15 @@ def _destructive_calls(sources: dict[str, str]) -> set[str]:
 
 
 #: V38 allowance, born 2026-09-27 at 16. The install-ledger prune is PLAN §1.1's
-#: "who owns an entry under a harness dir" authority (`_reconcile_install_ledger`).
+#: "who owns an entry under a harness dir" authority (`_reconcile_install_ledger`). Certify
+#: deletes its own disposable run; reconcile's rollback restores a state file to absent.
 _V38_BIRTH = 16
 _V38_ALLOWANCE: dict[str, str] = {
     "core/atomic_write.py:atomic_write": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
-    "features/certification/service.py:certify": "sa-reconcile-certify-skip-the-workspace-walk",
+    "features/certification/service.py:certify": "parity:tests/integration/features/certification/test_certify_journey.py",
     # the v1 hop drops the retired primary_context.json — pinned by the B7 transform test
     "features/migrate/state_v2.py:execute_migration": "parity:tests/unit/features/migrate/test_state_v2.py",
-    "features/reconcile/service.py:_restore_state": "sa-reconcile-certify-skip-the-workspace-walk",
-    "features/reconcile/service.py:reconcile_workspace": "sa-reconcile-certify-skip-the-workspace-walk",
+    "features/reconcile/service.py:_restore_state": "parity:tests/unit/features/reconcile/test_reconcile_service.py",
     # re-verified exact-token delete of a template artifact; features/specs cannot import sweep
     "features/specs/doctor_memory.py:fix_placeholder_atom": "parity:tests/unit/features/specs/test_scaffold_placeholder_repair.py",
     "infrastructure/projection.py:_clear": "parity:tests/integration/test_install_ledger_reconciliation.py",
@@ -545,6 +545,23 @@ def test_v38_trips_on_a_planted_deleter() -> None:
         "ok.py": "import os\nos.replace('a', 'b')\n",
     }
     assert _destructive_calls(sources) == {"features/x/tidy.py:tidy"}
+
+
+def test_no_doctor_section_subset_outside_doctor() -> None:
+    """sa-reconcile-certify-skip-the-workspace-walk#B5: no code selects a subset of doctor
+    sections — no `[...]["sections"]` read, no literal naming two section names."""
+    names = {"workspace", "specs", "ledgers"}
+    hits = [
+        f"{rel}:{node.lineno}"
+        for rel, text in _package_sources().items()
+        for node in ast.walk(ast.parse(text))
+        if (isinstance(node, ast.Subscript) and ast.unparse(node.slice) == "'sections'")
+        or (
+            isinstance(node, ast.Tuple | ast.List | ast.Set)
+            and len(names & {ast.unparse(e).strip("'") for e in node.elts}) >= 2
+        )
+    ]
+    assert hits == []
 
 
 def _doctor_codes() -> set[str]:

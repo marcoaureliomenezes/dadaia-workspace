@@ -25,7 +25,7 @@ class ReconcileResult:
         return asdict(self)
 
 
-def _snapshot_state(workspace_root: Path) -> tuple[Path, dict[Path, Path | None]]:
+def _snapshot_state(workspace_root: Path) -> dict[Path, Path | None]:
     backup_root = workspace_root / ".dadaia" / "tmp" / "reconcile" / f"state-{uuid.uuid4().hex}"
     backup_root.mkdir(parents=True, exist_ok=False)
     targets = (
@@ -40,7 +40,7 @@ def _snapshot_state(workspace_root: Path) -> tuple[Path, dict[Path, Path | None]
             snapshots[target] = backup
         else:
             snapshots[target] = None
-    return backup_root, snapshots
+    return snapshots
 
 
 def _restore_state(snapshots: dict[Path, Path | None]) -> None:
@@ -73,7 +73,7 @@ def reconcile_workspace(
         )
 
     steps: list[str] = ["provider-version"]
-    backup_root, snapshots = _snapshot_state(workspace_root)
+    snapshots = _snapshot_state(workspace_root)  # under .dadaia/tmp: the reaper expires it
     projections_started = False
     try:
         # Bug reconcile-root-owned-agentic: a mixed-ownership workspace (e.g.
@@ -112,20 +112,19 @@ def reconcile_workspace(
             raise RuntimeError("public doctor failed: " + "; ".join(blocking[:8]))
         steps.append("public-doctor")
 
-        workspace_issues = doctor_service.check()
-        if workspace_issues:
-            summary = "; ".join(
-                f"{issue.code}: {issue.description}" for issue in workspace_issues[:8]
-            )
-            raise RuntimeError("workspace doctor failed: " + summary)
-        steps.append("workspace-doctor")
+        # Context invariants only: operator slop never blocks an upgrade; `certify` and
+        # `dadaia doctor` judge the whole workspace (DEC-13 a).
+        broken = doctor_service.check()
+        if broken:
+            summary = "; ".join(f"{issue.code}: {issue.description}" for issue in broken[:8])
+            raise RuntimeError("context invariants failed: " + summary)
+        steps.append("context-invariants")
 
         if distribution_version() != expected_version:
             raise RuntimeError("capability canary does not identify the expected provider")
         steps.append("capability-canary")
     except Exception as exc:  # noqa: BLE001 - transaction boundary returns structured failure.
         _restore_state(snapshots)
-        shutil.rmtree(backup_root, ignore_errors=True)
         return ReconcileResult(
             ok=False,
             expected_version=expected_version,
@@ -135,7 +134,6 @@ def reconcile_workspace(
             rollback_required=projections_started,
         )
 
-    shutil.rmtree(backup_root, ignore_errors=True)
     return ReconcileResult(
         ok=True,
         expected_version=expected_version,
