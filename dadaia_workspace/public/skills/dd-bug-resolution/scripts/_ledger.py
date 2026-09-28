@@ -5,22 +5,21 @@ which runs the push gate's own matcher (`_privacy.py`, a staged `core/redaction.
 
 from __future__ import annotations
 
-import importlib.util
+import contextlib
 import json
 import os
 import re
 import sys
+import time
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from typing import Any
 
 _HERE = Path(__file__).resolve().parent
 _OWN = _HERE / "_privacy.py"
 _SOURCE = _OWN if _OWN.is_file() else _HERE.parents[3] / "core" / "redaction.py"
-_SPEC = importlib.util.spec_from_file_location("_privacy", _SOURCE)
-assert _SPEC is not None and _SPEC.loader is not None
-_privacy = importlib.util.module_from_spec(_SPEC)
-_SPEC.loader.exec_module(_privacy)
+_privacy = ModuleType("_privacy")  # executed from source: no loader, no bytecode beside it
+exec(compile(_SOURCE.read_text(encoding="utf-8"), _SOURCE, "exec"), _privacy.__dict__)
 
 
 JSON_TYPES: dict[str, Any] = {
@@ -34,8 +33,7 @@ def load_schema(name: str) -> dict[str, Any]:
     own = _HERE / "schemas" / f"{name}.schema.json"
     shipped = _HERE.parents[2] / "schemas"
     path = own if own.is_file() else next(shipped.rglob(own.name), own)
-    schema: dict[str, Any] = json.loads(path.read_text("utf-8"))
-    return schema
+    return dict(json.loads(path.read_text("utf-8")))
 
 
 def validate(value: object, spec: dict[str, Any], root: dict[str, Any], where: str) -> Any:
@@ -96,12 +94,15 @@ def stamp(path: Path) -> tuple[int, int] | None:
 
 
 def replace(path: Path, text: str) -> None:
-    """Write *text* to *path* atomically: LF bytes to a temp sibling, then ``os.replace``;
-    the temp sibling never survives, whichever step fails."""
+    """Write *text* to *path* atomically, in LF, via a temp sibling that never survives."""
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     try:
         tmp.write_text(text, encoding="utf-8", newline="")
+        for _ in range(49):  # Windows refuses the swap while a reader holds *path* open
+            with contextlib.suppress(PermissionError):
+                return os.replace(tmp, path)
+            time.sleep(0.01)
         os.replace(tmp, path)
     finally:
         tmp.unlink(missing_ok=True)
@@ -140,8 +141,7 @@ def _terms() -> list[tuple[str, str]]:
 def private_refusal(record: dict[str, Any]) -> tuple[str, str] | None:
     """The refusal ``(message, fix)`` for the first field of *record* the push would
     refuse, or ``None`` — the caller raises it before anything is written."""
-    hit = _privacy.first_private(record, _terms(), _baseline())
-    if hit is None:
+    if (hit := _privacy.first_private(record, _terms(), _baseline())) is None:
         return None
     return (
         f"field {hit[0]!r} carries {hit[1]!r}, which the push refuses — nothing was written",

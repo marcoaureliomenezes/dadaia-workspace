@@ -19,6 +19,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+sys.dont_write_bytecode = True  # the shared _ledger imports without a __pycache__
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 from _ledger import replace  # noqa: E402
 
@@ -48,8 +49,7 @@ def load(path: Path) -> dict[str, Any]:
             "range": {"min_port": DEFAULT_MIN_PORT, "max_port": DEFAULT_MAX_PORT},
             "entries": [],
         }
-    doc: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
-    return doc
+    return dict(json.loads(path.read_text(encoding="utf-8")))
 
 
 def pid_alive(pid: int) -> bool:
