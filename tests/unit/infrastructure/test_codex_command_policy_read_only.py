@@ -28,8 +28,6 @@ pytestmark = pytest.mark.unit
 _REGISTRY = Path(__file__).resolve().parents[3] / "dadaia_workspace/public/entities/registry.json"
 _RULE = re.compile(r"prefix_rule\((.*?)\n\)", re.S)
 _FIELD = re.compile(r"^\s*(\w+) = (.*?),?$", re.M)
-#: Write- or exec-capable first tokens (sed is admissible only as ``sed -n``).
-_WRITE_OR_EXEC = {"sed", "find", "awk", "xargs", "sh", "bash", "python", "perl", "tee"}
 
 
 def _allowed_prefixes() -> set[tuple[str, ...]]:
@@ -44,12 +42,9 @@ def _allowed_prefixes() -> set[tuple[str, ...]]:
     return allowed
 
 
-def test_b2_no_allow_prefix_starts_with_a_write_or_exec_capable_command() -> None:
-    offenders = {p for p in _allowed_prefixes() if p[0] in _WRITE_OR_EXEC and p != ("sed", "-n")}
-    assert offenders == set()
-
-
 def test_b3_read_only_inspection_stays_allowed() -> None:
+    """#B2 and #B3: the allow set is exactly the read-only one, so no allowed prefix is
+    write- or exec-capable (``sed`` only as ``sed -n``)."""
     assert _allowed_prefixes() == {("rg",), ("ls",), ("cat",), ("sed", "-n")}
 
 
