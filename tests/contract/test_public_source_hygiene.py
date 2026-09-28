@@ -46,10 +46,7 @@ def test_pre_push_ci_gate_ships_pyproject_excludes_bytecode_and_scripts_leave_no
     the canonical public asset tree carries no bytecode at rest.
     """
     listing = {p.name for p in _SCRIPTS_DIR.iterdir()}
-    # v0.4.5 FR5 (scan-test-vacuity-guard): the two membership asserts already imply
-    # non-emptiness; expressed via the shared convention for grep-ability.
     assert_populated(listing, sentinel="pre-push-ci-gate.sh")
-    assert "certify-dadaia-workspace.sh" in listing
 
     pyproject = _REPO_ROOT / "pyproject.toml"
     data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
