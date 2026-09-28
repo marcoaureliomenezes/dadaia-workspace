@@ -7,6 +7,7 @@ the third gate block.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -67,6 +68,7 @@ def test_classification_matrix(path: str, expected: PathClass) -> None:
 
 _BOUND_A: dict[str, object] = {"bound_context": "ctx-a", "bound_repos": frozenset({"ctx-a", "ctx-a-infra"})}
 _B = {**_BOUND_A, "target_slug": "ctx-b", "target_owner": "ctx-b"}
+_DADAIA = "/ws/.dadaia/.venv/Scripts/dadaia.exe" if sys.platform == "win32" else "/ws/.dadaia/.venv/bin/dadaia"
 _OWN = {**_BOUND_A, "target_slug": "ctx-a", "target_owner": "ctx-a"}
 
 
@@ -76,7 +78,7 @@ _OWN = {**_BOUND_A, "target_slug": "ctx-a", "target_owner": "ctx-a"}
     pytest.param("specs/releases/_archive/releases_histo.jsonl", {}, None, id="releases-histo-append"),
     pytest.param("specs/bugs/20260701T00Z-00.jsonl", {}, None, id="live-bugs-write"),
     pytest.param("repos/existing/AGENTS.md", {}, None, id="A1.2-existing-nonmanifest-repo-agents-md-editable"),
-    pytest.param("repos/ctx-b/src/x.py", _B, "fix: /ws/.dadaia/.venv/bin/dadaia context bind ctx-b", id="write-outside-the-bind-scope-names-the-bind"),
+    pytest.param("repos/ctx-b/src/x.py", _B, f"fix: {_DADAIA} context bind ctx-b", id="write-outside-the-bind-scope-names-the-bind"),
     pytest.param("repos/ctx-a-infra/main.tf", {**_BOUND_A, "target_slug": "ctx-a-infra", "target_owner": "ctx-a"}, None, id="associated-repo-in-scope"),
     pytest.param("repos/ctx-b/src/x.py", {"target_slug": "ctx-b", "target_owner": "ctx-b"}, None, id="unbound-session-never-scope-blocked"),
     pytest.param("repos/stranger/src/x.py", {**_BOUND_A, "target_slug": "stranger"}, None, id="unregistered-slug-fails-open"),
@@ -84,7 +86,7 @@ _OWN = {**_BOUND_A, "target_slug": "ctx-a", "target_owner": "ctx-a"}
     pytest.param("repos/ctx-b/specs/releases/_archive/releases_histo.jsonl", _B, None, id="B39-4-foreign-histo-stays-writable"),
     pytest.param("specs/memory/ARCHITECTURE.md", _OWN, None, id="memory-write-allowed-every-phase"),
     pytest.param("repos/ctx-a/specs/memory/product/catalog.json", _OWN, None, id="in-repo-memory-write-allowed"),
-    pytest.param("AGENTS.md", {"projected": frozenset({"AGENTS.md"})}, "fix: /ws/.dadaia/.venv/bin/dadaia public install", id="S6-projected-law-one-restore-command"),
+    pytest.param("AGENTS.md", {"projected": frozenset({"AGENTS.md"})}, f"fix: {_DADAIA} public install", id="S6-projected-law-one-restore-command"),
 ])
 # fmt: on
 def test_evaluate_decides_allow_or_block_with_one_fix(path: str, kwargs: dict[str, object], fix: str | None) -> None:

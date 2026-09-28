@@ -1,13 +1,6 @@
-"""FR6 copy-drift: a scaffolded AGENTS.md matching neither source nor shipped history.
-
-Intent: CONTRACT — T-047-02 / 0.4.7 FR6 and bug
-`scoped-memory-agents-md-prose-rewrite-undetected-by-doctor`: every scaffolded
-`specs/<area>/AGENTS.md` — `memory/` included — is compared against its scaffold source
-and the shipped-hashes history by the ONE TREE-5 comparator. Bytes matching neither are
-a `copy-drift` finding (WARNING); absence is a finding too (the check TREE-5M used to
-own); scaffold bytes are silent.
-Size: SMALL — SpecsDoctor over tmp_path trees plus one read of the real scaffold.
-"""
+"""Intent: CONTRACT — bug scoped-memory-agents-md-prose-rewrite-undetected-by-doctor: the ONE TREE-5
+comparator checks every scaffolded `specs/<area>/AGENTS.md` against its source and shipped history;
+matching neither is a `copy-drift` WARNING, absence a finding, scaffold bytes silent."""
 
 from __future__ import annotations
 
@@ -60,7 +53,7 @@ def _memory_issues(tmp_path: Path, content: str | None) -> list[str]:
     return [
         f"{i.code} {i.verdict} {i.message}"
         for i in doctor.check()
-        if i.message.endswith("memory/AGENTS.md)")
+        if i.message.replace("\\", "/").endswith("memory/AGENTS.md)")
     ]
 
 

@@ -8,6 +8,7 @@ the catalog digest (AC-W4-03), A19.1 (associated repos inject nothing), A30.1.
 from __future__ import annotations
 
 import json
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -213,7 +214,9 @@ _NO_MEMORY = ("end memory bootstrap", "Python 3.12")
             [
                 _UNBOUND,
                 "\nNext (command step context): no ALIVE Spec Context",
-                "context create '<name>' --main-repo '<clone-url>'",
+                "context create {0}<name>{0} --main-repo {0}<clone-url>{0}".format(
+                    "" if sys.platform == "win32" else "'"
+                ),
             ],
             _NO_MEMORY,
             id="no-alive-context-prints-the-doctor-step-AC6.2",
@@ -262,8 +265,7 @@ def test_first_emission(
     present: list[str],
     absent: tuple[str, ...],
 ) -> None:
-    """A fresh session's first emission carries only the memory of the context THIS session
-    bound — an unbound session gets the generic preflight and no memory."""
+    """A first emission carries only the memory of the context THIS session bound; unbound, none."""
     _ws(tmp_path, *contexts)
     if bound:
         _bind(tmp_path, *bound)

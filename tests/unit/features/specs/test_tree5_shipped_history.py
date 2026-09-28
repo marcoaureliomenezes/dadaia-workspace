@@ -123,7 +123,7 @@ def test_stale_shipped_scoped_law_is_refreshed(tmp_path: Path) -> None:
 
     doctor = SpecsDoctor(specs, public_dir=public)
     issues = [i for i in doctor.check() if i.code == "TREE-5"]
-    scoped = [i for i in issues if i.message.endswith("releases/AGENTS.md)")]
+    scoped = [i for i in issues if i.message.replace("\\", "/").endswith("releases/AGENTS.md)")]
     assert scoped and scoped[0].fixable, "a stale shipped scoped projection must be fixable"
 
     doctor.fix(issues)

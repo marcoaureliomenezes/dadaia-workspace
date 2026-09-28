@@ -100,7 +100,7 @@ def test_init_refuses_meta_and_unknown_harness_values(
         assert result.stdout == ""
     if fix:
         expected = fix.format(tmp=tmp_path.as_posix(), root=Path("/").resolve().as_posix().rstrip("/") + "/")
-        assert _the_fix(result.output).startswith(expected)
+        assert _the_fix(result.output).replace("\\", "/").startswith(expected)
     if setup is _foreign:
         assert (tmp_path / "demo" / "somebody-elses-file.txt").read_text(encoding="utf-8") == "keep me"
 

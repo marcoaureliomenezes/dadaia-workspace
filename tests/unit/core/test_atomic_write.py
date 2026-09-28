@@ -1,10 +1,5 @@
-"""Intent: CONTRACT — v0.4.5 A2.3 (temp cleanup on every failure path, every parameter
-combination); size: SMALL.
-
-``core.atomic_write.atomic_write`` is the package's one temp-then-replace writer (A2.2 census:
-``test_atomic_write_census.py``); it closed ``two-atomic-writers-leak-temp-file-on-injected-
-os-replace-failure`` at the root.
-"""
+"""Intent: CONTRACT — ``atomic_write`` is the one temp-then-replace writer: every parameter is
+honoured and no temp survives any failure (two-atomic-writers-leak-temp-file-on-injected-os-replace-failure)."""
 
 from __future__ import annotations
 
@@ -44,12 +39,13 @@ def test_write_round_trips_fresh_and_over_an_existing_target(
 
 
 def test_preserve_mode_copies_the_mode_and_a_missing_parent_raises(tmp_path: Path) -> None:
-    """preserve_mode keeps 0o640 (not mkstemp's 0600); without ensure_parent nothing is created."""
+    """preserve_mode keeps the prior mode, not mkstemp's 0600; without ensure_parent nothing is created."""
     target = tmp_path / "a.md"
     target.write_text("orig\n", encoding="utf-8")
     os.chmod(target, 0o640)
+    before = stat.S_IMODE(target.stat().st_mode)
     atomic_write(target, "new\n", preserve_mode=True)
-    assert stat.S_IMODE(target.stat().st_mode) == 0o640
+    assert stat.S_IMODE(target.stat().st_mode) == before
     with pytest.raises(OSError):
         atomic_write(tmp_path / "nowhere" / "a.md", "hello\n")
     assert not (tmp_path / "nowhere").exists()
