@@ -118,7 +118,7 @@ def test_create_clones_hooks_alives_and_leaves_the_repo_untouched(ws: Path, tmp_
     record = json.loads(_runner.invoke(app, ["context", "show", "my-app", "--json"]).stdout)
     assert record["state"] == "alive"
     assert [r["slug"] for r in record["associated_repos"]] == ["lib"]
-    assert session_store.read_session(ws, _SID) is None  # AC7.1: create binds nothing
+    assert session_store.read_session(ws, _SID) is None  # sa-bind-has-two-stores#S10, AC7.1
     assert "bound" not in out and "export DADAIA_" not in out
     for checkout in (repo, ws / "repos" / "lib"):
         assert (checkout / ".git" / "hooks" / "pre-push").is_file()
