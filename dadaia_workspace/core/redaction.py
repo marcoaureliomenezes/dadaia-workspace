@@ -6,7 +6,7 @@
   seam refuses exactly what the push refuses (sa-ledger-write-seam-redacts-less-than-push-refuses).
 
 - :func:`mask` — the one ``first…last`` rendering of a private match; used by
-  ``features/chokepoints/denylist_scan`` (the hits ``push_gate._compose_denylist_refusal``
+  ``features/chokepoints/denylist_scan`` (the hits ``push_gate.push_gate_decision``
   renders) and ``infrastructure/privacy_check`` (``public doctor``).
 - :class:`Redactor` — word-boundary, longest-first, ordinal-placeholder masking; used by
   ``cli/redact`` (``--redact``) and ``features/certification``.
