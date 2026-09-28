@@ -17,7 +17,7 @@ Extends T-044-27's A16.4 resolution-walk coverage
 inside the associated repo) up to the three real consumers that sit on top of that
 resolver: the ``dadaia doctor`` specs/ledgers sections (via the real Typer app,
 the same convention as
-``tests/integration/cli/test_bind_resolution_seam_executed_path.py``) and the
+``tests/integration/test_one_bind.py``) and the
 ``sdd_gate`` PreToolUse hook (via ``run_hook_subprocess``, the same convention as
 ``tests/unit/hooks/test_sdd_gate.py``). Fixture SHAPE (git-committed repos, same
 slug/name identifiers) is reused from T-044-27's suite locally, not shared as a fixture
