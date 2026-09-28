@@ -7,28 +7,21 @@ Python owns the UNRELATED/DUPLICATE/DIVERGENT_CONFLICT boundary via canonical-an
    item. **Empty intersection → ``UNRELATED``** (final, no model call).
 2. For each shared-anchor pair, Python checks change-equality → **``DUPLICATE``** if every
    shared anchor carries an identical change.
-3. A shared-anchor pair with **differing** change defaults **fail-closed** to
-   **``DIVERGENT_CONFLICT``**. A model may only **downgrade** it (to ``OVERLAP``/``SUPERSEDES``)
-   with an explicit, structured, proven-compatible merge — it can never *miss* a conflict.
-
-R1 ships the deterministic core (steps 1–2 + the fail-closed default of step 3). The model
-downgrade is a ``Callable`` seam, **offline by default** (``no_downgrade``): the
-``C->D``/``C->E`` divergent twin is classified with ZERO model calls (acceptance §3.7.3).
+3. A shared-anchor pair with **differing** change is **``DIVERGENT_CONFLICT``** — no model
+   call (acceptance §3.7.3).
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 
 __all__ = [
     "BoundItem",
     "Classification",
-    "Downgrade",
     "Verdict",
     "classify",
-    "no_downgrade",
 ]
 
 
@@ -37,10 +30,7 @@ class Verdict(StrEnum):
 
     UNRELATED = "unrelated"
     DUPLICATE = "duplicate"
-    OVERLAP = "overlap"
-    SUPERSEDES = "supersedes"
     DIVERGENT_CONFLICT = "divergent_conflict"
-    DEPENDS_ON = "depends_on"
 
 
 @dataclass(frozen=True)
@@ -70,32 +60,9 @@ class Classification:
     shared_anchors: tuple[str, ...] = ()
 
 
-#: A model-downgrade seam: given two change strings (new, existing) it MAY return a downgraded
-#: verdict (``OVERLAP``/``SUPERSEDES``/``DEPENDS_ON``) when it can prove compatibility, else
-#: ``None`` to keep the fail-closed ``DIVERGENT_CONFLICT``. Offline in R1.
-Downgrade = Callable[[str, str], "Verdict | None"]
-
-
-def no_downgrade(_new_change: str, _existing_change: str) -> Verdict | None:
-    """The default downgrade seam: never downgrade (model OFFLINE — fail-closed)."""
-    return None
-
-
-#: The ONLY verdicts a ``downgrade`` callable may use to narrow a fail-closed
-#: ``DIVERGENT_CONFLICT``. The clamp accepts a downgrade verdict only if it is in this set;
-#: any other value (``UNRELATED``, ``DUPLICATE``, ``DIVERGENT_CONFLICT`` itself, garbage, or
-#: ``None``) keeps the pair ``DIVERGENT_CONFLICT``. This is the boundary guard that prevents a
-#: wired-in model from *masking* a real conflict — the model can narrow the conflict's name
-#: but can never erase it (SPEC §3 WS-3 boundary clamp; CRITICAL fail-open fix).
-_ALLOWED_DOWNGRADE_VERDICTS: frozenset[Verdict] = frozenset(
-    {Verdict.OVERLAP, Verdict.SUPERSEDES, Verdict.DEPENDS_ON}
-)
-
-
 def _classify_pair(
     new: BoundItem,
     existing: BoundItem,
-    downgrade: Downgrade,
 ) -> Classification:
     shared = sorted(new.anchors & existing.anchors)
 
@@ -112,17 +79,7 @@ def _classify_pair(
             other_slug=existing.slug, verdict=Verdict.DUPLICATE, shared_anchors=tuple(shared)
         )
 
-    # (3) At least one shared anchor differs → fail-closed DIVERGENT_CONFLICT by default.
-    # The model downgrade seam may override ONLY this branch, and only with a verdict in the
-    # clamp set {OVERLAP, SUPERSEDES, DEPENDS_ON}. Any other value the callable returns
-    # (UNRELATED, DUPLICATE, DIVERGENT_CONFLICT, garbage, or None) is rejected here and the
-    # pair stays DIVERGENT_CONFLICT — a model can narrow the conflict's name, never erase it.
-    first = differing[0]
-    downgraded = downgrade(new.anchor_changes[first], existing.anchor_changes[first])
-    if downgraded in _ALLOWED_DOWNGRADE_VERDICTS:
-        return Classification(
-            other_slug=existing.slug, verdict=downgraded, shared_anchors=tuple(shared)
-        )
+    # (3) At least one shared anchor differs → DIVERGENT_CONFLICT.
     return Classification(
         other_slug=existing.slug,
         verdict=Verdict.DIVERGENT_CONFLICT,
@@ -133,14 +90,9 @@ def _classify_pair(
 def classify(
     new: BoundItem,
     existing: Sequence[BoundItem],
-    *,
-    downgrade: Downgrade = no_downgrade,
 ) -> list[Classification]:
     """Classify ``new`` against every item in ``existing``.
 
-    Returns one :class:`Classification` per existing item, in input order. With the default
-    ``no_downgrade`` seam the model is OFFLINE: a shared-anchor + differing-change pair is
-    ``DIVERGENT_CONFLICT`` with zero model calls (acceptance §3.7.3). The model is consulted
-    ONLY on the differing-change branch — never for an UNRELATED or DUPLICATE pair.
+    Returns one :class:`Classification` per existing item, in input order.
     """
-    return [_classify_pair(new, item, downgrade) for item in existing]
+    return [_classify_pair(new, item) for item in existing]
