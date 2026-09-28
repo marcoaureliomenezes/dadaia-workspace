@@ -19,6 +19,9 @@
   minimizar os testes, mantendo qualidade, requisitos, features especificadas e documentadas funcionando,
   sem ambiguidade e contradições sistêmicas... Sou contra algo verboso que poderia ser feito de forma
   menos verbosa."
+- Operator ruling, 2026-09-28 late (FR10 relaxation), verbatim: "não é preciso reduzir linhas de codigo e
+  testes de um jeito fechado, era sometne uma recomendação. mas não force a barra. para não quebrar nada e
+  não demorar muito. o fundamental mesmo é ter as contraadições e ambigfuidades sistemicas resolvidas"
 
 ---
 
@@ -143,7 +146,7 @@ PLAN §1.1 gives each Origin bug's question its one authority; PLAN §2 its wave
 
 ### FR8 — Shrink mandate
 
-- AC8.1 Production and test lines meet AC10.1–AC10.2; both logged at closure.
+- AC8.1 Production and test lines follow AC10.1–AC10.2; both logged at closure.
 - AC8.2 New units are the three as-is ADD rows: `workspace_layout.verdict` (a move), a stdlib
   `_shared/_privacy.py` pinned by byte parity, `release.py ship`; WP-34's `provider_version()` is an
   existing reader rebuilt in place. No new doctor code, state file or schema; flags only leave.
@@ -181,9 +184,10 @@ Baseline (the evidence's `c4/tests-audit-*.json`): 69/133 findings mirrored, 130
 Baseline `9cd5fbf4`. Lines: `git grep -h '' <sha> -- '<pathspec>' | wc -l`; test functions: the sum of
 `git grep -c 'def test_' <sha> -- 'tests/*.py'`.
 
-- AC10.1 Production `dadaia_workspace/**/*.py` ≤ 23,480 lines (−30%, the floor), aiming at ≤ 20,125
-  (−40%); baseline 33,543, pathspec `'dadaia_workspace/*.py'`.
-- AC10.2 Tests `tests/**/*.py` ≤ 39,773 lines (baseline 66,289) and ≤ 1,237 test functions (baseline
+- AC10.1 Recommended direction, never a gate (Origin, relaxation): measured and reported at closure
+  (AC10.7), never forced at the cost of risk or time. Production `dadaia_workspace/**/*.py` ≤ 23,480
+  lines (−30%), aiming at ≤ 20,125 (−40%); baseline 33,543, pathspec `'dadaia_workspace/*.py'`.
+- AC10.2 Recommended, as AC10.1: tests `tests/**/*.py` ≤ 39,773 lines (baseline 66,289) and ≤ 1,237 test functions (baseline
   2,063); both −40%, pathspec `'tests/*.py'`.
 - AC10.3 Every specified feature works. First, no documented feature, functionality or expected behavior
   breaks: every documented behavior (memory product atoms, `ARCHITECTURE.md`/`QUALITY.md`, Approved FRs,
@@ -206,8 +210,7 @@ Baseline `9cd5fbf4`. Lines: `git grep -h '' <sha> -- '<pathspec>' | wc -l`; test
   - The RED proof is a rewritten existing test when one exists.
   - `dd-bug-resolution` Phase 5/6 and `dd-test-stewardship` admission comply without restating it;
     this resolves `sa-implementation-adds-before-it-deletes`.
-- AC10.6 A CI ratchet records the production-line, test-line and test-function ceilings and fails when
-  any is exceeded; ceilings only go down.
+- AC10.6 Superseded by the 2026-09-28 relaxation (Origin).
 - AC10.7 Closure publishes an accountability report of AC10.1–AC10.4, measured before (`9cd5fbf4`) and
   after: production lines, test lines, test functions, ambiguities resolved.
 
