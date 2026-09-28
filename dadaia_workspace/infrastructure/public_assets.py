@@ -4,14 +4,12 @@ K3 (v0.5.1): install/doctor are now two folds over one ``ProjectionRule`` table
 (``infrastructure/projection_rules.py``) — ``install`` writes ``render``, ``doctor``
 compares against it. What remains here is genuinely bespoke: staging, plan
 resolution, install-ledger reconciliation, and the harness-independent
-doctor checks (privacy, entities-derivation, memory-phase, symlink-target,
-git-dirty).
+doctor checks (privacy, entities-derivation, memory-phase, symlink-target).
 """
 
 from __future__ import annotations
 
 import os
-import subprocess
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -200,7 +198,7 @@ class FileSystemPublicAssetManager:
         from dadaia_workspace.infrastructure.install_helpers import build_manifest
 
         manifest_path = agentic_dir / "manifest.json"
-        atomic_write(manifest_path, _json_dump(build_manifest(agentic_dir, self._iter_files)))
+        atomic_write(manifest_path, _json_dump(build_manifest(agentic_dir, iter_public_files)))
         staged.append(f"[stage] {manifest_path}")
         return staged
 
@@ -286,7 +284,7 @@ class FileSystemPublicAssetManager:
         typed store error HERE — loud, before any projection write (NFR-4). A missing
         overlay resolves the `balanced` defaults.
         """
-        overlay = self._load_agent_policy(workspace_root, agentic_dir)
+        overlay = self._load_agent_policy(workspace_root)
         resolved_models = self._resolved_core_models(overlay)
 
         # No harness named: project the roster of record — the shared authored set plus
@@ -329,16 +327,13 @@ class FileSystemPublicAssetManager:
     # Agent-model policy (v0.1.65 FR4/FR5) — loaded ONCE per install/doctor run
     # ------------------------------------------------------------------
 
-    def _load_agent_policy(
-        self, workspace_root: Path, agentic_dir: Path
-    ) -> AgentModelPolicyOverlay | None:
+    def _load_agent_policy(self, workspace_root: Path) -> AgentModelPolicyOverlay | None:
         """Load the operator overlay (``None`` when absent ⇒ ``balanced`` defaults).
 
         Raises the typed ``AgentModelPolicyStoreError`` on an invalid overlay — install
         fails loud BEFORE any projection write (NFR-4); doctor converts it to an ERROR
         line. Valid override targets are the ``CORE_AGENTS``.
         """
-        del agentic_dir
         return JsonAgentModelPolicyStore(workspace_root).load()
 
     @staticmethod
@@ -465,7 +460,7 @@ class FileSystemPublicAssetManager:
         # (NFR-4 — missing != invalid).
         overlay: AgentModelPolicyOverlay | None = None
         try:
-            overlay = self._load_agent_policy(workspace_root, agentic_dir)
+            overlay = self._load_agent_policy(workspace_root)
         except AgentModelPolicyStoreError as exc:
             reports.append(DoctorLine(DoctorStatus.DRIFT, f"agent-model-policy ERROR: {exc}"))
         resolved_models = self._resolved_core_models(overlay)
@@ -507,31 +502,6 @@ class FileSystemPublicAssetManager:
         reports.extend(attest("public-privacy", self._check_public_privacy()))
         reports.extend(attest("entities-derivation", check_entities_derivation(self._public_dir)))
 
-        try:
-            git_result = subprocess.run(
-                ["git", "diff", "--name-only", "HEAD", "--", str(self._public_dir)],
-                capture_output=True,
-                text=True,
-                cwd=self._public_dir.parent.parent,
-                timeout=5,
-            )
-            if git_result.returncode == 0:
-                for dirty_path in git_result.stdout.splitlines():
-                    if dirty_path.strip():
-                        reports.append(
-                            DoctorLine(DoctorStatus.WARN, f"git-dirty: {dirty_path.strip()}")
-                        )
-            elif git_result.returncode == 128:
-                reports.append(
-                    DoctorLine(DoctorStatus.NOT_APPLICABLE, "git-dirty check (not a git repo)")
-                )
-        except FileNotFoundError:
-            reports.append(
-                DoctorLine(DoctorStatus.NOT_APPLICABLE, "git-dirty check (git not found)")
-            )
-        except subprocess.TimeoutExpired:
-            reports.append(DoctorLine(DoctorStatus.WARN, "git-dirty check timed out"))
-
         for harness_dir in sorted(HARNESS_DIRS):
             legacy_dir = workspace_root / harness_dir / "workflows"
             for legacy in sorted(legacy_dir.glob("*.workflow.md")):
@@ -548,14 +518,8 @@ class FileSystemPublicAssetManager:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _iter_files(self, root: Path) -> Iterable[Path]:
-        return iter_public_files(root)
-
     def _staged_sources(self) -> Iterable[Path]:
-        return (f for name in _COPY_DIRS for f in self._iter_files(self._public_dir / name))
-
-    def _is_ignored_public_asset(self, path: Path) -> bool:
-        return is_ignored_public_asset(path)
+        return (f for name in _COPY_DIRS for f in iter_public_files(self._public_dir / name))
 
     def _compare(self, src: Path, dst: Path, label: str) -> DoctorLine:
         if not dst.exists():
@@ -607,5 +571,5 @@ class FileSystemPublicAssetManager:
     def _check_public_privacy(self) -> list[DoctorLine]:
         """Fail doctor if public distributed assets contain known private identifiers."""
         return _check_public_privacy_fn(
-            self._public_dir, self._iter_files, self._is_ignored_public_asset
+            self._public_dir, iter_public_files, is_ignored_public_asset
         )

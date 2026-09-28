@@ -5,8 +5,7 @@ is forgotten in one copy. Every consumer reads this one derived inventory instea
 
 This module is the single, DERIVED source of that inventory: it reuses
 :func:`tests.helpers.public_asset_roster.scan` — itself a thin wrapper over
-``FileSystemPublicAssetManager``'s own private walk (``_iter_files`` /
-``_is_ignored_public_asset``, the EXACT enumeration ``install()``/``stage()``/
+``iter_public_files`` (the EXACT enumeration ``install()``/``stage()``/
 ``doctor()`` use internally) — and extracts the top-level directory name under
 ``skills/`` from every real (non-ignored) file path already enumerated there.
 
