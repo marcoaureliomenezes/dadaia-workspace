@@ -1,7 +1,6 @@
-"""Intent: CONTRACT — 0.4.7 FR3/AC3.1 (T-047-68): the doctor's `ledgers` section
-delegates to each ledger's skill script instead of re-implementing its schema.
+"""The doctor's `ledgers` section delegates to each ledger's skill script.
 
-size: SMALL — a fake runner answers outside the `check` contract.
+Intent: CONTRACT — 0.4.7 AC3.1.
 """
 
 from __future__ import annotations
@@ -12,9 +11,7 @@ from dadaia_workspace.infrastructure.ledger_scripts import LEDGER_SCRIPTS, scrip
 
 
 def test_an_uninstalled_script_is_one_finding_naming_public_install(tmp_path: Path) -> None:
-    """A script that cannot run is ONE finding with a runnable fix — never a traceback
-    and never silence (the structural cause of the doctor bug family: a record class
-    nobody reads)."""
+    """A script that cannot run is one error finding per ledger whose fix names `public install`."""
     specs = tmp_path / "bare" / "specs"
     specs.mkdir(parents=True)
     findings = script_findings(specs, runner=_BrokenRunner())
@@ -23,8 +20,6 @@ def test_an_uninstalled_script_is_one_finding_naming_public_install(tmp_path: Pa
 
 
 class _BrokenRunner:
-    """A script that answers outside the `check` contract (exit 2, no JSON)."""
-
     def run(self, argv: object, *, cwd: object = None, timeout: float | None = None) -> object:
         class _Result:
             returncode = 2
