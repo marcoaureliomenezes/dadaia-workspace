@@ -1,17 +1,7 @@
-"""Unit tests for ``infrastructure/json_agent_model_policy_store.py`` (v0.1.65 FR3/D-7).
+"""JsonAgentModelPolicyStore (v0.1.65 FR3/D-7): the shared store contract once, then the
+store's own FR3 parse-rejection matrix and the D-7 Fable guard.
 
-Mirrors the ``json_workflow_model_policy_store`` discipline: missing file ⇒ ``None``
-(defaults) ≠ invalid file ⇒ typed :class:`AgentModelPolicyStoreError`; atomic
-temp+rename write with a ``.last-good.json`` snapshot of the PRIOR valid file; a shared
-no-I/O :meth:`parse` path (consumed later by the panel validate endpoint). Every FR3
-rejection carries a distinct, actionable message; D-7 rejects any combination that
-resolves a Fable-family model onto ``dd-code-reviewer``.
-
-The generic load/parse/save+last-good store contract (missing->None, corrupt->typed
-error, unknown-top-level-field, wrong schema_version, atomic-no-tmp, last-good
-snapshot, reload-identity) is asserted once via the shared ``_store_contract`` helpers
-— this file keeps only the store-specific logic: the FR3 parse-rejection matrix and
-the D-7 governance invariant.
+Intent: CONTRACT — v0.1.65 FR3, D-7
 """
 
 from __future__ import annotations
@@ -53,8 +43,6 @@ def _valid_doc() -> dict[str, object]:
 
 
 def test_load_contract(tmp_path: Path) -> None:
-    """missing->None / corrupt->typed error / unknown-field / wrong schema_version —
-    the shared store-contract template, applied once."""
     assert _store(tmp_path).path == tmp_path / ".dadaia" / "states" / "agent_model_policy.json"
     assert_missing_file_loads_default(_store(tmp_path), None)
     assert_corrupt_json_raises_typed_error(_store(tmp_path), AgentModelPolicyStoreError)
@@ -128,11 +116,9 @@ def test_valid_doc_and_minimal_doc_parse(tmp_path: Path) -> None:
 def test_d7_rejects_fable_on_security_reviewer_but_allows_on_other_agents(
     tmp_path: Path, fable_id: str
 ) -> None:
-    """D-7: an override putting ANY Fable-family model on dd-code-reviewer is rejected
-    at parse (bug g1-fable-guard-matches-only-claude-fable-5-so-fable-5-1-lands-on-
-    dd-code-reviewer: the guard is the registry family, never one literal id); the
-    same model is freely allowed on any other agent. This is the sole coverage of the
-    D-7 governance invariant — keep both assertions explicit."""
+    """D-7 (bug g1-fable-guard-matches-only-claude-fable-5-so-fable-5-1-lands-on-
+    dd-code-reviewer): any Fable-family model on dd-code-reviewer is rejected at parse;
+    the same model is allowed on any other agent."""
     store = _store(tmp_path)
 
     doc = _valid_doc()
@@ -150,9 +136,7 @@ def test_d7_rejects_fable_on_security_reviewer_but_allows_on_other_agents(
 
 
 def test_save_atomic_last_good_and_reload(tmp_path: Path) -> None:
-    """save() is atomic (no .tmp leftover), snapshots the PRIOR valid file to
-    .last-good.json on the second save (none on the first), and a saved overlay
-    reloads identically."""
+    """Atomic save, a last-good snapshot of the prior valid file, identical reload."""
     first = AgentModelPolicyOverlay(applied_template="balanced", overrides={})
     second = AgentModelPolicyOverlay(
         applied_template="max-quality",
