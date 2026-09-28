@@ -50,16 +50,6 @@ _ALLOWED_TOP_LEVEL = frozenset({"schema_version", "applied_template", "overrides
 #: Allowed keys inside one per-agent override (per-field: model, effort, or both).
 _ALLOWED_OVERRIDE_KEYS = frozenset({"model", "effort"})
 
-#: Retired persona names an operator-owned overlay may still carry -> the current name.
-#: The pre-0.4.7 bare names (T-047-56) and ADR 0022's deleted coordinator persona.
-_RETIRED_AGENT_NAMES: dict[str, str] = {
-    "project-manager": "dd-product-engineer",
-    "dd-project-manager": "dd-product-engineer",
-    "product-engineer": "dd-product-engineer",
-    "software-engineer": "dd-software-engineer",
-    "code-reviewer": "dd-code-reviewer",
-}
-
 #: The agent that must never resolve to a Fable-family model (G-1/D-7).
 
 
@@ -170,7 +160,7 @@ class JsonAgentModelPolicyStore:
         valid_agents = set(CORE_AGENTS)
         overrides: dict[str, AgentModelOverride] = {}
         for agent_name, override_value in value.items():
-            agent = _RETIRED_AGENT_NAMES.get(str(agent_name), str(agent_name))
+            agent = str(agent_name)
             if agent not in valid_agents:
                 raise AgentModelPolicyStoreError(
                     f"unknown agent {agent!r} in 'overrides'; valid agents: "

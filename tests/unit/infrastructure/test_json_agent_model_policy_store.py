@@ -16,7 +16,6 @@ the D-7 governance invariant.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -166,40 +165,3 @@ def test_save_atomic_last_good_and_reload(tmp_path: Path) -> None:
     assert_save_is_atomic_no_tmp_leftover(_store(tmp_path / "atomic"), first)
     assert_last_good_snapshot_of_prior_valid_file(_store(tmp_path / "lastgood"), first, second)
     assert_saved_value_reloads_identically(_store(tmp_path / "reload"), second)
-
-
-@pytest.mark.parametrize(
-    ("retired_key", "current_key"),
-    [
-        ("code-reviewer", "dd-code-reviewer"),
-        ("project-manager", "dd-product-engineer"),
-        ("dd-project-manager", "dd-product-engineer"),
-    ],
-)
-def test_an_overlay_keyed_by_a_retired_persona_name_still_resolves(
-    tmp_path: Path, retired_key: str, current_key: str
-) -> None:
-    """Intent: CONTRACT — T-047-56 + roster-keeps-a-coordinator-persona-while-the-main-thread-coordinates.
-
-    ``.dadaia/states/agent_model_policy.json`` is operator-owned state, not a projection:
-    nothing rewrites it on install. A retired key (the pre-0.4.7 bare names, and the
-    ADR 0022 coordinator persona) must migrate on read, or every install on an upgraded
-    instance fails loud on a name the library itself changed.
-    """
-    states = tmp_path / ".dadaia" / "states"
-    states.mkdir(parents=True)
-    (states / "agent_model_policy.json").write_text(
-        json.dumps(
-            {
-                "schema_version": "agent-model-policy-v1",
-                "overrides": {retired_key: {"model": "claude-sonnet-5"}},
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    overlay = JsonAgentModelPolicyStore(tmp_path).load()
-
-    assert overlay is not None
-    assert set(overlay.overrides) == {current_key}
-    assert overlay.overrides[current_key].model == "claude-sonnet-5"

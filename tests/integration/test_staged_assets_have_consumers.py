@@ -16,7 +16,6 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.infrastructure.agent_transcodes import codex_agent_toml_bytes
-from dadaia_workspace.infrastructure.json_agent_model_policy_store import _RETIRED_AGENT_NAMES
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from tests.helpers.harness_profile import register_all
 
@@ -106,12 +105,20 @@ def test_a_persona_without_a_model_is_refused_on_claude(tmp_path: Path) -> None:
         manager.install(ws)
 
 
-#: Retired persona names: the code's own rename table plus the pre-consolidation roles.
-_RETIRED_ROLES = frozenset(_RETIRED_AGENT_NAMES) | {
-    "qa-engineer",
-    "software-architect",
-    "security-reviewer",
-}
+#: Retired persona names: the pre-0.4.7 bare names, ADR 0022's coordinator and the
+#: pre-consolidation roles.
+_RETIRED_ROLES = frozenset(
+    {
+        "project-manager",
+        "dd-project-manager",
+        "product-engineer",
+        "software-engineer",
+        "code-reviewer",
+        "qa-engineer",
+        "software-architect",
+        "security-reviewer",
+    }
+)
 _FIXTURE_AGENT = re.compile(r"""\bagent"?\s*[:=]\s*["']([a-z-]+)["']""")
 
 
