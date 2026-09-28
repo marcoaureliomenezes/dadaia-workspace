@@ -1,21 +1,5 @@
 """Unit tests for ``features.specs.memory_lint`` — the ONE canonical LINT-1 implementation
-(v0.4.3 T-043-20/FR16).
-
-This module is imported directly by ``doctor_memory.MemoryValidator.check_lint1_memory_atoms``
-(no subprocess), and ``public/scripts/lint-memory-atoms.py`` is now a thin wrapper that
-imports and calls this module's ``main()`` — this test file exercises the package module
-as a normal Python import.
-
-``tests/unit/scripts/test_lint_memory_atoms.py`` (which loaded the standalone script via
-``importlib.util.spec_from_file_location`` and called its own ``lint_atom``/``lint_directory``/
-``HEADING_ALLOWLIST``/etc.) is DELETED, ai-engineer's T-043-20 half (A16.1/A16.2): once the
-script stopped owning those symbols, the file tested a surface that no longer exists on the
-script. Its behavioral coverage (lint_atom/lint_directory scenarios, main() exit codes) was
-already a byte-identical port of what this file covers — see
-the functions above this docstring's insertion point. Four checks in the deleted file were
-NOT duplicates — they validate real on-disk public assets (the frontmatter schema, the
-scaffold atoms) against this package's canon, independent of
-the script/package split — those four are ported below, now importing the package directly.
+(v0.4.3 T-043-20/FR16), imported directly by ``doctor_memory``.
 
 Intent: CONTRACT — v0.4.3 A16.1.
 """

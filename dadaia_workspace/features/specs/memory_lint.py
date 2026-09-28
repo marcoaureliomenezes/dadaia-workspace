@@ -1,21 +1,7 @@
-"""The memory-atom lint (LINT-1) — the ONE canonical implementation (v0.4.3 T-043-20/FR16).
+"""The memory-atom lint (LINT-1) — the ONE implementation; ``doctor_memory`` imports it.
 
-Inverts the pre-v0.4.3 architecture: ``doctor_memory.MemoryValidator.check_lint1_memory_atoms``
-used to shell out to the PROJECTED copy at ``dadaia_workspace/public/scripts/lint-memory-atoms.py``
-via a subprocess — the package depended on its own distributed asset at runtime, backwards from
-every other in-package check. This module IS the logic now; ``doctor_memory`` imports it
-directly (no subprocess, no ``ProcessRunner``, no dependency on the projected copy existing or
-being byte-identical). The projected ``public/scripts/lint-memory-atoms.py`` becomes a thin
-wrapper that execs the workspace venv's ``python -m dadaia_workspace.features.specs.memory_lint``
-entry point (ai-engineer's half of T-043-20 — see the task's handoff note for the exact contract).
-
-Ported faithfully from the pre-v0.4.3 script (same frontmatter schema, same CLI
-shape/exit codes) — the DEPENDENCY DIRECTION inverts (A16.1). The heading-vocabulary
-check (a curated allowlist of "known" ## headings, plus an optional per-workspace
-``.heading-allowlist`` extension file) is RETIRED: a heading vocabulary is prose
-policy, not a lint. This module keeps only what a lint can mechanically decide —
-frontmatter schema conformance, forbidden (changelog/history) headings, duplicate
-headings, and wikilink resolution.
+It decides only what a lint can decide mechanically: frontmatter schema conformance,
+forbidden (changelog/history) headings, duplicate headings, and wikilink resolution.
 """
 
 from __future__ import annotations
@@ -316,8 +302,7 @@ def lint_directory(memory_dir: Path, schema: dict[str, Any]) -> list[AtomResult]
 
 
 # ---------------------------------------------------------------------------
-# Output / reporting / CLI entry point (kept for the thin-wrapper contract, ai-
-# engineer's T-043-20 half: `python -m dadaia_workspace.features.specs.memory_lint`)
+# Output / reporting / CLI entry point (`python -m dadaia_workspace.features.specs.memory_lint`)
 # ---------------------------------------------------------------------------
 
 

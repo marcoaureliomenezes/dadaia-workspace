@@ -6,13 +6,7 @@ Residual R7: ``dadaia_workspace/public/scripts/__pycache__/`` had been committed
 compiled bytecode leaking into the canonical public asset tree, which is source-of-truth
 for every consumer and is staged/projected verbatim. Two failure modes must stay closed:
 
-1. **Regeneration.** Running the public scripts (``lint-memory-atoms.py`` —
-   ``generate-memory-catalog.py`` DELETED, v0.5.1 T-051-16/A10.1/A10.4) must NOT drop a
-   ``__pycache__/*.pyc`` under ``dadaia_workspace/public/``. The script sets
-   ``sys.dont_write_bytecode = True`` so the guard fires for any invocation style;
-   ``features/specs/doctor_memory.py`` additionally passes ``-B`` at the LINT-1 subprocess
-   call site. This test executes the script WITHOUT ``-B`` so it proves the in-script guard,
-   not just the call-site flag.
+1. **At rest.** No ``__pycache__``/``.pyc`` sits under ``dadaia_workspace/public/``.
 
 2. **Packaging.** The built wheel/sdist must contain no ``.pyc``. ``poetry-core`` honours
    the ``[tool.poetry] exclude`` globs for both artifacts; this test asserts the exclusion
@@ -23,8 +17,6 @@ for every consumer and is staged/projected verbatim. Two failure modes must stay
 from __future__ import annotations
 
 import re
-import subprocess
-import sys
 import tomllib
 from pathlib import Path
 
@@ -38,7 +30,6 @@ pytestmark = pytest.mark.contract
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PUBLIC_ROOT = _REPO_ROOT / "dadaia_workspace" / "public"
 _SCRIPTS_DIR = _PUBLIC_ROOT / "scripts"
-_MEMORY_DIR = _REPO_ROOT / "specs" / "memory"
 
 
 def _bytecode_artifacts_under_public() -> list[str]:
@@ -51,12 +42,8 @@ def _bytecode_artifacts_under_public() -> list[str]:
 def test_pre_push_ci_gate_ships_pyproject_excludes_bytecode_and_scripts_leave_no_pycache() -> None:
     """`pre-push-ci-gate.sh` is present in the public/scripts/ listing (the SINGLE
     explicit ship assertion for the pre-push gate script, suite-wide, v0.1.51 FR3),
-    and the poetry-core build config excludes __pycache__/*.pyc from sdist and wheel.
-
-    Also: the canonical public asset tree carries no bytecode at rest (precondition),
-    and executing the catalog + lint scripts must not write __pycache__ under public/.
-    Invoked WITHOUT ``-B`` so the in-script ``sys.dont_write_bytecode`` guard is what is
-    under test (the call-site ``-B`` would mask a missing guard).
+    and the poetry-core build config excludes __pycache__/*.pyc from sdist and wheel;
+    the canonical public asset tree carries no bytecode at rest.
     """
     listing = {p.name for p in _SCRIPTS_DIR.iterdir()}
     # v0.4.5 FR5 (scan-test-vacuity-guard): the two membership asserts already imply
@@ -70,27 +57,7 @@ def test_pre_push_ci_gate_ships_pyproject_excludes_bytecode_and_scripts_leave_no
     assert "**/__pycache__" in exclude
     assert "**/*.pyc" in exclude
 
-    if not _MEMORY_DIR.is_dir():
-        pytest.skip("specs/memory not present in this checkout")
-
-    before = _bytecode_artifacts_under_public()
-    assert before == [], f"precondition: public/ already polluted: {before}"
-
-    lint_script = _SCRIPTS_DIR / "lint-memory-atoms.py"
-    assert lint_script.is_file()
-
-    # lint exits 0 (clean) or 2 (warnings only); either is a valid run that imports the
-    # script module and would otherwise drop a .pyc.
-    lint = subprocess.run(
-        [sys.executable, str(lint_script), "--memory-dir", str(_MEMORY_DIR)],
-        cwd=_REPO_ROOT,
-        capture_output=True,
-        check=False,
-    )
-    assert lint.returncode in (0, 2), lint.stderr.decode()
-
-    after = _bytecode_artifacts_under_public()
-    assert after == [], f"script left bytecode under public/: {after}"
+    assert _bytecode_artifacts_under_public() == []
 
 
 _RETIRED_SURFACES: tuple[str, ...] = (

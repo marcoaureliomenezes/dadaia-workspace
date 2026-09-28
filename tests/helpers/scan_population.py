@@ -50,7 +50,7 @@ Tree-/package-walking population scans (the convention applies at the call site 
 * ``tests/contract/test_behavior_map.py`` :: ``_skills_on_disk()``,
   ``_scoped_agents_md_sources()``
 * ``tests/contract/test_public_scripts_thin_wrapper.py`` ::
-  test_thin_wrapper_registry_stays_data_driven_and_correctly_scoped
+  test_ledger_owner_scripts_expose_check
 * ``tests/contract/test_bind_resolution_seam_dynamic_walk.py`` ::
   test_no_resolver_driven_verb_hardcodes_the_dadaia_workspace_default
 * ``tests/unit/core/test_atomic_write_census.py`` ::

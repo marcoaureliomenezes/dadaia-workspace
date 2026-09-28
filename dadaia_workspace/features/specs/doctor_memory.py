@@ -4,8 +4,7 @@ invariants: required atoms present with a heading (SPEC-DOC-002/002L), no change
 headings (SPEC-DOC-008), catalog↔atom sync (CAT-1), the LINT-1 memory-atom lint, and (v0.5.1
 T-051-22 rework) MEM-DRIFT-1's features-package-map-vs-live-tree WARNING and (0.4.7 FR2)
 MEM-DRIFT-2's memory-citation WARNING (finders: ``features.specs.citations``). LINT-1 imports
-``features.specs.memory_lint`` directly (v0.4.3 T-043-20/FR16 — no subprocess, no dependency
-on the projected ``public/scripts/lint-memory-atoms.py`` copy existing or being current).
+``features.specs.memory_lint`` directly.
 Leaf-only: imports the shared leaves + core, never a sibling validator.
 """
 
@@ -463,10 +462,6 @@ class MemoryValidator:
         headings, duplicate headings, and unresolved wikilinks. A heading vocabulary
         is prose policy, not a lint (v0.5.0) — no WARNING severity path exists here
         any more.
-
-        v0.4.3 T-043-20/FR16: ``memory_lint`` is imported directly — no subprocess,
-        no dependency on the projected ``public/scripts/lint-memory-atoms.py`` copy
-        existing, being current, or matching this package's version at all.
         """
         mem_dir = self.specs_dir / "memory"
         if not mem_dir.is_dir():

@@ -1,8 +1,6 @@
 """Unit tests for the memory validator's LINT-1 mapping (v0.4.3 T-043-20/FR16).
 
-LINT-1 imports ``features.specs.memory_lint`` directly now — no subprocess, no
-``ProcessRunner``, no dependency on the projected ``public/scripts/lint-memory-atoms.py``
-copy existing (A16.1). These tests exercise ``check_lint1_memory_atoms`` against REAL
+LINT-1 imports ``features.specs.memory_lint`` directly (A16.1). These tests exercise ``check_lint1_memory_atoms`` against REAL
 memory-atom fixtures written under ``tmp_path``, proving the severity mapping end to end
 through the real ``memory_lint`` implementation — never a faked subprocess result.
 
