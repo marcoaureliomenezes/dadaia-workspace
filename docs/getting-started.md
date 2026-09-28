@@ -52,7 +52,7 @@ harness later and `.dadaia/.venv/bin/dadaia harness list` reads the roster.
 ## Level 2 — the project
 
 <!-- derived-from: spec-context-project sha256:47c11b26b98f -->
-<!-- derived-from: context-management sha256:bc3b4f2b4d9a -->
+<!-- derived-from: context-management sha256:3b1b76336431 -->
 
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
 owned by one main repository, optionally spanning associated repositories that live and

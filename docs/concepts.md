@@ -8,7 +8,7 @@ is `dadaia_workspace/public/data/AGENTS.md`, and the walkthrough is
 ## Context
 
 <!-- derived-from: spec-context-project sha256:47c11b26b98f -->
-<!-- derived-from: context-management sha256:bc3b4f2b4d9a -->
+<!-- derived-from: context-management sha256:3b1b76336431 -->
 
 A *context* — a Spec Context Project — is one canonical `specs/` tree owned by one
 main repository, the unit for memory, backlog, bugs, releases, reports and handoffs.
@@ -76,7 +76,7 @@ gate — a refusal whose fix is itself refused (a Stall) cannot ship.
 
 ## Memory
 
-<!-- derived-from: context-management sha256:bc3b4f2b4d9a -->
+<!-- derived-from: context-management sha256:3b1b76336431 -->
 <!-- derived-from: workspace-doctor sha256:eb7b1e19b277 -->
 <!-- derived-from: release-lifecycle sha256:16af688b63c6 -->
 <!-- derived-from: audits-canon sha256:87599de34ac0 -->

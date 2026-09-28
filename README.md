@@ -46,7 +46,7 @@ memory atom under its content hash.
 
 <!-- derived-from: pypi-distribution sha256:618098346ed6 -->
 <!-- derived-from: workspace-init sha256:acb8bc28e783 -->
-<!-- derived-from: context-management sha256:bc3b4f2b4d9a -->
+<!-- derived-from: context-management sha256:3b1b76336431 -->
 <!-- derived-from: workspace-doctor sha256:eb7b1e19b277 -->
 
 ```bash
@@ -135,7 +135,7 @@ with a RED test. Completed work leaves as a `handoff-v1` record, validated by
 ## Documentation
 
 <!-- derived-from: pypi-distribution sha256:618098346ed6 -->
-<!-- derived-from: public-asset-distribution sha256:70f6745b96cd -->
+<!-- derived-from: public-asset-distribution sha256:6a1fa0e2d023 -->
 
 The documentation is the repository's [docs folder](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs):
 

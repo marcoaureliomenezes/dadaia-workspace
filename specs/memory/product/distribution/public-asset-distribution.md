@@ -51,7 +51,7 @@ sources:
 
 ## Shipped scripts
 
-- `dadaia_workspace/public/scripts/` stages into `.dadaia/agentic/scripts/`: `pre-push-ci-gate.sh`, the source the hook installer copies into each repo's `.git/hooks/pre-push` ([[context-management]], [[sdd-gate-v3]]).
+- `pre-push-ci-gate.sh` ships in the package (`dadaia_workspace/public/scripts/`, never staged); the hook installer copies it into each repo's `pre-push` hook under `git rev-parse --git-path hooks` ([[context-management]], [[sdd-gate-v3]]).
 
 ## Dependencies
 
