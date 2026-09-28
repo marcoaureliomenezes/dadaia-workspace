@@ -1,29 +1,8 @@
-"""T-65-08: the v0.1.65 FR5 render-at-install seam, rewritten at the K3 (v0.5.1)
-pure-render interface.
+"""The render-at-install seam (v0.1.65 FR5) at its K3 (v0.5.1) pure-render interface:
+``render_claude_agent``, ``resolve_codex_agent_model``, ``codex_agent_toml_bytes`` and the
+one ``ProjectionRule``/``install_rules`` seam.
 
-Intent: CONTRACT — v0.1.65 F-3/F-5/F-6/D-3/D-6; K3 (v0.5.1) collapses
-``install_claude_agents``/``install_codex_agents`` into pure functions
-(``render_claude_agent``, ``resolve_codex_agent_model``,
-``projection_rules._codex_agent_toml_bytes``) plus the one ``ProjectionRule``
-seam (``install_rules``) — this file tests those directly instead of the
-retired per-writer delegators.
-
-Covers:
-- ``render_claude_agent`` — the D-6 single render seam: deterministic ``model:`` then
-  ``effort:`` injection as the LAST frontmatter lines; pre-existing ``model:``/``effort:``
-  lines stripped (pack bodies author ``model:``); ``effort:`` OMITTED entirely when
-  unresolved (F-6 — never empty/placeholder); a body without frontmatter raises.
-- ``resolve_codex_agent_model`` — fail-closed: ANY persona with neither an authored
-  ``model:`` nor a resolved policy model raises a loud typed ``PublicAssetError``
-  (sa-staged-assets-without-consumers#44.4); a resolved policy always wins over an
-  authored ``model:``; D-3 clamps the resolved effort via ``codex_effort_for_claude_effort``.
-- ``projection_rules._codex_agent_toml_bytes`` — the ONE codex-agent TOML renderer
-  (mirrors the historical ``install_codex_agents`` per-file body): a plugin body keeps
-  its authored model with no resolved policy,
-  and D-3's clamp reaches the rendered ``model_reasoning_effort`` field.
-- F-5: ``--force`` re-RENDERS a diverged claude agent projection back to the render
-  output — never to raw staged bytes — through the real ``ProjectionRule``/
-  ``install_rules`` seam every rule (Claude, Codex, guardrail, kimi) now shares.
+Intent: CONTRACT — v0.1.65 F-3/F-5/F-6/D-3/D-6; sa-staged-assets-without-consumers#44.4
 """
 
 from __future__ import annotations
@@ -75,11 +54,6 @@ def _staged_agent_md(tmp_path: Path, name: str, text: str) -> Path:
     path = tmp_path / f"{name}.md"
     path.write_text(text, encoding="utf-8")
     return path
-
-
-# ---------------------------------------------------------------------------
-# render_claude_agent — the D-6 seam
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -180,25 +154,12 @@ def test_a_persona_without_read_only_never_renders(tmp_path: Path, body: str) ->
         codex_agent_toml_bytes(md, "dd-software-engineer", resolved)
 
 
-# ---------------------------------------------------------------------------
-# resolve_codex_agent_model — F-3 fail-closed, precedence, D-3 clamp
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize("agent", ["dd-software-engineer", "frontend-engineer"])
 def test_resolve_codex_agent_model_fails_closed_for_any_agent_without_model(agent: str) -> None:
     """sa-staged-assets-without-consumers#44.4: a persona, core or not, with neither an
     authored ``model:`` nor a resolved policy model raises — never a silent default."""
     with pytest.raises(PublicAssetError, match=agent):
         resolve_codex_agent_model(agent, None, None)
-
-
-def test_resolve_codex_agent_model_prefers_resolved_over_staged() -> None:
-    """Precedence: resolved policy wins over an authored staged ``model:``."""
-    resolved = ResolvedAgentModel(model="claude-opus-4-8", effort="high", source="override")
-    model, effort = resolve_codex_agent_model("dd-software-engineer", "claude-sonnet-5", resolved)
-    assert model == "claude-opus-4-8"
-    assert effort == "high"
 
 
 def test_resolve_codex_agent_model_falls_back_to_staged_when_no_resolved_policy() -> None:
@@ -209,35 +170,41 @@ def test_resolve_codex_agent_model_falls_back_to_staged_when_no_resolved_policy(
     assert effort == "medium"
 
 
-def test_resolve_codex_agent_model_uses_d3_clamp_of_resolved_effort() -> None:
-    """D-3: resolved ``xhigh`` clamps to codex ``model_reasoning_effort = "high"``."""
-    resolved = ResolvedAgentModel(model="claude-sonnet-5", effort="xhigh", source="default")
-    _model, effort = resolve_codex_agent_model("dd-software-engineer", None, resolved)
-    assert effort == "high"
+@pytest.mark.parametrize(
+    ("staged", "effort", "model", "codex_effort"),
+    [
+        pytest.param("claude-sonnet-5", "high", "claude-opus-4-8", "high", id="policy-wins"),
+        pytest.param(None, "xhigh", "claude-sonnet-5", "high", id="D-3-xhigh-clamps-to-high"),
+    ],
+)
+def test_resolve_codex_agent_model_with_a_resolved_policy(
+    staged: str | None, effort: str, model: str, codex_effort: str
+) -> None:
+    """A resolved policy wins over an authored ``model:``; D-3 clamps its effort."""
+    resolved = ResolvedAgentModel(model=model, effort=effort, source="override")
+    got = resolve_codex_agent_model("dd-software-engineer", staged, resolved)
+    assert got == (model, codex_effort)
 
 
-# ---------------------------------------------------------------------------
-# projection_rules._codex_agent_toml_bytes — the ONE codex-agent TOML renderer
-# ---------------------------------------------------------------------------
-
-
-def test_codex_agent_toml_bytes_keeps_authored_model_for_plugin_body(tmp_path: Path) -> None:
-    md = _staged_agent_md(tmp_path, "frontend-engineer", _PACK_BODY)
-    toml = codex_agent_toml_bytes(md, "frontend-engineer", None).decode("utf-8")
+@pytest.mark.parametrize(
+    ("body", "resolved", "effort"),
+    [
+        pytest.param(_PACK_BODY, None, None, id="plugin-body-keeps-authored-model"),
+        pytest.param(
+            _GENERIC_BODY,
+            ResolvedAgentModel(model="claude-sonnet-5", effort="xhigh", source="default"),
+            "high",
+            id="D-3-clamp-reaches-the-toml",
+        ),
+    ],
+)
+def test_codex_agent_toml_bytes_renders_the_mapped_model(
+    tmp_path: Path, body: str, resolved: ResolvedAgentModel | None, effort: str | None
+) -> None:
+    md = _staged_agent_md(tmp_path, "agent", body)
+    toml = codex_agent_toml_bytes(md, "agent", resolved).decode("utf-8")
     assert 'model = "gpt-5.6-terra"' in toml
-
-
-def test_codex_agent_toml_bytes_uses_d3_clamp_of_resolved_effort(tmp_path: Path) -> None:
-    md = _staged_agent_md(tmp_path, "dd-software-engineer", _GENERIC_BODY)
-    resolved = ResolvedAgentModel(model="claude-sonnet-5", effort="xhigh", source="default")
-    toml = codex_agent_toml_bytes(md, "dd-software-engineer", resolved).decode("utf-8")
-    assert 'model = "gpt-5.6-terra"' in toml
-    assert 'model_reasoning_effort = "high"' in toml
-
-
-# ---------------------------------------------------------------------------
-# F-5 — --force re-renders (never re-copies staged bytes)
-# ---------------------------------------------------------------------------
+    assert effort is None or f'model_reasoning_effort = "{effort}"' in toml
 
 
 def test_force_rerenders_diverged_claude_projection_to_render_output(
@@ -269,8 +236,6 @@ def test_force_rerenders_diverged_claude_projection_to_render_output(
 def test_install_rules_rewrites_a_read_only_projection(tmp_path: Path) -> None:
     """Windows CI at 4ffc06b3: os.replace onto a 0o444 law file raised PermissionError.
     A changed read-only projection is made writable, rewritten, and re-pinned."""
-    from dadaia_workspace.infrastructure.projection import ProjectionRule, install_rules
-
     dst = tmp_path / "AGENTS.md"
     dst.write_bytes(b"old")
     dst.chmod(0o444)
