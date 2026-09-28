@@ -1,33 +1,9 @@
-"""v0.4.4 T-044-06 (FR3): the v2 branch contract across the REAL CLI boundary.
-
-The pre-push hook forwards git's pre-push stdin ref lines (``<local-ref> <local-sha>
-<remote-ref> <remote-sha>``) into ``dadaia ci push-gate-check``. Rather than stand up a
-real remote and a real ``git push`` (slow, networked, nondeterministic), this drives the
-SAME boundary the hook drives: it spawns ``ci push-gate-check`` through THIS interpreter
-with the ref lines on stdin and no ``.dadaia/handoff/`` tree on disk at all — exactly the
-contract ``pre-push-ci-gate.sh`` line 106 invokes.
-
-Scenarios (v2):
-
-* (a) a ``feature/{M.m.p}`` push flows — no security-reviewer handoff needed anywhere on
-  disk (A3.4: the verdict is no longer checked on this path at all; it is a PR gate now,
-  FR4).
-* (b) a ``develop`` push is BLOCKED, naming the PR path (``feature/{M.m.p}`` → develop).
-* (c) branch deletion (zero local sha) and a tag push both pass — never review-gated.
-* (d) 0.5.0 AC6.4/AC6.5: the branch names come from the constitution gitflow — a custom
-  one (``trunk``/``next``/``work/``), an absent block (default + warning, never a block),
-  and an associated repo inheriting its context's main-repo gitflow.
-
-Supersedes v0.6.0's verdict-keyed scenarios (a covering security-reviewer APPROVE
-required for ``develop`` to flow, and the "keys on the stdin sha, never HEAD" regression,
-which only had meaning while a verdict lookup existed on this path) — deleted per A3.4,
-not disabled.
-
-The CLI is invoked harness-free (no PreToolUse/PostToolUse payload) from the workspace,
-so this also covers the headless runtime the chokepoint protects.
-
-Intent: CONTRACT — v0.4.4 A3.1; 0.5.0 AC6.4, AC6.5 (T-050-12)
-Owner: dd-software-engineer
+"""Intent: CONTRACT — v0.4.4 A3.1; 0.5.0 AC6.4, AC6.5 (T-050-12): `ci push-gate-check`
+driven as the pre-push hook drives it (git's ref lines on stdin, harness-free env, no
+handoff on disk). A work-branch push, a branch deletion and a tag push pass; the branch
+names come from the committed constitution's gitflow (custom, absent -> default + one
+warning, inherited by an associated repo). The integration-branch refusal and its fix are
+the refusal harness Case `birth_published`.
 """
 
 from __future__ import annotations
@@ -95,43 +71,18 @@ def _run_push_gate(
     )
 
 
-def test_feature_branch_push_flows_with_no_verdict_anywhere(tmp_path: Path) -> None:
-    workspace = tmp_path
-    repo, sha = _init_repo(workspace, _SLUG)
-    # No handoff on disk at all — the verdict is no longer checked on this path (A3.4).
-    result = _run_push_gate(
-        repo, workspace, f"refs/heads/feature/0.0.1 {sha} refs/heads/feature/0.0.1 {_ZERO}\n"
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
-
-
-def test_develop_push_is_blocked_naming_the_pr_path(tmp_path: Path) -> None:
-    workspace = tmp_path
-    repo, sha = _init_repo(workspace, _SLUG)
-    result = _run_push_gate(repo, workspace, f"refs/heads/develop {sha} refs/heads/develop {sha}\n")
-    out = result.stdout + result.stderr
-    assert result.returncode != 0, out
-    assert "BLOCKED" in out, out
-    assert "PR" in out, out
-    assert "feature/" in out, out
-
-
 @pytest.mark.parametrize(
-    "variant",
-    ["branch-deletion", "tag-push"],
-    ids=["branch-deletion-passes", "tag-push-passes"],
-)
-def test_pass_matrix(tmp_path: Path, variant: str) -> None:
-    """Branch deletion (zero local sha) and a tag push both pass with NO verdict on
-    disk — never review-gated, exactly as before A3.4 (the check simply does not exist
-    anywhere on this path now)."""
-    workspace = tmp_path
-    repo, sha = _init_repo(workspace, _SLUG)
-
-    if variant == "branch-deletion":
-        result = _run_push_gate(repo, workspace, f"refs/heads/old {_ZERO} refs/heads/old {sha}\n")
-    else:
-        result = _run_push_gate(repo, workspace, f"refs/tags/v1 {sha} refs/tags/v1 {_ZERO}\n")
+    "line",
+    [
+        pytest.param("refs/heads/feature/0.0.1 {sha} refs/heads/feature/0.0.1 " + _ZERO, id="work-branch-push"),
+        pytest.param("refs/heads/old " + _ZERO + " refs/heads/old {sha}", id="branch-deletion"),
+        pytest.param("refs/tags/v1 {sha} refs/tags/v1 " + _ZERO, id="tag-push"),
+    ],
+)  # fmt: skip
+def test_pass_matrix(tmp_path: Path, line: str) -> None:
+    """Never review-gated: the verdict is a PR gate (A3.4), not on this path."""
+    repo, sha = _init_repo(tmp_path, _SLUG)
+    result = _run_push_gate(repo, tmp_path, line.format(sha=sha) + "\n")
     assert result.returncode == 0, result.stdout + result.stderr
 
 

@@ -1,13 +1,10 @@
-"""Push-range denylist scan over a REAL throwaway git repo (SPEC v0.9.0 FR4/FR6;
-SPEC v0.11.0 FR1/FR2).
-
-Intent: CONTRACT — v0.9.0 A4.2, A6.1; v0.11.0 A1.6, A2.3, A10.2
-
-Exercises the real ``GitSubprocessObjectReader`` adapter (real ``git`` subprocess) wired
-into ``push_gate_decision`` — no CLI layer, so this stays a fast, direct integration
-proof of the FROZEN<->scan invariant (FR4), the fail-closed git-failure boundary
-(FR6 row 2), and — since v0.11.0 — the FR1 amnesty over a real range with a real
-remote. Only synthetic terms ever appear here (TASKS standing rule).
+"""Intent: CONTRACT — v0.9.0 A4.2, A6.1; v0.11.0 A1.6, A2.3, A10.2: the push-range denylist
+scan over a REAL throwaway repo, through the real ``GitSubprocessObjectReader`` wired into
+``push_gate_decision`` (no CLI layer). Amnesty is bound to the PATH that already published
+a value at the range base (v0.11.0 FR1) — for a tag pushed over a published sha and for
+the first push of a new branch whose past is on origin (bug
+new-branch-push-loses-prior-published-denylist-amnesty); a git failure refuses naming
+``--no-verify`` (FR6 row 2). Synthetic terms only.
 """
 
 from __future__ import annotations
@@ -19,13 +16,14 @@ import pytest
 
 from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.features.chokepoints import push_gate_decision
-from dadaia_workspace.features.chokepoints.branch_policy import PushRef
+from dadaia_workspace.features.chokepoints.branch_policy import Decision, PushRef
 from dadaia_workspace.features.specs.canon import canon_violations
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from tests.fakes import gate_fixes
 
-_SYNTHETIC_TERM = "zz-frozen-invariant-term"
+_T = "zz-frozen-invariant-term"
 _ZERO = "0" * 40
+_ARCHIVED = "specs/releases/_archive/0.4.0/notes.md"
 
 
 def _git(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -46,223 +44,59 @@ def _commit(path: Path, message: str) -> str:
 
 
 def _tag_push_ref(local_sha: str, *, remote_sha: str = _ZERO) -> PushRef:
-    return PushRef(
-        local_ref="refs/tags/v1",
-        local_sha=local_sha,
-        remote_ref="refs/tags/v1",
-        remote_sha=remote_sha,
-    )
+    return PushRef("refs/tags/v1", local_sha, "refs/tags/v1", remote_sha)
 
 
-def test_git_mv_into_archive_produces_no_new_blob_and_a_clean_scan(tmp_path: Path) -> None:
-    """FR4/A4.2: renaming a tainted file into ``specs/releases/_archive/<M.m.p>/`` (a
-    canon per-area archive — root specs/_archive/ retired, v0.5.0 specs-canon
-    closure) reuses the same blob object — the range carries no NEW blob, so the
-    scan is clean by construction. The gate's blob-reuse logic itself is
-    directory-name agnostic; this fixture uses a real canon archive path on
-    principle. ``releases/_archive/<M.m.p>/**`` (wide open, any nested path) is used
-    rather than ``backlog/_archive/`` (a CLOSED shape — only ``backlog_histo.jsonl``
-    — since the v0.5.0 specs-canon closure's
-    pre-push canon scan now ALSO runs on this same push and would otherwise refuse
-    an arbitrary ``notes.md`` under the closed-shape area)."""
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    (repo / "notes.md").write_text(f"leftover {_SYNTHETIC_TERM} content\n")
-    # Simulates a push already reachable at the remote — the FROZEN↔scan invariant only
-    # holds relative to a real range boundary; `remote_sha` anchors it (FR1 row 1).
-    already_published_sha = _commit(repo, "already-published")
-
-    (repo / "specs" / "releases" / "_archive" / "0.4.0").mkdir(parents=True)
-    _git(["mv", "notes.md", "specs/releases/_archive/0.4.0/notes.md"], repo)
-    renamed_sha = _commit(repo, "archive: git mv the tainted file")
-
-    reader = GitSubprocessObjectReader()
-    decision = push_gate_decision(
-        [_tag_push_ref(renamed_sha, remote_sha=already_published_sha)],
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=reader,
-        repo=repo,
-        canon_violations_fn=canon_violations,
-        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
-    )
-    assert decision.allowed, decision.message
+def _decide(refs: list[PushRef], repo: Path, terms: tuple[tuple[str, str], ...] = ()) -> Decision:
+    return push_gate_decision(
+        refs, gitflow=DEFAULT, fixes=gate_fixes(), object_source=GitSubprocessObjectReader(),
+        repo=repo, canon_violations_fn=canon_violations, denylist_terms=terms,
+    )  # fmt: skip
 
 
-def test_editing_a_path_that_already_published_the_value_no_longer_refuses(
-    tmp_path: Path,
+@pytest.mark.parametrize(
+    ("ref", "published", "pushed", "allowed"),
+    [
+        pytest.param("tag", {"notes.md": f"a {_T}\n"}, {_ARCHIVED: f"a {_T}\n"}, True, id="A4.2-git-mv-into-archive-reuses-the-blob"),
+        pytest.param("tag", {"notes.md": f"a {_T}\n"}, {"notes.md": f"a {_T}\nmore\n"}, True, id="A1.1-edit-the-path-that-published-it"),
+        pytest.param("tag", {"tests/f.py": f"S = {_T!r}\n"}, {"tests/f.py": f"S = {_T!r}\nE = 1\n"}, True, id="A1.6-edit-a-published-tests-fixture"),
+        pytest.param("tag", {"tests/f.py": f"S = {_T!r}\n"}, {"tests/f.py": f"S = {_T!r}\n", "tests/new.py": f"C = {_T!r}\n"}, False, id="A1.2-same-value-into-a-new-path"),
+        pytest.param("branch", {"notes.md": f"a {_T}\n"}, {"notes.md": f"a {_T}\nnew line\n"}, True, id="new-branch-already-published-term"),
+        pytest.param("branch", {"notes.md": "u\n"}, {"notes.md": f"u\nintroducing {_T}\n"}, False, id="new-branch-novel-term"),
+    ],
+)  # fmt: skip
+def test_the_amnesty_is_bound_to_the_path_that_already_published_the_value(
+    tmp_path: Path, ref: str, published: dict[str, str], pushed: dict[str, str], allowed: bool
 ) -> None:
-    """SPEC v0.11.0 FR1/A1.1 (supersedes the v0.9.0-era assumption pinned by the OLD
-    version of this test, ``test_editing_the_same_content_produces_a_new_blob_and_a_
-    refusal``): editing the SAME path that already published the matched value at the
-    resolvable base no longer refuses, over a REAL range with a REAL remote — the
-    amnesty derives from published git state, not from narrowing the FR4 whole-blob
-    matching ruler (which this release explicitly does not touch, SPEC §4.2)."""
     repo = tmp_path / "repo"
     _init_repo(repo)
-    (repo / "notes.md").write_text(f"leftover {_SYNTHETIC_TERM} content\n")
-    already_published_sha = _commit(repo, "already-published")
-
-    (repo / "notes.md").write_text(f"leftover {_SYNTHETIC_TERM} content, plus more\n")
-    edited_sha = _commit(repo, "edit the file in place, keeping the same term")
-
-    reader = GitSubprocessObjectReader()
-    decision = push_gate_decision(
-        [_tag_push_ref(edited_sha, remote_sha=already_published_sha)],
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=reader,
-        repo=repo,
-        canon_violations_fn=canon_violations,
-        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
-    )
-    assert decision.allowed, decision.message
-
-
-def test_editing_a_tests_fixture_that_already_published_the_literal_no_longer_refuses(
-    tmp_path: Path,
-) -> None:
-    """SPEC v0.11.0 A1.6 (the literal ``tests/**`` scope this criterion names): editing
-    a file UNDER ``tests/**`` that already carried a pre-existing fixture literal at the
-    base no longer refuses the push — the exact real-world class this release exists to
-    fix (SPEC §1 "The blocking problem")."""
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    (repo / "tests").mkdir()
-    (repo / "tests" / "fixture.py").write_text(f"SAMPLE = {_SYNTHETIC_TERM!r}\n")
-    already_published_sha = _commit(repo, "already-published")
-
-    (repo / "tests" / "fixture.py").write_text(
-        f"SAMPLE = {_SYNTHETIC_TERM!r}\nEXTRA = 'a genuinely unrelated addition'\n"
-    )
-    edited_sha = _commit(repo, "edit the tests fixture, keeping the same literal")
-
-    reader = GitSubprocessObjectReader()
-    decision = push_gate_decision(
-        [_tag_push_ref(edited_sha, remote_sha=already_published_sha)],
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=reader,
-        repo=repo,
-        canon_violations_fn=canon_violations,
-        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
-    )
-    assert decision.allowed, decision.message
-
-
-def test_same_value_introduced_into_a_new_path_still_refuses(tmp_path: Path) -> None:
-    """SPEC v0.11.0 A1.2 (integration tier): the amnesty is bound to the PATH, not the
-    value — the same value copied into a path that never published it before is a new
-    publication and still refuses, over a real range with a real remote."""
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    (repo / "tests").mkdir()
-    (repo / "tests" / "fixture.py").write_text(f"SAMPLE = {_SYNTHETIC_TERM!r}\n")
-    already_published_sha = _commit(repo, "already-published")
-
-    (repo / "tests" / "new_fixture.py").write_text(f"COPY = {_SYNTHETIC_TERM!r}\n")
-    tip_sha = _commit(repo, "copy the term into a brand-new path")
-
-    reader = GitSubprocessObjectReader()
-    decision = push_gate_decision(
-        [_tag_push_ref(tip_sha, remote_sha=already_published_sha)],
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=reader,
-        repo=repo,
-        canon_violations_fn=canon_violations,
-        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
-    )
-    assert not decision.allowed
-    assert _SYNTHETIC_TERM not in decision.message
-
-
-# ---------------------------------------------------------------------------
-# bug new-branch-push-loses-prior-published-denylist-amnesty (v0.4.4) — the FIRST
-# push of a `feature/{M.m.p}` branch (gitflow v2's only pushable ref, `dd-gitflow-default`)
-# is a NEW remote ref: git's own pre-push line reports `remote_sha` as the all-zero
-# sentinel. Every fixture above configures NO remote at all, so it never exercised
-# "a real origin already published this branch's own past" — exactly the gap that
-# let a new-branch push of already-published content be refused as if it were
-# novel. These fixtures configure a REAL bare `origin` and fetch it, then push a
-# genuine `refs/heads/feature/M.m.p` branch line (the bug's own repro shape), not a
-# tag.
-# ---------------------------------------------------------------------------
-
-
-def _publish_to_bare_origin(repo: Path, tmp_path: Path, *, branch: str = "develop") -> None:
-    remote = tmp_path / "origin.git"
-    subprocess.run(["git", "init", "--bare", str(remote)], capture_output=True, check=True)
-    _git(["remote", "add", "origin", str(remote)], repo)
-    _git(["push", "origin", f"HEAD:refs/heads/{branch}"], repo)
-    _git(["fetch", "origin"], repo)
-
-
-def _feature_push_ref(local_sha: str, *, branch: str = "feature/1.0.0") -> PushRef:
-    return PushRef(
-        local_ref=f"refs/heads/{branch}",
-        local_sha=local_sha,
-        remote_ref=f"refs/heads/{branch}",
-        remote_sha=_ZERO,
+    for rel, text in published.items():
+        (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+        (repo / rel).write_text(text)
+    base = _commit(repo, "already-published")
+    if ref == "branch":
+        origin = tmp_path / "origin.git"
+        _git(["init", "--bare", str(origin)], tmp_path)
+        _git(["remote", "add", "origin", str(origin)], repo)
+        _git(["push", "origin", "HEAD:refs/heads/develop"], repo)
+        _git(["fetch", "origin"], repo)
+        _git(["checkout", "-b", "feature/1.0.0"], repo)
+    for rel in set(published) - set(pushed):
+        (repo / rel).unlink()
+    for rel, text in pushed.items():
+        (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+        (repo / rel).write_text(text)
+    tip = _commit(repo, "the pushed range")
+    push = (
+        PushRef("refs/heads/feature/1.0.0", tip, "refs/heads/feature/1.0.0", _ZERO)
+        if ref == "branch"
+        else _tag_push_ref(tip, remote_sha=base)
     )
 
+    decision = _decide([push], repo, ((_T, "synthetic"),))
 
-def test_new_branch_push_of_an_already_published_term_passes(tmp_path: Path) -> None:
-    """(a) The first push of a brand-new `feature/M.m.p` branch (`remote_sha` is the
-    all-zero sentinel) that only carries a term ALREADY published on `origin` must
-    pass — `dd-code-review`'s range scope: already-published history never needs a
-    rewrite, regardless of whether THIS ref existed on origin before."""
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    (repo / "notes.md").write_text(f"already published: {_SYNTHETIC_TERM}\n")
-    _commit(repo, "publish")
-    _publish_to_bare_origin(repo, tmp_path)
-
-    _git(["checkout", "-b", "feature/1.0.0"], repo)
-    (repo / "notes.md").write_text(
-        f"already published: {_SYNTHETIC_TERM}\nplus a genuinely new, unrelated line\n"
-    )
-    tip_sha = _commit(repo, "append an unrelated line")
-
-    reader = GitSubprocessObjectReader()
-    decision = push_gate_decision(
-        [_feature_push_ref(tip_sha)],
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=reader,
-        repo=repo,
-        canon_violations_fn=canon_violations,
-        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
-    )
-    assert decision.allowed, decision.message
-
-
-def test_new_branch_push_of_a_novel_term_still_refuses(tmp_path: Path) -> None:
-    """(b) Negative twin: a brand-new `feature/M.m.p` branch introducing a term never
-    published anywhere on `origin` is still refused — the amnesty stays scoped to
-    what is genuinely already published."""
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    (repo / "notes.md").write_text("unrelated\n")
-    _commit(repo, "publish")
-    _publish_to_bare_origin(repo, tmp_path)
-
-    _git(["checkout", "-b", "feature/1.0.0"], repo)
-    (repo / "notes.md").write_text(f"unrelated\nintroducing {_SYNTHETIC_TERM} for the first time\n")
-    tip_sha = _commit(repo, "introduce a novel term")
-
-    reader = GitSubprocessObjectReader()
-    decision = push_gate_decision(
-        [_feature_push_ref(tip_sha)],
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=reader,
-        repo=repo,
-        canon_violations_fn=canon_violations,
-        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
-    )
-    assert not decision.allowed
-    assert _SYNTHETIC_TERM not in decision.message
+    assert decision.allowed is allowed, decision.message
+    assert _T not in decision.message
 
 
 def test_prior_side_lookup_failure_refuses_naming_the_failure_and_no_verify(
@@ -295,15 +129,7 @@ def test_prior_side_lookup_failure_refuses_naming_the_failure_and_no_verify(
 
     monkeypatch.setattr(git_objects_module, "_run", _flaky_run)
 
-    reader = GitSubprocessObjectReader()
-    decision = push_gate_decision(
-        [_tag_push_ref(tip_sha, remote_sha=already_published_sha)],
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=reader,
-        repo=repo,
-        canon_violations_fn=canon_violations,
-    )
+    decision = _decide([_tag_push_ref(tip_sha, remote_sha=already_published_sha)], repo)
 
     assert not decision.allowed
     assert "prior content" in decision.message
@@ -315,16 +141,7 @@ def test_real_git_failure_refuses_naming_the_failure(tmp_path: Path) -> None:
     REAL adapter refuses, never silently allows an unscannable push."""
     not_a_repo = tmp_path / "not-a-repo"
     not_a_repo.mkdir()
-    reader = GitSubprocessObjectReader()
-
-    decision = push_gate_decision(
-        [_tag_push_ref("a" * 40)],
-        gitflow=DEFAULT,
-        fixes=gate_fixes(),
-        object_source=reader,
-        repo=not_a_repo,
-        canon_violations_fn=canon_violations,
-    )
+    decision = _decide([_tag_push_ref("a" * 40)], not_a_repo)
 
     assert not decision.allowed
     assert "--no-verify" in decision.message

@@ -1,6 +1,7 @@
 """Intent: CONTRACT — AC6.4 amended, ADR 0048 (reviewer H3 repro ws13): the pre-push gate
 reads the gitflow from committed data — HEAD's constitution, else the newest one on a
-remote-tracking ref — never the working tree, and warns only when neither exists.
+remote-tracking ref — never the working tree. Neither -> default + one warning:
+e2e/test_push_gate_check.py::test_an_absent_gitflow_block_warns_and_falls_back_to_the_default.
 Size: MEDIUM (real git repos on disk)."""
 
 from __future__ import annotations
@@ -11,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.cli.commands import ci
-from dadaia_workspace.core.gitflow import DEFAULT, Gitflow
+from dadaia_workspace.core.gitflow import Gitflow
 
 pytestmark = pytest.mark.integration
 
@@ -66,15 +67,3 @@ def test_heads_constitution_wins_over_the_working_tree(repo: Path) -> None:
     _git(repo, "checkout", "-q", "trunk")
     (repo / "specs" / "constitution.md").write_text("# an uncommitted edit\n", encoding="utf-8")
     assert ci._gate_inputs(repo, "")[0] == Gitflow("trunk", "next", "work/")
-
-
-def test_no_committed_constitution_is_the_default_with_one_warning(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.chdir(tmp_path)
-    bare = tmp_path / "bare"
-    _git(tmp_path, "init", "-q", str(bare))
-    (bare / "specs").mkdir()
-    (bare / "specs" / "constitution.md").write_text(_CUSTOM, encoding="utf-8")  # untracked
-    assert ci._gate_inputs(bare, "")[0] == DEFAULT
-    assert capsys.readouterr().err.count("WARNING") == 1
