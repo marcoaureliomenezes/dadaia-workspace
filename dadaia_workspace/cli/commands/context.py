@@ -62,14 +62,10 @@ def _ctx_service() -> SpecContextService:
         fail(exc)
 
 
-def _ctx_to_dict(svc: SpecContextService, ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]
-    # v0.1.72 FR4 (bug `context-current-branch-stale-for-alive-repo`) / v0.4.4 FR18
-    # (bug `context-list-current-branch-stale-for-alive-repo`, A18.3): `current_branch`
-    # is resolved through SpecContextService.repos_live_status — the ONE
-    # branch-resolution implementation `show` AND `list` both call, so the two verbs
-    # can no longer disagree on this field the way they used to (list previously read
-    # the stored snapshot directly while show queried git live). The stored snapshot
-    # remains available under the distinct name `stored_branch` (A18.1).
+def _ctx_to_dict(svc: SpecContextService, ctx: SpecContextProject) -> dict[str, Any]:
+    """The one record ``list`` and ``show`` render, JSON and table alike; every branch
+    resolved live through ``repos_live_status`` (FR18/A18.3), the stored snapshot kept
+    as ``stored_branch`` (A18.1)."""
     statuses = svc.repos_live_status(ctx)
     main_status, associated_statuses = statuses[0], statuses[1:]
     return {
@@ -197,14 +193,10 @@ def list_all(
     redactor = build_context_redactor(contexts) if redact else None
 
     if json_output:
-        payload = []
-        for ctx in contexts:
-            # FR18/A18.1-A18.3: the SAME payload builder `show --json` uses — one
-            # key set, so the two verbs cannot drift apart again.
-            payload.append(_ctx_to_dict(svc, ctx))
-        if redactor is not None:
-            payload = [redactor.json_value(row) for row in payload]
-        print(json.dumps(payload, sort_keys=True))
+        rows = [_ctx_to_dict(svc, ctx) for ctx in contexts]
+        print(
+            json.dumps([redactor.json_value(r) for r in rows] if redactor else rows, sort_keys=True)
+        )
         return
     if not contexts:
         console.print(
@@ -271,62 +263,35 @@ def show(
             all_contexts = [ctx] if ctx is not None else []
         redactor = build_context_redactor(all_contexts)
 
+    data = None if ctx is None else _ctx_to_dict(svc, ctx)
+    if data is not None and json_output:
+        # Only this caller's session: a context-wide "last binder" would be foreign state.
+        data["session"] = (
+            _live_session(resolve_workspace_root(), session_id) if session_id else None
+        )
+    if data is not None and redactor is not None:
+        data = redactor.json_value(data)
     if json_output:
-        if ctx is None:
-            print(json.dumps({"context": None}, indent=2))
-        else:
-            data = _ctx_to_dict(svc, ctx)
-            # Show only this caller's session. A context-wide "last binder" fallback would
-            # expose foreign state as the caller's own and can never be authoritative.
-            workspace_root = resolve_workspace_root()
-            session_obj = _live_session(workspace_root, session_id) if session_id else None
-            data["session"] = session_obj
-            if redactor is not None:
-                data = redactor.json_value(data)
-            print(json.dumps(data, indent=2))
+        print(json.dumps(data or {"context": None}, indent=2))
         return
-
-    if ctx is None:
+    if data is None:
         msg = f"Context '{name}' not found." if name else "No active context."
         console.print(f"[dim]{msg}[/dim]")
         return
-
-    display_name = redactor.text(ctx.name) if redactor is not None else ctx.name
-    display_repo = redactor.text(ctx.repo_slug) if redactor is not None else ctx.repo_slug
-    repo_url_text = ctx.repo_url or "—"
-    if redactor is not None and ctx.repo_url:
-        repo_url_text = redactor.text(ctx.repo_url)
-
-    # FR18: table and --json share the SAME branch-resolution seam
-    # (SpecContextService.repos_live_status, A18.3) — main repo's live branch here
-    # is the identical value `list`'s --json output reports for this context.
-    statuses = svc.repos_live_status(ctx)
-    main_status, associated_statuses = statuses[0], statuses[1:]
-    branch_text = main_status.current_branch or ctx.current_branch or "—"
-
-    console.print(f"[bold]Name:[/bold]       {display_name}")
-    console.print(f"[bold]State:[/bold]      {ctx.state.value}")
-    console.print(f"[bold]Main repo:[/bold]  {display_repo}")
-    console.print(f"[bold]Repo URL:[/bold]   {repo_url_text}")
-    console.print(f"[bold]Branch:[/bold]     {branch_text}")
-    console.print(f"[bold]Created:[/bold]    {ctx.created_at}")
-    console.print(f"[bold]Alive since:[/bold]  {ctx.alive_since or '—'}")
-    console.print(f"[bold]Dead since:[/bold]   {ctx.dead_since or '—'}")
-
-    if associated_statuses:
-        assoc_table = Table(title="Associated repos")
-        assoc_table.add_column("Slug", style="bold")
-        assoc_table.add_column("URL")
-        assoc_table.add_column("On disk")
-        assoc_table.add_column("Branch")
-        for status in associated_statuses:
-            assoc_table.add_row(
-                status.slug,
-                status.url or "—",
-                "yes" if status.on_disk else "no",
-                status.current_branch or "—",
-            )
-        console.print(assoc_table)
+    for label, key in (
+        *(("Name", "name"), ("State", "state"), ("Main repo", "main_repo")),
+        *(("Repo URL", "repo_url"), ("Branch", "current_branch"), ("Created", "created_at")),
+        *(("Alive since", "alive_since"), ("Dead since", "dead_since")),
+    ):
+        console.print(f"[bold]{label + ':':<13}[/bold] {data[key] or '—'}", highlight=False)
+    if data["associated_repos"]:
+        table = Table(title="Associated repos")
+        for column in ("Slug", "URL", "On disk", "Branch"):
+            table.add_column(column)
+        for r in data["associated_repos"]:
+            on_disk = "yes" if r["on_disk"] else "no"
+            table.add_row(r["slug"], r["url"] or "—", on_disk, r["current_branch"] or "—")
+        console.print(table)
 
 
 @app.command()
