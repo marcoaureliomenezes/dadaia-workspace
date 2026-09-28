@@ -1,10 +1,6 @@
-"""Read-only JSONL "one record per line" store (v0.5.0 FR2, AR-1 ruling answer (b)).
+"""Read-only, model-agnostic JSONL store; every ledger's ONE writer is its skill script.
 
-Model-agnostic: it parses each line with the caller's ``from_dict`` and imports no model.
-Reads split on ``"\\n"`` only, never ``str.splitlines()`` (bug
-``bug-event-field-with-unicode-line-separator-silently-drops-the-event``). It writes
-nothing: every ledger has ONE writer, its skill script
-(sa-audit-close-archives-without-validating).
+Splits on ``"\\n"`` only: ``str.splitlines()`` would break a record on U+2028.
 """
 
 from __future__ import annotations
@@ -22,9 +18,7 @@ _LOG = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class MalformedLine:
-    """One ledger line :meth:`JsonlRecordStore.scan` could not parse: not valid JSON, not
-    a JSON object, or refused by ``from_dict``. ``lineno`` is 1-based over a ``"\\n"``
-    split."""
+    """A line that is not JSON, not an object, or refused by ``from_dict``; ``lineno`` 1-based."""
 
     lineno: int
     raw: str

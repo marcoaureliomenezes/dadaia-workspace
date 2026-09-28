@@ -1,4 +1,4 @@
-"""SubprocessProcessRunner — the sole subprocess-execution adapter (ADR-0001: one adapter, no port)."""
+"""SubprocessProcessRunner — the sole subprocess-execution adapter."""
 
 from __future__ import annotations
 
@@ -38,18 +38,13 @@ class SubprocessProcessRunner:
             )
         except subprocess.TimeoutExpired as exc:
             raise TimeoutError(f"command timed out after {exc.timeout}s: {exc.cmd!r}") from exc
-        return ProcessResult(
-            returncode=result.returncode,
-            stdout=result.stdout or "",
-            stderr=result.stderr or "",
-        )
+        return ProcessResult(result.returncode, result.stdout or "", result.stderr or "")
 
 
 def subprocess_runner_for_ci(
     cwd: Path, env: Mapping[str, str]
 ) -> Callable[[Sequence[str]], tuple[int, str]]:
-    """A ``ci_preflight.Runner`` running each argv as a subprocess in *cwd* with *env* —
-    here so ``ci_preflight/service.py`` never imports ``subprocess``."""
+    """A ``ci_preflight.Runner`` running each argv in *cwd* with *env*."""
 
     def _run(argv: Sequence[str]) -> tuple[int, str]:
         try:

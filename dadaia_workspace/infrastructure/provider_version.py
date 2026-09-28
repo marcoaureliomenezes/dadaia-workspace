@@ -10,8 +10,7 @@ from urllib.request import url2pathname
 
 
 def provider_version() -> str | None:
-    """The dist-info version, except an editable install (its dist-info freezes at install
-    time): the source ``pyproject.toml`` version. ``None`` when not installed."""
+    """The dist-info version; an editable install reads its ``pyproject.toml`` (dist-info freezes)."""
     try:
         dist = metadata.distribution("dadaia-workspace")
     except metadata.PackageNotFoundError:

@@ -7,8 +7,7 @@ from pathlib import Path
 
 
 def _is_source_repo_root(path: Path) -> bool:
-    """True only for the library checkout (package source + its pyproject), never a
-    version-matching consumer workspace."""
+    """True only for the library checkout, never a version-matching consumer workspace."""
     if not (path / "dadaia_workspace" / "public").is_dir():
         return False
     try:
