@@ -29,14 +29,14 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 8. Candidate closure: open one work → integration PR and merge it green.
 9. After the merge, ask the operator: **promote or continue?** Continue = the next candidate's `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id>`; promote = step 10.
 10. Promote: open the PR integration → principal (ship verdict pre-staged naming the integration tip, §3b); its merge is the deploy.
-11. The moment the promote PR merges, record it — `python3 .agents/skills/dd-release-implementation/scripts/release.py phase CLOSURE --sha <sha> --pr <n>` — then delete the work branch and cut the next one per §2a, `git merge -s ours` the integration tip, in that order.
+11. The moment the promote PR merges, record it — `python3 .agents/skills/dd-release-implementation/scripts/release.py phase CLOSURE --sha <sha> --pr <n>` — then delete the work branch and cut the next one per §2a.
 12. Tag `archive/<name>` then delete a branch the moment its work lands elsewhere.
 
 ## 2a. The branch contract
 
 | Branch | Pushable | Cut from | Advances by |
 |---|---|---|---|
-| work `<work>M.m.p` | Yes — local CI preflight + valid name | principal | the PR below |
+| work `<work>M.m.p` | Yes — local CI preflight + valid name | integration | the PR below |
 | integration | No — never a direct push | principal (bootstrap only) | PR from the row above, at definition `Approved` and at each `rc` merge |
 | principal | No — never a direct push | — | PR from the integration branch, at the final `rc` |
 

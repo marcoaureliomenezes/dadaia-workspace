@@ -8,7 +8,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.cli_line import git_line
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
-from dadaia_workspace.core.gitflow import Gitflow, read_gitflow
+from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, read_gitflow
 from dadaia_workspace.core.models.git_scan import GitObjectReadError
 from dadaia_workspace.infrastructure.git_objects import unpublished
 
@@ -320,11 +320,14 @@ class GitSubprocessClient:
                 return shown.stdout
         return None
 
-    def default_branch(self, path: Path) -> str:
-        """The remote's default branch from the local ``origin/HEAD``; ``main`` when unset
-        (``-C``: *path* may not exist yet)."""
+    def principal(self, path: Path) -> str:
+        """``origin/HEAD``; unset or the integration branch: ``master`` when origin has it,
+        else ``DEFAULT.principal`` (``-C``: *path* may not exist yet)."""
         ref = _run(["git", "-C", str(path), "symbolic-ref", "--short", "refs/remotes/origin/HEAD"])
-        return ref.stdout.strip().removeprefix("origin/") if ref.returncode == 0 else "main"
+        if (head := ref.stdout.strip().removeprefix("origin/")) not in ("", DEFAULT.integration):
+            return head
+        master = _run(["git", "-C", str(path), "rev-parse", "-q", "--verify", "origin/master"])
+        return "master" if master.returncode == 0 else DEFAULT.principal
 
     def current_branch(self, path: Path) -> str:
         result = _run(["git", "branch", "--show-current"], cwd=path)

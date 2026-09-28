@@ -60,16 +60,15 @@ and a git tree listing (``git ls-tree``'s own native output) already produce.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
+from dataclasses import astuple, dataclass
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 from typing import Literal
 
 from dadaia_workspace.core.atomic_write import SymlinkRefusedError, atomic_write
-from dadaia_workspace.core.specs_version import (
-    CANONICAL_SPECS_VERSION,
-)
+from dadaia_workspace.core.gitflow import DEFAULT
+from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.core.workspace_layout import (
     CANON_ROOT_MEMBERS,
     MEMORY_TOPLEVEL_FILES,
@@ -109,7 +108,7 @@ __all__ = [
 _CONSTITUTION_STUB = """\
 ---
 specs_pattern_version: {specs_pattern_version}
-gitflow: {{principal: main, integration: develop, work: feature/}}
+gitflow: {gitflow}
 ---
 # Constitution — {project_name}
 
@@ -258,6 +257,7 @@ def scaffold(
         "today": _today(),
         "project_name": project_name,
         "specs_pattern_version": str(CANONICAL_SPECS_VERSION),
+        "gitflow": "{{principal: {}, integration: {}, work: {}}}".format(*astuple(DEFAULT)),
     }
     writes: list[tuple[Path, Callable[[], str], bool]] = [
         # Only "no destination" disqualifies an entry: a required_at_birth row always

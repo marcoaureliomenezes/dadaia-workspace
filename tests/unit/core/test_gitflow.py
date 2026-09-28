@@ -2,13 +2,22 @@
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 import pytest
 
-from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, from_mapping
+from dadaia_workspace.core.gitflow import DEFAULT, from_mapping
 
 
-def test_default_is_main_develop_feature() -> None:
-    assert Gitflow(principal="main", integration="develop", work_prefix="feature/") == DEFAULT
+def test_the_default_names_live_only_in_default_and_work_is_cut_from_integration() -> None:
+    """sa-principal-branch-defaults-to-main-and-cut-point-diverges#B42-6: only DEFAULT spells it.
+    sa-principal-branch-defaults-to-main-and-cut-point-diverges#B42-5: the skill cuts work from integration."""
+    pkg = Path(__file__).resolve().parents[3] / "dadaia_workspace"
+    literal = re.compile(r'principal: main|"--principal", "main"|else "main"')
+    assert [p.name for p in pkg.rglob("*.py") if literal.search(p.read_text("utf-8"))] == []
+    skill = (pkg / "public/skills/dd-gitflow-default/SKILL.md").read_text("utf-8")
+    assert "| Yes — local CI preflight + valid name | integration |" in skill
 
 
 @pytest.mark.parametrize(
@@ -28,18 +37,10 @@ def test_role_of_default(branch: str, role: str | None) -> None:
     assert DEFAULT.role_of(branch) == role
 
 
-def test_role_of_custom_gitflow() -> None:
-    flow = Gitflow(principal="trunk", integration="next", work_prefix="work/")
-    assert flow.role_of("trunk") == "principal"
-    assert flow.role_of("next") == "integration"
-    assert flow.role_of("work/1.2.3") == "work"
-    assert flow.role_of("main") is None
-    assert flow.role_of("feature/1.2.3") is None
-
-
-def test_from_mapping_reads_the_block_keys() -> None:
+def test_from_mapping_reads_the_block_keys_and_maps_their_roles() -> None:
     flow = from_mapping({"principal": "trunk", "integration": "next", "work": "work/"})
-    assert flow == Gitflow(principal="trunk", integration="next", work_prefix="work/")
+    roles = [flow.role_of(b) for b in ("trunk", "next", "work/1.2.3", "main", "feature/1.2.3")]
+    assert roles == ["principal", "integration", "work", None, None]
 
 
 @pytest.mark.parametrize(
@@ -53,24 +54,11 @@ def test_from_mapping_reads_the_block_keys() -> None:
         {"principal": "main", "integration": "develop", "work": "/feature/"},
         {"principal": "a.lock", "integration": "develop", "work": "feature/"},
         {"principal": 7, "integration": "develop", "work": "feature/"},
+        {"principal": "release", "integration": "develop", "work": "release/"},  # nests
+        {"principal": "main", "integration": "rel", "work": "rel/v"},  # nests (C9)
         "main",
     ],
 )
 def test_from_mapping_refuses_invalid(mapping: object) -> None:
     with pytest.raises(ValueError):
-        from_mapping(mapping)
-
-
-@pytest.mark.parametrize(
-    "mapping",
-    [
-        {"principal": "release", "integration": "develop", "work": "release/"},
-        {"principal": "main", "integration": "rel", "work": "rel/v"},
-    ],
-    ids=["under-principal", "under-integration"],
-)
-def test_from_mapping_refuses_a_work_prefix_nested_under_a_role(mapping: object) -> None:
-    """Design review (LOW, C9): git cannot hold both `release` and `release/0.1.0` — the block
-    is refused when read, never after the publish's anchor."""
-    with pytest.raises(ValueError, match="nests under"):
         from_mapping(mapping)

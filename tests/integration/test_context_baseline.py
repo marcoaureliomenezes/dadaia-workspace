@@ -388,8 +388,8 @@ def test_unrelated_operator_history_keeps_gits_refusal(env, tmp_path: Path) -> N
 def test_a_non_default_gitflow_is_adopted_from_the_committed_draft(
     env, tmp_path: Path, flow: tuple[str, str, str], work: str
 ) -> None:
-    """Review 5 H4 (P7/P7b): one baseline path — the onboarding is committed first and the
-    gitflow read once, from that commit; a non-default gitflow publishes under its names."""
+    """Review 5 H4: sa-principal-branch-defaults-to-main-and-cut-point-diverges#B42-4 — a
+    master principal births no `main`; work is cut from the integration branch."""
     svc, repo, bare = env
     _seed(bare, tmp_path / "seed", *dict.fromkeys((flow[0], "develop")))
     _git(bare, "symbolic-ref", "HEAD", f"refs/heads/{flow[0]}")
@@ -401,7 +401,7 @@ def test_a_non_default_gitflow_is_adopted_from_the_committed_draft(
     (repo / "specs" / "constitution.md").write_text(draft, encoding="utf-8")
     assert svc.baseline("proj") == work
     heads = _heads(bare)
-    assert {flow[0], flow[1], work} <= set(heads)
+    assert {flow[0], flow[1], work} == set(heads) and _ancestor(repo, heads[flow[1]], work)
     assert "specs/constitution.md" in _git(bare, "ls-tree", "-r", "--name-only", work).split()
 
 

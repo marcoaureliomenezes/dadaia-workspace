@@ -205,13 +205,11 @@ def _gitflow(
     work_prefix: str | None,
     rerun: tuple[str, ...],
 ) -> Gitflow:
-    """Flags over the tree's own valid block, over detection (``origin/HEAD``, else
-    ``main``); an invalid result refuses before anything is written."""
+    """Flags over the tree's own valid block, over detection (the git client's
+    ``principal``); an invalid result refuses, its fix naming the kept values."""
     kept, absent = gitflow.read_gitflow(target)  # a malformed block refused upstream
     if absent is not None:
-        kept = replace(
-            DEFAULT, principal=container.build_git_client().default_branch(target.parent)
-        )
+        kept = replace(DEFAULT, principal=container.build_git_client().principal(target.parent))
     try:
         return from_mapping(
             {
@@ -221,8 +219,8 @@ def _gitflow(
             }
         )
     except ValueError as exc:
-        fixed = ("--principal", "main", "--integration", "develop", "--work-prefix", "feature/")
-        fail(f"{exc}\n{_init_fix(*rerun, *fixed)}")
+        fixed = ("--principal", kept.principal, "--integration", kept.integration)
+        fail(f"{exc}\n{_init_fix(*rerun, *fixed, '--work-prefix', kept.work_prefix)}")
 
 
 def _move_foreign(target: Path, rerun: tuple[str, ...], replace_foreign: bool) -> None:

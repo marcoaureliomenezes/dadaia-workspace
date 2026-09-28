@@ -207,25 +207,25 @@ def test_a_symlinked_context_specs_root_is_refused_and_nothing_written(
 # ── T-050-13 (AC6.3): the gitflow flags ──────────────────────────────────────────────
 
 
-def test_fresh_tree_writes_the_detected_gitflow_and_names_it(repo: Path) -> None:
-    from dadaia_workspace.core.gitflow import Gitflow
-
-    remote = repo.parent / "origin.git"
-    _git(repo.parent, "init", "-q", "--bare", "-b", "trunk", str(remote))
-    _git(repo, "remote", "add", "origin", str(remote))
-    _git(repo, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/trunk")
+@pytest.mark.parametrize(("head", "principal"), [("trunk", "trunk"), ("develop", "master")])
+def test_fresh_tree_writes_the_detected_gitflow_and_names_it(
+    repo: Path, head: str, principal: str
+) -> None:
+    """sa-principal-branch-defaults-to-main-and-cut-point-diverges#B42-2 origin/HEAD=trunk: trunk.
+    sa-principal-branch-defaults-to-main-and-cut-point-diverges#B42-1 HEAD=develop, master present: master."""
+    for ref in {head, "master"}:
+        _git(repo, "update-ref", f"refs/remotes/origin/{ref}", "HEAD")
+    _git(repo, "symbolic-ref", "refs/remotes/origin/HEAD", f"refs/remotes/origin/{head}")
 
     result = _runner.invoke(app, ["specs", "init", "--context", "c"])
 
     assert result.exit_code == 0, result.output
     flow, warning = gitflow.read_gitflow(repo / "specs")
-    assert (flow, warning) == (Gitflow("trunk", "develop", "feature/"), None)
-    assert "[gitflow] principal trunk, integration develop, work feature/<M.m.p>" in result.output
+    assert (flow, warning) == (gitflow.Gitflow(principal, "develop", "feature/"), None)
+    assert f"[gitflow] principal {principal}, integration develop, work" in result.output
 
 
 def test_flags_merge_into_an_existing_tree_and_rerun_is_a_no_op(repo: Path) -> None:
-    from dadaia_workspace.core.gitflow import Gitflow
-
     assert _runner.invoke(app, ["specs", "init", "--context", "c"]).exit_code == 0
     constitution = repo / "specs" / "constitution.md"
     constitution.write_text(
@@ -239,16 +239,20 @@ def test_flags_merge_into_an_existing_tree_and_rerun_is_a_no_op(repo: Path) -> N
     second = _runner.invoke(app, ["specs", "init", "--context", "c", *flags])
 
     assert first.exit_code == 0 and second.exit_code == 0, first.output + second.output
-    assert gitflow.read_gitflow(repo / "specs")[0] == Gitflow("trunk", "next", "work/")
+    assert gitflow.read_gitflow(repo / "specs")[0] == gitflow.Gitflow("trunk", "next", "work/")
     assert "owner: me" in constitution.read_text(encoding="utf-8")
     assert _snapshot(repo / "specs") == snapshot
 
 
-def test_an_invalid_flag_refuses_with_a_fix_and_writes_nothing(repo: Path) -> None:
-    result = _runner.invoke(app, ["specs", "init", "--context", "c", "--integration", "main"])
-    assert result.exit_code == 1
-    assert "fix: " in result.output
-    assert not (repo / "specs").exists()
+def test_an_invalid_flag_refuses_with_a_fix_that_clears_it(repo: Path) -> None:
+    """sa-principal-branch-defaults-to-main-and-cut-point-diverges#B42-3: the fix names
+    the detected values and clears the refusal."""
+    _git(repo, "update-ref", "refs/remotes/origin/master", "HEAD")
+    result = _runner.invoke(app, ["specs", "init", "--context", "c", "--integration", "master"])
+    assert result.exit_code == 1 and not (repo / "specs").exists()
+    fix = "--principal master --integration develop --work-prefix feature/"
+    assert result.output.rstrip().endswith(f"specs init --context c {fix}"), result.output
+    assert _runner.invoke(app, ["specs", "init", "--context", "c", *fix.split()]).exit_code == 0
 
 
 #: The registry placeholders a shipped law template carries (literal, the law's own).
