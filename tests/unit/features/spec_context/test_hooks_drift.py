@@ -14,6 +14,8 @@ import re
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.spec_context.doctor import DoctorService, workspace_rules
@@ -40,39 +42,36 @@ def _ctx(name: str, state: ContextState = ContextState.ALIVE) -> SpecContextProj
     )
 
 
-def _workspace(tmp_path: Path, *, drifted: bool = False, installed: bool = True) -> Path:
+def _workspace(
+    tmp_path: Path, *, drifted: bool = False, installed: bool = True, git: bool = True
+) -> Path:
     repo = tmp_path / "repos" / "demo"
     repo.mkdir(parents=True)
+    if not git:
+        return tmp_path
     subprocess.run(["git", "init", "-q", str(repo)], check=True)
-    hooks = repo / ".git" / "hooks"
-    if installed:
-        for target, source in workspace_layout.INSTALLED_GIT_HOOKS:
-            shipped = (workspace_layout.public_scripts_dir() / source).read_bytes()
-            (hooks / target).write_bytes(b"# hand-edited\n" + shipped if drifted else shipped)
+    for target, source in workspace_layout.INSTALLED_GIT_HOOKS if installed else ():
+        shipped = (workspace_layout.public_scripts_dir() / source).read_bytes()
+        (repo / ".git" / "hooks" / target).write_bytes(
+            b"# hand-edited\n" + shipped if drifted else shipped
+        )
     return tmp_path
 
 
-def _codes(root: Path, contexts: list[SpecContextProject]) -> list[str]:
-    service = DoctorService(_Store(contexts), None, root)  # type: ignore[arg-type]
-    return [issue.code for issue in service.check_installed_hooks()]
-
-
-def test_hooks_matching_the_shipped_scripts_raise_nothing(tmp_path: Path) -> None:
-    assert "HOOKS-DRIFT-1" not in _codes(_workspace(tmp_path), [_ctx("demo")])
-
-
-def test_a_missing_installed_hook_is_the_same_finding(tmp_path: Path) -> None:
-    assert "HOOKS-DRIFT-1" in _codes(_workspace(tmp_path, installed=False), [_ctx("demo")])
-
-
-def test_a_dead_context_is_never_checked(tmp_path: Path) -> None:
-    root = _workspace(tmp_path, drifted=True)
-    assert "HOOKS-DRIFT-1" not in _codes(root, [_ctx("demo", ContextState.DEAD)])
-
-
-def test_a_repo_that_is_not_a_git_checkout_is_never_a_finding(tmp_path: Path) -> None:
-    (tmp_path / "repos" / "demo").mkdir(parents=True)
-    assert "HOOKS-DRIFT-1" not in _codes(tmp_path, [_ctx("demo")])
+# fmt: off
+@pytest.mark.parametrize(("layout", "state", "finding"), [
+    pytest.param({}, ContextState.ALIVE, False, id="matching-shipped-hooks"),
+    pytest.param({"drifted": True}, ContextState.ALIVE, True, id="drifted-hook"),
+    pytest.param({"installed": False}, ContextState.ALIVE, True, id="missing-hook-is-the-same-finding"),
+    pytest.param({"drifted": True}, ContextState.DEAD, False, id="dead-context-never-checked"),
+    pytest.param({"git": False}, ContextState.ALIVE, False, id="not-a-git-checkout-never-a-finding"),
+])
+# fmt: on
+def test_hooks_drift_1_flags_an_installed_hook_that_is_not_the_shipped_one(
+    tmp_path: Path, layout: dict[str, bool], state: ContextState, finding: bool
+) -> None:
+    service = DoctorService(_Store([_ctx("demo", state)]), None, _workspace(tmp_path, **layout))  # type: ignore[arg-type]
+    assert [i.code for i in service.check_installed_hooks()] == (["HOOKS-DRIFT-1"] if finding else [])
 
 
 def test_a_named_context_checks_only_its_own_repos(tmp_path: Path) -> None:
