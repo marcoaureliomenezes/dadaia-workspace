@@ -38,7 +38,6 @@ from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
 #: silence. Pinned by ``tests/unit/infrastructure/test_attesting_checks.py``: removing
 #: an entry is a reviewed decision, never an accidental vanishing.
 ATTESTING_CHECK_IDS: tuple[str, ...] = (
-    "rule-corpus",
     "trust-boundary",
     "public-privacy",
     "symlink-target",
@@ -233,67 +232,6 @@ def _codex_hook_commands(value: object) -> list[str]:
         for item in value:
             commands.extend(_codex_hook_commands(item))
     return commands
-
-
-_CODEX_RULE_CITATION_RE: re.Pattern[str] = re.compile(r"`([a-z][a-z0-9-]+)`\s+rule\b")
-
-
-def check_codex_rule_corpus_reachable(workspace_root: Path) -> list[DoctorLine]:
-    """WS-CDX-PROTOCOL (A6): every by-name rule cited by a Codex artifact is reachable.
-
-    A Codex session reaches the load-bearing rule-law corpus through the on-disk
-    surface ``.claude/rules/<rule-name>.md`` (documented in the projected root
-    ``AGENTS.md`` "Rule-Law Corpus" section). This check proves the contract: for
-    every ``\\`<name>\\` rule`` citation in any ``.codex/agents/*.toml`` artifact, the
-    file ``.claude/rules/<name>.md`` must exist. A missing file means a Codex artifact
-    cites a law surface Codex cannot reach.
-
-    **STATIC reference integrity only (A22.3).** This check answers "does the cited
-    file exist on disk" — nothing here proves a live Codex session actually LOADS that
-    file into its effective prompt. That is a different claim (effective prompt
-    visibility), answered by ``codex_trust_boundary_info`` below for the hook-fire
-    boundary, and by ``features/certification/service.py``'s live ``codex exec`` probe
-    (A22.4) for genuine runtime behavior. Do not read an ``[ok]`` here as proof of
-    anything beyond on-disk reachability.
-
-    Returns ``[ok] codex:rule-corpus-reachable`` when every citation resolves, or one
-    ``[error]`` line per unreachable citation.
-    """
-    codex_agents = workspace_root / ".codex" / "agents"
-    rules_dir = workspace_root / ".claude" / "rules"
-    out: list[DoctorLine] = []
-    if not codex_agents.exists():
-        return out
-
-    unreachable: set[str] = set()
-    cited_any = False
-    for toml_file in sorted(codex_agents.glob("*.toml")):
-        try:
-            text = toml_file.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        for match in _CODEX_RULE_CITATION_RE.finditer(text):
-            name = match.group(1)
-            cited_any = True
-            if not (rules_dir / f"{name}.md").is_file():
-                unreachable.add(name)
-
-    if unreachable:
-        for name in sorted(unreachable):
-            out.append(
-                DoctorLine(
-                    DoctorStatus.ERROR,
-                    f"codex:rule-corpus: by-name rule '{name}' cited in a Codex "
-                    f"artifact has no reachable surface "
-                    f".claude/rules/{name if name.endswith('.md') else name + '.md'} "
-                    "(WS-CDX-PROTOCOL)",
-                )
-            )
-    elif cited_any:
-        out.append(DoctorLine(DoctorStatus.OK, "codex:rule-corpus-reachable (WS-CDX-PROTOCOL)"))
-    # Zero citations ⇒ [] here; the assembly wraps this check in attest("rule-corpus", …),
-    # which turns silence into an explicit not-applicable line (Class-3 guard).
-    return out
 
 
 # The exact codex-cli version for which "projected command hooks fire and block in

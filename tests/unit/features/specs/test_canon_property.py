@@ -98,7 +98,7 @@ def _fresh_release(tmp_path: Path) -> Path:
                 "log": [
                     {
                         "ts": "2026-09-12T00:00:00Z",
-                        "agent": "product-engineer",
+                        "agent": "dd-product-engineer",
                         "kind": "note",
                         "text": "born",
                     }

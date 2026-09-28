@@ -39,13 +39,14 @@ def test_installed_dadaia_agents_md_carries_the_rendered_zone_table(tmp_path: Pa
 def test_install_all_projects_no_dadaia_scripts(tmp_path: Path) -> None:
     """0.4.6 AC10 (FR12): ``install()`` creates no ``.dadaia/scripts`` and the
     staged manifest names no such path. Git hooks and CI execute the package copy under
-    ``dadaia_workspace/public/scripts/``; only the ``agentic/scripts`` staging survives."""
+    ``dadaia_workspace/public/scripts/``; nothing reads a staged copy, so none is staged
+    (sa-staged-assets-without-consumers#44.2)."""
     ws = tmp_path / "ws"
     ws.mkdir()
     FileSystemPublicAssetManager().install(ws)
 
     assert not (ws / ".dadaia" / "scripts").exists()
-    assert (ws / ".dadaia" / "agentic" / "scripts").is_dir()
+    assert not (ws / ".dadaia" / "agentic" / "scripts").exists()
     manifest = (ws / ".dadaia" / "agentic" / "manifest.json").read_text(encoding="utf-8")
     assert ".dadaia/scripts" not in manifest
 

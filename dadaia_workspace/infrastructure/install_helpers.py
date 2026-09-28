@@ -10,7 +10,6 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 
-from dadaia_workspace.core.agent_model_templates import CORE_AGENTS
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.models.agent_model_policy import (
     ResolvedAgentModel,
@@ -23,7 +22,6 @@ from dadaia_workspace.infrastructure.public_assets_common import (
 )
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _parse_agent_frontmatter,
-    _parse_write_allowlist,
 )
 
 
@@ -47,17 +45,6 @@ def persona_read_only(frontmatter: Mapping[str, object]) -> bool:
 # ---------------------------------------------------------------------------
 # Stage helpers (moved from FileSystemPublicAssetManager internal methods)
 # ---------------------------------------------------------------------------
-
-
-def build_agents_index(agentic_dir: Path) -> dict[str, list[str]]:
-    """Map every staged agent to its ``paths.write_allowlist`` globs (T-016-00)."""
-    agents_dir = agentic_dir / "agents"
-    index: dict[str, list[str]] = {}
-    if not agents_dir.exists():
-        return index
-    for md_file in sorted(agents_dir.glob("*.md")):
-        index[md_file.stem] = _parse_write_allowlist(md_file.read_text(encoding="utf-8"))
-    return index
 
 
 def build_manifest(
@@ -124,19 +111,17 @@ def render_claude_agent(staged_text: str, resolved: ResolvedAgentModel) -> str:
 
 def resolve_codex_agent_model(
     agent_name: str,
-    staged_model: str | None,
+    staged_model: object,
     resolved: ResolvedAgentModel | None,
 ) -> tuple[str, str | None]:
-    """Resolve the ``(claude_model, reasoning_effort)`` for one codex agent render.
+    """Resolve the ``(claude_model, reasoning_effort)`` of one persona render (Codex's
+    TOML; Claude's refusal of a persona with no model).
 
     Precedence: resolved policy (core agents + installed pack agents) > staged
-    authored ``model:`` > the legacy ``claude-sonnet-4-6`` default.
+    authored ``model:``; neither refuses — for every persona, core or not.
 
     Raises:
-        PublicAssetError: F-3 fail-closed — a CORE agent supplied with neither a
-            staged ``model:`` nor a resolved policy model must never render on a
-            silent default (a wiring miss must never ship wrong codex models
-            under green tests).
+        PublicAssetError: fail-closed — no persona renders on a silent default model.
     """
     if resolved is not None:
         effort = (
@@ -144,11 +129,8 @@ def resolve_codex_agent_model(
         )
         return resolved.model, effort
     if staged_model:
-        return staged_model, None
-    if agent_name in CORE_AGENTS:
-        raise PublicAssetError(
-            f"cannot render codex agent '{agent_name}': core agent has neither a "
-            "staged 'model:' nor a resolved agent-model policy model (F-3 fail-closed "
-            "— the render pipeline must be supplied the resolved policy)"
-        )
-    return "claude-sonnet-4-6", None
+        return str(staged_model), None
+    raise PublicAssetError(
+        f"cannot render agent '{agent_name}': it has neither an authored 'model:' nor a "
+        "resolved agent-model policy model (fail-closed: no default model)"
+    )

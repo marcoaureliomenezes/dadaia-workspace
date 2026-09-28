@@ -40,14 +40,14 @@ def _make_manager(public_dir: Path) -> FileSystemPublicAssetManager:
 
 def _make_minimal_agentic(workspace_root: Path) -> Path:
     agentic_dir = workspace_root / ".dadaia" / "agentic"
-    (agentic_dir / "rules").mkdir(parents=True)
+    # sa-staged-assets-without-consumers#44.3, #44.4: no dead `rules` family; the
+    # persona authors its own model (no retired default).
     (agentic_dir / "agents").mkdir(parents=True)
     (agentic_dir / "skills").mkdir(parents=True)
     (agentic_dir / "workflows").mkdir(parents=True)
     (agentic_dir / "commands").mkdir(parents=True)
-    (agentic_dir / "rules" / "my-rule.md").write_text("# rule", encoding="utf-8")
     (agentic_dir / "agents" / "my-agent.md").write_text(
-        "---\nname: my-agent\nmodel: claude-sonnet-4-6\n---\n# body\n",
+        "---\nname: my-agent\nmodel: claude-opus-4-7\n---\n# body\n",
         encoding="utf-8",
     )
     manifest = {"schema_version": "1", "package_version": "0.0.1"}

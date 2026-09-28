@@ -4,13 +4,12 @@ K3 (v0.5.1): install/doctor are now two folds over one ``ProjectionRule`` table
 (``infrastructure/projection_rules.py``) — ``install`` writes ``render``, ``doctor``
 compares against it. What remains here is genuinely bespoke: staging, plan
 resolution, install-ledger reconciliation, and the harness-independent
-doctor checks (privacy, entities-derivation, memory-phase, rule-corpus, symlink-target,
+doctor checks (privacy, entities-derivation, memory-phase, symlink-target,
 git-dirty).
 """
 
 from __future__ import annotations
 
-import json
 import os
 import subprocess
 from collections.abc import Callable, Iterable
@@ -40,7 +39,6 @@ from dadaia_workspace.core.workspace_layout import (
     specs_canon_table_rows,
     zone_table_rows,
 )
-from dadaia_workspace.infrastructure.codex_doctor import check_codex_rule_corpus_reachable
 from dadaia_workspace.infrastructure.entity_doctor import (
     check_agent_skill_refs,
     check_entities_derivation,
@@ -241,7 +239,7 @@ class FileSystemPublicAssetManager:
             shutil.copy2(schema_src, dst)
             staged.append(f"[stage] {dst}")
 
-        for src in self._iter_files(self._public_dir):
+        for src in self._staged_sources():
             expected = _staged_bytes(src)
             if expected != src.read_bytes():
                 dst = agentic_dir / src.relative_to(self._public_dir)
@@ -250,18 +248,11 @@ class FileSystemPublicAssetManager:
 
         # LF-exact, atomic writes: staged JSON is hash-compared by doctor, so it must
         # not pick up Windows CRLF translation (FR-RC2-2).
-        from dadaia_workspace.infrastructure.install_helpers import (
-            build_agents_index,
-            build_manifest,
-        )
+        from dadaia_workspace.infrastructure.install_helpers import build_manifest
 
         manifest_path = agentic_dir / "manifest.json"
         atomic_write(manifest_path, _json_dump(build_manifest(agentic_dir, self._iter_files)))
         staged.append(f"[stage] {manifest_path}")
-
-        index_path = agentic_dir / "agents.index.json"
-        atomic_write(index_path, _json_dump(build_agents_index(agentic_dir)))
-        staged.append(f"[stage] {index_path}")
         return staged
 
     def list_all(self) -> dict[str, list[str]]:
@@ -396,7 +387,7 @@ class FileSystemPublicAssetManager:
 
         Raises the typed ``AgentModelPolicyStoreError`` on an invalid overlay — install
         fails loud BEFORE any projection write (NFR-4); doctor converts it to an ERROR
-        line. Valid override targets are the 9 core agents.
+        line. Valid override targets are the ``CORE_AGENTS``.
         """
         del agentic_dir
         return JsonAgentModelPolicyStore(workspace_root).load()
@@ -508,24 +499,12 @@ class FileSystemPublicAssetManager:
         agentic_dir = workspace_root / ".dadaia" / "agentic"
         reports: list[DoctorLine] = []
 
-        for src in self._iter_files(self._public_dir):
+        for src in self._staged_sources():
             rel = src.relative_to(self._public_dir)
             reports.append(self._compare(src, agentic_dir / rel, f"stage:{rel.as_posix()}"))
 
         if not (agentic_dir / "manifest.json").exists():
             reports.append(DoctorLine(DoctorStatus.MISSING, "stage:manifest.json"))
-
-        index_path = agentic_dir / "agents.index.json"
-        if not index_path.exists():
-            reports.append(DoctorLine(DoctorStatus.MISSING, "stage:agents.index.json"))
-        else:
-            try:
-                json.loads(index_path.read_text(encoding="utf-8"))
-                reports.append(DoctorLine(DoctorStatus.OK, "stage:agents.index.json"))
-            except (json.JSONDecodeError, OSError):
-                reports.append(
-                    DoctorLine(DoctorStatus.DRIFT, "stage:agents.index.json (invalid JSON)")
-                )
 
         # Resolve the profile-scoped active harness set FIRST — absent profile ⇒
         # all-four (back-compat). An out-of-profile runtime whose directory physically
@@ -576,7 +555,6 @@ class FileSystemPublicAssetManager:
         # unconditional attestation (never gated on codex-in-profile — ATTESTING_CHECK_IDS
         # must never vanish silently for a codex-absent profile); `trust-boundary` stays
         # gated (the codex-hooks record check above, matching the historical guard).
-        reports.extend(attest("rule-corpus", check_codex_rule_corpus_reachable(workspace_root)))
         reports.extend(check_agent_skill_refs(self._public_dir))
         reports.extend(check_memory_phase_single_source(self._public_dir))
         reports.extend(attest("symlink-target", self._check_symlink_targets(workspace_root)))
@@ -626,6 +604,9 @@ class FileSystemPublicAssetManager:
 
     def _iter_files(self, root: Path) -> Iterable[Path]:
         return iter_public_files(root)
+
+    def _staged_sources(self) -> Iterable[Path]:
+        return (f for name in _COPY_DIRS for f in self._iter_files(self._public_dir / name))
 
     def _is_ignored_public_asset(self, path: Path) -> bool:
         return is_ignored_public_asset(path)

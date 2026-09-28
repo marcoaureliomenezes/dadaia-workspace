@@ -408,7 +408,7 @@ gates cannot catch, because they never call the model.
   doctor is green.
 - **Lockstep:** with no overlay, `.claude/agents/<a>.md` frontmatter (`model`,
   `effort`) and `.codex/agents/<a>.toml` (`model`, `model_reasoning_effort`) must
-  render from the SAME resolved roster for all 9 core agents; the codex effort is
+  render from the SAME resolved roster for every agent in `CORE_AGENTS`; the codex effort is
   the D-3 clamp of the claude effort (`xhigh` → `high`).
 - **Overlay round-trip:** apply a template + a per-agent override by editing `.dadaia/states/agent_model_policy.json`
   API (`PUT /api/agent-model-policy`), re-install, and confirm BOTH surfaces moved

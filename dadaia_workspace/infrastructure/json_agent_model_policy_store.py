@@ -14,7 +14,7 @@ Two load paths, deliberately distinct (NFR-4, "missing != invalid"):
   :class:`AgentModelPolicyStoreError` with a distinct, actionable message per FR3
   rejection: corrupt JSON, non-object root, unknown top-level/override key, wrong
   schema version, unknown ``applied_template`` id, unknown agent name (valid names =
-  the three core agents; a retired persona name migrates on read), a model not in the registry, an
+  the ``CORE_AGENTS``; a retired persona name migrates on read), a model not in the registry, an
   effort outside the D-3 vocabulary, an empty override, and — D-7 — any combination
   that resolves a Fable-family model onto ``dd-code-reviewer``.
 

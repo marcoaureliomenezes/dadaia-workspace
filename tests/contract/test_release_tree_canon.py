@@ -42,13 +42,13 @@ def _valid_document(**overrides: Any) -> dict[str, Any]:
         "log": [
             {
                 "ts": "2026-09-01T00:00:00Z",
-                "agent": "product-engineer",
+                "agent": "dd-product-engineer",
                 "kind": "note",
                 "text": "x",
             },
             {
                 "ts": "2026-09-02T00:00:00Z",
-                "agent": "product-engineer",
+                "agent": "dd-product-engineer",
                 "kind": "note",
                 "text": "y",
             },

@@ -39,7 +39,10 @@ from dadaia_workspace.infrastructure.codex_doctor import (
     dcx8_codex_rules_shape,
     dcx9_codex_hook_shape,
 )
-from dadaia_workspace.infrastructure.install_helpers import render_claude_agent
+from dadaia_workspace.infrastructure.install_helpers import (
+    render_claude_agent,
+    resolve_codex_agent_model,
+)
 from dadaia_workspace.infrastructure.install_plan import InstallPlan
 from dadaia_workspace.infrastructure.projection import (
     ProjectionRule,
@@ -57,6 +60,7 @@ from dadaia_workspace.infrastructure.runtime_config import (
     merge_claude_settings,
     upsert_kimi_hooks_block,
 )
+from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import _parse_agent_frontmatter
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
     hook_file_payloads,
     hook_wrapper_contents,
@@ -126,18 +130,21 @@ def _agents_agent_rules(
     for src in iter_public_files(src_dir):
         rel = src.relative_to(src_dir)
         label = f"agents:agents/{rel.as_posix()}"
-        resolved = resolved_models.get(src.stem)
-        if resolved is None or src.suffix != ".md":
+        if src.suffix != ".md":
             rules.append(bytes_rule(label, "agents", dst_dir / rel, src.read_bytes()))
             continue
-        staged_text = src.read_text(encoding="utf-8")
 
         def _render(
             _current: bytes | None,
-            _text: str = staged_text,
-            _resolved: ResolvedAgentModel = resolved,
+            _src: Path = src,
+            _resolved: ResolvedAgentModel | None = resolved_models.get(src.stem),
         ) -> bytes:
-            return render_claude_agent(_text, _resolved).encode("utf-8")
+            text = _src.read_text(encoding="utf-8")
+            if _resolved is not None:
+                return render_claude_agent(text, _resolved).encode("utf-8")
+            # An authored model renders verbatim; a persona with none is refused.
+            resolve_codex_agent_model(_src.stem, _parse_agent_frontmatter(text).get("model"), None)
+            return _src.read_bytes()
 
         rules.append(
             ProjectionRule(label=label, harness="agents", dst=dst_dir / rel, render=_render)

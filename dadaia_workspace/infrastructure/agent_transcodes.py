@@ -179,9 +179,9 @@ def codex_agent_toml_bytes(
     else:
         body = text
     body = transform_for_codex(body, agent_name)
-    staged_model_raw = fm.get("model") if fm else None
-    staged_model = str(staged_model_raw) if staged_model_raw else None
-    claude_model, reasoning_effort = resolve_codex_agent_model(agent_name, staged_model, resolved)
+    claude_model, reasoning_effort = resolve_codex_agent_model(
+        agent_name, fm.get("model") if fm else None, resolved
+    )
     codex_model = map_model(claude_model)
     description = fm.get("description") if fm else None
     codex_description = transform_for_codex(str(description), agent_name) if description else None

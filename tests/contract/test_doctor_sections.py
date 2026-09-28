@@ -72,7 +72,7 @@ def _pre_wave0_046_document() -> dict[str, Any]:
         "log": [
             {
                 "ts": "2026-09-01T00:00:00Z",
-                "agent": "product-engineer",
+                "agent": "dd-product-engineer",
                 "kind": "note",
                 "text": "x",
             }

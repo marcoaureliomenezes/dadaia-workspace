@@ -525,7 +525,7 @@ _V38_ALLOWANCE: dict[str, str] = {
     "infrastructure/projection.py:_clear": "parity:tests/integration/test_install_ledger_reconciliation.py",
     "infrastructure/public_assets.py:_prune_empty_dirs": "parity:tests/integration/test_install_ledger_reconciliation.py",
     "infrastructure/public_assets.py:_reconcile_install_ledger": "parity:tests/integration/test_install_ledger_reconciliation.py",
-    "infrastructure/public_assets.py:stage": "sa-staged-assets-without-consumers",
+    "infrastructure/public_assets.py:stage": "parity:tests/integration/test_staged_assets_have_consumers.py",
     "public/skills/dd-release-implementation/scripts/_release_new.py:new_release": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
 }
 

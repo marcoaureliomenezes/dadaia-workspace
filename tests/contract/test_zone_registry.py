@@ -47,7 +47,10 @@ from dadaia_workspace.core.workspace_layout import (
     zone_names,
 )
 from dadaia_workspace.features.specs.doctor_common import RELEASE_ARTIFACTS
-from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from dadaia_workspace.infrastructure.public_assets import (
+    FileSystemPublicAssetManager,
+    render_registry_tables,
+)
 from tests.contract.test_slop_ratchets import _allowance_violations
 from tests.helpers.scan_population import assert_populated
 
@@ -318,9 +321,11 @@ def test_staged_law_canon_tables_equal_the_registry(staged_data: Path) -> None:
     row; the staged law's root line and ``repo-AGENTS.md``'s exclusion line ARE the rendered
     registry lists — documented == allowed, wherever the rule now lives."""
     text = (staged_data / "AGENTS.md").read_text("utf-8")
-    scoped = staged_data.parent / "templates"
-    specs_law = (scoped / "specs-AGENTS.md").read_text("utf-8")
-    repo_law = (scoped / "repo-AGENTS.md").read_text("utf-8")
+    # The scoped templates are not staged (sa-staged-assets-without-consumers#44.2: no
+    # reader of .dadaia/agentic/templates); they are rendered by the same one renderer.
+    scoped = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public" / "templates"
+    specs_law = render_registry_tables((scoped / "specs-AGENTS.md").read_text("utf-8"))
+    repo_law = render_registry_tables((scoped / "repo-AGENTS.md").read_text("utf-8"))
     canon_tables = [
         t for t in _markdown_tables(specs_law) if t and {"area", "members"} <= set(t[0])
     ]

@@ -157,10 +157,10 @@ def test_malformed_sibling_is_skipped_by_discovery_a_good_handoff_still_found(
 ) -> None:
     (tmp_path / "ctx").mkdir()
     (tmp_path / "ctx" / "broken.handoff.json").write_text("{ not json", encoding="utf-8")
-    _write(tmp_path / "ctx" / "good.handoff.json", _base_doc(agent="qa-engineer"))
+    _write(tmp_path / "ctx" / "good.handoff.json", _base_doc(agent="dd-code-reviewer"))
 
     agents = [h.agent for h in scan_handoffs(tmp_path) if h.malformed_error is None]
-    assert agents == ["qa-engineer"]
+    assert agents == ["dd-code-reviewer"]
 
 
 # ---------------------------------------------------------------------------

@@ -13,14 +13,13 @@ Covers:
   ``effort:`` injection as the LAST frontmatter lines; pre-existing ``model:``/``effort:``
   lines stripped (pack bodies author ``model:``); ``effort:`` OMITTED entirely when
   unresolved (F-6 — never empty/placeholder); a body without frontmatter raises.
-- ``resolve_codex_agent_model`` — F-3 fail-closed: a CORE agent with neither a staged
-  ``model:`` nor a resolved policy model raises a loud typed ``PublicAssetError``; a
-  resolved policy always wins over an authored ``model:``; a plugin body with neither
-  falls back to the legacy ``claude-sonnet-4-6`` default; D-3 clamps the resolved
-  effort via ``codex_effort_for_claude_effort``.
+- ``resolve_codex_agent_model`` — fail-closed: ANY persona with neither an authored
+  ``model:`` nor a resolved policy model raises a loud typed ``PublicAssetError``
+  (sa-staged-assets-without-consumers#44.4); a resolved policy always wins over an
+  authored ``model:``; D-3 clamps the resolved effort via ``codex_effort_for_claude_effort``.
 - ``projection_rules._codex_agent_toml_bytes`` — the ONE codex-agent TOML renderer
-  (mirrors the historical ``install_codex_agents`` per-file body): F-3 fail-closed at
-  the render boundary, a plugin body keeps its authored model with no resolved policy,
+  (mirrors the historical ``install_codex_agents`` per-file body): a plugin body keeps
+  its authored model with no resolved policy,
   and D-3's clamp reaches the rendered ``model_reasoning_effort`` field.
 - F-5: ``--force`` re-RENDERS a diverged claude agent projection back to the render
   output — never to raw staged bytes — through the real ``ProjectionRule``/
@@ -174,11 +173,12 @@ def test_a_persona_without_read_only_never_renders(tmp_path: Path, body: str) ->
 # ---------------------------------------------------------------------------
 
 
-def test_resolve_codex_agent_model_fails_closed_for_core_agent_without_model() -> None:
-    """F-3: a core agent with neither a staged ``model:`` nor a resolved policy model
-    raises loudly — never a silent ``claude-sonnet-4-6`` default."""
-    with pytest.raises(PublicAssetError, match="dd-software-engineer"):
-        resolve_codex_agent_model("dd-software-engineer", None, None)
+@pytest.mark.parametrize("agent", ["dd-software-engineer", "frontend-engineer"])
+def test_resolve_codex_agent_model_fails_closed_for_any_agent_without_model(agent: str) -> None:
+    """sa-staged-assets-without-consumers#44.4: a persona, core or not, with neither an
+    authored ``model:`` nor a resolved policy model raises — never a silent default."""
+    with pytest.raises(PublicAssetError, match=agent):
+        resolve_codex_agent_model(agent, None, None)
 
 
 def test_resolve_codex_agent_model_prefers_resolved_over_staged() -> None:
@@ -190,18 +190,10 @@ def test_resolve_codex_agent_model_prefers_resolved_over_staged() -> None:
 
 
 def test_resolve_codex_agent_model_falls_back_to_staged_when_no_resolved_policy() -> None:
-    """A plugin body's authored ``model:`` keeps working with no resolved policy (the
-    fail-closed guard applies to CORE agents only)."""
+    """sa-staged-assets-without-consumers#44.4: an authored ``model:`` is the persona's
+    model when no policy resolves it."""
     model, effort = resolve_codex_agent_model("frontend-engineer", "claude-sonnet-5", None)
     assert model == "claude-sonnet-5"
-    assert effort is None
-
-
-def test_resolve_codex_agent_model_legacy_default_for_plugin_with_neither() -> None:
-    """A non-core agent with neither a resolved policy nor a staged ``model:`` falls
-    back to the legacy default (never raises — F-3 is scoped to CORE agents)."""
-    model, effort = resolve_codex_agent_model("frontend-engineer", None, None)
-    assert model == "claude-sonnet-4-6"
     assert effort is None
 
 
@@ -215,14 +207,6 @@ def test_resolve_codex_agent_model_uses_d3_clamp_of_resolved_effort() -> None:
 # ---------------------------------------------------------------------------
 # projection_rules._codex_agent_toml_bytes — the ONE codex-agent TOML renderer
 # ---------------------------------------------------------------------------
-
-
-def test_codex_agent_toml_bytes_fails_closed_for_core_agent_without_model(
-    tmp_path: Path,
-) -> None:
-    md = _staged_agent_md(tmp_path, "dd-software-engineer", _GENERIC_BODY)
-    with pytest.raises(PublicAssetError, match="dd-software-engineer"):
-        codex_agent_toml_bytes(md, "dd-software-engineer", None)
 
 
 def test_codex_agent_toml_bytes_keeps_authored_model_for_plugin_body(tmp_path: Path) -> None:

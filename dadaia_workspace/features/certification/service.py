@@ -425,7 +425,7 @@ def certify(
                 {
                     "schema_version": "handoff-v1.2",
                     "self_pull": {"refs": ["specs/memory/QUALITY.md"]},
-                    "agent": "qa-engineer",
+                    "agent": "dd-code-reviewer",
                     "context": "certified-consumer",
                     "produced_at": "2026-07-15T00:00:00Z",
                     "artifact": {"type": "other"},

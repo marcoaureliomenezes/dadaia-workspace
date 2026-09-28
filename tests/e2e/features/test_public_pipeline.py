@@ -134,8 +134,15 @@ class TestStage:
         # ``rules`` is NOT staged: the nine core rules were consolidated into the single
         # always-on law file (``data/AGENTS.md``), so the family no longer exists as a
         # core asset dir. Plugin-pack rules stage under ``plugins/<pack>/rules/``.
-        for subdir in ("agents", "skills", "scripts", "data"):
-            assert (agentic / subdir).is_dir(), f".dadaia/agentic/{subdir}/ not created by stage"
+        # sa-staged-assets-without-consumers#44.2: only families a reader of
+        # .dadaia/agentic/ consumes are staged.
+        assert sorted(p.name for p in agentic.iterdir()) == [
+            "agents",
+            "data",
+            "manifest.json",
+            "schemas",
+            "skills",
+        ]
         assert (agentic / "data" / "AGENTS.md").is_file(), "the workspace map is not staged"
 
         manifest_path = agentic / "manifest.json"

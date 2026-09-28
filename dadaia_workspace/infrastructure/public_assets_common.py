@@ -50,18 +50,11 @@ class OverwritePolicy(StrEnum):
 
 
 # Shared layout constants for the install/stage pipeline.
-_COPY_DIRS = (
-    "rules",
-    "skills",
-    "agents",
-    "entities",
-    "scripts",
-    "schemas",
-    "data",
-    "scaffold",
-    "templates",
-)
-_CLAUDE_DIRS = ("rules", "skills", "agents")
+#: The staged families — each has a reader of ``.dadaia/agentic/`` (the projection rules
+#: read agents/skills/data; the handoff index and specs schemas read schemas). A family
+#: only the package tree serves (entities, scripts, scaffold, templates) is not staged.
+_COPY_DIRS = ("skills", "agents", "schemas", "data")
+_CLAUDE_DIRS = ("skills", "agents")
 
 
 def is_ignored_public_asset(path: Path) -> bool:

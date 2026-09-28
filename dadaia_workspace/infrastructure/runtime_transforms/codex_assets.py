@@ -405,41 +405,6 @@ def _parse_agent_frontmatter(text: str) -> dict[str, object]:
     return result
 
 
-def _parse_write_allowlist(text: str) -> list[str]:
-    """Extract ``paths.write_allowlist`` globs from agent .md frontmatter (stdlib only).
-
-    Used to pre-compile ``.dadaia/agentic/agents.index.json`` (T-016-00) so the SDD
-    gate's RULE D performs an O(1) JSON lookup instead of an inline YAML parse on
-    every PreToolUse. Returns ``[]`` when the agent declares no write_allowlist.
-    """
-    if not text.startswith("---\n"):
-        return []
-    end_idx = text.find("\n---\n", 4)
-    if end_idx == -1:
-        return []
-
-    in_paths = False
-    in_wl = False
-    items: list[str] = []
-    for line in text[4 : end_idx + 1].splitlines():
-        if not line.strip():
-            continue
-        stripped = line.strip()
-        indent = len(line) - len(line.lstrip())
-        if indent == 0:
-            in_paths = stripped == "paths:"
-            in_wl = False
-            continue
-        if not in_paths:
-            continue
-        if in_wl and stripped.startswith("- "):
-            items.append(stripped[2:].strip())
-            continue
-        # A sub-key under `paths:` (write_allowlist:, read_allowlist:, …).
-        in_wl = stripped == "write_allowlist:"
-    return items
-
-
 def _parse_skills_from_frontmatter(text: str) -> list[str]:
     """Extract the ``skills:`` list from agent YAML frontmatter.
 
