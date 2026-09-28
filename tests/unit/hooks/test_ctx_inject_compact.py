@@ -12,7 +12,7 @@ the same field ``dadaia context bind`` persists), not a bind-epoch marker: the m
 subsystem is no longer consulted by the injection path (T-50-04 deletes it outright). The
 PostCompact and SessionStart(compact|clear) event blocks are UNCHANGED by this task —
 they resolve context unconditionally (no sentinel/``bound_at`` gating) and emit every
-time they fire, per ``CONSUMER_VALIDATION_RECIPE.md:376``.
+time they fire.
 """
 
 from __future__ import annotations

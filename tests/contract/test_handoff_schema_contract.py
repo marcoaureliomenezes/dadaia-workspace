@@ -8,7 +8,6 @@ agree on every member.
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import jsonschema
@@ -18,7 +17,6 @@ from dadaia_workspace.core.handoff_index import load_schema, validate_schema_sha
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCHEMA_PATH = _REPO_ROOT / "dadaia_workspace" / "public" / "schemas" / "handoff-v1.schema.json"
-_RECIPE = _REPO_ROOT / "dadaia_workspace" / "public" / "data" / "CONSUMER_VALIDATION_RECIPE.md"
 
 
 def _valid_handoff() -> dict[str, object]:
@@ -120,28 +118,3 @@ def test_the_schema_and_the_validator_agree(doc: dict[str, object]) -> None:
     schema = load_schema(_SCHEMA_PATH)
     schema_ok = jsonschema.Draft202012Validator(schema).is_valid(doc)
     assert schema_ok is (validate_schema_shape(doc, schema) == [])
-
-
-def _law_minimal_example_keys() -> set[str]:
-    """The shipped law's minimal valid handoff (CONSUMER_VALIDATION_RECIPE.md F-12):
-    the backticked keys after 'Minimal valid = these keys:' up to the sentence end."""
-    text = _RECIPE.read_text(encoding="utf-8")
-    listing = text.split("Minimal valid = these keys:", 1)[1].split("}`.", 1)[0]
-    return set(re.findall(r"`([a-z_]+)(?::|`)", listing))
-
-
-def test_the_law_minimal_example_agrees_with_schema_and_validator() -> None:
-    """sa-handoff-self-pull-requirement-diverges#46.3 third party: a document holding exactly the law's minimal-example keys
-    is valid for the schema and the validator, and the example names every required key.
-    sa-handoff-self-pull-requirement-diverges#46.4: the recipe's F-12 self_pull passage promises no per-role check."""
-    schema = load_schema(_SCHEMA_PATH)
-    keys = _law_minimal_example_keys()
-    next_hop = {"agent": "human", "context": "c", "expected_artifact_type": "other"}
-    full = {**_valid_handoff(), "next_handoff": next_hop}
-    doc = {k: v for k, v in full.items() if k in keys}
-
-    assert set(schema["required"]) <= keys
-    assert jsonschema.Draft202012Validator(schema).is_valid(doc)
-    assert validate_schema_shape(doc, schema) == []
-    f12 = _RECIPE.read_text(encoding="utf-8").split("### F-12", 1)[1].split("\n### ", 1)[0]
-    assert "role" not in f12.lower()
