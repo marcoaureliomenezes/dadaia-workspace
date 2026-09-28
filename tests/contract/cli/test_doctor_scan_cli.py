@@ -32,7 +32,7 @@ from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import HARNESS_PROJECTION_DIRS, L1_ENTRY_HARNESSES
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.workspace_layout import provisioned_zones, zones_with_ttl
-from dadaia_workspace.features.spec_context import doctor
+from dadaia_workspace.features.spec_context import doctor, sweep
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.stores import context_store
@@ -251,6 +251,7 @@ def test_two_same_second_reaps_of_one_origin_leave_two_intact_holds(
     re-created with new content and reaped again inside one frozen second; the first hold
     keeps every byte and a second, distinct hold carries the new content."""
     monkeypatch.setattr(doctor, "datetime", _FrozenClock)
+    monkeypatch.setattr(sweep, "datetime", _FrozenClock)  # sweep.hold names the hold's day
     skill = workspace / "stray"
     skill.mkdir()
     (skill / "SKILL.md").write_bytes(b"v1\n")
