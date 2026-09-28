@@ -105,7 +105,7 @@ the task that resolves the row's bug. The table is the input the architecture le
 | what `measured_by` may name | `doctor_adr` (free text) | the audit | schema pattern |
 | the specs-tree state | `core/specs_version.state` | pre-push (from the pushed commit), `specs upgrade`, onboarding, `push_gate` | SPECS-VERSION; malformed → 0 |
 | is a memory atom valid | `_memory_schema.parse` | LINT-1, `memory.py catalog generate` | CAT-1, `check_memory_atomicity`, SPEC-DOC-008 |
-| is `_RELEASE.json` valid; which release is live | `release.py check` (`live_ids`) | doctor LEDGER-RELEASE-SCHEMA, core phase read | `release_tree` rules, `resolve_live_release_id`, rc-N rows, SemVer suffix; `next/` never live (0077) |
+| is `_RELEASE.json` valid; which release is live | `release.py check` (`live_ids`); package side `core/gitflow.resolve_live_release_id` — a pair because stdlib-only scripts and the package share no code, pinned equal by `tests/unit/core/test_release_state_filename.py::test_a_legacy_state_file_makes_no_release_live` | doctor LEDGER-RELEASE-SCHEMA, core phase read | `release_tree` rules, rc-N rows, SemVer suffix; `next/` never live (0077) |
 | is an upgraded workspace clean | `dadaia doctor` workspace rules | `certify`, reconcile, the recipe | `_OWNED_DOCTOR_SECTIONS`, transcribed recipe lines |
 | which checks gate a merge | `ci.yml` + the versioned required-checks file (0078) | `release.yml` (`workflow_call`), `ci_preflight.checks_for` | `release.yml`'s own matrix |
 | which repos belong to a context | the context registry (`repo_slug_for_context`) | handoff self-pull, store, `specs init --context` | name fallback |
