@@ -17,7 +17,7 @@ tests. `Δ` = prod/test lines; PLAN §2.7 ceilings stop a task, never rise.
 
 - [x] **T-050-40 — Fix lines, one printer, unfixable fixes (17–19 †).** Three commits. `W:` `core/`, `hooks/`, `f/chokepoints/`, `f/spec_context/`, `cli/`
   `blocked by:` T-050-39 · `delivers:` AC2.2, AC2.3 · `RED:` PLAN §2 WP-17, WP-18, WP-19 · Δ −48/+315.
-- [ ] **T-050-41 — TREE-8 alone (20).** `W:` `f/specs/` · `blocked by:` T-050-40, T-050-43, T-050-48 · `delivers:` one finding per stray path · `RED:` PLAN §2 WP-20 · Δ −115/−40.
+- [x] **T-050-41 — TREE-8 alone (20).** `W:` `f/specs/` · `blocked by:` T-050-40, T-050-43, T-050-48 · `delivers:` one finding per stray path · `RED:` PLAN §2 WP-20 · Δ −115/−40.
 - [x] **T-050-43 — Scripts own bug records and the seam (22, 23).** `W:` `core/`, `container.py`, `f/specs/`, `pub/skills/_shared/_privacy.py`, ledger `scripts/`, `pub/schemas/bugs/`, `i/public_assets.py`
   `blocked by:` T-050-40, T-050-70..74 · `delivers:` doctor = `bugs.py check`; seam ⇔ push · `RED:` PLAN §2 WP-22, WP-23 · Δ −700/−660.
 - [ ] **T-050-44 — Backlog status and pick (24).** `W:` `f/backlog/`, backlog `scripts/`, `_release_new.py`, law · `blocked by:` T-050-43, T-050-48, T-050-58 · `delivers:` exit without hand edit · `RED:` PLAN §2 WP-24 · Δ −80/−40.
