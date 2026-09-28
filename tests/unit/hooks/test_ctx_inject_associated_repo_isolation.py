@@ -114,6 +114,7 @@ def _bind_session(tmp_path: Path, session_id: str, context: str) -> None:
             "context": context,
             "mode": "read",
             "bound_at": datetime.now(tz=UTC).isoformat(),
+            "last_seen_at": datetime.now(tz=UTC).isoformat(),
         },
     )
 

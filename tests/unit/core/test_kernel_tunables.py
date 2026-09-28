@@ -14,8 +14,6 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-import pytest
-
 from dadaia_workspace.core import kernel_tunables
 
 
@@ -46,23 +44,3 @@ def test_tunables_are_pure_constants_with_no_io_imports() -> None:
                 assert alias.name.split(".")[0] not in banned, alias.name
         if isinstance(node, ast.ImportFrom) and node.module:
             assert node.module.split(".")[0] not in banned, node.module
-
-
-# --------------------------------------------------------------------------- #
-# 3. Behavioral: the liveness predicate observes the centralized constant.
-# --------------------------------------------------------------------------- #
-
-
-def test_record_liveness_observes_kernel_constant(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The generic TTL predicate observes the same value stamped by its caller."""
-    from datetime import UTC, datetime, timedelta
-
-    from dadaia_workspace.core import record_liveness
-
-    monkeypatch.setattr(kernel_tunables, "SESSION_GC_TTL_SECONDS", 7)
-    assert kernel_tunables.SESSION_GC_TTL_SECONDS == 7
-    ttl = kernel_tunables.SESSION_GC_TTL_SECONDS
-    old_hb = (datetime.now(tz=UTC) - timedelta(seconds=ttl + 10)).isoformat()
-    fresh_hb = datetime.now(tz=UTC).isoformat()
-    assert record_liveness.is_stale({"heartbeat": old_hb, "ttl": ttl}) is True
-    assert record_liveness.is_stale({"heartbeat": fresh_hb, "ttl": ttl}) is False

@@ -61,6 +61,7 @@ def _bind_session(tmp_path: Path, session_id: str, context: str) -> None:
             "context": context,
             "mode": "read",
             "bound_at": datetime.now(tz=UTC).isoformat(),
+            "last_seen_at": datetime.now(tz=UTC).isoformat(),
         },
     )
 
@@ -153,6 +154,7 @@ def test_post_compact_resolves_bound_context_from_session_record(tmp_path: Path)
                 "context": "ctx",
                 "mode": "implementation",
                 "bound_at": datetime.now(tz=UTC).isoformat(),
+                "last_seen_at": datetime.now(tz=UTC).isoformat(),
             }
         ),
         encoding="utf-8",

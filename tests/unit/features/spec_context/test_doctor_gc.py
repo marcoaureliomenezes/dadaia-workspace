@@ -1,8 +1,7 @@
 """Doctor cleanup for retired concurrency state and caller-owned sessions.
 
 Re-classification note (T-011-04 / FR-W1-04, ADR-8 amended): SESSION-record (bind) GC TTL
-semantics now measure against the heartbeat-renewed ``last_seen_at`` (with TTL-from-creation
-fallback for pre-heartbeat records), resolved by ``session_identity.liveness_timestamp``;
+semantics measure against the heartbeat-renewed ``last_seen_at`` (``session_store.is_live``);
 the bind-CLI pid is never consulted (dead by construction).
 
 CRITICAL GC: renewed-bind survival prevents live-session collection — kept verbatim,
@@ -122,11 +121,11 @@ def test_gc_deletion_matrix(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Clean-exit + TTL-from-creation fallback
+# Clean exit
 # ---------------------------------------------------------------------------
 
 
-def test_no_stale_records_and_ttl_from_creation_fallback(tmp_path: Path) -> None:
+def test_no_stale_records(tmp_path: Path) -> None:
     ws = _make_workspace(tmp_path)
     sessions_dir = ws / ".dadaia" / "sessions"
 
@@ -148,47 +147,6 @@ def test_no_stale_records_and_ttl_from_creation_fallback(tmp_path: Path) -> None
     assert sess_file.exists()
     gc_actions = [a for a in actions if "GC" in a]
     assert gc_actions == [], f"Expected no GC actions for fresh records, got: {gc_actions}"
-
-    # TTL-from-creation fallback: a record WITHOUT last_seen_at uses bound_at for GC;
-    # the session-record pid is NEVER consulted for bind GC.
-    from dadaia_workspace.core import session_store as session_identity
-
-    stale_id = "sess_pre01"
-    session_identity.write_session(
-        ws,
-        stale_id,
-        {
-            "session_id": stale_id,
-            "context": "myctx",
-            "mode": "READ",
-            "pid": 4242,
-            "bound_at": _stale_iso(ttl=300),
-            "ttl_seconds": 300,
-        },
-    )
-    fresh_id = "sess_pre02"
-    session_identity.write_session(
-        ws,
-        fresh_id,
-        {
-            "session_id": fresh_id,
-            "context": "myctx",
-            "mode": "READ",
-            "pid": 4242,
-            "bound_at": _fresh_iso(),
-            "ttl_seconds": 300,
-        },
-    )
-
-    doctor2 = _make_doctor(ws)
-    actions2 = doctor2.fix()
-
-    assert not (ws / ".dadaia" / "sessions" / f"{stale_id}.json").exists(), (
-        f"Pre-last_seen_at record stale by creation must be collected. Actions: {actions2}"
-    )
-    assert (ws / ".dadaia" / "sessions" / f"{fresh_id}.json").exists(), (
-        f"Pre-last_seen_at record fresh by creation must be spared. Actions: {actions2}"
-    )
 
 
 # ---------------------------------------------------------------------------

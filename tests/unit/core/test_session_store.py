@@ -75,10 +75,10 @@ def test_record_roundtrip_atomicity_and_fail_soft(tmp_path: Path) -> None:
     assert si.read_session(ws, "old-layout") == {"legacy": True}
 
 
-# --------------------------------------------------------------------------- last_seen_at / liveness_timestamp (T-011-04)
+# --------------------------------------------------------------------------- last_seen_at (T-011-04)
 
 
-def test_last_seen_at_and_liveness_timestamp_matrix(tmp_path: Path) -> None:
+def test_touch_last_seen_at(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
 
     # touch_last_seen_at stamps and persists.
@@ -93,23 +93,6 @@ def test_last_seen_at_and_liveness_timestamp_matrix(tmp_path: Path) -> None:
 
     # missing record -> None (fail-soft, no-op).
     assert si.touch_last_seen_at(ws, "ghost", now="2030-06-10T12:00:00+00:00") is None
-
-    # liveness_timestamp: prefers last_seen_at, falls back to bound_at/created_at, else "".
-    assert (
-        si.liveness_timestamp(
-            {"last_seen_at": "2030-06-10T12:00:00+00:00", "bound_at": "2020-01-01T00:00:00+00:00"}
-        )
-        == "2030-06-10T12:00:00+00:00"
-    )
-    assert (
-        si.liveness_timestamp({"bound_at": "2020-01-01T00:00:00+00:00"})
-        == "2020-01-01T00:00:00+00:00"
-    )
-    assert (
-        si.liveness_timestamp({"created_at": "2019-01-01T00:00:00+00:00"})
-        == "2019-01-01T00:00:00+00:00"
-    )
-    assert si.liveness_timestamp({"mode": "READ"}) == ""
 
 
 # ---------------------------------------------------------------------------
@@ -160,24 +143,39 @@ def test_a_record_carrying_the_retired_mode_and_release_keys_still_parses() -> N
     assert legacy["context"] == "alpha"
 
 
-def test_is_live_and_live_session(tmp_path: Path) -> None:
-    now = datetime.now(tz=UTC)
+@pytest.mark.parametrize(
+    ("record", "live"),
+    [
+        ({"last_seen_at": "2026-06-06T11:59:59+00:00", "ttl_seconds": 1800}, True),
+        ({"last_seen_at": "2026-06-06T11:59:59Z", "ttl_seconds": 1800}, True),
+        ({"last_seen_at": "2026-06-06T11:59:59", "ttl_seconds": 1800}, True),
+        ({"last_seen_at": "2026-06-06T11:30:00+00:00", "ttl_seconds": 1800}, False),
+        ({"last_seen_at": "2026-06-06T11:59:59+00:00", "ttl_seconds": 0}, False),
+        ({"last_seen_at": "2026-06-06T11:59:59+00:00", "ttl_seconds": "x"}, False),
+        ({"last_seen_at": "not-a-date", "ttl_seconds": 1800}, False),
+        ({"last_seen_at": "", "ttl_seconds": 1800}, False),
+        ({"bound_at": "2026-06-06T11:59:59+00:00", "ttl_seconds": 1800}, False),
+        ({}, False),
+    ],
+)
+def test_is_live_is_the_one_liveness_rule(record: dict[str, object], live: bool) -> None:
+    """Intent: CONTRACT — sa-session-liveness-has-two-rules: ``last_seen_at`` younger than
+    ``ttl_seconds`` (boundary stale) is live; a record without it (``bound_at`` only, the
+    retired creation-time fallback, §4a item 13) or with a corrupt clock/TTL is not."""
+    assert session_store.is_live(record, clock=lambda: datetime(2026, 6, 6, 12, tzinfo=UTC)) is live
+
+
+def test_live_session(tmp_path: Path) -> None:
     fresh = session_store.new_binding_record(
         session_id="sess-2",
         context="alpha",
         runtime="unknown",
         pid=1,
-        now=now.isoformat(),
+        now=datetime.now(tz=UTC).isoformat(),
     )
-    assert session_store.is_live(fresh)
     session_store.write_session(tmp_path, "sess-2", fresh)
     assert session_store.live_session(tmp_path, "sess-2") == fresh
-
-    stale = dict(fresh)
-    stale["last_seen_at"] = "2000-01-01T00:00:00+00:00"
-    stale["bound_at"] = "2000-01-01T00:00:00+00:00"
-    assert not session_store.is_live(stale)
-    session_store.write_session(tmp_path, "sess-3", stale)
+    session_store.write_session(tmp_path, "sess-3", {**fresh, "last_seen_at": "2000-01-01"})
     assert session_store.live_session(tmp_path, "sess-3") is None
     assert session_store.live_session(tmp_path, "sess-absent") is None
 
