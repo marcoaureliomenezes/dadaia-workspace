@@ -1,65 +1,12 @@
-"""Context-injection hook (the canonical, cross-platform gate surface).
+"""Context-injection hook (SessionStart, UserPromptSubmit, PostCompact).
 
-Invoked on SessionStart and UserPromptSubmit. It injects the lean workspace bootstrap
-(context line + the tech-stack section + catalog — FR30, T-044-60: the four-point dispatcher
-preflight restatement of the root `AGENTS.md` map §1/§2 is deleted; it is law, not state). A
-session-keyed sentinel
-guards re-injection: subsequent prompts emit nothing UNLESS this session's own bind is
-newer than the sentinel (T-50-03, SPEC v0.5.0 FR1 coupling 1) — bind is the SOLE trigger
-for context-memory injection.
-
-Bind-driven injection state machine (FR-W2-01 / FR-W2-02, v0.1.14; bound_at trigger,
-T-50-03)
------------------------------------------------------------------------------------
-Context NAME resolution (``_resolve_context``) delegates to the single resolution
-authority (the root `AGENTS.md` map §3, :func:`dadaia_workspace.core.invocation.resolve`): rung 0
-(none here) → ``DADAIA_CONTEXT`` env → this session's own live record (payload or env
-session id) → the repo containing the cwd → ``""``. There is no
-first-ALIVE fallback and — since T-50-03 — the bind-epoch marker subsystem is no longer
-consulted here: a session bound ONLY via a bind-epoch marker (no harness id, no
-``DADAIA_CONTEXT``) no longer resolves a context — the accepted FR1 coupling. T-50-04
-deletes the marker subsystem's attribution algorithm (``_newest_qualifying_marker``) and
-its harness-pid resolver (``_resolve_harness_pid``) outright — both had been uncalled
-from the injection path since T-50-03.
-
-The INJECTION TRIGGER (separate from name resolution, :func:`_session_bound_at`) is this
-session's own session record ``bound_at`` timestamp compared against the sentinel's mtime —
-not the resolved context name and not a bind-epoch marker's mtime. Re-injection rules:
-
-- **No sentinel for this sid** → whatever context resolves (if any) is injected
-  immediately and the sentinel is stamped — a session already bound before its first
-  prompt gets its context on that very first prompt.
-- **A LATER ``dadaia context bind`` than the sentinel** (this session's own record's
-  ``bound_at`` newer than the sentinel's mtime) → re-inject and restamp the sentinel,
-  even when the resolved context NAME is unchanged (**new pin, T-50-03**: a same-context
-  re-bind now re-injects — a re-bind is how a mode/release change reaches a live
-  session). A rebind to a DIFFERENT context also re-injects (the resolved name differs
-  from the sentinel's recorded slug, independent of ``bound_at``).
-- **Repeat prompt** (sentinel exists, no newer own-record ``bound_at``, same resolved
-  name) → silent.
-
-Parity invariants preserved verbatim from the rc-4 shell hook:
-
-- **Sentinel** keyed on the harness-native session id, path BYTE-IDENTICAL to the shell
-  sentinel ``.dadaia/tmp/ctx-inject-fired-<sessionId>``. Its CONTENT now carries the last
-  injected slug (or an empty marker for the generic-preflight case) so a re-bind is
-  detectable; an empty file remains a valid "already fired generic" sentinel.
-- **Session id resolution**: ``core.invocation.resolve_session_id`` (the one order),
-  default ``"workspace"``.
-- **Output contract**: ``DADAIA_HOOK_OUTPUT`` in {``codex-json``, ``json``} emits the
-  ``hookSpecificOutput.additionalContext`` envelope with ``hookEventName`` from
-  ``DADAIA_HOOK_EVENT`` (default ``UserPromptSubmit``); otherwise raw payload to stdout.
-- **Compact epoch (v0.2.8, kimi-code)**: with ``DADAIA_HOOK_EVENT=PostCompact`` the hook
-  stamps ``.dadaia/tmp/ctx-compact-<sessionId>`` AND re-emits the bootstrap on stdout
-  (observable contract; Kimi discards PostCompact stdout). The repeat-prompt guards
-  treat a compact marker NEWER than the sentinel as a re-injection trigger, so the next
-  ``UserPromptSubmit`` after a ``/compact`` re-injects the bootstrap exactly once
-  (the sentinel restamp makes subsequent prompts silent again). Harnesses that never wire
-  a PostCompact hook see byte-identical behavior — no marker, no trigger. This
-  compaction-recovery mechanism (and the ``recorded_slug`` sentinel fallbacks) is
-  untouched by T-50-03: the PostCompact / SessionStart(compact|clear) event blocks
-  resolve context and emit UNCONDITIONALLY on every fire, independent of ``bound_at``.
-"""
+Transport only: resolves the inputs, asks :func:`injection_policy.decide_injection`,
+executes the decision. The bind (``core.invocation``) names the context; the one
+re-injection predicate is "newer than this session's sentinel"
+(``.dadaia/tmp/ctx-inject-fired-<sid>``, content ``ctx=<slug>``) — for the session's
+own ``bound_at`` (a re-bind, same context included) and for the PostCompact marker
+(``ctx-compact-<sid>``). ``DADAIA_HOOK_OUTPUT`` in {codex-json, json} wraps the payload
+in ``hookSpecificOutput.additionalContext`` (event from ``DADAIA_HOOK_EVENT``)."""
 
 from __future__ import annotations
 
@@ -75,35 +22,17 @@ from dadaia_workspace.features.spec_context import injection_policy
 from dadaia_workspace.features.workspace import onboarding
 from dadaia_workspace.hooks import _common
 
-#: Lean fields kept in the INJECTED catalog digest. The heavy ``summary`` is dropped from
-#: the injection (catalog.json on disk is untouched — self-pull depth intact). Keeping
-#: slug/title/tldr/path is enough for the once-per-session first-pass scan; an agent
-#: that needs depth self-pulls the full atom (Step 0 memory bootstrap). ``rank`` is
-#: deliberately NOT injected (F-77): in catalog.json it is the 1-based alphabetical
-#: file order — a stable enumeration aid, not a priority signal — so injecting it
-#: would only invite agents to misread file order as importance.
+#: The injected catalog fields: ``summary`` is self-pulled; ``rank`` is file order, not
+#: priority (F-77).
 _DIGEST_FIELDS: tuple[str, ...] = ("slug", "title", "tldr", "path")
 
-#: Filename prefix of the once-per-session sentinel (``ctx-inject-fired-<sessionId>``).
 _SENTINEL_PREFIX = "ctx-inject-fired-"
-
-#: Filename prefix of the per-session compact-epoch marker (``ctx-compact-<sessionId>``),
-#: stamped by the PostCompact hook event (v0.2.8, kimi-code) and consumed by the
-#: repeat-prompt guards as a re-injection trigger (mtime > sentinel mtime).
 _COMPACT_PREFIX = "ctx-compact-"
 
 
 def _session_bound_at(workspace: Path, session_id: str) -> float | None:
-    """This session's own record ``bound_at``, as an epoch float, else ``None``.
-
-    T-50-03 (SPEC v0.5.0 FR1 coupling 1) — the INJECTION TRIGGER's source of truth. The
-    session record's ``bound_at`` field is written by ``dadaia context bind``
-    (``cli/commands/context.py``) on EVERY successful bind — including a same-context
-    re-bind, which refreshes it — replacing the bind-epoch marker mtime the trigger used
-    to compare. Fail-soft: an absent record, a missing/non-string/malformed ``bound_at``,
-    or any parse error yields ``None`` (never a trigger — the caller degrades to "no
-    rebind observed", never a crash).
-    """
+    """This session's own record ``bound_at`` (written by every bind) as epoch
+    seconds, else ``None`` — fail-soft, never a trigger."""
     record = session_store.read_session(workspace, session_id)
     if not isinstance(record, dict):
         return None
@@ -144,14 +73,8 @@ def _emit(payload: str) -> None:
 
 
 def _digest_catalog(raw: str) -> str:
-    """Return a tldr-digest of ``catalog.json`` text: drop ``summary``, keep lean fields.
-
-    Each feature is reduced to :data:`_DIGEST_FIELDS` (slug/title/tldr/path — ``rank``
-    is excluded: it is alphabetical file order, not priority). The catalog FILE is
-    never modified — this operates on the read-in text and returns the smaller string
-    to INJECT. On any parse failure the raw text is returned verbatim (fail-open: a
-    malformed catalog must not break the bootstrap).
-    """
+    """The catalog reduced to :data:`_DIGEST_FIELDS` per feature; the raw text when
+    it does not parse (fail-open)."""
     try:
         data = json.loads(raw)
     except (json.JSONDecodeError, ValueError):
@@ -169,20 +92,12 @@ def _digest_catalog(raw: str) -> str:
     return json.dumps({"features": digested}, ensure_ascii=False, indent=2)
 
 
-#: The ``ARCHITECTURE.md`` section carrying the tech stack — the one place the stack is
-#: stated since ``TECHSTACK.md`` left the canon at specs_pattern_version 7.
 _TECH_STACK_HEADING = "## Tech Stack"
 
 
 def _tech_stack_section(raw: str) -> str:
-    """Return ``ARCHITECTURE.md``'s ``## Tech Stack`` section verbatim, heading included.
-
-    The section runs to the next ``## `` heading (or EOF). It is emitted whole, not
-    digested: the section is already the bounded statement of the stack, and the digest
-    it replaces truncated mid-list and told the agent to self-pull the rest — a pointer
-    to a file the agent had no reason to believe was incomplete. A tree with no such
-    section yields the empty string, and the caller emits nothing.
-    """
+    """``ARCHITECTURE.md``'s ``## Tech Stack`` section, whole, to the next ``## ``;
+    ``""`` when absent."""
     lines = raw.splitlines()
     try:
         start = next(i for i, line in enumerate(lines) if line.strip() == _TECH_STACK_HEADING)
@@ -196,16 +111,8 @@ def _tech_stack_section(raw: str) -> str:
 
 
 def _build_memory(specs_dir: Path) -> str:
-    """Build the once-per-session LEAN memory bootstrap: tech digest + catalog digest.
-
-    WS-C (v0.1.30 / T-30-E-05): this is a session-orientation bootstrap for an interactive
-    agent session — a lightweight orientation aid, not the full memory tree. The agent
-    self-pulls deeper atoms (e.g. ``ARCHITECTURE.md``, a specific product atom) directly when
-    a decision needs them, per the ``dd-spec-navigator`` skill (memory-bootstrap phase). So the bootstrap
-    stays lean — ``ARCHITECTURE.md``'s ``## Tech Stack`` section + the lean catalog
-    tldr-digest, never the full memory tree, and never the fixed law blocks the law
-    chain already loads.
-    """
+    """The lean bootstrap: the tech-stack section + the catalog digest (else
+    ``index.md``); deeper atoms are self-pulled (``dd-spec-navigator``)."""
     memory_dir = specs_dir / "memory"
     if not memory_dir.is_dir():
         return ""
@@ -228,18 +135,11 @@ def _build_memory(specs_dir: Path) -> str:
     return "\n".join(parts)
 
 
-#: Sentinel-content prefix recording the last injected context slug. A sentinel whose
-#: content is ``ctx=<slug>`` already injected that slug's memory; an empty/legacy sentinel
-#: (no prefix) is treated as the generic-preflight state (no slug injected yet).
 _SENTINEL_SLUG_PREFIX = "ctx="
 
 
 def _read_sentinel(sentinel: Path) -> tuple[float | None, str]:
-    """Return ``(mtime, recorded_slug)`` for the sentinel, or ``(None, "")`` if absent.
-
-    The recorded slug is parsed from the ``ctx=<slug>`` content line; an empty or legacy
-    sentinel yields ``""`` (generic-preflight state). Fail-soft on any OS error.
-    """
+    """``(mtime, recorded slug)``; ``(None, "")`` when absent (fail-soft)."""
     try:
         mtime = sentinel.stat().st_mtime
     except OSError:
@@ -329,52 +229,34 @@ def main() -> int:
 
     session_id = _common.resolve_session_id(payload, default="workspace")
 
-    # Sentinel — path BYTE-IDENTICAL to the shell sentinel: .dadaia/tmp/ctx-inject-fired-<id>.
-    # Its content records the last injected slug so a re-bind is detectable. Sentinel
-    # GC (0.4.7 FR6b) is owned by doctor.reap(), never inject-time.
     tmp_dir = workspace / workspace_layout.MARKER_DIR
     sentinel = tmp_dir / f"{_SENTINEL_PREFIX}{session_id}"
+    compact_marker = tmp_dir / f"{_COMPACT_PREFIX}{session_id}"
     sentinel_mtime, recorded_slug = _read_sentinel(sentinel)
-
     event: injection_policy.Event = "prompt"
-    if os.environ.get("DADAIA_HOOK_EVENT") == "PostCompact":
-        # Kimi PostCompact (v0.2.8): stamp the compact-epoch marker (transport side
-        # effect — the next UserPromptSubmit re-injects deterministically), then emit
-        # per the policy. Kimi discards this stdout (observation-only), so the
-        # emission is the observable contract, never a double-inject.
+    if os.environ.get("DADAIA_HOOK_EVENT") == "PostCompact":  # Kimi: stamp, then emit
         event = "postcompact"
         with contextlib.suppress(OSError):
             tmp_dir.mkdir(parents=True, exist_ok=True)
-            (tmp_dir / f"{_COMPACT_PREFIX}{session_id}").write_text("", encoding="utf-8")
-    elif str(payload.get("hook_event_name") or "") == "SessionStart" and str(
-        payload.get("source") or ""
-    ) in ("compact", "clear"):
-        # Claude Code SessionStart re-injection (bug claude-compact-reinjection-missing):
-        # detection is payload-driven (hook_event_name + source), never an env prefix.
-        # Sources outside {compact, clear} (startup/resume/fork) stay normal prompts.
+            compact_marker.write_text("", encoding="utf-8")
+    elif payload.get("hook_event_name") == "SessionStart" and payload.get("source") in (
+        "compact",
+        "clear",
+    ):  # Claude Code re-entry (bug claude-compact-reinjection-missing)
         event = "session_restart"
 
-    compact_marker = tmp_dir / f"{_COMPACT_PREFIX}{session_id}"
-    compact_mtime: float | None = None
-    with contextlib.suppress(OSError):
-        compact_mtime = compact_marker.stat().st_mtime
-    compacted = (
-        sentinel_mtime is not None and compact_mtime is not None and compact_mtime > sentinel_mtime
-    )
+    def newer(stamp: float | None) -> bool:
+        """The one re-injection predicate: *stamp* is newer than the sentinel."""
+        return sentinel_mtime is not None and stamp is not None and stamp > sentinel_mtime
 
-    # T-50-03 injection trigger: this session's OWN bind (bound_at, self-keyed session
-    # record) newer than the sentinel — a same-context re-bind is how a mode/release
-    # change reaches a live session.
-    bound_at = _session_bound_at(workspace, session_id)
-    rebound = sentinel_mtime is not None and bound_at is not None and bound_at > sentinel_mtime
-
+    compact_mtime = _read_sentinel(compact_marker)[0]
     decision = injection_policy.decide_injection(
         event=event,
         context=_resolve_context(payload),
         recorded_slug=recorded_slug,
         sentinel_exists=sentinel_mtime is not None,
-        compacted=compacted,
-        rebound=rebound,
+        compacted=newer(compact_mtime),
+        rebound=newer(_session_bound_at(workspace, session_id)),
     )
 
     own = _common.resolve_session_id(payload) or None
