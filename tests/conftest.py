@@ -39,6 +39,7 @@ import sys
 import tempfile
 from collections.abc import Iterator, Sequence
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -311,8 +312,7 @@ def _no_real_venv_in_tests() -> Iterator[None]:
        reach, which rebuilt a real venv (~19 s unloaded / 242 s loaded) AND exercised
        whatever dadaia happened to be installed in the ambient interpreter instead of
        the source under test. The runner is patched to execute ``init`` in-process via
-       the CLI app (same argv contract), where the venv stub above applies. Every other
-       argv passes through to the real subprocess runner untouched.
+       the CLI app (same argv contract), where the venv stub above applies.
     """
     from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
     from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner
@@ -329,7 +329,7 @@ def _no_real_venv_in_tests() -> Iterator[None]:
         argv: Sequence[str],
         *,
         cwd: Path | None = None,
-        timeout: float | None = None,
+        **kw: Any,
     ) -> ProcessResult:
         argv = list(argv)
         if argv and Path(argv[0]).name.startswith("dadaia") and argv[1:2] == ["init"]:
@@ -340,7 +340,7 @@ def _no_real_venv_in_tests() -> Iterator[None]:
             target = Path(cwd) if cwd is not None else Path.cwd()
             result = CliRunner().invoke(app, ["init", str(target), *argv[2:]])
             return ProcessResult(returncode=result.exit_code, stdout=result.output, stderr="")
-        return real_run(self, argv, cwd=cwd, timeout=timeout)
+        return real_run(self, argv, cwd=cwd, **kw)
 
     mp = pytest.MonkeyPatch()
     mp.setattr(VenvPythonEnvironmentManager, "ensure_workspace_venv", _fake_ensure, raising=True)
