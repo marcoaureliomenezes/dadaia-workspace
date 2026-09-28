@@ -54,7 +54,7 @@ Lanes: PLAN §2 FR10; files and lines: `AGGREGATE.md` §6.
 - [x] **T-050-74 — L1.6 test-only items (§4a 21–29; `TestAutopilot` kept).** `W:` tests · `blocked by:` T-050-69 · `delivers:` §6 W1 · Δ 0/−540.
 - [x] **T-050-75 — L2.9 hook dialects, one verifier.** `W:` `i/` · `blocked by:` T-050-41, -44, -52 · `delivers:` `sa-hook-files-written-by-table-and-by-hand`, `sa-projected-file-judged-by-four-verifiers` · Δ −360.
 - [ ] **T-050-76 — L2.10 codex fold.** `W:` `i/`, `f/public/` · `blocked by:` T-050-41, -44, -52 · `delivers:` `sa-codex-effort-set-by-policy-and-by-tier`, `sa-frontmatter-split-five-ways` · Δ −160.
-- [ ] **T-050-77 — L2.11 infra small.** `W:` `i/` · `blocked by:` T-050-41, -44, -52 · `delivers:` §6 W2c · Δ −235.
+- [x] **T-050-77 — L2.11 infra small.** `W:` `i/` · `blocked by:` T-050-41, -44, -52 · `delivers:` §6 W2c · Δ −235.
 - [x] **T-050-78 — L2.12 core.** `W:` `core/` · `blocked by:` T-050-41, -44, -52 · `delivers:` `sa-json-schema-validated-by-two-engines`, `sa-agent-model-resolved-by-two-modules` · Δ −620.
 - [ ] **T-050-79 — L2.13 cli-features.** `W:` `f/{spec_context,chokepoints,ci_preflight}/`, `cli/commands/context.py` · `blocked by:` T-050-41, -44, -52 · `delivers:` §6 W2c · Δ −420.
 - [ ] **T-050-80 — L2.14 hooks.** `W:` `hooks/ctx_inject.py` · `blocked by:` T-050-41, -44, -52 · `delivers:` §6 W2c · Δ −50.
