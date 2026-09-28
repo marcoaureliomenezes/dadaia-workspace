@@ -17,7 +17,6 @@ import pytest
 
 from tests.helpers.golden_platform import (
     assert_golden,
-    canon_env_line,
     is_env_doctor_line,
     norm_path_line,
     norm_stderr,
@@ -66,46 +65,6 @@ def test_norm_path_line_table(tmp_path: Path, name: str, line_fn: object, expect
 
 
 # ---------------------------------------------------------------------------
-# canon_env_line — OS-phrase leak class (D-CX-9)
-# ---------------------------------------------------------------------------
-
-_DCX9_CANON = "[unsupported] codex hook wrapper probe failed .dadaia/hooks/pre_gate.sh (D-CX-9)"
-
-
-@pytest.mark.parametrize(
-    ("name", "raw", "expected"),
-    [
-        (
-            "linux_phrasing",
-            "[error] codex hook wrapper probe .dadaia/hooks/pre_gate.sh: exited 127 "
-            "missing executable /usr/bin/python (D-CX-9)",
-            _DCX9_CANON,
-        ),
-        (
-            "windows_phrasing",
-            "[error] codex hook wrapper probe .dadaia/hooks/pre_gate.sh: launch failed "
-            "[WinError 193] %1 is not a valid Win32 application (D-CX-9)",
-            _DCX9_CANON,
-        ),
-        (
-            "unrelated_line_untouched",
-            "[ok] stage:agents/x.md",
-            "[ok] stage:agents/x.md",
-        ),
-    ],
-)
-def test_canon_env_line_table(name: str, raw: str, expected: str) -> None:
-    assert canon_env_line(raw) == expected
-    if name == "linux_phrasing":
-        # The two OS phrasings of the SAME probe failure become one canonical line.
-        windows = (
-            "[error] codex hook wrapper probe .dadaia/hooks/pre_gate.sh: "
-            "[WinError 193] %1 is not a valid Win32 application (D-CX-9)"
-        )
-        assert canon_env_line(raw) == canon_env_line(windows) == _DCX9_CANON
-
-
-# ---------------------------------------------------------------------------
 # sort_line_lists — iteration-order leak class
 # ---------------------------------------------------------------------------
 
@@ -119,21 +78,13 @@ def test_sort_line_lists_locks_sorted_multiset_recurses_and_leaves_mixed_untouch
     assert sort_line_lists(windows_order) != sort_line_lists(windows_order[:-1])
 
     obj = {
-        "doctor": [
-            "[error] codex hook wrapper probe .dadaia/hooks/w.sh: exited 127 (D-CX-9)",
-            "[ok] a",
-        ],
+        "doctor": ["[ok] b", "[ok] a"],
         "nested": {"install": ["b", "a"]},
         "scalar": 3,
     }
     out = sort_line_lists(obj)
-    # NOTE the sorted order: '[ok]' < '[unsupported]' lexically, so the canonicalized
-    # probe line now sorts AFTER the ok line (it sorted first as '[error]').
     assert out == {
-        "doctor": [
-            "[ok] a",
-            "[unsupported] codex hook wrapper probe failed .dadaia/hooks/w.sh (D-CX-9)",
-        ],
+        "doctor": ["[ok] a", "[ok] b"],
         "nested": {"install": ["a", "b"]},
         "scalar": 3,
     }

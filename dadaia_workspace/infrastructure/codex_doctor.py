@@ -147,13 +147,6 @@ def dcx9_codex_hook_shape(workspace_root: Path) -> list[DoctorLine]:
 
     wrappers = hook_wrapper_contents(HARNESS_RECORDS["codex"])
     expected = {hook_wrapper_command(name) for name in wrappers}
-    # The exec probe feeds a fake hook payload on stdin: a no-op for a ``hooks.*`` module,
-    # a real run for the CLI reaper wrapper — a doctor never mutates, so it is not probed.
-    probeable = {
-        command
-        for command in expected
-        if "-m dadaia_workspace.hooks." in wrappers[Path(command).name]
-    }
     commands = set(_codex_hook_commands(hooks))
     missing = expected - commands
     for command in sorted(missing):
@@ -178,43 +171,6 @@ def dcx9_codex_hook_shape(workspace_root: Path) -> list[DoctorLine]:
             out.append(
                 DoctorLine(
                     DoctorStatus.ERROR, f"codex hook wrapper not executable {command} (D-CX-9)"
-                )
-            )
-            continue
-        if command not in probeable:
-            continue
-        try:
-            proc = subprocess.run(
-                [str(wrapper)],
-                input='{"session_id":"doctor","tool_name":"Read","tool_input":{}}',
-                capture_output=True,
-                text=True,
-                cwd=workspace_root,
-                timeout=10,
-                check=False,
-            )
-        except (OSError, subprocess.SubprocessError) as exc:
-            out.append(
-                DoctorLine(
-                    DoctorStatus.UNSUPPORTED,
-                    f"codex hook wrapper launch failed {command}: {exc} (D-CX-9)",
-                )
-            )
-            continue
-        if proc.returncode != 0:
-            detail = (proc.stderr or proc.stdout).strip().splitlines()
-            suffix = f": {detail[0]}" if detail else ""
-            # The exec probe's outcome is ENVIRONMENT-phrased (exit 127 = the venv
-            # runtime is absent; other exits/launch failures vary by host and are
-            # canonicalized as probe noise by the golden helpers). Reinstalling
-            # projections can never fix an environment, so probe outcomes are
-            # UNSUPPORTED (visible, non-blocking). The deterministic misconfig
-            # findings above — wrapper missing, not executable, wrong command path —
-            # remain blocking: those an install genuinely repairs.
-            out.append(
-                DoctorLine(
-                    DoctorStatus.UNSUPPORTED,
-                    f"codex hook wrapper exited {proc.returncode} {command}{suffix} (D-CX-9)",
                 )
             )
     return out
