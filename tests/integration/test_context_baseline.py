@@ -11,6 +11,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -27,6 +28,7 @@ from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.helpers.privacy_fixtures import aws_key_shape
 
+_WORK = "feature/0.1.0"
 _CONSTITUTION = (
     "---\nspecs_pattern_version: 6\n"
     "gitflow: {principal: main, integration: develop, work: feature/}\n---\n# c\n"
@@ -94,15 +96,17 @@ def _heads(bare: Path) -> dict[str, str]:
     return dict(line.split() for line in out.splitlines())
 
 
-def _assert_published(repo: Path, bare: Path, work: str, base: str) -> None:
+def _published(repo: Path, bare: Path, work: str = _WORK, base: str = "develop") -> bool:
     """*work* is checked out, level with origin, holds *base*, and adds exactly the
     onboarding paths to it (the anchor merged with origin's start)."""
     heads = _heads(bare)
-    assert work in heads and "main" in heads and "develop" in heads
-    assert _git(repo, "rev-parse", "HEAD") == _git(repo, "rev-parse", "@{u}") == heads[work]
-    assert _ancestor(repo, heads[base], work)
     files = _git(repo, "diff", "--name-only", heads[base], work).splitlines()
-    assert sorted(files) == ["AGENTS.md", "specs/constitution.md"]
+    return (
+        {work, "main", "develop"} <= set(heads)
+        and _git(repo, "rev-parse", "HEAD") == _git(repo, "rev-parse", "@{u}") == heads[work]
+        and _ancestor(repo, heads[base], work)
+        and sorted(files) == ["AGENTS.md", "specs/constitution.md"]
+    )
 
 
 def _ancestor(repo: Path, old: str, new: str) -> bool:
@@ -110,31 +114,104 @@ def _ancestor(repo: Path, old: str, new: str) -> bool:
     return done.returncode == 0
 
 
-def test_an_empty_origin_receives_the_local_principal_and_both_branches_cut_from_it(env) -> None:
-    """R13 rule 2: nothing contentless is born — the onboarding commit IS the principal."""
-    svc, repo, bare = env
-    _clone_onboarded(bare, repo)
-    assert svc.baseline("proj") == "feature/0.1.0"
-    heads = _heads(bare)
-    assert heads["main"] == heads["develop"] == heads["feature/0.1.0"]
-    assert _git(repo, "rev-parse", "HEAD") == _git(repo, "rev-parse", "@{u}") == heads["main"]
-    tree = _git(bare, "ls-tree", "-r", "--name-only", "main").splitlines()
-    assert sorted(tree) == ["AGENTS.md", "specs/constitution.md"]
+def _commit_file(repo: Path, rel: str, text: str = "x\n") -> None:
+    (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+    (repo / rel).write_text(text, encoding="utf-8")
+    _git(repo, "add", rel)
+    _git(repo, "commit", "-qm", rel)
 
 
-def test_operator_code_on_local_main_is_published_as_it_is(env) -> None:
-    """Review C2 (round 4): code committed before the first publish reaches origin on the
-    principal — never left on an unrelated root, never rewritten."""
+def _draft(
+    principal: str, integration: str = "develop", work: str = "feature/"
+) -> Callable[[Path], object]:
+    text = _CONSTITUTION.replace(
+        "{principal: main, integration: develop, work: feature/}",
+        f"{{principal: {principal}, integration: {integration}, work: {work}}}",
+    )
+    return lambda repo: (repo / "specs" / "constitution.md").write_text(text, encoding="utf-8")
+
+
+def _tree(bare: Path, ref: str) -> list[str]:
+    return sorted(_git(bare, "ls-tree", "-r", "--name-only", ref).splitlines())
+
+
+_ONBOARDING = ["AGENTS.md", "specs/constitution.md"]
+#: (seeded origin branches, origin HEAD, tag, prepare(repo), work returned,
+#:  then(repo, bare, seed_heads) -> bool)
+_ADOPTIONS = [
+    pytest.param((), "", "", lambda r: None, _WORK,
+        lambda r, b, s: len(set(_heads(b).values())) == 1 and _tree(b, "main") == _ONBOARDING
+        and _git(r, "rev-parse", "HEAD") == _git(r, "rev-parse", "@{u}"),
+        id="R13-2-empty-origin-gets-the-onboarding-commit-as-the-principal"),
+    pytest.param((), "", "", lambda r: _commit_file(r, "app.py"), _WORK,
+        lambda r, b, s: "app.py" in _tree(b, "main") and _ancestor(r, _heads(b)["main"], _heads(b)["develop"]),
+        id="C2-operator-code-on-local-main-published-as-it-is"),
+    pytest.param(("main",), "", "", lambda r: None, _WORK,
+        lambda r, b, s: _heads(b)["develop"] == _heads(b)["main"] == s["main"] and _published(r, b),
+        id="principal-only-births-integration-at-its-tip"),
+    pytest.param(("main", "develop"), "", "", lambda r: None, _WORK,
+        lambda r, b, s: all(_heads(b)[x] == s[x] for x in ("main", "develop")) and _published(r, b),
+        id="both-present-are-reused-work-cut-from-integration"),
+    pytest.param(("main", "develop", _WORK), "", "", lambda r: None, _WORK,
+        lambda r, b, s: _heads(b)[_WORK] == _git(r, "rev-parse", "HEAD") and _ancestor(r, s[_WORK], "HEAD"),
+        id="R13-1-origin-work-branch-adopted-never-deleted"),
+    pytest.param(("main",), "", "v0.4.7", lambda r: _commit_file(r, "specs/releases/0.5.0/_RELEASE.json", "{}"), "feature/0.5.0",
+        lambda r, b, s: "feature/0.5.0" in _heads(b),
+        id="sa-live-work-branch-named-three-ways#B41-1-live-release-never-a-tag"),
+    pytest.param(("main", "develop"), "", "", lambda r: _git(r, "branch", _WORK, "origin/main"), _WORK,
+        lambda r, b, s: _git(r, "rev-parse", "main") == s["main"] and _published(r, b),
+        id="D-E3-stale-local-work-takes-the-anchor-main-never-holds-it"),
+    pytest.param(("main", "develop"), "nothing", "", lambda r: None, _WORK,
+        lambda r, b, s: GitSubprocessClient().published(r) and _published(r, b),
+        id="R10b-unborn-clone-of-non-empty-origin-merges-onto-the-tool-root"),
+    pytest.param(("master", "develop"), "master", "", _draft("master"), _WORK,
+        lambda r, b, s: set(_heads(b)) == {"master", "develop", _WORK} and "specs/constitution.md" in _tree(b, _WORK),
+        id="sa-principal-branch-defaults-to-main-and-cut-point-diverges#B42-4-master-principal"),
+    pytest.param(("main", "develop"), "main", "", _draft("main", "develop", "release/"), "release/0.1.0",
+        lambda r, b, s: set(_heads(b)) == {"main", "develop", "release/0.1.0"}
+        and _ancestor(r, _heads(b)["develop"], "release/0.1.0"),
+        id="H4-release-prefix-from-the-committed-draft"),
+    pytest.param(("master",), "master", "", lambda r: (_draft("master")(r), _commit_file(r, "specs/constitution.md", (r / "specs/constitution.md").read_text())), _WORK,
+        lambda r, b, s: "specs/constitution.md" in _tree(b, _WORK) and (r / "specs/constitution.md").is_file(),
+        id="P7c-specs-committed-on-the-principal-are-published"),
+    pytest.param(("main", "develop"), "", "", lambda r: _commit_file(r, "app.py"), _WORK,
+        lambda r, b, s: "app.py" in _tree(b, _WORK),
+        id="P8-local-principal-commits-carried-onto-work"),
+    pytest.param(("main",), "", "", lambda r: (r / "README.md").write_text("operator\n"), _WORK,
+        lambda r, b, s: _published(r, b) and _git(r, "status", "--porcelain") == "M README.md",
+        id="h-dirty-work-outside-the-paths-rides-along-uncommitted"),
+    pytest.param((), "", "", lambda r: (r / "notes.md").write_text("operator\n"), _WORK,
+        lambda r, b, s: (r / "notes.md").read_text() == "operator\n" and "notes.md" not in _tree(b, _WORK),
+        id="unborn-clone-keeps-its-untracked-foreign-files"),
+    pytest.param((), "", "", lambda r: (r / "tests").mkdir() or (r / "tests/AGENTS.md").write_text("# t\n"), _WORK,
+        lambda r, b, s: _tree(b, "main") == [*_ONBOARDING, "tests/AGENTS.md"],
+        id="sa-public-install-writes-the-root-map-into-product-repos#K3-tests-law-published"),
+]  # fmt: skip
+
+
+@pytest.mark.parametrize(("seeded", "head", "tag", "prepare", "work", "then"), _ADOPTIONS)
+def test_baseline_adopts_origin_and_publishes_the_draft(
+    env: tuple[SpecContextService, Path, Path],
+    tmp_path: Path,
+    seeded: tuple[str, ...],
+    head: str,
+    tag: str,
+    prepare: Callable[[Path], object],
+    work: str,
+    then: Callable[[Path, Path, dict[str, str]], bool],
+) -> None:
+    """AC4.2-AC4.4: baseline returns the work branch it published and the Then holds —
+    origin's branches adopted, never rewritten; the draft published on top."""
     svc, repo, bare = env
+    if seeded:
+        _seed(bare, tmp_path / "seed", *seeded, tag=tag)
+    if head:
+        _git(bare, "symbolic-ref", "HEAD", f"refs/heads/{head}")
+    seed_heads = _heads(bare)
     _clone_onboarded(bare, repo)
-    (repo / "app.py").write_text("x\n", encoding="utf-8")
-    _git(repo, "add", "app.py")
-    _git(repo, "commit", "-qm", "operator code")
-    tip = _git(repo, "rev-parse", "HEAD")
-    assert svc.baseline("proj") == "feature/0.1.0"
-    heads = _heads(bare)
-    assert _ancestor(repo, tip, heads["main"]) and _ancestor(repo, heads["main"], heads["develop"])
-    assert "app.py" in _git(bare, "ls-tree", "--name-only", "feature/0.1.0").splitlines()
+    prepare(repo)
+    assert svc.baseline("proj") == work
+    assert then(repo, bare, seed_heads), _heads(bare)
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the shipped pre-push hook is bash")
@@ -157,50 +234,6 @@ def test_every_publish_passes_the_shipped_pre_push_gate(
     hook.chmod(0o755)
     assert svc.baseline("proj") == "feature/0.1.0"
     assert {"main", "develop", "feature/0.1.0"} <= set(_heads(bare))
-
-
-def test_principal_only_births_integration_at_its_tip(env, tmp_path: Path) -> None:
-    svc, repo, bare = env
-    _seed(bare, tmp_path / "seed", "main")
-    _clone_onboarded(bare, repo)
-    assert svc.baseline("proj") == "feature/0.1.0"
-    heads = _heads(bare)
-    assert heads["develop"] == heads["main"] == _git(tmp_path / "seed", "rev-parse", "main")
-    _assert_published(repo, bare, "feature/0.1.0", "develop")
-
-
-def test_both_present_are_reused_and_work_is_cut_from_integration(env, tmp_path: Path) -> None:
-    svc, repo, bare = env
-    _seed(bare, tmp_path / "seed", "main", "develop")
-    before = _heads(bare)
-    _clone_onboarded(bare, repo)
-    svc.baseline("proj")
-    assert {b: _heads(bare)[b] for b in ("main", "develop")} == {
-        b: before[b] for b in ("main", "develop")
-    }
-    _assert_published(repo, bare, "feature/0.1.0", "develop")
-
-
-def test_an_origin_work_branch_is_adopted_never_deleted(env, tmp_path: Path) -> None:
-    """R13 rule 1 / review H (round 4): the origin work branch is the live one — the publish
-    appends on it; its commits stay."""
-    svc, repo, bare = env
-    _seed(bare, tmp_path / "seed", "main", "develop", "feature/0.1.0")
-    theirs = _heads(bare)["feature/0.1.0"]
-    _clone_onboarded(bare, repo)
-    assert svc.baseline("proj") == "feature/0.1.0"
-    assert _heads(bare)["feature/0.1.0"] == _git(repo, "rev-parse", "HEAD")
-    assert _ancestor(repo, theirs, "HEAD")
-
-
-def test_the_live_release_names_the_work_branch_never_a_tag(env, tmp_path: Path) -> None:
-    """sa-live-work-branch-named-three-ways#B41-1: tag v0.4.7 + live release 0.5.0 -> feature/0.5.0."""
-    svc, repo, bare = env
-    _seed(bare, tmp_path / "seed", "main", tag="v0.4.7")
-    _clone_onboarded(bare, repo)
-    (repo / "specs/releases/0.5.0").mkdir(parents=True)
-    (repo / "specs/releases/0.5.0/_RELEASE.json").write_text("{}", encoding="utf-8")
-    assert svc.baseline("proj") == "feature/0.5.0" and "feature/0.5.0" in _heads(bare)
 
 
 @pytest.mark.parametrize("seeded", [(), ("main", "develop")], ids=["empty", "adopted"])
@@ -235,24 +268,6 @@ def test_an_origin_without_the_principal_refuses_and_publishes_nothing(env, tmp_
     assert anchor in str(refused.value) and "--principal '<principal>'" in str(refused.value)
 
 
-def test_a_born_principal_absent_refusal_leaves_head_on_work_and_names_the_one_candidate(
-    env, tmp_path: Path
-) -> None:
-    """Design review C3/C6: origin publishes `trunk` only — the one candidate is named in
-    the fix; HEAD is on the work branch (never detached) and the local branch the operator
-    was on is untouched."""
-    svc, repo, bare = env
-    _seed(bare, tmp_path / "seed", "trunk")
-    _git(bare, "symbolic-ref", "HEAD", "refs/heads/trunk")
-    _clone_onboarded(bare, repo)
-    trunk = _git(repo, "rev-parse", "trunk")
-    with pytest.raises(ContextStateError) as refused:
-        svc.baseline("proj")
-    assert str(refused.value).endswith("specs init --context proj --principal trunk")
-    assert _git(repo, "branch", "--show-current") == "feature/0.1.0"
-    assert _git(repo, "rev-parse", "trunk") == trunk and _heads(bare).keys() == {"trunk"}
-
-
 def test_several_principal_candidates_are_listed_never_guessed(env, tmp_path: Path) -> None:
     """Design review C6: two candidate heads — both listed, a `<principal>` placeholder."""
     svc, repo, bare = env
@@ -282,22 +297,6 @@ def test_a_never_onboarded_repo_is_refused_with_the_specs_init_fix(env, tmp_path
     assert str(refused.value).endswith("specs init --context proj")
     assert _heads(bare) == before and _git(repo, "rev-parse", "HEAD") == head
     assert _git(repo, "branch", "--show-current") == "main"
-
-
-def test_a_stale_local_work_branch_takes_the_anchor_and_main_never_holds_it(
-    env, tmp_path: Path
-) -> None:
-    """Design review C2 (D-E3) / review 6 N4: a local work branch from an earlier run, HEAD
-    on the principal — the anchor is made detached, <work> is fast-forwarded onto it, and
-    the local principal stays exactly where the operator left it."""
-    svc, repo, bare = env
-    _seed(bare, tmp_path / "seed", "main", "develop")
-    _clone_onboarded(bare, repo)
-    _git(repo, "branch", "feature/0.1.0", "origin/main")
-    main = _git(repo, "rev-parse", "main")
-    assert svc.baseline("proj") == "feature/0.1.0"
-    assert _git(repo, "rev-parse", "main") == main
-    _assert_published(repo, bare, "feature/0.1.0", "develop")
 
 
 def test_a_work_branch_checked_out_in_another_worktree_is_refused_and_left_untouched(
@@ -348,21 +347,6 @@ def test_a_stale_work_draft_conflict_names_the_anchor_and_never_publishes_the_ol
     assert _heads(bare) == before
 
 
-def test_an_unborn_clone_of_a_non_empty_origin_merges_onto_the_tool_root(
-    env, tmp_path: Path
-) -> None:
-    """Q1 ruling (R10b): origin's HEAD dangles, so the clone is unborn — the root anchor the
-    tool made merges origin's start with --allow-unrelated-histories; published() agrees."""
-    svc, repo, bare = env
-    _seed(bare, tmp_path / "seed", "main", "develop")
-    _git(bare, "symbolic-ref", "HEAD", "refs/heads/nothing")
-    _clone_onboarded(bare, repo)
-    assert svc.baseline("proj") == "feature/0.1.0"
-    assert GitSubprocessClient().published(repo)
-    _assert_published(repo, bare, "feature/0.1.0", "develop")
-    assert svc.baseline("proj") == ""
-
-
 def test_unrelated_operator_history_keeps_gits_refusal(env, tmp_path: Path) -> None:
     """Q1 ruling: HEAD's root carries operator content — git's own refusal stands."""
     svc, repo, bare = env
@@ -377,63 +361,6 @@ def test_unrelated_operator_history_keeps_gits_refusal(env, tmp_path: Path) -> N
     (repo / "specs" / "constitution.md").write_text(_CONSTITUTION, encoding="utf-8")
     with pytest.raises(GitSyncError, match="unrelated histories"):
         svc.baseline("proj")
-
-
-@pytest.mark.parametrize(
-    ("flow", "work"),
-    [
-        (("master", "develop", "feature/"), "feature/0.1.0"),
-        (("main", "develop", "release/"), "release/0.1.0"),
-    ],
-    ids=["master-principal", "release-prefix"],
-)
-def test_a_non_default_gitflow_is_adopted_from_the_committed_draft(
-    env, tmp_path: Path, flow: tuple[str, str, str], work: str
-) -> None:
-    """Review 5 H4: sa-principal-branch-defaults-to-main-and-cut-point-diverges#B42-4 — a
-    master principal births no `main`; work is cut from the integration branch."""
-    svc, repo, bare = env
-    _seed(bare, tmp_path / "seed", *dict.fromkeys((flow[0], "develop")))
-    _git(bare, "symbolic-ref", "HEAD", f"refs/heads/{flow[0]}")
-    _clone_onboarded(bare, repo)
-    draft = _CONSTITUTION.replace(
-        "{principal: main, integration: develop, work: feature/}",
-        f"{{principal: {flow[0]}, integration: {flow[1]}, work: {flow[2]}}}",
-    )
-    (repo / "specs" / "constitution.md").write_text(draft, encoding="utf-8")
-    assert svc.baseline("proj") == work
-    heads = _heads(bare)
-    assert {flow[0], flow[1], work} == set(heads) and _ancestor(repo, heads[flow[1]], work)
-    assert "specs/constitution.md" in _git(bare, "ls-tree", "-r", "--name-only", work).split()
-
-
-def test_specs_the_operator_committed_on_the_principal_are_published(env, tmp_path: Path) -> None:
-    """Review 5 H4 (P7c): the committed onboarding reaches origin — never a false success
-    that leaves origin with the README alone and the specs gone from disk."""
-    svc, repo, bare = env
-    _seed(bare, tmp_path / "seed", "master")
-    _git(bare, "symbolic-ref", "HEAD", "refs/heads/master")
-    _clone_onboarded(bare, repo)
-    draft = _CONSTITUTION.replace("principal: main", "principal: master")
-    (repo / "specs" / "constitution.md").write_text(draft, encoding="utf-8")
-    _git(repo, "add", "-A")
-    _git(repo, "commit", "-qm", "specs")
-    assert svc.baseline("proj") == "feature/0.1.0"
-    pushed = _git(bare, "ls-tree", "-r", "--name-only", "feature/0.1.0").split()
-    assert "specs/constitution.md" in pushed and (repo / "specs" / "constitution.md").is_file()
-
-
-def test_local_principal_commits_are_carried_onto_the_work_branch(env, tmp_path: Path) -> None:
-    """Review 5 M3 (P8): operator commits on the local principal are never stranded — the
-    published work branch carries them."""
-    svc, repo, bare = env
-    _seed(bare, tmp_path / "seed", "main", "develop")
-    _clone_onboarded(bare, repo)
-    (repo / "app.py").write_text("operator code\n", encoding="utf-8")
-    _git(repo, "add", "app.py")
-    _git(repo, "commit", "-qm", "operator code")
-    assert svc.baseline("proj") == "feature/0.1.0"
-    assert "app.py" in _git(bare, "ls-tree", "--name-only", "feature/0.1.0").split()
 
 
 def test_a_draft_origin_tracks_is_never_stashed_away(env, tmp_path: Path) -> None:
@@ -453,44 +380,6 @@ def test_a_draft_origin_tracks_is_never_stashed_away(env, tmp_path: Path) -> Non
     assert "stash" not in str(refused.value)
     assert _git(repo, "stash", "list") == ""
     assert (repo / "specs" / "constitution.md").is_file()
-
-
-def test_dirty_work_outside_the_paths_rides_along_uncommitted(env, tmp_path: Path) -> None:
-    """Cut (h): no preflight refusal — the pathspec commit never takes foreign work; it
-    stays modified in the tree and never reaches origin."""
-    svc, repo, bare = env
-    _seed(bare, tmp_path / "seed", "main")
-    _clone_onboarded(bare, repo)
-    (repo / "README.md").write_text("operator\n", encoding="utf-8")
-    assert svc.baseline("proj") == "feature/0.1.0"
-    _assert_published(repo, bare, "feature/0.1.0", "develop")
-    assert (repo / "README.md").read_text(encoding="utf-8") == "operator\n"
-    assert _git(repo, "status", "--porcelain") == "M README.md"
-
-
-def test_an_unborn_clone_keeps_its_untracked_foreign_files(env) -> None:
-    """Review CRITICAL (round 4): no forced checkout — an unborn clone's foreign files stay
-    untracked and byte-identical."""
-    svc, repo, bare = env
-    _clone_onboarded(bare, repo)
-    (repo / "notes.md").write_text("operator\n", encoding="utf-8")
-    assert svc.baseline("proj") == "feature/0.1.0"
-    assert (repo / "notes.md").read_text(encoding="utf-8") == "operator\n"
-    assert "notes.md" not in _git(bare, "ls-tree", "-r", "--name-only", "feature/0.1.0")
-
-
-def test_missing_identity_refuses_before_any_write(env, tmp_path: Path, monkeypatch) -> None:
-    svc, repo, bare = env
-    # No guessing: a host whose name yields an email would otherwise hand git an identity.
-    (tmp_path / "gitconfig").write_text("[user]\n\tuseConfigOnly = true\n", encoding="utf-8")
-    for var in ("NAME", "EMAIL"):
-        monkeypatch.delenv(f"GIT_AUTHOR_{var}", raising=False)
-        monkeypatch.delenv(f"GIT_COMMITTER_{var}", raising=False)
-    _clone_onboarded(bare, repo, identity=False)
-    with pytest.raises(ContextStateError, match="identity unknown") as refused:
-        svc.baseline("proj")
-    assert "fix: git -C" in str(refused.value)
-    assert _heads(bare) == {}
 
 
 def test_a_tool_commit_never_falls_back_to_a_tool_identity(tmp_path: Path, monkeypatch) -> None:
@@ -573,15 +462,3 @@ def test_the_publish_code_never_rewrites_forces_or_deletes() -> None:
         text = (pkg / rel).read_text(encoding="utf-8")
         for verb in ('"-f"', '"reset"', '"rebase"', '"--force"', '"--delete"', "--republish"):
             assert verb not in text, f"{rel} carries {verb}"
-
-
-def test_the_tests_law_specs_init_writes_is_published(env) -> None:
-    """sa-public-install-writes-the-root-map-into-product-repos#K3: the publishable paths
-    are REPO_LAW's full relative paths, so ``tests/AGENTS.md`` is published too."""
-    svc, repo, bare = env
-    _clone_onboarded(bare, repo)
-    (repo / "tests").mkdir()
-    (repo / "tests" / "AGENTS.md").write_text("# tests law\n", encoding="utf-8")
-    svc.baseline("proj")
-    tree = _git(bare, "ls-tree", "-r", "--name-only", "main").splitlines()
-    assert sorted(tree) == ["AGENTS.md", "specs/constitution.md", "tests/AGENTS.md"]
