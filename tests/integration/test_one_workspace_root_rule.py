@@ -1,8 +1,6 @@
-"""One workspace-root rule: the CLI's own venv workspace, else the nearest ancestor holding
-the sentinel; a write target is walked first; no environment variable is a rung.
+"""One workspace-root rule: the CLI's own venv workspace, else the nearest sentinel ancestor.
 
-Intent: CONTRACT — sa-seven-workspace-root-rules (WP-15, AC9.5); size: MEDIUM (hook and
-CLI subprocess boundaries).
+Intent: CONTRACT — sa-seven-workspace-root-rules (AC9.5).
 """
 
 from __future__ import annotations
@@ -41,9 +39,7 @@ def test_no_package_module_reads_workspace_root_from_the_environment() -> None:
 
 
 def test_workspace_root_in_the_hook_env_never_opens_a_protected_write(tmp_path: Path) -> None:
-    """sa-seven-workspace-root-rules#S2 and #S3: with WORKSPACE_ROOT naming an empty dir and
-    the hook spawned outside, the gate walks from the target and BLOCKs the PROTECTED
-    write exactly as without the variable."""
+    """sa-seven-workspace-root-rules#S2 and #S3 — WORKSPACE_ROOT elsewhere: the gate still BLOCKs."""
     ws = _workspace(tmp_path / "ws")
     elsewhere = tmp_path / "elsewhere"
     elsewhere.mkdir()
@@ -76,8 +72,7 @@ def test_migrate_runs_in_the_cli_own_workspace_from_any_cwd(
 def test_context_show_reads_name_registry_and_session_from_one_root(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """sa-seven-workspace-root-rules#S9: from a cwd inside a second workspace, `context
-    show --json` answers from the CLI's own workspace for all three."""
+    """sa-seven-workspace-root-rules#S9 — from another workspace, `context show` reads its own."""
     row = {"name": "zz-own", "state": "alive", "repo_slug": "zz-own", "repo_url": "u",
            "created_at": "2026-01-01T00:00:00Z", "current_branch": "main"}  # fmt: skip
     own = _workspace(tmp_path / "own", {"schema_version": "2", "contexts": [row]})
