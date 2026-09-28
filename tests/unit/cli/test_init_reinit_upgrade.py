@@ -17,7 +17,7 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli.commands import init as init_module
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import cli_path, fix_line
-from dadaia_workspace.core.platform import detect
+from dadaia_workspace.core.platform import Capabilities
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from tests.fixtures.provider_dist import install_fake_dist
 
@@ -93,7 +93,7 @@ def test_a_failed_reconcile_prints_the_windows_fix_line(
 
     def _reconcile(root: Path, *, expected_version: str, **_: object) -> object:
         # Windows from here on: only the refusal is rendered after the reconcile.
-        monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", detect("win32"))
+        monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
         return type("R", (), {"ok": False, "error": "boom"})()
 
     monkeypatch.setattr(init_module, "reconcile_workspace", _reconcile)
