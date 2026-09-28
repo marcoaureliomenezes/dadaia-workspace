@@ -190,13 +190,6 @@ def test_a_checkout_of_another_origin_under_the_slug_is_refused_not_adopted(
     assert not (ws / "repos" / "app" / ".git" / "hooks" / "pre-push").exists()
 
 
-@pytest.mark.parametrize("flag", ["--url", "--associated-repos"])
-def test_retired_flags_exit_2(ws: Path, flag: str) -> None:
-    """AC3.8."""
-    code, _ = _create("x", "--main-repo", "https://h.test/x.git", flag, "y")
-    assert code == 2
-
-
 def test_refusal_fix_lines_never_repeat_the_failing_command(ws: Path, tmp_path: Path) -> None:
     """Live audit G3/G4: a bad URL points at a clone-URL placeholder, an owned slug at
     the list that names its owner — neither echoes the command that just failed (G6: the

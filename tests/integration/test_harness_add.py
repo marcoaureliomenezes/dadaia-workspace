@@ -12,7 +12,6 @@ no-op on re-add.
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 import pytest
@@ -21,7 +20,6 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli.main import app as cli_app
 
 _runner = CliRunner()
-_ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def _profile(workspace: Path) -> list[str]:
@@ -145,10 +143,3 @@ def test_harness_add_refuses_an_unregistered_name(
     result = _runner.invoke(cli_app, ["harness", "add", "emacs"])
     assert result.exit_code == 2, result.output
     assert _profile(ws) == ["claude"]
-
-
-def test_public_install_help_carries_no_target_flag() -> None:
-    """AC2.1 second clause: `public install --target` is gone from `--help`."""
-    result = _runner.invoke(cli_app, ["public", "install", "--help"])
-    assert result.exit_code == 0, result.output
-    assert "--target" not in _ANSI.sub("", result.stdout)

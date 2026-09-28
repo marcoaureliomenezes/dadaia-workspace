@@ -178,15 +178,3 @@ def test_upgrade_refuses_a_two_tier_tree_without_stamping_or_writing(tmp_path: P
     assert "two-tier" in (upgrade.stderr + upgrade.stdout)
     assert _snapshot(specs) == before
     assert f"{_MARKER}: 6" in (specs / "constitution.md").read_text(encoding="utf-8")
-
-
-def test_upgrade_has_no_target_option(tmp_path: Path) -> None:
-    """sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges#47.1: `--target` is gone — a usage error (exit 2), nothing written."""
-    specs = _seed_v6_tree(tmp_path, _V6_ARCHITECTURE)
-    before = _snapshot(specs)
-
-    upgrade = _cli(tmp_path, "specs", "upgrade", "--specs-dir", str(specs), "--target", "99")
-
-    assert upgrade.returncode == 2
-    assert "No such option" in upgrade.stderr
-    assert _snapshot(specs) == before

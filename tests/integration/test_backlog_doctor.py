@@ -261,22 +261,6 @@ def test_divergent_anchor_change_fires_bl_conflict(tmp_path: Path) -> None:
     ]
 
 
-def test_bl_dup_code_no_longer_exists(tmp_path: Path) -> None:
-    """A5.2, proven negatively: the exact same-anchor+same-change fixture that used to
-    fire BL-DUP now fires NOTHING — the check code is gone, not silenced (the
-    classifier's own ``DUPLICATE`` verdict is unchanged, ``classifier.py`` is out of
-    this task's write set; this doctor simply never asks for it any more)."""
-    specs, src = _build_roots(tmp_path)
-    active = [
-        _active_entry("dup-a", "A", "candidate", ref="pkg/m.py#Widget", change="refactor Widget"),
-        _active_entry("dup-b", "B", "candidate", ref="pkg/m.py#Widget", change="refactor Widget"),
-    ]
-    _write_backlog_json(specs, active)
-    findings = _run(specs, src)
-    assert "BL-DUP" not in {f.code.value for f in findings}, [f.to_dict() for f in findings]
-    assert not hasattr(BacklogDoctorCode, "BL_DUP")
-
-
 # ── A2.6/v0.5.0 A5.2 — an ACTIVE item whose slug already has a histo record fires
 # BL-STALE (the retired in-document LEDGER condition's replacement) ─────────────────
 

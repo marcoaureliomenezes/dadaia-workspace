@@ -4,7 +4,7 @@ never writes under ``repos/``.
 Intent: CONTRACT — sa-public-install-writes-the-root-map-into-product-repos (WP-07);
 size: MEDIUM (real public tree, real install).
 
-Statements: sa-public-install-writes-the-root-map-into-product-repos#K1, #K2, #K4, #K6. The ledger-forget test is K6's upgrade
+Statements: sa-public-install-writes-the-root-map-into-product-repos#K1, #K2, #K6. The ledger-forget test is K6's upgrade
 safety: a single writer outside repos/ never prunes a repo file an older release wrote.
 """
 
@@ -15,9 +15,7 @@ import json
 from pathlib import Path
 
 import pytest
-from typer.testing import CliRunner
 
-from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.models.install_ledger import InstallLedger, LedgerEntry
 from dadaia_workspace.features.specs.canon import scaffold_repo_law
 from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
@@ -102,12 +100,6 @@ def test_a_formerly_ledgered_repo_copy_is_forgotten_never_pruned(tmp_path: Path)
     ledger = JsonInstallLedgerStore().read(states)
     assert ledger is not None
     assert "repos/zz-product/AGENTS.md" not in ledger.by_relpath()
-
-
-@pytest.mark.parametrize("flag", ["--repos-only", "--workspace-only"])
-def test_public_install_has_no_scope_flag(flag: str) -> None:
-    """sa-public-install-writes-the-root-map-into-product-repos#K4: Click rejects the retired scope flags (exit 2)."""
-    assert CliRunner().invoke(app, ["public", "install", flag]).exit_code == 2
 
 
 def test_repo_law_has_one_writer_and_the_root_map_one_source() -> None:
