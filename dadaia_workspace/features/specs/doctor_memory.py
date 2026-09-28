@@ -17,7 +17,6 @@ from pathlib import Path
 from dadaia_workspace.core import frontmatter as _fm
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.cli_line import materialize_line
-from dadaia_workspace.core.specs_repair import has_unfilled_angle_placeholders, is_placeholder_atom
 from dadaia_workspace.features.specs import citations, memory_canon, memory_lint
 from dadaia_workspace.features.specs.canon import default_public_dir
 from dadaia_workspace.features.specs.doctor_types import (
@@ -32,6 +31,32 @@ FORBIDDEN_MEMORY_H2_RE = memory_canon.FORBIDDEN_MEMORY_HEADING_RE
 TOPLEVEL_MEMORY_FILES = memory_canon.MEMORY_TOPLEVEL_FILES
 # Product memory is a folder catalog: index.md is required + 0..N feature .md atoms.
 PRODUCT_INDEX_REL = "product/index.md"
+
+#: Template tokens of the retired placeholder feature atom: an atom carrying one was never
+#: filled (bug scaffold-repair-cannot-remediate-invalid-placeholder-atom); MEM-PLACEHOLDER-1
+#: removes it.
+_PLACEHOLDER_TOKENS = ("SLUG_PLACEHOLDER", "TITLE_PLACEHOLDER", "RELEASE_PLACEHOLDER")
+#: FR8: an unfilled installed-file token is a tight code span around the token alone
+#: (`` `<UNIT_TIMEOUT_S>` ``); a token illustrated inside a longer span is not one.
+_ANGLE_PLACEHOLDER_RE = re.compile(r"`<[A-Z_]+>`")
+
+
+def _read_or_empty(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError:
+        return ""  # never flag, never delete on uncertainty
+
+
+def is_placeholder_atom(path: Path) -> bool:
+    """True when *path* is an unfilled placeholder memory atom (template artifact)."""
+    return any(token in _read_or_empty(path) for token in _PLACEHOLDER_TOKENS)
+
+
+def has_unfilled_angle_placeholders(path: Path) -> bool:
+    """True when *path* still carries an unfilled `` `<TOKEN>` `` placeholder (FR8)."""
+    return bool(_ANGLE_PLACEHOLDER_RE.search(_read_or_empty(path)))
+
 
 # ---------------------------------------------------------------------------
 # Markdown memory atom helpers

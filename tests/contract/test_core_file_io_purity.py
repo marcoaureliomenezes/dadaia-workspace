@@ -49,13 +49,11 @@ pytestmark = pytest.mark.contract
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _CORE_DIR = _REPO_ROOT / "dadaia_workspace" / "core"
 
-# Modules whose file I/O is architecture-authorized (specs_version rewrites the pattern-version file; specs_repair removes unfilled
-# placeholder atoms from old-scaffold trees (v0.2.9 — the one home both repair surfaces,
-# features.specs and features.migrate, may import without a forbidden sibling edge);
+# Modules whose file I/O is architecture-authorized (specs_version rewrites the pattern-version file;
 # specs_resolver + workspace_resolver walk
 # the filesystem; atomic_write (v0.4.5 FR2/T-045-12, architect ruling AR-1: UPHOLD D5) is
 # the single atomic tmp-file + os.replace primitive for hooks/infrastructure/features —
-# same precedent as specs_repair, exercised deliberately per this ratchet's own
+# same precedent as specs_resolver, exercised deliberately per this ratchet's own
 # prescribed path, not re-opened by accident).
 #
 # handoff_index (release 0.5.1 K6, deepening candidate): the one handoff discovery +
@@ -69,7 +67,6 @@ _CORE_DIR = _REPO_ROOT / "dadaia_workspace" / "core"
 # (seven) — out of this task's write scope (specs/** is off-limits here).
 _AUTHORIZED_STEMS: frozenset[str] = frozenset(
     {
-        "specs_repair",
         "workspace_resolver",
         "atomic_write",
         "invocation",

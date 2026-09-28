@@ -4,9 +4,9 @@ Eleven writers across ``hooks/``, ``infrastructure/`` and ``features/`` each han
 their own tmp-file + ``os.replace`` idiom; two of them diverged and leaked their temp
 sibling on an injected ``os.replace`` failure (bug
 ``two-atomic-writers-leak-temp-file-on-injected-os-replace-failure``, superseded by this
-consolidation). This module is the single home for that idiom, on the same precedent as
-``core/specs_repair``: a pure ``core`` leaf shared by every consumer layer (``features``,
-``infrastructure``, ``hooks``) without a forbidden sibling edge.
+consolidation). This module is the single home for that idiom: a pure ``core`` leaf shared
+by every consumer layer (``features``, ``infrastructure``, ``hooks``) without a forbidden
+sibling edge.
 
 AR-1 conditions this module is bound to: zero ``dadaia_workspace.*`` imports (not even a
 ``core`` sibling), stateless (no module-level mutable state), and cleanup on *every*

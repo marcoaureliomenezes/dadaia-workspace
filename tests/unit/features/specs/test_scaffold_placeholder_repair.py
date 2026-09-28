@@ -15,11 +15,11 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.specs_repair import is_placeholder_atom
 from dadaia_workspace.features.migrate import upgrade as upgrade_feat
 from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.features.specs.canon import scaffold
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
+from dadaia_workspace.features.specs.doctor_memory import is_placeholder_atom
 
 pytestmark = pytest.mark.unit
 
@@ -206,7 +206,7 @@ def test_agents_placeholder1_never_flags_the_canonical_template(tmp_path: Path) 
     """A8.2: the canonical template legitimately carries placeholders (verified here so
     the regex is proven live), yet the check never fires on it — it inspects the
     installed consumer copy only, never dadaia_workspace/public/templates/tests-AGENTS.md."""
-    from dadaia_workspace.core.specs_repair import has_unfilled_angle_placeholders
+    from dadaia_workspace.features.specs.doctor_memory import has_unfilled_angle_placeholders
 
     assert _TESTS_AGENTS_TEMPLATE.exists()
     assert has_unfilled_angle_placeholders(_TESTS_AGENTS_TEMPLATE) is True
@@ -223,8 +223,10 @@ def test_agents_placeholder1_silent_on_this_workspaces_own_tests_agents_md() -> 
     dadaia-workspace's own installed tests/AGENTS.md is already filled in. Exercises the
     MemoryValidator method directly (never the full SpecsDoctor.check()) so this stays
     a pure unit test — LINT-1 shells a real subprocess and is out of scope here."""
-    from dadaia_workspace.core.specs_repair import has_unfilled_angle_placeholders
-    from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
+    from dadaia_workspace.features.specs.doctor_memory import (
+        MemoryValidator,
+        has_unfilled_angle_placeholders,
+    )
 
     repo_root = Path(__file__).resolve().parents[4]
     installed = repo_root / "tests" / "AGENTS.md"
