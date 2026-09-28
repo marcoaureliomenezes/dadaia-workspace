@@ -109,3 +109,19 @@ def test_throttle_skips_the_reaper_inside_the_window_and_runs_after_it(
     monkeypatch.setattr(time, "time", lambda: base + RECONCILER_THROTTLE_TTL_SECONDS + 1)
     sdd_post_gate._throttled_gc(ws, _SID)
     assert calls["n"] == 2, "after the window the cadence runs again"
+
+
+def test_throttle_marker_rejects_traversal_shaped_identity_components(tmp_path: Path) -> None:
+    """v0.1.76 security LOW: a traversal-shaped marker name never lands outside
+    ``.dadaia/tmp/hooks/``; a valid one does."""
+    from dadaia_workspace.features.spec_context import markers
+
+    ws = _make_workspace(tmp_path)
+    markers.stamp_throttle(ws, "presence-warn-../../../escape-probe-x")
+    assert not (tmp_path / "escape-probe").exists()
+    assert (
+        markers.throttled(ws, "presence-warn-../../../escape-probe-x", window_seconds=300, now=0.0)
+        is False
+    )
+    markers.stamp_throttle(ws, "presence-warn-ok")
+    assert (ws / ".dadaia" / "tmp" / "hooks" / "presence-warn-ok").is_file()
