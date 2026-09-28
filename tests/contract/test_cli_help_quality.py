@@ -1,160 +1,166 @@
-"""Intent: CONTRACT — backlog cli-help-architecture (T-053-24) one-line-help ratchet
+"""The CLI surface: its verb tree, its rendered help and what `capabilities --json` advertises.
 
-Help-quality ratchet (backlog cli-help-architecture, T-053-24): a leaf command must
-not be born with a one-line docstring — the help IS the documentation surface now.
-Ratchet: the offender count only goes down. Size: unit."""
+Intent: CONTRACT — backlog cli-help-architecture (T-053-24) one-line-help ratchet; 0.4.7 FR5
+(T-047-78) verb ceiling and citation; cli-help-leaks-internal-spec-ids;
+help-texts-and-bug-schema-cite-behaviour-that-is-gone;
+capabilities-advertises-verbs-and-surfaces-that-do-not-exist; dadaia-capabilities-v3 schema.
+Size: SMALL (in-process Click tree and CliRunner).
+"""
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
+from typing import Any
+
+import pytest
+from jsonschema import Draft202012Validator
+from typer.main import get_command
+from typer.testing import CliRunner
+
+from dadaia_workspace.cli.help_digest import command_paths
+from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
+from dadaia_workspace.features.capabilities import build_capabilities
+
+_PUBLIC = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
+_ENV = {"COLUMNS": "400", "NO_COLOR": "1", "TERM": "dumb"}
 
 
-def _leaves() -> list[tuple[str, object]]:
-    from typer.main import get_command
+def _tree() -> list[tuple[tuple[str, ...], Any]]:
+    """Every command path (root first) with its Click command."""
+    out: list[tuple[tuple[str, ...], Any]] = []
 
-    from dadaia_workspace.cli.main import app
+    def walk(cmd: Any, path: tuple[str, ...]) -> None:
+        out.append((path, cmd))
+        for name, sub in (getattr(cmd, "commands", {}) or {}).items():
+            walk(sub, (*path, name))
 
-    out: list[tuple[str, object]] = []
-
-    def walk(cmd: object, prefix: str) -> None:
-        subs = dict(getattr(cmd, "commands", {}) or {})
-        if subs:
-            for name, sub in subs.items():
-                walk(sub, f"{prefix} {name}")
-        else:
-            out.append((prefix.strip(), cmd))
-
-    walk(get_command(app), "dadaia")
+    walk(get_command(app), ())
     return out
 
 
-#: Leaves whose help was a single line when the ratchet was recorded (2026-08-31).
-#: New leaves must ship a multi-line docstring; fixing an offender lowers the pin.
-#: 0.4.6 T-046-26: `clean` and six `reports` retention verbs deleted (42 -> 35).
-#: 0.4.6 T-046-28: the five `academy` leaves deleted (35 -> 30).
-_RATCHET = 30
+def _leaves() -> list[tuple[tuple[str, ...], Any]]:
+    return [(p, c) for p, c in _tree() if not getattr(c, "commands", None)]
 
 
-def test_deleted_reaper_verbs_are_gone_and_reports_keeps_validate() -> None:
-    """Intent: CONTRACT — 0.4.6 AC4 (FR4).
-
-    `dadaia doctor --fix` is the one reaper: `dadaia --help` lists no `clean`/`tmp`
-    group, no `academy` group (FR10, T-046-28), and `dadaia reports --help` lists
-    exactly `validate`.
-    """
-    from typer.main import get_command
-
-    from dadaia_workspace.cli.main import app
-
-    root = get_command(app)
-    groups = dict(getattr(root, "commands", {}) or {})
-    assert "clean" not in groups
-    assert "tmp" not in groups
-    assert "academy" not in groups
-    reports = dict(getattr(groups["reports"], "commands", {}) or {})
-    assert set(reports) == {"validate"}
+def _help(*argv: str) -> str:
+    """Rendered --help as plain words: CI forces colour and Rich wraps inside its box."""
+    result = CliRunner().invoke(app, [*argv, "--help"], env=_ENV)
+    assert result.exit_code == 0, result.output
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+    return " ".join(re.sub(r"[─-╿]", " ", plain).split())
 
 
-def test_the_bugs_group_is_retired_from_the_cli_tree() -> None:
-    """0.4.7 FR2 (T-047-64): the bug ledger's ONE writer is
-    `dd-bug-resolution/scripts/bugs.py`; no `dadaia bugs` group survives beside it —
-    two writers for one ledger is the drift this candidate deletes."""
-    from typer.main import get_command
-
-    from dadaia_workspace.cli.main import app
-
-    groups = dict(getattr(get_command(app), "commands", {}) or {})
-    assert groups, "the CLI tree walked to zero groups — mis-rooted app?"
-    assert "bugs" not in groups
-    assert {name for name, _cmd in _leaves() if name.startswith("bugs ")} == set()
+def test_deleted_groups_are_gone_and_reports_keeps_validate() -> None:
+    """0.4.6 AC4 (FR4): `doctor --fix` is the one reaper — no `clean`/`tmp`/`academy` group;
+    0.4.7 FR2 (T-047-64): bugs.py is the ledger's one writer — no `bugs` group."""
+    groups = dict(get_command(app).commands)  # type: ignore[attr-defined]
+    assert not {"clean", "tmp", "academy", "bugs"} & set(groups)
+    assert set(groups["reports"].commands) == {"validate"}
 
 
-def test_one_line_help_leaf_count_only_ratchets_down() -> None:
-    offenders = sorted(
-        name
-        for name, cmd in _leaves()
-        if len([ln for ln in (getattr(cmd, "help", None) or "").strip().splitlines() if ln.strip()])
-        <= 1
-    )
-    assert len(offenders) <= _RATCHET, (
-        f"{len(offenders)} leaf commands have a one-line/empty help (ratchet {_RATCHET}). "
-        f"New leaves must ship a real docstring. Offenders: {offenders}"
-    )
-
-
-#: The verb ceiling. `help tree` is the audited interface: a leaf nobody cites is a verb
-#: nobody runs, and an uncited verb is slop. Measured after the audit deleted `context
-#: update` (the URL repair no caller ever ran) and `context repo list` (a second reader
-#: of what `context show --json` already emits). Moves DOWN only.
-_VERB_CEILING = 30
-
-_PUBLIC = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
-
-#: The forms a public asset invokes the CLI in: the bare name, and the `$D`/`$DADAIA`
-#: shell handles the consumer recipes bind to an absolute venv path.
-_INVOCATION = r"(?:dadaia|\$D|\$DADAIA)"
-
-
-def _verb_paths() -> list[tuple[str, ...]]:
-    from typer.main import get_command
-
-    from dadaia_workspace.cli.main import app
-
-    out: list[tuple[str, ...]] = []
-
-    def walk(cmd: object, prefix: tuple[str, ...]) -> None:
-        subs = dict(getattr(cmd, "commands", {}) or {})
-        if subs:
-            for name, sub in subs.items():
-                walk(sub, (*prefix, name))
-        else:
-            out.append(prefix)
-
-    walk(get_command(app), ())
-    return sorted(out)
-
-
-def _public_texts() -> dict[str, str]:
-    texts: dict[str, str] = {}
-    for path in sorted(_PUBLIC.rglob("*")):
-        if not path.is_file() or path.is_symlink():
-            continue
-        if path.suffix not in {".md", ".json", ".sh", ".txt", ".yml", ".yaml", ""}:
-            continue
-        try:
-            texts[str(path)] = path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:  # pragma: no cover - binary asset
-            continue
-    return texts
-
-
-def test_the_verb_surface_stays_under_its_ceiling() -> None:
-    """Intent: CONTRACT — 0.4.7 FR5 (T-047-78). The audited interface is `help tree`:
-    at most 30 leaf verbs. A new verb enters only when an old one leaves (ADR 0018)."""
-    verbs = _verb_paths()
-    assert len(verbs) <= _VERB_CEILING, (
-        f"the CLI grew to {len(verbs)} leaf verbs (ceiling {_VERB_CEILING}). "
-        f"Delete one before adding one: {[' '.join(v) for v in verbs]}"
-    )
-
-
-def test_every_verb_is_cited_by_the_public_surface() -> None:
-    """Intent: CONTRACT — 0.4.7 FR5 (T-047-78). The inverse of the dead-verb citation
-    check: every leaf verb in the live tree is named by at least one skill, agent, map
-    or scaffold asset under `public/`. A verb no published asset tells an agent to run
-    is a verb nobody runs — it dies, or it earns a citation in the skill that owns it."""
-    texts = _public_texts()
-    assert texts, "the public asset tree walked to zero readable files"
+def test_the_verb_surface_is_bounded_documented_and_cited() -> None:
+    """At most 30 leaf verbs, a new one only when an old one leaves (ADR 0018); at most 30 with a
+    one-line help (both ratchet down); every leaf is invoked (`dadaia`, `$D`, `$DADAIA`) by some
+    public asset — an uncited verb is a verb nobody runs."""
+    leaves = _leaves()
+    assert len(leaves) <= 30, [" ".join(p) for p, _ in leaves]
+    one_line = [
+        p for p, c in leaves if len([ln for ln in (c.help or "").splitlines() if ln.strip()]) <= 1
+    ]
+    assert len(one_line) <= 30, one_line
+    texts = [
+        p.read_text(encoding="utf-8")
+        for p in sorted(_PUBLIC.rglob("*"))
+        if p.is_file()
+        and not p.is_symlink()
+        and p.suffix in {".md", ".json", ".sh", ".txt", ".yml", ".yaml", ""}
+    ]
     uncited = [
-        " ".join(verb)
-        for verb in _verb_paths()
+        " ".join(path)
+        for path, _ in leaves
         if not any(
-            re.search(_INVOCATION + r"\s+" + r"\s+".join(map(re.escape, verb)) + r"\b", text)
-            for text in texts.values()
+            re.search(r"(?:dadaia|\$D|\$DADAIA)\s+" + r"\s+".join(map(re.escape, path)) + r"\b", t)
+            for t in texts
         )
     ]
-    assert uncited == [], (
-        "verb(s) cited by no public asset — delete them, or cite each in the ONE skill "
-        f"that owns it (`dd-cli-library` is the CLI catalogue): {uncited}"
+    assert uncited == [], f"cite each in the one skill that owns it (dd-cli-library): {uncited}"
+
+
+_LEAK = re.compile(
+    r"\bFR\d|\bADR \d{4}|SPEC v\d|\bA\d+\.\d|T-\d{3}-\d|\bv\d+\.\d+\.\d+\b|container\.|cli-no-infrastructure"
+)
+
+
+def test_no_command_help_leaks_an_internal_id() -> None:
+    """cli-help-leaks-internal-spec-ids: every rendered --help states behaviour in the reader's
+    words — no requirement, task or audit id, no code seam name."""
+    leaks = [
+        f"{' '.join(p) or '<root>'}: {m.group(0)!r}"
+        for p, _ in _tree()
+        for m in _LEAK.finditer(_help(*p))
+    ]
+    assert leaks == [], "\n".join(leaks)
+
+
+@pytest.mark.parametrize(
+    ("argv", "present", "absent", "at_most_once"),
+    [
+        # preflight names its five checks and no hook that calls it
+        pytest.param(("ci", "preflight"), ("ruff format", "ruff check", "mypy --strict", "lint-imports", "pytest"), ("pre-push",), (), id="preflight-five-checks-no-hook"),
+        # bind carries no retired-flag history
+        pytest.param(("context", "bind"), (), ("--mode", "--release", "--force", "--reason", "0.4.7"), (), id="bind-no-history"),
+        pytest.param(("ci", "push-gate-check"), (), (), ("dd-gitflow-default",), id="push-gate-branch-model-once"),
+    ],
+)  # fmt: skip
+def test_help_states_current_behaviour(
+    argv: tuple[str, ...],
+    present: tuple[str, ...],
+    absent: tuple[str, ...],
+    at_most_once: tuple[str, ...],
+) -> None:
+    """help-texts-and-bug-schema-cite-behaviour-that-is-gone."""
+    text = _help(*argv)
+    assert [w for w in present if w not in text] == []
+    assert [w for w in absent if w in text] == []
+    assert [w for w in at_most_once if text.count(w) > 1] == []
+
+
+def test_reports_validate_help_shows_each_example_once() -> None:
+    output = CliRunner().invoke(app, ["reports", "validate", "--help"], env=_ENV).output
+    lines = [ln.strip() for ln in output.splitlines() if "--all" in ln and "validate" in ln]
+    assert len(lines) == len(set(lines)), lines
+
+
+def test_capabilities_json_matches_service_and_public_schema() -> None:
+    """`capabilities --json` is the service payload and validates against the v3 schema; it pins
+    context safety and names verbs, never a hand-spelled `dadaia ` command
+    (sa-fix-lines-not-built-by-cli-line#S7)."""
+    result = CliRunner().invoke(app, ["capabilities", "--json"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout)
+    assert payload == build_capabilities(command_paths())
+    schema = json.loads(
+        (_PUBLIC / "schemas" / "dadaia-capabilities-v3.schema.json").read_text(encoding="utf-8")
     )
+    Draft202012Validator(schema).validate(payload)
+    assert "workflows" not in payload
+    assert payload["contexts"]["selection_contract"] == "explicit-or-caller-owned-bind"
+    assert payload["consumer_requirements"]["exact_provider_version"] is True
+    assert payload["certification"] == {"schema_version": "dadaia-certification-v1"}
+    assert "dadaia " not in json.dumps(payload)
+
+
+def test_every_advertised_verb_and_harness_exists() -> None:
+    """capabilities-advertises-verbs-and-surfaces-that-do-not-exist: each advertised verb is a
+    path of the live tree, and the harness list is the harness registry."""
+    payload = build_capabilities(command_paths())
+    live = command_paths()
+    contexts, surfaces = payload["contexts"], payload["surfaces"]
+    assert "modes" not in contexts and "heartbeat" not in contexts["commands"]
+    assert {("context", verb) for verb in contexts["commands"]} <= live
+    assert {(group, verb) for group, verbs in surfaces.items() for verb in verbs} <= live
+    assert "panel" not in surfaces
+    assert payload["harnesses"]["layer_1"] == list(L1_ENTRY_HARNESSES)
