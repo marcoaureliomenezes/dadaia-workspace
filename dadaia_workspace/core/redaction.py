@@ -80,8 +80,7 @@ def redact_text(text: str, denylist_terms: Sequence[tuple[str, str]] = ()) -> st
 
     ``denylist_terms`` is ``(term, reason)`` pairs from the SAME operator-term source
     the push-time scan already refuses on
-    (``infrastructure.privacy_check.load_privacy_terms`` /
-    ``features.chokepoints.denylist_scan.operator_terms_match``) — threaded in by the
+    (``infrastructure.privacy_check.load_privacy_terms``) — threaded in by the
     caller since this module is pure core and must never import ``infrastructure``
     (v0.4.5 FR6/T-045-19, `core-no-upper-layers`). Matched case-insensitively as a
     literal substring, mirroring the push-time scan's own semantics exactly (A6.3), so

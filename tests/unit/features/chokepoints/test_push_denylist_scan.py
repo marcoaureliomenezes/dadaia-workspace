@@ -289,16 +289,16 @@ _UPPERCASE_HYPHENATED_TERM = "zz-acme"
 def test_refusal_path_segment_uppercase_hyphenated_variant_of_term_is_masked(
     repo: PushRepo,
 ) -> None:
-    """A4.1: detector-hit implies masker-hit — an upper-cased, hyphenated path segment
-    variant of a lowercase term is masked, as the content detector already flags it."""
+    """Intent: sa-path-segment-judged-by-two-matchers — the masker IS _first_match:
+    an upper-cased, hyphenated, ESC-split segment variant of a term is masked (A4.1)."""
     sha = repo.commit(
-        {"repos/Zz-Acme-Corp/notes.md": f"contains {_UPPERCASE_HYPHENATED_TERM} here\n"}
+        {"repos/Zz-A\x1bcme-Corp/notes.md": f"contains {_UPPERCASE_HYPHENATED_TERM} here\n"}
     )
     decision = _decide(
         repo, _branch(sha), denylist_terms=((_UPPERCASE_HYPHENATED_TERM, "synthetic"),)
     )
     assert not decision.allowed
-    assert "Zz-Acme-Corp" not in decision.message
+    assert "Zz-A\x1bcme-Corp" not in decision.message
     assert "repos/[REDACTED-PATH-1]/notes.md:1" in decision.message
 
 

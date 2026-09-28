@@ -38,7 +38,6 @@ __all__ = [
     "OversizedNote",
     "PathMasker",
     "ScanOutcome",
-    "operator_terms_match",
     "scan_objects",
 ]
 
@@ -106,23 +105,8 @@ class ScanOutcome:
 
 def _term_occurs(term: str, lowered_text: str) -> bool:
     """FR3(1)'s definition of "occurs": a literal, case-insensitive substring — no
-    word-boundary restriction. The ONE predicate both :func:`_first_match`'s per-line
-    loop and the public :func:`operator_terms_match` route through."""
+    word-boundary restriction."""
     return bool(term) and term.lower() in lowered_text
-
-
-def operator_terms_match(term_values: Iterable[str], text: str) -> bool:
-    """True iff any of *term_values* occurs in *text* (FR3(1) semantics, case-
-    insensitive substring).
-
-    Public (SPEC v0.4.2 FR4/GRILL D3): the gate-side path masker's operator-term check
-    routes through this SAME predicate — never a second, case-sensitive, hyphen-as-
-    word-char copy (the pre-v0.4.2 defect, GRILL P8: ``core.redaction.compile_candidates``
-    never set ``re.IGNORECASE`` and treated ``-`` as a word character, so it silently
-    under-matched relative to the detector's own layers).
-    """
-    lowered = text.lower()
-    return any(_term_occurs(term, lowered) for term in term_values)
 
 
 def _first_match(
@@ -263,76 +247,30 @@ _PATH_PLACEHOLDER_FMT = "[REDACTED-PATH-{n}]"
 
 
 class PathMasker:
-    """v0.11.0 FR6(b) — masks only the blob-path segments that match one of the FR3
-    term sources ``push_gate.push_gate_decision`` receives (operator denylist,
-    baseline structural patterns) — entry #23 resolution A (ADR
-    D1/D1-a). Every operator-facing string the gate emits that names a blob path routes
-    through :meth:`mask_path` before rendering (FR6's class rule, not a single call
-    site) — today that is the denylist refusal and the FR4 oversized-blob note.
-
-    v0.5.1 K7 ("one masking predicate"): this class used to be a private copy
-    (in the retired chokepoints service module) that merely CALLED this module's own
-    :func:`operator_terms_match`. Moved here — the module
-    that already owns those two predicates — so there is exactly ONE masking
-    implementation, not a detector module plus a second class elsewhere that reaches
-    into it.
-
-    Construct ONE instance per push-gate invocation and reuse it across every rendered
-    string, so a repeated offending segment gets the SAME stable, first-appearance
-    ordinal placeholder.
-
-    SPEC v0.4.2 FR4/GRILL D3: the offending-segment TEST consumes the detector's OWN
-    compiled matchers (:func:`operator_terms_match` + the baseline regexes — the SAME
-    predicates :func:`_first_match` uses, case-insensitive, whole-token
-    boundaries) instead of a second, narrower predicate built from
-    ``core.redaction.compile_candidates`` (case-SENSITIVE, and treats ``-`` as a word
-    character rather than a boundary — GRILL P8: a path segment like ``Acme-Corp`` that
-    the detector already flags for the lowercase term ``acme`` used to render
-    UNMASKED). Case-insensitivity and token-boundary treatment are identical by
-    construction: detector-hit implies masker-hit.
-
-    Masking happens at PATH-SEGMENT granularity: the path is split on ``/``, each
-    segment is tested, and only a matching segment is replaced wholesale — the line
-    number, the short blob sha, and every non-matching segment stay untouched, so the
-    operator can still locate the offending file (satisfiable diagnostics,
-    ``quality-assurance.md``). Where no segment matches, the path is returned
-    byte-identical to the input (A6.2).
-    """
+    """v0.11.0 FR6(b) — masks the blob-path segments :func:`_first_match` flags (the one
+    matcher); every gate string naming a blob path routes through :meth:`mask_path`.
+    One instance per push-gate run: a repeated segment keeps its first-appearance
+    ordinal. A path with no offending segment is returned byte-identical (A6.2)."""
 
     def __init__(
         self,
         denylist_terms: Iterable[tuple[str, str]],
         baseline_patterns: Iterable[BaselinePatternLike],
     ) -> None:
-        self._term_values = [term for term, _reason in denylist_terms if term]
-        self._pattern_list = list(baseline_patterns)
+        self._terms = list(denylist_terms)
+        self._patterns = list(baseline_patterns)
         self._map: dict[str, str] = {}
 
-    def _segment_is_offending(self, segment: str) -> bool:
-        if not segment:
-            return False
-        if operator_terms_match(self._term_values, segment):
-            return True
-        for pattern in self._pattern_list:
-            for match in pattern.regex.finditer(segment):
-                value = match.group(0)
-                if pattern.exclude is not None and pattern.exclude.search(value):
-                    continue
-                return True
-        return False
-
     def mask_path(self, path: str) -> str:
-        """Return *path* with every offending segment replaced; byte-identical to
-        *path* when no segment matches any term source (A6.2)."""
-        segments = path.split("/")
+        """Return *path* with every offending segment replaced by its placeholder."""
         masked_segments: list[str] = []
-        for segment in segments:
-            if not self._segment_is_offending(segment):
+        for segment in path.split("/"):
+            probe = ScannedObject(path=segment, sha="", text=segment, decodable=True)
+            if _first_match(probe, self._terms, self._patterns) is None:
                 masked_segments.append(segment)
                 continue
-            placeholder = self._map.get(segment)
-            if placeholder is None:
-                placeholder = _PATH_PLACEHOLDER_FMT.format(n=len(self._map) + 1)
-                self._map[segment] = placeholder
+            placeholder = self._map.setdefault(
+                segment, _PATH_PLACEHOLDER_FMT.format(n=len(self._map) + 1)
+            )
             masked_segments.append(placeholder)
         return "/".join(masked_segments)
