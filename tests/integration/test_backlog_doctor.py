@@ -44,10 +44,10 @@ from dadaia_workspace.features.backlog.doctor import (
     DoctorContext,
     Finding,
     Severity,
+    bound_anchor_changes,
     run_checks,
 )
 from dadaia_workspace.features.backlog.document import load_document
-from dadaia_workspace.features.backlog.preview import bound_anchor_changes
 from dadaia_workspace.features.backlog.subject_registry import build_registry
 
 pytestmark = pytest.mark.integration

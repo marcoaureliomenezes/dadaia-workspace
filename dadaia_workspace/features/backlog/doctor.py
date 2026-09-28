@@ -59,8 +59,7 @@ from dadaia_workspace.core.models.backlog import (
 from dadaia_workspace.core.models.histo import HistoRecord, is_terminal_disposition
 from dadaia_workspace.features.backlog.classifier import BoundItem, Verdict, classify
 from dadaia_workspace.features.backlog.document import ActiveItem, DocumentError, load_document
-from dadaia_workspace.features.backlog.preview import bound_anchor_changes
-from dadaia_workspace.features.backlog.subject_registry import Registry, build_registry
+from dadaia_workspace.features.backlog.subject_registry import BindStatus, Registry, build_registry
 from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 __all__ = [
@@ -386,6 +385,45 @@ def build_context(
         ctx.bound[item.slug] = bound_anchor_changes(item, registry)
 
     return ctx
+
+
+def bound_anchor_changes(item: ActiveItem, registry: Registry) -> tuple[dict[str, str], list[str]]:
+    """Bind each of ``item``'s intents to a canonical anchor.
+
+    Returns ``(anchor_changes, unresolved)``: a map of anchor-id → change for every intent
+    that resolved, plus the list of HALT messages for intents that did not (BL-SCHEMA fodder).
+    When two intents bind to the same anchor with differing changes, the first wins for the
+    map (the intra-item duplicate is an authoring error the doctor surfaces separately).
+    A ``surface: new`` subject binds by declared identity (``new:<kind>:<ref>``) instead of
+    registry resolution, so items introducing disjoint new surfaces classify UNRELATED.
+    """
+    anchor_changes: dict[str, str] = {}
+    unresolved: list[str] = []
+    for intent in item.intents:
+        if intent.subject.surface == "new":
+            # Bugs backlog-independent-cli-items-false-conflict-044 +
+            # backlog-cli-intent-hallucinated-anchor-045: a declared NEW surface binds
+            # by its own identity — never forced onto an existing anchor (false
+            # conflicts) and never unresolved (dead-end blocks). Guard the dual error:
+            # a "new" surface the registry already resolves is an authoring mistake.
+            result = registry.bind(intent.subject.ref, intent.subject.kind)
+            if result.status is BindStatus.RESOLVED and result.anchor is not None:
+                unresolved.append(
+                    f"subject ref {intent.subject.ref!r} (kind="
+                    f"{intent.subject.kind.value}) is declared 'surface: new' but "
+                    f"already resolves to existing anchor {result.anchor.id!r}; bind "
+                    "it as existing (drop 'surface: new') or choose a new name."
+                )
+                continue
+            declared = f"new:{intent.subject.kind.value}:{intent.subject.ref}"
+            anchor_changes.setdefault(declared, intent.change)
+            continue
+        result = registry.bind(intent.subject.ref, intent.subject.kind)
+        if result.status is BindStatus.RESOLVED and result.anchor is not None:
+            anchor_changes.setdefault(result.anchor.id, intent.change)
+        else:
+            unresolved.append(result.message or f"unresolved: {intent.subject.ref}")
+    return anchor_changes, unresolved
 
 
 def run_backlog_doctor(
