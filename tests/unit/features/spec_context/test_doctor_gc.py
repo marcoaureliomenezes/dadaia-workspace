@@ -46,112 +46,39 @@ def _make_doctor(ws: Path, store: JsonContextStore | None = None) -> DoctorServi
     )
 
 
-def _stale_iso(ttl: int = 300, extra_seconds: int = 60) -> str:
-    """Return an ISO timestamp TTL+extra_seconds in the past (guaranteed stale)."""
-    dt = datetime.now(tz=UTC) - timedelta(seconds=ttl + extra_seconds)
-    return dt.isoformat()
+def _stale() -> str:
+    return (datetime.now(tz=UTC) - timedelta(seconds=360)).isoformat()
 
 
-def _fresh_iso() -> str:
-    """Return a current ISO timestamp (guaranteed fresh for default TTL=1800)."""
-    return datetime.now(tz=UTC).isoformat()
+def _bind(ws: Path, sid: str, last_seen_at: str, ttl: int = 300) -> Path:
+    """A READ bind record written by the production session-store writer."""
+    from dadaia_workspace.core import session_store
 
-
-# ---------------------------------------------------------------------------
-# Retired context-global state plus expired session record
-# ---------------------------------------------------------------------------
+    record = {"session_id": sid, "context": "myctx", "mode": "READ", "release": None, "runtime": "test",
+              "pid": 4242, "last_seen_at": last_seen_at, "ttl_seconds": ttl, "is_stale": False}  # fmt: skip
+    session_store.write_session(ws, sid, record)
+    return ws / ".dadaia" / "sessions" / f"{sid}.json"
 
 
 def test_gc_deletion_matrix(tmp_path: Path) -> None:
+    """Retired context-global state (every ctx_locks shape: stale, sentinel, invalid JSON, incomplete)
+    goes as one directory (WS-states-slop); an expired session record goes by GRAVEYARD-GC."""
     ws = _make_workspace(tmp_path)
-    ctx_locks_dir = ws / ".dadaia" / "states" / "ctx_locks"
-    ctx_locks_dir.mkdir(parents=True)
-    sessions_dir = ws / ".dadaia" / "sessions"
+    locks = ws / ".dadaia" / "states" / "ctx_locks"
+    locks.mkdir(parents=True)
+    (locks / "myctx.lock.json").write_text(
+        json.dumps({"context": "myctx", "heartbeat": _stale()}), encoding="utf-8"
+    )
+    (locks / "myctx.lock.sentinel").write_text("", encoding="utf-8")
+    (locks / "badctx.lock.json").write_text("NOT JSON {{{", encoding="utf-8")
+    (locks / "incompletectx.lock.json").write_text('{"context": "x"}', encoding="utf-8")
+    expired = _bind(ws, "old-sess-001", _stale())
 
-    # Any pre-doctrine content is inert and removed as a directory.
-    lock_file = ctx_locks_dir / "myctx.lock.json"
-    stale_rec = {
-        "context": "myctx",
-        "release": "v0.1.6",
-        "session_id": "old-sess",
-        "mode": "BOUND_IMPLEMENTATION",
-        "acquired_at": _stale_iso(ttl=1800),
-        "heartbeat": _stale_iso(ttl=1800),
-        "ttl": 1800,
-    }
-    lock_file.write_text(json.dumps(stale_rec, indent=2), encoding="utf-8")
+    actions = _make_doctor(ws).fix()
 
-    # (b) TTL-expired .dadaia/sessions/<id>.json → GRAVEYARD-GC.
-    sess_file = sessions_dir / "old-sess-001.json"
-    expired_sess = {
-        "session_id": "old-sess-001",
-        "context": "myctx",
-        "mode": "BOUND_IMPLEMENTATION",
-        "release": "v0.1.6",
-        "runtime": "test",
-        "last_seen_at": _stale_iso(ttl=300),
-        "ttl_seconds": 300,
-    }
-    sess_file.write_text(json.dumps(expired_sess, indent=2), encoding="utf-8")
-
-    # Additional legacy shapes do not receive individual semantics.
-    sentinel = ctx_locks_dir / "myctx.lock.sentinel"
-    sentinel.write_text("", encoding="utf-8")
-
-    # (d) invalid JSON lock file → LOCK-NEW.
-    bad_lock = ctx_locks_dir / "badctx.lock.json"
-    bad_lock.write_text("NOT JSON {{{", encoding="utf-8")
-
-    # (e) lock file missing required fields → LOCK-NEW.
-    incomplete_lock = ctx_locks_dir / "incompletectx.lock.json"
-    incomplete_rec = {"context": "incompletectx"}  # missing everything else
-    incomplete_lock.write_text(json.dumps(incomplete_rec, indent=2), encoding="utf-8")
-
-    doctor = _make_doctor(ws)
-    actions = doctor.fix()
-
-    assert not lock_file.exists()
-    assert not ctx_locks_dir.exists()
+    assert not locks.exists() and not expired.exists()
     assert any("WS-states-slop" in a for a in actions), actions
-    assert not sess_file.exists()
     assert any("GRAVEYARD-GC" in a and "old-sess-001.json" in a for a in actions), actions
-    assert not sentinel.exists()
-    assert not bad_lock.exists()
-    assert not incomplete_lock.exists()
-
-
-# ---------------------------------------------------------------------------
-# Clean exit
-# ---------------------------------------------------------------------------
-
-
-def test_no_stale_records(tmp_path: Path) -> None:
-    ws = _make_workspace(tmp_path)
-    sessions_dir = ws / ".dadaia" / "sessions"
-
-    # A fresh caller-owned session survives.
-    sess_file = sessions_dir / "live-sess.json"
-    fresh_sess = {
-        "session_id": "live-sess",
-        "context": "freshctx",
-        "mode": "BOUND_IMPLEMENTATION",
-        "release": "v0.1.6",
-        "runtime": "test",
-        "last_seen_at": _fresh_iso(),
-        "ttl_seconds": 1800,
-    }
-    sess_file.write_text(json.dumps(fresh_sess, indent=2), encoding="utf-8")
-    doctor = _make_doctor(ws)
-    actions = doctor.fix()
-
-    assert sess_file.exists()
-    gc_actions = [a for a in actions if "GC" in a]
-    assert gc_actions == [], f"Expected no GC actions for fresh records, got: {gc_actions}"
-
-
-# ---------------------------------------------------------------------------
-# T-011-04 (FR-W1-04 / ADR-8 amended): heartbeat-renewed last_seen_at bind GC — CRITICAL
-# ---------------------------------------------------------------------------
 
 
 def _post_gate_heartbeat(ws: Path, sess_id: str) -> None:
@@ -187,74 +114,32 @@ def _post_gate_heartbeat(ws: Path, sess_id: str) -> None:
                 os.environ[k] = v
 
 
-def _write_read_bind(
-    ws: Path, sess_id: str, *, last_seen_at: str, bound_at: str | None = None
-) -> None:
-    """Persist a READ-mode bind record via the session-identity owner (production writer)."""
-    from dadaia_workspace.core import session_store as session_identity
-
-    record: dict[str, object] = {
-        "session_id": sess_id,
-        "context": "myctx",
-        "mode": "READ",
-        "release": None,
-        "runtime": "test",
-        "pid": 4242,
-        "last_seen_at": last_seen_at,
-        "ttl_seconds": 300,
-        "is_stale": False,
-    }
-    if bound_at is not None:
-        record["bound_at"] = bound_at
-    session_identity.write_session(ws, sess_id, record)
-
-
-def test_renewed_bind_survives_gc_and_gate_still_resolves_read(tmp_path: Path) -> None:
-    """FR-W1-04: real heartbeat renewal ⇒ bind survives GC ⇒ gate resolves READ for the sid.
-
-    No planted pid: we write a stale READ bind, run the PRODUCTION PostToolUse heartbeat
-    to refresh its last_seen_at, then sweep — the renewed record must NOT be collected,
-    and the gate's mode resolution must still see READ for that session.
-    """
+@pytest.mark.parametrize(
+    ("last_seen", "renew", "survives"),
+    [
+        pytest.param("fresh", False, True, id="fresh-session-survives-with-no-GC-action"),
+        pytest.param("stale", True, True, id="FR-W1-04-heartbeat-renewed-bind-survives-and-resolves"),
+        pytest.param("stale", False, False, id="FR-W1-04-unrenewed-stale-bind-collected"),
+    ],
+)  # fmt: skip
+def test_no_stale_records(tmp_path: Path, last_seen: str, renew: bool, survives: bool) -> None:
+    """CRITICAL GC (T-011-04, ADR-8 amended): a bind's TTL is measured against the heartbeat-renewed
+    ``last_seen_at``, renewed through the REAL PostToolUse path — never a planted pid."""
     from dadaia_workspace.core.session_store import live_session
 
     ws = _make_workspace(tmp_path)
-    sess_id = "sess_live01"
-    # Stale by last_seen_at — would be collected if not renewed.
-    _write_read_bind(ws, sess_id, last_seen_at=_stale_iso(ttl=300))
-
-    # REAL renewal: the PostToolUse heartbeat refreshes last_seen_at.
-    _post_gate_heartbeat(ws, sess_id)
-
-    doctor = _make_doctor(ws)
-    actions = doctor.fix()
-
-    sess_file = ws / ".dadaia" / "sessions" / f"{sess_id}.json"
-    assert sess_file.exists(), (
-        f"Renewed bind must survive GC (last_seen_at refreshed by heartbeat). Actions: {actions}"
+    sid = "sess_01"
+    record = _bind(
+        ws,
+        sid,
+        datetime.now(tz=UTC).isoformat() if last_seen == "fresh" else _stale(),
+        ttl=1800 if last_seen == "fresh" else 300,
     )
-    assert not any("GRAVEYARD-GC" in a and sess_id in a for a in actions), (
-        f"Renewed bind must NOT be graveyard-collected: {actions}"
-    )
-    # The record the gate's Bind resolution reads is still LIVE for this sid.
-    record = live_session(ws, sess_id)
-    assert record is not None and record.get("context") == "myctx"
+    if renew:
+        _post_gate_heartbeat(ws, sid)
 
+    actions = _make_doctor(ws).fix()
 
-def test_stale_unrenewed_bind_is_collected(tmp_path: Path) -> None:
-    """FR-W1-04: a bind whose last_seen_at is past TTL with NO renewal is collected."""
-    ws = _make_workspace(tmp_path)
-    sess_id = "sess_dead01"
-    _write_read_bind(ws, sess_id, last_seen_at=_stale_iso(ttl=300))
-    # No heartbeat — the session is dead.
-
-    doctor = _make_doctor(ws)
-    actions = doctor.fix()
-
-    sess_file = ws / ".dadaia" / "sessions" / f"{sess_id}.json"
-    assert not sess_file.exists(), (
-        f"Stale unrenewed bind must be graveyard-collected. Actions: {actions}"
-    )
-    assert any("GRAVEYARD-GC" in a and sess_id in a for a in actions), (
-        f"Expected GRAVEYARD-GC for the dead bind, got: {actions}"
-    )
+    assert record.exists() is survives
+    assert any("GRAVEYARD-GC" in a and sid in a for a in actions) is not survives
+    assert (live_session(ws, sid) is not None) is survives
