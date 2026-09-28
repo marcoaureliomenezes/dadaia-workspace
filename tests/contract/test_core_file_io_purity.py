@@ -379,7 +379,8 @@ def _behavior(behavior_id: str) -> dict[str, str]:
 def test_each_harness_carries_the_cache_env_or_declares_the_gap(tmp_path: Path) -> None:
     """sa-tool-caches-land-outside-the-cache-zone#B40-2: Claude and Codex export the same
     absolute env; kimi-code, cursor, devin and copilot declare a gap — never silence."""
-    ruff, mypy = "/ws/.dadaia/tmp/ruff-cache", "/ws/.dadaia/tmp/mypy-cache"
+    tmp = Path("/ws/.dadaia/tmp")  # native separators (a backslash path on Windows)
+    ruff, mypy = str(tmp / "ruff-cache"), str(tmp / "mypy-cache")
     assert merge_claude_settings(None, Path("/ws"))["env"] == {
         "MYPY_CACHE_DIR": mypy,
         "RUFF_CACHE_DIR": ruff,
