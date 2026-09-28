@@ -4,7 +4,7 @@
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-09-27
-**Origin:** bugs:sa-reaper-destroys-its-own-hold-before-ttl,sa-context-dead-removes-repos-outside-the-reaper,sa-public-install-unlinks-operator-files-outside-its-ledger,sa-gate-allows-root-entries-the-reaper-moves,sa-doctor-reaps-harness-owned-entries,sa-public-install-writes-the-root-map-into-product-repos,sa-scoped-public-install-prunes-the-gate-wiring,sa-ledger-verbs-append-histo-before-validating-the-pair,sa-private-match-rendering-has-three-renderers,sa-gate-blind-on-cursor-copilot-devin,sa-codex-policy-allows-write-capable-commands,sa-specs-upgrade-writes-through-symlinks,pre-push-gate-never-runs-under-core-hookspath,sa-seven-workspace-root-rules,sa-bind-has-two-stores,sa-fix-lines-not-built-by-cli-line,sa-rich-printer-wraps-fix-lines,sa-unfixable-doctor-findings-say-doctor-fix,sa-placement-rules-contradict-tree8,sa-registry-schema-version-has-three-grammars,sa-spec-doc-033-duplicates-bugs-check,sa-ledger-write-seam-redacts-less-than-push-refuses,sa-backlog-status-has-no-single-authority,sa-promote-has-no-verb,sa-status-line-has-two-parsers,sa-adr-measured-by-pattern-refuses-real-checks,sa-specs-tree-state-read-five-ways,sa-memory-atom-has-two-grammars,sa-release-json-validated-three-times,sa-reconcile-certify-skip-the-workspace-walk,sa-doctor-job-not-a-required-check,sa-context-repo-mapping-falls-back-to-the-name,sa-editable-install-reports-a-frozen-version,sa-subjects-resolve-is-circular,sa-hook-parity-claims-false-and-interpreter-rules-diverge,sa-reviewer-persona-body-contradicts-its-tools,sa-specs-init-writes-unrendered-law,sa-gate-path-classes-diverge-from-the-law,sa-tool-caches-land-outside-the-cache-zone,sa-live-work-branch-named-three-ways,sa-principal-branch-defaults-to-main-and-cut-point-diverges,sa-audit-close-archives-without-validating,sa-staged-assets-without-consumers,sa-expiry-has-two-clocks,sa-handoff-self-pull-requirement-diverges,sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges,sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts,sa-text-restates-rules-the-code-contradicts,sa-consumer-law-carries-library-facts,sa-implementation-adds-before-it-deletes,sa-hook-files-written-by-table-and-by-hand,sa-projected-file-judged-by-four-verifiers,sa-codex-effort-set-by-policy-and-by-tier,sa-frontmatter-split-five-ways,sa-privacy-match-has-two-matchers,sa-denylist-file-has-three-shapes,sa-ledger-script-paths-in-two-tables,sa-json-schema-validated-by-two-engines,sa-doctor-finding-has-four-shapes,sa-session-liveness-has-two-rules,sa-agent-model-resolved-by-two-modules,sa-release-id-has-three-grammars,sa-missing-memory-file-reported-twice,sa-command-tree-walked-twice,sa-path-segment-judged-by-two-matchers,sa-certify-children-resolve-the-live-workspace,sa-git-output-split-by-unicode-line-breaks
+**Origin:** bugs:sa-reaper-destroys-its-own-hold-before-ttl,sa-context-dead-removes-repos-outside-the-reaper,sa-public-install-unlinks-operator-files-outside-its-ledger,sa-gate-allows-root-entries-the-reaper-moves,sa-doctor-reaps-harness-owned-entries,sa-public-install-writes-the-root-map-into-product-repos,sa-scoped-public-install-prunes-the-gate-wiring,sa-ledger-verbs-append-histo-before-validating-the-pair,sa-private-match-rendering-has-three-renderers,sa-gate-blind-on-cursor-copilot-devin,sa-codex-policy-allows-write-capable-commands,sa-specs-upgrade-writes-through-symlinks,pre-push-gate-never-runs-under-core-hookspath,sa-seven-workspace-root-rules,sa-bind-has-two-stores,sa-fix-lines-not-built-by-cli-line,sa-rich-printer-wraps-fix-lines,sa-unfixable-doctor-findings-say-doctor-fix,sa-placement-rules-contradict-tree8,sa-registry-schema-version-has-three-grammars,sa-spec-doc-033-duplicates-bugs-check,sa-ledger-write-seam-redacts-less-than-push-refuses,sa-backlog-status-has-no-single-authority,sa-promote-has-no-verb,sa-status-line-has-two-parsers,sa-adr-measured-by-pattern-refuses-real-checks,sa-specs-tree-state-read-five-ways,sa-memory-atom-has-two-grammars,sa-release-json-validated-three-times,sa-reconcile-certify-skip-the-workspace-walk,sa-doctor-job-not-a-required-check,sa-context-repo-mapping-falls-back-to-the-name,sa-editable-install-reports-a-frozen-version,sa-subjects-resolve-is-circular,sa-hook-parity-claims-false-and-interpreter-rules-diverge,sa-reviewer-persona-body-contradicts-its-tools,sa-specs-init-writes-unrendered-law,sa-gate-path-classes-diverge-from-the-law,sa-tool-caches-land-outside-the-cache-zone,sa-live-work-branch-named-three-ways,sa-principal-branch-defaults-to-main-and-cut-point-diverges,sa-audit-close-archives-without-validating,sa-staged-assets-without-consumers,sa-expiry-has-two-clocks,sa-handoff-self-pull-requirement-diverges,sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges,sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts,sa-text-restates-rules-the-code-contradicts,sa-consumer-law-carries-library-facts,sa-implementation-adds-before-it-deletes,sa-hook-files-written-by-table-and-by-hand,sa-projected-file-judged-by-four-verifiers,sa-codex-effort-set-by-policy-and-by-tier,sa-frontmatter-split-five-ways,sa-privacy-match-has-two-matchers,sa-denylist-file-has-three-shapes,sa-ledger-script-paths-in-two-tables,sa-json-schema-validated-by-two-engines,sa-doctor-finding-has-four-shapes,sa-session-liveness-has-two-rules,sa-agent-model-resolved-by-two-modules,sa-release-id-has-three-grammars,sa-missing-memory-file-reported-twice,sa-command-tree-walked-twice,sa-path-segment-judged-by-two-matchers,sa-certify-children-resolve-the-live-workspace,sa-git-output-split-by-unicode-line-breaks,sa-release-dir-placement-judged-by-tree8-and-spec-doc-027,sa-redact-text-keeps-a-second-privacy-grammar,sa-backlog-intents-have-two-grammars,sa-instance-health-judged-by-two-doctors,harness-add-crashes-staging-shared-skill-scripts,bug-law-spelling-registers-into-a-reaped-root-specs-tree,ledger-fix-lines-drop-specs,gate-law-claims-out-of-scope-writes-blocked-but-bash-is-never-judged,bug-resolve-law-names-flags-the-script-does-not-have,sa-live-release-resolved-by-two-readers,sa-persona-model-read-by-two-parsers
 - Operator demand, 2026-09-28 (FR10), verbatim: "SE ESTAMOS RESOLVENDO AMBIGUIDADES, QUER DIZER QUE HAVIA
   REPETIÇÕES. COMO QUE AUMENTOU O NUMERO DE LINHAS DE CODIGO E NUMERO DE TESTES???? ISSO EU NÃO ACEITO." /
   "VC VIOLOU A REGRA FUNDAMENTAL DE DELEÇÃO -> ATUALIZAÇÃO / REFAZER / RECONSTRUIR E SOMENTE DEPOIS
@@ -22,6 +22,9 @@
 - Operator ruling, 2026-09-28 late (FR10 relaxation), verbatim: "não é preciso reduzir linhas de codigo e
   testes de um jeito fechado, era sometne uma recomendação. mas não force a barra. para não quebrar nada e
   não demorar muito. o fundamental mesmo é ter as contraadições e ambigfuidades sistemicas resolvidas"
+- Operator ruling, 2026-09-28 closure (review REJECTED, rubric 67/100): fix the systemic ambiguities and
+  the regression now (the 11 closure bugs); the gate law is corrected and gating Bash goes to the backlog;
+  AC5.7/AC9.2 are delivered; AC7.1's ≥ 80 becomes a recommendation, re-measured and reported.
 
 ---
 
@@ -30,8 +33,9 @@
 Operator, 2026-09-26: "não adicione fix em cima do que ta quebrado ... agora so aceito 80% pra mais com
 o restante permanecendo mapeados". 2026-09-27: "se não resolvermos os testes é impossível resolver o problema na raiz".
 
-- Origin: 67 ids — the 49 open at definition (22 C, 11 H, 11 M, 5 L: 48 packages from 142 verified
-  findings plus the hooks-path bug `2c1faf65`), the work-order bug (`11fe60bb`) FR10's survey (`c3f48ab8`) and the git-output bug (`32310314`).
+- Origin: 78 ids — the 49 open at definition (22 C, 11 H, 11 M, 5 L: 48 packages from 142 verified
+  findings plus the hooks-path bug `2c1faf65`), the work-order bug (`11fe60bb`) FR10's survey (`c3f48ab8`), the git-output bug (`32310314`)
+  and the 11 closure bugs (`dfe0cac8`).
 - 0.4.7's first-run rubric D1–D10: **44/100** (Claude 50, non-Claude 40); 3 stalls.
 
 ## Objective
@@ -139,8 +143,8 @@ PLAN §1.1 gives each Origin bug's question its one authority; PLAN §2 its wave
 
 ### FR7 — Publish gate
 
-- AC7.1 The rubric D1–D10, run fenced on the wheel built from the promote head, scores ≥ 80/100 on the
-  first run; the three scores enter the closure log.
+- AC7.1 Recommended, never a gate (Origin, closure ruling): the rubric D1–D10, run fenced on the wheel
+  built from the promote head, aims at ≥ 80/100 on the first run; the three scores enter the closure log.
 - AC7.2 Superseded by AC10.4.
 - AC7.3 Superseded by AC10.4.
 
@@ -192,7 +196,7 @@ Baseline `9cd5fbf4`. Lines: `git grep -h '' <sha> -- '<pathspec>' | wc -l`; test
 - AC10.3 Every specified feature works. First, no documented feature, functionality or expected behavior
   breaks: every documented behavior (memory product atoms, `ARCHITECTURE.md`/`QUALITY.md`, Approved FRs,
   enforced law) maps to a test proving it, and that inventory stays green after every deletion batch.
-  Then: the full suite is green on the three CI OSes; the fenced first-run rubric scores ≥ 80/100
+  Then: the full suite is green on the three CI OSes; the fenced first-run rubric is re-measured
   (AC7.1); each surviving test declares the ONE behavior it measures (a memory atom statement, an AC id
   or `<bug-id>#<id>`): its module's `Intent:` when every test in the module measures that behavior, else
   the first line of its own docstring; a table row carries its behavior id in the parametrize id; every
