@@ -10,8 +10,12 @@ chains grew from.
 
 from __future__ import annotations
 
+import importlib.util
 import re
+from collections.abc import Callable
 from pathlib import Path
+from types import ModuleType
+from typing import Any
 
 from dadaia_workspace.core.fixed_sections import (
     FIXED_SECTIONS,
@@ -38,8 +42,23 @@ FORBIDDEN_MEMORY_HEADING_RE = re.compile(
     r"^(Changelog|History|Hist[óo]rico|Versions?)\b", re.IGNORECASE
 )
 
+
+def _atom_grammar() -> ModuleType:
+    """The ONE atom grammar: the stdlib reader ``memory.py`` ships (sa-memory-atom-has-two-
+    grammars) — loaded from the packaged script, so LINT-1 and the catalog parse alike."""
+    path = Path(__file__).parents[2] / "public/skills/dd-spec-navigator/scripts/_memory_schema.py"
+    spec = importlib.util.spec_from_file_location("_memory_schema", path)
+    assert spec is not None and spec.loader is not None, path
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_GRAMMAR = _atom_grammar()
+#: ``(frontmatter | None, body, error | None)`` for one atom's text.
+parse_atom: Callable[[str], tuple[dict[str, Any] | None, str, str | None]] = _GRAMMAR.parse
 #: Wikilink grammar for memory atoms: ``[[slug]]``.
-WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
+WIKILINK_RE: re.Pattern[str] = _GRAMMAR.WIKILINK_RE
 
 #: ``specs/``-relative file -> fixed-section id, the lookup view of :data:`FIXED_SECTIONS`.
 FIXED_SECTION_BY_PATH: dict[str, str] = dict(FIXED_SECTIONS)
@@ -53,6 +72,7 @@ __all__ = [
     "WIKILINK_RE",
     "extract_fixed_section",
     "is_forbidden_memory_heading",
+    "parse_atom",
     "read_fixed_fragment",
     "render_fixed_section",
 ]

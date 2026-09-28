@@ -1,13 +1,9 @@
 """``core.frontmatter`` — the ONE frontmatter parser (v0.5.1 T-051-16, K10).
 
-Table-driven over :func:`parse`'s five outcome shapes: valid, missing delimiter,
-invalid YAML (with the line number), missing required field(s) (via
-:func:`missing_fields`, the memory-atom 6-field contract), and a present-but-non-dict
-block. Regression coverage for bug
+Table-driven over :func:`parse`'s outcome shapes: valid, missing delimiter, invalid YAML
+(with the line number), and a present-but-non-dict block. Regression coverage for bug
 ``memory-lint-blames-missing-delimiter-for-a-yaml-parse-error`` (kind distinguishes
-"no block" from "block present, invalid YAML") and the checker half of bug
-``memory-trio-missing-required-frontmatter-fields`` (``missing_fields`` names every
-absent field, not just the first).
+"no block" from "block present, invalid YAML").
 
 Intent: CONTRACT — v0.5.1 A10.2/A10.3.
 Size: SMALL — pure-function unit tests, no I/O.
@@ -17,16 +13,7 @@ from __future__ import annotations
 
 import pytest
 
-from dadaia_workspace.core.frontmatter import Frontmatter, FrontmatterError, missing_fields, parse
-
-#: The memory-atom 5-field contract (`specs/memory/AGENTS.md`).
-_MEMORY_REQUIRED_FIELDS: tuple[str, ...] = (
-    "slug",
-    "title",
-    "tldr",
-    "summary",
-    "tags",
-)
+from dadaia_workspace.core.frontmatter import Frontmatter, FrontmatterError, parse
 
 
 def test_valid_frontmatter_returns_data_and_body() -> None:
@@ -80,27 +67,6 @@ def test_non_mapping_frontmatter_is_named_not_a_mapping() -> None:
 
     assert isinstance(result, FrontmatterError)
     assert result.kind == "not_a_mapping"
-
-
-def test_missing_fields_reports_every_absent_field_not_just_the_first() -> None:
-    """Checker half of bug memory-trio-missing-required-frontmatter-fields."""
-    data = {"unrelated": "value"}
-
-    absent = missing_fields(data, _MEMORY_REQUIRED_FIELDS)
-
-    assert absent == ["slug", "title", "tldr", "summary", "tags"]
-
-
-def test_missing_fields_is_empty_when_the_five_field_contract_is_satisfied() -> None:
-    data = {
-        "slug": "x",
-        "title": "X",
-        "tldr": "t",
-        "summary": "s",
-        "tags": [],
-    }
-
-    assert missing_fields(data, _MEMORY_REQUIRED_FIELDS) == []
 
 
 @pytest.mark.parametrize(

@@ -416,7 +416,6 @@ _V37_ALLOWANCE: dict[str, str] = {
     "core/redaction.py:_WIN_HOME_RE": "sa-ledger-write-seam-redacts-less-than-push-refuses",
     "core/release_state.py:PHASES": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
     "features/backlog/document.py:_SLUG_RE": "sa-backlog-status-has-no-single-authority",
-    "features/specs/memory_canon.py:WIKILINK_RE": "sa-memory-atom-has-two-grammars",
     "public/skills/dd-audit-project/scripts/_audit_schema.py:_JSON_TYPES": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
     "public/skills/dd-audit-project/scripts/_audit_schema.py:_SCHEMAS": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
     "public/skills/dd-audit-project/scripts/_audit_schema.py:_SHIPPED": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
@@ -460,7 +459,6 @@ _V37_ALLOWANCE: dict[str, str] = {
     "public/skills/dd-release-implementation/scripts/_release_schema.py:load_schema": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
     "public/skills/dd-release-implementation/scripts/_release_schema.py:validate": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
     "public/skills/dd-release-implementation/scripts/_release_store.py:SCRIPT": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
-    "public/skills/dd-spec-navigator/scripts/_memory_schema.py:WIKILINK_RE": "sa-memory-atom-has-two-grammars",
     "public/skills/dd-spec-navigator/scripts/_memory_schema.py:find_specs": "sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts",
 }
 
@@ -519,7 +517,8 @@ _V38_ALLOWANCE: dict[str, str] = {
     "features/migrate/state_v2.py:execute_migration": "parity:tests/unit/features/migrate/test_state_v2.py",
     "features/reconcile/service.py:_restore_state": "sa-reconcile-certify-skip-the-workspace-walk",
     "features/reconcile/service.py:reconcile_workspace": "sa-reconcile-certify-skip-the-workspace-walk",
-    "features/specs/doctor_memory.py:fix_placeholder_atom": "sa-memory-atom-has-two-grammars",
+    # re-verified exact-token delete of a template artifact; features/specs cannot import sweep
+    "features/specs/doctor_memory.py:fix_placeholder_atom": "parity:tests/unit/features/specs/test_scaffold_placeholder_repair.py",
     "infrastructure/projection.py:_clear": "parity:tests/integration/test_install_ledger_reconciliation.py",
     "infrastructure/public_assets.py:_prune_empty_dirs": "parity:tests/integration/test_install_ledger_reconciliation.py",
     "infrastructure/public_assets.py:_reconcile_install_ledger": "parity:tests/integration/test_install_ledger_reconciliation.py",
@@ -573,7 +572,6 @@ _V39_ALLOWANCE: dict[str, str] = {
     "BL-CONFLICT": "sa-unfixable-doctor-findings-say-doctor-fix",
     "BL-SCHEMA": "sa-unfixable-doctor-findings-say-doctor-fix",
     "BL-STALE": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "CAT-1": "sa-unfixable-doctor-findings-say-doctor-fix",
     "FIXED-1": "sa-unfixable-doctor-findings-say-doctor-fix",
     "FIXED-2": "sa-unfixable-doctor-findings-say-doctor-fix",
     "HOOKS-DRIFT-1": "sa-unfixable-doctor-findings-say-doctor-fix",
@@ -598,7 +596,6 @@ _V39_ALLOWANCE: dict[str, str] = {
     "SPEC-DOC-001": "sa-unfixable-doctor-findings-say-doctor-fix",
     "SPEC-DOC-002L": "sa-unfixable-doctor-findings-say-doctor-fix",
     "SPEC-DOC-003": "sa-unfixable-doctor-findings-say-doctor-fix",
-    "SPEC-DOC-008": "sa-unfixable-doctor-findings-say-doctor-fix",
     "SPEC-DOC-024": "sa-unfixable-doctor-findings-say-doctor-fix",
     "SPEC-DOC-026": "sa-unfixable-doctor-findings-say-doctor-fix",
     "SPEC-DOC-027": "sa-unfixable-doctor-findings-say-doctor-fix",

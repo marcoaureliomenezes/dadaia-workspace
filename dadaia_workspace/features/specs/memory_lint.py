@@ -1,6 +1,7 @@
 """The memory-atom lint (LINT-1) — the ONE implementation; ``doctor_memory`` imports it.
 
-It decides only what a lint can decide mechanically: frontmatter schema conformance,
+It decides only what a lint can decide mechanically: frontmatter schema conformance over
+the one atom grammar (``memory_canon.parse_atom``, the reader ``memory.py`` ships),
 forbidden (changelog/history) headings, duplicate headings, and wikilink resolution.
 """
 
@@ -15,7 +16,6 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
-from dadaia_workspace.core import frontmatter as _fm
 from dadaia_workspace.features.specs import memory_canon
 from dadaia_workspace.features.specs.schemas import load_schema
 
@@ -213,18 +213,10 @@ def lint_atom(
         result.error(f"Cannot read file: {exc}")
         return result
 
-    parsed = _fm.parse(content)
-
-    if isinstance(parsed, _fm.FrontmatterError):
-        # Bug memory-lint-blames-missing-delimiter-for-a-yaml-parse-error: name the
-        # ACTUAL cause instead of always blaming a missing delimiter. `parsed.kind`
-        # already distinguishes "no block" from "block present, YAML invalid at
-        # line N" from "block present, not a mapping" — the fix IS not collapsing
-        # them, so the message below is exactly `parsed.message`, unmodified.
-        result.error(parsed.message)
+    fm, body, problem = memory_canon.parse_atom(content)
+    if fm is None:
+        result.error(f"Frontmatter is outside the atom grammar: {problem}")
         return result
-
-    fm, body = parsed.data, parsed.body
 
     # Bug memory-trio-missing-required-frontmatter-fields (checker half):
     # ``jsonschema.validate()`` stops at the FIRST error `iter_errors` yields, so

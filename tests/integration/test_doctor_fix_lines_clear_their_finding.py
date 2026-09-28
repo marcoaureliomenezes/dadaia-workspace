@@ -161,7 +161,6 @@ PLANTS: dict[str, Plant] = {
     "SPEC-DOC-005": Plant(_plant_oversized_plan),
     "GITFLOW-1": Plant(_plant_gitflow_gone, {"<specs>": "specs"}),
     "SPEC-DOC-048": Plant(_plant_origin_line_gone, {"<id>": _RELEASE}),
-    "SPEC-DOC-010": Plant(_plant_changelog_heading),
     "AGENTS-PLACEHOLDER-1": Plant(_plant_tests_agents_placeholder),
     "TREE-2": Plant(_plant_root_spec_md),
     "TREE-3": Plant(
@@ -186,7 +185,6 @@ _UNEXERCISED: dict[str, str] = {
     "and redaction is covered by the redaction suite",
     "RELEASE-TREE-MEMORY": "the fix runs `release.py memory` over the ledger-derived "
     "commit window; the rule's own cases are tests/unit/features/specs/test_release_tree.py",
-    "CAT-1": "the fix is `memory.py catalog generate`, exercised by tests/unit/skills/test_spec_navigator_memory_script.py",
     "SPEC-DOC-038": "the fix is `audit.py close`, exercised by tests/unit/skills/test_audit_project_audit_script.py",
     "LINT-1": "the fix inserts one missing frontmatter field; which field is per-atom",
     "ADR-SUPERSEDED-CITATION": "no auto-fix by design (the successor is a judgment); covered "
@@ -352,23 +350,23 @@ def test_no_fix_line_deletes_a_record_without_recording_it(codes: str, fix: str 
 
 
 def test_a_judgment_only_rule_never_makes_the_run_exit_1(tmp_path: Path) -> None:
-    """The exit-code half of the contract: the four judgment-only rules fire at once and
-    contribute NO error-class finding, so dropping their fix lines stalls nobody.
-
-    The one error left standing is LINT-1 on the same atom the atomicity rule warned
-    about — the forbidden-heading invariant keeps its exit-1 home; only the duplicate
-    finding that had no honest command became a warning."""
+    """The exit-code half of the contract: the three judgment-only rules fire at once and
+    contribute NO error-class finding. sa-memory-atom-has-two-grammars#B29-6: a history
+    heading planted beside them is reported once, by LINT-1 — CAT-1 and SPEC-DOC-008
+    do not exist."""
     from dadaia_workspace.cli.commands.doctor import _specs_section
 
     root = _repo(tmp_path)
-    for code in ("SPEC-DOC-005", "SPEC-DOC-010", "TREE-2", "AGENTS-PLACEHOLDER-1"):
+    for code in ("SPEC-DOC-005", "TREE-2", "AGENTS-PLACEHOLDER-1"):
         PLANTS[code].plant(root)
+    _plant_changelog_heading(root)
 
     report = _specs_section(SpecsDoctor(root / "specs"), Path())
     fired = {f.code for f in report.printable}
-    assert {"SPEC-DOC-005", "SPEC-DOC-008", "TREE-2", "AGENTS-PLACEHOLDER-1"} <= fired, fired
-    errors = {f.code for f in report.findings if f.error}
-    assert errors == {"LINT-1"}, errors
+    assert {"SPEC-DOC-005", "TREE-2", "AGENTS-PLACEHOLDER-1"} <= fired, fired
+    assert not {"CAT-1", "SPEC-DOC-008", "SPEC-DOC-010"} & fired, fired
+    history = [f for f in report.findings if "Changelog" in f.message]
+    assert [(f.code, f.error) for f in history] == [("LINT-1", True)], history
 
 
 # ── T-050-09: TREE-5 remedies are honest (AC2.3, AC2.4) ─────────────────────────

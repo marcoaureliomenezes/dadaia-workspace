@@ -1,23 +1,10 @@
-"""The ONE frontmatter parser (v0.5.1 T-051-16, K10).
+"""The YAML frontmatter parser for the constitution and release documents.
 
-Before this module, seven files each carried their own copy of a ``--- ... ---``
-delimiter regex plus a hand-rolled ``yaml.safe_load`` + dict-check loop:
-``features/specs/{memory_lint,catalog,doctor_memory}.py``,
-a since-deleted panel view, ``features/migrate/bugs_jsonl.py`` (deleted with
-its module, T-051-16), ``core/specs_version.py``, and the projected
-``public/scripts/generate-memory-catalog.py`` (deleted, T-051-16). Six of those
-survive as consumers of THIS module; ``core/specs_version.py`` imports only
-:data:`FRONTMATTER_RE` (never :func:`parse`) and must stay importable with zero
-third-party dependencies, so ``import yaml`` here is deferred INSIDE :func:`parse`,
-never at module level (A10.2).
-
-Fixes bug ``memory-lint-blames-missing-delimiter-for-a-yaml-parse-error``: the old
-``_parse_frontmatter`` copies collapsed every failure mode — no delimiter, a present
-block with invalid YAML, a present block that parses to a non-mapping — into the
-same ``None`` return, so the caller always blamed "no delimited block" even when a
-YAML syntax error (with its own precise line/column) was the real cause. ``parse()``
-below returns a :class:`FrontmatterError` that NAMES which of the three happened,
-carrying the parser's own line number for the ``invalid_yaml`` case.
+A memory atom is not read here: its one grammar is the stdlib reader ``memory.py`` ships
+(``features/specs/memory_canon.parse_atom``). ``import yaml`` is deferred inside
+:func:`parse` so :data:`FRONTMATTER_RE` stays importable with no third-party dependency.
+A failure names its kind (no block, invalid YAML at line N, not a mapping), never a
+blanket "missing delimiter".
 """
 
 from __future__ import annotations
@@ -26,7 +13,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Literal
 
-__all__ = ["Frontmatter", "FrontmatterError", "FRONTMATTER_RE", "missing_fields", "parse"]
+__all__ = ["Frontmatter", "FrontmatterError", "FRONTMATTER_RE", "parse"]
 
 #: The ONE compiled definition (A10.2 — ``rg '_FRONTMATTER_RE'`` names this line
 #: alone). Leading delimiter, DOTALL-captured block, closing delimiter with an
@@ -99,18 +86,3 @@ def parse(text: str) -> Frontmatter | FrontmatterError:
         )
 
     return Frontmatter(data=data, body=body)
-
-
-def missing_fields(data: dict[str, Any], required: tuple[str, ...]) -> list[str]:
-    """Every name in ``required`` absent from ``data``, in ``required`` order.
-
-    A generic presence check — never a partial one. Exists because
-    ``jsonschema.validate()`` (single-error) reports only the FIRST missing
-    ``required`` property, which is the checker half of bug
-    ``memory-trio-missing-required-frontmatter-fields``: an author fixing one
-    missing field at a time never sees the next one until they re-run. Callers
-    that want full schema conformance (patterns/enums/types) still validate
-    against the JSON schema separately; this helper is for the "which field(s)
-    are missing" question alone.
-    """
-    return [name for name in required if name not in data]

@@ -8,7 +8,6 @@ a genuinely valid tree, a property no single-code row can prove.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -155,58 +154,6 @@ def _codes(issues: list[SpecsDoctorIssue]) -> set[str]:
     return {i.code for i in issues}
 
 
-def _make_catalog_json(product_dir: Path, slugs: list[str]) -> None:
-    """Write a minimal but valid catalog.json with the given slugs (paths use .md)."""
-    import json as _json
-
-    features = [
-        {
-            "rank": i + 1,
-            "slug": slug,
-            "title": slug,
-            "summary": "",
-            "path": f"specs/memory/product/{slug}.md",
-            "tags": [],
-            "depends_on": [],
-        }
-        for i, slug in enumerate(slugs)
-    ]
-    catalog = {
-        "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "context": "test",
-        "features": features,
-    }
-    (product_dir / "catalog.json").write_text(
-        _json.dumps(catalog, indent=2) + "\n", encoding="utf-8"
-    )
-
-
-def _write_feature_md(product_dir: Path, slug: str) -> None:
-    """Write a minimal valid feature .md atom for the given slug."""
-    content = f"""\
----
-slug: {slug}
-title: {slug}
-tldr: 'Does {slug}.'
-summary: 'Does {slug}.'
-tags: []
-agent_tier: self-pull
-token_estimate: 100
----
-
-## Propósito
-
-{slug} feature.
-"""
-    (product_dir / f"{slug}.md").write_text(content, encoding="utf-8")
-
-
-# ---------------------------------------------------------------------------
-# The two negative anchors — kept named, they are the only proof the WHOLE
-# checker set stays silent on a genuinely valid tree.
-# ---------------------------------------------------------------------------
-
-
 def test_clean_tree_has_no_errors(tmp_path: Path) -> None:
     specs = _make_clean_specs_tree(tmp_path)
     issues = SpecsDoctor(specs).check()
@@ -294,26 +241,6 @@ def test_scaffold_copytree_source_tree_carries_agents_md_per_area(tmp_path: Path
             ),
             "SPEC-DOC-002L",
             id="doc002l-legacy-html",
-        ),
-        pytest.param(
-            "history-heading-changelog",
-            lambda specs: (specs / "memory" / "product" / "testarea" / "feature-a.md").write_text(
-                "---\nslug: feature-a\ntitle: Feature A\n---\n\n## Propósito\n\nDoes A.\n\n"
-                "## Changelog\n\nHistorical details.\n",
-                encoding="utf-8",
-            ),
-            "SPEC-DOC-008",
-            id="doc008-history-heading-changelog",
-        ),
-        pytest.param(
-            "history-heading-history",
-            lambda specs: (specs / "memory" / "product" / "testarea" / "feature-a.md").write_text(
-                "---\nslug: feature-a\ntitle: Feature A\n---\n\n## Propósito\n\nDoes A.\n\n"
-                "## History\n\nHistorical details.\n",
-                encoding="utf-8",
-            ),
-            "SPEC-DOC-008",
-            id="doc008-history-heading-history",
         ),
         pytest.param(
             "non-canonical-phase",
@@ -676,79 +603,6 @@ def test_stale_check_9_comment_no_longer_claims_coverage_it_does_not_provide() -
     structural_src = inspect.getsource(doctor_structural)
     assert "already reported by check 9" not in release_src
     assert "already reported by SPEC-DOC-009" not in structural_src
-
-
-# ---------------------------------------------------------------------------
-# CAT-1: catalog.json <-> feature atom sync — merged sad+silent matrix
-# ---------------------------------------------------------------------------
-
-
-def test_cat1_sync_matrix(tmp_path: Path) -> None:
-    # absent catalog + feature atoms present -> one warning.
-    specs_a = _make_clean_specs_tree(tmp_path)
-    product_dir_a = specs_a / "memory" / "product"
-    _write_feature_md(product_dir_a, "feature-b")
-    _write_feature_md(product_dir_a, "feature-c")
-    assert not (product_dir_a / "catalog.json").exists()
-    cat1_a = [i for i in SpecsDoctor(specs_a).check() if i.code == "CAT-1"]
-    assert cat1_a and cat1_a[0].severity == Severity.WARNING
-    assert len(cat1_a) == 1
-
-    # absent catalog, NO feature atoms (only index.md) -> silent.
-    specs_b = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-b"))
-    product_dir_b = specs_b / "memory" / "product"
-    (product_dir_b / "testarea" / "feature-a.md").unlink()
-    cat1_b = [i for i in SpecsDoctor(specs_b).check() if i.code == "CAT-1"]
-    assert cat1_b == []
-
-    # in-sync catalog -> silent.
-    specs_c = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-c"))
-    product_dir_c = specs_c / "memory" / "product"
-    _make_catalog_json(product_dir_c, ["feature-a"])
-    cat1_c = [i for i in SpecsDoctor(specs_c).check() if i.code == "CAT-1"]
-    assert cat1_c == []
-
-    # stale slug -> warning names the slug.
-    specs_d = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-d"))
-    product_dir_d = specs_d / "memory" / "product"
-    _make_catalog_json(product_dir_d, ["feature-a", "stale-feature"])
-    cat1_d = [i for i in SpecsDoctor(specs_d).check() if i.code == "CAT-1"]
-    assert cat1_d
-    assert "stale-feature" in " ".join(i.description for i in cat1_d)
-    assert all(i.severity == Severity.WARNING for i in cat1_d)
-
-    # extra .md not in catalog -> warning names the slug.
-    specs_e = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-e"))
-    product_dir_e = specs_e / "memory" / "product"
-    _write_feature_md(product_dir_e, "new-feature")
-    _make_catalog_json(product_dir_e, ["feature-a"])
-    cat1_e = [i for i in SpecsDoctor(specs_e).check() if i.code == "CAT-1"]
-    assert cat1_e
-    assert "new-feature" in " ".join(i.description for i in cat1_e)
-
-    # both stale and extra -> at least 2 separate warnings.
-    specs_f = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-f"))
-    product_dir_f = specs_f / "memory" / "product"
-    _write_feature_md(product_dir_f, "new-feature")
-    _make_catalog_json(product_dir_f, ["stale-slug"])
-    cat1_f = [i for i in SpecsDoctor(specs_f).check() if i.code == "CAT-1"]
-    assert len(cat1_f) >= 2
-
-    # subdir atom in sync -> silent (rglob fix, T-021-01).
-    specs_g = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-g"))
-    product_dir_g = specs_g / "memory" / "product"
-    subdir_g = product_dir_g / "philosophy"
-    subdir_g.mkdir(parents=True, exist_ok=True)
-    (subdir_g / "product-vision.md").write_text(
-        "---\nslug: product-vision\ntitle: Product Vision\n"
-        "tldr: 'Vision.'\nsummary: 'Vision summary.'\ntags: []\nagent_tier: self-pull\n"
-        "token_estimate: 100\n---\n\n"
-        "## Vision\n\nThe vision.\n",
-        encoding="utf-8",
-    )
-    _make_catalog_json(product_dir_g, ["feature-a", "product-vision"])
-    cat1_g = [i for i in SpecsDoctor(specs_g).check() if i.code == "CAT-1"]
-    assert cat1_g == []
 
 
 def test_doc016_and_doc027_remedies_name_the_mintable_bare_axis(tmp_path: Path) -> None:

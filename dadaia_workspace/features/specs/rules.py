@@ -23,7 +23,6 @@ from dadaia_workspace.infrastructure.ledger_scripts import (
     AUDIT_SCRIPT,
     BACKLOG_SCRIPT,
     BUGS_SCRIPT,
-    MEMORY_SCRIPT,
     RELEASE_SCRIPT,
 )
 
@@ -56,7 +55,7 @@ RULES: tuple[SpecsRule, ...] = (
         fix_help="printf '%s\\n' '## <missing section>' >> specs/constitution.md",
     ),
     _rule(
-        ("SPEC-DOC-002", "SPEC-DOC-002L", "SPEC-DOC-008"),
+        ("SPEC-DOC-002", "SPEC-DOC-002L"),
         lambda d: d._memory.check_memory_files(),
         fix_help="printf '%s\\n' '# <title>' >> specs/memory/<document>.md",
     ),
@@ -92,13 +91,6 @@ RULES: tuple[SpecsRule, ...] = (
         # deletes the plan's tail. WARNING-only (see check_plan_line_limit).
     ),
     _rule(
-        ("SPEC-DOC-010",),
-        lambda d: d._memory.check_memory_atomicity(),
-        # No fix line: where an atom's history belongs is judgment, and truncating at
-        # the heading deletes it. WARNING-only here; LINT-1 still errors on the same
-        # atom, so the invariant keeps its exit-1 home.
-    ),
-    _rule(
         ("TREE-2",),
         lambda d: d._structural.check_tree2_root_spec_md(),
         # No fix line: reclassifying a root SPEC.md needs operator consent (the check's
@@ -132,11 +124,6 @@ RULES: tuple[SpecsRule, ...] = (
         # Never auto-fixed (operator decision D8): content vs slop is the operator's call.
         # Plain mv serves untracked files and paths with no canon home alike.
         fix_help="mv <path> <canon path|outside specs/>",
-    ),
-    _rule(
-        ("CAT-1",),
-        lambda d: d._memory.check_cat1_catalog_sync(),
-        fix_help=f"{MEMORY_SCRIPT.invocation} catalog generate --specs <specs>",
     ),
     _rule(
         ("LINT-1",),

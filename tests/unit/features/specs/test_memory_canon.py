@@ -41,7 +41,6 @@ def test_fixed_section_facts_are_the_core_leaf_re_exported() -> None:
 
 
 def test_forbidden_heading_vocabulary_is_one_matcher() -> None:
-    assert doctor_memory.FORBIDDEN_MEMORY_H2_RE is memory_canon.FORBIDDEN_MEMORY_HEADING_RE
     for heading in ("Changelog", "History", "Histórico", "Historico", "Version", "Versions"):
         assert memory_canon.is_forbidden_memory_heading(heading), heading
     assert not memory_canon.is_forbidden_memory_heading("Design")

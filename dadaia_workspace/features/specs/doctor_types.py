@@ -38,12 +38,3 @@ class SpecsDoctorIssue:
             "description": self.description,
             "path": self.path,
         }
-
-
-@dataclass
-class _MemoryMdSummary:
-    has_heading: bool
-    heading_text: str
-    forbidden_h2: list[str]
-    frontmatter: dict | None  # type: ignore[type-arg]
-    body: str

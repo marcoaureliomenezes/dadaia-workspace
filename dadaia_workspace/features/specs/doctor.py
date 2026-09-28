@@ -4,11 +4,11 @@ v0.1.55 FR1 decomposed the former 2,830-line god module into a thin ``SpecsDocto
 coordinator (this file) that **owns check()/fix() ORDER** and delegates all LOGIC to six
 single-responsibility validator siblings plus two shared leaf modules:
 
-  * ``doctor_types``     — ``Severity`` / ``SpecsDoctorIssue`` / ``_MemoryMdSummary``
+  * ``doctor_types``     — ``Severity`` / ``SpecsDoctorIssue``
   * ``doctor_common``    — cross-validator pure helpers (``resolve_live_release_id`` + release-dir discovery)
   * ``doctor_structural``   — TREE-2..8 spec-tree invariants; ``fix_tree4``,
                               ``fix_tree5``
-  * ``doctor_memory``       — memory files/atomicity, CAT-1, LINT-1
+  * ``doctor_memory``       — memory files, LINT-1
   * ``doctor_release``      — active release (RELEASE.json state document), release artifacts, SemVer + ledger invariants
   * ``doctor_closure_audit``— orphan specs, audit disposition; ``fix_archive_dir``
   * ``doctor_governance``   — single-source backlog invariants, bug status/JSONL

@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """What a valid memory tree is HERE: the two generated files say what the atoms say.
 
-The atoms' own frontmatter is validated by the library lint (`features/specs/
-memory_lint.py`, the doctor's LINT-1) and by nothing else — this module is the
-generated-pair decider, and `catalog generate` validates its own result against it, so
-the renderer and the checker cannot disagree about what the pair should contain.
+The atoms' schema is the library lint's (the doctor's LINT-1, over this skill's one
+grammar) — this module is the generated-pair decider, and `catalog generate` validates
+its own result against it, so the renderer and the checker cannot disagree.
 """
 
 from __future__ import annotations
 
 import json
+import shlex
 import sys
 from pathlib import Path
 from typing import Any
@@ -39,6 +39,7 @@ def check(specs: Path) -> list[Finding]:
                 "path": name, "line": 0,
                 "message": f"{path.name} does not match the atoms it is generated from",
             })  # fmt: skip
+    fix = f"{FIX_PREFIX} catalog generate --specs {shlex.quote(str(specs.resolve()))}"
     for finding in out:  # the pair is regenerated, never hand-fixed: the fix line clears it
-        finding |= {"code": CODE, "fix": f"{FIX_PREFIX} catalog generate --specs specs"}
+        finding |= {"code": CODE, "fix": fix}
     return out

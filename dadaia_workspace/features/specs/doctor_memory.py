@@ -1,7 +1,7 @@
-"""Memory validator: atom files, atomicity, CAT-1, LINT-1, MEM-DRIFT-1, MEM-DRIFT-2.
+"""Memory validator: atom files, LINT-1, MEM-DRIFT-1, MEM-DRIFT-2.
 Single-responsibility sibling of the SpecsDoctor coordinator. Owns the memory-markdown-source
-invariants: required atoms present with a heading (SPEC-DOC-002/002L), no changelog/history
-headings (SPEC-DOC-008), catalog↔atom sync (CAT-1), the LINT-1 memory-atom lint, and (v0.5.1
+invariants: required atoms present with a heading (SPEC-DOC-002/002L), the LINT-1 memory-atom
+lint (the one home of the forbidden-heading rule; the generated pair is LEDGER-MEMORY's), and (v0.5.1
 T-051-22 rework) MEM-DRIFT-1's features-package-map-vs-live-tree WARNING and (0.4.7 FR2)
 MEM-DRIFT-2's memory-citation WARNING (finders: ``features.specs.citations``). LINT-1 imports
 ``features.specs.memory_lint`` directly.
@@ -14,20 +14,13 @@ import re
 from collections.abc import Collection
 from pathlib import Path
 
-from dadaia_workspace.core import frontmatter as _fm
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.cli_line import materialize_line
 from dadaia_workspace.features.specs import citations, memory_canon, memory_lint
 from dadaia_workspace.features.specs.canon import default_public_dir
-from dadaia_workspace.features.specs.doctor_types import (
-    Severity,
-    SpecsDoctorIssue,
-    _MemoryMdSummary,
-)
-from dadaia_workspace.infrastructure.ledger_scripts import MEMORY_SCRIPT
+from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 
 # ONE home for memory-canon facts (F011): features.specs.memory_canon.
-FORBIDDEN_MEMORY_H2_RE = memory_canon.FORBIDDEN_MEMORY_HEADING_RE
 TOPLEVEL_MEMORY_FILES = memory_canon.MEMORY_TOPLEVEL_FILES
 # Product memory is a folder catalog: index.md is required + 0..N feature .md atoms.
 PRODUCT_INDEX_REL = "product/index.md"
@@ -64,41 +57,14 @@ def has_unfilled_angle_placeholders(path: Path) -> bool:
 
 # Any ATX heading (H1-H6): satisfies the "has a heading" requirement.
 _MD_HEADING_RE = re.compile(r"^#{1,6}\s+\S", re.MULTILINE)
-_MD_H1_RE = re.compile(r"^#\s+(.+)$", re.MULTILINE)
-_MD_H2_RE = re.compile(r"^##\s+(.+)$", re.MULTILINE)
 
 
-def _parse_memory_md(path: Path) -> _MemoryMdSummary:
-    """Extract the facts the doctor needs from a memory .md atom."""
+def _has_heading(path: Path) -> bool:
+    """True when the atom's body — its whole text when the frontmatter does not parse —
+    carries an ATX heading."""
     content = path.read_text(encoding="utf-8")
-
-    # Tolerant: any frontmatter parse failure degrades to "no frontmatter", never raises.
-    fm: dict | None = None  # type: ignore[type-arg]
-    body = content
-    parsed = _fm.parse(content)
-    if isinstance(parsed, _fm.Frontmatter):
-        fm = parsed.data
-        body = parsed.body
-
-    h1_match = _MD_H1_RE.search(body)
-    heading_text = h1_match.group(1).strip() if h1_match else ""
-    # has_heading is True if the body contains ANY ATX heading (H1–H6), including
-    # atoms that only have ## / ### level headings and no H1.
-    has_heading = bool(_MD_HEADING_RE.search(body))
-
-    forbidden_h2: list[str] = []
-    for h2_match in _MD_H2_RE.finditer(body):
-        text = h2_match.group(1).strip()
-        if text and FORBIDDEN_MEMORY_H2_RE.search(text):
-            forbidden_h2.append(text)
-
-    return _MemoryMdSummary(
-        has_heading=has_heading,
-        heading_text=heading_text,
-        forbidden_h2=forbidden_h2,
-        frontmatter=fm,
-        body=body,
-    )
+    fm, body, _problem = memory_canon.parse_atom(content)
+    return bool(_MD_HEADING_RE.search(body if fm is not None else content))
 
 
 # ---------------------------------------------------------------------------
@@ -153,28 +119,8 @@ def _live_feature_package_names() -> set[str]:
     return {name for _finder, name, ispkg in pkgutil.iter_modules(pkg.__path__) if ispkg}
 
 
-def _iter_memory_md_files(mem_dir: Path) -> list[Path]:
-    """All memory .md atom files that should be checked for atomicity.
-
-    Includes the top-level singles (ARCHITECTURE.md, QUALITY.md) and every
-    *.md under product/ except index.md (the catalog folder).
-    """
-    out: list[Path] = []
-    for name in TOPLEVEL_MEMORY_FILES:
-        p = mem_dir / name
-        if p.exists():
-            out.append(p)
-    product_dir = mem_dir / "product"
-    if product_dir.is_dir():
-        for p in sorted(product_dir.glob("**/*.md")):
-            if p.name == "index.md":
-                continue
-            out.append(p)
-    return out
-
-
 class MemoryValidator:
-    """Memory-atom files, atomicity, CAT-1 catalog sync, and LINT-1 lint."""
+    """Memory-atom files and the LINT-1 lint."""
 
     def __init__(self, specs_dir: Path) -> None:
         self.specs_dir = specs_dir
@@ -340,7 +286,7 @@ class MemoryValidator:
                 )
                 continue
             try:
-                summary = _parse_memory_md(p)
+                has_heading = _has_heading(p)
             except Exception as e:
                 issues.append(
                     SpecsDoctorIssue(
@@ -351,7 +297,7 @@ class MemoryValidator:
                     )
                 )
                 continue
-            if not summary.has_heading:
+            if not has_heading:
                 issues.append(
                     SpecsDoctorIssue(
                         code="SPEC-DOC-002",
@@ -444,40 +390,6 @@ class MemoryValidator:
                     )
                 )
 
-        return issues
-
-    def check_memory_atomicity(self) -> list[SpecsDoctorIssue]:
-        """Check #8: no forbidden changelog/history ## headings in memory .md bodies.
-
-        memory-markdown-source-v1: .md is now the canonical source.  We grep the
-        Markdown body directly — no YAML escape hatch, no STRUCT bypass.
-        Forbidden headings: ## Changelog, ## History, ## Histórico, ## Versions.
-        """
-        issues: list[SpecsDoctorIssue] = []
-        mem_dir = self.specs_dir / "memory"
-
-        for p in _iter_memory_md_files(mem_dir):
-            try:
-                summary = _parse_memory_md(p)
-            except Exception:
-                continue
-            rel = p.relative_to(mem_dir).as_posix()
-            for label in summary.forbidden_h2:
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="SPEC-DOC-008",
-                        # WARNING: where the atom's history belongs is judgment, so this
-                        # rule hands back no command (0.4.7 c2 review). The exit-1 home
-                        # of the same invariant is LINT-1, which errors on the very same
-                        # forbidden heading over a superset of these files.
-                        severity=Severity.WARNING,
-                        description=(
-                            f"memory/{rel} has forbidden heading: ## {label!r} — "
-                            "memory atoms must be atomic, not changelogs"
-                        ),
-                        path=str(p),
-                    )
-                )
         return issues
 
     def check_lint1_memory_atoms(self) -> list[SpecsDoctorIssue]:
@@ -598,94 +510,4 @@ class MemoryValidator:
                     path=str(architecture_md),
                 )
             )
-        return issues
-
-    def check_cat1_catalog_sync(self) -> list[SpecsDoctorIssue]:
-        """CAT-1: catalog.json must stay in sync with *.md feature atom files.
-
-        memory-markdown-source-v1: .md is canonical source; .html is retired.
-
-        Logic:
-        1. Enumerate ``memory/product/*.md`` excluding ``index.md`` → ``md_slugs``.
-        2. If ``catalog.json`` is absent and md_slugs is non-empty → one WARNING.
-        3. If ``catalog.json`` is present → parse ``features[].slug``:
-           - One WARNING per slug in catalog that has no corresponding .md on disk.
-           - One WARNING per .md on disk whose slug is not in the catalog.
-        4. Severity is always WARNING (never ERROR) — catalog may simply need regeneration.
-        """
-        import json as _json
-
-        issues: list[SpecsDoctorIssue] = []
-        product_dir = self.specs_dir / "memory" / "product"
-        catalog_path = product_dir / "catalog.json"
-
-        if not product_dir.is_dir():
-            return issues
-
-        # Collect slugs from .md feature atoms (excluding index.md), recursing into subdirs
-        md_slugs: set[str] = {p.stem for p in product_dir.rglob("*.md") if p.name != "index.md"}
-
-        if not catalog_path.exists():
-            if md_slugs:
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="CAT-1",
-                        severity=Severity.WARNING,
-                        description=f"catalog.json absent; {len(md_slugs)} feature .md "
-                        f"atom{'s' if len(md_slugs) != 1 else ''} present; run "
-                        f"`{MEMORY_SCRIPT.invocation} catalog generate` to create it.",
-                        path=str(catalog_path),
-                    )
-                )
-            return issues
-
-        # catalog.json exists — compare slug sets
-        try:
-            data = _json.loads(catalog_path.read_text(encoding="utf-8"))
-            catalog_slugs: set[str] = {
-                str(entry.get("slug", ""))
-                for entry in data.get("features", [])
-                if entry.get("slug")
-            }
-        except Exception as exc:
-            issues.append(
-                SpecsDoctorIssue(
-                    code="CAT-1",
-                    severity=Severity.WARNING,
-                    description=f"catalog.json is not valid JSON: {exc}",
-                    path=str(catalog_path),
-                )
-            )
-            return issues
-
-        # Slugs in catalog but no .md on disk
-        for slug in sorted(catalog_slugs - md_slugs):
-            issues.append(
-                SpecsDoctorIssue(
-                    code="CAT-1",
-                    severity=Severity.WARNING,
-                    description=(
-                        f"catalog.json lists slug '{slug}' but no corresponding "
-                        f"'{slug}.md' exists in memory/product/. "
-                        f"Run `{MEMORY_SCRIPT.invocation} catalog generate` to resync."
-                    ),
-                    path=str(product_dir / f"{slug}.md"),
-                )
-            )
-
-        # .md atoms on disk but not in catalog
-        for slug in sorted(md_slugs - catalog_slugs):
-            issues.append(
-                SpecsDoctorIssue(
-                    code="CAT-1",
-                    severity=Severity.WARNING,
-                    description=(
-                        f"'{slug}.md' exists in memory/product/ but is not listed in "
-                        "catalog.json. "
-                        f"Run `{MEMORY_SCRIPT.invocation} catalog generate` to resync."
-                    ),
-                    path=str(product_dir / f"{slug}.md"),
-                )
-            )
-
         return issues
