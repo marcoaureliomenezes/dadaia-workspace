@@ -1,19 +1,5 @@
-"""Workspace filesystem-layout constants — the single authority (pure ``core`` leaf).
-
-Bug class (transversal; the six-bug ``.dadaia/`` layout ledger): the
-same invariant declared in multiple modules diverges. The root whitelist lived in
-``hooks/root_whitelist.py`` AND ``features/spec_context/doctor.py`` and diverged the day
-the root ``AGENTS.md`` map was added to one of them; the ``.dadaia/`` layout lived as bare name lists
-in four modules, and six fixes edited their membership without ever changing their shape.
-One fact, one place: every consumer DERIVES from this module (both ``hooks`` and
-``features`` may import ``core``; the reverse edges are forbidden by import-linter), and a
-``.dadaia/`` zone enters only as a :class:`Zone` record — a name without a class, a
-creator and a TTL cannot be added.
-
-Same regime as :mod:`dadaia_workspace.core.harness_registry`: stdlib-only, no I/O, no
-internal imports — a pure constants leaf, pinned by contract tests
-(``tests/contract/test_zone_registry.py``: the rendered table equals the registry, no
-second name list exists anywhere in the package, every creator is a live module).
+"""Workspace filesystem-layout constants: the one home of every root, ``.dadaia/`` zone and
+``specs/`` canon name. Pure ``core`` leaf — stdlib only, no I/O; every consumer derives from it.
 """
 
 from __future__ import annotations
@@ -77,24 +63,12 @@ REPO_LAW: tuple[tuple[str, str], ...] = (
     ("tests-AGENTS.md", "tests/AGENTS.md"),
 )
 
-#: SPEC-DOC-030 (`specs/audits/AGENTS.md`, v6 canon): every new ``specs/audits/`` directory must
-#: be named ``<YYYYMMDD>-<slug>`` — the SAME shape ``features.specs.canon``'s own
-#: audits ``CanonEntry`` pattern uses (bug
-#: spec-doc-030-audit-dir-rule-contradicts-dadaia-6-8-canon: this constant used to
-#: state an older, stale ``<YYYYMMDDTHHMMSSZ>-<session_id_8chars>`` shape that
-#: contradicted the law). One fact, one place: ``core`` may not import ``features``, so
-#: the fragment lives here and ``canon.py`` imports it — never a second, independently
-#: hand-kept regex.
+#: Every ``specs/audits/`` directory is named ``<YYYYMMDD>-<slug>``.
 AUDIT_DIR_NAME_PATTERN: str = r"\d{8}-[a-z0-9][a-z0-9-]*"
 AUDIT_DIR_NAME_RE: re.Pattern[str] = re.compile(f"^{AUDIT_DIR_NAME_PATTERN}$")
 
 
-#: Files the workspace root may contain. ``AGENTS.md`` is the root map (the one
-#: always-on law file the library projects); ``prompt.md`` the optional operator
-#: long-prompt file; ``.env`` the one credential home (the map §4); ``.gitignore`` the
-#: defence-in-depth exclusion list — bug
-#: doctor-root1-flags-env-that-dadaia-md-9-declares-canonical: the law named both, this
-#: set named neither, and hook + doctor (both derived from here) contradicted the law.
+#: Files the workspace root may contain: the root map, the operator prompt, the credential home.
 ROOT_ALLOWED_FILES: frozenset[str] = frozenset({"AGENTS.md", "prompt.md", ".env", ".gitignore"})
 
 
@@ -151,76 +125,30 @@ STATES_CANON: frozenset[str] = frozenset(
 )
 
 _ONE_DAY = 86_400
+_SEVEN_DAYS: int = 7 * _ONE_DAY  # the reaper's hold window
 
-#: The reaper's hold window: a moved entry is deleted only after this elapses (Q3).
-_SEVEN_DAYS: int = 7 * _ONE_DAY
-
-#: The one record of what may live in ``.dadaia/``. Row order is the
-#: rendered table order; every other list of zone names in the package is a view of this.
+#: The one record of what may live in ``.dadaia/``, in rendered-table order.
 DADAIA_ZONES: tuple[Zone, ...] = (
-    Zone(
-        "agentic",
-        ZoneClass.PROJECTION,
-        Creator.INSTALL,
-        None,
-        None,
-        "staged public assets + manifest.json",
-    ),
+    Zone("agentic", ZoneClass.PROJECTION, Creator.INSTALL, None, None, "staged public assets + manifest.json"),
     Zone("hooks", ZoneClass.PROJECTION, Creator.INSTALL, None, None, "projected hook entrypoints"),
     Zone("states", ZoneClass.STATE, Creator.INIT, None, STATES_CANON, "workspace database"),
-    Zone(
-        "sessions",
-        ZoneClass.PROTECTED,
-        Creator.RUNTIME,
-        None,
-        frozenset({"*.json"}),
-        "session records; reaper = core.session_store",
-    ),
-    Zone(
-        "handoff",
-        ZoneClass.OUTPUT,
-        Creator.RUNTIME,
-        _ONE_DAY,
-        None,
-        "agent handoffs, ack-on-consume",
-    ),
+    Zone("sessions", ZoneClass.PROTECTED, Creator.RUNTIME, None, frozenset({"*.json"}), "session records; reaper = core.session_store"),
+    Zone("handoff", ZoneClass.OUTPUT, Creator.RUNTIME, _ONE_DAY, None, "agent handoffs, ack-on-consume"),
     Zone("tmp", ZoneClass.EPHEMERAL, Creator.RUNTIME, _ONE_DAY, None, "scratch + evidence"),
-    Zone(
-        "reaped",
-        ZoneClass.EPHEMERAL,
-        Creator.RUNTIME,
-        _SEVEN_DAYS,
-        None,
-        "slop held by the reaper; deleted only by TTL expiry",
-    ),
+    Zone("reaped", ZoneClass.EPHEMERAL, Creator.RUNTIME, _SEVEN_DAYS, None, "slop held by the reaper; deleted only by TTL expiry"),
     Zone("mcps", ZoneClass.EPHEMERAL, Creator.RUNTIME, _ONE_DAY, None, "MCP working dirs"),
-    Zone(
-        "dist",
-        ZoneClass.STATE,
-        Creator.RUNTIME,
-        None,
-        frozenset({"spec-contexts.json"}),
-        "the one export artifact",
-    ),
-    Zone(
-        "references",
-        ZoneClass.OPERATOR,
-        Creator.OPERATOR,
-        None,
-        None,
-        "operator reference clones; never scanned",
-    ),
+    Zone("dist", ZoneClass.STATE, Creator.RUNTIME, None, frozenset({"spec-contexts.json"}), "the one export artifact"),
+    Zone("references", ZoneClass.OPERATOR, Creator.OPERATOR, None, None, "operator reference clones; never scanned"),
     Zone(".venv", ZoneClass.MANAGED, Creator.INIT, None, None, "workspace venv; never scanned"),
-)
+)  # fmt: skip
 
 #: Files (not zones) the ``.dadaia/`` top level may contain.
 DADAIA_ROOT_FILES: frozenset[str] = frozenset({"AGENTS.md", ".gitignore"})
 
-#: Workspace-relative path of the operator's exception globs: matches
-#: at the root and inside the harness dirs; outside the manifest and outside these = slop.
+#: The operator's exception globs (workspace-relative).
 INSTANCE_EXCEPTIONS: str = ".dadaia/states/instance_exceptions.txt"
 
-#: ADR 0080: absolute tool caches in tmp (exported by the harness env); markers per owner.
+#: Absolute tool caches in tmp, exported by the harness env.
 TOOL_CACHE_ENV: dict[str, str] = {"MYPY_CACHE_DIR": "mypy-cache", "RUFF_CACHE_DIR": "ruff-cache"}
 MARKER_DIR: Path = Path(".dadaia") / "tmp" / "hooks"
 
@@ -233,13 +161,9 @@ def parse_exception_globs(text: str) -> tuple[str, ...]:
 
 
 def verdict(rel: str, is_dir: bool, globs: tuple[str, ...]) -> Literal["canon", "operator", "slop"]:
-    """The ONE answer to "may this entry exist" (ADR 0058) for the gate and the doctor.
-
-    Judges each judged level of *rel* — the root, ``.dadaia/<zone>``, a closed-canon zone's
-    entry — type-aware (*is_dir* is the leaf's type; every ancestor is a directory). A level
-    outside its allow set is ``operator`` iff an exception glob matches its name or
-    workspace-relative path, else ``slop``; below an open level everything is ``canon``.
-    """
+    """The one answer to "may this entry exist", for the gate and the doctor: a judged level
+    (root, ``.dadaia/<zone>``, a closed zone's entry) outside its allow set is ``operator`` iff
+    an exception glob matches its name or path, else ``slop``; below an open level, ``canon``."""
     parts = rel.strip("/").split("/")
     for depth, name in enumerate(parts):
         directory = is_dir or depth < len(parts) - 1
@@ -262,25 +186,13 @@ def verdict(rel: str, is_dir: bool, globs: tuple[str, ...]) -> Literal["canon", 
     return "canon"
 
 
-# Derived views — one per consumer, all pure; a consumer never spells the names itself.
-
-
 def zone_names() -> frozenset[str]:
     """The doctor's allow set for the ``.dadaia/`` top level."""
     return frozenset(zone.name for zone in DADAIA_ZONES)
 
 
 def provisioned_zones() -> tuple[Zone, ...]:
-    """The zones a bootstrapped workspace must carry — ONE predicate, two consumers.
-
-    ``init`` creates exactly these and the doctor reports exactly these as ``missing``
-    (bug WS-hooks-missing: ``init`` provisioned the ``init``-created rows only while the
-    doctor demanded the ``install``-created ones too, so a ``claude``-only workspace —
-    whose hook format projects no ``.dadaia/hooks/`` wrapper — was born red). ``creator``
-    stays the row's metadata; it is no longer a second, narrower answer to "must this
-    exist?". MANAGED/OPERATOR rows are excluded for the same reason the doctor never
-    walks them: ``.venv`` is the venv manager's, not the zone pass'.
-    """
+    """The zones ``init`` creates and the doctor reports ``missing`` — one predicate."""
     return tuple(zone for zone in walked_zones() if zone.creator in (Creator.INIT, Creator.INSTALL))
 
 
@@ -328,54 +240,30 @@ def zone_table_rows() -> tuple[tuple[str, str, str, str, str], ...]:
     )
 
 
-#: The git chokepoints (`.dadaia/AGENTS.md`) and the shipped script each is installed FROM:
-#: ``(.git/hooks/<target>, public/scripts/<source>)``. One home for "which hooks exist
-#: and what they are made of" — ``cli.commands.ci`` installs them, the workspace doctor
-#: compares the installed copies to them (HOOKS-DRIFT-1).
+#: The git chokepoints: ``(.git/hooks/<target>, public/scripts/<source>)``.
 INSTALLED_GIT_HOOKS: tuple[tuple[str, str], ...] = (("pre-push", "pre-push-ci-gate.sh"),)
 
 
 def public_scripts_dir() -> Path:
-    """The shipped ``public/scripts/`` directory inside the installed package.
-
-    Pure path arithmetic on this module's own location — no filesystem read, so the
-    core-purity ratchet is untouched.
-    """
+    """The shipped ``public/scripts/`` directory (path arithmetic, no filesystem read)."""
     return Path(__file__).resolve().parents[1] / "public" / "scripts"
 
 
-#: The ``specs/`` paths the law's path classes call ADDITIVE (``specs/AGENTS.md``): the
-#: append-only ledger areas and every area's ``_archive/*_histo.jsonl`` (``fnmatch``).
+#: The ADDITIVE ``specs/`` paths (``fnmatch``): the ledger areas and every ``_histo.jsonl``.
 SPECS_ADDITIVE_GLOBS: tuple[str, ...] = (
     "specs/backlog/*", "specs/bugs/*", "specs/audits/*", "specs/*/_archive/*_histo.jsonl",
 )  # fmt: skip
 
-#: Every projection directory at the workspace root: the shared ``.agents`` tree plus
-#: the directory each entry harness owns (:data:`HARNESS_PROJECTION_DIRS` is the one
-#: home of the latter — a harness with an empty set contributes nothing here).
+#: Every projection directory at the workspace root: ``.agents`` plus each harness's own.
 HARNESS_DIRS: frozenset[str] = frozenset(
     {".agents", *(d for dirs in HARNESS_PROJECTION_DIRS.values() for d in dirs)}
 )
 
-#: Directories the workspace root may contain (the Workspace Root Law).
 ROOT_ALLOWED_DIRS: frozenset[str] = frozenset({".dadaia", ".git", "repos"} | HARNESS_DIRS)
 
-# ---------------------------------------------------------------------------------
-# The repo working tree (``repo-AGENTS.md``) and the ``specs/`` canon (``specs-AGENTS.md``) — the same
-# registry regime as the root law and the zone table above. 0.4.7 FR5: these names
-# lived in three homes (the law's hand-typed bullets, ``features/specs/canon.py``'s
-# rows, ``infrastructure/privacy_check.py``'s literal) and the ledger counted seven
-# bugs born of one home drifting from another.
-# ---------------------------------------------------------------------------------
-
-#: Tool artifacts a repo working tree may carry but that are never source: caches,
-#: build output, coverage data. Bare names — the display form (trailing ``/`` for the
-#: directories) is :func:`repo_excluded_display`.
+#: Tool artifacts a repo working tree may carry but that are never source.
 REPO_TREE_ARTIFACTS: tuple[str, ...] = (
-    # ``.venv`` is here for the RENDERED law line only (`repos/<slug>/AGENTS.md` lists `.venv/`
-    # and the rendering reads this tuple). It can never produce a finding: the repo-tree
-    # walk consults ``_REPO_WALK_PRUNED`` first, which ends the walk at ``.venv``.
-    ".venv",
+    ".venv",  # rendered law line only: the repo-tree walk prunes ``.venv`` first
     ".pytest_cache",
     ".mypy_cache",
     ".hypothesis",
@@ -386,39 +274,19 @@ REPO_TREE_ARTIFACTS: tuple[str, ...] = (
     ".coverage",
 )
 
-#: Everything a repo working tree must NOT carry (`repos/<slug>/AGENTS.md`): the tool artifacts
-#: above plus ``.dadaia`` — a nested workspace control directory, excluded for its own
-#: reason (it corrupts context resolution for every tree-walking tool), which is why a
-#: consumer walking artifacts only (the public-asset walk, which lives UNDER
-#: ``.dadaia/``) reads :data:`REPO_TREE_ARTIFACTS` instead.
+#: Everything a repo working tree must NOT carry: the artifacts plus a nested ``.dadaia``.
 REPO_TREE_EXCLUDED: tuple[str, ...] = (".dadaia", *REPO_TREE_ARTIFACTS)
 
-#: The one entry of :data:`REPO_TREE_ARTIFACTS` that is a file, not a directory — the
-#: only fact the rendered law line needs beyond the names themselves.
 _REPO_TREE_EXCLUDED_FILES: frozenset[str] = frozenset({".coverage"})
 
-#: Top-level ``specs/memory/`` files (v7 canon). Named here, with every other canonical
-#: name; ``features.specs.memory_canon`` re-exports it for its own consumers.
-#: ``TECHSTACK.md`` left the canon at specs_pattern_version 7: a third canonical file
-#: whose body is one section of the architecture is a second place the same fact could
-#: be stated, so it became ``ARCHITECTURE.md``'s ``## Tech Stack`` section and the
-#: upgrade lane folds a consumer's copy into it.
 MEMORY_TOPLEVEL_FILES: tuple[str, ...] = ("ARCHITECTURE.md", "QUALITY.md")
 
-#: The root member a :class:`CanonEntry` lives under. Distinct from a filesystem "area"
-#: only for the two bare root files (``AGENTS.md``, ``constitution.md``), each its own
-#: singleton member — every other value names the directory area it governs. Deriving
-#: :data:`CANON_ROOT_MEMBERS` as ``{e.area for e in SPECS_CANON}`` then needs zero
-#: special casing — the whole reason this carries 8 values, not 6.
+#: The root member a :class:`CanonEntry` lives under (each bare root file is its own).
 SpecsArea = Literal[
     "AGENTS.md", "constitution.md", "memory", "releases", "backlog", "bugs", "audits", "ADRs"
 ]
 
-#: The variable segments a canon path shape may carry: the law's own notation on the
-#: left, the regex fragment it compiles to on the right. A shape is written ONCE, in
-#: the law's notation; :attr:`CanonEntry.pattern` derives the matcher and
-#: :func:`specs_canon_table_rows` derives the rendered table from the same string —
-#: never a hand-kept regex beside a hand-kept prose spelling of the same path.
+#: A canon shape's variable tokens (the law's notation) and the regex each compiles to.
 _SHAPE_TOKENS: tuple[tuple[str, str], ...] = (
     ("<M.m.p>", RELEASE_ID_RE.pattern[1:-1]),
     ("<40hex>", r"[0-9a-f]{40}"),
@@ -428,33 +296,20 @@ _SHAPE_TOKENS: tuple[tuple[str, str], ...] = (
     ("**", r".+"),
 )
 
-#: The shape tokens as a lookup — a consumer needing one fragment reads it here.
 SHAPE_FRAGMENTS: dict[str, str] = dict(_SHAPE_TOKENS)
 
 _SHAPE_TOKEN_RE = re.compile("|".join(f"({re.escape(token)})" for token, _ in _SHAPE_TOKENS))
 
 
 def _shape_regex(shape: str) -> str:
-    """*shape* with every token replaced by its fragment and every literal part escaped."""
-    fragments = dict(_SHAPE_TOKENS)
-    return "".join(
-        fragments[part] if part in fragments else re.escape(part)
-        for part in _SHAPE_TOKEN_RE.split(shape)
-        if part
-    )
+    parts = _SHAPE_TOKEN_RE.split(shape)
+    return "".join(SHAPE_FRAGMENTS.get(part) or re.escape(part) for part in parts if part)
 
 
 @dataclass(frozen=True)
 class CanonEntry:
-    """One row of the ``specs/`` canon: a path SHAPE, its root member, and whether a
-    fresh tree must carry it at birth.
-
-    :attr:`shape` is the law's notation (``releases/<M.m.p>/SPEC.md``). A shape with no
-    variable token IS a concrete ``specs/``-relative destination (:attr:`dest`); a shape
-    with one is matched, never scaffolded at birth. Rendering — which template produces
-    the content — is the SCAFFOLDER's concern and lives in ``features.specs.canon``,
-    keyed by :attr:`shape`: ``core`` holds the names, never the file contents.
-    """
+    """One ``specs/`` canon row: a path shape in the law's notation, its root member, and
+    whether a fresh tree must carry it at birth."""
 
     shape: str
     area: SpecsArea
@@ -467,13 +322,10 @@ class CanonEntry:
 
     @cached_property
     def pattern(self) -> re.Pattern[str]:
-        """The anchored matcher derived from :attr:`shape` — never hand-written."""
         return re.compile(f"^{_shape_regex(self.shape)}$")
 
 
-#: THE CANON TABLE — one row per canon-conformant path shape, in rendered-table order
-#: (root, memory, releases, backlog, bugs, audits, ADRs; required-at-birth first within
-#: an area).
+#: The canon table, in rendered order (required-at-birth first within an area).
 SPECS_CANON: tuple[CanonEntry, ...] = (
     CanonEntry("AGENTS.md", "AGENTS.md", True),
     CanonEntry("constitution.md", "constitution.md", True),
@@ -503,15 +355,10 @@ SPECS_CANON: tuple[CanonEntry, ...] = (
     CanonEntry("ADRs/decisions.jsonl", "ADRs", True),
 )
 
-#: The v6 canon ROOT member names — every entry permitted directly under ``specs/``.
-#: Derived from :data:`SPECS_CANON` itself (zero special-casing: :data:`SpecsArea`
-#: already carries one value per root member, including the two bare root files).
+#: Every entry permitted directly under ``specs/``.
 CANON_ROOT_MEMBERS: frozenset[str] = frozenset(entry.area for entry in SPECS_CANON)
 
-#: TREE-4's required directories, derived (not hand-kept): every area that pre-creates
-#: its own ``_archive/<area>_histo.jsonl`` at birth also needs its directory to exist —
-#: exactly {audits, backlog, bugs, releases} today, self-updating if a future area gains
-#: a birth-time histo entry.
+#: TREE-4's required directories: every area whose ``_archive/`` histo is born with the tree.
 REQUIRED_ROOT_DIRS: tuple[str, ...] = tuple(
     sorted(
         {
@@ -524,16 +371,12 @@ REQUIRED_ROOT_DIRS: tuple[str, ...] = tuple(
     )
 )
 
-#: The areas whose scaffolded ``AGENTS.md`` a projection freezes (the doctor's TREE-5
-#: scoped-law coverage), derived from the rows that declare one.
+#: The areas carrying a scaffolded ``AGENTS.md`` (TREE-5 scoped-law coverage).
 SCOPED_LAW_AREAS: tuple[str, ...] = tuple(
     entry.dest.removesuffix("/AGENTS.md")
     for entry in SPECS_CANON
     if entry.dest and entry.dest.endswith("/AGENTS.md")
 )
-
-
-# Derived views — the rendered law tables (the root map, repo-AGENTS.md, specs-AGENTS.md).
 
 
 def root_entries_display() -> str:
@@ -551,14 +394,8 @@ def repo_excluded_display() -> str:
 
 
 def specs_canon_table_rows() -> tuple[tuple[str, str], ...]:
-    """``(parent, members)`` per rendered §6.2 row: one row per directory that holds two
-    or more canon members (``""`` = the ``specs/`` root), members in table order.
-
-    A directory holding exactly one member is path-compressed into its parent's cell
-    instead of earning a row of its own — nothing is
-    elided and nothing is spelled twice: the rows ARE :data:`SPECS_CANON` read one path
-    segment at a time.
-    """
+    """``(parent, members)`` per directory holding two or more canon members (``""`` = the
+    root); a single-member directory is path-compressed into its parent's cell."""
     children: dict[str, list[str]] = {}
     for entry in SPECS_CANON:
         segments = entry.shape.split("/")
@@ -568,7 +405,6 @@ def specs_canon_table_rows() -> tuple[tuple[str, str], ...]:
                 bucket.append(segment)
 
     def compress(node: str) -> tuple[str, str | None]:
-        """The cell text for the member at *node*, and the row it opens (or ``None``)."""
         parts = [node.rsplit("/", 1)[-1]]
         while len(children.get(node, ())) == 1:
             node = f"{node}/{children[node][0]}"
@@ -618,10 +454,7 @@ def _specs_canon_table() -> str:
     return "\n".join(rows)
 
 
-#: Law-fragment placeholder -> the registry view that fills it. The projected law's
-#: canonical-name tables ARE ``core.workspace_layout`` (0.4.6 FR14/D14 for the zone and
-#: states tables; 0.4.7 FR5b for the root map, repo-AGENTS.md and specs-AGENTS.md) — never a hand-kept copy
-#: that the next fix edits in one home and forgets in the other.
+#: Law-fragment placeholder -> the registry view that fills it.
 _PLACEHOLDERS: dict[str, Callable[[], str]] = {
     "<!-- zones -->": _zone_table,
     "<!-- canon -->": _states_canon_table,
