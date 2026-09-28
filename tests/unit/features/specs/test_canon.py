@@ -72,14 +72,8 @@ def test_every_known_non_canon_path_is_rejected() -> None:
     assert accepted == [], f"non-canon paths wrongly accepted: {accepted}"
 
 
-def test_canon_violations_is_order_preserving_and_filters_only_bad_paths() -> None:
+def test_canon_violations_keeps_only_the_bad_paths_in_order() -> None:
     mixed = ["AGENTS.md", ".gitkeep", "backlog/BACKLOG.json", "SPEC.md"]
     assert canon_violations(mixed) == [".gitkeep", "SPEC.md"]
-
-
-def test_canon_violations_over_a_fully_conformant_set_is_empty() -> None:
     assert canon_violations(_CANON_PATHS) == []
-
-
-def test_canon_violations_over_a_fully_nonconformant_set_is_everything() -> None:
     assert canon_violations(_NON_CANON_PATHS) == list(_NON_CANON_PATHS)
