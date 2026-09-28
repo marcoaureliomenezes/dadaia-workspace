@@ -48,21 +48,6 @@ def git() -> GitSubprocessClient:
     return GitSubprocessClient()
 
 
-@pytest.fixture()
-def service(
-    store: JsonContextStore,
-    git: GitSubprocessClient,
-    workspace_root: Path,
-) -> SpecContextService:
-    return SpecContextService(
-        context_store=store,
-        git_client=git,
-        workspace_root=workspace_root,
-        install_hooks=lambda _repo: None,
-        secret_scan=scan_publish_candidates,
-    )
-
-
 def test_alive_leaves_a_preexisting_specs_tree_untouched_and_hooks_the_repo(
     store: JsonContextStore,
     git: GitSubprocessClient,
