@@ -10,7 +10,6 @@ import hashlib
 import json
 import os
 from collections.abc import Iterable
-from enum import StrEnum
 from pathlib import Path
 
 from dadaia_workspace.infrastructure.privacy_check import (
@@ -20,33 +19,6 @@ from dadaia_workspace.infrastructure.privacy_check import (
 from dadaia_workspace.infrastructure.provider_version import provider_version
 
 _SCHEMA_VERSION = "1"
-
-
-class OverwritePolicy(StrEnum):
-    """Whether a projected file that already exists on disk is replaced (FR6, T-30-10).
-
-    Replaces the ``force: bool`` flag that used to travel through every private
-    install-pipeline signature in ``public_assets.py``. ``FORCE`` is the historical
-    ``force=True`` (clobber regardless of hash match); ``PRESERVE`` is the historical
-    ``force=False`` default (hash-compare skip on a match, overwrite only on drift —
-    the T-PROP-01 contract lives in the ``install_helpers``/``copy_file`` layer, which
-    this enum does not change). ``install()``'s public ``force: bool`` parameter stays
-    the port-conforming boundary; :meth:`of` is the ONE translation point.
-    """
-
-    FORCE = "force"
-    PRESERVE = "preserve"
-
-    @classmethod
-    def of(cls, force: bool) -> OverwritePolicy:
-        """Translate the port-conforming ``force: bool`` into a plan-carried policy."""
-        return cls.FORCE if force else cls.PRESERVE
-
-    @property
-    def force(self) -> bool:
-        """The raw ``bool`` the (out-of-scope) ``install_helpers``/``copy_file`` layer
-        still expects — the ONE point where the policy is converted back."""
-        return self is OverwritePolicy.FORCE
 
 
 # Shared layout constants for the install/stage pipeline.

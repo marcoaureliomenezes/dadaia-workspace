@@ -19,7 +19,7 @@ from dadaia_workspace.core.harness_registry import HARNESS_RECORDS, L1_ENTRY_HAR
 from dadaia_workspace.infrastructure.agent_transcodes import AGENT_RULE_BUILDERS
 from dadaia_workspace.infrastructure.install_plan import InstallPlan
 from dadaia_workspace.infrastructure.projection import ProjectionRule
-from dadaia_workspace.infrastructure.public_assets_common import OverwritePolicy, iter_public_files
+from dadaia_workspace.infrastructure.public_assets_common import iter_public_files
 
 _PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
 
@@ -36,7 +36,7 @@ def _agent_rules(workspace_root: Path, harness: str) -> tuple[ProjectionRule, ..
         workspace_root=workspace_root,
         agentic_dir=_PUBLIC,
         harness=harness,
-        overwrite=OverwritePolicy.PRESERVE,
+        force=False,
         harness_targets=(harness,),
         active_harnesses=frozenset({harness}),
         overlay=None,

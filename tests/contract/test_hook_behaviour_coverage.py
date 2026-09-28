@@ -31,7 +31,6 @@ from dadaia_workspace.infrastructure.projection_rules import (
     HOOK_RULE_BUILDERS,
     harnesses_with_a_hook_derivation,
 )
-from dadaia_workspace.infrastructure.public_assets_common import OverwritePolicy
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PUBLIC = _REPO_ROOT / "dadaia_workspace" / "public"
@@ -53,7 +52,7 @@ def _plan(workspace_root: Path) -> InstallPlan:
         workspace_root=workspace_root,
         agentic_dir=_PUBLIC,
         harness=None,
-        overwrite=OverwritePolicy.PRESERVE,
+        force=False,
         harness_targets=("agents", *HARNESS_RECORDS),
         active_harnesses=frozenset(HARNESS_RECORDS),
         overlay=None,

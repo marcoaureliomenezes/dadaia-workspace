@@ -54,7 +54,6 @@ from dadaia_workspace.infrastructure.projection_rules import (
 )
 from dadaia_workspace.infrastructure.public_assets_common import (
     _COPY_DIRS,
-    OverwritePolicy,
     _entry_digest,
     _json_dump,
     is_ignored_public_asset,
@@ -65,7 +64,6 @@ from dadaia_workspace.infrastructure.workspace_guardrail import _is_source_repo_
 __all__ = [
     "FileSystemPublicAssetManager",
     "InstallPlan",
-    "OverwritePolicy",
 ]
 
 
@@ -258,11 +256,9 @@ class FileSystemPublicAssetManager:
         if not (agentic_dir / "manifest.json").exists():
             installed.extend(self.stage(workspace_root))
 
-        plan = self._resolve_install_plan(
-            workspace_root, agentic_dir, harness, OverwritePolicy.of(force)
-        )
+        plan = self._resolve_install_plan(workspace_root, agentic_dir, harness, force)
         rules = projection_rules(plan)
-        transcript = install_rules(rules, force=plan.overwrite.force)
+        transcript = install_rules(rules, force=plan.force)
         installed.extend(transcript.render())
 
         # LEDGER RECONCILIATION (bug retired-lib-asset-leaves-orphan-projection): the
@@ -302,7 +298,7 @@ class FileSystemPublicAssetManager:
         workspace_root: Path,
         agentic_dir: Path,
         harness: str | None,
-        overwrite: OverwritePolicy,
+        force: bool,
     ) -> InstallPlan:
         """Resolve ``install()``'s arguments ONCE (FR6): the single translation point.
 
@@ -332,7 +328,7 @@ class FileSystemPublicAssetManager:
             workspace_root=workspace_root,
             agentic_dir=agentic_dir,
             harness=harness,
-            overwrite=overwrite,
+            force=force,
             harness_targets=harness_targets,
             active_harnesses=active_harnesses,
             overlay=overlay,
@@ -500,7 +496,7 @@ class FileSystemPublicAssetManager:
             workspace_root=workspace_root,
             agentic_dir=agentic_dir,
             harness=None,
-            overwrite=OverwritePolicy.PRESERVE,
+            force=False,
             harness_targets=("agents", *(h for h in L1_ENTRY_HARNESSES if h in active)),
             active_harnesses=frozenset(active),
             overlay=overlay,

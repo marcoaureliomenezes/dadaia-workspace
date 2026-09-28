@@ -542,13 +542,12 @@ def test_the_projection_rule_carries_the_exec_bit_for_an_executable_source(
     authored `public/skills/` tree through the public rule-table seam."""
     from dadaia_workspace.infrastructure.install_plan import InstallPlan
     from dadaia_workspace.infrastructure.projection_rules import projection_rules
-    from dadaia_workspace.infrastructure.public_assets_common import OverwritePolicy
 
     plan = InstallPlan(
         workspace_root=tmp_path,
         agentic_dir=_PUBLIC,
         harness=None,
-        overwrite=OverwritePolicy.PRESERVE,
+        force=False,
         harness_targets=("agents",),
         active_harnesses=frozenset({"agents"}),
         overlay=None,
