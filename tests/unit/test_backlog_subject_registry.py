@@ -17,9 +17,7 @@ import json
 from pathlib import Path
 
 import pytest
-import typer
 
-from dadaia_workspace.cli.anchors import derive_cli_anchors
 from dadaia_workspace.core.models.backlog import SubjectKind
 from dadaia_workspace.features.backlog.subject_registry import (
     BindStatus,
@@ -76,28 +74,6 @@ Mentions SPEC-DOC-099 in prose.
 """
 
 
-def _fixture_app() -> typer.Typer:
-    """A tiny Typer app tree mirroring ``dadaia <group> <verb>`` shape."""
-    app = typer.Typer()
-    backlog = typer.Typer()
-
-    @backlog.command("doctor")
-    def _doctor() -> None:  # pragma: no cover - registration only
-        pass
-
-    @backlog.command("subjects")
-    def _subjects() -> None:  # pragma: no cover - registration only
-        pass
-
-    app.add_typer(backlog, name="backlog")
-
-    @app.command("version")
-    def _version() -> None:  # pragma: no cover - registration only
-        pass
-
-    return app
-
-
 @pytest.fixture()
 def fixture_tree(tmp_path: Path) -> dict[str, Path]:
     """Build the fixed fixture tree once; every registry test consumes it."""
@@ -129,7 +105,7 @@ def _build(tree: dict[str, Path]) -> object:
         catalog_path=tree["catalog_path"],
         alias_map_path=tree["alias_map_path"],
         specs_dir=tree["specs_dir"],
-        cli_anchors=derive_cli_anchors(_fixture_app()),
+        cli_anchors=frozenset({"backlog doctor", "backlog subjects", "version"}),
     )
 
 
@@ -251,7 +227,7 @@ def test_alias_collapses_synonym_and_absent_alias_map_tolerated(
         catalog_path=catalog_path,
         alias_map_path=absent_root / "missing-aliases.txt",
         specs_dir=absent_root / "missing-specs",
-        cli_anchors=derive_cli_anchors(_fixture_app()),
+        cli_anchors=frozenset({"backlog doctor", "backlog subjects", "version"}),
     )
     assert (
         absent_reg.bind("pkg/sample.py#make_widget", SubjectKind.CODE).status is BindStatus.RESOLVED
@@ -302,7 +278,7 @@ def test_live_derivation_reflects_source_changes(tmp_path: Path) -> None:
             catalog_path=catalog_path,
             alias_map_path=alias_map_path,
             specs_dir=specs_dir,
-            cli_anchors=derive_cli_anchors(_fixture_app()),
+            cli_anchors=frozenset({"backlog doctor", "backlog subjects", "version"}),
         )
 
     # Step 1 — symbol present.

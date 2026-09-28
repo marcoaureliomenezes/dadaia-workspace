@@ -142,7 +142,7 @@ def _ledgers_section(
     `check`, run as a subprocess here. The doctor holds no second implementation of any
     ledger schema — this is the one delegation point.
     """
-    from dadaia_workspace.cli.anchors import derive_cli_anchors
+    from dadaia_workspace.cli.help_digest import command_paths
     from dadaia_workspace.core.models.histo import HistoRecord
     from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
     from dadaia_workspace.infrastructure.ledger_scripts import script_findings
@@ -156,7 +156,7 @@ def _ledgers_section(
         source_root=src,
         catalog_path=catalog_path,
         alias_map_path=alias_map_path,
-        cli_anchors=derive_cli_anchors(),
+        cli_anchors=frozenset(" ".join(p) for p in command_paths() if p),
         histo_store=JsonlRecordStore(
             specs_dir / "backlog" / "_archive" / "backlog_histo.jsonl",
             to_dict=HistoRecord.to_dict,

@@ -167,7 +167,7 @@ def _derive_code_anchors(source_root: Path) -> set[str]:
 # ── cli anchors ──────────────────────────────────────────────────────────────────
 #
 # The ``cli``-kind anchor set (``<group> <verb>`` command ids) is derived at each
-# composition boundary by :func:`dadaia_workspace.cli.anchors.derive_cli_anchors` and threaded
+# composition boundary by :func:`dadaia_workspace.cli.help_digest.command_paths` and threaded
 # in as ``cli_anchors`` — the Typer-tree walk lives in ``cli/`` so this feature never imports
 # ``cli.main`` (FR1b: the ``subject_registry -> cli.main`` red chain is removed).
 
@@ -380,7 +380,7 @@ def build_registry(
 
     All roots are **injected** — never ``os.getcwd()`` (SPEC §3.8 #6). ``cli_anchors`` is the
     pre-derived ``cli``-kind anchor set (``<group> <verb>`` command ids), threaded in from the
-    composition boundary via :func:`dadaia_workspace.cli.anchors.derive_cli_anchors`; this
+    composition boundary via :func:`dadaia_workspace.cli.help_digest.command_paths`; this
     feature never imports ``cli.main`` (FR1b). Every call recomputes the auto-derived anchor
     kinds (code/catalog/doc/invariant), so a symbol added/removed in source changes resolution
     with no stored file (acceptance §3.7.5).

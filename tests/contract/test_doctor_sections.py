@@ -21,7 +21,7 @@ from typing import Any
 import pytest
 from typer.testing import CliRunner
 
-from dadaia_workspace.cli.anchors import derive_cli_anchors
+from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.cli.main import app
 
 pytestmark = pytest.mark.contract
@@ -104,7 +104,7 @@ def test_pre_wave0_release_document_makes_the_specs_section_non_compliant(
 def test_specs_doctor_and_backlog_doctor_commands_are_gone() -> None:
     """(c) the two replaced commands are DELETED, not aliased — no hidden survivor in
     the Typer tree, and therefore none in the backlog subject registry's CLI anchors."""
-    anchors = derive_cli_anchors()
+    anchors = {" ".join(p) for p in command_paths()}
     assert "specs doctor" not in anchors
     assert "backlog doctor" not in anchors
     assert "doctor" in anchors
