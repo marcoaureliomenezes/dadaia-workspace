@@ -27,7 +27,7 @@
     },
     "phase": {
       "type": "string",
-      "description": "The release's current lifecycle phase. The three canonical phases are enumerated here AND in core/release_state.py (PHASES) — the two are pinned equal by tests/contract/test_release_state_schema.py, so neither can drift. Overwritten in place on every phase transition — no history of prior phases survives in this field; a transition worth remembering is recorded as a `log` entry.",
+      "description": "The release's current lifecycle phase. The three canonical phases enumerated here equal the dd-release-implementation _release_schema.py PHASES. Overwritten in place on every phase transition — no history of prior phases survives in this field; a transition worth remembering is recorded as a `log` entry.",
       "enum": [
         "DEFINITION",
         "IMPLEMENTATION",
